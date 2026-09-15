@@ -1,5 +1,194 @@
 # Progress log — 2026-08-25 → 09-14  (newest first)
 
+## Session 25 (2026-09-14) — a page that broke its own sound to check itself; the granulator learns to move; Kurenniemi restarted
+
+**Sixteen commits**, 20:24 to 23:39, and the last of them is what went out —
+`303b734-203944-6ff5`, not the `bf07099` this line said for the eleven hours it
+sat uncommitted. ⚠️ BOTH NUMBERS WERE WRITTEN MID-SESSION AND NEITHER WAS
+RE-MEASURED, which is the thing CLAUDE.md already refuses about its own demo
+count: a number nobody re-checks reads as a fact. The shape: one report chased
+with an instrument instead of a guess, which found three unrelated defects in
+the same sentence; then the answer to "why do all the patches sound the same",
+which was a diagnosis and not a preference.
+
+### "still start broken blurb and hole in 1-2 sec later" — three causes, none guessed
+
+Reported twice with a screenshot. The instrument that ended it: a CDP probe that
+wraps `createBufferSource` and records every `start()` — then asks the timeline
+itself whether any instant has TWO sources covering it (an overlap) or NONE (a
+hole). Sources are told apart from the page's other audio by their **sample
+rate**: a stream block carries the mount's 44 100 into a 48 000 Hz context, so
+no stack parsing is needed.
+
+**Before:** 63 overlaps in the first 5.4 s, then a 65–76 ms hole every ~1.2 s;
+**27.95 s of audio crammed into a 21 s span**. **After, over 75 s:** 0 overlaps,
+0 holes, 0 underruns, cushion steady at its 600 ms floor, rate 1.000.
+
+1. 🔴 **The start-up trim REWOUND `nextAt` into audio already scheduled and
+   already sounding**, so the Icecast burst played on top of itself. Its own
+   comment said *"the oldest audio is dropped and the clock moves up"* — nothing
+   was dropped and the clock moved DOWN. A comment describing the intention of
+   code that does the opposite is worse than no comment: it makes the reader
+   stop looking.
+2. 🔴 **The page tore its own stream down three times on every visit, to check
+   itself.** A station A/B and a transport stop; on the decoded path the 1 Hz
+   mirror closes the stream when the deck stops, so a pause is a teardown and a
+   rebuild. **Moving them earlier was the previous session's fix and it was the
+   wrong axis** — it stopped the granulator RECORDING the gaps and left them
+   exactly where the listener hears them. A self-check that breaks the product
+   cannot be scheduled into being harmless. `verify.mjs` now appends
+   `selfcheck=1` to every demo URL and the destructive halves run only for a
+   harness.
+3. 🔴 **The 6 ms crossfade was SPENDING 6 ms of station per block.** Four blocks
+   a second is playback running **2.4 % fast, for ever**: the cushion bled
+   600 ms → 90 ms over twenty seconds, underran, recovered to 80 ms, bled again.
+   The 2 % catch-up correction could never win because the leak was bigger than
+   the cap. Each block now opens with a COPY of the previous block's last 6 ms,
+   so the overlap contains the same audio twice and the clock advances by the
+   new samples alone.
+
+A fourth, found the same way: **`muted = true` was not enough and could never
+be.** The granulator's own probe runs the fader to both ends, presses the sound
+stepper twice and pauses the engine. Muting stops it being HEARD and does
+nothing about it being SEEN — reported as *"when pressed 0.5 it activated
+granulator and moved some sliders and showed grain viz"*, which was the probe
+arriving on its own schedule and looking like whatever was pressed last.
+
+### One connection per visit, not two
+
+`measure()` opened a SECOND socket on a volunteer's Icecast for five seconds on
+every visit, to read a bitrate the listening connection already had in front of
+it. `createMp3Stream` reports its own wire now (status, ICY headers, byte marks,
+arrival gaps, slots/filled). The element path keeps its fetch, because under
+`?decode=0` it genuinely is the only way to see a byte.
+
+⚠️ The first version of that read one connection's burst against ANOTHER's
+clock, across a self-check rebuild: **`10427 vs 128 kbps nominal`**, eighty
+times the truth. It failed loudly, which was luck; the same mistake a little
+smaller reads like a fast station.
+
+### The speeds came back, and were wrong in a way nobody could have seen
+
+Removed last session on the grounds that varispeed at a live edge cannot be
+SUSTAINED. True, and the wrong conclusion: *cannot be sustained* is a bounded
+effect with a known end, not a broken control. What actually made 0.25x unusable
+was the ceiling dropping ONE buffer at a time, stuttering the content forward —
+slow playback that sounds fast. It drains to the floor in one cut now and says
+so. 0.0625 / 0.125 / 0.25 / 0.5 / 1; no 2x, which genuinely starves.
+
+🔴 **`setRate` clamped at 0.1**, so the two slowest buttons would have played at
+nearly the same speed. A clamp the caller cannot see turns a rate button into
+one that plays at a different speed from the one written on it.
+
+And *"why rate change is so slooooooooow"* was three things: a 1 Hz poll of the
+bar (120 ms now), a glide of 1.10 **per block** — 1.46x/s, so 1x → 0.125x took
+five and a half seconds — and the cushion draining at the old rate. The glide is
+a ratio per SECOND now, which is also the right unit: per block, the character
+of the gesture depended on `blockMs`.
+
+### The transport bar owes the kit two controls
+
+*"rate controls should be radiobuttons everywhere. you keep breaking the rule"*
+— fair. The bar built its own loose buttons with its own `aria-pressed`
+bookkeeping and its own CSS block: the **fourth** hand-rolled copy of something
+that has been `choice.mjs` since it landed. This page's own speed picker WAS a
+`createChoice` before it moved into the bar, so moving it in is where it lost
+its component. 120/120 green across every demo that declares a lattice.
+
+*"transport timers are pointless here"* — they were. On an Icecast mount the
+left half of `19:33:46.098 / 3:00.000` is the wall clock and the right half is a
+duration a live stream does not have. `live: true` replaces it with a chip that
+reads **SLOWED** when the armed rate is not 1, because a chip saying LIVE while
+you are half a minute behind is the confident-wrong kind of readout.
+
+### The granulator moves now, and the mover is the station
+
+*"patches still too similar and not too interesting... more movement? extreme
+ranges? i am a bit lost here"*. The answer was in `plan-radio-patches §1.5` and
+it is a diagnosis: **upstream Pappus has eight LFOs, six shapes, 0.005–12 Hz, a
+Turing machine on its sample-and-hold and an envelope follower — and NONE of it
+is in the SynthDef.** It lives in the Lua half, pushing `/n_set` sixty times a
+second. We load the compiled graph and get the granulator with none of the
+motion. So every patch was a set of frozen numbers, and two sets of frozen
+numbers both making a static wash sound alike however far apart they are.
+Widening the ranges could not have helped.
+
+`demo/shell/pappus-mod.mjs` — the envelope follower first, because it is the
+smallest piece that answers the question. Three things make it safe and all
+three were CHECKED:
+
+- 🔴 **It will not zipper.** `Engine_Pappus.sc:485` sets `lagt = 0.02` and
+  `msize`, `mrate`, `mscan`, `mswarm`, `mstrum` and the window ends all go
+  through `Lag.kr(…, lagt)`. **The engine already smooths stepped control
+  changes over 20 ms** — stepping from a timer is what Pappus is built to
+  receive. That was the real risk and it evaporated on reading the source.
+- **20 ms of lag also sets the rate.** Above ~50 Hz the lag discards the extra
+  messages, so 25 Hz is an argument rather than a taste.
+- 🔴 **Every source is a function of the AUDIO clock, never an accumulator** —
+  `phase = (now*hz + offset) % 1`. A late tick costs RESOLUTION and never PHASE,
+  which is why a plain `setInterval` is adequate and why the plan's objection to
+  *"a per-frame wire this page cannot prove arrived"* does not apply: this
+  samples a continuous function.
+
+Both of upstream's invisible decisions are in: the amount is **CUBED**, and the
+offset is applied in the **control's own warped space**, so on `rate` and `size`
+a routing multiplies and divides — the same wobble stays musical at 2 ms and at
+4 s. A dead-band keeps traffic proportional to movement rather than to tick rate.
+
+MEASURED, and it is the assert: **`msize spanned 1.219 s over 10 reads while the
+follower ran, 0.000 s over 6 with it held`**. Both halves, because either alone
+passes on a broken page. Read through `/s_get`, from inside the graph. ⚠️ And
+the sampler counts its own readings — a spread of exactly 0.000 is what a held
+control reads AND what a sampler that got nothing back reads.
+
+It immediately caught a bad question: the patch read-back assert went red with
+`msize 2.44 not 1.8` — the modulator working, and the assert asking whether a
+moving control equals a constant.
+
+### Kurenniemi restarted
+
+`proto/kurenniemi/` → `proto/aikajana/`, and **20 files whose contents named the
+old path**: the build allowlist and its back-link key, the view worker and its
+verifier's assert labels, `timeline/lab/mobile-verify.mjs` (key AND path), a
+live `fetch` inside `strip-uncertainty.html`, three research documents. Not
+renamed: `kurenniemi-1972` in `demo/loops` and `timeline/score.mjs`, which is a
+deck id naming a TAPE.
+
+**<https://positron.studio/kurenniemi/>**, 12/12 — 22 rows through
+`createMessageList` from the kit, unmodified. What did not fit is recorded
+rather than worked around: the source domain has no column because both narrow
+gutters are five and eight characters and the shortest host is eleven.
+
+`research/kurenniemi-sources-2026-09.md`, verified by reading headers rather
+than claiming them. **Zenodo: 28 records, all CC-BY-4.0, already `ACAO: *`**,
+including a 238-row appearances CSV whose date convention ships in a README
+beside it — it dates six of our nine tapes now pinned to a flat 1963–1973 guess
+(`Kaukana väijyy ystäviä` → 28 July 1968). The **Finnish National Gallery DOES
+have a keyless bulk API** — 89 072 records, 30 Kurenniemi, both fonds with shelf
+metres — correcting the August report; no CORS. `lahteilla.fi` is DNS-dead.
+
+### Push, measured rather than assumed
+
+*"can not see push notif on ios"*. Two read-only probes, neither of which sent
+anything: `POST /subscribe` with a bogus token proved the worker's service
+account mints and reaches topic `positron-test` (FCM refused the fake address,
+which is the right answer); and `iid.googleapis.com/iid/info/<token>` proved the
+user's iPhone **is** a live `webpush`/`BROWSER` registration **and is on the
+topic**. So the subscribe path works end to end on a real installed iOS
+home-screen app. The remaining suspect is that iOS shows no banner while the
+installed app is in the FOREGROUND.
+
+🔴 **And a real bug found from a second report** — *"msg in composer in other
+machine"*: `demo/items/` **never polls the room**. Its only `pull()` outside its
+own publish flow fires when `nextDue` passes, i.e. only for an item the page
+already knows about. An item created anywhere else is invisible until reload.
+The comment above that interval states the design out loud — *"it watches its
+own schedule instead of polling on a timer"* — which is correct for one device
+and exactly wrong for a shared room. Not an iOS bug: it reproduces between any
+two devices, and the iOS framing would have sent the next reader hunting for a
+WebKit quirk that is not there.
+
+
 ## Session 23 (2026-09-14) — U:'s click track compiles, plays and has a page; the ERR archive becomes a floor; and two things carried as open were never true
 
 **Twenty commits.** The shape: a compiler that had never met its subject, a
