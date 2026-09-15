@@ -19,7 +19,7 @@ __pycache__/
 *.log
 .wrangler/
 proto/megatimeline/*-cache.jsonl
-proto/aikajana/.chrome-verify/
+proto/deck/.chrome-verify/
 proto/loops/.chrome-verify/
 
 # headless Chrome profiles (verify rigs) — never artifacts

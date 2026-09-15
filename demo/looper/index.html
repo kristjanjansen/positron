@@ -32,7 +32,6 @@
       { id: 'boot', label: 'Start audio', primary: true },
       { id: 'pedal', label: 'Rec / commit' },
       { id: 'demo', label: 'Record a loop for me' },
-      { id: 'check', label: 'Check' },
     ],
   });
   guard(d);
@@ -196,7 +195,17 @@
         setTimeout(() => { lastStamp = performance.now(); kb.release(seq[i], 'key'); }, 80);
       }, i * 100);
     }
-    setTimeout(() => { if (looper.recording()) pedal(); }, 400);
+    // ⚠️ THE NOTES ARE ON TIMERS, so this handler is not finished when it
+    // returns — it is finished when the last of them has been played and the
+    // pedal has closed the loop. Running the checks a line after scheduling
+    // them graded a looper that had recorded nothing, four asserts deep, which
+    // is worse than no check at all. Wait for the work this control started.
+    await new Promise((resolve) => {
+      setTimeout(() => { if (looper.recording()) pedal(); resolve(); }, 560);
+    });
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true — and a button for them would make them optional.
+    await d.run('check');
   });
 
   d.on('check', () => {

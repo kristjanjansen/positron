@@ -23,6 +23,12 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
   '.wasm': 'application/wasm',
+  // ⚠️ A FONT IS SERVED BY THIS TOO, and the deploy's static assets set the type
+  // from the extension by themselves — so a missing entry here shows up ONLY on
+  // the dev server and only as a browser being fussy, which is the shape of bug
+  // that gets blamed on the page. (`.glb` is absent on purpose: the controller
+  // models have always been served as octet-stream and browsers do not check.)
+  '.woff2': 'font/woff2',
 };
 
 /**

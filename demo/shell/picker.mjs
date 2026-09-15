@@ -45,6 +45,7 @@
 // stops being something the platform gets a vote on.
 
 import { el } from './shell.mjs';
+import { centreSymbol } from './symbol.mjs';
 
 /** Die face six: two columns of three pips. `currentColor`, so it wears the
  *  button's own colour including :disabled and :hover, with no extra rules. */
@@ -89,6 +90,12 @@ export function createPicker({ label, what = 'it', prev, next, random, onPick, c
 
   const back = mk('‹', `the ${what} before this one`, prev, 'ico');
   const fwd = mk('›', `the ${what} after this one`, next, 'ico');
+  // ⚠️ THE SAME CENTRING THE SHELL'S GLYPH CONTROLS GET. `‹` and `›` sit above
+  // the baseline and narrower than their own advance, so a grid that centres
+  // the BOX leaves them high and off to one side — the same defect as ⛶, in a
+  // control nobody had looked at closely. The die beside them is an `<svg>` and
+  // needs no measuring, which is why `symbol.mjs` takes either kind.
+  for (const b of [back, fwd]) centreSymbol(b);
 
   // The middle slot: our paint, the platform's list.
   const cell = el('span', 'pos-pick-cell');

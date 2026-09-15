@@ -25,7 +25,22 @@
              gap: 10px; align-items: center; }
   .kit-src { font: 400 11px/1.6 var(--mono); color: var(--dim2); white-space: pre-wrap;
              margin: 0 0 6px; padding-left: 2px; }
-  .kit-out { font: 500 12px/1.6 var(--mono); color: var(--hi); min-height: 1.6em; }
+  /* ⚠️ GREY, NOT `--hi`. This is what the control beside it last reported, and
+     it was yellow — the colour this project uses for the one thing on a page
+     that matters. Beside eight sample controls that all report, yellow is
+     eight highlights, which is none: the sandbox lit up like a page where
+     everything is urgent. It is a value, and values are `--dim`.
+     ⚠️ AND `align-self: center`, because `align-items: center` on the box
+     centres each FLEX LINE's items and the button rows beside these carry
+     their own height — so the readout sat low against the row it describes. */
+  /* ⚠️ ITS OWN LINE, ALWAYS. Beside a control it reads as part of the control —
+     `LOOK ‹ random › KALEIDOSCOPE` looks like a picker with a fourth segment,
+     which is exactly what it is not: it is what the picker REPORTED. A readout
+     sharing a row with the thing it reports on has to be told apart by colour
+     alone, and colour is already carrying whether a control is armed.
+     `flex: 1 1 100%` in a wrapping row is the whole mechanism. */
+  .kit-out { font: 500 12px/1.6 var(--mono); color: var(--dim); min-height: 1.6em;
+             flex: 1 1 100%; }
   /* A block holding a diagram is not a row of controls: the picture wants the
      whole width and the report under it wants the line below, so these two
      turn the flex row off rather than fighting it with `flex: 1 1 100%` on
@@ -42,6 +57,11 @@
 </style>
 
 <div class="pos-head">
+  <!-- ⚠️ THE SAME BACK LINK EVERY SHELLED PAGE GETS, written by hand because
+       this page does not mount the shell — which is also why it had none at
+       all: a page that opts out of `mount()` opts out of the furniture, and
+       the furniture included the only way back. -->
+  <a class="pos-back" href="/">← demos</a>
   <div class="pos-title"><h1 class="pos-name">kit</h1></div>
 </div>
 
@@ -59,6 +79,8 @@
   import { createSlider, createSliderGroup, GLIDE_MS } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createTabs } from '/shell/tabs.mjs';
+  import { createCard, createCardGrid } from '/shell/card.mjs';
+  import { DEMOS } from '/manifest.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createField } from '/shell/field.mjs';
@@ -228,6 +250,93 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
         t.panel(id).append(el('div', 'kit-n', text));
       }
       box.append(t.el, o);
+    });
+
+  // ── cards ───────────────────────────────────────────────────────────────
+  //
+  // ⚠️ THE ROWS ARE THE REAL ONES. `DEMOS` is the same array the front page
+  // renders from, so a card here cannot drift into describing pages that do not
+  // exist or tags nobody uses — which is the whole reason this page exists.
+  //
+  // 🔴 AND THE DESCRIPTIONS ARE TRIMMED, WHICH IS A FINDING RATHER THAN A
+  // CONVENIENCE. The index's `one` lines are written for a row the full width
+  // of the page; a card is a third of that, so the same sentence runs to five
+  // lines and the grid stretches every card in the row to match it. Cutting at
+  // the first dash or comma gives the clause that names the thing and drops the
+  // clause that qualifies it — which is what a card wants and, arguably, what
+  // a row wants too.
+  const firstClause = (t) => {
+    const cut = t.split(/\s+[—–-]\s+|,\s+/)[0];
+    return cut.length > 12 ? cut : t;
+  };
+  const pick = ['held', 'tapes', 'kurenniemi', 'rack', 'floor', 'radio1965', 'wire', 'strip'];
+  const rows = pick.map((n) => DEMOS.find((x) => x.name === n)).filter(Boolean);
+  const cardsFor = (extra = {}) => rows.map((r) => createCard({
+    title: r.name,
+    desc: firstClause(r.one),
+    tags: (r.tags || []).slice(0, 3),
+    href: `/${r.name}/`,
+    ...extra,
+  }));
+
+  section('a link with room in it — shell/card.mjs',
+    'A grey box, a name, one line about what is behind it, and the tags along the bottom. It is the '
+    + 'only component here set in sans: everything else is monospace because the fixed width lines '
+    + 'values up with each other, and a card holds a name and a sentence, which line up with nothing. '
+    + 'The rows below are the real front-page entries, so this sandbox cannot drift away from the '
+    + 'index it looks like. Nothing truncates — a card that is taller than its neighbours is a '
+    + 'description that is too long, and hiding that behind an ellipsis would only move the problem.',
+    '',
+    (box) => {
+      box.classList.add('kit-wide');
+      const g = createCardGrid({ min: 170 });
+      g.addAll(cardsFor());
+      box.append(g.el);
+    });
+
+  section('...and the same cards in a phone\u2019s width',
+    'Two columns at 375 px and up, which is every phone anyone owns, and one below that. The floor is '
+    + '`min(100%, 170px)` rather than a bare `170px`: a bare floor wider than the screen does not fall '
+    + 'back to one column, it makes a column wider than the page and the whole document scrolls '
+    + 'sideways. That is the defect the tab row shipped and this page caught, and it is invisible '
+    + 'until something does not fit — which is exactly what a sandbox is for.',
+    '', (box) => {
+      box.classList.add('kit-wide');
+      for (const w of [375, 320]) {
+        box.append(el('div', 'kit-cut', `${w} px`));
+        const frame = el('div');
+        frame.style.width = `${w}px`; frame.style.maxWidth = '100%';
+        const g = createCardGrid({ min: 170 });
+        g.addAll(cardsFor().slice(0, 4));
+        frame.append(g.el);
+        box.append(frame);
+      }
+    });
+
+  section('a card that cannot be pressed, and a card with buttons',
+    'A page the browser in front of you cannot run still gets a card, with the reason in words where '
+    + 'the tags would be \u2014 a row that simply vanishes says the thing does not exist, which is a '
+    + 'different and false statement. The last one carries buttons, and that changes what it is: a '
+    + '`<button>` inside an `<a>` is invalid HTML and browsers resolve the press ambiguously, so a '
+    + 'card with buttons moves the link onto its title and stops being one big target with smaller '
+    + 'targets inside it.',
+    '', (box) => {
+      box.classList.add('kit-wide');
+      const o = out('nothing pressed');
+      const g = createCardGrid({ min: 190 });
+      g.addAll([
+        createCard({ title: 'mirror', desc: 'the same shader drawn twice',
+          why: 'this browser draws no 3-D' }),
+        createCard({ title: 'instrument', desc: 'a keyboard you can play',
+          why: 'no MIDI here, but the on-screen keys still sound' }),
+        createCard({ title: 'held', desc: 'big words standing in a room',
+          tags: ['WebGL2'], href: '/held/',
+          actions: [
+            { label: 'Copy link', onPress: () => { o.textContent = 'copy link — held'; } },
+            { label: 'Open', onPress: () => { o.textContent = 'open — held'; } },
+          ] }),
+      ]);
+      box.append(g.el, o);
     });
 
   // ── a choice that has not arrived yet ───────────────────────────────────

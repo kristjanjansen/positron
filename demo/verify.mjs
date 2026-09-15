@@ -572,6 +572,26 @@ for (const t of targets) {
   const typed = await typing();
   if (typed) console.log(`        (typed into ${typed} field${typed > 1 ? 's' : ''})`);
 
+  // 🔴 A PAGE WHOSE CONTROL IS STILL RUNNING HAS NOT FINISHED, AND THE HARNESS
+  // USED TO WALK OFF ANYWAY. The press loop sleeps a fixed 650 ms after each
+  // button and does not await the handler, so a control that takes longer —
+  // `seek`'s sweep is five jumps at 700 ms — was still working while the
+  // stabiliser below decided the page had nothing more to say. It did not show
+  // up before because every such page carried a "Run the checks" BUTTON, which
+  // gave the checks a slot of their own; taking those buttons off the pages
+  // (they are harness machinery showing through, `shout` argues it) took the
+  // slot with them and eleven pages quietly lost their asserts.
+  //
+  // `shell.mjs` already marks a running control `data-busy="1"` — it is what
+  // draws the sweep across the button — so the answer was on the page the whole
+  // time. ⚠️ CAPPED: a handler that never settles must cost one demo a wait,
+  // not the run.
+  const busyCount = () =>
+    ev(`document.querySelectorAll('.pos-controls button[data-busy="1"]').length`);
+  let waited = 0;
+  for (let i = 0; i < 100 && (await busyCount()) > 0; i++) { await sleep(400); waited += 400; }
+  if (waited) console.log(`        (waited ${(waited / 1000).toFixed(1)} s for a control to finish)`);
+
   // Some checks are async (`replay` fetches the manifest before asserting), so
   // a fixed sleep either flakes or wastes time. Wait for the assert count to
   // stop growing instead.

@@ -2114,3 +2114,45 @@ same session — a peak-counting instrument whose window was 46 ms looking for
 events 41.7 ms apart, which can never see a gap. Both are the same mistake:
 **an instrument whose resolution or calibration is derived from the subject
 cannot be used to measure the subject.**
+
+## #57 — an outage is a claim, and it needs the same evidence as any other
+
+Twice in one session I attributed my own regression to something outside this
+machine. A regex with `[^}]*` swallowed three CSS rules above the one it was
+meant to delete, a canvas went to zero height, a click found nothing, and I said
+ERR was down. It was serving 294 of 298 tiles at 60 fps at that moment. Then a
+second `mark()` added to the same object literal in `grain-scope.mjs` silently
+overwrote the existing one, radio1965's grain ticks stopped, and I said the
+station was down.
+
+**The pull is that an external cause explains the symptom without implicating the
+last edit, and it is available instantly at no cost.** Both times one command
+separated the two stories and both times I reached for the story first. The rule
+is not "suspect yourself" — it is that "the thing outside is broken" is a
+measurement, so make it, and CLAUDE.md already says the same thing about ERR's
+403s and about a second Chrome holding relay sockets.
+
+## #58 — an assert derived the way the code is derived cannot fail
+
+`roomToEye` had its rotation sign inverted and its assert passed, because the
+assert rebuilt the matrix from the same reasoning. What caught it was rendering
+through the real path and finding zero pixels at 70 degrees.
+
+This is `timeline/csound.mjs` in a new costume — 22/22 green for months with two
+real defects, because the test compared against a number derived from the same
+formula the compiler implements. There it was a format and the fix was a real
+Csound. Here it is geometry and the fix is a rendered pixel. **Write the assert
+from the CLAIM** (facing a word puts it straight ahead) **rather than from the
+derivation** (the matrix equals this product).
+
+## #59 — nothing that changes while you watch it may change its own size
+
+The LOOP button said LOOP, then END, then LOOP. Three characters against four,
+and every press shoved the rate picker and the clock sideways. Same defect as
+`grain-scope`'s caption reflowing between three and four lines sixty times a
+second, reported then as "a horrible jump of content each time it updates".
+
+The two looked unrelated — one a live sentence, one a button label — and they are
+one rule: **a control's footprint is part of the layout, and state must be
+carried by something with no width.** Here that is `data-loop`, which paints, and
+the aria label, which a screen reader reads and a layout never sees.

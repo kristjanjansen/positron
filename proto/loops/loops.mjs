@@ -48,7 +48,7 @@
 // library, and it is the piece: **the composition IS the decay of its own
 // provenance.**
 //
-// Source material: a SYNTHETIC tone row, not proto/aikajana's corpus. The
+// Source material: a SYNTHETIC tone row, not proto/deck's corpus. The
 // corpus is metadata-only — its 13 playable items are `media: {url}` references
 // to archive.org MP3s, streamed cross-origin — so a Kurenniemi disintegration
 // would measure the network, not the loop, and could not run headless. A tone

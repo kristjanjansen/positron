@@ -90,30 +90,21 @@ export const DEFAULT_CONTROLS = [
     value: 75,
     apply: (v, ctx) => ctx?.room?.setGrid?.({ alpha: v / 100 }),
   },
-  {
-    // 🔴 THE WAY OUT YOU CAN SEE. It ADDS to the two the page already owns —
-    // any controller button ends the session, and a dead-man's switch ends it
-    // if nothing has been drawn after 4 s — and it replaces neither. It cannot:
-    // this button only exists if the tablet drew, on a controller whose grip
-    // pose resolved, and an exit with two conditions in front of it is not an
-    // exit. What it buys is that the way out stops being folklore you have to
-    // be told.
-    kind: 'button',
-    key: 'leave',
-    label: 'Hold to leave',
-    // ⚠️ THE NUMBER LIVES HERE, BESIDE THE THING IT GOVERNS, and the fingerprint
-    // prints it from this field rather than repeating it.
-    hold: 800,
-    // ⚠️ `leaves` IS A FLAG, NOT AN ACTION. `xr-hands.mjs` is handed the session
-    // every frame and performs it there, so every page that builds its hands
-    // through that module gets this exit with no wiring of its own — which is
-    // the difference between a control that works on both pages and one that is
-    // live on the page whose author remembered it.
-    leaves: true,
-    // The page's chance to KNOW it happened, and nothing more. Optional: a page
-    // that supplies no `left` still leaves, it just says less about it.
-    apply: (_, ctx) => ctx?.left?.(),
-  },
+  // 🔴 THE `Hold to leave` BUTTON WAS HERE AND IS GONE — THE WAY OUT MOVED TO
+  // THE CONTROLLER. It was the best of the three exits this project had, and it
+  // still had two conditions in front of it: the tablet has to have drawn, on a
+  // controller whose GRIP POSE RESOLVED, on the hand the tablet happens to be
+  // on. Pick up one controller and it is not there at all. An exit with
+  // conditions in front of it is not an exit.
+  //
+  // `shell/xr-quit.mjs` replaces it with the one thing true of every headset:
+  // a labelled button under your thumb, a ring that fills while you hold it,
+  // and nothing at all if you let go. It needs no tablet, no slab and no
+  // renderer, so every XR page has the same way out whichever hands are
+  // holding whichever controllers.
+  //
+  // ⚠️ THE TABLET ITSELF STAYS, because the slider above is a real control that
+  // fades the floor. What left is the exit, not the surface.
 ];
 
 /** A control's kind. Absent means the kind that was here first. */

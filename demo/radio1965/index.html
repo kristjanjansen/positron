@@ -126,7 +126,13 @@
      hearing — and two lines stacked here would leave one of them empty and
      reserving space for nothing. `min-height` holds the line so the page does
      not jump the first time the station names a track. */
-  .now { font: 600 13px/1.5 var(--mono); color: var(--hi); min-height: 20px; }
+  /* ⚠️ NOT BOLD. This is the name of whatever the station is playing — a
+     filename half the time, `01_EMA_Improvisation_I` — and at 600 weight in the
+     highlight colour it read as the most important thing on a page whose
+     subject is the sound, not its label. It is a caption: it says what you are
+     hearing, it changes when the programme does, and it does not need to
+     shout. */
+  .now { font: 400 13px/1.5 var(--mono); color: var(--hi); min-height: 20px; }
   .now.down { color: var(--bad, #ff7a7a); }
 </style>
 
@@ -135,6 +141,7 @@
   import { icyDemuxer } from '/shell/icy.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createPicker } from '/shell/picker.mjs';
@@ -238,15 +245,19 @@
 
   const d = mount({
     name: 'radio1965',
-    what: 'A live community radio station in Tallinn, played through a relay of '
-      + 'ours because their stream is plain HTTP and a secure page may not load it '
-      + 'directly. The sound also goes into a granulator running in this tab, and '
-      + 'the long fader blends the two: all station at the left, all granulator at '
-      + 'the right. Every tick in the picture is a grain the engine reported '
-      + 'firing, SOUND picks what kind, and the sliders nudge it. It also moves '
-      + 'by itself: MOVING counts how many grain settings are being walked right '
-      + 'now, some by the station\u2019s own loudness and colour, some on slow '
-      + 'waves this page makes.',
+    // ⚠️ HALF THE LENGTH IT WAS, ON INSTRUCTION, AND NOTHING WAS LOST THAT A
+    // VISITOR NEEDED. What went was the mechanism: WHY the relay is there, WHAT
+    // the sliders do to a grain, WHICH of the modulations come from the station
+    // and which from this page. Every one of those is true, none of them is
+    // something somebody arriving here has a use for, and all of them are
+    // written down in comments and in plan-radio.md where a reader who wants
+    // them will look. What is left is the three things CLAUDE.md asks for:
+    // what this is, what to move, what the numbers mean.
+    what: 'A live radio station in Tallinn, reachable from a secure page only '
+      + 'through a relay of ours. The same sound feeds a granulator running in '
+      + 'this tab, and the long fader blends them: station at the left, '
+      + 'granulator at the right. Every tick is a grain, SOUND picks the kind, '
+      + 'and MOVING counts the settings walking on their own.',
     // ⚠️ FOUR CELLS, DOWN FROM SIX, AND THE TWO THAT WENT WERE THE TWO THAT
     // COULD NOT MOVE. `gap` is the worst pause over one five-second read: it is
     // measured once and then sits there for the rest of the visit, which is a
@@ -270,7 +281,30 @@
     // similar and not too interesting"* — from the row rather than from the
     // prose: `slowed` reads `—` because nothing modulates it and that is its
     // whole claim, and the other six read 3 or 4.
-    readout: { kbps: '', behind: 's', grains: '/s', moving: '' },
+    // 🔴 `kbps` IS GONE AND `peak` TOOK ITS PLACE — a replacement, not a
+    // removal, because `mount()` throws on an odd count and the rule behind it
+    // is editorial: an odd readout always has a weakest cell. `kbps` was that
+    // cell. It read 131 and went on reading 131, because the mount is a fixed
+    // 128 kbit/s MP3 and a bitrate is a property of the encoder rather than of
+    // anything happening — a structural constant wearing a measurement's
+    // clothes, which teaches a reader to stop looking at the row. It is still
+    // asserted and still in the log line; REHOMED, not deleted.
+    //
+    // ⚠️ AND `peak` WENT THE SAME WAY ONE ROUND LATER, WHICH SETTLES SOMETHING
+    // ABOUT THIS PAGE: A LEVEL IS NOT WANTED HERE IN ANY FORM. It was tried as
+    // an instant `loudness` (unreadable at frame rate) and then as a four-second
+    // held `peak` (readable, and still refused). The row has four slots and
+    // three of them are about what the INSTRUMENT is doing; a meter is about
+    // the signal, which is what the picture under it already is. Stop
+    // proposing it.
+    //
+    // `voices` is what took the slot: how many of the engine's eight voices
+    // this sound uses. It changes when you change sound, which is human pace,
+    // and it is the difference between `slowed` — one voice, a stretch — and
+    // `the sixteenth`, which is four playing a figure four steps apart. That
+    // distinction is the one this page keeps being asked about and nothing on
+    // it said the number out loud.
+    readout: { voices: '', behind: 's', grains: '/s', moving: '' },
     // 🔴 NO CONTROLS AT ALL, AND THE GRANULATOR IS ALWAYS ON. There was a
     // `Synthesize` button, and before that a `Listen` button beside a transport
     // bar that already has a play button. Both were the same mistake one step
@@ -537,6 +571,80 @@
   // the reserved block is not a special case that has to be kept in step.
   const granSlot = el('div', 'gran-slot');
   scope.el.after(granSlot);
+
+  // ── how this works, last on the page ──────────────────────────────────────
+  //
+  // 🔴 LAST, AND THAT IS THE DECISION. `/grains/` puts its picture FIRST, and
+  // that was right there: it is a page about a shape — the same program at two
+  // ends of a wire — so the shape is what it is showing you. This page is about
+  // a SOUND. The first thing wanted here is the sound, and a diagram between
+  // somebody and the play button is an explanation nobody asked for yet. So the
+  // picture waits at the bottom for the reader who got interested.
+  //
+  // ⚠️ THE HEADING IS NOT TYPED HERE. `how: true` writes the standing one from
+  // `diagram.mjs`, because every page that ends this way has to end it with the
+  // same three words — see HOW.
+  //
+  // ⚠️ AND EVERY BOX IS A THING THAT EXISTS, NOT A STAGE IN A STORY. `an MP3
+  // reader` is `mp3-frames.mjs`, `a granulator` is the compiled Pappus graph,
+  // `the movement` is `pappus-mod.mjs`. A picture drawn out of nouns the code
+  // does not have is a picture of a program somebody meant to write.
+  createDiagram(d.el, {
+    caption: 'The station only speaks plain http, so a secure page cannot fetch it at all. '
+      + 'Everything else here follows from getting round that one fact.',
+    nodes: [
+      { id: 'stn', label: 'Icecast', sub: 'port 8001', kind: 'device', tech: 'station',
+        note: 'The station\u2019s own server, in Tallinn, on **port 8001 over plain http**. '
+            + 'A page served over https may not fetch http at all, which is why '
+            + '**Cloudflare** is in this picture.' },
+      { id: 'cf', label: 'Cloudflare', sub: 'a CORS proxy', kind: 'cloud', tech: 'cloudflare',
+        note: 'Fetches the stream from **Icecast**, which the **browser** may not, and '
+            + 'hands it on over https. Two headers do the rest: one lets the page read the '
+            + 'bytes instead of only hearing them, one un-hides the station\u2019s name and '
+            + 'bitrate.' },
+      { id: 'page', label: 'browser', kind: 'here', tech: 'browser',
+        note: 'Everything below runs in the browser you are reading this in, and **nothing '
+            + 'goes back**: the station is not told you are here.',
+        children: [
+          { id: 'mp3', label: 'MP3 scanner', sub: 'custom-made',
+            note: 'Finds where each MP3 frame begins, reading **headers only and never the '
+                + 'audio**. What comes out goes two ways: eight seconds of sound for '
+                + '**scsynth** to chew, and a measurement the **control clock** rides.' },
+          { id: 'mod', label: 'control clock', sub: '25 Hz, OSC',
+            note: 'Rides the station\u2019s own loudness and colour and changes '
+                + '**scsynth** **twenty-five times a second**. Faster is wasted: **scsynth** '
+                + 'smooths every control over 20 ms.' },
+          { id: 'gran', label: 'scsynth', sub: 'SuperCollider', tech: 'sound',
+            note: 'SuperCollider\u2019s real sound server, compiled to run in a **browser**. '
+                + 'It is handed one instrument at boot and **never rebuilt while it plays**.' },
+        ] },
+      { id: 'out', label: 'speakers', sub: '', kind: 'device', tech: 'device',
+        note: 'The long fader decides how much is station and how much is grains. Both '
+            + 'arrive through **one audio graph**, so they stay sample-aligned rather than '
+            + 'drifting apart as two players would.' },
+    ],
+    links: [
+      { from: 'stn', to: 'cf', label: 'MP3 stream',
+        note: 'A continuous MP3 stream with no end. The track titles travel **inside it** '
+            + 'rather than as headers: every 16000 bytes the server slips in a block naming '
+            + 'what is playing.' },
+      { from: 'cf', to: 'mp3', label: 'MP3 over https',
+        note: 'The same bytes the station sent. What changed is where they came from, '
+            + 'which is the difference between a stream a page can only hear and one it can '
+            + 'measure.' },
+      // 🔴 NO ARROWS BETWEEN THE THREE THINGS IN THE PAGE, AND THAT IS A
+      // DRAWING DECISION RATHER THAN A MISSING FACT. They were there and the
+      // layout could not place them: three children are one column, so a link
+      // between two of them is routed out round the container and comes back
+      // hugging its edge — a line that reads as "something goes past here"
+      // instead of "this feeds that". The tie down their left says they are one
+      // chain, and what flows between them is in each box's own note, which is
+      // where a reader is already looking.
+      { from: 'gran', to: 'out', label: 'sound output',
+        note: 'The granulator\u2019s own output, crossfaded against the station by the long '
+            + 'fader above.' },
+    ],
+  }, { how: true, atEnd: true });
 
   // ⚠️ THE FIRST PLAY MUST HAPPEN INSIDE THE GESTURE. A browser refuses
   // `audio.play()` from a timer, so the 1 Hz mirror below can keep the element
@@ -1128,12 +1236,10 @@
     // reasoning is kept on the dead branch in `grain-scope.mjs` rather than
     // here; what this page draws is the plain wave it drew before.
     scope.feed(buf, ctx.sampleRate);
-    // ⚠️ THE LEVEL IS MEASURED AND NOT DISPLAYED. It was a `loudness` cell and
-    // it rewrote itself sixty times a second — a number nobody can read, which
-    // is the readout version of the caption that reflowed under `grain-scope`.
-    // `rmsPeak` still feeds the assert that catches a tainted graph; what the
-    // cell shows now is BEHIND, below, which changes when something happens
-    // rather than on a clock.
+    // ⚠️ THE LEVEL IS STILL MEASURED AND STILL NOT DISPLAYED. `rmsPeak` feeds
+    // the assert that catches a tainted graph and the deafness control; what it
+    // does not get is a cell, twice asked for and twice refused — see the
+    // readout above.
     requestAnimationFrame(meterTick);
   }
 
@@ -1408,7 +1514,10 @@
     // the stabiliser has already stopped collecting.
     const { wasPlaying, stopped } = T;
 
-    d.set('kbps', Math.round(m.steadyKbps ?? m.kbps));
+    // ⚠️ NO CELL FOR THIS ANY MORE — see the readout above. The number is still
+    // measured, still logged and still asserted; what it lost is a box that
+    // could never show anything else.
+
     // ⚠️ `gap` LOST ITS CELL AND KEPT ITS FACTS. It is measured once over one
     // five-second read and never moves again, so as a readout it was a constant
     // teaching the reader to ignore the row. It is still asserted below and it
@@ -1879,6 +1988,55 @@
       noise: 0, noisetype: 2, noisedecay: 0.8, noisetone: 800, noisedyn: 1.0,
       wow: 0.10, rverb: 0.15, rtime: 0.30 },
 
+    // 🔴 WHAT MAKES A PATCH HERE MUSICAL, NAMED — because it was reported rather
+    // than designed. Of the eight, the two picked out as musical were `the
+    // sixteenth` and `four seconds ago`, and they have nothing in common on any
+    // knob: one is a sixteen-step figure of 55 ms grains, the other is a delay
+    // of quarter-second grains with no rhythm at all. What they share is that
+    // **you can follow something through them** — a pulse you can count in one,
+    // the programme's own phrasing in the other. Every other patch is a
+    // CONTINUUM: a wash, a stretch, a cloud, a crush, none of which has an event
+    // you can point at. So the axis is not density, brightness or space. It is
+    // whether the thing has a legible time structure, and the engine offers
+    // exactly two ways to get one — a gate figure (`elen` above 1) or grains
+    // long enough in DELAY mode that the broadcast's own shape survives.
+    //
+    // ⚠️ THESE TWO ARE BUILT ON THAT AND HAVE NOT BEEN HEARD. Nothing here can
+    // grade musicality — CLAUDE.md's rule about implementing somebody else's
+    // format applies with a vengeance to a judgement that is not a number. What
+    // is claimed is only that they sit on the same axis as the two that were
+    // praised, and that every value is inside the engine's own ranges.
+    //
+    // `dub` takes BOTH levers at once, which no patch here has: delay mode for
+    // the material and a gate figure for the time. The broadcast comes back two
+    // seconds late, chopped on an eight-step figure, into a tap network at
+    // three-eighths of a second — so it answers itself in time rather than
+    // smearing.
+    { name: 'dub',
+      says: 'the broadcast two seconds late, chopped on a figure, answering itself',
+      // MOTION: loud passages push the blend further into the grains and the
+      //         drive breathes on a half-minute triangle, so the delay opens up
+      //         when the programme does
+      mod: [
+        { src: 'env', dest: 'sos', amt: 0.30 },
+        { src: 'lfo', shape: 'tri', hz: 0.035, dest: 'drive', amt: 0.30 },
+        { src: 'env.high', dest: 'spray', amt: 0.25 },
+      ],
+      scanmode: 3, scan: 0.25, rate: 7, size: 0.24, contour: 6,
+      sos: 0.72, lock: 0, tilt: 0.10, ingain: 1, comp: 0.22,
+      spray: 0.04, spraymode: 1, swarm: 0, swarmmode: 1, strum: 0,
+      elen: 8, ephase: 0.25,
+      pattern: [1, 0, 0, 0, 1, 0, 1, 0],
+      gates: [1, 1, 0, 0, 0, 0, 0, 0],
+      pitches: [0, 0, 0, 0, 0, 0, 0, 0],
+      probs: [1, 0.85, 1, 1, 1, 1, 1, 1],
+      swet: 0.55, scycle: 1.5, sfb: 0.48, stilt: 0.15, sxover: 800, sdiffuse: 0.55,
+      taptimes: [0.375, 0.75, 1.125, 1.5], tappans: [-0.8, 0.8, -0.45, 0.45],
+      tappitch: [0, 0, 0, 0],
+      drive: 0.22, crush: 0, crushmode: 1,
+      noise: 0, noisetype: 2, noisedecay: 0.8, noisetone: 900, noisedyn: 1.0,
+      wow: 0.12, rverb: 0.30, rtime: 0.55 },
+
     // 🔴 THE STATION, SLOWED, AND NOTHING ELSE DONE TO IT. Pappus is a
     // time-stretcher before it is a texture machine and this is the proof: one
     // voice at pitch 0, a dense enough grain rate to read as continuous, every
@@ -1997,6 +2155,36 @@
       noise: 0.10, noisetype: 3, noisedecay: 0.2, noisetone: 2200, noisedyn: 2.0,
       wow: 0.05, rverb: 0.25, rtime: 0.40 },
 
+    // ⚠️ THE SECOND METRE, because one figure is not a lever, it is a patch.
+    // `the sixteenth` divides evenly and reads as a pulse; this leans —
+    // three steps, three steps, then two — so the same engine produces
+    // something that limps rather than marches. Three voices a third of the
+    // cycle apart on a stack of fourths, which is a different colour from the
+    // sixteenth's octaves and fifths.
+    { name: 'three, three, two',
+      says: 'an eight-step figure that leans, in three voices a third apart',
+      // MOTION: which voices fire steps on its own two-a-second pattern, and
+      //         the grain length follows how bright the programme is — so a
+      //         speaking voice makes shorter hits than music does
+      mod: [
+        { src: 'lfo', shape: 'step', hz: 2, machine: 0.85, dest: 'probs', amt: 0.55 },
+        { src: 'env.tone', dest: 'size', amt: 0.35 },
+      ],
+      scanmode: 1, scan: 0.5, rate: 12, size: 0.085, contour: 2,
+      sos: 0.74, lock: 0, tilt: 0.12, ingain: 1, comp: 0.18,
+      spray: 0.08, spraymode: 2, swarm: 0.15, swarmmode: 1, strum: 0.03,
+      elen: 8, ephase: 0.333,
+      pattern: [1, 0, 0, 1, 0, 0, 1, 0],
+      gates: [1, 1, 1, 0, 0, 0, 0, 0],
+      pitches: [0, 5, 10, 0, 0, 0, 0, 0],
+      probs: [1, 0.92, 0.82, 1, 1, 1, 1, 1],
+      swet: 0.20, scycle: 0.66, sfb: 0.28, stilt: 0.10, sxover: 850, sdiffuse: 0.25,
+      taptimes: [0.375, 0.75, 1.125, 1.5], tappans: [-0.7, 0.7, -0.4, 0.4],
+      tappitch: [0, 0, 12, 12],
+      drive: 0.30, crush: 0.15, crushmode: 2,
+      noise: 0.06, noisetype: 3, noisedecay: 0.25, noisetone: 2000, noisedyn: 1.6,
+      wow: 0.04, rverb: 0.20, rtime: 0.35 },
+
     // 🔴 FOUR-SECOND GRAINS, WHICH IS THE OTHER END OF A SCALE EVERY OLD PATCH
     // SAT IN THE MIDDLE OF. Half a grain a second, each one four seconds long
     // and read backwards at life speed, an octave and a fifth below. The
@@ -2096,7 +2284,28 @@
 
   const ALL_ONES = new Array(16).fill(1);
   /** The sixteen steps this patch wants in the gate buffer. */
-  const patternOf = (p) => p.pattern ?? ALL_ONES;
+  /**
+   * The gate buffer is SIXTEEN SLOTS and this pads a shorter figure up to it.
+   *
+   * 🔴 IT IS NOT A CONVENIENCE — an eight-element `pattern` produced an OSC
+   * message that SAYS sixteen values and carries eight (`/b_setn GATE0 0 16
+   * …`), which scsynth discards without a word. The patch then played on
+   * whatever the buffer already held, the page went on reporting the figure it
+   * had asked for, and the only thing that noticed was the read-back assert
+   * saying "its rhythm did not arrive". A length is a contract with a buffer and
+   * nothing in an author's way of writing `[1, 0, 0, 1, 0, 0, 1, 0]` says so.
+   *
+   * ⚠️ IT REPEATS RATHER THAN ZERO-FILLING. With `elen 8` the last eight slots
+   * are never read and either would do; with `elen 16` a repeat plays the figure
+   * twice, which is what somebody writing eight steps and asking for sixteen
+   * means, and a zero-fill would silently give them half a bar of silence.
+   */
+  const PATTERN_SLOTS = 16;
+  const patternOf = (p) => {
+    const src = p.pattern ?? ALL_ONES;
+    if (src.length === PATTERN_SLOTS) return src;
+    return Array.from({ length: PATTERN_SLOTS }, (_, i) => src[i % src.length]);
+  };
   /** How many of the steps the engine will actually read are open. */
   const liveSteps = (p) => patternOf(p).slice(0, Math.max(1, p.elen))
     .reduce((n, x) => n + (x > 0.001 ? 1 : 0), 0);
@@ -2457,6 +2666,7 @@
     const p = PATCHES[patch];
     P.rate = p.rate; P.size = p.size; P.spray = p.spray; P.scan = p.scan;
     writePatch(p);
+    d.set('voices', p.gates.reduce((n, g) => n + (g > 0.001 ? 1 : 0), 0));
     if (sliders) {
       for (const [sld, v] of [[sliders.rate, p.rate], [sliders.size, p.size],
                               [sliders.spray, p.spray]]) {

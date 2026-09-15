@@ -82,10 +82,30 @@ function noiseBuffer(ctx) {
   return buf;
 }
 
-export function createProjector(ctx, { frameHz = FRAME_HZ, mainsHz = MAINS_HZ, voice = 0 } = {}) {
+/** Where the booth wall starts taking the top off, in Hz. */
+const MUFFLE_HZ = 1800;
+
+export function createProjector(ctx, { frameHz = FRAME_HZ, mainsHz = MAINS_HZ, voice = 0,
+  muffle = MUFFLE_HZ } = {}) {
   let V = VOICES[((voice % VOICES.length) + VOICES.length) % VOICES.length];
   const out = ctx.createGain();
   out.gain.value = 0;
+  // 🔴 THE WHOLE MACHINE IS BEHIND A WALL, AND THAT IS WHAT IT SOUNDS LIKE.
+  // A projector is never in the room with you: it is in a booth, through glass,
+  // behind you. Without this the clatter arrives with all its top end intact
+  // and sits on top of the film instead of behind it — reported as wanting it
+  // more muffled. One lowpass on the WHOLE output, after every voice, so the
+  // eight machines stay eight machines and all of them are in the booth.
+  // ⚠️ It is on the output rather than on the clatter, because the bed's hiss
+  // and the motor's upper partials are just as much in front as the clicks are.
+  const wall = ctx.createBiquadFilter();
+  wall.type = 'lowpass';
+  wall.frequency.value = muffle;
+  wall.Q.value = 0.7;
+  const dull = ctx.createBiquadFilter();
+  dull.type = 'highshelf';
+  dull.frequency.value = 1400;
+  dull.gain.value = -6;
 
   // ── the motor ────────────────────────────────────────────────────────────
   // Two partials, the second slightly sharp of the octave. An exact octave
@@ -105,6 +125,10 @@ export function createProjector(ctx, { frameHz = FRAME_HZ, mainsHz = MAINS_HZ, v
   const humLP = ctx.createBiquadFilter();
   humLP.type = 'lowpass'; humLP.frequency.value = 320;
   hum.connect(humLP).connect(out);
+  // ⚠️ THE ORDER IS out -> shelf -> lowpass, and `node` is the LAST of them, so
+  // a caller connecting `p.node` to a panner gets the muffled sound and cannot
+  // accidentally bypass it.
+  out.connect(dull).connect(wall);
 
   // ── the transport bed ────────────────────────────────────────────────────
   const bedSrc = ctx.createBufferSource();
@@ -167,7 +191,7 @@ export function createProjector(ctx, { frameHz = FRAME_HZ, mainsHz = MAINS_HZ, v
   }
 
   return {
-    node: out,
+    node: wall,
     /** Which machine this is. Set it when a film starts; it takes effect on the
      *  next clatter, which at 24 a second is inside a frame. */
     setVoice(i) {

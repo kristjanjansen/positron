@@ -25,7 +25,6 @@
     readout: { latency: 's', advance: '×', buffer: 's', holes: '', stalls: '', switches: '' },
     controls: [
       { id: 'go', label: 'Start the stream and play', primary: true },
-      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -206,6 +205,9 @@
       .on('dimensions', ({ width, height }) => d.log(`${width}x${height}`));
 
     await playOrPrompt(video, d);
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true — and a button for them would make them optional.
+    await d.run('check');
   });
 
   if (capH) {

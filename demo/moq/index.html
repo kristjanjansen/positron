@@ -37,7 +37,6 @@
     readout: { latency: 'ms', p95: 'ms', fps: '', frames: '' },
     controls: [
       { id: 'go', label: 'Connect and publish', primary: true },
-      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -82,6 +81,9 @@
       if (p50 != null) d.set('latency', p50, p50 < 100 ? 'ok' : p50 < 400 ? '' : 'bad');
       if (p95 != null) d.set('p95', p95);
     }, 1000);
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true — and a button for them would make them optional.
+    await d.run('check');
   });
 
   d.on('check', () => {

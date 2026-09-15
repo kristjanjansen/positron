@@ -58,7 +58,6 @@
       // run is worse than one with no number in it.
       { id: 'fold', label: `Ask "which cues by now?" at ${CUES.length * 3} points` },
       { id: 'sweep', label: `Jump to ${STOPS.length} places and re-ask` },
-      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -110,7 +109,7 @@
   // and on drag; the bar's slider is a second one at a different scale, and two
   // stacked is a contradiction rather than a redundancy. Play, pause, the clock
   // and the keyboard table stay.
-  createTransportBar(d.el, deck, { scrub: false });
+  const tbar = createTransportBar(d.el, deck, { scrub: false });
   createStripView(d.el, deck, { size: 'default', lanes: [{
       id: 'cue', kind: 'cue', height: 44, as: 'ticks',
       // idToColor('cue') came out near-black on the dark ground, so the ticks
@@ -191,9 +190,61 @@
     d.set('wrong', wrong, wrong ? 'bad' : 'ok');
     d.assert('every jump lands on the right cue count', wrong === 0, `${seeks} jumps, ${wrong} wrong`);
     d.assert('no cue fires long after its own moment', retro === 0, `${retro} fired more than 1.5 s late`);
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true — and a button for them would make them optional.
+    await d.run('check');
   });
 
-  d.on('check', () => {
+  d.on('check', async () => {
+    // 🔴 THE LOOP, GRADED HERE BECAUSE THIS IS THE PAGE ABOUT GOING BACK. The
+    // button lives in the shared bar, so every page with a transport gets it and
+    // exactly one page has to prove it works. Driven through the BUTTON's own
+    // handler rather than by setting the state, which is `floor`'s lesson: the
+    // fault was in the index the click hands over, not in the playing.
+    {
+      const api = tbar.api;
+      const [r0, r1] = deck.range;
+      const before = api.loop;
+      deck.seek(r0 + (r1 - r0) * 0.30);
+      api.pressLoop();
+      const armed = api.loopArmed && !api.loop;
+      deck.seek(r0 + (r1 - r0) * 0.55);
+      api.pressLoop();
+      const made = api.loop;
+      d.assert('one button marks a loop in two presses',
+        before === null && armed && !!made && made[1] > made[0],
+        made ? `start ${Math.round(made[0] - r0)} ms in, end ${Math.round(made[1] - r0)} ms in`
+             : 'no loop was made');
+      // 🔴 AND IT GOES BACK. A mark pair that never wraps is two numbers.
+      // Jump past the end and let the paint loop see it.
+      // ⚠️ POLLED WITH A CEILING, NOT SLEPT ON. `verify.mjs` stops collecting
+      // 400 ms after the last assert, so a fixed wait long enough to be safe is
+      // long enough to lose every assert after it. Waiting for the ANSWER
+      // instead is both shorter in the normal case and bounded in the bad one.
+      const until = async (fn, ms) => {
+        const t0 = performance.now();
+        while (performance.now() - t0 < ms) {
+          if (fn()) return true;
+          await new Promise((r) => setTimeout(r, 16));
+        }
+        return fn();
+      };
+      deck.seek(made[1] + 5);
+      await until(() => deck.position() < made[1], 300);
+      const back = deck.position();
+      d.assert('...and the playhead comes back to the start when it passes the end',
+        back <= made[1] && back >= made[0] - 5,
+        `left at ${Math.round(made[1] + 5 - r0)} ms, found at ${Math.round(back - r0)} ms`);
+      // 🔴 PROVE THE THIRD PRESS. A loop you cannot take off is a trap.
+      api.pressLoop();
+      deck.seek(made[1] + 5);
+      await until(() => deck.position() > made[1] + 20, 300);
+      d.assert('...and a third press takes it off, so the playhead runs on',
+        api.loop === null && deck.position() > made[1],
+        `loop ${api.loop === null ? 'cleared' : 'still set'}, `
+        + `playhead at ${Math.round(deck.position() - r0)} ms of ${Math.round(r1 - r0)}`);
+    }
+
     d.assert('the timeline can be asked at any position', typeof deck.reduceAt === 'function');
     d.assert('range is the show length', deck.durationMs === ARCHIVE.durationMs, `${deck.durationMs}`);
     d.assert('cue adapter declares assertOnSeek', cueAdapter.caps.assertOnSeek === true);

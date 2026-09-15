@@ -59,7 +59,6 @@
     controls: [
       { id: 'start', label: 'Start channels', primary: true },
       { id: 'live', label: 'Jump to live edge' },
-      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -289,6 +288,9 @@
     }
     const edge = c.hls.liveSyncPosition;
     if (Number.isFinite(edge)) { c.media.currentTime = edge; d.log('jumped to the live edge'); }
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true — and a button for them would make them optional.
+    await d.run('check');
   });
 
   setInterval(() => {

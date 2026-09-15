@@ -36,7 +36,6 @@
     readout: { 'round trip': 'ms', fps: '', picture: '', state: '' },
     controls: [
       { id: 'go', label: 'Start the stream and play', primary: true },
-      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -140,6 +139,9 @@
         await new Promise((r) => setTimeout(r, 4000));
       }
     }
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true — and a button for them would make them optional.
+    await d.run('check');
   });
 
   setInterval(async () => {

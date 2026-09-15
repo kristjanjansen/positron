@@ -176,7 +176,11 @@ export async function markIndex(root = document) {
   root.documentElement?.classList.toggle('xr', caps.xr === true);
   if (caps.xr === true) offerHeadset(root);
 
-  for (const row of root.querySelectorAll('.pos-row[data-needs]')) {
+  // ⚠️ `[data-needs]`, NOT `.pos-row[data-needs]`. The front page is cards now
+  // and the sequence page is still rows; the capability logic is about the
+  // ATTRIBUTE, which both carry, and keying it to one markup is how the other
+  // one silently stops being marked at all.
+  for (const row of root.querySelectorAll('[data-needs]')) {
     const needs = row.dataset.needs.split(' ').filter(Boolean);
     const missing = needs.filter((c) => caps[c] === false);
     if (!missing.some((c) => HARD.has(c))) {
@@ -188,16 +192,20 @@ export async function markIndex(root = document) {
     }
     // Un-link, and SAY WHY. A row that quietly vanished would tell the reader
     // the demo does not exist, which is a different and false statement.
-    const a = row.querySelector('a');
+    // A card IS the link; a row CONTAINS one. Ask the element about itself
+    // first, or a card keeps its href and stays pressable while saying it
+    // cannot run.
+    const a = row.matches('a') ? row : row.querySelector('a');
     if (a) { a.removeAttribute('href'); }
     row.classList.add('todo', 'blocked');
+    if (row.classList.contains('pos-card')) row.dataset.off = '1';
     addWhy(row, missing.map((c) => MISSING_SAYS[c]).join(' · '));
   }
   return caps;
 }
 
 function addWhy(row, text, kind) {
-  const meta = row.querySelector('.pos-meta');
+  const meta = row.querySelector('.pos-meta, .pos-card-f');
   if (!meta || !text) return;
   const el = document.createElement('span');
   el.className = kind === 'soft' ? 'pos-why soft' : 'pos-why';

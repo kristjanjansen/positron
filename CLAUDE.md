@@ -706,6 +706,65 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
   `git add -A`.
 - Secrets never reach a log. The publisher redacts at the point of capture, so a
   secret split across two stderr chunks is still caught.
+- 🔴 **NO EM DASHES. ANYWHERE A READER LOOKS.** Not in `what`, not in a
+  readout key, not in a diagram note, not in a log line, not in a commit
+  message, not in a reply. They are a tic: an em dash lets a sentence bolt a
+  second clause on instead of ending, and the bolted clause is almost always
+  the vague one. The sentence that prompted this rule was *"It answers HTTP/1.0
+  on port 8001 and never over TLS — which is the fact everything to the right of
+  it exists to work around"*, and the half after the dash says nothing a reader
+  can use. Use a full stop and write the second sentence properly, or a colon
+  when the second half really is the first half named. ⚠️ THE TEST IS NOT
+  PUNCTUATION, IT IS WHAT THE CLAUSE DOES: if it qualifies, gestures, or
+  re-states, cut it; if it carries a fact, it deserves its own sentence.
+- 🔴 **A DIAGRAM IS WRITTEN TO A DIFFERENT RULE FROM PROSE, AND HERE IT IS.**
+  `demo/shell/diagram.mjs` draws it; these decide what goes in it.
+  - **A box label is a NAME.** `Icecast`, `scsynth`, `speakers`. It has to fit
+    the box at the width the layout gives it, which is about fourteen
+    characters, and a label that gets cut is reported on `cuts` for the author
+    to fix rather than ellipsised at the reader.
+  - **The `sub` is what KIND of thing it is**, in three or four words:
+    `port 8001`, `SuperCollider`, `25 Hz, OSC`. Never a second sentence.
+  - 🔴 **THE `note` IS TWO SENTENCES. NOT THREE, AND NEVER SIX.** It is read
+    once, on hover, under the picture, and it should say what a reader CANNOT
+    see: why this box is here, what it does that the name does not imply, the
+    number that matters. It must never repeat the label, which is on screen an
+    inch away. `createDiagram` reports anything over about forty words on
+    `cuts`, the same way it reports a label that did not fit.
+  - 🔴 **AND NOTHING ABOUT HOW THE PICTURE WAS MADE.** The note that bought this
+    rule ended *"What feeds the server is not visible from outside it. The
+    titles that arrive look like filenames, so something is playing files into
+    it, but that is a guess and no box is drawn for a guess."* Every word true,
+    and it is the author talking to himself about his own drawing in front of
+    somebody who asked what a radio station is. Reported as **"awful slop with
+    no audience"**. There is no audience for what you considered, what you could
+    not determine, what it used to say, or why you stopped. If a thing is not
+    known, leave it out; the absence of a box already says so.
+  - **An arrow's label is WHAT TRAVELS**, not what the step is called:
+    `128 kbit/s`, `OSC /n_set`, `grains`. Its note says what that actually is.
+  - 🔴 **NO FILE PATHS AND NO WARNING EMOJI IN ANYTHING A VISITOR READS.**
+    `shell/icy.mjs` in a note tells a visitor nothing and tells a reader of the
+    code something they could have grepped; ⚠️ in a sentence under a picture is
+    an alarm about a fact that is not alarming. Both belong in comments.
+  - **Boxes inside one machine are tied with a line and no arrowhead.** A head
+    would claim an order between the parts of one program that the drawing does
+    not know. If two children really do feed each other in a way worth drawing,
+    they are two machines, not one.
+  - **Labels sit top-left** (`BOX_ALIGN` in `diagram.mjs`, one switch, so the
+    whole project reverts together). Centred puts two boxes' names at two
+    heights for a reason nobody can see.
+- 🔴 **A CHANGE IN WHAT A PAGE DOES IS A CHANGE TO WHAT IT SAYS — IN THE SAME
+  COMMIT.** `what`, the `one` line in `manifest.mjs` and every readout key are
+  part of the page, not documentation about it, and they go stale silently:
+  nothing type-checks a sentence, no harness reads it, and a description that
+  has drifted is worse than a missing one because a visitor believes it. The
+  trigger is not "did I rewrite the page" — it is **did a control appear or
+  disappear, did a readout cell change, did the thing it is pointed at move, did
+  the way you work it change**. Radio1965's paragraph described a Synthesize
+  button for two sessions after the button was deleted. ⚠️ AND A CHANGE IS AN
+  OCCASION TO CUT: the same paragraph doubled in length over four rounds of
+  additions, because each one appended and none subtracted. Re-read the whole
+  thing against the rule below, do not staple a clause on the end.
 - 🔴 **THREE SENTENCES. A DESCRIPTION IS NOT AN ESSAY.** The rule below says
   three or four and it kept being broken — `grains` shipped a `what` of FIVE
   long sentences that explained the granulator, defended why it has its own

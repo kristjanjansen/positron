@@ -53,6 +53,60 @@ import { readGLB } from './xr-glb.mjs';
 // is still byte for byte the same room, which is the claim the negative control
 // makes and the whole reason a room fits in four bytes.
 export const radiusOf = (t) => t.s * 0.87;
+
+/**
+ * 🔴 THE THINGS ARE CUBES NOW, SO THE SEPARATION RULE IS A BOX TEST. It was a
+ * sphere test — `radiusOf` is a cube's half-diagonal, near enough — and that is
+ * the right approximation for a room of tumbling objects you only need to keep
+ * apart. It is the WRONG one for a builder: two unit bricks sitting side by
+ * side have their centres one unit apart and their bounding spheres overlapping
+ * by 74% of a unit, so every stack anybody built would have been reported as
+ * things inside each other. A sphere cannot say "touching" about a cube.
+ *
+ * ⚠️ `radiusOf` STAYS, because two other things use it — the bounds check that
+ * keeps a thing inside the room and the reach test that decides which thing the
+ * tablet is near — and both of those want a generous radius rather than an
+ * exact face.
+ *
+ * @returns {{ox:number, oy:number, oz:number} | null} how deep they are into
+ *   each other on each axis, or null when they are clear.
+ */
+export const halfOf = (t) => t.s / 2;
+/**
+ * ⚠️ NO `GAP` BY DEFAULT, AND THAT IS THE DIFFERENCE BETWEEN A ROOM AND A
+ * BUILDER. `GAP` is 4 cm of air so that two things a rounding error apart read
+ * as two things rather than one shape with a seam. On a grid the opposite is
+ * wanted: bricks that TOUCH are the product, and demanding air between them
+ * makes every stack illegal — MEASURED, a brick set exactly on top of another
+ * came out 0.40 m apart against a rule asking for 0.44 and was reported as
+ * still inside it. Two bricks flush read as two because they are different
+ * colours and their edges are shaded, which is three channels the seam never
+ * needed. Pass a gap where one is wanted.
+ */
+// 🔴 TOUCHING IS NOT OVERLAPPING, AND AT ZERO GAP THAT IS A FLOAT QUESTION. Two
+// bricks flush on a 0.2 m grid are `need - |d| = 0` apart, and 0.4 - 0.4 in
+// binary floating point is 5.5e-17 as often as it is zero — so a stack was
+// reported as interpenetrating by a twentieth of a femtometre. The tolerance is
+// a millionth of a metre: far below anything a grid can produce and far above
+// anything the arithmetic can invent.
+const TOUCH_EPS = 1e-6;
+export function overlapOf(a, b, gap = 0) {
+  const need = halfOf(a) + halfOf(b) + gap;
+  const ox = need - Math.abs(a.x - b.x);
+  if (ox <= TOUCH_EPS) return null;
+  const oy = need - Math.abs(a.y - b.y);
+  if (oy <= TOUCH_EPS) return null;
+  const oz = need - Math.abs(a.z - b.z);
+  if (oz <= TOUCH_EPS) return null;
+  return { ox, oy, oz };
+}
+
+/** The axis two boxes are LEAST into each other on — the short way out, and the
+ *  one that makes a brick land on top of another rather than beside it. */
+export function leastAxis(o) {
+  if (o.oy <= o.ox && o.oy <= o.oz) return 'y';
+  return o.ox <= o.oz ? 'x' : 'z';
+}
 // Air between two surfaces, and it is doing two jobs. It has to clear the
 // document's own rounding — MEASURED at a gap of zero, 128 pairs of 46,440 were
 // pushed to exactly touching and then ROUNDED back into contact, by 1.3e-4 m,
@@ -84,17 +138,20 @@ export function spaced(w) {
     let shifted = false;
     for (let i = 0; i < th.length; i++) for (let j = i + 1; j < th.length; j++) {
       const a = th[i], b = th[j];
-      const need = radiusOf(a) + radiusOf(b) + GAP;
-      let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-      let len = Math.hypot(dx, dy, dz);
-      if (len >= need - 1e-6) continue;
-      // Two centres in the same place have no line between them to push along.
-      // The direction comes from the pair's own indices — a random one would be
-      // a different room on every roll.
-      if (len < 1e-6) { dx = Math.cos(i + j); dy = 0.3; dz = Math.sin(i + j); len = Math.hypot(dx, dy, dz); }
-      const k = (need - len) / len / 2;        // half the shortfall each, along the line
-      a.x -= dx * k; a.y -= dy * k; a.z -= dz * k;
-      b.x += dx * k; b.y += dy * k; b.z += dz * k;
+      const o = overlapOf(a, b);
+      if (!o) continue;
+      // ⚠️ ALONG ONE AXIS, THE SHORTEST ONE, and half the distance each. Pushing
+      // along the line between two centres is what a sphere does; it takes two
+      // bricks that are barely touching on one face and slides them diagonally
+      // off the grid, which is a builder that will not stack.
+      const ax = leastAxis(o);
+      const need = o['o' + ax] / 2 + 1e-6;
+      // Two centres in the same place have no side to be on. The direction
+      // comes from the pair's own indices — a random one would be a different
+      // room on every roll.
+      const d = b[ax] - a[ax];
+      const dir = Math.abs(d) < 1e-6 ? (Math.cos(i + j) >= 0 ? 1 : -1) : Math.sign(d);
+      a[ax] -= dir * need; b[ax] += dir * need;
       shifted = true;
     }
     if (!shifted) break;
@@ -127,8 +184,11 @@ export function clashes(w) {
   let pairs = 0, deep = 0, closest = Infinity;
   for (let i = 0; i < th.length; i++) for (let j = i + 1; j < th.length; j++) {
     const a = th[i], b = th[j];
-    const gap = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) - radiusOf(a) - radiusOf(b);
-    if (gap < 0) { pairs++; deep = Math.max(deep, -gap); }
+    const need = halfOf(a) + halfOf(b);
+    // A box's gap is along the axis it is MOST separated on — that is the one
+    // that keeps them apart, and the other two are free to overlap.
+    const gap = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.z - b.z)) - need;
+    if (gap < -1e-9) { pairs++; deep = Math.max(deep, -gap); }
     closest = Math.min(closest, gap);
   }
   return { pairs, deep, closest: Number.isFinite(closest) ? closest : 0 };

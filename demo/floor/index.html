@@ -26,17 +26,19 @@
      would delete the fallback on exactly the browsers that need it. */
   .fl.pos-full { aspect-ratio: auto; width: 100%; height: 100%;
                  border: 0; border-radius: 0; min-height: 0; }
-  /* ⚠️ A GLYPH BUTTON IS A SQUARE, AND `.ico` DID NOT MAKE IT ONE. shell.css
-     scopes that class to `.step button.ico` — the stepper — so on a control-bar
-     button it matched nothing at all, and the ⛶ kept the row's `0 14px` padding
-     and came out 40.6 x 34: a rectangle pretending to be an icon.
-     MEASURED rather than derived: the control buttons are 34 px tall, so 34 is
-     the square. Re-measure if the bar's type or padding changes — a size
-     computed from four other values looks more rigorous and is one edit away
-     from being quietly wrong. */
-  .pos-controls button.ico { width: 34px; height: 34px; padding: 0;
-                             display: grid; place-items: center;
-                             font-size: 15px; line-height: 1; }
+  /* ⚠️ THE `.pos-controls button.ico` RULE THAT USED TO SIT HERE IS GONE, AND
+     SO IS THE ONE IN EVERY OTHER PAGE. It never matched: `mount()` has never put
+     an `ico` class on a control. `shell.mjs` stamps `data-glyph` on a control
+     whose whole label is one non-letter and `shell.css` squares it, once, for
+     every page — see the note there.
+     🔴 AND REMOVING IT COST THIS PAGE ITS OWN BOX. The regex that took the dead
+     rule out matched `[^}]*` and swallowed the three rules above with it, so
+     `.fl` lost `aspect-ratio`, `min-height` and `position: relative`: the canvas
+     had no height, and `a click on a tile` found no tile because the box it
+     clicks into was zero pixels tall. Every other assert on the page still
+     passed, because a shader, a matrix and a fade do not care how big the
+     element is. MEASURED at 294 of 298 tiles loaded and 60 fps, with the click
+     hitting nothing — which is what sent the diagnosis looking at ERR. */
   .fl canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* The title of whatever is under the pointer. A FIXED BOX: it is written on
      every frame the gaze moves, and a caption that can change its own height
@@ -64,8 +66,9 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { mul, perspective } from '/shell/xr-room.mjs';
-  import { createXRRay, rayCheck, MONO_AIM, MONO_HELD } from '/shell/xr-ray.mjs';
+  import { createXRRay, rayCheck, eyeFromView, MONO_AIM, MONO_HELD } from '/shell/xr-ray.mjs';
   import { createXRControllers } from '/shell/xr-controller.mjs';
+  import { createXRQuit } from '/shell/xr-quit.mjs';
   import { createProjector, VOICES } from '/shell/projector.mjs';
   import { toggle as toggleFull, exit as exitFull, watch as watchFull,
     support as fullSupport } from '/shell/fullscreen.mjs';
@@ -157,7 +160,12 @@
   // ⚠️ THE LIGHTER OF THE TWO IT USED TO BE. Averaging the tile's fade target
   // with the darker clear colour made the whole floor a shade darker than
   // either, which is the wrong way to settle a disagreement about a colour.
-  const FLOOR_RGB = [0.055, 0.066, 0.086];
+  // ⚠️ DARKER THAN THE PAGE AROUND IT, ON PURPOSE. This was `shell.css`'s own
+  // background, which makes the picture continuous with the page — and a floor
+  // of lit newsreels wants the opposite: the void behind them has to be further
+  // away than the page is, or the tiles at the fade's edge read as sitting on
+  // the document rather than receding into a room.
+  const FLOOR_RGB = [0.018, 0.022, 0.030];
 
   const d = mount({
     name: 'floor',
@@ -615,7 +623,12 @@
   // Slow up and quick down, because a projector spinning up is a thing you want
   // to hear arrive and one still running after you stopped it is a thing that
   // will not take the hint.
-  const PROJ_GAIN = 0.125, PROJ_UP = 1.2, PROJ_DOWN = 0.25;
+  // ⚠️ A THIRD OF WHAT IT WAS. At 0.125 the machine was level with the film it
+  // is supposed to be running; a projector you can hear over the soundtrack is
+  // a projector in the wrong place. `projector.mjs` also puts the whole thing
+  // behind a booth wall now, so this is quieter AND duller rather than just
+  // turned down, which is what makes it recede instead of vanish.
+  const PROJ_GAIN = 0.042, PROJ_UP = 1.2, PROJ_DOWN = 0.25;
   let actx = null, projector = null, panner = null, soundOn = false;
   /** Built on a real gesture. An AudioContext made at load starts suspended and
    *  `resume()` in a real browser neither resolves NOR rejects until somebody has
@@ -1318,7 +1331,14 @@
       // right one, which is the whole point of "any". "Press the Meta button"
       // is not an answer a page gets to give about its own bug, and neither is
       // "press the specific button we chose and did not tell you about".
-      session.addEventListener('squeeze', () => endVR('grip', session));
+      // ⚠️ THE GRIP NO LONGER LEAVES. It was invisible — nothing on screen ever
+      // said the grip did anything — and on this page the grip is next to the
+      // trigger you drag the floor with. The way out is the badge on the
+      // controller now; see `xr-quit.mjs`.
+      xrQuit = createXRQuit(gl, {
+        label: 'HOLD TO QUIT',
+        onQuit: () => endVR('held the button', session),
+      });
       session.addEventListener('end', () => {
         xrSession = null; d.log('left VR', 'hi'); requestAnimationFrame(frame);
       });
@@ -1357,20 +1377,12 @@
     session.end().catch(() => {});
   }
 
-  /** Any button but the trigger, polled from the gamepad each frame.
-   *  ⚠️ POLLED, because WebXR only raises events for select and squeeze — A, B,
-   *  X, Y and the thumbstick click have no event at all and are readable only
-   *  from `inputSource.gamepad`. A page that listens for events alone has three
-   *  or four buttons on every controller that silently do nothing. */
-  function checkExitButtons(session) {
-    for (const src of session.inputSources) {
-      const pad = src.gamepad;
-      if (!pad) continue;
-      for (let b = 1; b < pad.buttons.length; b++) {      // 0 is the trigger
-        if (pad.buttons[b]?.pressed) { endVR(`button ${b}`, session); return; }
-      }
-    }
-  }
+  // 🔴 "ANY BUTTON BUT THE TRIGGER LEAVES" IS GONE, AND IT WAS THE WRONG SHAPE.
+  // It made every other button a trap — you could not rest a thumb anywhere on
+  // this controller, on a page whose whole verb is a trigger you hold while you
+  // drag — and it never said which button had done it. One labelled button,
+  // held, with a ring that fills: `xr-quit.mjs`.
+  let xrQuit = null;
 
   let dragSource = null;
   // where the floor was when the trigger went down, and whether it has stayed
@@ -1451,7 +1463,7 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     xrFrames++;
-    checkExitButtons(session);
+    xrQuit?.update(session.inputSources, dt);
     dragFloor(xframe);              // writes the target
     settleFloor(dt);                // and the floor moves toward it
     // ⚠️ THE POINTER IS TAKEN ONCE, HERE, AND NOT ONCE PER EYE. Asking the
@@ -1588,6 +1600,10 @@
           const gf = new Float32Array(h.grip);
           gf[12] -= shift[0]; gf[14] -= shift[1];
           xrCons.draw({ vp: viewVP, grip: gf, profile: h.profile, handedness: h.hand });
+          // ⚠️ THE EYE COMES OUT OF `vm`, the matrix that is doing the
+          // projecting, so the badge faces the eye it is drawn for rather than
+          // one of them for both — see the disparity note by the ribbon below.
+          xrQuit?.draw(viewVP, [gf], eyeFromView(vm));
         }
         if (!h.pose) continue;
         const pf = new Float32Array(h.pose);
