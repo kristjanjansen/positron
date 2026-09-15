@@ -34,7 +34,6 @@
     readout: { fired: '', 'late by': 'ms', worst: 'ms', apart: 'ms' },
     controls: [
       { id: 'load', label: 'Load + play', primary: true },
-      { id: 'check', label: 'Check' },
     ],
   });
   guard(d);
@@ -153,6 +152,9 @@
     deck.seek(video.currentTime * 1000);
     await playOrPrompt(video, d);
     d.log(`playing ${url.split('/').slice(-2).join('/')} · readyState ${video.readyState} · dur ${video.duration?.toFixed?.(1)}s · ${CUES.length} cues`);
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true — and a button for them would make them optional.
+    await d.run('check');
   });
 
   // WATCHDOG. media-master's own rule L2: inside jumpMs an error is frame

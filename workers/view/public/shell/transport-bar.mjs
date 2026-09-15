@@ -64,6 +64,13 @@ export function createTransportBar(host, deck, {
    * default — a bar that animated on a timer would be inventing a wait.
    */
   settling = null,
+  /**
+   * Called when the loop changes or comes round: `('set'|'wrap'|'off', a, b)`.
+   * ⚠️ A WRAP IS AN EVENT AND THE BAR IS THE ONLY THING THAT KNOWS IT HAPPENED —
+   * the deck is told to seek and has no idea why. A page that draws the audio
+   * can put the moment on its own picture; `/tapes/` marks it on the wave.
+   */
+  onLoop = null,
 } = {}) {
   const cmd = {
     play: () => (command?.play ? command.play() : deck.play()),
@@ -76,7 +83,12 @@ export function createTransportBar(host, deck, {
   const scrub = el('div', 'tbar-scrub', '', { role: 'slider', tabindex: '0', 'aria-label': 'position' });
   const fill = el('div', 'tbar-fill');
   const headDot = el('div', 'tbar-head');
-  scrub.append(fill, headDot);
+  // The loop's own ground on the scrub, UNDER the fill and the head, so the
+  // playhead is never behind it. A loop you cannot see the extent of is a
+  // number in somebody's head.
+  const loopSpan = el('div', 'tbar-loopspan');
+  loopSpan.hidden = true;
+  scrub.append(loopSpan, fill, headDot);
   // `extras` — page buttons that belong to the TRANSPORT rather than beside it.
   // Recording is the case that earned this: on `take` it is a transport verb,
   // not a side control, and putting it in `.pos-controls` would have said it was
@@ -98,7 +110,15 @@ export function createTransportBar(host, deck, {
     extraEls.set(x.id, b);
   }
 
-  const time = el('output', 'tbar-time', '0:00.000');
+  // ⚠️ TWO LINES, NOT ONE. `0:00.902 / 3:55.076` is thirteen mono characters of
+  // which one is a slash, and it was the widest fixed thing on the bar —
+  // enough, with a LOOP button beside it, to push the rate group onto a second
+  // row. Stacked it is half the width and the two numbers stop being one long
+  // number with punctuation in the middle: where you are, and how long it is.
+  const time = el('output', 'tbar-time');
+  const timeNow = el('span', 'tbar-now', '0:00.000');
+  const timeAll = el('span', 'tbar-all', '');
+  time.append(timeNow, timeAll);
   const rates = el('div', 'tbar-rates');
   const badge = el('span', 'tbar-badge');
   /**
@@ -116,7 +136,27 @@ export function createTransportBar(host, deck, {
    * no end.
    */
   const liveChip = live ? el('span', 'tbar-live', 'LIVE') : null;
-  bar.append(toggle, ...extraEls.values(), scrub, ...(live ? [liveChip] : [time]), rates, badge);
+  /**
+   * 🔴 LOOP IS ON EVERY BAR, AND IT IS THREE PRESSES OF ONE BUTTON.
+   *
+   * Set the start, set the end, and the third press takes the loop off again.
+   * One control rather than two, because two controls for the two ends of one
+   * interval is a pair you can leave half-set — a start with no end is a
+   * button that looks armed and does nothing, and there is no state in this
+   * shape that isn't visible on the button's own face.
+   *
+   * ⚠️ IT IS NOT HIDDEN ON A DECK THAT CANNOT LOOP. A live Icecast mount has no
+   * end and nothing to come back to, and the honest answer there is the button
+   * SAYING so when it is pressed — the same rule `caps.mjs` follows for a demo
+   * a browser cannot run. A control that vanishes says the feature does not
+   * exist, which is a different and false statement.
+   */
+  const loopBtn = el('button', 'tbar-loop tbar-word', 'LOOP',
+    { type: 'button', 'aria-label': 'loop' });
+  loopBtn.dataset.loop = 'off';
+  loopBtn.title = 'press to mark where a loop starts, again to mark the end, again to take it off';
+  bar.append(toggle, ...extraEls.values(), scrub, ...(live ? [liveChip] : [time]),
+    loopBtn, rates, badge);
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────
@@ -155,7 +195,14 @@ export function createTransportBar(host, deck, {
     rateChoice = null;
     if (lattice && lattice.length) {
       rateChoice = createChoice({
-        options: lattice.map((r) => [`${r}x`, r]),
+        // 🔴 NO `x`. Five buttons reading `0.25x 0.5x 1x 1.5x 2x` spend a fifth
+        // of their width on a letter that is the same on every one of them —
+        // and a row of numbers under a transport is already unambiguously a
+        // speed. The suffix was also what pushed the group onto a second line
+        // at ordinary widths, which is a bar that changes height for a unit
+        // nobody was reading. The armed one is marked by colour and fill; the
+        // page's own words say what it is.
+        options: lattice.map((r) => [String(r), r]),
         at: Math.max(0, lattice.indexOf(deck.targetRate?.() ?? 1)),
         onPick: (r) => applyRate(r),
       });
@@ -164,7 +211,7 @@ export function createTransportBar(host, deck, {
       rateChoice.buttons.forEach((b, i) => { b.dataset.rate = String(lattice[i]); });
       rates.append(rateChoice.el);
     } else {
-      rates.append(el('span', 'tbar-rate1', '1x'));   // honest: no lattice, no choice
+      rates.append(el('span', 'tbar-rate1', '1'));    // honest: no lattice, no choice
     }
     syncRates();
   }
@@ -243,11 +290,35 @@ export function createTransportBar(host, deck, {
     // answer for a deck of seconds and a meaningless one for a deck of 1965,
     // where the position is a date. Default unchanged; a page that needs
     // calendar time supplies a formatter rather than the bar guessing.
-    time.textContent = fmt ? fmt(pos, range) : seekable
-      ? `${clock(pos, absolute)} / ${clock(range[1] - range[0], false)}`
-      : clock(pos, absolute);
+    // ⚠️ `fmt` STILL GETS THE WHOLE LINE. A page that supplies a formatter is
+    // saying how a position READS — `/tapes/` prints a date — and splitting its
+    // answer on a slash it did not put there would be this bar editing a page's
+    // own words.
+    if (fmt) { timeNow.textContent = fmt(pos, range); timeAll.textContent = ''; }
+    else {
+      timeNow.textContent = clock(pos, absolute);
+      timeAll.textContent = seekable ? clock(range[1] - range[0], false) : '';
+    }
     const playing = deck.playing?.() ?? false;
     toggle.dataset.state = playing ? 'playing' : atEnd ? 'ended' : 'paused';
+    // 🔴 THE WRAP, RATE-LIMITED, AND THE LIMIT IS NOT A SAFETY MARGIN — IT IS
+    // THE FIX. A seek is not instant on every kind of deck, so the frame after
+    // one is asked for can still report a position past the end, which asks
+    // for another, which is a seek storm that reads as a stuck playhead. This
+    // repo has the general form already written down: *a recovery action is
+    // not free — rate-limit it.*
+    // ⚠️ AND ONLY WHILE ROLLING. Wrapping a paused deck would drag the playhead
+    // back under somebody who is scrubbing inside their own loop.
+    if (loopA != null && loopB != null && playing && pos >= loopB) {
+      const t = performance.now();
+      if (t - lastWrap > 150) { lastWrap = t; doSeek(loopA); onLoop?.('wrap', loopA, loopB); }
+    }
+    // A loop is a claim about a range, so it cannot outlive one. A live deck's
+    // range walks forward and will eventually leave the marks behind it; saying
+    // so is better than looping over ground that is no longer there.
+    if (loopA != null && (loopA < range[0] || (loopB ?? loopA) > range[1])) {
+      clearLoop('the loop ran off the back of what is still held');
+    }
     syncPending();
   }
 
@@ -373,6 +444,64 @@ export function createTransportBar(host, deck, {
   // to leave `dragging` true forever, which silently froze the playhead paint.
   scrub.addEventListener('pointercancel', endDrag);
 
+  // ── the loop ────────────────────────────────────────────────────────────
+  let loopA = null, loopB = null, lastWrap = 0;
+
+  function drawLoop() {
+    const on = loopA != null && loopB != null;
+    loopBtn.dataset.loop = on ? 'on' : loopA != null ? 'armed' : 'off';
+    loopBtn.textContent = on ? 'LOOP' : loopA != null ? 'END' : 'LOOP';
+    loopBtn.setAttribute('aria-label',
+      on ? 'looping — press to take the loop off'
+        : loopA != null ? 'press to mark where the loop ends' : 'loop');
+    if (!on || !seekable) { loopSpan.hidden = true; return; }
+    const fa = posToFrac(loopA), fb = posToFrac(loopB);
+    loopSpan.hidden = false;
+    loopSpan.style.left = `${Math.min(fa, fb) * 100}%`;
+    loopSpan.style.width = `${Math.abs(fb - fa) * 100}%`;
+  }
+
+  function clearLoop(why) {
+    loopA = loopB = null;
+    drawLoop();
+    onLoop?.('off', null, null);
+    if (why) note(why); else clearNote();
+  }
+
+  loopBtn.addEventListener('click', () => {
+    // ⚠️ ASKED OF THE DECK, NOT OF THE BAR. `seekable` is the one fact that
+    // decides whether a loop can exist at all, and it is the same flag the
+    // scrub and the harness read, so the three cannot disagree.
+    // 🔴 A LIVE SOURCE CANNOT BE LOOPED, AND THE FIRST VERSION LET YOU TRY. On
+    // `/radio1965/` the deck is an Icecast mount whose range walks forward, so
+    // two marks were accepted and then thrown away a second later by the guard
+    // further down — reported as *"no looping in radio? 'loop fell outside...'
+    // what?"*, which is a control that works, then silently stops, and explains
+    // itself in a sentence about a range nobody can see. Refuse at the press,
+    // in words about the STATION rather than about the deck.
+    if (live) { note('a live station has no past to come back to'); return; }
+    if (!seekable) { note('this source has no end to come back to'); return; }
+    const pos = deck.position();
+    if (loopA == null) { loopA = pos; loopB = null; drawLoop(); note('loop starts here — press again for the end'); return; }
+    if (loopB == null) {
+      // 🔴 A LOOP MARKED BACKWARDS IS STILL A LOOP SOMEBODY MEANT. Pressing
+      // the second time after seeking BACK gives an end before the start, and
+      // refusing it is a control punishing somebody for the order they worked
+      // in. Swapped; only a zero-length one is refused, because that is the
+      // press that landed on the same frame as the first and means nothing.
+      const a = Math.min(loopA, pos), b = Math.max(loopA, pos);
+      if (b - a < 1) { note('the two marks are in the same place'); return; }
+      loopA = a; loopB = b;
+      drawLoop();
+      clearNote();
+      if (!(deck.playing?.() ?? false)) cmd.play();
+      doSeek(loopA);
+      onLoop?.('set', loopA, loopB);
+      return;
+    }
+    clearLoop();
+  });
+
   function doSeek(pos) {
     if (atEnd && pos < range[1]) { atEnd = false; clearNote(); }
     const res = cmd.seek(pos);
@@ -407,11 +536,18 @@ export function createTransportBar(host, deck, {
     get lattice() { return lattice; },
     get degraded() { return badge.textContent || null; },
     get seekable() { return seekable; },
+    /** null when there is none; `[a, b]` while one is running. The harness
+     *  grades the loop from here rather than from the button's label. */
+    get loop() { return loopA != null && loopB != null ? [loopA, loopB] : null; },
+    get loopArmed() { return loopA != null && loopB == null; },
+    /** press it the way a finger does, so a check drives the real handler */
+    pressLoop() { loopBtn.click(); },
   };
   if (window.__demo) window.__demo.transport = api;
 
   const stop = observePosition(deck.transport, paint, { hz: 60 });
   syncRates();
+  drawLoop();
   paint({ pos: deck.position() });
 
   return {

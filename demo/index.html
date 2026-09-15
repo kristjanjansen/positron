@@ -13,16 +13,18 @@
   <div class="pos-title"><h1 class="pos-name">positron</h1></div>
 </div>
 
-<ol class="pos-acts" id="rows"></ol>
+<div id="rows"></div>
 
 <script type="module">
-  import { NOTES, byNewest, rowHTML, noteHTML } from '/manifest.mjs';
+  import { NOTES, byGroup, groupHTML, noteHTML } from '/manifest.mjs';
   import { markIndex } from '/shell/caps.mjs';
 
-  // rowHTML lives in the manifest; this page used to carry its own copy and
-  // printed `undefined` for a whole afternoon after the other one was fixed.
-  // NEWEST FIRST — byNewest() copies, so the array is still the story order.
-  document.getElementById('rows').innerHTML = byNewest().map(rowHTML).join('');
+  // ⚠️ THE SAME FUNCTIONS THE BUILD CALLS, on rows this page renders itself.
+  // The deployed front page is baked by workers/view/build.mjs and this one is
+  // scripted, and they have printed different things before — `rowHTML` lived
+  // in two places and one copy went on printing `undefined` over every demo
+  // name for an afternoon after the other was fixed. One renderer, two callers.
+  document.getElementById('rows').innerHTML = byGroup().map(groupHTML).join('');
   document.body.insertAdjacentHTML('beforeend',
     '<h2 class="pos-act-h">notes</h2><ol class="pos-acts">' + NOTES.map(noteHTML).join('') + '</ol>');
 

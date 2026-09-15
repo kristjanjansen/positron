@@ -11,17 +11,14 @@
 //
 // The layout MIRRORS THE REPO on purpose. Every page's imports then resolve
 // untouched, exactly as they do under its own dev server:
-//   proto/aikajana  `../../timeline/transport.mjs` → /timeline/transport.mjs
+//   proto/deck      `../../timeline/transport.mjs` → /timeline/transport.mjs
 //   proto/remixer     `/timeline/transport.mjs`      → /timeline/transport.mjs
-//   proto/megatimeline `./viewport.mjs`              → /proto/megatimeline/…
-//   proto/megatimeline `/census.json`                → ROOT copy (hence two)
+//   proto/deck      `./ingest.mjs`                  → /proto/deck/…
 // That is the "solve it in the asset layout, not in the proto" rule.
 //
-// The JSONL caches (megatimeline's committed search/item caches) are EXPLODED
-// into one static JSON file per entry, addressed by a canonical hash of the
-// query. A cache hit is then a plain static asset read — no JSONL parsing, no
-// Durable Object, no upstream call, ever. That is what keeps ERR calls at zero
-// for the queries we already have on disk.
+// ⚠️ THERE WAS A CACHE-EXPLODING STEP HERE and the page it served is archived;
+// `explode()` still exists further down, unused, for the next proto that ships
+// a committed cache. See the note beside it.
 
 import zlib from 'node:zlib';
 import { mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
@@ -70,30 +67,32 @@ const SCRATCH = OUT !== DEPLOY_OUT;
 // the demo story order, single-sourced from demo/manifest.mjs
 // rowHTML/noteHTML come from the manifest too. They used to be duplicated here
 // AND in demo/index.html, so fixing one left the other printing `undefined`.
-const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byNewest, rowHTML, noteHTML, extraPages } =
+const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byGroup, groupHTML, noteHTML, extraPages } =
   await import(new URL('../../demo/manifest.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
 // [ repo-relative source, public/-relative destination ]
 const FILES = [
-  // shared timeline library — loaded by remixer and aikajana, never copied
+  // shared timeline library — loaded by remixer and deck, never copied
   // into either proto. One canonical copy, same as the dev servers alias.
   ['timeline/transport.mjs', 'timeline/transport.mjs'],
   ['timeline/media-master.mjs', 'timeline/media-master.mjs'],
 
-  // 1. megatimeline
-  ['proto/megatimeline/index.html', 'proto/megatimeline/index.html'],
-  ['proto/megatimeline/viewport.mjs', 'proto/megatimeline/viewport.mjs'],
-  ['proto/megatimeline/gesture.mjs', 'proto/megatimeline/gesture.mjs'],
-  ['proto/megatimeline/census.json', 'census.json'], // page fetches '/census.json'
+  // ⚠️ `megatimeline` WAS HERE AND IS IN `archive/`. Four entries came out with
+  // it — the page, its viewport and gesture modules, and the census it fetched
+  // from the ROOT (`/census.json`), which nothing else ever read. Its two
+  // committed JSONL caches were exploded into static assets a little further
+  // down; those calls are gone too, so the build no longer writes nine search
+  // results and one item that had no reader. The source is under `archive/`.
 
   // 2. remixer
   ['proto/remixer/index.html', 'proto/remixer/index.html'],
   ['proto/remixer/hls.min.js', 'proto/remixer/hls.min.js'],
 
-  // 3. aikajana (corpus + archive.org media; nothing proxied)
-  ['proto/aikajana/index.html', 'proto/aikajana/index.html'],
-  ['proto/aikajana/corpus.json', 'proto/aikajana/corpus.json'],
+  // 3. deck — renamed from `aikajana` 2026-09-15; the corpus plus archive.org
+  //    media, nothing proxied
+  ['proto/deck/index.html', 'proto/deck/index.html'],
+  ['proto/deck/corpus.json', 'proto/deck/corpus.json'],
 
   // 4. flipper (live ERR channels; streams are CORS-clear, no proxy)
   ['proto/flipper/index.html', 'proto/flipper/index.html'],
@@ -237,6 +236,36 @@ const FILES = [
   ['demo/shell/vendor/meta-quest-touch-plus-right.glb', 'shell/vendor/meta-quest-touch-plus-right.glb'],
   ['demo/shell/vendor/LICENSE-webxr-input-profiles', 'shell/vendor/LICENSE-webxr-input-profiles'],
 
+  // ── the typeface `/held/` is made of, vendored ────────────────────────────
+  //
+  // ⚠️ LISTED BY NAME, and this one would have been missed by looking: a font
+  // is not an `import`, so `checkImports()` cannot see it, AND `.woff2` is not
+  // in `demoFiles()`'s extension set, so even at the top of `demo/held/` it
+  // would not have been copied. That is the `manifest.webmanifest` failure
+  // exactly — `/items/` renamed one file and shipped a 404 to production
+  // because an allowlist declined silently. `checkVendorUrls()` below is what
+  // now refuses the build instead, which is why the page's `@font-face` writes
+  // its `src` as a QUOTED `/held/vendor/…` string.
+  //
+  // 🔴 TWO FILES, BECAUSE ESTONIAN IS SPLIT ACROSS TWO OF THEM. Ä Ö Ü Õ are in
+  // `latin` (U+00xx) and Š Ž are in `latin-ext` (U+0160, U+017E). Dropping
+  // either one does not fail: the browser substitutes a system face for the
+  // letters it cannot find, per glyph, with no 404 and no exception — one
+  // letter of one word in the wrong typeface. The page measures that rather
+  // than trusting it (`text.mjs`, `ensureFont`).
+  //
+  // ⚠️ THE PAGE DOES NOT NAME THE TYPEFACE — it asks for `held-display` and
+  // `held-text`, two aliases its stylesheet points at whatever is listed here.
+  // So a font change is these three lines, two files, and the `src` pair in the
+  // page; nothing in `text.mjs` or in any assert moves. Keep it that way.
+  //
+  // LICENCE: SIL Open Font License 1.1 — Gabarito, via `google/fonts`
+  // (`ofl/gabarito`). The two subsets are Google's own builds; the licence
+  // ships beside them.
+  ['demo/held/vendor/gabarito-latin.woff2', 'held/vendor/gabarito-latin.woff2'],
+  ['demo/held/vendor/gabarito-latin-ext.woff2', 'held/vendor/gabarito-latin-ext.woff2'],
+  ['demo/held/vendor/LICENSE-gabarito', 'held/vendor/LICENSE-gabarito'],
+
   ...extraPages(),
   ...demoFiles(),
 ];
@@ -378,8 +407,7 @@ const BACK = '<a href="/" style="position:fixed;left:8px;bottom:8px;z-index:9999
   + 'padding:7px 10px;text-decoration:none">\u2190 demos</a>';
 
 const APPEND = {
-  'proto/aikajana/index.html': BACK,
-  'proto/megatimeline/index.html': BACK,
+  'proto/deck/index.html': BACK,
   'proto/remixer/index.html': BACK,
 };
 /**
@@ -419,13 +447,6 @@ const BUILD_STAMP = `${execSync('git rev-parse --short HEAD', { cwd: REPO }).toS
 const REWRITES = {
   'demo/shell/shell.mjs': [
     [`export const BUILD = 'dev';`, `export const BUILD = '${BUILD_STAMP}';`],
-  ],
-  'proto/megatimeline/index.html': [
-    // megatimeline's "PLAY IN REMIXER ↗" hand-off opens `${REMIXER}/?play=…`.
-    // Hardcoded to the dev server's port, which is nothing on a phone.
-    [`const REMIXER = 'http://localhost:8891';`, `const REMIXER = '/proto/remixer';`],
-    // and the desktop help line that quotes the same port
-    ['click item = play (remixer :8891)', 'click item = play (opens remixer)'],
   ],
   'proto/flipper/index.html': [
     // flipper has NO viewport meta. research/mobile-2026-08.md §3 lists exactly
@@ -564,9 +585,11 @@ await mkdir(OUT, { recursive: true });
 // GENERATED from demo/manifest.mjs (plan-demos.md step 8) so there is no second
 // place to forget. Number and name only; a row with no target renders greyed.
 {
-  // NEWEST FIRST on the front page, story order everywhere else. byNewest()
-  // returns a copy for exactly this reason — the array is still the sequence.
-  const rows = byNewest(DEMO_MANIFEST).map((d, i) => '  ' + rowHTML(d, i)).join('\n');
+  // 🔴 GROUPED BY SUBJECT on the front page, story order everywhere else.
+  // `byGroup()` returns copies for exactly that reason — the array is still the
+  // sequence — and it REFUSES a row with no group rather than quietly leaving
+  // it off the one page everybody opens.
+  const rows = byGroup(DEMO_MANIFEST).map((g) => '  ' + groupHTML(g)).join('\n');
   const notes = '<h2 class="pos-act-h">notes</h2>\n<ol class="pos-acts">'
     + NOTES_MANIFEST.map((n) => '  ' + noteHTML(n)).join('\n') + '</ol>';
   const menu = await readFile(join(HERE, 'menu.html'), 'utf8');
@@ -789,15 +812,13 @@ async function explode(jsonl, key2path) {
   return n;
 }
 
-const nSearch = await explode('proto/megatimeline/search-cache.jsonl', async (key) => {
-  // dev-server key === JSON.stringify(body.queryParams)
-  return `cache/search/${await queryHash(JSON.parse(key))}.json`;
-});
-const nItem = await explode('proto/megatimeline/items-cache.jsonl', async (key) => {
-  const m = key.match(/^(audio|video|photo):([a-z0-9-]+)$/);
-  return m ? `cache/item/${m[1]}/${m[2]}.json` : null;
-});
-console.log(`cache: ${nSearch} search results, ${nItem} items — served as static assets`);
+// ⚠️ THE EXPLODED CACHES WENT WITH MEGATIMELINE. They turned its two committed
+// JSONL files into one static asset per entry, so a cache hit was a plain file
+// read and ERR was never called for a query already on disk. Nothing else ever
+// read them: the page that asked for `cache/search/…` and `cache/item/…` is the
+// page now in `archive/`. `explode()` and `queryHash()` are left in this file —
+// they are the mechanism, and the next proto with a committed cache wants them.
+console.log('cache: nothing to explode — megatimeline is archived');
 console.log(SCRATCH
   ? `\nSCRATCH BUILD OK — ${OUT}. Nothing in public/ changed and nothing is deployed from here.`
   : `\nbuild ok — ${OUT}, stamp ${BUILD_STAMP}. Deploy with: node workers/view/deploy.mjs`);

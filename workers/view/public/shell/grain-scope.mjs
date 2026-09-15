@@ -103,6 +103,14 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   let band = null;                                 // {from, to, at} — 0..1
   const live = [];                                 // flickering grain ticks
   const scroll = [];                               // {t, v} for the audio-only view
+  // ⚠️ `wraps`, NOT `marks`. This object already had `mark(g)` — one grain, at
+  // the point in the material it read — and a second `mark()` defined lower in
+  // the SAME object literal silently replaced it. Every grain tick on
+  // `/radio1965/` stopped being drawn, the page's own assert read `0 ticks
+  // alive`, and it was put down to the station being off air, which it also
+  // was. Two names, two jobs, and the collision was invisible because a later
+  // key in an object literal simply wins.
+  const wraps = [];                                // {t} — moments worth seeing
   let sourceName = '', counts = { measured: 0, inferred: 0 };
   // 🔴 HOW SOLID THE GRAINS ARE DRAWN, AND IT IS A NUMBER THE PAGE OWNS.
   // `/radio1965/` blends a live station against the granulator chewing it, and
@@ -174,9 +182,30 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      */
     grainAlpha(v) { grainAlpha = Math.max(0, Math.min(1, Number(v) || 0)); },
 
+    /**
+     * A moment worth seeing on the scrolling wave — today, a loop coming round.
+     *
+     * 🔴 THE LOOP'S ENDS ARE NOT DRAWABLE HERE AND THE WRAP IS. This scope's
+     * axis is ARRIVAL TIME: the last few seconds of what came out, scrolling
+     * left. A loop's start and end are positions in the MEDIA, and at any rate
+     * but 1x the two axes advance at different speeds — so drawing the bounds
+     * on this picture would put media positions on a time axis, which is the
+     * reading the whole file is careful not to invite (see `grainSeconds`).
+     * A WRAP is different: it is a thing that happened at an instant, and an
+     * instant is exactly what this axis holds. Marked where it happened, it
+     * scrolls away with the audio it belongs to — and the spacing between two
+     * marks is the loop's length as you actually heard it, which is the one
+     * number a picture can give you that the transport cannot.
+     */
+    wrap() { wraps.push({ t: now() }); },
+
     source(name) { sourceName = name; },
-    clear() { live.length = 0; scroll.length = 0; peaks = null; counts = { measured: 0, inferred: 0 }; },
-    stats: () => ({ ...counts, flickering: live.length }),
+    clear() { live.length = 0; scroll.length = 0; wraps.length = 0; peaks = null; counts = { measured: 0, inferred: 0 }; },
+    /** Which of the two pictures is being drawn. ⚠️ READ OFF THE SAME STATE THE
+     *  PAINT BRANCHES ON, not off whatever a caller last asked for — a page
+     *  that thinks it switched and did not is exactly the thing worth checking. */
+    showing: () => (peaks && peaks.length ? 'material' : 'scrolling'),
+    stats: () => ({ ...counts, flickering: live.length, wraps: wraps.length }),
   };
 
   // ── paint ────────────────────────────────────────────────────────────────
@@ -317,6 +346,23 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         for (let i = scroll.length - 1; i >= 0; i--) ctx.lineTo(X(scroll[i].t), mid + scroll[i].v * k);
         ctx.closePath();
         ctx.fillStyle = C.line2; ctx.fill();
+        // ── the loop coming round ──────────────────────────────────────────
+        // One hairline where each wrap happened, ageing off the left with the
+        // audio it belongs to. Drawn OVER the wave and under the grains: it is
+        // a fact about the wave, not a thing in it.
+        while (wraps.length && wraps[0].t < x0) wraps.shift();
+        if (wraps.length) {
+          ctx.save();
+          ctx.strokeStyle = C.hi; ctx.lineWidth = 1;
+          for (const m of wraps) {
+            const x = X(m.t);
+            // Fading with age says which wrap is the recent one without a
+            // second channel; the newest is full strength.
+            ctx.globalAlpha = 0.25 + 0.55 * ((m.t - x0) / seconds);
+            ctx.beginPath(); ctx.moveTo(x + 0.5, 2); ctx.lineTo(x + 0.5, H - 2); ctx.stroke();
+          }
+          ctx.restore();
+        }
         // the grains, on the same seconds the wave is drawn on.
         // ⚠️ SKIPPED OUTRIGHT AT ZERO, not drawn at `globalAlpha = 0`. The two
         // are identical on screen and they are not identical to read: a loop

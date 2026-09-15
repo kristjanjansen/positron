@@ -71,6 +71,86 @@ const NS = 'http://www.w3.org/2000/svg';
 // ── the numbers, all of them, here ────────────────────────────────────────
 // A constant belongs beside the thing it governs; these govern the whole
 // picture, so this is beside it.
+/**
+ * 🔴 WHERE A BOX'S WORDS SIT, AND IT IS ONE SWITCH BECAUSE IT HAS TO BE
+ * REVERTABLE. Centred is what this drew for its whole life; top-left is what a
+ * technical diagram wants, because a reader scanning a column of boxes wants
+ * every name to start at the same x and the same y rather than to float
+ * according to how much else is in its box. Two boxes of different heights,
+ * centred, put their names at two different heights for a reason nobody can
+ * see.
+ *
+ * ⚠️ IT IS A CONSTANT, NOT A PER-CALL OPTION, ON PURPOSE. Half the pictures
+ * aligned one way and half the other is worse than either; and if this turns
+ * out to be wrong, `'centre'` here puts every diagram in the project back the
+ * way it was in one edit, which is the whole reason it is written like this.
+ */
+export const BOX_ALIGN = 'topleft';           // 'topleft' | 'centre'
+
+/**
+ * 🔴 A BOX HAS A HUE, AND A NOTE THAT NAMES IT BORROWS THE SAME ONE.
+ *
+ * Every note wants to point at another box, and prose cannot: `the clock above`
+ * means counting boxes, and a file path or a capitalised SERVER-SIDE means
+ * nothing to anybody. So the picture carries the reference instead. Each box is
+ * tinted with one hue mixed a long way into the page's own grey, and a **bold**
+ * run in a note whose text is a box's NAME is drawn in that same hue, stronger.
+ * Pointing is then a colour rather than a sentence.
+ *
+ * ⚠️ NO NEW SYNTAX, WHICH IS WHY IT WILL STILL BE TRUE NEXT YEAR. There is no
+ * `[[link]]` to remember and nothing to keep in step: writing **scsynth** in a
+ * note colours it because a box is called scsynth, and renaming that box moves
+ * the colour with it. A bold run that matches nothing stays plain bold, which
+ * is what bold already meant.
+ *
+ * ⚠️ AND THE TINT IS FAINT ON PURPOSE. These are boxes on a dark page, not a
+ * chart: at 14% the hue is a family resemblance you notice when you look for it
+ * and never a colour the picture is about. The text takes 62% because a word in
+ * a line of prose has a twentieth of the area to say it with.
+ */
+/**
+ * 🔴 ONE COLOUR PER TECHNOLOGY, ACROSS EVERY DIAGRAM IN THE PROJECT. A page's
+ * picture is not the only one anybody will see: Cloudflare is in four of them,
+ * a browser in six, a sound pipeline in three. If each diagram picked its own
+ * hues then Cloudflare would be orange here, teal there and violet on the third
+ * page, and the colour would carry nothing across the set. Declared `tech` on a
+ * node takes its colour from this table; anything else falls back to the
+ * rotation below, which only has to keep neighbours apart within one picture.
+ *
+ * ⚠️ `cloudflare` IS ITS OWN BRAND ORANGE and that is the point of naming it.
+ * The colour a reader has already learned from the thing itself is worth more
+ * than any scheme, and the rotation had picked violet for it.
+ */
+export const TECH_HUE = {
+  cloudflare: 28,          // their orange
+  browser: 205,            // the page you are reading this in
+  sound: 145,              // anything that makes or carries audio
+  graphics: 278,           // anything that draws
+  relay: 190,              // our own sockets and workers
+  device: 330,             // a machine in a room: a board, a phone, a speaker
+  archive: 250,            // ERR, archive.org, a corpus
+  station: 205,            // a broadcaster
+};
+
+/**
+ * For nodes with no `tech`. It only has to keep neighbours apart inside one
+ * picture, so the order is by contrast rather than by meaning.
+ * ⚠️ MIXED INTO A NEAR-BLACK GREY, every hue loses saturation and the warm ones
+ * lose the most: 35 degrees at a quarter strength came out as brown and was
+ * reported as muddy. The repair was not to ban warm hues, which would have made
+ * Cloudflare's own colour unusable, but to move the identity into the EDGE: the
+ * fill stays almost grey and the stroke carries the hue.
+ */
+const HUES = [205, 168, 278, 330, 145, 250, 190, 305];
+// Almost grey. A tinted fill this faint reads as "these two belong together"
+// and never as a colour the picture is about.
+const BOX_TINT = 0.1;
+// The edge is where a hue survives the mix, so this is where identity lives.
+const EDGE_TINT = 0.75;
+const TEXT_TINT = 0.62;
+const tint = (deg, amt, onto) =>
+  `color-mix(in oklab, hsl(${deg} 72% 62%) ${Math.round(amt * 100)}%, ${onto})`;
+
 const PAD           = 2;    // keeps a 2 px stroke off the svg's own edge
 const BOX_PAD_X     = 10;
 const BOX_PAD_Y     = 9;
@@ -85,7 +165,10 @@ const GAP_Y_COL     = 30;   // between two boxes in the one-column layout
 // all four sides is deliberate — a box inset further from one edge than another
 // reads as a box that has drifted rather than one that is held.
 const CHILD_PAD     = 8;    // a container's edge to the boxes inside it
-const CHILD_GAP     = 6;    // between two boxes inside one container
+// ⚠️ 10 RATHER THAN 6, so the line that ties two children together has room to
+// be seen. At 6 px the tie was four pixels of hairline between two box edges,
+// which is indistinguishable from the edges themselves.
+const CHILD_GAP     = 10;   // between two boxes inside one container
 const HEAD_GAP      = 7;    // a container's own words to its first box
 const BOX_TARGET_W  = 122;  // narrow the gaps until a box is at least this wide
 const BOX_MIN_W     = 92;   // narrower than this and it becomes one column
@@ -109,6 +192,10 @@ const GUTTER_PAD    = 16;   // a gutter's fixed part: 6 px to the box, 6 to the
                             // lane, and the 4 the shallowest lane sits in from
                             // the picture's edge
 const STEP_OFF      = 9;    // a step's name, off to one side of its arrow
+// How far out of the source a step turns before it changes height. Short, so a
+// fork's branches separate at once and each gets the rest of the gap at its own
+// target's height — which is the room its name needs. See `stepElbow`.
+const STEP_TURN     = 16;
 
 /** what the drawer assumes about type, when nothing has measured it yet */
 export const METRICS = {
@@ -522,12 +609,36 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   // height to every other box in the picture rather than keeping it, for the
   // same reason: a row of unequal panels ranks them.
   const kidInner = Math.max(20, w - CHILD_PAD * 2 - BOX_PAD_X * 2);
+  // ⚠️ ASSIGNED IN READING ORDER, PARENTS AND CHILDREN ALIKE, so neighbouring
+  // boxes never share a hue and the order is the one a reader meets them in.
+  // A node may state its own; that is what a page reaches for when two pictures
+  // have to agree about what colour a thing is.
+  {
+    let h = 0;
+    const give = (n) => {
+      if (n.hue == null && n.tech) n.hue = TECH_HUE[n.tech];
+      if (n.hue == null) n.hue = HUES[h++ % HUES.length];
+      for (const k of (n.children || [])) give(k);
+    };
+    for (const n of nodes) give(n);
+  }
   const fit = (n, width) => {
     n._lab = wrapLines(n.label, width, 2, measure.lab);
     n._sub = wrapLines(n.sub, width, 1, measure.sub);
     if (n._lab.cut) {
       cuts.push({ id: n.id, where: 'label', full: n._lab.full,
                   shown: n._lab.lines.join(' '), width });
+    }
+    // 🔴 A LONG NOTE IS REPORTED THE WAY A LONG LABEL IS. It cannot be cut at
+    // the reader, because a note is prose and half a sentence is worse than
+    // none; what it gets instead is a line in `cuts` so the author sees it.
+    // Forty words is about two sentences at this register. See CLAUDE.md.
+    if (n.note) {
+      const words = String(n.note).trim().split(/\s+/).length;
+      if (words > 40) {
+        cuts.push({ id: n.id, where: 'note', full: String(n.note),
+                    shown: `${words} words`, width: 40 });
+      }
     }
     if (n._sub.cut) {
       cuts.push({ id: n.id, where: 'sub', full: n._sub.full,
@@ -659,35 +770,17 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
           cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
                       shown: lab.lines.join(' '), width: budget });
         }
-        // ⚠️ "SIX PIXELS ABOVE THE MIDDLE" IS ONLY CLEAR OF A HORIZONTAL
-        // ARROW. A fork puts two boxes in one column, so its arrows are
-        // DIAGONAL — MEASURED in /kit/ at 655 px, the line for `settings`
-        // climbed 5.4 px through the middle of the word, and `and out` 4.8.
-        // The lift is the height the line itself gains across the name's own
-        // width, so the clearance is the same at any slope, and zero for a
-        // horizontal arrow, which is every picture with no branch in it.
-        //
-        // 🔴 AND EACH NAME GOES ON THE OUTSIDE OF ITS OWN ARROW, which lifting
-        // alone does not give you: the two branches of a fork leave one point
-        // and open a wedge, so putting both names above pushed `and out`
-        // 4.2 px into the branch above it — the same defect one arrow further
-        // on. A name that rises sits above its line and a name that falls sits
-        // below it, so the wedge stays empty and each name is on the side its
-        // own arrow is travelling away from.
-        const half = Math.max(...lab.lines.map((t) => measure.link(t)), 0) / 2;
-        const rise = x2 === x1 ? 0 : Math.abs((y2 - y1) / (x2 - x1)) * half;
-        const falls = y2 > y1;
-        const lx = (ox1 + ox2) / 2;
-        // where the LINE is under the name. The two are the same point in a
-        // picture with nothing nested, and the old expression is kept for that
-        // case so it cannot drift by a float's last bit.
-        const ym = (ox1 === x1 && ox2 === x2) ? (y1 + y2) / 2
-                 : y1 + (y2 - y1) * ((lx - x1) / (x2 - x1));
-        drawn.push({ ...l, d: `M${r1(x1)} ${r1(y1)} L${r1(x2)} ${r1(y2)}`,
-                     lab, lx,
-                     ly: falls ? ym + rise + 4 + m.linkSize * 0.85
-                               : ym - rise - 6,
-                     anchor: 'middle', stack: falls ? 'none' : 'up' });
+        // 🔴 SIX PIXELS ABOVE THE LINE, AND NOW THAT IS ALL IT TAKES. The old
+        // code measured the arrow's SLOPE and lifted each name clear of it,
+        // then put the two names of a fork on opposite sides so they did not
+        // fall into the wedge the branches open. Both were repairs to the
+        // diagonal; `stepElbow` has no slope and no wedge, so the line under
+        // every name is horizontal at its own target's height and the
+        // clearance is one number.
+        const turn = Math.min(x1 + STEP_TURN, (x1 + x2) / 2);
+        const lx = Math.max((ox1 + ox2) / 2, turn + 1);
+        drawn.push({ ...l, d: stepElbow(x1, y1, x2, y2, turn),
+                     lab, lx, ly: y2 - 6, anchor: 'middle', stack: 'up' });
         continue;
       }
       // over the row, out of the source's TOP edge and down into the target's
@@ -872,6 +965,44 @@ function acrossLane(sx, sy, tx, ty, dy, vs) {
        + ` L${r1(tx)} ${r1(ty)}`;
 }
 
+/**
+ * A STEP from one column to the next: out of the box, across, and in.
+ *
+ * 🔴 IT USED TO BE ONE STRAIGHT LINE FROM EDGE TO EDGE, and for a step between
+ * two boxes at the same height that is exactly what this still draws. The
+ * problem was the other case: a fork puts two boxes in one column, so its
+ * arrows ran DIAGONALLY, and a diagonal is the only line in the whole picture
+ * that is not horizontal or vertical — the lanes over and under the row have
+ * turned corners since they were written, the boxes have rounded corners, and
+ * two slanted arrows in the middle of that read as a different drawing.
+ * Reported twice, on two different pictures, as wanting `-|` with rounded
+ * turns. Same `CORNER` as the lanes above, so there is one radius in the file.
+ *
+ * ⚠️ THE TURN IS EARLY, NEAR THE SOURCE, AND THAT IS WHAT THE NAMES NEED. Turn
+ * late and every branch shares one long trunk at the source's height, so their
+ * names stack on top of each other; turn early and each branch gets the whole
+ * gap at its OWN target's height to be named in. The short stub they share is
+ * the fork, which is how a fork ought to look anyway.
+ *
+ * ⚠️ AND A FORK'S NAMES NO LONGER NEED LIFTING OFF THEIR OWN ARROWS. The old
+ * code measured the slope and pushed each name clear of the wedge two diverging
+ * branches open — MEASURED in `/kit/` at 655 px, `settings` climbed 5.4 px
+ * through the middle of its own word. There is no wedge now and no slope: the
+ * line under a name is horizontal, so the name sits a fixed distance above it.
+ */
+function stepElbow(sx, sy, tx, ty, bx) {
+  if (Math.abs(ty - sy) < 0.5) return `M${r1(sx)} ${r1(sy)} L${r1(tx)} ${r1(ty)}`;
+  const vs = ty > sy ? 1 : -1;                 // down the picture, or up it
+  const hs = tx > sx ? 1 : -1;                 // onward, which is left to right
+  const c = Math.min(CORNER, Math.abs(ty - sy) / 2,
+    Math.abs(bx - sx), Math.abs(tx - bx));
+  return `M${r1(sx)} ${r1(sy)} L${r1(bx - c * hs)} ${r1(sy)}`
+       + ` Q${r1(bx)} ${r1(sy)} ${r1(bx)} ${r1(sy + c * vs)}`
+       + ` L${r1(bx)} ${r1(ty - c * vs)}`
+       + ` Q${r1(bx)} ${r1(ty)} ${r1(bx + c * hs)} ${r1(ty)}`
+       + ` L${r1(tx)} ${r1(ty)}`;
+}
+
 /** a lane that runs DOWN the side: `hs` +1 left of the column, -1 right of it */
 function sideLane(sx, sy, tx, ty, bx, hs) {
   const k = ty < sy ? 1 : -1;          // the usual return direction: bottom to top
@@ -933,10 +1064,17 @@ function box(n, x, y, w, h, m, kidH) {
   const stack = ks.length
     ? HEAD_GAP + ks.length * kidH + (ks.length - 1) * CHILD_GAP : 0;
   const block = own + stack;
-  const top = y + (h - block) / 2;
+  // ⚠️ THE CHILDREN STILL HANG OFF `top`, whichever way the text is aligned, so
+  // a container's contents move with its head rather than needing a second rule.
+  const top = BOX_ALIGN === 'topleft' ? y + BOX_PAD_Y : y + (h - block) / 2;
   const out = {
     id: n.id, kind: n.kind || 'plain', x, y, w, h,
+    hue: n.hue,
     cx: x + w / 2, cy: y + h / 2,
+    // Where a line of text STARTS, and what it is anchored by. One pair, read
+    // by the renderer, so the switch above is the only place that decides.
+    tx: BOX_ALIGN === 'topleft' ? r1(x + BOX_PAD_X) : r1(x + w / 2),
+    anchor: BOX_ALIGN === 'topleft' ? 'start' : 'middle',
     label: lab, sub,
     labY: lab.lines.map((_, i) => r1(top + i * m.labLh + m.labLh / 2 + m.labSize * 0.35)),
     subY: r1(top + lab.lines.length * m.labLh + SUB_GAP + m.subLh / 2 + m.subSize * 0.35),
@@ -976,8 +1114,39 @@ function s(tag, attrs, text) {
  *        print which labels had to be shortened and at what width
  * @returns {{el, svg, cuts, mode, measured, render, destroy}}
  */
-export function createDiagram(host, spec, { onRender } = {}) {
+/**
+ * 🔴 ONE HEADING, ONE WORDING, ONE PLACE. Every page that explains itself ends
+ * with the same picture under the same three words, and the moment that is
+ * typed per page it becomes "How this works" on one, "How it works" on the
+ * next and "how this works" on a third — which is a reader having to notice
+ * that they are the same thing. It is a constant because it is a promise the
+ * site makes, not a label a page chooses.
+ */
+export const HOW = 'How this works';
+
+/**
+ * @param {object} [o]
+ * @param {boolean} [o.how]  put the standing heading above it. A page passes
+ *                           `how: true` and says nothing about the words.
+ */
+export function createDiagram(host, spec, { onRender, how = false, atEnd = false } = {}) {
   const uid = `dg${++seq}`;
+  // 🔴 `atEnd` PUTS IT AFTER THE LOG, WHICH IS THE ACTUAL BOTTOM OF THE PAGE.
+  // `mount()` appends the log to `document.body`, not to `.pos-body`, so a
+  // diagram appended to the page's own element lands ABOVE it however late it
+  // is built — which is the whole page except the last box. A page that wants
+  // its explanation last has to say so, because "last" is not where the host
+  // element ends.
+  // ⚠️ Outside `.pos-body` the shell's `* + *` rhythm does not reach it, so the
+  // gap above comes from a class rather than from the page's own spacing.
+  const place = atEnd ? document.body : host;
+  if (atEnd) place.classList.add('has-dg-end');
+  if (how) {
+    const h = document.createElement('h2');
+    h.className = atEnd ? 'pos-how pos-dg-end' : 'pos-how';
+    h.textContent = HOW;
+    place.append(h);
+  }
   const wrap = document.createElement('figure');
   wrap.className = 'pos-dg';
 
@@ -1023,6 +1192,9 @@ export function createDiagram(host, spec, { onRender } = {}) {
   // plain text and drawn with a bold run in it can take one more line than was
   // reserved — which is the jump this whole mechanism exists to prevent,
   // reintroduced by the measurement instead of by the drawing.
+  // Every box's name, lower-cased, to the hue it was drawn in. Rebuilt on each
+  // layout because a re-layout can change what is in the picture.
+  let hueOfName = new Map();
   const say = (text) => {
     cap.textContent = '';
     for (const part of boldParts(text)) {
@@ -1030,13 +1202,19 @@ export function createDiagram(host, spec, { onRender } = {}) {
       if (!part.bold) { cap.append(part.text); continue; }
       const b = document.createElement('strong');
       b.textContent = part.text;
+      // 🔴 THE REFERENCE IS A COLOUR. A bold run whose text is a box's name is
+      // drawn in that box's own hue, so a note can point at a box without
+      // saying "the one above" or naming a file. Anything else stays plain
+      // bold, which is what bold already meant.
+      const hue = hueOfName.get(part.text.trim().toLowerCase());
+      if (hue != null) b.style.color = tint(hue, TEXT_TINT, 'var(--fg)');
       cap.append(b);
     }
   };
   say(spec.caption || '');
 
   wrap.append(head, svg, cap);
-  host.append(wrap);
+  place.append(wrap);
 
   const api = { el: wrap, svg, cuts: [], mode: 'row', measured: false, render, destroy };
 
@@ -1116,21 +1294,30 @@ export function createDiagram(host, spec, { onRender } = {}) {
     const spoken = (t) => boldParts(t).map((q) => q.text).join('');
     g.setAttribute('aria-label',
       [n.title, n.note && spoken(n.note)].filter(Boolean).join('. '));
-    g.append(s('rect', {
+    const rect = s('rect', {
       class: n.kids ? 'pos-dg-box pos-dg-cbox' : 'pos-dg-box',
       x: n.x + 0.5, y: n.y + 0.5, width: n.w - 1, height: n.h - 1, rx: 5, ry: 5,
-    }));
+    });
+    // ⚠️ SET AS CUSTOM PROPERTIES, NOT AS `fill`. The stylesheet still owns
+    // which state wins — a hovered box, a container, a dashed cloud — and it
+    // reads these two. An inline `fill` would beat every one of those rules and
+    // the kinds would quietly stop meaning anything.
+    if (n.hue != null) {
+      rect.style.setProperty('--dg-fill', tint(n.hue, BOX_TINT, 'var(--card2)'));
+      rect.style.setProperty('--dg-stroke', tint(n.hue, EDGE_TINT, 'var(--line2)'));
+    }
+    g.append(rect);
     if (n.label.lines.length) {
-      const t = s('text', { class: 'pos-dg-lab', x: r1(n.cx), y: n.labY[0],
-                            'text-anchor': 'middle' });
+      const t = s('text', { class: 'pos-dg-lab', x: n.tx, y: n.labY[0],
+                            'text-anchor': n.anchor });
       n.label.lines.forEach((line, i) => {
-        t.append(s('tspan', { x: r1(n.cx), y: n.labY[i] }, line));
+        t.append(s('tspan', { x: n.tx, y: n.labY[i] }, line));
       });
       g.append(t);
     }
     if (n.sub.lines.length) {
-      g.append(s('text', { class: 'pos-dg-sub', x: r1(n.cx), y: n.subY,
-                           'text-anchor': 'middle' }, n.sub.lines[0]));
+      g.append(s('text', { class: 'pos-dg-sub', x: n.tx, y: n.subY,
+                           'text-anchor': n.anchor }, n.sub.lines[0]));
     }
     // Hovering writes what this box DOES into the line under the picture.
     // Not a tooltip: a tooltip is drawn on top of the thing it describes and
@@ -1179,6 +1366,18 @@ export function createDiagram(host, spec, { onRender } = {}) {
     });
     probe.textContent = '';
 
+    // ⚠️ REBUILT ON EVERY LAYOUT, not once at construction. A re-layout can put
+    // different boxes in the picture, and a stale name-to-hue map would colour
+    // a word after the box it named had gone.
+    hueOfName = new Map();
+    for (const n of L.nodes) {
+      const add = (x) => {
+        if (x.hue != null && x.label?.full) hueOfName.set(x.label.full.trim().toLowerCase(), x.hue);
+        for (const k of (x.kids || [])) add(k);
+      };
+      add(n);
+    }
+
     svg.setAttribute('width', L.width);
     svg.setAttribute('height', L.height);
     svg.setAttribute('viewBox', `0 0 ${L.width} ${L.height}`);
@@ -1204,27 +1403,66 @@ export function createDiagram(host, spec, { onRender } = {}) {
     for (const n of L.nodes) if (n.kids) field.append(nodeGroup(n));
 
     for (const l of L.links) {
-      field.append(s('path', {
+      // 🔴 AN ARROW IS A THING YOU CAN POINT AT NOW, AND IT NEEDED A HIT AREA TO
+      // BE ONE. A `<path>` with no fill is only hittable ON ITS STROKE, and the
+      // stroke is one pixel — so the arrow that carries the most interesting
+      // sentence in the picture ("what actually travels here") was the one thing
+      // a pointer could not reach. The fat transparent copy underneath is the
+      // standard repair: same geometry, twelve pixels wide, invisible.
+      const lg = s('g', { class: 'pos-dg-l', tabindex: '0', role: 'img' });
+      lg.append(s('path', { class: 'pos-dg-hit', d: l.d }));
+      lg.append(s('path', {
         class: l.back ? 'pos-dg-link pos-dg-back' : 'pos-dg-link',
         d: l.d, 'marker-end': `url(#${uid}-${l.back ? 'b' : 'f'})`,
       }));
-      if (!l.lab.lines.length) continue;
-      const first = l.stack === 'up' ? l.ly - (l.lab.lines.length - 1) * m.linkLh : l.ly;
-      const t = s('text', { class: 'pos-dg-llab', x: r1(l.lx), y: r1(first),
-                            'text-anchor': l.anchor });
-      l.lab.lines.forEach((line, i) => {
-        t.append(s('tspan', { x: r1(l.lx), dy: i ? m.linkLh : 0 }, line));
-      });
-      // the whole name for a screen reader, with NO native tooltip — this is
-      // the same trade the boxes make, and a cut is reported on `cuts` for the
-      // author rather than hidden behind a hover for the reader
-      if (l.lab.cut) t.setAttribute('aria-label', l.lab.full);
-      field.append(t);
+      if (l.lab.lines.length) {
+        const first = l.stack === 'up' ? l.ly - (l.lab.lines.length - 1) * m.linkLh : l.ly;
+        const t = s('text', { class: 'pos-dg-llab', x: r1(l.lx), y: r1(first),
+                              'text-anchor': l.anchor });
+        l.lab.lines.forEach((line, i) => {
+          t.append(s('tspan', { x: r1(l.lx), dy: i ? m.linkLh : 0 }, line));
+        });
+        // the whole name for a screen reader, with NO native tooltip — this is
+        // the same trade the boxes make, and a cut is reported on `cuts` for the
+        // author rather than hidden behind a hover for the reader
+        if (l.lab.cut) t.setAttribute('aria-label', l.lab.full);
+        lg.append(t);
+      }
+      // ⚠️ AND IT SAYS WHAT TRAVELS, not what the arrow is called. The label is
+      // already on the picture; a hover that repeated it would be the third
+      // channel carrying one fact, which is the mistake the boxes' own note
+      // exists to avoid. With no `note` written, the label is still better than
+      // an empty line.
+      const said = l.note || l.lab.full || `${l.from} to ${l.to}`;
+      lg.setAttribute('aria-label', said);
+      const lshow = () => { lg.dataset.on = '1'; cap.dataset.on = '1'; say(said); };
+      const lhide = () => { delete lg.dataset.on; resetCaption(); };
+      lg.addEventListener('pointerenter', lshow);
+      lg.addEventListener('pointerleave', lhide);
+      lg.addEventListener('focus', lshow);
+      lg.addEventListener('blur', lhide);
+      field.append(lg);
     }
 
     for (const n of L.nodes) {
-      if (n.kids) for (const k of n.kids) field.append(nodeGroup(k));
-      else field.append(nodeGroup(n));
+      if (n.kids) {
+        // 🔴 THE THINGS INSIDE ONE MACHINE ARE JOINED, AND THE JOIN HAS NO
+        // ARROWHEAD. Three boxes stacked inside a container read as three
+        // unrelated things that happen to be in the same room; a line between
+        // them says they are one chain. ⚠️ AND NO HEAD, WHICH IS THE WHOLE
+        // POINT: every arrow in this picture means "the signal goes this way",
+        // and a head here would claim an ORDER between the parts of one machine
+        // that the drawing does not know. It is a bracket, not a step.
+        // Drawn BEFORE the children so a box's own fill covers its ends.
+        for (let i = 0; i + 1 < n.kids.length; i++) {
+          const a = n.kids[i], b = n.kids[i + 1];
+          field.append(s('path', {
+            class: 'pos-dg-tie',
+            d: `M${r1(a.x + 12)} ${r1(a.y + a.h)} L${r1(a.x + 12)} ${r1(b.y)}`,
+          }));
+        }
+        for (const k of n.kids) field.append(nodeGroup(k));
+      } else field.append(nodeGroup(n));
     }
 
     // 🔴 THE LINE UNDER THE PICTURE KEEPS ITS HEIGHT, OR HOVERING MOVES THE

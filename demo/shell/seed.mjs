@@ -33,27 +33,69 @@ export function mulberry32(seed) {
  * rather than of whether the world is the same. Round at the boundary, once,
  * and the claim "the same seed rebuilds the same room" means what it says.
  */
+/**
+ * 🔴 THE UNIT, AND EVERYTHING ELSE IS A MULTIPLE OF IT. A builder needs a grid
+ * or it is a pile: two bricks are either in the same system or they are two
+ * objects that happen to be near each other. 0.2 m is a brick you can pick up
+ * with a controller and stack four of before it is out of reach.
+ */
+export const UNIT = 0.2;
+/**
+ * 🔴 ONE SIZE, AND EVERY SIDE THE SAME. Three sizes were tried and they are the
+ * wrong kind of variety here: mixed cubes on one grid make the grid hard to
+ * read — you cannot tell at a glance whether two faces line up — and the snap
+ * has to offset each brick by its OWN half, so two bricks of different sizes
+ * sit on interleaved lattices that only meet every few units. One cube, one
+ * lattice, every face on a line. Colour is what makes one brick different from
+ * the next, which is one channel doing one job.
+ */
+export const BRICKS = [1];
+
+/**
+ * 🔴 A CURATED SET, NOT A ROTATION AROUND A RANDOM HUE. The old palette was
+ * `hue + r() * 0.34` — a wedge of the colour wheel starting somewhere the seed
+ * chose, which gave a coherent room and a DIFFERENT coherent room every roll,
+ * including some muddy ones. These are picked: primaries a brick is actually
+ * made in, plus a light and a dark neutral to build with. A seed chooses which
+ * of them appear, never what they are.
+ *
+ * ⚠️ THEY ARE HUES ON `hueRGB`'s COSINE, not RGB triples, because that is what
+ * the renderer takes — `0.45 + 0.55 * cos(2π(h + k))` per channel. Changing the
+ * shader to accept RGB is a bigger change than this is worth, and the cosine
+ * family is what makes them look like one set rather than six colours.
+ */
+export const PALETTE = [0.02, 0.09, 0.15, 0.36, 0.55, 0.72];
+
 export function world(seed) {
   const r = mulberry32(seed);
-  const n = 10 + Math.floor(r() * 22);
+  const n = 12 + Math.floor(r() * 16);
   const hue = Math.round(r() * 1000) / 1000;
   const things = [];
   for (let i = 0; i < n; i++) {
-    const ang = r() * Math.PI * 2;
-    const rad = 1.4 + r() * 3.2;
+    // 🔴 ON THE GRID FROM THE START. A generator that scatters and a builder
+    // that snaps disagree about where things belong, and the disagreement shows
+    // the first time you pick something up: it jumps. Placed on the grid, the
+    // first brick you move is already where the rule would have put it.
+    const u = BRICKS[Math.floor(r() * BRICKS.length)];
+    const half = u * UNIT / 2;
+    const gx = Math.floor(r() * 21) - 10;        // a 21x21 plate of unit cells
+    const gz = Math.floor(r() * 21) - 10;
+    const lift = Math.floor(r() * 5);            // how many units off the floor
     things.push({
-      x: round(Math.cos(ang) * rad),
-      y: round(0.3 + r() * 2.4),
-      z: round(Math.sin(ang) * rad),
-      s: round(0.12 + r() * 0.42),
-      rx: round(r() * Math.PI),
-      ry: round(r() * Math.PI),
-      spin: round((r() - 0.5) * 0.7),
-      // The palette is a rotation around the seed's hue rather than a free
-      // colour per object: a room of unrelated colours reads as noise, and the
-      // one thing a viewer should be able to see is that two rooms from two
-      // seeds are DIFFERENT rooms rather than the same room reshuffled.
-      c: round(hue + r() * 0.34),
+      x: round(gx * UNIT + half),
+      // ⚠️ SITTING ON SOMETHING, NEVER FLOATING AT A FRACTION. `y` is the
+      // CENTRE, so a brick resting on the floor has its centre at half its own
+      // height — which is the one place the snap below will also put it.
+      y: round(lift * UNIT + half),
+      z: round(gz * UNIT + half),
+      s: round(u * UNIT),
+      // ⚠️ NO TUMBLING. `rx`, `ry` and `spin` are what made these look like
+      // rubble; a brick is axis-aligned or it is not a brick. They are kept in
+      // the document at zero rather than dropped, because the renderer and the
+      // validator both still read them and a missing field is a different
+      // document.
+      rx: 0, ry: 0, spin: 0,
+      c: PALETTE[Math.floor(r() * PALETTE.length)],
     });
   }
   // Fixed key order, so `JSON.stringify` is canonical without a sort.

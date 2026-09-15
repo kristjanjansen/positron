@@ -44,6 +44,7 @@
 // test for it — one table, read here at render time, so a row's `data-needs`
 // and the browser's answer can never disagree about what a name means.
 import { needsOf } from './shell/caps.mjs';
+import { cardHTML } from './shell/card.mjs';
 
 export const ACTS = new Map([
   [0, 'the substrate'],
@@ -56,43 +57,43 @@ export const ACTS = new Map([
 ]);
 
 export const DEMOS = [
-  { name: 'transport', act: 0, created: '2026-09-04', built: true,
+  { name: 'transport', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'twenty things happen a second apart — how close to on time each one lands',
     tags: ['timeline'] },
-  { name: 'lanes', act: 0, created: '2026-09-04', built: true,
+  { name: 'lanes', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'an audio lane and a data lane on one transport',
     tags: ['timeline', 'WebAudio'] },
-  { name: 'loops', act: 0, created: '2026-09-04', built: true,
+  { name: 'loops', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'one recording placed three times — a slice, the same slice faster, and a loop',
     tags: ['timeline'] },
-  { name: 'score', act: 0, created: '2026-09-04', built: true,
+  { name: 'score', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'a score round-trips byte-identically and refuses mutation',
     tags: ['timeline'] },
-  { name: 'vclick', act: 0, created: '2026-09-07', built: true,
+  { name: 'vclick', group: 'timeline', act: 0, created: '2026-09-07', built: true,
     one: 'a Csound score compiled to a timeline — the tempo map is an integral, the repeat is a quotation',
     tags: ['timeline', 'Csound', 'WebAudio'] },
-  { name: 'click', act: 0, created: '2026-09-14', built: true,
+  { name: 'click', group: 'timeline', act: 0, created: '2026-09-14', built: true,
     one: 'U:’s wireless click track, playing their own score with nothing on the wire',
     tags: ['timeline', 'Csound'] },
 
-  { name: 'llhls', act: 1, created: '2026-09-04', built: true,
+  { name: 'llhls', group: 'transports', act: 1, created: '2026-09-04', built: true,
     one: 'the tuned v6 player on a live input this page starts and stops',
     tags: ['LL-HLS', 'Stream', 'container'],
     // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
     // harness asserts against a 204 and calls a working demo broken
     settleMs: 75000 },
-  { name: 'webrtc', act: 1, created: '2026-09-04', built: true,
+  { name: 'webrtc', group: 'transports', act: 1, created: '2026-09-04', built: true,
     one: 'the same live input over WHEP; same burned-in clock as 06',
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000 },
-  { name: 'moq', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
+  { name: 'moq', group: 'transports', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
     one: 'browser to browser over MoQ, the fast tier',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
 
-  { name: 'room', act: 2, created: '2026-09-04', built: true,
+  { name: 'room', group: 'transports', act: 2, created: '2026-09-04', built: true,
     one: 'join a room and see the others; peer to peer, the relay only signals',
     tags: ['getUserMedia', 'WebRTC', 'relay'] },
-  { name: 'cues', act: 2, created: '2026-09-04', built: true,
+  { name: 'cues', group: 'transports', act: 2, created: '2026-09-04', built: true,
     one: 'fire one cue; every open copy of the page acts on it, tokenless',
     tags: ['DO', 'WS', 'relay'] },
   // Act 2 with `cues` and for the same reason — one act reaching everybody —
@@ -111,7 +112,7 @@ export const DEMOS = [
   // deliberately not a progressive web app, because a site-wide worker is a
   // cache and this project's whole debugging discipline rests on the BUILD
   // stamp saying which build is live.
-  { name: 'items', act: 2, created: '2026-09-14', built: true, settleMs: 11000,
+  { name: 'items', group: 'vain', act: 2, created: '2026-09-14', built: true, settleMs: 11000,
     one: 'write an item, and it publishes itself at the moment you named — and tells the phones',
     tags: ['DO', 'alarms', 'push', 'PWA'] },
   // The demo ABOUT the socket, rather than one that happens to use it: the
@@ -122,7 +123,7 @@ export const DEMOS = [
   // rather than demo/verify.mjs — the ordinary harness runs Chrome with
   // --disable-gpu, where getContext('webgl2') returns null and every assert
   // here would be unreachable.
-  { name: 'mirror', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000, room: 'fixed',
+  { name: 'mirror', group: 'xr', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000, room: 'fixed',
     one: 'the same shader drawn by your browser and by a Raspberry Pi, side by side',
     tags: ['WebGL2', 'WebCodecs', 'H.264', 'WS'] },
 
@@ -139,11 +140,22 @@ export const DEMOS = [
   // The Immersive Web Emulator satisfies both on a laptop, which makes it
   // useful for writing the page and worthless as evidence about a device —
   // research/quest-xr calls that "the iPhone mistake in a new accent".
-  { name: 'scene', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 6000,
-    one: 'a room built from one number — roll it, and the same number rebuilds it exactly',
+  { name: 'blocks', group: 'xr', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 6000,
+    one: 'square bricks on a grid — pick one up and it snaps to whatever you set it on',
     tags: ['WebXR', 'WebGL2', 'relay', 'seeded'] },
 
-  { name: 'wire', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
+  // Typography with a position rather than a place on a page. `gl: true` and
+  // `xr: true` for the reason mirror, blocks and floor carry them: verify.mjs
+  // runs --disable-gpu, where getContext('webgl2') is null.
+  // ⚠️ `settleMs` COVERS A DISTANCE TRANSFORM PER WORD. Eleven fields are
+  // computed in JavaScript at load — measured around 25 ms each on this
+  // machine — before the page has anything to say, and the first assert sits
+  // behind all of them.
+  { name: 'held', group: 'xr', act: 0, created: '2026-09-15', built: true, gl: true, xr: true, settleMs: 8000,
+    one: 'big words standing in a room, flat and fixed — walk to the side and a word becomes a line',
+    tags: ['WebXR', 'WebGL2', 'fonts'] },
+
+  { name: 'wire', group: 'transports', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
     one: 'compose a message, watch the exact bytes go and come back, and read the history',
     tags: ['WS', 'DO', 'SQLite'] },
 
@@ -158,7 +170,7 @@ export const DEMOS = [
   // assert, and every assert on this page sits behind a recording that runs to
   // a 10 s cap. Shrink it and the suite reads zero asserts and calls a working
   // page broken.
-  { name: 'take', act: 3, created: '2026-09-07', built: true, settleMs: 13000,
+  { name: 'take', group: 'capture', act: 3, created: '2026-09-07', built: true, settleMs: 13000,
     one: 'record two takes; they land end to end on one line and it plays and scrubs as one',
     tags: ['getUserMedia', 'MediaRecorder', 'timeline', 'local only'] },
   // The 2025 experiment finished: an automation lane bound to a media clip,
@@ -174,108 +186,119 @@ export const DEMOS = [
   // assert, and every assert sits behind a recorded clip, a drawn pass and a
   // five-point seek sweep. Shrink it and the suite reads zero asserts and calls
   // a working page broken.
-  { name: 'memento', act: 3, created: '2026-09-13', built: true, settleMs: 13000,
+  { name: 'memento', group: 'capture', act: 3, created: '2026-09-13', built: true, settleMs: 13000,
     one: 'move a knob while a clip plays; it lands on the same line and comes back in the right place',
     tags: ['MediaRecorder', 'timeline', 'canvas', 'local only'] },
   // The round trip a browser can make on its own: publish out through a worker
   // that holds the key, subscribe back, and record the copy that came back.
   // settleMs covers the WHIP handshake, the WHEP handshake and one take.
-  { name: 'keep', act: 3, created: '2026-09-08', built: true, settleMs: 30000,
+  { name: 'keep', group: 'capture', act: 3, created: '2026-09-08', built: true, settleMs: 30000,
     one: 'send a picture out, record the copy that comes back, and scrub it',
     tags: ['getUserMedia', 'WHIP', 'WHEP', 'timeline'] },
-  { name: 'record', act: 3, created: '2026-09-04', built: true,
+  { name: 'record', group: 'capture', act: 3, created: '2026-09-04', built: true,
     one: 'record in segments and ship each one, so disk stays flat',
     tags: ['MediaRecorder', 'R2'] },
-  { name: 'replay', act: 3, created: '2026-09-04', built: true,
+  { name: 'replay', group: 'capture', act: 3, created: '2026-09-04', built: true,
     one: 'a 190 s show off R2, played with the eight cues it was recorded with',
     tags: ['HLS', 'R2', 'timeline'] },
-  { name: 'seek', act: 3, created: '2026-09-04', built: true,
+  { name: 'seek', group: 'capture', act: 3, created: '2026-09-04', built: true,
     one: 'seek inside that recording; the fold at any position must be exact',
     tags: ['HLS', 'R2', 'timeline'] },
 
-  { name: 'looper', act: 4, created: '2026-09-04', built: true,
+  { name: 'looper', group: 'instruments', act: 4, created: '2026-09-04', built: true,
     one: 'a keyboard into a WebAudio synth, then loop what you played',
     tags: ['WebAudio', 'AudioWorklet'] },
-  { name: 'instrument', act: 4, created: '2026-09-04', built: true,
+  { name: 'instrument', group: 'instruments', act: 4, created: '2026-09-04', built: true,
     one: 'play an instrument that is somewhere else, and hear how late it is',
     tags: ['WebMIDI', 'relay', 'WebAudio', 'WebRTC'] },
-  { name: 'jam', act: 4, created: '2026-09-04', built: true,
+  { name: 'jam', group: 'instruments', act: 4, created: '2026-09-04', built: true,
     one: 'two browsers on one pulse, on a peer-corrected clock',
     tags: ['WS', 'relay', 'WebAudio'] },
 
   // The archival horizon and the timeline library, meeting for the first time:
   // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
   // committed; the media streams from ERR and nothing is stored here.
-  { name: 'reel', act: 5, created: '2026-09-08', built: true,
+  { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true,
     one: 'every 1965 newsreel on one line, at the day it was broadcast',
     tags: ['ERR', 'archive', 'timeline'] },
-  { name: 'now', act: 5, created: '2026-09-08', built: true,
+  { name: 'now', group: 'err', act: 5, created: '2026-09-08', built: true,
     one: 'one live ERR channel on a line whose right-hand end is the present moment',
     tags: ['HLS', 'live', 'timeline', 'DVR'],
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
     // fetch + a 13-point two-byte sweep, all behind control 0
     settleMs: 26000 },
-  // `gl: true` and `xr: true` for the same reason mirror and scene carry them:
+  // `gl: true` and `xr: true` for the same reason mirror and blocks carry them:
   // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
   // a GPU page graded there reports a defect that belongs to the harness.
   // `node demo/verify-gl.mjs` is the grader.
-  { name: 'floor', act: 5, created: '2026-09-14', built: true, gl: true, xr: true,
+  { name: 'floor', group: 'xr', act: 5, created: '2026-09-14', built: true, gl: true, xr: true,
     one: 'every 1965 newsreel face up on a floor you walk over, and any of them plays where it lies',
     tags: ['WebGL2', 'WebXR', 'ERR', 'archive', 'HLS'],
     // 298 thumbnails arrive as you look at them; a cold floor is a few seconds
     // of fetching before there is much to see
     settleMs: 4000 },
-  { name: 'flipper', act: 5, created: '2026-09-04', built: true,
+  { name: 'flipper', group: 'err', act: 5, created: '2026-09-04', built: true,
     one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],
     settleMs: 14000 },
   // Everything that could be reached about one artist, before anything is
   // played: 122 rows out of fourteen archives, saying when it is from, who
   // holds it, what it is, whether there is a file and what its licence allows.
-  // Refs only — nothing is copied here. `demo/kurenniemi/build-corpus.mjs`
+  // Refs only — nothing is copied here. `demo/resources/build-corpus.mjs`
   // gathers it and folds in the shorter list `aikajana` plays from, and the
   // page re-checks that fold from the other end so the two cannot disagree.
-  { name: 'kurenniemi', act: 5, created: '2026-09-14', built: true,
+  { name: 'resources', group: 'kurenniemi', act: 5, created: '2026-09-14', built: true,
     one: 'every reachable source and asset of Erkki Kurenniemi: who holds it, when, and what it allows',
     tags: ['archive', 'provenance'] },
   // The same corpus as the row above, on an axis instead of in a table: one
   // mark per record, as wide as its date is vague, and the twenty-six a browser
   // can open are pressable. Named for the thing you can hear, because that is
   // the reason it exists rather than the table.
-  { name: 'tapes', act: 5, created: '2026-09-15', built: true,
+  { name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true,
     one: 'Kurenniemi in time — a mark as wide as its date is vague, and the ones you can play',
     tags: ['timeline', 'uncertainty', 'archive'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
-  { name: 'aikajana', act: 5, created: '2026-08-28', built: false, page: '/proto/aikajana/',
+  { name: 'deck', group: 'kurenniemi', act: 5, created: '2026-08-28', built: false, page: '/proto/deck/',
     one: "Erkki Kurenniemi's corpus on one deck, media from archive.org",
     tags: ['timeline', 'not shelled'] },
-  { name: 'megatimeline', act: 5, created: '2026-08-27', built: false, page: '/proto/megatimeline/',
-    one: 'the ERR archive as one zoomable century, 1908 to 2026',
-    tags: ['canvas', 'DO cache', 'not shelled'] },
-  { name: 'remixer', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
+  // ⚠️ `megatimeline` IS OFF THE MENU AND STILL ON THE EDGE. The row is gone;
+  // the page, its viewport module, its gesture module and the committed census
+  // are all still built and still answer at <https://positron.studio/proto/megatimeline/>,
+  // because taking a row off a list and deleting a deployed page are different
+  // acts and only the first was asked for. Moving the files into `archive/` is
+  // a second, larger step — four entries out of the build's allowlist and a URL
+  // that starts 404ing — and it is decided on purpose rather than as a side
+  // effect of tidying the front page.
+  { name: 'remixer', group: 'err', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
     one: 'stack archive recordings from any year on one playhead',
     tags: ['HLS', 'timeline', 'not shelled'] },
 
-  { name: 'studio', act: 6, created: '2026-08-26', built: false,
-    one: 'the operator surface: go live, fire cues, archive the show',
-    tags: ['WebRTC', 'DO', 'R2'],
-    why: 'consumes 10 through 14' },
-  { name: 'capture', act: 4, created: '2026-09-05', built: true, settleMs: 26000,
+  // ⚠️ `studio` IS GONE FROM THE LIST AND THERE WAS NOTHING TO ARCHIVE. It never
+  // had a page: the row was a placeholder carrying `why: 'consumes 10 through
+  // 14'`, which is a promise rather than a demo, and it had sat on the front
+  // page unbuilt since 2026-08-26. `plan-studio.md` still holds the argument
+  // for it, which is where a proposal belongs. A row for a page that does not
+  // exist makes the list longer and the reader's odds worse.
+  { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, settleMs: 26000,
     one: 'camera in, segments out, played back on the timeline',
     tags: ['getUserMedia', 'MediaRecorder', 'R2', 'timeline'] },
   // the first page where all three legs meet: live over a real WebRTC hop, the
   // FAR END of that hop recorded, and the recording scrubbed on the deck
-  { name: 'show', act: 3, created: '2026-09-05', built: true, settleMs: 9000,
+  { name: 'show', group: 'capture', act: 3, created: '2026-09-05', built: true, settleMs: 9000,
     one: 'live over WebRTC, recorded off the far end of that hop, replayed on the timeline',
     tags: ['getUserMedia', 'WebRTC', 'MediaRecorder', 'timeline'] },
 
   // 26 is Act 5 with 19: both are ERR's live output, one television and one
   // radio, and both are here because the archive work needs the live end of the
   // same pipe. `built` flips the moment positron-shout answers.
-  { name: 'shout', act: 5, created: '2026-09-06', built: true, settleMs: 12000,
-    one: 'an icecast stream through Cloudflare — the relay adds the CORS that makes it measurable',
-    tags: ['Icecast', 'Workers', 'WebAudio'] },
+  // ⚠️ `shout` IS OFF THE LIST AND ITS WORKER IS UNTOUCHED. The demo page was a
+  // measurement OF the relay — status, CORS, bitrate, burst, underruns — and
+  // `/radio1965/` now makes the same relay do something you can hear, which is
+  // the better demonstration of the same fact. 🔴 `workers/shout/` STAYS AND
+  // MUST: it is the thing that carries the station's plain-HTTP mount to a
+  // secure page, and deleting it takes `/radio1965/` and `/grains/` with it.
+  // The page's own source is under `archive/`.
 
   // Act 5 with shout, and deliberately NOT a second copy of it: same relay,
   // different subject. `shout` asks what Cloudflare costs in front of an
@@ -291,14 +314,14 @@ export const DEMOS = [
   // to cover a wasm scsynth boot, 31 buffer allocations, a definition, a 2.5 s
   // level, two 700 ms ink samples and a 1.2 s deafness control before the page
   // says anything at all.
-  { name: 'radio1965', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
+  { name: 'radio1965', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
     one: 'a live radio station in Tallinn, reachable from a secure page only through a relay of ours',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
 
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
   // network demo — it touches nothing outside the page.
-  { name: 'strip', act: 0, created: '2026-09-04', built: true,
+  { name: 'strip', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'deep time, uncertain dates, and a statistic that names what it dropped',
     tags: ['timeline', 'canvas'] },
   // The studio Mac as an instrument: the same page as /box/, pointed at a
@@ -309,7 +332,7 @@ export const DEMOS = [
   // renders while that audio carries on to the speakers — so BlackHole, the
   // Multi-Output Device and Live's own output setting are all out of the path.
   // MEASURED over the relay: silence 0.00000, keys down -5.3 dBFS.
-  { name: 'rack', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',
+  { name: 'rack', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',
     one: 'play Ableton Live on a studio Mac from here, with no virtual audio cable',
     tags: ['Ableton Live', 'CoreMIDI', 'CoreAudio tap', 'relay', 'PCM'] },
 
@@ -327,7 +350,7 @@ export const DEMOS = [
   // been given a page — hold 24.19 px against Catmull-Rom 0.036, and 93.4% of
   // the drawn line invented. The adapter was the asset; its hand-rolled UI is
   // what the kit replaces.
-  { name: 'draw', act: 0, created: '2026-09-13', built: true,
+  { name: 'draw', group: 'timeline', act: 0, created: '2026-09-13', built: true,
     one: 'record a gesture, play it back, and see how much of the line was never recorded',
     tags: ['pointer', 'timeline', 'canvas'] },
   // The last of the protos to be given a page, promoted from proto/text/: the
@@ -337,7 +360,7 @@ export const DEMOS = [
   // each change DID to the document, which is what makes a seek a fold rather
   // than a replay — 73 edits captured through a real browser, rebuilt to the
   // browser's own text character for character.
-  { name: 'typist', act: 0, created: '2026-09-13', built: true,
+  { name: 'typist', group: 'timeline', act: 0, created: '2026-09-13', built: true,
     one: 'type, and it types itself back — drag to any moment and the words and the cursor come back',
     tags: ['timeline', 'text', 'local only'] },
   // 🔴 TWO ENGINES ON ONE PAGE, and `dust` is the other half of it. They were
@@ -355,7 +378,7 @@ export const DEMOS = [
   // sound server. ⚠️ `AudioWorklet` is off the tags for the same reason: the
   // tag drives `caps.mjs`, and what this page now needs is WebAssembly and an
   // audio output, not a hand-written worklet.
-  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 60000, room: 'fixed',
+  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 60000, room: 'fixed',
     one: 'one granulator, running in this page and on a Raspberry Pi at once, with a blend between them',
     tags: ['SuperCollider', 'WebAssembly', 'relay', 'PCM', 'live board'] },
 
@@ -400,7 +423,7 @@ export const DEMOS = [
   // wired to nothing, so one can be looked at and pushed around without a board,
   // a relay or a stream. `built: false` because it publishes no `__demo` and
   // asserts nothing: it is a mirror for the components, not a claim about them.
-  { name: 'kit', act: 0, created: '2026-09-12', built: false, page: '/kit/',
+  { name: 'kit', group: 'kit', act: 0, created: '2026-09-12', built: false, page: '/kit/',
     src: 'demo/kit/index.html',
     one: 'every reusable control on one page, wired to nothing',
     tags: ['shell', 'no network'] },
@@ -414,7 +437,7 @@ export const DEMOS = [
   // rig/box/listen.html, deployed to /box/ by workers/view/build.mjs. The Pi
   // in the other building, played from here: its own instrument library, a
   // random hour of 1965 Estonian radio, and pappus chewing either one up.
-  { name: 'box', act: 4, created: '2026-09-10', built: false, page: '/box/',
+  { name: 'box', group: 'instruments', act: 4, created: '2026-09-10', built: false, page: '/box/',
     src: 'rig/box/listen.html',
     one: 'play a Raspberry Pi in another building — its instruments, 1965 radio, and a granulator over both',
     tags: ['WS', 'relay', 'PCM', 'live board'] },
@@ -532,6 +555,94 @@ export function shortDate(iso) {
  * the same defect as a blank cell that collapses "we did not look" into "we
  * looked and it was fine".
  */
+/**
+ * The front page's sections, in the order they are read.
+ *
+ * 🔴 A SECOND AXIS, ON PURPOSE, AND IT IS NOT THE ACTS. `ACTS` is the STORY —
+ * the order to walk the demos in to be taught something, and it is what the
+ * sequence is for. A visitor arriving at the front page is not being taught;
+ * they are looking for a THING, and the thing has a subject: a headset, a
+ * radio station, one man's archive, ERR's. Sorting that list by recency
+ * answered a question nobody asked ("what changed?") and sorting it by act
+ * answered one they cannot have yet ("where does this fit in the argument?").
+ *
+ * ⚠️ NEITHER AXIS REPLACES THE OTHER and neither is derived from the other.
+ * `held` is act 0 because it teaches how a picture is drawn, and it is in the
+ * headset group because that is where you would go looking for it.
+ */
+export const GROUPS = new Map([
+  ['xr', 'in a headset'],
+  ['vain', 'väin'],
+  ['kurenniemi', 'kurenniemi'],
+  ['err', 'the ERR archive'],
+  ['instruments', 'instruments'],
+  ['capture', 'capture'],
+  ['timeline', 'the timeline'],
+  ['transports', 'technologies'],
+  ['kit', 'the kit'],
+]);
+
+/**
+ * The demos in sections, newest first inside each.
+ *
+ * 🔴 IT REFUSES AN UNGROUPED ROW rather than dropping it. A demo with no
+ * `group` would simply not appear on the front page — the worst shape a
+ * failure can take here, because the page still renders, still looks complete,
+ * and the only way to notice is to count. Same argument as `mount()` throwing
+ * on an odd readout.
+ */
+export function byGroup(list = DEMOS) {
+  const lost = list.filter((d) => !GROUPS.has(d.group));
+  if (lost.length) {
+    throw new Error(`these rows have no group, so the front page would not show them: `
+      + lost.map((d) => `${d.name}${d.group ? ` (group "${d.group}" is not in GROUPS)` : ''}`).join(', '));
+  }
+  // ⚠️ `rank` PUTS ONE ROW AT THE FRONT OF ITS GROUP and everything else stays
+  // newest first. A group's leading card is the one somebody should open, which
+  // is an editorial fact and not a date — `radio1965` is what väin IS, and it
+  // happens to share a creation day with the page beside it, so recency could
+  // not even break the tie consistently.
+  return [...GROUPS].map(([id, title]) => ({
+    id, title,
+    rows: byNewest(list.filter((d) => d.group === id))
+      .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99)),
+  })).filter((g) => g.rows.length);
+}
+
+/**
+ * One demo as a card.
+ *
+ * ⚠️ THE MARKUP IS `card.mjs`'s AND NOT THIS FILE'S. That module holds the one
+ * renderer both the build and the browser use; this function only decides what
+ * a DEMO puts in one. The `data-needs` goes through untouched because
+ * `caps.mjs` reads it in the browser afterwards, on whatever markup it finds.
+ */
+export function demoCardHTML(d) {
+  const href = targetOf(d);
+  const needs = needsOf(d);
+  return cardHTML({
+    // ⚠️ `title` OVERRIDES THE SHOWN NAME AND `name` IS STILL THE IDENTITY. It is
+    // unused today — `kurenniemi` became `resources` and `aikajana` became
+    // `deck` as REAL renames, directory and URL and all, which is the right way
+    // round: a card that says one thing while its address says another is two
+    // names for one page. The hook stays for the case where a slug must not
+    // move (an address somebody has written down) and the label must.
+    title: d.title || d.name,
+    desc: d.one || '',
+    tags: d.tags || [],
+    href: href || '',
+    why: href ? '' : d.why || '',
+    attrs: (d.xr ? ' data-xr="1"' : '') + (needs.length ? ` data-needs="${needs.join(' ')}"` : ''),
+  });
+}
+
+/** A whole section: its name and its cards. */
+export function groupHTML(g) {
+  return `<h2 class="pos-act-h">${g.title}</h2>`
+    + `<div class="pos-cards" style="--card-min:210px">`
+    + g.rows.map(demoCardHTML).join('') + '</div>';
+}
+
 export function rowHTML(d, i, opt = {}) {
   const href = opt.blocked ? null : targetOf(d);
   const bits = [];

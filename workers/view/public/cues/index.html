@@ -45,7 +45,6 @@
     controls: [
       { id: 'fire', label: 'Fire a cue', primary: true },
       { id: 'burst', label: 'Fire ten' },
-      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -110,7 +109,15 @@
   const fire = () => send({ type: 'cue', id: `CUE-${String(++seq).padStart(2, '0')}-${ID}`, at: Date.now() });
 
   d.on('fire', () => { fired++; fire(); });
-  d.on('burst', () => { for (let i = 0; i < 10; i++) setTimeout(() => { fired++; fire(); }, i * 120); });
+  // ⚠️ THE BURST IS SPREAD OVER 1.2 s, so the checks cannot run when the LOOP
+  // ends — they would count a tenth of what was asked for. They run when the
+  // last one has actually gone, which is the only moment the numbers they read
+  // are the numbers this control made.
+  d.on('burst', async () => {
+    for (let i = 0; i < 10; i++) setTimeout(() => { fired++; fire(); }, i * 120);
+    await new Promise((r) => setTimeout(r, 10 * 120 + 120));
+    await d.run('check');
+  });
 
   d.on('check', async () => {
     // a burst fired 120 ms apart can still have one in flight; drain before

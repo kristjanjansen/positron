@@ -12,6 +12,11 @@ export const BUILD = 'dev';
 //   const d = mount({ name:'transport', what:'…', readout:{drift:'ms'} });
 //   d.set('drift', 0.4);  d.log('seeked');  d.ready();
 
+// ⚠️ THE ONLY IMPORT IN THIS FILE, AND IT IS A LEAF. `shell.mjs` is the frame
+// every page mounts, so a dependency here is a dependency everywhere;
+// `symbol.mjs` imports nothing and touches nothing but the element it is handed.
+import { centreSymbol } from './symbol.mjs';
+
 const LOG_CAP = 400;
 
 export function mount({
@@ -114,6 +119,30 @@ export function mount({
     const b = el('button', c.primary ? 'pos-pri' : '', c.label);
     b.type = 'button';
     b.dataset.id = c.id;
+    // 🔴 A GLYPH BUTTON IS A SQUARE, AND THE SHELL DECIDES IT — NOT THE PAGE.
+    // Three pages carried `.pos-controls button.ico { width: 34px; height: 34px }`
+    // in their own <style>, and `mount()` has never put an `ico` class on
+    // anything: the rule matched nothing, on every page, for as long as it
+    // existed. The ⛶ kept the row's `0 14px` padding and came out about 41 by
+    // 34 — a rectangle pretending to be an icon, reported twice, fixed twice in
+    // a place that could not work.
+    // ⚠️ THE TEST IS ON THE LABEL, not on a flag a page has to remember. One
+    // character that is not a letter or a digit is an icon by construction;
+    // everything else is a word and gets a word's box. A page cannot forget to
+    // pass something it does not pass.
+    if ([...String(c.label)].length === 1 && !/[\p{L}\p{N}]/u.test(c.label)) {
+      b.dataset.glyph = '1';
+      // ⚠️ AND CENTRED ON ITS INK, not on its box. `place-items: center` centres
+      // the ADVANCE and the BASELINE — the right rectangle for a letter and the
+      // wrong one for a picture: ⛶ is drawn small and high in a box sized for a
+      // capital, so it sat up and left in its square. `symbol.mjs` measures the
+      // glyph in the face it will actually be drawn in and moves it.
+      centreSymbol(b);
+      // The label is a picture, so it is not a name. Without this the control
+      // reads as "⛶" to a screen reader and to anything looking for it.
+      b.setAttribute('aria-label', c.aria || 'full screen');
+      if (!b.title) b.title = c.aria || 'full screen';
+    }
     // `end: true` pushes a control to the far right of the row. It is for the
     // destructive one — deleting what you just made should not sit shoulder to
     // shoulder with the button that makes it, where a mis-aimed click lands on
@@ -233,6 +262,19 @@ export function mount({
     // sentences in `what`, not a lead line plus a second paragraph of mechanism:
     // two blocks meant the mechanism went unread and the lead said too little.
     on: (id, fn) => handlers.set(id, fn),
+    /**
+     * Run a registered handler without a button.
+     *
+     * 🔴 THIS EXISTS SO THAT "RUN THE CHECKS" CAN STOP BEING A BUTTON. Eleven
+     * pages carried one, and it is harness machinery showing through into a
+     * page a person is meant to read — `shout` already wrote the argument down
+     * beside its own: *it made the asserts OPTIONAL, which is the wrong default
+     * for the only thing that can say it worked.* A handler is a named piece of
+     * work; a control is one way to start it, and it was never the only way.
+     * The checks now run at the end of whatever produced the numbers they read,
+     * which is also the first moment they can be true.
+     */
+    run: (id) => handlers.get(id)?.(),
     button: (id) => cbar.querySelector(`[data-id="${id}"]`),
     /** Empty the log and the `logs` array together. A control that clears what
      *  a page HOLDS should clear what the page SAID about it too, or the lines

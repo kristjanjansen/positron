@@ -48,7 +48,6 @@
     controls: [
       { id: 'rec', label: 'Start recording', primary: true },
       { id: 'stop', label: 'Stop' },
-      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -127,11 +126,14 @@
     d.log(`recording ${mime}, ${SEG_MS / 1000}s segments`, 'hi');
   });
 
-  d.on('stop', () => {
+  d.on('stop', async () => {
     if (!rec) return;
     rec.stop();
     rec = null;
     d.log(`stopped after ${closed} segment(s)`);
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true — and a button for them would make them optional.
+    await d.run('check');
   });
 
   d.on('check', async () => {

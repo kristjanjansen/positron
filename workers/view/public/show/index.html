@@ -83,7 +83,6 @@
       { id: 'run', label: 'Go live and record 3 s', primary: true },
       { id: 'camera', label: 'Use the camera' },
       { id: 'play', label: 'Play it back' },
-      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -430,6 +429,9 @@
     await playOrPrompt(back, d);
     deck.play?.();
     d.log(`playing back ${duration.toFixed(2)}s of the received stream — scrub it`, 'hi');
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true — and a button for them would make them optional.
+    await d.run('check');
   });
 
   d.on('check', async () => {

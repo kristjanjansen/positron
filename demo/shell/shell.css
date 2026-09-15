@@ -310,13 +310,31 @@ button.pos-pri[data-busy="1"] {
    decided it. MEASURED on /click/, the four gaps down the page read
    0 · 22 · 4 · 22 px — reported as "you are not respecting vertical spacing.
    again", and it was the shell doing it, on every page with a transport bar. */
+/* 🔴 ONE ROW, SO EVERY BAR IN THE PROJECT IS THE SAME HEIGHT. It wrapped, and
+   what wrapped was whichever member happened not to fit — so `tapes` had two
+   rows, `replay` had one, and two pages side by side disagreed about how tall a
+   transport is. `gap: 8px` plus the floors below buy back the width the wrap
+   was paying for. ⚠️ It still wraps under 560 px, on purpose: there the rate
+   group takes a row of its own and fills it, which is the phone layout the
+   media query further down exists for. */
 .tbar {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   background: var(--card); border: 1px solid var(--line);
   border-radius: 4px; padding: 8px 10px;
+  min-height: 52px;
 }
+/* 🔴 ONE HEIGHT FOR EVERY BUTTON ON THE BAR, SET RATHER THAN IMPLIED. There
+   were two ways of sizing them and so there were two heights: the square ones
+   took `height: 38px`, and the rate options took `padding: 5px 7px` and came
+   out 30 — a row where the thing you press is a different size depending on
+   which control it belongs to. Padding is a way of describing a height by
+   accident; `--tbar-btn` is the height, every button takes it, and the
+   horizontal padding says only how wide a word is allowed to be.
+   34 rather than 38: with a LOOP button and two walk buttons on the same bar,
+   the old squares were what pushed the rate group onto a second line. */
+.tbar { --tbar-btn: 34px; }
 .tbar-toggle {
-  flex: none; width: 38px; height: 38px; padding: 0;
+  flex: none; width: var(--tbar-btn); height: var(--tbar-btn); padding: 0;
   display: grid; place-items: center; font-size: 13px;
 }
 .tbar-toggle::before { content: "▶"; }
@@ -330,8 +348,8 @@ button.pos-pri[data-busy="1"] {
    38 px square like ▶ and ❚❚, not words in a pill: a row that mixes the two
    reads as a toolbar with a stray form control in it. The label a page passes
    is the glyph; `aria` carries the word for anyone who cannot see it. */
-.tbar-x {
-  flex: none; width: 38px; height: 38px; padding: 0;
+.tbar-x, .tbar-loop {
+  flex: none; width: var(--tbar-btn); height: var(--tbar-btn); padding: 0;
   display: grid; place-items: center; font-size: 15px; line-height: 1;
 }
 /* A WORD, not a glyph: width from the text, and the uppercase treatment every
@@ -340,12 +358,15 @@ button.pos-pri[data-busy="1"] {
    they count, which a label never does. Quiet rather than coloured: colour on
    the bar is spent on the thing that is running, and a place you can go should
    not compete with it. */
-.tbar-x.tbar-word {
-  width: auto; min-width: 0; padding: 0 12px;
-  font: 600 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
+.tbar-x.tbar-word, .tbar-loop.tbar-word {
+  width: auto; min-width: 0; padding: 0 11px;
+  /* ⚠️ 500, NOT 600. At 600 `LOOP` was the heaviest ink on a bar whose job is
+     to be furniture around a playhead — it read as the thing to press, which it
+     is not. Tracked uppercase already carries enough weight to be a label. */
+  font: 500 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim);
 }
-.tbar-x.tbar-word:hover { color: var(--fg); background: var(--card2); }
+.tbar-x.tbar-word:hover, .tbar-loop.tbar-word:hover { color: var(--fg); background: var(--card2); }
 
 /* RECORD IS RED, and armed rather than shouting: a filled red dot on a dark
    face. It is the one control on the bar that starts WRITING something, and the
@@ -358,8 +379,26 @@ button.pos-pri[data-busy="1"] {
 .tbar-x[data-on="1"], .tbar-x.pos-pri[data-on="1"] {
   color: #fff; background: var(--rec); border-color: var(--rec); font-size: 15px; }
 
+/* 🔴 THE BAR IS ONE ROW, AND THE SLIDER IS WHAT GIVES WAY. Everything else in
+   it is fixed — buttons at their own width, a clock whose digits do not change
+   width, the rate group — and the scrub is the only member with nothing to lose
+   by being shorter. At `min-width: 200px` it was the LAST thing to shrink, so
+   the rate group wrapped to a second line instead and the bar changed height
+   from page to page. 90 px is the least a playhead can travel and still be
+   worth dragging. */
+/* 🔴 THE BASIS IS THE FLOOR, NOT THE PREFERRED WIDTH, AND THAT IS THE WHOLE
+   FIX. It read `flex: 1 1 200px; min-width: 200px` and the bar wrapped to two
+   rows on any page with an extra button — lowering `min-width` alone changed
+   nothing, which is the part worth writing down: **a flex container decides
+   where to WRAP using each item's hypothetical main size, which is its BASIS,
+   and only then shrinks the items within a line.** A 200 px basis therefore
+   overflowed the line and broke it before the scrub was ever asked to give
+   anything up. With the basis at the floor the line fits, and `flex-grow: 1`
+   hands the slider every pixel nobody else wanted — same result, right order.
+   MEASURED on `/tapes/`, the worst case here at 688 px: two rows and 94 px
+   tall, against `replay`'s one row and 52. Both are 52 now. */
 .tbar-scrub {
-  flex: 1 1 200px; min-width: 200px; height: 38px; position: relative;
+  flex: 1 1 56px; min-width: 56px; height: var(--tbar-btn); position: relative;
   cursor: pointer; touch-action: none;
 }
 .tbar-scrub::before {
@@ -380,9 +419,15 @@ button.pos-pri[data-busy="1"] {
 .tbar[data-scrub="0"] .tbar-time { margin-right: auto; }
 
 .tbar-time {
-  flex: none; font: 500 12px/1 var(--mono); font-variant-numeric: tabular-nums;
+  flex: none; display: grid; gap: 2px; justify-items: end;
+  font: 500 10.5px/1 var(--mono); font-variant-numeric: tabular-nums;
   color: var(--dim); white-space: nowrap;
 }
+/* Where you are is the live number and reads first; how long the thing is never
+   changes, so it is quieter and sits under it. */
+.tbar-now { color: var(--fg); }
+.tbar-all { color: var(--dim2); }
+.tbar-all:empty { display: none; }
 /* ⚠️ NO GAP. The options are a `createChoice` now, which is SEGMENTED — it
    overlaps the borders by a pixel so a join is one line. A 4 px gap here put
    space back between them and made four rates read as four separate controls,
@@ -417,10 +462,11 @@ button.pos-pri[data-busy="1"] {
    written as arithmetic over four other values looks more rigorous and is one
    font change away from being wrong in a way nobody thinks to check. */
 .tbar-rates button {
-  padding: 5px 7px; font-size: 11px;
-  min-width: 34px;          /* = the measured height, so the floor is a square */
-  text-align: center;
+  height: var(--tbar-btn); padding: 0 7px; font-size: 11px;
+  min-width: 30px;          /* the `x` is gone, so the floor came down with it */
+  display: grid; place-items: center;
 }
+
 /* the armed rate has to be findable at a glance, so it gets a fill as well as
    an edge — colour alone on a 30 px button in a row of five reads as noise */
 .tbar-rates button[aria-pressed="true"] {
@@ -463,10 +509,18 @@ button.pos-pri[data-busy="1"] {
 
 /* ── index ────────────────────────────────────────────────────────────── */
 .pos-acts { list-style: none; margin: 0; padding: 0; }
+/* ⚠️ THE GAP ABOVE IS THREE TIMES THE GAP BELOW, and that ratio is the whole
+   job of a subheader. A heading belongs to what FOLLOWS it; with similar space
+   on both sides it floats between two groups and a reader has to work out
+   which one it names. 26/6 was enough when the groups were rows sharing one
+   hairline; with cards each group is already a block of boxes, so the sections
+   ran together and the headings read as labels on nothing. */
 .pos-act-h {
   font: 600 10.5px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
-  color: var(--hi); margin: 26px 0 6px;
+  color: var(--hi); margin: 44px 0 12px;
 }
+/* The first one has the page's own title above it and needs no separating. */
+.pos-act-h:first-of-type { margin-top: 26px; }
 .pos-row { border-bottom: 1px solid var(--line); }
 .pos-row a {
   display: grid; grid-template-columns: 3.7em 1fr; gap: 2px 10px;
@@ -594,7 +648,7 @@ video[hidden] { display: none; }
 .xr .pos-tag, .xr .pos-why { font-size: 12px; padding: 3px 10px; }
 .xr .pos-meta { gap: 8px; margin-top: 6px; }
 .xr .pos-name { font-size: 30px; }
-.xr .pos-act-h { font-size: 13px; margin: 34px 0 8px; }
+.xr .pos-act-h { font-size: 13px; margin: 52px 0 14px; }
 /* A ray drifts, so a row must not need a steady hand to stay lit. */
 .xr .pos-row a:hover { background: var(--card); }
 
@@ -981,11 +1035,21 @@ video[hidden] { display: none; }
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
 .pos-tabs-bar::-webkit-scrollbar { display: none; }
+/* ⚠️ `margin-right: -.1em` IS NOT A NUDGE, IT IS THE LETTER-SPACE COMING BACK.
+   `letter-spacing` puts its space AFTER every character including the last, so
+   a letter-spaced word carries an invisible trailing gap and the space between
+   two tabs is the flex gap PLUS that. It is uniform in CSS and uneven to look
+   at, because the eye measures from the last stem rather than from the box.
+   Cancelling exactly one letter-space puts every gap back on 20 px of ink-to-
+   ink, which is what "equal space between" means. Same trick any typesetter
+   uses on tracked caps; it must stay tied to the `letter-spacing` above, so if
+   one changes the other changes with it. */
 .pos-tabs-t {
   flex: 0 0 auto; white-space: nowrap;
   background: none; border: 0; border-radius: 0; height: 30px; padding: 0 0 6px;
   font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); cursor: pointer;
+  margin-right: -.1em;
 }
 .pos-tabs-t:hover:not(:disabled) { color: var(--fg); }
 .pos-tabs-t[aria-selected="true"] { color: var(--hi); box-shadow: inset 0 -2px 0 0 var(--hi); }
@@ -1254,10 +1318,43 @@ video[hidden] { display: none; }
    colours — overriding the weight or the dash there would delete the channel
    that survives greyscale for exactly as long as the pointer is over it.      */
 
+/* The standing heading over a page's own explanation — see diagram.mjs's HOW.
+   ⚠️ It carries NO margin of its own: `.pos-body > * + *` owns the gap between
+   siblings, and an element with both gets the two added together. */
+/* 🔴 THE GAP UNDER A DIAGRAM'S HEADING IS THE HEADING'S, BECAUSE THE SHELL'S
+   RHYTHM CANNOT REACH IT. `.pos-body > * + *` gives 22 px between siblings and
+   would have covered this — except `.pos-dg` sets `margin: 0 0 14px`, which
+   zeroes its own top and, at equal specificity and later in the file, wins. So
+   the heading sat about nine pixels off the box: close enough to read as a
+   label stuck to it rather than a title over it. ⚠️ THIS IS THE `margin` HALF
+   OF THE RULE THE SHELL AVOIDS ON PURPOSE — a gap written on one of the two
+   elements — and it is deliberate here: a title and the picture it names are
+   ONE relationship, not two siblings that happen to be adjacent, and 14 px is
+   a claim about that pair rather than the page's own spacing. */
+.pos-how {
+  font: 600 10.5px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
+  /* ⚠️ THE GAP ABOVE IS BIG, and it is doing the job a divider would. This
+     heading starts a new part of the page, under whatever the page was for, and
+     the shell has no rules or boxes to separate sections with. 44 above and 14
+     below is the same three-to-one a subheader uses on the index: a heading
+     belongs to what follows it. */
+  color: var(--dim2); margin: 44px 0 14px;
+}
 .pos-dg { margin: 0 0 14px; width: 100%; min-width: 0; }
+/* A diagram placed after the log is outside `.pos-body`, so it takes the page's
+   own left inset and its top gap from here rather than from the `* + *` rhythm
+   that cannot reach it. */
+.pos-how.pos-dg-end { margin-top: 52px; }
+body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
+  max-width: var(--wrap, 720px); margin-left: auto; margin-right: auto;
+  padding-left: var(--pad, 0); padding-right: var(--pad, 0);
+}
+/* The diagram's own title, where a page gives one instead of the standing
+   heading. Same relationship, same gap — 6 px was the same defect one element
+   in, and two headings over one picture must not sit at two distances. */
 .pos-dg-t {
   font: 600 10px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase;
-  color: var(--dim2); margin: 0 0 6px;
+  color: var(--dim2); margin: 0 0 14px;
 }
 .pos-dg-t[hidden] { display: none; }
 /* `display: block` because an inline svg sits on a text baseline and leaves a
@@ -1280,7 +1377,15 @@ video[hidden] { display: none; }
 
 .pos-dg-n { cursor: default; }
 .pos-dg-n:focus-visible { outline-offset: 3px; }
-.pos-dg-box { fill: var(--card2); stroke: var(--line2); stroke-width: 1; }
+/* ⚠️ THE FALLBACKS ARE WHAT THE PICTURE LOOKED LIKE BEFORE HUES. `--dg-fill`
+   and `--dg-stroke` are set inline per box by `diagram.mjs`; a box with none
+   (or a browser without `color-mix`) draws exactly the old grey, so the tint is
+   an addition rather than a dependency. */
+.pos-dg-box {
+  fill: var(--dg-fill, var(--card2));
+  stroke: var(--dg-stroke, var(--line2));
+  stroke-width: 1;
+}
 /* ⚠️ `--line2`, NOT `--line`. The plan names `--line` for a box's edge, and at
    #1f2937 it is genuinely invisible against `--card` — which is the background
    every /kit/ block and several demo panels are drawn on. One step up is still
@@ -1317,17 +1422,23 @@ video[hidden] { display: none; }
    is a 4 px period, even round the corners, and still unmistakably not solid.
    Round caps were tried and are nearly solid at this weight, so the default
    butt caps stay. */
-.pos-dg-n[data-kind="cloud"] .pos-dg-box {
-  fill: color-mix(in oklab, #5b9bd5 8%, var(--card2));
-  stroke: color-mix(in oklab, #5b9bd5 26%, var(--line2));
-  stroke-width: 1.2; stroke-dasharray: 1 3;
-}
-/* a machine in a room somewhere — heavy, because it is a physical thing */
-.pos-dg-n[data-kind="device"] .pos-dg-box {
-  fill: color-mix(in oklab, #a98ad6 8%, var(--card2));
-  stroke: color-mix(in oklab, #a98ad6 26%, var(--line2));
-  stroke-width: 2;
-}
+/* 🔴 A KIND SETS THE EDGE, NOT THE COLOUR, and that split is what makes the
+   hues work at all. These rules used to paint their own fill and stroke, at
+   (0,3,0), which beats the `.pos-dg-box` rule the per-box hue arrives through
+   (0,1,0) — so every cloud was one blue and every device one purple whatever
+   hue the diagram had assigned, and four differently-tinted boxes rendered as
+   four identical greys. MEASURED by looking at the picture twice and wondering
+   why the system had done nothing.
+   What a kind is ABOUT is the edge: dotted for somebody else's computer, heavy
+   for a physical machine. Colour now says which box, and weight says what kind
+   of thing, which is two channels carrying two facts instead of one carrying
+   neither. */
+/* ⚠️ NO DASH. It was dotted to say "somebody else's computer", and with hues on
+   the boxes it is one channel too many: the dots read as a broken edge rather
+   than as a category, and the thing they were saying is in the box's own note.
+   Weight alone still separates a physical machine from the rest. */
+.pos-dg-n[data-kind="cloud"] .pos-dg-box { stroke-width: 1.2; }
+.pos-dg-n[data-kind="device"] .pos-dg-box { stroke-width: 2; }
 
 /* A CONTAINER — a machine with the programs on it drawn as boxes inside it.
    Its back is whatever the picture sits on, not a panel of its own: a
@@ -1353,9 +1464,14 @@ video[hidden] { display: none; }
    hovering a dashed box would change nothing at all and the rule would look
    absent rather than beaten. That is LESSONS #65's third case, and the tell is
    the same: read the computed style, not the rule. */
+/* ⚠️ HOVER LIFTS THE BOX'S OWN HUE, IT DOES NOT REPLACE IT. This used to mix
+   into `--card2` directly, which threw the tint away: pointing at a box turned
+   it grey, so the one moment a reader is looking hardest is the one moment the
+   colour coding stopped working. Mixing into `--dg-fill` keeps whose box it is
+   and only makes it brighter. */
 .pos-dg-n[data-on] .pos-dg-box {
   stroke: var(--fg);
-  fill: color-mix(in oklab, var(--fg) 7%, var(--card2));
+  fill: color-mix(in oklab, var(--fg) 9%, var(--dg-fill, var(--card2)));
 }
 .pos-dg-n[data-on] .pos-dg-sub { fill: var(--dim); }
 
@@ -1379,3 +1495,150 @@ video[hidden] { display: none; }
 html.xr .pos-acts .pos-row:not([data-xr]) { opacity: .45; transition: opacity 120ms ease; }
 html.xr .pos-acts .pos-row:not([data-xr]):hover,
 html.xr .pos-acts .pos-row:not([data-xr]):focus-within { opacity: 1; }
+
+/* ── a card: a link with room in it — shell/card.mjs ─────────────────────────
+ *
+ * 🔴 THE ONLY COMPONENT HERE SET IN SANS, AND IT IS NOT AN INCONSISTENCY.
+ * Everything else in this kit is monospace because the fixed width is carrying
+ * meaning: a value lines up with the value above it, a key lines up with its
+ * lane, a readout cell has to hold still while its digits change. A card holds
+ * a NAME and a SENTENCE, neither of which lines up with anything, and small
+ * monospace prose in a box reads as a terminal rather than as a label. `/kit/`
+ * already makes this argument for its own paragraphs.
+ *
+ * 🔴 `minmax(min(100%, …), 1fr)` — NOT `minmax(190px, 1fr)`. A bare floor wider
+ * than the screen does not fall back to one column, it makes a COLUMN WIDER
+ * THAN THE PAGE and the whole document scrolls sideways. That is the defect
+ * `tabs.mjs` shipped and `/kit/` caught: 390 px of screen, a 500 px row and
+ * 141 px of page overflow. `min(100%, …)` is the whole fix.
+ *
+ * ⚠️ AND `min-width: 0` ON THE CARD, for the other half of the same bug: a grid
+ * item's automatic minimum size is its CONTENT, so one long unbroken word in a
+ * title pushes its column past the track it was given, with the same result.
+ * `overflow-wrap: anywhere` on the title is what lets it break rather than
+ * push.
+ *
+ * ⚠️ EQUAL HEIGHTS COME FOR FREE and are not set anywhere. Grid items stretch
+ * to their row by default, so every card in a row matches the tallest — which
+ * is why nothing here clamps the description: a card that does not fit is
+ * VISIBLY a description that is too long, where a clamp would have hidden it
+ * behind an ellipsis. CLAUDE.md: anything that truncates with an ellipsis is in
+ * the wrong place. */
+.pos-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--card-min, 190px)), 1fr));
+  gap: var(--card-gap, 10px);
+}
+.pos-card {
+  display: flex; flex-direction: column; gap: 7px;
+  min-width: 0;
+  padding: 13px 14px 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+  color: var(--fg); text-decoration: none;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+a.pos-card:hover, a.pos-card:focus-visible {
+  background: var(--card2); border-color: var(--line2);
+}
+a.pos-card:hover .pos-card-t, a.pos-card:focus-visible .pos-card-t { color: var(--hi); }
+.pos-card-t {
+  font: 600 15px/1.2 var(--sans); color: var(--fg);
+  overflow-wrap: anywhere;
+  transition: color 120ms ease;
+}
+.pos-card-d {
+  font: 400 12.5px/1.45 var(--sans); color: var(--dim);
+  overflow-wrap: anywhere;
+}
+/* Pushed to the bottom of whatever height the row settled on, so the tags of
+   every card in a row sit on one line however tall the cards had to be. */
+.pos-card-f { margin-top: auto; display: flex; flex-wrap: wrap; gap: 4px 5px; padding-top: 4px; }
+.pos-card-g {
+  font: 500 10px/1 var(--sans); letter-spacing: .05em; color: var(--dim2);
+  border: 1px solid var(--line2); border-radius: 3px; padding: 3px 5px;
+  white-space: nowrap;
+}
+/* A card that is not a link says why, where the tags would have been — the same
+   argument `caps.mjs` makes: a row that vanishes claims the thing does not
+   exist, which is a different and false statement. */
+.pos-card-why { font: 400 11px/1.35 var(--sans); color: var(--warn); }
+.pos-card[data-off="1"] { opacity: .62; }
+/* Buttons on a card sit at the far end of the same row as the tags — see
+   card.mjs for why a card that has them stops being one big link. */
+.pos-card-a { margin-left: auto; display: flex; gap: 5px; }
+.pos-card-a button {
+  font: 500 10.5px/1 var(--sans); letter-spacing: .04em;
+  padding: 5px 9px; border-radius: 4px;
+  background: var(--card2); border: 1px solid var(--line2); color: var(--fg);
+  cursor: pointer;
+}
+.pos-card-a button:hover { border-color: var(--hi); color: var(--hi); }
+a.pos-card-t { color: inherit; text-decoration: none; }
+a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
+
+/* 🔴 ONE SQUARE, EVERY PAGE. `shell.mjs` stamps `data-glyph` on a control whose
+   whole label is one non-letter — see the note there for why this lives in the
+   shell and not in three pages' own stylesheets, where it matched nothing.
+   MEASURED rather than derived: the control buttons are 34 px tall, so 34 is
+   the square. Re-measure if the row's type or padding changes — a size computed
+   from four other values looks more rigorous and is one edit from being quietly
+   wrong. */
+.pos-controls button[data-glyph="1"] {
+  width: 34px; height: 34px; padding: 0;
+  display: grid; place-items: center;
+  font-size: 15px; line-height: 1;
+}
+
+/* ── loop: one button, three presses — shell/transport-bar.mjs ───────────── */
+/* 🔴 IT SHARES `.tbar-x`'s LOOK AND NOT ITS CLASS, and that is not tidiness —
+   `demo/verify.mjs` presses `.pos-controls button, .tbar-x` on every page,
+   because `.tbar-x` means "a button the PAGE put in the transport", like
+   `take`'s Record. The loop is shell furniture, the same as play/pause and the
+   rate row, neither of which is in that selector. Left as a `.tbar-x` it was
+   pressed on every demo in the suite: one press arms a loop start under
+   whatever else that page was measuring. Caught the day it was written, in the
+   harness's own "(pressed …, "LOOP")" line. */
+/* The word changes with the state because the NEXT press is what a reader
+   needs to know, not the current mode: `LOOP` when there is none, `END` when a
+   start is waiting for its other mark, `LOOP` lit while one is running. */
+.tbar-loop[data-loop="armed"] { color: var(--hi); border-color: var(--hi); }
+.tbar-loop[data-loop="on"] { color: var(--bg); background: var(--hi); border-color: var(--hi); }
+/* ⚠️ UNDER the fill and the head — it is the ground the playhead runs over, and
+   a band drawn on top of the playhead hides the one thing that moves. */
+.tbar-loopspan {
+  position: absolute; top: 0; bottom: 0;
+  background: color-mix(in srgb, var(--hi) 16%, transparent);
+  border-left: 1px solid var(--hi); border-right: 1px solid var(--hi);
+  pointer-events: none;
+}
+
+/* ── symbol: a label that is a picture — shell/symbol.mjs ────────────────── */
+/* The span the nudge is applied to. It must not affect layout: the button is
+   already the right size and the transform is about where the INK sits inside
+   it, not about how much room the label takes. */
+.pos-sym { display: inline-block; will-change: transform; }
+.pos-sym-svg { display: block; }
+.pos-sym-svg svg { display: block; }
+
+/* The line joining the parts of one machine. No head: every arrow in a diagram
+   means "the signal goes this way", and a head between two programs on one
+   board would claim an order the drawing does not know. See diagram.mjs. */
+.pos-dg-tie { stroke: var(--line2); stroke-width: 1; fill: none; }
+/* 🔴 HOVER IS EASED, BECAUSE AT ZERO IT READS AS A FAULT. The fill and the
+   stroke both change the instant a pointer crosses a box, and with six boxes in
+   a row a reader sweeping across them gets six hard flashes — reported as
+   "very nervous". 140 ms is under the threshold where a control feels laggy and
+   well over the one where a change reads as a flicker.
+   ⚠️ The reduced-motion rule further up already turns every transition off, so
+   this needs no guard of its own. */
+.pos-dg-box, .pos-dg-sub, .pos-dg-lab {
+  transition: fill 140ms ease, stroke 140ms ease;
+}
+/* A link you can point at. The hit path is invisible and fat; the visible one
+   is what changes. Eased for the same reason the boxes are. */
+.pos-dg-l { cursor: default; }
+.pos-dg-l:focus-visible { outline-offset: 3px; }
+.pos-dg-hit { stroke: transparent; stroke-width: 12; fill: none; pointer-events: stroke; }
+.pos-dg-link, .pos-dg-llab { transition: stroke 140ms ease, fill 140ms ease; }
+.pos-dg-l[data-on] .pos-dg-link { stroke: var(--fg); }
+.pos-dg-l[data-on] .pos-dg-llab { fill: var(--fg); }

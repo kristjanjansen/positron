@@ -42,8 +42,10 @@
     controls: [
       { id: 'zin', label: 'Zoom in' },
       { id: 'zout', label: 'Zoom out' },
-      { id: 'fit', label: 'Fit' },
-      { id: 'check', label: 'Check limits', primary: true },
+      // ⚠️ PRIMARY NOW THAT THE CHECK BUTTON IS GONE. A control row with no
+      // primary reads as four equal options when one of them is the thing to
+      // press; `Fit` is the one that puts the whole subject in view.
+      { id: 'fit', label: 'Fit', primary: true },
     ],
   });
   guard(d);
@@ -219,7 +221,11 @@
   }
   d.on('zin', () => { strip.zoomIn(); refresh(); });
   d.on('zout', () => { strip.zoomOut(); refresh(); });
-  d.on('fit', () => { strip.fit(); refresh(); });
+  d.on('fit', async () => {
+    strip.fit(); refresh();
+    // The checks read the strip's limits, which fitting has just settled.
+    await d.run('check');
+  });
   setInterval(refresh, 250);
 
   d.on('check', () => {

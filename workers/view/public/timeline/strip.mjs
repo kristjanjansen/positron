@@ -658,7 +658,16 @@ registerRenderer('spans', (ctx, L, C) => {
     // the reading the picture must not give. The radius is small and capped at
     // a third of the width so a narrow span stays a bar rather than a pill.
     const rad = Math.min(2, bw / 3, barH / 3);
+    // 🔴 THE LABEL'S COLOUR FOLLOWS THE BAR'S, and it did not. The text was a
+    // fixed near-black, which is right on a bar drawn at 0.85 and unreadable on
+    // one drawn at 0.30 — and 0.30 is the SKIRT, which is what every vague date
+    // gets. On `/tapes/`, where most records know only a year or a decade, that
+    // meant almost every label was dark ink on a dark bar. Recorded here rather
+    // than guessed further down, because this is the only place that knows how
+    // solid the bar ended up.
+    let drawnAlpha = 0;
     const band = (alpha, x0 = xa, w0 = bw) => {
+      drawnAlpha = Math.max(drawnAlpha, alpha);
       ctx.globalAlpha = alpha; ctx.fillStyle = col;
       if (!feather) {
         if (rad > 0.5 && ctx.roundRect) {
@@ -768,7 +777,11 @@ registerRenderer('spans', (ctx, L, C) => {
     // the one that loses its label — and the narrowest span is often the one
     // whose label matters most, since narrow is usually the thing being shown.
     if (L.labels !== false && xb - xa > 30 && barH >= 9) {
-      ctx.globalAlpha = 0.95; ctx.fillStyle = '#04121a';
+      // Dark ink on a solid bar, light ink on a faint one. 0.55 is between the
+      // skirt (0.30) and everything else (0.85 and up), so the choice is never
+      // close.
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = drawnAlpha >= 0.55 ? '#04121a' : '#dfe6ea';
       ctx.font = '10px ui-monospace, Menlo, monospace';
       // TOP-LEFT. A label on the baseline of a tall bar floats in the middle of
       // nothing and drifts as the bar's height changes; anchored to the corner
@@ -1137,6 +1150,24 @@ export function createStrip(canvas, deck, opts = {}) {
     const w = b - a, p = w * pad;
     a -= p; b += p;
     return setView({ originTime: a, pxPerSecond: (plotW() * 1000) / (b - a), scrollX: 0 });
+  }
+  /**
+   * Frame a moment: put `t` at a fraction across the view, with `span` ms
+   * showing.
+   *
+   * 🔴 THE PLAYHEAD BELONGS LEFT OF CENTRE, NOT AT IT. `fit()` centres a RANGE,
+   * which is right when the range is the subject; when a playhead is the
+   * subject, centring puts half the view behind you — and what a reader wants
+   * from a timeline is mostly what is ahead. 0.38 leaves enough behind to see
+   * where you came from and gives the rest to where you are going. Asked for
+   * from a phone, where the difference is the whole screen.
+   *
+   * ⚠️ IT IS HERE RATHER THAN IN A PAGE so every strip can have it. A page that
+   * wants the old behaviour simply goes on calling `fit`.
+   */
+  function frame(t, span, at = 0.38) {
+    const w = Math.max(1, span);
+    return setView({ originTime: t - w * at, pxPerSecond: (plotW() * 1000) / w, scrollX: 0 });
   }
   /** zoom about a screen x, so the point under the cursor stays put */
   function zoomAt(factor, screenX = plotW() / 2) {
@@ -1781,12 +1812,18 @@ export function createStrip(canvas, deck, opts = {}) {
       // the hover says WHICH OF THE THREE ANSWERS this row gives to "certainly
       // in view", in words, because the mark alone cannot carry the reason.
       const st = whenState(s, tAt(0), tAt(plotW()));
-      if (st === 'core') out.push(`certain core ${formatTime(s.innerFrom, M, S.absolute)} → ${formatTime(s.innerTo, M, S.absolute)}  [inner containment]`);
-      else if (st === 'outer') out.push('NO INNER BRACKET — "certainly in view" answered by OUTER containment: sound, incomplete');
-      else if (st === 'unanswerable') out.push('NO INNER BRACKET and the bracket is not contained — "certainly in view" is UNDECIDABLE here (zoom out to recover it)');
-      if (s.kind) out.push(`when.kind ${s.kind}${s.kind === 'ignorance' ? ' — a real day the catalogue lost: narrowable' : ' — no fact of the matter: not narrowable'}`);
-      if (s.rule) out.push(`positioned by rule ${s.rule}`);
-      if (s.verbatim) out.push(`verbatim ${String(s.verbatim).slice(0, 48)}`);
+      // 🔴 A TOOLTIP IS TWO OR THREE SHORT LINES AND THESE WERE PARAGRAPHS OF
+      // THIS PROJECT'S PRIVATE VOCABULARY. One read `NO INNER BRACKET and the
+      // bracket is not contained — "certainly in view" is UNDECIDABLE here
+      // (zoom out to recover it)`, drawn on top of the thing it describes, in
+      // front of somebody who pointed at a bar to find out what it was.
+      // Reported as unusable, and it was. The distinction the three states
+      // carry is real and belongs in prose somebody chose to read, not in a box
+      // that appears under a pointer. What is left is the fact: how sure the
+      // date is, in the words a catalogue would use.
+      if (s.kind === 'ignorance') out.push('the exact date is lost, not absent');
+      else if (s.kind === 'vagueness') out.push('no exact date exists');
+      if (s.verbatim) out.push(String(s.verbatim).slice(0, 48));
     }
     if (r) {
       // `terse` drops the identity and provenance lines. They exist for the
@@ -2076,7 +2113,7 @@ export function createStrip(canvas, deck, opts = {}) {
     lanes: () => S.lanes,
     setLanes,
     show(id, on) { const L = S.lanes.find((l) => l.id === id); if (L) { L.show = on !== false; layout(); invalidate(); } return !!L; },
-    view: () => ({ ...S.view }), setView, fit, zoomAt,
+    view: () => ({ ...S.view }), setView, fit, frame, zoomAt,
     zoomIn: (f = 1.5) => zoomAt(f), zoomOut: (f = 1.5) => zoomAt(1 / f),
     setFollow, follow: () => ({ on: S.follow, engaged: S.follow && !S.userScrolled }),
     armWall, wallPos, gapMs: () => (wallPos() === null ? null : wallPos() - S.pos),

@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* 🔴 WIDER THAN THE PROSE, FOR THE SAME REASON `/kurenniemi/`'S TABLE IS. The
+  /* 🔴 WIDER THAN THE PROSE, FOR THE SAME REASON `/resources/`'S TABLE IS. The
      shell caps a page at 720 px, which is right for a paragraph. This axis
      carries 130 years; at 720 px a decade is 55 px and the 1960s — where a
      third of everything sits — is a smear. The strip breaks out and the prose
@@ -33,11 +33,11 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
 
-  // The same file `/kurenniemi/` reads. ONE corpus, two pictures of it: that
+  // The same file `/resources/` reads. ONE corpus, two pictures of it: that
   // page answers "what is there and who holds it", this one answers "when was
   // it, and can I hear it". A second copy of the data would be a second thing
   // to keep true.
-  const CORPUS = '/kurenniemi/corpus.json';
+  const CORPUS = '/resources/corpus.json';
 
   const d = mount({
     name: 'tapes',
@@ -47,7 +47,7 @@
       + 'one that is loaded, or ‹ and › to walk through the tapes. Colour says how a record '
       + 'landed, never which row it is in — grey is a pointer to somewhere else, slate means there is '
       + 'a file this browser may not fetch, amber means the holder refused or is gone.',
-    // No readout: the strip IS the readout, the same argument `/kurenniemi/`
+    // No readout: the strip IS the readout, the same argument `/resources/`
     // makes about its table. Every number worth having is a count of what is
     // directly above it.
     readout: null,
@@ -151,7 +151,9 @@
   d.el.append(now);
 
   const view = createStripView(d.el, mapDeck, {
-    size: 'auto', absolute: true, gutter: 132, follow: false,
+    // 78 px is `tapes` plus its swatch — see the lane's own note about why the
+    // gutter lost the line that used to set this width.
+    size: 'auto', absolute: true, gutter: 78, follow: false,
   });
 
   /**
@@ -169,16 +171,91 @@
    * each lane's gutter rather than dropped, because a silent truncation reads as
    * "there were none".
    */
+  /**
+   * 🔴 ONE LANE, AND THE OTHER FIVE WERE DELETED ON PURPOSE — WRITE THIS DOWN.
+   * There were six: `his life` (3), `films & records` (86), `instruments` (3),
+   * `papers & photographs` (204) and `the archive itself` (14) sat above and
+   * below this one. At the zoom this page is actually read at — about a year
+   * across — five of them are a wall of bars nobody can open, because only the
+   * playable ones do anything when you press them. A lane you cannot act on,
+   * beside one you can, teaches a reader that pressing does nothing.
+   *
+   * ⚠️ THE RECORDS ARE NOT GONE AND NOTHING WAS FILTERED OUT OF THE CORPUS.
+   * `/resources/` still tabulates all 334 and `corpus.json` is untouched; what
+   * changed is which of them this page draws. **An every-material timeline is
+   * wanted and is a separate page** — it needs its own answer to what a mark
+   * means when there is nothing to play, and borrowing this page's answer is
+   * how it would get one by accident.
+   */
   const LANES = [
-    { id: 'life', label: 'his life', pick: (it) => it.kind === 'life' || it.kind === 'event' },
-    { id: 'tapes', label: 'tapes you can play', pick: playable },
-    { id: 'works', label: 'films & records',
-      pick: (it) => !playable(it) && /^(work|film|video|audio|recording|release)$/.test(it.kind) },
-    { id: 'kit', label: 'instruments', pick: (it) => it.kind === 'instrument' },
-    { id: 'paper', label: 'papers & photographs',
-      pick: (it) => /^(text|image|data|article)$/.test(it.kind) },
-    { id: 'fonds', label: 'the archive itself', pick: (it) => it.kind === 'collection' },
+    { id: 'tapes', label: 'tapes', pick: playable },
   ];
+
+  /**
+   * 🔴 OVERLAPPING TAPES GO IN SUB-ROWS OF ONE LANE, NOT IN LANES OF THEIR OWN.
+   *
+   * Nine of these records sit inside the same few months and several are dated
+   * only to a year or a decade, so their bars are wide by construction — and
+   * they were drawn on top of each other, titles included. What you saw was
+   * `Sähkösoittimen Ääniä` and four other names in the same forty pixels: not a
+   * rendering fault, five names at one x.
+   *
+   * A lane each would be 24 lanes, which makes a lane stop meaning "a kind of
+   * thing" and starts meaning "a record" — and 24 gutters of one item each says
+   * nothing. The strip's own `stack` does that too: one slot per KEY, so a lane
+   * 30 px tall becomes 24 bars 3 px tall whether or not any of them overlap.
+   *
+   * What is wanted is the interval-packing every calendar does: put each bar in
+   * the FIRST row where it does not touch what is already there. Rows appear
+   * only where the archive is actually dense, one row where it is not, and
+   * every bar keeps its full width and gets its title back. The lane's height
+   * follows the answer instead of being guessed.
+   *
+   * ⚠️ PACKED BY TIME, NOT BY PIXELS. Two bars that do not overlap in time can
+   * still have their LABELS collide at some zoom, and packing by pixels would
+   * re-pack on every scroll — a lane that changes shape while you drag it. The
+   * label rule below already handles the narrow case by dropping the text.
+   */
+  /**
+   * 🔴 THE MAP OPENS AT THE ZOOM IT IS READ AT, NOT AT ITS WHOLE RANGE. `fit()`
+   * to 1890–2027 puts a hundred and thirty-seven years across twelve hundred
+   * pixels: every bar is a sliver, every title is dropped by the label rule
+   * below, and the first thing anybody does is zoom in by hand to about a year.
+   * So the page arrives there. ⚠️ The axis is still 1890–2027 — this moves the
+   * VIEW, not the range, so scrolling out to the whole century still works and
+   * the gutter's counts still describe the whole corpus.
+   *
+   * ⚠️ CLAMPED AT BOTH ENDS, because the spans are honest about vagueness and
+   * the window must not be. A tape dated to the day would fit to a window of
+   * one day — a single tick on an empty axis — and one dated `196X` would fit
+   * to a decade, which is the zoom this exists to get away from.
+   */
+  const MONTH = 1000 * 60 * 60 * 24 * 30;
+  const WIN_MIN = 10 * MONTH, WIN_MAX = 48 * MONTH;
+  function focus(it) {
+    const a = it.when?.earliest, b = it.when?.latest ?? a;
+    if (a == null) return;
+    const w = Math.min(WIN_MAX, Math.max(WIN_MIN, (b - a) * 1.6));
+    // ⚠️ THE TAPE'S OWN START AT THE PLAYHEAD, not its middle in the middle. A
+    // record dated `1963–1973` centred puts five years of nothing on the left
+    // and the mark half off the right; framed on its start, the mark begins
+    // where the cursor is and runs into the room ahead of it, which is how a
+    // timeline is read.
+    view.strip.frame(a, w);
+  }
+
+  const LABEL_GAP_MS = 1000 * 60 * 60 * 24 * 30;      // a month of clear air
+  function packRows(rows) {
+    const ends = [];                                   // last end time per row
+    const of = new Map();
+    for (const r of [...rows].sort((a, b) => a.from - b.from)) {
+      let i = ends.findIndex((e) => e + LABEL_GAP_MS <= r.from);
+      if (i < 0) { i = ends.length; ends.push(-Infinity); }
+      ends[i] = Math.max(ends[i], r.to);
+      of.set(r.id, i);
+    }
+    return { of, count: Math.max(1, ends.length) };
+  }
 
   const rowsFor = (pick) => items.filter((it) => pick(it) && it.when?.earliest != null)
     .map((it) => ({ at: it.when.earliest, id: it.id, kind: 'record',
@@ -188,11 +265,28 @@
     view.strip.setLanes(LANES.map((L) => {
       const all = items.filter(L.pick);
       const undated = all.filter((it) => it.when?.earliest == null).length;
+      const pack = packRows(all
+        .filter((it) => it.when?.earliest != null)
+        .map((it) => ({ id: it.id, from: it.when.earliest,
+                        to: it.when.latest ?? it.when.earliest })));
+      // ⚠️ THE HEIGHT IS THE ANSWER, NOT A SETTING. `strip.mjs` divides a lane
+      // between its slots, so a fixed height would shrink every bar as soon as
+      // one more overlapped. 15 px a row keeps a bar readable and a title on it.
+      const ROW = 15, PAD = 5;
       return {
-        id: L.id, label: L.label, as: 'spans', height: 30, barPad: 5, stack: false, terse: true,
-        // The gutter says what this lane MEASURED — how many it holds and how
-        // many of them no axis can place. Never an instruction (CLAUDE.md).
-        subLabel: `${all.length}${undated ? ` · ${undated} undated` : ''}`,
+        id: L.id, label: L.label, as: 'spans', terse: true,
+        height: pack.count * ROW + PAD * 2, barPad: PAD,
+        slots: pack.count,
+        slotOf: (sp) => pack.of.get(sp.row?.id) ?? 0,
+        // 🔴 NO SUB-LABEL, AND THE COUNT IT CARRIED IS REHOMED RATHER THAN
+        // DROPPED. It read `24 · 11 undated`, and on a phone the gutter has to
+        // be as wide as that line — which took a third of the screen away from
+        // the picture, on the one page whose subject is the picture. With one
+        // lane left the name alone identifies it.
+        // ⚠️ THE UNDATED COUNT IS NOT GONE. CLAUDE.md is explicit that a silent
+        // truncation reads as "there were none", so it moved into the log line
+        // below, which says it once, in words, where a reader can see it.
+        subLabel: '',
         rows: () => rowsFor(L.pick),
         colorOf: (s) => INK[stateOf(s.row.payload.it)],
         /**
@@ -270,14 +364,70 @@
    * analyser is three copies of one measurement that can disagree about which
    * frame they are in.
    */
+  /**
+   * 🔴 WHILE A LOOP IS RUNNING THE PICTURE STOPS SCROLLING AND BECOMES THE LOOP.
+   *
+   * Asked directly: *why not waveform go back and forth on looping as in DAWs?*
+   * Because the scope was showing ARRIVAL TIME — the last few seconds of what
+   * came out, sliding left — and on that axis a loop can only ever be a mark
+   * where it came round, which is what it was. That is the honest picture for a
+   * live station, where there is no file and no end. It is the wrong one here:
+   * a tape is a file with a length, a loop inside it is a fixed piece of sound,
+   * and a person who has just marked one wants to watch the playhead cross it.
+   *
+   * ⚠️ THE LOOP'S OWN AUDIO, NOT THE FILE'S. `grain-scope`'s header refuses to
+   * draw a whole file and is right to — the largest thing here is 225 MB and
+   * drawing it means fetching all of it before a single sample is heard. A loop
+   * is bounded by the two marks somebody just made, so the first pass through it
+   * fills the peaks and every pass after that draws them. It costs the loop's
+   * own length and nothing else, and the picture appears exactly when it can be
+   * true.
+   *
+   * ⚠️ AND THE BINS ARE THE PICTURE'S, NOT THE SOUND'S. One column per pixel-ish
+   * is all a 380 px canvas can show; asking for more is measuring something
+   * nobody can see.
+   */
+  let loopWin = null;                       // {a, b, peaks, seen} while looping
+  function loopBegin(a, b) {
+    const bins = Math.max(48, Math.min(900, Math.round((b - a) / 25)));
+    loopWin = { a, b, peaks: new Float32Array(bins), seen: 0 };
+    scope.clear();
+  }
+  function loopEnd() {
+    loopWin = null;
+    // Back to the scrolling picture — `buffer(null)` is what the scope reads to
+    // decide which of its two pictures it is drawing.
+    scope.buffer(null);
+    scope.range(0, 0, 0);
+  }
+
   let peak = 0, master = null;
   function frame() {
     if (analyser && buf) {
       analyser.getFloatTimeDomainData(buf);
-      scope.feed(buf, ctx.sampleRate);
-      let s = 0;
-      for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+      let s = 0, mx = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = buf[i] < 0 ? -buf[i] : buf[i];
+        if (v > mx) mx = v;
+        s += buf[i] * buf[i];
+      }
       peak = Math.max(peak, Math.sqrt(s / buf.length));
+      if (loopWin) {
+        // Where the playhead is INSIDE the loop, 0..1. `tapeDeck.position()` is
+        // the tape's own milliseconds, which is the axis the marks were made on.
+        const pos = tapeDeck.position();
+        const f = Math.max(0, Math.min(0.9999, (pos - loopWin.a) / (loopWin.b - loopWin.a)));
+        const i = Math.floor(f * loopWin.peaks.length);
+        // ⚠️ MAX, NOT REPLACE. A second pass over the same bin has different
+        // samples in it — a waveform that overwrote itself would flicker at the
+        // loop's rate, which is a picture that moves for a reason nobody can see.
+        if (mx > loopWin.peaks[i]) loopWin.peaks[i] = mx;
+        loopWin.seen = Math.max(loopWin.seen, f);
+        scope.buffer(loopWin.peaks, { write: f, filledFrac: loopWin.seen });
+        scope.range(0, 1, f);
+      } else {
+        scope.feed(buf, ctx.sampleRate);
+      }
     }
     master?.tick();
     requestAnimationFrame(frame);
@@ -306,7 +456,7 @@
       el('span', 'n-of', `${cur + 1}/${tapes.length}  `),
       document.createTextNode(it.title),
       el('span', 'n-when', `  ${it.when.edtf || 'no date'}`));
-    if (it.when?.earliest != null) mapDeck.seek(it.when.earliest);
+    if (it.when?.earliest != null) { mapDeck.seek(it.when.earliest); focus(it); }
     d.log(`${it.title} — ${it.when.edtf || 'no date, so it is not on the axis'}`, 'hi');
     retried = false;                   // a new tape gets its own one chance
     if (play) start();
@@ -317,6 +467,19 @@
   // this page duplicates them.
   const bar = createTransportBar(d.el, tapeDeck, {
     scrub: true, endStop: false,
+    // ⚠️ THE WRAP GOES ON THE WAVE, NOT THE LOOP'S ENDS. The scope's axis is
+    // when sound arrived; a loop's ends are positions in the tape, and at any
+    // rate but 1x those two run at different speeds. A wrap is an instant, and
+    // the gap between two of them on this picture is the loop's length as you
+    // heard it.
+    // 🔴 THE PICTURE CHANGES WITH THE LOOP, which is the answer to "why does it
+    // not go back and forth like a DAW". With a loop set the scope draws that
+    // loop's own sound, once, with a cursor crossing it; with none it goes back
+    // to the scrolling wave, which is the only honest picture of a stream.
+    onLoop: (what, a, b) => {
+      if (what === 'set') loopBegin(a, b);
+      else if (what === 'off') loopEnd();
+    },
     extras: [
       { id: 'prev', label: '‹', aria: 'the tape before this one',
         onClick: () => select(cur - 1, { play: !audio.paused }) },
@@ -421,7 +584,14 @@
     master = mediaMaster(tapeDeck, audio, { anchorMs: 0 });
     frame();
     select(0);
-    d.log(`${items.length} records, ${tapes.length} of them playable`, 'hi');
+    // ⚠️ THE UNDATED COUNT LIVES HERE NOW. It was in the lane's gutter and the
+    // gutter had to be as wide as it; saying it once in the log costs no width
+    // and is the honest home for a fact about the corpus rather than about the
+    // lane. A record with no date cannot be on an axis, and a page that drew 13
+    // marks for 24 tapes without saying so would be claiming eleven do not exist.
+    const undated = items.filter((it) => playable(it) && it.when?.earliest == null).length;
+    d.log(`${items.length} records, ${tapes.length} of them playable`
+      + `${undated ? ` — ${undated} of those have no date and cannot be on the axis` : ''}`, 'hi');
     heard = await playable_now();
     d.log(heard
       ? `${tapes[cur].title} is loaded — ${(audio.duration / 60).toFixed(1)} minutes`
@@ -440,10 +610,63 @@
    * actually build, not off the file — a lane that silently dropped its spans
    * would still let the file's own counts pass.
    */
+  // ⚠️ THE DENOMINATOR IS THE LANE'S OWN, NOT THE CORPUS'S. It used to be every
+  // dated record in the file, which was right while six lanes between them held
+  // everything; with one lane left that assert compared 13 playable marks
+  // against 275 dated records and read as a page that had lost its axis. What
+  // the check is FOR is that a lane draws every one of the rows it claims —
+  // a lane that silently dropped its spans would still pass a count taken off
+  // the file.
   const placed = LANES.reduce((n, L) => n + rowsFor(L.pick).length, 0);
+  const claimed = LANES.reduce((n, L) =>
+    n + items.filter((it) => L.pick(it) && it.when?.earliest != null).length, 0);
   const dated = items.filter((it) => it.when?.earliest != null).length;
-  d.assert('every dated record is on the axis, in exactly one lane',
-    placed === dated, `${placed} marks for ${dated} dated records`);
+  // 🔴 THE LOOP CHANGES THE PICTURE, GRADED THROUGH THE BUTTON. Driven by
+  // `pressLoop()` rather than by calling `loopBegin` — the fault worth catching
+  // is in the wiring between the bar and the page, not in either half.
+  {
+    const api = window.__demo?.transport;
+    const [r0, r1] = tapeDeck.range;
+    if (api && r1 > r0) {
+      const before = scope.showing();
+      tapeDeck.seek(r0 + (r1 - r0) * 0.2);
+      api.pressLoop();
+      tapeDeck.seek(r0 + (r1 - r0) * 0.5);
+      api.pressLoop();
+      await new Promise((r) => setTimeout(r, 120));
+      const during = scope.showing();
+      api.pressLoop();
+      await new Promise((r) => setTimeout(r, 120));
+      const after = scope.showing();
+      d.assert('a loop turns the scrolling wave into a picture of the loop, and back',
+        before === 'scrolling' && during === 'material' && after === 'scrolling',
+        `${before} → ${during} → ${after}`);
+    }
+  }
+
+  d.assert('every dated record its lane claims is on the axis',
+    placed === claimed && placed > 0,
+    `${placed} marks for the ${claimed} dated records this page draws, `
+    + `of ${dated} dated in the corpus`);
+
+  // 🔴 AND NOTHING IS DRAWN ON TOP OF ANYTHING. The packing is the answer to
+  // five titles in the same forty pixels, so the thing to check is that no two
+  // bars sharing a row share any time — which is a property of the answer, not
+  // of the drawing, and is false the moment the greedy loop is wrong.
+  {
+    const rows = items.filter((it) => playable(it) && it.when?.earliest != null)
+      .map((it) => ({ id: it.id, from: it.when.earliest,
+                      to: it.when.latest ?? it.when.earliest }));
+    const pack = packRows(rows);
+    let clash = 0;
+    for (const a of rows) for (const b of rows) {
+      if (a.id >= b.id || pack.of.get(a.id) !== pack.of.get(b.id)) continue;
+      if (a.from <= b.to && b.from <= a.to) clash++;
+    }
+    d.assert('no two tapes in one row overlap in time',
+      clash === 0 && pack.count >= 1,
+      `${rows.length} tapes packed into ${pack.count} row(s), ${clash} overlapping pair(s)`);
+  }
 
   const widths = items.filter((it) => it.when?.earliest != null)
     .map((it) => (it.when.latest - it.when.earliest) / 86400e3);

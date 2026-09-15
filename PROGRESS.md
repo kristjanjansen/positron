@@ -1,3 +1,49 @@
+# Session 27 — the Marinetti detour, and what was actually found (2026-09-15)
+
+⚠️ **A NOTE, NOT A PLAN.** `/held/` briefly carried words from Marinetti's
+`Zang Tumb Tumb` (1914) and they were replaced by `Kalevipoeg` on instruction.
+What was learned is worth keeping so nobody re-runs it.
+
+**The typographic argument was right and the words were wrong.** *Parole in
+libertà* (1913) is the claim that a word has a size, a weight and a place, and
+that setting one in a line at one size throws all three away — which is exactly
+what `/held/` is. `Zang Tumb Tumb` is that claim typeset. But its words are
+onomatopoeia for artillery at the siege of Adrianople, so the first question
+anybody asked, within a minute of the words going up, was **"what is zang?"** —
+and the honest answer is that a futurist was enjoying a bombardment. A room a
+visitor walks into should not need that footnote, and Kreutzwald's epic carries
+the same weight in the language the audience already has.
+
+**Copyright, checked:** F. T. Marinetti died 1944, so the TEXT has been public
+domain since 1 January 2015 under life-plus-seventy. Kreutzwald died 1882 —
+public domain since 1952.
+
+🔴 **RECORDINGS EXIST AND NONE OF THEM HAS PROVENANCE.** Asked whether Marinetti
+recordings could be played. He recorded *parole in libertà* for Italian radio
+around 1935. What is actually reachable, MEASURED 2026-09-15:
+
+| where | what | licence |
+|---|---|---|
+| `archive.org/details/Marinetti` | one 78 KB mp3/ogg | **no creator, no date, no licence stated** |
+| `archive.org/details/soundpoetry-full-archive` | `Filippo Tommaso Marinetti - Declama.rar`, 138 MB | none stated, and a RAR is not streamable |
+| archive.org search, `marinetti AND mediatype:audio` | 91 items, almost all unrelated | — |
+
+archive.org serves `access-control-allow-origin: *` and honours Range, so
+**access is not the blocker — provenance is.** A bare upload with no creator and
+no licence is exactly what `research/kurenniemi-sources-2026-09.md` treats as
+unshippable, and the same rule has to apply here or it is not a rule.
+
+⚠️ **And the recording is a separate right from the text.** A 1935 Italian
+recording is out of copyright in the EU (the 50-year term expired before the
+2011 extension could catch it); in the US, pre-1972 recordings published
+1923–1946 run 100 years under the Music Modernization Act, which would put a
+1935 recording in the public domain on 1 January 2036. ⚠️ Both of those are
+read off the rules rather than from a lawyer, and neither has been checked
+against a specific recording's own publication date — which is the thing none
+of the copies above states.
+
+---
+
 # Progress log — 2026-08-25 → 09-15  (newest first)
 
 ## Session 26 (2026-09-15) — the suite was texting a real phone; the archive gets an axis; two components and the bug one of them found
@@ -6460,3 +6506,36 @@ State when parked:
 8. Perception-lag loop: finish `rig/loop-lag.sh` per the parked design above.
 9. Unexplained: hls.js `liveMaxLatencyDurationCount` arm never played; one
    same-broadcast resume settled ~26 s behind without drift-seek firing.
+
+## 2026-09-15, session 27 — diagrams get a grammar, cards get a front page
+
+Deployed `df826fb-100522-6725`. ⚠️ No suite total recorded: the last full
+`verify.mjs` run predates the diagram, card, transport and `blocks` work.
+Measured per demo: `tapes` 22/22, `blocks` 45/45, `held` 22/22, diagram-test
+64 ok.
+
+**Renames.** `scene` -> `blocks`, `kurenniemi` -> `resources`, `aikajana` ->
+`deck`. `shout` and `proto/megatimeline` moved to `archive/`.
+
+**Diagram colour, measured rather than picked.** Four differently-tinted boxes
+were rendering as identical greys: the per-kind rules sat at (0,3,0) against the
+hue's (0,1,0) and overrode the fill. Kind rules set stroke-width only now. The
+separate mud complaint had a different cause and the same shape: a warm hue at
+low saturation mixed into a near-black fill is mud at any alpha, which
+`pattern.mjs` already knew about the test picture's field. Identity moved to the
+stroke (`EDGE_TINT = 0.75`) and the fill stays near-grey (`BOX_TINT = 0.1`).
+
+**Marinetti, closed as a source.** Recordings of the 1935 *Zang Tumb Tumb*
+readings do exist, are reachable and answer with CORS headers clear. **Not one
+copy carries a creator, a date or a licence.** Provenance is the blocker, not
+availability, and this project does not ship attested-only material it cannot
+attest. `held` uses Kalevipoeg instead, which is public domain, has a named
+translator lineage and carries a cultural link the audience actually has.
+
+**The three failures worth the space.** A `[^}]*` regex ate three CSS rules above
+its target and I called the resulting blank canvas an ERR outage while 294 of 298
+tiles were loading at 60 fps. A second `mark()` added to the same object literal
+silently overwrote the first, killed radio1965's grain ticks, and I called that
+the station being down. And `roomToEye` shipped an inverted rotation sign with a
+PASSING assert, because the assert recomputed the matrix from the same wrong
+derivation — caught only by rendering and finding zero pixels at 70°.
