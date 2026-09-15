@@ -72,7 +72,7 @@ const PROBS = { min: 0, max: 1, n: 8 };
   r.tick(0.75);
   const got = r.sent.at(-1)[1];
   ok(Math.abs(s.unmap(got) - (s.unmap(B) + 0.5)) < 1e-9,
-    `amt 1 moves half a lane on a half-height saw — ${got.toFixed(4)} s`);
+    `amt 1 moves half a lane on a half-height saw · ${got.toFixed(4)} s`);
 
   const half = rig({ specs: { size: SIZE }, bases: { size: B },
                      routes: [{ src: 'lfo', dest: 'size', shape: 'saw', hz: 1, amt: 0.5 }] });
@@ -80,7 +80,7 @@ const PROBS = { min: 0, max: 1, n: 8 };
   const g2 = half.sent.at(-1)[1];
   const moved = s.unmap(g2) - s.unmap(B);
   ok(Math.abs(moved - 0.5 * 0.125) < 1e-9,
-    `amt 0.5 is CUBED to 0.125 — moved ${moved.toFixed(5)} of the lane, not ${(0.5 * 0.5).toFixed(5)}`);
+    `amt 0.5 is CUBED to 0.125 · moved ${moved.toFixed(5)} of the lane, not ${(0.5 * 0.5).toFixed(5)}`);
 }
 
 // ── the Turing machine ────────────────────────────────────────────────────
@@ -95,19 +95,19 @@ function turingSeq({ machine, steps = 32, hz = 1 }) {
   const locked = turingSeq({ machine: 1 });
   const a = locked.slice(0, 16).join(','), b = locked.slice(16, 32).join(',');
   ok(a === b && new Set(locked.slice(0, 16)).size > 8,
-    `machine 1 locks a 16-step loop — lap 2 is identical, ${new Set(locked.slice(0, 16)).size} distinct values`);
+    `machine 1 locks a 16-step loop · lap 2 is identical, ${new Set(locked.slice(0, 16)).size} distinct values`);
 
   // THE CONTROL. At 0 it must NOT repeat, or the test above is passing on a
   // machine that has no choice.
   const free = turingSeq({ machine: 0 });
   ok(free.slice(0, 16).join(',') !== free.slice(16, 32).join(','),
-    'machine 0 does not repeat — so the lock above is a real setting');
+    'machine 0 does not repeat, so the lock above is a real setting');
 
   // and the middle, which is the one worth having: a few values change a lap
   const drift = turingSeq({ machine: 0.85, steps: 48 });
   const lap1 = drift.slice(0, 16), lap2 = drift.slice(16, 32);
   const changed = lap1.filter((v, i) => v !== lap2[i]).length;
-  ok(changed > 0 && changed < 16, `machine 0.85 drifts — ${changed} of 16 values rewritten in a lap`);
+  ok(changed > 0 && changed < 16, `machine 0.85 drifts · ${changed} of 16 values rewritten in a lap`);
 }
 
 // ── a skipped tick ages the pattern by the CLOCK, not by the tick ─────────
@@ -126,7 +126,7 @@ function turingSeq({ machine, steps = 32, hz = 1 }) {
   r.tick(100.5);
   const jumped = r.sent.at(-1)[1];
   ok(jumped === lap1[100 % 16],
-    `a tick 85 steps late reads slot ${100 % 16}, the one the clock says — ${jumped.toFixed(4)} s`);
+    `a tick 85 steps late reads slot ${100 % 16}, the one the clock says · ${jumped.toFixed(4)} s`);
 }
 
 // ── an array destination ──────────────────────────────────────────────────
@@ -136,9 +136,9 @@ function turingSeq({ machine, steps = 32, hz = 1 }) {
   r.tick(0.3);
   const v = r.sent.at(-1);
   ok(v[0] === 'probs' && Array.isArray(v[1]) && v[1].length === 8,
-    `an array destination writes all eight — ${v[1].map((x) => x.toFixed(2)).join(' ')}`);
+    `an array destination writes all eight · ${v[1].map((x) => x.toFixed(2)).join(' ')}`);
   ok(new Set(v[1].map((x) => x.toFixed(4))).size > 4,
-    'the eight elements differ — one shape rotated across the voices, not one value copied');
+    'the eight elements differ: one shape rotated across the voices, not one value copied');
   ok(v[1].every((x) => x >= 0 && x <= 1), 'every element stays inside the spec');
 }
 
@@ -195,7 +195,7 @@ function turingSeq({ machine, steps = 32, hz = 1 }) {
   ]);
   const st = r.m.stats();
   ok(st.routes === 1 && st.dropped === 2,
-    `1 routing kept, ${st.dropped} refused — a typo does not become a 0.1 Hz sine`);
+    `1 routing kept, ${st.dropped} refused · a typo does not become a 0.1 Hz sine`);
 }
 
 // ── the envelope follower ─────────────────────────────────────────────────
@@ -224,7 +224,7 @@ function turingSeq({ machine, steps = 32, hz = 1 }) {
   r.tick(0.64);
   const falling = r.sent.at(-1)[1];
   ok(falling > quiet && falling < loud,
-    `and it falls back SLOWLY — ${falling.toFixed(4)} s, 0.2 s after the sound stopped`);
+    `and it falls back SLOWLY · ${falling.toFixed(4)} s, 0.2 s after the sound stopped`);
 }
 
 console.log(bad ? `\n${bad} FAILED` : '\nall green');

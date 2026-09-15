@@ -1,5 +1,12 @@
-// demo/shell/mp3-stream.mjs — an Icecast MP3 mount as an AudioNode, with no
-// media element anywhere in it.
+// demo/shell/mp3-stream.mjs — an Icecast mount as an AudioNode, with no media
+// element anywhere in it.
+//
+// TWO CODECS. `audio/mpeg` mounts (ERR, Radio 1965) and `audio/aac` ones (IDA
+// Radio, and every AzuraCast station). The framing is chosen from the RESPONSE's
+// `content-type` and the decoder is configured from the FIRST FRAME's own
+// header, so neither decision is taken from the URL. CLAUDE.md has that rule
+// twice over: `canPlayType` answers "maybe" in two browsers that cannot both
+// play the thing, and an `.mp3` suffix says nothing about what a mount serves.
 //
 // 🔴 WHY THIS EXISTS, MEASURED RATHER THAN ASSUMED. `/radio1965/` played its
 // station through `<audio>` and tapped it with `createMediaElementSource`. On an
@@ -19,7 +26,7 @@
 //
 // ── the two decode paths, and why both ──────────────────────────────────────
 //
-// A. `AudioDecoder` (WebCodecs), one `EncodedAudioChunk` per MP3 frame. The
+// A. `AudioDecoder` (WebCodecs), one `EncodedAudioChunk` per frame. The
 //    decoder keeps state across frames, so the output is continuous and there
 //    is no seam anywhere. Preferred wherever it will configure.
 // B. `decodeAudioData` over a GROUP of frames. Available everywhere, and the
@@ -38,7 +45,7 @@
 // broken assumption.
 
 import { icyDemuxer } from './icy.mjs';
-import { createFrameSplitter } from './mp3-frames.mjs';
+import { createFrameSplitter, framingFor } from './mp3-frames.mjs';
 
 /**
  * @param {AudioContext} ctx
@@ -53,10 +60,15 @@ import { createFrameSplitter } from './mp3-frames.mjs';
 export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilingMs = 2500,
                                        onTitle = () => {}, log = () => {} } = {}) {
   const node = ctx.createGain();
-  const splitter = createFrameSplitter();
+  // ⚠️ BUILT AFTER THE HEADERS, NOT BEFORE THE FETCH. Which framing to read is
+  // the response's answer, so the splitter cannot exist until there is one.
+  let splitter = null;
   const st = {
     path: 'starting', rate: 1, bytes: 0, frames: 0, decoded: 0, blocks: 0,
     underruns: 0, skipped: 0, dropped: 0, errors: 0, sampleRate: 0, channels: 0, startedAt: 0,
+    // What is actually being read and decoded, reported rather than assumed:
+    // 'mpeg' or 'adts', and the codec string the frame headers asked for.
+    framing: '', codec: '',
   };
   /**
    * 🔴 WHAT THE WIRE DID, RECORDED HERE SO NOBODY OPENS A SECOND CONNECTION FOR
@@ -272,7 +284,7 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     const ceiling = startingUp ? ceilingMs / 1000 : MAX_AHEAD;
     if (ahead > ceiling) {
       if (!trimming && !startingUp) {
-        log(`${ahead.toFixed(0)} s behind the station — rejoining live`);
+        log(`${ahead.toFixed(0)} s behind the station · rejoining live`);
       }
       trimming = true;
     }
@@ -411,9 +423,18 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
   }
 
   // ── path A: WebCodecs ─────────────────────────────────────────────────────
-  async function tryWebCodecs(sampleRate, channels) {
+  /**
+   * 🔴 NO `description`, AND FOR AAC THAT IS THE WHOLE CONFIGURATION.
+   * WebCodecs reads an AAC bitstream one of two ways: with a `description` (an
+   * AudioSpecificConfig) the chunks must be bare AAC, and WITHOUT one they must
+   * be ADTS-framed. This file hands over whole ADTS frames, headers included, so
+   * the absent field is the thing that makes it work rather than an omission.
+   * MEASURED in Chrome: `mp4a.40.2` at 44100/2 configures, and 1024-sample
+   * frames come back out of it.
+   */
+  async function tryWebCodecs(codec, sampleRate, channels) {
     if (typeof AudioDecoder === 'undefined') return null;
-    const config = { codec: 'mp3', sampleRate, numberOfChannels: channels };
+    const config = { codec, sampleRate, numberOfChannels: channels };
     try {
       const sup = await AudioDecoder.isConfigSupported(config);
       if (!sup?.supported) return null;
@@ -445,7 +466,9 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
   // ⚠️ IT MUST START ON A SYNC. `decodeAudioData` refuses — or worse, silently
   // mis-decodes — a buffer that begins part-way through a frame, which is
   // exactly what an Icecast listener's first read is. The splitter guarantees
-  // whole frames, so a group of them is a valid tiny MP3 file.
+  // whole frames, and a run of whole frames is a valid tiny file in BOTH
+  // framings: MPEG audio and ADTS are each just their frames, back to back,
+  // with no container around them.
   const groupFrames = [];
   async function decodeGroup(sampleRate) {
     if (!groupFrames.length) return;
@@ -482,6 +505,19 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
       if (v) wire.headers[k] = v;
     }
     if (!res.ok || !res.body) { st.errors++; log(`stream answered HTTP ${res.status}`); return; }
+
+    // 🔴 THE FRAMING COMES OFF THE RESPONSE. `audio/mpeg` is Layer III,
+    // `audio/aac` is ADTS, and they share a sync word, so a scanner pointed at
+    // the wrong one finds NOTHING rather than finding rubbish — MEASURED, the
+    // Layer III scanner over a megabyte of a real AAC mount returns 0 frames.
+    // That is the worst shape available: bytes arriving, no errors, no sound.
+    //
+    // ⚠️ A `content-type` NEITHER NAME MATCHES IS NOT A REASON TO GUESS. `null`
+    // here puts the splitter on its own sniff, which latches whichever reader
+    // finds CONFIRMED frames in the arriving bytes.
+    const framing = framingFor(res.headers.get('content-type'));
+    splitter = createFrameSplitter({ framing });
+    st.framing = framing || 'sniffing';
 
     const metaint = Number(res.headers.get('icy-metaint') || 0);
     // 🔴 THE AUDIO COMES OUT OF `onAudio`, AND IT DID NOT EXIST UNTIL THIS FILE
@@ -534,13 +570,22 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
         st.frames++;
         if (!st.sampleRate) {
           st.sampleRate = f.sampleRate; st.channels = f.channels;
-          decoder = await tryWebCodecs(f.sampleRate, f.channels);
+          st.framing = splitter.framing;
+          st.codec = f.codec;
+          decoder = await tryWebCodecs(f.codec, f.sampleRate, f.channels);
           st.path = decoder ? 'WebCodecs AudioDecoder' : 'decodeAudioData';
-          log(`${st.path} · ${f.sampleRate} Hz · ${f.channels} ch · ${f.bitrate / 1000} kbps`);
+          // ⚠️ THE RATE IS ROUNDED BECAUSE ONE OF THE TWO CODECS HAS NO SUCH
+          // FIELD. MPEG audio writes its bitrate in every header; AAC does not,
+          // so this is the first frame's own length turned back into a rate and
+          // it wobbles frame to frame. A number carried to three decimals would
+          // claim a precision the format does not have.
+          log(`${st.path} · ${f.codec} · ${f.sampleRate} Hz · ${f.channels} ch`
+            + ` · ${Math.round(f.bitrate / 1000)} kbps`);
         }
         if (decoder) {
-          // A whole MP3 frame is a key frame for this purpose: every one can be
-          // handed over on its own and the decoder carries its own state.
+          // A whole frame is a key frame for this purpose, in both framings:
+          // every one can be handed over on its own and the decoder carries its
+          // own state across them.
           decoder.decode(new EncodedAudioChunk({
             type: 'key',
             timestamp: Math.round((st.frames * f.samplesPerFrame * 1e6) / f.sampleRate),
@@ -606,7 +651,7 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     stats: () => ({
       ...st,
       buffered: Math.max(0, nextAt - ctx.currentTime),
-      pendingBytes: splitter.pending,
+      pendingBytes: splitter ? splitter.pending : 0,
       // Is the armed speed audible yet? See `arriveAt`. `arriveIn` is null
       // while the glide is still running, because the answer is not known until
       // the block that reaches the target has been scheduled — and a made-up

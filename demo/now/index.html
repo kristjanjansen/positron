@@ -33,14 +33,13 @@
   const d = mount({
     name: 'now',
     what: 'One ERR television channel on a line whose right-hand end is the present '
-      + 'moment. The white line is the frame on the glass and the orange one is now; '
-      + 'the distance between them, about seven seconds, is what a live picture costs '
-      + 'to reach you, and the row underneath counts it in its own margin. ERR keeps '
-      + 'roughly the last two hours, so press anywhere on the line to watch from that '
-      + 'moment instead, and LIVE returns to the edge. That row also says how many '
-      + 'instants across the window ERR agreed to hand over when the page asked, two '
-      + 'bytes at a time, and how many it refused. The grey row under it is what ERR '
-      + 'says was on.',
+      + 'moment. The white line is the frame on the glass and the orange one is now, '
+      + 'and the distance between them, about seven seconds, is what a live picture '
+      + 'costs to reach you. ERR keeps roughly the last two hours, so press anywhere '
+      + 'on the line to watch from that moment instead, and LIVE returns to the edge. '
+      + 'The margin of the live row says how far behind the picture is, how much of '
+      + 'the window you have watched, and whether ERR refused any of the instants the '
+      + 'page asked for; the grey row under it is what ERR says was on.',
     // NO READOUT. Four cells above the picture repeated what the rows already
     // say and put the page's headline number — how far behind the picture is —
     // as far from the line that draws it as the layout allows. The distance is in
@@ -318,7 +317,7 @@
       hls.attachMedia(glass);
       wallHandler(hls, window.Hls, () => {
         loadStopped = true;
-        d.log('ERR refused three fragments in a row — stopped loading rather than hammering it', 'bad');
+        d.log('ERR refused three fragments in a row. Stopped loading rather than hammering it', 'bad');
       });
     } else { d.log('this browser cannot play HLS', 'bad'); return; }
 
@@ -359,7 +358,7 @@
     await waitForCatchUp();
     await toLive();
     await liveTest();
-    d.log('walked back into the window and returned — the break in the top row is where that seek skipped');
+    d.log('walked back into the window and returned. The break in the top row is where that seek skipped');
     openView(deck.position());
     checks();
   }
@@ -388,7 +387,7 @@
       const outside = pos < edgeMs - reach || pos > edgeMs;
       setRange();
       if (outside)
-        d.log(`the window ate your position — moved to ${new Date(deck.position()).toTimeString().slice(0, 8)}`, 'bad');
+        d.log(`the window ate your position · moved to ${new Date(deck.position()).toTimeString().slice(0, 8)}`, 'bad');
       d.set('newest', ((Date.now() - edgeMs) / 1000).toFixed(1));
     } catch { /* one missed refresh is not an event */ }
   }, 1000 / RANGE_HZ);
@@ -520,7 +519,7 @@
     const served = probes.filter((p) => p.state === 'served' && p.at <= asked);
     let want = served.length ? served[served.length - 1].at : asked;
     if (probes.length && !served.length) {
-      d.log('ERR served nothing older than the live edge — there is nowhere to walk back to', 'bad');
+      d.log('ERR served nothing older than the live edge', 'bad');
     } else if (Math.abs(want - asked) > 60000) {
       d.log(`asked for ${new Date(asked).toTimeString().slice(0, 5)}; the nearest instant ERR agreed to serve is `
         + `${new Date(want).toTimeString().slice(0, 5)}`);
@@ -531,7 +530,7 @@
     }
     const sought = seekTo(want);
     d.log(`walking back to ${new Date(want).toTimeString().slice(0, 8)}`
-      + `${sought == null ? ' — no clock yet' : ''}`);
+      + `${sought == null ? ' · no clock yet' : ''}`);
     return want;
   }
 

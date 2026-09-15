@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* No margins on these: the gap between the drop row, the fields, the table
+     and the transport bar is `.pos-body > * + *` in shell.css, one rhythm for
+     every page. */
+  .vain-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  /* 🔴 THE BOX IS A TARGET, SO IT IS THE SIZE OF ONE. It was a 38 px strip
+     that happened to contain a button, which is a form control rather than
+     somewhere to let go of a file. Taller, with the text centred in it, and it
+     accepts a drop anywhere inside. */
+  .vain-row input[type="file"] {
+    flex: 1 1 260px; min-width: 0;
+    font: 500 12.5px/1.5 var(--mono); color: var(--dim);
+    background: var(--card); border: 1px dashed var(--line2); border-radius: 4px;
+    padding: 26px 14px; cursor: pointer;
+    transition: border-color 140ms ease, background 140ms ease;
+  }
+  /* ⚠️ THE HOVER STATE IS ON A CLASS, NOT ON `:hover`. A drag does not fire
+     hover in every browser, and the class is set from `dragenter` and cleared
+     on `dragleave` and `drop`, which is the only thing that knows a file is
+     over the box rather than a pointer. */
+  .vain-row input[type="file"].over {
+    border-color: var(--hi); background: var(--card2);
+  }
+  .vain-row input[type="file"]::file-selector-button {
+    font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--fg); background: transparent;
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 7px 10px; margin-right: 10px; cursor: pointer;
+  }
+  /* 🔴 THE ELEMENT IS A SOUND SOURCE, NOT A SURFACE, SO IT TAKES NO ROOM. With
+     no `controls` it renders at zero height and still collects the 22 px the
+     shell's rhythm gives every sibling, which put a doubled gap between the
+     table and the transport bar: the same shape as an empty readout painting
+     its own borders. The bar is the only position surface on this page. */
+  audio { display: none; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createDeck, normalizeWhen } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+
+  // The write path and, for now, the read path too. plan-vain-upload §9 wants
+  // the bytes to come straight off a public bucket with no worker in front of
+  // them; making this bucket public is an action this machine refuses, and §9
+  // named that case as the one where a read worker earns its place. The page
+  // never spells the read address out: it comes back from `/open` and from
+  // `/limits`, so the day the bucket goes public nothing here changes.
+  const BASE = 'https://positron-vain.kristjan-jansen.workers.dev';
+
+  // 🔴 THE HARNESS SAYS WHETHER ANYBODY IS COLLECTING THE ANSWER, and this page
+  // is one where that matters. `demo/verify.mjs` appends `selfcheck=1`; without
+  // it nothing is uploaded at all, so an ordinary visit writes nothing anywhere
+  // and the page is exactly what it looks like: a box you drop a file into.
+  const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
+
+  const d = mount({
+    name: 'crate',
+    what: 'Drop one audio file and it goes into Cloudflare R2 in pieces of 16 MiB, '
+      + 'each piece its own request that the far end accepts before the next one is sent. '
+      + 'Then it plays back from the address the archive gave it, and the bar moves by '
+      + 'asking for a range of bytes rather than fetching the file again. sent is how '
+      + 'much has left this browser and pieces is how much the far end has taken, which '
+      + 'are different numbers on a slow link. What you drop here lands in a sandbox the '
+      + 'server clears after six hours, because the archive itself needs a key this page '
+      + 'does not have.',
+    // Four cells, and every one of them moves while an upload is running.
+    // `left` is the derived one and the first suspect if it ever reads as
+    // noise; it cannot go on its own, because `speed` is what it is derived
+    // from and the two leave together, which keeps the count even.
+    readout: { sent: 'MB', pieces: '', speed: 'MB/s', left: 's' },
+    // 🔴 NO CONTROLS, AND THAT IS THE FIRST FENCE. `verify.mjs` presses every
+    // button in `.pos-controls` on every page on every run, so an upload button
+    // wired like an ordinary control would write to R2 from every machine that
+    // runs the suite. That is the FCM defect CLAUDE.md records at length. The
+    // button below lives in the page body instead, and the fence that actually
+    // holds is `isTrusted` on it plus the server deciding the store from the
+    // token and the origin.
+    controls: [],
+  });
+  guard(d);
+
+  // ── what the archive takes, asked rather than assumed ────────────────────
+  let LIMITS = null;
+  const MB = (n) => n / 1024 / 1024;
+
+  // ── the drop row ─────────────────────────────────────────────────────────
+  const row = el('div', 'vain-row');
+  const pick = el('input', '', null, { type: 'file', accept: 'audio/*' });
+  // 🔴 NOT `pos-pri`. The primary thing on this page is the box you drop into,
+  // and a filled yellow button beside itcompetes with with the target. Upload
+  // is what happens after the choice, not the choice.
+  const send = el('button', '', 'Upload', { type: 'button' });
+  send.disabled = true;
+  row.append(pick, send);
+  d.el.append(row);
+
+  /**
+   * 🔴 DROPPING A FILE ON THE BOX, WHICH IS WHAT THE PAGE ALREADY SAID IT WAS.
+   * Its own description calls it *a box you drop a file into* and until now the
+   * only way in was the picker. A file input does not accept drops on its own.
+   *
+   * ⚠️ `preventDefault` ON BOTH `dragover` AND `drop`, AND ON THE WINDOW TOO.
+   * Without the first the browser refuses the drop; without the last, letting
+   * go anywhere except exactly on the box makes the browser NAVIGATE to the
+   * file, which throws the page away mid-upload and looks like a crash.
+   * ⚠️ AND THE FILE IS PUT BACK INTO THE INPUT rather than uploaded straight
+   * from the event. `pick.files` is what every other path on this page reads,
+   * so a dropped file that bypassed it would be a second source of truth and
+   * the Upload button would still think nothing had been chosen.
+   */
+  for (const ev of ['dragover', 'drop']) {
+    window.addEventListener(ev, (e) => { e.preventDefault(); }, false);
+  }
+  pick.addEventListener('dragenter', () => pick.classList.add('over'));
+  pick.addEventListener('dragleave', () => pick.classList.remove('over'));
+  pick.addEventListener('dragover', (e) => { e.preventDefault(); pick.classList.add('over'); });
+  pick.addEventListener('drop', (e) => {
+    e.preventDefault();
+    pick.classList.remove('over');
+    const f = e.dataTransfer?.files?.[0];
+    if (!f) return;
+    const dt = new DataTransfer();
+    dt.items.add(f);
+    pick.files = dt.files;
+    pick.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  // ── the record, as far as a person can correct it ────────────────────────
+  //
+  // ⚠️ A TYPED DATE IS A SECOND ROW, NEVER AN EDIT. What the file said keeps
+  // its own row with the versioned rule that read it, so a reader can tell the
+  // two apart without being told anything, and a changed heuristic can still be
+  // found later. An override with nothing written in these two boxes is refused
+  // by the server: a corrected date nobody can question is a number, not a
+  // correction.
+  /**
+   * 🔴 ONE FIELD, AND IT NAMES THE RECORDING RATHER THAN CORRECTING IT.
+   *
+   * There were two here, `recorded` and `corrected by`, and together they were
+   * a date-override form: type a real date, sign it, and the server would keep
+   * it as a second row beside whatever the filename said. The machinery for
+   * that is still on the server and still right. What it was not is the thing
+   * somebody standing in front of this page wants to do, which is say what the
+   * file IS before sending it.
+   *
+   * So the field is a title now. It takes the whole row, because a title is a
+   * sentence and the half-width box it inherited fitted about twenty
+   * characters of one.
+   * ⚠️ EMPTY IS A REAL ANSWER. With nothing typed the filename is the title,
+   * which is what happened before this field existed, so sending a file
+   * without touching anything behaves exactly as it always did.
+   */
+  const fields = el('div', 'vain-row');
+  const saidTitle = createField({
+    label: 'title', placeholder: 'what this recording is', wide: true,
+  });
+  saidTitle.el.style.flex = '1 1 100%';
+  fields.append(saidTitle.el);
+  d.el.append(fields);
+
+  // ── one row per file ─────────────────────────────────────────────────────
+  //
+  // A FIXED WIDTH ON `state`, because nothing that redraws while somebody is
+  // looking at it may change how much room it takes. A sentence under the table
+  // saying "uploading piece 4 of 6" would reflow the page four times a second,
+  // and every figure in that sentence has a cell of its own above.
+  const table = createTable({
+    columns: [
+      { key: 'name', label: 'file', grow: true, clip: true, hi: true },
+      { key: 'size', label: 'size', width: 90, align: 'right' },
+      { key: 'state', label: 'state', width: 90, align: 'right' },
+    ],
+    // 🔴 NOTHING WHERE THE EMPTY MESSAGE WAS. It said "nothing dropped yet"
+    // over a box whose whole job is to be dropped into, an inch under a target
+    // that says the same thing by existing. An empty table with a hidden header
+    // is already silent and already the right size.
+    empty: '',
+  });
+  d.el.append(table.el);
+
+  /**
+   * 🔴 WHAT IS ALREADY IN THE CRATE, READ ON LOAD.
+   *
+   * The table only ever held this session's drop, so reloading showed an empty
+   * crate with a full store behind it. Reported in those words. A page whose
+   * whole subject is that a file ARRIVED and is still there cannot be the one
+   * thing on the site that forgets.
+   *
+   * `GET /list` is the index and there is no other one: a directory per
+   * recording means one call with a delimiter returns the recordings rather
+   * than every file, already ordered newest first. The titles come from each
+   * recording's own sidecar, so this is one request plus one per row shown.
+   * ⚠️ CAPPED AT 40 AND SAID OUT LOUD. The store has no upper bound and a page
+   * that quietly renders the first N reads as "this is everything". Six at a
+   * time, because forty parallel fetches to one worker is a self-inflicted
+   * rate limit.
+   */
+  const SHELF_MAX = 40, SHELF_LANES = 6;
+  let shelf = [];          // what the store already had
+  let live = null;         // the row for a drop in flight
+  const paintRows = () => table.set([...(live ? [live] : []), ...shelf]);
+
+  async function loadShelf() {
+    let list;
+    try { list = await jget(`${BASE}/list`); } catch { list = null; }
+    if (!list?.body?.recordings) { d.log('could not read what is already in the crate', 'warn'); return; }
+    const dirs = list.body.recordings;
+    const show = dirs.slice(0, SHELF_MAX);
+    const rows = new Array(show.length).fill(null);
+    let next = 0;
+    await Promise.all(Array.from({ length: SHELF_LANES }, async () => {
+      for (let i = next++; i < show.length; i = next++) {
+        const dir = show[i];
+        try {
+          // 🔴 THE WHOLE DIR, STORE INCLUDED. `readBase` ends at `/a` and a
+          // recording's key is `<store>/<stamp>`, so dropping the store with a
+          // `.pop()` asked for `/a/<stamp>/meta.json` and got 404 every time.
+          // The list call succeeded, forty sidecars quietly failed, and the
+          // table stayed empty: a page that reported nothing rather than an
+          // error, which is the shape that takes longest to find.
+          const m = await jget(`${list.body.readBase}/${dir}/meta.json`);
+          if (m.status === 200) {
+            rows[i] = { name: m.body.title || m.body.name || dir,
+                        size: `${MB(m.body.bytes || 0).toFixed(2)} MB`, state: 'kept' };
+          }
+        } catch { /* a row that will not load is left out rather than guessed at */ }
+      }
+    }));
+    shelf = rows.filter(Boolean);
+    paintRows();
+    d.log(dirs.length > show.length
+      ? `${shelf.length} of ${dirs.length} in the crate, newest first`
+      : `${shelf.length} in the crate`);
+  }
+
+  // ── the sound, and the bar that seeks it ─────────────────────────────────
+  const audio = el('audio', '', null, { preload: 'auto', playsinline: '' });
+  d.el.append(audio);
+
+  // ONE DECK FOR THE PAGE'S LIFE: the transport bar binds its deck when it is
+  // built, so a deck made later leaves the bar pointing at something nobody is
+  // playing. The range opens at one millisecond and is corrected the moment a
+  // length is known.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, 1] });
+  createTransportBar(d.el, deck, {
+    // no LOOP: this page plays an upload once to show it came back whole, and
+    // hearing it twice proves nothing the first pass did not
+    loop: false,
+    // 🔴 THE DECK IS A FOLLOWER HERE. The element owns position once it is
+    // playing, so a control that writes to the deck alone is undone by the
+    // master's next tick, silently, within a few hundred milliseconds.
+    command: {
+      play: () => { deck.play(); audio.play().catch(() => {}); },
+      pause: () => { audio.pause(); deck.pause(); },
+      // The playhead moves at once and the sound catches up: setting
+      // `currentTime` on a file coming off a server is a range request, and it
+      // arrives when the network says so. The deck may snap back a frame when
+      // the bytes land, which is the master re-anchoring rather than a fault.
+      seek: (pos) => { audio.currentTime = Math.max(0, pos) / 1000; deck.seek(pos); },
+    },
+  });
+  const master = mediaMaster(deck, audio, { anchorMs: 0 });
+  // `mediaMaster` does not run itself. Without this loop the object is built,
+  // holds a deck, and the playhead never moves.
+  (function frame() { master.tick(); requestAnimationFrame(frame); })();
+  audio.addEventListener('loadedmetadata', () => {
+    const ms = Math.round((audio.duration || 0) * 1000);
+    if (ms > 0) deck.setRange([0, ms]);
+  });
+
+  // ── progress, which is two quantities and not one ────────────────────────
+  //
+  // `xhr.upload.onprogress` says how much has left this browser. It moves
+  // smoothly, and on a slow link with a large socket buffer it can read 100%
+  // while nothing at all has been acknowledged. A 200 from `PUT /piece` says
+  // how much the far end has taken. Both are shown; only the second is
+  // evidence, and showing only the first is this repo's `scheduled()` bug in
+  // new clothes.
+  const TICK_MS = 250;              // the readout changes four times a second
+  const SPEED_WINDOW_MS = 3000;     // over the last few seconds, not since the start
+  let job = null;                   // {total, sent, pieces, accepted, samples[]}
+  let ticker = null;
+
+  function paint() {
+    if (!job) return;
+    d.set('sent', MB(job.sent));
+    d.set('pieces', `${job.accepted} of ${job.pieces}`);
+    const s = job.samples;
+    const now = performance.now();
+    while (s.length > 1 && now - s[0].t > SPEED_WINDOW_MS) s.shift();
+    const span = s.length > 1 ? (s[s.length - 1].t - s[0].t) / 1000 : 0;
+    const moved = s.length > 1 ? s[s.length - 1].n - s[0].n : 0;
+    const rate = span > 0.2 ? MB(moved) / span : null;
+    d.set('speed', rate);
+    d.set('left', rate && rate > 0.01 ? Math.max(0, MB(job.total - job.sent) / rate) : null);
+  }
+
+  function startTicker() {
+    if (ticker) return;
+    ticker = setInterval(paint, TICK_MS);
+  }
+  function stopTicker() {
+    clearInterval(ticker); ticker = null; paint();
+  }
+
+  /** One piece, with the progress events `fetch()` does not have. */
+  function putPiece(url, blob, token) {
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', url);
+      if (token) xhr.setRequestHeader('authorization', `Bearer ${token}`);
+      const base = job ? job.sent : 0;
+      xhr.upload.addEventListener('progress', (e) => {
+        if (!job) return;
+        job.sent = base + e.loaded;
+        job.samples.push({ t: performance.now(), n: job.sent });
+      });
+      const done = (status, body) => resolve({ status, body });
+      xhr.addEventListener('load', () => {
+        let body = {};
+        try { body = JSON.parse(xhr.responseText); } catch { body = { error: 'the reply was not readable' }; }
+        done(xhr.status, body);
+      });
+      xhr.addEventListener('error', () => done(0, { error: 'the connection failed' }));
+      xhr.addEventListener('abort', () => done(0, { error: 'stopped' }));
+      xhr.send(blob);
+    });
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const jget = async (url, opts) => {
+    const r = await fetch(url, { cache: 'no-store', ...opts });
+    let body = {};
+    try { body = await r.json(); } catch { body = {}; }
+    return { status: r.status, body };
+  };
+
+  /**
+   * Send one file and say what happened. Never throws.
+   *
+   * ⚠️ IT IS NOT THE BUTTON'S HANDLER. The button is guarded on `isTrusted`;
+   * this is the plain function underneath it, so the page can drive the whole
+   * route as a check without synthesising a press. Everything it is bound by is
+   * on the server: the store comes from the token and the origin, and this page
+   * has no token.
+   */
+  async function upload(file, { title = '', when = null, whenRead = null, by = '' } = {}) {
+    // the in-flight row sits ON TOP of what the crate already held, rather
+    // than replacing it: a drop is an addition, and the table said otherwise
+    const rowOf = (state) => {
+      live = { name: file.name, size: `${MB(file.size).toFixed(2)} MB`, state };
+      paintRows();
+    };
+    rowOf('opening');
+
+    const open = await jget(`${BASE}/open`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: file.name, size: file.size, type: file.type, intent: 'check' }),
+    });
+    if (open.status !== 200) {
+      rowOf('refused');
+      d.log(`not opened: ${open.body.error || open.status}`, 'bad');
+      return { ok: false, said: open.body.error || `the archive answered ${open.status}`, status: open.status };
+    }
+    // The two halves of the fence, checked against each other. This page cannot
+    // hold a key, so the server must have put it in the sandbox; if it says
+    // anything else one of us is wrong and neither can tell which.
+    if (open.body.tier !== 'check') {
+      rowOf('refused');
+      return { ok: false, said: `this page expects the sandbox and the server picked ${open.body.tier}` };
+    }
+
+    job = { total: file.size, sent: 0, pieces: open.body.pieces, accepted: 0, samples: [{ t: performance.now(), n: 0 }] };
+    startTicker();
+    paint();
+    rowOf('sending');
+
+    const P = open.body.pieceBytes;
+    for (let n = 0; n < open.body.pieces; n++) {
+      const slice = file.slice(n * P, Math.min(file.size, (n + 1) * P));
+      // A RETRY IS BOUNDED AND THEN IT YIELDS. Three attempts with backoff,
+      // then the file stops and names the piece it stopped on. A recovery
+      // action that retries for ever is a recovery action nobody can stop.
+      let got = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        job.sent = n * P;                       // a retry re-sends this piece
+        got = await putPiece(`${BASE}/piece/${open.body.id}/${n}`, slice, null);
+        if (got.status === 200) break;
+        // A REFUSAL IS NOT AN ERROR AND MUST NOT BE RETRIED. A cap, a format or
+        // a quota is the server saying no on purpose; only a broken connection
+        // or a 5xx is worth asking again.
+        if (got.status >= 400 && got.status < 500) break;
+        d.log(`piece ${n} did not land (${got.body.error || got.status}), trying again`, 'warn');
+        await sleep(400 * attempt);
+      }
+      if (got.status !== 200) {
+        stopTicker();
+        rowOf('stopped');
+        await fetch(`${BASE}/abort/${open.body.id}`, { method: 'POST' }).catch(() => {});
+        const said = `${got.body.error || `the archive answered ${got.status}`} (piece ${n} of ${open.body.pieces})`;
+        d.log(said, 'bad');
+        return { ok: false, said, status: got.status, body: got.body, piece: n };
+      }
+      job.accepted = got.body.accepted;
+      job.sent = got.body.bytes;
+      job.samples.push({ t: performance.now(), n: job.sent });
+      paint();
+      d.log(`piece ${n} kept, ${MB(got.body.bytes).toFixed(2)} MB in`);
+    }
+
+    // 🔴 THE SIDECAR IS WRITTEN AFTER THE AUDIO, BY THE SERVER, AND THIS IS
+    // WHERE A READER CAN SEE IT. A half-failure leaves audio with no record,
+    // which can be repaired by reading the audio again; the other order leaves
+    // a record pointing at nothing.
+    const metaUrl = `${open.body.readBase}/${open.body.dir}/meta.json`;
+    const before = await fetch(metaUrl, { cache: 'no-store' }).then((r) => r.status, () => 0);
+
+    const close = await jget(`${BASE}/close/${open.body.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ meta: { title, by, when, whenRead } }),
+    });
+    stopTicker();
+    if (close.status !== 200) {
+      rowOf('refused');
+      d.log(`not closed: ${close.body.error || close.status}`, 'bad');
+      return { ok: false, said: close.body.error || `the archive answered ${close.status}`, status: close.status, body: close.body };
+    }
+    rowOf('kept');
+    d.log(`kept as ${close.body.key}`, 'hi');
+    return { ok: true, open: open.body, close: close.body, metaUrl, sidecarBefore: before, pieces: open.body.pieces };
+  }
+
+  // ── the button, which only a person can work ─────────────────────────────
+  //
+  // 🔴 A SCRIPTED PRESS DOES NOTHING. `element.click()`, which is how this
+  // project's harness presses everything it presses, produces an event with
+  // `isTrusted: false`, and so does anything else a page can synthesise. A real
+  // finger, a real mouse and a real keyboard produce true. `busy` is flipped on
+  // the far side of the gate, which is what the check below reads.
+  let busy = false;
+  send.addEventListener('click', async (e) => {
+    if (!e.isTrusted) return;
+    if (busy || !pick.files?.length) return;
+    busy = true;
+    send.disabled = true;
+    try { await dropOne(pick.files[0]); } finally { busy = false; send.disabled = !pick.files?.length; }
+  });
+  pick.addEventListener('change', () => { send.disabled = !pick.files?.length; });
+
+  /**
+   * The date this recording is from, read out of the name their own hook
+   * writes: `<slug>-YYYYMMDD-HHMMSS.<ext>`, which is the best source there is
+   * for this material because it is stamped at the moment the broadcast starts.
+   *
+   * ⚠️ ONE SOURCE, ON PURPOSE. plan-vain-upload §7 has a table of six more, and
+   * the rest wait until this one is proved to reach the page as something a
+   * reader can tell from a typed date. A second parser before then is a second
+   * thing to debug through one untested path.
+   */
+  const REC_NAME = /^[a-z0-9-]{1,20}-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})\.[a-z0-9]{2,4}$/;
+  function dateFromName(name) {
+    const m = String(name).toLowerCase().match(REC_NAME);
+    if (!m) return null;
+    const at = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+    if (!Number.isFinite(at)) return null;
+    // A bracket, never a point, and a second wide because a second is all the
+    // name commits to. `normalizeWhen` is the project's own check and it runs
+    // here rather than being re-implemented: a versioned rule is required, so a
+    // changed heuristic can be found again later.
+    return normalizeWhen({
+      earliest: at, latest: at + 1000,
+      rule: 'vain-recname@1', kind: 'ignorance', verbatim: name,
+    });
+  }
+
+  async function dropOne(file) {
+    const whenRead = dateFromName(file.name);
+    // No typed date any more: what the name says is what is recorded, and the
+    // override path is the server's to offer when something needs correcting.
+    const when = null;
+    if (whenRead) d.log(`the name says ${new Date(whenRead.earliest).toISOString().replace('T', ' ').slice(0, 19)} · ${whenRead.rule}`);
+    else d.log('the name carries no date, so nothing was read from it', 'warn');
+    const out = await upload(file, {
+      title: saidTitle.value().trim() || file.name, when, whenRead, by: '',
+    });
+    if (out.ok) {
+      audio.src = out.close.url;
+      audio.load();
+      // 🔴 THE NEW ONE JOINS THE SHELF AND THE IN-FLIGHT ROW GOES. Re-reading
+      // the whole list here would be a second round trip to learn something
+      // this page already knows, and it would put the row at the mercy of R2's
+      // listing catching up with a write that just happened.
+      shelf = [{ name: saidTitle.value().trim() || file.name,
+                 size: `${MB(out.close.bytes || file.size).toFixed(2)} MB`,
+                 state: 'kept' }, ...shelf];
+      live = null;
+      paintRows();
+    }
+    return out;
+  }
+
+  // ── a file of a known length, made here ──────────────────────────────────
+  //
+  // ⚠️ THE CHECK BRINGS ITS OWN MATERIAL. There is one real recording in this
+  // project and it is seven seconds, so every assumption about this route was
+  // untested on anything longer. The 90-minute case is measured against a file
+  // ffmpeg generates outside the browser; what a page can prove is the rest of
+  // it, and it needs something long enough that a seek to 60 seconds means
+  // something. 100 seconds of 8 kHz eight-bit sound is 800 KB, one piece, and
+  // it rises in pitch so the far end of it does not sound like the near end.
+  function makeWav({ seconds = 100, rate = 8000 } = {}) {
+    const n = seconds * rate;
+    const buf = new ArrayBuffer(44 + n);
+    const v = new DataView(buf);
+    const put = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+    put(0, 'RIFF'); v.setUint32(4, 36 + n, true); put(8, 'WAVE');
+    put(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true);        // PCM, mono
+    v.setUint32(24, rate, true); v.setUint32(28, rate, true);  // rate, bytes a second
+    v.setUint16(32, 1, true); v.setUint16(34, 8, true);        // block align, bits
+    put(36, 'data'); v.setUint32(40, n, true);
+    const a = new Uint8Array(buf, 44);
+    let phase = 0;
+    for (let i = 0; i < n; i++) {
+      const hz = 220 + 660 * (i / n);
+      phase += (2 * Math.PI * hz) / rate;
+      a[i] = 128 + Math.round(100 * Math.sin(phase));
+    }
+    return new File([buf], 'vaincheck-19980412-091500.wav', { type: 'audio/wav' });
+  }
+
+  // ── the checks ───────────────────────────────────────────────────────────
+  //
+  // 🔴 EVERY ASSERT LANDS IN ONE BURST AT THE END. `verify.mjs` stops
+  // collecting 400 ms after the last assert and its first-assert budget only
+  // runs while the page's own count is still at zero, so a page that asserts
+  // something early and then works for ten seconds loses everything after the
+  // early one. An upload takes longer than that window.
+  //
+  // ⚠️ AND A VISIT ASSERTS A STRICT SUBSET. Without `selfcheck=1` nothing is
+  // uploaded, so the write checks do not run and the count is smaller. The
+  // suite always sets it, so the number a run is diffed against is the whole
+  // set and cannot shrink without something breaking.
+  async function checks() {
+    const rows = [];
+    const add = (label, pass, detail) => rows.push([label, pass, detail]);
+
+    const lim = await jget(`${BASE}/limits`);
+    LIMITS = lim.body;
+    if (lim.status === 200) {
+      d.log(`this sandbox takes ${MB(lim.body.limits.maxFileBytes).toFixed(0)} MB a file, `
+        + `in pieces of ${MB(lim.body.pieceBytes).toFixed(0)} MiB`);
+    }
+    add('the archive says what it takes, and the piece size is the server\'s',
+      lim.status === 200 && lim.body.pieceBytes === 16 * 1024 * 1024,
+      `${lim.status} · piece ${lim.body?.pieceBytes}`);
+
+    // 🔴 GATE ONE, FROM THE SERVER'S OWN MOUTH. `/limits` answers with the tier
+    // THIS request would get, so the page is not guessing: with no key it is
+    // the sandbox, and nothing this page sends can move a write into the
+    // permanent archive.
+    add('this page cannot reach the archive, whatever it asks for',
+      lim.body?.tier === 'check' && lim.body?.stores?.check === 'vain-dev',
+      `tier ${lim.body?.tier} · store ${lim.body?.stores?.check}`);
+
+    // 🔴 GATE TWO, PROVED BY BREAKING IT. This presses the upload button the way
+    // a script presses a button and asserts that nothing started. It
+    // discriminates: `busy` is set on the far side of the `isTrusted` check, so
+    // taking that check out turns this red rather than leaving it green about
+    // nothing.
+    // ⚠️ THE BUTTON HAS TO BE ARMED FOR THE PRESS TO MEAN ANYTHING. With no file
+    // chosen the handler stops one line further down whether the press was
+    // trusted or not, which is a check that passes about nothing. `armed` says
+    // whether this browser let us put a file on the input at all; where it does
+    // not, the check reports that it could not look rather than passing.
+    let armed = false;
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(makeWav({ seconds: 1 }));
+      pick.files = dt.files;
+      armed = pick.files.length === 1;
+    } catch { armed = false; }
+    send.disabled = false;
+    send.click();
+    add('only a person can start an upload, so a harness press does nothing',
+      armed && busy === false && table.count() === 0,
+      armed ? `busy=${busy} rows=${table.count()}` : 'this browser would not let a file be put on the input, so nothing was proved');
+    try { pick.value = ''; } catch { /* nothing to clear */ }
+    send.disabled = true;
+
+    if (SELFCHECK) {
+      // 🔴 THE CAPS ARE ENFORCED ON THE SERVER, PROVED BY BREAKING TWO OF THEM.
+      // A declared size over the cap is refused before a byte is sent, and a
+      // file that is not what it is called is refused at the first piece with
+      // the bytes it actually found in the reply. Neither creates anything:
+      // the first never reaches R2 and the second is checked before the
+      // multipart upload is made, so a run that only ever tests the refusals
+      // writes nothing at all.
+      //
+      // ⚠️ DONE WITH PLAIN REQUESTS RATHER THAN THROUGH `upload()`, because
+      // this page has about seven seconds to finish everything before the
+      // harness stops waiting for it, and a refusal needs no progress events,
+      // no table row and no ticker.
+      const big = await jget(`${BASE}/open`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'huge-19980412-091500.mp3', size: LIMITS.limits.maxFileBytes + 1, intent: 'check' }),
+      });
+      add('a file over the cap is refused before a byte of it is sent',
+        big.status === 413 && big.body.max === LIMITS.limits.maxFileBytes,
+        `${big.status} · max ${big.body?.max}`);
+
+      const liar = await jget(`${BASE}/open`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'liar-19980412-091500.mp3', size: 10, intent: 'check' }),
+      });
+      const refused = await jget(`${BASE}/piece/${liar.body.id}/0`, {
+        method: 'PUT', body: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70]),
+      });
+      fetch(`${BASE}/abort/${liar.body.id}`, { method: 'POST' }).catch(() => {});
+      add('a file that is not what it is called is refused, and the refusal names the bytes',
+        refused.status === 415 && refused.body.saw === 'ff d8 ff e0',
+        `${refused.status} · saw ${refused.body?.saw}`);
+
+      const file = makeWav();
+      // The travel is set from the length we already know, rather than waiting
+      // for the sound to arrive and say so. A bar whose whole span is one
+      // millisecond reports a seek that landed perfectly as a seek to 1 ms,
+      // which is a slider with nowhere to go rather than a seek that missed.
+      deck.setRange([0, 100000]);
+      // the title field, exercised where the two date fields used to be: a
+      // field the check never touches is a field nothing grades
+      saidTitle.set('the self check');
+
+      /**
+       * 🔴 THE DROP IS DRIVEN, NOT ASSUMED. A drop target that silently does
+       * nothing looks exactly like one nobody has tried, and this page's own
+       * description calls itself a box you drop a file into. So the check fires
+       * a real `drop` event carrying a real file and reads back what the input
+       * ended up holding.
+       * ⚠️ IT GRADES `pick.files`, WHICH IS THE THING EVERY OTHER PATH READS.
+       * Grading the handler's own variable would pass while the Upload button
+       * still believed nothing had been chosen, which is the bug this is for.
+       */
+      const dtDrop = new DataTransfer();
+      dtDrop.items.add(file);
+      pick.dispatchEvent(new DragEvent('drop', { dataTransfer: dtDrop, bubbles: true, cancelable: true }));
+      add('a dropped file lands in the picker every other path reads',
+        pick.files?.length === 1 && pick.files[0].size === file.size,
+        `${pick.files?.length ?? 0} file(s), ${pick.files?.[0]?.size ?? 0} of ${file.size} bytes`);
+
+      const out = await dropOne(file);
+      add('the file went up in one piece and came back the size it went', out.ok,
+        out.ok ? `${out.close.bytes} bytes` : out.said);
+
+      if (out.ok) {
+        const want = Math.max(1, Math.ceil(file.size / LIMITS.pieceBytes));
+        add('the piece count is the size divided by the piece size',
+          out.pieces === want && out.close.pieces === want, `${out.pieces} of ${want}`);
+        add('the page counted the pieces R2 actually assembled',
+          out.close.parts === out.pieces, `${out.close.parts} parts, ${out.pieces} pieces`);
+        add('the sidecar was not there before the audio was, and is there after',
+          out.sidecarBefore === 404, `before ${out.sidecarBefore}`);
+
+        const rec = await jget(out.close.meta);
+        add('the record is beside the audio once the audio exists',
+          rec.status === 200 && rec.body.bytes === file.size,
+          `${rec.status} · ${rec.body?.bytes} bytes`);
+        // 🔴 THE TWO DATES, TOLD APART BY THEIR RULE AND NOTHING ELSE. A read
+        // date carries a versioned rule; a typed one carries `hand`. Nobody has
+        // to be told which is which, and the read one is still there when the
+        // heuristic that produced it changes.
+        add('the date read out of the file carries the rule that read it',
+          rec.body?.whenRead?.rule === 'vain-recname@1'
+          && rec.body.whenRead.earliest === Date.UTC(1998, 3, 12, 9, 15, 0),
+          `${rec.body?.whenRead?.rule} · ${new Date(rec.body?.whenRead?.earliest || 0).toISOString()}`);
+        // 🔴 THE TYPED TITLE REACHES THE RECORD, AND THE FILENAME DOES NOT
+        // OVERWRITE IT. This replaced a check on the typed DATE, which went
+        // when the two correction fields did. The claim is the same shape and
+        // it is the one thing the remaining field can get wrong: the title is
+        // what was typed, and the name the file arrived under is still there
+        // beside it rather than instead of it.
+        add('the typed title is what the record carries, not the filename',
+          rec.body?.title === 'the self check' && rec.body.title !== file.name,
+          `title "${rec.body?.title}" against a file called "${file.name}"`);
+
+        // 🔴 THE SEEK IS THE PROOF. An upload that reports success and cannot be
+        // scrubbed is indistinguishable from a working one until somebody drags
+        // the bar, which is why playback is in the first build at all.
+        const rr = await fetch(out.close.url, { headers: { range: 'bytes=1000-1999' } });
+        add('the archive answers a byte range with 206 and says which bytes',
+          rr.status === 206 && /^bytes 1000-1999\//.test(rr.headers.get('content-range') || ''),
+          `${rr.status} · ${rr.headers.get('content-range')}`);
+
+        const landed = await seekTo(60);
+        add('a seek to 60 seconds lands within a second of 60 seconds',
+          landed !== null && Math.abs(landed - 60) < 1,
+          landed === null ? 'the sound never loaded' : `${landed.toFixed(3)} s`);
+      }
+    }
+
+    for (const [label, pass, detail] of rows) d.assert(label, pass, detail);
+  }
+
+  /** Ask the element to go somewhere and report where it actually went. */
+  function seekTo(seconds) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (v) => { if (!done) { done = true; resolve(v); } };
+      const timer = setTimeout(() => finish(null), 8000);
+      const ready = () => {
+        audio.removeEventListener('loadedmetadata', ready);
+        audio.addEventListener('seeked', () => {
+          clearTimeout(timer);
+          finish(audio.currentTime);
+        }, { once: true });
+        audio.currentTime = seconds;
+      };
+      if (audio.readyState >= 1) ready();
+      else audio.addEventListener('loadedmetadata', ready);
+    });
+  }
+
+  // 🔴 `ready()` GOES OUT LAST, AND NO `src` IS SET ANYWHERE NEAR IT. The
+  // harness presses play, pauses, and seeks the bar the moment a page says it
+  // is ready. A page that points the element somewhere new and then says it is
+  // finished has left a fetch in the air: when the file lands, `currentTime`
+  // resets to nought and the element stops being a clock for a moment, so the
+  // master either drags the playhead to zero or lets go. `/tapes/` MEASURED
+  // that as `pause holds position 821.9 == 0.0` in nine runs of ten, on a page
+  // whose own checks were green in all ten.
+  //
+  // ⚠️ AND THE PAGE IS HANDED OVER STOPPED, AT THE TOP. Nobody has asked for
+  // anything yet, whatever the checks left rolling.
+  checks()
+    .catch((e) => d.fail(e))
+    .finally(() => {
+      audio.pause();
+      if (audio.readyState >= 1) audio.currentTime = 0;
+      deck.pause();
+      deck.seek(0);
+      d.ready();
+      // 🔴 AFTER `ready()`, DELIBERATELY. Reading the crate is one request plus
+      // one per row, and CLAUDE.md is explicit that slow work behind a wait is
+      // how a page reports "asserted nothing": the harness stops collecting
+      // shortly after the last assert, so anything awaited before this line
+      // pushes the whole run past its settle. Nothing here is asserted, and a
+      // visitor gets the list a moment after the page is usable rather than
+      // waiting on it to become usable at all.
+      loadShelf();
+    });
+</script>

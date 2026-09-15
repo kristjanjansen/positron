@@ -64,10 +64,10 @@
     if (leg) return;
     ship(`MOQ-SUPPORT ${JSON.stringify(support)}`);
     if (!support.ok && !forceTransport) {
-      d.log(`MoQ needs WebTransport — ${support.why}. Try Chrome or Edge.`, 'bad');
+      d.log(`MoQ needs WebTransport: ${support.why}. Try Chrome or Edge.`, 'bad');
       return;
     }
-    d.log(`relay ${new URL(MOQ_RELAY).host} — role ${role}, namespace ${ns}`);
+    d.log(`relay ${new URL(MOQ_RELAY).host} · role ${role}, namespace ${ns}`);
     leg = await startMoq({ out, ns, role, forceTransport, codec, log: (m, k) => d.log(m, k) });
     pill.dataset.on = '1';
     pill.textContent = `relay: ${leg.version}`;
@@ -127,10 +127,10 @@
     }
   });
 
-  if (!support.ok) d.log(`${support.why} — this demo needs Chrome or Edge`, 'bad');
+  if (!support.ok) d.log(`${support.why}. This demo needs Chrome or Edge`, 'bad');
   d.log(role === 'loopback'
     ? 'loopback: one page publishes and subscribes the same namespace, so one clock times the whole path'
-    : `role ${role} — pair it with ?role=${role === 'pub' ? 'watch' : 'pub'}&ns=${ns}`);
+    : `role ${role} · pair it with ?role=${role === 'pub' ? 'watch' : 'pub'}&ns=${ns}`);
   d.ready();
 </script>
 </html>

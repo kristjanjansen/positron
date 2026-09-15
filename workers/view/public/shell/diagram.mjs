@@ -23,10 +23,21 @@
 // plan said one level of nesting was enough and that a program could be named
 // in its machine's `sub` — which is true right up to the point where the
 // machine and the program are two different things a link can reach: an arrow
-// may target a container or any box inside one. Two boxes in the SAME
-// container have no route between them and that link is dropped with a
-// warning, because drawing it would mean a third routing rule for a picture
-// nothing has asked for yet.
+// may target a container or any box inside one.
+//
+// 🔴 TWO BOXES IN ONE CONTAINER ARE LINKED IN THE GAP THEY ALREADY SHARE, AND
+// THAT LINK REPLACES THE TIE BETWEEN THEM. It used to be dropped with a
+// warning, on the argument that routing it would mean a third rule for a
+// picture nothing had asked for. `/station/` asked: grouping seven boxes into
+// three machines killed three real arrows at once and left plain ties standing
+// where they had been, which is a picture claiming a chain that does not
+// exist. Two boxes that are NEXT TO EACH OTHER inside their container get the
+// arrow in the gap between them, with its name beside it. One that reaches
+// PAST the box between them gets a lane inside the container's own padding,
+// which is the same idea as the lanes over and under the row, one level in.
+// A link from a container to a box inside ITSELF has no gap to run through and
+// is still refused — reported on `cuts`, never dropped in silence, because a
+// link that vanishes without a word is exactly how those three went missing.
 //
 // 🔴 THERE IS NO `title` ATTRIBUTE ANYWHERE IN HERE, AND THAT IS THE POINT.
 // A box used to carry an SVG `<title>`, which the browser draws as a native
@@ -146,8 +157,17 @@ const HUES = [205, 168, 278, 330, 145, 250, 190, 305];
 // and never as a colour the picture is about.
 const BOX_TINT = 0.1;
 // The edge is where a hue survives the mix, so this is where identity lives.
-const EDGE_TINT = 0.75;
+// ⚠️ TURNED DOWN FROM 0.75. At three quarters the strokes were saturated enough
+// to read as the subject of the picture rather than as labels on it: four
+// bright outlines around near-grey boxes puts the loudest ink on the part that
+// carries the least information. Half is still enough to tell two technologies
+// apart side by side, which is the whole job.
+const EDGE_TINT = 0.52;
 const TEXT_TINT = 0.62;
+// Kinds whose stylesheet rule replaces the hue on the box edge. A name of one
+// of these must not be tinted in the prose either, or the two channels disagree.
+// See `.pos-dg-n[data-kind="here"]` in shell.css.
+const HUELESS_KINDS = new Set(['here']);
 const tint = (deg, amt, onto) =>
   `color-mix(in oklab, hsl(${deg} 72% 62%) ${Math.round(amt * 100)}%, ${onto})`;
 
@@ -170,6 +190,19 @@ const CHILD_PAD     = 8;    // a container's edge to the boxes inside it
 // which is indistinguishable from the edges themselves.
 const CHILD_GAP     = 10;   // between two boxes inside one container
 const HEAD_GAP      = 7;    // a container's own words to its first box
+// A LINK BETWEEN TWO BOXES IN ONE CONTAINER LIVES IN THESE TWO NUMBERS.
+// ⚠️ THE LANE'S ROOM IS TAKEN FROM BOTH SIDES, so the boxes inside stay
+// centred. Taking it from the right alone would buy the lane at the price of
+// the rule above it: a box inset further from one edge than another reads as a
+// box that has drifted rather than one that is held.
+const SIB_LANE      = 14;   // room inside a container for one such lane
+const SIB_CORNER    = 4;    // its turns: the run out of a box is about 5 px
+// ⚠️ AND THE GAP GROWS FOR THE HEAD, NOT FOR A NAME. An arrowhead is 7 px long
+// and is drawn back along the line from its tip, so in a 10 px gap it starts
+// inside the box it leaves: a smear between two edges rather than an arrow.
+// Sixteen leaves four pixels of line behind the head, which is what makes it
+// read as pointing somewhere.
+const SIB_GAP       = 16;   // a gap with an arrow in it rather than a tie
 const BOX_TARGET_W  = 122;  // narrow the gaps until a box is at least this wide
 const BOX_MIN_W     = 92;   // narrower than this and it becomes one column
 const BOX_MAX_W     = 190;
@@ -470,13 +503,20 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   // drawn inside. Every question about where a link goes is asked of this.
   const ref = (id) => owner.get(id) || id;
   const inside = [];
+  const sibs = [];
   const links = (spec.links || [])
     .filter((l) => byId.has(l.from) && byId.has(l.to) && l.from !== l.to)
-    // 🔴 TWO BOXES IN ONE CONTAINER HAVE NO ROUTE BETWEEN THEM. Dropped and
-    // reported rather than drawn: every routing rule here is about the space
-    // OUTSIDE the boxes, and a line between two boxes that share a container
-    // would need a third one for a picture nothing has asked for yet.
-    .filter((l) => { const ok = ref(l.from) !== ref(l.to); if (!ok) inside.push(l); return ok; })
+    // 🔴 A LINK WHOSE TWO ENDS SHARE A MACHINE NEVER REACHES THE OUTSIDE, so
+    // none of the routing below is about it. Two boxes INSIDE the container
+    // are routed between themselves by `placeSibs`; a container and a box
+    // inside itself have no gap to run a line through and are refused, in
+    // writing, on `cuts`.
+    .filter((l) => {
+      if (ref(l.from) !== ref(l.to)) return true;
+      if (owner.has(l.from) && owner.has(l.to)) sibs.push({ ...l });
+      else inside.push(l);
+      return false;
+    })
     .map((l) => ({ ...l }));
   const cuts = [];
   const avail = Math.max(140, Math.floor(width));
@@ -494,6 +534,37 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     links.map((l) => ({ ...l, from: ref(l.from), to: ref(l.to) })));
   for (const c of kids) col.set(c.id, col.get(c._owner));
   const cols = Math.max(...nodes.map((n) => col.get(n.id))) + 1;
+
+  // ── what the boxes inside a container have to make room for ─────────────
+  // 🔴 A LINK ASKED FOR AND NOT DRAWN IS A REPORT, NOT A SILENCE. This is how
+  // three arrows went missing from /station/ without anybody seeing it: the
+  // picture looked complete, the ties between the children stood where the
+  // arrows should have been, and the only trace was a console warning nobody
+  // was reading. Every one of these is on `cuts`, which /kit/ prints.
+  for (const l of inside) {
+    cuts.push({ id: `${l.from} to ${l.to}`, where: 'link',
+                full: l.label || `${l.from} to ${l.to}`,
+                shown: 'NOT DRAWN: a box and the box it is inside have no gap between them',
+                width: 0 });
+  }
+  // where each box sits in its container, which is what "are these two next to
+  // each other" means
+  const kidIx = new Map();
+  for (const n of nodes) n._kids.forEach((c, i) => kidIx.set(c.id, i));
+  const sibSpan = (l) => Math.abs(kidIx.get(l.to) - kidIx.get(l.from));
+  // how many lanes the busiest container needs, and therefore how far in from
+  // its edges every container holds its boxes
+  const laneCount = new Map();
+  for (const l of sibs) {
+    if (sibSpan(l) <= 1) continue;
+    const k = owner.get(l.from);
+    laneCount.set(k, (laneCount.get(k) || 0) + 1);
+  }
+  const maxLanes = laneCount.size ? Math.max(...laneCount.values()) : 0;
+  const childInset = CHILD_PAD + maxLanes * SIB_LANE;
+  // one gap for every container in the picture, because gaps of two sizes
+  // would read as a difference that means something
+  const childGap = sibs.some((l) => sibSpan(l) === 1) ? SIB_GAP : CHILD_GAP;
 
   // ── how wide a box gets, and whether the row layout is possible at all ──
   // The gaps give way before the boxes do: a narrow box cuts words, a narrow
@@ -577,7 +648,7 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     for (const n of nodes) boxNeed = Math.max(boxNeed, measure.sub(n.sub || ''));
     // a box INSIDE a container is inset, so what it needs is what it needs
     // plus the room its container holds around it
-    for (const c of kids) boxNeed = Math.max(boxNeed, measure.sub(c.sub || '') + CHILD_PAD * 2);
+    for (const c of kids) boxNeed = Math.max(boxNeed, measure.sub(c.sub || '') + childInset * 2);
     boxNeed = Math.min(Math.ceil(boxNeed) + BOX_PAD_X * 2, BOX_MAX_W_COL);
     const room = avail - PAD * 2 - boxNeed;
     if (leftInset + rightInset > room) {
@@ -608,7 +679,7 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   // container is taller than a plain box by what it holds — and it hands that
   // height to every other box in the picture rather than keeping it, for the
   // same reason: a row of unequal panels ranks them.
-  const kidInner = Math.max(20, w - CHILD_PAD * 2 - BOX_PAD_X * 2);
+  const kidInner = Math.max(20, w - childInset * 2 - BOX_PAD_X * 2);
   // ⚠️ ASSIGNED IN READING ORDER, PARENTS AND CHILDREN ALIKE, so neighbouring
   // boxes never share a hue and the order is the one a reader meets them in.
   // A node may state its own; that is what a page reaches for when two pictures
@@ -658,22 +729,25 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   for (const n of nodes) {
     boxH = Math.max(boxH, n._kids.length
       ? own(n) + HEAD_GAP + n._kids.length * kidH
-        + (n._kids.length - 1) * CHILD_GAP + CHILD_PAD * 2
+        + (n._kids.length - 1) * childGap + CHILD_PAD * 2
       : own(n) + BOX_PAD_Y * 2);
   }
   boxH = Math.round(boxH);
 
+  const shared = { sibs, kidIx, sibSpan, childGap, childInset };
   const out = mode === 'row'
-    ? placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts })
+    ? placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts,
+                               ...shared })
     : placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
-                           backBudget, skipBudget, m, measure, cuts });
+                           backBudget, skipBudget, m, measure, cuts, ...shared });
 
   for (const n of nodes.concat(kids)) { delete n._lab; delete n._sub; }
   return { mode, boxW: w, boxH, cuts, cycle, gapX, ...out,
            ...(inside.length ? { inside } : {}) };
 }
 
-function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts }) {
+function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts,
+                                  sibs, kidIx, sibSpan, childGap, childInset }) {
   const total = cols * w + (cols - 1) * gapX;
   const left = Math.max(PAD, Math.round((avail - total) / 2));
 
@@ -711,7 +785,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
     const r = inCol[c].indexOf(n);
     const x = left + c * (w + gapX);
     const y = top + Math.round((tallest - colH[c]) / 2) + r * (boxH + GAP_Y);
-    return box(n, x, y, w, boxH, m, kidH);
+    return box(n, x, y, w, boxH, m, kidH, childGap, childInset);
   });
   const at = new Map();
   for (const p of placed) { at.set(p.id, p); for (const k of p.kids || []) at.set(k.id, k); }
@@ -751,6 +825,36 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
   const laneBudget = (sx, tx) =>
     Math.max(LINK_MIN, Math.min(LINK_MAX, Math.abs(sx - tx) - 20));
 
+  // 🔴 TWO ARROWS THAT LAND ON ONE BOX MUST NOT LAND AT ONE POINT. Both would
+  // come in at the target's centre, so the second is drawn exactly on top of
+  // the first and their two names are written at one x and one y — MEASURED on
+  // /station/, `Range requests` and `the playlist` printed over each other into
+  // an unreadable smear, and the picture said one thing arrives where two do.
+  // A fork is spread by its branches' own targets; a JOIN has nothing to spread
+  // it, so the arrivals share out the target's edge instead. One line of link
+  // type apart at the least, because the names are what collide first.
+  const arrivals = new Map();
+  for (const l of links) {
+    if (l.back || overs.includes(l)) continue;
+    if (!arrivals.has(l.to)) arrivals.set(l.to, []);
+    arrivals.get(l.to).push(l);
+  }
+  // 🔴 TWO LINES OF ROOM, NOT ONE, AND THAT IS THE WHOLE FIX THE SECOND TIME.
+  // Spreading arrivals by ONE line height was right about the mechanism and
+  // short by half: `wrapLines` is allowed two lines, a name sits ABOVE its own
+  // arrow, and both of station's arrivals into `player` wrap. So two two-line
+  // names 15 px apart still printed through each other, which is the same smear
+  // in a smaller font. `LINK_MAX_LINES` is the cap, so reserving it can never
+  // be too little, and where a name turns out to be one line the extra gap
+  // costs nothing but air.
+  const LINK_MAX_LINES = 2;
+  const spread = Math.max(ATTACH_OFF, Math.round(m.linkLh) * LINK_MAX_LINES + 6);
+  const arriveAt = (l, t) => {
+    const list = arrivals.get(l.to);
+    if (!list || list.length < 2) return t.cy;
+    return t.cy + (list.indexOf(l) - (list.length - 1) / 2) * spread;
+  };
+
   const drawn = [];
   for (const l of links) {
     const f = at.get(l.from), t = at.get(l.to);
@@ -759,7 +863,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
       const o = overs.indexOf(l);
       if (o < 0) {
         const x1 = f.x + f.w + EDGE_OUT, y1 = f.cy;
-        const x2 = t.x - EDGE_OUT - 1, y2 = t.cy;
+        const x2 = t.x - EDGE_OUT - 1, y2 = arriveAt(l, t);
         // the gap between the two MACHINES, which is the room the name has —
         // never the length of the line, which reaches further whenever one end
         // of it is a box inside one of them
@@ -816,13 +920,16 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
                  anchor: 'middle', stack: 'none', level: level[i], depth: dy });
   }
 
+  drawn.push(...placeSibs(sibs, at, { owner, kidIx, sibSpan, cuts }));
+
   const height = Math.round(
     backs.length ? deepest + (backLabelled ? 16 : 6) + PAD : bottom + PAD);
   return { width: avail, height, nodes: placed, links: drawn };
 }
 
 function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
-                             backBudget, skipBudget, m, measure, cuts }) {
+                             backBudget, skipBudget, m, measure, cuts,
+                             sibs, kidIx, sibSpan, childGap, childInset }) {
   // ⚠️ ONE COLUMN IS NOT THE ROW LAYOUT ROTATED. A horizontal diagram on a
   // phone is a diagram nobody reads, so below the break the steps stack top to
   // bottom in the order the signal takes them, the return paths run down the
@@ -831,7 +938,7 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
   // gutters that cannot collide, and neither line is ever behind a box.
   const x = leftInset + PAD;
   const placed = order.map((n, r) =>
-    box(n, x, PAD + r * (boxH + GAP_Y_COL), w, boxH, m, kidH));
+    box(n, x, PAD + r * (boxH + GAP_Y_COL), w, boxH, m, kidH, childGap, childInset));
   const at = new Map();
   for (const p of placed) { at.set(p.id, p); for (const k of p.kids || []) at.set(k.id, k); }
   // the machine a box is drawn inside, or the box itself — see placeRow, where
@@ -872,6 +979,23 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
   const stepLeft = roomL > roomR;
   const fwdBudget = Math.min(LINK_MAX, Math.floor(Math.max(0, roomL, roomR)));
 
+  // 🔴 AND TWO LINKS BETWEEN ONE PAIR OF MACHINES ARE ONE LINE WITH TWO NAMES,
+  // WHICH MUST NOT BE WRITTEN AT ONE POINT. Stacked, every link attaches to the
+  // machine, so `Worker -> player` and `programmes -> player` are the SAME
+  // vertical run: their two names landed on one x and one y and printed over
+  // each other. MEASURED on /station/ at 390 px, both at y 641.8. The row
+  // layout spreads the same case across the target's edge, which it can because
+  // the two arrows are distinct there; here the arrow is one thing and only the
+  // names can move.
+  const pairs = new Map();
+  for (const l of links) {
+    if (l.back || overs.includes(l)) continue;
+    const key = `${outer(l.from).id}|${outer(l.to).id}`;
+    if (!pairs.has(key)) pairs.set(key, []);
+    pairs.get(key).push(l);
+  }
+  const apart = Math.round(m.linkLh) + 2;
+
   const drawn = [];
   for (const l of links) {
     // 🔴 IN ONE COLUMN EVERY LINK ATTACHES TO THE MACHINE, NEVER TO A BOX
@@ -896,9 +1020,12 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
           cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
                       shown: lab.lines.join(' '), width: fwdBudget });
         }
+        const share = pairs.get(`${f.id}|${t.id}`) || [l];
+        const off = share.length < 2 ? 0
+          : (share.indexOf(l) - (share.length - 1) / 2) * apart;
         drawn.push({ ...l, d: `M${r1(f.cx)} ${r1(y1)} L${r1(f.cx)} ${r1(y2)}`,
                      lab, lx: f.cx + (stepLeft ? -STEP_OFF : STEP_OFF),
-                     ly: (y1 + y2) / 2 + m.linkSize * 0.35,
+                     ly: (y1 + y2) / 2 + off + m.linkSize * 0.35,
                      anchor: stepLeft ? 'end' : 'start', stack: 'none' });
         continue;
       }
@@ -945,6 +1072,8 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
                  anchor: 'end', stack: 'none', level: level[i], bx });
   }
 
+  drawn.push(...placeSibs(sibs, at, { owner, kidIx, sibSpan, cuts }));
+
   return { width: avail, height: Math.round(bottom + PAD), nodes: placed, links: drawn };
 }
 
@@ -990,6 +1119,85 @@ function acrossLane(sx, sy, tx, ty, dy, vs) {
  * through the middle of its own word. There is no wedge now and no slope: the
  * line under a name is horizontal, so the name sits a fixed distance above it.
  */
+/**
+ * The join between two boxes stacked inside one machine: straight down the
+ * middle, or down-across-down with the same rounded turns every other link in
+ * the picture uses when their centres do not line up.
+ */
+function tieElbow(sx, sy, tx, ty) {
+  if (Math.abs(sx - tx) < 0.5) return `M${r1(sx)} ${r1(sy)} L${r1(tx)} ${r1(ty)}`;
+  const mid = (sy + ty) / 2;
+  const k = tx > sx ? 1 : -1;
+  return `M${r1(sx)} ${r1(sy)} L${r1(sx)} ${r1(mid - CORNER)}`
+       + ` Q${r1(sx)} ${r1(mid)} ${r1(sx + CORNER * k)} ${r1(mid)}`
+       + ` L${r1(tx - CORNER * k)} ${r1(mid)}`
+       + ` Q${r1(tx)} ${r1(mid)} ${r1(tx)} ${r1(mid + CORNER)}`
+       + ` L${r1(tx)} ${r1(ty)}`;
+}
+
+/**
+ * Every link whose two ends are boxes inside ONE container.
+ *
+ * 🔴 IT REPLACES THE TIE, IT IS NEVER DRAWN ON TOP OF ONE. A tie is a bracket
+ * saying "these are parts of one machine" and carries no head, because a head
+ * would claim an order the drawing does not know. Where the author has DECLARED
+ * a link the order is known and said out loud, so the bracket has nothing left
+ * to add and the arrow takes its place. Two lines between one pair of boxes is
+ * the defect a return path under the row exists to avoid, one level in.
+ *
+ * 🔴 AND IT CARRIES NO NAME. The gap two stacked boxes share is sixteen pixels
+ * tall and about half a box wide, so a name in it either runs under both boxes
+ * or shrinks past the point of being read. The DIRECTION is the whole message
+ * here; what travels goes in the link's `note`, which is read on hover in the
+ * line under the picture where there is room for a sentence. A label written on
+ * one anyway is reported on `cuts` rather than quietly ignored, because an
+ * author who cannot see their own label has no way to know where it went.
+ *
+ * Two shapes, and which one is used is not a preference:
+ *   next to each other: the arrow runs down the gap they already share, where
+ *     the tie ran.
+ *   reaching past a box: a lane inside the container's own padding, out of one
+ *     side and back in at the same side, because down the middle it would pass
+ *     straight through a box it never visits.
+ *
+ * @returns {object[]} drawable links, in the same shape the placers produce
+ */
+function placeSibs(sibs, at, { owner, kidIx, sibSpan, cuts }) {
+  const drawn = [];
+  const lanes = new Map();      // container -> how many lanes it is already holding
+  for (const l of sibs || []) {
+    const f = at.get(l.from), t = at.get(l.to);
+    const c = at.get(owner.get(l.from));
+    if (!f || !t || !c) continue;
+    // the name survives whole for a screen reader and for the line under the
+    // picture, and nothing is drawn from it
+    const lab = { lines: [], cut: false, full: String(l.label ?? '') };
+    if (l.label) {
+      cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: String(l.label),
+                  shown: 'NOT DRAWN: an arrow between two boxes in one container shows '
+                       + 'direction only. Put what travels in its note',
+                  width: 0 });
+    }
+    const mid = { lab, lx: c.cx, ly: (f.cy + t.cy) / 2, anchor: 'middle', stack: 'none' };
+
+    if (sibSpan(l) === 1) {
+      const down = t.y > f.y;
+      const sy = down ? f.y + f.h + EDGE_OUT : f.y - EDGE_OUT;
+      const ty = down ? t.y - EDGE_OUT - 1 : t.y + t.h + EDGE_OUT + 1;
+      drawn.push({ ...l, sib: true, ...mid, d: tieElbow(f.cx, sy, t.cx, ty) });
+      continue;
+    }
+
+    const i = lanes.get(c.id) || 0;
+    lanes.set(c.id, i + 1);
+    const bx = c.x + c.w - CHILD_PAD - SIB_LANE * (i + 0.5);
+    const sx = f.x + f.w + EDGE_OUT, tx = t.x + t.w + EDGE_OUT + 1;
+    drawn.push({ ...l, sib: true, ...mid,
+                 d: sideLane(sx, f.cy, tx, t.cy, bx, -1, SIB_CORNER) });
+  }
+  return drawn;
+}
+
 function stepElbow(sx, sy, tx, ty, bx) {
   if (Math.abs(ty - sy) < 0.5) return `M${r1(sx)} ${r1(sy)} L${r1(tx)} ${r1(ty)}`;
   const vs = ty > sy ? 1 : -1;                 // down the picture, or up it
@@ -1003,13 +1211,20 @@ function stepElbow(sx, sy, tx, ty, bx) {
        + ` L${r1(tx)} ${r1(ty)}`;
 }
 
-/** a lane that runs DOWN the side: `hs` +1 left of the column, -1 right of it */
-function sideLane(sx, sy, tx, ty, bx, hs) {
+/**
+ * a lane that runs DOWN the side: `hs` +1 left of the column, -1 right of it.
+ * ⚠️ THE RADIUS IS A PARAMETER FOR ONE REASON: a lane inside a container has
+ * about five pixels to turn in, and a 6 px corner on a 5 px run doubles back
+ * on itself. Every lane outside the boxes keeps `CORNER`, so there is still
+ * one radius in the picture a reader can see.
+ */
+function sideLane(sx, sy, tx, ty, bx, hs, corner = CORNER) {
   const k = ty < sy ? 1 : -1;          // the usual return direction: bottom to top
-  return `M${r1(sx)} ${r1(sy)} L${r1(bx + CORNER * hs)} ${r1(sy)}`
-       + ` Q${r1(bx)} ${r1(sy)} ${r1(bx)} ${r1(sy - CORNER * k)}`
-       + ` L${r1(bx)} ${r1(ty + CORNER * k)}`
-       + ` Q${r1(bx)} ${r1(ty)} ${r1(bx + CORNER * hs)} ${r1(ty)}`
+  const c = Math.min(corner, Math.abs(bx - sx), Math.abs(bx - tx), Math.abs(ty - sy) / 2);
+  return `M${r1(sx)} ${r1(sy)} L${r1(bx + c * hs)} ${r1(sy)}`
+       + ` Q${r1(bx)} ${r1(sy)} ${r1(bx)} ${r1(sy - c * k)}`
+       + ` L${r1(bx)} ${r1(ty + c * k)}`
+       + ` Q${r1(bx)} ${r1(ty)} ${r1(bx + c * hs)} ${r1(ty)}`
        + ` L${r1(tx)} ${r1(ty)}`;
 }
 
@@ -1057,12 +1272,12 @@ export function captionTexts(spec, nodes) {
  * top-aligned its contents would sit differently from every other box in the
  * row for a reason a reader cannot see.
  */
-function box(n, x, y, w, h, m, kidH) {
+function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PAD) {
   const lab = n._lab, sub = n._sub;
   const ks = n._kids || [];
   const own = lab.lines.length * m.labLh + (sub.lines.length ? SUB_GAP + m.subLh : 0);
   const stack = ks.length
-    ? HEAD_GAP + ks.length * kidH + (ks.length - 1) * CHILD_GAP : 0;
+    ? HEAD_GAP + ks.length * kidH + (ks.length - 1) * childGap : 0;
   const block = own + stack;
   // ⚠️ THE CHILDREN STILL HANG OFF `top`, whichever way the text is aligned, so
   // a container's contents move with its head rather than needing a second rule.
@@ -1078,14 +1293,14 @@ function box(n, x, y, w, h, m, kidH) {
     label: lab, sub,
     labY: lab.lines.map((_, i) => r1(top + i * m.labLh + m.labLh / 2 + m.labSize * 0.35)),
     subY: r1(top + lab.lines.length * m.labLh + SUB_GAP + m.subLh / 2 + m.subSize * 0.35),
-    title: [lab.full, sub.full].filter(Boolean).join(' — '),
+    title: [lab.full, sub.full].filter(Boolean).join(', '),
   };
   if (n.note) out.note = String(n.note);
   if (ks.length) {
     let ky = top + own + HEAD_GAP;
     out.kids = ks.map((c) => {
-      const p = box(c, x + CHILD_PAD, ky, w - CHILD_PAD * 2, kidH, m, 0);
-      ky += kidH + CHILD_GAP;
+      const p = box(c, x + childInset, ky, w - childInset * 2, kidH, m, 0);
+      ky += kidH + childGap;
       return p;
     });
   }
@@ -1372,7 +1587,17 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
     hueOfName = new Map();
     for (const n of L.nodes) {
       const add = (x) => {
-        if (x.hue != null && x.label?.full) hueOfName.set(x.label.full.trim().toLowerCase(), x.hue);
+        // 🔴 ONLY A BOX THAT PAINTS ITS HUE MAY LEND IT TO A WORD. `here` is the
+        // browser you are reading this in, and the stylesheet gives it a lighter
+        // fill and a plain grey edge on purpose: being filled is its whole
+        // signal and it carries no colour. Its `tech` hue was still going into
+        // this map, so the word `browser` came out BLUE under a picture where
+        // the browser box is grey — a reader matching ink to ink finds nothing,
+        // which is worse than no colour at all, because a colour that matches
+        // nothing reads as a box they have missed.
+        if (x.hue != null && x.label?.full && !HUELESS_KINDS.has(x.kind)) {
+          hueOfName.set(x.label.full.trim().toLowerCase(), x.hue);
+        }
         for (const k of (x.kids || [])) add(k);
       };
       add(n);
@@ -1454,11 +1679,30 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
         // and a head here would claim an ORDER between the parts of one machine
         // that the drawing does not know. It is a bracket, not a step.
         // Drawn BEFORE the children so a box's own fill covers its ends.
+        // ⚠️ DOWN THE MIDDLE, NOT DOWN THE LEFT. It used to hang at a fixed
+        // 12 px inset, which put it under the first letter of each label and
+        // read as a margin rule rather than as a join between two boxes. A tie
+        // leaves the bottom edge of one and meets the top edge of the next, and
+        // it steps across with a rounded turn where their centres differ, which
+        // is the same shape every other link in the picture makes.
+        // 🔴 AND A TIE IS NOT DRAWN WHERE A DECLARED LINK ALREADY RUNS. The
+        // author has said there is a direction between those two boxes, so the
+        // bracket has nothing left to say and two lines down one gap is the
+        // thing every routing rule in this file exists to prevent.
+        const stepped = new Set();
+        for (const l of L.links) {
+          if (l.sib) stepped.add(`${l.from}|${l.to}`).add(`${l.to}|${l.from}`);
+        }
         for (let i = 0; i + 1 < n.kids.length; i++) {
           const a = n.kids[i], b = n.kids[i + 1];
+          if (stepped.has(`${a.id}|${b.id}`)) continue;
+          const ax = a.x + a.w / 2, bx = b.x + b.w / 2;
+          const y0 = a.y + a.h, y1 = b.y;
           field.append(s('path', {
             class: 'pos-dg-tie',
-            d: `M${r1(a.x + 12)} ${r1(a.y + a.h)} L${r1(a.x + 12)} ${r1(b.y)}`,
+            d: Math.abs(ax - bx) < 0.5
+              ? `M${r1(ax)} ${r1(y0)} L${r1(ax)} ${r1(y1)}`
+              : tieElbow(ax, y0, bx, y1),
           }));
         }
         for (const k of n.kids) field.append(nodeGroup(k));
@@ -1503,16 +1747,18 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
     api.cuts = L.cuts;
     api.mode = L.mode;
     for (const l of L.inside || []) {
-      // two boxes inside one container, with a line asked for between them.
-      // Reported rather than drawn: see the header.
-      console.warn(`[diagram] ${l.from} and ${l.to} are in the same box, `
-        + 'so there is no room for an arrow between them — it is not drawn');
+      // a container and a box inside ITSELF: there is no gap between the two
+      // to run a line through. Two boxes that are both inside one container do
+      // have one and are drawn there; this is the case that is left. It is on
+      // `cuts` as well, which is the report anybody actually reads.
+      console.warn(`[diagram] ${l.from} holds ${l.to}, so there is no gap `
+        + 'between them for an arrow and none is drawn');
     }
     if (L.cycle) {
       // every link pointing forward in a loop means somebody forgot a
       // `back: true`. The picture is still drawn — a diagram that looks wrong
       // is a better bug report than a page that threw.
-      console.warn('[diagram] the links run forward in a circle — is one of them missing `back: true`?');
+      console.warn('[diagram] the links run forward in a circle. Is one of them missing `back: true`?');
     }
     onRender?.({ mode: L.mode, width: L.width, height: L.height,
                  boxW: L.boxW, boxH: L.boxH, cuts: L.cuts, measured: api.measured });

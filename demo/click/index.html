@@ -283,7 +283,7 @@ i	"notification"	0	2	"Start"
     // ⚠️ THREE SHORT SENTENCES. The first version was three sentences of
     // ninety words, which is the same essay with fewer full stops: what it is,
     // what to press, what the numbers mean, and stop.
-    what: 'U:\u2019s vClick — a click track with no earpieces, where every '
+    what: 'U:\u2019s vClick is a click track with no earpieces, where every '
       + 'player watches a screen for the bar, the beat and a lamp. Theirs sends '
       + 'two messages a beat over the hall\u2019s wifi; this works the piece out '
       + 'once and then each screen reads its own clock. pushed is what theirs '
@@ -835,7 +835,7 @@ i	"notification"	0	2	"Start"
     const bars = [...new Set(events.filter((e) => e.beat === 1 && e.bar > 0).map((e) => e.bar))];
     const found = bars.filter((b) => msOfBar(b) !== null);
     d.assert('every bar in the score can be started from', bars.length > 0 && found.length === bars.length,
-      `${found.length} of ${bars.length} bars — ${bars.join(', ')}`);
+      `${found.length} of ${bars.length} bars: ${bars.join(', ')}`);
     let wrong = 0;
     for (const b of bars) {
       const at = msOfBar(b);

@@ -95,6 +95,7 @@ export function createXRQuit(gl, { label = 'HOLD TO QUIT', button = 4,
   const g = cv.getContext('2d');
 
   let prog = null, vao = null, tex = null, drawn = -1, fired = false;
+  let why = null;                                 // why it would not build, if it did not
   let held = 0;                                  // ms the button has been down
   let lastFrom = null;                            // which hand is holding it
 
@@ -157,11 +158,30 @@ export function createXRQuit(gl, { label = 'HOLD TO QUIT', button = 4,
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
       gl.bindVertexArray(null);
       tex = gl.createTexture();
-    } catch { prog = null; }
+    } catch (e) {
+      // ⚠️ A SWALLOWED COMPILE ERROR IS A CONTROL THAT IS SIMPLY ABSENT, with
+      // nothing anywhere saying why. This used to be a bare `catch {}`, so a
+      // badge that would not build looked exactly like a badge nobody asked
+      // for. Kept rather than rethrown, because a way out that will not compile
+      // must not take the session with it.
+      prog = null;
+      why = e?.message || String(e);
+    }
     return !!prog;
   }
 
   return {
+    /**
+     * 🔴 COMPILE NOW, SO SOMETHING OTHER THAN A HEADSET CAN GRADE IT. Everything
+     * in here is lazy until the first `draw`, which means the object existing
+     * says nothing at all about whether its shader builds. A page asserting
+     * "there is a way out" off the object alone passes on a broken badge:
+     * PROVED by making `compile` throw and watching the check stay green.
+     * Returns whether it is really ready.
+     */
+    prepare() { return ensure(); },
+    /** Why it would not build, or null. */
+    get why() { return why; },
     /** How far through the hold, 0..1 — published so a page can assert it. */
     get progress() { return Math.min(1, held / holdMs); },
     get holding() { return held > 0; },

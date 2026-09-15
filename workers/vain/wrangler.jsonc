@@ -1,0 +1,35 @@
+{
+	// positron-vain: the write path for Vain's archive, and the read path in
+	// front of it until the bucket is made public.
+	//
+	// ITS OWN WORKER, ITS OWN BUCKET, for the reasons plan-vain-upload §2 sets
+	// out. `workers/shout` holds a connection open for the length of a listen
+	// and reads none of the body; giving it a bucket and a Durable Object would
+	// hand the site's radio relay a new way to fall over. `workers/ingest` is
+	// the right SHAPE and the wrong home: its caps are a 24 MiB session on a
+	// 6-hour TTL with a cron that deletes, shared with an open tier a public
+	// page depends on, and a broadcast is 57.6 MB an hour and is kept.
+	//
+	// 🔴 NOT `elektron-archive-test`. Two workers already share that bucket and
+	// one of them runs a cron that deletes every object under a prefix in it.
+	// Material nobody can re-record does not live one prefix typo away from a
+	// delete loop.
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "positron-vain",
+	"main": "worker.mjs",
+	"compatibility_date": "2026-09-01",
+	"workers_dev": true,
+	"r2_buckets": [
+		{ "binding": "ARCHIVE", "bucket_name": "vain-archive" }
+	],
+	"durable_objects": {
+		"bindings": [{ "name": "UPLOADS", "class_name": "Uploads" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Uploads"] }],
+	// The sandbox tier's TTL is enforced, not documented. Every harness run
+	// writes one small object under `vain-dev/`, on purpose, so that the whole
+	// route is exercised rather than merely guarded; this is what takes it away
+	// again. The kept tier carries no expiry and the sweep skips it explicitly.
+	"triggers": { "crons": ["23 * * * *"] },
+	"observability": { "enabled": true }
+}

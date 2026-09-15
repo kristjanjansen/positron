@@ -37,8 +37,8 @@
 
   const d = mount({
     name: 'memento',
-    what: 'This page records its own video clip — the project\'s test picture, with the '
-      + 'moment burned into it — and then records a knob moved while that clip plays. '
+    what: 'This page records its own video clip, the project\'s test picture with the '
+      + 'moment burned into it, and then records a knob moved while that clip plays. '
       + 'Drag up and down on the lane below and the clip starts rolling: a sample is '
       + 'written down about ten times a second, which is a small part of what your finger '
       + 'did, and the line between those samples is drawn from them. Drag the bar at the '
@@ -193,7 +193,7 @@
       if (behind > 20) lateFires++;
     },
     onAssert: (map, info) => {
-      d.log(`the line moved to ${(info.pos / 1000).toFixed(2)}s — ${map.size} `
+      d.log(`the line moved to ${(info.pos / 1000).toFixed(2)}s · ${map.size} `
         + `value${map.size === 1 ? '' : 's'} restated after a reset (${info.reason})`);
     },
   });
@@ -508,7 +508,7 @@
   };
   let writing = false;
   lane.addEventListener('pointerdown', (ev) => {
-    if (!ready) { d.log('the clip is still being made — one moment', 'hi'); return; }
+    if (!ready) { d.log('the clip is still being made', 'hi'); return; }
     writing = true;
     // A synthetic pointer can refuse capture; losing it costs nothing, because
     // the lane is the only thing being drawn on.
@@ -690,7 +690,7 @@
     const s = series.get(KNOB_KEY);
     if (!s || s.pts.length < 3 || rawKnob.length < 20) {
       d.log(`${rawKnob.length} sample${rawKnob.length === 1 ? '' : 's'} and `
-        + `${s ? s.pts.length : 0} kept — draw a longer pass on the lane and the checks will run`, 'hi');
+        + `${s ? s.pts.length : 0} kept. Draw a longer pass on the lane and the checks will run`, 'hi');
       return;
     }
     checked = true;
@@ -814,13 +814,13 @@
 
     d.assert('the clip carries its own clock, readable back out of its pixels',
       still !== null,
-      still ? `the picture reads ${still.ms} — ${(still.pos / 1000).toFixed(3)}s on the line`
+      still ? `the picture reads ${still.ms} · ${(still.pos / 1000).toFixed(3)}s on the line`
             : 'nothing decoded out of the row');
 
-    d.assert('the clip has a length, not Infinity — so the line has a right-hand end',
+    d.assert('the clip has a length, not Infinity, so the line has a right-hand end',
       Number.isFinite(deck.durationMs) && deck.durationMs > 0 && clipMs > 0,
       `${clipMs} ms of clip on a ${deck.durationMs} ms line`
-        + (fileMs === null ? ' — the file would not say its length, so the asked-for one stands' : '')
+        + (fileMs === null ? ' · the file would not say its length, so the asked-for one stands' : '')
         + `, made in ${Math.round(readyAtMs)} ms`);
 
     d.assert('the clip does not start where the line starts, so the mapping is a real offset',
@@ -841,7 +841,7 @@
     // frames is what the mechanism promises: the burn is redrawn on a 40 ms
     // timer, the capture samples the canvas on its own cadence, and a decoder
     // presents the frame at or before the moment it was sent to.
-    d.assert('the picture and the line move together — the burned clock grades the mapping from outside',
+    d.assert('the picture and the line move together: the burned clock grades the mapping from outside',
       got.length === marks.length && spread !== null && spread <= 3 * FRAME_MS
         && Math.abs(median(errs)) <= 3 * FRAME_MS,
       `${got.length} of ${marks.length} seeks read · the picture sits `
@@ -854,7 +854,7 @@
 
     d.assert('a pass is recorded twice, in full and thinned',
       capture.rows.length >= 3 && capture.rawLane.length > capture.rows.length * 2,
-      `${capture.rawLane.length} samples in, ${capture.rows.length} written down — `
+      `${capture.rawLane.length} samples in, ${capture.rows.length} written down · `
         + `${(capture.rawLane.length / capture.rows.length).toFixed(1)}:1 at a ${THROTTLE_MS} ms gate`);
 
     d.assert('the last thing the knob did is written down, at the moment it happened',
@@ -870,7 +870,7 @@
             + `${dev.lerp.mean.toFixed(0)} of 16383 out typically `
             + `(${((100 * dev.lerp.mean) / 16383).toFixed(2)}% of the knob's travel), worst `
             + `${dev.lerp.worst.toFixed(0)}; holding the last sample is `
-            + `${dev.hold.mean.toFixed(0)} and ${dev.hold.worst.toFixed(0)} — `
+            + `${dev.hold.mean.toFixed(0)} and ${dev.hold.worst.toFixed(0)} · `
             + `${(dev.hold.mean / Math.max(1e-9, dev.lerp.mean)).toFixed(1)}x`
           : 'nothing to compare');
 
@@ -884,7 +884,7 @@
       restored.knob !== null && Math.abs(restored.knob - wantAtProbe) <= 1
         && restored.replay === 0 && restored.reset >= 1,
       `at ${(probe / 1000).toFixed(2)}s the knob reads ${restored.knob} against `
-        + `${wantAtProbe.toFixed(1)} on the line — ${restored.assert} value`
+        + `${wantAtProbe.toFixed(1)} on the line · ${restored.assert} value`
         + `${restored.assert === 1 ? '' : 's'} restated after ${restored.reset} reset`
         + `${restored.reset === 1 ? '' : 's'}, ${restored.replay} of the pass replayed`);
 
@@ -912,8 +912,8 @@
     paintReadout();
     d.log('the picture against each ask, in ms: '
       + marks.map((m) => (m.picture === null ? '—' : (m.picture - m.asked).toFixed(0))).join(' · '));
-    d.log(`${stalledSamples} sample${stalledSamples === 1 ? '' : 's'} were dropped at the door — `
-      + 'the line was not moving under them');
+    d.log(`${stalledSamples} sample${stalledSamples === 1 ? '' : 's'} were dropped at the door. `
+      + 'The line was not moving under them');
   }
 
   // ── boot ────────────────────────────────────────────────────────────────
@@ -926,7 +926,7 @@
   //     `[data-gesture]` elements; it cannot drag a slider, so the lane is the
   //     surface the suite grades and the knob shares its one write path.
   makeClip()
-    .then(() => { d.log('drag up and down on the lane — the clip rolls while you do', 'hi'); })
+    .then(() => { d.log('drag up and down on the lane · the clip rolls while you do', 'hi'); })
     .catch((e) => { d.log(`the clip could not be made: ${e.message}`, 'bad'); })
     .finally(() => { d.ready(); });
 </script>

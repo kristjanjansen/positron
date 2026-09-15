@@ -1,6 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>mirror — positron</title>
+<title>mirror · positron</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
@@ -34,7 +34,6 @@
   /* One row, two groups. They sit ABOVE both pictures because they change both
      — a control that belongs to one pane goes in that pane's bar, and these do
      not. */
-  .lookname { font: 500 11px/1.5 var(--mono); color: var(--hi); margin-left: 9px; }
   .knobs { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; margin: 18px 0 16px; }
   .knob { display: flex; align-items: center; gap: 8px; }
   /* ⚠️ THE SAME KEY STYLE AS THE READOUT, copied from shell.css's `.pos-k` rather
@@ -157,7 +156,7 @@
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
-  import { createStepper } from '/shell/stepper.mjs';
+  import { createPicker } from '/shell/picker.mjs';
   import { createPanel, createPanelFooter, FOOT } from '/shell/panel.mjs';
   import { createXRPanels, beacon, facing, barOf, grabOffset, heldAt, PLACE } from '/shell/xr-panel.mjs';
   import { pickQuad } from '/shell/xr-pick.mjs';
@@ -170,7 +169,7 @@
 
   const d = mount({
     name: 'mirror',
-    what: 'The same picture drawn twice: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Same shader on both sides — it is a short document, so it runs anywhere. Put a headset on and both hang in front of you on a dotted floor, the left one drawn by the headset itself rather than copied across, and either can be picked up by the bar under it and moved. Under each is what it costs.',
+    what: 'The same picture drawn twice from the same shader: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Put a headset on and both hang in front of you on a dotted floor, the left one drawn by the headset itself rather than copied across, and either can be picked up by the bar under it and moved. Under each is what it costs.',
     // ⚠️ NO SHELL READOUT. Every number here belongs to ONE of the two pictures,
     // so it goes in that picture's own bar rather than in a row above both —
     // joining a figure to its ink across two elements is exactly what makes a
@@ -240,7 +239,7 @@
     full.onclick = async () => {
       const how = await toggleFull(p);
       syncFull();
-      if (how !== 'exit') d.log(`fullscreen — ${how === 'element' ? 'the browser\u2019s own' : 'drawn by the page, this browser has no fullscreen'}`);
+      if (how !== 'exit') d.log(`fullscreen · ${how === 'element' ? 'the browser\u2019s own' : 'drawn by the page, this browser has no fullscreen'}`);
     };
     watchFull(p, () => syncFull());
     bar.append(left, el('span', 'sp'), full);
@@ -366,14 +365,19 @@
   // It is a STEPPER rather than a "next" because a list you can only walk
   // forwards through is one you have to go all the way round to revisit.
   {
-    const wrap = el('span', 'knob');
-    wrap.append(el('span', '', 'LOOK'));
+    // 🔴 `createPicker`, NOT A STEPPER PLUS A SPAN. This was `createStepper` with
+    // a hand-made `.lookname` next to it, which is the shape CLAUDE.md warns
+    // about by name: a control that exists in one page and nowhere else is a
+    // component that has not been noticed yet. The picker already puts the
+    // current name INSIDE the row, already carries the die, and already sits on
+    // the shared segmented join, so the separate span and the CSS rule for it go
+    // with it. REPORTED, after the same swap had been made on `/radio1965/`.
     const jump = (to) => {
       lookAt_ = (to + LOOKS.length) % LOOKS.length;
       const { name, body } = LOOKS[lookAt_];
-      lookName.textContent = name;
+      look.show(name, lookAt_);
       const okHere = window.__applyShader(body);
-      d.log(`“${name}” — ${okHere ? 'fading in here' : 'refused here'}`);
+      d.log(`“${name}” · ${okHere ? 'fading in here' : 'refused here'}`);
       const open = ctl?.readyState === 1;
       let sent = false;
       if (open) { try { send({ type: 'video.shader', body }); sent = true; } catch { sent = false; } }
@@ -381,29 +385,23 @@
       d.assert('and the same body went to the box, when there is one',
         sent || !open, open ? (sent ? 'sent' : 'the socket refused it') : 'no board in the room, so nothing to send');
     };
-    const step = createStepper({
+    const look = createPicker({
+      label: 'LOOK',
       what: 'look',
       prev: () => jump(lookAt_ - 1),
       next: () => jump(lookAt_ + 1),
       random: () => jump(Math.floor(Math.random() * LOOKS.length)),
+      onPick: (i) => jump(i),
     });
-    // ⚠️ EMPTY HERE, FILLED WHERE `LOOKS` EXISTS. The shader sources are
-    // declared BELOW this row, so reading `LOOKS[0].name` at build time is a
-    // temporal dead zone — `Cannot access 'LOOKS' before initialization`, at
+    // ⚠️ THE LIST IS FILLED WHERE `LOOKS` EXISTS, NOT HERE. The shader sources
+    // are declared BELOW this row, so reading `LOOKS[0].name` at build time is a
+    // temporal dead zone: `Cannot access 'LOOKS' before initialization`, at
     // module scope, which means a blank page with no asserts and no log line
-    // saying why. This file's own comments already record two of these; this
-    // is the third.
-    //
-    // A stepper with no readout is three buttons and a guess about which of
-    // four you are looking at, so the label still has to exist — it is just
-    // named a few lines later.
-    var lookName = el('span', 'lookname', '');
-    const seg2 = el('div', 'seg');
-    seg2.append(step.el);
-    wrap.append(seg2, lookName);
+    // saying why. This file's own comments already record two of these.
     const row = document.querySelector('.pos-controls');
-    if (row) { row.style.display = 'flex'; row.style.alignItems = 'center'; row.append(wrap); }
-    else knobRow.append(wrap);
+    if (row) { row.style.display = 'flex'; row.style.alignItems = 'center'; row.append(look.el); }
+    else knobRow.append(look.el);
+    window.__lookPicker = look;
   }
 
   // ⚠️ AFTER the row is built. `const knobRow` is in the temporal dead zone
@@ -835,8 +833,9 @@
         o = vec4(mix(c*0.8, fb, min(0.93, uFb+0.12)), 1.0); }` },
   ];
   let lookAt_ = 0;
-  // Now that LOOKS exists, say which one is running. See the note by lookName.
-  if (typeof lookName !== 'undefined' && lookName) lookName.textContent = LOOKS[0].name;
+  // Now that `LOOKS` exists, hand the picker the whole list and say which one is
+  // running. Until this line the control has a shape and no contents.
+  window.__lookPicker?.options(LOOKS.map((l) => l.name), 0);
 
   const gl = local.c.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
   let rendererName = null, localFps = 0, drewAny = 0;
@@ -1003,7 +1002,7 @@
 
   if (!gl) {
     local.p.append(el('div', 'none', 'this browser gave no WebGL2 context, so the left pane cannot be drawn here'));
-    d.log('no WebGL2 context — the left pane is unavailable on this browser', 'bad');
+    d.log('no WebGL2 context · the left pane is unavailable on this browser', 'bad');
     chip.here = 'no WebGL2';
     relabel('here');
   } else {
@@ -1037,7 +1036,7 @@
       try {
         pageK.apply(body);
       } catch (e) {
-        d.log(`the new look would not compile — keeping this one · ${String(e.message).slice(0, 80)}`, 'warn');
+        d.log(`the new look would not compile, keeping this one · ${String(e.message).slice(0, 80)}`, 'warn');
         return false;
       }
       liveBody = body;
@@ -1046,11 +1045,11 @@
         catch (e) {
           // The headset's context refused what this one took. Said out loud
           // rather than left to look like a frozen panel.
-          d.log(`the headset's own copy refused the new look — ${String(e.message).slice(0, 60)}`, 'warn');
-          beacon(`FAIL live panel · the new look would not compile in the session's context — ${e.message}`);
+          d.log(`the headset's own copy refused the new look · ${String(e.message).slice(0, 60)}`, 'warn');
+          beacon(`FAIL live panel · the new look would not compile in the session's context: ${e.message}`);
         }
       }
-      d.log('a new look arrived — fading it in over 0.9 s');
+      d.log('a new look arrived · fading it in over 0.9 s');
       return true;
     };
 
@@ -1085,7 +1084,7 @@
         lockedFrame = null;
         i = Math.max(i, 1);
         relabel('here');
-        d.log('the box stopped sending — this pane is free-running again', 'warn');
+        d.log('the box stopped sending. This pane is free-running again', 'warn');
         stat('box', { fps: null, kbit: null });
       }
       // ONE CLOCK FOR BOTH RENDERERS. `uT` is a frame counter, not wall time —
@@ -1227,8 +1226,8 @@
       // is silence cannot be trusted to its own internal care. The batched
       // shipper is no use here: entering a session is exactly when timers stop
       // being generous.
-      beacon(`FAIL enter(${mode}) — ${e.name}: ${e.message}`);
-      d.log(`entering failed — ${e.name}: ${e.message}`, 'bad');
+      beacon(`FAIL enter(${mode}) · ${e.name}: ${e.message}`);
+      d.log(`entering failed · ${e.name}: ${e.message}`, 'bad');
       try { await xr.end(); } catch { /* it may never have started */ }
       startFlat();
     }
@@ -1257,7 +1256,7 @@
       !!R?.on && !!R.dots && R.dots.span / 2 === R.dots.fadeFar && R.dots.fadeNear < R.dots.fadeFar,
       R?.dots
         ? `seed ${R.seed} · ${R.scenery} · ${R.dots.span} m of floor, dots fading from ${R.dots.fadeNear} to ${R.dots.fadeFar} m`
-        : 'no room — the panels would hang in nothing');
+        : 'no room · the panels would hang in nothing');
     // 🔴 "NO SURFACES" MUST NEVER BE DRAWN AS "NO WALLS". Real room data is
     // optional and it does not gate the grid: with none, the dots go on the
     // page's own floor and the page has to SAY that is what they are. The
@@ -1345,7 +1344,7 @@
       // look" and "we looked and it was fine". The line above says which step
       // did not come back; this says that it is a failure.
       d.assert(`a headset is here, so the ${who} session has to start`, false,
-        'it did not — the line above says which step never came back');
+        'it did not. The line above says which step never came back');
     } else {
       d.assert(`with no headset it says so and keeps drawing here (${who})`,
         !xr.state.presenting && (drewAny > 0 || !gl),
@@ -1385,7 +1384,7 @@
       return;
     }
     if (msg.type === 'video.shader.applied') {
-      d.log(msg.ok ? 'the box took the new look too' : `the box refused it — ${msg.reason}`, msg.ok ? 'ok' : 'warn');
+      d.log(msg.ok ? 'the box took the new look too' : `the box refused it: ${msg.reason}`, msg.ok ? 'ok' : 'warn');
       return;
     }
     if (msg.type === 'video.started') {
@@ -1393,11 +1392,11 @@
         // `video.status` answers this when nothing is running, which is not a
         // fault — it is the cue to ask. Anything else is worth a line.
         if (/no picture running/.test(msg.reason || '')) { askForPicture(); return; }
-        d.log(`the box is not drawing — ${msg.reason}`, msg.available === false ? 'bad' : 'warn');
+        d.log(`the box is not drawing: ${msg.reason}`, msg.available === false ? 'bad' : 'warn');
 
         return;
       }
-      d.log(`the box is drawing ${msg.w}x${msg.h} at ${msg.fps} — ${(msg.bitrate / 1000).toFixed(0)} kbit/s`, 'hi');
+      d.log(`the box is drawing ${msg.w}x${msg.h} at ${msg.fps} · ${(msg.bitrate / 1000).toFixed(0)} kbit/s`, 'hi');
       // The box names its GPU the same way this page names yours. It arrives on
       // the second status at the latest, because the renderer prints it on its
       // own first line and the reply may be composed before that lands.
@@ -1483,7 +1482,7 @@
     closeVideo();
     if (typeof VideoDecoder !== 'function') {
       farNone.textContent = 'this browser has no WebCodecs, so the box’s picture cannot be decoded here';
-      d.log('no WebCodecs — the right pane is unavailable on this browser', 'bad');
+      d.log('no WebCodecs · the right pane is unavailable on this browser', 'bad');
       return;
     }
     waitingForKey = true; farDecoded = 0; farGaps = 0; farBytes = 0;
@@ -1496,7 +1495,7 @@
         farNone.remove();
 
       },
-      error: (e) => d.log(`decode error — ${String(e.message ?? e).slice(0, 80)}`, 'bad'),
+      error: (e) => d.log(`decode error: ${String(e.message ?? e).slice(0, 80)}`, 'bad'),
     });
     decoder.configure({ codec: info.codec ?? 'avc1.42E01E', optimizeForLatency: true });
 
@@ -1524,14 +1523,14 @@
       // is an error it reports once and then stays broken through, so a joiner
       // waits — up to one second at this GOP, which is a GOP choice and not a
       // fault.
-      if (waitingForKey) { if (!key) return; waitingForKey = false; d.log('keyframe — the box’s picture starts here'); }
+      if (waitingForKey) { if (!key) return; waitingForKey = false; d.log('keyframe · the box’s picture starts here'); }
       try {
         decoder.decode(new EncodedVideoChunk({
           type: key ? 'key' : 'delta',
           timestamp: s * 1e6 / (info.fps ?? 30),
           data: new Uint8Array(e.data, 8),
         }));
-      } catch (err) { d.log(`chunk refused — ${String(err.message ?? err).slice(0, 70)}`, 'bad'); }
+      } catch (err) { d.log(`chunk refused: ${String(err.message ?? err).slice(0, 70)}`, 'bad'); }
       tick++;
       const now = performance.now();
       if (now - at >= 1000) {
@@ -1653,7 +1652,7 @@
           for (let i = 0; i < foot.length; i += 4) {
             if (foot[i] > 90 || foot[i + 1] > 90 || foot[i + 2] > 90) footInk++;
           }
-        } catch (e) { d.log(`a panel could not be read — ${String(e.message).slice(0, 60)}`, 'warn'); }
+        } catch (e) { d.log(`a panel could not be read: ${String(e.message).slice(0, 60)}`, 'warn'); }
         return { picSpread, footInk };
       };
       const here = readPanel(panelHere);
@@ -1673,7 +1672,7 @@
           if (fd[i] > 90 || fd[i + 1] > 90 || fd[i + 2] > 90) stripInk++;
         }
         void sc;
-      } catch (e) { d.log(`the footer strip could not be read — ${String(e.message).slice(0, 60)}`, 'warn'); }
+      } catch (e) { d.log(`the footer strip could not be read: ${String(e.message).slice(0, 60)}`, 'warn'); }
       d.assert('and the rendered panel gets the same numbers on a strip of its own',
         stripInk > 200, `${stripInk} lit pixels in it`);
 
@@ -1689,7 +1688,7 @@
       // clean", which are the two questions a laptop can answer.
       let pv = null;
       try { pv = await xr.preview({ frames: 14 }); }
-      catch (e) { d.log(`the room preview threw — ${String(e.message).slice(0, 70)}`, 'warn'); }
+      catch (e) { d.log(`the room preview threw: ${String(e.message).slice(0, 70)}`, 'warn'); }
       wantPanel = false;
       // 🔴 WHAT ONE LIVE PASS COSTS, ON WHATEVER IS IN FRONT OF YOU. It is NOT
       // a headset number and this line says so — a laptop's card tells you
@@ -1700,7 +1699,7 @@
       if (pv?.ok) {
         d.log(`the headset's own copy of the shader, timed here: ${pv.whereCost}`
           + ` · ${pv.pixels ? `${pv.pixels.w}x${pv.pixels.h}` : 'unknown size'}`
-          + ' — this machine, not a headset', 'hi');
+          + ' · this machine, not a headset', 'hi');
         window.__demo.livePreview = {
           gpuMs: pv.liveGpuMs, halfGpuMs: pv.liveHalfGpuMs, where: pv.whereCost,
           timer: pv.gpuTimer, pixels: pv.pixels,
@@ -1711,7 +1710,32 @@
         pv?.ok
           ? `the widest colour channel spans ${pv.spread} of 255 · ${(pv.litShare * 100).toFixed(1)}% of the frame has ink in it`
             + ` · grab bars ${pv.bars ? 'compiled' : 'DID NOT COMPILE'} · picture ${pv.live ? 'rendered here' : 'copied in'}`
-          : `it did not draw — ${pv?.why ?? 'no answer'}`);
+          : `it did not draw: ${pv?.why ?? 'no answer'}`);
+      // 🔴 AND THE WAY OUT, WHICH IS THE ONE CONTROL A HEADSET RUN CANNOT
+      // RECOVER FROM BEING WRONG ABOUT. Everything else in here can be got out
+      // of by leaving, and leaving is this. It used to be a tap on ANY button:
+      // no warning, nothing on screen naming it, so reaching for a control
+      // could end the session and the gesture somebody needs most was the one
+      // they had to discover. It is a hold on one named button now, drawn on
+      // the controller with its own words and a ring that fills as you hold.
+      //
+      // ⚠️ IT IS GRADED HERE RATHER THAN BESIDE THE SESSION, and the difference
+      // is not tidiness. Written into `enterHeadset` it reported `no badge was
+      // built` on this laptop, which is a FALSE claim about the page dressed as
+      // a true one about the machine: with no headset there is no context, so
+      // nothing had been compiled yet and the check was grading the absence of
+      // a GPU. This block exists precisely because a preview builds the same
+      // context the headset would, so by here the question has an answer.
+      //
+      // ⚠️ AND IT GRADES THE COMPILE, NOT THE OBJECT. `createXRQuit` is lazy
+      // until its first draw, so an object alone proves nothing. PROVED by
+      // sabotage: with the badge's `compile` made to throw, this check stayed
+      // GREEN until the module was made to compile it up front.
+      const q = window.__demo?.xrState?.quit ?? xr.state.quit;
+      d.assert('the way out is a hold on one named button, drawn where the hand is',
+        !!q?.built && Number.isInteger(q.button) && typeof q.label === 'string' && q.label.length > 0,
+        q?.built ? `button ${q.button} of the xr-standard mapping, labelled "${q.label}"`
+                 : `nothing on screen says how to leave: ${q?.why ?? 'no answer'}`);
       // ⚠️ ASSERT ON THE ERROR FLAG, HERE TOO. A Quest reported 1282 on its
       // first frame and DREW CORRECTLY ANYWAY; the only way that is ever caught
       // before a device run is by a laptop reading the same flag.
@@ -1801,14 +1825,14 @@
         d.assert('the box’s picture decoded here', farDecoded > 5, `${farDecoded} frames`);
         d.assert('and arrived without the relay dropping any', farGaps === 0, `${farGaps} lost`);
       } else {
-        d.log('box not sending — right pane has nothing to report', 'warn');
+        d.log('box not sending · right pane has nothing to report', 'warn');
       }
 
       d.ready();
   }
   (async () => {
     for (let i = 0; i < 30 && farDecoded === 0; i++) await new Promise((r) => setTimeout(r, 400));
-    if (farDecoded === 0) d.log('the box did not send in 12 s — checking the left pane only', 'warn');
+    if (farDecoded === 0) d.log('the box did not send in 12 s. Checking the left pane only', 'warn');
     runChecks();
   })();
 

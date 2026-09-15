@@ -11,6 +11,8 @@
 //     declared -> a static 1x label, never a slider
 //   · seek always via deck.seek() (two-phase: reduce + assertState)
 //   · any {degraded, reason} lands in the badge, never swallowed
+//   · a LIVE deck loops over a window that fills at the live edge — the bar
+//     owns the two numbers and the page owns the sound (see `liveWindowMs`)
 
 import { observePosition } from '/timeline/transport.mjs';
 import { el } from './shell.mjs';
@@ -29,6 +31,25 @@ import { createChoice } from './choice.mjs';
  */
 export function createTransportBar(host, deck, {
   absolute = false, scrub: wantScrub = true, extras = [], fmt = null, live = false,
+  // 🔴 `false` LEAVES THE LOOP BUTTON OFF, the way `scrub: false` already
+  // leaves the slider off. A loop is a claim that hearing a passage twice is
+  // worth a control, and that is true of a tape and of a live window and false
+  // of a page whose subject is whether a file arrived intact. `/crate/` plays
+  // an upload once to prove it came back whole, and LOOP there was a button
+  // nobody had a reason to press.
+  loop: wantLoop = true,
+  /**
+   * 🔴 BUTTONS THAT BELONG TO THE LOOP, SHOWN ONLY WHILE ONE IS RUNNING.
+   * `extras` sit by the play toggle and are always there, which is right for a
+   * transport verb like record and wrong for a thing that can only act on a
+   * loop: a control that is visible and inert is this project's named failure.
+   * These sit immediately LEFT of the LOOP button, because that is the thing
+   * they modify, and they appear and vanish with it.
+   * `[{ id, label, aria, title, onPress(btn) }]`. `onPress` gets the button, so
+   * a page can read and set `aria-pressed` and keep the state where the DOM
+   * already holds it rather than in a second variable beside it.
+   */
+  loopExtras = [],
   // A LIVE DECK HAS NO END. The bar arms a one-shot at range[1] and, when it
   // fires, pauses the deck and parks the playhead there — right for a
   // recording, wrong for a window whose right-hand end is the present moment,
@@ -65,12 +86,43 @@ export function createTransportBar(host, deck, {
    */
   settling = null,
   /**
-   * Called when the loop changes or comes round: `('set'|'wrap'|'off', a, b)`.
+   * Called when the loop changes or comes round:
+   * `('fill'|'set'|'wrap'|'off', a, b)`.
    * ⚠️ A WRAP IS AN EVENT AND THE BAR IS THE ONLY THING THAT KNOWS IT HAPPENED —
    * the deck is told to seek and has no idea why. A page that draws the audio
    * can put the moment on its own picture; `/tapes/` marks it on the wave.
+   *
+   * `fill` is the live case and it is the one a page must act on: the window
+   * has opened at `a` and will close at `b`, so whatever is holding the sound
+   * starts keeping it NOW. The bar holds no audio of its own.
    */
   onLoop = null,
+  /**
+   * How much live sound one loop may hold, in milliseconds.
+   *
+   * 🔴 A LIVE LOOP NEEDS A CEILING OR IT IS A RECORDING WITH NO END. The first
+   * press opens the window and the live edge fills it at one second per second;
+   * without a limit the only way it ever closes is a second press, which is a
+   * control you can leave running.
+   *
+   * 20 s is long enough for a phrase of music or a spoken sentence and short
+   * enough to sit through while it fills, and it is far inside the three minute
+   * window the one live deck in this repo declares. ⚠️ IT IS A DEFAULT, NOT A
+   * MEASUREMENT: the bar cannot know how many seconds a page can really keep.
+   * A page that holds a ring of its own passes that ring's length here, and
+   * then the button promises exactly what the page can deliver.
+   */
+  liveWindowMs = 20000,
+  /**
+   * Where the playhead is INSIDE a running loop, 0..1, and `null` once when
+   * there is no loop. A page that draws the sound can run its own playhead
+   * across a frozen picture from this; `grain-scope.mjs` takes exactly that.
+   *
+   * ⚠️ PUSHED FROM THIS BAR'S PAINT, NOT POLLED BY THE PAGE. `observePosition`
+   * is already running at 60 Hz here, and a second rAF loop in a page is the
+   * thing this file exists to stop.
+   */
+  onLoopPos = null,
 } = {}) {
   const cmd = {
     play: () => (command?.play ? command.play() : deck.play()),
@@ -94,6 +146,17 @@ export function createTransportBar(host, deck, {
   // not a side control, and putting it in `.pos-controls` would have said it was
   // something you do to the page rather than to the playhead. They sit next to
   // the toggle and are returned by id so a page can relabel or disable one.
+  const loopExtraEls = new Map();
+  for (const x of loopExtras) {
+    const b = el('button', 'tbar-x', x.label,
+      { type: 'button', 'aria-label': x.aria || x.id, 'aria-pressed': 'false' });
+    b.dataset.id = x.id;
+    if (x.title) b.title = x.title;
+    b.hidden = true;                 // until there is a loop for them to act on
+    b.addEventListener('click', () => x.onPress?.(b));
+    loopExtraEls.set(x.id, b);
+  }
+
   const extraEls = new Map();
   for (const x of extras) {
     // `word: true` says the label is a WORD, not a glyph — it gets width from
@@ -145,18 +208,25 @@ export function createTransportBar(host, deck, {
    * button that looks armed and does nothing, and there is no state in this
    * shape that isn't visible on the button's own face.
    *
-   * ⚠️ IT IS NOT HIDDEN ON A DECK THAT CANNOT LOOP. A live Icecast mount has no
-   * end and nothing to come back to, and the honest answer there is the button
-   * SAYING so when it is pressed — the same rule `caps.mjs` follows for a demo
-   * a browser cannot run. A control that vanishes says the feature does not
+   * ⚠️ IT IS NOT HIDDEN ON A DECK THAT CANNOT LOOP. A source with no end has
+   * nothing to come back to, and the honest answer there is the button SAYING
+   * so when it is pressed — the same rule `caps.mjs` follows for a demo a
+   * browser cannot run. A control that vanishes says the feature does not
    * exist, which is a different and false statement.
+   *
+   * ⚠️ AND A LIVE SOURCE IS NO LONGER ONE OF THOSE. It used to answer *a live
+   * station has no past to come back to*, which is true of the station and
+   * false of the page: what a live loop plays is a window this bar opens and
+   * the page fills. See the live-window block further down.
    */
   const loopBtn = el('button', 'tbar-loop tbar-word', 'LOOP',
     { type: 'button', 'aria-label': 'loop' });
   loopBtn.dataset.loop = 'off';
-  loopBtn.title = 'press to mark where a loop starts, again to mark the end, again to take it off';
+  loopBtn.title = live
+    ? 'press to hold the live sound from here. it closes and plays when the window is full, or press again to end it sooner'
+    : 'press to mark where a loop starts, again to mark the end, again to take it off';
   bar.append(toggle, ...extraEls.values(), scrub, ...(live ? [liveChip] : [time]),
-    loopBtn, rates, badge);
+    ...loopExtraEls.values(), ...(wantLoop ? [loopBtn] : []), rates, badge);
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────
@@ -210,9 +280,14 @@ export function createTransportBar(host, deck, {
       // the component does not know about rates — so it is stamped here.
       rateChoice.buttons.forEach((b, i) => { b.dataset.rate = String(lattice[i]); });
       rates.append(rateChoice.el);
-    } else {
-      rates.append(el('span', 'tbar-rate1', '1'));    // honest: no lattice, no choice
     }
+    // 🔴 A DECK WITH NO RATE LATTICE SHOWS NOTHING, NOT A LONE "1".
+    // This printed a grey 1 to be honest that there was no choice, and honesty
+    // was not the problem: a control that can only ever read 1 is a structural
+    // constant wearing a measurement's clothes, which is the thing CLAUDE.md
+    // throws a readout out for. It taught a reader to look at a spot where
+    // nothing will ever happen. The absence of a rate group already says there
+    // is no choice, and says it without occupying anything.
     syncRates();
   }
   buildRates();
@@ -316,9 +391,26 @@ export function createTransportBar(host, deck, {
     // A loop is a claim about a range, so it cannot outlive one. A live deck's
     // range walks forward and will eventually leave the marks behind it; saying
     // so is better than looping over ground that is no longer there.
-    if (loopA != null && (loopA < range[0] || (loopB ?? loopA) > range[1])) {
+    //
+    // 🔴 ONLY THE LEFT EDGE ON A LIVE DECK, AND THIS WOULD HAVE THROWN EVERY
+    // LIVE LOOP AWAY THE INSTANT IT WAS MADE. A live range's right edge is the
+    // present moment as the PAGE last published it, and the station page
+    // publishes it once a second — while the deck's own position runs
+    // continuously. So a window that ends exactly at the live edge reads as up
+    // to a second PAST `range[1]`, and the test below would have cleared it,
+    // with a badge blaming a range nobody can see. A live range can only be
+    // outrun at the back.
+    const outrunsEnd = !live && (loopB ?? loopA) > range[1];
+    if (loopA != null && (loopA < range[0] || outrunsEnd)) {
       clearLoop('the loop ran off the back of what is still held');
     }
+    // THE WARNING, WHICH IS A BLINK AND NOT A NUMBER — see setBlink. The last
+    // quarter of the window is when the button starts saying it is about to
+    // close itself, measured against the window that was actually opened rather
+    // than against the option, so the two can never disagree.
+    setBlink(filling && fillEnds != null && loopA != null
+      && pos >= fillEnds - (fillEnds - loopA) * LIVE_WARN_FRAC);
+    reportLoopPos(pos);
     syncPending();
   }
 
@@ -377,9 +469,10 @@ export function createTransportBar(host, deck, {
     endTimer = setTimeout(hitEnd, delay);
   }
   // re-armed on every play / pause / rate / seek, because each one moves the
-  // instant at which range[1] arrives
+  // instant at which range[1] arrives — and the instant a live window is full,
+  // which is the same kind of boundary and gets the same kind of one-shot
   const offState = deck.transport?.onState
-    ? deck.transport.onState(() => { armEnd(); syncRates(); })
+    ? deck.transport.onState(() => { armEnd(); armFill(); syncRates(); })
     : null;
 
   // ── interaction ─────────────────────────────────────────────────────────
@@ -447,12 +540,148 @@ export function createTransportBar(host, deck, {
   // ── the loop ────────────────────────────────────────────────────────────
   let loopA = null, loopB = null, lastWrap = 0;
 
+  /**
+   * 🔴 A LIVE SOURCE GETS A LOOP TOO, AND WHAT IT LOOPS OVER IS A WINDOW THAT
+   * FILLS IN REAL TIME.
+   *
+   * This used to refuse at the press: *a live station has no past to come back
+   * to*. That is true of the station and false of the page, which can keep the
+   * last few seconds of what arrived. So the first press marks the start and
+   * OPENS a window, the live edge fills it at one second per second, and when
+   * it is full the loop is finished and starts playing. A second press before
+   * that ends it early; a press after it takes it off.
+   *
+   * ⚠️ THE BAR HOLDS NO AUDIO, AND CANNOT. It owns the window in the deck's own
+   * time and says when it opened, closed and came round; the page owns the
+   * sound and hears those through `onLoop`. A page that does not listen gets a
+   * playhead that loops over silence, which is why `fill` is an event and not
+   * an internal state change.
+   */
+  let filling = false, fillEnds = null, fillTimer = null;
+  // The blink's own state, so the DOM is touched only when the answer changes.
+  // Same rule `syncPending` follows for the rate pulse, for the same reason: at
+  // 60 Hz, restarting an animation every frame renders as a still.
+  let blinking = false, blinkAnim = null;
+  let lastLoopFrac = null;
+  // The last quarter of the window is the warning. A FRACTION rather than a
+  // fixed number of seconds, so a page that passes a short window gets a
+  // warning in proportion to it instead of one longer than the loop itself.
+  const LIVE_WARN_FRAC = 0.25;
+  const BLINK_MS = 640;
+  const lessMotion = typeof matchMedia === 'function'
+    ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+
+  /**
+   * 🔴 A WARNING, NOT A COUNTDOWN. A number ticking down is a readout: it asks
+   * to be read, and there is nothing a reader can do with the digits. The blink
+   * says the one thing there is to say, which is that the window is about to
+   * close itself.
+   *
+   * ⚠️ IT ANIMATES OPACITY AND NOTHING ELSE. The word on the face never
+   * changes, the padding never changes, and neither does the border — so the
+   * rate picker and the clock beside it stay exactly where they are. That is
+   * the rule this button already carries for its three states, and a blink that
+   * grew a glow or a letter would break it in a new way.
+   *
+   * ⚠️ REDUCED MOTION GETS A STEADY DIM RATHER THAN NOTHING. Somebody who asked
+   * for less movement still has to be told the window is closing. `shell.css`
+   * already does exactly this for a busy button. It is built here rather than
+   * in the stylesheet because the animation belongs to this control and to no
+   * other, and because the global reduced-motion rule in `shell.css` switches
+   * CSS animations off outright — which for a warning would be silence.
+   */
+  function setBlink(on) {
+    if (on === blinking) return;
+    blinking = on;
+    blinkAnim?.cancel();
+    blinkAnim = null;
+    loopBtn.style.opacity = '';
+    if (!on) return;
+    if (!lessMotion?.matches) {
+      blinkAnim = loopBtn.animate?.([
+        { opacity: 1, offset: 0 }, { opacity: 1, offset: 0.49 },
+        { opacity: 0.24, offset: 0.5 }, { opacity: 0.24, offset: 1 },
+      ], { duration: BLINK_MS, iterations: Infinity }) ?? null;
+    }
+    if (!blinkAnim) loopBtn.style.opacity = '0.62';
+  }
+
+  /** 0..1 through a running loop, or null. Pushed only when it changes to or
+   *  from nothing, so a page is not told "no loop" sixty times a second. */
+  function reportLoopPos(pos) {
+    let f = null;
+    if (loopA != null && loopB != null && loopB > loopA && pos != null) {
+      f = Math.min(1, Math.max(0, (pos - loopA) / (loopB - loopA)));
+    }
+    if (f === null && lastLoopFrac === null) return;
+    lastLoopFrac = f;
+    onLoopPos?.(f);
+  }
+
+  const clearFill = () => { if (fillTimer) { clearTimeout(fillTimer); fillTimer = null; } };
+
+  /**
+   * ⚠️ A COMMITTED ONE-SHOT, NOT A CHECK ON THE PAINT LOOP, for the same reason
+   * `armEnd` is one: `observePosition` runs off requestAnimationFrame, so in a
+   * hidden tab the window would go on filling forever and the loop would never
+   * close. Re-armed from `onState` beside `armEnd`, because a play, a pause, a
+   * rate or a seek each move the instant at which the window is full.
+   *
+   * A paused deck gets no timer at all, and that is right: nothing is arriving,
+   * so nothing is filling.
+   */
+  function armFill() {
+    clearFill();
+    if (!filling || fillEnds == null) return;
+    const t = deck.transport;
+    const due = t?.timeAt ? t.timeAt(fillEnds) : null;
+    if (due === null || due === undefined) return;
+    const delay = due - t.clock.now();
+    if (delay <= 0) return closeWindow();
+    fillTimer = setTimeout(closeWindow, delay);
+  }
+
+  /** The window is full, so the loop is finished and it starts playing. */
+  function closeWindow() {
+    fillTimer = null;
+    if (!filling || fillEnds == null || loopA == null) return;
+    startLoop(loopA, fillEnds);
+  }
+
+  /** Both marks are known: arm the loop, go back to its start and roll. */
+  function startLoop(a, b) {
+    filling = false; fillEnds = null;
+    clearFill();
+    setBlink(false);
+    loopA = a; loopB = b;
+    drawLoop();
+    clearNote();
+    if (!(deck.playing?.() ?? false)) cmd.play();
+    doSeek(loopA);
+    onLoop?.('set', loopA, loopB);
+  }
+
   function drawLoop() {
     const on = loopA != null && loopB != null;
+    // 🔴 THE WORD NEVER CHANGES, BECAUSE A CONTROL THAT RESIZES ITSELF MOVES
+    // EVERY CONTROL BESIDE IT. It said LOOP, then END, then LOOP again, and
+    // three characters against four is enough to shove the rate picker and the
+    // clock sideways every time somebody pressed it. That is the same defect as
+    // a live sentence reflowing under a picture: nothing that changes while you
+    // are looking at it may change how much room it takes. State is carried by
+    // `data-loop`, which paints, and by the label a screen reader is given,
+    // which has no width.
+    //
+    // ⚠️ A FILLING WINDOW IS THE `armed` STATE AND KEEPS ITS PAINT. It is a
+    // start with no end yet, which is what `armed` already means, so the live
+    // case needs no fourth colour and no stylesheet of its own. What the live
+    // case adds is the blink, which is opacity and takes no room.
     loopBtn.dataset.loop = on ? 'on' : loopA != null ? 'armed' : 'off';
-    loopBtn.textContent = on ? 'LOOP' : loopA != null ? 'END' : 'LOOP';
+    // they act on a loop, so they exist while there is one and not before
+    for (const b of loopExtraEls.values()) b.hidden = !on;
     loopBtn.setAttribute('aria-label',
-      on ? 'looping — press to take the loop off'
+      on ? 'looping. press to take the loop off'
+        : filling ? 'holding the live sound. press to end the loop here'
         : loopA != null ? 'press to mark where the loop ends' : 'loop');
     if (!on || !seekable) { loopSpan.hidden = true; return; }
     const fa = posToFrac(loopA), fb = posToFrac(loopB);
@@ -462,27 +691,60 @@ export function createTransportBar(host, deck, {
   }
 
   function clearLoop(why) {
+    const wasLive = live && loopA != null;
     loopA = loopB = null;
+    filling = false; fillEnds = null;
+    clearFill();
+    setBlink(false);
     drawLoop();
+    reportLoopPos(null);
     onLoop?.('off', null, null);
-    if (why) note(why); else clearNote();
+    // A LIVE SOURCE HAS ONE POSITION THAT MEANS ANYTHING ONCE THE LOOP IS OFF,
+    // and it is now. Leaving the playhead where the loop was would park it in a
+    // past the station has stopped sending, with a LIVE chip above it saying
+    // otherwise.
+    if (wasLive) doSeek(deck.range[1]);
+    /**
+     * 🔴 THE BADGE SAYS NOTHING ABOUT A LOOP ENDING. ASKED FOR, MORE THAN ONCE.
+     *
+     * `why` is still passed and is still the reason, because a caller reading
+     * this code needs to know which of four paths cleared the loop. What it no
+     * longer does is put that reason on screen. Every one of those sentences is
+     * longer than the 60 characters the badge shows, so what a person actually
+     * saw was `THE LOOP RAN OFF THE BACK OF WHAT IS ST…` sitting in the
+     * transport, and CLAUDE.md is explicit that anything truncating with an
+     * ellipsis is in the wrong place rather than in need of a wider box.
+     *
+     * It is also not news. The loop ending is visible: the LOOP button goes
+     * dark, the band leaves the slider, the sound changes. A line of prose
+     * saying so is a third channel repeating what two already carried.
+     * ⚠️ THE BADGE ITSELF STAYS for the things it is right for, which are
+     * states a page cannot see any other way: a degraded source, a refused
+     * rate. Those are reported by their own callers and are not this.
+     */
+    clearNote();
   }
 
   loopBtn.addEventListener('click', () => {
     // ⚠️ ASKED OF THE DECK, NOT OF THE BAR. `seekable` is the one fact that
     // decides whether a loop can exist at all, and it is the same flag the
     // scrub and the harness read, so the three cannot disagree.
-    // 🔴 A LIVE SOURCE CANNOT BE LOOPED, AND THE FIRST VERSION LET YOU TRY. On
-    // `/radio1965/` the deck is an Icecast mount whose range walks forward, so
-    // two marks were accepted and then thrown away a second later by the guard
-    // further down — reported as *"no looping in radio? 'loop fell outside...'
-    // what?"*, which is a control that works, then silently stops, and explains
-    // itself in a sentence about a range nobody can see. Refuse at the press,
-    // in words about the STATION rather than about the deck.
-    if (live) { note('a live station has no past to come back to'); return; }
     if (!seekable) { note('this source has no end to come back to'); return; }
     const pos = deck.position();
-    if (loopA == null) { loopA = pos; loopB = null; drawLoop(); note('loop starts here — press again for the end'); return; }
+    if (loopA == null) {
+      loopA = pos; loopB = null;
+      // 🔴 A LIVE DECK HAS NOTHING BEHIND THIS PRESS, SO THE WINDOW IS AHEAD OF
+      // IT. On a recording both marks are behind you and the second press picks
+      // the end; on a station the sound the loop will play has not arrived yet,
+      // so the press opens a window instead and the live edge fills it. The
+      // page is told at once, because it is the thing that has to start keeping
+      // the audio — the bar keeps only the two numbers.
+      filling = live;
+      fillEnds = live ? pos + liveWindowMs : null;
+      drawLoop();
+      if (filling) { onLoop?.('fill', loopA, fillEnds); armFill(); }
+      return;
+    }
     if (loopB == null) {
       // 🔴 A LOOP MARKED BACKWARDS IS STILL A LOOP SOMEBODY MEANT. Pressing
       // the second time after seeking BACK gives an end before the start, and
@@ -491,12 +753,7 @@ export function createTransportBar(host, deck, {
       // press that landed on the same frame as the first and means nothing.
       const a = Math.min(loopA, pos), b = Math.max(loopA, pos);
       if (b - a < 1) { note('the two marks are in the same place'); return; }
-      loopA = a; loopB = b;
-      drawLoop();
-      clearNote();
-      if (!(deck.playing?.() ?? false)) cmd.play();
-      doSeek(loopA);
-      onLoop?.('set', loopA, loopB);
+      startLoop(a, b);
       return;
     }
     clearLoop();
@@ -540,6 +797,23 @@ export function createTransportBar(host, deck, {
      *  grades the loop from here rather than from the button's label. */
     get loop() { return loopA != null && loopB != null ? [loopA, loopB] : null; },
     get loopArmed() { return loopA != null && loopB == null; },
+    /** live only: the window is open and the live edge is filling it. */
+    get loopFilling() { return filling; },
+    /** where the window will close, so a check can say how much is left */
+    get loopFillEnds() { return fillEnds; },
+    /** how much live sound one loop may hold, in ms */
+    get loopWindowMs() { return liveWindowMs; },
+    /**
+     * The warning is running.
+     *
+     * ⚠️ GRADED FROM HERE AND NOT FROM A CLASS OR A COMPUTED STYLE. The blink
+     * is built in JavaScript (see setBlink), so there is no class to look for,
+     * and sampling opacity would be sampling whichever half of the cycle the
+     * check happened to land in — a measurement that is right half the time.
+     */
+    get loopBlinking() { return blinking; },
+    /** 0..1 through a running loop, or null. The same number `onLoopPos` pushes. */
+    get loopFrac() { return lastLoopFrac; },
     /** press it the way a finger does, so a check drives the real handler */
     pressLoop() { loopBtn.click(); },
   };
@@ -558,10 +832,14 @@ export function createTransportBar(host, deck, {
     endStop, commanded: !!command,
     /** an `extras` button by id, so a page can relabel or disable it */
     extra: (id) => extraEls.get(id) || null,
+    /** a `loopExtras` button by id. It is hidden unless a loop is running. */
+    loopExtra: (id) => loopExtraEls.get(id) || null,
     note,
     destroy() {
       stop();
       clearEnd();
+      clearFill();
+      setBlink(false);
       offState && offState();
       removeEventListener('keydown', onKey);
       bar.remove();

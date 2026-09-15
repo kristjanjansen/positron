@@ -23,7 +23,7 @@
     name: 'webrtc',
     what: 'The same live picture the HLS pages play, delivered over WHEP instead: one '
       + 'POST of an offer, one answer back, and the frames arrive over WebRTC. Press '
-      + 'Start the stream and play — this page starts the publisher itself and then '
+      + 'Start the stream and play. This page starts the publisher itself and then '
       + 'waits for it, so the first seconds are the stream coming up. round trip is '
       + 'the network round trip to Cloudflare and NOT how far behind the picture is; '
       + 'nothing on this page measures that.',
@@ -213,7 +213,7 @@
         framePresented
           ? framePresented
           : lastVideoRtp
-            ? `nothing presented — rtp says ${JSON.stringify(lastVideoRtp)}`
+            ? `nothing presented · rtp says ${JSON.stringify(lastVideoRtp)}`
             : 'nothing presented and NO inbound video rtp at all');
       d.assert('element is playing', !video.paused, video.paused ? `paused rs${video.readyState}` : 'playing');
     }

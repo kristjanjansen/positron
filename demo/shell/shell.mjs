@@ -30,6 +30,18 @@ export function mount({
   // position were the same facts twice.
   readout = {},
   showReadout = true,    // false: published on __demo, not drawn — see below
+  // 🔴 `false` REMOVES THE LOG BOX FROM THE PAGE AND KEEPS THE RECORD.
+  // Lines still accumulate on `__demo.logs`, so a harness and an assert read
+  // exactly what they read before; what goes is the surface. `videoradio` is
+  // the case that bought this: it is a picture you watch, asked for full
+  // screen, and a scrolling block of prose under it is the one element on the
+  // page that is not the picture.
+  // ⚠️ IT MUST NOT APPEND THE ELEMENT AT ALL rather than hide its contents.
+  // `.pos-log` carries its own border, and CLAUDE.md already records a page
+  // that opted out of a surface, kept its empty box, and painted a 2 px
+  // full-width band nobody wrote. A container with nothing in it must not
+  // paint its edges.
+  showLog = true,
   controls = [],         // [{id, label, primary?}]
   index = '/',
 } = {}) {
@@ -41,6 +53,48 @@ export function mount({
   if (index) head.append(el('a', 'pos-back', '← demos', { href: index }));
   const title = el('div', 'pos-title');
   title.append(el('h1', 'pos-name', name));
+  // 🔴 EVERY SHELLED PAGE GETS THE FEEDBACK BUTTON, WHICH IS WHY IT IS HERE AND
+  // NOT IN FORTY PAGES. It sits beside the title, pushed right, because the
+  // title row is the one strip of every demo that means the same thing on all
+  // of them: this page, and what you can do about this page.
+  //
+  // ⚠️ IT IS NOT A `.pos-controls` BUTTON AND THAT IS NOT AN ACCIDENT OF
+  // LAYOUT. `verify.mjs` presses every control in that row on every page on
+  // every run, and a feedback button wired like one would have sent forty real
+  // messages per run — the FCM defect CLAUDE.md records at length, in new
+  // clothes. The row it is in is only the first fence; the one that holds is
+  // `isTrusted` below, and the server-side origin check behind it.
+  const fbBtn = el('button', 'pos-fb-btn', 'Feedback', {
+    type: 'button',
+    'aria-haspopup': 'dialog',
+    'aria-expanded': 'false',
+    title: 'say something about this page',
+  });
+  fbBtn.dataset.slug = name;
+  // 🔴 A SCRIPTED PRESS DOES NOTHING. `element.click()` — which is how this
+  // project's harness presses every control it presses — produces an event with
+  // `isTrusted: false`, and so does anything else a page can synthesise. A real
+  // finger, a real mouse and a real keyboard produce `true`. So the one control
+  // on the site that writes to a store a person is going to read can only be
+  // worked by a person, and no future harness change can quietly start pressing
+  // it. `aria-expanded` is flipped on the far side of the gate, which is both
+  // correct markup for a disclosure button and the thing the check below reads.
+  fbBtn.addEventListener('click', async (e) => {
+    if (!e.isTrusted) return;
+    fbBtn.setAttribute('aria-expanded', 'true');
+    try {
+      // Imported here rather than at the top of this file: `shell.mjs` is
+      // mounted by every page, and a panel nobody opens should not cost every
+      // page the module, the field and the wire on load. It also keeps this
+      // file importing nothing but a leaf.
+      const fb = await import('./feedback.mjs');
+      fb.openFeedback({ log }, { slug: name });
+    } catch (err) {
+      fbBtn.setAttribute('aria-expanded', 'false');
+      log(`the feedback box did not load (${err?.message || err})`, 'bad');
+    }
+  });
+  title.append(fbBtn);
   head.append(title);
   if (what) head.append(el('p', 'pos-what', what));
 
@@ -178,7 +232,8 @@ export function mount({
   const body = el('div', 'pos-body');
   const logEl = el('pre', 'pos-log');
 
-  document.body.append(head, rb, cbar, body, logEl);
+  document.body.append(head, rb, cbar, body);
+  if (showLog) document.body.append(logEl);
 
   // ── the machine contract ────────────────────────────────────────────────
   const api = {
@@ -188,12 +243,49 @@ export function mount({
     readout: Object.fromEntries(Object.keys(readout).map((k) => [k, null])),
     // the DECLARATION, so a harness can tell "no cells on purpose" from "none yet"
     readoutOptOut,
+    // the DECLARATION again, so a check can tell "no log on purpose" from
+    // "a log that never got a line"
+    logOptOut: !showLog,
     how: null,
     logs: [],
     asserts: [],
     transport: null,           // filled by transport-bar when one is attached
   };
   window.__demo = api;
+
+  // ── the feedback control, checked on every page, on every run ────────────
+  //
+  // 🔴 THE SECOND ONE PROVES THE GUARD BY BREAKING IT. CLAUDE.md: prove a guard
+  // fires, break the thing on purpose once. This presses the button the way a
+  // script presses a button and asserts that nothing opened — and it
+  // discriminates, because `aria-expanded` is set on the far side of the
+  // `isTrusted` check, so removing the check turns this assert red rather than
+  // leaving it green about nothing. It costs one synthetic click at load and it
+  // is the difference between believing the suite cannot write feedback and
+  // knowing it.
+  assert('every page carries a feedback button, beside its title',
+    head.contains(fbBtn) && fbBtn.dataset.slug === name, `.pos-head · ${name}`);
+  fbBtn.click();
+  assert('only a person can open it, so a harness press does nothing',
+    fbBtn.getAttribute('aria-expanded') === 'false' && !document.querySelector('.pos-fb'),
+    `a scripted press left it aria-expanded=${fbBtn.getAttribute('aria-expanded')}`);
+  /**
+   * 🔴 HOW MANY OF THESE THE SHELL MADE, SO THE HARNESS CAN TELL THEM FROM THE
+   * PAGE'S. `demo/verify.mjs` waits for a page to produce its first assert
+   * before it starts timing out, and the test for "has it produced one yet" was
+   * `asserts.length === 0`. These two land at t+0 on EVERY shelled page, so
+   * that test became false immediately and the wait never engaged again.
+   *
+   * MEASURED the day they landed: `/radio1965/` makes 34 asserts, the suite
+   * collected **2**, and reported **13/13 green**. A green suite with no
+   * coverage, across the 28 demos that declare `settleMs`, and nothing about it
+   * looked wrong from the outside.
+   *
+   * ⚠️ IT IS A COUNT, NOT A FLAG ON EACH ROW. The harness only needs to know
+   * where the page's own asserts begin, and a count says that without changing
+   * the shape of `asserts`, which other things read.
+   */
+  api.shellAsserts = api.asserts.length;
 
   function set(k, value, state) {
     if (!cells.has(k)) throw new Error(`readout '${k}' was not declared in mount()`);
@@ -250,13 +342,24 @@ export function mount({
   // unchanged, so per-demo counts are unaffected by this.
   function assert(label, pass, detail) {
     api.asserts.push({ label, pass: !!pass, detail: detail ?? null });
-    if (!pass) log(`FAIL ${label}${detail !== undefined ? ` — ${detail}` : ''}`, 'bad');
+    // ⚠️ `·`, NOT AN EM DASH, AND THIS ONE LINE STAMPED THEM EVERYWHERE. Every
+    // failing assert on every shelled page came through here, so a sweep of 418
+    // reader-facing strings could not have caught the formatter that puts one
+    // back on each of them. `·` is already this project's separator inside these
+    // same log lines.
+    if (!pass) log(`FAIL ${label}${detail !== undefined ? ` · ${detail}` : ''}`, 'bad');
     return !!pass;
   }
 
   return {
     el: body,
     head,
+    // 🔴 THE CONTROL ROW ITSELF, so a page can MOVE it rather than build a
+    // second one. `videoradio` wants its buttons inside the picture's box and
+    // under the screen, the way a player's chrome sits; hand-rolling that row
+    // would give the project a fourth set of buttons and would take them out
+    // of `.pos-controls`, which is what `verify.mjs` presses on every page.
+    controls: cbar,
     set, log, assert,
     // `how()` is gone. A demo's intro is now ONE paragraph of three or four
     // sentences in `what`, not a lead line plus a second paragraph of mechanism:

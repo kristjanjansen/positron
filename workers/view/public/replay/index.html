@@ -194,7 +194,7 @@
       d.assert('cues land within 250 ms of the picture', p50 < 250,
         `p50 ${p50.toFixed(0)} ms over ${fires.length} fires`);
     } else {
-      d.log(`no cues fired yet — the first is at ${(CUES[0].offsetMs / 1000).toFixed(1)} s`
+      d.log(`no cues fired yet · the first is at ${(CUES[0].offsetMs / 1000).toFixed(1)} s`
         + ` (the picture is at ${video.currentTime.toFixed(1)} s)`);
     }
   });

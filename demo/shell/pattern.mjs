@@ -405,7 +405,7 @@ const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
  */
 export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
   if (!epoch) throw new Error('ffmpegFilters: epoch required');
-  if (!font) throw new Error('ffmpegFilters: fontfile required — drawtext without one fails silently');
+  if (!font) throw new Error('ffmpegFilters: fontfile required; drawtext without one fails silently');
   // SAME TYPOGRAPHY AS THE CANVAS: a small brand-yellow word over a big light
   // number, not black text in a white box. The box stays, but as a dark scrim
   // rather than a white slab — testsrc2 is a bright, busy background and plain

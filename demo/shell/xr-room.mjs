@@ -510,8 +510,16 @@ export function holdM(m, o = TABLET) {
     m[12] - fx * TABLET_LIFT, m[13] - fy * TABLET_LIFT, m[14] - fz * TABLET_LIFT, 1]);
 }
 
-/** hue 0..1 -> rgb, the same three-cosines palette the walls use. */
-export const hueRGB = (h) => [0, 0.33, 0.67].map((o) => 0.45 + 0.55 * Math.cos(6.2831 * (h + o)));
+/**
+ * A thing's `c` 0..1 -> rgb. It is a SHADE OF GREY, and that is the whole
+ * change: it used to be a hue on three cosines 120 degrees apart, which is the
+ * family CLAUDE.md already records as varying almost entirely in hue at
+ * near-constant luminance. That is the wrong property for bricks. Brightness is
+ * how this room says what is under your pointer and what is in your hand, and a
+ * red brick beside a blue one at the same luminance leaves that signal nowhere
+ * to move.
+ */
+export const shadeRGB = (c) => [c, c, c];
 
 // ── the look ──────────────────────────────────────────────────────────────
 export const ROOM_VS = `#version 300 es
@@ -1003,7 +1011,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       cube = unitCube(); quad = unitQuad();
       standIn = { body: lathe(BODY_PROFILE), stick: lathe(STICK_PROFILE, 14) };
       ok = true;
-    } catch (e) { log(`the room would not compile — ${e.message}`, 'bad'); return false; }
+    } catch (e) { log(`the room would not compile: ${e.message}`, 'bad'); return false; }
     // ⚠️ THE GRID IS ALLOWED TO FAIL ON ITS OWN. It is the newest thing here
     // and the only one that needs `fwidth`; a driver that will not compile it
     // must cost the dots, never the room.
@@ -1013,8 +1021,8 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     try { modelProg = link(MODEL_VS, MODEL_FS, ['aPos', 'aNrm', 'aUv']); }
     catch (e) {
       modelProg = null;
-      log(`the controller models would not compile — ${e.message}`, 'warn');
-      say(`FAIL controllers · the model shader would not compile — ${e.message}`);
+      log(`the controller models would not compile: ${e.message}`, 'warn');
+      say(`FAIL controllers · the model shader would not compile: ${e.message}`);
     }
     try { holdProg = link(HOLD_VS, HOLD_FS, ['aPos']); }
     // ⚠️ `log`, NOT `onLog`. There is no `onLog` in this scope, so a failed
@@ -1025,11 +1033,11 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // owner reads rather than only the page behind their face.
     catch (e) {
       holdProg = null;
-      log(`the tablet would not compile — ${e.message}`, 'warn');
-      say(`FAIL tablet · its shader would not compile — ${e.message}`);
+      log(`the tablet would not compile: ${e.message}`, 'warn');
+      say(`FAIL tablet · its shader would not compile: ${e.message}`);
     }
     try { gridProg = link(GRID_VS, GRID_FS, ['aPos']); }
-    catch (e) { log(`the floor grid would not compile — ${e.message}`, 'warn'); }
+    catch (e) { log(`the floor grid would not compile: ${e.message}`, 'warn'); }
     return true;
   }
   attach(gl);
@@ -1120,12 +1128,12 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // description that can disagree with its config is worse than none, and
     // this one had exactly that shape: it said "with 3 m walls" for as long as
     // there were walls to say it about, and it would have gone on saying it.
-    const own = `the page's own floor — a ${GRID.span} m square of dots at y=0, and no walls,`
+    const own = `the page's own floor: a ${GRID.span} m square of dots at y=0, and no walls,`
       + ' because the floor is the one surface a headset standing on it can be sure of';
     if (planes.state === 'yours') {
       const bits = Object.entries(planes.labels).map(([k, v]) => `${k} ${v}`).join(' · ');
       const walls = planes.labels.wall || 0;
-      planes.note = `${planes.count} surface(s) from your room — ${bits} — grid is on them, floor at y=${planes.floorY.toFixed(2)} m`
+      planes.note = `${planes.count} surface(s) from your room · ${bits} · grid is on them, floor at y=${planes.floorY.toFixed(2)} m`
         + (walls ? ` · ${walls} of them are walls, and those are the only walls this page draws`
                  : ' · NO wall surfaces came back, so there are no dotted walls');
       planes.short = `floor: your room\n${planes.count} surfaces, ${walls} walls`;
@@ -1150,15 +1158,15 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       // So the note now says which session it is in, and only mentions Space
       // Setup where that is still a live possibility.
       planes.note = planes.opaque
-        ? 'no surfaces, and this is a VR session — a headset composites nothing over your room here, '
+        ? 'no surfaces, and this is a VR session. A headset composites nothing over your room here, '
           + `so it does not hand one over either. Try the XR button for passthrough. The grid is ${own}`
-        : `your headset reported NO surfaces in a passthrough session — Space Setup may never have been run here. The grid is ${own}`;
+        : `your headset reported NO surfaces in a passthrough session. Space Setup may never have been run here. The grid is ${own}`;
       planes.short = planes.opaque
         ? 'floor: this page\nVR gives no surfaces'
         : 'floor: this page\nyour room reported none';
       planes.from = 'the page';
     } else if (planes.state === 'refused') {
-      planes.note = `this session was not given surface detection (${planes.why}) — the grid is ${own}`;
+      planes.note = `this session was not given surface detection (${planes.why}). The grid is ${own}`;
       planes.short = 'floor: this page\nno surface detection';
       planes.from = 'the page';
     } else if (planes.state === 'unreadable') {
@@ -1167,15 +1175,15 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       // certainly not "your room has no walls". Without this it read as "not
       // asked", i.e. as OUR failure to ask, and the next person would go
       // looking for the request that was in fact made.
-      planes.note = `your headset answered about its surfaces and this page could not read the answer (${planes.why}) — the grid is ${own}`;
+      planes.note = `your headset answered about its surfaces and this page could not read the answer (${planes.why}). The grid is ${own}`;
       planes.short = 'floor: this page\nanswer unreadable';
       planes.from = 'the page';
     } else if (planes.state === 'waiting') {
-      planes.note = `your headset has been asked for its surfaces and has not answered yet — the grid is ${own}`;
+      planes.note = `your headset has been asked for its surfaces and has not answered yet. The grid is ${own}`;
       planes.short = 'floor: this page\nwaiting on an answer';
       planes.from = 'the page';
     } else {
-      planes.note = `nothing has asked your headset for surfaces yet — the grid is ${own}`;
+      planes.note = `nothing has asked your headset for surfaces yet. The grid is ${own}`;
       planes.short = 'floor: this page\nnot asked yet';
       planes.from = 'the page';
     }
@@ -1294,7 +1302,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       // rather than about the answer that did arrive.
       planeFails++;
       if (planes.state === 'not asked') { planes.state = 'unreadable'; planes.why = e.message; describe(); }
-      if (planeFails === 1) log(`could not read your room's surfaces — ${e.message}`, 'warn');
+      if (planeFails === 1) log(`could not read your room's surfaces: ${e.message}`, 'warn');
     }
   }
 
@@ -1381,7 +1389,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       gl.enable(gl.CULL_FACE);
     } catch (e) {
       gridBroke = true;
-      log(`the floor grid stopped drawing — ${e.message}`, 'warn');
+      log(`the floor grid stopped drawing: ${e.message}`, 'warn');
     }
   }
 
@@ -1414,8 +1422,8 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     try { drawInner(o); }
     catch (e) {
       ok = false;
-      log(`the room stopped drawing — ${e.message}`, 'bad');
-      say(`FAIL the room threw while drawing — ${e.message}`);
+      log(`the room stopped drawing: ${e.message}`, 'bad');
+      say(`FAIL the room threw while drawing: ${e.message}`);
     }
   }
 
@@ -1595,7 +1603,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       const tch = touch ? touch(held?.i === i, aimed === i) : { lit: 1, scale: 1 };
       gl.uniformMatrix4fv(L.model, false,
         modelM(t.x, t.y, t.z, t.s * tch.scale, t.rx, t.ry + tSec * t.spin));
-      const c = hueRGB(t.c);
+      const c = shadeRGB(t.c);
       gl.uniform3fv(L.col, [c[0] * tch.lit, c[1] * tch.lit, c[2] * tch.lit]);
       gl.drawArrays(gl.TRIANGLES, 0, cube.count);
     });
@@ -1608,7 +1616,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       fadeOn(bk);
       things.forEach((t, i) => {
         gl.uniformMatrix4fv(NB.model, false, modelM(t.x, t.y, t.z, t.s, t.rx, t.ry + tSec * t.spin));
-        const c = hueRGB(t.c);
+        const c = shadeRGB(t.c);
         const lit = held?.i === i ? 1.8 : (aimed === i ? 1.35 : 1);
         gl.uniform3fv(NB.col, [c[0] * lit, c[1] * lit, c[2] * lit]);
         gl.drawArrays(gl.TRIANGLES, 0, cube.count);
@@ -1847,8 +1855,8 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       models.set(key, false);
       // ⚠️ REFUSED, NOT APPROXIMATED — and it is said in the one place you can
       // read it while wearing the thing.
-      say(`FAIL controllers · ${profile} ${handedness} — ${e.message} · drawing the stand-in instead`);
-      log(`no model for your controller (${e.message}) — drawing a stand-in`, 'warn');
+      say(`FAIL controllers · ${profile} ${handedness}: ${e.message} · drawing the stand-in instead`);
+      log(`no model for your controller (${e.message}) · drawing a stand-in`, 'warn');
       return false;
     }
   }
@@ -1883,7 +1891,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
         saidThisSession = true;
         say(`controllers · this session is drawing ${w === 'model'
           ? 'your REAL controller models'
-          : 'the amber STAND-IN — no model for this profile, or it would not load'}`
+          : 'the amber STAND-IN (no model for this profile, or it would not load)'}`
           + ` · ${hands.map((h) => `${h.handedness}:${h.profile}`).join(' | ')}`);
       }
     }

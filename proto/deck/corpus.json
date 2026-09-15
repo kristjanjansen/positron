@@ -1,7 +1,7 @@
 {
  "subject": "Erkki Kurenniemi (1941–2017)",
- "generated": "2026-08-28T08:24:04.712Z",
- "generator": "proto/aikajana/ingest.mjs --rewhen",
+ "generated": "2026-09-15T15:04:20.387Z",
+ "generator": "proto/deck/ingest.mjs --rewhen",
  "note": "Media is REFERENCED at its origin, never copied. Rights status and its ASSERTER travel per item.",
  "corpusRange": {
   "from": 1963,
@@ -49,152 +49,7 @@
     "innerTo": null,
     "rule": "wikidata-precision@1",
     "kind": "ignorance",
-    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
-   }
-  },
-  {
-   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3",
-   "title": "Inventio _ Outventio",
-   "kind": "audio",
-   "dateEvidence": {
-    "how": "derived-from-corpus-range",
-    "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
-    "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
-   },
-   "durSec": 235.08,
-   "media": {
-    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Inventio%20_%20Outventio%20(64%20kbps).mp3",
-    "type": "audio/mpeg",
-    "bytes": 1880745
-   },
-   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
-   "prov": {
-    "source": "archive.org",
-    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3",
-    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
-    "custody": "community upload (aggregator), not an institutional deposit",
-    "uploader": "4033675@opsb.info",
-    "uploaded": "2023-04-11 14:08:58",
-    "itemDateField": "2002-01-01",
-    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
-    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
-    "rightsAsserter": "uploader (self-asserted, unverified)",
-    "rightsConfidence": "LOW",
-    "retrieved": "2026-08-28"
-   },
-   "at": -220924800000,
-   "bandMs": 347155200000,
-   "precision": "range",
-   "when": {
-    "verbatim": null,
-    "edtf": "1963/1973",
-    "earliest": -220924800000,
-    "latest": 126230400000,
-    "innerFrom": null,
-    "innerTo": null,
-    "rule": "corpus-range@1",
-    "kind": "ignorance",
-    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
-   }
-  },
-  {
-   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
-   "title": "Katkelmia äänikirjeestä Jan Barkille",
-   "kind": "audio",
-   "dateEvidence": {
-    "how": "filename-year",
-    "raw": "Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
-    "at": -220924800000,
-    "hi": -189388800000,
-    "precision": "year"
-   },
-   "durSec": 73.17,
-   "media": {
-    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Katkelmia%20%C3%A4%C3%A4nikirjeest%C3%A4%20Jan%20Barkille%20(1963)%20(320%20kbps)%20(1).mp3",
-    "type": "audio/mpeg",
-    "bytes": 2926897
-   },
-   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
-   "prov": {
-    "source": "archive.org",
-    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
-    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
-    "custody": "community upload (aggregator), not an institutional deposit",
-    "uploader": "4033675@opsb.info",
-    "uploaded": "2023-04-11 14:08:58",
-    "itemDateField": "2002-01-01",
-    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
-    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
-    "rightsAsserter": "uploader (self-asserted, unverified)",
-    "rightsConfidence": "LOW",
-    "retrieved": "2026-08-28"
-   },
-   "at": -220924800000,
-   "bandMs": 31536000000,
-   "precision": "year",
-   "when": {
-    "verbatim": "Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
-    "edtf": "1963",
-    "earliest": -220924800000,
-    "latest": -189388800000,
-    "innerFrom": null,
-    "innerTo": null,
-    "rule": "ia-filename-year@1",
-    "kind": "ignorance",
-    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year."
-   }
-  },
-  {
-   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3",
-   "title": "Mix Master Universe 2",
-   "kind": "audio",
-   "dateEvidence": {
-    "how": "derived-from-corpus-range",
-    "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
-    "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
-   },
-   "durSec": 829.83,
-   "media": {
-    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Mix%20Master%20Universe%202%20(64%20kbps).mp3",
-    "type": "audio/mpeg",
-    "bytes": 6638792
-   },
-   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
-   "prov": {
-    "source": "archive.org",
-    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3",
-    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
-    "custody": "community upload (aggregator), not an institutional deposit",
-    "uploader": "4033675@opsb.info",
-    "uploaded": "2023-04-11 14:08:58",
-    "itemDateField": "2002-01-01",
-    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
-    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
-    "rightsAsserter": "uploader (self-asserted, unverified)",
-    "rightsConfidence": "LOW",
-    "retrieved": "2026-08-28"
-   },
-   "at": -220924800000,
-   "bandMs": 347155200000,
-   "precision": "range",
-   "when": {
-    "verbatim": null,
-    "edtf": "1963/1973",
-    "earliest": -220924800000,
-    "latest": 126230400000,
-    "innerFrom": null,
-    "innerTo": null,
-    "rule": "corpus-range@1",
-    "kind": "ignorance",
-    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01). Same fact, two paddings, one declared precision."
    }
   },
   {
@@ -202,14 +57,14 @@
    "title": "On-Off",
    "kind": "audio",
    "dateEvidence": {
-    "how": "wikidata-title-match",
-    "raw": "+1963-00-00T00:00:00Z",
-    "wdPrecision": 9,
-    "at": -220924800000,
-    "hi": -189388800000,
-    "precision": "year",
-    "matched": "wd:Q115919332",
-    "tier": 1
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p89",
+    "how": "ojanen-2020-thesis-p89",
+    "at": -252460800000,
+    "hi": -204336000000,
+    "precision": "range",
+    "edtf": "1962/1963-07-11",
+    "note": "WIDENED, on a better source. The year 1963 here came from a Wikidata title match. Ojanen 2020 says \"The container of the On-Off master tape does not include any date markings\" and \"The exact dates of the move, and of Kurenniemi’s On-Off session remain unknown\", with the session possibly at the end of 1962. The bracket is the whole of 1962 forward to the premiere, which the tape has to precede"
    },
    "durSec": 770.21,
    "media": {
@@ -232,216 +87,21 @@
     "rightsConfidence": "LOW",
     "retrieved": "2026-08-28"
    },
-   "at": -220924800000,
-   "bandMs": 31536000000,
-   "precision": "year",
-   "when": {
-    "verbatim": "+1963-00-00T00:00:00Z",
-    "edtf": "1963",
-    "earliest": -220924800000,
-    "latest": -189388800000,
-    "innerFrom": null,
-    "innerTo": null,
-    "rule": "wikidata-title-match@1",
-    "kind": "ignorance",
-    "note": "No date on the file; a Wikidata work with the same normalised title carries one, and its declared precision is inherited whole."
-   }
-  },
-  {
-   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
-   "title": "Saharan uni I",
-   "kind": "audio",
-   "dateEvidence": {
-    "how": "derived-from-corpus-range",
-    "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
-    "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
-   },
-   "durSec": 445.26,
-   "media": {
-    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Saharan%20uni%20I%20(64%20kbps).mp3",
-    "type": "audio/mpeg",
-    "bytes": 3562195
-   },
-   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
-   "prov": {
-    "source": "archive.org",
-    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
-    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
-    "custody": "community upload (aggregator), not an institutional deposit",
-    "uploader": "4033675@opsb.info",
-    "uploaded": "2023-04-11 14:08:58",
-    "itemDateField": "2002-01-01",
-    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
-    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
-    "rightsAsserter": "uploader (self-asserted, unverified)",
-    "rightsConfidence": "LOW",
-    "retrieved": "2026-08-28"
-   },
-   "at": -220924800000,
-   "bandMs": 347155200000,
+   "at": -252460800000,
+   "bandMs": 48124800000,
    "precision": "range",
    "when": {
     "verbatim": null,
-    "edtf": "1963/1973",
-    "earliest": -220924800000,
-    "latest": 126230400000,
+    "edtf": "1962/1963-07-11",
+    "earliest": -252460800000,
+    "latest": -204336000000,
     "innerFrom": null,
     "innerTo": null,
-    "rule": "corpus-range@1",
+    "rule": "ojanen-2020-thesis@1",
     "kind": "ignorance",
-    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
-   }
-  },
-  {
-   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3",
-   "title": "Saharan uni II",
-   "kind": "audio",
-   "dateEvidence": {
-    "how": "derived-from-corpus-range",
-    "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
-    "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
+    "note": "WIDENED, on a better source. The year 1963 here came from a Wikidata title match. Ojanen 2020 says \"The container of the On-Off master tape does not include any date markings\" and \"The exact dates of the move, and of Kurenniemi’s On-Off session remain unknown\", with the session possibly at the end of 1962. The bracket is the whole of 1962 forward to the premiere, which the tape has to precede"
    },
-   "durSec": 396.67,
-   "media": {
-    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Saharan%20uni%20II%20(64%20kbps).mp3",
-    "type": "audio/mpeg",
-    "bytes": 3173493
-   },
-   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
-   "prov": {
-    "source": "archive.org",
-    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3",
-    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
-    "custody": "community upload (aggregator), not an institutional deposit",
-    "uploader": "4033675@opsb.info",
-    "uploaded": "2023-04-11 14:08:58",
-    "itemDateField": "2002-01-01",
-    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
-    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
-    "rightsAsserter": "uploader (self-asserted, unverified)",
-    "rightsConfidence": "LOW",
-    "retrieved": "2026-08-28"
-   },
-   "at": -220924800000,
-   "bandMs": 347155200000,
-   "precision": "range",
-   "when": {
-    "verbatim": null,
-    "edtf": "1963/1973",
-    "earliest": -220924800000,
-    "latest": 126230400000,
-    "innerFrom": null,
-    "innerTo": null,
-    "rule": "corpus-range@1",
-    "kind": "ignorance",
-    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
-   }
-  },
-  {
-   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3",
-   "title": "Sähkösoittimen Ääniä",
-   "kind": "audio",
-   "dateEvidence": {
-    "how": "derived-from-corpus-range",
-    "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
-    "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
-   },
-   "durSec": 162.14,
-   "media": {
-    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20S%C3%A4hk%C3%B6soittimen%20%C3%84%C3%A4ni%C3%A4%20.mp3",
-    "type": "audio/mpeg",
-    "bytes": 2594349
-   },
-   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
-   "prov": {
-    "source": "archive.org",
-    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3",
-    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
-    "custody": "community upload (aggregator), not an institutional deposit",
-    "uploader": "4033675@opsb.info",
-    "uploaded": "2023-04-11 14:08:58",
-    "itemDateField": "2002-01-01",
-    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
-    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
-    "rightsAsserter": "uploader (self-asserted, unverified)",
-    "rightsConfidence": "LOW",
-    "retrieved": "2026-08-28"
-   },
-   "at": -220924800000,
-   "bandMs": 347155200000,
-   "precision": "range",
-   "when": {
-    "verbatim": null,
-    "edtf": "1963/1973",
-    "earliest": -220924800000,
-    "latest": 126230400000,
-    "innerFrom": null,
-    "innerTo": null,
-    "rule": "corpus-range@1",
-    "kind": "ignorance",
-    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
-   }
-  },
-  {
-   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3",
-   "title": "Sähkösoittimen ääniä",
-   "kind": "audio",
-   "dateEvidence": {
-    "how": "derived-from-corpus-range",
-    "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
-    "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
-   },
-   "durSec": 170.48,
-   "media": {
-    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20S%C3%A4hk%C3%B6soittimen%20%C3%A4%C3%A4ni%C3%A4%20.mp3",
-    "type": "audio/mpeg",
-    "bytes": 2727739
-   },
-   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
-   "prov": {
-    "source": "archive.org",
-    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3",
-    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
-    "custody": "community upload (aggregator), not an institutional deposit",
-    "uploader": "4033675@opsb.info",
-    "uploaded": "2023-04-11 14:08:58",
-    "itemDateField": "2002-01-01",
-    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
-    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
-    "rightsAsserter": "uploader (self-asserted, unverified)",
-    "rightsConfidence": "LOW",
-    "retrieved": "2026-08-28"
-   },
-   "at": -220924800000,
-   "bandMs": 347155200000,
-   "precision": "range",
-   "when": {
-    "verbatim": null,
-    "edtf": "1963/1973",
-    "earliest": -220924800000,
-    "latest": 126230400000,
-    "innerFrom": null,
-    "innerTo": null,
-    "rule": "corpus-range@1",
-    "kind": "ignorance",
-    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
-   }
+   "note": "Ojanen 2020 (printed pp. 88 to 89): premiered with Salmenhaara’s White Label at the Jyväskylän Kesä festival on 11 July 1963. Kurenniemi, interviewed in 2004, tied the recording session to the studio’s move down to the Porthania cellar, \"which could have happened at the end of 1962\"; the university’s annual report for 1963 to 1964 puts that move in the fall of 1963. The master tape carries no date markings, and it is photographed at zenodo:3601403"
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Virsi (64 kbps).mp3",
@@ -489,21 +149,72 @@
     "innerTo": null,
     "rule": "corpus-range@1",
     "kind": "ignorance",
-    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\", the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
    }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
+   "title": "Katkelmia äänikirjeestä Jan Barkille",
+   "kind": "audio",
+   "dateEvidence": {
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p89",
+    "how": "ojanen-2020-thesis-p89",
+    "at": -202608000000,
+    "hi": -199929600000,
+    "precision": "month",
+    "note": "the source gives the month: \"In August 1963, Kurenniemi, Donner, Salmenhaara, Kaj Chydenius, and Raija Mattila produced a tape collage Äänikirje Jan Barkille\". The year here had come from the filename"
+   },
+   "durSec": 73.17,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Katkelmia%20%C3%A4%C3%A4nikirjeest%C3%A4%20Jan%20Barkille%20(1963)%20(320%20kbps)%20(1).mp3",
+    "type": "audio/mpeg",
+    "bytes": 2926897
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -202608000000,
+   "bandMs": 2678400000,
+   "precision": "month",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963-08",
+    "earliest": -202608000000,
+    "latest": -199929600000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ojanen-2020-thesis@1",
+    "kind": "ignorance",
+    "note": "the source gives the month: \"In August 1963, Kurenniemi, Donner, Salmenhaara, Kaj Chydenius, and Raija Mattila produced a tape collage Äänikirje Jan Barkille\". The year here had come from the filename"
+   },
+   "note": "Ojanen 2020 (printed p. 89): a tape collage made as a tribute to the Swedish composer Jan Bark, who taught a composition course in Helsinki that August. Five people made it, parts of it were recorded in various locations, Chydenius directed it and Kurenniemi spliced the final work"
   },
   {
    "id": "ia:videoplayback-13_202304/M.A. Numminen & Erkki Kurenniemi - Oigu-S (64 kbps).mp3",
    "title": "M.A. Numminen & Erkki Kurenniemi - Oigu-S",
    "kind": "audio",
    "dateEvidence": {
-    "how": "derived-from-corpus-range",
     "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
-    "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
+    "replaces": "ojanen-2020-thesis-p110-p111",
+    "how": "ojanen-2020-thesis-p110-p111",
+    "at": -189388800000,
+    "hi": -181180800000,
+    "precision": "range",
+    "edtf": "1964/1964-04-04",
+    "note": "the source says the tape was made in early 1964 for a contest held on 4 April 1964. The bracket starts at the whole year because \"early\" has no defined width, and ends on the performance, which the tape has to precede"
    },
    "durSec": 500.98,
    "media": {
@@ -526,69 +237,21 @@
     "rightsConfidence": "LOW",
     "retrieved": "2026-08-28"
    },
-   "at": -220924800000,
-   "bandMs": 347155200000,
+   "at": -189388800000,
+   "bandMs": 8208000000,
    "precision": "range",
    "when": {
     "verbatim": null,
-    "edtf": "1963/1973",
-    "earliest": -220924800000,
-    "latest": 126230400000,
+    "edtf": "1964/1964-04-04",
+    "earliest": -189388800000,
+    "latest": -181180800000,
     "innerFrom": null,
     "innerTo": null,
-    "rule": "corpus-range@1",
+    "rule": "ojanen-2020-thesis@1",
     "kind": "ignorance",
-    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
-   }
-  },
-  {
-   "id": "ia:videoplayback-13_202304/M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä (64 kbps).mp3",
-   "title": "M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä",
-   "kind": "audio",
-   "dateEvidence": {
-    "how": "derived-from-corpus-range",
-    "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
-    "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
+    "note": "the source says the tape was made in early 1964 for a contest held on 4 April 1964. The bracket starts at the whole year because \"early\" has no defined width, and ends on the performance, which the tape has to precede"
    },
-   "durSec": 96.16,
-   "media": {
-    "url": "https://archive.org/download/videoplayback-13_202304/M.A.%20Nummisen%20s%C3%A4hk%C3%B6kvartetti%20-%20Kaukana%20v%C3%A4ijyy%20yst%C3%A4vi%C3%A4%20(64%20kbps).mp3",
-    "type": "audio/mpeg",
-    "bytes": 769391
-   },
-   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
-   "prov": {
-    "source": "archive.org",
-    "sourceId": "videoplayback-13_202304/M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä (64 kbps).mp3",
-    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
-    "custody": "community upload (aggregator), not an institutional deposit",
-    "uploader": "4033675@opsb.info",
-    "uploaded": "2023-04-11 14:08:58",
-    "itemDateField": "2002-01-01",
-    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
-    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
-    "rightsAsserter": "uploader (self-asserted, unverified)",
-    "rightsConfidence": "LOW",
-    "retrieved": "2026-08-28"
-   },
-   "at": -220924800000,
-   "bandMs": 347155200000,
-   "precision": "range",
-   "when": {
-    "verbatim": null,
-    "edtf": "1963/1973",
-    "earliest": -220924800000,
-    "latest": 126230400000,
-    "innerFrom": null,
-    "innerTo": null,
-    "rule": "corpus-range@1",
-    "kind": "ignorance",
-    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
-   }
+   "note": "Ojanen 2020 (printed pp. 110 to 111): Numminen used the University Studio in early 1964 to prepare for the academic singing contest of 4 April 1964, and produced a background tape of concrete and electronic sounds to accompany his voice through the Laulukone, an electronic sound-processing unit built with Kullervo Aura and Kurenniemi’s assistance. The background tape was released in 2005 on More Arctic Hysteria (Love LXCD 647), not on the 2002 compilation (p. 111 n. 189)"
   },
   {
    "id": "wd:Q115918920",
@@ -624,7 +287,7 @@
     "innerTo": null,
     "rule": "wikidata-precision@1",
     "kind": "ignorance",
-    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01). Same fact, two paddings, one declared precision."
    }
   },
   {
@@ -661,7 +324,7 @@
     "innerTo": null,
     "rule": "wikidata-precision@1",
     "kind": "ignorance",
-    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01). Same fact, two paddings, one declared precision."
    }
   },
   {
@@ -698,7 +361,7 @@
     "innerTo": null,
     "rule": "wikidata-precision@1",
     "kind": "ignorance",
-    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01). Same fact, two paddings, one declared precision."
    }
   },
   {
@@ -735,7 +398,7 @@
     "innerTo": null,
     "rule": "wikidata-precision@1",
     "kind": "ignorance",
-    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01). Same fact, two paddings, one declared precision."
    }
   },
   {
@@ -782,19 +445,172 @@
     "innerTo": null,
     "rule": "ia-filename-year@1",
     "kind": "ignorance",
-    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year."
+    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real: the bracket is the whole year."
    }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
+   "title": "Saharan uni I",
+   "kind": "audio",
+   "dateEvidence": {
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p180",
+    "how": "ojanen-2020-thesis-p180",
+    "at": -94694400000,
+    "hi": -63158400000,
+    "precision": "year",
+    "note": "the source dates the work 1967 and gives no month. The 9 February 1968 premiere is a playback of this tape, so it bounds the work from above rather than dating it"
+   },
+   "durSec": 445.26,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Saharan%20uni%20I%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 3562195
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -94694400000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": null,
+    "edtf": "1967",
+    "earliest": -94694400000,
+    "latest": -63158400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ojanen-2020-thesis@1",
+    "kind": "ignorance",
+    "note": "the source dates the work 1967 and gives no month. The 9 February 1968 premiere is a playback of this tape, so it bounds the work from above rather than dating it"
+   },
+   "note": "Ojanen 2020 (printed p. 180): \"the two-piece tape music work Saharan uni I & II (1967, realized with Kari Hakala)\" · recorded in the University Studio at Vironkatu and mixed in the Yle sound-control room at Kulttuuritalo · premiered 9 February 1968 at the Sähköshokki-ilta, Amos Anderson Art Museum, where the Integrated Synthesizer made its last known public appearance · a recording of the 8 February 1968 rehearsal survives (p. 100 n. 160)"
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3",
+   "title": "Saharan uni II",
+   "kind": "audio",
+   "dateEvidence": {
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p180",
+    "how": "ojanen-2020-thesis-p180",
+    "at": -94694400000,
+    "hi": -63158400000,
+    "precision": "year",
+    "note": "the source dates the work 1967 and gives no month. The 9 February 1968 premiere is a playback of this tape, so it bounds the work from above rather than dating it"
+   },
+   "durSec": 396.67,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Saharan%20uni%20II%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 3173493
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -94694400000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": null,
+    "edtf": "1967",
+    "earliest": -94694400000,
+    "latest": -63158400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ojanen-2020-thesis@1",
+    "kind": "ignorance",
+    "note": "the source dates the work 1967 and gives no month. The 9 February 1968 premiere is a playback of this tape, so it bounds the work from above rather than dating it"
+   },
+   "note": "Ojanen 2020 (printed p. 180): \"the two-piece tape music work Saharan uni I & II (1967, realized with Kari Hakala)\" · recorded in the University Studio at Vironkatu and mixed in the Yle sound-control room at Kulttuuritalo · premiered 9 February 1968 at the Sähköshokki-ilta, Amos Anderson Art Museum · a recording of the 8 February 1968 rehearsal survives (p. 100 n. 160)"
+  },
+  {
+   "id": "ia:videoplayback-13_202304/M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä (64 kbps).mp3",
+   "title": "M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä",
+   "kind": "audio",
+   "dateEvidence": {
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p116-p216",
+    "how": "ojanen-2020-thesis-p116-p216",
+    "at": -63158400000,
+    "hi": 31536000000,
+    "precision": "range",
+    "edtf": "1968/1970",
+    "note": "the source dates the work 1968 and says only three recordings of it survive, from 25 November 1968, the 1969 television documentary and 17 November 1970. Which one this file holds is not established, so the bracket is the band’s whole working period"
+   },
+   "durSec": 96.16,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/M.A.%20Nummisen%20s%C3%A4hk%C3%B6kvartetti%20-%20Kaukana%20v%C3%A4ijyy%20yst%C3%A4vi%C3%A4%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 769391
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -63158400000,
+   "bandMs": 94694400000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1968/1970",
+    "earliest": -63158400000,
+    "latest": 31536000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ojanen-2020-thesis@1",
+    "kind": "ignorance",
+    "note": "the source dates the work 1968 and says only three recordings of it survive, from 25 November 1968, the 1969 television documentary and 17 November 1970. Which one this file holds is not established, so the bracket is the band’s whole working period"
+   },
+   "note": "Ojanen 2020 (printed p. 216): \"The Sähkökvartetti (instrument) was used in several live performances by Sähkökvartetti (the band), but only three recordings have survived.\" The piece was improvised and \"the duration and structure of which varied from one performance to another\" (p. 114), running from a few minutes to an hour and a half. The band played about fifteen times between August 1968 and November 1970"
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
    "title": "Antropoidien tanssi",
    "kind": "audio",
    "dateEvidence": {
-    "how": "filename-year",
-    "raw": "Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p121",
+    "how": "ojanen-2020-thesis-p121",
     "at": -63158400000,
     "hi": -31536000000,
-    "precision": "year"
+    "precision": "year",
+    "note": "the year is unchanged and its evidence is not: it had come from the filename, and a named source now states it. NOT narrowed to the November 1968 release month, which dates the album and not the tape"
    },
    "durSec": 282.1,
    "media": {
@@ -821,16 +637,67 @@
    "bandMs": 31622400000,
    "precision": "year",
    "when": {
-    "verbatim": "Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
+    "verbatim": null,
     "edtf": "1968",
     "earliest": -63158400000,
     "latest": -31536000000,
     "innerFrom": null,
     "innerTo": null,
-    "rule": "ia-filename-year@1",
+    "rule": "ojanen-2020-thesis@1",
     "kind": "ignorance",
-    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year."
-   }
+    "note": "the year is unchanged and its evidence is not: it had come from the filename, and a named source now states it. NOT narrowed to the November 1968 release month, which dates the album and not the tape"
+   },
+   "note": "Ojanen 2020 (printed p. 121): Kurenniemi selected three segments from a tape he had recorded with the Andromatic and spliced them together without further processing, for the commissioned album Perspectives ’68: Music in Finland (Love Records LRLP 4), released in November 1968 for the centenary of the Helsinki student union. The draft contents were discussed on 30 May 1968 and the contract settled on 19 June 1968; the draft is deposited at zenodo:4290689. An excerpt was reissued in 1970 on Wigwam’s Tombstone Valentine"
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3",
+   "title": "Inventio _ Outventio",
+   "kind": "audio",
+   "dateEvidence": {
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p138",
+    "how": "ojanen-2020-thesis-p138",
+    "at": 0,
+    "hi": 31536000000,
+    "precision": "year",
+    "note": "the source says it was realized in the fall of 1970. The bracket is the whole year because that qualifier has no defined width"
+   },
+   "durSec": 235.08,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Inventio%20_%20Outventio%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 1880745
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": 0,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": null,
+    "edtf": "1970",
+    "earliest": 0,
+    "latest": 31536000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ojanen-2020-thesis@1",
+    "kind": "ignorance",
+    "note": "the source says it was realized in the fall of 1970. The bracket is the whole year because that qualifier has no defined width"
+   },
+   "note": "Ojanen 2020 (printed p. 138): \"The two-part piece Inventio-Outventio (1970), which was realized in the fall of 1970, consists of Kurenniemi’s arrangement of Johann Sebastian Bach’s Invention No. 13 in A minor (BWV 784) for the DIMI-A, and the tape collage Outventio realized jointly by Kurenniemi and Ruohomäki in a separate session.\" The Bach arrangement is the only work he composed solely with the DIMI-A. An annotated video of the master tape is deposited at zenodo:1469722"
   },
   {
    "id": "wd:Q115918963",
@@ -866,7 +733,7 @@
     "innerTo": null,
     "rule": "wikidata-precision@1",
     "kind": "ignorance",
-    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01). Same fact, two paddings, one declared precision."
    }
   },
   {
@@ -874,11 +741,13 @@
    "title": "DIMI-A — the surviving instrument (Stockholm)",
    "kind": "instrument",
    "dateEvidence": {
+    "raw": null,
+    "replaces": "edm-literal-length",
     "how": "edm-literal-length",
-    "raw": "1970",
     "at": 0,
     "hi": 31536000000,
-    "precision": "year"
+    "precision": "year",
+    "note": "Ojanen 2020 Table 3 (printed p. 81) gives the DIMI-A as 1970 with two built, which agrees with the year taken here from a Europeana length literal"
    },
    "thumb": "http://www.mimo-international.com/media/SMS-MM/IMAGE/X5176_01.jpg",
    "prov": {
@@ -897,7 +766,7 @@
    "bandMs": 31536000000,
    "precision": "year",
    "when": {
-    "verbatim": "1970",
+    "verbatim": null,
     "edtf": "1970",
     "earliest": 0,
     "latest": 31536000000,
@@ -905,8 +774,158 @@
     "innerTo": null,
     "rule": "edm-literal-length@1",
     "kind": "ignorance",
-    "note": "Europeana/EDM keeps the date LITERAL, so precision is the string's own length. Honest by omission; the bracket is the unit the literal names."
+    "note": "Ojanen 2020 Table 3 (printed p. 81) gives the DIMI-A as 1970 with two built, which agrees with the year taken here from a Europeana length literal"
    }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3",
+   "title": "Sähkösoittimen Ääniä",
+   "kind": "audio",
+   "dateEvidence": {
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p205-n402",
+    "how": "ojanen-2020-thesis-p205-n402",
+    "at": 31536000000,
+    "hi": 63072000000,
+    "precision": "year",
+    "note": "the source dates the radio-play sessions 1971 and gives no month. The CD that carries this track states no date for it at all"
+   },
+   "durSec": 162.14,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20S%C3%A4hk%C3%B6soittimen%20%C3%84%C3%A4ni%C3%A4%20.mp3",
+    "type": "audio/mpeg",
+    "bytes": 2594349
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": 31536000000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": null,
+    "edtf": "1971",
+    "earliest": 31536000000,
+    "latest": 63072000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ojanen-2020-thesis@1",
+    "kind": "ignorance",
+    "note": "the source dates the radio-play sessions 1971 and gives no month. The CD that carries this track states no date for it at all"
+   },
+   "note": "MISATTRIBUTED ON THE CD, and Ojanen 2020 says so (printed p. 205 n. 402): the two Sähkösoittimen ääniä tracks are Sähkökvartetti and DIMI-A parts from the sessions for the radio play Vihreä eläin (1971), recorded by Donner with Kurenniemi, Ruohomäki and Vesterinen in Yle’s Fabianinkatu studio (p. 141). \"Vihreä eläin is not mentioned as the origin of the sound material.\" Of the CD pair, #4 is \"the original radio-play session recording without the latter overdubs\" (p. 206 n. 403); which of the two files is #4 is not established here"
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3",
+   "title": "Sähkösoittimen ääniä",
+   "kind": "audio",
+   "dateEvidence": {
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p205-n402",
+    "how": "ojanen-2020-thesis-p205-n402",
+    "at": 31536000000,
+    "hi": 63072000000,
+    "precision": "year",
+    "note": "the source dates the radio-play sessions 1971 and gives no month. The CD that carries this track states no date for it at all"
+   },
+   "durSec": 170.48,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20S%C3%A4hk%C3%B6soittimen%20%C3%A4%C3%A4ni%C3%A4%20.mp3",
+    "type": "audio/mpeg",
+    "bytes": 2727739
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": 31536000000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": null,
+    "edtf": "1971",
+    "earliest": 31536000000,
+    "latest": 63072000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ojanen-2020-thesis@1",
+    "kind": "ignorance",
+    "note": "the source dates the radio-play sessions 1971 and gives no month. The CD that carries this track states no date for it at all"
+   },
+   "note": "MISATTRIBUTED ON THE CD, and Ojanen 2020 says so (printed p. 205 n. 402): the two Sähkösoittimen ääniä tracks are Sähkökvartetti and DIMI-A parts from the sessions for the radio play Vihreä eläin (1971), recorded by Donner with Kurenniemi, Ruohomäki and Vesterinen in Yle’s Fabianinkatu studio (p. 141). \"On the CD the tracks are credited to Kurenniemi and the DIMI-A track is introduced as the Sähkökvartetti recording. Vihreä eläin is not mentioned as the origin of the sound material.\" The CD numbers them #1 and #4; which of the two files is which is not established here"
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3",
+   "title": "Mix Master Universe 2",
+   "kind": "audio",
+   "dateEvidence": {
+    "raw": null,
+    "replaces": "ojanen-2020-thesis-p138",
+    "how": "ojanen-2020-thesis-p138",
+    "at": 94694400000,
+    "hi": 126230400000,
+    "precision": "year",
+    "note": "the source dates the work 1973 and gives no month"
+   },
+   "durSec": 829.83,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Mix%20Master%20Universe%202%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 6638792
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": 94694400000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": null,
+    "edtf": "1973",
+    "earliest": 94694400000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ojanen-2020-thesis@1",
+    "kind": "ignorance",
+    "note": "the source dates the work 1973 and gives no month"
+   },
+   "note": "Ojanen 2020 (printed pp. 138 and 180): \"Mix Master Universe (1973, realized with Jukka Ruohomäki)\", one of Ruutsalo’s tape collages, built from DIMI-A sounds and produced as a spontaneous process without a prescribed plan. The thesis names no part 2"
   },
   {
    "id": "wd:Q115919656",
@@ -942,7 +961,7 @@
     "innerTo": null,
     "rule": "wikidata-precision@1",
     "kind": "ignorance",
-    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01). Same fact, two paddings, one declared precision."
    }
   },
   {
@@ -979,7 +998,7 @@
     "innerTo": null,
     "rule": "wikidata-precision@1",
     "kind": "ignorance",
-    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01). Same fact, two paddings, one declared precision."
    }
   }
  ],
@@ -988,9 +1007,9 @@
   "bracket": "CLOSED-OPEN [earliest, latest)",
   "rules": [
    "wikidata-precision@1",
+   "ojanen-2020-thesis@1",
    "corpus-range@1",
    "ia-filename-year@1",
-   "wikidata-title-match@1",
    "edm-literal-length@1"
   ],
   "inner": "innerFrom/innerTo are null on every row: no source in this set carries CRM P81 evidence, so \"certainly in year Y\" is answerable only through outer containment (sound, incomplete)",

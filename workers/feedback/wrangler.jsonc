@@ -1,0 +1,26 @@
+{
+  "name": "positron-feedback",
+  // feedback.positron.studio — what a visitor typed, kept.
+  //
+  // A SEPARATE SCRIPT, for the same reason positron-store is one. The relay's
+  // whole value is that it does not parse; this thing parses every frame in its
+  // room, and giving it its own script means it has its own deploy and its own
+  // failure. Nothing here can wake a relay room or slow a fan-out.
+  //
+  // NOT a path under store.positron.studio either. positron-store keeps DEMO
+  // history: a 1,000 row cap and a 24 hour window, pruned on every write. That
+  // retention is right for a page that watches its own traffic and fatal for
+  // feedback, which has to survive the night. Two lifetimes, two workers.
+  "main": "src/index.js",
+  "routes": [{ "pattern": "feedback.positron.studio", "custom_domain": true }],
+  "workers_dev": true,
+  "compatibility_date": "2026-08-01",
+  "durable_objects": {
+    "bindings": [{ "name": "NOTES", "class_name": "Feedback" }]
+  },
+  // SQLite-backed: one row per note, indexed by time. Two objects ever exist —
+  // `feedback` and `feedback-dev` — and which one a write reaches is decided by
+  // the Origin header in src/index.js, never by anything a caller sends.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Feedback"] }],
+  "observability": { "enabled": true }
+}

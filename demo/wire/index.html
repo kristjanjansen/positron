@@ -38,7 +38,7 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { openWire, LIMITS } from '/shell/wire.mjs';
-  import { createMessageList } from '/shell/messages.mjs';
+  import { createTable } from '/shell/table.mjs';
 
   const q = new URLSearchParams(location.search);
   // ONE shared room by default. It used to be a room per tab, which made
@@ -57,13 +57,18 @@
 
   const d = mount({
     name: 'wire',
-    what: `Compose a message and watch the exact bytes travel — out, and back again, because the relay returns
-           your own message to you and that echo is what gives everyone one order. Every message carries a kind, a
+    what: `Compose a message and watch the exact bytes travel out and back again: the relay returns
+           your own message to you, and that echo is what gives everyone one order. Every message carries a kind, a
            sender, a time and a counter, and the counter is how a loss becomes visible: the relay drops anything
            over ${(LIMITS.maxBytes / 1024) | 0} KiB or past its rate limit without telling the sender. A message
-           you store also goes to a small history, which is already on the page when you arrive — the stored
+           you store also goes to a small history, which is already on the page when you arrive, and the stored
            column says which ones went there.`,
-    readout: { delivery: 'ms', sent: '', stored: '', missing: '' },
+    // 🔴 NO READOUT. `delivery`, `sent`, `stored` and `missing` were four cells
+    // about a list that is on screen underneath them: every message in the log
+    // carries its own delivery time and its own stored mark, so the row on top
+    // was the same facts counted a second time, in a place with no context. A
+    // count of what you can see is not a measurement.
+    readout: null,
     controls: [
       // ⚠️ NO PRIMARY HERE. A primary is for a page with one main path, and
       // this page's whole subject is the DIFFERENCE between sending and
@@ -110,11 +115,35 @@
   // which is a claim about the TRANSPORT — the subject of the paragraph and of
   // an assert, not a label over a list of messages.
   const pane = el('div', 'pane');
-  const msgs = createMessageList({ cap: 40,
-    // The empty state says what to DO, not merely that nothing is there — this
+  /**
+   * 🔴 `table.mjs`, NOT `messages.mjs`, AND THE COMPONENT ARGUES AGAINST IT.
+   * Its own header says it does not replace `messages.mjs`, which "renders a
+   * MESSAGE, a thing with a direction and a size that arrived over a wire" —
+   * this page exactly. Asked for twice anyway, and the reason outranks the
+   * component's: two list components on one site means two places a row can be
+   * styled, and `/kit/` exists to stop precisely that. The columns here are the
+   * five hard-coded ones `messages.mjs` had, written down where a reader can
+   * see them.
+   *
+   * ⚠️ `text` DOES NOT CLIP. A line of JSON cut with an ellipsis is a line of
+   * JSON nobody can read, and the whole subject of this page is the exact bytes.
+   * It is the growing column, so it wraps.
+   */
+  const msgs = createTable({
+    cap: 40,
+    columns: [
+      { key: 'dir', width: 44, hi: true },
+      { key: 'size', width: 58, align: 'right' },
+      { key: 'text', grow: true },
+    ],
+    // The empty state says what to DO, not merely that nothing is there. This
     // is the one moment on the page where a visitor has arrived and nothing has
     // happened yet, and `nothing here yet` leaves them to guess.
-    empty: 'nothing sent yet — press Send, and watch the bytes go out and come back' });
+    empty: 'nothing sent yet. Press Send, and watch the bytes go out and come back',
+  });
+  // ⚠️ THE BYTES ARE FORMATTED HERE, not by the table. `messages.mjs` knew that
+  // a size is a size; a table of records does not and should not.
+  const rowOf = (r) => ({ ...r, size: `${r.bytes} B` });
   // ⚠️ NO GUTTER LINE. It read `room wire · 0 held of 1 seen · cap 8 · oldest —
   // · recording, keeps 8` — five facts nobody asked for, four of which never
   // change, under a list that already shows what is stored. The counts that
@@ -138,18 +167,16 @@
     // The component writes with textContent, so the hand-rolled `<` and `&`
     // escaping this page carried is gone — a message is data, and building it
     // into innerHTML was one paste away from being markup.
-    msgs.add({ dir: dir === 'out' ? 'out' : hi ? 'echo' : 'in', bytes, stored: !!wasStored, text: short(text), hi });
+    msgs.add(rowOf({ dir: dir === 'out' ? 'out' : hi ? 'echo' : 'in', bytes, stored: !!wasStored, text: short(text), hi }));
   }
 
-  function render() {
-    const s = wire.stats();
-    d.set('sent', s.sent);
-    d.set('missing', s.missing);
-    if (deliveries.length) {
-      const sorted = deliveries.slice().sort((a, b) => a - b);
-      d.set('delivery', sorted[Math.floor(sorted.length / 2)]);
-    }
-  }
+  // ⚠️ THE NUMBERS ARE STILL COMPUTED, THEY JUST HAVE NO CELLS. `deliveries`
+  // feeds the asserts below, and `wire.stats()` is read by them too, so
+  // deleting the arithmetic with the display would quietly stop this page
+  // grading its own delivery. Nothing calls this any more; it is gone rather
+  // than left as a function that sets nothing.
+  function render() { /* the readout it fed is gone; the asserts read the same
+    numbers directly from `wire.stats()` and `deliveries`. */ }
 
   // ── the wire ────────────────────────────────────────────────────────────
   const wire = openWire(ROOM, {
@@ -184,7 +211,7 @@
 
   function put(msg) {
     const out = wire.send(msg);
-    if (out) show('out', out.bytes, out.sent ? out.line : `refused here — ${out.bytes} B is over the ${LIMITS.maxBytes} B roof`,
+    if (out) show('out', out.bytes, out.sent ? out.line : `refused here · ${out.bytes} B is over the ${LIMITS.maxBytes} B roof`,
                   false, out.sent && !!msg.store);
     if (out?.sent && msg.store) stored.push(out.line);
     render();
@@ -208,7 +235,7 @@
       recordNote = recording ? `recording, keeps ${j.cap}` : 'the recorder could not join';
     } catch (e) {
       recording = false;
-      recordNote = `no history here — ${String(e.name || e)}`;
+      recordNote = `no history here: ${String(e.name || e)}`;
     }
     d.log(recordNote, recording ? 'info' : 'bad');
   }
@@ -226,7 +253,6 @@
     const num = (k) => Number(new RegExp(`${k}=(\\d+)`).exec(header)?.[1] ?? 0);
     const held = num('kept'); const seen = num('seen'); const oldest = num('oldest');
     const rows = text.split('\n').filter(Boolean);
-    d.set('stored', held);
     // ⚠️ THE HISTORY SEEDS THE LIST, IT DOES NOT REPLACE IT. This is read again
     // after almost every check, and re-setting the list each time would wipe
     // the live rows the check had just put there — the page would delete the
@@ -238,7 +264,7 @@
       // column AND carried the `stored` tag — the same word twice on one row.
       // Direction means out / echo / in, and a message that was here before
       // this tab was has none; the tag is what says it was kept.
-      msgs.set(rows.map((r) => ({ dir: '', bytes: new TextEncoder().encode(r).length, stored: true, text: short(r) })));
+      msgs.set(rows.map((r) => rowOf({ dir: '', bytes: new TextEncoder().encode(r).length, stored: true, text: short(r) })));
     }
     return { rows, held, seen, oldest };
   }
@@ -299,7 +325,7 @@
     // real fact is that the counter did NOT advance: there is nowhere in a
     // binary frame to put one, so this message is invisible to the loss check.
     d.assert('a binary frame carries no counter', out?.sent === true && wire.stats().seq === seqBefore,
-      `counter still at ${seqBefore} — the bytes had nowhere to carry it`);
+      `counter still at ${seqBefore} · the bytes had nowhere to carry it`);
     render();
   });
 
@@ -354,7 +380,7 @@
     try {
       const res = await fetch(`${STORE}/room/${ROOM}/clear`, { method: 'POST', signal: AbortSignal.timeout(8000) });
       wiped = await res.json();
-    } catch (e) { d.log(`clear failed — ${String(e.name || e)}`, 'bad'); }
+    } catch (e) { d.log(`clear failed: ${String(e.name || e)}`, 'bad'); }
     stored.length = 0;
     let after = { rows: [], held: 0 };
     try { after = await readHistory(); } catch { /* asserted below */ }

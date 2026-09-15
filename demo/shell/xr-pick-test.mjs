@@ -34,8 +34,8 @@ import { dedupe, SAME_THING_M } from './xr-hands.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
-  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' — ' + detail : ''}`); }
-  else { fail++; console.log(`  FAIL ${name}${detail ? ' — ' + detail : ''}`); }
+  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' · ' + detail : ''}`); }
+  else { fail++; console.log(`  FAIL ${name}${detail ? ' · ' + detail : ''}`); }
 };
 const near = (a, b, eps = 1e-4) => Math.abs(a - b) <= eps;
 
@@ -147,7 +147,7 @@ const at = (target) => {
   // 🔴 THE REGRESSION, NAMED BY ITS OWN NUMBER. The bug read EXACTLY 1.0000
   // here — the face pointing straight along the controller, i.e. at the
   // ceiling. It must now be sin(FACE_TILT), which is the lean and nothing more.
-  ok('the tablet does not face along the controller — the bug that did read exactly 1.0',
+  ok('the tablet does not face along the controller (the bug that did read exactly 1.0)',
      Math.abs(dot(n, gnZ)) < 0.5 && near(dot(n, gnZ), Math.sin(FACE_TILT), 1e-6),
      `its face against the controller's own axis: ${dot(n, gnZ).toFixed(4)} (the lean, sin ${(FACE_TILT * 180 / Math.PI).toFixed(0)}°), and it was 1.0000`);
 
@@ -200,10 +200,10 @@ const at = (target) => {
   const topOfHead = Math.max(...BODY_PROFILE.map(([z]) => -z));
   const bottomEdge = Math.hypot(C[0], C[1] - 1, C[2]) - (TABLET.h / 2) * Math.cos(FACE_TILT);
   const gap = bottomEdge - topOfHead;
-  ok('the tablet sits ON the controller — not buried in its head, not floating above it',
+  ok('the tablet sits ON the controller: not buried in its head, not floating above it',
      gap > 0 && gap < 0.03,
      `${(gap * 1000).toFixed(1)} mm between its lower edge and the top of the head`
-     + ' (it was -0.4 mm — inside — when the tablet grew by two thirds)');
+     + ' (it was -0.4 mm, inside, when the tablet grew by two thirds)');
 }
 
 // ── one physical thing, one stand-in ──────────────────────────────────────
@@ -296,7 +296,7 @@ const at = (target) => {
   const midU = (L.x + L.knobW / 2 + L.travel / 2) / W;
   ok('...and the middle of the TRAVEL is the middle of the range',
      near(valueFromU(midU, c[0]), (c[0].min + c[0].max) / 2),
-     `${valueFromU(midU, c[0])} at u ${midU.toFixed(3)} — the middle of the TABLET (u 0.5) would read ${valueFromU(0.5, c[0])}`);
+     `${valueFromU(midU, c[0])} at u ${midU.toFixed(3)} · the middle of the TABLET (u 0.5) would read ${valueFromU(0.5, c[0])}`);
 
   // NEGATIVE CONTROL, and it is the one that catches the mistake this rule
   // exists for: if the value were a share of the LANE rather than of the
@@ -305,7 +305,7 @@ const at = (target) => {
   const endsFlush = Math.abs((L.x + L.travel) + L.knobW - (L.x + L.w)) < 1e-9;
   ok('the knob\'s two ends land flush inside the lane, neither short nor over',
      endsFlush && L.travel > 0 && L.travel < L.w,
-     `travel ${L.travel} of a ${L.w} lane, knob ${L.knobW} — ${L.travel + L.knobW} back to ${L.w}`);
+     `travel ${L.travel} of a ${L.w} lane, knob ${L.knobW} · ${L.travel + L.knobW} back to ${L.w}`);
 
   // NEGATIVE CONTROL: past the end is clamped, not extrapolated.
   ok('a drag that runs off the end is clamped rather than extrapolated',
@@ -370,7 +370,7 @@ const btnUV = () => {
   const below = controlAt(mid.u, vAt(top + TABLET.btn.h + TABLET.kit.rowGap / 2));
   const leftOf = controlAt((TABLET.btn.x / 2) / TABLET.designW, mid.v);
   const rightOf = controlAt((TABLET.designW - TABLET.btn.x / 2) / TABLET.designW, mid.v);
-  ok('...and only its own rectangle is it — not the ring\'s air, the gap, or the margins',
+  ok('...and only its own rectangle is it: not the ring\'s air, the gap, or the margins',
      above === null && below === null && leftOf === null && rightOf === null,
      `above ${above === null} · below ${below === null} · left ${leftOf === null} · right ${rightOf === null}`);
 
@@ -527,7 +527,7 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
      three
        ? `${three.TABLET.controls.length} controls · ${TABLET.designH} -> ${three.TABLET.designH} design px`
          + ` · the lane is still ${three.TABLET.lane.w} · ${three.TABLET.fingerprint.match(/\[[^\]]*\]/)?.[0]}`
-       : `the copy would not load — ${why}`);
+       : `the copy would not load: ${why}`);
 }
 
 {

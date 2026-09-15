@@ -21,7 +21,7 @@
   const d = mount({
     name: 'instrument',
     what: 'A keyboard whose sound may be coming out of a different machine. '
-        + 'Press Start audio and join, then play the keys — with nobody else in '
+        + 'Press Start audio and join, then play the keys. With nobody else in '
         + 'the room this page makes the sound itself, and when another machine '
         + 'offers to, Hear the other machine brings its audio back over the '
         + 'same connection. Two of the cells are delays: how late a note '
@@ -143,7 +143,7 @@
     // be read as a duplicate range.
     ws = openWire(ROOM, {
       onOpen: (from) => { d.log(`joined ${ROOM} as ${from}`, 'hi'); assertRelay(true); },
-      onClose: () => d.log('relay closed — reconnecting', 'bad'),
+      onClose: () => d.log('relay closed · reconnecting', 'bad'),
       onMessage: (got) => {
       if (got.kind !== 'json') return;
       const m = got.msg;
@@ -198,8 +198,8 @@
     if (!synth) {
       source = 'here';
       d.set('sound', 'here');
-      d.log('nobody else is in this room, so the sound is made in this page — '
-          + 'open rig/m1/synth.html on another machine for the other half', 'hi');
+      d.log('nobody else is in this room, so the sound is made in this page. '
+          + 'Open rig/m1/synth.html on another machine for the other half', 'hi');
       return;
     }
     pc = new RTCPeerConnection({ iceServers: [] });   // same room: host candidates

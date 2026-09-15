@@ -67,7 +67,7 @@
   const d = mount({
     name: 'show',
     what: 'A picture goes live over WebRTC to a second connection in this same page, '
-      + 'and what that far end receives — decode losses and all — is what gets '
+      + 'and what that far end receives, decode losses and all, is what gets '
       + 'recorded. Press Go live and record 3 s, then Play it back and scrub the '
       + 'result. live is how long the first frame took to arrive and fps is what the '
       + 'far end is decoding now; the rest is the size and length of what was kept.',
@@ -146,7 +146,7 @@
       // the track already published keeps flowing: the canvas is the source of
       // truth for the wire, so switching sources needs no renegotiation
     } catch (e) {
-      d.log(`camera refused: ${e.name} — staying on the canvas`, 'bad');
+      d.log(`camera refused: ${e.name} · staying on the canvas`, 'bad');
     }
   });
 
@@ -202,7 +202,7 @@
       iv = setInterval(() => { if (liveVideo.videoWidth > 0) done(); }, 100);
       setTimeout(() => { clearInterval(iv); res(); }, 5000);
     });
-    d.log(`live in ${liveAt == null ? '>5000' : Math.round(liveAt)} ms — ${liveVideo.videoWidth}x${liveVideo.videoHeight}`, 'hi');
+    d.log(`live in ${liveAt == null ? '>5000' : Math.round(liveAt)} ms · ${liveVideo.videoWidth}x${liveVideo.videoHeight}`, 'hi');
     if (ROOM) joinRoom();
   }
 
@@ -228,7 +228,7 @@
       // reader measures the throttle and files it as a bug.
       if (!saidThrottled && fps != null && fps < 5 && document.visibilityState === 'hidden') {
         saidThrottled = true;
-        d.log('tab is in the background — the source canvas is throttled to ~1 fps, not the wire', 'bad');
+        d.log('tab is in the background · the source canvas is throttled to ~1 fps, not the wire', 'bad');
       }
       lastFrames = framesDecoded; lastStatsAt = now;
     }
@@ -345,7 +345,7 @@
     rec.onerror = (e) => d.log(`recorder: ${e.error?.name ?? 'error'}`, 'bad');
     recording = true;
     rec.start(SEG_MS);
-    d.log(`recording the received stream — ${mime}, ${SEG_MS / 1000}s segments`, 'hi');
+    d.log(`recording the received stream · ${mime}, ${SEG_MS / 1000}s segments`, 'hi');
     await new Promise((r) => setTimeout(r, REC_MS));
     rec.stop();
     await new Promise((r) => setTimeout(r, 400));
@@ -423,12 +423,12 @@
   d.on('play', async () => {
     await settled();                       // pressed mid-recording: wait it out
     armVideo(back);
-    if (!(await buildDeck())) { d.log('nothing recorded yet — press Record first', 'bad'); return; }
+    if (!(await buildDeck())) { d.log('nothing recorded yet. Press Record first', 'bad'); return; }
     pair.style.display = 'none';
     back.style.display = '';
     await playOrPrompt(back, d);
     deck.play?.();
-    d.log(`playing back ${duration.toFixed(2)}s of the received stream — scrub it`, 'hi');
+    d.log(`playing back ${duration.toFixed(2)}s of the received stream · scrub it`, 'hi');
     // The checks read what this control just produced, so this is the first
     // moment they can be true — and a button for them would make them optional.
     await d.run('check');
@@ -456,7 +456,7 @@
     d.assert('segments closed', segs.length > 0, `${segs.length} segment(s), ${Math.round(bytes / 1024)} KiB`);
     const dk = await buildDeck();
     d.assert('the recording resolves a duration', duration != null && duration > 0,
-      duration == null ? 'Infinity — unscrubbable' : `${duration.toFixed(2)}s`);
+      duration == null ? 'Infinity' : `${duration.toFixed(2)}s`);
     // deck.range is the span ARRAY (mutated in place by setRange), not a getter
     d.assert('the deck spans the recording', !!dk
       && Math.abs(dk.range[1] - duration * 1000) < 1500,
@@ -482,7 +482,7 @@
 
   d.log(ROOM
     ? `room ${ROOM}: this page also offers the show to real peers`
-    : 'the peer is a second connection in this page — add ?room=NAME to offer it to a real one');
+    : 'the peer is a second connection in this page · add ?room=NAME to offer it to a real one');
   d.ready();
 </script>
 </html>

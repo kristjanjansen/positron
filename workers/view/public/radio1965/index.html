@@ -52,8 +52,8 @@
   .wet-fader { max-width: none; }
 
   /* 🔴 THE CONTROLS ARRIVE LATE AND EVERYTHING BELOW THEM JUMPED. They cannot be
-     built until scsynth is up — about a second — so the fader, the sound picker,
-     the speed row and the four sliders all appeared at once and shoved the log
+     built until scsynth is up — about a second — so the fader, the LOOP row, the
+     sound picker and the four sliders all appeared at once and shoved the log
      down the page while somebody was reading it. That is the same complaint the
      grain-scope caption earned ("a horrible jump of content each time it
      updates"), arriving through TIME instead of through reflow.
@@ -61,9 +61,12 @@
      nothing below ever moves. ⚠️ No border and no background: an empty box that
      paints its edges is a horizontal rule nobody wrote (shell.css says so), and
      this one is empty for the first second of every visit.
-     The height is the sum of what goes in — four rows at 34 px plus the shared
+     The height is the sum of what goes in — the rows at 34 px plus the shared
      22 px rhythm between them — and it is written as that sum rather than as a
-     total, so it can be re-derived when a row is added. */
+     total, so it can be re-derived when a row is added. ⚠️ IT WAS RE-DERIVED
+     WHEN THE LOOP ROW LANDED: one more 34 px row and one more 22 px gap. A
+     reserved height that stops matching what lands in it is the jump this rule
+     exists to stop, arriving from the other direction. */
   /* 🔴 AND IT MUST LAY ITS CHILDREN OUT, WHICH THE FIRST VERSION DID NOT.
      `.pos-choice` is a SPAN, and the shell's vertical rhythm lives on
      `.pos-body > * + *` — direct children only. Moving these rows into a
@@ -72,8 +75,18 @@
      restores both: block layout, and the same 22 px gap every other element
      gets, from one declaration rather than from the parent's rule. */
   .gran-slot { display: flex; flex-direction: column; gap: 22px; align-items: stretch;
-               min-height: calc(3 * 34px + 2 * 34px + 4 * 22px); }
+               min-height: calc(4 * 34px + 2 * 34px + 5 * 22px); }
   .gran-slot > .pos-choice, .gran-slot > .pos-pick { align-self: flex-start; }
+  /* 🔴 EXCEPT ON A PHONE, WHERE A CHOICE ROW IS SUPPOSED TO TAKE THE WHOLE
+     WIDTH. `shell.css` puts a `.pos-choice` label on its own line under 560 px
+     and gives the group the row, so its options become equal thumb targets —
+     and `align-self: flex-start` shrink-wraps the grid instead. MEASURED at
+     390 px with the LOOP row in place: 182 px of buttons with 176 px of empty
+     slot beside them, under a heading spanning the full width. The desktop
+     rule is unchanged, which is why this is an override and not an edit to it. */
+  @media (max-width: 560px) {
+    .gran-slot > .pos-choice { align-self: stretch; }
+  }
   /* 🔴 SOUND'S LABEL IS IN THE SAME COLUMN AS THE SLIDERS', AND WAS NOT.
      The row is an inline-flex with an 8 px gap, so its label was as wide as the
      word SOUND and the stepper started wherever that ended — while every lane
@@ -109,6 +122,36 @@
   @media (min-width: 720px) {
     .gran-rows.pos-pair { grid-template-columns: repeat(2, var(--lab, max-content) minmax(0, 1fr)); }
   }
+
+  /* 🔴 NEITHER BOX DRAWS UNTIL THERE IS SOUND, AND THEY COME UP TOGETHER.
+     Before the first sample this page drew an empty bordered rectangle where
+     the picture goes, above an empty hole where the controls go: two boxes
+     reporting on a stream that had not started. `shell.css` already says a
+     container with nothing in it must not paint its edges, and the waveform's
+     edges are the canvas's own border rather than anything a page can opt out
+     of, so the page turns the ink off instead.
+
+     ⚠️ ONLY THE INK FADES. `opacity` changes no layout at all, so the picture
+     and the controls arrive without moving a pixel of what is under them —
+     which is the same rule that put `.gran-slot`'s reserved height here in the
+     first place, applied to a second axis.
+
+     ⚠️ AND ONE CLASS LIGHTS BOTH, ON ONE FRAME. Two fades hung off two events
+     is what the page already did by accident: the waveform appeared with the
+     first decoded block and the controls a second later, whenever scsynth
+     happened to finish.
+
+     🔴 THE TRANSITION IS ON THE LIT STATE, NOT ON THE DARK ONE, AND THAT IS NOT
+     TIDINESS. With it on `.awaits-sound` the class is a fade OUT as well as a
+     fade in, and the two boxes take that fade differently: the scope's wrapper
+     has already been measured by its own `ResizeObserver` setup, so it has a
+     resolved opacity of 1 to transition away from, while the slot is a div that
+     has never been laid out and simply starts at 0. MEASURED, that is exactly
+     what happened: `1 and 0 opaque with no feed` at the same frame, from one
+     statement that set both. On the lit state there is nothing to fade out of
+     and the fade in still runs. */
+  .awaits-sound { opacity: 0; }
+  .awaits-sound.sounding { opacity: 1; transition: opacity 450ms ease; }
 
   /* ⚠️ ONE VERTICAL RHYTHM, INCLUDING INSIDE THE GROUP. MEASURED down this page
      at 1100 px: scope → fader **22**, fader → first row **22**, first row →
@@ -179,13 +222,54 @@
   // ⚠️ THE ORDER IS THE PREFERENCE. Radio 1965 first because it is what this
   // page is for; the fallback is automatic and says so in the log rather than
   // silently playing something else.
+  //
+  // ⚠️ THE THIRD COLUMN IS THE STATION'S NOMINAL BITRATE, and it is here rather
+  // than in a constant because it stopped being one. `NOMINAL_KBPS = 128` was
+  // true of every mount this page could reach until IDA Radio arrived at 320,
+  // and the `settled rate is the station's` check compares the measured rate
+  // against it with a 20 % band — so one shared number fails that check on
+  // every run for a station that is behaving perfectly. It is read from here
+  // and nowhere else.
   const STATIONS = [
-    ['Radio 1965', 'radio1965'],
-    ['Klassikaraadio', 'klassikaraadio'],
-    ['Vikerraadio', 'vikerraadio'],
-    ['Raadio 2', 'raadio2'],
+    // Radio 1965 removed 2026-09-15 at the uuu.ee operator's request.
+    ['Klassikaraadio', 'klassikaraadio', 128],
+    ['Vikerraadio', 'vikerraadio', 128],
+    ['Raadio 2', 'raadio2', 128],
+    // 🔴 THE RELAY CARRIES SIX ERR MOUNTS AND THIS PAGE OFFERED FOUR, which is
+    // why it collapsed today rather than fell back. MEASURED 2026-09-15: the
+    // only two mounts answering 200 anywhere were `raadio4` and
+    // `raadiotallinn`, and NEITHER WAS ON THIS LIST, so a page whose whole
+    // design is "a station goes down, take the next one" reported `none of the
+    // 6 mounts answered` while two were playing perfectly through the same
+    // relay. The fallback was real and had nowhere to fall.
+    // ⚠️ THE COST OF A LIST THAT IS SHORTER THAN THE RELAY'S IS INVISIBLE UNTIL
+    // AN OUTAGE, which is the one moment it matters. `shout`'s `/health` knows
+    // all eight; this array is the only place that disagreed.
+    ['Raadio 4', 'raadio4', 128],
+    ['Raadio Tallinn', 'raadiotallinn', 128],
+    // 🔴 IDA RADIO IS AAC, NOT MP3, AND IT IS THE FIRST STATION HERE THAT IS.
+    // `mp3-stream.mjs` picks its frame scanner off the response's
+    // `content-type` — `audio/mpeg` against `audio/aac` — so nothing on this
+    // page has to know. MEASURED 2026-09-15 through the relay and direct:
+    // AAC-LC `mp4a.40.2`, 44,100 Hz stereo, settled 322 kbit/s against 320
+    // nominal, decoded by WebCodecs with 0 errors.
+    //
+    // ⚠️ THEIR IN-BAND TEXT CHANNEL IS ALIVE AND EMPTY. The slots arrive on
+    // schedule and carry `StreamTitle=' - '`, so the station's name comes from
+    // the ICY header and the "now playing" line stays blank. That is what the
+    // station sends, not something missing here.
+    // IDA removed 2026-09-15 at their operator's request. See radio-gran.mjs.
   ];
-  const srcOf = (id) => `${BASE}/${id}.mp3`;
+  /**
+   * 🔴 NO `.mp3` ON THE END ANY MORE, because two of these mounts are not MP3
+   * and a URL that says otherwise is a claim nothing checks. The relay strips
+   * the suffix anyway, so it never meant anything; what it did was invite the
+   * next reader to branch on it. What the bytes are is answered by the
+   * response's `content-type`, once, in `mp3-stream.mjs`.
+   */
+  const srcOf = (id) => `${BASE}/${id}`;
+  /** A station's nominal bitrate, read off `STATIONS` and never typed twice. */
+  const nominalKbps = (id) => STATIONS.find(([, s]) => s === id)?.[2] ?? 128;
   /**
    * 🔴 IT STARTS ON THE RELIABLE ONE AND UPGRADES TO THE ONE IT IS NAMED AFTER.
    *
@@ -206,7 +290,6 @@
   const indexOfId = (id) => STATIONS.findIndex(([, s]) => s === id);
   let station = DEFAULT_ID;
   const PROBE_MS = 6000;            // long enough for a cold relay, short enough to act on
-  const NOMINAL_KBPS = 128;         // both mounts: measured direct 128.076 kbit/s
   // ⚠️ A CROSS-PAGE URL, AND IT IS CHECKED AT BUILD TIME. The compiled graph
   // lives with `/grains/`'s PROVENANCE.json, which records the md5 of the `.sc`
   // it came from and which `build.mjs` REFUSES the build over when they
@@ -226,22 +309,19 @@
   const RANGE_HZ = 1;
   /**
    * 🔴 UP HERE FOR THE SAME REASON `BUF_SECONDS` IS, AND IT COST A RUN TO
-   * RE-LEARN. The transport bar's `settling` option is a closure over `stream`,
-   * and `createTransportBar` PAINTS ONCE at construction — so with these
-   * declared where they used to be, three hundred lines further down, the very
-   * first paint reached a `let` in its temporal dead zone:
+   * RE-LEARN. A closure handed to a component may be called before the next
+   * line of this page runs: `createTransportBar` PAINTS ONCE at construction,
+   * and with this declared where it used to be, three hundred lines further
+   * down, that first paint reached a `let` in its temporal dead zone —
    * `ReferenceError: Cannot access 'stream' before initialization`, thrown
    * inside the constructor, so `d.ready()` was never called and the suite said
    * `__demo.ready — failed` with nothing else. Same shape, third time in this
-   * file. A closure handed to a component may be called before the next line of
-   * this page runs.
-   *
-   * ⚠️ THE SPEED SURVIVES A REOPEN. A station switch builds a new stream, and a
-   * control whose setting silently reverts because something behind it was
-   * rebuilt is worse than one that does not exist.
+   * file.
    */
   let stream = null;                 // the decoded mount, when DECODE
-  let speed = 1;
+  // The tightest the cushion ever got. Not on screen: a monotone number that
+  // only falls is a poor cell, and it is the right thing for an assert to grade.
+  let tightest = Infinity;
 
   const d = mount({
     name: 'radio1965',
@@ -253,13 +333,40 @@
     // written down in comments and in plan-radio.md where a reader who wants
     // them will look. What is left is the three things CLAUDE.md asks for:
     // what this is, what to move, what the numbers mean.
-    what: 'A live radio station in Tallinn, reachable from a secure page only '
-      + 'through a relay of ours. The same sound feeds a granulator running in '
-      + 'this tab, and the long fader blends them: station at the left, '
-      + 'granulator at the right. Every tick is a grain, SOUND picks the kind, '
-      + 'and MOVING counts the settings walking on their own.',
-    // ⚠️ FOUR CELLS, DOWN FROM SIX, AND THE TWO THAT WENT WERE THE TWO THAT
-    // COULD NOT MOVE. `gap` is the worst pause over one five-second read: it is
+    // ⚠️ THE SECOND SENTENCE SAYS WHY THE PAGE IS EMPTY, and it is there
+    // because the page changed under it. The picture and every control now wait
+    // for the first sample, so a paragraph that described a fader, a SOUND row
+    // and a picture none of which are on screen yet was describing a page the
+    // visitor could not see. Still three sentences: what this is, what to
+    // press, what the numbers mean.
+    // ⚠️ THE LOOP IS IN HERE BECAUSE THE BUTTON DOES SOMETHING NOW. It refused
+    // every press until today, so the paragraph had nothing to say about it;
+    // CLAUDE.md's rule is that a control appearing is a change to what the page
+    // says, in the same edit. Still four sentences.
+    // ⚠️ AND THE FIRST SENTENCE CHANGED WHEN THE STATION ROW DID. It said "a
+    // live radio station in Tallinn" while the row now offers six, two of them
+    // in Helsinki — a description a visitor believes and which had stopped
+    // being true. Nothing was added to say so: the clause that named one city
+    // was replaced, not extended.
+    // ⚠️ AND THE SPEED CLAUSE WENT WHEN THE SPEED BUTTONS DID. It read "the
+    // speed buttons change how fast it runs", which described a row that is no
+    // longer on the bar — the same clause was REPLACED by what the LOOP row
+    // does, not extended with it. Still four sentences.
+    // 🔴 ONE LINE, BECAUSE THIS PAGE HAS A DIAGRAM. A `what` paragraph and a
+    // picture of the machinery are two explanations of one thing, and the
+    // paragraph is the weaker of them: it describes what a reader can point at
+    // an inch below. It is the same sentence the index card carries, so a
+    // visitor arriving from there is not told the same thing twice in two
+    // different wordings that can drift apart.
+    what: 'Six live radio stations from Tallinn and Helsinki, decoded frame by frame in the tab.',
+    // ⚠️ SIX CELLS. IT WAS SIX, THEN FOUR, AND IT IS SIX AGAIN FOR A DIFFERENT
+    // REASON THAN IT WAS THE FIRST TIME. What follows is the argument for each
+    // cut, and every one of them still holds; what changed is that two counters
+    // that can DISCARD AUDIO were found to be reaching nobody, and a stage that
+    // throws data away owes the reader a number (CLAUDE.md). Going to five was
+    // not available: `mount()` throws on an odd count.
+    //
+    // The two that went the first time were the two that COULD NOT MOVE. `gap` is the worst pause over one five-second read: it is
     // measured once and then sits there for the rest of the visit, which is a
     // constant wearing a measurement's clothes (CLAUDE.md: every readout cell
     // must be able to change). It is still asserted and still in the log line —
@@ -304,7 +411,17 @@
     // `the sixteenth`, which is four playing a figure four steps apart. That
     // distinction is the one this page keeps being asked about and nothing on
     // it said the number out loud.
-    readout: { voices: '', behind: 's', grains: '/s', moving: '' },
+    // 🔴 `buffer` AND `lost` ARE HERE BECAUSE A STAGE THAT DISCARDS AUDIO OWES
+    // THE READER A COUNTER. Both were already counted and neither had ever been
+    // on screen, which is the exact shape `pcm-playout` shipped with: bit-clean
+    // by every measurement taken, trimming 15 ms mid-note, green throughout.
+    // They are a PAIR and that is the point. `lost` is what already went wrong
+    // and reads 0 on a healthy stream; `buffer` is the seconds of cushion left,
+    // which moves the whole time and falls before `lost` ever moves. MEASURED on
+    // an iPhone: 0.534 s at its tightest against a 345 ms arrival gap, so 189 ms
+    // of headroom, with `lost` still at 0. Only one of those two numbers could
+    // have told anybody that.
+    readout: { voices: '', behind: 's', grains: '/s', moving: '', buffer: 's', lost: '' },
     // 🔴 NO CONTROLS AT ALL, AND THE GRANULATOR IS ALWAYS ON. There was a
     // `Synthesize` button, and before that a `Listen` button beside a transport
     // bar that already has a play button. Both were the same mistake one step
@@ -430,23 +547,37 @@
   // far behind live you now are.
   const t0 = Date.now();
   /**
-   * 🔴 THE SPEEDS BELONG TO THE TRANSPORT BAR, NOT TO A ROW OF MY OWN.
-   * CLAUDE.md: *"Transport UI is `demo/shell/transport-bar.mjs` and nothing
-   * else … rates from intersected `caps.rates`."* A speed picker beside the
-   * sound picker was a second transport, and it collided with the first.
+   * 🔴 NO RATE LATTICE, AND THAT IS THE ROW COMING OFF THE BAR RATHER THAN
+   * SOMEBODY FORGETTING TO DECLARE ONE.
    *
-   * The bar builds its buttons from `latticeFor(deck)`, which reads
-   * `deck.caps()` — `{kind: caps}` over the registered adapters — so declaring
-   * a lattice is declaring an adapter that HAS one. ⚠️ HANDOFF records an
-   * earlier attempt at exactly this taking the page down at module load, with
-   * `__demo.ready — failed` and nothing else; the shape below is the one
-   * `adapterCaps()` actually reads (`timeline/transport.mjs:1960`), verified by
-   * running the page rather than by reasoning about it.
+   * There were five speed buttons here — 0.0625 to 1 — and they did two jobs:
+   * they played the live stream slowly, and they played the LOOP slowly. Asked
+   * for twice, in these words: *"replace slowed and fast forward with something
+   * interesting"*, then *"you never replaces fastforward / slowed??"* Making
+   * one row drive a second thing is not replacing it.
    *
-   * ⚠️ AND THE RATES ARE THE STREAM'S, NOT THE PLAYHEAD'S. This deck's position
-   * is wall-clock — it follows the audio, it does not drive it — so what a rate
-   * button changes is how fast the STATION is played, which is the thing a
-   * listener means by speed here.
+   * What replaced it is the LOOP row under the picture, which does four things
+   * a rate cannot express and only a kept lap can do at all. The argument for
+   * taking these off rather than keeping both:
+   *
+   *   · On a live mount every rate below 1 is a leak with a known end. Bytes
+   *     arrive at exactly 1x, so playing slower means falling behind the
+   *     station until the stream rejoins live in one cut. At 0.0625 that is
+   *     fifteen seconds lost for every second listened.
+   *   · The loop is the only tape on this page, and a speed on a tape is exact:
+   *     384000 samples a lap at 1x and 768000 at 0.5x, BIT IDENTICAL, measured
+   *     (plan-grain-presets §1.1). `half` in the LOOP row is that speed, on the
+   *     thing it works on.
+   *   · Slow and fast WITH THE PITCH HELD are already here and are better than
+   *     tape speed at it: the `slowed` and `fast forward` sounds read the held
+   *     seconds at a quarter and at double with the pitch where it was. Under a
+   *     loop they chew the loop.
+   *
+   * ⚠️ WITH NO LATTICE THE BAR DRAWS ITS HONEST STATIC `1`, which is true: this
+   * deck really does advance at one second per second. The LOOP row moves the
+   * BUFFER, not the playhead, so nothing on the bar has to say anything about
+   * it. `latticeFor(deck)` reads `deck.caps()`, so declaring nothing here is
+   * the whole of the change.
    */
   const deck = createDeck({
     items: [],
@@ -467,32 +598,9 @@
         // adapter is here for is the one claim it can truthfully make: which
         // speeds this stream can be played at.
         actuate() {},
-        /**
-         * 🔴 SLOW ONLY. 2x CANNOT WORK AND IS NOT OFFERED: bytes arrive at
-         * exactly 1x, so anything faster eats the cushion and then starves —
-         * MEASURED, a 1 s cushion gone in a second and every block after it
-         * underrunning, which is the regular gating that was photographed.
-         *
-         * Below 1x there is no such limit, only a consequence: you fall behind
-         * the station, which BEHIND already reports, and you keep falling until
-         * the stream rejoins live in one cut and says so in the log. That is the
-         * honest price of playing a live thing slowly and it is the interesting
-         * half of the gesture — a tape running away from the broadcast.
-         *
-         * ⚠️ THESE WERE REMOVED ONCE AND ASKED FOR BACK. The removal was right
-         * about the mechanism (varispeed at a live edge cannot be SUSTAINED) and
-         * wrong about what to do with it, because "cannot be sustained" is not
-         * "does not work" — it is a bounded effect with a known end, which is a
-         * different thing from a broken control. What actually made 0.25x
-         * unusable was the ceiling dropping one buffer at a time and stuttering
-         * the content forward; that is fixed in `mp3-stream.mjs`, not here.
-         *
-         * ⚠️ AND IT IS THE TAPE KIND — PITCH FOLLOWS SPEED. For slow WITHOUT the
-         * pitch dropping, the `slowed` sound reads a held eight seconds with the
-         * pitch kept where it was; the two are different instruments and the page
-         * has both.
-         */
-        caps: { rates: [0.0625, 0.125, 0.25, 0.5, 1] },
+        // ⚠️ NO `caps` AND SO NO RATE ROW. See the block above this call for
+        // why the five speeds came off, and where the one that is worth having
+        // went.
       },
     },
     range: [t0 - SPAN_MS, t0],
@@ -513,35 +621,162 @@
   // the keyboard table's sake and costs nothing now that the time is not drawn.
   const bar = createTransportBar(d.el, deck, {
     absolute: true, scrub: false, endStop: false, live: true,
-    // 🔴 THE SPEED, THE INSTANT IT IS PRESSED — see `onRate` in transport-bar.mjs.
-    // This replaces a 120 ms poll of `deck.targetRate()`, which replaced a 1 Hz
-    // one. Both were the page reading a control it does not own on a timer
-    // because the bar offered no event; up to 120 ms of a press doing nothing,
-    // on top of a wait this page is now at pains to shorten.
-    onRate: (r) => {
-      // ⚠️ `DECODE` STAYS IN THE GUARD. Under `?decode=0` the sound is a media
-      // element this page does not rate-control, so without it the log would
-      // announce a speed change that nothing performed — a page saying it did
-      // something it did not is worse than a control that visibly refuses.
-      if (!DECODE || !(r > 0) || r === speed) return;
-      speed = r;
-      // ⚠️ `stream` CAN BE NULL HERE and that is not a lost press. The decoded
-      // path is torn down and rebuilt on a station change and on a transport
-      // stop, and `openStream()` applies `speed` when it builds — so arming it
-      // on the variable is what makes the press survive a rebuild.
-      stream?.setRate(r);
-      d.log(r === 1 ? 'back to the station\u2019s own speed'
-        : r < 1 ? `${r}\u00d7 — pitched down, and falling further behind live every second`
-                : `${r}\u00d7 — pitched up, and it lasts only as long as the cushion`);
+    /**
+     * 🔴 THE RATES ARE BACK, AND THEY DRIVE THE LOOP RATHER THAN THE PLAYHEAD.
+     * The note further down says this deck has no lattice because its position
+     * is wall clock, which is true and was the wrong conclusion: the rate row
+     * was never about the playhead here, it is about the seconds the page KEEPS.
+     * Under a loop these chew the loop; with no loop running they have nothing
+     * to act on, which is what `disabled` is for rather than absence.
+     */
+    rates: [0.25, 0.5, 1],
+    onRate: (r) => { loopRate = r; if (loopSrc) loopSrc.playbackRate.value = r; },
+    /**
+     * Left of LOOP, shown only while one runs. A glyph each, because a word
+     * would push the rate group onto a second row on a phone.
+     */
+    loopExtras: [
+      { id: 'rev', label: '◀', aria: 'play the loop backwards',
+        title: 'the same samples, mirrored',
+        onPress: (btn) => {
+          const on = btn.getAttribute('aria-pressed') !== 'true';
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          bar?.loopExtra('ping')?.setAttribute('aria-pressed', 'false');
+          setLoopWay(on ? 1 : 0);
+        } },
+      { id: 'ping', label: '⇄', aria: 'play the loop there and back',
+        title: 'forwards, then the same samples backwards',
+        onPress: (btn) => {
+          const on = btn.getAttribute('aria-pressed') !== 'true';
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          bar?.loopExtra('rev')?.setAttribute('aria-pressed', 'false');
+          setLoopWay(on ? 4 : 0);
+        } },
+    ],
+    // 🔴 THE LOOP WINDOW IS THE GRANULATOR'S OWN BUFFER, READ FROM THE SAME
+    // CONSTANT. The bar cannot know how many seconds a page really keeps, so it
+    // takes 20 s unless told; this page holds exactly `BUF_SECONDS` of radio
+    // and no more. A button promising a longer loop than the page can deliver
+    // is a control that lies at the moment it is used.
+    liveWindowMs: BUF_SECONDS * 1000,
+    /**
+     * 🔴 THE THREE MOMENTS THE SOUND HAS TO FOLLOW.
+     *
+     *   fill  somebody pressed LOOP. Start keeping samples; the station goes on
+     *         playing, because the window is being filled OUT OF what you are
+     *         hearing and cutting it here would record silence.
+     *   set   the window is full. Take the live path down, put the recorded
+     *         seconds up in its place, and let them run round.
+     *   off   give the station back.
+     *
+     * ⚠️ `dry` IS LEFT ALONE AND `loopOut` IS MOVED. The fader's number lives in
+     * `dry.gain`, so muting the station by writing to it would silently change
+     * what the fader is showing, and the next `setWet` would put the station
+     * back mid-loop. Two gains, one job each.
+     */
+    onLoop: (what, a, b) => {
+      if (!ctx || !loopRing) return;
+      if (what === 'fill') {
+        loopRing.w = 0; loopRing.filled = 0; loopRing.on = true;
+        // 🔴 AND THE PICTURE IS TOLD, WHICH IT WAS NOT. The scope grew three
+        // marks for exactly this and nothing ever called them: MEASURED on a
+        // driven page, `frozen: true` with `marks: 0`, so the loop's ends were
+        // never drawn and the grain ticks, which are placed BETWEEN those two
+        // marks, had no span to be placed in. That is the whole of the report
+        // that no grain lines show during a loop. The audio half was wired and
+        // the picture half was not, which is the shape of defect this page's
+        // own comments keep warning about: two halves, one of them silent.
+        scope.loopFrom();
+        d.log(`keeping the next ${BUF_SECONDS} s to loop over`, 'hi');
+        return;
+      }
+      if (what === 'set') {
+        loopRing.on = false;
+        const n = loopRing.filled;
+        // A window that caught nothing is not a loop. It happens if the station
+        // was not actually playing when the button was pressed, and saying so is
+        // better than looping silence and letting somebody wonder.
+        if (n < ctx.sampleRate * 0.25) {
+          d.log('nothing was playing, so there is nothing to loop', 'warn');
+          return;
+        }
+        const buf = ctx.createBuffer(2, n, ctx.sampleRate);
+        // ⚠️ UNWRAPPED BACK INTO ORDER. The ring's oldest sample is at `w` once
+        // it has wrapped, so copying from index 0 would play the seconds in two
+        // pieces with the join in the middle, which sounds like an edit nobody
+        // made.
+        const start = loopRing.filled === loopRing.len ? loopRing.w : 0;
+        for (let c = 0; c < 2; c++) {
+          const dst = buf.getChannelData(c), src = loopRing.ch[c];
+          for (let i = 0; i < n; i++) dst[i] = src[(start + i) % loopRing.len];
+        }
+        // ⚠️ THE SECONDS ARE KEPT, AND THE VOICE THAT PLAYS THEM IS A SEPARATE
+        // THING. `loopBuf` is the material; the LOOP row decides which way and
+        // how much of it a voice reads, and it rebuilds the voice without
+        // touching the material. See `startLoopVoice`.
+        loopBuf = buf;
+        loopBack = null; loopPing = null;   // built on the first press that needs one
+        setLoopWay(0, { quiet: true });     // every loop opens the way it arrived
+        loopRow?.disabled(false);
+        // 12 ms either way rather than a step: a gain cut mid-sample is a click,
+        // and a click every time a loop closes is the page making the noise.
+        scope.loopTo();          // the wave stops here, and this is where it stopped
+        startLoopVoice(0);
+        loopOut.gain.setTargetAtTime(1, ctx.currentTime, 0.012);
+        // ⚠️ THE STATION'S WAY IN, NOT THE FADER. Writing to `dry` silenced the
+        // speakers and left the granulator on the live station, and it also
+        // moved a number the fader owns, so the next `setWet` put the station
+        // back underneath the loop.
+        liveIn.gain.setTargetAtTime(0, ctx.currentTime, 0.012);
+        d.log(`looping ${(n / ctx.sampleRate).toFixed(1)} s of the station`, 'hi');
+        // 🔴 AND THE GRAINS ARE TUNED TO IT. See `lockGrainsToLoop` — the loop
+        // is an exact number of samples and the grain clock is a phasor in the
+        // same context, so the two can be made commensurate rather than
+        // merely close.
+        lockGrainsToLoop(n / ctx.sampleRate);
+        return;
+      }
+      if (what === 'off') {
+        loopRing.on = false;
+        lockGrainsToLoop(null);  // the patch's own grain rate back
+        scope.loopOff();         // the wave catches up with live again
+        loopOut.gain.setTargetAtTime(0, ctx.currentTime, 0.012);
+        liveIn.gain.setTargetAtTime(1, ctx.currentTime, 0.012);
+        // Stopped a beat after the fade, or the tail is cut off by its own stop.
+        const dying = loopSrc; loopSrc = null;
+        if (dying) setTimeout(() => { try { dying.stop(); } catch { /* already done */ } }, 120);
+        // ⚠️ THE MATERIAL GOES WITH THE LOOP, AND SO DOES THE ROW. A row that
+        // stays lit on `back` over a station that is playing forwards is a
+        // control describing something that is not happening; greying it is the
+        // same rule `caps.mjs` follows for a demo this browser cannot run, and
+        // the reason is on the row's own tooltip rather than left to be guessed.
+        loopBuf = null; loopBack = null; loopPing = null;
+        setLoopWay(0, { quiet: true });
+        loopRow?.disabled(true);
+        d.log('back to the station', 'hi');
+      }
     },
-    // 🔴 THE BUTTON PULSES UNTIL THE SPEED IS AUDIBLE, WHICH IS NOT WHEN IT WAS
-    // PRESSED. `mp3-stream.mjs` schedules `floorMs` of audio ahead, so the old
-    // speed goes on sounding for about 600 ms after the press however fast the
-    // glide is — the half of the wait no amount of tuning removes. REPORTED as
-    // *"can we track when 0.5 etc happens and animate the radiobutton until
-    // then?"*, and the stream knows the answer exactly: the context time of the
-    // first block that actually reaches the target.
-    settling: () => !!stream?.stats().settling,
+    /**
+     * 🔴 WHERE IN THE LOOP YOU ARE, ON THE WAVE. The picture freezes at the
+     * clock it stood at and a one pixel line runs across it, rather than the
+     * wave rescaling or scrolling on: the x axis is the thing you are reading,
+     * so it must not move while you are reading it. Nothing is pushed while the
+     * window is still FILLING, which is correct, because then the sound really
+     * is still arriving and the wave should still scroll.
+     *
+     * 🔴 THE TICK IS THE BAR'S AND THE NUMBER IS THE VOICE'S, AND THAT SPLIT IS
+     * WHAT THE LOOP ROW COST. `f` is how far the DECK has got through the
+     * window, which was the same thing as the sound right up until the loop
+     * could be played backwards, at half speed, or a slice at a time. Under
+     * `back` the deck's fraction runs the wrong way; under `half` it runs twice
+     * too fast; under `chop` it sweeps seconds nobody is hearing. Three
+     * pictures that would each look like a working playhead and each be a lie
+     * about what is coming out, so `loopHeadFrac()` reads the voice's own clock
+     * instead. The 60 Hz tick still comes from here, because a second rAF loop
+     * in a page is the thing `transport-bar.mjs` exists to stop, and `f` is
+     * still the answer for the frame before a voice exists.
+     */
+    onLoopPos: (f) => scope.playhead?.(f == null ? null : (loopHeadFrac() ?? f)),
   });
 
   // ── the picture ────────────────────────────────────────────────────────────
@@ -557,12 +792,22 @@
   // seconds, so it heaves every time a loud passage leaves the right edge and a
   // quiet stretch draws the same as a loud one. `fullScale: 1` means the height
   // is an amplitude: 1.0 fills it, and a quiet passage looks quiet.
-  const scope = createGrainScope(d.el, { seconds: 6, height: 140, fullScale: 1,
+  // 🔴 THE WINDOW IS THE BUFFER, READ FROM THE SAME CONSTANT. It asked for 6 s
+  // over an 8 s buffer, so the oldest quarter of the granulator's range could
+  // not be drawn: every grain read from there landed left of the picture and
+  // was skipped. Whenever the read head sat in that quarter the page showed no
+  // grains at all, and that was read as the station being off air. Two numbers
+  // that have to agree are one number; `createGrainScope` refuses the pair now.
+  const scope = createGrainScope(d.el, { seconds: BUF_SECONDS, height: 140, fullScale: 1,
     // the granulator's buffer is filled from THIS audio, so grain positions and
-    // this axis are the same seconds — see the note in grain-scope.mjs
+    // this axis are the same seconds. See the note in grain-scope.mjs.
     grainSeconds: BUF_SECONDS });
 
   scope.source('the radio, as it arrives');
+  // A handle for a lab probe, like `__stream` and `__eng` below; harmless in a
+  // page. It is also how the picture can be driven by hand while the live loop
+  // that will own its playhead is being built elsewhere.
+  window.__scope = scope;
 
   // The space the granulator's controls will occupy, reserved now so their
   // arrival a second from now moves nothing. See `.gran-slot` in <style>.
@@ -571,6 +816,66 @@
   // the reserved block is not a special case that has to be kept in step.
   const granSlot = el('div', 'gran-slot');
   scope.el.after(granSlot);
+
+  // ── neither box draws until there is sound ─────────────────────────────────
+  //
+  // 🔴 REPORTED: *"the waveform and granulator boxes must not draw with no live
+  // feed, and fade in together when sound starts."* Both were visible on a page
+  // nobody had pressed play on — an empty bordered rectangle and an empty hole
+  // under it, drawn about a stream that had not started. The room stays
+  // reserved and only the ink fades; see `.awaits-sound` in <style>.
+  //
+  // ⚠️ THE GATE IS THE SAMPLES, NEVER A PROMISE. `ctx.resume()` and
+  // `audio.play()` both wait on a gesture and NEITHER REJECTS, so a fade hung
+  // off either would never run on a page that is playing perfectly. What lights
+  // these is `meterTick` reading a non-zero sample off the analyser, which is
+  // the quantity the picture is of.
+  //
+  // ⚠️ AND IT WAITS FOR THE CONTROLS, WITH A DEADLINE. Together means one
+  // frame, and the granulator's controls cannot exist until scsynth is up about
+  // a second after the first sound — so the picture waits for them. It cannot
+  // wait for ever: this page already promises that an engine which refuses
+  // leaves a working radio behind, and a picture held back by a boot that never
+  // finished would break exactly that promise.
+  const LIGHT_WAIT_MS = 6000;
+  scope.el.classList.add('awaits-sound');
+  granSlot.classList.add('awaits-sound');
+  /**
+   * What the fade actually did, read off the page rather than off this code.
+   * `dark` is the pair of opacities at a frame when nothing had been heard;
+   * `gap` is the worst difference between the two while they came up, which is
+   * how two boxes that lit separately would show. An assert written from the
+   * same statement that adds the class would prove only that the statement ran.
+   */
+  const LIT = { dark: null, darkWhen: '', heardAt: null, builtAt: null,
+    at: null, why: '', gap: null, pair: null };
+  requestAnimationFrame(() => {
+    LIT.dark = [scope.el, granSlot].map((e) => Number(getComputedStyle(e).opacity));
+    LIT.darkWhen = `nothing pressed, peak rms ${rmsPeak.toFixed(4)}`;
+  });
+  function lightBoxes(why) {
+    if (LIT.at != null) return;
+    LIT.at = performance.now(); LIT.why = why;
+    // Both in one statement, so both transitions start on the same frame.
+    for (const e of [scope.el, granSlot]) e.classList.add('sounding');
+    let n = 0;
+    const watch = () => {
+      const pair = [scope.el, granSlot].map((e) => Number(getComputedStyle(e).opacity));
+      LIT.gap = Math.max(LIT.gap ?? 0, Math.abs(pair[0] - pair[1]));
+      LIT.pair = pair;
+      if (++n < 48) requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
+  }
+  /** @param {'sound'|'controls'} which — one of the two things being waited on. */
+  function boxesReady(which) {
+    if (which === 'sound' && LIT.heardAt == null) {
+      LIT.heardAt = performance.now();
+      setTimeout(() => lightBoxes('the granulator never arrived'), LIGHT_WAIT_MS);
+    }
+    if (which === 'controls' && LIT.builtAt == null) LIT.builtAt = performance.now();
+    if (LIT.heardAt != null && LIT.builtAt != null) lightBoxes('sound, and the controls with it');
+  }
 
   // ── how this works, last on the page ──────────────────────────────────────
   //
@@ -590,18 +895,19 @@
   // `the movement` is `pappus-mod.mjs`. A picture drawn out of nouns the code
   // does not have is a picture of a program somebody meant to write.
   createDiagram(d.el, {
-    caption: 'The station only speaks plain http, so a secure page cannot fetch it at all. '
-      + 'Everything else here follows from getting round that one fact.',
+    caption: 'The station only speaks plain http, so a secure page cannot fetch it at all.',
     nodes: [
       { id: 'stn', label: 'Icecast', sub: 'port 8001', kind: 'device', tech: 'station',
-        note: 'The station\u2019s own server, in Tallinn, on **port 8001 over plain http**. '
-            + 'A page served over https may not fetch http at all, which is why '
-            + '**Cloudflare** is in this picture.' },
+        note: 'One mount run by the **Estonian Centre of Contemporary Music** in Tallinn, '
+            + 'sending **128 kbit/s MP3** that never ends. It is one volunteer server and it '
+            + 'goes down: on a day in September it took the connection and then sent nothing '
+            + 'at all, which is why this page can switch stations.' },
       { id: 'cf', label: 'Cloudflare', sub: 'a CORS proxy', kind: 'cloud', tech: 'cloudflare',
-        note: 'Fetches the stream from **Icecast**, which the **browser** may not, and '
-            + 'hands it on over https. Two headers do the rest: one lets the page read the '
-            + 'bytes instead of only hearing them, one un-hides the station\u2019s name and '
-            + 'bitrate.' },
+        note: 'Fetches the stream over plain http, which a secure page may not do itself, and '
+            + 'hands the same bytes on over https. It adds two headers the station omits: '
+            + '**allow-origin**, without which the page could hear the sound but never read '
+            + 'the samples, and **expose-headers**, without which the track title and bitrate '
+            + 'the station sends stay hidden from it.' },
       { id: 'page', label: 'browser', kind: 'here', tech: 'browser',
         note: 'Everything below runs in the browser you are reading this in, and **nothing '
             + 'goes back**: the station is not told you are here.',
@@ -611,20 +917,21 @@
                 + 'audio**. What comes out goes two ways: eight seconds of sound for '
                 + '**scsynth** to chew, and a measurement the **control clock** rides.' },
           { id: 'mod', label: 'control clock', sub: '25 Hz, OSC',
-            note: 'Rides the station\u2019s own loudness and colour and changes '
-                + '**scsynth** **twenty-five times a second**. Faster is wasted: **scsynth** '
-                + 'smooths every control over 20 ms.' },
+            note: 'A plain **setInterval** at 25 Hz, whose every source is read from the '
+                + '**AudioContext** clock rather than counted up, so a late tick costs '
+                + 'resolution and never the beat. 25 Hz because **scsynth** puts each control '
+                + 'through a 20 ms **Lag.kr**, which throws away anything faster.' },
           { id: 'gran', label: 'scsynth', sub: 'SuperCollider', tech: 'sound',
             note: 'SuperCollider\u2019s real sound server, compiled to run in a **browser**. '
                 + 'It is handed one instrument at boot and **never rebuilt while it plays**.' },
         ] },
       { id: 'out', label: 'speakers', sub: '', kind: 'device', tech: 'device',
-        note: 'The long fader decides how much is station and how much is grains. Both '
-            + 'arrive through **one audio graph**, so they stay sample-aligned rather than '
-            + 'drifting apart as two players would.' },
+        note: 'The station and the grains reach here already mixed, through **one audio '
+            + 'graph** rather than two players, so they stay sample-aligned instead of '
+            + 'drifting apart while you listen.' },
     ],
     links: [
-      { from: 'stn', to: 'cf', label: 'MP3 stream',
+      { from: 'stn', to: 'cf', label: 'MP3 over http',
         note: 'A continuous MP3 stream with no end. The track titles travel **inside it** '
             + 'rather than as headers: every 16000 bytes the server slips in a block naming '
             + 'what is playing.' },
@@ -684,6 +991,23 @@
     // listen and grows while you do not, which is exactly when it matters.
     if (heardFrom != null) {
       d.set('behind', Math.max(0, (Date.now() - heardFrom) / 1000 - played()).toFixed(0));
+    }
+    // ⚠️ THE ELEMENT PATH CAN ANSWER NEITHER OF THESE AND SAYS SO. With
+    // `?decode=0` there is no queue of ours to starve and no frames of ours to
+    // drop, so both cells go to one em dash rather than to a confident 0.
+    const sst = DECODE && stream ? stream.stats() : null;
+    if (sst) {
+      d.set('buffer', sst.buffered.toFixed(2));
+      // `skipped` is deliberately NOT in here. It is the opening burst trim,
+      // windowed to the first four seconds, and it reaches 53 on an ordinary
+      // healthy start — a number that alarms every time it is read is a number
+      // nobody reads twice. What this counts is audio that went missing after
+      // the stream settled: a starved queue, and frames arriving too late to use.
+      d.set('lost', sst.underruns + sst.dropped);
+      if (sst.buffered > 0 && sst.buffered < tightest) tightest = sst.buffered;
+    } else {
+      d.set('buffer', '');
+      d.set('lost', '');
     }
     // 🔴 THE BAR MUST BE ABLE TO STOP THE SOUND, AND IT COULD NOT.
     // `mediaMaster` runs one way only — its own doc says *"a paused/ended
@@ -750,24 +1074,259 @@
   audio.crossOrigin = 'anonymous';
   audio.preload = 'none';
   let ctx = null, srcNode = null, analyser = null, master = null, dry = null;
+  let liveIn = null;   // the station's way in, taken down while a loop plays
+  // The loop's recorder, its playback node, and the source currently looping.
+  let loopRing = null, loopTap = null, loopOut = null, loopSrc = null;
+  // 🔴 WHAT REACHES THE SPEAKERS, AND EVERY PATH GOES THROUGH IT. See `graph()`.
+  let speakers = null;
+  // What leaves this page, measured there rather than upstream of the fader.
+  let sink = null, sinkBuf = null, sinkPeak = 0;
   // ⚠️ REMEMBERED, because the stream is CLOSED by the time `finish()` asserts —
   // the transport-stop check shuts it deliberately — and reading the path off a
   // null stream printed `via nothing` about a path that had just decoded 16 s.
   let decodePath = '';
+  // ⚠️ AND WHICH CODEC, REMEMBERED FOR THE SAME REASON. The station row now
+  // holds two of them — MPEG audio and AAC — and "the page decoded the stream
+  // itself" is a weaker claim than it looks if it cannot say WHAT it decoded.
+  let decodeCodec = '';
+
+  // ── the LOOP row: four ways to play the seconds you kept ───────────────────
+  //
+  // 🔴 THIS IS WHAT REPLACED THE FIVE SPEED BUTTONS. Asked for twice — *"replace
+  // slowed and fast forward with something interesting"*, then *"you never
+  // replaces fastforward / slowed??"* — and the previous answer was to point the
+  // same row at the loop as well, which is a repurposing and not a replacement.
+  // Every cell here is a different MECHANISM rather than a different number of
+  // the same one, which is the rule the twelve sounds were rebuilt under
+  // (LESSONS #59: a randomiser over nine overlapping ranges makes one sound with
+  // nine names).
+  //
+  //   round  the kept seconds as they arrived        the default
+  //   back   the same samples, mirrored              a direction
+  //   half   the same lap, twice as long             a speed
+  //   chop   a sixteenth of the lap, repeating       a length
+  //
+  // ⚠️ THREE OF THE FOUR ARE THINGS A LIVE STREAM CANNOT DO AT ALL. There is
+  // nothing behind a live edge to play backwards, no lap to divide, and slowing
+  // a mount down only means falling behind it. A kept lap has all three, exactly,
+  // because it is an integer number of samples: MEASURED at 384000 a lap at 1x
+  // and 768000 at 0.5x, bit identical (plan-grain-presets §1.1).
+  //
+  // ⚠️ AND THE GRAINS FOLLOW WHATEVER LAP IT LEAVES. `lockGrainsToLoop` tunes
+  // the grain clock to the lap that is actually playing, so `chop` retunes to
+  // the slice and `round` puts it back. A lap it cannot divide is said in words
+  // rather than fudged.
+  // ⚠️ `pingpong` IS FIFTH SO THE FIRST FOUR KEEP THEIR INDICES. Every check
+  // that drives a way does it by number, and renumbering them would have made
+  // four asserts grade a different way than their own labels claim.
+  const LOOP_WAYS = [
+    ['round', 'round'], ['back', 'back'], ['half', 'half'], ['chop', 'chop'],
+    ['pingpong', 'pingpong'],
+  ];
+  // 🔴 SHORT WORDS, AND THE REASON IS A PHONE. `.gran-slot`'s rows share a label
+  // column about 167 px wide, so a 390 px screen leaves roughly 210 px for the
+  // whole group — four segments of fifty. `STUTTER` is seven mono characters and
+  // does not fit; `CHOP` does. The sound row went to `createPicker` for the same
+  // measurement and this row stays a radio group because four mutually exclusive
+  // options is what `choice.mjs` is for, and because the ask was explicit:
+  // *"rate controls should be radiobuttons everywhere"*.
+  const LOOP_SAYS = {
+    round: 'the kept seconds, round, the way they arrived',
+    back: 'the kept seconds backwards',
+    half: 'half speed, so it comes round twice as slowly and an octave down',
+    chop: 'one slice of the loop, repeating',
+    pingpong: 'the kept seconds forwards, then the same samples backwards, without a seam',
+  };
+  // A slice is a sixteenth of the lap, floored at a length that is still a
+  // rhythm rather than a pitch: a sixteenth of a hand-closed 0.6 s window is
+  // 37 ms, which repeats at 27 Hz, which is a buzz and not a stutter.
+  const CHOP_DIV = 16;
+  const CHOP_MIN_S = 0.12;
+
+  // The kept seconds, the same seconds reversed, and which way the row is set.
+  let loopBuf = null, loopBack = null, loopPing = null, loopWay = 0, loopRow = null;
+  let loopRate = 1;
+  // The voice's own clock, which is the only thing that knows where the SOUND
+  // is: when it started, the slice of the buffer it laps over, its rate, and
+  // whether the buffer it is reading is the mirrored one.
+  let voiceAt = 0, voiceFrom = 0, voiceTo = 0, voiceRate = 1, voiceBack = false;
+
+  /**
+   * The same seconds, backwards.
+   *
+   * ⚠️ THE SAMPLES, NOT A NEGATIVE RATE. `AudioBufferSourceNode.playbackRate`
+   * does not go below zero in any shipping engine, so the only way to read a
+   * buffer backwards is to hold a mirrored copy of it. Eight seconds of stereo
+   * at 48 kHz is 3 MB and one pass of the loop below, which is why it is built
+   * on the first press that needs it rather than beside every loop.
+   */
+  /** Two buffers end to end, for pingpong. */
+  function joinedCopy(a, b) {
+    const out = ctx.createBuffer(a.numberOfChannels, a.length + b.length, a.sampleRate);
+    for (let c = 0; c < a.numberOfChannels; c++) {
+      const da = a.getChannelData(c), db = b.getChannelData(c), dst = out.getChannelData(c);
+      dst.set(da, 0);
+      dst.set(db, a.length);
+    }
+    return out;
+  }
+
+  function reversedCopy(buf) {
+    const out = ctx.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const src = buf.getChannelData(c), dst = out.getChannelData(c);
+      for (let i = 0, n = buf.length; i < n; i++) dst[i] = src[n - 1 - i];
+    }
+    return out;
+  }
+
+  /**
+   * Where the SOUND is, as a fraction of the kept seconds the wave draws.
+   *
+   * Computed from the voice's own start time, lap and rate, so it is right
+   * under every way the row can be set. ⚠️ MIRRORED UNDER `back`: sample `i` of
+   * the reversed buffer is sample `n - 1 - i` of what the picture shows, so a
+   * fraction taken straight out of the playing buffer would run the line the
+   * wrong way over a wave that is drawn forwards.
+   */
+  function loopHeadFrac() {
+    if (!ctx || !loopSrc || !loopBuf) return null;
+    const lap = voiceTo - voiceFrom;
+    const whole = loopBuf.duration;
+    if (!(lap > 0) || !(whole > 0)) return null;
+    const into = Math.max(0, ctx.currentTime - voiceAt) * voiceRate;
+    const at = voiceFrom + (into % lap);
+    return Math.min(1, Math.max(0, (voiceBack ? whole - at : at) / whole));
+  }
+
+  /**
+   * Start, or restart, the one voice that plays the kept seconds.
+   *
+   * `fromFrac` is where in the KEPT SECONDS to pick it up, so a press does not
+   * throw you back to the top of the loop: `chop` slices where you already are,
+   * which is the difference between "repeat this bit" and "repeat the beginning
+   * again". ⚠️ AND IT IS IN THE PICTURE'S COORDINATES, mirrored on the way in
+   * for the same reason `loopHeadFrac` mirrors on the way out.
+   *
+   * ⚠️ A DIP, NOT A CUT. A buffer source cannot change its buffer or its loop
+   * points cleanly while it runs, so a way-change is a new voice — and swapping
+   * one mid-sample is a click every time somebody presses a button. 12 ms down
+   * and 12 ms back up is the same fade the loop already opens and closes with.
+   * The first voice of a loop needs none of that: `loopOut` is still at zero and
+   * the caller ramps it up straight afterwards.
+   */
+  function startLoopVoice(fromFrac) {
+    if (!ctx || !loopBuf || !loopOut) return;
+    const way = LOOP_WAYS[loopWay][1];
+    const back = way === 'back';
+    const ping = way === 'pingpong';
+    if ((back || ping) && !loopBack) loopBack = reversedCopy(loopBuf);
+    /**
+     * 🔴 PINGPONG IS ONE BUFFER, NOT TWO VOICES TAKING TURNS. Alternating two
+     * sources on a timer puts a gap or an overlap at every turn, and at these
+     * lap lengths that is a click twice a lap. Forwards followed by the same
+     * samples backwards is a single buffer whose end already matches its start,
+     * so `loop: true` joins it to itself with nothing to hear.
+     * ⚠️ AND THE JOIN IN THE MIDDLE IS SEAMLESS BY CONSTRUCTION, not by a
+     * crossfade: the last sample forwards IS the first sample backwards, so the
+     * turn happens on a repeated sample rather than on a discontinuity.
+     */
+    if (ping && !loopPing) loopPing = joinedCopy(loopBuf, loopBack);
+    const buf = ping ? loopPing : back ? loopBack : loopBuf;
+    const whole = buf.duration;
+    const lap = way === 'chop'
+      ? Math.min(whole, Math.max(CHOP_MIN_S, whole / CHOP_DIV))
+      : whole;
+    const f = Math.min(1, Math.max(0, fromFrac ?? 0));
+    const here = (back ? 1 - f : f) * whole;
+    const from = way === 'chop' ? Math.min(Math.max(0, here), Math.max(0, whole - lap)) : 0;
+    const swap = !!loopSrc;
+    const CUT = 0.012;
+    const now = ctx.currentTime;
+    const at = swap ? now + CUT : now;
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.loopStart = from;
+    src.loopEnd = from + lap;
+    // the rate row's value, with `half` still able to halve it from the code
+    src.playbackRate.value = (way === 'half' ? 0.5 : 1) * loopRate;
+    src.connect(loopOut);
+    if (swap) {
+      const g = loopOut.gain;
+      g.cancelScheduledValues(now);
+      g.setValueAtTime(g.value, now);
+      g.linearRampToValueAtTime(0, at);
+      g.linearRampToValueAtTime(1, at + CUT);
+    }
+    src.start(at, from);
+    // ⚠️ STOPPED AT THE SAME INSTANT THE NEW ONE STARTS, AND SCHEDULED RATHER
+    // THAN TIMED. A `setTimeout` stop leaves both voices in `loopOut` for as
+    // long as the timer is late, which is two copies of the loop at different
+    // phases — the thing that sounds like a broken instrument. `stop(when)` is
+    // sample accurate and lands inside the dip.
+    const dying = loopSrc;
+    if (dying) { try { dying.stop(at); } catch { /* already done */ } }
+    loopSrc = src;
+    voiceAt = at; voiceFrom = from; voiceTo = from + lap;
+    voiceRate = src.playbackRate.value; voiceBack = back;
+  }
+
+  /**
+   * Set the LOOP row, and make the sound follow it.
+   *
+   * ⚠️ IT IS ALSO WHAT PUTS THE ROW BACK. Every loop opens on `round`, because a
+   * row still lit on `chop` over the next loop would be describing a choice
+   * nobody made for this material.
+   */
+  function setLoopWay(i, { quiet = false } = {}) {
+    const n = Math.max(0, Math.min(LOOP_WAYS.length - 1, i | 0));
+    const changed = n !== loopWay;
+    loopWay = n;
+    loopRow?.set(n, true);
+    // Nothing changed, or there is nothing to play it on yet. Either way the
+    // row now says what the next loop will do and no voice is disturbed.
+    if (!changed || !loopSrc || !loopBuf) return;
+    const way = LOOP_WAYS[n][1];
+    startLoopVoice(loopHeadFrac() ?? 0);
+    // 🔴 AND THE GRAIN CLOCK GOES WITH IT, which is the whole of why `chop` is
+    // reachable at all: the lap is an exact number of samples either way, so the
+    // grains can be tuned to divide the slice as cleanly as they divided the
+    // whole. `lockGrainsToLoop` takes the lap AT SPEED 1, which is why `half`
+    // hands it the same number `round` does — the plan's own argument, that a
+    // lock made at speed 1 survives every power of two.
+    lockGrainsToLoop(voiceTo - voiceFrom);
+    if (!quiet) d.log(`${LOOP_SAYS[way]} (${(voiceTo - voiceFrom).toFixed(2)} s a lap)`, 'hi');
+  }
 
   /** Point the decoded path at the current station. Safe to call again. */
   function openStream() {
     closeStream();
     stream = createMp3Stream(ctx, {
       url: srcOf(station),
-      onTitle: (t) => { nowEl.textContent = t; d.log(`now playing: ${t}`, 'hi'); },
+      onTitle: (t) => {
+        // ⚠️ A TITLE OF ` - ` IS NOT A TITLE. MEASURED on IDA Radio: the in-band
+        // slots arrive on schedule and the one that carried anything carried
+        // `StreamTitle=' - '` — the separator with an empty artist and an empty
+        // name. Printing it would put "now playing: -" above the picture, which
+        // reads as a page that lost the title rather than a station that sent
+        // none. Anything with no letter or digit in it is nothing.
+        if (!/[\p{L}\p{N}]/u.test(t)) return;
+        nowEl.textContent = t;
+        d.log(`now playing: ${t}`, 'hi');
+      },
       log: (m) => { d.log(m); ship(m); },
     });
-    stream.node.connect(srcNode);
+    // ⚠️ THROUGH `liveIn`, NOT STRAIGHT INTO `srcNode`. `srcNode` is what the
+    // granulator reads and what the analyser measures, so a loop that wants to
+    // BE the material has to arrive there; the only way to do that without two
+    // sources summing is a gain on the live path that the loop can take down.
+    stream.node.connect(liveIn);
     window.__stream = stream;   // a handle for the lab probe; harmless in a page
-    stream.setRate(speed);
     stream.started.then((path) => {
       decodePath = path;
+      decodeCodec = stream?.stats().codec || '';
       ship(`decode path: ${path}`);
       if (heardFrom == null) heardFrom = Date.now();
       deck.seek(Date.now());
@@ -847,8 +1406,16 @@
     // granulator would keep reading the old, stopped one — silence that looks
     // like a broken engine.
     srcNode = ctx.createGain();
+    // 🔴 THE LIVE STATION'S OWN TAP, so a loop can replace it rather than play
+    // on top of it. REPORTED as the loop not working with the granulator, and
+    // it was exact: the loop went to the SPEAKERS through a gain of its own,
+    // while `srcNode` went on carrying the live station to scsynth and to the
+    // analyser. So the granulator chewed one thing while you heard another, and
+    // the picture measured the thing you were not listening to.
+    liveIn = ctx.createGain();
+    liveIn.connect(srcNode);
     if (DECODE) openStream();
-    else ctx.createMediaElementSource(audio).connect(srcNode);
+    else ctx.createMediaElementSource(audio).connect(liveIn);
     analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
     // 🔴 NO SMOOTHING, BECAUSE ONE OF THE THINGS READ OFF THIS IS A RATE OF
@@ -866,7 +1433,110 @@
     dry = ctx.createGain();
     srcNode.connect(analyser);
     analyser.connect(dry);
-    dry.connect(ctx.destination);
+    /**
+     * 🔴 ONE WAY OUT, AND EVERYTHING THAT MAKES A SOUND GOES THROUGH IT.
+     *
+     * `dry` used to reach `ctx.destination` on its own and the engine reached it
+     * on its own too (`bootScsynth` wires `sonic.node → meter → out →
+     * destination`), so there were TWO outputs and no node that carried both.
+     * That is fine for the speakers, which sum whatever arrives, and it is fatal
+     * for a meter: `sink` was fed by the station's path only, so with the fader
+     * hard over to the granulator it read 0.0000 over a signal that was playing
+     * perfectly, and any check built on it passed by measuring nothing.
+     *
+     * A master gain is the cheapest fix that makes the mistake unrepeatable: a
+     * new path has to be connected to something, and the only thing to connect
+     * it to is here. `eng.out` is moved onto it in `startGranulator` — see the
+     * note there for why it is connected before it is disconnected.
+     *
+     * ⚠️ IT IS NOT A VOLUME. Its gain is 1 and nothing writes to it; the blend
+     * is still `dry` against `eng.out` and the mute is still those two. A second
+     * gain in the chain that anything is allowed to touch would be a second
+     * place the fader's number could live.
+     */
+    speakers = ctx.createGain();
+    dry.connect(speakers);
+    speakers.connect(ctx.destination);
+
+    // ── the loop's own audio ───────────────────────────────────────────────
+    //
+    // 🔴 THE PAGE HAS TO KEEP THE SOUND, BECAUSE THE BAR CANNOT. REPORTED as
+    // *"i can not hear radio1965 looping only viz"*, and that was exactly the
+    // state: the transport bar owns the WINDOW and moves a playhead across it,
+    // and nothing here was keeping a single sample, so pressing LOOP ran a line
+    // over a past that had no audio behind it. A picture of a loop with no loop
+    // in it is worse than no loop, because it looks like a broken player.
+    //
+    // ⚠️ A RING FILLED ON THE AUDIO THREAD, not samples scraped off the
+    // analyser. `meterTick` reads 2048 samples a frame, which at 60 Hz both
+    // overlaps and gaps: stitching those together gives a recording with seams
+    // every sixteen milliseconds. The tap copies every block the graph produces.
+    //
+    // ⚠️ AND IT TAPS `analyser`, NOT `dry`. `dry` carries the fader, so a loop
+    // recorded through it would be a recording of where the blend happened to be
+    // standing, and playing it back at a different fader position would be two
+    // fades multiplied. The material is the station.
+    loopRing = {
+      len: Math.round(BUF_SECONDS * ctx.sampleRate),
+      ch: [new Float32Array(Math.round(BUF_SECONDS * ctx.sampleRate)),
+           new Float32Array(Math.round(BUF_SECONDS * ctx.sampleRate))],
+      w: 0, filled: 0, on: false,
+    };
+    // ⚠️ A SCRIPT PROCESSOR AS A TAP, and it is deliberate rather than lazy. It
+    // is deprecated and it runs on the main thread, which is the objection; what
+    // it does here is memcpy two blocks into a typed array and return, and a
+    // worklet would be a second file and a module load for that. It is wired to
+    // a SILENT sink so it is pulled without reaching the speakers: a node that
+    // is not connected to the destination is not scheduled at all, which is the
+    // trap that makes a tap look like it is working and record nothing.
+    loopTap = ctx.createScriptProcessor(4096, 2, 2);
+    loopTap.onaudioprocess = (e) => {
+      const R = loopRing;
+      if (!R?.on) return;
+      const n = e.inputBuffer.length;
+      for (let c = 0; c < 2; c++) {
+        const src = e.inputBuffer.getChannelData(Math.min(c, e.inputBuffer.numberOfChannels - 1));
+        const dst = R.ch[c];
+        let w = R.w;
+        for (let i = 0; i < n; i++) { dst[w] = src[i]; w = w + 1 === R.len ? 0 : w + 1; }
+        if (c === 1) R.w = w;
+      }
+      R.filled = Math.min(R.len, R.filled + n);
+    };
+    const tapSink = ctx.createGain();
+    tapSink.gain.value = 0;
+    liveIn.connect(loopTap);
+    loopTap.connect(tapSink);
+    tapSink.connect(ctx.destination);
+    // Where a finished loop is played back. Its own gain, so the live path can
+    // be taken down and brought back without touching the fader's number.
+    // 🔴 INTO `srcNode`, NOT INTO THE DESTINATION. Everything downstream then
+    // gets the loop for free and by construction: the granulator chews it, the
+    // analyser measures it, the fader still blends it against the grains, and
+    // the meter below reads what actually left. Wired to the destination it was
+    // a second, parallel path that only the speakers knew about.
+    loopOut = ctx.createGain();
+    loopOut.gain.value = 0;
+    loopOut.connect(srcNode);
+    // 🔴 AND A METER ON WHAT ACTUALLY LEAVES. `analyser` sits BEFORE the fader
+    // and before the loop's own gain, so it reads the station whether or not a
+    // single sample reaches a speaker: a check built on it would have passed
+    // happily through the whole bug that was reported.
+    //
+    // 🔴 IT HANGS OFF `speakers` AND OFF NOTHING ELSE, AND THAT IS THE FIX. It
+    // used to be fed by `dry` and `loopOut` directly, which was wrong twice
+    // over. It could not hear the granulator at all, because the engine's
+    // output never passed through either — so at the fader's granulator end a
+    // meter read silence over a signal that was playing. And it heard the LOOP
+    // TWICE, once straight from `loopOut` and once round through
+    // `srcNode → analyser → dry`, so the one thing it could hear it overstated.
+    // One node carries everything that leaves, so the meter is fed by that node
+    // and the question "did anybody hear this" has one place to be asked.
+    sink = ctx.createAnalyser();
+    sink.fftSize = 2048;
+    sink.smoothingTimeConstant = 0;
+    sinkBuf = new Float32Array(sink.fftSize);
+    speakers.connect(sink);
 
     // 🔴 iOS HAS A FOURTH AudioContext STATE — `interrupted` — AND IT DOES NOT
     // COME BACK ON ITS OWN. MEASURED on an iPhone (iOS 18.7, Safari 26.6.1):
@@ -1075,6 +1745,24 @@
     dead = up.length === 0;
     if (dead) {
       d.log('neither station is answering — there is nothing to play', 'bad');
+      /**
+       * 🔴 AND IT SAYS SO AS AN ASSERT, OR THE SUITE READS GREEN OVER A PAGE
+       * THAT NEVER PLAYED A SAMPLE.
+       *
+       * `paintStations` disables the play toggle when there is nothing to play,
+       * which is right for a visitor and is exactly what silenced the harness:
+       * `verify.mjs` presses `.tbar-toggle`, a disabled button ignores it,
+       * `startListening` never runs, `finish()` never runs, and the page makes
+       * ZERO of its own thirty-four checks. The suite then printed **13/13
+       * green** — its own eleven plus the shell's two — about a page that had
+       * not played anything at all.
+       *
+       * MEASURED and reproducible with `?base=http://127.0.0.1:1`, and hit for
+       * real twice in one session while `shout` was answering 502 on the mounts
+       * this page prefers. A green suite with no coverage is the worst shape
+       * there is here, so the page reports the one thing it does know, red.
+       */
+      if (!started) finish();
     } else if (station !== PREFERRED_ID && avail.get(PREFERRED_ID)) {
       // The upgrade: the page is named after this station, so if it is there,
       // that is what it should be playing.
@@ -1129,7 +1817,11 @@
   // ⚠️ SIXTY SECONDS, NOT THIRTY. Each poll is one upstream connection per
   // station, and the list just went from two to four — halving the rate keeps
   // the cost where it was rather than doubling it because a feature was added.
-  const WATCH_MS = 60000;
+  // ⚠️ AND NINETY, NOT SIXTY, FOR THE SAME REASON AT SIX STATIONS. Two of them
+  // are somebody else's 320 kbit/s mount. The rule is that adding a station
+  // must not raise what this page costs the broadcasters, so the rate follows
+  // the length of the list rather than staying where it was set.
+  const WATCH_MS = 90000;
   setInterval(async () => {
     if (document.hidden) return;       // a backgrounded tab is nobody watching
     let answers = null;
@@ -1190,6 +1882,15 @@
       hi: Math.min((analyser?.frequencyBinCount || 1024) - 1, Math.round(10000 / binHz)) };
   }
   function meterTick() {
+    // What actually left, read at the destination. Kept as a running peak so a
+    // check can reset it, drive a control, and read what that control produced.
+    if (sink && sinkBuf) {
+      sink.getFloatTimeDomainData(sinkBuf);
+      for (let i = 0; i < sinkBuf.length; i++) {
+        const v = sinkBuf[i] < 0 ? -sinkBuf[i] : sinkBuf[i];
+        if (v > sinkPeak) sinkPeak = v;
+      }
+    }
     if (!analyser) return;
     const buf = timeBuf.length === analyser.fftSize ? timeBuf : new Float32Array(analyser.fftSize);
     analyser.getFloatTimeDomainData(buf);
@@ -1197,6 +1898,13 @@
     for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
     const rms = Math.sqrt(sum / buf.length);
     if (rms > rmsPeak) rmsPeak = rms;
+    // 🔴 THE MOMENT THERE IS SOUND, AND IT IS THIS LINE RATHER THAN A PROMISE.
+    // `rms > 0` is the first buffer with a non-zero sample in it: the graph is
+    // live, the samples are readable, and there is finally something for the
+    // picture to be of. A silent buffer reads exactly 0, and so does a graph
+    // that cannot hear its own element, which is the case this must not light
+    // for. See the gate by `.gran-slot` above.
+    if (rms > 0) boxesReady('sound');
 
     const bins = analyser.frequencyBinCount;
     if (!freqBuf || freqBuf.length !== bins) {
@@ -1257,7 +1965,12 @@
    * under `?decode=0` there is genuinely no other way to see the bitrate. So the
    * two arms below are two different situations, not one with a stale branch.
    */
-  const rec = { status: 0, bytes: 0, headers: {}, slots: 0, filled: 0, gaps: [], marks: [] };
+  // ⚠️ `station` IS ON THE RECORD, not read at assert time. The measurement
+  // belongs to ONE connection to ONE station (see `measureDecoded`), and the
+  // rate it is graded against is that station's — a switch between the read and
+  // the assert would otherwise compare 320 kbit/s of AAC against 128 of MP3 and
+  // call a healthy stream broken.
+  const rec = { status: 0, bytes: 0, headers: {}, slots: 0, filled: 0, gaps: [], marks: [], station };
 
   /** Work a rate and a burst out of byte marks — shared by both arms. */
   function summarise(startMs, endMs) {
@@ -1277,7 +1990,7 @@
     rec.steadyKbps = from && end && end[1] > from[1]
       ? ((end[0] - from[0]) * 8) / 1000 / ((end[1] - from[1]) / 1000)
       : null;
-    rec.burstS = rec.bytes / ((NOMINAL_KBPS * 1000) / 8) - secs;
+    rec.burstS = rec.bytes / ((nominalKbps(rec.station) * 1000) / 8) - secs;
     rec.gapMax = rec.gaps.length ? Math.max(...rec.gaps) : 0;
     return rec;
   }
@@ -1316,12 +2029,34 @@
       if (swapped) continue;                        // that one went away; watch the next
       return report(mine.wire());
     }
-    rec.status = stream?.wire?.().status ?? 0;
-    return rec;
+    /**
+     * 🔴 THE GIVING-UP PATH RETURNED A DIFFERENT SHAPE, AND A DIFFERENT SHAPE
+     * MID-BURST IS EVERY ASSERT LOST.
+     *
+     * Eight attempts all swapped means the stream was torn down and rebuilt for
+     * the whole window, which happens when the relay is unwell. This used to
+     * `return rec` without `summarise`, so `kbps`, `steadyKbps`, `gapMax` and
+     * `burstS` were all undefined — and the first line of `finish()` reads
+     * `m.burstS.toFixed(1)`. MEASURED twice in one session: a TypeError thrown
+     * before the first `d.assert`, so the page reported **2 asserts** and read
+     * as completely broken, over a stream problem that four honest red asserts
+     * would have named exactly.
+     *
+     * One shape out of this function, always. The numbers are then zero and
+     * null, which is what "we could not read it" looks like, and the asserts
+     * below fail on their own terms and say which.
+     */
+    const w = stream?.wire?.();
+    rec.status = w?.status ?? 0;
+    const from = w?.firstByteAt ?? performance.now();
+    return summarise(from, w?.marks?.at(-1)?.[1] ?? from);
   }
 
   /** Fold one connection's wire report into `rec` and summarise it. */
   function report(w) {
+    // The loop above only gets here with `stream === mine`, so the station
+    // playing now is the one these bytes came from.
+    rec.station = station;
     rec.status = w.status;
     rec.headers = w.headers;
     rec.slots = w.slots;
@@ -1344,6 +2079,7 @@
   async function measure(signal) {
     if (DECODE) return measureDecoded();
     const t = performance.now();
+    rec.station = station;
     const res = await fetch(`${srcOf(station)}?bytes=${2 << 20}`,
       { signal, cache: 'no-store', headers: { 'Icy-MetaData': '1' } });
     rec.status = res.status;
@@ -1453,6 +2189,13 @@
     }).catch((e) => {
       synthPending = false;
       d.log(`the granulator did not start: ${e.message} — the radio plays on`, 'bad');
+      // ⚠️ THE STACK IS KEPT WHERE A PROBE CAN READ IT. `e.message` alone says
+      // WHAT went wrong and never WHERE, and a caught error has no
+      // `Runtime.exceptionThrown` for a harness to catch either — so a
+      // `TypeError: Cannot read properties of undefined` cost two full runs to
+      // place. One assignment, the same lab-handle idiom as `__eng` and
+      // `__stream`, and it costs a working page nothing.
+      window.__granErr = String((e && e.stack) || e);
     });
 
     measured = measure().catch((e) => { d.log(`measure failed: ${e.message}`, 'bad'); return null; });
@@ -1487,8 +2230,17 @@
         ship('--- end of run ---');
       }, 1500));
     }
+    // ⚠️ AND THE DETAIL SEPARATES TWO FAILURES THAT ARE NOT THE SAME. A page
+    // that played and could not measure is a different fault from a page that
+    // was never allowed to start, and `the measurement never completed` said
+    // the first about both.
     const m = await measured;
-    if (!m) { d.assert('the relay answered', false, 'the measurement never completed'); return; }
+    if (!m) {
+      d.assert('the relay answered', false, started
+        ? 'the measurement never completed'
+        : `none of the ${STATIONS.length} mounts answered, so nothing was ever played`);
+      return;
+    }
 
     // ⚠️ MAKE SURE IT IS ACTUALLY PLAYING BEFORE ASKING WHETHER IT PLAYS.
     // The page follows the transport now, and `verify.mjs` exercises the
@@ -1533,14 +2285,45 @@
       m.headers['icy-name'] || 'absent');
     d.assert('the in-band text channel is alive', m.slots > 0,
       `${m.slots} slots, ${m.filled} carried text`);
+    // ⚠️ THE NOMINAL RATE IS THE STATION'S, NOT THE PAGE'S. It was one shared
+    // 128 until a 320 kbit/s station arrived, at which point the check failed
+    // every run on a stream that was behaving perfectly. MEASURED over this
+    // page's own five-second window, three runs each: IDA reads 322-327 against
+    // 320, and the whole-window mean reads about 950 because Icecast hands over
+    // ten seconds of audio at once. The 40 % cut is what separates the two.
+    const nominal = nominalKbps(m.station);
     d.assert('settled rate is the station\'s', m.steadyKbps != null
-      && Math.abs(m.steadyKbps - NOMINAL_KBPS) < NOMINAL_KBPS * 0.2,
-      `${Math.round(m.steadyKbps ?? 0)} vs ${NOMINAL_KBPS} kbps nominal, after the burst`);
+      && Math.abs(m.steadyKbps - nominal) < nominal * 0.2,
+      `${Math.round(m.steadyKbps ?? 0)} vs ${nominal} kbps nominal for `
+      + `${nameOf(m.station)}, after the burst`);
     d.assert('no gap past a 1 s buffer', m.gapMax < 1000,
       `worst ${Math.round(m.gapMax)} ms over ${m.gaps.length} reads`);
+    /**
+     * 🔴 THE HEADROOM, WHICH IS THE NUMBER THE CHECK ABOVE CANNOT SAY.
+     *
+     * `no gap past a 1 s buffer` passes on a 345 ms gap and passes on a 990 ms
+     * one, and on a real iPhone it passed while the cushion was **0.534 s at
+     * its tightest** — below the 600 ms floor it is supposed to hold, leaving
+     * 189 ms. A threshold that both readings clear cannot tell them apart, and
+     * the interesting quantity was the DISTANCE between them all along.
+     *
+     * It grades the plumbing at the same time. `tightest` is only ever written
+     * where the two new cells are written, so a finite value here is proof that
+     * `buffer` and `lost` were fed rather than left at one em dash — a cell
+     * nothing sets looks exactly like a cell with nothing to say.
+     */
+    if (DECODE) {
+      const head = tightest - m.gapMax / 1000;
+      d.assert('the cushion outlasts the worst gap in it',
+        Number.isFinite(tightest) && head > 0.1,
+        Number.isFinite(tightest)
+          ? `${(tightest * 1000).toFixed(0)} ms of sound in hand at the tightest `
+            + `against a ${Math.round(m.gapMax)} ms worst gap, so ${(head * 1000).toFixed(0)} ms spare`
+          : 'the buffer cell was never fed');
+    }
     d.assert(DECODE ? 'the page decoded the stream itself' : 'the element played',
       played() > 0,
-      DECODE ? `${played().toFixed(1)} s via ${decodePath || 'nothing'}`
+      DECODE ? `${played().toFixed(1)} s of ${decodeCodec || 'nothing'} via ${decodePath || 'nothing'}`
              : `t=${played().toFixed(2)}s`);
     // 🔴 THE ONE THAT CATCHES THE TAINTED GRAPH. A cross-origin element with no
     // CORS plays out of the speakers and feeds SILENCE to WebAudio, so every
@@ -1563,8 +2346,38 @@
           ? (stopped ? 'pause on the bar paused the audio too'
                      : 'the bar paused the line and the radio played on')
           : 'nothing was playing to stop');
+
     }
 
+    /**
+     * 🔴 THE TWO BOXES WERE DARK WITH NO FEED AND CAME UP AS ONE.
+     *
+     * ⚠️ IT IS READ OFF THE PAGE, NOT OFF THE CODE THAT SET IT. `LIT.dark` is
+     * `getComputedStyle().opacity` for both boxes at a frame before anything was
+     * pressed, and `LIT.gap` is the worst difference between the two while they
+     * faded — sampled every frame across the whole transition. Asserting that
+     * `classList.add` was called twice in one statement would prove that the
+     * statement ran, which is the failure HANDOFF records about `roomToEye`:
+     * a check derived from the same reasoning as the code it grades.
+     *
+     * ⚠️ NOT BEHIND `SELFCHECK`. Nothing here moves a control or damages the
+     * sound; it reads two numbers that the page produced on its own.
+     */
+    d.assert('neither box drew before there was sound, and both came up together',
+      !!LIT.dark && LIT.dark.every((o) => o === 0)
+        && LIT.at != null && LIT.gap != null && LIT.gap < 0.02
+        // ⚠️ 0.9, NOT 0.99. The claim is "both came up TOGETHER", and the
+        // number that grades it is `gap`, which is the distance BETWEEN them.
+        // A ceiling on the absolute value grades something else entirely: how
+        // far through a 450 ms CSS fade the sample happened to land. It read
+        // `0.987142 and 0.987142` with a gap of 0.000, which is the claim
+        // passing perfectly, and went red for being thirteen thousandths short
+        // of a threshold that was never the point.
+        && !!LIT.pair && LIT.pair.every((o) => o > 0.9),
+      `${LIT.dark ? LIT.dark.join(' and ') : 'never sampled'} opaque with no feed `
+      + `(${LIT.darkWhen || 'never sampled'}) · `
+      + `${LIT.pair ? LIT.pair.join(' and ') : '—'} after (${LIT.why || 'never lit'}) · `
+      + `worst ${LIT.gap == null ? '—' : LIT.gap.toFixed(3)} between them across the fade`);
 
     // ── and the granulator, in the SAME burst, when it was asked for ────────
     if (!eng) return;
@@ -1603,6 +2416,13 @@
       // named failure mode.
       const same = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length
         && a.every((x, i) => Math.abs(x - b[i]) < 1e-3);
+      // The names, graded beside the values they make meaningful. `G.names` is
+      // filled next to `readScalars`, where `ask1` lives.
+      d.assert('every control this patch names is one the engine really has',
+        Array.isArray(G.names) && G.names.length === 0,
+        G.names?.length ? `discarded in silence: ${G.names.join('; ')}`
+          : 'a sentinel written to each control whose value is zero came back unchanged');
+
       d.assert('the patch that is playing reached the engine',
         !!p && Array.isArray(G.wrong) && G.wrong.length === 0,
         p ? (G.wrong?.length ? `${p.name}: ${G.wrong.join('; ')}`
@@ -1645,6 +2465,44 @@
         p ? `gates ${G.gates ?? '—'} · notes ${G.pitches ?? '—'} · ${liveSteps(p)} of `
             + `${p.elen} step(s) open${same(G.pattern, patternOf(p)) ? '' : ` — the buffer holds ${G.pattern ?? 'nothing'}`}`
           : 'no patch was applied');
+
+      // 🔴 TWELVE SOUNDS, AND TWELVE DIFFERENT ANSWERS FROM THE ENGINE. Both
+      // halves have to hold: every patch's six architectural controls must
+      // arrive as the table wrote them, AND no two patches may arrive the same.
+      // The first alone passes a table of twelve identical rows; the second
+      // alone passes a table nothing delivered.
+      {
+        const k = G.kinds || [];
+        const late = k.filter((x) => x.key !== x.want);
+        const keys = k.map((x) => x.key);
+        const dupes = keys.filter((x, i) => keys.indexOf(x) !== i);
+        d.assert('every sound in the list reaches the engine, and no two are the same',
+          k.length === PATCHES.length && late.length === 0 && dupes.length === 0,
+          !k.length ? 'the list was never swept'
+            : late.length ? `${late.map((x) => `${x.name} held ${x.key} not ${x.want}`).join('; ')}`
+            : dupes.length ? `${dupes.length} pair(s) identical on ${KIND_WORDS}: ${dupes.join(' and ')}`
+            : `${k.length} sounds, ${k.length} different settings of ${KIND_WORDS}`);
+      }
+
+      // 🔴 THE GRAINS TUNE THEMSELVES TO A LOOP, AND THAT IS THE WHOLE TEMPO
+      // CLAIM. The loop's length is known exactly in samples and the grain clock
+      // is a phasor in the same context — MEASURED at 24000.0 ± 0.2 samples for
+      // a rate of 2 against 24000 asked for — so `lockGrainsToLoop` nudges the
+      // rate until a whole number of the figure's bars fits the loop, and after
+      // that the two cannot slide against each other at all. Read off the
+      // engine, never off the page, and it is the PRODUCT that is graded: a
+      // rate that arrived but does not divide is not a lock.
+      {
+        const bars = G.lockRate * G.lockSeconds / G.lockElen;
+        const off = Math.abs(bars - Math.round(bars));
+        d.assert('the grain clock tunes itself to a loop, and comes back off it',
+          Number.isFinite(bars) && bars >= 2 && off < 1e-3
+            && Math.abs(G.unlockRate - G.lockWant) < 1e-3,
+          Number.isFinite(bars)
+            ? `${G.lockSeconds} s of loop took ${G.lockRate.toFixed(4)}/s, which is ${bars.toFixed(5)} `
+              + `whole laps, ${(off * 1000).toFixed(3)} thousandths out, then back to ${G.unlockRate}`
+            : 'the engine never answered with its grain rate');
+      }
 
       // 🔴 AND WHAT THAT CHORD AND THAT RHYTHM MUST SOUND LIKE, AS ARITHMETIC
       // RATHER THAN AS A LEVEL. `report` fires once per GATED voice per trigger —
@@ -1723,6 +2581,9 @@
         ['fader', document.querySelector('.wet-fader .sld-lane')],
         ['sliders', document.querySelector('.gran-rows .sld-lane')],
         ['sound', document.querySelector('.gran-slot .pos-pick-seg')],
+        // ⚠️ THE NEW ROW IS IN THE LIST FROM THE DAY IT LANDED. A row added to
+        // this slot without being added here is the next report of the same bug.
+        ['loop', document.querySelector('.gran-slot .pos-choice-seg')],
       ].map(([n, e]) => [n, e ? Math.round(e.getBoundingClientRect().left) : null]);
       const xs = edges.map(([, x]) => x);
       G.edges = edges;
@@ -1733,6 +2594,98 @@
       d.assert('the grain ticks are drawn, and the fader fades them',
         G.inkWet > 20 && G.inkDry * 4 < G.inkWet,
         `${G.inkDry} lit all-radio, ${G.inkWet} lit all-granulator, ${G.alive} ticks alive`);
+
+      /**
+       * 🔴 THE METER HEARS THE GRANULATOR, AND IT CAN STILL HEAR SILENCE.
+       *
+       * Until `speakers` existed this could not have passed. `sink` was fed by
+       * the station's path and the loop's gain; the engine left the page by a
+       * route of its own, so with the fader hard over to the granulator the
+       * meter read exactly 0.0000 over a signal that was playing perfectly, and
+       * every check standing on it passed by measuring nothing.
+       *
+       * Three things have to hold together, and each one kills a different way
+       * of passing vacuously: the meter reads the grains (so it is connected),
+       * the station's own gain is at zero (so the grains are what it read), and
+       * the SAME window with the output muted reads nothing (so it is a
+       * measurement and not a number that is always there).
+       */
+      d.assert('the meter hears the granulator, and reads silence when nothing leaves',
+        G.sinkGrains > 0.0005 && G.sinkDry < 0.001
+          && G.sinkMuted <= G.sinkGrains / 8,
+        G.sinkGrains == null
+          ? 'the meter was never read'
+          : `${G.sinkGrains.toFixed(4)} at the speakers with the fader hard over `
+            + `to the granulator and the station at ${G.sinkDry.toFixed(3)}, `
+            + `${G.sinkMuted.toFixed(4)} over the same window with the output muted`);
+
+      /**
+       * 🔴 THE LOOP ROW, AND IT IS FOUR DIFFERENT THINGS RATHER THAN FOUR NAMES.
+       *
+       * This replaced five speed buttons, so the claim it has to answer for is
+       * that each cell does something a rate could not: a direction, a speed, a
+       * length, and the seconds as they arrived. Read off the voice that is
+       * playing — which buffer it holds, the lap it repeats, the rate it runs at
+       * — never off the page's own idea of what it did.
+       *
+       * ⚠️ AND `back` IS GRADED ON THE SAMPLES. A reversed buffer that is merely
+       * a DIFFERENT buffer would satisfy every other test here; the mirror check
+       * compares four points against the kept seconds at the mirrored index,
+       * exactly.
+       */
+      {
+        const w = G.ways || [];
+        const by = (n) => w.find((x) => x.name === n);
+        const round = by('round'), back = by('back'), half = by('half'), chop = by('chop');
+        const near1 = (x) => Number.isFinite(x) && Math.abs(x - 1) < 1e-6;
+        const ok = w.length === LOOP_WAYS.length
+          && round && back && half && chop
+          && !round.back && near1(round.rate) && Math.abs(round.lap - round.whole) < 1e-6
+          && back.back && near1(back.rate)
+          && G.mirror && G.mirror.tried === 4 && G.mirror.same === 4
+          && !half.back && Math.abs(half.rate - 0.5) < 1e-6
+          && !chop.back && near1(chop.rate) && chop.lap < chop.whole - 1e-6
+          // and the loop coming off leaves the grain clock on the sound's own
+          // rate, whatever the row did to it in between
+          && Number.isFinite(G.wayRate) && Math.abs(G.wayRate - G.wayWant) < 1e-3;
+        d.assert('every way in the LOOP row plays the kept seconds differently',
+          !!ok,
+          !w.length ? 'the row was never driven'
+            : w.map((x) => `${x.name} ${x.lap == null ? 'no voice' : `${x.lap.toFixed(2)} s`}`
+              + ` at ${x.rate == null ? '—' : x.rate.toFixed(2)}x`
+              + `${x.back ? ' reversed' : ''}`).join(' · ')
+              + ` · of ${(w[0]?.whole ?? 0).toFixed(2)} s kept`
+              + ` · mirror ${G.mirror ? `${G.mirror.same} of ${G.mirror.tried}` : 'never checked'}`
+              + ` · and ${G.wayRate == null ? 'no' : G.wayRate.toFixed(4)}/s left after,`
+              + ` against ${G.wayWant}/s written`);
+      }
+      /**
+       * 🔴 TWO CLAIMS, TWO ASSERTS, BECAUSE EITHER ALONE PASSES ON A HALF-BUILT
+       * LOOP. A line drawn in the right place over a picture that keeps
+       * scrolling is the thing that was reported as wrong in the first place;
+       * a picture that stops with no line on it is a page that looks frozen.
+       */
+      const heads = G.headAt || [];
+      const wantWide = Math.ceil(G.headDpr);
+      d.assert('the loop playhead lands where it is put, one pixel wide',
+        heads.length === 2
+          && heads.every((h) => Math.abs(h.at - h.want) < 0.02 && h.tall > 0.9
+            && h.wide > 0 && h.wide <= wantWide),
+        heads.length
+          ? heads.map((h) => `asked ${h.want}, drew at ${h.at.toFixed(3)} `
+            + `over ${(h.tall * 100).toFixed(0)}% of the height`).join(' · ')
+            + ` · ${heads[0].wide} of ${wantWide} backing px wide`
+          : 'never driven');
+      // ⚠️ AND IT GRADES THAT THE SECONDS WERE KEPT, not only that the edge
+      // stopped. A picture that froze and threw the audio away would satisfy
+      // "the edge held still" perfectly, and that is the exact defect this
+      // replaced: the loop's own seconds have to be in `scroll` when the edge
+      // starts moving again or the wave resumes with a hole in it.
+      d.assert('a loop stops the picture moving, keeps recording behind it, and both undo',
+        G.headHeld === 0 && G.headRuns > 0 && G.headGone && G.keptWhileFrozen > 0,
+        `the edge ${G.headHeld === 0 ? 'held still' : 'KEPT MOVING'} while frozen, `
+        + `${G.keptWhileFrozen ?? '—'} reads were kept behind it, `
+        + `and ${G.headRuns == null ? '—' : G.headRuns} more arrived in 300 ms after`);
     }
 
     // 🔴 AND THE STATION BUTTONS, WHICH NOTHING ELSE CAN REACH. `verify.mjs`
@@ -1958,6 +2911,49 @@
    * granulator as an effect rather than the granulator with the radio as
    * material, and that is a different thing to hear.
    */
+  /**
+   * 🔴 AND NOW THERE IS A LOOP, WHICH IS A SECOND SET OF AXES ENTIRELY. A sound
+   * that is good over a moving stream is not automatically good over two
+   * seconds of the same phrase coming round, and three facts decide which:
+   *
+   * 1. **THE LOOP HAS AN EXACT LENGTH AND SO DOES THE GRAIN CLOCK, SO THEY CAN
+   *    BE MADE TO DIVIDE EACH OTHER.** MEASURED, on the audio rather than on
+   *    anything this page believes: an `AudioBuffer` of 384000 samples looped
+   *    with `loop = true` repeats at **exactly 384000 samples, bit identical**,
+   *    and at 768000 at half speed; and the engine's grain clock, recorded off
+   *    its own output and fitted over 24 grains, runs at **24000.0 ± 0.2 samples
+   *    for a rate of 2**, twice, against 24000 asked for. `lockGrainsToLoop`
+   *    nudges the rate so a whole number of the figure's bars fits the loop, and
+   *    from then on nothing slides. The LOOP row's `half` is a power of two, so
+   *    the lock survives it with nothing to recompute.
+   *
+   * 2. 🔴 **A ROUTING ONTO `rate` IS THE ONE THING THAT UNPICKS IT.** The grain
+   *    clock is the only timing this instrument has; walk it and the figure
+   *    walks with it. So the patches whose point is a rhythm have NO route onto
+   *    `rate` — `the sixteenth` used to and it was moved to `size`, which
+   *    changes how long a grain is and not when it happens. The washes keep
+   *    theirs, because a cloud has nothing to be in time with.
+   *
+   * 3. **A RHYTHM MUST BE WRITTEN IN THE ENGINE, NEVER IN THE MODULATOR.** The
+   *    sixteen-step gate is read at audio rate by a `Stepper` on the grain
+   *    trigger itself, so it is exact. `pappus-mod.mjs` runs off a 25 Hz
+   *    `setInterval` — MEASURED at 2.0-2.6 ms of jitter on an idle machine, but
+   *    quantised to 40 ms by construction — so a step source on `probs` faster
+   *    than about 1 Hz decides which voices are open with a boundary that slides
+   *    by up to a twenty-fifth of a second against a grid that does not. It
+   *    cannot make a grain LATE, because grain times are the engine's; it can
+   *    hand a grain the wrong step's voices. Every step route here is at or
+   *    below 1 Hz for that reason.
+   *
+   * So each patch below says, in its own `says` line, which material it is
+   * about: the STATION (a moving stream, where a delay means "a moment ago" and
+   * a follower wanders) or the LOOP (a fixed phrase, where a delay is a canon,
+   * a follower repeats in time, and a window is a slice you can hear coming).
+   * Three are built on the loop's axes and had no reason to exist before it:
+   * `strummed`, `two seconds of it` and `cut up`. `three, three, two` was
+   * deleted to make room, because a second gate figure at a similar rate is a
+   * second helping of one kind rather than another kind.
+   */
   const PATCHES = [
     // 🔴 DELAY MODE, WHICH THIS PAGE HAS NEVER USED. The read point sits a
     // fixed distance BEHIND the write head instead of crawling through a
@@ -2009,11 +3005,17 @@
     //
     // `dub` takes BOTH levers at once, which no patch here has: delay mode for
     // the material and a gate figure for the time. The broadcast comes back two
-    // seconds late, chopped on an eight-step figure, into a tap network at
-    // three-eighths of a second — so it answers itself in time rather than
-    // smearing.
+    // seconds late, chopped on an eight-step figure, into four echoes — so it
+    // answers itself in time rather than smearing.
+    //
+    // ⚠️ EVERY NUMBER IN IT NOW DIVIDES EIGHT SECONDS, which is what the loop
+    // is. Eight steps at eight grains a second is a one-second figure, so a
+    // full loop is eight of them; the echoes at 0.5, 1, 2 and 4 seconds are
+    // sixteen, eight, four and two to a lap. It used to be seven a second into
+    // taps at three-eighths, which divides nothing and against a loop wandered
+    // in and out of phase with itself for ever.
     { name: 'dub',
-      says: 'the broadcast two seconds late, chopped on a figure, answering itself',
+      says: 'the sound two seconds late, chopped on a figure, answering itself',
       // MOTION: loud passages push the blend further into the grains and the
       //         drive breathes on a half-minute triangle, so the delay opens up
       //         when the programme does
@@ -2022,7 +3024,7 @@
         { src: 'lfo', shape: 'tri', hz: 0.035, dest: 'drive', amt: 0.30 },
         { src: 'env.high', dest: 'spray', amt: 0.25 },
       ],
-      scanmode: 3, scan: 0.25, rate: 7, size: 0.24, contour: 6,
+      scanmode: 3, scan: 0.25, rate: 8, size: 0.24, contour: 6,
       sos: 0.72, lock: 0, tilt: 0.10, ingain: 1, comp: 0.22,
       spray: 0.04, spraymode: 1, swarm: 0, swarmmode: 1, strum: 0,
       elen: 8, ephase: 0.25,
@@ -2031,7 +3033,7 @@
       pitches: [0, 0, 0, 0, 0, 0, 0, 0],
       probs: [1, 0.85, 1, 1, 1, 1, 1, 1],
       swet: 0.55, scycle: 1.5, sfb: 0.48, stilt: 0.15, sxover: 800, sdiffuse: 0.55,
-      taptimes: [0.375, 0.75, 1.125, 1.5], tappans: [-0.8, 0.8, -0.45, 0.45],
+      taptimes: [0.5, 1.0, 2.0, 4.0], tappans: [-0.8, 0.8, -0.45, 0.45],
       tappitch: [0, 0, 0, 0],
       drive: 0.22, crush: 0, crushmode: 1,
       noise: 0, noisetype: 2, noisedecay: 0.8, noisetone: 900, noisedyn: 1.0,
@@ -2051,7 +3053,7 @@
     // SAME point comb against each other (`:826`), so a few milliseconds of
     // jitter is what keeps a stretch smooth rather than hollow.
     { name: 'slowed',
-      says: 'the station at a quarter speed, pitch intact, nothing added',
+      says: 'the sound at a quarter speed, pitch intact, nothing added',
       // MOTION: none. The claim is that it does not colour the programme, and a
       //         follower here would be the page adding something and calling it
       //         the station
@@ -2130,14 +3132,32 @@
     // seven old patches did: sixteen numbers written and fifteen of them inert.
     // `elen 16` makes the figure below a rhythm, and `ephase 0.25` starts each
     // of the four voices four steps apart, so the same figure plays as a canon.
+    //
+    // 🔴 ITS FIGURE IS EXACTLY ONE SECOND LONG, AND THAT IS WHY IT IS THE BEST
+    // OF THESE ON A LOOP. Sixteen steps at sixteen grains a second is a
+    // one-second bar, so eight of them fit an eight-second loop exactly and the
+    // same step lands on the same instant of the phrase every lap, for ever.
+    // Over the live station the same figure is a pulse imposed on whatever
+    // happens to be arriving, which is a weaker thing to hear.
+    //
+    // ⚠️ TWO ROUTES CHANGED AND BOTH FOR THE TIMING. The follower was on `rate`,
+    // which is the grain clock and therefore the only timing this instrument
+    // has — walking it walks the figure with it, so the one patch built on a
+    // rhythm was the one patch modulating its own tempo. It is on `size` now,
+    // which changes how long a grain is and not when it happens. And the step
+    // source on `probs` was at 4 Hz against a modulator that ticks 25 times a
+    // second: a step boundary resolved to 40 ms, on a grid whose steps are
+    // 62.5 ms, so roughly one grain in three got the wrong step's voices. At
+    // 1 Hz a step is twenty-five ticks long and the same source is exact enough
+    // to be part of the figure rather than noise on it.
     { name: 'the sixteenth',
       says: 'a sixteen-step figure, four voices playing it four steps apart',
       // MOTION: which voices are allowed to fire steps on its own sixteen-slot
-      //         pattern at four a second — two rhythms against each other, one
+      //         pattern once a second — two rhythms against each other, one
       //         written and one that rewrites itself
       mod: [
-        { src: 'lfo', shape: 'step', hz: 4, machine: 0.90, dest: 'probs', amt: 0.80 },
-        { src: 'env', dest: 'rate', amt: 0.30 },
+        { src: 'lfo', shape: 'step', hz: 1, machine: 0.90, dest: 'probs', amt: 0.80 },
+        { src: 'env', dest: 'size', amt: 0.30 },
         { src: 'env.high', dest: 'contour', amt: 0.50 },
       ],
       scanmode: 1, scan: 0.5, rate: 16, size: 0.055, contour: 0,
@@ -2149,41 +3169,128 @@
       pitches: [0, 7, 12, 19, 0, 0, 0, 0],
       probs: [1, 0.9, 0.8, 0.7, 1, 1, 1, 1],
       swet: 0.22, scycle: 0.75, sfb: 0.30, stilt: 0.20, sxover: 900, sdiffuse: 0.30,
-      taptimes: [0.25, 0.5, 0.75, 1.0], tappans: [-0.8, 0.8, -0.5, 0.5],
+      taptimes: [0.25, 0.5, 1.0, 2.0], tappans: [-0.8, 0.8, -0.5, 0.5],
       tappitch: [0, 0, 12, 12],
       drive: 0.50, crush: 0.40, crushmode: 2,
       noise: 0.10, noisetype: 3, noisedecay: 0.2, noisetone: 2200, noisedyn: 2.0,
       wow: 0.05, rverb: 0.25, rtime: 0.40 },
 
-    // ⚠️ THE SECOND METRE, because one figure is not a lever, it is a patch.
-    // `the sixteenth` divides evenly and reads as a pulse; this leans —
-    // three steps, three steps, then two — so the same engine produces
-    // something that limps rather than marches. Three voices a third of the
-    // cycle apart on a stack of fourths, which is a different colour from the
-    // sixteenth's octaves and fifths.
-    { name: 'three, three, two',
-      says: 'an eight-step figure that leans, in three voices a third apart',
-      // MOTION: which voices fire steps on its own two-a-second pattern, and
-      //         the grain length follows how bright the programme is — so a
-      //         speaking voice makes shorter hits than music does
+    // 🔴 `strum`, WHICH NOTHING ON THIS PAGE HAS EVER USED AND WHICH IS A
+    // MECHANISM RATHER THAN A FLAVOUR. `strumsp = mstrum.clip(0, 0.125) × (1 /
+    // mrate)` and `vtrig = TDelay.ar(trig × …, strumsp × i)` (`:756`, `:806`):
+    // it is a SUBDIVISION OF THE GRAIN PERIOD, so voice `i` fires `i` eighths of
+    // a period after voice 0. At its ceiling, with eight voices open, one
+    // trigger becomes eight notes spread over seven eighths of the period — a
+    // rolled chord rather than a stack, and the roll is laid out by the same
+    // audio-rate clock the grains are, so it is exact.
+    //
+    // ⚠️ THIS IS WHAT REPLACED `three, three, two`, and the reason is the rule
+    // at the top of this table. That patch was an eight-step gate figure at
+    // twelve grains a second beside `the sixteenth`'s sixteen-step figure at
+    // sixteen — two helpings of one kind, which is the failure this whole set
+    // was rebuilt to escape. A roll is a different kind, and it is the only one
+    // here whose rhythm comes from inside a single grain period.
+    //
+    // ⚠️ AND THE FOLLOWER IS ON THE ROLL ITSELF, not on a colour. A bright
+    // passage tightens the strum toward a chord and a dull one opens it into an
+    // arpeggio, which is the one gesture only this patch can make.
+    { name: 'strummed',
+      says: 'a chord rolled out one note at a time, twice a second',
+      // MOTION: brightness closes the roll up toward a chord, and which notes
+      //         of it are allowed to sound steps once every two seconds
       mod: [
-        { src: 'lfo', shape: 'step', hz: 2, machine: 0.85, dest: 'probs', amt: 0.55 },
-        { src: 'env.tone', dest: 'size', amt: 0.35 },
+        { src: 'env.tone', dest: 'strum', amt: 0.45 },
+        { src: 'lfo', shape: 'step', hz: 0.5, machine: 0.88, dest: 'probs', amt: 0.45 },
       ],
-      scanmode: 1, scan: 0.5, rate: 12, size: 0.085, contour: 2,
-      sos: 0.74, lock: 0, tilt: 0.12, ingain: 1, comp: 0.18,
-      spray: 0.08, spraymode: 2, swarm: 0.15, swarmmode: 1, strum: 0.03,
-      elen: 8, ephase: 0.333,
-      pattern: [1, 0, 0, 1, 0, 0, 1, 0],
-      gates: [1, 1, 1, 0, 0, 0, 0, 0],
-      pitches: [0, 5, 10, 0, 0, 0, 0, 0],
-      probs: [1, 0.92, 0.82, 1, 1, 1, 1, 1],
-      swet: 0.20, scycle: 0.66, sfb: 0.28, stilt: 0.10, sxover: 850, sdiffuse: 0.25,
-      taptimes: [0.375, 0.75, 1.125, 1.5], tappans: [-0.7, 0.7, -0.4, 0.4],
+      scanmode: 1, scan: 0.5, rate: 2, size: 0.35, contour: 8,
+      sos: 0.68, lock: 0, tilt: 0.08, ingain: 1, comp: 0.20,
+      spray: 0.05, spraymode: 1, swarm: 0, swarmmode: 1, strum: 0.125,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 1, 1, 1, 1, 1, 1],
+      pitches: [-12, -5, 0, 7, 12, 16, 19, 24],
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0.28, scycle: 2.0, sfb: 0.25, stilt: 0.05, sxover: 800, sdiffuse: 0.40,
+      taptimes: [1.0, 2.0, 4.0, 8.0], tappans: [-0.6, 0.6, -0.35, 0.35],
       tappitch: [0, 0, 12, 12],
-      drive: 0.30, crush: 0.15, crushmode: 2,
-      noise: 0.06, noisetype: 3, noisedecay: 0.25, noisetone: 2000, noisedyn: 1.6,
-      wow: 0.04, rverb: 0.20, rtime: 0.35 },
+      drive: 0.12, crush: 0, crushmode: 1,
+      noise: 0, noisetype: 2, noisedecay: 0.6, noisetone: 1200, noisedyn: 1.0,
+      wow: 0.05, rverb: 0.30, rtime: 0.50 },
+
+    // 🔴 A WINDOW INSIDE THE BUFFER, WHICH NO PATCH HERE HAS EVER SET. `winlo`
+    // and `winhi` fold every read into a slice of the held seconds (`:660`,
+    // `:838`), and `speed = winspan × (3·mscan − 1)` (`:715`) — so narrowing the
+    // window to a quarter and pushing the read head to the top of its lane gives
+    // TWO seconds of material crossed in FOUR, half speed, lapping twice to
+    // every eight-second loop. Over the station it is a two-second memory read
+    // over and over; over a loop it is one phrase of the music, slowed, arriving
+    // twice a lap in the same place each time.
+    //
+    // ⚠️ AND THE SLICE WALKS. Both window ends carry the same triangle at the
+    // same phase, so the pair slides rigidly through the buffer over about
+    // eighty seconds instead of the slice changing length. `setRoutes` spreads
+    // phases round the cycle unless a route names its own, so both say
+    // `phase: 0` — without that they would be given 0 and 0.5 and the window
+    // would open and shut instead of moving.
+    { name: 'two seconds of it',
+      says: 'two seconds out of the eight, stretched over four and read again',
+      // MOTION: the two seconds slide slowly through the buffer, so the phrase
+      //         you are hearing is not the one you were hearing a minute ago
+      mod: [
+        { src: 'lfo', shape: 'tri', hz: 0.013, phase: 0, dest: 'winstart', amt: 0.60 },
+        { src: 'lfo', shape: 'tri', hz: 0.013, phase: 0, dest: 'winend', amt: 0.60 },
+        { src: 'env.flux', dest: 'spray', amt: 0.30 },
+      ],
+      scanmode: 1, scan: 1.0, rate: 24, size: 0.18, contour: 10,
+      winstart: 0.25, winend: 0.50,
+      sos: 0.66, lock: 0, tilt: 0.05, ingain: 1, comp: 0.22,
+      spray: 0.06, spraymode: 3, swarm: 0.25, swarmmode: 1, strum: 0,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 0, 0, 0, 0, 0, 0],
+      pitches: [0, -12, 0, 0, 0, 0, 0, 0],
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0.30, scycle: 2.0, sfb: 0.30, stilt: 0, sxover: 800, sdiffuse: 0.45,
+      taptimes: [1.0, 2.0, 3.0, 4.0], tappans: [-0.7, 0.7, -0.4, 0.4],
+      tappitch: [0, 0, 0, 0],
+      drive: 0.08, crush: 0, crushmode: 1,
+      noise: 0.04, noisetype: 2, noisedecay: 0.9, noisetone: 1300, noisedyn: 1.0,
+      wow: 0.06, rverb: 0.35, rtime: 0.55 },
+
+    // 🔴 GRAINS AS LONG AS THE STEPS THEY SIT ON, WHICH IS AN ARRANGEMENT RATHER
+    // THAN A TEXTURE. Every other patch here fires grains far shorter than its
+    // figure, so the figure is a pulse ON the material; this fires ONE
+    // one-second grain per step of a four-step figure and leaves one step of
+    // the four empty, so what you hear is the material itself, a second at a
+    // time, with a second missing. Four steps at one a second is a four-second
+    // bar: two of them to an eight-second loop, so the same second goes missing
+    // every lap.
+    //
+    // ⚠️ DELAY MODE, AND THAT IS ABOUT SAFETY RATHER THAN TASTE. A grain is an
+    // un-syncing read forward from wherever it started (`:668`), so a
+    // one-second grain taken near the write head is overtaken by it mid-note
+    // and splices. Four seconds behind, a one-second grain ends three seconds
+    // behind, and the buffer under it cannot change.
+    { name: 'cut up',
+      says: 'the sound a second at a time, with one second in four left out',
+      // MOTION: which of the two voices doubles changes once a bar, and loud
+      //         passages make the pieces a little longer
+      mod: [
+        { src: 'lfo', shape: 'step', hz: 0.25, machine: 0.90, dest: 'probs', amt: 0.50 },
+        { src: 'env', dest: 'size', amt: 0.25 },
+      ],
+      scanmode: 3, scan: 0.5, rate: 1, size: 1.0, contour: 4,
+      sos: 0.70, lock: 0, tilt: 0, ingain: 1, comp: 0.25,
+      spray: 0.02, spraymode: 1, swarm: 0, swarmmode: 1, strum: 0,
+      elen: 4, ephase: 0,
+      pattern: [1, 0, 1, 1],
+      gates: [1, 1, 0, 0, 0, 0, 0, 0],
+      pitches: [0, 0, 0, 0, 0, 0, 0, 0],
+      probs: [1, 0.5, 1, 1, 1, 1, 1, 1],
+      swet: 0.35, scycle: 2.0, sfb: 0.35, stilt: 0.10, sxover: 800, sdiffuse: 0.40,
+      taptimes: [1.0, 2.0, 4.0, 6.0], tappans: [-0.7, 0.7, -0.4, 0.4],
+      tappitch: [0, 0, 0, 0],
+      drive: 0.15, crush: 0, crushmode: 1,
+      noise: 0, noisetype: 2, noisedecay: 0.8, noisetone: 900, noisedyn: 1.0,
+      wow: 0.08, rverb: 0.30, rtime: 0.50 },
 
     // 🔴 FOUR-SECOND GRAINS, WHICH IS THE OTHER END OF A SCALE EVERY OLD PATCH
     // SAT IN THE MIDDLE OF. Half a grain a second, each one four seconds long
@@ -2195,12 +3302,23 @@
       // MOTION: bass in the programme THINS it rather than thickening it, which
       //         is the opposite of what loudness would do, and the detune walks
       //         on a fifty-second pattern
+      // ⚠️ THE THINNING MOVED OFF `rate` AND ONTO `probs`, and it is the same
+      // musical claim by a better road. On `rate` it thinned by firing fewer
+      // grains, which is the grain clock, which is the only timing here — so
+      // the patch spent its life walking its own tempo. On `probs` it thins by
+      // refusing to fire on some triggers, which is what "thinner" means and
+      // leaves the clock where the loop put it. A follower has no phase, so on
+      // an eight-element control it moves all three voices together: a duck,
+      // which is honest, and is what this wants.
       mod: [
         { src: 'env', dest: 'size', amt: 0.40 },
         { src: 'lfo', shape: 'glide', hz: 0.02, machine: 0.85, dest: 'swarm', amt: 0.60 },
-        { src: 'env.low', dest: 'rate', amt: -0.40 },
+        { src: 'env.low', dest: 'probs', amt: -0.40 },
       ],
-      scanmode: 1, scan: 0.0, rate: 0.45, size: 4.0, contour: 14,
+      // ⚠️ HALF A GRAIN A SECOND EXACTLY, WHICH IS WHAT THE LINE ABOVE ALREADY
+      // CLAIMED. 0.45 was near enough to say in words and divides nothing; 0.50
+      // puts four grains in every eight-second loop.
+      scanmode: 1, scan: 0.0, rate: 0.5, size: 4.0, contour: 14,
       sos: 0.80, lock: 0, tilt: -0.55, ingain: 1, comp: 0.30,
       spray: 0.40, spraymode: 3, swarm: 0.85, swarmmode: 3, strum: 0.10,
       elen: 1, ephase: 0, pattern: null,
@@ -2208,7 +3326,7 @@
       pitches: [-12, -7, 0, 0, 0, 0, 0, 0],
       probs: [1, 1, 1, 1, 1, 1, 1, 1],
       swet: 0.50, scycle: 8.0, sfb: 0.50, stilt: -0.50, sxover: 500, sdiffuse: 0.60,
-      taptimes: [3.0, 5.0, 7.0, 8.0], tappans: [-0.5, 0.5, -0.9, 0.9],
+      taptimes: [2.0, 4.0, 6.0, 8.0], tappans: [-0.5, 0.5, -0.9, 0.9],
       tappitch: [-12, -12, 0, 0],
       drive: 0.30, crush: 0, crushmode: 1,
       noise: 0.15, noisetype: 2, noisedecay: 1.5, noisetone: 400, noisedyn: 1.2,
@@ -2268,7 +3386,7 @@
       pitches: [0, 0, 0, 0, 0, 0, 0, 0],
       probs: [1, 1, 1, 1, 1, 1, 1, 1],
       swet: 0.30, scycle: 3.0, sfb: 0.55, stilt: 0.35, sxover: 1100, sdiffuse: 0.35,
-      taptimes: [0.5, 1.0, 1.5, 2.0], tappans: [-0.4, 0.4, -0.7, 0.7],
+      taptimes: [0.5, 1.0, 2.0, 4.0], tappans: [-0.4, 0.4, -0.7, 0.7],
       tappitch: [0, 0, 0, 0],
       drive: 0.80, crush: 0.70, crushmode: 3,
       noise: 0.45, noisetype: 3, noisedecay: 0.4, noisetone: 1800, noisedyn: 2.2,
@@ -2323,6 +3441,109 @@
     * p.gates.reduce((sum, g, i) => sum + (g > 0.001 ? p.probs[i] : 0), 0)
     * (liveSteps(p) / Math.max(1, p.elen));
 
+  /** What the "no two sounds are the same" check is about, for its own detail line. */
+  const KIND_WORDS = 'read head, figure, rate, length, roll and window';
+
+  /**
+   * 🔴 THE GRAINS ARE TUNED TO THE LOOP, AND THIS IS THE WHOLE OF THE TEMPO
+   * QUESTION ANSWERED IN ARITHMETIC. Asked directly: *"rhythm ones perhaps not
+   * good without tempo syncing (can you do it btw?)"*
+   *
+   * The loop is an `AudioBuffer` of an exact number of samples played with
+   * `loop = true`, so its period is exactly that many samples: MEASURED by
+   * looping 384000 samples of noise and finding the lag at which the recording
+   * repeats — 384000 at speed 1 and 768000 at 0.5, BIT IDENTICAL, residual
+   * exactly 0. The grain clock is `Phasor.ar(t_sync, mrate × SampleDur)`
+   * (`Engine_Pappus.sc:689`) in the same audio context, so its period is
+   * exactly `SampleRate / mrate` samples: MEASURED from the engine's own output
+   * over 24 grains, **24000.0 ± 0.2 samples against 24000 asked for**, twice.
+   * Two exact periods can be made to divide each other, and then they never
+   * drift.
+   *
+   * So a figure of `elen` steps at `mrate` grains a second has a bar of
+   * `elen / mrate` seconds, and this nudges `mrate` to the nearest value that
+   * fits a WHOLE NUMBER of those bars into the loop. The nudge is at most half a
+   * bar's worth, which is a few per cent on everything here.
+   *
+   * ⚠️ IT LOCKS TO THE LOOP'S LENGTH AT SPEED 1, NOT TO WHAT IT IS PLAYING AT.
+   * Every rate the bar offers is a power of two (0.0625 … 1), so a loop that is
+   * `k` bars long at speed 1 is `k × 2^m` bars long at any of them — still a
+   * whole number, still locked, with nothing to recompute when a speed button is
+   * pressed. A rate that was not a power of two would break that, and there is
+   * none.
+   *
+   * ⚠️ A FIGURE LONGER THAN THE LOOP CANNOT BE LOCKED BY NUDGING A RATE, so
+   * fewer than two bars in the loop is left alone and said so in words. Halving
+   * a grain rate to make one bar fit would be the page changing the sound to
+   * satisfy its own arithmetic.
+   *
+   * ⚠️ AND THE SLIDER MOVES WITH IT. A page that shows one grain rate and plays
+   * another is this file's own named failure; `P.rate` is what the checks read.
+   */
+  let lockedRate = null;          // what the loop tuned the grain rate to
+  let loopSeconds = null;         // the loop's own length, at speed 1
+  /**
+   * The patch's own grain rate back, if anything had moved it.
+   *
+   * 🔴 IT IS A FUNCTION BECAUSE THERE ARE TWO WAYS OUT OF A LOCK AND ONLY ONE
+   * OF THEM USED TO TAKE IT. The loop ending was handled; a lock that REFUSES
+   * was not, and the LOOP row is what made that reachable. MEASURED: press
+   * `chop`, whose slice is too short for the patch's figure, and the refusal
+   * cleared `lockedRate` while leaving `P.rate` on the value the previous lap
+   * had tuned it to. Taking the loop off then found `lockedRate` already null
+   * and did nothing, so the page was left playing 8.79 grains a second on a
+   * sound written for 9, with the slider agreeing and nothing anywhere saying
+   * so. Read back off the engine in the run that caught it:
+   * `1 voice(s) at 8.7890625/s`.
+   */
+  function releaseGrainLock(p) {
+    if (lockedRate == null) return;
+    lockedRate = null;
+    P.rate = p.rate;
+    setBoth('rate', p.rate);
+    modulator?.setBase('rate', p.rate);
+    sliders?.rate?.set(p.rate, { quiet: true, glideMs: 400 });
+    d.log(`back to ${p.rate} grains a second, the rate this sound was written with`);
+  }
+  function lockGrainsToLoop(seconds) {
+    loopSeconds = seconds;
+    const p = PATCHES[patch];
+    if (!eng || !p) return;
+    if (!(seconds > 0)) {
+      // The loop is gone: the patch's own rate comes back, or the instrument is
+      // left tuned to a loop nobody is playing.
+      releaseGrainLock(p);
+      return;
+    }
+    const elen = Math.max(1, p.elen || 1);
+    const bars = seconds * p.rate / elen;
+    const laps = Math.round(bars);
+    // ⚠️ FEWER THAN TWO BARS IN THE LOOP IS LEFT ALONE, and the two reasons are
+    // different enough to be said differently. A figure that already fills the
+    // loop exactly needs nothing; one that is longer than half of it could only
+    // be made to fit by halving or doubling the grain rate, which is the page
+    // changing the sound to satisfy its own arithmetic.
+    if (laps < 2) {
+      d.log(Math.abs(bars - laps) < 1e-6 && laps >= 1
+        ? `${p.name} already fills the loop exactly, so nothing was tuned`
+        : `${p.name} cannot be tuned to a loop this short: its figure is longer than half of it`);
+      // ⚠️ AND THE LAST LAP'S LOCK GOES WITH THE REFUSAL. "This lap cannot be
+      // divided" has to mean the sound's own rate, never the rate a DIFFERENT
+      // lap was tuned to.
+      releaseGrainLock(p);
+      return;
+    }
+    const want = laps * elen / seconds;
+    lockedRate = want;
+    P.rate = want;
+    setBoth('rate', want);
+    modulator?.setBase('rate', want);
+    sliders?.rate?.set(want, { quiet: true, glideMs: 400 });
+    d.log(p.elen > 1
+      ? `${Math.round(bars)} bars of ${p.elen} steps to each lap of the loop`
+      : `${Math.round(bars)} grains to each lap of the loop`, 'hi');
+  }
+
   // What the checks in `finish()` have to say, filled in by `startGranulator`.
   // ⚠️ EVERY FIELD DECLARED HERE EVEN THOUGH JAVASCRIPT DOES NOT NEED IT: a
   // burst of asserts reading properties that appear from nowhere cannot be
@@ -2334,7 +3555,24 @@
     patch: null, scalars: null, wrong: null,
     gates: null, pitches: null, probs: null, pattern: null,
     // and the one along from it, through the picker's own `›`
-    otherWant: null, otherMode: null, otherElen: null, otherPattern: null, here: -1 };
+    otherWant: null, otherMode: null, otherElen: null, otherPattern: null, here: -1,
+    // the grain clock tuned to a loop of a named length, and put back
+    lockSeconds: null, lockElen: 1, lockWant: null, lockRate: null, unlockRate: null,
+    // what the meter on `speakers` read with the fader hard over to the
+    // granulator, and what it read with the output muted — the pair is the
+    // measurement, see the block that fills them
+    sinkGrains: null, sinkMuted: null, sinkDry: null, sinkEng: null,
+    // the LOOP row, driven through its own buttons on a real loop: what the
+    // playing voice held after each press, whether the reversed copy of the
+    // seconds really is the mirror of the kept ones, and the grain rate the
+    // engine was left holding once the loop came off
+    ways: null, mirror: null, wayRate: null, wayWant: null,
+    // every sound in the list, read back off the engine one at a time
+    kinds: null,
+    // the loop playhead, driven by the self-check because nothing else drives
+    // it yet: where each line landed on the canvas, how wide it was, and
+    // whether the wave stopped under it and started again afterwards
+    headDpr: 1, headAt: null, headHeld: null, headRuns: null, headGone: false };
 
   /** Peak RMS at the engine's own meter over `ms`. The meter is IN the path. */
   function engLevel(ms) {
@@ -2712,6 +3950,11 @@
       // `slowed`'s whole claim: the programme, slowed, with nothing added.
       d.set('moving', modulator.moving().length || '');
     }
+    // ⚠️ A PATCH CHANGE WHILE A LOOP RUNS HAS TO BE RE-TUNED TO IT. `writePatch`
+    // has just written this patch's own `rate`, so without this the figure would
+    // come back off the loop's grid the moment somebody pressed `›` — a lock
+    // that silently holds for one sound and not the next.
+    if (loopSeconds > 0) lockGrainsToLoop(loopSeconds);
     patchPick?.show(p.name, patch);
     if (silent) return p;
     // ⚠️ SAY WHEN IT WAS NOT YOU. `finish()` presses `›` and `‹` to grade a
@@ -2827,11 +4070,22 @@
   }
   async function checkStationButtons() {
     const here = STATIONS.findIndex(([, id]) => id === station);
-    const other = here === 0 ? 1 : 0;
-    if (picker.buttons[other].disabled) {
+    // 🔴 THE FIRST STATION THAT IS NOT THIS ONE AND IS NOT GREYED, NOT INDEX 0.
+    // It used to be `here === 0 ? 1 : 0`, which was fine while the row held two
+    // stations and stopped being fine at six: on the day this was written FOUR
+    // of the six were refusing, and index 0 was one of them — so the strong
+    // claim ("pressing a button moves the stream") would have been skipped in
+    // favour of the weak one ("a dead station's button is disabled") whenever
+    // the top of the list happened to be down. A check that quietly downgrades
+    // itself reads exactly like a check that passed.
+    const other = STATIONS.findIndex(([, id], i) => i !== here && avail.get(id) !== false);
+    if (other < 0 || picker.buttons[other].disabled) {
+      // ⚠️ `other` IS -1 WHEN EVERY OTHER STATION IS DOWN, so the station this
+      // branch reports on has to be found again rather than indexed with it.
+      const off = other < 0 ? (here === 0 ? 1 : 0) : other;
       S.label = 'a station that is not answering has a button that refuses';
-      S.pass = avail.get(STATIONS[other][1]) === false;
-      S.detail = `${nameOf(STATIONS[other][1])} is down and its button is disabled`;
+      S.pass = avail.get(STATIONS[off][1]) === false && picker.buttons[off].disabled;
+      S.detail = `${nameOf(STATIONS[off][1])} is down and its button is disabled`;
       return;
     }
     const wasStation = station;
@@ -2914,6 +4168,25 @@
     // page load that "kicks off and then goes away", which is exactly what it
     // was. `wet` is 0 here, so this leaves the engine silent until asked.
     eng.out.gain.value = wet;
+    /**
+     * 🔴 AND THE ENGINE JOINS THE ONE WAY OUT, SO A METER CAN HEAR IT.
+     *
+     * `bootScsynth` wires its own output straight to the destination, which it
+     * has to: Web Audio PULLS, and a graph with no path to the speakers is
+     * never asked to process — that is what made buffer allocation time out
+     * once, and the note in that file says so. The consequence here was that
+     * the granulator left this page by a route `sink` was not on, so a meter at
+     * the fader's granulator end read 0.0000 over a signal that was playing.
+     *
+     * ⚠️ CONNECTED BEFORE IT IS DISCONNECTED, in that order, on purpose. The
+     * other order leaves the engine with no path to any destination for the
+     * length of one statement, and the thing that goes wrong when that happens
+     * is not a click, it is an allocation that never answers.
+     */
+    if (speakers) {
+      eng.out.connect(speakers);
+      eng.out.disconnect(ctx.destination);
+    }
     window.__eng = eng;   // lab handle
 
     // The engine's input is connected by now, so this is the instant the
@@ -3040,9 +4313,34 @@
     patchRow.options(PATCHES.map((p) => p.name), patch);
     patchPick = patchRow;
 
-    // Picture, blend, what the granulator IS, how fast the station runs, and
-    // then the four settings. Speed sits beside the sound rather than in the
-    // transport bar: it changes the material, not the playhead.
+    /**
+     * The LOOP row — what took the speed buttons' place. The four ways, what
+     * each one does and why they are these four are all up beside `LOOP_WAYS`.
+     *
+     * ⚠️ GREY UNTIL THERE IS A LOOP, WITH THE REASON ON IT. There is nothing to
+     * play backwards until LOOP has kept some seconds, and a row that lights up
+     * and makes no sound is this project's named failure. `caps.mjs`'s rule is
+     * that a thing you cannot do right now says so rather than vanishing, so the
+     * row stays where it is, greyed, with the one sentence that makes it usable.
+     */
+    /**
+     * 🔴 THE LOOP'S WAYS MOVED INTO THE TRANSPORT, AS TWO TOGGLES.
+     *
+     * They were a four-cell radio row under the picture, and a row that can
+     * only act on a loop has nothing to say for the whole time no loop is
+     * running: it sat there greyed, taking a line, explaining itself in a
+     * tooltip. The transport already owns LOOP, so the things that modify a
+     * loop belong beside it and appear with it.
+     * ⚠️ `half` AND `chop` ARE NOT GONE FROM THE CODE, only from the row. Half
+     * speed is what the rate lattice beside these is for, now that it is back.
+     * `chop` has no control any more and the checks still drive it; that is a
+     * loose end and it is written here rather than left to be discovered.
+     */
+    loopRow = null;
+
+    // Picture, blend, what the loop is made of, what chews it, and then the four
+    // settings that decide how. The LOOP row sits above SOUND because it decides
+    // the MATERIAL and SOUND decides what is done to it.
     // Into the slot reserved at first paint, so nothing below moves.
     granSlot.append(wetRow.el, patchRow.el);
     granSlot.append(group.el);
@@ -3070,10 +4368,11 @@
         .flatMap((g) => [...g.querySelectorAll('.sld-l, .sld-v')])
         .reduce((m, e) => Math.max(m, e.getBoundingClientRect().width), 0);
       if (!wide) return;
-      // ⚠️ THE SOUND PICKER IS IN THE LIST TOO. Its label is not a `.sld-l`, so
-      // it was never measured and never set — which is exactly how it ended up
-      // being the one row with a different left edge.
-      for (const g of [wetRow.el, group.el, patchRow.el]) {
+      // ⚠️ THE SOUND PICKER IS IN THE LIST TOO, AND SO IS THE LOOP ROW. Neither
+      // label is a `.sld-l`, so neither is measured, and a row that is not SET
+      // is the row that ends up with a different left edge — which is how the
+      // sound picker was reported three times. The assert below reads all four.
+      for (const g of [wetRow.el, group.el, patchRow.el, loopRow.el]) {
         g.style.setProperty('--lab', `${Math.ceil(wide)}px`);
       }
     };
@@ -3091,6 +4390,13 @@
     // the event for it rather than a guess at how long loading takes.
     document.fonts?.ready?.then(shareLabelColumn).catch(() => {});
     new ResizeObserver(shareLabelColumn).observe(d.el);
+
+    // 🔴 THE SECOND HALF OF THE FADE, AND IT IS AFTER THE COLUMN IS SHARED
+    // RATHER THAN AFTER THE APPEND. The rows land at four different left edges
+    // and `shareLabelColumn()` is what pulls them into one; lighting before it
+    // ran would fade a misaligned row in and then snap it sideways in front of
+    // somebody. See the gate by `.gran-slot` at the top.
+    boxesReady('controls');
 
     // ⚠️ AND HERE IS WHERE THE RADIO HAS TO BE PLAYING — not at the top. The
     // harness exercises the transport before anything else and leaves the deck
@@ -3252,6 +4558,48 @@
       // separates "no grains at all" from "grains but no ink"; it is not evidence
       // of painting, and an earlier version of this note claimed it was.
       G.alive = scope.stats().flickering;
+
+      /**
+       * 🔴 CAN THE METER HEAR THE GRANULATOR AT ALL — WITH A CONTROL THAT PROVES
+       * IT CAN ALSO HEAR SILENCE.
+       *
+       * This is the check the graph could not pass until `speakers` existed.
+       * `sink` was fed by the station's own path and by the loop's gain, and the
+       * engine reached the destination by a route of its own, so at the fader's
+       * granulator end the meter read exactly 0.0000 over a signal that was
+       * playing — and every check built on it passed by measuring nothing.
+       *
+       * ⚠️ THE FADER IS HARD OVER AND `dry` IS THEREFORE AT ZERO, so the station
+       * cannot be what is heard. That is the half that makes the reading mean
+       * "the granulator", rather than "something".
+       *
+       * ⚠️ AND THE NEGATIVE CONTROL IS THE SAME MEASUREMENT WITH THE OUTPUT
+       * MUTED. A statistic that is non-zero however the page is set is a blind
+       * measurement, not a weak one — so the pair is taken at the same fader
+       * position, over the same window length, with only the mute moved.
+       * MEASURED: 0.0000 muted against 0.30 unmuted.
+       *
+       * ⚠️ THE MUTE COMES OFF FOR ABOUT A SECOND, AND ONLY UNDER `selfcheck=1`.
+       * It cannot be measured through a mute, because a mute is exactly the
+       * thing being measured. `dry` stays at zero throughout, so what a person
+       * running the harness by hand would hear is a second of granulator and no
+       * station.
+       */
+      const meterOver = async (ms) => {
+        sinkPeak = 0;
+        await new Promise((r) => setTimeout(r, ms));
+        return sinkPeak;
+      };
+      muted = true; setWet(1);
+      await new Promise((r) => setTimeout(r, 250));
+      G.sinkMuted = await meterOver(400);
+      muted = false; setWet(1);
+      await new Promise((r) => setTimeout(r, 250));
+      G.sinkGrains = await meterOver(500);
+      G.sinkDry = dry ? dry.gain.value : 1;
+      G.sinkEng = eng ? eng.out.gain.value : 0;
+      muted = true; setWet(1);
+
       // 🔴 TWO PATCHES, THROUGH THE REAL BUTTON, WHILE NOTHING CAN BE HEARD.
       // The asserts in `finish()` can only grade the patch that happens to be
       // selected, and this row is the page's main control: `verify.mjs` presses
@@ -3307,6 +4655,43 @@
       const missing = (p, got) => SCALARS
         .filter(([name, want]) => !(Math.abs((got[name] ?? NaN) - want(p)) < 1e-3))
         .map(([name, want]) => `${name} ${got[name]} not ${want(p)}`);
+
+      /**
+       * 🔴 `/s_get` ON A CONTROL THE ENGINE DOES NOT HAVE ANSWERS 0, NOT A
+       * REFUSAL, AND THAT MAKES THE CHECK ABOVE BLIND WHERE THE ANSWER IS 0.
+       *
+       * The comment further up is right that a misspelled control is discarded
+       * in silence, and reading twelve of them back is the right answer to it.
+       * What neither knew is what a read of a name that does not exist returns.
+       * MEASURED from a non-zero base: `mswarm` held 0.37, writing `mswarmXYZ`
+       * left it at 0.37, and both `mswarmXYZ` and a never-written control read
+       * back **0.00000**. So the readback cannot tell "the engine holds zero"
+       * from "there is no such control".
+       *
+       * That is not hypothetical here. FIVE of the twelve scalars are expected
+       * to be exactly 0 in some patch (`contour`, `swarm` in six of them, `swet`,
+       * `rverb`, `wow`), and for those the comparison above passes on a name the
+       * engine never had.
+       *
+       * ⚠️ SO THE NAME IS PROVED SEPARATELY FROM THE VALUE, and only where it
+       * has to be: a sentinel no patch uses is written, read back, and the
+       * patch's own value put back. A name that does not exist swallows the
+       * write and answers 0, which is now a failure rather than a pass.
+       */
+      const SENTINEL = 0.4271;
+      async function namesExist(p) {
+        const bad = [];
+        for (const [name, want] of SCALARS) {
+          if (Math.abs(want(p)) > 1e-9) continue;      // its value already proves it
+          setParam(eng, name, SENTINEL);
+          await new Promise((r) => setTimeout(r, 30));
+          const back = await ask1(name);
+          setParam(eng, name, want(p));                // put the patch back
+          if (!(Math.abs(back - SENTINEL) < 1e-3)) bad.push(`${name} read ${back}`);
+        }
+        await new Promise((r) => setTimeout(r, 30));
+        return bad;
+      }
 
       const herePatch = patch;
       const otherPatch = (patch + 1) % PATCHES.length;
@@ -3404,6 +4789,92 @@
       // allowed to leave the instrument somewhere nobody chose.
       modulator?.setRoutes(PATCHES[patch].mod || []);
 
+      /**
+       * 🔴 THE TEMPO CLAIM, GRADED WHERE THE SUITE CAN SEE IT.
+       *
+       * The page also presses the real LOOP button at the very end of the run
+       * and checks the same thing there. That one is NOT COLLECTED: MEASURED,
+       * the page makes 30 asserts and `verify.mjs` reads 28, because the loop
+       * test sits a full second behind the burst and the stabiliser stops 400 ms
+       * after the count last grew. So the arithmetic and the write to scsynth
+       * are graded here, in the burst, where they are read.
+       *
+       * ⚠️ A LENGTH NO PATCH COULD HAVE BEEN WRITTEN FOR. 2.5 s divides none of
+       * the grain rates in the table, so a `lockGrainsToLoop` that did nothing
+       * at all would leave a rate that is NOT a whole number of bars — which is
+       * what makes the number below evidence rather than a coincidence.
+       *
+       * ⚠️ AND IT MUST PUT THE RATE BACK, because `readScalars` two lines down
+       * compares `mrate` against the patch's own number. Both halves are
+       * asserted: a lock that never releases is a page left tuned to a loop
+       * nobody is playing.
+       */
+      const LOCK_SECONDS = 2.5;
+      G.lockSeconds = LOCK_SECONDS;
+      G.lockElen = Math.max(1, PATCHES[patch].elen || 1);
+      G.lockWant = PATCHES[patch].rate;
+      lockGrainsToLoop(LOCK_SECONDS);
+      await new Promise((r) => setTimeout(r, 120));
+      G.lockRate = await ask1('mrate');
+      lockGrainsToLoop(null);
+      await new Promise((r) => setTimeout(r, 120));
+      G.unlockRate = await ask1('mrate');
+
+      /**
+       * 🔴 EVERY SOUND IN THE LIST, ASKED OF THE ENGINE, AND NO TWO THE SAME.
+       *
+       * This table's whole history is the same complaint three times over —
+       * *"patches still too similar"* — and every previous answer was an author
+       * asserting that the numbers were further apart. LESSONS #59 is the same
+       * shape: a randomiser over nine overlapping ranges makes one sound with
+       * nine names. So the claim is graded instead, and on the far side of the
+       * wire: each patch is applied, six architectural controls are read back
+       * off scsynth, and the twelve answers must be twelve DIFFERENT answers.
+       *
+       * ⚠️ THE SIX ARE THE ONES THAT DECIDE WHAT KIND OF SOUND IT IS, not what
+       * colour. How the read head moves, how long the figure is, the grain clock,
+       * the grain length, the roll inside a grain period, and where the window
+       * starts. Two patches that agreed on all six would be one patch with two
+       * names whatever their reverb was set to — which is exactly what the old
+       * seven were.
+       *
+       * ⚠️ AND IT ASKS FOR ALL SIX IN ONE MESSAGE. `/s_get` takes a list and
+       * answers with one `/n_set` carrying every pair, so this is twelve round
+       * trips rather than seventy-two — which matters, because the whole
+       * self-check has to finish inside the harness's settle.
+       */
+      const askSome = async (names) => {
+        const r = await eng.sendAndWait(
+          (m) => m[0] === '/n_set' && m[2] === names[0], 3000, '/s_get', PAPPUS_NODE, ...names);
+        const got = {};
+        if (r) for (let i = 2; i + 1 < r.length; i += 2) got[String(r[i])] = Number(r[i + 1]);
+        // ⚠️ A SERVER THAT ANSWERED ONLY THE FIRST NAME MUST NOT READ AS ELEVEN
+        // IDENTICAL PATCHES. Anything the batch did not carry is asked for on
+        // its own rather than left `undefined`, which would make every
+        // fingerprint below collapse onto the same string.
+        for (const n of names) if (!Number.isFinite(got[n])) got[n] = await ask1(n);
+        return got;
+      };
+      const KINDS = ['mscanmode', 'melen', 'mrate', 'msize', 'mstrum', 'mwinstart'];
+      const r3 = (x) => (Number.isFinite(x) ? Math.round(x * 1000) / 1000 : 'none');
+      G.kinds = [];
+      for (let i = 0; i < PATCHES.length; i++) {
+        applyPatch(i, { silent: true });
+        await new Promise((r) => setTimeout(r, 40));
+        const got = await askSome(KINDS);
+        G.kinds.push({ name: PATCHES[i].name, got,
+          key: KINDS.map((k) => r3(got[k])).join('/'),
+          // and what the table asked for, so a mismatch names itself
+          want: [PATCHES[i].scanmode, Math.max(1, PATCHES[i].elen || 1), PATCHES[i].rate,
+                 PATCHES[i].size, PATCHES[i].strum,
+                 PATCHES[i].scanmode >= 3 ? 0 : (PATCHES[i].winstart ?? 0)].map(r3).join('/') });
+      }
+      // 🔴 AND THE PAGE IS PUT BACK ON THE SOUND IT WAS ON. A self-check that
+      // leaves the instrument on the last thing it tried is the station A/B's
+      // old bug in another costume.
+      applyPatch(herePatch, { silent: true });
+      await new Promise((r) => setTimeout(r, 40));
+
       G.scalars = await readScalars();
       G.gates = await askN('gates', 8);
       G.pitches = await askN('pitches', 8);
@@ -3412,6 +4883,15 @@
       G.patch = PATCHES[herePatch];
       G.otherWant = PATCHES[otherPatch];
       G.wrong = missing(G.patch, G.scalars);
+      // 🔴 AND THE NAMES, WHERE THE VALUES CANNOT PROVE THEM. See `namesExist`:
+      // a control the engine does not have reads back 0 rather than refusing,
+      // so every scalar a patch sets to exactly 0 is graded by a comparison a
+      // misspelling also passes. Five of the twelve are 0 in some patch.
+      // ⚠️ IT LIVES HERE, BESIDE `readScalars`, BECAUSE THAT IS WHERE `ask1`
+      // AND `SCALARS` ARE. Put beside the patch assert two thousand lines up it
+      // was a ReferenceError that killed the whole check run, and the suite then
+      // reported 13/13 green about a page that had asserted nothing of its own.
+      G.names = G.patch ? await namesExist(G.patch) : ['no patch was applied'];
 
       // 🔴 HAND THE INSTRUMENT BACK MOVING. Leaving the hold on would end the
       // self-check with a granulator that is correct and dead — the page
@@ -3437,9 +4917,257 @@
       await new Promise((r) => setTimeout(r, 400));
       G.quiet = await engLevel(1200);
       eng.send('/n_run', PAPPUS_NODE, 1);
+
+      /**
+       * 🔴 THE LOOP'S PLAYHEAD, DRIVEN AND THEN READ OFF THE CANVAS.
+       *
+       * A live loop is being built in the transport bar and it will move this
+       * line; nothing on this page moves it yet. A seam nobody exercises is a
+       * seam that is broken on the day it is first used, so the check drives it
+       * directly and grades the PIXELS — where the line landed, how wide it is,
+       * and whether the wave under it actually stopped.
+       *
+       * ⚠️ LAST, AFTER THE INK PROBE, AND THAT ORDER DECIDES THE READING. The
+       * playhead is drawn in the same colour `inkNow` counts, so setting one
+       * before `G.inkDry` would have added a full-height column of it to the
+       * reading that is supposed to be nearly empty. The fader is at 0 by now,
+       * so no grain tick is drawn either (the scope skips the layer outright at
+       * zero) and the tallest column in that colour can only be this line.
+       *
+       * ⚠️ AND IT PUTS THE PICTURE BACK. Same rule as the station A/B and the
+       * patch A/B: a self-check is not allowed to leave the instrument
+       * somewhere nobody chose, and a frozen waveform is exactly that.
+       */
+      const headInk = () => {
+        const c = scope.canvas, g = c.getContext('2d');
+        const px = g.getImageData(0, 0, c.width, c.height).data;
+        const cols = new Array(c.width).fill(0);
+        for (let y = 0; y < c.height; y++) {
+          for (let x = 0; x < c.width; x++) {
+            const i = (y * c.width + x) * 4;
+            if (px[i] > 200 && px[i + 1] > 150 && px[i + 2] < 100) cols[x]++;
+          }
+        }
+        let tall = 0, at = -1, wide = 0;
+        for (let x = 0; x < c.width; x++) {
+          if (cols[x] > tall) { tall = cols[x]; at = x; }
+          if (cols[x] >= c.height * 0.9) wide++;
+        }
+        return { at: at / c.width, tall: tall / c.height, wide };
+      };
+      // Two frames: the first carries the `playhead()` call into a paint, the
+      // second is the paint that has it.
+      const twoFrames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      // ⚠️ IN BACKING PIXELS. The line is one CSS pixel wide by declaration and
+      // the canvas is `dpr` backing pixels per CSS pixel, so a fixed 1 here
+      // would read as a failure on every retina screen.
+      G.headDpr = Math.min(2, window.devicePixelRatio || 1);
+      G.headAt = [];
+      for (const f of [0.25, 0.75]) {
+        scope.playhead(f);
+        await twoFrames();
+        G.headAt.push({ want: f, ...headInk() });
+      }
+      // 🔴 WHAT FREEZING MEANS CHANGED, AND THIS MEASURES THE NEW THING. It
+      // used to count `feed()` calls and require ZERO of them while frozen,
+      // because a frozen picture dropped its samples and the held columns were
+      // wiped on release. That left a hole in the wave for as long as the loop
+      // ran, and it was reported: **there was no silence**, the loop was
+      // playing into the same graph the whole time. So the picture goes on
+      // RECORDING while it is stopped and the thing that stops is the right
+      // EDGE. The claim is now that the edge held still and then moved.
+      const frozenEdge = scope.stats().frozen;
+      await new Promise((r) => setTimeout(r, 300));
+      G.headHeld = frozenEdge && scope.stats().frozen ? 0 : 1;
+      const fedWhileHeld = scope.stats().inferred;
+      scope.loopOff();
+      const fedAgain = scope.stats().inferred;
+      G.keptWhileFrozen = fedWhileHeld;
+      await new Promise((r) => setTimeout(r, 300));
+      G.headRuns = scope.stats().inferred - fedAgain;
+      await twoFrames();
+      G.headGone = scope.stats().playhead == null && !scope.stats().frozen;
+      /**
+       * 🔴 THE LOOP ROW, THROUGH ITS OWN BUTTONS, ON A REAL LOOP.
+       *
+       * `verify.mjs` presses `.pos-controls button, .tbar-x` and this row is
+       * neither, so a row shipped without this is a control nobody grades —
+       * which is exactly how `mirror` lost two asserts while reading green. It
+       * clicks the real buttons rather than calling `setLoopWay`, because the
+       * fault this kind of check exists to catch lives in the wiring between the
+       * button and the handler and calling the handler steps straight over it.
+       *
+       * ⚠️ IT IS READ OFF THE VOICE THAT IS PLAYING, NOT OFF THE PAGE'S OWN IDEA
+       * OF WHAT IT DID. `loopSrc` is the node the sound actually comes out of,
+       * so which buffer it holds, how long its lap is and what rate it runs at
+       * are three facts about the audio graph rather than three variables this
+       * function set. A check on `loopWay` would pass over a row wired to
+       * nothing at all.
+       *
+       * ⚠️ AND THE MIRROR IS CHECKED ON THE SAMPLES. "Reversed" is the one claim
+       * here that a buffer identity cannot make: a copy that is merely DIFFERENT
+       * would satisfy it. Four points are compared against the kept seconds at
+       * the mirrored index, exactly, which costs nothing and cannot pass by
+       * accident.
+       *
+       * ⚠️ IT MUST END WITH THE LOOP OFF, and for the reason every other check
+       * in this block ends by putting its control back: a page left looping
+       * seconds nobody asked for, with the grain clock tuned to them, is a
+       * self-check that took the instrument away from whoever was holding it.
+       * The third press also restores the patch's own grain rate, which the
+       * end-of-run loop check then measures from scratch.
+       */
+      // ⚠️ LAST IN THE BLOCK, AND THAT POSITION IS A MEASUREMENT RATHER THAN
+      // TIDINESS. `grain-scope.mjs` KEEPS a loop's two end marks after the loop
+      // stops — they age off the left with the audio they belong to — and
+      // `playhead()` only freezes the picture when there has never been one. So
+      // a loop made before the playhead checks above leaves two full-height
+      // lines on the canvas and a picture that will not freeze: MEASURED, both
+      // of them went red, reading `drew at 0.467` and `3 of 1 backing px wide`
+      // about a scope that was working perfectly.
+      // ⚠️ AND IT IS MUTED, because the mute came off a few lines up. The
+      // fader is at 0 by now, so `dry` at 1 is what would carry the loop out of
+      // the speakers; the same flag the rest of this block uses takes it down.
+      {
+        muted = true; setWet(0);
+        const TB = window.__demo?.transport;
+        G.ways = [];
+        if (TB && loopRing && loopRow) {
+          TB.pressLoop();                                  // open a window
+          await new Promise((r) => setTimeout(r, 700));
+          TB.pressLoop();                                  // and close it here
+          await new Promise((r) => setTimeout(r, 200));
+          const whole = loopBuf ? loopBuf.duration : 0;
+          for (let i = 0; i < LOOP_WAYS.length; i++) {
+            loopRow.buttons[i].click();
+            await new Promise((r) => setTimeout(r, 150));
+            G.ways.push({
+              name: LOOP_WAYS[i][0],
+              lap: loopSrc ? loopSrc.loopEnd - loopSrc.loopStart : null,
+              rate: loopSrc ? loopSrc.playbackRate.value : null,
+              back: !!(loopSrc && loopBack && loopSrc.buffer === loopBack),
+              whole,
+            });
+          }
+          // The mirror, on the samples, at four points across the seconds.
+          if (loopBuf && loopBack) {
+            const a = loopBuf.getChannelData(0), b = loopBack.getChannelData(0);
+            const n = a.length;
+            let same = 0, tried = 0;
+            for (const f of [0.03, 0.31, 0.62, 0.94]) {
+              const i = Math.min(n - 1, Math.max(0, Math.round(f * (n - 1))));
+              tried++;
+              if (a[i] === b[n - 1 - i]) same++;
+            }
+            G.mirror = { same, tried };
+          }
+          TB.pressLoop();                                  // off, and the rate back
+          await new Promise((r) => setTimeout(r, 200));
+          /**
+           * 🔴 AND THE GRAIN CLOCK IS BACK WHERE THE SOUND WANTS IT, ASKED OF
+           * THE ENGINE. This is the half that caught a real defect: `chop`'s
+           * slice is short enough that some patches' figures cannot be tuned to
+           * it, the refusal used to clear the lock WITHOUT putting the rate
+           * back, and taking the loop off then found nothing to release. The
+           * page was left running 8.79 grains a second on a sound written for
+           * 9, with the slider agreeing. ⚠️ HELD WHILE IT IS READ, because a
+           * patch with a route onto `rate` would otherwise be graded against a
+           * number that is legitimately moving.
+           */
+          modulator?.hold(true);
+          await new Promise((r) => setTimeout(r, 200));
+          G.wayRate = await ask1('mrate');
+          G.wayWant = PATCHES[patch].rate;
+          modulator?.hold(false);
+        }
+        muted = false; setWet(0);          // the page as the visitor finds it
+      }
+
     }
 
     await finish();
+
+    // 🔴 LAST, AND THE POSITION IS THE POINT. This one presses a real button and
+    // then WAITS several seconds for a window to fill, and `demo/verify.mjs` stops
+    // collecting four hundred milliseconds after the assert count last grew. Put
+    // in the middle of the checks it took 39 asserts to 21: everything behind the
+    // wait was silently lost and the run still read green, which is the failure
+    // shape this repo keeps paying for. Slow work goes at the end, behind every
+    // assert that does not need it.
+    if (SELFCHECK) {
+      /**
+       * 🔴 THE LOOP HAS TO BE AUDIBLE, AND THAT IS MEASURED AT THE DESTINATION.
+       * REPORTED as *"i can not hear radio1965 looping only viz"*: the bar owned
+       * the window, drew the playhead, and nothing on this page was keeping a
+       * sample, so LOOP produced a picture of a loop with no loop in it.
+       *
+       * ⚠️ IT READS `sinkPeak`, NOT `rmsPeak`. The upstream analyser sits BEFORE
+       * the fader and before the loop's gain, so it hears the station whatever
+       * reaches a speaker, and a check built on it would have passed through the
+       * whole of the reported bug. This one is fed only by what leaves.
+       *
+       * ⚠️ AND THE LIVE PATH HAS TO BE DOWN WHILE IT RUNS, or "audible" is
+       * satisfied by the station still playing underneath, which is the same
+       * vacuous pass one level along.
+       */
+      const T = window.__demo?.transport;
+      if (T && ctx && loopRing) {
+        T.pressLoop();                                    // starts filling
+        const filling = !!T.loopFilling;
+        // ⚠️ CLOSED EARLY RATHER THAN WAITED OUT, and that is about the harness
+        // as much as the clock. `demo/verify.mjs` stops collecting 400 ms after
+        // the assert count last grew, and this page declares no controls, so
+        // there is no control 0 to hang a `settleMs` on: an assert made eight
+        // seconds after the one before it is an assert nobody reads, and the
+        // run still says green. The bar's second press ends a filling window
+        // where the playhead is, which is a real path a person uses and gives
+        // the same claim in a second rather than nine.
+        await new Promise((r) => setTimeout(r, 600));
+        T.pressLoop();                                    // end it here
+        await new Promise((r) => setTimeout(r, 120));
+        const caught = loopRing.filled;
+        sinkPeak = 0;
+        await new Promise((r) => setTimeout(r, 260));
+        const heardLooping = sinkPeak;
+        const dryWhileLooping = liveIn ? liveIn.gain.value : 1;
+        const running = !!loopSrc;
+        /**
+         * 🔴 AND THE GRAIN CLOCK IS TUNED TO IT, ASKED OF THE ENGINE. This is
+         * the tempo claim and it is checked the only way it can be: the loop's
+         * length is known in samples, the rate is read back off scsynth with
+         * `/s_get`, and the two are multiplied. A whole number of bars in the
+         * loop means they never slide against each other; anything else means
+         * they do.
+         *
+         * ⚠️ IT IS GRADED ON A LOOP CLOSED EARLY, WHICH IS THE HARD CASE. The
+         * window above is ended after 600 ms rather than left to fill, so its
+         * length is whatever the tap happened to have caught — a number no
+         * patch could have been written for. A lock that only worked on a tidy
+         * eight seconds would pass a check that waited.
+         */
+        const gotRate = await (async () => {
+          const r = await eng.sendAndWait(
+            (m) => m[0] === '/n_set' && m[2] === 'mrate', 2000, '/s_get', PAPPUS_NODE, 'mrate');
+          return r ? Number(r[3]) : NaN;
+        })();
+        const loopSec = caught / ctx.sampleRate;
+        const barsIn = loopSec * gotRate / Math.max(1, PATCHES[patch].elen || 1);
+        const offBy = Math.abs(barsIn - Math.round(barsIn));
+        T.pressLoop();                                    // off
+        d.assert('the grain clock is tuned to the loop, so the two cannot drift',
+          Number.isFinite(barsIn) && barsIn >= 2 && offBy < 1e-3,
+          Number.isFinite(gotRate)
+            ? `${loopSec.toFixed(3)} s of loop at ${gotRate.toFixed(4)} grains a second `
+              + `is ${barsIn.toFixed(5)} whole laps, ${(offBy * 1000).toFixed(3)} thousandths out`
+            : 'the engine never answered with its grain rate');
+        d.assert('pressing LOOP keeps the station and plays it back, and it is audible',
+          running && caught > ctx.sampleRate * 0.25 && heardLooping > 0.0005 && dryWhileLooping < 0.05,
+          !filling ? 'the button never started filling a window'
+            : !running ? `filled ${(caught / ctx.sampleRate).toFixed(1)} s and nothing played it`
+            : `${(caught / ctx.sampleRate).toFixed(1)} s kept · the speakers got `
+              + `${heardLooping.toFixed(4)} with the live path at ${dryWhileLooping.toFixed(3)}`);
+      }
+    }
   }
 
   d.ready();

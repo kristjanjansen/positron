@@ -67,7 +67,7 @@ import { el } from './shell.mjs';
  */
 export function createTable({ columns, cap = 1000, empty = 'nothing yet', note = '' } = {}) {
   if (!Array.isArray(columns) || !columns.length) {
-    throw new Error('createTable: columns are the whole point — declare some');
+    throw new Error('createTable: columns are the whole point, so declare some');
   }
   // 🔴 EXACTLY ONE COLUMN MAY GROW, AND SAYING SO IS CHEAPER THAN DEBUGGING IT.
   // With none, the table does not fill its box and the last column floats in the
@@ -84,12 +84,25 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
     .join(' ');
   wrap.style.setProperty('--tbl-cols', tracks);
 
+  /**
+   * 🔴 A HEADER OVER NOTHING IS THREE WORDS LABELLING AIR. An empty table used
+   * to draw `file · size · state` above a line saying nothing had been dropped
+   * yet, which is a column heading for a column that does not exist and a
+   * promise the table is not yet keeping. Reported on /crate/, pointing at each
+   * of the three in turn.
+   * The header is HIDDEN rather than removed, so the moment a row lands it is
+   * there and the rows below it line up under names that were already measured.
+   * Building it late would size its columns against the first row instead of
+   * against the track list every row shares.
+   */
   const hasHead = columns.some((c) => c.label);
+  let head = null;
   if (hasHead) {
-    const head = el('div', 'pos-tbl-row pos-tbl-head');
+    head = el('div', 'pos-tbl-row pos-tbl-head');
     for (const c of columns) {
       head.append(el('span', `pos-tbl-c${c.align === 'right' ? ' r' : ''}`, c.label || ''));
     }
+    head.hidden = true;
     wrap.append(head);
   }
 
@@ -99,13 +112,21 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
 
   const blank = (msg) => {
     body.textContent = '';
-    body.append(el('div', 'pos-tbl-empty', msg ?? empty));
+    // 🔴 AN EMPTY STRING MEANS SAY NOTHING, AND SAYING NOTHING MEANS NO
+    // ELEMENT. `.pos-tbl-empty` carries `padding: 8px 10px`, so appending it
+    // with no text leaves a padded band with nothing in it: a container
+    // painting its own space, which is the same fault as the empty readout
+    // that drew a 2 px rule nobody wrote. A caller that passes '' wants the
+    // table silent, not quietly tall.
+    const said = msg ?? empty;
+    if (said) body.append(el('div', 'pos-tbl-empty', said));
     n = 0;
+    if (head) head.hidden = true;
   };
   blank();
 
   function add(r) {
-    if (!n) body.textContent = '';
+    if (!n) { body.textContent = ''; if (head) head.hidden = false; }
     const row = el('div', 'pos-tbl-row');
     if (note && r[note]) row.title = String(r[note]);
     for (const c of columns) {

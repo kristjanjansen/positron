@@ -50,7 +50,7 @@ export function createMidi({ onDown, onUp, onControl, log = () => {}, onPorts = 
     if (!navigator.requestMIDIAccess) {
       state = 'unsupported';
       onPorts(0);
-      log('this browser has no MIDI — the keys on screen still play', 'warn');
+      log('this browser has no MIDI, but the keys on screen still play', 'warn');
       return;
     }
     try {
@@ -59,12 +59,12 @@ export function createMidi({ onDown, onUp, onControl, log = () => {}, onPorts = 
       // Plugging a keyboard in after the page loaded is the ordinary case, not
       // an edge one — a page that only looks once is a page you have to reload.
       access.onstatechange = recount;
-      log(ports ? `${ports} MIDI input${ports === 1 ? '' : 's'} — play it`
+      log(ports ? `${ports} MIDI input${ports === 1 ? '' : 's'} · play it`
                 : 'no MIDI keyboard plugged in; the keys on screen still play');
     } catch (e) {
       state = 'refused';
       onPorts(0);
-      log(`MIDI was refused — ${e.message}`, 'warn');
+      log(`MIDI was refused: ${e.message}`, 'warn');
     }
   })();
 

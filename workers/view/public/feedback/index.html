@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The table's own rows carry the columns; this is only the line under it that
+     says what an agent should ask for.
+     🔴 NO `margin`, AND THE FIRST VERSION HAD ONE. `margin: 0` here looks like
+     tidiness and is a page overruling the shell: `.pos-body > * + *` and
+     `.where` have the SAME specificity, so the page's stylesheet wins on order
+     and the 22 px between the table and this line became 0. MEASURED at 0, then
+     at 22 with this removed. CLAUDE.md: vertical spacing is a rule, not a
+     per-page decision, and the rhythm lives on the gap between siblings so that
+     no element can disagree with its neighbour about it. */
+  .where {
+    font: 400 11px/1.6 var(--mono); color: var(--dim2);
+    overflow-wrap: anywhere;
+  }
+  .where b { color: var(--dim); font-weight: 400; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { FEEDBACK_BASE, LIVE_ROOM, DEV_ROOM, roomFor, isLive, sendNote }
+    from '/shell/feedback.mjs';
+
+  // Which room this copy of the page reads is the same decision the button on
+  // every other page makes about where it WRITES — one function, so the table
+  // can never end up reading a room nothing is writing to.
+  const ROOM = roomFor(location.origin);
+  const QUERY = `${FEEDBACK_BASE}/feedback?room=${ROOM}&last=200`;
+
+  const d = mount({
+    name: 'feedback',
+    what: `Every demo carries a Feedback button beside its title; this is what has been written into it. `
+        + `A note travels over the same relay the demos use, into a room of its own, to a recorder that `
+        + `joined that room as an ordinary socket and keeps it. The same rows come back as plain JSON at `
+        + `the address under the table, so this page is one way of reading them and not the only one.`,
+    readout: { held: '', newest: 'min' },
+    controls: [{ id: 'reload', label: 'Reload', primary: true }],
+  });
+  guard(d);
+
+  const notes = createTable({
+    columns: [
+      { key: 'when', label: 'when', width: 96 },
+      { key: 'slug', label: 'page', width: 78, hi: true },
+      { key: 'who', label: 'name', width: 74 },
+      { key: 'text', label: 'what was said', grow: true, hi: true },
+    ],
+    empty: 'nothing has been written yet',
+    note: 'full',
+  });
+  d.el.append(notes.el);
+
+  const where = el('p', 'where');
+  d.el.append(where);
+
+  const clock = (at) => {
+    const t = new Date(at);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${p(t.getDate())}.${p(t.getMonth() + 1)} ${p(t.getHours())}:${p(t.getMinutes())}`;
+  };
+
+  let held = 0, newest = 0, reachable = false, reason = '';
+
+  async function load() {
+    try {
+      const r = await fetch(QUERY, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+      if (!r.ok) { reachable = false; reason = `the store answered ${r.status}`; return; }
+      const j = await r.json();
+      reachable = true;
+      held = j.held || 0;
+      newest = j.newest || 0;
+      notes.set((j.notes || []).map((n) => ({
+        when: clock(n.at),
+        slug: n.slug || '',
+        who: n.name || '',
+        text: n.text,
+        // the row's own title: everything the table shortens, plus the two
+        // facts that have no column and should not get one
+        full: `${n.text}\n\n${n.page || ''}${n.build ? `  build ${n.build}` : ''}`,
+      })));
+      d.set('held', held);
+      d.set('newest', newest ? Math.round((Date.now() - newest) / 60000) : '');
+    } catch (e) {
+      reachable = false;
+      reason = `the store did not answer (${e.name || e})`;
+    }
+  }
+
+  function describe() {
+    where.textContent = '';
+    where.append(
+      el('b', '', 'read it without a browser: '),
+      document.createTextNode(`curl "${QUERY}"`),
+    );
+    where.append(el('br'));
+    where.append(
+      el('b', '', 'one demo: '),
+      document.createTextNode(`curl "${FEEDBACK_BASE}/feedback?room=${ROOM}&slug=mirror&format=text"`),
+    );
+    where.append(el('br'));
+    where.append(document.createTextNode(isLive()
+      ? `room ${ROOM} · unlisted, not secret · nothing here identifies anybody who did not sign a note`
+      : `room ${ROOM} · this copy is not the published site, so it reads the sandbox rather than the real room`));
+  }
+
+  d.on('reload', async () => { await load(); describe(); });
+
+  /**
+   * 🔴 THE ROUND TRIP IS DRIVEN ONLY WHERE IT CANNOT REACH THE REAL ROOM, and
+   * both halves assert so the count does not move between them.
+   *
+   * `DEMO_BASE=https://positron.studio node demo/verify.mjs` is a documented
+   * command in CLAUDE.md, so a page that sends a note to prove itself would
+   * write a real one every time somebody ran the suite against the deploy.
+   * That is the FCM defect again. The branch is the SAME exact-match allowlist
+   * the whole feature rests on: off the published site the chain is driven end
+   * to end into a sandbox nobody reads, and on it nothing is written at all.
+   */
+  async function roundTrip() {
+    if (isLive()) {
+      d.assert('a check never writes into the room people read', true,
+        'this is the published site, so the round trip is proved off it instead');
+      return;
+    }
+    const out = await sendNote({
+      slug: 'feedback',
+      text: `a check wrote this at ${new Date().toISOString()}`,
+      name: 'the suite',
+      tries: 6,
+    });
+    d.assert('a note goes out over the relay and comes back from the store',
+      out.ok, out.said);
+  }
+
+  (async () => {
+    await load();
+    describe();
+    await roundTrip();
+    await load();          // so the table shows what the round trip just wrote
+
+    d.assert('the store answers', reachable, reachable ? `${held} held in ${ROOM}` : reason);
+    d.assert('this page reads the room this origin writes to',
+      ROOM === roomFor(location.origin) && (ROOM === LIVE_ROOM || ROOM === DEV_ROOM), ROOM);
+    d.assert('the published site is the only origin that reaches the real room',
+      roomFor('https://positron.studio') === LIVE_ROOM
+      && roomFor('http://127.0.0.1:8890') === DEV_ROOM
+      && roomFor('https://positron-view.kristjan-jansen.workers.dev') === DEV_ROOM,
+      `${LIVE_ROOM} for one origin, ${DEV_ROOM} for everything else`);
+    d.assert('a note with nothing in it is refused before it reaches the wire',
+      !(await sendNote({ slug: 'feedback', text: '   ' })).ok,
+      'an empty box sends nothing');
+    d.assert('the table shows a row for every note the store handed over',
+      notes.count() === Math.min(held, 200) || (held === 0 && notes.count() === 0),
+      `${notes.count()} rows against ${held} held`);
+    d.ready();
+  })();
+</script>

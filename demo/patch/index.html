@@ -54,8 +54,8 @@
   const d = mount({
     name: 'patch',
     what: 'A sound can be written down as a file of a few hundred bytes, and this is a page about the file. '
-        + 'Press Start it up: the bytes go out over a relay and come back, and only the copy that came back is played — '
-        + 'first by SuperCollider itself, compiled to run inside this page, then by a small reader written here that '
+        + 'Press Start it up: the bytes go out over a relay and come back, and only the copy that came back is played. '
+        + 'It is played first by SuperCollider itself, compiled to run inside this page, then by a small reader written here that '
         + 'refuses any file it cannot read all of rather than guessing at the rest. '
         + 'The numbers are the size of the file and how many building blocks it holds, how long the round trip took, '
         + 'and how loud each reader got, with the same meter reading silence beside them.',
@@ -301,7 +301,7 @@
       const timer = setTimeout(() => {
         if (waiting?.timer !== timer) return;
         waiting = null;
-        msgs.add({ dir: 'in', text: 'nothing came back — the relay did not answer' });
+        msgs.add({ dir: 'in', text: 'nothing came back from the relay' });
         resolve({ back: null, ms: null });
       }, 5000);
       waiting = { t0, timer, resolve: (r) => { clearTimeout(timer); resolve(r); } };
@@ -309,7 +309,7 @@
       if (!out) {
         clearTimeout(timer);
         waiting = null;
-        msgs.add({ dir: 'out', text: 'the relay socket is not open — nothing was sent' });
+        msgs.add({ dir: 'out', text: 'the relay socket is not open · nothing was sent' });
         resolve({ back: null, ms: null });
       }
     });
@@ -323,7 +323,7 @@
   }
 
   async function playInSc(bytes, def, defaults) {
-    if (!sc) { d.log('SuperCollider is not up yet — press Start it up', 'warn'); return false; }
+    if (!sc) { d.log('SuperCollider is not up yet. Press Start it up', 'warn'); return false; }
     if (!loadedInSc.has(def.name)) {
       const took = await sc.load(bytes);
       if (!took.ok) {
@@ -332,12 +332,12 @@
         // one — and `load` now names the two silences apart: refused before
         // sending because it could never fit, against sent and never
         // acknowledged.
-        d.log(`SuperCollider did not take ${def.name} — ${took.why}`, 'bad');
+        d.log(`SuperCollider did not take ${def.name}: ${took.why}`, 'bad');
         return false;
       }
       loadedInSc.add(def.name);
       d.log(`SuperCollider took ${def.name}, ${took.bytes} B, and said so itself `
-        + `— ${took.margin} B under the ${SIZE_CEILING}-byte ceiling a socket can carry`);
+        + `· ${took.margin} B under the ${SIZE_CEILING}-byte ceiling a socket can carry`);
     }
     if (scNode) sc.free(scNode);
     scNode = sc.play(def.name, { ...defaults, ...(defaults.amp !== undefined ? { amp: loud.get() } : {}) });
@@ -349,8 +349,8 @@
     hereVoice = null;
     const v = playHere(ears(), def, { params: { ...defaults, amp: loud.get() }, destination: hereMeter });
     if (!v.played) {
-      d.log(`the browser's own reader does not know ${v.unknown.join(', ')} — `
-        + `it knows ${KNOWN.join(', ')}, so it plays nothing rather than part of the file`, 'warn');
+      d.log(`the browser's own reader does not know ${v.unknown.join(', ')}. `
+        + `It knows ${KNOWN.join(', ')}, so it plays nothing rather than part of the file`, 'warn');
       return null;
     }
     for (const c of v.caveats) d.log(`not identical: ${c}`, 'warn');
@@ -486,7 +486,7 @@
     const travelled = [...measured.keys()].length
       ? FILES.map((_, i) => sizes.get(i) || 0).reduce((a, b) => a + b, 0) : 0;
     d.log(`the reader cost at least ${engine.atLeast.toLocaleString('en-US')} B across `
-      + `${engine.files} files, once — the sound module it loads inside the worklet is not in `
+      + `${engine.files} files, once · the sound module it loads inside the worklet is not in `
       + `the page's own accounting · the three definitions are `
       + `${travelled.toLocaleString('en-US')} B together · `
       + `${Math.round(engine.atLeast / Math.max(1, travelled))}x`, 'hi');

@@ -135,9 +135,12 @@ const FILES = [
   ...shellFiles(),
   // 06 imports the v6 player UNCHANGED rather than reimplementing it
   ['src/low-latency-player.js', 'src/low-latency-player.js'],
-  ['demo/notes/index.html', 'notes/index.html'],
-  ['demo/notes/uuu-positron.md', 'notes/uuu-positron.md'],
-  ['demo/notes/hardware-box.md', 'notes/hardware-box.md'],
+  // 🔴 `/notes/` IS NOT SHIPPED. It rendered two essays on the front page, and
+  // those have moved to `research/`, which is where writing that argues or
+  // reports lives and which is not deployed. A viewer page with nothing left to
+  // view is furniture, so the three lines go together rather than leaving a URL
+  // that 404s whatever you ask it for. `demo/notes/index.html` stays in the
+  // repo: putting a note back is these lines and a row in `NOTES`.
 
   // The box listener: play a Raspberry Pi in another building from a phone.
   // It needs nothing else deployed — proto/jam/playout-worklet.js is already

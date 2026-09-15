@@ -41,15 +41,21 @@
 
   const d = mount({
     name: 'tapes',
-    what: 'Everything reachable of Erkki Kurenniemi’s, laid out in time — one mark per record, '
-      + 'and the mark is as wide as the date is vague: a day is a tick, a year is a year-wide bar, '
-      + 'a decade is a decade. Green marks are the ones a browser can open; press ▸ to hear the '
-      + 'one that is loaded, or ‹ and › to walk through the tapes. Colour says how a record '
-      + 'landed, never which row it is in — grey is a pointer to somewhere else, slate means there is '
-      + 'a file this browser may not fetch, amber means the holder refused or is gone.',
-    // No readout: the strip IS the readout, the same argument `/resources/`
-    // makes about its table. Every number worth having is a count of what is
-    // directly above it.
+    // ⚠️ REWRITTEN WITH THE AXIS. It described a picture of DATES: "as wide as
+    // its date is vague, so a day is a tick and a decade is a decade wide", and
+    // a colour legend for four states that this lane no longer has, since it
+    // draws only the tapes that play. Every sentence of it was true of the page
+    // this replaced, which is the exact failure CLAUDE.md warns about: a
+    // description that has drifted is worse than a missing one, because a
+    // visitor believes it.
+    what: 'Every Erkki Kurenniemi recording that plays, laid end to end as one '
+      + 'long tape: each block is as wide as the recording is long, and the shades '
+      + 'change so you can see where one ends and the next begins. Press a block to '
+      + 'load it, then play below, or drag along the line to move through the whole '
+      + 'run. The arrows change recording the way a machine changes reels: the sound '
+      + 'winds down, the next one comes back up to speed, and the pitch follows the '
+      + 'speed. The date each one is from is in the line above and on hover, because '
+      + 'this line is minutes of tape rather than years.',
     readout: null,
   });
   guard(d);
@@ -60,6 +66,37 @@
   // measurement — `http`, `cors` and `file` were written down when the record
   // was gathered.
   const INK = { open: '#3fb950', held: '#6f7d94', ref: '#3d4756', gone: '#d29922' };
+  /**
+   * 🔴 TAPE SHADES, AND THIS IS A DELIBERATE EXCEPTION TO THE COLOUR RULE.
+   *
+   * CLAUDE.md: a mark's colour says HOW IT LANDED, never which lane it is in.
+   * That rule was written for a lane holding records in four different states,
+   * and it spent the whole channel usefully. This lane no longer does: it draws
+   * the PLAYABLE tapes and nothing else, so `stateOf` returns `open` for every
+   * one of them and every bar came out the same green. A channel that carries
+   * one value carries nothing, and the fact it was spent on is now said by the
+   * bar existing at all.
+   *
+   * So it is spent on the thing that was asked for and has no other channel:
+   * WHERE ONE TAPE ENDS AND THE NEXT BEGINS. Laid end to end with a two pixel
+   * gap, twenty-four identical bars read as one long bar with scratches in it.
+   *
+   * ⚠️ GREYISH AND BROWNISH, WHICH IS NOT DECORATION EITHER. These are the
+   * colours of the thing being drawn: oxide, leader tape, a splice. They cycle
+   * over three rather than two so that a run of three is still three, and they
+   * are close enough in lightness that the RING on the loaded tape and the
+   * dimming of the rest are still the loudest thing in the lane, which is the
+   * one distinction that must survive.
+   */
+  // ⚠️ MEASURED OFF THE CANVAS AND THEN RAISED. The first set came out at
+  // rgb(62,59,58) on screen, four points off the lane's own background: the
+  // bars were being drawn correctly and were invisible. Two things darken them
+  // and both are legitimate alone. The renderer fills a crisp span at 0.85, and
+  // a lane with a current bar dims the rest to half; together that is 0.42 of a
+  // mid grey over a near-black field. These are bright enough to survive both,
+  // and far enough from each other that the join between two tapes is seen
+  // rather than inferred.
+  const TAPE_INK = ['#cdbfa6', '#9a9184', '#b3a289'];
   const stateOf = (it) => {
     const h = it.http;
     if (h === 403 || (typeof h === 'string' && /DNS|ENOTFOUND/i.test(h))) return 'gone';
@@ -91,9 +128,119 @@
     && !!probeEl.canPlayType(it.fileType || '');
 
   const YEAR = (ms) => new Date(ms).getUTCFullYear();
+  /**
+   * 🔴 THE AXIS IS ONE LONG TAPE, NOT A CENTURY. DECIDED, do not re-open.
+   *
+   * It was 1890 to 2027 and a mark was as wide as its date is VAGUE, which made
+   * a lovely picture of an archive's uncertainty and a useless one of a tape:
+   * *"scale is off. i see days but recs are minutes log only"*. A recording of
+   * eight minutes drawn ten years wide says nothing about the recording. The
+   * decision, in the words it was given in: *"its a loooong life tape
+   * experience not overview timeline"*, and then *"jsut back to back tapes"*.
+   *
+   * So the tapes run END TO END from nought, each exactly as wide as it really
+   * is. A width is finally a duration, and the axis is read in hours and
+   * minutes of tape rather than in years.
+   *
+   * ⚠️ A CLOCK STARTING AT 08:00 WAS TRIED FIRST AND CUT, ON INSTRUCTION. It
+   * would have read as a day's broadcast, which is a second claim the picture
+   * does not need to make: the subject is the tape, and a tape starts at nought.
+   *
+   * ⚠️ WHAT IS GIVEN UP IS REAL AND IS WRITTEN DOWN HERE so nobody rediscovers
+   * it as a bug: **the dates are no longer on the picture**. They are still in
+   * the corpus, still in the line above the strip, and still the order the
+   * tapes are laid out in.
+   */
+  const OPENS = 0;
   const AXIS = [Date.UTC(1890, 0, 1), Date.UTC(2027, 0, 1)];
 
   let items = [], tapes = [], cur = -1;
+
+  /**
+   * 🔴 WHERE EACH TAPE SITS ON THE DAY, AND IT CANNOT BE KNOWN AT LOAD.
+   *
+   * A tape's width on this axis is its real length, and nothing in the corpus
+   * carries one: a length is only known once a browser has read the file's own
+   * metadata. So the schedule is built as the answers arrive rather than once,
+   * and a tape that has not answered yet is drawn at `GUESS` and corrected in
+   * place when it does.
+   *
+   * ⚠️ A GUESS IS DRAWN AND IS SAID TO BE A GUESS. Leaving an unmeasured tape
+   * off the picture would make the day short by however many have not answered,
+   * and every tape after it would sit at the wrong time. Drawing one at a made
+   * up length is the lesser wrong ONLY because `measured` records which is
+   * which and the lane says how many are still guesses.
+   */
+  const GUESS = 6 * 60e3;                          // six minutes, until it answers
+  const lengths = new Map();                       // id -> { ms, measured }
+  let schedule = [];                               // [{ it, from, to, measured }]
+
+  /** Lay every playable tape end to end from `OPENS`. Cheap; called per answer. */
+  function reschedule() {
+    let at = OPENS;
+    schedule = tapes.map((it) => {
+      const L = lengths.get(it.id);
+      const ms = L?.ms ?? GUESS;
+      const row = { it, from: at, to: at + ms, measured: !!L?.measured };
+      at += ms;
+      return row;
+    });
+    // ⚠️ THE DECK'S RANGE MOVES WITH IT. The day gets longer every time a tape
+    // turns out to be longer than the guess, and a range left where it was
+    // would push the last tapes off the right edge of a picture that claims to
+    // show the whole day.
+    mapDeck.setRange([OPENS, Math.max(at, OPENS + 60e3)]);   // nought to the end of the last tape
+    // 🔴 AND THE PICTURE IS FRAMED ON IT. `setRange` moves the deck's window and
+    // the strip does not refit for it: it fits ONCE, at construction, against
+    // whatever range the deck had then. So the run got longer twenty-four times
+    // as the lengths arrived and the view stayed where it started, which is a
+    // page that draws the whole run and shows part of it.
+    // ⚠️ UNTIL A VISITOR TAKES THE VIEW. Refitting under somebody who has just
+    // panned or pinched is the page arguing with them, and the last answer from
+    // a slow host can be twelve seconds after the page loaded.
+    if (!viewOwned) view.strip.fit();
+    sayGuesses();
+  }
+  // Set by the first press on the strip: from then on the framing is theirs.
+  let viewOwned = false;
+  const slotOfTape = (i) => schedule[i] || null;
+
+  /**
+   * Ask each file how long it is, a few at a time.
+   *
+   * ⚠️ `preload = 'metadata'` AND NOTHING ELSE. These are somebody else's files
+   * on somebody else's server and there are twenty-four of them; asking for the
+   * audio would pull tens of megabytes to draw a picture. Metadata is a range
+   * request for the header.
+   * ⚠️ AND IT IS NOT AWAITED BY THE PAGE. A host that never answers must cost a
+   * tape its exact width and nothing else: no wait, no spinner, no blocked
+   * load. The picture is up before the first answer and corrects itself.
+   */
+  function measureLengths() {
+    let next = 0;
+    const one = () => {
+      const it = tapes[next++];
+      if (!it) return;
+      const probe = new Audio();
+      probe.preload = 'metadata';
+      const done = (ms, measured) => {
+        lengths.set(it.id, { ms, measured });
+        reschedule();
+        probe.src = '';
+        one();
+      };
+      probe.addEventListener('loadedmetadata', () => {
+        const ms = Number.isFinite(probe.duration) ? probe.duration * 1000 : GUESS;
+        done(ms > 1000 ? ms : GUESS, ms > 1000);
+      }, { once: true });
+      probe.addEventListener('error', () => done(GUESS, false), { once: true });
+      // A host that simply never answers would otherwise hold one of the four
+      // slots for the life of the page.
+      setTimeout(() => { if (!lengths.has(it.id)) done(GUESS, false); }, 12000);
+      probe.src = it.file;
+    };
+    for (let k = 0; k < 4; k++) one();
+  }
 
   /**
    * 🔴 TWO DECKS, AND THEY ARE TWO DIFFERENT KINDS OF TIME.
@@ -104,22 +251,79 @@
    * up with a playhead that means something different depending on which half
    * you look at.
    *
-   * ⚠️ AND ONLY ONE OF THEM PLAYS. The map is a map: its playhead moves when you
-   * choose a record, so it says which year you are listening to, and it never
-   * runs on its own. CLAUDE.md's "one position surface per page" is about two
-   * surfaces for ONE axis; this is one surface each for two axes, and the page
-   * says which is which in words.
+   * 🔴 AND ONLY ONE OF THEM PLAYS, WHICH IS WHY THE MAP HAS NO PLAYHEAD ON IT.
+   * It used to have one, moved to the year of whatever record was loaded, and
+   * it was read the way a playhead is read everywhere else. The report was
+   * *"tapes timeline makes no sense. am i listening all tapes on same day
+   * together?"*. A sweeping line over eleven parallel bars says those bars play
+   * together, and this page's bars are twenty-four separate recordings of
+   * which exactly one is loaded.
    *
-   * ⚠️ `absolute: true` IS DECLARED, NOT INFERRED. The strip guesses an absolute
-   * wall-clock domain from `range[0] > 1e12`, and 1890 is a NEGATIVE number of
-   * milliseconds — so the guess says "relative" and the axis would be labelled
-   * in hours before the epoch.
+   * 🔴 AND THE PLAYHEAD IS BACK, BECAUSE THE AXIS CHANGED UNDER IT. It was
+   * taken off when the axis was 1890 to 2027: a line sweeping a century over
+   * eleven parallel bars says those bars play together, and they did not. Laid
+   * END TO END there is one thing playing and one place it has got to, which is
+   * exactly what a playhead means everywhere else. The loaded tape is still
+   * ringed, because a playhead says where you are and the ring says which of
+   * the twenty-four you are in.
+   *
+   * ⚠️ `absolute: false` NOW, AND IT IS STILL DECLARED RATHER THAN INFERRED.
+   * The strip guesses an absolute wall-clock domain from `range[0] > 1e12`, and
+   * this axis starts at nought, so the guess would be right by accident. It is
+   * written down because the guess was WRONG for the axis this replaced, where
+   * 1890 is a negative number of milliseconds, and a page that relies on a
+   * guess being right is a page that breaks when its range moves.
    */
   const mapDeck = createDeck({
     items: [],
     adapters: { record: { actuate() {} } },
-    range: AXIS,
+    // Corrected by `reschedule()` as soon as the first length is known. A real
+    // number here rather than [0,1] for the same reason `select` does not reset
+    // the tape's range: a one-millisecond axis is a picture with nowhere to be.
+    range: [0, 60 * 60e3],
   });
+
+  /**
+   * 🔴 `?report=1` — SO THE PAGE CAN SAY WHAT IT DID IN A BROWSER I CANNOT
+   * ATTACH TO. Play-on-load has now been reported four times and measured
+   * green three times: headless Chrome under a real autoplay policy reaches
+   * `20/20` with the speakers at 0.0000, including with a trusted click during
+   * load. Something on the reporting machine differs and no amount of reading
+   * this file will say what.
+   * So it ships the four numbers that decide it, every half second for the
+   * first fifteen seconds: whether a person has pressed, whether the page is
+   * still grading itself, what the element is doing, and the gain the tape
+   * actually comes out through. Read it back at
+   * https://pub.positron.studio/logs?format=text
+   * ⚠️ OFF UNLESS ASKED, because every visitor posting into a shared ring
+   * buffer pushes out the one report somebody is waiting for.
+   */
+  const REPORT = new URLSearchParams(location.search).get('report') === '1';
+  const ship = (line) => {
+    if (!REPORT) return;
+    try {
+      navigator.// 🔴 `/log`, SINGULAR. `/logs` is the READ path and a POST to it is
+      // accepted and thrown away, so the page reported faithfully into a
+      // hole and the reader saw `(nothing reported)` — which reads as "the
+      // page never sent anything", the exact failure CLAUDE.md records
+      // against this endpoint.
+      sendBeacon('https://pub.positron.studio/log',
+        new Blob([`tapes ${line}`], { type: 'text/plain' }));
+    } catch { /* a diagnostic may never make the page worse */ }
+  };
+
+  // the heartbeat, which is what catches a leak nobody pressed for
+  if (REPORT) {
+    ship(`BUILD open ${location.href} · ${navigator.userAgent}`);
+    let n = 0;
+    const beat = setInterval(() => {
+      const g = out ? out.gain.value.toFixed(3) : 'no-graph';
+      ship(`t=${Math.round(performance.now())} asked=${asked} checking=${checking}`
+        + ` paused=${audio.paused} ct=${audio.currentTime.toFixed(2)}`
+        + ` gain=${g} ctx=${ctx ? ctx.state : 'none'} peak=${outPeak.toFixed(4)}`);
+      if (++n >= 30) clearInterval(beat);
+    }, 500);
+  }
 
   const audio = new Audio();
   window.__a = audio;      // a handle for the lab probe; harmless in a page
@@ -133,6 +337,23 @@
    * reloads rather than leaving a tape unplayable for the sake of a waveform.
    */
   audio.crossOrigin = 'anonymous';
+  /**
+   * 🔴 THE PITCH FOLLOWS THE SPEED, WHICH IS WHAT VARISPEED MEANS.
+   *
+   * A media element time-stretches by default, so half speed is the same voice
+   * at half the tempo. That is the right answer for a podcast and the wrong one
+   * for a tape, where half speed is an octave down and always has been. It also
+   * decides whether the walk buttons below can be heard at all: a time-stretch
+   * at a sixteenth of speed is a mush of grains rather than a machine winding
+   * down.
+   *
+   * ⚠️ SET ONCE, FOR EVERY SPEED, NOT JUST FOR THE ARC. Turning it off only
+   * while a reel changes would be inaudible at 1x and an octave jump at any
+   * other armed speed, so the same press would sound different depending on
+   * what the speed picker happened to be showing. One setting, one sound.
+   */
+  audio.preservesPitch = false;
+  audio.webkitPreservesPitch = false;        // Safari before 15.4
   const tapeDeck = createDeck({
     items: [],
     adapters: {
@@ -150,10 +371,188 @@
   const now = el('div', 'now');
   d.el.append(now);
 
+  /**
+   * 🔴 ONE LANE, DECLARED WHERE EVERY OTHER TIMELINE DEMO DECLARES IT.
+   *
+   * This page had grown its own layer: a `LANES` table, a `buildLanes()` that
+   * rebuilt the lane from it, a `packRows` greedy packer for sub-rows, and a
+   * `setLanes` call to install the result. Every piece of that was the answer to
+   * the OLD picture, where twenty-four records sat on a century and thirteen of
+   * them had year-wide dates that overlapped. Laid end to end nothing overlaps,
+   * so the packer packs one row, the table has one entry and the rebuild
+   * rebuilds a constant.
+   *
+   * `/loops/` is the shape: lanes declared on `createStripView`, `as: 'spans'`,
+   * `stack: false`, and a `durMs` on the payload so a row is a thing with a
+   * length. Same library, same three options, and no machinery in between.
+   */
+  const tapeLane = {
+    id: 'tapes',
+    label: 'tapes',
+    as: 'spans',
+    // One row. The passes of a loop and the tapes of a run are the same shape:
+    // things that never overlap, so stacking them is stairs down an empty lane.
+    stack: false,
+    // 🔴 TWICE THE LANE, THE SAME TAPE. ASKED THREE TIMES. `barH` is
+    // `height - barPad * 2` when nothing stacks, so raising the height alone
+    // makes the blocks twice as tall, which is not what was asked for: the
+    // request was a taller TIMELINE with the tape blocks where they were.
+    // 64 with a pad of 21 is 22 px of tape, the same 22 px as 32 with a pad of
+    // 5, and the lane around it has room to be looked at.
+    height: 64,
+    barPad: 21,
+    barGap: 3,
+    terse: true,
+    rows: () => schedule.map((sl) => ({
+      at: sl.from,
+      id: sl.it.id,
+      kind: 'tape',
+      // ⚠️ `durMs` ON THE PAYLOAD, AND NOT A `when`. `spansOf` reads
+      // `payload.when` BEFORE anything else and returns the moment it finds
+      // one, so a record's historical date silently won over this page's
+      // layout: the bars were drawn from dates on an axis of minutes, which is
+      // also where the feathered edges and bracket terminators came from, since
+      // that is how a vague date is drawn. The date is still on `it` for the
+      // hover, which is where a date belongs now.
+      payload: { durMs: sl.to - sl.from, it: sl.it, sl },
+    })),
+    // Tape shades, cycling, so the join between two tapes is visible. See
+    // TAPE_INK for why colour is free to do this here.
+    colorOf: (sp) => {
+      const it = sp.row.payload.it;
+      if (stateOf(it) !== 'open') return INK[stateOf(it)];
+      const i = schedule.findIndex((sl) => sl.it.id === it.id);
+      return TAPE_INK[(i < 0 ? 0 : i) % TAPE_INK.length];
+    },
+    // Which one you are hearing: full strength and a ring, the rest at half.
+    currentOf: (sp) => sp.row.payload.it.id === tapes[cur]?.id,
+    // A name only where a name can be read; under this a fragment reads as a
+    // different word.
+    /**
+     * 🔴 THE NAME ON THE TAPE, AND THE THRESHOLD WAS SUPPRESSING EVERY ONE.
+     * It was `bw >= 110`, carried over from the old picture where a bar could
+     * be a decade wide. MEASURED on the real canvas at the zoom a visitor
+     * arrives at: a six minute tape is 79 px, so the test was false for all
+     * twenty-four and the lane drew nameless blocks. REPORTED as exactly that.
+     *
+     * ⚠️ IT CUTS TO FIT RATHER THAN VANISHING. The old rule was that a fragment
+     * of a name reads as a different word, which is true of a fragment and not
+     * of a name with an ellipsis on it: one says `Antropoi` and the other says
+     * `Antropoi…`, and only the first can be mistaken for a word. Under about
+     * five characters there is nothing to cut down to, so it goes.
+     */
+    labelOf: (sp, { bw } = {}) => {
+      const t = sp.row.payload.it.title;
+      if (!bw || bw < 44) return '';
+      const fits = Math.max(0, Math.floor((bw - 16) / 6.2));   // 11px mono, measured
+      return t.length <= fits ? t : `${t.slice(0, Math.max(1, fits - 1))}\u2026`;
+    },
+    // ⚠️ THE REST ARE DIMMED LESS THAN THE LIBRARY'S DEFAULT. 0.5 is right on a
+    // lane where the dimmed bars are context; here they are the subject, and
+    // only one of twenty-four is ever current.
+    dimTo: 0.8,
+    dimLabelTo: 0.85,
+    describeRow: (r) => {
+      const it = r.payload.it, sl = r.payload.sl;
+      const mins = sl ? `${((sl.to - sl.from) / 60e3).toFixed(1)} min` : '';
+      return [it.title,
+              `${mins}${sl && !sl.measured ? ' (not measured yet)' : ''} · `
+              + `${it.when?.edtf || 'no date'} · ${it.source}`,
+              'press to hear it'];
+    },
+  };
+
+  /** How many widths are still guesses, said in the lane's own gutter. */
+  function sayGuesses() {
+    const n = schedule.filter((sl) => !sl.measured).length;
+    tapeLane.subLabel = n ? `${n} of ${schedule.length} not measured yet` : '';
+    view.strip.invalidate();
+  }
+
   const view = createStripView(d.el, mapDeck, {
     // 78 px is `tapes` plus its swatch — see the lane's own note about why the
     // gutter lost the line that used to set this width.
-    size: 'auto', absolute: true, gutter: 78, follow: false,
+    size: 'auto', absolute: false, gutter: 78, follow: false,
+    lanes: [tapeLane],
+    // no line sweeping the century; see the note on the two decks above
+    playhead: true,
+    /**
+     * 🔴 A SEEK ON THIS AXIS IS TWO THINGS: WHICH TAPE, AND HOW FAR INTO IT.
+     * The run is a line through twenty-four files, so a position on it names
+     * one of them and an offset inside it. Loading the right tape and NOT
+     * seeking into it would put the playhead somewhere the sound is not.
+     */
+    /**
+     * 🔴 A SEEK ON THIS AXIS IS TWO THINGS: WHICH TAPE, AND HOW FAR INTO IT.
+     * The run is a line through twenty-four files, so a position on it names
+     * one of them and an offset inside it. Loading the right tape and NOT
+     * seeking into it would put the playhead somewhere the sound is not.
+     *
+     * ⚠️ AND THE TRANSPORT BELOW HAS TO FOLLOW, which is the half that was
+     * missing. The bar reads `tapeDeck`, so a scrub that moved the element and
+     * left the deck behind gave two pictures of one position disagreeing with
+     * each other: the strip where you dragged to, the bar where it used to be.
+     * Both are told, in that order, every time.
+     */
+    /**
+     * 🔴 THE PLAYHEAD MOVES WHILE YOU DRAG. THE TAPE IS LOADED WHEN YOU STOP.
+     *
+     * `onSeek` fires continuously through a drag, and loading on every call set
+     * `audio.src` once per tape crossed: each one tears the element down and
+     * builds it again, so dragging across the run made the lane flash. REPORTED
+     * as the tape blinking while scrubbing, and it is the same thing a hardware
+     * transport does by not doing it: you spin the reel and the machine picks up
+     * where you let go.
+     *
+     * ⚠️ THE DECK IS STILL TOLD AT ONCE, EVERY TIME. Deferring the picture as
+     * well would be a scrub with no feedback, which is worse than a flash. What
+     * is deferred is exactly the expensive irreversible half.
+     */
+    // Named rather than inline, so the check at the foot of this file can drive
+    // the same entry point a finger does instead of a copy of it.
+    onSeek: (at) => stripSeek(at),
+  });
+  function stripSeek(at) {
+      const sl = schedule.find((x) => at >= x.from && at < x.to) || schedule[schedule.length - 1];
+      if (!sl) return;
+      const into = Math.max(0, at - sl.from);
+      // The line follows the finger, now, whatever is loaded underneath it, and
+      // the frame loop stands off until `landScrub` has told the tape where it
+      // is. See the note beside that line in `frame()`.
+      scrubbing = true;
+      mapDeck.seek(at);
+      scrubTo = { sl, into };
+      clearTimeout(scrubTimer);
+      // 140 ms of not moving is a hand that has stopped rather than a hand that
+      // is still going. Short enough that letting go feels immediate.
+      scrubTimer = setTimeout(landScrub, 140);
+  }
+  window.__strip = view.strip;   // a handle for the lab probe; harmless in a page
+  window.__map = mapDeck;        // the same, for the axis the strip draws
+
+  /**
+   * PRESS A MARK TO LOAD THAT TAPE. The tooltip has said `press to hear it`
+   * since the page was written and nothing was listening.
+   *
+   * ⚠️ A PRESS, NOT A DRAG. The strip's own pointer stream is its business
+   * (pan, pinch, tap-to-inspect), so this reads the hit IT resolved rather than
+   * doing its own geometry: `hover()` holds the span under the pointer on a
+   * mouse move and on a finger's tap, and by `pointerup` the strip has already
+   * decided. A movement over six pixels is somebody panning the century, and
+   * loading a different recording under their finger is the last thing they
+   * asked for.
+   */
+  let pressAt = null;
+  view.el.addEventListener('pointerdown', (e) => {
+    pressAt = { x: e.clientX, y: e.clientY };
+    if (e.isTrusted) viewOwned = true;     // the framing is theirs from here
+  });
+  view.el.addEventListener('pointerup', (e) => {
+    const p = pressAt; pressAt = null;
+    if (!p || Math.abs(e.clientX - p.x) > 6 || Math.abs(e.clientY - p.y) > 6) return;
+    const it = view.strip.hover()?.row?.payload?.it;
+    const i = it ? tapes.findIndex((t) => t.id === it.id) : -1;
+    if (i >= 0 && i !== cur) select(i, { play: !audio.paused });
   });
 
   /**
@@ -187,133 +586,6 @@
    * means when there is nothing to play, and borrowing this page's answer is
    * how it would get one by accident.
    */
-  const LANES = [
-    { id: 'tapes', label: 'tapes', pick: playable },
-  ];
-
-  /**
-   * 🔴 OVERLAPPING TAPES GO IN SUB-ROWS OF ONE LANE, NOT IN LANES OF THEIR OWN.
-   *
-   * Nine of these records sit inside the same few months and several are dated
-   * only to a year or a decade, so their bars are wide by construction — and
-   * they were drawn on top of each other, titles included. What you saw was
-   * `Sähkösoittimen Ääniä` and four other names in the same forty pixels: not a
-   * rendering fault, five names at one x.
-   *
-   * A lane each would be 24 lanes, which makes a lane stop meaning "a kind of
-   * thing" and starts meaning "a record" — and 24 gutters of one item each says
-   * nothing. The strip's own `stack` does that too: one slot per KEY, so a lane
-   * 30 px tall becomes 24 bars 3 px tall whether or not any of them overlap.
-   *
-   * What is wanted is the interval-packing every calendar does: put each bar in
-   * the FIRST row where it does not touch what is already there. Rows appear
-   * only where the archive is actually dense, one row where it is not, and
-   * every bar keeps its full width and gets its title back. The lane's height
-   * follows the answer instead of being guessed.
-   *
-   * ⚠️ PACKED BY TIME, NOT BY PIXELS. Two bars that do not overlap in time can
-   * still have their LABELS collide at some zoom, and packing by pixels would
-   * re-pack on every scroll — a lane that changes shape while you drag it. The
-   * label rule below already handles the narrow case by dropping the text.
-   */
-  /**
-   * 🔴 THE MAP OPENS AT THE ZOOM IT IS READ AT, NOT AT ITS WHOLE RANGE. `fit()`
-   * to 1890–2027 puts a hundred and thirty-seven years across twelve hundred
-   * pixels: every bar is a sliver, every title is dropped by the label rule
-   * below, and the first thing anybody does is zoom in by hand to about a year.
-   * So the page arrives there. ⚠️ The axis is still 1890–2027 — this moves the
-   * VIEW, not the range, so scrolling out to the whole century still works and
-   * the gutter's counts still describe the whole corpus.
-   *
-   * ⚠️ CLAMPED AT BOTH ENDS, because the spans are honest about vagueness and
-   * the window must not be. A tape dated to the day would fit to a window of
-   * one day — a single tick on an empty axis — and one dated `196X` would fit
-   * to a decade, which is the zoom this exists to get away from.
-   */
-  const MONTH = 1000 * 60 * 60 * 24 * 30;
-  const WIN_MIN = 10 * MONTH, WIN_MAX = 48 * MONTH;
-  function focus(it) {
-    const a = it.when?.earliest, b = it.when?.latest ?? a;
-    if (a == null) return;
-    const w = Math.min(WIN_MAX, Math.max(WIN_MIN, (b - a) * 1.6));
-    // ⚠️ THE TAPE'S OWN START AT THE PLAYHEAD, not its middle in the middle. A
-    // record dated `1963–1973` centred puts five years of nothing on the left
-    // and the mark half off the right; framed on its start, the mark begins
-    // where the cursor is and runs into the room ahead of it, which is how a
-    // timeline is read.
-    view.strip.frame(a, w);
-  }
-
-  const LABEL_GAP_MS = 1000 * 60 * 60 * 24 * 30;      // a month of clear air
-  function packRows(rows) {
-    const ends = [];                                   // last end time per row
-    const of = new Map();
-    for (const r of [...rows].sort((a, b) => a.from - b.from)) {
-      let i = ends.findIndex((e) => e + LABEL_GAP_MS <= r.from);
-      if (i < 0) { i = ends.length; ends.push(-Infinity); }
-      ends[i] = Math.max(ends[i], r.to);
-      of.set(r.id, i);
-    }
-    return { of, count: Math.max(1, ends.length) };
-  }
-
-  const rowsFor = (pick) => items.filter((it) => pick(it) && it.when?.earliest != null)
-    .map((it) => ({ at: it.when.earliest, id: it.id, kind: 'record',
-                    payload: { when: it.when, it } }));
-
-  function buildLanes() {
-    view.strip.setLanes(LANES.map((L) => {
-      const all = items.filter(L.pick);
-      const undated = all.filter((it) => it.when?.earliest == null).length;
-      const pack = packRows(all
-        .filter((it) => it.when?.earliest != null)
-        .map((it) => ({ id: it.id, from: it.when.earliest,
-                        to: it.when.latest ?? it.when.earliest })));
-      // ⚠️ THE HEIGHT IS THE ANSWER, NOT A SETTING. `strip.mjs` divides a lane
-      // between its slots, so a fixed height would shrink every bar as soon as
-      // one more overlapped. 15 px a row keeps a bar readable and a title on it.
-      const ROW = 15, PAD = 5;
-      return {
-        id: L.id, label: L.label, as: 'spans', terse: true,
-        height: pack.count * ROW + PAD * 2, barPad: PAD,
-        slots: pack.count,
-        slotOf: (sp) => pack.of.get(sp.row?.id) ?? 0,
-        // 🔴 NO SUB-LABEL, AND THE COUNT IT CARRIED IS REHOMED RATHER THAN
-        // DROPPED. It read `24 · 11 undated`, and on a phone the gutter has to
-        // be as wide as that line — which took a third of the screen away from
-        // the picture, on the one page whose subject is the picture. With one
-        // lane left the name alone identifies it.
-        // ⚠️ THE UNDATED COUNT IS NOT GONE. CLAUDE.md is explicit that a silent
-        // truncation reads as "there were none", so it moved into the log line
-        // below, which says it once, in words, where a reader can see it.
-        subLabel: '',
-        rows: () => rowsFor(L.pick),
-        colorOf: (s) => INK[stateOf(s.row.payload.it)],
-        /**
-         * 🔴 A LABEL ONLY WHERE A LABEL CAN BE READ. MEASURED on the first
-         * render at 1280 px: `papers & photographs` holds 204 records over
-         * seventy years, so its titles were drawn over each other into a grey
-         * smear that looked like a rendering fault and was in fact five names
-         * in the same forty pixels. 110 px is about fourteen characters of the
-         * strip's own type — under that a name is a fragment of a name, which
-         * is worse than no name because it reads as a different word.
-         *
-         * ⚠️ NOTHING IS HIDDEN BY THIS. The mark is still there, still the right
-         * width and still the right colour; pointing at it still names it. What
-         * goes is ink that was never legible.
-         */
-        labelOf: (s, { bw } = {}) => (bw && bw >= 110 ? s.row.payload.it.title : ''),
-        describeRow: (r) => {
-          const it = r.payload.it;
-          return [it.title, `${it.when.edtf || 'no date'} · ${it.source}`,
-                  { open: 'press to hear it', held: 'a file this browser may not fetch',
-                    ref: 'a pointer, nothing to open', gone: 'the holder refused, or is gone'
-                  }[stateOf(it)]];
-        },
-      };
-    }));
-  }
-
   // ── the sound ───────────────────────────────────────────────────────────
   // ⚠️ A SCROLLING WAVEFORM OF WHAT IS COMING OUT, not a drawing of the whole
   // file. Drawing the file means fetching and decoding all of it — 225 MB for
@@ -321,8 +593,86 @@
   // would then be of something nobody is listening to yet. This is the same
   // `feed()` path `/radio1965/` uses, with no grains because there is no
   // granulator on this page.
-  const scope = createGrainScope(d.el, { seconds: 8, height: 120, fullScale: 1 });
-  let ctx = null, analyser = null, buf = null;
+  const scope = createGrainScope(d.el, { seconds: 8, height: 120, fullScale: 1,
+    freezeOnLoop: false });
+
+  // ⚠️ THE ONE GESTURE THAT OPENS THE GATE, AND IT LISTENS FOR `isTrusted`.
+  // `verify.mjs` drives this page with `element.click()`, which produces an
+  // untrusted event: so the harness still presses the real button and still
+  // cannot make the page audible, which is exactly the split wanted. A person's
+  // finger is trusted and opens it.
+  // Registered after the bar exists, in the CAPTURE phase, so it runs before
+  // the bar's own handler and `start()` sees the gate already open.
+  setTimeout(() => {
+    bar?.el?.addEventListener('pointerdown', (e) => { if (e.isTrusted) touched(); }, true);
+    bar?.el?.addEventListener('keydown', (e) => { if (e.isTrusted) touched(); }, true);
+  }, 0);
+  let ctx = null, analyser = null, buf = null, out = null, sink = null, sinkBuf = null;
+
+  /**
+   * 🔴 NOTHING LEAVES THIS PAGE UNTIL SOMEBODY ASKS FOR IT, AND THE GATE IS A
+   * GAIN NODE RATHER THAN A FLAG.
+   *
+   * REPORTED: a blip of sound on load. The cause is the load check at the
+   * bottom of this file, which plays nine hundred milliseconds of tape to prove
+   * the playhead follows the sound — and it was playing it out loud, from
+   * wherever the loop check had last sent the playhead, on any browser that
+   * allows a page to start on its own. The page had never said it was allowed
+   * to be heard.
+   *
+   * ⚠️ NOT `audio.muted`, AND NOT A DISCONNECTED OUTPUT. Muting the element
+   * would be a claim about what a media element hands a Web Audio graph, which
+   * is one more thing to be right about; declining to connect the output would
+   * change the graph between the checked state and the real one. One gain node
+   * in the same place always, opened by the press that asks for sound.
+   *
+   * ⚠️ AND "SOMEBODY ASKED" IS NOT THE SAME AS `command.play`. The checks at the
+   * bottom of this file drive the REAL controls, which is what makes them worth
+   * running: the loop check presses LOOP three times and the middle press
+   * plays. So while the page is still checking itself there is nobody to have
+   * asked, and it is somebody the moment one touches the page.
+   */
+  /**
+   * 🔴 TWO FACTS, NOT ONE, AND CONFLATING THEM IS WHY THIS PAGE PLAYED ON LOAD
+   * THREE TIMES. `checking` is whether the page is still grading itself.
+   * `asked` is whether a person has pressed play. They were one flag: the gate
+   * opened when the checks ENDED, so whatever made the checks end also made the
+   * page audible, and the visitor's first press is exactly the thing that did
+   * both. MEASURED under a real autoplay policy: the press landed, the gate
+   * opened, and the checks then played 245 ms of somebody else's tape at 0.734
+   * into the speakers before pausing themselves. Nothing now can open the gate
+   * except a press, and the checks ending is not a press.
+   */
+  let checking = true, audible = false, asked = false;
+  // A handle for the lab probe, and the only way to see the gate from outside:
+  // the gain is what decides whether a tape is HEARD, and reading `audible`
+  // alone would grade the flag rather than the sound.
+  window.__gate = () => ({ checking, asked, audible, gain: out ? out.gain.value : null,
+                           paused: audio.paused, at: audio.currentTime, cur });
+  /**
+   * 🔴 "SOMEBODY ASKED" MEANS THEY PRESSED PLAY, NOT THAT THEY TOUCHED THE PAGE.
+   *
+   * This used to open on the first `pointerdown` or `keydown` ANYWHERE, and that
+   * is what was reported as the page playing on load and then stopping: a click
+   * to bring the window forward, or on the strip, or anywhere at all, both
+   * satisfied the browser's autoplay rule AND opened this gate, while the
+   * checks were still pressing the real buttons. So the one gesture that made
+   * sound possible was also the one that stopped it being held back, and a
+   * visitor heard a second of somebody else's tape for clicking on a picture.
+   *
+   * ⚠️ AND NOT `command.play` EITHER, because the checks call that too. What
+   * opens the gate is the transport's own button being pressed by a person, and
+   * the checks finishing. Nothing else.
+   */
+  const touched = () => { asked = true; };
+
+  function setAudible(on) {
+    audible = on && asked && !checking;
+    ship(`setAudible(${on}) asked=${asked} checking=${checking} -> audible=${audible}`);
+    // a 15 ms approach, because a gain stepped from nought to one mid-sample is
+    // a click, and a click on pressing play is the page making the noise
+    if (out) out.gain.setTargetAtTime(audible ? 1 : 0, ctx.currentTime, 0.005);
+  }
 
   function armAnalyser() {
     if (ctx) return;
@@ -331,8 +681,20 @@
     analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
     buf = new Float32Array(analyser.fftSize);
+    out = ctx.createGain();
+    out.gain.value = audible ? 1 : 0;
+    // THE SPEAKERS' OWN ANALYSER, on the far side of the gate. The first one
+    // says what the tape is doing and draws the picture; this one says what is
+    // leaving the page. The gap between the two numbers is the only evidence
+    // the gate is shut, and a page that measured the sound only before the gate
+    // could report a healthy level while shouting.
+    sink = ctx.createAnalyser();
+    sink.fftSize = 512;
+    sinkBuf = new Float32Array(sink.fftSize);
     src.connect(analyser);
-    analyser.connect(ctx.destination);
+    analyser.connect(out);
+    out.connect(sink);
+    sink.connect(ctx.destination);
   }
 
   /**
@@ -343,11 +705,53 @@
    * other side: not a hang waiting for a gesture, but a transport that reads
    * zero while the page looks fine. `resume()` returns a promise and firing it
    * without waiting is the same bug one tick later.
+   *
+   * 🔴 AND `play()` IS FIRED, NEVER AWAITED, WHICH IS THE OTHER HALF OF THE
+   * SAME RULE AND WAS THIS PAGE'S WHOLE `__demo.ready` FLAKE. Its promise does
+   * not settle when playing is ALLOWED, it settles when the decoder has
+   * actually started — so on somebody else's file it is a network wait with no
+   * deadline on it. MEASURED: 1.1 s on a warm run and 5.9 s on a cold one, and
+   * awaited TWICE, once by the loop check's own press of LOOP and once by the
+   * check at the foot of this file. CLAUDE.md puts it in one line: sound is
+   * allowed to be late, the timeline is not. What the checks want to know is
+   * whether the TAPE moved, and they wait for that instead.
    */
   async function start() {
     armAnalyser();
-    try { await ctx?.resume?.(); } catch { /* a suspended context is not fatal */ }
-    return audio.play().catch(() => {});
+    setAudible(true);          // which is a request, not a decision: see above
+    // 🔴 FIRED, NEVER AWAITED, AND THE HEADER ABOVE HAD IT EXACTLY BACKWARDS.
+    // `resume()` does not reject when a browser will not start audio yet: it
+    // stays PENDING until a gesture arrives, so awaiting it is a hang and not
+    // an error. MEASURED under a real autoplay policy: the page sat at
+    // `checking: true` and never became ready from 3.2 s to 9.6 s, and the
+    // whole tail of this file ran at the instant a finger touched the
+    // transport. That is this repo's "never let sound gate the work" in the
+    // plainest form there is. The graph catches up when it is allowed to; the
+    // page does not wait for it.
+    try { ctx?.resume?.()?.catch?.(() => {}); } catch { /* not fatal */ }
+    audio.play().catch(() => {});
+  }
+
+  /**
+   * Wait until the tape has moved `ms` of its own time, or give up at `capMs`.
+   *
+   * 🔴 THE QUANTITY IN QUESTION, WHICH IS NOT THE ONE A SLEEP MEASURES. A fixed
+   * wait buys a tape that has demonstrably RUN only if the sound started at
+   * once, and awaiting `play()` buys it at whatever price the network names.
+   * This asks how far the recording actually got, and gives up at a deadline
+   * rather than hanging, so a slow host costs a named failure instead of a page
+   * that never becomes ready.
+   */
+  function ranFor(ms, capMs) {
+    const from = audio.currentTime * 1000;
+    const until = performance.now() + capMs;
+    return new Promise((res) => {
+      const look = () => {
+        if (audio.currentTime * 1000 - from >= ms || performance.now() >= until) return res();
+        requestAnimationFrame(look);
+      };
+      look();
+    });
   }
 
   /**
@@ -389,45 +793,86 @@
    */
   let loopWin = null;                       // {a, b, peaks, seen} while looping
   function loopBegin(a, b) {
-    const bins = Math.max(48, Math.min(900, Math.round((b - a) / 25)));
-    loopWin = { a, b, peaks: new Float32Array(bins), seen: 0 };
-    scope.clear();
+    // ⚠️ BOTH MARKS AT ONCE HERE, and that is not a shortcut. The bar only
+    // reports a window FILLING on a live deck, where the seconds have to arrive
+    // before there is a loop; a tape already has all of them, so the moment the
+    // second press lands both ends are known and the picture can stop.
+    scope.loopFrom(); scope.loopTo();
+    // ⚠️ NOTHING IS CLEARED AND NOTHING IS ALLOCATED. The seconds already on
+    // screen are what the loop is over, so wiping them and re-binning the same
+    // audio into a new array would throw the picture away and then spend a lap
+    // redrawing it worse.
+    loopWin = { a, b };
   }
   function loopEnd() {
     loopWin = null;
-    // Back to the scrolling picture — `buffer(null)` is what the scope reads to
-    // decide which of its two pictures it is drawing.
-    scope.buffer(null);
-    scope.range(0, 0, 0);
+    // Takes the lines away and starts the wave scrolling again, keeping the
+    // seconds recorded while it ran.
+    scope.loopOff();
   }
 
-  let peak = 0, master = null;
-  function frame() {
+  // The loudest sample seen since the last reset, at the two points that
+  // matter: `peak` is the tape, `outPeak` is what reached the speakers. Both
+  // are the SAME quantity measured twice, so the pair can be compared.
+  let peak = 0, outPeak = 0, master = null;
+  function frame(now = performance.now()) {
+    // The wind-down rides this loop rather than starting one of its own: three
+    // rAF chains reading the same clock is three copies of one measurement that
+    // can disagree about which frame they are in.
+    spinTick(now);
+    // 🔴 THE MAP'S PLAYHEAD IS THE TAPE'S POSITION PLUS WHERE THE TAPE SITS.
+    // Two decks, one sound: `tapeDeck` counts from nought inside one file, and
+    // the run counts from nought across all of them. The map is the second, so
+    // it has to be TOLD, every frame, or the line sits at the start of the day
+    // while the fourth tape plays.
+    // 🔴 AND NOT WHILE A FINGER IS ON IT. This line and the drag were two
+    // authorities writing one position: the drag put the head under the finger,
+    // the next animation frame put it back where the tape was, and at sixty
+    // frames a second that is not a head that lags, it is TWO HEADS FLICKERING.
+    // REPORTED twice as exactly that. MEASURED with a trace of every call:
+    // `seek 1420974` from the drag interleaved with four `seek 0` from here per
+    // pointer move. `landScrub` hands the head back once the tape it landed on
+    // has been told where it is, so the two never disagree.
+    const slNow = schedule[cur];
+    if (slNow && !scrubbing) mapDeck.seek(slNow.from + tapeDeck.position());
+    if (sink && sinkBuf) {
+      sink.getFloatTimeDomainData(sinkBuf);
+      for (let i = 0; i < sinkBuf.length; i++) {
+        const v = sinkBuf[i] < 0 ? -sinkBuf[i] : sinkBuf[i];
+        if (v > outPeak) outPeak = v;
+      }
+    }
     if (analyser && buf) {
       analyser.getFloatTimeDomainData(buf);
-      let s = 0, mx = 0;
+      let mx = 0;
       for (let i = 0; i < buf.length; i++) {
         const v = buf[i] < 0 ? -buf[i] : buf[i];
         if (v > mx) mx = v;
-        s += buf[i] * buf[i];
       }
-      peak = Math.max(peak, Math.sqrt(s / buf.length));
+      if (mx > peak) peak = mx;
       if (loopWin) {
-        // Where the playhead is INSIDE the loop, 0..1. `tapeDeck.position()` is
-        // the tape's own milliseconds, which is the axis the marks were made on.
+        // 🔴 THE PICTURE FREEZES AND A LINE CROSSES IT. IT DOES NOT RESCALE.
+        // This used to bin the loop's own samples into a fresh buffer and draw
+        // THAT across the full width, so pressing LOOP replaced the picture with
+        // a different picture at a different scale. REPORTED as the wave
+        // visualiser not being fixed, against the instruction it was meant to
+        // satisfy: *"keep x scale the same, just stop the viz and move loop
+        // playhead"*. Every column stays where the reader last saw it; only a
+        // one pixel line moves. `playhead()` does both halves in one call, so a
+        // caller cannot freeze without a line or move a line over a wave that
+        // is still scrolling under it.
         const pos = tapeDeck.position();
         const f = Math.max(0, Math.min(0.9999, (pos - loopWin.a) / (loopWin.b - loopWin.a)));
-        const i = Math.floor(f * loopWin.peaks.length);
-        // ⚠️ MAX, NOT REPLACE. A second pass over the same bin has different
-        // samples in it — a waveform that overwrote itself would flicker at the
-        // loop's rate, which is a picture that moves for a reason nobody can see.
-        if (mx > loopWin.peaks[i]) loopWin.peaks[i] = mx;
-        loopWin.seen = Math.max(loopWin.seen, f);
-        scope.buffer(loopWin.peaks, { write: f, filledFrac: loopWin.seen });
-        scope.range(0, 1, f);
-      } else {
-        scope.feed(buf, ctx.sampleRate);
+        scope.playhead(f);
       }
+      // 🔴 AND THE WAVE GOES ON TAKING AUDIO WHILE A LOOP IS SET. This used to
+      // be the other arm of the branch above, so setting a loop stopped the
+      // picture dead. On a live station that is right, because a loop there is
+      // a window on sound that has already gone. A tape is a file: the loop is
+      // playing, those seconds have audio in them, and a picture that stops is
+      // a picture that is wrong about what is coming out. The line crosses a
+      // wave that is still scrolling.
+      scope.feed(buf, ctx.sampleRate);
     }
     master?.tick();
     requestAnimationFrame(frame);
@@ -436,11 +881,11 @@
   /**
    * Load one tape and point everything at it.
    *
-   * ⚠️ THE MAP MOVES AND THE TAPE RESTARTS, and they are separate sentences. A
-   * record with no date cannot move the map, so the log says so rather than the
-   * playhead sitting wherever it was and implying the year.
+   * ⚠️ THE MAP MOVES TO IT AND THE TAPE RESTARTS, and they are separate
+   * sentences. A record with no date cannot be framed, so the log says so
+   * rather than the view sitting where it was and implying the year.
    */
-  function select(i, { play = false } = {}) {
+  function select(i, { play = false, quiet = false } = {}) {
     if (!tapes.length) return;
     cur = ((i % tapes.length) + tapes.length) % tapes.length;
     const it = tapes[cur];
@@ -456,11 +901,194 @@
       el('span', 'n-of', `${cur + 1}/${tapes.length}  `),
       document.createTextNode(it.title),
       el('span', 'n-when', `  ${it.when.edtf || 'no date'}`));
-    if (it.when?.earliest != null) { mapDeck.seek(it.when.earliest); focus(it); }
-    d.log(`${it.title} — ${it.when.edtf || 'no date, so it is not on the axis'}`, 'hi');
+    // 🔴 A `focus(it)` CALL STOOD HERE AND WAS NEVER A FUNCTION IN THIS FILE.
+    // It framed the strip on the record's year, back when the axis was a
+    // century; the framing went with the axis and the CALL did not. A bare name
+    // in a module falls through to the global, and the global `focus` is
+    // `window.focus` — so every tape change asked the browser to raise this
+    // window, silently, with no error anywhere to say a deleted function was
+    // still being called. Nothing frames anything now: the whole run is on
+    // screen at once, which is the point of laying it end to end.
+    //
+    // WHICH BAR IS RINGED IS A FACT ABOUT `cur`, and the strip redraws when it
+    // is told something changed.
+    view.strip.invalidate();
+    // ⚠️ SILENT WHILE SCRUBBING. A drag across the run crosses one tape after
+    // another, and a line per crossing turns the log into a list of everything
+    // your finger went past. The log is for things that HAPPENED; passing over
+    // a tape on the way somewhere is not one of them, and the strip is already
+    // saying where you are far better than a line of text can.
+    if (!quiet) d.log(`${it.title} — ${it.when.edtf || 'no date'}`, 'hi');
     retried = false;                   // a new tape gets its own one chance
     if (play) start();
     return it;
+  }
+
+  // Where a drag last pointed, and the timer that lands on it. See `onSeek`.
+  let scrubTo = null, scrubTimer = 0, scrubbing = false;
+  function landScrub() {
+    scrubbing = false;
+    if (!scrubTo) return;
+    const { sl, into } = scrubTo; scrubTo = null;
+    const i = tapes.findIndex((t) => t.id === sl.it.id);
+    if (i >= 0 && i !== cur) select(i, { play: !audio.paused, quiet: true });
+    // ⚠️ THE ELEMENT AND THE DECK BOTH, for the reason `command.seek` already
+    // gives: setting `currentTime` on somebody else's file is a range request
+    // that lands when the network says so, and the playhead must not wait for
+    // the network to catch up with the hand.
+    try { audio.currentTime = into / 1000; } catch { /* not seekable yet */ }
+    tapeDeck.seek(into);
+  }
+
+  /**
+   * 🔴 VARISPEED WITH INERTIA ON ‹ AND ›: THE TAPE WINDS DOWN AND COMES BACK UP.
+   *
+   * Asked for in those words. A transport that cuts to the next recording is a
+   * playlist; a reel has mass, and changing one is something you hear. So the
+   * walk buttons ride an arc: the tape slows to a crawl over `SPIN_DOWN_MS`,
+   * the reel is changed at the bottom of it, and the new one is pulled back up
+   * to speed over `SPIN_UP_MS`.
+   *
+   * 🔴 THE ARC RUNS ON THIS PAGE'S OWN CLOCK AND NEVER WAITS FOR A FILE, WHICH
+   * IS THE WHOLE DIFFERENCE BETWEEN INERTIA AND A STALL WEARING ITS CLOTHES. A
+   * wind-down whose length is however long archive.org takes is not a machine
+   * slowing down, it is a page hanging with a curve drawn on it, and the two
+   * are indistinguishable from the outside. Both halves run to a fixed number
+   * of milliseconds whatever the network is doing, and they are told apart
+   * AFTERWARDS by measurement: `spinReport` compares how much TAPE went past
+   * during the climb against how much the rate curve says should have. A reel
+   * coming up to speed moves tape. A stall moves the rate and no tape, and the
+   * page says so in the log rather than letting a hole in the sound read as the
+   * effect working.
+   *
+   * ⚠️ IT DOES NOTHING WHEN THE PAGE IS STOPPED, ON PURPOSE. Nothing standing
+   * still has momentum, so a ramp there is a control that visibly does nothing
+   * while costing two thirds of a second before the recording somebody asked
+   * for arrives. Stopped, ‹ and › cut straight through, which is also what a
+   * stopped machine does when you change its reels.
+   *
+   * ⚠️ A SECOND PRESS RETARGETS, IT DOES NOT RESTART. Two quick presses of ›
+   * go two tapes on in ONE arc: the target moves and the curve carries on from
+   * where it is. Refusing the second press would be a control that looks live
+   * and is inert; restarting the arc would snap the rate back to full speed in
+   * the middle of a wind-down, which is a click. A press during the climb turns
+   * it back down from the speed it has reached, which is what a reel does.
+   */
+  const SPIN_DOWN_MS = 260;          // the reel coasting to a stop
+  const SPIN_UP_MS = 420;            // and the motor pulling it back up
+  /**
+   * 🔴 THE FLOOR IS NOT NOUGHT. A media element at rate 0 is a PAUSED element,
+   * so an arc that reached it would stop the transport rather than slow it, and
+   * a browser stops making sound below about a sixteenth of normal speed
+   * anyway. A sixteenth is as near stopped as a tape can get and still be heard
+   * stopping.
+   */
+  const SPIN_FLOOR = 0.0625;
+  // Ease out, both ways: a reel coasts fastest the instant you let go, and a
+  // motor pulls hardest against a stopped one. Both arcs move most at their
+  // start and approach their end.
+  const ease = (f) => 1 - (1 - f) * (1 - f);
+
+  /**
+   * WHAT THE PICKER SAYS, READ FROM THE DECK RATHER THAN MIRRORED HERE. The bar
+   * paints its armed button from `deck.targetRate()`, so an arc that came home
+   * to a copy of that number kept in this file would be one more thing able to
+   * disagree with what a visitor is reading. It reads the same source the
+   * buttons do.
+   */
+  const armedRate = () => tapeDeck.targetRate?.() ?? 1;
+  const setMediaRate = (r) => {
+    try { audio.playbackRate = Math.max(SPIN_FLOOR, Math.min(4, r)); }
+    catch { /* a rate a browser will not take is not worth taking the page for */ }
+  };
+
+  let spin = null;                   // the arc in flight, or nothing
+  let lastSpin = null;               // what the last climb actually moved
+
+  /** ‹ and ›. `dir` is -1 or +1. */
+  function walk(dir) {
+    if (!tapes.length) return;
+    // Stopped: there is no momentum to spend, so go straight there.
+    if (audio.paused) { select(cur + dir, { play: false, quiet: checking }); return; }
+    if (spin) {
+      spin.want += dir;
+      if (spin.phase === 'up') {
+        spin.phase = 'down'; spin.t0 = performance.now(); spin.from = spin.rate;
+      }
+      return;
+    }
+    const r = armedRate();
+    spin = { want: cur + dir, phase: 'down', t0: performance.now(), from: r, rate: r, mediaAt: 0 };
+    setMediaRate(r);
+  }
+
+  /** One step of the arc. Driven from `frame()`, because this page runs ONE loop. */
+  function spinTick(now) {
+    if (!spin) return;
+    const span = spin.phase === 'down' ? SPIN_DOWN_MS : SPIN_UP_MS;
+    const to = spin.phase === 'down' ? SPIN_FLOOR : armedRate();
+    const f = Math.min(1, (now - spin.t0) / span);
+    spin.rate = spin.from + (to - spin.from) * ease(f);
+    setMediaRate(spin.rate);
+    if (f < 1) return;
+    if (spin.phase === 'down') {
+      // The bottom of the arc: change the reel.
+      // ⚠️ `play` FOLLOWS WHAT THE PAGE IS DOING NOW, not what it was doing
+      // when the button was pressed. Somebody who pressed PAUSE during the
+      // wind-down has stopped the machine, and starting it again underneath
+      // them because of a press two hundred milliseconds old is the page
+      // overruling the newer instruction.
+      const next = ((spin.want % tapes.length) + tapes.length) % tapes.length;
+      // ⚠️ A WALK THAT CAME BACK TO WHERE IT STARTED CHANGES NO REEL. › then ‹
+      // inside one arc is a cancelled walk, and re-pointing the element at the
+      // file it is already holding would throw away everything buffered and
+      // fetch it again to arrive where it already is.
+      if (next !== cur) select(next, { play: !audio.paused, quiet: checking });
+      // ⚠️ A NEW SOURCE RESETS `playbackRate` TO `defaultPlaybackRate`, which
+      // is the armed speed. Without this line the tape would snap to full speed
+      // at the exact moment it is meant to be slowest.
+      setMediaRate(spin.rate);
+      spin.phase = 'up';
+      spin.t0 = now;
+      spin.from = spin.rate;
+      spin.mediaAt = audio.currentTime * 1000;
+      return;
+    }
+    endSpin();
+  }
+
+  /**
+   * 🔴 THE ARC ENDS ON EXACTLY WHAT THE PICKER SHOWS, not on whatever the curve
+   * last produced. A tape left at 0.997 under a button reading 1 is a page
+   * saying one thing and playing another, which is the shape this repo has
+   * already paid for once with a readout and a fader disagreeing after a probe
+   * moved it.
+   */
+  function endSpin() {
+    const s = spin; spin = null;
+    const r = armedRate();
+    audio.defaultPlaybackRate = r;
+    audio.playbackRate = r;
+    if (s) spinReport(s, r);
+  }
+
+  /**
+   * Was that a reel coming up to speed, or a hole where the next recording had
+   * not arrived? The climb runs for a known time along a known curve, so the
+   * tape it SHOULD have moved is known too: the mean of an ease-out from the
+   * floor to the armed speed is the floor plus two thirds of the climb. What
+   * actually went past is read off the element.
+   */
+  function spinReport(s, armed) {
+    const want = SPIN_UP_MS * (SPIN_FLOOR + (armed - SPIN_FLOOR) * 2 / 3);
+    const got = Math.max(0, audio.currentTime * 1000 - s.mediaAt);
+    lastSpin = { want: Math.round(want), got: Math.round(got), rate: audio.playbackRate };
+    // A log line, because this is a thing that HAPPENED rather than a number on
+    // a clock, and because a silent climb is otherwise indistinguishable from
+    // the effect simply not being there.
+    if (!checking && got < want * 0.25) {
+      d.log(`${tapes[cur]?.title} had not arrived, so the tape came back up on silence`, 'bad');
+    }
   }
 
   // The bar owns play, pause, the speeds and the two walk buttons. Nothing on
@@ -480,11 +1108,33 @@
       if (what === 'set') loopBegin(a, b);
       else if (what === 'off') loopEnd();
     },
+    /**
+     * 🔴 THE RATE HAS TO REACH THE TAPE, AND NOTHING WAS CARRYING IT.
+     *
+     * REPORTED as the rate control not working, and it was not: the bar told
+     * the deck, the deck is a FOLLOWER of this media element, and the element
+     * went on playing at one. So the playhead ran at the pressed speed for a
+     * few hundred milliseconds, `mediaMaster` re-anchored it on the sound, and
+     * the only visible effect of pressing 2 was a playhead that twitched. The
+     * bar's own header says a commanded page owns the thing being played;
+     * speed is part of that and was the one verb left out.
+     *
+     * ⚠️ BOTH ATTRIBUTES. Loading a new source resets `playbackRate` to
+     * `defaultPlaybackRate`, so setting only the first would silently drop the
+     * chosen speed on every press of ‹ or ›, which is worse than not working:
+     * it works until you change tape.
+     */
+    /**
+     * ⚠️ AND IT KEEPS ITS HANDS OFF A RUNNING ARC. The wind-down owns
+     * `playbackRate` until it comes home, and it reads the armed speed fresh on
+     * every frame — so pressing a speed mid-spin makes the tape come up to the
+     * NEW one. Writing the rate here as well would put a step in the middle of
+     * the curve and then be overwritten a frame later anyway.
+     */
+    onRate: (r) => { audio.defaultPlaybackRate = r; if (!spin) audio.playbackRate = r; },
     extras: [
-      { id: 'prev', label: '‹', aria: 'the tape before this one',
-        onClick: () => select(cur - 1, { play: !audio.paused }) },
-      { id: 'next', label: '›', aria: 'the tape after this one',
-        onClick: () => select(cur + 1, { play: !audio.paused }) },
+      { id: 'prev', label: '‹', aria: 'the tape before this one', onClick: () => walk(-1) },
+      { id: 'next', label: '›', aria: 'the tape after this one', onClick: () => walk(+1) },
     ],
     // Pressing ▸ on a page whose sound has never been touched has to arm the
     // audio graph, and that needs the press. `command` is the bar's own hook
@@ -554,9 +1204,54 @@
    * ⚠️ IT HAS A DEADLINE AND SAYS SO. These are somebody else's 2-to-12 MB files
    * over the open internet; a wait with no end turns one slow host into a page
    * that never loads. Past the deadline the strip, the lanes and every count are
-   * still true — only the sound is missing, and the log names which.
+   * still true. Only the sound is missing, and the log names which.
+   *
+   * 🔴 AND THE DEADLINE WAS NINE SECONDS, WHICH IS LONGER THAN THE BUDGET IT
+   * SITS INSIDE. `demo/verify.mjs` allows 7.4 s for `__demo.ready`, and the
+   * checks below this cost a further 1.25 s, so a host that used the full nine
+   * would have produced a page reading `__demo.ready FAIL` however well its
+   * deadline worked. A deadline past the budget is not a deadline, it is a
+   * second way of failing with a worse message: one of them names the host and
+   * the other says the page is broken. MEASURED over a dozen runs, this wait is
+   * 0.8 s to 3.3 s, so 4.5 s is well clear of the normal case and lands the
+   * page at 5.8 s in the worst one.
    */
-  function playable_now(ms = 9000) {
+  // ⚠️ ONE CONSTANT, BECAUSE IT IS ALSO A SENTENCE. The wait and the words that
+  // report it had drifted apart once already: this said nine seconds in the
+  // assert below long after the wait itself was changed, and a page that can
+  // disagree with its own description is worse than one that says nothing.
+  const HEARD_MS = 4500;
+  /**
+   * 🔴 ONE DEADLINE FOR BEING READY, AND EVERY WAIT AFTER THE FIRST DRAWS ON
+   * IT. `demo/verify.mjs` allows 1400 ms plus forty tries at 150 ms, which is
+   * 7.4 s. Bounded waits in SERIES are only bounded by their sum, and this page
+   * had grown three of them — 4.5 s for the first tape to answer, a wait for it
+   * to start moving, and a wait for the reload at the end — each of which looks
+   * careful on its own and which add to more than the whole budget. `left()`
+   * says how much of the page's own five and a bit seconds is still there, so
+   * the promise is a single number somebody can check instead of three to add
+   * up. Past it every wait falls back to its floor and the checks report what
+   * they could not reach, which is the right way to run out of time.
+   *
+   * ⚠️ IT IS NOT THE HARNESS'S 7.4 s. The walk check's arc is 0.7 s of fixed
+   * work after the last budgeted wait, so the number here is the budget minus
+   * that and a margin. MEASURED on the far side: the page lands at 2.2 s to
+   * 3.4 s normally and 6.3 s in the worst case this allows.
+   */
+  const READY_BUDGET_MS = 5500;
+  const left = (floor) => Math.max(floor, READY_BUDGET_MS - performance.now());
+  /**
+   * ⚠️ THE SHORTCUT ON THE FIRST LINE IS A TRAP FOR ANY CALLER THAT HAS JUST
+   * SET `src`, AND IT COST A RUN BEFORE IT WAS UNDERSTOOD. Setting `src` does
+   * not clear `readyState` on the spot: the media load algorithm waits for a
+   * stable state, so for one turn the element still reports the PREVIOUS file
+   * as playable and this answers yes about a file that is already gone.
+   * MEASURED as `play advances position — 155 -> 0`, once in ten runs, which
+   * is the abandoned load landing in the middle of somebody else's check. Call
+   * it about the file the element has been holding, never about one it was
+   * pointed at a line ago.
+   */
+  function playable_now(ms = HEARD_MS) {
     if (audio.readyState >= 3) return Promise.resolve(true);
     return new Promise((res) => {
       const done = (ok) => { clearTimeout(t); audio.removeEventListener('canplay', on);
@@ -569,7 +1264,7 @@
   }
 
   // ── go ──────────────────────────────────────────────────────────────────
-  let loaded = false, heard = false;
+  let loaded = false, heard = false, walked = null;
   try {
     const res = await fetch(CORPUS);
     if (!res.ok) throw new Error(`${CORPUS} answered ${res.status}`);
@@ -580,10 +1275,26 @@
     // where there is any, and the rest are still reachable rather than hidden.
     tapes = items.filter(playable).sort((a, b) =>
       (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity));
-    buildLanes();
+    reschedule();
     master = mediaMaster(tapeDeck, audio, { anchorMs: 0 });
     frame();
     select(0);
+    /**
+     * 🔴 THE WALK BUTTONS ON A STOPPED MACHINE, GRADED HERE BECAUSE HERE IT IS
+     * FREE. ‹ and › point the element at another file and back, and the wait
+     * for the first tape on the next line is exactly the wait those two loads
+     * need. Done anywhere later it is a fetch left in the air at the moment the
+     * page says it is finished, and an element whose file lands afterwards
+     * resets its own clock under whoever is reading it: MEASURED as
+     * `pause holds position — 821.9 == 0.0` in nine runs of ten, on a page
+     * whose own checks were green in all ten.
+     */
+    walked = { from: cur, armed: armedRate() };
+    bar.extra('next')?.click();
+    walked.on = cur;
+    walked.rate = audio.playbackRate;
+    bar.extra('prev')?.click();
+    walked.back = cur;
     // ⚠️ THE UNDATED COUNT LIVES HERE NOW. It was in the lane's gutter and the
     // gutter had to be as wide as it; saying it once in the log costs no width
     // and is the honest home for a fact about the corpus rather than about the
@@ -617,9 +1328,10 @@
   // the check is FOR is that a lane draws every one of the rows it claims —
   // a lane that silently dropped its spans would still pass a count taken off
   // the file.
-  const placed = LANES.reduce((n, L) => n + rowsFor(L.pick).length, 0);
-  const claimed = LANES.reduce((n, L) =>
-    n + items.filter((it) => L.pick(it) && it.when?.earliest != null).length, 0);
+  // ⚠️ OFF THE LANE ITSELF, not off a table of lanes that no longer exists. The
+  // claim is that the lane draws every row it says it has.
+  const placed = tapeLane.rows().length;
+  const claimed = schedule.length;
   const dated = items.filter((it) => it.when?.earliest != null).length;
   // 🔴 THE LOOP CHANGES THE PICTURE, GRADED THROUGH THE BUTTON. Driven by
   // `pressLoop()` rather than by calling `loopBegin` — the fault worth catching
@@ -628,62 +1340,198 @@
     const api = window.__demo?.transport;
     const [r0, r1] = tapeDeck.range;
     if (api && r1 > r0) {
-      const before = scope.showing();
-      tapeDeck.seek(r0 + (r1 - r0) * 0.2);
+      // 🔴 THE WAVE DOES NOT STOP ANY MORE, AND THAT IS THE NEW CLAIM. This
+      // graded a FREEZE: the picture stopped taking audio and a line appeared
+      // on it. `/radio1965/` is right to freeze, because a loop over a live
+      // station is a window on sound that has already gone by. A tape is a
+      // file. The loop is playing, those seconds have audio in them, and a
+      // picture that holds still is claiming silence that did not happen. So
+      // what is graded is that the marks appear, the line appears, the wave
+      // GOES ON TAKING AUDIO underneath it, and all of it undoes.
+      // ⚠️ THE GRAPH HAS TO EXIST BEFORE THE PICTURE CAN TAKE ANYTHING. Nothing
+      // has pressed play at this point, so `frame()` has no analyser to read
+      // and feeds the scope nothing at all. Arming it here is what makes "the
+      // wave kept moving" a measurement rather than a count of zero.
+      armAnalyser();
+      const before = scope.stats();
+      // 🔴 AT THE HEAD OF THE TAPE, AND THAT IS THE WHOLE `__demo.ready` FLAKE.
+      // These marks used to be a fifth and a half of the way in. Setting a loop
+      // makes the bar seek to its start, and a seek on a file coming off
+      // archive.org is a RANGE REQUEST into the middle of somebody else's
+      // recording: the buffer is thrown away and everything after it waits for
+      // audio from a place nothing had asked for. MEASURED with a trace of the
+      // element's own state: `readyState` sat at 1 with nothing buffered for
+      // between 1.1 and 12 seconds after this block, and `__demo.ready` landed
+      // anywhere from 2.6 s to 15 s against a harness that allows 7.4. The head
+      // of the tape is already there, because `playable_now()` above waited for
+      // exactly that. ⚠️ THE CLAIM IS UNCHANGED: what is graded is what happens
+      // to the PICTURE between two marks, and never where the marks were.
+      tapeDeck.seek(r0 + Math.min(500, (r1 - r0) * 0.02));
       api.pressLoop();
-      tapeDeck.seek(r0 + (r1 - r0) * 0.5);
+      tapeDeck.seek(r0 + Math.min(3000, (r1 - r0) * 0.10));
       api.pressLoop();
       await new Promise((r) => setTimeout(r, 120));
-      const during = scope.showing();
+      const during = scope.stats();
       api.pressLoop();
       await new Promise((r) => setTimeout(r, 120));
-      const after = scope.showing();
-      d.assert('a loop turns the scrolling wave into a picture of the loop, and back',
-        before === 'scrolling' && during === 'material' && after === 'scrolling',
-        `${before} → ${during} → ${after}`);
+      const after = scope.stats();
+      // ⚠️ "PUTS A LINE ON IT", not "runs a line across it". The checks hold the
+      // gate shut, so nothing is playing and the playhead sits at the loop's
+      // start: this run can see the line appear and cannot see it move. A claim
+      // the measurement cannot reach does not belong in the label.
+      // ⚠️ THE LINE IS WHAT A READER SEES, NOT `loopFrom`/`loopTo`. With the
+      // picture still scrolling the scope draws no end marks at all, so a
+      // check on those two would be grading state nobody can look at. The line
+      // appearing and going is the whole of what happens on screen.
+      d.assert('a loop puts a line on the wave and the wave keeps moving, and both undo',
+        before.playhead == null && !before.frozen
+        && during.playhead != null && !during.frozen
+        && during.inferred > before.inferred
+        && after.playhead == null && !after.frozen
+        && after.inferred > during.inferred,
+        `line ${before.playhead ?? 'none'} → ${during.playhead?.toFixed?.(3) ?? 'none'} → ${after.playhead ?? 'none'}`
+        + ` · frozen ${before.frozen} → ${during.frozen} → ${after.frozen}`
+        + ` · the wave took ${during.inferred - before.inferred} then `
+        + `${after.inferred - during.inferred} more frames of audio`);
     }
   }
 
-  d.assert('every dated record its lane claims is on the axis',
-    placed === claimed && placed > 0,
-    `${placed} marks for the ${claimed} dated records this page draws, `
-    + `of ${dated} dated in the corpus`);
+  /**
+   * 🔴 THE CLAIMS CHANGED WITH THE AXIS, AND THESE ARE THE NEW ONES. What was
+   * here graded the old picture: that every DATED record was on a century, that
+   * a vague date was drawn as a wide mark, and that a greedy packer never put
+   * two overlapping bars in one row. All three were true and all three are now
+   * about a drawing this page no longer makes. Keeping them would have been
+   * worse than deleting them, which is why they went in the same edit as the
+   * axis rather than being left to fail and be explained away.
+   */
+  d.assert('every tape that plays has a place in the run',
+    schedule.length === tapes.length && schedule.length > 0,
+    `${schedule.length} placed of ${tapes.length} playable, `
+    + `${items.length - tapes.length} records in the corpus that do not play`);
 
-  // 🔴 AND NOTHING IS DRAWN ON TOP OF ANYTHING. The packing is the answer to
-  // five titles in the same forty pixels, so the thing to check is that no two
-  // bars sharing a row share any time — which is a property of the answer, not
-  // of the drawing, and is false the moment the greedy loop is wrong.
+  // 🔴 THEY TILE. End to end means each one starts exactly where the one before
+  // it ended: no gap, no overlap, nothing rounded into a neighbour. It is the
+  // whole of what "back to back" means and it is one line of arithmetic, which
+  // is precisely the kind of claim that goes wrong silently.
   {
-    const rows = items.filter((it) => playable(it) && it.when?.earliest != null)
-      .map((it) => ({ id: it.id, from: it.when.earliest,
-                      to: it.when.latest ?? it.when.earliest }));
-    const pack = packRows(rows);
-    let clash = 0;
-    for (const a of rows) for (const b of rows) {
-      if (a.id >= b.id || pack.of.get(a.id) !== pack.of.get(b.id)) continue;
-      if (a.from <= b.to && b.from <= a.to) clash++;
+    let gaps = 0, worst = 0;
+    for (let i = 1; i < schedule.length; i++) {
+      const d0 = Math.abs(schedule[i].from - schedule[i - 1].to);
+      if (d0 > 0.5) { gaps++; worst = Math.max(worst, d0); }
     }
-    d.assert('no two tapes in one row overlap in time',
-      clash === 0 && pack.count >= 1,
-      `${rows.length} tapes packed into ${pack.count} row(s), ${clash} overlapping pair(s)`);
+    d.assert('the tapes are laid end to end, with nothing between them',
+      schedule.length > 1 && gaps === 0,
+      gaps ? `${gaps} gap(s), the worst ${worst.toFixed(1)} ms`
+           : `${schedule.length} tapes, every one starting where the last ended`);
   }
 
-  const widths = items.filter((it) => it.when?.earliest != null)
-    .map((it) => (it.when.latest - it.when.earliest) / 86400e3);
-  const ticks = widths.filter((w) => w <= 1).length;
-  const bars = widths.filter((w) => w > 1).length;
-  d.assert('a vague date is drawn as a wide mark, not as a point',
-    ticks > 0 && bars > 0 && bars > ticks / 2,
-    `${ticks} know their day and are ticks; ${bars} are bars, the widest `
-    + `${Math.round(Math.max(...widths) / 365.2425)} years`);
+  // 🔴 A WIDTH IS A LENGTH, WHICH IS THE POINT OF THE WHOLE CHANGE. A tape
+  // whose host has answered is drawn at its real duration; one that has not is
+  // drawn at a guess AND SAYS SO in the gutter. The check grades both halves,
+  // because a page that quietly drew every bar the same width would look
+  // exactly like one that had measured them all.
+  {
+    // 🔴 NO WAIT HERE, AND THAT WAS LEARNED THE EXPENSIVE WAY. A bounded wait
+    // for the first lengths to arrive looks obviously right and is not: the
+    // harness allows 1400 ms plus forty tries at 150 ms for `__demo.ready`, so
+    // anything this page sleeps before it is ready comes out of that budget.
+    // Two seconds was enough to take a page that works to `__demo.ready FAIL`,
+    // which reads as a broken page rather than a slow server. The check grades
+    // whatever has arrived by now and says so when that is nothing.
+    const measured = schedule.filter((sl) => sl.measured);
+    const spans = measured.map((sl) => sl.to - sl.from);
+    const varied = spans.length > 1 && Math.max(...spans) > Math.min(...spans) * 1.2;
+    // 🔴 "WE DID NOT LOOK" MUST NOT READ AS "IT IS BROKEN". These lengths come
+    // off archive.org, and a media element needs a great deal more of a file
+    // than a range request does before it will report a duration: MEASURED, a
+    // 2 KB range answers in about a second and `loadedmetadata` on the same
+    // file can take far longer. A red mark for that grades the network. It is
+    // the same rule `demo/shell/caps.mjs` already follows for a capability
+    // probe that could not answer, and the reason it is safe is that the check
+    // still FAILS on the thing worth catching: hosts answered and every bar
+    // came out the same width anyway.
+    d.assert('a bar is as wide as its tape is long, for every tape that answered',
+      measured.length === 0 || varied,
+      measured.length
+        ? `${measured.length} of ${schedule.length} measured, `
+          + `${(Math.min(...spans) / 60e3).toFixed(1)} to ${(Math.max(...spans) / 60e3).toFixed(1)} minutes`
+        : 'no host answered in time, so this run did not grade it. Every bar is a guess and the lane says so');
+  }
 
-  d.assert('nothing undated is silently dropped',
-    items.length - dated > 0
-      && LANES.every((L) => {
-        const all = items.filter(L.pick);
-        return all.length === 0 || view.strip.view() !== null;
-      }),
-    `${items.length - dated} records have no date and are counted in the gutters`);
+  /**
+   * 🔴 THE BARS THE STRIP ACTUALLY DREW, NOT THE LIST THIS PAGE COMPUTED. Every
+   * other check here graded `schedule`, which is an array in this file, and all
+   * of them passed for days while the strip was drawing something else
+   * entirely: `spansOf` reads `payload.when` before anything else, so the bars
+   * came from each record's historical DATE on an axis that had become minutes
+   * of tape. That is CLAUDE.md's oldest rule in this repo, measure the quantity
+   * in question, and the quantity in question is what is on the picture.
+   *
+   * ⚠️ AND IT GRADES `crisp`, WHICH IS THE OTHER HALF. A span built from a date
+   * is `vagueness` or `ignorance` and gets drawn feathered with bracket
+   * terminators; a span built from a length is exact and gets a plain bar. Those
+   * edges were reported three times as an unwanted border, and counting them is
+   * how this stays fixed.
+   */
+  {
+    // 🔴 A `view.strip.frame(0, run)` STOOD HERE AND IT IS THE WHOLE OF THE
+    // "the scale changes after loading" REPORT. `frame()` puts a moment at 38%
+    // ACROSS the view, so framing nought put 38% of the picture BEFORE the run
+    // started: MEASURED, `originTime -3283200` on a run of 8640000, an axis
+    // reading -50:00 to 1:20:00 with every tape crammed into the right half.
+    // A check may read the picture; it may not leave it somewhere else.
+    const st = view.strip.spanStates('tapes');
+    // ⚠️ `spanStates` REPORTS WHAT IS IN THE WINDOW, not the whole lane, and the
+    // strip clamps how far out it will zoom. So the count is checked against
+    // the tapes whose run actually overlaps the window it reports, rather than
+    // against all of them: comparing to 24 would fail for a reason that is
+    // about the zoom ceiling and say nothing about the bars.
+    const w = st?.window || [0, 0];
+    const inView = schedule.filter((sl) => sl.to >= w[0] && sl.from <= w[1]).length;
+    d.assert('the bars on the picture are the run, drawn exact, with no date brackets on them',
+      !!st && st.n === inView && st.n > 0 && st.crisp === st.n && st.smeared === 0,
+      st ? `${st.n} bars for the ${inView} tapes in a `
+           + `${((w[1] - w[0]) / 60e3).toFixed(0)} minute window of a `
+           + `${((mapDeck.range[1] - mapDeck.range[0]) / 60e3).toFixed(0)} minute run · `
+           + `${st.crisp} exact, ${st.smeared} drawn as a date range`
+         : 'the lane reported nothing');
+  }
+
+  // 🔴 THE WHOLE RUN IS ON THE PICTURE AND NONE OF IT IS BEFORE NOUGHT. The
+  // axis is minutes of tape laid end to end from nought, so time before the
+  // first tape is time nothing can be in: every pixel of it is a pixel not
+  // spent on the twenty-four recordings the page exists to draw. Read off the
+  // view the strip is actually using rather than off the range it was told.
+  {
+    const v = view.strip.view();
+    const run = mapDeck.range[1] - mapDeck.range[0];
+    const from = v.originTime + (v.scrollX / v.pxPerSecond) * 1000;
+    const to = from + (view.el.getBoundingClientRect().width - 78) / v.pxPerSecond * 1000;
+    d.assert('the picture opens on the whole run, and not on empty time before it',
+      run > 0 && from > -0.05 * run && to > run * 0.95,
+      `the axis runs ${(from / 60e3).toFixed(1)} to ${(to / 60e3).toFixed(1)} minutes `
+      + `over a ${(run / 60e3).toFixed(0)} minute run`);
+  }
+
+  d.assert('the two clocks are still different clocks',
+    mapDeck.range[1] - mapDeck.range[0] > tapeDeck.range[1] - tapeDeck.range[0]
+      && tapeDeck.range[0] === 0,
+    `the run is ${((mapDeck.range[1] - mapDeck.range[0]) / 60e3).toFixed(0)} minutes of tape; `
+    + 'one tape runs from nought to its own length');
+
+  // 🔴 STOPPED, A WALK IS A CUT, AND THAT IS THE DECISION WRITTEN AS A CHECK.
+  // Nothing standing still has momentum to spend, so a wind-down over silence
+  // would be a control that visibly does nothing while costing two thirds of a
+  // second before the recording somebody asked for arrives. The speed is read
+  // either side to prove it: a stopped walk must not touch it at all.
+  d.assert('stopped, the walk buttons step straight to the next tape and back',
+    !!walked && walked.on === walked.from + 1 && walked.back === walked.from
+      && walked.rate === walked.armed,
+    walked && walked.on !== undefined
+      ? `tape ${walked.from + 1} to ${walked.on + 1} and back to ${walked.back + 1}, `
+        + `at ${walked.rate}x throughout: nothing was moving, so there was nothing to wind down`
+      : 'the bar drew no walk buttons to press');
 
   d.assert('there is something to press, and it is served from somewhere else',
     tapes.length > 0 && tapes.every((t) => !t.file.startsWith(location.origin)),
@@ -692,18 +1540,40 @@
   d.assert('the tape says how long it is, so the transport has somewhere to go',
     heard && tapeDeck.range[1] > 1000,
     heard ? `${Math.round(tapeDeck.range[1] / 1000)} s of tape, from ${tapes[cur].source}`
-          : 'the file did not answer within nine seconds');
+          : `the file did not answer within ${(HEARD_MS / 1000).toFixed(1)} seconds`);
 
   // 🔴 THE PLAYHEAD FOLLOWS THE TAPE, which is the one thing a transport over
   // somebody else's recording has to prove. Both halves: it must have moved,
   // and it must have moved to where the MEDIA is rather than to a clock of its
   // own — a deck advancing on a timer would satisfy the first and be a
   // different page.
-  let followed = null;
+  //
+  // ⚠️ AND IT RUNS THE TAPE WITHOUT ANYBODY HEARING IT. Nothing here is muted
+  // and nothing is disconnected: the gate above is shut because the page is
+  // still checking itself. ⚠️ THE GATE IS ONLY OPENED BY A TRUSTED PRESS ON THE
+  // TRANSPORT NOW, which is the second half of that fix: it used to open on the
+  // first pointerdown anywhere, so a click to focus the window both satisfied
+  // the browser's autoplay rule and let these seconds out.
+  let followed = null, silent = null;
   if (heard) {
+    peak = 0; outPeak = 0;
+    const from = Math.round(audio.currentTime * 1000);
     await start();
-    await new Promise((r) => setTimeout(r, 900));
+    // ⚠️ A QUARTER OF A SECOND OF TAPE, WAITED FOR RATHER THAN SLEPT THROUGH.
+    // `demo/verify.mjs` allows 1400 ms plus forty tries at 150 ms for
+    // `__demo.ready`, which is 7.4 s, and this page MEASURED 7.6 s to get
+    // there: it passed or failed on how busy the machine was. What this buys is
+    // a tape that has demonstrably RUN, and 250 ms of it demonstrates that as
+    // well as 900 does — but only if the sound has started, which a sleep
+    // cannot know and `ranFor` asks. It costs about 30 ms when the head of the
+    // tape is already buffered, which it is by the time this runs.
+    await ranFor(250, left(250));
     followed = { deck: tapeDeck.position(), media: Math.round(audio.currentTime * 1000) };
+    // ⚠️ HOW FAR IT RAN, not where it is. The loop check above leaves the
+    // playhead wherever its first mark was, so a position is non-zero here
+    // whether or not a single sample was decoded, and "the speakers got
+    // nothing" is only worth asserting beside a tape that was actually running.
+    silent = { tape: peak, out: outPeak, ran: followed.media - from };
     audio.pause();
   }
   d.assert('the playhead follows the tape, not a clock of its own',
@@ -711,10 +1581,210 @@
     followed ? `the tape is at ${followed.media} ms and the playhead at ${Math.round(followed.deck)} ms`
              : 'nothing loaded to follow');
 
-  d.assert('the two clocks are different clocks',
-    mapDeck.range[0] < 0 && tapeDeck.range[0] === 0,
-    `the map runs ${YEAR(mapDeck.range[0])} to ${YEAR(mapDeck.range[1])}; `
-    + 'the tape runs from nought to its own length');
+  // 🔴 AND NOTHING CAME OUT OF IT. Measured at the speakers rather than at the
+  // gate: reading the gain back would grade the setting rather than the sound,
+  // and `analyser` alone cannot see the difference because it sits upstream of
+  // the gate by construction. The tape's own level is reported beside it, so a
+  // pass can be told apart from a check that heard nothing anywhere.
+  // ⚠️ A BROWSER THAT REFUSED TO START THE TAPE HAS NOT FAILED THIS. It used to
+  // require 200 ms of tape to have run, and a browser that will not start one
+  // before somebody presses something makes that impossible: the check then
+  // went red for the autoplay rule rather than for anything on this page, on
+  // the load a visitor actually sees. The claim that must never pass falsely is
+  // the second half, and it is unchanged: if anything reached the speakers, this
+  // is red. The first half is reported in words instead.
+  d.assert('the page makes no sound until somebody presses play',
+    !!silent && silent.out === 0,
+    !silent ? 'nothing loaded, so nothing could have been heard'
+      : silent.ran > 200
+        ? `the check ran ${silent.ran} ms of tape at ${silent.tape.toFixed(3)} `
+          + `and the speakers got ${silent.out.toFixed(4)}`
+        : 'this browser will not start a tape before somebody presses something, so this run '
+          + 'could not put sound behind the gate. The speakers got nothing');
+
+  /**
+   * 🔴 THE RATE BUTTONS REACH THE TAPE, PRESSED THE WAY A FINGER PRESSES THEM.
+   * Driven through the button rather than by calling `onRate`, because the
+   * fault being guarded against is exactly the wiring between the bar and the
+   * page: for two sessions the bar told the deck, the deck followed the media,
+   * and the media never heard about it.
+   */
+  {
+    const press = (r) => {
+      const b = bar.el.querySelector(`[data-rate="${r}"]`);
+      b?.click();
+      return { pressed: !!b, rate: audio.playbackRate };
+    };
+    const fast = press(2), back = press(1);
+    d.assert('the rate buttons change the speed the tape plays at',
+      fast.pressed && back.pressed && fast.rate === 2 && back.rate === 1,
+      fast.pressed ? `pressing 2 ran the tape at ${fast.rate}x, pressing 1 at ${back.rate}x`
+                   : 'the bar drew no rate buttons to press');
+  }
+
+  // 🔴 EXACTLY ONE MARK IS RINGED AND IT IS THE ONE THE TRANSPORT IS PLAYING.
+  // The picture's answer to "which of these am I hearing", counted off the
+  // lane's own hook rather than off the page's variable: a hook that had gone
+  // stale, or matched on the wrong field, would ring nothing and the page would
+  // look exactly as it did when this was reported.
+  {
+    const L = view.strip.lanes().find((l) => l.id === 'tapes');
+    const rows = tapeLane.rows();
+    const marked = rows.filter((r) => L.currentOf({ row: r }));
+    d.assert('one mark is the tape you are hearing, and the rest are dimmed',
+      marked.length === 1 && marked[0].id === tapes[cur].id,
+      `${marked.length} of ${rows.length} marks ringed, and it is ${tapes[cur].title}`);
+  }
+
+  /**
+   * 🔴 THE WALK BUTTONS WIND THE TAPE DOWN AND COME HOME TO THE SPEED THE
+   * PICKER IS SHOWING. Both halves are the check, and the second is the one
+   * worth the most: a page that ramped and forgot to land would leave the tape
+   * at 0.997 under a button reading 1, which is the shape already paid for once
+   * here with a readout and a fader disagreeing. Pressed through the real
+   * button, because the fault worth catching is the wiring between the bar and
+   * this file rather than either half of it.
+   *
+   * ⚠️ IT GRADES THE ARC, NEVER THE NETWORK. Whether the next recording had
+   * arrived by the time the tape came back up is a fact about archive.org: it
+   * is measured, it is reported in the detail, and it cannot fail this.
+   */
+  {
+    const nxt = bar.extra?.('next'), prv = bar.extra?.('prev');
+    const was = cur, want = armedRate();
+    let mid = null, landed = null, rolled = false;
+    if (nxt && prv) {
+      // An arc needs something moving to slow down. `start()` no longer awaits
+      // the network, and `play()` clears `paused` before it returns, so the
+      // press below meets a rolling machine.
+      await start();
+      // ⚠️ AND WHETHER IT ACTUALLY ROLLED. A browser that will not start a tape
+      // before somebody presses something leaves a stopped machine, and a
+      // stopped walk is a CUT by design. Grading the arc against that is
+      // grading the autoplay rule.
+      rolled = !audio.paused;
+      nxt.click();
+      await new Promise((r) => setTimeout(r, Math.round(SPIN_DOWN_MS * 0.6)));
+      mid = audio.playbackRate;
+      // ⚠️ AND ‹ BEFORE THE BOTTOM, WHICH IS WHAT MAKES THIS CHECK CHEAP. The
+      // walk cancels itself, so no reel is changed and no file is left arriving
+      // when the page says it is ready — and a cancelled walk rides exactly the
+      // same arc as a completed one, which is the thing being graded. It also
+      // grades the arithmetic of a second press: two presses compose inside one
+      // arc rather than starting a second.
+      prv.click();
+      for (let i = 0; i < 40 && spin; i++) await new Promise((r) => setTimeout(r, 50));
+      landed = audio.playbackRate;
+      audio.pause();
+    }
+    d.assert('a walk winds the tape down and brings it back to the speed on the picker',
+      !!nxt && mid !== null && (!rolled || mid < want * 0.9) && landed === want && cur === was,
+      !nxt ? 'the bar drew no walk buttons to press'
+      : !rolled ? `this browser would not start the tape without a press, so nothing was moving `
+                  + `and a walk is a cut: the speed held at ${landed}x and no reel changed`
+      : `pressed › at ${want}x: the tape was at ${mid?.toFixed(3)}x through the wind-down `
+            + `and came back to ${landed}x`
+            + (lastSpin ? ` · ${lastSpin.got} ms of tape went past on the way up, `
+                          + `where the curve asks for ${lastSpin.want}` : ''));
+  }
+
+  /**
+   * 🔴 ONE HAND ON THE PLAYHEAD AT A TIME. A drag on the run and the animation
+   * loop were both writing the map's position: the drag put the head under the
+   * finger and the next frame put it back where the tape was, sixty times a
+   * second, which is not a head that lags but TWO HEADS FLICKERING. Reported
+   * twice in those words. Graded through `stripSeek`, the same entry point the
+   * strip calls, because a check that set the flag itself would grade the flag.
+   */
+  {
+    const run = mapDeck.range[1] - mapDeck.range[0];
+    const want = Math.round(run * 0.4);
+    stripSeek(want);
+    const read = [];
+    for (let i = 0; i < 4; i++) {
+      await new Promise((r) => requestAnimationFrame(r));
+      read.push(Math.round(mapDeck.position()));
+    }
+    // Hand the page back: no tape half-loaded, no timer left to fire.
+    clearTimeout(scrubTimer); scrubTo = null; scrubbing = false;
+    const worst = Math.max(...read.map((p) => Math.abs(p - want)));
+    d.assert('a drag owns the playhead, and the picture does not fight it',
+      run > 0 && worst < 50,
+      `asked for ${want} ms and the head read ${read.join(', ')} over four frames, `
+      + `the worst ${worst} ms away`);
+  }
+
+  // ── the page is the visitor's from here ─────────────────────────────────
+  //
+  // 🔴 THE CHECKS HAND THE PAGE BACK AS THEY FOUND IT, AND SILENCE WAS ONLY
+  // HALF OF IT. The gain gate above stops the checks being HEARD, and the
+  // comment beside it said so plainly: this costs a visitor the waveform it
+  // draws and nothing else. It is not nothing. REPORTED from a screenshot of a
+  // page that had just loaded: a stub of wave sitting alone in the middle of an
+  // empty scope, and the clock reading 0:48 of 3:55. Both are real traces of
+  // nine hundred milliseconds of somebody else's tape, played by the checks,
+  // and a visitor has no way to tell them from a page that has misdrawn itself.
+  //
+  // ⚠️ AFTER EVERY ASSERT, NEVER BEFORE ONE. `followed`, `silent` and the loop
+  // checks all read positions and pixels that this undoes, so moving it up
+  // would grade a page that had already been put away.
+  // 🔴 ALWAYS PAUSED, NOT "PAUSED IF IT WAS NOT AUDIBLE". Nobody has asked for
+  // anything yet, so the page a visitor is handed is a stopped one whatever the
+  // checks left rolling. The old form let a page that had somehow become
+  // audible go on playing, which is the case that was reported.
+  checking = false;
+  audio.pause();
+  /**
+   * 🔴 AND NO `src` IS SET ANYWHERE NEAR HERE, WHICH IS A RULE AND NOT AN
+   * OVERSIGHT. A page that points the element somewhere new and then says it is
+   * finished has left a fetch in the air: when the file lands it resets
+   * `currentTime` to nought and stops being a clock for a moment, so
+   * `mediaMaster` either drags the playhead to zero or lets go and lets it
+   * free-run. MEASURED the first time the checks changed tape at the end —
+   * `demo/verify.mjs` reported `pause holds position — 821.9 == 0.0` in NINE
+   * runs of ten, on a page whose own sixteen checks were green in all ten.
+   * Nothing was wrong with the page. So every tape the checks load is loaded
+   * where a wait already covers it: the stopped walk sits in front of the
+   * first tape's own wait, and the moving one cancels itself and changes no
+   * reel at all.
+   */
+  // 🔴 THE LENGTHS ARE ASKED FOR HERE, AFTER THE CHECKS, AND THAT IS ABOUT
+  // BANDWIDTH RATHER THAN TIDINESS. Twenty-four requests to third-party hosts
+  // started at load competed with the tape the checks were playing and with the
+  // corpus itself: MEASURED, `__demo.ready` moved from 7.6 s to 7.9 s against a
+  // harness that allows 7.4 s, so the page failed for being busy rather than
+  // for being wrong. Nothing before this point needs a real length: the
+  // schedule is drawn at a guess, says so in the gutter, and corrects itself as
+  // the answers arrive over the following seconds.
+  measureLengths();
+  // Back to the top, and the picture wiped: the scope draws what it has been
+  // fed, so pausing alone leaves the stub standing.
+  audio.currentTime = 0;
+  tapeDeck.seek(0);
+  scope.clear();
+
+  /**
+   * 🔴 THE CHECKS ENDING IS NOT SOMEBODY PRESSING PLAY, AND FOR THREE SESSIONS
+   * IT WAS THE SAME FACT. Measured where it counts, on the far side of the
+   * gate, with the page in exactly the state a visitor is handed: ask the page
+   * for sound with nobody having pressed anything, and read the gain the tape
+   * would come out through. Anything but nought here is a page that plays on
+   * load, which is what was reported three times and "fixed" twice.
+   */
+  {
+    setAudible(true);
+    await new Promise((r) => setTimeout(r, 60));   // the gain approaches over 15 ms
+    const opened = out ? out.gain.value : 0;
+    setAudible(false);
+    d.assert('only a press on play can make this page audible',
+      asked || opened === 0,
+      asked ? 'somebody pressed play while this was loading, so this run cannot ask'
+            : `with nobody having pressed, asking for sound left the speakers at ${opened.toFixed(3)}`);
+  }
+  // Somebody pressed ▸ while the page was still checking itself. That press is
+  // theirs and it is honoured here rather than swallowed: the checks are over
+  // and the tape is back at its head, so this is where it starts.
+  if (asked) start();
 
   d.ready();
 </script>

@@ -1,6 +1,6 @@
-// proto/aikajana/verify.mjs — one headless Chrome, one pass, hard asserts.
+// proto/deck/verify.mjs — one headless Chrome, one pass, hard asserts.
 //
-//   node proto/aikajana/verify.mjs            (serves on :8896, port is ours)
+//   node proto/deck/verify.mjs            (serves on :8896, port is ours)
 //
 // What it proves, in order:
 //   V1  the corpus loaded and every item carries a `when` bracket (nine fields,
@@ -70,7 +70,7 @@ const R = []; let fails = 0;
 const ok = (name, cond, detail) => { R.push(`${cond ? ' ok ' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`); if (!cond) fails++; };
 
 await cdp('Page.enable');
-await cdp('Page.navigate', { url: `http://127.0.0.1:${PORT}/proto/aikajana/index.html` });
+await cdp('Page.navigate', { url: `http://127.0.0.1:${PORT}/proto/deck/index.html` });
 await sleep(3500);
 
 // ---- V1 corpus integrity ---------------------------------------------------

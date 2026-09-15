@@ -17,7 +17,8 @@ failing demos ALONE before believing the suite**. `scene` is the first WebXR pag
 ordered NEWEST FIRST — `DEMOS` is still the story order and `byNewest()` copies
 it, because the index answers "what is new here?" and the sequence answers
 "where do I start?". Read
-`HANDOFF.md` for current state, `LESSONS.md` for why the rules below exist,
+`HANDOFF.md` for current state, **`BACKLOG.md` for what has been asked for and
+not yet done**, `LESSONS.md` for why the rules below exist,
 `PROGRESS.md` for what was measured when, and **`LAYOUT.md` for where a new file
 goes** — including the two renames that were priced and rejected, so they are
 not re-litigated.
@@ -77,6 +78,33 @@ or checking it tells you nothing about what is running. Compare `md5sum` against
 `/opt/positron-box/rig/box/` before believing a deploy landed.
 
 ## Rules that cost real time to learn
+
+🔴 **DO NOT RE-VERIFY `/radio1965/` OR PROBE STATION HEALTH. ASKED TWICE.**
+*"stop messing around with live stream assertions, you're wasting everybody's
+time"*, then *"can we please stop assessing the radio, its killing me and my
+budget"*. A run of that page costs minutes and a lot of tokens, it needs a
+relay and eight mounts nobody here controls, and what it returns is a fact
+about somebody else's server rather than about our code. Four of eight were
+down the last time it was run, which is the normal state of it.
+**Change the page, syntax-check it, ship it.** Verify it ONLY when asked to, or
+when a change is to the decode path itself and nothing else can grade it. A red
+run on that page is not information until somebody asks for it.
+⚠️ The same goes for `curl .../health`, for re-running a demo to attribute a
+flake, and for A/B'ing a failure that the rules already say is external. The
+answer to "is it red because of me or because of them" is: SAY BOTH ARE
+POSSIBLE AND MOVE ON.
+
+
+🔴 **A REQUEST THAT ARRIVES MID-TASK GOES IN `BACKLOG.md` BEFORE IT IS WORKED
+ON.** Over one long run a stream of small requests was tracked in the session's
+head instead, and two were quietly dropped: the report that followed was *"do
+you have it in yr backlog or you keep losing them"*, which is the right question
+and the answer was no. Working from memory is fine for one thing and fails
+silently for twenty, because a lost request looks exactly like a request that
+was never made. Write the line first, work from the file, strike it off when it
+is done. ⚠️ And a line leaves that file by being FINISHED or by being refused in
+writing. Never by going quiet.
+
 
 **Measure the quantity in question, not one adjacent to it.** An A/B where both
 arms share the bug returns "identical", which reads as "fine". Before running a
@@ -718,11 +746,52 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
   PUNCTUATION, IT IS WHAT THE CLAUSE DOES: if it qualifies, gestures, or
   re-states, cut it; if it carries a fact, it deserves its own sentence.
 - 🔴 **A DIAGRAM IS WRITTEN TO A DIFFERENT RULE FROM PROSE, AND HERE IT IS.**
+  - 🔴 **THE VISITOR'S MACHINE IS CALLED `Browser`. ALWAYS THAT WORD.** Not
+    `your device`, not `this page`, not `here`. It is the name of the thing, a
+    reader meets it on more than one diagram, and a name learned once should
+    not be re-learned per page. The same goes for the other machines: `Cloudflare`,
+    `Icecast`, `ffmpeg` are what those things are CALLED.
+  - 🔴 **A CONTAINER TAKES NO `note`.** A box holding other boxes is a machine,
+    and its name and the boxes inside it already say what it is. A paragraph on
+    it repeats the children underneath it and is read before them, which is the
+    wrong order. Notes belong on the boxes that do something and on the arrows
+    between them. Reported as noise on three containers at once.
+  - 🔴 **A DIAGRAM OPENS A SECTION AND SITS 44 px BELOW WHAT PRECEDES IT.**
+    Not the body's ordinary 22 px rhythm: a picture of the machinery is a new
+    part of the page, the way `.pos-how` already is. The number is declared once
+    in `shell.css` on `.pos-body > .pos-dg`, so a page that brings its own
+    `title` and a page that uses the standing heading cannot end up at two
+    distances, which is exactly what happened and was spotted by comparing two
+    pages side by side.
+  - 🔴 **IT GOES LAST ON THE PAGE, AND IT CARRIES `title: 'how it works'`.**
+    A diagram is REFERENCE: it is read once, on purpose, by somebody who has
+    already pressed the thing and wants to know what is behind it. Put between
+    the page's sentence and its controls it delays the only thing a first
+    visitor came for, and it makes the page look like documentation with a demo
+    attached. Under the controls and the readout it is exactly where somebody
+    who now has a question will look for one.
+    ⚠️ AND THE TITLE IS THE SAME FOUR WORDS ON EVERY PAGE, because a reader
+    learns a heading once. A per-page heading is a per-page thing to read.
+  - 🔴 **A PAGE WITH A DIAGRAM HAS A ONE LINE `what`, AND IT IS THE INDEX'S OWN
+    LINE.** A paragraph and a picture of the machinery are two explanations of
+    one thing and the paragraph is the weaker of them: it describes what a
+    reader can point at an inch below. Use the `one` line from `manifest.mjs`
+    verbatim, so a visitor arriving from the index is not told the same thing
+    twice in two wordings that can drift apart.
   `demo/shell/diagram.mjs` draws it; these decide what goes in it.
   - **A box label is a NAME.** `Icecast`, `scsynth`, `speakers`. It has to fit
     the box at the width the layout gives it, which is about fourteen
     characters, and a label that gets cut is reported on `cuts` for the author
     to fix rather than ellipsised at the reader.
+  - 🔴 **NO ARTICLE IN A LABEL. NOT `a`, NOT `an`, NOT `the`.** A label is a
+    NAME and names do not take articles: `a granulator` and `an item` read as
+    the start of a sentence somebody did not finish, and on an arrow they are
+    worse, because `a banner` and `the same` are the two halves of a caption
+    that is not there. Drop the article and what is left is either a good label
+    or a bad one that was hiding behind it: `a granulator` becomes `granulator`,
+    `an item` becomes what actually travels (`POST /items`), and `the same` was
+    never a label at all. ⚠️ THE `sub` AND THE NOTE ARE DIFFERENT: those are
+    prose and take articles normally.
   - **The `sub` is what KIND of thing it is**, in three or four words:
     `port 8001`, `SuperCollider`, `25 Hz, OSC`. Never a second sentence.
   - 🔴 **THE `note` IS TWO SENTENCES. NOT THREE, AND NEVER SIX.** It is read
@@ -740,16 +809,61 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
     no audience"**. There is no audience for what you considered, what you could
     not determine, what it used to say, or why you stopped. If a thing is not
     known, leave it out; the absence of a box already says so.
+  - 🔴 **A NOTE NAMES THE TECHNOLOGY. THE NO-JARGON RULE WAS DIALLED TOO FAR
+    BACK AND THIS IS THE CORRECTION.** A note saying a box "rides the station's
+    loudness and changes the synth twenty-five times a second" describes an
+    effect and names nothing a reader could look up, search for, or recognise.
+    `setInterval`, `AudioContext`, `Lag.kr`, `MediaRecorder`, `allow-origin`,
+    `Icecast` are what those things ARE CALLED, and a note is exactly where they
+    belong: it is read once, on purpose, by somebody who pointed at the box
+    because they wanted to know what is in it. The banned words were always the
+    PRIVATE vocabulary of this project (a fold, a lane, an evidence gate, a
+    horizon), never the public names of real technology. When a note could be
+    describing any of four implementations, it is not yet a note.
   - **An arrow's label is WHAT TRAVELS**, not what the step is called:
     `128 kbit/s`, `OSC /n_set`, `grains`. Its note says what that actually is.
   - 🔴 **NO FILE PATHS AND NO WARNING EMOJI IN ANYTHING A VISITOR READS.**
     `shell/icy.mjs` in a note tells a visitor nothing and tells a reader of the
     code something they could have grepped; ⚠️ in a sentence under a picture is
     an alarm about a fact that is not alarming. Both belong in comments.
+    ⚠️ **AND THE LOG BOX IS SOMETHING A VISITOR READS.** `items` shipped a
+    ⚠️ at the head of a log line about Focus modes. The line was worth saying and
+    the emoji made an ordinary fact look like a fault on a page whose log is
+    where real faults are reported, which is the one place a false alarm costs
+    something. A path, a warning emoji and a file name are all the same mistake
+    in a log line as in a note. This applies to prose in a code comment too when
+    it is quoted into a page.
   - **Boxes inside one machine are tied with a line and no arrowhead.** A head
     would claim an order between the parts of one program that the drawing does
-    not know. If two children really do feed each other in a way worth drawing,
-    they are two machines, not one.
+    not know. A tie is a bracket: it says these boxes are parts of one thing,
+    and nothing more.
+    🔴 **A DECLARED LINK BETWEEN TWO OF THEM IS DIFFERENT, AND IT REPLACES THE
+    TIE RATHER THAN BEING DRAWN OVER IT.** The reasoning above is about what the
+    DRAWING knows; where the author writes `{ from, to }` between two children,
+    the direction has been stated, so the tie has nothing left to add and the
+    arrow takes its place. Never both: two lines down one gap is exactly the
+    confusion a return path runs under the row to avoid.
+    🔴 **AND IT TAKES NO LABEL. THE DIRECTION IS THE WHOLE MESSAGE.** The gap
+    two stacked children share is sixteen pixels tall and half a box wide, so a
+    name in it either runs under both boxes or shrinks below the point of being
+    read. **What travels goes in the link's `note`**, which is read on hover in
+    the line under the picture, where there is room for a sentence. A `label`
+    written on one anyway is reported on `cuts` and not drawn, because an author
+    who cannot see their own label has no way to know where it went. ⚠️ The rule used to
+    end "if two children really do feed each other in a way worth drawing, they
+    are two machines, not one", and that was wrong in the one case it was
+    tested on. `/station/` groups seven boxes into three machines, and four of
+    its seven arrows are between boxes on ONE of them: R2 to R2, a schedule to
+    the Worker that reads it. Ungrouping them to get the arrows back loses the
+    fact the picture exists to carry, which is who runs what. `createDiagram`
+    routes them now: in the gap two neighbours share, or in a lane inside the
+    container for one that reaches past the box between them.
+    🔴 **AND A LINK IT STILL CANNOT ROUTE IS REPORTED ON `cuts`, NEVER DROPPED.**
+    This is how three real arrows went missing from that page for two sessions:
+    they were refused with a `console.warn` nobody was reading, the ties stood
+    where they should have been, and the picture looked complete while claiming
+    a chain that does not exist. A link from a container to a box inside ITSELF
+    is the one case left, and it says so in writing.
   - **Labels sit top-left** (`BOX_ALIGN` in `diagram.mjs`, one switch, so the
     whole project reverts together). Centred puts two boxes' names at two
     heights for a reason nobody can see.

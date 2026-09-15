@@ -141,7 +141,7 @@ function fromEdmLiteral(s) {
 // earliest) so the renderer and the older asserts keep working — but `when` is
 // now the single source of truth and they are computed from it, never beside it.
 // ---------------------------------------------------------------------------
-const CORPUS_RANGE_WHY = 'Wikidata Q122801742 "Äänityksiä / Recordings 1963–1973" — the authoritative compilation of his tapes';
+const CORPUS_RANGE_WHY = 'Wikidata Q122801742 "Äänityksiä / Recordings 1963–1973", the authoritative compilation of his tapes';
 const RULE_OF = {
   'wikidata-declared-precision': 'wikidata-precision@1',
   'edm-literal-length': 'edm-literal-length@1',
@@ -150,9 +150,9 @@ const RULE_OF = {
   'derived-from-corpus-range': 'corpus-range@1',
 };
 const NOTE_OF = {
-  'wikidata-declared-precision': 'Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision.',
+  'wikidata-declared-precision': 'Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01). Same fact, two paddings, one declared precision.',
   'edm-literal-length': 'Europeana/EDM keeps the date LITERAL, so precision is the string\'s own length. Honest by omission; the bracket is the unit the literal names.',
-  'filename-year': 'The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year.',
+  'filename-year': 'The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real: the bracket is the whole year.',
   'wikidata-title-match': 'No date on the file; a Wikidata work with the same normalised title carries one, and its declared precision is inherited whole.',
   'derived-from-corpus-range': `No date evidence at all on the file. The bracket is the corpus range: ${CORPUS_RANGE_WHY}. A lower AND upper bound that are true, in place of a point that is false.`,
 };
@@ -169,21 +169,36 @@ function edtfOf(precision, lo, hi) {
   return `${y}/${new Date(hi - 1).getUTCFullYear()}`;      // EDTF interval
 }
 
+/** The versioned rule behind a bracket. Every `how` in the table above names
+ *  one; the scholarly readings named below carry their page number IN the
+ *  `how`, so they share one rule and stay one `WHERE rule = …` away. */
+function ruleOf(how) {
+  if (RULE_OF[how]) return RULE_OF[how];
+  if (String(how).startsWith('ojanen-2020-thesis')) return 'ojanen-2020-thesis@1';
+  return null;
+}
+
 /** dateEvidence -> the library's frozen-sibling shape. Pure, so the corpus can
- *  be re-expressed offline (`--rewhen`) without re-hitting four APIs. */
+ *  be re-expressed offline (`--rewhen`) without re-hitting four APIs.
+ *
+ *  ⚠️ `edtf` and `note` can be STATED rather than derived, and only a reading
+ *  of a source states them. `edtfOf` writes an interval as `1964/1964` because
+ *  it only has two numbers to work with; the thesis says the tape precedes a
+ *  contest on a named day, which is `1964/1964-04-04`. Deriving it would throw
+ *  that away and there is nowhere else to put it. */
 export function whenFor(e) {
   if (!e || !Number.isFinite(e.at) || !Number.isFinite(e.hi)) return null;
-  const rule = RULE_OF[e.how];
+  const rule = ruleOf(e.how);
   if (!rule) throw new Error(`no versioned rule for dateEvidence.how='${e.how}' — every bracket must name the rule that made it`);
   return {
     verbatim: e.raw === undefined ? null : e.raw,
-    edtf: edtfOf(e.precision, e.at, e.hi),
+    edtf: e.edtf || edtfOf(e.precision, e.at, e.hi),
     earliest: e.at,
     latest: e.hi,                 // CLOSED-OPEN
     innerFrom: null, innerTo: null,   // CRM P81 not instantiated — correct here
     rule,
     kind: 'ignorance',            // see the block comment: uniform, and a finding
-    note: NOTE_OF[e.how] || null,
+    note: e.note ?? NOTE_OF[e.how] ?? null,
   };
 }
 
@@ -399,6 +414,144 @@ function reconcile(items, works) {
   return items;
 }
 
+// ---------------------------------------------------------------------------
+// THE THESIS PASS: A READING THAT LIVES IN CODE, BECAUSE NO API RETURNS IT.
+//
+// 🔴 THESE DATES WERE ONCE HAND-EDITED INTO A GENERATED FILE AND WERE ONE BUILD
+// AWAY FROM BEING ERASED. Mikko Ojanen's PhD (University of Helsinki, 2020,
+// 10.5281/zenodo.4306056, CC-BY-4.0 on the text) dates eleven of these tapes off
+// named pages, and the evidence is a page number in a book. archive.org has no
+// such field, Wikidata has no such statement, and a re-ingest would put every one
+// of them back to a filename year or to the span of a compilation. So the values
+// live HERE, in the only place the three generators that rewrite these files
+// cannot silently drop: `ingest.mjs`, `ingest.mjs --rewhen` and
+// `demo/resources/build-corpus.mjs`, which folds this list in.
+//
+// The argument for every bracket, quoted verbatim from the source with its
+// printed page, is in `research/corpus-from-thesis-2026-09.md`.
+//
+// ⚠️ A QUALIFIER DOES NOT NARROW A BRACKET AND A DATED EVENT DOES. "the fall of
+// 1970" and "early 1964" keep the whole year and carry the qualifier in words,
+// which is the rule this corpus already applies to a Finnish archivist's
+// decades. A premiere or a contest IS a ceiling, because a tape has to exist to
+// be played, and that is why two of these are ranges ending on a named day. One
+// of them, On-Off, got WIDER: it reads as a regression in a diff and it is the
+// strongest result in the set, because a one-year band opened to eighteen months
+// is a judgement where a ten-year band cut to a year is arithmetic.
+//
+// `note` says why the bracket has this width and `item` says what the record is.
+// Both are read by a person on `/resources/`, so both are written for somebody
+// who has not read the book.
+// ---------------------------------------------------------------------------
+const P = 'ia:videoplayback-13_202304/';
+const THESIS = {
+  [`${P}Erkki Kurenniemi - Saharan uni I (64 kbps).mp3`]: {
+    how: "ojanen-2020-thesis-p180",
+    at: U(1967), hi: U(1968), precision: "year",
+    note: "the source dates the work 1967 and gives no month. The 9 February 1968 premiere is a playback of this tape, so it bounds the work from above rather than dating it",
+    item: "Ojanen 2020 (printed p. 180): \"the two-piece tape music work Saharan uni I & II (1967, realized with Kari Hakala)\" · recorded in the University Studio at Vironkatu and mixed in the Yle sound-control room at Kulttuuritalo · premiered 9 February 1968 at the Sähköshokki-ilta, Amos Anderson Art Museum, where the Integrated Synthesizer made its last known public appearance · a recording of the 8 February 1968 rehearsal survives (p. 100 n. 160)",
+  },
+  [`${P}Erkki Kurenniemi - Saharan uni II (64 kbps).mp3`]: {
+    how: "ojanen-2020-thesis-p180",
+    at: U(1967), hi: U(1968), precision: "year",
+    note: "the source dates the work 1967 and gives no month. The 9 February 1968 premiere is a playback of this tape, so it bounds the work from above rather than dating it",
+    item: "Ojanen 2020 (printed p. 180): \"the two-piece tape music work Saharan uni I & II (1967, realized with Kari Hakala)\" · recorded in the University Studio at Vironkatu and mixed in the Yle sound-control room at Kulttuuritalo · premiered 9 February 1968 at the Sähköshokki-ilta, Amos Anderson Art Museum · a recording of the 8 February 1968 rehearsal survives (p. 100 n. 160)",
+  },
+  [`${P}Erkki Kurenniemi - Sähkösoittimen ääniä .mp3`]: {
+    how: "ojanen-2020-thesis-p205-n402",
+    at: U(1971), hi: U(1972), precision: "year",
+    note: "the source dates the radio-play sessions 1971 and gives no month. The CD that carries this track states no date for it at all",
+    item: "MISATTRIBUTED ON THE CD, and Ojanen 2020 says so (printed p. 205 n. 402): the two Sähkösoittimen ääniä tracks are Sähkökvartetti and DIMI-A parts from the sessions for the radio play Vihreä eläin (1971), recorded by Donner with Kurenniemi, Ruohomäki and Vesterinen in Yle’s Fabianinkatu studio (p. 141). \"On the CD the tracks are credited to Kurenniemi and the DIMI-A track is introduced as the Sähkökvartetti recording. Vihreä eläin is not mentioned as the origin of the sound material.\" The CD numbers them #1 and #4; which of the two files is which is not established here",
+  },
+  [`${P}Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3`]: {
+    how: "ojanen-2020-thesis-p205-n402",
+    at: U(1971), hi: U(1972), precision: "year",
+    note: "the source dates the radio-play sessions 1971 and gives no month. The CD that carries this track states no date for it at all",
+    item: "MISATTRIBUTED ON THE CD, and Ojanen 2020 says so (printed p. 205 n. 402): the two Sähkösoittimen ääniä tracks are Sähkökvartetti and DIMI-A parts from the sessions for the radio play Vihreä eläin (1971), recorded by Donner with Kurenniemi, Ruohomäki and Vesterinen in Yle’s Fabianinkatu studio (p. 141). \"Vihreä eläin is not mentioned as the origin of the sound material.\" Of the CD pair, #4 is \"the original radio-play session recording without the latter overdubs\" (p. 206 n. 403); which of the two files is #4 is not established here",
+  },
+  [`${P}Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3`]: {
+    how: "ojanen-2020-thesis-p138",
+    at: U(1970), hi: U(1971), precision: "year",
+    note: "the source says it was realized in the fall of 1970. The bracket is the whole year because that qualifier has no defined width",
+    item: "Ojanen 2020 (printed p. 138): \"The two-part piece Inventio-Outventio (1970), which was realized in the fall of 1970, consists of Kurenniemi’s arrangement of Johann Sebastian Bach’s Invention No. 13 in A minor (BWV 784) for the DIMI-A, and the tape collage Outventio realized jointly by Kurenniemi and Ruohomäki in a separate session.\" The Bach arrangement is the only work he composed solely with the DIMI-A. An annotated video of the master tape is deposited at zenodo:1469722",
+  },
+  [`${P}Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3`]: {
+    how: "ojanen-2020-thesis-p138",
+    at: U(1973), hi: U(1974), precision: "year",
+    note: "the source dates the work 1973 and gives no month",
+    item: "Ojanen 2020 (printed pp. 138 and 180): \"Mix Master Universe (1973, realized with Jukka Ruohomäki)\", one of Ruutsalo’s tape collages, built from DIMI-A sounds and produced as a spontaneous process without a prescribed plan. The thesis names no part 2",
+  },
+  [`${P}M.A. Numminen & Erkki Kurenniemi - Oigu-S (64 kbps).mp3`]: {
+    how: "ojanen-2020-thesis-p110-p111",
+    at: U(1964), hi: U(1964, 4, 5), precision: "range",
+    edtf: "1964/1964-04-04",
+    note: "the source says the tape was made in early 1964 for a contest held on 4 April 1964. The bracket starts at the whole year because \"early\" has no defined width, and ends on the performance, which the tape has to precede",
+    item: "Ojanen 2020 (printed pp. 110 to 111): Numminen used the University Studio in early 1964 to prepare for the academic singing contest of 4 April 1964, and produced a background tape of concrete and electronic sounds to accompany his voice through the Laulukone, an electronic sound-processing unit built with Kullervo Aura and Kurenniemi’s assistance. The background tape was released in 2005 on More Arctic Hysteria (Love LXCD 647), not on the 2002 compilation (p. 111 n. 189)",
+  },
+  [`${P}M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä (64 kbps).mp3`]: {
+    how: "ojanen-2020-thesis-p116-p216",
+    at: U(1968), hi: U(1971), precision: "range",
+    edtf: "1968/1970",
+    note: "the source dates the work 1968 and says only three recordings of it survive, from 25 November 1968, the 1969 television documentary and 17 November 1970. Which one this file holds is not established, so the bracket is the band’s whole working period",
+    item: "Ojanen 2020 (printed p. 216): \"The Sähkökvartetti (instrument) was used in several live performances by Sähkökvartetti (the band), but only three recordings have survived.\" The piece was improvised and \"the duration and structure of which varied from one performance to another\" (p. 114), running from a few minutes to an hour and a half. The band played about fifteen times between August 1968 and November 1970",
+  },
+  [`${P}Erkki Kurenniemi - On-Off.mp3`]: {
+    how: "ojanen-2020-thesis-p89",
+    at: U(1962), hi: U(1963, 7, 12), precision: "range",
+    edtf: "1962/1963-07-11",
+    note: "WIDENED, on a better source. The year 1963 here came from a Wikidata title match. Ojanen 2020 says \"The container of the On-Off master tape does not include any date markings\" and \"The exact dates of the move, and of Kurenniemi’s On-Off session remain unknown\", with the session possibly at the end of 1962. The bracket is the whole of 1962 forward to the premiere, which the tape has to precede",
+    item: "Ojanen 2020 (printed pp. 88 to 89): premiered with Salmenhaara’s White Label at the Jyväskylän Kesä festival on 11 July 1963. Kurenniemi, interviewed in 2004, tied the recording session to the studio’s move down to the Porthania cellar, \"which could have happened at the end of 1962\"; the university’s annual report for 1963 to 1964 puts that move in the fall of 1963. The master tape carries no date markings, and it is photographed at zenodo:3601403",
+  },
+  [`${P}Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3`]: {
+    how: "ojanen-2020-thesis-p89",
+    at: U(1963, 8), hi: U(1963, 9), precision: "month",
+    note: "the source gives the month: \"In August 1963, Kurenniemi, Donner, Salmenhaara, Kaj Chydenius, and Raija Mattila produced a tape collage Äänikirje Jan Barkille\". The year here had come from the filename",
+    item: "Ojanen 2020 (printed p. 89): a tape collage made as a tribute to the Swedish composer Jan Bark, who taught a composition course in Helsinki that August. Five people made it, parts of it were recorded in various locations, Chydenius directed it and Kurenniemi spliced the final work",
+  },
+  [`${P}Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3`]: {
+    how: "ojanen-2020-thesis-p121",
+    at: U(1968), hi: U(1969), precision: "year",
+    note: "the year is unchanged and its evidence is not: it had come from the filename, and a named source now states it. NOT narrowed to the November 1968 release month, which dates the album and not the tape",
+    item: "Ojanen 2020 (printed p. 121): Kurenniemi selected three segments from a tape he had recorded with the Andromatic and spliced them together without further processing, for the commissioned album Perspectives ’68: Music in Finland (Love Records LRLP 4), released in November 1968 for the centenary of the Helsinki student union. The draft contents were discussed on 30 May 1968 and the contract settled on 19 June 1968; the draft is deposited at zenodo:4290689. An excerpt was reissued in 1970 on Wigwam’s Tombstone Valentine",
+  },
+  "eu:09102/_SMS_MM_X5176": {
+    how: "edm-literal-length",
+    at: U(1970), hi: U(1971), precision: "year",
+    note: "Ojanen 2020 Table 3 (printed p. 81) gives the DIMI-A as 1970 with two built, which agrees with the year taken here from a Europeana length literal",
+  },
+};
+
+/** Apply the thesis pass, and REFUSE on a miss.
+ *
+ *  🔴 A CORRECTION KEYED ON AN ID THAT IS NO LONGER HERE DOES NOTHING, QUIETLY.
+ *  That is the exact failure this table exists to end, so it is a thrown error
+ *  and not a warning: a run that cannot place a reading has to be louder than
+ *  the file it was about to write. Proved by breaking it once.
+ *
+ *  The old `how` is kept as `replaces`, because what a date USED to rest on is
+ *  the fact that makes the correction legible. */
+function amendAll(items) {
+  const seen = new Set();
+  const out = items.map((i) => {
+    const t = THESIS[i.id];
+    if (!t) return i;
+    seen.add(i.id);
+    const { item, ...ev } = t;
+    return {
+      ...i,
+      dateEvidence: { raw: null, replaces: i.dateEvidence?.how ?? null, ...ev },
+      ...(item ? { note: item } : {}),
+    };
+  });
+  const missed = Object.keys(THESIS).filter((id) => !seen.has(id));
+  if (missed.length) {
+    throw new Error(`the thesis pass placed ${seen.size} of ${Object.keys(THESIS).length} readings; `
+      + `nothing in this corpus carries these ids: ${missed.join(' · ')}`);
+  }
+  console.log(`thesis pass: ${seen.size} rows re-dated or re-evidenced from Ojanen 2020`);
+  return out;
+}
+
 /** The one place `at`, `bandMs` and `precision` are written, and all three are
  *  now DERIVED from `when` — one source of truth, so they cannot drift apart.
  *  `at = when.earliest` is the library's firing rule stated in the client. */
@@ -433,8 +586,8 @@ function summarise(all, label) {
 function rewhen() {
   const path = join(HERE, 'corpus.json');
   const corpus = JSON.parse(readFileSync(path, 'utf8'));
-  const before = corpus.items.map((i) => [i.id, i.at, i.bandMs, i.precision]);
-  corpus.items = corpus.items.map(withWhen);
+  const before = new Map(corpus.items.map((i) => [i.id, [i.at, i.bandMs, i.precision]]));
+  corpus.items = amendAll(corpus.items).map(withWhen).sort((a, b) => a.at - b.at);
   corpus.generated = new Date().toISOString();
   corpus.generator = 'proto/deck/ingest.mjs --rewhen';
   corpus.positionRule = {
@@ -445,7 +598,10 @@ function rewhen() {
     kind: 'every smear here is IGNORANCE — a real day the catalogue lost, never a vague concept',
   };
   writeFileSync(path, JSON.stringify(corpus, null, 1));
-  const moved = corpus.items.filter((i, k) => before[k][1] !== i.at || before[k][2] !== i.bandMs || before[k][3] !== i.precision);
+  const moved = corpus.items.filter((i) => {
+    const b = before.get(i.id);
+    return !b || b[0] !== i.at || b[1] !== i.bandMs || b[2] !== i.precision;
+  });
   console.log(`--rewhen: ${corpus.items.length} items re-expressed through \`when\`; ${moved.length} number(s) moved` +
     (moved.length ? `: ${moved.map((m) => m.id).join(', ')}` : ' — at / bandMs / precision are BIT-IDENTICAL'));
   summarise(corpus.items, 'corpus.json');
@@ -460,8 +616,8 @@ const main = async () => {
   const iaKeys = new Set(ia.map((i) => i.title.toLowerCase().replace(/[^a-z0-9]/g, '')));
   const spine = works.filter((w) => !iaKeys.has(w.title.toLowerCase().replace(/[^a-z0-9]/g, '')));
 
-  const all = [...life, ...spine, ...eu, ...ia]
-    .filter((i) => Number.isFinite(i.dateEvidence.at))
+  const all = amendAll([...life, ...spine, ...eu, ...ia]
+    .filter((i) => Number.isFinite(i.dateEvidence.at)))
     .sort((a, b2) => a.dateEvidence.at - b2.dateEvidence.at)
     .map(withWhen);
 

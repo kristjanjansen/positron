@@ -1,0 +1,42 @@
+{
+	// positron-station: the schedule, as one continuous HLS source.
+	//
+	// ITS OWN WORKER AND ITS OWN BUCKET. `workers/vain` holds one broadcaster's
+	// archive and a write path with per-session quotas; this one holds the
+	// running order of a station and must be readable by anybody with a phone.
+	// They will share objects eventually and they do not share a failure
+	// surface: a station that cannot compute its playlist must not be able to
+	// stop an upload finishing, and an upload must not be able to stop the
+	// station playing.
+	//
+	// 🔴 NOT `elektron-archive-test`, for the reason `workers/vain` gives: two
+	// workers already share that bucket and one of them runs a cron that deletes
+	// every object under a prefix in it.
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "positron-station",
+	"main": "worker.mjs",
+	"compatibility_date": "2026-09-01",
+	"workers_dev": true,
+	// 🔴 R2, NOT WORKERS STATIC ASSETS. MEASURED 2026-09-15 17:50Z: a
+	// `Range: bytes=461-1460` against an asset directory answered 200 with the
+	// whole 4 801 140-byte file and no `accept-ranges`, from outside and from
+	// the ASSETS binding alike. No Range means no `#EXT-X-BYTERANGE`, which is
+	// the entire design. R2 answers 206.
+	"r2_buckets": [
+		{ "binding": "MEDIA", "bucket_name": "positron-station" }
+	],
+	// The running order and the live segment lists. A Durable Object rather than
+	// KV because "how long does a schedule change take to reach a listener" has
+	// to be a measurable number, and KV's propagation window is longer than the
+	// answer.
+	"durable_objects": {
+		"bindings": [{ "name": "SCHEDULE", "class_name": "Schedule" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Schedule"] }],
+	// Retention. A live show writes one 160 KB object every ten seconds and
+	// nothing deleted them, so an hour of broadcast left 57.6 MB in the bucket
+	// that no playlist could ever reference again. See `sweep()` in worker.mjs
+	// for what it keeps; `POST /sweep` runs the same function on demand.
+	"triggers": { "crons": ["*/5 * * * *"] },
+	"observability": { "enabled": true }
+}

@@ -28,7 +28,7 @@
     // ⚠️ THREE SENTENCES, and it had quietly become five — describing a pink
     // line and a yellow mark that are both gone now. A description that
     // advertises things the page no longer draws is worse than a short one.
-    what: 'Press record, then draw a line with a finger or a mouse: the page keeps every sample the browser gave it, and a thinned-out record of the same line, which is what a recording of a gesture normally is. White is everything that happened and blue is what a player rebuilds from that record, so press play — or drag the bar — and the white line follows the cursor instead of showing you the part that has not happened yet. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far each reading sits from what happened, and how much of what you see no sample attests at all.',
+    what: 'Press record, then draw a line with a finger or a mouse: the page keeps every sample the browser gave it, and a thinned-out record of the same line, which is what a recording of a gesture normally is. White is everything that happened and blue is what a player rebuilds from that record, so press play or drag the bar and the white line follows the cursor instead of showing you the part that has not happened yet. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far each reading sits from what happened, and how much of what you see no sample attests at all.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     //
@@ -832,7 +832,7 @@
       ghost = null; dirty = true; traceIsTake = true;
       render(); publish(); deck.seek(0); view.strip.invalidate();
     }
-    d.log(on ? 'recording — draw on the pad' : 'stopped', on ? 'hi' : undefined);
+    d.log(on ? 'recording · draw on the pad' : 'stopped', on ? 'hi' : undefined);
   }
 
   // UNDER the pad and its transport, because they change the picture above
@@ -887,7 +887,7 @@
     // is genuinely sparser than what happened.
     d.assert('a gesture was recorded twice, in full and sparsely',
       stored.length >= 4 && stored.length < evidence.length / 2,
-      `${evidence.length} samples in, ${stored.length} kept — ${(evidence.length / stored.length).toFixed(1)}:1`);
+      `${evidence.length} samples in, ${stored.length} kept · ${(evidence.length / stored.length).toFixed(1)}:1`);
 
     // 🔴 THE ONE THIS PAGE EXISTS FOR. Most of the line you see was never
     // recorded — say how much, in the same breath as how wrong it is.
@@ -900,7 +900,7 @@
     const invented = 100 * (1 - Math.min(1, stored.length / evidence.length));
     d.assert('most of the drawn line was never recorded, at the rate the page opens on',
       invented > 80,
-      `${evidence.length} samples captured, ${stored.length} kept — ${invented.toFixed(1)}% of the `
+      `${evidence.length} samples captured, ${stored.length} kept · ${invented.toFixed(1)}% of the `
       + `line you see is joined up rather than recorded`);
 
     // ⚠️ ASSERT THE ORDER, NOT A THRESHOLD. The three reconstructions are the
@@ -918,7 +918,7 @@
     // smoothing is worth a lot MORE than holding, and how much is the number.
     d.assert('smoothing is many times closer than holding the last sample',
       errs.hold / errs.catmull > 5,
-      `${(errs.hold / errs.catmull).toFixed(0)}x closer — ${errs.catmull.toFixed(3)} px against ${errs.hold.toFixed(2)} px`);
+      `${(errs.hold / errs.catmull).toFixed(0)}x closer · ${errs.catmull.toFixed(3)} px against ${errs.hold.toFixed(2)} px`);
 
     // 🔴 THE ONE THAT ANSWERS "HOW DO I MAKE THIS BETTER". Three levers exist —
     // keep more samples, interpolate better, or put the samples somewhere
@@ -951,7 +951,7 @@
     // on a map — and wrong for a gesture that has to happen at the right time.
     d.assert('a line replayed on a clock wants samples spaced on that clock, not samples where it bends',
       evenly.t < bends.t && bends.n <= evenly.n,
-      `${evenly.n} samples either way — in time ${evenly.t.toFixed(3)} px evenly against ${bends.t.toFixed(3)} px `
+      `${evenly.n} samples either way · in time ${evenly.t.toFixed(3)} px evenly against ${bends.t.toFixed(3)} px `
       + `where it bends (${(bends.t / evenly.t).toFixed(1)}x worse); as a shape ${evenly.s.toFixed(3)} against ${bends.s.toFixed(3)}`);
 
     // WHAT THE RATE BUYS YOU, as a ladder rather than a claim. The knob spans a
@@ -1033,7 +1033,7 @@
         && splitX.length === stored.length && splitY.length === stored.length
         && shared * 2 < stored.length,
       `${Math.min(...gaps).toFixed(1)}x to ${Math.max(...gaps).toFixed(1)}x closer across ${rungs.length} rates; `
-      + `at this one ${stored.length} samples per direction either way — in time ${together.t.toFixed(3)} px as one `
+      + `at this one ${stored.length} samples per direction either way · in time ${together.t.toFixed(3)} px as one `
       + `record against ${apart.t.toFixed(3)} px as two, as a shape ${together.s.toFixed(3)} against `
       + `${apart.s.toFixed(3)}; the two directions chose ${shared} of ${stored.length} instants in common`);
 
@@ -1080,7 +1080,7 @@
     const mk = mean('mark'), rc = mean('rec'), hl = mean('held');
     d.assert('the playhead puts the hand where the record says it was',
       fresh === 20 && Math.abs(mk - rc) <= SEEK_TOL && hl > rc * 5,
-      `${fresh}/20 seeks answered — the mark lands ${mk.toFixed(3)} px from the hand against the record's own `
+      `${fresh}/20 seeks answered · the mark lands ${mk.toFixed(3)} px from the hand against the record's own `
       + `${rc.toFixed(3)} px (${Math.abs(mk - rc).toExponential(1)} apart); refusing to interpolate: ${hl.toFixed(2)} px`);
 
     // Park the playhead in the middle, so the mark below is somewhere with a
@@ -1148,7 +1148,7 @@
       a.white < b2.white && b2.white < c2.white && a.white > 0
       && a.blue < b2.blue && b2.blue < c2.blue && a.blue > 0,
       `white ${a.white} -> ${b2.white} -> ${c2.white} and blue ${a.blue} -> ${b2.blue} -> ${c2.blue} `
-      + `at a quarter, three fifths and the end — both ends of the ink ARE the playhead, `
+      + `at a quarter, three fifths and the end, `
       + `over ${Math.round(end)} ms`);
   }
 

@@ -42,7 +42,7 @@
 
   const d = mount({
     name: 'capture',
-    what: 'A camera — or a generated picture, if you would rather not be on one — '
+    what: 'A camera, or a generated picture if you would rather not be on one, '
       + 'is recorded in two-second segments and played back on the timeline below. '
       + 'Press Record 6 seconds, then Play it back and scrub it. Add ?r2=1 to the '
       + 'address and every segment is uploaded to Cloudflare R2 and fetched back '
@@ -111,7 +111,7 @@
       };
       draw();
     } catch (e) {
-      d.log(`camera refused: ${e.name} — staying on the canvas`, 'bad');
+      d.log(`camera refused: ${e.name} · staying on the canvas`, 'bad');
     }
   });
 
@@ -138,7 +138,7 @@
     const r = await fetch(`${INGEST}/open`, { method: 'POST' });
     const j = await r.json();
     if (!r.ok) { d.log(`ingest refused: ${j.error}${j.retryInS ? ` (retry in ${j.retryInS}s)` : ''}`, 'bad'); return null; }
-    d.log(`ingest session ${j.session} — caps ${j.limits.maxSegments} segs / ${Math.round(j.limits.maxSessionBytes / 1048576)} MiB`, 'hi');
+    d.log(`ingest session ${j.session} · caps ${j.limits.maxSegments} segs / ${Math.round(j.limits.maxSessionBytes / 1048576)} MiB`, 'hi');
     return j.session;
   }
 
@@ -255,7 +255,7 @@
   d.on('play', async () => {
     armVideo(video);
     const dur = await assemble();
-    if (dur == null) { d.log('could not resolve a duration — no range to scrub', 'bad'); return; }
+    if (dur == null) { d.log('could not resolve a duration · no range to scrub', 'bad'); return; }
     d.set('length', Math.round(dur * 100) / 100);
     video.style.display = '';
     canvas.style.display = 'none';
@@ -266,7 +266,7 @@
     }
     await playOrPrompt(video, d);
     deck.play?.();
-    d.log(`playing back ${dur.toFixed(2)}s on the deck — scrub it`, 'hi');
+    d.log(`playing back ${dur.toFixed(2)}s on the deck · scrub it`, 'hi');
     // The checks read what this control just produced, so this is the first
     // moment they can be true — and a button for them would make them optional.
     await d.run('check');
@@ -289,7 +289,7 @@
     // playback is what makes this a timeline demo rather than a recorder
     const dur = await assemble();
     d.assert('the recording resolves a duration', dur != null && dur > 0,
-      dur == null ? 'Infinity — unscrubbable' : `${dur.toFixed(2)}s`);
+      dur == null ? 'Infinity' : `${dur.toFixed(2)}s`);
     if (dur != null && deck) {
       const before = deck.position?.() ?? 0;
       deck.seek(Math.round(dur * 500));
@@ -301,7 +301,7 @@
 
   d.log(useR2
     ? 'each closed segment is uploaded as it closes, then fetched back before it plays'
-    : 'recorded and played back inside this page — add ?r2=1 for the round trip');
+    : 'recorded and played back inside this page · add ?r2=1 for the round trip');
   d.ready();
 </script>
 </html>

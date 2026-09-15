@@ -207,9 +207,9 @@
         d.set('blocked', served ? Math.round(served.blockedMin) : null,
           !served || served.none ? 'bad' : served.blockedMin ? '' : 'ok');
         if (served?.none) {
-          d.log(`${c.id}: ERR refuses every segment in the window (rights) — nothing to play`, 'bad');
+          d.log(`${c.id}: ERR refuses every segment in the window (rights)`, 'bad');
         } else if (served?.position != null) {
-          d.log(`${c.id}: ERR refuses the newest ${Math.round(served.blockedMin)} min (rights) — starting behind it`, 'bad');
+          d.log(`${c.id}: ERR refuses the newest ${Math.round(served.blockedMin)} min (rights) · starting behind it`, 'bad');
         } else if (served) {
           d.log(`${c.id}: ERR serves to the live edge`);
         }
@@ -238,13 +238,13 @@
             c.atWall = true;                 // the readout tick below reads this
             const left = c.media.buffered.length
               ? c.media.buffered.end(c.media.buffered.length - 1) - c.media.currentTime : 0;
-            d.log(`${c.id}: reached what ERR refuses (rights) — stopped asking, ${left.toFixed(0)}s left to play`, 'bad');
+            d.log(`${c.id}: reached what ERR refuses (rights) · stopped asking, ${left.toFixed(0)}s left to play`, 'bad');
             return;
           }
           if (x.fatal) d.log(`${c.id}: ${x.details}`, 'bad');
         });
       } else {
-        d.log(`${c.id}: no HLS engine — neither native nor MSE`, 'bad');
+        d.log(`${c.id}: no HLS engine: neither native nor MSE`, 'bad');
       }
     } else {
       c.media.src = `https://icecast.err.ee/${c.id}.mp3`;
@@ -282,7 +282,7 @@
       const frag = frags?.find((f) => f.sn === served.sn);
       if (frag) {
         c.media.currentTime = frag.start;
-        d.log(`jumped to the newest served frame — ERR refuses the ${Math.round(served.blockedMin)} min after it`);
+        d.log(`jumped to the newest served frame · ERR refuses the ${Math.round(served.blockedMin)} min after it`);
         return;
       }
     }

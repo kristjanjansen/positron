@@ -34,8 +34,8 @@ import { assignColumns, backLevels, wrapLines, layout, captionTexts, boldParts, 
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
-  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' — ' + detail : ''}`); }
-  else { fail++; console.log(`  FAIL ${name}${detail ? ' — ' + detail : ''}`); }
+  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' · ' + detail : ''}`); }
+  else { fail++; console.log(`  FAIL ${name}${detail ? ' · ' + detail : ''}`); }
 };
 
 // 10 px a character. Chosen so every width in this file is countable by eye.
@@ -385,7 +385,7 @@ console.log('\n== the line under the picture, and the height reserved for it =='
   // reservation exists to prevent.
   const spec = { caption: 'a caption long enough to take three lines on a phone, '
                         + 'which is the tallest this line will ever be' };
-  const nodes = [{ id: 'a', title: 'this page — one copy here', label: { full: 'this page' } },
+  const nodes = [{ id: 'a', title: 'this page, one copy here', label: { full: 'this page' } },
                  { id: 'b', title: '', label: { full: 'a copy here' } }];
   const t = captionTexts(spec, nodes);
   ok('the height reserved under the picture counts the CAPTION, not only the boxes',
@@ -435,7 +435,7 @@ const roomFor = (L, l, lanes) => {
   const link = L.cuts.filter((c) => c.where === 'link');
   ok('NEGATIVE CONTROL: a name nobody could fit is still cut, and still counted',
      link.length === 1 && link[0].shown.endsWith('…'),
-     `${link.length} reported — "${link[0] ? link[0].shown : ''}" at ${link[0] ? link[0].width : '-'} px`);
+     `${link.length} reported · "${link[0] ? link[0].shown : ''}" at ${link[0] ? link[0].width : '-'} px`);
 }
 
 {
@@ -629,7 +629,7 @@ console.log('\n== a box inside a box ==');
     { width: 660, measure }));
   ok('a description with nothing inside any box is unchanged, to the last decimal',
      plain === withKey, `${plain.length} characters, identical`);
-  ok('and it carries no trace of nesting — no empty list, no key',
+  ok('and it carries no trace of nesting: no empty list, no key',
      L.nodes.every((n) => !('kids' in n)) && !('inside' in L),
      `${L.nodes.length} boxes, keys ${Object.keys(L.nodes[0]).join(' ')}`);
 }
@@ -679,17 +679,71 @@ console.log('\n== a box inside a box ==');
 }
 
 {
-  // 🔴 TWO BOXES IN ONE CONTAINER HAVE NO ROUTE BETWEEN THEM, so the link is
-  // dropped and REPORTED. Drawing it silently is the defect this is here to
-  // prevent: a line between two boxes that share a container has nowhere to go
-  // that is not through one of them.
+  // 🔴 TWO BOXES IN ONE CONTAINER ARE LINKED IN THE GAP THEY SHARE. This used
+  // to assert the opposite — that the link was dropped and reported — and
+  // /station/ is what changed it: grouping seven boxes into three machines
+  // killed three real arrows and left the plain ties standing where they had
+  // been, so the picture claimed a chain that does not exist.
   const L = layout({ ...NEST,
-    links: [...NEST.links, { from: 'synth', to: 'rec', label: 'straight on' }] },
+    links: [...NEST.links, { from: 'synth', to: 'rec', label: 'plays it' }] },
     { width: 660, measure });
-  ok('a link between two boxes in one container is dropped AND reported',
-     (L.inside || []).length === 1 && !findLink(L, 'synth', 'rec'),
-     `${(L.inside || []).length} reported: ` +
-     (L.inside || []).map((l) => `${l.from} to ${l.to}`).join(', '));
+  const step = findLink(L, 'synth', 'rec');
+  const synth = boxOf(L, 'synth'), rec = boxOf(L, 'rec');
+  ok('a link between two boxes in one container is drawn between them',
+     !!step && (L.inside || []).length === 0,
+     step ? `${step.d}` : 'it was dropped');
+  const pts = pathPoints(step.d);
+  ok('and it runs down the gap they share, out of one edge and into the other',
+     pts[0][1] >= synth.y + synth.h && pts.at(-1)[1] <= rec.y
+     && pts.every(([x]) => Math.abs(x - synth.cx) < 0.6),
+     `y ${pts[0][1]} to ${pts.at(-1)[1]}, between ${synth.y + synth.h} and ${rec.y}, at x ${pts[0][0]}`);
+  // 🔴 AND IT CARRIES NO NAME. Sixteen pixels of gap, half a box wide: a name
+  // there runs under both boxes or shrinks past reading. The direction is the
+  // message; what travels goes in the link's `note`. A label written anyway is
+  // REPORTED, because a label that is nowhere on the picture and nowhere in a
+  // report is a label its author will keep believing is drawn.
+  ok('and it carries no name, because the gap it runs in cannot hold one',
+     step.lab.lines.length === 0 && step.lab.full === 'plays it',
+     `"${step.lab.lines.join(' ')}" drawn, "${step.lab.full}" kept for the hover`);
+  ok('NEGATIVE CONTROL: and a name written on one anyway is reported, not ignored',
+     L.cuts.some((c) => c.id === 'synth to rec' && /NOT DRAWN/.test(c.shown)
+                     && /note/.test(c.shown)),
+     L.cuts.filter((c) => c.id === 'synth to rec').map((c) => c.shown).join(' | ') || 'nothing reported');
+  // 🔴 NEGATIVE CONTROL, AND IT IS THE HALF THE OLD RULE GOT RIGHT: a box and
+  // the box it is INSIDE have no gap between them at all. Still refused, and
+  // now on `cuts` as well, because a console warning nobody reads is how the
+  // three missing arrows stayed missing.
+  const N = layout({ ...NEST,
+    links: [...NEST.links, { from: 'pi', to: 'synth', label: 'inwards' }] },
+    { width: 660, measure });
+  ok('NEGATIVE CONTROL: a container and a box inside itself is still refused, in writing',
+     !findLink(N, 'pi', 'synth') && (N.inside || []).length === 1
+     && N.cuts.some((c) => c.id === 'pi to synth' && /NOT DRAWN/.test(c.shown)),
+     `${(N.inside || []).length} refused, ${N.cuts.filter((c) => c.id === 'pi to synth').length} on cuts`);
+}
+
+{
+  // 🔴 AND ONE THAT REACHES PAST THE BOX BETWEEN THEM GETS A LANE. Down the
+  // middle it would pass straight through the box it never visits, which is
+  // the fork bug the lanes over and under the row already exist to stop.
+  const spec = { ...NEST,
+    nodes: [NEST.nodes[0], { ...NEST.nodes[1], children: [...NEST.nodes[1].children,
+      { id: 'log', label: 'a log', sub: 'says what it did' }] }],
+    links: [...NEST.links, { from: 'synth', to: 'log', label: 'played' }] };
+  const L = layout(spec, { width: 660, measure });
+  const lane = findLink(L, 'synth', 'log');
+  const pi = boxOf(L, 'pi'), synth = boxOf(L, 'synth'), rec = boxOf(L, 'rec');
+  const xs = pathPoints(lane.d).map(([x]) => x);
+  ok('a link that reaches past a box runs in a lane, clear of every box it passes',
+     !!lane && Math.max(...xs) > synth.x + synth.w && Math.max(...xs) < pi.x + pi.w,
+     `the lane reaches x ${Math.max(...xs)}, boxes end at ${synth.x + synth.w}, the machine at ${pi.x + pi.w}`);
+  ok('and the boxes inside are still centred in their container',
+     synth.x - pi.x === (pi.x + pi.w) - (synth.x + synth.w),
+     `${synth.x - pi.x} px left, ${(pi.x + pi.w) - (synth.x + synth.w)} px right`);
+  ok('and it carries no name either, and says so',
+     lane.lab.lines.length === 0
+     && L.cuts.some((c) => c.id === 'synth to log' && /NOT DRAWN/.test(c.shown)),
+     `${lane.lab.lines.length} lines drawn, ${L.cuts.filter((c) => c.id === 'synth to log').length} on cuts`);
 }
 
 {
@@ -707,7 +761,7 @@ console.log('\n== a box inside a box ==');
   const xs = L.nodes.map((n) => n.x);
   ok('a box inside a machine does not take a column of its own',
      L.nodes.length === 3 && xs[0] < xs[1] && xs[1] < xs[2] && new Set(xs).size === 3,
-     `three boxes at x ${xs.join(', ')} — the program is inside the middle one`);
+     `three boxes at x ${xs.join(', ')} · the program is inside the middle one`);
 }
 
 console.log('\n== the line under the picture says what a box DOES ==');

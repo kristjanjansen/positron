@@ -2115,7 +2115,7 @@ events 41.7 ms apart, which can never see a gap. Both are the same mistake:
 **an instrument whose resolution or calibration is derived from the subject
 cannot be used to measure the subject.**
 
-## #57 — an outage is a claim, and it needs the same evidence as any other
+## 90. An outage is a claim, and it needs the same evidence as any other (session 27)
 
 Twice in one session I attributed my own regression to something outside this
 machine. A regex with `[^}]*` swallowed three CSS rules above the one it was
@@ -2132,7 +2132,7 @@ is not "suspect yourself" — it is that "the thing outside is broken" is a
 measurement, so make it, and CLAUDE.md already says the same thing about ERR's
 403s and about a second Chrome holding relay sockets.
 
-## #58 — an assert derived the way the code is derived cannot fail
+## 91. An assert derived the way the code is derived cannot fail (session 27)
 
 `roomToEye` had its rotation sign inverted and its assert passed, because the
 assert rebuilt the matrix from the same reasoning. What caught it was rendering
@@ -2145,7 +2145,7 @@ Csound. Here it is geometry and the fix is a rendered pixel. **Write the assert
 from the CLAIM** (facing a word puts it straight ahead) **rather than from the
 derivation** (the matrix equals this product).
 
-## #59 — nothing that changes while you watch it may change its own size
+## 92. Nothing that changes while you watch it may change its own size (session 27)
 
 The LOOP button said LOOP, then END, then LOOP. Three characters against four,
 and every press shoved the rate picker and the clock sideways. Same defect as
@@ -2156,3 +2156,71 @@ The two looked unrelated — one a live sentence, one a button label — and the
 one rule: **a control's footprint is part of the layout, and state must be
 carried by something with no width.** Here that is `data-loop`, which paints, and
 the aria label, which a screen reader reads and a layout never sees.
+
+## 93. Two numbering schemes met and nobody noticed for a session (session 28)
+
+Session 27 appended three lessons as `## #57`, `## #58`, `## #59` to a file whose
+last entry was `## 89.`, and 57 through 59 had been taken since session 20. So
+the file carried two `#59`s with unrelated subjects, while four places in the
+repo cite `LESSONS #59` meaning the original one about a randomiser over nine
+ranges. A reader following that citation lands on a lesson about button widths.
+
+**A number in prose is a foreign key with no constraint on it.** Nothing type
+checks a heading, no harness reads this file, and the duplicate looked right
+because each of the two schemes is internally consistent. It was found by
+reading the headings in order, which is the only thing that finds it.
+The repair is renumbering the NEW ones, never the old: the citations point at
+the old, and moving a target because a duplicate arrived breaks the references
+that were correct all along.
+
+## 94. Twenty-one green checks over a picture that had stopped moving (session 28)
+
+A readout was taken off `held` and one `d.set` was left behind. `d.set` THROWS on
+a key `mount()` never declared, the call was inside `requestAnimationFrame`, and
+so the render loop died on its first frame. The page then reported **21/21
+green**, because every check on it grades a still image: the font loaded, the
+words are words, their boxes contain their ink, a ray lands where the picture
+is. A frozen first frame satisfies all of that.
+
+What a person saw was a page where clicking a word did nothing, and one line at
+the bottom of the log. Reported as *"no text editing on click. how y missed
+it?"*, which is the right question: nothing missed it, because nothing was
+looking.
+
+**A check that reads state can pass on a page that has stopped producing it.**
+The assert added is `frames` counted ACROSS A WAIT rather than a total, because
+`frames > 0` is true of a page that drew once and stopped, and that is the case.
+PROVED by putting the original defect back: `1 frames in 400 ms`, red.
+
+⚠️ The general form is worth more than the instance. **Anything that removes a
+surface must remove every write to it**, and the ones that bite are inside a
+loop, where the throw is invisible and takes the loop with it. `d.set` throwing
+is right; a page with no test for "is it still running" is what made the throw
+cost an hour.
+
+## 95. Two asserts at t+0 blinded the whole suite (session 28)
+
+The shell gained two asserts of its own, fired at page load on every shelled
+page. `demo/verify.mjs` waits for a page to produce its FIRST assert before it
+starts timing out, and the test for "has it produced one yet" was
+`asserts.length === 0`. Those two made it false immediately, on every page, so
+the wait never engaged again and each demo got 12 tries at 400 ms to produce
+everything it had.
+
+MEASURED: `/radio1965/` makes 43 asserts. The suite collected **2** and reported
+**13/13 green**. Twenty-eight demos declare `settleMs`, so all of them were
+exposed.
+
+**The proxy was fine until somebody else changed what it was a proxy for.**
+`count === 0` meant "the page has not started" only while nothing but the page
+could assert. Nothing in the shell's change was wrong, nothing in the harness
+was wrong, and the two together were silently catastrophic. The shell publishes
+`shellAsserts` now, so the harness can ask the question it actually means: has
+the PAGE asserted anything yet.
+
+⚠️ And two wrong fixes were tried first, both plausible. Arming the wait on
+`d.ready()` fails because a page may call it before driving its own checks:
+`/radio1965/` does, from inside the granulator's boot. Requiring "ready AND the
+count is stable" fails the same way, and would have shipped looking correct.
+What was needed was not a better heuristic for done, it was the one number that
+makes the question answerable.

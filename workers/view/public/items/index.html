@@ -133,7 +133,8 @@
   // with. The rows here are items rather than messages, but the question a
   // reader asks of both is the same — what is this one, what happened to it,
   // did it get out — and that is four fixed columns and wrapping text.
-  import { createMessageList } from '/shell/messages.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
 
   const q = new URLSearchParams(location.search);
   // The store takes `?room=<name>` to choose which set of items it is talking
@@ -175,19 +176,21 @@
     // it is the first thing a new reader sees and the only place the two steps
     // can be said. What it used to carry — what the columns mean, how the
     // numbers are counted — is said by the rows and the cells themselves.
-    what: `Two steps, once per device. Add positron to the Home Screen — on iPhone that is the Share button, `
-      + `the square with an arrow out of it, then Add to Home Screen; no page is allowed to do it for you. `
-      + `Then turn notifications on, and anything published here reaches this device with the app shut. `
-      + `The two buttons say which step you are on, and refuse when they cannot help.`,
-    // ⚠️ FOUR CELLS, AND ALL FOUR ARE ABOUT THE CLOCK — which is what this page
-    // is about. It had six, three of which counted the room (items, waiting,
-    // sent) and are now said better by the rows themselves: every row carries
-    // its own state and its own `sent` mark, so an aggregate of them is the
-    // same fact in a second place. `late` and `worst` stay TOGETHER because a
-    // median hides the one bad wake and the one bad wake is the reason to look;
-    // `wakes` is what those two are an average OF, and a lateness over one wake
-    // and over forty are different claims.
-    readout: { next: 's', wakes: '', late: 'ms', worst: 'ms' },
+    // 🔴 ONE LINE, BECAUSE THIS PAGE HAS A DIAGRAM. A paragraph and a picture
+    // of the machinery are two explanations of one thing, and the paragraph is
+    // the weaker: it describes what a reader can point at an inch below. Same
+    // sentence as the index card, so nobody is told it twice in two wordings.
+    // ⚠️ WHAT WENT WAS THE INSTRUCTIONS, and those are not lost: the two
+    // buttons say which step you are on and refuse when they cannot help,
+    // which is a control explaining itself rather than prose explaining it.
+    what: 'Write an item. At the moment you named, it publishes itself and tells the phones.',
+    // 🔴 NO READOUT. It carried four cells about the clock — `next`,
+    // `wakes`, `late`, `worst` — and every fact in them is already asserted
+    // below, where it is graded rather than displayed: the clock's lateness at
+    // each wake, the moment the store set for itself, and that moment going
+    // back to nothing when the room is cleared. A cell that repeats an assert
+    // is a second place for the same fact to go stale.
+    readout: null,
     // 🔴 THE ORDER IS THE ONE ASKED FOR, AND IT COST A REDESIGN RATHER THAN A
     // SWAP. `demo/verify.mjs` gives its `settleMs` to control 0 and to nothing
     // else, and stops collecting asserts 400 ms after the count last grew — so
@@ -216,8 +219,8 @@
       // that silently becomes the other is a control whose label you have to
       // re-read to find out what pressing it will do. Each says its own state
       // and refuses for its own reason.
-      { id: 'install', label: 'Add to the Home Screen' },
-      { id: 'notices', label: 'Turn notifications on' },
+      { id: 'install', label: 'Add to homescreen' },
+      { id: 'notices', label: 'Allow notifications' },
       { id: 'clear', label: 'Clear all', end: true },
     ],
   });
@@ -243,16 +246,47 @@
   const cbar = d.button('now').parentElement;
   cbar.parentNode.insertBefore(compose, cbar);
 
+  // 🔴 THE TWO ONCE-PER-DEVICE STEPS ARE NOT PART OF PUBLISHING, SO THEY DO NOT
+  // SIT IN THE PUBLISH ROW. Adding positron to a homescreen and allowing
+  // notifications are done once, by a reader, on the day they arrive; writing
+  // and publishing an item is done every time. Standing all five in one row put
+  // a button somebody presses once beside the one they press every visit, and
+  // the once-only pair had the loudest button on the page.
+  //
+  // ⚠️ THEY STAY IN `controls` AND ONLY THEIR BOXES MOVE. `d.button`, `d.run`,
+  // `guard` and the harness all address a control by id through the shell, so
+  // declaring these somewhere else would mean re-building four things the kit
+  // already does. What is moved is the DOM node, the same way the composer
+  // above is spliced in.
+  const setup = el('div', 'pos-controls setup');
+  setup.append(d.button('install'), d.button('notices'));
+  // Directly under the block that ends with the paragraph telling a reader to
+  // do these two things, and OUTSIDE it: the shell lays the page out as head,
+  // readout, controls, body, log as siblings, so a row spliced into the head
+  // would be inheriting the head's spacing rules rather than a control row's.
+  const headEl = document.querySelector('.pos-head');
+  headEl ? headEl.after(setup) : cbar.parentNode.insertBefore(setup, compose);
+
   // ── the log ─────────────────────────────────────────────────────────────
   // ⚠️ THE FIRST COLUMN IS 34 px WIDE, so the state is a word of four letters
   // and there is no fifth. It is the whole reason the words are these words,
   // and the colours for them are in the stylesheet above.
   const STATE = { unpublished: 'wait', new: 'live', shelved: 'away', archived: 'gone' };
-  const log = createMessageList({
+  // 🔴 `table.mjs`, THE SAME COMPONENT `/wire/` USES. Two list components on one
+  // site is two places a row can be styled, and `/kit/` exists to make that
+  // visible rather than to house both. The columns that were hard-coded inside
+  // `messages.mjs` are written down here instead, which is also the only reason
+  // `sent` can be a column of its own rather than a boolean the component knew
+  // a name for.
+  const log = createTable({
     cap: 40,
-    // The one more fact a row carries, and the only one that says what crossed
-    // to the phones rather than what happened in the store.
-    mark: 'sent',
+    columns: [
+      { key: 'dir', width: 52, hi: true },
+      { key: 'text', grow: true },
+      // The one more fact a row carries, and the only one that says what crossed
+      // to the phones rather than what happened in the store.
+      { key: 'sent', width: 42, align: 'right' },
+    ],
     empty: 'nothing published yet',
   });
   const logbox = el('div', 'logbox');
@@ -303,10 +337,6 @@
 
   let painted = null;
   function paint() {
-    d.set('wakes', punct?.fires ?? '');
-    d.set('late', punct?.late_ms?.p50 ?? '');
-    d.set('worst', punct?.late_ms?.max ?? '');
-
     // ⚠️ REDRAWN ONLY WHEN A ROW ACTUALLY CHANGED. `pull()` runs every few
     // hundred milliseconds while an item is being watched, and `set()` replaces
     // every row — which throws away where the reader had scrolled to, several
@@ -319,7 +349,10 @@
     // the oldest rather than the row that just arrived.
     log.set([...all].reverse().map((i) => ({
       dir: STATE[i.status] || i.status.slice(0, 4),
-      mark: i.announced_at != null,
+      // A word rather than a tick, because a column has room for one and a word
+      // needs no legend. Empty rather than `no`: nothing went out is the quiet
+      // case and the common one.
+      sent: i.announced_at != null ? 'sent' : '',
       // Brighter text for the item that is live right now: the colour of the
       // state says how it landed, this says which row you are looking for.
       hi: i.status === 'new',
@@ -327,15 +360,13 @@
     })));
   }
 
-  // A number that moves on a clock rather than on an event, which is why it is
-  // in a readout cell: a fixed box in tabular figures, where a digit changing
-  // moves nothing. Whole seconds, so it ticks once a second rather than four
-  // times. When the moment passes the page asks the store at once, rather than
-  // waiting up to three seconds for the steady read below to come round.
+  // The moment passing is worth asking about at once rather than waiting up to
+  // three seconds for the steady read below to come round. This used to drive a
+  // countdown cell as well; the cell is gone and the early ask is not, because
+  // it is behaviour rather than display.
   setInterval(() => {
-    if (nextDue == null) { d.set('next', ''); return; }
+    if (nextDue == null) return;
     const left = (nextDue - Date.now()) / 1000;
-    d.set('next', Math.max(0, Math.ceil(left)));
     if (left < -1 && dueSeen !== nextDue) { dueSeen = nextDue; pull().catch(() => {}); }
   }, 250);
 
@@ -555,7 +586,7 @@
       return;
     }
     if (!window.isSecureContext) {
-      d.log('this page is not being served securely — notifications need https, or localhost', 'bad');
+      d.log('this page is not being served securely. Notifications need https, or localhost', 'bad');
     }
     const installed = window.navigator.standalone === true
       || matchMedia('(display-mode: standalone)').matches;
@@ -574,7 +605,7 @@
     answer?.then?.(paintNotices).catch?.(() => {});
     if (!offered) {
       d.log('this browser is not offering notifications at all. On iPhone and iPad they appear only '
-        + 'once the page is added to the Home Screen (Share, then Add to Home Screen) — in an ordinary '
+        + 'once the page is added to the Home Screen (Share, then Add to Home Screen). In an ordinary '
         + 'tab nothing here can work, and it looks exactly like a broken setup.', 'bad');
     }
 
@@ -589,7 +620,7 @@
     try {
       reg = await navigator.serviceWorker.register('./push-sw.js', { scope: './' });
       await Promise.race([navigator.serviceWorker.ready, sleep(6000)]);
-    } catch (e) { d.log(`the worker would not register — ${e.name}: ${e.message}`, 'bad'); }
+    } catch (e) { d.log(`the worker would not register · ${e.name}: ${e.message}`, 'bad'); }
     d.assert('the part that waits for a notification takes this page\'s directory and nothing else',
       reg?.scope === here && reg.scope !== `${location.origin}/`,
       reg ? reg.scope : 'never registered');
@@ -642,9 +673,9 @@
 
     if (!answer) return;
     const perm = await answer;
-    if (perm === 'granted') d.log('notifications allowed — anything published here now reaches this browser', 'hi');
-    else if (perm === 'denied') d.log('notifications refused — items still publish, this browser just will not be told');
-    else d.log('notifications not answered — items still publish, this browser just will not be told');
+    if (perm === 'granted') d.log('notifications allowed. Anything published here now reaches this browser', 'hi');
+    else if (perm === 'denied') d.log('notifications refused. Items still publish, this browser just will not be told');
+    else d.log('notifications not answered. Items still publish, this browser just will not be told');
     if (perm !== 'granted' || !reg) return;
 
     // Loaded HERE rather than at the top of the page, and only once somebody
@@ -678,7 +709,7 @@
       // as a thing worth not showing: it identifies this browser to the sending
       // service and there is nothing to do with it here. What matters is that
       // one came back and that the store took it, and both of those are said.
-      d.log(`this browser has an address for notifications — ${token.length} characters, not shown`, 'hi');
+      d.log(`this browser has an address for notifications · ${token.length} characters, not shown`, 'hi');
       /**
        * 🔴 AND NOW JOIN THE ANNOUNCEMENT LIST, WHICH THE BROWSER CANNOT DO
        * ITSELF. A page can mint its own address from public configuration
@@ -698,7 +729,7 @@
       const joined = await write('/subscribe', { token })
         .catch((e) => ({ ok: false, error: e.message }));
       if (joined && joined.ok) {
-        d.log('this device is on the announcement list — anything published here now reaches it', 'hi');
+        d.log('this device is on the announcement list. Anything published here now reaches it', 'hi');
       } else {
         d.log(`the store would not add this device to the list: ${joined?.error || 'no answer'}`, 'bad');
       }
@@ -750,7 +781,7 @@
        * API here" are different facts and were about to look identical.
        */
       const refused = (e) =>
-        d.log(`this browser has an install prompt and would not show it for this press — `
+        d.log(`this browser has an install prompt and would not show it for this press: `
           + `${e?.name || e}`, 'bad');
       // ⚠️ IT REJECTS, IT DOES NOT THROW, and a `try` around it catches nothing.
       // `prompt()` returns a promise; a `NotAllowedError` for a press that was
@@ -767,15 +798,15 @@
       // 🔴 AND WHERE THERE IS NOT, THE SENTENCE IS THE BUTTON. Safari implements
       // neither `beforeinstallprompt` nor `navigator.install()`, so on an iPhone
       // there is nothing else a page can do.
-      d.log('this browser will not let a page offer that. On iPhone and iPad: the Share button — '
-        + 'the square with an arrow out of it — then Add to Home Screen, and open it from the new '
+      d.log('this browser will not let a page offer that. On iPhone and iPad: the Share button '
+        + '(the square with an arrow out of it), then Add to Home Screen, and open it from the new '
         + 'icon.', 'bad');
     }
     paintNotices();
     d.assert('the install step is offered, by API where there is one and in words where there is not',
       true, standalone ? 'already installed'
         : installPrompt ? 'this browser has an install prompt and it was offered'
-        : 'no install API here — the gesture is named instead');
+        : 'no install API here · the gesture is named instead');
   });
 
   d.on('notices', () => {
@@ -786,20 +817,20 @@
       setUpNotices().catch((e) => d.log(`${e.name}: ${e.message}`, 'bad'));
     } else if (!offered) {
       d.log(standalone
-        ? 'this browser has no Notification or PushManager at all, even installed — nothing here can reach it.'
-        : 'not installed yet — add it to the Home Screen first, and the notification APIs appear with it.',
+        ? 'this browser has no Notification or PushManager at all, even installed. Nothing here can reach it.'
+        : 'not installed yet. Add it to the Home Screen first, and the notification APIs appear with it.',
         'bad');
     } else {
       d.log(permission === 'granted'
-        ? 'this device is already on the list — it will be told with the page shut'
-        : 'this device has refused notifications. Settings, Notifications, positron — that is the row, '
-          + 'and it is named after the Home Screen icon rather than after the page.', permission === 'granted' ? 'hi' : 'bad');
+        ? 'this device is already on the list · it will be told with the page shut'
+        : 'this device has refused notifications. Settings, Notifications, positron is the row, '
+          + 'named after the Home Screen icon rather than after the page.', permission === 'granted' ? 'hi' : 'bad');
     }
     paintNotices();
     d.assert('this page can put the question to this browser, or say why it cannot',
       true,
       offered ? `permission is ${noticesState().permission}`
-        : 'not installed, so the APIs are hidden — the install button is the step before this one');
+        : 'not installed, so the APIs are hidden · the install button is the step before this one');
   });
 
   // 🔴 CONTROL 0, AND THE ONE THAT CARRIES THE CLOCK. It publishes at once —
@@ -858,13 +889,35 @@
        * meaning "the announce step ran" is a quieter and worse lie than none.
        */
       const live = await until(id, isLive, 12000);
-      const told = live ? await until(id, wasTold, 9000) : null;
+      // 🔴 STOP THE CLOCK WHERE THE CLAIM ENDS. This used to be read after the
+      // wait below, and the wait below is up to nine seconds long — so the
+      // sentence "goes live unprompted" was reported with a number that was
+      // almost entirely the time spent waiting for a NOTIFICATION. MEASURED in
+      // a side room, where no notification can ever arrive: `live 9568 ms after
+      // the press`, of which the publishing was a few hundred. The same number
+      // was read off the real room and taken for a slow store. Measure the
+      // quantity in question.
+      const liveMs = performance.now() - t0;
       const real = ROOM === 'items';
+      // ⚠️ AND DO NOT WAIT FOR SOMETHING THAT CANNOT COME. In any room but the
+      // announcing one, nothing is sent by design, so this wait could only ever
+      // run out the full nine seconds before agreeing. It costs the suite nine
+      // seconds a run to learn a fact the room's own rule already states.
+      const told = live && real ? await until(id, wasTold, 9000) : null;
       d.assert('publishing now needs no time to be named, and goes live unprompted',
         !!live && (!real || !!told),
+        // 🔴 THE THIRD BRANCH USED TO SAY THE OPPOSITE OF WHY IT FAILED. It was
+        // written for a side room, where nothing going out is the rule and the
+        // assert PASSES, and it printed for the announcing room too — where
+        // nothing going out is the whole defect. So the one line a reader got
+        // on a real failure was `room items is not the announcing room`, about
+        // the room that is. A message has to be branched on the same fact the
+        // verdict is.
         !live ? 'never went live'
-          : told ? `live ${(performance.now() - t0).toFixed(0)} ms after the press, notification and all`
-          : `live ${(performance.now() - t0).toFixed(0)} ms after the press; room ${ROOM} is not `
+          : told ? `live ${liveMs.toFixed(0)} ms after the press, notification and all`
+          : real ? `live ${liveMs.toFixed(0)} ms after the press, and then nothing was `
+              + `announced: ${ROOM} is the announcing room, so the send itself failed`
+          : `live ${liveMs.toFixed(0)} ms after the press; room ${ROOM} is not `
             + 'the announcing room, so nothing was sent to a phone');
 
       // 3 — THE CLAIM. A moment named when the item was written, kept by the
@@ -889,7 +942,7 @@
       // second announcement would show as a different one; in a side room both
       // are null, and `null === null` is the same claim — nothing went out on
       // either wake.
-      d.assert('and that second wake goes out to nobody — one notification, not two',
+      d.assert('and that second wake goes out to nobody: one notification, not two',
         !!put && !!live && put.announced_at === live.announced_at,
         put && live
           ? (put.announced_at ? `still stamped ${clock(put.announced_at)}`
@@ -991,8 +1044,8 @@
     // arrived and nothing has happened, saying what is missing beats saying
     // that something is.
     if (offered && permission === 'default') {
-      d.log('this device has never been asked — press TELL ME ABOUT NEW ITEMS, '
-        + 'and it will appear in Settings, Notifications, positron once you allow it', 'hi');
+      d.log('this device has never been asked. Press Allow notifications, and positron '
+        + 'appears in Settings, Notifications once you allow it', 'hi');
     }
     // 🔴 A FOCUS MODE SWALLOWS THE BANNER AND NOTHING CAN TELL YOU SO. This cost
     // an evening: permission granted, address minted, device on the list, FCM
@@ -1002,10 +1055,101 @@
     // a broken subscription. ⚠️ AND IT IS SAID WHERE THE GOOD NEWS IS SAID,
     // because that is the moment somebody is about to conclude it is broken.
     if (offered && permission === 'granted') {
-      d.log('⚠️ a Focus mode — Sleep, Do Not Disturb — holds the banner back even '
+      d.log('a Focus mode such as Sleep or Do Not Disturb holds the banner back even '
         + 'when everything here is right. Notification Centre still has it.');
     }
   }
+
+  // ── how this works ──────────────────────────────────────────────────────
+  //
+  // ⚠️ EVERY BOX IS A THING THAT EXISTS. The store is one Durable Object with a
+  // SQLite table and an alarm; the announcement is Firebase Cloud Messaging by
+  // topic; the thing that wakes a shut phone is `push-sw.js`. A picture drawn
+  // out of nouns the code does not have is a picture of a program somebody
+  // meant to write.
+  //
+  // ⚠️ THE HEADING IS NOT TYPED HERE. `how: true` writes the standing one.
+  // ⚠️ EVERY NOTE NAMES THE TECHNOLOGY. CLAUDE.md's diagram rule, added this
+  // session and then broken in this very block: the first draft said things like
+  // "sent by the alarm, not by the press" and "the item rides along as data",
+  // which describe an effect and name nothing a reader could look up. A note is
+  // read once, on purpose, by somebody who pointed at the box because they
+  // wanted to know what is in it.
+  createDiagram(d.el, {
+    // ⚠️ THE CAPTION IS THE ARCHITECTURE AND ITS REASON, NOT A WALKTHROUGH. Two
+    // drafts were wrong in the same way and it took being told twice: the first
+    // picked two mechanisms out of the middle of the picture, the second traced
+    // the path a message takes, which is what the arrows are already for. What a
+    // reader cannot get from the boxes is WHY it is shaped like this, and the
+    // shape here is two refusals.
+    caption: 'Two refusals shape this: nothing runs between publishes, and nothing here '
+      + 'holds a list of who is subscribed. A server object sleeps until the moment an '
+      + 'item named, and one send to a topic reaches whoever asked.',
+    nodes: [
+      { id: 'here', label: 'browser', kind: 'here',
+        note: 'An ordinary page over **https**, with no connection held open: no WebSocket, '
+            + 'no long poll. Everything it does is a **fetch** that finishes.',
+        children: [
+          { id: 'form', label: 'this page',
+            note: 'POSTs the item as **JSON** and GETs the room back. It re-reads on a timer '
+                + 'because the room is SHARED, so an item written on another device has to be '
+                + 'able to appear here.' },
+        ] },
+      { id: 'store', label: 'Cloudflare', sub: 'a Durable Object', kind: 'cloud', tech: 'cloudflare',
+        note: 'One **Durable Object** per room, with a **SQLite** table of items inside it and '
+            + 'a single **storage.setAlarm**. The alarm is the trick: the runtime evicts the '
+            + 'object and brings it back at the moment an item named, so nothing runs in '
+            + 'between and nothing is billed for waiting.' },
+      { id: 'fcm', label: 'Firebase', sub: 'Cloud Messaging', kind: 'cloud', tech: 'relay',
+        note: 'Reached through the **FCM HTTP v1** API with an **OAuth2** bearer token minted '
+            + 'from a service-account key. Devices are put on a **topic** by '
+            + '**iid.googleapis.com/iid/v1:batchAdd**, which is the half only a server can do, '
+            + 'and it is why the store never holds a list of who is subscribed.' },
+      // 🔴 TWO PHONES, BECAUSE THE FAN-OUT IS THE POINT AND ONE PHONE HIDES IT.
+      // With a single device the picture reads as "the store sends a message to
+      // that phone", which is the design this one deliberately is not: the store
+      // addresses a TOPIC and never learns who is on it. Two arrows out of one
+      // send is the whole claim, drawn.
+      { id: 'phone', label: 'iPhone', sub: 'on the homescreen', kind: 'device', tech: 'device',
+        note: 'Reached over **Web Push**, which on iOS goes through **APNs**. It only works '
+            + 'once positron has been added to the homescreen: Safari gives a plain tab no '
+            + 'push at all, which is why this page asks for that step first.',
+        children: [
+          { id: 'sw', label: 'push-sw.js', sub: 'a service worker',
+            note: 'A **service worker**, registered once and kept by the browser after the tab '
+                + 'is gone. Its **push** event fires with no page running, and '
+                + '**showNotification** is what actually draws the banner.' },
+        ] },
+      { id: 'phone2', label: 'Android', sub: 'app shut', kind: 'device', tech: 'device',
+        note: 'The same **Web Push**, delivered by **FCM** directly rather than through a '
+            + 'second service. It needs no homescreen icon: an ordinary Chrome tab that has '
+            + 'been closed still receives one.',
+        children: [
+          { id: 'sw2', label: 'push-sw.js', sub: 'the same file',
+            note: 'The same **service worker**, byte for byte. Nothing here is written twice '
+                + 'per platform, which is the reason to use Web Push rather than two apps.' },
+        ] },
+    ],
+    links: [
+      { from: 'form', to: 'store', label: 'POST /items',
+        note: 'Title, body and the moment it is due, as **JSON** over https. The reply is the '
+            + 'whole room, so one write also refreshes the list.' },
+      { from: 'store', to: 'fcm', label: 'messages:send',
+        note: 'A **POST** to **fcm.googleapis.com/v1/projects/…/messages:send**, made by the '
+            + 'alarm rather than by a request, so there is no browser anywhere in the call. '
+            + 'It carries a `notification` for the banner and a `data` map for the client, '
+            + 'and **every value in `data` must be a string** because FCM refuses nested '
+            + 'objects.' },
+      { from: 'fcm', to: 'sw', label: 'push',
+        note: 'One send fans out to every device on the topic. The browser STARTS the service '
+            + 'worker to handle it, which is what makes a banner possible with nothing of this '
+            + 'page running.' },
+      { from: 'fcm', to: 'sw2', label: 'same push',
+        note: 'The second arrow is the reason for the topic. The store made ONE call and never '
+            + 'learned that this device exists, so adding a hundred more costs it nothing.' },
+    ],
+  }, { how: true, atEnd: true });
+
   d.ready();
 </script>
 </html>

@@ -200,11 +200,64 @@ listeners.push((m) => {
     // outage as "normal churn".
     if (/seg_\d+_part|_part_all\.mp4|\.m4s(\?|$)/.test(e.url || '') && /\b404\b/.test(e.text || '')) {
       edgeMisses.push(e.url);
+    } else if (/webRTC\/play/.test(e.url || '') && /\b409\b/.test(e.text || '')) {
+      // 🔴 A 409 ON A WHEP PLAY URL MEANS NOTHING IS PUBLISHING TO THAT INPUT,
+      // which is a fact about the rig being off rather than about the page.
+      // `demo/shell/live.mjs` records the same 409 for the same reason: an
+      // input has to be fed by WHIP before it can be played by WHEP.
+      // MEASURED 2026-09-15 against Cloudflare directly, outside any browser:
+      // a bare POST to that play URL answered 409 while `keep` read 13/14 run
+      // after run on an otherwise clear machine.
+      // ⚠️ RECORDED AND CAPPED, NEVER IGNORED, which is the whole difference.
+      // Silence here would turn "the studio rig is not running" into a green
+      // run, and the next person to look would have no way to tell that from a
+      // page that had stopped asking at all.
+      probed.push(e.url);
     } else if (/webRTC\/play/.test(e.url || '') && /\b400\b/.test(e.text || '')) {
       // Cloudflare WHEP refuses a single-track offer with a 400, both ways.
       // `tracks` used to assert on that refusal; it is gone, so nothing sends
       // one today. Kept because the fact has not changed and the next page to
       // probe it should not read as broken. Capped like the others.
+      probed.push(e.url);
+    } else if (/shout\.positron\.studio/.test(e.url || '') && /\b50[02]\b/.test(e.text || '')) {
+      // 🔴 A 502 FROM `shout` IS THE RELAY SAYING AN ORIGIN IS DOWN, and the
+      // page whose job is six radio stations handles it by falling back and
+      // saying so. MEASURED repeatedly today: four of eight mounts 502 while
+      // the other four answered 200 through the identical worker, and this
+      // laptop reached every one of them directly at `icecast.err.ee`. So the
+      // failure is upstream of us, it is not constant, and a demo that cycles
+      // stations meets it as a matter of course.
+      // ⚠️ CAPPED, NEVER IGNORED, AND THAT MATTERS MORE HERE THAN ELSEWHERE.
+      // Past the ceiling this stops being one flapping mount and becomes OUR
+      // relay being down, which is the opposite diagnosis and the one a reader
+      // of this suite most needs told apart. `shout.positron.studio/health`
+      // answers per station and is the thing to look at.
+      probed.push(e.url);
+    } else if (/positron-vain\.[^/]+\.workers\.dev|vain\.positron\.studio/.test(e.url || '')
+               && /\b(404|413|415)\b/.test(e.text || '')) {
+      // 🔴 `vain` ASKS ITS OWN ARCHIVE TO REFUSE, THREE TIMES, ON PURPOSE: a
+      // file over the cap (413), a JPEG named `.mp3` (415), and the sidecar
+      // before it exists (404). All three are asserted ON the page and none
+      // writes a byte, which is the point of asking.
+      // ⚠️ NO PAGE-SIDE CHANGE CAN REMOVE THESE. Chrome logs a resource error
+      // for any 4xx and does it identically for `fetch` and `XMLHttpRequest`,
+      // MEASURED both ways rather than reasoned about. A check that cannot be
+      // made without a console error is exactly what this allowance is for.
+      // Capped like the others, never ignored: past the ceiling these stop
+      // being three deliberate refusals and become an archive that is refusing
+      // everything.
+      probed.push(e.url);
+    } else if (/\.archive\.org/.test(e.url || '') && /\b5\d\d\b/.test(e.text || '')) {
+      // 🔴 archive.org 5xx ON A METADATA PROBE IS THEIR SERVER, NOT THIS PAGE.
+      // `/tapes/` asks all 24 recordings how long they are so a bar can be as
+      // wide as its tape, four at a time, straight at whichever node
+      // archive.org hands out. MEASURED across ten runs: two of them drew a 500
+      // from `dn720304.ca.archive.org` on one probe, and the other eight drew
+      // none, with no code between them.
+      // ⚠️ CAPPED LIKE THE OTHERS AND NEVER IGNORED. Past the ceiling this stops
+      // being one flaky node and becomes an archive that is down, which is
+      // something a reader of this suite needs to be told rather than have
+      // folded into "expected churn".
       probed.push(e.url);
     } else if (/live\.err\.ee/.test(`${e.url || ''} ${e.text || ''}`)
                && /\b403\b|CORS|ERR_FAILED/.test(e.text || '')) {
@@ -379,9 +432,14 @@ async function typing() {
 
 // ── run ─────────────────────────────────────────────────────────────────────
 let pass = 0, fail = 0;
+// ⚠️ `·` RATHER THAN AN EM DASH, AND THIS IS THE SOURCE OF EVERY ONE IN A SUITE
+// RUN. A sweep of 418 strings across 62 files could not reach it, because the
+// dash is not in any page: it is added here, to every line, as it is printed.
+// The rule is about anything a reader looks at, and a suite run is read more
+// often than most pages.
 const ok = (label, cond, detail) => {
-  if (cond) { pass++; console.log(`  ok    ${label}${detail !== undefined ? `  — ${detail}` : ''}`); }
-  else { fail++; console.log(`  FAIL  ${label}${detail !== undefined ? `  — ${detail}` : ''}`); }
+  if (cond) { pass++; console.log(`  ok    ${label}${detail !== undefined ? `  · ${detail}` : ''}`); }
+  else { fail++; console.log(`  FAIL  ${label}${detail !== undefined ? `  · ${detail}` : ''}`); }
 };
 
 for (const t of targets) {
@@ -616,11 +674,49 @@ for (const t of targets) {
   const FIRST_ASSERT_CEIL = 30000;
   const countAsserts = () => ev('(window.__demo && __demo.asserts.length) || 0');
   let n = await countAsserts();
+  /**
+   * 🔴 THE WAIT IS ARMED BY `d.ready()`, NOT BY THE COUNT BEING ZERO, AND THAT
+   * DISTINCTION BLINDED THE SUITE.
+   *
+   * This loop used to run `while (n === 0)`, on the reasoning that once
+   * anything has landed the cheap growth loop below can take over. That held
+   * only while nothing asserted early. The moment the SHELL gained two asserts
+   * of its own, every page in the suite had a non-zero count at t+0, this phase
+   * fell through on its first test, and a page was left with 12 tries at 400 ms
+   * to produce everything it had.
+   *
+   * MEASURED the day it landed: `/radio1965/` makes 34 asserts and the suite
+   * collected **2**, then reported **13/13 green**. That is this project's worst
+   * failure shape, a green suite with no coverage, and it hit 28 demos at once
+   * because 28 declare `settleMs`.
+   *
+   * ⚠️ `ready` IS THE RIGHT SIGNAL BECAUSE IT IS THE PAGE'S OWN CLAIM TO BE
+   * FINISHED. A count cannot distinguish "two asserts because the page has
+   * barely started" from "two asserts because that is all there are"; `ready`
+   * can, since a page calls it when its checks are done. The count is still the
+   * fallback for a page that never calls it, so nothing hangs.
+   */
+  const isReady = () => ev('!!(window.__demo && window.__demo.ready)');
   const firstBudget = Math.ceil(Math.min(t.settleMs || 0, FIRST_ASSERT_CEIL) / 400);
-  for (let i = 0; i < firstBudget && n === 0; i++) {
+  // ⚠️ ONE LOOP, NOT TWO. The old pair was a "wait while nothing has landed"
+  // phase followed by a "stop when it stops growing" phase, and the handover
+  // between them was the defect: the first fell through the instant ANY assert
+  // existed, so two asserts from the shell at t+0 handed every page straight to
+  // a loop that allows 4.8 s in total. A page is done when it says it is ready
+  // AND its count has stopped moving. Both conditions, or a page that calls
+  // `ready()` before driving its own checks (`/radio1965/` does, from inside
+  // the granulator's boot) is cut off at the moment it starts working.
+  // ⚠️ "THE PAGE HAS NOT ASSERTED YET" IS NOT "THE COUNT IS ZERO". The shell
+  // makes two of its own at t+0 on every shelled page, so a zero test answered
+  // false immediately and this phase stopped running at all. `shellAsserts` is
+  // the shell saying how many of the rows are its, which is the only thing that
+  // separates a page that has barely started from one that is finished.
+  const shellN = await ev('(window.__demo && window.__demo.shellAsserts) || 0');
+  for (let i = 0; i < firstBudget && n <= shellN; i++) {
     await sleep(400);
     n = await countAsserts();
   }
+  // Then the cheap one: stop when it stops growing.
   let prev = -1;
   for (let i = 0; i < 12 && n !== prev; i++) {
     prev = n;
@@ -642,6 +738,10 @@ for (const t of targets) {
   //   now      sweeps 13 points across the window, once, capped at 30 in-page
   // plus hls.js's own retries on whatever comes back refused.
   const PROBE_CEILING = 60;
+  // ⚠️ AND THE LINE HAS TO SAY WHICH KIND, or a reader sees a number with no
+  // meaning. `keep` and `take` ask WHEP for an input the rig feeds; when the
+  // rig is off that is a 409 every time, and an unexplained ceiling is how the
+  // next reader mistakes a real outage for expected churn.
   const edgeOk = edgeMisses.length <= EDGE_CEILING;
   const probedOk = probed.length <= PROBE_CEILING;
   ok('no console errors', errors.length === 0 && edgeOk && probedOk,

@@ -13,7 +13,16 @@
               page underneath while somebody is looking around */
            touch-action: none; cursor: grab; }
   .stage:active { cursor: grabbing; }
-  .stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; }
+  .stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9;
+                  transition: opacity 420ms ease; }
+  /* 🔴 THE ROOM APPEARS ONCE, RATHER THAN FOUR TIMES. The checks below roll
+     four rooms into this canvas before anything is pressed — an opening room,
+     a random one, a second random one and back — and each change cross-fades
+     over 900 ms, so a visitor arriving met three and a half seconds of bricks
+     sliding into different places. Reported as the boxes jumping position a
+     couple of times, which is exactly what it was. The frames are still drawn
+     and still timed; what waits is showing them. */
+  .stage.warming canvas { opacity: 0; }
   /* ⚠️ `.stage.pos-full`, NEVER `.stage:fullscreen, .stage.pos-full` — a browser
      that does not know that pseudo-class discards the WHOLE selector list, which
      deletes the fallback on exactly the browsers that need it. (0,2,0) beats
@@ -129,7 +138,7 @@
       .filter((dsc) => typeof dsc?.value === 'function')
       .map((dsc) => dsc.value);
     const faked = fns.filter((fn) => !/\{\s*\[native code\]\s*\}/.test(Function.prototype.toString.call(fn)));
-    if (faked.length) return { native: false, why: `${faked.length} method(s) are JavaScript — something is installed over navigator.xr` };
+    if (faked.length) return { native: false, why: `${faked.length} method(s) are JavaScript. Something is installed over navigator.xr` };
     if (Object.prototype.hasOwnProperty.call(navigator, 'xr')) return { native: false, why: 'navigator owns `xr` as an own property' };
     return { native: true, why: `${proto.constructor?.name || 'XRSystem'} · ${fns.length} methods, all [native code]` };
   }
@@ -147,8 +156,8 @@
       + 'across. Drag to look and the arrow keys to walk; in a headset your right '
       + 'hand points and your left carries a small screen, the trigger picks a '
       + 'brick up and the thumbstick pushes it nearer or further. Let one go and '
-      + 'it snaps to the grid and settles onto whatever is under it — and it '
-      + 'stops at the walls rather than going through them.',
+      + 'it snaps to the grid, settles onto whatever is under it, and stops at '
+      + 'the walls rather than going through them.',
     // 🔴 FOUR CELLS, DOWN FROM EIGHT, AND FOUR OF THE OLD ONES COULD NOT MOVE.
     // `seed`, `things` and `refused` were written once at load and then sat
     // there; `round trip` only changed on a roll, and the roll is not a button
@@ -170,7 +179,7 @@
   });
   guard(d);
 
-  const stage = el('div', 'stage');
+  const stage = el('div', 'stage warming');
   const canvas = el('canvas', null, null, { width: 960, height: 540 });
   // ⚠️ NO LABEL OVER THE PICTURE. There was a badge in the top-left corner
   // saying `window · <renderer>` and then `headset · you are in the room`, over
@@ -196,7 +205,7 @@
   // is replaced by black rather than composited under. The flat and VR paths
   // clear to opaque, so nothing else changes.
   const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, xrCompatible: true });
-  if (!gl) { d.log('no WebGL2 in this browser — there is nothing to draw with', 'bad'); }
+  if (!gl) { d.log('no WebGL2 in this browser', 'bad'); }
 
   const compile = (t, src) => {
     const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s);
@@ -296,11 +305,14 @@
     // `end` handler below can say so instead of printing the same line for all
     // three. The label and the hold are read off the control rather than typed
     // here — a description that can disagree with its config is worse than none.
-    // ⚠️ NO `left` HANDLER ANY MORE. The tablet carried a `Hold to leave` button
-    // and it has moved to the controller — see `xr-quit.mjs` and the note where
-    // the button used to be in `xr-tablet.mjs`. What is left on the slab is the
-    // floor-dots slider, which is a control this page actually needs.
-    tablet = createXRTablet({ ctx: { room } });
+    // ⚠️ `left` IS BACK, AND IT IS A NOTIFICATION RATHER THAN THE ACTION. The
+    // tablet's `Hold to leave` was removed in favour of the controller badge and
+    // that was a swap where it should have been an addition: REPORTED from a
+    // Quest as "i was not able to get out". The session is ended by
+    // `xr-hands.mjs`, which is handed the session every frame; this is only how
+    // this page learns it was that exit, so the `end` handler can name it
+    // instead of printing one line for all three.
+    tablet = createXRTablet({ ctx: { room, left: () => leaving('the tablet\u2019s button') } });
     room.setTablet(tablet);
     tablet.applyAll();          // the dots start where the slider says, not at a default
     // 🔴 ONE INPUT PATH, AND IT CANNOT TELL VR FROM AR. Every controller, the
@@ -415,14 +427,14 @@
     const why = validate(next);
     if (why) {
       refused++;
-      d.log(`refused — ${why}`, 'warn');
+      d.log(`refused: ${why}`, 'warn');
       return false;
     }
     doc = next; applied++;
     appliedAt = performance.now(); shown = false;
     lastDocs.push(docOf(next));
     if (askedAt) roundTrip = Date.now() - askedAt;
-    d.log(`room ${next.seed} — ${next.things.length} things, ${docOf(next).length} bytes`);
+    d.log(`room ${next.seed} · ${next.things.length} things, ${docOf(next).length} bytes`);
     return true;
   }
 
@@ -467,7 +479,11 @@
    * brick may be put — and collapsing them would mean a generator change could
    * silently move the walls.
    */
-  const PLATE = 2.2;
+  // ⚠️ THE PLATE FOLLOWS THE BRICK. It was 2.2 m against a 0.2 m unit, which is
+  // eleven bricks across; at 0.5 m the same number is 5.5 m of floor, which is
+  // further than you can walk in most rooms. Four and a half cells each way
+  // keeps everything inside a reach or two of where you are standing.
+  const PLATE = 2.4;
 
   /**
    * Where a brick goes when you let go of it.
@@ -575,12 +591,23 @@
   const roll = async (seed) => {
     if (ws?.readyState !== 1) await open();
     asked = Date.now();
+    const before = applied;
     if (!send({ type: 'scene.room', doc: world(seed) })) {
       // No relay: still show a room rather than an empty stage, and SAY that
       // the number is missing rather than printing a zero that looks measured.
       apply(world(seed), 0);
     }
-    await new Promise((r) => setTimeout(r, 900));
+    // ⚠️ WAIT FOR THE ROOM TO BE DRAWN, NOT FOR A FIXED SLEEP. This was 900 ms
+    // flat, against a relay that answers in about thirty — so five rolls cost
+    // four and a half seconds of which nearly all was a timer. The cap is the
+    // old number, because a relay that never answers must cost this page a
+    // moment and then be reported, not hang it. `applied` rather than `shown`
+    // alone: `shown` is left TRUE by the previous roll, so a wait on it would
+    // fall straight through before this room had even come back.
+    const t0 = performance.now();
+    while (performance.now() - t0 < 900 && !(applied > before && shown)) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
   };
 
   /**
@@ -614,11 +641,11 @@
         // picture keeps its own.
         room.applyLook({ sky: m.sky, box: m.box });
         setPanel('✓ new look\nfading in');
-        shipNow('dev.shader compiled — fading in');
+        shipNow('dev.shader compiled · fading in');
       } catch (e) {
         // A shader that will not compile must not take the picture with it.
         setPanel(`✗ new look refused\n${String(e.message).slice(0, 30)}`);
-        shipNow(`FAIL dev.shader — ${e.message}`);
+        shipNow(`FAIL dev.shader: ${e.message}`);
       }
       return;
     }
@@ -629,18 +656,18 @@
         const mod = await import(`/shell/seed.mjs?v=${encodeURIComponent(m.v || Date.now())}`);
         world = (seed) => spaced(mod.world(seed)); validate = mod.validate;
         setPanel('✓ new generator, applied\nroll to see it');
-        shipNow(`dev.module applied live — v${m.v}`);
+        shipNow(`dev.module applied live · v${m.v}`);
       } catch (e) {
         setPanel(`✗ new generator refused\n${String(e.message).slice(0, 30)}`);
-        shipNow(`FAIL dev.module — ${e.message}`);
+        shipNow(`FAIL dev.module: ${e.message}`);
       }
       return;
     }
     if (m.type === 'dev.reload') {
       reloadOffered = m.build || 'a new build';
-      setPanel(`● update ready — ${reloadOffered}\npress A to take it`, 60000);
-      d.log(`an update is ready (${reloadOffered}) — reload when you want it`);
-      shipNow(`dev.reload offered — ${reloadOffered}`);
+      setPanel(`● update ready · ${reloadOffered}\npress A to take it`, 60000);
+      d.log(`an update is ready (${reloadOffered}). Reload when you want it`);
+      shipNow(`dev.reload offered · ${reloadOffered}`);
     }
   }
 
@@ -894,7 +921,7 @@
     // one already taken at load (`headsetKnown`), never a fresh await here.
     // This is the whole reason the first attempt on a real Quest produced no
     // asserts at all: the handler threw where nothing was reporting.
-    if (headsetKnown === false) { d.log('no headset here — the window above is the same room', 'warn'); return false; }
+    if (headsetKnown === false) { d.log('no headset here. The window above is the same room', 'warn'); return false; }
     // ⚠️ A DEADLINE ON EVERY STEP. A rejected promise reports itself; one that
     // simply never settles does not, and that is what the first two headset
     // runs looked like from here — a session the user was standing in, with no
@@ -919,7 +946,7 @@
       const out = await Promise.race([p,
         new Promise((_, no) => setTimeout(() => no(new Error(
           `${what} did not answer in ${ms / 1000} s`
-          + (ms > 6000 ? ' — is there a permission prompt waiting for you?' : ''))), ms))]);
+          + (ms > 6000 ? '. Is there a permission prompt waiting for you?' : ''))), ms))]);
       shipNow(`ok  ${what}`);
       return out;
     };
@@ -961,7 +988,7 @@
       let gaveUp = false;
       ask.then((late) => {
         if (!gaveUp) return;
-        shipNow('the session arrived after this page gave up waiting — ending it rather than leaving you in a room nothing is drawing');
+        shipNow('the session arrived after this page gave up waiting. Ending it rather than leaving you in a room nothing is drawing');
         try { late.end(); } catch { /* already gone */ }
       }, () => { /* a rejection is reported by the step below */ });
       try {
@@ -992,8 +1019,8 @@
       xrSpace = await step('requestReferenceSpace local-floor',
         session.requestReferenceSpace('local-floor'));
     } catch (e) {
-      d.log(`the headset refused the session — ${e.name}: ${e.message}`, 'bad');
-      shipNow(`FAIL session — ${e.name}: ${e.message}`);
+      d.log(`the headset refused the session · ${e.name}: ${e.message}`, 'bad');
+      shipNow(`FAIL session · ${e.name}: ${e.message}`);
       try { await session?.end(); } catch { /* it may never have started */ }
       session = null;
       return false;
@@ -1037,9 +1064,9 @@
       // those to be guessed at from the outside, which is the shape of failure
       // that has already cost this page three headset runs.
       const why = leftBy
-        || 'something outside this page — the system menu, the headset coming off, or the runtime taking it';
+        || 'something outside this page: the system menu, the headset coming off, or the runtime taking it';
       shipNow(`session ended · ${why} · ${xrFrames} frames drawn`);
-      d.log(`the headset session ended — ${why}`);
+      d.log(`the headset session ended: ${why}`);
       xrOk = false; session = null; arMode = false; publishXR();
       d.set('view', 'window'); raf = requestAnimationFrame(flat);
     });
@@ -1074,12 +1101,12 @@
       // anything. A press that misses both controls must still not reach
       // through the slab and grab a cube on the far side of it.
       if (xrHands?.over) {
-        shipNow('trigger on the tablet — the tablet has it, nothing was grabbed');
+        shipNow('trigger on the tablet · nothing was grabbed');
         return;
       }
       if (!rayNow) return;
       held = pick(rayNow.o, rayNow.dir);
-      shipNow(held ? `grabbed thing ${held.i} at ${held.dist.toFixed(2)} m` : 'trigger — nothing under the pointer');
+      shipNow(held ? `grabbed thing ${held.i} at ${held.dist.toFixed(2)} m` : 'trigger · nothing under the pointer');
     });
     session.addEventListener('selectend', () => {
       if (held) {
@@ -1095,7 +1122,7 @@
         // everyone else the thing jumping after it landed.
         const out = pushClear(held.i);
         if (out) setPanel(`moved it clear of another thing\n${out.toFixed(2)} m`, 2500);
-        shipNow(`dropped thing ${held.i}${out ? ` · pushed ${out.toFixed(2)} m clear` : ''} — document now ${docOf(doc).length} bytes`);
+        shipNow(`dropped thing ${held.i}${out ? ` · pushed ${out.toFixed(2)} m clear` : ''} · document now ${docOf(doc).length} bytes`);
         send({ type: 'scene.room', doc });
       }
       held = null;
@@ -1121,13 +1148,13 @@
     // with exactly that and no line explaining either.
     setTimeout(() => {
       if (session && xrFrames === 0) {
-        shipNow('FAIL no frame drawn 4 s after the session started — leaving on my own');
-        d.log('the headset session drew nothing — ended it rather than leave you in the dark', 'bad');
-        leaveNow('this page\'s dead-man\'s switch — nothing had been drawn 4 s in');
+        shipNow('FAIL no frame drawn 4 s after the session started · leaving on my own');
+        d.log('the headset session drew nothing. Ended it rather than leave you in the dark', 'bad');
+        leaveNow('this page\'s dead-man\'s switch · nothing had been drawn 4 s in');
       }
     }, 4000);
     session.requestAnimationFrame(onXR);
-    shipNow('session running — requestAnimationFrame registered');
+    shipNow('session running · requestAnimationFrame registered');
     return true;
   }
 
@@ -1158,7 +1185,7 @@
     if (xrFrames === 1) {
       const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       if (st !== gl.FRAMEBUFFER_COMPLETE) {
-        shipNow(`first frame: the framebuffer is NOT complete — status ${st}`);
+        shipNow(`first frame: the framebuffer is NOT complete · status ${st}`);
       }
     }
     const tSec = (now - t0) / 1000;
@@ -1209,7 +1236,7 @@
             tracked = [...session.trackedSources];
             trackedSays = `attribute present, ${tracked.length} in it`;
           }
-        } catch (e) { trackedSays = `attribute threw — ${e.name}`; }
+        } catch (e) { trackedSays = `attribute threw: ${e.name}`; }
 
         const all = [...session.inputSources.length ? [...session.inputSources].map((x) => ['I', x]) : [],
                      ...tracked.map((x) => ['T', x])];
@@ -1236,7 +1263,7 @@
         shipNow(`in your hands · ${session.inputSources.length} input + ${tracked.length} tracked`
           + ` · trackedSources ${trackedSays} · ${seen.join(' || ')}`);
       } catch (e) {
-        shipNow(`in your hands: could not be read — ${e.name}: ${e.message}`);
+        shipNow(`in your hands: could not be read · ${e.name}: ${e.message}`);
       }
       const bits = [...session.inputSources].map((src, i) => {
         if (!src.targetRaySpace) return `${i}:${src.handedness} NO targetRaySpace`;
@@ -1435,7 +1462,7 @@
     // show two different looks in one frame.
     if (room?.retire()) {
       setPanel('✓ the new look is the look');
-      shipNow('dev.shader live — the fade finished');
+      shipNow('dev.shader live · the fade finished');
     }
     if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
     lastFrame = now;
@@ -1482,12 +1509,16 @@
                : `tightest pair ${cl.closest.toFixed(3)} m apart`);
     d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
     d.assert('the room changed only when the message came back', echoed || ws?.readyState !== 1,
-      echoed ? 'own message echoed' : 'no relay — drew locally and said so');
+      echoed ? 'own message echoed' : 'no relay · drew locally and said so');
     // The ceiling is read from the same constant the label prints. It was
     // typed twice once — the label said 120 and the comparison said 1200 — and
     // the run still read green, which is what a description that can disagree
     // with its config buys you.
-    d.assert(`an accepted room is on screen inside ${TO_FRAME_CEIL_MS} ms`,
+    // ⚠️ "REACHES A DRAWN FRAME", NOT "IS ON SCREEN". What `markShown` measures
+    // is the distance from a room being accepted to the frame that drew it, and
+    // at load this canvas is deliberately still transparent while the checks
+    // run. The old wording claimed something this number does not know.
+    d.assert(`an accepted room reaches a drawn frame inside ${TO_FRAME_CEIL_MS} ms`,
       lastToFrame !== null && lastToFrame < TO_FRAME_CEIL_MS,
       lastToFrame === null ? 'no frame drawn' : `${lastToFrame.toFixed(1)} ms`);
   });
@@ -1543,15 +1574,15 @@
     if (uiSeen === null) uiSeen = now;
     d.assert('the controller interface is the same whichever kind of session this is',
       now === uiSeen && !/\b(vr|ar|immersive|passthrough|opaque)\b/i.test(now),
-      `${where} — ${now}`);
+      `${where} · ${now}`);
   };
 
   d.on('ar', async () => {
     let got = false;
     try { got = await enter('immersive-ar'); }
     catch (e) {
-      shipNow(`FAIL enter(ar) — ${e.name}: ${e.message}`);
-      d.log(`passthrough failed — ${e.name}: ${e.message}`, 'bad');
+      shipNow(`FAIL enter(ar) · ${e.name}: ${e.message}`);
+      d.log(`passthrough failed · ${e.name}: ${e.message}`, 'bad');
       try { await session?.end(); } catch { /* may not exist */ }
       session = null; xrOk = false; arMode = false;
     }
@@ -1581,7 +1612,7 @@
     d.log(how === 'exit' ? 'back to the page' : `filling the screen (${how})`, 'hi');
   });
   watchFull(stage, (on) => {
-    d.log(on ? 'filling the screen — Escape to come back' : 'back to the page', 'hi');
+    d.log(on ? 'filling the screen · Escape to come back' : 'back to the page', 'hi');
   });
 
   d.on('enter', async () => {
@@ -1592,8 +1623,8 @@
     let got = false;
     try { got = await enter(); }
     catch (e) {
-      shipNow(`FAIL enter() — ${e.name}: ${e.message}`);
-      d.log(`entering failed — ${e.name}: ${e.message}`, 'bad');
+      shipNow(`FAIL enter() · ${e.name}: ${e.message}`);
+      d.log(`entering failed · ${e.name}: ${e.message}`, 'bad');
       try { await session?.end(); } catch { /* may not exist */ }
       session = null; xrOk = false;
     }
@@ -1685,7 +1716,27 @@
       pushClear(2);
       const t = doc.things[2];
       const inside = Math.abs(t.x) <= PLATE && Math.abs(t.z) <= PLATE && t.y >= t.s / 2 - 1e-6;
-      d.assert('a brick let go past the wall stops at it',
+      /**
+     * 🔴 AND IT CANNOT BE PUSHED UNDER THE FLOOR, WHICH IS A NEW RULE AND A
+     * REPORTED BUG. `validate` bounded x and z and never y, so the room had
+     * walls and no ground: a brick dragged downward sank through the dots and
+     * there was no way to reach it again. The negative control is the point of
+     * this one, because "it stayed above the floor" is also what a page that
+     * refuses every move looks like.
+     */
+    {
+      const before = doc.things[0].y;
+      const sank = moveThing(0, doc.things[0].x, -3, doc.things[0].z);
+      const after = doc.things[0].y;
+      const legal = moveThing(0, doc.things[0].x, before + UNIT, doc.things[0].z);
+      d.assert('a brick cannot be pushed under the floor, and can still be lifted',
+        !sank && after === before && legal,
+        `${sank ? 'IT WENT THROUGH' : 'refused at -3 m'}, y held at ${after.toFixed(2)}; `
+        + `${legal ? 'and a lift of one unit was allowed' : 'AND A LEGAL LIFT WAS REFUSED TOO'}`);
+      moveThing(0, doc.things[0].x, before, doc.things[0].z);
+    }
+
+    d.assert('a brick let go past the wall stops at it',
         inside, `let go at 40 m, came to rest at ${t.x.toFixed(2)}, ${t.y.toFixed(2)}, `
           + `${t.z.toFixed(2)} inside a ${PLATE} m plate`);
       moveThing(2, before.x, before.y, before.z);
@@ -1714,7 +1765,7 @@
     // 90 missing)". The bug read EXACTLY 1.0 for the first number below — the
     // face pointing straight along the controller, which with the thing held
     // normally is at the ceiling. It must now be the lean and nothing more.
-    d.assert('the tablet faces across the controller, back at you — not along it at the sky',
+    d.assert('the tablet faces across the controller, back at you, not along it at the sky',
       Math.abs(dot3(nrm, axis)) < 0.5 && dot3(nrm, across) > 0.9 && det > 0,
       `${(Math.acos(Math.max(-1, Math.min(1, dot3(nrm, across)))) * 180 / Math.PI).toFixed(0)}° of lean back towards you`
       + ` · along the controller it reads ${dot3(nrm, axis).toFixed(3)}, and the bug read 1.000`
@@ -1866,7 +1917,7 @@
         const onPress = q.update(pad(true), 0);
         const halfWay = q.update(pad(true), 0.45);
         const letGo = q.update(pad(false), 0.01);
-        d.assert('the way out takes a hold — a press, or letting go part-way, does nothing',
+        d.assert('the way out takes a hold: a press, or letting go part-way, does nothing',
           onPress === 0 && halfWay > 0.4 && halfWay < 0.6 && letGo === 0 && fired === 0,
           `pressed ${(onPress * 100).toFixed(0)}% · half way ${(halfWay * 100).toFixed(0)}% · `
           + `let go ${(letGo * 100).toFixed(0)}% · fired ${fired} times`);
@@ -1898,6 +1949,26 @@
           q.button === 4 && /QUIT/i.test(q.label),
           `button ${q.button} of the xr-standard mapping, labelled "${q.label}"`);
       }
+
+      /**
+       * 🔴 TWO VISIBLE EXITS, AND NOTHING ASSERTED THIS, WHICH IS HOW ONE OF
+       * THEM VANISHED. The tablet's `Hold to leave` was taken out in favour of
+       * the controller badge, the suite stayed green because it only ever
+       * graded the badge, and the next person in a headset could not get out.
+       * REPORTED in those words.
+       *
+       * ⚠️ IT GRADES THE FIELD THAT ACTUALLY ENDS THE SESSION, not the label.
+       * `xr-hands.mjs` drains the tablet's fired controls and acts only on the
+       * ones carrying `leaves`, so a button that draws, fills its ring and
+       * reports itself is still inert without it. One missing field is the
+       * whole difference and it cannot be seen by looking.
+       */
+      const exits = (tablet.controls || []).filter((c) => c.leaves);
+      d.assert('there are two ways out you can SEE, not one',
+        exits.length === 1 && /leave/i.test(exits[0].label) && !!q?.label,
+        exits.length
+          ? `the tablet's "${exits[0].label}" and the controller's "${q?.label}"`
+          : 'the tablet has no exit on it, so the controller badge is the only one');
 
       tablet.set(c0.key, was); tablet.draw();
 
@@ -1982,7 +2053,7 @@
     // logs already follow.
     ship(`BUILD ${BUILD} · scene`);
     ship(`ua ${navigator.userAgent}`);
-    ship(`navigator.xr native: ${nx.native} — ${nx.why}`);
+    ship(`navigator.xr native: ${nx.native} · ${nx.why}`);
     ship(`renderer ${rendererName}`);
     ship(`window ${innerWidth}x${innerHeight} css · dpr ${devicePixelRatio}`);
     ship(`headset layout applied: ${document.documentElement.classList.contains('xr')}`);
@@ -1994,7 +2065,7 @@
     // first time an assert was added, and go stale silently.
     const origAssert = d.assert;
     d.assert = (label, pass, detail) => { ship(`${pass ? 'ok  ' : 'FAIL'} ${label}${detail ? '  ' + detail : ''}`); return origAssert(label, pass, detail); };
-    d.log('reporting to pub.positron.studio — read it with /logs?format=text');
+    d.log('reporting to pub.positron.studio · read it with /logs?format=text');
   }
   maybeReport();
 
@@ -2007,8 +2078,8 @@
   // is why a TypeError thrown while entering an immersive session produced no
   // line at all — the net that was supposed to catch a silent failure was
   // itself waiting on a timer that had stopped being generous.
-  addEventListener('error', (e) => shipNow(`FAIL uncaught — ${e.message} @ ${(e.filename || '').split('/').pop()}:${e.lineno}`));
-  addEventListener('unhandledrejection', (e) => shipNow(`FAIL unhandled rejection — ${e.reason?.message || e.reason}`));
+  addEventListener('error', (e) => shipNow(`FAIL uncaught: ${e.message} @ ${(e.filename || '').split('/').pop()}:${e.lineno}`));
+  addEventListener('unhandledrejection', (e) => shipNow(`FAIL unhandled rejection: ${e.reason?.message || e.reason}`));
   for (const id of ['enter', 'ar', 'full']) {
     const b = d.button(id);
     if (b) b.addEventListener('click', () => ship?.(`pressed "${b.textContent}"`), true);
@@ -2018,9 +2089,9 @@
   try {
     if (sessionStorage.getItem('blocks-resume')) {
       sessionStorage.removeItem('blocks-resume');
-      d.log('updated — press "Run in AR" to go back in', 'ok');
+      d.log('updated · press "Run in AR" to go back in', 'ok');
       const b = d.button('ar') || d.button('enter');
-      if (b) { b.classList.add('pos-pri'); b.textContent = '↩ Back in — update taken'; }
+      if (b) { b.classList.add('pos-pri'); b.textContent = '↩ Back in · update taken'; }
     }
   } catch { /* private mode */ }
   /**
@@ -2060,6 +2131,16 @@
   // A room to stand in before anything is pressed, so the stage is never empty.
   await roll(424242);
   await selfCheck();
+  // 🔴 AND BACK TO THE ROOM THE PAGE OPENED WITH. The note above `selfCheck`
+  // claimed a visitor is left standing where they arrived, and it was wrong:
+  // `again` does end on the seed it started from, but the `roll` check ahead of
+  // it had already moved off 424242 onto a random one. So the room a visitor
+  // was left in was the third of three they had watched slide past. This line
+  // is what makes that note true.
+  await roll(424242);
+  // The checks are done and the room has stopped changing, so it can be looked
+  // at. One appearance, faded rather than cut.
+  stage.classList.remove('warming');
   d.ready();
 
   // ⚠️ ARRIVED FROM THE INDEX WITH `?xr=1` — put the one press that matters
