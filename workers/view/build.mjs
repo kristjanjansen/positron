@@ -331,7 +331,15 @@ function demoFiles() {
   // recover from and the build had no reason to mention. `dust` carries two
   // 1965 excerpts; the allowlist is still an allowlist, because this directory
   // is the wall that keeps `enumerate, don't list` away from the repo root.
-  const OK = new Set(['.html', '.mjs', '.js', '.css', '.json',
+  // 🔴 `.webmanifest` IS ON THIS LIST BECAUSE LEAVING IT OFF SHIPPED A 404 TO
+  // PRODUCTION. `/items/` renamed `manifest.json` to `manifest.webmanifest` to
+  // get the spec content type, the build silently declined to copy it, and the
+  // deploy went out with `<link rel="manifest">` pointing at nothing — the one
+  // file an iPhone reads to decide whether a page may be installed at all.
+  // ⚠️ AN ALLOWLIST FAILS SILENTLY BY DESIGN, which is the point of it; what
+  // was missing is that nothing ASKED whether every local URL in a page has a
+  // file behind it. `checkImports()` does that for modules only.
+  const OK = new Set(['.html', '.mjs', '.js', '.css', '.json', '.webmanifest',
                       '.m4a', '.mp3', '.opus', '.ogg', '.wav', '.webm',
                       '.png', '.jpg', '.jpeg', '.svg', '.webp']);
   for (const d of DEMO_MANIFEST) {
