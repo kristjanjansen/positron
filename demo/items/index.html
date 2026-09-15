@@ -872,14 +872,32 @@
         sameAsSent(sent, all.find((x) => x.id === id)),
         `${sent.title.length} characters of title · ${sent.summary.length} of body`);
 
-      // 2 — it is live, and the phones were told.
+      /**
+       * 2 — it is live. And whether the phones were told depends on WHICH ROOM,
+       * which is the honest shape of it.
+       *
+       * 🔴 A HARNESS ROOM NO LONGER REACHES A PHONE, AND THAT IS A FIX RATHER
+       * THAN A LIMITATION. Rooms are separate objects and everything was per
+       * room except the loudspeaker: one `FCM_TOPIC`, so every run of this suite
+       * sent two real notifications to real subscribers. REPORTED from the other
+       * end — *"why do I get notifications from positron?"*. `workers/items`
+       * announces only from the room named `items` now.
+       *
+       * ⚠️ SO THE CLAIM SPLITS IN TWO AND BOTH HALVES ARE CHECKED. Reaching its
+       * moment unprompted is what this page is about and is true in every room.
+       * Being announced is true in one, and `announced_at` is the field that
+       * says which — it is NOT stamped when nothing went out, because a stamp
+       * meaning "the announce step ran" is a quieter and worse lie than none.
+       */
       const live = await until(id, isLive, 12000);
       const told = live ? await until(id, wasTold, 9000) : null;
-      d.assert('publishing now needs no time to be named, and still goes out the same way',
-        !!told,
+      const real = ROOM === 'items';
+      d.assert('publishing now needs no time to be named, and goes live unprompted',
+        !!live && (!real || !!told),
         !live ? 'never went live'
           : told ? `live ${(performance.now() - t0).toFixed(0)} ms after the press, notification and all`
-                 : 'live, but nothing was announced within 9 s of it');
+          : `live ${(performance.now() - t0).toFixed(0)} ms after the press; room ${ROOM} is not `
+            + 'the announcing room, so nothing was sent to a phone');
 
       // 3 — THE CLAIM. A moment named when the item was written, kept by the
       // store, arriving with nothing here asking for it. Asked of the store's
@@ -898,9 +916,17 @@
       // see without anything having gone out: the stamp has to be the SAME one
       // the publish left, so a second announcement would show up as a different
       // number.
+      // ⚠️ COMPARED AGAINST THE ROW AS IT WENT LIVE, not against a stamp that
+      // may never exist. In the announcing room both are the same number and a
+      // second announcement would show as a different one; in a side room both
+      // are null, and `null === null` is the same claim — nothing went out on
+      // either wake.
       d.assert('and that second wake goes out to nobody — one notification, not two',
-        !!put && !!told && put.announced_at === told.announced_at,
-        put && told ? `still stamped ${clock(told.announced_at)}` : 'nothing to compare');
+        !!put && !!live && put.announced_at === live.announced_at,
+        put && live
+          ? (put.announced_at ? `still stamped ${clock(put.announced_at)}`
+                              : 'nothing was announced on either wake, which is this room\u2019s rule')
+          : 'nothing to compare');
 
       // 5 — the store's own record of how close both wakes were. Read across
       // the boundary, never computed here: a number this page worked out from

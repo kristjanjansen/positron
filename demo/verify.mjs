@@ -418,7 +418,20 @@ for (const t of targets) {
   // client its own Raspberry Pi: there is one JACK graph and one instrument, so
   // board-bound demos still have to take turns. Rooms were never that problem;
   // conflating the two is what made them look like one.
-  const own = t.room === 'fixed' ? '' : `room=v-${t.name}-${Math.random().toString(36).slice(2, 8)}`;
+  /**
+   * A private room per run, so two runs cannot see each other's rows and
+   * neither can see the real page's.
+   *
+   * ⚠️ `<demo>-test-<hash>`, NOT `v-<demo>-<hash>`. The `v` stood for verify and
+   * was obvious to nobody — asked, in those words: *"What is v- prefix?"*. A
+   * room name is read by somebody looking at a store wondering what all these
+   * rows are, and `items-test-4f2a` answers that where `v-items-4f2a` needs a
+   * footnote. It also cannot be mistaken for the real room by a rule that has to
+   * tell them apart: `workers/items` will only announce from the room named
+   * `items`, because one FCM topic means one room may use it — a harness room
+   * that reached real phones is exactly how this came up.
+   */
+  const own = t.room === 'fixed' ? '' : `room=${t.name}-test-${Math.random().toString(36).slice(2, 8)}`;
   // 🔴 THE HARNESS SAYS SO, SO A PAGE CAN KEEP ITS DESTRUCTIVE CHECKS OUT OF A
   // VISIT. `radio1965` proves a station button works by pressing another station
   // and pressing back, and proves the transport stops by stopping it — on the
