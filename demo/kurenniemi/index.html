@@ -16,7 +16,14 @@
   /* Taller than the component's default: this is a list of 334 records and the
      page has nothing else on it, so the box is the page. `--tbl-h` is the
      component's own knob rather than an override of its rule. */
-  .pos-tbl { --tbl-h: 620px; }
+  /* 🔴 AS TALL AS THE SCREEN, NOT A NUMBER I PICKED. 620 px showed
+     twenty-three of 334 records on a laptop and rather fewer on anything
+     smaller — REPORTED as *"page should fit more"*. What is above the table is
+     the back link, the name and four lines of prose; `dvh` rather than `vh`
+     because a phone's address bar comes and goes and `vh` measures the taller
+     state, which puts the last rows under it. The floor keeps it a table rather
+     than a slot on a short window. */
+  .pos-tbl { --tbl-h: max(420px, calc(100dvh - 250px)); }
   /* 🔴 WIDER THAN THE PROSE, AND THE PAGE SAYS WHY RATHER THAN JUST DOING IT.
      The shell caps a page at 720 px, which is right for a paragraph — 62
      characters is a readable line and CLAUDE.md's one vertical rhythm assumes
