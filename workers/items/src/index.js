@@ -52,6 +52,19 @@ export class Items {
       at INTEGER PRIMARY KEY, scheduled INTEGER NOT NULL, late_ms INTEGER NOT NULL,
       did INTEGER NOT NULL
     )`);
+    /**
+     * 🔴 THE OBJECT HAS TO REMEMBER WHICH ROOM IT IS, because the ALARM has no
+     * request to read it from. `idFromName(room)` gives each room its own
+     * object and then tells the object nothing about its own name — so the one
+     * place that decides whether an item may reach a phone is the one place
+     * with no access to the answer. Written once on the first request that
+     * names it, and read back from storage on a cold wake.
+     */
+    this.room = null;
+    ctx.blockConcurrencyWhile(async () => {
+      this.room = (await ctx.storage.get('room')) ?? null;
+    });
+
     // 🔴 NOTHING SCHEDULES AN ALARM HERE, AND THAT IS DELIBERATE. The
     // constructor runs BEFORE the handler on a cold wake, so a `setAlarm()` in
     // it overwrites the alarm that is about to fire — Cloudflare documents the
@@ -108,8 +121,14 @@ export class Items {
         this.sql.exec(`UPDATE items SET status = 'new' WHERE id = ?`, row.id);
         did++;
         try {
-          await announce(this.env, row);
-          this.sql.exec(`UPDATE items SET announced_at = ? WHERE id = ?`, Date.now(), row.id);
+          // ⚠️ THE STAMP IS ONLY SET WHEN SOMETHING ACTUALLY WENT OUT. A side
+          // room reaches its moment and goes live exactly as the real one does;
+          // what it does not do is reach a phone, and `announced_at` is the only
+          // field that says so. Stamping it anyway would make the column mean
+          // "the announce step ran", which is a quieter and worse lie.
+          if (await announce(this.env, row, this.room)) {
+            this.sql.exec(`UPDATE items SET announced_at = ? WHERE id = ?`, Date.now(), row.id);
+          }
         } catch (e) {
           console.log(`announce failed for ${row.id}: ${e.message}`);
         }
@@ -137,6 +156,16 @@ export class Items {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^\/+/, '');
     if (request.method === 'OPTIONS') return json({});
+
+    // ⚠️ RECORDED, NOT TRUSTED PER REQUEST. The alarm fires with no request at
+    // all, so the name has to be on the object before it is needed — and it is
+    // written once rather than on every call, so a later request carrying a
+    // different `room` for the same object cannot talk it into announcing.
+    const named = url.searchParams.get('room') || 'default';
+    if (this.room === null) {
+      this.room = named;
+      await this.ctx.storage.put('room', named);
+    }
 
     if (path === 'items' && request.method === 'POST') {
       const body = await request.json().catch(() => null);
@@ -319,7 +348,29 @@ async function accessToken(sa) {
   return cachedToken.value;
 }
 
-async function announce(env, row) {
+/**
+ * 🔴 ONE TOPIC, SO ONE ROOM MAY USE IT. Rooms are separate Durable Objects —
+ * `idFromName(room)` — and this was the one thing that is NOT per room: every
+ * room's publishes went to the single `FCM_TOPIC`, which is the topic real
+ * phones are subscribed to.
+ *
+ * `demo/verify.mjs` gives every run its own room, `v-items-<random>`, and
+ * publishes two items into it on every pass. So the suite sent a real
+ * notification to a real phone twice per run, dozens of times in an afternoon —
+ * REPORTED, from the other end, as *"why do I get notifications from
+ * positron?"*. The harness was correct, the page was correct, the worker was
+ * correct, and the thing nobody owned was that a side room shares one loudspeaker
+ * with the real one.
+ *
+ * ⚠️ AN ALLOWLIST OF ONE, NOT A PREFIX TEST. Refusing rooms that look like
+ * `v-…` would let the next room that is not the real one through by default,
+ * and the default has to be silence: a room has to be NAMED here to be able to
+ * reach somebody's phone.
+ */
+const ANNOUNCING_ROOM = 'items';
+
+async function announce(env, row, room) {
+  if (room !== ANNOUNCING_ROOM) return false;
   if (!env.FIREBASE_SA) throw new Error('no FIREBASE_SA secret — nothing to announce with');
   if (!env.FCM_TOPIC) throw new Error('no FCM_TOPIC configured');
   const sa = JSON.parse(env.FIREBASE_SA);
