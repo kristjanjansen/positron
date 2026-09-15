@@ -53,11 +53,43 @@ export function createChoice({ label, options, at = 0, onPick } = {}) {
     if (!quiet) onPick?.(options[chosen][1], options[chosen][0], chosen);
   }
 
+  /**
+   * Mark one option as PRESSED BUT NOT YET ARRIVED, or `null` for none.
+   *
+   * 🔴 A CONTROL WHOSE EFFECT IS SECONDS AWAY LOOKS BROKEN WITHOUT THIS, and
+   * `/radio1965/` is where it was reported: a speed button lights the moment it
+   * is pressed and the sound takes about a second to get there — 600 ms of
+   * already-scheduled audio plus the glide — so the first thing a listener does
+   * is press it again. REPORTED as *"can we track when 0.5 etc happens and
+   * animate the radiobutton until then?"*, which is the right instinct: the
+   * wait is real and cannot be removed, so show the end of it.
+   *
+   * ⚠️ IT IS A SEPARATE CHANNEL FROM `aria-pressed`, deliberately. Chosen and
+   * arrived are two different facts — the button IS the armed one throughout —
+   * and collapsing them would make a pressed button appear unpressed while the
+   * sound catches up, which is a worse lie than the one being fixed.
+   *
+   * ⚠️ IT SETS `data-busy`, WHICH IS THE SHELL'S OWN ATTRIBUTE, on purpose. Every
+   * other button in this project says "working on it" with one sweep across its
+   * face; this had its own opacity pulse for about an hour and was REPORTED as a
+   * flicker. One idea, one picture — and reusing it means the reduced-motion
+   * fallback, the `cursor: progress` and the colours all come along without a
+   * second copy to drift. `shell.mjs` only ever sets `data-busy` on
+   * `.pos-controls` buttons, so nothing collides.
+   */
+  function pending(i) {
+    buttons.forEach((b, k) => {
+      if (i != null && k === i) b.dataset.busy = '1';
+      else delete b.dataset.busy;
+    });
+  }
+
   return {
     el: wrap, buttons,
     get: () => chosen,
     value: () => options[chosen][1],
     set,
+    pending,
     disabled: (yes) => buttons.forEach((b) => { b.disabled = !!yes; }),
   };
 }

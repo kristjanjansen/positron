@@ -28,7 +28,21 @@ import { el } from './shell.mjs';
  * for must not move at different speeds — a page that ramps its engine over a
  * quarter second while the knob snaps is two controls wearing one label.
  */
-export const GLIDE_MS = 250;
+// 🔴 SLOW, AND SLOWER THAN FEELS RIGHT WHEN YOU WRITE IT. Asked for: "way
+// slower and humanlike easing". 250 ms is the reflex-fast default every UI
+// library ships and it reads as a SNAP with a blur on it — the knob is at the
+// new value before the eye has found it, so what you perceive is a jump, and
+// the animation has bought nothing. 900 ms is long enough to be FOLLOWED: the
+// eye tracks the knob across the lane, which is the only thing a moving control
+// can tell you that a jumping one cannot — WHERE IT CAME FROM.
+//
+// ⚠️ THIS IS A DRAWING, NOT THE VALUE. The number is committed immediately and
+// everything downstream — the sound, the readout, `aria-valuenow` — already
+// uses it; only the handle is still travelling. So a longer glide cannot make
+// anything late, which is the property that makes 900 ms affordable at all.
+// ⚠️ And `prefers-reduced-motion` skips it entirely, which matters more the
+// longer it gets.
+export const GLIDE_MS = 900;
 
 const reducedMotion = () =>
   globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
@@ -60,7 +74,13 @@ export function glide(onFrame, { ms = GLIDE_MS } = {}) {
   const step = () => {
     if (done) return;
     const t = Math.min(1, (performance.now() - t0) / ms);
-    onFrame(t * t * (3 - 2 * t));
+    // HUMANLIKE, WHICH IS NOT SYMMETRIC. Smoothstep (`t²(3−2t)`) leaves and
+    // arrives at rest with the same shape at both ends, and over 900 ms that
+    // reads as machinery: a hand does not accelerate as gently as it decelerates.
+    // This is the standard ease-out-quint — off quickly, then a long settle —
+    // which is what a thrown-then-caught object does and what every physical
+    // control you have ever used does.
+    onFrame(1 - Math.pow(1 - t, 5));
     if (t >= 1) { stop(); return; }
     raf = requestAnimationFrame(step);
   };
@@ -112,26 +132,66 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
  * @param {(v:number)=>void} [o.onChange]  on release, and on a keyboard step
  * @returns {{el:HTMLElement, get:()=>number,
  *   set:(v:number, opt?:boolean|{quiet?:boolean, glideMs?:number})=>number,
+ *   label:(text:string)=>void,
  *   disabled:(v:boolean)=>void}}
  */
-export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
-                               digits, onInput, onChange } = {}) {
-  const span = max - min;
+/**
+ * @param [o.warp] `'exp'` for a logarithmic lane. Default linear, unchanged.
+ *
+ * 🔴 WHY A LINEAR LANE HIDES THE INTERESTING HALF OF A RANGE, MEASURED.
+ * `/radio1965/` granulates a radio station and every setting sounded like the
+ * same wash. The upstream norns script this engine came from declares grain
+ * rate `0.1-100 Hz EXPONENTIAL` and grain length `0.002-8 beats EXPONENTIAL`;
+ * this page exposed `0.5-40` and `0.01-1` LINEAR. So the top of the engine was
+ * unreachable, and worse, half the travel sat between 0.5 s and 1 s where
+ * nothing audibly changes — while 2 ms to 50 ms, which is where a granulator
+ * stops being a delay and starts being a texture, was squeezed into the first
+ * two percent of the lane.
+ *
+ * A perceptual quantity wants a perceptual lane: each step of the hand is a
+ * constant RATIO rather than a constant amount, which is how pitch, level and
+ * time are actually heard.
+ *
+ * ⚠️ `min` MUST BE ABOVE ZERO — a ratio lane cannot reach zero, by construction.
+ * It throws rather than quietly producing NaN for every position, because a
+ * lane whose knob is at `NaN%` renders at the far left and looks like a slider
+ * sitting at its minimum.
+ */
+export function createSlider({ label, aria, min = 0, max = 1, step, value, unit = '',
+                               digits, warp, onInput, onChange } = {}) {
+  let span = max - min;
+  let exp = warp === 'exp';
+  if (exp && !(min > 0)) throw new Error('slider: warp "exp" needs min > 0');
   const stp = step ?? span / 100;
-  const dp = digits ?? Math.max(0, Math.min(4, String(stp).split('.')[1]?.length ?? 0));
+  let dp = digits ?? Math.max(0, Math.min(4, String(stp).split('.')[1]?.length ?? 0));
+  // position 0..1 -> value, and back. The linear pair is what every existing
+  // caller already had; nothing about it changes.
+  let ratio = exp ? Math.log(max / min) : 0;
+  const fromT = (t) => (exp ? min * Math.exp(ratio * t) : min + t * span);
+  const toT = (x) => (exp ? Math.log(x / min) / ratio : (span ? (x - min) / span : 0));
   let v = clamp(value ?? min);
 
   function clamp(x) {
-    const snapped = Math.round((x - min) / stp) * stp + min;
+    // ⚠️ AN EXPONENTIAL LANE IS NOT SNAPPED TO A FIXED STEP. A step of 0.01
+    // across 0.002-4 would make the bottom two thirds of the lane unreachable —
+    // every value below 0.01 snapping to the same place. It rounds to the
+    // slider's decimals instead, so resolution follows the value.
+    const snapped = exp ? Number(x.toFixed(dp)) : Math.round((x - min) / stp) * stp + min;
     return Math.max(min, Math.min(max, Number(snapped.toFixed(6))));
   }
 
   const wrap = el('span', 'sld');
+  const head = el('span', 'sld-head');
   const name = el('span', 'sld-l', label || '');
   const lane = el('span', 'sld-lane', null, {
     // A real slider to anything that asks: a screen reader, and a keyboard.
     role: 'slider', tabindex: '0',
-    'aria-label': label || 'value',
+    // ⚠️ `aria` FOR A SLIDER WITH NO VISIBLE LABEL. `grains`' blend sits
+    // between two labelled ends — `this page` / `the board` — so a third word
+    // between them is noise on screen and the only thing a screen reader has.
+    // The two are different audiences with different needs, and collapsing them
+    // means one of the two always loses.
+    'aria-label': aria || label || 'value',
     'aria-valuemin': String(min), 'aria-valuemax': String(max),
   });
   const knob = el('span', 'sld-knob');
@@ -146,7 +206,23 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
   const widest = Math.max(...[min, max].map((v) => `${v.toFixed(dp)}${unit ? ' ' + unit : ''}`.length));
   read.style.minWidth = `${widest}ch`;
   lane.append(knob);
-  wrap.append(name, lane, read);
+  // 🔴 THE NUMBER GOES UNDER ITS OWN LABEL, NOT ON THE FAR SIDE OF THE LANE.
+  // Asked for, and it fixes a spacing complaint that was never about spacing.
+  // A slider used to be THREE grid columns — label, lane, number — so a row of
+  // two sliders was six evenly-spaced things and the eye could not tell where
+  // one slider ended. Worse, the third column is as wide as the widest value
+  // that slider can ever show, so the gap before the NEXT slider's label was a
+  // different width on every row. PHOTOGRAPHED on /draw/: `SAMPLE EVERY` sat
+  // tight against its lane while `100 ms` and `SMOOTHING` had a visibly larger
+  // gap between them — the same `column-gap`, three different-looking spaces,
+  // because one of the columns was sized by its content.
+  //
+  // Stacked, a slider is TWO columns and the label column is as wide as the
+  // wider of its two lines. The number is beside the word it belongs to, which
+  // is this project's rule for every other figure it prints (a lane's numbers
+  // go in that lane's gutter, never in a table somewhere else).
+  head.append(name, read);
+  wrap.append(head, lane);
 
   const show = (x) => `${x.toFixed(dp)}${unit ? ' ' + unit : ''}`;
   // Where the handle is DRAWN, which is `v` except while a glide is running.
@@ -163,7 +239,7 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
    */
   function paint(at = v) {
     shown = at;
-    const t = span ? (at - min) / span : 0;
+    const t = Math.max(0, Math.min(1, toT(at)));
     // Percentage of the TRAVEL, not of the lane: `calc` subtracts the handle's
     // own width so the two ends land flush. See the note at the top.
     knob.style.left = `calc(${(t * 100).toFixed(3)}% - ${(t * 100).toFixed(3)} * var(--sld-knob) / 100)`;
@@ -224,7 +300,7 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
     // by half a handle at each end — otherwise the value only reaches its
     // extremes when the pointer leaves the lane entirely.
     const x = Math.max(0, Math.min(travel, clientX - r.left - kw / 2));
-    return min + (x / travel) * span;
+    return fromT(x / travel);
   };
 
   let dragging = false;
@@ -250,10 +326,19 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
   // ⚠️ A KEYBOARD PATH, and not only for accessibility: it is the one route a
   // harness can drive without synthesising pointer events.
   lane.addEventListener('keydown', (e) => {
+    // ⚠️ ON AN EXPONENTIAL LANE THE KEYS MOVE BY POSITION, NOT BY VALUE. A fixed
+    // `+0.01` is a huge jump at the bottom of 0.002-4 and invisible at the top;
+    // one percent of the LANE is the same gesture everywhere, which is the whole
+    // reason the lane is warped.
     const big = span / 10;
-    const d = { ArrowLeft: -stp, ArrowDown: -stp, ArrowRight: stp, ArrowUp: stp,
-                PageDown: -big, PageUp: big }[e.key];
-    if (d !== undefined) { set(v + d); e.preventDefault(); return; }
+    const step1 = exp ? 0.01 : stp;
+    const stepBig = exp ? 0.1 : big;
+    const d = { ArrowLeft: -step1, ArrowDown: -step1, ArrowRight: step1, ArrowUp: step1,
+                PageDown: -stepBig, PageUp: stepBig }[e.key];
+    if (d !== undefined) {
+      set(exp ? fromT(Math.max(0, Math.min(1, toT(v) + d))) : v + d);
+      e.preventDefault(); return;
+    }
     if (e.key === 'Home') { set(min); e.preventDefault(); }
     if (e.key === 'End') { set(max); e.preventDefault(); }
   });
@@ -263,6 +348,56 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
     el: wrap,
     get: () => v,
     set,
+    /**
+     * Re-scale this slider in place.
+     *
+     * 🔴 A CONTROL WHOSE MEANING CHANGES NEEDS ITS UNITS TO CHANGE WITH IT, and
+     * without this the page could only relabel the word. `/radio1965/`'s read
+     * head is a PLACE in one mode, a SPEED in another and a LAG in a third —
+     * `Engine_Pappus.sc:719` selects between them — so one 0..1 lane showed
+     * `0.30` for what was actually **-0.10x**, a number that is not wrong so
+     * much as meaningless. Relabelling alone would have left the units lying.
+     *
+     * ⚠️ The VALUE is re-derived by the caller, not converted here: only the
+     * caller knows what the old number meant.
+     */
+    setRange({ min: lo, max: hi, unit: u, digits: dg, warp: w } = {}) {
+      if (lo !== undefined) min = lo;
+      if (hi !== undefined) max = hi;
+      if (u !== undefined) unit = u;
+      if (dg !== undefined) dp = dg;
+      if (w !== undefined) { exp = w === 'exp'; ratio = exp ? Math.log(max / min) : 0; }
+      span = max - min;
+      lane.setAttribute('aria-valuemin', String(min));
+      lane.setAttribute('aria-valuemax', String(max));
+      read.style.minWidth = `${Math.max(...[min, max]
+        .map((x) => `${x.toFixed(dp)}${unit ? ' ' + unit : ''}`.length))}ch`;
+      v = clamp(v);
+      paint();
+    },
+    /**
+     * Rename the control.
+     *
+     * 🔴 FOR A CONTROL WHOSE MEANING A PRESET DECIDES, NOT FOR DECORATION.
+     * `/radio1965/`'s read-head slider drives `mscan` in one engine mode and
+     * `mdelay` in another, and in a third `mscan` is a SPEED rather than a
+     * place — so one fixed word is wrong for two of the three, which is this
+     * project's named hazard: a control that looks like it does one thing and
+     * does another. The page had a comment saying exactly that and no way to
+     * act on it.
+     *
+     * ⚠️ IT CHANGES AT HUMAN PACE OR NOT AT ALL. A label that rewrites itself
+     * on a clock is the caption that reflowed under `grain-scope` (CLAUDE.md);
+     * this one moves when somebody chooses a preset, which is a thing that
+     * happened rather than a thing that ticks.
+     *
+     * ⚠️ AND IT CAN CHANGE THE LABEL COLUMN'S WIDTH. `.sld-group` sizes that
+     * column from its widest label, and a page sharing one column across two
+     * groups measures it itself — so a caller that renames must re-measure, or
+     * every lane on the page shifts sideways on a preset press. The `aria`
+     * label is left alone: it was given for a reason when it differs.
+     */
+    label: (text) => { name.textContent = text ?? ''; },
     disabled: (yes) => {
       if (yes) { lane.setAttribute('aria-disabled', 'true'); lane.removeAttribute('tabindex'); }
       else { lane.removeAttribute('aria-disabled'); lane.setAttribute('tabindex', '0'); }

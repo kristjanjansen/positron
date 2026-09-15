@@ -484,6 +484,21 @@ registerRenderer('ticks', (ctx, L, C) => {
   const y0 = L.y, h = L.height;
   ctx.save();
   ctx.globalAlpha = style.alpha ?? 0.95;
+  // 🔴 `marks: 'char'` INVERTS THE LINE AND THE LETTER. In the default lane a
+  // tick is the mark and a glyph is drawn ON it where the zoom has left room;
+  // here THE CHARACTER IS THE MARK and no line is drawn at all, with a middot
+  // standing in wherever a character cannot be shown. Asked for on `typist`,
+  // whose subject is the letters: a comb of ticks with letters stuck on it is
+  // two marks per edit saying one thing.
+  //
+  // ⚠️ IT IS OPT-IN, AND THAT IS NOT TIMIDITY — it is `demo/strip`. That page's
+  // `glyphOf` returns `·` for an exact date, `?` for an unknown one and `~` for
+  // a vague one, so a middot ALREADY MEANS SOMETHING THERE. Making the crowded
+  // fallback a middot for every lane would redraw its `?` marks as `·` — a page
+  // whose whole subject is uncertainty, quietly reporting certainty. A flag on
+  // the lane costs one word; that costs the reader a false claim.
+  const charMarks = L.marks === 'char' && !!L.glyphOf;
+  const glyphs = [];
   for (const r of C.rows) {
     const px = Math.round(x(r.at)) + 0.5;
     const fired = L.latch && r.at <= C.pos;
@@ -491,8 +506,10 @@ registerRenderer('ticks', (ctx, L, C) => {
     // as `colorOf` since the start; ticks only ever offered one colour for the
     // whole latched half, which cannot say WHICH mark went wrong. Falsy falls
     // straight back to the two-colour behaviour, so no existing lane changes.
-    ctx.strokeStyle = (L.colorOfRow && L.colorOfRow(r, fired))
+    const col = (L.colorOfRow && L.colorOfRow(r, fired))
       || (fired ? (L.firedColor || '#7fd18c') : style.color);
+    if (charMarks) { glyphs.push([px, r, col]); continue; }   // the letter IS the mark
+    ctx.strokeStyle = col;
     // The SECOND per-row channel. One lane, two facts: colour for the value,
     // width for a property of the row itself. Cheaper and clearer than a second
     // lane, which needs a label, occupies height forever, and reads as a
@@ -500,7 +517,81 @@ registerRenderer('ticks', (ctx, L, C) => {
     ctx.lineWidth = (L.widthOfRow && L.widthOfRow(r, fired)) || style.width || 1.4;
     if (style.dash) ctx.setLineDash(style.dash); else ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(px, y0 + 2); ctx.lineTo(px, y0 + h - 2); ctx.stroke();
+    if (L.glyphOf) glyphs.push([px, r, col]);
   }
+  // WHAT THE MARK WAS, DRAWN ON THE MARK — but only where the zoom has made
+  // room for it. `glyphOf(row)` returns a character or two (the letter that was
+  // typed, the key that was pressed); at a zoom where the ticks are 2 px apart
+  // there is nowhere to put it, and drawing it anyway turns a legible comb of
+  // marks into a smear that is neither a picture nor a word.
+  //
+  // 🔴 SO THE ZOOM IS THE CONTROL. Zoom in and the marks become letters; zoom
+  // out and they go back to being marks.
+  //
+  // ⚠️ A glyph is skipped on its NEIGHBOUR's spacing, not on its own width
+  // alone, and the test is against BOTH sides — one-sided, a run of letters
+  // would draw the first of every crowded pair and drop the second, which reads
+  // as "these particular keys are special" rather than "there is no room here".
+  // ⚠️ And the count is published (`L.glyphState`) rather than left implicit:
+  // a page that says "12 of 48 letters fit" tells the reader the other 36 exist
+  // and that zooming will find them. Silence there reads as 12 letters typed.
+  if (glyphs.length) {
+    ctx.font = L.glyphFont || '10px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 1;
+    const yc = y0 + h / 2, pad = 2;
+    let drawn = 0, dotted = 0;
+    // 🔴 WHAT THE MIDDOT MEANS, WRITTEN DOWN. It inherits EXACTLY the colour the
+    // tick would have had — `colorOfRow`, else the latch colour, else the lane's
+    // — so the dot says nothing about the lane that the row it sits in was not
+    // already saying. What the DOT itself says is "no character is shown here",
+    // and its strength says which of the two reasons:
+    //   full    this row HAS no character — a space, a line break, a key that
+    //           moved the cursor and put nothing in. True at every zoom, a
+    //           property of the row, and zooming will not change it.
+    //   faded   there IS a character and the neighbouring marks have left no
+    //           room for it. A property of the VIEW: zoom in and it appears.
+    // Two readings of one fact, told apart by density rather than by hue,
+    // because hue is spoken for.
+    const dot = (px, col, faded) => {
+      ctx.globalAlpha = faded ? 0.45 : 0.95;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(px, yc, 1.6, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    };
+    for (let i = 0; i < glyphs.length; i++) {
+      const [px, r, col] = glyphs[i];
+      const g = L.glyphOf(r);
+      // ⚠️ The default lane asks `colorOfRow(r, FALSE)` for its glyph — the
+      // unfired ink, because the tick underneath is already carrying the latch.
+      // Under `marks: 'char'` there is no tick, so the character has to carry
+      // it and takes the same `col` the tick would have had.
+      const ink = L.glyphColor
+        || (charMarks ? col : ((L.colorOfRow && L.colorOfRow(r, false)) || style.color));
+      if (!g) { if (charMarks) { dot(px, ink, false); dotted++; } continue; }
+      const w = ctx.measureText(g).width;
+      const need = w / 2 + 2;
+      const left = i > 0 ? px - glyphs[i - 1][0] : Infinity;
+      const right = i < glyphs.length - 1 ? glyphs[i + 1][0] - px : Infinity;
+      if (Math.min(left, right) < need * 2) {
+        if (charMarks) { dot(px, ink, true); dotted++; }
+        continue;
+      }
+      // a backing so the tick does not strike through the letter; the tick
+      // stays visible above and below it, so the mark is still a mark.
+      // Under `marks: 'char'` there is no tick to hide, so there is nothing to
+      // back out — a plate there would only put a box round every letter.
+      if (!charMarks) {
+        ctx.fillStyle = C.theme && C.theme.lane ? C.theme.lane : '#151a24';
+        ctx.fillRect(px - w / 2 - pad, yc - 6, w + pad * 2, 12);
+      }
+      ctx.fillStyle = ink;
+      ctx.fillText(g, px, yc + 3.5);
+      drawn++;
+    }
+    L.glyphState = { had: glyphs.length, drawn, dotted };
+    ctx.textAlign = 'start';
+  } else if (L.glyphOf) L.glyphState = { had: 0, drawn: 0, dotted: 0 };
   ctx.restore();
 });
 
@@ -782,9 +873,29 @@ registerRenderer('continuous', (ctx, L, C) => {
     try { const p = C.deck.sampleAt(L.kind, t, { evidence: C.evidence }); const v = val(p); return Number.isFinite(v) ? { x: x(t), y: y(v) } : null; }
     catch { return null; }
   };
-  const a = edge(C.t0); if (a) pts.push(a);
+  // 🔴 THE LINE STOPS WHERE THE DATA STOPS. It used to run to both edges of the
+  // visible window, because `deck.sampleAt` HOLDS the first and last knot
+  // outside them — so a two-second gesture on an eight-second line drew six
+  // seconds of perfectly flat blue at each end. Reported from a screenshot, and
+  // the objection is exact: that flat run is not a measurement of anything. It
+  // is the interpolator's boundary rule, drawn as if it were a signal, and on a
+  // page whose subject is "how much of this line was never recorded" it is the
+  // worst possible thing to draw.
+  //
+  // ⚠️ `edge` STAYS, for the case it was written for: a window scrolled INTO
+  // the middle of a long recording, where the first visible sample is genuinely
+  // preceded by data. So the edges are only asked for when the rows actually
+  // extend past them.
+  //
+  // `L.span` overrides it where a lane knows its own extent better than its
+  // rows do.
+  const first = rows.length ? rows[0].at : null;
+  const last = rows.length ? rows[rows.length - 1].at : null;
+  const from = L.span?.[0] ?? first;
+  const to = L.span?.[1] ?? last;
+  if (from !== null && from < C.t0) { const a = edge(C.t0); if (a) pts.push(a); }
   for (const r of rows) { const v = val(r.payload); if (Number.isFinite(v)) pts.push({ x: x(r.at), y: y(v) }); }
-  const b = edge(C.t1); if (b) pts.push(b);
+  if (to !== null && to > C.t1) { const b = edge(C.t1); if (b) pts.push(b); }
   strokePoly(ctx, pts, style);
   if (L.dots !== false && rows.length < C.width / 6) {
     ctx.save(); ctx.fillStyle = style.color; ctx.globalAlpha = 0.9;
@@ -863,13 +974,24 @@ export function createStrip(canvas, deck, opts = {}) {
     },
     gutterPx: opts.gutter ?? 92,
     gutterBase: opts.gutter ?? 92,
-    // NARROW-VIEWPORT gutter: at 360 px a 92 px label column eats a quarter of
-    // the plot. The gutter is the one piece of chrome that can shrink without
-    // changing a single measured number, because `plotW()` is derived from it
-    // and every renderer already draws in plot space. Desktop is untouched:
-    // the clamp only engages below `narrowAt`.
-    narrowAt: opts.narrowAt ?? 520,
-    gutterNarrow: opts.gutterNarrow ?? 46,
+    // 🔴 THE GUTTER IS SIZED BY WHAT IT CARRIES, NOT BY A CONSTANT — AND IT
+    // GROWS ON A NARROW SCREEN RATHER THAN SHRINKING. It used to be 92 px,
+    // CLAMPED TO 46 below `narrowAt`, on the reasoning that a label column
+    // should not eat a quarter of a 360 px plot. That reasoning priced the
+    // plot and forgot to price the words: 46 px is narrower than the text, so
+    // a strip on a 390 px phone read `ty…`, `52…`, `64…` — a lane whose name
+    // and BOTH of its measured numbers were each a single ellipsis. That is
+    // the worst possible trade, because the gutter still took its slice of the
+    // plot and gave nothing back for it. CLAUDE.md's rule is that anything
+    // truncating with an ellipsis is in the WRONG PLACE; here it is the right
+    // place at a made-up width, so the width is MEASURED now.
+    // Bounded on both sides: never below `gutterBase`, so a short-labelled
+    // strip does not give every page a different, moving left edge — and never
+    // above `gutterMaxFrac` of the canvas, because a gutter free to grow is a
+    // plot free to vanish. ⚠️ `narrowAt`/`gutterNarrow` are gone; a caller
+    // still passing them is passing something that no longer does anything.
+    gutterMaxFrac: opts.gutterMaxFrac ?? 0.42,
+    gutterKey: null,
     axisH: opts.axisHeight ?? 20,
     // is the position domain absolute wall ms (replay-grid) or 0-based (jam)?
     absolute: opts.absolute !== undefined ? opts.absolute : !!(deck.range && deck.range[0] > 1e12),
@@ -880,7 +1002,12 @@ export function createStrip(canvas, deck, opts = {}) {
   function setLanes(list) {
     S.lanes = (list || []).map((l, i) => ({
       id: l.id || l.kind || `lane-${i}`,
-      height: l.height ?? 28,
+      // ⚠️ 24, not 28. The default is what a lane gets when a page has not
+      // thought about it, so it is the number that decides how tall most
+      // strips are — and it was set when the gutter needed more room per line
+      // than it does. A lane carrying a name and ONE number needs 21 + a
+      // baseline, so 24 is the smallest that still says everything.
+      height: l.height ?? 24,
       as: l.as || null,
       show: l.show !== false,
       ...l,
@@ -891,6 +1018,20 @@ export function createStrip(canvas, deck, opts = {}) {
     return S.lanes;
   }
   function layout() {
+    // 🔴 THE GUTTER IS SIZED HERE, NOT IN `resize()`, AND THAT IS THE WHOLE
+    // POINT OF THE FIX. Sizing it on resize alone read as working and did
+    // NOTHING: `setLanes` does not resize, and a page sets `L.subLabel` by
+    // reaching into the lane object long after both have run — `typist` does it
+    // every time its numbers change. So the width was decided while the strip
+    // had no lanes, or no numbers in them, and never revisited. MEASURED with
+    // the sizer wired to resize only: a lane given a 458 px number still got a
+    // 92 px gutter, i.e. the function existed, was correct, and could not
+    // affect anything. A measurement that runs at the wrong moment is
+    // indistinguishable from one that is never taken.
+    // ⚠️ Cached on the TEXT, not on a dirty flag, because nothing tells us when
+    // a client mutates a label — the only honest trigger is the text changing.
+    const key = `${S.width}|${S.lanes.map((L) => (L.show ? `${L.label ?? L.id}\u0001${subLabelsOf(L).join('\u0002')}` : '')).join('\u0003')}`;
+    if (key !== S.gutterKey) { S.gutterKey = key; S.gutterPx = gutterWidthFor(S.width); }
     let y = S.axisH;
     for (const L of S.lanes) { L.y = y; if (L.show) y += L.height; }
     S.contentH = y;
@@ -1045,8 +1186,25 @@ export function createStrip(canvas, deck, opts = {}) {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     return S.wallAnchor.pos + (now - S.wallAnchor.wall);
   }
-  if (opts.armWall !== false && deck.transport && deck.transport.onState) {
-    // arm on the first play, so the gap counts from the moment the piece started
+  // 🔴 OFF UNLESS A PAGE ASKS, AND THE EVIDENCE IS THE PAGES THEMSELVES. This
+  // armed on the first play by default, and of the thirteen pages that use a
+  // strip, TEN pass `armWall: false` and the other three call `armWall(anchor)`
+  // with an anchor of their own (`keep` and `take` a part's start, `now` the
+  // real clock). **Not one page wanted the default** — and the seven that never
+  // mentioned it were getting a cursor they had not asked for.
+  //
+  // What it measures is how far the piece has fallen behind real time since it
+  // first played. That is the number to watch on a LIVE feed, and it is noise
+  // on a fixture: once the playhead stops, the gap just counts how long ago you
+  // finished. PHOTOGRAPHED on `draw` — an amber band across half the strip and
+  // `209.31 s` beside it, which is the age of the browser tab and not a fact
+  // about the drawing. The reader's words were "I do not understand what that
+  // 209.31 s and dark yellow area is", which is the correct response to it.
+  //
+  // ⚠️ A default that turns a second cursor ON is a default that has to be
+  // right about every page that never thought about it. `opts.armWall === true`
+  // keeps the auto-arm for anything that genuinely wants it on first play.
+  if (opts.armWall === true && deck.transport && deck.transport.onState) {
     const off = deck.transport.onState((st) => {
       if (st && st.reason === 'play' && !S.wallAnchor) armWall(deck.position());
     });
@@ -1097,7 +1255,7 @@ export function createStrip(canvas, deck, opts = {}) {
       certainty: S.certainty, position: posAcct, states: visibleStates(),
       smearedPct: posAcct && posAcct.total ? +(100 * (posAcct.smeared / posAcct.total)).toFixed(1) : 0,
       drift, driftStats: dstats,
-      zoom: S.zoom || null, ticks: S.axisTicks || null,
+      zoom: S.zoom || null, ticks: S.axisTicks || null, gutter: S.gutterPx,
       view: { ...S.view }, lod: tickLOD(S.view.pxPerSecond),
       pos: S.pos, wall: wallPos(), gapMs: wallPos() === null ? null : +(wallPos() - S.pos).toFixed(1),
       follow: S.follow, followEngaged: S.follow && !S.userScrolled,
@@ -1115,7 +1273,8 @@ export function createStrip(canvas, deck, opts = {}) {
       canvas.width = Math.round(cssW * S.dpr); canvas.height = Math.round(cssH * S.dpr);
     }
     S.width = cssW; S.height = cssH;
-    S.gutterPx = cssW < S.narrowAt ? Math.min(S.gutterBase, S.gutterNarrow) : S.gutterBase;
+    // the width changed, so the cached decision is stale; `layout()` re-takes it
+    S.gutterKey = null;
   }
 
   // The tick loop is INDEX-BASED (`first + i*step`), never accumulating, for two
@@ -1160,6 +1319,110 @@ export function createStrip(canvas, deck, opts = {}) {
     if (S.axisTicks.clamped) note('axis', `tick LOD asked for ${Math.max(nMinor, nMajor)} ticks; drew ${MAX_TICKS}. The ladder does not reach this zoom.`);
   }
 
+  // 🔴 ONE RIGHT-HAND INSET, READ BY BOTH THE SIZER AND THE CLIPPER. They had
+  // two, and the gap was silent: `gutterWidthFor` reserved
+  // `11 + text + 10` while `drawGutter` clipped every line against
+  // `gutterPx - 18 - 8` — the NAME's inset, applied to the numbers
+  // as well. So a sub-line was measured against 19 px of chrome and then cut
+  // against 26, and **any sub-line long enough to SET the gutter width was
+  // always one character too long for it**. MEASURED: `usual 12 ms` sizes the
+  // gutter and renders `usual 12 …`. A component that widens itself to fit its
+  // own text and then truncates that text is the worst version of this — it
+  // paid for the room and did not use it.
+  // `gutRoom(x)` is the one right-hand inset both of them read, and it stays a
+  // function of x so that a future line starting somewhere else cannot
+  // reintroduce the gap by being measured against somebody else's margin.
+  //
+  // 🔴 ONE LEFT EDGE. THE NAME AND THE NUMBERS ARE ONE COLUMN. They were two —
+  // the name at 18 and its own numbers at 11 — with nothing justifying the
+  // 7 px, so every lane read as a ragged step. Worse, 11 is exactly where the
+  // SWATCH ends (`fillRect(8, …, 3, …)` paints 8..11), so the first number
+  // started on the pixel the swatch finished on AND overlapped it vertically:
+  // the swatch spans y+6..y+20 and that number's glyphs sit y+15..y+24. They
+  // touched on both axes. One `GUT_TEXT_X` fixes both at once and leaves the
+  // swatch 7 px of clear gutter.
+  // ⚠️ IT COSTS PLOT AND THAT IS THE TRADE. `gutterWidthFor` sizes from
+  // `TEXT_X + widest line`, so a page whose widest line is a NUMBER now pays up
+  // to 7 px more gutter. MEASURED across the sixteen strip pages at 1200 px:
+  // four moved — strip 118->125, now 101->107, score 150->155, vclick 172->179
+  // — and the other twelve did not, because they declare a base gutter wider
+  // than anything they carry.
+  const GUT_TEXT_X = 18, GUT_SWATCH_X = 8, GUT_PAD = 10;
+  const gutRoom = (x) => S.gutterPx - x - GUT_PAD;
+  // 🔴 THE GUTTER'S LINE SPACING SETS THE MINIMUM LANE HEIGHT, so it is the
+  // thing to tighten when the lanes are too tall — not the marks, which are
+  // already derived from the lane height and would shrink on their own. A name
+  // and two numbers used to need 15 + 24 + 35 = a 42 px lane; at 12 + 21 + 31
+  // the same three lines fitted in 36, which was 6 px back per lane on every
+  // page with a strip. At 11 + 22 + 32 they need 34 and the pages still ask for
+  // 36, so the saving stands.
+  //
+  // ⚠️ A NAME IS NOT ONE OF THE NUMBERS, SO IT DOES NOT SIT ON THEIR STEP.
+  // 12 -> 21 was a 9 px step under a 10 px face: the name's descenders and the
+  // first number's ascenders met, and the block read as three equally-weighted
+  // lines rather than as a heading over a pair of figures. 11 -> 22 is 11 px
+  // there and 10 px between the numbers, which groups them.
+  // 🔴 AND THE 11 px IS ALL THERE IS — the numbers' own step CANNOT grow.
+  // MEASURED on the sixteen strip pages, the binding lanes are `reel`'s
+  // `newsreels` (THREE lines in 44 px, last baseline at +42 against a
+  // `height - 2` = 42 ceiling) and `now`'s `ETV schedule` (two lines in 34 px,
+  // +32 against 32). Both are EXACTLY at the limit now, so a bigger step, or a
+  // page adding a third line to a 44 px lane, drops a line in silence. That is
+  // what `gutterFit()` is for: it reports `dropped` per lane, and 0 across all
+  // sixteen is the measurement this rhythm was chosen against.
+  const GUT_NAME_Y = 11, GUT_SUB_Y = 22, GUT_SUB_STEP = 10;
+
+  /** A lane's own lines under its name: the client's numbers when it has them,
+   *  else the derived clock domain. ⚠️ Factored out because the gutter is now
+   *  MEASURED, and a sizer that computes its width from different text than the
+   *  drawer renders is a gutter that is confidently the wrong size. One source,
+   *  both callers. */
+  function subLabelsOf(L) {
+    const st = L._style || {};
+    const caps = (deck.caps && L.kind !== undefined) ? (() => { try { return deck.caps(L.kind); } catch { return null; } })() : null;
+    const sub = [];
+    if (caps && caps.lane) sub.push(caps.lane);
+    else if (caps && caps.domain) sub.push(caps.domain);
+    if (caps && caps.audible === false) sub.push('silent');
+    if (st.tier) sub.push(`tier ${st.tier}`);
+    // A lane's OWN NUMBERS belong beside its own ink, not in a table somewhere
+    // else that the reader has to join up by colour. `subLabel` is the client's
+    // line (or lines) under the label — typical and worst, or "no feedback" for
+    // a lane that cannot say. A lane that says something about itself REPLACES
+    // the derived line rather than queueing behind it: the derived line names
+    // the clock domain, which is worth having when nothing better is on offer
+    // and is noise the moment the client has real numbers.
+    const client = L.subLabel === undefined || L.subLabel === null ? []
+      : [].concat(L.subLabel).filter(Boolean).map(String);
+    return client.length ? client : (sub.length ? [sub.join(' · ')] : []);
+  }
+
+  /** How wide the label column has to be to say what it is for. */
+  function gutterWidthFor(cssW) {
+    const base = S.gutterBase;
+    if (!S.lanes || !S.lanes.length) return base;
+    ctx.save();
+    ctx.font = '10px ui-monospace, Menlo, monospace';
+    let need = 0;
+    for (const L of S.lanes) {
+      if (!L.show) continue;
+      need = Math.max(need, GUT_TEXT_X + ctx.measureText(String(L.label ?? L.id)).width);
+      for (const s of subLabelsOf(L)) need = Math.max(need, GUT_TEXT_X + ctx.measureText(s).width);
+    }
+    ctx.restore();
+    // ⚠️ The cap is `max(base, frac)`, never the fraction alone: on a very
+    // narrow canvas a bare fraction would clamp BELOW the base and quietly
+    // reintroduce the ellipsis this function exists to remove.
+    const cap = Math.max(base, Math.round(cssW * S.gutterMaxFrac));
+    // ⚠️ `ceil`, NOT `round`, AND IT IS A WHOLE CHARACTER. `need` is a
+    // measured text width with a fraction on it, so rounding 111.4 down to 111
+    // leaves the very line that SET the width a sub-pixel short of fitting in
+    // it — and the clipper does not do sub-pixels, it drops a character and adds
+    // an ellipsis. MEASURED: `12.3 ms typical` sized the gutter to 111 px and
+    // then rendered cut, in a gutter it had just paid for.
+    return Math.ceil(Math.min(cap, Math.max(base, need + GUT_PAD)));
+  }
+
   function drawGutter() {
     ctx.save();
     ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
@@ -1174,9 +1437,8 @@ export function createStrip(canvas, deck, opts = {}) {
     // against the plot on the right. `avail` moves with the inset or the
     // measured truncation would be computed against a width the text no longer
     // has.
-    const LABEL_X = 18, SWATCH_X = 8;
-    const avail = S.gutterPx - LABEL_X - 8;
-    const clip = (s) => {
+    const TEXT_X = GUT_TEXT_X, SWATCH_X = GUT_SWATCH_X;
+    const clip = (s, avail) => {
       if (ctx.measureText(s).width <= avail) return s;
       let n = s.length;
       while (n > 1 && ctx.measureText(s.slice(0, n) + '…').width > avail) n--;
@@ -1188,33 +1450,33 @@ export function createStrip(canvas, deck, opts = {}) {
       ctx.fillStyle = st.color || T.ink; ctx.globalAlpha = 0.9;
       ctx.fillRect(SWATCH_X, L.y + 6, 3, Math.min(14, L.height - 12));
       ctx.fillStyle = T.ink;
-      ctx.fillText(clip(String(L.label ?? L.id)), LABEL_X, L.y + 15);
+      ctx.fillText(clip(String(L.label ?? L.id), gutRoom(TEXT_X)), TEXT_X, L.y + GUT_NAME_Y);
       // the per-lane label GUTTER states the lane's own clock and whether it is
       // AUDIBLE — proto/instrument's two ideas, which nothing else carried.
-      const caps = (deck.caps && L.kind !== undefined) ? (() => { try { return deck.caps(L.kind); } catch { return null; } })() : null;
-      const sub = [];
-      if (caps && caps.lane) sub.push(caps.lane);
-      else if (caps && caps.domain) sub.push(caps.domain);
-      if (caps && caps.audible === false) sub.push('silent');
-      if (st.tier) sub.push(`tier ${st.tier}`);
-      // A lane's OWN NUMBERS belong beside its own ink, not in a table
-      // somewhere else that the reader has to join up by colour. `subLabel` is
-      // the client's line (or lines) under the label — typical and worst, or
-      // "no feedback" for a lane that cannot say.
-      const client = L.subLabel === undefined || L.subLabel === null ? []
-        : [].concat(L.subLabel).filter(Boolean).map(String);
-      // A lane that says something about itself REPLACES the derived line
-      // rather than queueing behind it. The derived line names the lane's clock
-      // domain, which is worth having when nothing better is on offer and is
-      // noise the moment the client has real numbers — and on a short lane it
-      // was pushing those numbers out of the row entirely.
-      const all = client.length ? client : (sub.length ? [sub.join(' · ')] : []);
+      let all = subLabelsOf(L);
+      // ⚠️ JOIN THE LINES WHEN THEY FIT ON ONE. Two lines cost a lane 11 px of
+      // height each, and the gutter is now wide enough that `52 ms typical` and
+      // `64 ms worst` usually fit side by side — so the same numbers arrive in
+      // a shorter lane. Measured against the real width, never assumed: where
+      // they do not fit, they stay stacked.
+      if (all.length > 1 && ctx.measureText(all.join(' · ')).width <= gutRoom(TEXT_X)) all = [all.join(' · ')];
       ctx.fillStyle = T.dim; ctx.globalAlpha = 0.8;
+      // 🔴 WHAT DID NOT FIT IS RECORDED, because the break below is SILENT and
+      // the line it drops is the last one — which is where a page puts its
+      // count. `typist`'s own comment says a lane one pixel short loses a
+      // number with nothing to say it happened; that was true, and the only
+      // reason it was ever noticed is that somebody did the arithmetic by
+      // hand. `gutterFit()` publishes it, so a harness can ask 16 pages at
+      // once whether any lane is a pixel short. Cut, never ellipsized: an
+      // ellipsis at least leaves a mark, a dropped line leaves nothing.
+      let shown = 0;
       for (let i = 0; i < all.length; i++) {
-        const y = L.y + 24 + i * 11;
+        const y = L.y + GUT_SUB_Y + i * GUT_SUB_STEP;
         if (y > L.y + L.height - 2) break;         // never spill into the next lane
-        ctx.fillText(clip(all[i]), 11, y);
+        ctx.fillText(clip(all[i], gutRoom(TEXT_X)), TEXT_X, y);
+        shown++;
       }
+      L._gutterFit = { lines: all.length, shown, dropped: all.length - shown };
       ctx.globalAlpha = 1;
     }
     ctx.restore();
@@ -1312,6 +1574,9 @@ export function createStrip(canvas, deck, opts = {}) {
     const C = {
       deck, x, tAt, t0, t1, width: plotW(), pos: S.pos, evidence: ev(), style,
       hover: S.hover, view: S.view,
+      // the palette, so a renderer that needs to paint a backing uses the
+      // lane's OWN background rather than guessing a hex that is right today
+      theme: T,
     };
     const as = L.as || autoKind(L);
     if (as === 'spans') C.spans = spansFor(L).filter((s) => (Number.isFinite(s.to) ? s.to : t1) >= t0 && s.from <= t1);
@@ -1862,6 +2127,16 @@ export function createStrip(canvas, deck, opts = {}) {
       return { method: a.method, colMs: a.colMs, cols: a.mass.length, max: a.max, peakCol: a.peakCol,
                total: a.total, items: a.items, counted: a.counted, open: a.open, points: a.points, clipped: a.clipped };
     },
+    /** DID EVERY GUTTER LINE FIT IN ITS LANE? The drop is silent by design
+     *  (a sub-line must never spill into the next lane) and the dropped line
+     *  is always the LAST one, which is where a page puts its count — so
+     *  "this lane is one pixel short" and "this page never had that number"
+     *  look identical on the canvas. One call says which. Populated by the
+     *  last draw; a lane that has not been drawn reports `lines: null`. */
+    gutterFit: () => S.lanes.filter((L) => L.show).map((L) => ({
+      id: L.id, label: String(L.label ?? L.id), height: L.height,
+      ...(L._gutterFit || { lines: null, shown: 0, dropped: 0 }),
+    })),
     /** what the fingers are currently doing — the only way a headless harness
      *  can tell a pan from a pinch from a tap without reading pixels. */
     gesture: () => ({ mode: touchGesture, pointers: touches.size, pinching: !!pinch, slop: TOUCH.slop }),

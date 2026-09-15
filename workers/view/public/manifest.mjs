@@ -71,6 +71,9 @@ export const DEMOS = [
   { name: 'vclick', act: 0, created: '2026-09-07', built: true,
     one: 'a Csound score compiled to a timeline — the tempo map is an integral, the repeat is a quotation',
     tags: ['timeline', 'Csound', 'WebAudio'] },
+  { name: 'click', act: 0, created: '2026-09-14', built: true,
+    one: 'U:’s wireless click track, playing their own score with nothing on the wire',
+    tags: ['timeline', 'Csound'] },
 
   { name: 'llhls', act: 1, created: '2026-09-04', built: true,
     one: 'the tuned v6 player on a live input this page starts and stops',
@@ -82,7 +85,7 @@ export const DEMOS = [
     one: 'the same live input over WHEP; same burned-in clock as 06',
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000 },
-  { name: 'moq', act: 1, created: '2026-09-05', built: true, settleMs: 20000,
+  { name: 'moq', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
     one: 'browser to browser over MoQ, the fast tier',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
 
@@ -92,6 +95,25 @@ export const DEMOS = [
   { name: 'cues', act: 2, created: '2026-09-04', built: true,
     one: 'fire one cue; every open copy of the page acts on it, tokenless',
     tags: ['DO', 'WS', 'relay'] },
+  // Act 2 with `cues` and for the same reason — one act reaching everybody —
+  // but on a delay instead of at once, and out to phones rather than to open
+  // tabs. The claim it demonstrates is that a store can wake AT a time from the
+  // same object that holds the state deciding it, with no machine polling in
+  // between, so `settleMs` has to cover the whole demonstration. It is carried
+  // by `Publish now`, which is control 0 and the only control the harness gives
+  // this budget to: it publishes at once and hands its item a moment four
+  // seconds out to put itself away at, which is the unattended wake. About five
+  // seconds of work, and the ten-second button asserts only what is true
+  // immediately, because an assert made behind that wait would never be read.
+  //
+  // ⚠️ IT IS ALSO THE ONE INSTALLABLE PAGE HERE, AND ONLY THIS ONE. Its
+  // manifest and its service worker are scoped to `/items/`; positron.studio is
+  // deliberately not a progressive web app, because a site-wide worker is a
+  // cache and this project's whole debugging discipline rests on the BUILD
+  // stamp saying which build is live.
+  { name: 'items', act: 2, created: '2026-09-14', built: true, settleMs: 11000,
+    one: 'write an item, and it publishes itself at the moment you named — and tells the phones',
+    tags: ['DO', 'alarms', 'push', 'PWA'] },
   // The demo ABOUT the socket, rather than one that happens to use it: the
   // message shape written down, the exact bytes shown both ways, and the
   // history the relay refuses to keep. settleMs covers asking the recorder to
@@ -193,12 +215,40 @@ export const DEMOS = [
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
     // fetch + a 13-point two-byte sweep, all behind control 0
     settleMs: 26000 },
+  // `gl: true` and `xr: true` for the same reason mirror and scene carry them:
+  // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
+  // a GPU page graded there reports a defect that belongs to the harness.
+  // `node demo/verify-gl.mjs` is the grader.
+  { name: 'floor', act: 5, created: '2026-09-14', built: true, gl: true, xr: true,
+    one: 'every 1965 newsreel face up on a floor you walk over, and any of them plays where it lies',
+    tags: ['WebGL2', 'WebXR', 'ERR', 'archive', 'HLS'],
+    // 298 thumbnails arrive as you look at them; a cold floor is a few seconds
+    // of fetching before there is much to see
+    settleMs: 4000 },
   { name: 'flipper', act: 5, created: '2026-09-04', built: true,
     one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],
     settleMs: 14000 },
-  { name: 'kurenniemi', act: 5, created: '2026-08-28', built: false, page: '/proto/kurenniemi/',
-    one: "Erkki Kurenniemi's corpus, media from archive.org",
+  // Everything that could be reached about one artist, before anything is
+  // played: 122 rows out of fourteen archives, saying when it is from, who
+  // holds it, what it is, whether there is a file and what its licence allows.
+  // Refs only — nothing is copied here. `demo/kurenniemi/build-corpus.mjs`
+  // gathers it and folds in the shorter list `aikajana` plays from, and the
+  // page re-checks that fold from the other end so the two cannot disagree.
+  { name: 'kurenniemi', act: 5, created: '2026-09-14', built: true,
+    one: 'every reachable source and asset of Erkki Kurenniemi: who holds it, when, and what it allows',
+    tags: ['archive', 'provenance'] },
+  // The same corpus as the row above, on an axis instead of in a table: one
+  // mark per record, as wide as its date is vague, and the twenty-six a browser
+  // can open are pressable. Named for the thing you can hear, because that is
+  // the reason it exists rather than the table.
+  { name: 'tapes', act: 5, created: '2026-09-15', built: true,
+    one: 'Kurenniemi in time — a mark as wide as its date is vague, and the ones you can play',
+    tags: ['timeline', 'uncertainty', 'archive'] },
+  // The deck that gathered it, under its own name since 2026-09-14 — it was
+  // called `kurenniemi` until the row above took that slug.
+  { name: 'aikajana', act: 5, created: '2026-08-28', built: false, page: '/proto/aikajana/',
+    one: "Erkki Kurenniemi's corpus on one deck, media from archive.org",
     tags: ['timeline', 'not shelled'] },
   { name: 'megatimeline', act: 5, created: '2026-08-27', built: false, page: '/proto/megatimeline/',
     one: 'the ERR archive as one zoomable century, 1908 to 2026',
@@ -226,6 +276,24 @@ export const DEMOS = [
   { name: 'shout', act: 5, created: '2026-09-06', built: true, settleMs: 12000,
     one: 'an icecast stream through Cloudflare — the relay adds the CORS that makes it measurable',
     tags: ['Icecast', 'Workers', 'WebAudio'] },
+
+  // Act 5 with shout, and deliberately NOT a second copy of it: same relay,
+  // different subject. `shout` asks what Cloudflare costs in front of an
+  // Icecast stream; this one is a station somebody actually runs, and it is
+  // here because their mount is plain HTTP on port 8001 — which a page on
+  // positron.studio may not load at all. The relay is the difference between a
+  // page that works and a page that cannot, rather than between a page that
+  // measures and one that does not.
+  // ⚠️ `settleMs` HERE DOES ONE JOB, NOT TWO, AND THAT IS WHY IT WENT UP. The
+  // harness applies it to control 0 and to the first-assert budget; this page
+  // declares no controls at all now (the granulator comes up with the sound
+  // rather than behind a button), so only the second use reaches it — and it has
+  // to cover a wasm scsynth boot, 31 buffer allocations, a definition, a 2.5 s
+  // level, two 700 ms ink samples and a 1.2 s deafness control before the page
+  // says anything at all.
+  { name: 'radio1965', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
+    one: 'a live radio station in Tallinn, reachable from a secure page only through a relay of ours',
+    tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
 
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
@@ -279,9 +347,54 @@ export const DEMOS = [
   // the same thing is running on a Raspberry Pi in another building. Side by
   // side with a crossfade, the difference between the two panes IS the subject,
   // and the page now checks a granulator even when the board is down.
-  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000, room: 'fixed',
-    one: 'the same granulator in this page and on a Raspberry Pi, side by side, with a blend between them',
-    tags: ['AudioWorklet', 'SuperCollider', 'relay', 'PCM', 'live board'] },
+  // 🔴 `the same granulator` IS TRUE NOW, AND IT WAS NOT BEFORE (2026-09-13).
+  // This line said it while the left pane was a 251-line AudioWorklet written
+  // for this page — a reimplementation that sounds similar is not the same
+  // instrument. Both panes load the SAME `pappus.scsyndef`, compiled by sclang
+  // ON THE BOARD, one into wasm scsynth in the tab and one into the Pi's own
+  // sound server. ⚠️ `AudioWorklet` is off the tags for the same reason: the
+  // tag drives `caps.mjs`, and what this page now needs is WebAssembly and an
+  // audio output, not a hand-written worklet.
+  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 60000, room: 'fixed',
+    one: 'one granulator, running in this page and on a Raspberry Pi at once, with a blend between them',
+    tags: ['SuperCollider', 'WebAssembly', 'relay', 'PCM', 'live board'] },
+
+  // 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is
+  // a DOCUMENT — "~2 KB of GLSL plus ~200 bytes of parameters reproduces it at
+  // any resolution" — and works out when generated code may cross a wire. This
+  // is the sound half of that argument, which had never been written down: a
+  // SuperCollider synth definition is a few hundred bytes that completely
+  // describe an instrument, they survive the relay unchanged, and at the far
+  // end TWO different engines read the same ones.
+  //
+  // ⚠️ NOT THE QUESTION research §5 ANSWERED. That one priced shipping scsynth
+  // as a demo's sound engine — 1,701,983 B against a 6,659 B worklet, correctly
+  // no. The engine here is a reader fetched once and only when asked; the
+  // subject is the asset that travels.
+  //
+  // settleMs covers a 1.7 MB fetch, the engine boot (~630 ms measured), three
+  // round trips over the relay and six loudness windows. Every assert on this
+  // page sits behind control 0.
+  //
+  // ⚠️ THREE OF ITS TWENTY ASSERTS ARE ABOUT SOMEBODY ELSE'S NETWORK, so a red
+  // run here is not automatically a regression — the same caveat CLAUDE.md
+  // already carries for `now` and `carry`. MEASURED by taking the relay away
+  // (`--host-resolver-rules=MAP ws.positron.studio 127.0.0.1:1`): 17 of 20,
+  // the three round-trip asserts saying `nothing came back`, and nothing hung.
+  // 🔴 `patch` IS OFF THE SITE — asked for, and it has already served its
+  // purpose. It existed to ask whether a synth definition can travel as a
+  // message the way a shader does; the answer is yes, and it is now a fact
+  // rather than a page. What it proved is in
+  // `research/supercollider-browser-2026-09.md` §10 and in the commits, and the
+  // thing it proved is being built INTO `grains`, where two granulators can run
+  // the same definition instead of one page demonstrating that they could.
+  //
+  // ⚠️ THE FILES STAY ON DISK AND ARE NOT DEAD. `demo/patch/vendor/` holds the
+  // vendored, licensed SuperSonic engine and `engine.mjs` boots, meters and
+  // collects OSC from it — that is the infrastructure the `grains` rewire runs
+  // on. Removing the ROW takes the page off the deploy; deleting the directory
+  // would take the engine with it. When `grains` has moved what it needs to a
+  // shared home, the leftovers can go.
 
   // Not a demo of anything — a page where every reusable control is present and
   // wired to nothing, so one can be looked at and pushed around without a board,

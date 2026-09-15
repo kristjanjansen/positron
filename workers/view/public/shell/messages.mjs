@@ -24,10 +24,17 @@ import { el } from './shell.mjs';
  * @param {number} [o.cap]      most rows kept; older ones fall off the end
  * @param {boolean} [o.newestFirst]  prepend rather than append
  * @param {string} [o.empty]    what to say when there is nothing yet
+ * @param {string} [o.mark]     the WORD in the third column. It says one more
+ *   fact about a row and the fact is not always "stored": `wire` asks whether
+ *   the relay kept it, `patch` asks whether the bytes came back unchanged. One
+ *   renderer, one column, the caller names it — which is cheaper than a second
+ *   copy of this list, and a second copy is exactly what this file exists to
+ *   have prevented once already.
  * @returns {{el:HTMLElement, add:(row:object)=>void, set:(rows:object[])=>void,
  *            clear:(msg?:string)=>void, count:()=>number}}
  */
-export function createMessageList({ cap = 40, newestFirst = true, empty = 'nothing yet' } = {}) {
+export function createMessageList({ cap = 40, newestFirst = true, empty = 'nothing yet',
+                                   mark = 'stored' } = {}) {
   const list = el('div', 'pos-msgs');
   let n = 0;
 
@@ -42,7 +49,8 @@ export function createMessageList({ cap = 40, newestFirst = true, empty = 'nothi
    * @param {object} r
    * @param {string} r.dir      'out' | 'in' | 'echo' — what happened to it
    * @param {number} [r.bytes]  size on the wire
-   * @param {boolean} [r.stored] did it go to the history as well
+   * @param {boolean} [r.mark]   is the column's fact true of this row
+   * @param {boolean} [r.stored] the older name for the same flag
    * @param {string} r.text     the message itself
    * @param {boolean} [r.hi]    ours, and worth reading
    */
@@ -56,7 +64,8 @@ export function createMessageList({ cap = 40, newestFirst = true, empty = 'nothi
     // never empty-by-accident — a message that was not stored says so by
     // being blank in a column that is always the same width, so the eye reads
     // the column rather than hunting for marks.
-    row.append(el('span', `pos-msgs-store${r.stored ? ' yes' : ''}`, r.stored ? 'stored' : ''));
+    const on = r.mark ?? r.stored;
+    row.append(el('span', `pos-msgs-store${on ? ' yes' : ''}`, on ? mark : ''));
     const t = el('span', 'pos-msgs-txt');
     t.textContent = r.text ?? '';
     if (r.hi) t.dataset.hi = '1';

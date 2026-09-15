@@ -7,19 +7,27 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
+  /* 🔴 A FIXED HEIGHT, BECAUSE THIS IS THE PART THAT CHANGES. `Fire ten` puts
+     ten cues through here in a little over a second; a box that sizes itself
+     to whatever name arrived would move the message list and the log under it
+     each time. One line, never wrapped, never taller.
+     It used to carry a second line under the name — `fired here · delivered in
+     35.0 ms` — which is a page narrating its own state in a sentence. Both
+     halves of it are columns in the list below, and the time is in a cell. */
   .zone {
     border: 1px solid var(--line); border-radius: 4px; background: var(--card);
-    padding: 22px 16px; margin: 0 0 10px; text-align: center; min-height: 96px;
+    height: 96px; display: grid; place-items: center; overflow: hidden;
   }
-  .zone .cue { font: 700 34px/1.1 var(--mono); color: var(--hi); letter-spacing: .02em; }
+  .zone .cue {
+    font: 700 30px/1.1 var(--mono); color: var(--hi); letter-spacing: .02em;
+    white-space: nowrap;
+  }
   .zone .cue.idle { color: var(--dim2); font-size: 15px; font-weight: 500; }
-  .zone .meta { font: 400 11.5px/1.6 var(--mono); color: var(--dim); margin-top: 8px; }
-  .rows { font: 400 11.5px/1.7 var(--mono); color: var(--dim); margin: 0; }
-  .rows b { color: var(--fg); font-weight: 500; }
 </style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
+  import { createMessageList } from '/shell/messages.mjs';
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'cues-demo';
   const ID = Math.random().toString(36).slice(2, 8);
@@ -27,8 +35,13 @@
 
   const d = mount({
     name: 'cues',
-    what: 'Fire one cue; every open copy of this page acts on it. No token — the relay is tokenless.',
-    readout: { peers: '', fired: '', rtt: 'ms', room: '' },
+    what: 'One press here and every open copy of this page shows the same cue '
+        + 'name at the same moment. Press Fire a cue, or Fire ten to see them '
+        + 'queue up, and open the page again in another tab to watch them '
+        + 'arrive on both. Delivery is how long a cue took to get here, timed '
+        + 'from the stamp the sender put on it — the middle one of them, and the '
+        + 'slowest.',
+    readout: { copies: '', arrived: '', delivery: 'ms', slowest: 'ms' },
     controls: [
       { id: 'fire', label: 'Fire a cue', primary: true },
       { id: 'burst', label: 'Fire ten' },
@@ -36,31 +49,31 @@
     ],
   });
   guard(d);
-  d.set('room', ROOM);
 
   const zone = el('div', 'zone');
   const big = el('div', 'cue idle', 'waiting for a cue');
-  const meta = el('div', 'meta', '');
-  zone.append(big, meta);
+  zone.append(big);
   d.el.append(zone);
-  const rows = el('p', 'rows', '');
-  d.el.append(rows);
+
+  // The shared list (demo/shell/messages.mjs) — the same renderer `wire` uses,
+  // with a column per thing you need to know about one message. It was a
+  // hand-built `<p>` of `innerHTML` here, which is the third copy that file
+  // exists to have prevented.
+  const msgs = createMessageList({ cap: 40, empty: 'no cues yet', mark: 'mine' });
+  d.el.append(msgs.el);
 
   let ws = null, seq = 0, fired = 0, received = 0;
   const peers = new Set();
-  const rtts = [];
-  const log = [];
+  const times = [];
 
   function render() {
-    d.set('peers', peers.size + 1);
-    d.set('fired', received);
-    if (rtts.length) {
-      const s = rtts.slice().sort((a, b) => a - b);
-      d.set('rtt', s[Math.floor(s.length / 2)]);
+    d.set('copies', peers.size + 1);
+    d.set('arrived', received || '');
+    if (times.length) {
+      const s = times.slice().sort((a, b) => a - b);
+      d.set('delivery', s[Math.floor(s.length / 2)]);
+      d.set('slowest', s[s.length - 1]);
     }
-    rows.innerHTML = log.slice(-6).reverse()
-      .map((r) => `<b>${r.id}</b> ${r.from === ID ? 'mine' : `from ${r.from}`} · ${r.deliveryMs.toFixed(1)}ms`)
-      .join('<br>');
   }
 
   function connect() {
@@ -77,12 +90,13 @@
         // THE SENDER STAMPS; the relay never re-stamps. So delivery time is
         // honest even though the relay has no idea what time it is.
         const deliveryMs = Date.now() - m.at;
+        const mine = m.from === ID;
         received++;
-        rtts.push(deliveryMs);
-        log.push({ id: m.id, from: m.from, deliveryMs });
+        times.push(deliveryMs);
         big.className = 'cue';
         big.textContent = m.id;
-        meta.textContent = `${m.from === ID ? 'fired here' : `from ${m.from}`} · delivered in ${deliveryMs.toFixed(1)} ms`;
+        msgs.add({ dir: mine ? 'echo' : 'in', bytes: e.data.length, mark: mine,
+                   text: `${m.id} · ${deliveryMs.toFixed(1)} ms`, hi: mine });
         render();
       }
     };
@@ -105,10 +119,19 @@
     d.assert('relay open', ws?.readyState === 1, String(ws?.readyState));
     d.assert('tokenless — no secret in this page', !location.href.includes('token') && !RELAY.includes('token'));
     d.assert('own cues echo back', received >= fired, `${received} received / ${fired} fired`);
-    if (rtts.length) {
-      const s = rtts.slice().sort((a, b) => a - b);
+    // THE LIST IS THE HISTORY, so it has to hold one row per cue that arrived
+    // until its cap bites. Nothing asked it that while it was hand-built.
+    d.assert('every cue that arrived is in the list', msgs.count() === Math.min(received, 40),
+      `${msgs.count()} rows for ${received} cues`);
+    // The big name is what a second copy of this page is looking at, so it
+    // cannot be the placeholder once a cue has landed.
+    d.assert('the cue name on show is the last one that arrived',
+      received === 0 || (!big.classList.contains('idle') && big.textContent.startsWith('CUE-')),
+      big.textContent);
+    if (times.length) {
+      const s = times.slice().sort((a, b) => a - b);
       const p50 = s[Math.floor(s.length / 2)];
-      d.assert('delivery under 250 ms', p50 < 250, `p50 ${p50.toFixed(1)} ms over ${rtts.length}`);
+      d.assert('delivery under 250 ms', p50 < 250, `middle ${p50.toFixed(1)} ms of ${times.length}, slowest ${s[s.length - 1].toFixed(1)} ms`);
     }
     d.log(`open this page twice to see cross-device delivery (?room=${ROOM})`);
   });

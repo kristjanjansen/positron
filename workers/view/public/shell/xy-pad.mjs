@@ -36,7 +36,12 @@
 //  3. WHAT IT DRAWS IS WHAT WAS RECORDED, not what it was asked to show. The
 //     white line is the capture. A second reading of the same gesture — a
 //     reconstruction, a sparse record, anything derived — is the caller's, and
-//     goes through `overlay`, on top, in its own colour.
+//     goes through `overlay`, on top, in its own colour. `upTo` caps the white
+//     line at a TIME and does not break the rule: a prefix of what was
+//     recorded is still what was recorded, and it is what lets a caller
+//     replaying its own capture redraw the line under its playhead instead of
+//     retracing a finished drawing, where the replay and the original are the
+//     same pixels.
 //
 // STYLING. Five rules, prepended to <head> so shell.css and any page's own
 // <style> both override them on source order. They want hoisting into
@@ -97,9 +102,14 @@ function fmtFor(a) {
  *                    is (a playhead, a remote peer). Drawn as the mark.
  * @param o.overlay   (ctx, view) — a second reading of the same gesture, drawn
  *                    over the capture. `view` = {W, H, px(x,y), colors, axes}.
+ * @param o.upTo      () => number | null — draw the capture only as far as this
+ *                    TIMESTAMP. See the note above `paint`; null draws all of
+ *                    it, which is the default and what a pad with no playhead
+ *                    over it always wants.
  */
 export function createXyPad(host, {
-  label = '', x, y, onStart, onInput, onDone, value, overlay, gesture = true,
+  label = '', x, y, onStart, onInput, onDone, value, overlay, upTo, gesture = true,
+  showMark = true,
 } = {}) {
   ensureCss();
   const ax = axis(x, 'x'), ay = axis(y, 'y');
@@ -236,22 +246,42 @@ export function createXyPad(host, {
     furniture();
 
     // THE CAPTURE, and it is the loudest thing here.
-    if (trace.length > 1) {
+    //
+    // ⚠️ `upTo` CAPS IT AT A TIME, NOT AT A COUNT, and it is still rule 3 —
+    // what is drawn is what was recorded, just not all of it yet. A caller
+    // replaying its own capture uses this so the line grows under its playhead
+    // instead of being retraced over a finished drawing, where the replay and
+    // the original are the same pixels. A COUNT would make the caller work out
+    // how many samples the browser coalesced into each frame, which is exactly
+    // the thing only this file knows; a timestamp is what a playhead already
+    // has. Out of range on the low side draws nothing, which is correct: at
+    // position zero no part of the gesture has happened yet.
+    const limit = upTo ? upTo() : null;
+    const capped = Number.isFinite(limit);
+    if (trace.length > 1 && (!capped || limit >= trace[0].at)) {
       ctx.strokeStyle = C.trace; ctx.lineWidth = 6;
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       ctx.beginPath();
       const [x0, y0] = px(trace[0].x, trace[0].y);
       ctx.moveTo(x0, y0);
-      for (const p of trace) { const [a, b] = px(p.x, p.y); ctx.lineTo(a, b); }
+      for (const p of trace) {
+        if (capped && p.at > limit) break;
+        const [a, b] = px(p.x, p.y); ctx.lineTo(a, b);
+      }
       ctx.stroke();
     }
 
     // whatever the caller makes of the same gesture, over the top
     if (overlay) overlay(ctx, view);
 
-    // and where something ELSE says the point is now
+    // and where something ELSE says the point is now — when the caller still
+    // wants a mark for it. ⚠️ `showMark: false` is for a pad that ALREADY ENDS
+    // ITS LINE AT THE PLAYHEAD: there, the mark is a second thing pointing at
+    // the place the line already stops, and two indicators for one position
+    // read as two positions. The value is still asked for and still reaches
+    // `upTo`; only the dot is gone.
     const v = value && value();
-    if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) mark(v);
+    if (showMark && v && Number.isFinite(v.x) && Number.isFinite(v.y)) mark(v);
 
     ctx.restore();
   }
@@ -260,45 +290,25 @@ export function createXyPad(host, {
   /** a unit joins its number with a space, in one place — `330px` reads as a
    *  token and `330 px` as a measurement */
   const u = (a) => (a.unit ? (a.unit.startsWith(' ') ? a.unit : ' ' + a.unit) : '');
+  /**
+   * 🔴 THE PAD DRAWS NO FURNITURE — asked for, and right. It carried its name,
+   * the live pair, and both axes' ranges written down the edges, and on a page
+   * whose whole subject is a LINE that is five pieces of text competing with
+   * the one thing you came to look at. The numbers were already on the page:
+   * `across`/`down` name the axes in the strip's own gutters and the readout
+   * carries the measurements.
+   *
+   * ⚠️ THE LABELS ARE NOT DELETED, ONLY UNDRAWN. `label`, `x.label` and
+   * `y.label` still reach `aria-label` and `data-gesture`, which is what a
+   * screen reader and the harness read — a pad that is silent to a person who
+   * cannot see it is a different and worse thing than an uncluttered one.
+   */
   function furniture() {
-    ctx.fillStyle = C.dim;
-    ctx.font = `500 13px ${SANS}`;
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
-    if (label) ctx.fillText(label, PAD_IN, PAD_IN);
-
-    // the live pair — what an XY pad is FOR. `--dim`, like the rest of the
-    // furniture, so the only bright ink on the pad is the line you made.
-    const v = (value && value()) || (trace.length ? trace[trace.length - 1] : null);
-    if (v) {
-      ctx.textAlign = 'right';
-      ctx.font = `500 13px ${MONO}`;
-      ctx.fillText(`${fx(v.x)}${u(ax)} · ${fy(v.y)}${u(ay)}`, W - PAD_IN, PAD_IN);
-    }
-
-    ctx.font = `500 11px ${SANS}`;
-    ctx.textBaseline = 'bottom';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${ax.label} ${fx(ax.min)}`, PAD_IN, H - PAD_IN);
-    ctx.textAlign = 'right';
-    ctx.fillText(`${fx(ax.max)}${u(ax)}`, W - PAD_IN, H - PAD_IN);
-
-    // the y axis reads bottom-up along the left edge, in ITS order: `min` is at
-    // the top, so the label sits at the top too and the far value at the foot.
-    ctx.save();
-    ctx.translate(PAD_IN, PAD_IN);
-    ctx.rotate(Math.PI / 2);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(`${ay.label} ${fy(ay.min)}`, 22, 0);
-    ctx.restore();
-    ctx.save();
-    ctx.translate(PAD_IN, H - PAD_IN);
-    ctx.rotate(Math.PI / 2);
-    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-    ctx.fillText(`${fy(ay.max)}${u(ay)}`, -22, 0);
-    ctx.restore();
+    // nothing. See the note above; the axes speak through aria and the page.
   }
 
+  /** The playhead's position on the pad — a filled dot inside a ring, so it
+   *  reads over both the pale line and the bright one. */
   function mark(v) {
     const [mx, my] = px(v.x, v.y);
     ctx.fillStyle = C.mark;

@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* ── THE PLAYER'S SCREEN ────────────────────────────────────────────────
+     Every colour and proportion here is read off `client/main.qml` in
+     tarmoj/vclick, not invented: the light blue ground, the dark blue tempo
+     line, the ghost-white bar number on the left and the beat number on the
+     right coloured by WHICH beat it is, and three round lamps that light and
+     fade over exactly one beat. It is meant to be recognisable to somebody who
+     has held the real one in a rehearsal.
+
+     🔴 ONE DELIBERATE DIFFERENCE, AND IT IS A RULE HERE. Theirs sizes the two
+     numerals with `fontSizeMode: Text.Fit`, so the glyphs grow and shrink as
+     the number gains a digit. Nothing that redraws on a clock may change how
+     much room it takes — a bar counter going 9 → 10 would shove the lamps
+     down. Fixed boxes, one reserved width, `tabular-nums`. */
+  /* ── TWO THEMES, ONE ATTRIBUTE ──────────────────────────────────────
+     `original` is the faithful copy. `subtle` keeps every MEANING and
+     softens the delivery: same downbeat-stands-out, same three lamps, same
+     fade over one beat. Only the paint changes, so the two are comparable
+     rather than two different designs. Tokens, because a theme that is a set
+     of values can be diffed and a theme that is a set of rules cannot. */
+
+  /* 🔴 THEIR GROUND IS NOT LIGHT BLUE, IT IS A GRADIENT THROUGH BLACK, and I
+     had it wrong until I looked: stops at 0.00 #a5c9db, 0.26 black, 0.84
+     black, 1.00 #a5c9db. That is WHY a ghost-white bar number and a white
+     beat number are legible — they sit on the black band, not on the blue.
+     Copied at the same four positions. */
+  .cl[data-theme="original"] {
+    --cl-ground: linear-gradient(#a5c9db 0%, #000 26%, #000 84%, #a5c9db 100%);
+    --cl-tempo: #00008b;          /* darkblue on light blue — the harsh pair */
+    --cl-bar: ghostwhite;
+    --cl-rim: #ffea44;
+    --cl-note-bg: #00008b;
+    --cl-note-fg: #fff;
+  }
+  /* The same four stops, but between two darks instead of between a light and
+     a black: the edges lift rather than slam, so nothing in the picture has to
+     compete with a 200:1 step two centimetres from the numerals. The tempo
+     line goes white because darkblue on light blue was the worst pair on the
+     page and it sits at the top where the eye lands first. */
+  .cl[data-theme="subtle"] {
+    --cl-ground: linear-gradient(#1b2430 0%, #0d1117 26%, #0d1117 84%, #1b2430 100%);
+    --cl-tempo: #e6edf3;
+    --cl-bar: #e9eef5;
+    --cl-rim: rgba(255, 255, 255, .16);
+    --cl-note-bg: #1d2836;
+    --cl-note-fg: #dbe4ee;
+  }
+  .cl { background: var(--cl-ground);
+        border-radius: 6px; padding: 18px 16px 22px;
+        display: grid; gap: 10px; justify-items: center; position: relative;
+        overflow: hidden; }
+  .cl-tempo { color: var(--cl-tempo); font: 600 13px/1 var(--mono); letter-spacing: .04em; }
+  .cl-nums { display: grid; grid-template-columns: 1fr 1fr; align-items: center;
+             width: 100%; max-width: 420px; }
+  /* the reserved width IS the design: 3 characters of the widest digit */
+  .cl-bar, .cl-beat { font: 700 clamp(54px, 17vw, 96px)/1 var(--mono);
+                      font-variant-numeric: tabular-nums; min-width: 3ch;
+                      text-align: right; padding-right: 14px; }
+  .cl-beat { text-align: left; padding: 0 0 0 14px; }
+  .cl-bar { color: var(--cl-bar); }
+  .cl-lamps { display: flex; gap: 10px; justify-content: center;
+              align-items: center; height: 92px; width: 100%; }
+  /* Their lamp animates colour AND diameter together over one beat. A box that
+     changes size inside a fixed-height flex row moves nothing around it. */
+  .cl-lamp { border-radius: 50%; border: 1px solid var(--cl-rim); width: 22px;
+             height: 22px; transition: none; }
+  .cl-note { position: absolute; left: 0; right: 0; bottom: 0;
+             background: var(--cl-note-bg); color: var(--cl-note-fg);
+             text-align: center;
+             font: 600 15px/1.5 var(--sans); padding: 7px 10px; }
+  .cl-note:empty { display: none; }
+  /* ── THE DOCUMENT, BELOW THE LINE ────────────────────────────────────
+     `/score/`'s block, and its rule: TWO CHANNELS, TWO FACTS. The left
+     border says which part a line belongs to; the TEXT says whether it has
+     played. Hue never means "played" and lightness never means "which part".
+     ⚠️ It holds a fixed height and scrolls inside itself — a block that grows
+     as a longer score is picked would move everything under it, and this one
+     sits under a picture that is being watched. */
+  /* ── THEIRS AND OURS, SIDE BY SIDE ───────────────────────────────────
+     The score a composer typed, and the document this page made out of it.
+     Side by side because the claim is a TRANSLATION — the same moment lights
+     in both columns as it plays, and a reader can see that the p-fields
+     crossed unchanged rather than take it on trust.
+     ⚠️ One column on a narrow screen. Two 11 px monospace columns at 400 px
+     total is four characters each, which is not a comparison, it is a pair of
+     ellipses. */
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  @media (max-width: 720px) { .two { grid-template-columns: 1fr; } }
+  .two > div { min-width: 0; }
+  .two h4 { margin: 0 0 6px; font: 600 10px/1 var(--mono); letter-spacing: .1em;
+            text-transform: uppercase; color: var(--dim2); }
+  /* ⚠️ NO `margin` HERE. Setting even `margin: 0` overrides the shell's
+     `.pos-body > * + *` on source order and collapses the gap above this
+     block — which is how this page ended up with 0 · 22 · 4 · 22 px down it. */
+  .sc { max-height: calc(12 * 1.75em + 22px); overflow: auto;
+        font: 400 11px/1.75 var(--mono); background: var(--card);
+        border: 1px solid var(--line); border-radius: 4px; padding: 10px 0; }
+  .sc-l { display: block; white-space: pre; color: var(--dim2);
+          border-left: 3px solid transparent; padding: 0 12px 0 9px; }
+  .sc-l[data-state="played"] { color: var(--dim); }
+  .sc-l[data-state="now"]    { color: var(--fg);
+                               background: color-mix(in oklab, var(--hi) 10%, transparent); }
+  .sc-n { color: var(--dim2); }
+  .sc-l[data-state="now"] .sc-n { color: var(--fg); }  /* the operator's half — a plain row, because it is not the subject */
+  .op { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .op label { font: 500 11px/1 var(--mono); color: var(--dim); }
+  .warn { font: 500 10.5px/1.7 var(--mono); color: var(--warn); margin: 0; }
+  .warn:empty { display: none; }
+</style>
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { scoreDoc, quotation, scoreDocToJSONL, parseScoreDocJSONL } from '/timeline/score.mjs';
+  import { csoundPart, tempoMap } from '/timeline/csound.mjs';
+
+  // ── THEIR SCORES, CARRIED RATHER THAN FETCHED ──────────────────────────
+  //
+  // `server/test.sco` and `server/simple-4-4.sco` from tarmoj/vclick, GPL-3.0,
+  // (c) Tarmo Johannes — copied verbatim, tabs and comments included, because a
+  // score edited to suit the compiler would prove nothing about the compiler.
+  //
+  // ⚠️ EMBEDDED, NOT FETCHED, AND THAT IS THE POINT OF THE PAGE. A click track
+  // that needs the network to tell it where the beat is has put the network
+  // back in the per-beat path. This page makes NO request of any kind — no
+  // fetch, no socket — and the two scores are here so that stays true.
+  const SCORES = {
+    'test.sco': `; vClick score - for test and demo
+#define TUTTI #0#
+#define TEMPO1 #80#
+#define TEMPO2 #52#
+#define BEGIN #9#
+#define REPTEMPO #$TEMPO1#
+
+t 0 $TEMPO1
+i 1 0 0 $TEMPO1 0
+i "countdown" 0 4 4 $TUTTI
+i "notification" 3 1 "READY"
+s
+
+;ADVANCE
+t 0 $TEMPO1 4 $TEMPO1 12 $TEMPO2
+i1 4 8 $TEMPO1 $TEMPO2 8
+i1 12 0 $TEMPO2 0
+
+i	2	0	4	4	4	0	1	$TUTTI
+i	2	4	4	4	4	0	2	$TUTTI
+i	2	8	4	4	4	0	3	$TUTTI
+i	2	12	4	4	4	0	4	$TUTTI
+
+i	2	18	1	1	4	0	5	$TUTTI
+i	2	19	1.5	1	[8/3]	0	-5.2	$TUTTI
+i	2	20.5	1	1	4	0	-5.3	$TUTTI
+
+i	2	21.5	0.5	1	[16/3]	0	6	$TUTTI
+i	2	22	0.75	1	4	0	-6.2	$TUTTI
+i	2	22.75	0.5	1	4	0	7	$TUTTI
+i	2	23.25	0.75	1	[16/3]	0	-7.2	$TUTTI
+
+i	2	24	0.75	[16/3]	4	0	8	$TUTTI
+i	2	24.75	0.5	1	4	0	-8.2	$TUTTI
+
+i	2	25.25	0.75	[16/3]	4	0	9	$TUTTI
+i	2	26	0.5	1	4	0	-9.2	$TUTTI
+
+i	"notification"	0	2	"Go!"
+i	"notification"	4	8	"Ritenuto"
+i	"notification"	16	2	"Complex"
+i	"notification"	18	3	"2+3+2/8"
+i	"notification"	21.5	3	"5/16"
+`,
+    'simple-4-4.sco': `; vClick score template							
+							
+;count-down 								
+								
+								
+#define TUTTI  #0#								
+#define TEMPO1 #60#								
+#define REPTEMPO #$TEMPO1# ; REPTEMPO for setting tempo for countdown (if starts from section in another tempo)								
+#define BEGIN #5#								
+								
+								
+t 0 $REPTEMPO								
+i 1 0 0 $REPTEMPO 0								
+i "countdown" 0 4 4 $TUTTI			; four click in four beats					
+i "notification" 3 0.9 "READY"			; notification					
+f 0 4 	; workaround – not to leave early – FIX IT							
+s								
+								
+								
+t	0	$TEMPO1						
+								
+i 	1	0	0	$TEMPO1	0	0	; set the tempo	
+								
+								
+								
+								
+								
+;ADVANCE		; do not change by hand!						
+; a 0 0.01 < beats>								
+
+							
+; times bar by bar								
+;i	instrnr	start	duration	number of beats	part of the whole note	subdivision	bar number	instruments
+i	2	0	4	4	4	0	1	$TUTTI
+i	2	4	4	4	4	0	2	$TUTTI
+i	2	8	4	4	4	0	3	$TUTTI
+i	2	12	4	4	4	0	4	$TUTTI
+i	2	16	4	4	4	0	5	$TUTTI
+i	2	20	4	4	4	0	6	$TUTTI
+i	2	24	4	4	4	0	7	$TUTTI
+i	2	28	4	4	4	0	8	$TUTTI
+i	2	32	4	4	4	0	9	$TUTTI
+i	2	36	4	4	4	0	10	$TUTTI
+i	2	40	4	4	4	0	11	$TUTTI
+i	2	44	4	4	4	0	12	$TUTTI
+i	2	48	4	4	4	0	13	
+i	2	52	4	4	4	0	14	
+i	2	56	4	4	4	0	15	
+i	2	60	4	4	4	0	16	
+i	2	64	4	4	4	0	17	
+i	2	68	4	4	4	0	18	
+i	2	72	4	4	4	0	19	
+i	2	76	4	4	4	0	20	
+i	2	80	4	4	4	0	21	
+i	2	84	4	4	4	0	22	
+i	2	88	4	4	4	0	23	
+i	2	92	4	4	4	0	24	
+i	2	96	4	4	4	0	25	
+i	2	100	4	4	4	0	26	
+i	2	104	4	4	4	0	27	
+i	2	108	4	4	4	0	28	
+i	2	112	4	4	4	0	29	
+i	2	116	4	4	4	0	30	
+i	2	120	4	4	4	0	31	
+i	2	124	4	4	4	0	32	
+i	2	128	4	4	4	0	33	
+i	2	132	4	4	4	0	34	
+i	2	136	4	4	4	0	35	
+i	2	140	4	4	4	0	36	
+i	2	144	4	4	4	0	37	
+i	2	148	4	4	4	0	38	
+i	2	152	4	4	4	0	39	
+i	2	156	4	4	4	0	40	
+i	2	160	4	4	4	0	41	
+i	2	164	4	4	4	0	42	
+i	2	168	4	4	4	0	43	
+i	2	172	4	4	4	0	44	
+i	2	176	4	4	4	0	45	
+i	2	180	4	4	4	0	46	
+i	2	184	4	4	4	0	47	
+i	2	188	4	4	4	0	48	
+i	2	192	4	4	4	0	49	
+i	2	196	4	4	4	0	50	
+								
+								
+								
+; CUES								
+								
+i	"playfile"	0	999	"test.wav"	0	; t1		
+								
+								
+								
+								
+; NOTIFICATIONS								
+								
+i	"notification"	0	2	"Start"				
+`,
+  }
+  const d = mount({
+    name: 'click',
+    // ⚠️ THREE SHORT SENTENCES. The first version was three sentences of
+    // ninety words, which is the same essay with fewer full stops: what it is,
+    // what to press, what the numbers mean, and stop.
+    what: 'U:\u2019s vClick — a click track with no earpieces, where every '
+      + 'player watches a screen for the bar, the beat and a lamp. Theirs sends '
+      + 'two messages a beat over the hall\u2019s wifi; this works the piece out '
+      + 'once and then each screen reads its own clock. pushed is what theirs '
+      + 'would have sent by now; late is how far each flash landed from the '
+      + 'moment the score asks for.',
+    // 🔴 `bytes` REPLACED `rows`, AND IT IS THE WHOLE COMPARISON IN ONE CELL.
+    // `rows` was a constant per score. `bytes` is what actually crosses the
+    // wire on this design — the score DOCUMENT, once — and it sits next to
+    // `pushed`, which is what vClick puts on the hall's wifi and which climbs
+    // for as long as the piece lasts. One number is paid once; the other is
+    // paid per beat, per player.
+    readout: { bar: '', beat: '', tempo: 'bpm', late: 'ms', pushed: '', bytes: 'B' },
+    // ⚠️ NO PAGE-LEVEL START, BECAUSE THE TRANSPORT BAR ALREADY HAS ONE. A
+    // `Start` button above a bar with a ▶ on it is the same verb twice, and the
+    // one further from the picture wins the eye. The controls that remain are
+    // the ones that CHOOSE something rather than run it.
+    // ⚠️ And it does NOT autoplay: a deck starts paused, the bar's ▶ starts it,
+    // and the suite checks exactly that contract — `play advances position`
+    // and `pause holds position` both went red the moment this page played
+    // itself, because the harness's first press then PAUSED it.
+    controls: [],
+  });
+  guard(d);
+
+  // ── one deck, and it owns the clock ────────────────────────────────────
+  //
+  // 🔴 THIS REPLACED A HAND-ROLLED `requestAnimationFrame` LOOP, AND THE LOOP
+  // WAS THE DEFECT. MEASURED while building this page: in a background tab
+  // Chrome stops rAF outright — a one-second rAF loop did not finish in
+  // FORTY-FIVE seconds — so the flashes arrived in clumps when the tab was
+  // next painted, and `late` read 2487.2 ms of somebody else's throttling.
+  // `createDeck` defaults to a WORKER tick host, which is the whole reason
+  // that option exists; the clock is no longer the thing the compositor owns.
+  //
+  // ⚠️ It is still not a promise that this survives a locked phone. Their
+  // client is a native app that keeps counting in a pocket; a page needs a
+  // wake lock for that and this one has none. What has gone away is a page
+  // that stopped when you looked at another tab.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, 1000] });
+
+  // ── the player's screen ────────────────────────────────────────────────
+  const screen = el('div', 'cl');
+  const tempoLine = el('div', 'cl-tempo', 'Tempo: 0');
+  const nums = el('div', 'cl-nums');
+  const barEl = el('div', 'cl-bar', '0');
+  const beatEl = el('div', 'cl-beat', '0');
+  nums.append(barEl, beatEl);
+  const lamps = el('div', 'cl-lamps');
+  // ── THE TWO THEMES, AND WHAT ACTUALLY DIFFERS ──────────────────────────
+  //
+  // 🔴 THE MEANINGS ARE IDENTICAL AND THAT IS THE POINT. Three lamps in their
+  // order; red is the downbeat, green every other beat, blue a subdivision; the
+  // beat NUMBER is coloured by which beat it is, standing out on 1 and settling
+  // down after. `subtle` changes no rule, only the paint — so the two can be
+  // compared rather than argued about, and `original` stays one click away as
+  // the thing to check a mimic against.
+  //
+  // What `subtle` changes, in full:
+  //   · the ground fades between two DARKS instead of light-blue → pure black,
+  //     so there is no 200:1 step two centimetres from the numerals
+  //   · the tempo line goes WHITE — darkblue on light blue was the worst pair
+  //     on the page, at the top, where the eye lands first
+  //   · the lamp rim goes from #ffea44 to a 16% white, which reads as an edge
+  //     rather than as a fourth lit thing
+  //   · the beat ramp keeps ONE warm downbeat and then cools AND dims, instead
+  //     of red followed by five greens that are hard to tell apart in motion —
+  //     greenyellow → forestgreen is four steps of roughly equal lightness, so
+  //     at tempo they read as one colour changing slightly rather than as a
+  //     count.
+  const THEME = {
+    original: {
+      lamp: [
+        { key: 'red', on: '#ff0000', off: '#5c0303' },
+        { key: 'green', on: '#008000', off: '#092d23' },
+        { key: 'blue', on: '#add8e6', off: '#01192b' },
+      ],
+      // their array, verbatim, indexed by |beat| and clamped at 6
+      beat: ['white', 'red', 'greenyellow', 'lightgreen', 'green', 'darkgreen', 'forestgreen'],
+    },
+    subtle: {
+      // ⚠️ BRIGHTER THAN THE FIRST TRY, AND THAT WAS THE RIGHT CORRECTION.
+      // Reported as "animated dots bit too subtle · keep them nice still", and
+      // both halves are the brief: a lamp on a click track is a SIGNAL somebody
+      // reads from across a rehearsal room, so restraint that costs legibility
+      // is not restraint, it is a broken instrument. What changed is the LIT
+      // end only — the off colours stay dark so the row still reads as three
+      // unlit dots at rest, and the rim stays an edge. The lit colours now sit
+      // near full chroma while keeping their hue, so they are recognisably the
+      // same three lamps rather than the original's pure red and pure green.
+      lamp: [
+        { key: 'red', on: '#ff5a3c', off: '#2a1a17' },
+        { key: 'green', on: '#3fe39a', off: '#17241f' },
+        { key: 'blue', on: '#5ec8ff', off: '#141d26' },
+      ],
+      // one warm downbeat, then a ramp that cools and dims together, so the
+      // order of the beats survives being read at speed and out of the corner
+      // of an eye
+      // the numerals lift with the lamps, for the same reason — the downbeat
+      // has to be findable at a glance and the ramp still has to read as a ramp
+      beat: ['#cfd8e3', '#ffa733', '#7ff0cd', '#63d8b6', '#4fc0a1', '#42a88c', '#3a9079'],
+    },
+  };
+  let themeName = 'subtle';
+  const LAMP_OF = () => THEME[themeName].lamp;
+  const lampEl = LAMP_OF().map((L) => {
+    const e = el('div', 'cl-lamp');
+    e.style.background = L.off;
+    lamps.append(e);
+    return e;
+  });
+  const noteEl = el('div', 'cl-note', '');
+  screen.append(tempoLine, nums, lamps, noteEl);
+  screen.dataset.theme = themeName;
+  d.el.append(screen);
+
+  /** Repaint what is not driven by CSS tokens: the lamps at rest, and the
+   *  beat numeral that is currently showing. ⚠️ The numeral has to be redone
+   *  too — its colour was set by the last actuate and nothing will set it
+   *  again until the next beat, so a theme switch between beats would leave
+   *  one glyph in the other theme's palette. */
+  function paintTheme() {
+    screen.dataset.theme = themeName;
+    lampEl.forEach((e, k) => {
+      e.style.transition = 'none';
+      e.style.background = LAMP_OF()[k].off;
+      e.style.width = e.style.height = '22px';
+    });
+    const shown = Number(beatEl.textContent);
+    if (Number.isFinite(shown)) {
+      beatEl.style.color = THEME[themeName].beat[Math.min(Math.abs(shown), 6)];
+    }
+  }
+
+  /** Light one lamp and let it fade over a beat.
+   *
+   *  ⚠️ A CSS TRANSITION, NOT A FRAME LOOP. Their QML runs a ParallelAnimation
+   *  over colour and diameter together; the browser's equivalent is two
+   *  properties and one duration, and it runs on the compositor. The version
+   *  this replaced redrew the fade by hand every frame — which meant the
+   *  decoration needed the same clock as the timing, and stopped with it.
+   */
+  function flash(i, beatMs) {
+    const e = lampEl[i];
+    if (!e) return;
+    const L = LAMP_OF()[i];
+    // 🔴 WEB ANIMATIONS, NOT A FRAME CALLBACK — and not SVG either. The fade
+    // went wrong twice before landing here, both times for the same reason:
+    // `requestAnimationFrame` was being used as a TRIGGER. First it redrew the
+    // fade by hand every frame; then it only ARMED a CSS transition one frame
+    // later, to get a committed starting style. MEASURED, both times: in a
+    // hidden tab the callback never runs, so every lamp lit and none ever
+    // faded, and two sat at full size at once.
+    // ⚠️ SVG would not have fixed this. SMIL is the same class of thing as a
+    // CSS transition — declarative, driven by the browser's own timeline — so
+    // it solves a problem nobody had, and the lamps are circles. What actually
+    // removes the trigger is asking the browser for the whole animation at
+    // once: no reflow to force, no starting style to commit, and a handle that
+    // cancels cleanly when the next beat lands on the same lamp.
+    e.getAnimations().forEach((a) => a.cancel());
+    // 🔴 A HOLD BEFORE THE DECAY, AND IT IS WHY THE LAMPS READ AT ALL. Their
+    // QML ramps from bright to dark across one beat, so the PEAK is
+    // instantaneous — at 80 bpm the lamp is under half brightness within 300 ms
+    // and a glance almost never lands on the bright part. Reported as "animated
+    // dots bit too subtle". Holding the lit state for the first eighth of a
+    // beat costs nothing in timing (the flash still starts exactly on the beat,
+    // which is the only thing anyone reads a click track for) and turns a peak
+    // into something with a duration.
+    // ⚠️ The decay still fills the whole beat, so the lamp is always back at
+    // rest before the next one — an overlap would make two lamps look lit and
+    // that is a different beat being claimed.
+    e.animate(
+      [{ background: L.on, width: '76px', height: '76px', offset: 0 },
+       { background: L.on, width: '76px', height: '76px', offset: 0.12 },
+       { background: L.off, width: '22px', height: '22px', offset: 1 }],
+      { duration: Math.max(60, beatMs), easing: 'linear', fill: 'forwards' },
+    );
+  }
+
+  // ── compiling, which is all the work there is ──────────────────────────
+  let cp = null, tm = null, doc = null;
+  let events = [];        // {ms, bar, beat, lamp, bpm} or {ms, text, durMs}
+  let wouldSend = 0;      // messages their server would have pushed by now
+  let worstLate = 0;
+  let scoreName = 'test.sco';
+
+  /** A bar statement expands into its own beats.
+   *
+   *  From THEIR orchestra (`server/metro_sendosc.orc`, instr 2), not guessed:
+   *  p4 is how many beats the bar has, p5 is the note value as a fraction of a
+   *  whole note, p6 the subdivision, p7 the bar number. Their metronome runs at
+   *  `tempo/60 * p5/4`, so beat k sits 4/p5 score-beats after the one before.
+   *
+   *  ⚠️ A NEGATIVE BAR NUMBER IS NOT A BAR BEFORE THE START. It means "do not
+   *  flash red on the first beat", for a bar built out of unequal groups —
+   *  2+3+2/8 is written as three statements, one per group, and only the first
+   *  gets the red. The FRACTIONAL part carries the beat number to start
+   *  counting from, so -5.2 is bar 5 counting from beat 2. Reading it as a
+   *  number would put four bars of the piece before bar 1.
+   */
+  function barBeats(r) {
+    const p = r.payload.p;
+    const count = Math.max(1, Math.round(Number(p[3]) || 1));
+    const value = Number(p[4]) || 4;
+    const barNo = Number(p[6]) || 0;
+    const shown = Math.abs(Math.trunc(barNo));
+    const frac = Math.abs(barNo % 1);
+    const first = frac === 0 ? 1 : Math.round(frac * 10);
+    const step = 4 / value;
+    const out = [];
+    for (let k = 0; k < count; k++) {
+      const gb = r.at + k * step;
+      out.push({
+        ms: tm.msAt(gb),
+        bar: shown,
+        beat: first + k,
+        lamp: (k === 0 && barNo >= 0) ? 0 : 1,
+        bpm: bpmAtBeat(gb),
+        row: r.id,
+      });
+    }
+    return out;
+  }
+
+  function bpmAtBeat(beat) {
+    const a = tm.msAt(beat), b = tm.msAt(beat + 0.001);
+    return b > a ? 60000 / ((b - a) * 1000) : 0;
+  }
+
+  function build() {
+    warn.textContent = '';
+    let part;
+    try { part = csoundPart(SCORES[scoreName]); }
+    catch (e) { warn.textContent = `${scoreName} did not compile: ${e.message}`; return; }
+    cp = part;
+    tm = tempoMap(part.tempo.length ? part.tempo : [[0, 60]]);
+
+    // 🔴 THE SCORE BECOMES A DOCUMENT, AND THE DOCUMENT IS WHAT WOULD CROSS.
+    // `/score/`'s container, unchanged: the Csound rows keep their p-fields
+    // verbatim — nothing here decides that p5 is a note value, the player's
+    // screen does — and one use places the part once. It round-trips
+    // byte-identically, which is what makes `bytes` an honest number rather
+    // than an estimate of one.
+    const lastBeat = part.part.rows.length
+      ? Math.max(...part.part.rows.map((r) => r.at + (r.dur || 0))) : 0;
+    doc = scoreDoc({
+      id: scoreName.replace(/\W+/g, '-'),
+      tempo: part.tempo.length ? part.tempo : [[0, 60]],
+      parts: { click: part.part },
+      uses: [quotation({ id: 'u1', ref: 'click', at: 0, in: 0, out: lastBeat || 1 })],
+    });
+
+    const ev = [];
+    for (const r of part.part.rows) {
+      const instr = String(r.payload.instr).replace(/"/g, '');
+      const atMs = tm.msAt(r.at);
+      const durMs = tm.msAt(r.at + (r.dur || 0)) - atMs;
+      if (instr === '2') ev.push(...barBeats(r));
+      else if (instr === 'countdown') {
+        // a count-in: p4 clicks spread over p3, shown as negative numbers, and
+        // the last one green rather than blue — their instr 18, exactly
+        const clicks = Math.max(1, Math.round(Number(r.payload.p[3]) || 1));
+        for (let k = 0; k < clicks; k++) {
+          ev.push({ ms: atMs + (durMs * k) / clicks, bar: 0, beat: -(clicks - k),
+                    lamp: k === clicks - 1 ? 1 : 2, bpm: bpmAtBeat(r.at), row: r.id });
+        }
+      } else if (instr === 'notification') {
+        ev.push({ ms: atMs, text: String(r.payload.p[3] ?? '').replace(/"/g, ''), durMs, row: r.id });
+      }
+    }
+    ev.sort((a, b) => a.ms - b.ms);
+    events = ev;
+
+    // hand the whole piece to the deck, once. This is the argument in one line:
+    // everything the piece will ever ask for is scheduled up front, and nothing
+    // crosses a network again.
+    deck.sched.clear();
+    let n = 0;
+    for (const e of ev) {
+      deck.schedule(e.text !== undefined
+        ? { at: e.ms, kind: 'word', id: `w${n++}`, payload: { ...e } }
+        : { at: e.ms, kind: 'flash', id: `f${n++}`, payload: { ...e } });
+    }
+    const end = ev.length ? ev[ev.length - 1].ms + 2000 : 1000;
+    deck.setRange([0, Math.max(end, part.durationMs)]);
+    view.strip.invalidate();
+    drawDoc();
+
+    // ⚠️ UTF-8 BYTES, not `String.length` — that counts UTF-16 code units, and
+    // this repo has already paid for the difference once on the wire.
+    d.set('bytes', new TextEncoder().encode(scoreDocToJSONL(doc)).length);
+    // ⚠️ NOT 0 — nothing has been pushed because nothing has been played, and
+    // a zero here would read as a measurement rather than as an empty cell.
+    d.set('pushed', '');
+    d.set('late', '');
+    worstLate = 0; wouldSend = 0;
+    if (part.part.warnings.length) warn.textContent = part.part.warnings.join(' \u00b7 ');
+    d.log(`${scoreName}: ${part.part.rows.length} rows, ${ev.length} to show`, 'hi');
+    lanesLabel();
+  }
+
+  // ── the adapter: what a scheduled thing DOES when its moment comes ──────
+  const flashAdapter = {
+    caps: { rates: [0.5, 1, 2], continuous: false, assertOnSeek: true },
+    actuate(p) {
+      barEl.textContent = String(p.bar);
+      beatEl.textContent = String(p.beat);
+      // their beat colours, in their order — beat 1 red, then progressively
+      // deeper greens, and everything past the sixth stays forest green
+      beatEl.style.color = THEME[themeName].beat[Math.min(Math.abs(p.beat), 6)];
+      flash(p.lamp, p.bpm > 0 ? 60000 / p.bpm : 500);
+      tempoLine.textContent = `Tempo: ${Math.round(p.bpm)}`;
+      d.set('tempo', Math.round(p.bpm));
+      d.set('bar', p.bar);
+      d.set('beat', p.beat);
+      // 🔴 THE NUMBER THE PAGE EXISTS TO REPORT. How late this flash was
+      // against the millisecond the score asks for — not against the previous
+      // flash, which would only measure the timer against itself. Read on the
+      // page's side of the boundary, which is the side that can be wrong.
+      worstLate = Math.max(worstLate, Math.abs(deck.position() - p.ms));
+      d.set('late', worstLate.toFixed(1));
+      // what vClick would have put on the wire to reach one player: the
+      // beat/bar pair and the lamp are two separate OSC messages in their
+      // `instr send`, and there is one of each per beat, per player.
+      wouldSend += 2;
+      d.set('pushed', wouldSend);
+      lightRow(p.row);
+    },
+    reduce: (rows) => ({ count: rows.length }),
+    assertState: (s) => s,
+  };
+  const wordAdapter = {
+    caps: { rates: [0.5, 1, 2], continuous: false, assertOnSeek: true },
+    actuate(p) {
+      noteEl.textContent = p.text;
+      clearTimeout(noteEl._t);
+      noteEl._t = setTimeout(() => { noteEl.textContent = ''; }, Math.max(400, p.durMs));
+      lightRow(p.row);
+    },
+    // ⚠️ COUNT ONLY. The first version reached into `rows[n].payload.text` and
+    // threw — the rows a reducer is handed are not the items that were
+    // scheduled, and assuming they are took the whole page down from inside a
+    // seek. Reduce over what the deck guarantees: how many of these have
+    // passed.
+    reduce: (rows) => ({ count: rows.length }),
+    assertState: (s) => s,
+  };
+  deck.sched.registerAdapter('flash', flashAdapter);
+  deck.sched.registerAdapter('word', wordAdapter);
+
+  // ⚠️ ONE POSITION SURFACE. The strip below seeks on press AND on drag, so the
+  // bar's slider would be a second horizontal time axis at a different scale,
+  // stacked on the first — a contradiction rather than a redundancy.
+  createTransportBar(d.el, deck, { scrub: false });
+
+  const INK = { beat: '#ffd400', word: '#6f7d94' };
+
+  const view = createStripView(d.el, deck, {
+    size: 'auto', follow: true, gutter: 150,
+    lanes: [
+      { id: 'beats', kind: 'flash', label: 'beat', height: 44, width: 2, as: 'ticks',
+        color: INK.beat, terse: true,
+        rows: () => events.filter((e) => e.text === undefined)
+          .map((e, i) => ({ at: e.ms, id: `f${i}`, kind: 'flash', payload: { ...e } })),
+        describeRow: (r) => {
+          const p = r.payload || {};
+          return [`bar ${p.bar} beat ${p.beat}`, `${Math.round(p.bpm)} bpm`];
+        } },
+      { id: 'words', kind: 'word', label: 'word', height: 40, barPad: 6,
+        as: 'spans', stack: false, barGap: 3, terse: true, color: INK.word,
+        rows: () => events.filter((e) => e.text !== undefined)
+          .map((e, i) => ({ at: e.ms, id: `w${i}`, kind: 'word',
+                            payload: { ...e, durMs: e.durMs } })),
+        labelOf: (s, { bw } = {}) => {
+          const t = s.row?.payload?.text || '';
+          return bw && bw < 60 ? t.slice(0, 4) : t;
+        },
+        describeRow: (r) => {
+          const p = r.payload || {};
+          return [p.text, `${Math.round(p.durMs)} ms`];
+        } },
+    ],
+  });
+
+  // ── theirs and ours, under the line that plays them ───────────────────
+  const two = el('div', 'two');
+  const srcCol = el('div'), docCol = el('div');
+  srcCol.append(el('h4', '', 'their score'));
+  docCol.append(el('h4', '', 'our document'));
+  const srcPre = el('pre', 'sc');
+  const pre = el('pre', 'sc');
+  srcCol.append(srcPre); docCol.append(pre);
+  two.append(srcCol, docCol);
+  d.el.append(two);
+  let lineOfRow = new Map();     // row id -> line index in OUR document
+  let srcOfRow = new Map();      // row id -> line number in THEIR score
+
+  /** Draw the document, and remember which line each row is on.
+   *  ⚠️ Rebuilt only when the SCORE changes; the per-beat path just flips
+   *  `data-state` on one element, because rewriting a block of text on every
+   *  beat is a reflow on a clock. */
+  function drawInto(box, lines) {
+    box.textContent = '';
+    lines.forEach((text, i) => {
+      const line = el('span', 'sc-l');
+      line.append(el('span', 'sc-n', String(i + 1).padStart(3, ' ') + '  '));
+      line.append(document.createTextNode(text));
+      box.append(line);
+    });
+  }
+
+  function drawDoc() {
+    // OURS: one JSON object a line, and which line each row is on
+    const lines = scoreDocToJSONL(doc).split('\n').filter(Boolean);
+    lineOfRow = new Map();
+    drawInto(pre, lines);
+    lines.forEach((text, i) => {
+      try {
+        const o = JSON.parse(text);
+        if (o && o.t === 'row' && o.id) lineOfRow.set(o.id, i);
+      } catch { /* a line that is not a row is not addressable, and that is fine */ }
+    });
+    // THEIRS: the file as the composer typed it, tabs and comments included.
+    // ✅ `csoundPart` keeps each row's `line`, so the two columns can be joined
+    // without this page re-parsing anything — which would be a second reading
+    // of the format, and this repo has paid for one of those already.
+    drawInto(srcPre, SCORES[scoreName].split('\n'));
+    srcOfRow = new Map();
+    for (const r of cp.part.rows) if (r.line) srcOfRow.set(r.id, r.line - 1);
+  }
+
+  /** Light the line a beat came from. Several beats belong to ONE bar
+   *  statement, so the same line lights again — which is the honest picture:
+   *  the document has one line there, not four. */
+  function lightOne(box, i) {
+    for (const e of box.children) if (e.dataset.state === 'now') e.dataset.state = 'played';
+    if (i !== undefined && box.children[i]) box.children[i].dataset.state = 'now';
+  }
+  function lightRow(id) {
+    lightOne(pre, lineOfRow.get(id));
+    lightOne(srcPre, srcOfRow.get(id));
+  }
+
+  /** The per-lane numbers, in the lane's own gutter rather than in a table. */
+  function lanesLabel() {
+    const beats = events.filter((e) => e.text === undefined);
+    const words = events.filter((e) => e.text !== undefined);
+    const bl = view.strip.lanes().find((l) => l.id === 'beats');
+    const wl = view.strip.lanes().find((l) => l.id === 'words');
+    const bpms = beats.map((e) => Math.round(e.bpm)).filter((x) => x > 0);
+    if (bl) bl.subLabel = [`${beats.length} of them,`,
+      bpms.length && Math.min(...bpms) !== Math.max(...bpms)
+        ? `${Math.min(...bpms)}–${Math.max(...bpms)} bpm` : `${bpms[0] ?? 0} bpm`];
+    if (wl) wl.subLabel = [`${words.length} of them,`, 'shown, never sounded'];
+  }
+
+  // ── the operator's half ────────────────────────────────────────────────
+  const op = el('div', 'op');
+  const pick = createChoice({
+    label: 'Score',
+    options: Object.keys(SCORES).map((k) => [k, k]),
+    at: 0,
+    onPick: (id) => { scoreName = id; build(); },
+  });
+  let startBar = 1;
+  const barLabel = el('span', '', 'bar 1');
+  const stepper = createStepper({
+    what: 'the starting bar',
+    prev: () => { startBar = Math.max(1, startBar - 1); barLabel.textContent = `bar ${startBar}`; seekBar(); },
+    next: () => { startBar = startBar + 1; barLabel.textContent = `bar ${startBar}`; seekBar(); },
+  });
+  const themePick = createChoice({
+    label: 'Theme',
+    options: [['subtle', 'subtle'], ['original', 'original']],
+    at: 0,
+    onPick: (id) => { themeName = id; paintTheme(); d.log(`theme: ${id}`); },
+  });
+  op.append(pick.el, el('label', '', 'Start from'), stepper.el, barLabel, themePick.el);
+  // ⚠️ FIRST IN THE BODY, not last. These pick WHAT you are looking at, so they
+  // belong above the thing rather than under it — a chooser below its own
+  // result is a control you find after you have stopped looking for it.
+  d.el.prepend(op);
+  const warn = el('p', 'warn', '');
+  d.el.append(warn);
+
+  /** Where in the piece a bar number starts.
+   *
+   *  🔴 THIS IS THE WHOLE ARGUMENT, IN ONE FUNCTION. Their server does it by
+   *  rewriting the score text: find the line whose eighth field is the bar,
+   *  replace a comment reading `;ADVANCE` with a skip statement, hunt backwards
+   *  for the last tempo line and re-insert it with a patched time. Their README
+   *  says playback can start from any bar "if the vClick score is done well",
+   *  and that qualifier is this machinery — the score has to contain the magic
+   *  comment, write `i 2` with a space, and carry enough fields.
+   *  Compiled, it is a search through a list and a `deck.seek()`, and the tempo
+   *  needs no repair because the tempo is a map over the whole piece rather
+   *  than a thing the score is in the middle of doing.
+   */
+  function msOfBar(n) {
+    const hit = events.find((e) => e.bar === n && e.beat === 1);
+    return hit ? hit.ms : null;
+  }
+  function seekBar() {
+    const at = msOfBar(startBar);
+    if (at === null) { d.log(`bar ${startBar} is not in ${scoreName}`, 'bad'); return; }
+    worstLate = 0; wouldSend = 0;
+    deck.seek(at);
+    d.log(`bar ${startBar} is ${Math.round(at)} ms in`, 'hi');
+  }
+
+  build();
+  seekBar();
+
+  // ── what the page checks about itself ──────────────────────────────────
+  d.assert('their real score compiles', !!cp && cp.part.rows.length === 25,
+    cp ? `${cp.part.rows.length} rows` : 'did not compile');
+  d.assert('it compiles with nothing to warn about', !!cp && cp.part.warnings.length === 0,
+    (cp?.part.warnings || []).join(' · ') || 'no warnings');
+  d.assert('every bar statement expanded into its own beats', events.length > cp.part.rows.length,
+    `${cp.part.rows.length} rows became ${events.length} things to show`);
+  // the document is the thing that would cross, so it has to survive the trip
+  d.assert('the score document round-trips byte-identically',
+    scoreDocToJSONL(parseScoreDocJSONL(scoreDocToJSONL(doc))) === scoreDocToJSONL(doc),
+    `${new TextEncoder().encode(scoreDocToJSONL(doc)).length} B`);
+  {
+    // ⚠️ Counted on the DECK's side of the boundary, not on the page's — a
+    // count of what we handed over is a count of our own intention.
+    const on = deck.eventsOf('flash').length + deck.eventsOf('word').length;
+    d.assert('the whole piece is on the deck', on === events.length,
+      `${on} scheduled of ${events.length}`);
+  }
+
+  // A bar's first beat must land on the row's own millisecond — the expansion
+  // walks the tempo map by hand, so this is the one place it could disagree
+  // with the compiler that produced the row.
+  {
+    let worst = 0;
+    for (const r of cp.part.rows) {
+      if (String(r.payload.instr).replace(/"/g, '') !== '2') continue;
+      worst = Math.max(worst, Math.abs(barBeats(r)[0].ms - tm.msAt(r.at)));
+    }
+    d.assert('each bar\u2019s first beat lands on the row\u2019s own time', worst < 1e-6,
+      `worst ${worst.toExponential(2)} ms over ${cp.part.rows.length} rows`);
+  }
+
+  // 🔴 The claim the page makes about starting anywhere, checked rather than
+  // stated: every bar the score names can be seeked to, and the fold says what
+  // has sounded by then — which is what their `;ADVANCE` surgery is for.
+  {
+    const bars = [...new Set(events.filter((e) => e.beat === 1 && e.bar > 0).map((e) => e.bar))];
+    const found = bars.filter((b) => msOfBar(b) !== null);
+    d.assert('every bar in the score can be started from', bars.length > 0 && found.length === bars.length,
+      `${found.length} of ${bars.length} bars — ${bars.join(', ')}`);
+    let wrong = 0;
+    for (const b of bars) {
+      const at = msOfBar(b);
+      const want = events.filter((e) => e.text === undefined && e.ms <= at).length;
+      const got = deck.reduceAt('flash', at);
+      if (!got || got.count !== want) wrong++;
+    }
+    d.assert('and the count of what has sounded is exact at every one', wrong === 0,
+      `${bars.length} bars probed, ${wrong} wrong`);
+  }
+
+  // The score declares its tempo twice and the two must agree, or the number on
+  // a player's screen is not the number the beats are spaced by.
+  {
+    const rows = cp.part.rows.filter((r) => String(r.payload.instr) === '1'
+      && Number(r.payload.p[3]) > 0);
+    let worst = 0;
+    for (const r of rows) worst = Math.max(worst, Math.abs(bpmAtBeat(r.at) - Number(r.payload.p[3])));
+    d.assert('the two ways the score states its tempo agree', rows.length > 0 && worst < 1.5,
+      `${rows.length} tempo rows, worst ${worst.toFixed(2)} bpm apart`);
+  }
+
+  // The offline claim, asserted rather than assumed — plan-uuu-local P2.
+  d.assert('the page asked the network for nothing',
+    performance.getEntriesByType('resource')
+      .every((r) => new URL(r.name, location.href).pathname.startsWith('/shell/')
+        || new URL(r.name, location.href).pathname.startsWith('/timeline/')),
+    `${performance.getEntriesByType('resource').length} resources, all local code`);
+
+  d.log('press \u25b6 on the bar \u2014 or step the bar number to start anywhere', 'hi');
+  d.ready();
+</script>
+</html>

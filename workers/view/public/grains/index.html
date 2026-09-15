@@ -60,8 +60,19 @@
   .pane .hd span { display: block; font: 400 10.5px/1.5 var(--mono); color: var(--dim2); }
   /* the crossfade reads as a line between the two panes, so its ends are
      labelled where they point rather than in the paragraph above */
-  .fade { gap: 10px; align-items: center; }
+  /* 🔴 THE SLIDER TAKES THE ROW. A `.sld` is `inline-flex`, so between two
+     `max-content` end labels it sat at its standalone 96 px with the whole
+     content width empty either side — photographed, and it reads as a control
+     that failed to lay out rather than one that is small. `1fr` on the middle
+     item and the lane stretching inside it is what makes the track the width of
+     the thing it is blending. */
+  .fade { display: flex; gap: 14px; align-items: center; }
   .fade .end { font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim2); white-space: nowrap; }
+  .fade > .sld { flex: 1 1 auto; min-width: 0; }
+  .fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
+  /* with no label there is no head to show, and an empty one would still take
+     its gap */
+  .fade > .sld > .sld-head:empty, .fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
 </style>
 
 <script type="module">
@@ -69,7 +80,14 @@
   import { createSlider, createSliderGroup, glide, GLIDE_MS } from '/shell/slider.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
-  import { buildSource, SHAPES, sourceMessage } from '/shell/source.mjs';
+  import { SHAPES, sourceMessage } from '/shell/source.mjs';
+  // 🔴 REAL SUPERCOLLIDER, IN THIS TAB. The left pane used to be
+  // `demo/shell/granular-worklet.js`, 251 hand-written lines, under a page
+  // claiming "the same granulator in this page and on a Raspberry Pi" — which
+  // was false: a reimplementation that sounds similar is not the same
+  // instrument. Both ends now load the SAME compiled `pappus.scsyndef`. The
+  // 1.7 MB engine is fetched inside `startPappus()`, so a visit costs the page.
+  import { startPappus, levelOver } from './engine.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
@@ -98,8 +116,21 @@
       // engines side by side, so a shared row of numbers has to say which one
       // each belongs to or it is a legend. The per-lane detail lives in each
       // card's own gutter, beside the ink it describes.
-      'grains a second': '', 'at once': '',
+      // 🔴 THE PAGE'S OWN GRAINS ARE NOT IN HERE, and they used to be. `grains
+      // a second` and `at once` are already printed in granulator one's own
+      // card, beside the picture they describe — which is where this project
+      // puts a per-lane figure — so the row was saying them a second time, and
+      // saying them BLANK until you press Switch it on. Two empty cells above
+      // two full ones reads as a readout that failed to load.
       board: '', sound: '',
+      // ⚠️ THESE TWO EXIST BECAUSE TWO PARAGRAPHS WERE DELETED, and they are
+      // the same facts in the form this project uses for a moving figure. The
+      // prose said "53 nudges in the 8 s this page has been watching, none of
+      // them asked for" and "reading at 0.416 of the way through the sixty
+      // seconds"; a cell says it in a fixed box that does not reflow.
+      // 🔴 Deleting a display without rehoming what it said is how a page
+      // quietly stops reporting something, which is worse than saying it badly.
+      nudges: '', 'reading at': '',
     },
     controls: [
       // 🔴 THE ONE CONTROL THAT MAKES IT SOUND LIKE A GRANULATOR. MEASURED on
@@ -136,19 +167,20 @@
   // The first demo to take the drawer (plan-diagram §7). It goes where the
   // paragraph was, above the numbers, because it is the thing to read first.
   //
-  // 🔴 THREE BOXES, AND THE SECOND GRANULATOR IS NAMED INSIDE THE BOX THAT
-  // HOLDS IT — MEASURED, NOT PREFERRED. The true shape here is a fork: the
-  // same four settings go to a granulator in this page AND out to the one on
-  // the board. Drawn as one — `this page` branching to `a granulator here` and
-  // to `Cloudflare`, which is right and legible at 688 px — it is FALSE at
-  // 358 px: below 560 px the drawer stacks every box in one column and draws a
-  // forward link as a straight vertical at its source's centre, so the branch
-  // to Cloudflare runs behind the granulator box and a phone reads
-  // `this page → a granulator here → Cloudflare`. That is a path this page
-  // does not have, has never measured, and is exactly the plausible wrong
-  // story (granulate here, then send it). So each granulator is named in the
-  // box of the machine that runs it, which is plan-diagram §3's own rule for
-  // two programs in one device, and the picture is true at both widths.
+  // 🔴 EACH GRANULATOR IS A BOX INSIDE THE MACHINE THAT RUNS IT. It was a
+  // `sub` on the machine — `this page` / `a granulator in it` — which draws
+  // the two as ONE thing doing one job, and they are not one thing: the
+  // granulator is IN the page, the way the other one is in the board. That is
+  // the shape, so the drawer draws it.
+  //
+  // ⚠️ AND IT IS STILL NOT A FORK, WHICH IS WHAT IT LOOKED LIKE FIRST. Drawn
+  // as one — `this page` branching to `a granulator here` and to `Cloudflare`,
+  // right and legible at 688 px — it was FALSE at 358 px: below 560 px every
+  // box stacks in one column, so the branch to Cloudflare ran behind the
+  // granulator box and a phone read `this page → a granulator here →
+  // Cloudflare`, a path this page does not have and has never measured. A box
+  // inside a box says the same true thing at both widths and has no second
+  // branch to route.
   //
   // ⚠️ EVERY ARROW IS A THING THIS PAGE ASSERTS. `four settings` is the
   // `params.set` pair `setKnob` sends, under "the page reached the relay";
@@ -158,28 +190,64 @@
   // the notes and the material spec also go out, and they are left off rather
   // than crowding the one arrow that carries the page's subject.
   createDiagram(d.head, {
-    title: 'the same four settings, in two buildings',
+    // 🔴 NO TITLE. It sat directly under the page's own name — two headings
+    // stacked, the second explaining the first — and it drove the diagram hard
+    // against them, which is the vertical-spacing rule broken by a component
+    // that was given a heading it did not need. The diagram is the first thing
+    // on the page and its boxes say what it is; a caption above a picture that
+    // is about to explain itself is a label on a label.
     // The paragraph that was in `what`, cut to the part the drawing cannot
     // say. Hovering a box replaces this line with what that box does, which is
     // why there is no tooltip anywhere on this page.
     caption: 'The blend decides how much of each you hear, so one can become the other while both '
       + 'keep running. Press Hold and the board stops listening: its grains then come only from the '
       + 'minute it already has, which is when the settings start to do something you can hear.',
+    // ⚠️ A BOX'S SENTENCE SAYS WHAT IT DOES HERE, NEVER ITS NAME AGAIN.
+    // Hovering `Raspberry Pi` used to put `Raspberry Pi — another granulator`
+    // under the picture, beside a browser tooltip saying the same, over a box
+    // already saying it: three channels, one fact. These are the fourth
+    // sentence of the paragraph that is not in `what` any more.
+    // 🔴 AND THEY ARE STATIC. A sentence that recomputed itself from a live
+    // number is the slop prose this page had two paragraphs of; these describe
+    // a fixed picture and never change while anybody is looking at them.
     nodes: [
-      { id: 'you', label: 'this page', sub: 'a granulator in it', kind: 'here' },
-      { id: 'cf', label: 'Cloudflare', sub: 'passes it all on', kind: 'cloud' },
-      { id: 'pi', label: 'Raspberry Pi', sub: 'another granulator', kind: 'device' },
+      { id: 'you', label: 'this page', kind: 'here',
+        note: 'Everything you press is in this browser, and so is **one of the two granulators**.',
+        children: [{ id: 'here', label: 'a granulator', sub: 'called Pappus',
+          note: 'The **same program** as the board’s, compiled to run in a browser, '
+              + 'chewing the same description of a sound.' }] },
+      { id: 'cf', label: 'Cloudflare', sub: 'passes it all on', kind: 'cloud',
+        note: 'A computer rented by the hour, so the two ends never have to find each '
+            + 'other. It **changes nothing** on the way through.' },
+      // ⚠️ `called Pappus` IS A NAME, NOT JARGON — CLAUDE.md, decided
+      // 2026-09-13. It is what the program on the board is called, and hiding
+      // it behind a friendly word would hide the one fact this box carries.
+      { id: 'pi', label: 'Raspberry Pi', kind: 'device',
+        note: 'A small board in the studio, on a network of its own, which this page '
+            + 'reaches **only through Cloudflare**.',
+        children: [{ id: 'there', label: 'a granulator', sub: 'called Pappus',
+          note: 'The **same program** again, on the board’s own sound server, '
+              + 'with the same four settings.' }] },
     ],
     links: [
       // ⚠️ `four settings`, NOT `the four settings` — MEASURED. In one column
-      // an arrow's name gets half a box minus 16 px, so the article costs four
-      // characters the drawer does not have below a 375 px phone: it reported
-      // `the four…` at 343 px, which is a 17-character label in a 93 px slot.
-      // Dropping one word is clean down to a 360 px screen.
+      // an arrow's name gets the room beside it in the row it sits in, and the
+      // article costs four characters the drawer does not have on a narrow
+      // phone: it reported `the four…` at 343 px, a 17-character label in a
+      // 93 px slot. Dropping one word is clean down to 258 px.
+      //
+      // 🔴 EVERY ARROW IS NAMED, AND THE TWO MIDDLE ONES SAY `the same`
+      // BECAUSE THAT IS WHAT CROSSES THEM. A bare arrow says only "these two
+      // are connected", which the line already said. The relay hands on
+      // exactly what it was given, so the second hop of each direction carries
+      // the same thing as the first — which is the fact, and inventing a
+      // different word for it would be a small lie. MEASURED at 258 / 288 /
+      // 320 / 343 / 375 / 390 / 560 / 688 px: nothing shortened at any of
+      // them, with four names in the picture instead of two.
       { from: 'you', to: 'cf', label: 'four settings' },
-      { from: 'cf', to: 'pi', label: '' },
+      { from: 'cf', to: 'pi', label: 'the same four' },
       { from: 'pi', to: 'cf', label: 'sound and grains', back: true },
-      { from: 'cf', to: 'you', label: '', back: true },
+      { from: 'cf', to: 'you', label: 'the same back', back: true },
     ],
   });
 
@@ -189,12 +257,55 @@
   let wantSource = null;               // a source this page asked the board to start
   let playing = null, onJack = false;  // what the board is sounding, and whether the granulator can reach it
   let fxOn = false, fxWhy = null, fed = null, switching = false;
+  /**
+   * 🔴 WHO ELSE IS DRIVING THIS BOARD. Two pages share one Raspberry Pi:
+   * `/box/` takes the granulator OUT on load — rightly, because an insert left
+   * in by a tab that CLOSED wraps whatever it plays and feeds its own delay —
+   * and this page puts it IN, because the granulator is its whole subject. So
+   * whichever was opened last used to win SILENTLY, and the loser went on
+   * drawing a picture that was no longer true, which is the worst shape of
+   * failure there is.
+   *
+   * The board reports its own insert now — in `fx.pappus`, in `audio.started`
+   * and in the five-second `box.alive` — so a change made in another window
+   * arrives here without this page asking for anything. ⚠️ This page does NOT
+   * fight back: switching it on again automatically would be two tabs taking
+   * turns for ever. It says what happened and leaves the button where it is.
+   */
+  let fxBy = null, fxTakenAt = 0;
+  /**
+   * How many of the board's eight granulator voices are open, from the board's
+   * own `params.state`.
+   *
+   * 🔴 THE NUMBER THAT WOULD HAVE SAVED A SESSION. With every gate shut the
+   * granulator fires no grain at all while PASSTHROUGH STILL WORKS — so the
+   * board streams audio, answers every question, reports the right material,
+   * and makes nothing. The page read that as "the board is silent" and could
+   * not say why. It was on the wire the whole time and nothing looked at it.
+   */
+  let boardVoices = null;
   let roll = null;                     // the board's current roll: character, seed, every parameter
   let drift = null, rolledAt = 0;
   const driftLog = [];                 // {t, nudges} — every reading, so the window is real
   let probe = null;                    // { quiet, held } — peak with nothing pressed, then with a key down
   let frames = 0, gaps = 0, gapWarned = false, lastSeq = -1, firstFrame = 0, level = 0, levelAt = 0;
   let boardGrains = 0;                 // how many the board has reported to this page
+  /**
+   * Every batch the board has sent, with the time it landed — so a RATE can be
+   * taken over a window this page actually watched.
+   *
+   * ⚠️ A RUNNING TOTAL OVER A START TIME IS THE WRONG COLLECTOR HERE, and it
+   * read 0.6 a second about a board firing 2.2. `grain.report` EXPIRES after
+   * 30 s and this page only re-asks once the granulator is on, so on a cold
+   * board — forty seconds of compiling — the counting window opens long before
+   * the reports are continuous, and the dead time goes into the denominator.
+   * A sliding window over the arrivals cannot have that bug.
+   */
+  const grainLog = [];                 // {t, seen}
+  // What the BOARD says it is chewing — the engine's own answer, not this
+  // page's request. plan-twins §4a: the two panes are only comparable if the
+  // material is the same, and this is the end that can be asked.
+  let made = null;                     // { partials, topHz, engine } | { reason }
   let collect = null;                  // set while a measurement is open
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -257,21 +368,12 @@
     return Number.isFinite(drift.scan) ? 'moving' : 'nothing';
   }
   /** The same three states in words, for the line under the panel. */
-  function driftLine() {
-    const moved = driftMoved();
-    switch (driftState()) {
-      case 'moving':
-        return `moving on its own · ${moved ? `${moved.nudges} nudges in the ${secs(moved.ms)} this page has been watching` : 'no reading yet'}`
-          + `, none of them asked for · the slow one is reading at ${drift.scan} of the way through the sixty seconds`;
-      case 'nothing':
-        return 'switched on at the board and moving nothing yet — it circles the last value anybody set, and this page has not '
-          + 'set one since the board came up; press a sound';
-      case 'off':
-        return 'not moving on its own — the movement is switched off on the board, and it is asked for with every patch';
-      default:
-        return 'the board has not said whether it is moving anything on its own';
-    }
-  }
+  // ⚠️ `driftLine()` IS GONE WITH THE PARAGRAPH IT FED. Its own comment
+  // recorded that it had once printed `moving on its own · 0 nudges … reading
+  // at —` about a board that was moving nothing — a headline claim with its own
+  // contradiction beside it — and the repair was to make the sentence smarter.
+  // The sentence was the problem. The drift count is a readout cell now and the
+  // board's state changes are logged when they CHANGE.
 
   // ── the page ─────────────────────────────────────────────────────────────
   // 🔴 NO SOURCE PICKER, AND NO ARCHIVE. This page makes no request to ERR at
@@ -320,7 +422,7 @@
   const here = () => blend < 0.5;      // which lane the page is mostly listening to
   const fadeGains = () => {
     const a = Math.cos(blend * Math.PI / 2), b = Math.sin(blend * Math.PI / 2);
-    if (lgain) lgain.gain.value = 0.9 * a;
+    if (pap?.out) pap.out.gain.value = 0.9 * a;
     if (boardGain) boardGain.gain.value = b;
   };
 
@@ -404,6 +506,43 @@
    * ⚠️ The two halves are deliberately unlike each other. Giving both the same
    * numbers is what made the old roll sound like one thing played twice.
    */
+  /**
+   * 🔴 GRAINS ONLY, AND IT IS A NUMBER OUT OF THE ENGINE'S SOURCE. `sos` is not
+   * a flavour control — at the value the patches below used to carry it, this
+   * board was not granulating at all.
+   *
+   *     Engine_Pappus.sc:945
+   *       sxf  = (msos.max(mlock) / 0.6).clip(0, 1)
+   *       gsum = gsum * sin(sxf * pi/2)  +  [capl, capr] * cos(sxf * pi/2)
+   *
+   * `capl`/`capr` is the LIVE INPUT. So `sos 0` is `cos(0) = 1` on the input and
+   * `sin(0) = 0` on the grains: the granulator's output is its own input,
+   * verbatim, and `sos 0.6` is the first value that is all grains. MEASURED over
+   * the relay on a held note, sweeping `mrate` 0.5 against 24 at each `sos`:
+   *
+   *     sos 0     0.030519 against 0.030519   — the same to six digits
+   *     sos 0.3   0.021687 against 0.028364
+   *     sos 0.6   0.004981 against 0.041123   — 8.3x
+   *     sos 1     0.007658 against 0.043263
+   *
+   * and the gaps appear with it: the fifth-percentile envelope against the
+   * median reads 0.981 at `sos 0` (a continuous drone) and 0.000 at `sos 0.6`
+   * with a slow rate (real silence between grains).
+   *
+   * ⚠️ THIS IS THE 2026-09-12 PUZZLE, CLOSED. "No granulator parameter on this
+   * board could be shown to change the returned audio — mrate 0.5 against 24,
+   * pwet 0 against 1, melen 1 against 8, all identical", and "the envelope NEVER
+   * dropped below a quarter of its own median at any setting". Every one of
+   * those sweeps was taken at `sos 0`, which is the engine passing its input
+   * through. Nothing was broken.
+   *
+   * ⚠️ AND 0.6 RATHER THAN 1, because `sos` also sets how much of the old buffer
+   * is kept: the blend reaches grains-only at 0.6 while the RECORD keeps going
+   * to 1.0, so 1 is a frozen buffer. The engine's own comment says so. Two
+   * patches here were at 0.10 and 0.15 — a quarter grains, three quarters live
+   * instrument — on a page whose other pane is grains and nothing else.
+   */
+  const SOS = 0.6;
   const PATCHES = [
     { name: 'slow drift', voice: 'pad', notes: [43, 50, 55, 62],
       m: { rate: 2.2, size: 0.30, scan: 0.35, spray: 0.12, swarm: 0.35, tilt: -0.2, delay: 0.35, sos: 0.45, strum: 0.05 },
@@ -463,8 +602,24 @@
     // played by the OUTGOING instrument — which reads as the patch not working.
     await wait(140);
     for (const n of p.notes) { send({ type: 'note.on', note: n, vel: 80, channel: 0 }); holding.push(n); }
-    for (const [k, v] of Object.entries(p.m)) send({ type: 'params.set', cmd: `m${k}`, args: [v] });
-    for (const [k, v] of Object.entries(p.n)) send({ type: 'params.set', cmd: `n${k}`, args: [v] });
+    // 🔴 THROUGH `forBoth`, WHICH IS THE ONLY PATH. Both engines run the same
+    // definition, so they take the same command names — and a second path for
+    // the browser would be a second place for the two panes to disagree,
+    // invisibly, because both would still work.
+    writePatch(p);
+    // 🔴 SET, NEVER INHERITED — plan-twins §5. `mscanmode` decides what `mscan`
+    // MEANS and the engine's default is 1 STRETCH, where it is a playhead speed
+    // mapped -1..+2 rather than a position; `msrc` 1 is OFF and OFF ERASES
+    // (LESSONS #46); `msos` 0 hands the input back with no grains in it; the
+    // nine `BYPASS` stages are heard in whichever pane the last visitor left
+    // them on. Every one of them is in `setFixed()`, which sends to BOTH ends.
+    //
+    // ⚠️ AND THE BROWSER NEEDS IT MORE, NOT LESS. The board is an OBJECT that
+    // keeps what it was left with; the engine in this tab is FRESH, so its
+    // defaults are the ENGINE's — `report` off, `run` 0, `msos` 0, `mscanmode`
+    // 1. Neither end can be assumed and they cannot be assumed for the same
+    // reason, which is why one function answers for both. (`writePatch` above
+    // sends the fixed settings too.)
     // ⚠️ ASKED FOR, NOT ASSUMED. Setting a parameter gives the board's slow
     // movement a centre; it does not switch the movement on, because
     // `params.set` is also the surface a harness sweeps one parameter through
@@ -479,8 +634,10 @@
     // that, and stops the moment the page goes away.
     send({ type: 'grain.report', on: true });
     // A patch is the new truth about both halves, so the panel's source of
-    // truth is reset with it.
-    live = { m: { ...p.m }, n: { ...p.n } };
+    // truth is reset with it. ⚠️ WITH THE SAME CLAMP THE WIRE GOT — a `live`
+    // holding the table's `sos` while the board holds `SOS` is a readout
+    // describing a setting nobody sent.
+    live = { m: { ...p.m, sos: Math.max(SOS, p.m.sos) }, n: { ...p.n, sos: Math.max(SOS, p.n.sos) } };
     // ⚠️ NOTHING DRAWN FROM THE PATCH. The scope used to take an `expect()` of
     // what the settings imply; it does not any more, and the reason is this
     // page. Drawing the requested grain rate here would put a confident row of
@@ -499,8 +656,8 @@
     // decoration — it is gliding because a grain rate going 2.2 to 20 in one
     // render quantum is a click rather than a new setting.
     // ⚠️ ONE SHAPE AND ONE DURATION for the handle and the sound: `glide()`
-    // draws both from `GLIDE_MS`, so the knob is a picture of what the worklet
-    // is doing rather than a second animation that happens to look similar.
+    // draws both from `GLIDE_MS`, so the knob is a picture of what the engines
+    // are doing rather than a second animation that happens to look similar.
     // ⚠️ STOP THE LAST GLIDE WHERE IT IS AND CARRY ON FROM THERE — do not finish
     // it first. Two patches inside a quarter second would otherwise jump the
     // sound to the first patch's settings and then drag it back, an audible
@@ -516,13 +673,16 @@
       to[key] = v;
       sliders.get(key)?.set(v, { quiet: true, glideMs: GLIDE_MS });
     }
-    // The page engine is on this side of the wire, so a ramp costs nothing but
-    // a postMessage a frame — about fifteen of them, none of which leave the
-    // tab. The board gets ONE `params.set` per parameter, above, for the reason
-    // in the comment there.
+    // The engine in this tab is on this side of the wire, so a ramp costs
+    // nothing but a postMessage a frame — about fifteen of them, none of which
+    // leave the tab. The board got ONE `params.set` per parameter above, for
+    // the reason in `setKnob`'s own comment.
     endLocalGlide = glide((k) => {
-      for (const key of Object.keys(to)) K[key] = from[key] + (to[key] - from[key]) * k;
-      applyLocal();
+      for (const key of Object.keys(to)) {
+        K[key] = from[key] + (to[key] - from[key]) * k;
+        pap?.set(`m${cmdOf(key)}`, K[key]);
+      }
+      showRange();
     }, { ms: GLIDE_MS });
     d.log(`${p.name} — ${p.voice}, ${p.notes.length} notes held`, 'hi');
     render();
@@ -565,7 +725,11 @@
     panes.append(box);
     return box;
   };
-  const hereCard = card('in this page', 'an AudioWorklet · every grain reported');
+  // ⚠️ NOT `an AudioWorklet` ANY MORE, AND THE HEADING IS THE CLAIM. This pane
+  // runs SuperCollider's own sound server, compiled to WebAssembly, loading the
+  // Raspberry Pi's own compiled graph — so the two headings differ in WHERE and
+  // in nothing else, which is the whole point of the page.
+  const hereCard = card('in this page', 'SuperCollider in a tab · every grain reported');
   // ⚠️ NOT `sound only` — THAT WENT STALE THE DAY THE BOARD LEARNED TO REPORT
   // ITS GRAINS, and the diagram at the top of the page is what caught it. The
   // picture says `sound and grains` come back and the check below asserts
@@ -573,92 +737,308 @@
   // page disagreeing with itself about its own subject.
   const boardCard = card('on the Raspberry Pi', 'over the relay · every grain reported');
   const scope = createGrainScope(hereCard, { seconds: 4, height: 150 });
-  scope.source('every tick is a grain this page started');
+  scope.source('every tick is a grain the engine reported firing');
   const boardScope = createGrainScope(boardCard, { seconds: 4, height: 150 });
   boardScope.source('every tick is a grain the board reported firing');
 
   // ── the granulator in this page ──────────────────────────────────────────
   //
-  // ~200 lines of AudioWorklet: a ring buffer, a grain scheduler and a
-  // raised-cosine window. It exists so this page works with the network
-  // unplugged AND so there is one lane where every mark in the picture is a
-  // grain something actually started — see `scope.stats()`, which counts
-  // `measured` against `inferred` and is asserted below.
-  // 🔴 THE MATERIAL COMES FROM A DESCRIPTION, NOT FROM THIS FILE. `source.mjs`
-  // expands one spec into a table of sine partials, and the board expands the
-  // SAME spec with the SAME function — so when the two panes disagree it is a
-  // disagreement about granulation rather than about what went in. The old
-  // version was six `type: 'sawtooth'` oscillators, which is a wavetable the
-  // WebAudio specification does not pin down and therefore a sound no other
-  // engine can reproduce. See plan-twins §4a.
+  // 🔴 IT IS THE BOARD'S GRANULATOR, NOT A COPY OF IT. SuperCollider's own
+  // sound server runs here as WebAssembly and loads `pappus-tiny.scsyndef` —
+  // the file sclang compiled ON THE PI out of the engine the service runs. Both
+  // panes are the same 1,467 building blocks with the same 103 settings; the
+  // only difference left is which machine they are on, which is what a page
+  // drawing two panes side by side is claiming.
   //
-  // C3 G3 C4 E4 G4 C5, which is what the six notes were.
+  // 📄 `research/supercollider-browser-2026-09.md` §10 measured all of it
+  // first: the graph loads in 11–12 ms, starts, sounds against a silence
+  // control that reads exactly 0.000000, and its per-grain reports reach the
+  // page at 8.00 / 4.00 / 15.99 a second against the board's 8.0 / 4.0 / 16.0.
+  //
+  // 🔴 AND PAPPUS IS NOT SELF-CONTAINED — it granulates whatever is on a BUS,
+  // filled from outside the definition. On the board that is JACK; in a browser
+  // there is no JACK, so a Pappus loaded alone granulates silence. The second
+  // definition, `PosSource`, is what fills it, and it is the SAME definition
+  // the board runs, fed the same description through the same expander.
+  //
+  // ⚠️ THE MATERIAL STAYS A TABLE OF SINE PARTIALS, AND THAT IS NOT AN
+  // OVERSIGHT. `PosSource.sc`'s own header argues the additive constraint was
+  // needed only while the two ends were different engines — which stopped being
+  // true today. Relaxing it is a separate decision with its own test: changing
+  // the material in the same change that changes the engine means neither can
+  // be attributed. The table is what every measurement in `plan-twins.md` was
+  // taken with, so it stays until somebody replaces it on purpose.
+  //
+  // C3 G3 C4 E4 G4 C5.
   const SPEC = { shape: 'saw', count: 12, hz: 130.81, chord: [0, 7, 12, 16, 19, 24], level: 0.16, spread: 0 };
-  let lctx = null, lnode = null, lsrc = null, lgain = null;
-  let lstats = { live: 0, fired: 0, heldSec: 0, overlap: 0 };
-  let lwrite = 0, lfilled = 1;
 
   /**
-   * The lit band, computed the way the WORKLET computes it. The chord is always
-   * arriving, so the read point is a distance BEHIND the write head rather than
-   * an absolute place in a fixed recording — draw it any other way and the
-   * picture is a different claim from the sound.
+   * 🔴 THE ACTIVE WINDOW, SET AT BOTH ENDS, AND IT IS TWO CLAIMS AT ONCE.
+   *
+   * Pappus records into a SIXTY SECOND ring and reads grains out of a window
+   * `buflen` seconds long — and `/pgrain`'s `pos` is a fraction of the WHOLE
+   * ring, so at `buflen` 8 every mark lands in the left 13% of a picture whose
+   * axis is the ring. `winPos` rescales to the window, which is the part
+   * anything is reading from, and both panes are drawn through it.
+   *
+   * ⚠️ AND IT HAS TO BE SET RATHER THAN INHERITED, for the reason everything
+   * else here is: the browser engine is FRESH every load and starts with an
+   * EMPTY ring, while the board has been recording for hours. A window it can
+   * fill in four seconds is what makes the two comparable inside one visit —
+   * §10.5's own trap, where the first grain arm read 0.000000 because the
+   * grains were reading a part of the buffer nothing had ever written into.
    */
-  function showRange() {
-    const span = Math.max(0.02, lfilled);
-    const centre = ((lwrite - (1 - K.where) * span) % 1 + 1) % 1;
-    const half = K.spray * span;
-    scope.range(((centre - half) % 1 + 1) % 1, ((centre + half) % 1 + 1) % 1, centre);
-  }
+  const RING_SECONDS = 60, WINDOW_SECONDS = 4;
+  const winPos = (p) => Math.min(1, Math.max(0, (p ?? 0) * RING_SECONDS / WINDOW_SECONDS));
 
-  async function startLocal() {
-    if (lnode) return;
-    lctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000, latencyHint: 'interactive' });
-    // ⚠️ Fire and move on — resume() waits on a gesture and NEVER rejects, so
-    // awaiting it is a hang rather than an error.
-    lctx.resume().catch(() => {});
-    await lctx.audioWorklet.addModule('/shell/granular-worklet.js');
-    lnode = new AudioWorkletNode(lctx, 'granular', {
-      numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
-      processorOptions: { bufferSeconds: 12 },
-    });
-    lnode.port.onmessage = (e) => {
-      const m = e.data || {};
-      if (m.stats) lstats = m.stats;
-      // EVERY GRAIN, FROM THE THING THAT STARTED IT. This is the whole argument
-      // for having this lane at all.
-      if (m.grains?.length) scope.marks(m.grains);
-      if (m.peaks) {
-        scope.buffer(m.peaks, { write: m.write, filledFrac: m.filled });
-        lfilled = m.filled; lwrite = m.write; showRange();
-      }
-    };
-    lgain = lctx.createGain(); lgain.gain.value = 0.9;
-    lnode.connect(lgain).connect(lctx.destination);
-    fadeGains();
-    // the material, straight into the worklet's input
-    lsrc = buildSource(lctx, SPEC, { destination: lnode });
-    d.log(`material: ${SPEC.shape}, ${lsrc.plan.partials.length} sine partials over `
-          + `${SPEC.chord.length} notes${lsrc.plan.dropped ? `, ${lsrc.plan.dropped} dropped above Nyquist` : ''}`);
-    applyLocal();
-  }
-
-  function applyLocal() {
-    lnode?.port.postMessage({
-      cmd: 'set', rate: K.rate, sizeMs: K.size * 1000, scan: K.where, spray: K.spray,
-      pitch: 1, pan: 0.8, level: 0.7, follow: 1,
-    });
-    showRange();
-  }
-
-  // ── one set of knob values, whichever engine is listening ────────────────
-  // The patch below writes into this too, so the two lanes cannot drift apart
-  // into two different sounds wearing one control surface.
-  const K = { rate: 2.2, size: 0.3, where: 0.5, spray: 0.12 };
+  let pap = null;                      // the engine, once somebody presses something
+  let papStarting = null;              // the in-flight start, so two presses are one boot
+  let papGrains = 0;                   // `/pgrain` this page has received from it
+  let papSource = null;                // what ITS scsynth answered about the material
+  let papPlan = null;                  // the partial table this end was given
+  let papDeaf = null;                  // { loud, silent } — the deafness control
   /** stops the patch glide below; `true` sends it to the end rather than freezing it */
   let endLocalGlide = null;
+  /**
+   * When each `/pgrain` landed, so a RATE can be taken over a window this page
+   * actually watched — the same collector shape the board's marks use, and for
+   * the same reason: a running total over a start time puts the seconds before
+   * the engine existed into the denominator.
+   */
+  const papLog = [];
 
-  function setKnob(key, v, why, unit, toBoard) {
+  /**
+   * The lit band: where in the window the grains are reading from.
+   *
+   * 🔴 AN ABSOLUTE PLACE IN THE RECORDING, NOT A DISTANCE BEHIND THE WRITE
+   * HEAD. `where` used to mean two different things — the old worklet ran a
+   * fixed distance behind the write head while the same number went to the
+   * board as `mscan` with `mscanmode` never set at all, and Pappus's default
+   * mode is 1 STRETCH, where `mscan` is a playhead SPEED mapped −1..+2. One
+   * slider, one number, three meanings. 2 POSITION is the only mode under which
+   * the slider's label, both engines and the grain reports are the same claim,
+   * and it is now set on both.
+   */
+  function showRange() {
+    const centre = ((K.where % 1) + 1) % 1;
+    const half = K.spray;
+    const band = [((centre - half) % 1 + 1) % 1, ((centre + half) % 1 + 1) % 1, centre];
+    scope.range(...band);
+    boardScope.range(...band);
+  }
+
+  /**
+   * Boot the engine in this tab, once, and put everything the sound depends on
+   * into it.
+   *
+   * ⚠️ IT IS SLOW ON PURPOSE AND IT IS BEHIND CONTROL 0. A wasm boot, thirty-one
+   * buffer allocations and a 64 KB `/d_recv` is exactly the work `verify.mjs`
+   * only gives a settle budget to the FIRST control — so `Switch it on` owns it,
+   * and nothing here runs on a visit where nobody pressed anything.
+   */
+  function startLocal() {
+    if (pap) return Promise.resolve(pap);
+    if (papStarting) return papStarting;
+    papStarting = (async () => {
+      // The board's playout context first, so both engines share one clock and
+      // the blend is a blend rather than two independent outputs.
+      await startAudio();
+      const e = await startPappus({
+        audioContext: ctx || undefined,
+        log: (m) => d.log(m),
+        // EVERY GRAIN, FROM THE THING THAT FIRED IT. `SendReply` on the grain
+        // trigger inside the graph — the same UGen the board's reports come
+        // out of, with no relay in the path.
+        onGrain: (g) => {
+          papGrains++;
+          papLog.push(performance.now());
+          while (papLog.length > 2 && papLog[0] < performance.now() - 12000) papLog.shift();
+          scope.mark({ pos: winPos(g.pos), half: g.half, level: 1 });
+        },
+      });
+      pap = e;
+      // ⚠️ THE ENGINE OWNS ITS CONNECTION TO THE SPEAKERS, not this page — a
+      // dangling output is a worklet nothing pulls, and this engine services
+      // `/b_alloc` inside that worklet. All the page gets is the gain.
+      fadeGains();
+      if (!e.started) { d.log('the graph would not start in this browser', 'bad'); return e; }
+      // ⚠️ IF NOTHING HAS WRITTEN THE RECORD YET, WRITE IT NOW. `applyPatch`
+      // normally does, but it only runs once the BOARD has answered — and this
+      // engine needs no board at all. A visitor who drags the blend with the Pi
+      // switched off must not get a granulator sitting at the engine's own
+      // defaults.
+      if (!SENT.size) writePatch(PATCHES[patch]);
+      // 🔴 EVERY SETTING, REPLAYED. A fresh engine's defaults are the ENGINE's,
+      // not the last visitor's — which is the one way this end differs from the
+      // board — so the page's own record of what it has sent is flushed into
+      // it. That record is the SAME one the board is driven from.
+      flushSettings();
+      const src = await e.setSource(SPEC);
+      if (!src?.ok) d.log(`the engine would not build the material: ${src?.reason}`, 'bad');
+      papPlan = src?.plan ?? null;
+      papSource = await e.askSource();
+      // ⚠️ ASKED FOR — `report` is OFF by default, and the picture is the whole
+      // reason this pane exists.
+      e.report(true);
+      showRange();
+      d.log(`SuperCollider in this page is chewing the same description`
+        + `${papSource ? ` — its own engine answers ${papSource.voices} notes at ${Math.round(papSource.hz)} Hz` : ''}`, 'hi');
+      render();
+      return e;
+    })().catch((err) => { d.log(`no SuperCollider in this page: ${err.message}`, 'bad'); return null; });
+    return papStarting;
+  }
+
+  // ── one set of knob values, and ONE PATH TO BOTH ENGINES ─────────────────
+  const K = { rate: 2.2, size: 0.3, where: 0.5, spray: 0.12 };
+
+  /**
+   * Every stage BETWEEN the granulator and the master, held at zero.
+   * ⚠️ These names are the engine's, and the numbers are "no contribution" for
+   * each: a wet mix, a feedback, a drive.
+   */
+  const BYPASS = {
+    pwet: 0,        // RESONATOR — the modal bank, which TINY compiles out anyway
+    swet: 0, sfb: 0,   // DELAY
+    drive: 0, crush: 0, loss: 0, noise: 0,   // COLOUR
+    rverb: 0, rshimmer: 0,                   // REVERB
+  };
+
+  /**
+   * 🔴 ONE PATH FOR EVERY SETTING THE SOUND DEPENDS ON, AND IT IS THIS.
+   *
+   * The two ends run the same definition, so they take the same command names —
+   * `mrate`, `msize`, `mscan`, `mspray`, `mscanmode`, `msrc`, `mlock`, every
+   * `BYPASS` stage. A second control path for the browser would be a second
+   * place for the two to disagree, which is the confound this whole page exists
+   * to remove, and it would be invisible because both panes would still work.
+   *
+   * ⚠️ AND `SENT` IS THE PAGE'S OWN RECORD, WHICH IS WHAT MAKES IT SAFE FOR TWO
+   * ENDS THAT COME UP AT DIFFERENT TIMES. The board answers in about forty
+   * seconds on a cold visit; the engine in this tab takes a second or two. A
+   * value sent while one of them was not listening would simply be missing
+   * there — so each end replays the whole record when it arrives, and the
+   * record is complete because everything goes through here.
+   *
+   * 🔴 THE BOARD IS AN OBJECT THAT KEEPS WHAT IT WAS LEFT WITH, AND THE TAB IS
+   * NOT. `msrc 1` does not pause the write, it ERASES (LESSONS #46), so a
+   * visitor who pressed Hold and closed the tab used to hand the next one an
+   * empty buffer. A page driving this board sets every control its sound
+   * depends on, every time, or it works exactly once.
+   */
+  const SENT = new Map();
+  /**
+   * A whole patch into the record, and from there into whichever ends exist.
+   *
+   * 🔴 IT IS SEPARATE FROM `applyPatch` BECAUSE THE BOARD MIGHT NEVER ANSWER.
+   * `applyPatch` also releases a chord, changes the instrument and asks the
+   * board for its drift — all of which need a board. The SETTINGS do not, and
+   * the engine in this tab is a whole granulator on its own. Without this split
+   * a visitor who dragged the blend with the Pi switched off got an engine
+   * running at the ENGINE's defaults: `run` 0, `msos` 0, `report` off — a left
+   * pane that is silent and draws nothing, on a page that looks fine.
+   */
+  function writePatch(p) {
+    for (const [k, v] of Object.entries(p.m)) forBoth(`m${k}`, k === 'sos' ? Math.max(SOS, v) : v);
+    for (const [k, v] of Object.entries(p.n)) forBoth(`n${k}`, k === 'sos' ? Math.max(SOS, v) : v);
+    setFixed();
+  }
+  function forBoth(cmd, value) {
+    SENT.set(cmd, value);
+    // ⚠️ AN ARRAY IS STILL ONE SETTING. `gates` and `probs` are eight-element
+    // control arrays; the box takes 1..48 numbers in `args`, and the engine in
+    // this tab needs `/n_setn` rather than `/n_set` — see `engine.mjs`.
+    if (fxOn) send({ type: 'params.set', cmd, args: Array.isArray(value) ? value : [value] });
+    pap?.set(cmd, value);
+  }
+  /** Board only — the other end has no such command. See `setFixed()`. */
+  function forBoard(cmd, value) {
+    if (fxOn) send({ type: 'params.set', cmd, args: Array.isArray(value) ? value : [value] });
+  }
+  /** Replay the record into the engine in this tab, when it finally exists. */
+  function flushSettings() { for (const [cmd, v] of SENT) pap?.set(cmd, v); }
+
+  /**
+   * Everything that is not a slider and not a patch: the settings that decide
+   * what the four knobs MEAN, sent to both ends every time.
+   *
+   * ⚠️ `mscanmode 2` POSITION, because the engine's default is 1 STRETCH where
+   * `mscan` is a speed and not a place. ⚠️ `msrc 2` STEREO, because 1 is OFF and
+   * OFF erases. ⚠️ `msos` 0.6, the first value that is all grains — at 0 the
+   * stage hands its input straight back and there is not one grain in it.
+   * ⚠️ `mbuflen`, so the tab's empty ring fills inside a visit. ⚠️ `amp`,
+   * `ingain` and `run`, which the board's own startup sets and a fresh engine
+   * does not.
+   */
+  function setFixed() {
+    for (const h of ['m', 'n']) {
+      forBoth(`${h}scanmode`, 2);
+      forBoth(`${h}src`, held ? 1 : 2);
+      forBoth(`${h}lock`, held ? 1 : 0);
+      forBoth(`${h}sos`, SOS);
+      forBoth(`${h}buflen`, WINDOW_SECONDS);
+    }
+    forBoth('amp', 1);
+    forBoth('ingain', 1);
+    forBoth('run', 1);
+    // 🔴 THE EIGHT VOICE GATES, AND THIS IS THE ONE THAT COST A RED SUITE.
+    //
+    // `gates` decides whether ANY grain fires: the engine's trigger is
+    // `trig * (gates[i] > 0.001) * coin * egate`, so all-zeros is a granulator
+    // that never fires one — and PASSTHROUGH STILL WORKS, so the board goes on
+    // streaming audio and answering every question while making no grains.
+    // MEASURED 2026-09-14: the page's exact configuration read `rms 0.000000,
+    // 0 grains/s` over 299 frames; writing these eight numbers took it to
+    // `0.016037` and 1.5 grains/s in the same sitting, with nothing else
+    // changed.
+    //
+    // ⚠️ AND NOTHING HERE WAS EVER GOING TO REOPEN THEM. The board's eight
+    // granulator voices are played like a keyboard (`makeVoices` in
+    // `pappus.mjs`), it starts with every gate SHUT, and `note.off` and
+    // `note.panic` shut them again — while this page's notes go to the
+    // INSTRUMENT, never to the granulator. So one `note.panic` from anybody, at
+    // any time, silenced this page for ever after, and the page could not say
+    // why. That is the `msrc 1` lesson exactly, on the one control that decides
+    // whether the instrument exists at all.
+    //
+    // ⚠️ The board WAS saying so the whole time — `params.state` returns
+    // `notes.gate`, and it read `[0,0,0,0,0,0,0,0]`. The evidence was on the
+    // wire and no page read it; the grain assert below now prints it.
+    forBoth('gates', [1, 0, 0, 0, 0, 0, 0, 0]);
+    forBoth('gates2', [1, 0, 0, 0, 0, 0, 0, 0]);
+    forBoth('probs', [1, 1, 1, 1, 1, 1, 1, 1]);
+    forBoth('probs2', [1, 1, 1, 1, 1, 1, 1, 1]);
+    // 🔴 AND THE SIXTEEN-STEP EUCLIDEAN GATE, WHICH A DIE CAN LEAVE SPARSE.
+    // `rollPappus` writes `epattern` (pappus.mjs: "AND THE PATTERN MUST FIRE"),
+    // so a page that adopts a board somebody rolled can inherit a granulator
+    // firing one grain in sixteen. Measured harmless here — the board's was
+    // already all ones — and set anyway, because "it happened to be right" is
+    // not a reason to depend on it.
+    // ⚠️ BOARD ONLY, AND THE ASYMMETRY IS REAL RATHER THAN AN OVERSIGHT: on the
+    // board this is a COMMAND that writes a buffer (`patbuf.setn`), not a
+    // SynthDef control, so there is nothing for `/n_setn` to name at the other
+    // end. The browser's equivalent is `engine.mjs` filling the same two gate
+    // buffers with ones at boot, which it does.
+    forBoard('epattern', new Array(16).fill(1));
+    forBoard('epattern2', new Array(16).fill(1));
+    // 🔴 EVERY STAGE DOWNSTREAM OF THE GRANULATOR PINNED TO OFF. This page's
+    // subject is one granulator against another, and a stage left on by the
+    // last visitor is heard in one pane and reported as if the granulators had
+    // made the difference. ⚠️ Both ends now, because both ends have the chain.
+    for (const [cmd, v] of Object.entries(BYPASS)) forBoth(cmd, v);
+  }
+
+  /**
+   * One knob, both engines, one path.
+   *
+   * ⚠️ `live` IS WHETHER THE HAND HAS STOPPED, AND IT ONLY GATES THE RELAY. A
+   * drag is ~60 events a second into a relay whose measured ceiling is 60 msg/s
+   * for everything on it, and it drops past that SILENTLY — so the value you
+   * let go on would be the one lost. The engine in this tab has no wire in
+   * front of it and a change is audible in one render quantum, so it takes
+   * every move. Both end up on the same number; only the cadence differs.
+   */
+  function setKnob(key, v, why, unit, settled) {
     // ⚠️ FINISH IT, DO NOT FREEZE IT. A hand on one knob during a patch glide
     // has to win — but abandoning the glide where it stands would leave the
     // other three parameters half way between two patches while their handles
@@ -666,23 +1046,40 @@
     // sound. Jump the rest to the patch, then take the drag.
     endLocalGlide?.(true); endLocalGlide = null;
     K[key] = v;
-    applyLocal();
-    if (!toBoard) return;
-    if (!fxOn) { d.log(`${key} ${v}${unit ? ' ' + unit : ''} — ${why} · the board’s granulator is not on yet`, 'warn'); return; }
     const other = partner(key, v);
     setLive(key, v, other);
-    send({ type: 'params.set', cmd: `m${cmdOf(key)}`, args: [v] });
-    send({ type: 'params.set', cmd: `n${cmdOf(key)}`, args: [other] });
-    d.log(`${key} ${v} here and ${round(other)} on the board${unit ? ' ' + unit : ''} — ${why}`);
+    const cmd = cmdOf(key);
+    if (settled) {
+      forBoth(`m${cmd}`, v);
+      forBoth(`n${cmd}`, other);
+      d.log(`${key} ${v} and ${round(other)} for the second granulator${unit ? ' ' + unit : ''} — ${why}`
+        + (fxOn ? '' : ' · the board’s granulator is not on yet'), fxOn ? undefined : 'warn');
+    } else {
+      // Mid-drag: the record still moves, so a hand that never settles cannot
+      // leave the two ends holding different numbers — the relay is simply not
+      // told until it stops.
+      SENT.set(`m${cmd}`, v); SENT.set(`n${cmd}`, other);
+      pap?.set(`m${cmd}`, v); pap?.set(`n${cmd}`, other);
+    }
+    showRange();
   }
 
   // Both engines are always running; the blend only moves what you HEAR. The
   // pictures never swap, so nothing has to be cleared and neither lane's
   // history is thrown away when you compare them.
   const fade = createSlider({
-    label: 'blend', min: 0, max: 100, step: 1, value: 0, unit: '%',
-    // The slider IS the gesture, so it is also what starts the page engine —
-    // an AudioContext needs one and this is the first thing a hand touches.
+    // 🔴 NO LABEL. Its ENDS are labelled — `this page` on one side, `the board`
+    // on the other — so a third word between them said nothing the row was not
+    // already saying, and printed `THIS PAGE  BLEND 0 %  THE BOARD`: three
+    // labels for one control, the middle one stacked over its own number and
+    // squeezing the track down to a stub. A slider between two named ends does
+    // not need a name; it needs room.
+    // ⚠️ `aria` still gets one, because a screen reader has no ends to read.
+    label: '', aria: 'blend', min: 0, max: 100, step: 1, value: 0, unit: '%',
+    // The slider IS the gesture, so it is also what starts the engine in this
+    // tab — an AudioContext needs one and this is the first thing a hand
+    // touches. ⚠️ It is also 1.7 MB of WebAssembly, which is why nothing here
+    // is fetched until somebody moves this or presses `Switch it on`.
     onInput: (v) => { blend = v / 100; startLocal().then(fadeGains); fadeGains(); render(); },
   });
   // ── what they are chewing ────────────────────────────────────────────────
@@ -700,14 +1097,26 @@
     label: 'partials', min: 1, max: 24, step: 1, value: SPEC.count, unit: '',
     onInput: (v) => setSource({ count: v }),
   });
-  function setSource(next) {
+  /**
+   * The material, to both ends, from one description.
+   *
+   * 🔴 ONE SPEC, ONE EXPANDER, TWO ENGINES. `demo/shell/source-args.mjs` turns
+   * the spec into the amplitude table, the semitone array and the three
+   * scalars `PosSource` wants, and BOTH ends call it — the box on its way to
+   * sclang, this page on its way to its own scsynth. A second copy of that
+   * arithmetic would be two authorities on one number, which is what the
+   * shared `partialsOf` already exists to prevent one level down.
+   */
+  async function setSource(next) {
     Object.assign(SPEC, next);
-    const re = lsrc?.set(next);
     // The board builds the same spec from the same numbers — one message, on a
     // change rather than on every move, for the relay's sake.
     send(sourceMessage(SPEC));
-    d.log(`material: ${SPEC.shape}, ${re ? re.partials.length : '—'} sine partials`
-          + `${re?.dropped ? `, ${re.dropped} dropped above Nyquist` : ''}`);
+    const re = await pap?.setSource(SPEC);
+    if (re && !re.ok) { d.log(`the engine in this page refused the material: ${re.reason}`, 'bad'); return; }
+    if (re?.ok) { papSource = await pap.askSource(); papPlan = re.plan; }
+    d.log(`material: ${SPEC.shape}, ${re?.plan ? re.plan.partials.length : '—'} sine partials`
+          + `${re?.plan?.dropped ? `, ${re.plan.dropped} dropped above Nyquist` : ''}`);
   }
   const srcBar = el('div', 'pos-controls');
   srcBar.append(shapeRow.el, brightness.el);
@@ -741,10 +1150,10 @@
     // `answers` rather than `answering`, and `1.1+2.1` rather than `1.1 + 2.1`:
     // two characters each, and the difference between a cell that reads and a
     // cell that ends in an ellipsis on a phone. Measured at 390 px.
-    // this page's engine, COUNTED rather than asked for: `fired` is what the
-    // worklet reports having started
-    d.set('grains a second', lstats.fired ? Math.round(K.rate) : '');
-    d.set('at once', lstats.live || '');
+    // the board moving ON ITS OWN — nobody asked for these, which is the point
+    const mv = driftMoved();
+    d.set('nudges', mv ? mv.nudges : '');
+    d.set('reading at', Number.isFinite(drift?.scan) ? drift.scan.toFixed(2) : '');
     d.set('board', answered ? 'answers' : 'silent', answered ? 'ok' : 'bad');
     if (!frames) d.set('sound', 'nothing', answered ? 'bad' : undefined);
     else if (level < 0.002) d.set('sound', 'silent');
@@ -780,7 +1189,15 @@
           + 'heard, which takes about forty seconds; after that a switch is instant.'],
         off: fxWhy
           ? ['The board would not switch it on', `the board refused: ${fxWhy}`]
-          : ['The granulator is not in the sound', 'press “Switch it on” — the board compiles the engine the first time, which takes about forty seconds'],
+          : fxBy && fxBy !== me && fxTakenAt
+            // ⚠️ SAY THAT SOMEBODY ELSE DID IT. "It is off" and "another window
+            // turned it off nine seconds ago" are the same sentence about two
+            // very different situations, and only one of them has an answer.
+            ? ['Another page took the granulator out',
+               `the board is shared, and another window asked for the granulator to come out of the sound `
+               + `${Math.max(1, Math.round((Date.now() - fxTakenAt) / 1000))} seconds ago. Press “Switch it on” to put it back — `
+               + 'it will stay while this page is open.']
+            : ['The granulator is not in the sound', 'press “Switch it on” — the board compiles the engine the first time, which takes about forty seconds'],
         // It records its input, so with no input it is reading sixty seconds of
         // silence. That is not a fault and it is not a sound either, and it
         // happens whenever somebody else stops the board's instrument.
@@ -806,17 +1223,37 @@
       // the picker as well — the same two words three times, and the one thing
       // in the block that is identical between the two halves, in a block whose
       // entire job is showing how they differ.
+      // ⚠️ THREE FIGURES, NOT A SENTENCE ABOUT THEM. This ran the three
+      // together with joining words and wrapped to three lines that reflowed as
+      // the numbers changed width. Same facts, one per line, each line a fixed
+      // shape — so a digit changing changes a digit and nothing moves.
       s.append(el('span', 'hd', `granulator ${k}`),
-               el('span', 'nums', `${side.rate} grains a second · each ${Math.round(side.size * 1000)} ms long`
-                  + ` · reading ${side.scan.toFixed(2)} of the way through the sixty seconds`));
+               el('span', 'nums', `${side.rate} grains a second`),
+               el('span', 'nums', `${Math.round(side.size * 1000)} ms long`),
+               el('span', 'nums', `reading at ${side.scan.toFixed(2)}`));
       box.append(s);
     }
     panel.append(box);
-    // What the board has done to the sound with nobody asking — or, when it is
-    // doing nothing, that and the reason. ⚠️ This printed `moving on its own ·
-    // 0 nudges … reading at —` about a board that was moving nothing at all: a
-    // headline claim with its own contradiction printed beside it.
-    panel.append(el('p', 'drift', driftLine()));
+    // 🔴 TWO GENERATED PARAGRAPHS REMOVED, AND THEY WERE THE WORST KIND. One
+    // said "both are chewing the same saw — 72 sine partials over 6 notes, made
+    // separately at each end from one description"; the other, "moving on its
+    // own · 53 nudges in the 8 s this page has been watching, none of them asked
+    // for · the slow one is reading at 0.416 of the way through the sixty
+    // seconds". Every number in them is real and both rewrote themselves
+    // continuously, reflowing between two and three lines and shoving the whole
+    // page down each time. Called what it was: slop prose.
+    //
+    // The failure is not the wording, it is the FORM. A page narrating its own
+    // state in sentences has to re-say the unchanging part ("of the way through
+    // the sixty seconds") beside the one number that moved, so the reader
+    // re-reads a paragraph to find a digit — and the line rewraps while they
+    // do it. These are all readout cells and lane gutters, which is where this
+    // project puts a moving figure and why those are fixed-width boxes.
+    //
+    // What they said that is worth keeping is kept: the shared-material claim
+    // is an ASSERT ("both granulators are chewing the same description, and the
+    // board's engine says so"), which is where a claim belongs, and the drift
+    // is logged when it CHANGES rather than narrated every frame.
   }
 
   // ── audio out of this page ───────────────────────────────────────────────
@@ -908,13 +1345,23 @@
     if (frames % 25 === 0) render();
   }
 
-  /** Loudest thing that arrives in a window. Resolves a number, always. */
+  /**
+   * Loudest thing that arrives in a window, and HOW MANY FRAMES ARRIVED.
+   *
+   * 🔴 THE FRAME COUNT IS NOT DECORATION. A peak of 0 means "silence" and it
+   * also means "nothing reached this page", and those are opposite findings: one
+   * is a board making no sound and the other is a relay, a socket or a second
+   * browser of mine getting in the way. Measured the hard way — a run of this
+   * page read `0.0000 with it up, 0.0000 with it down` with a stray headless
+   * Chrome of mine still holding the room, which is CLAUDE.md's own warning
+   * arriving as a red assert about the board.
+   */
   async function listen(ms) {
-    let p = 0;
-    collect = (v) => { if (v > p) p = v; };
+    let p = 0, n = 0;
+    collect = (v) => { n++; if (v > p) p = v; };
     await wait(ms);
     collect = null;
-    return p;
+    return { peak: p, frames: n };
   }
 
   // ── the socket ───────────────────────────────────────────────────────────
@@ -1014,6 +1461,26 @@
   function heard(m) {
     if (!fromBox(m)) return;           // somebody else asking the board something
     answered = true; lastHeard = Date.now();
+    // 🔴 THE BOARD'S OWN ACCOUNT OF ITS INSERT, WHEREVER IT ARRIVES. `fx` rides
+    // on `fx.pappus`, on `audio.started` and on the heartbeat, so the only
+    // thing this needs to know is that the field turned up and what it says.
+    // ⚠️ ONLY ON A CHANGE, and only when it was somebody else. A line every
+    // five seconds saying the same thing buries the log, and a page narrating
+    // its own unchanged state in sentences is the thing this page deleted two
+    // paragraphs of.
+    if (m.fx !== undefined) {
+      const nowIn = m.fx === 'pappus';
+      const mine = m.fxBy === me;
+      if (fxOn !== nowIn && !mine) {
+        fxTakenAt = Date.now();
+        d.log(nowIn
+          ? 'another page put the granulator back in the sound'
+          : 'another page took the granulator out of the sound — press “Switch it on” to put it back',
+          nowIn ? 'hi' : 'warn');
+      }
+      fxOn = nowIn;
+      fxBy = m.fxBy ?? null;
+    }
     // The board has spoken, so there is something to switch on. Once.
     if (!enabledOnce) { enabledOnce = true; enable(); }
     // The board says this every five seconds with nobody asking, which makes it
@@ -1074,6 +1541,7 @@
       // roll landed answers with the PREVIOUS settings, and letting that
       // overwrite a fresh roll would blank the page for four seconds after
       // every press.
+      if (Array.isArray(m.notes?.gate)) boardVoices = m.notes.gate.filter((g) => g > 0.001).length;
       if (Date.now() - rolledAt > 1500) {
         roll = m.roll ?? null;
         drift = m.drift ?? null;
@@ -1091,7 +1559,10 @@
     // comes with the list so a short list reads as few grains rather than as a
     // dropped message.
     if (m.type === 'grain.marks' && Array.isArray(m.marks)) {
-      boardGrains += m.seen || m.marks.length;
+      const seen = m.seen || m.marks.length;
+      boardGrains += seen;
+      grainLog.push({ t: performance.now(), seen });
+      while (grainLog.length > 2 && grainLog[0].t < performance.now() - 12000) grainLog.shift();
       for (const g of m.marks) boardScope.mark({ pos: g.pos, half: g.half, level: 1 });
       // the read band, from the board's own report of where it is reading
       if (Number.isFinite(drift?.scan)) {
@@ -1101,6 +1572,20 @@
       }
     }
     if (m.type === 'params.drifted') drift = m;
+    // 🔴 THE BOARD'S ANSWER ABOUT THE MATERIAL, WHICH IS THE WHOLE OF §4a. The
+    // page and the board expand the same spec with the same `partialsOf`, and
+    // the board builds it with `PosSource.sc` on its own scsynth — so the two
+    // granulators finally chew the same thing. `engine` is what scsynth ANSWERED
+    // when asked for a control value, not what the box sent: a node id proves
+    // nothing, because sclang allocates one before the server has read the
+    // message and it answered `node 1002` about a def that had failed to load.
+    if (m.type === 'source.applied') {
+      made = m.ok ? { partials: m.partials, topHz: m.topHz, engine: m.engine } : { reason: m.reason };
+      d.log(m.ok
+        ? `the board is chewing the same material — ${m.partials} sine partials, top ${m.topHz} Hz`
+          + `, and its own engine says ${m.engine?.voices} notes at ${Math.round(m.engine?.hz)} Hz`
+        : `the board would not build the material: ${m.reason}`, m.ok ? 'hi' : 'bad');
+    }
     // The board picks the item; this page only says which. The search cannot be
     // called from a browser at all — its JSON content type forces a preflight
     // that the archive answers 204 with no permission header — so the board is
@@ -1123,6 +1608,12 @@
     // Re-ask for the grains well inside the box's 30 s expiry, so the picture
     // survives as long as the page is open and stops on its own when it is not.
     if (fxOn && wire.state() === 1) send({ type: 'grain.report', on: true });
+    // The board is an object, not a session: it can be restarted with this page
+    // open, and it comes back with the instrument in the granulator's input and
+    // no generated material at all. `made === null` is "it has never answered",
+    // which is the only state worth re-asking from — a refusal has a reason and
+    // asking again every four seconds would just repeat it.
+    if (fxOn && made === null && wire.state() === 1) send(sourceMessage(SPEC));
     if (answered && Date.now() - lastHeard > 12000) {
       answered = false; rtt = null;
       d.log('the board stopped answering', 'bad');
@@ -1141,14 +1632,17 @@
   let held = false;
   d.on('hold', async () => {
     held = !held;
+    // ⚠️ BOTH ENGINES, THROUGH THE ONE PATH. Holding one end and not the other
+    // is the page telling you two granulators disagree when what disagrees is
+    // which of them is still recording.
     for (const h of ['m', 'n']) {
-      send({ type: 'params.set', cmd: `${h}lock`, args: [held ? 1 : 0] });
-      send({ type: 'params.set', cmd: `${h}src`, args: [held ? 1 : 2] });
+      forBoth(`${h}lock`, held ? 1 : 0);
+      forBoth(`${h}src`, held ? 1 : 2);
     }
     d.button('hold').textContent = held ? 'Listen again' : 'Hold what it has';
     d.log(held
-      ? 'holding the last minute — the grains are now the only thing you hear'
-      : 'listening again — the grains follow the instrument, so they sound like it', 'hi');
+      ? `holding the last ${WINDOW_SECONDS} seconds — the grains are now the only thing you hear`
+      : 'listening again — the grains follow the material, so they sound like it', 'hi');
   });
 
   // 🔴 IT SWITCHES ITSELF ON. This page's entire subject is the granulator, so
@@ -1201,6 +1695,18 @@
     const state = await ask({ type: 'params.state' }, 'params.state', 6000);
     void state;
     await applyPatch(patch);
+    // 🔴 THE MATERIAL, AND IT IS AWAITED — plan-twins §4a. One description, and
+    // since 2026-09-13 ONE DEFINITION as well: `PosSource.scsyndef` runs in
+    // this tab and on the board, both fed by `sourceArgs` on the same spec.
+    // What used to be "two builders agreed" is now one builder in two places.
+    //
+    // ⚠️ AWAITED BECAUSE THE CHECK BELOW BRANCHES ON IT. Sent and forgotten, the
+    // reply landed several seconds later — after `probeSound()` had already
+    // chosen the key branch and measured an instrument that was about to be
+    // unplugged. Read 0.1434 against 0.0870 and passed, which is a check
+    // grading a transition.
+    const src = await ask({ type: 'source.set', spec: SPEC }, 'source.applied', 20000);
+    if (!src) d.log('the board did not answer about the material', 'warn');
     render();
   }
 
@@ -1217,11 +1723,74 @@
    * about a working board. Enabling is a side effect; measuring is the check.
    */
   async function probeSound() {
-    const quiet = await listen(900);
+    // 🔴 TWO WAYS TO MAKE THE BOARD LOUDER, AND THE FIRST ONE IS BETTER — and it
+    // had to change, because the generated material MADE THE KEY PROBE VACUOUS.
+    // With `PosSource` feeding the granulator the instrument is unplugged from
+    // it (it has to be: scsynth sums its input bus, so an instrument still
+    // patched in is a second material nobody declared), so a held key changes
+    // nothing — and the old assert would still have passed, on the drone that
+    // was there before the key and after it. A check that cannot fail is not a
+    // check.
+    //
+    // Turning the MATERIAL down and up crosses strictly more of the chain than
+    // a key does: this page's own description, the relay, the box, the shared
+    // `partialsOf`, sclang, the wavetable, the granulator, the capture, and the
+    // relay again. A key only ever reached the instrument.
+    //
+    // ⚠️ 0.001 RATHER THAN 0. An all-zero amplitude table is a `/b_gen sine1`
+    // edge nobody here has tested; a peak of 0.001 is -60 dB, which is silence
+    // by any threshold on this page and is an ordinary value all the way down.
+    if (made?.partials) {
+      // 🔴 LOUD FIRST, QUIET SECOND, AND THAT ORDER IS A MEASUREMENT. A
+      // granulator answers a change of material only when its write head next
+      // passes the point the grains are reading, so the two directions cost
+      // very different amounts of time: `bufclear` empties the ring and the
+      // QUIET arm lands inside a second, while the LOUD arm has to wait for the
+      // head to come round — measured at about six seconds at this page's own
+      // settings, and variable, because where the head is when `bufclear` lands
+      // is not something anybody chose.
+      //
+      // Three shapes of this check were wrong before this one. A flat 1.6 s
+      // read 0.0880 against 0.0821 (the old material still in the ring). A
+      // shortened `mbuflen` read 0.0000 twice over. A fixed 1.8 s on the loud
+      // arm read the QUIET level twice, three runs out of three. So the slow
+      // direction is waited on in one-second slices until there is something to
+      // report, and the fast one follows it.
+      const hi = { peak: 0, frames: 0 };
+      for (let i = 0; i < 12 && hi.peak < 0.01; i++) {
+        const slice = await listen(1000);
+        hi.frames += slice.frames;
+        if (slice.peak > hi.peak) hi.peak = slice.peak;
+      }
+      // ⚠️ AWAITED, AND `bufclear` ONLY AFTER IT. Sent together, the two race:
+      // `params.set` is one hop to the box and straight out as OSC, while
+      // `source.set` has to reach sclang, fill the wavetable that is not playing
+      // and crossfade to it. Emptying the ring BEFORE the material goes quiet
+      // just refills it with the loud one — measured, a down arm that read
+      // 0.0331 against a 0.0555 up arm on one run in three while the other two
+      // read 0.0000.
+      await ask({ type: 'source.set', spec: { ...SPEC, level: 0.001 } }, 'source.applied', 15000);
+      send({ type: 'params.set', cmd: 'bufclear', args: [1] });
+      await wait(1200);
+      const lo = await listen(1200);
+      // ⚠️ PUT IT BACK. The check ends on the quiet arm, and a page that left
+      // the material turned down would hand the next visitor a granulator
+      // chewing something 60 dB below what the screen says it is chewing —
+      // which is the same class of mistake as leaving `msrc 1` behind.
+      send(sourceMessage(SPEC));
+      probe = { quiet: lo.peak, held: hi.peak, frames: lo.frames + hi.frames, how: 'material' };
+      d.log(`the material turned down and up: ${hi.peak.toFixed(4)} against ${lo.peak.toFixed(4)} over `
+            + `${probe.frames} frames — the board is making the sound this page described`,
+            hi.peak > 0.002 ? 'hi' : 'bad');
+      render();
+      return;
+    }
+    const lo = await listen(900);
     send({ type: 'note.on', note: 60, vel: 100, channel: 0 });
-    const held = await listen(1800);
+    const hi = await listen(1800);
     send({ type: 'note.off', note: 60, channel: 0 });
-    probe = { quiet, held };
+    const quiet = lo.peak, held = hi.peak;
+    probe = { quiet, held, frames: lo.frames + hi.frames, how: 'key' };
     // ⚠️ SAY WHICH OF THE TWO THE NUMBERS MEAN. A cloud that was already
     // droning is often LOUDER before the key than during it, and printing the
     // pair without saying so reads as a failure on a working board.
@@ -1235,18 +1804,52 @@
   // one that CHECKS as well — a page that checks itself only when asked is a
   // page nobody checks.
   d.on('on', async () => {
-    // BOTH ENGINES. The page one is instant and needs only a gesture; the
-    // board one compiles a 2,030-line graph and is why this control owns the
-    // page's `settleMs`. Starting them together is what makes the blend mean
-    // something the moment anybody touches it.
-    startLocal().catch((e) => d.log(`no granulator in this page: ${e.message}`, 'bad'));
+    // BOTH ENGINES, AND BOTH ARE SLOW, SO THEY START TOGETHER. The board
+    // compiles a 2,030-line graph — about forty seconds the first time — and
+    // the tab boots WebAssembly, allocates thirty-one buffers and takes a
+    // 64 KB definition. Started one after the other that is a minute; started
+    // side by side it is the board's forty seconds and nothing else. This
+    // control owns the page's whole settle budget for exactly that reason.
+    const local = startLocal();
     await enable();
     // Wait out an enable that is already in flight — the page starts one the
     // moment the board answers, and the harness can press this before it ends.
     for (let i = 0; i < 160 && enabling; i++) await wait(500);
+    await local;
     if (fxOn) await probeSound();
+    await probeLocal();
     checkAll();
   });
+
+  /**
+   * THE DEAFNESS CONTROL FOR THE ENGINE IN THIS TAB, and it is the same shape
+   * as the board's: turn the thing off and watch the number go to zero.
+   *
+   * 🔴 A LEVEL ON ITS OWN PROVES NOTHING. "It is loud" is satisfied by a stuck
+   * meter, a feedback path, or another tab; "it is loud AND it is exactly
+   * 0.000000 when the master is down, and loud again afterwards" is a claim
+   * about this graph. §10.5 measured exactly 0.000000 at `amp 0` with
+   * everything else still running, which is the number to reproduce.
+   *
+   * ⚠️ `amp` GOES TO THE TAB ONLY, NEVER THROUGH `forBoth`. `amp` is Pappus's
+   * master, and putting the board's to 0 would silence the studio for whoever
+   * is standing next to it. The board's own deafness control is `probeSound`,
+   * which turns the MATERIAL down and up and crosses the whole chain.
+   *
+   * ⚠️ AND THE QUIET ARM IS MEASURED AFTER THE CHANGE HAS LANDED. An analyser
+   * window still holds 42 ms of the old signal, so a reading taken immediately
+   * reports that turning it down did nothing.
+   */
+  async function probeLocal() {
+    if (!pap?.started) return;
+    const loud = await levelOver(() => pap.level(), 900, 400);
+    pap.set('amp', 0);
+    const silent = await levelOver(() => pap.level(), 700, 500);
+    pap.set('amp', SENT.get('amp') ?? 1);
+    papDeaf = { loud, silent };
+    d.log(`the engine in this page: ${loud.toFixed(6)} playing, ${silent.toFixed(6)} with its master down`,
+      loud > 0.0005 && silent === 0 ? 'hi' : 'warn');
+  }
 
   function checkAll() {
     // ── the lane that is always reachable ─────────────────────────────────
@@ -1256,28 +1859,47 @@
     // could go green having granulated nothing. And it is the only lane where
     // the picture can be checked, because it is the only one whose engine
     // reports the grains it fired.
-    d.assert('a granulator is running in this page, with no network in the path',
-      !!lnode && !!lctx, lctx ? `an AudioWorklet at ${lctx.sampleRate} Hz` : 'no audio context');
-    d.assert('it is holding sound to chew', lstats.heldSec > 0.5, `${lstats.heldSec?.toFixed(1)} s held`);
+    // 🔴 IT IS REAL SUPERCOLLIDER, AND THE EVIDENCE IS THE ENGINE'S OWN VOICE.
+    // Not `loadSynthDef()`'s return value, which research §8 measured returning
+    // `{name, size}` for a definition the server never received, and not a
+    // count this page keeps: `/done /d_recv` and `/n_go`, said by the server.
+    d.assert('the granulator in this page is SuperCollider running the board’s own graph',
+      !!pap?.graph?.ok && !!pap?.started,
+      pap ? `${pap.graph.bytes} B of compiled SynthDef taken in ${pap.graph.ms} ms, `
+        + `${pap.running?.ugens} building blocks running at ${pap.sampleRate} Hz`
+        : 'no engine — nothing has been pressed');
+    // 🔴 AND THE MATERIAL IS A SECOND DEFINITION, BECAUSE PAPPUS IS NOT
+    // SELF-CONTAINED: it granulates whatever is on a bus, and in a browser
+    // nothing fills that bus. Without this the pane would look perfect and be
+    // granulating silence.
+    d.assert('something is feeding it, and its own engine says so',
+      !!pap?.source?.ok && !!papSource && papSource.voices === SPEC.chord.length,
+      papSource ? `${pap.source.bytes} B of material definition, and scsynth answers `
+        + `${papSource.voices} notes at ${Math.round(papSource.hz)} Hz`
+        : 'the engine has not answered about the material');
+    // 🔴 THE WRITER RUNS BEFORE THE READER, ASKED OF THE SERVER. `Out.ar` SUMS
+    // into a bus and scsynth runs nodes in tree order, so a reader placed ahead
+    // of its writer hears the PREVIOUS block — one block late, for ever, which
+    // reads as "it nearly works" rather than as a wiring mistake. `/g_queryTree`
+    // is the only thing that can answer; this page cannot know it.
+    d.assert('the material is built before the granulator reads it, not one block after',
+      pap?.order?.sourceFirst === true,
+      pap?.order ? `the tree answers ${pap.order.reply.slice(0, 12).join(' ')}` : 'the engine did not answer about its node tree');
     // ⚠️ MEASURED, NOT DRAWN FROM THE SETTINGS. A scope fed parameters would
     // look identical and mean nothing — which is the picture this page deleted
     // once already.
     const sc = scope.stats();
-    d.assert('every tick in this page’s picture is a grain it actually started',
-      sc.measured > 0 && sc.inferred === 0,
-      `${sc.measured} reported by the engine, ${sc.inferred} guessed from audio`);
-
-    // 🔴 WHAT IT IS CHEWING, CHECKED — because the whole side-by-side rests on
-    // both ends being handed the same material, and this is the end that can
-    // answer for itself. A sine table is the one description two different
-    // engines render identically; a `type: 'sawtooth'` would look the same on
-    // screen and be a different sound on the board (plan-twins §4a).
-    const plan = lsrc?.plan;
-    const top = plan?.partials?.length ? Math.max(...plan.partials.map((p) => p.hz)) : 0;
-    d.assert('the material is the table the spec asked for, and none of it aliases',
-      !!plan && plan.partials.length > 0 && plan.dropped === 0 && top < lctx.sampleRate / 2,
-      plan ? `${plan.partials.length} sine partials of ${SPEC.shape} over ${SPEC.chord.length} notes, `
-        + `top at ${Math.round(top)} Hz against a ${lctx.sampleRate / 2} Hz ceiling` : 'no source built');
+    d.assert('every tick in this page’s picture is a grain the engine reported firing',
+      sc.measured > 0 && sc.measured === papGrains && sc.inferred === 0,
+      `${papGrains} reported by the engine, ${sc.measured} drawn, ${sc.inferred} guessed from audio`);
+    // 🔴 THE DEAFNESS CONTROL FOR THIS END. A level on its own is satisfied by
+    // a stuck meter; a level that is EXACTLY zero when the master goes down and
+    // loud again afterwards is a claim about this graph. research §10.5
+    // measured 0.000000 at `amp 0` with everything else still running.
+    d.assert('the sound is this engine’s, and it stops exactly when its master does',
+      !!papDeaf && papDeaf.loud > 0.0005 && papDeaf.silent === 0,
+      papDeaf ? `${papDeaf.loud.toFixed(6)} playing against ${papDeaf.silent.toFixed(6)} with the master down`
+        : 'nothing has been measured yet — press “Switch it on”');
 
     d.assert('the page reached the relay', wire.state() === 1, `readyState ${wire.state()}`);
     // ⚠️ ONE BRANCH PER NAMED STATE, AND THE COUNT MOVES WITH IT. This board is
@@ -1286,8 +1908,16 @@
     // playing nothing at all into it — and asserting a running instrument's
     // numbers in those states reported four failures about a board that was
     // fine. Each state asserts what it can answer for and says which it was.
-    // Diff the count against the BRANCH: silent 4, answering-but-not-sounding 5,
-    // sounding 8 — 10 with the two rolls.
+    // Diff the count against the BRANCH: silent 9, answering-but-not-sounding 10,
+    // sounding 17. MEASURED 2026-09-14, 17/17 with the board live.
+    // ⚠️ IT WAS 16 BEFORE THE LEFT PANE BECAME REAL SUPERCOLLIDER, and the four
+    // asserts it had about a hand-written worklet became five about an engine:
+    // that it IS SuperCollider running the board's graph, that a second
+    // definition is feeding it (Pappus granulates a BUS, and in a browser
+    // nothing else fills one), that the writer runs before the reader, that
+    // every tick came from a `/pgrain`, and that the sound stops EXACTLY when
+    // its master goes down. The grain-rate assert now grades both ends against
+    // the slider rather than one end against the other.
     const st = panel.dataset.state;
     const why = {
       silent: 'the board is silent, and the page says so',
@@ -1323,11 +1953,19 @@
       `${PATCHES[patch].m.rate} against ${PATCHES[patch].n.rate} grains a second`);
     // The claim the whole page rests on: this is sound that was made on a
     // machine somewhere else and came back, not a page making a noise.
-    d.assert('sound comes back from the board while a key is held',
-      !!probe && probe.held > 0.002,
-      probe ? `${probe.held.toFixed(4)} with a key down, ${probe.quiet.toFixed(4)} without`
-        + (probe.quiet <= 0.002 ? ' — the key started it' : ' — it was already droning')
-        : 'no key has been held yet — press “Switch it on”');
+    // ⚠️ AND IT HAS TO SEPARATE THE TWO, NOT JUST BE LOUD. Both branches now
+    // require the quiet arm to be QUIET — with the material driven from this
+    // page there is something to turn down, so "it was already droning" stops
+    // being an excuse the check has to accept.
+    d.assert(probe?.how === 'material'
+      ? 'the board is making the sound this page described, and stops when it is turned down'
+      : 'sound comes back from the board while a key is held',
+      !!probe && probe.held > 0.002 && (probe.how === 'material' ? probe.quiet < probe.held * 0.5 : true),
+      probe ? (probe.frames === 0
+        ? 'not one audio frame arrived in either window — nothing was measured, and that is a socket rather than a silence'
+        : `${probe.held.toFixed(4)} with it up, ${probe.quiet.toFixed(4)} with it down, over ${probe.frames} frames`
+          + (probe.how === 'material' ? ' — the material is this page’s own description' : ''))
+        : 'nothing has been measured yet — press “Switch it on”');
     // 🔴 THE MECHANISM AND WHETHER IT HAS ANYTHING TO ACT ON — NOT THE COUNT ON
     // ITS OWN. This asserted `nudges > 0` and read red for a reason that was
     // true and was not a timing fault: the movement circled the last dice roll
@@ -1374,10 +2012,85 @@
     // against `inferred` is the scope saying where its ink came from, which is
     // the only way to tell a picture of grains from a picture of settings —
     // and this page has drawn the wrong one before.
+    // ⚠️ AND THE DETAIL NAMES THE ONE THING THAT MAKES THIS ZERO WITHOUT
+    // ANYTHING ELSE LOOKING WRONG. The board plays its granulator's eight
+    // voices like a keyboard and starts with every gate SHUT; with none open
+    // the trigger never fires, so there are no grains and no sound — while the
+    // audio stream, the material and every reply stay perfectly healthy. The
+    // page SETS the gates now, so this cannot happen; printing the board's own
+    // count is what stops the next zero being a mystery.
     const bs = boardScope.stats();
     d.assert('the board’s grains are reported by the engine that fired them, not guessed from its audio',
       boardGrains > 0 && bs.measured > 0,
-      `${boardGrains} reported by the board, ${bs.measured} drawn, ${bs.inferred} guessed from audio`);
+      `${boardGrains} reported by the board, ${bs.measured} drawn, ${bs.inferred} guessed from audio`
+      + (boardVoices === null ? '' : ` · ${boardVoices} of the board’s 8 voices open`));
+
+    // 🔴 THE CLAIM plan-twins §4a EXISTS FOR. Two panes side by side are a claim
+    // that they are comparable, and until today that claim was false for a
+    // reason nothing on the page could see: this end granulated a table of sines
+    // and the board granulated whatever instrument was running. Both ends now
+    // expand ONE spec with ONE function (`partialsOf`), and the board builds it
+    // on its own scsynth.
+    //
+    // ⚠️ IT ASSERTS THE ENGINE'S OWN ANSWER, not the box's. `engine.voices` and
+    // `engine.hz` come back from an `/s_get` to scsynth, which replies only for a
+    // node that really exists holding the value it really holds — and the first
+    // version of this path reported `node 1002, engineOn true` about a SynthDef
+    // that had failed to load, because `Synth.new` allocates an id on the client
+    // before the server has read the message.
+    // ⚠️ AND THE TWO ENGINES ARE NOW THE SAME DEFINITION, so this is no longer
+    // "two builders agreed": it is one `PosSource.scsyndef` running in two
+    // places, each asked what it is holding.
+    const lp = papPlan?.partials?.length ?? 0;
+    d.assert('both granulators are chewing the same description, and both engines say so',
+      !!made?.partials && lp > 0 && made.partials === lp
+        && made.engine?.voices === SPEC.chord.length && papSource?.voices === SPEC.chord.length,
+      made?.partials
+        ? `${lp} sine partials here, ${made.partials} on the board — this page’s scsynth answers `
+          + `${papSource?.voices} notes at ${Math.round(papSource?.hz ?? 0)} Hz and the board’s `
+          + `${made.engine?.voices} at ${Math.round(made.engine?.hz)} Hz`
+        : made?.reason ? `the board refused: ${made.reason}` : 'the board has not answered about the material');
+    // 🔴 `rate` HAS TO MEAN ONE THING — plan-twins §5, and it is measured here
+    // rather than assumed. The board's granulator has eight voices and each can
+    // bring up swarm duplicates, so "grains a second" could have meant anything
+    // from 1x to 50x the number on the slider. MEASURED over the relay: at
+    // `mrate` 8 the engine reported 8.0 grains a second, at 4 it reported 4.0, at
+    // 16 it reported 16.0 — one voice is gated by default, so the slider's number
+    // IS grains a second on both engines and no division is needed.
+    //
+    // ⚠️ COUNTED ON THE FAR SIDE. These are the board's own `SendReply` per
+    // trigger, not anything this page asked for. Tolerant by a factor of two
+    // because a patch can open more voices and because the window starts
+    // whenever the first report happens to land.
+    // 🔴 AND THE SLIDER IS A VALID ORACLE HERE ONLY BECAUSE `rate` IS OUTSIDE
+    // THE DRIFT. The board's slow movement is ON while this page drives — the
+    // page asks for it and asserts it above — and it walks `scan`, `spray`,
+    // `swarm`, `tilt`, `size` and `sos` around whatever was last SET
+    // (`DRIFT` in `pappus.mjs`). So `where` is a CENTRE and not a position,
+    // and no assert here may be written against it. `rate` is deliberately
+    // excluded from that list — "an integer-ish grain rate is not drifted" —
+    // which is what makes this one comparison immune to a moving target.
+    // ⚠️ THE FIRST BATCH'S GRAINS FIRED BEFORE THE WINDOW OPENED, so its count
+    // is the one dropped rather than an arbitrary one — the span is measured
+    // from its arrival, and everything after it happened inside that span.
+    const gspan = grainLog.length > 1 ? (grainLog[grainLog.length - 1].t - grainLog[0].t) / 1000 : 0;
+    const gsec = gspan > 0.5 ? grainLog.slice(1).reduce((t, g) => t + g.seen, 0) / gspan : 0;
+    // 🔴 AND THE SAME QUESTION ASKED OF THE ENGINE IN THIS TAB, WHICH IS THE
+    // WHOLE POINT OF THE REWIRE. `mrate` is an ORACLE — research §10.6 graded
+    // this end at 8.00 / 4.00 / 15.99 a second against the board's documented
+    // 8.0 / 4.0 / 16.0 — so both panes are graded against the slider rather
+    // than against each other. Two ends compared only to each other agree when
+    // they share a fault; compared to the number asked for, they cannot.
+    const pspan = papLog.length > 1 ? (papLog[papLog.length - 1] - papLog[0]) / 1000 : 0;
+    const psec = pspan > 0.5 ? (papLog.length - 1) / pspan : 0;
+    d.assert('a grain a second means the same thing on both engines',
+      gsec > 0 && gsec >= K.rate * 0.4 && gsec <= K.rate * 2.5
+      && psec > 0 && psec >= K.rate * 0.4 && psec <= K.rate * 2.5,
+      gspan > 0.5 && pspan > 0.5
+        ? `${psec.toFixed(1)} a second in this page and ${gsec.toFixed(1)} on the board, `
+          + `against ${K.rate.toFixed(1)} asked for`
+        : `${pspan > 0.5 ? `${psec.toFixed(1)} a second here` : 'this page’s engine has not reported two grains yet'}`
+          + ` · ${gspan > 0.5 ? `${gsec.toFixed(1)} on the board` : 'the board has not reported two batches yet'}`);
 
     d.assert('a named patch is on screen, chosen rather than rolled',
       !!PATCHES[patch] && step.select.options[step.select.selectedIndex]?.text === PATCHES[patch].name,
