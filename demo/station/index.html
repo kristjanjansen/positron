@@ -378,7 +378,7 @@
   // sentence.
   // 🔴 THE PICTURE THAT ANSWERS "HOW DO LIVE AND FILES MIX", which was asked
   // twice in prose and is a drawing rather than a paragraph.
-  createDiagram(d.el, {
+  const dg = createDiagram(d.el, {
     title: 'how it works',
     caption: 'A live show and an old recording are the same thing here: bytes in a bucket, '
       + 'named by a text file that is rewritten every few seconds.',
@@ -389,28 +389,33 @@
        * what is somebody else's server, and what is on their own device. That
        * distinction is the whole cost model: only the middle box bills us.
        *
-       * ⚠️ THREE ARROWS ARE MISSING WHILE THIS STANDS, AND THEY ARE NOT
-       * FORGOTTEN. `createDiagram` computes a link between the MACHINES its two
-       * ends are in, so for two boxes in one container the geometry collapses
-       * to zero length and nothing is drawn: `chunks -> programmes`,
-       * `schedule -> Worker` and `programmes -> Worker` are declared below and
-       * do not appear. The plain ties between the children stand where they
-       * would be. Sibling routing is being added to the component; when it
-       * lands these draw with no change to this file.
+       * 🔴 AND CLOUDFLARE'S FOUR BOXES ARE IN THIS ORDER SO THAT EVERY PAIR A
+       * READER SEES SIDE BY SIDE IS A PAIR WITH A DECLARED ARROW IN IT.
+       * `schedule` sat third and nothing was declared between it and
+       * `programmes`, so the component tied those two with a plain line, which
+       * is what it does for boxes whose order the drawing does not know. Down
+       * one column that came out as an arrow, a headless line and an arrow, and
+       * it was reported as "where is arrowhead between programmes and
+       * schedule". The line was correct and it read as a broken one. Moving
+       * `schedule` under `Worker` puts a declared arrow in all three gaps: the
+       * schedule now points UP into the Worker and the recordings point down
+       * into it, which is also the truer picture, since both are inputs to the
+       * one box that writes the playlist. `dg.ties` is asserted at 0 below, so
+       * re-ordering these back cannot pass unnoticed.
        */
       { id: 'onair', label: 'broadcast', sub: 'built, not in use', kind: 'device', tech: 'station',
         children: [
           { id: 'mount', label: 'mount', sub: 'endless http', tech: 'station',
             note: 'One connection that never closes. Nothing downstream can seek in it, which '
                 + 'is exactly why the segments beside it have to exist.' },
-          { id: 'seg', label: 'ffmpeg', sub: '-f segment, 10 s', tech: 'encoder',
+          { id: 'seg', label: 'ffmpeg', sub: '-f segment, 10s', tech: 'encoder',
             note: 'Cuts a broadcast into ten second files as it arrives, with **-c copy**, so '
                 + 'nothing is decoded and nothing is re-encoded. It runs as a hook on the '
                 + 'broadcaster\'s machine: a Worker has no processes to run it in.' },
         ] },
       { id: 'cf', label: 'Cloudflare', sub: 'the only part we run', kind: 'cloud', tech: 'cloudflare',
         children: [
-          { id: 'chunks', label: 'chunks', sub: 'R2, ten seconds', tech: 'file',
+          { id: 'chunks', label: 'chunks', sub: 'R2, 10s', tech: 'file',
             note: 'Ten second mp3 files written while a show is on air, sitting beside the '
                 + 'recordings as ordinary objects. Nothing is broadcasting into this station '
                 + 'yet, so today these hold a test tone.' },
@@ -418,14 +423,31 @@
             note: 'Recordings that already existed, and the shows that have finished. Never '
                 + 'cut up: the playlist points at byte ranges inside them with '
                 + '**#EXT-X-BYTERANGE**, so one file serves a hundred segments.' },
-          { id: 'sched', label: 'schedule', sub: 'Durable Object', tech: 'cloudflare',
-            note: 'What plays when: which recording, or which live slot, owns which minute. '
-                + 'A change takes effect in the playlist within a second.' },
           { id: 'wrk', label: 'Worker', sub: 'writes playlist', tech: 'cloudflare',
             note: 'Asks the schedule what should be playing, then writes the text naming the '
                 + 'next ten seconds. It never reads or writes a sample of audio, so a live '
                 + 'show and a forty minute recording cost it the same.' },
+          { id: 'sched', label: 'schedule', sub: 'Durable Object', tech: 'cloudflare',
+            note: 'What plays when: which recording, or which live slot, owns which minute. '
+                + 'A change takes effect in the playlist within a second.' },
         ] },
+      /**
+       * 🔴 THE FILES HAVE TO GET IN, AND NOTHING SHOWED THEM ARRIVING.
+       * Reported 2026-09-16: *"station diagram does not have r2 files coming
+       * in"*. The picture had `chunks` arriving from the segmenter and
+       * `programmes` arriving from `chunks` when a show ends, and no way at all
+       * for a recording that was made before this station existed. Those are
+       * what it is actually playing today, and they come in by one POST each.
+       *
+       * ⚠️ `curl` IS WHAT DOES IT, so `curl` is what the box is called. CLAUDE.md
+       * says a label is a NAME and that a name is not jargon: inventing
+       * `uploader` here would be a friendly word for a thing nobody can search
+       * for, and it would hide which program makes the request.
+       */
+      { id: 'put', label: 'curl', sub: 'one POST per show', kind: 'device', tech: 'file',
+        note: 'Whoever has the recording posts it once. The Worker writes the mp3 and a '
+            + 'second small JSON file beside it listing where every frame starts, which is '
+            + 'what lets a playlist name byte ranges later.' },
       { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
         children: [
           { id: 'player', label: 'player', sub: 'hls.js or Safari', tech: 'browser',
@@ -443,7 +465,7 @@
       { from: 'mount', to: 'seg',
         note: 'The stream itself, on the broadcaster\'s own machine. It never crosses a '
             + 'network here: **ffmpeg** reads the mount over localhost.' },
-      { from: 'seg', to: 'chunks', label: 'ten second mp3s',
+      { from: 'seg', to: 'chunks', label: '10s mp3s',
         note: 'Ten seconds is the whole trade. Shorter means the playlist is rewritten more '
             + 'often and a listener sits closer to the live edge; longer means fewer requests '
             + 'and a deeper cushion. At ten, a player holding three is about 30 seconds '
@@ -458,13 +480,69 @@
       { from: 'prog', to: 'wrk',
         note: 'Which bytes of which file are the next ten seconds. The Worker turns those '
             + 'numbers into **#EXT-X-BYTERANGE** lines and touches no audio.' },
-      { from: 'wrk', to: 'player', label: 'the playlist' },
-      { from: 'prog', to: 'player', label: 'Range requests',
-        note: 'The player asks for byte 461 to byte 160538 of a forty minute mp3 and gets '
-            + 'exactly those bytes back, with a **206**. That is what makes whole files '
-            + 'usable as segments: nothing is cut up in advance and nothing is copied.' },
+      // 🔴 THE TWO ARROWS OUT OF CLOUDFLARE NAME WHAT TRAVELS ALONG THEM, AND
+      // THE SECOND ONE USED TO NAME TRAFFIC GOING THE OTHER WAY. It read
+      // `Range requests`, which is what the **Browser** sends, on an arrow
+      // drawn pointing AT the Browser: the picture said requests arrive here.
+      // What comes down it is audio. The first read `the playlist`, which is a
+      // name with an article on it, and it carried no note at all, so hovering
+      // the one arrow a reader is most likely to ask about repeated its own
+      // label. Reported as "what happens between cf and browser?".
+      { from: 'put', to: 'prog', label: 'whole mp3',
+        note: 'One **POST /programme** with the file in the body, and nothing after it: the '
+            + 'bytes are never cut up, copied or re-encoded. A forty minute show is one '
+            + 'object that a hundred segments point into.' },
+      { from: 'wrk', to: 'player', label: 'playlist text',
+        note: 'Under a kilobyte of text, fetched again every few seconds because the live '
+            + 'edge keeps moving. It names the bytes of the next ten seconds and carries no '
+            + 'audio itself.' },
+      { from: 'prog', to: 'player', label: 'mp3 bytes',
+        note: 'The player sends a **Range** header asking for byte 461 to byte 160538 of a '
+            + 'forty minute mp3, and exactly those bytes come back with a **206**. Nothing '
+            + 'was cut up in advance and nothing was copied.' },
     ],
+  }, {
+    /**
+     * 🔴 LAST ON THE PAGE, WHICH IS AFTER THE LOG AND NOT MERELY AFTER THE
+     * CONTROLS. Reported 2026-09-16 as a violation of the rule, and it was: this
+     * called `createDiagram` with no options at all, so it landed wherever in
+     * `d.el` the call happened to sit, above the log a reader scrolls to.
+     *
+     * The rule and its reason are in CLAUDE.md: a diagram is REFERENCE. It is
+     * read once, on purpose, by somebody who has already pressed the thing and
+     * wants to know what is behind it. Put above the controls it delays the one
+     * thing a first visitor came for; under everything it is exactly where
+     * somebody who now has a question will look.
+     * `how: true` writes the standing `how it works` heading, which is the same
+     * four words on every page so a reader learns the heading once.
+     */
+    how: true, atEnd: true,
   });
+
+  /**
+   * 🔴 THE PICTURE GRADES ITSELF. `createDiagram` collects every label it had
+   * to shorten, every note over about forty words and every link it could not
+   * route on `cuts`, and nothing on this page had ever read that list. So a
+   * name cut to `Range req…`, a note that had grown to six sentences, or an
+   * arrow declared here and refused would all have reached the deploy looking
+   * exactly like a picture that was fine. Asserted at load rather than inside a
+   * check, because the diagram is on the page whether or not anybody presses
+   * play.
+   */
+  d.assert('the diagram drew every name and every arrow whole',
+    dg.cuts.length === 0,
+    dg.cuts.map((c) => `${c.where} ${c.id}`).join(' · ') || 'nothing cut, nothing refused');
+
+  /**
+   * 🔴 AND EVERY LINE IN IT HAS A HEAD ON IT. A bracket between two boxes in a
+   * machine carries no arrowhead on purpose, which is right for a machine whose
+   * parts have no stated order and wrong for this one: all three of Cloudflare's
+   * relations are declared, so a headless line anywhere in this picture is a
+   * head that has gone missing rather than a bracket. That is what was reported,
+   * and looking at the picture was the only way to find it.
+   */
+  d.assert('and no line in it is missing its arrowhead', dg.ties === 0,
+    `${dg.ties} line${dg.ties === 1 ? '' : 's'} with no head`);
 
   d.ready();
 </script>

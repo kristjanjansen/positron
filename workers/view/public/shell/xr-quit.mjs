@@ -33,8 +33,26 @@
 
 const HOLD_MS = 900;
 const PX = 256;               // the label texture, square
-const SIZE = 0.075;           // how big the badge is in the world, in metres
-const LIFT = 0.055;           // how far above the grip it floats
+/**
+ * 🔴 HOW BIG THE BADGE IS IN THE WORLD, IN METRES, AND IT WAS TWICE THIS.
+ * Reported 2026-09-16: *"make smaller. its a small thing perpendicular to
+ * button"*. At 75 mm it was a sign held over the controller; at 40 mm it is a
+ * marking ON one, which is what a face button's legend actually is. The whole
+ * badge is about the width of the thumb resting under it.
+ */
+const SIZE = 0.040;
+/**
+ * 🔴 HOW FAR OFF THE BUTTON IT SITS, ALONG THE CONTROLLER'S OWN AXIS.
+ * Reported 2026-09-16: *"its a small thing perpendicular to button"*. It used
+ * to be lifted along WORLD up, which is right for a sign and wrong for a
+ * legend: turn your wrist over and the badge stayed hanging above the grip
+ * while the button it names rotated away underneath it. Along the grip's own
+ * up it stands off the face the button is on and turns with the hand, which is
+ * what perpendicular to the button means.
+ * ⚠️ HALVED WITH THE BADGE. 55 mm above a 75 mm sign was proportionate; above
+ * a 40 mm marking it was a balloon on a string.
+ */
+const LIFT = 0.030;
 
 const VS = `#version 300 es
 in vec2 aCorner;
@@ -88,7 +106,7 @@ function compile(gl, vs, fs) {
  *                              not a press; short enough to be a decision.
  * @param {Function} o.onQuit   called once, when the ring fills.
  */
-export function createXRQuit(gl, { label = 'HOLD TO QUIT', button = 4,
+export function createXRQuit(gl, { label = 'Quit', button = 4,
   holdMs = HOLD_MS, onQuit = () => {} } = {}) {
   const cv = document.createElement('canvas');
   cv.width = PX; cv.height = PX;
@@ -111,13 +129,29 @@ export function createXRQuit(gl, { label = 'HOLD TO QUIT', button = 4,
     drawn = q;
     const f = q / 100;
     g.clearRect(0, 0, PX, PX);
-    const cx = PX / 2, cy = PX / 2, r = PX * 0.34;
-    // the track, so the ring has somewhere to fill into rather than appearing
-    g.lineWidth = PX * 0.055;
-    g.strokeStyle = 'rgba(255,255,255,.18)';
-    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+    const cx = PX / 2, cy = PX / 2, r = PX * 0.40;
+    /**
+     * 🔴 NO CIRCLE UNTIL THERE IS SOMETHING TO COUNT. Reported 2026-09-16:
+     * *"initially no circle, its appears on countdown (no bg circle just
+     * arc). make it thinner and just white and bit rounded"*.
+     *
+     * There was a faint full circle behind it at all times, on the argument
+     * that the arc needs somewhere to fill INTO. That is a good argument about
+     * a progress bar on a screen and the wrong one here: a ring drawn round a
+     * word on a controller you are not pressing is a shape that means nothing
+     * yet, and it is the loudest thing on the badge. The arc appearing from
+     * nothing IS the feedback. With no hold there is a word and no geometry at
+     * all.
+     *
+     * ⚠️ WHITE, NOT THE SITE'S YELLOW. Yellow in here is spent on the thing
+     * that is running; this is the way out, which is furniture until the moment
+     * you use it. ⚠️ AND THINNER, with round caps, which is the `bit rounded`:
+     * at 0.055 of the badge it read as a heavy dial, and a countdown that has
+     * only to be SEEN does not need weight.
+     */
     if (f > 0) {
-      g.strokeStyle = '#ffd400';
+      g.lineWidth = PX * 0.030;
+      g.strokeStyle = '#ffffff';
       g.lineCap = 'round';
       g.beginPath();
       g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f);
@@ -125,8 +159,8 @@ export function createXRQuit(gl, { label = 'HOLD TO QUIT', button = 4,
     }
     // ⚠️ THE LABEL IS INSIDE THE RING, not under it. A caption below the badge
     // is a second thing to find at arm's length; inside, the ring is a frame
-    // round the words and the whole badge is one object.
-    g.fillStyle = f >= 1 ? '#ffd400' : '#ffffff';
+    // round the word and the whole badge is one object.
+    g.fillStyle = '#ffffff';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const words = label.split(' ');
@@ -231,7 +265,17 @@ export function createXRQuit(gl, { label = 'HOLD TO QUIT', button = 4,
       paint(this.progress);
       const m = grips[0];
       if (!m) return false;
-      const o = [m[12], m[13] + LIFT, m[14]];
+      // The grip's own up: column 1 of its matrix, which points out of the face
+      // the button is on. Normalised, because a grip matrix is not guaranteed
+      // to be free of scale and a badge that changed size with the pose would
+      // be a very confusing thing to look at.
+      const uy = [m[4], m[5], m[6]];
+      const ul = Math.hypot(uy[0], uy[1], uy[2]) || 1;
+      const o = [
+        m[12] + (uy[0] / ul) * LIFT,
+        m[13] + (uy[1] / ul) * LIFT,
+        m[14] + (uy[2] / ul) * LIFT,
+      ];
       // Billboard: right is across the line of sight, up is perpendicular to
       // both. Computed per draw because the eye moves every frame.
       const f = [o[0] - eye[0], o[1] - eye[1], o[2] - eye[2]];

@@ -9,6 +9,15 @@
   "main": "worker.mjs",
   "compatibility_date": "2026-09-01",
   "routes": [{ "pattern": "shout.positron.studio", "custom_domain": true }],
+  // 🔴 ONE OBJECT PER MOUNT, ADDRESSED BY NAME. This is what makes the relay
+  // one listener at the broadcaster however many people are on the site. See
+  // the `Mount` class at the bottom of worker.mjs and the note above it.
+  "durable_objects": { "bindings": [{ "name": "MOUNT", "class_name": "Mount" }] },
+  // ⚠️ `new_sqlite_classes`, NOT `new_classes`. This object keeps no storage at
+  // all, and the SQLite backend is what a new object gets on this account; the
+  // key-value backend is being retired and a migration that asks for it is
+  // refused outright.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Mount"] }],
   "workers_dev": true,
   "observability": { "enabled": true }
 }

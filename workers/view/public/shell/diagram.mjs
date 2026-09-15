@@ -38,6 +38,13 @@
 // A link from a container to a box inside ITSELF has no gap to run through and
 // is still refused — reported on `cuts`, never dropped in silence, because a
 // link that vanishes without a word is exactly how those three went missing.
+// ⚠️ A TIE AND AN ARROW ARE ONE WEIGHT OF INK DOWN ONE MIDDLE, so a container
+// holding both says two things in one alphabet and the headless one reads as a
+// head that went missing. That is a fact about the DESCRIPTION rather than
+// about the drawer: order a machine's boxes so every pair a reader sees side by
+// side is a pair a direction was stated for, and the mix cannot arise.
+// `api.ties` is how many headless lines the picture holds, so a page can assert
+// its own description got that right instead of anybody having to look.
 //
 // 🔴 THERE IS NO `title` ATTRIBUTE ANYWHERE IN HERE, AND THAT IS THE POINT.
 // A box used to carry an SVG `<title>`, which the browser draws as a native
@@ -848,7 +855,15 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
   // be too little, and where a name turns out to be one line the extra gap
   // costs nothing but air.
   const LINK_MAX_LINES = 2;
-  const spread = Math.max(ATTACH_OFF, Math.round(m.linkLh) * LINK_MAX_LINES + 6);
+  // 🔴 AND A THIRD TIME, BECAUSE NOT COLLIDING IS NOT THE SAME AS BEING APART.
+  // Two lines of room plus 6 px puts two two-line names 28 px apart, which is
+  // exactly enough that they do not overlap and reads as one clump: reported
+  // with a photograph of `playlist text` and `mp3 bytes` arriving at `player`,
+  // *"can we get connectors a bit separate?"*. The first two fixes were about a
+  // SMEAR and this one is about the gap being legible. 18 px of air rather than
+  // 6 is half a line between the blocks, so the eye takes them as two arrivals
+  // before it has read either name.
+  const spread = Math.max(ATTACH_OFF, Math.round(m.linkLh) * LINK_MAX_LINES + 18);
   const arriveAt = (l, t) => {
     const list = arrivals.get(l.to);
     if (!list || list.length < 2) return t.cy;
@@ -1431,7 +1446,11 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
   wrap.append(head, svg, cap);
   place.append(wrap);
 
-  const api = { el: wrap, svg, cuts: [], mode: 'row', measured: false, render, destroy };
+  // `ties` is how many headless bracket lines the last layout drew. See the
+  // count in `render`: it is the only thing that can answer "is there a line in
+  // my picture with no arrowhead on it".
+  const api = { el: wrap, svg, cuts: [], ties: 0, mode: 'row', measured: false,
+                render, destroy };
 
   /** the line under the picture, back to what it says when nothing is hovered */
   const resetCaption = () => {
@@ -1669,6 +1688,12 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       field.append(lg);
     }
 
+    // 🔴 HOW MANY BRACKETS THIS PICTURE DREW, AND IT IS COUNTED BECAUSE A PAGE
+    // HAS NO OTHER WAY TO ASK. A tie is the one mark in here that carries no
+    // head, so "is there a headless line in my diagram" is the exact question
+    // behind the report that bought the rule below, and until this existed the
+    // only answer was to look at it. `cuts` cannot see it: nothing was cut.
+    let ties = 0;
     for (const n of L.nodes) {
       if (n.kids) {
         // 🔴 THE THINGS INSIDE ONE MACHINE ARE JOINED, AND THE JOIN HAS NO
@@ -1689,6 +1714,18 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
         // author has said there is a direction between those two boxes, so the
         // bracket has nothing left to say and two lines down one gap is the
         // thing every routing rule in this file exists to prevent.
+        // 🔴 BUT A GAP NOBODY DECLARED ACROSS STILL GETS ONE, AND THAT IS A
+        // DECISION RATHER THAN AN OVERSIGHT. /station/ was reported as "where
+        // is the arrowhead between programmes and schedule": its Cloudflare box
+        // had an arrow, then a tie, then an arrow, and a headless line between
+        // two headed ones reads as a head that fell off. Taking every tie out
+        // of a container the moment one arrow is declared in it was tried and
+        // is wrong. It puts the fix in the drawer for a fact only the author
+        // knows, and it silently deletes the bracket from any machine whose
+        // parts really are unordered. The repair belongs in the description:
+        // order the boxes so that every pair the reader sees side by side is a
+        // pair a direction has been stated for. `api.ties` is how a page checks
+        // that it did, and /kit/ shows both halves of this gap on purpose.
         const stepped = new Set();
         for (const l of L.links) {
           if (l.sib) stepped.add(`${l.from}|${l.to}`).add(`${l.to}|${l.from}`);
@@ -1704,6 +1741,7 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
               ? `M${r1(ax)} ${r1(y0)} L${r1(ax)} ${r1(y1)}`
               : tieElbow(ax, y0, bx, y1),
           }));
+          ties++;
         }
         for (const k of n.kids) field.append(nodeGroup(k));
       } else field.append(nodeGroup(n));
@@ -1745,6 +1783,7 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
     cap.style.minHeight = `${capH}px`;
 
     api.cuts = L.cuts;
+    api.ties = ties;
     api.mode = L.mode;
     for (const l of L.inside || []) {
       // a container and a box inside ITSELF: there is no gap between the two

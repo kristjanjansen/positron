@@ -1336,7 +1336,7 @@
       // trigger you drag the floor with. The way out is the badge on the
       // controller now; see `xr-quit.mjs`.
       xrQuit = createXRQuit(gl, {
-        label: 'HOLD TO QUIT',
+        label: 'Quit',
         onQuit: () => endVR('held the button', session),
       });
       session.addEventListener('end', () => {

@@ -21,18 +21,6 @@
      pixels would be one more number to keep in step with a layout. */
   .vr-screen { position: relative; aspect-ratio: 16 / 9; background: #05060a; }
   .vr-screen canvas { display: block; width: 100%; height: 100%; }
-  /* 🔴 ABSOLUTE, AND WITH ITS WIDTH RESERVED. A clock that redraws every frame
-     is exactly the thing CLAUDE.md forbids from changing how much room it
-     takes: `tabular-nums` so the digits do not jitter, a fixed `ch` width so
-     going from 9 to 10 seconds cannot widen it, and `position: absolute` so it
-     cannot move the picture under it whatever it says. */
-  .vr-clock {
-    position: absolute; top: 8px; right: 10px; z-index: 2; pointer-events: none;
-    font: 500 11px/1 var(--mono); font-variant-numeric: tabular-nums;
-    width: 7ch; text-align: right; color: var(--dim2);
-    text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
-  }
-
   /* 🔴 A LINE HERE, ON INSTRUCTION, AND THE RULE IT LOOKS LIKE IT BREAKS DOES
      NOT APPLY. CLAUDE.md's "separation is spacing, not lines" is about siblings
      down a page, where the vertical rhythm already says where one thing ends.
@@ -43,14 +31,48 @@
      than a decoration of one. */
   .vr-bar.pos-controls {
     margin: 0; padding: 8px 10px; background: var(--card);
-    /* `--line`, the same token `/mirror/`'s `.bar` uses. Two player chromes
-       on two pages separated at two weights is a difference a reader can
-       see and nobody chose. */
-    border-top: 1px solid var(--line);
+    /* 🔴 `--line2`, NOT `--line`, AND IT WAS ASKED FOR AS IF THERE WERE NO
+       BORDER AT ALL: *"add top border on videoradio panel footer"*. There was
+       one. `--line` is #1f2937 against a `--card` row sitting under a picture
+       that runs to black, and at that contrast the edge of the screen and the
+       top of the chrome were the same darkness. A border nobody can see is a
+       border nobody drew.
+       ⚠️ IT IS NOW A WEIGHT APART FROM `/mirror/`'s `.bar`, which keeps
+       `--line`. That was the argument for using `--line` here and it loses to
+       being legible: `/mirror/`'s bar sits under a lit shader pane, this one
+       under a picture with black in its corners. */
+    border-top: 1px solid var(--line2);
     display: flex; align-items: center; gap: 8px;
   }
   /* the one control that is not about playing: pushed to the far end */
   .vr-bar [data-id="full"] { margin-left: auto; }
+
+  /* 🔴 A WAY OUT OF FULL SCREEN THAT IS NOT IN THE ROW THAT FADES.
+     Asked 2026-09-16: *"when fullscreen (not vr) add symbolbutton to bottom
+     left to return from fullscreen"*. The ⛶ in the bar already toggles both
+     ways, and in full screen the bar is exactly what disappears after three
+     seconds of stillness, so the control that gets you back is the one the
+     design hides. On a laptop Escape works and is invisible; on a phone in the
+     faux cover there is no Escape at all.
+     ⚠️ INSIDE THE PANE, because the pane is what goes full screen: a button
+     outside it is on a document nobody can see. ⚠️ AND IT IS NOT IN THE BAR, so
+     the auto-hide cannot take it. */
+  .vr-out {
+    position: absolute; left: 10px; bottom: 10px; z-index: 3;
+    width: 34px; height: 34px; padding: 0;
+    display: none; place-items: center;
+    font-size: 15px; line-height: 1;
+    background: color-mix(in srgb, var(--card) 72%, transparent);
+    border: 1px solid var(--line2); color: var(--dim);
+    backdrop-filter: blur(6px);
+  }
+  .vr-out:hover { color: var(--fg); border-color: var(--dim2); }
+  /* ⚠️ BOTH CLASSES, because `fullscreen.mjs` sets `.pos-full` on either path
+     and adds `.pos-faux` only for the cover. A page that matched one of them
+     would have no way out on exactly the browsers that need one. And never
+     `:fullscreen` — a browser that does not know that pseudo-class discards the
+     whole selector list it appears in, which this repo has already paid for. */
+  .vr-pane.pos-full .vr-out, .vr-pane.pos-faux .vr-out { display: grid; }
 
   /* 🔴 THE ROW FADES WHEN NOTHING IS HAPPENING, AND IT FADES ONLY ITS INK.
      The page asked for is a picture with nothing else on the screen, and the
@@ -186,12 +208,18 @@
     // went was the list of everything the tour does to itself, which a visitor
     // watches happen rather than reads about, and the sentence naming the
     // picture as the instrument, which was the page describing its own design.
+    // 🔴 THE HEADSET IS IN HERE BECAUSE A CONTROL APPEARED, and a change in
+    // what a page DOES is a change in what it SAYS, in the same commit. It is
+    // also three sentences and not four: the clause about each loop running at
+    // its own speed between a quarter and double came out to make room, which
+    // is the rule that a change is an occasion to CUT rather than to append.
     what: 'A radio station fed through a granulator, playing itself: twelve '
       + 'sounds, nothing set by hand. It keeps taking a few seconds of whatever '
       + 'is on air and plays them round, up to three of those loops at once, '
       + 'layered over the station still coming in. Across the picture is where '
-      + 'in the last eight seconds it is reading, up is how long each piece '
-      + 'lasts, and each loop runs at its own speed between a quarter and double.',
+      + 'in the last eight seconds it is reading and up is how long each piece '
+      + 'lasts; in a headset that picture is the ground you stand on, fading '
+      + 'out in every direction.',
     // 🔴 TWO CELLS, AND `tour` WENT ON INSTRUCTION. Removing one left three,
     // which `mount()` refuses, and the rule behind that refusal is editorial:
     // an odd row always has a weakest cell and being made to find it is the
@@ -259,21 +287,32 @@
   const canvas = el('canvas');
   canvas.width = FIELD_W; canvas.height = FIELD_H;
   screen.append(canvas);
-  // Seconds since the page opened, for lining an event up against the picture.
-  // It survives full screen because it is inside the pane that goes full
-  // screen, which the log box is not.
-  const clock = el('div', 'vr-clock', '0.0s');
-  screen.append(clock);
-  const clockFrom = performance.now();
-  setInterval(() => {
-    clock.textContent = `${((performance.now() - clockFrom) / 1000).toFixed(1)}s`;
-  }, 100);
+  // 🔴 NO SECONDS COUNTER. Removed on instruction 2026-09-16: *"rm sec counter
+  // from videoradio"*. It was seconds since the page opened, for lining a
+  // reported event up against the picture, and it did that job during the
+  // sessions where the picture was being debugged from photographs. It is a
+  // number about the TAB rather than about the station or the instrument, it
+  // grew for ever whatever anything else did, and it sat over a picture whose
+  // whole ask is to be the only thing on the screen. Every log line still
+  // carries its own timestamp, which is where that fact belongs.
   // the shell's own row, MOVED rather than rebuilt, so `.pos-controls button`
   // still finds these and the project keeps one set of buttons
   d.controls.classList.add('vr-bar');
 
 
-  pane.append(screen, d.controls);
+  /**
+   * The way back out, bottom left, inside the pane so it goes full screen with
+   * it. `⤡` rather than `⛶`: the glyph in the bar means "fill the screen" and
+   * this one has to mean the opposite, and two controls wearing one symbol is
+   * worse than an unfamiliar second one.
+   * ⚠️ IT CALLS `exit`, NEVER `toggle`. A toggle on a control that is only ever
+   * visible in full screen can only do one thing, and saying so in the code is
+   * what stops somebody later making it a second way IN by accident.
+   */
+  const outBtn = el('button', 'vr-out', '⤡',
+    { type: 'button', 'aria-label': 'leave full screen', title: 'leave full screen' });
+  outBtn.addEventListener('click', () => { FS.exit(pane).catch(() => {}); });
+  pane.append(screen, d.controls, outBtn);
   d.el.append(pane);
 
   /**
@@ -1368,13 +1407,24 @@
    */
   /**
    * @param {WebGL2RenderingContext} g
-   * @param {{present?: boolean}} [o] `present: false` builds the chain WITHOUT
-   *   the final copy to the page's canvas. A headset session renders into the
-   *   layer's framebuffer and takes `finalTex()` as a texture, so a copy to a
-   *   16x16 canvas nobody presents would be a wasted pass and a bound
-   *   framebuffer the caller has to undo.
+   * @param {{present?: boolean, w?: number, h?: number}} [o]
+   *   `present: false` builds the chain WITHOUT the final copy to the page's
+   *   canvas. A headset session renders into the layer's framebuffer and takes
+   *   `finalTex()` as a texture, so a copy to a 16x16 canvas nobody presents
+   *   would be a wasted pass and a bound framebuffer the caller has to undo.
+   *
+   *   `w`/`h` size the chain's own targets. 🔴 EVERY PASS ALREADY TAKES ITS
+   *   SIZE AS A UNIFORM (`uRes`), so this costs nothing but the pixels: no
+   *   shader body has `960` typed in it. The window keeps `FIELD_W x FIELD_H`
+   *   because that is what the looks were tuned against and it is what a canvas
+   *   this size can show. A headset is a different question, and `SEA_PX` below
+   *   answers it.
+   *   ⚠️ THE PIXEL-PERIOD TERMS MOVE WITH IT. The scanlines and the glitch are
+   *   in `uRes` units, so a bigger field gives FINER scanlines rather than the
+   *   same ones larger. That is correct for a picture you walk on and it is a
+   *   real difference from the window, said here rather than discovered.
    */
-  function makeField(g, { present = true } = {}) {
+  function makeField(g, { present = true, w: FW = FIELD_W, h: FH = FIELD_H } = {}) {
     const compile = (type, src) => {
       const s = g.createShader(type);
       g.shaderSource(s, src); g.compileShader(s);
@@ -1431,18 +1481,18 @@
     for (const q of [g.TEXTURE_MIN_FILTER, g.TEXTURE_MAG_FILTER]) g.texParameteri(g.TEXTURE_2D, q, g.NEAREST);
     for (const q of [g.TEXTURE_WRAP_S, g.TEXTURE_WRAP_T]) g.texParameteri(g.TEXTURE_2D, q, g.CLAMP_TO_EDGE);
 
-    let A = target(FIELD_W, FIELD_H), B = target(FIELD_W, FIELD_H);
+    let A = target(FW, FH), B = target(FW, FH);
     // ⚠️ THE GLOW IS A QUARTER WIDTH ON PURPOSE. A nine-tap blur at full size
     // is sixteen times the sampling for a blur that would look narrower, not
     // wider: downsampling IS most of the softness.
-    const GLOW_W = FIELD_W >> 2, GLOW_H = FIELD_H >> 2;
+    const GLOW_W = FW >> 2, GLOW_H = FH >> 2;
     const glowA = target(GLOW_W, GLOW_H), glowB = target(GLOW_W, GLOW_H);
     // the screen-space trail, ping-ponged like the field for the same reason:
     // a pass may not sample the target it is drawing to
-    let P = target(FIELD_W, FIELD_H), Q = target(FIELD_W, FIELD_H);
+    let P = target(FW, FH), Q = target(FW, FH);
     let field = null;                    // the accumulate target most recently written
     let finalT = null;                   // the composite most recently written
-    const shown = target(FIELD_W, FIELD_H);
+    const shown = target(FW, FH);
     // ⚠️ THE CHECKS GET THEIR OWN TARGETS. Rendering a probe into the visible
     // ping-pong puts a frame into the feedback tap and leaves a smear that lasts
     // as long as the trail does, which is a measurement changing the thing it
@@ -1471,9 +1521,9 @@
       step(bytes) {
         g.bindVertexArray(vao);
         upload(bytes);
-        pass(acc, B.f, FIELD_W, FIELD_H, A.t, 'uPrev');
+        pass(acc, B.f, FW, FH, A.t, 'uPrev');
         field = B;                       // before the swap: B is what was just written
-        pass(pre, shown.f, FIELD_W, FIELD_H, B.t, 'uField');
+        pass(pre, shown.f, FW, FH, B.t, 'uField');
         // bright pass, then the gaussian along x and back along y
         pass(bri, glowA.f, GLOW_W, GLOW_H, shown.t, 'uSrc');
         g.useProgram(blr.p); g.uniform2f(blr.u.uDir, 1.0, 0.0);
@@ -1482,9 +1532,9 @@
         pass(blr, glowA.f, GLOW_W, GLOW_H, glowB.t, 'uSrc');
         // the composite: glow added, last frame held under, scanlines, glitch
         g.bindFramebuffer(g.FRAMEBUFFER, Q.f);
-        g.viewport(0, 0, FIELD_W, FIELD_H);
+        g.viewport(0, 0, FW, FH);
         g.useProgram(out.p);
-        g.uniform2f(out.u.uRes, FIELD_W, FIELD_H);
+        g.uniform2f(out.u.uRes, FW, FH);
         g.activeTexture(g.TEXTURE0); g.bindTexture(g.TEXTURE_2D, shown.t); g.uniform1i(out.u.uSrc, 0);
         g.activeTexture(g.TEXTURE1); g.bindTexture(g.TEXTURE_2D, dataTex); g.uniform1i(out.u.uData, 1);
         g.activeTexture(g.TEXTURE2); g.bindTexture(g.TEXTURE_2D, glowA.t); g.uniform1i(out.u.uGlow, 2);
@@ -2604,58 +2654,170 @@
   // twenty seconds and a floor that is not drawing look identical from inside a
   // headset.
   const SEA = {
-    // Both radii in metres, and the plane is bigger than the outer one so its
-    // own edge is already gone before it is reached. 11 and 16 are the band
-    // `/floor/` settled on for the same problem.
-    fadeFrom: 11, fadeTo: 16, half: 18, y: 0.02,
-    // 🔴 THE FADE TARGET AND THE CLEAR COLOUR ARE ONE TRIPLE, AND THIS IS THE
-    // ONE. `/floor/` paid for typing them twice with a visibly brighter disc on
-    // a darker void, a rim nobody drew, at exactly the radius the fade was
-    // meant to hide. `xr-panel.mjs` hands `bg` to `draw()` so the surface never
-    // has to know this number; it is here only to be handed to the room.
+    // Both radii in metres, and the mesh is bigger than the outer one so its
+    // own edge is already gone before it is reached.
+    fadeFrom: 11, fadeTo: 16, y: 0.02,
+    // How far the water goes: a 34 m square centred on where you are standing,
+    // which puts its nearest edge 17 m out and the fade finished at 16.
+    spanX: 34, spanZ: 34,
+    // 🔴 HOW HIGH A CREST STANDS, IN METRES. A wave you are standing among has
+    // to be shin-high at most or it is a wall: 0.55 m at full density reads as
+    // swell from an eye 1.6 m up, and the whole point is that you are ON the
+    // sea rather than looking at a relief map of one.
+    lift: 0.8,
+    // 🔴 HOW THICK A WAVE FRONT IS, IN METRES BELOW ITS OWN CREST. This is what
+    // replaced a line width: `gl.lineWidth` is capped at 1 in every shipping
+    // WebGL, so a front was one device pixel wherever you stood. 7 cm is a bold
+    // band underfoot and a thin one at the fade, which is what perspective does.
+    band: 0.07,
+    // How many lines and how many points along each. 46 is `LOOK.rows`, and
+    // keeping it is keeping the picture: the note by `rows` records that 72
+    // merged into a grey ramp and that the GAP between lines is worth more
+    // than the line. 192 points is 33 per metre at the near edge.
+    cols: 192,
+    // 🔴 THE FADE TARGET AND THE CLEAR COLOUR ARE ONE TRIPLE, AND THIS IS IT.
+    // `/floor/` paid for typing them twice with a ring of faded geometry
+    // reading as a brighter disc on a darker void, at exactly the radius the
+    // fade was meant to hide. `xr-panel.mjs` hands `bg` to `draw()`.
     bg: [0.018, 0.022, 0.030],
   };
+
+  /**
+   * 🔴 REAL GEOMETRY, NOT A PICTURE OF IT. THIS REPLACED A TEXTURED PLANE AND
+   * THE REPORT THAT KILLED THAT PLANE IS WORTH KEEPING:
+   *
+   *   *"nothing is happening in this really lowres floor pseudotexture except
+   *   some scattered lines on top of floor wave texture. make actual wave
+   *   outlines / geometry moving."*
+   *
+   * Stage A put the composite on a quad on the ground, which is a PHOTOGRAPH
+   * of a landscape lying on the carpet: its perspective, its hidden-line
+   * removal and its vignette are all screen-space, computed for an eye that is
+   * not yours, and flattening it on the floor leaves the crests as marks rather
+   * than as things standing up. `plan-videoradio-xr.md` §2.1 said so before it
+   * was built and the picture proved it.
+   *
+   * 🔴 AND IT IS CHEAPER, WHICH THE FIRST HEADSET RUN MEASURED. That run held
+   * **72 fps** where `/earshot/` on the same device held 90.0, and the only
+   * heavy thing in it was a full-screen chain at 1920x1080 whose `OUT_FS` loops
+   * over 46 rows PER PIXEL: about 95 million inner iterations a frame. This
+   * mesh is 46 x 192 vertices and some thin lines. The chain is not built in a
+   * session at all any more.
+   *
+   * ⚠️ IT READS THE DATA TEXTURE DIRECTLY, WHICH IS THE SAME 64x4 BYTES THE
+   * WINDOW'S SHADER READS. Not the same arithmetic, and that is deliberate
+   * rather than sloppy: `h` in `OUT_FS` mixes the bucket density with the
+   * luminance of the ACCUMULATED FIELD, and there is no accumulated field here
+   * because there is no chain. What is left is the density itself plus the same
+   * standing wave, which is the quantity the picture was always of.
+   */
   const SEA_VS = `#version 300 es
   precision highp float;
   uniform mat4 uProj, uView;
+  uniform sampler2D uData;
   uniform vec2 uCentre;
-  uniform float uHalf, uY;
-  out vec2 vWorld;
+  uniform vec4 uCfg;          // spanX, spanZ, lift, floorY
+  in vec3 aRCF;               // row 0..1, column 0..1, 1 at the floor edge
+  out vec3 vW;
+  out float vH;
+  out float vDrop;            // metres below this wave's own crest
+  vec4 D(int x, int y) { return texelFetch(uData, ivec2(x, y), 0); }
   void main() {
-    // Two triangles from gl_VertexID, so the plane needs no buffer at all and
-    // cannot fight anybody else's vertex array for attribute state.
-    vec2 c[6] = vec2[6](vec2(-1.,-1.), vec2(1.,-1.), vec2(1.,1.),
-                        vec2(-1.,-1.), vec2(1.,1.), vec2(-1.,1.));
-    vec2 q = c[gl_VertexID];
-    vWorld = uCentre + q * uHalf;
-    gl_Position = uProj * uView * vec4(vWorld.x, uY, vWorld.y, 1.0);
+    float loud  = D(0, 3).r;
+    float lowB  = D(1, 3).r;
+    float pulse = D(19, 3).r;
+    float drift = D(21, 3).r;
+    float u = aRCF.y, v = aRCF.x;
+    // 🔴 THE SAME FACET INTERPOLATION THE WINDOW USES, and for the same reason:
+    // sampling the buckets with a linear filter rounds every ridge into one
+    // soft hump, so 46 of them are 46 copies of one shape. texelFetch on the
+    // bucket row, interpolated between CENTRES, gives a polygonal crest cut by
+    // the data rather than by a smoothing kernel.
+    float cf = clamp(u * 64.0 - 0.5, 0.0, 63.0);
+    int c0 = int(floor(cf));
+    int c1 = min(c0 + 1, 63);
+    float mixf = fract(cf);
+    vec4 b0 = D(c0, 0), b1 = D(c1, 0);
+    float d0 = clamp(b0.r * 255.0 / 2.2, 0.0, 1.0);
+    float d1 = clamp(b1.r * 255.0 / 2.2, 0.0, 1.0);
+    float mf = mix(mixf, clamp((mixf - 0.5) * 2.2 + 0.5, 0.0, 1.0), ${LOOK.facet.toFixed(4)});
+    float dens = mix(d0, d1, mf);
+    // the bucket's grain position bends the crest, so two rows over the same
+    // density are not the same shape
+    dens *= mix(1.0, 0.55 + 0.45 * sin(mix(b0.g, b1.g, mf) * 9.4 + v * 6.0), ${LOOK.bucket.toFixed(4)});
+    /**
+     * 🔴 THE SEA MOVES WITH NO SOUND AT ALL, AND IT DID NOT. Reported as
+     * *"these floor lines, they just lie there"*, and the cause was one
+     * subtraction: the height was \`max(0.0, h - valley)\` with valley at 0.30,
+     * while the standing wave alone only ever reaches 0.055. So with nothing
+     * playing EVERY VERTEX clamped to exactly the floor and the mesh was 46
+     * perfectly straight lines drawn on the ground. It looked like a mesh that
+     * was not reading its data; it was reading it and throwing the answer away.
+     *
+     * Two repairs. The swell is its own term with its own amplitude, so there
+     * is water before there is any signal. And the clamp is gone: \`valley\` is
+     * a MID POINT, so a quiet stretch sinks BELOW the surface and a loud one
+     * rises, which is what gives a wave a trough to have a crest above.
+     */
+    float swell = 0.34 * sin(u * 2.7 + v * 5.0 - drift * 6.28318)
+                + 0.22 * sin(u * 6.1 - v * 3.3 + drift * 9.90)
+                + 0.16 * sin(v * 31.416 - drift * 12.566);
+    float h = dens + ${LOOK.idle.toFixed(4)} * 3.0 * swell * (1.0 - loud * 0.55);
+    vH = h;
+    // the heights reach on the grain clock, so the sea breathes when the
+    // instrument does and holds still when it stops
+    float amp = (0.42 + 0.95 * loud + 0.45 * lowB) * mix(1.0, 0.78 + 0.34 * pulse, 0.6);
+    float crest = uCfg.w + (h - ${LOOK.valley.toFixed(4)}) * amp * uCfg.z;
+    float y = mix(crest, uCfg.w - uCfg.z * 0.9, aRCF.z);
+    vDrop = crest - y;
+    vec3 w = vec3(uCentre.x + (u - 0.5) * uCfg.x, y, uCentre.y + (v - 0.5) * uCfg.y);
+    vW = w;
+    gl_Position = uProj * uView * vec4(w, 1.0);
   }`;
   const SEA_FS = `#version 300 es
   precision highp float;
-  uniform sampler2D uSrc;
   uniform vec2 uCentre;
   uniform vec3 uBg;
-  uniform vec2 uFade;
-  in vec2 vWorld;
+  uniform vec3 uFade;         // from, to, band thickness in metres
+  in vec3 vW;
+  in float vH;
+  in float vDrop;
   out vec4 o;
   void main() {
-    // The picture spans the VISIBLE disc, not the whole plane: mapped over the
-    // plane most of it would be drawn where the fade has already taken it away.
-    vec2 uv = (vWorld - uCentre) / (2.0 * uFade.y) + 0.5;
-    vec3 c = texture(uSrc, uv).rgb;
-    float far = distance(vWorld, uCentre);
+    // 🔴 FROM THE EYE, NOT FROM THE WORLD. A fade centred anywhere else moves
+    // under you as you walk and reaches full opacity behind your back.
+    float far = distance(vW.xz, uCentre);
     float a = 1.0 - smoothstep(uFade.x, uFade.y, far);
-    // MIXED INTO THE GROUND, NOT BLENDED. The lines and their skirts will
-    // overlap in depth in stage B: a transparent fringe that writes depth
-    // punches a hole the second eye cannot fill, and one that does not write
-    // depth needs sorting. Mixing into a known colour needs neither.
-    o = vec4(mix(uBg, c, a), 1.0);
+    /**
+     * 🔴 THE LINE IS THE TOP OF A SOLID WAVE FRONT, NOT A LINE.
+     * Reported as *"these lines are way too thin and do nada"*, and they were:
+     * \`gl.lineWidth\` is capped at 1 in every shipping WebGL, so a wave front
+     * was one device pixel wherever you stood and vanished at any distance.
+     *
+     * Every wave is a curtain from its crest down to below the floor, and this
+     * lights the top few centimetres of it. Thickness is therefore a distance
+     * IN METRES rather than in pixels: a near crest is a bold band and a far
+     * one is thin, which is what perspective does and what a line width can
+     * never do. The curtain below it is the ground's own colour and writes
+     * depth, so a wave behind a crest is simply behind something. That is the
+     * hidden-line removal the window's shader does by hand with a break and a
+     * margin, done here by the depth buffer from wherever you are standing.
+     */
+    float band = 1.0 - smoothstep(0.0, uFade.z, vDrop);
+    // P7 phosphor: strikes blue-white at a tall crest and decays to a cold
+    // grey, so height has a second channel.
+    vec3 cold = vec3(0.38, 0.56, 0.92);
+    vec3 c = mix(cold * 0.60, vec3(1.0), clamp(vH * 0.95, 0.0, 1.0));
+    // MIXED INTO THE GROUND, NOT BLENDED. The curtains overlap in depth; a
+    // transparent fringe that writes depth punches a hole the second eye cannot
+    // fill, and one that does not write depth needs sorting.
+    o = vec4(mix(uBg, c, band * a), 1.0);
   }`;
-  let sea = null, seaProg = null, seaU = null, seaVao = null, seaFrames = 0;
+  let seaProg = null, seaU = null, seaVao = null, seaFrames = 0;
+  let seaGl = null, seaData = null, seaVerts = 0;
   let xr = null;
 
   /** What `createXRPanels` draws on the ground. See `surface` in xr-panel.mjs. */
-  let seaGl = null;
   const theSea = {
     attach(g) {
       const sh = (t, src) => {
@@ -2666,56 +2828,91 @@
       seaProg = g.createProgram();
       g.attachShader(seaProg, sh(g.VERTEX_SHADER, SEA_VS));
       g.attachShader(seaProg, sh(g.FRAGMENT_SHADER, SEA_FS));
+      // ⚠️ BEFORE `linkProgram`, NEVER AFTER. CLAUDE.md records a Quest
+      // reporting GL_INVALID_OPERATION on its first frame and DRAWING CORRECTLY
+      // ANYWAY, because the linker happened to choose the same slot.
+      g.bindAttribLocation(seaProg, 0, 'aRCF');
       g.linkProgram(seaProg);
       if (!g.getProgramParameter(seaProg, g.LINK_STATUS)) throw new Error(g.getProgramInfoLog(seaProg));
       seaU = {};
-      for (const n of ['uProj', 'uView', 'uCentre', 'uHalf', 'uY', 'uSrc', 'uBg', 'uFade']) {
+      for (const n of ['uProj', 'uView', 'uData', 'uCentre', 'uCfg', 'uBg', 'uFade']) {
         seaU[n] = g.getUniformLocation(seaProg, n);
       }
-      // ⚠️ AN EMPTY VERTEX ARRAY IS STILL REQUIRED. WebGL2 draws nothing at all
-      // with none bound, even from a shader that reads only `gl_VertexID`.
+      /**
+       * The mesh, built once: every wave is a solid curtain from its crest down
+       * past the floor, two triangles per segment.
+       *
+       * ⚠️ ONE BUFFER, ONE DRAW, AND NO SEPARATE LINES. It was a set of
+       * `gl.LINES` over a skirt, which is two draws to say one thing and gave a
+       * wave front one device pixel wide however near it was. The curtain IS
+       * the wave now and the shader lights its top few centimetres, so
+       * thickness is a distance in metres and a near crest is bolder than a far
+       * one. 46 rows of 192 points is 52,440 vertices: nothing for a card that
+       * was being asked to loop over 46 rows per pixel a moment ago.
+       */
+      const R = LOOK.rows, C = SEA.cols;
+      const vtx = [];
+      for (let r = 0; r < R; r++) {
+        const v = (r + 0.5) / R;
+        for (let c = 0; c < C - 1; c++) {
+          const a = c / (C - 1), b = (c + 1) / (C - 1);
+          // crest a, crest b, floor a  /  crest b, floor b, floor a
+          vtx.push(v, a, 0, v, b, 0, v, a, 1,
+                   v, b, 0, v, b, 1, v, a, 1);
+        }
+      }
+      seaVerts = vtx.length / 3;
       seaVao = g.createVertexArray();
+      g.bindVertexArray(seaVao);
+      const vb = g.createBuffer();
+      g.bindBuffer(g.ARRAY_BUFFER, vb);
+      g.bufferData(g.ARRAY_BUFFER, new Float32Array(vtx), g.STATIC_DRAW);
+      g.enableVertexAttribArray(0);
+      g.vertexAttribPointer(0, 3, g.FLOAT, false, 0, 0);
+      g.bindVertexArray(null);
+      // Its own copy of the 64x4 bytes, in this context. A texture belongs to
+      // the context that made it, so the window's cannot be read here at all.
+      seaData = g.createTexture();
+      g.bindTexture(g.TEXTURE_2D, seaData);
+      g.texImage2D(g.TEXTURE_2D, 0, g.RGBA8, DATA_W, DATA_H, 0, g.RGBA, g.UNSIGNED_BYTE, null);
+      for (const q of [g.TEXTURE_MIN_FILTER, g.TEXTURE_MAG_FILTER]) g.texParameteri(g.TEXTURE_2D, q, g.NEAREST);
+      for (const q of [g.TEXTURE_WRAP_S, g.TEXTURE_WRAP_T]) g.texParameteri(g.TEXTURE_2D, q, g.CLAMP_TO_EDGE);
       seaGl = g;
-      sea = makeField(g, { present: false });
       seaFrames = 0;
-      d.log(`the sea has its own copy of the picture, ${FIELD_W}x${FIELD_H}, `
-        + 'and it opens dark while the trail builds');
+      d.log(`the sea is ${R} wave fronts of ${C} points, standing up out of the `
+        + `same bytes the picture is drawn from (${seaVerts} vertices)`);
       return true;
     },
-    /** One frame of the chain, from the bytes the window was last given. */
+    /** The data the mesh stands on, once a frame. */
     step() {
-      if (sea && lastBytes) { sea.step(lastBytes); seaFrames++; }
+      if (!seaGl || !seaData || !lastBytes) return;
+      seaGl.bindTexture(seaGl.TEXTURE_2D, seaData);
+      seaGl.texSubImage2D(seaGl.TEXTURE_2D, 0, 0, 0, DATA_W, DATA_H,
+        seaGl.RGBA, seaGl.UNSIGNED_BYTE, lastBytes);
+      seaFrames++;
     },
     draw({ proj, view, eye, bg }) {
       if (!seaProg || !seaGl) return;
       const g = seaGl;
-      const t = sea && sea.finalTex();
-      // Nothing has been stepped yet. Draw NOTHING rather than a plane of
-      // whatever an uninitialised texture holds: an empty floor is honest and a
-      // floor of garbage is a bug that looks like a look.
-      if (!t) return;
       g.useProgram(seaProg);
       g.bindVertexArray(seaVao);
       g.uniformMatrix4fv(seaU.uProj, false, proj);
       g.uniformMatrix4fv(seaU.uView, false, view);
-      // 🔴 CENTRED ON THE EYE, NOT ON THE WORLD. A fade centred anywhere else
-      // moves under you as you walk and reaches full opacity behind your back,
-      // and a plane centred anywhere else has an edge you can walk to.
       g.uniform2f(seaU.uCentre, eye[0], eye[2]);
-      g.uniform1f(seaU.uHalf, SEA.half);
-      g.uniform1f(seaU.uY, SEA.y);
-      g.uniform2f(seaU.uFade, SEA.fadeFrom, SEA.fadeTo);
+      g.uniform4f(seaU.uCfg, SEA.spanX, SEA.spanZ, SEA.lift, SEA.y);
+      g.uniform3f(seaU.uFade, SEA.fadeFrom, SEA.fadeTo, SEA.band);
       g.uniform3fv(seaU.uBg, bg);
       g.activeTexture(g.TEXTURE0);
-      g.bindTexture(g.TEXTURE_2D, t);
-      g.uniform1i(seaU.uSrc, 0);
-      // A floor has no back you can get under, but the room turns culling on
-      // and this is drawn straight after it.
+      g.bindTexture(g.TEXTURE_2D, seaData);
+      g.uniform1i(seaU.uData, 0);
+      // ⚠️ NO CULLING. A curtain is a two-sided sheet and you can walk round
+      // behind one; the room turns culling on for its own walls, and a wave
+      // that vanished from one side would look like a hole in the water.
       g.disable(g.CULL_FACE);
-      g.drawArrays(g.TRIANGLES, 0, 6);
+      g.drawArrays(g.TRIANGLES, 0, seaVerts);
       g.bindVertexArray(null);
     },
-    /** For the checks: how many frames the session chain has taken. */
+    /** For the checks: how many frames of data the mesh has been given. */
     frames: () => seaFrames,
   };
 
@@ -2773,7 +2970,11 @@
   const makeXR = () => createXRPanels({
     panels: [],
     surface: theSea,
-    room: { seed: 424242, sky: false, things: false, bg: SEA.bg },
+    // ⚠️ THE ROOM STAYS AND ITS DOTS DO NOT. `room: null` would take the tablet,
+    // the hands and the quit badge's grips with it, which is a session with no
+    // visible way out; `grid: false` takes only the floor this page is already
+    // drawing its own version of. Reported as two floors: *"hide floor dots"*.
+    room: { seed: 424242, sky: false, things: false, grid: false, bg: SEA.bg },
     clear: [...SEA.bg, 1],
     // The chain steps once per headset frame, not once per eye: it is one
     // picture and both eyes look at the same one.
@@ -2795,6 +2996,53 @@
       d.log('no headset here, so there is nothing to enter', 'warn');
       return null;
     }
+    /**
+     * 🔴 THE SOUND STARTS WITH THE SESSION, BECAUSE IN A HEADSET THERE IS NO
+     * PLAY BUTTON TO PRESS. Asked 2026-09-16: *"add audio to vr videoradio"*.
+     *
+     * The page opens silent on purpose and the picture is honest about it: with
+     * no audio graph there are no grains and what draws is the standby field.
+     * Enter a session in that state and you are standing on a sea made of
+     * nothing, with the one control that would fix it on a screen you can no
+     * longer see. This press IS the gesture, so it is the right and only moment
+     * to spend it.
+     *
+     * ⚠️ NOT AWAITED, AND THE ORDER MATTERS. `requestSession` needs a TRANSIENT
+     * USER ACTIVATION and the first await in a handler spends it, so `start()`
+     * is FIRED and `enter()` is called synchronously after it in the same task.
+     * `start()` is itself careful never to await `ctx.resume()`, for the reason
+     * written on it: neither that nor `play()` rejects when the gesture is
+     * missing, so awaiting one is a hang rather than an error.
+     *
+     * ⚠️ AND THE PLAY BUTTON IS PUT IN STEP, or somebody who takes the headset
+     * off finds a page that is plainly making a noise over a button offering to
+     * start it. That is the same defect as a control describing a loop that is
+     * not running, and this page has already paid for it once.
+     */
+    /**
+     * 🔴 WHATEVER STATE THE SOUND IS IN, ENTERING TURNS IT ON. Reported twice,
+     * the second time as *"when music is paused and i enter turn music on"*.
+     * It handled "never started" and "stopped" as two branches and a page can
+     * be silent for a third reason: the context suspended itself while the tab
+     * was in the background, which is exactly what a headset does to the window
+     * it came from. So all three are handled unconditionally rather than
+     * branched on, because the intent of the press is not ambiguous: somebody
+     * putting a headset on wants the sound.
+     *
+     * ⚠️ NOT ONE `await`, AND `start()` IS FIRED RATHER THAN AWAITED.
+     * `requestSession` needs a TRANSIENT USER ACTIVATION and the first await in
+     * a handler spends it. `ctx.resume()` and `play()` never REJECT when the
+     * gesture is missing either, so awaiting one is a hang rather than an error.
+     */
+    if (!started) {
+      start().catch((e) => d.log(`the sound did not start: ${e.message}`, 'bad'));
+      d.log('the station is starting, and it plays into the headset');
+    }
+    ctx?.resume?.();
+    quiet = false;
+    if (speakers && ctx) speakers.gain.setTargetAtTime(1, ctx.currentTime, 0.012);
+    const pb = d.button('play');
+    if (pb) { pb.textContent = '❚❚'; pb.setAttribute('aria-label', 'stop'); }
     // `enter` reports into the page's log by itself and returns whether a
     // session started. It is returned so the shell marks the control busy
     // until the headset has it.

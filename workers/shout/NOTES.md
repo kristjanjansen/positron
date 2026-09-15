@@ -1,4 +1,53 @@
-# positron-shout — measurements
+# shout — NOTES
+
+## 🔴 IT TEES NOW, AND THAT IS THE WHOLE POINT OF THE OBJECT
+
+**MEASURED 2026-09-16 against the deployed worker, on `vikerraadio`:** three
+clients listening at once, and `GET /tee/vikerraadio` answered
+
+```json
+{"listeners":3,"peak":3,"upstream":true,"title":"Võimla*",
+ "pulled":424321,"served":602027,"dropped":0,
+ "upstreamConnections":1,"openFor":4701}
+```
+
+**One connection upstream, three downstream.** It served 602 KB to clients out
+of 424 KB pulled from the origin, which is the 1.4x that says the same bytes
+went to more than one person. All three clients received their full 200 KB and
+the ICY title parsed out of the single upstream and back into each of them.
+
+Before this the worker was a pass-through: `fetch(upstream)` per request, no
+caching (a cached radio stream is a contradiction), so **N browsers were N
+listeners at the broadcaster**, plus one per harness tab and one per orphaned
+Chrome. On 2026-09-15 that reached about a hundred concurrent clients against
+one operator's limit. On 2026-09-16 ERR said the same traffic was corrupting
+their public listener statistics, which is a fact about their funding rather
+than about their bandwidth.
+
+⚠️ **The ICY metadata is stripped and re-inserted per subscriber**, and that is
+not a flourish. Icecast interleaves a metadata block every `icy-metaint` bytes
+counted from the first byte THAT CLIENT received. A tee hands a late joiner
+bytes from the middle of the origin's stream, so its byte 0 is not the origin's
+byte 0: every block it expected would land in the wrong place and it would read
+audio as a length byte and delete that many bytes of sound.
+
+⚠️ **The last listener leaving eventually closes the origin.** A tee that holds
+a connection nobody is hearing is WORSE than the pass-through it replaced. There
+is a 20 s linger because a page reload is two seconds of nobody and hanging up
+on every one of those is more connections, not fewer.
+
+⚠️ **A HEAD still goes direct**, because it is a health question that wants the
+origin's own answer and hangs up before a frame of audio is paid for. `/rec/`
+recordings are files and were never in this path.
+
+⚠️ **There is deliberately no `?direct=1`.** An escape hatch back to a
+connection per client is the defect with a flag on it.
+
+`GET /tee/<station>` is the readout. `upstreamConnections` must be 1 whenever
+anybody is listening; anything else is the tee not working.
+
+---
+
 
 SHOUTcast/Icecast is one HTTP response that never ends. There is no manifest, no
 segment list and no seek: the server writes audio frames at roughly wall-clock

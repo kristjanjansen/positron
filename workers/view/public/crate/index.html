@@ -48,6 +48,7 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createField } from '/shell/field.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
   import { createDeck, normalizeWhen } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
 
@@ -67,14 +68,17 @@
 
   const d = mount({
     name: 'crate',
-    what: 'Drop one audio file and it goes into Cloudflare R2 in pieces of 16 MiB, '
-      + 'each piece its own request that the far end accepts before the next one is sent. '
-      + 'Then it plays back from the address the archive gave it, and the bar moves by '
-      + 'asking for a range of bytes rather than fetching the file again. sent is how '
-      + 'much has left this browser and pieces is how much the far end has taken, which '
-      + 'are different numbers on a slow link. What you drop here lands in a sandbox the '
-      + 'server clears after six hours, because the archive itself needs a key this page '
-      + 'does not have.',
+    // 🔴 ONE LINE, BECAUSE THIS PAGE HAS A DIAGRAM AT THE BOTTOM OF IT. A
+    // paragraph and a picture of the machinery are two explanations of one
+    // thing and the paragraph is the weaker: it spends seven sentences on what
+    // a reader can point at an inch below. It is the same sentence the index
+    // card carries, so arriving from there does not mean reading the same claim
+    // twice in two wordings that can drift apart.
+    // ⚠️ WHAT THE PARAGRAPH SAID IS REHOMED, NOT DELETED. The pieces, the
+    // sandbox and the six hours are boxes and notes in the picture; `sent`
+    // against `pieces`, which is the one thing here that is about the READOUT
+    // rather than about the machinery, is the line under it.
+    what: 'One audio file into R2 in pieces of 16 MiB, played back and scrubbed from where it landed.',
     // Four cells, and every one of them moves while an upload is running.
     // `left` is the derived one and the first suspect if it ever reads as
     // noise; it cannot go on its own, because `speed` is what it is derived
@@ -712,6 +716,30 @@
       }
     }
 
+    /**
+     * 🔴 THE PICTURE GRADES ITSELF, AND IT IS GRADED IN THIS BURST RATHER THAN
+     * AT LOAD. `createDiagram` collects every name it had to shorten, every
+     * note over about forty words and every arrow it could not route, and a
+     * page that never reads that list ships a cut label looking exactly like a
+     * picture that is fine. Asserted from here because the harness stops
+     * collecting shortly after the count stops growing: two asserts at load
+     * followed by ten seconds of uploading is how a page loses everything
+     * after the early ones.
+     */
+    add('the diagram drew every name and every arrow whole',
+      dg.cuts.length === 0,
+      dg.cuts.map((c) => `${c.where} ${c.id}`).join(' · ') || 'nothing cut, nothing refused');
+    /**
+     * 🔴 AND EVERY LINE IN IT HAS A HEAD ON IT. A headless line is the bracket
+     * the component draws between two boxes whose order nobody stated, which
+     * is right for a machine with unordered parts and wrong for both of these:
+     * every pair here has a direction written down. A head that is missing and
+     * a bracket that is meant look identical, and only this number tells them
+     * apart.
+     */
+    add('and no line in it is missing its arrowhead', dg.ties === 0,
+      `${dg.ties} line${dg.ties === 1 ? '' : 's'} with no head`);
+
     for (const [label, pass, detail] of rows) d.assert(label, pass, detail);
   }
 
@@ -733,6 +761,93 @@
       else audio.addEventListener('loadedmetadata', ready);
     });
   }
+
+  // ── the picture ──────────────────────────────────────────────────────────
+  //
+  // 🔴 IT IS THE LAST THING ON THE PAGE. A diagram is reference: it is read
+  // once, on purpose, by somebody who has already dropped a file and now wants
+  // to know where it went. Between the page's own sentence and the drop box it
+  // would delay the only thing a first visitor came for.
+  //
+  // 🔴 TWO MACHINES, AND EVERY BOX SITS IN THE ONE THAT RUNS IT. Without the
+  // grouping this is five peers and a reader cannot tell what is on their own
+  // device from what is rented by the hour, which is the whole subject: a file
+  // leaves this browser, and the claim the page exists to make is that it came
+  // back out of somebody else's disk rather than out of memory here.
+  //
+  // 🔴 AND CLOUDFLARE'S THREE BOXES ARE IN THIS ORDER SO THAT EVERY PAIR A
+  // READER SEES SIDE BY SIDE IS A PAIR WITH A DECLARED ARROW IN IT. The
+  // component ties two boxes with a headless line where nothing was declared
+  // between them, which down one column reads as an arrowhead that fell off.
+  // `Uploads` over `Worker` over `recordings` puts a stated direction in both
+  // gaps; the six-hour sweep reaches past the middle box and gets a lane of its
+  // own. `dg.ties` is asserted at 0 above, so re-ordering these cannot pass
+  // unnoticed.
+  const dg = createDiagram(d.el, {
+    title: 'how it works',
+    caption: 'Nothing counts until the far end says so: sent is how much has left this '
+      + 'browser, pieces is how much R2 has taken, and on a slow link those are '
+      + 'different numbers.',
+    nodes: [
+      { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'send', label: 'uploader', sub: 'XMLHttpRequest', tech: 'browser',
+            note: 'Cuts the file up with **Blob.slice** and sends one piece at a time, so a '
+                + 'long recording is never held in memory whole. Upload progress events are '
+                + 'why this is not **fetch**, which reports none.' },
+          { id: 'play', label: 'player', sub: 'audio element', tech: 'sound',
+            note: 'Plays the object straight out of the bucket rather than anything kept '
+                + 'here. The element owns position once it is playing, so a seek is its own '
+                + '**currentTime** and the bar follows.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'one worker, one bucket', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'acct', label: 'Uploads', sub: 'Durable Object', tech: 'cloudflare',
+            note: 'Decides whether a piece may be written: its size, its place in the order, '
+                + 'and the bytes this address has sent this hour. One object does the '
+                + 'counting, so two uploads cannot both read as under the cap.' },
+          { id: 'wrk', label: 'Worker', sub: 'checks, then writes', tech: 'cloudflare',
+            note: 'The first piece has to begin like the format its name claims, or it is '
+                + 'refused with a **415** naming the four bytes that were actually there. '
+                + 'Nothing exists in the bucket until that passes.' },
+          { id: 'store', label: 'recordings', sub: 'R2, folder each', tech: 'file',
+            note: 'One folder per recording: the audio, and a small JSON record beside it '
+                + 'holding the title and the date read out of the file name. The audio is '
+                + 'never rewritten, so the edge may keep a copy.' },
+        ] },
+    ],
+    links: [
+      // ⚠️ THE ARROWS INSIDE A MACHINE CARRY A `note` AND NO `label`. The gap
+      // two stacked boxes share is sixteen pixels tall, so a name in it runs
+      // under both of them; the component draws direction only and reports any
+      // label written on one. What travels is said on hover instead.
+      { from: 'acct', to: 'wrk',
+        note: 'Every piece is cleared before a byte of it reaches R2, and one that arrives '
+            + 'out of order is a **409** rather than a hole in the middle of a file. The '
+            + 'sandbox expiry is checked here too.' },
+      { from: 'wrk', to: 'store',
+        note: 'Each piece becomes one part of an R2 multipart upload, assembled into a '
+            + 'single object at the end. The record beside it is written last, so a half '
+            + 'failure never leaves a record pointing at nothing.' },
+      { from: 'acct', to: 'store',
+        note: 'What this page writes lands in a sandbox that a cron deletes six hours '
+            + 'later, folder and all. A time to live nothing enforces is a comment.' },
+      { from: 'send', to: 'play',
+        note: 'When the last piece is accepted the archive answers with the address to read '
+            + 'it back from, and that address goes into the element. Nothing here is played '
+            + 'out of this browser\'s own copy.' },
+      { from: 'send', to: 'wrk', label: '16 MiB pieces',
+        note: 'One PUT per piece, in order, and the next goes only when the one before is '
+            + 'accepted. A Worker takes at most 100 MB of body on this plan, so a whole '
+            + 'broadcast cannot cross in one request.' },
+      // The return path, under the row, because what comes back down it is
+      // audio rather than a second request.
+      { from: 'store', to: 'play', label: 'audio bytes', back: true,
+        note: 'Seeking asks for a range of bytes rather than for the file again: a **Range** '
+            + 'header comes back as a **206** carrying only those. The same worker serves '
+            + 'them, and it is what adds **access-control-allow-origin**.' },
+    ],
+  });
 
   // 🔴 `ready()` GOES OUT LAST, AND NO `src` IS SET ANYWHERE NEAR IT. The
   // harness presses play, pauses, and seeks the bar the moment a page says it

@@ -1144,7 +1144,11 @@
         note: 'One send fans out to every device on the topic. The browser STARTS the service '
             + 'worker to handle it, which is what makes a banner possible with nothing of this '
             + 'page running.' },
-      { from: 'fcm', to: 'sw2', label: 'same push',
+      // ⚠️ `push`, NOT `same push`. CLAUDE.md names `the same` as a label that
+      // was never a label at all: a label is WHAT TRAVELS, and what travels
+      // down both of these arrows is a push. That it is the same one is the
+      // note's job, and the note already says it.
+      { from: 'fcm', to: 'sw2', label: 'push',
         note: 'The second arrow is the reason for the topic. The store made ONE call and never '
             + 'learned that this device exists, so adding a hundred more costs it nothing.' },
     ],
