@@ -134,7 +134,6 @@
   // reader asks of both is the same — what is this one, what happened to it,
   // did it get out — and that is four fixed columns and wrapping text.
   import { createMessageList } from '/shell/messages.mjs';
-  import { createTabs } from '/shell/tabs.mjs';
 
   const q = new URLSearchParams(location.search);
   // The store takes `?room=<name>` to choose which set of items it is talking
@@ -224,39 +223,15 @@
   });
   guard(d);
 
-  /**
-   * ── the parts of the app ────────────────────────────────────────────────
-   *
-   * 🔴 HASH LINKS, NOT SUBPAGES, AND IT IS THE INSTALLED APP THAT DECIDES IT.
-   * Asked directly — *"Second and third tab should be #links? Or subpages?"* A
-   * subpage is a NAVIGATION: the document is thrown away and rebuilt, so the
-   * steady read that brings other people's items in restarts, the service worker
-   * hands over again, and an installed web app flashes white on every press. A
-   * hash changes one attribute and is still a real address — shareable, in the
-   * history, answered by the back button, and a notification can open the app
-   * straight onto one part of it.
-   *
-   * ⚠️ `Archive` IS IN THE ROW AND DISABLED, not left out. The store already
-   * keeps what has been put away — `status: shelved` — so this is a part that
-   * exists and is not built, which is a different fact from one that does not
-   * exist, and hiding it would make them the same fact.
-   */
-  const tabs = createTabs({
-    tabs: [
-      { id: 'air', label: 'On air' },
-      { id: 'archive', label: 'Archive', disabled: true,
-        note: 'what has been put away — the store keeps it, this page does not show it yet' },
-      { id: 'write', label: 'Contribute' },
-    ],
-    at: 'air',
-  });
-  d.el.append(tabs.el);
-
+  // ── the composer ────────────────────────────────────────────────────────
   // Title and body, stacked, and they are not two names for the same thing: the
   // title is the line a phone shows in bold and the body is the line under it.
-  // ⚠️ THEY LIVE IN `Contribute` NOW and nowhere else. They used to sit above
-  // the control row on every visit, so the first thing anybody saw on a page
-  // they had arrived at from a notification was a form.
+  //
+  // ⚠️ IT SAT IN A `Contribute` TAB FOR ONE COMMIT AND THE TABS WERE TAKEN OUT
+  // AGAIN. The component is still in the kit and still right; what was wrong was
+  // this page having three parts when it has one — a list you read and a form
+  // you write in, which is not a thing anybody navigates between. Naming two
+  // places on a page that has one is furniture.
   const fields = {
     title: createField({ label: 'title', value: 'Rehearsal moved to Thursday', grow: 'wide',
                          placeholder: 'the bold line of the notification' }),
@@ -265,7 +240,8 @@
   };
   const compose = el('div', 'compose');
   compose.append(fields.title.el, fields.body.el);
-  tabs.panel('write').append(compose);
+  const cbar = d.button('now').parentElement;
+  cbar.parentNode.insertBefore(compose, cbar);
 
   // ── the log ─────────────────────────────────────────────────────────────
   // ⚠️ THE FIRST COLUMN IS 34 px WIDE, so the state is a word of four letters
@@ -281,9 +257,7 @@
   });
   const logbox = el('div', 'logbox');
   logbox.append(log.el);
-  // What is on air is the list of items, so it is the first tab and the one a
-  // notification opens onto.
-  tabs.panel('air').append(logbox);
+  d.el.append(logbox);
 
   // ── talking to the store ────────────────────────────────────────────────
   const at = (path, params = {}) => {
@@ -835,12 +809,6 @@
   // unattended wake: named when the item was written, kept by the store, and
   // arriving with nothing here polling for it.
   d.on('now', () => {
-    // ⚠️ THE PRESS TAKES YOU TO WHAT IS BEING PUBLISHED. The publish buttons are
-    // the page's control row and the fields are a tab, so pressing Publish while
-    // reading `On air` would send a draft nobody had in front of them. Going
-    // there is a truer answer than greying the button out: the control works,
-    // and it shows you what it worked on.
-    tabs.go('write');
     return watch((async () => {
       const sent = draft();
       const t0 = performance.now();
@@ -954,7 +922,6 @@
   // has set its clock — because the harness moves on 650 ms after this press
   // and an assert made ten seconds later would never be read.
   d.on('schedule', () => {
-    tabs.go('write');
     return watch((async () => {
       const sent = draft();
       const due = Date.now() + LEAD;
