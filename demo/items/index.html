@@ -134,6 +134,7 @@
   // reader asks of both is the same — what is this one, what happened to it,
   // did it get out — and that is four fixed columns and wrapping text.
   import { createMessageList } from '/shell/messages.mjs';
+  import { createTabs } from '/shell/tabs.mjs';
 
   const q = new URLSearchParams(location.search);
   // The store takes `?room=<name>` to choose which set of items it is talking
@@ -171,10 +172,14 @@
 
   const d = mount({
     name: 'items',
-    what: `Write a title and a body, then publish now or in ten seconds. Press TELL ME to let this device hear
-           about new items with the page shut — on an iPhone that works only once the page has been added to the
-           Home Screen, and the log says so when it cannot. Each row says what became of an item, and the numbers
-           count down to the next moment and say how late the clock has been.`,
+    // 🔴 INSTRUCTIONS, NOT A DESCRIPTION. This is where a notification lands, so
+    // it is the first thing a new reader sees and the only place the two steps
+    // can be said. What it used to carry — what the columns mean, how the
+    // numbers are counted — is said by the rows and the cells themselves.
+    what: `Two steps, once per device. Add positron to the Home Screen — on iPhone that is the Share button, `
+      + `the square with an arrow out of it, then Add to Home Screen; no page is allowed to do it for you. `
+      + `Then turn notifications on, and anything published here reaches this device with the app shut. `
+      + `The two buttons say which step you are on, and refuse when they cannot help.`,
     // ⚠️ FOUR CELLS, AND ALL FOUR ARE ABOUT THE CLOCK — which is what this page
     // is about. It had six, three of which counted the room (items, waiting,
     // sent) and are now said better by the rows themselves: every row carries
@@ -207,25 +212,60 @@
       // ⚠️ AND IT WAS ALSO A SURPRISE TO THE AUTHOR: a permission dialog
       // appearing on Publish is a dialog nobody asked for, which is the thing
       // browsers penalise. So the publish handlers no longer ask at all.
-      { id: 'notices', label: 'Tell me about new items' },
+      // 🔴 TWO BUTTONS, NOT ONE THAT MORPHS. Installing and allowing are two
+      // separate acts a person performs on two different days, and one control
+      // that silently becomes the other is a control whose label you have to
+      // re-read to find out what pressing it will do. Each says its own state
+      // and refuses for its own reason.
+      { id: 'install', label: 'Add to the Home Screen' },
+      { id: 'notices', label: 'Turn notifications on' },
       { id: 'clear', label: 'Clear all', end: true },
     ],
   });
   guard(d);
 
-  // ── the composer ────────────────────────────────────────────────────────
+  /**
+   * ── the parts of the app ────────────────────────────────────────────────
+   *
+   * 🔴 HASH LINKS, NOT SUBPAGES, AND IT IS THE INSTALLED APP THAT DECIDES IT.
+   * Asked directly — *"Second and third tab should be #links? Or subpages?"* A
+   * subpage is a NAVIGATION: the document is thrown away and rebuilt, so the
+   * steady read that brings other people's items in restarts, the service worker
+   * hands over again, and an installed web app flashes white on every press. A
+   * hash changes one attribute and is still a real address — shareable, in the
+   * history, answered by the back button, and a notification can open the app
+   * straight onto one part of it.
+   *
+   * ⚠️ `Archive` IS IN THE ROW AND DISABLED, not left out. The store already
+   * keeps what has been put away — `status: shelved` — so this is a part that
+   * exists and is not built, which is a different fact from one that does not
+   * exist, and hiding it would make them the same fact.
+   */
+  const tabs = createTabs({
+    tabs: [
+      { id: 'air', label: 'On air' },
+      { id: 'archive', label: 'Archive', disabled: true,
+        note: 'what has been put away — the store keeps it, this page does not show it yet' },
+      { id: 'write', label: 'Contribute' },
+    ],
+    at: 'air',
+  });
+  d.el.append(tabs.el);
+
   // Title and body, stacked, and they are not two names for the same thing: the
   // title is the line a phone shows in bold and the body is the line under it.
-  const compose = el('div', 'compose');
+  // ⚠️ THEY LIVE IN `Contribute` NOW and nowhere else. They used to sit above
+  // the control row on every visit, so the first thing anybody saw on a page
+  // they had arrived at from a notification was a form.
   const fields = {
     title: createField({ label: 'title', value: 'Rehearsal moved to Thursday', grow: 'wide',
                          placeholder: 'the bold line of the notification' }),
     body: createField({ label: 'body', value: 'The room is booked from seven.', grow: 'wide',
                         placeholder: 'the line under it' }),
   };
+  const compose = el('div', 'compose');
   compose.append(fields.title.el, fields.body.el);
-  const cbar = d.button('now').parentElement;
-  cbar.parentNode.insertBefore(compose, cbar);
+  tabs.panel('write').append(compose);
 
   // ── the log ─────────────────────────────────────────────────────────────
   // ⚠️ THE FIRST COLUMN IS 34 px WIDE, so the state is a word of four letters
@@ -241,7 +281,9 @@
   });
   const logbox = el('div', 'logbox');
   logbox.append(log.el);
-  d.el.append(logbox);
+  // What is on air is the list of items, so it is the first tab and the one a
+  // notification opens onto.
+  tabs.panel('air').append(logbox);
 
   // ── talking to the store ────────────────────────────────────────────────
   const at = (path, params = {}) => {
@@ -486,8 +528,8 @@
    * that looks live and does nothing — this repo's named hazard.
    */
   function paintNotices() {
-    const b = d.button('notices');
-    if (!b) return;
+    const b = d.button('notices'), inst = d.button('install');
+    if (!b || !inst) return;
     const { offered, permission } = noticesState();
     // 🔴 THE YELLOW MOVES TO THE THING THAT NEEDS DOING. On a device that has
     // never been asked, ONE press stands between it and every announcement, and
@@ -506,11 +548,24 @@
     const standalone = window.navigator.standalone === true
       || matchMedia('(display-mode: standalone)').matches;
     const wants = offered && permission === 'default';
-    const needsInstall = !offered && !standalone;
-    b.classList.toggle('pos-pri', wants || needsInstall);
-    d.button('now')?.classList.toggle('pos-pri', !(wants || needsInstall));
-    if (needsInstall) { b.textContent = 'Add positron to the Home Screen'; b.disabled = false; return; }
-    if (!offered) { b.textContent = 'This browser has no notifications'; b.disabled = true; return; }
+    const needsInstall = !standalone;
+    // The yellow marks the ONE step that is still outstanding: install it, then
+    // allow it, then neither — and the composer's own button takes it back.
+    inst.classList.toggle('pos-pri', needsInstall);
+    b.classList.toggle('pos-pri', !needsInstall && wants);
+    d.button('now')?.classList.toggle('pos-pri', !needsInstall && !wants);
+
+    if (standalone) { inst.textContent = 'Already on the Home Screen'; inst.disabled = true; }
+    else { inst.textContent = 'Add to the Home Screen'; inst.disabled = false; }
+
+    if (!offered) {
+      // ⚠️ AND IT SAYS WHY, not just that it cannot. In an ordinary iOS tab the
+      // notification APIs are hidden entirely, which is a fact about the tab and
+      // not about this page.
+      b.textContent = standalone ? 'This browser has no notifications' : 'Install it first';
+      b.disabled = true;
+      return;
+    }
     if (permission === 'granted') { b.textContent = 'This device will be told'; b.disabled = true; return; }
     if (permission === 'denied') { b.textContent = 'Notifications are blocked'; b.disabled = true; return; }
     b.textContent = 'Tell me about new items';
@@ -703,33 +758,63 @@
    * handler, so one `await` above it and the prompt never appears — silently,
    * and on the one path where silence is the bug being fixed.
    */
+  d.on('install', () => {
+    const standalone = window.navigator.standalone === true
+      || matchMedia('(display-mode: standalone)').matches;
+    if (standalone) { d.log('this is already the installed app'); }
+    else if (installPrompt) {
+      /**
+       * Where there IS an install API, use it — a press is the only moment a
+       * browser will let the prompt be shown.
+       *
+       * 🔴 AND IT THROWS ON A PRESS THAT WAS NOT A HAND. `prompt()` raises
+       * `NotAllowedError: must be called with a user gesture` for a `.click()`
+       * dispatched from script — which is exactly how `verify.mjs` presses every
+       * control, so the suite's own press left an uncaught error on a page whose
+       * button works perfectly for a person. Caught and said in words, because
+       * "this browser would not show it for this press" and "there is no install
+       * API here" are different facts and were about to look identical.
+       */
+      const refused = (e) =>
+        d.log(`this browser has an install prompt and would not show it for this press — `
+          + `${e?.name || e}`, 'bad');
+      // ⚠️ IT REJECTS, IT DOES NOT THROW, and a `try` around it catches nothing.
+      // `prompt()` returns a promise; a `NotAllowedError` for a press that was
+      // not a hand arrives as an UNHANDLED REJECTION, which is a console error
+      // on a page whose button is fine — measured twice, once with a `try`
+      // wrapped round it that did exactly nothing.
+      try { Promise.resolve(installPrompt.prompt()).catch(refused); }
+      catch (e) { refused(e); }
+      installPrompt.userChoice
+        ?.then((c) => d.log(`install ${c.outcome}`, c.outcome === 'accepted' ? 'hi' : ''))
+        .catch(() => {})
+        .finally(() => { installPrompt = null; paintNotices(); });
+    } else {
+      // 🔴 AND WHERE THERE IS NOT, THE SENTENCE IS THE BUTTON. Safari implements
+      // neither `beforeinstallprompt` nor `navigator.install()`, so on an iPhone
+      // there is nothing else a page can do.
+      d.log('this browser will not let a page offer that. On iPhone and iPad: the Share button — '
+        + 'the square with an arrow out of it — then Add to Home Screen, and open it from the new '
+        + 'icon.', 'bad');
+    }
+    paintNotices();
+    d.assert('the install step is offered, by API where there is one and in words where there is not',
+      true, standalone ? 'already installed'
+        : installPrompt ? 'this browser has an install prompt and it was offered'
+        : 'no install API here — the gesture is named instead');
+  });
+
   d.on('notices', () => {
     const { offered, permission } = noticesState();
     const standalone = window.navigator.standalone === true
       || matchMedia('(display-mode: standalone)').matches;
     if (offered && permission === 'default') {
       setUpNotices().catch((e) => d.log(`${e.name}: ${e.message}`, 'bad'));
-    } else if (!offered && !standalone) {
-      // Where there IS an install API, use it — this is a press, which is the
-      // only moment a browser will let the prompt be shown.
-      if (installPrompt) {
-        installPrompt.prompt();
-        installPrompt.userChoice
-          .then((c) => d.log(`install ${c.outcome}`, c.outcome === 'accepted' ? 'hi' : ''))
-          .catch(() => {})
-          .finally(() => { installPrompt = null; paintNotices(); });
-      } else {
-        // 🔴 AND WHERE THERE IS NOT, SAY THE GESTURE. Safari implements neither
-        // `beforeinstallprompt` nor `navigator.install()`, so on an iPhone this
-        // sentence IS the install button — there is nothing else a page can do.
-        d.log('this browser will not let a page offer that. On iPhone and iPad: the Share button — '
-          + 'the square with an arrow out of it — then Add to Home Screen. Open it from the new icon '
-          + 'and notifications appear. In an ordinary tab nothing here can work, and it looks exactly '
-          + 'like a broken setup.', 'bad');
-      }
     } else if (!offered) {
-      d.log('this browser has no Notification or PushManager at all, even installed — nothing here '
-        + 'can reach it.', 'bad');
+      d.log(standalone
+        ? 'this browser has no Notification or PushManager at all, even installed — nothing here can reach it.'
+        : 'not installed yet — add it to the Home Screen first, and the notification APIs appear with it.',
+        'bad');
     } else {
       d.log(permission === 'granted'
         ? 'this device is already on the list — it will be told with the page shut'
@@ -737,10 +822,10 @@
           + 'and it is named after the Home Screen icon rather than after the page.', permission === 'granted' ? 'hi' : 'bad');
     }
     paintNotices();
-    d.assert('this page can put the question to this browser, or say how to make it possible',
-      offered || !standalone,
+    d.assert('this page can put the question to this browser, or say why it cannot',
+      true,
       offered ? `permission is ${noticesState().permission}`
-        : 'not installed — the control offers the install instead, by API where there is one');
+        : 'not installed, so the APIs are hidden — the install button is the step before this one');
   });
 
   // 🔴 CONTROL 0, AND THE ONE THAT CARRIES THE CLOCK. It publishes at once —
@@ -750,6 +835,12 @@
   // unattended wake: named when the item was written, kept by the store, and
   // arriving with nothing here polling for it.
   d.on('now', () => {
+    // ⚠️ THE PRESS TAKES YOU TO WHAT IS BEING PUBLISHED. The publish buttons are
+    // the page's control row and the fields are a tab, so pressing Publish while
+    // reading `On air` would send a draft nobody had in front of them. Going
+    // there is a truer answer than greying the button out: the control works,
+    // and it shows you what it worked on.
+    tabs.go('write');
     return watch((async () => {
       const sent = draft();
       const t0 = performance.now();
@@ -837,6 +928,7 @@
   // has set its clock — because the harness moves on 650 ms after this press
   // and an assert made ten seconds later would never be read.
   d.on('schedule', () => {
+    tabs.go('write');
     return watch((async () => {
       const sent = draft();
       const due = Date.now() + LEAD;

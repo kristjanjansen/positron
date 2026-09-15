@@ -959,6 +959,37 @@ video[hidden] { display: none; }
    directly above it, that means the button you are about to press again is not
    where it was. The floor is the same height a few rows occupy, so arriving
    messages fill the box rather than inflate it. */
+/* ── tabs: the parts of one page — shell/tabs.mjs ───────────────────────── */
+/* 🔴 NO BORDERS AND NO BOX, ASKED FOR IN THOSE WORDS. A tab is a place you go,
+   not a setting you arm, and `choice.mjs` already owns the boxed, segmented look
+   for the second of those — two acts drawn the same way is the drift `/kit/`
+   exists to catch. What marks the open one here is COLOUR plus a bar under the
+   word, which is the one convention every reader already has for a tab.
+   ⚠️ The bar is `box-shadow`, not `border-bottom`: a border would change the
+   button's height when it appeared and shunt the row by 2 px on every press —
+   CLAUDE.md, nothing that redraws may change how much room it takes. */
+.pos-tabs-bar {
+  display: flex; gap: 20px; overflow-x: auto;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.pos-tabs-bar::-webkit-scrollbar { display: none; }
+.pos-tabs-t {
+  flex: 0 0 auto; white-space: nowrap;
+  background: none; border: 0; border-radius: 0; height: 30px; padding: 0 0 6px;
+  font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); cursor: pointer;
+}
+.pos-tabs-t:hover:not(:disabled) { color: var(--fg); }
+.pos-tabs-t[aria-selected="true"] { color: var(--hi); box-shadow: inset 0 -2px 0 0 var(--hi); }
+/* A part that is coming and a part that does not exist are different facts, so
+   the unbuilt one stays in the row, named, and says so by weight alone. */
+.pos-tabs-t:disabled { color: var(--line2); cursor: default; }
+.pos-tabs-t:focus:not(:focus-visible) { outline: none; }
+.pos-tabs-t:focus-visible { outline: 2px solid var(--dim2); outline-offset: 3px; }
+/* ⚠️ The panels carry the shell's own vertical rhythm INSIDE them, because a
+   panel is a `.pos-body` child's child and the `* + *` rule does not reach it. */
+.pos-tabs-p > * + * { margin-top: 22px; }
+
 /* ── table: rows in columns the caller declares — shell/table.mjs ───────── */
 /* 🔴 A BOX, BECAUSE A TABLE IS A THING AND NOT A REGION OF THE PAGE. `/wire/`
    drew one round its traffic in its own <style> and `/kurenniemi/` was about to
