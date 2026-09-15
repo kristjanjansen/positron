@@ -19,7 +19,14 @@
   same 11°-38° aperture — rendered square rather than rounded, because iOS masks
   a Home Screen icon itself and a rounded source is rounded twice.
 -->
-<link rel="manifest" href="./manifest.json">
+<!-- ⚠️ `.webmanifest`, NOT `.json`, AND THE REASON IS THE CONTENT TYPE. Static
+     hosting names the type from the extension, so `manifest.json` went out as
+     `application/json` while the spec type is `application/manifest+json`.
+     Browsers are lenient about it and iOS gives no diagnostic either way, which
+     is exactly why it is worth removing as a variable rather than arguing
+     about: the cost is a rename. The app's identity is the manifest's `id`, not
+     this URL, so an installed icon is unaffected. -->
+<link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -552,7 +559,7 @@
     let says = '';
     let okManifest = false;
     try {
-      const base = new URL('./manifest.json', location.href);
+      const base = new URL('./manifest.webmanifest', location.href);
       const mres = await fetch(base, { signal: AbortSignal.timeout(8000) });
       const m = await mres.json();
       const icon = new URL(m.icons[0].src, base);
@@ -808,6 +815,32 @@
   // reader who is already on the list is not invited to join it a second time
   // and one who cannot be asked at all is told why on the control itself.
   paintNotices();
+  /**
+   * 🔴 SAY WHAT THIS DEVICE IS, ON LOAD, BEFORE ANYBODY PRESSES ANYTHING.
+   * *"Positron is not in notification settings"* is a symptom with four
+   * different causes and no way to tell them apart from the outside — not
+   * installed, installed but launched from Safari, installed and never asked,
+   * asked and refused. WebKit's own wording settles what the SYMPTOM means: a
+   * web app appears in Notifications Settings *"once permission is granted"*.
+   * So no row is not a scope problem and not a domain problem; it is `default`
+   * or `denied`, and this line says which.
+   *
+   * ⚠️ AND IT NAMES THE SERVICE WORKER'S SCOPE, because the other half of the
+   * question was whether this has to live at the root of the domain. It does
+   * not — a worker's scope is the path it is SERVED from, this one owns
+   * `/items/`, and that is all Web Push requires. Printing it means nobody has
+   * to take my word for it.
+   */
+  {
+    const { offered, permission } = noticesState();
+    const standalone = window.navigator.standalone === true
+      || matchMedia('(display-mode: standalone)').matches;
+    const reg = await navigator.serviceWorker?.getRegistration('./').catch(() => null);
+    d.log(`${standalone ? 'running from the Home Screen' : 'an ordinary browser tab'}`
+      + ` · notifications ${offered ? `offered, permission ${permission}` : 'not offered here'}`
+      + ` · worker ${reg ? reg.scope.replace(location.origin, '') : 'not registered yet'}`,
+      offered && permission === 'granted' ? 'hi' : '');
+  }
   d.ready();
 </script>
 </html>
