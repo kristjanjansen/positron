@@ -134,7 +134,27 @@ export function createPicker({ label, what = 'it', prev, next, random, onPick, c
     options: (names, at = 0) => {
       select.textContent = '';
       for (const n of names) select.append(el('option', '', n));
-      if (names.length) select.selectedIndex = Math.max(0, Math.min(names.length - 1, at));
+      const i = names.length ? Math.max(0, Math.min(names.length - 1, at)) : -1;
+      if (i >= 0) select.selectedIndex = i;
+      /**
+       * 🔴 AND IT DRAWS THE NAME IT JUST SELECTED. IT DID NOT, AND THE CONTROL
+       * READ `—` FOREVER.
+       *
+       * PHOTOGRAPHED on `/mirror/`: a LOOK picker with ten shaders in it, a
+       * shader running, and a long em dash where the name goes. The list was
+       * handed over correctly, `selectedIndex` was set correctly, and the
+       * VISIBLE half was never told — so the cell kept the placeholder it is
+       * built with until somebody pressed ‹ or ›, at which point the name
+       * appeared and the control looked as though it had been fine all along.
+       *
+       * ⚠️ IT IS NOT THE PAGE'S JOB TO CALL `show()` AFTERWARDS. Two pages did
+       * and one did not, which is the definition of a thing that belongs in the
+       * component: this function already knows the names and already knows
+       * which one is current, so a caller repeating it is a second place for
+       * the same fact to be written and a second place for it to be forgotten.
+       */
+      name.textContent = i >= 0 ? names[i] : '—';
+      cell.title = i >= 0 ? names[i] : '';
       // A list of one has nowhere to go; a list of none is not a list yet.
       const usable = names.length > 1;
       select.disabled = !usable;

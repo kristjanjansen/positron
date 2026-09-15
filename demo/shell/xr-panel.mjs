@@ -391,7 +391,37 @@ export function createXRPanels({
   panels = [], onFrame = null, onEnd = null, log = () => {},
   dist = 1.6, clear = [0.02, 0.03, 0.045, 1], deadManMs = 4000, room = null,
   glow = null, live = true, fan = 0.7,
+  /**
+   * 🔴 SOMETHING THE PAGE DRAWS ON THE GROUND, IN THIS SESSION'S CONTEXT.
+   *
+   * `{ attach(gl), draw({ proj, view, eye, tSec, bg }), detach?() }`. It is
+   * attached once when the context is built and drawn once per eye, after the
+   * room and before the panels, because it is the ground the panels stand over.
+   *
+   * ⚠️ THIS EXISTS SO THERE IS NOT A FOURTH SESSION PATH. `blocks`, `floor` and
+   * this module already each own one, and every one of the five WebXR defects
+   * at the top of this file is silent from outside: a page that writes its own
+   * `requestSession` inherits none of the fixes and none of the ways out. What
+   * a page owns here is its picture and nothing else.
+   *
+   * ⚠️ AND IT IS HANDED `bg`, WHICH IS THE COLOUR THE FRAME WAS CLEARED TO.
+   * A surface that fades at its edges has to fade INTO something, and if it
+   * picks that colour itself the two drift: `demo/floor/index.html:154-168`
+   * records a visibly brighter disc on a darker void, a rim nobody drew, at
+   * exactly the radius the fade was meant to hide, because the fade target and
+   * the clear colour were typed twice and were out by nearly a factor of two.
+   * One triple, passed in.
+   *
+   * ⚠️ IT IS ALLOWED TO FAIL ON ITS OWN, like the grab bars and the room's
+   * grid. A driver that will not compile it costs the picture on the floor,
+   * never the session and never the way out.
+   */
+  surface = null,
 } = {}) {
+  // What `surface` started as, and what is left of it. A surface that threw is
+  // set to null here and SAID SO in `state`, because a page whose floor quietly
+  // did not draw looks exactly like a page whose floor drew black.
+  let theSurface = surface;
   let gl = null, prog = null, quad = null, U = null;
   let barProg = null, barU = null;
   let session = null, space = null, arMode = false;
@@ -679,6 +709,11 @@ export function createXRPanels({
     // would not say" is a finding, and it is not the same as not asking.
     frameRate: null,
     supportedFrameRates: null,
+    // The page's own floor: whether it attached, and why not when it did not.
+    // ⚠️ `null` MEANS NONE WAS OFFERED, which is not the same as one that
+    // refused. A check that cannot tell those apart passes on a page that
+    // forgot to pass a surface at all.
+    surface: surface ? { attached: false, why: 'not built yet', draws: 0 } : null,
     // ⚠️ CPU TIME, AND IT SAYS SO. `uploadCpuMs` is how long `texImage2D` takes
     // on the PROCESSOR; the graphics card's own time for the copy is NOT
     // visible from here without a timer extension, and a number that has to be
@@ -822,6 +857,26 @@ export function createXRPanels({
       beacon(`FAIL grab bars · ${e.message} · the panels cannot be moved in this session`);
     }
     glCheck('bar');
+    /**
+     * The page's floor gets the context once, here, and never a second one.
+     * ⚠️ SAME RULE AS THE BAR PROGRAM ABOVE: it may fail and the session goes on
+     * without it, with the reason said in words rather than left as a black
+     * floor somebody has to guess at. `attach` returning `false` is a refusal
+     * and is treated exactly like a throw, so a surface that checks its own
+     * capabilities does not have to invent an Error to report one.
+     */
+    if (theSurface) {
+      try {
+        if (theSurface.attach?.(gl) === false) throw new Error('it refused this context');
+        state.surface = { attached: true, why: '', draws: 0 };
+      } catch (e) {
+        state.surface = { attached: false, why: e.message, draws: 0 };
+        theSurface = null;
+        log(`the floor would not build: ${e.message}`, 'warn');
+        beacon(`FAIL surface · ${e.message} · the session runs with nothing on the ground`);
+      }
+      glCheck('surface');
+    }
     const P = [-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0];
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
     const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
@@ -1189,6 +1244,42 @@ export function createXRPanels({
       gl.enable(gl.SCISSOR_TEST);
       gl.clear(gl.DEPTH_BUFFER_BIT);
       gl.disable(gl.SCISSOR_TEST);
+    }
+    // ── the page's floor ─────────────────────────────────────────────────
+    // 🔴 AFTER THE ROOM AND BEFORE THE PANELS, because it is the GROUND: the
+    // room's grid is under it and the panels stand over it. The room branch
+    // above has just cleared depth inside this eye's scissor, so the floor is
+    // never occluded by a wall, which is the whole reason it is drawn here
+    // rather than with the room.
+    if (theSurface) {
+      // 🔴 THE FRAMEBUFFER IS REMEMBERED AND PUT BACK, AND THIS IS THE BUG THE
+      // PREVIEW FOUND ON ITS FIRST RUN, ONE LEVEL UP. A page that renders its
+      // own chain leaves ITS framebuffer bound and hands back a texture that is
+      // that framebuffer's colour attachment; sampling it while drawing into it
+      // is a feedback loop, which WebGL answers with GL_INVALID_OPERATION and a
+      // frame with nothing in it. In a session the layer's framebuffer is the
+      // one that must be bound, and it is bound long before this line.
+      const fbWas = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+      try {
+        theSurface.draw({ proj, view: viewM, eye: [hp.x, hp.y, hp.z], tSec,
+          // ONE triple: what this frame was actually cleared to. See `surface`.
+          bg: roomBg || [clear[0], clear[1], clear[2]] });
+        state.surface.draws++;
+      } catch (e) {
+        theSurface = null;
+        state.surface = { attached: false, why: `it threw while drawing: ${e.message}`,
+          draws: state.surface.draws };
+        log(`the floor threw and was taken down: ${e.message}`, 'bad');
+        beacon(`FAIL surface draw · ${e.message}`);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbWas);
+      // ⚠️ AND THE STATE THE PANELS ASSUME. They are drawn unblended with depth
+      // writing, and a surface that left `BLEND` on or `depthMask` off would
+      // make them translucent for a reason nothing in their own code says. The
+      // VAO, the program and face culling are set by the panels themselves a
+      // few lines down, so only these two need putting back.
+      gl.disable(gl.BLEND);
+      gl.depthMask(true);
     }
     // ⚠️ A SCREEN HAS NO BACK. The room turns face culling ON (it has to —
     // its walls are a cube seen from the inside), and a panel you can walk
@@ -1730,6 +1821,39 @@ export function createXRPanels({
       }
       if (px[i] > 24 || px[i + 1] > 24 || px[i + 2] > 24) lit++;
     }
+    /**
+     * 🔴 A LINE ACROSS THE FLOOR, SO A CHECK CAN TELL A RAMP FROM A DISC.
+     *
+     * `spread` and `litShare` both pass on a surface drawn at one flat alpha,
+     * which is exactly the failure a radial fade has: it is easy to draw a
+     * bright plate with a hard edge and call it a fade. This is 32 samples
+     * across the LEFT eye at a quarter of the way up the image, which is where
+     * a floor in front of a standing viewer lands, each the brightest channel
+     * at that point. Centre-bright and edge-dark is a ramp; flat is not.
+     *
+     * ⚠️ `readPixels` COUNTS ROWS FROM THE BOTTOM, so a quarter of the way up
+     * this array is a quarter of the way up the picture. Getting that backwards
+     * samples the sky and reports a floor that is not drawing.
+     * ⚠️ AND IT IS THE LEFT EYE ONLY. Both eyes are in one framebuffer side by
+     * side, so a row across the whole width crosses the seam between them and
+     * reads the second eye's left edge as the first eye's centre.
+     */
+    const PROFILE_N = 32;
+    const profile = [];
+    {
+      const eyeW = width >> 1;
+      const row = Math.round(height * 0.25);
+      for (let i = 0; i < PROFILE_N; i++) {
+        const x = Math.min(eyeW - 1, Math.round(((i + 0.5) / PROFILE_N) * eyeW));
+        const o = (row * width + x) * 4;
+        profile.push(Math.max(px[o], px[o + 1], px[o + 2]));
+      }
+    }
+    // The clear colour, read off the top row of the same eye: what the fade has
+    // to reach. A ramp that never gets there is a rim, which is the defect
+    // `/floor/` paid for.
+    const groundAt = ((height - 2) * width + (width >> 2)) * 4;
+    const ground = Math.max(px[groundAt], px[groundAt + 1], px[groundAt + 2]);
     // ⚠️ AND THE DRAWING BUFFER GOES BACK TO NOTHING. This module deliberately
     // does not build a context for a visitor who will never press the button;
     // the preview has to build one to check anything at all, so the least it
@@ -1764,6 +1888,14 @@ export function createXRPanels({
       spread: Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]),
       litShare: lit / (width * height),
       bars: !!barProg,
+      // ⚠️ `draws` IS THE LOAD-BEARING HALF. `attached` only says the page's
+      // programs compiled; a surface can attach cleanly and never be reached,
+      // which is what an early `return` in `drawEye` would look like from here.
+      surface: state.surface ? { ...state.surface } : null,
+      /** 32 brightnesses across the left eye, a quarter up. See the note. */
+      profile,
+      /** the brightest channel at the top of that eye: the ground colour */
+      ground,
       live: liveOn && panels.some((p) => p.live),
       // ⚠️ THIS MACHINE'S NUMBERS, AND THEY ARE NOT A HEADSET'S. Reported so
       // that "we can measure it at all" is established here rather than on the

@@ -2122,7 +2122,7 @@ machine. A regex with `[^}]*` swallowed three CSS rules above the one it was
 meant to delete, a canvas went to zero height, a click found nothing, and I said
 ERR was down. It was serving 294 of 298 tiles at 60 fps at that moment. Then a
 second `mark()` added to the same object literal in `grain-scope.mjs` silently
-overwrote the existing one, radio1965's grain ticks stopped, and I said the
+overwrote the existing one, radio's grain ticks stopped, and I said the
 station was down.
 
 **The pull is that an external cause explains the symptom without implicating the
@@ -2207,7 +2207,7 @@ starts timing out, and the test for "has it produced one yet" was
 the wait never engaged again and each demo got 12 tries at 400 ms to produce
 everything it had.
 
-MEASURED: `/radio1965/` makes 43 asserts. The suite collected **2** and reported
+MEASURED: `/radio/` makes 43 asserts. The suite collected **2** and reported
 **13/13 green**. Twenty-eight demos declare `settleMs`, so all of them were
 exposed.
 
@@ -2220,7 +2220,7 @@ the PAGE asserted anything yet.
 
 ⚠️ And two wrong fixes were tried first, both plausible. Arming the wait on
 `d.ready()` fails because a page may call it before driving its own checks:
-`/radio1965/` does, from inside the granulator's boot. Requiring "ready AND the
+`/radio/` does, from inside the granulator's boot. Requiring "ready AND the
 count is stable" fails the same way, and would have shipped looking correct.
 What was needed was not a better heuristic for done, it was the one number that
 makes the question answerable.

@@ -10,7 +10,7 @@ All timestamps are UTC on 2026-09-15.
 anything currently on `workers/shout`: HTTPS on port 443, `access-control-allow-origin`
 reflected to any caller, 320 kbit/s AAC-LC. It needs **no relay at all**, which
 is the opposite of the case `shout` was built for. It is nevertheless **not
-added to `/radio1965/`**, because that page decodes MP3 frames in the tab and
+added to `/radio/`**, because that page decodes MP3 frames in the tab and
 the shipped frame scanner finds **zero frames in a megabyte of IDA's AAC**
 (measured, with a passing MP3 control beside it). The archive is a **flat no**.
 
@@ -65,7 +65,7 @@ the shipped frame scanner finds **zero frames in a megabyte of IDA's AAC**
   origin. `broadcast.idaidaida.net:8000` accepts TCP and then resets, and an
   `openssl s_client` handshake to it dies with `errno=54`. That measures this
   sandbox, and it measures nothing about IDA. This is the trap
-  `research/radio1965-app-2026-09.md` §5 records, and the control is the only
+  `research/radio-app-2026-09.md` §5 records, and the control is the only
   thing that separates the two readings.
 - **So the `:8000` URL their site uses was never probed from here.** Everything
   below is the port 443 path, which is reachable and which is the station's own
@@ -203,11 +203,11 @@ for `mp4a.40.2`. Neither of those is the missing piece.
 
 ---
 
-## 3. Why it is NOT in `/radio1965/`
+## 3. Why it is NOT in `/radio/`
 
 🔴 **THE PAGE DECODES MP3 FRAMES IN THE TAB, AND IDA IS AAC.**
 
-`/radio1965/` stopped using a media element on purpose. `demo/shell/mp3-stream.mjs`
+`/radio/` stopped using a media element on purpose. `demo/shell/mp3-stream.mjs`
 fetches the mount, splits it into frames with `demo/shell/mp3-frames.mjs`, and
 feeds those frames either to `AudioDecoder` or to `decodeAudioData`. The header
 of `mp3-frames.mjs` says what it is in its first line: "Layer III only, that is
@@ -248,7 +248,7 @@ fourth copy of something in a page. What it needs, scoped:
    `content-type` (`audio/mpeg` against `audio/aac`), and configure `AudioDecoder`
    with `mp4a.40.2` rather than `mp3`. Both paths are measured available in
    Chrome above.
-3. `demo/radio1965/index.html`: `NOMINAL_KBPS` becomes a per-station number, and
+3. `demo/radio/index.html`: `NOMINAL_KBPS` becomes a per-station number, and
    `srcOf` stops hard-coding a `.mp3` suffix.
 4. A decision about `srcOf` and `/health`, because both are relay-shaped and this
    station does not need a relay. See §5.
@@ -331,7 +331,7 @@ measurement.
 **INFERRED**, three consequences for this project specifically. Using the token
 from IDA's Strapi endpoint is using **IDA's** SoundCloud credential from a third
 party's app, which is the last clause. Granulating a set, which is what
-`/radio1965/` does to whatever it is pointed at, is modification, which needs the
+`/radio/` does to whatever it is pointed at, is modification, which needs the
 uploader's consent. And keeping a set to loop or to analyse across a visit runs
 into the caching clause.
 
@@ -390,16 +390,16 @@ about files, not an integration against SoundCloud.
 ## 7. What was decided, and what is open
 
 **Decided.** The live feed measures fine and is not wired in, because
-`/radio1965/` cannot decode it. No station was added to `workers/shout`, no
-worker was deployed, and `demo/radio1965/index.html` is unchanged. The assert
-count for `radio1965` is unchanged at 39.
+`/radio/` cannot decode it. No station was added to `workers/shout`, no
+worker was deployed, and `demo/radio/index.html` is unchanged. The assert
+count for `radio` is unchanged at 39.
 
 **Open, in the order it would be done.**
 
 1. An ADTS frame scanner in `demo/shell/mp3-frames.mjs` and a content-type branch
    in `demo/shell/mp3-stream.mjs`. That one change makes every AAC Icecast mount
    in the world playable by this project, not only IDA's.
-2. Per-station `NOMINAL_KBPS` in `/radio1965/`, so the settled-rate assert is
+2. Per-station `NOMINAL_KBPS` in `/radio/`, so the settled-rate assert is
    about the station being played.
 3. A decision about the relay-shaped parts of that page. `srcOf` builds
    `${BASE}/${id}.mp3` and the health probe asks `${BASE}/health`, and a station

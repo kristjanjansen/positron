@@ -43,11 +43,24 @@ export function createTransportBar(host, deck, {
    * `extras` sit by the play toggle and are always there, which is right for a
    * transport verb like record and wrong for a thing that can only act on a
    * loop: a control that is visible and inert is this project's named failure.
-   * These sit immediately LEFT of the LOOP button, because that is the thing
-   * they modify, and they appear and vanish with it.
-   * `[{ id, label, aria, title, onPress(btn) }]`. `onPress` gets the button, so
-   * a page can read and set `aria-pressed` and keep the state where the DOM
-   * already holds it rather than in a second variable beside it.
+   * These sit immediately RIGHT of the LOOP button, because that is the thing
+   * they modify, and they appear and vanish with it. ⚠️ THEY WERE ON THE LEFT
+   * AND WERE MOVED, ASKED FOR IN THOSE WORDS: *"move loop mode to right not
+   * left"*. LOOP is the verb and the extra is what it does; reading `[LOOP|→]`
+   * left to right gives the action and then its adverb, where `[→|LOOP]` gave
+   * a glyph with nothing yet to modify.
+   * `[{ id, label, aria, title, always, onPress(btn) }]`. `onPress` gets the
+   * button, so a page can read and set `aria-pressed` and keep the state where
+   * the DOM already holds it rather than in a second variable beside it.
+   *
+   * 🔴 `always: true` KEEPS ONE ON THE BAR WITH NO LOOP RUNNING, AND IT IS NOT
+   * AN EXCEPTION TO THE RULE ABOVE. That rule is about a control that can do
+   * nothing until there is a loop. A button that says WHICH WAY the next loop
+   * will play can be pressed before there is one and changes what the next
+   * press of LOOP does, so it is neither inert nor hidden: it is the same
+   * distinction `caps.mjs` draws between a thing you cannot do and a thing you
+   * have not done yet. `/radio/` uses it for the direction button glued to
+   * LOOP, which is why the group below exists.
    */
   loopExtras = [],
   // A LIVE DECK HAS NO END. The bar arms a one-shot at range[1] and, when it
@@ -66,7 +79,7 @@ export function createTransportBar(host, deck, {
    * Called with the new rate the instant a rate button is pressed.
    *
    * 🔴 IT REPLACES A POLL, AND THE POLL WAS A THIRD OF A REPORTED DELAY.
-   * `/radio1965/` owns the thing the rate actually acts on (an Icecast playout,
+   * `/radio/` owns the thing the rate actually acts on (an Icecast playout,
    * not this deck's playhead), and the only way it could learn about a press
    * was to read `deck.targetRate()` on a timer. That timer was 1 Hz — *"why
    * rate change is so slooooooooow"* — then 120 ms, which is better and is
@@ -152,7 +165,8 @@ export function createTransportBar(host, deck, {
       { type: 'button', 'aria-label': x.aria || x.id, 'aria-pressed': 'false' });
     b.dataset.id = x.id;
     if (x.title) b.title = x.title;
-    b.hidden = true;                 // until there is a loop for them to act on
+    if (x.always) b.dataset.always = '1';
+    b.hidden = !x.always;            // until there is a loop for them to act on
     b.addEventListener('click', () => x.onPress?.(b));
     loopExtraEls.set(x.id, b);
   }
@@ -225,8 +239,22 @@ export function createTransportBar(host, deck, {
   loopBtn.title = live
     ? 'press to hold the live sound from here. it closes and plays when the window is full, or press again to end it sooner'
     : 'press to mark where a loop starts, again to mark the end, again to take it off';
+  /**
+   * 🔴 THE EXTRAS AND LOOP ARE ONE SEGMENTED CONTROL, NOT TWO BUTTONS WITH A
+   * GAP. ASKED FOR IN THOSE WORDS: *"[→|LOOP] - two different buttons visually
+   * together"*. They are two buttons and they stay two buttons — separate hit
+   * areas, separate labels, separate aria — and what joins them is one shared
+   * edge, because what the left one sets is a property OF the right one. At the
+   * bar's ordinary 8 px gap the direction glyph read as another piece of
+   * furniture that happened to be next to LOOP.
+   * ⚠️ NO GROUP WHEN THERE IS NOTHING TO GROUP: a lone LOOP button goes
+   * straight on the bar, so every page that declares no extras is untouched.
+   */
+  const loopPair = loopExtraEls.size && wantLoop ? el('div', 'tbar-loopgrp') : null;
+  if (loopPair) loopPair.append(loopBtn, ...loopExtraEls.values());
   bar.append(toggle, ...extraEls.values(), scrub, ...(live ? [liveChip] : [time]),
-    ...loopExtraEls.values(), ...(wantLoop ? [loopBtn] : []), rates, badge);
+    ...(loopPair ? [loopPair] : [...(wantLoop ? [loopBtn] : []), ...loopExtraEls.values()]),
+    rates, badge);
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────
@@ -677,8 +705,9 @@ export function createTransportBar(host, deck, {
     // case needs no fourth colour and no stylesheet of its own. What the live
     // case adds is the blink, which is opacity and takes no room.
     loopBtn.dataset.loop = on ? 'on' : loopA != null ? 'armed' : 'off';
-    // they act on a loop, so they exist while there is one and not before
-    for (const b of loopExtraEls.values()) b.hidden = !on;
+    // they act on a loop, so they exist while there is one and not before —
+    // unless they were declared `always`, which means they act on the NEXT one.
+    for (const b of loopExtraEls.values()) if (!b.dataset.always) b.hidden = !on;
     loopBtn.setAttribute('aria-label',
       on ? 'looping. press to take the loop off'
         : filling ? 'holding the live sound. press to end the loop here'
@@ -816,6 +845,17 @@ export function createTransportBar(host, deck, {
     get loopFrac() { return lastLoopFrac; },
     /** press it the way a finger does, so a check drives the real handler */
     pressLoop() { loopBtn.click(); },
+    /**
+     * A `loopExtras` button by id, so a check can press the real control and
+     * read the real face.
+     *
+     * ⚠️ IT IS ON THIS OBJECT AS WELL AS ON THE RETURN VALUE, and that is not a
+     * duplicate. This is what `window.__demo.transport` points at, which is the
+     * only handle a CDP check has; the return value is what the PAGE holds. A
+     * control reachable from one and not the other is a control the harness
+     * cannot press, which is how `/radio/`'s ways went ungraded.
+     */
+    loopExtra: (id) => loopExtraEls.get(id) || null,
   };
   if (window.__demo) window.__demo.transport = api;
 
@@ -832,7 +872,8 @@ export function createTransportBar(host, deck, {
     endStop, commanded: !!command,
     /** an `extras` button by id, so a page can relabel or disable it */
     extra: (id) => extraEls.get(id) || null,
-    /** a `loopExtras` button by id. It is hidden unless a loop is running. */
+    /** a `loopExtras` button by id. It is hidden unless a loop is running, or
+     *  it was declared `always`, in which case it is always on the bar. */
     loopExtra: (id) => loopExtraEls.get(id) || null,
     note,
     destroy() {

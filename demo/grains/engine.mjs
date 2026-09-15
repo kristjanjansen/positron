@@ -145,7 +145,7 @@ export const PAPPUS_NODE = 3000, SOURCE_NODE = 3001;
  */
 export async function startPappus({ audioContext, log = () => {}, onGrain = null } = {}) {
   // 🔴 THE BOOT IS `/shell/scsynth.mjs` NOW, NOT THIS FILE. It was here while
-  // `/grains/` was the only page running SuperCollider; `/radio1965/` granulates
+  // `/grains/` was the only page running SuperCollider; `/radio/` granulates
   // a live radio stream with the same engine, and two copies of a boot this
   // full of measured gotchas is the `rowHTML`/`moq.mjs` mistake a third time.
   // Every detail that was proved here moved with it, verbatim — the explicit

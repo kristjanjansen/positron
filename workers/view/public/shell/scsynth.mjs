@@ -1,7 +1,7 @@
 // demo/shell/scsynth.mjs — real SuperCollider in a tab, for any page that wants it.
 //
 // 🔴 THIS WAS `demo/grains/engine.mjs`'s BOOT AND IS NOW SHARED. `/grains/`
-// was the only page running scsynth, so its boot lived inside it. `/radio1965/`
+// was the only page running scsynth, so its boot lived inside it. `/radio/`
 // needs the same engine to granulate a live radio stream, and this repo has
 // paid twice for two copies of one function (`rowHTML` printing `undefined`
 // over every demo name; `moq.mjs` importing a URL that had been renamed away).

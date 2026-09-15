@@ -1,21 +1,21 @@
 // demo/shell/radio-gran.mjs — the radio-into-Pappus machine, with no page on it.
 //
 // 🔴 WHY THIS EXISTS, AND IT IS THE SECOND COPY BECOMING A COMPONENT.
-// `/radio1965/` is a station list, an audio graph, a wasm SuperCollider, twelve
+// `/radio/` is a station list, an audio graph, a wasm SuperCollider, twelve
 // finished sounds, a modulator spec and a grain clock that locks to a loop, all
 // inside one 4,985-line page. `/videoradio/` is the same machine with the
 // instrument panel taken off and a shader in its place. Building a second copy
 // of any of that inside a new page is the failure `/kit/` exists to catch, and
 // `research/vr-sound-visual-2026-09.md §6` already left the feature extractor
 // open in exactly these terms: *"add `demo/shell/features.mjs` as a kit
-// component, or lift what `radio1965` already has? Both are defensible;
+// component, or lift what `radio` already has? Both are defensible;
 // building a third copy inside a new page is not."*
 //
-// ⚠️ 🔴 `/radio1965/` HAS NOT BEEN MOVED ONTO THIS YET, AND UNTIL IT IS THERE
+// ⚠️ 🔴 `/radio/` HAS NOT BEEN MOVED ONTO THIS YET, AND UNTIL IT IS THERE
 // ARE TWO IMPLEMENTATIONS. This header is the reason to finish the job rather
 // than a record that it was done. `field.mjs` carries the same warning about
 // `wire` and it is the same situation: the table below and the one at
-// `demo/radio1965/index.html:2820` are the same twelve sounds typed twice, and
+// `demo/radio/index.html:2820` are the same twelve sounds typed twice, and
 // a drift between them is SILENT because both pages go on working. What to do,
 // in order: delete `PATCHES`, `SCAN_RANGE`, `patternOf`, `liveSteps`,
 // `predictedRate`, `STATIONS`, `srcOf`, `nominalKbps`, the modulator `specs`
@@ -30,7 +30,7 @@
 // of the ENGINE and of the RELAY whoever is asking.
 //
 // 🔴 AND ONE THING HERE IS NEW RATHER THAN LIFTED, WHICH IS WHY IT IS A MODULE
-// AND NOT A FILE OF CONSTANTS. `writePatch` on `/radio1965/` writes a whole
+// AND NOT A FILE OF CONSTANTS. `writePatch` on `/radio/` writes a whole
 // patch in one shot, which is right for pressing a button and useless for a
 // page that has to travel from one sound to another over eight seconds. The
 // split into `writeDiscrete` and `writeContinuous` is what makes a morph
@@ -46,7 +46,7 @@ import { setParam, GATE0 } from './pappus.mjs';
  * position has to rescale by `RING_SECONDS / BUF_SECONDS` (see `pappus.mjs`).
  *
  * ⚠️ IT IS EIGHT AND NOT SIXTY, and the argument is written out at
- * `demo/radio1965/index.html:2654`: the ring has to be FILLED before the
+ * `demo/radio/index.html:2654`: the ring has to be FILLED before the
  * granulator sounds like itself, and at sixty that wait is a minute, which puts
  * every assert outside the harness's budget and a visitor in front of silence.
  */
@@ -582,7 +582,7 @@ export const routesOf = (p) => (p.mod || []).filter((r) =>
 // ── writing a patch, in two halves ─────────────────────────────────────────
 //
 // 🔴 THE SPLIT IS THE ARGUMENT, AND THE LINE BETWEEN THEM IS THE ENGINE'S.
-// `/radio1965/` writes a whole patch on a button press and that is right there.
+// `/radio/` writes a whole patch on a button press and that is right there.
 // A page that TRAVELS from one sound to another needs to know which fields can
 // be a value in between and which cannot, and the answer is not a matter of
 // taste:

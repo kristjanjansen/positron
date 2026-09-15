@@ -6,7 +6,7 @@
 // MPEG audio never writes `00` there because it is the reserved layer, and ADTS
 // always writes `00` because AAC has no layers. Everything below hangs off that.
 //
-// 🔴 WHY A PAGE HERE NEEDS THIS AT ALL. `/radio1965/` played an Icecast mount
+// 🔴 WHY A PAGE HERE NEEDS THIS AT ALL. `/radio/` played an Icecast mount
 // through an `<audio>` element and tapped it with `createMediaElementSource`.
 // MEASURED on an iPhone (iOS 18.7, Safari 26.6.1): the element plays, the
 // AudioContext runs, and the analyser reads **0.0000 on every line for the whole

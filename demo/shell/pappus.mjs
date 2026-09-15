@@ -5,7 +5,7 @@
 // the gate buffers, and the synth itself.
 //
 // 🔴 WITHOUT THIS, A LOADED PAPPUS FIRES NOTHING AND MAKES NO SOUND, and says
-// nothing about why. MEASURED on `/radio1965/` while it was being written:
+// nothing about why. MEASURED on `/radio/` while it was being written:
 // engine up in 531 ms, definition taken in 22 ms, `/s_new` answered `/n_go` —
 // and then `0 grains reported in 2.5 s` with the meter at `0.0000`. Every
 // visible step succeeded. The graph reads its envelope windows and its gates
@@ -151,7 +151,7 @@ export function setParam(eng, cmd, value, node = PAPPUS_NODE) {
  * the output bus read exactly **0.00000**. "Grains are firing and reported" and
  * "sound is coming out" are different claims about different quantities, and
  * reading the first as progress toward the second cost a full debugging round
- * on `/radio1965/`.
+ * on `/radio/`.
  *
  * ⚠️ `gates` IS THE ONE THAT DECIDES WHETHER THE INSTRUMENT EXISTS. The
  * engine's trigger is `trig * (gates[i] > 0.001) * coin * egate`, so all-zeros

@@ -8,7 +8,7 @@
 // exactly, and 1 of 29 carried text over 25 s.
 //
 // ⚠️ THIS LIVED INSIDE `shout`'s PAGE AND WAS LIFTED HERE RATHER THAN COPIED.
-// A second page (`radio1965`) needed the same forty lines, and this repo has
+// A second page (`radio`) needed the same forty lines, and this repo has
 // paid twice for two copies of one function — `rowHTML` printed `undefined`
 // over every demo name for an afternoon, and `moq.mjs` held a URL that had been
 // renamed away. CLAUDE.md's rule is the reason this file exists: *"A control
@@ -38,7 +38,7 @@
  *   callers fed this demuxer purely to read the station's text and let an
  *   `<audio>` element fetch the SAME STREAM A SECOND TIME for the sound — so
  *   the audio bytes arriving here were simply dropped on the floor. When
- *   `/radio1965/` had to decode for itself (WebKit does not route a media
+ *   `/radio/` had to decode for itself (WebKit does not route a media
  *   element into WebAudio — see mp3-stream.mjs), there was nowhere for the bytes
  *   to come out. ⚠️ A demuxer that throws away half of what it demuxes reads as
  *   complete right up until somebody wants the other half.

@@ -20,7 +20,7 @@ The subject: `demo/shell/pappus-mod.mjs` re-creates, in JavaScript, the half of
 Pappus that upstream keeps in Lua — eight LFOs, six shapes, a Turing
 sample-and-hold, an envelope follower, the cubed amount, the offset in the
 control's own warped space. It runs in a tab today
-(<https://positron.studio/radio1965/>, 35/35). This file is about getting the
+(<https://positron.studio/radio/>, 35/35). This file is about getting the
 same movement onto the Raspberry Pi that serves
 <https://positron.studio/box/> and <https://positron.studio/grains/>.
 
@@ -41,7 +41,7 @@ tell the rungs apart and has already misled this project for a day:
 
 So `lite = true` as well (`Engine_Pappus.sc:218`, `if(tiny) { lite = true }`),
 and **the board and the tab are on the same rung**. Every destination that
-`radio1965` can modulate in a browser exists on the board, and no destination
+`radio` can modulate in a browser exists on the board, and no destination
 the board has is one the browser lacks. That is a larger convenience than it
 looks: it means the modulator's spec table does not have to fork.
 
@@ -183,7 +183,7 @@ Three consequences, and all three are load-bearing:
    AND `sendSide('n', …)` — 6 + 6 commands, 96 datagrams a second at 8 Hz — and
    on TINY `graw2 = DC.ar([0,0])` (`Engine_Pappus.sc:1013`). **48 messages a
    second have been writing a granulator that is compiled out**, for as long as
-   the board has been on TINY. `radio1965` already worked this out for the tab
+   the board has been on TINY. `radio` already worked this out for the tab
    and wrote it down in `MOD_CMD`'s comment; nobody has applied it here.
 
 ---
@@ -409,7 +409,7 @@ gives OUT (`mt6`, `mt7`), GS1 (`mt1`), GS2 (dead here) and three chain points.
 `LeakDC.ar([In.ar(inbusl,1), In.ar(inbusr,1)])` at `:518`, on hardware busses 2
 and 3 (`run-pappus.scd`, `context.in_b`).
 
-That is exactly the difference between the board and `radio1965`. In the tab the
+That is exactly the difference between the board and `radio`. In the tab the
 follower's source is a **live radio station** and the whole gesture is *the
 station plays the granulator*. On the board the closest available source is the
 granulator's own output.
@@ -497,7 +497,7 @@ which every rung builds:
 - delay taps 4…7 — `(if(tiny) { 4 } { 8 }).do` (`:1515`).
 
 🔴 **So the modulator writes `m…` and the globals, and never `n…`.** That is
-`radio1965`'s `MOD_CMD` argument applied to the board, and §0.4 measured the
+`radio`'s `MOD_CMD` argument applied to the board, and §0.4 measured the
 board getting it wrong today: 48 messages a second into `DC.ar([0,0])`.
 
 🔴 **AND A COMPILED-OUT CONTROL READS BACK PERFECTLY, WHICH IS WHY §4 NEEDS
@@ -528,7 +528,7 @@ that answers, which is §8's second open question.
 ### 3.2 A destination the board has and the tab does not
 
 None. Same rung, same graph, same md5 — that is the point of TINY and it is why
-the spec table in `radio1965`'s `startModulator()` transplants unchanged.
+the spec table in `radio`'s `startModulator()` transplants unchanged.
 
 ⚠️ With one exception in the other direction: `demo/shell/pappus.mjs:54`, inside
 `bufferPlan()`, allocates loop buffers 5…9 and never fills them, so `noisetype ≥
@@ -697,7 +697,7 @@ is to be told anything graded, that is where it comes from.
 live sentence — `CLAUDE.md`'s *"NOTHING THAT REDRAWS EVERY FRAME MAY CHANGE HOW
 MUCH ROOM IT TAKES"* — and `/grains/` would have to draw it. One `moving` count
 in a readout cell, updated when a patch changes, is the whole of what a page
-needs. `radio1965` already does exactly this: `d.set('moving',
+needs. `radio` already does exactly this: `d.set('moving',
 modulator.moving().length || '')`.
 
 ### 5.4 ✅ What the relay will carry — measured, and CLAUDE.md is stale
@@ -753,7 +753,7 @@ unattended.
 existing drift starts crossfading the granulator against its own raw input.** At
 `msos 0.552` that is `sxf 0.92`, `cos(0.92·π/2) = 0.125` — about an eighth of
 the raw signal leaking through. Small, and it is the kind of small that gets
-blamed on the material. `radio1965` already fixed this for the tab by putting
+blamed on the material. `radio` already fixed this for the tab by putting
 the floor in the SPEC (`sos: { min: 0.62, max: 1 }`) rather than in a comment.
 
 ### 6.2 Who enforces them, and it must be the board
@@ -817,7 +817,7 @@ the SPEC lane and is **cubed** (`taper()`). Compute the `amt` that reproduces
 each old excursion and assert it — a drift that silently got three times wider
 because a cube was forgotten is the failure this note exists to prevent.
 
-⚠️ And the `PARAMS` ranges and `radio1965`'s spec ranges **disagree**: `size` is
+⚠️ And the `PARAMS` ranges and `radio`'s spec ranges **disagree**: `size` is
 `[0.02, 0.4]` on the board and `[0.002, 4]` in the tab; `rate` is `[0.5, 24]`
 against `[0.1, 100]`; `spray` is `[0, 0.6]` against `[0, 1]`. Both are defensible
 — one is a die's playable range, the other is the engine's own — but **a
@@ -868,7 +868,7 @@ Three, and each catches something the others cannot:
 
 3. **`import { createModulator } from '../../demo/shell/pappus-mod.mjs'` into
    `rig/box/pappus.mjs`**, ticking at 25 Hz through `send` (never `set`), with a
-   spec table that is the board's `PARAMS` reconciled against `radio1965`'s
+   spec table that is the board's `PARAMS` reconciled against `radio`'s
    (§6.3), `m…` destinations only (§3.1), and the floors in the spec (§6.2).
 4. **Port `DRIFT` to twelve routings and delete `driftValues`.** Assert the new
    excursions equal the old ones before deleting anything. Keep
@@ -891,7 +891,7 @@ and any change to `run-pappus.scd` other than the optional input listener in
 
 ### 8.1 🔴 Which range table wins — and it is a real fork, not a detail
 
-`rig/box/pappus.mjs:125` `PARAMS` and `demo/radio1965/index.html`'s
+`rig/box/pappus.mjs:125` `PARAMS` and `demo/radio/index.html`'s
 `startModulator()` specs are **two authorities on one number** today, and they
 disagree by more than an order of magnitude on `size` (`[0.02, 0.4]` against
 `[0.002, 4]`). Because a modulation is applied in the control's warped space,

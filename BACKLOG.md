@@ -15,13 +15,59 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
-- 🔴 **`/tapes/`, ASKED 2026-09-15, FIVE THINGS AND ONE IS A REPEAT.**
-  *"zoom to 1h"*, *"reduce space between tapes to 1px"*, *"add 2x height to
-  timeline (same tape h)"*, *"scrubbimign shows 2 flickering cursors"*, and
-  🔴 *"page load still trggers play!!!!"* — which has now been reported THREE
-  times (*"plays on load and then stops"*, *"loading still stars and stops"*,
-  this). The gate that was added is not holding and the next attempt has to
-  prove it with a check that fails before it passes, not by reading the code.
+- **`/earshot/` reported `null view(s)` on a real Quest.** MEASURED 2026-09-16:
+  the session line reads `session drawing · blend opaque · null view(s)` on a
+  run that then drew 3322 frames in stereo at 90 fps, so the count is being read
+  before the first animation frame has one. Same family as CLAUDE.md's
+  `baseLayer` rule. `blend opaque` was right.
+- **`/earshot/`'s hands check calls a FAIL on something nobody has done yet.**
+  MEASURED on the same run: `FAIL hands · "the ray on the tablet" has not
+  happened 25.0 s in` at 56.6 s, and the ray landed on the tablet at 67.1 s.
+  Nobody had pointed at it, which is not a failure. A lane with no feedback must
+  not count as a failure (CLAUDE.md); it should say it is still waiting.
+
+- **`v2in: station`, asked 2026-09-16.** NOT UNDERSTOOD, and written down
+  verbatim rather than guessed at. Ask before working it.
+
+- 🔴 **`shout` OPENS ONE UPSTREAM PER CLIENT. IT DOES NOT TEE, AND THAT IS WHY
+  ERR COUNTS US AS MANY LISTENERS.** READ OFF THE CODE 2026-09-16, not
+  remembered: `workers/shout/worker.mjs:291` does a fresh `fetch(upstream)` on
+  every request and hands the body straight back, with
+  `cf: { cacheEverything: false, cacheTtl: 0 }` because a cached radio stream is
+  a contradiction. So the relay is a pass-through and **N browsers are N
+  listeners at the broadcaster**, plus one per harness tab and one per orphaned
+  Chrome. Asked 2026-09-16: *"we have single listener atm, no?"* and the answer
+  is no, not by design. The fix is a Durable Object holding ONE upstream
+  connection per mount and teeing it to every subscriber, which would make this
+  whole site exactly one listener per mount however many people are on it.
+  `workers/shout/NOTES.md` already says a DO is *"worth doing if this is not
+  enough"*; ERR's corrupted listener statistics are the evidence that it is not.
+  ⚠️ It also has to handle the last subscriber leaving, or the tee becomes a
+  permanent listener that nobody is hearing, which is worse than what we have.
+
+- 🔴 **MEASURE THE MEDIA DURATIONS AND WRITE THEM INTO `corpus.json`.** Asked
+  2026-09-16: *"just measure file lenghts?"*, *"and write to corpus json?"*,
+  *"i mean duration"*. MEASURED NOW: `demo/resources/corpus.json` holds 334
+  items, 129 with a `file`, of which **26 are time-based** (16 `audio/mpeg`,
+  9 `video/mp4`, 1 `video/mpeg`) and **none of them has a duration field** —
+  there is `bytes` and nothing else. `/tapes/` therefore cannot draw a record
+  as long as it actually is. The generator is
+  `demo/resources/build-corpus.mjs`; the amendment has to go through it or
+  through a script it records in `amended`, never by hand-editing the JSON.
+- **`/videoradio/` in a headset: stage A is written, stage B is not, and NEITHER
+  HAS EVER BEEN RUN.** `xr-panel.mjs` takes a `surface`, `/videoradio/` has a
+  Run in VR control and a sea (a second `makeField` in the session's context fed
+  the same bytes as the window's, on a 36 m plane with a world-space radial
+  fade). Its two asserts go through `preview()` and open nothing, but they live
+  INSIDE `/videoradio/`, which no harness may open, so they will not run until
+  somebody deliberately runs that page. Stage B is the displaced mesh and the
+  skirts. `plan-videoradio-xr.md` §5.
+  ⚠️ The audio half is ANSWERED: see CLAUDE.md, measured on a Quest 2026-09-16.
+- **`/tapes/`: the lane height is right and NOTHING GRADES IT.** The 2026-09-15
+  ask *"add 2x height to timeline (same tape h)"* is implemented at
+  `demo/tapes/index.html` (`height: 64, barPad: 21` gives 22 px of tape), and no
+  assert reads a drawn bar height, so it regresses silently. The other four
+  asks from that day are DONE 2026-09-16, each with a check proved by sabotage.
 - **`/videoradio/`: blend several stations at once, and loop far more.**
   *"way more looping. can you blend multiple station loops?"*. Today one mount
   is decoded at a time and one loop buffer is kept. Several stations looping
@@ -88,7 +134,7 @@ file by being finished or by being refused in writing, never by being forgotten.
   files, and the two FORMATTERS that were stamping a fresh one onto every
   failing assert (`shell.mjs`'s assert log and `verify.mjs`'s ok/FAIL printer),
   which no sweep of strings could have reached. What remains is only what was
-  agent-held at the time: `radio1965` (23), `tapes` (4), `resources` (2), and
+  agent-held at the time: `radio` (23), `tapes` (4), `resources` (2), and
   four in `shell.mjs` that are not the formatter.
 
 ## Done, with what it was measured at
@@ -164,10 +210,10 @@ repeat, and several of these were asked for more than once.
   now, where the page has already buffered. Ready time median **3626 to 2472 ms**,
   worst **9189 to 5529**, ten runs each. No check was weakened.
 - ✅ **CLEARED, and the diagnosis held.** MEASURED now: all EIGHT stations up,
-  `radio1965` 200 included, plus both IDA channels. It was between Cloudflare's
+  `radio` 200 included, plus both IDA channels. It was between Cloudflare's
   edge and ERR for three mounts, exactly as the two-mounts-still-200 control
   said, and it needed nothing from us.
-  `/radio1965/` re-run against the REAL relay is **43/43 green**, naming Radio
+  `/radio/` re-run against the REAL relay is **43/43 green**, naming Radio
   1965 itself rather than falling back, with the tempo lock reading
   `23.00000 whole laps, 0.000 thousandths out`. The presets had only ever been
   verified against a stand-in; they are now verified for real.
@@ -221,8 +267,8 @@ repeat, and several of these were asked for more than once.
 - ✅ `held`: the sentence across four walls, size from word length, sentence case,
   textarea of three lines, live rebuild on every keystroke, readout removed.
 - ✅ Live loop with a blinking button and no scrollbar; frozen waveform playhead;
-  both joined on `/radio1965/` and `/tapes/`.
-- ✅ `/radio1965/`: it now KEEPS the audio and plays it back, measured at the
+  both joined on `/radio/` and `/tapes/`.
+- ✅ `/radio/`: it now KEEPS the audio and plays it back, measured at the
   destination. Boxes fade in together on first sound. Scope window widened to
   the granulator's buffer, which had been silently dropping the oldest quarter.
 - ✅ Diagrams: 1 px border on every kind, less saturated edges, centred ties,

@@ -1,10 +1,10 @@
-# plan-radio — `/radio1965/`, what it is and where it goes
+# plan-radio — `/radio/`, what it is and where it goes
 
 Written 2026-09-14, session 24, after building it. The page is live and green;
 this records the decisions, the measured prices behind them, and the one thing
 that is parked and why — so none of it gets re-litigated from scratch.
 
-**Live: <https://positron.studio/radio1965/>** · 21/21 green against the deploy.
+**Live: <https://positron.studio/radio/>** · 21/21 green against the deploy.
 
 ---
 
@@ -15,7 +15,7 @@ on the national broadcaster's output. Every ERR mount is already HTTPS and
 would play in an `<audio>` tag with or without our relay, so there the relay
 only adds **measurability**.
 
-`radio1965` is a station somebody actually runs — one Icecast mount belonging to
+`radio` is a station somebody actually runs — one Icecast mount belonging to
 the Estonian Centre of Contemporary Music — and it is here because of a
 difference in kind:
 
@@ -26,20 +26,20 @@ a page that works and a page that cannot exist — not between one that measures
 and one that does not.
 
 That is the whole argument for a second page rather than a second default on the
-first. ⚠️ The default on `shout` WAS switched to `radio1965` for about an hour
+first. ⚠️ The default on `shout` WAS switched to `radio` for about an hour
 and switched back; a shared relay is not a reason to share a page.
 
 ---
 
 ## 1. The chain, end to end
 
-    live.uuu.ee:8001/radio1965          Icecast 2.4.4, MP3 128 kbit/s 44.1 stereo
+    live.uuu.ee:8001/radio          Icecast 2.4.4, MP3 128 kbit/s 44.1 stereo
       │  http, no TLS, no CORS
       ▼
     workers/shout  (positron-shout)      allowlisted mount, one named entry
       │  https + access-control-allow-origin: *   + every icy-* header exposed
       ▼
-    shout.positron.studio/radio1965.mp3
+    shout.positron.studio/radio.mp3
       │
       ├─▶ <audio crossOrigin="anonymous">  ──▶ MediaElementSource ──▶ analyser ──▶ dry ──▶ speakers
       │        │                                    │
@@ -204,7 +204,7 @@ an engine and produces silence is the inert control CLAUDE.md forbids.
 
 - **A copy of `shout`.** Same relay, different subject; a copy would have been
   two pages drifting apart. The manifest row carries the difference in one line.
-- **A second row pointing at `/shout/?station=radio1965`.** Cheap, and redundant
+- **A second row pointing at `/shout/?station=radio`.** Cheap, and redundant
   once this page does something `shout` does not.
 - **Putting the granulator behind a disabled button "for now".** A greyed
   control still makes a promise. Nothing ships until it sounds.

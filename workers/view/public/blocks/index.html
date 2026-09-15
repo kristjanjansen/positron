@@ -1910,9 +1910,22 @@
       // graded through `update()` with supplied timestamps rather than by
       // waiting — a real 900 ms pause here would push this handler past what
       // the harness waits for and lose every assert after it.
+      /**
+       * 🔴 DECLARED OUT HERE BECAUSE A LATER CHECK READS IT, AND IT WAS NOT.
+       * It was a `const` inside the block below, and the two-exits check
+       * further down reads `q?.label`. Optional chaining guards a value that is
+       * null; it does NOTHING for a name that was never declared in this scope,
+       * so the page threw `q is not defined`, the handler died where it stood,
+       * and everything after it — the remaining asserts and the picture — was
+       * gone. PHOTOGRAPHED: a black canvas with `q is not defined` as the last
+       * line of the log. That is CLAUDE.md's own rule about `?.` building a
+       * control that looks safe and is inert, in a new costume: here it made a
+       * REFERENCE look guarded.
+       */
+      let q = null;
       {
         let fired = 0;
-        const q = createXRQuit(gl, { label: 'HOLD TO QUIT', onQuit: () => { fired++; } });
+        q = createXRQuit(gl, { label: 'HOLD TO QUIT', onQuit: () => { fired++; } });
         const pad = (down) => [{ gamepad: { buttons: [{}, {}, {}, {}, { pressed: down }], axes: [0, 0, 0, 0] } }];
         const onPress = q.update(pad(true), 0);
         const halfWay = q.update(pad(true), 0.45);

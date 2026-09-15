@@ -45,21 +45,21 @@ whether that is worth a page:
 
 1. 🔴 **Two of the four numbers the engine reports about every grain are thrown
    away before anything can draw them.** READ: `/pgrain` carries
-   `pos, dur, voice, half` and `demo/radio1965/index.html:3284` hands all four
+   `pos, dur, voice, half` and `demo/radio/index.html:3284` hands all four
    to the scope, but `demo/shell/grain-scope.mjs:211` keeps only
    `pos, level, half`. MEASURED by grep in this session: `g.dur` appears **0
    times** in `grain-scope.mjs` and `g.voice` **0 times**. Grain length is the
    single control this page argues about most (READ, the long comment at
-   `demo/radio1965/index.html:3366-3382` about the engine's 2 ms to 8 s lane)
+   `demo/radio/index.html:3366-3382` about the engine's 2 ms to 8 s lane)
    and it has never reached a picture.
 2. 🔴 **A third channel is constant by construction on this page.** The tick's
    alpha is `(0.25 + 0.75 * min(1, g.level))` (READ `grain-scope.mjs:425`), and
-   `radio1965` passes no `level`, so `g.level ?? 1` is **always 1** and that term
+   `radio` passes no `level`, so `g.level ?? 1` is **always 1** and that term
    is always exactly 1.0. CLAUDE.md: a statistic that is constant by
    construction over your subject is blind, not weak. The picture has a
    loudness-of-grain channel that has never varied.
 3. **The modulation has no picture at all.** `moving` in the readout is a count
-   of destinations (READ `demo/radio1965/index.html:350` and `:3095`), and
+   of destinations (READ `demo/radio/index.html:350` and `:3095`), and
    MEASURED by parsing the spec table in this session, there are **15
    destinations, 14 scalars plus `probs` with 8 elements, so 22 numbers**, driven
    by **6 followers** (`rms low mid high tone flux`) and four LFO shapes and a
@@ -87,7 +87,7 @@ refuses to build it first.
 | surface | axis | what it carries | what it cannot say |
 |---|---|---|---|
 | `grain-scope`'s scrolling wave (READ `grain-scope.mjs:480-614`) | arrival time, 8 s across | the material, the loop marks, the live edge, a hairline per grain at its read position | how **long** any grain was, which **voice** took it, how loud it was, and whether any parameter is moving |
-| the readout (READ `demo/radio1965/index.html:350`) | none | `voices`, `behind`, `grains/s`, `moving` | anything with a shape. `moving 3` is a count of routings, on the near side of the wire |
+| the readout (READ `demo/radio/index.html:350`) | none | `voices`, `behind`, `grains/s`, `moving` | anything with a shape. `moving 3` is a count of routings, on the near side of the wire |
 
 Both are correct and neither is the picture being proposed. The scope answers
 *where in the sound is it eating*. Nothing answers *what is it eating with*.
@@ -96,11 +96,11 @@ Both are correct and neither is the picture being proposed. The scope answers
 
 One field, the width of the picture, on **the same left-to-right axis the scope
 already uses**: position in the eight seconds the granulator is holding
-(`BUF_SECONDS = 8`, READ `demo/radio1965/index.html:255`).
+(`BUF_SECONDS = 8`, READ `demo/radio/index.html:255`).
 
 - **Up the picture is grain length**, on the engine's own exponential lane, 2 ms
   at the bottom to 4 s at the top. Those are the page's own slider ends (READ
-  `demo/radio1965/index.html:3382`, `add('grain length', 'size', 0.002, 4, …,
+  `demo/radio/index.html:3382`, `add('grain length', 'size', 0.002, 4, …,
   { warp: 'exp' })`), so the axis is the control's axis and not an invented one.
 - **Every grain the engine reports is one mark at (where it read, how long it
   was)**, written once and left to decay. `voice` is the mark's shape, `half`
@@ -133,7 +133,7 @@ are three visibly different motions today reported as the single number 3.
 
 **"Did the grain go where I think it went?"** This page has already shipped a
 wrong answer to exactly that, twice in one line, and the comment at
-`demo/radio1965/index.html:3253-3278` records it: the position was read from the
+`demo/radio/index.html:3253-3278` records it: the position was read from the
 wrong OSC field so every grain was drawn at `-1`, and the rescale from the
 capture ring to the held window was missing so everything landed in the left
 13%. READ, in that comment: *"the count was right the whole time and the place
@@ -199,7 +199,7 @@ mechanism that is not present.
 ⚠️ **The mistake in the other direction is just as easy.** "The shader runs at
 60 or 90, so feed it at 60 or 90" is a claim about the *drawing* rate, not about
 the *information* rate, and those are different. READ
-`demo/radio1965/index.html:1091`: `analyser.fftSize = 2048`. INFERRED at the
+`demo/radio/index.html:1091`: `analyser.fftSize = 2048`. INFERRED at the
 48 kHz this page runs at, that is a **42.7 ms window**. Read at 60 Hz,
 consecutive reads overlap by 61% and genuinely new information arrives at about
 23 Hz. Re-reading an overlapped window is not waste, because the alternative is a
@@ -209,7 +209,7 @@ measurements.
 
 ### 2.2 The answer: one clock, and it is the frame callback, because the work is already being done there
 
-READ, `demo/radio1965/index.html:1503-1560`. `meterTick` is a
+READ, `demo/radio/index.html:1503-1560`. `meterTick` is a
 `requestAnimationFrame` loop that already, every frame:
 
 - reads `sink` with `getFloatTimeDomainData` and updates a running peak;
@@ -231,8 +231,8 @@ Three channels, three places they are sampled, one place they are assembled:
 | channel | sampled | where | why there |
 |---|---|---|---|
 | spectrum and level | once per frame | inside `meterTick` | it is already computed there; a second timer would be a second clock for one number |
-| parameters | at the instant they change | a tap in the modulator's `send` callback (READ `demo/radio1965/index.html:2976`, `send: (name, v) => setParam(...)`) | `send` is a page callback. One assignment beside the existing call, no polling, no missed change, and the tap sees exactly what went out |
-| grain events | when they arrive | inside `onReply` (READ `demo/radio1965/index.html:3279`) | they are events. §3 |
+| parameters | at the instant they change | a tap in the modulator's `send` callback (READ `demo/radio/index.html:2976`, `send: (name, v) => setParam(...)`) | `send` is a page callback. One assignment beside the existing call, no polling, no missed change, and the tap sees exactly what went out |
+| grain events | when they arrive | inside `onReply` (READ `demo/radio/index.html:3279`) | they are events. §3 |
 
 All three land in one `Uint8Array`, uploaded with **one `texSubImage2D` per
 frame**. One clock, one upload, one thing to reason about.
@@ -249,11 +249,11 @@ channels are on opposite sides of the same wire.
   failure: a count of what was queued read identically to delivery while every
   note was fifty-six years out.
 - **The grain row is on the FAR side.** Every mark is the engine reporting, over
-  OSC, that it fired. READ `demo/radio1965/index.html:3254`: *"Every tick is a
+  OSC, that it fired. READ `demo/radio/index.html:3254`: *"Every tick is a
   grain the ENGINE reported firing, from the code that started it, never one
   inferred from an output envelope."*
 - **The spectrum row is on the far side of the audio boundary**, but ⚠️ **not of
-  the granulator's.** READ `demo/radio1965/index.html:1176-1180`: `sink` is fed
+  the granulator's.** READ `demo/radio/index.html:1176-1180`: `sink` is fed
   by `dry` and `loopOut` only. `dry` is the station path after the fader (READ
   `:3149`, `dry.gain.value = muted ? 0 : 1 - v`) and the granulator's own output
   goes to the destination by its own gain (`:3148`, `eng.out.gain.value`). **So
@@ -307,7 +307,7 @@ all. §5.
 ### 3.1 The failure mode if they share one
 
 A grain is a thing that happened at an instant. The rate slider reaches
-**100 grains a second** (READ `demo/radio1965/index.html:3360`,
+**100 grains a second** (READ `demo/radio/index.html:3360`,
 `add('grains a second', 'rate', 0.1, 100, …)`) and the engine has **eight
 voices** with independent gates, so the reported rate can exceed the frame rate.
 INFERRED: at 60 fps and 200 grains a second, an average frame carries **3.3
@@ -349,7 +349,7 @@ from (READ `grain-scope.mjs:10-17`).
 
 **Continuous (spectrum, level, centroid, flatness, width).** Sampled in the
 frame callback, written to rows 0 and 3, and **smoothed in seconds, never per
-call**. READ `demo/radio1965/index.html:1099`,
+call**. READ `demo/radio/index.html:1099`,
 `analyser.smoothingTimeConstant = 0`, with the comment explaining that the
 analyser's own smoothing is applied per call so the same page smooths
 differently at 60, 72, 90 and 120 Hz. Every filter in the shader's feed uses
@@ -436,7 +436,7 @@ stream, so a channel driven from there reports the encoder's opinion.
 | ch | quantity | mapping |
 |---|---|---|
 | R | grains landing in this bucket since the last upload | count, capped at 255 |
-| G | mean grain length of those grains | `spec.unmap(dur)` on the engine's own exponential lane, `min 0.002 max 4 warp exp` (READ `demo/radio1965/index.html:3382`) |
+| G | mean grain length of those grains | `spec.unmap(dur)` on the engine's own exponential lane, `min 0.002 max 4 warp exp` (READ `demo/radio/index.html:3382`) |
 | B | the voice that fired most in this bucket | `voice * 32`, so 0..7 maps to 0..224 |
 | A | grains refused because R saturated | count, capped at 255. **This is the counter §3.3 demands** |
 
@@ -652,9 +652,9 @@ would just clear.
 
 ### 6.3 🔴 THE REAL RISK IS NOT THE GPU, IT IS THE MAIN THREAD OF THIS PARTICULAR PAGE
 
-`/radio1965/` already runs, on one thread:
+`/radio/` already runs, on one thread:
 
-- **wasm scsynth**, booted in the tab (READ `demo/radio1965/index.html:3249`);
+- **wasm scsynth**, booted in the tab (READ `demo/radio/index.html:3249`);
 - a **`ScriptProcessor(4096, 2, 2)`**, READ `:1140`, with its own comment
   admitting "it is deprecated and it runs on the main thread". INFERRED at
   48 kHz that is a callback **every 85.3 ms** which must return before the next
@@ -694,7 +694,7 @@ eight and reports the spread, or says it cannot be measured.
 under `demo/verify.mjs`, which launches Chrome with `--disable-gpu` where
 `getContext('webgl2')` returns null (READ `demo/verify-gl.mjs:8-12`). Count the
 asserts and diff the count after any change. For scale: MEASURED by grep this
-session, `mirror` has **30** `d.assert` call sites and `radio1965` has **32**.
+session, `mirror` has **30** `d.assert` call sites and `radio` has **32**.
 
 Each row says what it **cannot** detect, because that is where this project
 keeps getting hurt.
@@ -706,7 +706,7 @@ keeps getting hurt.
 | 3 | N frames drawn, proved finished by a one-pixel `readPixels` rather than submitted | a frame the compositor dropped. That is on the far side and a page cannot see it |
 | 4 | not a flat field: **per-channel** spread over the **whole** frame | that the picture is of the sound rather than of `uT`. ⚠️ Per channel because three cosines 120 degrees apart sum to a constant; whole frame because four points on an eight-fold symmetric image measure the symmetry. `mirror` failed this assert twice, both ways (READ `demo/mirror/index.html:1573-1614`) |
 | 5 | 🔴 **the separating pair.** Hold `uT` and hold the data: two frames must be **byte identical**. Hold `uT` and change **one texel**: the frames must differ | which texel drives what. Assert 4 alone passes on a body that never reads `uData`, and that is the failure this pair exists for |
-| 6 | 🔴 **the positional assert.** Push **two** synthetic grains into known, distinct buckets with everything else zero. Read back and assert the two brightest columns are at the expected x within tolerance, **in the right order and the right distance apart** | whether *live* grains are decoded from the right OSC field, because these are synthetic. One grain proves a deposit; two prove the axis. This is `radio1965`'s own `/pgrain` bug written as a check: a count could not tell you where a grain read, and a green suite hid it |
+| 6 | 🔴 **the positional assert.** Push **two** synthetic grains into known, distinct buckets with everything else zero. Read back and assert the two brightest columns are at the expected x within tolerance, **in the right order and the right distance apart** | whether *live* grains are decoded from the right OSC field, because these are synthetic. One grain proves a deposit; two prove the axis. This is `radio`'s own `/pgrain` bug written as a check: a count could not tell you where a grain read, and a green suite hid it |
 | 7 | the live histogram is non-degenerate and lies **inside the lit range the page also draws** | a constant offset shared by the picture and the range, since both come from `winPos` |
 | 8 | 🔴 **the drop counter fires.** Flood one bucket past 255 in one frame on purpose and assert row 1's A channel is non-zero; assert it is zero in ordinary play | a drop upstream, in the board's OSC batcher or in `onReply`. That is a different boundary and needs its own counter |
 | 9 | 🔴 **the stationary control.** With `modulator.hold(true)`, row 2's B channel goes to zero for every destination and the **parameter part of the field stops moving while the grain marks keep arriving** | which of two moving destinations is which. `plan-box-modulation §4.2` states the general rule: every movement check needs a stationary control in the same reading |
@@ -737,7 +737,7 @@ would be grading the page against a number the page itself supplied. **The first
 commit is a script, not a shader.** `plan-plate.md` reaches the same conclusion
 independently, which is a reason to do it once and share it.
 
-**0b. Measure the main thread of `/radio1965/` as it stands.** §6.3. The
+**0b. Measure the main thread of `/radio/` as it stands.** §6.3. The
 `ScriptProcessor` block time and the frame budget with the scope running. This is
 the number that decides whether the picture goes on that page or on its own, and
 that decision should not be made by feel.
@@ -758,13 +758,13 @@ pattern, nothing built on top of them is trustworthy.
 
 🔴 `research/vr-sound-visual-2026-09.md §6` leaves this open in exactly the terms
 CLAUDE.md demands: *"add `demo/shell/features.mjs` as a kit component, or lift
-what `radio1965` already has? Both are defensible; building a third copy inside a
+what `radio` already has? Both are defensible; building a third copy inside a
 new page is not."*
 
 **Recommendation: lift it.** `meterTick` is already written, already tuned, and
 already carries the two guards a second author would miss: the
 `Number.isFinite(freqBuf[i])` check because an empty bin reports `-Infinity` and
-one NaN poisons every follower at once (READ `demo/radio1965/index.html:1539`),
+one NaN poisons every follower at once (READ `demo/radio/index.html:1539`),
 and positive-only flux because a decay is not an event (READ `:1543`). Rewriting
 that is how a second implementation of one measurement gets made.
 
@@ -814,7 +814,7 @@ marks, the live edge and the playhead. The grain layer moves to the shader.
 - **A generated shader from a model.** `plan-visuals.md §1.2` seam 3 is
   explicitly undecided and the validator does not exist. Until it does the answer
   is no.
-- **A second time axis on `/radio1965/`.** CLAUDE.md: one position surface per
+- **A second time axis on `/radio/`.** CLAUDE.md: one position surface per
   page, because two horizontal time axes at different scales stacked is a
   contradiction. The proposal shares the scope's axis rather than adding one.
 - **Hue, by default.** §1.4. Reverted twice, on instruction.
@@ -827,7 +827,7 @@ Each is checkable and each names who checks it.
 
 1. **The anchors can be re-derived.** Step 0a. Until they are, §4.2's rows 0 and
    3 are quoting a document nobody can reproduce.
-2. **`/radio1965/`'s main thread has room for a second canvas.** Step 0b.
+2. **`/radio/`'s main thread has room for a second canvas.** Step 0b.
    Unmeasured.
 3. **The determinism pair passes.** §7 assert 5. If a body cannot be made to draw
    byte-identical frames from identical inputs on one machine, the whole

@@ -9,7 +9,7 @@ Companions: `research/vr-sound-visual-2026-09.md` (the material, measured),
 `plan-visuals.md` §4 (which side of the wire a picture is made on),
 `plan-xr.md` (the headset, and five defects it found),
 `demo/floor/index.html` (an infinite instanced WebXR floor that already exists),
-`demo/radio1965/index.html` (the station, its relay, and the only feature
+`demo/radio/index.html` (the station, its relay, and the only feature
 extractor in this repo).
 
 ---
@@ -96,7 +96,7 @@ win**, because the anchors are the ones a script can produce again.
 
 ## 2 · What the page is
 
-**Slug `plate`. Act 5, beside `radio1965` and `floor`.** Its subject is the
+**Slug `plate`. Act 5, beside `radio` and `floor`.** Its subject is the
 station, not the shader; a visitor arrives at it from the radio.
 
 ```js
@@ -155,7 +155,7 @@ decode fault. And `HANDOFF.md` says of that page: *"NOTHING IN THE HEADSET HALF
 IS MACHINE-GRADED"* — adding an ungradeable feature to the least-graded page is
 how the five-round "no playback" failure happened there.
 
-**As a mode of `/radio1965/`.** Tempting: it owns the relay, the `audioSession`
+**As a mode of `/radio/`.** Tempting: it owns the relay, the `audioSession`
 claim, the iOS `interrupted` watcher and a deafness control, all of which this
 page needs. Rejected on the rule that costs the most when it is broken — *a demo
 that branches must assert every branch on every run*, and that page is at 36
@@ -174,13 +174,13 @@ for exactly that reason. The plate has its own vertex work. It shares
 R§6 hands this over deliberately, and CLAUDE.md is explicit: *"If the thing you
 need is not in the kit, stop and ask."*
 
-**What exists today:** `demo/radio1965/index.html:1084` `meterTick()` computes
+**What exists today:** `demo/radio/index.html:1084` `meterTick()` computes
 RMS, three fixed bands, a spectral centroid folded to a 0..1 `tone`, and a
 positive-only flux, and feeds them to `pappus-mod.mjs`'s `sense()`. `shout` has
 a smaller hand-rolled one. `demo/shell/` has a scope and **nothing that extracts
 features**.
 
-**The recommendation: `demo/shell/features.mjs`, and `radio1965` moves onto it
+**The recommendation: `demo/shell/features.mjs`, and `radio` moves onto it
 in the same change.** *A control that exists in one page and nowhere else is a
 component that has not been noticed yet* — and the failure mode of doing half of
 it is already written in this repo: `field.mjs`'s header says `wire` has still
@@ -188,20 +188,20 @@ not been moved onto it, *"so there are two implementations and this header is
 the reason to finish the job."*
 
 ⚠️ **It is a superset, not a rename.** The research rejects three of
-`radio1965`'s six numbers for this purpose: RMS instead of K-weighted loudness,
+`radio`'s six numbers for this purpose: RMS instead of K-weighted loudness,
 three bands instead of twenty-four, and an onset flux that R§1.2 measures firing
 **194 times in 98.5 s with no periodicity behind it**. `features.mjs` adds
 K-weighted momentary (400 ms) and short-term (3 s) loudness, 24 log-spaced bands
 from 40 Hz to 12 kHz, flatness, side/mid width, and a `|ΔLU| > 3` event — and
 keeps the old six, computed the same way.
 
-🔴 **And the lift has to be provably sound-neutral, because `radio1965` is an
+🔴 **And the lift has to be provably sound-neutral, because `radio` is an
 instrument.** Those six numbers modulate a granulator; a "tidy-up" that shifts
 `tone` by 2% changes how the page sounds and nothing would report it. **The
 migration's first assert feeds one fixed buffer through the old code and the new
 and requires the six to agree**, before the old code is deleted.
 
-**The alternative** — leave `radio1965` alone and write the extractor inside
+**The alternative** — leave `radio` alone and write the extractor inside
 `/plate/` — is defensible for exactly one reason: it cannot break a working
 instrument. It is rejected because it makes the third copy, and because the kit
 is the only place a component gets looked at.
@@ -255,7 +255,7 @@ this is the line to revisit.
 `smoothingTimeConstant = 0`, then `a = exp(-dt/τ)` against a real τ. The
 analyser's own smoothing is applied **per call**, so a page smooths differently
 at 60, 72, 90 and 120 fps — a time constant that silently depends on frame rate.
-⚠️ `radio1965:747` already sets it to 0 for its own independent reason (a flux
+⚠️ `radio:747` already sets it to 0 for its own independent reason (a flux
 follower measuring the blend rather than the programme). Two arrivals at one
 rule; `features.mjs` states it once.
 
@@ -333,7 +333,7 @@ passes for any mapping, including a scrambled one.
 
 ## 7 · The suite must not need the station
 
-`radio1965` measures the station live and carries three-state availability for
+`radio` measures the station live and carries three-state availability for
 it because a stream is a thing that goes away. This repo already knows what that
 costs a harness: *a demo that needs something off this machine goes red when a
 leftover Chrome is holding relay sockets*, and *run the failing demos ALONE
@@ -344,7 +344,7 @@ graph — the same analyser, the same bands, the same step. It is three things a
 once, which is why it is cheap:
 
 1. the fixture for §6.6's mapping assert,
-2. the **deafness control**, which `radio1965` had to invent under `?report=1`
+2. the **deafness control**, which `radio` had to invent under `?report=1`
    after an iPhone read `rms=0.0000` on a page that was playing — *"six arms of
    zero is the shape of a deaf instrument"*,
 3. what the page falls back to when the station is down, so it shows something
@@ -407,7 +407,7 @@ session-entry path is a hang rather than an error.
 |---|---|---|---|
 | **0** | `lab/analyse.mjs` over an hour of the station; `anchors.mjs` | its own click-track and pink-noise controls | the anchors exist and R§1 is annotated where it disagrees |
 | **0b** | the headset audio gate (§8.4) | `verify-quest.mjs`, one page, beacon | a non-zero RMS from inside a session, or a changed architecture |
-| **1** | `features.mjs` in the kit; `radio1965` moved onto it | `verify.mjs`; the six-number equality assert first | `radio1965` still 36/36 **and** provably unchanged in sound |
+| **1** | `features.mjs` in the kit; `radio` moved onto it | `verify.mjs`; the six-number equality assert first | `radio` still 36/36 **and** provably unchanged in sound |
 | **2** | `/plate/` on the desktop: the plate, the tone source, the readout | `verify-gl.mjs` + the offline `step()` checks of §6 | the three sabotage runs go red |
 | **3** | XR, passthrough first | `verify-quest.mjs` | `environmentBlendMode: alpha-blend` asserted, exit proved |
 | **4** | *optional* — the wave layer for `|ΔLU| > 3` events | as phase 2 | ripples decay without scripting |

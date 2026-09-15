@@ -13,7 +13,7 @@ meets an existing client at the edge.
 ## 0. The clean-room rule, and how to audit it
 
 **Nothing in the design below is derived from reading anyone else's code.** The
-Radio 1965 repo (`github.com/tarmoj/radio1965`, `origin/main` = `8606632`,
+Radio 1965 repo (`github.com/tarmoj/radio`, `origin/main` = `8606632`,
 2026-09-14) is cited in exactly two roles, and never as a justification:
 
 | label | means |
@@ -722,7 +722,7 @@ page says these limits are subject to change.
 
 ⚠️ **Where the credential lives is a real decision, not a detail.** The Firebase
 web config is public by design and is already published in their service worker —
-READ, `client/firebase-messaging-sw.js`: project `radio1965-fbffd`, sender
+READ, `client/firebase-messaging-sw.js`: project `radio-fbffd`, sender
 `43305541336`. The **service-account key is not**, and it is **not on this
 machine**: `server/config/` contains only a `README.md`. Sending from a Worker
 means that key becomes a Worker secret on a shared platform rather than a file on
@@ -1136,7 +1136,7 @@ omission.
    *"restrict before production"* comment. 🔴 **Raise privately and first**, and
    independently of this proposal.
 8. **One catalogue or several?** §9's localisation row.
-9. ⚠️ **Licence.** `github.com/tarmoj/radio1965` reports `license: null`. This
+9. ⚠️ **Licence.** `github.com/tarmoj/radio` reports `license: null`. This
    repo **may read it and may not copy from it**. §0's clean-room rule is what
    makes that safe: the design is argued from requirements, and their repo is
    cited only for requirements and interop bytes. Worth asking them to add a
@@ -1218,7 +1218,7 @@ architecture into a URL that can be opened and typed into.
 
 **This repo:** `CLAUDE.md`, `LAYOUT.md`, `plan-ws.md`, `plan-names.md`,
 `HANDOFF.md:478-492`, `PROGRESS.md:730-740`,
-`research/radio1965-app-2026-09.md`, `research/uuu-integration-2026-09.md`,
+`research/radio-app-2026-09.md`, `research/uuu-integration-2026-09.md`,
 `demo/shell/wire.mjs`, `demo/shell/shell.mjs`, `demo/shell/messages.mjs`,
 `demo/shell/picker.mjs`, `demo/shell/choice.mjs`, `demo/shell/caps.mjs`,
 `demo/wire/index.html`, `demo/manifest.mjs`, `workers/relay/src/index.js`,
@@ -1227,11 +1227,11 @@ architecture into a URL that can be opened and typed into.
 **MEASURED 2026-09-14, ~16:21–16:26 UTC:**
 `https://ws.positron.studio/` → relay limits;
 `https://backlog.positron.studio/` → retention;
-`https://live.uuu.ee/radio1965/api/events` → 200, 8 items;
+`https://live.uuu.ee/radio/api/events` → 200, 8 items;
 `https://eccm.ee/` → Joomla generator tag, `/administrator/` → 200,
 `/api/index.php/v1/content/articles` → 401.
 
-**Cited for REQUIREMENTS and INTEROP only** (§0), `github.com/tarmoj/radio1965`
+**Cited for REQUIREMENTS and INTEROP only** (§0), `github.com/tarmoj/radio`
 @ `origin/main` = `8606632`, 2026-09-14: `project-description.md`,
 `server/db.py`, `server/main.py`, `server/notifications.py`,
 `server/cron_publish.py`, `server/config.py`, `server/joomla_importer.py`,

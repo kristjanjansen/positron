@@ -5,11 +5,11 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON</title>
+<title>positron: media art experiments</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="icon" href="/favicon.ico">
 
-<div class="pos-head">
+<div class="pos-head pos-index">
   <div class="pos-title"><h1 class="pos-name">positron</h1></div>
 </div>
 
@@ -23,6 +23,51 @@
   // why in words. demo/index.html calls the same function on rows it rendered
   // itself, so there is one copy of the rule.
   import { markIndex } from '/shell/caps.mjs';
+
+  /**
+   * 🔴 THE FRONT PAGE GETS A FEEDBACK BUTTON TOO, AND IT IS NOT THE SHELL'S.
+   * Every demo page has one because `shell.mjs` mounts it; this page does not
+   * mount the shell, so the one page everybody lands on first was the one page
+   * with nowhere to say anything. Asked for in those words, with the label:
+   * *"add feedback button to fronpage too ('general feedback')"*.
+   *
+   * ⚠️ `isTrusted`, THE SAME GATE, FOR THE SAME REASON. `shell.mjs` carries the
+   * long note: a scripted press produces `isTrusted: false`, and a control that
+   * writes to a store a person is going to read may only be worked by a person.
+   * A second copy of that button without a second copy of that gate is how the
+   * gate stops meaning anything.
+   *
+   * ⚠️ AND THE SLUG IS `general`, WHICH IS WHAT THE PANEL TITLES ITSELF FROM.
+   * Notes are stored with it, so a note about the site as a whole can be told
+   * apart from a note about a page when they are read back.
+   */
+  {
+    const fb = document.createElement('button');
+    fb.className = 'pos-fb-btn';
+    fb.type = 'button';
+    // ⚠️ THE BUTTON SAYS `Feedback` ON EVERY PAGE INCLUDING THIS ONE, and only
+    // the PANEL says which feedback it is. Reported in one line: *"'feedback'
+    // is always button name. 'general feedback' is modal title"*. A button
+    // whose label changes per page is a control a reader has to re-find; the
+    // panel's own title is where the scope belongs, and `slug` below is what
+    // writes it.
+    fb.textContent = 'Feedback';
+    fb.dataset.slug = 'general';
+    fb.setAttribute('aria-haspopup', 'dialog');
+    fb.setAttribute('aria-expanded', 'false');
+    fb.title = 'say something about the site as a whole';
+    fb.addEventListener('click', async (e) => {
+      if (!e.isTrusted) return;
+      fb.setAttribute('aria-expanded', 'true');
+      try {
+        const m = await import('/shell/feedback.mjs');
+        m.openFeedback(null, { slug: 'general' });
+      } catch {
+        fb.setAttribute('aria-expanded', 'false');
+      }
+    });
+    document.querySelector('.pos-title')?.append(fb);
+  }
   // markIndex also puts the headset offer at the top when there is one —
   // one copy, in caps.mjs, because both index pages need it.
   await markIndex(document);

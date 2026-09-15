@@ -47,7 +47,7 @@
     // name has room to be a name.
     readout: { into: 's', behind: 's', advance: 'x', crossed: '' },
     // 🔴 NO CONTROL ROW. The transport bar below is the control, the same one
-    // `/radio1965/` uses, and a LISTEN button beside it would be a second way
+    // `/radio/` uses, and a LISTEN button beside it would be a second way
     // to start the same sound in a different shape.
     controls: [],
   });
@@ -72,14 +72,14 @@
   d.el.append(nowLine);
 
   /**
-   * 🔴 THE SAME TRANSPORT AS `/radio1965/`, AND FOR THE SAME REASON: this is a
+   * 🔴 THE SAME TRANSPORT AS `/radio/`, AND FOR THE SAME REASON: this is a
    * live source with no past to seek in, so the bar runs in `live` mode, which
    * gives a play toggle and a LIVE chip and gives up the slider. A station and
    * a radio mount are the same shape of thing to a listener, and two pages
    * showing it two ways is two things to learn.
    * ⚠️ THE DECK IS A FOLLOWER. The element owns position once it is playing, so
    * `command` drives the element and the deck follows, exactly as `/crate/` and
-   * `/radio1965/` do. A control writing to the deck alone is undone by the
+   * `/radio/` do. A control writing to the deck alone is undone by the
    * master's next tick, silently, within a few hundred milliseconds.
    */
   const deck = createDeck({ items: [], adapters: {}, range: [Date.now() - 60000, Date.now()] });

@@ -1,11 +1,11 @@
-# plan-radio-patches — a patch selector for `/radio1965/`, and where its sound went
+# plan-radio-patches — a patch selector for `/radio/`, and where its sound went
 
 > ✅ **§2 IS BUILT (2026-09-14). §0.3 IS NOT, ON PURPOSE. §3 IS NOT.**
 > Read this before the body, which is still written as a proposal throughout.
 >
 > **Built:** the six patches of §2, as a `createPicker` row in
-> `demo/radio1965/index.html`, replacing both the `material` and the `chord`
-> choice rows. 33/33 green (`node demo/verify.mjs radio1965`), up from 31/31 —
+> `demo/radio/index.html`, replacing both the `material` and the `chord`
+> choice rows. 33/33 green (`node demo/verify.mjs radio`), up from 31/31 —
 > the two new checks read the patch back off scsynth with `/s_get`, `/s_getn`
 > and `/b_getn`, and both were proved by sabotage rather than by passing.
 >
@@ -46,7 +46,7 @@
 > page OPENS on has `probs` all ones — otherwise its own arithmetic assert
 > flaps. The other five thin freely.
 
-Live page today: <https://positron.studio/radio1965/?decode=1>
+Live page today: <https://positron.studio/radio/?decode=1>
 
 Companion: `plan-radio-sound.md` ranks fourteen individual ideas with the same
 engine citations. This file does not repeat it. What is new here is (1) the
@@ -57,9 +57,9 @@ controls, and (3) an answer to "can interestingness be measured".
 
 ## 0 · The diagnosis, before any proposal — the page has never left the granulator
 
-**Every engine control `/radio1965/` has ever written, in full.** From
+**Every engine control `/radio/` has ever written, in full.** From
 `applyAudibleDefaults` (`demo/shell/pappus.mjs:165–181`) and the seven `setBoth` /
-`setParam` call sites in `demo/radio1965/index.html` (lines 1270, 1271, 1277,
+`setParam` call sites in `demo/radio/index.html` (lines 1270, 1271, 1277,
 1279, 1288, 1289, 1423):
 
 | written | value |
@@ -160,7 +160,7 @@ seconds of zeros** — silence that looks exactly like a broken engine. Fix
 - ⚠️ `winhi` is held at `winlo + 0.01` (`:659`), so the narrowest reachable
   window is **0.6 s** at `mbuflen 60`.
 - ⚠️ **`BUF_SECONDS` IS READ IN FOUR PLACES AND THEY MUST MOVE TOGETHER.**
-  `demo/radio1965/index.html:138` declares it and it is used at `:278`
+  `demo/radio/index.html:138` declares it and it is used at `:278`
   (`grainSeconds`, the picture's width), `:1148`
   (`winPos = p × RING_SECONDS / BUF_SECONDS`, the grain-mark rescale), `:1271`
   (`setBoth('delay', v × BUF_SECONDS)`) and `:1563` (the fill wait). Change one
@@ -249,7 +249,7 @@ selector carries the values and the slider is only for nudging.
 ### 1.3 The mappings the engine does NOT contain — Lua does this work
 
 Our page talks to the SynthDef directly, so it inherits none of these. Each one
-is a real behaviour that is simply absent from `/radio1965/`:
+is a real behaviour that is simply absent from `/radio/`:
 
 1. **Grain length is in BEATS upstream.** `msize = m_size × 60/tempo`,
    clamped 0.002…8 seconds (`:1826`). Our page sends seconds. Not a defect —

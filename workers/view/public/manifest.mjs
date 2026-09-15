@@ -46,14 +46,20 @@
 import { needsOf } from './shell/caps.mjs';
 import { cardHTML } from './shell/card.mjs';
 
+// ⚠️ NO ARTICLE IN AN ACT TITLE, AND IT IS THE SAME RULE THE DIAGRAMS ALREADY
+// FOLLOW. Five of these seven were already bare and two were not, so the front
+// page read `the substrate` over `one stream` over `many people`: a list where
+// two members are phrases and five are names. Asked for in one line, *"rm 'the'
+// from the titles"*, and the argument is in CLAUDE.md under labels: a title is a
+// NAME, and names do not take articles.
 export const ACTS = new Map([
-  [0, 'the substrate'],
+  [0, 'substrate'],
   [1, 'one stream'],
   [2, 'many people'],
   [3, 'capture and return'],
   [4, 'instruments'],
   [5, 'archives'],
-  [6, 'the composition'],
+  [6, 'composition'],
 ]);
 
 export const DEMOS = [
@@ -155,6 +161,31 @@ export const DEMOS = [
     one: 'one sentence broken across four walls, each word as big as it is short. Point at one and type your own over it',
     tags: ['WebXR', 'WebGL2', 'fonts'] },
 
+  // 🔴 THE ONE XR ROW WITH NO `gl: true`, AND THAT IS THE POINT OF IT. Its
+  // subject is SOUND, so everything it can answer without a headset it answers
+  // in the ordinary harness: the window baselines, the decode path, the
+  // main-thread callback rate, and the headset guard broken on purpose three
+  // ways. It draws one small panel through demo/shell/xr-panel.mjs, and that
+  // module builds no graphics context until somebody presses Enter VR, so
+  // --disable-gpu costs this page nothing.
+  // ⚠️ IT TOUCHES NO THIRD-PARTY MOUNT, WHICH IS WHY IT EXISTS AT ALL. The
+  // questions it asks were asked of /videoradio/ first, and that page plays
+  // ERR mounts whose operator told us on 2026-09-16 that our connections
+  // corrupt their listener statistics. This one reads from our own R2 worker,
+  // so "the headset went silent" and "somebody else's station was down" can
+  // never be the same observation.
+  // `settleMs` covers control 0: a watch window, the gate shut on purpose for
+  // half a second, and a second watch window after it reopens.
+  // ⚠️ `report=1` IN THE LINK ITSELF. The page holds its beacons back unless it
+  // is in a headset, which is right for a visitor and wrong for the one job it
+  // exists to do: somebody is going to open this in a Quest and then read
+  // `https://pub.positron.studio/logs?format=text` on a laptop, and a run that
+  // reported nothing is indistinguishable from a run that never happened.
+  { name: 'earshot', group: 'xr', act: 0, created: '2026-09-16', built: true, xr: true,
+    query: 'report=1', settleMs: 8000,
+    one: 'the four unmeasured questions about sound in a headset, asked in the window first so a zero inside the session means something',
+    tags: ['WebXR', 'WebAudio', 'AudioDecoder', 'R2'] },
+
   { name: 'wire', group: 'transports', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
     one: 'compose a message, watch the exact bytes go and come back, and read the history',
     tags: ['WS', 'DO', 'SQLite'] },
@@ -218,11 +249,11 @@ export const DEMOS = [
   // The archival horizon and the timeline library, meeting for the first time:
   // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
   // committed; the media streams from ERR and nothing is stored here.
-  { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true,
+  { name: 'reel', group: 'xr', act: 5, created: '2026-09-08', built: true,
     one: 'every 1965 newsreel on one line, at the day it was broadcast',
-    tags: ['ERR', 'archive', 'timeline'] },
-  { name: 'now', group: 'err', act: 5, created: '2026-09-08', built: true,
-    one: 'one live ERR channel on a line whose right-hand end is the present moment',
+    tags: ['archive', 'timeline'] },
+  { name: 'now', group: 'transports', act: 5, created: '2026-09-08', built: true,
+    one: 'one live television channel on a line whose right-hand end is the present moment',
     tags: ['HLS', 'live', 'timeline', 'DVR'],
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
     // fetch + a 13-point two-byte sweep, all behind control 0
@@ -233,12 +264,12 @@ export const DEMOS = [
   // `node demo/verify-gl.mjs` is the grader.
   { name: 'floor', group: 'xr', act: 5, created: '2026-09-14', built: true, gl: true, xr: true,
     one: 'every 1965 newsreel face up on a floor you walk over, and any of them plays where it lies',
-    tags: ['WebGL2', 'WebXR', 'ERR', 'archive', 'HLS'],
+    tags: ['WebGL2', 'WebXR', 'archive', 'HLS'],
     // 298 thumbnails arrive as you look at them; a cold floor is a few seconds
     // of fetching before there is much to see
     settleMs: 4000 },
-  { name: 'flipper', group: 'err', act: 5, created: '2026-09-04', built: true,
-    one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
+  { name: 'flipper', group: 'transports', act: 5, created: '2026-09-04', built: true,
+    one: 'eight live television channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],
     settleMs: 14000 },
   // Everything that could be reached about one artist, before anything is
@@ -270,7 +301,7 @@ export const DEMOS = [
   // a second, larger step — four entries out of the build's allowlist and a URL
   // that starts 404ing — and it is decided on purpose rather than as a side
   // effect of tidying the front page.
-  { name: 'remixer', group: 'err', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
+  { name: 'remixer', group: 'transports', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
     one: 'stack archive recordings from any year on one playhead',
     tags: ['HLS', 'timeline', 'not shelled'] },
 
@@ -294,10 +325,10 @@ export const DEMOS = [
   // same pipe. `built` flips the moment positron-shout answers.
   // ⚠️ `shout` IS OFF THE LIST AND ITS WORKER IS UNTOUCHED. The demo page was a
   // measurement OF the relay — status, CORS, bitrate, burst, underruns — and
-  // `/radio1965/` now makes the same relay do something you can hear, which is
+  // `/radio/` now makes the same relay do something you can hear, which is
   // the better demonstration of the same fact. 🔴 `workers/shout/` STAYS AND
   // MUST: it is the thing that carries the station's plain-HTTP mount to a
-  // secure page, and deleting it takes `/radio1965/` and `/grains/` with it.
+  // secure page, and deleting it takes `/radio/` and `/grains/` with it.
   // The page's own source is under `archive/`.
 
   // Act 5 with shout, and deliberately NOT a second copy of it: same relay,
@@ -314,7 +345,7 @@ export const DEMOS = [
   // to cover a wasm scsynth boot, 31 buffer allocations, a definition, a 2.5 s
   // level, two 700 ms ink samples and a 1.2 s deafness control before the page
   // says anything at all.
-  { name: 'radio1965', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
+  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
     one: 'six live radio stations from Tallinn and Helsinki, decoded frame by frame in the tab',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
   // The same machine as the row above with the instrument panel taken off: it
@@ -565,7 +596,19 @@ export const extraPages = () =>
  * thing under your hand: the page scrolls its own Run-in-VR control into view
  * and focuses it, so from the index it is link, tap, in.
  */
-export const targetOf = (d) => (d.built ? `/${d.name}/${d.xr ? '?xr=1' : ''}` : d.page || null);
+/**
+ * ⚠️ `query` IS A ROW'S OWN EXTRA PARAMETERS, AND IT MERGES WITH `?xr=1`.
+ * `earshot` needs `report=1` to beacon from a machine that is not a headset,
+ * and it also wants the headset offer under the visitor's thumb, so the two
+ * cannot be a choice between them. Written once here rather than as a link
+ * somebody types into the front page by hand, which is the second place this
+ * project keeps learning not to have.
+ */
+export const targetOf = (d) => {
+  if (!d.built) return d.page || null;
+  const q = [d.xr ? 'xr=1' : '', d.query || ''].filter(Boolean).join('&');
+  return `/${d.name}/${q ? `?${q}` : ''}`;
+};
 
 /**
  * Newest first, and the array is left alone.
@@ -639,16 +682,31 @@ export function shortDate(iso) {
  * `held` is act 0 because it teaches how a picture is drawn, and it is in the
  * headset group because that is where you would go looking for it.
  */
+/**
+ * 🔴 THERE IS NO SECTION NAMED AFTER A BROADCASTER ANY MORE, AND THAT IS NOT
+ * TIDINESS. Asked 2026-09-16, *"hide the ERR archive from frontpage"* and
+ * *"no err refs"*, the same evening they told us our connections were
+ * corrupting their listener statistics (CLAUDE.md). A heading advertising whose
+ * streams this site pulls is the one thing on the front page they would be
+ * shown first. The pages are unchanged and still reachable; what has gone is
+ * the section, the name in three one-line descriptions, and the `ERR` tag on
+ * two cards. `reel` joins the newsreels that are already in a headset, and the
+ * two live channel pages go to `technologies`, which is what they demonstrate.
+ *
+ * ⚠️ AND NO ARTICLES. Asked in the same breath, *"rm 'the' from the titles"*.
+ * Five of these were bare and three were not, so the column read `the timeline`
+ * over `instruments` over `capture`: a list where some members are names and
+ * some are phrases. Same rule as the diagram labels in CLAUDE.md.
+ */
 export const GROUPS = new Map([
   ['xr', 'in a headset'],
   ['vain', 'väin'],
   ['kurenniemi', 'kurenniemi'],
-  ['err', 'the ERR archive'],
   ['instruments', 'instruments'],
   ['capture', 'capture'],
-  ['timeline', 'the timeline'],
+  ['timeline', 'timeline'],
   ['transports', 'technologies'],
-  ['kit', 'the kit'],
+  ['kit', 'kit'],
 ]);
 
 /**
@@ -673,7 +731,7 @@ export function byGroup(list = DEMOS) {
   }
   // ⚠️ `rank` PUTS ONE ROW AT THE FRONT OF ITS GROUP and everything else stays
   // newest first. A group's leading card is the one somebody should open, which
-  // is an editorial fact and not a date — `radio1965` is what väin IS, and it
+  // is an editorial fact and not a date — `radio` is what väin IS, and it
   // happens to share a creation day with the page beside it, so recency could
   // not even break the tie consistently.
   return [...GROUPS].map(([id, title]) => ({

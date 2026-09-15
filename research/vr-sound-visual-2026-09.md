@@ -68,7 +68,7 @@ legibility rule reaching the same conclusion.
 ### 1.1 The capture
 
 The source is the station this repo already relays. MEASURED 2026-09-14 12:41 UTC,
-`curl -D -` against `https://shout.positron.studio/radio1965.mp3`:
+`curl -D -` against `https://shout.positron.studio/radio.mp3`:
 
 ```
 access-control-allow-origin: *
@@ -80,7 +80,7 @@ x-shout-ttfb: 125
 ```
 
 98.5 s captured; `ffprobe` reads **mp3, 44100 Hz, 2 ch, 128,018 bit/s** —
-matching the 128.076 kbit/s already recorded in `demo/radio1965/index.html`.
+matching the 128.076 kbit/s already recorded in `demo/radio/index.html`.
 The relay is live, CORS-open, and first byte in 125 ms. ⚠️ **One 98.5 s capture
 of one station at one time of day.** Every percentile below is from that
 capture; a different hour will differ, and §3.5 says what to do about it.
@@ -274,7 +274,7 @@ Each of these is a normal, well-intentioned change that moves energy into
 
 ### 3.1 The CORS trap is already solved here — do not re-solve it
 
-`demo/radio1965/index.html` records it: their mount is **plain HTTP on port
+`demo/radio/index.html` records it: their mount is **plain HTTP on port
 8001**, so an HTTPS page cannot load it at all, and Icecast omits
 `access-control-allow-origin`, so `createMediaElementSource` on the raw
 cross-origin element **yields a graph that outputs silence while the speakers
@@ -481,9 +481,9 @@ Then the plate, on the desktop, then in XR.
 🔴 **One decision for the session, not for me:** a feature extractor is **shared
 code**, and CLAUDE.md is explicit — *"If the thing you need is not in the kit,
 stop and ask"*. `demo/shell/` has `grain-scope.mjs` (a scope) and nothing that
-extracts features; `shout` and `radio1965` each hand-roll an `AnalyserNode`.
+extracts features; `shout` and `radio` each hand-roll an `AnalyserNode`.
 So: **add `demo/shell/features.mjs` as a kit component, or lift what
-`radio1965` already has?** Both are defensible; building a third copy inside a
+`radio` already has?** Both are defensible; building a third copy inside a
 new page is not.
 
 ---

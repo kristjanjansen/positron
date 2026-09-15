@@ -15,7 +15,7 @@
 // ⚠️ `importScripts` + the COMPAT builds, not ESM. A classic service worker
 // cannot `import`, and registering a module worker is a second thing to get
 // wrong while debugging a first. This mirrors the arrangement already proven in
-// the radio1965 client.
+// the radio client.
 
 importScripts('https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/12.16.0/firebase-messaging-compat.js');

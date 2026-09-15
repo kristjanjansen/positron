@@ -50,7 +50,7 @@ NOT, and an iPhone is still unproven** (research §8, question 3).
 ## 2. A live show is a file that does not exist yet
 
 Radio 1965's server already records its own Icecast mount. READ,
-`research/radio1965-server-2026-09-15.md:66-70`: a broadcaster sets
+`research/radio-server-2026-09-15.md:66-70`: a broadcaster sets
 `save_stream`, `icecast_on_connect.sh` starts `ffmpeg -c copy` against the mount,
 and `icecast_on_disconnect.sh` stops it, rsyncs the mp3 and turns the
 `livestream` event into a `streamrecording` one.

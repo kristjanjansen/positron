@@ -286,7 +286,7 @@
    * with is not the same as changing it under somebody's hand.
    */
   const DEFAULT_ID = 'klassikaraadio';
-  const PREFERRED_ID = 'radio1965';
+  const PREFERRED_ID = 'radio';
   const indexOfId = (id) => STATIONS.findIndex(([, s]) => s === id);
   let station = DEFAULT_ID;
   const PROBE_MS = 6000;            // long enough for a cold relay, short enough to act on
@@ -324,7 +324,7 @@
   let tightest = Infinity;
 
   const d = mount({
-    name: 'radio1965',
+    name: 'radio',
     // ⚠️ HALF THE LENGTH IT WAS, ON INSTRUCTION, AND NOTHING WAS LOST THAT A
     // VISITOR NEEDED. What went was the mechanism: WHY the relay is there, WHAT
     // the sliders do to a grain, WHICH of the modulations come from the station
@@ -479,7 +479,7 @@
    * trimming, the speed work — has landed on it and not on the element.
    *
    * ⚠️ LEAVING IT OPT-IN MEANT THE DEFAULT PAGE WAS THE UNFIXED ONE. Reported
-   * from `positron.studio/radio1965/` with no flag: a blurb, then a hole, then
+   * from `positron.studio/radio/` with no flag: a blurb, then a hole, then
    * audio — the element path's holes, on a page whose decoded path had been
    * green for hours. A flag that has to be remembered is a flag that will be
    * forgotten, and the person who forgets it sees the old defect.
@@ -512,7 +512,7 @@
   const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
   const ship = REPORTING ? createShipper() : () => {};
   if (REPORTING) {
-    ship(`--- radio1965 BUILD ${BUILD} ---`);
+    ship(`--- radio BUILD ${BUILD} ---`);
     ship(`UA ${navigator.userAgent}`);
     d.log('reporting to pub.positron.studio — this session is being posted');
   }
@@ -607,6 +607,88 @@
   });
   deck.seek(t0);
 
+  // 🔴 THE LOOP'S WAYS ARE DECLARED BEFORE THE BAR IS BUILT, AND THAT IS NOT
+  // TIDINESS. `createTransportBar` is called with the direction button's first
+  // face read out of `WAY_GLYPH`, and a `const` read above its own declaration
+  // is a ReferenceError rather than an `undefined` — so this block sitting 500
+  // lines below the call would have killed the page at boot.
+  // ── the LOOP row: four ways to play the seconds you kept ───────────────────
+  //
+  // 🔴 THIS IS WHAT REPLACED THE FIVE SPEED BUTTONS. Asked for twice — *"replace
+  // slowed and fast forward with something interesting"*, then *"you never
+  // replaces fastforward / slowed??"* — and the previous answer was to point the
+  // same row at the loop as well, which is a repurposing and not a replacement.
+  // Every cell here is a different MECHANISM rather than a different number of
+  // the same one, which is the rule the twelve sounds were rebuilt under
+  // (LESSONS #59: a randomiser over nine overlapping ranges makes one sound with
+  // nine names).
+  //
+  //   round  the kept seconds as they arrived        the default
+  //   back   the same samples, mirrored              a direction
+  //   half   the same lap, twice as long             a speed
+  //   chop   a sixteenth of the lap, repeating       a length
+  //
+  // ⚠️ THREE OF THE FOUR ARE THINGS A LIVE STREAM CANNOT DO AT ALL. There is
+  // nothing behind a live edge to play backwards, no lap to divide, and slowing
+  // a mount down only means falling behind it. A kept lap has all three, exactly,
+  // because it is an integer number of samples: MEASURED at 384000 a lap at 1x
+  // and 768000 at 0.5x, bit identical (plan-grain-presets §1.1).
+  //
+  // ⚠️ AND THE GRAINS FOLLOW WHATEVER LAP IT LEAVES. `lockGrainsToLoop` tunes
+  // the grain clock to the lap that is actually playing, so `chop` retunes to
+  // the slice and `round` puts it back. A lap it cannot divide is said in words
+  // rather than fudged.
+  // ⚠️ `pingpong` IS FIFTH SO THE FIRST FOUR KEEP THEIR INDICES. Every check
+  // that drives a way does it by number, and renumbering them would have made
+  // four asserts grade a different way than their own labels claim.
+  const LOOP_WAYS = [
+    ['round', 'round'], ['back', 'back'], ['half', 'half'], ['chop', 'chop'],
+    ['pingpong', 'pingpong'],
+  ];
+  // 🔴 SHORT WORDS, AND THE REASON IS A PHONE. `.gran-slot`'s rows share a label
+  // column about 167 px wide, so a 390 px screen leaves roughly 210 px for the
+  // whole group — four segments of fifty. `STUTTER` is seven mono characters and
+  // does not fit; `CHOP` does. The sound row went to `createPicker` for the same
+  // measurement and this row stays a radio group because four mutually exclusive
+  // options is what `choice.mjs` is for, and because the ask was explicit:
+  // *"rate controls should be radiobuttons everywhere"*.
+  const LOOP_SAYS = {
+    round: 'the kept seconds, round, the way they arrived',
+    back: 'the kept seconds backwards',
+    half: 'half speed, so it comes round twice as slowly and an octave down',
+    chop: 'one slice of the loop, repeating',
+    pingpong: 'the kept seconds forwards, then the same samples backwards, without a seam',
+  };
+  // A slice is a sixteenth of the lap, floored at a length that is still a
+  // rhythm rather than a pitch: a sixteenth of a hand-closed 0.6 s window is
+  // 37 ms, which repeats at 27 Hz, which is a buzz and not a stutter.
+  const CHOP_DIV = 16;
+  const CHOP_MIN_S = 0.12;
+
+  /**
+   * 🔴 THE THREE THE BUTTON CYCLES, IN THE ORDER IT CYCLES THEM. Directions,
+   * and only directions: `half` is what the rate row beside it is for, and
+   * `chop` is a length with no control today — both are still in `LOOP_WAYS`
+   * and both are still driven by the checks, which is a loose end written down
+   * rather than left to be found.
+   */
+  const LOOP_TURN = [0, 1, 4];               // round → back → pingpong → round
+  /**
+   * The face of the button for each way. ⚠️ A GLYPH IS THE STATE, NOT THE NEXT
+   * PRESS — the opposite of what LOOP's own word does, and the difference is
+   * that LOOP has three states with two names while this has three states with
+   * three faces. Showing the next one here would mean the button never says
+   * which way the loop you are listening to is running.
+   */
+  const WAY_GLYPH = { round: '→', back: '←', pingpong: '⇆', half: '→', chop: '→' };
+  const WAY_SAYS = {
+    round: 'playing forwards. press for backwards',
+    back: 'playing backwards. press for there and back',
+    pingpong: 'playing there and back. press for forwards',
+    half: 'playing forwards, at half speed',
+    chop: 'repeating one slice',
+  };
+
   let heardFrom = null;                 // when audio actually started arriving
   // 🔴 SECONDS PLAYED BEFORE THE CURRENT `src`, BECAUSE `currentTime` RESTARTS
   // AT ZERO ON EVERY SWITCH. HEARD says how long you have been listening, and a
@@ -632,26 +714,29 @@
     rates: [0.25, 0.5, 1],
     onRate: (r) => { loopRate = r; if (loopSrc) loopSrc.playbackRate.value = r; },
     /**
-     * Left of LOOP, shown only while one runs. A glyph each, because a word
-     * would push the rate group onto a second row on a phone.
+     * 🔴 ONE BUTTON, GLUED TO THE RIGHT OF LOOP, CYCLING → ← ⇆. ASKED FOR IN
+     * THOSE WORDS: *"looper mode is → | ← | ⇆ and its a part of loop button
+     * [→|LOOP]"*, then *"single mode button cycling"*, then *"move loop mode to
+     * right not left"* once it was on screen.
+     *
+     * It replaced two toggles that each turned the other off — a pair of
+     * radio buttons wearing the clothes of two independent switches, where
+     * neither face said what the loop was actually doing and both had to be
+     * read together to find out. One button has one face and it is the current
+     * state: the glyph you can see is the way the loop is playing, or the way
+     * the next one will.
+     *
+     * ⚠️ IT IS ON THE BAR WITH NO LOOP RUNNING, which the two toggles were not.
+     * A direction is a choice you can make BEFORE pressing LOOP, and it is kept
+     * when a loop ends rather than reset — see `onLoop`'s `off`. `always: true`
+     * in `transport-bar.mjs` carries that, and the note there says why it is not
+     * an inert control.
      */
     loopExtras: [
-      { id: 'rev', label: '◀', aria: 'play the loop backwards',
-        title: 'the same samples, mirrored',
-        onPress: (btn) => {
-          const on = btn.getAttribute('aria-pressed') !== 'true';
-          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-          bar?.loopExtra('ping')?.setAttribute('aria-pressed', 'false');
-          setLoopWay(on ? 1 : 0);
-        } },
-      { id: 'ping', label: '⇄', aria: 'play the loop there and back',
-        title: 'forwards, then the same samples backwards',
-        onPress: (btn) => {
-          const on = btn.getAttribute('aria-pressed') !== 'true';
-          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-          bar?.loopExtra('rev')?.setAttribute('aria-pressed', 'false');
-          setLoopWay(on ? 4 : 0);
-        } },
+      { id: 'way', label: WAY_GLYPH[LOOP_WAYS[0][1]], always: true,
+        aria: 'which way the loop plays',
+        title: WAY_SAYS[LOOP_WAYS[0][1]],
+        onPress: () => cycleLoopWay() },
     ],
     // 🔴 THE LOOP WINDOW IS THE GRANULATOR'S OWN BUFFER, READ FROM THE SAME
     // CONSTANT. The bar cannot know how many seconds a page really keeps, so it
@@ -716,12 +801,18 @@
         // touching the material. See `startLoopVoice`.
         loopBuf = buf;
         loopBack = null; loopPing = null;   // built on the first press that needs one
-        setLoopWay(0, { quiet: true });     // every loop opens the way it arrived
-        loopRow?.disabled(false);
+        // 🔴 IT OPENS THE WAY THE BUTTON IS SHOWING, AND IT USED TO RESET TO
+        // `round` HERE. That was right while the direction lived on two toggles
+        // that appeared with the loop and vanished with it: nothing was on
+        // screen to contradict. The button is on the bar now with no loop
+        // running, so it can be set BEFORE pressing LOOP — and a control that
+        // reads ← while the sound it just started runs forwards is the page
+        // lying about itself. The normalising happens on `off`, where the
+        // button is the only thing left to be true to.
         // 12 ms either way rather than a step: a gain cut mid-sample is a click,
         // and a click every time a loop closes is the page making the noise.
         scope.loopTo();          // the wave stops here, and this is where it stopped
-        startLoopVoice(0);
+        startLoopVoice(null);    // from the top of the loop, whichever end that is
         loopOut.gain.setTargetAtTime(1, ctx.currentTime, 0.012);
         // ⚠️ THE STATION'S WAY IN, NOT THE FADER. Writing to `dry` silenced the
         // speakers and left the granulator on the live station, and it also
@@ -751,8 +842,13 @@
         // same rule `caps.mjs` follows for a demo this browser cannot run, and
         // the reason is on the row's own tooltip rather than left to be guessed.
         loopBuf = null; loopBack = null; loopPing = null;
-        setLoopWay(0, { quiet: true });
-        loopRow?.disabled(true);
+        // ⚠️ THE DIRECTION SURVIVES THE LOOP, AND ONLY A WAY WITH NO BUTTON IS
+        // PUT BACK. Somebody who chose ← meant ←, and taking it away the moment
+        // a loop ends makes the choice something that has to be re-made every
+        // time. `half` and `chop` have no face on the bar, so leaving the button
+        // showing → over a loop that would come back chopped is the one case
+        // where keeping it would be the lie.
+        if (!LOOP_TURN.includes(loopWay)) setLoopWay(0, { quiet: true });
         d.log('back to the station', 'hi');
       }
     },
@@ -1090,66 +1186,17 @@
   // itself" is a weaker claim than it looks if it cannot say WHAT it decoded.
   let decodeCodec = '';
 
-  // ── the LOOP row: four ways to play the seconds you kept ───────────────────
-  //
-  // 🔴 THIS IS WHAT REPLACED THE FIVE SPEED BUTTONS. Asked for twice — *"replace
-  // slowed and fast forward with something interesting"*, then *"you never
-  // replaces fastforward / slowed??"* — and the previous answer was to point the
-  // same row at the loop as well, which is a repurposing and not a replacement.
-  // Every cell here is a different MECHANISM rather than a different number of
-  // the same one, which is the rule the twelve sounds were rebuilt under
-  // (LESSONS #59: a randomiser over nine overlapping ranges makes one sound with
-  // nine names).
-  //
-  //   round  the kept seconds as they arrived        the default
-  //   back   the same samples, mirrored              a direction
-  //   half   the same lap, twice as long             a speed
-  //   chop   a sixteenth of the lap, repeating       a length
-  //
-  // ⚠️ THREE OF THE FOUR ARE THINGS A LIVE STREAM CANNOT DO AT ALL. There is
-  // nothing behind a live edge to play backwards, no lap to divide, and slowing
-  // a mount down only means falling behind it. A kept lap has all three, exactly,
-  // because it is an integer number of samples: MEASURED at 384000 a lap at 1x
-  // and 768000 at 0.5x, bit identical (plan-grain-presets §1.1).
-  //
-  // ⚠️ AND THE GRAINS FOLLOW WHATEVER LAP IT LEAVES. `lockGrainsToLoop` tunes
-  // the grain clock to the lap that is actually playing, so `chop` retunes to
-  // the slice and `round` puts it back. A lap it cannot divide is said in words
-  // rather than fudged.
-  // ⚠️ `pingpong` IS FIFTH SO THE FIRST FOUR KEEP THEIR INDICES. Every check
-  // that drives a way does it by number, and renumbering them would have made
-  // four asserts grade a different way than their own labels claim.
-  const LOOP_WAYS = [
-    ['round', 'round'], ['back', 'back'], ['half', 'half'], ['chop', 'chop'],
-    ['pingpong', 'pingpong'],
-  ];
-  // 🔴 SHORT WORDS, AND THE REASON IS A PHONE. `.gran-slot`'s rows share a label
-  // column about 167 px wide, so a 390 px screen leaves roughly 210 px for the
-  // whole group — four segments of fifty. `STUTTER` is seven mono characters and
-  // does not fit; `CHOP` does. The sound row went to `createPicker` for the same
-  // measurement and this row stays a radio group because four mutually exclusive
-  // options is what `choice.mjs` is for, and because the ask was explicit:
-  // *"rate controls should be radiobuttons everywhere"*.
-  const LOOP_SAYS = {
-    round: 'the kept seconds, round, the way they arrived',
-    back: 'the kept seconds backwards',
-    half: 'half speed, so it comes round twice as slowly and an octave down',
-    chop: 'one slice of the loop, repeating',
-    pingpong: 'the kept seconds forwards, then the same samples backwards, without a seam',
-  };
-  // A slice is a sixteenth of the lap, floored at a length that is still a
-  // rhythm rather than a pitch: a sixteenth of a hand-closed 0.6 s window is
-  // 37 ms, which repeats at 27 Hz, which is a buzz and not a stutter.
-  const CHOP_DIV = 16;
-  const CHOP_MIN_S = 0.12;
 
-  // The kept seconds, the same seconds reversed, and which way the row is set.
-  let loopBuf = null, loopBack = null, loopPing = null, loopWay = 0, loopRow = null;
+
+  // The kept seconds, the same seconds reversed, and which way the loop is set.
+  let loopBuf = null, loopBack = null, loopPing = null, loopWay = 0;
   let loopRate = 1;
   // The voice's own clock, which is the only thing that knows where the SOUND
-  // is: when it started, the slice of the buffer it laps over, its rate, and
-  // whether the buffer it is reading is the mirrored one.
-  let voiceAt = 0, voiceFrom = 0, voiceTo = 0, voiceRate = 1, voiceBack = false;
+  // is: when it started, the slice of the buffer it laps over, where in that
+  // slice it was told to begin, its rate, and whether the buffer it is reading
+  // is the mirrored one or the mirror joined onto the end of the original.
+  let voiceAt = 0, voiceFrom = 0, voiceTo = 0, voiceOff = 0;
+  let voiceRate = 1, voiceBack = false, voicePing = false;
 
   /**
    * The same seconds, backwards.
@@ -1192,11 +1239,27 @@
   function loopHeadFrac() {
     if (!ctx || !loopSrc || !loopBuf) return null;
     const lap = voiceTo - voiceFrom;
-    const whole = loopBuf.duration;
-    if (!(lap > 0) || !(whole > 0)) return null;
+    const unit = loopBuf.duration;           // ONE pass of the kept seconds
+    if (!(lap > 0) || !(unit > 0)) return null;
     const into = Math.max(0, ctx.currentTime - voiceAt) * voiceRate;
-    const at = voiceFrom + (into % lap);
-    return Math.min(1, Math.max(0, (voiceBack ? whole - at : at) / whole));
+    // ⚠️ FROM WHERE THE VOICE WAS TOLD TO BEGIN, not from the top of its lap.
+    // A way-change picks the sound up where it already was, so a head computed
+    // from `voiceFrom` alone runs a whole lap out of step with what you hear.
+    const at = voiceFrom + (((voiceOff - voiceFrom) + into) % lap);
+    /**
+     * 🔴 PINGPONG IS A TRIANGLE AND IT USED TO BE A RAMP THAT STUCK.
+     * REPORTED as *"the looper animation viz does not follow the mode"*. The
+     * voice reads ONE buffer of `2 × unit` — forwards, then the mirror — so
+     * `at` runs 0 to 2·unit while the picture is only `unit` wide. Divided by
+     * `unit` and clamped, the line crossed the picture over the first half and
+     * then SAT AT THE RIGHT EDGE for the whole return, which is the half a
+     * reader is listening for. Folded at the turn it runs back the way it came,
+     * which is what the sound is doing.
+     */
+    const f = voicePing ? (at <= unit ? at : 2 * unit - at)
+      : voiceBack ? unit - at
+      : at;
+    return Math.min(1, Math.max(0, f / unit));
   }
 
   /**
@@ -1207,6 +1270,13 @@
    * which is the difference between "repeat this bit" and "repeat the beginning
    * again". ⚠️ AND IT IS IN THE PICTURE'S COORDINATES, mirrored on the way in
    * for the same reason `loopHeadFrac` mirrors on the way out.
+   *
+   * 🔴 `null` MEANS THE TOP OF THE LOOP, AND IT IS NOT THE SAME AS `0`. Zero is
+   * the LEFT EDGE OF THE PICTURE, and under `back` the top of the loop is the
+   * right edge: the mirrored buffer's first sample is the kept seconds' last
+   * one. A new loop that opens backwards was asking to start at picture 0,
+   * which mirrors to an offset of exactly the buffer's whole duration, where
+   * `start()` has nothing left to read.
    *
    * ⚠️ A DIP, NOT A CUT. A buffer source cannot change its buffer or its loop
    * points cleanly while it runs, so a way-change is a new voice — and swapping
@@ -1233,13 +1303,28 @@
      */
     if (ping && !loopPing) loopPing = joinedCopy(loopBuf, loopBack);
     const buf = ping ? loopPing : back ? loopBack : loopBuf;
-    const whole = buf.duration;
+    const whole = buf.duration;              // 2 × the kept seconds under ping
+    const unit = loopBuf.duration;           // one pass of them
     const lap = way === 'chop'
       ? Math.min(whole, Math.max(CHOP_MIN_S, whole / CHOP_DIV))
       : whole;
-    const f = Math.min(1, Math.max(0, fromFrac ?? 0));
-    const here = (back ? 1 - f : f) * whole;
+    const cont = Number.isFinite(fromFrac);
+    const f = cont ? Math.min(1, Math.max(0, fromFrac)) : 0;
+    // Where that fraction of the PICTURE sits in the buffer this voice reads.
+    // ⚠️ AGAINST `unit`, NEVER `whole`: under pingpong the buffer is twice the
+    // picture, and against `whole` a press at the middle of the wave would pick
+    // the sound up at the turn.
+    const here = cont ? (back ? 1 - f : f) * unit : 0;
     const from = way === 'chop' ? Math.min(Math.max(0, here), Math.max(0, whole - lap)) : 0;
+    /**
+     * 🔴 WHERE IT ACTUALLY STARTS READING, AND IT WAS ALWAYS THE TOP.
+     * This function's own note promises that a press does not throw you back to
+     * the start of the loop, and only `chop` was getting that: every other way
+     * started at 0, so pressing ← jumped the sound and the line to the far end
+     * of the picture. `loopStart`/`loopEnd` bound the lap; the second argument
+     * to `start()` is where inside it to begin, and they are different numbers.
+     */
+    const begin = way === 'chop' ? from : here;
     const swap = !!loopSrc;
     const CUT = 0.012;
     const now = ctx.currentTime;
@@ -1260,7 +1345,7 @@
       g.linearRampToValueAtTime(0, at);
       g.linearRampToValueAtTime(1, at + CUT);
     }
-    src.start(at, from);
+    src.start(at, begin);
     // ⚠️ STOPPED AT THE SAME INSTANT THE NEW ONE STARTS, AND SCHEDULED RATHER
     // THAN TIMED. A `setTimeout` stop leaves both voices in `loopOut` for as
     // long as the timer is late, which is two copies of the loop at different
@@ -1269,8 +1354,8 @@
     const dying = loopSrc;
     if (dying) { try { dying.stop(at); } catch { /* already done */ } }
     loopSrc = src;
-    voiceAt = at; voiceFrom = from; voiceTo = from + lap;
-    voiceRate = src.playbackRate.value; voiceBack = back;
+    voiceAt = at; voiceFrom = from; voiceTo = from + lap; voiceOff = begin;
+    voiceRate = src.playbackRate.value; voiceBack = back; voicePing = ping;
   }
 
   /**
@@ -1284,12 +1369,22 @@
     const n = Math.max(0, Math.min(LOOP_WAYS.length - 1, i | 0));
     const changed = n !== loopWay;
     loopWay = n;
-    loopRow?.set(n, true);
+    // 🔴 THE BUTTON'S FACE IS SET HERE AND NOWHERE ELSE, so a way reached from
+    // the code and a way reached by pressing cannot disagree about what is
+    // showing. That is the `shareLabelColumn` lesson in a smaller costume: two
+    // places writing one fact is one fact that will drift.
+    const btn = bar?.loopExtra('way');
+    if (btn) {
+      const w = LOOP_WAYS[n][1];
+      btn.textContent = WAY_GLYPH[w];
+      btn.title = WAY_SAYS[w];
+      btn.setAttribute('aria-label', `${LOOP_SAYS[w]}. press to change which way it plays`);
+    }
     // Nothing changed, or there is nothing to play it on yet. Either way the
-    // row now says what the next loop will do and no voice is disturbed.
+    // button now says what the next loop will do and no voice is disturbed.
     if (!changed || !loopSrc || !loopBuf) return;
     const way = LOOP_WAYS[n][1];
-    startLoopVoice(loopHeadFrac() ?? 0);
+    startLoopVoice(loopHeadFrac());   // pick the sound up where it already is
     // 🔴 AND THE GRAIN CLOCK GOES WITH IT, which is the whole of why `chop` is
     // reachable at all: the lap is an exact number of samples either way, so the
     // grains can be tuned to divide the slice as cleanly as they divided the
@@ -1298,6 +1393,20 @@
     // lock made at speed 1 survives every power of two.
     lockGrainsToLoop(voiceTo - voiceFrom);
     if (!quiet) d.log(`${LOOP_SAYS[way]} (${(voiceTo - voiceFrom).toFixed(2)} s a lap)`, 'hi');
+  }
+
+  /**
+   * One press of the button glued to LOOP: → then ← then ⇆ then → again.
+   *
+   * ⚠️ IT CYCLES WITHIN `LOOP_TURN`, AND A WAY THAT IS NOT IN IT LANDS ON THE
+   * FIRST. `half` and `chop` are reachable from the checks and from nothing
+   * else; pressing the button after one of those has run is a reader asking for
+   * a direction, and the honest answer is the first direction rather than an
+   * index arithmetic accident.
+   */
+  function cycleLoopWay() {
+    const at = LOOP_TURN.indexOf(loopWay);
+    setLoopWay(LOOP_TURN[(at + 1) % LOOP_TURN.length]);
   }
 
   /** Point the decoded path at the current station. Safe to call again. */
@@ -1461,7 +1570,7 @@
     // ── the loop's own audio ───────────────────────────────────────────────
     //
     // 🔴 THE PAGE HAS TO KEEP THE SOUND, BECAUSE THE BAR CANNOT. REPORTED as
-    // *"i can not hear radio1965 looping only viz"*, and that was exactly the
+    // *"i can not hear radio looping only viz"*, and that was exactly the
     // state: the transport bar owns the WINDOW and moves a playhead across it,
     // and nothing here was keeping a single sample, so pressing LOOP ran a line
     // over a past that had no audio behind it. A picture of a loop with no loop
@@ -2581,9 +2690,10 @@
         ['fader', document.querySelector('.wet-fader .sld-lane')],
         ['sliders', document.querySelector('.gran-rows .sld-lane')],
         ['sound', document.querySelector('.gran-slot .pos-pick-seg')],
-        // ⚠️ THE NEW ROW IS IN THE LIST FROM THE DAY IT LANDED. A row added to
-        // this slot without being added here is the next report of the same bug.
-        ['loop', document.querySelector('.gran-slot .pos-choice-seg')],
+        // ⚠️ THE NEW ROW IS IN THE LIST FROM THE DAY IT LANDED, AND LEAVES IT
+        // THE DAY THE ROW DOES. The LOOP row was here after it had moved into
+        // the transport, so this queried an element that is not in the slot and
+        // read `loop missing` about a page with nothing wrong with it.
       ].map(([n, e]) => [n, e ? Math.round(e.getBoundingClientRect().left) : null]);
       const xs = edges.map(([, x]) => x);
       G.edges = edges;
@@ -2645,6 +2755,11 @@
           && G.mirror && G.mirror.tried === 4 && G.mirror.same === 4
           && !half.back && Math.abs(half.rate - 0.5) < 1e-6
           && !chop.back && near1(chop.rate) && chop.lap < chop.whole - 1e-6
+          // ⚠️ AND THE BUTTON'S FACE IS THE WAY THAT IS PLAYING. Three ways are
+          // reached by pressing it, so a cycle that lands on the right sound
+          // with the wrong glyph showing is a control describing a different
+          // loop from the one you are hearing.
+          && w.every((x) => x.face === x.want)
           // and the loop coming off leaves the grain clock on the sound's own
           // rate, whatever the row did to it in between
           && Number.isFinite(G.wayRate) && Math.abs(G.wayRate - G.wayWant) < 1e-3;
@@ -2657,7 +2772,35 @@
               + ` · of ${(w[0]?.whole ?? 0).toFixed(2)} s kept`
               + ` · mirror ${G.mirror ? `${G.mirror.same} of ${G.mirror.tried}` : 'never checked'}`
               + ` · and ${G.wayRate == null ? 'no' : G.wayRate.toFixed(4)}/s left after,`
-              + ` against ${G.wayWant}/s written`);
+              + ` against ${G.wayWant}/s written`
+              + ` · faces ${w.map((x) => `${x.face}${x.face === x.want ? '' : `≠${x.want}`}`).join('')}`);
+
+        /**
+         * 🔴 AND THE LINE ON THE PICTURE GOES THE WAY THE SOUND DOES.
+         *
+         * Every assert above reads the VOICE. This one reads the PLAYHEAD, and
+         * they are different quantities joined by arithmetic that was wrong:
+         * under pingpong the head ran across once and then stuck against the
+         * right edge for the entire return, because the voice reads a buffer
+         * twice as long as the picture is wide and the fraction was taken
+         * against the picture. Reported as the viz not following the mode.
+         *
+         * Forwards may only go up, backwards may only go down, and there and
+         * back has to do both inside one lap. A lane with no samples at all
+         * fails rather than passing for want of evidence.
+         */
+        const t = G.turns || [];
+        const turn = (n) => t.find((x) => x.name === n);
+        const fwd = turn('round'), rev = turn('back'), png = turn('pingpong');
+        const turnsOk = t.length === LOOP_TURN.length
+          && fwd && fwd.up > 2 && fwd.down === 0
+          && rev && rev.down > 2 && rev.up === 0
+          && png && png.up > 2 && png.down > 2;
+        d.assert('the line on the picture runs the way the loop is playing',
+          !!turnsOk,
+          !t.length ? 'the ways were never driven'
+            : t.map((x) => `${x.name} ${x.up} up ${x.down} down of ${x.seen}`
+              + ` over ${x.lap.toFixed(2)} s a lap`).join(' · '));
       }
       /**
        * 🔴 TWO CLAIMS, TWO ASSERTS, BECAUSE EITHER ALONE PASSES ON A HALF-BUILT
@@ -4314,29 +4457,26 @@
     patchPick = patchRow;
 
     /**
-     * The LOOP row — what took the speed buttons' place. The four ways, what
-     * each one does and why they are these four are all up beside `LOOP_WAYS`.
+     * 🔴 THE LOOP'S WAYS MOVED INTO THE TRANSPORT, AS ONE CYCLING BUTTON.
      *
-     * ⚠️ GREY UNTIL THERE IS A LOOP, WITH THE REASON ON IT. There is nothing to
-     * play backwards until LOOP has kept some seconds, and a row that lights up
-     * and makes no sound is this project's named failure. `caps.mjs`'s rule is
-     * that a thing you cannot do right now says so rather than vanishing, so the
-     * row stays where it is, greyed, with the one sentence that makes it usable.
-     */
-    /**
-     * 🔴 THE LOOP'S WAYS MOVED INTO THE TRANSPORT, AS TWO TOGGLES.
-     *
-     * They were a four-cell radio row under the picture, and a row that can
-     * only act on a loop has nothing to say for the whole time no loop is
+     * They were a four-cell radio row here, under the picture, and a row that
+     * can only act on a loop has nothing to say for the whole time no loop is
      * running: it sat there greyed, taking a line, explaining itself in a
-     * tooltip. The transport already owns LOOP, so the things that modify a
-     * loop belong beside it and appear with it.
-     * ⚠️ `half` AND `chop` ARE NOT GONE FROM THE CODE, only from the row. Half
-     * speed is what the rate lattice beside these is for, now that it is back.
+     * tooltip. The transport already owns LOOP, so the thing that modifies a
+     * loop belongs against it — see `loopExtras` in the bar's options, which is
+     * where the button and its three faces now live.
+     *
+     * ⚠️ THE VARIABLE THAT USED TO HOLD THIS ROW IS GONE, AND THAT IS THE WHOLE
+     * REPAIR OF A CRASH. `loopRow = null` stood here for a session while
+     * `shareLabelColumn` still read `loopRow.el`, which threw on every boot.
+     * A handle kept at `null` after the thing it names has gone is a name that
+     * type-checks, greps clean, and is a live TypeError.
+     *
+     * ⚠️ `half` AND `chop` ARE NOT GONE FROM THE CODE, only from the bar. Half
+     * speed is what the rate lattice beside it is for, now that it is back.
      * `chop` has no control any more and the checks still drive it; that is a
      * loose end and it is written here rather than left to be discovered.
      */
-    loopRow = null;
 
     // Picture, blend, what the loop is made of, what chews it, and then the four
     // settings that decide how. The LOOP row sits above SOUND because it decides
@@ -4368,11 +4508,24 @@
         .flatMap((g) => [...g.querySelectorAll('.sld-l, .sld-v')])
         .reduce((m, e) => Math.max(m, e.getBoundingClientRect().width), 0);
       if (!wide) return;
-      // ⚠️ THE SOUND PICKER IS IN THE LIST TOO, AND SO IS THE LOOP ROW. Neither
-      // label is a `.sld-l`, so neither is measured, and a row that is not SET
-      // is the row that ends up with a different left edge — which is how the
-      // sound picker was reported three times. The assert below reads all four.
-      for (const g of [wetRow.el, group.el, patchRow.el, loopRow.el]) {
+      // ⚠️ THE SOUND PICKER IS IN THE LIST TOO. Its label is not a `.sld-l`, so
+      // it is not measured, and a row that is not SET is the row that ends up
+      // with a different left edge — which is how the sound picker was reported
+      // three times. The assert below reads all three.
+      //
+      // 🔴 AND EVERY ROW IN THIS LIST IS A ROW THAT EXISTS. It held `loopRow.el`
+      // for a session after `loopRow` was set to `null` — the LOOP row had moved
+      // into the transport and the list was not moved with it — so this threw
+      // `Cannot read properties of null (reading 'el')` on the FIRST call, which
+      // is inside `applyPatch`, during the boot. What that cost is not a label
+      // column: `applyPatch` died before it could name the patch, so the sound
+      // picker read `—`; `startGranulator` died before `boxesReady('controls')`,
+      // so the picture and the controls sat dark for the whole 6 s deadline and
+      // then lit saying *the granulator never arrived*; and the granulator's own
+      // asserts never ran. PHOTOGRAPHED, reported as three separate complaints
+      // (*"why viz and granular appear so late?"*, *"patch names??"*, and a red
+      // fade check) that were one line of code.
+      for (const g of [wetRow.el, group.el, patchRow.el]) {
         g.style.setProperty('--lab', `${Math.ceil(wide)}px`);
       }
     };
@@ -4500,13 +4653,19 @@
       // one pair of numbers.
       const inkNow = () => {
         const c = scope.canvas, g = c.getContext('2d');
-        // ⚠️ EXCLUDE THE LIVE-EDGE LINE GENEROUSLY. It is drawn in the ticks' own
-        // colour on every frame whether a grain ever arrives or not, and the old
-        // 4-CSS-pixel margin was computed from `clientWidth`, which is 0 while the
-        // element is being laid out — so on a dpr-3 phone the margin collapsed to
-        // 4 BACKING pixels and counted the line. REPORTED from an iPhone as
-        // `2834 lit all-radio, 2832 lit all-granulator`: a constant, at both ends
-        // of a fader that is supposed to separate them. LESSONS #75.
+        // ⚠️ EXCLUDE THE LIVE-EDGE LINE GENEROUSLY. It used to be drawn in the
+        // ticks' own colour on every frame whether a grain ever arrived or not,
+        // and the old 4-CSS-pixel margin was computed from `clientWidth`, which
+        // is 0 while the element is being laid out — so on a dpr-3 phone the
+        // margin collapsed to 4 BACKING pixels and counted the line. REPORTED
+        // from an iPhone as `2834 lit all-radio, 2832 lit all-granulator`: a
+        // constant, at both ends of a fader that is supposed to separate them.
+        // LESSONS #75.
+        // ⚠️ THE COLOUR CLASH IS GONE AND THE MARGIN STAYS. That line is grey
+        // now, so it can no longer be counted as a grain — but the margin costs
+        // 12 px of a measurement that has thousands to spare, and removing a
+        // guard because the thing it caught has moved is how the thing comes
+        // back.
         const dpr = Math.max(1, window.devicePixelRatio || 1);
         const px = g.getImageData(0, 0, Math.max(1, c.width - Math.ceil(12 * dpr)), c.height).data;
         let lit = 0;
@@ -4945,7 +5104,14 @@
         for (let y = 0; y < c.height; y++) {
           for (let x = 0; x < c.width; x++) {
             const i = (y * c.width + x) * 4;
-            if (px[i] > 200 && px[i + 1] > 150 && px[i + 2] < 100) cols[x]++;
+            // 🔴 NEAR WHITE, BECAUSE THE PLAYHEAD IS `--fg` NOW AND NOT
+            // `--hi`. It was found by looking for yellow, which is the grain
+            // ticks' colour and was the playhead's too; greying the loop
+            // furniture would have left this counting a line that is no longer
+            // there and reading `0 lit` about a picture with a playhead in it.
+            // A colour test in a check is a copy of a stylesheet value, and it
+            // has to move when the stylesheet does.
+            if (px[i] > 180 && px[i + 1] > 180 && px[i + 2] > 180) cols[x]++;
           }
         }
         let tall = 0, at = -1, wide = 0;
@@ -4977,7 +5143,47 @@
       // RECORDING while it is stopped and the thing that stops is the right
       // EDGE. The claim is now that the edge held still and then moved.
       const frozenEdge = scope.stats().frozen;
-      await new Promise((r) => setTimeout(r, 300));
+      /**
+       * 🔴 AND THE WAVE IS STILL THE WHOLE WAVE A SECOND LATER.
+       *
+       * REPORTED as the waveform being *"chipped away"* under a loop, and the
+       * check above cannot see it: the right edge held perfectly still the
+       * whole time, which is all `frozen` ever claimed. The picture was drawn
+       * against the frozen clock while `feed()` went on trimming its columns
+       * against the running one, so the wave was eaten from the LEFT at one
+       * second of picture per second of loop, against marks that did not move.
+       *
+       * ⚠️ MEASURED OFF THE CANVAS, NOT OFF A COLUMN COUNT. `grain-scope` holds
+       * a snapshot now, so its own array length is constant by construction and
+       * a check on it could not fail. Where the grey ink STARTS is the quantity
+       * a reader is looking at, and it is the one that moved.
+       */
+      const waveSpan = () => {
+        const c = scope.canvas, g = c.getContext('2d');
+        const px = g.getImageData(0, 0, c.width, c.height).data;
+        const y0 = Math.round(c.height * 0.1), y1 = Math.round(c.height * 0.9);
+        let left = -1, right = -1;
+        for (let x = 0; x < c.width; x++) {
+          let hit = false;
+          for (let y = y0; y < y1 && !hit; y++) {
+            const i = (y * c.width + x) * 4;
+            // the wave is `--line2` (43,53,70): bluer and brighter than the
+            // field (17,21,29) and than the border (31,41,55). The playhead is
+            // `--fg` and the loop's marks are `--dim2` (106,114,128), both far
+            // redder than that, so the red channel excludes them and the blue
+            // channel excludes the field and the border.
+            if (px[i + 2] >= 62 && px[i] < 80) hit = true;
+          }
+          if (hit) { if (left < 0) left = x; right = x; }
+        }
+        return { left: left < 0 ? null : left / c.width, right: right < 0 ? null : right / c.width };
+      };
+      const spanAt = waveSpan();
+      await new Promise((r) => setTimeout(r, 1200));
+      await twoFrames();
+      const spanLater = waveSpan();
+      G.frozenSpan = { at: spanAt, later: spanLater,
+        cols: scope.stats().frozenCols };
       G.headHeld = frozenEdge && scope.stats().frozen ? 0 : 1;
       const fedWhileHeld = scope.stats().inferred;
       scope.loopOff();
@@ -5031,23 +5237,74 @@
       {
         muted = true; setWet(0);
         const TB = window.__demo?.transport;
-        G.ways = [];
-        if (TB && loopRing && loopRow) {
+        const wayBtn = TB?.loopExtra ? TB.loopExtra('way') : bar?.loopExtra('way');
+        G.ways = []; G.turns = [];
+        if (TB && loopRing && wayBtn) {
           TB.pressLoop();                                  // open a window
           await new Promise((r) => setTimeout(r, 700));
           TB.pressLoop();                                  // and close it here
           await new Promise((r) => setTimeout(r, 200));
           const whole = loopBuf ? loopBuf.duration : 0;
-          for (let i = 0; i < LOOP_WAYS.length; i++) {
-            loopRow.buttons[i].click();
+          /**
+           * 🔴 DRIVEN BY THE REAL BUTTON WHERE THERE IS ONE. The three
+           * directions are reached the way a visitor reaches them — pressing
+           * the thing glued to LOOP until the face says what is wanted — so a
+           * cycle that skips a way, sticks, or leaves the wrong glyph showing
+           * fails here rather than looking fine. `half` and `chop` have no
+           * control at all, and pretending otherwise by driving them through a
+           * fake press would be a check about nothing.
+           */
+          const reach = async (i) => {
+            if (LOOP_TURN.includes(i)) {
+              for (let n = 0; n < LOOP_TURN.length && loopWay !== i; n++) wayBtn.click();
+            } else setLoopWay(i);
             await new Promise((r) => setTimeout(r, 150));
+          };
+          for (let i = 0; i < LOOP_WAYS.length; i++) {
+            await reach(i);
             G.ways.push({
               name: LOOP_WAYS[i][0],
               lap: loopSrc ? loopSrc.loopEnd - loopSrc.loopStart : null,
               rate: loopSrc ? loopSrc.playbackRate.value : null,
               back: !!(loopSrc && loopBack && loopSrc.buffer === loopBack),
+              // the FACE, read off the page rather than off the table it was
+              // written from: a glyph set by one path and not the other is the
+              // whole reason `setLoopWay` is the only place that writes it.
+              face: wayBtn.textContent,
+              want: WAY_GLYPH[LOOP_WAYS[i][1]],
               whole,
             });
+          }
+          /**
+           * 🔴 WHICH WAY THE LINE ON THE PICTURE ACTUALLY MOVES.
+           *
+           * REPORTED as the viz not following the mode, and nothing here could
+           * have caught it: every check above reads the VOICE — its buffer, its
+           * lap, its rate — and the defect was entirely in the arithmetic that
+           * turns a voice into a fraction of the picture. Under pingpong the
+           * line crossed once and then sat against the right edge for the whole
+           * return half, which is a playhead that is wrong about half the sound
+           * and looks like a playhead the whole time.
+           *
+           * So this samples the head itself and counts which way it went, over
+           * a window long enough to contain a turn. A jump over half the width
+           * is the lap coming round and is not a direction.
+           */
+          for (const i of LOOP_TURN) {
+            await reach(i);
+            const lapS = Math.max(0.05, (voiceTo - voiceFrom) / Math.max(0.01, voiceRate));
+            const span = Math.min(2.2, lapS * 1.15);
+            const step = 50, n = Math.max(6, Math.round((span * 1000) / step));
+            let up = 0, down = 0, seen = 0, prev = loopHeadFrac();
+            for (let k = 0; k < n; k++) {
+              await new Promise((r) => setTimeout(r, step));
+              const f = loopHeadFrac();
+              if (f == null || prev == null) { prev = f; continue; }
+              const dz = f - prev; prev = f; seen++;
+              if (Math.abs(dz) > 0.5) continue;            // the lap coming round
+              if (dz > 0.002) up++; else if (dz < -0.002) down++;
+            }
+            G.turns.push({ name: LOOP_WAYS[i][0], up, down, seen, lap: lapS });
           }
           // The mirror, on the samples, at four points across the seconds.
           if (loopBuf && loopBack) {
@@ -5097,7 +5354,7 @@
     if (SELFCHECK) {
       /**
        * 🔴 THE LOOP HAS TO BE AUDIBLE, AND THAT IS MEASURED AT THE DESTINATION.
-       * REPORTED as *"i can not hear radio1965 looping only viz"*: the bar owned
+       * REPORTED as *"i can not hear radio looping only viz"*: the bar owned
        * the window, drew the playhead, and nothing on this page was keeping a
        * sample, so LOOP produced a picture of a loop with no loop in it.
        *

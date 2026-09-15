@@ -152,6 +152,12 @@
    * tapes are laid out in.
    */
   const OPENS = 0;
+  // 🔴 HOW WIDE THE PICTURE OPENS, AND IT IS ONE HOUR. Asked as *"zoom to 1h"*.
+  // It is a constant rather than a number typed at the `fit()` call because the
+  // assert below prints it: a check that types its own idea of the span grades
+  // the page against a second copy of the answer, which is the defect
+  // `timeline/csound.mjs` was green through for months.
+  const OPEN_SPAN_MS = 60 * 60e3;
   const AXIS = [Date.UTC(1890, 0, 1), Date.UTC(2027, 0, 1)];
 
   let items = [], tapes = [], cur = -1;
@@ -198,7 +204,17 @@
     // ⚠️ UNTIL A VISITOR TAKES THE VIEW. Refitting under somebody who has just
     // panned or pinched is the page arguing with them, and the last answer from
     // a slow host can be twelve seconds after the page loaded.
-    if (!viewOwned) view.strip.fit();
+    // 🔴 AN HOUR WIDE, NOT THE WHOLE RUN. Asked as *"zoom to 1h"* and never
+    // done: `fit()` takes the deck's whole range, so a 24-tape day opened at
+    // about two and a half hours across a strip a few hundred pixels wide,
+    // where a six minute tape is a sliver and the gap between two of them is
+    // less than the one pixel the lane was just given. An hour is a window you
+    // can read: it holds roughly ten recordings at a width where each is a
+    // block rather than a line.
+    // ⚠️ ANCHORED AT THE START, not centred on the playhead. The page opens at
+    // the beginning of the first tape, so the hour a visitor is given is the
+    // first hour, and the strip pans from there.
+    if (!viewOwned) view.strip.fit(OPENS, OPENS + OPEN_SPAN_MS);
     sayGuesses();
   }
   // Set by the first press on the strip: from then on the framing is theirs.
@@ -401,7 +417,13 @@
     // 5, and the lane around it has room to be looked at.
     height: 64,
     barPad: 21,
-    barGap: 3,
+    // 🔴 ONE PIXEL, AND IT WENT IN AT THREE. Asked as *"reduce space between
+    // tapes to 1px"* and shipped as `barGap: 3` in the same commit, which is
+    // the shape of mistake nothing catches: there was no gap at all before, so
+    // three read as an improvement rather than as the wrong number. `strip.mjs`
+    // takes the inset off the right edge in CSS pixels, so this IS the space a
+    // reader sees between two tapes laid end to end.
+    barGap: 1,
     terse: true,
     rows: () => schedule.map((sl) => ({
       at: sl.from,
@@ -591,7 +613,7 @@
   // file. Drawing the file means fetching and decoding all of it — 225 MB for
   // the largest thing here — before a single sample is heard, and the picture
   // would then be of something nobody is listening to yet. This is the same
-  // `feed()` path `/radio1965/` uses, with no grains because there is no
+  // `feed()` path `/radio/` uses, with no grains because there is no
   // granulator on this page.
   const scope = createGrainScope(d.el, { seconds: 8, height: 120, fullScale: 1,
     freezeOnLoop: false });
@@ -604,8 +626,28 @@
   // Registered after the bar exists, in the CAPTURE phase, so it runs before
   // the bar's own handler and `start()` sees the gate already open.
   setTimeout(() => {
-    bar?.el?.addEventListener('pointerdown', (e) => { if (e.isTrusted) touched(); }, true);
-    bar?.el?.addEventListener('keydown', (e) => { if (e.isTrusted) touched(); }, true);
+    bar?.el?.addEventListener('pointerdown', (e) => {
+      if (e.isTrusted && fromPlayButton(e.target)) touched(e.target);
+    }, true);
+    bar?.el?.addEventListener('keydown', (e) => {
+      if (e.isTrusted && fromPlayButton(e.target)) touched(e.target);
+    }, true);
+    /**
+     * 🔴 AND THE SPACE BAR, WHICH IS THE SAME PRESS BY ANOTHER ROUTE.
+     * `transport-bar.mjs` registers its key handler on the WINDOW, so space
+     * plays the tape from anywhere on the page while this gate stayed shut: the
+     * transport visibly ran and nothing came out, which is a page that looks
+     * like it is playing and is silent. The bar's own handler ignores text
+     * fields and so does this, or typing a space in the feedback box would
+     * count as pressing play.
+     */
+    addEventListener('keydown', (e) => {
+      if (!e.isTrusted || e.key !== ' ') return;
+      const t = e.target;
+      if (t instanceof HTMLElement
+        && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      touched(t);
+    }, true);
   }, 0);
   let ctx = null, analyser = null, buf = null, out = null, sink = null, sinkBuf = null;
 
@@ -661,10 +703,42 @@
    * visitor heard a second of somebody else's tape for clicking on a picture.
    *
    * ⚠️ AND NOT `command.play` EITHER, because the checks call that too. What
-   * opens the gate is the transport's own button being pressed by a person, and
-   * the checks finishing. Nothing else.
+   * opens the gate is the PLAY BUTTON being pressed by a person, and the checks
+   * finishing. Nothing else.
+   * ⚠️ THE SENTENCE ABOVE WAS TRUE OF THE COMMENT AND FALSE OF THE CODE for a
+   * session: the listener was on the whole transport row. See `fromPlayButton`.
    */
-  const touched = () => { asked = true; };
+  /**
+   * 🔴 IS THIS PRESS ON THE PLAY BUTTON? A PURE FUNCTION OF THE TARGET, AND IT
+   * IS PUBLISHED SO A CHECK CAN GRADE THE ROUTING WITHOUT A REAL FINGER.
+   *
+   * The listener below was on `bar.el`, which is the WHOLE TRANSPORT ROW: the
+   * scrub slider, the rate buttons, LOOP and the walk buttons all opened the
+   * gate, and the comment above claimed it was the transport's own button. So a
+   * visitor who dragged the scrub bar during the self-check had `asked` set, and
+   * the `if (asked) start()` at hand-over then played the page at them a few
+   * seconds later, unasked. That is the third and fourth report of play on load,
+   * with the first two fixes sitting correctly in place above it.
+   *
+   * ⚠️ `isTrusted` IS STILL THE OTHER HALF AND IS CHECKED SEPARATELY. Splitting
+   * them is what makes this testable: no page can forge a trusted event, so a
+   * check that could only drive the whole handler could never grade which
+   * controls are wired. It can grade this.
+   */
+  const fromPlayButton = (t) => !!(t instanceof Element && t.closest('.tbar-toggle'));
+  window.__gateRoute = fromPlayButton;
+  /**
+   * What the button was SHOWING when it was pressed, which is what the person
+   * saw. `playing` means the press they just made was a pause, so hand-over
+   * must not start anything; anything else means they asked for sound.
+   */
+  let wantPlay = false;
+  const touched = (t) => {
+    asked = true;
+    const b = bar?.el?.querySelector('.tbar-toggle');
+    wantPlay = b ? b.dataset.state !== 'playing' : true;
+    void t;
+  };
 
   function setAudible(on) {
     audible = on && asked && !checking;
@@ -1342,7 +1416,7 @@
     if (api && r1 > r0) {
       // 🔴 THE WAVE DOES NOT STOP ANY MORE, AND THAT IS THE NEW CLAIM. This
       // graded a FREEZE: the picture stopped taking audio and a line appeared
-      // on it. `/radio1965/` is right to freeze, because a loop over a live
+      // on it. `/radio/` is right to freeze, because a loop over a live
       // station is a window on sound that has already gone by. A tape is a
       // file. The loop is playing, those seconds have audio in them, and a
       // picture that holds still is claiming silence that did not happen. So
@@ -1498,19 +1572,33 @@
          : 'the lane reported nothing');
   }
 
-  // 🔴 THE WHOLE RUN IS ON THE PICTURE AND NONE OF IT IS BEFORE NOUGHT. The
-  // axis is minutes of tape laid end to end from nought, so time before the
-  // first tape is time nothing can be in: every pixel of it is a pixel not
-  // spent on the twenty-four recordings the page exists to draw. Read off the
-  // view the strip is actually using rather than off the range it was told.
+  // 🔴 THE PICTURE OPENS ON AN HOUR, AND NONE OF IT IS BEFORE NOUGHT.
+  //
+  // ⚠️ THIS ASSERT USED TO SAY THE OPPOSITE AND WAS GREEN. It read *the picture
+  // opens on the whole run* and required `to > run * 0.95`, which is exactly
+  // what *"zoom to 1h"* asked to stop: a 24-tape day is about two and a half
+  // hours across a few hundred pixels, where a six minute tape is a sliver.
+  // So the ask could not be done without a passing check going red, which is
+  // the most expensive kind of wrong check there is. The axis is still minutes
+  // of tape laid end to end from nought, so time before the first tape is time
+  // nothing can be in and it is still refused.
+  // Read off the view the strip is actually using rather than off the range it
+  // was told, and graded against `OPEN_SPAN_MS` rather than against a second
+  // copy of the number.
   {
     const v = view.strip.view();
     const run = mapDeck.range[1] - mapDeck.range[0];
     const from = v.originTime + (v.scrollX / v.pxPerSecond) * 1000;
     const to = from + (view.el.getBoundingClientRect().width - 78) / v.pxPerSecond * 1000;
-    d.assert('the picture opens on the whole run, and not on empty time before it',
-      run > 0 && from > -0.05 * run && to > run * 0.95,
-      `the axis runs ${(from / 60e3).toFixed(1)} to ${(to / 60e3).toFixed(1)} minutes `
+    const span = to - from;
+    // A run shorter than the window cannot be an hour wide, and asking it to be
+    // would fail a page whose tapes simply have not arrived yet. `fit` also
+    // adds 2% of padding at each end, so the window is a little over the span.
+    const want = Math.min(OPEN_SPAN_MS, run);
+    d.assert('the picture opens on an hour, and not on empty time before it',
+      run > 0 && from > -0.05 * OPEN_SPAN_MS && span > want * 0.9 && span < want * 1.4,
+      `the axis runs ${(from / 60e3).toFixed(1)} to ${(to / 60e3).toFixed(1)} minutes, `
+      + `${(span / 60e3).toFixed(1)} wide, against the ${(want / 60e3).toFixed(0)} asked for, `
       + `over a ${(run / 60e3).toFixed(0)} minute run`);
   }
 
@@ -1780,6 +1868,39 @@
       asked || opened === 0,
       asked ? 'somebody pressed play while this was loading, so this run cannot ask'
             : `with nobody having pressed, asking for sound left the speakers at ${opened.toFixed(3)}`);
+    /**
+     * 🔴 AND WHICH CONTROLS OPEN THE GATE, WHICH IS THE HALF THAT WAS WRONG.
+     *
+     * The check above cannot see the defect that was reported twice more: it
+     * measures the gain with `asked` false, and the bug was that `asked` became
+     * TRUE for a press anywhere on the transport row. In a real visitor's
+     * session it then excuses itself on `asked ||`, so the one case worth
+     * grading is the one case it declines to grade.
+     *
+     * This grades the ROUTING instead, which is a pure function of the press's
+     * target and needs no trusted event: the play button opens the gate and
+     * every other control on the bar does not. Put the listener back on
+     * `bar.el` and the four refusals below become four acceptances.
+     *
+     * ⚠️ IT ASSERTS THE CONTROLS EXIST, TOO. A selector that matches nothing
+     * routes `false` and would pass as a refusal, so a bar that had been
+     * restyled out from under this would read as a page with a perfect gate.
+     */
+    {
+      const at = (sel) => document.querySelector(`.tbar ${sel}`);
+      const play = at('.tbar-toggle');
+      const others = [['scrub', at('.tbar-scrub')], ['rate', at('.tbar-rates button')],
+        ['loop', at('.tbar-loop')], ['mode', at('.tbar-loopgrp .tbar-x')]]
+        .filter(([, e]) => e);
+      const opens = play ? window.__gateRoute(play) : null;
+      const leaks = others.filter(([, e]) => window.__gateRoute(e)).map(([n]) => n);
+      d.assert('the play button opens the sound gate and nothing else on the bar does',
+        !!play && opens === true && leaks.length === 0 && others.length >= 2,
+        !play ? 'there is no play button on this bar to press'
+          : `play ${opens ? 'opens' : 'DOES NOT OPEN'} it; `
+            + `of ${others.length} other controls (${others.map(([n]) => n).join(', ')}) `
+            + `${leaks.length ? `${leaks.join(' and ')} ALSO open it` : 'none do'}`);
+    }
   }
   // Somebody pressed ▸ while the page was still checking itself. That press is
   // theirs and it is honoured here rather than swallowed: the checks are over

@@ -205,8 +205,6 @@ export function openFeedback(d, { slug = '' } = {}) {
   let ui = document.querySelector('.pos-fb');
   if (ui) { show(ui); return ui; }
 
-  const live = isLive();
-  const room = roomFor(location.origin);
 
   ui = el('div', 'pos-fb');
   const box = el('div', 'pos-fb-box');
@@ -220,17 +218,15 @@ export function openFeedback(d, { slug = '' } = {}) {
   top.append(x);
   box.append(top);
 
-  // ⚠️ IT SAYS WHERE THE WORDS GO, because a page that is not the published
-  // site is not collecting anything and must not look as though it is. This is
-  // the only branch in the panel and both halves are true sentences about the
-  // same mechanism, not a working control and a broken one.
-  // The note is gone: the title carries the page name and the placeholders say
-  // what to write and that a name is optional. What a sandbox copy does still
-  // has to be said, because that one is not guessable from anything on screen.
-  if (!live) {
-    box.append(el('p', 'pos-fb-note',
-      'This copy is not the published site, so it goes to a sandbox that nobody reads.'));
-  }
+  // 🔴 NO SANDBOX NOTICE. Asked 2026-09-16, in full: *"rm This copy is not the
+  // published site, so it goes to a sandbox that nobody reads."*
+  // It was there because a page that is not the published site must not look as
+  // though it is collecting anything. Two lines of apparatus about the copy you
+  // are running is the wrong thing to put in front of somebody who opened a box
+  // to say something, and the only people who ever see it are the two of us
+  // running the dev server. The routing is unchanged: `roomFor(origin)` still
+  // sends a note from anywhere but `positron.studio` to `feedback-dev`, and the
+  // panel still prints the room it landed in after a send.
 
   // ⚠️ NO `grow: 'wide'`. That variant is a flex BASIS, and the basis in this
   // column is the height — see `.pos-fb-box > .pos-field` in shell.css.
@@ -243,7 +239,26 @@ export function openFeedback(d, { slug = '' } = {}) {
   const row = el('div', 'pos-fb-row');
   const who = createField({ label: 'name', placeholder: 'optional' });
   row.append(who.el);
-  const send = el('button', 'pos-pri pos-fb-send', 'Send', { type: 'button' });
+  /**
+   * 🔴 THE ORDINARY BUTTON, NOT THE PRIMARY ONE. Asked 2026-09-16: *"fields:
+   * have buttons heiht. use secondary button here"*, with a photograph of the
+   * yellow Send standing taller than the name field beside it.
+   *
+   * Both halves of that report are one cause. `.pos-field input` and `button`
+   * are both 34 px and always were; what made Send bigger is `button.pos-pri`'s
+   * `box-shadow: 0 0 0 1px`, which paints a ring OUTSIDE the border and reads
+   * as two more pixels of height and width that no layout number accounts for.
+   * Dropping the primary treatment puts the two controls on the same edge.
+   *
+   * ⚠️ AND IT IS THE RIGHT WEIGHT ANYWAY. The site's yellow is spent on the
+   * thing that is running; this is a dialog where Send is the only action, so
+   * nothing is competing with it and nothing needs to shout. Return fires it,
+   * which is the other half of being the default.
+   */
+  const send = el('button', 'pos-fb-send', 'Send', { type: 'button' });
+  // What Return does, on the control it does it to. The message box is a
+  // textarea, so the combination is the one that works from inside it as well.
+  send.title = 'send the note. Cmd or Ctrl and Return does the same';
   row.append(send);
   box.append(row);
 
@@ -295,7 +310,30 @@ export function openFeedback(d, { slug = '' } = {}) {
   x.addEventListener('click', close);
   // A press on the dark ground closes it; a press inside the box does not.
   ui.addEventListener('mousedown', (e) => { if (e.target === ui) close(); });
-  ui.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  /**
+   * 🔴 SEND IS THE DEFAULT BUTTON. ASKED FOR: *"defaul button on feedback
+   * modal"*. Escape closes and Return sends, which is the pair every dialog a
+   * reader has ever used gives them, and this panel had only half of it.
+   *
+   * ⚠️ NOT A PLAIN RETURN IN THE MESSAGE BOX. That is a four row `<textarea>`
+   * and Return there is a NEW LINE — the one keystroke somebody writing a
+   * paragraph presses most. Taking it would send half a note on the first
+   * sentence, which is worse than having no default at all. Cmd or Ctrl and
+   * Return is the escape hatch there, and it is the same combination Slack,
+   * GitHub and every other box like it uses.
+   * ⚠️ AND IT IS NOT A `<form>`. A form would give Return for free and would
+   * also give a page navigation on submit: the panel lives inside a demo that
+   * is playing sound, and a navigation stops it. `preventDefault` on a listener
+   * is the version with no way for that to happen.
+   */
+  ui.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { close(); return; }
+    if (e.key !== 'Enter' || e.altKey || e.shiftKey) return;
+    const typing = e.target === msg.input;
+    if (typing && !(e.metaKey || e.ctrlKey)) return;
+    e.preventDefault();
+    go();
+  });
 
   ui.append(box);
   document.body.append(ui);
