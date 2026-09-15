@@ -238,6 +238,13 @@ export const DEMOS = [
   { name: 'kurenniemi', act: 5, created: '2026-09-14', built: true,
     one: 'every reachable source and asset of Erkki Kurenniemi: who holds it, when, and what it allows',
     tags: ['archive', 'provenance'] },
+  // The same corpus as the row above, on an axis instead of in a table: one
+  // mark per record, as wide as its date is vague, and the twenty-six a browser
+  // can open are pressable. Named for the thing you can hear, because that is
+  // the reason it exists rather than the table.
+  { name: 'tapes', act: 5, created: '2026-09-15', built: true,
+    one: 'Kurenniemi in time — a mark as wide as its date is vague, and the ones you can play',
+    tags: ['timeline', 'uncertainty', 'archive'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
   { name: 'aikajana', act: 5, created: '2026-08-28', built: false, page: '/proto/aikajana/',

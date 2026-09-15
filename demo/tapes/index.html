@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 WIDER THAN THE PROSE, FOR THE SAME REASON `/kurenniemi/`'S TABLE IS. The
+     shell caps a page at 720 px, which is right for a paragraph. This axis
+     carries 130 years; at 720 px a decade is 55 px and the 1960s — where a
+     third of everything sits — is a smear. The strip breaks out and the prose
+     above it does not, because they are answering different questions. */
+  .pos-strip { width: min(1180px, calc(100vw - 32px)); margin-left: 50%; transform: translateX(-50%); }
+  /* The name of what is playing. ⚠️ FIXED HEIGHT AND `nowrap`: it changes every
+     time you press ‹ or ›, and CLAUDE.md is explicit that nothing which redraws
+     may change how much room it takes. Two lines of title would move the strip
+     under it every time. */
+  .now {
+    font: 500 12px/1.5 var(--mono); color: var(--fg);
+    height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .now .n-of { color: var(--dim2); }
+  .now .n-when { color: var(--dim); }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
+
+  // The same file `/kurenniemi/` reads. ONE corpus, two pictures of it: that
+  // page answers "what is there and who holds it", this one answers "when was
+  // it, and can I hear it". A second copy of the data would be a second thing
+  // to keep true.
+  const CORPUS = '/kurenniemi/corpus.json';
+
+  const d = mount({
+    name: 'tapes',
+    what: 'Everything reachable of Erkki Kurenniemi’s, laid out in time — one mark per record, '
+      + 'and the mark is as wide as the date is vague: a day is a tick, a year is a year-wide bar, '
+      + 'a decade is a decade. Green marks are the ones a browser can open; press ▸ to hear the '
+      + 'one that is loaded, or ‹ and › to walk through the tapes. Colour says how a record '
+      + 'landed, never which row it is in — grey is a pointer to somewhere else, slate means there is '
+      + 'a file this browser may not fetch, amber means the holder refused or is gone.',
+    // No readout: the strip IS the readout, the same argument `/kurenniemi/`
+    // makes about its table. Every number worth having is a count of what is
+    // directly above it.
+    readout: null,
+  });
+  guard(d);
+
+  // ── colour says HOW IT LANDED, never which lane ─────────────────────────
+  // CLAUDE.md, one meaning for colour across every demo. Every one of these
+  // comes from a field the corpus already carries, so nothing here is a new
+  // measurement — `http`, `cors` and `file` were written down when the record
+  // was gathered.
+  const INK = { open: '#3fb950', held: '#6f7d94', ref: '#3d4756', gone: '#d29922' };
+  const stateOf = (it) => {
+    const h = it.http;
+    if (h === 403 || (typeof h === 'string' && /DNS|ENOTFOUND/i.test(h))) return 'gone';
+    if (it.file && it.cors) return 'open';
+    if (it.file) return 'held';
+    return 'ref';
+  };
+  /**
+   * 🔴 ASK THE BROWSER AND THE FILENAME, NOT THE HOLDER'S HEADER. Two things the
+   * corpus says about a file turn out not to be about that file:
+   *
+   *   · `fileType` is the content-type the host SENT, and archive.org serves
+   *     `YLE.Time.and.Matter.4of5….avi` as `video/mp4`. `canPlayType` believes
+   *     it, the browser then cannot decode a frame, and the page offers a
+   *     recording nobody can hear. The extension is the better evidence here,
+   *     which is not a thing one expects to have to write down.
+   *   · `cors` was measured with a Range probe on ONE FILE PER SOURCE, so it is
+   *     a fact about archive.org and not about this object — MEASURED the first
+   *     time this page ran: `No 'Access-Control-Allow-Origin' header` on exactly
+   *     that `.avi`, from a row the corpus marks `cors: true`.
+   *
+   * Both are capability tests rather than trust: either this browser plays it or
+   * it does not, and that is the same question everywhere.
+   */
+  const PLAYS = /\.(mp3|m4a|mp4|webm|ogg|opus|wav|aac)(\?|#|$)/i;
+  const probeEl = new Audio();
+  const playable = (it) => stateOf(it) === 'open'
+    && PLAYS.test(it.file || '')
+    && !!probeEl.canPlayType(it.fileType || '');
+
+  const YEAR = (ms) => new Date(ms).getUTCFullYear();
+  const AXIS = [Date.UTC(1890, 0, 1), Date.UTC(2027, 0, 1)];
+
+  let items = [], tapes = [], cur = -1;
+
+  /**
+   * 🔴 TWO DECKS, AND THEY ARE TWO DIFFERENT KINDS OF TIME.
+   *
+   * `mapDeck` is 1890 to 2027 — where in HISTORY you are looking. `tapeDeck` is
+   * nought to the length of one recording — where in THE TAPE you are. They are
+   * not two views of one quantity and pretending otherwise is how a page ends
+   * up with a playhead that means something different depending on which half
+   * you look at.
+   *
+   * ⚠️ AND ONLY ONE OF THEM PLAYS. The map is a map: its playhead moves when you
+   * choose a record, so it says which year you are listening to, and it never
+   * runs on its own. CLAUDE.md's "one position surface per page" is about two
+   * surfaces for ONE axis; this is one surface each for two axes, and the page
+   * says which is which in words.
+   *
+   * ⚠️ `absolute: true` IS DECLARED, NOT INFERRED. The strip guesses an absolute
+   * wall-clock domain from `range[0] > 1e12`, and 1890 is a NEGATIVE number of
+   * milliseconds — so the guess says "relative" and the axis would be labelled
+   * in hours before the epoch.
+   */
+  const mapDeck = createDeck({
+    items: [],
+    adapters: { record: { actuate() {} } },
+    range: AXIS,
+  });
+
+  const audio = new Audio();
+  window.__a = audio;      // a handle for the lab probe; harmless in a page
+  audio.preload = 'metadata';
+  /**
+   * ⚠️ `anonymous` IS FOR THE PICTURE, NOT FOR THE SOUND, and it can cost the
+   * sound. A cross-origin element plays perfectly well without it; what it buys
+   * is a graph the analyser may read, and what it costs is that a host which
+   * does not send `access-control-allow-origin` on THIS object refuses the
+   * request outright. So it is tried, and `retryOpen()` below drops it and
+   * reloads rather than leaving a tape unplayable for the sake of a waveform.
+   */
+  audio.crossOrigin = 'anonymous';
+  const tapeDeck = createDeck({
+    items: [],
+    adapters: {
+      tape: {
+        actuate() {},
+        // Tape speeds, and no faster than 2: these are files, so nothing
+        // starves, but past 2 a voice stops being a voice.
+        caps: { rates: [0.25, 0.5, 1, 1.5, 2] },
+      },
+    },
+    range: [0, 1],
+  });
+
+  // ── the picture ─────────────────────────────────────────────────────────
+  const now = el('div', 'now');
+  d.el.append(now);
+
+  const view = createStripView(d.el, mapDeck, {
+    size: 'auto', absolute: true, gutter: 132, follow: false,
+  });
+
+  /**
+   * A lane is a KIND of thing, and the mark's shape is the date's honesty.
+   *
+   * 🔴 THE CORPUS'S `when` IS ALREADY THE STRIP'S `when`, which is why this is
+   * six lines rather than a renderer. `{earliest, latest, edtf}` is exactly what
+   * `whenOf()` reads, so a record dated `195X` arrives as a decade-wide bar and
+   * one dated `1975-06-30` as a tick, with no code here deciding that. MEASURED
+   * off the corpus: 85 rows know their day, 112 know only their year, 48 only
+   * their decade and 25 span longer than that. Drawn as points, a third of this
+   * archive would have been asserted to have happened on the 1st of January.
+   *
+   * ⚠️ 59 ROWS HAVE NO DATE AT ALL and cannot be on an axis. They are counted in
+   * each lane's gutter rather than dropped, because a silent truncation reads as
+   * "there were none".
+   */
+  const LANES = [
+    { id: 'life', label: 'his life', pick: (it) => it.kind === 'life' || it.kind === 'event' },
+    { id: 'tapes', label: 'tapes you can play', pick: playable },
+    { id: 'works', label: 'films & records',
+      pick: (it) => !playable(it) && /^(work|film|video|audio|recording|release)$/.test(it.kind) },
+    { id: 'kit', label: 'instruments', pick: (it) => it.kind === 'instrument' },
+    { id: 'paper', label: 'papers & photographs',
+      pick: (it) => /^(text|image|data|article)$/.test(it.kind) },
+    { id: 'fonds', label: 'the archive itself', pick: (it) => it.kind === 'collection' },
+  ];
+
+  const rowsFor = (pick) => items.filter((it) => pick(it) && it.when?.earliest != null)
+    .map((it) => ({ at: it.when.earliest, id: it.id, kind: 'record',
+                    payload: { when: it.when, it } }));
+
+  function buildLanes() {
+    view.strip.setLanes(LANES.map((L) => {
+      const all = items.filter(L.pick);
+      const undated = all.filter((it) => it.when?.earliest == null).length;
+      return {
+        id: L.id, label: L.label, as: 'spans', height: 30, barPad: 5, stack: false, terse: true,
+        // The gutter says what this lane MEASURED — how many it holds and how
+        // many of them no axis can place. Never an instruction (CLAUDE.md).
+        subLabel: `${all.length}${undated ? ` · ${undated} undated` : ''}`,
+        rows: () => rowsFor(L.pick),
+        colorOf: (s) => INK[stateOf(s.row.payload.it)],
+        /**
+         * 🔴 A LABEL ONLY WHERE A LABEL CAN BE READ. MEASURED on the first
+         * render at 1280 px: `papers & photographs` holds 204 records over
+         * seventy years, so its titles were drawn over each other into a grey
+         * smear that looked like a rendering fault and was in fact five names
+         * in the same forty pixels. 110 px is about fourteen characters of the
+         * strip's own type — under that a name is a fragment of a name, which
+         * is worse than no name because it reads as a different word.
+         *
+         * ⚠️ NOTHING IS HIDDEN BY THIS. The mark is still there, still the right
+         * width and still the right colour; pointing at it still names it. What
+         * goes is ink that was never legible.
+         */
+        labelOf: (s, { bw } = {}) => (bw && bw >= 110 ? s.row.payload.it.title : ''),
+        describeRow: (r) => {
+          const it = r.payload.it;
+          return [it.title, `${it.when.edtf || 'no date'} · ${it.source}`,
+                  { open: 'press to hear it', held: 'a file this browser may not fetch',
+                    ref: 'a pointer, nothing to open', gone: 'the holder refused, or is gone'
+                  }[stateOf(it)]];
+        },
+      };
+    }));
+  }
+
+  // ── the sound ───────────────────────────────────────────────────────────
+  // ⚠️ A SCROLLING WAVEFORM OF WHAT IS COMING OUT, not a drawing of the whole
+  // file. Drawing the file means fetching and decoding all of it — 225 MB for
+  // the largest thing here — before a single sample is heard, and the picture
+  // would then be of something nobody is listening to yet. This is the same
+  // `feed()` path `/radio1965/` uses, with no grains because there is no
+  // granulator on this page.
+  const scope = createGrainScope(d.el, { seconds: 8, height: 120, fullScale: 1 });
+  let ctx = null, analyser = null, buf = null;
+
+  function armAnalyser() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaElementSource(audio);
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    buf = new Float32Array(analyser.fftSize);
+    src.connect(analyser);
+    analyser.connect(ctx.destination);
+  }
+
+  /**
+   * 🔴 RESUME BEFORE PLAY, AND AWAIT IT. Routing a media element through an
+   * AudioContext makes the GRAPH drive it, so a suspended context is an element
+   * whose `currentTime` does not advance — playing, by every visible sign, and
+   * standing still. That is this repo's "never let sound gate the work" from the
+   * other side: not a hang waiting for a gesture, but a transport that reads
+   * zero while the page looks fine. `resume()` returns a promise and firing it
+   * without waiting is the same bug one tick later.
+   */
+  async function start() {
+    armAnalyser();
+    try { await ctx?.resume?.(); } catch { /* a suspended context is not fatal */ }
+    return audio.play().catch(() => {});
+  }
+
+  /**
+   * 🔴 `mediaMaster` DOES NOT RUN ITSELF, AND NOTHING SAYS SO LOUDLY. Its header
+   * shows the caller's loop on its second line — `function loop() {
+   * requestAnimationFrame(loop); mm.tick(); }` — and without it the object is
+   * constructed, holds a deck, listens to nothing that matters, and the deck
+   * never moves. MEASURED with a CDP probe after the harness pressed play:
+   * `paused false · currentTime 2.395 · deck 0`. The sound was fine the whole
+   * time; the page had simply never asked the master to look.
+   *
+   * ⚠️ AND IT IS ONE LOOP, NOT THREE. The picture, the level and the master all
+   * want a frame, and three `requestAnimationFrame` chains reading the same
+   * analyser is three copies of one measurement that can disagree about which
+   * frame they are in.
+   */
+  let peak = 0, master = null;
+  function frame() {
+    if (analyser && buf) {
+      analyser.getFloatTimeDomainData(buf);
+      scope.feed(buf, ctx.sampleRate);
+      let s = 0;
+      for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+      peak = Math.max(peak, Math.sqrt(s / buf.length));
+    }
+    master?.tick();
+    requestAnimationFrame(frame);
+  }
+
+  /**
+   * Load one tape and point everything at it.
+   *
+   * ⚠️ THE MAP MOVES AND THE TAPE RESTARTS, and they are separate sentences. A
+   * record with no date cannot move the map, so the log says so rather than the
+   * playhead sitting wherever it was and implying the year.
+   */
+  function select(i, { play = false } = {}) {
+    if (!tapes.length) return;
+    cur = ((i % tapes.length) + tapes.length) % tapes.length;
+    const it = tapes[cur];
+    audio.src = it.file;
+    // ⚠️ THE RANGE IS NOT RESET TO NOTHING. It used to go to `[0, 1]` here and
+    // wait for `loadedmetadata` — so for as long as the file took to answer,
+    // the transport's whole travel was one millisecond and a seek landed at
+    // 1 ms whatever you asked for. MEASURED: the harness's `keyboard seek
+    // lands` read `0 ~ 1`, which is a slider with nowhere to go rather than a
+    // seek that missed. The last known length stands until the new one
+    // arrives; `loadedmetadata` corrects it within a second.
+    now.replaceChildren(
+      el('span', 'n-of', `${cur + 1}/${tapes.length}  `),
+      document.createTextNode(it.title),
+      el('span', 'n-when', `  ${it.when.edtf || 'no date'}`));
+    if (it.when?.earliest != null) mapDeck.seek(it.when.earliest);
+    d.log(`${it.title} — ${it.when.edtf || 'no date, so it is not on the axis'}`, 'hi');
+    retried = false;                   // a new tape gets its own one chance
+    if (play) start();
+    return it;
+  }
+
+  // The bar owns play, pause, the speeds and the two walk buttons. Nothing on
+  // this page duplicates them.
+  const bar = createTransportBar(d.el, tapeDeck, {
+    scrub: true, endStop: false,
+    extras: [
+      { id: 'prev', label: '‹', aria: 'the tape before this one',
+        onClick: () => select(cur - 1, { play: !audio.paused }) },
+      { id: 'next', label: '›', aria: 'the tape after this one',
+        onClick: () => select(cur + 1, { play: !audio.paused }) },
+    ],
+    // Pressing ▸ on a page whose sound has never been touched has to arm the
+    // audio graph, and that needs the press. `command` is the bar's own hook
+    // for a page that owns the thing being played.
+    command: {
+      play: () => start(),
+      pause: () => audio.pause(),
+      /**
+       * 🔴 THE PLAYHEAD MOVES AT ONCE AND THE TAPE CATCHES UP, and both of those
+       * are deliberate. Setting `currentTime` on a file coming off somebody
+       * else's server is a RANGE REQUEST — the media arrives at the asked
+       * position when the network says so, not when the key was pressed.
+       * MEASURED: the harness asked for 117 538 ms and read 1 296 back, which is
+       * not a seek that missed, it is a seek still in flight.
+       *
+       * So the deck is told directly as well. ⚠️ AND IT MAY SNAP BACK BY A FRAME
+       * OR TWO when the media lands, because `mediaMaster` makes the MEDIA the
+       * master and its next tick re-anchors on where the sound actually is. That
+       * correction is the design working, not a fault: the picture is allowed to
+       * be optimistic for a moment, the sound is never allowed to be wrong.
+       */
+      seek: (pos) => {
+        const ms = Math.max(0, pos);
+        audio.currentTime = ms / 1000;
+        tapeDeck.seek(ms);
+      },
+    },
+  });
+
+  audio.addEventListener('loadedmetadata', () => {
+    const ms = Math.round((audio.duration || 0) * 1000);
+    if (ms > 0) tapeDeck.setRange([0, ms]);
+  });
+  /**
+   * 🔴 A TAPE THAT WILL NOT LOAD CROSS-ORIGIN IS RETRIED WITHOUT THE CROSSING.
+   * Dropping `crossOrigin` taints the graph, so the waveform goes blank for that
+   * one — and a blank picture beside a playing tape is a far better trade than a
+   * silent one beside a picture that could not have been drawn anyway. Said in
+   * words, because a viz that is empty for a reason and a viz that is broken
+   * look identical.
+   */
+  let retried = false;
+  function retryOpen() {
+    if (retried || !audio.crossOrigin || !tapes[cur]) return false;
+    retried = true;
+    audio.crossOrigin = null;
+    audio.src = tapes[cur].file;
+    d.log(`${tapes[cur].title} — its host will not share this file with a page, so it plays `
+      + 'with no waveform', 'bad');
+    return true;
+  }
+  audio.addEventListener('error', () => {
+    if (retryOpen()) return;
+    d.log(`this one would not load: ${tapes[cur]?.title}`, 'bad');
+  });
+
+  /**
+   * Wait for the loaded tape to be playable, or say it is not.
+   *
+   * 🔴 THE PAGE IS NOT READY UNTIL IT CAN SAY HOW LONG THE TAPE IS. Everything
+   * about a transport — the travel of the slider, where a seek lands, whether
+   * play advances — is a statement about a length nobody knows until the file
+   * answers. Calling `d.ready()` before that is a page announcing a transport
+   * over a recording of unknown duration, and it fails exactly the way it
+   * should: `play advances position — 0 -> 0`.
+   *
+   * ⚠️ IT HAS A DEADLINE AND SAYS SO. These are somebody else's 2-to-12 MB files
+   * over the open internet; a wait with no end turns one slow host into a page
+   * that never loads. Past the deadline the strip, the lanes and every count are
+   * still true — only the sound is missing, and the log names which.
+   */
+  function playable_now(ms = 9000) {
+    if (audio.readyState >= 3) return Promise.resolve(true);
+    return new Promise((res) => {
+      const done = (ok) => { clearTimeout(t); audio.removeEventListener('canplay', on);
+                             audio.removeEventListener('error', bad); res(ok); };
+      const on = () => done(true), bad = () => done(false);
+      const t = setTimeout(() => done(false), ms);
+      audio.addEventListener('canplay', on, { once: true });
+      audio.addEventListener('error', bad, { once: true });
+    });
+  }
+
+  // ── go ──────────────────────────────────────────────────────────────────
+  let loaded = false, heard = false;
+  try {
+    const res = await fetch(CORPUS);
+    if (!res.ok) throw new Error(`${CORPUS} answered ${res.status}`);
+    const corpus = await res.json();
+    items = corpus.items || [];
+    loaded = items.length > 0;
+    // Dated first and in order, undated appended — so ‹ and › walk history
+    // where there is any, and the rest are still reachable rather than hidden.
+    tapes = items.filter(playable).sort((a, b) =>
+      (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity));
+    buildLanes();
+    master = mediaMaster(tapeDeck, audio, { anchorMs: 0 });
+    frame();
+    select(0);
+    d.log(`${items.length} records, ${tapes.length} of them playable`, 'hi');
+    heard = await playable_now();
+    d.log(heard
+      ? `${tapes[cur].title} is loaded — ${(audio.duration / 60).toFixed(1)} minutes`
+      : `${tapes[cur]?.title} has not answered yet; the picture is complete, the sound is not`,
+      heard ? 'hi' : 'bad');
+  } catch (e) {
+    d.log(`could not read the list: ${e.message}`, 'bad');
+  }
+
+  d.assert('the corpus loaded and every record has a place', loaded,
+    `${items.length} records`);
+
+  /**
+   * 🔴 THE MARKS ARE AS WIDE AS THE DATES ARE VAGUE, WHICH IS THE WHOLE CLAIM OF
+   * THE PAGE AND SO IS THE THING TO CHECK. Counted off the rows the lanes
+   * actually build, not off the file — a lane that silently dropped its spans
+   * would still let the file's own counts pass.
+   */
+  const placed = LANES.reduce((n, L) => n + rowsFor(L.pick).length, 0);
+  const dated = items.filter((it) => it.when?.earliest != null).length;
+  d.assert('every dated record is on the axis, in exactly one lane',
+    placed === dated, `${placed} marks for ${dated} dated records`);
+
+  const widths = items.filter((it) => it.when?.earliest != null)
+    .map((it) => (it.when.latest - it.when.earliest) / 86400e3);
+  const ticks = widths.filter((w) => w <= 1).length;
+  const bars = widths.filter((w) => w > 1).length;
+  d.assert('a vague date is drawn as a wide mark, not as a point',
+    ticks > 0 && bars > 0 && bars > ticks / 2,
+    `${ticks} know their day and are ticks; ${bars} are bars, the widest `
+    + `${Math.round(Math.max(...widths) / 365.2425)} years`);
+
+  d.assert('nothing undated is silently dropped',
+    items.length - dated > 0
+      && LANES.every((L) => {
+        const all = items.filter(L.pick);
+        return all.length === 0 || view.strip.view() !== null;
+      }),
+    `${items.length - dated} records have no date and are counted in the gutters`);
+
+  d.assert('there is something to press, and it is served from somewhere else',
+    tapes.length > 0 && tapes.every((t) => !t.file.startsWith(location.origin)),
+    `${tapes.length} tapes, none of them ours`);
+
+  d.assert('the tape says how long it is, so the transport has somewhere to go',
+    heard && tapeDeck.range[1] > 1000,
+    heard ? `${Math.round(tapeDeck.range[1] / 1000)} s of tape, from ${tapes[cur].source}`
+          : 'the file did not answer within nine seconds');
+
+  // 🔴 THE PLAYHEAD FOLLOWS THE TAPE, which is the one thing a transport over
+  // somebody else's recording has to prove. Both halves: it must have moved,
+  // and it must have moved to where the MEDIA is rather than to a clock of its
+  // own — a deck advancing on a timer would satisfy the first and be a
+  // different page.
+  let followed = null;
+  if (heard) {
+    await start();
+    await new Promise((r) => setTimeout(r, 900));
+    followed = { deck: tapeDeck.position(), media: Math.round(audio.currentTime * 1000) };
+    audio.pause();
+  }
+  d.assert('the playhead follows the tape, not a clock of its own',
+    !!followed && followed.deck > 200 && Math.abs(followed.deck - followed.media) < 400,
+    followed ? `the tape is at ${followed.media} ms and the playhead at ${Math.round(followed.deck)} ms`
+             : 'nothing loaded to follow');
+
+  d.assert('the two clocks are different clocks',
+    mapDeck.range[0] < 0 && tapeDeck.range[0] === 0,
+    `the map runs ${YEAR(mapDeck.range[0])} to ${YEAR(mapDeck.range[1])}; `
+    + 'the tape runs from nought to its own length');
+
+  d.ready();
+</script>
+</html>
