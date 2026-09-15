@@ -1,4 +1,108 @@
-# Progress log — 2026-08-25 → 09-14  (newest first)
+# Progress log — 2026-08-25 → 09-15  (newest first)
+
+## Session 26 (2026-09-15) — the suite was texting a real phone; the archive gets an axis; two components and the bug one of them found
+
+**Twenty-two commits.** Live at `217a948-055838-8fd9`. The shape: a day of
+reported defects, each of which turned out to be a different bug from the one
+the report described — and one that was nobody's bug at all.
+
+### 🔴 Every run of the suite sent two real notifications to real subscribers
+
+*"why do I get notifications from positron? Is it your testing rig or what?"*
+It was, and it had been all day.
+
+Rooms in `workers/items` are separate Durable Objects, so two runs cannot see
+each other's rows and neither can see the real page's. **The one thing that was
+not per room was `env.FCM_TOPIC`.** `verify.mjs` gives every run its own room
+and publishes two items into it on every pass.
+
+Nothing was broken. The harness was right, the page was right, the worker was
+right, and nobody owned the sentence *"a side room shares one loudspeaker with
+the real one."* **A fact true of every part and of no part's author** is the
+shape worth remembering.
+
+Announcing is now an allowlist of ONE room — a prefix test would let the next
+non-real room through by default, and the default has to be silence. 🔴 The
+object had to learn its own name first: the alarm fires with no request and
+`idFromName(room)` tells the object nothing about its own name, so the one place
+deciding whether an item may reach a phone had no access to the answer.
+⚠️ `announced_at` is stamped only when something went out; stamping it regardless
+would make it mean "the announce step ran", a quieter and worse lie than null.
+
+Measured against the deployed worker before the page was touched: a fresh side
+room published an item that went `status: new` with `announced_at: null`.
+
+### `/tapes/` — the corpus on an axis, and the marks are as wide as the dates are vague
+
+85 records know their day, 112 only their year, 48 only a decade, 25 span
+longer, **59 have no date at all** and are counted in the gutters. Drawn as
+points, a third of this archive would have been asserted to have happened on the
+1st of January. ⚠️ None of it is code on the page — the corpus's `when` is
+already what the strip's `whenOf()` reads, so the uncertainty research finally
+has real data.
+
+Four things it cost: **`mediaMaster` does not run itself** (its header shows the
+caller's rAF loop; without it the deck never moves while the audio plays
+perfectly — `paused false · currentTime 2.395 · deck 0`); **archive.org serves a
+`.avi` as `video/mp4`**, so the extension is better evidence than the header;
+**the corpus's `cors` was probed per source, not per file**; and **a seek into a
+remote file is a Range request**, so `117538` read back as `1296` — a seek in
+flight, not a seek that missed.
+
+### The diaries exist and are not online
+
+122 rows became **334 from 17 sources**. Twelve diary rows say exactly what
+exists: five photographed pages surviving only in the Internet Archive with **no
+licence stated anywhere**, an audio diary printed in a paywalled book, the paper
+volumes, 100 digitised cassettes and an Apple Newton diary — all described, none
+published. The item-level finding aid answers 403 for every id.
+
+🔴 **`lahteilla.fi`'s 545 Wayback URLs were recorded on the first pass and never
+opened.** A list of addresses is not a list of what is at them. 🔴 **A cache key
+that does not move when the question moves answers the old question for ever** —
+adding a property to the Wikidata query re-ran nothing and read as "there is no
+such statement".
+
+### radio1965's patches differed in numbers, not in kind
+
+Reported a third time. MEASURED off the old set: scanmode 1 on 7 of 7, read
+speed within −0.10x..+0.25x on 5 of 7, overlap 2.0–5.0 on a scale clamped at
+2..40, euclid inert on 6 of 7. Seven variations on one architecture; widening
+ranges and adding movement could not have helped. The new eight span mode, speed,
+density and blend — including one that is **not all grains**, which no patch here
+had ever been.
+
+Also: the sound row's left edge, reported three times and two different bugs.
+🔴 **A component swap moves every selector that named the old one** —
+`createChoice` → `createPicker`, one of three rules updated, so
+`shareLabelColumn()` kept setting `--lab` and nothing consumed it. ⚠️ And a `12`
+typed in one file against a `0` in another; it is `--sld-col` now. There is an
+assert on the left edges and it fired at `12 px apart` before it passed.
+
+### Two components, and the bug the sandbox found
+
+`table.mjs` (columns the caller declares; throws unless exactly one grows) and
+`tabs.mjs` (uppercase, scrollable, no borders, `#links`). 🔴 **`min-width: 0` or
+a tab row drags the page sideways instead of scrolling** — 141 px of page
+overflow at 390 px, already live on `/items/` and invisible there because three
+short tabs fit. `/kit/` holds four, one deliberately too long.
+
+⚠️ And `/kit/` **is not machine-graded**: `verify.mjs kit` answers "nothing for
+this harness to verify". The one page whose job is to make component drift
+visible is the one page the suite cannot see.
+
+### Smaller, and each one a rule
+
+🔴 **`prompt()` refuses a press that was not a hand and REJECTS rather than
+throws** — a `try` around it catches nothing. ⚠️ **An allowlist fails silently
+by design**: renaming to `manifest.webmanifest` shipped a 404 because
+`build.mjs` did not list the extension, on the one page whose problem is that it
+will not install. ⚠️ The iPhone push silence was **Sleep Focus**, in the status
+bar of every screenshot sent to me and not read by me; there is no API for it,
+so the page names it as a cause.
+
+The `vain` rename was done and fully reverted on instruction; `radio1965` keeps
+its slug.
 
 ## Session 25 (2026-09-14) — a page that broke its own sound to check itself; the granulator learns to move; Kurenniemi restarted
 
