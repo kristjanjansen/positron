@@ -105,7 +105,43 @@ static void mktarget(int w,int h,GLuint*t,GLuint*f){
 // and stderr carries the timings, so parameters had nowhere to arrive — and the
 // alternative, restarting the process with new argv, costs seconds and cycles
 // the exclusive hardware encoder, which is the thing that wedged the board
-// once already. One line per change: `seg 16\n`, `fb 0.85\n`.
+// once already. One line per change: `seg 16\n`, `fb 0.85\n`,
+// `data <1368 base64 characters>\n`.
+//
+// 🔴 NOT BUILT OR RUN ANYWHERE YET. The `data` verb and `uData` below were
+// written on a laptop that SIGKILLs locally compiled binaries, so nothing here
+// has been through a compiler. On the board:
+//
+//   scp rig/vis/v3dpipe.c positron@<board>:/tmp/ && ssh positron@<board> '
+//     cd /tmp && gcc -O2 -o v3dpipe v3dpipe.c -lEGL -lGLESv2 -lgbm'
+//
+//   # a defined still picture with no data at all: uData reads zero, not noise
+//   ./v3dpipe 640 480 60 > /dev/null
+//
+//   # the verb, proved by BREAKING it first, which is the only way to know the
+//   # size check is doing anything. Three lines, three different answers:
+//   { printf 'data %s\n' "$(head -c 1023 /dev/urandom | base64 -w0)";   # REFUSED
+//     printf 'data %s\n' "$(head -c 1024 /dev/urandom | base64 -w0)";   # OK
+//     printf 'data %s\n' "$(head -c 1024 /dev/zero    | base64 -w0)";   # layout 0
+//     sleep 4; } | ./v3dpipe 640 480 120 > /dev/null
+//
+//   # and the frame rate WITH a line every frame against WITHOUT one, which is
+//   # the open question in the note below. Same resolution, same frame count,
+//   # and the difference is the syscalls:
+//   ./v3dpipe 1280 720 300 > /dev/null                          # baseline fps
+//   B64=$(head -c 1024 /dev/urandom | base64 -w0)
+//   while :; do printf 'data %s\n' "$B64"; sleep 0.033; done |\
+//     ./v3dpipe 1280 720 300 > /dev/null                        # with data
+//
+// 🔴 THE SYSCALL COUNT IS THE UNMEASURED THING ABOUT `data`, AND IT IS THE
+// FIRST THING TO MEASURE. drain_stdin reads ONE BYTE PER read() SYSCALL. That is
+// nothing for a `shader` line, which arrives when somebody types; a 1024-byte
+// payload is 1368 base64 characters plus the verb and the newline, so a data
+// line every frame at 30 fps is about 41,200 read syscalls a second on a board
+// whose renderer is the thing being measured. INFERRED from the loop, never
+// measured. If the frame rate moves, the fix is a buffered read HERE, not a
+// smaller payload: shrinking the table to fit a syscall budget would be sizing
+// the picture to the transport.
 //
 // NON-BLOCKING, because this is read in the render loop: a blocking read with
 // nobody typing would stop the picture dead.
@@ -116,10 +152,63 @@ static float g_seg = 8.0f, g_fb = 0.78f, g_scale = 4.0f, g_warp = 0.08f, g_hue =
    that rule explicit is cheaper than remembering it. */
 static char  g_pending[16384];
 static int   g_pending_n = 0;
+
+/* ── THE DATA TEXTURE. One line, `data <base64>`, 1024 bytes, once a frame. ──
+   Five named floats was the whole control channel, and a spectrum is not five
+   floats. See plan-audio-shader.md §4 for what the bytes MEAN; nothing here
+   knows, and that is deliberate: this end is a transport, and a C file that
+   decoded the layout would be a second copy of it to keep in step.
+
+   🔴 64 x 4 RGBA8 IS FROZEN, THE WAY pattern.mjs's ROW IS FROZEN, AND FOR THE
+   SAME REASON. A body compiled against one layout and fed another does not
+   fail, it draws a plausible wrong picture. So the size is refused rather than
+   padded (a short line is DATA-REFUSED, never a half-filled texture), and the
+   sender puts a version byte at row 3 x 63 which this prints ONCE so a board
+   log can be attributed to a layout the way every log line here is already
+   attributed to a build.
+
+   ⚠️ RGBA8 AND NOT A FLOAT TEXTURE, and the argument is portability rather
+   than size: half-float and float textures raise filtering and renderability
+   questions that differ between GLSL ES 3.00 in a browser and 3.10 here, while
+   RGBA8 is core in both and needs no sampler state at all when it is read with
+   texelFetch. One 8-bit step is 1/255 of a lane; the modulator that fills row 2
+   has a dead-band of 0.005 of a lane, so it cannot send a change this cannot
+   carry. */
+#define DATA_W 64
+#define DATA_H 4
+#define DATA_BYTES (DATA_W * DATA_H * 4)
+#define DATA_VERSION_AT (3 * DATA_W * 4 + 63 * 4)   /* row 3, x 63, R */
+static unsigned char g_data[DATA_BYTES];
+static int           g_data_ready = 0;              /* a line arrived; upload it */
+static int           g_data_said  = 0;              /* the version has been printed */
+static GLuint        g_datatex = 0;
+
+/* NEAREST and CLAMP_TO_EDGE, because this is a table and not a picture. A
+   filtered read halfway between two texels returns a number that is in neither
+   of them, which for a spectrum is a band that does not exist. */
+static GLuint mkdatatex(void){
+  GLuint t;
+  glGenTextures(1,&t); glBindTexture(GL_TEXTURE_2D,t);
+  glTexStorage2D(GL_TEXTURE_2D,1,GL_RGBA8,DATA_W,DATA_H);
+  glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+  /* ⚠️ ZEROED, AND THAT IS NOT TIDINESS. glTexStorage2D allocates without
+     initialising, so a body that samples uData before the first `data` line
+     would be drawing whatever the driver left in that memory - a picture with
+     no source, which reads as a bug in the shader. Zero is a defined still
+     picture and the board pane can say "no sound here" over it. */
+  static const unsigned char zero[DATA_BYTES] = {0};
+  glTexSubImage2D(GL_TEXTURE_2D,0,0,0,DATA_W,DATA_H,GL_RGBA,GL_UNSIGNED_BYTE,zero);
+  glBindTexture(GL_TEXTURE_2D,0);
+  return t;
+}
+
 /* The uniforms every pass wants, set defensively: a shader that arrived over
    the wire need not declare all of them, and `glGetUniformLocation` returning
    -1 for one it dropped is the normal case rather than an error. */
-static void draw_pass(GLuint prog, long i, int W, int H, GLuint src,
+static void draw_pass(GLuint prog, long i, int W, int H, GLuint src, GLuint data,
                       float seg, float fb, float scale, float warp, float hue){
   glUseProgram(prog);
   GLint l;
@@ -130,8 +219,19 @@ static void draw_pass(GLuint prog, long i, int W, int H, GLuint src,
   if((l=glGetUniformLocation(prog,"uScale"))>=0) glUniform1f(l,scale);
   if((l=glGetUniformLocation(prog,"uWarp"))>=0) glUniform1f(l,warp);
   if((l=glGetUniformLocation(prog,"uHue"))>=0) glUniform1f(l,hue);
+  /* ⚠️ UNIT 1, AND uPrev IS BOUND AFTER IT ON PURPOSE. glActiveTexture is
+     global state: leaving unit 1 selected would send the NEXT glBindTexture
+     anywhere in this program to the wrong unit. Binding uData first and uPrev
+     second leaves unit 0 selected on the common path, and the line after the
+     pair leaves it selected on the path where a body dropped uPrev.
+     ⚠️ `layout(binding = 1)` would be shorter and is ES 3.10 only, so a body
+     using it would compile here and be refused by a browser. Set from the host,
+     the way mirror already does. */
+  if((l=glGetUniformLocation(prog,"uData"))>=0 && data){
+    glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,data); glUniform1i(l,1); }
   if((l=glGetUniformLocation(prog,"uPrev"))>=0){
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,src); glUniform1i(l,0); }
+  glActiveTexture(GL_TEXTURE0);
   glDrawArrays(GL_TRIANGLES,0,3);
 }
 
@@ -147,6 +247,30 @@ static void drain_stdin(void){
       int n = b64dec(line+7, g_pending, sizeof g_pending);
       if(n > 0){ g_pending_n = n; fprintf(stderr, "SHADER-QUEUED %d bytes\n", n); }
       else { g_pending_n = 0; fprintf(stderr, "SHADER-REFUSED base64\n"); }
+      continue;
+    }
+    if(!strncmp(line, "data ", 5)){
+      /* 🔴 DECODED INTO SCRATCH FIRST, AND ACCEPTED ONLY AT THE EXACT SIZE.
+         Decoding straight into g_data would let a truncated line leave half a
+         frame of new numbers sitting on top of half a frame of old ones - a
+         texture that is a blend of two uploads, drawing a plausible picture of
+         something that never happened. Refuse and SAY SO: a dropped frame of
+         data that nothing counts is the pcm-playout failure in a new medium. */
+      static char tmp[DATA_BYTES + 1];
+      int n = b64dec(line+5, tmp, sizeof tmp);
+      if(n == DATA_BYTES){
+        memcpy(g_data, tmp, DATA_BYTES);
+        g_data_ready = 1;
+        /* ONCE, so a board log can be attributed to a layout. Every 06 log
+           already opens with its build; a picture fed a table needs the same
+           for the table, and this is the one byte the sender promises. */
+        if(!g_data_said){
+          g_data_said = 1;
+          fprintf(stderr, "DATA-OK layout %d\n", (int)g_data[DATA_VERSION_AT]);
+        }
+      } else {
+        fprintf(stderr, "DATA-REFUSED %d bytes, wanted %d\n", n, DATA_BYTES);
+      }
       continue;
     }
     char k[32]; float v;
@@ -176,6 +300,7 @@ int main(int argc,char**argv){
           glGetString(GL_RENDERER),W,H,PASSES,N);
   GLuint vao; glGenVertexArrays(1,&vao); glBindVertexArray(vao);
   GLuint tA,fA,tB,fB; mktarget(W,H,&tA,&fA); mktarget(W,H,&tB,&fB);
+  g_datatex = mkdatatex();
   GLuint pK=mkprog(FS_KAL), pB=mkprog(FS_BLUR);
   GLuint pKnew = 0; double fadeT0 = 0;
   glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND); glViewport(0,0,W,H);
@@ -209,10 +334,23 @@ int main(int argc,char**argv){
       }
     }
 
+    /* One upload per frame, and only when a line actually arrived - a
+       glTexSubImage2D every frame regardless would be a 1 KB copy saying
+       nothing. Here rather than in drain_stdin for the reason the shader
+       compile is here: GL calls belong where the context is current, and
+       keeping that rule explicit is cheaper than remembering it. */
+    if(g_data_ready){
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, g_datatex);
+      glTexSubImage2D(GL_TEXTURE_2D,0,0,0,DATA_W,DATA_H,GL_RGBA,GL_UNSIGNED_BYTE,g_data);
+      glActiveTexture(GL_TEXTURE0);
+      g_data_ready = 0;
+    }
+
     for(int p=0;p<PASSES;p++){
       GLuint prog=p?pB:pK;
       glBindFramebuffer(GL_FRAMEBUFFER,dst);
-      draw_pass(prog, i, W, H, src, g_seg, g_fb, g_scale, g_warp, g_hue);
+      draw_pass(prog, i, W, H, src, g_datatex, g_seg, g_fb, g_scale, g_warp, g_hue);
       /* ⚠️ THE CROSSFADE IS CONSTANT-ALPHA BLENDING, NOT A MIX SHADER AND NOT
          EXTRA TARGETS. The old picture is already in the framebuffer, so
          drawing the new one over it with GL_CONSTANT_ALPHA gives
@@ -225,7 +363,7 @@ int main(int argc,char**argv){
         glEnable(GL_BLEND);
         glBlendColor(0.f,0.f,0.f,kk);
         glBlendFunc(GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA);
-        draw_pass(pKnew, i, W, H, src, g_seg, g_fb, g_scale, g_warp, g_hue);
+        draw_pass(pKnew, i, W, H, src, g_datatex, g_seg, g_fb, g_scale, g_warp, g_hue);
         glDisable(GL_BLEND);
         if(k >= 1.0){ glDeleteProgram(pK); pK = pKnew; pKnew = 0;
                       fprintf(stderr, "SHADER-LIVE the new look is the look\n"); }

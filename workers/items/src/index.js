@@ -227,6 +227,19 @@ export class Items {
         fires: rows.length,
         late_ms: { min: rows[0] ?? null, p50: q(50), p95: q(95), max: rows[rows.length - 1] ?? null },
         all: rows,
+        // 🔴 THE NAME THIS OBJECT REMEMBERS, AND WHETHER IT MAY ANNOUNCE. It is
+        // written ONCE, at whatever the first request called it, and a later
+        // request carrying a different `room` cannot change it — which is the
+        // point, and is also a state nothing could see. An object first reached
+        // without `?room=` stores `default` and then silently refuses to
+        // announce for ever, while every row it holds reads `announced_at:
+        // null` and looks like a failed send. Those are opposite diagnoses and
+        // they were indistinguishable from outside.
+        room: this.room,
+        announcing: this.room === ANNOUNCING_ROOM,
+        // Which of the three things `announce` needs are actually present. Not
+        // the values, obviously: whether there is one.
+        has_key: !!this.env?.FIREBASE_SA, has_topic: !!this.env?.FCM_TOPIC,
       });
     }
 

@@ -613,6 +613,32 @@ registerRenderer('spans', (ctx, L, C) => {
   // rather than as an object with ends.
   const barPad = L.barPad ?? 3;
   const barH = L.stack === false ? L.height - barPad * 2 : Math.max(3, (L.height - barPad * 2) / nSlots - 2);
+  /**
+   * 🔴 WHICH SPAN IS THE ONE IN HAND, AND IT CANNOT BE SAID IN COLOUR.
+   *
+   * A lane whose bars are things you can pick one of — a corpus of tapes, a
+   * list of takes — needs to say which one is picked, and every colour channel
+   * is already spoken for: hue is HOW A ROW LANDED across this whole project,
+   * and the two tones inside a bar are how sure its date is. So the channel is
+   * strength: `currentOf(s)` true for one span leaves that one at full weight,
+   * a hairline ring in the playhead's own ink around it, and drops the rest to
+   * `dimTo`. Nothing moves, nothing changes hue, and the picture answers "which
+   * of these am I on" without a second legend.
+   *
+   * ⚠️ IT DIMS ONLY WHEN SOMETHING IS ACTUALLY CURRENT. A lane that answers
+   * false for everything — nothing loaded yet — gets its ordinary picture
+   * rather than a lane greyed out for no reason a reader can see.
+   */
+  const anyCur = L.currentOf ? spans.some((s) => L.currentOf(s)) : false;
+  // HALF STRENGTH, and no less. MEASURED at 1, 0.38 and 0.55 on `/tapes/` at
+  // 1440 px: below about a half the bars of an archive whose subject is HOW
+  // WIDE A VAGUE DATE IS stop reading as bars at all, and dimming that erases
+  // the encoding has thrown away more than it bought. The ring is what makes
+  // the current one unmistakable; this only has to rank the rest behind it.
+  const DIM = L.dimTo ?? 0.5;
+  // and its labels dim less than its bars: a title is the row's identity, and
+  // the point of dimming is to rank the bars, not to make the archive unreadable
+  const DIM_LABEL = L.dimLabelTo ?? 0.62;
   ctx.save();
   // `bars:false` gives the AGGREGATE ITS OWN LANE. A stacked span lane and a
   // per-column silhouette want the same pixels, and the silhouette loses — the
@@ -628,8 +654,17 @@ registerRenderer('spans', (ctx, L, C) => {
       : L.slotOf ? (L.slotOf(s) % nSlots + nSlots) % nSlots
       : (rowsByKey.get(s.key) || 0) % nSlots;
     const y = L.y + 3 + row * (barH + 2);
+    // WHERE THIS BAR ENDED UP, written back for `hitTest`. A packed lane puts
+    // its bars in sub-rows and the hit test used to ignore them: it returned the
+    // FIRST span covering the pointer's time, so on a lane of overlapping dates
+    // pointing at any bar named the topmost one. The draw is the only thing that
+    // knows the geometry (it depends on the slot count, the pad and the lane's
+    // height), so it records it rather than making the hit test guess again.
+    s._y = y; s._h = barH;
     const xa = x(s.from), xb = x(to);
     const col = L.colorOf ? L.colorOf(s) : (L.color || (L.byKey ? idToColor(s.key) : style.color));
+    const isCur = anyCur && !!L.currentOf(s);
+    const dim = anyCur && !isCur ? DIM : 1;
     const prov = s.row && s.row.provenance;
     const st = whenState(s, C.t0, C.t1);
     s.state = st;                               // read back by spanStates()/hover
@@ -666,7 +701,12 @@ registerRenderer('spans', (ctx, L, C) => {
     // than guessed further down, because this is the only place that knows how
     // solid the bar ended up.
     let drawnAlpha = 0;
-    const band = (alpha, x0 = xa, w0 = bw) => {
+    const band = (a0, x0 = xa, w0 = bw) => {
+      // ⚠️ `drawnAlpha` IS WHAT WAS PAINTED, dim included. The label below picks
+      // its ink from it, so a dimmed bar that recorded its undimmed strength
+      // would get dark ink on a faint bar — which is the exact bug the label
+      // rule was written to fix, one channel later.
+      const alpha = a0 * dim;
       drawnAlpha = Math.max(drawnAlpha, alpha);
       ctx.globalAlpha = alpha; ctx.fillStyle = col;
       if (!feather) {
@@ -691,7 +731,7 @@ registerRenderer('spans', (ctx, L, C) => {
       // fill. It is visible (you can see what the query threw away) and it can
       // never be mistaken for an answer.
       band(TONE.ghost);
-      ctx.globalAlpha = 0.55; ctx.strokeStyle = col; ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.55 * dim; ctx.strokeStyle = col; ctx.lineWidth = 1;
       ctx.strokeRect(xa + 0.5, y + 0.5, Math.max(1, bw - 1), barH - 1);
     } else {
       // AMBIGUATION (Gschwandtner et al. 2016): lighter tone = the possible
@@ -700,7 +740,7 @@ registerRenderer('spans', (ctx, L, C) => {
       if (st === 'core' && !L.allSkirt) {
         // …and the saturated core, the ONE place a saturated rectangle is true.
         const ia = x(s.innerFrom), ib = x(s.innerTo);
-        ctx.globalAlpha = TONE.core; ctx.fillStyle = col;
+        ctx.globalAlpha = TONE.core * dim; ctx.fillStyle = col;
         ctx.fillRect(ia, y, Math.max(1.5, ib - ia), barH);
       } else if (st === 'outer' && !L.allSkirt) {
         // THE EMPTY CORE, AND WHY IT IS NOT NOTHING. All 22 Kurenniemi rows have
@@ -718,7 +758,7 @@ registerRenderer('spans', (ctx, L, C) => {
         // it is not a filled region at all.
         const my = y + barH / 2;
         const cap = Math.max(3, barH * 0.34);
-        ctx.globalAlpha = TONE.bar; ctx.lineWidth = 1.5;
+        ctx.globalAlpha = TONE.bar * dim; ctx.lineWidth = 1.5;
         ctx.setLineDash([]);
         // …and the CAPS are the outer bounds asserted as facts, so they belong
         // to ignorance only. A capped error bar on a VAGUE row would put a hard
@@ -744,7 +784,7 @@ registerRenderer('spans', (ctx, L, C) => {
       // IGNORANCE gets its hard terminators and its affordance; VAGUENESS gets
       // neither, and the feathered band above already said why.
       if (!soft && s.smeared && bw > 3) {
-        ctx.globalAlpha = 0.75; ctx.strokeStyle = col; ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.75 * dim; ctx.strokeStyle = col; ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(xa + 0.5, y); ctx.lineTo(xa + 0.5, y + barH);
         ctx.moveTo(xb - 0.5, y); ctx.lineTo(xb - 0.5, y + barH);
@@ -752,7 +792,7 @@ registerRenderer('spans', (ctx, L, C) => {
         // the "narrow this" affordance: a 4 px caret at the head of the band.
         // Present ONLY for ignorance, because only ignorance can be repaired.
         if (L.narrowable !== false && bw > 16 && barH >= 7) {
-          ctx.globalAlpha = 0.9; ctx.fillStyle = col;
+          ctx.globalAlpha = 0.9 * dim; ctx.fillStyle = col;
           ctx.beginPath();
           ctx.moveTo(xa + 2, y + 1); ctx.lineTo(xa + 6, y + 1); ctx.lineTo(xa + 2, y + 5);
           ctx.closePath(); ctx.fill();
@@ -763,7 +803,7 @@ registerRenderer('spans', (ctx, L, C) => {
     // TRATTEGGIO — a derived row is hatched at its own tier, on top, in ink
     // that is not spoken for by uncertainty.
     if (prov) {
-      ctx.globalAlpha = 0.9; ctx.strokeStyle = col; ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.9 * dim; ctx.strokeStyle = col; ctx.lineWidth = 1;
       ctx.setLineDash(hatchFor(prov.tier) || [3, 3]);
       ctx.strokeRect(xa + 0.5, y + 0.5, Math.max(1, xb - xa - 1), barH - 1);
       ctx.setLineDash([]);
@@ -771,7 +811,26 @@ registerRenderer('spans', (ctx, L, C) => {
     if (s.open) {                                                   // feathered right edge
       const g = ctx.createLinearGradient(xb - 24, 0, xb, 0);
       g.addColorStop(0, col); g.addColorStop(1, 'transparent');
-      ctx.globalAlpha = 0.5; ctx.fillStyle = g; ctx.fillRect(xb - 24, y, 24, barH);
+      ctx.globalAlpha = 0.5 * dim; ctx.fillStyle = g; ctx.fillRect(xb - 24, y, 24, barH);
+    }
+    // THE ONE IN HAND, RINGED. A hairline in the playhead's own ink, on the
+    // bar's edge rather than around it: the rows are two pixels apart, and a
+    // ring drawn outside the bar would touch the row above. It goes on before
+    // the label so the text stays on top of it, and it is the last thing the
+    // bar draws at full strength whatever tone the bar itself ended up.
+    if (isCur) {
+      // 🔴 THE EDGE IS THE BAR'S OWN COLOUR, NOT A SECOND ONE. A white hairline
+      // round a green bar reads as two objects, and REPORTED as exactly that:
+      // "same border and bg color". It is the same ink filled behind the label
+      // as well, so the one in hand is a SOLID block rather than an outline
+      // with a dark hole in it, and the label on it has something to sit on.
+      // Solid is also what makes the text legible: at full strength the ink
+      // rule below picks dark on light, which is the readable pairing.
+      ctx.globalAlpha = 0.92; ctx.fillStyle = col;
+      if (rad > 0.5 && ctx.roundRect) {
+        ctx.beginPath(); ctx.roundRect(xa, y, Math.max(1, bw), barH, rad); ctx.fill();
+      } else ctx.fillRect(xa, y, Math.max(1, bw), barH);
+      drawnAlpha = 0.92;
     }
     // `labelOf` is handed the bar's WIDTH. Without it the narrowest span is
     // the one that loses its label — and the narrowest span is often the one
@@ -780,14 +839,24 @@ registerRenderer('spans', (ctx, L, C) => {
       // Dark ink on a solid bar, light ink on a faint one. 0.55 is between the
       // skirt (0.30) and everything else (0.85 and up), so the choice is never
       // close.
-      ctx.globalAlpha = 0.95;
+      ctx.globalAlpha = 0.95 * (anyCur && !isCur ? DIM_LABEL : 1);
       ctx.fillStyle = drawnAlpha >= 0.55 ? '#04121a' : '#dfe6ea';
-      ctx.font = '10px ui-monospace, Menlo, monospace';
+      // ⚠️ 11 px, NOT 10. REPORTED as not legible, and a monospace face at 10 px
+      // over Finnish and Estonian titles is where it shows: the diacritics that
+      // tell `ääniä` from `Ääniä` are the first thing to go.
+      ctx.font = '11px ui-monospace, Menlo, monospace';
       // TOP-LEFT. A label on the baseline of a tall bar floats in the middle of
       // nothing and drifts as the bar's height changes; anchored to the corner
       // it stays where the eye goes first and is the same distance from the
       // edge whatever height the lane is given.
-      ctx.fillText(String(L.labelOf ? L.labelOf(s, { bw }) : s.key), xa + 5, y + 11.5);
+      // ⚠️ PADDING, AND VERTICALLY CENTRED RATHER THAN PINNED TO A BASELINE.
+      // `y + 11.5` was a baseline measured for one bar height; on a packed lane
+      // whose slots are shorter it put the text through the bar's bottom edge.
+      // Centring reads off the height the bar actually got, so a lane can be
+      // repacked without the labels needing a second number changed with it.
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(L.labelOf ? L.labelOf(s, { bw }) : s.key), xa + 8, y + barH / 2 + 0.5);
+      ctx.textBaseline = 'alphabetic';
     }
   }
   ctx.restore();
@@ -961,6 +1030,8 @@ registerRenderer('waveform', (ctx, L, C) => {
  *            fitted to deck.range.
  *   evidence 'attested' | {restored:{maxTier:n}} | 'all' — asked of the DECK.
  *   follow   boolean, default true
+ *   playhead false for a strip that is a MAP rather than a transport: no line,
+ *            no triangle, and no touch-scrub on an invisible one
  *   onSeek   (posMs) => void; defaults to deck.seek
  *   onHover  (detail|null) => void
  *   hud      an element the strip writes its quality readout into
@@ -1478,13 +1549,45 @@ export function createStrip(canvas, deck, opts = {}) {
     for (const L of S.lanes) {
       if (!L.show) continue;
       const st = L._style || {};
+      const subs = subLabelsOf(L);
+      /**
+       * 🔴 THE SWATCH IS AS TALL AS THE TEXT BESIDE IT, WHICH IS NOT WHAT IT
+       * WAS. It ran `min(14, height - 12)` whatever the lane held, so a lane
+       * with a name and nothing else got a 14 px bar against one 10 px line:
+       * a rule down the gutter rather than a mark beside a word. With a
+       * sub-label under it there really are two lines to span and 14 is right.
+       * The swatch now measures what is there.
+       */
+      const nameOnly = subs.length === 0;
+      const swatchH = nameOnly ? 9 : Math.min(14, L.height - 12);
       ctx.fillStyle = st.color || T.ink; ctx.globalAlpha = 0.9;
-      ctx.fillRect(SWATCH_X, L.y + 6, 3, Math.min(14, L.height - 12));
-      ctx.fillStyle = T.ink;
-      ctx.fillText(clip(String(L.label ?? L.id), gutRoom(TEXT_X)), TEXT_X, L.y + GUT_NAME_Y);
+      ctx.fillRect(SWATCH_X, L.y + (nameOnly ? 3 : 6), 3, Math.max(4, swatchH));
+      /**
+       * 🔴 THE NAME CARRIES THE LANE'S OWN COLOUR, mixed toward the ink rather
+       * than set to it. The swatch has always been coloured and the name was
+       * always `T.ink`, so the one thing a reader looks at to tell two lanes
+       * apart was the one thing that said nothing: on a strip of six lanes the
+       * names were six identical greys beside six coloured ticks, and joining
+       * them up was the reader's job.
+       *
+       * ⚠️ MIXED, NOT REPLACED. A lane colour at full strength is chosen to
+       * stand out against a dark plot, and a name set in it competes with the
+       * marks it is labelling. This is the same argument `diagram.mjs` settled
+       * when a hue pushed into a near-black fill came out as mud, and the same
+       * answer: identity lives at a fraction, legibility comes first.
+       */
+      ctx.fillStyle = st.color
+        ? `color-mix(in oklab, ${st.color} 42%, ${T.ink})`
+        : T.ink;
+      ctx.globalAlpha = 1;
+      // ⚠️ THE NAME SITS HIGHER WHEN IT IS ALONE. `GUT_NAME_Y` was measured for
+      // a name with lines beneath it, so on a lane with none the word hung low
+      // in its own row with all the air above it.
+      ctx.fillText(clip(String(L.label ?? L.id), gutRoom(TEXT_X)), TEXT_X,
+        L.y + (nameOnly ? GUT_NAME_Y - 3 : GUT_NAME_Y));
       // the per-lane label GUTTER states the lane's own clock and whether it is
       // AUDIBLE — proto/instrument's two ideas, which nothing else carried.
-      let all = subLabelsOf(L);
+      let all = subs;
       // ⚠️ JOIN THE LINES WHEN THEY FIT ON ONE. Two lines cost a lane 11 px of
       // height each, and the gutter is now wide enough that `52 ms typical` and
       // `64 ms worst` usually fit side by side — so the same numbers arrive in
@@ -1590,11 +1693,25 @@ export function createStrip(canvas, deck, opts = {}) {
       ctx.fillText(txt, 8, 11);
     }
 
-    const px = Math.round(x(S.pos)) + 0.5;
-    ctx.globalAlpha = 1; ctx.strokeStyle = T.playhead; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, S.contentH); ctx.stroke();
-    ctx.fillStyle = T.playhead;
-    ctx.beginPath(); ctx.moveTo(px - 4, 0); ctx.lineTo(px + 4, 0); ctx.lineTo(px, 6); ctx.closePath(); ctx.fill();
+    /**
+     * 🔴 `playhead: false` — A STRIP THAT IS A MAP HAS NO POSITION IN IT.
+     *
+     * A sweeping line across bars means one thing everywhere it has ever been
+     * drawn: this is where playback is, and everything it crosses is sounding.
+     * On a strip whose axis is WHEN THINGS ARE FROM that sentence is false, and
+     * it was read exactly as written. The report on `/tapes/` was *"am I
+     * listening to all the tapes on the same day together?"*, about an axis
+     * running 1890 to 2027 where one tape plays at a time. A map draws no
+     * playhead; `currentOf` on a lane is how such a page says which of its bars
+     * is the one in hand.
+     */
+    if (opts.playhead !== false) {
+      const px = Math.round(x(S.pos)) + 0.5;
+      ctx.globalAlpha = 1; ctx.strokeStyle = T.playhead; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, S.contentH); ctx.stroke();
+      ctx.fillStyle = T.playhead;
+      ctx.beginPath(); ctx.moveTo(px - 4, 0); ctx.lineTo(px + 4, 0); ctx.lineTo(px, 6); ctx.closePath(); ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -1713,7 +1830,38 @@ export function createStrip(canvas, deck, opts = {}) {
     // same swatch its lane's marks carry, which is the join between a number in
     // here and the ink out there — the lane-stats table earns its readability
     // the same way, and a tooltip listing four lanes needs it more.
-    const lines = (h.lines || h.text.split('\n')).map((l) => (typeof l === 'string' ? { text: l } : l));
+    const raw = (h.lines || h.text.split('\n')).map((l) => (typeof l === 'string' ? { text: l } : l));
+    /**
+     * 🔴 A LINE THAT DOES NOT FIT IS WRAPPED, NOT MEASURED AND OBEYED.
+     *
+     * The box used to take the width of its LONGEST line, so one long line made
+     * the whole tooltip that wide — and a tooltip is drawn ON TOP of the thing
+     * it describes, so a wide one covers the picture a reader is pointing at.
+     * Photographed on /tapes/, where a record's title, its minutes, its date
+     * bracket and its source ran to one line: the box reached most of the strip
+     * and its last line was cut off by the bottom edge.
+     *
+     * CLAUDE.md budgets a tooltip at about forty characters a line for exactly
+     * this reason. That is a rule about the LINE, and the honest way to hold a
+     * line to it is to break it rather than to ask every caller to count.
+     * ⚠️ A wrapped continuation keeps its colour but loses its swatch: the bar
+     * marks a lane, and the second half of a lane's line is not a second lane.
+     */
+    const CH = 40;
+    const lines = [];
+    for (const src of raw) {
+      const words = String(src.text).split(' ');
+      let cur = '', first = true;
+      for (const word of words) {
+        const next = cur ? cur + ' ' + word : word;
+        if (next.length > CH && cur) {
+          lines.push({ ...src, text: cur, colour: first ? src.colour : null });
+          first = false;
+          cur = word;
+        } else cur = next;
+      }
+      lines.push({ ...src, text: cur, colour: first ? src.colour : null });
+    }
     // A thin BAR, the same 3 px mark the gutter puts beside a lane name, not a
     // square — the tooltip and the gutter are labelling the same lanes and a
     // reader should not have to learn two shapes for one idea.
@@ -1724,6 +1872,13 @@ export function createStrip(canvas, deck, opts = {}) {
     const bh = lines.length * LH + PAD * 2 - 3;
     let bx = h.px + 10, by = Math.max(2, h.py - bh - 8);
     if (bx + w > plotW()) bx = h.px - w - 10;
+    // ⚠️ AND IT MUST NOT BE DRAWN OFF THE BOTTOM. `by` was clamped at the top
+    // and nowhere else, so a box tall enough ran past the lower edge and its
+    // last lines simply were not there — which reads as a tooltip that forgot
+    // to say the thing it was opened for. Lift it instead of letting it spill.
+    const floor = S.height - 2;
+    if (by + bh > floor) by = Math.max(2, floor - bh);
+    if (bx < 2) bx = 2;
     g.fillStyle = 'rgba(8,10,16,.94)'; g.strokeStyle = T.axis;
     g.fillRect(bx, by, w, bh); g.strokeRect(bx + 0.5, by + 0.5, w, bh);
     lines.forEach((l, i) => {
@@ -1784,11 +1939,22 @@ export function createStrip(canvas, deck, opts = {}) {
     const t = tAt(px), tol = (tolPx / S.view.pxPerSecond) * 1000;
     const C = laneContext(L, tAt(px - 400), tAt(px + 400));
     if (C.as === 'spans') {
+      // 🔴 THE SUB-ROW THE POINTER IS ACTUALLY IN, not the first bar that
+      // happens to cover this instant. `/tapes/` packs 13 overlapping dates
+      // into 11 sub-rows, and one of them spans a decade: pointing anywhere
+      // named that one, so the tooltip described a bar nobody was pointing at
+      // and a press could only ever pick it. `_y`/`_h` are written by the
+      // renderer, which is the only thing that knows where a bar went.
+      // ⚠️ THE TIME MATCH REMAINS THE FALLBACK. A lane with no stacking, and a
+      // finger between two rows, must still hit something.
+      let loose = null;
       for (const s of C.spans) {
         const to = Number.isFinite(s.to) ? s.to : Infinity;
-        if (t >= s.from - tol && t <= to + tol) return { lane: L, span: s, row: s.row, t };
+        if (t < s.from - tol || t > to + tol) continue;
+        if (s._y != null && py >= s._y - 1 && py <= s._y + s._h + 1) return { lane: L, span: s, row: s.row, t };
+        if (!loose) loose = { lane: L, span: s, row: s.row, t };
       }
-      return { lane: L, t };
+      return loose || { lane: L, t };
     }
     let best = null, bd = Infinity;
     for (const r of C.rows || []) { const d = Math.abs(r.at - t); if (d < bd) { bd = d; best = r; } }
@@ -1941,7 +2107,11 @@ export function createStrip(canvas, deck, opts = {}) {
     // full finger radius and a press inside it SCRUBS (the one place where a
     // touch drag is a seek and not a pan). Desktop keeps its 1 px precision:
     // this branch is only reachable from a touch pointer.
-    touchGesture = Math.abs(px - x(S.pos)) <= TOUCH.slop ? 'scrub' : 'undecided';
+    // ⚠️ AND NOT ON A STRIP WITH NO PLAYHEAD DRAWN. `playhead: false` leaves
+    // `S.pos` sitting wherever the deck was last told; a finger landing within
+    // the slop of an INVISIBLE line would start scrubbing a line nobody can
+    // see, and the pan and the tap it stole are both gone.
+    touchGesture = opts.playhead !== false && Math.abs(px - x(S.pos)) <= TOUCH.slop ? 'scrub' : 'undecided';
     S.dragX = px;
     if (touchGesture === 'scrub') { S.dragging = true; disengage(); holdForScrub(); }
   }

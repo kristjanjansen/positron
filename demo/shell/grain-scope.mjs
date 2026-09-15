@@ -34,11 +34,49 @@
 // ⚠️ AND THE GUTTER NAMES IT. A picture of grains drawn from settings and a
 // picture drawn from reported grains look alike and mean completely different
 // things, so the line under it says which this is, in words.
+//
+// 🔴 `playhead()` STOPS THE PICTURE AND THAT IS THE WHOLE POINT OF IT. Asked for
+// in these words: *"keep x scale the same, just stop the viz and move loop
+// playhead."* A loop plays a window of sound that has already gone by, so while
+// one runs there is nothing new to scroll and a wave that kept sliding would be
+// drawing arriving audio that the listener is not hearing. Setting a playhead
+// freezes the scrolling picture where it stands, at the SAME seconds-per-pixel
+// it already had, and runs one solid hairline across it; clearing the playhead
+// starts the scroll again. Nothing is rescaled in either direction, so the
+// picture a reader learned before the loop is the picture they are reading
+// during it.
 
 import { el } from './shell.mjs';
 
+/** How wide the playhead is drawn, in CSS pixels. One, and it is solid. */
+const HEAD_PX = 1;
+
+/**
+ * 🔴 A WINDOW NARROWER THAN THE BUFFER IT DRAWS GRAINS FROM SILENTLY DROPS THE
+ * OLDEST OF THEM, AND IT IS REFUSED. A grain reported at position `p` of a
+ * `grainSeconds` buffer is drawn at `bornAt - (1 - p) * grainSeconds`, so with
+ * `seconds` smaller than `grainSeconds` every grain read from the first
+ * `1 - seconds/grainSeconds` of the buffer lands left of x=0 and is skipped by
+ * the bounds test.
+ *
+ * MEASURED on `/radio1965/`, which asked for a 6 s window over an 8 s buffer:
+ * the oldest QUARTER of the granulator's range could not be drawn at all, so
+ * whenever its read head sat there the picture showed no grains and the page's
+ * own check read `0 lit`. That was taken for the station being off air more
+ * than once, which is the expensive half: a display defect wearing an outage's
+ * clothes. The picture was also simply wrong for a reader, every day, with
+ * nothing saying so.
+ *
+ * It throws rather than widening itself, because a scope that quietly changes
+ * the axis it was asked for is a second thing that can disagree with the page.
+ */
 export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520,
-                                        fullScale = null, grainSeconds = 0 } = {}) {
+                                        fullScale = null, grainSeconds = 0,
+                                        freezeOnLoop = true } = {}) {
+  if (grainSeconds && grainSeconds > seconds) {
+    throw new Error(`a ${seconds} s window cannot draw grains from a ${grainSeconds} s buffer`
+      + `. The oldest ${Math.round((1 - seconds / grainSeconds) * 100)}% of them would land off the left edge`);
+  }
   // 🔴 `grainSeconds` PUTS GRAIN TICKS ON THE SCROLLING WAVE, and the branch
   // below explains at length why that is normally forbidden: a remote engine's
   // grain positions are fractions of ITS held buffer, while its arriving audio
@@ -111,6 +149,31 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   // was. Two names, two jobs, and the collision was invisible because a later
   // key in an object literal simply wins.
   const wraps = [];                                // {t} — moments worth seeing
+  // A loop's playhead, 0..1 across the picture, and the scope clock the
+  // scrolling picture was stopped at. They are one state in two variables: a
+  // playhead is only meaningful on a picture that is not moving under it.
+  let head = null, frozenAt = null;
+  /**
+   * 🔴 A LOOP IS THREE MARKS, NOT ONE, AND THEY ARRIVE AT DIFFERENT TIMES.
+   * Specified from the page rather than invented here:
+   *
+   *   press one   a line at the live edge, and THE WAVE KEEPS SCROLLING. The
+   *               sound is still arriving and being kept, so a frozen picture
+   *               would be a lie about what the button just did. The seconds
+   *               since that line are tinted, which is the only thing on screen
+   *               saying "this part is being recorded".
+   *   press two   the wave STOPS where it is, and a second line lands at the
+   *               rightmost point it reached. Those two lines are now the ends
+   *               of the loop, and they cannot move, because the picture under
+   *               them cannot.
+   *   then        a third line runs between the two, and only between the two.
+   *   press three the lines go and the wave starts moving again.
+   *
+   * ⚠️ `loopA` AND `loopB` ARE TIMES ON THIS FILE'S OWN CLOCK, not fractions.
+   * A fraction would have to be re-read against the window every frame while
+   * the window is still sliding, and the first mark lives through exactly that.
+   */
+  let loopA = null, loopB = null;
   let sourceName = '', counts = { measured: 0, inferred: 0 };
   // 🔴 HOW SOLID THE GRAINS ARE DRAWN, AND IT IS A NUMBER THE PAGE OWNS.
   // `/radio1965/` blends a live station against the granulator chewing it, and
@@ -164,6 +227,20 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      *   measurement; this file draws what it is handed and nothing else.
      */
     feed(pcm, rate = 48000, tone = null) {
+      // 🔴 A FROZEN PICTURE GOES ON RECORDING. It used to drop every sample and
+      // then wipe the held columns on release, which left a gap in the picture
+      // for exactly as long as the loop had run. REPORTED, and the reason it is
+      // wrong is one sentence: **there was no silence**. The loop was playing
+      // the whole time and it plays into the same graph, so those seconds have
+      // audio in them and the wave should simply carry on with the loop in its
+      // past and the station after it.
+      //
+      // ⚠️ THE OLD WORRY WAS REAL AND IS ANSWERED BY RECORDING RATHER THAN
+      // ACCUMULATING. Holding one running maximum across the whole loop would
+      // have put a single enormous column at the seam, a spike that never
+      // happened. Columns keep being pushed at their own times instead; what
+      // freezing changes is only the RIGHT EDGE the picture is drawn against,
+      // so the new ones are off-screen until the edge starts moving again.
       const t = now();
       const win = Math.max(1, Math.round(rate * 0.004));
       for (let i = 0; i < pcm.length; i++) {
@@ -199,13 +276,118 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      */
     wrap() { wraps.push({ t: now() }); },
 
+    /**
+     * Where a loop has got to, as a fraction of the picture's width, drawn as
+     * one solid hairline. `null` takes it away.
+     *
+     * 🔴 IT ALSO STOPS THE SCROLLING PICTURE, AND THAT IS NOT A SIDE EFFECT —
+     * it is the thing that was asked for (see the note at the top of this
+     * file). While a playhead is set the wave holds still at the scale it
+     * already had, so the line moves against a fixed picture instead of two
+     * things sliding past each other at different speeds. Clearing it lets the
+     * wave start again.
+     *
+     * ⚠️ THE FRACTION IS OF THE PICTURE, NOT OF THE LOOP, and the caller is who
+     * turns one into the other. This file knows how many seconds are across its
+     * own width and knows nothing about a loop's ends, so anything else would
+     * be it guessing at somebody else's axis.
+     *
+     * @param {number|null} frac 0..1, clamped. Anything not a finite number
+     *   takes the playhead away, so `playhead()` and `playhead(null)` agree.
+     */
+    /** Press one: mark the live edge and go on scrolling. */
+    loopFrom() { loopA = now(); loopB = null; head = null; frozenAt = null; },
+    /**
+     * Press two: stop the picture and mark where it stopped.
+     * ⚠️ `frozenAt` IS SET FIRST, AND `loopB` READS IT. Taking `now()` twice
+     * puts the second line a frame's worth of milliseconds right of the edge
+     * the picture actually froze at, which at eight seconds across is a couple
+     * of pixels of the line standing outside the wave it is supposed to end.
+     */
+    /**
+     * 🔴 FREEZING IS RIGHT WHERE SOMETHING KEEPS LANDING ON THE FROZEN PICTURE,
+     * AND WRONG WHERE NOTHING DOES.
+     *
+     * On `/radio1965/` the wave stops and the GRAINS carry on being drawn
+     * across the held span, so a stopped picture is still a live one: the thing
+     * that moves is the instrument reading the seconds again and again. On
+     * `/tapes/` there is no granulator, so the same freeze is a picture that
+     * simply stopped, reported as *"visualization just stops on looping
+     * tapes"*. Same call, same code, opposite result, and the difference is
+     * whether anything is still arriving to draw.
+     * So the caller declares it. `freezeOnLoop: false` keeps the clock running,
+     * which keeps the wave scrolling under the marks.
+     */
+    // 🔴 ONE `now()`, READ ONCE. The line this replaced carried a warning saying
+    // exactly that and the `freezeOnLoop` edit broke it anyway: two calls a
+    // microsecond apart put the freeze instant and the loop's end mark at
+    // DIFFERENT times, so the picture is held at one moment while the band that
+    // marks the loop is drawn against another. What that looks like is the wave
+    // vanishing and the loop region sitting alone on an empty scope, reported
+    // as the loop eating the waveform.
+    loopTo() { const t = now(); if (freezeOnLoop) frozenAt = t; loopB = t; },
+    /**
+     * Press three: the wave catches up with live again.
+     *
+     * 🔴 NOTHING IS THROWN AWAY. This used to empty `scroll`, because with the
+     * picture taking nothing in during a loop the held columns were followed by
+     * a hole, and the wave is one polygon so the hole was drawn as a flat line
+     * at zero: a picture of silence over audio that was playing. Now the loop's
+     * own seconds were recorded as they played, so letting the edge move again
+     * simply reveals them, and the station follows on behind with no seam.
+     *
+     * ⚠️ THE TWO END MARKS STAY. They age off the left with the audio they
+     * belong to, exactly as a wrap does, so the loop you just heard is still
+     * visible in the picture's past instead of vanishing the moment it stops.
+     */
+    loopOff() { head = null; frozenAt = null; },
+    playhead(frac) {
+      if (!Number.isFinite(frac)) {
+        // 🔴 THE HELD COLUMNS GO WITH IT, AND THIS IS NOT TIDYING UP.
+        // PHOTOGRAPHED: leaving them there drew a FLAT LINE AT ZERO across the
+        // seconds the loop ran, because the wave is one polygon and the gap
+        // between the last old column and the first new one is filled in by the
+        // straight edge that joins them. That is a picture of silence, over
+        // audio that was playing the whole time and simply was not measured.
+        // Dropping them leaves the field empty there instead, and the picture
+        // refills from the right over the next few seconds. Nothing drawn where
+        // nothing is known is this file's whole argument.
+        //
+        // ⚠️ ONLY IF IT WAS ACTUALLY STOPPED. A page that clears a playhead it
+        // never set would otherwise wipe several seconds of perfectly good
+        // picture, which is the kind of defensive call that costs nothing to
+        // make and everything to answer.
+        if (frozenAt != null) scroll.length = 0;
+        head = null; frozenAt = null;
+        return;
+      }
+      head = Math.max(0, Math.min(1, frac));
+      // ⚠️ IT NO LONGER FREEZES BY ITSELF. `loopTo()` is what stops the
+      // picture, and it is a different press from the one that starts the line
+      // moving. A `playhead` that also froze meant the first position pushed
+      // after the loop closed decided where the wave stopped, which is a frame
+      // or two late and is the wrong event to hang it on.
+      if (loopA == null && frozenAt == null) frozenAt = now();
+    },
+
     source(name) { sourceName = name; },
-    clear() { live.length = 0; scroll.length = 0; wraps.length = 0; peaks = null; counts = { measured: 0, inferred: 0 }; },
+    clear() {
+      live.length = 0; scroll.length = 0; wraps.length = 0; peaks = null;
+      head = null; frozenAt = null; loopA = null; loopB = null;
+      counts = { measured: 0, inferred: 0 };
+    },
     /** Which of the two pictures is being drawn. ⚠️ READ OFF THE SAME STATE THE
      *  PAINT BRANCHES ON, not off whatever a caller last asked for — a page
      *  that thinks it switched and did not is exactly the thing worth checking. */
     showing: () => (peaks && peaks.length ? 'material' : 'scrolling'),
-    stats: () => ({ ...counts, flickering: live.length, wraps: wraps.length }),
+    // ⚠️ `frozen` IS REPORTED SEPARATELY FROM `playhead` even though one sets
+    // the other, because they answer different questions: one is where the line
+    // is, the other is whether any new audio is reaching the picture at all.
+    // A check that a loop stopped the wave needs the second and cannot get it
+    // from the first.
+    stats: () => ({ ...counts, flickering: live.length, wraps: wraps.length,
+      playhead: head, frozen: frozenAt != null,
+      loopFrom: loopA, loopTo: loopB, marks: (loopA != null) + (loopB != null) }),
   };
 
   // ── paint ────────────────────────────────────────────────────────────────
@@ -319,7 +501,12 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
     } else {
       // ── audio only: what arrived, scrolling ────────────────────────────
       if (scroll.length > 1) {
-        const t = now(), x0 = t - seconds;
+        // ⚠️ THE CLOCK IS THE FROZEN ONE WHILE A LOOP RUNS, and that single
+        // substitution is what holds the x scale. `seconds` never changes, so
+        // stopping the right edge stops the whole mapping with it: every column
+        // stays exactly where the reader last saw it rather than sliding left
+        // under a line that is supposed to be the only thing moving.
+        const t = frozenAt ?? now(), x0 = t - seconds;
         const X = (tt) => ((tt - x0) / seconds) * W;
         let mx = fullScale ?? 0;
         if (!fullScale) for (const s of scroll) if (s.v > mx) mx = s.v;
@@ -340,6 +527,23 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         // data carrying a `tone` field. Looking at the page that showed it would
         // never have found it. If colour comes back here it needs a flag the
         // PAGE sets by name, not a field that turns it on by being present.
+        // ── the seconds being kept ─────────────────────────────────────────
+        // 🔴 UNDER THE WAVE, AND IT IS THE ONLY THING THAT SAYS RECORDING IS
+        // HAPPENING. Between the first press and the second the picture goes on
+        // scrolling exactly as before, which is correct and leaves the button
+        // with nothing visible to show for itself. A tint from the first mark to
+        // the live edge is that: it grows as the sound arrives, and it is the
+        // shape the loop will have. Drawn before the wave so the wave stays the
+        // brightest thing in the box.
+        if (loopA != null) {
+          const ax = Math.max(0, X(loopA));
+          const bx = loopB != null ? X(loopB) : W;
+          if (bx > ax) {
+            ctx.globalAlpha = 0.10; ctx.fillStyle = C.hi;
+            ctx.fillRect(ax, 1, bx - ax, H - 2);
+            ctx.globalAlpha = 1;
+          }
+        }
         ctx.beginPath();
         ctx.moveTo(X(scroll[0].t), mid);
         for (const s of scroll) ctx.lineTo(X(s.t), mid - s.v * k);
@@ -353,15 +557,44 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         while (wraps.length && wraps[0].t < x0) wraps.shift();
         if (wraps.length) {
           ctx.save();
-          ctx.strokeStyle = C.hi; ctx.lineWidth = 1;
+          // 🔴 ONE PIXEL, SOLID, IN `--hi`, THE SAME AS EVERY OTHER LOOP EDGE.
+          // These used to fade from 0.25 to 0.80 with age, on the argument that
+          // the fade says which wrap is the recent one without spending a second
+          // channel. The argument is fine and the consistency is worth more: the
+          // transport bar draws a loop's ends as a 1 px solid `--hi` border, and
+          // the playhead below is 1 px solid `--hi`, so a loop boundary that is
+          // sometimes a quarter-strength hairline is the same mark in three
+          // strengths across two surfaces. Age is already said by position, which
+          // is the channel a scrolling wave has for free: the leftmost is the
+          // oldest, and it leaves the picture when the audio it belongs to does.
+          ctx.strokeStyle = C.hi; ctx.lineWidth = 1; ctx.globalAlpha = 1;
           for (const m of wraps) {
             const x = X(m.t);
-            // Fading with age says which wrap is the recent one without a
-            // second channel; the newest is full strength.
-            ctx.globalAlpha = 0.25 + 0.55 * ((m.t - x0) / seconds);
             ctx.beginPath(); ctx.moveTo(x + 0.5, 2); ctx.lineTo(x + 0.5, H - 2); ctx.stroke();
           }
           ctx.restore();
+        }
+        // ── the loop's ends ────────────────────────────────────────────────
+        // One pixel, solid, in `--hi`: the same mark the transport bar draws
+        // round a loop and the same the playhead below is drawn in. The first
+        // appears on the first press and travels left with the audio it belongs
+        // to while the picture is still moving; the second lands when the
+        // picture stops, and after that neither can move because nothing under
+        // them does.
+        // ⚠️ THEY EXPIRE WITH THEIR AUDIO. A mark whose second has scrolled off
+        // the left is a mark about nothing, and left in place it would pin
+        // itself to the edge and read as a loop that is still running.
+        if (loopA != null && loopA < x0) loopA = null;
+        if (loopB != null && loopB < x0) loopB = null;
+        for (const t of [loopA, loopB]) {
+          if (t == null) continue;
+          const x = X(t);
+          if (x < -1 || x > W + 1) continue;
+          ctx.strokeStyle = C.hi; ctx.lineWidth = 1; ctx.globalAlpha = 1;
+          ctx.beginPath();
+          ctx.moveTo(Math.round(x) + 0.5, 1);
+          ctx.lineTo(Math.round(x) + 0.5, H - 1);
+          ctx.stroke();
         }
         // the grains, on the same seconds the wave is drawn on.
         // ⚠️ SKIPPED OUTRIGHT AT ZERO, not drawn at `globalAlpha = 0`. The two
@@ -390,9 +623,76 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
           }
           ctx.globalAlpha = 1;
         }
-        ctx.strokeStyle = C.hi; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(W - 0.5, 0); ctx.lineTo(W - 0.5, H); ctx.stroke();
+        // 🔴 THE LIVE EDGE IS NOT DRAWN ON A STOPPED PICTURE. This hairline
+        // means "this is now", and while a loop runs the right edge is the
+        // moment the picture stopped rather than the moment you are in. Left
+        // standing it would be a second full-height line in the same colour as
+        // the playhead, claiming to be the live edge of a wave that is not
+        // advancing.
+        if (frozenAt == null) {
+          ctx.strokeStyle = C.hi; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(W - 0.5, 0); ctx.lineTo(W - 0.5, H); ctx.stroke();
+        }
       }
+    }
+
+    // ── the loop's playhead ──────────────────────────────────────────────
+    // Last, so it is on top of whichever of the three pictures was drawn, and
+    // SOLID: no age, no fade, no alpha. Every other mark here is faded by
+    // something (a tick by its age, a wrap by how long ago it happened, the
+    // grain layer by the fader), and fading is how this file says a mark is
+    // reported rather than certain. A playhead is neither: it is where the
+    // sound being played has got to, which is not a measurement that can be
+    // more or less confident.
+    // ── grains, while the picture is stopped ──────────────────────────────
+    // 🔴 A FROZEN WAVE USED TO DRAW NO GRAINS AT ALL, and the page still had a
+    // granulator running. REPORTED as not being able to see the grain
+    // animation: every tick was placed at `bornAt` on an axis whose right edge
+    // had stopped moving, so every one of them landed past the right edge and
+    // was skipped by the bounds test. The picture was correct about the wave
+    // and silently blank about the thing chewing it.
+    //
+    // ⚠️ POSITIONED ACROSS THE LOOP, AND ONLY BECAUSE THE LOOP IS WHAT IS BEING
+    // READ. A grain reports where in the granulator's buffer it read; while a
+    // loop plays, that buffer holds the loop and nothing else, so the fraction
+    // IS a position inside these two marks. Without both marks there is no span
+    // to map into and nothing is drawn, because a tick at a guessed position is
+    // worse than no tick.
+    if (frozenAt != null && loopA != null && loopB != null && grainAlpha > 0 && live.length) {
+      const t = frozenAt, s0 = t - seconds;
+      const LX = (tt) => ((tt - s0) / seconds) * W;
+      const ax = LX(loopA), bx = LX(loopB);
+      const tnow = performance.now();
+      for (let i = live.length - 1; i >= 0; i--) {
+        const g = live[i];
+        const age = (tnow - g.born) / fadeMs;
+        if (age >= 1) { live.splice(i, 1); continue; }
+        const x = ax + g.pos * (bx - ax);
+        if (x < 0 || x > W) continue;
+        ctx.globalAlpha = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level)) * grainAlpha;
+        ctx.fillStyle = C.hi;
+        ctx.fillRect(x - 0.5, mid - H * 0.44, 1.5, H * 0.88);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    if (head != null) {
+      ctx.globalAlpha = 1;             // whatever the branch above left behind
+      ctx.fillStyle = C.hi;
+      // 🔴 BETWEEN THE TWO ENDS, NOT ACROSS THE BOX. It used to run the whole
+      // width, which is only right when the loop happens to be the entire
+      // window: any shorter loop had its playhead outside its own ends, over
+      // audio it was not playing. With both marks known the fraction is mapped
+      // into the span they bound, and the fallback stays the full width for a
+      // caller that pushes a position without having marked anything.
+      let x0p = 0, x1p = W - HEAD_PX;
+      if (loopA != null && loopB != null && frozenAt != null) {
+        const t = frozenAt, s0 = t - seconds;
+        const X2 = (tt) => ((tt - s0) / seconds) * W;
+        x0p = X2(loopA);
+        x1p = Math.max(x0p, X2(loopB) - HEAD_PX);
+      }
+      ctx.fillRect(Math.round(x0p + head * (x1p - x0p)), 1, HEAD_PX, H - 2);
     }
 
     ctx.strokeStyle = C.line; ctx.lineWidth = 1;

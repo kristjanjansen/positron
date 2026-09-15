@@ -134,7 +134,7 @@ export const MISSING_SAYS = {
   webtransport: 'this browser has no WebTransport',
   camera: 'no camera on this device',
   mediarecorder: 'this browser cannot record',
-  midi: 'no MIDI here — the on-screen keys still work',
+  midi: 'no MIDI here, but the on-screen keys still work',
 };
 
 /**

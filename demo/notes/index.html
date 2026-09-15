@@ -143,7 +143,7 @@
     document.getElementById('md').innerHTML = render(body);
     if (h1) { document.getElementById('t').textContent = h1[1]; document.title = `POSITRON · ${h1[1]}`; }
   } catch (e) {
-    document.getElementById('md').innerHTML = `<p>could not load <code>${safe}.md</code> — ${e.message}</p>`;
+    document.getElementById('md').innerHTML = `<p>could not load <code>${safe}.md</code>: ${e.message}</p>`;
   }
 </script>
 </html>

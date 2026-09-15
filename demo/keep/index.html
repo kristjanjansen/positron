@@ -117,7 +117,7 @@
       d.log(`camera on: ${camStream.getVideoTracks()[0].label || 'default'}`, 'hi');
     } catch (e) {
       camStream = null;
-      d.log(`camera: ${e.name} — staying on the generated picture`, 'bad');
+      d.log(`camera: ${e.name} · staying on the generated picture`, 'bad');
     }
   });
 
@@ -132,7 +132,7 @@
     asserted = false; didClock = false;
     paint();
     forget();
-    d.log('takes deleted, and forgotten — the R2 files stay until their six hours '
+    d.log('takes deleted, and forgotten. The R2 files stay until their six hours '
       + 'are up, but this page will not pick them up again');
   });
 
@@ -197,7 +197,7 @@
 
   // ── recording the RECEIVED picture ────────────────────────────────────────
   function startRecording() {
-    if (recording || !sub) { if (!sub) d.log('nothing to record yet — press Send and receive', 'bad'); return; }
+    if (recording || !sub) { if (!sub) d.log('nothing to record yet. Press Send and receive', 'bad'); return; }
     const mime = recorderMime(d);
     if (!mime) return;
     // THE RECEIVER'S TRACK, not the source. `sub.inbound` is the stream this
@@ -312,7 +312,7 @@
           part.blobs.length = 0;                       // the local copy is gone
           remember({ url: put.url, mime: part.mime, expiresAt: put.expiresAt });
         }
-        else d.log(`take ${part.n}: could not fetch it back — keeping the local copy`, 'bad');
+        else d.log(`take ${part.n}: could not fetch it back · keeping the local copy`, 'bad');
       }
     }
     part.from = blob ? 'r2' : 'local';
@@ -346,7 +346,7 @@
       + `${(part.startMs / 1000).toFixed(2)}s, playing from ${part.from === 'r2' ? 'R2' : 'memory'}`, 'hi');
     if (part.expiresAt) {
       const mins = Math.round((new Date(part.expiresAt) - Date.now()) / 60000);
-      d.log(`this recording is deleted in ${Math.floor(mins / 60)}h ${mins % 60}m — six hours is the cap, `
+      d.log(`this recording is deleted in ${Math.floor(mins / 60)}h ${mins % 60}m. Six hours is the cap, `
         + `and a cron enforces it`, 'hi');
     }
   }
@@ -551,7 +551,7 @@
       const startOf2 = await readAt(Math.round(parts[1].startMs + 120));
       if (endOf1 !== null && startOf2 !== null) {
         d.log(`the pause between take 1 and take 2 was ${((startOf2 - endOf1) / 1000).toFixed(2)}s `
-          + `— the line does not show it, the pixels still do`, 'hi');
+          + `. The line does not show it, the pixels still do`, 'hi');
       }
     }
   }
@@ -564,7 +564,7 @@
     // not an index — another device sees nothing, and Safari clears it after a
     // week without a visit, so the note can die while the file it points at is
     // still there. The six-hour TTL is what keeps that from mattering here.
-    d.log(`${saved.length} recording${saved.length > 1 ? 's' : ''} still in R2 — fetching them back. `
+    d.log(`${saved.length} recording${saved.length > 1 ? 's' : ''} still in R2, fetching them back. `
       + `This list is a note THIS BROWSER made; another device would see none of them`, 'hi');
     for (const t of saved) {
       const blob = await fetchBack(t.url, t.mime, { log: (m, k) => d.log(m, k) });

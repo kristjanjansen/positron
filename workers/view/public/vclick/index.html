@@ -81,7 +81,7 @@
     'i 2 4    0.25 6000 220',
     'i 2 +    .    .    .',
     'i 2 +    .    .    .',
-    'n theme                 ; and again — a reference, not seven more lines',
+    'n theme                 ; and again, a reference, not seven more lines',
   ].join('\n');
 
   const d = mount({
@@ -435,7 +435,7 @@
   let typing = null;
   ta.addEventListener('input', () => {
     clearTimeout(typing);
-    typing = setTimeout(() => { if (compile()) d.log(`recompiled — ${part.rows.length} rows`); }, 400);
+    typing = setTimeout(() => { if (compile()) d.log(`recompiled · ${part.rows.length} rows`); }, 400);
   });
 
   setInterval(() => {
@@ -549,7 +549,7 @@
       `at ${Math.round(pos)} ms, fold ${got && got.count} of ${want}`);
   }
 
-  d.log('edit the score — t bends the tempo lane, m/n becomes one use');
+  d.log('edit the score · t bends the tempo lane, m/n becomes one use');
   d.ready();
 </script>
 </html>

@@ -93,9 +93,9 @@
   const d = mount({
     name: 'reel',
     what: 'Every 1965 newsreel ERR has, on one line at the day it was broadcast, '
-      + 'so the whole year is a picture. Press a mark to play it — it streams '
-      + 'from ERR and nothing is stored here — and where a mute newsreel has '
-      + 'surviving radio from the same day, the two play together.',
+      + 'so the whole year is a picture. Press a mark to play it, and where a '
+      + 'mute newsreel has surviving radio from the same day, the two play '
+      + 'together. It streams from ERR and nothing is stored here.',
     // PUBLISHED, NOT DRAWN. Every cell was already on the page: the count in
     // the lane's gutter, the date in the film's own title line AND in the
     // transport bar, the length in the tooltip. A second table saying the same
@@ -278,7 +278,7 @@
         : p.catalogueMs ? `${(p.catalogueMs / 60000).toFixed(1)} min, per the shot list`
         : 'length unknown until played';
       return [sentenceCase(p.title).slice(0, 46), `${p.date} · ${len}`,
-              p.kind === 'audio' ? 'radio — this one has sound' : 'silent newsreel'];
+              p.kind === 'audio' ? 'radio, with sound' : 'silent newsreel'];
     },
   });
 
@@ -438,9 +438,9 @@
       else { aHls = new window.Hls({ enableWorker: true }); aHls.loadSource(su); aHls.attachMedia(wireless); }
       wireless.muted = false;
       if (!armed) wireless.play().catch(() => {});
-      d.log(`paired with the same day's radio — ${sentenceCase(sound.title).slice(0, 40)}`, 'hi');
+      d.log(`paired with the same day's radio · ${sentenceCase(sound.title).slice(0, 40)}`, 'hi');
     } else if (picture) {
-      d.log('no radio survives from this day — the newsreel plays silent');
+      d.log('no radio survives from this day. The newsreel plays silent');
     }
 
     if (!picture) {
@@ -453,7 +453,7 @@
       if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) film.src = su;
       else { hls = window.__hls = new window.Hls({ enableWorker: true }); hls.loadSource(su); hls.attachMedia(film); }
       if (!armed) await film.play().catch(() => {});
-      d.log(`playing ${sound.slug} — radio, streamed from ERR, nothing stored here`, 'hi');
+      d.log(`playing ${sound.slug} · radio, streamed from ERR, nothing stored here`, 'hi');
       return;
     }
 
@@ -484,7 +484,7 @@
     // anyway, and a muted picture beats no picture. But it is the fallback now,
     // not the default.
     film.muted = false;
-    if (armed) { d.log(`${picture.slug} is loaded — press play`); return; }
+    if (armed) { d.log(`${picture.slug} is loaded · press play`); return; }
     try {
       await film.play();
     } catch {
@@ -492,9 +492,9 @@
       // picture — but it should now be rare rather than every single time.
       film.muted = true;
       await film.play().catch(() => {});
-      d.log('the browser refused sound — press play on the picture to hear it', 'bad');
+      d.log('the browser refused sound. Press play on the picture to hear it', 'bad');
     }
-    d.log(`playing ${picture.slug} — streamed from ERR, nothing stored here`, 'hi');
+    d.log(`playing ${picture.slug} · streamed from ERR, nothing stored here`, 'hi');
     // THE PICTURE DRIVES THE SOUND. Not a servo and not a sync loop — the two
     // are different recordings of different lengths that merely share a day, so
     // pretending to hold them in lockstep would be inventing a relationship the
@@ -531,8 +531,8 @@
       if (a === undefined) return;
       const kbps = (a * 8) / 6 / 1000;
       d.log(kbps > 24
-        ? `sound is arriving — ${Math.round(kbps)} kbps decoded`
-        : `this newsreel is SILENT — its audio track carries ${kbps.toFixed(1)} kbps, which is `
+        ? `sound is arriving · ${Math.round(kbps)} kbps decoded`
+        : `this newsreel is SILENT. Its audio track carries ${kbps.toFixed(1)} kbps, which is `
           + `what silence costs. The newsreels were shot mute.`, 'hi');
     }, 6000);
 
@@ -626,7 +626,7 @@
     d.assert('the whole year is on it', items.length > 250, `${items.length} newsreels`);
     d.assert('every newsreel has a day', items.every((i) => Number.isFinite(i.at)),
       `${items[0].date} to ${items[items.length - 1].date}`);
-    d.assert('positions are negative — 1965 is before the epoch',
+    d.assert('positions are negative: 1965 is before the epoch',
       items.every((i) => i.at < 0), `${items[0].at}`);
     // WHY THIS IS ASSERTED AT ALL: the strip auto-detects an absolute domain by
     // magnitude (`range[0] > 1e12`), and 1965 is NEGATIVE — so the detection
@@ -636,7 +636,7 @@
       view.strip.state.absolute === true
         && /^\d{4}-\d{2}-\d{2}$/.test(formatTime(deck.position(), 86400000, view.strip.state.absolute)),
       formatTime(deck.position(), 86400000, view.strip.state.absolute));
-    d.assert('nothing is stored — no media in the fixture',
+    d.assert('nothing is stored: no media in the fixture',
       !JSON.stringify(items[0]).match(/https?:|\.m3u8|\.mp4/), 'catalogue metadata only');
     d.ready();
   })().catch((e) => d.fail(e));

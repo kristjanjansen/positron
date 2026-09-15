@@ -15,6 +15,22 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
+/* 🔴 NO SIDEWAYS RUBBER BAND ON A PHONE. iOS and Android bounce the whole
+   document horizontally the moment a drag has any x in it, and almost every
+   drag on these pages does: the strip pans, the transport scrubs, a headset
+   preview is dragged to look around. So a gesture aimed at a control pulled the
+   page out from under it and let it snap back, which reads as the page being
+   loose rather than as the control working.
+   ⚠️ `overscroll-behavior-x`, NOT `overflow: hidden`. Hidden clips, and this
+   file already records what that cost: at 390 px the transport row overflowed
+   by 94 px and `body{overflow-x:hidden}` CUT the last rates off rather than
+   showing them, so half the lattice did not exist on a phone. This stops the
+   BOUNCE and the scroll chaining and clips nothing.
+   ⚠️ AND IT DOES NOT TOUCH INNER SCROLLERS. The tabs row and the tables scroll
+   themselves on x by their own `overflow-x: auto`; what they lose is only the
+   ability to hand a leftover swipe up to the document, which is the behaviour
+   being removed. */
+html, body { overscroll-behavior-x: none; }
 body {
   font: 15px/1.5 var(--sans);
   padding: max(16px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
@@ -23,6 +39,17 @@ body {
   overflow-x: hidden;
 }
 :focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
+/* 🔴 A CONTROL THAT ALREADY HAS A BORDER COLOURS IT. IT DOES NOT GROW A SECOND
+   ONE. The rule above is right for a bare button or a link, which have no edge
+   of their own and need one drawn. An input and a textarea already have a
+   1 px border, so the ring above landed 2 px outside it and the result was two
+   concentric yellow rectangles around one box. Photographed on the feedback
+   panel and reported as "do not intruduce double outline. globally".
+   ⚠️ GLOBAL ON PURPOSE, matched on the ELEMENTS rather than on a class, so a
+   field added to any future page gets this without anybody remembering. */
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: none; border-color: var(--hi);
+}
 
 /* ── head ─────────────────────────────────────────────────────────────── */
 /* NO RULE UNDER THE INTRO. The heading, the sentence under it and the space
@@ -41,8 +68,20 @@ body {
   .pos-what { margin-top: 12px; }
 }
 .pos-back:hover { color: var(--hi); }
-.pos-title { display: flex; align-items: baseline; gap: 10px; }
-.pos-n { font: 600 11px/1.4 var(--mono); color: var(--hi); font-variant-numeric: tabular-nums; }
+/* 🔴 `center`, NOT `baseline`, AND THE BASELINE WAS FOR SOMETHING THAT NO
+   LONGER EXISTS. This row was baseline-aligned so a small number chip beside
+   the page name would sit on the name's own baseline. The numbers went when a
+   demo's identity became its slug, and `.pos-n` is now used by nothing at all
+   (grep: zero hits outside this file). What was left was a rule holding the
+   only other thing in the row, the feedback button, on a baseline it has no
+   business sharing.
+   MEASURED on the deployed page: the title's box and the button's both started
+   at y=65, so the button's middle sat at 78 against the title's 75 and it read
+   as hanging low. Centred, the two middles are the same number.
+   ⚠️ NOT A NUDGE. A typed offset would be right at this font size and wrong at
+   the next one; `symbol.mjs` in this same kit measures rather than nudging for
+   the same reason. */
+.pos-title { display: flex; align-items: center; gap: 10px; }
 .pos-name {
   font: 600 17px/1.2 var(--mono); letter-spacing: .01em; margin: 0;
 }
@@ -397,9 +436,19 @@ button.pos-pri[data-busy="1"] {
    hands the slider every pixel nobody else wanted — same result, right order.
    MEASURED on `/tapes/`, the worst case here at 688 px: two rows and 94 px
    tall, against `replay`'s one row and 52. Both are 52 now. */
+/* 🔴 THE 5px IS THE KNOB'S RADIUS, AND WITHOUT IT THE ROW'S GAP IS A LIE.
+   `.tbar-head` is 10px wide and centred on its position, so at 0 it hangs 5px
+   past the track's left edge and at the end it hangs 5px past the right. The
+   row's `gap: 8px` is measured to the TRACK, which nobody can see, so what was
+   actually between the walk button and the knob was 3px — reported as
+   "add space between", and the picture showed them almost touching.
+   Margin here rather than a bigger row gap: the gap is shared by every member
+   and was tuned to 8 to stop the bar wrapping, so raising it to fix one edge
+   would push the rate group onto a second line on the pages that only just
+   fit. This moves the one member whose ink escapes its own box. */
 .tbar-scrub {
   flex: 1 1 56px; min-width: 56px; height: var(--tbar-btn); position: relative;
-  cursor: pointer; touch-action: none;
+  cursor: pointer; touch-action: none; margin: 0 5px;
 }
 .tbar-scrub::before {
   content: ""; position: absolute; left: 0; right: 0; top: 50%;
@@ -473,7 +522,6 @@ button.pos-pri[data-busy="1"] {
   color: var(--hi); border-color: var(--hi);
   background: color-mix(in oklab, var(--hi) 16%, var(--card2));
 }
-.tbar-rate1 { font: 500 11px/1 var(--mono); color: var(--dim2); }
 .tbar-badge {
   flex: none; font: 500 10px/1.5 var(--mono); letter-spacing: .06em;
   text-transform: uppercase; color: var(--warn);
@@ -844,7 +892,21 @@ video[hidden] { display: none; }
   font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); white-space: nowrap;
 }
-.pos-choice button { font: 500 11px/1 var(--mono); padding: 0 11px; }
+/* 🔴 A LABEL NEVER WRAPS. `Radio 1965` broke into `Radio` over `1965`, and so
+   did every two-word station in the row: six buttons two lines tall, each one
+   naming a thing nobody calls by half its name. A wrapped label is also a
+   button that is twice as tall as its neighbours, so the row stops being a row.
+   The name is the control's whole content; if it does not fit, the row scrolls
+   or the names are too long, and neither is fixed by folding a word in half. */
+.pos-choice button { font: 500 11px/1 var(--mono); padding: 0 11px; white-space: nowrap; }
+/* 🔴 AND THE ROW SCROLLS RATHER THAN THE PAGE. `overflow-x` cannot shrink a
+   flex item below its content without `min-width: 0`, and CLAUDE.md records
+   what happens when it is left off: 390 px measured 141 px of PAGE overflow,
+   so the whole document dragged sideways instead of the row. Both properties
+   or neither. */
+.pos-choice { min-width: 0; }
+.pos-choice .step { overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.pos-choice .step::-webkit-scrollbar { display: none; }
 /* 🔴 AN EDGE, NOT A FILL. A solid `--hi` block is the loudest thing this
    palette has, and a row of three options with one of them filled makes the
    chosen one shout while the other two disappear — on a phone, where the group
@@ -966,24 +1028,157 @@ video[hidden] { display: none; }
    the iOS loupe over the keys — but a text field is the one control where
    magnifying, selecting and pasting are the whole point, and it is deliberately
    outside those selectors. */
-.pos-field { display: inline-flex; flex-direction: column; gap: 4px; flex: 0 1 150px; min-width: 0; }
+/* gap 7 rather than 4: at 9.5 px uppercase the label sat on the box it names,
+   so the two read as one object instead of as a name and a field. */
+.pos-field { display: inline-flex; flex-direction: column; gap: 7px; flex: 0 1 150px; min-width: 0; }
 .pos-field.wide { flex: 1 1 240px; }
 .pos-field-l {
   font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); white-space: nowrap;
 }
-.pos-field input {
+.pos-field input, .pos-field textarea {
   font: 400 12.5px/1.4 var(--mono); color: var(--fg); background: var(--bg);
   border: 1px solid var(--line2); border-radius: 4px;
   padding: 0 9px; height: 34px; width: 100%; min-width: 0;
 }
-.pos-field input::placeholder { color: var(--dim2); }
-.pos-field input:disabled { opacity: .4; }
+/* `rows` on createField. ⚠️ THE HEIGHT COMES FROM `rows`, NOT FROM CSS — the
+   caller asked for four lines and four lines is what the attribute means, so
+   pinning a pixel height here would quietly overrule it. Only the padding and
+   the line box change, because a one-line box centres its text on 34 px and a
+   four-line one has to start at the top. `resize: vertical` because a person
+   with more to say should be able to see it; horizontal resizing would push
+   the panel wider than the screen. */
+.pos-field.tall textarea {
+  height: auto; padding: 7px 9px; line-height: 1.5; resize: vertical;
+  font-family: var(--sans); font-size: 13.5px;
+}
+.pos-field input::placeholder, .pos-field textarea::placeholder { color: var(--dim2); }
+.pos-field input:disabled, .pos-field textarea:disabled { opacity: .4; }
 /* On a phone a field takes the whole width rather than sharing a row: a
    half-width mono box fits about twenty characters, which is less than a title. */
 @media (max-width: 560px) {
   .pos-field, .pos-field.wide { flex: 1 1 100%; }
 }
+
+/* ── feedback ─────────────────────────────────────────────────────────────
+   demo/shell/feedback.mjs. A button beside every demo's title and the box it
+   opens.
+
+   🔴 THE BOX IS A FIXED OVERLAY AND THAT IS THE WHOLE REASON IT IS ONE.
+   CLAUDE.md: nothing that changes while somebody is looking at it may change
+   how much room it takes. A panel that unfolded under the title would push the
+   readout, the controls, a canvas, a transport bar and the log down the page
+   every time it opened, on a page whose subject is often a picture you were
+   watching. Fixed, it is drawn OVER the page and the page does not move a
+   pixel — measured, and asserted on the feedback page.
+
+   ⚠️ ONE IMPLEMENTATION, NOT A `<dialog>` WITH A FALLBACK. `showModal()` would
+   give focus handling and Escape for free, and it would also give this page a
+   second code path that no harness here would ever enter — which is the shape
+   of every "green suite, dead page" bug in CLAUDE.md. A fixed cover needs no
+   API, so there is nothing to feature-test and nothing to leave untested. */
+.pos-fb-btn {
+  margin-left: auto; align-self: center;
+  font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); background: transparent;
+  border: 1px solid var(--line2); border-radius: 4px;
+  padding: 0 10px; height: 26px; cursor: pointer; white-space: nowrap;
+  -webkit-touch-callout: none; touch-action: manipulation;
+}
+.pos-fb-btn:hover { color: var(--hi); border-color: var(--line2); }
+
+/* 🔴 CENTRED ON A DESKTOP, AT THE TOP ON A PHONE, AND THE SPLIT IS THE
+   KEYBOARD. It was `flex-start` everywhere, so on a wide screen the panel hung
+   off the top edge with the whole page empty beneath it. Centring it there is
+   what a dialog does.
+   ⚠️ AND CENTRING IT ON A PHONE WOULD BE WRONG. Tapping the message field
+   raises the software keyboard over the lower half of the screen, and a
+   vertically centred panel gets pushed up, clipped, or scrolled under it while
+   somebody is typing into it. At the top it stays where it was put.
+   The padding is a real margin on both axes so the box never touches a screen
+   edge, and it respects the safe area, because an iPhone's notch and home
+   indicator are inside `inset: 0`. */
+.pos-fb {
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-left))
+           calc(20px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
+  background: rgba(4, 6, 10, .72);
+  overflow-y: auto;
+}
+@media (min-width: 620px) and (min-height: 560px) {
+  /* `safe-area` is not in here: a desktop has none, and `center` is what the
+     `align-items` above is being overruled for. */
+  .pos-fb { align-items: center; padding: 32px; }
+}
+.pos-fb[hidden] { display: none; }
+.pos-fb-box {
+  width: 100%; max-width: 480px;
+  background: var(--card); border: 1px solid var(--line2); border-radius: 6px;
+  /* equal on both axes: 16 across and 26 down read as a panel that is falling
+     out of its own box at the bottom */
+  padding: 18px; display: flex; flex-direction: column; gap: 14px;
+}
+/* 🔴 A FIELD IN A COLUMN IS NOT A FIELD IN A ROW, AND `flex` MEANS THE OTHER
+   AXIS IN EACH. `.pos-field` carries `flex: 0 1 150px` for the row it normally
+   lives in, where 150px is a WIDTH; dropped into this column that basis becomes
+   a HEIGHT and the `.wide` variant's `1 1 240px` makes the message box GROW to
+   eat every spare pixel. Photographed: a four row textarea with 250 px of empty
+   panel under it and the name row pushed to the floor. The rows attribute says
+   how tall the box is, so nothing here may add to it. */
+.pos-fb-box > .pos-field { flex: 0 0 auto; align-self: stretch; }
+/* 🔴 CENTRE, NOT BASELINE, AND THIS IS WHERE THE TOP PADDING WENT. The close
+   glyph is `18px/1` and the title is `13px/1.2`, so baseline alignment makes
+   the row as tall as the TALLER line box and pushes the title down inside it.
+   The gap over the title then reads as padding that is not there: the box says
+   18 and the eye measures about 30. `.pos-title` in this same file was changed
+   from baseline to centre for exactly this reason and the note is still on it. */
+.pos-fb-top { display: flex; align-items: center; gap: 10px; min-height: 0; }
+.pos-fb-top .pos-fb-h, .pos-fb-top .pos-fb-x { line-height: 1; }
+/* uppercase to match the FEEDBACK button that opens it: the panel and the
+   control share a name, so they should share its shape too. */
+.pos-fb-h { font: 600 13px/1.2 var(--mono); margin: 0; text-transform: uppercase; letter-spacing: .06em; }
+.pos-fb-x {
+  margin-left: auto; background: transparent; border: 0; color: var(--dim2);
+  font: 400 18px/1 var(--mono); cursor: pointer; padding: 0 2px;
+}
+.pos-fb-x:hover { color: var(--fg); }
+.pos-fb-note { margin: 0; color: var(--dim); font-size: 12.5px; }
+.pos-fb-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.pos-fb-row .pos-field { flex: 1 1 160px; }
+.pos-fb-send { margin-left: auto; }
+/* 🔴 A FIXED BOX FOR A LINE THAT CHANGES. The send path has five steps that can
+   each fail differently, so it has something to say after every press — and a
+   sentence that rewrites itself under the button reflows the panel, which is
+   the jump CLAUDE.md names. Two lines are reserved whether or not anything is
+   written in them, so the panel is the same height before and after. */
+.pos-fb-said {
+  min-height: 2.8em; margin: 0; font: 400 12px/1.4 var(--mono); color: var(--dim);
+  overflow-wrap: anywhere;
+}
+/* 🔴 TWO RESERVED LINES ARE RIGHT UNTIL THE LAST ONE IS WRITTEN. The reserve
+   above exists so the panel does not jump while the send path reports its five
+   steps, and it is correct for every one of them EXCEPT the final state, where
+   the work is over, nothing more will be written, and the reserve is just a
+   band of empty panel under a one-line answer. Photographed after a successful
+   send and reported as "poitless whitespace between lower text".
+   ⚠️ `.ok` and `.bad` are the terminal states, so they are the ones that stop
+   reserving; a mid-flight line keeps the full two. */
+.pos-fb-said.ok, .pos-fb-said.bad { min-height: 0; }
+/* 🔴 AND NOTHING RESERVED BEFORE ANYTHING HAS BEEN SAID. The reserve exists so
+   the panel does not jump while the send reports its five steps, and before the
+   first press there are no steps: an unopened panel was carrying 2.8em of empty
+   line under the Send button, photographed as a band of dead panel taller than
+   the name field. The reserve arrives with the first word, which is the first
+   moment a jump is possible. */
+/* 🔴 `min-height: 0` IS NOT ENOUGH, THE ELEMENT HAS TO GO. An empty block in a
+   flex column still takes a line box AND still collects the column's 14 px gap
+   above it, so the panel kept about 20 px of nothing under the Send button
+   after the reserve was zeroed. Reported three times as the padding not being
+   fixed, and it was not: only half of it had been. */
+.pos-fb-said:empty { display: none; }
+.pos-fb-said.bad { color: var(--bad); }
+.pos-fb-said.ok { color: var(--ok); }
 
 /* ── grain scope ──────────────────────────────────────────────────────────
    demo/shell/grain-scope.mjs. Time across, position-in-the-held-seconds up,
@@ -1030,8 +1225,13 @@ video[hidden] { display: none; }
    `scrolls false`, and 141 px of horizontal PAGE overflow. The whole row of
    tabs was dragging the page sideways. */
 .pos-tabs, .pos-tabs-bar { min-width: 0; max-width: 100%; }
+/* ⚠️ 28, NOT 20. These are letter-spaced uppercase, which already spreads each
+   word out, so a gap that looks generous between two lower-case words reads as
+   cramped between two tracked ones: the words run together into one band of
+   caps. The `margin-right` below still cancels exactly one letter-space, so the
+   gap is 28 px of ink to ink rather than 28 px of boxes. */
 .pos-tabs-bar {
-  display: flex; gap: 20px; overflow-x: auto;
+  display: flex; gap: 28px; overflow-x: auto;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
 .pos-tabs-bar::-webkit-scrollbar { display: none; }
@@ -1054,8 +1254,12 @@ video[hidden] { display: none; }
 .pos-tabs-t:hover:not(:disabled) { color: var(--fg); }
 .pos-tabs-t[aria-selected="true"] { color: var(--hi); box-shadow: inset 0 -2px 0 0 var(--hi); }
 /* A part that is coming and a part that does not exist are different facts, so
-   the unbuilt one stays in the row, named, and says so by weight alone. */
-.pos-tabs-t:disabled { color: var(--line2); cursor: default; }
+   the unbuilt one stays in the row, named, and says so by weight alone.
+   ⚠️ `--dim2`, NOT `--line2`. `--line2` is the colour of a BORDER, and type set
+   in it is at the edge of being readable rather than merely quiet: a tab nobody
+   can read is one that does not exist, which is the distinction this rule was
+   written to preserve. One step lighter than live, not invisible. */
+.pos-tabs-t:disabled { color: var(--dim2); opacity: .7; cursor: default; }
 .pos-tabs-t:focus:not(:focus-visible) { outline: none; }
 .pos-tabs-t:focus-visible { outline: 2px solid var(--dim2); outline-offset: 3px; }
 /* ⚠️ The panels carry the shell's own vertical rhythm INSIDE them, because a
@@ -1084,17 +1288,35 @@ video[hidden] { display: none; }
    2 px give 21 px, which is a fifth more of the archive on one screen and is
    still two clear pixels of air either side of an 11 px glyph. Below this the
    rules between rows start touching the text. */
+/* ⚠️ 5 px AND 14 px, UP FROM 2 AND 10. The tight row above was measured against
+   a table of 334 archive records where fitting more on a screen is the whole
+   job. It is the wrong trade on a table of a dozen messages, where the rows are
+   not the subject and the text ran into the box's own edge. 5 px still leaves a
+   21 px row at this line-height, so the dense case loses nothing worth counting;
+   14 px across is a clear gutter rather than a hairline. */
 .pos-tbl-row {
   display: grid; grid-template-columns: var(--tbl-cols);
-  gap: 8px; padding: 2px 10px; line-height: 1.4; align-items: baseline;
+  gap: 12px; padding: 5px 14px; line-height: 1.4; align-items: baseline;
   border-bottom: 1px solid #ffffff08;
 }
 .pos-tbl-body > .pos-tbl-row:last-child { border-bottom: 0; }
 /* The heading is the one row that is not a record, so it says so by weight and
    by case rather than by a rule under it — which every other row has too. */
+/* ⚠️ NO FILL BEHIND THE HEADER. A grey bar across the top is a second divider
+   saying what the row's own bottom border already says, and `shell.css` holds
+   one rule about this: separation is spacing, not lines. The header is told
+   apart by being smaller, tracked and uppercase, which is three channels
+   already. It stays sticky, so it still needs a background to scroll rows
+   UNDER: it takes the surface it is sitting on rather than painting a new one. */
 .pos-tbl-head {
   color: var(--dim2); text-transform: uppercase; letter-spacing: .06em;
-  font-size: 10px; background: var(--card2); position: sticky; top: 0;
+  font-size: 10px; background: var(--card); position: sticky; top: 0;
+  /* 🔴 MORE AIR THAN A RECORD ROW, AND THAT IS WHAT THE GREY BAR WAS DOING. The
+     fill is gone, so the only thing left to separate the heading from the first
+     record is space: at the body's own padding the two sat 5 px apart and read
+     as one block with a shouty first line. Uneven top and bottom on purpose —
+     the heading belongs to the table, not to the row under it. */
+  padding-top: 9px; padding-bottom: 7px;
 }
 .pos-tbl-c { color: var(--dim); min-width: 0; overflow-wrap: anywhere; }
 .pos-tbl-c.r { text-align: right; }
@@ -1168,12 +1390,24 @@ video[hidden] { display: none; }
    ⚠️ FIXED WIDTH. `--pick-w`, and long names ellipsize. A cell that sizes to
    its text moves the arrows and the die every time you step, so the control you
    are about to press again is not where it was. */
+/* 🔴 13 ch WAS A PHONE'S WIDTH IMPOSED ON A DESKTOP. `four seconds ago` came
+   out as `four seco…` on a 1490 px window with the rest of the row half empty,
+   and an ellipsis is this project's own signal that a thing is in the wrong
+   place rather than a styling problem to widen your way out of. Here the place
+   is right and the number was simply a phone's. The narrow value is kept as the
+   floor, because the one-column phone rule below sets its own width anyway and
+   a cell that is 22 ch on a 360 px screen would push the row off the side.
+   ⚠️ `ch` ON A MONOSPACE FACE IS EXACTLY CHARACTERS, which is why the unit is
+   worth keeping: 22 ch fits `Vibraphone Soft 2` and `four seconds ago` whole,
+   and the longest name in `/box/`'s Yoshimi library with one to spare. */
 .pos-pick { display: inline-flex; align-items: center; gap: 8px; height: 34px; --pick-w: 13ch; }
+@media (min-width: 620px) { .pos-pick { --pick-w: 22ch; } }
 .pos-pick-l {
   font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
   color: var(--dim2); flex: none;
 }
 .pos-pick-cell {
+  white-space: nowrap;
   position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   width: var(--pick-w); height: 34px; padding: 0 10px; box-sizing: border-box;
   font: 500 13px/1 var(--mono); color: var(--fg);
@@ -1356,6 +1590,14 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
   font: 600 10px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase;
   color: var(--dim2); margin: 0 0 14px;
 }
+/* 🔴 A DIAGRAM OPENS A SECTION, SO IT SITS AT THE SECTION DISTANCE, AND THERE
+   IS ONE OF THOSE. `.pos-how` above carries `margin-top: 44px` and a diagram
+   that brings its own `title` was getting the body's ordinary 22 px rhythm
+   instead: two headings over two pictures on two pages at two distances, which
+   is the defect CLAUDE.md's vertical spacing rule exists to stop. Photographed
+   against `/radio1965/`, which uses the standing heading and therefore looked
+   right. 44 in both cases, declared in one place. */
+.pos-body > .pos-dg { margin-top: 44px; }
 .pos-dg-t[hidden] { display: none; }
 /* `display: block` because an inline svg sits on a text baseline and leaves a
    few pixels of descender space under it, which reads as a caption that has
@@ -1412,7 +1654,7 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
 /* `here` — the browser you are reading this in. The only box with a lighter
    back, and it needs no hue at all: being filled is the whole signal. */
 .pos-dg-n[data-kind="here"] .pos-dg-box {
-  fill: var(--line); stroke: var(--dim2); stroke-width: 1.2;
+  fill: var(--line); stroke: var(--dim2); stroke-width: 1;
 }
 /* somebody else's computer, rented by the hour — DOTTED, because its edge is
    the one thing in the picture that is not ours.
@@ -1429,16 +1671,18 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
    hue the diagram had assigned, and four differently-tinted boxes rendered as
    four identical greys. MEASURED by looking at the picture twice and wondering
    why the system had done nothing.
-   What a kind is ABOUT is the edge: dotted for somebody else's computer, heavy
-   for a physical machine. Colour now says which box, and weight says what kind
-   of thing, which is two channels carrying two facts instead of one carrying
-   neither. */
+   What a kind is ABOUT is the edge. */
 /* ⚠️ NO DASH. It was dotted to say "somebody else's computer", and with hues on
    the boxes it is one channel too many: the dots read as a broken edge rather
-   than as a category, and the thing they were saying is in the box's own note.
-   Weight alone still separates a physical machine from the rest. */
-.pos-dg-n[data-kind="cloud"] .pos-dg-box { stroke-width: 1.2; }
-.pos-dg-n[data-kind="device"] .pos-dg-box { stroke-width: 2; }
+   than as a category, and the thing they were saying is in the box's own note. */
+/* 🔴 AND NO WEIGHT EITHER. ONE BORDER WIDTH, EVERY BOX, EVERY KIND. `cloud` was
+   1.2, `device` was 2 and `here` was 1.2 against a plain box's 1, on the theory
+   that weight says what kind of thing a box is while colour says which box. It
+   does not read that way: four widths inside a hundred pixels are not four
+   categories, they are four boxes that look unevenly drawn, and the one at 2 px
+   simply looks the most important. What kind of thing a box is, is in its note,
+   which is where a reader who wants that goes. */
+.pos-dg-n[data-kind] .pos-dg-box { stroke-width: 1; }
 
 /* A CONTAINER — a machine with the programs on it drawn as boxes inside it.
    Its back is whatever the picture sits on, not a panel of its own: a
@@ -1563,12 +1807,20 @@ a.pos-card:hover .pos-card-t, a.pos-card:focus-visible .pos-card-t { color: var(
    exist, which is a different and false statement. */
 .pos-card-why { font: 400 11px/1.35 var(--sans); color: var(--warn); }
 .pos-card[data-off="1"] { opacity: .62; }
-/* Buttons on a card sit at the far end of the same row as the tags — see
-   card.mjs for why a card that has them stops being one big link. */
-.pos-card-a { margin-left: auto; display: flex; gap: 5px; }
+/* Buttons on a card. See card.mjs for why a card that has them stops being one
+   big link.
+   🔴 LEFT, NOT PUSHED TO THE FAR END. `margin-left: auto` shoved them against
+   the right edge while the card's title, sentence and tags all start at the
+   left, so the one row a reader has to aim at was the one row that did not line
+   up with anything. A card is read down its left edge; the things you can press
+   belong on it.
+   ⚠️ AND ITS OWN ROW, WITH AIR ABOVE IT. Sharing the tag row meant the buttons
+   moved sideways as the tags changed, and a control whose position depends on
+   how many capabilities a demo declares is a control you have to look for. */
+.pos-card-a { display: flex; gap: 5px; flex: 1 0 100%; margin-top: 8px; }
 .pos-card-a button {
   font: 500 10.5px/1 var(--sans); letter-spacing: .04em;
-  padding: 5px 9px; border-radius: 4px;
+  padding: 6px 14px; border-radius: 4px;
   background: var(--card2); border: 1px solid var(--line2); color: var(--fg);
   cursor: pointer;
 }
@@ -1622,8 +1874,12 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 
 /* The line joining the parts of one machine. No head: every arrow in a diagram
    means "the signal goes this way", and a head between two programs on one
-   board would claim an order the drawing does not know. See diagram.mjs. */
-.pos-dg-tie { stroke: var(--line2); stroke-width: 1; fill: none; }
+   board would claim an order the drawing does not know. See diagram.mjs.
+   ⚠️ THE SAME INK AS A LINK, THOUGH. It was a hairline in `--line2`, which is
+   the colour of a box edge, so a join between two programs read as another
+   piece of the container's furniture rather than as a line carrying something.
+   The head is the channel that says "no order here"; the weight is not. */
+.pos-dg-tie { stroke: var(--dim); stroke-width: 1.1; stroke-linecap: round; fill: none; }
 /* 🔴 HOVER IS EASED, BECAUSE AT ZERO IT READS AS A FAULT. The fill and the
    stroke both change the instant a pointer crosses a box, and with six boxes in
    a row a reader sweeping across them gets six hard flashes — reported as

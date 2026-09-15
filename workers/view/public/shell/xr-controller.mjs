@@ -92,7 +92,7 @@ export function createXRControllers(gl, { log = () => {}, say = () => {} } = {})
     };
   } catch (e) {
     prog = null;
-    log(`the controller models would not compile — ${e.message}`, 'warn');
+    log(`the controller models would not compile: ${e.message}`, 'warn');
   }
 
   const models = new Map();        // "profile|handedness" -> entry | null asked | false refused
@@ -155,7 +155,7 @@ export function createXRControllers(gl, { log = () => {}, say = () => {} } = {})
       models.set(key, false);
       // refused by name rather than approximated — and said where you can read
       // it while wearing the thing
-      say(`FAIL controllers · ${profile} ${handedness} — ${e.message}`);
+      say(`FAIL controllers · ${profile} ${handedness}: ${e.message}`);
       log(`no model for your controller (${e.message})`, 'warn');
       return false;
     }

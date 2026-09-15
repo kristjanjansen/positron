@@ -22,7 +22,7 @@ export async function openSession({ log = () => {} } = {}) {
   const r = await fetch(`${INGEST}/open`, { method: 'POST' });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
-    log(`R2 refused: ${j.error || r.status}${j.retryInS ? ` — retry in ${j.retryInS}s` : ''}`, 'bad');
+    log(`R2 refused: ${j.error || r.status}${j.retryInS ? ` · retry in ${j.retryInS}s` : ''}`, 'bad');
     return null;
   }
   log(`R2 session ${j.session} · up to ${j.limits.maxSegments} pieces`, 'hi');

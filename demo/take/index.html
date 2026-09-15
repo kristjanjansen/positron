@@ -194,7 +194,7 @@
       // report the CAPABILITY, not an error string — the lesson @moq/net taught.
       // The page keeps working: the generated picture is the source either way.
       camStream = null;
-      d.log(`camera: ${e.name} — staying on the generated picture`, 'bad');
+      d.log(`camera: ${e.name} · staying on the generated picture`, 'bad');
     }
   });
 
@@ -380,7 +380,7 @@
     // real time, which is what a recording head IS.
     view.strip.armWall(part.startMs);
     setRecUI(true);
-    d.log(`take ${part.n}: recording ${mime}, ${SLICE_MS} ms slices, stop when you like — ${capMs / 1000}s cap`, 'hi');
+    d.log(`take ${part.n}: recording ${mime}, ${SLICE_MS} ms slices, stop when you like · ${capMs / 1000}s cap`, 'hi');
     // The cap is a BACKSTOP and it is said before it bites, not after. It exists
     // so a forgotten take cannot grow without bound, which is the moment these
     // blobs go anywhere but memory.
@@ -483,7 +483,7 @@
     // under it, the burned numbers in the frames are lying and everything that
     // reads them is lying with them — so it is checked, not assumed.
     if (part.startMs !== totalMs) {
-      d.log(`take ${part.n}: the line moved under it (${part.startMs} vs ${totalMs}) — burned positions are stale`, 'bad');
+      d.log(`take ${part.n}: the line moved under it (${part.startMs} vs ${totalMs}) · burned positions are stale`, 'bad');
       part.startMs = totalMs;
     }
     totalMs += part.lenMs;
@@ -495,7 +495,7 @@
     paint();
     d.log(`take ${part.n} landed: ${(part.lenMs / 1000).toFixed(2)}s at `
       + `${(part.startMs / 1000).toFixed(2)}s, ${Math.round(part.bytes / 1024)} KiB`
-      + (part.fileMs === null ? ' — the file would not say its length' : ''), 'hi');
+      + (part.fileMs === null ? ' · the file would not say its length' : ''), 'hi');
   }
 
   // ── the strip ────────────────────────────────────────────────────────────
@@ -583,7 +583,7 @@
     scrub: false,          // the strip is the only position surface on this page
     // recording is a TRANSPORT verb here, not a side action beside the page
     extras: [{ id: 'rec', label: '\u25CF', aria: 'Record', primary: true,
-               title: `stop when you like — ${CAP_MS / 1000}s cap`,
+               title: `stop when you like · ${CAP_MS / 1000}s cap`,
                onClick: () => (recording ? stopRecording() : startRecording(CAP_MS)) }],
   });
 
@@ -678,7 +678,7 @@
       d.assert('every chunk is stamped on arrival',
         p1.chunks.every((c) => Number.isFinite(c.at) && Number.isFinite(c.gapMs)),
         `first at ${p1.chunks[0] ? Math.round(p1.chunks[0].at) : '—'} ms`);
-      d.assert('the take is seekable — a finite range, not Infinity',
+      d.assert('the take is seekable: a finite range, not Infinity',
         Number.isFinite(deck.durationMs) && deck.durationMs > 0, `${deck.durationMs} ms`);
       d.assert('the recorded length and the file length are both known',
         Number.isFinite(p1.recordedMs) && (p1.fileMs === null || Number.isFinite(p1.fileMs)),
@@ -696,13 +696,13 @@
     // page says so out loud, so "6 asserts" reads as "half the page" rather
     // than as "the page".
     if (parts.length < 2) {
-      d.log(`${parts.length} take on the line — the eight sequence checks (end to end, `
+      d.log(`${parts.length} take on the line. The eight sequence checks (end to end, `
         + 'boundary handover, one clock) need a second one. Press Record again.', 'hi');
     }
     if (parts.length < 2 || didSequence) { paint(); return; }
     didSequence = true;
 
-    d.assert('parts are laid end to end — no gap, no overlap',
+    d.assert('parts are laid end to end: no gap, no overlap',
       parts.every((p, i) => (i === 0 ? p.startMs === 0 : p.startMs === parts[i - 1].startMs + parts[i - 1].lenMs)),
       parts.map((p) => `${p.n}@${p.startMs}+${p.lenMs}`).join(' '));
     d.assert('the line is as long as the takes put together',

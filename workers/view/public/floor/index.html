@@ -1295,7 +1295,7 @@
   // the exit and for the real API's own changes.
   watchFull(wrap, (on) => {
     if (!on) outEl.dataset.on = '0';
-    d.log(on ? 'filling the screen — Escape to come back' : 'back to the page', 'hi');
+    d.log(on ? 'filling the screen · Escape to come back' : 'back to the page', 'hi');
   });
 
   d.on('vr', async () => {
@@ -1303,7 +1303,7 @@
     // ⚠️ NO AWAIT BEFORE requestSession — it needs a TRANSIENT user activation
     // and awaiting anything first can spend it. The support answer is the one
     // taken at load, never a fresh await here.
-    if (headsetKnown === false) { d.log('no headset here — the window above is the same floor', 'warn'); return; }
+    if (headsetKnown === false) { d.log('no headset here. The window above is the same floor', 'warn'); return; }
     try {
       const session = await navigator.xr.requestSession('immersive-vr',
         { requiredFeatures: ['local-floor'] });
@@ -1342,7 +1342,7 @@
       session.addEventListener('end', () => {
         xrSession = null; d.log('left VR', 'hi'); requestAnimationFrame(frame);
       });
-      d.log('in VR — trigger drags the floor, rest your look to play, GRIP to leave', 'hi');
+      d.log('in VR: trigger drags the floor, rest your look to play, GRIP to leave', 'hi');
       // 🔴 A DEAD-MAN'S SWITCH. If nothing has been drawn 6 s after the session
       // started, something threw where nothing was reporting and the wearer is
       // standing in a black room with no way out. MEASURED elsewhere in this
@@ -1353,7 +1353,7 @@
       const entered = xrFrames;
       setTimeout(() => {
         if (xrSession === session && xrFrames === entered) {
-          d.log('nothing drew in 6 s — ending the session rather than leaving you in it', 'bad');
+          d.log('nothing drew in 6 s. Ending the session rather than leaving you in it', 'bad');
           session.end().catch(() => {});
         }
       }, 6000);
@@ -1373,7 +1373,7 @@
 
   /** End the session and say which thing ended it. */
   function endVR(why, session) {
-    d.log(`${why} — leaving VR`, 'hi');
+    d.log(`${why} · leaving VR`, 'hi');
     session.end().catch(() => {});
   }
 
@@ -1788,7 +1788,7 @@
     // part: what changed is not the code, it is which gesture is deliberate.
     d.assert('the tile the ray is on lightens a little',
       aimed[0] > rest[0] + 8 && aimed[0] < rest[0] * 1.35,
-      `${aimed[0]} against ${rest[0]} of 255 — enough to find, not enough to shout`);
+      `${aimed[0]} against ${rest[0]} of 255`);
     d.assert('...and choosing one takes the rest of the floor down',
       rest[1] < rest[0] - 8 && rest[2] < rest[1] - 8,
       `the rest of the floor ${rest.join(' \u2192 ')} of 255 at rest, part way, and with a film`);
@@ -2102,11 +2102,11 @@
   // does not fire at all on mobile Safari. All of them mean the same thing here:
   // stop decoding a film for somebody who is no longer looking.
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { stopVideo(true); d.log('hidden — stopped', 'hi'); }
+    if (document.hidden) { stopVideo(true); d.log('hidden · stopped', 'hi'); }
   });
   addEventListener('pagehide', () => stopVideo(true));
 
-  d.log(`${tiles.length} films on the floor — drag to look, arrows to walk, rest your look to play`, 'hi');
+  d.log(`${tiles.length} films on the floor · drag to look, arrows to walk, rest your look to play`, 'hi');
   d.ready();
 </script>
 </html>

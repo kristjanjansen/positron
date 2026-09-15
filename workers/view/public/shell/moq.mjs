@@ -219,7 +219,7 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
   const t0 = performance.now();
   const relayUrl = new URL(MOQ_RELAY);
   const transport = await webTransportFor(relayUrl, forceTransport);
-  if (transport) log('FORCED a self-built WebTransport — expect a flow-control deadlock, WebKit 319818', 'bad');
+  if (transport) log('FORCED a self-built WebTransport. Expect a flow-control deadlock, WebKit 319818', 'bad');
   const conn = await Connection.connect(relayUrl, {
     websocket: { enabled: false },
     ...(transport ? { transport } : {}),
@@ -326,7 +326,7 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     const name = Object.keys(rends)[0];
     if (!name) { log('catalog carries no video rendition', 'bad'); return api(); }
     const rc = rends[name];
-    log(`catalog ok — ${rc.codec} ${rc.codedWidth}x${rc.codedHeight} (${rc.container?.kind})`, 'hi');
+    log(`catalog ok · ${rc.codec} ${rc.codedWidth}x${rc.codedHeight} (${rc.container?.kind})`, 'hi');
 
     const vSub = bc.subscribe(name);
     const consumer = new Container.Consumer(vSub, { format: new Container.Legacy.Format(), latency: 0 });
@@ -344,7 +344,7 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
         if (fw && fh && (out.width !== fw || out.height !== fh)) {
           out.width = fw; out.height = fh;                     // this also CLEARS it
           out.style.aspectRatio = `${fw} / ${fh}`;
-          log(`output sized to the source — ${fw}x${fh}`);
+          log(`output sized to the source · ${fw}x${fh}`);
         }
         octx.drawImage(vf, 0, 0);
         vf.close();

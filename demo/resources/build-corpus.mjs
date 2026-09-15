@@ -10,6 +10,18 @@
 //
 // NODE ONLY. Never shipped to a browser, never imported by the page.
 //
+// 🔴 THE WORD `kurenniemi` IN THIS FILE IS A SUBJECT, A HOST PATH AND A FILTER,
+// AND A RENAME ONCE TURNED TWELVE OF THEM INTO `resources`. MEASURED on
+// e5a8ad9, which renamed the DEMO from `kurenniemi` to `resources` and matched
+// bare words: three filters became `/resources/i.test(…)`, which no archive
+// record on earth satisfies, and two live hosts became `lahteilla.fi/resources/`
+// and `vandal.ist/kurenniemi/`, which do not exist. The corpus in git was built
+// before the rename and looked perfect, so the damage was invisible until
+// something re-ran the build: 285 rows instead of 334, with Zenodo keeping 0 of
+// 28 and archive.org 0 of 15. LAYOUT.md's rule is the one that was broken here,
+// a second time: match a class name or a path, never a bare identifier, and
+// syntax-checking proves nothing about a string.
+//
 // 🔴 REFS, NOT CONTENT. Every row is a POINTER — a title, a date, who holds it,
 // its identifier there, one URL, a licence and who asserts it. Nothing is
 // mirrored: no audio, no images, no PDFs, no page text. Six of these sources
@@ -358,7 +370,7 @@ function whenFinnishArchive(text, how) {
   // where it does.
   if ((m = /^(\d{4})\s+jälkeen$/i.exec(s))) {
     return { edtf: `after ${m[1]}`, earliest: Y(+m[1]), latest: Y(2018), precision: 'after', how,
-             note: `the source says "${s}" — after ${m[1]}, with no end. The bracket closes at his `
+             note: `the source says "${s}": after ${m[1]}, with no end. The bracket closes at his `
                  + 'death in 2017 because nothing in his own archive can be later' };
   }
   // `1950-luku`, and the four qualified forms.
@@ -372,7 +384,7 @@ function whenFinnishArchive(text, how) {
     const qual = /puoliväli|alkupuoli|loppupuoli|alku|loppu/.exec(s)?.[0] || null;
     return { edtf: `${String(dec).slice(0, 3)}X`, earliest: Y(dec), latest: Y(dec + 10),
              precision: 'decade', how,
-             ...(qual ? { note: `the source says "${s}" — ${FI[qual]} of the ${dec}s. The bracket is `
+             ...(qual ? { note: `the source says "${s}", which is ${FI[qual]} of the ${dec}s. The bracket is `
                               + 'the whole decade because that qualifier has no defined width' } : {}) };
   }
   return whenFrom(s, how);
@@ -390,12 +402,20 @@ const unent = (s) => String(s || '')
 // ⚠️ ONE GATHERING, NOT TWO. The 22 rows the deck plays from are not
 // re-researched here — their dates carry evidence this script has no way to
 // re-derive (a filename year, a compilation's span, Wikidata's declared
-// precision) and a second opinion about them would be a second opinion that
-// drifts. They are read in, converted to this file's shape, and their source
-// file is recorded in `inputs` with ITS generation date, so a stale fold is
-// visible in the output rather than invisible in it. The page checks the same
-// thing from the other end: it fetches both files and asserts every id in the
-// deck's list is in this one.
+// precision, a page of Ojanen's thesis) and a second opinion about them would be
+// a second opinion that drifts. They are read in, converted to this file's
+// shape, and their source file is recorded in `inputs` with ITS generation date,
+// so a stale fold is visible in the output rather than invisible in it. The page
+// checks the same thing from the other end: it fetches both files and asserts
+// every id in the deck's list is in this one.
+//
+// 🔴 AND IT CARRIES THE TWO SENTENCES, WHICH IT DID NOT UNTIL 2026-09-15.
+// `when.note` (why the bracket has this width) and the row's own `note` (what
+// the record is) were both dropped on the way through, so eleven readings of a
+// named source arrived here as bare numbers with a slug. That is how fourteen
+// corrections ended up hand-written into this generated file: there was nowhere
+// upstream for the prose to ride. Both fields fold now, and `/resources/` shows
+// them.
 function foldDeck() {
   const path = 'proto/deck/corpus.json';
   const deck = JSON.parse(readFileSync(join(REPO, path), 'utf8'));
@@ -428,18 +448,50 @@ function foldDeck() {
         latest: it.when.latest,
         precision: it.precision,
         how: it.dateEvidence?.how || it.when.rule,
+        note: it.when.note || null,
       },
       licence: it.prov.rights || 'not stated',
       licenceBy: it.prov.rightsAsserter || 'nobody',
       licenceConfidence: it.prov.rightsConfidence || null,
       http: null, httpFrom: 'deck',
       cors: null,
-      note: null,
+      note: it.note || null,
       via: path,
     };
   });
   return { deck, out };
 }
+
+// ── the thesis pass, and where its other half lives ─────────────────────────
+//
+// 🔴 FOURTEEN DATES IN THIS FILE REST ON A BOOK, AND A BOOK HAS NO API.
+// Mikko Ojanen's PhD reads eleven of these tapes off named pages and corroborates
+// three museum objects against its instrument table. Nothing above can harvest
+// that: there is no field at archive.org, no statement at Wikidata and no
+// literal at Europeana that carries a printed page number. The values were once
+// hand-edited into this generated file and would have been erased by the next
+// run of it.
+//
+// They arrive by TWO DOORS now, and each value lives in exactly one place.
+// TWELVE fold in from the deck, where `proto/deck/ingest.mjs` holds them beside
+// the rule that made every other bracket in that file. TWO are National Gallery
+// rows, harvested here from a bulk dump with no hand-editable upstream at all,
+// so they are here. The count is checked at the end: a build that assembles any
+// other number than fourteen refuses to write.
+//
+// ⚠️ THESE TWO MOVE NO DATE. Table 3 (printed p. 81) agrees with the year the
+// catalogue already states, and a value that did not change with a confidence
+// that did is the only kind of corroboration worth recording.
+const THESIS_ROWS = 14;
+const THESIS_SOURCE = 'Mikko Ojanen, "User Stories of Erkki Kurenniemi\'s Electronic Musical '
+  + 'Instruments, 1961-1978" (PhD, University of Helsinki, 2020), 10.5281/zenodo.4306056, '
+  + 'CC BY 4.0 on the text';
+const CORROBORATED = {
+  'fng:646207': 'Ojanen 2020 Table 3 (printed p. 81) gives the DIMI-O as 1971 with one built, '
+    + 'which agrees with the year the catalogue states',
+  'fng:382248': 'Ojanen 2020 Table 3 (printed p. 81) gives the DIMI-S as 1972 with two built, '
+    + 'which agrees with the year the catalogue states',
+};
 
 // ── 1. Zenodo ───────────────────────────────────────────────────────────────
 async function zenodo() {
@@ -466,7 +518,7 @@ async function zenodo() {
       const says = [m.title, (m.creators || []).map((c) => c.name).join(' '),
                     (m.keywords || []).join(' '), String(m.description || '').replace(/<[^>]+>/g, ' ')]
         .join(' ');
-      if (!/resources/i.test(says)) {
+      if (!/kurenniemi/i.test(says)) {
         dropped.push(`${h.id} "${m.title}" (${(m.creators || []).map((c) => c.name).join('; ')})`);
         continue;
       }
@@ -944,7 +996,7 @@ async function archiveOrg() {
   const r = await ask(asked + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=mediatype'
     + '&fl%5B%5D=licenseurl&fl%5B%5D=uploader&fl%5B%5D=date', { cache: true, key: 'ia-search' });
   const docs = json(r)?.response?.docs || [];
-  const mine = docs.filter((d) => /resources/i.test(`${d.identifier} ${d.title}`));
+  const mine = docs.filter((d) => /kurenniemi/i.test(`${d.identifier} ${d.title}`));
   // ⚠️ FIVE ITEMS IS THE WHOLE OF IT, AND THAT IS ASKED RATHER THAN ASSUMED.
   // The free-text query is the widest one there is; the four field queries are
   // the narrow ones. If the collection grew, the field queries would find it
@@ -1186,7 +1238,7 @@ async function digi() {
 // here, with the count read off the page rather than remembered — the page
 // prints `N total, starting on record 1` and that N is what goes in `count`.
 async function vandal() {
-  const asked = 'https://vandal.ist/resources/sampledata/index.html';
+  const asked = 'https://vandal.ist/kurenniemi/sampledata/index.html';
   const r = await ask(asked, { cache: true, key: 'vandal' });
   const m = /(\d+)\s+total, starting on record/.exec(r.body || '');
   source({
@@ -1199,14 +1251,14 @@ async function vandal() {
   });
   // 🔴 THE PROJECT'S OWN PAGE ABOUT THE TAPES IS THE ONLY PLACE ANYBODY SAYS
   // HOW MANY AUDIO DIARIES THERE ARE. The mirror kept the sample data and
-  // dropped the Data Radio — `vandal.ist/resources/dataradio/material.html`
+  // dropped the Data Radio — `vandal.ist/kurenniemi/dataradio/material.html`
   // answers 404, measured — so the page survives only on the dead
   // `kurenniemi.activearchives.org` in the Wayback Machine, where it reads:
   // "Kurenniemi's archive contains 100 digitized cassettes of a period that
   // ranges from 1970 to 1975." That sentence is a finding aid nobody else
   // publishes, and it is two rows below: the cassettes and the Newton diary.
   const DR = 'http://kurenniemi.activearchives.org/dataradio/';
-  const gone = await ask('https://vandal.ist/resources/dataradio/material.html',
+  const gone = await ask('https://vandal.ist/kurenniemi/dataradio/material.html',
     { cache: true, key: 'vandal-dataradio-404' });
   const mat = await ask(`https://web.archive.org/web/2020/${DR}material.html`,
     { cache: true, key: 'aa-dataradio-material' });
@@ -1285,7 +1337,7 @@ async function vandal() {
 // ── 9b. lahteilla.fi, through the Internet Archive ──────────────────────────
 //
 // 🔴 THIS IS WHERE THE DIARIES ARE, AND THE SITE THAT HOLDS THEM IS DEAD.
-// `lahteilla.fi/resources/` was the Finnish National Gallery's own public
+// `lahteilla.fi/kurenniemi/` was the Finnish National Gallery's own public
 // presentation of the fonds — *Erkki Kurenniemi, Mies tulevaisuudesta* — and it
 // does not resolve (`DNS ENOTFOUND`, measured, and already a row in this file).
 // The Wayback Machine holds 545 of its URLs, and inside them is the item-level
@@ -1334,7 +1386,7 @@ async function lahteilla() {
   // is asked ONCE and matched against the img src on each tag page, because the
   // timestamp baked into a rewritten src belongs to the HTML capture and not to
   // the image — following one of those verbatim is a 404, measured.
-  const cdx = await ask('http://web.archive.org/cdx/search/cdx?url=lahteilla.fi/resources/'
+  const cdx = await ask('http://web.archive.org/cdx/search/cdx?url=lahteilla.fi/kurenniemi/'
     + 'sites/default/files*&output=json&collapse=urlkey&limit=5000'
     + '&fl=original,timestamp,statuscode,mimetype,length',
     { cache: true, key: 'lahteilla-cdx-files', tries: 3, maxAgeMs: 30 * 86400e3 });
@@ -1507,7 +1559,7 @@ async function lahteilla() {
   }
   // The publication the National Gallery made about this archive, chapter by
   // chapter. Open PDFs, every one of them, on a host that is gone.
-  const pubs = await ask('http://web.archive.org/cdx/search/cdx?url=lahteilla.fi/resources/'
+  const pubs = await ask('http://web.archive.org/cdx/search/cdx?url=lahteilla.fi/kurenniemi/'
     + 'julkaisu*&output=json&collapse=urlkey&fl=original,timestamp,statuscode,mimetype,length',
     { cache: true, key: 'lahteilla-cdx-julkaisu', tries: 3, maxAgeMs: 30 * 86400e3 });
   let pubCount = 0, pubBytes = 0;
@@ -1526,8 +1578,8 @@ async function lahteilla() {
       source: 'lahteilla.fi',
       holder: 'the Finnish National Gallery published it; only the Internet Archive still serves it',
       sourceId: 'julkaisu/' + name,
-      url: wb('http://www.lahteilla.fi/resources/julkaisu/' + name, row[1]),
-      file: wb('http://www.lahteilla.fi/resources/julkaisu/' + name, row[1] + 'if_'),
+      url: wb('http://www.lahteilla.fi/kurenniemi/julkaisu/' + name, row[1]),
+      file: wb('http://www.lahteilla.fi/kurenniemi/julkaisu/' + name, row[1] + 'if_'),
       fileType: 'application/pdf',
       bytes: +row[4] || null,
       count: 1,
@@ -1617,7 +1669,7 @@ async function crossref() {
     const pub = (w.issued?.['date-parts'] || [[]])[0];
     const when = m
       ? { ...whenYears(+m[1], m[2] ? +m[2] : null, 'the-year-the-editors-printed-in-the-chapter-title'),
-          note: /ca\./i.test(title) ? 'the editors wrote "ca." — the year is their estimate, not a date on the document' : undefined }
+          note: /ca\./i.test(title) ? 'the editors wrote "ca.", so the year is their estimate and not a date on the document' : undefined }
       : whenFrom(pub.length ? pub.slice(0, 3).map((n, i) => String(n).padStart(i ? 2 : 4, '0')).join('-') : null,
                  'crossref-issued-date-of-the-book');
     out.push({
@@ -1764,7 +1816,7 @@ async function openalex(have) {
     // separate them is the punctuation — a place is quoted, a person is not.
     // Strip the quoted form and require the name to survive somewhere else.
     const unquoted = title.replace(/[«"“”'‘’‹›]\s*Kurenniemi\s*[»"“”'‘’‹›]/gi, ' ');
-    if (!/resources/i.test(unquoted + ' ' + authors.join(' '))) {
+    if (!/kurenniemi/i.test(unquoted + ' ' + authors.join(' '))) {
       dropped.push(`${title} — the name is a place here, not him`);
       continue;
     }
@@ -1866,8 +1918,8 @@ const BY_NAME = [
   // COPY'S. `url` is where you can still read it; `probe` is the thing whose
   // answer the row is about, and writing the cache's 200 here would have said
   // the opposite of what happened.
-  { id: 'lahteilla:kurenniemi', url: 'https://web.archive.org/web/2024/http://lahteilla.fi/resources/',
-    probe: 'http://lahteilla.fi/resources/',
+  { id: 'lahteilla:kurenniemi', url: 'https://web.archive.org/web/2024/http://lahteilla.fi/kurenniemi/',
+    probe: 'http://lahteilla.fi/kurenniemi/',
     kind: 'collection', source: 'lahteilla.fi', title: "the National Gallery's own Kurenniemi site — dead",
     holder: 'was the Finnish National Gallery; now only the Internet Archive',
     when: () => whenYears(2013, 2026, 'the-span-of-the-wayback-captures'),
@@ -2052,6 +2104,46 @@ for (const s of sources) s.items = items.filter((x) => x.source === s.name).leng
   }
 }
 
+// ── the thesis pass ─────────────────────────────────────────────────────────
+// The two rows with no upstream, then the count of all fourteen. See the block
+// beside `CORROBORATED` for why this is a pass and not a harvester.
+//
+// ⚠️ `--only` BUILDS A PARTIAL CORPUS ON PURPOSE, so these refusals are for a
+// full run. Under `--only` a missing row means the step that would have brought
+// it was not asked for, which is not a defect and must not read as one.
+{
+  const missing = [];
+  for (const [id, note] of Object.entries(CORROBORATED)) {
+    const it = items.find((x) => x.id === id);
+    if (!it) { missing.push(id); continue; }
+    it.when = { ...it.when, note };
+  }
+  if (missing.length && !ONLY) {
+    throw new Error(`nothing to corroborate: ${missing.join(', ')} is not in this corpus`);
+  }
+  if (missing.length) log(`  --only: ${missing.length} corroborated rows not in this partial build`);
+}
+// 🔴 DERIVED FROM THE DECK, NOT RE-TYPED HERE. `ingest.mjs` marks every row its
+// own thesis pass touched with `dateEvidence.replaces` — what the date used to
+// rest on — so the twelve are counted off the file they came from. A stale deck
+// makes this number fall and the build refuses, which is the alarm that did not
+// exist when the corrections were sitting in a generated file.
+const amendedIds = new Set([
+  ...deck.items.filter((i) => i.dateEvidence?.replaces !== undefined).map((i) => i.id),
+  ...Object.keys(CORROBORATED),
+]);
+const amended = items.filter((x) => amendedIds.has(x.id));
+if (amended.length !== THESIS_ROWS && !ONLY) {
+  const lost = [...amendedIds].filter((id) => !items.some((x) => x.id === id));
+  throw new Error(`the thesis pass reached ${amended.length} rows and there are ${THESIS_ROWS} of them: `
+    + (lost.length ? `not in the corpus — ${lost.join(', ')}`
+                   : 'proto/deck/corpus.json is stale, run `node proto/deck/ingest.mjs --rewhen`'));
+}
+{
+  const mute = amended.filter((x) => !x.when.note);
+  if (mute.length) throw new Error(`amended with no reason given: ${mute.map((x) => x.id).join(', ')}`);
+}
+
 const dated = items.filter((x) => x.when.earliest != null);
 const doc = {
   subject: 'Erkki Kurenniemi (1941–2017)',
@@ -2061,6 +2153,20 @@ const doc = {
       + 'who holds it, its identifier there, one URL and a licence. Nothing is copied. '
       + 'Statuses and CORS were observed on the date above, not assumed.',
   inputs: [{ path: 'proto/deck/corpus.json', generated: deck.generated, items: deck.items.length }],
+  // 🔴 THE ROWS THAT REST ON A BOOK, NAMED SO A REBUILD CAN BE CHECKED.
+  // This used to be a hand-written warning saying that running the generator
+  // would erase everything under it. It is generated now, and what it records is
+  // the opposite: these values come out of the same run that writes this file.
+  // `/resources/` reads it and goes red if a row named here has lost its bracket.
+  amended: {
+    source: THESIS_SOURCE,
+    recordedIn: 'research/corpus-from-thesis-2026-09.md',
+    what: `${amended.filter((x) => /^ojanen-2020-thesis/.test(x.when.how || '')).length} records re-dated `
+        + `or re-evidenced from named pages and ${amended.filter((x) => !/^ojanen-2020-thesis/.test(x.when.how || '')).length} `
+        + 'corroborated without moving. One bracket got WIDER, on a better source.',
+    heldIn: ['proto/deck/ingest.mjs', 'demo/resources/build-corpus.mjs'],
+    rows: amended.map((x) => ({ id: x.id, edtf: x.when.edtf, how: x.when.how })),
+  },
   counts: {
     items: items.length,
     sources: sources.length,

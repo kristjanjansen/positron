@@ -106,7 +106,7 @@ export async function allocBuffers(eng, { sourceTable = 4096, log = () => {} } =
   eng.send('/b_setn', GATE0, 0, 16, ...ones);
   eng.send('/b_setn', GATE0 + 1, 0, 16, ...ones);
   await eng.sleep(250);
-  log(`${allocated} of ${plan.length} buffers${refused.length ? ` — ${refused.join(',')} refused` : ''}`);
+  log(`${allocated} of ${plan.length} buffers${refused.length ? ` · ${refused.join(',')} refused` : ''}`);
   return { allocated, total: plan.length, refused };
 }
 

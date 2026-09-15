@@ -278,7 +278,7 @@ export function readSynthDef(input) {
   const str = () => { const n = u8(); need(n); const s = new TextDecoder().decode(bytes.subarray(p, p + n)); p += n; return s; };
 
   const head = String.fromCharCode(u8(), u8(), u8(), u8());
-  if (head !== MAGIC) throw new Error(`synthdef: this does not start with ${MAGIC} — it starts with ${JSON.stringify(head)}`);
+  if (head !== MAGIC) throw new Error(`synthdef: this does not start with ${MAGIC}; it starts with ${JSON.stringify(head)}`);
   const version = i32();
   if (version !== 1 && version !== 2) throw new Error(`synthdef: version ${version} is not one this reads`);
   // The one line that is the whole version difference.
@@ -318,7 +318,7 @@ export function readSynthDef(input) {
   // green suite with no coverage: every number it printed would look right.
   // research §2.1 made the same demand of its converter and said so.
   if (p !== bytes.length) {
-    throw new Error(`synthdef: read ${p} of ${bytes.length} bytes — the rest is not accounted for`);
+    throw new Error(`synthdef: read ${p} of ${bytes.length} bytes; the rest is not accounted for`);
   }
   return { head, version, defs, bytes: bytes.length };
 }

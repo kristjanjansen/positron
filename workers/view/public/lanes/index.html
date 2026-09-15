@@ -224,7 +224,7 @@
         mute.gain.value = 0;                 // pulled by the graph, heard by nobody
         probe.connect(ear); ear.connect(mute); mute.connect(ctx.destination);
         d.log('ear listening on the audio thread');
-      }).catch((e) => d.log(`no ear: ${e.name} — sound card stays unmeasured`, 'bad'));
+      }).catch((e) => d.log(`no ear: ${e.name} · sound card stays unmeasured`, 'bad'));
 
       audio = createAudioLane(deck.transport, ctx, { horizonMs: AHEAD, makeNode: audibleClick });
       for (let at = 0; at < DURATION; at += BEAT) audio.schedule({ at, kind: 'click', id: `c${at}` });

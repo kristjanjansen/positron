@@ -22,6 +22,26 @@
   // hostname is this line, and wrangler provisions the DNS and the certificate
   // itself. Same arrangement as store/shout/backlog.
   "routes": [{ "pattern": "items.positron.studio", "custom_domain": true }],
+  // 🔴 THE TOPIC WAS NEVER CONFIGURED, AND IT BROKE THE PUSH PATH IN BOTH
+  // DIRECTIONS. `announce()` throws `no FCM_TOPIC configured` on every publish,
+  // so `announced_at` stayed null on every row; and `POST /subscribe` reads the
+  // same value, so no device could be joined to a named topic either. MEASURED
+  // 2026-09-15 at `GET /punctuality?room=items`, which reports what the object
+  // knows about itself: `room: "items"`, `announcing: true`, `has_key: true`,
+  // **`has_topic: false`**. The room rule and the service-account key were both
+  // fine, and both were suspected first.
+  //
+  // ⚠️ A `var`, NOT A SECRET. A topic name is not a credential: it is a public
+  // channel name that every subscriber has to know, and `FIREBASE_SA` beside it
+  // is the thing that must stay secret. Keeping it here means one file says
+  // what this worker publishes to, rather than an invisible value somebody has
+  // to remember to set on a new account.
+  //
+  // ⚠️ AND NOTHING WAS SUBSCRIBED TO AN OLDER NAME, which is why picking one is
+  // safe: `subscribe` used this same unset value, so no device has ever joined
+  // a correctly named topic. Change the name here and every device has to
+  // re-subscribe.
+  "vars": { "FCM_TOPIC": "positron-items" },
   "compatibility_date": "2026-08-01",
   "workers_dev": true,
   "durable_objects": {

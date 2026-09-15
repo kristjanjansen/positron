@@ -1,0 +1,3492 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 THE PICTURE IS THE PAGE, AND THE BUTTONS LIVE INSIDE ITS BOX.
+     Asked for: *"buttons under video inside box, fullscreen on right"*. So the
+     pane is a COLUMN — screen, then the control row — and the shell's own
+     `.pos-controls` is moved into it rather than copied, which keeps the
+     buttons `verify.mjs` presses on every page. */
+  .vr-pane {
+    position: relative; overflow: hidden; display: flex; flex-direction: column;
+    background: var(--card2); border: 1px solid var(--line2); border-radius: 4px;
+  }
+  /* `aspect-ratio` rather than a pixel height: the field's two axes are the
+     granulator's own, so the box has no natural height and a height typed in
+     pixels would be one more number to keep in step with a layout. */
+  .vr-screen { position: relative; aspect-ratio: 16 / 9; background: #05060a; }
+  .vr-screen canvas { display: block; width: 100%; height: 100%; }
+  /* 🔴 ABSOLUTE, AND WITH ITS WIDTH RESERVED. A clock that redraws every frame
+     is exactly the thing CLAUDE.md forbids from changing how much room it
+     takes: `tabular-nums` so the digits do not jitter, a fixed `ch` width so
+     going from 9 to 10 seconds cannot widen it, and `position: absolute` so it
+     cannot move the picture under it whatever it says. */
+  .vr-clock {
+    position: absolute; top: 8px; right: 10px; z-index: 2; pointer-events: none;
+    font: 500 11px/1 var(--mono); font-variant-numeric: tabular-nums;
+    width: 7ch; text-align: right; color: var(--dim2);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+  }
+
+  /* 🔴 A LINE HERE, ON INSTRUCTION, AND THE RULE IT LOOKS LIKE IT BREAKS DOES
+     NOT APPLY. CLAUDE.md's "separation is spacing, not lines" is about siblings
+     down a page, where the vertical rhythm already says where one thing ends.
+     There is no rhythm inside this box: the row is flush against the picture
+     with nothing between them, and the picture's own content runs right up to
+     its bottom edge, so a dark ridge against a dark row has nothing to separate
+     it. The line is the edge of the screen, which is a real boundary rather
+     than a decoration of one. */
+  .vr-bar.pos-controls {
+    margin: 0; padding: 8px 10px; background: var(--card);
+    /* `--line`, the same token `/mirror/`'s `.bar` uses. Two player chromes
+       on two pages separated at two weights is a difference a reader can
+       see and nobody chose. */
+    border-top: 1px solid var(--line);
+    display: flex; align-items: center; gap: 8px;
+  }
+  /* the one control that is not about playing: pushed to the far end */
+  .vr-bar [data-id="full"] { margin-left: auto; }
+
+  /* 🔴 THE ROW FADES WHEN NOTHING IS HAPPENING, AND IT FADES ONLY ITS INK.
+     The page asked for is a picture with nothing else on the screen, and the
+     row is the one thing left that is not the picture. It is a player's chrome:
+     gone while you watch, back the moment you move.
+     ⚠️ OPACITY AND NOT `display` OR `visibility`. The box has to keep its
+     height or the picture above it resizes every time the row comes and goes,
+     and a canvas that changes size reallocates its framebuffer and drops the
+     feedback trail with it. Nothing about the layout moves here.
+     ⚠️ AND `pointer-events` STAYS ON. A faded control that cannot be clicked is
+     a trap: somebody reaching for a button they can still faintly see should
+     hit it, not have the first click count as "wake up" and do nothing. */
+  .vr-bar.pos-controls { transition: opacity 600ms ease; }
+  .vr-pane.idle .vr-bar.pos-controls { opacity: 0.12; }
+  /* a keyboard user is never idle: focus inside the row always shows it */
+  .vr-bar.pos-controls:focus-within { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .vr-bar.pos-controls { transition: none; }
+  }
+
+  /* ⚠️ THE FULLSCREEN RULE TOUCHES SHAPE AND FRAME AND NOTHING ELSE, AND THAT
+     IS DELIBERATE. `shell.css` already owns the cover: `.pos-faux-host
+     .pos-faux` sets `position: fixed; inset: 0; height: 100dvh` at (0,2,0).
+     This rule is (0,2,0) too and sits in a later stylesheet, so anything it
+     declared twice would WIN and take the fallback down on exactly the
+     browsers that need it (an iPhone has no element fullscreen at all).
+     ⚠️ AND IT IS A CLASS, NEVER `:fullscreen`. A browser that does not know
+     that pseudo-class throws away the whole selector list it appears in. */
+  .vr-pane.pos-full { border: 0; border-radius: 0; }
+  /* the screen takes the room the shape no longer claims, and the row keeps
+     its place under it, so there is always a way back out of full screen */
+  .vr-pane.pos-full .vr-screen { flex: 1 1 auto; aspect-ratio: auto; }
+  /* 🔴 NO ROW AT ALL IN FULL SCREEN. Asked for, and it is the point of full
+     screen on this page: the picture is the only thing on the screen. The row
+     fades on idle everywhere else, which is right when there is a page around
+     it and pointless when there is not.
+     ⚠️ THE WAY BACK IS NOT LOST. Escape leaves element fullscreen, and the
+     fallback cover listens for it too, so there is always an exit that does not
+     need a button. */
+  .vr-pane.pos-full .vr-bar.pos-controls { display: none; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createModulator } from '/shell/pappus-mod.mjs';
+  import { bootScsynth } from '/shell/scsynth.mjs';
+  import { allocBuffers, startPappusSynth, applyAudibleDefaults, setParam,
+           PAPPUS_NODE, RING_SECONDS } from '/shell/pappus.mjs';
+  import { createMp3Stream } from '/shell/mp3-stream.mjs';
+  import * as FS from '/shell/fullscreen.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import {
+    BUF_SECONDS, STATIONS, RELAY, srcOf, nameOf, indexOfId, askHealth,
+    PATCHES, LANES, MOD_SPECS, MOD_FOLLOWERS, MOD_CMD, MOD_HZ, MOD_DESTS,
+    FOLLOWER_NAMES, LAYOUT_VERSION, basesOf, routesOf, morphOf,
+    writeDiscrete, writeContinuous, lockRate, createFeatures, voicesOf, winPos,
+  } from '/shell/radio-gran.mjs';
+
+  // 🔴 WHAT THIS PAGE IS, AND WHY IT IS NOT `/radio1965/` WITH THE CONTROLS
+  // HIDDEN. The instrument over there is a thing you play: a fader, four
+  // settings, a sound picker, a station row and a LOOP row, with a waveform
+  // above them. Take the hands off it and nothing moves, because every one of
+  // those decisions was a person's. So this page is the same machine with the
+  // decisions given to a clock: a tour that slides from one sound to the next,
+  // a blend that breathes with it, a station that changes on its own, and a
+  // loop that arrives, tunes the grain clock to itself and leaves again.
+  //
+  // 🔴 AND THE MACHINE IS IMPORTED, NOT COPIED. `demo/shell/radio-gran.mjs`
+  // holds the station list, the twelve sounds, the modulator's lanes, the two
+  // halves of a patch write, the loop's grain-clock arithmetic and the six
+  // numbers the instrument listens to. ⚠️ `/radio1965/` HAS NOT BEEN MOVED ONTO
+  // IT YET, so those things exist twice today. Read that module's header before
+  // editing either.
+
+  const BASE = new URLSearchParams(location.search).get('base') || RELAY;
+  /**
+   * 🔴 THE CHECKS ARE ON BY DEFAULT HERE AND THEY ARE OFF BY DEFAULT ON
+   * `/radio1965/`, AND THE DIFFERENCE IS WHO IS HOLDING THE INSTRUMENT. Over
+   * there a self-check moves a fader and a slider row in front of somebody who
+   * was using them, which was reported as the page taking itself away from its
+   * own listener. Nobody holds this one: it moves the blend, changes station
+   * and runs a loop by itself anyway, so a check that does those things is
+   * indistinguishable from the page working.
+   *
+   * ⚠️ ONE EXCEPTION, AND IT IS VISIBLE: the full screen check really does go
+   * full screen and come back, which is about a frame of flash a few seconds
+   * after load. It cannot be measured any other way, because what it grades is
+   * which of two mechanisms the browser took. `?selfcheck=0` turns the lot off.
+   * ⚠️ `verify-gl.mjs` appends NO query of its own, which is why the default is
+   * this way round rather than matching the other page.
+   */
+  const CHECK = new URLSearchParams(location.search).get('selfcheck') !== '0';
+
+  // ── the tour's clock ───────────────────────────────────────────────────────
+  //
+  // 🔴 EVERY PHASE HERE IS A FUNCTION OF THE CLOCK AND NOTHING IS AN
+  // ACCUMULATOR. `pappus-mod.mjs` makes the argument and it applies to a page
+  // that runs for hours: a late tick, a dropped tick or a backgrounded tab costs
+  // RESOLUTION and never POSITION, because the next tick still reads the tour
+  // exactly where it should be. A counter incremented per tick would come back
+  // from a minimised window playing a sound it should have left.
+  const DWELL_MS = 22000;          // how long one sound is held
+  const MORPH_MS = 9000;           // how long the slide into the next one takes
+  const SLOT_MS = DWELL_MS + MORPH_MS;
+  const DWELL_FRAC = DWELL_MS / SLOT_MS;
+  // ⚠️ NOT A MULTIPLE OF THE SLOT. At 31 s a slot and 71 s a station, the two
+  // clocks land on a different pairing every time round, so a page left running
+  // does not repeat itself every six minutes.
+  const STATION_MS = 71000;
+  const HEALTH_MS = 90000;         // one upstream connection per station asked about
+  // 🔴 THE BLEND'S TWO ENDS, AND NEITHER IS 0 OR 1. At 0 the granulator is
+  // inaudible and the picture is drawing something nobody is hearing, which is
+  // the failure `grain-scope`'s own `grainAlpha` exists to avoid. At 1 the
+  // station is gone and what is left is an instrument with no material.
+  const WET_MIN = 0.25, WET_MAX = 0.92;
+  const FIELD_W = 960, FIELD_H = 540;
+  // How long a grain mark takes to fade, in seconds, as a time constant. The
+  // shader is handed `exp(-dt / TAU)` per frame rather than a per-frame
+  // fraction, so the trail is the same length at 30, 60 and 120 Hz.
+  const TRAIL_S = 1.6;
+  // ⚠️ AND IT IS LONGER WHILE A STATION IS ARRIVING. Tearing a decoder down and
+  // building another one is about a second of no audio, so a trail on its
+  // ordinary time constant would empty and the page would look broken at
+  // exactly the moment it is doing what it was asked to do.
+  const TRAIL_SWITCH_S = 5.0;
+
+  const d = mount({
+    name: 'videoradio',
+    // ⚠️ TWO SENTENCES, DOWN FROM FOUR, ON INSTRUCTION: *"3x shorter"*. What
+    // went was the list of everything the tour does to itself, which a visitor
+    // watches happen rather than reads about, and the sentence naming the
+    // picture as the instrument, which was the page describing its own design.
+    what: 'A radio station fed through a granulator, playing itself: twelve '
+      + 'sounds, nothing set by hand. It keeps taking a few seconds of whatever '
+      + 'is on air and plays them round, up to three of those loops at once, '
+      + 'layered over the station still coming in. Across the picture is where '
+      + 'in the last eight seconds it is reading, up is how long each piece '
+      + 'lasts, and each loop runs at its own speed between a quarter and double.',
+    // 🔴 TWO CELLS, AND `tour` WENT ON INSTRUCTION. Removing one left three,
+    // which `mount()` refuses, and the rule behind that refusal is editorial:
+    // an odd row always has a weakest cell and being made to find it is the
+    // point. Here it was `moving`. On a page whose whole claim is that NOTHING
+    // IS SET BY HAND, a count of the settings moving on their own is never
+    // zero and never surprising, so it reports the premise rather than the
+    // state. It is still in the log, where a line appears because something
+    // happened.
+    //
+    // ⚠️ BOTH SURVIVORS ARE NUMBERS, WHICH IS NOT A STYLE CHOICE. `.pos-v` is
+    // `white-space: nowrap; text-overflow: ellipsis` at 19 px mono in a 96 px
+    // cell, so a station name or a sound name would be CUT, and CLAUDE.md is
+    // explicit that anything truncating with an ellipsis is in the wrong place
+    // rather than in need of a wider box.
+    // 🔴 NO READOUT AT ALL, ON INSTRUCTION: *"rm readouts"*. It went one cell at
+    // a time — `tour`, then `moving`, then `blend`, then the last two — and
+    // that is the honest end of it rather than an accident: every cut was the
+    // same complaint, that a number beside this picture is a thing to read
+    // instead of a thing to watch.
+    // `null` is the shell's DECLARED opt-out and is different from `{}`: it
+    // says this page has deliberately no cells because its subject is visible
+    // rather than numeric, a harness can check that it meant it, and the shell
+    // then hides the box as well as the cells. An empty `.pos-readout` still
+    // paints its own border, which is a horizontal rule nobody wrote.
+    readout: null,
+    // 🔴 NO LOG BOX, ON INSTRUCTION: *"rm logs"*. The lines are all still
+    // written and still on `__demo.logs`, so every assert and the harness read
+    // exactly what they read before; what goes is the block of scrolling prose
+    // under a picture that was asked to be the only thing on the screen.
+    showLog: false,
+    // 🔴 TWO BUTTONS, AND THE FIRST ONE IS NOT NEGOTIABLE. A browser will not
+    // start audio without a gesture, and neither `AudioContext.resume()` nor
+    // `play()` REJECTS when the gesture is missing, so a page that waits for
+    // either is a hang rather than an error. Play is the gesture. Fullscreen is
+    // what was asked for, and in fullscreen the picture is the only thing on
+    // the screen, which is the rest of what was asked for.
+    controls: [
+      // not primary: the picture is the subject, and a filled yellow button is
+      // the loudest thing this palette has sitting next to it
+      // A GLYPH, THE SAME ONE THE TRANSPORT BAR USES. The word sat in a row
+      // with a glyph beside it, so the two controls were different shapes for
+      // no reason a reader could see. `aria` carries the name for anything not
+      // reading the picture.
+      { id: 'play', label: '▶', aria: 'play' },
+      { id: 'full', label: '⛶', aria: 'full screen' },
+    ],
+  });
+  guard(d);
+
+  // 🔴 NO FADE-IN, ON INSTRUCTION: *"show video canvas immideately"*. This
+  // carried `.awaits-sound`, which held the box at `opacity: 0` until the first
+  // grain arrived, on the argument that an empty bordered rectangle makes a
+  // claim about an instrument that has not started. The argument is sound and
+  // the answer was not to hide the box: the screen now draws from the first
+  // frame, before any audio exists, so there is something true in it to show.
+  const pane = el('div', 'vr-pane');
+  const screen = el('div', 'vr-screen');
+  const canvas = el('canvas');
+  canvas.width = FIELD_W; canvas.height = FIELD_H;
+  screen.append(canvas);
+  // Seconds since the page opened, for lining an event up against the picture.
+  // It survives full screen because it is inside the pane that goes full
+  // screen, which the log box is not.
+  const clock = el('div', 'vr-clock', '0.0s');
+  screen.append(clock);
+  const clockFrom = performance.now();
+  setInterval(() => {
+    clock.textContent = `${((performance.now() - clockFrom) / 1000).toFixed(1)}s`;
+  }, 100);
+  // the shell's own row, MOVED rather than rebuilt, so `.pos-controls button`
+  // still finds these and the project keeps one set of buttons
+  d.controls.classList.add('vr-bar');
+
+
+  pane.append(screen, d.controls);
+  d.el.append(pane);
+
+  /**
+   * The idle timer for the row above. Three seconds of no pointer and no key,
+   * and the chrome gets out of the way.
+   *
+   * ⚠️ IT LISTENS ON THE PANE, NOT ON THE WINDOW. Moving the mouse somewhere
+   * else on the page, or in another pane entirely, is not interest in this
+   * picture's controls, and a window listener would hold them up permanently on
+   * any page that has something else moving on it.
+   * ⚠️ `pointerdown` IS IN THE LIST because a touch screen sends no
+   * `pointermove` before a tap: on a phone the row would fade and never come
+   * back, which is a page with no way to press anything.
+   */
+  const IDLE_MS = 3000;
+  let idleTimer = null;
+  function stirChrome() {
+    pane.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => pane.classList.add('idle'), IDLE_MS);
+  }
+  for (const ev of ['pointermove', 'pointerdown', 'keydown', 'focusin']) {
+    pane.addEventListener(ev, stirChrome, { passive: true });
+  }
+  stirChrome();
+
+  // ═══ the picture ═══════════════════════════════════════════════════════════
+  //
+  // 🔴 DRAW THE INSTRUMENT, NOT THE SOUND. `plan-audio-shader.md §0` argues it
+  // and the argument is stronger here than it was there, because over on
+  // `/radio1965/` this would be a SECOND surface beside a waveform and a
+  // readout, while here it is the only one. A spectrum turned into moving
+  // shapes says nothing specific about the sound: the same picture appears for
+  // any input, and this project has already answered two of those with *"this
+  // viz does nothing to me"* and *"mambo jumbo"*.
+  //
+  // So the field is the granulator's own two axes:
+  //
+  //   across  where in the eight seconds it is reading, which is `/pgrain`'s
+  //           own `pos` rescaled off the sixty-second ring
+  //   up      how long that grain was, on the engine's own exponential lane,
+  //           2 ms at the bottom and 4 s at the top
+  //
+  // Both of those are REPORTED BY THE ENGINE, over OSC, from the code that
+  // fires each grain, and `dur` and `voice` have never reached a picture on any
+  // page here: `grain-scope.mjs` is handed all four fields and keeps three.
+  //
+  // 🔴 AND THE ANCHORS THE PLAN QUOTES ARE NOT USED, ON PURPOSE. Its rows 0 and
+  // 3 map loudness to `-40.0 .. -14.5 LUFS` and centroid to `1374 .. 3821 Hz`,
+  // every one of them read out of `research/vr-sound-visual-2026-09.md`, whose
+  // provenance `plan-plate.md §0` records as unknown and whose analysis scripts
+  // are gone. A page that hard-codes a number nobody can re-take is grading
+  // itself against its own supply. What lights this field instead is the
+  // FOLLOWER values the modulator is already consuming: `clamp01(env * sens)`,
+  // bounded 0..1 by construction, tuned in `pappus-mod-test.mjs`, and the exact
+  // signal that is moving the instrument. The picture is lit by what the
+  // instrument is listening to.
+  //
+  // 🔴 THERE IS NO `uT` AND NO CLOCK IN ANY SHADER HERE, AND THAT IS THE CLAIM.
+  // `mirror`'s bodies drive their motion from a frame counter, so "it moved" and
+  // "it is a picture of something" are different questions there. Every pass
+  // below is a pure function of the previous frame and the data texture, so if
+  // the data stops the picture stops, and the determinism check further down is
+  // exact rather than approximate.
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false,
+                                           preserveDrawingBuffer: false });
+  let renderer = null, glErr = 0, frames = 0, fps = 0;
+
+  /**
+   * 🔴 THE DATA TEXTURE'S LAYOUT IS FROZEN THE WAY `pattern.mjs`'s `ROW` IS
+   * FROZEN, AND FOR THE SAME REASON: a shader compiled against layout 1 and fed
+   * layout 2 does not fail, it draws a plausible wrong picture. So the version
+   * lives IN the texture, at row 3 x 63, and the page asserts it against the
+   * constant it compiled with.
+   *
+   * 64 x 4, RGBA8, UNSIGNED_BYTE, NEAREST, CLAMP_TO_EDGE, 1024 bytes, read with
+   * `texelFetch` and never `texture()`: a fetch takes integer coordinates, needs
+   * no filtering and cannot be off by half a texel, which is the entire class of
+   * bug a data-in-a-texture design invites.
+   *
+   * ⚠️ RGBA8 RATHER THAN A FLOAT TEXTURE, and the quantisation costs nothing
+   * real: one step of an 8-bit channel is 1/255 = 0.39% of a lane, against
+   * `pappus-mod.mjs`'s dead-band of 0.5%. The modulator will not send a change
+   * this texture cannot represent.
+   *
+   *   row 0, x 0..63   the grain deposit, 64 buckets across the eight seconds
+   *     R  grains that landed in this bucket since the last upload, capped
+   *     G  their mean length, unmapped onto the engine's own 2 ms..4 s lane
+   *     B  the voice that fired most here, x32
+   *     A  grains REFUSED because R saturated. See the note on `bucket()`
+   *   row 1, x 0..22   the parameters, in `MOD_DESTS` order, then probs 0..7
+   *     R  the value now, as a fraction of its own lane
+   *     G  the base, where the sound puts it. R minus G is the excursion
+   *     B  255 if this destination is being modulated right now
+   *   row 2, x 0..63   where the read head may be
+   *     R  the scatter density at this bucket, 0 when it cannot be known
+   *     G  255 inside the window this sound reads from
+   *   row 3            scalars, one per x
+   *     0..5  the six followers: rms low mid high tone flux
+   *     6     the blend, radio at 0 and granulator at 1
+   *     7     grains reported since the last upload
+   *     8     grains refused since the last upload
+   *     9     the morph, 0 at this sound and 255 at the next
+   *     10    which sound is being left, 11 which is being gone to
+   *     12    the loop: 0 none, 128 filling, 255 playing
+   *     13    where in the lap the loop is
+   *     14    which station
+   *     15    how recently the station changed, 255 at the change
+   *     16    the trail's per-frame survival, `exp(-dt / tau)`
+   *     17    how many voices this sound opens, x32
+   *     18    255 when the read point is knowable, 0 when it is not
+   *     63    the layout version, R channel
+   */
+  const DATA_W = 64, DATA_H = 4;
+  const data = new Uint8Array(DATA_W * DATA_H * 4);
+  const at = (x, y) => (y * DATA_W + x) * 4;
+  const u8 = (v) => Math.max(0, Math.min(255, Math.round(v * 255)));
+  data[at(63, 3)] = LAYOUT_VERSION;
+
+  const VS = `#version 300 es
+    void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+      gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+
+  /**
+   * 🔴 COLOUR IS SPOKEN FOR ON THIS MATERIAL AND IT WAS REFUSED TWICE.
+   * `grain-scope.mjs` carries a dead branch that mapped spectral centroid to
+   * hue; the argument was good and it was reverted, on instruction, twice, and
+   * the rule left behind is that colour may only come back behind a flag the
+   * PAGE sets by name. So the field is monochrome: one highlight and one dim,
+   * read out of `shell.css` at compile time rather than typed here, because a
+   * colour typed into a shader is a colour that will disagree with the theme.
+   * The fast spectral axis drives SHARPNESS instead, which is the research's own
+   * nodal-line row moved off the colour channel.
+   */
+  const cssRGB = (name, fallback) => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const m = /^#?([0-9a-f]{6})$/i.exec(v);
+    const hex = m ? m[1] : fallback;
+    return [0, 2, 4].map((i) => (parseInt(hex.slice(i, i + 2), 16) / 255).toFixed(4));
+  };
+  const HI = cssRGB('--hi', 'ffd400');
+  const DIM = cssRGB('--dim2', '6b7486');
+
+  /**
+   * 🔴 THE TWO FLOORS THE PICTURE PROMISES, AND THEY ARE CONSTANTS BECAUSE A
+   * CHECK READS THEM.
+   *
+   * `lit` is how bright a mark is drawn, from loudness; `WET_FLOOR` is the share
+   * of the picture the grains get when the blend is all radio. Both have a floor
+   * rather than reaching zero, for the same reason: a quiet passage and a
+   * station-end blend are ordinary, and a page that plays itself must not go
+   * black on either. Between them they fix the DIMMEST a saturated mark can be
+   * drawn, which is the only number the flat-field check can honestly be
+   * calibrated against.
+   *
+   * ⚠️ THEY WERE 0.25 AND 0.15 AND THAT MADE THE CHECK FLAKE ON A QUIET
+   * PROGRAMME. MEASURED on Radio 1965, which plays improvisation recordings with
+   * long quiet stretches: `the station reads 0.062 of 1` and the widest channel
+   * spanned 42 of 255 against a threshold of 60, on a page with a hundred and
+   * forty thousand lit pixels of grain in it. CLAUDE.md: a colour scale whose
+   * normal reading is a warning has no warning left, and a threshold is
+   * calibrated against what the mechanism promises rather than against an
+   * absolute ideal.
+   *
+   * ⚠️ AND THEY ARE INTERPOLATED INTO THE BODY RATHER THAN TYPED THERE. A
+   * threshold read from one constant and a shader written with another is a
+   * check that grades the page against a number the page no longer uses.
+   */
+  /**
+   * 🔴 THE LOOKS, PICKABLE, BECAUSE WALKING ONE BACK BY HAND KEPT FAILING.
+   *
+   * Four pictures were built in an hour and going back to any of them meant
+   * lifting a span of shader out of a saved file. That failed TWICE in a row on
+   * the same page: the span matched and the picture did not, because the
+   * constants it depends on live OUTSIDE it. One of them was a row count, and
+   * 132 rows with an amplitude tuned for 46 merges every line into a blob.
+   *
+   * So the differences between the looks are named and gathered here, in one
+   * object, where a diff can see them. `?look=<name>` picks one; they are
+   * compiled into the body, so there is no uniform and no branch per pixel and
+   * the determinism check is untouched.
+   *
+   * ⚠️ A LOOK IS THE CONSTANTS, NOT THE CODE. Anything that changes the shape
+   * of the picture rather than its numbers is still a new body and still needs
+   * a copy in `looks/`. This is for the ones that differ by a row count and a
+   * fold.
+   */
+  /**
+   * 🔴 THE LOOKS ARE THE ARCHIVE, AND THE ARCHIVE IS THE WAY BACK.
+   *
+   * `vista` is the working one. Everything else in this table is kept, not
+   * maintained: it is what the picture looked like at a moment somebody liked
+   * it, and it stays reachable at `?look=<name>` for ever.
+   *
+   * 🔴 THE PROTOCOL, WHICH EXISTS BECAUSE GOING BACK FAILED FOUR TIMES IN ONE
+   * EVENING. Before changing `vista` in a way that changes how it LOOKS, copy
+   * it to a new entry with a new name. A name is unique and permanent; `vista`
+   * is a moving target. What went wrong every time was reconstructing a picture
+   * from a diff or from a saved page, and both lost something: once a row
+   * count that lived outside the block, once the corner sharpening, which had
+   * been silently dropped and was the thing actually being looked for.
+   *
+   * A name is a noun for what it looks like. Never a number and never a date:
+   * somebody choosing between two of these is choosing between two pictures,
+   * and `v3` says nothing about either.
+   *
+   * ⚠️ A LOOK IS THE CONSTANTS. Anything that changes the SHAPE of the picture
+   * rather than its numbers needs a flag added here as well, or it cannot be
+   * archived at all. That is why `facet`, `bucket`, `valley` and `mono` are in
+   * this table next to the row count: each one was once a code change that a
+   * constants-only archive could not hold.
+   *
+   * They are in the order they were made. Six were built in an evening
+   * and five of them existed only in a diff by the time anybody asked to see
+   * one again. That is the whole reason this table has more in it than a row
+   * count: a look is not always a constant, and the honest fix is to keep the
+   * ones that are not as flags rather than to pretend they were.
+   * They are in the order they were made.
+   */
+  const LOOKS = {
+    // 1. the first answer to the New Order reference. Stacked scanlines, white
+    //    on black, no colour, height read from the drawn field alone.
+    slab:   { swellY: 0.0, stretch: 0.0, keep: 0.962, chroma: 1.0, xbreath: 0.0, rows: 72, mirror: 0, mir: 1.00, baseA: 0.10, baseB: 0.66, baseE: 1.00,
+              travel: 1.0, sway: 0.0, heave: 0.0, halo: 0.0, occl: 0.0,
+              idle: 0.0, waves: 1, gamma: 1.45, gain: 1.35,
+              mono: 1.0, valley: 0.0, facet: 0.0, bucket: 0.0,
+              ampA: 0.26, ampL: 0.34, ampB: 0.0, ampM: 1.0, wide: 1.30, cam: 0.42 },
+    // 2. "is this all?" — the grain buckets became the height, so the ridges
+    //    got real shape, and a standby wave arrived.
+    plot:   { swellY: 0.0, stretch: 0.0, keep: 0.962, chroma: 1.0, xbreath: 0.0, rows: 46, mirror: 0, mir: 1.00, baseA: 0.08, baseB: 0.70, baseE: 1.00,
+              travel: 1.0, sway: 0.0, heave: 0.0, halo: 0.0, occl: 0.0,
+              idle: 0.055, waves: 1, gamma: 1.45, gain: 1.35,
+              mono: 1.0, valley: 0.0, facet: 0.0, bucket: 1.0,
+              ampA: 0.10, ampL: 0.13, ampB: 0.05, ampM: 5.2, wide: 1.30, cam: 0.42 },
+    // 3. the same picture with a still x axis. Archived the moment `vista` was
+    //    about to start breathing, which is the protocol in this file's header.
+    bluff:  { swellY: 0.0, stretch: 0.0, keep: 0.962, chroma: 1.0, xbreath: 0.0, rows: 46, mirror: 0, mir: 1.00, baseA: 0.06, baseB: 0.56, baseE: 0.72,
+              travel: 1.0, sway: 0.0, heave: 0.0, halo: 0.0, occl: 0.0,
+              idle: 0.055, waves: 1, gamma: 1.35, gain: 1.45,
+              mono: 0.0, valley: 0.30, facet: 1.0, bucket: 1.0,
+              ampA: 0.10, ampL: 0.13, ampB: 0.05, ampM: 5.2, wide: 1.55, cam: 0.38 },
+    // 5. waves rolling toward the eye at a walk, and bright enough to be a
+    //    picture on their own rather than a trail with lines in it. MEASURED:
+    //    the landscape pass alone was carrying a mean of 0.07 while the field
+    //    and the present pass were healthy, so what looked like the picture
+    //    fading was the trail decaying back to a terrain nobody could see.
+    //    The halo, the gain and the low chroma are all that fix.
+    swell:  { swellY: 0.0, stretch: 0.0, keep: 0.962, chroma: 0.35, rows: 54, mirror: 0, mir: 1.00, baseA: 0.05, baseB: 0.60, baseE: 0.74,
+              travel: 0.35, sway: 0.0, heave: 0.0, halo: 1.0, occl: 6.0,
+              idle: 0.075, waves: 3, gamma: 0.95, gain: 2.6, xbreath: 0.20,
+              mono: 0.0, valley: 0.30, facet: 1.0, bucket: 1.0,
+              ampA: 0.13, ampL: 0.16, ampB: 0.06, ampM: 5.4, wide: 1.55, cam: 0.38 },
+    /**
+     * 🔴 `quartz` IS `vista`, NUMBER FOR NUMBER, WITH ONE EXCEPTION.
+     *
+     * The first attempt at this changed the contrast curve, which stopped the
+     * fade and made a DIFFERENT picture: brighter, flatter, not the thing that
+     * was asked to be kept. The ask was the same look that does not drift away,
+     * so exactly one value moves and it is not one the eye reads directly.
+     *
+     * `keep` is how much of the fed-back frame survives a lap. At 0.962 a trail
+     * is down to a tenth in about sixty frames, and MEASURED on vista the
+     * landscape underneath it carries a mean of 0.07 — so what a viewer watches
+     * is the opening trail draining away to a terrain that is nearly invisible.
+     * At 0.995 the same trail is still nine tenths there after a second and
+     * decays over about half a minute, so the picture holds the state it opens
+     * in instead of sliding out of it.
+     * ⚠️ IT CANNOT GO TO 1.0. The composite is `max(fresh, back * hold)`, which
+     * is bounded and cannot run away, but with no loss at all it stops being a
+     * trail and becomes a max accumulator: every bright pixel ever drawn stays
+     * lit for ever and the frame fills in. 0.995 is a long memory, not an
+     * infinite one.
+     */
+    // ⚠️ `xbreath: 0` IS THE SECOND AND LAST DIFFERENCE FROM `vista`. It was
+    //    0.45 there, which opens and closes the perspective on the grain
+    //    clock. That does not only move the x axis: a wider row samples the
+    //    field somewhere else, so the HEIGHT it reads changes with it and the
+    //    terrain heaves. Reported as moving up and down. `vista` keeps it.
+    dune:   { swellY: 0.0, stretch: 1.6, keep: 0.995, chroma: 1.0, rows: 46, mirror: 0, mir: 1.00,
+              baseA: 0.06, baseB: 0.56, baseE: 0.72,
+              // 🔴 `travel: 0` IS WHY IT HOLDS STILL. Every other look advances
+              //    the rows on `drift`, which walks each one to a new depth and
+              //    therefore to a new height on screen: the whole terrain
+              //    slides vertically, reported as moving up and down. With it
+              //    at zero the rows sit at fixed depths and the only thing that
+              //    moves is what the sound is doing to them, which is the point.
+              //    `xbreath` stays: the x axis opening and closing was wanted.
+              travel: 0.0, sway: 0.0, heave: 0.0, halo: 0.0, occl: 0.0,
+              idle: 0.055, waves: 1, gamma: 1.35, gain: 1.45, xbreath: 0.45,
+              mono: 0.0, valley: 0.30, facet: 1.0, bucket: 1.0,
+              ampA: 0.10, ampL: 0.13, ampB: 0.05, ampM: 5.2, wide: 1.55, cam: 0.38 },
+    quartz: { swellY: 0.014, stretch: 1.6, keep: 0.995, chroma: 1.0, rows: 46, mirror: 0, mir: 1.00,
+              baseA: 0.06, baseB: 0.56, baseE: 0.72,
+              // 🔴 `travel: 0` IS WHY IT HOLDS STILL. Every other look advances
+              //    the rows on `drift`, which walks each one to a new depth and
+              //    therefore to a new height on screen: the whole terrain
+              //    slides vertically, reported as moving up and down. With it
+              //    at zero the rows sit at fixed depths and the only thing that
+              //    moves is what the sound is doing to them, which is the point.
+              //    `xbreath` stays: the x axis opening and closing was wanted.
+              travel: 0.0, sway: 0.0, heave: 0.0, halo: 0.0, occl: 0.0,
+              idle: 0.055, waves: 1, gamma: 1.35, gain: 1.45, xbreath: 0.45,
+              mono: 0.0, valley: 0.30, facet: 1.0, bucket: 1.0,
+              ampA: 0.10, ampL: 0.13, ampB: 0.05, ampM: 5.2, wide: 1.55, cam: 0.38 },
+    // 4. valleys, hard corners, a lower eye and the phosphor blue, and the
+    //    perspective breathing on the grain clock.
+    vista:  { swellY: 0.0, stretch: 0.0, keep: 0.962, chroma: 1.0, xbreath: 0.45, rows: 46, mirror: 0, mir: 1.00, baseA: 0.06, baseB: 0.56, baseE: 0.72,
+              travel: 1.0, sway: 0.0, heave: 0.0, halo: 0.0, occl: 0.0,
+              idle: 0.055, waves: 1, gamma: 1.35, gain: 1.45,
+              mono: 0.0, valley: 0.30, facet: 1.0, bucket: 1.0,
+              ampA: 0.10, ampL: 0.13, ampB: 0.05, ampM: 5.2, wide: 1.55, cam: 0.38 },
+    // 4. the same, moving: rows travelling five times faster, a sway per row,
+    //    and the amplitude breathing on the grain clock.
+    ridge:  { swellY: 0.0, stretch: 0.0, keep: 0.962, chroma: 1.0, xbreath: 0.0, rows: 46, mirror: 0, mir: 1.00, baseA: 0.02, baseB: 0.86, baseE: 0.72,
+              travel: 5.0, sway: 1.0, heave: 1.0, halo: 1.0, occl: 9.0,
+              idle: 0.085, waves: 3, gamma: 1.15, gain: 1.9,
+              mono: 0.0, valley: 0.30, facet: 1.0, bucket: 1.0,
+              ampA: 0.10, ampL: 0.13, ampB: 0.05, ampM: 5.2, wide: 1.55, cam: 0.38 },
+    // 5. folded about a horizon, so the terrain gets a reflection.
+    pulsar: { swellY: 0.0, stretch: 0.0, keep: 0.962, chroma: 1.0, xbreath: 0.0, rows: 46, mirror: 1, mir: 0.52, baseA: 0.01, baseB: 0.50, baseE: 0.88,
+              travel: 5.0, sway: 1.0, heave: 1.0, halo: 1.0, occl: 9.0,
+              idle: 0.085, waves: 3, gamma: 1.15, gain: 1.9,
+              mono: 0.0, valley: 0.30, facet: 1.0, bucket: 1.0,
+              ampA: 0.10, ampL: 0.13, ampB: 0.05, ampM: 5.2, wide: 1.55, cam: 0.38 },
+    // 6. many more rows, crowded toward the horizon.
+    deep:   { swellY: 0.0, stretch: 0.0, keep: 0.962, chroma: 1.0, xbreath: 0.0, rows: 132, mirror: 0, mir: 1.00, baseA: 0.01, baseB: 0.92, baseE: 0.88,
+              travel: 5.0, sway: 1.0, heave: 1.0, halo: 1.0, occl: 9.0,
+              idle: 0.085, waves: 3, gamma: 1.15, gain: 1.9,
+              mono: 0.0, valley: 0.30, facet: 1.0, bucket: 1.0,
+              ampA: 0.10, ampL: 0.13, ampB: 0.05, ampM: 5.2, wide: 1.55, cam: 0.38 },
+  };
+  const LOOK_NAME = (() => {
+    const want = new URLSearchParams(location.search).get('look');
+    return Object.hasOwn(LOOKS, want) ? want : 'quartz';
+  })();
+  const LOOK = LOOKS[LOOK_NAME];
+
+  /**
+   * 🔴 THE LOOK PICKER, BACK, AND THE REASON IT LEFT WAS WRONG.
+   *
+   * It was removed on the argument that a control for a decision already made
+   * is furniture. The decision was not made: nine pictures exist, the right one
+   * has not been found, and without this row the only way to compare two of
+   * them is to type a query parameter. A chooser is furniture AFTER a choice
+   * and it is the whole job before one.
+   * ⚠️ IT RELOADS. The differences compile into the shader body, which is what
+   * keeps the determinism check exact and costs no per-pixel branch; swapping
+   * one live means recompiling three programs and rebuilding every target.
+   */
+  const lookRow = createChoice({
+    label: 'look',
+    options: Object.keys(LOOKS).map((k) => [k, k]),
+    at: Object.keys(LOOKS).indexOf(LOOK_NAME),
+    onPick: (name) => {
+      const u = new URL(location.href);
+      u.searchParams.set('look', name);
+      location.replace(u);
+    },
+  });
+  lookRow.el.title = 'the same instrument drawn nine ways. Picking one reloads the page.';
+
+  /**
+   * 🔴 WHY FULL SCREEN ENDED, SAID OUT LOUD. It has dropped out on its own and
+   * guessing at that has already cost an evening elsewhere. A browser leaves
+   * full screen for several reasons that look identical from inside the page:
+   * Escape, the window losing focus, a NAVIGATION, or the fullscreen element
+   * being taken out of the document. Only the page can tell them apart, and
+   * only at the moment it happens.
+   * ⚠️ `beforeunload` FIRES BEFORE `fullscreenchange` ON A NAVIGATION, so the
+   * flag it sets is what separates "something reloaded this page" from "the
+   * viewer pressed Escape". That is the distinction worth having: a reload
+   * would be our bug, Escape is not.
+   */
+  let leaving = null, wasCover = false;
+  // ⚠️ IT SHIPS AS WELL AS LOGS. The log box is `display: none` in full screen,
+  // so the one line that explains what just happened is written where nobody
+  // can be looking at the moment it is written. A beacon survives the unload
+  // that a batched sender would not.
+  const fsShip = (line) => {
+    try {
+      navigator.// 🔴 `/log`, SINGULAR. `/logs` is the READ path and a POST to it is
+      // accepted and thrown away, so the page reported faithfully into a
+      // hole and the reader saw `(nothing reported)` — which reads as "the
+      // page never sent anything", the exact failure CLAUDE.md records
+      // against this endpoint.
+      sendBeacon('https://pub.positron.studio/log',
+        new Blob([`videoradio ${line}`], { type: 'text/plain' }));
+    } catch { /* a diagnostic may never make the page worse */ }
+  };
+  addEventListener('beforeunload', () => { leaving = 'the page navigated or reloaded'; });
+  addEventListener('pagehide', () => { leaving = leaving || 'the page was hidden'; });
+  const fsSay = (line, kind) => { d.log(line, kind); fsShip(line); };
+  /**
+   * 🔴 THE STATION CHANGES SHIP TOO, SO THE TWO CAN BE LINED UP. Full screen
+   * is reported as ending every time a new station arrives, and neither
+   * `nextStation` nor `switchTo` touches the DOM, so reading the code further
+   * would be guessing. Two streams of timestamps into one log settles whether
+   * the two events are the same event: if the exit lands in the same
+   * millisecond as a switch it is ours, and if it does not, it never was.
+   */
+  const stationShip = (line) => fsShip(`station · ${line}`);
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) { fsSay(`full screen, by the element API · ${Math.round(performance.now() / 100) / 10}s in`); return; }
+    /**
+     * 🔴 THE TWO REMAINING CAUSES LOOK IDENTICAL AND DO NOT HAVE TO. Both
+     * drops so far read "Escape, or the window lost focus", which is one line
+     * covering two unrelated things: a key the viewer pressed, and the window
+     * going to the background. `document.hasFocus()` tells them apart at the
+     * moment it happens, and `visibilityState` says whether the tab itself went
+     * away. Both drops were at about 23 seconds, which is a timer's signature
+     * rather than a person's, so the answer matters.
+     */
+    const why = leaving ? leaving
+      : !document.hasFocus() ? `the window was not focused · visibility ${document.visibilityState}`
+      : `the window WAS focused, so Escape or the browser itself · visibility ${document.visibilityState}`;
+    fsSay(`left full screen · ${why} · ${Math.round(performance.now() / 100) / 10}s in`, 'warn');
+  });
+  // 🔴 AND THE FALLBACK HAS NO EVENT AT ALL. `fullscreen.mjs` falls back to a
+  // fixed cover where the element API is missing, and a cover going away fires
+  // nothing: if the page leaves full screen with SILENCE in the log, that is
+  // the answer rather than a missing listener. This watches the class instead.
+  new MutationObserver(() => {
+    // ⚠️ `pos-faux` ONLY. This also watched `pos-full`, which BOTH paths set,
+    // so a real element-API entry reported itself twice in the same
+    // millisecond: once truthfully and once as the fallback. A detector that
+    // fires on the thing it is meant to distinguish is worse than none, and it
+    // nearly sent the next hour after a fallback that was never used.
+    const cover = pane.classList.contains('pos-faux');
+    if (cover !== wasCover) { wasCover = cover; fsSay(cover ? 'full screen, by the cover' : 'the cover was taken off', cover ? undefined : 'warn'); }
+  }).observe(pane, { attributes: true, attributeFilter: ['class'] });
+  d.controls.append(lookRow.el);
+
+
+  /**
+   * 🔴 `?bare=1` LEAVES THE PICTURE AND NOTHING ELSE, FOR COMPARING LOOKS.
+   * Three of these in frames on one page put a paragraph, a title and a button
+   * row around each picture, so the pictures themselves came out a third of the
+   * pane and read as identical. What is being compared is the picture, so the
+   * picture gets the pane.
+   * ⚠️ IT HIDES RATHER THAN SKIPS. Everything is still built and still
+   * published on `__demo`, so a check run against a bare page grades the same
+   * page; only the ink is gone. A mode that BUILT less would be a second page
+   * wearing this one's name.
+   */
+  const BARE = new URLSearchParams(location.search).get('bare') === '1';
+  if (BARE) {
+    const css = document.createElement('style');
+    css.textContent = `.pos-head, .pos-what, .pos-controls, .pos-readout, .pos-log { display: none !important; }
+      body { padding: 0 !important; }
+      .pos-body > * + * { margin-top: 0 !important; }
+      .vr-pane { border: 0; border-radius: 0; }`;
+    document.head.append(css);
+  }
+
+  const LIT_FLOOR = 0.40, LIT_RANGE = 0.60;
+  const WET_FLOOR = 0.30, WET_RANGE = 0.70;
+
+  const HEAD = `#version 300 es
+    precision highp float;
+    uniform vec2 uRes;
+    uniform sampler2D uData;
+    out vec4 o;
+    vec4 D(int x, int y){ return texelFetch(uData, ivec2(x, y), 0); }
+  `;
+
+  /**
+   * The accumulate pass: this frame's grains, on top of what is left of the
+   * last frame.
+   *
+   * ⚠️ IT IS GREYSCALE AND THE COLOUR HAPPENS LATER. A trail that carried colour
+   * would be re-tinting history every frame, so an old grain would slowly become
+   * whatever the sound is doing now. The deposit is a quantity; what it looks
+   * like is the present pass's business.
+   *
+   * ⚠️ AND THE BED IS NOT IN HERE. A window density added every frame into a
+   * feedback tap saturates to white in about a second, because the steady state
+   * of `x + decay*x + decay^2*x + ...` is `x/(1-decay)`. Only things that happen
+   * ONCE belong in an accumulator.
+   */
+  const ACC_FS = HEAD + `
+    uniform sampler2D uPrev;
+    void main(){
+      vec2 uv = gl_FragCoord.xy / uRes;
+      int col = int(clamp(floor(uv.x * 64.0), 0.0, 63.0));
+      vec4 g = D(col, 0);
+      float tone  = D(4, 3).r;
+      float decay = D(16, 3).r;
+      // Tonal passages give crisp marks and noisy ones diffuse marks.
+      float sharp = mix(16.0, 120.0, tone);
+      float band  = exp(-abs(uv.y - g.g) * sharp);
+      // Eight voices are eight phases of one striation, so a chord and a single
+      // voice do not draw the same mark. The voice arrives as v*32/255.
+      float stripe = 0.5 + 0.5 * cos(gl_FragCoord.x * 0.9 + g.b * 178.5);
+      // 🔴 THE RED CHANNEL IS A COUNT AND THE COUNT IS USUALLY ONE OR TWO, so it
+      // is undone back into grains before it is used. The channel holds 0..255
+      // because the drop counter beside it needs to mean something, but at 60
+      // frames a second and the rates this instrument runs at, an ordinary
+      // bucket holds a handful: read as a 0..1 fraction, one grain is 1/255 and
+      // a working page draws almost nothing. MEASURED before this line existed:
+      // the widest colour channel spanned 42 of 255 on a picture with grains in
+      // it, which is a working instrument drawn too dim to check. Two and a half
+      // grains in one bucket in one frame is a fully lit mark.
+      float n = g.r * 255.0;
+      float hit = clamp(n / 3.2, 0.0, 1.0) * band * (0.45 + 0.55 * stripe);
+      // 🔴 ADVECTION, AND THIS IS WHY THE PICTURE HAS SOMEWHERE TO GO. A trail
+      // that samples uPrev at the SAME uv can only fade: every mark softens
+      // exactly where it was laid down and the field is a still photograph
+      // getting dimmer. Sampling UPSTREAM of a flow field carries the whole
+      // deposit along, so a grain laid down now is somewhere else in a second
+      // and somewhere else again after that. The marks are still the engine's;
+      // what moves them is not.
+      // The flow is two crossed waves rather than noise, because a wave has a
+      // direction a viewer can follow and noise reads as boiling. Its speed is
+      // the low and mid energy of the station, so a bassline drags the field
+      // sideways and a quiet passage lets it settle.
+      float lowB = D(1, 3).r, midB = D(2, 3).r;
+      float ph = D(21, 3).r * 6.28318;
+      vec2 flow = vec2(
+         sin(uv.y * 7.0 + ph * 1.3) * (0.0006 + 0.0042 * lowB),
+        -cos(uv.x * 5.0 - ph * 0.9) * (0.0004 + 0.0032 * midB));
+      float prev = texture(uPrev, uv - flow).r * decay;
+      // 🔴 SCREEN, NOT ADD, AND THIS IS WHAT THE MUDDINESS WAS. A clamped add
+      // clamps, so anywhere busy pins at exactly 1.0 and STAYS there: a whole
+      // band of the picture becomes one flat value, every difference inside it
+      // is thrown away, and the present pass then paints that slab in one hue.
+      // Reported as "this muddiness", with a screenshot of a solid yellow bar.
+      // The screen blend approaches 1 and never reaches it, so density keeps its
+      // gradient all the way up and the colour ramp below has something to read.
+      float acc = 1.0 - (1.0 - prev) * (1.0 - hit);
+      o = vec4(vec3(acc), 1.0);
+    }`;
+
+  /**
+   * The present pass: the accumulated field, lit by what the instrument is
+   * listening to, over the window it is reading from.
+   *
+   * ⚠️ THE BLEND SCALES THE GRAINS AND NOT THE BED, which is the same rule
+   * `grain-scope`'s `grainAlpha` follows: the marks are drawn at the share of
+   * the output they actually are, and the material underneath is being chewed
+   * whatever the fader says. ⚠️ And the decay still runs at blend 0, in the
+   * accumulate pass, so the field FADES rather than freezing.
+   */
+  const PRESENT_FS = HEAD + `
+    uniform sampler2D uField;
+    const vec3 DIM = vec3(${DIM.join(', ')});
+    /**
+     * A RAMP, NOT A TINT. The old body was one colour times density, so every lit pixel was
+     * the same hue at a different brightness and a busy picture was one slab of
+     * yellow. A ramp gives density somewhere to go: cold and dark where the
+     * instrument is barely reading, through a green-blue middle, to a warm
+     * near-white only where grains really are stacking up.
+     * Deliberately LOW SATURATION and deliberately not neon: asked for
+     * *"dreamy, floaty"* and *"does not have to be sock synthwave"*.
+     */
+    vec3 ramp(float t){
+      t = clamp(t, 0.0, 1.0);
+      vec3 c = mix(vec3(0.07, 0.09, 0.20), vec3(0.16, 0.34, 0.46), smoothstep(0.00, 0.42, t));
+      c = mix(c, vec3(0.42, 0.62, 0.58), smoothstep(0.34, 0.72, t));
+      c = mix(c, vec3(0.96, 0.88, 0.72), smoothstep(0.66, 1.00, t));
+      return c;
+    }
+    void main(){
+      vec2 uv = gl_FragCoord.xy / uRes;
+      int col = int(clamp(floor(uv.x * 64.0), 0.0, 63.0));
+      vec4 w = D(col, 2);
+      float loud  = D(0, 3).r;
+      float tone  = D(4, 3).r;
+      float flux  = D(5, 3).r;
+      float wet   = D(6, 3).r;
+      float loopy = D(12, 3).r;
+      float head  = D(13, 3).r;
+      float known = D(18, 3).r;
+      float pulse = D(19, 3).r;
+      float f = texture(uField, uv).r;
+      // The read window as a DENSITY, not a rectangle: the dim half is the
+      // window this sound may read from at all, the bright half is the scatter
+      // the engine is actually sampling from, and it is zero where the read
+      // point cannot be known rather than guessed at.
+      float bed = 0.12 * w.g + 0.60 * w.r * known;
+      // 🔴 THE VERTICAL BAR IS GONE. It was a hard 3-pixel column at the loop
+      // head, reported as a *"pointless scanline"*, and a straight line across
+      // a picture made of drifting marks is the one shape in it that is not
+      // about the sound. The loop still reads: it warms and lifts the field it
+      // is sitting over, across a soft 6% of the width.
+      float lp = loopy * exp(-pow((uv.x - head) / 0.06, 2.0));
+      // Brightness breathes with the grain clock. pulse is a phase advanced
+      // by the grains the engine actually reported, so this is the instrument's
+      // own rhythm rather than a free-running clock.
+      float breathe = 0.86 + 0.14 * pulse;
+      float lit = (${LIT_FLOOR} + ${LIT_RANGE} * loud) * (1.0 + 0.35 * flux) * breathe;
+      float dens = clamp(f * lit * (${WET_FLOOR} + ${WET_RANGE} * wet), 0.0, 1.0);
+      // A warm/cool lean from the spectral tilt, kept small on purpose: it is a
+      // drift across the ramp, not a second palette.
+      vec3 c = ramp(dens * (0.88 + 0.24 * tone) + 0.22 * lp);
+      c *= smoothstep(0.0, 0.10, dens + 0.35 * bed + 0.5 * lp);
+      c += DIM * bed * 0.55;
+      o = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`;
+
+  const COPY_FS = `#version 300 es
+    precision highp float;
+    uniform vec2 uRes; uniform sampler2D uSrc;
+    out vec4 o;
+    void main(){ o = vec4(texture(uSrc, gl_FragCoord.xy / uRes).rgb, 1.0); }`;
+
+  /** Bright pass, at a quarter of the width, which is the blur's first half. */
+  const BRIGHT_FS = HEAD + `
+    uniform sampler2D uSrc;
+    void main(){
+      vec3 c = texture(uSrc, gl_FragCoord.xy / uRes).rgb;
+      float l = dot(c, vec3(0.299, 0.587, 0.114));
+      o = vec4(c * smoothstep(0.42, 0.80, l), 1.0);
+    }`;
+
+  /**
+   * One separable gaussian, run twice with its direction turned. Nine taps at a
+   * quarter resolution is a wide, soft glow for very little: the whole point of
+   * doing it small is that the blur is cheap and the softness is free.
+   */
+  const BLUR_FS = HEAD + `
+    uniform sampler2D uSrc;
+    uniform vec2 uDir;
+    void main(){
+      vec2 uv = gl_FragCoord.xy / uRes;
+      vec2 st = uDir / uRes;
+      float wt[5] = float[](0.2270, 0.1946, 0.1216, 0.0540, 0.0162);
+      vec3 c = texture(uSrc, uv).rgb * wt[0];
+      for (int i = 1; i < 5; i++) {
+        c += texture(uSrc, uv + st * float(i)).rgb * wt[i];
+        c += texture(uSrc, uv - st * float(i)).rgb * wt[i];
+      }
+      o = vec4(c, 1.0);
+    }`;
+
+  /**
+   * 🔴 THE LAST PASS, AND EVERYTHING A PERSON ACTUALLY SEES IS DECIDED HERE:
+   * the glow added back, the previous frame held under this one, the scanlines,
+   * the glitch. It is one pass because each of those is cheap and because
+   * splitting them would put four more full-size targets on a phone.
+   *
+   * ⚠️ IT TAKES NO CLOCK. Every number that moves arrives in the data texture,
+   * which is what lets the same data twice draws the same bytes stay an exact
+   * check rather than a tolerance. A body with uT in it could not be graded
+   * that way at all.
+   */
+  const OUT_FS = HEAD + `
+    /**
+     * One feedback layer: the previous output, resampled smaller and turned.
+     * Smaller means last frame is redrawn LARGER, so everything in it travels
+     * outward. This is a camera pointed at its own monitor, which is how the
+     * Rutt-Etra scan processors and Paik made moving images out of a signal
+     * and no drawing at all. It suits this material for a better reason than
+     * period: the page is a radio through a granulator, and video feedback is
+     * the same shape of process as the audio one beside it.
+     */
+    vec3 fbTap(sampler2D t, vec2 uv, float zoom, float ang){
+      float cs = cos(ang), sn = sin(ang);
+      return texture(t, (mat2(cs, -sn, sn, cs) * (uv - 0.5)) / zoom + 0.5).rgb;
+    }
+    uniform sampler2D uSrc;
+    uniform sampler2D uGlow;
+    uniform sampler2D uPrevOut;
+    void main(){
+      vec2 uv = gl_FragCoord.xy / uRes;
+      float loud  = D(0, 3).r;
+      float flux  = D(5, 3).r;
+      float lowB  = D(1, 3).r;
+      float midB  = D(2, 3).r;
+      float highB = D(3, 3).r;
+      float pulse = D(19, 3).r;
+      float jolt  = D(20, 3).r;
+      float drift = D(21, 3).r;
+
+      // ── glitch: horizontal bands slipped sideways ──
+      // Bands, because the scanlines are horizontal and a tear that runs along
+      // them reads as the picture breaking up rather than as a shape drawn on
+      // top of it. It is gated on the jolt value, which only moves when the
+      // sound or the station changes, so the ordinary state of this page is NO
+      // glitch.
+      float band = floor(uv.y * 28.0 + drift * 6.0);
+      float rnd = fract(sin(band * 91.7 + drift * 53.1) * 43758.5453);
+      float slip = (step(0.82, rnd) * (rnd - 0.82) / 0.18 - 0.5) * 0.09 * jolt;
+      vec2 guv = vec2(uv.x + slip, uv.y);
+
+      /**
+       * 🔴 A SCAN LANDSCAPE IN PERSPECTIVE, WHICH IS THE ANSWER TO "IT IS SO
+       * 2D". Everything before this drew the field FLAT and then moved the flat
+       * thing around: zooming a picture of a plane is still a plane, and no
+       * amount of feedback puts a viewer inside it.
+       *
+       * Here the field is a HEIGHTFIELD. Sixty-four horizontal scanlines are
+       * placed at sixty-four depths, each one displaced upward by how much
+       * signal is at that point, and each projected by 1/z — so a near line is
+       * tall, wide and thick, a far line is compressed toward the horizon, and
+       * the lines TRAVEL toward the viewer as the phase advances. The parallax
+       * is real: near rows sweep past the edges while far rows barely move,
+       * which is the thing a zoom cannot fake.
+       *
+       * This is the Rutt-Etra scan processor, the Vasulkas' machine: a raster
+       * whose lines are bent in depth by the signal driving them. It is the
+       * right reference rather than a borrowed look, because the material here
+       * IS a raster of a signal, and because the horizontal-scanline reading
+       * that was asked for is what the technique is made of.
+       *
+       * ⚠️ IT READS uSrc AND DOES NOT REPLACE IT. The pass before this still
+       * draws the flat field, so every check that grades WHERE A GRAIN LANDED
+       * still has a flat picture to measure. Projecting before those ran would
+       * have made them grade a camera instead of an instrument.
+       */
+      const int ROWS = ${LOOK.rows};
+      /**
+       * 🔴 HIDDEN LINES, WHICH IS THE WHOLE REFERENCE AND NOT A DETAIL.
+       *
+       * Asked for the New Order and Factory look, which is Peter Saville's 1979
+       * Unknown Pleasures sleeve: Harold Craft's stacked plot of the pulsar
+       * CP 1919, white on black, no colour at all. Stacking lines gets nowhere
+       * near it on its own. What makes that image read as a landscape rather
+       * than as a graph is OCCLUSION: every ridge is opaque, so a near peak
+       * hides the lines behind it and the eye gets depth out of what is
+       * MISSING. Additive lines drawn over each other give a mesh, which is a
+       * different and much weaker picture.
+       *
+       * ⚠️ 46 ROWS, DOWN FROM 72, AND THE COUNT IS THE PICTURE. At 72 the lines
+       * sat under a pixel apart on a 540 px frame, so they merged into a smooth
+       * grey ramp with a moire in it and no ridge was ever visible. Reported
+       * with a photograph of exactly that. A stacked plot needs the GAP between
+       * lines to be worth more than the line.
+       *
+       * ⚠️ FLIPPED 180 AROUND X, ON INSTRUCTION. The rows run from the bottom
+       * of the frame upward to a horizon, the way that sleeve is set.
+       */
+      /**
+       * 🔴 THE Y MIRROR, AND IT IS A FOLDED COORDINATE RATHER THAN A SECOND
+       * PASS. Reflecting the picture the obvious way means running the whole
+       * 46-row landscape twice, once for the image and once for its
+       * reflection, which doubles the most expensive thing on the page.
+       * Folding the sample coordinate about the mirror line gives the same
+       * image for one loop: a pixel above the line asks what the pixel the same
+       * distance below it would have been.
+       *
+       * It also earns the rest of the frame. The terrain now occupies the half
+       * below the line and its reflection the half above, so the black band
+       * that filled the bottom of the box is gone and the two halves moire
+       * against each other, which is the one thing about this picture that was
+       * already liked.
+       */
+      float MIR = ${LOOK.mir.toFixed(4)};
+      float sy = guv.y, refl = 0.0;
+      if (${LOOK.mirror} == 1 && sy > MIR) { sy = 2.0 * MIR - sy; refl = 1.0; }
+      float lit = 0.0, near = 0.0;
+      for (int i = 0; i < ROWS; i++) {
+        // 🔴 THE TERRAIN HAS TO TRAVEL, AND AT 0.06 Hz IT DID NOT. drift is a
+        // sawtooth that takes seventeen seconds to come round, so the rows
+        // crawled: the picture looked like a still photograph with a moire in
+        // it. Multiplying the phase here makes the landscape flow toward the
+        // viewer several times faster without touching the drift everything
+        // else is tuned against.
+        float t = fract((float(i) + 0.5) / float(ROWS) + drift * ${LOOK.travel.toFixed(4)});
+        // 🔴 A HIGHER EYE, SO THERE IS GROUND TO LOOK ACROSS. The horizon sat
+        // near the top and the rows ran up to it, which is a view from inside
+        // the terrain: every ridge was edge-on and the valleys behind them were
+        // never in shot. Lifting the eye and pushing the horizon down opens the
+        // floor out, which is the from-the-sky reading that was asked for and
+        // is also how that sleeve is framed.
+        // the rows take the whole frame now. They were packed into the top
+        // 56% and the rest of the box was black.
+        // rows fill the half under the mirror line; the reflection takes the rest
+        // 0.88 rather than 0.72: the exponent bunched the near rows into a band
+        // and left the rest of the half empty
+        float baseY = ${LOOK.baseA.toFixed(4)} + ${LOOK.baseB.toFixed(4)} * pow(t, ${LOOK.baseE.toFixed(4)});
+        // 🔴 A SIDEWAYS SWAY, PER ROW, AND IT IS WHAT MAKES A LANDSCAPE LOOK
+        // LIKE IT IS MOVING RATHER THAN SCROLLING. Every row sampled the field
+        // at the same x, so the whole terrain slid straight at the eye like a
+        // conveyor. Offsetting each row by its own depth-dependent amount makes
+        // the ridges pass each other, which is the parallax the rows were
+        // already entitled to and were not using.
+        float sway = ${LOOK.sway.toFixed(4)} * sin(t * 9.1 + drift * 12.6) * (0.03 + 0.10 * lowB);
+        /**
+         * 🔴 THE X AXIS BREATHES ON THE SAME CLOCK THE RIDGES DO. pulse is
+         * advanced by the grains the engine actually reported, so it is already
+         * driving the heave; putting it on the depth term as well makes the
+         * whole perspective open and close with the instrument rather than only
+         * the heights moving inside a fixed frame.
+         * ⚠️ IT IS THE DEPTH TERM ONLY, NEVER cam. Breathing the near end too
+         * would slide the foreground sideways under the eye, which reads as the
+         * camera being shoved rather than as the world opening out.
+         */
+        float widen = ${LOOK.wide.toFixed(4)} * (1.0 + ${LOOK.xbreath.toFixed(4)} * (pulse - 0.5));
+        float fx = (guv.x - 0.5) * (${LOOK.cam.toFixed(4)} + t * widen) + 0.5 + sway;
+        float h = 0.0;
+        if (fx >= 0.0 && fx <= 1.0) {
+          // 🔴 ANGULAR, AND THE FACETS ARE THE 64 BUCKETS THEMSELVES. Sampling
+          // the field with a linear filter rounds every ridge into the same
+          // soft hump, so a landscape of 46 of them is 46 copies of one shape.
+          // Reading the bucket row with texelFetch gives a piecewise-constant
+          // profile, and interpolating BETWEEN bucket centres in a straight
+          // line gives a polygonal crest: real corners, cut by the data rather
+          // than by a smoothing kernel.
+          float cf = clamp(fx * 64.0 - 0.5, 0.0, 63.0);
+          int c0 = int(floor(cf));
+          int c1 = min(c0 + 1, 63);
+          float mixf = fract(cf);
+          vec4 b0 = D(c0, 0), b1 = D(c1, 0);
+          float d0 = clamp(b0.r * 255.0 / 2.2, 0.0, 1.0);
+          float d1 = clamp(b1.r * 255.0 / 2.2, 0.0, 1.0);
+          // 🔴 THE CORNERS. Pushing the blend toward the ends makes each facet
+          // flatter and each corner harder, which is the angular reading that
+          // was asked for. facet 0 leaves the plain linear blend, which is
+          // what the first two looks had: rounded crests rather than corners.
+          // ⚠️ THIS WAS LOST ONCE ALREADY, restoring a shader block from a
+          // saved file that predated it. That is why it is a named flag now.
+          float mf = mix(mixf, clamp((mixf - 0.5) * 2.2 + 0.5, 0.0, 1.0), ${LOOK.facet.toFixed(4)});
+          float dens = mix(d0, d1, mf);
+          vec3 fc = texture(uSrc, vec2(fx, t)).rgb;
+          float fl = dot(fc, vec3(0.299, 0.587, 0.114));
+          // bucket 0 reads the drawn field alone, the way the first look did,
+          // before the grain counts became the height.
+          h = mix(fl, max(dens, fl * 0.85), ${LOOK.bucket.toFixed(4)});
+          // the bucket's grain position bends the crest, so two rows over the
+          // same density are not the same shape
+          h *= mix(1.0, 0.55 + 0.45 * sin(mix(b0.g, b1.g, mf) * 9.4 + t * 6.0), ${LOOK.bucket.toFixed(4)});
+        }
+        // something to see before there is any sound: a slow standing wave,
+        // small enough that a real signal buries it the moment one arrives
+        // 🔴 THE STANDBY FIELD IS THREE WAVES, NOT ONE, AND THE RATIOS NEVER
+        // COME BACK INTO PHASE. A single sine is one smooth undulation: every
+        // row is the same shape shifted, so there are no peaks for a near row
+        // to hide and the landscape has no features at all. Photographed as a
+        // faint ribbon in an otherwise black box. Three waves give ridges,
+        // saddles and gaps that keep changing, which is what the occlusion
+        // below needs in order to have anything to do.
+        float idle = sin(fx * 9.0 + t * 5.0 - drift * 6.28318);
+        if (${LOOK.waves} == 3) {
+          idle += 0.62 * sin(fx * 21.7 - t * 11.3 + drift * 9.4)
+                + 0.38 * sin(fx * 37.1 + t * 3.1 - drift * 15.7);
+        }
+        h += ${LOOK.idle.toFixed(4)} * idle * (1.0 - loud * 0.75);
+        // 🔴 VALLEYS, WHICH MEANS THE HEIGHT HAS TO GO BELOW THE LINE AS WELL
+        // AS ABOVE IT. Everything before this was max(0, signal), so the floor
+        // WAS the baseline and a quiet column was flat rather than sunk. Taking
+        // the height off a mid point gives a crest and a trough on the same
+        // row, and the troughs are what the near ridges then stand in front of.
+        // 🔴 THE HEAVE. pulse is the phase advanced by the grains the engine
+        // actually reported, so this is the terrain breathing on the
+        // instrument's own clock rather than on a timer. It was already in the
+        // data and nothing in the landscape was reading it.
+        float amp = (${LOOK.ampA.toFixed(4)} + ${LOOK.ampL.toFixed(4)} * loud + ${LOOK.ampB.toFixed(4)} * lowB)
+                  * mix(1.0, 0.78 + 0.34 * pulse, ${LOOK.heave.toFixed(4)})
+                  * (1.0 - t * 0.45) * ${LOOK.ampM.toFixed(4)};
+        /**
+         * 🔴 THE SPLINE STRETCHES BY HEIGHT, WHICH IS NOT THE SAME AS MORE
+         * AMPLITUDE. Scaling amp lifts the whole row, floor included, and the
+         * picture just gets bigger. Pulling on each point in proportion to how
+         * tall it ALREADY is leaves the floor where it is and sends the crests
+         * up: h * (1 + stretch * h * pulse). The landscape gains relief
+         * rather than size, which is the difference between a mountain range
+         * growing and a photograph being enlarged.
+         * ⚠️ ON pulse, the phase advanced by the grains the engine actually
+         * reported, so the ridges reach on the instrument's own clock and stand
+         * still when it stops.
+         */
+        h *= 1.0 + ${LOOK.stretch.toFixed(4)} * clamp(h, 0.0, 1.0) * pulse;
+        // valley 0 puts the floor back on the baseline, which is what every
+        // look before the valleys were asked for did.
+        /**
+         * 🔴 A SWELL THAT TRAVELS THROUGH THE ROWS, STAGGERED BY DEPTH. The
+         * background was reading as still: with the rows held at fixed depths
+         * the only thing moving was the grain data, and the standby wave that
+         * used to carry motion is scaled down by loudness, so a busy passage
+         * took it away exactly when there was most to look at.
+         * This lifts and drops each row on its own phase, set by how far away
+         * it is, so a crest walks from the horizon to the front rather than the
+         * whole field bobbing together. It moves the ROW, not the signal, so
+         * nothing the engine reported is altered by it.
+         * ⚠️ NEAR ROWS SWELL MORE THAN FAR ONES, by 1 - t * 0.6. An equal offset
+         * at every depth is the one thing perspective never does, and the eye
+         * reads it immediately as the picture sliding rather than the water
+         * moving.
+         */
+        // 🔴 THE SWELL IS THE BACK OF THE PICTURE, NOT THE FRONT. It was
+        // strongest at the near rows and weakest at the horizon, which is the
+        // right weighting for perspective and the wrong one for this: the
+        // foreground carries the grain data, so swelling it fights the signal,
+        // and it was reported as too much. Inverted, so the far rows breathe
+        // and the near ones hold still, and halved while it was being touched.
+        // 🔴 THE STAGGER IS HOW MANY CYCLES FIT THROUGH THE STACK. At two, the
+        // rows nearest each other were nearly in phase and the whole back half
+        // rose and fell as one slab, which reads as the picture tilting rather
+        // than as water. At five, a neighbour is visibly behind the row in
+        // front of it and the crest walks through them one at a time, which is
+        // the thing that was asked for.
+        float swell = sin(t * 31.416 - drift * 6.28318 * 2.0) * (0.25 + t * 0.85);
+        float y = baseY + ${LOOK.swellY.toFixed(4)} * swell + (h - ${LOOK.valley.toFixed(4)}) * amp;
+        float d = sy - y;
+        // 🔴 A WEDGE, NOT A GAUSSIAN. A gaussian has no edge, so every line
+        // faded into its neighbours and 46 of them averaged into a ramp. A
+        // linear falloff with a hard cut is a drawn line, and drawn lines are
+        // what a plot is made of.
+        // 🔴 A CORE AND A HALO, BECAUSE ONE WITHOUT THE OTHER IS HALF A LINE.
+        // A pure gaussian has no edge and 46 of them average into a grey ramp,
+        // which is what the wedge was brought in to fix. But a pure wedge has
+        // no light around it either, and the picture went from a ramp to a
+        // faint wire drawing. A hard core for the edge, a wide dim halo for the
+        // glow: crisp where it matters, luminous where the bloom picks it up.
+        float w = 0.0010 + 0.0034 * (1.0 - t);
+        float dim = 0.40 + 0.60 * (1.0 - t);
+        lit += max(0.0, 1.0 - abs(d) / w) * dim;
+        lit += exp(-pow(d / (w * 5.5), 2.0)) * dim * 0.38 * ${LOOK.halo.toFixed(4)};
+        // how near the ridge that owns this pixel is, kept for the colour below
+        // 🔴 THE BREAK IS THE OCCLUSION, AND IT HAS TO BE FORGIVING NEAR THE
+        // CREST OR IT EATS THE PICTURE. Breaking the instant a pixel sits below
+        // a ridge is right for a tall landscape and ruinous for a shallow one:
+        // with a low field the very first row owns almost every pixel, so one
+        // crest blacks out the entire frame under it. That is the mostly empty
+        // box in the photograph. Waiting until the pixel is a clear margin
+        // below the crest keeps the hiding, because a real peak still stands in
+        // front of what is behind it, and lets a shallow field show its layers.
+        if (d < -w * ${LOOK.occl.toFixed(4)}) { near = 1.0 - t; break; }
+      }
+      // contrast as a curve rather than a multiply: scaling brightness lifts
+      // the floor with the peaks and the picture goes grey. This pushes darks
+      // down and lights up around a pivot, so black stays black.
+      lit = clamp(lit, 0.0, 1.6);
+      // 1.15 and 1.9: the old curve crushed a thin line to nothing before the
+      // gain could lift it, so the whole picture sat under the floor
+      lit = pow(lit, ${LOOK.gamma.toFixed(4)}) * ${LOOK.gain.toFixed(4)};
+      /**
+       * 🔴 ONE HUE, WHICH IS WHAT MONOCHROME MEANS HERE. Grey was asked for and
+       * then the blue was asked back, and those are not in conflict: a P7
+       * phosphor is monochrome and it is blue. It strikes blue-white and decays
+       * through a cold grey, which is the screen this whole picture is
+       * pretending to be, and it gives depth a second channel for free because
+       * the far rows sit in the cold end while a near crest burns to white.
+       */
+      // mono 1 is white on black, which is how the first two looks read before
+      // the blue was asked back. The phosphor ramp is the same picture in one hue.
+      /**
+       * 🔴 THE DIM END GOES PALE, NOT SATURATED. The ramp put its most
+       * saturated blue where the picture is FAINTEST, so everything far away
+       * was a dark navy smear: reported as a murky colour blob in the distance.
+       * That is backwards for a phosphor and backwards for aerial perspective,
+       * where distance washes colour OUT. chroma is how much of the blue
+       * survives at the dim end; the looks made before this keep 1.0.
+       */
+      vec3 COLD = mix(vec3(0.66, 0.72, 0.82), vec3(0.38, 0.56, 0.92), ${LOOK.chroma.toFixed(4)});
+      vec3 phos = mix(COLD, vec3(0.90, 0.95, 1.00), smoothstep(0.35, 1.0, lit));
+      vec3 c = mix(phos, vec3(1.0), ${LOOK.mono.toFixed(4)})
+             * clamp(lit, 0.0, 1.0) * (0.72 + 0.38 * near);
+      // a reflection is dimmer and colder than the thing it reflects, and that
+      // is the whole cue that tells a viewer which half is the real one
+      c *= mix(1.0, 0.46, refl);
+      c = mix(c, c * COLD * 1.35, refl * 0.55);
+
+      // ── the glow, added ──
+      /**
+       * 🔴 THE GLOW IS MASKED BY THE TERRAIN THAT EARNED IT. uGlow is a blur
+       * of the PRESENT pass, which is the flat field before any of this is
+       * projected, so adding it straight put a soft bright patch in the SKY:
+       * a blurred copy of a 2D picture floating where there is no landscape at
+       * all. Photographed and asked about as a cloud, which is exactly what it
+       * looked like and exactly what it was not.
+       * Scaling it by lit keeps the bloom where there are ridges and takes it
+       * off the empty half of the frame. The right fix one day is to bloom the
+       * composite instead of its input, which costs two more full-size targets;
+       * this costs one multiply and removes the artifact.
+       */
+      c += texture(uGlow, guv).rgb * 0.62 * clamp(lit, 0.0, 1.0);
+
+      // 🔴 MOTION BLUR, WHICH IS WHAT MAKES IT FLOAT. The previous OUTPUT is
+      // held under this one, so a mark leaves a soft wake instead of blinking.
+      // It is a second trail and it is not the accumulator's: that one is in
+      // field space and decays on a time constant, this one is in screen space
+      // and survives the glitch, so a tear smears rather than flickering.
+      // It LOOSENS when the sound gets loud (0.74 down to 0.52), because a
+      // long hold on a busy passage turns the picture to soup, which is the
+      // muddiness this whole change exists to remove.
+      float hold = mix(0.74, 0.52, clamp(loud * 1.3, 0.0, 1.0));
+
+      // 🔴 VIDEO FEEDBACK, WHICH IS THE WHOLE DIFFERENCE BETWEEN A TRAIL AND A
+      // TUNNEL. A straight mix with the previous frame at the SAME uv is motion
+      // blur: every mark softens in place and nothing goes anywhere. Sampling
+      // the previous frame slightly SMALLER and slightly TURNED means last
+      // frame's picture is redrawn a little bigger and rotated, so everything
+      // in it travels outward and keeps travelling. Each grain leaves a wake
+      // that recedes into the middle distance, which is the layers-coming-at-me
+      // the picture had no depth cue for.
+      //
+      // This is a camera pointed at its own monitor, which is how Nam June Paik
+      // and the Rutt-Etra scan processors made moving images out of a signal
+      // and no drawing at all. It suits this material for a better reason than
+      // period: the picture is a RADIO going through a granulator, and video
+      // feedback is the same shape of process as the audio one next to it.
+      //
+      // The zoom BREATHES with the grain clock, so the tunnel pulls harder on
+      // the beat, and the turn drifts both ways rather than spinning, because
+      // a constant rotation reads as a screensaver.
+      // 🔴 THREE LAYERS, ONE PER BAND, AND THAT IS THE DIFFERENCE BETWEEN A
+      // TUNNEL AND AN EXPERIENCE. One feedback tap is one tunnel at one speed:
+      // it moves, and after ten seconds you have seen all of it. Three taps at
+      // three zooms and three rotations are three tunnels THROUGH EACH OTHER,
+      // and because each one is weighted by a different part of the spectrum
+      // they take turns. A bassline brings the wide slow layer forward; the
+      // tight fast one only shows up on sibilance and cymbals; the middle one
+      // carries speech. Nothing schedules that and nothing repeats, because
+      // the thing choosing is the radio.
+      float ang = (drift - 0.5) * 0.035;
+      float z = 0.008 + 0.012 * pulse;
+      float wl = 0.30 + 0.70 * lowB;
+      float wm = 0.22 + 0.78 * midB;
+      float wh = 0.12 + 0.88 * highB;
+      float ws = wl + wm + wh;
+      vec3 back = (fbTap(uPrevOut, uv, 1.0 + z * 0.45, ang * 0.40) * wl
+                 + fbTap(uPrevOut, uv, 1.0 + z * 1.15, -ang * 1.00) * wm
+                 + fbTap(uPrevOut, uv, 1.0 + z * 2.40, ang * 2.30) * wh) / ws;
+      // 🔴 IT HAS TO LOSE SOMETHING EVERY LAP OR IT RUNS AWAY. Feedback with a
+      // gain of 1 is an oscillator: the picture fills with white in a couple of
+      // seconds and never comes back. Losing a few per cent a frame puts a
+      // ceiling on it. The loss is COLOURED, warm end first, so a layer cools
+      // as it travels out. That is a depth cue for nothing: the eye reads
+      // cooler as further away.
+      // one scalar, not three: a coloured loss would drag a monochrome
+      // picture back toward a hue over a few laps
+      back *= ${LOOK.keep.toFixed(4)};
+      // and the trail LENGTH fluctuates, so even the amount of memory in the
+      // picture is something the station is doing rather than a setting
+      // 🔴 THE CEILING IS 0.80, NOT 0.88, AND THE DIFFERENCE IS WHETHER THE
+      // PICTURE SURVIVES. Each lap the fed-back frame also loses 3.8%, so the
+      // loop gain is hold x 0.962: at 0.88 that is 0.847, leaving 12% fresh ink
+      // per frame to hold the whole image up. On a quiet passage, where the
+      // fresh ink is nearly nothing anyway, the steady state is close enough to
+      // zero to read as the picture fading out. Reported as exactly that.
+      /**
+       * 🔴 THE TRAIL ADDS. IT MUST NEVER SUBTRACT, AND mix SUBTRACTS.
+       *
+       * MEASURED, and this is the bug rather than a tuning problem: mean red
+       * 0.77 -> 0.29 -> 0.05 over five seconds with the station playing. A mix
+       * REPLACES most of this frame with a dimmed copy of the last one, so the
+       * fresh picture only ever contributes its small share and the loop
+       * converges on whatever survives the per-lap loss. On a picture made of
+       * thin lines over black, most of the frame is black, so the thing it
+       * converges on is black. Two attempts to fix that by moving the ceiling
+       * were treating an arithmetic sign as a number.
+       *
+       * max is what a phosphor actually does: this frame is drawn at FULL
+       * strength, always, and the decaying previous frame shows through only
+       * where this one is darker. A trail can then never take anything away,
+       * and the picture cannot fade while there is anything to draw.
+       */
+      c = max(c, back * clamp(hold + 0.14 * flux - 0.10 * jolt, 0.30, 0.86));
+
+      // ── horizontal scanlines, and a slow roll ──
+      // Asked for: *"go 90deg for hoziz vintage scanlines feel"*. The line
+      // period is fixed in PIXELS rather than in uv, so it stays a scanline at
+      // every size instead of turning into a moire of the window width.
+      float scan = 0.90 + 0.10 * cos(gl_FragCoord.y * 3.14159);
+      float roll = 1.0 + 0.05 * cos((uv.y - drift) * 6.28318);
+      c *= scan * roll;
+
+      // a soft edge, so the picture sits in its box rather than being cut out
+      vec2 v = (uv - 0.5) * 2.0;
+      c *= 1.0 - 0.28 * dot(v, v) * 0.5;
+
+      o = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`;
+
+  /**
+   * 🔴 THE WHOLE PICTURE, AND IT NEVER SAMPLES THE TARGET IT IS DRAWING TO.
+   * OpenGL ES 3.0.6 §4.4.3 makes a feedback loop UNDEFINED BEHAVIOUR and WebGL
+   * promotes it to a hard INVALID_OPERATION, so a body that reads its own
+   * target works by accident on some machines and errors in a browser. Two
+   * targets, swapped every frame, which is what ping-pong is for.
+   */
+  function makeField(g) {
+    const compile = (type, src) => {
+      const s = g.createShader(type);
+      g.shaderSource(s, src); g.compileShader(s);
+      if (!g.getShaderParameter(s, g.COMPILE_STATUS)) throw new Error(g.getShaderInfoLog(s));
+      return s;
+    };
+    const prog = (fs, names) => {
+      const p = g.createProgram();
+      g.attachShader(p, compile(g.VERTEX_SHADER, VS));
+      g.attachShader(p, compile(g.FRAGMENT_SHADER, fs));
+      g.linkProgram(p);
+      if (!g.getProgramParameter(p, g.LINK_STATUS)) throw new Error(g.getProgramInfoLog(p));
+      const u = {};
+      for (const n of names) u[n] = g.getUniformLocation(p, n);
+      return { p, u };
+    };
+    const target = (w, h) => {
+      const t = g.createTexture();
+      g.bindTexture(g.TEXTURE_2D, t);
+      g.texImage2D(g.TEXTURE_2D, 0, g.RGBA8, w, h, 0, g.RGBA, g.UNSIGNED_BYTE, null);
+      for (const q of [g.TEXTURE_MIN_FILTER, g.TEXTURE_MAG_FILTER]) g.texParameteri(g.TEXTURE_2D, q, g.LINEAR);
+      for (const q of [g.TEXTURE_WRAP_S, g.TEXTURE_WRAP_T]) g.texParameteri(g.TEXTURE_2D, q, g.CLAMP_TO_EDGE);
+      const f = g.createFramebuffer();
+      g.bindFramebuffer(g.FRAMEBUFFER, f);
+      g.framebufferTexture2D(g.FRAMEBUFFER, g.COLOR_ATTACHMENT0, g.TEXTURE_2D, t, 0);
+      g.bindFramebuffer(g.FRAMEBUFFER, null);
+      return { t, f, w, h };
+    };
+
+    // ⚠️ ONE VERTEX ARRAY, BOUND ONCE. A vertex array object belongs to the
+    // context that made it, and WebGL2 draws nothing at all without one bound.
+    g.bindVertexArray(g.createVertexArray());
+
+    const acc = prog(ACC_FS, ['uRes', 'uData', 'uPrev']);
+    const pre = prog(PRESENT_FS, ['uRes', 'uData', 'uField']);
+    const cpy = prog(COPY_FS, ['uRes', 'uSrc']);
+    const bri = prog(BRIGHT_FS, ['uRes', 'uData', 'uSrc']);
+    const blr = prog(BLUR_FS, ['uRes', 'uData', 'uSrc', 'uDir']);
+    const out = prog(OUT_FS, ['uRes', 'uData', 'uSrc', 'uGlow', 'uPrevOut']);
+
+    // ⚠️ A DATA TEXTURE IS NEAREST AND NOT FILTERABLE BY ACCIDENT. It is read
+    // with texelFetch, which takes no sampler state at all, and the filter is
+    // set anyway so that a body someone writes later with texture() fails
+    // visibly rather than smearing two parameters together.
+    const dataTex = g.createTexture();
+    g.bindTexture(g.TEXTURE_2D, dataTex);
+    g.texImage2D(g.TEXTURE_2D, 0, g.RGBA8, DATA_W, DATA_H, 0, g.RGBA, g.UNSIGNED_BYTE, null);
+    for (const q of [g.TEXTURE_MIN_FILTER, g.TEXTURE_MAG_FILTER]) g.texParameteri(g.TEXTURE_2D, q, g.NEAREST);
+    for (const q of [g.TEXTURE_WRAP_S, g.TEXTURE_WRAP_T]) g.texParameteri(g.TEXTURE_2D, q, g.CLAMP_TO_EDGE);
+
+    let A = target(FIELD_W, FIELD_H), B = target(FIELD_W, FIELD_H);
+    // ⚠️ THE GLOW IS A QUARTER WIDTH ON PURPOSE. A nine-tap blur at full size
+    // is sixteen times the sampling for a blur that would look narrower, not
+    // wider: downsampling IS most of the softness.
+    const GLOW_W = FIELD_W >> 2, GLOW_H = FIELD_H >> 2;
+    const glowA = target(GLOW_W, GLOW_H), glowB = target(GLOW_W, GLOW_H);
+    // the screen-space trail, ping-ponged like the field for the same reason:
+    // a pass may not sample the target it is drawing to
+    let P = target(FIELD_W, FIELD_H), Q = target(FIELD_W, FIELD_H);
+    let field = null;                    // the accumulate target most recently written
+    let finalT = null;                   // the composite most recently written
+    const shown = target(FIELD_W, FIELD_H);
+    // ⚠️ THE CHECKS GET THEIR OWN TARGETS. Rendering a probe into the visible
+    // ping-pong puts a frame into the feedback tap and leaves a smear that lasts
+    // as long as the trail does, which is a measurement changing the thing it
+    // measures on a page where the trail IS the subject.
+    let tA = null, tB = null, tS = null;
+    const TEST_W = 256, TEST_H = 144;
+
+    const upload = (bytes) => {
+      g.bindTexture(g.TEXTURE_2D, dataTex);
+      g.texSubImage2D(g.TEXTURE_2D, 0, 0, 0, DATA_W, DATA_H, g.RGBA, g.UNSIGNED_BYTE, bytes);
+    };
+    const pass = (pr, dst, w, h, src, srcName) => {
+      g.bindFramebuffer(g.FRAMEBUFFER, dst);
+      g.viewport(0, 0, w, h);
+      g.useProgram(pr.p);
+      g.uniform2f(pr.u.uRes, w, h);
+      g.activeTexture(g.TEXTURE0); g.bindTexture(g.TEXTURE_2D, src); g.uniform1i(pr.u[srcName], 0);
+      g.activeTexture(g.TEXTURE1); g.bindTexture(g.TEXTURE_2D, dataTex);
+      if (pr.u.uData) g.uniform1i(pr.u.uData, 1);
+      g.drawArrays(g.TRIANGLES, 0, 3);
+    };
+
+    return {
+      shown,
+      /** One live frame: accumulate, present, copy to the canvas. */
+      step(bytes) {
+        upload(bytes);
+        pass(acc, B.f, FIELD_W, FIELD_H, A.t, 'uPrev');
+        field = B;                       // before the swap: B is what was just written
+        pass(pre, shown.f, FIELD_W, FIELD_H, B.t, 'uField');
+        // bright pass, then the gaussian along x and back along y
+        pass(bri, glowA.f, GLOW_W, GLOW_H, shown.t, 'uSrc');
+        g.useProgram(blr.p); g.uniform2f(blr.u.uDir, 1.0, 0.0);
+        pass(blr, glowB.f, GLOW_W, GLOW_H, glowA.t, 'uSrc');
+        g.useProgram(blr.p); g.uniform2f(blr.u.uDir, 0.0, 1.0);
+        pass(blr, glowA.f, GLOW_W, GLOW_H, glowB.t, 'uSrc');
+        // the composite: glow added, last frame held under, scanlines, glitch
+        g.bindFramebuffer(g.FRAMEBUFFER, Q.f);
+        g.viewport(0, 0, FIELD_W, FIELD_H);
+        g.useProgram(out.p);
+        g.uniform2f(out.u.uRes, FIELD_W, FIELD_H);
+        g.activeTexture(g.TEXTURE0); g.bindTexture(g.TEXTURE_2D, shown.t); g.uniform1i(out.u.uSrc, 0);
+        g.activeTexture(g.TEXTURE1); g.bindTexture(g.TEXTURE_2D, dataTex); g.uniform1i(out.u.uData, 1);
+        g.activeTexture(g.TEXTURE2); g.bindTexture(g.TEXTURE_2D, glowA.t); g.uniform1i(out.u.uGlow, 2);
+        g.activeTexture(g.TEXTURE3); g.bindTexture(g.TEXTURE_2D, P.t); g.uniform1i(out.u.uPrevOut, 3);
+        g.drawArrays(g.TRIANGLES, 0, 3);
+        finalT = Q;
+        // the canvas, last, so what a person sees is what the composite holds
+        g.bindFramebuffer(g.FRAMEBUFFER, null);
+        g.viewport(0, 0, canvas.width, canvas.height);
+        g.useProgram(cpy.p);
+        g.uniform2f(cpy.u.uRes, canvas.width, canvas.height);
+        g.activeTexture(g.TEXTURE0); g.bindTexture(g.TEXTURE_2D, Q.t); g.uniform1i(cpy.u.uSrc, 0);
+        g.drawArrays(g.TRIANGLES, 0, 3);
+        [A, B] = [B, A];
+        [P, Q] = [Q, P];
+        frames++;
+      },
+      /** Whatever is on screen now, as bytes. */
+      readShown() { return this.readTarget(shown); },
+      /**
+       * The composite: glow, trail, scanlines and glitch included. readShown
+       * deliberately still reads the pass BEFORE all of that, because the
+       * checks that grade where a grain landed want the picture without a
+       * screen-space trail smeared across it.
+       */
+      readFinal() { return finalT ? this.readTarget(finalT) : null; },
+      /**
+       * 🔴 THE ACCUMULATED FIELD ALONE, WHICH IS THE ONLY SURFACE HERE THAT
+       * HOLDS NOTHING BUT GRAINS. What is on screen is the deposits plus the
+       * window bed plus the lighting plus the blend, and the bed is drawn from
+       * the page's own parameters whether a single grain has ever arrived or
+       * not: a statistic over the whole picture can be entirely the bed, which
+       * is blind rather than weak. This target has no bed, no colour and no
+       * lighting in it. Every lit pixel is a grain the ENGINE reported.
+       */
+      readField() { return field ? this.readTarget(field) : null; },
+      readTarget(t) {
+        const px = new Uint8Array(t.w * t.h * 4);
+        g.bindFramebuffer(g.READ_FRAMEBUFFER, t.f);
+        g.readPixels(0, 0, t.w, t.h, g.RGBA, g.UNSIGNED_BYTE, px);
+        g.bindFramebuffer(g.READ_FRAMEBUFFER, null);
+        return { px, w: t.w, h: t.h };
+      },
+      /**
+       * 🔴 THE SAME TWO PASSES OVER A KNOWN PREVIOUS FRAME, WHICH IS THE ONLY
+       * WAY EITHER OF THE SEPARATING CHECKS CAN MEAN ANYTHING. Asking a
+       * feedback picture whether two consecutive live frames are identical
+       * answers no on a working page, because frame n+1 is a function of frame
+       * n. What IS deterministic is ONE pass from a fixed input, so the probe
+       * clears its own previous frame to black first and both checks compare
+       * passes rather than frames.
+       */
+      testRender(bytes) {
+        tA ||= target(TEST_W, TEST_H); tB ||= target(TEST_W, TEST_H); tS ||= target(TEST_W, TEST_H);
+        g.bindFramebuffer(g.FRAMEBUFFER, tA.f);
+        g.viewport(0, 0, TEST_W, TEST_H);
+        g.clearColor(0, 0, 0, 1); g.clear(g.COLOR_BUFFER_BIT);
+        upload(bytes);
+        pass(acc, tB.f, TEST_W, TEST_H, tA.t, 'uPrev');
+        pass(pre, tS.f, TEST_W, TEST_H, tB.t, 'uField');
+        const px = new Uint8Array(TEST_W * TEST_H * 4);
+        g.bindFramebuffer(g.READ_FRAMEBUFFER, tS.f);
+        g.readPixels(0, 0, TEST_W, TEST_H, g.RGBA, g.UNSIGNED_BYTE, px);
+        g.bindFramebuffer(g.READ_FRAMEBUFFER, null);
+        return { px, w: TEST_W, h: TEST_H };
+      },
+    };
+  }
+
+  let pic = null;
+  if (gl) {
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    try { pic = makeField(gl); } catch (e) { d.log(`the picture did not compile: ${e.message}`, 'bad'); }
+    // the standby picture starts here, not at play: the screen is shown from
+    // the first frame and has to have something true in it
+    if (pic) requestAnimationFrame(frame);
+  } else {
+    d.log('this browser draws no 3-D, so there is no picture to draw', 'bad');
+  }
+  // verify-gl.mjs reads this and refuses to grade a software rasteriser, and
+  // it also checks that the page and the harness name the SAME renderer. A page
+  // that cannot say which card it got produces numbers about nothing.
+  window.__demo.gl = { renderer, ok: !!gl };
+
+  // ═══ the audio ═════════════════════════════════════════════════════════════
+  let ctx = null, srcNode = null, liveIn = null, liveDuck = null, analyser = null;
+  let dry = null, speakers = null, gate = null, sink = null, sinkBuf = null;
+  let preGate = null, preBuf = null;
+  let loopRing = null, loopTap = null, loopOut = null;
+  let stream = null, feats = null, modulator = null, eng = null;
+  // ⚠️ THERE IS NO FAVOURITE, AND THE ONE THAT WAS HERE COST TWO RUNS. It
+  // opened on klassikaraadio because /radio1965/ does, and that page has a
+  // reason: it upgrades to the station it is named after. This one changes
+  // station on its own every minute, so it has nothing to prefer, and a
+  // hard-coded first choice is a mount that can be down all afternoon while the
+  // page sits on it. MEASURED: Klassikaraadio is delivering 0 blocks on three
+  // consecutive runs, on a relay that had been calling it down all session.
+  // The real first choice is made from the health answer, below.
+  let station = STATIONS[0][1];
+  let started = false, wet = WET_MIN, grains = 0, ringFilled = false;
+  const avail = new Map();
+  // 🔴 DECLARED HERE AND NOT BESIDE THE CHECKS THAT READ IT. A const further
+  // down the file is in its temporal dead zone until the module reaches it, and
+  // this repo has paid for that three times in one page: a closure handed to a
+  // component ran before the declaration, threw a ReferenceError inside a
+  // constructor, and the whole page reported __demo.ready — failed with
+  // nothing else to go on.
+  // ⚠️ EVERY FIELD IS WRITTEN OUT EVEN THOUGH JAVASCRIPT DOES NOT NEED IT: a
+  // burst of asserts reading properties that appear from nowhere cannot be
+  // reviewed, and a typo reads as undefined, which most of these checks would
+  // treat as a failure of the ENGINE rather than of the page.
+  const G = { def: null, bufs: null, running: false, grains: 0 };
+  /** True only while the page is exercising its own controls. */
+  let checking = false;
+
+  /**
+   * 🔴 NOTHING LEAVES THIS PAGE UNTIL A PERSON ASKS, AND THE GATE IS A GAIN NODE
+   * RATHER THAN A FLAG. verify.mjs and verify-gl.mjs drive a page with
+   * element.click(), which produces an UNTRUSTED event: so the harness presses
+   * the real button, the real machine starts, every check runs, and not one
+   * sample reaches a speaker. A finger is trusted and opens it.
+   *
+   * ⚠️ NOT A DISCONNECTED OUTPUT AND NOT muted. Declining to connect changes
+   * the graph between the checked state and the real one, and Web Audio PULLS:
+   * a node with no path to the destination is never asked to process at all,
+   * which is what made a buffer allocation time out once. One gain, in the same
+   * place always, at 0 or at 1.
+   *
+   * ⚠️ AND THE EVIDENCE IS A PAIR OF ANALYSERS, ONE EITHER SIDE. Reading the
+   * gain back would grade the setting rather than the sound.
+   */
+  let asked = false;
+  const openGate = () => {
+    asked = true;
+    if (gate && ctx) gate.gain.setTargetAtTime(1, ctx.currentTime, 0.005);
+  };
+  // Registered on the button in the CAPTURE phase and on pointerdown, which
+  // fires before click, so the gate is already open when the shell's own
+  // handler runs. A click listener would be registered after the shell's and
+  // would arrive too late to matter.
+  setTimeout(() => {
+    const b = d.button('play');
+    b?.addEventListener('pointerdown', (e) => { if (e.isTrusted) openGate(); }, true);
+    b?.addEventListener('keydown', (e) => { if (e.isTrusted) openGate(); }, true);
+  }, 0);
+
+  function graph() {
+    if (ctx) return;
+    // iOS sends WebAudio through the silent switch and a media element past it,
+    // so a page whose only output is WebAudio gets the ambient session, which
+    // the ring switch mutes. It is absent everywhere else, so this is a
+    // capability test and never a platform check.
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; }
+    catch (e) { d.log(`could not claim a playback audio session: ${e.message}`); }
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // ⚠️ A STABLE GAIN IS THE ENGINE'S INPUT, NOT WHATEVER IS FEEDING IT.
+    // scsynth is wired to this node ONCE at boot; a station change replaces the
+    // decoded stream behind it, and handing out the stream's own node would
+    // leave the granulator reading a stopped one, which is silence that looks
+    // like a broken engine.
+    srcNode = ctx.createGain();
+    liveIn = ctx.createGain();          // the station's way in, and what a loop records
+    // 🔴 THE DUCK IS A SECOND NODE, AND IT IS WHAT MAKES SEVERAL LOOPS AT ONCE
+    // POSSIBLE. The ring taps `liveIn`, so taking `liveIn` itself down to make
+    // room for a loop recorded SILENCE into the next one, and the page could
+    // only ever keep one loop at a time. The tap now sits upstream of the
+    // level, so the page can go on keeping fresh seconds of the station while
+    // three loops of it are playing.
+    liveDuck = ctx.createGain();
+    liveIn.connect(liveDuck);
+    liveDuck.connect(srcNode);
+
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    // 🔴 NO SMOOTHING, BECAUSE ONE OF THE SIX IS A RATE OF CHANGE.
+    // getFloatFrequencyData applies smoothingTimeConstant PER CALL, so a
+    // flux follower would measure the blend rather than the programme and the
+    // same page would read differently at 60, 72, 90 and 120 Hz.
+    analyser.smoothingTimeConstant = 0;
+    dry = ctx.createGain();
+    srcNode.connect(analyser);
+    analyser.connect(dry);
+
+    // 🔴 ONE WAY OUT AND EVERYTHING THAT MAKES A SOUND GOES THROUGH IT. The
+    // station's path and the engine's output both land on speakers, so the
+    // meter below hears the instrument as well as the material. Fed by dry
+    // alone it would read 0.0000 with the blend hard over to the granulator,
+    // and every check built on it would pass by measuring nothing.
+    speakers = ctx.createGain();
+    dry.connect(speakers);
+    gate = ctx.createGain();
+    gate.gain.value = asked ? 1 : 0;
+    speakers.connect(gate);
+    // 🔴 ONE ANALYSER EITHER SIDE OF THE GATE, AND THAT IS WHAT MAKES THE PAIR A
+    // PAIR. analyser above sits on the granulator's INPUT, before the blend
+    // and before the engine's output joins, so comparing it against the far side
+    // of the gate compares two different signals and reads as evidence. These
+    // two see the same samples with one gain between them, so the only thing
+    // that can separate their readings is the gain.
+    preGate = ctx.createAnalyser();
+    preGate.fftSize = 2048;
+    preGate.smoothingTimeConstant = 0;
+    preBuf = new Float32Array(preGate.fftSize);
+    speakers.connect(preGate);
+    sink = ctx.createAnalyser();
+    sink.fftSize = 2048;
+    sink.smoothingTimeConstant = 0;
+    sinkBuf = new Float32Array(sink.fftSize);
+    gate.connect(sink);
+    sink.connect(ctx.destination);
+
+    // ── the loop's own audio ──────────────────────────────────────────────
+    //
+    // ⚠️ A RING FILLED ON THE AUDIO THREAD, not samples scraped off the
+    // analyser. A frame callback reads 2048 samples a frame, which at 60 Hz
+    // both overlaps and gaps: stitching those gives a recording with a seam
+    // every sixteen milliseconds.
+    //
+    // ⚠️ AND IT TAPS liveIn, NOT dry. dry carries the blend, so a loop
+    // recorded through it would be a recording of wherever the fader happened
+    // to be standing, played back under a second fade. The material is the
+    // station.
+    const len = Math.round(BUF_SECONDS * ctx.sampleRate);
+    loopRing = { len, ch: [new Float32Array(len), new Float32Array(len)], w: 0, filled: 0, on: false };
+    // ⚠️ A SCRIPT PROCESSOR, DELIBERATELY. It is deprecated and it runs on the
+    // main thread, and what it does here is memcpy two blocks into a typed array
+    // and return. It is wired to a SILENT sink so it is pulled without being
+    // heard: a node with no path to the destination is not scheduled at all,
+    // which is the trap that makes a tap look like it works and record nothing.
+    loopTap = ctx.createScriptProcessor(4096, 2, 2);
+    loopTap.onaudioprocess = (e) => {
+      const R = loopRing;
+      if (!R?.on) return;
+      const n = e.inputBuffer.length;
+      for (let c = 0; c < 2; c++) {
+        const src = e.inputBuffer.getChannelData(Math.min(c, e.inputBuffer.numberOfChannels - 1));
+        const dst = R.ch[c];
+        let w = R.w;
+        for (let i = 0; i < n; i++) { dst[w] = src[i]; w = w + 1 === R.len ? 0 : w + 1; }
+        if (c === 1) R.w = w;
+      }
+      R.filled = Math.min(R.len, R.filled + n);
+    };
+    const tapSink = ctx.createGain();
+    tapSink.gain.value = 0;
+    liveIn.connect(loopTap);
+    loopTap.connect(tapSink);
+    tapSink.connect(ctx.destination);
+
+    // 🔴 INTO srcNode, NOT INTO THE DESTINATION. Everything downstream then
+    // gets the loop for free: the granulator chews it, the analyser measures it,
+    // the blend still works and the meter reads what actually left. Wired to the
+    // destination it would be a parallel path only the speakers knew about, and
+    // the instrument would go on eating the live station while you heard a loop.
+    loopOut = ctx.createGain();
+    loopOut.gain.value = 0;
+    loopOut.connect(srcNode);
+
+    feats = createFeatures(analyser, ctx.sampleRate);
+
+    // iOS has a fourth AudioContext state, interrupted, and it does not come
+    // back on its own.
+    ctx.addEventListener?.('statechange', () => {
+      if (ctx.state === 'running') return;
+      d.log(`the browser ${ctx.state} the audio; asking for it back`);
+      ctx.resume?.().catch(() => {});
+    });
+    addEventListener('pointerdown', () => {
+      if (ctx && ctx.state !== 'running') ctx.resume?.().catch(() => {});
+    }, { passive: true });
+  }
+
+  // ── the stream, and which station it points at ─────────────────────────────
+  //
+  // 🔴 stream === null MEANS THE PAGE IS NOT LISTENING TO ANYTHING, AND IT IS
+  // A STATE THE PAGE CAN BE IN FOR MINUTES. All six of these mounts refused at
+  // once while this was being written. The picture, the tour, the blend and the
+  // engine all go on running with nothing to eat, which is what the trail, the
+  // parameter row and the log are for; the poll below brings a station back
+  // without a reload.
+  let switchedAt = -1e9;
+
+  function closeStream() {
+    if (!stream) return;
+    try { stream.stop(); } catch { /* already stopped */ }
+    stream = null;
+  }
+  function openStream() {
+    closeStream();
+    const mine = createMp3Stream(ctx, {
+      url: srcOf(BASE, station),
+      onTitle: (t) => { if (/[\p{L}\p{N}]/u.test(t)) d.log(`now playing: ${t}`, 'hi'); },
+      log: (m) => d.log(m),
+    });
+    stream = mine;
+    mine.node.connect(liveIn);
+    window.__stream = mine;                     // a lab handle; harmless in a page
+    mine.started.catch(() => {});
+    // 🔴 AN OUTCOME-GATED FALLBACK, NOT A SECOND PROBE. A mount that answered
+    // /health a minute ago and is refusing now is the ordinary case for a
+    // volunteer server, and the stream failing IS the evidence. MEASURED on the
+    // day this was written: three of the six mounts answered 502 inside an hour.
+    // ⚠️ AND IT SAYS SO RATHER THAN LOOKING BROKEN. A picture that empties with
+    // no line in the log is a page somebody debugs.
+    setTimeout(() => {
+      if (stream !== mine) return;
+      if (mine.stats().blocks > 0) return;
+      dropStation(station, 'answered and then sent nothing, so it is being left out');
+    }, 9000);
+  }
+
+  /**
+   * A mount has stopped delivering: leave it out, move to the next one that is
+   * answering, and if there is no next one stop listening entirely.
+   *
+   * 🔴 THE LAST LINE IS THE ONE THAT MATTERS AND IT WAS MISSING. With every
+   * mount refusing the page went on holding a dead connection, which is a
+   * fetch that answers 502 and a console error the page cannot suppress, about
+   * a station it already knows is down. Closing it is what makes
+   * stream === null mean "there is nothing to listen to", which is what the
+   * poll below waits for.
+   */
+  function dropStation(id, why) {
+    avail.set(id, false);
+    d.log(`${nameOf(id)} ${why}`, 'bad');
+    const next = pickStation(id);
+    if (next) { switchTo(next, 'it is the next one answering'); return; }
+    closeStream();
+    d.log('every mount is refusing, so there is nothing to play. The picture runs on '
+      + 'what the granulator still holds', 'bad');
+  }
+
+  /**
+   * The next station that is not known to be down, starting after this one.
+   *
+   * ⚠️ !== false, NOT TRUTHY. A station nobody has an answer about is
+   * undefined and must stay in the rotation: "we did not look" and "it is
+   * down" are different facts with opposite consequences, and caps.mjs
+   * already states the rule that an unknown never blocks.
+   *
+   * ⚠️ AND IT RETURNS NULL RATHER THAN THE STATION IT STARTED FROM. Wrapping
+   * all the way round to the current one would read as a successful choice, so
+   * "everything else is refusing" would never be said out loud.
+   */
+  function pickStation(from = station) {
+    const here = Math.max(0, indexOfId(from));
+    for (let i = 1; i <= STATIONS.length; i++) {
+      const [, id] = STATIONS[(here + i) % STATIONS.length];
+      if (id === from) continue;
+      if (avail.get(id) !== false) return id;
+    }
+    return null;
+  }
+  function switchTo(id, why) {
+    if (!id || id === station) return false;
+    station = id;
+    switchedAt = performance.now();
+    jolt = 1;
+    d.log(`${nameOf(id)} · ${why}`, 'hi');
+    if (started) openStream();
+    return true;
+  }
+  /**
+   * The station clock's move, once a minute or so.
+   *
+   * ⚠️ IT IS ALSO THE WAY BACK IN. With nothing playing there is no station to
+   * move ON from, so the first mount that is answering is simply started: a
+   * page that stopped listening during an outage and never started again would
+   * need a reload, which is the one thing a page that plays itself must not
+   * ask for.
+   */
+  function nextStation(why) {
+    const id = pickStation();
+    if (!id) {
+      if (!stream && avail.get(station) !== false) { openStream(); return true; }
+      return false;
+    }
+    if (!stream) { station = id; switchedAt = performance.now(); openStream(); d.log(`${nameOf(id)} · ${why}`, 'hi'); stationShip(`opened ${nameOf(id)}`); return true; }
+    stationShip(`switching to ${nameOf(id)} · ${why}`);
+    const out = switchTo(id, why);
+    stationShip(`switched, fullscreenElement=${document.fullscreenElement ? 'yes' : 'no'}`);
+    return out;
+  }
+
+  // ═══ the tour ══════════════════════════════════════════════════════════════
+  //
+  // 🔴 WHAT CAN BE SLID AND WHAT MUST BE STEPPED IS AN ARGUMENT ABOUT THE
+  // ENGINE, NOT A TASTE, and it lives in radio-gran.mjs beside the write that
+  // depends on it. Select.kr indices, a chord in semitones and a sixteen-step
+  // gate figure have no halfway; a grain length behind a 20 ms Lag.kr has
+  // nothing but. So a morph slides every continuous control in its own lane and
+  // steps the rest, once, at the middle.
+  //
+  // ⚠️ AND THE ROUTES STEP WITH THEM. A patch is a place AND a motion, and two
+  // motions cannot be crossfaded: {shape:'step', hz:1} and {src:'env.tone'}
+  // are different machines, not two settings of one.
+  let tourFrom = performance.now();
+  let loaded = null, lockedRate = null;
+  let routedNow = new Set();
+  const modNow = {};                  // what the modulator last SENT, per destination
+  let morphK = 0, fromIdx = 0, toIdx = 1;
+  // ⚠️ COMPUTED AT 25 Hz AND READ AT FRAME RATE, NOT COMPUTED TWICE. morphOf
+  // builds a whole set of continuous values and two arrays; doing it again in
+  // the frame callback would be a second answer to one question and sixty
+  // objects a second of garbage for numbers that are already in hand.
+  let lastMorph = null;
+
+  const tourPos = () => (performance.now() - tourFrom) / SLOT_MS;
+  const slotOf = (p) => Math.floor(p);
+  const withinOf = (p) => p - Math.floor(p);
+  const kOf = (within) => (within <= DWELL_FRAC ? 0 : (within - DWELL_FRAC) / (1 - DWELL_FRAC));
+
+  /** Which sound this instant is between, and how far. */
+  function tourNow(pos = tourPos()) {
+    const slot = slotOf(pos), within = withinOf(pos);
+    const a = ((slot % PATCHES.length) + PATCHES.length) % PATCHES.length;
+    const b = (a + 1) % PATCHES.length;
+    return { slot, within, a, b, k: kOf(within) };
+  }
+
+  /**
+   * 🔴 THE BLEND IS A FUNCTION OF WHERE THE TOUR IS, NOT A FREE-RUNNING LFO, and
+   * the difference is legible rather than cosmetic. It opens from the station
+   * to the granulator over the first half of a sound and comes back over the
+   * second, so the handover between two sounds always happens while you can
+   * still hear what the station is doing. A sine on its own clock would
+   * eventually put the deepest part of the granulator exactly on a crossover,
+   * which is the one moment the instrument has least to say.
+   */
+  const wetFor = (within) => WET_MIN + (WET_MAX - WET_MIN) * (0.5 - 0.5 * Math.cos(2 * Math.PI * within));
+
+  function setWet(v) {
+    wet = Math.max(0, Math.min(1, v));
+    if (eng) eng.out.gain.value = wet;
+    if (dry) dry.gain.value = 1 - wet;
+  }
+
+  /**
+   * Land on a sound: everything that cannot be interpolated, the bases, and the
+   * routes, in that order.
+   *
+   * ⚠️ THE ORDER MATTERS. setRoutes sends the base of every destination that
+   * has STOPPED being modulated, so it has to run after the bases are the new
+   * sound's or a control goes home to the previous sound's number.
+   */
+  function land(p) {
+    if (!eng) return;
+    loaded = p;
+    writeDiscrete(eng, p, { bufSeconds: BUF_SECONDS });
+    const base = basesOf(p);
+    for (const [k, v] of Object.entries(base)) modulator?.setBase(k, v);
+    const routes = routesOf(p);
+    modulator?.setRoutes(routes);
+    routedNow = new Set(routes.map((r) => r.dest));
+    // ⚠️ A SOUND CHANGE IS A STATE CHANGE, so it goes in the log, once, when it
+    // happens, and not into a cell that would re-say it sixty times a second.
+    // 🔴 THE COUNT RODE IN HERE WHEN THE moving CELL WENT. It is the same
+    // fact and this is the honest place for it: it changes when the sound
+    // changes, which is exactly when this line is written, so a cell repainting
+    // it sixty times a second was always saying a thing that had not moved.
+    jolt = 1;   // a sound change is the other thing the picture tears on
+    d.log(`${p.name} · ${p.says} · ${routedNow.size} walking`);
+    // A lock made for the previous sound's figure does not divide this one's.
+    if (loopState === 'on') relock();
+  }
+
+  /**
+   * One pass of the tour, at the modulator's own rate.
+   *
+   * 🔴 THE MORPH MOVES THE BASE OF A ROUTED CONTROL AND WRITES EVERY OTHER ONE
+   * ITSELF. Two writers at 25 Hz on one control is a 25 Hz square wave, not a
+   * glide: createModulator writes base + modulation and a morph writing the
+   * raw value would alternate with it. writeContinuous's skip is what keeps
+   * them out of each other's way, and it is why the routed set is tracked here.
+   */
+  function tourTick() {
+    if (!eng || !modulator) return;
+    const t = tourNow();
+    const A = PATCHES[t.a], B = PATCHES[t.b];
+    const m = morphOf(A, B, t.k);
+    morphK = m.k; fromIdx = t.a; toIdx = t.b; lastMorph = m;
+    if (m.at !== loaded) land(m.at);
+
+    // 🔴 A LOCKED GRAIN CLOCK OUTRANKS THE MORPH, and that is what tempo-synced
+    // means: while a loop is playing, the grain rate belongs to the lap rather
+    // than to the sound the tour is travelling through. It is written here
+    // rather than fought with afterwards, because two writers on one control at
+    // 25 Hz is a 25 Hz square wave and not a compromise.
+    const values = { ...m.values };
+    if (lockedRate != null) values.rate = lockedRate;
+
+    // The base is where a modulated control returns to, so it has to be the
+    // MORPHED value and not the arriving sound's: otherwise every routed
+    // control jumps to its destination at the crossover while the unrouted ones
+    // glide, and half the instrument arrives early.
+    const bases = basesOf(m.at);
+    for (const k of Object.keys(bases)) {
+      const moved = values[k];
+      modulator.setBase(k, typeof moved === 'number' ? moved : bases[k]);
+    }
+    writeContinuous(eng, values, { scanmode: m.at.scanmode, bufSeconds: BUF_SECONDS, skip: routedNow });
+    modulator.tick();
+    setWet(wetFor(t.within));
+  }
+
+  // ═══ the loop ══════════════════════════════════════════════════════════════
+  //
+  // 🔴 FOUR WAYS, AND EACH IS A DIFFERENT MECHANISM RATHER THAN A DIFFERENT
+  // NUMBER OF ONE, AND EACH LAYER OF A STACK GETS THE NEXT ONE IN TURN.
+  // Round is the kept seconds as they arrived, back is the same
+  // samples mirrored, half is the same lap at half speed, chop is a sixteenth of
+  // it repeating. Three of the four are things a live mount cannot do at all:
+  // there is nothing behind a live edge to play backwards, no lap to divide, and
+  // slowing a stream down only means falling behind it.
+  const LOOP_WAYS = ['round', 'back', 'half', 'chop'];
+  const CHOP_DIV = 16, CHOP_MIN_S = 0.12;
+  //
+  // 🔴 SEVERAL LOOPS AT ONCE, EACH A DIFFERENT LENGTH OF A DIFFERENT MINUTE.
+  // A layer is kept seconds of the station with its own way of playing, its own
+  // speed and its own gain, and up to three of them run against each other into
+  // the same granulator. The lengths below are deliberately not multiples of
+  // each other: three loops that divide evenly are one loop with more voices,
+  // and what makes a stack of them worth hearing is that they come back into
+  // phase rarely.
+  //
+  // ⚠️ AND A NEW ONE IS NEVER A RECORDING OF THE OLD ONES. The ring taps the
+  // station upstream of everything the loops reach, so a layer can be taken
+  // while three are playing and it still holds only what is on air.
+  const MAX_LAYERS = 3;
+  const LOOP_LENS = [3, 8, 2, 5, 1.5, 4];      // seconds kept, in turn
+  const ARM_GAP_MS = 2600;                     // quiet between one layer and taking the next
+  const LAYER_LIFE_MS = 32000;                 // how long a layer stays before it is let go
+  const DUCK = 0.22;                           // what is left of the live station under a stack
+  const layers = [];                           // oldest first
+  let loopState = 'off';               // off | filling | on
+  let loopCount = 0, loopBuf = null;
+  let voiceAt = 0, voiceFrom = 0, voiceTo = 0, voiceRate = 1, voiceBack = false;
+  let loopWant = 0;                    // seconds to keep before setting the loop
+  let lastArm = -1e9;                  // when the last layer landed, for the gap above
+
+  /**
+   * ⚠️ THE SAMPLES, NOT A NEGATIVE RATE. AudioBufferSourceNode.playbackRate
+   * does not go below zero in any shipping engine, so the only way to read a
+   * buffer backwards is to hold a mirrored copy. Built on the first loop that
+   * needs one rather than beside every loop.
+   */
+  function reversedCopy(buf) {
+    const out = ctx.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const src = buf.getChannelData(c), dst = out.getChannelData(c);
+      for (let i = 0, n = buf.length; i < n; i++) dst[i] = src[n - 1 - i];
+    }
+    return out;
+  }
+
+  /** Where the SOUND is in the kept seconds, from the voice's own clock. */
+  function loopHeadFrac() {
+    if (!ctx || !layers.length || !loopBuf) return null;
+    const lap = voiceTo - voiceFrom, whole = loopBuf.duration;
+    if (!(lap > 0) || !(whole > 0)) return null;
+    const into = Math.max(0, ctx.currentTime - voiceAt) * voiceRate;
+    const p = voiceFrom + (into % lap);
+    // Sample i of the reversed buffer is sample n-1-i of what the picture draws.
+    return Math.min(1, Math.max(0, (voiceBack ? whole - p : p) / whole));
+  }
+
+  /**
+   * How loud each layer is, recomputed whenever the stack changes.
+   *
+   * 🔴 THREE COPIES OF A STATION AT FULL LEVEL IS THREE TIMES THE AMPLITUDE,
+   * and the granulator is downstream of this, so a stack that clips arrives at
+   * the instrument already broken. The newest is loudest and each older one is
+   * a third of the way down, which is also what makes the stack legible: a
+   * listener can hear which one just arrived.
+   */
+  function balance() {
+    if (!ctx) return;
+    const n = layers.length;
+    layers.forEach((l, i) => {
+      const age = n - 1 - i;                       // 0 is the newest
+      const want = 0.68 ** age / Math.sqrt(Math.max(1, n));
+      l.gain.gain.setTargetAtTime(want, ctx.currentTime, 0.05);
+    });
+  }
+
+  /**
+   * Let a layer go: down over ~80 ms, then stopped and unwired.
+   *
+   * ⚠️ THE STOP IS TIMED AND THE FADE IS NOT, which is the opposite of the
+   * handover this used to do. There is no new voice to align with here, so
+   * nothing can be scheduled against one, and stopping at the instant the fade
+   * starts is the click the fade exists to avoid.
+   */
+  function retire(l) {
+    if (!l || !ctx) return;
+    l.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+    setTimeout(() => {
+      try { l.src.stop(); } catch { /* already done */ }
+      try { l.gain.disconnect(); } catch { /* already done */ }
+    }, 500);
+  }
+
+  function startLoopVoice(way, from = loopBuf) {
+    if (!ctx || !from || !loopOut) return 0;
+    const back = way === 'back';
+    const buf = back ? reversedCopy(from) : from;
+    const whole = buf.duration;
+    const lap = way === 'chop'
+      ? Math.min(whole, Math.max(CHOP_MIN_S, whole / CHOP_DIV))
+      : whole;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.loopStart = 0;
+    src.loopEnd = lap;
+    // 🔴 VARISPEED, AND EVERY SPEED IS A POWER OF TWO BECAUSE THE GRAIN CLOCK
+    // DEPENDS ON IT. `relock` right below says why: a loop k bars long at 1x is
+    // k x 2^m bars long at any power of two, so it is still a whole number of
+    // bars and the lock survives the change with nothing to recompute. A 0.8x
+    // would sound like varispeed and would silently unpick the tempo lock,
+    // which is the one thing on this page that is exactly true.
+    // The step walks rather than jumps: a loop is at most one notch off the
+    // last one, so the speed drifts across a sitting instead of flipping
+    // between extremes.
+    const STEPS = [0.25, 0.5, 1, 2];
+    if (way === 'half') varistep = 1;
+    else varistep = Math.max(0, Math.min(STEPS.length - 1,
+      varistep + (jolt > 0.5 ? 0 : [-1, 0, 0, 1][Math.floor(driftPhase * 4) & 3])));
+    src.playbackRate.value = STEPS[varistep];
+    // ⚠️ ITS OWN GAIN, NOT loopOut's. loopOut carries the whole stack, so
+    // fading one layer through it would take the other two down with it.
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    src.connect(g);
+    g.connect(loopOut);
+    const when = ctx.currentTime;
+    src.start(when, 0);
+    layers.push({ src, gain: g, at: when, from: 0, to: lap,
+                  rate: src.playbackRate.value, back, way, bornAt: performance.now() });
+    // ⚠️ THE OLDEST GOES WHEN THE STACK IS FULL, AND IT GOES BY BEING FADED
+    // RATHER THAN BY BEING DROPPED. An AudioBufferSourceNode with no reference
+    // to it goes on playing until it is stopped: forgetting a layer is a voice
+    // nobody can ever silence.
+    while (layers.length > MAX_LAYERS) retire(layers.shift());
+    balance();
+    // What the picture, the lock and the checks read is the NEWEST layer: one
+    // head to draw, one lap to tune to, and the one a listener is hearing
+    // arrive. The older ones are audible and are not claimed to be measured.
+    loopBuf = from;
+    voiceAt = when; voiceFrom = 0; voiceTo = lap;
+    voiceRate = src.playbackRate.value; voiceBack = back;
+    return lap;
+  }
+
+  /** Tune the grain clock to the lap that is actually playing, or say why not. */
+  function relock() {
+    if (!eng || !loaded) return;
+    // 🔴 THE LAP AT SPEED 1, WHICH IS THE BUFFER SPAN, NOT THE WALL TIME IT
+    // TAKES TO PLAY. Every speed this page uses is a power of two, so a loop
+    // that is k bars long at 1x is k x 2^m bars long at any of them: still a
+    // whole number, still locked, and nothing to recompute when the way changes.
+    // Dividing by the rate here would hand the arithmetic a different number
+    // for half than for round over the same seconds of material.
+    const seconds = voiceTo - voiceFrom;
+    // 🔴 subdivide, BECAUSE THE LAPS HERE ARE SHORT ON PURPOSE. A sound whose
+    // figure is longer than half the lap cannot fit into it twice, and without
+    // this the lock simply refused: MEASURED before it existed, most of the
+    // twelve sounds refused every loop and the log filled with the same
+    // sentence. It fits a whole number of LAPS into the figure instead, which
+    // divides exactly the same way and takes several laps to come round.
+    const r = lockRate(seconds, { rate: loaded.rate, elen: loaded.elen, name: loaded.name,
+      subdivide: true });
+    lockedRate = r.rate;
+    d.log(r.rate == null ? r.why : `${r.why} (${seconds.toFixed(2)} s, ${r.rate.toFixed(2)} grains a second)`,
+      r.rate == null ? undefined : 'hi');
+  }
+
+  /**
+   * What state the loop is in, derived rather than assigned.
+   *
+   * 🔴 RECORDING AND PLAYING ARE NO LONGER THE SAME STATE MACHINE. With one
+   * loop at a time they were: the page was either keeping seconds or playing
+   * them. A stack keeps the next layer WHILE three are playing, so `on` means
+   * something is looping and the ring's own flag means something is being kept.
+   */
+  function syncLoopState() {
+    loopState = layers.length ? 'on' : (loopRing?.on ? 'filling' : 'off');
+  }
+
+  function armLoop(seconds = BUF_SECONDS) {
+    if (!loopRing || loopRing.on) return;
+    loopWant = Math.min(BUF_SECONDS, seconds);
+    loopRing.w = 0; loopRing.filled = 0; loopRing.on = true;
+    syncLoopState();
+    d.log(`keeping the next ${loopWant.toFixed(1)} s to loop over`);
+  }
+
+  function setLoop() {
+    const n = loopRing.filled;
+    if (n < ctx.sampleRate * 0.25) {
+      d.log('nothing was playing, so there is nothing to loop', 'warn');
+      loopRing.on = false; syncLoopState();
+      return false;
+    }
+    const buf = ctx.createBuffer(2, n, ctx.sampleRate);
+    // ⚠️ UNWRAPPED BACK INTO ORDER. Once the ring has wrapped its oldest sample
+    // is at w, so copying from index 0 plays the seconds in two pieces with
+    // the join in the middle, which sounds like an edit nobody made.
+    const start = loopRing.filled === loopRing.len ? loopRing.w : 0;
+    for (let c = 0; c < 2; c++) {
+      const dst = buf.getChannelData(c), src = loopRing.ch[c];
+      for (let i = 0; i < n; i++) dst[i] = src[(start + i) % loopRing.len];
+    }
+    loopRing.on = false;
+    const way = LOOP_WAYS[loopCount % LOOP_WAYS.length];
+    loopCount++;
+    startLoopVoice(way, buf);
+    lastArm = performance.now();
+    // 12 ms either way rather than a step: a gain cut mid-sample is a click, and
+    // a click every time a loop closes is the page making the noise.
+    loopOut.gain.setTargetAtTime(1, ctx.currentTime, 0.012);
+    // ⚠️ THE STATION'S LEVEL, NOT THE BLEND. Writing to dry would move a number
+    // the blend owns, and the next setWet would put the station back on top of
+    // the loops.
+    // 🔴 AND IT DUCKS RATHER THAN CLOSING. With one loop at a time the station
+    // had to go, or a live edge and a recording of it a few seconds apart
+    // fought each other. Under a stack it is the thing the layers are stacked
+    // ON: a fifth of it left underneath is what keeps the loops sounding like
+    // now rather than like a tape.
+    liveDuck.gain.setTargetAtTime(DUCK, ctx.currentTime, 0.012);
+    syncLoopState();
+    d.log(`${(n / ctx.sampleRate).toFixed(1)} s of the station, playing ${way} `
+      + `· ${layers.length} loop${layers.length === 1 ? '' : 's'} going`, 'hi');
+    relock();
+    return true;
+  }
+
+  /** Let the oldest layer go, and give the station back if it was the last. */
+  function dropOldest() {
+    if (!layers.length) return;
+    retire(layers.shift());
+    balance();
+    if (!layers.length) {
+      lockedRate = null;
+      if (loopOut) loopOut.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
+      if (liveDuck) liveDuck.gain.setTargetAtTime(1, ctx.currentTime, 0.2);
+      loopBuf = null;
+      d.log('back to the station');
+    } else {
+      // The newest is still the one the picture draws and the clock follows,
+      // and it has not changed, so there is nothing to retune.
+      d.log(`a loop was let go · ${layers.length} still going`);
+    }
+    syncLoopState();
+  }
+
+  function endLoop() {
+    if (loopState === 'off' && !layers.length) return;
+    if (loopRing) loopRing.on = false;
+    lockedRate = null;
+    if (loopOut) loopOut.gain.setTargetAtTime(0, ctx.currentTime, 0.012);
+    if (liveDuck) liveDuck.gain.setTargetAtTime(1, ctx.currentTime, 0.012);
+    while (layers.length) retire(layers.pop());
+    loopBuf = null;
+    syncLoopState();
+    d.log('back to the station');
+  }
+
+  /**
+   * When a layer is kept, when one is let go, and nothing else.
+   *
+   * A layer arrives every few seconds, lives about half a minute and leaves
+   * oldest first, so the page is nearly always playing two or three lengths of
+   * the station against each other over what is on air now.
+   */
+  function loopTick() {
+    // ⚠️ THE SCHEDULER STANDS DOWN WHILE THE PAGE IS CHECKING ITSELF. The loop
+    // check drives armLoop and setLoop by hand at a tour position this
+    // would not have chosen, and without this it would take the loop away
+    // between the two asserts that grade it, which reads as the lock failing.
+    if (checking || !eng || !ringFilled || !loopRing) return;
+    // 🔴 THE LOOP NO LONGER BELONGS TO THE TOUR'S CLOCK, AND THAT IS THE WHOLE
+    // CHANGE. It used to be one loop every other sound, arriving and leaving on
+    // the same 31 s slots as everything else, which meant about half the time
+    // with nothing looping and never two loops together. A layer is kept on its
+    // OWN cadence now: as soon as the last one has been playing for a few
+    // seconds, the next few seconds of the station are taken. Two clocks that
+    // do not divide each other is also what stops the page repeating itself.
+    const now = performance.now();
+    if (loopRing.on) {
+      if (loopRing.filled >= Math.round(loopWant * ctx.sampleRate)) setLoop();
+      return;
+    }
+    // ⚠️ THE OLDEST GOES BEFORE THE NEWEST ARRIVES, so a stack at its limit is
+    // never four deep for the length of one tick.
+    if (layers.length && now - layers[0].bornAt > LAYER_LIFE_MS) { dropOldest(); return; }
+    if (now - lastArm > ARM_GAP_MS) armLoop(LOOP_LENS[loopCount % LOOP_LENS.length]);
+  }
+
+  // ═══ the frame ═════════════════════════════════════════════════════════════
+  //
+  // 🔴 ONE CLOCK, AND IT IS THE FRAME CALLBACK, BECAUSE THE WORK IS ALREADY
+  // BEING DONE THERE. The six features, the modulator's sense, the data
+  // texture and the draw all happen once per frame off ONE analyser read. A
+  // second timer would be a second clock for numbers that are already in hand.
+  //
+  // ⚠️ AND THE 25 Hz ARGUMENT DOES NOT TRANSFER TO A SHADER. pappus-mod.mjs
+  // fixes 25 because Engine_Pappus.sc puts a 20 ms Lag.kr on every control,
+  // so a faster write is thrown away. There is no one-pole between a uniform and
+  // a pixel: the consumer is an eye and a compositor.
+  let pulsePhase = 0, driftPhase = 0, jolt = 0;
+  let varistep = 2;   // index into the varispeed ladder; 2 is 1x
+  let grainRate = 0;
+  const idle = new Uint8Array(DATA_W * DATA_H * 4);
+  const buckets = Array.from({ length: DATA_W }, () => ({ n: 0, dsum: 0, v: new Array(8).fill(0), drop: 0 }));
+  let everDropped = 0, lastFrame = 0, fpsFrom = 0, fpsCount = 0;
+  const sizeLane = LANES.size;
+  const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
+
+  /**
+   * ⚠️ A STAGE THAT CAN DISCARD DATA NEEDS A COUNTER A PAGE ACTUALLY DISPLAYS.
+   * A bucket holds a count in one 8-bit channel, so past 255 grains in one
+   * frame something is lost. At 60 fps and the fastest sound here that cannot
+   * happen, and the counter exists so the saturation can be SEEN rather than
+   * deduced. The check below floods one bucket on purpose to prove it fires.
+   */
+  function bucket(pos, dur, voice) {
+    const x = Math.min(DATA_W - 1, Math.max(0, Math.floor(winPos(pos, RING_SECONDS, BUF_SECONDS) * DATA_W)));
+    const b = buckets[x];
+    if (b.n >= 255) { b.drop++; everDropped++; return; }
+    b.n++;
+    b.dsum += sizeLane.unmap(Math.max(0, Number(dur) || 0));
+    b.v[(voice | 0) & 7]++;
+  }
+
+  /**
+   * Where the read head may be, as a density over the eight seconds.
+   *
+   * 🔴 IT IS ZERO WHERE IT CANNOT BE KNOWN, AND ONE OF THE THREE MODES IS
+   * KNOWABLE. In POSITION the read point is winstart + scan*winspan, exactly,
+   * and the page holds both numbers. In STRETCH it is a phasor inside the engine
+   * that nothing on this side has. In DELAY it is wpos - mdelay/mbuflen
+   * wrapped into the lap, and wpos is the ENGINE'S WRITE PHASE: the read point
+   * is a fixed distance behind a head that is itself sweeping the lap, so on an
+   * axis that IS the lap the read point sweeps too, and where it is right now is
+   * a number this page does not hold.
+   *
+   * ⚠️ THE FIRST VERSION DREW IT ANYWAY, AT 1 - scan, AND THE PICTURE SAID SO.
+   * PHOTOGRAPHED with four seconds ago running: one bright stationary column
+   * of window density with the engine's own grain marks sweeping straight past
+   * it, left to right, across the whole width. The marks were right and the
+   * column was a guess, and the two disagreed in front of anybody looking.
+   * A lane with nothing to say says so; it does not borrow an answer from the
+   * thing it is supposed to be a second opinion about.
+   */
+  function windowRow(v, scanmode) {
+    const lo = scanmode >= 3 ? 0 : Math.max(0, Math.min(1, v.winstart));
+    const hi = scanmode >= 3 ? 1 : Math.max(lo + 0.01, Math.min(1, v.winend));
+    const span = hi - lo;
+    let centre = null;
+    if (scanmode === 2) centre = lo + Math.max(0, Math.min(1, v.scan)) * span;
+    // off = ... x mspray x 0.25 is a fraction of the WINDOW, not of the ring.
+    const half = Math.max(1 / DATA_W, v.spray * 0.25 * span);
+    for (let x = 0; x < DATA_W; x++) {
+      const f = (x + 0.5) / DATA_W;
+      const inWin = f >= lo && f <= hi ? 1 : 0;
+      let dens = 0;
+      if (centre != null && inWin) {
+        const u = Math.abs(f - centre) / half;
+        dens = u >= 1 ? 0 : (1 - u * u);            // a bump, not a box
+      }
+      const i = at(x, 2);
+      data[i] = u8(dens);
+      data[i + 1] = inWin ? 255 : 0;
+      data[i + 2] = 0;
+      data[i + 3] = 255;
+    }
+    data[at(18, 3)] = centre == null ? 0 : 255;
+  }
+
+  let env = {};                     // the follower values, for the picture and the checks
+  let lit = false;
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!pic) return;
+    // 🔴 THE STANDBY PICTURE, WHICH IS WHY THE BOX CAN BE SHOWN FROM THE FIRST
+    // FRAME. Before play there is no audio graph and no grains, so the data is
+    // all zeroes except the slow drift: what draws is the scanlines, the roll
+    // and the vignette over an empty field. It is a true picture of an
+    // instrument that has not started rather than a hidden box or a fake one.
+    if (!ctx || !analyser || !feats) {
+      const dtIdle = lastFrame ? Math.min(0.25, (now - lastFrame) / 1000) : 1 / 60;
+      lastFrame = now;
+      driftPhase = (driftPhase + dtIdle * 0.06) % 1;
+      idle.fill(0);
+      idle[at(21, 3)] = u8(driftPhase);
+      idle[at(63, 3)] = LAYOUT_VERSION;
+      pic.step(idle);
+      return;
+    }
+    const dt = lastFrame ? Math.min(0.25, (now - lastFrame) / 1000) : 1 / 60;
+    lastFrame = now;
+    if (!fpsFrom) fpsFrom = now;
+    if (++fpsCount >= 30) { fps = (fpsCount * 1000) / (now - fpsFrom); fpsFrom = now; fpsCount = 0; }
+
+    const f = feats.read();
+    modulator?.sense(f);
+    env = modulator ? (modulator.stats().env || {}) : {};
+
+    // ── row 0: the grains that arrived since the last frame ──
+    let got = 0, lost = 0;
+    for (let x = 0; x < DATA_W; x++) {
+      const b = buckets[x], i = at(x, 0);
+      data[i] = Math.min(255, b.n);
+      data[i + 1] = b.n ? u8(b.dsum / b.n) : 0;
+      let best = 0;
+      for (let v = 1; v < 8; v++) if (b.v[v] > b.v[best]) best = v;
+      data[i + 2] = b.n ? best * 32 : 0;
+      data[i + 3] = Math.min(255, b.drop);
+      got += b.n; lost += b.drop;
+      b.n = 0; b.dsum = 0; b.drop = 0; b.v.fill(0);
+    }
+
+    // ── row 1: every parameter, in its own lane ──
+    const base = loaded ? basesOf(loaded) : null;
+    for (let x = 0; x < MOD_DESTS.length; x++) {
+      const name = MOD_DESTS[x];
+      const lane = LANES[name];
+      const i = at(x, 1);
+      if (!base || !lane) { data[i] = data[i + 1] = data[i + 2] = 0; data[i + 3] = 255; continue; }
+      const b = base[name];
+      const cur = modNow[name] ?? b;
+      if (lane.n) {
+        // probs is eight numbers; x 15..22 carry them one at a time and this
+        // slot holds their mean, so the row reads the same way either side.
+        data[i] = u8(lane.unmap(mean(Array.isArray(cur) ? cur : b)));
+        data[i + 1] = u8(lane.unmap(mean(b)));
+        for (let j = 0; j < 8; j++) {
+          const k = at(15 + j, 1);
+          data[k] = u8(lane.unmap((Array.isArray(cur) ? cur : b)[j]));
+          data[k + 1] = u8(lane.unmap(b[j]));
+          data[k + 2] = routedNow.has(name) ? 255 : 0;
+          data[k + 3] = 255;
+        }
+      } else {
+        data[i] = u8(lane.unmap(Number(cur)));
+        data[i + 1] = u8(lane.unmap(Number(b)));
+      }
+      data[i + 2] = routedNow.has(name) ? 255 : 0;
+      data[i + 3] = 255;
+    }
+
+    // ── row 2: where it is reading from ──
+    if (lastMorph) windowRow(lastMorph.values, lastMorph.at.scanmode);
+
+    // ── row 3: the scalars ──
+    FOLLOWER_NAMES.forEach((n, i) => { data[at(i, 3)] = u8(env[n] ?? 0); });
+    data[at(6, 3)] = u8(wet);
+    data[at(7, 3)] = Math.min(255, got);
+    data[at(8, 3)] = Math.min(255, lost);
+    data[at(9, 3)] = u8(morphK);
+    data[at(10, 3)] = u8(fromIdx / Math.max(1, PATCHES.length - 1));
+    data[at(11, 3)] = u8(toIdx / Math.max(1, PATCHES.length - 1));
+    // 🔴 HOW MANY LOOPS, NOT WHETHER THERE IS ONE. The shader warms the field
+    // by this, so a stack that grows from one layer to three is something a
+    // viewer sees rather than a fact only the log holds.
+    data[at(12, 3)] = layers.length ? Math.min(255, 105 + 50 * layers.length)
+      : (loopRing?.on ? 60 : 0);
+    data[at(13, 3)] = u8(loopHeadFrac() ?? 0);
+    data[at(14, 3)] = u8(Math.max(0, indexOfId(station)) / Math.max(1, STATIONS.length - 1));
+    const since = (performance.now() - switchedAt) / 1000;
+    data[at(15, 3)] = u8(Math.max(0, 1 - since / 4));
+    // 🔴 A TIME CONSTANT, NOT A PER-FRAME FRACTION, so the trail is the same
+    // length at 30, 60 and 120 Hz. It is stretched for a few seconds after a
+    // station change, because building a new decoder is about a second with no
+    // audio in it and a trail on its ordinary setting would empty: the picture
+    // would report a broken page at the exact moment it is doing what it was
+    // asked to do.
+    const tau = since < 4 ? TRAIL_SWITCH_S : TRAIL_S;
+    data[at(16, 3)] = u8(Math.exp(-dt / tau));
+    data[at(17, 3)] = loaded ? voicesOf(loaded) * 32 : 0;
+    // 🔴 THE THREE THINGS THAT MAKE THE PICTURE MOVE, AND ALL THREE ARE DATA.
+    // Nothing in any shader body reads a clock: every one of them is a pure
+    // function of this texture and the previous frame, which is what lets
+    // "the same data twice draws the same bytes" stay an exact check. A time
+    // uniform would have made that check impossible to write.
+    //
+    // `pulse` breathes with the grain clock. It is advanced by the grains the
+    // engine ACTUALLY REPORTED this frame rather than by the rate that was
+    // asked for, so it slows when the instrument slows and stops when the
+    // instrument stops. That is the difference between the picture keeping
+    // time with the sound and the picture keeping time with itself.
+    pulsePhase = (pulsePhase + got * 0.045) % 1;
+    data[at(19, 3)] = u8(0.5 - 0.5 * Math.cos(pulsePhase * Math.PI * 2));
+    // `jolt` is the glitch, and its ordinary value is ZERO. It is set to 1 when
+    // the sound or the station changes and decays over about a second, so the
+    // picture tears at the moments something really did change and is perfectly
+    // steady the rest of the time. A glitch that runs continuously is a
+    // texture; one that fires on an event is information.
+    jolt = Math.max(0, jolt - dt * 1.1);
+    data[at(20, 3)] = u8(jolt);
+    // `drift` is the slow floaty one: a sawtooth on wall time, which is the
+    // only place a real clock is allowed, and it is turned into data here
+    // rather than read inside a body.
+    driftPhase = (driftPhase + dt * 0.06) % 1;
+    data[at(21, 3)] = u8(driftPhase);
+    data[at(63, 3)] = LAYOUT_VERSION;
+
+    pic.step(data);
+    if (!glErr) glErr = gl.getError();
+
+    // The picture is worth showing the moment the engine has reported a grain:
+    // before that it is an empty box making a claim about an instrument that has
+    // not started.
+    if (!lit && grains > 0) { lit = true; pane.classList.add('sounding'); }
+  }
+
+  // ── the readout, at human pace ─────────────────────────────────────────────
+  let grainsSeen = 0, grainsAt = performance.now();
+  setInterval(() => {
+    // ⚠️ NOTHING IS WRITTEN BEFORE PLAY. A readout full of numbers over a page
+    // that has not started is a row of confident measurements of nothing, and
+    // mount() already draws a pending cell as empty rather than as a zero.
+    if (!started) return;
+    if (eng) {
+      const now = performance.now(), secs = (now - grainsAt) / 1000;
+      if (secs > 0.9) {
+        // the rate is still COUNTED, and still reaches the checks and the log;
+        // what went is the cell that displayed it
+        grainRate = Math.max(0, grains - grainsSeen) / secs;
+        grainsSeen = grains; grainsAt = now;
+      }
+    }
+  }, 250);
+
+  // ── the two buttons ────────────────────────────────────────────────────────
+  d.on('full', async () => {
+    // ⚠️ THE KIT'S TOGGLE, NEVER requestFullscreen BY HAND. An iPhone has no
+    // element fullscreen at all and p.requestFullscreen?.() optional-chains
+    // straight past the missing method: no throw, no catch, no log line and no
+    // picture, which is a control that looks live and is inert. fullscreen.mjs
+    // tries the real API, falls back to a cover that needs no API, and SAYS
+    // which one ran.
+    const by = await FS.toggle(pane);
+    d.log(by === 'exit' ? 'back out of full screen'
+      : `full screen by the ${by === 'element' ? 'browser’s own API' : 'fallback cover, which needs no API'}`);
+  });
+  FS.watch(pane, () => {});
+
+  /**
+   * 🔴 IT DOES NOT RETURN THE PROMISE, AND A DEAD BUTTON IS GREYED RATHER THAN
+   * LEFT LOOKING LIVE. The shell sweeps a control that returns a promise and
+   * re-enables it afterwards, which here would be half a minute of a button
+   * that looks busy followed by a button that looks pressable and does nothing.
+   * This page plays itself: play is a gesture, it happens once, and what says
+   * so is the control going grey with its reason on it. A control that looks
+   * live and is inert is this repo's named hazard.
+   */
+  /**
+   * 🔴 IT STOPS AS WELL AS STARTS. The button disabled itself on the first
+   * press, on the argument that this page plays itself and there is nothing
+   * else to press. That is true of the INSTRUMENT and false of the listener:
+   * somebody who wants the sound to stop had no way to ask, and the only
+   * remaining option was closing the tab.
+   * ⚠️ IT MUTES THE MASTER RATHER THAN TEARING THE GRAPH DOWN. Stopping the
+   * engine would cost the loops it is holding, the station's decoder and about
+   * five seconds to come back; the picture would freeze with it, and the tour
+   * would lose its place. A gain at zero is instant, reversible, and leaves the
+   * instrument playing itself exactly as the page claims it does.
+   * The glide is 12 ms because a gain stepped mid-sample is a click.
+   */
+  let quiet = false;
+  d.on('play', () => {
+    const b = d.button('play');
+    if (!started) {
+      start().catch((e) => d.fail(e));
+      if (b) { b.textContent = '❚❚'; b.setAttribute('aria-label', 'stop'); }
+      return null;
+    }
+    quiet = !quiet;
+    if (speakers && ctx) speakers.gain.setTargetAtTime(quiet ? 0 : 1, ctx.currentTime, 0.012);
+    if (b) {
+      b.textContent = quiet ? '▶' : '❚❚';
+      b.setAttribute('aria-label', quiet ? 'play' : 'stop');
+    }
+    d.log(quiet ? 'stopped' : 'playing');
+    return null;
+  });
+
+  /**
+   * 🔴 AUTOSTART, WHICH IS REFUSED BY DEFAULT AND ALLOWED IN TWO REAL CASES.
+   *
+   * A browser will not start audio without a gesture, and CLAUDE.md records the
+   * trap that goes with it: neither `AudioContext.resume()` nor `play()`
+   * REJECTS when the gesture is missing, so a page that awaits one is a hang
+   * rather than an error. Nothing here awaits either.
+   *
+   * It is tried anyway, because the refusal is not universal.
+   *   · Chrome's Media Engagement Index lets a site autoplay with sound once
+   *     somebody has played sound on it enough times, and an installed web app
+   *     is granted it outright. A screen in a room running this all day is
+   *     exactly that case.
+   *   · A kiosk launched with `--autoplay-policy=no-user-gesture-required`
+   *     allows it flatly. That is the same flag this repo's own harnesses use.
+   * iOS allows neither, ever.
+   *
+   * ⚠️ IT IS OPT IN, `?auto=1`, AND NOT THE DEFAULT. A page that starts making
+   * noise at somebody who followed a link is a page they close. The one place
+   * this is wanted is a screen nobody is sitting at, and that screen can carry
+   * a query parameter.
+   * ⚠️ AND IT MUST FAIL INVISIBLY. If the browser refuses, `ctx.state` stays
+   * suspended, the button stays exactly where it was, and pressing it works the
+   * way it always did. No message, because a visitor who did not ask for this
+   * has nothing to be told.
+   */
+  if (new URLSearchParams(location.search).get('auto') === '1') {
+    d.run('play');
+  }
+
+  // ═══ starting ══════════════════════════════════════════════════════════════
+  async function start() {
+    started = true;
+    graph();
+    // NEVER LET SOUND GATE THE WORK: neither of these REJECTS when the gesture
+    // is missing, so awaiting one is a hang rather than an error. Fire and move
+    // on; sound is allowed to be late, the picture is not.
+    ctx.resume?.();
+    requestAnimationFrame(frame);
+
+    const health = await askHealth(BASE, STATIONS.map(([, id]) => id));
+    for (const [id, up] of health) avail.set(id, up);
+    // 🔴 THE OPENING CHOICE WANTS === true, AND EVERY OTHER TEST HERE WANTS
+    // !== false. They are different questions. "Which mount should I start on"
+    // has an answer in hand and should use it; "may I still offer this one"
+    // must not be blocked by a station nobody asked about, which is caps.mjs's
+    // rule that an unknown never blocks. Treating the two the same is what left
+    // the page sitting on a mount the relay had just called down.
+    const up = STATIONS.filter(([, id]) => avail.get(id) === true);
+    // 🔴 A MOUNT THE RELAY HAS JUST SAID IS DOWN IS NOT FETCHED. It answers 502,
+    // **and the browser logs that to the console with no way to suppress it**,
+    // so a page that opens one anyway prints a red line about somebody else's
+    // server and holds a connection that will never deliver. MEASURED with all
+    // six refusing: stream answered HTTP 502 in the log, a dead decoder left
+    // connected, and the page waiting nine seconds to discover what it had
+    // already been told.
+    if (!health.size) {
+      // ⚠️ NO ANSWER AT ALL IS NOT THE SAME AS AN ANSWER OF NO. A relay without
+      // the health route, or one that timed out, leaves every mount unknown, and
+      // an unknown must be tried rather than refused.
+      d.log('the relay did not answer about its mounts, so they are tried in order');
+      openStream();
+      switchedAt = performance.now();
+    } else if (!up.length) {
+      d.log('the relay says every mount is down, so there is nothing to play yet. '
+        + 'The picture starts anyway and a station is picked up as soon as one answers', 'bad');
+    } else {
+      station = up[0][1];
+      d.log(`${up.length} of ${STATIONS.length} mounts answering, starting on ${nameOf(station)}`);
+      openStream();
+      switchedAt = performance.now();
+    }
+
+    // ⚠️ THE STATION CLOCK AND THE HEALTH POLL ARE SEPARATE, and the second one
+    // does NOT move you off a station that is working. A mount coming back gets
+    // its name into the rotation; one that stops drops out of it.
+    setInterval(() => nextStation('it is time for another one'), STATION_MS);
+    /**
+     * 🔴 THE POLL IS SLOW WHILE SOMETHING IS PLAYING AND QUICK WHILE NOTHING IS,
+     * AND BOTH HALVES ARE ABOUT COST. Each poll opens one upstream connection
+     * PER STATION it asks about, so a page that is working must not keep asking:
+     * that is how three ERR mounts came to answer this relay 502 in 9 ms while
+     * serving a laptop normally. A page with nothing to play costs the
+     * broadcasters the same either way and is useless until one answers, so it
+     * asks three times as often until it has something.
+     *
+     * ⚠️ A CHAIN OF TIMEOUTS RATHER THAN AN INTERVAL, because the rate depends
+     * on a state that changes: an interval would have to be cleared and remade,
+     * which is two places for the rate to live.
+     */
+    const poll = async () => {
+      if (!document.hidden) {
+        const h = await askHealth(BASE, STATIONS.map(([, id]) => id));
+        for (const [id, upNow] of h) {
+          const was = avail.get(id);
+          avail.set(id, upNow);
+          if (was === upNow) continue;
+          d.log(upNow ? `${nameOf(id)} is back in the rotation` : `${nameOf(id)} stopped answering`,
+            upNow ? 'hi' : 'bad');
+        }
+        // Nothing playing and something answering: take it, without waiting for
+        // the station clock.
+        if (!stream) {
+          const back = STATIONS.find(([, id]) => avail.get(id) === true);
+          if (back) { station = back[1]; switchedAt = performance.now(); openStream(); d.log(`${back[0]} · it came back`, 'hi'); }
+        }
+      }
+      setTimeout(poll, stream ? HEALTH_MS : HEALTH_MS / 3);
+    };
+    setTimeout(poll, stream ? HEALTH_MS : HEALTH_MS / 3);
+
+    // 🔴 ready() IS IN A finally, AND THAT IS THE DIFFERENCE BETWEEN A PAGE
+    // THAT REPORTS FOUR RED CHECKS AND ONE THAT REPORTS NOTHING AT ALL. A throw
+    // anywhere below would otherwise leave __demo.ready false, and the harness
+    // would wait its whole budget and then say "asserted nothing", which reads
+    // as a broken page rather than as a broken relay.
+    try {
+      await startEngine();
+      if (CHECK) await check();
+    } catch (e) {
+      d.fail(e);
+    } finally {
+      d.ready();
+    }
+  }
+
+  async function startEngine() {
+    // 🔴 REAL SUPERCOLLIDER, EATING A REAL RADIO STATION. Pappus does not
+    // generate, it granulates whatever is ON A BUS: bootScsynth's input
+    // connects the page's audio to scsynth's hardware input busses 2 and 3,
+    // which is exactly the inbusl 2 inbusr 3 the Raspberry Pi uses.
+    try {
+      eng = await bootScsynth({
+        audioContext: ctx,
+        input: srcNode,
+        log: (m) => d.log(m),
+        onReply: (m) => {
+          // 🔴 m IS [address, nodeID, replyID, pos, dur, voice, half].
+          // SendReply prepends two of its own arguments, so pos is at index
+          // 3, and reading it at 2 takes the replyID, which is -1 on every grain
+          // there has ever been. This page has that bug's whole history in
+          // /radio1965/'s comments; it is not going to be repeated here.
+          if (m[0] !== '/pgrain') return false;
+          grains++;
+          bucket(m[3], m[4], m[5]);
+          return true;
+        },
+      });
+    } catch (e) {
+      d.log(`the granulator did not start: ${e.message}. The radio plays on`, 'bad');
+      window.__granErr = String((e && e.stack) || e);
+      return;
+    }
+    // 🔴 SILENCE THE ENGINE BEFORE IT CAN BE HEARD. bootScsynth wires its
+    // output to the destination at gain 0.9, because Web Audio PULLS and a graph
+    // with no path to the speakers is never asked to process. This page starts
+    // mostly dry, so without this line there are a few hundred milliseconds of
+    // granulator at nearly full volume on load.
+    eng.out.gain.value = wet;
+    // ⚠️ CONNECTED BEFORE IT IS DISCONNECTED, in that order. The other order
+    // leaves the engine with no path to any destination for the length of one
+    // statement, and what goes wrong then is not a click, it is an allocation
+    // that never answers.
+    eng.out.connect(speakers);
+    eng.out.disconnect(ctx.destination);
+    window.__eng = eng;
+
+    const ringFrom = ctx.currentTime;
+    G.bufs = await allocBuffers(eng, { log: (m) => d.log(m) });
+    G.def = await eng.recvDef('/grains/defs/pappus-tiny.scsyndef');
+    d.log(`Pappus TINY: ${G.def.bytes} B, ${G.def.ok ? `taken in ${G.def.ms} ms` : G.def.why}`);
+    G.running = await startPappusSynth(eng);
+    applyAudibleDefaults(eng, { live: true, bufSeconds: BUF_SECONDS });
+
+    /**
+     * ⚠️ THE TAP IS ON THE MODULATOR'S send, WHICH IS THE ONLY PLACE THE
+     * VALUE EXISTS. createModulator keeps what it last sent to itself, so a
+     * page drawing a modulated control has to see it go past rather than ask
+     * for it back. One assignment beside the call that was happening anyway: no
+     * polling, no missed change, and what the picture draws is exactly what went
+     * out.
+     *
+     * 🔴 AND IT IS ON THE NEAR SIDE OF THE WIRE, WHICH THE PICTURE HAS TO BE
+     * ABLE TO SHOW. This row proves the page asked; the grain row proves the
+     * engine answered. Stop the engine with the modulator still ticking and the
+     * parameters must go on moving while the marks stop arriving, or one of the
+     * two rows is being fed from the wrong place.
+     */
+    modulator = createModulator({
+      now: () => ctx.currentTime,
+      send: (name, v) => {
+        modNow[name] = Array.isArray(v) ? v.slice() : v;
+        setParam(eng, MOD_CMD[name] ?? `m${name}`, v);
+      },
+      specs: MOD_SPECS,
+      followers: MOD_FOLLOWERS,
+      warn: (m) => d.log(`modulation refused: ${m}`, 'bad'),
+    });
+
+    tourFrom = performance.now();
+    land(PATCHES[0]);
+    setWet(wetFor(0));
+    setInterval(() => { tourTick(); loopTick(); }, 1000 / MOD_HZ);
+
+    // 🔴 WAIT FOR THE RING TO HOLD SOMETHING, ON PLAYED SECONDS RATHER THAN ON A
+    // LEVEL. A granulator cannot be louder than what it has recorded, and
+    // polling a meter until it passes a threshold picked out of the air is a
+    // measurement of nothing: a run once left that loop at 0.0021 over a ring
+    // that was still nearly empty. The ring holds BUF_SECONDS, so it has been
+    // filled once when that many seconds of audio have gone into it.
+    for (let i = 0; i < 200 && (ctx.currentTime - ringFrom) < BUF_SECONDS; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    ringFilled = true;
+    G.grains = grains;
+    d.log(`the granulator's ${BUF_SECONDS} s ring has been filled once`);
+  }
+
+  // ═══ what the checks have to say ═══════════════════════════════════════════
+
+  /**
+   * One control, asked of the SERVER.
+   *
+   * 🔴 EVERY /n_set THIS PAGE SENDS IS FIRE AND FORGET, so what the page
+   * believes about the engine is not evidence about the engine. /s_get is the
+   * only thing on the far side of the wire, and every claim below about the
+   * morph and the lock goes through it.
+   */
+  async function sGet(name) {
+    const r = await eng.sendAndWait((m) => m[0] === '/n_set' && m[2] === name, 3000,
+      '/s_get', PAPPUS_NODE, name);
+    return r ? Number(r[3]) : null;
+  }
+
+  /** Per-channel colour spread over a whole frame. See the note where it is used. */
+  function spreadOf(px) {
+    const lo = [255, 255, 255], hi = [0, 0, 0];
+    for (let i = 0; i < px.length; i += 4) {
+      for (let k = 0; k < 3; k++) {
+        const v = px[i + k];
+        if (v < lo[k]) lo[k] = v;
+        if (v > hi[k]) hi[k] = v;
+      }
+    }
+    return [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+  }
+  const meanRed = (s) => {
+    let n = 0;
+    for (let i = 0; i < s.px.length; i += 4) n += s.px[i];
+    return n / (s.px.length / 4);
+  };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /**
+   * Put the tour at a named place without introducing a second way of being
+   * somewhere.
+   *
+   * ⚠️ IT MOVES THE CLOCK'S ORIGIN RATHER THAN SETTING A FLAG. The tour is a
+   * FUNCTION of performance.now(), and a "pretend we are here" flag would be
+   * a second answer to the same question that the two halves could disagree
+   * about the moment one of them was forgotten. Moving the origin means the
+   * page carries on running normally from wherever it was put.
+   *
+   * k is where in the MORPH to sit: 0 is the end of the dwell, 1 is the
+   * arriving sound.
+   */
+  const holdTour = (slot, k) => {
+    const within = DWELL_FRAC + k * (1 - DWELL_FRAC);
+    tourFrom = performance.now() - (slot + within) * SLOT_MS;
+  };
+
+  async function check() {
+    checking = true;
+
+    // ── the picture ────────────────────────────────────────────────────────
+    d.assert('a real WebGL2 context, not a fallback', !!gl, renderer ?? 'none');
+    /**
+     * 🔴 THE PICTURE MUST NOT DARKEN ON ITS OWN, AND NOTHING ELSE HERE CAN SEE
+     * THAT. Every other check reads ONE frame: the flat-field check, the grain
+     * positions, the loudness ramp. A feedback loop that loses a little every
+     * lap passes all of them and is black a minute later, which is exactly what
+     * happened and was reported three times before it was measured.
+     * Three reads five seconds apart is the smallest thing that can catch it.
+     */
+    {
+      const meanOf = (r) => { const px = r?.px; if (!px?.length) return -1; let t = 0; for (let i = 0; i < px.length; i += 4) t += px[i]; return t / (px.length / 4); };
+      const fld = () => meanOf(pic?.readField?.());
+      const shw = () => meanOf(pic?.readShown?.());
+      const f0 = fld(), s0 = shw();
+      const a0 = pic?.readFinal?.(); const m0 = a0 ? meanOf(a0) : -1;
+      await new Promise((r) => setTimeout(r, 2500));
+      const a1 = pic?.readFinal?.(); const m1 = a1 ? meanOf(a1) : -1;
+      await new Promise((r) => setTimeout(r, 2500));
+      const a2 = pic?.readFinal?.(); const m2 = a2 ? meanOf(a2) : -1;
+      const f2 = fld(), s2 = shw();
+      d.assert('the picture does not darken on its own',
+        m0 > 0 && m2 > m0 * 0.6,
+        `final ${m0.toFixed(2)} -> ${m1.toFixed(2)} -> ${m2.toFixed(2)}`
+        + ` · field ${f0.toFixed(2)} -> ${f2.toFixed(2)}`
+        + ` · shown ${s0.toFixed(2)} -> ${s2.toFixed(2)} over 5 s`);
+    }
+    d.assert('the picture compiled, drew, and left no GL error behind',
+      !!pic && frames > 0 && glErr === 0,
+      `${frames} frames drawn · gl.getError ${glErr}`);
+    const before = frames;
+    await wait(900);
+    d.assert('it keeps drawing, at a real frame rate', frames > before + 20 && fps > 5,
+      `${frames - before} frames in 900 ms · ${fps.toFixed(1)} fps at ${FIELD_W}x${FIELD_H}`);
+
+    // 🔴 NOT A FLAT FIELD, PER CHANNEL, OVER THE WHOLE FRAME. Four points on a
+    // structured picture measure the structure rather than the picture, and a
+    // SUM over channels is the one statistic that can be constant by
+    // construction. mirror failed this assert twice, once each way: once on a
+    // four-point sample of an eight-fold symmetric image, and once because
+    // three cosines 120 degrees apart sum to a constant. Each channel is
+    // reported separately so a failure is attributable on sight.
+    const live = pic ? pic.readShown() : null;
+    const sp = live ? spreadOf(live.px) : [0, 0, 0];
+    // ⚠️ THE LOUDNESS IS IN THE LINE BECAUSE IT IS WHAT LIGHTS THE FIELD. A
+    // station that answers and then sends nothing leaves the granulator firing
+    // into silence: the marks are still drawn and the field is still moving, at
+    // a quarter brightness, which is honest and reads here as a dim picture.
+    // Without the number in the line, that is indistinguishable from a shader
+    // that stopped working.
+    // 🔴 THE THRESHOLD COMES OUT OF THE BODY'S OWN FLOORS, NOT OUT OF THE AIR.
+    // The dimmest a saturated mark can be drawn is LIT_FLOOR (a silent
+    // station) times the blend's floor share at WET_MIN (the quietest moment
+    // of a sound), on the red channel of --hi. Three quarters of that is the
+    // line, so this check fails when the marks are MISSING and not when the
+    // programme happens to be quiet.
+    const floorSpread = 255 * LIT_FLOOR * (WET_FLOOR + WET_RANGE * WET_MIN) * Number(HI[0]);
+    d.assert('there is a picture in it, not a flat field',
+      Math.max(...sp) > floorSpread * 0.75,
+      `red spans ${sp[0]}, green ${sp[1]}, blue ${sp[2]}, of 255 against `
+      + `${Math.round(floorSpread * 0.75)} the body guarantees · `
+      + `the station reads ${(env.rms ?? 0).toFixed(3)} of 1`);
+
+    // 🔴 AND THE CHECK ABOVE ON ITS OWN IS BLIND TO THE HALF THAT MATTERS, WHICH
+    // IS WHY THIS ONE IS HERE. The window behind the grains is drawn from the
+    // page's own parameters and has structure whether a single grain has ever
+    // arrived or not, so a spread over the frame can be entirely the bed and a
+    // page whose engine fires nothing would pass it.
+    //
+    // ⚠️ THE FIRST ATTEMPT AT THIS WAS A COLOUR TEST AND IT WAS THE WRONG
+    // INSTRUMENT. The bed is drawn on --dim2 and the grains on --hi, so a
+    // pixel where red leads blue can only be a grain: true, and MEASURED at
+    // 45 pixels on a picture with fourteen live marks in it, because the
+    // margin between the two colours after lighting and the blend is about
+    // thirty of 255 and the check was asking for exactly thirty. A threshold
+    // sitting on top of four multiplications is a threshold nobody can
+    // calibrate. The accumulate target holds the deposits and NOTHING else, so
+    // it needs no threshold argument at all.
+    const fieldPx = pic ? pic.readField() : null;
+    let hot = 0, peak = 0;
+    if (fieldPx) {
+      for (let i = 0; i < fieldPx.px.length; i += 4) {
+        const v = fieldPx.px[i];
+        if (v > peak) peak = v;
+        if (v > 8) hot++;
+      }
+    }
+    d.assert('the grains reach the picture, and not only the window behind them',
+      peak > 40 && hot > 200,
+      `${hot} lit pixels in the grain layer, brightest ${peak} of 255 · `
+      + `${grains} grains reported over OSC so far`);
+
+    // 🔴 THE SEPARATING PAIR, AND IT IS THE ONE CHECK A BODY THAT NEVER READS
+    // THE DATA CANNOT PASS. The flat-field check above passes happily on a
+    // shader drawing its own noise. Hold everything and render twice: the two
+    // must be byte identical, which says nothing else is driving it. Then
+    // change ONE texel and render again: it must differ, which says the data is
+    // reaching the pixels. Neither half means anything without the other.
+    //
+    // ⚠️ IT COMPARES TWO PASSES, NOT TWO CONSECUTIVE LIVE FRAMES. This picture
+    // feeds back, so frame n+1 is a function of frame n and two live frames are
+    // never identical on a page that is working. testRender clears its own
+    // previous frame to black first, which is what makes the comparison exact.
+    const held = new Uint8Array(data.length);
+    held[at(63, 3)] = LAYOUT_VERSION;
+    held[at(0, 3)] = 220;                       // loud, so whatever is drawn is visible
+    held[at(6, 3)] = 255;                       // all granulator, so the marks are not faded
+    held[at(16, 3)] = 0;                        // no trail: one pass is the whole picture
+    held[at(30, 0)] = 200;                      // one bucket of grains
+    held[at(30, 0) + 1] = 128;                  // halfway up the grain-length lane
+    const same1 = pic ? pic.testRender(held) : null;
+    const same2 = pic ? pic.testRender(held) : null;
+    const identical = !!same1 && !!same2 && same1.px.every((v, i) => v === same2.px[i]);
+    d.assert('the same data twice draws the same bytes, so nothing else is driving it',
+      identical, identical ? `${same1.px.length} bytes identical, and no clock in any body`
+                           : 'two passes over identical data disagreed');
+
+    const moved = new Uint8Array(held);
+    moved[at(30, 0) + 1] = 20;                  // the same grains, much shorter ones
+    const other = pic ? pic.testRender(moved) : null;
+    const differs = !!same1 && !!other && !same1.px.every((v, i) => v === other.px[i]);
+    d.assert('and one changed texel moves the picture, so the data reaches the pixels',
+      differs, differs ? 'one grain length changed, one different frame'
+                       : 'the frame did not change');
+
+    // 🔴 THE POSITIONAL PAIR, WITH TWO GRAINS AND NOT ONE. One grain proves a
+    // deposit; two prove the AXIS, in the right order and the right distance
+    // apart. /radio1965/ shipped a wrong answer to exactly this question
+    // twice in one line, and the count was right the whole time while the place
+    // was not, with nothing able to see it.
+    //
+    // ⚠️ WHAT IT CANNOT DETECT is whether a LIVE grain is decoded out of the
+    // right OSC field, because these two are synthetic. That is what the grain
+    // rate below is for.
+    const two = new Uint8Array(data.length);
+    two[at(63, 3)] = LAYOUT_VERSION;
+    two[at(0, 3)] = 255;
+    two[at(6, 3)] = 255;
+    two[at(16, 3)] = 0;
+    // ⚠️ TWO DIFFERENT LENGTHS AS WELL AS TWO DIFFERENT PLACES, so the same
+    // render grades both axes. 40 and 200 of 255 are 6 ms and 1.1 s on the
+    // engine's own 2 ms to 4 s exponential lane.
+    two[at(12, 0)] = 255; two[at(12, 0) + 1] = 40;
+    two[at(48, 0)] = 255; two[at(48, 0) + 1] = 200;
+    const shot = pic ? pic.testRender(two) : null;
+    let peaks = [];
+    if (shot) {
+      const colSum = new Float64Array(shot.w);
+      for (let y = 0; y < shot.h; y++) {
+        for (let x = 0; x < shot.w; x++) colSum[x] += shot.px[(y * shot.w + x) * 4];
+      }
+      const argmax = (from, to) => {
+        let best = from;
+        for (let x = from; x < to; x++) if (colSum[x] > colSum[best]) best = x;
+        return best;
+      };
+      peaks = [argmax(0, shot.w >> 1), argmax(shot.w >> 1, shot.w)].map((x) => (x + 0.5) / shot.w);
+    }
+    const want = [(12 + 0.5) / DATA_W, (48 + 0.5) / DATA_W];
+    const near = peaks.length === 2
+      && Math.abs(peaks[0] - want[0]) < 0.03 && Math.abs(peaks[1] - want[1]) < 0.03
+      && peaks[0] < peaks[1];
+    d.assert('two grains land where the held seconds say, in that order',
+      near, peaks.length === 2
+        ? `wanted ${want.map((v) => v.toFixed(3)).join(' and ')}, drew ${peaks.map((v) => v.toFixed(3)).join(' and ')}`
+        : 'no columns found');
+
+    // 🔴 AND THE SAME QUESTION ABOUT THE OTHER AXIS, WHICH NOTHING ELSE ASKS.
+    // Up the picture is grain length on the engine's own exponential lane, and
+    // the check above would pass just as well with every mark at one height.
+    // The two synthetic grains carry two different lengths, so the brightest ROW
+    // in each half says whether the lane reached the pixels. ⚠️ readPixels
+    // returns rows from the BOTTOM, which is the same direction gl_FragCoord.y
+    // counts in, so no flip is needed and one would be invisible.
+    let rows = [];
+    if (shot) {
+      const rowSum = new Float64Array(shot.h);
+      const half = shot.w >> 1;
+      const band = (from, to) => {
+        rowSum.fill(0);
+        for (let y = 0; y < shot.h; y++) {
+          for (let x = from; x < to; x++) rowSum[y] += shot.px[(y * shot.w + x) * 4];
+        }
+        let best = 0;
+        for (let y = 0; y < shot.h; y++) if (rowSum[y] > rowSum[best]) best = y;
+        return (best + 0.5) / shot.h;
+      };
+      rows = [band(0, half), band(half, shot.w)];
+    }
+    const wantRows = [40 / 255, 200 / 255];
+    const rightHeight = rows.length === 2
+      && Math.abs(rows[0] - wantRows[0]) < 0.06 && Math.abs(rows[1] - wantRows[1]) < 0.06
+      && rows[0] < rows[1];
+    d.assert('a short grain and a long one are drawn at their own heights',
+      rightHeight, rows.length === 2
+        ? `wanted ${wantRows.map((v) => v.toFixed(3)).join(' and ')}, `
+          + `drew ${rows.map((v) => v.toFixed(3)).join(' and ')} up the lane`
+        : 'no rows found');
+
+    // 🔴 THE LIGHT COMES FROM THE AUDIO AND NOT FROM A CLOCK. Sweep loudness
+    // from its floor to its ceiling with everything else held: there is no uT
+    // in any body here, so a failure means the follower value is not reaching
+    // the pixels at all. ⚠️ Measured on ONE channel, for the same reason the
+    // flat-field check is.
+    //
+    // ⚠️ AND OVER A FRAME THE MARKS FILL, WHICH IS NOT THE SAME TEST DATA THE
+    // POSITIONAL CHECK USES. MEASURED with the two-grain frame: the mean red
+    // went 0.1 to 0.5 of 255, a real 5x that no sensible threshold can tell
+    // from rounding, because two narrow columns of a 256-wide picture are 1% of
+    // it. Every bucket is lit here so the mean is a measurement rather than a
+    // rounding error, and the shader's own formula predicts the answer:
+    // 0.25 + 0.75 * loud is a factor of four between the ends.
+    const wide = new Uint8Array(data.length);
+    wide[at(63, 3)] = LAYOUT_VERSION;
+    wide[at(6, 3)] = 255;
+    wide[at(16, 3)] = 0;
+    for (let x = 0; x < DATA_W; x++) { wide[at(x, 0)] = 255; wide[at(x, 0) + 1] = 128; }
+    const darkD = new Uint8Array(wide); darkD[at(0, 3)] = 0;
+    const brightD = new Uint8Array(wide); brightD[at(0, 3)] = 255;
+    // 🔴 THREE LEVELS AND A MONOTONE CLAIM, NOT ONE RATIO.
+    //
+    // This used to divide loud by quiet and compare against
+    // `(LIT_FLOOR + LIT_RANGE) / LIT_FLOOR`, which was exactly right while the
+    // present pass was one colour times a number: colour was LINEAR in density,
+    // so a 2.5x in density was a 2.5x on the screen. The pass is a RAMP now,
+    // deliberately non-linear, and it compresses at the top where the warm end
+    // flattens. MEASURED the moment the ramp landed: 2.16 against the 2.25 this
+    // demanded, on a body doing exactly what it was written to do.
+    //
+    // Dividing by 0.9 harder would have made it pass and would have made it
+    // mean less every time the ramp is tuned. What loudness actually promises
+    // is that MORE OF IT IS BRIGHTER, at every step, and that is a claim no
+    // ramp shape can satisfy by accident: a body ignoring loudness reads flat,
+    // and one reading it backwards reads inverted. Both go red here and neither
+    // could be told from the other by a single ratio.
+    const midD = new Uint8Array(wide); midD[at(0, 3)] = 128;
+    const darkShot = pic ? pic.testRender(darkD) : null;
+    const midShot = pic ? pic.testRender(midD) : null;
+    const brightShot = pic ? pic.testRender(brightD) : null;
+    const quiet = darkShot ? meanRed(darkShot) : 0;
+    const mid = midShot ? meanRed(midShot) : 0;
+    const loudMean = brightShot ? meanRed(brightShot) : 0;
+    d.assert('loudness lights the field, and a quiet station leaves it dark',
+      quiet > 0 && mid > quiet + 1 && loudMean > mid + 1 && loudMean > quiet * 1.8,
+      `mean red ${quiet.toFixed(1)} quiet, ${mid.toFixed(1)} half, `
+      + `${loudMean.toFixed(1)} loud, rising at every step, `
+      + `a factor of ${quiet > 0 ? (loudMean / quiet).toFixed(2) : 'nothing'} end to end `
+      + `(the ramp compresses it below the ${((LIT_FLOOR + LIT_RANGE) / LIT_FLOOR).toFixed(2)} in density)`);
+
+    // ⚠️ THE DROP COUNTER HAS TO HAVE FIRED IN THIS RUN, or it is a claim rather
+    // than a counter. One bucket is flooded past the 255 an 8-bit channel holds,
+    // on purpose, and the second half of the assert is that nothing has
+    // overflowed during ordinary play.
+    const droppedInPlay = everDropped;
+    const FLOOD = 300, bIdx = 7;
+    for (let i = 0; i < FLOOD; i++) {
+      bucket(((bIdx + 0.5) / DATA_W) * BUF_SECONDS / RING_SECONDS, 0.1, 0);
+    }
+    const refused = buckets[bIdx].drop;
+    buckets[bIdx].n = 0; buckets[bIdx].drop = 0; buckets[bIdx].dsum = 0; buckets[bIdx].v.fill(0);
+    everDropped = droppedInPlay;
+    d.assert('a bucket that overflows counts what it refused, and none overflowed in play',
+      refused === FLOOD - 255 && droppedInPlay === 0,
+      `flooded ${FLOOD} into one bucket and it refused ${refused}; ${droppedInPlay} refused in ordinary play`);
+
+    // ⚠️ THE LAYOUT IS CHECKED AGAINST THE SHADER TEXT, NOT AGAINST ITSELF.
+    // Asserting that the byte this page just wrote is the constant this page
+    // just read is circular. What can actually drift is the module growing a
+    // destination past the width the body was written for, so the bucket count
+    // is read back OUT of the compiled source.
+    const shaderBuckets = Number(/floor\(uv\.x \* (\d+)\.0\)/.exec(ACC_FS)?.[1] ?? 0);
+    d.assert('the picture was compiled for the layout the module exports',
+      shaderBuckets === DATA_W && MOD_DESTS.length + 8 <= DATA_W
+      && data[at(63, 3)] === LAYOUT_VERSION,
+      `${shaderBuckets} buckets in the body, ${DATA_W} in the texture, `
+      + `${MOD_DESTS.length} destinations plus 8 voices, layout ${LAYOUT_VERSION}`);
+
+    // ── the machine ────────────────────────────────────────────────────────
+    d.assert('SuperCollider is running in this tab', !!eng && eng.bootMs > 0,
+      eng ? `up in ${Math.round(eng.bootMs)} ms` : (window.__granErr || 'it never booted'));
+    if (!eng) {
+      // ⚠️ IT STOPS HERE AND SAYS SO RATHER THAN THROWING. Everything below asks
+      // the server questions, and an engine that refused has to leave a page
+      // that still reports what it does know. The count is smaller on such a
+      // run, which is the honest shape: this is a different run, not the same
+      // one with a failure in it.
+      d.log('the engine never booted, so nothing below it could be graded', 'bad');
+      checking = false;
+      return;
+    }
+    d.assert('the board’s own compiled graph loaded, and the engine reports its grains',
+      !!G.def?.ok && G.running && grains > 0,
+      `${G.def?.bytes ?? 0} B taken in ${G.def?.ms ?? 0} ms · ${grains} grains reported over OSC`);
+
+    // ── silence ────────────────────────────────────────────────────────────
+    //
+    // 🔴 THE PAIR IS THE MEASUREMENT AND EITHER NUMBER ALONE IS BLIND. One
+    // analyser sits on speakers and the other past gate, one gain apart, so
+    // the only thing that can make their readings differ is the gain. Reading
+    // the gain back would grade the SETTING rather than the sound, which is the
+    // thing being claimed.
+    //
+    // 🔴 AND THE SIGNAL IS ONE THIS PAGE MAKES, NOT THE RADIO. The first two
+    // versions used the station as the control and both failed on a working
+    // page: 0.0000 inside the page, 0.0000 past the gate on five runs across
+    // an afternoon when these mounts were answering a health probe with a 200
+    // and then sending no bytes. A claim about a gain node has nothing to do
+    // with whether a volunteer server in Tallinn is having a good day, and a
+    // control that borrows its signal from one is a check that goes red for a
+    // reason that is not its own. Four hundred milliseconds of 440 Hz into
+    // speakers answers the same question with nothing outside this tab in it.
+    //
+    // ⚠️ IT GOES IN AT speakers, WHICH IS DOWNSTREAM OF EVERYTHING THAT MAKES
+    // THE SOUND. The granulator reads srcNode and the loop records liveIn,
+    // both upstream, so the tone cannot reach the instrument, the ring or the
+    // picture. A diagnostic that changes the thing it measures is worse than
+    // none, and this page's neighbour has the scar: a test oscillator armed
+    // sixty times a second once filled a waveform with its own tone while the
+    // page reported it as the radio.
+    //
+    // ⚠️ AND IT ONLY RUNS WITH THE GATE SHUT. With a trusted press the gate is
+    // open and a 440 Hz tone would be a beep at somebody, so that case asserts
+    // the other half instead: sound really is leaving.
+    let pre = 0, post = 0, osc = null;
+    if (!asked) {
+      osc = ctx.createOscillator();
+      const og = ctx.createGain();
+      osc.frequency.value = 440; og.gain.value = 0.25;
+      osc.connect(og); og.connect(speakers);
+      osc.start();
+    }
+    const untilSilence = performance.now() + 400;
+    while (performance.now() < untilSilence) {
+      await new Promise((r) => requestAnimationFrame(r));
+      preGate.getFloatTimeDomainData(preBuf);
+      sink.getFloatTimeDomainData(sinkBuf);
+      for (let i = 0; i < preBuf.length; i++) pre = Math.max(pre, Math.abs(preBuf[i]));
+      for (let i = 0; i < sinkBuf.length; i++) post = Math.max(post, Math.abs(sinkBuf[i]));
+    }
+    if (osc) { try { osc.stop(); } catch { /* already stopped */ } osc.disconnect(); }
+    d.assert('nothing reaches a speaker until a person presses play',
+      asked ? post > 0 : (pre > 0.01 && post === 0),
+      asked
+        ? `a trusted press opened the gate and ${post.toFixed(4)} is leaving`
+        : `a 440 Hz tone reads ${pre.toFixed(4)} inside the page and `
+          + `${post.toFixed(4)} past the gate`);
+
+    // ── the morph ──────────────────────────────────────────────────────────
+    //
+    // 🔴 DRIVEN AND READ BACK OFF THE SERVER, NEVER WAITED FOR. A sound lasts
+    // thirty-one seconds and the harness stops collecting 400 ms after the
+    // assert count last grew, so a check that waited for a morph to come round
+    // would report nothing and read as a broken page. What is graded is the
+    // arithmetic and the delivery: put the tour at a known point, let one tick
+    // write it, and ask scsynth what it is holding.
+    // 🔴 A CHECK THAT READS A CONTROL BACK CANNOT READ A MOVING ONE, AND THIS
+    // ONE FAILED BY EXACTLY THAT THE FIRST TIME IT RAN. four seconds ago
+    // routes an envelope follower onto grain length, and on an exponential lane
+    // taper(0.50) = 0.125 is a factor of 2.6: the read-back came back 0.7057
+    // against 0.2733 asked for, which is the modulator working perfectly and
+    // the assert asking the wrong question. hold(true) puts every destination
+    // back on its base and stops writing, so the read-back grades DELIVERY; the
+    // movement checks further down grade the movement, with the hold off.
+    const A = PATCHES[0], B = PATCHES[1];
+    holdTour(0, 0.25);
+    tourTick();
+    modulator.hold(true);
+    await wait(250);
+    const quarter = await sGet('msize');
+    modulator.hold(false);
+    const wantQ = morphOf(A, B, 0.25).values.size;
+    const lo = Math.min(A.size, B.size), hi = Math.max(A.size, B.size);
+    d.assert('a sound on the way to another reaches the engine, between the two it is between',
+      quarter != null && Math.abs(quarter - wantQ) < Math.max(0.002, wantQ * 0.08)
+      && quarter >= lo - 1e-6 && quarter <= hi + 1e-6,
+      `grain length ${quarter?.toFixed(4) ?? '—'} against ${wantQ.toFixed(4)} asked for, `
+      + `between ${lo} and ${hi}`);
+
+    // 🔴 AND IT TRAVELS AS A RATIO, WHICH IS NOT THE SAME PLACE AS HALFWAY. A
+    // grain length halfway between these two geometrically and halfway
+    // arithmetically are different numbers, and only one of them spends any
+    // time in the part of the lane where a granulator stops being a delay and
+    // becomes a texture. If the two are too close to tell apart on this pair,
+    // the check says so rather than passing on a distinction it cannot make.
+    const geo = Math.sqrt(A.size * B.size);
+    const lin = (A.size + B.size) / 2;
+    const half = morphOf(A, B, 0.5).values.size;
+    d.assert('and it travels as a ratio rather than as a difference',
+      Math.abs(half - geo) < Math.abs(half - lin),
+      `halfway is ${half.toFixed(4)}: ${geo.toFixed(4)} as a ratio, ${lin.toFixed(4)} as a difference`);
+
+    // 🔴 WHAT CANNOT BE SLID IS STEPPED, ONCE, AT THE MIDDLE, AND THE CLOCK IS
+    // WHAT DOES IT. mscanmode is a Select.kr index and 2.5 is not a mode.
+    // The tour is put just before the crossover and then LEFT ALONE, so the
+    // second reading is a fact about the page running rather than about this
+    // check driving it.
+    const C = PATCHES[3], E = PATCHES[4];            // POSITION into STRETCH
+    holdTour(3, 0.42);
+    tourTick();
+    await wait(220);
+    const modeBefore = Math.round(await sGet('mscanmode'));
+    // k crosses 0.5 in 0.08 x MORPH_MS = 720 ms, and nothing below touches the
+    // tour: the 25 Hz tick does it.
+    await wait(1600);
+    const modeAfter = Math.round(await sGet('mscanmode'));
+    d.assert('the read head steps mode on its own at the middle, instead of landing between two modes',
+      modeBefore === C.scanmode && modeAfter === E.scanmode,
+      `${modeBefore} then ${modeAfter} with nothing touching it, wanted ${C.scanmode} then ${E.scanmode}`);
+
+    // ⚠️ AND THE MOTIONS WENT WITH IT. Two motions cannot be crossfaded:
+    // a sixteen-slot step source and an envelope follower are different
+    // machines, not two settings of one. So the set of walking destinations has
+    // to be the arriving sound's and never a union of both.
+    const wantRoutes = routesOf(E).map((r) => r.dest);
+    d.assert('the settings that walk are the arriving sound’s, not both sounds’',
+      routedNow.size === new Set(wantRoutes).size
+      && [...routedNow].every((n) => wantRoutes.includes(n)),
+      `${[...routedNow].join(', ') || 'none'} walking, and ${E.name} asks for ${wantRoutes.join(', ') || 'none'}`);
+
+    // ── it moves on its own, with a stationary control in the same reading ──
+    //
+    // 🔴 EVERY MOVEMENT CHECK NEEDS A STATIONARY CONTROL IN THE SAME READING OR
+    // IT IS UNFALSIFIABLE. hold(true) puts every destination back on its base
+    // and stops writing, and the tour has to go on advancing underneath it.
+    //
+    // 🔴 AND THE DESTINATION IS CHOSEN SO THE ANSWER IS ARITHMETIC RATHER THAN
+    // LUCK. two seconds of it walks winstart from a TRIANGLE at 0.013 Hz,
+    // and three things follow: a triangle's slope is constant everywhere except
+    // at its two vertices, so the distance moved in a window is the same
+    // wherever the window lands; the route declares phase: 0 itself so
+    // setRoutes does not reassign it; and the excursion is taper(0.60) = 0.216
+    // of a lane the base sits at 0.417 of, so it can never reach a clamp and
+    // report a working modulator as a stuck one.
+    //
+    // ⚠️ AN AUDIO-DRIVEN ROUTE WOULD HAVE BEEN THE WRONG CHOICE HERE. It would
+    // make this check depend on somebody else's programme being loud, which is
+    // a check about the station rather than about the page.
+    const MOVER = 7, LANE_SPAN = 2000;
+    holdTour(MOVER, 0);
+    tourTick();
+    await wait(150);
+    const pos0 = tourPos();
+    const mv0 = modNow.winstart ?? null;
+    const sends0 = modulator.stats().sends;
+    await wait(LANE_SPAN);
+    const mv1 = modNow.winstart ?? null;
+    const sends1 = modulator.stats().sends;
+    // 0.013 Hz over 2 s is 0.026 of a cycle; a triangle covers 4x that in its
+    // own -1..1, and the amount is cubed to 0.216, so the lane moves 0.0225 and
+    // the control moves 0.0135 in engine units. The threshold is a third of it.
+    d.assert('a granulator setting walks itself, with nobody touching the page',
+      mv0 != null && mv1 != null && Math.abs(mv1 - mv0) > 0.004 && sends1 > sends0,
+      `window start ${mv0?.toFixed(4) ?? '—'} to ${mv1?.toFixed(4) ?? '—'} `
+      + `(0.0135 predicted) · ${sends1 - sends0} writes in ${(LANE_SPAN / 1000).toFixed(1)} s`);
+
+    modulator.hold(true);
+    await wait(500);
+    const sendsH0 = modulator.stats().sends;
+    const mvH0 = modNow.winstart ?? null;
+    await wait(700);
+    const sendsH1 = modulator.stats().sends;
+    const mvH1 = modNow.winstart ?? null;
+    const posH = tourPos();
+    modulator.hold(false);
+    d.assert('and everything stops when it is told to, while the tour keeps advancing',
+      mvH0 != null && mvH0 === mvH1 && sendsH1 === sendsH0 && posH > pos0,
+      `held at ${mvH0?.toFixed(4) ?? '—'} for 700 ms with ${sendsH1 - sendsH0} writes, `
+      + `while the tour moved ${(posH - pos0).toFixed(3)} of a sound`);
+
+    // The blend, which is the one number a listener feels and which nothing on
+    // this page lets anybody set.
+    tourFrom = performance.now();                    // the top of a sound
+    tourTick();
+    const wLow = wet;
+    tourFrom = performance.now() - 0.5 * SLOT_MS;    // its middle
+    tourTick();
+    const wHigh = wet;
+    d.assert('the blend walks itself between the station and the grains, and both gains follow it',
+      Math.abs(wHigh - wLow) > 0.3
+      && Math.abs(dry.gain.value - (1 - wet)) < 1e-6
+      && Math.abs(eng.out.gain.value - wet) < 1e-6,
+      `${(wLow * 100).toFixed(0)}% at the top of a sound, ${(wHigh * 100).toFixed(0)}% at its middle`);
+
+    // ── the loop, and the grain clock it tunes ─────────────────────────────
+    //
+    // 🔴 THE LOCK IS ARITHMETIC AND IT IS READ BACK OFF THE ENGINE. A figure of
+    // elen steps at rate grains a second has a bar of elen / rate
+    // seconds, and lockRate is the nearest rate that fits a whole number of
+    // those bars into the lap. Both periods are exact: a looped AudioBuffer
+    // repeats at its own sample count, bit identical, and the grain clock is a
+    // Phasor in the same context, measured at 24000.0 +/- 0.2 samples against
+    // 24000 asked for.
+    endLoop();
+    holdTour(5, 0);                                  // `the sixteenth`, which has a figure
+    tourTick();
+    await wait(150);
+    // ⚠️ A SHORT LAP ON PURPOSE. The tour keeps the full eight seconds; the
+    // check keeps two and a half, because eight seconds of waiting inside an
+    // assert burst is eight seconds the harness spends collecting nothing.
+    const LAP_S = 2.5;
+    armLoop(LAP_S);
+    for (let i = 0; i < 80 && loopState === 'filling'; i++) {
+      // ⚠️ THE TOUR IS PINNED WHILE THE RING FILLS. It travels through real
+      // seconds like everything else here, so without this the lock would be
+      // made against one sound's figure and graded against another's.
+      holdTour(5, 0);
+      if (loopRing.filled >= Math.round(LAP_S * ctx.sampleRate)) setLoop();
+      else await wait(100);
+    }
+    // The lap at speed 1, which is the same number relock uses. See the note
+    // there for why the playback rate is deliberately not in it.
+    const lapS = voiceTo - voiceFrom;
+    // ⚠️ THE SAME subdivide THE PAGE USES. A prediction made under different
+    // rules from the write it is grading is a check on a quantity next to the
+    // one in question, which is how this page's neighbour lost a lock for a day.
+    const predicted = lockRate(lapS, { rate: loaded.rate, elen: loaded.elen, name: loaded.name,
+      subdivide: true });
+    await wait(250);
+    const lockedOnEngine = await sGet('mrate');
+    d.assert('a loop keeps the seconds it was told to and plays them round',
+      loopState === 'on' && !!loopBuf && lapS > 0.2,
+      loopBuf ? `${loopBuf.duration.toFixed(2)} s kept, a lap of ${lapS.toFixed(2)} s`
+              : 'nothing was playing, so there was nothing to loop');
+    d.assert('the grain clock tunes itself to the lap, and the engine is holding that rate',
+      predicted.rate != null && lockedRate != null && lockedOnEngine != null
+      && Math.abs(lockedOnEngine - predicted.rate) < 0.05,
+      `${predicted.why} · asked ${predicted.rate?.toFixed(3) ?? '—'}, `
+      + `engine holds ${lockedOnEngine?.toFixed(3) ?? '—'}`);
+
+    // ── several loops at once ──────────────────────────────────────────────
+    //
+    // 🔴 THE ONE THING THE CHECKS ABOVE CANNOT SEE. They grade a loop, and a
+    // loop was already graded when the page could only hold one. What is new is
+    // that a second is KEPT WHILE THE FIRST IS PLAYING, and that depends on the
+    // ring tapping the station upstream of the level the loops duck: tapped
+    // downstream it would record the ducked signal, so the assert compares the
+    // two kept peaks rather than only counting voices.
+    const peakOf = (b) => {
+      const c = b.getChannelData(0);
+      let p = 0;
+      for (let i = 0; i < c.length; i += 7) p = Math.max(p, Math.abs(c[i]));
+      return p;
+    };
+    const firstLap = voiceTo - voiceFrom;
+    const peak1 = loopBuf ? peakOf(loopBuf) : 0;
+    armLoop(1.0);
+    for (let i = 0; i < 40 && loopRing.on; i++) {
+      holdTour(5, 0);
+      if (loopRing.filled >= Math.round(1.0 * ctx.sampleRate)) setLoop();
+      else await wait(100);
+    }
+    const peak2 = loopBuf ? peakOf(loopBuf) : 0;
+    const both = `${layers.length} playing, laps ${firstLap.toFixed(2)} s and `
+      + `${(voiceTo - voiceFrom).toFixed(2)} s · kept peaks ${peak1.toFixed(3)} then ${peak2.toFixed(3)}`;
+    // 🔴 A SILENT MOUNT GRADES A DIFFERENT CLAIM UNDER A DIFFERENT NAME rather
+    // than the same one more weakly, which is the rule the station check below
+    // already follows: with nothing on air both peaks are zero and a comparison
+    // between them would pass by measuring nothing.
+    if (peak1 > 0.002) {
+      d.assert('a second loop is kept while the first is playing, and it holds the station and not the ducked silence',
+        layers.length === 2 && Math.abs((voiceTo - voiceFrom) - firstLap) > 0.2
+        && peak2 > peak1 * 0.25, both);
+    } else {
+      d.assert('a second loop is kept while the first is playing, on a station that was sending nothing to hear',
+        layers.length === 2 && Math.abs((voiceTo - voiceFrom) - firstLap) > 0.2, both);
+    }
+
+    // ⚠️ THE TOUR IS PUT BACK WHERE THE LOCK WAS MADE BEFORE THE RATE IS READ,
+    // and the first run of this check is why. Filling a loop takes seconds, and
+    // the tour goes on travelling through them: by the time the loop came off,
+    // the page was 34% of the way from a sound at 16 grains a second to one at
+    // 2, so the engine honestly held 8.636 and the assert compared it against
+    // 16. That is the check measuring a quantity next to the one in question.
+    endLoop();
+    holdTour(5, 0);
+    tourTick();
+    await wait(300);
+    const freeRate = await sGet('mrate');
+    d.assert('and it comes back off the lock when the loop ends',
+      lockedRate == null && freeRate != null && Math.abs(freeRate - loaded.rate) < 0.6,
+      `${freeRate?.toFixed(3) ?? '—'} against the ${loaded.rate} written into ${loaded.name}`);
+
+    // ── the stations ───────────────────────────────────────────────────────
+    //
+    // ⚠️ THROUGH THE REAL PATH, NOT BY SETTING A VARIABLE. What this is about is
+    // the wiring between choosing a station and bytes arriving from it, and
+    // assigning station steps straight over that.
+    // 🔴 AND WHEN THERE IS NOWHERE TO GO IT GRADES A DIFFERENT CLAIM UNDER A
+    // DIFFERENT NAME, RATHER THAN THE SAME ONE MORE WEAKLY. MEASURED twice in
+    // one afternoon: the relay had five of six mounts refusing, then four, then
+    // three, and this check had no second station to press. A downgrade that
+    // keeps the label reads exactly like a check that passed, so the label says
+    // which of the two runs this was. What it costs is that a red suite cannot
+    // be blamed on the relay without reading the line.
+    //
+    // 🔴 AND IT WALKS PAST A MOUNT THAT ANSWERS AND THEN SENDS NOTHING, WHICH IS
+    // WHAT THESE MOUNTS DO. MEASURED: Radio 1965 to IDA Helsinki · 0 blocks
+    // decoded off the new one, on a station /health had called up thirty
+    // seconds earlier. A check that presses ONE button and grades the result is
+    // grading the broadcaster's afternoon; pressing until something delivers or
+    // the list runs out grades the wiring, which is the thing in question.
+    const was = station;
+    let landedOn = null, blocks = 0;
+    for (let tries = 0; tries < 3 && !landedOn; tries++) {
+      const cand = pickStation();
+      if (!cand) break;
+      switchTo(cand, 'checking that a change really changes the source');
+      for (let i = 0; i < 60 && !(stream && stream.stats().blocks > 0); i++) await wait(100);
+      blocks = stream ? stream.stats().blocks : 0;
+      if (blocks > 0) { landedOn = cand; break; }
+      // ⚠️ MARKED DOWN HERE RATHER THAN THROUGH dropStation, which switches on
+      // its own: this loop owns the walk, and two things choosing the next
+      // station would skip one of them every time.
+      avail.set(cand, false);
+      d.log(`${nameOf(cand)} answered and then sent nothing, so it is being left out`, 'bad');
+    }
+    if (landedOn) {
+      d.assert('changing station really changes what is being decoded',
+        station === landedOn && blocks > 0,
+        `${nameOf(was)} to ${nameOf(landedOn)} · ${blocks} blocks decoded off the new one`);
+    } else if (stream && stream.stats().blocks > 0) {
+      const up = STATIONS.filter(([, id]) => avail.get(id) !== false).map(([n]) => n);
+      d.assert('with one station left answering, the page stays on it and says so',
+        up.length === 1 && up[0] === nameOf(station),
+        `${nameOf(station)} is the only mount answering, and it is still decoding `
+        + `${stream.stats().blocks} blocks`);
+    } else {
+      // 🔴 THE THIRD SITUATION, AND IT IS THE ONE THAT WAS HAPPENING WHILE THIS
+      // WAS BEING WRITTEN: every mount refusing, including the ones /health
+      // calls up. Three of these six answer a probe with a 200 and then send no
+      // bytes at all, which is what a volunteer Icecast does when it is unwell,
+      // and it is not something this page can fix or should read as its own
+      // failure. What it CAN be graded on is whether it said so and carried on
+      // drawing rather than going blank and leaving somebody to debug a browser.
+      const said = (d.api?.logs ?? []).some((l) =>
+        /sent nothing|stopped answering|refusing|nothing to play|is down/i.test(l.msg));
+      d.assert('with every mount refusing, the page says so and goes on drawing',
+        said && frames > 0,
+        `${nameOf(station)} answered a probe and delivered `
+        + `${stream ? stream.stats().blocks : 0} blocks · the log names it and the picture has drawn `
+        + `${frames} frames`);
+    }
+
+    // 🔴 AND THE ONE THAT MATTERS WHEN THE RELAY IS UNWELL: a station known to
+    // be down is never chosen. Three of these six mounts were refusing within
+    // an hour of this page being written, so this is the ordinary case and not
+    // an edge one. ⚠️ It is proved by BREAKING it: one station is marked down
+    // and every starting point is asked, which is the only way to know the
+    // refusal fires rather than that it happens to be unnecessary.
+    const pig = STATIONS.find(([, id]) => id !== station)?.[1];
+    const wasKnown = avail.get(pig);
+    avail.set(pig, false);
+    const chose = STATIONS.map(([, id]) => pickStation(id));
+    avail.set(pig, wasKnown);
+    d.assert('a station that is not answering is never chosen',
+      !chose.includes(pig),
+      `${nameOf(pig)} marked down and skipped from all ${chose.length} starting points`);
+
+    // ── the screen ─────────────────────────────────────────────────────────
+    //
+    // ⚠️ IT REPORTS WHICH MECHANISM RAN, because an iPhone has no element
+    // fullscreen at all and requestFullscreen?.() optional-chains straight
+    // past the missing method: no throw, no catch, no log line and no picture.
+    // A page that cannot say which path it took cannot be debugged from a phone.
+    const by = await FS.toggle(pane);
+    const wasFull = FS.isFull(pane);
+    await FS.exit(pane);
+    d.assert('the full screen control says which mechanism it used',
+      (by === 'element' || by === 'faux') && wasFull,
+      `${by}${by === 'faux' ? ', the cover that needs no API' : ', the browser’s own API'}`);
+
+    // The tour was moved about; put it back at the start so a visitor arrives at
+    // the beginning of a sound rather than in the middle of a crossover.
+    tourFrom = performance.now();
+    checking = false;
+  }
+
+  // ⚠️ THE PAGE SAYS WHAT IT IS BEFORE ANYTHING IS PRESSED, so somebody who
+  // never touches it still knows what would happen. ⚠️ AND NO CELL IS PRE-SET
+  // TO A NUMBER: a zero in a readout reads as a very confident measurement of
+  // nothing, and every cell here is pending until it has been measured.
+  d.log(`${PATCHES.length} sounds, ${(SLOT_MS / 1000).toFixed(0)} s each, `
+    + `${STATIONS.length} stations, one picture. Press play.`);
+</script>

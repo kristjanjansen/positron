@@ -22,8 +22,8 @@ import { readGLB } from './xr-glb.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
-  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' — ' + detail : ''}`); }
-  else { fail++; console.log(`  FAIL ${name}${detail ? ' — ' + detail : ''}`); }
+  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' · ' + detail : ''}`); }
+  else { fail++; console.log(`  FAIL ${name}${detail ? ' · ' + detail : ''}`); }
 };
 const refused = (name, buf, want) => {
   let msg = null;

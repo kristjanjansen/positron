@@ -38,9 +38,9 @@
     what: 'One press here and every open copy of this page shows the same cue '
         + 'name at the same moment. Press Fire a cue, or Fire ten to see them '
         + 'queue up, and open the page again in another tab to watch them '
-        + 'arrive on both. Delivery is how long a cue took to get here, timed '
-        + 'from the stamp the sender put on it — the middle one of them, and the '
-        + 'slowest.',
+        + 'arrive on both. Delivery is the middle of how long those cues took to '
+        + 'get here and slowest is the worst, both timed from the stamp the '
+        + 'sender put on it.',
     readout: { copies: '', arrived: '', delivery: 'ms', slowest: 'ms' },
     controls: [
       { id: 'fire', label: 'Fire a cue', primary: true },
@@ -124,7 +124,7 @@
     // asserting rather than calling a race a failure
     for (let i = 0; i < 20 && received < fired; i++) await new Promise((r) => setTimeout(r, 100));
     d.assert('relay open', ws?.readyState === 1, String(ws?.readyState));
-    d.assert('tokenless — no secret in this page', !location.href.includes('token') && !RELAY.includes('token'));
+    d.assert('no secret in this page', !location.href.includes('token') && !RELAY.includes('token'));
     d.assert('own cues echo back', received >= fired, `${received} received / ${fired} fired`);
     // THE LIST IS THE HISTORY, so it has to hold one row per cue that arrived
     // until its cap bites. Nothing asked it that while it was hand-built.

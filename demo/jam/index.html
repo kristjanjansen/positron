@@ -31,8 +31,9 @@
   const d = mount({
     name: 'jam',
     what: 'Two machines counting the same eight beats with neither leading. '
-        + 'Open this page again — another tab, a phone, or `node rig/peer.mjs` '
-        + 'on a Raspberry Pi — and they count together. offset is how far this '
+        + 'Open this page again in another tab, on a phone, or as '
+        + '`node rig/peer.mjs` on a Raspberry Pi, and they count together. '
+        + 'offset is how far this '
         + 'clock had to move to agree with the others; round trip is how long a '
         + 'message takes to reach one and come back.',
     readout: { offset: 'ms', 'round trip': 'ms', others: '', beat: '' },
@@ -182,7 +183,7 @@
       roster = now;
       d.log(ps.length
         ? `in the room: ${ps.map((p) => `${p.id} ${Number.isFinite(p.rttMs) ? `${p.rttMs.toFixed(1)} ms away` : 'not timed yet'}`).join(' · ')}`
-        : 'alone in the room — open this page again, or run node rig/peer.mjs', 'hi');
+        : 'alone in the room · open this page again, or run node rig/peer.mjs', 'hi');
     }
   }, 500);
 

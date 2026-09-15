@@ -280,12 +280,12 @@ export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new P
     if (res.status !== 409 || i >= WHEP_RETRY.tries) break;
     const back = WHEP_RETRY.firstMs + i * WHEP_RETRY.stepMs;
     waited += back;
-    log(`409 — nothing is publishing to that input yet; asking again in ${back} ms`);
+    log(`409: nothing is publishing to that input yet; asking again in ${back} ms`);
     await sleep(back);
   }
   if (!res.ok) {
     throw new Error(`WHEP ${res.status}`
-      + (res.status === 409 ? ` — still nothing publishing after ${(waited / 1000).toFixed(1)} s of asking` : ''));
+      + (res.status === 409 ? `: still nothing publishing after ${(waited / 1000).toFixed(1)} s of asking` : ''));
   }
   if (waited) log(`attached after ${(waited / 1000).toFixed(1)} s of waiting for the publish to go live`, 'hi');
   return res;

@@ -180,8 +180,8 @@
     // its own — the zoom needed naming, the replay claim was the point — and
     // the result was four sentences nobody reads. What a visitor needs: what
     // this is, what to press, what the numbers mean.
-    what: 'Type, and every change is written down as what it did to the document — where '
-      + 'the text changed and what it changed to — never as the key you pressed. Drag the '
+    what: 'Type, and every change is written down as where the text changed and what '
+      + 'it changed to, never as the key you pressed. Drag the '
       + 'line below to any moment to put the box back as it was, and zoom in until each '
       + 'mark becomes the letter it recorded. "Worked out" counts the deletions where '
       + 'nothing said what had been removed, so the text before and after had to be '
@@ -609,7 +609,7 @@
     const apart = cmp.divergences > 0;
     rbVerdict.dataset.apart = apart ? '1' : '0';
     rbVerdict.textContent = !cmp.compares ? 'nothing compared yet'
-      : apart ? `apart at ${cmp.last && cmp.last.pos} — the rebuild disagrees`
+      : apart ? `apart at ${cmp.last && cmp.last.pos} · the rebuild disagrees`
       : `the same, ${cmp.compares} times over`
         + (cmp.lags ? ` · ${cmp.lags} caught mid-edit` : '');
     readout();
@@ -665,7 +665,7 @@
     keys.value = '';
     keys.focus();
     paintAll();
-    d.log('typing now — arrow keys, backspace, selection and paste are all welcome');
+    d.log('typing now · arrow keys, backspace, selection and paste are all welcome');
   }
 
   function loadRecording() {
@@ -813,7 +813,7 @@
     const fields = new Set();
     for (const r of rows) for (const k of Object.keys(r.op)) fields.add(k);
     const moves = rows.filter((r) => r.op.type === OP_SELECT).length;
-    d.assert('not one key was written down — only what changed, and to what',
+    d.assert('not one key was written down: only what changed, and to what',
       rows.length > 0 && keysStored(rows) === 0,
       `${rows.length} edits, ${moves} of them cursor moves; every edit carries `
       + `${[...fields].sort().join(', ')}`);
@@ -846,7 +846,7 @@
         close.drawn > wide.drawn && close.drawn > 0 && wide.had > 0
           && allMarked(wide) && allMarked(close),
         `${wide.drawn} letters legible of ${wide.had} marks at 20 px a second, `
-        + `${close.drawn} of ${close.had} at 400 — the rest are middots, `
+        + `${close.drawn} of ${close.had} at 400 · the rest are middots, `
         + `${wide.dotted} and ${close.dotted} of them, so every edit has a mark `
         + `at both zooms and only the zoom decides which ones can be read`);
     }
@@ -855,7 +855,7 @@
     const workedOut = dels.filter(hadToBeWorkedOut);
     d.assert('a backspace never says what it removed, so the text before and after is compared',
       dels.length > 0 && workedOut.length === dels.length,
-      `${workedOut.length} of ${dels.length} deletions — the cursor was sitting at one place `
+      `${workedOut.length} of ${dels.length} deletions · the cursor was sitting at one place `
       + `and the range that went was somewhere else`);
 
     // ── the two scripted comparisons ──────────────────────────────────────
@@ -897,7 +897,7 @@
       wrong(withCursor) === 0 && wrong(onText) > 0,
       `typing a fourth "a" at the front of "aaa" is written down as `
       + `${shows(withCursor[last])} with the cursor and ${shows(onText[last])} without it, `
-      + `truly ${shows(truthRanges[last])} — same letters either way, `
+      + `truly ${shows(truthRanges[last])} · same letters either way, `
       + `${wrong(onText)} of ${truthRanges.length} ranges wrong, so the cursor comes back `
       + `at ${onText[last][0] + 1} instead of ${truthRanges[last][0] + 1}`);
 
@@ -914,7 +914,7 @@
     d.assert('every edit applied one at a time agrees with the document rebuilt from the start',
       rows.length > 0 && agreed === rows.length,
       `${agreed} of ${rows.length} moments, text and cursor both`
-      + (firstOff === null ? '' : ` — first apart at edit ${firstOff}`));
+      + (firstOff === null ? '' : ` · first apart at edit ${firstOff}`));
 
     // Drag to three quiet places and read the BOX back — the browser's own
     // value and selection, not ours.
@@ -931,7 +931,7 @@
     }
     d.assert('drag to any moment and the box holds that moment, cursor included',
       probes.length === 3 && restored === 3,
-      `${restored} of ${probes.length} — ${seen.join(' · ')}`);
+      `${restored} of ${probes.length} · ${seen.join(' · ')}`);
     deck.seek(0);
     await nextFrame();
 

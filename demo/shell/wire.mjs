@@ -77,7 +77,7 @@ const ENVELOPE = ['from', 'at', 'seq'];
 export function format(msg, { from, seq, at = Date.now(), id = randomId() }) {
   for (const k of ENVELOPE) {
     if (Object.hasOwn(msg, k)) {
-      throw new Error(`wire: "${k}" is an envelope field — ${msg.type || 'this message'} would lose it. Rename the payload field (e.g. "${k}Sec", "${k}Value").`);
+      throw new Error(`wire: "${k}" is an envelope field, so ${msg.type || 'this message'} would lose it. Rename the payload field (e.g. "${k}Sec", "${k}Value").`);
     }
   }
   return JSON.stringify({ id, type: '', ...msg, from, at, seq });
@@ -145,7 +145,7 @@ export function openWire(room, {
       const max = s2.limits?.maxSockets;
       stats.roomSockets = s2.sockets;
       stats.refusal = (max && s2.sockets >= max)
-        ? `the room is full — ${s2.sockets} of ${max} sockets, and the relay refuses the next one rather than dropping it`
+        ? `the room is full · ${s2.sockets} of ${max} sockets, and the relay refuses the next one rather than dropping it`
         : null;                       // reachable and not full: an ordinary network failure
     } catch (e) {
       stats.refusal = `the relay is unreachable (${e.message})`;

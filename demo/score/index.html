@@ -63,7 +63,7 @@
       },
     },
     {
-      id: 'bar', label: 'a bar',
+      id: 'bar', label: 'bar',
       note: 'Four instructions and a tempo. At 120 the beats are half-seconds, so the same numbers mean different times.',
       build() {
         const cp = cs(['t 0 120',
@@ -76,7 +76,7 @@
     },
     {
       id: 'ramp', label: 'tempo ramp',
-      note: 'The tempo falls from 120 to 60 across eight beats. The beats are evenly numbered and the gaps get longer — that is why a score is compiled, not read.',
+      note: 'The tempo falls from 120 to 60 across eight beats. The beats are evenly numbered and the gaps get longer. That is why a score is compiled, not read.',
       build() {
         const cp = cs(['t 0 120 8 60',
           ...Array.from({ length: 8 }, (_, i) => `i 1 ${i} 0.4 8000 ${440 + i * 55}`)]);
@@ -86,8 +86,8 @@
       },
     },
     {
-      id: 'loop', label: 'a loop',
-      note: 'One part, used twice — the second time it says "twice". Both passes light the SAME line below, because there is only one.',
+      id: 'loop', label: 'loop',
+      note: 'One part, used twice: the second time it says "twice". Both passes light the SAME line below, because there is only one.',
       build() {
         const cp = cs(['t 0 120',
           'i 1 0 0.5 8000 440', 'i 1 0.5 0.5 8000 550',

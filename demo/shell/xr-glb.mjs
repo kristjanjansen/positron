@@ -124,7 +124,7 @@ const COMPONENT = {
 /** accessor type -> how many components. */
 const NUMS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
 
-const refuse = (why) => { throw new Error(`this model uses something the reader does not implement — ${why}`); };
+const refuse = (why) => { throw new Error(`this model uses something the reader does not implement: ${why}`); };
 
 /** Column-major 4x4 multiply, the same convention xr-room.mjs uses. */
 const mul4 = (a, b) => {
@@ -209,7 +209,7 @@ export function readGLB(buf) {
   }
   if (!json) refuse('no JSON chunk');
   let g;
-  try { g = JSON.parse(json); } catch (e) { refuse(`a JSON chunk that will not parse — ${e.message}`); }
+  try { g = JSON.parse(json); } catch (e) { refuse(`a JSON chunk that will not parse: ${e.message}`); }
   if (!bin) refuse('no binary chunk; only self-contained .glb files are read');
 
   // 🔴 REFUSE ON `extensionsRequired` BEFORE ANYTHING ELSE. That array is the
@@ -238,7 +238,7 @@ export function readGLB(buf) {
     // model that is present, plausible and wrong. Neither vendored file uses
     // one — checked, 0 of 23 accessors — so this is a refusal rather than a
     // gap, and it names itself if a future model needs it.
-    if (a.sparse) refuse('a sparse accessor (read in three.js, deliberately not implemented — see the header)');
+    if (a.sparse) refuse('a sparse accessor (read in three.js, deliberately not implemented here)');
     // Likewise `normalized`: an integer attribute that means a fraction. 0 of
     // 23 here, and silently reading the raw integers would put positions
     // thousands of times too large.

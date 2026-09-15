@@ -124,7 +124,7 @@ export async function bootScsynth({ audioContext, input = null, log = () => {}, 
     const targ = sonic.node?.input ?? sonic.node;
     const why = !targ ? 'the engine exposes no node'
       : typeof targ.connect !== 'function' ? `engine node is ${targ?.constructor?.name ?? typeof targ}, not an AudioNode`
-      : (targ.numberOfInputs ?? 0) < 1 ? `engine node has ${targ.numberOfInputs} inputs — nothing to feed`
+      : (targ.numberOfInputs ?? 0) < 1 ? `engine node has ${targ.numberOfInputs} inputs, nothing to feed`
       : (input.context !== targ.context) ? 'the input node belongs to a different AudioContext than the engine'
       : null;
     if (why) throw new Error(`scsynth live input refused: ${why}`);

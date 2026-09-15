@@ -80,6 +80,36 @@
  * exactly what "the same interface in both kinds of session" forbids, one level
  * up. One list, both pages, both modes.
  */
+/**
+ * 🔴 HOW LONG THE WAY OUT HAS TO BE HELD, IN MILLISECONDS — and the reason it
+ * is held at all rather than pressed.
+ *
+ * The tablet is a surface a ray sweeps across to reach the slider, and the
+ * trigger that drives the slider is the same trigger that would press this. A
+ * control that ended the session on one press would end sessions nobody meant
+ * to end, and the cost of that mistake is the whole run somebody was in the
+ * middle of.
+ *
+ * ⚠️ WHAT WAS REJECTED, AND WHY, SO IT IS NOT RE-PROPOSED. A CONFIRM DIALOG:
+ * a panel in a headset that needs a second press to dismiss is a new way to be
+ * stuck, which is the failure this button exists to reduce rather than to add
+ * to. PRESS-ON-HOVER: it ends a session by looking at it. A DOUBLE PRESS: it is
+ * invisible — nothing on the face can show you that the first press landed.
+ *
+ * A hold shows its own progress, is abandoned by doing nothing, and can be
+ * aborted THREE ways that all come naturally: let go, slide the ray off it, or
+ * point somewhere else. None of them needs a second control.
+ */
+const HOLD_MS = 800;
+
+// ⚠️ DECLARED ABOVE `DEFAULT_CONTROLS` BECAUSE THE TABLE USES IT. It sat a
+// hundred and fifty lines below, which made naming it from the table a temporal
+// dead zone reference, so the exit control was written without a `hold` and left
+// to the `c.hold ?? HOLD_MS` fallback every reader applies. The runtime was
+// correct and `xr-pick-test.mjs` went to `NaN% of undefined ms` on four checks,
+// because a test reads the field rather than the fallback. Moving the constant
+// is the fix; typing 800 twice is what CLAUDE.md forbids.
+
 export const DEFAULT_CONTROLS = [
   {
     key: 'grid',
@@ -90,21 +120,38 @@ export const DEFAULT_CONTROLS = [
     value: 75,
     apply: (v, ctx) => ctx?.room?.setGrid?.({ alpha: v / 100 }),
   },
-  // 🔴 THE `Hold to leave` BUTTON WAS HERE AND IS GONE — THE WAY OUT MOVED TO
-  // THE CONTROLLER. It was the best of the three exits this project had, and it
-  // still had two conditions in front of it: the tablet has to have drawn, on a
-  // controller whose GRIP POSE RESOLVED, on the hand the tablet happens to be
-  // on. Pick up one controller and it is not there at all. An exit with
-  // conditions in front of it is not an exit.
-  //
-  // `shell/xr-quit.mjs` replaces it with the one thing true of every headset:
-  // a labelled button under your thumb, a ring that fills while you hold it,
-  // and nothing at all if you let go. It needs no tablet, no slab and no
-  // renderer, so every XR page has the same way out whichever hands are
-  // holding whichever controllers.
-  //
-  // ⚠️ THE TABLET ITSELF STAYS, because the slider above is a real control that
-  // fades the floor. What left is the exit, not the surface.
+  /**
+   * 🔴 BACK, AND IT SHOULD NEVER HAVE BEEN A SWAP. It was taken out in favour
+   * of the controller badge in `xr-quit.mjs`, and the argument written here was
+   * that this button has two conditions in front of it (a tablet that has
+   * drawn, on a controller whose grip pose resolved) and an exit with
+   * conditions is not an exit. Every word of that is true and the conclusion
+   * was wrong: it argues for the badge being ADDED, not for this being removed.
+   * REPORTED from a real Quest, in these words: **"i was not able to get out"**.
+   *
+   * ⚠️ TWO VISIBLE EXITS IS NOT A DUPLICATE, IT IS THE POINT. They fail in
+   * different ways. The badge needs a gamepad button the runtime maps where
+   * this project expects; this needs a slab that has been drawn. A room you
+   * cannot leave is the worst failure an immersive page has, so the way out is
+   * the one control that is allowed to be said twice.
+   *
+   * `apply` is a NOTIFICATION. The session is ended by `xr-hands.mjs`, which is
+   * handed the session every frame; a page learns it was this one and can say
+   * so rather than printing the same line for all its exits.
+   */
+  {
+    key: 'left',
+    kind: 'button',
+    label: 'Hold to leave',
+    // ⚠️ `leaves` IS WHAT ENDS THE SESSION. `xr-hands.mjs` drains this tablet's
+    // fired controls every frame and acts only on the ones carrying it, so a
+    // button without it is a button that draws, fills its ring, reports itself
+    // and does nothing. That is the inert-control failure this repo keeps
+    // paying for, and it is one missing field away at all times.
+    leaves: true,
+    hold: HOLD_MS,
+    apply: (_v, ctx) => ctx?.left?.(),
+  },
 ];
 
 /** A control's kind. Absent means the kind that was here first. */
@@ -191,27 +238,7 @@ const KIT = {
   btnRingOffset: 2 * K,   // :focus-visible outline-offset
 };
 
-/**
- * 🔴 HOW LONG THE WAY OUT HAS TO BE HELD, IN MILLISECONDS — and the reason it
- * is held at all rather than pressed.
- *
- * The tablet is a surface a ray sweeps across to reach the slider, and the
- * trigger that drives the slider is the same trigger that would press this. A
- * control that ended the session on one press would end sessions nobody meant
- * to end, and the cost of that mistake is the whole run somebody was in the
- * middle of.
- *
- * ⚠️ WHAT WAS REJECTED, AND WHY, SO IT IS NOT RE-PROPOSED. A CONFIRM DIALOG:
- * a panel in a headset that needs a second press to dismiss is a new way to be
- * stuck, which is the failure this button exists to reduce rather than to add
- * to. PRESS-ON-HOVER: it ends a session by looking at it. A DOUBLE PRESS: it is
- * invisible — nothing on the face can show you that the first press landed.
- *
- * A hold shows its own progress, is abandoned by doing nothing, and can be
- * aborted THREE ways that all come naturally: let go, slide the ray off it, or
- * point somewhere else. None of them needs a second control.
- */
-const HOLD_MS = 800;
+
 /**
  * 🔴 HOW MANY STEPS THE FILL MOVES IN, AND IT IS NOT A STYLE CHOICE. The room
  * re-uploads this whole canvas to the graphics card whenever `version` moves,
@@ -706,7 +733,7 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
     if (isButton(found.control)) {
       holding_ = { i: found.i, from: at, p: 0, step: 0, on: true };
       version++;                              // `button:active`, straight away
-      note(`holding "${found.control.label}" — it wants ${holdSpan(found.control)} ms`
+      note(`holding "${found.control.label}" · it wants ${holdSpan(found.control)} ms`
         + '; let go, or run the ray off it, and nothing happens');
       return true;
     }
@@ -754,7 +781,7 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
   /** The hold ran to the end. */
   function fire(c) {
     holding_ = null; dragging = null; version++;
-    note(`"${c.label}" was held all the way — doing it`);
+    note(`"${c.label}" was held all the way · doing it`);
     firedQ.push(c);
     try { c.apply?.(null, hostCtx); } catch { /* a control must not take the frame with it */ }
   }
@@ -764,7 +791,7 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
     if (holding_) {
       const c = controls[holding_.i];
       note(`let go of "${c.label}" at ${(holding_.p * 100).toFixed(0)}% of its ${holdSpan(c)} ms`
-        + `${holding_.on ? '' : ', with the ray already off it'} — nothing happened`);
+        + `${holding_.on ? '' : ', with the ray already off it'} · nothing happened`);
       holding_ = null; version++;
     } else if (had) {
       const c = controls[dragging];

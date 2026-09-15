@@ -191,7 +191,7 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
   // times a second in silence.
   if (tablet && (typeof tablet.fired !== 'function' || typeof tablet.notes !== 'function')) {
     say('FAIL hands · this tablet cannot report its own presses (no fired/notes)'
-      + ' — anything drawn on it as a way out would be a picture of a button');
+      + ' · anything drawn on it as a way out would be a picture of a button');
     log('the screen on your hand cannot report what you press on it', 'bad');
   }
 
@@ -213,9 +213,9 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
   // Each entry: [stage, ms after the first frame, what its absence means].
   const DUE = [
     ['a source with a grip pose', 5000,
-     'no controller reported a grip pose — there is nothing to hang the tablet on, and the stand-ins will be missing too'],
+     'no controller reported a grip pose. There is nothing to hang the tablet on, and the stand-ins will be missing too'],
     ['the tablet placed', 5000,
-     'a grip resolved but the tablet was never placed — holdM or the tablet module'],
+     'a grip resolved but the tablet was never placed · holdM or the tablet module'],
     // ⚠️ THIS ONE IS NOT A DIAGNOSIS AND IT MUST NOT READ AS ONE. Nobody is
     // obliged to point at the tablet, so the honest line names BOTH readings
     // and says which one the numbers beside it would settle. A guess presented
@@ -237,8 +237,8 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
     for (const [name, ms, why] of DUE) {
       if (dt > ms && !reached(name)) {
         overdueSaid = true;
-        say(`FAIL hands · "${name}" has not happened ${(dt / 1000).toFixed(1)} s in — ${why}`);
-        log(`the controller interface stalled at: ${name} — ${why}`, 'bad');
+        say(`FAIL hands · "${name}" has not happened ${(dt / 1000).toFixed(1)} s in: ${why}`);
+        log(`the controller interface stalled at: ${name} · ${why}`, 'bad');
         return;
       }
     }
@@ -275,7 +275,7 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
           tracked = [...session.trackedSources];
           trackedSays = `attribute present, ${tracked.length} in it`;
         }
-      } catch (e) { trackedSays = `attribute threw — ${e.name}`; }
+      } catch (e) { trackedSays = `attribute threw: ${e.name}`; }
       const inputs = [...(session.inputSources || [])];
       state.sources = inputs.length;
       state.tracked = tracked.length;
@@ -411,7 +411,7 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
           if (!c.leaves) continue;
           state.left = c.label;
           say(`hands · leaving · the tablet's "${c.label}", held the whole ${c.hold} ms`);
-          log(`leaving — you held "${c.label}" on the tablet`, 'ok');
+          log(`leaving · you held "${c.label}" on the tablet`, 'ok');
           try { session.end()?.catch?.(() => {}); } catch { /* it may already be going */ }
         }
       }
@@ -438,7 +438,7 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
       }
       if (!announced && seen.length) {
         announced = true;
-        log(`${state.sources} controller(s) — the tablet is on your ${TABLET_HAND} hand, the pointer on your ${POINTER_HAND}`, 'ok');
+        log(`${state.sources} controller(s) · the tablet is on your ${TABLET_HAND} hand, the pointer on your ${POINTER_HAND}`, 'ok');
       }
 
       // ── the rate line, twice ──────────────────────────────────────────────
@@ -467,8 +467,8 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
       // removes everything below it. Said once, then swallowed for good.
       if (!failSaid) {
         failSaid = true;
-        say(`FAIL hands · could not be read — ${e.name}: ${e.message}`);
-        log(`could not read what is in your hands — ${e.message}`, 'bad');
+        say(`FAIL hands · could not be read · ${e.name}: ${e.message}`);
+        log(`could not read what is in your hands: ${e.message}`, 'bad');
       }
     }
     return state;

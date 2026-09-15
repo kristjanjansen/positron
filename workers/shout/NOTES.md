@@ -1,9 +1,15 @@
 # positron-shout — measurements
 
 SHOUTcast/Icecast is one HTTP response that never ends. There is no manifest, no
-segment list and no seek: the server writes MP3 frames at roughly wall-clock
+segment list and no seek: the server writes audio frames at roughly wall-clock
 speed and the client plays whatever it has. The questions worth asking of a
 Cloudflare Worker in front of one are therefore not the LL-HLS questions.
+
+⚠️ **AUDIO FRAMES, NOT MP3 FRAMES.** Six of the eight mounts in the allowlist are
+MPEG Layer III and two are AAC in ADTS. Nothing in this worker cares, because it
+passes the body through untouched; the one place it matters is the
+`content-type` header, which is forwarded and never invented. See the IDA
+section below.
 
 ## The origin
 
@@ -84,12 +90,143 @@ listener holding Icecast's burst would not have heard it, a listener with a
 1 s jitter buffer would. So: streaming responses are not the limit here, and
 the thing to watch is the occasional gap, not the duration.
 
+## `/rec/` — the same station's past (2026-09-15)
+
+Radio 1965's server started recording broadcasts this week. Icecast's on-connect
+hook runs `ffmpeg -c copy` against the mount when a broadcaster sets a
+`save_stream` flag, on-disconnect stops it and rsyncs the mp3 to `eccm.ee`, and
+a `streamrecording` event replaces the `livestream` one with an https URL. Read
+from `tarmoj/radio1965` at `7366bfe`.
+
+MEASURED 2026-09-15 against `https://eccm.ee/radio1965/streams/`:
+
+| | |
+|---|---|
+| a recording | 200, `audio/mpeg`, `accept-ranges: bytes`, LiteSpeed |
+| a Range | 206 with `content-range`, so seeking works |
+| CORS | **none**. Same defect as the live mount |
+| their events API | `allow-origin: *` already, so only the audio needs carrying |
+
+So `/rec/<name>.mp3` re-serves one with CORS, forwarding the client's `range`
+straight through. Three things about it are deliberate:
+
+- **The name is matched against a pattern, not taken as a parameter.** Their
+  hook writes a slug of at most twenty characters and a datestamp, so that is
+  what is accepted. `?url=` would make this an open proxy for anything on
+  eccm.ee, which is the same reason `STATIONS` is an allowlist. PROVED by
+  breaking it: `../../etc/passwd`, `anything.mp3`, a capitalised `.MP3` and a
+  seven-digit datestamp all answer 404.
+- **The status is passed through and the guard is `>= 400`, not `!ok`.** A Range
+  answers 206, and guarding on `ok` would have made every seek report the origin
+  as broken.
+- **It is cached, and the live mounts are not.** A recording never changes once
+  it is written; `public, max-age=86400, immutable`. That is the opposite of the
+  rule above it, and the reason is that these are files rather than streams.
+
+MEASURED through the relay on the one recording that exists (a 7 s test, 116823
+bytes): 200 with `content-length` and `accept-ranges`, and `bytes 1000-1999/116823`
+on a Range.
+
+## IDA Radio: added, and it is the one station here that did not have to be (2026-09-15)
+
+🔴 **NOT EVERY ICECAST NEEDS THIS WORKER, AND IDA RADIO IS THE PROOF.** The two
+facts at the top of this file, no CORS and no TLS, are true of ERR and of
+Radio 1965 and were quietly being treated as true of Icecast in general.
+`idaidaida.net` has neither defect.
+
+⚠️ **IT WAS MEASURED, REFUSED, AND THEN ADDED ANYWAY, ON INSTRUCTION.** The
+measurement below has not changed and neither has what it implies: this relay
+adds nothing to these two mounts, and carrying them costs 144 MB per
+listener-hour of the account's egress. What changed is that `/radio1965/` now
+plays six stations, and one code path through the relay for all six is worth
+more to that page than the bytes are worth here. ⚠️ **The two entries are
+`ida-tallinn` and `ida-helsinki` and they are the first thing to drop if egress
+ever bites**: the page can reach these mounts directly, which is true of nothing
+else in the allowlist.
+
+MEASURED 2026-09-15 against `https://broadcast.idaidaida.net/listen/tallinn/stream`,
+which is the `listen_url` the station's own AzuraCast API publishes:
+
+| | |
+|---|---|
+| protocol | HTTP/2 over TLS on **port 443**, nginx in front of Icecast |
+| audio | **AAC-LC 320 kbit/s, 44.1 kHz stereo**, `icy-metaint: 16000` |
+| CORS | **present, and it reflects any origin.** An `Origin: https://evil.example.com` comes back allowed, a preflight answers 204 |
+| HEAD | **200.** Not the `400` this worker exists to work around |
+| in a real browser on `https://positron.studio` | `fetch` gives `response.type: "cors"`, the page reads `icy-name` and 302 KB of body |
+
+So a positron page can fetch those bytes, read the ICY headers and put them
+through WebAudio with nothing in between. Relaying them spends this account's
+egress at **144 MB per listener-hour**, 2.5x the 128 kbps mounts above, to add a
+hop that buys nothing on the network. The allowlist is what bounds it: two named
+mounts, added on purpose, and nothing in this file makes a third arrive by
+itself.
+
+⚠️ **THE CONTENT-TYPE IS NOW LOAD-BEARING AND IT USED TO BE DEFAULTED.** These
+mounts send `audio/aac`; every other station here sends `audio/mpeg`. The page
+reads its frame scanner off that header, and the two framings share a sync word,
+so a scanner pointed at the wrong one finds **nothing at all** rather than
+finding rubbish — bytes arriving, no errors, no sound. This worker used to
+substitute `audio/mpeg` when the origin sent no type, which was harmless while
+every mount was MP3 and is now a confident wrong answer. It forwards what it was
+given and sends no type when it was given none; an absent header makes the page
+look at the bytes, which is the honest fallback.
+
+⚠️ **THE IN-BAND TEXT CHANNEL IS ALIVE AND CARRIES NOTHING.** `icy-metaint: 16000`
+is advertised and the slots arrive on schedule, and over ~25 s exactly one of 88
+on Tallinn was non-empty: `StreamTitle=' - '`, the separator with no artist and
+no title. The station names itself in the `icy-name` header and says nothing
+in-band. Their AzuraCast API at `/api/nowplaying/tallinn` DOES carry show names,
+answers 200 with `access-control-allow-origin: *`, and is not read by anything
+here.
+
+⚠️ **HELSINKI'S OWN API CALLS IT OFFLINE WHILE IT IS PLAYING.** `nowplaying`
+reported `is_online: false`, 0 listeners and `' - Station Offline'` in the same
+minute that the mount served 15 s of audio at -15.6 dB against a
+synthesised-silence control at -91.0. Believe the bytes. `/health` here does,
+because it asks the mount rather than the API.
+
+## IDA goes through the relay, and that is DECIDED (2026-09-15)
+
+IDA Radio is the first station here that does not NEED this worker: it is on
+TLS, it reflects CORS to any origin, and it exposes its `icy-*` headers. The
+argument for fetching it direct was that a relay adds a hop for nothing and puts
+320 kbit/s of somebody else's stream on this account's egress, which is 144 MB
+per listener-hour, 2.5x every other mount.
+
+**Decided: it stays on the relay, for ONE PIPELINE.** `srcOf(id)` is
+`${BASE}/${id}` and nothing in the page branches on which station it is; a
+station fetched another way would be a second path that only one station takes,
+and the next defect in it would be invisible on five stations out of six.
+
+⚠️ **AND THE HOP IS NOT A COST HERE. MEASURED 2026-09-15**, time to first byte,
+three runs each from this machine:
+
+| | relayed | direct |
+|---|---|---|
+| 1 | 0.185 s | 0.397 s |
+| 2 | 0.325 s | 0.447 s |
+| 3 | 0.256 s | 0.444 s |
+
+The relay is FASTER every time, because Cloudflare's edge is nearer than
+`broadcast.idaidaida.net` is. The assumption that a proxy must cost latency was
+wrong in this direction and it was worth measuring rather than reasoning about.
+What the relay does cost is the egress, and that is the number to watch.
+
 ## Still open
 
 - **Egress.** 128 kbps is ~57.6 MB per listener-hour, all of it billable and
   none of it cacheable — the origin says `Cache-Control: no-cache, no-store`,
   and a cached radio stream is a contradiction. Nothing here throttles or counts
-  listeners; a link that goes anywhere public should get a cap first.
+  listeners; a link that goes anywhere public should get a cap first. ⚠️ **The
+  two IDA mounts are 144 MB per listener-hour each** and are the only ones a
+  page could reach without this worker, so they are where a cap costs least.
+- **Their permission.** IDA publishes no terms, no licence and no refusal: no
+  `/terms`, no `/privacy`, no copyright line on the about page, and a
+  `robots.txt` that is AzuraCast's shipped default. The mounts declare
+  `icy-pub: 1` and `icy-url: https://idaidaida.net`. That is an open door and it
+  is not a licence. Anything public-facing that plays IDA should say whose it is
+  and link back, and `hello@idaidaida.net` costs one email.
 - **Distance.** Every number above was taken from Tallinn, where both the origin
   and the colo are. The carry figure is the one to re-measure from elsewhere.
 

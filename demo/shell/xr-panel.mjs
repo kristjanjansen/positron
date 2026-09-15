@@ -78,8 +78,9 @@ export const touchOf = (isHeld, isAimed) => (isHeld ? TOUCH.held : isAimed ? TOU
 // two DO now share is the PICTURE: demo/shell/xr-room.mjs draws the room for
 // both, so a panel hanging here hangs in the same room `scene` shows.
 
-import { createXRRoom, roomOf, ROOM_OPTIONAL_FEATURES, GRID } from './xr-room.mjs';
+import { createXRRoom, roomOf, ROOM_OPTIONAL_FEATURES, GRID, mul } from './xr-room.mjs';
 import { createXRHands, BUTTON, AXIS } from './xr-hands.mjs';
+import { createXRQuit } from './xr-quit.mjs';
 import { createXRTablet } from './xr-tablet.mjs';
 // ⚠️ READ, NEVER WRITTEN, AND THAT IS THE POINT. `xr-pick.mjs` is the ONE
 // ray-to-rectangle answer in this repo — `xr-hands.mjs` already asks it where
@@ -394,6 +395,55 @@ export function createXRPanels({
   let gl = null, prog = null, quad = null, U = null;
   let barProg = null, barU = null;
   let session = null, space = null, arMode = false;
+  // 🔴 THE WAY OUT IS A HOLD ON ONE BUTTON, NOT A TAP ON ANY OF THEM. Every
+  // other immersive page here already reads that way; this one still exited on
+  // whatever button happened to be pressed, which is the design `xr-quit.mjs`
+  // was written to replace. The difference is not politeness: a page whose exit
+  // is any button is a page you leave by accident while reaching for something,
+  // and it gives no warning that it is about to happen. The badge is on the
+  // controller, it says what the button does, and the ring shows how far the
+  // hold has got so a release cancels something visible.
+  let theQuit = null;
+
+  /**
+   * 🔴 BUILT ON FIRST DRAW, IN EITHER PATH, AND THAT IS WHAT LETS A LAPTOP
+   * GRADE IT. Built inside `requestSession` it is reached for the first time on
+   * the first frame of a headset session, where a shader that will not compile
+   * costs the one run somebody was going to make and the page has no way out at
+   * the moment it needs one most. It is the same argument the tablet's own note
+   * makes two hundred lines down, and WebXR draws through this very context, so
+   * there is no second context to worry about.
+   *
+   * ⚠️ IT MUST NOT THROW INTO THE CALLER. A badge that will not compile is a
+   * page with an uglier way out; a throw here is a page with none, because an
+   * uncaught error in a frame callback deletes everything below it.
+   */
+  function ensureQuit() {
+    if (theQuit !== null || quitFailed || !gl) return theQuit;
+    try {
+      theQuit = createXRQuit(gl, {
+        // Guarded by `armed` for the same reason every other exit is: the press
+        // that opened this page's own button may still be down as the session
+        // starts, and an exit that fires on entry is a session nobody gets into.
+        onQuit: () => {
+          if (!armed) return;
+          beacon('held the quit button · leaving');
+          session?.end().catch(() => {});
+        },
+      });
+      // ⚠️ COMPILED HERE, NOT ON THE FIRST DRAW. The object is lazy, so having
+      // one proves nothing about its shader, and the check below would pass on
+      // a badge that cannot be drawn. PROVED by sabotage: with `compile` made to
+      // throw, the assert stayed green until this line existed.
+      quitReady = theQuit.prepare();
+      if (!quitReady) beacon(`FAIL quit badge would not compile: ${theQuit.why}`);
+    } catch (e) {
+      quitFailed = true;
+      beacon(`FAIL quit badge would not build: ${e.message}`);
+    }
+    return theQuit;
+  }
+  let quitFailed = false, quitReady = false;
   let placed = null, armed = false, armAt = 0;
   // Whether the live renderers are the ones on the quads. The A/B this page
   // exists to measure is a single boolean, so it is one.
@@ -524,7 +574,7 @@ export function createXRPanels({
     const rate = mp && state.liveGpuMs > 0 ? (mp / (state.liveGpuMs / 1000)) : null;
     const head = `${state.liveGpuMs.toFixed(3)} ms on the card`
       + (mp ? ` for ${mp.toFixed(2)} Mpix` : '')
-      + (rate ? ` — ${rate.toFixed(0)} Mpix/s` : '');
+      + (rate ? ` · ${rate.toFixed(0)} Mpix/s` : '');
     if (state.liveHalfGpuMs == null) { state.liveWhereCost = `${head} · half-size not measured yet`; return; }
     const k = state.liveHalfGpuMs / state.liveGpuMs;
     // ⚠️ THE SAMPLE COUNTS, BECAUSE THE RATIO IS A MEDIAN OF A FEW AND IT
@@ -550,9 +600,9 @@ export function createXRPanels({
     // Half in each direction is a QUARTER of the pixels, so pure fragment cost
     // predicts 0.25 and a pass whose cost is all in issuing it predicts 1.
     state.liveWhereCost = `${head} · a quarter of the pixels costs ${k.toFixed(2)}x${n}, so it is `
-      + (k < 0.45 ? 'FRAGMENT-bound — resolution is the lever'
-        : k > 0.80 ? 'NOT fragment-bound — the pass costs what it costs whatever size it is, so resolution will not help'
-        : 'partly fragment-bound — resolution helps, but not in proportion');
+      + (k < 0.45 ? 'FRAGMENT-bound: resolution is the lever'
+        : k > 0.80 ? 'NOT fragment-bound: the pass costs what it costs whatever size it is, so resolution will not help'
+        : 'partly fragment-bound: resolution helps, but not in proportion');
   }
   /**
    * What the trigger has hold of.
@@ -594,7 +644,7 @@ export function createXRPanels({
     liveOn = next;
     liveMs.length = 0; gpuFull.length = 0; state.liveGpuMs = null; state.liveWorstMs = 0;
     uploads.length = 0; state.uploadWorstMs = 0;
-    beacon(`${why} — the picture is now ${liveOn
+    beacon(`${why} · the picture is now ${liveOn
       ? 'RENDERED LIVE by this session, in its own context'
       : 'UPLOADED from a 2-D canvas, the way it was'}`
       + ` · last second ${state.fps == null ? 'no rate yet' : `${state.fps.toFixed(1)} fps`}`);
@@ -712,6 +762,19 @@ export function createXRPanels({
   Object.defineProperty(state, 'supported', { get: () => supported, enumerable: true });
   Object.defineProperty(state, 'supportedAr', { get: () => supportedAr, enumerable: true });
   Object.defineProperty(state, 'live', { get: () => liveOn, enumerable: true });
+  // 🔴 THE WAY OUT, ON THE MACHINE SURFACE. A page that cannot assert its own
+  // exit has an exit nobody grades, and this is the one control a headset run
+  // cannot recover from being wrong about: everything else on this page can be
+  // got out of by leaving, and leaving is this. A getter, because the badge is
+  // built when the session starts and this object is built at load.
+  Object.defineProperty(state, 'quit', {
+    enumerable: true,
+    get: () => (theQuit && quitReady
+      ? { built: true, button: theQuit.button, label: theQuit.label,
+          holding: theQuit.holding, progress: theQuit.progress }
+      : { built: false, button: null, label: null, holding: false, progress: 0,
+          why: theQuit?.why || (quitFailed ? 'it threw on construction' : 'never built') }),
+  });
   if (panels[0]?.canvas) state.panelPixels = { w: panels[0].canvas.width, h: panels[0].canvas.height };
   const liveOne = panels.find((p) => p.live);
   if (liveOne?.live?.pixels) state.livePixels = { ...liveOne.live.pixels };
@@ -755,7 +818,7 @@ export function createXRPanels({
                alpha: gl.getUniformLocation(barProg, 'uAlpha'), aspect: gl.getUniformLocation(barProg, 'uAspect') };
     } catch (e) {
       barProg = null; barU = null;
-      log(`the panels' grab bars would not compile — ${e.message}`, 'warn');
+      log(`the panels' grab bars would not compile: ${e.message}`, 'warn');
       beacon(`FAIL grab bars · ${e.message} · the panels cannot be moved in this session`);
     }
     glCheck('bar');
@@ -807,7 +870,7 @@ export function createXRPanels({
         if (!ok) throw new Error('the renderer refused this context');
       } catch (e) {
         p.live = null;
-        log(`the live picture would not compile in the headset's context — ${e.message}`, 'warn');
+        log(`the live picture would not compile in the headset's context: ${e.message}`, 'warn');
         beacon(`FAIL live panel · ${e.message} · falling back to the uploaded canvas`);
       }
     }
@@ -819,6 +882,15 @@ export function createXRPanels({
       theRoom.attach(gl);
       glCheck('room');
     }
+    // 🔴 THE WAY OUT COMPILES HERE, WITH EVERYTHING ELSE. `build()` is where
+    // this module's context comes into existence, so it is the earliest moment
+    // the badge CAN be made, and making it here is what lets a laptop grade it
+    // rather than a headset discovering the shader is broken at the moment
+    // somebody needs to leave. Tried at construction first and it could not
+    // work: `gl` is null until this function runs, and the swallowed error said
+    // so only after `ensure` was made to report one.
+    ensureQuit();
+    glCheck('quit');
     return true;
   }
 
@@ -836,7 +908,7 @@ export function createXRPanels({
    */
   async function enter(mode = 'immersive-vr') {
     if (session) return true;
-    if (!navigator.xr) { log('this browser has no WebXR at all — nothing to put on', 'warn'); return false; }
+    if (!navigator.xr) { log('this browser has no WebXR at all', 'warn'); return false; }
     // 🔴 NO AWAIT BEFORE `requestSession`. The support answer is the one already
     // taken at load; asking again here can spend the user activation, and a
     // handler that throws where nothing is reporting is what produced a run
@@ -845,14 +917,14 @@ export function createXRPanels({
     const can = wantAr ? supportedAr : supported;
     if (can === false) {
       log(wantAr
-        ? 'this browser cannot show passthrough — nothing changes on this page'
-        : 'no headset here — nothing changes on this page', 'warn');
+        ? 'this browser cannot show passthrough · nothing changes on this page'
+        : 'no headset here · nothing changes on this page', 'warn');
       return false;
     }
     if (!gl) {
       try {
         if (!build()) { log('this browser gave no 3-D context, so there is nothing to draw with', 'bad'); return false; }
-      } catch (e) { log(`the panel would not compile — ${e.message}`, 'bad'); return false; }
+      } catch (e) { log(`the panel would not compile: ${e.message}`, 'bad'); return false; }
     }
     // ⚠️ A DEADLINE ON EVERY STEP. A rejected promise reports itself; one that
     // never settles does not, and that is what two headset runs looked like
@@ -877,7 +949,7 @@ export function createXRPanels({
       const out = await Promise.race([p,
         new Promise((_, no) => setTimeout(() => no(new Error(
           `${what} did not answer in ${ms / 1000} s`
-          + (ms > 6000 ? ' — is there a permission prompt waiting for you?' : ''))), ms))]);
+          + (ms > 6000 ? '. Is there a permission prompt waiting for you?' : ''))), ms))]);
       beacon(`ok  ${what}`);
       return out;
     };
@@ -904,7 +976,7 @@ export function createXRPanels({
       let gaveUp = false;
       ask.then((late) => {
         if (!gaveUp) return;
-        beacon('the session arrived after this page gave up waiting — ending it rather than leaving you in a room nothing is drawing');
+        beacon('the session arrived after this page gave up waiting. Ending it rather than leaving you in a room nothing is drawing');
         try { late.end(); } catch { /* already gone */ }
       }, () => { /* a rejection is reported by the step below */ });
       // 🔴 90 s, BECAUSE THIS ONE ASKS YOU A QUESTION. See `step`.
@@ -931,15 +1003,15 @@ export function createXRPanels({
       if (gl.getContextAttributes?.()?.xrCompatible !== true) {
         await step('makeXRCompatible', gl.makeXRCompatible());
       } else {
-        beacon('ok  the context was already made for a headset — makeXRCompatible not needed');
+        beacon('ok  the context was already made for a headset · makeXRCompatible not needed');
       }
       beacon('… XRWebGLLayer');
       session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
       beacon('ok  XRWebGLLayer');
       space = await step('requestReferenceSpace local-floor', session.requestReferenceSpace('local-floor'));
     } catch (e) {
-      log(`the headset refused — ${e.name}: ${e.message}`, 'bad');
-      beacon(`FAIL session — ${e.name}: ${e.message}`);
+      log(`the headset refused · ${e.name}: ${e.message}`, 'bad');
+      beacon(`FAIL session · ${e.name}: ${e.message}`);
       try { await session?.end(); } catch { /* it may never have started */ }
       session = null;
       return false;
@@ -956,8 +1028,8 @@ export function createXRPanels({
     // place the two are separated, and everything downstream reads `arMode`.
     arMode = state.blendMode === 'alpha-blend' || state.blendMode === 'additive';
     if (wantAr && !arMode) {
-      log(`this session was asked for passthrough and composites ${state.blendMode || 'something it will not name'} — drawing it as an opaque room instead`, 'warn');
-      beacon(`asked for ${mode} and got blend ${state.blendMode || 'not reported'} — NOT compositing over your room`);
+      log(`this session was asked for passthrough and composites ${state.blendMode || 'something it will not name'} · drawing it as an opaque room instead`, 'warn');
+      beacon(`asked for ${mode} and got blend ${state.blendMode || 'not reported'} · NOT compositing over your room`);
     }
     state.frameRate = session.frameRate ?? null;
     try { state.supportedFrameRates = session.supportedFrameRates ? Array.from(session.supportedFrameRates) : null; }
@@ -972,13 +1044,13 @@ export function createXRPanels({
     beacon(`session created · ${mode} · blend ${session.environmentBlendMode || 'not reported'} · refresh ${session.frameRate || 'not reported'}`
       + ` · picture ${liveOn && panels.some((p) => p.live) ? 'RENDERED LIVE in this session' : 'uploaded from a canvas'}`
       + ` · walls ${wantSky ? 'on' : 'off'} · objects ${wantThings ? 'on' : 'off'}`);
-    log('you are in it — the grip or any face button comes back out', 'ok');
+    log('you are in it · the grip or any face button comes back out', 'ok');
 
     session.addEventListener('end', () => {
       state.presenting = false; state.mode = 'window';
       session = null; space = null; placed = null; arMode = false;
       grabbing = null; aimedBar = null;
-      log(`came back out — ${state.frames} frames drawn${state.fps ? ` at ${state.fps.toFixed(1)} a second` : ''}`);
+      log(`came back out · ${state.frames} frames drawn${state.fps ? ` at ${state.fps.toFixed(1)} a second` : ''}`);
       beacon(`session ended · ${state.frames} frames · ${state.fps ? state.fps.toFixed(1) : '—'} fps`
         + ` · picture ${liveOn ? 'live' : 'uploaded'} · ${state.liveWhereCost}`
         + ` · ${state.grabbed} panel move(s)`);
@@ -991,7 +1063,7 @@ export function createXRPanels({
     // that fires on entry is a session nobody can get into.
     const leave = (why) => {
       if (!armed) return;
-      beacon(`${why} — leaving`);
+      beacon(`${why} · leaving`);
       session?.end().catch(() => {});
     };
     // 🔴 TRIGGER GRABS, GRIP LEAVES — the same split `scene` already settled
@@ -1006,7 +1078,7 @@ export function createXRPanels({
     // past, which is what leaves the surface free for the page to use later.
     session.addEventListener('selectstart', (e) => {
       if (!armed) return;
-      if (theHands?.over) { beacon('trigger on the tablet — the slider has it, the panel was not grabbed'); return; }
+      if (theHands?.over) { beacon('trigger on the tablet · the slider has it, the panel was not grabbed'); return; }
       if (!placed || !aimedBar) return;
       const src = e.inputSource?.targetRaySpace ? e.inputSource : null;
       if (!src) return;
@@ -1018,7 +1090,7 @@ export function createXRPanels({
       // and it stops the two-controller case being a surprise.
       const pointerSrc = theHands?.state?.pointerSrc;
       if (pointerSrc && src !== pointerSrc) {
-        beacon('trigger on the hand that is not pointing — nothing grabbed');
+        beacon('trigger on the hand that is not pointing · nothing grabbed');
         return;
       }
       grabbing = { i: aimedBar.i, src, local: null, from: null };
@@ -1036,7 +1108,7 @@ export function createXRPanels({
         // evidence anywhere that it works. One line per completed cycle is that
         // evidence, and `grabbed`/`grabMovedM` are its machine copy.
         beacon(`released panel ${grabbing.i} after moving it ${moved.toFixed(2)} m`
-          + ` — it is now ${state.panelsAt?.[grabbing.i]?.dist?.toFixed?.(2) ?? '—'} m from you, facing you`);
+          + ` · it is now ${state.panelsAt?.[grabbing.i]?.dist?.toFixed?.(2) ?? '—'} m from you, facing you`);
       }
       grabbing = null;
     });
@@ -1046,13 +1118,14 @@ export function createXRPanels({
     // rather than leaving somebody standing in it.
     setTimeout(() => {
       if (session && state.frames === 0) {
-        beacon('FAIL no frame drawn 4 s after the session started — leaving on my own');
-        log('the headset session drew nothing — ended it rather than leave you in the dark', 'bad');
+        beacon('FAIL no frame drawn 4 s after the session started · leaving on my own');
+        log('the headset session drew nothing. Ended it rather than leave you in the dark', 'bad');
         session.end().catch(() => {});
       }
     }, deadManMs);
+    ensureQuit();
     session.requestAnimationFrame(onXR);
-    beacon('session running — requestAnimationFrame registered');
+    beacon('session running · requestAnimationFrame registered');
     return true;
   }
 
@@ -1178,6 +1251,16 @@ export function createXRPanels({
       gl.depthMask(true);
       gl.disable(gl.BLEND);
     }
+    // ⚠️ LAST IN THE EYE, AFTER EVERYTHING ELSE. The badge is the one thing in
+    // here that must never be behind a panel: it is how somebody leaves, and a
+    // way out you cannot see is the failure the module already has a dead-man's
+    // switch for. Its own program binds what it needs and this one has finished
+    // with the state.
+    const quit = ensureQuit();
+    if (quit) {
+      const grips = (theHands?.hands || []).map((h) => h.m).filter(Boolean);
+      if (grips.length) quit.draw(mul(proj, viewM), grips, [hp.x, hp.y, hp.z]);
+    }
     gl.bindVertexArray(null);
   }
 
@@ -1186,6 +1269,11 @@ export function createXRPanels({
     session.requestAnimationFrame(onXR);
     const pose = frame.getViewerPose(space);
     if (!pose) return;
+    // How long this frame was, for anything that integrates. Capped, because a
+    // headset that stalled for a second must not advance a hold by a second:
+    // the whole point of the hold is that it measures a deliberate press, and a
+    // stall is not one.
+    const dtSec = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
     // 🔴 THE LAYER IS READ HERE, INSIDE THE CALLBACK, WHERE IT EXISTS.
     const layer = session.renderState.baseLayer;
     if (!layer) return;
@@ -1200,36 +1288,30 @@ export function createXRPanels({
       }
       if (!anyDown || performance.now() - armAt > 3000) armed = true;
     } else {
-      // 🔴 ANY BUTTON LEAVES — EXCEPT THE TRIGGER, AND THAT EXCEPTION IS A BUG
-      // FIX RATHER THAN A LOOSENING. This scan took EVERY button including
-      // index 0, while `selectstart` two screens up sets `grabbing` on that
-      // same press: so the panel drag this module has carried since it was
-      // written could never run for more than one frame — the trigger armed the
-      // drag and then ended the session. A page with a slider on it would have
-      // been worse, because pressing the control would put you back in the
-      // window.
+      // 🔴 THE WAY OUT IS A HOLD ON ONE NAMED BUTTON. It was a tap on ANY
+      // button, which is two separate faults. A page you leave by brushing a
+      // control while reaching for another one is a page that ends without
+      // being asked; and nothing on screen said which button did it, so the one
+      // gesture somebody needs most was the one they had to discover. The badge
+      // is drawn on the controller, it carries its own words, and its ring
+      // fills as the hold goes on, so a release cancels something visible.
       //
-      // ⚠️ THE WAY OUT IS UNCHANGED IN SUBSTANCE. Grip leaves, A/B/X/Y leave,
-      // menu leaves, and the dead-man's switch still ends a session that has
-      // drawn nothing after 4 s. What went is two indices — the ones this
-      // module has given other jobs to.
+      // ⚠️ THE OTHER WAYS OUT ARE UNCHANGED. The grip still leaves through
+      // `squeezestart`, and the dead-man's switch still ends a session that has
+      // drawn nothing after 4 s. This is the deliberate one, not the only one.
       //
-      // 🔴 THE SECOND EXCEPTION IS THE THUMBSTICK, AND IT IS THE A/B SWITCH.
-      // The one thing a headset run of this page has to be able to do is
-      // compare the picture RENDERED HERE against the same picture UPLOADED
-      // from a canvas — and a comparison you have to take the headset off to
-      // make is not one anybody will make. Click the stick and the panels swap
-      // path; the rate, the card's own time and the verdict are all published
-      // and beaconed, so "this is costing us" is legible rather than inferred.
+      // 🔴 THE THUMBSTICK IS THE A/B SWITCH AND IT IS NOT AN EXIT. The one
+      // thing a headset run of this page has to do is compare the picture
+      // RENDERED HERE against the same picture UPLOADED from a canvas, and a
+      // comparison you have to take the headset off to make is not one anybody
+      // will make. Click the stick and the panels swap path; the rate, the
+      // card's own time and the verdict are all published and beaconed.
       // ⚠️ It is the CLICK, and only while nothing is held: pushing the same
       // stick is how a held panel is pushed away and pulled back, so the two
       // gestures cannot collide.
+      ensureQuit()?.update(session.inputSources, dtSec);
       for (const src of session.inputSources) {
         const bs = src.gamepad?.buttons || [];
-        for (let i = 0; i < bs.length; i++) {
-          if (i === BUTTON.trigger || i === BUTTON.thumbstick) continue;
-          if (bs[i].pressed) { beacon(`button ${i} — leaving`); session.end().catch(() => {}); return; }
-        }
         const stick = !!bs[BUTTON.thumbstick]?.pressed;
         if (stick && !stickWasDown && !grabbing) setLive(!liveOn, 'the thumbstick');
         stickWasDown = stickWasDown || stick;
@@ -1246,7 +1328,7 @@ export function createXRPanels({
     // show the two eyes two different instants, which reads as a headache
     // rather than as a bug.
     const t0 = performance.now();
-    try { onFrame?.({ frame, pose, session }); } catch (e) { log(`the picture threw — ${e.message}`, 'bad'); }
+    try { onFrame?.({ frame, pose, session }); } catch (e) { log(`the picture threw: ${e.message}`, 'bad'); }
     const t1 = performance.now();
     state.drawCpuMs = t1 - t0;
 
@@ -1306,8 +1388,8 @@ export function createXRPanels({
         try { p.liveTex = p.live.draw({ tSec: now / 1000 }); }
         catch (e) {
           p.live = null; p.liveTex = null;
-          log(`the live picture stopped drawing — ${e.message}`, 'bad');
-          beacon(`FAIL live panel while drawing — ${e.message} · back to the uploaded canvas`);
+          log(`the live picture stopped drawing: ${e.message}`, 'bad');
+          beacon(`FAIL live panel while drawing: ${e.message} · back to the uploaded canvas`);
         }
       }
       if (timed) gpuEnd();

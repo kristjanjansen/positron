@@ -14,8 +14,8 @@ import { partialsOf, compareSource, SHAPES, DEFAULT } from './source.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
-  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' — ' + detail : ''}`); }
-  else { fail++; console.log(`  FAIL ${name}${detail ? ' — ' + detail : ''}`); }
+  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' · ' + detail : ''}`); }
+  else { fail++; console.log(`  FAIL ${name}${detail ? ' · ' + detail : ''}`); }
 };
 const near = (a, b, eps) => Math.abs(a - b) <= eps;
 

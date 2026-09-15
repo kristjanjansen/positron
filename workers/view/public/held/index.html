@@ -97,6 +97,33 @@
             font: 500 11px/1 var(--mono); letter-spacing: .04em;
             opacity: 0; transition: opacity .6s linear; pointer-events: none; }
   .hd-out[data-on="1"] { opacity: 1; }
+  /* 🔴 A REAL TEXT FIELD, NOT A KEYBOARD DRAWN IN THE ROOM. Focusing one is the
+     only thing that raises the device's OWN text entry, and a headset, a phone
+     and a laptop all already have one that knows the wearer's languages, their
+     dictation and their autocorrect. A keyboard modelled in the room would be a
+     worse copy of a thing already in the box. ⚠️ It is NOT inside `.hd`'s
+     `touch-action: none` by accident either: a field has to keep the ordinary
+     tap-to-place-a-caret behaviour, so it sets its own. */
+  .hd-type { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+             width: min(420px, calc(100% - 28px)); padding: 9px 12px;
+             background: rgba(7, 9, 13, .94); border: 1px solid var(--hi);
+             border-radius: 4px; color: var(--fg); touch-action: auto;
+             /* ⚠️ `1.4` AND `resize: none`. A textarea's default line-height
+                packs three lines too tight to read, and a drag handle in the
+                corner would let the field be pulled over the picture it is
+                editing. The height comes from `rows`, so the box is exactly
+                three lines whatever the face measures. */
+             font: 500 15px/1.4 var(--mono); resize: none; display: block; }
+  .hd-type[hidden] { display: none; }
+  /* 🔴 ONE BORDER, NOT TWO. `shell.css` gives everything a 2 px `--hi` outline
+     on `:focus-visible`, and this field already carries a 1 px `--hi` border of
+     its own, so opening it drew two concentric yellow rectangles two pixels
+     apart. The outline exists to say WHICH element has the keyboard, and here
+     nothing else can have it: the field is only on screen while it is being
+     typed in. The border is the signal, so the outline is the duplicate and it
+     is the one that goes. ⚠️ `:focus-visible` ONLY, so a browser that would
+     have shown no ring is not being robbed of one it needed. */
+  .hd-type:focus, .hd-type:focus-visible { outline: none; }
 </style>
 
 <script type="module">
@@ -107,7 +134,13 @@
   import { buildText, ensureFont, DISPLAY, DISPLAY_WEIGHT, SPREAD } from './text.mjs';
   import { createXRControllers } from '/shell/xr-controller.mjs';
   import { createXRQuit } from '/shell/xr-quit.mjs';
-  import { eyeFromView } from '/shell/xr-ray.mjs';
+  // ⚠️ `HELD_RGB` IS IMPORTED RATHER THAN RETYPED, and it is the same constant
+  // the pointer already uses for "I have hold of this". A word the trigger has
+  // taken hold of goes the colour the ray goes, so the mark is the ray's own
+  // meaning carried onto the thing it landed on rather than a second vocabulary
+  // this page invented. Typing `1.0, 0.83, 0.0` here instead would be a shared
+  // measurement in two files, which is a measurement that will disagree.
+  import { createXRRay, eyeFromView, HELD_RGB } from '/shell/xr-ray.mjs';
 
   // ── the room ──────────────────────────────────────────────────────────────
   // 15 m across. A word sits ON a wall plane or a little way out from it, and
@@ -125,70 +158,83 @@
   };
 
   // ⚠️ `cap` IS THE CAP HEIGHT IN METRES, NOT THE QUAD HEIGHT. Sizing a quad by
-  // its ink would set `MÄLU` — whose umlaut climbs above the capitals — smaller
-  // than `HELD` at the same declared size, which is the one thing a wall of
-  // words must not do. `line` does the same job for a block: the distance from
-  // one baseline to the next.
+  // its ink would set an accented word, whose diacritic climbs above the
+  // capitals, smaller than a plain one at the same declared size, which is the
+  // one thing a wall of words must not do. `line` does the same job for a
+  // block: the distance from one baseline to the next.
   //   u    along the wall, in metres, from its middle
   //   y    the middle of the ink, in metres off the floor
-  //   out  how far it stands off the wall — variety, and it is visible when you
-  //        walk past the edge of one
+  //   out  how far it stands off the wall, which is visible when you walk past
+  //        the edge of one
   /**
-   * 🔴 THE WORDS ARE FROM `KALEVIPOEG`, AND THE REASON IS THE AUDIENCE. The
-   * first set was Marinetti — `Zang Tumb Tumb`, 1914, the free-standing type
-   * that is this page's direct ancestor. It is the right ARGUMENT and the wrong
-   * words: `ZANG` and `TATATATA` are onomatopoeia for artillery, so the first
-   * question anybody asked was *what is zang?*, and the honest answer is that a
-   * futurist was enjoying a bombardment. A room somebody walks into should not
-   * need that footnote.
+   * 🔴 SIZE COMES FROM LENGTH AND FROM NOTHING ELSE. A cap height is never
+   * authored per word here: it is `TALLEST` divided by the letter count, so the
+   * shortest word in the room is always the biggest one in it. That is the
+   * typographic argument of the page, and it is why the words can be RETYPED at
+   * all. Type a shorter word over a longer one and it GROWS as you press
+   * return, which is a thing a page of set type cannot do.
    *
-   * These carry the same weight and are the reader's own: Kreutzwald's national
-   * epic, 1857–1861, in the language this project is made in. Names, the words
-   * the poem itself shouts, and three lines of the verse. Somebody standing in
-   * this room in Tallinn has met all of them at school.
+   * ⚠️ AND IT IS NOT ASSERTED BY RE-DIVIDING THIS NUMBER. A check that
+   * recomputed `TALLEST / length` would be comparing the rule with itself. The
+   * one further down RENDERS every word head-on from one distance and measures
+   * how tall its letters come out in pixels.
+   */
+  const TALLEST = 5.5;
+  /**
+   * How tall a capital stands: the shorter the word, the bigger it is drawn.
    *
-   * ⚠️ PUBLIC DOMAIN, AND CHECKED RATHER THAN ASSUMED. Friedrich Reinhold
-   * Kreutzwald died in 1882, so the text has been out of copyright everywhere
-   * since 1952 under life-plus-seventy. Nothing here is a translation — a
-   * translation is somebody else's work with its own term.
+   * ⚠️ MEASURED ON THE LONGEST LINE, NOT ON THE WHOLE STRING. Once a line break
+   * survives, a two-line entry has two lengths and the total is neither: taking
+   * the total would make `What is going` over `on?` smaller than `What is going
+   * on?` on one line, which is backwards, since breaking a line makes it
+   * NARROWER. The widest line is what has to fit, so it is what sets the size.
+   */
+  const capFor = (s) => {
+    const longest = String(s).split('\n')
+      .reduce((n, l) => Math.max(n, [...l.replace(/\s+/g, '')].length), 0);
+    return TALLEST / Math.max(1, longest);
+  };
+
+  /**
+   * 🔴 SENTENCE CASE, AND THE CAPITALS ARE THE VISITOR'S TO TYPE. The room used
+   * to shout: every word was set in capitals, which is the page deciding on
+   * somebody else's behalf how somebody else's words are said. Now that a word
+   * can be typed over, the case belongs to whoever types it.
    *
-   * ⚠️ AND THE DIACRITICS ARE THE POINT NOW, NOT A TEST. `SÕRVE`, `TÄHT`, `ÖÖ`
-   * are spelled that way, and they are the reason the page ships two font files
-   * — see the note in the stylesheet about Estonian falling across the split.
+   * ⚠️ THE WORDS WERE `KALEVIPOEG` AND THIS IS WHERE THEY WENT, written down so
+   * nobody restores them thinking something was dropped by accident.
+   * Kreutzwald's epic was the right content for a room of FIXED words: out of
+   * copyright since 1952, and a reader in Tallinn has met all of it at school.
+   * A room whose words are typed by the person standing in it has no content to
+   * choose, and a sentence about walls is what four walls are for. The two font
+   * files are still both shipped and still both checked: Estonian falls across
+   * Google's unicode-range split, and `ensureFont()` measures an S against a Š
+   * rather than trusting that some word on a wall happens to carry one.
    */
   const ITEMS = [
-    // ⚠️ THE LENGTHS ARE THE POINT, AND THEY WERE ALL ABOUT THE SAME. Eight
-    // words of four to eight letters at three cap heights is one size of thing
-    // repeated, and a room of one size is a wall of text however big the text
-    // is. A four-letter shout, a sixteen-letter one, a name, a line.
-    { text: 'KALEV', wall: 'n', u: -2.6, y: 3.4, cap: 2.2, out: 0 },
-    { text: 'LINDA', wall: 'n', u: 3.6, y: 3.2, cap: 1.1, out: 0.5 },
-    { text: '\u00f6\u00f6', wall: 'n', u: 5.0, y: 1.9, cap: 0.42, out: 0.15 },
-    { text: '\u00dcks tuli tuulest, teine veest, kolmas kotkasulest.',
-      wall: 'n', u: -3.6, y: 1.2, line: 0.21, out: 0.55, weight: 400, px: 96, width: 3.1 },
+    // Five words on four walls, and the sentence only closes if you turn all
+    // the way round: `If` and `talk` share a wall, so the last word is waiting
+    // where the first one was.
+    { text: 'If', wall: 'n', u: -3.3, y: 3.5, out: 0 },
+    { text: 'talk', wall: 'n', u: 3.4, y: 1.5, out: 0.35 },
+    { text: 'these', wall: 'e', u: -1.2, y: 2.6, out: 0.5 },
+    { text: 'walls', wall: 's', u: 1.6, y: 3.0, out: 0 },
+    { text: 'could', wall: 'w', u: -2.2, y: 2.1, out: 0.3 },
 
-    // The long one. Sixteen letters at a modest cap is nine metres of wall —
-    // you cannot take it in from one place, which is a fact about a name that
-    // is also a title.
-    { text: 'KALEVIPOEG', wall: 'e', u: 0, y: 3.3, cap: 1.25, out: 0 },
-    { text: 'S\u00d5RVE', wall: 'e', u: -3.4, y: 1.6, cap: 0.75, out: 0.45 },
-    { text: '1861', wall: 'e', u: 4.6, y: 0.9, cap: 0.5, out: 0.15 },
-    { text: 'Laena mulle kannelt, Vanemuine! Laulu kohta otsin kodusta '
-      + 'm\u00e4lestusest.',
-      wall: 'e', u: 3.1, y: 2.3, line: 0.185, out: 0.75, weight: 400, px: 96, width: 2.5 },
-
-    { text: 'VANEMUINE', wall: 's', u: 0.4, y: 3.1, cap: 1.15, out: 0 },
-    { text: 'raudmees', wall: 's', u: -4.2, y: 1.0, cap: 0.4, out: 0.3 },
-    { text: 'T\u00c4HT', wall: 's', u: 4.2, y: 1.8, cap: 0.7, out: 0.6 },
-
-    // ⚠️ THIS ONE WRAPS ITSELF: no newline, just five and a half metres of wall
-    // to fit into. A `\n` is honoured as a hard break where somebody wants one.
-    { text: 'KIVI KANNAB KIRJA', wall: 'w', u: -0.4, y: 2.7, cap: 0.85, out: 0, width: 5.5 },
-    { text: 'S\u00c4RGAV', wall: 'w', u: 4.2, y: 1.2, cap: 0.95, out: 0.2 },
-    { text: 'Aga \u00fckskord algab aega, kus k\u00f5ik piirud '
-      + 'k\u00e4tte j\u00f5uavad \u2014 Kreutzwald, 1861.',
-      wall: 'w', u: -4.2, y: 1.15, line: 0.175, out: 0.55, weight: 400, px: 96, width: 2.6 },
+    // ⚠️ A BLOCK IS SET BY ITS BASELINE STEP AND NOT BY `capFor`. A paragraph
+    // has no one length to be short, and the rule above is about words. This
+    // one wraps itself: no newline, just 3.2 m of wall to fit into. A `\n` is
+    // honoured as a hard break where somebody wants one.
+    // ⚠️ IT SAID "YOUR OWN KEYBOARD OPENS" AND THAT IS NOT TRUE IN A HEADSET.
+    // This block is the one instruction inside the room, so a runtime with no
+    // way to show a keyboard during a session had this sentence on a wall in
+    // front of somebody it was wrong about. What is true everywhere is the part
+    // about the size, which is the page.
+    { text: 'Point at a word and click. What you type stands there instead, at '
+      + 'the size its length gives it.',
+      wall: 'n', u: 0.2, y: 1.3, line: 0.2, out: 0.4, weight: 400, px: 96, width: 3.2 },
   ];
+  for (const it of ITEMS) if (!it.line) it.cap = capFor(it.text);
 
   // ⚠️ A REALLY SMALL AMOUNT, AND IT IS DELIBERATELY NOT ZERO. At 0.94 a word
   // in front of another shows a trace of it, which is what tells you the two
@@ -196,28 +242,40 @@
   // Below about 0.85 white on a dark room starts reading as grey rather than as
   // white-behind-white, and the weight goes out of the letters.
   const INK_ALPHA = 0.94;
+  /** What a word is normally set in, and what one the trigger has hold of is. */
+  const INK_RGB = [1, 1, 1];
+  const MARK_RGB = HELD_RGB;
 
   const d = mount({
     name: 'held',
-    // ⚠️ IT NAMES THE SOURCE, because the first question anybody asks is "what
-    // is ZANG?" — asked here within a minute of the words going up. They are
-    // Marinetti's onomatopoeia for artillery, from `Zang Tumb Tumb` (1914), and
-    // a page that shows a word nobody can look up owes the reader where it came
-    // from. One clause; the argument for why these words are on a wall at all
-    // lives in a comment by the list.
-    what: 'Words from `Kalevipoeg` \u2014 Kreutzwald, 1861 \u2014 in a room, '
-      + 'flat and fixed where they are, and not one of them turns to face you: '
-      + 'walk to the side and a word becomes a line. Drag to look and the arrow '
-      + 'keys to walk; in a headset '
-      + 'the left stick glides, the right one turns in steps, and Run in AR puts '
-      + 'the same words in your own room. nearest is how far the closest word is '
-      + 'and magnified is how far past its own stored size its edges are being '
-      + 'blown up \u2014 they stay sharp past 1x because a word is kept as a '
-      + 'distance to its edge rather than as a picture of itself.',
+    // ⚠️ IT NAMES WHAT THE PAGE DOES NOW, AND IT USED TO NAME KREUTZWALD. The
+    // words on these walls are the visitor's to type, so there is no longer a
+    // source to credit. What has to be said instead is the rule that decides
+    // how big a word comes out, because nothing on screen announces it.
+    // ⚠️ IT DESCRIBED A READOUT THAT HAD BEEN DELETED, for two sessions, in a
+    // sentence a visitor had no way to doubt. `nearest` and `magnified` were
+    // both named here and neither is on the page. A description that has drifted
+    // is worse than a missing one, and the repair is to re-read the whole
+    // paragraph rather than to staple the new behaviour onto the end of it.
+    what: 'One sentence stands broken across the four walls of a room, each '
+      + 'word as big as it is short, and not one of them turns to face you: '
+      + 'walk to the side and a word becomes a line. Drag to look, the arrow '
+      + 'keys to walk, and click a word to type your own over it, which grows '
+      + 'as you shorten it. In a headset the sticks glide and turn, the trigger '
+      + 'lights up the word you are pointing at so you can type over it, and '
+      + 'Run in AR puts the words in your own room. The letters stay sharp '
+      + 'however close you walk, because a word is kept as a distance to its '
+      + 'own edge rather than as a picture of itself.',
     // ⚠️ FOUR CELLS, ALL OF WHICH MOVE. A count of the words was the obvious
     // fifth and it is a structural constant: a cell that cannot change teaches
     // a reader to stop looking at the row.
-    readout: { nearest: 'm', magnified: '×', walked: 'm', fps: '' },
+    // 🔴 NO READOUT. It carried `nearest`, `magnified`, `walked` and `fps`, and
+    // all four are about the WALK rather than about the typography this page is
+    // for. Standing in a room and reading what is on its walls is not a task
+    // with numbers in it, and four cells of them above the picture were an
+    // instrument panel bolted to a thing you look at. The frame rate is still
+    // measured and still asserted, where it is graded rather than displayed.
+    readout: null,
     controls: [
       { id: 'vr', label: 'Run in VR' },
       { id: 'ar', label: 'Run in AR' },
@@ -229,7 +287,21 @@
   const wrap = el('div', 'hd');
   const canvas = el('canvas');
   const outEl = el('div', 'hd-out', 'Esc to leave');
-  wrap.append(canvas, outEl);
+  // The field a word is retyped in. ⚠️ `autocapitalize` is OFF on purpose: the
+  // case is the visitor's to choose, and a phone that capitalises the first
+  // letter for them is making exactly the decision this page stopped making.
+  // 🔴 A TEXTAREA OF THREE LINES, NOT ONE LINE OF INPUT. A wall takes a
+  // sentence as readily as a word, and a single-line field says it does not:
+  // what you can type is the shape of the box you type it in. Three lines is
+  // enough to see a sentence whole without the field becoming the page.
+  const typeEl = el('textarea', 'hd-type');
+  typeEl.rows = 3;
+  typeEl.hidden = true;
+  typeEl.autocapitalize = 'none';
+  typeEl.autocomplete = 'off';
+  typeEl.spellcheck = false;
+  typeEl.setAttribute('aria-label', 'the word on the wall');
+  wrap.append(canvas, outEl, typeEl);
   d.el.append(wrap);
 
   // 🔴 `alpha: true`, AND IT IS NOT A DEFAULT BEING ACCEPTED. The compositor
@@ -307,12 +379,40 @@
     m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14],
   ];
 
+  /**
+   * 🔴 THE OTHER DIRECTION, WHICH THE PAGE NEEDED THE MOMENT YOU COULD POINT AT
+   * SOMETHING. A headset reports a hand where the HEADSET's space says it is;
+   * the words live in room coordinates. `roomToEye` is `rotY(turn)` after a
+   * translation, so coming back is the translation after `rotY(-turn)`, and the
+   * rotation alone is what a DIRECTION needs.
+   *
+   * ⚠️ THIS WAS ALREADY BEING DONE INLINE AND IT WAS MIRRORED. The old line
+   * read `pos[0] + head[12] * c + head[14] * s`, which is `rotY(+turn)`: correct
+   * at a turn of zero and wrong by twice the angle after that. It only fed the
+   * back-to-front sort and the floor's centre, so it never drew anything anybody
+   * could point at, and nothing on the page could see it. The check below runs
+   * it against `roomToEye` itself, which is graded by rendering rather than by
+   * arithmetic.
+   */
+  function dirToRoom(v) {
+    const c = Math.cos(turn), s = Math.sin(turn);
+    return [c * v[0] - s * v[2], v[1], s * v[0] + c * v[2]];
+  }
+  function pointToRoom(v) {
+    const r = dirToRoom(v);
+    return [pos[0] + r[0], r[1], pos[1] + r[2]];
+  }
+
   // ── where you are ─────────────────────────────────────────────────────────
   // Room coordinates. `turn` is the facing the locomotion owns; on the window a
   // drag writes it directly, in a headset the neck owns the rest of the facing
   // and the stick only ever moves this in steps.
   const EYE_Y = 1.6;
-  let pos = [0, 4.2], turn = 0, pitch = 0;
+  // ⚠️ THE MIDDLE OF THE ROOM, NOT BACKED UP AGAINST A WALL. Five words on four
+  // walls is a sparser room than the fourteen this page used to hold, and from
+  // the old arrival spot two of them were behind you and one was too far to
+  // read. From the middle every wall is a turn away.
+  let pos = [0, 0.6], turn = 0, pitch = 0;
   let walked = 0;
   const held = new Set();          // keys down
 
@@ -358,18 +458,24 @@ void main() {
   // level of detail to choose. ⚠️ Clamped at both ends: a quad seen edge-on has
   // a gradient that runs away, and an unclamped width there turns a word into a
   // grey smear rather than into the thin line it should be.
+  // ⚠️ `uCol` IS NEW AND EVERY DRAW HAS TO SET IT. It was a literal white, and a
+  // uniform nobody sets is zero — which is BLACK ink on a dark room, drawn
+  // correctly and invisible. Both callers below set it, and `probe()` sets it
+  // too: the probes read the RED channel to find ink, so a probe that left this
+  // at its default would report every word on the page as blank.
   const TEXT_FS = `#version 300 es
 precision highp float;
 in vec2 vUV;
 uniform sampler2D uTex;
 uniform float uAlpha;
+uniform vec3 uCol;
 out vec4 o;
 void main() {
   float s = texture(uTex, vUV).r;
   float w = clamp(fwidth(s), 0.0009, 0.30);
   float a = smoothstep(0.5 - w, 0.5 + w, s);
   if (a <= 0.003) discard;
-  o = vec4(1.0, 1.0, 1.0, a * uAlpha);
+  o = vec4(uCol, a * uAlpha);
 }`;
 
   const FLOOR_VS = `#version 300 es
@@ -425,6 +531,7 @@ void main() {
     VP: gl.getUniformLocation(textProg, 'uVP'), O: gl.getUniformLocation(textProg, 'uO'),
     R: gl.getUniformLocation(textProg, 'uR'), U: gl.getUniformLocation(textProg, 'uU'),
     tex: gl.getUniformLocation(textProg, 'uTex'), a: gl.getUniformLocation(textProg, 'uAlpha'),
+    col: gl.getUniformLocation(textProg, 'uCol'),
   };
   const uF = {
     VP: gl.getUniformLocation(floorProg, 'uVP'), c: gl.getUniformLocation(floorProg, 'uCentre'),
@@ -483,6 +590,7 @@ void main() {
       built.push(place(item, t));
     }
     d.log(`${built.length} words standing, ${SPREAD}-texel fields`, 'hi');
+    sayWords();
   }
 
   // ── drawing ───────────────────────────────────────────────────────────────
@@ -528,6 +636,11 @@ void main() {
       gl.uniform3fv(uT.R, b.r);
       gl.uniform3fv(uT.U, b.up);
       gl.uniform1f(uT.a, INK_ALPHA);
+      // 🔴 THE WHOLE OF WHAT A TRIGGER PRESS DOES IN A HEADSET, IN ONE LINE. The
+      // word you pulled the trigger on is repainted where it stands, so the
+      // press has an answer you can see from inside the room. It used to have
+      // one you could only see by being thrown out of the room.
+      gl.uniform3fv(uT.col, b === marked ? MARK_RGB : INK_RGB);
       gl.bindTexture(gl.TEXTURE_2D, b.t.tex);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
@@ -573,8 +686,13 @@ void main() {
     pos[1] = Math.max(-lim, Math.min(lim, pos[1]));
   }
 
+  // 🔴 A PAGE THAT WALKS ON `w` AND ALSO TAKES TYPING HAS TO ASK WHICH IS
+  // HAPPENING. Without this guard, typing `walls` into the field would slide you
+  // across the room and `preventDefault` would eat the letters as they were
+  // pressed, so the field would look broken and the room would look haunted.
+  const typing = () => document.activeElement === typeEl;
   addEventListener('keydown', (e) => {
-    if (!wrap.isConnected) return;
+    if (!wrap.isConnected || typing()) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd'].includes(k)) {
       held.add(k); e.preventDefault();
@@ -586,20 +704,238 @@ void main() {
   });
   addEventListener('blur', () => held.clear());
 
+  // ── pointing at a word ────────────────────────────────────────────────────
+  /**
+   * Where a ray lands, in room coordinates. Every word is a flat quad on a wall
+   * whose normal is the wall's, so this is a plane crossing followed by two
+   * comparisons against the quad's own half-extents.
+   *
+   * ⚠️ `r` AND `up` ARE HALF-VECTORS, not axes plus a size. They are what the
+   * shader is handed, which is the point: the thing being pointed at and the
+   * thing being drawn are described by the same three numbers, so a word cannot
+   * be picked anywhere other than where it appears.
+   */
+  function aimAt(origin, dir) {
+    let best = null, bestT = Infinity;
+    for (const b of built) {
+      const n = WALLS[b.item.wall].nrm;
+      const denom = dir[0] * n[0] + dir[1] * n[1] + dir[2] * n[2];
+      if (Math.abs(denom) < 1e-6) continue;
+      const t = ((b.o[0] - origin[0]) * n[0] + (b.o[1] - origin[1]) * n[1]
+        + (b.o[2] - origin[2]) * n[2]) / denom;
+      if (t <= 0.02 || t >= bestT) continue;
+      const px = origin[0] + dir[0] * t - b.o[0];
+      const py = origin[1] + dir[1] * t - b.o[1];
+      const pz = origin[2] + dir[2] * t - b.o[2];
+      const rl = Math.hypot(b.r[0], b.r[1], b.r[2]);
+      const ul = Math.hypot(b.up[0], b.up[1], b.up[2]);
+      if (!(rl > 0) || !(ul > 0)) continue;
+      const along = (px * b.r[0] + py * b.r[1] + pz * b.r[2]) / rl;
+      const up = (px * b.up[0] + py * b.up[1] + pz * b.up[2]) / ul;
+      if (Math.abs(along) <= rl && Math.abs(up) <= ul) { bestT = t; best = { b, t }; }
+    }
+    return best;
+  }
+
+  /** The ray under a point on the canvas, in room coordinates. `nx`/`ny` are
+   *  normalised: 0,0 is the middle, 1,1 the top right corner. */
+  function rayThrough(nx, ny, aspect) {
+    const tanY = Math.tan(FOV / 2);
+    const inEye = [nx * tanY * aspect, ny * tanY, -1];
+    const m = mul(rotY(-turn), rotX(pitch));
+    const d = apply(m, inEye);
+    const len = Math.hypot(d[0], d[1], d[2]) || 1;
+    return { origin: [pos[0], EYE_Y, pos[1]], dir: [d[0] / len, d[1] / len, d[2] / len] };
+  }
+
+  // ── typing over a word, and marking one to type later ─────────────────────
+  let editing = null;
+  /**
+   * 🔴 THE WORD THE TRIGGER HAS HOLD OF, AND IT IS WHAT REPLACED ENDING THE
+   * SESSION. REPORTED from a real Quest in these words: **"held demo: click in
+   * vr brought me back to browser."** The page was doing that on purpose. Where
+   * a runtime refuses to put a text field inside the session there is no
+   * keyboard to raise, and the old answer was to leave the session so the
+   * keyboard could be raised over the window instead. Every step of that
+   * reasoning is true and the result is the worst outcome available: the one
+   * gesture the page advertises throws you out of the room.
+   *
+   * So the press now MARKS. The word goes the colour the pointer goes when it
+   * has hold of something, it stays marked while you walk around and look at it
+   * from the side, another press moves the mark, and the word you left marked
+   * is the one the field opens on when YOU decide to leave. Nothing about the
+   * way out changes: it is still the labelled button under your thumb, held.
+   *
+   * ⚠️ IT IS NOT A WORSE KEYBOARD, IT IS A DIFFERENT DIVISION OF THE JOB. The
+   * choosing is the part that needs the room and it happens in the room; the
+   * typing is the part that needs a keyboard and it happens where there is one.
+   * `plan-vr-text-entry.md` prices the options for typing in the room itself.
+   */
+  let marked = null;
+  /** Mark a word, or clear the mark with `null`. */
+  function markWord(b) {
+    if (marked === (b || null)) return;
+    marked = b || null;
+    sayWords();
+  }
+
+  /** Rebuild one word at the size its NEW length asks for, in place. */
+  function retext(b, raw) {
+    // 🔴 NEWLINES SURVIVE. This was `replace(/\s+/g, ' ')`, which is every kind
+    // of whitespace INCLUDING `\n`, so a line break typed into the field was
+    // destroyed here and the wall drew one long line. `buildText` has honoured
+    // `\n` as a hard break since it was written; nothing downstream needed
+    // changing, the text simply never arrived with one in it.
+    //
+    // ⚠️ SPACES ARE STILL COLLAPSED, WITHIN A LINE. Two spaces between words is
+    // a typing artefact and reads as a gap in a wall of type; a line break is a
+    // decision. Blank lines at either end go, blank lines in the middle stay,
+    // because somebody who typed one meant it.
+    const s = String(raw).split('\n').map((l) => l.replace(/[^\S\n]+/g, ' ').trim())
+      .join('\n').replace(/^\n+|\n+$/g, '');
+    if (!s) return null;
+    const item = { ...b.item, text: s };
+    if (!item.line) item.cap = capFor(s);
+    const t = buildText(gl, {
+      text: item.text, weight: item.weight || DISPLAY_WEIGHT, px: item.px || 320,
+      cap: item.cap || 0, line: item.line || 0, width: item.width || 0,
+    });
+    const nb = place(item, t);
+    const i = built.indexOf(b);
+    built[i] = nb;
+    // ⚠️ `ITEMS` IS KEPT IN STEP, not left behind. A check on this page asks
+    // that every word is a word and counts `built` against `ITEMS`, and a page
+    // whose two lists have drifted is a page whose asserts are about the old
+    // room.
+    const j = ITEMS.indexOf(b.item);
+    if (j >= 0) ITEMS[j] = item;
+    // ⚠️ AND SO IS THE MARK. `retext` replaces the object in `built`, so a mark
+    // left pointing at the old one would compare unequal to everything drawn and
+    // the colour would come off a word nobody unmarked — a state that is set and
+    // has no way back, which is the worst kind.
+    if (marked === b) marked = nb;
+    // ⚠️ AND SO IS THE ONE BEING CARRIED OUT OF THE SESSION. A word typed over
+    // with the headset's own keyboard is retexted on every keystroke, so by the
+    // time the session ends the object the trigger stored is several rebuilds
+    // stale — and opening the field on it would put the text back to what it was
+    // before the first letter, which reads as the typing having been thrown away.
+    if (xrPending === b) xrPending = nb;
+    gl.deleteTexture(b.t.tex);
+    sayWords();
+    return nb;
+  }
+
+  // ⚠️ WHAT IS ON THE WALLS, WHERE SOMETHING OUTSIDE THE PAGE CAN READ IT. The
+  // asserts are taken once at load and the words can change at any time after
+  // it, so a check that drives a real click has no other way to see whether the
+  // wall actually changed or only the field did.
+  function sayWords() {
+    window.__demo.words = built.map((b) => ({
+      text: b.item.text, cap: b.item.cap ?? null, line: b.item.line ?? null,
+      marked: b === marked,
+    }));
+  }
+
+  /**
+   * @param {boolean} [o.keepMark] leave the word lit while it is being typed.
+   *
+   * ⚠️ FALSE ON THE PAGE AND TRUE IN A SESSION, AND IT IS NOT A PREFERENCE. On
+   * the page the field is on screen an inch under the word, so a lit word is
+   * the same fact in two places and the wall is about to be overwritten letter
+   * by letter anyway. Inside a headset the field is BEHIND YOUR FACE: focusing
+   * it is what raises the runtime's own keyboard, but nothing about it can be
+   * seen from in there. The lit word is then the only thing in the room saying
+   * which word the keyboard is pointed at, which is the opposite of a duplicate.
+   */
+  function openTyping(b, how, { keepMark = false } = {}) {
+    if (!keepMark) markWord(null);
+    editing = b;
+    typeEl.value = b.item.text;
+    typeEl.hidden = false;
+    typeEl.focus();
+    typeEl.select();
+    d.log(`typing over "${b.item.text.slice(0, 28)}" (${how})`, 'hi');
+  }
+  function closeTyping() {
+    editing = null;
+    typeEl.hidden = true;
+    typeEl.blur();
+  }
+  /**
+   * 🔴 THE WALL FOLLOWS THE KEYSTROKE. It used to rebuild only on Return, so
+   * every letter you typed went into a box at the bottom of the screen while
+   * the thing you were editing sat unchanged above it: you were writing blind
+   * and finding out at the end. Since the size comes from the LENGTH, the
+   * letter you are typing is the one changing how big the word will be, and
+   * watching that happen is the page.
+   *
+   * ⚠️ REBUILT ON A FRAME, NOT ON THE EVENT. `retext` rasterises a new glyph
+   * atlas and uploads a texture; doing that inside the keydown of somebody
+   * typing quickly queues one upload per keystroke and the field goes sticky.
+   * One rebuild per animation frame collapses a burst to what the eye can see
+   * anyway, and a key pressed while one is pending still lands, because the
+   * pending flag is cleared before the work rather than after it.
+   */
+  let liveWaiting = false;
+  function liveRetext() {
+    if (liveWaiting || !editing) return;
+    liveWaiting = true;
+    requestAnimationFrame(() => {
+      liveWaiting = false;
+      if (!editing) return;
+      const nb = retext(editing, typeEl.value);
+      // An empty field is not an error while somebody is mid-word: it is what a
+      // field looks like a moment after select-all. The wall keeps what it had
+      // and the next keystroke replaces it.
+      if (nb) editing = nb;
+    });
+  }
+  typeEl.addEventListener('input', liveRetext);
+  typeEl.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Escape') { closeTyping(); return; }
+    // ⚠️ RETURN IS A NEWLINE NOW, AND ONLY MODIFIER-RETURN FINISHES. In a
+    // one-line field Return could only ever have meant "done"; in a three-line
+    // one it means what it means in every other textarea, and taking that away
+    // would be a box shaped for three lines that refuses to hold two.
+    if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)) return;
+    e.preventDefault();
+    const b = editing;
+    closeTyping();
+    if (!b) return;
+    d.log(`"${b.item.text}" stands at ${(b.item.cap || b.item.line).toFixed(2)} m `
+      + `${b.item.cap ? 'of capital' : 'a line'}`, 'hi');
+  });
+  typeEl.addEventListener('blur', () => { if (editing) closeTyping(); });
+
   let drag = null;
   wrap.addEventListener('pointerdown', (e) => {
-    drag = { x: e.clientX, y: e.clientY };
+    if (e.target === typeEl) return;
+    drag = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY };
     wrap.setPointerCapture(e.pointerId);
   });
   wrap.addEventListener('pointermove', (e) => {
     if (!drag) return;
     turn += (e.clientX - drag.x) * 0.005;
     pitch = Math.max(-1.2, Math.min(1.2, pitch - (e.clientY - drag.y) * 0.005));
-    drag = { x: e.clientX, y: e.clientY };
+    drag = { ...drag, x: e.clientX, y: e.clientY };
   });
-  const endDrag = () => { drag = null; };
-  wrap.addEventListener('pointerup', endDrag);
-  wrap.addEventListener('pointercancel', endDrag);
+  // ⚠️ A CLICK IS A DRAG THAT DID NOT GO ANYWHERE. The same pointer both looks
+  // around and picks a word, so the only thing separating them is how far it
+  // travelled: four pixels is under a hand tremor and over a tap's wobble.
+  wrap.addEventListener('pointerup', (e) => {
+    const was = drag; drag = null;
+    if (!was || Math.hypot(e.clientX - was.x0, e.clientY - was.y0) > 4) return;
+    const r = wrap.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return;
+    const nx = ((e.clientX - r.left) / r.width) * 2 - 1;
+    const ny = 1 - ((e.clientY - r.top) / r.height) * 2;
+    const ray = rayThrough(nx, ny, r.width / r.height);
+    const hit = aimAt(ray.origin, ray.dir);
+    if (hit) openTyping(hit.b, 'clicked');
+    else if (editing) closeTyping();
+  });
+  wrap.addEventListener('pointercancel', () => { drag = null; });
 
   function windowView() {
     return mul(rotX(-pitch), roomToEye(pos[0], EYE_Y, pos[1], turn));
@@ -619,11 +955,19 @@ void main() {
     return { dist, mag: pxPerM * best.texelM, b: best };
   }
 
+  // Measured every frame, read by the checks, drawn nowhere.
+  let fps = 0, nearest = null;
+
   function frame(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     frames++;
     if (dt > 0) { fpsAcc += 1 / dt; fpsN++; }
-    if (fpsN >= 30) { d.set('fps', Math.round(fpsAcc / fpsN)); fpsAcc = 0; fpsN = 0; }
+    // ⚠️ `fps` IS STILL COUNTED AND NO LONGER DISPLAYED. The readout is gone and
+    // `d.set` THROWS on a key `mount()` never declared, so leaving the call in
+    // killed the render loop on its first frame: the picture froze, clicking a
+    // word did nothing, and the only sign was one line in the log. `fps` is
+    // read by the checks below, so the arithmetic stays.
+    if (fpsN >= 30) { fps = Math.round(fpsAcc / fpsN); fpsAcc = 0; fpsN = 0; }
     step(dt);
 
     const r = wrap.getBoundingClientRect();
@@ -639,12 +983,8 @@ void main() {
     sortFor(eye);
     drawScene(mul(perspective(FOV, W / H, 0.05, 200), windowView()), eye);
 
-    const near = readNearest(eye, H);
-    if (near) {
-      d.set('nearest', near.dist.toFixed(1));
-      d.set('magnified', near.mag.toFixed(1));
-    }
-    d.set('walked', walked.toFixed(0));
+    // Still measured, because the checks read them; no longer drawn anywhere.
+    nearest = readNearest(eye, H);
     if (!xrSession) requestAnimationFrame(frame);
   }
 
@@ -676,21 +1016,111 @@ void main() {
     else if (Math.abs(x) < 0.4) snapArmed = true;
   }
 
+  // 🔴 THE HEADSET'S OWN KEYBOARD, NOT ONE MODELLED IN THE ROOM. A device with
+  // text entry already has one that knows the wearer's languages, their
+  // dictation and their autocorrect, and the only thing that raises it is a
+  // focused text field. A keyboard modelled in the room would be a worse copy of
+  // a thing already in the box.
+  //
+  // 🔴 AND THERE ARE TWO SEPARATE WAYS TO REACH IT, WHICH THIS PAGE HAD
+  // CONFLATED INTO ONE. They are different features, they are granted by
+  // different runtimes, and asking only the first is what made a trigger press
+  // eject somebody from a headset.
+  //
+  //   · `dom-overlay` puts the page's OWN elements in front of somebody inside
+  //     a session. It is asked for as an OPTIONAL feature so a runtime that
+  //     refuses it still gets a working page.
+  //   · `session.isSystemKeyboardSupported` is the runtime saying that focusing
+  //     a field raises ITS keyboard, as system UI, over whatever the session is
+  //     drawing. The field itself stays behind your face and is never seen.
+  //
+  // ⚠️ THE SECOND IS NOT A FALLBACK FOR THE FIRST, and the page does not choose
+  // between them: where the keyboard is offered the word is marked AND the field
+  // is focused, so a runtime that answers yes and then does nothing still leaves
+  // a visible answer on the wall. Neither of these can be established from this
+  // laptop — desktop Chrome reports `immersive-vr false` and never enters a
+  // session at all — so both are published on `__demo.xr` for a headset run to
+  // read back rather than asserted here.
+  let overlay = false, sysKeyboard = false;
+  /**
+   * What a session says about the runtime's own keyboard: `true`, `false`, or
+   * `'unknown'` where it does not carry the attribute at all.
+   *
+   * ⚠️ A NAMED FUNCTION SO IT CAN BE GRADED, and that is not tidiness. It was
+   * two inline characters (`!!`), and the check written for it set the RESULT
+   * by hand and then tested the branch: sabotaging the real decision left the
+   * check green, because `'unknown'` is truthy and so is `true`. A check that
+   * cannot see the thing it is about is the trap CLAUDE.md records twice, once
+   * for a format and once for geometry. The claim is about the DECISION, so the
+   * decision has to be reachable.
+   */
+  const keyboardVerdict = (session) => {
+    const kb = session?.isSystemKeyboardSupported;
+    return kb === undefined ? 'unknown' : !!kb;
+  };
+
+  /** Point at a word, pull the trigger, and type over it. */
+  function xrAim(ev) {
+    if (!xrRefSpace || !ev.frame) return;
+    const p = ev.inputSource?.targetRaySpace
+      && ev.frame.getPose(ev.inputSource.targetRaySpace, xrRefSpace);
+    if (!p) return;
+    const m = p.transform.matrix;
+    const origin = pointToRoom([m[12], m[13], m[14]]);
+    const dir = dirToRoom([-m[8], -m[9], -m[10]]);
+    const len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+    const hit = aimAt(origin, [dir[0] / len, dir[1] / len, dir[2] / len]);
+    if (!hit) return;
+    if (overlay) { openTyping(hit.b, 'pointed at'); return; }
+    // 🔴 IT MARKS. IT DOES NOT END THE SESSION. This line used to read
+    // `xrSession?.end()`, on the argument that a trigger landing on a word and
+    // producing no field is a control that looks live and is inert. The
+    // argument is sound and the fix was the one thing worse than the problem:
+    // from inside the headset it is indistinguishable from the page crashing.
+    // A mark is visible, it is undone by marking something else, and it leaves
+    // the wearer exactly where they were.
+    xrPending = hit.b;
+    markWord(hit.b);
+    // ⚠️ MARKED FIRST, THEN THE KEYBOARD ASKED FOR — in that order, and the order
+    // is the whole safety of it. Focusing a field is a request; a runtime that
+    // claims the keyboard and does not raise one leaves a press with no answer,
+    // which is the inert control this page is trying to stop being. Marking
+    // first means the worst case is a lit word and a keyboard that did not come,
+    // and the word is still there to type over on the way out.
+    if (sysKeyboard) {
+      openTyping(hit.b, sysKeyboard === 'unknown'
+        ? 'pointed at. This runtime does not say whether it has a keyboard, so the field is focused anyway'
+        : 'pointed at, on the headset\u2019s own keyboard', { keepMark: true });
+      return;
+    }
+    // ⚠️ THE LOG LINE IS FOR AFTERWARDS, NOT FOR NOW. It is on the flat page,
+    // behind your face; nothing said here can be read until the session ends.
+    // The colour on the wall is the whole of what this press reports in the
+    // room, which is why the press had to change the picture and not the log.
+    d.log(`"${hit.b.item.text.slice(0, 28)}" is marked. `
+      + 'This runtime keeps its keyboard outside the session, so the field opens '
+      + 'on it when you leave', 'hi');
+  }
+  let xrPending = null;
+
   async function enterXR(mode) {
     if (!navigator.xr) { d.log('this browser has no WebXR at all', 'bad'); return; }
     const known = mode === 'immersive-ar' ? arKnown : vrKnown;
     if (known === false) {
       d.log(mode === 'immersive-ar'
-        ? 'nothing here can show the room behind the page — the window above is the same room'
-        : 'no headset here — the window above is the same room', 'warn');
+        ? 'nothing here can show the room behind the page. The window above is the same room'
+        : 'no headset here. The window above is the same room', 'warn');
       return;
     }
     try {
       // ⚠️ NO AWAIT BEFORE requestSession — it needs a transient user activation
       // and awaiting anything first can spend it. The support answers were taken
       // at load for exactly this reason.
-      const session = await navigator.xr.requestSession(mode,
-        { requiredFeatures: ['local-floor'] });
+      const session = await navigator.xr.requestSession(mode, {
+        requiredFeatures: ['local-floor'],
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: wrap },
+      });
       xrSession = session;
       await gl.makeXRCompatible();
       session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
@@ -700,21 +1130,70 @@ void main() {
       // bug rather than as a session one.
       xrBlend = session.environmentBlendMode || '';
       clearAlpha = xrBlend === 'opaque' ? 1 : 0;
-      d.log(`in ${mode === 'immersive-ar' ? 'AR' : 'VR'} — blend mode ${xrBlend || 'unreported'}`, 'hi');
+      // ⚠️ ASKED OF THE SESSION, NOT OF THE REQUEST. `optionalFeatures` says what
+      // was wanted; `domOverlayState` says what was granted, and the two differ
+      // on every runtime that does not implement it.
+      overlay = !!session.domOverlayState;
+      /**
+       * 🔴 THREE ANSWERS, NOT TWO, AND `undefined` IS THE THIRD. It was `!!`,
+       * on the reasoning that a runtime without the attribute would leave a
+       * field focused that nothing answers. True, and it makes the page REFUSE
+       * TO TRY on every runtime that has not shipped the attribute yet, which
+       * is the larger failure: CLAUDE.md's rule is that a probe which could not
+       * answer returns `unknown` and unknown NEVER BLOCKS, because "we did not
+       * look" must not read as "it is missing".
+       *
+       * So `true` tries, `undefined` tries and says it is guessing, and only an
+       * explicit `false` does not. The cost of trying and being wrong is a
+       * focused field behind your face, which the marked word already covers;
+       * the cost of not trying is no keyboard on a headset that had one.
+       */
+      sysKeyboard = keyboardVerdict(session);
+      d.log(`in ${mode === 'immersive-ar' ? 'AR' : 'VR'}: blend mode `
+        + `${xrBlend || 'unreported'}. A field of the page's own inside the `
+        + `session: ${overlay ? 'yes' : 'no'}. The headset's own keyboard over `
+        + `the session: ${sysKeyboard === 'unknown'
+          ? 'this runtime does not say, so it will be tried' : sysKeyboard ? 'yes' : 'no'}`, 'hi');
       // ⚠️ THE LABEL IS ON THE CONTROLLER, so this line says what the sticks do
       // and lets the badge speak for itself. A log line is behind your face in
       // an immersive session; it is the one place an instruction cannot be read.
       xrQuit = createXRQuit(gl, {
         label: 'HOLD TO QUIT',
-        onQuit: () => { d.log('held to quit — leaving', 'hi'); session.end().catch(() => {}); },
+        onQuit: () => { d.log('held to quit, leaving', 'hi'); session.end().catch(() => {}); },
       });
-      d.log('left stick glides, right stick turns in steps; hold the button under '
-        + 'your thumb to leave', 'hi');
-      window.__demo.xr = { mode, blend: xrBlend, entered: true };
+      d.log('left stick glides, right stick turns in steps, and the trigger '
+        + (overlay || sysKeyboard ? 'types over whatever you are pointing at'
+          : 'marks whatever you are pointing at, to type when you come out')
+        + '; hold the button under your thumb to leave', 'hi');
+      // 🔴 `overlay` IS THE ONE MEASUREMENT THAT SETTLES WHAT THIS PAGE SHOULD
+      // DO, AND IT IS PUBLISHED SO A HARNESS CAN READ IT. Whether a runtime will
+      // put a text field inside an immersive session is a fact about the runtime
+      // that nothing on this laptop can answer: desktop Chrome reports
+      // `immersive-vr false` and never enters. `demo/verify-quest.mjs held` on a
+      // real headset reads this object back and prints it.
+      //
+      // ⚠️ `presenting` AND `frames` ARE THE QUEST HARNESS'S OWN CONTRACT, not
+      // decoration. Without them its compositor lane says "the page did not
+      // present" and grades nothing, which is a lane reporting silence about a
+      // session that ran.
+      window.__demo.xr = { mode, blend: xrBlend, entered: true, presenting: true,
+        frames: 0, overlay, sysKeyboard,
+        keyboard: overlay ? 'a field of our own, inside the session'
+          : (sysKeyboard ? 'the runtime raises its own over the session'
+            : 'outside the session, so a word is marked instead') };
 
+      session.addEventListener('select', xrAim);
       session.addEventListener('end', () => {
-        xrSession = null; clearAlpha = 1; xrQuit?.reset();
+        xrSession = null; clearAlpha = 1; overlay = false; sysKeyboard = false;
+        xrQuit?.reset();
+        if (window.__demo.xr) window.__demo.xr.presenting = false;
         d.log('back on the page', 'hi'); requestAnimationFrame(frame);
+        // The word you marked in the room, opened in the field the moment there
+        // is a field to open. ⚠️ `openTyping` clears the mark, so the two cannot
+        // disagree; the `markWord(null)` is for the case where the session ended
+        // some other way and nothing was carried out.
+        if (xrPending) { const b = xrPending; xrPending = null; openTyping(b, 'marked in the room'); }
+        else markWord(null);
       });
       // 🔴 A DEAD-MAN'S SWITCH, ARMED BEFORE THE FIRST FRAME IS ASKED FOR. If a
       // throw escapes the handler the render loop and the way out are both never
@@ -723,7 +1202,7 @@ void main() {
       const entered = xrFrames;
       setTimeout(() => {
         if (xrSession === session && xrFrames === entered) {
-          d.log('nothing drew in 6 s — ending the session rather than leaving you in it', 'bad');
+          d.log('nothing drew in 6 s. Ending the session rather than leaving you in it', 'bad');
           session.end().catch(() => {});
         }
       }, 6000);
@@ -738,6 +1217,8 @@ void main() {
   // The dead-man's switch below is unchanged and is NOT this: it covers the
   // case where the page threw and there is no ring to hold.
   const xrControllers = createXRControllers(gl, { log: (m) => d.log(m) });
+  const xrAimRay = createXRRay(gl);
+  const aimLand = new Map();
   let xrQuit = null;
 
   function xrFrame(now, xframe) {
@@ -753,8 +1234,11 @@ void main() {
     if (!layer) return;
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     xrFrames++; frames++;
+    // The page's own count, beside the compositor's. `verify-quest.mjs` prints
+    // both and says to compare them rather than average them.
+    if (window.__demo.xr) window.__demo.xr.frames = xrFrames;
     if (dt > 0) { fpsAcc += 1 / dt; fpsN++; }
-    if (fpsN >= 30) { d.set('fps', Math.round(fpsAcc / fpsN)); fpsAcc = 0; fpsN = 0; }
+    if (fpsN >= 30) { fps = Math.round(fpsAcc / fpsN); fpsAcc = 0; fpsN = 0; }
     xrQuit?.update(session.inputSources, dt);
 
     // ⚠️ EACH HAND ONLY IF THE RUNTIME ANSWERED FOR IT THIS FRAME. MEASURED on a
@@ -762,12 +1246,31 @@ void main() {
     // grip did not resolve while the right did, in the same frame. A page that
     // draws a hand wherever it last saw one leaves a shape in the air.
     const grips = [];
+    // ⚠️ `targetRaySpace` IS WHERE YOU ARE POINTING AND `gripSpace` IS WHERE YOU
+    // ARE HOLDING. They differ by the angle a controller sits in a hand, which
+    // is about 40° on this hardware: a pointer drawn from the grip lands
+    // somewhere nobody aimed at.
+    const aims = [];
     for (const src of session.inputSources) {
       const g = src.gripSpace && xframe.getPose(src.gripSpace, xrRefSpace);
+      const a = src.targetRaySpace && xframe.getPose(src.targetRaySpace, xrRefSpace);
+      if (a) aims.push(a.transform.matrix);
       if (!g) continue;
       grips.push({ grip: g.transform.matrix, profile: src.profiles?.[0] || '',
                    hand: src.handedness || 'none' });
       if (src.profiles?.[0]) xrControllers.want(src.profiles[0], src.handedness);
+    }
+
+    // Where each pointer lands, worked out ONCE for the frame rather than once
+    // per eye: two eyes must not be able to disagree about what is being
+    // pointed at.
+    aimLand.clear();
+    for (const a of aims) {
+      const origin = pointToRoom([a[12], a[13], a[14]]);
+      const dir = dirToRoom([-a[8], -a[9], -a[10]]);
+      const len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+      const land = aimAt(origin, [dir[0] / len, dir[1] / len, dir[2] / len]);
+      if (land) aimLand.set(a, land);
     }
 
     const head = pose.transform.matrix;
@@ -786,10 +1289,8 @@ void main() {
     // the pose carries the rest.
     const T = roomToEye(pos[0], 0, pos[1], turn);
     // The wearer, in room coordinates: the head inside the headset's space,
-    // carried back through the same transform the room is drawn with.
-    const c = Math.cos(turn), s = Math.sin(turn);
-    const eye = [pos[0] + head[12] * c + head[14] * s, head[13],
-      pos[1] - head[12] * s + head[14] * c];
+    // carried back through the inverse of the transform the room is drawn with.
+    const eye = pointToRoom([head[12], head[13], head[14]]);
     sortFor(eye);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
@@ -822,8 +1323,18 @@ void main() {
         xrControllers.draw(eyeVP, grips);
         xrQuit?.draw(eyeVP, grips.map((h) => h.grip), eyeFromView(eyeView));
       }
+      // ⚠️ THE RAY IS DRAWN PER EYE AND TURNED IN THE VERTEX SHADER. A ribbon
+      // oriented on the processor picks one of the two eyes and is wrong for the
+      // other, and the error reads as DEPTH rather than as a smear: a pointer
+      // that looks fine and lands somewhere else.
+      for (const a of aims) {
+        const land = aimLand.get(a);
+        xrAimRay.draw({
+          vp: eyeVP, view: eyeView, pose: a,
+          len: land ? land.t : 4, held: !!land,
+        });
+      }
     }
-    d.set('walked', walked.toFixed(0));
   }
 
   d.on('vr', () => enterXR('immersive-vr'));
@@ -832,7 +1343,7 @@ void main() {
   let outTimer = null;
   watchFull(wrap, (on) => {
     if (!on) outEl.dataset.on = '0';
-    d.log(on ? 'filling the screen — Escape to come back' : 'back to the page', 'hi');
+    d.log(on ? 'filling the screen. Escape to come back' : 'back to the page', 'hi');
   });
   d.on('full', async () => {
     // ⚠️ ASK, DO NOT OPTIONAL-CHAIN. `el.requestFullscreen?.()` on an iPhone is
@@ -907,19 +1418,30 @@ void main() {
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform3fv(uT.O, b.o); gl.uniform3fv(uT.R, b.r); gl.uniform3fv(uT.U, b.up);
     gl.uniform1f(uT.a, 1);
+    // ⚠️ ALWAYS WHITE HERE, WHATEVER IS MARKED ON THE PAGE. Every probe below
+    // finds ink by reading the RED channel, so a probe that inherited the mark's
+    // colour would still read as ink and a probe that inherited the uniform's
+    // zero default would read as a blank frame. One word drawn alone has nothing
+    // to be distinguished FROM, so the mark has no meaning in here.
+    gl.uniform3fv(uT.col, INK_RGB);
     gl.uniformMatrix4fv(uT.VP, false, vp);
     gl.bindTexture(gl.TEXTURE_2D, b.t.tex);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     const px = new Uint8Array(W * H * 4);
     gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    let ink = 0, minX = W, maxX = -1;
+    // ⚠️ THE INK'S HEIGHT IS COLLECTED HERE AND NOT DERIVED FROM THE QUAD. A
+    // quad carries `SPREAD` texels of margin above and below the letterform, so
+    // its height is a fact about the texture; what a reader sees is how tall the
+    // LETTERS come out, which is the top and bottom of the lit pixels.
+    let ink = 0, minX = W, maxX = -1, minY = H, maxY = -1;
     const mask = new Uint8Array(W * H);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         if (px[(y * W + x) * 4] > 128) {
           ink++; mask[y * W + x] = 1;
           if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
         }
       }
     }
@@ -940,7 +1462,8 @@ void main() {
     runs.sort((a, z) => a - z);
     const edge = runs.length ? runs[Math.floor(runs.length / 2)] : 0;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return { ink, width: maxX - minX + 1, edge, runs: runs.length, mask, W, H };
+    return { ink, width: maxX - minX + 1, height: maxY - minY + 1,
+      edge, runs: runs.length, mask, W, H };
   }
 
   /** How much of the letterform this got wrong, against a reference drawn the
@@ -956,6 +1479,25 @@ void main() {
   }
 
   async function finish() {
+    /**
+     * 🔴 THE LOOP IS STILL RUNNING, AND NOTHING HERE ASKED THAT UNTIL NOW. A
+     * readout was removed from this page and one `d.set` was left behind, which
+     * THROWS on a key `mount()` never declared: the render loop died on its
+     * first frame. The picture froze at frame one, clicking a word did nothing,
+     * and this page reported **21/21 green** with a single line in the log.
+     * Every other check here grades a still image, and a still image is exactly
+     * what a dead loop produces.
+     *
+     * ⚠️ IT COUNTS ACROSS A WAIT rather than reading a total. `frames > 0` is
+     * true of a page that drew once and stopped, which is the case.
+     */
+    const framesWas = frames;
+    await new Promise((r) => setTimeout(r, 400));
+    const drewSince = frames - framesWas;
+    d.assert('the picture is still being drawn, not frozen on its first frame',
+      drewSince > 5,
+      `${drewSince} frames in 400 ms, ${frames} in all`);
+
     d.assert('the font arrived, and it is not the browser’s own',
       !!fontReport && fontReport.loaded,
       `the page asked for a family no system has and got it; `
@@ -965,14 +1507,14 @@ void main() {
     // system face for those two letters alone, with nothing reported anywhere.
     d.assert('...and the Estonian letters came out of the same file as the rest',
       !!fontReport && fontReport.bothFiles,
-      `S ${fontReport?.latin.toFixed(3)}x, Š ${fontReport?.ext.toFixed(3)}x — `
+      `S ${fontReport?.latin.toFixed(3)}x against Š ${fontReport?.ext.toFixed(3)}x, `
       + `${Math.abs((fontReport?.ext ?? 0) - (fontReport?.latin ?? 0)).toFixed(3)} apart`);
 
     {
       // A letterform covers some of its own box and not all of it. Blank says
       // the raster never happened; flooded says the transform inverted.
       const inks = built.map((b) => b.t.stats.ink);
-      d.assert('every word is a word — ink in its box, and box around its ink',
+      d.assert('every word is a word: ink in its box, and box around its ink',
         built.length === ITEMS.length && inks.every((v) => v > 0.02 && v < 0.6),
         `${built.length} of ${ITEMS.length} built, covering `
         + `${(Math.min(...inks) * 100).toFixed(0)}–${(Math.max(...inks) * 100).toFixed(0)}% of their boxes`);
@@ -987,19 +1529,46 @@ void main() {
         `the least graded field is ${(worst * 100).toFixed(1)}% between the two ends`);
     }
 
-    // 🔴 THE SIZING RULE, CHECKED ON THE PAIR THAT BREAKS IT. An umlaut makes
-    // the INK taller; if the quad were sized by ink, MÄLU would be set smaller
-    // than HELD at the same declared cap height.
+    // 🔴 THE SIZING RULE, CHECKED ON THE PAIR THAT BREAKS IT, AND READ OFF THE
+    // PICTURE. An accent makes the INK taller; if a quad were sized by its ink,
+    // an accented word would come out SMALLER than a plain one at the same
+    // declared height, which is the one thing a wall of words must not do.
+    //
+    // ⚠️ THE OLD VERSION COMPARED TWO `capPx` FIGURES AND THAT HALF WAS VACUOUS:
+    // both words were rastered at the same `px` in the same family, so the two
+    // numbers were the same number and the comparison could not fail. What is
+    // asked now is what somebody looking at the wall would ask. Draw both from
+    // one distance, find the band of rows the letter bodies occupy, and require
+    // that band to be the SAME height while the accented word's total ink is
+    // taller. `oo` and `oo` with two dots differ in nothing else, and the marks
+    // sit clear of the letters with a blank row between, which is what makes the
+    // band findable at all.
     {
-      const plain = built.find((b) => b.item.text === 'LINDA');
-      const accented = built.find((b) => b.item.text === 'S\u00d5RVE');
-      const capM = (b) => b.item.cap;
-      const capPxRatio = accented.t.capPx / plain.t.capPx;
-      const inkRatio = (accented.h / capM(accented)) / (plain.h / capM(plain));
-      d.assert('an accent makes a word taller without making its capitals smaller',
-        Math.abs(capPxRatio - 1) < 0.02 && inkRatio > 1.05,
-        `cap heights agree to ${((capPxRatio - 1) * 100).toFixed(1)}%, `
-        + `SÕRVE’s ink is ${inkRatio.toFixed(2)}x as tall`);
+      const pair = ['oo', 'öö'].map((text) => {
+        const t = buildText(gl, { text, weight: DISPLAY_WEIGHT, px: 320, cap: 0.9 });
+        const b = place({ text, wall: 'n', u: 0, y: 1.6, out: 0, cap: 0.9 }, t);
+        const p = probe(b, { dist: 3 });
+        // readPixels counts rows from the BOTTOM, so the letter bodies are the
+        // first unbroken run of lit rows and a mark is anything above the gap.
+        const lit = [];
+        for (let y = 0; y < p.H; y++) {
+          let n = 0;
+          for (let x = 0; x < p.W; x++) if (p.mask[y * p.W + x]) n++;
+          lit.push(n > 0);
+        }
+        const from = lit.indexOf(true);
+        let to = from;
+        while (to + 1 < lit.length && lit[to + 1]) to++;
+        gl.deleteTexture(t.tex);
+        return { text, body: from < 0 ? 0 : to - from + 1, all: p.height };
+      });
+      const [plain, accented] = pair;
+      const sameBody = Math.abs(accented.body - plain.body) <= Math.max(2, plain.body * 0.03);
+      d.assert('an accent makes a word taller without making its letters smaller',
+        plain.body > 20 && sameBody && accented.all > accented.body + 4
+        && accented.all > plain.all * 1.05,
+        `the letters are ${plain.body} px and ${accented.body} px tall, `
+        + `and the two dots take the ink to ${accented.all} px against ${plain.all}`);
     }
 
     {
@@ -1015,6 +1584,98 @@ void main() {
         `${worst.t} reaches ${worst.m.toFixed(1)} m of the ${R} m half-wall`);
     }
 
+    // 🔴 THE PAGE'S OWN RULE, AND IT IS READ OFF THE PICTURE RATHER THAN OUT OF
+    // THE ARITHMETIC THAT DREW IT. `capFor` divides one constant by a letter
+    // count, so a check that divided the same constant by the same count would
+    // be the rule agreeing with itself. This draws every word head-on from ONE
+    // distance and counts how many pixels tall its letters come out: a shorter
+    // word has to be bigger, and two words of a length have to match.
+    //
+    // ⚠️ EVERY WORD ON THIS WALL RUNS BASELINE TO ASCENDER and none of them has
+    // a descender, so lit height is proportional to the size it was set at. A
+    // word with a `g` in it would be taller for a reason that is not its length,
+    // which is why the check reports the pixels rather than hiding them.
+    {
+      const rows = built.filter((b) => b.item.cap).map((b) => {
+        const p = probe(b, { dist: 6 });
+        return { text: b.item.text, n: [...b.item.text].length,
+          tall: p.height, wide: p.width, framed: p.width < p.W - 4 && p.height < p.H - 4 };
+      }).sort((a, z) => a.n - z.n);
+      window.__demo.sized = rows;
+      let holds = rows.length >= 3 && rows.every((r) => r.framed && r.tall > 8);
+      for (let i = 1; i < rows.length; i++) {
+        const a = rows[i - 1], z = rows[i];
+        if (z.n === a.n) { if (Math.abs(z.tall - a.tall) > Math.max(2, a.tall * 0.05)) holds = false; }
+        else if (!(z.tall < a.tall * 0.95)) holds = false;
+      }
+      d.assert('a shorter word is drawn bigger, and two of a length the same',
+        holds, rows.map((r) => `${r.text} (${r.n}) ${r.tall} px`).join(' · '));
+    }
+
+    // 🔴 AND THE RULE HOLDS FOR A WORD THAT WAS NEVER IN THE SOURCE. Typing is
+    // the one thing on this page that changes a size while somebody is looking,
+    // so it is graded the same way: draw the word, type a shorter one over it,
+    // draw again, and put the first one back.
+    {
+      const before = built.find((b) => b.item.text === 'could');
+      const was = probe(before, { dist: 6 }).height;
+      const typed = retext(before, 'oh');
+      const now = probe(typed, { dist: 6 }).height;
+      const back = retext(typed, 'could');
+      const again = probe(back, { dist: 6 }).height;
+      window.__demo.typed = { was, now, again };
+      d.assert('typing a shorter word over a longer one makes it bigger',
+        now > was * 1.8 && Math.abs(again - was) <= 2 && built.length === ITEMS.length,
+        `could is ${was} px tall, oh is ${now} px, and could typed back is ${again}`);
+
+      /**
+       * 🔴 A LINE BREAK SURVIVES BEING TYPED, AND IT MAKES THE WORD BIGGER.
+       * `retext` used to run `replace(/\s+/g, ' ')` over what was typed, which
+       * is every kind of whitespace INCLUDING a newline, so a break typed into
+       * the field was destroyed before it reached the renderer and the wall drew
+       * one long line. `buildText` has honoured `\n` as a hard break since it
+       * was written; the text simply never arrived carrying one.
+       *
+       * ⚠️ AND THE SIZE IS TAKEN OFF THE LONGEST LINE. Breaking a line makes the
+       * text NARROWER, so it must come out BIGGER, and measuring the whole
+       * string would make it smaller instead. MEASURED through the real field:
+       * `What is going / on?` sizes on the 11 characters of its first line
+       * rather than on all 14. Both halves are graded, because the break
+       * surviving with the wrong size is a fix that looks like it worked.
+       */
+      const oneLine = retext(back, 'What is going on?');
+      const flat = probe(oneLine, { dist: 6 }).height;
+      const broken = retext(oneLine, 'What is going\non?');
+      const tall = probe(broken, { dist: 6 }).height;
+      const kept = (broken?.item?.text || '').includes('\n');
+      retext(broken, 'could');            // put the room back as it was found
+      d.assert('a line break typed into a word survives, and sizes on its longest line',
+        kept && tall > flat,
+        `${kept ? 'the break survived' : 'THE BREAK WAS FLATTENED'} · `
+        + `one line ${flat} px tall, two lines ${tall} px`);
+    }
+
+    // 🔴 THE WAY BACK OUT OF THE HEADSET'S SPACE, WHICH IS WHAT A POINTED HAND
+    // ARRIVES IN. A runtime reports a controller where the HEADSET's own space
+    // says it is, and the words are in room coordinates: get the sign wrong and
+    // the ray lands mirrored through wherever you are standing, which at a turn
+    // of zero is exactly right and at every other turn is wrong by twice the
+    // angle. ⚠️ This is not two derivations agreeing, which is the trap this
+    // page has already fallen into once: it runs the answer back through
+    // `roomToEye`, and `roomToEye` is graded by rendering further down.
+    {
+      const keepPos = pos.slice(), keepTurn = turn;
+      pos = [2.4, -1.3]; turn = 0.9;
+      const inHeadset = [0.35, 1.5, -0.8];
+      const back = apply(roomToEye(pos[0], 0, pos[1], turn), pointToRoom(inHeadset));
+      const off = Math.hypot(back[0] - inHeadset[0], back[1] - inHeadset[1],
+        back[2] - inHeadset[2]);
+      d.assert('a hand the headset reports comes back to the same spot it started',
+        off < 1e-5,
+        `${off.toExponential(1)} m apart after the round trip, `
+        + `standing 2.8 m out and turned ${(0.9 * 180 / Math.PI).toFixed(0)}°`);
+      pos = keepPos; turn = keepTurn;
+    }
     // 🔴 THE PURE FUNCTION, GRADED WITH NOTHING IN THE LOOP. Walking and turning
     // can be wrong in a way no picture shows.
     {
@@ -1062,7 +1723,13 @@ void main() {
     }
 
     // ── what only a GPU can answer ──────────────────────────────────────────
-    const big = built.find((b) => b.item.text === 'KALEV');
+    // ⚠️ FOUND BY SIZE, NOT BY NAME. Every word here is the visitor's to type
+    // over, so a check that looked one up by its spelling would be a check
+    // about a word that may not be on the wall any more. `big` is whichever
+    // word is set largest and `five` is one of the full-length ones.
+    const big = built.filter((b) => b.item.cap)
+      .reduce((a, b) => (b.item.cap > a.item.cap ? b : a));
+    const five = built.find((b) => b.item.cap && [...b.item.text].length === 5);
     const head = probe(big, { dist: 6 });
     d.assert('a word is drawn', head.ink > 2000 && head.width > 80,
       `${head.ink} lit pixels, ${head.width} across at 6 m`);
@@ -1079,9 +1746,8 @@ void main() {
     // frame — CLAUDE.md's *check the instrument before believing the pattern*,
     // and it is one comparison rather than a cleverer statistic.
     {
-      const small = built.find((b) => b.item.text === 'S\u00c4RGAV');
       const turns = [0, 35, 70].map((deg) => ({
-        deg, p: probe(small, { dist: 12, yaw: deg * Math.PI / 180 }),
+        deg, p: probe(five, { dist: 12, yaw: deg * Math.PI / 180 }),
       }));
       const inside = turns.every((t) => t.p.ink > 200
         && t.p.width < t.p.W - 4 && t.p.width > 4);
@@ -1089,7 +1755,7 @@ void main() {
       window.__demo.turned = turns.map((t) => ({ deg: t.deg, width: t.p.width, ink: t.p.ink }));
       d.assert('a word does not turn to face you',
         inside && c2 < b2 && b2 < a && c2 / a < 0.6,
-        `${a} px across head-on, ${b2} at 35°, ${c2} at 70° — `
+        `${a} px across head-on, ${b2} at 35°, ${c2} at 70°, `
         + `${((c2 / a) * 100).toFixed(0)}% of it, all of it still in frame`);
     }
 
@@ -1105,7 +1771,7 @@ void main() {
       window.__demo.sharp = rows;
       d.assert('the edge stays about a pixel wide however far it is blown up',
         rows.every((r) => r.edge > 0 && r.edge <= 3),
-        `blown up ${rows.map((r) => `${r.mag.toFixed(0)}x`).join(', ')} — the edge takes `
+        `blown up ${rows.map((r) => `${r.mag.toFixed(0)}x`).join(', ')}, and the edge takes `
         + `${rows.map((r) => `${r.edge}px`).join(', ')}`);
     }
 
@@ -1126,19 +1792,23 @@ void main() {
     // raster it came from, so `raw` at the same `px` would be handed four times
     // the bytes and the comparison would say nothing.
     {
-      const ref = probe(big, { dist: 0.9 }).mask;
+      // ⚠️ A FIVE-LETTER WORD RATHER THAN THE BIGGEST ONE. `disagree` divides by
+      // the reference's ink, so a two-letter word gives it a small denominator
+      // and a noisy answer about a letterform there is not much of.
+      const word = five.item.text, capM = five.item.cap;
+      const ref = probe(five, { dist: 0.9 }).mask;
       const rows = [];
       for (const px of [60, 30, 16]) {
-        const fT = buildText(gl, { text: 'KALEV', weight: DISPLAY_WEIGHT, px, cap: big.item.cap });
-        const pT = buildText(gl, { text: 'KALEV', weight: DISPLAY_WEIGHT, px: px / 2, cap: big.item.cap, raw: true });
+        const fT = buildText(gl, { text: word, weight: DISPLAY_WEIGHT, px, cap: capM });
+        const pT = buildText(gl, { text: word, weight: DISPLAY_WEIGHT, px: px / 2, cap: capM, raw: true });
         rows.push({
           // ⚠️ THE INK'S OWN HEIGHT, NOT THE TEXTURE'S. The field carries SPREAD
           // texels of margin on each side, so a 22-texel texture is a SIX-texel
           // word — and quoting the padded number is how the last row below
           // would have read as a reasonable resolution instead of as rubble.
           tall: fT.h - 2 * SPREAD,
-          field: disagree(probe(place(big.item, fT), { dist: 0.9 }).mask, ref),
-          picture: disagree(probe(place(big.item, pT), { dist: 0.9 }).mask, ref),
+          field: disagree(probe(place(five.item, fT), { dist: 0.9 }).mask, ref),
+          picture: disagree(probe(place(five.item, pT), { dist: 0.9 }).mask, ref),
         });
         gl.deleteTexture(fT.tex); gl.deleteTexture(pT.tex);
       }
@@ -1182,8 +1852,40 @@ void main() {
       window.__demo.firstView = share;
       d.assert('the view you arrive at is a room with words in it',
         share > 0.008 && share < 0.35,
-        `${(share * 100).toFixed(1)}% of the first frame is ink — `
+        `${(share * 100).toFixed(1)}% of the first frame is ink. `
         + `under 1% is an empty room, over 35% is a letter you are standing inside`);
+
+      // 🔴 THE POINTER AND THE PICTURE, ASKED THE SAME QUESTION IN THE SAME
+      // FRAME. A pick worked out from a matrix can be mirrored, offset or a
+      // half-frame out and still look like a reasonable answer in a log line;
+      // the only thing that can catch it is the picture beside it. Every eighth
+      // pixel of the frame just drawn is turned back into the ray under it, and
+      // the claim is that WHEREVER THERE IS INK, THAT RAY LANDS ON A WORD.
+      //
+      // ⚠️ AND THE OTHER HALF STOPS A LAZY PASS. A pick that answered "yes, a
+      // word" everywhere would satisfy the first half perfectly, so most of the
+      // frame has to come back EMPTY: the words are a small part of a room.
+      // ⚠️ `> 128` is the words and nothing else. The floor's dots are drawn at
+      // 0.64 red through at most 0.62 of alpha, which cannot pass 104.
+      {
+        let ink = 0, orphan = 0, onWord = 0, taken = 0;
+        for (let y = 4; y < 360; y += 8) {
+          for (let x = 4; x < 640; x += 8) {
+            taken++;
+            // readPixels counts rows from the bottom, the same way the
+            // projection's +Y does, so the row index needs no flip.
+            const r = rayThrough((x + 0.5) / 640 * 2 - 1, (y + 0.5) / 360 * 2 - 1, 640 / 360);
+            const land = aimAt(r.origin, r.dir);
+            if (land) onWord++;
+            if (px[(y * 640 + x) * 4] > 128) { ink++; if (!land) orphan++; }
+          }
+        }
+        window.__demo.aimed = { taken, ink, orphan, onWord };
+        d.assert('pointing lands where the picture is',
+          ink > 30 && orphan <= Math.max(1, ink * 0.05) && onWord < taken * 0.5,
+          `${ink} of ${taken} sampled pixels have ink and ${ink - orphan} of those `
+          + `land on a word; ${onWord} of ${taken} rays find one at all`);
+      }
 
       // 🔴 AND THERE IS A FLOOR UNDER YOU. Nothing else here can see it: the
       // words are white and the check above counts white, so a floor that
@@ -1202,6 +1904,204 @@ void main() {
       d.assert('there is a floor under you, and it is made of dots',
         floorLit > 300 && floorLit < 640 * 120 * 0.5,
         `${floorLit} lit pixels in the bottom third of the first frame, of ${640 * 120}`);
+    }
+
+    /**
+     * 🔴 WHAT A TRIGGER PRESS NOW DOES, READ OFF THE PICTURE. A mark that is
+     * "set" in a variable is not a mark: the whole point of it is that somebody
+     * standing in the room can SEE which word the trigger took, and a check that
+     * compared `marked === b` would be the assignment agreeing with itself.
+     * This renders the room through `drawScene` — the frame loop's own path, not
+     * around it — and counts pixels by colour.
+     *
+     * ⚠️ FOUND BY COLOUR, NOT BY POSITION. The mark's colour has zero blue in it
+     * and white ink has all of it, so "which pixels changed" is one channel
+     * compared against itself before and after, with nothing derived from where
+     * the word was supposed to be.
+     */
+    {
+      const shot = () => {
+        probeTarget(640, 360);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, probeFB);
+        gl.viewport(0, 0, 640, 360);
+        gl.clearColor(0.027, 0.035, 0.051, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        const eye = [pos[0], EYE_Y, pos[1]];
+        sortFor(eye);
+        drawScene(mul(perspective(FOV, 640 / 360, 0.05, 200), windowView()), eye);
+        const px = new Uint8Array(640 * 360 * 4);
+        gl.readPixels(0, 0, 640, 360, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        // ⚠️ `> 128` on red is the words and not the floor — the dots are 0.64
+        // red through at most 0.62 of alpha, which cannot pass 104. Of those,
+        // the ones with no blue in them are the marked word.
+        let ink = 0, lit = 0;
+        for (let i = 0; i < 640 * 360; i++) {
+          if (px[i * 4] > 128) { ink++; if (px[i * 4 + 2] < 64) lit++; }
+        }
+        return { ink, lit };
+      };
+      markWord(null);
+      const plain = shot();
+      // Every word in turn, because which of them the arrival view happens to
+      // show is not something this check should be asserting about. One that
+      // lights up AND leaves other ink white is what the claim needs.
+      const tries = [];
+      let pick = null;
+      for (const b of built) {
+        markWord(b);
+        const s = shot();
+        tries.push({ text: b.item.text.split('\n')[0].slice(0, 12), ...s });
+        if (!pick && s.lit > 200 && s.ink - s.lit > 200) pick = { b, s };
+      }
+      markWord(null);
+      const off = shot();
+      window.__demo.marking = { plain, tries, off };
+      d.assert('the trigger repaints the word it landed on, and leaves the rest white',
+        plain.lit === 0 && off.lit === 0 && !!pick
+        && Math.abs(pick.s.ink - plain.ink) < plain.ink * 0.1,
+        pick
+          ? `nothing marked: ${plain.ink} lit pixels of ink and ${plain.lit} of them the `
+            + `mark's colour. Marking "${pick.b.item.text.split('\n')[0]}" turns `
+            + `${pick.s.lit} of ${pick.s.ink} that colour, leaving `
+            + `${pick.s.ink - pick.s.lit} white; unmarking puts ${off.lit} back`
+          : `no word changed colour where the picture could see it: `
+            + tries.map((t) => `${t.text} ${t.lit}/${t.ink}`).join(' · '));
+    }
+
+    /**
+     * 🔴 THE BUG THIS PAGE WAS REPORTED FOR, AND BOTH HALVES OF THE BRANCH IT
+     * SITS IN. Reported from a real Quest: *"held demo: click in vr brought me
+     * back to browser."* The trigger handler is driven here with a pose the
+     * runtime would have supplied, against a session object that counts being
+     * ended, on both settings of `overlay`.
+     *
+     * ⚠️ THE RAY IS AN INPUT, NOT THE CLAIM. It is built from the wall's own
+     * basis, which is where `aimAt` reads from too, and on its own that would be
+     * two derivations agreeing. It is not asserted on: if the ray were wrong,
+     * `aimAt` returns nothing, the handler returns early and the assert fails
+     * loudly. Where a ray actually LANDS is graded above, off the picture, by
+     * *pointing lands where the picture is*.
+     *
+     * ⚠️ AND THE WHOLE BLOCK IS SYNCHRONOUS ON PURPOSE. `xrSession` is a stub for
+     * the length of it, and the window's frame loop stops asking for frames the
+     * moment that is non-null — so an `await` in here would park the page on a
+     * still image for the rest of the run.
+     */
+    {
+      const keepPos = pos.slice(), keepTurn = turn;
+      const keepRef = xrRefSpace, keepSession = xrSession;
+      const keepOverlay = overlay, keepSys = sysKeyboard;
+      // Standing at the origin facing 0, the headset's space and the room's are
+      // the same space, so a pose can be written down in room metres.
+      pos = [0, 0]; turn = 0;
+      const target = big, w = WALLS[target.item.wall];
+      // Column-major, the way a runtime hands one over: right, up, back,
+      // position. A pose's forward is its NEGATIVE z, so the back column is the
+      // wall's own outward normal and the pose stands 2 m off the wall.
+      const m = new Float32Array([
+        w.right[0], 0, w.right[2], 0,
+        0, 1, 0, 0,
+        w.nrm[0], 0, w.nrm[2], 0,
+        target.o[0] + w.nrm[0] * 2, target.o[1], target.o[2] + w.nrm[2] * 2, 1,
+      ]);
+      const ev = { frame: { getPose: () => ({ transform: { matrix: m } }) },
+        inputSource: { targetRaySpace: {} } };
+      let ended = 0;
+      xrRefSpace = { standIn: true };
+      xrSession = { end: () => { ended++; return Promise.resolve(); } };
+
+      // 1. Neither way to a keyboard. The case that was reported, and the one
+      //    every runtime measured so far actually lands in.
+      overlay = false; sysKeyboard = false; markWord(null); xrPending = null;
+      xrAim(ev);
+      const markedIt = marked === target, carried = xrPending === target;
+      const endedNoOverlay = ended;
+
+      // 2. No field of our own, but the runtime says it will raise its own
+      //    keyboard over the session. Both things have to happen: the field is
+      //    focused where nobody can see it, so the word must light up as well.
+      overlay = false; sysKeyboard = true; markWord(null); xrPending = null;
+      xrAim(ev);
+      const sysOpened = editing === target && typeEl.hidden === false;
+      const sysLit = marked === target;
+      closeTyping();
+      const endedSys = ended;
+
+      // 2b. 🔴 THE RUNTIME DOES NOT SAY, WHICH IS THE COMMON CASE AND WAS THE
+      //     ONE THAT DID NOTHING. `isSystemKeyboardSupported` is a recent
+      //     addition, so a headset that has not shipped it reports `undefined`
+      //     and the page treated that as a no: it refused to try on exactly the
+      //     runtimes most likely to be in somebody's hands. Unknown never
+      //     blocks. It must behave like the yes above, not like the no.
+      overlay = false; sysKeyboard = 'unknown'; markWord(null); xrPending = null;
+      xrAim(ev);
+      const unkOpened = editing === target && typeEl.hidden === false;
+      const unkLit = marked === target;
+      closeTyping();
+      const endedUnk = ended;
+
+      // 3. A field of our own, inside the session.
+      overlay = true; sysKeyboard = false; markWord(null); xrPending = null;
+      xrAim(ev);
+      const opened = editing === target && typeEl.hidden === false;
+      // ⚠️ AND IT MUST NOT ALSO MARK. Two answers to one press is a word left
+      // lit behind a field that is editing it, which is the same fact said twice
+      // and the second one has no way to be cleared.
+      const markedToo = marked !== null;
+      closeTyping();
+
+      xrSession = keepSession; xrRefSpace = keepRef;
+      // 🔴 THE DECISION, NOT THE BRANCH. `keyboardVerdict` is what turns a
+      // session's answer into what this page does, and a runtime that has not
+      // shipped the attribute reports `undefined`. Treating that as a no is the
+      // defect: the page refuses to try on exactly the headsets most likely to
+      // be in somebody's hands. Graded here, at the source, because the branch
+      // below passes for `true` and `'unknown'` alike.
+      const vUnknown = keyboardVerdict({});
+      const vNo = keyboardVerdict({ isSystemKeyboardSupported: false });
+      const vYes = keyboardVerdict({ isSystemKeyboardSupported: true });
+      d.assert('a runtime that will not say is treated as maybe, never as no',
+        vUnknown === 'unknown' && !!vUnknown && vNo === false && vYes === true,
+        `undefined -> ${vUnknown}, false -> ${vNo}, true -> ${vYes}`);
+
+      d.assert('...and where the runtime will not say, it tries anyway rather than refusing',
+        unkOpened && unkLit && endedUnk === 0,
+        `${unkOpened ? 'the field was focused' : 'THE FIELD WAS NOT FOCUSED'} and `
+        + `${unkLit ? 'the word lit' : 'THE WORD DID NOT LIGHT'}, `
+        + `session ended ${endedUnk} time(s)`);
+
+      overlay = keepOverlay; sysKeyboard = keepSys;
+      pos = keepPos; turn = keepTurn;
+      markWord(null); xrPending = null;
+      window.__demo.trigger = { markedIt, carried, sysOpened, sysLit, opened, markedToo, ended };
+
+      d.assert('the trigger in a headset marks a word and never ends the session',
+        markedIt && carried && endedNoOverlay === 0 && ended === 0,
+        ended === 0
+          ? `pointing at "${target.item.text}" from 2 m marked it and kept it for `
+            + 'the field, across all three ways a runtime can answer about a keyboard, '
+            + 'and not one of them asked the session to end'
+          : 'A TRIGGER PRESS ENDED THE SESSION, which is the bug this was reported for');
+      // The second way to a keyboard, which is the one a Quest actually offers:
+      // the runtime raises its own over the session when a field takes focus.
+      // ⚠️ BOTH HALVES. The field is invisible in there, so an open field with no
+      // lit word is a press that looks like it did nothing.
+      d.assert('...and where the runtime raises its own keyboard, the press does both',
+        sysOpened && sysLit && endedSys === 0,
+        sysOpened && sysLit
+          ? `the field took focus on "${target.item.text}" and the word stayed lit, `
+            + 'which is the only part of it anybody in the room can see'
+          : `field focused: ${sysOpened}, word lit: ${sysLit}`);
+      // The other half of the same branch. A runtime that DOES put a field in
+      // the session must type in the session, and a check that only ever ran the
+      // refused side would be green about half the code.
+      d.assert('...and where the runtime allows a field in the session, it types there instead',
+        opened && !markedToo,
+        opened
+          ? `with a field allowed, the same press opened it on "${target.item.text}" `
+            + `rather than marking, and left ${markedToo ? 'a word lit as well' : 'nothing lit'}`
+          : 'the press did not open the field on the word it landed on');
     }
 
     // Both eyes share a framebuffer and a clear ignores the viewport; that is

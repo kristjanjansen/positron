@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<title>videoradio looks, side by side</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 EACH PANE IS THE REAL PAGE IN A FRAME, NOT A COPY OF ITS SHADER.
+     A comparison built by pasting three shader bodies into one canvas is a
+     comparison of three things nobody can open, and it goes stale the first
+     time the real page changes. These are `/videoradio/` three times with
+     different `?look=`, so what is on screen is what the page does. */
+  body { margin: 0; padding: 18px; background: var(--bg); }
+  h1 { font: 600 13px/1.2 var(--mono); letter-spacing: .06em;
+       text-transform: uppercase; color: var(--fg); margin: 0 0 4px; }
+  .lede { font: 400 12.5px/1.5 var(--sans); color: var(--dim); margin: 0 0 18px; max-width: 62ch; }
+  .grid { display: grid; gap: 18px; grid-template-columns: 1fr; }
+  /* side by side once there is room for two to be worth comparing. Below that
+     they stack, which is still a comparison, just a scrolled one. */
+  @media (min-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1400px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  .look { min-width: 0; }
+  .look h2 { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+             color: var(--hi); margin: 0 0 6px; }
+  .look p { font: 400 12px/1.45 var(--sans); color: var(--dim); margin: 0 0 8px; min-height: 5.8em; }
+  /* the frame carries the aspect, so a pane cannot change height while it draws */
+  .look iframe { width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line2);
+                 border-radius: 4px; background: #05060a; display: block; }
+  .look a { font: 400 11.5px/1 var(--mono); color: var(--dim2); text-decoration: none;
+            display: inline-block; margin-top: 8px; }
+  .look a:hover, .look a:focus-visible { color: var(--hi); }
+</style>
+
+<h1>videoradio looks</h1>
+<p class="lede">
+  The same page three times, differing only in a row count and whether the
+  landscape is folded. Each frame is <code>/videoradio/</code> with a
+  <code>?look=</code>, so this is not a mock-up of the shader and cannot drift
+  from it. They are in standby with their checks off, which is why nothing is
+  playing: the picture before any sound is the fairest way to compare two of
+  them, because the programme is not a variable anybody controls.
+</p>
+
+<div class="grid">
+  <div class="look">
+    <h2>slab</h2>
+    <p>The first answer to the New Order reference. Stacked scanlines, white on black, height read from the drawn field alone. 72 rows.</p>
+    <iframe src="/videoradio/?look=slab&selfcheck=0&bare=1" title="slab" loading="lazy"></iframe>
+    <a href="/videoradio/?look=slab" target="_blank">open it on its own</a>
+  </div>
+  <div class="look">
+    <h2>plot</h2>
+    <p>The grain buckets became the height, so the ridges got real shape, and a standby wave arrived. Still white. 46 rows.</p>
+    <iframe src="/videoradio/?look=plot&selfcheck=0&bare=1" title="plot" loading="lazy"></iframe>
+    <a href="/videoradio/?look=plot" target="_blank">open it on its own</a>
+  </div>
+  <div class="look">
+    <h2>vista</h2>
+    <p>Valleys cut below the baseline, hard corners on every facet, a lower eye and the phosphor blue. The one called truly awesome.</p>
+    <iframe src="/videoradio/?look=vista&selfcheck=0&bare=1" title="vista" loading="lazy"></iframe>
+    <a href="/videoradio/?look=vista" target="_blank">open it on its own</a>
+  </div>
+  <div class="look">
+    <h2>ridge</h2>
+    <p>The same, moving: rows travelling five times faster, a sway per row, and the amplitude breathing on the grain clock.</p>
+    <iframe src="/videoradio/?look=ridge&selfcheck=0&bare=1" title="ridge" loading="lazy"></iframe>
+    <a href="/videoradio/?look=ridge" target="_blank">open it on its own</a>
+  </div>
+  <div class="look">
+    <h2>pulsar</h2>
+    <p>Folded about a horizon, so the terrain has a reflection above it and the two halves moire against each other.</p>
+    <iframe src="/videoradio/?look=pulsar&selfcheck=0&bare=1" title="pulsar" loading="lazy"></iframe>
+    <a href="/videoradio/?look=pulsar" target="_blank">open it on its own</a>
+  </div>
+  <div class="look">
+    <h2>deep</h2>
+    <p>Many more rows, crowded toward the horizon by perspective rather than by a curve. The lines merge sooner.</p>
+    <iframe src="/videoradio/?look=deep&selfcheck=0&bare=1" title="deep" loading="lazy"></iframe>
+    <a href="/videoradio/?look=deep" target="_blank">open it on its own</a>
+  </div>
+</div>
+</div>

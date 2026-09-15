@@ -14,8 +14,8 @@ import { offerSdp, WHEP_RETRY } from './live.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
-  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' — ' + detail : ''}`); }
-  else { fail++; console.log(`  FAIL ${name}${detail ? ' — ' + detail : ''}`); }
+  if (cond) { pass++; console.log(`  ok   ${name}${detail ? ' · ' + detail : ''}`); }
+  else { fail++; console.log(`  FAIL ${name}${detail ? ' · ' + detail : ''}`); }
 };
 
 /** A fetch that answers with the given statuses in order, and counts calls. */
@@ -83,7 +83,7 @@ console.log('\n== the WHEP 409 retry ==');
   try { await offerSdp('https://x/whep', 'v=0 offer', { sleep: nap }); } catch (e) { err = e; }
   ok('a 404 fails at once, with no retry and no waiting',
      calls.length === 1 && napped.length === 0 && /WHEP 404/.test(err?.message || ''),
-     `${calls.length} request(s), ${napped.length} waits — ${err?.message}`);
+     `${calls.length} request(s), ${napped.length} waits · ${err?.message}`);
 }
 
 // 5. NEGATIVE CONTROL: nor a 500, which is the one a retry looks most sensible
@@ -94,7 +94,7 @@ console.log('\n== the WHEP 409 retry ==');
   napped.length = 0;
   let err = null;
   try { await offerSdp('https://x/whep', 'v=0 offer', { sleep: nap }); } catch (e) { err = e; }
-  ok('a 500 fails at once too — only 409 means “not yet”',
+  ok('a 500 fails at once too: only 409 means “not yet”',
      calls.length === 1 && napped.length === 0, `${calls.length} request(s), ${err?.message}`);
 }
 

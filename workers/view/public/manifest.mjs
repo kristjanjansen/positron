@@ -58,19 +58,19 @@ export const ACTS = new Map([
 
 export const DEMOS = [
   { name: 'transport', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'twenty things happen a second apart — how close to on time each one lands',
+    one: 'twenty things happen a second apart, and each one reports how close to on time it landed',
     tags: ['timeline'] },
   { name: 'lanes', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'an audio lane and a data lane on one transport',
     tags: ['timeline', 'WebAudio'] },
   { name: 'loops', group: 'timeline', act: 0, created: '2026-09-04', built: true,
-    one: 'one recording placed three times — a slice, the same slice faster, and a loop',
+    one: 'one recording placed three times: a slice, the same slice faster, and a loop',
     tags: ['timeline'] },
   { name: 'score', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'a score round-trips byte-identically and refuses mutation',
     tags: ['timeline'] },
   { name: 'vclick', group: 'timeline', act: 0, created: '2026-09-07', built: true,
-    one: 'a Csound score compiled to a timeline — the tempo map is an integral, the repeat is a quotation',
+    one: 'a Csound score compiled to a timeline. The tempo map is an integral and the repeat is a quotation',
     tags: ['timeline', 'Csound', 'WebAudio'] },
   { name: 'click', group: 'timeline', act: 0, created: '2026-09-14', built: true,
     one: 'U:’s wireless click track, playing their own score with nothing on the wire',
@@ -113,7 +113,7 @@ export const DEMOS = [
   // cache and this project's whole debugging discipline rests on the BUILD
   // stamp saying which build is live.
   { name: 'items', group: 'vain', act: 2, created: '2026-09-14', built: true, settleMs: 11000,
-    one: 'write an item, and it publishes itself at the moment you named — and tells the phones',
+    one: 'write an item. At the moment you named, it publishes itself and tells the phones',
     tags: ['DO', 'alarms', 'push', 'PWA'] },
   // The demo ABOUT the socket, rather than one that happens to use it: the
   // message shape written down, the exact bytes shown both ways, and the
@@ -141,18 +141,18 @@ export const DEMOS = [
   // useful for writing the page and worthless as evidence about a device —
   // research/quest-xr calls that "the iPhone mistake in a new accent".
   { name: 'blocks', group: 'xr', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 6000,
-    one: 'square bricks on a grid — pick one up and it snaps to whatever you set it on',
+    one: 'square bricks on a grid. Pick one up and it snaps to whatever you set it on',
     tags: ['WebXR', 'WebGL2', 'relay', 'seeded'] },
 
   // Typography with a position rather than a place on a page. `gl: true` and
   // `xr: true` for the reason mirror, blocks and floor carry them: verify.mjs
   // runs --disable-gpu, where getContext('webgl2') is null.
-  // ⚠️ `settleMs` COVERS A DISTANCE TRANSFORM PER WORD. Eleven fields are
-  // computed in JavaScript at load — measured around 25 ms each on this
-  // machine — before the page has anything to say, and the first assert sits
-  // behind all of them.
+  // ⚠️ `settleMs` COVERS A DISTANCE TRANSFORM PER WORD, AND THE CHECKS RENDER.
+  // Six fields are computed in JavaScript at load, measured around 25 ms each
+  // on this machine, and the asserts then draw every word off-screen twice to
+  // read its size out of the pixels. The first assert sits behind all of it.
   { name: 'held', group: 'xr', act: 0, created: '2026-09-15', built: true, gl: true, xr: true, settleMs: 8000,
-    one: 'big words standing in a room, flat and fixed — walk to the side and a word becomes a line',
+    one: 'one sentence broken across four walls, each word as big as it is short. Point at one and type your own over it',
     tags: ['WebXR', 'WebGL2', 'fonts'] },
 
   { name: 'wire', group: 'transports', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
@@ -255,7 +255,7 @@ export const DEMOS = [
   // can open are pressable. Named for the thing you can hear, because that is
   // the reason it exists rather than the table.
   { name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true,
-    one: 'Kurenniemi in time — a mark as wide as its date is vague, and the ones you can play',
+    one: 'every Kurenniemi recording that plays, laid end to end as one long tape',
     tags: ['timeline', 'uncertainty', 'archive'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
@@ -315,8 +315,48 @@ export const DEMOS = [
   // level, two 700 ms ink samples and a 1.2 s deafness control before the page
   // says anything at all.
   { name: 'radio1965', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
-    one: 'a live radio station in Tallinn, reachable from a secure page only through a relay of ours',
+    one: 'six live radio stations from Tallinn and Helsinki, decoded frame by frame in the tab',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
+  // The same machine as the row above with the instrument panel taken off: it
+  // walks its own twelve sounds, moves its own blend, changes station on its own
+  // and loops itself in time, and the only picture is a shader of what the
+  // granulator is doing rather than of what it sounds like. Both pages import
+  // `demo/shell/radio-gran.mjs` for the stations, the sounds and the lanes.
+  // ⚠️ `gl: true` PUTS IT IN `demo/verify-gl.mjs` RATHER THAN `demo/verify.mjs`:
+  // the ordinary harness runs Chrome with --disable-gpu, where
+  // getContext('webgl2') returns null and every assert here would be
+  // unreachable, which reads as green.
+  // ⚠️ AND `settleMs` COVERS A WHOLE BOOT BEFORE THE PAGE SAYS ANYTHING. Play is
+  // control 0, and behind it sit a relay health call, a decoder, a wasm scsynth,
+  // 31 buffer allocations, a definition, an eight-second ring fill and then a
+  // burst of checks that drives a morph, a loop and a station change.
+  { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true,
+    gl: true, settleMs: 45000,
+    one: 'the same radio and granulator, playing itself, drawn as the instrument rather than as the sound',
+    tags: ['WebGL2', 'Icecast', 'WebAudio', 'live'] },
+  // The other end of the same station: what it broadcast, kept. A broadcast at
+  // the bitrate their own server records is 57.6 MB an hour, which does not fit
+  // through a Worker in one request on this zone, so it goes in pieces of
+  // 16 MiB and comes back with byte ranges. `settleMs` covers an upload, a
+  // sidecar and a seek, all of which land in one burst at the end.
+  // ⚠️ `crate`, NOT `vain`. The slug named the ORGANISATION, and `vain` is
+  // already this file's group name for Väin's pages, so one word meant a demo
+  // and a group at once. A crate is what a long recording arrives in, and it is
+  // a THING rather than a transaction, which is how every other slug here reads:
+  // `tapes`, `blocks`, `reel`, `rack`. The group, the worker and the bucket keep
+  // the organisation's name, because those really are Väin's and this page is
+  // ours.
+  { name: 'crate', group: 'vain', act: 5, created: '2026-09-15', built: true, settleMs: 25000,
+    one: 'one audio file into R2 in pieces of 16 MiB, played back and scrubbed from where it landed',
+    tags: ['R2', 'Workers', 'uncertainty', 'archive'] },
+  // The far end of `crate`: once whole programmes are in R2, a running order is
+  // a playlist of BYTE RANGES into them and the station needs no encoder at all.
+  // ⚠️ `settleMs` is 50 s because the claim being checked is that the sound
+  // CROSSES a programme boundary, and the programmes are 40 s long. A shorter
+  // settle would assert that a station plays, which is not the subject.
+  { name: 'station', group: 'vain', act: 5, created: '2026-09-15', built: true, settleMs: 50000,
+    one: 'a schedule played as one stream: a text file names which seconds of which recording come next',
+    tags: ['HLS', 'R2', 'DO', 'mediaSession', 'archive'] },
 
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
@@ -361,7 +401,7 @@ export const DEMOS = [
   // than a replay — 73 edits captured through a real browser, rebuilt to the
   // browser's own text character for character.
   { name: 'typist', group: 'timeline', act: 0, created: '2026-09-13', built: true,
-    one: 'type, and it types itself back — drag to any moment and the words and the cursor come back',
+    one: 'type, and it types itself back. Drag to any moment and the words and the cursor come back',
     tags: ['timeline', 'text', 'local only'] },
   // 🔴 TWO ENGINES ON ONE PAGE, and `dust` is the other half of it. They were
   // two pages about one subject and the split cost the better half of each:
@@ -423,10 +463,35 @@ export const DEMOS = [
   // wired to nothing, so one can be looked at and pushed around without a board,
   // a relay or a stream. `built: false` because it publishes no `__demo` and
   // asserts nothing: it is a mirror for the components, not a claim about them.
-  { name: 'kit', group: 'kit', act: 0, created: '2026-09-12', built: false, page: '/kit/',
+  { name: 'kit', group: 'kit', act: 0, created: '2026-09-12', // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
+    // double duty: hide this from the index, and skip it in `verify.mjs`, which
+    // filters on the same field. So the one page whose entire job is to make
+    // component drift visible was the one page the suite could not look at, and
+    // CLAUDE.md recorded that as open work without noticing the flag was the
+    // cause. It carries `mount()` and eight asserts now, so it is a page the
+    // harness grades like any other.
+    built: true, page: '/kit/',
     src: 'demo/kit/index.html',
     one: 'every reusable control on one page, wired to nothing',
     tags: ['shell', 'no network'] },
+
+  // 🔴 `unlisted` IS A THIRD STATE AND THE TWO THAT EXISTED COULD NOT SAY THIS.
+  // `built: true` deploys a page, runs it in `verify.mjs` AND puts a card on the
+  // front page; `built: false` takes it out of the suite. What was wanted here
+  // is a page that is deployed and graded and NOT advertised: the box beside
+  // every demo title collects what visitors write, and a link to the pile of it
+  // on the front page invites a reader to treat other people's notes as part of
+  // the work. `byGroup()` drops it, so both index renderers drop it — there is
+  // one of those now and it is in this file.
+  // ⚠️ UNLISTED IS NOT SECRET, and the page says so on itself. Anything else
+  // would be a token, and a token pasted into a public page is a published one.
+  { name: 'feedback', group: 'kit', act: 0, created: '2026-09-15', built: true, unlisted: true,
+    // Its first assert sits behind an arm, a socket, an echo and a read back,
+    // and `verify.mjs` walks off 400 ms after a count stops growing — which for
+    // a count still at zero is immediately. This is the budget for that phase.
+    settleMs: 9000,
+    one: 'what visitors wrote into the box beside every demo title',
+    tags: ['DO', 'WS', 'relay'] },
 
   // ── pages that are not shelled demos, but are the point of the whole rig ──
   //
@@ -439,7 +504,7 @@ export const DEMOS = [
   // random hour of 1965 Estonian radio, and pappus chewing either one up.
   { name: 'box', group: 'instruments', act: 4, created: '2026-09-10', built: false, page: '/box/',
     src: 'rig/box/listen.html',
-    one: 'play a Raspberry Pi in another building — its instruments, 1965 radio, and a granulator over both',
+    one: 'play a Raspberry Pi in another building: its instruments, 1965 radio, and a granulator over both',
     tags: ['WS', 'relay', 'PCM', 'live board'] },
 
   // A CHECKUP, not a player — and that is what makes it shippable. The playing
@@ -466,12 +531,16 @@ export const DEMOS = [
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */
-export const NOTES = [
-  { doc: 'uuu-positron', title: 'positron and U:',
-    one: 'two answers to one problem, where they already agree, and six ways to cowork' },
-  { doc: 'hardware-box', title: 'an instrument in a box',
-    one: 'what the smallest machine is that can be the instrument at the far end' },
-];
+/**
+ * 🔴 EMPTY, AND THAT IS THE DECISION RATHER THAN AN OVERSIGHT. It carried two
+ * essays, `positron and U:` and `an instrument in a box`, on a front page whose
+ * question is "what is here to open". A document that argues is not something
+ * to open and it does not belong in a list of things that are; both have moved
+ * to `research/`, which is where writing that REPORTS or ARGUES lives.
+ * `noteHTML` and `groupHTML` still handle a populated list, so putting one back
+ * is adding a row here.
+ */
+export const NOTES = [];
 
 export const bySlug = (name) => DEMOS.find((d) => d.name === name);
 
@@ -592,6 +661,11 @@ export const GROUPS = new Map([
  * on an odd readout.
  */
 export function byGroup(list = DEMOS) {
+  // ⚠️ DROPPED HERE RATHER THAN IN EACH RENDERER, because there are two index
+  // renderers (this file's own and the build's, which both call this) and a row
+  // that has to be hidden in two places is a row that will show up in one. See
+  // `unlisted` on the `feedback` row for what it is for.
+  list = list.filter((d) => !d.unlisted);
   const lost = list.filter((d) => !GROUPS.has(d.group));
   if (lost.length) {
     throw new Error(`these rows have no group, so the front page would not show them: `

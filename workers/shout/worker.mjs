@@ -40,15 +40,44 @@ const ERR = 'https://icecast.err.ee';
  * ⚠️ It is somebody else's stream on this account's egress, which is the thing
  * the allowlist above exists to bound. One named mount, added on purpose.
  */
+const IDA = 'https://broadcast.idaidaida.net/listen';
+
 const STATIONS = {
-  // Estonian Centre of Contemporary Music's community station (uuu.ee).
-  radio1965: 'http://live.uuu.ee:8001/radio1965',
+  /**
+   * 🔴 `radio1965` IS REMOVED, ON REQUEST, 2026-09-15. Same report as IDA: the
+   * operator of the uuu.ee server found roughly 100 concurrent clients against
+   * their limit, traced to positron.studio. Ours.
+   *
+   * ⚠️ THE LOAD WAS THE CHECKS, NOT THE VISITORS. Every `verify.mjs radio1965`
+   * and every `verify-gl.mjs videoradio` opens a live mount, and those were run
+   * dozens of times in one evening. A relay entry is a standing claim on
+   * somebody else's bandwidth and a harness that opens it is a claim made
+   * automatically, over and over, by nobody in particular.
+   *
+   * ⚠️ DO NOT ADD IT BACK WITHOUT ASKING THEM. The recordings at `/rec/` are a
+   * different host and a different shape of request (one file, not a held
+   * connection) and are left alone.
+   */
   // ERR's five public radio streams, 128 kbps MP3.
   vikerraadio: `${ERR}/vikerraadio.mp3`,
   raadio2: `${ERR}/raadio2.mp3`,
   klassikaraadio: `${ERR}/klassikaraadio.mp3`,
   raadio4: `${ERR}/raadio4.mp3`,
   raadiotallinn: `${ERR}/raadiotallinn.mp3`,
+  /**
+   * 🔴 IDA IS REMOVED, ON REQUEST FROM THE PEOPLE WHOSE SERVER IT IS.
+   * 2026-09-15: their operator reported roughly 100 concurrent clients, their
+   * limit, with the connections traced to positron.studio. That is us. These
+   * two mounts had been moved to the FRONT of the station list an hour before,
+   * which made them the default every visitor and every harness run opens, and
+   * at 320 kbit/s they are 2.5 times the weight of any other mount here.
+   *
+   * ⚠️ DO NOT ADD THEM BACK WITHOUT ASKING THEM FIRST. The allowlist is the
+   * only thing that bounds this, and a station in it is a standing claim on
+   * somebody else's bandwidth. What made this expensive was not the relay, it
+   * was defaulting to it: one line reordering an array put every page on their
+   * server at once.
+   */
 };
 
 // Everything a client needs to read about the stream, including the ICY fields
@@ -57,6 +86,11 @@ const STATIONS = {
 const EXPOSE = [
   'icy-name', 'icy-description', 'icy-genre', 'icy-br', 'icy-url', 'icy-pub',
   'icy-metaint', 'content-type', 'x-shout-ttfb', 'x-shout-station',
+  // ⚠️ THE RECORDINGS NEED THESE AND THE LIVE MOUNTS NEVER WILL. A stream has
+  // no length and no position; a recording has both, and a page that cannot
+  // read `content-length` or `content-range` cannot draw a scrub bar for one.
+  'content-length', 'content-range', 'accept-ranges', 'last-modified', 'etag',
+  'x-shout-recording',
 ].join(',');
 
 /**
@@ -68,6 +102,33 @@ const EXPOSE = [
  * open tab asking within the same few seconds. A hard global bound would need a
  * Durable Object, and that is worth doing if this is not enough.
  */
+/**
+ * 🔴 THE SAME STATION'S PAST, WHICH DID NOT EXIST UNTIL THIS WEEK. Their server
+ * now records a broadcast when the broadcaster asks it to: Icecast's on-connect
+ * hook starts `ffmpeg -c copy` against the mount, on-disconnect stops it and
+ * rsyncs the mp3 to eccm.ee, and a `streamrecording` event replaces the
+ * `livestream` one with an https URL. So a live station finally has a past, and
+ * it is an ordinary file with byte ranges.
+ *
+ * ⚠️ AND IT HAS THE SAME DEFECT AS THE MOUNT: MEASURED 2026-09-15, a recording
+ * answers 200 and honours a Range with a 206, and sends NO
+ * `access-control-allow-origin`. A page can put one in an <audio> element and
+ * read nothing about it, which is the whole reason this worker exists. Their
+ * events API is fine on its own (`live.uuu.ee/radio1965/api/events` answers
+ * with `allow-origin: *`), so only the audio needs carrying.
+ *
+ * 🔴 A PATTERN, NOT A PATH PARAMETER, and for the same reason `STATIONS` is an
+ * allowlist. `/rec/?url=…` would make this an open proxy for anything on
+ * eccm.ee; the names their hook writes are a slug of at most twenty characters
+ * and a datestamp, so that is exactly what is accepted and nothing else. No
+ * slashes, no dots beyond the one, no traversal to reason about.
+ */
+const REC_BASE = 'https://eccm.ee/radio1965/streams/';
+const REC_NAME = /^[a-z0-9-]{1,20}-\d{8}-\d{6}\.mp3$/;
+// A recording never changes once it is written, which is the opposite of the
+// streams above. It is worth caching at the edge and worth a client keeping.
+const REC_CACHE = 'public, max-age=86400, immutable';
+
 const HEALTH_TTL_MS = 20000;
 const healthCache = new Map();
 
@@ -171,6 +232,45 @@ export default {
         { headers: cors({ 'cache-control': 'no-store' }) });
     }
 
+    // ── a past broadcast, rather than the live one ──────────────────────
+    if (url.pathname.startsWith('/rec/')) {
+      const name = url.pathname.slice('/rec/'.length);
+      if (!REC_NAME.test(name)) {
+        return new Response('no such recording', { status: 404, headers: cors() });
+      }
+      // ⚠️ THE RANGE HEADER IS FORWARDED, AND THAT IS THE WHOLE POINT OF THIS
+      // BRANCH BEING SEPARATE. Seeking in an hour of audio is a Range request;
+      // swallowing it would turn every scrub into a fresh download from the
+      // beginning, which on a phone is the difference between a transport bar
+      // and a progress bar.
+      const range = req.headers.get('range');
+      const rt0 = Date.now();
+      const up = await fetch(REC_BASE + name, {
+        method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+        headers: {
+          ...(range ? { range } : {}),
+          'user-agent': 'positron-shout/1 (+https://positron.studio)',
+        },
+      });
+      // 🔴 NOT `!up.ok`. A Range request answers 206, which is not `ok` on some
+      // readings and is exactly what a working seek looks like. Guarding on
+      // `ok` here would have made every scrub report the origin as broken.
+      if (up.status >= 400) {
+        return new Response(`origin ${up.status}`, { status: 502, headers: cors() });
+      }
+      const h = cors({
+        'content-type': up.headers.get('content-type') || 'audio/mpeg',
+        'cache-control': REC_CACHE,
+        'x-shout-ttfb': String(Date.now() - rt0),
+        'x-shout-recording': name,
+      });
+      for (const k of ['content-length', 'content-range', 'accept-ranges', 'last-modified', 'etag']) {
+        const v = up.headers.get(k);
+        if (v) h[k] = v;
+      }
+      return new Response(req.method === 'HEAD' ? null : up.body, { status: up.status, headers: h });
+    }
+
     const id = url.pathname.replace(/^\/+/, '').replace(/\.mp3$/, '');
     const upstream = STATIONS[id];
     if (!upstream) return new Response('no such station', { status: 404, headers: cors() });
@@ -207,8 +307,16 @@ export default {
       return new Response(`origin ${up.status}`, { status: 502, headers: cors() });
     }
 
+    // 🔴 THE CONTENT-TYPE IS FORWARDED, NEVER INVENTED. It used to fall back to
+    // `audio/mpeg`, which was harmless while every mount here was MP3 and is a
+    // trap now that two of them are AAC: the page reads its frame scanner off
+    // this header, and a scanner pointed at the wrong framing finds NOTHING
+    // rather than finding rubbish. A default would turn a missing header into a
+    // confident wrong answer, and the page handles an ABSENT one correctly by
+    // looking at the bytes.
+    const upType = up.headers.get('content-type');
     const headers = cors({
-      'content-type': up.headers.get('content-type') || 'audio/mpeg',
+      ...(upType ? { 'content-type': upType } : {}),
       'x-shout-ttfb': String(ttfb),          // what the relay itself waited for
       'x-shout-station': id,
     });

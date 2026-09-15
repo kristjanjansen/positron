@@ -61,9 +61,10 @@
   const d = mount({
     name: 'resources',
     what: 'Every reachable source for Erkki Kurenniemi\'s work, one row each: when it is from, who '
-        + 'holds it, what it is, and the licence they state. Nothing is copied — a row points at its '
-        + 'holder, and one row can stand for a whole set. Places that refused are listed with what '
-        + 'they answered.',
+        + 'holds it, what it is, and the licence they state. Point at a date to see where it comes '
+        + 'from and how wide the bracket is, or at the rest of the row for what the record is and '
+        + 'why its date is not narrower. Nothing is copied, one row can stand for a whole set, and '
+        + 'places that refused are listed with what they answered.',
     // 🔴 NO READOUT AND NO CONTROLS, AND BOTH WENT ON THE SAME INSTRUCTION.
     // The page carried four counters and five buttons above a list of 334 rows
     // — three orderings, two filters — which is more furniture than list before
@@ -109,16 +110,25 @@
     // `build-corpus.mjs` now refuses to WRITE a file over this, so the two
     // cannot disagree, and the assert below counts rows against items anyway.
     cap: 600,
-    // The sentence a record carries and no column can hold — see `note` in
-    // table.mjs. Several of the diary rows are only legible through it.
-    note: 'note',
+    // The sentences a record carries and no column can hold — see `note` in
+    // table.mjs. Several of the diary rows are only legible through it, and it
+    // is where the argument for a bracket goes: `when.note` says why a date is
+    // not narrower, which is a paragraph on the rows that have been read against
+    // a source and has no business being squeezed into 84 px.
+    note: 'about',
     empty: 'nothing in this view',
     columns: [
       { key: 'kind', label: 'kind', width: 46 },
       // A size can only exist if there is something to measure, which is why
       // this replaced a column that said the word `file` beside the kind.
       { key: 'size', label: 'size', width: 58, align: 'right' },
-      { key: 'date', label: 'when', width: 84 },
+      // 🔴 A DATE IS A CLAIM AND THE CELL CANNOT HOLD ITS EVIDENCE. `1962–1963-07-11`
+      // is eighteen months where a Wikidata title match had said `1963`, and
+      // until now a visitor could see the bracket get WIDER with nowhere to find
+      // out why. The two lines on hover are the two facts a reader cannot see:
+      // who says so, and how wide this is. Everything longer than two lines is
+      // on the row, which is the one surface in this component sized for prose.
+      { key: 'date', label: 'when', width: 84, hover: 'dateWhy' },
       { key: 'source', label: 'who holds it', width: 122 },
       // The name, linked to the record, cut to one line with the whole of it on
       // `title`. `hi` because it is the thing on the row you are looking for.
@@ -159,6 +169,76 @@
   // gets one em dash, never a padded guess at a year.
   const dateOf = (it) => it.when.edtf || '—';
   const fileOf = (it) => !!it.file;
+
+  /**
+   * 🔴 WHERE A DATE COMES FROM, IN WORDS. `when.how` is a slug a machine wrote
+   * for a machine — `ojanen-2020-thesis-p205-n402`, `edm-literal-length` — and
+   * showing one to a visitor is showing them a field name and calling it an
+   * answer. Most of them were already written as English with hyphens for
+   * spaces, so the fallback is honest; the ones named here are the ones that
+   * read as a database column, plus the citations, which become the form a
+   * reader could look up in a library.
+   *
+   * ⚠️ NOT A COLUMN. Thirty-nine distinct values, some of them a full clause,
+   * against a table that already has to cut the titles.
+   */
+  const SAYS = {
+    'national-gallery-yearFrom-yearTo': "the catalogue's own year fields",
+    'the-two-fonds-own-yearFrom-yearTo-taken-together': "both archives' year fields together",
+    'zenodo-publication-date': 'the day it was deposited at Zenodo',
+    'discogs-year-integer': 'a year, and nothing finer, from Discogs',
+    'openalex-publication-date': 'the publication date OpenAlex holds',
+    'crossref-issued-date-of-the-book': 'the day Crossref says the book came out',
+    'wikidata-declared-precision': 'Wikidata, which declares how precise it is',
+    'commons-quickstatements-precision': 'Wikimedia Commons, which declares how precise it is',
+    'wikidata-P577-P571-or-P580': 'a date field on the Wikidata record',
+    'wikidata-title-match': 'a Wikidata work with the same title',
+    'wikidata-has-no-date': 'nothing: Wikidata states no date',
+    'edm-literal-length': 'a Europeana date, as wide as the text it is written in',
+    'filename-year': 'a year in the uploaded filename',
+    'derived-from-corpus-range': 'the span of the compilation it came off',
+    'archive-org-has-no-work-date': 'nothing: archive.org dates the upload, not the work',
+    'musicbrainz-has-no-recording-date': 'nothing: MusicBrainz dates releases, not recordings',
+    'musicbrainz-works-carry-no-date': 'nothing: MusicBrainz dates releases, not works',
+    'musicbrainz-release-date': 'the release date MusicBrainz holds',
+    'not-reached': 'nothing: the source was not reached',
+    'the-pdf-is-not-opened-here': 'nothing: the document is pointed at, never opened',
+  };
+  // `ojanen-2020-thesis-p205-n402` -> `Ojanen 2020, printed p. 205 n. 402`. The
+  // page number is the PRINTED one, which is the one a reader holding the book
+  // would turn to.
+  const cite = (tail) => {
+    const parts = tail.split('-');
+    const pp = parts.filter((t) => /^p\d+$/.test(t)).map((t) => t.slice(1));
+    const nn = parts.filter((t) => /^n\d+$/.test(t)).map((t) => t.slice(1));
+    return `Ojanen 2020, printed ${pp.length > 1 ? `pp. ${pp.join(' and ')}` : `p. ${pp[0]}`}`
+      + (nn.length ? ` n. ${nn.join(' and ')}` : '');
+  };
+  const saysOf = (how) => {
+    if (!how) return '';
+    const m = /^ojanen-2020-thesis-(.+)$/.exec(how);
+    return m ? cite(m[1]) : SAYS[how] || how.replace(/-/g, ' ');
+  };
+  // How wide the bracket is, which is the other thing the cell cannot show: a
+  // reader can see `1967` and not that it means the whole of that year.
+  const WIDE = { day: 'a day', month: 'a month', year: 'a year', decade: 'a decade' };
+  const spanOf = (it) => {
+    const w = it.when;
+    if (w.earliest == null) return '';
+    if (WIDE[w.precision]) return `the bracket is ${WIDE[w.precision]}`;
+    if (w.precision === 'after') return 'the bracket has no far edge';
+    const days = (w.latest - w.earliest) / 86400e3;
+    const n = days < 60 ? `${Math.round(days)} days`
+      : days < 700 ? `${Math.round(days / 30.44)} months`
+      : `${Math.round(days / 365.2425)} years`;
+    return `the bracket is ${n} wide`;
+  };
+  // Two lines, and it is a hard ceiling: this is drawn ON TOP of the rows under
+  // it and read every time somebody points at a date.
+  const whyOf = (it) => [saysOf(it.when.how), spanOf(it)].filter(Boolean).join('\n');
+  // The row, which is the surface that may hold a paragraph: what the record is,
+  // then why its date is not narrower.
+  const aboutOf = (it) => [it.note, it.when.note].filter(Boolean).join('\n\n');
   /**
    * The size column, and the page does the arithmetic because the page owns the
    * measurement — `messages.mjs` prints what it is handed.
@@ -258,11 +338,13 @@
       kind: kindOf(it),
       size: sizeOf(it),
       date: dateOf(it),
+      dateWhy: whyOf(it),
       source: it.source,
       title: it.title,
       url: it.url || null,
       licence: licOf(it),
       licenceFull: it.licence || 'no licence is stated anywhere for this row',
+      about: aboutOf(it),
     })));
     return rows;
   }
@@ -350,6 +432,32 @@
       deck === null ? `${DECK} answered ${deckRes.status}`
         : lost.length ? `${lost.length} of ${deck.items.length} missing — first ${lost[0].id}`
         : `all ${deck.items.length} of the deck's rows are here`);
+
+    // 🔴 FOURTEEN DATES HERE REST ON A BOOK, AND THEY WERE ONE BUILD AWAY FROM
+    // BEING ERASED. They were hand-written into a generated file, so the next
+    // run of `build-corpus.mjs` would have put every one of them back to a
+    // filename year or the span of a compilation, with nothing on this page
+    // saying anything had changed. The values live in code now, twelve in
+    // `proto/deck/ingest.mjs` and two in `build-corpus.mjs`, and this is the
+    // check that was missing: a rebuild that loses them reads red here.
+    const rows = corpus.amended?.rows || [];
+    const brackets = rows.filter((r) => {
+      const it = items.find((x) => x.id === r.id);
+      return !it || it.when.edtf !== r.edtf || !it.when.note;
+    });
+    // ⚠️ ONE VALUE TYPED HERE, AND IT HAS TO BE. Everything above compares the
+    // document with itself, which cannot notice the document being rebuilt
+    // without the readings in it — the ledger would simply be gone too. On-Off
+    // is the row a plain rebuild puts back to a bare `1963` off a Wikidata title
+    // match, so it is the one the page knows by heart.
+    const onOff = items.find((it) => it.id.endsWith('Erkki Kurenniemi - On-Off.mp3'));
+    const WIDENED = '1962–1963-07-11';
+    d.assert('the fourteen dates read off the thesis are still in the list',
+      rows.length === 14 && brackets.length === 0 && onOff?.when.edtf === WIDENED,
+      !rows.length ? 'the corpus names no amended rows at all, so a rebuild dropped the readings'
+        : brackets.length ? `${brackets.length} of ${rows.length} lost their bracket, first ${brackets[0].id}`
+        : onOff?.when.edtf !== WIDENED ? `On-Off reads ${onOff?.when.edtf || 'nothing'}, not ${WIDENED}`
+        : `${rows.length} rows, every one with its reason; On-Off ${onOff.when.edtf}`);
 
     d.ready();
   } catch (e) {

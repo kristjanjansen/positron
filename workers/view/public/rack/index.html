@@ -27,7 +27,7 @@
 
   const d = mount({
     name: 'rack',
-    what: 'A MacBook in a studio is running Ableton Live, and this page plays it. Press a key: the note number goes out over a socket, a small program on that machine hands it to Live over the Mac’s own MIDI bus, and a copy of what Live renders comes straight back as sound. Round trip is how long the far end took to answer, buffer is how much sound is held in hand before it is played, and a dropout is a moment that cushion ran out or had to be cut — one click each.',
+    what: 'A MacBook in a studio is running Ableton Live, and this page plays it. Press a key: the note number goes out over a socket, a small program on that machine hands it to Live over the Mac’s own MIDI bus, and a copy of what Live renders comes straight back as sound. Round trip is how long the far end took to answer, buffer is how much sound is held in hand before it is played, and a dropout is a moment that cushion ran out or had to be cut, one click each.',
     // `buffer` and `dropouts` are here because "it sounds noisy" and "the stream
     // is fine" were both true at once for an hour: the samples arriving over the
     // relay measured bit-clean against the source — same pitch, same peak, zero
@@ -88,7 +88,7 @@
     // which is a noise complaint, not a pitch one. Chrome honours the request,
     // which is exactly why nobody would ever see this fail by accident.
     if (ctx.sampleRate !== RATE) {
-      d.log(`asked for ${RATE} Hz and got ${ctx.sampleRate} — every sample arriving at ${RATE} will play ${(RATE / ctx.sampleRate).toFixed(3)}x wrong`, 'bad');
+      d.log(`asked for ${RATE} Hz and got ${ctx.sampleRate}. Every sample arriving at ${RATE} will play ${(RATE / ctx.sampleRate).toFixed(3)}x wrong`, 'bad');
     }
     await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
     // Two out, so a stereo instrument stays stereo. A mono sender is upmixed
@@ -110,7 +110,7 @@
         // what they were.
         const was = breaks; breaks = b;
         d.set('dropouts', b, b ? 'warn' : 'ok');
-        if (was >= 0) d.log(`${starved} ran dry, ${trimmed} trimmed — cushion ${Math.round(bufMs)} ms`, 'warn');
+        if (was >= 0) d.log(`${starved} ran dry, ${trimmed} trimmed · cushion ${Math.round(bufMs)} ms`, 'warn');
       }
     };
     applyChannels();
@@ -155,7 +155,7 @@
     if (Math.abs(implied - told.frameMs) <= told.frameMs * 0.02) return;
     const real = Math.max(1, Math.min(2, Math.round(samples / ((told.frameMs / 1000) * RATE))));
     d.log(`it announced ${chIn} channel${chIn > 1 ? 's' : ''}, but a frame works out at ` +
-          `${implied.toFixed(1)} ms against the ${told.frameMs} ms it declared — playing it as ${real}`, 'warn');
+          `${implied.toFixed(1)} ms against the ${told.frameMs} ms it declared · playing it as ${real}`, 'warn');
     chCorrected++;
     chProven = real;
     applyChannels(real);
@@ -165,7 +165,7 @@
     ws = new WebSocket(RELAY);
     ws.binaryType = 'arraybuffer';
     ws.onopen = () => { d.log(`joined ${ROOM}`); send({ type: 'rack.status' }); pingAt = performance.now(); };
-    ws.onclose = () => { d.log('socket closed — reconnecting'); setTimeout(connect, 1200); };
+    ws.onclose = () => { d.log('socket closed · reconnecting'); setTimeout(connect, 1200); };
     ws.onmessage = (e) => {
       if (typeof e.data !== 'string') { onPcm(e.data); return; }
       let m; try { m = JSON.parse(e.data); } catch { return; }
@@ -178,7 +178,7 @@
       // The far end's rate against ours. Announced, so it can be checked.
       if (m.rate && m.rate !== RATE && !rateWarned) {
         rateWarned = true;
-        d.log(`the far end sends ${m.rate} Hz and this page plays at ${RATE} — nothing in the chain resamples`, 'bad');
+        d.log(`the far end sends ${m.rate} Hz and this page plays at ${RATE}. Nothing in the chain resamples`, 'bad');
       }
         applyChannels();
         // It named itself ONCE, in the log, where a long name fits and a repeat
@@ -239,7 +239,7 @@
   d.on('play', async () => {
     await startAudio();
     started = true;
-    d.log('listening — press a key');
+    d.log('listening · press a key');
     const before = frames;
     send({ type: 'note.on', note: 60, vel: 110 });
     send({ type: 'note.on', note: 64, vel: 100 });
@@ -265,7 +265,7 @@
         !!told?.rate && told.rate === RATE && ctx?.sampleRate === RATE,
         `sent ${told?.rate} Hz · context ${ctx?.sampleRate} Hz`);
       d.assert('the frame length agrees with the channel count', chChecked && !chCorrected,
-        chCorrected ? `it said ${claim}, the frames say ${chIn} — playing ${chIn}`
+        chCorrected ? `it said ${claim}, the frames say ${chIn} · playing ${chIn}`
                     : `${chIn === 2 ? 'stereo' : 'mono'} checks out against ${told?.frameMs} ms`);
       d.assert('sound came back while keys were held', during > 20, `${during} frames of audio in 2.2 s`);
       d.assert('the relay dropped none of it', missing === 0, `${missing} missing of ${frames}`);

@@ -23,8 +23,8 @@
     name: 'looper',
     what: 'A keyboard into a synthesiser made of WebAudio, with a loop pedal on '
         + 'it. Press Start audio, play the letter keys, then tap space once to '
-        + 'start recording and again to close the loop — what you played in '
-        + 'between repeats while you play over it. Latency is how late this '
+        + 'start recording and again to close the loop. What you played in '
+        + 'between then repeats while you play over it. Latency is how late this '
         + 'browser says its own audio is, and off is how far from the beat the '
         + 'notes coming back round actually landed.',
     readout: { latency: 'ms', layers: '', notes: '', off: 'ms' },
@@ -70,7 +70,7 @@
     base: 60,
     onDown: (note) => { kb.lightNote(note, true); capture('note-on', note); },
     onUp: (note) => { kb.lightNote(note, false); capture('note-off', note); },
-    onOctave: (base) => d.log(`octave moved — the leftmost key is note ${base}`),
+    onOctave: (base) => d.log(`octave moved · the leftmost key is note ${base}`),
   });
 
   function capture(type, note) {
@@ -165,7 +165,7 @@
     const at = performance.now();
     if (!looper.recording()) {
       looper.armRecord(at);
-      d.log(looper.layers.length === 0 ? 'recording — this pass sets the length' : 'overdubbing', 'hi');
+      d.log(looper.layers.length === 0 ? 'recording · this pass sets the length' : 'overdubbing', 'hi');
     } else if (!looper.commitLayer(at)) {
       d.log('nothing was played in that pass', 'bad');
     }
@@ -235,7 +235,7 @@
     const layer = looper?.layers.at(-1);
     d.assert('the pedal turned what was played into a loop', !!layer,
       layer ? `loop ${layer.index} · ${layer.items.length} notes in ${Math.round(layer.loopMs)} ms`
-            : 'no loop — press Rec / commit twice around some notes');
+            : 'no loop · press Rec / commit twice around some notes');
     // A LANE THAT DREW NOTHING IS THE DEFECT THIS PAGE CARRIED FOR A WEEK, and
     // it never went red because nothing asked the picture a question.
     const ink = view ? view.strip.inkOf('note') : 0;
@@ -248,7 +248,7 @@
         d.set('off', st.p50);
         d.log(`off the beat: median ${st.p50.toFixed(1)} ms over ${pe.length} playbacks`);
       } else {
-        d.log('nothing has played back yet — let the loop go round once');
+        d.log('nothing has played back yet. Let the loop go round once');
       }
     }
   });

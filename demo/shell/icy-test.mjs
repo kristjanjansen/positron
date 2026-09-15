@@ -100,7 +100,7 @@ const wrong = [];
 const mis = icyDemuxer(METAINT + 1, { onTitle: (t) => wrong.push(t) });
 for (let i = 0; i < stream.length; i += 100) mis(stream.subarray(i, i + 100));
 console.log(wrong.length < expectTitles.length
-  ? `sabotage control: wrong metaint recovers ${wrong.length}/${expectTitles.length} titles — the test can fail`
+  ? `sabotage control: wrong metaint recovers ${wrong.length}/${expectTitles.length} titles · the test can fail`
   : 'FAIL: wrong metaint still passed, so this test proves nothing');
 
 process.exit(bad || fired || failed ? 1 : 0);

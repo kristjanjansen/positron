@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>station · positron</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script src="/proto/remixer/hls.min.js"></script>
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+
+  const STATION = 'https://positron-station.kristjan-jansen.workers.dev';
+  const PLAYLIST = `${STATION}/station.m3u8`;
+  const POLL_MS = 2000;          // how often the numbers are re-read
+  const RATE_WINDOW_MS = 4000;   // over how long `advance` is measured
+
+  // NATIVE HLS ONLY ON WEBKIT, GATED ON ManagedMediaSource.
+  // `canPlayType('application/vnd.apple.mpegurl')` answers "maybe" in Chrome
+  // and in headless Chrome as well as in Safari, so it cannot tell the two
+  // apart; MMS is WebKit-only and is therefore a capability test rather than a
+  // brand check. CLAUDE.md carries this as a rule and three demos shipped
+  // broken without it.
+  const NATIVE_HLS = 'ManagedMediaSource' in window
+    && !!document.createElement('audio').canPlayType('application/vnd.apple.mpegurl');
+
+  const d = mount({
+    name: 'station',
+    // 133 words to 44, on instruction. What went was every sentence explaining
+    // the mechanism, which is what the diagram below is for and says better.
+    // 🔴 ONE LINE, BECAUSE THIS PAGE HAS A DIAGRAM. A `what` paragraph and a
+    // picture of the machinery are two explanations of one thing, and the
+    // paragraph is the weaker of them: it describes what a reader can point at
+    // an inch below. It is the same sentence the index card carries, so a
+    // visitor arriving from there is not told the same thing twice in two
+    // different wordings that can drift apart.
+    what: 'A schedule played as one stream: a text file names which seconds of which recording come next.',
+    // 🔴 FOUR CELLS, AND `programme` IS NOT ONE OF THEM. It is a FILE NAME:
+    // `progc.mp3` at 19 px mono in a 96 px cell is cut, and CLAUDE.md is
+    // explicit that anything truncating with an ellipsis is in the wrong place
+    // rather than in need of a wider box. Reported as running into its
+    // neighbour. It has a line of its own above the transport now, where a
+    // name has room to be a name.
+    readout: { into: 's', behind: 's', advance: 'x', crossed: '' },
+    // 🔴 NO CONTROL ROW. The transport bar below is the control, the same one
+    // `/radio1965/` uses, and a LISTEN button beside it would be a second way
+    // to start the same sound in a different shape.
+    controls: [],
+  });
+  guard(d);
+
+  /**
+   * 🔴 THE ELEMENT IS A SOUND SOURCE, NOT A SURFACE. It carried `controls`, so
+   * the page had a browser's own player on it: a fourth transport in a project
+   * whose rule is that transport UI is `transport-bar.mjs` and nothing else. It
+   * also looked different in every browser and could not say LIVE.
+   * With no `controls` it renders at zero height, so it is hidden without
+   * needing to be hidden.
+   */
+  const audio = el('audio', '', null, { playsinline: '' });
+  d.el.append(audio);
+
+  // The programme's name, on its own line above the transport. A file name does
+  // not fit a readout cell and is not a measurement; it changes when the
+  // station changes, which is human pace, so prose is the right shape for it.
+  const nowLine = el('div', 'pos-t2', 'off air');
+  nowLine.style.cssText = 'font: 400 12.5px/1.4 var(--mono); color: var(--dim);';
+  d.el.append(nowLine);
+
+  /**
+   * 🔴 THE SAME TRANSPORT AS `/radio1965/`, AND FOR THE SAME REASON: this is a
+   * live source with no past to seek in, so the bar runs in `live` mode, which
+   * gives a play toggle and a LIVE chip and gives up the slider. A station and
+   * a radio mount are the same shape of thing to a listener, and two pages
+   * showing it two ways is two things to learn.
+   * ⚠️ THE DECK IS A FOLLOWER. The element owns position once it is playing, so
+   * `command` drives the element and the deck follows, exactly as `/crate/` and
+   * `/radio1965/` do. A control writing to the deck alone is undone by the
+   * master's next tick, silently, within a few hundred milliseconds.
+   */
+  const deck = createDeck({ items: [], adapters: {}, range: [Date.now() - 60000, Date.now()] });
+  // 🔴 BOTH ENDS MOVE, ONCE A SECOND. A live deck's right edge is now, and a
+  // range left at [0, 1] makes the whole travel one millisecond: a seek that
+  // landed perfectly reports as a seek to 1 ms, which is a slider with nowhere
+  // to go rather than a seek that missed. `/crate/` shipped exactly that bug
+  // and the harness caught it the same way here, at `503 ~ 1`.
+  setInterval(() => {
+    const t = Date.now();
+    deck.setRange([t - 60000, t]);
+  }, 1000);
+  const bar = createTransportBar(d.el, deck, {
+    absolute: true, scrub: false, endStop: false, live: true, loop: false,
+    command: {
+      play: () => { listen(); deck.play(); },
+      pause: () => { audio.pause(); deck.pause(); },
+      // the bar has to be able to move the deck or a seek reports as a miss
+      seek: (pos) => deck.seek(pos),
+    },
+  });
+
+
+  let hls = null, engine = 'none';
+  let stalls = 0, crossed = 0, lastProgramme = null, playing = false;
+  let rateAt = 0, rateT = 0;
+  const discSeen = { polls: 0, withTag: 0, seq: new Set() };
+
+  // `stalls` lost its cell with the cut to four. It is still counted, still
+  // asserted, and now reaches a person through the log, where a stall is an
+  // event that HAPPENED rather than a number sitting at zero.
+  audio.addEventListener('waiting', () => { stalls++; d.log(`stalled · ${stalls} so far`, 'warn'); });
+
+  // ── the artwork a lock screen shows ────────────────────────────────────────
+  // Drawn rather than fetched: MediaMetadata wants an image URL and a station
+  // with no page cannot have a file. A canvas gives a real PNG data URI with
+  // nothing to deploy.
+  function artwork() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 512;
+    const g = c.getContext('2d');
+    g.fillStyle = '#0b0e14'; g.fillRect(0, 0, 512, 512);
+    g.strokeStyle = '#ffd400'; g.lineWidth = 26;
+    g.beginPath(); g.arc(256, 280, 150, 0.66, 5.9); g.stroke();
+    g.fillStyle = '#ffd400'; g.fillRect(105, 265, 300, 30);
+    g.fillRect(330, 120, 100, 22); g.fillRect(369, 81, 22, 100);
+    return c.toDataURL('image/png');
+  }
+  const ART = artwork();
+
+  // 🔴 THE FIRST USE OF mediaSession IN THIS PROJECT. Without it a phone's lock
+  // screen shows the page title and a generic icon, and the pause button on a
+  // pair of headphones does nothing. The metadata is refreshed on every
+  // programme change, because a station that keeps one title across four
+  // programmes is lying on the one surface a listener sees with the screen off.
+  const MEDIA_SESSION = 'mediaSession' in navigator;
+  function announce(programme) {
+    if (!MEDIA_SESSION) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: programme || 'positron station',
+      artist: 'positron',
+      album: 'one playlist, files and live shows in the same line',
+      artwork: [{ src: ART, sizes: '512x512', type: 'image/png' }],
+    });
+    navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+    try {
+      navigator.mediaSession.setActionHandler('play', () => audio.play().catch(() => {}));
+      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+    } catch { /* an agent that does not take handlers is not a failure */ }
+  }
+
+  // ── the numbers ────────────────────────────────────────────────────────────
+  /** How far behind the live edge the sound is, in seconds, or null where this
+   *  engine cannot say. hls.js keeps the playing segment's PROGRAM-DATE-TIME;
+   *  WebKit exposes the playlist's start date on the element itself. */
+  function behindS() {
+    if (hls && hls.playingDate) return (Date.now() - hls.playingDate.getTime()) / 1000;
+    if (audio.getStartDate) {
+      const s = audio.getStartDate();
+      if (s && !Number.isNaN(s.getTime())) return (Date.now() - (s.getTime() + audio.currentTime * 1000)) / 1000;
+    }
+    return null;
+  }
+
+  // ── the watchdog ───────────────────────────────────────────────────────────
+  // ⚠️ A RECOVERY ACTION IS NOT FREE. It waits STUCK_MS before believing the
+  // sound has stopped, backs off to eight seconds between attempts, and gives
+  // up in words after twelve rather than retrying into an outage forever.
+  // WebKit's native HLS needs none of this: the element keeps its own loader
+  // and retries on its own, which is why this whole block is inside the hls.js
+  // branch and why the plan's "it recovers with no page code" was true when it
+  // was measured and false here.
+  const STUCK_MS = 6000, RESTART_CAP = 12;
+  let lastT = 0, lastMoveAt = performance.now(), restarts = 0, lastRestart = 0;
+  function watchdog() {
+    if (!hls || audio.paused) { lastMoveAt = performance.now(); return; }
+    const now = performance.now();
+    if (audio.currentTime !== lastT) { lastT = audio.currentTime; lastMoveAt = now; return; }
+    if (now - lastMoveAt < STUCK_MS) return;
+    const wait = Math.min(1000 * 2 ** restarts, 8000);
+    if (Date.now() - lastRestart < wait) return;
+    if (restarts >= RESTART_CAP) return;
+    lastRestart = Date.now(); restarts++;
+    d.api.restarts = restarts;
+    d.log(`nothing has played for ${((now - lastMoveAt) / 1000).toFixed(0)} s; asking the loader to start again (${restarts})`);
+    try { hls.startLoad(); } catch { /* torn down */ }
+    if (restarts === RESTART_CAP) d.log('the station has been unreachable too long; not asking again', 'bad');
+  }
+
+  async function poll() {
+    watchdog();
+    // advance: seconds of audio per second of wall clock.
+    //
+    // 🔴 SINCE PLAYBACK BEGAN, NOT OVER THE LAST FEW SECONDS, AND THAT IS NOT
+    // A SMOOTHING PREFERENCE. A short window reads a legitimate **0 x** every
+    // time the player catches up to the live edge and waits for the segment
+    // that has not been written yet, which is the normal state of a live
+    // stream several times a minute. Asserting on it failed a page that had
+    // just played 60.0 s of audio without a gap. The average since the first
+    // frame is the quantity the claim is actually about, and it still moves:
+    // every stall pulls it down and it never comes back up.
+    const now = performance.now();
+    if (!rateT && audio.currentTime > 0 && !audio.paused) { rateAt = audio.currentTime; rateT = now; }
+    if (rateT && now - rateT >= RATE_WINDOW_MS) {
+      d.set('advance', Math.round(((audio.currentTime - rateAt) / ((now - rateT) / 1000)) * 100) / 100);
+    }
+    const b = behindS();
+    d.set('behind', b === null ? '' : Math.round(b * 10) / 10);
+
+    let now_ = null;
+    try { now_ = await fetch(`${STATION}/now.json`, { cache: 'no-store' }).then((r) => r.json()); } catch { /* the station is allowed to be slow */ }
+    if (now_ && !now_.error) {
+      nowLine.textContent = `${now_.programme} · ${now_.title || 'no title'}`;
+      d.set('into', Math.round(now_.into * 10) / 10);
+      if (lastProgramme && now_.programme !== lastProgramme) {
+        if (playing) { crossed++; d.set('crossed', crossed); }
+        d.log(`${lastProgramme} to ${now_.programme}`, 'hi');
+        announce(now_.programme);
+      }
+      if (!lastProgramme) announce(now_.programme);
+      lastProgramme = now_.programme;
+    }
+
+    // The playlist itself, which is what the claims below are about.
+    try {
+      const pl = await fetch(PLAYLIST, { cache: 'no-store' }).then((r) => r.text());
+      discSeen.polls++;
+      if (pl.includes('\n#EXT-X-DISCONTINUITY\n')) discSeen.withTag++;
+      const m = pl.match(/#EXT-X-DISCONTINUITY-SEQUENCE:(\d+)/);
+      if (m) discSeen.seq.add(m[1]);
+      lastPlaylist = pl;
+    } catch { /* same */ }
+  }
+  let lastPlaylist = '';
+
+  // ── going on air ───────────────────────────────────────────────────────────
+  async function listen() {
+    if (playing) { audio.pause(); playing = false; announce(lastProgramme); return; }
+    playing = true;
+    if (NATIVE_HLS) {
+      engine = 'native HLS';
+      // ⚠️ REQUIRED WITH ManagedMediaSource ANYWHERE NEAR, and harmless
+      // otherwise: an AirPlay-eligible element can be handed to a remote route
+      // mid-measurement, and then the numbers describe a device that is not here.
+      audio.disableRemotePlayback = true;
+      audio.src = PLAYLIST;
+    } else if (window.Hls && Hls.isSupported()) {
+      engine = 'hls.js MediaSource';
+      hls = new Hls({ lowLatencyMode: false, liveSyncDurationCount: 3 });
+      // 🔴 MEASURED 2026-09-15, AND IT IS THE OPPOSITE OF WHAT THE NATIVE PATH
+      // DOES. With the station blocked for 30 s from outside the page, the
+      // element played out its 26.4 s of buffer, stalled at 79.97 s, and was
+      // STILL at 79.97 s forty seconds after the block was lifted: no error on
+      // the element, `ended` false, readyState 2, and no way back. hls.js
+      // exhausts its retries and then stops loading; the element it is feeding
+      // has no loader of its own to keep trying. WebKit's native HLS retries
+      // forever and needs none of this, which is why the claim "it recovers by
+      // itself with no page code" was true when it was measured and false here.
+      //
+      // 🔴 AND THE RECOVERY WATCHES THE PLAYHEAD, NOT THE ERROR EVENT. The
+      // first attempt here hung a restart off `Hls.Events.ERROR`, which read
+      // correct and MEASURED as three restarts during the outage and then
+      // silence: once hls.js has exhausted its retries it stops loading, and a
+      // loader that is not loading raises no more errors, so an event-driven
+      // recovery has nothing left to fire on. The station came back and the
+      // page sat at 69.97 s with `error` null and `ended` false. A watchdog on
+      // "is the sound still moving" has no such dependency.
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (!data.fatal) return;
+        d.log(`hls ${data.type} ${data.details}`, 'bad');
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError?.();
+      });
+      hls.loadSource(PLAYLIST);
+      hls.attachMedia(audio);
+    } else {
+      engine = 'none';
+      d.log('this browser has neither native HLS nor MediaSource', 'bad');
+    }
+    d.log(`engine ${engine}`, 'hi');
+    d.api.engine = engine;
+    // 🔴 FIRE IT AND MOVE ON. `audio.play()` waits on a user gesture in a real
+    // browser and never rejects into anything useful, so awaiting it here is a
+    // hang rather than an error, and CLAUDE.md records two demos lost to
+    // exactly that. Sound is allowed to be late; the measurement is not.
+    audio.play().catch((e) => d.log(`play deferred · ${e.name}`));
+    rateAt = 0; rateT = 0;   // the average starts at the first frame, not at the press
+    await poll();
+    clearInterval(timer); timer = setInterval(poll, POLL_MS);
+    // 🔴 THE CHECKS ARE IN TWO PHASES AND THE SPLIT IS NOT COSMETIC.
+    // Everything about the PLAYLIST can be true within a second, and it has to
+    // be: the harness stops collecting once the assert count stops growing, so
+    // a page whose FIRST assert sits behind a forty-second wait reports
+    // "asserted nothing" and reads as broken while it is working. CLAUDE.md
+    // carries this as a rule and this page broke it on its first run: 0/1,
+    // `__demo.ready` false, not one assert collected.
+    await d.run('check-playlist');
+    // ⚠️ AWAITED INSIDE CONTROL 0, never hung off a setTimeout. Control 0 is
+    // the only control the harness gives `settleMs`, so slow work has to be
+    // inside its handler for that wait to cover it. Forty seconds is one
+    // programme, which is what "it crossed a boundary" needs to become true.
+    await new Promise((r) => setTimeout(r, 42000));
+    await d.run('check-playback');
+  }
+
+  let timer = setInterval(poll, POLL_MS);
+
+  d.on('check-playlist', async () => {
+    const pl = lastPlaylist;
+    d.assert('the playlist never ends', !pl.includes('#EXT-X-ENDLIST'),
+      pl.includes('#EXT-X-ENDLIST') ? 'ENDLIST present' : 'no ENDLIST in ' + pl.length + ' bytes');
+    d.assert('it is live, not VOD', !pl.includes('#EXT-X-PLAYLIST-TYPE:VOD'));
+    d.assert('it declares a target duration', /#EXT-X-TARGETDURATION:\d+/.test(pl));
+    d.assert('its segments are byte ranges into whole files',
+      /#EXT-X-BYTERANGE:\d+@\d+/.test(pl));
+
+    // A range GET against the first segment the playlist offers: the design
+    // rests on R2 answering 206, so the page checks it rather than assuming it.
+    // ⚠️ WRAPPED, AND THAT IS NOT TIDINESS. This probe threw once while the
+    // station was deliberately unreachable, the exception escaped the handler,
+    // and the five checks after it never ran. The page reported 4/4 green with
+    // its real subject unmeasured. CLAUDE.md's rule about a check that pauses
+    // mid-way losing every assert after it, in a second costume. A probe that
+    // could not be made is a FAILED assert, never a missing one.
+    const br = pl.match(/#EXT-X-BYTERANGE:(\d+)@(\d+)\n(\S+)/);
+    if (br) {
+      const [, len, off, uri] = br;
+      try {
+        const r = await fetch(new URL(uri, STATION), { headers: { range: `bytes=${off}-${+off + +len - 1}` } });
+        const buf = await r.arrayBuffer();
+        d.assert('a segment answers 206 with its range', r.status === 206,
+          `${r.status} ${r.headers.get('content-range')}`);
+        d.assert('and the bytes are the length declared', buf.byteLength === +len,
+          `${buf.byteLength} of ${len}`);
+      } catch (e) {
+        d.assert('a segment answers 206 with its range', false, String(e.message || e));
+        d.assert('and the bytes are the length declared', false, 'the range was never fetched');
+      }
+    }
+
+  });
+
+  // The second phase, forty-odd seconds later: everything that needed a
+  // programme to end before it could be true.
+  d.on('check-playback', async () => {
+    d.assert('the joins between unlike programmes are marked',
+      discSeen.withTag > 0, `${discSeen.withTag} of ${discSeen.polls} playlists carried #EXT-X-DISCONTINUITY`);
+
+    d.assert('the sound advanced with the clock', audio.currentTime > 5,
+      `${audio.currentTime.toFixed(1)} s played on ${engine}`);
+    const adv = d.api.readout.advance;
+    d.assert('and it advanced at about real time', typeof adv === 'number' && adv > 0.85 && adv < 1.15,
+      `${adv} x`);
+    d.assert('it crossed a programme boundary while playing', crossed >= 1,
+      `${crossed} crossing${crossed === 1 ? '' : 's'}`);
+
+    if (MEDIA_SESSION) {
+      d.assert('the lock screen was told what is on',
+        navigator.mediaSession.metadata?.title === lastProgramme,
+        `${navigator.mediaSession.metadata?.title} against ${lastProgramme}`);
+    } else {
+      d.log('no mediaSession in this browser, so nothing to check');
+    }
+    d.log(`checked · ${d.api.asserts.filter((a) => a.pass).length}/${d.api.asserts.length}`, 'hi');
+  });
+
+  // 🔴 `ready()` MEANS THE PAGE HAS FINISHED BOOTING, NOT THAT ITS CHECKS ARE
+  // DONE, AND GETTING THAT BACKWARDS COST A RUN. It was called at the end of
+  // the last check instead, which reads as the more honest place and is the
+  // wrong one: the harness tests `__demo.ready` before it presses anything, so
+  // the page reported 0/1 with `failed: null` and not one of its eleven asserts
+  // was ever collected. The asserts land later and are picked up later; this
+  // line is only the page saying it is up.
+  // 🔴 THE DIAGRAM IS LAST ON THE PAGE. See CLAUDE.md: it is reference, read
+  // once by somebody who has already used the thing, so it goes under the
+  // controls and the numbers rather than between them and the page's own
+  // sentence.
+  // 🔴 THE PICTURE THAT ANSWERS "HOW DO LIVE AND FILES MIX", which was asked
+  // twice in prose and is a drawing rather than a paragraph.
+  createDiagram(d.el, {
+    title: 'how it works',
+    caption: 'A live show and an old recording are the same thing here: bytes in a bucket, '
+      + 'named by a text file that is rewritten every few seconds.',
+    nodes: [
+      /**
+       * 🔴 THREE MACHINES, AND EVERY BOX SITS IN THE ONE THAT RUNS IT. Without
+       * this the picture is seven peers and a reader cannot tell what is ours,
+       * what is somebody else's server, and what is on their own device. That
+       * distinction is the whole cost model: only the middle box bills us.
+       *
+       * ⚠️ THREE ARROWS ARE MISSING WHILE THIS STANDS, AND THEY ARE NOT
+       * FORGOTTEN. `createDiagram` computes a link between the MACHINES its two
+       * ends are in, so for two boxes in one container the geometry collapses
+       * to zero length and nothing is drawn: `chunks -> programmes`,
+       * `schedule -> Worker` and `programmes -> Worker` are declared below and
+       * do not appear. The plain ties between the children stand where they
+       * would be. Sibling routing is being added to the component; when it
+       * lands these draw with no change to this file.
+       */
+      { id: 'onair', label: 'broadcast', sub: 'built, not in use', kind: 'device', tech: 'station',
+        children: [
+          { id: 'mount', label: 'mount', sub: 'endless http', tech: 'station',
+            note: 'One connection that never closes. Nothing downstream can seek in it, which '
+                + 'is exactly why the segments beside it have to exist.' },
+          { id: 'seg', label: 'ffmpeg', sub: '-f segment, 10 s', tech: 'encoder',
+            note: 'Cuts a broadcast into ten second files as it arrives, with **-c copy**, so '
+                + 'nothing is decoded and nothing is re-encoded. It runs as a hook on the '
+                + 'broadcaster\'s machine: a Worker has no processes to run it in.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'the only part we run', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'chunks', label: 'chunks', sub: 'R2, ten seconds', tech: 'file',
+            note: 'Ten second mp3 files written while a show is on air, sitting beside the '
+                + 'recordings as ordinary objects. Nothing is broadcasting into this station '
+                + 'yet, so today these hold a test tone.' },
+          { id: 'prog', label: 'programmes', sub: 'R2, whole files', tech: 'file',
+            note: 'Recordings that already existed, and the shows that have finished. Never '
+                + 'cut up: the playlist points at byte ranges inside them with '
+                + '**#EXT-X-BYTERANGE**, so one file serves a hundred segments.' },
+          { id: 'sched', label: 'schedule', sub: 'Durable Object', tech: 'cloudflare',
+            note: 'What plays when: which recording, or which live slot, owns which minute. '
+                + 'A change takes effect in the playlist within a second.' },
+          { id: 'wrk', label: 'Worker', sub: 'writes playlist', tech: 'cloudflare',
+            note: 'Asks the schedule what should be playing, then writes the text naming the '
+                + 'next ten seconds. It never reads or writes a sample of audio, so a live '
+                + 'show and a forty minute recording cost it the same.' },
+        ] },
+      { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'player', label: 'player', sub: 'hls.js or Safari', tech: 'browser',
+            note: 'Reads the text, fetches the bytes it names with **Range** requests, and '
+                + 'joins them below JavaScript. That is why it survives a locked phone: '
+                + 'nothing on the page is running while it plays.' },
+        ] },
+    ],
+    links: [
+      // ⚠️ THE FOUR ARROWS INSIDE A MACHINE CARRY A `note` AND NO `label`.
+      // A name in the gap between two stacked boxes runs under both of them,
+      // so the component draws direction only and reports any label written on
+      // one. What travels is said on hover instead, in the line under the
+      // picture. See CLAUDE.md.
+      { from: 'mount', to: 'seg',
+        note: 'The stream itself, on the broadcaster\'s own machine. It never crosses a '
+            + 'network here: **ffmpeg** reads the mount over localhost.' },
+      { from: 'seg', to: 'chunks', label: 'ten second mp3s',
+        note: 'Ten seconds is the whole trade. Shorter means the playlist is rewritten more '
+            + 'often and a listener sits closer to the live edge; longer means fewer requests '
+            + 'and a deeper cushion. At ten, a player holding three is about 30 seconds '
+            + 'behind the sound.' },
+      { from: 'chunks', to: 'prog',
+        note: 'When the show ends, nothing moves and nothing is re-encoded. The same bytes '
+            + 'stop being the live edge and start being the archive, which is why this needs '
+            + 'no separate ingest for recordings of its own broadcasts.' },
+      { from: 'sched', to: 'wrk',
+        note: 'What plays when, read out of the Durable Object every time the playlist is '
+            + 'written. A change to it is on air within a second.' },
+      { from: 'prog', to: 'wrk',
+        note: 'Which bytes of which file are the next ten seconds. The Worker turns those '
+            + 'numbers into **#EXT-X-BYTERANGE** lines and touches no audio.' },
+      { from: 'wrk', to: 'player', label: 'the playlist' },
+      { from: 'prog', to: 'player', label: 'Range requests',
+        note: 'The player asks for byte 461 to byte 160538 of a forty minute mp3 and gets '
+            + 'exactly those bytes back, with a **206**. That is what makes whole files '
+            + 'usable as segments: nothing is cut up in advance and nothing is copied.' },
+    ],
+  });
+
+  d.ready();
+</script>
+</html>
