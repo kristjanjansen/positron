@@ -1056,7 +1056,16 @@
        * gap between two neighbours looks like, so the arrow that is true still
        * draws and the one that was invented does not.
        */
-      { id: 'you', label: 'Browser', kind: 'here', tech: 'browser',
+      /**
+       * ⚠️ A CONTAINER'S SUB SAYS WHAT ROLE THE MACHINE PLAYS, which is the one
+       * thing its name cannot. Asked 2026-09-16: *"outer boxes have no
+       * descriptions. make short but useful"*, after an earlier round removed
+       * `phone or laptop`, `one object` and `in another building` as unhelpful,
+       * which they were: they described the machines rather than their part in
+       * this. Three or four words each, and still no `note`, because a
+       * paragraph on a container repeats the boxes underneath it.
+       */
+      { id: 'you', label: 'Browser', sub: 'what you touch', kind: 'here', tech: 'browser',
         join: false,
         children: [
           { id: 'sliders', label: 'sliders', sub: 'cutoff, resonance', tech: 'browser',
@@ -1076,7 +1085,7 @@
       // helpful"*. `phone or laptop`, `one object` and `in another building` were
       // three captions saying what the boxes inside them already say: the
       // children name the machine better than a phrase above them can.
-      { id: 'cf', label: 'Cloudflare', kind: 'cloud', tech: 'cloudflare',
+      { id: 'cf', label: 'Cloudflare', sub: 'public address', kind: 'cloud', tech: 'cloudflare',
         children: [
           // The name is `Relay`; `Durable Object` under it is what kind of thing it
           // is, so `Relay object` said the kind twice and spent a third of the
@@ -1088,7 +1097,7 @@
         ] },
       // `raspberry` is in `TECH_HUE` and `board` never was, so this box had been
       // taking whatever the rotation handed it.
-      { id: 'pi', label: 'Raspberry Pi', kind: 'box', tech: 'raspberry',
+      { id: 'pi', label: 'Raspberry Pi', sub: 'makes the sound', kind: 'box', tech: 'raspberry',
         children: [
           /**
            * ⚠️ THE SUB SAYS WHAT KIND OF PROGRAM IT IS, NOT WHERE IT CAME FROM.
