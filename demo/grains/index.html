@@ -1599,10 +1599,11 @@
           + `, and its own engine says ${m.engine?.voices} notes at ${Math.round(m.engine?.hz)} Hz`
         : `the board would not build the material: ${m.reason}`, m.ok ? 'hi' : 'bad');
     }
-    // The board picks the item; this page only says which. The search cannot be
-    // called from a browser at all — its JSON content type forces a preflight
-    // that the archive answers 204 with no permission header — so the board is
-    // the only end that can ask.
+    // ⚠️ A COMMENT ABOUT ERR'S ARCHIVE SEARCH STOOD HERE AND WAS ORPHANED ON
+    // 2026-09-16, when the board's `source.search` and `source.load` left with
+    // the rest of that path. This page never sent either of them. `source.set`
+    // above is the only material verb there is now, and it is generated on the
+    // board rather than fetched from anybody.
 
     for (const w of [...waiters]) {
       if (w.type !== m.type || (w.re && m.re !== w.re)) continue;

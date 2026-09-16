@@ -1,16 +1,20 @@
-// rig/box/insert-test.mjs — two pages, one Raspberry Pi, and the granulator
-// they were fighting over.
+// rig/box/insert-test.mjs: the granulator a closed tab leaves behind, and the
+// board taking it out by itself.
 //
-// 🔴 WHY THIS FILE EXISTS AT ALL. `/box/` sends `fx.pappus {on:false}` on load
-// and `/grains/` sends `{on:true}`, so whichever page you opened last won —
-// SILENTLY — and the other went on drawing a picture that was no longer true.
-// Both halves of the repair (the board REPORTING who holds the insert, and
-// `onlyIfIdle` refusing to remove one somebody is still looking at) live on the
-// board, and the board is the only end that can be graded: `/box/` is
-// `rig/box/listen.html`, it is `built: false`, it publishes no `__demo` and
-// `demo/verify.mjs` cannot see it. A guard nothing can grade is a guard that
-// will rot, so the guard was put where a harness can reach it and this is the
-// harness.
+// 🔴 WHY THIS FILE EXISTS AT ALL. An insert left in by a `/grains/` tab that
+// was simply CLOSED goes on wrapping whatever the next page plays and feeds its
+// own delay: MEASURED 2026-09-12, a steady -6.1 dBFS subsonic drone while
+// `box.alive` reported `voices: 0`, true about notes and false about sound.
+// Until 2026-09-16 the thing that cleared it was `/box/` sending `fx.pappus
+// {on:false, onlyIfIdle:true}` on load. That message is gone, with the last of
+// the granulator on that page, so THE BOARD CLEANS UP AFTER ITSELF now. A
+// guarantee that used to depend on somebody opening a second page was never a
+// guarantee, because nobody had to open one.
+//
+// The guard lives on the board and the board is the only end that can be
+// graded: `/box/` is `rig/box/listen.html`, it is `built: false`, it publishes
+// no `__demo` and `demo/verify.mjs` cannot see it. A guard nothing can grade is
+// a guard that will rot, so this is the harness.
 //
 //   node rig/box/insert-test.mjs --room studio-1
 //
@@ -20,11 +24,28 @@
 // starts one if nothing is playing and reports what it did.
 //
 // ⚠️ TWO IDENTITIES, NOT TWO SOCKETS OF CONVENIENCE. The whole mechanism turns
-// on `from` being per-connection, so the test opens TWO connections: one that
-// pretends to be `/grains/` (asks for the insert and keeps talking) and one
-// that pretends to be `/box/` (asks for it to go away on load). A single socket
-// sending both requests would pass vacuously, because a client is never held
-// off by its own claim.
+// on `from` being per-connection: the board dates every client by when it last
+// sent ANY message, and "the tab was closed" is visible to it only as "that
+// `from` stopped talking". So the test opens TWO connections. One pretends to
+// be `/grains/` (asks for the insert and keeps polling, exactly as that page
+// does) and one pretends to be `/box/` (which now sends nothing at all and only
+// watches). One socket doing both would pass vacuously, because a client is
+// never held off by its own claim.
+//
+// ── WHAT THIS PROVES, AND WHAT WOULD MAKE IT FAIL ───────────────────────────
+//
+//   1  the insert goes in when a page asks, and the board names the holder
+//   2  the five-second heartbeat carries it, so a page learns without asking
+//   3  NEGATIVE CONTROL: a live page KEEPS its insert past the board's window.
+//      A board that swept on a plain timer fails here, and it is the only case
+//      that can tell "cleans up after itself" from "drops it after 15 s".
+//   4  and a second page merely ARRIVING changes nothing. `/box/` used to send
+//      a message here; it sends none, and the insert must survive that.
+//   5  THE DROP: the `/grains/` connection CLOSES and the board takes the
+//      insert out on its own, announced on `box.alive`, with nobody asking.
+//   6  a new instrument does not come up granulated afterwards.
+//   7  a plain `fx.pappus {on:false}` is still obeyed, which is what keeps it a
+//      thing a person can type at a wedged board.
 import { format, parse, randomId, RELAY_BASE } from '../../demo/shell/wire.mjs';
 
 const argv = process.argv.slice(2);
@@ -36,6 +57,9 @@ const RELAY = arg('relay', RELAY_BASE);
 // waits a margin past it and SAYS the number, which is how a disagreement shows
 // up as a failure rather than as flake.
 const HELD_MS = 15000;
+// The board's heartbeat, which is where every page learns about a change it did
+// not make. Two of them past the window is the deadline used below.
+const BEAT_MS = 5000;
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -49,19 +73,19 @@ async function client(label) {
   const from = `${label}-${randomId(6)}`;
   const ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
   ws.binaryType = 'arraybuffer';
-  let seq = 0;
+  let seq = 0, sent = 0;
   const seen = [];
   ws.onmessage = (e) => {
     if (typeof e.data !== 'string') return;
     const { kind, msg } = parse(e.data);
-    if (kind === 'json' && msg.from !== from) seen.push(msg);
+    if (kind === 'json' && msg.from !== from) seen.push({ ...msg, seenAt: Date.now() });
   };
   await new Promise((res, rej) => {
     ws.onopen = res;
     ws.onerror = () => rej(new Error(`could not reach ${RELAY}`));
     setTimeout(() => rej(new Error('the relay did not open in 8 s')), 8000);
   });
-  const send = (m) => { const line = format(m, { from, seq: seq++ }); ws.send(line); return JSON.parse(line).id; };
+  const send = (m) => { const line = format(m, { from, seq: seq++ }); ws.send(line); sent++; return JSON.parse(line).id; };
   /**
    * Ask, and wait for the answer to THIS question.
    *
@@ -80,12 +104,27 @@ async function client(label) {
     }
     return null;
   };
-  return { from, send, ask, seen, close: () => ws.close() };
+  /** Wait for an UNPROMPTED heartbeat that satisfies `want`, asking nothing. */
+  const beat = async (want, ms) => {
+    const from_ = seen.length;
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      const hit = seen.slice(from_).find((x) => x.type === 'box.alive' && want(x));
+      if (hit) return hit;
+      await sleep(200);
+    }
+    return null;
+  };
+  return { from, send, ask, beat, seen, sentCount: () => sent, close: () => ws.close() };
 }
 
-console.log(`\n== the insert, and who holds it — room "${ROOM}" ==`);
+console.log(`\n== the insert, and the board taking it out by itself · room "${ROOM}" ==`);
 
-const grainsTab = await client('as-grains');
+let grainsTab = await client('as-grains');
+// 🔴 CONNECTED AND SILENT FOR THE WHOLE RUN. This is what `/box/` is now: a page
+// that joins the room and asks the board for nothing about the granulator. If a
+// check below needed it to speak, the thing being graded would not be the board
+// cleaning up after itself.
 const boxTab = await client('as-box');
 
 // ── something for the insert to wrap ──────────────────────────────────────
@@ -110,76 +149,122 @@ ok('and the board says WHO asked for it, which nothing could see before',
   `${on?.fxBy} ${on?.fxAgoSec} s ago, held=${on?.fxHeld}`);
 
 // ── 2. the heartbeat carries it, so a page learns without asking ──────────
-// 🔴 THE WHOLE REPORTING HALF TURNS ON THIS. A page that has to ASK finds out
-// when it next polls; a page that is told finds out in five seconds, and the
-// page that needs telling is the one that did NOT make the change.
+// 🔴 THE WHOLE REPORTING HALF TURNS ON THIS, AND SO DOES CASE 5. A page that
+// has to ASK finds out when it next polls; a page that is told finds out in
+// five seconds, and the page that needs telling is the one that did NOT make
+// the change. `/box/` reads nothing about the insert any more, so this channel
+// is now what `insert-test` itself watches.
 {
-  boxTab.seen.length = 0;
-  const until = Date.now() + 12000;
-  let beat = null;
-  while (Date.now() < until && !beat) {
-    beat = boxTab.seen.find((m) => m.type === 'box.alive');
-    if (!beat) await sleep(200);
-  }
+  const b = await boxTab.beat((m) => m.fx !== undefined, 12000);
   ok('the five-second heartbeat carries the insert and its holder',
-    beat?.fx === 'pappus' && beat?.fxBy === grainsTab.from,
-    beat ? `box.alive fx=${beat.fx} fxBy=${beat.fxBy} fxHeld=${beat.fxHeld}` : 'no heartbeat in 12 s');
+    b?.fx === 'pappus' && b?.fxBy === grainsTab.from,
+    b ? `box.alive fx=${b.fx} fxBy=${b.fxBy} fxHeld=${b.fxHeld}` : 'no heartbeat in 12 s');
 }
 
-// ── 3. the stomp, refused OUT LOUD, while the holder is still talking ─────
+// ── 3. THE NEGATIVE CONTROL: a live page keeps its insert ─────────────────
+//
+// 🔴 WITHOUT THIS, CASE 5 PASSES ON A BOARD THAT SIMPLY DROPS THE INSERT AFTER
+// FIFTEEN SECONDS WHATEVER IS HAPPENING. That board would be worse than the bug
+// it replaced: `/grains/` would lose the granulator under itself every quarter
+// minute while somebody was listening to it. So the claim being graded is not
+// "it goes away", it is "it goes away WHEN AND ONLY WHEN nobody is holding it".
+//
+// ⚠️ IT POLLS THE WAY `/grains/` DOES AND NO FASTER: `params.state` on a 4 s
+// interval, which is that page's own `setInterval`. A test that talked
+// continuously would prove something no real page does.
 {
-  // A live tab keeps talking. This is the evidence the board actually has —
-  // no lease, nothing to release, and a closed tab is simply silent.
-  grainsTab.send({ type: 'params.state' });
-  await sleep(300);
-  const kept = await boxTab.ask({ type: 'fx.pappus', on: false, onlyIfIdle: true }, 'fx.pappus', 30000);
-  ok('another page loading does not take the insert away from a page that is still there',
-    kept?.kept === true && kept?.on === true && kept?.fx === 'pappus',
-    kept?.reason ?? 'no reply');
-  // 🔴 AND IT SAYS SO, WHICH IS THE POINT. An arbitration nobody can see turns
-  // a visible problem into an invisible one — the refusal has to name the
-  // holder and the ages or the second page is now the one showing a stale
-  // picture.
-  ok('the refusal names the holder, rather than silently doing nothing',
-    typeof kept?.reason === 'string' && kept.reason.includes('another page')
-      && kept?.fxBy === grainsTab.from,
-    kept?.reason ?? '');
+  const until = Date.now() + HELD_MS + 2 * BEAT_MS;
+  console.log(`  … holding the insert for ${Math.round((HELD_MS + 2 * BEAT_MS) / 1000)} s while the grains half polls every 4 s, which is what an open tab looks like`);
+  const beforeSent = boxTab.sentCount();
+  boxTab.seen.length = 0;
+  while (Date.now() < until) {
+    grainsTab.send({ type: 'params.state' });
+    await sleep(4000);
+  }
+  const beats = boxTab.seen.filter((m) => m.type === 'box.alive');
+  const dropped = beats.filter((m) => m.fx !== 'pappus');
+  ok('a page that is open and quiet KEEPS its insert past the board\'s window',
+    beats.length >= 3 && dropped.length === 0,
+    `${beats.length} heartbeats over ${Math.round((HELD_MS + 2 * BEAT_MS) / 1000)} s, ${dropped.length} of them without the insert · the board's window is ${HELD_MS / 1000} s`);
+  // ── 4. and a second page ARRIVING changes nothing ───────────────────────
+  // `/box/` used to send `fx.pappus {on:false, onlyIfIdle:true}` right here, on
+  // connect. It sends nothing now, and this is the assert that says so: if this
+  // half ever speaks again, the case above stops being about the board.
+  ok('the box half sent nothing at all, so what held the insert was the grains half being alive',
+    boxTab.sentCount() === beforeSent,
+    `${boxTab.sentCount() - beforeSent} messages from the box half`);
 }
 
-// ── 4. the negative control: the old behaviour is still one message away ───
-// 🔴 WITHOUT THIS, #3 PASSES ON A BOARD THAT SIMPLY STOPPED SWITCHING THINGS
-// OFF. `onlyIfIdle` is opt-in, so a caller that does not send it must still be
-// obeyed — that is what keeps `fx.pappus {on:false}` a thing a person can type
-// at a wedged board.
+// ── 5. THE DROP: a closed tab, and the board clearing up after it ─────────
+//
+// 🔴 THIS IS THE FAULT THE WHOLE FILE IS ABOUT. The socket CLOSES, which is
+// what a tab being shut looks like from the relay. The relay says nothing about
+// it, because `workers/relay/src/index.js` forwards frames verbatim, never
+// parses one, and its `webSocketClose()` is an empty method. The board
+// sees only that a `from` stopped talking.
+//
+// ⚠️ NOBODY ASKS FOR THIS. The watching half sends no message; it waits for an
+// unprompted `box.alive`. A check that asked would be grading the reply to its
+// own question rather than the board acting on its own.
 {
-  const gone = await boxTab.ask({ type: 'fx.pappus', on: false }, 'fx.pappus', 90000);
-  ok('a plain switch-off is still obeyed, holder or no holder',
-    gone?.ok === true && gone?.on === false && gone?.kept !== true && gone?.fx === null,
-    `on=${gone?.on} kept=${gone?.kept ?? false} fxBy=${gone?.fxBy}`);
+  const closedAt = Date.now();
+  grainsTab.close();
+  console.log(`  … the grains half is gone. the board has ${HELD_MS / 1000} s of window plus a ${BEAT_MS / 1000} s heartbeat to notice`);
+  boxTab.seen.length = 0;
+  const gone = await boxTab.beat((m) => m.fx === null, HELD_MS + 4 * BEAT_MS);
+  const tookSec = gone ? Math.round((gone.seenAt - closedAt) / 1000) : null;
+  ok('a closed tab does not keep the insert: the board takes it out with nobody asking',
+    gone !== null,
+    gone ? `announced ${tookSec} s after the socket closed, against a ${HELD_MS / 1000} s window`
+         : `no heartbeat said fx=null within ${(HELD_MS + 4 * BEAT_MS) / 1000} s`);
+  ok('and it is not still recorded as held by somebody',
+    gone?.fxBy === null && gone?.fxHeld === false,
+    gone ? `fxBy=${gone.fxBy} fxHeld=${gone.fxHeld}` : 'nothing to read');
 }
 
-// ── 5. and a holder that went away cannot hold anything ───────────────────
-// 🔴 THIS IS THE FAULT `/box/`'s SWITCH-OFF WAS WRITTEN FOR, AND IT MUST STILL
-// BE FIXED. An insert left in by a `grains` tab that was CLOSED wraps whatever
-// `/box/` plays and feeds its own delay — measured at a steady -6.1 dBFS
-// subsonic drone. So: claim it, stop talking for longer than the board's
-// window, and check that the claim has expired on its own with nothing
-// released and nothing to leak.
+// ── 6. a new instrument does not come up granulated ──────────────────────
+//
+// `startAudio` re-patches a switched-on insert onto whatever comes up, which is
+// right for the page holding it and is how a closed tab's granulator used to
+// end up wrapping the next person's yoshimi. The board sweeps at the top of
+// that call too, so the five seconds between the drop and the next heartbeat
+// are not audible either.
+//
+// ⚠️ THIS ASSERTS THE PROPERTY, NOT THE RACE. Beating the heartbeat from
+// outside the board is not something this can time reliably, so what is checked
+// is the thing that matters: the instrument comes up with no insert on it.
 {
-  const mine = await grainsTab.ask({ type: 'fx.pappus', on: true }, 'fx.pappus');
-  ok('the insert goes back in for the second half of the test', mine?.on === true, mine?.reason ?? '');
-  console.log(`  … going quiet for ${(HELD_MS + 4000) / 1000} s, which is what a closed tab looks like from the board`);
-  await sleep(HELD_MS + 4000);
-  const swept = await boxTab.ask({ type: 'fx.pappus', on: false, onlyIfIdle: true }, 'fx.pappus', 90000);
-  ok('a holder that stopped talking holds nothing — no lease, nothing to release',
-    swept?.on === false && swept?.kept !== true,
-    `on=${swept?.on} kept=${swept?.kept ?? false} · the board's window is ${HELD_MS / 1000} s`);
+  const started = await boxTab.ask({ type: 'audio.start', source: 'yoshimi' }, 'audio.started', 120000);
+  ok('an instrument started afterwards comes up with no insert on it',
+    started?.ok === true && started?.fx === null,
+    `source=${started?.source} fx=${started?.fx} fxBy=${started?.fxBy}`);
+}
+
+// ── 7. the negative control for the other direction ──────────────────────
+//
+// 🔴 WITHOUT THIS, EVERY CASE ABOVE PASSES ON A BOARD THAT STOPPED PUTTING THE
+// INSERT IN AT ALL. A fresh connection claims it, and a plain switch-off is
+// still obeyed, which is what keeps `fx.pappus {on:false}` a thing a person can
+// type at a wedged board.
+{
+  grainsTab = await client('as-grains');
+  const back = await grainsTab.ask({ type: 'fx.pappus', on: true }, 'fx.pappus');
+  ok('a fresh page can still put the insert in, so nothing above passed by it being broken',
+    back?.ok === true && back?.on === true && back?.fxBy === grainsTab.from, back?.reason ?? '');
+  const off = await grainsTab.ask({ type: 'fx.pappus', on: false }, 'fx.pappus', 90000);
+  ok('a plain switch-off is still obeyed',
+    off?.ok === true && off?.on === false && off?.fx === null,
+    `on=${off?.on} fx=${off?.fx}`);
 }
 
 // ── put it back the way it was found ──────────────────────────────────────
 if (wasInsert) {
   const back = await grainsTab.ask({ type: 'fx.pappus', on: true }, 'fx.pappus');
   console.log(`  put the insert back: ${back?.on === true ? 'in' : `FAILED — ${back?.reason}`}`);
+  // ⚠️ AND THE BOARD WILL TAKE IT STRAIGHT BACK OUT when this process exits,
+  // because a closed socket is exactly what case 5 is about. Said here so the
+  // next reader does not report it as a bug.
+  console.log(`  ⚠ the board will drop it again about ${HELD_MS / 1000} s after this process exits, which is the rule working`);
 }
 grainsTab.close(); boxTab.close();
 

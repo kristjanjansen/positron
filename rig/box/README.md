@@ -264,12 +264,12 @@ without the board (`plan-hardware` §8.6):
 What a container cannot answer is anything involving the kernel: no `/dev/snd`,
 and `snd-virmidi` / `snd-aloop` are not in its kernel to load.
 
-## 🔴 Two pages, one board, and who holds the granulator (2026-09-14)
+## 🔴 Two pages, one board, and who holds the granulator (2026-09-14, rewritten 2026-09-16)
 
-`/box/` sends `fx.pappus {on:false}` on load. `/grains/` sends `{on:true}`.
-**Whichever you opened last won, silently**, and the other page went on drawing
-a picture that was no longer true — which is the worst shape of failure there
-is, because nothing anywhere said so.
+`/box/` used to send `fx.pappus {on:false}` on load. `/grains/` sends
+`{on:true}`. **Whichever you opened last won, silently**, and the other page
+went on drawing a picture that was no longer true. That is the worst shape of
+failure there is, because nothing anywhere said so.
 
 ⚠️ **Both pages were right.** `/box/` has no controls for the insert, and one
 left behind by a `grains` tab that CLOSED wraps whatever it plays and feeds its
@@ -286,48 +286,130 @@ only end that knows; the pages were guessing. `insertState()` rides on
     fxAgoSec how long ago
     fxHeld   whether that client has been heard from recently
 
-— so a page learns about a change it did not make **without polling**, and both
-pages now say so in words. 🔴 **This half is the one that matters.** A page that
-says *"another page took the granulator out of the sound"* is correct and
-honest with no arbitration at all; **arbitration that hides the conflict is
-worse than none**, because it turns a visible problem into an invisible one.
+so a page learns about a change it did not make **without polling**. 🔴 **This
+half is the one that matters.** A page that says *"another page took the
+granulator out of the sound"* is correct and honest with no arbitration at all;
+**arbitration that hides the conflict is worse than none**, because it turns a
+visible problem into an invisible one.
 
-**Second half: `fx.pappus {on:false, onlyIfIdle:true}`.** Opt-in, and `/box/`
-sends it on load. It refuses — **out loud**, `ok:true, on:true, kept:true` with
-the holder and both ages in the reply — when the insert was asked for by a
-DIFFERENT client that the box has heard from inside `INSERT_HELD_MS` (15 s).
+### 🔴 The board cleans up after itself now (2026-09-16)
+
+`/box/` has no granulator on it at all since 2026-09-16, not even the message:
+`grep -c pappus rig/box/listen.html` answers **0**. So the guarantee moved onto
+the board, where it should always have been. A guarantee that depended on
+somebody opening a second page was never a guarantee, because nobody had to open
+one.
+
+**`sweepInsert()` in `box.mjs` runs on the five-second heartbeat and again at
+the top of `startAudio()`.** If the insert is in and the client that asked for
+it has not been heard from inside `INSERT_HELD_MS`, the insert comes out,
+`fxOn`/`fxAsked`/`madeSource` are cleared, the board logs it, and a `box.alive`
+goes out **immediately** rather than on the next beat. There is no new message
+type: every page already reads that heartbeat, and a second authority on one
+fact is how they disagree.
+
+🔴 **A REAL SIGNAL WAS LOOKED FOR FIRST, AND THERE IS NONE.** Checked in the
+code rather than assumed: `workers/relay/src/index.js` forwards every frame
+**verbatim and never parses one**, so the Durable Object does not know any
+client's `from`; its `webSocketClose()` is an **empty method** and announces
+nothing; and `openWire` in `demo/shell/wire.mjs` sends no farewell on unload.
+`GET /room/<name>/stats` does report a per-socket idle time, but that array is
+**anonymous and sorted**, so it cannot say WHICH socket went away. Teaching the
+relay to announce a departure means teaching it to read messages, which is the
+one thing that file refuses to do.
+
+🔴 **SO THE NUMBER IS CHECKED, NOT CHOSEN.** `/grains/` has one
+`setInterval(…, 4000)` whose first line is `hello()`, which sends `params.state`
+**unconditionally** whenever the socket is open. So a tab nobody is touching is
+a message every 4 s, and with the insert in it also re-sends `grain.report` on
+the same tick. **15 s is 3.75 of those polls**, so one or two lost to the
+relay's own caps cost nothing, and a closed tab is exactly **zero**. A window of
+4 or 5 s would be arithmetically enough and would drop the insert out from under
+a live page the first time a poll went missing.
+
+⚠️ **IT NEVER FIGHTS A LIVE PAGE.** A granulator nobody is talking to is still
+one somebody is listening to. A `/grains/` tab that is open and quiet is
+indistinguishable from one being played, and that is correct. The same applies
+to an instrument change somebody else starts: a **stale** insert is dropped
+before the new instrument comes up, a **live** one is carried over, and the
+board says which in that call's own reply.
 
 🔴 **NO LEASE, NOTHING TO RELEASE, NOTHING TO LEAK.** A lease nobody can clear
 is how `studio-1` sat full for hours. The relay solves the same problem by
 DATING each socket (`getWebSocketAutoResponseTimestamp`) and reclaiming idle
 ones; this is that idea in a smaller costume, on the only evidence the box
-actually has — **a client that is still there keeps talking**. `/grains/` polls
-`params.state` and re-asks `grain.report` every four seconds, so a live tab is
-three messages inside the window and a closed one is zero. A client id is minted
-per CONNECTION, so a claim can never outlive the tab that made it.
+actually has: **a client that is still there keeps talking**. A client id is
+minted per CONNECTION, so a claim can never outlive the tab that made it.
+
+**`fx.pappus {on:false, onlyIfIdle:true}` is still implemented and nothing in
+this repo sends it any more.** It is kept because it is a correct thing for a
+person or another program to ask, and because it reads the liveness verdict
+**out loud**, as `ok:true, on:true, kept:true` with the holder and both ages,
+which the sweep cannot do for a caller that wants an answer now.
 
 ⚠️ **`/box/` is `listen.html`, it is `built: false`, and `demo/verify.mjs`
-cannot see it** — it publishes no `__demo` and has zero asserts. That is why
-both halves live on the BOARD and why there is a harness for them:
-**`node rig/box/insert-test.mjs --room studio-1`, 8/8**, with two connections
-(one pretending to be `/grains/`, one pretending to be `/box/`) because a single
-socket would pass vacuously — a client is never held off by its own claim. It
-carries two negative controls: a **plain** `{on:false}` must still be obeyed, so
-the old behaviour stays one message away for a wedged board; and a holder that
-**stops talking** must lose its claim, which is the fault `/box/`'s switch-off
-was written for in the first place.
+cannot see it**: it publishes no `__demo` and has zero asserts. That is why the
+guard lives on the BOARD and why there is a harness for it:
+**`node rig/box/insert-test.mjs --room studio-1`**, with two connections (one
+pretending to be `/grains/`, one pretending to be `/box/` and therefore SILENT)
+because a single socket would pass vacuously. A client is never held off by its
+own claim. What it proves, and the controls that make it mean something:
 
-🔴 **AND SINCE 2026-09-16 `/box/` NO LONGER DRAWS THE GRANULATOR, ON
-INSTRUCTION.** *"there is no ui to control it"*, which was true: the page had a
-box for it in its diagram, a `let insert` following the board's reports, and a
-log line on every ordinary visit saying the granulator was NOT in the sound.
-⚠️ **Everything on this page is unaffected.** The board half is untouched,
-`/grains/` still switches the insert on, and `/box/` still sends
-`fx.pappus {on:false, onlyIfIdle:true}` on connect and still logs the refusal
-when a live `grains` tab holds it. What went is the picture and the narration,
-not the message: an undrawn insert is not an absent one, and the -6.1 dBFS drone
-above is what a page that stopped asking would sound like.
-`archive/box-pappus/` and `plan-box-pappus.md`.
+| # | what it asks |
+|---|---|
+| 1 | the insert goes in when a page asks, and the board names the holder |
+| 2 | the five-second heartbeat carries it, so a page learns without asking |
+| 3 | **negative control.** A page that is open and quiet KEEPS its insert past the 15 s window. A board that swept on a plain timer fails here |
+| 4 | the box half sent **nothing**, so what held the insert was the grains half being alive |
+| 5 | the grains connection CLOSES and the board takes the insert out **with nobody asking**, announced on `box.alive` |
+| 6 | an instrument started afterwards comes up with **no insert on it** |
+| 7 | **negative control.** A fresh page can still put it in, and a plain `{on:false}` is still obeyed |
+
+🔴 **IT HAS NOT BEEN RUN.** Written 2026-09-16 and not executed: it touches a
+shared instrument in another building and nobody had said the board was free.
+
+🔴 **AND `/box/` NO LONGER DRAWS THE GRANULATOR EITHER, ON INSTRUCTION.**
+*"there is no ui to control it"*, which was true: the page had a box for it in
+its diagram, a `let insert` following the board's reports, and a log line on
+every ordinary visit saying the granulator was NOT in the sound. The first pass
+(2026-09-16) took the picture and the narration; the second took the last
+message. `archive/box-pappus/` and `plan-box-pappus.md` have both.
+
+## 🔴 ERR's 1965 archive left the board (2026-09-16)
+
+`errSearch`, `errItem`, `errExcerpt`, `errStatus` and `loadBuffers` in
+`pappus.mjs`, the `source.search` / `source.load` / `source.clear` verbs in
+`box.mjs`, the `archive` entry in `JACK_SYNTHS`, and the idle stop that existed
+to keep it from streaming to an empty room. Three reasons:
+
+- **no page in `demo/` called any of them.** Grepped, not remembered: `/grains/`
+  uses `source.set` with a spec it makes itself, and `/box/` never offered the
+  archive as an instrument at all.
+- **`/box/`'s description stopped claiming an archive source weeks ago**, so the
+  code was live and undescribed, which is the state things rot in.
+- **CLAUDE.md's standing rule**: every connection this repo opens to ERR appears
+  in a public broadcaster's audience measurement. An unused path to their
+  archive, from a machine nobody is watching, is exposure with no benefit. The
+  `archive` source was the sharp end: `-stream_loop -1`, about 28 MB an hour,
+  for as long as the board was up.
+
+⚠️ **`source.set` AND THE WHOLE MADE-SOURCE PATH ARE UNTOUCHED**: `PosSource`,
+`sourceArgs`, `sourceFeed`, `madeSource`. That is a sound BUILT on the board
+from a spec `/grains/` sends, it touches nobody else's server, and it is the
+whole point of that page.
+
+⚠️ **Two things changed shape rather than going away.** A key press no longer
+pitches a grain voice: it only ever did with material LOADED into the buffers,
+which was the archive path. And `params.state` no longer answers `source`, which
+was the loaded excerpt; `made` is the only material the board can be given now,
+so the ambiguity between the two went with it.
+
+`archive/box-pappus/pappus-err.js` and `archive/box-pappus/box-err.js` hold the
+code verbatim, including the politeness this board had earned the hard way after
+ERR blocked its address on 2026-09-11: a disk cache for a year that ended sixty
+years ago, a floor between requests, and a backoff that stopped asking when ERR
+said no. **Read those before writing anything like it again.** The tests that
+graded them are in `git show 141d7f3^:rig/box/pappus-test.mjs`.
 
 ## What still needs the board
 
@@ -349,7 +431,7 @@ down:
 | `box.mjs` | the service: relay socket, request handlers, synth and capture |
 | `ask.mjs` | a terminal client — the proof that the browser is not the interface |
 | `test.mjs` | 38 checks, no hardware |
-| `insert-test.mjs` | 8 checks against a running box: who holds the granulator, and what happens when two pages want different things |
+| `insert-test.mjs` | against a running box: that the granulator goes in, stays in while its page is alive, and comes out BY ITSELF when that page closes. Written 2026-09-16 and not yet run |
 | `norns/writedefs.scd` | compiles `pappus-<rung>.scsyndef` and `possource.scsyndef` on the board, for `/grains/` to load in a browser |
 | `live-test.mjs` | 13 checks against a running box, over the real relay |
 | `bench.mjs` | replaces the estimated Pi column with a measurement |

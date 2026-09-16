@@ -1,10 +1,10 @@
 // rig/box/pappus-live.mjs — drive a box running Pappus and check that the die,
-// the drift and the 1965 material move the SOUND.
+// the drift and a key press move the SOUND.
 //
 //   node box.mjs --room studio-1              (on the board; it is the service)
 //   node pappus-live.mjs --room studio-1      (from anywhere; about 7.5 minutes)
 //   node pappus-live.mjs --self-test          (the statistics alone — no relay, no board)
-//   node pappus-live.mjs --only pitch         (one section: seeds | drift | err | pitch)
+//   node pappus-live.mjs --only pitch         (one section: seeds | drift | pitch)
 //
 // ⚠️ DO NOT PIPE THIS INTO `tail`. `cmd | tail` reports TAIL's exit status, so a
 // failed run reads as a passing one; and node buffers a piped stdout until exit,
@@ -124,8 +124,9 @@
 // window in real time. Freezing in the order `src` then `lock` therefore erases
 // the head of whatever was just recorded, for as long as the second command
 // takes to cross the relay. Lock first; `lock 1` alone already both holds the
-// material and stops the input being mixed in. (`loadBuffers` uses the other
-// order and is right to — it `snapread`s straight afterwards.)
+// material and stops the input being mixed in. (A loader that `snapread`s the
+// buffers immediately afterwards can use the other order and be right, because
+// it has something to restore from. This has nothing.)
 //
 // And `src` is **1 OFF, 2 STEREO, 3 MONO L, 4 MONO R, with no 0** — a value
 // outside that table is silence rather than an error. See `rig/box/norns/CHAIN.md`.
@@ -181,7 +182,14 @@ const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i >= 0 
  */
 const QUICK = process.argv.includes('--quick');
 const SELF = process.argv.includes('--self-test');
-const SECTIONS = ['seeds', 'drift', 'err', 'pitch'];
+// 🔴 THERE WAS AN `err` SECTION AND IT LEFT ON 2026-09-16 WITH ERR'S ARCHIVE.
+// It loaded a minute of 1965 into the grain buffers and asked three things:
+// that it landed, that it sounded unlike the synth under the same roll, and
+// that it was still there 25 s later rather than swept away by `src 1`. The
+// last of those is the guard for LESSONS #46 and it is not lost: the `pitch`
+// section below records a note into the buffers and locks them the same way.
+// `archive/box-pappus/` has the removed board code.
+const SECTIONS = ['seeds', 'drift', 'pitch'];
 const only = arg('only', null);
 const RUN = new Set(only ? only.split(',').map((s) => s.trim()) : SECTIONS);
 for (const s of RUN) if (!SECTIONS.includes(s)) { console.error(`unknown section "${s}" — pick from ${SECTIONS.join(' | ')}`); process.exit(2); }
@@ -778,64 +786,11 @@ try {
     await wait(500);
   }
 
-  // ── 1965 ──────────────────────────────────────────────────────────────────
-  if (RUN.has('err')) {
-    const found = await answer(send({ type: 'source.search', limit: 100 }), 'source.found', 30000);
-    okOnce('the box can reach ERR\'s 1965 audio archive', found.ok && found.total > 500,
-      `${found.total} items, page of ${found.items.length}`);
-
-    // ⚠️ THE REFERENCE IS TAKEN HERE, NOT REUSED FROM THE SEED SECTION MINUTES
-    // AGO. It used to compare the 1965 takes against a seed-section condition
-    // captured before the drift section ran — so "the material changed" was
-    // being asked across a gap in which the drift had been switched on, left
-    // running for two minutes, and the comparison could have been answering
-    // about that instead. Same roll, same second, one difference: what is in
-    // the buffer.
-    await roll(SEED_A);
-    await wait(1200);
-    const synth = await takes(`the synth under seed ${SEED_A}`);
-
-    const pick = found.items[7];
-    const loaded = await answer(send({ type: 'source.load', slug: pick.slug, atSec: 120, dur: 60 }), 'source.loaded', 90000);
-    okOnce('a minute of 1965 lands in the grain buffers', loaded.ok === true,
-      loaded.ok ? `${loaded.date} · ${loaded.title} · ${loaded.tookMs} ms · ${loaded.buffers} buffers` : loaded.reason);
-    if (!loaded.ok) throw new Error(loaded.reason);
-    await wait(2000);
-
-    // The SAME roll, so the only thing that changed is what is in the buffer.
-    await roll(SEED_A);
-    await wait(1200);
-    const err = await takes(`1965 under seed ${SEED_A}`);
-    // A DETECTION, NOT A COMPARISON: sound against no sound is categorical, so
-    // it is counted rather than shuffled, and it says how many captures cleared.
-    ok('...and it makes a sound', err.peak > SILENCE,
-      `${sounded(err)} of ${err.n} captures above ${SILENCE} · middle peak ${err.peak.toFixed(4)} — a silence line, not a tuned threshold`);
-    okStat('the same roll over 1965 sounds unlike the same roll over the synth', compare(synth, err));
-
-    // ⚠️ THE REGRESSION GUARD FOR THE BUG THAT MADE ALL OF THIS UNREADABLE.
-    // `src 1` zeroes the record gain but the write head keeps going, and with
-    // nothing retaining the old sample it writes SILENCE over the whole live
-    // window in one pass — one to twelve seconds. So a capture started right
-    // after the load caught the material on its way out, and every reading of
-    // this feature was right about the second it was taken and wrong about the
-    // feature. A single capture cannot tell "loaded" from "loaded and already
-    // being erased"; only a second one, later, can. `lock` is what holds it.
-    //
-    // Counted, not shuffled, for the same reason as above: the defect it guards
-    // takes the peak to 0.0000 (measured: 0.1061 -> 0.0000), so the question is
-    // whether there is a sound at all, not whether two sounds differ.
-    console.log(`  waiting ${QUICK ? 8 : 25} s to see whether the material is still there ...`);
-    await wait(QUICK ? 8000 : 25000);
-    const still = await takes('1965, 25 s after loading');
-    ok('the loaded minute is HELD, not erased under the write head',
-      still.peak > SILENCE && sounded(still) === still.n,
-      `${sounded(still)} of ${still.n} captures still above ${SILENCE} · middle peak ${still.peak.toFixed(4)} against ${err.peak.toFixed(4)} at the load`);
-  }
-
   // ── does a key pitch the grains? ─────────────────────────────────────────
   //
-  // ⚠️ THIS CANNOT BE ASKED OF 1965 THROUGH THE WHOLE CHAIN, and asking it that
-  // way read FAILED for a day against an engine that was working. Two reasons,
+  // ⚠️ THIS CANNOT BE ASKED OF RECORDED SPEECH THROUGH THE WHOLE CHAIN, and
+  // asking it that way read FAILED for a day against an engine that was
+  // working. Two reasons,
   // both about measuring the quantity in question:
   //
   //   the CHAIN — 48 resonators tuned to a fixed chord, eight delay taps and a
@@ -858,7 +813,6 @@ try {
   // come into the band, so "+12 semitones is exactly +1.00 octaves" is a claim
   // about the spectrum of the material, not about the engine.
   if (RUN.has('pitch')) {
-    await answer(send({ type: 'source.clear' }), 'source.cleared');
     await answer(send({ type: 'params.drift', on: false }), 'params.drifted');
     // ⚠️ ROLL FIRST, and a KNOWN seed. This block inherits whatever the previous
     // checks left behind — a tilt that buries the recording, a contour, a window
@@ -910,11 +864,11 @@ try {
     //
     // ⚠️ SAY WHAT RECORDING IS, RATHER THAN INHERIT IT. `src` is **1 OFF,
     // 2 STEREO, 3 MONO L, 4 MONO R, and there is no 0** (CHAIN.md; a value
-    // outside the table is silence, not an error). `source.clear` above does
-    // hand the buffers back — `mlock 0, msrc 2` — but this block's own comment
+    // outside the table is silence, not an error). This block's own comment
     // claims nothing is inherited, and these two were the only parameters it
     // was inheriting, which is the pair that decides whether anything is
-    // recorded at all. Now it says so.
+    // recorded at all. ⚠️ THEY ARE NOW THE ONLY THING THAT HANDS THE BUFFERS
+    // BACK: a `source.clear` used to run above this and left with the archive.
     await set('mlock', 0); await set('nlock', 0);
     await set('msrc', 2); await set('nsrc', 2);     // 2 = STEREO
     await wait(800);
@@ -930,8 +884,8 @@ try {
     // and then waited TWO RELAY ROUND TRIPS for `mlock 1` to land, erasing the
     // head of the recording it was about to measure. `lock 1` on its own
     // already does both jobs: `sosret` 1 holds the material and `sosin` 0 stops
-    // the input being mixed in. ⚠️ `loadBuffers` uses the opposite order and is
-    // right to — it `snapread`s the buffers immediately afterwards, so it has
+    // the input being mixed in. ⚠️ A loader that `snapread`s the buffers
+    // immediately afterwards may use the opposite order, because it has
     // something to restore from. This has nothing.
     await set('mlock', 1); await set('nlock', 1);
     await set('msrc', 1); await set('nsrc', 1);
@@ -1061,7 +1015,11 @@ try {
   ok('one clean source, not two', gaps < allFrames * 0.05,
     `${allFrames} frames, ${gaps} dropped at the relay · counted over the whole run, nothing to average`);
 
-  send({ type: 'source.clear' });
+  // Hand the buffers back to the input, which is what a `source.clear` verb
+  // used to do in one message before it left with the archive.
+  for (const [cmd, v] of [['mlock', 0], ['nlock', 0], ['msrc', 2], ['nsrc', 2]]) {
+    send({ type: 'params.set', cmd, args: [v] });
+  }
   send({ type: 'note.panic' });
 } catch (e) {
   fail++;
