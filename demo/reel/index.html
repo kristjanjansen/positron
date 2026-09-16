@@ -32,8 +32,16 @@
      the line below by its own margin. A day that has only one of the two still
      gets both columns, and the empty one says in words which half did not
      survive. */
+  /* 🔴 THE GAP ABOVE IT IS THE SHELL'S, NOT A NUMBER TYPED HERE. Asked for
+     2026-09-16 with a screenshot: *"add space on top of newsreel | radio"*. It
+     carried `margin: 14px 0 4px`, so the two column headings sat tight under
+     the line and the strip and the day below it read as one block.
+     ⚠️ `margin-bottom`, NEVER the `margin` shorthand. The shorthand's implied
+     `margin-top: 0` BEATS `.pos-body > * + *` on source order at the same
+     specificity, which is exactly how this page lost the rhythm in the first
+     place and how the transport bar lost it on every page in the project. */
   .picked { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px;
-            font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 14px 0 4px; }
+            font: 500 12px/1.6 var(--mono); color: var(--dim); margin-bottom: 4px; }
   /* TWO COLUMNS ON A PHONE TOO. Stacked, the second archive reads as a
      footnote to the first; side by side, the day is one thing with two halves,
      which is what the page is about. Estonian compounds are long and a narrow
@@ -70,6 +78,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { formatTime } from '/timeline/strip.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
 
   const YEAR_FROM = Date.UTC(1965, 0, 1);
   const YEAR_TO   = Date.UTC(1966, 0, 1);
@@ -309,8 +318,83 @@
       : [...days].reverse().find((x) => x.at < at);
     if (next && next !== current) play(next);
   };
+  /**
+   * 🔴 THE LOOP PLAYS THE FILM, BECAUSE THE PAGE OWNS WHAT IS BEING PLAYED.
+   * Asked for 2026-09-16: *"make loop work"*.
+   *
+   * What it did before: LOOP marked two positions on a deck of 1965 and wrapped
+   * the PLAYHEAD between them while the newsreel ran straight on to its end.
+   * The bar wraps by SEEKING, and with no `command` a seek goes to the deck,
+   * which on this page is a year rather than the thing making the picture. So
+   * the control lit, the marks were real, and nothing a visitor could see ever
+   * came back. `/replay/` had the identical fault the same week, reported as
+   * *"transport loops but video does not, time keeps increasing"*, and this is
+   * the same repair: every verb drives the element and the deck follows.
+   *
+   * ⚠️ A POSITION HERE IS A MOMENT IN 1965, WHICH IS WHAT MAKES THE MAPPING
+   * HONEST RATHER THAN CLEVER. A clip is drawn from the day it went out and is
+   * as wide as it is long, so `position - current.at` IS how far into the film
+   * the playhead has got. Press LOOP twenty seconds in and again thirty-five
+   * seconds in and the loop is that passage of that newsreel, with the same
+   * day's radio following it through the picture's own `seeked`.
+   */
+  const intoFilm = (pos) => (current ? (pos - current.at) / 1000 : null);
+  const filmSecs = () => (Number.isFinite(film.duration) && film.duration > 0 ? film.duration : null);
+  const command = {
+    play: () => {
+      // Pressing play with nothing chosen starts the first film, which is what
+      // this page has always done: a year with no clip chosen has nothing else
+      // it could play.
+      if (!current) { if (firstPick) play(firstPick); return; }
+      // FIRED, NEVER AWAITED. play() waits on a gesture in a real browser and
+      // does not reject when it is refused, so awaiting it is a hang.
+      film.play().catch(() => {});
+      if (hasSound() && wireless.paused) wireless.play().catch(() => {});
+      deck.play();
+    },
+    pause: () => { film.pause(); if (hasSound()) wireless.pause(); deck.pause(); },
+    seek: (pos) => {
+      const into = intoFilm(pos), dur = filmSecs();
+      // 🔴 ONLY INSIDE THE FILM THAT IS PLAYING. A loop marked across days has
+      // both ends on the line and neither of them in this newsreel, and writing
+      // an eleven-day currentTime onto a two-minute element clamps to the end,
+      // which is a loop that plays nothing at all. Out there the picture is left
+      // alone and the playhead moves by itself, which is what it did before.
+      if (into != null && dur != null && into >= -0.25 && into <= dur + 0.25) {
+        try { film.currentTime = Math.min(Math.max(0, into), Math.max(0, dur - 0.05)); }
+        catch { /* no data yet */ }
+      }
+      return deck.seek(pos);
+    },
+  };
+
+  // THE PICTURE IS THE MASTER AND THE YEAR FOLLOWS IT. The playhead used to
+  // free-run at one second of 1965 per second of now from wherever the film was
+  // opened, which agrees with the film until somebody uses the picture's own
+  // controls: then the line says one thing, the film says another, and a mark
+  // made off the line is made in the wrong place. `anchorMs` is a function
+  // because the anchor is whichever clip is up. No rAF here: the L4 timeupdate
+  // backstop drives it, exactly as on `/replay/`.
+  const master = mediaMaster(deck, film, {
+    anchorMs: () => (current ? current.at : YEAR_FROM),
+  });
+
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
+    command,
+    // A wrap fires every lap and is not news. The marks going on and coming off
+    // are, because with no slider on this bar there is no band to read them from.
+    onLoop: (what, a, b) => {
+      if (what === 'off') { d.log('the loop is off'); return; }
+      if (what !== 'set') return;
+      const from = intoFilm(a), to = intoFilm(b), dur = filmSecs();
+      const inside = from != null && to != null && dur != null
+        && from >= -0.25 && to <= dur + 0.25;
+      d.log(inside
+        ? `looping ${from.toFixed(1)}s to ${to.toFixed(1)}s of ${current.slug}`
+        : 'both marks have to be in the film that is playing. This one runs across '
+          + 'days, so the picture keeps going and only the line comes back', inside ? 'hi' : 'bad');
+    },
     // A DATE, not a duration. `0:03.910` is the right answer for a deck of
     // seconds and a meaningless one for a deck of 1965.
     fmt: (pos) => iso(pos),
@@ -636,6 +720,15 @@
       view.strip.state.absolute === true
         && /^\d{4}-\d{2}-\d{2}$/.test(formatTime(deck.position(), 86400000, view.strip.state.absolute)),
       formatTime(deck.position(), 86400000, view.strip.state.absolute));
+    // 🔴 THE LOOP'S ARITHMETIC, GRADED WITHOUT OPENING ANYTHING. A mark on this
+    // line is a moment in 1965, and the loop plays it as an offset into the film
+    // that is up, so `intoFilm` is the whole mapping the loop stands on. This is
+    // also the ONLY part of the loop this page can check: the rest needs a real
+    // stream from ERR, and a check is not a reason to open one.
+    d.assert('a mark on the line is an offset into the film that is playing',
+      current != null && Math.abs(intoFilm(current.at + 12345) - 12.345) < 1e-9,
+      current ? `${intoFilm(current.at + 12345).toFixed(3)} s into ${current.slug}` : 'nothing is up');
+    d.assert('the picture is the transport master, so the line follows it', !!master);
     d.assert('nothing is stored: no media in the fixture',
       !JSON.stringify(items[0]).match(/https?:|\.m3u8|\.mp4/), 'catalogue metadata only');
     d.ready();
