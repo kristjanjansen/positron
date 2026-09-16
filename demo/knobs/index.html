@@ -105,7 +105,7 @@
     /**
      * Six cells, and every one of them moves.
      *
-     * `sent` and `skipped` are your hand, counted in this page. `played` is the
+     * `sent` is your hand, counted in this page. `played` is the
      * board, counted on the far side of the wire, which is the only side that
      * can answer for it. `round trip` and `buffer` are the two biggest terms in
      * how late the sound is, and `lost` is whether anything vanished on the way.
@@ -122,7 +122,23 @@
      * one that moves, because a pointer really does outrun the gate, and that
      * is `skipped`.
      */
-    readout: { sent: '/s', skipped: '/s', played: '/s', 'round trip': 'ms', buffer: 'ms', lost: '' },
+    /**
+     * 🔴 FOUR, DOWN FROM SIX. Asked 2026-09-16 with a photograph of the row:
+     * *"can we keep 4?"*. CLAUDE.md says a readout with a cell too many always
+     * has a weakest one, and here it had two.
+     *
+     * `lost` counts frames the relay dropped, and a healthy run leaves it at 0
+     * for as long as anybody watches: a counter that only moves when something
+     * is broken teaches a reader to stop looking at the row. It is still
+     * COUNTED and still said in the log when it moves, which is where a fault
+     * belongs.
+     * `skipped` was the page's own discard, and it is the pair to `sent` rather
+     * than a fact of its own: what your hand made that did not go is the
+     * difference between the two, and the sentence under the picture says so.
+     * What is left is the whole claim in four numbers: what went out, what the
+     * board wrote, how far away it is, and how much sound is in hand.
+     */
+    readout: { sent: '/s', played: '/s', 'round trip': 'ms', buffer: 'ms' },
     /**
      * 🔴 THE NUMBERS AND THE LOG ARE ONE SURFACE AT THE FOOT OF THIS PAGE.
      * Asked for 2026-09-16, and this is the page it was asked about. Split,
@@ -471,20 +487,26 @@
   }
 
   // ── what the numbers are counted over ─────────────────────────────────────
-  let t0 = performance.now(), m0 = 0, k0 = 0;
+  let t0 = performance.now(), m0 = 0, k0 = 0, lastGone = 0;
   setInterval(() => {
     const now = performance.now(), dt = (now - t0) / 1000;
     if (dt < 1) return;
     d.set('sent', Math.round((wireMsgs - m0) / dt));
-    d.set('skipped', Math.round((gate.stats.thinned - k0) / dt));
+    // ⚠️ STILL COUNTED WITH NO CELL TO SHOW IT. `skipped` and `lost` came off
+    // the row and neither stopped being measured: what your hand made that did
+    // not go is still the difference between what the gate was offered and what
+    // it sent, and a frame the relay dropped is still noticed. Both reach a
+    // reader through the log, which is where something that only moves when
+    // there is a fault belongs.
+    const skipped = Math.round((gate.stats.thinned - k0) / dt);
     t0 = now; m0 = wireMsgs; k0 = gate.stats.thinned;
-    // ⚠️ NOT SET UNTIL SOMETHING HAS ARRIVED. A counter pre-set to 0 reads as a
-    // very confident measurement of nothing, and with no board there is nothing
-    // that could have been lost. `sent` and `skipped` are rates and are
-    // different: 0 a second is a true statement about a hand that is not moving.
     if (!frames) return;
     const gone = pcmMissing + Math.max(0, breaks);
-    d.set('lost', gone, gone ? 'bad' : 'ok');
+    if (gone > lastGone) {
+      d.log(`${gone - lastGone} slice${gone - lastGone === 1 ? '' : 's'} of sound went missing on the way`, 'bad');
+      lastGone = gone;
+    }
+    void skipped;
   }, 1000);
 
   // The network alone, with the relay's Durable Object never woken: the runtime
@@ -819,13 +841,26 @@
       wire.state() === 1 ? `open in ${ROOM}` : `readyState ${wire.state()}${wire.stats().refusal ? ` · ${wire.stats().refusal}` : ''}`);
     d.assert('the relay answered a round trip with nothing woken at the far end',
       Number.isFinite(rtt), rtt === null ? 'no pong came back' : `${Math.round(rtt)} ms`);
-    // The relay echoes verbatim to the sender, so the difference between what
-    // went out and what came back is this socket's drop count, with no
-    // cooperation from anybody. A few can be in flight at check time.
+    /**
+     * The relay echoes verbatim to the sender, so the difference between what
+     * went out and what came back is this socket's drop count, with nobody's
+     * cooperation.
+     *
+     * ⚠️ THE TOLERANCE IS A ROUND TRIP'S WORTH, NOT A NUMBER I LIKED. It was
+     * three, and a board run read `33 of 37` because the sweep ends about 40 ms
+     * before this line and the gate sends up to one message per controller per
+     * 20 ms. What can honestly be in flight is whatever left within one round
+     * trip, so the allowance is computed from the round trip this page has just
+     * MEASURED rather than guessed: 45 ms at two sliders every 20 ms is four
+     * or five, and on a slow link it is more, correctly.
+     */
     const w = wire.stats();
+    const inFlight = Math.ceil(((Number.isFinite(rtt) ? rtt : 60) / SEND_GATE_MS) * 2) + 1;
     d.assert('the relay delivered the control messages this page sent',
-      w.sent > 0 && w.sent - w.echoed <= 3,
-      `${w.echoed} of ${w.sent} came back${w.refused ? `, ${w.refused} refused by this page as too big` : ''}`);
+      w.sent > 0 && w.sent - w.echoed <= inFlight,
+      `${w.echoed} of ${w.sent} came back, with up to ${inFlight} still in flight at a `
+      + `${Math.round(Number.isFinite(rtt) ? rtt : 60)} ms round trip`
+      + `${w.refused ? `, ${w.refused} refused by this page as too big` : ''}`);
     // Both branches. A board that is off is the ordinary case, and a page that
     // only asserts the happy path has no coverage on those days.
     // ⚠️ `d.api.logs`, NOT `d.logs`. The mount API does not carry the array;
@@ -988,8 +1023,9 @@
    */
   const dg = createDiagram(d.el, {
     caption: 'Your hand makes more positions than the wire needs to carry, so the page sends a '
-      + 'thinned version of your gesture: SENT counts what went out, SKIPPED counts what was '
-      + 'overtaken before its turn, and PLAYED counts what the board wrote to the synth.',
+      + 'thinned version of your gesture: sent counts what left this browser, played counts '
+      + 'what the board wrote to the synth, and the difference is what your hand made and the '
+      + 'page did not send.',
     nodes: [
       /**
        * 🔴 `join: false`, BECAUSE THESE THREE ARE NOT A CHAIN. REPORTED
@@ -1107,9 +1143,9 @@
        * them.
        */
       { from: 'ffmpeg', to: 'relay', label: 'PCM slices', back: true,
-        note: 'Fifty slices of sound a second, each stamped with a number so the far end can '
-            + 'tell whether any went missing on the way. The LOST cell above counts gaps in '
-            + 'those numbers.' },
+        note: 'Fifty slices of sound a second, each stamped with a number, so the far end can '
+            + 'tell from a break in the counting whether any went missing on the way rather '
+            + 'than guessing from the sound.' },
       { from: 'relay', to: 'playout', label: 'PCM slices', back: true,
         note: 'The sound comes back down the same connection the slider values went out on. '
             + 'Nothing else sends audio into this room, so its arrival is also how the page '

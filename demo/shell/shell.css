@@ -274,19 +274,17 @@ button.pos-pri[data-busy="1"] {
    margin, because a lone element should not carry a gap to nothing. 22px is
    a comfortable read at a laptop's distance and scales up in the headset
    block below. */
-/* 🔴 TWO GAPS IN THE WHOLE PROJECT, AND ONLY TWO. Instructed 2026-09-16: *"use
-   vetical space heights ~40 ~120 px. (small,big) only. big onlu before
-   (readout)logs"*. Everything between siblings takes the small one. The big one
-   is spent once per page, on the gap before the surface that reports what
-   happened, because that is where the page stops being an instrument and starts
-   being an account of one.
-   ⚠️ IT WAS 22 AND 44, WHICH IS TWO STEPS OF THE SAME SIZE. A rhythm whose
-   large gap is twice its small one does not read as two kinds of separation; it
-   reads as an accident. Three times apart is a decision a reader can see.
-   ⚠️ AND THE BOTTOM MARGIN IS THE BIG ONE, so a page with a joined report and a
-   page with a split log get the same gap before their foot: the report's own
-   margin collapses with this rather than adding to it. */
-.pos-body { margin: 0 0 120px; }
+/* 🔴 ONE GAP IN THE WHOLE PROJECT, 40 px, AND NOTHING IS AN EXCEPTION.
+   Instructed 2026-09-16: *"revert vert spacing as it was, make it all equal
+   (40px)"*, after a build that had two.
+   ⚠️ THE TWO GAP VERSION IS WORTH RECORDING BECAUSE IT WAS TRIED. It spent a
+   big gap once per page, before the surface that reports what happened, on the
+   argument that a page stops being an instrument there. What that actually
+   produced was a hole: a screen of air between the thing you play and the
+   numbers about it, on a page you read while your hand is still on a slider.
+   One rhythm means no element has to argue for its own position, which is what
+   the rule was for before it grew a second number. */
+.pos-body { margin: 0 0 40px; }
 .pos-body > * + * { margin-top: 40px; }
 .pos-body:empty { display: none; }
 /* ⚠️ And the things the SHELL stacks, for the same reason: the readout, the
@@ -408,10 +406,11 @@ button.pos-pri[data-busy="1"] {
   display: flex; flex-direction: column;
   gap: 1px; background: var(--line); border: 1px solid var(--line);
   border-radius: 4px; overflow: hidden;
-  /* 🔴 THE BIG GAP, AND IT IS THE ONLY PLACE THE BIG GAP IS SPENT. 120 px
-     against the page's 40, instructed 2026-09-16: *"use vetical space heights
-     ~40 ~120 px. (small,big) only. big onlu before (readout)logs"*. It was 44
-     against 22, which is two steps of one size rather than two kinds of gap.
+  /* The page's one gap, stated here because this surface sits OUTSIDE
+     `.pos-body` and the rhythm on that element's children cannot reach it.
+     It was 44, then 120, and is now the same 40 everything else gets: a foot
+     that needs a bigger gap to look like a foot is a foot that does not look
+     like one.
      It is the diagram's number and it is the diagram's reason. `.pos-body >
      .pos-dg` already sits 44 px below what precedes it, because a picture of
      the machinery is a new PART of the page rather than another row in it, and
@@ -425,7 +424,7 @@ button.pos-pri[data-busy="1"] {
      ⚠️ THE SPLIT ARRANGEMENT IS UNTOUCHED: a split log takes 22 px from
      `.pos-body` exactly as it always has, and nothing in this rule can reach
      it. `/kit/` measures both and reports the two numbers. */
-  margin: 44px 0 0;
+  margin: 40px 0 0;
 }
 /* `display: flex` beats the UA's `[hidden]` rule. The readout and the control
    row are both already patched for the same trap, and both cost a band of dead
