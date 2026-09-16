@@ -301,6 +301,10 @@
     // rather than what this page asked for. Byte 4 carries the board's own
     // `performance.now()`, which step 5 will read to separate the network's
     // share of the delay from the board's.
+    // Audio in this room is the board and nothing else, and it arrives fifty
+    // times a second against a heartbeat every five.
+    pres.seen();
+    pres.checking(false);
     if (lastPcmSeq >= 0 && s > lastPcmSeq + 1) pcmMissing += s - lastPcmSeq - 1;
     lastPcmSeq = s;
     frames++;
@@ -334,6 +338,9 @@
   // back, and refuses a payload field the envelope would overwrite.
   const waiters = [];
   let boardAnswered = false, playing = null, boardSaid = '';
+  // Which socket in this room is the board. Learned from the two messages only
+  // it sends, never assumed, and relearned when it reconnects.
+  let boardFrom = null;
   let meter = null, meterAt = 0, playedPerSec = 0;
   let rtt = null;
 
@@ -403,8 +410,26 @@
     // ANY message from the board is proof it is there, not just the one this
     // page happened to ask for. `box.alive` is the heartbeat the interval above
     // is sized for, and an answer to a question counts just as much.
-    pres.seen();
-    pres.checking(false);
+    /**
+     * 🔴 ONLY THE BOARD COUNTS AS THE BOARD. This called `seen()` on ANY message
+     * that was not our own echo, and the relay is VERBATIM: everything in the
+     * room reaches everybody. So another tab of this page, or `/box/`, or
+     * `/grains/`, or a harness run, would have painted the badge green while
+     * the Raspberry Pi was unplugged. A presence badge that can be satisfied by
+     * somebody else in the room is worse than no badge, because it is wrong in
+     * precisely the case it exists for.
+     *
+     * The board is identified by the messages only it sends: it says
+     * `box.hello` when it joins and `box.alive` every five seconds. Its `from`
+     * is per SOCKET, so it is learned rather than assumed, and it is learned
+     * again whenever the board reconnects under a new one.
+     * ⚠️ AND AUDIO COUNTS TOO. A stream of PCM frames is the board playing, and
+     * nothing else puts audio into this room, so `onPcm` marks it seen as well.
+     * That matters because the frames arrive fifty times a second and a
+     * heartbeat only every five.
+     */
+    if (m.type === 'box.hello' || m.type === 'box.alive') boardFrom = m.from || boardFrom;
+    if (m.from && m.from === boardFrom) { pres.seen(); pres.checking(false); }
     if (m.type === 'audio.started') {
       boardAnswered = true;
       playing = m.ok ? m.source : null;
