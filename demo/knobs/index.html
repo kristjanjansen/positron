@@ -109,7 +109,7 @@
     // sentence and a visitor believes it. `manifest.mjs`'s own line moved in the
     // same change, verbatim, so arriving from the index does not mean reading
     // the same claim twice in two wordings.
-    what: 'Sweep a big filter on a Raspberry Pi in another building, with two sliders an invisible hand can take over.',
+    what: 'Sweep a big filter on a Raspberry Pi in another building, with two sliders that can also move themselves.',
     /**
      * Six cells, and every one of them moves.
      *
@@ -253,9 +253,15 @@
     if (s.why === 'coarse') { d.log(`${what}: ${s.says}`, 'warn'); return; }
     if (s.on) {
       handStarts++;
-      d.log(`an invisible hand has the ${what} slider: it sweeps by itself, back and forth, `
-        + 'and stops on its own after ten minutes. Grab it, use the arrow keys or press stop '
-        + 'and it hands over at once');
+      /**
+       * 🔴 SHORT, AND NOT IN THIS PROJECT'S OWN WORDS. Reported 2026-09-16 with
+       * the old line quoted back: *"= slooop. sjrorter. no invisb hand refs on
+       * uis"*. It was three clauses explaining a ceiling nobody had hit yet and
+       * an interruption anybody would discover by touching the slider, and it
+       * opened with `an invisible hand`, which is the PLAN's name for this and
+       * means nothing to a visitor. A log line says what just happened.
+       */
+      d.log(`${what} is moving by itself`);
     } else {
       const why = s.why === 'ceiling' ? ', which is the ten minute ceiling'
         : s.why === 'hidden' ? ', because this tab went to the background'
@@ -1129,7 +1135,7 @@
       d.assert('while a hand runs its symbol is lit, and the slider beside it is untouched',
         h.lit.mine === 'on' && h.lit.other === 'off' && h.lit.pressed === 'true'
         && h.lit.glyph !== h.lit.otherGlyph && h.lit.starts === 1
-        && d.api.logs.some((l) => l.msg.includes('an invisible hand has the cutoff slider')),
+        && d.api.logs.some((l) => l.msg.includes('cutoff is moving by itself')),
         `the driven symbol is ${h.lit.glyph} and the one beside it ${h.lit.otherGlyph}, `
         + `its row reads ${h.lit.mine} against ${h.lit.other}, and the log has the line`);
       /**

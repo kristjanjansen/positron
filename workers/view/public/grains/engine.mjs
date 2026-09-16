@@ -57,8 +57,8 @@
 // 🔴 AND PAPPUS IS NOT A SELF-CONTAINED INSTRUMENT. `Engine_Pappus.sc:518` is
 // `in = LeakDC.ar([In.ar(inbusl, 1), In.ar(inbusr, 1)])` — it granulates
 // whatever is ON A BUS, and the bus is filled from outside the definition. On
-// the board that is JACK (fluidsynth, Yoshimi, the radio). In a browser there
-// is no JACK and nothing fills that bus, so a Pappus loaded here alone
+// the board that is JACK, which since 2026-09-16 means Yoshimi. In a browser
+// there is no JACK and nothing fills that bus, so a Pappus loaded here alone
 // granulates silence. `PosSource.scsyndef` is the second definition and it is
 // what makes the pane sound: the same one the board runs, rendering the same
 // description this page sends over the relay.
