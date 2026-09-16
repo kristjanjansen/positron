@@ -248,24 +248,25 @@
   // LOG line now, which is where a thing that happened belongs.
   let saidUnchosen = false;
 
-  // Pappus is an effect, so it is a switch beside the instruments rather than
-  // one of them: it wraps whatever is playing, and can go on and off underneath.
-  // The effect lives on the SAME line as the instruments, pushed right: it is
-  // not a fourth instrument, it wraps whichever one is chosen, and the gap says
-  // so better than a second row would.
-
   let ctx = null, playout = null, ws = null, seq = 0;
   let rtt = null, cushionMs = 0, breaks = -1, rateWarned = false;
   /**
-   * What the BOARD says its insert is — `'pappus'` or `null`, and `undefined`
-   * until it has said anything.
+   * Whether the board says a granulator is in the sound, which on this page is
+   * only ever a thing to WARN about.
    *
-   * ⚠️ NOT A GUESS AND NOT THIS PAGE'S REQUEST. Two pages drive one Raspberry
-   * Pi and until 2026-09-14 each of them assumed its own last message was still
-   * true. The board is the only end that knows, so this follows what it says
-   * and never what this page asked for.
+   * 🔴 THE GRANULATOR CAME OUT OF THIS PAGE ON 2026-09-16, ON INSTRUCTION, AND
+   * `archive/box-pappus/` HAS THE CODE AND THE REASONING. `/box/` never had a
+   * control for it and drew it anyway. What is left is the one message that
+   * takes it out of this page's sound, and this flag, which exists so that the
+   * one case the message can be REFUSED is not silent: a live `/grains/` tab
+   * holds the insert, and then what you hear is not the instrument.
+   *
+   * ⚠️ IT STARTS `null` RATHER THAN `undefined`, WHICH IS THE WHOLE EDIT. It
+   * used to open at `undefined`, so the board's first `fx: null` counted as a
+   * change and every ordinary visit logged a line about a granulator nobody had
+   * met. Silence is the correct report for the normal case.
    */
-  let insert;
+  let insert = null;
 
 
   let frames = 0, lost = 0, last = -1, avail = null, current = null, idx = 0, lastBank = -1;
@@ -535,14 +536,17 @@
 
   // ── the keyboard, from the shell ─────────────────────────────────────────
   // ── the space the note falls into ───────────────────────────────────────
-  // 🔴 REPLACES THE GRANULATOR, AND THE DIFFERENCE IS NOTE-OFF. `pappus` was an
-  // insert that REPLACED the signal, and a grain cloud has none — so releasing
-  // a key swapped one drone for another and every instrument's envelope, attack
-  // and patch character were washed out before you heard them, which is why the
-  // patch arrows and the die both stopped doing anything audible. A reverb
-  // passes the dry signal and adds a tail, so the note still stops when you let
-  // go. The granulator is not at fault and has its own page now; wrapping an
-  // instrument in it was.
+  // 🔴 REPLACED THE GRANULATOR, AND THE DIFFERENCE IS NOTE-OFF. The insert that
+  // used to sit here REPLACED the signal, and a grain cloud has no note-off, so
+  // releasing a key swapped one drone for another and every instrument's
+  // envelope, attack and patch character were washed out before you heard them.
+  // That is why the patch arrows and the die both stopped doing anything
+  // audible. A reverb passes the dry signal and adds a tail, so the note still
+  // stops when you let go. `archive/box-pappus/` has the rest of that story.
+  //
+  // ⚠️ THIS IS A CSOUND INSERT ON THE JACK GRAPH, `positron-space`, and it is
+  // the one stage between the instrument and the capture that this page can
+  // actually reach. It is deliberately not drawn: see plan-box-pappus §3.
   //
   // ⚠️ THE BOARD RENDERS, THE PAGE SENDS NUMBERS — the same split `mirror` uses
   // for its shader knobs. Nothing is processed in this page: it plays what
@@ -646,31 +650,20 @@
     ws.binaryType = 'arraybuffer';
     ws.onopen = () => {
       d.log(`joined ${ROOM}`, 'hi');
-      // 🔴 TAKE THE GRANULATOR OUT, BECAUSE THIS PAGE CANNOT EXPRESS IT.
-      // The insert belongs to `grains` now and its controls were cut from here
-      // — but cutting a control does not clear the STATE it used to set, and
-      // the board is shared hardware. An insert left in by a `grains` tab that
-      // was simply closed goes on wrapping whatever this page plays, and with
-      // nothing arriving it feeds its own delay: MEASURED 2026-09-12, the board
-      // streamed a steady **-6.1 dBFS** subsonic drone (everything a multiple
-      // of ~8.8 Hz) while `box.alive` reported `voices: 0` — true about notes
-      // and false about sound. One `fx.pappus {on:false}` took it to digital
-      // silence, which is the A/B.
+      // 🔴 THE ONE LINE OF GRANULATOR LEFT ON THIS PAGE, AND IT IS WHAT MAKES
+      // THE PICTURE TRUE. The granulator belongs to `/grains/` and is not drawn
+      // here since 2026-09-16, but an undrawn insert is not an absent one: the
+      // board is shared hardware, and one left in by a `grains` tab that was
+      // simply CLOSED goes on wrapping whatever this page plays and feeds its
+      // own delay. MEASURED 2026-09-12, a steady -6.1 dBFS subsonic drone while
+      // `box.alive` reported `voices: 0`, true about notes and false about
+      // sound. One `fx.pappus {on:false}` took it to digital silence.
       //
-      // 🔴 `onlyIfIdle`, ADDED 2026-09-14, AND IT DOES NOT WEAKEN ANY OF THAT.
-      // The fault above is an insert left by a tab that CLOSED, and a closed
-      // tab stops talking — so the board still clears it, measured in
-      // `rig/box/insert-test.mjs`. What this stops is the OTHER half of the
-      // same coin: two pages share one Raspberry Pi, `/grains/` switches the
-      // granulator ON because it is that page's entire subject, and this page
-      // switched it off merely by LOADING. Whichever you opened last won,
-      // silently, and the other went on drawing a picture that was no longer
-      // true.
-      //
-      // ⚠️ THE BOARD ANSWERS OUT LOUD EITHER WAY, and that matters more than
-      // the arbitration: a refusal names the holder and how long ago it was
-      // heard from, and this page logs it. An arbitration nobody can see turns
-      // a visible problem into an invisible one.
+      // ⚠️ `onlyIfIdle` SO A LIVE `grains` TAB IS NOT STAMPED ON. A closed tab
+      // stops talking and is still cleared (`rig/box/insert-test.mjs`); an open
+      // one is refused, out loud, with the holder and the ages in the reply.
+      // That refusal is the only granulator line this page logs.
+      // `archive/box-pappus/` has what was taken out and why.
       send({ type: 'fx.pappus', on: false, onlyIfIdle: true });
       send({ type: 'sf.list' });
       send({ type: 'audio.status' });
@@ -758,23 +751,19 @@
       // The ping still runs — it is how this page knows the board is answering
       // at all — it just has no cell of its own any more.
       if (m.type === 'box.pong' && pingAt) { rtt = Math.round(performance.now() - pingAt); pingAt = 0; }
-      // 🔴 THE GRANULATOR, WHICH THIS PAGE DOES NOT CONTROL AND MUST NOT HIDE.
-      // The board reports its insert in `fx.pappus`, in `audio.started` and in
-      // the five-second `box.alive` — so a change made by a `/grains/` tab in
-      // another window shows up here without this page asking for anything.
-      // ⚠️ ONLY WHEN IT CHANGES. A line that re-stated the same fact every five
-      // seconds would bury the log, and a live SENTENCE that rewrites itself is
-      // the thing CLAUDE.md has a rule about.
+      // 🔴 THE ONE CASE WORTH A LINE: THIS PAGE ASKED FOR THE GRANULATOR TO GO
+      // AND IT IS STILL THERE. The board reports its insert in `fx.pappus`, in
+      // `audio.started` and in the five-second `box.alive`, so a `/grains/` tab
+      // in another window shows up here without this page asking for anything.
+      // ⚠️ ONLY WHEN IT CHANGES, AND ONLY WHEN IT IS IN. Re-stating the same
+      // fact every five seconds buries the log, and saying "there is no
+      // granulator" to somebody who never met one is the page discussing a
+      // thing it has no control over.
       if (m.fx !== undefined && m.fx !== insert) {
         insert = m.fx;
-        d.log(insert
-          ? `another page has the granulator in the sound${m.fxBy ? ` — it asked ${m.fxAgoSec} s ago` : ''}`
-            + ' · this page has no controls for it, so what you hear is being shaped elsewhere'
-          : 'the granulator is out of the sound — what you hear is the instrument', insert ? 'warn' : 'info');
+        if (insert) d.log(`a granulator is in the sound${m.fxBy ? `, put there by another page ${m.fxAgoSec} s ago` : ''}`
+          + ' · this page has no control over it, so what you hear is not the instrument by itself', 'warn');
       }
-      // And the one case this page DID ask about: it asked for the granulator
-      // to go and was told no, with a reason. Said once, when it happens.
-      if (m.type === 'fx.pappus' && m.kept) d.log(`left the granulator in — ${m.reason}`, 'warn');
       if (m.type === 'box.hello') { avail = m.instruments ?? null; drawInstruments(); send({ type: 'sf.list' }); }
       if (m.type === 'sf.listed') { soundfonts = m.soundfonts || []; drawInstruments(); }
       // The box's own library. It arrives once per instrument change and is
@@ -851,9 +840,6 @@
       }
     };
   }
-  // "random" means a different thing per instrument. Pappus has no patches at
-  // all — it has 106 parameters — so rolling a program number there does
-  // nothing audible, which is exactly how it sounded.
   // z / x shift the octave too, because a keyboard player's hands are already
   // on the keys and reaching for a 26 px button under them is a lost note. The
   // pad's own buttons and the log line are the keyboard's — see `onOctave`.
@@ -932,39 +918,73 @@
             note: 'The same object and the same socket as the box above, drawn separately '
                 + 'because one box carrying both directions could not be read.' },
         ] },
+      /**
+       * 🔴 THREE INSTRUMENTS, NOT ONE BOX CALLED `instruments`, AND `set: true`
+       * BECAUSE THEY ARE ALTERNATIVES. Asked for 2026-09-16: *"can we sampled
+       * (renamed to the collection name), hexter, yoshimi side by side in pi
+       * box"*. Exactly one of them is up at any moment, so a default arrowhead
+       * between them would claim that `FluidR3 GM` feeds `hexter`. A bracket
+       * says they are parts of one machine, which is the true statement.
+       *
+       * ⚠️ `capture` IS THE EXCEPTION AND IT IS DECLARED. Each instrument has a
+       * link to it, so the gap `yoshimi` shares with it gets an arrow rather
+       * than a bracket and the other two run as lanes inside the container.
+       * `dg.ties` is 2, which is what the two bracketed gaps are.
+       *
+       * ⚠️ AND THE NOTE ARROW LANDS ON THE MACHINE, NOT ON A BOX. A note goes
+       * to whichever instrument is running, which the picture cannot know, so
+       * pointing it at one of the three would be a guess drawn as a fact.
+       */
       { id: 'pi', label: 'Raspberry Pi', sub: 'another building', kind: 'device', tech: 'board',
+        set: true,
         children: [
-          { id: 'synth', label: 'instruments', sub: 'Yoshimi, hexter',
-            note: 'The programs that actually make the sound, plus **FluidSynth** for the '
-                + 'sampled one. A patch change is an ordinary MIDI program change.' },
-          { id: 'pappus', label: 'pappus', sub: 'SuperCollider',
-            note: 'A granulator the sound can be run through on its way out. Another page '
-                + 'can switch it in, which is why this one reports it rather than owning it.' },
-          { id: 'cap', label: 'capture', sub: '48kHz mono PCM',
-            note: 'Takes what the board is playing and sends it back down the same socket. '
-                + 'Raw samples, so nothing has to be decoded at this end.' },
+          // 🔴 THE COLLECTION, BY NAME. The button on this page says `sampled`,
+          // because one button beats four filenames a visitor has to know what
+          // a soundfont is to read. The picture has room for the real thing:
+          // 141 MB of General MIDI, and the board prefers this file over
+          // anything else it finds.
+          { id: 'sf', label: 'FluidR3 GM', sub: 'FluidSynth',
+            note: 'The 128 General MIDI programs and a drum bank, 141 MB of samples played by '
+                + '**FluidSynth** as a JACK client. It is loaded whole, because FluidSynth '
+                + 'streams nothing from disk.' },
+          { id: 'hexter', label: 'hexter', sub: 'DSSI, DX7',
+            note: 'A Yamaha DX7 with its four factory ROM cartridges, 128 voices, run under '
+                + '**jack-dssi-host**. Six-operator FM, so a patch is a set of ratios and '
+                + 'envelopes rather than a recording.' },
+          { id: 'yoshimi', label: 'yoshimi', sub: 'ZynAddSubFX',
+            note: 'A fork of **ZynAddSubFX** carrying 911 patches in 24 banks on this board. '
+                + 'The board enumerates them and sends the list, because it is the only end '
+                + 'that can see the files.' },
+          { id: 'cap', label: 'capture', sub: 'ffmpeg, JACK',
+            note: '**ffmpeg** reads the JACK client the running instrument is wired into and '
+                + 'writes raw 16-bit samples at 48 kHz. Many ports into one input sum, so a '
+                + 'stereo instrument arrives here as one channel.' },
         ] },
     ],
-    // 🔴 ONE WAY ROUND, AND IT IS A RING. Out along the top: keys, notes out,
-    // instruments. Down the board: pappus, capture. Back along the bottom:
-    // sound back, playout. Every arrow points the way the signal actually
-    // travels, and nothing meets in the middle.
+    // 🔴 ONE WAY ROUND, AND IT IS A RING. Out along the top: keys, notes, the
+    // board. Down the board: whichever instrument is up, then capture. Back
+    // along the bottom: audio, playout. Every arrow points the way the signal
+    // actually travels, and nothing meets in the middle.
     links: [
       { from: 'keys', to: 'down', label: 'note on/off',
         note: 'A few bytes of JSON per key, over a **WebSocket**. Half the round trip of one '
             + 'of these is half of what the **lag** cell reports.' },
-      { from: 'down', to: 'synth', label: 'note on/off',
-        note: 'The same message, copied on. The board is a service that dials out on boot '
-            + 'and waits, so it is reachable from anywhere without a port forward.' },
+      { from: 'down', to: 'pi', label: 'note on/off',
+        note: 'The same message, copied on. The board writes it as raw MIDI bytes to a '
+            + '**snd-virmidi** device, which **aconnect** has already routed to whichever '
+            + 'instrument is up.' },
       // ⚠️ NO LABELS INSIDE A CONTAINER. The gap two stacked children share is
       // sixteen pixels tall, so a name in it runs under both boxes;
       // `createDiagram` refuses one and reports it. What travels is in the note.
-      { from: 'synth', to: 'pappus',
-        note: 'Audio, on the board, between two programs on it. Nothing crosses a network '
-            + 'here and nothing is encoded.' },
-      { from: 'pappus', to: 'cap',
-        note: 'Whatever is actually going to the speakers, granulated or not, on its way to '
-            + 'being sent back.' },
+      { from: 'sf', to: 'cap',
+        note: 'Audio on the **JACK** graph, inside the board. Nothing crosses a network here '
+            + 'and nothing is encoded.' },
+      { from: 'hexter', to: 'cap',
+        note: 'The same wire, made by one **jack_connect** when the instrument came up. Only '
+            + 'one of the three is running, so only one of these carries anything.' },
+      { from: 'yoshimi', to: 'cap',
+        note: 'Both channels of a stereo instrument go into the one input, which is what '
+            + 'makes the mono that comes back a sum rather than the left side.' },
       // ⚠️ NO LABEL ON THE RETURN PATH. It runs back under the row rather than
       // between two boxes, and `createDiagram` reported both of these at a width
       // of -444: there is no room there for a name. The box it arrives at is

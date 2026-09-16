@@ -1,0 +1,240 @@
+# plan-box-pappus: take the granulator out of `/box/`, and say what is left
+
+Asked for 2026-09-16: *"plan and remove pappus from the
+http://127.0.0.1:8890/box/ signal path. there is no ui to control it. arhvice
+it. update diagram as well. captutre: should be more techical, JACK etc. can we
+sampled (renamed to the collection name), hexter, yoshimi side by side in pi box
+in diagram"*.
+
+`/box/` is `rig/box/listen.html`, served at `/box/`, deployed as
+`workers/view/public/box/index.html`. The board's code is `rig/box/`.
+
+---
+
+## 1. What Pappus IS, read off the code rather than remembered
+
+Pappus is a SuperCollider engine (`rig/box/norns/Engine_Pappus.sc`, 2,030 lines
+of class library) run by `sclang` from `rig/box/norns/run-pappus.scd`. It is
+**not an instrument and has not been one since it was taken out of
+`JACK_SYNTHS`**: it granulates its INPUT, so as an instrument it faithfully
+processed silence. It is an **insert**, raised and patched by
+`pappusFx()` in `rig/box/jacksynth.mjs`, and driven over OSC by
+`rig/box/pappus.mjs` (106 parameters, no note numbers).
+
+What `pappusFx(true)` does to the JACK graph, exactly:
+
+    instrument:out  ->  SuperCollider:in_1 / in_2      (the feed)
+    SuperCollider:out_1 / out_2  ->  posbox:input_1    (the return)
+
+and `pappusFx(false)` undoes both and re-connects the instrument straight to
+`posbox:input_1`. `posbox` is the capture: `ffmpeg -f jack -i posbox -f s16le
+-ar 48000 -ac 1 -`, whose stdout `box.mjs` cuts into 960-sample frames and sends
+over the relay.
+
+**On `/box/` today it is drawn, reported, and cannot be touched.** The page has
+had no control for it since the reverb replaced it; what is left is a box in the
+diagram between `instruments` and `capture`, a `let insert` that follows what
+the board says, two log lines that narrate it, and one message on connect.
+
+⚠️ **And the log line fires on an ordinary visit.** `insert` starts `undefined`,
+the board answers `fx: null`, so `m.fx !== insert` is true on the first
+heartbeat and every visit logs *"the granulator is out of the sound"*. A page
+with no control for a thing opens by talking about it.
+
+---
+
+## 2. What must NOT be removed, and why
+
+🔴 **`rig/box/pappus.mjs`, `pappusFx()` and the `fx.pappus` handler in
+`box.mjs` all stay on the board.** `/grains/` is a live, built demo whose entire
+subject is the same granulator running in a tab and on the Raspberry Pi. It
+sends `fx.pappus {on:true}` from its own handler, polls `params.state`, and
+compares the two. Deleting the board half breaks a deployed page. The ask is
+about `/box/`'s signal path, and the board is not `/box/`.
+
+🔴 **`/box/` keeps sending `fx.pappus {on:false, onlyIfIdle:true}` on connect.**
+This is the thing that MAKES the removal true rather than merely undrawn. An
+insert left behind by a `/grains/` tab that was simply closed goes on wrapping
+whatever `/box/` plays and feeds its own delay: MEASURED 2026-09-12, a steady
+-6.1 dBFS subsonic drone while `box.alive` reported `voices: 0`. Deleting the
+message would take the picture and the sound in opposite directions, which is
+the failure this repo has a shelf of rules about. `onlyIfIdle` stays too, so a
+live `/grains/` tab is not stamped on by somebody opening `/box/`.
+
+🔴 **One log line survives, for the case where the board refuses.** The refusal
+answers `ok:true, on:true, kept:true` with the holder and the ages. If `/box/`
+said nothing there, its diagram would be a confident lie in exactly the one
+situation where it is wrong. `rig/box/README.md` promises that both pages say so
+in words, and that promise is kept.
+
+So the shape is: **the page stops discussing the granulator, and keeps the one
+message and the one line that are about its OWN sound.**
+
+---
+
+## 3. The signal path once Pappus is out
+
+Verified against `rig/box/jacksynth.mjs` and `rig/box/box.mjs`:
+
+| step | what runs | where it is in the code |
+|---|---|---|
+| clock | `jackd -d dummy` | `JACK_SYNTHS` needs, `startJackSynth` |
+| instrument | one of `fluidsynth` (JACK client, `FluidR3_GM.sf2`), `hexter` (under `jack-dssi-host`), `yoshimi` | `JACK_SYNTHS` |
+| notes in | `snd-virmidi` character device, `aconnect`ed to the synth's ALSA sequencer port | `findVirmidi()`, step 5 |
+| optional insert | `positron-space`, a **Csound** reverb and chorus (`csd/space.csd`) | `spaceFx()` |
+| capture | `ffmpeg -f jack -i posbox -f s16le -ar 48000 -ac 1 -` | step 3, `jack_connect <port> posbox:input_1` |
+| out | 960-sample frames over the relay WebSocket | `box.mjs` |
+
+Two things this makes exact, and both go in the diagram:
+
+- **JACK is the thing to name.** Every instrument on this page is a JACK client
+  and the capture is a JACK client; the insert can only reach what is on that
+  graph, which is why FluidSynth was moved onto it.
+- **Many ports into one input SUM in JACK.** A stereo instrument is wired left
+  and right into the same `posbox:input_1`, which is what mono-sum means here.
+
+⚠️ **The reverb is in this path and is NOT being drawn.** It is a fifth box in a
+container that is about to hold four, and nobody asked for it. Named here so the
+next person does not have to re-derive that `positron-space` exists.
+
+---
+
+## 4. What the sample collection is called
+
+`rig/box/fluid.mjs`:
+
+    export const DEFAULT_SF = '/usr/share/sounds/sf2/FluidR3_GM.sf2';
+
+and `drawInstruments()` in the page prefers the FluidR3 file over anything else
+the board lists. So the `sampled` button plays **FluidR3 GM**: the 128 General
+MIDI programs and a drum bank, 141 MB, loaded whole because FluidSynth has no
+mmap and no disk streaming.
+
+⚠️ **The BUTTON stays `sampled`.** The ask names the diagram, the button already
+carries a comment explaining why it is one choice rather than one per file, and
+a control labelled `FluidR3 GM` would ask a visitor to know what a soundfont is
+before they can press it. The diagram is where the real name belongs, which is
+where it was asked for.
+
+---
+
+## 5. The diagram, box by box
+
+`Raspberry Pi` gains `set: true` and holds four children instead of three.
+
+| label | sub | why |
+|---|---|---|
+| `FluidR3 GM` | `FluidSynth` | the collection, named |
+| `hexter` | `DSSI, DX7` | four DX7 factory cartridges, 128 voices |
+| `yoshimi` | `ZynAddSubFX` | it is a fork of one, with 911 patches here |
+| `capture` | `ffmpeg, JACK` | the technical ask |
+
+🔴 **THE SUBS HAVE TWELVE CHARACTERS, AND THAT IS THE LANES' DOING.** A
+container insets its boxes by `CHILD_PAD + maxLanes * SIB_LANE` **from both
+sides**, and `maxLanes` is a figure for the WHOLE picture rather than for one
+machine. Two lanes take 96 px off every box in the diagram, which dropped the
+sub budget from 154 px to 74. MEASURED: the first draft wrote
+`FluidSynth, 141MB`, `DSSI, 128 voices`, `ZynAddSubFX fork` and `ffmpeg -f
+jack`, and `dg.cuts` reported **all four** truncated. The quantities moved into
+the notes, which is where there is room for them.
+
+- `set: true` because the three instruments are **alternatives**, not a chain:
+  exactly one is up at a time. Brackets say "parts of one machine", which is
+  true; arrowheads between them would say `FluidR3 GM` feeds `hexter`, which is
+  false.
+- Three declared links, one per instrument, into `capture`. A declared link
+  REPLACES the connector in the gap it crosses, so `yoshimi -> capture` takes
+  the bracket in the gap they share and the other two run as lanes inside the
+  container. `dg.ties` reads 2, which is the two bracketed gaps.
+- The note arrow from Cloudflare lands on the **`Raspberry Pi` container**
+  rather than on one instrument, because a note goes to whichever one is
+  running. `createDiagram` resolves a link naming a machine to the machine.
+- ⚠️ **"side by side" is as siblings, not left to right.** `diagram.mjs` stacks
+  a container's children in one column; there is no horizontal option and adding
+  one is a layout change across every page that draws a picture. Reported rather
+  than silently approximated.
+
+---
+
+## 6. What gets archived
+
+`archive/box-pappus/`, matching `archive/demos/` and `archive/videoradio-xr/`:
+
+- `README.md`: what it was in this page, what it cost, what is NOT archived.
+- `page-half.js`: the removed page code verbatim, in the order it stood.
+
+Nothing under `rig/box/` moves. The archive records what `/box/` used to draw
+and say, not what the board can do.
+
+---
+
+## 7. Order of work
+
+1. This file.
+2. `archive/box-pappus/` with the removed code verbatim and its README.
+3. `rig/box/listen.html`: the diagram, the insert reporting, the stale comments.
+4. `demo/manifest.mjs`: the `one` line, which says "1965 radio, and a granulator
+   over both" and is false on both counts.
+5. Mirror `listen.html` into `workers/view/public/box/index.html` and
+   `manifest.mjs` into `workers/view/public/manifest.mjs`, by hand, byte for
+   byte. No build, no deploy.
+6. `node demo/check-html.mjs rig/box/listen.html`, and read `dg.cuts` out of a
+   headless Chrome pointed at a DEAD relay (`?relay=ws://127.0.0.1:9`) so no
+   room is joined and no board is touched.
+
+---
+
+## 8. What a person has to do on the board
+
+**Nothing, for the page.** `/box/` is served from this repo and from
+`workers/view/public/`; the board runs `box.mjs`, which is unchanged. The
+removal is a change to what a browser draws and asks for.
+
+⚠️ And the board's own copy is not this checkout anyway: `positron-box.service`
+executes `/opt/positron-box/`, and `~/positron` on the board is stale. If
+anything under `rig/box/` is ever changed for this, it reaches the board only
+through `push.sh` / `setup.sh`, and `md5sum` against `/opt/positron-box/rig/box/`
+is what says the deploy landed. Not needed here.
+
+---
+
+## 9. Left open, on purpose
+
+- 🔴 **`/box/` has a diagram and a six-sentence `what`, and that `what` carries
+  four em dashes.** CLAUDE.md says a page with a diagram carries a ONE line
+  `what`, that it is the index's own `one` line verbatim, and that there are no
+  em dashes anywhere a reader looks. This page breaks all of that today and it
+  predates this work. Rewriting the paragraph would delete the only explanation
+  of `buffer`, `lag` and `lost`, and fixing the punctuation without fixing the
+  length is half a job. Named here rather than done quietly, because the two
+  have to be done together.
+- **The Browser and Cloudflare boxes got emptier.** Every container in the row
+  is drawn to one height, so a fourth child on the Pi adds about 40 px of blank
+  ground inside the other two. Visible on a phone, where the picture is one
+  column. That is `diagram.mjs`'s deliberate equal-height rule and changing it
+  reaches every page that draws a picture.
+- **The reverb has no box**, see §3.
+- **`/kit/` is not machine-graded and `/box/` is `built: false`**, so the only
+  thing that reports a bad label or an unroutable link on this page is its own
+  log line off `dg.cuts`.
+
+
+---
+
+## 10. What was measured, and how
+
+`/box/` is `built: false`, so `demo/verify.mjs` never opens it and nothing turns
+red. The diagram was read directly out of a headless Chrome pointed at the dev
+server with **a dead relay**, `?relay=ws://127.0.0.1:9`, so no room was joined,
+no board was asked anything and nothing outside this machine was touched.
+`window.__dg()` is what the page already publishes.
+
+| | `cuts` | `ties` | `mode` |
+|---|---|---|---|
+| before | 0 | 0 | row |
+| first draft, long subs | **4** (every sub in the Pi truncated) | 2 | row |
+| shipped | 0 | 2 | row |
+| shipped, 390 px | 0 | 2 | column |
+
+`node demo/check-html.mjs rig/box/listen.html workers/view/public/box/index.html`
+parses both copies. The two files are byte-identical, checked with `md5`.

@@ -576,7 +576,13 @@ export const DEMOS = [
   // random hour of 1965 Estonian radio, and pappus chewing either one up.
   { name: 'box', group: 'instruments', act: 4, created: '2026-09-10', built: false, page: '/box/',
     src: 'rig/box/listen.html',
-    one: 'play a Raspberry Pi in another building: its instruments, 1965 radio, and a granulator over both',
+    // ⚠️ THIS LINE WAS STALE ON BOTH COUNTS AND NOTHING TYPE-CHECKS A SENTENCE.
+    // It read 'its instruments, 1965 radio, and a granulator over both'. The
+    // page has offered no archive source for weeks, and the granulator came out
+    // on 2026-09-16 (`archive/box-pappus/`, `plan-box-pappus.md`). What is left
+    // is the thing the page actually is: three programs on a board, played from
+    // here.
+    one: 'play three instruments on a Raspberry Pi in another building, and hear what it makes come back',
     tags: ['WS', 'relay', 'PCM', 'live board'] },
 
   // A CHECKUP, not a player — and that is what makes it shippable. The playing
