@@ -11,6 +11,17 @@
      and the transport bar is `.pos-body > * + *` in shell.css, one rhythm for
      every page. */
   .vain-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  /* 🔴 ONE BLOCK ROUND THE WHOLE THING. The target, its button and the numbers
+     an upload produces are one job, and they were three separate surfaces with
+     the page's 22 px rhythm between them. No border of its own: the dashed
+     target inside it already draws the edge, and a second box round that is a
+     line where spacing already says "one thing". */
+  .vain-block { display: flex; flex-direction: column; gap: 12px; }
+  /* ⚠️ THE READOUT LOSES ITS OWN TOP RULE IN HERE. `.pos-readout` draws a border
+     because on every other page it is a surface of its own with the body rhythm
+     above it; inside this block it sits 12 px under the button it belongs to,
+     and the line would cut one thing in half. */
+  .vain-nums { border: 0 !important; padding-top: 0 !important; margin: 0 !important; }
   /* 🔴 THE BOX IS A TARGET, SO IT IS THE SIZE OF ONE. It was a 38 px strip
      that happened to contain a button, which is a form control rather than
      somewhere to let go of a file. Taller, with the text centred in it, and it
@@ -100,6 +111,20 @@
   const MB = (n) => n / 1024 / 1024;
 
   // ── the drop row ─────────────────────────────────────────────────────────
+  /**
+   * 🔴 ONE BLOCK: THE TARGET, THE BUTTON AND THE NUMBERS. Asked for
+   * 2026-09-16: *"merge these on single block with single uplad button when
+   * clicked show data on upload"*.
+   *
+   * The readout sat above as four labelled cells with nothing in them, on a page
+   * where nothing had been uploaded yet, which is a row of headings describing a
+   * thing that has not happened. It is inside the block now and hidden until
+   * there is something to say, so what a visitor first meets is one box with one
+   * button and no furniture.
+   * ⚠️ IT IS THE SHELL'S OWN READOUT, MOVED, NEVER REBUILT. `d.set()` has to go
+   * on writing to the same cells the harness reads, and a second copy would be a
+   * second thing to keep in step.
+   */
   const row = el('div', 'vain-row');
   const pick = el('input', '', null, { type: 'file', accept: 'audio/*' });
   // 🔴 NOT `pos-pri`. The primary thing on this page is the box you drop into,
@@ -108,7 +133,23 @@
   const send = el('button', '', 'Upload', { type: 'button' });
   send.disabled = true;
   row.append(pick, send);
-  d.el.append(row);
+  const block = el('div', 'vain-block');
+  block.append(row);
+  d.el.append(block);
+  // The shell drew its readout above; it belongs to this block and to nothing
+  // else on the page.
+  const readout = d.el.querySelector('.pos-readout');
+  if (readout) { readout.classList.add('vain-nums'); block.append(readout); }
+  /**
+   * 🔴 THE NUMBERS APPEAR WHEN THERE ARE NUMBERS, AND NOT A MOMENT BEFORE.
+   * `hidden` rather than `opacity`, because an invisible row that still takes
+   * up its own height leaves a hole under the button that nothing explains.
+   * ⚠️ IT IS ONE WAY. Once an upload has run, its numbers stay: they are the
+   * record of what happened, and hiding them again when it finishes would take
+   * the answer away at the moment somebody looks for it.
+   */
+  if (readout) readout.hidden = true;
+  const showNums = () => { if (readout) readout.hidden = false; };
 
   /**
    * 🔴 DROPPING A FILE ON THE BOX, WHICH IS WHAT THE PAGE ALREADY SAID IT WAS.
@@ -191,6 +232,20 @@
     // that says the same thing by existing. An empty table with a hidden header
     // is already silent and already the right size.
     empty: '',
+    /**
+     * 🔴 PRESSING A FILE PLAYS IT. Asked for 2026-09-16: *"no table rework.
+     * just make clickin files playable"*, so this is one callback and no change
+     * to what the table looks like: no play glyph, no fourth column.
+     * ⚠️ A ROW WITH NO ADDRESS SAYS SO RATHER THAN DOING NOTHING. A sidecar that
+     * did not load leaves a row with no `url`, and a press that silently fails
+     * is the control-that-looks-live failure this repo keeps paying for.
+     * ⚠️ AND `play()` IS FIRED, NEVER AWAITED. It settles when the decoder has
+     * started, which on somebody else's network is a wait with no deadline.
+     */
+    onPick: (r) => {
+      if (!r.url) { d.log(`${r.name} has no address to play from`, 'warn'); return; }
+      play(r);
+    },
   });
   d.el.append(table.el);
 
@@ -214,7 +269,10 @@
   const SHELF_MAX = 40, SHELF_LANES = 6;
   let shelf = [];          // what the store already had
   let live = null;         // the row for a drop in flight
-  const paintRows = () => table.set([...(live ? [live] : []), ...shelf]);
+  const paintRows = () => {
+    table.set([...(live ? [live] : []), ...shelf]);
+    markPlaying?.();
+  };
 
   async function loadShelf() {
     let list;
@@ -236,8 +294,22 @@
           // error, which is the shape that takes longest to find.
           const m = await jget(`${list.body.readBase}/${dir}/meta.json`);
           if (m.status === 200) {
+            /**
+             * 🔴 THE ADDRESS IS `key`, AND `name` IS A DIFFERENT THING THAT LOOKS
+             * LIKE IT. MEASURED against the real store, 2026-09-16: `key` is
+             * `vain-dev/<stamp>/audio.wav` and answers 200; `name` is the file's
+             * ORIGINAL name on whoever uploaded it, `vaincheck-19980412-091500.wav`,
+             * and answers 404. Building the URL out of `name` made every row in
+             * this table unplayable while the page logged `playing …` and the
+             * transport sat at one millisecond: reported as *"no playing on
+             * clip. still juping to end"*.
+             * ⚠️ AND THE URL TRAVELS WITH THE ROW rather than being worked out
+             * again at press time, which would be a second place that has to
+             * know how a key is built.
+             */
             rows[i] = { name: m.body.title || m.body.name || dir,
-                        size: `${MB(m.body.bytes || 0).toFixed(2)} MB`, state: 'kept' };
+                        size: `${MB(m.body.bytes || 0).toFixed(2)} MB`, state: 'kept',
+                        url: m.body.key ? `${list.body.readBase}/${m.body.key}` : null };
           }
         } catch { /* a row that will not load is left out rather than guessed at */ }
       }
@@ -283,6 +355,61 @@
     const ms = Math.round((audio.duration || 0) * 1000);
     if (ms > 0) deck.setRange([0, ms]);
   });
+
+  /**
+   * 🔴 OPEN A RECORDING AND PLAY IT, AND THE RANGE IS WHY THIS IS NOT THREE
+   * LINES. REPORTED 2026-09-16: *"clickin on items moves transport to end and
+   * no playing"*, with the bar reading `0:00.001 / 0:00.001` and the toggle
+   * showing `↺`.
+   *
+   * The deck is built with `range: [0, 1]` and only `loadedmetadata` widens it.
+   * Pressing a row set `src` and called `deck.play()` in the same breath, so
+   * the playhead was inside a one millisecond range, reached the end
+   * immediately, and the bar's end stop paused it and drew the restart glyph.
+   * Nothing was wrong with the file: the transport had nowhere to go.
+   *
+   * ⚠️ SO THE RANGE IS PUT BACK TO NOTHING FIRST AND THE DECK IS STARTED ONLY
+   * WHEN THERE IS SOMEWHERE TO GO. The previous file's length standing while a
+   * new one loads is a slider whose travel describes a recording that is no
+   * longer in the element, and this repo has already paid for that on `/tapes/`.
+   * ⚠️ AND `play()` IS FIRED, NEVER AWAITED: it settles when the decoder has
+   * started, which over somebody else's network is a wait with no deadline.
+   * The element starting is what moves the deck, through `mediaMaster`.
+   */
+  /**
+   * 🔴 A FILE THAT WILL NOT LOAD SAYS SO. Without this the page logged
+   * `playing …`, the element failed silently, the deck kept its one millisecond
+   * range and the only symptom was a transport parked at the end. A control that
+   * looks live and does nothing is this repo's named hazard, and so is a page
+   * that reports an action it did not manage to take.
+   */
+  audio.addEventListener('error', () => {
+    if (!playingUrl) return;
+    d.log(`that file would not load: HTTP or format error at ${playingUrl.split('/').pop()}`, 'bad');
+  });
+
+  let playingUrl = null;
+  function play(r) {
+    playingUrl = r.url;
+    markPlaying();
+    deck.pause();
+    deck.setRange([0, 1]);
+    deck.seek(0);
+    audio.src = r.url;
+    audio.load();
+    audio.play().catch(() => {});
+    audio.addEventListener('canplay', () => {
+      const ms = Math.round((audio.duration || 0) * 1000);
+      if (ms > 0) deck.setRange([0, ms]);
+      deck.seek(0);
+      deck.play();
+    }, { once: true });
+    d.log(`playing ${r.name}`, 'hi');
+  }
+  // Which row is lit, re-applied after every repaint because `table.set` builds
+  // new elements. Matched on the address rather than on a position in the list:
+  // an upload puts a new row at the top and every index below it moves.
+  const markPlaying = () => table.mark((row) => !!playingUrl && row.url === playingUrl);
 
   // ── progress, which is two quantities and not one ────────────────────────
   //
@@ -361,6 +488,9 @@
    * has no token.
    */
   async function upload(file, { title = '', when = null, whenRead = null, by = '' } = {}) {
+    // The four cells are about an upload, so this is the moment they mean
+    // something. See `showNums`.
+    showNums();
     // the in-flight row sits ON TOP of what the crate already held, rather
     // than replacing it: a drop is an addition, and the table said otherwise
     const rowOf = (state) => {
@@ -510,7 +640,7 @@
       // listing catching up with a write that just happened.
       shelf = [{ name: saidTitle.value().trim() || file.name,
                  size: `${MB(out.close.bytes || file.size).toFixed(2)} MB`,
-                 state: 'kept' }, ...shelf];
+                 state: 'kept', url: out.close.url }, ...shelf];
       live = null;
       paintRows();
     }
@@ -783,8 +913,12 @@
   // gaps; the six-hour sweep reaches past the middle box and gets a lane of its
   // own. `dg.ties` is asserted at 0 above, so re-ordering these cannot pass
   // unnoticed.
+  // 🔴 `how: true`, NOT A TITLE OF ITS OWN. This page typed `title: 'how it
+  // works'` and was the odd one out: four pages passed `how: true` and got the
+  // standing heading, this one wrote its own in lower case, and `/grains/` had
+  // none. `diagram.mjs` refuses a title under `how` and reports it on `cuts`,
+  // so the two together would have been caught; a title INSTEAD of it was not.
   const dg = createDiagram(d.el, {
-    title: 'how it works',
     caption: 'Nothing counts until the far end says so: sent is how much has left this '
       + 'browser, pieces is how much R2 has taken, and on a slow link those are '
       + 'different numbers.',
@@ -869,7 +1003,7 @@
             + 'rather than the file again: a **Range** header comes back as a **206**, '
             + 'served by the same worker, which is what adds **access-control-allow-origin**.' },
     ],
-  });
+  }, { how: true, atEnd: true });
 
   // 🔴 `ready()` GOES OUT LAST, AND NO `src` IS SET ANYWHERE NEAR IT. The
   // harness presses play, pauses, and seeks the bar the moment a page says it
