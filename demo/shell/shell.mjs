@@ -16,6 +16,10 @@ export const BUILD = 'dev';
 // every page mounts, so a dependency here is a dependency everywhere;
 // `symbol.mjs` imports nothing and touches nothing but the element it is handed.
 import { centreSymbol } from './symbol.mjs';
+// ⚠️ AND SO IS THIS ONE. `stack.mjs` imports nothing — it makes its own element
+// with `createElement` rather than borrowing `el()` from here, which is what
+// keeps a cycle out of the frame every page mounts.
+import { createStack } from './stack.mjs';
 
 const LOG_CAP = 400;
 
@@ -197,14 +201,32 @@ export function mount({
 
   const body = el('div', 'pos-body');
 
+  /**
+   * 🔴 TWO STACKS, AND BETWEEN THEM THEY COVER EVERY WAY A BLOCK REACHES A
+   * PAGE. The rhythm used to be one CSS rule on the children of `.pos-body`,
+   * so a page that wrapped two controls in a div, or spliced a row in with
+   * `insertBefore`, or appended a block anywhere else, fell out of it silently
+   * — and nobody found out until somebody photographed a keyboard sitting flush
+   * against a transport bar. demo/shell/stack.mjs carries the three measured
+   * cases and the argument.
+   *
+   *   column   `document.body` — the head, the surfaces, the control row, the
+   *            page, the diagram, and anything a page inserts between them
+   *   page     `.pos-body` — the blocks the demo itself draws
+   *
+   * ⚠️ IT CHANGES NO EXISTING CALL. `d.el` is the same element it always was,
+   * so `d.el.append(x)` now gets the rhythm rather than needing it. The stack
+   * handle is returned as `d.stack` for a page that wants to state its blocks
+   * in one line, which is the form the order of a page should be readable in.
+   */
+  const column = createStack(document.body);
+  const page = createStack(body);
+
   // ⚠️ THE ORDER IS THE ARRANGEMENT, AND SPLIT IS UNCHANGED TO THE ELEMENT.
   // `report.top` is the readout when the two are split and NOTHING when they
   // are joined; `report.foot` is the log when they are split, the one joined
   // surface when they are not, and `null` when there is nothing to draw.
-  document.body.append(head);
-  if (report.top) document.body.append(report.top);
-  document.body.append(cbar, body);
-  if (report.foot) document.body.append(report.foot);
+  column.add(head, report.top, cbar, body, report.foot);
 
   // ── the machine contract ────────────────────────────────────────────────
   const api = {
@@ -299,6 +321,16 @@ export function mount({
 
   return {
     el: body,
+    /**
+     * The page's own blocks, as a stack: `d.stack.add(bar.el, picks, keys.el)`
+     * states the order of a page in one line and gets the project's one gap
+     * between every pair of them. `d.el` is the same element, so nothing that
+     * appends to it has to change.
+     */
+    stack: page,
+    /** The whole page column, for a block that has to sit OUTSIDE the page —
+     *  above the control row, or under the log. Same rhythm, same number. */
+    column,
     head,
     // 🔴 THE CONTROL ROW ITSELF, so a page can MOVE it rather than build a
     // second one. `videoradio` wants its buttons inside the picture's box and

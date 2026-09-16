@@ -71,6 +71,18 @@ export function createTransportBar(host, deck, {
    * the flag a bar with no toggle would take the harness red on a page where
    * nothing is wrong. There is no such page in the suite today, since `/keys/`
    * is `built: false`, and the guard is here because the next one will be.
+   *
+   * 🔴 THE GUARD WAS PROVED BY BREAKING IT, AND THE BREAK FOUND A SECOND THING.
+   * MEASURED 2026-09-16: forcing this getter false took `/knobs/` from 34/34 to
+   * **11/11, still green** — the skip line printed, the two drill asserts went,
+   * and TWENTY-ONE MORE went with them. That drill's click is what starts the
+   * page: `/knobs/` declares `controls: []`, so the toggle is the only control
+   * a harness presses, and every check it has sits behind `startNote()`.
+   * ⚠️ SO A PAGE THAT PASSES `toggle: false` MUST NOT PUT ITS CHECKS BEHIND A
+   * PRESS. There is no press. Nothing is wrong on `/keys/`, which declares no
+   * asserts at all, and this is written down because the next page to take this
+   * option will not be so lucky, and 23 asserts vanishing while the run stays
+   * green is the worst shape a loss takes.
    */
   toggle: wantToggle = true,
   /**

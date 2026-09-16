@@ -942,29 +942,20 @@ video[hidden] { display: none; }
   flex: none; width: 34px; min-width: 34px; height: 34px; padding: 0;
   font-size: 15px; line-height: 1;
 }
-/* 🔴 THE LIT HALF IS FILLED AND THE OTHER HALF WEARS THE PAIR'S SHARED EDGE.
-   This is `.tbar-loopgrp`'s settled answer, which was photographed and reported
-   three separate times before it stuck: state the idle edge once for BOTH
-   segments and let only the segment that is RUNNING override it. Without it the
-   lane keeps `--line2` beside a solid `--fg` button, which is a block of white
-   next to a hole. */
-.sld-hand[data-on="1"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
-.sld-hand-row[data-hand="on"] > .sld-lane { box-shadow: inset 0 0 0 1px var(--dim2); }
-/* 🔴 THE HANDLE GOES HOLLOW WHILE THE PAGE IS MOVING IT, AND THAT IS A STATE
-   RATHER THAN A NEW MEANING FOR A COLOUR. This project spends colour on how
-   something landed and reserves `--hi` for the thing that moves; dropping the
-   fill and keeping the edge says "nobody is holding this" without inventing a
-   seventh meaning for yellow.
-   ⚠️ IT IS THE SECOND OF THREE CHANNELS, ON PURPOSE. The button says "is this
-   slider automated" even at rest, the handle says "is this one being moved
-   right now", and a log line says when it started. One channel is exactly what
-   failed the last time this page moved its own sliders. */
-.sld-hand-row[data-hand="on"] .sld-knob {
-  background: none; box-shadow: inset 0 0 0 2px var(--hi);
-}
-/* Yielded: somebody has their hand on it, the button still says ON, and the
-   handle goes solid again because it really is being held. */
-.sld-hand-row[data-hand="on"][data-held] .sld-knob { background: var(--hi); box-shadow: none; }
+/* 🔴 THE SYMBOL LIGHTS, AND NOTHING ELSE CHANGES. Instructed 2026-09-16: *"do
+   not change slider playhead color when automated not change mode button bg.
+   just color it yellow when enabled (the symbol)"*.
+   ⚠️ WHAT WENT WAS A FILLED BUTTON AND A HOLLOWED HANDLE, and both were
+   arguments rather than observations. The filled button was `.tbar-loopgrp`'s
+   answer to a DIFFERENT question, which is what a two segment pair looks like
+   when one half is running; this is one button next to a lane a hand is
+   holding. The hollow handle was a second channel for the same fact, and a
+   slider whose handle changes shape while it moves reads as a handle that has
+   broken rather than one being driven.
+   ⚠️ `--hi` ON THE GLYPH IS THE PROJECT'S OWN MEANING, NOT A NEW ONE. Yellow is
+   the thing this control is about, and while a hand is running the thing this
+   control is about IS the hand. */
+.sld-hand[data-on="1"] { color: var(--hi); }
 /* ⚠️ SHARED COLUMNS, OR NOTHING LINES UP. Four sliders each laying themselves
    out means four different label widths, so four lanes start at four different
    x positions and four values end wherever their lane left them — photographed

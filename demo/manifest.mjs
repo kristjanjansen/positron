@@ -508,7 +508,7 @@ export const DEMOS = [
   // ⚠️ `settleMs` sizes the wait after control 0 ONLY, and control 0 is `Play`,
   // which on a cold board brings Yoshimi up over ten to forty seconds.
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
-    one: 'sweep a big filter on a Raspberry Pi in another building, with two sliders an invisible hand can take over',
+    one: 'sweep a big filter on a Raspberry Pi in another building, with two sliders that can also move themselves',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
 
   // 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is
