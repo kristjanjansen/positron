@@ -44,6 +44,18 @@
 // the same numbers and two of them are already in two files. That is the same
 // warning as the one above about the twelve sounds, and it is here rather than
 // in a commit message because nothing type-checks a duplicate.
+//
+// 🔴 AND NOBODY IMPORTS THAT CLOCK TODAY, WHICH IS A FACT TO KNOW BEFORE
+// DELETING IT. `/radio/`'s tour was removed on instruction the same day it was
+// built (*"rm 'automate' button from radio demo (and functionaitu)"*, see
+// `archive/radio-automate/`), and it was the only caller of `tourAt`, `breathe`,
+// `SLOT_MS`, `DWELL_MS` and `MORPH_MS`, and of `morphOf`, `basesOf` and
+// `writeContinuous` besides. They are kept rather than deleted because the
+// paragraph above is still the job: `/videoradio/` has that arithmetic inline
+// and moving it onto these needs them to exist. ⚠️ SO THE COVERAGE IS WORSE
+// THAN IT LOOKS. Everything named here is exported, unreferenced and ungraded
+// by any page or harness; a change to one of them breaks nothing today and
+// breaks `/videoradio/` the day it moves across.
 
 import { spec } from './pappus-mod.mjs';
 import { setParam, GATE0 } from './pappus.mjs';

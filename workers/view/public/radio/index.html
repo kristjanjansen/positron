@@ -66,16 +66,39 @@
      total, so it can be re-derived when a row is added. ⚠️ IT WAS RE-DERIVED
      WHEN THE LOOP ROW LANDED: one more 34 px row and one more 22 px gap. A
      reserved height that stops matching what lands in it is the jump this rule
-     exists to stop, arriving from the other direction. */
+     exists to stop, arriving from the other direction.
+
+     🔴 AND IT IS TWO SUMS, BECAUSE THE FOUR SETTINGS ARE TWO ROWS ON A WIDE
+     SCREEN AND FOUR ON A NARROW ONE. There was one sum, the narrow one, and it
+     over-reserved by 112 px at every width above 720 — MEASURED at 720, 900 and
+     1280, all three reading a 314 px box round 202 px of content. That is dead
+     space under the sliders which reads as something that failed to render,
+     which is the shell's own argument for hiding an empty readout.
+     ⚠️ AND IT HAD ALREADY FAILED THE OTHER WAY. `Automate` was appended here as a
+     seventh row and neither sum was re-derived for it, so on a phone the slot
+     was 56 px SHORT and the thing this rule exists to prevent happened. The
+     button is gone (`archive/radio-automate/`); the lesson is that a number
+     written as a sum still has to be re-added by somebody. The assert on this
+     page reads the box against what lands in it, at whatever width the harness
+     is running, so the next row cannot be added without the arithmetic. */
   /* 🔴 AND IT MUST LAY ITS CHILDREN OUT, WHICH THE FIRST VERSION DID NOT.
-     `.pos-choice` is a SPAN, and the shell's vertical rhythm lives on
-     `.pos-body > * + *` — direct children only. Moving these rows into a
+     `.pos-choice` is a SPAN, and the shell's vertical rhythm reaches the
+     children of a `.pos-stack` and nothing deeper. Moving these rows into a
      wrapper took both away at once, so two inline spans flowed onto ONE line
      and landed on top of the fader above them. PHOTOGRAPHED. A flex column
      restores both: block layout, and the same 22 px gap every other element
      gets, from one declaration rather than from the parent's rule. */
   .gran-slot { display: flex; flex-direction: column; gap: 22px; align-items: stretch;
+               /* four settings stacked, the fader and the sound row, five gaps */
                min-height: calc(4 * 34px + 2 * 34px + 5 * 22px); }
+  /* ⚠️ THE BREAKPOINT IS `.sld-group.pos-pair`'s OWN 720 px, in `shell.css`, and
+     it is the one number here that cannot be derived: a reserve that changes at
+     a different width from the layout it is reserving for is wrong on both
+     sides of the difference. */
+  @media (min-width: 720px) {
+    /* two settings across, so two rows instead of four, and three gaps */
+    .gran-slot { min-height: calc(2 * 34px + 2 * 34px + 3 * 22px); }
+  }
   .gran-slot > .pos-choice, .gran-slot > .pos-pick { align-self: flex-start; }
   /* 🔴 EXCEPT ON A PHONE, WHERE A CHOICE ROW IS SUPPOSED TO TAKE THE WHOLE
      WIDTH. `shell.css` puts a `.pos-choice` label on its own line under 560 px
@@ -155,7 +178,7 @@
 
   /* ⚠️ ONE VERTICAL RHYTHM, INCLUDING INSIDE THE GROUP. MEASURED down this page
      at 1100 px: scope → fader **22**, fader → first row **22**, first row →
-     second row **10**. The first two are `shell.css`'s `.pos-body > * + *`; the
+     second row **10**. The first two are `shell.css`'s stack rhythm; the
      last is `.sld-group`'s own `row-gap`, which is tuned for a tall stack of
      related sliders and is the odd one out here, where there are two rows under
      a fader that is spaced at 22. Three gaps down one column, one of them
@@ -178,19 +201,14 @@
   .now { font: 400 13px/1.5 var(--mono); color: var(--hi); min-height: 20px; }
   .now.down { color: var(--bad, #ff7a7a); }
 
-  /* 🔴 THE ONE CONTROL ON THIS PAGE THAT IS A STATE RATHER THAN AN ACTION, AND
-     ITS FACE MUST SAY SO WITHOUT CHANGING SIZE. `Automate` is a
-     toggle: its label stays put and `aria-pressed` carries the state, because a
-     button that rewrites its own label resizes, the row reflows, and the thing
-     you were about to press moves out from under the pointer. That is why
-     `shell.mjs` refuses a label change on a busy control.
-     ⚠️ THE SAME TREATMENT `/score/` GIVES ITS ARMED CONTROL AND THE TRANSPORT
-     BAR GIVES ITS RATE, copied deliberately rather than invented: an armed
-     control should not look like a different KIND of thing from page to page. */
-  .pos-controls button[aria-pressed="true"] {
-    color: var(--hi); border-color: var(--hi);
-    background: color-mix(in oklab, var(--hi) 16%, var(--card2));
-  }
+  /* 🔴 NO RULE HERE FOR A CONTROL THAT IS A STATE, AND THE ABSENCE IS THE
+     RECORD OF ONE. `Automate` was a toggle in this page's control row and
+     carried `.pos-controls button[aria-pressed="true"]` so its armed state
+     showed without the label changing width. Button, tour and rule left
+     together on 2026-09-16; see `archive/radio-automate/`. What moves a control
+     by itself now is the slider's own hand button, and `shell.css` owns how
+     that looks, on every page that has one. A page-local copy of a kit
+     component's look is the drift this file has already paid for twice. */
 </style>
 
 <script type="module">
@@ -199,7 +217,10 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
-  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  // ⚠️ `HAND_YIELD_MS` IS IMPORTED RATHER THAN TYPED. The self-check waits out
+  // part of the hand's own yield after a synthetic lift, and a constant typed
+  // here would go red the hour somebody changes it in the component.
+  import { createSlider, createSliderGroup, HAND_YIELD_MS } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
@@ -211,19 +232,18 @@
   // plays, and the grain clock that follows the lap.
   import { createLooper, LOOP_WAYS, LOOP_TURN, WAY_GLYPH, LOOP_SAYS } from '/shell/looper.mjs';
   import { createModulator } from '/shell/pappus-mod.mjs';
-  // 🔴 THE TOUR IS THE KIT'S, NOT THIS PAGE'S. `/videoradio/` is this same
-  // machine with every decision given to a clock, and what it took to build was
-  // the clock, the split between what a morph may interpolate and what it must
-  // step, and the write that respects that split. All of it already lives in
-  // `radio-gran.mjs` because that page imports it, so the movement here is the
-  // same movement rather than a second one that looks like it.
+  // 🔴 NOTHING IS IMPORTED FROM `radio-gran.mjs` ANY MORE, AND THAT IS A LOSS
+  // RATHER THAN A TIDY-UP. This page took the tour clock, the morph and the two
+  // halves of a patch write from that module, which is how it and `/videoradio/`
+  // ran one movement rather than two that looked alike. The tour was removed on
+  // instruction 2026-09-16 (*"rm 'automate' button from radio demo (and
+  // functionaitu)"*) and those four imports had no other caller here, so the
+  // only code the two pages shared has gone with it. `/videoradio/` is
+  // untouched: it carries its own copy of the clock and imports the rest.
   // ⚠️ THE TWELVE SOUNDS ARE STILL TYPED TWICE, once in that module and once
   // further down this file, and MEASURED 2026-09-16 the two tables are
-  // identical character for character. `morphOf` works on either, because a
-  // sound is a plain object; de-duplicating them is open work and is written up
-  // in that module's header.
-  import { morphOf, writeContinuous, writeDiscrete, basesOf,
-           tourAt, breathe, SLOT_MS, DWELL_MS, MORPH_MS } from '/shell/radio-gran.mjs';
+  // identical character for character. De-duplicating them is open work and is
+  // written up in that module's header. It just got harder to notice.
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { allocBuffers, startPappusSynth, applyAudibleDefaults, setParam, PAPPUS_NODE, RING_SECONDS, GATE0 }
     from '/shell/pappus.mjs';
@@ -414,13 +434,15 @@
     // an inch below. It is the same sentence the index card carries, so a
     // visitor arriving from there is not told the same thing twice in two
     // different wordings that can drift apart.
-    // ⚠️ AND IT CHANGED AGAIN WHEN `Automate` LANDED. A control
-    // appearing is a change to what the page SAYS, in the same edit, and the
-    // failure is silent: nothing type-checks a sentence. What went is `decoded
-    // frame by frame in the tab`, which is the mechanism and is what the
-    // picture at the bottom is FOR; what arrived is the one thing a visitor now
-    // has to choose between. Still one line, still the index's own line.
-    what: 'Six live radio stations from Tallinn and Helsinki, granulated in the tab by hand or left to play themselves.',
+    // ⚠️ AND IT CHANGED TWICE MORE, ONCE IN EACH DIRECTION, WHICH IS THE POINT.
+    // `Automate` arriving bought `or left to play themselves`; `Automate`
+    // leaving on 2026-09-16 has to take it away again in the same edit, because
+    // nothing type-checks a sentence and a visitor believes one that has drifted.
+    // ⚠️ AND THE REPLACEMENT IS NOT THE SAME CLAIM IN NEW WORDS. A tour walked
+    // twelve sounds, breathed the blend and moved five things in step; what is
+    // there now is one button per slider that sweeps that slider between its two
+    // ends. The line says sliders, because sliders is what it is.
+    what: 'Six live radio stations from Tallinn and Helsinki, granulated in the tab by hand, or by sliders that sweep themselves back and forth.',
     // ⚠️ SIX CELLS. IT WAS SIX, THEN FOUR, AND IT IS SIX AGAIN FOR A DIFFERENT
     // REASON THAN IT WAS THE FIRST TIME. What follows is the argument for each
     // cut, and every one of them still holds; what changed is that two counters
@@ -484,48 +506,35 @@
     // of headroom, with `lost` still at 0. Only one of those two numbers could
     // have told anybody that.
     readout: { voices: '', behind: 's', grains: '/s', moving: '', buffer: 's', lost: '' },
-    // 🔴 ONE CONTROL, AND IT IS THE ONLY THING ON THIS PAGE THAT IS NOT PART OF
-    // PLAYING IT. There is no `Synthesize` and no `Listen`: the granulator is
-    // not a mode this page can be in or out of, it is what the page IS, so it
-    // comes up with the sound and the fader decides how much of it reaches you.
-    // Both of those buttons were the same mistake one step apart, a second
-    // control for something the page is already doing.
+    // 🔴 NO CONTROLS AT ALL, AND THAT IS WHERE THIS PAGE STARTED AND HAS COME
+    // BACK TO. There is no `Synthesize` and no `Listen`: the granulator is not a
+    // mode this page can be in or out of, it is what the page IS, so it comes up
+    // with the sound and the fader decides how much of it reaches you. Both of
+    // those buttons were the same mistake one step apart, a second control for
+    // something the page is already doing.
     //
-    // 🔴 THIS ONE IS DIFFERENT AND THE DIFFERENCE IS THE WHOLE DESIGN. Asked
-    // for 2026-09-16: *"can you have simular cool movement you had on
-    // videoradio to the radio granulator too?"*. `/videoradio/` gives every
-    // decision to a clock and nobody is holding it. THIS page has a person
-    // holding it, and this repo has already been told twice what it costs to
-    // move a control in front of that person: *"when pressed 0.5 it activated
-    // granulator and moved some sliders and showed grain viz"*, and a mystery
-    // full-screen exit that took two sessions to attribute. So the movement is
-    // OFF until somebody asks for it, by name, in words.
+    // 🔴 AND `Automate` WAS THE THIRD, WHICH IS ONLY OBVIOUS NOW IT IS GONE.
+    // Removed on instruction 2026-09-16: *"rm 'automate' button from radio demo
+    // (and functionaitu) and bring in automated sliders we made"*. It armed a
+    // tour that walked twelve sounds, breathed the blend and moved the fader and
+    // four settings together, all from one button three inches above the things
+    // it moved. What replaces it is smaller and is attached to what it acts on:
+    // every slider under the picture carries its own hand button, so the thing
+    // that moves a control sits against that control. The tour, its checks and
+    // the reasoning that built it are in `archive/radio-automate/`.
     //
-    // ⚠️ OFF BY DEFAULT RATHER THAN ON-AND-YIELDING, AND THE ARGUMENT IS NOT
-    // TIDINESS. A page that opens with its fader already sliding IS the
-    // reported complaint, with a nicer recovery bolted on: the visitor still
-    // watches the instrument being worked by somebody who is not them, and they
-    // still have to discover that touching it stops that. On top of which
-    // `/videoradio/` already exists and already is the on-by-default answer at
-    // the same URL family; a second page that does the same thing on arrival is
-    // the same page twice. What `/radio/` adds is that you can hand the
-    // instrument over and take it straight back.
-    //
-    // ⚠️ A WORD, NOT A GLYPH, AND NOT A TOGGLE THAT RENAMES ITSELF. `shell.mjs`
-    // gives a one-character non-alphanumeric label a 34 px square and an
-    // `aria-label`; this is a sentence-case imperative like every other control
-    // in this suite (`Switch it on`, `Hold what it has`, `Run in VR`). The
-    // state is `aria-pressed` plus the armed colour in this page's <style>,
-    // because a label that changes changes the button's width.
-    // 🔴 `Automate`, AND IT IS NOT IN THIS ROW ANY MORE. Renamed and moved on
-    // instruction 2026-09-16: *"let it play itself: rename to Automate and put
-    // under granulator"*. `mount()` still builds it, because that is what makes
-    // it a real control the harness presses and `aria-pressed` styles; the page
-    // then moves the element into the granulator block, the same way the VR
-    // button used to be moved and the same way `/tapes/` moves its own row.
-    // ⚠️ MOVED, NEVER REBUILT. A second copy is a second thing to keep in step,
-    // and `d.button('drift')` has to keep finding the one the shell made.
-    controls: [{ id: 'drift', label: 'Automate' }],
+    // ⚠️ AND THE HAND BUTTONS ARE NOT IN THIS ROW, WHICH IS LOAD BEARING RATHER
+    // THAN TIDY. `verify.mjs` presses every `.pos-controls button` on every demo
+    // on every run, so `slider.mjs` disables a hand that finds itself inside one
+    // and says why on its own face. The sliders here live in `.gran-slot`; the
+    // assert below reads `.pos-controls .sld-hand` and expects none.
+    // ⚠️ AND REMOVING THE ONE CONTROL MOVED THE HARNESS'S PRESSES. `settleMs`
+    // lands on control 0 only, and control 0 is now the transport's loop-way
+    // `.tbar-x` rather than `Automate` — so the one stray press that button gets
+    // arrives at the start of the run again instead of thirty seconds in. The
+    // loop check's `reach()` already reaches twice for exactly that press and
+    // says so where it is written.
+    controls: [],
   });
   guard(d);
 
@@ -1275,12 +1284,12 @@
   let sliders = null, patchPick = null, shareLabelColumn = null;
   // ⚠️ THE FADER NEEDS A HANDLE OUTSIDE ITS OWN SCOPE, which the four settings
   // already had through `sliders`. It is built in `startGranulator` and the
-  // tour has to move it from the 25 Hz tick, which runs anywhere.
+  // self-check has to put it back where the visitor left it.
   let faderSld = null;
-  // Which destinations the modulator is walking right now. `writeContinuous`
-  // skips them, because two writers at 25 Hz on one control is a 25 Hz square
-  // wave and not a compromise. Set by `applyPatch`, which is the only thing
-  // that calls `setRoutes`.
+  // Which destinations the modulator is walking right now. `moveSetting` skips
+  // them, because two writers at 25 Hz on one control is a 25 Hz square wave
+  // and not a compromise. Set by `applyPatch`, which is the only thing that
+  // calls `setRoutes`.
   let routedNow = new Set();
   // Has the granulator's ring been through one full lap of live radio? Until it
   // has, the engine is quiet for a reason and nothing may report that as a fault.
@@ -2470,6 +2479,34 @@
         xs.every((x) => x != null) && Math.max(...xs) - Math.min(...xs) <= 1,
         edges.map(([n, x]) => `${n} ${x == null ? 'missing' : x}`).join(' · ')
         + (xs.every((x) => x != null) ? ` — ${Math.max(...xs) - Math.min(...xs)} px apart` : ''));
+      /**
+       * 🔴 AND THE SPACE THIS PAGE RESERVES FOR THOSE CONTROLS IS THE SIZE OF
+       * THE CONTROLS. `.gran-slot` holds a `min-height` written as a sum of rows
+       * and gaps, because the granulator arrives about a second after the page
+       * does and everything below it used to be shoved down while somebody was
+       * reading. A sum nobody re-adds is the whole hazard: too small and the
+       * page jumps, which is the complaint it was built for, and too large is a
+       * band of nothing under the sliders that reads as something that failed to
+       * render. Both have happened here, MEASURED — 56 px short on a phone the
+       * day `Automate` was appended, then 112 px long at every width above
+       * 720 px the day it was removed.
+       *
+       * ⚠️ IT READS THE BOX AGAINST WHAT IS IN IT rather than against the sum,
+       * so it is true at whatever width the harness happens to be running and
+       * cannot be satisfied by copying the arithmetic into two places.
+       * ⚠️ AND IT IS ONLY MEANINGFUL ONCE THE CONTROLS HAVE LANDED, which is why
+       * it sits here, in `finish()`, rather than at first paint where the slot
+       * is empty on purpose.
+       */
+      const slotBox = granSlot.getBoundingClientRect();
+      const kids = [...granSlot.children].map((k) => k.getBoundingClientRect());
+      const filled = kids.length
+        ? Math.max(...kids.map((k) => k.bottom)) - Math.min(...kids.map((k) => k.top)) : 0;
+      const spare = Math.round(slotBox.height - filled);
+      d.assert('the space held open for the controls is the size of the controls',
+        kids.length > 0 && spare >= 0 && spare <= 2,
+        `${kids.length} rows filling ${Math.round(filled)} px of a ${Math.round(slotBox.height)} px `
+        + `slot at ${Math.round(window.innerWidth)} px wide, so ${spare} px spare`);
       d.assert('the grain ticks are drawn, and the fader fades them',
         G.inkWet > 20 && G.inkDry * 4 < G.inkWet,
         `${G.inkDry} lit all-radio, ${G.inkWet} lit all-granulator, ${G.alive} ticks alive`);
@@ -2600,60 +2637,65 @@
         + `and ${G.headRuns == null ? '—' : G.headRuns} more arrived in 300 ms after`);
 
       /**
-       * 🔴 THE TOUR MOVES REAL THINGS, AND THE PROOF IS ON THE FAR SIDE OF THE
-       * WIRE. Three quantities in one assert because each of them alone is
-       * passable by a page that is doing something else: a blend that breathes
-       * with nothing behind it, a sound that steps without sliding, and a set
-       * of numbers this page computed and never sent. The middle one is the
-       * strong claim: `m<name>` read back with `/s_get`, strictly between two
-       * patches' own values, which is the reading a stepped change cannot give.
+       * 🔴 A SLIDER MOVES BY ITSELF, AND THE ONE BESIDE IT DOES NOT. Four things
+       * in one assert because each alone is passable by a page doing something
+       * else: a face that lights over a handle standing still, a handle that
+       * jumps once, a movement nobody asked for, and a hand that is a module
+       * singleton and so moves every slider at once. The last is a NEGATIVE
+       * CONTROL and it fails on the obvious way to write this feature.
        */
-      const mid = G.driftMid;
-      const midOk = !!mid && Number.isFinite(mid.got)
-        && mid.got > Math.min(mid.a, mid.b) * 1.02
-        && mid.got < Math.max(mid.a, mid.b) * 0.98;
-      d.assert('it plays itself: the blend breathes, the sound slides, and the engine takes it',
-        G.driftOn && G.driftFace === 'true'
-          && (G.driftWet?.span ?? 0) > 0.02 && (G.driftWet?.moves ?? 0) > 10
-          && G.driftLanded && G.driftSliders >= 2 && midOk,
-        !G.driftOn ? `pressing the button left it ${G.driftFace}`
-          : `the blend spanned ${(G.driftWet?.span ?? 0).toFixed(3)} over `
-            + `${G.driftWet?.n ?? 0} reads and ${G.driftWet?.moves ?? 0} writes · `
-            + `${G.driftSliders} of 4 settings moved · `
-            + `it ${G.driftLanded ? 'stepped to the next sound' : 'NEVER STEPPED'} · `
-            + (mid ? `${mid.name} read back ${Number(mid.got).toFixed(4)} between `
-                     + `${mid.a} and ${mid.b}`
-                   : 'no two sounds here differ enough to grade the halfway'));
+      const H = G.hand;
+      d.assert('a slider sweeps itself when its own button is pressed, and its neighbour stays put',
+        !!H && H.lit.running && H.lit.row === 'on' && H.lit.pressed === 'true'
+          && H.lit.otherRow === 'off' && H.lit.starts === 1
+          && H.seen > 10 && H.hi > H.lo
+          && H.otherStill === H.startedWith && H.otherOff === 'off',
+        !H ? 'never driven'
+          : `${H.name} took ${H.seen} different positions between ${H.lo} and ${H.hi} `
+            + `over 2 s, its symbol lit and ${H.other} sat at ${H.otherStill} `
+            + `with its own row reading ${H.otherOff}`);
       /**
-       * 🔴 AND A HAND TAKES IT BACK, WHICH IS THE HALF THAT MATTERS ON THIS
-       * PAGE. This repo has twice shipped a page that worked a control in front
-       * of the person holding it, and both times the report was about the
-       * instrument being taken away rather than about the feature. So the
-       * yield is graded the same way the feature is: a real `pointerdown` on a
-       * control the tour moves, the tour off on the next line, and the LOG
-       * carrying the sentence that says so. A page that stops silently and a
-       * page that has crashed look identical from a chair.
+       * 🔴 AND WHAT IT MOVES REACHES THE ENGINE, ASKED OF THE ENGINE, AT TWO
+       * DIFFERENT PLACES ON THE LANE. Everything above is a handle. A hand that
+       * animated one beautifully and wrote nothing would satisfy all of it,
+       * which is the failure `/s_get` exists to close: the value scsynth is
+       * holding, equal to the number under the label, twice, at two positions
+       * the sweep visited a second and a half apart.
        *
-       * ⚠️ IT ASSERTS THE BEFORE AS WELL AS THE AFTER. `driftYielded` alone is
-       * satisfied by a tour that was never running, which is the vacuous pass
-       * this check exists to be worth more than.
+       * ⚠️ THE TOLERANCE IS RELATIVE AND IT IS ABOUT float32. The control goes
+       * out as a float and comes back as one, so an exact comparison fails on
+       * the seventh digit of a number that is correct.
        */
-      d.assert('a hand on the sound row takes the instrument straight back, and it says so',
-        G.driftYieldFrom && G.driftYielded && G.driftYields === 1 && G.driftSaid,
-        !G.driftYieldFrom ? 'it was not playing itself when the hand arrived'
-          : `${G.driftYields} hand-back(s), it is ${G.driftYielded ? 'stopped' : 'STILL MOVING'}, `
-            + `and the log ${G.driftSaid ? 'said so' : 'SAID NOTHING'}`);
-      // ⚠️ AND THE OTHER WAY OUT, which is the one a visitor uses when they want
-      // the movement to stop without taking the instrument over. The face is
-      // read off the button both times: `aria-pressed` is the only thing on
-      // screen that says which state this control is in, so a toggle that works
-      // and does not repaint is a control nobody can read.
-      d.assert('the same button stops it again, and the face follows both ways',
-        !!G.driftToggle?.onAgain && !!G.driftToggle?.offAgain,
-        G.driftToggle
-          ? `pressed on: ${G.driftToggle.onAgain ? 'running and lit' : 'NOT BOTH'} · `
-            + `pressed off: ${G.driftToggle.offAgain ? 'stopped and dark' : 'NOT BOTH'}`
-          : 'never driven');
+      const holds = (a, b) => Number.isFinite(a) && Number.isFinite(b)
+        && Math.abs(a - b) <= Math.max(1e-6, Math.abs(b) * 1e-5);
+      d.assert('what a hand moves reaches the engine, at both ends of the reach',
+        !!H && holds(H.A.got, H.A.ui) && holds(H.B.got, H.B.ui) && H.A.ui !== H.B.ui,
+        !H ? 'never driven'
+          : `m${H.name} read back ${Number(H.A.got).toFixed(5)} against ${H.A.ui} on the handle, `
+            + `then ${Number(H.B.got).toFixed(5)} against ${H.B.ui} 1.8 s later`);
+      /**
+       * 🔴 A FINGER TAKES IT BACK, THE BUTTON STOPS IT, AND NOTHING STARTS ONE
+       * BY ITSELF. This repo has twice shipped a page that worked a control in
+       * front of the person holding it, so the three guards are graded the same
+       * way the feature is. A pointer on the lane YIELDS — the handle stays
+       * where the finger left it and the row says it is being held — while the
+       * button is what turns the movement off, which is the difference between
+       * a fader you can grab and one that argues with you.
+       *
+       * ⚠️ AND `.pos-controls` IS READ RATHER THAN ASSUMED. `verify.mjs` presses
+       * every button in that row on every demo on every run, so a hand button
+       * that ended up in one would start a sweep on every run for ever.
+       */
+      d.assert('a finger takes the handle back, the button stops the sweep, and none of it is in the control row',
+        !!H && H.heldByFinger && H.stayed === H.atFinger
+          && H.offRow === 'off' && !H.offRunning && H.offPressed === 'false'
+          && H.lit.inControls === 0 && H.lit.starts === 1
+          && H.lit.leftMs > 9 * 60000 && H.lit.leftMs <= 10 * 60000,
+        !H ? 'never driven'
+          : `the finger left it at ${H.atFinger} and it was still there 300 ms after the lift, `
+            + `the next press left the row reading ${H.offRow}, `
+            + `${H.lit.inControls} hand buttons are in the control row, and `
+            + `${Math.round(H.lit.leftMs / 1000)} s were left of the ten minute ceiling`);
     }
 
     // 🔴 AND THE STATION BUTTONS, WHICH NOTHING ELSE CAN REACH. `verify.mjs`
@@ -3549,13 +3591,10 @@
     // it yet: where each line landed on the canvas, how wide it was, and
     // whether the wave stopped under it and started again afterwards
     headDpr: 1, headAt: null, headHeld: null, headRuns: null, headGone: false,
-    // the tour, driven through its own button: whether the press armed it, what
-    // the blend spanned while it ran, whether it stepped from one sound to the
-    // next, what the engine was holding halfway between two of them, and
-    // whether a hand on the sound row took it straight back
-    driftOn: false, driftFace: null, driftWet: null, driftLanded: false,
-    driftSliders: 0, driftMid: null, driftYieldFrom: false, driftYielded: false,
-    driftYields: 0, driftSaid: false, driftToggle: null };
+    // a slider moving by itself, driven through its own button: how far the
+    // handle travelled, what the engine was holding at two points of that
+    // travel, whether the slider beside it stayed put, and the three guards
+    hand: null };
 
   /** Peak RMS at the engine's own meter over `ms`. The meter is IN the path. */
   function engLevel(ms) {
@@ -3878,60 +3917,50 @@
       },
       warn: (m) => d.log(`modulation refused: ${m}`, 'bad'),
     });
-    // ⚠️ THE TOUR RIDES THIS TIMER RATHER THAN BRINGING ITS OWN, and the order
-    // in the line is the whole of the arrangement: the tour sets every base and
-    // writes the controls nothing is modulating, then `tick()` writes the ones
-    // that are, from those bases. A second interval would put two writers on
-    // one control at two phases of the same 25 Hz, which is the square wave
-    // `routedNow` exists to prevent, arriving through scheduling instead.
-    setInterval(() => { if (!eng) return; driftTick(); modulator.tick(); }, 1000 / MOD_HZ);
+    // ⚠️ ONE WRITER ON THIS TIMER NOW. The tour used to run immediately before
+    // `tick()` on this same interval, deliberately, so that it set every base
+    // and wrote the unmodulated controls before `tick()` wrote the modulated
+    // ones from those bases. It is gone; what took its place is a hand on a
+    // slider, which runs on the FRAME clock and keeps out of the modulator's way
+    // through `moveSetting` rather than through scheduling. See there.
+    setInterval(() => { if (!eng) return; modulator.tick(); }, 1000 / MOD_HZ);
     return modulator;
   }
 
   /**
    * @param [o.silent]  do not write the log line naming the sound
-   * @param [o.half]    🔴 `'discrete'` WRITES ONLY WHAT CANNOT BE A VALUE IN
-   *   BETWEEN, AND IT IS FOR THE TOUR AND NOTHING ELSE. `writePatch` lands the
-   *   whole sound in one shot, which is right for a button press and wrong in
-   *   the middle of a nine-second slide: it would put this sound's own rate,
-   *   length and blend on the engine for one 25 Hz tick and the next tick would
-   *   pull them back to halfway, which is a step in the middle of a glide.
-   *   `radio-gran.mjs` owns the line between the two halves and the argument
-   *   for where it falls: `Select.kr` indices, a chord in semitones and a
-   *   sixteen-step gate figure have no halfway, and everything behind a 20 ms
-   *   `Lag.kr` has nothing but. The sliders are skipped for the same reason.
+   *
+   * 🔴 IT LANDS THE WHOLE SOUND, AND THERE IS NO HALF ANY MORE. A `half:
+   * 'discrete'` option stood here and existed for one caller, the tour: in the
+   * middle of a nine-second slide between two sounds you may write only what has
+   * no halfway (a `Select.kr` index, a chord in semitones, a sixteen-step gate
+   * figure) and must leave everything behind a 20 ms `Lag.kr` to the morph. The
+   * tour was removed 2026-09-16 and the option went with it rather than being
+   * left as a branch nothing takes. `radio-gran.mjs` still owns that line and
+   * `/videoradio/` still uses it; see `archive/radio-automate/`.
    */
-  function applyPatch(i, { silent = false, half = null } = {}) {
+  function applyPatch(i, { silent = false } = {}) {
     patch = ((i % PATCHES.length) + PATCHES.length) % PATCHES.length;
     const p = PATCHES[patch];
-    const whole = half !== 'discrete';
-    if (whole) {
-      P.rate = p.rate; P.size = p.size; P.spray = p.spray; P.scan = p.scan;
-      writePatch(p);
-    } else {
-      writeDiscrete(eng, p, { bufSeconds: BUF_SECONDS });
-    }
+    P.rate = p.rate; P.size = p.size; P.spray = p.spray; P.scan = p.scan;
+    writePatch(p);
     d.set('voices', p.gates.reduce((n, g) => n + (g > 0.001 ? 1 : 0), 0));
     if (sliders) {
-      if (whole) {
-        for (const [sld, v] of [[sliders.rate, p.rate], [sliders.size, p.size],
-                                [sliders.spray, p.spray]]) {
-          sld?.set(v, { quiet: true, glideMs: 900 });
-        }
+      for (const [sld, v] of [[sliders.rate, p.rate], [sliders.size, p.size],
+                              [sliders.spray, p.spray]]) {
+        sld?.set(v, { quiet: true, glideMs: 900 });
       }
       // ⚠️ RANGE BEFORE VALUE. `setRange` re-clamps what the slider is holding,
       // so setting the new value first would clamp it against the OLD lane —
       // `ground`'s -1.00x would land at 0 on a 0..1 range and then be
       // re-shown on the right one as a speed nobody asked for.
-      // ⚠️ AND THE RANGE MOVES EVEN ON THE DISCRETE HALF. The read head is a
-      // speed in one mode, a place in another and a lag in a third, and the
-      // mode is exactly the kind of thing that STEPS. A tour that landed
-      // without this would go on showing `time behind` in seconds over a
-      // control the engine is now reading as a speed.
+      // ⚠️ AND THE LABEL MOVES WITH IT. The read head is a speed in one mode, a
+      // place in another and a lag in a third, so a lane relabelled without its
+      // range, or ranged without its label, is a control whose units lie.
       const r = SCAN_RANGE[p.scanmode] ?? SCAN_RANGE[2];
       sliders.scan?.setRange(r);
       sliders.scan?.label(r.label);
-      if (whole) sliders.scan?.set(r.toUi(p.scan), { quiet: true });
+      sliders.scan?.set(r.toUi(p.scan), { quiet: true });
       shareLabelColumn?.();
     }
     // 🔴 A PATCH IS NOW A PLACE AND A MOTION. The base is where each control
@@ -4028,270 +4057,105 @@
     scope.grainAlpha(v);
   };
 
-  // ═══ letting it play itself ════════════════════════════════════════════════
+  // ═══ a slider that moves by itself ═════════════════════════════════════════
   //
-  // 🔴 THE SAME MOVEMENT `/videoradio/` HAS, ON A PAGE WITH A PERSON HOLDING IT,
-  // AND THAT SECOND CLAUSE IS ALL OF THE DESIGN. Over there every decision is a
-  // clock's and there are no controls to move; here every decision is a hand's
-  // and there are five rows of them. So the movement is the same tour and it is
-  // wrapped in three rules, each of which this repo has already paid for:
+  // 🔴 THERE IS NO PAGE-LEVEL MOVEMENT HERE ANY MORE, AND THE THING THAT
+  // REPLACED IT IS SMALLER ON PURPOSE. What stood in these two hundred and fifty
+  // lines was a TOUR: one button armed a clock that walked the twelve sounds on
+  // a 22 s dwell with a 9 s slide between them, breathed the blend between 0.25
+  // and 0.92, moved the fader and the four settings in step, and handed the
+  // instrument back the moment a finger landed anywhere in `.gran-slot`. It was
+  // removed whole on instruction 2026-09-16, and the code, the three asserts
+  // that graded it and the reasoning that built it are in
+  // `archive/radio-automate/`.
   //
-  //   · it is OFF until somebody presses `Let it play itself`
-  //   · a hand on anything it moves takes it back AT ONCE, and the log says so
-  //   · it never moves a control a finger is already on, because the hand-back
-  //     fires on `pointerdown`, which is the FIRST event of a touch
+  // 🔴 A SWEEP IS NOT A TOUR AND THIS FILE IS NOT GOING TO PRETEND IT IS. Every
+  // slider under the picture now carries its own hand button — `slider.mjs`'s
+  // `hand: true`, the movement itself in `hand.mjs`, graded with no browser by
+  // `node demo/shell/hand-test.mjs`. One button moves ONE lane between its two
+  // ends. It does not change sound, it does not move two controls together, and
+  // it has no opinion about where the blend should be while the grain length is
+  // travelling. What it does instead is sit against the control it moves, which
+  // is the one thing the tour's single button three inches above them could not.
   //
-  // ⚠️ AND IT DOES NOT CHANGE STATION, WHICH IS THE ONE THING `/videoradio/`
-  // DOES THAT IS NOT COPIED. Two separate reasons and either is enough. This
-  // page was asked in as many words not to move the row by itself: *"do not
-  // switch channels if I do not"*, which is why the background watch ungreys a
-  // dead station and never follows it. And every mount here is a public
-  // broadcaster's, whose listener figures count each connection this repo opens:
-  // a tour that hops stations on a timer adds one of those every seventy-one
-  // seconds for as long as a tab is open. The blend, the sound and the four
-  // settings are this page's own and cost nobody anything.
-  //
-  // ⚠️ THE BLEND'S TWO ENDS, AND NEITHER IS 0 OR 1. At 0 the granulator is
-  // inaudible and the grain picture is drawing something nobody can hear; at 1
-  // the station is gone and what is left is an instrument with no material.
-  const DRIFT_LO = 0.25, DRIFT_HI = 0.92;
-  const drift = {
-    on: false,
-    from: 0,
-    /**
-     * 🔴 HELD WHILE THE PAGE IS EXERCISING ITS OWN CONTROLS, AND ONLY THEN.
-     * `demo/verify.mjs` presses every `.pos-controls` button a second or two
-     * after load, which is in the middle of a wasm boot, an eight-second ring
-     * fill, an ink probe that runs the fader to both ends and a patch A/B that
-     * presses `›` and `‹`. A tour running through all of that would fight every
-     * one of them, and each fight reads as a broken page rather than as two
-     * things writing one control. So under a harness the PAGE drives this
-     * control itself, once, at the one moment in the run when nothing else is
-     * moving the instrument. A visitor never sets this.
-     */
-    held: SELFCHECK,
-    moves: 0,           // ticks that actually wrote something
-    yields: 0,          // times a hand took it back
-    k: 0,               // where in the slide between two sounds
-  };
-  // The shell's own accessor, so the id is written once and a rename cannot
-  // leave a selector here pointing at nothing.
-  const driftBtn = () => d.button('drift');
-  // What the four sliders were last shown, so a dwell costs no DOM at all: with
-  // `k` at 0 the morph returns sound A's own numbers EXACTLY, so every one of
-  // these comparisons is false and nothing is written for twenty-two seconds.
-  const shown = { rate: NaN, size: NaN, spray: NaN, scan: NaN };
-
-  function driftFace() {
-    const b = driftBtn();
-    if (b) b.setAttribute('aria-pressed', String(drift.on));
-  }
-
-  function driftStart() {
-    if (drift.on || drift.held) return false;
-    drift.on = true;
-    drift.moves = 0;
-    // 🔴 IT BEGINS ON THE SOUND THAT IS ALREADY LOADED, so pressing the button
-    // changes nothing you can hear in that instant: the tour opens at the top
-    // of `patch`'s own slot and slides out of it twenty-two seconds later. A
-    // clock started at zero would jump to whatever sound slot 0 happens to be.
-    drift.from = performance.now() - patch * SLOT_MS;
-    // the blend rides the frame clock while this is on; see `blendFrame`
-    if (!blendRaf) blendRaf = requestAnimationFrame(blendFrame);
-    driftFace();
-    d.log(`playing itself: ${(DWELL_MS / 1000).toFixed(0)} s on each sound, `
-      + `${(MORPH_MS / 1000).toFixed(0)} s sliding to the next, and the blend `
-      + 'breathing with it. Touch any of it and it is yours again.', 'hi');
-    return true;
-  }
+  // ⚠️ AND A HAND IS SUBJECT TO THE ONE RULE THE TOUR REALLY NEEDED. Two writers
+  // on one control at 25 Hz is a square wave rather than a glide: the modulator
+  // writes `base + modulation` for every destination a patch routes, so anything
+  // else writing that control's raw value alternates with it. The tour answered
+  // that with `routedNow`; `moveSetting` below is the same answer for a hand and
+  // for a finger, and a finger has needed it all along.
 
   /**
-   * 🔴 STOPPING LEAVES THE INSTRUMENT EXACTLY WHERE IT IS, AND THAT IS THE
-   * POINT RATHER THAN A SHORTCUT. Landing the current sound whole on the way
-   * out would move all four sliders at the moment a hand arrives, including the
-   * one under the finger, which is the rule this whole block exists to keep.
-   * What a visitor takes over is what they can see: the engine is holding the
-   * values the sliders are showing, halfway between two sounds if that is where
-   * the tour was, which is an ordinary place for an instrument to be and is one
-   * press of `‹` away from a named sound.
-   */
-  function driftStop(why) {
-    if (!drift.on) return false;
-    drift.on = false;
-    // the frame loop checks `drift.on` too, but cancelling is what stops a
-    // frame being queued for a tour that has already ended
-    if (blendRaf) { cancelAnimationFrame(blendRaf); blendRaf = 0; }
-    driftFace();
-    d.log(why, 'hi');
-    return true;
-  }
-
-  /**
-   * A hand on anything the tour moves.
+   * A hand or a finger on one of the four settings.
    *
-   * ⚠️ `pointerdown` AND `keydown`, NEVER `click`. Two reasons and they pull the
-   * same way. A click arrives at the END of a press, so a tour that yielded on
-   * it would have a whole gesture's worth of time to move the control under the
-   * finger; `pointerdown` is the first event of a touch. And `element.click()`
-   * fires no pointer events at all, which is what `verify.mjs` and this page's
-   * own checks use to drive controls, so the page working its own picker
-   * cannot be mistaken for somebody reaching for it.
+   * 🔴 IT MOVES WHERE THE CONTROL SITS, AND ONLY WRITES THE ENGINE WHEN NOTHING
+   * ELSE IS. `modulator.setBase` is where a modulated control RETURNS to, so
+   * moving it is how a slider stays meaningful under a routing: the handle says
+   * where the setting is and the modulation wobbles around that, which is what
+   * every synth ever built does and the reason a modulated knob has a ring
+   * rather than a jumping handle.
+   * ⚠️ AND THE DIRECT WRITE IS SKIPPED WHERE THE MODULATOR IS WRITING. Without
+   * the skip a hand at frame rate and `tick()` at 25 Hz alternate between `v`
+   * and `v + modulation` on the same control, which is audible as a buzz on a
+   * setting that is supposed to be gliding. `writeContinuous`'s own `skip`
+   * argument exists for exactly this and this page no longer calls it.
    */
-  /**
-   * A hand on the granulator takes the instrument back.
-   *
-   * 🔴 IT IGNORES THE BUTTON THAT STARTS IT, AND THAT BECAME LOAD BEARING THE
-   * MOMENT THAT BUTTON MOVED IN HERE. `Automate` was in the page's control row
-   * and is now inside `.gran-slot`, which is the element this listener is on:
-   * without the guard, pressing it would arm the tour and then immediately hand
-   * it back on the same gesture, so the control would look broken rather than
-   * off. Checked by id on the composed path, because the press lands on the
-   * button and bubbles through the slot.
-   */
-  const handBack = (e) => {
-    if (!drift.on) return;
-    const from = e?.target?.closest?.('[data-id="drift"]');
-    if (from) return;
-    drift.yields++;
-    driftStop('the instrument is yours now, so it has stopped moving by itself');
+  const moveSetting = (name, v) => {
+    P[name] = v;
+    modulator?.setBase(name, v);
+    if (!routedNow.has(name)) setBoth(name, v);
   };
 
   /**
-   * One pass of the tour, at the modulator's own rate.
+   * The same thing for the read head, which is the one lane whose number on
+   * screen is not the number the engine holds.
    *
-   * 🔴 THE MORPH MOVES THE BASE OF A ROUTED CONTROL AND WRITES EVERY OTHER ONE
-   * ITSELF. `createModulator` writes `base + modulation` twenty-five times a
-   * second; a tour writing the raw value of the same control at the same rate
-   * makes the two alternate, which is a 25 Hz square wave on something that is
-   * supposed to be gliding. `routedNow` is what keeps them out of each other's
-   * way, and it is why `applyPatch` remembers the set.
+   * ⚠️ IT CANNOT SIMPLY BE `setScan` WITH A GUARD IN IT. `writePatch` calls
+   * `setScan` too, and at that moment `routedNow` is still the PREVIOUS sound's
+   * set — so a guard inside it would skip a write the new sound needs, on the
+   * sounds that happen to have modulated the read head before. The gate belongs
+   * where the caller is known to be a control.
    */
-  function driftTick() {
-    if (!eng || !modulator || !drift.on || drift.held) return;
-    const t = tourAt(performance.now() - drift.from, PATCHES.length);
-    const m = morphOf(PATCHES[t.a], PATCHES[t.b], t.k);
-    drift.k = m.k;
-    const landOn = PATCHES.indexOf(m.at);
-    if (landOn >= 0 && landOn !== patch) applyPatch(landOn, { half: 'discrete' });
-
-    const values = { ...m.values };
-    // 🔴 A LOCKED GRAIN CLOCK OUTRANKS THE TOUR, and that is what tempo-synced
-    // means here: while a loop is playing the grain rate belongs to the lap
-    // rather than to the sound the tour is travelling through. Written here
-    // rather than fought with afterwards, for the same reason as `routedNow`.
-    if (lockedRate != null) values.rate = lockedRate;
-
-    // The base is where a modulated control RETURNS to, so it has to be the
-    // morphed value and not the arriving sound's: otherwise every routed
-    // control jumps to its destination at the crossover while the unrouted ones
-    // glide, and half the instrument arrives early.
-    const bases = basesOf(m.at);
-    for (const k of Object.keys(bases)) {
-      const moved = values[k];
-      modulator.setBase(k, typeof moved === 'number' ? moved : bases[k]);
-    }
-    writeContinuous(eng, values, { scanmode: m.at.scanmode, bufSeconds: BUF_SECONDS,
-      skip: routedNow });
-    P.rate = values.rate; P.size = values.size;
-    P.spray = values.spray; P.scan = values.scan;
-
-    /**
-     * 🔴 AND THE SLIDERS FOLLOW, WHICH THE MODULATOR DELIBERATELY DOES NOT.
-     * The note on `startModulator` is right that a knob redrawn twenty-five
-     * times a second is the `grain-scope` caption in another costume: a
-     * modulation is a wobble AROUND where a setting sits, and the handle has to
-     * show where it sits. A morph is the other thing. The setting itself is
-     * travelling from one sound to another over nine seconds, so a handle that
-     * stayed put would be this file's own named failure, a page showing one
-     * patch and playing another.
-     * ⚠️ IT COSTS NOTHING DURING A DWELL. `blend(a, b, 0)` is `a` exactly, in
-     * both the linear and the geometric lane, so for twenty-two seconds out of
-     * every thirty-one every comparison below is false.
-     */
-    if (sliders) {
-      const r = scanRange();
-      const four = [[sliders.rate, 'rate', values.rate],
-                    [sliders.size, 'size', values.size],
-                    [sliders.spray, 'spray', values.spray],
-                    [sliders.scan, 'scan', r.toUi(values.scan)]];
-      for (const [sld, key, v] of four) {
-        if (!sld || !Number.isFinite(v) || v === shown[key]) continue;
-        shown[key] = v;
-        sld.set(v, { quiet: true });
-      }
-    }
-    drift.moves++;
-  }
+  const moveScan = (v) => {
+    const raw = scanRange().toEngine(v);
+    P.scan = raw;
+    modulator?.setBase('scan', raw);
+    if (!routedNow.has('scan')) setScan(v);
+  };
 
   /**
-   * 🔴 THE BLEND MOVES ON THE FRAME CLOCK, NOT ON THE MODULATOR'S 25 Hz.
-   * REPORTED 2026-09-16: *"wet dry movement is janky/choppy"*.
+   * What a hand says when it starts and stops, for the log and for nowhere else.
    *
-   * It was written from the same `setInterval` as everything else the tour
-   * does, at 40 ms. That is plenty of steps for a value, and it is the wrong
-   * CLOCK for a thing being watched: a 40 ms timer and a 16.7 ms paint do not
-   * divide, so the handle got one update on some frames and two on others, in a
-   * pattern that repeats every three frames. The number was smooth and the
-   * picture of it juddered.
-   *
-   * ⚠️ THE FOUR SETTINGS STAY ON THE 25 Hz TICK AND THAT IS NOT AN OVERSIGHT.
-   * They only move during the 9 s slide and they are written through
-   * `shown[key]`, which skips a write when the value has not changed; the blend
-   * is the one control that moves through the WHOLE slot, every tick, which is
-   * why it is the one that showed this.
-   * ⚠️ AND THE AUDIO MOVED WITH IT rather than being left behind on the timer.
-   * Two clocks writing one gain would put the ear and the eye a frame apart for
-   * no reason; `breathe()` is a pure function of the tour clock, so both simply
-   * read it at whatever rate they run.
+   * 🔴 SHORT, AND NOT IN THIS PROJECT'S OWN WORDS. `plan-slider-automation.md`
+   * calls this an invisible hand and a visitor has never read it, so the line
+   * says what happened to the control they can see. A state change belongs in
+   * the log: it is the only channel that survives a screenshot taken a minute
+   * later, and it is the one place a page may put a sentence, because it moves
+   * when something happens rather than on a clock.
    */
-  let blendRaf = 0;
-  function blendFrame() {
-    blendRaf = 0;
-    if (!drift.on) return;
-    if (!drift.held) {
-      const t = tourAt(performance.now() - drift.from, PATCHES.length);
-      setWet(breathe(t.within, DRIFT_LO, DRIFT_HI));
-      faderSld?.set(wet, { quiet: true });
-    }
-    blendRaf = requestAnimationFrame(blendFrame);
-  }
-
-  d.on('drift', () => {
-    // ⚠️ REFUSED WHILE THE PAGE IS CHECKING ITSELF, IN SILENCE. See `held`: the
-    // harness presses this in the middle of a boot, and the page drives the same
-    // button itself once everything else has stopped moving.
-    if (drift.held) return;
-    if (drift.on) driftStop('stopped playing itself');
-    else driftStart();
-  });
-
-  /**
-   * 🔴 ON THE SLOT, NOT ON THE WHOLE PAGE, AND THE SCOPE IS THE CLAIM. What
-   * takes the instrument back is a hand on something the tour MOVES: the fader,
-   * the four settings and the sound picker, all of which land inside
-   * `.gran-slot`. The station row and the transport are not moved by the tour,
-   * so pressing play, LOOP or a station is not a request to stop it, and a
-   * listener on the whole body would have made it one.
-   * ⚠️ CAPTURE PHASE, so it runs before the control's own handler and before
-   * anything can be dragged. A capture listener reaches a target even when the
-   * event does not bubble, which is what makes it reliable across three
-   * different components.
-   */
-  granSlot.addEventListener('pointerdown', handBack, { capture: true });
-  granSlot.addEventListener('keydown', handBack, { capture: true });
+  let handStarts = 0;
+  const handSaid = (what) => (s) => {
+    if (s.why === 'coarse') { d.log(`${what}: ${s.says}`, 'warn'); return; }
+    if (s.on) { handStarts++; d.log(`${what} is moving by itself`); return; }
+    const why = s.why === 'ceiling' ? ', which is the ten minute ceiling'
+      : s.why === 'hidden' ? ', because this tab went to the background'
+      : s.why === 'disabled' ? ', because the station stopped arriving' : '';
+    d.log(`${what} is yours again${why}`);
+  };
 
   /**
    * Bring the granulator up. Called once, from the moment there is sound.
    *
    * 🔴 IT IS NOT BEHIND A BUTTON AND NOTHING WAITS FOR IT. `verify.mjs` presses
    * `.pos-controls button, .tbar-x` and applies the manifest's `settleMs` to
-   * control 0 ONLY, and control 0 here is `Let it play itself`, which returns
-   * in a microsecond. What carries the boot is the harness's OTHER use of
-   * `settleMs`: the first-assert budget, which waits while the page has not
-   * called `ready()`. This page holds every assert to one burst in `finish()`,
-   * so that budget covers the whole boot, and it is the only thing that does.
-   * ⚠️ AND THE ONE CONTROL IS NOT A SECOND WAY TO START THE GRANULATOR. That
-   * was `Synthesize`, and before it `Listen`; both were a second control for
+   * control 0 ONLY, and this page declares no controls at all, so control 0 is
+   * the transport's loop-way `.tbar-x`, which returns in a microsecond. What
+   * carries the boot is the harness's OTHER use of `settleMs`: the first-assert
+   * budget, which waits while the page has not called `ready()`. This page holds
+   * every assert to one burst in `finish()`, so that budget covers the whole
+   * boot, and it is the only thing that does.
+   * ⚠️ AND NO BUTTON HERE IS A SECOND WAY TO START THE GRANULATOR. That was
+   * `Synthesize`, and before it `Listen`; both were a second control for
    * something the page already does. The granulator comes up with the sound.
    *
    * ⚠️ AND A FAILURE HERE MUST NOT TAKE THE RADIO DOWN. Booting 1.7 MB of wasm
@@ -4496,13 +4360,20 @@
     // settings that decide what those ticks ARE. Placed with `after()` rather
     // than `append()` so it is anchored to the picture instead of to whatever
     // happens to be last in the body.
+    // 🔴 EVERY SLIDER FROM HERE DOWN CARRIES `hand: true`, AND THE BUTTON IS
+    // WHAT MAKES IT DIFFERENT FROM THE THING THAT WAS REMOVED. The tour armed
+    // five controls from one button that was not beside any of them, and a page
+    // that works its own instrument in front of the person holding it has been
+    // reported here twice. One button per lane, off on arrival and forever, is
+    // the smallest version of the same idea: it is asked for by a press, it is
+    // unmistakable while it runs, and a finger on the lane takes it back in one
+    // frame. `slider.mjs` owns all three; this page owns only the log line.
     const fader = createSlider({ label: 'radio → granulator', min: 0, max: 1, step: 0.01,
-      value: wet, onInput: setWet });
+      value: wet, onInput: setWet, hand: true, onHand: handSaid('radio → granulator') });
     const wetRow = createSliderGroup([fader]);
     wetRow.el.classList.add('wet-fader');
     granControls.push(fader);
-    // The tour breathes this one, from a timer that knows nothing about this
-    // scope. See `drift`.
+    // Kept because the self-check puts the blend back where the visitor left it.
     faderSld = fader;
 
     // 🔴 ONE GROUP, ONE SET OF COLUMNS. Four bare sliders in a div each lay
@@ -4515,7 +4386,8 @@
     const add = (label, name, min, max, step, value, unit, opts = {}) => {
       const sld = group.add(createSlider({ label, min, max, step, value, unit,
         warp: opts.warp, digits: opts.digits,
-        onInput: (v) => { P[name] = v; setBoth(name, v); } }));
+        hand: true, onHand: handSaid(label),
+        onInput: (v) => moveSetting(name, v) }));
       granControls.push(sld);
       return sld;
     };
@@ -4553,9 +4425,14 @@
     // ⚠️ `scan` has its own setter and its own LABEL — see setScan. The label is
     // set from the patch below, so what is typed here is only what shows in the
     // half-second before the first patch lands.
+    // ⚠️ THE HAND'S NAME FOR IT IS FIXED WHILE THE LABEL IS NOT. This lane is
+    // called `read speed`, `read position` or `time behind` depending on the
+    // sound, so a log line built from the label would name three controls for
+    // one slider.
     const sScan = group.add(createSlider({
       label: 'read speed', min: 0, max: 1, step: 0.01, value: P.scan, unit: '',
-      onInput: setScan,
+      hand: true, onHand: handSaid('the read head'),
+      onInput: moveScan,
     }));
     granControls.push(sScan);
     const sSpray = add('scatter', 'spray', 0, 1, 0.01, P.spray, '');
@@ -4620,24 +4497,14 @@
     granSlot.append(wetRow.el, patchRow.el);
     granSlot.append(group.el);
     sliderRow = group.el;
-    /**
-     * 🔴 `Automate` GOES LAST, UNDER THE THINGS IT MOVES. Asked for in those
-     * words. It belongs here rather than in the page's control row because what
-     * it acts on is this block: the blend, the sound and the four settings are
-     * exactly what it drives, and a control sitting three inches above them in a
-     * row with Play said it was about the page.
-     * ⚠️ AND IT IS INSIDE `.gran-slot`, WHICH IS ALSO WHAT TAKES IT BACK. The
-     * hand-back listener is on that element, so a press on this button would now
-     * stop the thing the button just started. `handBack` ignores it by id for
-     * that reason, and the check below presses it twice to prove the toggle
-     * still turns on and off from where it now sits.
-     */
-    const autoBtn = d.button('drift');
-    if (autoBtn) {
-      const row = el('div', 'pos-controls gran-auto');
-      row.append(autoBtn);
-      granSlot.append(row);
-    }
+    // 🔴 AND NOTHING GOES UNDER THEM. `Automate` stood here, in a row of its own
+    // that this page built and gave the class `pos-controls` so it would look
+    // like one. It was removed on instruction 2026-09-16 and what moves a
+    // control now is the button glued to that control's own lane, which is why
+    // there is nothing left to place. ⚠️ A PAGE-BUILT `.pos-controls` IS NOT
+    // FREE: `verify.mjs` presses every button in one, on every run, so the row
+    // that used to be here is exactly the row `slider.mjs` refuses to let a hand
+    // live in. Do not build another.
     granControls.push({ disabled: (y) => patchRow.disabled(y) });
 
     /**
@@ -5429,12 +5296,17 @@
            * ⚠️ IT CONFIRMS WHERE IT LANDED, BECAUSE THIS BUTTON HAS A SECOND
            * PRESSER. `demo/verify.mjs` presses `.pos-controls button, .tbar-x`
            * on every page and this is a `.tbar-x`, so exactly one harness click
-           * arrives on it at a moment nothing here controls. It used to land
-           * before any of this ran, and it now lands about thirty seconds in,
-           * because the sleep after control 0 moved when this page gained one:
-           * MEASURED, `pingpong 0.68 s` against 1.37 and a face reading `≠`,
-           * on a cycle that was working. Reaching again once is enough for a
-           * single stray press and costs nothing when there is none.
+           * arrives on it at a moment nothing here controls.
+           * 🔴 AND THE MOMENT HAS MOVED TWICE, WHICH IS WHY IT IS CONFIRMED
+           * RATHER THAN REASONED ABOUT. `settleMs` lands on control 0 only. With
+           * no declared controls this IS control 0, so the press arrives at the
+           * start of the run; the day `Automate` was added it became control 1
+           * and the press slid to about thirty seconds in, which MEASURED as
+           * `pingpong 0.68 s` against 1.37 and a face reading `≠` on a cycle
+           * that was working; `Automate` was removed on 2026-09-16 and it is
+           * back at the start. Nothing here should have to know which of those
+           * is true today. Reaching again once covers a single stray press at
+           * any time and costs nothing when there is none.
            */
           const reach = async (i) => {
             for (let go = 0; go < 2; go++) {
@@ -5527,133 +5399,140 @@
       }
 
       /**
-       * 🔴 IT PLAYS ITSELF, A HAND TAKES IT BACK, AND THE BUTTON STOPS IT TOO.
-       * Three claims and three asserts, because each one alone passes on a page
-       * that is broken in one of the other two ways: a tour that never yields
-       * satisfies the first, a control wired to nothing satisfies the second,
-       * and a toggle that only latches on satisfies both.
+       * 🔴 A SLIDER MOVES BY ITSELF, THE ENGINE TAKES IT, AND A FINGER GETS IT
+       * BACK. Three claims and three asserts, because each one alone passes on a
+       * page broken in one of the other two ways: a handle animating in front of
+       * an engine that never heard about it satisfies the first, a button wired
+       * to nothing satisfies the third, and a hand that cannot be interrupted
+       * satisfies the first two.
        *
        * ⚠️ LAST IN THE BLOCK, AND THAT POSITION IS THE MEASUREMENT. Everything
        * above this line drives a control: the ink probe runs the fader to both
        * ends, the patch A/B presses `›` and `‹`, the loop row cycles four ways.
-       * A tour running through any of that is a second writer on the control
+       * A hand running through any of that is a second writer on the control
        * being graded, and the reading would be about the collision rather than
        * about either thing. This is the one moment in the run when the page has
        * stopped working its own instrument.
        *
-       * ⚠️ DRIVEN BY THE REAL BUTTON, never by calling `driftStart`. The fault
+       * ⚠️ DRIVEN BY THE REAL BUTTON, never by calling `hand.start()`. The fault
        * this kind of check exists to catch lives in the wiring between a button
        * and its handler, and calling the handler steps straight over it.
        */
-      {
+      if (sliders?.rate?.hand) {
         muted = true; setWet(0);
-        const btn = driftBtn();
         const wasPatch = patch;
-        drift.held = false;                    // see `held`: the page's turn now
-        const before = { rate: P.rate, size: P.size, scan: P.scan, spray: P.spray };
-        btn?.click();
-        G.driftOn = drift.on;
-        G.driftFace = btn ? btn.getAttribute('aria-pressed') : 'no button';
-
         /**
-         * 🔴 THE CLOCK IS PLACED, AND THIS IS THE ONE THING THE CHECK DOES THAT
-         * A VISITOR DOES NOT. A slot is thirty-one seconds and a run cannot
-         * wait for one: at the top of a dwell the blend's cosine is flat and
-         * nothing has started sliding yet, so a second and a half of sampling
-         * there would read `0.001 of span` about a tour that is working
-         * perfectly. Seeded to just before the crossover, the same window
-         * contains the steep part of the blend, the slide between two sounds,
-         * and the step from one to the other.
-         * ⚠️ IT SETS THE CLOCK, NOT THE STATE. Everything downstream is still a
-         * pure function of `performance.now()`, which is the property that
-         * makes this safe to do at all.
+         * 🔴 THE LANE IS CHOSEN RATHER THAN TYPED, AND THE RULE IS THE ONE
+         * `moveSetting` FOLLOWS. A setting this sound is MODULATING is written
+         * by `tick()` from its base, so the direct write is skipped and `/s_get`
+         * would read `base + modulation` rather than what the handle shows. That
+         * is a true reading of a working page and a useless one for this claim,
+         * so the check takes a setting nothing is walking. A hard-coded `size`
+         * was exactly the trap the follower check next door fell into when the
+         * opening sound changed.
          */
-        const DWELL_FRAC = DWELL_MS / SLOT_MS;
-        const atK = (k) => { drift.from = performance.now()
-          - (wasPatch + DWELL_FRAC + k * (1 - DWELL_FRAC)) * SLOT_MS; };
-        atK(0.40);
-        let lo = Infinity, hi = -Infinity, n = 0;
-        for (let i = 0; i < 26; i++) {
-          await new Promise((r) => setTimeout(r, 50));
-          lo = Math.min(lo, wet); hi = Math.max(hi, wet); n++;
+        const pick = ['size', 'rate', 'spray'].find((k) => !routedNow.has(k) && sliders[k]?.hand);
+        const sld = pick ? sliders[pick] : null;
+        const mate = ['spray', 'size', 'rate'].find((k) => k !== pick && sliders[k]?.hand);
+        const other = mate ? sliders[mate] : null;
+        if (sld && other) {
+          const btn = sld.el.querySelector('.sld-hand');
+          const row = sld.el.querySelector('.sld-hand-row');
+          const otherRow = other.el.querySelector('.sld-hand-row');
+          const startsBefore = handStarts;
+          const startedWith = other.get();
+
+          btn.click();                                   // off -> sweep, one press
+          const lit = {
+            running: !!sld.hand.running,
+            row: row.dataset.hand, otherRow: otherRow.dataset.hand,
+            pressed: btn.getAttribute('aria-pressed'),
+            // ⚠️ A CEILING IS ONLY A CEILING IF IT IS RUNNING DOWN. Reading the
+            // constant would assert the source rather than the behaviour.
+            leftMs: sld.hand.leftMs,
+            starts: handStarts - startsBefore,
+            inControls: document.querySelectorAll('.pos-controls .sld-hand').length,
+          };
+
+          // How far the handle travelled, and how many places it stopped at on
+          // the way. A range with two readings in it is a jump; this lane is
+          // supposed to be swept.
+          let lo = Infinity, hi = -Infinity;
+          const seen = new Set();
+          for (let i = 0; i < 20; i++) {
+            await new Promise((r) => setTimeout(r, 100));
+            const x = sld.get();
+            lo = Math.min(lo, x); hi = Math.max(hi, x); seen.add(x);
+          }
+
+          /**
+           * 🔴 AND THE ENGINE IS HOLDING WHAT THE HANDLE SHOWS, ASKED OF THE
+           * ENGINE, AT TWO DIFFERENT PLACES ON THE LANE. Everything above is
+           * this page's own idea of what it sent. A hand that animated a handle
+           * beautifully and wrote nothing would pass all of it, which is the
+           * failure `/s_get` exists to close.
+           *
+           * ⚠️ FROZEN WHILE IT IS READ. `/s_get` is a round trip and the hand is
+           * still travelling during it, so an unfrozen read grades whatever the
+           * sweep reached by the time the answer came back rather than the value
+           * that was asked about. `hand.yield()` is the component's own pause —
+           * the same one a finger on the lane causes — and `resume()` puts it
+           * back rather than starting it again.
+           */
+          const freeze = async () => {
+            sld.hand.yield();
+            await new Promise((r) => setTimeout(r, 120));
+            const ui = sld.get();
+            const got = await ask1(`m${pick}`);
+            sld.hand.resume();
+            return { ui, got };
+          };
+          const A = await freeze();
+          await new Promise((r) => setTimeout(r, 1800));
+          const B = await freeze();
+
+          /**
+           * 🔴 AND A FINGER TAKES IT BACK IN ONE FRAME. This repo has twice
+           * shipped a page that worked a control in front of the person holding
+           * it, and both times the report was about the instrument being taken
+           * away rather than about the feature. A real `pointerdown` on the lane
+           * is the route a visitor uses; `slider.mjs` yields on it and keeps
+           * yielding for 1200 ms after the lift, which is why the wait below is
+           * read from that constant rather than typed.
+           * ⚠️ IT IS A YIELD AND NOT AN OFF, which is the promise: a motorised
+           * fader you can grab. The button is what turns it off, two lines down.
+           */
+          const lane = sld.el.querySelector('.sld-lane');
+          const rect = lane.getBoundingClientRect();
+          const kw = sld.el.querySelector('.sld-knob').getBoundingClientRect().width;
+          const midY = rect.top + rect.height / 2;
+          const atX = (f) => rect.left + kw / 2 + (rect.width - kw) * f;
+          const poke = (type, x) => lane.dispatchEvent(new PointerEvent(type,
+            { pointerId: 1, bubbles: true, cancelable: true, clientX: x, clientY: midY }));
+          poke('pointerdown', atX(0.3));
+          const heldByFinger = row.dataset.held === '1' && row.dataset.hand === 'on';
+          const atFinger = sld.get();
+          poke('pointerup', atX(0.3));
+          await new Promise((r) => setTimeout(r, Math.round(HAND_YIELD_MS / 4)));
+          const stayed = sld.get();
+
+          btn.click();                                   // sweep -> off
+          G.hand = {
+            name: pick, lit, lo, hi, seen: seen.size, A, B,
+            heldByFinger, atFinger, stayed,
+            offRow: row.dataset.hand, offRunning: !!sld.hand.running,
+            offPressed: btn.getAttribute('aria-pressed'),
+            other: mate, otherStill: other.get(), startedWith,
+            otherOff: otherRow.dataset.hand,
+          };
         }
-        G.driftWet = { lo, hi, n, span: hi - lo, moves: drift.moves };
-        G.driftLanded = patch !== wasPatch;
-        G.driftSliders = ['rate', 'size', 'spray', 'scan']
-          .filter((k) => Math.abs(P[k] - before[k]) > Math.abs(before[k]) * 1e-6).length;
-
-        /**
-         * 🔴 AND THE ENGINE IS HOLDING A VALUE BETWEEN THE TWO SOUNDS, ASKED OF
-         * THE ENGINE. Everything above is this page's own idea of what it sent.
-         * A morph that computed beautifully and wrote nothing would pass all of
-         * it, which is the failure `/s_get` exists to close: a value strictly
-         * between two patches' numbers, on the far side of the wire, is the one
-         * reading a stepped patch change cannot produce.
-         *
-         * ⚠️ THE DESTINATION IS CHOSEN RATHER THAN TYPED. It has to be a control
-         * the modulator is NOT walking (the tour does not write those, by
-         * design) whose two ends are far enough apart that halfway is not
-         * halfway to the same place. A hard-coded `msize` was exactly the trap
-         * the follower check next door fell into when the opening sound changed.
-         */
-        // ⚠️ FROZEN WHILE IT IS READ. `/s_get` is a round trip and the tour is
-        // still travelling during it, so an unfrozen read grades whatever the
-        // morph reached by the time the answer came back rather than the value
-        // that was asked about. Holding the tick leaves the engine on the last
-        // value it was written, which is the one quantity in question.
-        atK(0.5);
-        await new Promise((r) => setTimeout(r, 200));
-        drift.held = true;
-        const A = PATCHES[wasPatch], B = PATCHES[(wasPatch + 1) % PATCHES.length];
-        const pick = ['size', 'rate', 'spray'].find((k) => !routedNow.has(k)
-          && Math.min(A[k], B[k]) > 0
-          && Math.max(A[k], B[k]) / Math.min(A[k], B[k]) >= 1.3);
-        G.driftMid = pick
-          ? { name: pick, got: await ask1(`m${pick}`), a: A[pick], b: B[pick] }
-          : null;
-        drift.held = false;
-
-        // 🔴 AND NOW THE HAND. A synthetic `pointerdown` on the sound picker's
-        // `›`, which is a control the tour moves and whose own handler is an
-        // `onclick`, so this exercises the hand-back and cannot press the
-        // button as a side effect.
-        // ⚠️ NOT ON A SLIDER LANE. `slider.mjs` reads `clientX` in its own
-        // `pointerdown` and calls `setPointerCapture`, so a synthetic event with
-        // no real pointer behind it would either write NaN into the engine or
-        // throw inside a listener, which lands in the console check two asserts
-        // along as a failure with nothing to do with this one.
-        const reach = patchPick?.buttons?.[1];
-        G.driftYieldFrom = drift.on;
-        reach?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-        G.driftYielded = !drift.on;
-        G.driftYields = drift.yields;
-        G.driftSaid = (d.api?.logs || []).slice(-3)
-          .some((l) => /yours now/.test(l.msg));
-
-        // 🔴 AND THE BUTTON STOPS IT TOO, WHICH THE HAND-BACK CANNOT SHOW. A
-        // toggle whose second press is never driven is half a control, and this
-        // is the half a visitor reaches for when they want the movement to end
-        // without taking the instrument over. Two synchronous presses: no tick
-        // can fire between them, so nothing moves and the face is the only
-        // thing being read.
-        btn?.click();
-        const onAgain = drift.on && driftBtn()?.getAttribute('aria-pressed') === 'true';
-        btn?.click();
-        const offAgain = !drift.on && driftBtn()?.getAttribute('aria-pressed') === 'false';
-        G.driftToggle = { onAgain, offAgain };
 
         // 🔴 AND THE PAGE IS PUT BACK WHERE THE VISITOR LEFT IT. Same rule as
         // the station A/B and the patch A/B: the sound it opened on, the fader
-        // at 0, the button unpressed, nothing playing itself.
-        driftStop('the check is finished');
+        // at 0, every hand off.
         applyPatch(wasPatch, { silent: true });
         muted = false; setWet(0);
         faderSld?.set(0, { quiet: true });
-        // ⚠️ AND HELD AGAIN. `verify.mjs` presses every control once and the
-        // press is not synchronised with anything this page does, so a press
-        // that lands AFTER this block would start a tour over the loop check
-        // below. The page has had its turn.
-        drift.held = true;
       }
     }
 
@@ -5688,12 +5567,12 @@
         const filling = !!T.loopFilling;
         // ⚠️ CLOSED EARLY RATHER THAN WAITED OUT, and that is about the harness
         // as much as the clock. `demo/verify.mjs` stops collecting 400 ms after
-        // the assert count last grew, and this page declares no controls, so
-        // there is no control 0 to hang a `settleMs` on: an assert made eight
-        // seconds after the one before it is an assert nobody reads, and the
-        // run still says green. The bar's second press ends a filling window
-        // where the playhead is, which is a real path a person uses and gives
-        // the same claim in a second rather than nine.
+        // the assert count last grew, and this block runs behind `finish()`, so
+        // nothing about `settleMs` reaches it: an assert made eight seconds
+        // after the one before it is an assert nobody reads, and the run still
+        // says green. The bar's second press ends a filling window where the
+        // playhead is, which is a real path a person uses and gives the same
+        // claim in a second rather than nine.
         await new Promise((r) => setTimeout(r, 600));
         T.pressLoop();                                    // end it here
         await new Promise((r) => setTimeout(r, 120));
