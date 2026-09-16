@@ -798,7 +798,22 @@ export const GRID = {
   // ONE quad, so the work is per pixel and not per dot, and the sub-pixel fade
   // two lines down is what keeps a denser grid from turning into haze.
   cell: 0.125,
-  dot: 0.007,           // dot radius — ONE size, see the note in the shader
+  // 🔴 5 mm, DOWN FROM 7. Asked 2026-09-16: *"make them smaller (global vr grid
+  // everywhere, same for xr)"*. At 7 mm on a 12.5 cm cell the dots were 11% of
+  // the gap between them and read as a stipple you look AT; at 5 they are 8%
+  // and read as a surface that happens to be marked. Both numbers are here so
+  // the ratio is visible, which is the quantity that matters rather than either
+  // one alone.
+  dot: 0.005,           // dot radius — ONE size, see the note in the shader
+  /**
+   * 🔴 HOW STRONG THE DOTS START, EXPORTED BECAUSE THE TABLET ALSO NEEDS IT.
+   * `xr-tablet.mjs`'s `floor dots` slider had `value: 75` typed into it beside
+   * this file's own `0.75`, which is a shared measurement in two files and this
+   * project's own named way of getting one of them wrong. Lowering it here and
+   * not there would have put the slider at 75 over dots drawn at 52.5, so the
+   * control would have been lying the moment the page opened.
+   */
+  alpha: 0.525,
   fadeNear: FADE_NEAR,  // metres from the eye where the dots start to go
   fadeFar: FADE_FAR,
 };
@@ -982,7 +997,17 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   // 0..1, and it is the tablet's slider. Set once at session start through
   // `applyAll` so the dots start where the control says they are rather than at
   // a default that only agrees with the number by coincidence.
-  let gridAlpha = 0.75;
+  /**
+   * 🔴 HOW STRONG THE DOTS ARE, AND IT CAME DOWN 30% ON 2026-09-16.
+   * Asked as *"reduce floor dot opacity 30%"*, globally, in VR and in
+   * passthrough alike, along with the smaller dot in `GRID`. 0.75 to 0.525.
+   *
+   * ⚠️ IT IS ALSO THE TABLET'S SLIDER, so this is a DEFAULT and not a ceiling:
+   * anybody wearing the headset can take the dots back up or down for
+   * themselves, which is the reason the grid has one colour and one strength
+   * rather than one per session mode.
+   */
+  let gridAlpha = GRID.alpha;
   let cube = null, quad = null, standIn = null, ok = false;
   // ── the real controller models ──────────────────────────────────────────
   // `null` until asked for, then a promise, then `{ vao, count, tex, col }` or

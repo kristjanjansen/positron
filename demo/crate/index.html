@@ -806,7 +806,7 @@
             note: 'Decides whether a piece may be written: its size, its place in the order, '
                 + 'and the bytes this address has sent this hour. One object does the '
                 + 'counting, so two uploads cannot both read as under the cap.' },
-          { id: 'wrk', label: 'Worker', sub: 'checks, then writes', tech: 'cloudflare',
+          { id: 'wrk', label: 'Worker', sub: 'checks, writes', tech: 'cloudflare',
             note: 'The first piece has to begin like the format its name claims, or it is '
                 + 'refused with a **415** naming the four bytes that were actually there. '
                 + 'Nothing exists in the bucket until that passes.' },
@@ -832,10 +832,31 @@
       { from: 'acct', to: 'store',
         note: 'What this page writes lands in a sandbox that a cron deletes six hours '
             + 'later, folder and all. A time to live nothing enforces is a comment.' },
+      /**
+       * 🔴 THIS ARROW IS AN ADDRESS, NOT AUDIO, AND IT WAS READ AS AUDIO.
+       * Reported with a photograph: *"audio bytes should go to player, no? why
+       * uploader -> player??"*. The answer is that the audio DOES go to the
+       * player, on the arrow under the row, and this one carries the URL that
+       * tells it where to look.
+       *
+       * ⚠️ IT WAS REMOVED AND PUT BACK IN THE SAME HOUR, so the reason is
+       * written here rather than discovered again. Taking it out leaves the
+       * Browser's two boxes with no declared link between them, and
+       * `diagram.mjs` then brackets them with a TIE: a plain headless line, in
+       * a picture where every other line has a head. That is exactly the defect
+       * reported on `/station/` the day before, and the page's own
+       * `no line in it is missing its arrowhead` check went red on the run that
+       * removed it. An arrow that has to be read carefully beats a line that
+       * looks broken.
+       * ⚠️ AND IT CANNOT CARRY A LABEL. A sibling link's name would run under
+       * both boxes, so what travels goes in the note. That is the whole reason
+       * this was ambiguous and it is a rule, not an oversight.
+       */
       { from: 'send', to: 'play',
-        note: 'When the last piece is accepted the archive answers with the address to read '
-            + 'it back from, and that address goes into the element. Nothing here is played '
-            + 'out of this browser\'s own copy.' },
+        note: 'One address, not one byte of sound: when the last piece is accepted the '
+            + 'archive answers with where to read the whole thing back from, and the '
+            + 'uploader puts that into the element. The audio itself arrives on the arrow '
+            + 'under the row.' },
       { from: 'send', to: 'wrk', label: '16 MiB pieces',
         note: 'One PUT per piece, in order, and the next goes only when the one before is '
             + 'accepted. A Worker takes at most 100 MB of body on this plan, so a whole '
@@ -843,9 +864,10 @@
       // The return path, under the row, because what comes back down it is
       // audio rather than a second request.
       { from: 'store', to: 'play', label: 'audio bytes', back: true,
-        note: 'Seeking asks for a range of bytes rather than for the file again: a **Range** '
-            + 'header comes back as a **206** carrying only those. The same worker serves '
-            + 'them, and it is what adds **access-control-allow-origin**.' },
+        note: 'The upload answers with an address and that address goes into the element, so '
+            + 'nothing is played out of this browser\'s own copy. Seeking asks for a range '
+            + 'rather than the file again: a **Range** header comes back as a **206**, '
+            + 'served by the same worker, which is what adds **access-control-allow-origin**.' },
     ],
   });
 

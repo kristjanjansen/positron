@@ -202,7 +202,22 @@ const HEAD_GAP      = 7;    // a container's own words to its first box
 // centred. Taking it from the right alone would buy the lane at the price of
 // the rule above it: a box inset further from one edge than another reads as a
 // box that has drifted rather than one that is held.
-const SIB_LANE      = 14;   // room inside a container for one such lane
+/**
+ * 🔴 20, UP FROM 14, AND THE SIX PIXELS ARE AN ARROWHEAD. Reported 2026-09-16
+ * with a photograph of `/crate/`: *"can not see rightmost connector
+ * arrowhead"*. It was not missing, it had nowhere to stand.
+ *
+ * The arithmetic, because it is the whole bug. A container insets its boxes by
+ * `CHILD_PAD + maxLanes * SIB_LANE` and puts lane `i` at `CHILD_PAD +
+ * SIB_LANE * (i + 0.5)` from its edge, so the straight run from the lane to the
+ * box it arrives at was `14 - 7 - 3 = 4 px` — and `SIB_CORNER` is 4, so the
+ * TURN ate the entire run and the marker had a zero-length segment to orient
+ * itself on. At 20 the run is 10 px, the corner takes 4 and the head has 6 to
+ * sit on, which is its own length.
+ * ⚠️ THE COST IS 6 px OF CONTAINER WIDTH PER LANE and nothing else: the boxes
+ * inset by the same amount the lane moves out, so no label gets narrower.
+ */
+const SIB_LANE      = 20;   // room inside a container for one such lane
 const SIB_CORNER    = 4;    // its turns: the run out of a box is about 5 px
 // ⚠️ AND THE GAP GROWS FOR THE HEAD, NOT FOR A NAME. An arrowhead is 7 px long
 // and is drawn back along the line from its tip, so in a 10 px gap it starts
@@ -525,7 +540,11 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
       return false;
     })
     .map((l) => ({ ...l }));
-  const cuts = [];
+  // ⚠️ SEEDED FROM THE SPEC, so anything refused BEFORE the layout runs — a
+  // title under the standing heading, today — arrives in the same list the
+  // page's own `nothing cut, nothing refused` assert reads. A second channel
+  // for refusals is a refusal nobody sees.
+  const cuts = Array.isArray(spec.cutsSink) ? [...spec.cutsSink] : [];
   const avail = Math.max(140, Math.floor(width));
 
   if (!nodes.length) {
@@ -869,6 +888,29 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
     if (!list || list.length < 2) return t.cy;
     return t.cy + (list.indexOf(l) - (list.length - 1) / 2) * spread;
   };
+  /**
+   * 🔴 AND EACH ARRIVAL TURNS DOWN AT ITS OWN x, WHICH IS THE OTHER HALF.
+   *
+   * Reported with a photograph after the vertical gap was widened: *"still no x
+   * separation"*. Two arrows into one box were 46 px apart at their heads and
+   * their VERTICAL RUNS were on top of each other, because the bend is taken at
+   * `x1 + STEP_TURN` and `x1` is the source box's right edge — and on
+   * `/station/` both sources are boxes in ONE container, so they share that
+   * edge to the pixel. Two names, two heads, one line down the middle.
+   *
+   * The index into the arrival list is already the number that spreads the
+   * heads, so it spreads the bends too: arrival 0 turns first and each one
+   * after it turns further along. They nest instead of overlapping.
+   */
+  const TURN_STEP = 13;
+  const turnAt = (l, x1, x2) => {
+    const list = arrivals.get(l.to);
+    const i = list && list.length > 1 ? list.indexOf(l) : 0;
+    const want = x1 + STEP_TURN + i * TURN_STEP;
+    // ⚠️ CLAMPED INSIDE THE RUN. A bend past the target is an elbow that
+    // doubles back, and one behind the source is a line that leaves backwards.
+    return Math.max(x1 + 6, Math.min(want, Math.max(x1 + 6, x2 - 6)));
+  };
 
   const drawn = [];
   for (const l of links) {
@@ -896,7 +938,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
         // diagonal; `stepElbow` has no slope and no wedge, so the line under
         // every name is horizontal at its own target's height and the
         // clearance is one number.
-        const turn = Math.min(x1 + STEP_TURN, (x1 + x2) / 2);
+        const turn = turnAt(l, x1, x2);
         const lx = Math.max((ox1 + ox2) / 2, turn + 1);
         drawn.push({ ...l, d: stepElbow(x1, y1, x2, y2, turn),
                      lab, lx, ly: y2 - 6, anchor: 'middle', stack: 'up' });
@@ -1205,10 +1247,27 @@ function placeSibs(sibs, at, { owner, kidIx, sibSpan, cuts }) {
 
     const i = lanes.get(c.id) || 0;
     lanes.set(c.id, i + 1);
+    /**
+     * 🔴 AN INLET AND AN OUTLET MAY NOT BE THE SAME POINT, AND ON ONE EDGE THEY
+     * WERE. Reported 2026-09-16 with a photograph of `/station/`: two lanes
+     * arriving at the Worker's right edge landed on one arrowhead at `t.cy`,
+     * because a lane's arrival y was the target's CENTRE whatever else was
+     * already there. The forward links across the picture have shared out a
+     * target's edge since the day two names printed over each other; the lanes
+     * inside a container never learned it.
+     * ⚠️ HALF THE SPREAD THE OUTER ONES USE. Those are keeping two NAMES apart
+     * and a name is two lines tall; a lane inside a container carries no label
+     * at all, so what has to be apart is two arrowheads.
+     */
+    const inTo = sibs.filter((x) => x.to === l.to && sibSpan(x) > 1);
+    const k = inTo.length > 1 ? inTo.indexOf(l) - (inTo.length - 1) / 2 : 0;
+    const ty0 = t.cy + k * ATTACH_OFF;
     const bx = c.x + c.w - CHILD_PAD - SIB_LANE * (i + 0.5);
-    const sx = f.x + f.w + EDGE_OUT, tx = t.x + t.w + EDGE_OUT + 1;
+    // ⚠️ THE HEAD LANDS ON THE BOX'S EDGE, not three pixels short of it. Those
+    // three were the last of the four the corner needed; see `SIB_LANE`.
+    const sx = f.x + f.w + EDGE_OUT, tx = t.x + t.w;
     drawn.push({ ...l, sib: true, ...mid,
-                 d: sideLane(sx, f.cy, tx, t.cy, bx, -1, SIB_CORNER) });
+                 d: sideLane(sx, f.cy, tx, ty0, bx, -1, SIB_CORNER) });
   }
   return drawn;
 }
@@ -1361,6 +1420,30 @@ export const HOW = 'How this works';
  */
 export function createDiagram(host, spec, { onRender, how = false, atEnd = false } = {}) {
   const uid = `dg${++seq}`;
+  /**
+   * 🔴 A PAGE MAY NOT TYPE ITS OWN TITLE UNDER THE STANDING HEADING, AND IT
+   * COULD, AND THE RESULT WAS TWO HEADINGS. PHOTOGRAPHED on `/station/`:
+   *
+   *     HOW THIS WORKS
+   *     HOW IT WORKS
+   *     [the picture]
+   *
+   * The page had carried `title: 'how it works'` since before `how` existed,
+   * and adding `how: true` put the standing one above it rather than instead of
+   * it. Neither half is wrong on its own, which is why nothing caught it.
+   *
+   * Refused rather than silently dropped, and reported on `cuts` like every
+   * other thing this component will not draw: an author who cannot see their
+   * own title has no way to know where it went, and the page's own
+   * `nothing cut, nothing refused` assert is what tells them.
+   */
+  if (how && spec && spec.title) {
+    (spec.cutsSink || (spec.cutsSink = [])).push({
+      id: 'title', where: 'heading', full: String(spec.title),
+      shown: 'NOT DRAWN: `how: true` already writes the standing heading. '
+           + 'Remove the title, or drop `how`', width: 0 });
+    spec = { ...spec, title: '' };
+  }
   // 🔴 `atEnd` PUTS IT AFTER THE LOG, WHICH IS THE ACTUAL BOTTOM OF THE PAGE.
   // `mount()` appends the log to `document.body`, not to `.pos-body`, so a
   // diagram appended to the page's own element lands ABOVE it however late it

@@ -509,6 +509,34 @@ export function createXRPanels({
    * This takes the dots to zero alpha and leaves everything that gets you home.
    */
   const wantGrid = roomOpt.grid !== false;
+  /**
+   * 🔴 `hands: false` DRAWS NO CONTROLLER AND KEEPS EVERY POSE.
+   *
+   * Asked for on `/videoradio/`, which is a sea you stand in: *"rm dotted floor
+   * and controlers from vr videoradio"*. A page whose whole subject is the
+   * water has a pair of plastic Touch controllers floating in it.
+   *
+   * ⚠️ IT STRIPS THE MODELS, NOT THE INPUT. `pointer`, `tabletM` and the hit
+   * test all still arrive, so the ray still points, the tablet still hangs and
+   * the quit badge still draws at the grip — that badge reads `theHands.hands`
+   * from this module rather than from the room, so it is untouched either way.
+   * Taking input away instead would be a session with no visible way out, which
+   * is the failure `room: null` already has a warning about.
+   */
+  const wantHands = roomOpt.hands !== false;
+  /**
+   * 🔴 `tablet: false` TAKES THE SLAB OFF THE LEFT HAND TOO.
+   * `hands: false` stopped the controller models and the tablet stayed, because
+   * it hangs on a matrix that is input rather than a model: reported as
+   * *"videoradio vr: still has left controller and tablet"* — the thing still
+   * in the left hand WAS the tablet.
+   * ⚠️ THE WAY OUT SURVIVES. `xr-quit.mjs`'s badge reads grips from THIS module
+   * rather than from the room, and it is a hold on a face button, so it draws
+   * and fires with nothing else in the picture. A page that takes the tablet
+   * away has one visible exit instead of two, which is why this is a switch a
+   * page asks for rather than the default.
+   */
+  const wantTablet = roomOpt.tablet !== false;
   const roomBg = Array.isArray(roomOpt.bg) ? roomOpt.bg : null;
   const roomDoc = room ? roomOf(roomSeed) : null;
   // ⚠️ THE DOCUMENT IS STILL ROLLED FROM THE SEED EVEN WHEN NOTHING IS DRAWN
@@ -1544,7 +1572,15 @@ export function createXRPanels({
     // IN IT. Once per frame, never per eye, and it cannot throw — every read
     // inside it is guarded, because an uncaught error in a frame callback does
     // not stop the loop, it silently deletes everything below it.
-    if (theHands && theRoom) theRoom.setInput(theHands.observe(frame, space, session));
+    if (theHands && theRoom) {
+      const seen = theHands.observe(frame, space, session);
+      // The room draws what is in `hands`; everything else in here is input.
+      theRoom.setInput({
+        ...seen,
+        ...(wantHands ? {} : { hands: [] }),
+        ...(wantTablet ? {} : { tabletM: null, hit: null }),
+      });
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     if (state.frames === 1) glCheck('bindFramebuffer');
