@@ -61,7 +61,7 @@ twice on these pages.
 - **Both check themselves only when a button is pressed.** A page that checks
   itself only when asked is a page nobody checks — the rule `rack` produced.
 - **`instrument` is partly superseded.** `rack` (Ableton on the studio Mac) and
-  `/box/` (the Raspberry Pi) are the grown-up form of "the sound is made
+  `/keys/` (the Raspberry Pi) are the grown-up form of "the sound is made
   somewhere else", with measurements neither of these pages has.
 
 ---

@@ -1,11 +1,10 @@
 // rig/box/jacksynth.mjs — instruments that are JACK clients.
 //
-// FluidSynth is easy: its `file` driver writes realtime-paced PCM to a FIFO and
-// the box reads it. hexter and Yoshimi cannot do that — they are JACK clients —
-// so this module builds the chain the container proved out:
+// Yoshimi is a JACK client and cannot write to a pipe, so this module builds
+// the chain the container proved out:
 //
 //   jackd -d dummy          a clock, no hardware
-//     -> the synth          hexter (via jack-dssi-host) or yoshimi
+//     -> yoshimi            the instrument
 //     -> ffmpeg -f jack     capture, raw s16 on stdout, straight into the box
 //
 // MIDI IN is the other half, and it uses something setup.sh already loads.
@@ -48,97 +47,29 @@ export function oscMessage(address, args = []) {
 const sh = (cmd) => { try { return execSync(cmd, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }); } catch { return ''; } };
 const have = (bin) => { try { execFileSync('which', [bin], { stdio: 'pipe' }); return true; } catch { return false; } };
 
-/** The instruments this module knows how to raise. */
+/**
+ * The instruments this module knows how to raise.
+ *
+ * 🔴 ONE INSTRUMENT, SINCE 2026-09-16. FluidSynth and hexter stood here and are
+ * at `archive/box-fluidsynth-hexter/`. The reason is the graph rather than the
+ * code: there is ONE jackd, ONE capture and ONE room on this board, so whatever
+ * is up is what every listener on every page hears, and a second instrument is
+ * a way to take the sound away from somebody in another building. `/knobs/`
+ * cannot work at all without yoshimi's filter, and it was found refusing to
+ * start because somebody had pressed a button on another page.
+ *
+ * ⚠️ The two INSERTS — pappus and space — are deliberately not keys here.
+ * Everything in this table is offered to clients as an instrument. They live
+ * further down, by the code that raises them: `pappusFx()` and `spaceFx()`.
+ *
+ * ⚠️ Pappus is NOT an instrument and is not in this table any more. It
+ * granulates its INPUT, so as an instrument it faithfully processed silence,
+ * and shipping it beside yoshimi made it look like a second sound source that
+ * happened to be identical to the first. It is an EFFECT — see `pappusFx()`
+ * below, which inserts it between whatever is playing and the capture, and can
+ * be switched on and off under a running instrument.
+ */
 export const JACK_SYNTHS = {
-  hexter: {
-    needs: ['jack-dssi-host', 'jackd', 'ffmpeg'],
-    // -n: no plugin GUIs. Without it the host tries to start an X client.
-    spawn: () => spawn('jack-dssi-host', ['-n', 'hexter.so'],
-      { env: { ...process.env, DSSI_PATH: '/usr/lib/dssi' }, stdio: ['ignore','pipe','pipe'] }),
-    portMatch: /hexter/i,
-    alsaMatch: /hexter/i,
-    // The DX7 factory cartridges, shipped in Debian main: ROM1A/1B/2A/2B.
-    // Program 10 is ROM1A voice 11 — E.PIANO 1.
-    after: (osc) => osc && [['-C', 'load', '/usr/share/hexter/dx7_roms.dx7'], ['-p', '0', '10']],
-    osc: true,
-  },
-  // ⚠️ The two INSERTS — pappus and space — are deliberately not keys here.
-  // Everything in this table is offered to clients as an instrument. They live
-  // further down, by the code that raises them: `pappusFx()` and `spaceFx()`.
-  //
-  // ⚠️ Pappus is NOT an instrument and is not in this table any more. It
-  // granulates its INPUT, so as an instrument it faithfully processed silence,
-  // and shipping it beside hexter and yoshimi made it look like a third sound
-  // source that happened to be identical to the second. It is an EFFECT — see
-  // pappusFx() below, which inserts it between whatever is playing and the
-  // capture, and can be switched on and off under a running instrument.
-  _pappus_removed: {
-    needs: ['sclang', 'jackd', 'ffmpeg', 'jack-dssi-host'],
-    spawn: () => {
-      // ⚠️ The unit sets PrivateTmp=true, so the service has its OWN /tmp. A
-      // runtime dir created from an ssh session is not the one this process
-      // sees, and Qt fails on a missing XDG_RUNTIME_DIR. Make it here.
-      const rt = '/tmp/rt';
-      try { mkdirSync(rt, { recursive: true, mode: 0o700 }); } catch { /* already there */ }
-      return spawn('sclang', ['/opt/positron-box/rig/box/norns/run-pappus.scd'], {
-        env: { ...process.env, XDG_RUNTIME_DIR: rt,
-               QT_QPA_PLATFORM: 'offscreen', QTWEBENGINE_DISABLE_SANDBOX: '1' },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-    },
-    portMatch: /^SuperCollider:out_1/,
-    alsaMatch: /hexter/i,          // notes go to the synth FEEDING it
-    feeder: 'hexter',              // raised first, then patched into its inputs
-    warmup: 30000,                 // sclang compiles a 2,030-line class library
-    oscCmd: true,                  // driven by parameters, not by notes
-    osc: false,
-  },
-  // FluidSynth again, but as a JACK CLIENT rather than writing to a FIFO.
-  // The FIFO path is cheaper — one process, no jackd — and is what plays
-  // normally. This variant exists so the sampler can be wrapped by an insert:
-  // an effect can only reach what is on the JACK graph, and the FIFO never is.
-  // The box swaps between the two transparently when the effect is toggled.
-  /**
-   * FluidSynth ON JACK, and this is now what `fluidsynth` means.
-   *
-   * It used to write realtime PCM to a FIFO — one process, no jackd — and that
-   * was kept for efficiency. MEASURED on the board, same binary, same
-   * soundfont, same note: the pipe costs 12.8% of 400 against JACK's 12.3%, and
-   * 84 ms to the ear against 74 ms. The efficiency argument was not a CPU
-   * argument and JACK is the FASTER of the two; the FIFO's buffering costs more
-   * than jackd's period does.
-   *
-   * What it buys is the whole reason to move: the granular insert is a JACK
-   * insert, so on a pipe the 128 General MIDI instruments and the drum bank
-   * could not be granulated at all. The pipe path is still here as `fluidpipe`,
-   * because it is what let the whole of rig/box run in a container with no
-   * sound hardware in existence — a claim that would need re-testing before
-   * anything removed it.
-   */
-  fluidsynth: {
-    needs: ['fluidsynth', 'jackd', 'ffmpeg'],
-    // ⚠️ `-s` (SERVER), OR IT LOADS THE SOUNDFONT AND EXITS 0. `-i` means "do
-    // not read commands from stdin", and without a shell to sit in and no MIDI
-    // file to play, fluidsynth has nothing left to do and quits — registering
-    // no JACK port, which is what the caller sees and is three steps from the
-    // cause. Measured on the board: with `-s` it registers fluidsynth:left and
-    // fluidsynth:right in under five seconds. The pipe path avoids this a
-    // different way, by keeping its shell open on stdin, which is also how it
-    // receives notes.
-    spawn: (opt = {}) => spawn('fluidsynth', [
-      '-a', 'jack', '-m', 'alsa_seq', '-i', '-s',
-      '-o', 'audio.jack.id=fluidsynth',
-      '-o', 'audio.jack.autoconnect=0',
-      '-o', 'synth.lock-memory=0',
-      '-o', `synth.sample-rate=${RATE}`,
-      '-o', 'synth.gain=0.6',
-      opt.soundfont || '/usr/share/sounds/sf2/FluidR3_GM.sf2',
-    ], { stdio: ['ignore', 'pipe', 'pipe'] }),
-    portMatch: /^fluidsynth:left/i,
-    portMatch2: /^fluidsynth:right/i,
-    alsaMatch: /fluid/i,
-    osc: false,
-  },
   yoshimi: {
     needs: ['yoshimi', 'jackd', 'ffmpeg'],
     // -i no GUI, -a ALSA MIDI (so virmidi can reach it), -J JACK audio
@@ -407,10 +338,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 //   on:   instrument -> positron-space:in_1/in_2 ... out_1/out_2 -> posbox
 //
 // It is Csound, and it is NOT a key in JACK_SYNTHS above — for the same reason
-// `_pappus_removed` is not: everything in that table is offered to clients as
-// an instrument (box.mjs puts `Object.keys(JACK_SYNTHS)` straight into
-// `box.hello`), and an effect listed beside hexter and yoshimi reads as a third
-// sound source. The descriptor below carries the same fields that table uses so
+// Pappus is not: everything in that table is offered to clients as an
+// instrument (box.mjs puts `Object.keys(JACK_SYNTHS)` straight into
+// `box.hello`), and an effect listed beside yoshimi reads as a second sound
+// source. The descriptor below carries the same fields that table uses so
 // it reads the same, and lives here with the code that raises it.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -938,7 +869,7 @@ export async function spaceFx(on, { instrumentPort, instrumentPortR, capture = C
     // anyone shortening it would need, and it is measured rather than guessed.
     took,
     // NAME the link that did not take. "check jack_lsp" is a chore handed to
-    // somebody in another city; `hexter:out -> positron-space:in_1` is the
+    // somebody in another city; `yoshimi:left -> positron-space:in_1` is the
     // answer they would have gone and looked up.
     ...(patched && set.ok ? {} : {
       reason: patched ? set.reason
@@ -1018,19 +949,12 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     onLog?.('jackd up');
   }
 
-  // 2. a feeder, for instruments that process rather than generate
-  let feeder = null;
-  if (def.feeder) {
-    const fd = JACK_SYNTHS[def.feeder];
-    feeder = fd.spawn();
-    procs.push(feeder);
-    await wait(6000);
-    if (fd.after) {
-      const oscPort = sh("ss -ulnp 2>/dev/null | grep jack-dssi-host | grep -oE ':[0-9]+' | tr -d ':' | head -1").trim();
-      const url = oscPort && `osc.udp://localhost:${oscPort}/dssi/hexter/chan00`;
-      for (const args of (fd.after(url) || [])) { sh(`dssi_osc_send ${args[0]} ${url} ${args.slice(1).join(' ')}`); await wait(300); }
-    }
-  }
+  // ⚠️ STEP 2 WAS A FEEDER AND IT LEFT WITH hexter, 2026-09-16. A def could
+  // declare `feeder: '<another key>'`, which raised that instrument first and
+  // patched it into this one's inputs, for a source that PROCESSES rather than
+  // generates. Exactly one def ever declared one and its feeder was hexter, so
+  // the mechanism had no second user and no way to be exercised.
+  // `archive/box-fluidsynth-hexter/board-half.js` has it.
 
   // 3. the instrument
   //
@@ -1069,7 +993,7 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     // ⚠️ SAY WHEN ONE OF THEM DIES. A source is more than one process now, and
     // the one that makes the sound is not the one that holds the JACK port. A
     // bridge such as `alsa_in` keeps its port registered whether or not
-    // anything is being written to the card behind it, so a dead feeder
+    // anything is being written to the card behind it, so a dead writer
     // presents as a perfectly healthy graph carrying digital silence. That is
     // this project's oldest failure shape and the only defence is to report it.
     pr.on('exit', (code, sig) => {
@@ -1084,8 +1008,9 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   // The lesson was written down and not applied to the line below it.
   //
   // It cost nine and a half seconds on every switch to an instrument that was
-  // ready in one. MEASURED: a warm switch to fluidjack took 9540 ms against the
-  // pipe path's 725 ms, and almost all of it was 6000 + 2500 + 600 of sleeping.
+  // ready in one. MEASURED while there were three instruments: a warm switch
+  // took 9540 ms against a pipe path's 725 ms, and almost all of it was
+  // 6000 + 2500 + 600 of sleeping.
   // The warmup is now a CEILING rather than a duration.
   //
   // `settle` is for an instrument that registers its port before it can play —
@@ -1130,17 +1055,11 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     else onLog?.(`${name}: no right channel found — the capture is one channel of a stereo source`);
   }
 
-  // and patch the feeder into it. Pappus reads In.ar on the HARDWARE inputs,
-  // which is what SuperCollider:in_1 is — private busses would have it
-  // granulating silence, which is exactly how it failed the first time.
-  if (feeder) {
-    const fp = sh('jack_lsp').split('\n').find((p) => JACK_SYNTHS[def.feeder].portMatch.test(p));
-    if (!fp) onLog?.(`FEEDER ${def.feeder} registered no port — nothing to granulate`);
-    else {
-      const out = sh(`jack_connect "${fp}" SuperCollider:in_1 2>&1`);
-      onLog?.(out.trim() ? `feeder patch said: ${out.trim().slice(0, 120)}` : `patched ${def.feeder} -> pappus`);
-    }
-  }
+  // ⚠️ THE FEEDER'S OWN PATCH WAS HERE and left with step 2 above. It joined
+  // the feeding instrument to `SuperCollider:in_1`, which is a HARDWARE input:
+  // Pappus reads `In.ar` there, and a private bus would have had it granulating
+  // silence. `pappusFx()` further down does that join for the running
+  // instrument and is untouched.
 
   // 5. MIDI in, through virmidi
   const vm = findVirmidi();
@@ -1168,16 +1087,13 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   });
   cap.stderr?.on('data', (d) => onLog?.(`ffmpeg: ${String(d).trim()}`));
 
-  // 7. anything the instrument wants said once it is up (hexter's ROM bank)
-  if (def.osc) {
-    const oscPort = sh("ss -ulnp 2>/dev/null | grep jack-dssi-host | grep -oE ':[0-9]+' | tr -d ':' | head -1").trim();
-    const url = oscPort && `osc.udp://localhost:${oscPort}/dssi/hexter/chan00`;
-    for (const args of (def.after?.(url) || [])) {
-      // ⚠️ dssi_osc_send wants <option> <URL> <values> — URL second, not first.
-      sh(`dssi_osc_send ${args[0]} ${url} ${args.slice(1).join(' ')}`);
-      await wait(400);
-    }
-  }
+  // ⚠️ STEP 7 WAS `def.osc` AND IT LEFT WITH hexter TOO. It sent DSSI OSC to a
+  // plugin host once the instrument was up, which is how hexter loaded its four
+  // factory DX7 cartridges and chose a program. Yoshimi is not a plugin and
+  // reads its own banks off the disk, so nothing is left to say afterwards.
+  // ⚠️ `def.oscCmd` BELOW IS A DIFFERENT CHANNEL and stays: that is the running
+  // parameter socket a SuperCollider engine is driven on, not a one-off setup
+  // message to a plugin host.
 
   const midi = (bytes) => { if (midiFd !== null) { try { writeSync(midiFd, Buffer.from(bytes)); } catch { /* gone */ } } };
 

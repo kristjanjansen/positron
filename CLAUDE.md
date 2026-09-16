@@ -12,7 +12,23 @@ The slug, the directory and every reference moved together; the deployed
 been written. The line that stood here before said the slug was fixed and not to
 re-open it, and that was about an unasked-for rename to `vain` on 2026-09-15
 which was reverted within the hour. An instruction supersedes it. ⚠️ Only
-`archive/` still says `radio1965`, on purpose: an archive records what was there. ⚠️ The suite total that
+`archive/` still says `radio1965`, on purpose: an archive records what was there.
+⚠️ **AND `box` IS NOW `keys`, RENAMED 2026-09-16 ON INSTRUCTION, THE SAME DAY
+AND THE SAME WAY.** The deployed `/box/` is GONE and no redirect was written;
+119 references in 30 files moved. ⚠️ **`rig/box/` DID NOT MOVE AND MUST NOT.**
+The sweep matched the URL form `/box/`, never the word, because the BOARD is
+still the box: `rig/box/`, `box.mjs`, `box.hello`, `box.alive`, and
+`rig/box/listen.html` is still where the page lives. `LAYOUT.md` rule 2 names
+that file as the example of a page that belongs with its hardware, and moving it
+under `demo/` would invite `built: true`, which puts a shared Raspberry Pi in
+another building into every run of the suite.
+⚠️ **AND THAT BOARD HAS ONE INSTRUMENT SINCE 2026-09-16.** FluidSynth and hexter
+are at `archive/box-fluidsynth-hexter/`, out of `jacksynth.mjs` and out of
+`rig/audit.mjs`; a board asked for either answers `unknown source`. There is ONE
+jackd, ONE capture and ONE room on it, so an instrument picker was a control
+that took the sound away from somebody in another building, and it did: `/knobs/`
+was found refusing to start because somebody had pressed `sampled`.
+⚠️ The suite total that
 used to sit here was removed rather than updated: it was stale for two sessions, and a count nobody re-measures reads as
 a fact. Run `node demo/verify.mjs` for the current one. ⚠️ A red run is not automatically a
 regression here: `now`'s asserts go red when ERR refuses its own live edge (one
@@ -394,7 +410,7 @@ to recover.
   `rig/m1/live-agent.mjs` hands it to Live over CoreMIDI, and a **Core Audio
   process tap** sends a copy of what Live renders back down the same socket —
   so Live keeps playing out of its own speakers while the page hears it too.
-  `/box/` is the SAME PAGE pointed at a Raspberry Pi. **No BlackHole, no
+  `/keys/` is the SAME PAGE pointed at a Raspberry Pi. **No BlackHole, no
   Multi-Output Device, no Live Preferences click** — the tap removes the one
   requirement the Live Object Model could not script, which is what parked the
   old rig. It stays up by itself via `studio.positron.rack-agent.plist`
@@ -533,7 +549,7 @@ to recover.
   order and the cover stayed 338px wide inside its grid.
 - **A long press on a control raises the iOS text LOUPE, and `user-select:
   none` does not stop it.** `-webkit-touch-callout: none` is the one that does.
-  Photographed on `/box/` and `/mirror/`: the magnifier over the piano keys and
+  Photographed on `/keys/` and `/mirror/`: the magnifier over the piano keys and
   selection handles dragged across a readout. Controls and keys now carry it
   along with `touch-action: manipulation`, which also drops the 300 ms
   double-tap wait so a key sounds when it is pressed. Prose, readouts and the
@@ -656,7 +672,7 @@ to recover.
 - 🔴 **A full relay room is a silent outage, and a redeploy does NOT clear it.**
   `studio-1` sat at 16/16 and refused the board for hours — it logged
   `closed 1006`, which is what a browser reports for the relay's `503`, so it
-  read as a network fault on the Pi while `/box/` was down for everyone. The
+  read as a network fault on the Pi while `/keys/` was down for everyone. The
   room was full of **orphaned harness Chromes of mine** (four profile groups,
   118 processes); killing them took it 16 → 1 and the board rejoined unaided.
   Hibernated sockets are RESTORED across a restart, so deploying the worker
@@ -955,7 +971,7 @@ is checkable in one command, so check it before repeating it.
     twice in two wordings that can drift apart.
   `demo/shell/diagram.mjs` draws it; these decide what goes in it.
   - **A box label is a NAME.** `Icecast`, `scsynth`, `speakers`.
-    ⚠️ **AND A DIRECTION IS NOT A NAME.** `/box/` split one relay into two boxes
+    ⚠️ **AND A DIRECTION IS NOT A NAME.** `/keys/` split one relay into two boxes
     by role and labelled them `notes out` and `sound back`, which are captions
     saying which way the traffic goes. Reported as *"not good names"*. Where one
     machine is drawn twice by role, the LABEL is what that half carries
@@ -1040,13 +1056,13 @@ is checkable in one command, so check it before repeating it.
     ARROW is the default and says these boxes feed each other. `set: true` draws
     a BRACKET and says they are parts of one machine. `join: false` draws
     NOTHING, and is right where the container's own box already carries the
-    whole relationship: `/box/`'s `Browser` holds a keyboard and a playout, and
+    whole relationship: `/keys/`'s `Browser` holds a keyboard and a playout, and
     a line between them adds no fact, it just gives the eye something to follow
     that leads nowhere. Asked for on sight: *"no connections between
     keyboard/playout and and notesout/soundback"*.
     🔴 **A RETURN PATH NEEDS `back: true` AND IT IS AN AUTHOR FLAG.** Nothing
     infers it. A link without it is laid out as a forward step, so a right to
-    left link is drawn through whatever stands in the way: on `/box/` it ran
+    left link is drawn through whatever stands in the way: on `/keys/` it ran
     straight through `playout` and put its head on the far left of the Browser,
     reported as *"what is this thing on left of playout?"*.
     ⚠️ **AND A RETURN PATH LANDS ON THE BOX, NOT ON THE MACHINE AROUND IT.**
@@ -1184,6 +1200,24 @@ is checkable in one command, so check it before repeating it.
   has not been componentised yet. Do not quietly build a fourth copy. A control
   that exists in one page and nowhere else is a component that has not been
   noticed yet, not a special case.
+- 🔴 **THE RASPBERRY PI IS A KIT MODULE, AND BOTH PAGES THAT PLAY IT USE IT.**
+  `demo/shell/board.mjs`, 2026-09-16, asked for as *"share code with knobs"*. It
+  owns the socket, the reconnect, the presence, the 12-byte frame header, the
+  conversion to float, the `pcm-playout` worklet, the cushion and its counters,
+  and the check that a frame is the SHAPE the board publishes. A page owns which
+  verbs it sends, what it does with a frame after the playout has it, and what
+  its log calls things.
+  ⚠️ **IT IS THE BETTER OF THE TWO HALVES, NEVER THE AVERAGE, AND THAT IS THE
+  GENERAL RULE FOR THIS KIND OF MERGE.** `/keys/` hand-rolled its WebSocket and
+  so could not tell a FULL ROOM from a DEAD RELAY (a browser cannot read the
+  HTTP status of a refused upgrade; `openWire` asks `/stats` and says which),
+  never checked a frame's shape, and never worked out which socket in the room
+  WAS the board. All three came from `/knobs/`, so the page that had less gained
+  three things rather than the two of them meeting in the middle.
+  ⚠️ **THE CUSHIONS STAY DIFFERENT AND THAT IS NOT DRIFT.** 100 ms on `/keys/`,
+  which reports press to sound and pays for every millisecond of it; 160 on
+  `/knobs/`, which holds one note under a filter sweep where a click is the
+  thing a listener cannot ignore. Two trades, one component.
 - **Write for someone who does not work here.** Terse, but understandable —
   those are not in tension, and the old rule ("no explanatory prose, one line
   and a readout") produced pages that only their author could read. A demo page
@@ -1201,13 +1235,18 @@ is checkable in one command, so check it before repeating it.
   milliseconds, and that it is NOT stream latency — a reader assumed exactly
   that, which is what prompted this rule.
   ⚠️ **A THING'S NAME IS NOT JARGON — DECIDED 2026-09-13, do not re-litigate.**
-  `hexter`, `Yoshimi`, `FluidSynth`, `Pappus`, `Ableton Live`, `SuperCollider`
-  are what those programs are CALLED, and the open question of renaming them in
-  `/box/`'s instrument row is answered: leave them. A friendly label invented
-  here would be a name nobody can search for, and it would hide which program
-  is making the sound — the one fact that page exists to report. The rule is
-  about words that describe a MECHANISM in this project's private vocabulary
-  (a fold, a lane, an evidence gate), not about proper nouns.
+  `Yoshimi`, `Pappus`, `Ableton Live`, `SuperCollider` are what those programs
+  are CALLED, and the open question of renaming them to something friendlier is
+  answered: leave them. A friendly label invented here would be a name nobody
+  can search for, and it would hide which program is making the sound, which is
+  the one fact those pages exist to report. The rule is about words that
+  describe a MECHANISM in this project's private vocabulary (a fold, a lane, an
+  evidence gate), not about proper nouns.
+  ⚠️ **THE ROW THIS WAS DECIDED ABOUT NO LONGER EXISTS**, and the decision is
+  kept because it is about names rather than about that control. `/keys/` had an
+  instrument row offering `sampled`, `hexter` and `yoshimi`; two of the three
+  left the board on 2026-09-16 and a choice of one is not a choice. See
+  `archive/box-fluidsynth-hexter/`.
 - **A constant belongs beside the thing it governs, not in a header.** `how()`
   took a spec line of real values (`looks 100 ms ahead · re-checks every 25 ms`)
   on the theory that constants beat prose. They do — when someone is looking for
@@ -1300,3 +1339,16 @@ is checkable in one command, so check it before repeating it.
   `createTransportBar(…, { scrub: false })`: two horizontal time axes at
   different scales, stacked, is not a redundancy but a contradiction. The
   strip already seeks on press AND on drag, which the bar's slider did not.
+  🔴 **AND A BAR MAY HAVE NO PLAY BUTTON AT ALL: `toggle: false`, 2026-09-16.**
+  Play, pause and seek are all claims about a POSITION inside a sound, and
+  `/keys/` has none: a note sounds while a key is held, there is nothing to
+  start or resume, and a toggle whose only honest behaviour is to do nothing is
+  the shape of control this project calls a lie. What such a bar still carries
+  is the `chip`. On both board pages that is the presence badge, because the
+  fact worth having about an instrument in another building is whether it is
+  answering. ⚠️ **IT DISARMS EVERYTHING THAT DEPENDED ON PLAYING** rather than
+  leaving it to read false by luck: `api.playing` is forced false, the space bar
+  stops being a play key, the end-stop never arms, and `api.toggles` says so in
+  one boolean. **`demo/verify.mjs` reads `api.toggles` before its play drill**,
+  which clicks `.tbar-toggle` and asserts the position advanced; without that a
+  bar with no toggle takes the harness red on a page where nothing is wrong.

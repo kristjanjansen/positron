@@ -15,7 +15,7 @@
 // granulator, so two runs at once interleave: one switches the source while the
 // other is mid-capture, and the second reads silence or somebody else's sound.
 // Seen for real — a run died with "no audio" while another had just restarted
-// hexter underneath it.
+// the instrument underneath it.
 //
 // The claim under test is not "OSC was sent". Nothing downstream of the socket
 // answers: sclang takes a message for a command that does not exist, or a value
@@ -660,10 +660,10 @@ const sounded = (c) => c.all.filter((t) => t.peak > SILENCE).length;
 
 try {
   // ── raise the chain ───────────────────────────────────────────────────────
-  // hexter is the feeder: an insert can only reach what is on the JACK graph,
-  // and fluidsynth writes to a pipe.
-  console.log('  raising hexter (a JACK chain takes ~13 s) ...');
-  const s = await answer(send({ type: 'audio.start', source: 'hexter' }), 'audio.started', 60000);
+  // Yoshimi is what the insert wraps: an insert can only reach what is on the
+  // JACK graph, and it is the only instrument this board has since 2026-09-16.
+  console.log('  raising yoshimi (a JACK chain takes ~13 s) ...');
+  const s = await answer(send({ type: 'audio.start', source: 'yoshimi' }), 'audio.started', 60000);
   okOnce('a JACK instrument is up for the insert to wrap', s.ok !== false, s.source ?? '');
 
   console.log('  switching pappus on (first time compiles 2,030 lines, ~40 s) ...');

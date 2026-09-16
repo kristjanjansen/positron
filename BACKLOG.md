@@ -47,6 +47,20 @@ file by being finished or by being refused in writing, never by being forgotten.
   add it to silders. Single sidebutton, on and off atm"*. `plan-slider-automation.md`,
   six steps, the first of which decides whether the human feel is real before a
   pixel moves.
+  ✅ **STEPS 1 TO 5 ARE BUILT, 2026-09-16.** `demo/shell/hand.mjs` and
+  `hand-test.mjs` (23 asserts, three negative controls, a sabotage caught by
+  exactly one check, and three deliberate breakages taking 4, 6 and 7 of them
+  red); `.pos-seg` lifted out of `.tbar-loopgrp`, `.step` and `.pos-pick-cell`
+  and measured byte for byte identical before and after; `createSlider({ hand:
+  true })` with a specimen in `/kit/`; `/knobs/` turning it on for both sliders.
+  ⚠️ **STEP 6 IS OPEN**: a second movement preset, which exists to prove that
+  adding one costs one row in `MOVES`, one glyph, one sentence and one index in
+  `MOVE_TURN`, and turns the button into a three-way cycle with no new control.
+  ⚠️ **AND NOBODY HAS WATCHED IT YET.** Every number in the plan and in the test
+  is about the shape of a curve; that Beta(3,4) with peak speed at 0.400 is what
+  a hand LOOKS like is judgement, and the ten defaults (`lapMs` 2200, `turnMs`
+  130, `endJit` 0.030, `timeJit` 0.120, `over` 0.022, `wobble` 0.050) are a
+  guess that wants an eye on it.
 
 - 🔴 **`/draw/` AND `/grains/` PUT SLIDERS IN `.pos-controls`, AND THE HARNESS
   PRESSES EVERY BUTTON IN THERE.** Found while planning the automation, by
@@ -58,6 +72,18 @@ file by being finished or by being refused in writing, never by being forgotten.
   board, a suite run drives a shared Raspberry Pi. The rule is that a control
   inside `.pos-controls` is a control the harness will press, and it wants a
   page-level assert rather than a memory.
+  ✅ **HALF ANSWERED, 2026-09-16, AND STRUCTURALLY RATHER THAN BY AN ASSERT.**
+  A page-level assert protects the page that has one, which is never the page
+  where the mistake gets made: neither `/draw/` nor `/grains/` would have
+  carried it. So `createSlider` answers for itself. One frame after it is built,
+  a slider with an invisible hand asks whether it landed inside `.pos-controls`,
+  and if it did it disables its own button, says why on the button's face and
+  puts a line in the page's log. PROVED BY BUILDING BOTH: the one in the row
+  reads `running false, disabled true` and the identical one beside it reads
+  `running true, disabled false`.
+  ⚠️ **AND THAT COVERS HANDS ONLY.** Any OTHER control somebody puts in one of
+  those two rows that reaches the board is the same hazard with nothing standing
+  in front of it, which is what is left of this entry.
 
 - **A SECOND VIEWPORT META IN `proto/flipper/index.html`.** `build.mjs` inserts
   the line its comment says the proto lacks, and the proto has since gained its
@@ -98,13 +124,18 @@ file by being finished or by being refused in writing, never by being forgotten.
   go. `build.mjs` guards against an anchor that VANISHES and cannot see one that
   became redundant.
 
-- 🔴 **`box.ping` IS BROKEN ON THE BOARD AND `/box/`'s `rtt` CAN NEVER FILL.**
+- 🔴 **`box.ping` IS BROKEN ON THE BOARD, AND NO PAGE SENDS IT ANY MORE.**
   Found 2026-09-16 while building `/knobs/`. It replies `box.pong` with an `at`
   field, `at` is an ENVELOPE field, so the board's own `format()` throws and the
-  handler answers `box.error` instead. `rig/box/listen.html` times a pong that
-  never arrives. `/knobs/` works around it with `openWire.ping()`, which is the
-  relay round trip with the Durable Object never woken and needs no board at
-  all, but the board's verb is still wrong.
+  handler answers `box.error` instead. The verb is still wrong and the fix is one
+  line in `rig/box/box.mjs`: name the field something that is not `at`.
+  ⚠️ **THE PAGE HALF IS DONE AND WAS NOT A WORKAROUND, IT WAS A DELETION.**
+  `/keys/` timed a pong that never arrived into a variable NO CELL SHOWED and no
+  check asked for, which is the more interesting half of this: a counter nobody
+  displays is not instrumentation, and it could never have filled anyway. What
+  it was for is answered by two better things: the presence badge, and
+  `openWire`'s `/stats` question, which says whether a room was full or a relay
+  unreachable, which a ping cannot answer at all.
 
 - **`ctlMeter()` DOES NOT REPORT `ctrls`.** `plan-controller.md` §4.2 specifies
   `{in, out, folded, ctrls}` and step 2 shipped `{in, out, folded, forMs, on,
@@ -114,7 +145,7 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 - ⚠️ **`/rack/` MAY BE CLIPPING AT FULL SCALE, UNVERIFIED.** It posts an
   `Int16Array` straight into `pcm-playout`, whose ring is a `Float32Array` that
-  stores what it is given; `/box/` divides by 32768 first. Noticed while reading
+  stores what it is given; `/keys/` divides by 32768 first. Noticed while reading
   the playout for `/knobs/`, not measured. ⚠️ That page's own comment records
   *"it sounded noisy for an hour while six measurements said the stream was
   perfect"*, which is what this would look like.
@@ -138,9 +169,9 @@ file by being finished or by being refused in writing, never by being forgotten.
   seconds of silence and a report that no board was in the room while writing
   `cc-test.mjs`. Anything waiting on the name of the QUESTION waits forever.
 
-- **PAPPUS LEAVES `/box/`'S SIGNAL PATH, AND THE DIAGRAM SAYS WHAT IS THERE.
+- **PAPPUS LEAVES `/keys/`'S SIGNAL PATH, AND THE DIAGRAM SAYS WHAT IS THERE.
   ASKED 2026-09-16:** *"plan and remove pappus from the
-  http://127.0.0.1:8890/box/ signal path. there is no ui to control it. arhvice
+  http://127.0.0.1:8890/keys/ signal path. there is no ui to control it. arhvice
   it. update diagram as well. captutre: should be more techical, JACK etc. can
   we sampled (renamed to the collection name), hexter, yoshimi side by side in
   pi box in diagram"*. Four things: Pappus out of the path and archived, the
@@ -521,6 +552,46 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Done, with what it was measured at
 
+- ✅ **FLUIDSYNTH AND HEXTER ARE OFF THE BOARD AND OUT OF THE PAGE**, to
+  `archive/box-fluidsynth-hexter/`. Asked as *"lets remove fluidynth and hexter
+  code and move to arvhice (in browser and in board). update board."* There is
+  ONE jackd, ONE capture and ONE room on that board, so an instrument picker was
+  a control that took the sound away from somebody in another building: `/knobs/`
+  was found refusing to start because somebody had pressed `sampled`. Board
+  restarted 22:44:41 and yoshimi confirmed up, `jack: true`, `yoshimi:left`,
+  50 frames/s. MEASURED that the deploy landed: `md5` of `box.mjs` and
+  `jacksynth.mjs` identical board against local, and the board's own copy of
+  that file answers `JACK_SYNTHS: yoshimi`.
+  ⚠️ It found a real defect on the way past: `/grains/` asked the board for
+  `fluidsynth` while waiting for a reply naming `yoshimi`, so `wantSource` was
+  never cleared and the mark it gates stayed armed for a whole visit.
+
+- ✅ **THE `box` DEMO IS `keys`.** Asked as *"rename box demo to keys"*. 119
+  references in 30 files, swept on the URL form rather than the word, so
+  `rig/box/` is untouched: the BOARD is still the box. The source file did not
+  move and `LAYOUT.md` rule 2 is why. The deployed `/box/` is gone and no
+  redirect was written, same as `radio1965`.
+
+- ✅ **`demo/shell/board.mjs`: ONE MODULE FOR THE RASPBERRY PI.** Asked as
+  *"share code with knobs"*. `/keys/` stopped hand-rolling its WebSocket, its
+  12-byte frame header, its int16 conversion, its `pcm-playout` worklet, its
+  cushion and its counters; it GAINED three things it never had, because the
+  module is the better of the two halves rather than the average — a full room
+  told apart from a dead relay, a frame checked against the shape the board
+  publishes, and the board identified by the messages only it sends.
+
+- ✅ **ONE DIAGRAM, TWO VARIATIONS.** Asked as *"current box diagram is so much
+  nicer. unify the diagrams to look best and have knobs and keys variations of
+  this"*. Both draw the same ring now: out along the top, down the board, back
+  along the bottom. `/knobs/` gained the split relay that makes it read one way
+  round, `/keys/` gained the JACK and ffmpeg split. Both report `cuts: 0`.
+
+- ✅ **`/keys/` HAS A TRANSPORT BAR WITH NO PLAY BUTTON.** Asked as *"bring
+  transport bar to keys but no play button, just online badge. plush
+  readout+logs"*. `transport-bar.mjs` takes `toggle: false`, in the same family
+  as `scrub: false` and `loop: false`, and `demo/verify.mjs` reads
+  `api.toggles` before pressing a button that may not be there.
+
 - ✅ **IDA AND RADIO 1965 ARE BACK, LAST IN THE LIST, ON THE TEE.** Asked as
   *"bring ida's back to radio (if single listener)"*, *"bring ida to videoradio
   too"* and *"bring back radio65 stream as last. we are single user connected?"*.
@@ -665,7 +736,7 @@ repeat, and several of these were asked for more than once.
   very gentle r&d"*. So: no assert loops against live mounts, and whatever is
   built has to confirm the tee is still holding one upstream.
 
-- ✅ **`/box/`: A DIAGRAM, A LAG READOUT, AND DROP THE COLLECTION LINE. ASKED
+- ✅ **`/keys/`: A DIAGRAM, A LAG READOUT, AND DROP THE COLLECTION LINE. ASKED
   2026-09-16:** *"add diagram to box demo. i want lag readout. rm
   Will_Godfrey_Collection · 657 of 878"*, then *"add 'patch' label to patch
   selector"*.

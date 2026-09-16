@@ -392,21 +392,10 @@ ok('a bare sweep pauses for nothing and turns at one value per end, because noth
     lane.h.crest < THRESH.crest && lane.t.crest < THRESH.crest && lane.s.crest < THRESH.crest,
     `hand ${lane.h.crest.toFixed(3)}, triangle ${lane.t.crest.toFixed(3)}, sabotage ${lane.s.crest.toFixed(3)}, `
     + `all under ${THRESH.crest}`);
-  /**
-   * ⚠️ THE CLAIM IS THAT THE LANE CANNOT TELL THEM APART, AND SAYING THAT AS A
-   * DISTANCE WAS WRONG. This read `the separation collapses` and compared the
-   * two crest numbers, which went red the moment the lap got slower: at 7 s a
-   * lane-read triangle yields NO measurable reach at all, so its crest is 0 and
-   * the distance to the hand is as wide as it was in the air while meaning the
-   * opposite. The quantity in question is the VERDICT, not the gap between two
-   * numbers, so that is what is asserted: in the air the metric says hand and
-   * says not-a-hand, and through the lane it says not-a-hand about both.
-   */
-  const verdict = (r) => r.crest >= THRESH.crest;
-  ok('in the air the metric separates them and through the lane it cannot',
-    verdict(air.h) && !verdict(air.t) && !verdict(lane.h) && !verdict(lane.t),
-    `air: hand ${verdict(air.h) ? 'passes' : 'fails'}, triangle ${verdict(air.t) ? 'passes' : 'fails'} · `
-    + `lane: hand ${verdict(lane.h) ? 'passes' : 'fails'}, triangle ${verdict(lane.t) ? 'passes' : 'fails'}`);
+  ok('and the separation between a hand and a triangle collapses with it',
+    (air.h.crest - air.t.crest) > 0.9 && (lane.h.crest - lane.t.crest) < 0.25,
+    `${(air.h.crest - air.t.crest).toFixed(3)} apart in the air, `
+    + `${(lane.h.crest - lane.t.crest).toFixed(3)} apart through the lane`);
 }
 
 // 14. And the floor that follows from it, stated as arithmetic: the end wander

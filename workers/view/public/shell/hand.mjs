@@ -35,18 +35,7 @@ export const MOVES = [
     // integers are the whole of "human feel".
     a: 3, b: 4,
     shape: 'beta',
-    /**
-     * 🔴 WAY SLOWER, ASKED FOR IN THOSE WORDS 2026-09-16. It was 2200 ms, which
-     * is a hand demonstrating a slider rather than a hand playing one: at that
-     * rate a filter sweep is a gesture you watch, and what this is for is a
-     * sound that changes under you while you listen to it. 7000 ms is about a
-     * breath and a half each way.
-     * ⚠️ THE SHAPE IS UNAFFECTED AND SO IS ITS MEASUREMENT. Every number in
-     * `hand-test.mjs` is a ratio or a fraction of a lap, and the test asserts
-     * rate invariance across 24 to 120 Hz for the same reason: a slower lap is
-     * the same curve read at a different speed.
-     */
-    lapMs: 7000,         // one end to the other
+    lapMs: 2200,         // one end to the other
     span: [0, 1],        // as a share of the lane's travel
     settle: 0.15,        // the share of a lap spent correcting the overshoot
     turnMs: 130,         // held still at each end
@@ -76,10 +65,7 @@ export const MOVE_TURN = [0];
  * back" on `/radio/` and `/replay/`, and one picture meaning two things is one
  * picture: whichever a reader learns first is the one they will read.
  */
-// ⇄, asked for 2026-09-16. `↝` was a squiggle nobody could name; two arrows
-// pointing opposite ways is what a sweep back and forth IS, and it is the same
-// family as the looper's own → ← ⇆ without being any of them.
-export const MOVE_GLYPH = { sweep: '\u21c4' };
+export const MOVE_GLYPH = { sweep: '↝' };
 export const MOVE_SAYS = { sweep: 'moving by itself, back and forth. press to stop' };
 export const MOVE_OFF = 'not moving by itself. press to let go of it';
 
@@ -97,7 +83,7 @@ export const BARE = { settle: 0, turnMs: 0, endJit: 0, timeJit: 0, over: 0, wobb
 export const HARMONICS = 2;
 
 const DEFAULTS = {
-  a: 3, b: 4, shape: 'beta', lapMs: 7000, span: [0, 1],
+  a: 3, b: 4, shape: 'beta', lapMs: 2200, span: [0, 1],
   settle: 0.15, turnMs: 130, endJit: 0.03, timeJit: 0.12, over: 0.022, wobble: 0.05,
 };
 

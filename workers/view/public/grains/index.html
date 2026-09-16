@@ -266,7 +266,7 @@
   let fxOn = false, fxWhy = null, fed = null, switching = false;
   /**
    * 🔴 WHO ELSE IS DRIVING THIS BOARD. Two pages share one Raspberry Pi:
-   * `/box/` takes the granulator OUT on load — rightly, because an insert left
+   * `/keys/` takes the granulator OUT on load — rightly, because an insert left
    * in by a tab that CLOSED wraps whatever it plays and feeds its own delay —
    * and this page puts it IN, because the granulator is its whole subject. So
    * whichever was opened last used to win SILENTLY, and the loser went on
@@ -391,9 +391,12 @@
   // question; it will be answered without a page that can hammer a stranger.
   //
   // Until then the board plays Yoshimi into the granulator and the sliders are
-  // the point. Yoshimi rather than the sampled instrument because it is a JACK
-  // client the insert can actually wrap, and because it holds a note — a
-  // granulator with nothing arriving has nothing to granulate.
+  // the point. Yoshimi because it is a JACK client the insert can actually wrap,
+  // and because it holds a note: a granulator with nothing arriving has nothing
+  // to granulate.
+  // ⚠️ IT IS ALSO THE ONLY INSTRUMENT ON THE BOARD SINCE 2026-09-16. The
+  // sampled one and the DX7 left (`archive/box-fluidsynth-hexter/`), so this
+  // constant is now a fact rather than a choice.
   const SOURCE = 'yoshimi';
 
   const panel = el('div', '');
@@ -1149,7 +1152,7 @@
   const rate = (side) => (side.rate >= 10 ? side.rate.toFixed(0) : side.rate.toFixed(1));
   function materialShort() {
     if (!answered) return null;
-    if (playing) return playing;          // hexter · yoshimi · fluidsynth
+    if (playing) return playing;          // whatever the board says is up
     return 'nothing';
   }
   function materialLong() {
@@ -1688,10 +1691,28 @@
     // Something has to be going into it, or it granulates an empty recording
     // and the page is honestly, uselessly silent.
     const st = await ask({ type: 'audio.status' }, 'audio.started', 6000);
+    /**
+     * 🔴 IT STARTS `SOURCE`, AND FOR TWO SESSIONS IT DID NOT. This asked the
+     * board for `fluidsynth` while setting `wantSource` to `yoshimi` four
+     * hundred lines below a comment explaining, correctly, why it has to be
+     * Yoshimi: an insert can only wrap what is on the JACK graph, and a note
+     * has to be HELD or there is nothing to granulate. So the page started one
+     * instrument and then waited for a reply naming another, which never
+     * matched, so `wantSource` was never cleared and the four-second mark it
+     * gates stayed armed for the rest of the visit.
+     *
+     * ⚠️ IT IS ALSO A NAME THE BOARD NO LONGER KNOWS. FluidSynth left
+     * `rig/box/jacksynth.mjs` on 2026-09-16 (`archive/box-fluidsynth-hexter/`),
+     * and an unrecognised source is refused by name rather than fallen through
+     * to a microphone, so this line would now answer `unknown source
+     * "fluidsynth"` and the page would granulate silence. One constant, used
+     * once, is what stops a page asking for something it has already explained
+     * it does not want.
+     */
     if (st && !st.ok) {
-      d.log('nothing was playing. Starting the sampled instrument so there is something to chew', 'hi');
+      d.log(`nothing was playing. Starting ${SOURCE} so there is something to chew`, 'hi');
       wantSource = SOURCE;
-      await ask({ type: 'audio.start', source: 'fluidsynth' }, 'audio.started', 60000);
+      await ask({ type: 'audio.start', source: SOURCE }, 'audio.started', 60000);
     }
     // First time this is asked of a cold board it compiles a two-thousand line
     // engine, about forty seconds; after that it is a re-patch. `switching` is

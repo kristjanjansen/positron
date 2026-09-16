@@ -78,39 +78,39 @@ after it, plus a decay. A live, unmuted stream of digital silence looks
 identical to a working one from every angle except the samples, which is how
 three readings went wrong in 2026-09.
 
-## Multitimbral, and it runs anywhere
+## One instrument, and why
 
-`fluid.mjs` drives FluidSynth: **16 channels, 16 instruments, one process.**
+`jacksynth.mjs` raises **Yoshimi** and nothing else, since 2026-09-16.
 
-    node ask.mjs --room studio-1 audio.start   '{"source":"fluidsynth"}'
-    node ask.mjs --room studio-1 voice.select  '{"channel":1,"voice":"pad"}'
+    node ask.mjs --room studio-1 audio.start   '{"source":"yoshimi"}'
+    node ask.mjs --room studio-1 voice.select  '{"channel":0,"bank":95,"program":6}'
 
-The discovery that makes this simple: FluidSynth's `file` audio driver is
-**realtime-paced**, so the soundcard becomes a pipe into this process. No
-`/dev/snd`, no ALSA, no mixer, no `snd-aloop`, no audio server. Notes arrive on
-its stdin, so no sequencer either.
+🔴 **FluidSynth and hexter were here and are at `archive/box-fluidsynth-hexter/`.**
+The reason is the graph, not the code. This board has ONE `jackd`, ONE ffmpeg
+capture and ONE relay room, so whatever is up is what every listener on every
+page hears: pressing an instrument button took the sound away from somebody in
+another building, mid note. It happened for real. `/knobs/` was found refusing
+to start because somebody had pressed `sampled` on the listener page, and that
+page cannot work at all without Yoshimi's filter.
 
-⚠️ **It must be a FIFO, not `/dev/stdout`.** fluidsynth writes happily to a
-shell pipe, but under `spawn` it cannot re-open the inherited descriptor —
-`Failed to open audio file '/dev/stdout' for writing`, and `/dev/fd/1` fails
-identically. A named pipe is opened by path by both ends and has none of that
-ambiguity. Open the read end **`r+`**, never read-only: a read-only open of a
-FIFO blocks until a writer attaches, and fluidsynth has not started yet.
+⚠️ **A program number, never a General MIDI name.** `{voice:"pad"}` resolved
+through a GM table, and General MIDI was FluidSynth's meaning for a program
+number and nobody else's. Yoshimi's index its current bank, which the board
+enumerates itself with `voices.list` — it is the only end that can see the
+files. **Bank select is CC 32 here, read out of Yoshimi's own config, not CC 0**:
+CC 0 is its root directory, and sending a bank on it points Yoshimi at a root
+that does not exist, after which every program change lands nowhere.
 
-Measured on an M2, startup subtracted out: **0.088 s of CPU per second of
-audio** with 24 notes sounding across six parts — about 9% of one core.
-
-`fluid-test.mjs` checks the claim that matters: the same note under two voices
-must sound *different*. Piano `tail/peak 0.087`, flute `0.556` — a decay against
-a sustain. A multitimbral test that never compares two voices is testing a
-config file.
+`yoshimi-test.mjs` checks the claim that matters: the same note under two
+patches must sound *different*. A patch test that never compares two patches is
+testing a config file.
 
 ## It runs in a container, with no sound hardware at all
 
 The whole suite passes inside arm64 Linux with no `/dev/snd`:
 
     docker run --platform linux/arm64 -v "$PWD:/repo:ro" -w /repo/rig/box \
-      fsbox node box.mjs --room <room>          # then fluid-test.mjs from anywhere
+      fsbox node box.mjs --room <room>          # then live-test.mjs from anywhere
 
 13/13, streaming over the live relay. This corrects `plan-hardware` §8.6, which
 ruled containers out for the whole box: true for the patchbay, **wrong for the
@@ -125,10 +125,13 @@ testable in CI.
 nothing but arithmetic?** Both are gone from the instrument list. What they
 found is worth more than either of them.
 
-**They lost to things already packaged.** `hexter` plays the *actual DX7
+**They lost to things already packaged.** `hexter` played the *actual DX7
 factory cartridges* — ROM1A/1B/2A/2B, E.PIANO 1 included, shipped in Debian
 main — which is the patch `rhodes.mjs` was imitating from memory. SuperCollider's
 `MoogFF` is a correct ladder filter. Neither took an afternoon to write.
+⚠️ **hexter itself has since left this board** for a reason that is about the
+shared graph rather than about the synth: `archive/box-fluidsynth-hexter/`. What
+it settled about writing your own is unaffected.
 
 **The Rhodes was diagnosed rather than merely disliked.** The first listener's
 verdict was "super metally and has no warmth", and the measurement agreed:
@@ -159,7 +162,7 @@ for anyone porting one, not a working filter.
 **What they are still for.** They are pure per-sample arithmetic with no audio
 library, so the same maths runs in a browser AudioWorklet (`/carry/`), in node
 on the box, and in C on a microcontroller. **No plugin ports there** — not
-hexter, not Yoshimi, not a sampler. If the box ever becomes a chip rather than
+Yoshimi, not a DSSI host, not a sampler. If the box ever becomes a chip rather than
 a Pi, this is the only code in this directory that comes along. Measured on the
 Pi 4's A72: 8 voices at **6.8x realtime, 15% of one core**.
 
@@ -194,8 +197,9 @@ patchbay above needs no special case:
 | **SuperCollider** 3.13 | yes | yes, with JACK | `jackd -d dummy` -> `scsynth` -> a capture client |
 | **Csound** 6.18 | yes | **yes, but offline** | renders to a pipe at ~150x realtime |
 
-**FluidSynth is the only one that needs no audio server** — one process, and
-that is why it is the default here.
+**FluidSynth is the only one that needs no audio server** — one process. That
+is why it used to be the default here, and it is not the reason it left: see
+"One instrument, and why" above.
 
 **SuperCollider** works: `scsynth` is linked against `libjack.so.0`, and on a
 dummy JACK backend it reported *"SuperCollider 3 server ready"* and exposed
@@ -266,12 +270,12 @@ and `snd-virmidi` / `snd-aloop` are not in its kernel to load.
 
 ## 🔴 Two pages, one board, and who holds the granulator (2026-09-14, rewritten 2026-09-16)
 
-`/box/` used to send `fx.pappus {on:false}` on load. `/grains/` sends
+`/keys/` used to send `fx.pappus {on:false}` on load. `/grains/` sends
 `{on:true}`. **Whichever you opened last won, silently**, and the other page
 went on drawing a picture that was no longer true. That is the worst shape of
 failure there is, because nothing anywhere said so.
 
-⚠️ **Both pages were right.** `/box/` has no controls for the insert, and one
+⚠️ **Both pages were right.** `/keys/` has no controls for the insert, and one
 left behind by a `grains` tab that CLOSED wraps whatever it plays and feeds its
 own delay: measured 2026-09-12, a steady **-6.1 dBFS** subsonic drone while
 `box.alive` reported `voices: 0`. And the granulator is the entire subject of
@@ -294,7 +298,7 @@ visible problem into an invisible one.
 
 ### 🔴 The board cleans up after itself now (2026-09-16)
 
-`/box/` has no granulator on it at all since 2026-09-16, not even the message:
+`/keys/` has no granulator on it at all since 2026-09-16, not even the message:
 `grep -c pappus rig/box/listen.html` answers **0**. So the guarantee moved onto
 the board, where it should always have been. A guarantee that depended on
 somebody opening a second page was never a guarantee, because nobody had to open
@@ -347,11 +351,11 @@ person or another program to ask, and because it reads the liveness verdict
 **out loud**, as `ok:true, on:true, kept:true` with the holder and both ages,
 which the sweep cannot do for a caller that wants an answer now.
 
-⚠️ **`/box/` is `listen.html`, it is `built: false`, and `demo/verify.mjs`
+⚠️ **`/keys/` is `listen.html`, it is `built: false`, and `demo/verify.mjs`
 cannot see it**: it publishes no `__demo` and has zero asserts. That is why the
 guard lives on the BOARD and why there is a harness for it:
 **`node rig/box/insert-test.mjs --room studio-1`**, with two connections (one
-pretending to be `/grains/`, one pretending to be `/box/` and therefore SILENT)
+pretending to be `/grains/`, one pretending to be `/keys/` and therefore SILENT)
 because a single socket would pass vacuously. A client is never held off by its
 own claim. What it proves, and the controls that make it mean something:
 
@@ -368,7 +372,7 @@ own claim. What it proves, and the controls that make it mean something:
 🔴 **IT HAS NOT BEEN RUN.** Written 2026-09-16 and not executed: it touches a
 shared instrument in another building and nobody had said the board was free.
 
-🔴 **AND `/box/` NO LONGER DRAWS THE GRANULATOR EITHER, ON INSTRUCTION.**
+🔴 **AND `/keys/` NO LONGER DRAWS THE GRANULATOR EITHER, ON INSTRUCTION.**
 *"there is no ui to control it"*, which was true: the page had a box for it in
 its diagram, a `let insert` following the board's reports, and a log line on
 every ordinary visit saying the granulator was NOT in the sound. The first pass
@@ -383,9 +387,9 @@ message. `archive/box-pappus/` and `plan-box-pappus.md` have both.
 to keep it from streaming to an empty room. Three reasons:
 
 - **no page in `demo/` called any of them.** Grepped, not remembered: `/grains/`
-  uses `source.set` with a spec it makes itself, and `/box/` never offered the
+  uses `source.set` with a spec it makes itself, and `/keys/` never offered the
   archive as an instrument at all.
-- **`/box/`'s description stopped claiming an archive source weeks ago**, so the
+- **`/keys/`'s description stopped claiming an archive source weeks ago**, so the
   code was live and undescribed, which is the state things rot in.
 - **CLAUDE.md's standing rule**: every connection this repo opens to ERR appears
   in a public broadcaster's audience measurement. An unused path to their

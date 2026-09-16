@@ -16,7 +16,7 @@
 **Live at <https://positron.studio/rack/>.** Press a key in a browser anywhere:
 the note number crosses the relay, `live-agent.mjs` on the studio Mac hands it
 to Live over CoreMIDI, and a copy of what Live renders comes back down the same
-socket. `/box/` is the SAME PAGE pointed at a Raspberry Pi — what crosses the
+socket. `/keys/` is the SAME PAGE pointed at a Raspberry Pi — what crosses the
 wire is a note number, so neither end knows what kind of machine the other is.
 
     rig/m1/live-agent.mjs   the agent: notes in over the relay, audio out
@@ -107,7 +107,7 @@ landing early threw ~15 ms of audio away mid-note, over and over.
 What found it was **giving the cushion a number**: `breaks` in the readout, and
 it read `0 ran dry, 1 trimmed` inside 2.2 s. Slack now follows the frame size
 the worklet OBSERVES, because every caller feeds a different one and none of
-them declares it. ⚠️ `/box/` and `grains` were doing the same thing, unreported,
+them declares it. ⚠️ `/keys/` and `grains` were doing the same thing, unreported,
 for as long as they have existed.
 
 **"The bytes are correct" and "the sound is correct" are different claims**, and
@@ -542,7 +542,7 @@ record it as working until a note moves Live's meter.**
 
 **Left to build — `live-box.mjs`:** join a relay room, turn `note.on`/`note.off`
 into lines on `midisend`'s stdin, and stream BlackHole back as 20 ms frames. Then
-`/box/?room=pro-1` plays Live with no page changes, because the box page does not
+`/keys/?room=pro-1` plays Live with no page changes, because the box page does not
 know what a Raspberry Pi is.
 
 ⚠️ **It cannot dial out unattended the way the Pi does.** A capture started over

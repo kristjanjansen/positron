@@ -38,7 +38,7 @@
    * `demo/verify.mjs` presses every control in `.pos-controls` on every run,
    * dozens of times a day, and control 0 here starts Yoshimi on a board in
    * another building. There is ONE JACK graph and ONE instrument on it, so a
-   * suite run would silently stop whatever `/box/` or `/grains/` was doing.
+   * suite run would silently stop whatever `/keys/` or `/grains/` was doing.
    * plan-controller §6.6 says never start audio on load for exactly that
    * reason; a scripted press is not a load, it is worse, because it happens
    * far more often.
@@ -101,17 +101,22 @@
     // wordings that can drift apart.
     // ⚠️ WHAT THE PARAGRAPH SAID IS REHOMED, NOT DELETED. The gate, the relay
     // and the twenty millisecond frame are boxes and notes in the picture now.
-    what: 'Sweep a big filter on a Raspberry Pi in another building, with two sliders and no keyboard.',
+    // ⚠️ IT SAYS THE HAND NOW, BECAUSE THE PAGE GAINED A CONTROL. A description
+    // that has drifted is worse than a missing one: nothing type-checks a
+    // sentence and a visitor believes it. `manifest.mjs`'s own line moved in the
+    // same change, verbatim, so arriving from the index does not mean reading
+    // the same claim twice in two wordings.
+    what: 'Sweep a big filter on a Raspberry Pi in another building, with two sliders an invisible hand can take over.',
     /**
      * Six cells, and every one of them moves.
      *
-     * `sent` and `skipped` are your hand, counted in this page. `played` is the
+     * `sent` is your hand, counted in this page. `played` is the
      * board, counted on the far side of the wire, which is the only side that
      * can answer for it. `round trip` and `buffer` are the two biggest terms in
      * how late the sound is, and `lost` is whether anything vanished on the way.
      *
      * ⚠️ NO `lag` CELL YET. plan-controller §6.3 wants one and §5.3 says how to
-     * take it: a spectral centroid crossing, because `/box/`'s silence-to-onset
+     * take it: a spectral centroid crossing, because `/keys/`'s silence-to-onset
      * trick cannot work on a sweep that happens on top of a note already
      * sounding. That is step 5 of the build order, and a cell that can never
      * fill teaches a reader to skip the row.
@@ -122,7 +127,36 @@
      * one that moves, because a pointer really does outrun the gate, and that
      * is `skipped`.
      */
-    readout: { sent: '/s', skipped: '/s', played: '/s', 'round trip': 'ms', buffer: 'ms', lost: '' },
+    /**
+     * 🔴 FOUR, DOWN FROM SIX. Asked 2026-09-16 with a photograph of the row:
+     * *"can we keep 4?"*. CLAUDE.md says a readout with a cell too many always
+     * has a weakest one, and here it had two.
+     *
+     * `lost` counts frames the relay dropped, and a healthy run leaves it at 0
+     * for as long as anybody watches: a counter that only moves when something
+     * is broken teaches a reader to stop looking at the row. It is still
+     * COUNTED and still said in the log when it moves, which is where a fault
+     * belongs.
+     * `skipped` was the page's own discard, and it is the pair to `sent` rather
+     * than a fact of its own: what your hand made that did not go is the
+     * difference between the two, and the sentence under the picture says so.
+     * What is left is the whole claim in four numbers: what went out, what the
+     * board wrote, how far away it is, and how much sound is in hand.
+     */
+    /**
+     * 🔴 THE TWO COUNTERS NAME THE SAME UNIT NOW, AND RENAMING THEM IS WHAT
+     * SHOWED THEY DID NOT. Asked 2026-09-16: *"sent? 'cc out'?"*. `sent`
+     * counted MESSAGES and `played` counted VALUES, and one message carries
+     * both sliders, so a two handed sweep read 50 against 100 and the gap was
+     * the packing rather than anything lost. Two numbers a reader is invited to
+     * compare have to be in the same unit or the comparison is a trap.
+     * ⚠️ `played` IS NOT `slices in`, which was the other half of the question.
+     * It is what the BOARD wrote to the synth, read off its own counter, so it
+     * is the far end of the control path and not the near end of the audio one.
+     * Sound arriving is a different measurement and `buffer` is the one that
+     * says whether it is healthy.
+     */
+    readout: { 'cc out': '/s', 'cc played': '/s', 'round trip': 'ms', buffer: 'ms' },
     /**
      * 🔴 THE NUMBERS AND THE LOG ARE ONE SURFACE AT THE FOOT OF THIS PAGE.
      * Asked for 2026-09-16, and this is the page it was asked about. Split,
@@ -196,13 +230,45 @@
   // Appended to the body rather than to the control row: they are the subject
   // of the page, not furniture beside it, and the harness cannot press a slider
   // anyway.
+  /**
+   * 🔴 A HAND ON EACH, AND THE PAGE SAYS SO IN THREE PLACES WHENEVER ONE IS ON.
+   * This page HAD something that moved its own sliders and it was taken out on
+   * 2026-09-16, on this report: *"I'm not sure where sliders did anything... Is
+   * there some param CC parameters which are already moving, which I don't
+   * see?"*. What makes this a different feature rather than that one coming
+   * back is that it is asked for by a press, it is unmistakable while it runs,
+   * and a hand takes it back in one frame. Nothing here starts by itself.
+   *
+   * ⚠️ AND THE BUTTON IS NOT IN THE CONTROL ROW. `verify.mjs` presses
+   * `.pos-controls button` on every demo on every run, dozens of times a day,
+   * and this page's control row is empty on purpose. A hand button in it would
+   * start fifty messages a second to a shared Raspberry Pi on every one of
+   * those runs. There is an assert on it below.
+   */
+  let handStarts = 0;                  // how many times a hand has been asked for
+  const handSaid = (what) => (s) => {
+    if (s.why === 'coarse') { d.log(`${what}: ${s.says}`, 'warn'); return; }
+    if (s.on) {
+      handStarts++;
+      d.log(`an invisible hand has the ${what} slider: it sweeps by itself, back and forth, `
+        + 'and stops on its own after ten minutes. Grab it, use the arrow keys or press stop '
+        + 'and it hands over at once');
+    } else {
+      const why = s.why === 'ceiling' ? ', which is the ten minute ceiling'
+        : s.why === 'hidden' ? ', because this tab went to the background'
+        : s.why === 'pause' ? ', because everything stopped' : '';
+      d.log(`the ${what} slider is yours again${why}`);
+    }
+  };
   const cutoff = createSlider({
     label: 'cutoff', aria: 'filter cutoff', min: 0, max: 127, step: 1, value: CUTOFF_HOME,
+    hand: true, onHand: handSaid('cutoff'),
     onInput: (v) => move(CUTOFF, v),
     onChange: (v) => land(CUTOFF, v),
   });
   const reso = createSlider({
     label: 'resonance', aria: 'filter resonance', min: 0, max: 127, step: 1, value: NEUTRAL,
+    hand: true, onHand: handSaid('resonance'),
     onInput: (v) => move(RESO, v),
     onChange: (v) => land(RESO, v),
   });
@@ -422,7 +488,7 @@
     /**
      * 🔴 ONLY THE BOARD COUNTS AS THE BOARD. This called `seen()` on ANY message
      * that was not our own echo, and the relay is VERBATIM: everything in the
-     * room reaches everybody. So another tab of this page, or `/box/`, or
+     * room reaches everybody. So another tab of this page, or `/keys/`, or
      * `/grains/`, or a harness run, would have painted the badge green while
      * the Raspberry Pi was unplugged. A presence badge that can be satisfied by
      * somebody else in the room is worse than no badge, because it is wrong in
@@ -454,7 +520,7 @@
       const now = performance.now();
       if (meter && now > meterAt) playedPerSec = (m.out - meter.out) / ((now - meterAt) / 1000);
       meter = m; meterAt = now;
-      d.set('played', Math.max(0, Math.round(playedPerSec)));
+      d.set('cc played', Math.max(0, Math.round(playedPerSec)));
     }
   }
 
@@ -471,20 +537,28 @@
   }
 
   // ── what the numbers are counted over ─────────────────────────────────────
-  let t0 = performance.now(), m0 = 0, k0 = 0;
+  let t0 = performance.now(), m0 = 0, k0 = 0, lastGone = 0;
   setInterval(() => {
     const now = performance.now(), dt = (now - t0) / 1000;
     if (dt < 1) return;
-    d.set('sent', Math.round((wireMsgs - m0) / dt));
-    d.set('skipped', Math.round((gate.stats.thinned - k0) / dt));
-    t0 = now; m0 = wireMsgs; k0 = gate.stats.thinned;
-    // ⚠️ NOT SET UNTIL SOMETHING HAS ARRIVED. A counter pre-set to 0 reads as a
-    // very confident measurement of nothing, and with no board there is nothing
-    // that could have been lost. `sent` and `skipped` are rates and are
-    // different: 0 a second is a true statement about a hand that is not moving.
+    // VALUES, not messages: one message carries both sliders, so counting
+    // messages here put this cell in a different unit from the one beside it.
+    d.set('cc out', Math.round((gate.stats.sent - m0) / dt));
+    // ⚠️ STILL COUNTED WITH NO CELL TO SHOW IT. `skipped` and `lost` came off
+    // the row and neither stopped being measured: what your hand made that did
+    // not go is still the difference between what the gate was offered and what
+    // it sent, and a frame the relay dropped is still noticed. Both reach a
+    // reader through the log, which is where something that only moves when
+    // there is a fault belongs.
+    const skipped = Math.round((gate.stats.thinned - k0) / dt);
+    t0 = now; m0 = gate.stats.sent; k0 = gate.stats.thinned;
     if (!frames) return;
     const gone = pcmMissing + Math.max(0, breaks);
-    d.set('lost', gone, gone ? 'bad' : 'ok');
+    if (gone > lastGone) {
+      d.log(`${gone - lastGone} slice${gone - lastGone === 1 ? '' : 's'} of sound went missing on the way`, 'bad');
+      lastGone = gone;
+    }
+    void skipped;
   }, 1000);
 
   // The network alone, with the relay's Durable Object never woken: the runtime
@@ -551,7 +625,7 @@
   // online'"*. `board` is this repo's own shorthand for it, which is the kind of
   // private vocabulary CLAUDE.md keeps out of anything a visitor reads, and it
   // is vaguer than the truth: the page already says a Raspberry Pi in another
-  // building, and the diagram on /box/ calls the same machine by the same name.
+  // building, and the diagram on /keys/ calls the same machine by the same name.
   const pres = createPresence({ of: 'Raspberry Pi' });
   pres.follow({ everyMs: 5000, comingMs: 45000 });
   pres.checking();          // a question is out before anything has answered
@@ -653,7 +727,7 @@
         d.log(`yoshimi was already up, so nothing was restarted. ${PATCH} is loaded and one note is held. Drag the sliders`, 'hi');
       } else if (status && status.ok) {
         // 🔴 DO NOT AUTOSTART OVER SOMEBODY. There is one JACK graph and one
-        // instrument, so starting here stops whatever `/box/` or `/grains/` is
+        // instrument, so starting here stops whatever `/keys/` or `/grains/` is
         // doing. Say what is running and let a person decide.
         d.log(`${status.source} is playing on the board and this page will not stop it. Nothing here is going anywhere until it is free`, 'warn');
       } else if (status) {
@@ -677,11 +751,17 @@
     // while it runs, so with it in the middle the harness saw the free checks,
     // waited 400 ms, and stopped before anything else arrived. Every assert on
     // this page now lands in one uninterrupted run.
-    if (SELFCHECK) { await sweepChecks(); freeChecks(); }
+    if (SELFCHECK) { await sweepChecks(); await handChecks(); freeChecks(); }
     checkAll();
   }
 
   function panic() {
+    // 🔴 AND EVERY INVISIBLE HAND GOES OFF FIRST. A hand still running would
+    // fight the glide below within one frame, which is a page arguing with
+    // itself in front of somebody, and stop here means stop. It goes before the
+    // `set` calls so the homing glide is the last thing that touches a handle.
+    cutoff.hand?.stop('pause');
+    reso.hand?.stop('pause');
     // The sliders come back to neutral, which is where the patch's own filter
     // is, and the board is told to release every note. The board may be holding
     // notes this page never pressed, so the message has to go out as well as
@@ -796,6 +876,103 @@
     cutoff.set(CUTOFF_HOME, { quiet: true });
   }
 
+  /**
+   * 🔴 THE THREE PROMISES AN INVISIBLE HAND HAS TO KEEP, DRIVEN RATHER THAN
+   * DESCRIBED. Behind `?selfcheck=1`, because every line of it moves a control.
+   *
+   *   A  unmistakable while it runs, on three channels at once
+   *   B  per slider, so the one beside it is untouched
+   *   C  a hand takes it back in one frame, by any of three routes
+   *
+   * ⚠️ AND IT NEVER REACHES THE BOARD UNDER A CHECK. Everything the hand makes
+   * goes through `move()` and so through `pump()`, which holds every value back
+   * while `MAY_PLAY` is false. The assert about that is the one already in
+   * `checkAll`, and it now covers a hand's messages as well as a finger's.
+   */
+  let handRun = null;
+  async function handChecks() {
+    const a = cutoff.hand, b = reso.hand;
+    if (!a || !b) return;
+    const rowOf = (s) => s.el.querySelector('.sld-hand-row');
+    const knobOf = (s) => getComputedStyle(s.el.querySelector('.sld-knob')).backgroundColor;
+    const startedWith = reso.get();
+    const startsBefore = handStarts;
+
+    a.press();                                   // off -> sweep. One press, like a person's
+    const lit = {
+      mine: rowOf(cutoff).dataset.hand, other: rowOf(reso).dataset.hand,
+      knob: knobOf(cutoff), otherKnob: knobOf(reso),
+      pressed: cutoff.el.querySelector('.sld-hand').getAttribute('aria-pressed'),
+      // ⚠️ A CEILING IS ONLY A CEILING IF IT IS RUNNING DOWN. Reading the
+      // constant would assert the source rather than the behaviour.
+      leftMs: a.leftMs,
+      starts: handStarts - startsBefore,
+    };
+    const from = cutoff.get();
+    await wait(900);
+    const movedTo = cutoff.get();
+
+    // ── C1. a pointer on the lane ──────────────────────────────────────────
+    const lane = cutoff.el.querySelector('.sld-lane');
+    const r = lane.getBoundingClientRect();
+    const kw = cutoff.el.querySelector('.sld-knob').getBoundingClientRect().width;
+    const y = r.top + r.height / 2;
+    const px = (f) => r.left + kw / 2 + (r.width - kw) * f;
+    const send = (type, x) => lane.dispatchEvent(new PointerEvent(type,
+      { pointerId: 1, bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    send('pointerdown', px(0.25));
+    const heldByPointer = rowOf(cutoff).dataset.held === '1' && rowOf(cutoff).dataset.hand === 'on';
+    send('pointermove', px(0.40));
+    const atPointer = cutoff.get();
+    send('pointerup', px(0.40));
+    const onLift = cutoff.get();
+    // ⚠️ 400 ms RATHER THAN THE 200 THE PLAN ASKS FOR, AND IT IS ARITHMETIC.
+    // A reach leaves rest with no speed and no acceleration, so 200 ms into a
+    // 1.87 s reach is about three of this lane's 127 steps. 400 ms is about
+    // nine, which is a movement rather than a rounding.
+    await wait(400);
+    const resumed = cutoff.get();
+
+    // ── C2. the keyboard, which goes through set() ──────────────────────────
+    lane.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    const afterKey = cutoff.get();
+    const heldByKey = rowOf(cutoff).dataset.held === '1';
+    await wait(400);
+    const keyStuck = cutoff.get();
+
+    // ── C3. the page itself, which is what stop does with both handles ──────
+    cutoff.set(12, { quiet: true });
+    const heldByPage = rowOf(cutoff).dataset.held === '1';
+    await wait(400);
+    const pageStuck = cutoff.get();
+
+    const otherStill = reso.get();
+    const otherRow = rowOf(reso).dataset.hand;
+
+    // ── the guard that has no other way to be proved ────────────────────────
+    // 🔴 BREAK IT ON PURPOSE: tell the page it is in the background and see
+    // whether the hand goes off. `document.hidden` is a getter on the
+    // prototype, so it is shadowed for the length of this one check and then
+    // removed. Without this the third guard is a line of code nobody has ever
+    // watched run.
+    let wentOffHidden = null;
+    if (a.running) {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      wentOffHidden = !a.running;
+      delete document.hidden;
+    }
+    if (a.running) a.press();                    // sweep -> off, whatever happened
+    handRun = {
+      lit, from, movedTo, heldByPointer, atPointer, onLift, resumed,
+      afterKey, heldByKey, keyStuck, heldByPage, pageStuck,
+      otherStill, otherRow, startedWith, wentOffHidden,
+      offAfter: rowOf(cutoff).dataset.hand,
+      inControls: document.querySelectorAll('.pos-controls .sld-hand').length,
+    };
+    cutoff.set(CUTOFF_HOME, { quiet: true });
+  }
+
   function checkAll() {
     /**
      * 🔴 NOT FOR A VISITOR. NOT ONE OF THEM, EVER. PHOTOGRAPHED 2026-09-16 on a
@@ -819,13 +996,26 @@
       wire.state() === 1 ? `open in ${ROOM}` : `readyState ${wire.state()}${wire.stats().refusal ? ` · ${wire.stats().refusal}` : ''}`);
     d.assert('the relay answered a round trip with nothing woken at the far end',
       Number.isFinite(rtt), rtt === null ? 'no pong came back' : `${Math.round(rtt)} ms`);
-    // The relay echoes verbatim to the sender, so the difference between what
-    // went out and what came back is this socket's drop count, with no
-    // cooperation from anybody. A few can be in flight at check time.
+    /**
+     * The relay echoes verbatim to the sender, so the difference between what
+     * went out and what came back is this socket's drop count, with nobody's
+     * cooperation.
+     *
+     * ⚠️ THE TOLERANCE IS A ROUND TRIP'S WORTH, NOT A NUMBER I LIKED. It was
+     * three, and a board run read `33 of 37` because the sweep ends about 40 ms
+     * before this line and the gate sends up to one message per controller per
+     * 20 ms. What can honestly be in flight is whatever left within one round
+     * trip, so the allowance is computed from the round trip this page has just
+     * MEASURED rather than guessed: 45 ms at two sliders every 20 ms is four
+     * or five, and on a slow link it is more, correctly.
+     */
     const w = wire.stats();
+    const inFlight = Math.ceil(((Number.isFinite(rtt) ? rtt : 60) / SEND_GATE_MS) * 2) + 1;
     d.assert('the relay delivered the control messages this page sent',
-      w.sent > 0 && w.sent - w.echoed <= 3,
-      `${w.echoed} of ${w.sent} came back${w.refused ? `, ${w.refused} refused by this page as too big` : ''}`);
+      w.sent > 0 && w.sent - w.echoed <= inFlight,
+      `${w.echoed} of ${w.sent} came back, with up to ${inFlight} still in flight at a `
+      + `${Math.round(Number.isFinite(rtt) ? rtt : 60)} ms round trip`
+      + `${w.refused ? `, ${w.refused} refused by this page as too big` : ''}`);
     // Both branches. A board that is off is the ordinary case, and a page that
     // only asserts the happy path has no coverage on those days.
     // ⚠️ `d.api.logs`, NOT `d.logs`. The mount API does not carry the array;
@@ -843,6 +1033,34 @@
      * that creeps back in the next time somebody reaches for the transport,
      * because a scrub and an end are what a transport USUALLY has.
      */
+    /**
+     * 🔴 THE PICTURE IS LAST AND CARRIES THE STANDING HEADING, AND THIS PAGE
+     * SHIPPED WITH NEITHER. REPORTED 2026-09-16 with a screenshot: *"no heading
+     * on diagram. and not last in page. breaking the rules afgain and afain"*.
+     *
+     * The cause was that `how` and `atEnd` are `createDiagram`'s THIRD argument
+     * and had been written inside the spec, where they are two unread keys
+     * rather than an error. Nothing could see it: not the parser, not `cuts`,
+     * not the suite. So it is a check now, and it is about the page rather than
+     * about the call, because the next way to get this wrong will not be the
+     * same way.
+     */
+    const kids = [...document.body.children].map((e) => e.className.split(' ')[0]);
+    const fig = kids.lastIndexOf('pos-dg');
+    /**
+     * 🔴 AND THE PICTURE REPORTS ITS OWN DAMAGE. `createDiagram` collects every
+     * label it had to shorten, every note over about forty words and every
+     * arrow it could not route, and a page that never reads that list ships a
+     * cut label looking exactly like a picture that is fine.
+     */
+    d.assert('nothing in the picture was cut, shortened or left undrawn',
+      (dg.cuts?.length ?? 0) === 0,
+      (dg.cuts?.length ?? 0) === 0 ? `${dg.ties ?? 0} tie(s), nothing reported`
+        : dg.cuts.map((c) => `${c.id}: ${c.shown}`).join(' · '));
+    d.assert('the picture is the last thing on the page, under the standing heading',
+      fig === kids.length - 1 && kids[fig - 1] === 'pos-how'
+        && document.querySelector('.pos-how')?.textContent === 'How it works',
+      `${kids.join(' -> ')} · heading "${document.querySelector('.pos-how')?.textContent || 'none'}"`);
     d.assert('the transport offers no position and no loop, because a held note has neither',
       !d.el.querySelector('.tbar-loop') && bar.el.dataset.scrub !== '1',
       `${d.el.querySelector('.tbar-loop') ? 'a LOOP button is on the bar' : 'no loop'} · scrub ${bar.el.dataset.scrub}`);
@@ -872,6 +1090,71 @@
           wireMsgs === 0 && !armed && heldBack > 0,
           `the gate made ${gate.stats.messages} messages, ${heldBack} were held back and ${wireMsgs} went on the wire`);
       }
+    }
+
+    // ── the invisible hand ───────────────────────────────────────────────
+    if (SELFCHECK && handRun) {
+      const h = handRun;
+      /**
+       * 🔴 A. UNMISTAKABLE, ON THREE CHANNELS, BECAUSE ONE CHANNEL IS WHAT
+       * FAILED LAST TIME. The button says "this slider is automated" even while
+       * the handle is standing still at a turn; the handle says "the page is
+       * moving THIS one right now"; the log says when it started, which is the
+       * only channel that survives a screenshot taken a minute later. The
+       * comparison is against the slider beside it rather than against a
+       * remembered colour, which is what having two of them buys.
+       */
+      d.assert('while a hand runs, its button is lit, its handle is hollow and the slider beside it is neither',
+        h.lit.mine === 'on' && h.lit.other === 'off' && h.lit.pressed === 'true'
+        && h.lit.knob !== h.lit.otherKnob && h.lit.starts === 1
+        && d.api.logs.some((l) => l.msg.includes('an invisible hand has the cutoff slider')),
+        `the driven handle is ${h.lit.knob} and the one beside it ${h.lit.otherKnob}, `
+        + `its row reads ${h.lit.mine} against ${h.lit.other}, and the log has the line`);
+      /**
+       * 🔴 B. PER SLIDER, AND THIS IS A NEGATIVE CONTROL: it fails if the hand
+       * is a module-level singleton, which is the obvious way to write one.
+       */
+      d.assert('a hand belongs to one slider: the other never moved and never said it was on',
+        h.otherStill === h.startedWith && h.otherRow === 'off',
+        `resonance sat at ${h.otherStill} for the whole ${'2.1'} s the cutoff was being driven, `
+        + `and its own row still reads ${h.otherRow}`);
+      /**
+       * 🔴 C. THREE WAYS TO TAKE IT BACK, AND ALL THREE HAVE TO WORK. A pointer
+       * on the lane, an arrow key, and the page calling `set()` itself. The
+       * last two both go through `set()`, which is why one rule covers them and
+       * cannot be forgotten for one of them.
+       */
+      d.assert('a pointer, an arrow key and the page each take the handle back in one frame',
+        h.heldByPointer && h.heldByKey && h.heldByPage
+        && h.onLift === h.atPointer && h.keyStuck === h.afterKey && h.pageStuck === 12,
+        `the pointer left it at ${h.atPointer} and it was still there on the lift, `
+        + `an arrow key left it at ${h.afterKey} and it stayed for 400 ms, `
+        + `and the page put it at 12 and it stayed at ${h.pageStuck}`);
+      /**
+       * ⚠️ YIELD, NOT OFF. Nothing pressed the button, so the hand picks the
+       * movement up from where the pointer left it. A motorised fader you can
+       * grab is the physical thing the phrase names.
+       */
+      d.assert('and it picks the movement up again when the pointer lifts, from where it was left',
+        h.resumed !== h.onLift && h.movedTo !== h.from && h.offAfter === 'off',
+        `it swept ${h.from} to ${h.movedTo}, was put at ${h.onLift} by hand, read ${h.resumed} `
+        + '400 ms after the lift, and a second press turned it off');
+      /**
+       * 🔴 THE GUARDS, AND TWO OF THEM ARE PROVED BY BREAKING SOMETHING. Never
+       * on load: nothing had asked for a hand before this press. Never in the
+       * control row: `verify.mjs` presses every button in it on every run. Off
+       * when the tab is hidden: `document.hidden` was shadowed for one line and
+       * the event dispatched, so the guard is watched rather than assumed. The
+       * ceiling is read off a clock that is running down rather than off the
+       * constant that set it.
+       */
+      d.assert('nothing starts a hand by itself, none of them is in the control row, and it stops itself',
+        h.lit.starts === 1 && h.inControls === 0
+        && h.wentOffHidden === true
+        && h.lit.leftMs > 9 * 60000 && h.lit.leftMs <= 10 * 60000,
+        `${h.inControls} hand buttons in the control row, the tab going to the background `
+        + `turned it ${h.wentOffHidden ? 'off' : 'NOT off'}, and ${Math.round(h.lit.leftMs / 1000)} s `
+        + 'were left of the ten minute ceiling one frame after it started');
     }
 
     // ── only answerable with a board ─────────────────────────────────────
@@ -959,67 +1242,179 @@
    * under the controls rather than in front of them.
    */
   const dg = createDiagram(d.el, {
-    how: true,
-    atEnd: true,
-    caption: 'A hand moves faster than a filter can be heard to change, so what leaves this '
-      + 'page is thinner than what your hand made: sent is what went, skipped is the rest.',
+    // ⚠️ `A HAND`, NOT `YOUR HAND`. One of the two that move these sliders now
+    // belongs to the page, and both of them make far more positions than the
+    // gate lets out. A caption that says only your finger would be describing
+    // half the traffic it is there to explain.
+    caption: 'A hand makes more positions than the wire needs to carry, yours or the page’s own, so the page sends a '
+      + 'thinned version of your gesture: cc out counts the values that left this browser, cc '
+      + 'played counts the ones the board wrote to the synth, and the difference between them '
+      + 'is what went missing between here and there.',
     nodes: [
-      { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+      /**
+       * 🔴 `join: false`, BECAUSE THESE THREE ARE NOT A CHAIN. REPORTED
+       * 2026-09-16 with a screenshot: *"why send gate connects to playout?"*.
+       *
+       * An arrow between two neighbours is the container's DEFAULT, and it was
+       * drawing `send gate -> playout`, which says the gate feeds the playout.
+       * It does not: one is control leaving and the other is audio arriving, and
+       * they never touch. The real chain is declared, sliders into the gate, and
+       * the third box belongs to the return path, which reaches it from outside
+       * the machine.
+       * ⚠️ A DECLARED LINK IS UNAFFECTED: `join` only decides what an UNDECLARED
+       * gap between two neighbours looks like, so the arrow that is true still
+       * draws and the one that was invented does not.
+       */
+      /**
+       * ⚠️ A CONTAINER'S SUB SAYS WHAT ROLE THE MACHINE PLAYS, which is the one
+       * thing its name cannot. Asked 2026-09-16: *"outer boxes have no
+       * descriptions. make short but useful"*, after an earlier round removed
+       * `phone or laptop`, `one object` and `in another building` as unhelpful,
+       * which they were: they described the machines rather than their part in
+       * this. Three or four words each, and still no `note`, because a
+       * paragraph on a container repeats the boxes underneath it.
+       */
+      { id: 'you', label: 'Browser', kind: 'here', tech: 'browser',
+        join: false,
         children: [
           { id: 'sliders', label: 'sliders', sub: 'cutoff, resonance', tech: 'browser',
-            note: 'Two ordinary range inputs. What they carry is MIDI control change 74 and '
-                + '71, which is what a hardware filter knob has sent since the 1980s, so '
-                + 'nothing here has to be translated at the far end.' },
+        },
           { id: 'gate', label: 'send gate', sub: 'one value per 20ms', tech: 'browser',
-            note: 'A finger reports faster than the board can be heard to answer, so at most '
-                + 'one value per controller per audio frame goes out. The last value of a '
-                + 'gesture is never held back, because that is the one that stays true.' },
+        },
           { id: 'playout', label: 'playout', sub: 'AudioWorklet, 160ms', tech: 'sound',
-            note: 'Holds a cushion of sound before playing any of it, because frames arrive '
-                + 'in lumps: measured p50 20.0 ms and a worst gap of 83.6 ms. Too small a '
-                + 'cushion is a click and too large is a filter that answers late.' },
+        },
         ] },
-      { id: 'cf', label: 'Cloudflare', sub: 'one object', kind: 'cloud', tech: 'cloudflare',
+      // ⚠️ NO `sub` ON A CONTAINER. Asked 2026-09-16: *"rm outer boxes descs not
+      // helpful"*. `phone or laptop`, `one object` and `in another building` were
+      // three captions saying what the boxes inside them already say: the
+      // children name the machine better than a phrase above them can.
+      /**
+       * 🔴 ONE OBJECT, DRAWN AS TWO BOXES BY ROLE, AND IT IS `/keys/`'s SHAPE.
+       * Asked for 2026-09-16: *"current box diagram is so much nicer. unify the
+       * diagrams"*.
+       *
+       * With a single `Relay` box THREE arrows met at one node: the control
+       * going out, and both halves of the audio coming back. So the outward
+       * arrow and the return arrow shared a point and the return had to be
+       * routed under the row, arriving at `playout` as a stub from nowhere.
+       * That was reported on the other page in exactly those words: *"what is
+       * this thing on left of playout?"* and *"how sound gets back from pi to
+       * browser? no connector on this"*. Split by role the picture is a RING:
+       * out along the top, down the board, back along the bottom, and nothing
+       * meets in the middle.
+       *
+       * ⚠️ IT IS NOT TWO RELAYS AND THE PICTURE MUST NOT SAY IT IS. It is one
+       * Durable Object on one socket carrying traffic both ways, which is what
+       * `Relay object` under each of them says. A drawing may split a thing by
+       * ROLE to be read; it may not invent a second machine.
+       * ⚠️ AND IT EVENS THE ROW. Containers are drawn to one height, so with one
+       * box here against three in the Browser this machine was two rows of blank
+       * ground. Two is still one short of three, which is as close as three
+       * honest boxes get.
+       *
+       * The name is `Relay`; `Durable Object` under it is what kind of thing it
+       * is. The label is what that half CARRIES, because a direction is not a
+       * name: `notes out` and `sound back` were tried on the other page and
+       * reported as *"not good names"*, correctly. The direction is in the
+       * arrows already.
+       */
+      { id: 'cf', label: 'Cloudflare', kind: 'cloud', tech: 'cloudflare',
+        join: false,
         children: [
-          { id: 'relay', label: 'Relay object', sub: 'Durable Object', tech: 'cloudflare',
-            note: 'Copies every message to everybody else in the room and reads none of '
-                + 'them. That is why this page learns which socket is the board rather than '
-                + 'trusting that anything arriving is from it.' },
+          { id: 'down', label: 'control', sub: 'Relay object', tech: 'cloudflare',
+        },
+          { id: 'up', label: 'audio', sub: 'Relay object', tech: 'cloudflare',
+        },
         ] },
-      { id: 'pi', label: 'Raspberry Pi', sub: 'in another building', kind: 'box', tech: 'board',
+      // `raspberry` is in `TECH_HUE` and `board` never was, so this box had been
+      // taking whatever the rotation handed it.
+      // ⚠️ `kind: 'device'`, WHICH IS WHAT EVERY OTHER MACHINE-IN-A-ROOM IN THIS
+      // project declares. This page was the only `kind: 'box'` anywhere, so the
+      // same Raspberry Pi was two different kinds on two pages that draw it.
+      { id: 'pi', label: 'Raspberry Pi', kind: 'device', tech: 'raspberry',
         children: [
-          { id: 'yoshimi', label: 'yoshimi', sub: 'ZynAddSubFX', tech: 'sound',
-            note: 'A software synth holding one note, with a patch whose filter answers CC 74. '
-                + 'MEASURED on this board: the controller moves the brightness 6.18 octaves, '
-                + 'from 162 Hz to 11.7 kHz.' },
-          { id: 'capture', label: 'capture', sub: 'ffmpeg, JACK', tech: 'board',
-            note: 'Reads the JACK graph the synth plays into and cuts it into 20 ms frames of '
-                + '48 kHz mono. It runs whether or not a note is sounding, which is why a '
-                + 'frame count cannot tell sound from silence.' },
+          /**
+           * ⚠️ THE SUB SAYS WHAT KIND OF PROGRAM IT IS, NOT WHERE IT CAME FROM.
+           * It read `ZynAddSubFX`, which is the synth Yoshimi was forked from
+           * and means nothing to anybody who has not met it. Asked 2026-09-16:
+           * *"explain yoshimi: supercolooder etc"*. The lineage is in the note,
+           * where there is room to say what it is FOR, and it is set against
+           * SuperCollider because this board runs that too, for `/grains/`.
+           */
+          { id: 'yoshimi', label: 'yoshimi', sub: 'software synth', tech: 'sound',
+            /**
+             * ⚠️ NO SUPERCOLLIDER IN HERE. It said `SuperCollider on this same
+             * board is the other kind`, meaning to place Yoshimi by contrast,
+             * and it did the opposite: *"do not get sc thing, is yoshimi
+             * sc-based on no?"*. It is not, it is C++ and forked from
+             * ZynAddSubFX, and naming a second program inside a note about the
+             * first invites a relationship that does not exist. A note explains
+             * the box it is on.
+             */
+        },
+          /**
+           * 🔴 TWO BOXES, BECAUSE THEY ARE TWO PROGRAMS. Asked 2026-09-16:
+           * *"should it break into 2 boxes (jack / ffmpeg)"*. One box called
+           * `capture` with `ffmpeg, JACK` under it was a sub doing a diagram's
+           * job: the fact that the synth is not wired to a loudspeaker but to a
+           * sound server, and that something else reads it from there, was a
+           * sentence in a note instead of a thing a reader can point at.
+           * ⚠️ IT ALSO EVENS THE PICTURE. The Browser holds three boxes and the
+           * board held two, and containers are drawn to one height, so the
+           * board's spare row was blank ground in every machine beside it.
+           */
+          { id: 'jack', label: 'JACK', sub: 'sound server', tech: 'sound',
+        },
+          { id: 'ffmpeg', label: 'ffmpeg', sub: '20ms pieces', tech: 'sound',
+        },
         ] },
     ],
+    // 🔴 ONE WAY ROUND, AND IT IS A RING. Out along the top: sliders, gate,
+    // control, yoshimi. Down the board: the sound server, then the capture.
+    // Back along the bottom: audio, playout. Every arrow points the way the
+    // signal actually travels, and nothing meets in the middle. `/keys/` draws
+    // the same ring with a keyboard where the sliders are.
     links: [
       { from: 'sliders', to: 'gate',
-        note: 'Every move is offered and most are dropped: a value nobody sent is one another '
-            + 'overtook before its turn came round. A release is never dropped.' },
-      { from: 'gate', to: 'relay', label: 'ctl.set',
-        note: 'One message carries every controller that is due, because the relay counts '
-            + 'messages rather than values. A two handed sweep is about 5% of what it allows.' },
-      { from: 'relay', to: 'yoshimi', label: 'CC 74, CC 71',
-        note: 'The board folds whatever arrived and writes at most one value per controller '
-            + 'every 5 ms as three raw MIDI bytes. A backlog of knob positions is not played '
-            + 'out, because all but the last are already wrong.' },
-      { from: 'yoshimi', to: 'capture',
-        note: 'The synth plays into a JACK graph rather than a speaker, so the board makes '
-            + 'this sound whether or not anybody is listening to it.' },
-      { from: 'capture', to: 'relay', label: '48kHz mono', back: true,
-        note: 'Fifty frames a second, each with a twelve byte header carrying its own number. '
-            + 'A gap in those numbers is what the LOST cell counts.' },
-      { from: 'relay', to: 'playout', back: true,
-        note: 'The same room and the same socket the controls went out on. Audio in this room '
-            + 'is the board and nothing else, which is how the badge knows it is there.' },
+        },
+      { from: 'gate', to: 'down', label: 'ctl.set',
+        },
+      // ⚠️ `CC`, NOT `CC 74, CC 71`. Asked for after a screenshot showed it
+      // wrapping onto two lines over the gap between two machines. Which
+      // controllers travel is in the note and on the sliders themselves; what
+      // the arrow has room to say is what KIND of thing is crossing.
+      { from: 'down', to: 'yoshimi', label: 'CC',
+        },
+      { from: 'yoshimi', to: 'jack',
+        },
+      { from: 'jack', to: 'ffmpeg',
+        },
+      /**
+       * ⚠️ BOTH HALVES OF THE RETURN CARRY THE SAME LABEL, BECAUSE THE SAME
+       * THING IS TRAVELLING. Reported 2026-09-16: *"47khz mono on one sound
+       * connector, other nothing, not good. its PCM slices?"*. It is: raw
+       * samples, uncompressed, in 20 ms slices. One arrow said the format and
+       * the next said nothing, which reads as two different journeys.
+       * The rate and the channel count moved into ffmpeg's own note, where
+       * there is room for them and where they describe the thing that chose
+       * them.
+       */
+      // 🔴 `back: true` ON BOTH RETURN LINKS, AND IT IS AN AUTHOR FLAG. Nothing
+      // infers it: a link without it is laid out as a forward step, so a right
+      // to left link gets drawn through whatever stands in the way and puts its
+      // head somewhere nobody can account for. Flagged, they run in a lane under
+      // the row and arrive at the bottom edge.
+      { from: 'ffmpeg', to: 'up', label: 'PCM slices', back: true,
+        },
+      { from: 'up', to: 'playout', label: 'PCM slices', back: true,
+        },
     ],
-  });
+    // ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC. Put
+    // inside it they are silently ignored, and the page shipped with no heading
+    // and the picture sitting above the log: both rules broken at once, and
+    // neither the harness nor `cuts` can see it, because a spec with two extra
+    // keys is not an error. Every other page with a diagram passes them here.
+  }, { how: true, atEnd: true });
 
   d.ready();
 </script>

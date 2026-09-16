@@ -12,7 +12,7 @@
 // into banks whose slots are sparse, and landing on an empty one looks exactly
 // like landing on a full one from the sending end.
 //
-// So this checks by ear, the way fluid-test.mjs does: the same note under two
+// So this checks by ear: the same note under two
 // instruments from two different banks, and a measurement that separates them.
 //
 // ⚠️ AND IT INCLUDES THE NEGATIVE CONTROL, because a difference test that

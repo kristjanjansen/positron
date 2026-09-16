@@ -14,7 +14,7 @@
 //
 // ── THE PAD, and why it is part of the keyboard rather than part of a page ──
 //
-// Octave down, octave up, notes off. /box/ declared these three as ordinary
+// Octave down, octave up, notes off. /keys/ declared these three as ordinary
 // controls, which put them in the row at the TOP of the page — a hand's width
 // away from the keys they act on, and after four other buttons that do
 // something else entirely. They are not page controls: every one of them is
@@ -37,7 +37,7 @@
 // `base` reads it back, and every key's printed note name moves with it. A
 // page in the suite should drive those from its own check — the same bargain
 // `slider.mjs` makes with `set()`. (Today the two pages that draw a pad,
-// `/box/` and `/kit/`, are both `built: false` and the suite never opens
+// `/keys/` and `/kit/`, are both `built: false` and the suite never opens
 // either, so there is nothing for them to assert INTO; that is a gap in
 // coverage, not a gap in this file.)
 
@@ -54,7 +54,7 @@ export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
  *                 A page that wants to say so in its log hooks this rather
  *                 than wrapping every route that can move it.
  * @param onPanic  extra work when `notes off` is pressed, for a page whose
- *                 sound is made somewhere this component cannot reach — /box/
+ *                 sound is made somewhere this component cannot reach — /keys/
  *                 sends the board its own all-notes-off, because a note the
  *                 board is holding was never a key on this keyboard.
  * @param minBase  lowest / highest leftmost note the octave buttons will reach.
@@ -124,7 +124,7 @@ export function createKeyboard(host, {
   // (see stepper.mjs). Copying those four rules at a new height is how two
   // controls drift into looking like two kinds of thing; shell.css only
   // changes the SIZE here.
-  const octPair = make('span', 'step kpad-oct');
+  const octPair = make('span', 'step pos-seg kpad-oct');
   const mkOct = (text, title, delta) => {
     const b = make('button', 'ico', text, { type: 'button', title });
     b.onclick = () => api.shiftOctave(delta);
@@ -178,7 +178,7 @@ export function createKeyboard(host, {
   // stops working.
   const onKeyDown = (e) => {
     if (e.repeat) return;
-    // ⚠️ NOT WHILE SOMEBODY IS TYPING. `wire` has a compose box and `/box/` a
+    // ⚠️ NOT WHILE SOMEBODY IS TYPING. `wire` has a compose box and `/keys/` a
     // room field; a global keydown that swallows `z` would make them unusable,
     // and this listener is on `window`.
     const t = e.target;

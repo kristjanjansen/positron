@@ -295,10 +295,10 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
       // /dev/video11 survived SIGTERM and kept the device for minutes, so every
       // later `video.start` queued behind it and read from the outside as "the
       // encoder produces no bytes". Six of them stacked up that way and the
-      // device ended up needing a REBOOT. fluid.mjs already recorded this exact
-      // lesson — "`quit` plus SIGTERM left a fluidsynth alive for two minutes
-      // once; SIGKILL after a grace period is the guarantee" — and it was not
-      // applied here.
+      // device ended up needing a REBOOT. The board had already recorded this
+      // exact lesson about an instrument: a graceful quit plus SIGTERM left the
+      // process alive for two minutes once, and SIGKILL after a grace period is
+      // the only guarantee. It was not applied here.
       setTimeout(() => {
         for (const p of [render, enc]) { try { p.kill('SIGKILL'); } catch { /* gone */ } }
       }, 800).unref?.();

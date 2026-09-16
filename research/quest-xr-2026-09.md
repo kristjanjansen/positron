@@ -844,7 +844,7 @@ network.
 
 ### 4.2 `rig/box/` — the Pi instrument
 
-The page at `/box/` opens a socket, sends `note.on` and `voice.select` as JSON,
+The page at `/keys/` opens a socket, sends `note.on` and `voice.select` as JSON,
 and receives **binary frames of 16-bit PCM at 48 000 Hz, 960 samples per frame,
 50 frames a second**, which it converts to float and posts to a `pcm-playout`
 AudioWorklet ring buffer with a 60 ms cushion.

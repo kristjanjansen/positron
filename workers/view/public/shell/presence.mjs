@@ -2,7 +2,7 @@
 //
 // Four pages ask this question and four pages answer it differently. `/knobs/`
 // waits six seconds and writes a log line, `/grains/` waits for a `box.hello`
-// and enables its buttons, `/box/` watches for the same message and draws an
+// and enables its buttons, `/keys/` watches for the same message and draws an
 // instrument row, `/rack/` waits on an agent on a Mac that may simply be off.
 // None of them can SHOW the answer without reading the log, and none of them
 // distinguishes the two greys: a thing that has gone quiet, and a thing nobody
@@ -248,10 +248,20 @@ export function createPresence({
   root.setAttribute('role', 'status');
   root.setAttribute('aria-live', 'polite');
 
+  /**
+   * 🔴 THE DOT LEADS, AND IT WENT TO THE RIGHT FOR ONE BUILD. Asked for
+   * (*"dot should not appear before text"*), tried, photographed, and asked
+   * back (*"put dot back to left"*). The reason it failed is the reserve: the
+   * widest phrase this badge can say is held on the WORD, so a dot after it
+   * parks at the end of that reserved width rather than after the text. On
+   * anything shorter than the longest state it floated off on its own with a
+   * gap in between, which reads as a stray mark rather than as part of a label.
+   * ⚠️ SO THE TWO POSITIONS ARE NOT EQUIVALENT: leading is the one that can be
+   * fixed to the text, because the text grows to the right of it.
+   */
   const dot = document.createElement('i');
   dot.className = 'pos-pres-dot';
   dot.setAttribute('aria-hidden', 'true');
-  root.append(dot);
 
   /**
    * 🔴 THE NAME AND THE STATE ARE ONE STRING. Instructed 2026-09-16:
@@ -277,7 +287,7 @@ export function createPresence({
   const phrase = (x) => (named ? `${of} ${words[x]}` : words[x]);
   const widest = Math.max(...reach.map((x) => phrase(x).length));
   word.style.setProperty('--pres-ch', String(widest));
-  root.append(word);
+  root.append(dot, word);
 
   let now = null, note = null;
   let timer = null, f = null;
@@ -312,23 +322,38 @@ export function createPresence({
    * region, so the word is announced on change whether or not it faded.
    */
   const WORD_FADE_MS = 90;
-  let fading = null;
+  let fading = null, fadingTo = null;
 
   function paint() {
     root.dataset.state = now;
     root.title = title();
     const next = phrase(now);
     if (word.textContent === next) return;
+    /**
+     * 🔴 A FADE ALREADY RUNNING TO THIS WORD IS NOT RESTARTED, AND LEAVING THAT
+     * OUT MADE THE BADGE DISAPPEAR. PHOTOGRAPHED 2026-09-16: a green dot with
+     * nothing beside it and the reserve still holding the space.
+     *
+     * `/knobs/` calls `seen()` on every audio frame, which is fifty times a
+     * second, and each call re-derived and repainted. During the 90 ms trough
+     * the element still holds the OLD word, so every repaint saw a difference,
+     * cleared the pending restore and started another: the text was swapped and
+     * brought back only once the frames stopped. A state change is an event and
+     * the fade belongs to the change, not to whoever asked again.
+     */
+    if (fadingTo === next) return;
     // First paint, or a browser that says no: swap it and say nothing more.
     if (!word.textContent || matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
       word.textContent = next;
       return;
     }
     clearTimeout(fading);
+    fadingTo = next;
     word.style.opacity = '0';
     fading = setTimeout(() => {
       word.textContent = next;
       word.style.opacity = '';
+      fadingTo = null;
     }, WORD_FADE_MS);
   }
 
@@ -390,11 +415,18 @@ export function createPresence({
     },
 
     /** It spoke. Stamp it with YOUR clock, at the moment it arrived. */
+    /**
+     * ⚠️ CHEAP ON PURPOSE. A page with audio calls this fifty times a second,
+     * so it records the time and derives only when the answer could have
+     * changed: while the thing is already `online` and nothing else is
+     * pending, the next tick of `follow()` will say the same word anyway.
+     */
     seen(at = Date.now()) {
       if (!f) throw new Error('presence: seen() needs follow() first, which is where the heartbeat interval is.');
+      const wasComing = f.comingSince != null;
       f.lastSeenAt = at;
       f.comingSince = null;             // it is here; it is not on its way any more
-      derive();
+      if (now !== 'online' || wasComing) derive();
       return api;
     },
 

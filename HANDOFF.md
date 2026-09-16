@@ -64,7 +64,7 @@ granulator, agent-built), IDA and Radio 1965 back, `dub` the default preset,
 short station labels, the wet/dry judder fixed, `speakers` out of the diagram.
 51/51.
 
-**`/box/`**: a diagram, press-to-sound `lag`, a `patch` label, the patch line
+**`/keys/`**: a diagram, press-to-sound `lag`, a `patch` label, the patch line
 gone. The diagram took four rounds and every round was a real renderer fault.
 
 **`/replay/`** (agent): all six asks, 22/22, plus a `cue log` box saying where

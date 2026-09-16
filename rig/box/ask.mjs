@@ -32,9 +32,9 @@ ws.onopen = () => {
   let body;
   if (BODY) { try { body = JSON.parse(BODY); } catch (e) { console.error('body is not JSON:', e.message); process.exit(1); } }
   // A patch verb takes a DOCUMENT and everything else takes FIELDS. Nesting
-  // both under `patch` meant `audio.start {"source":"fluidsynth"}` arrived with
-  // no source at all and fell back to the built-in synth — reporting ok:true
-  // for an instrument nobody asked for, which is the worst kind of wrong.
+  // both under `patch` meant `audio.start {"source":"yoshimi"}` arrived with
+  // no source at all and fell back to the built-in synth, reporting ok:true for
+  // an instrument nobody asked for, which is the worst kind of wrong.
   const wrap = body ? (VERB.startsWith('patch.') ? { patch: body } : body) : {};
   ws.send(format({ type: VERB, ...wrap }, { from: FROM, seq: seq++ }));
 };

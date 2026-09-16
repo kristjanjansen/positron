@@ -19,7 +19,6 @@
 import { format, parse, randomId, RELAY_BASE, LIMITS } from '../../demo/shell/wire.mjs';
 import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.mjs';
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
-import { VOICES, DEFAULT_SF, fluidAvailable, soundfontAt } from './fluid.mjs';
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          pappusFx, pappusAvailable, pappusPanic, stopPappus, sourceFeed,
          spaceFx, spaceSet, spaceClamp, spaceState, stopSpace } from './jacksynth.mjs';
@@ -27,7 +26,7 @@ import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
 import { spawn, execFileSync } from 'node:child_process';
-import { readdirSync, statSync, realpathSync } from 'node:fs';
+import { statSync } from 'node:fs';
 
 const arg = (k, dflt) => {
   const i = process.argv.indexOf(`--${k}`);
@@ -48,17 +47,18 @@ const URL_ = `${RELAY}/room/${ROOM}/ws`;
 
 const FROM = `box-${randomId(6)}`;   // per SOCKET, per wire.mjs: `seq` counts a connection
 let seq = 0, ws = null, audio = null, since = Date.now();
-// ONE variable for whatever is making sound. There used to be two — `fluid`
-// for the pipe path and `jsyn` for the JACK ones — and fourteen sites branched
-// on which was set, so every new source meant remembering both halves and every
-// reviewer had to check both. They are two implementations of one interface
-// now; `inst.jack` is the only thing anyone downstream actually needs to know,
+// ONE variable for whatever is making sound. There used to be two — one for a
+// pipe path and one for the JACK ones — and fourteen sites branched on which
+// was set, so every new source meant remembering both halves and every reviewer
+// had to check both. They are two implementations of one interface now;
+// `inst.jack` is the only thing anyone downstream actually needs to know,
 // because the granular insert can only wrap what is on the JACK graph.
 let synth = null, stopSynth = null, midiIn = null, inst = null;
 // ⚠️ Set BEFORE any await in startAudio. Raising a JACK chain takes ~13 s,
-// and during that window jsyn is still null — so a note.on arriving mid-start
-// saw 'nothing running' and started FluidSynth alongside it. Two instruments,
-// interleaved samples, 100 msg/s into a 60 msg/s relay. Measured twice.
+// and during that window `inst` is still null — so a note.on arriving mid-start
+// saw 'nothing running' and started a SECOND instrument alongside it. Two
+// instruments, interleaved samples, 100 msg/s into a 60 msg/s relay. Measured
+// twice.
 let starting = null;
 let fxOn = false;          // pappus inserted between the instrument and the capture
 
@@ -67,11 +67,11 @@ let fxOn = false;          // pappus inserted between the instrument and the cap
  * Raspberry Pi and until 2026-09-14 neither of them could see it happening.
  *
  * `/grains/` switches the granulator ON, because the granulator is its entire
- * subject. `/box/` used to switch it OFF on load, so whichever page you opened
+ * subject. `/keys/` used to switch it OFF on load, so whichever page you opened
  * last won, SILENTLY, and the other one went on drawing a picture that was no
  * longer true.
  *
- * ⚠️ `/box/` SENDS NOTHING ABOUT THE INSERT SINCE 2026-09-16 and has no
+ * ⚠️ `/keys/` SENDS NOTHING ABOUT THE INSERT SINCE 2026-09-16 and has no
  * granulator on it at all. What its message was protecting against is real. An
  * insert left in by a `grains` tab that was simply CLOSED goes on wrapping
  * whatever the next page plays and feeds its own delay, MEASURED 2026-09-12 at
@@ -136,7 +136,7 @@ function insertState() {
  * 🔴 THE BOARD CLEANS UP AFTER ITSELF, BECAUSE SINCE 2026-09-16 NOTHING ELSE
  * DOES.
  *
- * `/box/` used to send `fx.pappus {on:false, onlyIfIdle:true}` on connect, and
+ * `/keys/` used to send `fx.pappus {on:false, onlyIfIdle:true}` on connect, and
  * that one message was the whole guarantee: an insert left behind by a
  * `/grains/` tab that was simply CLOSED goes on wrapping whatever the next page
  * plays and feeds its own delay. MEASURED 2026-09-12, a steady -6.1 dBFS
@@ -463,7 +463,7 @@ async function startAudio(source = 'synth', msg = null) {
     // something already running got a reply with no port and no title — which
     // reads as "started, and playing nothing". A reply about a running source
     // must describe it as fully as the reply that started it.
-    if (running === source && source !== 'fluidsynth') {
+    if (running === source) {
       return { ok: true, already: true, source: running, jack: !!inst?.jack, port: inst?.port ?? null,
                ...insertState() };
     }
@@ -471,24 +471,25 @@ async function startAudio(source = 'synth', msg = null) {
     // 🔴 REMEMBER THE INSERT BEFORE STOPPING, because stopAudio() switches it
     // off — correctly, since nothing is playing between the two instruments.
     // Reading `spaceState()` afterwards therefore always answers "off", and the
-    // carry-over below silently did nothing. Caught by testing it: yoshimi ->
-    // hexter reported `on=false` with the reverb armed a second earlier. Two
-    // fixes in one edit that each work alone and cancel each other.
+    // carry-over below silently did nothing. Caught by testing it while there
+    // were three instruments: a switch reported `on=false` with the reverb
+    // armed a second earlier. Two fixes in one edit that each work alone and
+    // cancel each other.
     spaceWas = spaceState().on;
     stopAudio();
     await new Promise((r) => setTimeout(r, 600));   // let the old one actually die
   }
 
-  // JACK-client instruments: hexter (the real DX7, factory cartridges) and
-  // yoshimi. They cannot write to a pipe, so jacksynth.mjs raises jackd, the
-  // synth and an ffmpeg capture, and plays them by writing raw MIDI bytes to
-  // a snd-virmidi device that aconnect routes to their sequencer port.
+  // The JACK-client instrument: yoshimi. It cannot write to a pipe, so
+  // jacksynth.mjs raises jackd, the synth and an ffmpeg capture, and plays it
+  // by writing raw MIDI bytes to a snd-virmidi device that aconnect routes to
+  // its sequencer port.
   if (JACK_SYNTHS[source]) {
     if (!jackSynthAvailable(source)) return { ok: false, reason: `${source} is not installed on this box` };
     starting = source;
     log(`starting ${source} (jack chain) ...`);
     let r;
-    try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l), soundfont: msg?.soundfont }); }
+    try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l) }); }
     finally { starting = null; }
     if (!r.ok) { log(`${source} failed: ${r.reason}`); return r; }
     inst = r;
@@ -518,32 +519,25 @@ async function startAudio(source = 'synth', msg = null) {
   }
 
 
-  // A real multitimbral instrument: 16 channels, 16 GM programs, one process.
-  // Its `file` audio driver is realtime-paced, so its stdout IS the stream —
-  // no soundcard, no ALSA, nothing to mix.
-  // ⚠️ `fluidpipe` WAS HERE AND IS GONE, 2026-09-11, on a measurement.
+  // 🔴 THE SAMPLED INSTRUMENT AND THE DX7 LEFT ON 2026-09-16, and the board is
+  // one instrument now. `archive/box-fluidsynth-hexter/` has the code and the
+  // argument; the short form is that this board has ONE jackd, ONE capture and
+  // ONE room, so a second instrument is a way to take the sound away from
+  // somebody in another building who is listening to the first.
   //
-  // It wrote realtime PCM to a FIFO — one process, no jackd — and the one thing
-  // keeping it alive was a platform fact: the whole of rig/box once ran in an
-  // arm64 container with no sound hardware in existence, BECAUSE FluidSynth's
-  // `file` driver needs no kernel. That argument is transferable and nobody had
-  // checked. Now checked: in a `debian:trixie` arm64 container with no /dev/snd
-  // at all and `ulimit -r` 0, `jackd -r -d dummy` came up, fluidsynth
-  // registered left and right, the ffmpeg capture client attached, and three
-  // seconds of the graph came back as 144,021 samples at peak 0.1096 — real
-  // audio, not silence. jackd's dummy driver is pure software timing, which is
-  // the same reason the `file` driver worked.
-  //
-  // So the pipe path bought nothing the JACK path does not, and cost the one
-  // thing that mattered: pappus is a JACK insert, so on a pipe the 128 General
-  // MIDI instruments could not be granulated at all. `git show 0ca0d67^` has it
-  // if it is ever wanted back.
+  // ⚠️ THE ONE MEASUREMENT WORTH KEEPING OUT OF THAT PATH, because it is about
+  // the container rather than about FluidSynth: in a `debian:trixie` arm64
+  // container with no /dev/snd at all and `ulimit -r` 0, `jackd -r -d dummy`
+  // came up, a synth registered left and right, the ffmpeg capture attached,
+  // and three seconds of the graph came back as 144,021 samples at peak 0.1096.
+  // Real audio, not silence. jackd's dummy driver is pure software timing, so
+  // this whole module runs where there is no sound hardware in existence.
 
   // ⚠️ 'synth' (the FM Rhodes) and 'moog' are NO LONGER OFFERED as instruments.
   // Both were written to find out what a box can do with plain arithmetic, and
-  // both were beaten by things already packaged: hexter plays the real DX7
-  // factory cartridges, and SuperCollider's MoogFF is a correct ladder where
-  // this one's resonance measurably does nothing (loop gain 0.001 at fc 900).
+  // both were beaten by things already packaged: a real DX7 under a plugin
+  // host, and SuperCollider's MoogFF, which is a correct ladder where this
+  // one's resonance measurably does nothing (loop gain 0.001 at fc 900).
   // The code stays in demo/shell for /carry/ and for the microcontroller path
   // where no plugin can follow — see README, "the two we wrote and removed".
   // Kept reachable with an explicit source name so the measurements can be
@@ -577,9 +571,11 @@ async function startAudio(source = 'synth', msg = null) {
   // match above used to arrive here and become a MICROPHONE — so a typo, or a
   // source removed from the table, started `arecord` and answered
   // `{ok: true, source: 'capture'}`. It even made sound, because a capture
-  // device usually has something on it. Measured after `fluidpipe` was deleted:
+  // device usually has something on it. Measured after a source was deleted:
   // asking for it still "worked", peak 0.0391, which is the deletion silently
   // not taking effect. A name nobody recognises is an error, not a default.
+  // ⚠️ THIS IS WHAT A PAGE ASKING FOR `fluidsynth` OR `hexter` NOW GETS, and it
+  // is the right answer: `known` lists what this board actually has.
   if (source !== 'capture') {
     return { ok: false, reason: `unknown source ${JSON.stringify(source)}`,
              known: [...Object.keys(JACK_SYNTHS), 'synth', 'moog', 'capture'] };
@@ -681,7 +677,7 @@ async function handle(msg) {
       log('clearing every subscription');
       return reply('patch.cleared', clearAll({ dry: DRY }));
     case 'audio.start':
-      startAudio(msg.source ?? 'fluidsynth', msg).then((r) => reply('audio.started', r));
+      startAudio(msg.source ?? 'yoshimi', msg).then((r) => reply('audio.started', r));
       return true;
     // Notes from anywhere: a browser keyboard, a phone, `ask.mjs`. The box does
     // not care which, and does not need one to exist.
@@ -690,7 +686,7 @@ async function handle(msg) {
       // If something is mid-start, do NOT start a second instrument — drop the
       // note. One missed note is nothing; two instruments is a broken stream.
       if (starting) return reply('note.ack', { note: msg.note, dropped: true, starting });
-      if (!synth && !inst) await startAudio('fluidsynth', {});
+      if (!synth && !inst) await startAudio('yoshimi', {});
       if (inst) inst.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
       else synth?.noteOn(msg.note, msg.vel ?? 100);
       // ⚠️ A KEY NO LONGER PITCHES A GRAIN VOICE, AND THAT WENT WITH THE
@@ -731,36 +727,32 @@ async function handle(msg) {
         // reply sitting right there. The file is `file`.
         return reply('voices.listed', { ...list, source: 'yoshimi' });
       }
-      // hexter's programs index a cartridge this box loaded and fluidsynth's
-      // are General MIDI: both are fixed tables the page already carries, and
-      // inventing a second copy here is a second thing to keep in step.
-      // `fixed` is the difference between "this instrument has no library to
-      // read" and "something went wrong reading one" — a client that cannot
-      // tell them apart has to log both, and then it logs a non-event every
-      // time an instrument starts.
+      // ⚠️ THIS BRANCH IS NOT DEAD, THOUGH YOSHIMI IS THE ONLY INSTRUMENT.
+      // `nothing is playing` is the ordinary answer on a cold board, and it has
+      // to be told apart from a library that failed to read. `fixed` is that
+      // difference: a client that cannot tell them apart has to log both, and
+      // then it logs a non-event every time an instrument starts.
       return reply('voices.listed', {
         source: src, ok: false, fixed: !!src, banks: [], count: 0,
         reason: src ? `${src}'s programs are a fixed table, not a library on this box` : 'nothing is playing',
       });
     }
     // The multitimbral surface: one call per channel, then sixteen channels are
-    // sixteen instruments. Names so a client need not memorise GM numbers.
+    // sixteen instruments.
     case 'voice.select': {
-      // Every instrument here answers program change; only the MEANING of the
-      // number differs. FluidSynth's are General MIDI, hexter's index the
-      // loaded DX7 cartridge, Yoshimi's index its current bank — so a client
-      // sends either a GM name (fluidsynth) or a program number (anything).
+      // 🔴 A PROGRAM NUMBER, NEVER A NAME. `{voice:'rhodes'}` used to resolve
+      // through a General MIDI table in fluid.mjs, and General MIDI was
+      // FluidSynth's meaning for a program number and nobody else's: Yoshimi's
+      // index its current bank, which the board enumerates and sends as
+      // `voices.listed`. With FluidSynth gone the name had nothing left to
+      // resolve against, so a page that sent one would have been answered with
+      // a table for an instrument that is not there.
+      // `archive/box-fluidsynth-hexter/` has the table and the old branch.
       if (inst) {
-        const prog = typeof msg.voice === 'string' ? VOICES[msg.voice] : msg.program;
-        if (prog === undefined) {
-          // Two different mistakes, two different answers. A NAME that is not
-          // in the GM table is worth listing the table for; no name and no
-          // number is worth saying what to send instead. The pipe path used to
-          // give the first and the JACK path the second, which meant the help
-          // you got depended on which transport happened to be running.
-          return reply('voice.selected', typeof msg.voice === 'string'
-            ? { ok: false, reason: `unknown voice ${JSON.stringify(msg.voice)}`, known: Object.keys(VOICES), on: inst.source }
-            : { ok: false, reason: 'send {program:<0-127>} or {voice:"<general midi name>"}', on: inst.source });
+        const prog = msg.program;
+        if (!Number.isInteger(prog)) {
+          return reply('voice.selected',
+            { ok: false, reason: 'send {program:<0-127>}, and {bank:<n>} with it to change bank', on: inst.source });
         }
         // ⚠️ BANK SELECT IS CC 32, AND THE NUMBER IS READ FROM YOSHIMI'S OWN
         // CONFIG (`midi_bank_C`), never typed here. CC 0 is `midi_bank_root`:
@@ -793,7 +785,7 @@ async function handle(msg) {
      * way, and it is reported rather than hidden: a control plane that silently
      * drops is the shape every failure here takes.
      *
-     * ⚠️ THE EXISTING `cc` VERB IS UNTOUCHED, so `/box/` cannot regress. Two
+     * ⚠️ THE EXISTING `cc` VERB IS UNTOUCHED, so `/keys/` cannot regress. Two
      * verbs, two disciplines, one instrument.
      * ⚠️ AND THE LAST VALUE SENT IS THE LAST VALUE WRITTEN. A fold that kept
      * the FIRST of a burst would leave the filter behind the finger for as long
@@ -816,9 +808,8 @@ async function handle(msg) {
     case 'ctl.meter':
       return reply('ctl.meter', ctlMeter());
     case 'cc': {
-      // Yoshimi answers CC 74 (cutoff) and 71 (resonance) for real; hexter has
-      // no filter at all but takes CC 16/17/18/19/80/81 as operator coarse
-      // frequency, effective on notes ALREADY SOUNDING.
+      // Yoshimi answers CC 74 (cutoff) and 71 (resonance) for real, which is
+      // the pair `/knobs/` is built on.
       if (inst) { inst.cc(msg.channel ?? 0, msg.ctrl, msg.value); return reply('cc.ack', { ok: true, on: inst.source }); }
       // 74 and 71 are the conventional cutoff and resonance, so a hardware knob
       // maps onto them with no translation anywhere.
@@ -829,25 +820,14 @@ async function handle(msg) {
     case 'moog.patch':
       return reply('moog.patched', { ok: !!synth?.setPatch?.(msg.patch), patch: msg.patch, patches: Object.keys(MOOG_PATCHES) });
     case 'audio.stop':  return reply('audio.stopped', stopAudio());
-    case 'sf.list': {
-      const dirs = (process.env.BOX_SF_DIRS || '/sf:/usr/share/sounds/sf2').split(':');
-      const out = [], seen = new Set();
-      for (const d of dirs) {
-        try {
-          for (const f of readdirSync(d)) if (/\.sf[23]$/i.test(f)) {
-            const p = `${d}/${f}`;
-            // Debian ships default-GM.sf2 as an ALTERNATIVES SYMLINK to
-            // FluidR3_GM.sf2, so a naive listing offers one 141 MB file twice
-            // under two names. Dedupe on the resolved path.
-            let real; try { real = realpathSync(p); } catch { continue; }
-            if (seen.has(real)) continue;
-            seen.add(real);
-            out.push({ path: real, name: f.replace(/\.sf[23]$/i, ''), mb: +(statSync(real).size / 1048576).toFixed(1) });
-          }
-        } catch { /* a directory that is not there is not an error, it is empty */ }
-      }
-      return reply('sf.listed', { soundfonts: out });
-    }
+    // ⚠️ `sf.list` STOOD HERE AND LEFT ON 2026-09-16 with the sampled
+    // instrument. It walked the board's soundfont directories so a page could
+    // offer a choice of them; with nothing on this board that can read one, a
+    // reply would have been a list of files nobody can play.
+    // `archive/box-fluidsynth-hexter/board-half.js` has it.
+    // ⚠️ A PAGE STILL SENDING IT FALLS THROUGH TO `default` BELOW, which returns
+    // false and says nothing. That is correct on a relay that broadcasts
+    // verbatim: an unknown verb is usually somebody else's traffic.
     // What is sounding RIGHT NOW. A page that joins mid-session has clicked
     // nothing, so without this it shows no selection while the box plays on —
     // a readout that contradicts the thing it is describing.
@@ -855,17 +835,10 @@ async function handle(msg) {
     // it has no patches, it has 106 knobs — so "random" has to mean something
     // different here, and this is it.
     // Pappus is an INSERT, not an instrument: it wraps whatever is playing.
-    // It only reaches JACK instruments — fluidsynth writes to a pipe and never
-    // appears on the JACK graph at all, which is worth saying rather than
-    // failing quietly.
+    // It only reaches what is on the JACK graph, which is worth saying rather
+    // than failing quietly.
     case 'fx.pappus': {
       const want = msg.on !== false;
-      // ⚠️ An insert can only reach what is ON THE JACK GRAPH. FluidSynth
-      // normally writes to a FIFO and never appears there, so pappus cannot
-      // wrap it. A `fluidjack` variant exists in jacksynth.mjs and swapping to
-      // it was tried — it works in principle and was flaky in practice, so the
-      // honest thing is to say no rather than half-swap under the user. The
-      // page disables the switch on fluidsynth for the same reason.
       // ⚠️ THE GATE IS `inst.jack`, NOT AN INSTRUMENT NAME. It used to read
       // `!jsyn`, which meant "is it one of the JACK ones" by which variable
       // happened to be set — so adding a source meant remembering this line.
@@ -879,7 +852,7 @@ async function handle(msg) {
       });
       // 🔴 `onlyIfIdle` — "take it out, UNLESS somebody is still using it".
       //
-      // ⚠️ NOTHING IN THIS REPO SENDS IT ANY MORE. `/box/` did, on load, and
+      // ⚠️ NOTHING IN THIS REPO SENDS IT ANY MORE. `/keys/` did, on load, and
       // that page has no granulator on it since 2026-09-16; `sweepInsert()`
       // applies the same liveness rule on the board's own clock, so the message
       // is no longer how an orphaned insert gets cleared. It is kept because it
@@ -1277,8 +1250,7 @@ async function handle(msg) {
     // the question the answer belongs to, so it gets the holder and the ages
     // here as well as in `fx.pappus` and the heartbeat.
     case 'audio.status':
-      return reply('audio.started', inst ? { ok: true, source: inst.source, jack: !!inst.jack, ...insertState(),
-                                            soundfont: inst.soundfont ?? null }
+      return reply('audio.started', inst ? { ok: true, source: inst.source, jack: !!inst.jack, ...insertState() }
         : stopSynth ? { ok: true, source: 'synth', ...insertState() }
         : audio ? { ok: true, source: 'capture', ...insertState() }
         : { ok: false, reason: 'nothing playing', ...insertState() });
@@ -1310,7 +1282,7 @@ function connect() {
     // and no page is left inferring which it is holding.
     send({ type: 'box.hello', name: NAME, backend: s.backend, ports: s.ports.length, dry: DRY, since,
            audioChannels: 1, frameMs: 1000 * FRAME / RATE,
-                 instruments: { synth: true, fluidsynth: fluidAvailable() && !!soundfontAt(), pappusFx: pappusAvailable(),
+                 instruments: { synth: true, pappusFx: pappusAvailable(),
                                 ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) },
                  ...(s.error ? { error: s.error, hint: s.hint } : {}) });
     if (ONCE) { console.log(JSON.stringify(s, null, 2)); setTimeout(() => process.exit(0), 400); }
@@ -1428,6 +1400,12 @@ function sweepOrphans() {
   // JACK ports, so the next insert finds the names taken and patches into a
   // process nobody is talking to — audible, uncontrollable, and indisting-
   // uishable from the new one having failed.
+  // ⚠️ `fluidsynth` AND `jack-dssi-host` STAY IN THIS LIST THOUGH NOTHING HERE
+  // SPAWNS THEM ANY MORE. The sweep runs at startup, and the run it has to
+  // survive is the one where the service restarts onto a NEW build while an old
+  // build's instrument is still holding the JACK graph. Removing them would
+  // strand exactly that board, and this list costs one `pkill` that finds
+  // nothing. See `archive/box-fluidsynth-hexter/`.
   for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'csound', 'ffmpeg', 'jackd']) {
     try { execFileSync('pkill', ['-9', '-x', name], { stdio: 'pipe' }); log(`swept a stray ${name}`); }
     catch { /* nothing of that name, which is the normal case */ }

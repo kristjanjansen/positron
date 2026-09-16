@@ -177,7 +177,7 @@ button, .pos-btn {
   -webkit-tap-highlight-color: rgba(255,212,0,.12);
   /* 🔴 A LONG PRESS ON A CONTROL IS ALWAYS A MIS-PRESS, NEVER A COPY.
      Holding a button on iPhone raised the text loupe and dropped selection
-     handles over the page — photographed on /box/ and /mirror/ — which is the
+     handles over the page — photographed on /keys/ and /mirror/ — which is the
      magnifier, not selection, and `user-select: none` does NOT suppress it.
      `-webkit-touch-callout: none` is the one that does. `touch-action:
      manipulation` goes with it: it drops the 300 ms double-tap-to-zoom wait, so
@@ -263,6 +263,36 @@ button.pos-pri[data-busy="1"] {
   button[data-busy="1"] { animation: none; opacity: .62; }
 }
 
+/* ── a segmented row (.pos-seg) ──────────────────────────────────────────
+   🔴 ONE LOOK THAT FOUR COMPONENTS WERE EACH WRITING OUT. Two or more controls
+   joined into one object: the border overlapped by exactly one pixel so a join
+   is a single line rather than two, corners rounded only on the outside, and
+   whichever segment you are pointing at raised above its neighbours so its own
+   edge is not painted over by the one overlapping it.
+
+   `.tbar-loopgrp`, `.step` and `.pos-pick-cell` had all three written the same
+   six declarations separately, which is this project's own rule one level down:
+   a LOOK that exists in three places and nowhere else is a utility nobody has
+   noticed yet. The slider's hand button is the fourth and it gets the join with
+   no new CSS about joining at all.
+
+   ⚠️ SOURCE ORDER IS LOAD-BEARING AND THIS IS WHY IT IS HERE. `.step
+   button:hover` weighs more than `.pos-seg > :hover`, and `.tbar-loopgrp`'s own
+   `display: flex` has to beat the `inline-flex` below it, so this block goes
+   AFTER the base `button` rules and BEFORE every component that specialises it.
+   ⚠️ AND A LANE HAS NO BORDER, IT HAS AN INSET SHADOW. `.sld-lane` paints its
+   edge with `box-shadow: inset 0 0 0 1px` because a real border insets the
+   padding box the handle travels in, so its travel comes up one pixel short at
+   each end. The join still works: `margin-left: -1px` on the button beside it
+   puts the button's left border in the same pixel column as the lane's shadow,
+   and the lane's own box is untouched. */
+.pos-seg { display: inline-flex; align-items: center; }
+.pos-seg > * { border-radius: 0; }
+.pos-seg > :first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.pos-seg > :last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.pos-seg > * + * { margin-left: -1px; }
+.pos-seg > :hover, .pos-seg > :focus-visible { position: relative; z-index: 1; }
+
 /* ── slot: whatever the demo itself draws ─────────────────────────────── */
 /* 🔴 ONE VERTICAL RHYTHM, AND EVERY PAGE GETS IT WITHOUT ASKING.
    Reported from a screenshot, 2026-09-13: a pad, a strip, a transport bar, a
@@ -274,8 +304,18 @@ button.pos-pri[data-busy="1"] {
    margin, because a lone element should not carry a gap to nothing. 22px is
    a comfortable read at a laptop's distance and scales up in the headset
    block below. */
-.pos-body { margin: 0 0 22px; }
-.pos-body > * + * { margin-top: 22px; }
+/* 🔴 ONE GAP IN THE WHOLE PROJECT, 40 px, AND NOTHING IS AN EXCEPTION.
+   Instructed 2026-09-16: *"revert vert spacing as it was, make it all equal
+   (40px)"*, after a build that had two.
+   ⚠️ THE TWO GAP VERSION IS WORTH RECORDING BECAUSE IT WAS TRIED. It spent a
+   big gap once per page, before the surface that reports what happened, on the
+   argument that a page stops being an instrument there. What that actually
+   produced was a hole: a screen of air between the thing you play and the
+   numbers about it, on a page you read while your hand is still on a slider.
+   One rhythm means no element has to argue for its own position, which is what
+   the rule was for before it grew a second number. */
+.pos-body { margin: 0 0 40px; }
+.pos-body > * + * { margin-top: 40px; }
 .pos-body:empty { display: none; }
 /* ⚠️ And the things the SHELL stacks, for the same reason: the readout, the
    control bar and the log are siblings of the body, not children of it.
@@ -291,7 +331,10 @@ button.pos-pri[data-busy="1"] {
    ⚠️ SO WHATEVER FOLLOWS THE PAGE TAKES ITS GAP FROM `.pos-body`, and the
    joined surface at `.pos-report` does the same rather than typing its own 22.
    A shared measurement in two places is a measurement that will disagree. */
-.pos-readout { margin-bottom: 22px; }
+/* Small: a readout ABOVE the body is part of the page's flow rather than its
+   foot, so it takes the ordinary gap. The big one belongs to the surface at the
+   bottom, whichever arrangement a page chose. */
+.pos-readout { margin-bottom: 40px; }
 
 /* a refused play() must be visible, not a black rectangle */
 /* Outlined, not filled: this is a fallback, and a second solid yellow button
@@ -393,9 +436,11 @@ button.pos-pri[data-busy="1"] {
   display: flex; flex-direction: column;
   gap: 1px; background: var(--line); border: 1px solid var(--line);
   border-radius: 4px; overflow: hidden;
-  /* 🔴 44 px ABOVE IT, NOT THE PAGE'S 22, AND THE NUMBER IS DECLARED HERE AND
-     NOWHERE ELSE. Asked for on sight, 2026-09-16: *"add more space on top of
-     readoutslog"*.
+  /* The page's one gap, stated here because this surface sits OUTSIDE
+     `.pos-body` and the rhythm on that element's children cannot reach it.
+     It was 44, then 120, and is now the same 40 everything else gets: a foot
+     that needs a bigger gap to look like a foot is a foot that does not look
+     like one.
      It is the diagram's number and it is the diagram's reason. `.pos-body >
      .pos-dg` already sits 44 px below what precedes it, because a picture of
      the machinery is a new PART of the page rather than another row in it, and
@@ -409,7 +454,7 @@ button.pos-pri[data-busy="1"] {
      ⚠️ THE SPLIT ARRANGEMENT IS UNTOUCHED: a split log takes 22 px from
      `.pos-body` exactly as it always has, and nothing in this rule can reach
      it. `/kit/` measures both and reports the two numbers. */
-  margin: 44px 0 0;
+  margin: 40px 0 0;
 }
 /* `display: flex` beats the UA's `[hidden]` rule. The readout and the control
    row are both already patched for the same trap, and both cost a band of dead
@@ -871,6 +916,55 @@ video[hidden] { display: none; }
   background: var(--hi); border-radius: 4px; pointer-events: none;
 }
 .sld-lane[aria-disabled] { opacity: .4; cursor: default; }
+
+/* ── the invisible hand's button (slider.mjs, hand.mjs) ──────────────────
+   One button on the right of the lane, joined to it the way the transport's
+   LOOP pair is joined. The join itself is `.pos-seg` and none of it is written
+   again here; what is below is only what is about a slider.
+
+   ⚠️ THE ROW EXISTS ONLY WHEN A HAND WAS ASKED FOR, so every slider without one
+   keeps a byte-identical DOM. `/grains/` selects `.fade > .sld > .sld-lane`
+   with a CHILD combinator and an unconditional wrapper would break it in
+   silence. */
+.sld-group .sld-hand-row { width: 100%; }
+.sld-hand-row > .sld-lane { flex: 1 1 auto; }
+/* 🔴 A SEGMENT THAT ROUNDS ITS OWN CORNERS HAS TO GIVE UP THE INNER ONES HERE.
+   `.pos-seg > *` zeroes the radius, and it is deliberately placed high in this
+   file so `.step button:hover` can outweigh it. That means `.sld-lane`'s own
+   `border-radius: 4px`, further down, wins on source order and leaves the seam
+   with a notch in it. Buttons have no such rule of their own and need no such
+   line; the lane does. */
+.sld-hand-row > .sld-lane { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+/* SQUARE, and it needs its own size: `.ico` is scoped `.step button.ico` and
+   this button is not inside a `.step`. That is the `.pos-pick-die` lesson, one
+   component over. */
+.sld-hand {
+  flex: none; width: 34px; min-width: 34px; height: 34px; padding: 0;
+  font-size: 15px; line-height: 1;
+}
+/* 🔴 THE LIT HALF IS FILLED AND THE OTHER HALF WEARS THE PAIR'S SHARED EDGE.
+   This is `.tbar-loopgrp`'s settled answer, which was photographed and reported
+   three separate times before it stuck: state the idle edge once for BOTH
+   segments and let only the segment that is RUNNING override it. Without it the
+   lane keeps `--line2` beside a solid `--fg` button, which is a block of white
+   next to a hole. */
+.sld-hand[data-on="1"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
+.sld-hand-row[data-hand="on"] > .sld-lane { box-shadow: inset 0 0 0 1px var(--dim2); }
+/* 🔴 THE HANDLE GOES HOLLOW WHILE THE PAGE IS MOVING IT, AND THAT IS A STATE
+   RATHER THAN A NEW MEANING FOR A COLOUR. This project spends colour on how
+   something landed and reserves `--hi` for the thing that moves; dropping the
+   fill and keeping the edge says "nobody is holding this" without inventing a
+   seventh meaning for yellow.
+   ⚠️ IT IS THE SECOND OF THREE CHANNELS, ON PURPOSE. The button says "is this
+   slider automated" even at rest, the handle says "is this one being moved
+   right now", and a log line says when it started. One channel is exactly what
+   failed the last time this page moved its own sliders. */
+.sld-hand-row[data-hand="on"] .sld-knob {
+  background: none; box-shadow: inset 0 0 0 2px var(--hi);
+}
+/* Yielded: somebody has their hand on it, the button still says ON, and the
+   handle goes solid again because it really is being held. */
+.sld-hand-row[data-hand="on"][data-held] .sld-knob { background: var(--hi); box-shadow: none; }
 /* ⚠️ SHARED COLUMNS, OR NOTHING LINES UP. Four sliders each laying themselves
    out means four different label widths, so four lanes start at four different
    x positions and four values end wherever their lane left them — photographed
@@ -1175,7 +1269,13 @@ video[hidden] { display: none; }
   padding: 0 10px; height: 26px; cursor: pointer; white-space: nowrap;
   -webkit-touch-callout: none; touch-action: manipulation;
 }
-.pos-fb-btn:hover { color: var(--hi); border-color: var(--line2); }
+/* 🔴 IT LIGHTENS, IT DOES NOT LIGHT UP. Asked 2026-09-16: *"feedback hover:
+   ligtgray not yellow"*. `--hi` is this site's yellow and it means THE ONE
+   THING THIS PAGE IS ABOUT: the record button, the armed rate, the grains a
+   granulator is making. A feedback button is furniture beside the title, and
+   painting it in the page's own accent on hover promoted it above whatever the
+   page exists to show. Brighter ink is the whole of what a hover has to say. */
+.pos-fb-btn:hover { color: var(--fg); border-color: var(--line2); }
 
 /* 🔴 CENTRED ON A DESKTOP, AT THE TOP ON A PHONE, AND THE SPLIT IS THE
    KEYBOARD. It was `flex-start` everywhere, so on a wide screen the panel hung
@@ -1515,7 +1615,7 @@ video[hidden] { display: none; }
    a cell that is 22 ch on a 360 px screen would push the row off the side.
    ⚠️ `ch` ON A MONOSPACE FACE IS EXACTLY CHARACTERS, which is why the unit is
    worth keeping: 22 ch fits `Vibraphone Soft 2` and `four seconds ago` whole,
-   and the longest name in `/box/`'s Yoshimi library with one to spare. */
+   and the longest name in `/keys/`'s Yoshimi library with one to spare. */
 .pos-pick { display: inline-flex; align-items: center; gap: 8px; height: 34px; --pick-w: 13ch; }
 @media (min-width: 620px) { .pos-pick { --pick-w: 22ch; } }
 .pos-pick-l {
@@ -1528,7 +1628,10 @@ video[hidden] { display: none; }
   width: var(--pick-w); height: 34px; padding: 0 10px; box-sizing: border-box;
   font: 500 13px/1 var(--mono); color: var(--fg);
   background: var(--card2); border: 1px solid var(--line2);
-  border-radius: 0; margin-left: -1px; cursor: pointer;
+  /* ⚠️ THE ZEROED RADIUS AND THE ONE PIXEL OVERLAP ARE `.pos-seg`'S NOW. This
+     cell sits between two arrows inside a `.step`, so it is a segment like any
+     other and was writing the join out a third time. */
+  cursor: pointer;
   -webkit-touch-callout: none; touch-action: manipulation;
 }
 .pos-pick-n {
@@ -1550,7 +1653,8 @@ video[hidden] { display: none; }
 /* Focus lands on the select, so the ring has to be drawn on the cell around it.
    Grey, never `--hi` — green means armed here and nothing else. */
 .pos-pick-cell:has(.pos-pick-sel:focus-visible) { outline: 2px solid var(--dim2); outline-offset: 2px; z-index: 1; }
-.pos-pick-cell:hover { position: relative; z-index: 1; border-color: var(--line2); }
+/* The raise on hover is `.pos-seg`'s; the edge colour is this cell's own. */
+.pos-pick-cell:hover { border-color: var(--line2); }
 /* ⚠️ A GAP, SO IT IS NOT A FOURTH STEP. The die is a different kind of move
    from ‹ and ›, and joining it to them says it is the same kind.
    🔴 AND IT NEEDS ITS OWN SIZE. `.ico` is scoped `.step button.ico`, and this
@@ -1564,13 +1668,18 @@ video[hidden] { display: none; }
 }
 .pos-pick-die svg { display: block; }
 
-.step { display: inline-flex; align-items: center; height: 34px; }
-.step button { border-radius: 0; margin-left: -1px; }
-.step button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
-.step button:last-child { border-radius: 0 4px 4px 0; }
-/* ⚠️ The pressed one has to come FORWARD or its own border is painted over by
-   the neighbour that overlaps it, and the highlight loses one side. */
-.step button:hover, .step button:focus-visible { position: relative; z-index: 1; }
+/* ⚠️ THE JOIN ITSELF IS `.pos-seg`, WHICH EVERY `.step` CARRIES. The overlapped
+   border, the outer-only corners and the hover raise used to be written out
+   here, and again on `.tbar-loopgrp`, and a third time on `.pos-pick-cell`.
+   ⚠️ THE FOUR CORNER SHORTHAND THAT USED TO SIT HERE ONLY WORKED BECAUSE THE
+   RADIUS HAD BEEN ZEROED FIRST. `.step button:first-child` wrote
+   `4px 0 0 4px`, which is the same picture as the two longhand corners in
+   `.pos-seg` only because `.pos-seg > *` sets all four to zero ahead of it.
+   Deleting one without the other would have left the right-hand corners of the
+   first segment rounded, which is a seam with a notch in it.
+   What is left here is the one thing that is about a stepper rather than about
+   a join: its height. */
+.step { height: 34px; }
 /* An icon button is SQUARE: its width comes from the control's height, never
    from how wide the glyph happens to be in whatever font arrived. */
 .step button.ico { width: 34px; padding: 0; font-size: 15px; line-height: 1; }
@@ -1849,8 +1958,17 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
    ⚠️ AND ITS CHILDREN KEEP THEIR OWN. `[data-on]` is set on the node under the
    pointer, so a box inside a lit container is still the brighter thing, which
    is the order a reader needs. */
+/* 🔴 IT LIGHTENS IN ITS OWN COLOUR, IT DOES NOT GO GREY. REPORTED 2026-09-16:
+   *"outer boxes should ligthen up on hover, currently they gray out"*, and that
+   is exactly what a flat `--dim2` did: a machine drawn in its own hue, orange
+   for Cloudflare and blue for the board, LOST that hue the moment a pointer
+   touched it. Hovering is the one moment a reader is asking which machine this
+   is, so it was answering by throwing the answer away.
+   ⚠️ MIXED INTO `--dg-stroke`, WHICH IS THE BOX'S OWN EDGE COLOUR, the same way
+   the inner boxes already mix into `--dg-fill` rather than replacing it. The
+   fallback is what an untinted container had before hues existed. */
 .pos-dg-n[data-on] .pos-dg-cbox {
-  stroke: var(--dim2);
+  stroke: color-mix(in oklab, var(--fg) 34%, var(--dg-stroke, var(--line2)));
   fill: color-mix(in oklab, var(--fg) 3%, transparent);
 }
 
@@ -2008,11 +2126,11 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    pages than before, because a rate lattice of one now draws no buttons at all.
    ⚠️ `:empty` IS LIVE, so the badge reappears the moment it is given text. */
 .tbar-rates:empty, .tbar-badge:empty { display: none; }
-.tbar-loopgrp { flex: none; display: flex; align-items: center; }
-.tbar-loopgrp > * { border-radius: 0; }
-.tbar-loopgrp > :first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
-.tbar-loopgrp > :last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
-.tbar-loopgrp > * + * { margin-left: -1px; }
+/* ⚠️ THE JOIN IS `.pos-seg`, WHICH THIS GROUP CARRIES. What is left here is
+   what is about the TRANSPORT rather than about a join: it must not grow or
+   shrink inside the bar's flex row, and it lays out as a block-level flex
+   because that is what it did before the join was lifted out. */
+.tbar-loopgrp { flex: none; display: flex; }
 /* 🔴 THE GLYPH HALF IS A SQUARE, AND IT HAD STOPPED BEING ONE. Asked with the
    same screenshot: *"arrow button square size"*. `.tbar-x` is `--tbar-btn` both
    ways, but `.tbar-word` (which the WORD half needs) sets `width: auto` and
@@ -2066,7 +2184,6 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   color: var(--dim2);
   cursor: default;
 }
-.tbar-loopgrp > :hover, .tbar-loopgrp > :focus-visible { position: relative; z-index: 1; }
 /* 🔴 A LOOP IS GREY, NOT YELLOW, AND THAT IS ABOUT WHAT `--hi` IS FOR. ASKED
    FOR: *"find another color for loop button enabled bg and loop info viz
    colors: just grayscale?"*. Yellow was paying for four things at once on one
@@ -2161,7 +2278,13 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    for it. */
 .pos-pres {
   position: relative;
-  display: inline-flex; align-items: center; gap: 6px;
+  /* 🔴 10 px BETWEEN THE DOT AND THE WORDS, UP FROM 6. Asked 2026-09-16 with a
+     crop of the two: *"add more scace between"*. Six was the gap between two
+     parts of one word; these are two different kinds of thing, a state you read
+     as a colour and a phrase you read as text, and they were close enough to
+     look like one clipped label. A gap is fixed, so it costs the no-twitch
+     reserve nothing: every state still measures the same width. */
+  display: inline-flex; align-items: center; gap: 10px;
   font: 500 11px/1 var(--mono);
   vertical-align: -1px;               /* sits on the baseline of a word beside it */
   white-space: nowrap;

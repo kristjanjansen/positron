@@ -1100,7 +1100,7 @@ Three things to carry:
 - **A user's report beat six green measurements.** "Noisy and distorted" was the
   only correct statement in the room for about an hour.
 
-⚠️ `/box/` and `grains` ask for the same 60 ms floor and were doing the same
+⚠️ `/keys/` and `grains` ask for the same 60 ms floor and were doing the same
 thing, unreported, for as long as they have existed.
 
 ## 53. A channel count cannot be inferred, so it has to be announced — and checked
@@ -1170,7 +1170,7 @@ layer above reports as success.
 `studio-1` sat at **16/16 sockets** and refused the board for hours. From the
 board it looked like a network fault — it dialled every 30 s and logged
 `closed 1006`, which is what a browser reports for a `503`, so the log said
-nothing about the real reason. **`/box/` was down for everyone**, and the first
+nothing about the real reason. **`/keys/` was down for everyone**, and the first
 guess was the Raspberry Pi.
 
 The room was full of **my own leftover Chrome instances**: four orphaned profile
@@ -1323,7 +1323,7 @@ comes back.
 
 ## 60. Two files, one instrument, named after the files
 
-`/box/` drew a button per soundfont on the board, labelled with the filename:
+`/keys/` drew a button per soundfont on the board, labelled with the filename:
 `FluidR3_GM` · `sf_GMbank` · `hexter` · `yoshimi`. **Two of those four are the
 same instrument** — General MIDI, twice — and a visitor has to know what a
 soundfont is before they can work that out. The page was showing its storage
@@ -1436,7 +1436,7 @@ screen.
 
 ## 65. Three ways a CSS rule can be present and inert (session 20)
 
-`/box/`'s phone layout was written three times before it did anything, and each
+`/keys/`'s phone layout was written three times before it did anything, and each
 failure looked like the rule was absent:
 
 - **It was in the wrong container.** The reverb row is appended to
@@ -2361,7 +2361,7 @@ off, not as "this pair is unordered".
 The default reversed. There are three answers now and a container picks one: an
 ARROW (they feed each other), `set: true` for a BRACKET (parts of one machine
 that do not), and `join: false` for NOTHING, which is right where the container's
-own box already carries the whole relationship. `/box/`'s `Browser` holds a
+own box already carries the whole relationship. `/keys/`'s `Browser` holds a
 keyboard and a playout; a line between them adds no fact and gives the eye
 something to follow that leads nowhere.
 

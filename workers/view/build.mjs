@@ -145,7 +145,7 @@ const FILES = [
   // The box listener: play a Raspberry Pi in another building from a phone.
   // It needs nothing else deployed — proto/jam/playout-worklet.js is already
   // listed above for the MoQ return path, and the page talks only to
-  // ws.positron.studio. Served at /box/.
+  // ws.positron.studio. Served at /keys/.
   // ⚠️ FROM THE MANIFEST, NOT LISTED HERE. `demoFiles()` enumerates BUILT demos;
   // a page that is not one — the box's listener in rig/, the component sandbox —
   // used to need a hand-written line here AND a matching rewrite in

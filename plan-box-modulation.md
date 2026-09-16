@@ -22,7 +22,7 @@ sample-and-hold, an envelope follower, the cubed amount, the offset in the
 control's own warped space. It runs in a tab today
 (<https://positron.studio/radio/>, 35/35). This file is about getting the
 same movement onto the Raspberry Pi that serves
-<https://positron.studio/box/> and <https://positron.studio/grains/>.
+<https://positron.studio/keys/> and <https://positron.studio/grains/>.
 
 ---
 
@@ -623,10 +623,10 @@ probs` — and that is a prediction a check can assert on without a microphone.
 
 ## 5 · What reaches the page
 
-### 5.1 ⚠️ It is not `/box/` — the granulator's surface is `/grains/`
+### 5.1 ⚠️ It is not `/keys/` — the granulator's surface is `/grains/`
 
-Worth saying plainly because the brief says `/box/`. `rig/box/listen.html` — the
-page deployed at <https://positron.studio/box/> — is the INSTRUMENT page. Its
+Worth saying plainly because the brief says `/keys/`. `rig/box/listen.html` — the
+page deployed at <https://positron.studio/keys/> — is the INSTRUMENT page. Its
 only granulator control is the `fx.pappus` insert switch (`:601`, `:648`), and
 its own comment says the granulator *"has its own page now"* (`:487`).
 
@@ -634,7 +634,7 @@ The page with the granulator surface is `demo/grains/index.html`, deployed at
 <https://positron.studio/grains/>: `params.set {cmd, args}` per knob (`:951`,
 `:956`), `params.drift {on:true}` (`:629`), `grain.report {on:true}` (`:635`),
 `params.state` as its poll (`:1412`). **That is the page a modulation has to
-reach and report to**, and `/box/` needs nothing except not to be surprised.
+reach and report to**, and `/keys/` needs nothing except not to be surprised.
 
 ### 5.2 What goes down: a patch name — and the routes behind it
 

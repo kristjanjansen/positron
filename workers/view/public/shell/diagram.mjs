@@ -146,6 +146,18 @@ export const TECH_HUE = {
   graphics: 278,           // anything that draws
   relay: 190,              // our own sockets and workers
   device: 330,             // a machine in a room: a board, a phone, a speaker
+  /**
+   * 🔴 THEIR OWN RASPBERRY, FOR THE REASON `cloudflare` IS THEIR ORANGE. Asked
+   * 2026-09-16 with their logo: *"pi should be brandcolorsih on diageam"*. The
+   * colour a reader has already learned from the thing itself is worth more
+   * than a slot in a rotation, and a Raspberry Pi is one of the few machines in
+   * these pictures that a reader can recognise by colour at all.
+   * ⚠️ 343 IS READ OFF THE LOGO, not chosen: #C51A4A is the crimson in their
+   * mark, which is hue 343 in HSL. It sits three degrees from `device`, and
+   * that is fine: `device` is any machine in a room and this is one machine
+   * anybody can name.
+   */
+  raspberry: 343,          // #C51A4A, the crimson in their own logo
   archive: 250,            // ERR, archive.org, a corpus
   station: 205,            // a broadcaster
 };
@@ -965,7 +977,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
     deepest = Math.max(deepest, dy);
     /**
      * 🔴 A RETURN PATH LANDS ON THE BOX IT REACHES, NOT ON THE MACHINE AROUND
-     * IT. This used the containers (`fm`, `tm`), so on `/box/` the sound came
+     * IT. This used the containers (`fm`, `tm`), so on `/keys/` the sound came
      * back from the bottom edge of `Raspberry Pi` and arrived at the bottom
      * edge of `Cloudflare`, with nothing joining it to `capture` or to `sound
      * back`. REPORTED in exactly those terms: *"capture should conntect to

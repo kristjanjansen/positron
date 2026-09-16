@@ -280,7 +280,7 @@ read 2026-09-13). 📄 `--udp-console=address:port` and
 `--udp-mirror-console=address:port` send the console back the other way. 📄
 U: already drive this from `tarmoj/CsoundRemote`, whose README describes
 *"controlling a running Csound instance on a headless Raspberry Pi from a touch
-screen device"* — which is `/box/`'s shape, arrived at independently.
+screen device"* — which is `/keys/`'s shape, arrived at independently.
 
 **The bridge is a program that joins a relay room and writes datagrams.**
 ✅ `rig/box/ask.mjs` is 57 lines and already does the first half — joins
@@ -422,7 +422,7 @@ one that matters most.** Getting a hardware synth's output onto a page in
 another building needs no MIDI and no CV at all: it is a class-compliant USB
 audio interface, a Raspberry Pi, and `rig/box/box.mjs` unchanged. ✅ That chain
 is running today — the board dials out to `wss://ws.positron.studio`, publishes
-`arecord -f S16_LE -r 48000 -c 1` in 20 ms frames at 50 frames/s, and `/box/`
+`arecord -f S16_LE -r 48000 -c 1` in 20 ms frames at 50 frames/s, and `/keys/`
 plays it. **If the ask is "let people hear the studio", stop reading here.**
 
 ### 3.1 The recommendation: MIDI first, and the reason is arithmetic
@@ -662,7 +662,7 @@ capability.
 🔴 **This is not a gap to close, it is a boundary to respect.** The shape that
 already works in this repo is: **the browser is the interface, a small computer
 next to the gear is the driver, and a relay is between them.** ✅ That is
-literally `/box/` — a page in one building, a Raspberry Pi in another, `ask.mjs`
+literally `/keys/` — a page in one building, a Raspberry Pi in another, `ask.mjs`
 as the proof that the browser is not the only client. Whatever converts to CV
 should sit on the Pi's side of that line, as a native program, and report its
 own counters upward.
