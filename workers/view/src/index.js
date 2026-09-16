@@ -142,10 +142,123 @@ async function serveCached({ cacheKey, assetPath, upstreamReq, env, ctx, origin 
   });
 }
 
-export default {
+// ── not ready to be found ───────────────────────────────────────────────────
+//
+// 🔴 positron.studio IS R&D AND MUST NOT BE INDEXED. Asked for 2026-09-16:
+// "hide positron from Google ... no indexing. We are not ready."
+//
+// Three channels, and they do different jobs. The meta tag in each page is the
+// weakest: it only covers HTML, and only HTML whose head carries it. robots.txt
+// is the next: it stops a compliant crawler FETCHING, and does NOT stop one
+// listing a URL it heard about elsewhere. `X-Robots-Tag` is the one that
+// actually works, because it rides on EVERY response, HTML or not, and it is
+// the only one of the three that removes a URL already in an index.
+//
+// ⚠️ THIS HEADER IS ONLY HALF THE SURFACE. Static assets are served by the edge
+// BEFORE this Worker runs, so nothing here can reach them. `public/_headers`
+// (written by build.mjs) is the other half, and the two must say the same thing.
+const NOINDEX = 'noindex, nofollow';
+
+/**
+ * Every response this Worker returns, marked.
+ *
+ * ⚠️ A RESPONSE OUT OF THE CACHE API OR THE ASSET BINDING HAS IMMUTABLE
+ * HEADERS, and `.set()` on one throws a TypeError rather than failing quietly.
+ * Both kinds are returned from the routes below (`/err-img` serves a
+ * `caches.default` hit, `/notes/<slug>` serves an `env.ASSETS` fetch), so this
+ * rebuilds rather than mutating.
+ * ⚠️ AND A BODY-LESS STATUS MUST NOT BE GIVEN A BODY: `/report` answers 204,
+ * and `new Response(<body>, { status: 204 })` is a TypeError.
+ */
+function marked(res) {
+  const bodyless = res.status === 204 || res.status === 304;
+  const out = new Response(bodyless ? null : res.body, res);
+  out.headers.set('x-robots-tag', NOINDEX);
+  return out;
+}
+
+/**
+ * 🔴 ONE `User-agent` PER GROUP. NEVER A SHARED ONE.
+ *
+ * The shared form (N `User-agent` lines above one `Allow`) is legal under
+ * RFC 9309 and Meta's parser does not honour it: `facebookexternalhit` binds
+ * directives to the NEAREST `User-agent` line only, so it fell through to
+ * `* Disallow` and the Sharing Debugger reported a 403 while the edge had
+ * served it 200 all afternoon. That is a synthetic code for "robots.txt
+ * refuses me", and it sent the sibling project on an evening's tour of Bot
+ * Fight Mode, Browser Integrity Check and AI Crawl Control before zone
+ * analytics said the requests had never been blocked at all. Write this file
+ * in the dumbest parser's dialect and the whole class of bug goes away.
+ *
+ * 🔴 AND ALLOWING THE PREVIEW BOTS IS A DELIBERATE CALL, NOT AN OVERSIGHT.
+ * They build the card when somebody pastes a positron link into Slack,
+ * Telegram, Discord or a chat. They do not build a search index, and the ask
+ * was about search. A blanket `Disallow: /` takes those cards out everywhere,
+ * silently, and the breakage is invisible from here. To go completely dark,
+ * delete every group above `User-agent: *` and nothing else changes.
+ */
+const PREVIEW_BOTS = [
+  'Twitterbot', 'Slackbot', 'Slack-ImgProxy', 'facebookexternalhit',
+  'meta-externalfetcher', 'LinkedInBot', 'Discordbot', 'TelegramBot', 'WhatsApp',
+];
+
+const ROBOTS = `# positron.studio is R&D and is not ready to be found. Asked for 2026-09-16:
+# "hide positron from Google, no indexing, we are not ready".
+#
+# THIS FILE IS THE POLITE HALF AND IT IS THE WEAKER HALF. robots.txt stops a
+# compliant crawler FETCHING a page. It does not stop one LISTING a URL it
+# heard about somewhere else, and a URL already in an index is only removed by
+# a noindex the crawler is allowed to read. The gate that does the real work is
+# the X-Robots-Tag header, which rides on every response from this site.
+#
+# The groups below are LINK PREVIEW bots, allowed on purpose: they render the
+# card when somebody pastes a link into a chat, and they do not index. Delete
+# them to go completely dark. One User-agent per group is not a style choice,
+# it is what Meta's parser requires.
+
+${PREVIEW_BOTS.map((b) => `User-agent: ${b}\nAllow: /\n`).join('\n')}
+# Everybody else gets nothing, anywhere.
+#
+# Content-Signal is a machine-readable reservation of rights under Article 4 of
+# EU Directive 2019/790. Cloudflare's free plan serves a default robots.txt that
+# EXPLAINS these signals without expressing any preference, and it serves it
+# only while a domain has no robots.txt of its own. This file replaces that
+# default, so the preference is stated here rather than lost with it.
+User-agent: *
+Content-Signal: search=no, ai-input=no, ai-train=no
+Disallow: /
+`;
+
+// 🔴 THE ROUTES LIVE HERE AND THE EXPORT IS BELOW THEM, so the header cannot be
+// forgotten by a route that returns early. Adding one to `routes` is the only
+// way to serve anything from this Worker, and there is exactly one way out.
+const routes = {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
+
+    // ── GET /robots.txt ────────────────────────────────────────────────────
+    // Served from the Worker rather than committed into public/, so no build
+    // allowlist and no asset route can drop it. Assets are tried first, so this
+    // is reached only because build.mjs does not write a robots.txt; if one ever
+    // appears in public/ it would win silently and this route would go dead.
+    // ⚠️ HEAD AS WELL AS GET. Every other route here is GET-only and that is
+    // fine, because the paths a crawler HEADs are static assets and the asset
+    // server answers those itself. This one has no asset behind it, so a
+    // GET-only guard sends a HEAD straight to the 404 below: `curl -sI` on it
+    // read `404` while `curl -s` on the same URL read the file, which is the
+    // shape of a bug that survives being tested.
+    if (p === '/robots.txt' && (request.method === 'GET' || request.method === 'HEAD')) {
+      return new Response(request.method === 'HEAD' ? null : ROBOTS, {
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          // Short, because turning this off when the site IS ready should take
+          // effect the same day rather than a week later. Meta caches robots
+          // for about a day whatever we say here.
+          'cache-control': 'public, max-age=3600',
+        },
+      });
+    }
 
     // Not an open proxy, part 1: same-origin only. Our own pages are
     // same-origin so they always pass; a POST from anyone else's site carries
@@ -339,6 +452,12 @@ export default {
 
     // Anything else that reached the Worker is a path with no static asset.
     return new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } });
+  },
+};
+
+export default {
+  async fetch(request, env, ctx) {
+    return marked(await routes.fetch(request, env, ctx));
   },
 };
 

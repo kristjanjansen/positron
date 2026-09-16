@@ -616,24 +616,79 @@ await mkdir(OUT, { recursive: true });
 // a 404 to the console, and "zero console errors" stops being true.
 await writeFile(join(OUT, 'favicon.ico'), favicon());
 
+// ── _headers — the half of the noindex that the Worker cannot reach ──────────
+//
+// 🔴 STATIC ASSETS ARE SERVED BY THE EDGE BEFORE THE WORKER RUNS. `src/index.js`
+// wraps every response IT returns in `X-Robots-Tag`, and that covers `/api/*`,
+// `/err-img`, `/icy/*`, `/report`, `/notes/<slug>` and the 404. It covers none
+// of the fifty pages, none of the modules and none of the committed cache,
+// because for those the Worker is never invoked at all. This file is what
+// covers them, and the two must keep saying the same thing.
+//
+// ⚠️ `_headers` IS A CONFIG FILE, NOT AN ASSET. Cloudflare reads it at upload
+// and does not serve it, so this does not put a file at /_headers. `/*` matches
+// every path on every hostname this Worker answers, which includes the
+// `workers.dev` name that `workers_dev: true` keeps alive.
+//
+// To turn indexing back on when the site IS ready: delete this block, delete
+// `NOINDEX`/`marked()`/`ROBOTS` from src/index.js, and drop the meta pass in
+// the copy loop below. Nothing else knows about any of it.
+await writeFile(join(OUT, '_headers'), '/*\n  X-Robots-Tag: noindex, nofollow\n');
+
+// ── the noindex meta, on every page, whoever wrote the page ─────────────────
+//
+// The header above is the control that actually works. This is the second
+// channel, and it exists because a header is invisible in the file: somebody
+// reading a page's source should be able to see that it is not meant to be
+// found. 45 of the 50 pages already carried it when this landed.
+//
+// ⚠️ IT PATCHES THE DEPLOYED COPY ONLY, which is the same treatment
+// `proto/flipper/index.html` already gets for its missing viewport, and for the
+// same reason: three of the four protos must not be edited. A page in demo/
+// should carry the tag in its own source, and this is the net under it.
+// ⚠️ AND IT SAYS HOW MANY IT CAUGHT. A build step that silently repairs pages
+// cannot be told apart from one that has nothing to repair, so the count is
+// printed: if it ever rises, a new page shipped without the tag.
+const ROBOTS_META = '<meta name="robots" content="noindex, nofollow">';
+const CHARSET = '<meta charset="utf-8">';
+const patched = [];
+
+function withRobotsMeta(src, text) {
+  if (text.includes('name="robots"')) return text;
+  patched.push(src);
+  // After the charset declaration, which every page here opens with, so the
+  // encoding is still declared inside the first 1024 bytes. A page without one
+  // gets the tag at the very top, where it is still inside the head.
+  return text.includes(CHARSET)
+    ? text.replace(CHARSET, `${CHARSET}\n${ROBOTS_META}`)
+    : `${ROBOTS_META}\n${text}`;
+}
+
 for (const [src, dst] of FILES) {
   const to = join(OUT, dst);
   await mkdir(dirname(to), { recursive: true });
   const rewrites = REWRITES[src];
   const append = APPEND[src];
-  if (rewrites || append) {
+  const isPage = extname(dst) === '.html';
+  if (rewrites || append || isPage) {
     let text = await readFile(join(REPO, src), 'utf8');
     for (const [from, into] of rewrites || []) {
       if (!text.includes(from)) throw new Error(`rewrite target vanished in ${src}: ${from}`);
       text = text.split(from).join(into);
     }
     if (append) text += '\n' + append + '\n';
+    if (isPage) text = withRobotsMeta(src, text);
     await writeFile(to, text);
-    console.log(`  ${rewrites ? `rewrote ${dst} (${rewrites.length} substitution(s))` : `copied ${dst}`}${append ? ' + back link' : ''}`);
+    if (rewrites || append) {
+      console.log(`  ${rewrites ? `rewrote ${dst} (${rewrites.length} substitution(s))` : `copied ${dst}`}${append ? ' + back link' : ''}`);
+    }
   } else {
     await copyFile(join(REPO, src), to);
   }
 }
+console.log(patched.length
+  ? `  noindex meta added to ${patched.length} page(s) that lacked it: ${patched.join(', ')}`
+  : '  noindex meta: every page carried it already');
 {
   // Stripping the demo/ prefix on deploy made it possible for two sources to
   // land on one destination (demo/index.html and the generated menu both wanted

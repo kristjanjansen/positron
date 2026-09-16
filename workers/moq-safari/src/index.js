@@ -34,10 +34,73 @@ const STAGE_RANK = {
 	live: 7,
 };
 
-export default {
+// ── not ready to be found ───────────────────────────────────────────────────
+// moq.positron.studio serves a real HTML page from `public/`, which makes it
+// the second indexable surface on this zone after positron.studio itself.
+// Same three channels as there, and the same division of labour: the meta tag
+// in public/index.html covers the page, public/_headers covers every static
+// asset (the edge serves those without ever invoking this Worker), and the
+// wrapper below covers everything this Worker answers itself.
+const NOINDEX = "noindex, nofollow";
+
+const ROBOTS = `# moq.positron.studio is R&D and is not ready to be found.
+# The header X-Robots-Tag does the real work; this file is the polite half.
+# Link preview bots are allowed on purpose so pasted links still make a card.
+# One User-agent per group: Meta's parser ignores shared groups.
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+User-agent: Slack-ImgProxy
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: meta-externalfetcher
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: *
+Content-Signal: search=no, ai-input=no, ai-train=no
+Disallow: /
+`;
+
+/** ⚠️ A DO RESPONSE HAS IMMUTABLE HEADERS and a 204 must not be given a body. */
+function marked(res) {
+	const bodyless = res.status === 204 || res.status === 304;
+	const out = new Response(bodyless ? null : res.body, res);
+	out.headers.set("X-Robots-Tag", NOINDEX);
+	return out;
+}
+
+const routes = {
 	async fetch(request, env) {
 		const url = new URL(request.url);
 		const stub = () => env.BEACONS.get(env.BEACONS.idFromName("global"));
+
+		if (url.pathname === "/robots.txt" && (request.method === "GET" || request.method === "HEAD")) {
+			return new Response(request.method === "HEAD" ? null : ROBOTS, {
+				headers: {
+					"content-type": "text/plain; charset=utf-8",
+					"cache-control": "public, max-age=3600",
+				},
+			});
+		}
 
 		if (request.method === "POST" && url.pathname === "/beacon") {
 			const text = (await request.text()).slice(0, MAX_BODY);
@@ -65,6 +128,12 @@ export default {
 		}
 
 		return new Response("not found", { status: 404 });
+	},
+};
+
+export default {
+	async fetch(request, env) {
+		return marked(await routes.fetch(request, env));
 	},
 };
 

@@ -15,6 +15,41 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **TWO HOSTS ARE STILL INDEXABLE: `moq.` AND `feedback.positron.studio`.**
+  The noindex work of 2026-09-16 covered `positron.studio` and shipped
+  (`robots.txt` from the Worker, `X-Robots-Tag` on every response, the meta tag
+  on all 50 pages). The same change is WRITTEN AND LOCALLY VERIFIED for the
+  other two hosts that a crawler would keep, and NOT DEPLOYED, because that
+  session was asked to deploy `workers/view` only. One command each:
+  `cd workers/moq-safari && npx wrangler deploy`, same for `workers/feedback`.
+  ⚠️ `moq.positron.studio` is the only other host serving real HTML;
+  `feedback.positron.studio` answers 200 JSON at `/` and its own header calls it
+  unlisted rather than secret, which is the thing an index undoes.
+
+- ⚠️ **THE OTHER SIX HOSTS WERE LEFT ON PURPOSE AND ARE NOT COVERED.**
+  `items`, `pub`, `store`, `shout` and the relay answer 200 JSON at `/` and a
+  search engine will keep that; `ingest`, `instrument`, `rtc`, `selfrec`,
+  `cues`, `osc` answer 404 or 403 and are self-limiting. Every one of them has
+  a WebSocket 101 path, and a response wrapper that rebuilds a 101 breaks the
+  upgrade, so this is its own pass with its own verification rather than a
+  bundled edit. ⚠️ **AND `backlog.positron.studio` TAKES LIVE TRAFFIC WITH NO
+  CONFIG IN THIS REPO** (49 requests in 7 days), so there is nothing to add a
+  header to: an old script still deployed, or a DNS record that outlived one.
+  ⚠️ THE CHEAP ANSWER TO ALL OF THEM IS ONE ZONE-WIDE RESPONSE HEADER TRANSFORM
+  RULE setting `X-Robots-Tag` on `*.positron.studio`, which needs no worker
+  edits and covers the orphan too. The wrangler OAuth token is NOT scoped to
+  rulesets (measured: 403 on `GET /zones/<id>/rulesets`), so it is a dashboard
+  click or an API token with Zone / Config Rules / Edit.
+
+- ⚠️ **`proto/flipper/index.html` SHIPS TWO IDENTICAL VIEWPORT METAS.** Found
+  2026-09-16 while adding the robots meta to the same build step, and it
+  predates that work. `build.mjs`'s `REWRITES` still inserts the viewport line
+  the comment says the proto lacks, and the proto has since gained its own, so
+  the deployed copy carries it twice. Harmless to a browser, which takes the
+  first. The rewrite and its comment are now both wrong and one of them should
+  go. `build.mjs` guards against an anchor that VANISHES and cannot see one that
+  became redundant.
+
 - 🔴 **`box.ping` IS BROKEN ON THE BOARD AND `/box/`'s `rtt` CAN NEVER FILL.**
   Found 2026-09-16 while building `/knobs/`. It replies `box.pong` with an `at`
   field, `at` is an ENVELOPE field, so the board's own `format()` throws and the

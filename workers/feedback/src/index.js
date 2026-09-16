@@ -306,9 +306,48 @@ const json = (o, status = 200) => new Response(JSON.stringify(o), {
   },
 });
 
-export default {
+// ── not ready to be found ───────────────────────────────────────────────────
+// 🔴 THIS HOST ANSWERS 200 JSON AT `/` AND A SEARCH ENGINE WILL KEEP THAT.
+// The header of this file calls the service unlisted rather than secret, and
+// unlisted is exactly the thing an index undoes: it turns a URL nobody has into
+// a result anybody can find. positron.studio itself is noindexed as of
+// 2026-09-16 and this host is covered the same way.
+//
+// ⚠️ THE WRAPPER IS THE POINT, NOT THE HELPER. Most of the traffic here is
+// `/feedback` and `/stats`, and both return a Durable Object's response
+// verbatim without ever passing through `json()`. Marking the helper would have
+// missed the majority of real requests while looking like a fix.
+const NOINDEX = 'noindex, nofollow';
+
+const ROBOTS = `# feedback.positron.studio is unlisted and is not ready to be found.
+# The header X-Robots-Tag does the real work; this file is the polite half.
+# There is nothing here a link preview could render, so nothing is allowed.
+
+User-agent: *
+Content-Signal: search=no, ai-input=no, ai-train=no
+Disallow: /
+`;
+
+/** ⚠️ A DO RESPONSE HAS IMMUTABLE HEADERS and a 204 must not be given a body. */
+function marked(res) {
+  const bodyless = res.status === 204 || res.status === 304;
+  const out = new Response(bodyless ? null : res.body, res);
+  out.headers.set('x-robots-tag', NOINDEX);
+  return out;
+}
+
+const routes = {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === '/robots.txt' && (request.method === 'GET' || request.method === 'HEAD')) {
+      return new Response(request.method === 'HEAD' ? null : ROBOTS, {
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'public, max-age=3600',
+        },
+      });
+    }
 
     if (request.method === 'OPTIONS') {
       return new Response(null, {
@@ -367,6 +406,12 @@ export default {
     }
 
     return new Response('use POST /arm, GET /feedback, GET /stats', { status: 404 });
+  },
+};
+
+export default {
+  async fetch(request, env) {
+    return marked(await routes.fetch(request, env));
   },
 };
 
