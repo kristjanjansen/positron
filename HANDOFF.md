@@ -1,4 +1,192 @@
-# Handoff, 2026-09-16, session 29
+# Handoff, 2026-09-16, session 31
+
+**DEPLOYED AND CONFIRMED ON THE EDGE AT `b2bddd2-092128-ad26`.** The relay went
+out separately (`positron-shout`, version `9e029e2e`).
+
+🔴 **NOTHING IS COMMITTED. 67 files are dirty and every BUILD stamp this session
+reads `b2bddd2`, which is the PREVIOUS commit.** The stamp's tree digest is the
+only thing telling two of today's builds apart. Committing is the first job of
+the next session, in coherent pieces, and `demo/manifest.mjs` was edited by
+three agents so read it before staging.
+
+⚠️ **`workers/view/preview.mjs` EXISTS NOW AND I SHOULD HAVE USED IT.** It runs
+the same build and interlock and then `wrangler versions upload --preview-alias`,
+MEASURED at 11 s with production untouched. Twice this session a deploy went out
+while a background agent was still writing, which is exactly what it is for.
+⚠️ Wrangler printed no preview URL, so Preview URLs may not be enabled on the
+Worker. That is a dashboard toggle nobody has flipped and I did not flip it.
+
+---
+
+## 🔴 READ FIRST: THREE RULES CHANGED, AND ONE REVERSED
+
+**A self-check never runs for a visitor. No exceptions.** Instructed as *"rip
+those selfchecks out of user experience and make rule about it"*. In CLAUDE.md
+with both excuses that were used here and what each cost. Four pages obey it;
+**41 do not** and are listed by name in `BACKLOG.md`. That sweep is not
+mechanical: a read-only assert costs a visitor nothing, what has to move is
+anything that opens a file, makes a sound, presses a control or moves the
+picture.
+
+**Inner diagram boxes get ARROWHEADS now.** This reverses the old tie rule,
+which was correct and still lost: a headed line, then a headless one, then a
+headed one down one column reads as a head that fell off, reported twice. There
+are THREE answers on a container and CLAUDE.md names them: an arrow (default),
+`set: true` (a bracket, for a machine whose children are a set), and
+`join: false` (nothing at all).
+
+**The diagram heading is `How it works`**, from `HOW` in `diagram.mjs`, on every
+page. It was three treatments across six pages when the day started.
+
+---
+
+## What shipped, by page
+
+**`/tapes/` stopped loading and playing on page load.** Reported three times,
+the third as *"omg you still do not get it"*. The self-check suite was running
+for every visitor: it opened a 12 MB recording from archive.org, played it and
+looped it four ways inside three seconds. The two previous repairs were both
+real and both about something else (one shut the sound gate, the other stopped
+the duration probes), which is why it survived. 38/38, and the new assert goes
+red under sabotage naming the exact URL it opened.
+⚠️ **Every run walks the visitor's path first**, including the suite's, then the
+suite opens a file on purpose. The obvious `load: SELFCHECK` would have let the
+suite take a different path from the visitor, which is how this lived so long.
+
+**`/videoradio/`**: the headset half archived to `archive/videoradio-xr/` with
+its plan and a README of what the three device runs bought; the sea removed
+entirely (*"remove bottom one"*, after I misread *"lower"* as "make it shorter"
+and shipped that); the standard transport bar in its own box with the LIVE chip
+and ⛶ in a real `loopSlot`; moved to the `vain` group.
+
+**`/radio/`**: `Automate` (off until pressed, hands back on `pointerdown` on the
+granulator, agent-built), IDA and Radio 1965 back, `dub` the default preset,
+short station labels, the wet/dry judder fixed, `speakers` out of the diagram.
+51/51.
+
+**`/box/`**: a diagram, press-to-sound `lag`, a `patch` label, the patch line
+gone. The diagram took four rounds and every round was a real renderer fault.
+
+**`/replay/`** (agent): all six asks, 22/22, plus a `cue log` box saying where
+the cues come from.
+
+**`/crate/`**: rows play on press, the live row is lit, the upload block merged.
+
+**`/seek/`** retired to `archive/demos/` (agent), 5 real references swept of 30
+slug-shaped candidates.
+
+**`/items/`**: a red check that was a race, not a bug. See below.
+
+---
+
+## 🔴 IDA AND RADIO 1965 ARE BACK, AND HERE IS THE EXACT STANDING
+
+Both were removed on 2026-09-15 at their operators' request: roughly 100
+concurrent clients each, traced to positron.studio. They are back on
+instruction, on the user's own condition *"(if single listener)"*, and the
+condition is met: `class Mount` in `workers/shout/worker.mjs` holds ONE upstream
+per mount and fans it out, `?direct=1` is deliberately not offered, and
+`GET /tee/<id>` reports `upstreamConnections`.
+
+⚠️ **NEITHER OPERATOR HAS BEEN RE-ASKED.** What changed is the SIZE of the
+claim, not their permission. The code says so in those words.
+⚠️ **BOTH ARE LAST IN THE LIST AND MUST STAY THERE.** A page opens the first
+entry it finds; being at the front is what did the damage.
+⚠️ The other half is fixed too: `demo/fake-station.mjs` means the suite opens
+nothing of anybody's.
+
+---
+
+## 🔴 AND THE RULE GOT WIDER: EVERY EXTERNAL SOURCE, NOT JUST ERR
+
+Instructed after I called an archive.org harness "safe": *"stil: super careful
+with external sources, better avoid"*. The mistake was reading the ERR rule as
+being about that specific harm rather than about whose server it is.
+`node demo/verify.mjs tapes` pulls real recordings and must not run in a loop.
+`/tapes/` needs a stand-in like `fake-station.mjs`; it is in `BACKLOG.md`.
+
+---
+
+## What cost the most time, so it is not repeated
+
+🔴 **I REPORTED THE SAME `/crate/` BUG FIXED TWICE BECAUSE I REASONED INSTEAD OF
+MEASURING.** Three separate faults were hiding in one symptom, and each had a
+definitive answer available in seconds:
+- **CSS pasted INSIDE a rule.** My `.pick` and `.on` rules landed between
+  `.pos-tbl-row {` and its declarations. Nested rules are ignored, so every
+  visual change was inert AND I had broken that rule's own layout. One look at
+  the file showed the brace.
+- **`key` is not `name`.** The sidecar carries both: `key` is
+  `vain-dev/<stamp>/audio.wav` and answers **200**, `name` is the uploader's
+  original filename and answers **404**. Two `curl`s settled it. I had guessed.
+- **The failure was silent**, so it presented as a transport bug. The page
+  logged `playing …` for an action it had not managed to take.
+
+**A page that gains its first control moves every OTHER control's harness
+press.** `settleMs` lands on control 0 only. Adding `Automate` moved the
+looper's single click from t+1 s to t+31 s, into the middle of another check,
+intermittently. The symptom is a failure in a check with nothing to do with what
+you added. In CLAUDE.md.
+
+**`d.button(id)` searched the control row only**, so any page that MOVES a
+control got null back. `/videoradio/` and `/tapes/` both move controls and had
+the same latent fault. The shell keeps a map of what it built now.
+
+**`/replay/` reported 3 of 10 asserts and read GREEN.** Its diagram asserted at
+load, which disarms `verify.mjs`'s first-assert budget; every real check sits
+behind a 2.4 s guard and landed after the harness stopped collecting. This is
+the trap already written in `BACKLOG.md`, met in the wild. `/station/` still
+asserts at load.
+
+**`/items/`'s red check was a race in the CHECK.** It captured its baseline the
+instant the row went live, and the worker publishes in two steps with an
+`announce()` fetch between them: **a Durable Object's input gate does not cover
+a non-storage await**. Announcing is an allowlist of one room, so a harness room
+reads null on both sides and passes however the race falls. Only a real run can
+fail it.
+
+**An empty flex child still eats a gap.** `/videoradio/`'s ⛶ measured 9 px from
+top, bottom and left and **17 from the right**: two zero-width members after it,
+each still separated by the 8 px gap. Same family as an empty readout painting
+its own border.
+
+**`scope.source()` set a string that was never drawn.** `/radio/` had been
+calling it into the void for weeks. A setter with no reader is the same shape as
+a control that looks live and is inert.
+
+**A flag added to a diagram node must be carried to the render node.** `box()`
+builds a fresh object rather than spreading the spec, so `set` was invisible to
+the painter and read as an option that did nothing. Two runs.
+
+**`back: true` is an AUTHOR flag that nothing infers.** A return link without it
+is laid out as a forward step, which drew a line straight through `playout` and
+put its head on the far left of the Browser.
+
+---
+
+## Open, in rough priority
+
+1. 🔴 **COMMIT THIS SESSION.** 67 dirty files, three agents' work mixed in.
+2. 🔴 **The 41 pages whose self-checks still run for visitors.** `BACKLOG.md`.
+3. **`/draw/`**: default zoom 2.0, and the blue line has no contrast on white.
+   Asked with a suggested mechanism (no blue while drawing, fade it in when
+   stopped, fade the drawn line to semitransparent, and that semitransparent
+   state applies during playback too). NOT STARTED.
+4. **`rm 'pappus chewin radio' erc label`** — I could not find that string
+   anywhere a reader sees it. Asked where it is; unanswered.
+5. **Why no push notification arrived on `/items/`.** The worker is healthy
+   (`announcing: true, has_key: true, has_topic: true`) and the row was stamped,
+   but **an FCM topic send succeeds with zero subscribers**, so a stamp proves
+   we published, not that a device is on the topic. The log showed NO subscribe
+   line either way, so that step did not run. Needs a full log from 0.00.
+6. **The twelve sounds are typed twice**, in `demo/radio/index.html` and
+   `demo/shell/radio-gran.mjs`, measured character for character identical. A
+   contained 437-line deletion plus an import.
+7. `BACKLOG.md` holds the rest.
+
+---
+
+# Handoff, 2026-09-16, session 29 (previous)
 
 Deployed and confirmed on the edge at **`b5a7d0f-232956-32a1`**. Committed to
 `session-28-station-videoradio` up to `b5a7d0f`, with one commit of the evening's

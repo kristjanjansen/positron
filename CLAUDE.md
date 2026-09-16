@@ -1,9 +1,12 @@
 # positron
 
-Live at **https://positron.studio**. 40 shelled demos of 45 rows
-(2026-09-15, counted from `DEMOS` rather than remembered) — `tapes` is the newest:
-the `kurenniemi` corpus on a time axis, where a mark is as wide as its date is
-vague and 24 of the records play. ⚠️ **`radio1965` IS NOW `radio`, RENAMED 2026-09-16 ON INSTRUCTION.**
+Live at **https://positron.studio**. 43 shelled demos of 46 rows
+(2026-09-16, counted from `DEMOS` rather than remembered) — `tapes` is the newest:
+the 24 Kurenniemi recordings that play, laid END TO END as one long tape, each
+as wide as it really is. ⚠️ THE SENTENCE HERE DESCRIBED A DIFFERENT PICTURE for
+two sessions — a mark as wide as its DATE is vague, on a century — which is the
+axis that was replaced on 2026-09-15 and is exactly the drift CLAUDE.md's own
+rule is about. The lengths are measured and live in `corpus.json`. ⚠️ **`radio1965` IS NOW `radio`, RENAMED 2026-09-16 ON INSTRUCTION.**
 The slug, the directory and every reference moved together; the deployed
 `/radio1965/` is GONE, so any link anybody has kept 404s and a redirect has not
 been written. The line that stood here before said the slug was fixed and not to
@@ -34,6 +37,9 @@ node demo/server.mjs                     # :8890, serves the repo; / == deployed
 node demo/verify.mjs                     # every built demo (CDP, asserts on window.__demo)
 node demo/verify.mjs llhls ladder        # just these, by slug
 node demo/verify-native.mjs              # THE IPHONE CODE PATH — verify.mjs cannot reach it
+node demo/fake-station.mjs               # an Icecast mount that is nobody's radio
+node demo/shell/looper-test.mjs          # the looper's arithmetic, no browser
+node demo/resources/measure-durations.mjs   # how long each recording is, asked once
 node demo/verify-safari.mjs              # desktop Safari over WebDriver, both engines
 DEMO_BASE=https://positron.studio node demo/verify.mjs      # against the deploy
 
@@ -92,9 +98,34 @@ about somebody else's server rather than about our code. Four of eight were
 down the last time it was run, which is the normal state of it.
 **Change the page, syntax-check it, ship it** (`node demo/check-html.mjs
 demo/<slug>/index.html` parses every module block without opening a browser).
-Verify it ONLY when asked to, or
-when a change is to the decode path itself and nothing else can grade it. A red
-run on that page is not information until somebody asks for it.
+A red run on that page is not information until somebody asks for it.
+
+✅ **AND SINCE 2026-09-16 IT CAN BE GRADED WITHOUT COSTING ANYBODY ANYTHING.**
+`node demo/verify.mjs radio` starts `demo/fake-station.mjs` itself and points
+the page at it with its own `?base=`: real MP3 frames, real ICY headers, a real
+`icy-metaint` text channel and a `/health` route in the relay's shape, paced at
+128 kbit/s. **MEASURED: 48/48 green with zero bytes from anybody's radio.** So
+the rule above is now about the RELAY and the mounts, not about the page: run
+the page freely, and never `curl` a mount, a health route or a live segment to
+find out whether somebody else's server is up.
+⚠️ It grades OUR code. A stand-in cannot tell you a mount is 403ing, and a page
+green here can still meet one out there.
+⚠️ `DEMO_QUERY=base=…` overrides it, which is the escape hatch for somebody who
+has been ASKED to check the real relay.
+
+🔴 **AND IT IS NOT ONLY ERR. EVERY EXTERNAL SOURCE, 2026-09-16:** *"stil: super
+careful with external sources, better avoid"*, said in reply to
+*"it uses archive.org, not ERR, so it is safe to run"*. That reasoning was the
+mistake: the ERR rule is written about a broadcaster's listener statistics, and
+it was read as though the SPECIFIC harm were the whole rule, so a harness that
+pulls twenty-four recordings off archive.org on every run was called safe.
+**The rule is about whose server it is, not about which harm has been named
+yet.** `node demo/verify.mjs tapes` fetches real recordings from archive.org and
+must not be run in a development loop. ⚠️ THE ANSWER IS A STAND-IN, and this
+repo already has the pattern: `demo/fake-station.mjs` is an Icecast mount that
+is nobody's radio, and it took `/radio/` from ungradable to 48/48 at zero cost
+to anybody. `/tapes/` has no equivalent yet; until it does, change the page,
+syntax-check it with `node demo/check-html.mjs`, and ship it.
 
 🔴 **AND THE COST IS NOT OURS TO PAY. ERR SAID SO, 2026-09-16, RELAYED TO
 KRISTJAN:** *"ERRil oli ka probleem, et nende kuulajastatistika läheb sassi"* —
@@ -119,6 +150,46 @@ answer to "is it red because of me or because of them" is: SAY BOTH ARE
 POSSIBLE AND MOVE ON.
 
 
+🔴 **A SELF-CHECK NEVER RUNS FOR A VISITOR. NOT ONE, NOT EVER, ON ANY PAGE.**
+Instructed 2026-09-16: *"rip those selfchecks out of user experience and make
+rule about it"*. It is gated on `?selfcheck=1`, which `demo/verify.mjs` appends
+to every demo it opens, and the DEFAULT IS OFF. There is no page that is an
+exception, and the two arguments that were used to make exceptions are both
+answered below.
+
+⚠️ **"NOBODY IS HOLDING THIS ONE" IS NOT AN EXCEPTION.** `/videoradio/` ran its
+checks by default on exactly that reasoning: the page moves its own blend,
+changes station and runs a loop unattended, so a check that does those things
+was said to be indistinguishable from the page working. Everything in that
+sentence is true and the conclusion was still wrong, because the check does
+things the PAGE never does. It pressed full screen, which took a visitor out of
+their own full screen about twenty seconds after they pressed play. That was
+reported twice as a mystery timer (*"drops out of full screen after 22 to 25
+seconds"*, then *"chrome drops out of fullscreen when radio source changes"*)
+and was open for two sessions, because 22 s is also the tour's dwell and 71 s is
+the station clock, so the real cause looked like two innocent ones.
+
+⚠️ **"IT IS CHEAP HERE" IS NOT AN EXCEPTION EITHER.** `/tapes/` loaded a tape,
+played it and looped it four ways inside three seconds of every visit, because
+its checks were never gated at all. Reported as *"tapes still does some loading
+and playback on page load"*, and *"omg you still do not get it"* on the third
+report.
+
+⚠️ **AND THE GATE HAS TO COVER THE WHOLE COST, NOT THE AUDIBLE PART.** Both
+earlier repairs on `/tapes/` were real and neither was this: one shut the sound
+gate, the other stopped the page asking archive.org for durations. A page can be
+silent, ask nobody for a duration, and still spend a visitor's bandwidth on a
+12 MB recording and run its transport in front of them. **A VISIT ASSERTS A
+STRICT SUBSET** and that is the intended shape: everything gradable from data
+already in hand still runs, anything that opens a file, makes a sound, presses a
+control or moves the picture does not.
+
+⚠️ **A CHECK THAT MUTATES IS THE TEST, NOT A CHECK THAT IS SLOW.** `/tapes/`'s
+zoom check called `openFinish()` one frame into the opening animation, so the
+self-moving zoom somebody had asked for was being destroyed by the thing
+grading it. It waits for the move now. Ask of every check: if a person were
+watching this page, would they see it happen?
+
 🔴 **A REQUEST THAT ARRIVES MID-TASK GOES IN `BACKLOG.md` BEFORE IT IS WORKED
 ON.** Over one long run a stream of small requests was tracked in the session's
 head instead, and two were quietly dropped: the report that followed was *"do
@@ -133,6 +204,18 @@ writing. Never by going quiet.
 **Measure the quantity in question, not one adjacent to it.** An A/B where both
 arms share the bug returns "identical", which reads as "fine". Before running a
 comparison, ask what defect it could NOT detect.
+
+🔴 **A PAGE THAT GAINS ITS FIRST CONTROL MOVES EVERY OTHER CONTROL'S HARNESS
+PRESS, AND `settleMs` ONLY EVER LANDS ON CONTROL 0.** MEASURED 2026-09-16 on
+`/radio/`: adding one button made the looper's `→` control 1 instead of control
+0, so the single press the harness gives it moved from t+1 s to **t+31 s**,
+landing in the middle of the page's own loop check and taking it red
+intermittently with a face that read `≠`. Nothing about either control changed.
+⚠️ The symptom is an intermittent failure in a check that has nothing to do with
+the control you added, which is the worst place to start looking. **After adding
+or removing a control, re-run the page and diff the per-demo assert count**, and
+if a check depends on WHEN a press lands, have it confirm where it landed rather
+than assuming.
 
 **A green suite can mean zero coverage.** `verify.mjs` reported 261/261 while a
 demo was fatally broken on iPhone, because desktop Chrome never enters that
@@ -466,8 +549,9 @@ to recover.
   advance 0.961x / latency 5.25 s / 0 errors, against hls.js 0.344x / 7.71 s /
   2 errors. **HEADLESS Chrome answers `"maybe"` too**, so the suite cannot tell
   the two paths apart: `replay`, `seek` and `flipper` all ran
-  `video.src = <m3u8>` on a Chrome that cannot play it — dead picture, green
+  `video.src = <m3u8>` on a Chrome that cannot play it: dead picture, green
   suite, because their asserts were about decks and cue folds, not about frames.
+  ⚠️ `seek` IS RETIRED (2026-09-16) and is at `archive/demos/seek-index.html`.
   All three now gate on MMS (2026-09-06). Grep for `canPlayType` before trusting
   any HLS page.
 - **Safari can close a ManagedMediaSource under you.** Every buffer is dumped.
@@ -817,15 +901,31 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
     `title` and a page that uses the standing heading cannot end up at two
     distances, which is exactly what happened and was spotted by comparing two
     pages side by side.
-  - 🔴 **IT GOES LAST ON THE PAGE, AND IT CARRIES `title: 'how it works'`.**
+  - 🔴 **IT GOES LAST ON THE PAGE, AND IT PASSES `how: true` AND NO `title`.**
     A diagram is REFERENCE: it is read once, on purpose, by somebody who has
     already pressed the thing and wants to know what is behind it. Put between
     the page's sentence and its controls it delays the only thing a first
     visitor came for, and it makes the page look like documentation with a demo
     attached. Under the controls and the readout it is exactly where somebody
     who now has a question will look for one.
-    ⚠️ AND THE TITLE IS THE SAME FOUR WORDS ON EVERY PAGE, because a reader
-    learns a heading once. A per-page heading is a per-page thing to read.
+    🔴 **EVERY DIAGRAM PASSES `{ how: true, atEnd: true }` AND NO `title`, AND
+    THE HEADING IS `How it works`, WHICH LIVES IN `diagram.mjs` AS `HOW`.**
+    Never typed on a page. A page that passes a `title` alongside `how` gets it
+    REFUSED and reported on `cuts`, because `/station/` once shipped two
+    headings stacked.
+    ⚠️ **THE WORDING WAS `How this works` AND WAS CHANGED ON A DIRECT ASK,
+    2026-09-16.** `it` is the settled English phrase, a reader recognises it
+    without parsing, and on these pages `it` ALREADY means the demo because
+    every `what` paragraph uses it that way. `this` pointed at something
+    position already makes unambiguous: the picture is last on the page it
+    belongs to.
+    ⚠️ **AND THE DRIFT THIS PREVENTS WAS REAL AND MEASURED, NOT HYPOTHETICAL.**
+    On the day the rule was written there were THREE treatments across six
+    pages: four passed `how: true`, `/crate/` typed its own lowercase title, and
+    `/grains/` drew into `d.head` with no heading at all, so its picture came
+    first. All six are uniform now. This line itself said `title: 'how it
+    works'` for weeks while the code said otherwise, and an agent working from
+    this file is what caught it.
   - 🔴 **A PAGE WITH A DIAGRAM HAS A ONE LINE `what`, AND IT IS THE INDEX'S OWN
     LINE.** A paragraph and a picture of the machinery are two explanations of
     one thing and the paragraph is the weaker of them: it describes what a
@@ -833,7 +933,13 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
     verbatim, so a visitor arriving from the index is not told the same thing
     twice in two wordings that can drift apart.
   `demo/shell/diagram.mjs` draws it; these decide what goes in it.
-  - **A box label is a NAME.** `Icecast`, `scsynth`, `speakers`. It has to fit
+  - **A box label is a NAME.** `Icecast`, `scsynth`, `speakers`.
+    ⚠️ **AND A DIRECTION IS NOT A NAME.** `/box/` split one relay into two boxes
+    by role and labelled them `notes out` and `sound back`, which are captions
+    saying which way the traffic goes. Reported as *"not good names"*. Where one
+    machine is drawn twice by role, the LABEL is what that half carries
+    (`notes`, `audio`) and the `sub` is what the thing IS (`Relay object`, the
+    Durable Object's own class name). The direction is already in the arrows. It has to fit
     the box at the width the layout gives it, which is about fourteen
     characters, and a label that gets cut is reported on `cuts` for the author
     to fix rather than ellipsised at the reader.
@@ -896,10 +1002,49 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
     something. A path, a warning emoji and a file name are all the same mistake
     in a log line as in a note. This applies to prose in a code comment too when
     it is quoted into a page.
-  - **Boxes inside one machine are tied with a line and no arrowhead.** A head
-    would claim an order between the parts of one program that the drawing does
-    not know. A tie is a bracket: it says these boxes are parts of one thing,
-    and nothing more.
+  - 🔴 **BOXES INSIDE ONE MACHINE ARE JOINED WITH AN ARROWHEAD, LIKE EVERY
+    OTHER LINE IN THE PICTURE. THIS REVERSED ON 2026-09-16 AND THE OLD RULE IS
+    BELOW SO IT IS NOT RE-ARGUED.** Instructed with a screenshot of `video`,
+    `cue log` and `timeline` joined by bare lines: *"need arrowheads between
+    inner boxes (make it a rule)"*.
+    ⚠️ **WHAT THE OLD RULE GOT RIGHT AND WHY IT STILL LOST.** It said a head
+    claims an ORDER between the parts of one program that the drawing does not
+    know, and a tie is a bracket meaning only "these are parts of one thing".
+    That is true and it is not what a reader sees. A headed line, then a
+    headless one, then a headed one down a single column reads as **a head that
+    fell off**, which was REPORTED on `/station/` and then again on `/replay/`.
+    A convention only works if it is legible, and this one was being read as a
+    bug every time it appeared.
+    🔴 **THERE ARE THREE ANSWERS, NOT TWO, AND A CONTAINER PICKS ONE.** An
+    ARROW is the default and says these boxes feed each other. `set: true` draws
+    a BRACKET and says they are parts of one machine. `join: false` draws
+    NOTHING, and is right where the container's own box already carries the
+    whole relationship: `/box/`'s `Browser` holds a keyboard and a playout, and
+    a line between them adds no fact, it just gives the eye something to follow
+    that leads nowhere. Asked for on sight: *"no connections between
+    keyboard/playout and and notesout/soundback"*.
+    🔴 **A RETURN PATH NEEDS `back: true` AND IT IS AN AUTHOR FLAG.** Nothing
+    infers it. A link without it is laid out as a forward step, so a right to
+    left link is drawn through whatever stands in the way: on `/box/` it ran
+    straight through `playout` and put its head on the far left of the Browser,
+    reported as *"what is this thing on left of playout?"*.
+    ⚠️ **AND A RETURN PATH LANDS ON THE BOX, NOT ON THE MACHINE AROUND IT.**
+    Fixed 2026-09-16 after *"capture should conntect to sound back and that
+    should connet to playout"*: back links attached to containers while forward
+    links attached to boxes, so the two halves of one picture disagreed about
+    what a link connects and only the return half was wrong.
+    🔴 **`set: true` IS THE ESCAPE HATCH FROM THE HEAD, AND IT IS THE ONLY
+    CASE THE OLD RULE SHOULD EVER HAVE COVERED.** A machine whose children
+    really are a SET rather than a chain declares it and gets brackets back.
+    `/station/`'s `studio` holds a live mount and recordings that already exist,
+    and neither produces the other; its `Cloudflare` holds two buckets side by
+    side. Both say `set: true` and the page asserts `dg.ties === 2`.
+    ⚠️ **A DECLARED LINK IS UNAFFECTED EITHER WAY**: it replaces the connector
+    in that gap and has always had a head. `set` decides only what an
+    UNDECLARED gap between two neighbours looks like.
+    ⚠️ **AND IF YOU ADD A FLAG LIKE THIS, CARRY IT TO THE RENDER NODE.** `box()`
+    builds a fresh object rather than spreading the spec, so `set` was invisible
+    to the painter and read as an option that did nothing. It cost two runs.
     🔴 **A DECLARED LINK BETWEEN TWO OF THEM IS DIFFERENT, AND IT REPLACES THE
     TIE RATHER THAN BEING DRAWN OVER IT.** The reasoning above is about what the
     DRAWING knows; where the author writes `{ from, to }` between two children,
@@ -964,6 +1109,38 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
   ⚠️ Its other half: a `12` typed in `shell.css` and a `0` typed in the page —
   **a shared measurement in two files is a measurement that will disagree**. It
   is `--sld-col` now.
+- 🔴 **THE LOOPER IS A KIT MODULE, AND BOTH PAGES WITH A LOOP USE IT.**
+  `demo/shell/looper.mjs`, 2026-09-16, asked for as *"make it use same looping
+  ui as radio (make it global)"*. It owns what a loop IS: the ring that keeps
+  the sound, the kept buffer, the mirrored copy, the one voice that reads a lap,
+  where the sound has got to inside it, and the button glued to LOOP that
+  cycles → ← ⇆. A page owns what else happens on its own graph, which node stops
+  being heard, and what its log calls the thing it is looping.
+  ⚠️ **THE TWO PAGES REACH IT AT DIFFERENT MOMENTS AND BOTH ARE RIGHT.** On a
+  live station the sound has not arrived yet, so `keep()` is the bar's `fill`
+  and `close()` is its `set`. On a tape both marks are behind you and the bar
+  loops the file itself, so `keep()` is `set` and `close()` is the FIRST `wrap`:
+  the first lap comes off the tape while the ring fills, and every lap after it
+  comes off the ring. That is what makes a direction possible at all, because
+  **no media element has a negative playback rate** and a kept lap is an
+  `AudioBuffer` that can simply be mirrored.
+  ⚠️ **ITS ARITHMETIC IS PURE AND IS GRADED WITHOUT A BROWSER.** `ringOrder`,
+  `planVoice` and `headOf` are where every bug it has ever had lived (a ring
+  copied from index 0 after it wrapped; a voice that always began at the top; a
+  pingpong head that was a ramp and sat at the right edge for the whole return).
+  `node demo/shell/looper-test.mjs` is 18 asserts, four of them negative
+  controls, and three deliberate sabotages take 7 of them red.
+- 🔴 **A DURATION IS A FACT ABOUT A FILE, MEASURED ONCE AND WRITTEN DOWN.**
+  `corpus.json` carries `durationMs` on all 26 time-based rows since
+  2026-09-16. `demo/resources/measure-durations.mjs` asks each file once with
+  ffprobe, one at a time, two seconds apart, at `-probesize 65536` (a header,
+  not half a recording), and writes `demo/resources/durations.json`;
+  `build-corpus.mjs` merges it. `/tapes/` used to open twenty-four media
+  elements on every visit and correct its picture over the following seconds,
+  so every visitor paid archive.org for the same answers and saw a run of the
+  wrong length first. ⚠️ **AMEND THE CORPUS WITH `--offline`**: it rebuilds from
+  the cache, asks no source anything, and was MEASURED byte for byte identical
+  to the committed file apart from its timestamp.
 - **Two more kit components, both 2026-09-15.** `table.mjs` — rows in columns
   the caller declares (`key`, `label`, `width | grow`, `align`, `link`, `hi`,
   `clip`, `hover`); it THROWS unless exactly one column grows. `tabs.mjs` —
