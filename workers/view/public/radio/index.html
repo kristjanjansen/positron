@@ -177,6 +177,20 @@
      shout. */
   .now { font: 400 13px/1.5 var(--mono); color: var(--hi); min-height: 20px; }
   .now.down { color: var(--bad, #ff7a7a); }
+
+  /* 🔴 THE ONE CONTROL ON THIS PAGE THAT IS A STATE RATHER THAN AN ACTION, AND
+     ITS FACE MUST SAY SO WITHOUT CHANGING SIZE. `Automate` is a
+     toggle: its label stays put and `aria-pressed` carries the state, because a
+     button that rewrites its own label resizes, the row reflows, and the thing
+     you were about to press moves out from under the pointer. That is why
+     `shell.mjs` refuses a label change on a busy control.
+     ⚠️ THE SAME TREATMENT `/score/` GIVES ITS ARMED CONTROL AND THE TRANSPORT
+     BAR GIVES ITS RATE, copied deliberately rather than invented: an armed
+     control should not look like a different KIND of thing from page to page. */
+  .pos-controls button[aria-pressed="true"] {
+    color: var(--hi); border-color: var(--hi);
+    background: color-mix(in oklab, var(--hi) 16%, var(--card2));
+  }
 </style>
 
 <script type="module">
@@ -189,7 +203,27 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
+  // 🔴 THE LOOPER IS NO LONGER THIS PAGE'S. Asked for as *"make it use same
+  // looping ui as radio (make it global)"*: the ring, the kept buffer, the
+  // mirrored copy, the voice and the button glued to LOOP all moved to
+  // `shell/looper.mjs`, and `/tapes/` now has the same instrument. What stayed
+  // here is what is about a STATION: which node stops being heard while a loop
+  // plays, and the grain clock that follows the lap.
+  import { createLooper, LOOP_WAYS, LOOP_TURN, WAY_GLYPH, LOOP_SAYS } from '/shell/looper.mjs';
   import { createModulator } from '/shell/pappus-mod.mjs';
+  // 🔴 THE TOUR IS THE KIT'S, NOT THIS PAGE'S. `/videoradio/` is this same
+  // machine with every decision given to a clock, and what it took to build was
+  // the clock, the split between what a morph may interpolate and what it must
+  // step, and the write that respects that split. All of it already lives in
+  // `radio-gran.mjs` because that page imports it, so the movement here is the
+  // same movement rather than a second one that looks like it.
+  // ⚠️ THE TWELVE SOUNDS ARE STILL TYPED TWICE, once in that module and once
+  // further down this file, and MEASURED 2026-09-16 the two tables are
+  // identical character for character. `morphOf` works on either, because a
+  // sound is a plain object; de-duplicating them is open work and is written up
+  // in that module's header.
+  import { morphOf, writeContinuous, writeDiscrete, basesOf,
+           tourAt, breathe, SLOT_MS, DWELL_MS, MORPH_MS } from '/shell/radio-gran.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { allocBuffers, startPappusSynth, applyAudibleDefaults, setParam, PAPPUS_NODE, RING_SECONDS, GATE0 }
     from '/shell/pappus.mjs';
@@ -232,9 +266,9 @@
   // and nowhere else.
   const STATIONS = [
     // Radio 1965 removed 2026-09-15 at the uuu.ee operator's request.
-    ['Klassikaraadio', 'klassikaraadio', 128],
-    ['Vikerraadio', 'vikerraadio', 128],
-    ['Raadio 2', 'raadio2', 128],
+    ['Klassika', 'klassikaraadio', 128],
+    ['Viker', 'vikerraadio', 128],
+    ['R2', 'raadio2', 128],
     // 🔴 THE RELAY CARRIES SIX ERR MOUNTS AND THIS PAGE OFFERED FOUR, which is
     // why it collapsed today rather than fell back. MEASURED 2026-09-15: the
     // only two mounts answering 200 anywhere were `raadio4` and
@@ -245,8 +279,8 @@
     // ⚠️ THE COST OF A LIST THAT IS SHORTER THAN THE RELAY'S IS INVISIBLE UNTIL
     // AN OUTAGE, which is the one moment it matters. `shout`'s `/health` knows
     // all eight; this array is the only place that disagreed.
-    ['Raadio 4', 'raadio4', 128],
-    ['Raadio Tallinn', 'raadiotallinn', 128],
+    ['R4', 'raadio4', 128],
+    ['Tallinn', 'raadiotallinn', 128],
     // 🔴 IDA RADIO IS AAC, NOT MP3, AND IT IS THE FIRST STATION HERE THAT IS.
     // `mp3-stream.mjs` picks its frame scanner off the response's
     // `content-type` — `audio/mpeg` against `audio/aac` — so nothing on this
@@ -258,7 +292,29 @@
     // schedule and carry `StreamTitle=' - '`, so the station's name comes from
     // the ICY header and the "now playing" line stays blank. That is what the
     // station sends, not something missing here.
-    // IDA removed 2026-09-15 at their operator's request. See radio-gran.mjs.
+    //
+    // 🔴 BACK 2026-09-16, ON INSTRUCTION AND ON THE USER'S OWN CONDITION:
+    // *"bring ida's back to radio (if single listener)"*. They were taken out
+    // on 2026-09-15 because their operator counted roughly 100 concurrent
+    // clients against their limit and traced them to positron.studio. The relay
+    // now holds ONE upstream connection per mount and copies it to every
+    // subscriber, so what their server counts is one. `workers/shout/worker.mjs`
+    // carries the mechanism, the readout that proves it, and the caveat that
+    // the operator has not been asked again.
+    // ⚠️ LAST, AND THAT IS THE PART THAT MATTERS. The original harm was one
+    // line that moved these two to the FRONT of this array: the page opens the
+    // first entry it finds, so every visitor and every harness run landed on
+    // their server at 320 kbit/s. Do not move them up.
+    ['Ida TLL', 'ida-tallinn', 320],
+    ['Ida HEL', 'ida-helsinki', 320],
+    // 🔴 RADIO 1965 IS BACK, LAST, 2026-09-16: *"bring back radio65 stream as
+    // last"*. One volunteer-run Icecast mount at the Estonian Centre of
+    // Contemporary Music, removed on 2026-09-15 when their operator counted
+    // roughly 100 concurrent clients from here. The relay tees now, so what
+    // they count is one, and the suite runs against `demo/fake-station.mjs`
+    // rather than against them. LAST is not a ranking: a page opens the first
+    // entry it finds, and being at the front is what did the damage.
+    ['Radio 1965', 'radio1965', 128],
   ];
   /**
    * 🔴 NO `.mp3` ON THE END ANY MORE, because two of these mounts are not MP3
@@ -358,7 +414,13 @@
     // an inch below. It is the same sentence the index card carries, so a
     // visitor arriving from there is not told the same thing twice in two
     // different wordings that can drift apart.
-    what: 'Six live radio stations from Tallinn and Helsinki, decoded frame by frame in the tab.',
+    // ⚠️ AND IT CHANGED AGAIN WHEN `Automate` LANDED. A control
+    // appearing is a change to what the page SAYS, in the same edit, and the
+    // failure is silent: nothing type-checks a sentence. What went is `decoded
+    // frame by frame in the tab`, which is the mechanism and is what the
+    // picture at the bottom is FOR; what arrived is the one thing a visitor now
+    // has to choose between. Still one line, still the index's own line.
+    what: 'Six live radio stations from Tallinn and Helsinki, granulated in the tab by hand or left to play themselves.',
     // ⚠️ SIX CELLS. IT WAS SIX, THEN FOUR, AND IT IS SIX AGAIN FOR A DIFFERENT
     // REASON THAN IT WAS THE FIRST TIME. What follows is the argument for each
     // cut, and every one of them still holds; what changed is that two counters
@@ -422,15 +484,48 @@
     // of headroom, with `lost` still at 0. Only one of those two numbers could
     // have told anybody that.
     readout: { voices: '', behind: 's', grains: '/s', moving: '', buffer: 's', lost: '' },
-    // 🔴 NO CONTROLS AT ALL, AND THE GRANULATOR IS ALWAYS ON. There was a
-    // `Synthesize` button, and before that a `Listen` button beside a transport
-    // bar that already has a play button. Both were the same mistake one step
-    // apart: a second control for something the page is already doing. The
-    // granulator is not a mode this page can be in or out of — it is what the
-    // page IS — so it comes up with the sound and the fader decides how much of
-    // it reaches you. `mount()` hides an empty `.pos-controls` (shell.mjs:111),
-    // so the row leaves no band behind it.
-    controls: [],
+    // 🔴 ONE CONTROL, AND IT IS THE ONLY THING ON THIS PAGE THAT IS NOT PART OF
+    // PLAYING IT. There is no `Synthesize` and no `Listen`: the granulator is
+    // not a mode this page can be in or out of, it is what the page IS, so it
+    // comes up with the sound and the fader decides how much of it reaches you.
+    // Both of those buttons were the same mistake one step apart, a second
+    // control for something the page is already doing.
+    //
+    // 🔴 THIS ONE IS DIFFERENT AND THE DIFFERENCE IS THE WHOLE DESIGN. Asked
+    // for 2026-09-16: *"can you have simular cool movement you had on
+    // videoradio to the radio granulator too?"*. `/videoradio/` gives every
+    // decision to a clock and nobody is holding it. THIS page has a person
+    // holding it, and this repo has already been told twice what it costs to
+    // move a control in front of that person: *"when pressed 0.5 it activated
+    // granulator and moved some sliders and showed grain viz"*, and a mystery
+    // full-screen exit that took two sessions to attribute. So the movement is
+    // OFF until somebody asks for it, by name, in words.
+    //
+    // ⚠️ OFF BY DEFAULT RATHER THAN ON-AND-YIELDING, AND THE ARGUMENT IS NOT
+    // TIDINESS. A page that opens with its fader already sliding IS the
+    // reported complaint, with a nicer recovery bolted on: the visitor still
+    // watches the instrument being worked by somebody who is not them, and they
+    // still have to discover that touching it stops that. On top of which
+    // `/videoradio/` already exists and already is the on-by-default answer at
+    // the same URL family; a second page that does the same thing on arrival is
+    // the same page twice. What `/radio/` adds is that you can hand the
+    // instrument over and take it straight back.
+    //
+    // ⚠️ A WORD, NOT A GLYPH, AND NOT A TOGGLE THAT RENAMES ITSELF. `shell.mjs`
+    // gives a one-character non-alphanumeric label a 34 px square and an
+    // `aria-label`; this is a sentence-case imperative like every other control
+    // in this suite (`Switch it on`, `Hold what it has`, `Run in VR`). The
+    // state is `aria-pressed` plus the armed colour in this page's <style>,
+    // because a label that changes changes the button's width.
+    // 🔴 `Automate`, AND IT IS NOT IN THIS ROW ANY MORE. Renamed and moved on
+    // instruction 2026-09-16: *"let it play itself: rename to Automate and put
+    // under granulator"*. `mount()` still builds it, because that is what makes
+    // it a real control the harness presses and `aria-pressed` styles; the page
+    // then moves the element into the granulator block, the same way the VR
+    // button used to be moved and the same way `/tapes/` moves its own row.
+    // ⚠️ MOVED, NEVER REBUILT. A second copy is a second thing to keep in step,
+    // and `d.button('drift')` has to keep finding the one the shell made.
+    controls: [{ id: 'drift', label: 'Automate' }],
   });
   guard(d);
 
@@ -607,87 +702,38 @@
   });
   deck.seek(t0);
 
-  // 🔴 THE LOOP'S WAYS ARE DECLARED BEFORE THE BAR IS BUILT, AND THAT IS NOT
-  // TIDINESS. `createTransportBar` is called with the direction button's first
-  // face read out of `WAY_GLYPH`, and a `const` read above its own declaration
-  // is a ReferenceError rather than an `undefined` — so this block sitting 500
-  // lines below the call would have killed the page at boot.
-  // ── the LOOP row: four ways to play the seconds you kept ───────────────────
+  // ── the LOOP row: the ways to play the seconds you kept ───────────────────
   //
   // 🔴 THIS IS WHAT REPLACED THE FIVE SPEED BUTTONS. Asked for twice — *"replace
   // slowed and fast forward with something interesting"*, then *"you never
   // replaces fastforward / slowed??"* — and the previous answer was to point the
   // same row at the loop as well, which is a repurposing and not a replacement.
-  // Every cell here is a different MECHANISM rather than a different number of
-  // the same one, which is the rule the twelve sounds were rebuilt under
-  // (LESSONS #59: a randomiser over nine overlapping ranges makes one sound with
-  // nine names).
   //
-  //   round  the kept seconds as they arrived        the default
-  //   back   the same samples, mirrored              a direction
-  //   half   the same lap, twice as long             a speed
-  //   chop   a sixteenth of the lap, repeating       a length
+  // 🔴 AND IT LIVES IN `shell/looper.mjs` NOW, NOT HERE. The table of ways, the
+  // button that cycles → ← ⇆, the ring, the mirrored copy and the voice are all
+  // in that module, so `/tapes/` has the same instrument rather than a second
+  // implementation of it. Everything below is what is true of a STATION and of
+  // nothing else.
   //
-  // ⚠️ THREE OF THE FOUR ARE THINGS A LIVE STREAM CANNOT DO AT ALL. There is
-  // nothing behind a live edge to play backwards, no lap to divide, and slowing
-  // a mount down only means falling behind it. A kept lap has all three, exactly,
-  // because it is an integer number of samples: MEASURED at 384000 a lap at 1x
-  // and 768000 at 0.5x, bit identical (plan-grain-presets §1.1).
+  // ⚠️ THREE OF THE FIVE WAYS ARE THINGS A LIVE STREAM CANNOT DO AT ALL. There
+  // is nothing behind a live edge to play backwards, no lap to divide, and
+  // slowing a mount down only means falling behind it. A kept lap has all three,
+  // exactly, because it is an integer number of samples: MEASURED at 384000 a
+  // lap at 1x and 768000 at 0.5x, bit identical (plan-grain-presets §1.1).
   //
   // ⚠️ AND THE GRAINS FOLLOW WHATEVER LAP IT LEAVES. `lockGrainsToLoop` tunes
   // the grain clock to the lap that is actually playing, so `chop` retunes to
-  // the slice and `round` puts it back. A lap it cannot divide is said in words
-  // rather than fudged.
-  // ⚠️ `pingpong` IS FIFTH SO THE FIRST FOUR KEEP THEIR INDICES. Every check
-  // that drives a way does it by number, and renumbering them would have made
-  // four asserts grade a different way than their own labels claim.
-  const LOOP_WAYS = [
-    ['round', 'round'], ['back', 'back'], ['half', 'half'], ['chop', 'chop'],
-    ['pingpong', 'pingpong'],
-  ];
-  // 🔴 SHORT WORDS, AND THE REASON IS A PHONE. `.gran-slot`'s rows share a label
-  // column about 167 px wide, so a 390 px screen leaves roughly 210 px for the
-  // whole group — four segments of fifty. `STUTTER` is seven mono characters and
-  // does not fit; `CHOP` does. The sound row went to `createPicker` for the same
-  // measurement and this row stays a radio group because four mutually exclusive
-  // options is what `choice.mjs` is for, and because the ask was explicit:
-  // *"rate controls should be radiobuttons everywhere"*.
-  const LOOP_SAYS = {
-    round: 'the kept seconds, round, the way they arrived',
-    back: 'the kept seconds backwards',
-    half: 'half speed, so it comes round twice as slowly and an octave down',
-    chop: 'one slice of the loop, repeating',
-    pingpong: 'the kept seconds forwards, then the same samples backwards, without a seam',
-  };
-  // A slice is a sixteenth of the lap, floored at a length that is still a
-  // rhythm rather than a pitch: a sixteenth of a hand-closed 0.6 s window is
-  // 37 ms, which repeats at 27 Hz, which is a buzz and not a stutter.
-  const CHOP_DIV = 16;
-  const CHOP_MIN_S = 0.12;
-
-  /**
-   * 🔴 THE THREE THE BUTTON CYCLES, IN THE ORDER IT CYCLES THEM. Directions,
-   * and only directions: `half` is what the rate row beside it is for, and
-   * `chop` is a length with no control today — both are still in `LOOP_WAYS`
-   * and both are still driven by the checks, which is a loose end written down
-   * rather than left to be found.
-   */
-  const LOOP_TURN = [0, 1, 4];               // round → back → pingpong → round
-  /**
-   * The face of the button for each way. ⚠️ A GLYPH IS THE STATE, NOT THE NEXT
-   * PRESS — the opposite of what LOOP's own word does, and the difference is
-   * that LOOP has three states with two names while this has three states with
-   * three faces. Showing the next one here would mean the button never says
-   * which way the loop you are listening to is running.
-   */
-  const WAY_GLYPH = { round: '→', back: '←', pingpong: '⇆', half: '→', chop: '→' };
-  const WAY_SAYS = {
-    round: 'playing forwards. press for backwards',
-    back: 'playing backwards. press for there and back',
-    pingpong: 'playing there and back. press for forwards',
-    half: 'playing forwards, at half speed',
-    chop: 'repeating one slice',
-  };
+  // the slice and `round` puts it back. That is this page's business, which is
+  // why the looper is told about it through `onWay` rather than knowing it.
+  const looper = createLooper({
+    // The granulator's own buffer, read from the same constant. The bar cannot
+    // know how many seconds a page really keeps, and a button promising a longer
+    // loop than the page can deliver is a control that lies at the moment it is
+    // used.
+    seconds: BUF_SECONDS,
+    log: (m, k) => d.log(m, k),
+    onWay: (_way, lap) => lockGrainsToLoop(lap),
+  });
 
   let heardFrom = null;                 // when audio actually started arriving
   // 🔴 SECONDS PLAYED BEFORE THE CURRENT `src`, BECAUSE `currentTime` RESTARTS
@@ -712,7 +758,7 @@
      * to act on, which is what `disabled` is for rather than absence.
      */
     rates: [0.25, 0.5, 1],
-    onRate: (r) => { loopRate = r; if (loopSrc) loopSrc.playbackRate.value = r; },
+    onRate: (r) => looper.setRate(r),
     /**
      * 🔴 ONE BUTTON, GLUED TO THE RIGHT OF LOOP, CYCLING → ← ⇆. ASKED FOR IN
      * THOSE WORDS: *"looper mode is → | ← | ⇆ and its a part of loop button
@@ -732,12 +778,7 @@
      * in `transport-bar.mjs` carries that, and the note there says why it is not
      * an inert control.
      */
-    loopExtras: [
-      { id: 'way', label: WAY_GLYPH[LOOP_WAYS[0][1]], always: true,
-        aria: 'which way the loop plays',
-        title: WAY_SAYS[LOOP_WAYS[0][1]],
-        onPress: () => cycleLoopWay() },
-    ],
+    loopExtras: [looper.wayExtra()],
     // 🔴 THE LOOP WINDOW IS THE GRANULATOR'S OWN BUFFER, READ FROM THE SAME
     // CONSTANT. The bar cannot know how many seconds a page really keeps, so it
     // takes 20 s unless told; this page holds exactly `BUF_SECONDS` of radio
@@ -754,101 +795,51 @@
      *         seconds up in its place, and let them run round.
      *   off   give the station back.
      *
-     * ⚠️ `dry` IS LEFT ALONE AND `loopOut` IS MOVED. The fader's number lives in
+     * ⚠️ `dry` IS LEFT ALONE AND THE LOOPER'S OWN GAIN IS MOVED. The fader's number lives in
      * `dry.gain`, so muting the station by writing to it would silently change
      * what the fader is showing, and the next `setWet` would put the station
      * back mid-loop. Two gains, one job each.
      */
-    onLoop: (what, a, b) => {
-      if (!ctx || !loopRing) return;
+    onLoop: (what) => {
+      if (!ctx || !looper.attached()) return;
       if (what === 'fill') {
-        loopRing.w = 0; loopRing.filled = 0; loopRing.on = true;
+        looper.keep();
         // 🔴 AND THE PICTURE IS TOLD, WHICH IT WAS NOT. The scope grew three
         // marks for exactly this and nothing ever called them: MEASURED on a
         // driven page, `frozen: true` with `marks: 0`, so the loop's ends were
         // never drawn and the grain ticks, which are placed BETWEEN those two
         // marks, had no span to be placed in. That is the whole of the report
-        // that no grain lines show during a loop. The audio half was wired and
-        // the picture half was not, which is the shape of defect this page's
-        // own comments keep warning about: two halves, one of them silent.
+        // that no grain lines show during a loop.
         scope.loopFrom();
         d.log(`keeping the next ${BUF_SECONDS} s to loop over`, 'hi');
         return;
       }
       if (what === 'set') {
-        loopRing.on = false;
-        const n = loopRing.filled;
-        // A window that caught nothing is not a loop. It happens if the station
-        // was not actually playing when the button was pressed, and saying so is
-        // better than looping silence and letting somebody wonder.
-        if (n < ctx.sampleRate * 0.25) {
-          d.log('nothing was playing, so there is nothing to loop', 'warn');
-          return;
-        }
-        const buf = ctx.createBuffer(2, n, ctx.sampleRate);
-        // ⚠️ UNWRAPPED BACK INTO ORDER. The ring's oldest sample is at `w` once
-        // it has wrapped, so copying from index 0 would play the seconds in two
-        // pieces with the join in the middle, which sounds like an edit nobody
-        // made.
-        const start = loopRing.filled === loopRing.len ? loopRing.w : 0;
-        for (let c = 0; c < 2; c++) {
-          const dst = buf.getChannelData(c), src = loopRing.ch[c];
-          for (let i = 0; i < n; i++) dst[i] = src[(start + i) % loopRing.len];
-        }
-        // ⚠️ THE SECONDS ARE KEPT, AND THE VOICE THAT PLAYS THEM IS A SEPARATE
-        // THING. `loopBuf` is the material; the LOOP row decides which way and
-        // how much of it a voice reads, and it rebuilds the voice without
-        // touching the material. See `startLoopVoice`.
-        loopBuf = buf;
-        loopBack = null; loopPing = null;   // built on the first press that needs one
-        // 🔴 IT OPENS THE WAY THE BUTTON IS SHOWING, AND IT USED TO RESET TO
-        // `round` HERE. That was right while the direction lived on two toggles
-        // that appeared with the loop and vanished with it: nothing was on
-        // screen to contradict. The button is on the bar now with no loop
-        // running, so it can be set BEFORE pressing LOOP — and a control that
-        // reads ← while the sound it just started runs forwards is the page
-        // lying about itself. The normalising happens on `off`, where the
-        // button is the only thing left to be true to.
-        // 12 ms either way rather than a step: a gain cut mid-sample is a click,
-        // and a click every time a loop closes is the page making the noise.
+        // The window is full. Take the live path down, put the recorded seconds
+        // up in its place, and let them run round.
+        const secs = looper.close();
+        // A window that caught nothing is not a loop, and the looper has already
+        // said so in the log.
+        if (!secs) return;
         scope.loopTo();          // the wave stops here, and this is where it stopped
-        startLoopVoice(null);    // from the top of the loop, whichever end that is
-        loopOut.gain.setTargetAtTime(1, ctx.currentTime, 0.012);
         // ⚠️ THE STATION'S WAY IN, NOT THE FADER. Writing to `dry` silenced the
         // speakers and left the granulator on the live station, and it also
         // moved a number the fader owns, so the next `setWet` put the station
         // back underneath the loop.
         liveIn.gain.setTargetAtTime(0, ctx.currentTime, 0.012);
-        d.log(`looping ${(n / ctx.sampleRate).toFixed(1)} s of the station`, 'hi');
+        d.log(`looping ${secs.toFixed(1)} s of the station`, 'hi');
         // 🔴 AND THE GRAINS ARE TUNED TO IT. See `lockGrainsToLoop` — the loop
         // is an exact number of samples and the grain clock is a phasor in the
-        // same context, so the two can be made commensurate rather than
-        // merely close.
-        lockGrainsToLoop(n / ctx.sampleRate);
+        // same context, so the two can be made commensurate rather than merely
+        // close.
+        lockGrainsToLoop(secs);
         return;
       }
       if (what === 'off') {
-        loopRing.on = false;
+        looper.stop();
         lockGrainsToLoop(null);  // the patch's own grain rate back
         scope.loopOff();         // the wave catches up with live again
-        loopOut.gain.setTargetAtTime(0, ctx.currentTime, 0.012);
         liveIn.gain.setTargetAtTime(1, ctx.currentTime, 0.012);
-        // Stopped a beat after the fade, or the tail is cut off by its own stop.
-        const dying = loopSrc; loopSrc = null;
-        if (dying) setTimeout(() => { try { dying.stop(); } catch { /* already done */ } }, 120);
-        // ⚠️ THE MATERIAL GOES WITH THE LOOP, AND SO DOES THE ROW. A row that
-        // stays lit on `back` over a station that is playing forwards is a
-        // control describing something that is not happening; greying it is the
-        // same rule `caps.mjs` follows for a demo this browser cannot run, and
-        // the reason is on the row's own tooltip rather than left to be guessed.
-        loopBuf = null; loopBack = null; loopPing = null;
-        // ⚠️ THE DIRECTION SURVIVES THE LOOP, AND ONLY A WAY WITH NO BUTTON IS
-        // PUT BACK. Somebody who chose ← meant ←, and taking it away the moment
-        // a loop ends makes the choice something that has to be re-made every
-        // time. `half` and `chop` have no face on the bar, so leaving the button
-        // showing → over a loop that would come back chopped is the one case
-        // where keeping it would be the lie.
-        if (!LOOP_TURN.includes(loopWay)) setLoopWay(0, { quiet: true });
         d.log('back to the station', 'hi');
       }
     },
@@ -867,13 +858,18 @@
      * `back` the deck's fraction runs the wrong way; under `half` it runs twice
      * too fast; under `chop` it sweeps seconds nobody is hearing. Three
      * pictures that would each look like a working playhead and each be a lie
-     * about what is coming out, so `loopHeadFrac()` reads the voice's own clock
-     * instead. The 60 Hz tick still comes from here, because a second rAF loop
+     * about what is coming out, so the looper's own `headFrac()` reads the
+     * voice's clock instead. The 60 Hz tick still comes from here, because a second rAF loop
      * in a page is the thing `transport-bar.mjs` exists to stop, and `f` is
      * still the answer for the frame before a voice exists.
      */
-    onLoopPos: (f) => scope.playhead?.(f == null ? null : (loopHeadFrac() ?? f)),
+    onLoopPos: (f) => scope.playhead?.(f == null ? null : (looper.headFrac() ?? f)),
   });
+  // 🔴 THE BUTTON EXISTS ONLY NOW, WHICH IS WHY THE FACE IS WRITTEN FROM ONE
+  // PLACE AND THAT PLACE IS THE LOOPER. A way reached from the code and a way
+  // reached by pressing cannot then disagree about what is showing, which is
+  // the `shareLabelColumn` lesson in a smaller costume.
+  looper.bind(bar);
 
   // ── the picture ────────────────────────────────────────────────────────────
   // 🔴 TWO PICTURES, AND THE COMPONENT CHOOSES BY WHAT IT IS GIVEN. Before the
@@ -1021,10 +1017,6 @@
             note: 'SuperCollider\u2019s real sound server, compiled to run in a **browser**. '
                 + 'It is handed one instrument at boot and **never rebuilt while it plays**.' },
         ] },
-      { id: 'out', label: 'speakers', sub: '', kind: 'device', tech: 'device',
-        note: 'The station and the grains reach here already mixed, through **one audio '
-            + 'graph** rather than two players, so they stay sample-aligned instead of '
-            + 'drifting apart while you listen.' },
     ],
     links: [
       { from: 'stn', to: 'cf', label: 'MP3 over http',
@@ -1043,9 +1035,14 @@
       // instead of "this feeds that". The tie down their left says they are one
       // chain, and what flows between them is in each box's own note, which is
       // where a reader is already looking.
-      { from: 'gran', to: 'out', label: 'sound output',
-        note: 'The granulator\u2019s own output, crossfaded against the station by the long '
-            + 'fader above.' },
+      // 🔴 NO `speakers` BOX AND NO ARROW INTO ONE. Removed on instruction
+      // 2026-09-16: *"rm 'speakers' and its connector from radio diagram"*. It
+      // was the last box in the row and it said what every diagram of an audio
+      // path ends with, which is that the sound comes out: a reader on a page
+      // they are listening to already knows. What it carried that the picture
+      // does not is that the station and the grains arrive there ALREADY MIXED,
+      // through one graph rather than two players, and that is a fact about the
+      // granulator rather than about a speaker.
     ],
   }, { how: true, atEnd: true });
 
@@ -1100,7 +1097,25 @@
       // nobody reads twice. What this counts is audio that went missing after
       // the stream settled: a starved queue, and frames arriving too late to use.
       d.set('lost', sst.underruns + sst.dropped);
-      if (sst.buffered > 0 && sst.buffered < tightest) tightest = sst.buffered;
+      /**
+       * 🔴 THE TIGHTEST CUSHION AFTER THE STREAM HAS SETTLED, NOT WHILE IT IS
+       * FILLING, AND THE BOUNDARY IS THE MODULE'S OWN.
+       *
+       * This took every reading, so the smallest number it ever saw was the
+       * first one after audio started arriving, which is the queue part way
+       * through being built rather than a cushion that got thin. On the open
+       * internet the first lump is big enough to hide that; on a local link it
+       * is not. MEASURED against the stand-in: `33 ms of sound in hand` on a
+       * stream that then held its 600 ms floor for the whole run, and the assert
+       * below went red about a page that was working.
+       *
+       * ⚠️ FOUR SECONDS, READ FROM `startedAt`, WHICH IS THE SAME WINDOW
+       * `mp3-stream.mjs` USES to call a dropped block `skipped` rather than
+       * `dropped`. Inventing a second settling period here would be a number
+       * that could disagree with the one the player acts on.
+       */
+      const settled = sst.startedAt > 0 && ctx.currentTime - sst.startedAt > 4;
+      if (settled && sst.buffered > 0 && sst.buffered < tightest) tightest = sst.buffered;
     } else {
       d.set('buffer', '');
       d.set('lost', '');
@@ -1171,8 +1186,6 @@
   audio.preload = 'none';
   let ctx = null, srcNode = null, analyser = null, master = null, dry = null;
   let liveIn = null;   // the station's way in, taken down while a loop plays
-  // The loop's recorder, its playback node, and the source currently looping.
-  let loopRing = null, loopTap = null, loopOut = null, loopSrc = null;
   // 🔴 WHAT REACHES THE SPEAKERS, AND EVERY PATH GOES THROUGH IT. See `graph()`.
   let speakers = null;
   // What leaves this page, measured there rather than upstream of the fader.
@@ -1187,227 +1200,6 @@
   let decodeCodec = '';
 
 
-
-  // The kept seconds, the same seconds reversed, and which way the loop is set.
-  let loopBuf = null, loopBack = null, loopPing = null, loopWay = 0;
-  let loopRate = 1;
-  // The voice's own clock, which is the only thing that knows where the SOUND
-  // is: when it started, the slice of the buffer it laps over, where in that
-  // slice it was told to begin, its rate, and whether the buffer it is reading
-  // is the mirrored one or the mirror joined onto the end of the original.
-  let voiceAt = 0, voiceFrom = 0, voiceTo = 0, voiceOff = 0;
-  let voiceRate = 1, voiceBack = false, voicePing = false;
-
-  /**
-   * The same seconds, backwards.
-   *
-   * ⚠️ THE SAMPLES, NOT A NEGATIVE RATE. `AudioBufferSourceNode.playbackRate`
-   * does not go below zero in any shipping engine, so the only way to read a
-   * buffer backwards is to hold a mirrored copy of it. Eight seconds of stereo
-   * at 48 kHz is 3 MB and one pass of the loop below, which is why it is built
-   * on the first press that needs it rather than beside every loop.
-   */
-  /** Two buffers end to end, for pingpong. */
-  function joinedCopy(a, b) {
-    const out = ctx.createBuffer(a.numberOfChannels, a.length + b.length, a.sampleRate);
-    for (let c = 0; c < a.numberOfChannels; c++) {
-      const da = a.getChannelData(c), db = b.getChannelData(c), dst = out.getChannelData(c);
-      dst.set(da, 0);
-      dst.set(db, a.length);
-    }
-    return out;
-  }
-
-  function reversedCopy(buf) {
-    const out = ctx.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
-    for (let c = 0; c < buf.numberOfChannels; c++) {
-      const src = buf.getChannelData(c), dst = out.getChannelData(c);
-      for (let i = 0, n = buf.length; i < n; i++) dst[i] = src[n - 1 - i];
-    }
-    return out;
-  }
-
-  /**
-   * Where the SOUND is, as a fraction of the kept seconds the wave draws.
-   *
-   * Computed from the voice's own start time, lap and rate, so it is right
-   * under every way the row can be set. ⚠️ MIRRORED UNDER `back`: sample `i` of
-   * the reversed buffer is sample `n - 1 - i` of what the picture shows, so a
-   * fraction taken straight out of the playing buffer would run the line the
-   * wrong way over a wave that is drawn forwards.
-   */
-  function loopHeadFrac() {
-    if (!ctx || !loopSrc || !loopBuf) return null;
-    const lap = voiceTo - voiceFrom;
-    const unit = loopBuf.duration;           // ONE pass of the kept seconds
-    if (!(lap > 0) || !(unit > 0)) return null;
-    const into = Math.max(0, ctx.currentTime - voiceAt) * voiceRate;
-    // ⚠️ FROM WHERE THE VOICE WAS TOLD TO BEGIN, not from the top of its lap.
-    // A way-change picks the sound up where it already was, so a head computed
-    // from `voiceFrom` alone runs a whole lap out of step with what you hear.
-    const at = voiceFrom + (((voiceOff - voiceFrom) + into) % lap);
-    /**
-     * 🔴 PINGPONG IS A TRIANGLE AND IT USED TO BE A RAMP THAT STUCK.
-     * REPORTED as *"the looper animation viz does not follow the mode"*. The
-     * voice reads ONE buffer of `2 × unit` — forwards, then the mirror — so
-     * `at` runs 0 to 2·unit while the picture is only `unit` wide. Divided by
-     * `unit` and clamped, the line crossed the picture over the first half and
-     * then SAT AT THE RIGHT EDGE for the whole return, which is the half a
-     * reader is listening for. Folded at the turn it runs back the way it came,
-     * which is what the sound is doing.
-     */
-    const f = voicePing ? (at <= unit ? at : 2 * unit - at)
-      : voiceBack ? unit - at
-      : at;
-    return Math.min(1, Math.max(0, f / unit));
-  }
-
-  /**
-   * Start, or restart, the one voice that plays the kept seconds.
-   *
-   * `fromFrac` is where in the KEPT SECONDS to pick it up, so a press does not
-   * throw you back to the top of the loop: `chop` slices where you already are,
-   * which is the difference between "repeat this bit" and "repeat the beginning
-   * again". ⚠️ AND IT IS IN THE PICTURE'S COORDINATES, mirrored on the way in
-   * for the same reason `loopHeadFrac` mirrors on the way out.
-   *
-   * 🔴 `null` MEANS THE TOP OF THE LOOP, AND IT IS NOT THE SAME AS `0`. Zero is
-   * the LEFT EDGE OF THE PICTURE, and under `back` the top of the loop is the
-   * right edge: the mirrored buffer's first sample is the kept seconds' last
-   * one. A new loop that opens backwards was asking to start at picture 0,
-   * which mirrors to an offset of exactly the buffer's whole duration, where
-   * `start()` has nothing left to read.
-   *
-   * ⚠️ A DIP, NOT A CUT. A buffer source cannot change its buffer or its loop
-   * points cleanly while it runs, so a way-change is a new voice — and swapping
-   * one mid-sample is a click every time somebody presses a button. 12 ms down
-   * and 12 ms back up is the same fade the loop already opens and closes with.
-   * The first voice of a loop needs none of that: `loopOut` is still at zero and
-   * the caller ramps it up straight afterwards.
-   */
-  function startLoopVoice(fromFrac) {
-    if (!ctx || !loopBuf || !loopOut) return;
-    const way = LOOP_WAYS[loopWay][1];
-    const back = way === 'back';
-    const ping = way === 'pingpong';
-    if ((back || ping) && !loopBack) loopBack = reversedCopy(loopBuf);
-    /**
-     * 🔴 PINGPONG IS ONE BUFFER, NOT TWO VOICES TAKING TURNS. Alternating two
-     * sources on a timer puts a gap or an overlap at every turn, and at these
-     * lap lengths that is a click twice a lap. Forwards followed by the same
-     * samples backwards is a single buffer whose end already matches its start,
-     * so `loop: true` joins it to itself with nothing to hear.
-     * ⚠️ AND THE JOIN IN THE MIDDLE IS SEAMLESS BY CONSTRUCTION, not by a
-     * crossfade: the last sample forwards IS the first sample backwards, so the
-     * turn happens on a repeated sample rather than on a discontinuity.
-     */
-    if (ping && !loopPing) loopPing = joinedCopy(loopBuf, loopBack);
-    const buf = ping ? loopPing : back ? loopBack : loopBuf;
-    const whole = buf.duration;              // 2 × the kept seconds under ping
-    const unit = loopBuf.duration;           // one pass of them
-    const lap = way === 'chop'
-      ? Math.min(whole, Math.max(CHOP_MIN_S, whole / CHOP_DIV))
-      : whole;
-    const cont = Number.isFinite(fromFrac);
-    const f = cont ? Math.min(1, Math.max(0, fromFrac)) : 0;
-    // Where that fraction of the PICTURE sits in the buffer this voice reads.
-    // ⚠️ AGAINST `unit`, NEVER `whole`: under pingpong the buffer is twice the
-    // picture, and against `whole` a press at the middle of the wave would pick
-    // the sound up at the turn.
-    const here = cont ? (back ? 1 - f : f) * unit : 0;
-    const from = way === 'chop' ? Math.min(Math.max(0, here), Math.max(0, whole - lap)) : 0;
-    /**
-     * 🔴 WHERE IT ACTUALLY STARTS READING, AND IT WAS ALWAYS THE TOP.
-     * This function's own note promises that a press does not throw you back to
-     * the start of the loop, and only `chop` was getting that: every other way
-     * started at 0, so pressing ← jumped the sound and the line to the far end
-     * of the picture. `loopStart`/`loopEnd` bound the lap; the second argument
-     * to `start()` is where inside it to begin, and they are different numbers.
-     */
-    const begin = way === 'chop' ? from : here;
-    const swap = !!loopSrc;
-    const CUT = 0.012;
-    const now = ctx.currentTime;
-    const at = swap ? now + CUT : now;
-
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    src.loopStart = from;
-    src.loopEnd = from + lap;
-    // the rate row's value, with `half` still able to halve it from the code
-    src.playbackRate.value = (way === 'half' ? 0.5 : 1) * loopRate;
-    src.connect(loopOut);
-    if (swap) {
-      const g = loopOut.gain;
-      g.cancelScheduledValues(now);
-      g.setValueAtTime(g.value, now);
-      g.linearRampToValueAtTime(0, at);
-      g.linearRampToValueAtTime(1, at + CUT);
-    }
-    src.start(at, begin);
-    // ⚠️ STOPPED AT THE SAME INSTANT THE NEW ONE STARTS, AND SCHEDULED RATHER
-    // THAN TIMED. A `setTimeout` stop leaves both voices in `loopOut` for as
-    // long as the timer is late, which is two copies of the loop at different
-    // phases — the thing that sounds like a broken instrument. `stop(when)` is
-    // sample accurate and lands inside the dip.
-    const dying = loopSrc;
-    if (dying) { try { dying.stop(at); } catch { /* already done */ } }
-    loopSrc = src;
-    voiceAt = at; voiceFrom = from; voiceTo = from + lap; voiceOff = begin;
-    voiceRate = src.playbackRate.value; voiceBack = back; voicePing = ping;
-  }
-
-  /**
-   * Set the LOOP row, and make the sound follow it.
-   *
-   * ⚠️ IT IS ALSO WHAT PUTS THE ROW BACK. Every loop opens on `round`, because a
-   * row still lit on `chop` over the next loop would be describing a choice
-   * nobody made for this material.
-   */
-  function setLoopWay(i, { quiet = false } = {}) {
-    const n = Math.max(0, Math.min(LOOP_WAYS.length - 1, i | 0));
-    const changed = n !== loopWay;
-    loopWay = n;
-    // 🔴 THE BUTTON'S FACE IS SET HERE AND NOWHERE ELSE, so a way reached from
-    // the code and a way reached by pressing cannot disagree about what is
-    // showing. That is the `shareLabelColumn` lesson in a smaller costume: two
-    // places writing one fact is one fact that will drift.
-    const btn = bar?.loopExtra('way');
-    if (btn) {
-      const w = LOOP_WAYS[n][1];
-      btn.textContent = WAY_GLYPH[w];
-      btn.title = WAY_SAYS[w];
-      btn.setAttribute('aria-label', `${LOOP_SAYS[w]}. press to change which way it plays`);
-    }
-    // Nothing changed, or there is nothing to play it on yet. Either way the
-    // button now says what the next loop will do and no voice is disturbed.
-    if (!changed || !loopSrc || !loopBuf) return;
-    const way = LOOP_WAYS[n][1];
-    startLoopVoice(loopHeadFrac());   // pick the sound up where it already is
-    // 🔴 AND THE GRAIN CLOCK GOES WITH IT, which is the whole of why `chop` is
-    // reachable at all: the lap is an exact number of samples either way, so the
-    // grains can be tuned to divide the slice as cleanly as they divided the
-    // whole. `lockGrainsToLoop` takes the lap AT SPEED 1, which is why `half`
-    // hands it the same number `round` does — the plan's own argument, that a
-    // lock made at speed 1 survives every power of two.
-    lockGrainsToLoop(voiceTo - voiceFrom);
-    if (!quiet) d.log(`${LOOP_SAYS[way]} (${(voiceTo - voiceFrom).toFixed(2)} s a lap)`, 'hi');
-  }
-
-  /**
-   * One press of the button glued to LOOP: → then ← then ⇆ then → again.
-   *
-   * ⚠️ IT CYCLES WITHIN `LOOP_TURN`, AND A WAY THAT IS NOT IN IT LANDS ON THE
-   * FIRST. `half` and `chop` are reachable from the checks and from nothing
-   * else; pressing the button after one of those has run is a reader asking for
-   * a direction, and the honest answer is the first direction rather than an
-   * index arithmetic accident.
-   */
-  function cycleLoopWay() {
-    const at = LOOP_TURN.indexOf(loopWay);
-    setLoopWay(LOOP_TURN[(at + 1) % LOOP_TURN.length]);
-  }
 
   /** Point the decoded path at the current station. Safe to call again. */
   function openStream() {
@@ -1480,6 +1272,15 @@
   // sliders on screen still reaches the engine; it is only the picture of it
   // that waits.
   let sliders = null, patchPick = null, shareLabelColumn = null;
+  // ⚠️ THE FADER NEEDS A HANDLE OUTSIDE ITS OWN SCOPE, which the four settings
+  // already had through `sliders`. It is built in `startGranulator` and the
+  // tour has to move it from the 25 Hz tick, which runs anywhere.
+  let faderSld = null;
+  // Which destinations the modulator is walking right now. `writeContinuous`
+  // skips them, because two writers at 25 Hz on one control is a 25 Hz square
+  // wave and not a compromise. Set by `applyPatch`, which is the only thing
+  // that calls `setRoutes`.
+  let routedNow = new Set();
   // Has the granulator's ring been through one full lap of live radio? Until it
   // has, the engine is quiet for a reason and nothing may report that as a fault.
   let ringFilled = false;
@@ -1576,68 +1377,29 @@
     // over a past that had no audio behind it. A picture of a loop with no loop
     // in it is worse than no loop, because it looks like a broken player.
     //
-    // ⚠️ A RING FILLED ON THE AUDIO THREAD, not samples scraped off the
-    // analyser. `meterTick` reads 2048 samples a frame, which at 60 Hz both
-    // overlaps and gaps: stitching those together gives a recording with seams
-    // every sixteen milliseconds. The tap copies every block the graph produces.
-    //
-    // ⚠️ AND IT TAPS `analyser`, NOT `dry`. `dry` carries the fader, so a loop
+    // ⚠️ IT TAPS `liveIn`, NOT `dry`. `dry` carries the fader, so a loop
     // recorded through it would be a recording of where the blend happened to be
     // standing, and playing it back at a different fader position would be two
     // fades multiplied. The material is the station.
-    loopRing = {
-      len: Math.round(BUF_SECONDS * ctx.sampleRate),
-      ch: [new Float32Array(Math.round(BUF_SECONDS * ctx.sampleRate)),
-           new Float32Array(Math.round(BUF_SECONDS * ctx.sampleRate))],
-      w: 0, filled: 0, on: false,
-    };
-    // ⚠️ A SCRIPT PROCESSOR AS A TAP, and it is deliberate rather than lazy. It
-    // is deprecated and it runs on the main thread, which is the objection; what
-    // it does here is memcpy two blocks into a typed array and return, and a
-    // worklet would be a second file and a module load for that. It is wired to
-    // a SILENT sink so it is pulled without reaching the speakers: a node that
-    // is not connected to the destination is not scheduled at all, which is the
-    // trap that makes a tap look like it is working and record nothing.
-    loopTap = ctx.createScriptProcessor(4096, 2, 2);
-    loopTap.onaudioprocess = (e) => {
-      const R = loopRing;
-      if (!R?.on) return;
-      const n = e.inputBuffer.length;
-      for (let c = 0; c < 2; c++) {
-        const src = e.inputBuffer.getChannelData(Math.min(c, e.inputBuffer.numberOfChannels - 1));
-        const dst = R.ch[c];
-        let w = R.w;
-        for (let i = 0; i < n; i++) { dst[w] = src[i]; w = w + 1 === R.len ? 0 : w + 1; }
-        if (c === 1) R.w = w;
-      }
-      R.filled = Math.min(R.len, R.filled + n);
-    };
-    const tapSink = ctx.createGain();
-    tapSink.gain.value = 0;
-    liveIn.connect(loopTap);
-    loopTap.connect(tapSink);
-    tapSink.connect(ctx.destination);
-    // Where a finished loop is played back. Its own gain, so the live path can
-    // be taken down and brought back without touching the fader's number.
-    // 🔴 INTO `srcNode`, NOT INTO THE DESTINATION. Everything downstream then
-    // gets the loop for free and by construction: the granulator chews it, the
-    // analyser measures it, the fader still blends it against the grains, and
-    // the meter below reads what actually left. Wired to the destination it was
-    // a second, parallel path that only the speakers knew about.
-    loopOut = ctx.createGain();
-    loopOut.gain.value = 0;
-    loopOut.connect(srcNode);
+    //
+    // 🔴 AND IT PLAYS BACK INTO `srcNode`, NOT INTO THE DESTINATION. Everything
+    // downstream then gets the loop for free and by construction: the granulator
+    // chews it, the analyser measures it, the fader still blends it against the
+    // grains, and the meter below reads what actually left. Wired to the
+    // destination it was a second, parallel path that only the speakers knew
+    // about.
+    looper.attach(ctx, { tap: liveIn, out: srcNode });
     // 🔴 AND A METER ON WHAT ACTUALLY LEAVES. `analyser` sits BEFORE the fader
     // and before the loop's own gain, so it reads the station whether or not a
     // single sample reaches a speaker: a check built on it would have passed
     // happily through the whole bug that was reported.
     //
     // 🔴 IT HANGS OFF `speakers` AND OFF NOTHING ELSE, AND THAT IS THE FIX. It
-    // used to be fed by `dry` and `loopOut` directly, which was wrong twice
+    // used to be fed by `dry` and the loop's gain directly, which was wrong twice
     // over. It could not hear the granulator at all, because the engine's
     // output never passed through either — so at the fader's granulator end a
     // meter read silence over a signal that was playing. And it heard the LOOP
-    // TWICE, once straight from `loopOut` and once round through
+    // TWICE, once straight from the loop's gain and once round through
     // `srcNode → analyser → dry`, so the one thing it could hear it overstated.
     // One node carries everything that leaves, so the meter is fed by that node
     // and the question "did anybody hear this" has one place to be asked.
@@ -2658,12 +2420,18 @@
       // control built in. Nothing should be lit at the dry end and something must
       // be lit at the wet end; a probe that reads the same at both is measuring
       // neither.
+      // ⚠️ NO UNIT IN THE DETAIL LINE. It said `s`, because the destination was
+      // hard-coded to grain length; it is now whichever control this sound lets
+      // the station walk, and those are seconds, grains a second and bare
+      // fractions. A unit that is right for one of them is a lie about the
+      // other two.
       d.assert('the station moves the granulator, and stops when told',
-        G.modMoved.got > 4 && G.modStill.got > 2
+        !!G.modDest && G.modMoved.got > 4 && G.modStill.got > 2
           && G.modMoved.spread > 0.001 && G.modStill.spread <= G.modMoved.spread / 5,
-        `${G.modDest} spanned ${G.modMoved.spread.toFixed(3)} s over ${G.modMoved.got} reads `
-        + `while the follower ran, ${G.modStill.spread.toFixed(3)} s over ${G.modStill.got} `
-        + 'with it held');
+        !G.modDest ? `${PATCHES[G.here]?.name ?? 'this sound'} lets the station move nothing`
+          : `${G.modDest} spanned ${G.modMoved.spread.toFixed(3)} over ${G.modMoved.got} reads `
+            + `while the follower ran, ${G.modStill.spread.toFixed(3)} over ${G.modStill.got} `
+            + 'with it held');
       d.assert('a shape this page generates moves it too, and stops when told',
         G.lfoMoved?.got > 5 && G.lfoStill?.got > 2
           && G.lfoMoved.spread > 0.2 && G.lfoStill.spread <= G.lfoMoved.spread / 5,
@@ -2829,6 +2597,62 @@
         `the edge ${G.headHeld === 0 ? 'held still' : 'KEPT MOVING'} while frozen, `
         + `${G.keptWhileFrozen ?? '—'} reads were kept behind it, `
         + `and ${G.headRuns == null ? '—' : G.headRuns} more arrived in 300 ms after`);
+
+      /**
+       * 🔴 THE TOUR MOVES REAL THINGS, AND THE PROOF IS ON THE FAR SIDE OF THE
+       * WIRE. Three quantities in one assert because each of them alone is
+       * passable by a page that is doing something else: a blend that breathes
+       * with nothing behind it, a sound that steps without sliding, and a set
+       * of numbers this page computed and never sent. The middle one is the
+       * strong claim: `m<name>` read back with `/s_get`, strictly between two
+       * patches' own values, which is the reading a stepped change cannot give.
+       */
+      const mid = G.driftMid;
+      const midOk = !!mid && Number.isFinite(mid.got)
+        && mid.got > Math.min(mid.a, mid.b) * 1.02
+        && mid.got < Math.max(mid.a, mid.b) * 0.98;
+      d.assert('it plays itself: the blend breathes, the sound slides, and the engine takes it',
+        G.driftOn && G.driftFace === 'true'
+          && (G.driftWet?.span ?? 0) > 0.02 && (G.driftWet?.moves ?? 0) > 10
+          && G.driftLanded && G.driftSliders >= 2 && midOk,
+        !G.driftOn ? `pressing the button left it ${G.driftFace}`
+          : `the blend spanned ${(G.driftWet?.span ?? 0).toFixed(3)} over `
+            + `${G.driftWet?.n ?? 0} reads and ${G.driftWet?.moves ?? 0} writes · `
+            + `${G.driftSliders} of 4 settings moved · `
+            + `it ${G.driftLanded ? 'stepped to the next sound' : 'NEVER STEPPED'} · `
+            + (mid ? `${mid.name} read back ${Number(mid.got).toFixed(4)} between `
+                     + `${mid.a} and ${mid.b}`
+                   : 'no two sounds here differ enough to grade the halfway'));
+      /**
+       * 🔴 AND A HAND TAKES IT BACK, WHICH IS THE HALF THAT MATTERS ON THIS
+       * PAGE. This repo has twice shipped a page that worked a control in front
+       * of the person holding it, and both times the report was about the
+       * instrument being taken away rather than about the feature. So the
+       * yield is graded the same way the feature is: a real `pointerdown` on a
+       * control the tour moves, the tour off on the next line, and the LOG
+       * carrying the sentence that says so. A page that stops silently and a
+       * page that has crashed look identical from a chair.
+       *
+       * ⚠️ IT ASSERTS THE BEFORE AS WELL AS THE AFTER. `driftYielded` alone is
+       * satisfied by a tour that was never running, which is the vacuous pass
+       * this check exists to be worth more than.
+       */
+      d.assert('a hand on the sound row takes the instrument straight back, and it says so',
+        G.driftYieldFrom && G.driftYielded && G.driftYields === 1 && G.driftSaid,
+        !G.driftYieldFrom ? 'it was not playing itself when the hand arrived'
+          : `${G.driftYields} hand-back(s), it is ${G.driftYielded ? 'stopped' : 'STILL MOVING'}, `
+            + `and the log ${G.driftSaid ? 'said so' : 'SAID NOTHING'}`);
+      // ⚠️ AND THE OTHER WAY OUT, which is the one a visitor uses when they want
+      // the movement to stop without taking the instrument over. The face is
+      // read off the button both times: `aria-pressed` is the only thing on
+      // screen that says which state this control is in, so a toggle that works
+      // and does not repaint is a control nobody can read.
+      d.assert('the same button stops it again, and the face follows both ways',
+        !!G.driftToggle?.onAgain && !!G.driftToggle?.offAgain,
+        G.driftToggle
+          ? `pressed on: ${G.driftToggle.onAgain ? 'running and lit' : 'NOT BOTH'} · `
+            + `pressed off: ${G.driftToggle.offAgain ? 'stopped and dark' : 'NOT BOTH'}`
+          : 'never driven');
     }
 
     // 🔴 AND THE STATION BUTTONS, WHICH NOTHING ELSE CAN REACH. `verify.mjs`
@@ -3535,13 +3359,21 @@
       noise: 0.45, noisetype: 3, noisedecay: 0.4, noisetone: 1800, noisedyn: 2.2,
       wow: 0.70, rverb: 0.35, rtime: 0.50 },
   ];
-  // 🔴 OPENS ON `four seconds ago`, AND THE CHOICE IS ABOUT WHAT A VISITOR
-  // HEARS FIRST. It is the one patch where the programme is still recognisable
-  // — the station itself, four seconds late, in pieces long enough that words
-  // survive — so the first thing anybody hears is a granulator doing something
-  // to a radio rather than a wash that could be any material at all. Every
-  // other sound here is one press away.
-  let patch = 0;
+  /**
+   * 🔴 OPENS ON `dub`, ON INSTRUCTION 2026-09-16: *"dub as default preset"*.
+   *
+   * It opened on `four seconds ago`, on the argument that the one patch where
+   * the programme is still recognisable is the right thing to hear first. That
+   * argument was about legibility and this is a decision about the sound.
+   *
+   * ⚠️ BY NAME, NOT BY INDEX. `let patch = 1` would be a default that moves
+   * whenever somebody reorders `PATCHES`, silently, with nothing to catch it:
+   * the page would still open on a real patch, so there is no failure to
+   * notice. The lookup falls back to 0 rather than to `-1`, because a
+   * `patch` of -1 is every read of `PATCHES[patch]` returning undefined.
+   */
+  const OPENS_ON = 'dub';
+  let patch = Math.max(0, PATCHES.findIndex((p) => p.name === OPENS_ON));
 
   const ALL_ONES = new Array(16).fill(1);
   /** The sixteen steps this patch wants in the gate buffer. */
@@ -3715,7 +3547,14 @@
     // the loop playhead, driven by the self-check because nothing else drives
     // it yet: where each line landed on the canvas, how wide it was, and
     // whether the wave stopped under it and started again afterwards
-    headDpr: 1, headAt: null, headHeld: null, headRuns: null, headGone: false };
+    headDpr: 1, headAt: null, headHeld: null, headRuns: null, headGone: false,
+    // the tour, driven through its own button: whether the press armed it, what
+    // the blend spanned while it ran, whether it stepped from one sound to the
+    // next, what the engine was holding halfway between two of them, and
+    // whether a hand on the sound row took it straight back
+    driftOn: false, driftFace: null, driftWet: null, driftLanded: false,
+    driftSliders: 0, driftMid: null, driftYieldFrom: false, driftYielded: false,
+    driftYields: 0, driftSaid: false, driftToggle: null };
 
   /** Peak RMS at the engine's own meter over `ms`. The meter is IN the path. */
   function engLevel(ms) {
@@ -4038,29 +3877,60 @@
       },
       warn: (m) => d.log(`modulation refused: ${m}`, 'bad'),
     });
-    setInterval(() => { if (eng) modulator.tick(); }, 1000 / MOD_HZ);
+    // ⚠️ THE TOUR RIDES THIS TIMER RATHER THAN BRINGING ITS OWN, and the order
+    // in the line is the whole of the arrangement: the tour sets every base and
+    // writes the controls nothing is modulating, then `tick()` writes the ones
+    // that are, from those bases. A second interval would put two writers on
+    // one control at two phases of the same 25 Hz, which is the square wave
+    // `routedNow` exists to prevent, arriving through scheduling instead.
+    setInterval(() => { if (!eng) return; driftTick(); modulator.tick(); }, 1000 / MOD_HZ);
     return modulator;
   }
 
-  function applyPatch(i, { silent = false } = {}) {
+  /**
+   * @param [o.silent]  do not write the log line naming the sound
+   * @param [o.half]    🔴 `'discrete'` WRITES ONLY WHAT CANNOT BE A VALUE IN
+   *   BETWEEN, AND IT IS FOR THE TOUR AND NOTHING ELSE. `writePatch` lands the
+   *   whole sound in one shot, which is right for a button press and wrong in
+   *   the middle of a nine-second slide: it would put this sound's own rate,
+   *   length and blend on the engine for one 25 Hz tick and the next tick would
+   *   pull them back to halfway, which is a step in the middle of a glide.
+   *   `radio-gran.mjs` owns the line between the two halves and the argument
+   *   for where it falls: `Select.kr` indices, a chord in semitones and a
+   *   sixteen-step gate figure have no halfway, and everything behind a 20 ms
+   *   `Lag.kr` has nothing but. The sliders are skipped for the same reason.
+   */
+  function applyPatch(i, { silent = false, half = null } = {}) {
     patch = ((i % PATCHES.length) + PATCHES.length) % PATCHES.length;
     const p = PATCHES[patch];
-    P.rate = p.rate; P.size = p.size; P.spray = p.spray; P.scan = p.scan;
-    writePatch(p);
+    const whole = half !== 'discrete';
+    if (whole) {
+      P.rate = p.rate; P.size = p.size; P.spray = p.spray; P.scan = p.scan;
+      writePatch(p);
+    } else {
+      writeDiscrete(eng, p, { bufSeconds: BUF_SECONDS });
+    }
     d.set('voices', p.gates.reduce((n, g) => n + (g > 0.001 ? 1 : 0), 0));
     if (sliders) {
-      for (const [sld, v] of [[sliders.rate, p.rate], [sliders.size, p.size],
-                              [sliders.spray, p.spray]]) {
-        sld?.set(v, { quiet: true, glideMs: 900 });
+      if (whole) {
+        for (const [sld, v] of [[sliders.rate, p.rate], [sliders.size, p.size],
+                                [sliders.spray, p.spray]]) {
+          sld?.set(v, { quiet: true, glideMs: 900 });
+        }
       }
       // ⚠️ RANGE BEFORE VALUE. `setRange` re-clamps what the slider is holding,
       // so setting the new value first would clamp it against the OLD lane —
       // `ground`'s -1.00x would land at 0 on a 0..1 range and then be
       // re-shown on the right one as a speed nobody asked for.
+      // ⚠️ AND THE RANGE MOVES EVEN ON THE DISCRETE HALF. The read head is a
+      // speed in one mode, a place in another and a lag in a third, and the
+      // mode is exactly the kind of thing that STEPS. A tour that landed
+      // without this would go on showing `time behind` in seconds over a
+      // control the engine is now reading as a speed.
       const r = SCAN_RANGE[p.scanmode] ?? SCAN_RANGE[2];
       sliders.scan?.setRange(r);
       sliders.scan?.label(r.label);
-      sliders.scan?.set(r.toUi(p.scan), { quiet: true });
+      if (whole) sliders.scan?.set(r.toUi(p.scan), { quiet: true });
       shareLabelColumn?.();
     }
     // 🔴 A PATCH IS NOW A PLACE AND A MOTION. The base is where each control
@@ -4089,6 +3959,9 @@
       const routes = (p.mod || []).filter((r) =>
         !(p.scanmode >= 3 && (r.dest === 'winstart' || r.dest === 'winend')));
       modulator.setRoutes(routes);
+      // 🔴 AND THE SET IS REMEMBERED, because the tour has to know which
+      // controls it may NOT write. See `routedNow` where it is declared.
+      routedNow = new Set(routes.map((r) => r.dest));
       // How many settings the station is walking. `—` when nothing is, which is
       // `slowed`'s whole claim: the programme, slowed, with nothing added.
       d.set('moving', modulator.moving().length || '');
@@ -4154,18 +4027,271 @@
     scope.grainAlpha(v);
   };
 
+  // ═══ letting it play itself ════════════════════════════════════════════════
+  //
+  // 🔴 THE SAME MOVEMENT `/videoradio/` HAS, ON A PAGE WITH A PERSON HOLDING IT,
+  // AND THAT SECOND CLAUSE IS ALL OF THE DESIGN. Over there every decision is a
+  // clock's and there are no controls to move; here every decision is a hand's
+  // and there are five rows of them. So the movement is the same tour and it is
+  // wrapped in three rules, each of which this repo has already paid for:
+  //
+  //   · it is OFF until somebody presses `Let it play itself`
+  //   · a hand on anything it moves takes it back AT ONCE, and the log says so
+  //   · it never moves a control a finger is already on, because the hand-back
+  //     fires on `pointerdown`, which is the FIRST event of a touch
+  //
+  // ⚠️ AND IT DOES NOT CHANGE STATION, WHICH IS THE ONE THING `/videoradio/`
+  // DOES THAT IS NOT COPIED. Two separate reasons and either is enough. This
+  // page was asked in as many words not to move the row by itself: *"do not
+  // switch channels if I do not"*, which is why the background watch ungreys a
+  // dead station and never follows it. And every mount here is a public
+  // broadcaster's, whose listener figures count each connection this repo opens:
+  // a tour that hops stations on a timer adds one of those every seventy-one
+  // seconds for as long as a tab is open. The blend, the sound and the four
+  // settings are this page's own and cost nobody anything.
+  //
+  // ⚠️ THE BLEND'S TWO ENDS, AND NEITHER IS 0 OR 1. At 0 the granulator is
+  // inaudible and the grain picture is drawing something nobody can hear; at 1
+  // the station is gone and what is left is an instrument with no material.
+  const DRIFT_LO = 0.25, DRIFT_HI = 0.92;
+  const drift = {
+    on: false,
+    from: 0,
+    /**
+     * 🔴 HELD WHILE THE PAGE IS EXERCISING ITS OWN CONTROLS, AND ONLY THEN.
+     * `demo/verify.mjs` presses every `.pos-controls` button a second or two
+     * after load, which is in the middle of a wasm boot, an eight-second ring
+     * fill, an ink probe that runs the fader to both ends and a patch A/B that
+     * presses `›` and `‹`. A tour running through all of that would fight every
+     * one of them, and each fight reads as a broken page rather than as two
+     * things writing one control. So under a harness the PAGE drives this
+     * control itself, once, at the one moment in the run when nothing else is
+     * moving the instrument. A visitor never sets this.
+     */
+    held: SELFCHECK,
+    moves: 0,           // ticks that actually wrote something
+    yields: 0,          // times a hand took it back
+    k: 0,               // where in the slide between two sounds
+  };
+  // The shell's own accessor, so the id is written once and a rename cannot
+  // leave a selector here pointing at nothing.
+  const driftBtn = () => d.button('drift');
+  // What the four sliders were last shown, so a dwell costs no DOM at all: with
+  // `k` at 0 the morph returns sound A's own numbers EXACTLY, so every one of
+  // these comparisons is false and nothing is written for twenty-two seconds.
+  const shown = { rate: NaN, size: NaN, spray: NaN, scan: NaN };
+
+  function driftFace() {
+    const b = driftBtn();
+    if (b) b.setAttribute('aria-pressed', String(drift.on));
+  }
+
+  function driftStart() {
+    if (drift.on || drift.held) return false;
+    drift.on = true;
+    drift.moves = 0;
+    // 🔴 IT BEGINS ON THE SOUND THAT IS ALREADY LOADED, so pressing the button
+    // changes nothing you can hear in that instant: the tour opens at the top
+    // of `patch`'s own slot and slides out of it twenty-two seconds later. A
+    // clock started at zero would jump to whatever sound slot 0 happens to be.
+    drift.from = performance.now() - patch * SLOT_MS;
+    // the blend rides the frame clock while this is on; see `blendFrame`
+    if (!blendRaf) blendRaf = requestAnimationFrame(blendFrame);
+    driftFace();
+    d.log(`playing itself: ${(DWELL_MS / 1000).toFixed(0)} s on each sound, `
+      + `${(MORPH_MS / 1000).toFixed(0)} s sliding to the next, and the blend `
+      + 'breathing with it. Touch any of it and it is yours again.', 'hi');
+    return true;
+  }
+
+  /**
+   * 🔴 STOPPING LEAVES THE INSTRUMENT EXACTLY WHERE IT IS, AND THAT IS THE
+   * POINT RATHER THAN A SHORTCUT. Landing the current sound whole on the way
+   * out would move all four sliders at the moment a hand arrives, including the
+   * one under the finger, which is the rule this whole block exists to keep.
+   * What a visitor takes over is what they can see: the engine is holding the
+   * values the sliders are showing, halfway between two sounds if that is where
+   * the tour was, which is an ordinary place for an instrument to be and is one
+   * press of `‹` away from a named sound.
+   */
+  function driftStop(why) {
+    if (!drift.on) return false;
+    drift.on = false;
+    // the frame loop checks `drift.on` too, but cancelling is what stops a
+    // frame being queued for a tour that has already ended
+    if (blendRaf) { cancelAnimationFrame(blendRaf); blendRaf = 0; }
+    driftFace();
+    d.log(why, 'hi');
+    return true;
+  }
+
+  /**
+   * A hand on anything the tour moves.
+   *
+   * ⚠️ `pointerdown` AND `keydown`, NEVER `click`. Two reasons and they pull the
+   * same way. A click arrives at the END of a press, so a tour that yielded on
+   * it would have a whole gesture's worth of time to move the control under the
+   * finger; `pointerdown` is the first event of a touch. And `element.click()`
+   * fires no pointer events at all, which is what `verify.mjs` and this page's
+   * own checks use to drive controls, so the page working its own picker
+   * cannot be mistaken for somebody reaching for it.
+   */
+  /**
+   * A hand on the granulator takes the instrument back.
+   *
+   * 🔴 IT IGNORES THE BUTTON THAT STARTS IT, AND THAT BECAME LOAD BEARING THE
+   * MOMENT THAT BUTTON MOVED IN HERE. `Automate` was in the page's control row
+   * and is now inside `.gran-slot`, which is the element this listener is on:
+   * without the guard, pressing it would arm the tour and then immediately hand
+   * it back on the same gesture, so the control would look broken rather than
+   * off. Checked by id on the composed path, because the press lands on the
+   * button and bubbles through the slot.
+   */
+  const handBack = (e) => {
+    if (!drift.on) return;
+    const from = e?.target?.closest?.('[data-id="drift"]');
+    if (from) return;
+    drift.yields++;
+    driftStop('the instrument is yours now, so it has stopped moving by itself');
+  };
+
+  /**
+   * One pass of the tour, at the modulator's own rate.
+   *
+   * 🔴 THE MORPH MOVES THE BASE OF A ROUTED CONTROL AND WRITES EVERY OTHER ONE
+   * ITSELF. `createModulator` writes `base + modulation` twenty-five times a
+   * second; a tour writing the raw value of the same control at the same rate
+   * makes the two alternate, which is a 25 Hz square wave on something that is
+   * supposed to be gliding. `routedNow` is what keeps them out of each other's
+   * way, and it is why `applyPatch` remembers the set.
+   */
+  function driftTick() {
+    if (!eng || !modulator || !drift.on || drift.held) return;
+    const t = tourAt(performance.now() - drift.from, PATCHES.length);
+    const m = morphOf(PATCHES[t.a], PATCHES[t.b], t.k);
+    drift.k = m.k;
+    const landOn = PATCHES.indexOf(m.at);
+    if (landOn >= 0 && landOn !== patch) applyPatch(landOn, { half: 'discrete' });
+
+    const values = { ...m.values };
+    // 🔴 A LOCKED GRAIN CLOCK OUTRANKS THE TOUR, and that is what tempo-synced
+    // means here: while a loop is playing the grain rate belongs to the lap
+    // rather than to the sound the tour is travelling through. Written here
+    // rather than fought with afterwards, for the same reason as `routedNow`.
+    if (lockedRate != null) values.rate = lockedRate;
+
+    // The base is where a modulated control RETURNS to, so it has to be the
+    // morphed value and not the arriving sound's: otherwise every routed
+    // control jumps to its destination at the crossover while the unrouted ones
+    // glide, and half the instrument arrives early.
+    const bases = basesOf(m.at);
+    for (const k of Object.keys(bases)) {
+      const moved = values[k];
+      modulator.setBase(k, typeof moved === 'number' ? moved : bases[k]);
+    }
+    writeContinuous(eng, values, { scanmode: m.at.scanmode, bufSeconds: BUF_SECONDS,
+      skip: routedNow });
+    P.rate = values.rate; P.size = values.size;
+    P.spray = values.spray; P.scan = values.scan;
+
+    /**
+     * 🔴 AND THE SLIDERS FOLLOW, WHICH THE MODULATOR DELIBERATELY DOES NOT.
+     * The note on `startModulator` is right that a knob redrawn twenty-five
+     * times a second is the `grain-scope` caption in another costume: a
+     * modulation is a wobble AROUND where a setting sits, and the handle has to
+     * show where it sits. A morph is the other thing. The setting itself is
+     * travelling from one sound to another over nine seconds, so a handle that
+     * stayed put would be this file's own named failure, a page showing one
+     * patch and playing another.
+     * ⚠️ IT COSTS NOTHING DURING A DWELL. `blend(a, b, 0)` is `a` exactly, in
+     * both the linear and the geometric lane, so for twenty-two seconds out of
+     * every thirty-one every comparison below is false.
+     */
+    if (sliders) {
+      const r = scanRange();
+      const four = [[sliders.rate, 'rate', values.rate],
+                    [sliders.size, 'size', values.size],
+                    [sliders.spray, 'spray', values.spray],
+                    [sliders.scan, 'scan', r.toUi(values.scan)]];
+      for (const [sld, key, v] of four) {
+        if (!sld || !Number.isFinite(v) || v === shown[key]) continue;
+        shown[key] = v;
+        sld.set(v, { quiet: true });
+      }
+    }
+    drift.moves++;
+  }
+
+  /**
+   * 🔴 THE BLEND MOVES ON THE FRAME CLOCK, NOT ON THE MODULATOR'S 25 Hz.
+   * REPORTED 2026-09-16: *"wet dry movement is janky/choppy"*.
+   *
+   * It was written from the same `setInterval` as everything else the tour
+   * does, at 40 ms. That is plenty of steps for a value, and it is the wrong
+   * CLOCK for a thing being watched: a 40 ms timer and a 16.7 ms paint do not
+   * divide, so the handle got one update on some frames and two on others, in a
+   * pattern that repeats every three frames. The number was smooth and the
+   * picture of it juddered.
+   *
+   * ⚠️ THE FOUR SETTINGS STAY ON THE 25 Hz TICK AND THAT IS NOT AN OVERSIGHT.
+   * They only move during the 9 s slide and they are written through
+   * `shown[key]`, which skips a write when the value has not changed; the blend
+   * is the one control that moves through the WHOLE slot, every tick, which is
+   * why it is the one that showed this.
+   * ⚠️ AND THE AUDIO MOVED WITH IT rather than being left behind on the timer.
+   * Two clocks writing one gain would put the ear and the eye a frame apart for
+   * no reason; `breathe()` is a pure function of the tour clock, so both simply
+   * read it at whatever rate they run.
+   */
+  let blendRaf = 0;
+  function blendFrame() {
+    blendRaf = 0;
+    if (!drift.on) return;
+    if (!drift.held) {
+      const t = tourAt(performance.now() - drift.from, PATCHES.length);
+      setWet(breathe(t.within, DRIFT_LO, DRIFT_HI));
+      faderSld?.set(wet, { quiet: true });
+    }
+    blendRaf = requestAnimationFrame(blendFrame);
+  }
+
+  d.on('drift', () => {
+    // ⚠️ REFUSED WHILE THE PAGE IS CHECKING ITSELF, IN SILENCE. See `held`: the
+    // harness presses this in the middle of a boot, and the page drives the same
+    // button itself once everything else has stopped moving.
+    if (drift.held) return;
+    if (drift.on) driftStop('stopped playing itself');
+    else driftStart();
+  });
+
+  /**
+   * 🔴 ON THE SLOT, NOT ON THE WHOLE PAGE, AND THE SCOPE IS THE CLAIM. What
+   * takes the instrument back is a hand on something the tour MOVES: the fader,
+   * the four settings and the sound picker, all of which land inside
+   * `.gran-slot`. The station row and the transport are not moved by the tour,
+   * so pressing play, LOOP or a station is not a request to stop it, and a
+   * listener on the whole body would have made it one.
+   * ⚠️ CAPTURE PHASE, so it runs before the control's own handler and before
+   * anything can be dragged. A capture listener reaches a target even when the
+   * event does not bubble, which is what makes it reliable across three
+   * different components.
+   */
+  granSlot.addEventListener('pointerdown', handBack, { capture: true });
+  granSlot.addEventListener('keydown', handBack, { capture: true });
+
   /**
    * Bring the granulator up. Called once, from the moment there is sound.
    *
-   * 🔴 IT IS NOT BEHIND A BUTTON ANY MORE AND THAT CHANGED WHAT IT HAS TO
-   * SURVIVE. `verify.mjs` presses `.pos-controls button, .tbar-x` and applies
-   * the manifest's `settleMs` to control 0 ONLY — with no controls declared,
-   * neither applies to this page at all. What carries it now is the harness's
-   * OTHER use of `settleMs`: the first-assert budget, which waits while
-   * `__demo.asserts` is still empty. This page already holds every assert to one
-   * burst in `finish()`, so that budget covers the whole boot — but it is the
-   * only thing that does, which is why the manifest figure went up with this
-   * change rather than being left where a button had been doing half the job.
+   * 🔴 IT IS NOT BEHIND A BUTTON AND NOTHING WAITS FOR IT. `verify.mjs` presses
+   * `.pos-controls button, .tbar-x` and applies the manifest's `settleMs` to
+   * control 0 ONLY, and control 0 here is `Let it play itself`, which returns
+   * in a microsecond. What carries the boot is the harness's OTHER use of
+   * `settleMs`: the first-assert budget, which waits while the page has not
+   * called `ready()`. This page holds every assert to one burst in `finish()`,
+   * so that budget covers the whole boot, and it is the only thing that does.
+   * ⚠️ AND THE ONE CONTROL IS NOT A SECOND WAY TO START THE GRANULATOR. That
+   * was `Synthesize`, and before it `Listen`; both were a second control for
+   * something the page already does. The granulator comes up with the sound.
    *
    * ⚠️ AND A FAILURE HERE MUST NOT TAKE THE RADIO DOWN. Booting 1.7 MB of wasm
    * used to be something a visitor opted into; now everyone who presses play
@@ -4369,6 +4495,9 @@
     const wetRow = createSliderGroup([fader]);
     wetRow.el.classList.add('wet-fader');
     granControls.push(fader);
+    // The tour breathes this one, from a timer that knows nothing about this
+    // scope. See `drift`.
+    faderSld = fader;
 
     // 🔴 ONE GROUP, ONE SET OF COLUMNS. Four bare sliders in a div each lay
     // themselves out, so a wider label pushes its own lane right and the four
@@ -4485,6 +4614,24 @@
     granSlot.append(wetRow.el, patchRow.el);
     granSlot.append(group.el);
     sliderRow = group.el;
+    /**
+     * 🔴 `Automate` GOES LAST, UNDER THE THINGS IT MOVES. Asked for in those
+     * words. It belongs here rather than in the page's control row because what
+     * it acts on is this block: the blend, the sound and the four settings are
+     * exactly what it drives, and a control sitting three inches above them in a
+     * row with Play said it was about the page.
+     * ⚠️ AND IT IS INSIDE `.gran-slot`, WHICH IS ALSO WHAT TAKES IT BACK. The
+     * hand-back listener is on that element, so a press on this button would now
+     * stop the thing the button just started. `handBack` ignores it by id for
+     * that reason, and the check below presses it twice to prove the toggle
+     * still turns on and off from where it now sits.
+     */
+    const autoBtn = d.button('drift');
+    if (autoBtn) {
+      const row = el('div', 'pos-controls gran-auto');
+      row.append(autoBtn);
+      granSlot.append(row);
+    }
     granControls.push({ disabled: (y) => patchRow.disabled(y) });
 
     /**
@@ -4910,16 +5057,34 @@
         }
         return { spread: got ? hi - lo : 0, got };
       };
-      // `four seconds ago` routes the follower onto grain length, and the radio
-      // is playing, so this is the live instrument being watched rather than a
-      // synthetic wobble.
-      G.modDest = 'msize';
-      G.modMoved = await sampleSpread('msize');
+      /**
+       * 🔴 THE DESTINATION IS READ OFF THE SOUND THAT IS PLAYING, NEVER TYPED,
+       * AND THE TYPED ONE WAS ALREADY WRONG. This said `msize` with a comment
+       * that `four seconds ago` routes the follower onto grain length. That was
+       * true when it was written and false since the page was told to open on `dub`
+       * instead, whose three routes are `sos`, `drive` and `spray` and not one
+       * of them is `size`. So it sampled a control nothing was moving, read a
+       * perfectly flat `0.000`, and went red every run about a modulator that
+       * was working: MEASURED 2026-09-16, `msize spanned 0.000 s over 10 reads
+       * while the follower ran`.
+       *
+       * ⚠️ IT TAKES A FOLLOWER ROUTE, not any route. The point of this check is
+       * that THE STATION is moving the instrument, and the shapes this page
+       * generates are graded separately below with a known 2 Hz input. An `lfo`
+       * here at 0.035 Hz would be legitimately flat over 1.6 s.
+       * ⚠️ AND IT USES THE SAME NAME THE MODULATOR WRITES. Four destinations are
+       * global controls with no `m` prefix, which is what `MOD_CMD` is for; a
+       * read of `mdrive` answers 0 rather than refusing.
+       */
+      const follows = (PATCHES[herePatch].mod || [])
+        .find((r) => String(r.src).startsWith('env') && r.dest !== 'probs');
+      G.modDest = follows ? (MOD_CMD[follows.dest] ?? `m${follows.dest}`) : null;
+      G.modMoved = G.modDest ? await sampleSpread(G.modDest) : { spread: 0, got: 0 };
       // The negative control: hold it, and the SAME sampling must read a flat
       // line. Prove a guard fires.
       modulator?.hold(true);
       await new Promise((r) => setTimeout(r, 250));
-      G.modStill = await sampleSpread('msize', 6);
+      G.modStill = G.modDest ? await sampleSpread(G.modDest, 6) : { spread: 0, got: 0 };
 
       /**
        * 🔴 AND A SOURCE THAT IS NOT THE STATION, BECAUSE THE CHECK ABOVE CANNOT
@@ -5199,15 +5364,15 @@
        * `verify.mjs` presses `.pos-controls button, .tbar-x` and this row is
        * neither, so a row shipped without this is a control nobody grades —
        * which is exactly how `mirror` lost two asserts while reading green. It
-       * clicks the real buttons rather than calling `setLoopWay`, because the
+       * clicks the real buttons rather than calling `looper.setWay`, because the
        * fault this kind of check exists to catch lives in the wiring between the
        * button and the handler and calling the handler steps straight over it.
        *
        * ⚠️ IT IS READ OFF THE VOICE THAT IS PLAYING, NOT OFF THE PAGE'S OWN IDEA
-       * OF WHAT IT DID. `loopSrc` is the node the sound actually comes out of,
+       * OF WHAT IT DID. `looper.voice()` is the node the sound comes out of,
        * so which buffer it holds, how long its lap is and what rate it runs at
        * are three facts about the audio graph rather than three variables this
-       * function set. A check on `loopWay` would pass over a row wired to
+       * function set. A check on the way NUMBER would pass over a row wired to
        * nothing at all.
        *
        * ⚠️ AND THE MIRROR IS CHECKED ON THE SAMPLES. "Reversed" is the one claim
@@ -5239,12 +5404,12 @@
         const TB = window.__demo?.transport;
         const wayBtn = TB?.loopExtra ? TB.loopExtra('way') : bar?.loopExtra('way');
         G.ways = []; G.turns = [];
-        if (TB && loopRing && wayBtn) {
+        if (TB && looper.attached() && wayBtn) {
           TB.pressLoop();                                  // open a window
           await new Promise((r) => setTimeout(r, 700));
           TB.pressLoop();                                  // and close it here
           await new Promise((r) => setTimeout(r, 200));
-          const whole = loopBuf ? loopBuf.duration : 0;
+          const whole = looper.buffer() ? looper.buffer().duration : 0;
           /**
            * 🔴 DRIVEN BY THE REAL BUTTON WHERE THERE IS ONE. The three
            * directions are reached the way a visitor reaches them — pressing
@@ -5254,22 +5419,36 @@
            * control at all, and pretending otherwise by driving them through a
            * fake press would be a check about nothing.
            */
+          /**
+           * ⚠️ IT CONFIRMS WHERE IT LANDED, BECAUSE THIS BUTTON HAS A SECOND
+           * PRESSER. `demo/verify.mjs` presses `.pos-controls button, .tbar-x`
+           * on every page and this is a `.tbar-x`, so exactly one harness click
+           * arrives on it at a moment nothing here controls. It used to land
+           * before any of this ran, and it now lands about thirty seconds in,
+           * because the sleep after control 0 moved when this page gained one:
+           * MEASURED, `pingpong 0.68 s` against 1.37 and a face reading `≠`,
+           * on a cycle that was working. Reaching again once is enough for a
+           * single stray press and costs nothing when there is none.
+           */
           const reach = async (i) => {
-            if (LOOP_TURN.includes(i)) {
-              for (let n = 0; n < LOOP_TURN.length && loopWay !== i; n++) wayBtn.click();
-            } else setLoopWay(i);
-            await new Promise((r) => setTimeout(r, 150));
+            for (let go = 0; go < 2; go++) {
+              if (LOOP_TURN.includes(i)) {
+                for (let n = 0; n < LOOP_TURN.length && looper.way() !== i; n++) wayBtn.click();
+              } else looper.setWay(i);
+              await new Promise((r) => setTimeout(r, 150));
+              if (looper.way() === i) return;
+            }
           };
           for (let i = 0; i < LOOP_WAYS.length; i++) {
             await reach(i);
             G.ways.push({
               name: LOOP_WAYS[i][0],
-              lap: loopSrc ? loopSrc.loopEnd - loopSrc.loopStart : null,
-              rate: loopSrc ? loopSrc.playbackRate.value : null,
-              back: !!(loopSrc && loopBack && loopSrc.buffer === loopBack),
+              lap: looper.voice() ? looper.voice().loopEnd - looper.voice().loopStart : null,
+              rate: looper.voice() ? looper.voice().playbackRate.value : null,
+              back: !!(looper.voice() && looper.mirror() && looper.voice().buffer === looper.mirror()),
               // the FACE, read off the page rather than off the table it was
               // written from: a glyph set by one path and not the other is the
-              // whole reason `setLoopWay` is the only place that writes it.
+              // whole reason the looper is the only place that writes it.
               face: wayBtn.textContent,
               want: WAY_GLYPH[LOOP_WAYS[i][1]],
               whole,
@@ -5292,13 +5471,14 @@
            */
           for (const i of LOOP_TURN) {
             await reach(i);
-            const lapS = Math.max(0.05, (voiceTo - voiceFrom) / Math.max(0.01, voiceRate));
+            const lapS = Math.max(0.05, looper.lapSeconds()
+              / Math.max(0.01, looper.voice()?.playbackRate.value ?? 1));
             const span = Math.min(2.2, lapS * 1.15);
             const step = 50, n = Math.max(6, Math.round((span * 1000) / step));
-            let up = 0, down = 0, seen = 0, prev = loopHeadFrac();
+            let up = 0, down = 0, seen = 0, prev = looper.headFrac();
             for (let k = 0; k < n; k++) {
               await new Promise((r) => setTimeout(r, step));
-              const f = loopHeadFrac();
+              const f = looper.headFrac();
               if (f == null || prev == null) { prev = f; continue; }
               const dz = f - prev; prev = f; seen++;
               if (Math.abs(dz) > 0.5) continue;            // the lap coming round
@@ -5307,8 +5487,8 @@
             G.turns.push({ name: LOOP_WAYS[i][0], up, down, seen, lap: lapS });
           }
           // The mirror, on the samples, at four points across the seconds.
-          if (loopBuf && loopBack) {
-            const a = loopBuf.getChannelData(0), b = loopBack.getChannelData(0);
+          if (looper.buffer() && looper.mirror()) {
+            const a = looper.buffer().getChannelData(0), b = looper.mirror().getChannelData(0);
             const n = a.length;
             let same = 0, tried = 0;
             for (const f of [0.03, 0.31, 0.62, 0.94]) {
@@ -5340,6 +5520,135 @@
         muted = false; setWet(0);          // the page as the visitor finds it
       }
 
+      /**
+       * 🔴 IT PLAYS ITSELF, A HAND TAKES IT BACK, AND THE BUTTON STOPS IT TOO.
+       * Three claims and three asserts, because each one alone passes on a page
+       * that is broken in one of the other two ways: a tour that never yields
+       * satisfies the first, a control wired to nothing satisfies the second,
+       * and a toggle that only latches on satisfies both.
+       *
+       * ⚠️ LAST IN THE BLOCK, AND THAT POSITION IS THE MEASUREMENT. Everything
+       * above this line drives a control: the ink probe runs the fader to both
+       * ends, the patch A/B presses `›` and `‹`, the loop row cycles four ways.
+       * A tour running through any of that is a second writer on the control
+       * being graded, and the reading would be about the collision rather than
+       * about either thing. This is the one moment in the run when the page has
+       * stopped working its own instrument.
+       *
+       * ⚠️ DRIVEN BY THE REAL BUTTON, never by calling `driftStart`. The fault
+       * this kind of check exists to catch lives in the wiring between a button
+       * and its handler, and calling the handler steps straight over it.
+       */
+      {
+        muted = true; setWet(0);
+        const btn = driftBtn();
+        const wasPatch = patch;
+        drift.held = false;                    // see `held`: the page's turn now
+        const before = { rate: P.rate, size: P.size, scan: P.scan, spray: P.spray };
+        btn?.click();
+        G.driftOn = drift.on;
+        G.driftFace = btn ? btn.getAttribute('aria-pressed') : 'no button';
+
+        /**
+         * 🔴 THE CLOCK IS PLACED, AND THIS IS THE ONE THING THE CHECK DOES THAT
+         * A VISITOR DOES NOT. A slot is thirty-one seconds and a run cannot
+         * wait for one: at the top of a dwell the blend's cosine is flat and
+         * nothing has started sliding yet, so a second and a half of sampling
+         * there would read `0.001 of span` about a tour that is working
+         * perfectly. Seeded to just before the crossover, the same window
+         * contains the steep part of the blend, the slide between two sounds,
+         * and the step from one to the other.
+         * ⚠️ IT SETS THE CLOCK, NOT THE STATE. Everything downstream is still a
+         * pure function of `performance.now()`, which is the property that
+         * makes this safe to do at all.
+         */
+        const DWELL_FRAC = DWELL_MS / SLOT_MS;
+        const atK = (k) => { drift.from = performance.now()
+          - (wasPatch + DWELL_FRAC + k * (1 - DWELL_FRAC)) * SLOT_MS; };
+        atK(0.40);
+        let lo = Infinity, hi = -Infinity, n = 0;
+        for (let i = 0; i < 26; i++) {
+          await new Promise((r) => setTimeout(r, 50));
+          lo = Math.min(lo, wet); hi = Math.max(hi, wet); n++;
+        }
+        G.driftWet = { lo, hi, n, span: hi - lo, moves: drift.moves };
+        G.driftLanded = patch !== wasPatch;
+        G.driftSliders = ['rate', 'size', 'spray', 'scan']
+          .filter((k) => Math.abs(P[k] - before[k]) > Math.abs(before[k]) * 1e-6).length;
+
+        /**
+         * 🔴 AND THE ENGINE IS HOLDING A VALUE BETWEEN THE TWO SOUNDS, ASKED OF
+         * THE ENGINE. Everything above is this page's own idea of what it sent.
+         * A morph that computed beautifully and wrote nothing would pass all of
+         * it, which is the failure `/s_get` exists to close: a value strictly
+         * between two patches' numbers, on the far side of the wire, is the one
+         * reading a stepped patch change cannot produce.
+         *
+         * ⚠️ THE DESTINATION IS CHOSEN RATHER THAN TYPED. It has to be a control
+         * the modulator is NOT walking (the tour does not write those, by
+         * design) whose two ends are far enough apart that halfway is not
+         * halfway to the same place. A hard-coded `msize` was exactly the trap
+         * the follower check next door fell into when the opening sound changed.
+         */
+        // ⚠️ FROZEN WHILE IT IS READ. `/s_get` is a round trip and the tour is
+        // still travelling during it, so an unfrozen read grades whatever the
+        // morph reached by the time the answer came back rather than the value
+        // that was asked about. Holding the tick leaves the engine on the last
+        // value it was written, which is the one quantity in question.
+        atK(0.5);
+        await new Promise((r) => setTimeout(r, 200));
+        drift.held = true;
+        const A = PATCHES[wasPatch], B = PATCHES[(wasPatch + 1) % PATCHES.length];
+        const pick = ['size', 'rate', 'spray'].find((k) => !routedNow.has(k)
+          && Math.min(A[k], B[k]) > 0
+          && Math.max(A[k], B[k]) / Math.min(A[k], B[k]) >= 1.3);
+        G.driftMid = pick
+          ? { name: pick, got: await ask1(`m${pick}`), a: A[pick], b: B[pick] }
+          : null;
+        drift.held = false;
+
+        // 🔴 AND NOW THE HAND. A synthetic `pointerdown` on the sound picker's
+        // `›`, which is a control the tour moves and whose own handler is an
+        // `onclick`, so this exercises the hand-back and cannot press the
+        // button as a side effect.
+        // ⚠️ NOT ON A SLIDER LANE. `slider.mjs` reads `clientX` in its own
+        // `pointerdown` and calls `setPointerCapture`, so a synthetic event with
+        // no real pointer behind it would either write NaN into the engine or
+        // throw inside a listener, which lands in the console check two asserts
+        // along as a failure with nothing to do with this one.
+        const reach = patchPick?.buttons?.[1];
+        G.driftYieldFrom = drift.on;
+        reach?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        G.driftYielded = !drift.on;
+        G.driftYields = drift.yields;
+        G.driftSaid = (d.api?.logs || []).slice(-3)
+          .some((l) => /yours now/.test(l.msg));
+
+        // 🔴 AND THE BUTTON STOPS IT TOO, WHICH THE HAND-BACK CANNOT SHOW. A
+        // toggle whose second press is never driven is half a control, and this
+        // is the half a visitor reaches for when they want the movement to end
+        // without taking the instrument over. Two synchronous presses: no tick
+        // can fire between them, so nothing moves and the face is the only
+        // thing being read.
+        btn?.click();
+        const onAgain = drift.on && driftBtn()?.getAttribute('aria-pressed') === 'true';
+        btn?.click();
+        const offAgain = !drift.on && driftBtn()?.getAttribute('aria-pressed') === 'false';
+        G.driftToggle = { onAgain, offAgain };
+
+        // 🔴 AND THE PAGE IS PUT BACK WHERE THE VISITOR LEFT IT. Same rule as
+        // the station A/B and the patch A/B: the sound it opened on, the fader
+        // at 0, the button unpressed, nothing playing itself.
+        driftStop('the check is finished');
+        applyPatch(wasPatch, { silent: true });
+        muted = false; setWet(0);
+        faderSld?.set(0, { quiet: true });
+        // ⚠️ AND HELD AGAIN. `verify.mjs` presses every control once and the
+        // press is not synchronised with anything this page does, so a press
+        // that lands AFTER this block would start a tour over the loop check
+        // below. The page has had its turn.
+        drift.held = true;
+      }
     }
 
     await finish();
@@ -5368,7 +5677,7 @@
        * vacuous pass one level along.
        */
       const T = window.__demo?.transport;
-      if (T && ctx && loopRing) {
+      if (T && ctx && looper.attached()) {
         T.pressLoop();                                    // starts filling
         const filling = !!T.loopFilling;
         // ⚠️ CLOSED EARLY RATHER THAN WAITED OUT, and that is about the harness
@@ -5382,12 +5691,12 @@
         await new Promise((r) => setTimeout(r, 600));
         T.pressLoop();                                    // end it here
         await new Promise((r) => setTimeout(r, 120));
-        const caught = loopRing.filled;
+        const caught = looper.caught();
         sinkPeak = 0;
         await new Promise((r) => setTimeout(r, 260));
         const heardLooping = sinkPeak;
         const dryWhileLooping = liveIn ? liveIn.gain.value : 1;
-        const running = !!loopSrc;
+        const running = looper.playing();
         /**
          * 🔴 AND THE GRAIN CLOCK IS TUNED TO IT, ASKED OF THE ENGINE. This is
          * the tempo claim and it is checked the only way it can be: the loop's
