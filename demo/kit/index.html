@@ -54,10 +54,39 @@
   .kit-cut { font: 400 11px/1.6 var(--mono); color: var(--dim); margin-top: 8px;
              white-space: pre-wrap; }
   .kit-cut b { color: var(--warn); font-weight: 500; }
+  /* The stand-in for everything between a split readout and a split log, which
+     on a real page is the whole demo. 🔴 IT IS A REAL `.pos-body` AND THIS
+     RULE DECLARES NO MARGIN. The gap under a split readout and the gap over a
+     split log are both the shell's, and one of them is `.pos-body`'s own
+     `margin-bottom` rather than anything the log asks for — so a stand-in with
+     a margin typed here would be this page inventing the number it then grades
+     itself against. */
+  .kit-mid { border: 1px dashed var(--line2); border-radius: 4px; color: var(--dim2);
+             font: 400 11px/1 var(--mono); text-align: center; padding: 26px 0; }
+  /* ⚠️ AND NO RULE HERE RESETTING WHAT FOLLOWS A CAPTION. The split specimen
+     below is measured, and its gaps are the shell's own 22 px: a `margin-top:
+     0` typed here would make this page move the thing it is grading, which is
+     the same mistake as a check that mutates. */
+  .kit-cap { font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+             color: var(--dim2); margin: 0; }
+  /* A caption belongs to the specimen UNDER it, so the air goes above the
+     caption rather than below it. Nothing measured passes through this gap:
+     the two numbers graded in the split block are readout-to-page and
+     page-to-log, and no caption stands in either.
+     🔴 AND THE 44 px THE SHELL PUTS ABOVE A JOINED SURFACE IS MOVED HERE, NOT
+     SHRUNK. That gap is the distance from the PAGE to the surface at the foot
+     of it, and there is no page inside a sandbox box: what sits directly above
+     each specimen is its own caption, so leaving the margin on the box put
+     44 px between a label and the thing it labels. Photographed: the word
+     JOINED floating in the middle of the gap, reading as a heading for
+     nothing. The caption takes the air and its specimen sits under it, so the
+     pair is still one group with the shell's own 44 px above it. */
+  .kit-box > * + .kit-cap { margin-top: 44px; }
+  .kit-cap + .pos-report { margin-top: 0; }
 </style>
 
 <script type="module">
-  import { mount, el } from '/shell/shell.mjs';
+  import { mount, el, createReport } from '/shell/shell.mjs';
   import { createStepper } from '/shell/stepper.mjs';
   import { createSlider, createSliderGroup, GLIDE_MS } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
@@ -87,9 +116,11 @@
    * those components live in is a sandbox that can drift from the thing it
    * exists to police. The head, the back link and the log are the real ones.
    *
-   * `readout: null` because the subject here is the controls themselves; there
-   * is a readout further down the page, and it is a SPECIMEN rather than this
-   * page's own instrument.
+   * `readout: null` because the subject here is the controls themselves. Every
+   * readout on this page is a SPECIMEN rather than this page's own instrument,
+   * including the two in the block at the top: that block is about where the
+   * numbers and the log SIT, and a sandbox that joined its own pair could only
+   * ever show one of the two arrangements.
    */
   const d = mount({
     name: 'kit',
@@ -136,6 +167,19 @@
   const presSpec = new Map();
   let presLive = null;        // one badge that can change, measured over time
 
+  // The three arrangements of the readout and the log, for the geometry checks
+  // at the bottom. ⚠️ SAME REASON AS THE LINE ABOVE: the block that fills these
+  // is the newest one and so it is the topmost one, and a `const` left where
+  // the block used to be is read in its dead zone.
+  let joinedSpec = null;      // a readout on top of a log, one surface
+  let logOnlySpec = null;     // joined, with no readout declared
+  let neitherSpec = null;     // joined, with neither — there is nothing to draw
+  let splitSpec = null;       // the default: two surfaces, the page between them
+  // the two `.pos-body` stand-ins, held rather than queried: the gaps this
+  // block grades are measured FROM them, and `querySelector` would find
+  // whichever came first and grade the wrong arrangement
+  let joinedPage = null, splitPage = null;
+
   /**
    * 🔴 THE NEWEST COMPONENT GOES AT THE TOP OF THIS PAGE. Instructed
    * 2026-09-16: *"in kit move online stuff to topmost item (all new should land
@@ -153,6 +197,64 @@
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
+  section('READOUT AND LOG, JOINED OR SPLIT',
+    'The numbers a page is showing now and the record of what it did are one component '
+    + 'with two arrangements. Split is the default and is what every page here already '
+    + 'does: the readout above the controls, the log under the page. Joined makes them a '
+    + 'single surface at the foot, the readout sitting on top of the log, with one border '
+    + 'round both and the same one pixel of line colour between them that already runs '
+    + 'between two readout cells. A joined surface missing one half draws one border and '
+    + 'no seam, and one missing both is never put on the page at all.',
+    `mount({ readout: { sent: '/s', lost: '' }, joined: true })   // one surface, at the foot
+mount({ readout: { sent: '/s', lost: '' } })                 // two surfaces, the default
+createReport({ readout, showLog: false, joined: true })      // the same pair, standalone`,
+    (box) => {
+      box.classList.add('kit-wide');
+
+      // ── joined ──────────────────────────────────────────────────────────
+      joinedSpec = createReport({ readout: { sent: '/s', lost: '' }, joined: true });
+      joinedSpec.set('sent', 48);
+      joinedSpec.set('lost', 0, 'ok');
+      // A fixed time on every line, so this block draws the same picture on
+      // every visit. `performance.now()` here would put the age of the page
+      // into a specimen, which is a number that says nothing about the
+      // component and changes every time anybody looks at it.
+      joinedSpec.line('the board answered', 'hi', 1240);
+      joinedSpec.line('holding a note', null, 2480);
+      // ⚠️ THE PAGE IS PART OF THE SPECIMEN, because "at the foot" is half of
+      // what joined MEANS and because the gap under it is the thing the shell
+      // declares: 44 px, the diagram's number, rather than the 22 px between
+      // two ordinary rows. Without a `.pos-body` here there is nothing for that
+      // distance to be measured from.
+      joinedPage = el('div', 'pos-body kit-mid', 'the page goes here');
+      box.append(el('p', 'kit-cap', 'joined'), joinedPage, joinedSpec.foot);
+
+      // ── joined, with only one of the two ────────────────────────────────
+      // `readout: null` on a real page, which is the `/typist/` case: the
+      // document IS the readout and cells repeating it would be the same facts
+      // twice. The surface is still one box, and there is no seam in it.
+      logOnlySpec = createReport({ joined: true });
+      logOnlySpec.line('nothing to count on this page', null, 1240);
+      box.append(el('p', 'kit-cap', 'joined, with no readout declared'), logOnlySpec.foot);
+
+      // ⚠️ AND WITH NEITHER THERE IS NOTHING TO APPEND, which is the point:
+      // `foot` comes back null rather than an empty box drawing its own two
+      // borders as a 2 px band. Nothing goes in the page for this one.
+      neitherSpec = createReport({ showLog: false, joined: true });
+
+      // ── split ───────────────────────────────────────────────────────────
+      splitSpec = createReport({ readout: { sent: '/s', lost: '' } });
+      splitSpec.set('sent', 48);
+      splitSpec.set('lost', 0, 'ok');
+      splitSpec.line('the board answered', 'hi', 1240);
+      splitSpec.line('holding a note', null, 2480);
+      // a real `.pos-body` again, because the gap under a split log belongs to
+      // the body rather than to the log; a plain div here would measure nothing
+      splitPage = el('div', 'pos-body kit-mid', 'the page goes here');
+      box.append(el('p', 'kit-cap', 'split, which is the default'),
+        splitSpec.top, splitPage, splitSpec.foot);
+    });
+
   section('ONLINE, OFFLINE, COMING ONLINE',
     'Four states, not three: a thing nobody has asked yet is not offline, which is '
     + 'the same rule caps.mjs follows when it answers "unknown" about a browser it '
@@ -1296,6 +1398,91 @@ green = inside what it promised · amber/red = later`,
     over <= 0,
     over <= 0 ? `${document.documentElement.clientWidth} px wide, nothing overflowing`
               : `${over} px of horizontal overflow`);
+
+  // 12 — 🔴 JOINED IS ONE SURFACE, AND IT TAKES TWO MEASUREMENTS TO SAY SO.
+  // A border is the easiest thing in this arrangement to draw twice: the
+  // readout and the log both carry `border: 1px solid var(--line)` of their
+  // own on every other page, and the joined box has to take those off or the
+  // log sits inside a double rule with a stray line under the readout.
+  // ⚠️ THE SEAM CANNOT SEE THAT, WHICH IS WHY THE WIDTHS ARE READ TOO.
+  // MEASURED by putting the defect back on purpose: with the inner borders
+  // restored the seam still read **1.0 px** and only the widths moved, 0 and 0
+  // to 1 and 1 — because a border is drawn INSIDE the box's own rectangle, so
+  // two halves 1 px apart stay 1 px apart however thick their edges are. The
+  // seam proves the gap is the mosaic's, the widths prove there is one edge.
+  const px = (e, side) => Number.parseFloat(getComputedStyle(e)[`border${side}Width`]);
+  // ⚠️ AND THE SECOND HALF OF WHAT JOINED MEANS IS WHERE IT SITS: at the FOOT,
+  // 44 px under the page rather than the 22 px between two ordinary rows. That
+  // number is the diagram's, for the diagram's reason — a surface the page
+  // hands over to is a new part of the page, not another row in it — and it is
+  // declared once, on `.pos-report` in shell.css. It is measured here from a
+  // real `.pos-body`, and the split block below measures the 22 it is NOT.
+  {
+    const rep = joinedSpec?.foot;
+    const ro = joinedSpec?.readoutEl.getBoundingClientRect();
+    const lo = joinedSpec?.logEl.getBoundingClientRect();
+    const seam = ro && lo ? lo.top - ro.bottom : -1;
+    const foot = rep && joinedPage
+      ? rep.getBoundingClientRect().top - joinedPage.getBoundingClientRect().bottom : -1;
+    const outer = rep ? px(rep, 'Top') : -1;
+    const inner = joinedSpec ? [px(joinedSpec.readoutEl, 'Bottom'), px(joinedSpec.logEl, 'Top')] : [-1, -1];
+    d.assert('joined is one box at the foot of the page, with the two halves one pixel apart',
+      !!rep && rep.classList.contains('pos-report')
+      && rep.contains(joinedSpec.readoutEl) && rep.contains(joinedSpec.logEl)
+      && Math.abs(seam - 1) <= 0.5 && Math.abs(foot - 44) <= 0.5
+      && outer === 1 && inner[0] === 0 && inner[1] === 0,
+      `${foot.toFixed(1)} px under the page · seam ${seam.toFixed(1)} px · `
+      + `one edge of ${outer} px round both, ${inner.join(' and ')} inside`);
+  }
+
+  // 13 — and the default is still two surfaces with the page between them, at
+  // the shell's own 22 px. Both halves of the claim matter: 22 px is the
+  // rhythm every other element on every page gets, and it is what would read
+  // wrong inside a joined box.
+  // ⚠️ THE TWO GAPS COME FROM DIFFERENT RULES AND ONLY ONE OF THEM IS THE
+  // READOUT'S. Above the page it is `.pos-readout`'s own bottom margin; below
+  // the page it is `.pos-body`'s, which is why the stand-in in that block IS a
+  // `.pos-body`. The log asks for nothing — a `.pos-log { margin-top: 22px }`
+  // stood in shell.css and was inert, beaten by a `margin` shorthand later in
+  // the same file, and this measurement is what found it.
+  {
+    const mid = splitPage?.getBoundingClientRect();
+    const ro = splitSpec?.readoutEl.getBoundingClientRect();
+    const lo = splitSpec?.logEl.getBoundingClientRect();
+    const above = mid && ro ? mid.top - ro.bottom : -1;
+    const below = mid && lo ? lo.top - mid.bottom : -1;
+    const own = splitSpec ? px(splitSpec.readoutEl, 'Top') === 1 && px(splitSpec.logEl, 'Top') === 1 : false;
+    d.assert('split leaves two surfaces, each with its own edge and the page rhythm between them',
+      own && splitSpec.report === null
+      && !splitSpec.readoutEl.closest('.pos-report') && !splitSpec.logEl.closest('.pos-report')
+      && Math.abs(above - 22) <= 0.5 && Math.abs(below - 22) <= 0.5,
+      `${above.toFixed(1)} px above the page and ${below.toFixed(1)} px below it, ${own ? 'two edges' : 'NOT two edges'}`);
+  }
+
+  // 14 — 🔴 HALF A SURFACE IS NOT HALF A BOX. A page that declares no readout
+  // and joins anyway must get one bordered box holding a log, with no seam and
+  // no empty strip where the cells would have been. A `display: none` child
+  // takes no `gap` in a flex column, so the log starts exactly one border
+  // inside the box; anything else means the hidden row is still taking room.
+  {
+    const rep = logOnlySpec?.foot;
+    const drop = rep ? logOnlySpec.logEl.getBoundingClientRect().top - rep.getBoundingClientRect().top : -1;
+    const gone = logOnlySpec ? getComputedStyle(logOnlySpec.readoutEl).display === 'none' : false;
+    d.assert('a joined surface with no readout is one box with no seam in it',
+      !!rep && gone && Math.abs(drop - 1) <= 0.5,
+      `the log starts ${drop.toFixed(1)} px inside the box, which is its edge and nothing else`);
+  }
+
+  // 15 — 🔴 AND WITH NEITHER HALF, NO BOX. This is the `/typist/` defect in the
+  // joined arrangement: an empty container painting its own two borders as a
+  // full-width band nobody wrote. `createReport` returns no surface at all, so
+  // there is nothing for a page to append and nothing to paint.
+  d.assert('and with neither half to draw, nothing is put on the page at all',
+    !!neitherSpec && neitherSpec.foot === null && neitherSpec.report === null
+    && !document.body.contains(neitherSpec.readoutEl) && !document.body.contains(neitherSpec.logEl),
+    neitherSpec && neitherSpec.foot === null
+      ? 'no surface was returned, so there is no box to paint'
+      : 'an empty surface was returned and would draw its own two edges');
 
   d.ready();
 

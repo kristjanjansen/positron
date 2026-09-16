@@ -278,9 +278,20 @@ button.pos-pri[data-busy="1"] {
 .pos-body > * + * { margin-top: 22px; }
 .pos-body:empty { display: none; }
 /* ⚠️ And the things the SHELL stacks, for the same reason: the readout, the
-   control bar and the log are siblings of the body, not children of it. */
+   control bar and the log are siblings of the body, not children of it.
+   🔴 THE LOG'S HALF OF THIS RULE WAS `.pos-log { margin-top: 22px }` AND IT
+   WAS INERT FOR AS LONG AS IT EXISTED. The `.pos-log` block further down this
+   file sets `margin: 0` inside its shorthand, same specificity and later in
+   source order, so the shorthand won and the log's top margin has always
+   computed to ZERO. Nothing ever moved, because `.pos-body` above carries
+   `margin-bottom: 22px` and gives the log its gap anyway — which is the worst
+   shape a dead rule can have: the page looks right, so the rule reads as the
+   thing making it right. MEASURED in `/kit/`, where a specimen log with no
+   `.pos-body` in front of it came back **0.0 px** from its neighbour.
+   ⚠️ SO WHATEVER FOLLOWS THE PAGE TAKES ITS GAP FROM `.pos-body`, and the
+   joined surface at `.pos-report` does the same rather than typing its own 22.
+   A shared measurement in two places is a measurement that will disagree. */
 .pos-readout { margin-bottom: 22px; }
-.pos-log { margin-top: 22px; }
 
 /* a refused play() must be visible, not a black rectangle */
 /* Outlined, not filled: this is a fallback, and a second solid yellow button
@@ -346,6 +357,66 @@ button.pos-pri[data-busy="1"] {
 .pos-line.bad .pos-m, .pos-log i { color: var(--bad); font-style: normal; }
 .pos-line.warn .pos-m { color: var(--warn); }
 .pos-line.ok .pos-m { color: var(--ok); }
+
+/* ── readout and log, joined ──────────────────────────────────────────── */
+/* 🔴 ONE SURFACE, THE READOUT SITTING ON TOP OF THE LOG, AT THE FOOT OF THE
+   PAGE. Asked for 2026-09-16: *"combine readout with log component, put it top
+   of it. they can be used split or also be the same thing in bottom of page"*.
+   `mount({ joined: true })` picks it and `createReport()` builds it; the split
+   pair is still the default, so a page that does not ask keeps its layout to
+   the element.
+
+   🔴 WHAT SEPARATES THE TWO HALVES IS 1 px OF `--line`, AND THAT IS NOT A
+   DIVIDER. The standing rule is that separation is spacing, and that a line is
+   a second channel saying what the spacing already said — and it is a rule
+   about the gap BETWEEN surfaces, which is the 22 px rhythm at
+   `.pos-body > * + *`. Inside ONE surface there is no rhythm to repeat: the
+   readout is already a mosaic of cells on a line-coloured ground, with exactly
+   1 px of `--line` showing through between every pair of them. The log joins
+   that mosaic as one more tile, so the seam above it is the SAME seam the
+   cells already have, drawn by the same `gap` on the same background. Air here
+   would be the thing that reads wrong: two boxes with 22 px between them are
+   two surfaces, and two surfaces is the split arrangement.
+
+   ⚠️ THE BORDER MOVES OUT, IT IS NOT DRAWN TWICE. The children give up their
+   own border and radius to this box, so a joined surface has ONE edge. Nested
+   1 px borders would put a double rule round the log and a stray one under the
+   readout, which is the "old UI creeping in" band from `/typist/` in a new
+   place.
+
+   ⚠️ AND A HALF-EMPTY ONE DRAWS NO SEAM. A `display: none` child takes no
+   `gap` in a flex column, so a report holding only a log, or only a readout,
+   is one bordered box with nothing hanging off it. A report holding NEITHER is
+   never appended: `createReport()` returns no `foot` at all, because a
+   container with nothing in it must not paint its edges. */
+.pos-report {
+  display: flex; flex-direction: column;
+  gap: 1px; background: var(--line); border: 1px solid var(--line);
+  border-radius: 4px; overflow: hidden;
+  /* 🔴 44 px ABOVE IT, NOT THE PAGE'S 22, AND THE NUMBER IS DECLARED HERE AND
+     NOWHERE ELSE. Asked for on sight, 2026-09-16: *"add more space on top of
+     readoutslog"*.
+     It is the diagram's number and it is the diagram's reason. `.pos-body >
+     .pos-dg` already sits 44 px below what precedes it, because a picture of
+     the machinery is a new PART of the page rather than another row in it, and
+     a joined report has exactly that character: split, the readout and the log
+     are two rows of the page's own flow; joined, they are one surface at the
+     foot that the page hands over to. 22 px is the rhythm BETWEEN rows, so
+     using it here would say this block is another row.
+     ⚠️ AND IT IS 44 IN TOTAL, NOT 66. `.pos-body` carries `margin-bottom:
+     22px` and two adjacent siblings collapse to the larger of the two, so the
+     page's own gap is absorbed rather than added to.
+     ⚠️ THE SPLIT ARRANGEMENT IS UNTOUCHED: a split log takes 22 px from
+     `.pos-body` exactly as it always has, and nothing in this rule can reach
+     it. `/kit/` measures both and reports the two numbers. */
+  margin: 44px 0 0;
+}
+/* `display: flex` beats the UA's `[hidden]` rule. The readout and the control
+   row are both already patched for the same trap, and both cost a band of dead
+   space nobody wrote before they were. */
+.pos-report[hidden] { display: none; }
+.pos-report > .pos-readout,
+.pos-report > .pos-log { border: 0; border-radius: 0; margin: 0; }
 
 /* ── transport bar ────────────────────────────────────────────────────── */
 /* WRAP. Measured at 390 px (iPhone) this row overflowed its own card by 94 px
@@ -2059,3 +2130,144 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-dg-link, .pos-dg-llab { transition: stroke 140ms ease, fill 140ms ease; }
 .pos-dg-l[data-on] .pos-dg-link { stroke: var(--fg); }
 .pos-dg-l[data-on] .pos-dg-llab { fill: var(--fg); }
+
+/* ── presence: online, offline, coming online — shell/presence.mjs ──────────
+   🔴 GREEN AND TWO GREYS, AND THE COLOUR SAYS HOW IT LANDED. This project's
+   standing rule is that a mark's colour says how something landed rather than
+   which lane it is in, and a presence badge is that rule applied to a
+   heartbeat: green means it spoke inside the time it promised to speak in, and
+   grey means it did not. It is not identity, and the subject's name is carried
+   by the label beside it, exactly the way a lane's identity is carried by its
+   row.
+
+   🔴 AND `coming` IS NEVER FULL-STRENGTH GREEN, WHICH IS THE WHOLE OF THE
+   RECONCILIATION. Colouring an unchecked thing as if it passed is an assertion
+   nobody made, so the fill on a thing that is still coming up breathes between
+   0.18 and 0.62 and never reaches 1. A solid still green dot is the only thing
+   on the page that means "it answered". Pale and moving means "on its way".
+
+   🔴 AND THE TWO GREYS ARE TOLD APART BY INK, NOT BY HUE. `offline` is a SOLID
+   grey dot: somebody listened and heard nothing, which is a measurement.
+   `unknown` is a HOLLOW ring: nobody has looked yet, which is not. Hollow is
+   less ink for less knowledge, and it is readable with no colour at all.
+
+   🔴 NOTHING IN HERE CAN CHANGE THE ELEMENT'S SIZE. The only animated property
+   is `opacity` on the fill, which has no effect on layout; the footprint is the
+   ring, which never animates; and the word sits in a box whose `min-width` is
+   reserved from the longest word that badge can say. `--pres-ch` is written by
+   `createPresence` at build time and is a COUNT OF CHARACTERS, which is why
+   nothing here sets letter-spacing: `ch` is the advance of `0`, and tracking
+   would add one space per character on top of a reserve that did not budget
+   for it. */
+.pos-pres {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 500 11px/1 var(--mono);
+  vertical-align: -1px;               /* sits on the baseline of a word beside it */
+  white-space: nowrap;
+  cursor: default;
+}
+/* The footprint. 8 px, `flex: none`, and it is the same box in all four states
+   and at every moment of the animation. */
+.pos-pres-dot {
+  position: relative; flex: none;
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1px solid currentColor;
+  background: none;
+}
+/* The fill, drawn over the ring rather than inside it, so a full state is one
+   solid disc with no seam. `inset: -1px` is the border box from the padding
+   box, which is what an absolutely positioned child is measured against. */
+.pos-pres-dot::after {
+  content: ''; position: absolute; inset: -1px;
+  border-radius: 50%; background: currentColor;
+  opacity: 1;
+}
+/* The subject's name, which never changes. Tracked-out small caps so that a
+   name and a state cannot be read as one phrase: `the board no word yet` is a
+   sentence nobody wrote, and it happens whenever both halves are the same grey.
+   ⚠️ THE TRACKING IS SAFE HERE AND WOULD NOT BE ON THE WORD, whose box is
+   reserved in `ch` and would overflow by one space per character. */
+/* The subject's name is no longer its own element: it is part of the one
+   string the word carries, so it fades with the state rather than sitting
+   still while half the label changes under it. */
+
+/* The reserve. `min-width` rather than `width`, so a page that hands it a word
+   longer than it declared grows rather than clipping — a truncated state word
+   would be the one failure this box exists to prevent, in a new costume. */
+.pos-pres-w {
+  display: inline-block; text-align: left;
+  min-width: calc(var(--pres-ch, 0) * 1ch);
+  /* UPPERCASE, LIKE EVERY OTHER LABEL ON THIS SITE. Instructed 2026-09-16,
+     *"always uppercase"*. It costs no width here: this is a monospace face,
+     so a capital has the same advance as a lowercase letter and the `ch`
+     reserve above is unchanged. No letter-spacing, for the same reason the
+     reserve exists. */
+  text-transform: uppercase;
+  /* The fade the word changes through. 90 ms each way, opacity only: a state
+     change is an event and may move, and this box has no room to slide in. */
+  transition: opacity 90ms linear;
+}
+
+.pos-pres[data-state="online"]  { color: var(--ok); }
+.pos-pres[data-state="online"]  .pos-pres-w { color: var(--ok); }
+
+.pos-pres[data-state="coming"]  { color: var(--ok); }
+/* 🔴 THE RING AND THE FILL ARE THE SAME GREEN. Instructed 2026-09-16: *"coming
+   online: keep border and fill the same"*. The ring was held at 55% so a coming
+   dot could not be mistaken for an online one in the brightest frame of its
+   breath, and that argument was answered by the breath itself: the fill never
+   reaches full and never stops moving, so the state is carried by MOTION, which
+   a still dot cannot imitate. Two greens in one 8 px dot is a seam a reader
+   sees before they read anything. */
+.pos-pres[data-state="coming"] .pos-pres-dot { border-color: transparent; }
+.pos-pres[data-state="coming"] .pos-pres-dot::after { animation: pos-pres-breathe 1400ms ease-in-out infinite; }
+/* grey, not green: the word is the half a reader takes at face value, so the
+   only full-strength statement belongs to a thing that actually answered */
+.pos-pres[data-state="coming"]  .pos-pres-w { color: var(--dim); }
+
+/* 🔴 CHECKING: GREY, AND MOVING. The colour says what is known and the motion
+   says something is happening, so grey-and-moving is us asking and
+   green-and-moving is the instrument starting. The ring is the same grey as the
+   fill, for the reason the coming dot's ring is the same green as its. */
+.pos-pres[data-state="checking"] { color: var(--dim2); }
+/* 🔴 NO RING ON A MOVING DOT. Asked 2026-09-16: *"coming online / checking: no
+   border"*. A ring is a fixed edge and the fill inside it is breathing, so the
+   two read as a dot rattling inside a hoop rather than as one thing pulsing.
+   The settled states keep their ring, which is what carries `unknown` as a
+   hollow one. */
+.pos-pres[data-state="checking"] .pos-pres-dot { border-color: transparent; }
+.pos-pres[data-state="checking"] .pos-pres-dot::after {
+  background: var(--dim2);
+  animation: pos-pres-breathe 1400ms ease-in-out infinite;
+}
+.pos-pres[data-state="checking"] .pos-pres-w { color: var(--dim); }
+
+.pos-pres[data-state="offline"] { color: var(--dim2); }
+.pos-pres[data-state="offline"] .pos-pres-w { color: var(--dim); }
+
+.pos-pres[data-state="unknown"] { color: var(--dim2); }
+.pos-pres[data-state="unknown"] .pos-pres-dot::after { opacity: 0; }
+.pos-pres[data-state="unknown"] .pos-pres-w { color: var(--dim2); }
+
+@keyframes pos-pres-breathe {
+  0%, 100% { opacity: .18; }
+  50%      { opacity: .62; }
+}
+/* A thing on its way up still has to be distinguishable from a thing that is
+   there, with no motion at all. Half way up the breath, held. */
+@media (prefers-reduced-motion: reduce) {
+  .pos-pres[data-state="coming"] .pos-pres-dot::after { animation: none; opacity: .45; }
+}
+
+/* Inside something else: the dot alone. The words are CLIPPED rather than
+   removed, so the accessible name is still the whole sentence and the live
+   region still announces a change. `display: none` would take both away, which
+   is how a dot ends up meaning something only to people who can see it. */
+.pos-pres[data-mode="dot"] .pos-pres-w,
+.pos-pres[data-mode="dot"] .pos-pres-of {
+  position: absolute; width: 1px; height: 1px;
+  min-width: 0; margin: 0; padding: 0; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.pos-pres[data-mode="dot"] { gap: 0; }

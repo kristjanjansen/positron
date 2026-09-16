@@ -15,6 +15,29 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **THE PLAYOUT TRIMS BECAUSE TWO CLOCKS DISAGREE, AND NO CUSHION SIZE CURES
+  IT.** Found 2026-09-16 while chasing *"some vobbly sound, cutoffs, not nice"*.
+  The arrival jitter is measured and is now covered: 992 frames in 20 s, nothing
+  lost, p50 20.0 ms, worst gap 83.6 ms, against a 160 ms floor, and `ran dry`
+  went to zero. What is left is the board's clock against the browser's: the
+  buffer grows until the worklet cuts it back, and a trim discards tens of
+  milliseconds mid-note, which is a click. MEASURED on one run: 0 dry, 8 trimmed.
+  A bigger floor only moves where it happens. The repair is rate MATCHING rather
+  than padding, which means resampling slightly or asking the worklet to trim a
+  frame at a time instead of back to the floor. `/knobs/` asserts the half that
+  is fixed and reports the half that is not.
+
+- **`/crate/`'s READOUT RELOCATION HAS NEVER WORKED.** `demo/crate/index.html`
+  queries `.pos-readout` inside `d.el`, and `d.el` is `.pos-body` while the
+  readout is a SIBLING of it, so the query has always returned null: the class
+  lands on nothing, the row is never moved into the upload block, and the
+  `hidden` meant to keep four empty cells off the page until an upload runs is
+  never set. `mount()` now returns `readoutEl`, which is the one line repair.
+
+- **`CLAUDE.md` SAYS AN UNMEASURED CELL DRAWS AN EM DASH.** `shell.mjs` has
+  written EMPTY since 2026-09-13. Two comments in `/kit/` repeat the stale
+  version.
+
 - **SLIDER AUTOMATION, PLANNED AND NOT BUILT. ASKED 2026-09-16:** *"plan a work
   on slider automation each slider can possibly have a mode button like loop
   does (also looking similar in right) that allow pick 'invsible hand' moving

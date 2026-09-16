@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = 'dba273a-170423-a93b';
+export const BUILD = 'e155b07-181548-6204';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -42,6 +42,14 @@ export function mount({
   // full-width band nobody wrote. A container with nothing in it must not
   // paint its edges.
   showLog = true,
+  // 🔴 `true` PUTS THE READOUT ON TOP OF THE LOG AS ONE SURFACE, AT THE FOOT.
+  // Asked for 2026-09-16: *"combine readout with log component, put it top of
+  // it. they can be used split or also be the same thing in bottom of page"*.
+  // The split pair — a readout above the controls, a log under the page — is
+  // still the default, so a page that does not ask keeps the layout it had.
+  // `createReport()` below owns both arrangements and the empty cases; this
+  // flag only chooses between them.
+  joined = false,
   controls = [],         // [{id, label, primary?}]
   index = '/',
 } = {}) {
@@ -99,7 +107,9 @@ export function mount({
   if (what) head.append(el('p', 'pos-what', what));
 
 
-  // readout — every key gets a cell, all pending until set()
+  // The readout and the log, as two surfaces or as one. `createReport()` below
+  // owns both arrangements, the cells, the lines and the empty cases; `mount()`
+  // owns only what the page declared and what `__demo` reports about it.
   //
   // `showReadout: false` publishes the numbers on `__demo` without drawing the
   // row. It is for a page whose numbers have found a better home — 02 puts each
@@ -107,59 +117,11 @@ export function mount({
   // row on top duplicating them a second time in a place with no context. The
   // MACHINE contract is unchanged: a CDP script still reads `__demo.readout`,
   // and `verify.mjs` still asserts the page declares one.
-  //
-  // 🔴 AN EVEN NUMBER OF CELLS, AND WHEN IT IS ODD THE ANSWER IS TO CUT ONE.
-  // The row is `repeat(auto-fit, minmax(96px, 1fr))`, so a phone gets two
-  // columns and an odd count leaves a HOLE in the last row — a slot of a
-  // different colour with nothing in it, which reads as a cell that failed to
-  // load rather than as a cell that does not exist. Padding it with a blank is
-  // the wrong repair: it adds a thing to look at that says nothing. Trimming
-  // is the right one, because a readout with an odd cell always has a weakest
-  // cell — usually one that cannot change (a constant read out of a playlist,
-  // a codec name) or one a neighbour already implies. Thirteen pages were odd
-  // when this rule landed and every one of them got BETTER for losing a cell.
-  //
-  // It throws rather than warns so the suite catches it on the next run: every
-  // demo is driven by `verify.mjs`, so a page that breaks this cannot reach a
-  // visitor without going red first.
   const readoutOptOut = readout === null;
   if (readoutOptOut) readout = {};
-  const keys = Object.keys(readout);
-  if (keys.length % 2) {
-    throw new Error(
-      `readout has ${keys.length} cells and wants an even number — ` +
-      `drop the weakest one (${keys.join(', ')}), do not add a filler`);
-  }
-
-  const cells = new Map();
-  const rb = el('div', 'pos-readout');
-  // 🔴 AND HIDDEN WHEN IT HAS NOTHING IN IT, WHICH IS A DIFFERENT CASE AND WAS
-  // NOT HANDLED. `readout: null` empties the row without removing it, so the
-  // shell appended a childless `<div class="pos-readout">` — and shell.css
-  // gives that div `border: 1px solid var(--line)`. MEASURED on `/typist/`:
-  // height **2.0 px, 0 children**, a full-width band made entirely of a box's
-  // own two borders, sitting 24 px above the controls. **A horizontal rule
-  // nobody wrote**, reported as "old UI creeping in" — which it was, just not
-  // in the way it looked.
-  // ⚠️ A page that opts out of a surface has to opt out of its BOX too, and
-  // that cannot be the page's job to remember: it is the same shape as
-  // `.pos-controls[hidden]` two rules below, where an empty control row left a
-  // 14 px band behind. A container with nothing in it must not paint its edges.
-  if (!showReadout || !keys.length) rb.hidden = true;
-  for (const [k, unit] of Object.entries(readout)) {
-    const cell = el('div', 'pos-cell');
-    const v = el('span', 'pos-v', '');
-    v.dataset.state = 'pending';
-    cell.append(el('span', 'pos-k', k), v);
-    // ⚠️ THE UNIT IS PART OF THE VALUE, SO IT IS HIDDEN WHILE THERE IS NONE.
-    // A pending cell reading a lone `%` or `px` is a unit with nothing under
-    // it — it looks like the number went missing, when in truth it has not been
-    // measured yet. CSS hides it on `[data-state="pending"]`; it stays in the
-    // DOM so `set()` can re-append it without rebuilding the cell.
-    if (unit) v.append(el('span', 'pos-u', unit));
-    cells.set(k, v);
-    rb.append(cell);
-  }
+  const report = createReport({ readout, showReadout, showLog, joined });
+  const cells = report.cells;
+  const logEl = report.logEl;
 
   const cbar = el('div', 'pos-controls');
   // ⚠️ A ROW WITH NOTHING IN IT STILL TAKES ITS MARGIN. `.pos-controls` carries
@@ -234,10 +196,15 @@ export function mount({
   }
 
   const body = el('div', 'pos-body');
-  const logEl = el('pre', 'pos-log');
 
-  document.body.append(head, rb, cbar, body);
-  if (showLog) document.body.append(logEl);
+  // ⚠️ THE ORDER IS THE ARRANGEMENT, AND SPLIT IS UNCHANGED TO THE ELEMENT.
+  // `report.top` is the readout when the two are split and NOTHING when they
+  // are joined; `report.foot` is the log when they are split, the one joined
+  // surface when they are not, and `null` when there is nothing to draw.
+  document.body.append(head);
+  if (report.top) document.body.append(report.top);
+  document.body.append(cbar, body);
+  if (report.foot) document.body.append(report.foot);
 
   // ── the machine contract ────────────────────────────────────────────────
   const api = {
@@ -291,30 +258,14 @@ export function mount({
    */
   api.shellAsserts = api.asserts.length;
 
+  // Both of these are thin now: the cell and the line are written by
+  // `setCell()` and `addLine()`, which `createReport()` hands to `/kit/` too,
+  // so a specimen in the sandbox is filled by the same code a demo is. What
+  // stays here is the half that belongs to the page rather than to the
+  // surface: the declaration check, the published value and the capped record.
   function set(k, value, state) {
-    if (!cells.has(k)) throw new Error(`readout '${k}' was not declared in mount()`);
+    setCell(cells, k, value, state);      // throws if the page never declared it
     api.readout[k] = value;
-    const v = cells.get(k);
-    const unit = v.querySelector('.pos-u');
-    // 🔴 NOTHING MEASURED PRINTS AS ABSENT, AND THAT INCLUDES `''` AND `NaN`.
-    // `null` always did; the empty string did not, so `d.set('invented', '')`
-    // emptied the cell and left the unit standing alone — a `%` with no number
-    // in front of it. And a page that pre-sets a counter to 0 before anything
-    // has happened is worse: a zero reads as a very confident measurement.
-    // Pages hand over `''`/`null` until they have something; this turns all
-    // three into one pending cell: EMPTY, with the unit hidden too.
-    //
-    // ⚠️ EMPTY, NOT AN EM DASH — 2026-09-13. The placeholder used to be `—`,
-    // on the reasoning that a cell has to show it is a cell. It does not: the
-    // key above it and the box around it already say that, and four dashes in
-    // a row read as four failed readings rather than as four cells waiting.
-    // The empty cell is quiet and says the same thing.
-    const blank = value === null || value === undefined || value === ''
-      || (typeof value === 'number' && !Number.isFinite(value));
-    v.textContent = blank ? ''
-      : typeof value === 'number' ? fmtNum(value) : String(value);
-    if (unit) v.append(unit);
-    v.dataset.state = state || (blank ? 'pending' : '');
     return value;
   }
 
@@ -322,16 +273,7 @@ export function mount({
     const line = { t: performance.now(), msg: String(msg), kind: kind || 'info' };
     api.logs.push(line);
     if (api.logs.length > LOG_CAP) api.logs.shift();
-    // ⚠️ THREE CELLS, NOT ONE PADDED STRING. A line was time + text in one
-    // node, so a message longer than the box wrapped back to COLUMN ZERO — the
-    // continuation started under the timestamp and read as a new entry with no
-    // time. Photographed on `mirror`: "…spans 157" then "of 255" hanging off
-    // the left margin. A grid gives the message its own column to wrap inside.
-    const row = el('span', `pos-line${kind && kind !== 'info' ? ' ' + kind : ''}`);
-    row.append(el('span', 'pos-t', (line.t / 1000).toFixed(2)));
-    row.append(el('span', 'pos-m', line.msg));
-    logEl.append(row);
-    logEl.scrollTop = logEl.scrollHeight;
+    addLine(logEl, line.msg, line.kind, line.t);
   }
 
   // 🔴 A PASSING CHECK IS NOT A MESSAGE. Every assert used to write a prose
@@ -364,6 +306,23 @@ export function mount({
     // would give the project a fourth set of buttons and would take them out
     // of `.pos-controls`, which is what `verify.mjs` presses on every page.
     controls: cbar,
+    /**
+     * The two surfaces the shell made, and the box round them when they are
+     * joined (`null` when they are not).
+     *
+     * 🔴 HANDED OVER RATHER THAN LOOKED UP, BECAUSE THE LOOK-UP DOES NOT WORK.
+     * `/crate/` wants its readout inside its own upload block and asks for it
+     * with `d.el.querySelector('.pos-readout')` — and `d.el` is `.pos-body`
+     * while the readout is a SIBLING of it, so that query has always answered
+     * `null`: the class is added to nothing, the row is never moved, and the
+     * `hidden` that was meant to keep four empty cells off the page until an
+     * upload runs is never set. It is the same shape as `d.button(id)`
+     * searching the control row for a button a page had moved. A page that
+     * wants a surface somewhere else is told where it is.
+     */
+    readoutEl: report.readoutEl,
+    logEl: report.logEl,
+    report: report.report,
     set, log, assert,
     // `how()` is gone. A demo's intro is now ONE paragraph of three or four
     // sentences in `what`, not a lead line plus a second paragraph of mechanism:
@@ -414,6 +373,160 @@ export function mount({
     fail: (e) => { api.failed = String(e?.stack || e); log(String(e?.message || e), 'bad'); },
     api,
   };
+}
+
+/**
+ * THE READOUT AND THE LOG, AS ONE COMPONENT.
+ *
+ * 🔴 IT LIVES HERE RATHER THAN IN `demo/shell/<name>.mjs`, AND THAT IS A
+ * DELIBERATE BREAK WITH THE ONE-FILE-PER-COMPONENT CONVENTION. Every other kit
+ * module — slider, choice, table, presence — starts with
+ * `import { el } from './shell.mjs'`, so a file of its own here would make
+ * `shell.mjs` import a module that imports `shell.mjs` back. A cycle in the
+ * frame every page mounts is not worth a filename, and the alternative (a third
+ * file holding `el` and `fmtNum` so the cycle can be broken) is a new module
+ * whose only job is to work around this one. These two surfaces are also not
+ * controls a page drops in: no page has ever built one, `mount()` has always
+ * made both, and the 120 lines of measured comment about them were already in
+ * this file. So the COMPONENT is `createReport`, exported, and `/kit/` builds
+ * its specimens with the same call `mount()` makes.
+ *
+ * Two arrangements, and a page chooses with one flag:
+ *
+ *   split (default)   `top` is the readout, above the controls
+ *                     `foot` is the log, under the page
+ *   joined            `top` is nothing, `foot` is ONE surface at the bottom of
+ *                     the page with the readout sitting on top of the log
+ *
+ * 🔴 AND A CONTAINER WITH NOTHING IN IT MUST NOT PAINT ITS EDGES, WHICH IS THE
+ * WHOLE REASON THIS FUNCTION DECIDES WHAT GETS APPENDED RATHER THAN THE PAGE.
+ * `readout: null` used to leave a childless `<div class="pos-readout">` on the
+ * page, and shell.css gives that div `border: 1px solid var(--line)`: MEASURED
+ * on `/typist/` at **2.0 px tall with 0 children**, a full-width band made
+ * entirely of a box's own two borders, 24 px above the controls. A horizontal
+ * rule nobody wrote, reported as "old UI creeping in". Joining the two
+ * surfaces gives that trap two new faces and both are answered here: a joined
+ * report holding only a log, or only a readout, draws ONE border and no seam,
+ * because a `display: none` child takes no `gap` in a flex column; and a joined
+ * report holding NEITHER is never appended at all, so there is no box to paint.
+ */
+export function createReport({
+  readout = {}, showReadout = true, showLog = true, joined = false,
+} = {}) {
+  // 🔴 AN EVEN NUMBER OF CELLS, AND WHEN IT IS ODD THE ANSWER IS TO CUT ONE.
+  // The row was `repeat(auto-fit, minmax(96px, 1fr))` when this rule was
+  // written, so a phone got two columns and an odd count left a HOLE in the
+  // last row — a slot of a different colour with nothing in it, which reads as
+  // a cell that failed to load rather than as a cell that does not exist. The
+  // row is flex now and fills at every width, so the rule is EDITORIAL: a
+  // readout with an odd cell always has a weakest cell — usually one that
+  // cannot change (a constant read out of a playlist, a codec name) or one a
+  // neighbour already implies — and being made to find it is the point.
+  // Padding with a blank is the wrong repair: it adds a thing to look at that
+  // says nothing. Thirteen pages were odd when this landed and every one of
+  // them got BETTER for losing a cell.
+  //
+  // It throws rather than warns so the suite catches it on the next run: every
+  // demo is driven by `verify.mjs`, so a page that breaks this cannot reach a
+  // visitor without going red first.
+  const keys = Object.keys(readout);
+  if (keys.length % 2) {
+    throw new Error(
+      `readout has ${keys.length} cells and wants an even number — ` +
+      `drop the weakest one (${keys.join(', ')}), do not add a filler`);
+  }
+
+  const cells = new Map();
+  const readoutEl = el('div', 'pos-readout');
+  // hidden, not absent: `/crate/` and `/videoradio/` both reach for this
+  // element, and shell.css gives `.pos-readout[hidden]` an explicit
+  // `display: none` because `display: flex` beats the UA's own `[hidden]` rule.
+  if (!showReadout || !keys.length) readoutEl.hidden = true;
+  for (const [k, unit] of Object.entries(readout)) {
+    const cell = el('div', 'pos-cell');
+    const v = el('span', 'pos-v', '');
+    v.dataset.state = 'pending';
+    cell.append(el('span', 'pos-k', k), v);
+    // ⚠️ THE UNIT IS PART OF THE VALUE, SO IT IS HIDDEN WHILE THERE IS NONE.
+    // A pending cell reading a lone `%` or `px` is a unit with nothing under
+    // it — it looks like the number went missing, when in truth it has not been
+    // measured yet. CSS hides it on `[data-state="pending"]`; it stays in the
+    // DOM so `set()` can re-append it without rebuilding the cell.
+    if (unit) v.append(el('span', 'pos-u', unit));
+    cells.set(k, v);
+    readoutEl.append(cell);
+  }
+
+  const logEl = el('pre', 'pos-log');
+
+  const r = {
+    joined, readoutEl, logEl, cells,
+    report: null, top: null, foot: null,
+    set: (k, value, state) => setCell(cells, k, value, state),
+    line: (msg, kind, t) => addLine(logEl, msg, kind, t),
+  };
+
+  if (!joined) {
+    // The readout goes on even when it is hidden: pages reach for it, and this
+    // is exactly the DOM every page has had, element for element.
+    r.top = readoutEl;
+    r.foot = showLog ? logEl : null;
+    return r;
+  }
+
+  const rep = el('div', 'pos-report');
+  rep.append(readoutEl);
+  if (showLog) rep.append(logEl);
+  if (!readoutEl.hidden || showLog) { r.report = rep; r.foot = rep; }
+  return r;
+}
+
+/**
+ * Write one readout cell.
+ *
+ * 🔴 NOTHING MEASURED PRINTS AS ABSENT, AND THAT INCLUDES `''` AND `NaN`.
+ * `null` always did; the empty string did not, so `d.set('invented', '')`
+ * emptied the cell and left the unit standing alone — a `%` with no number in
+ * front of it. And a page that pre-sets a counter to 0 before anything has
+ * happened is worse: a zero reads as a very confident measurement. Pages hand
+ * over `''`/`null` until they have something; this turns all three into one
+ * pending cell: EMPTY, with the unit hidden too.
+ *
+ * ⚠️ EMPTY, NOT AN EM DASH — 2026-09-13. The placeholder used to be `—`, on the
+ * reasoning that a cell has to show it is a cell. It does not: the key above it
+ * and the box around it already say that, and four dashes in a row read as four
+ * failed readings rather than as four cells waiting. The empty cell is quiet
+ * and says the same thing.
+ */
+export function setCell(cells, k, value, state) {
+  const v = cells.get(k);
+  if (!v) throw new Error(`readout '${k}' was not declared in mount()`);
+  const unit = v.querySelector('.pos-u');
+  const blank = value === null || value === undefined || value === ''
+    || (typeof value === 'number' && !Number.isFinite(value));
+  v.textContent = blank ? ''
+    : typeof value === 'number' ? fmtNum(value) : String(value);
+  if (unit) v.append(unit);
+  v.dataset.state = state || (blank ? 'pending' : '');
+  return value;
+}
+
+/**
+ * Write one log line.
+ *
+ * ⚠️ THREE CELLS, NOT ONE PADDED STRING. A line was time + text in one node, so
+ * a message longer than the box wrapped back to COLUMN ZERO — the continuation
+ * started under the timestamp and read as a new entry with no time.
+ * Photographed on `mirror`: "…spans 157" then "of 255" hanging off the left
+ * margin. A grid gives the message its own column to wrap inside.
+ */
+export function addLine(logEl, msg, kind, t) {
+  const row = el('span', `pos-line${kind && kind !== 'info' ? ' ' + kind : ''}`);
+  row.append(el('span', 'pos-t', ((t ?? performance.now()) / 1000).toFixed(2)));
+  row.append(el('span', 'pos-m', String(msg)));
+  logEl.append(row);
+  logEl.scrollTop = logEl.scrollHeight;
+  return row;
 }
 
 /**
