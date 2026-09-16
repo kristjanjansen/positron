@@ -228,8 +228,11 @@ ok('and a reconnect says so rather than looking like a first attempt',
 
 console.log('\n== the words ==');
 
-// ── 21. all four are reachable ──────────────────────────────────────────────
+// ── 21. every DERIVED state is reachable ────────────────────────────────────
 // A state no input can produce is dead code wearing a colour.
+// ⚠️ `checking` IS NOT ONE OF THEM AND MUST NOT BE. It is not a fact about the
+// far end: it is this page saying a question is out, so no arrangement of
+// heartbeats may produce it. The control at the bottom is that half.
 {
   const walk = [
     board({ now: at(1_000), since: at(0) }),
@@ -237,8 +240,9 @@ console.log('\n== the words ==');
     board({ now: at(9_000), since: at(0), lastSeenAt: at(8_800) }),
     board({ now: at(40_000), since: at(0), lastSeenAt: at(8_800) }),
   ];
-  ok('one board over forty seconds reaches all four states',
-    new Set(walk).size === 4 && PRESENCE_STATES.every((s) => walk.includes(s)),
+  ok('one board over forty seconds reaches all four states a heartbeat can produce',
+    new Set(walk).size === 4
+      && PRESENCE_STATES.filter((s) => s !== 'checking').every((s) => walk.includes(s)),
     walk.join(' -> '));
 }
 
@@ -269,6 +273,26 @@ ok('no em dash in anything the badge says',
   const bad = Object.values(SAYS).filter((s) => banned.some((b) => s.toLowerCase().includes(b)));
   ok('NEGATIVE CONTROL: no word a visitor reads is this project\'s own vocabulary',
     bad.length === 0, bad.length ? bad.join(', ') : Object.values(SAYS).join(' · '));
+}
+
+// ── NEGATIVE CONTROL: a heartbeat never invents `checking` ────────────────
+// The state means "we asked and nobody has answered yet", which is a fact about
+// the PAGE and not about the board. If a derivation could produce it, the grey
+// axis would stop meaning what it says: a reader could not tell a question that
+// is out from a thing that is genuinely unmeasured.
+{
+  const cases = [
+    { now: at(1_000) },
+    { now: at(1_000), since: at(0) },
+    { now: at(9_000), since: at(0), lastSeenAt: at(8_800) },
+    { now: at(40_000), since: at(0), lastSeenAt: at(8_800) },
+    { now: at(2_000), since: at(0), comingSince: at(1_500) },
+    { now: at(1_000), since: at(0), lastSeenAt: at(90_000) },
+  ];
+  const got = cases.map((c) => board(c));
+  ok('NEGATIVE CONTROL: no arrangement of heartbeats produces "checking"',
+    got.every((g) => g !== 'checking'),
+    got.join(' · '));
 }
 
 console.log(`\n${pass} ok · ${fail} failed`);
