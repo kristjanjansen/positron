@@ -1188,10 +1188,11 @@
        * limitation. The tape still loops, off the file, forwards: what is lost
        * is the direction, and the button says so on its own face.
        */
+      // The reason lives on the control's own face, where somebody who pressed
+      // it is already looking. The log line that repeated it went 2026-09-16 on
+      // instruction: *"rm all loop messages."*.
       looper.sayTooLong(`this loop is ${lap.toFixed(0)} s and the page can keep `
         + `${LOOP_SECONDS} s, so it plays forwards off the tape`);
-      d.log(`${lap.toFixed(0)} s is longer than the ${LOOP_SECONDS} s this page can keep, `
-        + 'so it loops off the tape and cannot be turned round', 'warn');
       return;
     }
     looper.sayTooLong('');
@@ -1200,7 +1201,6 @@
     // Where the loop began, drawn on the wave. The picture goes on scrolling for
     // this one lap, because the sound really is still arriving.
     scope.loopFrom();
-    d.log(`keeping this ${lap.toFixed(1)} s lap as it goes past`, 'hi');
   }
 
   function loopWrap() {
@@ -1212,7 +1212,6 @@
     if (!secs) return;
     scope.loopTo();          // the wave stops here, and this is where it stopped
     liveIn?.gain.setTargetAtTime(0, ctx.currentTime, 0.012);
-    d.log(`looping ${secs.toFixed(1)} s of ${tapes[cur]?.title ?? 'the tape'}`, 'hi');
   }
 
   function loopOff() {

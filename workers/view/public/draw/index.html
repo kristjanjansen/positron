@@ -7,16 +7,6 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* 🔴 THE DESCRIPTION RECEDES, ASKED FOR AS *"desc (2x smaller)"* alongside
-     the page order, 2026-09-16. The shell sets `.pos-what` at 13.5px and half
-     of that is 6.75px, which nobody can read, so this is 10px: the SMALLEST
-     SIZE THIS PROJECT USES ANYWHERE, rather than a number invented for one
-     page. Line height goes up as the size comes down, because a long paragraph
-     set small and tight is where a reader loses their line.
-     ⚠️ A PAGE-LOCAL RULE, AND IT SAYS SO. `.pos-what` is the shell's element
-     and every other page keeps 13.5px; this is one page making a claim about
-     its own paragraph, which is what CLAUDE.md asks a deviation to do. */
-  .pos-what { font-size: 10px; line-height: 1.7; }
   /* The pad styles itself — it is `demo/shell/xy-pad.mjs` now, not a canvas
      this page dresses. What is left here is layout: the row under the transport
      that carries the knob and the one destructive button, pushed to the far end
@@ -38,7 +28,14 @@
     // ⚠️ THREE SENTENCES, and it had quietly become five — describing a pink
     // line and a yellow mark that are both gone now. A description that
     // advertises things the page no longer draws is worse than a short one.
-    what: 'Press record, then draw a line with a finger or a mouse: the page keeps every sample the browser gave it, and a thinned-out record of the same line, which is what a recording of a gesture normally is. While your hand is down the only line on the pad is yours; lift it and yours fades to a ghost while blue fades in over it, which is what a player rebuilds from that record and what the bar plays back. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far each reading sits from what happened, and how much of what you see no sample attests at all.',
+    // 🔴 AND HALF AS LONG, ON INSTRUCTION 2026-09-16: *"keep demo desc FONT SIZE
+    // the same, reduce its length by 2x"*. It was 129 words in three long
+    // sentences, which is an essay wearing a word limit's clothes, and the
+    // first answer to it was to set the type at 10px instead — a paragraph
+    // nobody could read is not a paragraph anybody skipped. 65 words, the
+    // shell's own 13.5px. What went is the sentence about the numbers, because
+    // the numbers are on the pad in front of you.
+    what: 'Press record, then draw a line with a finger or a mouse. The page keeps every sample the browser gave it and a thinned-out record of it: yours is the only line while your hand is down, and blue fades in when you lift it, rebuilt from that record. The knobs set how often a sample is kept and how much a player may invent between them.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     //

@@ -489,6 +489,10 @@ export function createTransportBar(host, deck, {
       const t = performance.now();
       if (t - lastWrap > 150) { lastWrap = t; doSeek(loopA); onLoop?.('wrap', loopA, loopB); }
     }
+    // AND THE OTHER HALF OF THE SAME RULE, for a bar built with `endStop: false`
+    // and for a deck whose end arrives without the timer: a start with no end,
+    // rolling, that reaches the end of the source closes there and engages.
+    if (playing && loopA != null && loopB == null && !filling && pos >= range[1]) closeAtEnd();
     // A loop is a claim about a range, so it cannot outlive one. A live deck's
     // range walks forward and will eventually leave the marks behind it; saying
     // so is better than looping over ground that is no longer there.
@@ -547,9 +551,35 @@ export function createTransportBar(host, deck, {
   let endTimer = null, atEnd = false;
   const clearEnd = () => { if (endTimer) { clearTimeout(endTimer); endTimer = null; } };
 
+  /**
+   * 🔴 ONE PRESS IS ENOUGH: THE END IS THE SECOND MARK. ASKED FOR 2026-09-16:
+   * *"if not pressing loop again and playback reaches the end, mark loop right
+   * mark as end and consider the state 'loop engaged'"*.
+   *
+   * So a start with no end is not a half-set control waiting for a hand any
+   * more. Press once and let it run, and what you get is a loop from there to
+   * the end of the source, running, with the button on. Press a second time on
+   * the way and you get the shorter loop you marked, which is what it always
+   * did. ⚠️ A ZERO LENGTH ONE IS STILL REFUSED: a mark on the last frame has no
+   * room in front of it, and the end behaves normally there.
+   * ⚠️ AND NOT ON A LIVE DECK, where a start with no end is a window being
+   * FILLED and already has its own way of closing. `filling` says which.
+   */
+  function closeAtEnd() {
+    if (!seekable || filling || loopA == null || loopB != null) return false;
+    if (range[1] - loopA < 1) return false;
+    startLoop(loopA, range[1]);
+    return true;
+  }
+
   function hitEnd() {
     endTimer = null;
     if (!endStop || !deck.playing?.()) return;
+    // A running loop owns the wrap, and its end may BE the end of the source,
+    // which is the one case where this timer and that wrap are due at the same
+    // instant. Pausing here would stop a loop that is working.
+    if (loopA != null && loopB != null) return;
+    if (closeAtEnd()) return;
     cmd.pause();
     cmd.seek(range[1]);
     atEnd = true;
@@ -827,14 +857,48 @@ export function createTransportBar(host, deck, {
     clearNote();
   }
 
+  /**
+   * 🔴 THE LOOP SAYS NOTHING IN WORDS. ASKED FOR IN THOSE WORDS, 2026-09-16,
+   * WITH A PHOTOGRAPH OF THE BADGE: *"rm all loop messages."*.
+   *
+   * Two sentences used to appear in the transport when a press was refused:
+   * `this source has no end to come back to` and `the two marks are in the same
+   * place`. Both were true and neither was worth a line of prose in a bar six
+   * controls wide. A deck with no end gets a DISABLED button instead, which
+   * says the same thing before you press rather than after; two marks in one
+   * place is now almost unreachable, because a press on a stopped transport
+   * starts it rather than leaving the playhead where the next press will land.
+   * ⚠️ THE BADGE ITSELF STAYS for what it is right for, which is a degraded
+   * source and a refused rate. Neither of those is about a loop.
+   */
+  loopBtn.disabled = !seekable;
+  if (!seekable) loopBtn.title = 'this source has no end to come back to';
+
   loopBtn.addEventListener('click', () => {
     // ⚠️ ASKED OF THE DECK, NOT OF THE BAR. `seekable` is the one fact that
     // decides whether a loop can exist at all, and it is the same flag the
     // scrub and the harness read, so the three cannot disagree.
-    if (!seekable) { note('this source has no end to come back to'); return; }
+    if (!seekable) return;
     const pos = deck.position();
     if (loopA == null) {
-      loopA = pos; loopB = null;
+      /**
+       * 🔴 A PRESS ON A STOPPED TRANSPORT STARTS IT. ASKED FOR 2026-09-16:
+       * *"when not playing and prssing loop, playback should start"*.
+       *
+       * The old shape needed the transport to be rolling already, and pressing
+       * LOOP twice on a stopped deck put both marks in the same place, because
+       * nothing moved between them. That is the state the badge was reporting.
+       * ⚠️ PARKED AT THE END, A PRESS MEANS FROM THE TOP. Marking the start of
+       * a loop at the last frame is a loop of nothing, and the play button
+       * already treats a press at the end as a restart, so the two agree.
+       */
+      let at = pos;
+      const rolling = deck.playing?.() ?? false;
+      if (!rolling && !live && endStop && (atEnd || pos >= range[1])) {
+        leaveEnd(range[0]);
+        at = range[0];
+      }
+      loopA = at; loopB = null;
       // 🔴 A LIVE DECK HAS NOTHING BEHIND THIS PRESS, SO THE WINDOW IS AHEAD OF
       // IT. On a recording both marks are behind you and the second press picks
       // the end; on a station the sound the loop will play has not arrived yet,
@@ -842,9 +906,10 @@ export function createTransportBar(host, deck, {
       // page is told at once, because it is the thing that has to start keeping
       // the audio — the bar keeps only the two numbers.
       filling = live;
-      fillEnds = live ? pos + liveWindowMs : null;
+      fillEnds = live ? loopA + liveWindowMs : null;
       drawLoop();
       if (filling) { onLoop?.('fill', loopA, fillEnds); armFill(); }
+      else if (!rolling) cmd.play();
       return;
     }
     if (loopB == null) {
@@ -854,7 +919,11 @@ export function createTransportBar(host, deck, {
       // in. Swapped; only a zero-length one is refused, because that is the
       // press that landed on the same frame as the first and means nothing.
       const a = Math.min(loopA, pos), b = Math.max(loopA, pos);
-      if (b - a < 1) { note('the two marks are in the same place'); return; }
+      // Silently, and it stays armed. The press landed on the same frame as the
+      // first one and means nothing; a sentence in the transport saying so was
+      // removed on instruction, and with a press now starting the transport
+      // this is a hand that pressed twice rather than a state anybody is in.
+      if (b - a < 1) return;
       startLoop(a, b);
       return;
     }

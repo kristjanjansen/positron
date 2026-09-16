@@ -811,7 +811,9 @@
         // marks, had no span to be placed in. That is the whole of the report
         // that no grain lines show during a loop.
         scope.loopFrom();
-        d.log(`keeping the next ${BUF_SECONDS} s to loop over`, 'hi');
+        // 🔴 NOTHING SAID ABOUT IT, ON INSTRUCTION 2026-09-16: *"rm all loop
+        // messages."*. The button is armed, the wave has the mark on it and the
+        // tint is growing from it; a line of prose is a third channel.
         return;
       }
       if (what === 'set') {
@@ -827,7 +829,6 @@
         // moved a number the fader owns, so the next `setWet` put the station
         // back underneath the loop.
         liveIn.gain.setTargetAtTime(0, ctx.currentTime, 0.012);
-        d.log(`looping ${secs.toFixed(1)} s of the station`, 'hi');
         // 🔴 AND THE GRAINS ARE TUNED TO IT. See `lockGrainsToLoop` — the loop
         // is an exact number of samples and the grain clock is a phasor in the
         // same context, so the two can be made commensurate rather than merely
