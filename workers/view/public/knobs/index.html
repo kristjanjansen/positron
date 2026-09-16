@@ -57,12 +57,30 @@
   const SELFCHECK = q.get('selfcheck') === '1';
   const MAY_PLAY = !SELFCHECK || q.get('board') === '1';
 
-  // The two controllers this page is about. 74 is Brightness and 71 is
+  // The four controllers this page is about. 74 is Brightness and 71 is
   // Harmonic Intensity in the MIDI specification, and in the ZynAddSubFX family
   // Yoshimi belongs to they reach a part's filter cutoff and its resonance.
   // 64 is neutral: the value is an offset around whatever the patch's own
   // filter is set to, so the middle of the lane leaves the patch alone.
   const CUTOFF = 74, RESO = 71, NEUTRAL = 64;
+  /**
+   * 🔴 75 AND 76 ARE NOT WHAT THE MIDI SPECIFICATION CALLS THEM, AND THE ASK
+   * THAT PRODUCED THEM WAS FOR A VIBRATO. In General MIDI, 76 and 77 are
+   * vibrato rate and depth. Yoshimi does not implement those: its extended
+   * controllers are 71 filter Q, 74 filter cutoff, 75 bandwidth, 76 FM
+   * amplitude, 77 and 78 resonance. So a slider labelled vibrato would have
+   * been a control that moves and does nothing.
+   *
+   * MEASURED on this board with `node rig/box/wobble-test.mjs`, one note held
+   * throughout, each controller read twice at one value first so every claim has
+   * a floor under it. CC 76 and 77 and the mod wheel move the pitch by 0.2 cents
+   * at every value, which is the pitch tracker's own noise: there is no vibrato
+   * here to have a rate. What 75 and 76 do move is large. Bandwidth takes the
+   * beating between the oscillator's partials from 225 cents wide at 6 Hz down
+   * to 114 cents at 0.8 Hz, and FM amplitude takes it from 149 cents to 0.2,
+   * which is a tone that shimmers becoming a tone that sits still.
+   */
+  const BANDWIDTH = 75, FM = 76;
   /**
    * 🔴 THE CUTOFF OPENS AT 100, NOT AT THE MIDDLE. Asked 2026-09-16: *"cutoff
    * 100 by default"*, after *"cutoff below 38 is nada"*.
@@ -109,7 +127,7 @@
     // sentence and a visitor believes it. `manifest.mjs`'s own line moved in the
     // same change, verbatim, so arriving from the index does not mean reading
     // the same claim twice in two wordings.
-    what: 'Sweep a big filter on a Raspberry Pi in another building, with two sliders an invisible hand can take over.',
+    what: 'Turn four knobs on a synthesizer in another building, and any of them can move by itself.',
     /**
      * Six cells, and every one of them moves.
      *
@@ -200,10 +218,17 @@
   // controller, and switches are never gated. This page has no switch; the rule
   // still applies to the first one anybody adds.
   const gate = makeCcSend();
+  /**
+   * ⚠️ WHICH GATE, rather than THE gate. The checks below point this at a
+   * scratch one for a few lines so they can ask what a slider actually sends
+   * without a board, a socket or a message. Everything else in the page reads
+   * it once and never changes it.
+   */
+  let sendTo = gate;
   // `onInput` is a move and `onChange` is the endpoint, which is exactly the
   // gate's `end` flag. That is the whole reason the flag exists.
-  const move = (c, v) => { gate.put(c, v); pump(); };
-  const land = (c, v) => { gate.put(c, v, { end: true }); pump(); };
+  const move = (c, v) => { sendTo.put(c, v); if (sendTo === gate) pump(); };
+  const land = (c, v) => { sendTo.put(c, v, { end: true }); if (sendTo === gate) pump(); };
 
   let armed = false;              // an instrument is running, so values mean something
   let wireMsgs = 0;               // messages that actually went on the wire
@@ -253,9 +278,15 @@
     if (s.why === 'coarse') { d.log(`${what}: ${s.says}`, 'warn'); return; }
     if (s.on) {
       handStarts++;
-      d.log(`an invisible hand has the ${what} slider: it sweeps by itself, back and forth, `
-        + 'and stops on its own after ten minutes. Grab it, use the arrow keys or press stop '
-        + 'and it hands over at once');
+      /**
+       * 🔴 SHORT, AND NOT IN THIS PROJECT'S OWN WORDS. Reported 2026-09-16 with
+       * the old line quoted back: *"= slooop. sjrorter. no invisb hand refs on
+       * uis"*. It was three clauses explaining a ceiling nobody had hit yet and
+       * an interruption anybody would discover by touching the slider, and it
+       * opened with `an invisible hand`, which is the PLAN's name for this and
+       * means nothing to a visitor. A log line says what just happened.
+       */
+      d.log(`${what} is moving by itself`);
     } else {
       const why = s.why === 'ceiling' ? ', which is the ten minute ceiling'
         : s.why === 'hidden' ? ', because this tab went to the background'
@@ -275,8 +306,28 @@
     onInput: (v) => move(RESO, v),
     onChange: (v) => land(RESO, v),
   });
+  /**
+   * The oscillator's two, under the filter's two. `AddSynth Morph` answers both
+   * of them strongly, which is not true of every patch in the board's library:
+   * bandwidth needs partials to spread and FM amplitude needs a modulator to
+   * scale, and a patch with neither will leave these handles moving over a
+   * sound that does not change. That is a fact about the patch rather than about
+   * the page, and the log line under Play names the patch for that reason.
+   */
+  const bandwidth = createSlider({
+    label: 'bandwidth', aria: 'oscillator bandwidth', min: 0, max: 127, step: 1, value: NEUTRAL,
+    hand: true, onHand: handSaid('bandwidth'),
+    onInput: (v) => move(BANDWIDTH, v),
+    onChange: (v) => land(BANDWIDTH, v),
+  });
+  const fm = createSlider({
+    label: 'fm depth', aria: 'FM amplitude', min: 0, max: 127, step: 1, value: NEUTRAL,
+    hand: true, onHand: handSaid('fm depth'),
+    onInput: (v) => move(FM, v),
+    onChange: (v) => land(FM, v),
+  });
   // Named, because it is moved below the transport once that exists. See there.
-  const knobs = createSliderGroup([cutoff, reso], { pair: true });
+  const knobs = createSliderGroup([cutoff, reso, bandwidth, fm], { pair: true });
   d.el.append(knobs.el);
 
   // ── audio ─────────────────────────────────────────────────────────────────
@@ -652,7 +703,7 @@
   // 🔴 THE SLIDERS SIT UNDER THE TRANSPORT. Asked 2026-09-16: *"put sliders
   // below transport"*. They were built before the bar and so were drawn above
   // it, which put the instrument's controls before the thing that starts it:
-  // you met two sliders that did nothing, and the reason they did nothing was
+  // you met sliders that did nothing, and the reason they did nothing was
   // further down the page. `append` MOVES a node already in the document, so
   // this is a reordering rather than a second copy.
   d.el.append(knobs.el);
@@ -763,8 +814,7 @@
     // fight the glide below within one frame, which is a page arguing with
     // itself in front of somebody, and stop here means stop. It goes before the
     // `set` calls so the homing glide is the last thing that touches a handle.
-    cutoff.hand?.stop('pause');
-    reso.hand?.stop('pause');
+    for (const k of [cutoff, reso, bandwidth, fm]) k.hand?.stop('pause');
     // The sliders come back to neutral, which is where the patch's own filter
     // is, and the board is told to release every note. The board may be holding
     // notes this page never pressed, so the message has to go out as well as
@@ -775,8 +825,8 @@
     // two of them: the cutoff opens where the filter can be heard and the
     // resonance opens where its maker left it.
     cutoff.set(CUTOFF_HOME, { glideMs: 240 });
-    reso.set(NEUTRAL, { glideMs: 240 });
-    d.log(`stopped: every note released, cutoff back to ${CUTOFF_HOME} and resonance to ${NEUTRAL}`);
+    for (const k of [reso, bandwidth, fm]) k.set(NEUTRAL, { glideMs: 240 });
+    d.log(`stopped: every note released, cutoff back to ${CUTOFF_HOME} and the other three to ${NEUTRAL}`);
   }
 
   // Reachable from a probe, the way `window.__hls` and `window.__strip` are on
@@ -821,14 +871,49 @@
       quiet === null && again?.restate === true && again.set.length === 1,
       again ? `nothing to say at ${RESTATE_MS - 1} ms, and ${again.set.length} controller restated at ${RESTATE_MS}` : 'nothing was restated');
 
-    // The relay's budget is counted in MESSAGES, so two sliders moving together
-    // have to cost one message rather than two.
+    // The relay's budget is counted in MESSAGES, so four sliders moving together
+    // have to cost one message rather than four.
     const g3 = makeCcSend();
-    g3.put(CUTOFF, 91); g3.put(RESO, 40);
+    g3.put(CUTOFF, 91); g3.put(RESO, 40); g3.put(BANDWIDTH, 12); g3.put(FM, 118);
     const both = g3.tick(0);
-    d.assert('two sliders moving together travel in one message',
-      both?.set?.length === 2 && g3.stats.messages === 1,
+    d.assert('four sliders moving together travel in one message',
+      both?.set?.length === 4 && g3.stats.messages === 1,
       both ? `${g3.stats.messages} message carrying ${both.set.length} values` : 'nothing went out');
+
+    /**
+     * 🔴 EACH SLIDER DRIVES ITS OWN CONTROLLER, AND THIS IS THE CHECK THAT A
+     * COPIED SLIDER NEEDS. Two handles wired to one controller look completely
+     * normal: both move, both send, the counters rise, and the second one simply
+     * overwrites the first with no error anywhere. It costs nothing to ask,
+     * because the gate is the thing that knows, and a scratch gate needs no
+     * board.
+     * ⚠️ IT DRIVES THE REAL `onInput`, not `move()` with a number typed here.
+     * Calling the constants back would assert this check against itself.
+     */
+    const g4 = makeCcSend();
+    sendTo = g4;
+    /**
+     * A press ON THE KNOB and a lift, on each lane in turn. That is the real
+     * `onInput` path, reached the way a finger reaches it, and pressing where
+     * the handle already is leaves every value where it was: the check after
+     * this one asserts each slider is still at its own home, and it would be
+     * asserting this check's leftovers otherwise.
+     */
+    for (const k of [cutoff, reso, bandwidth, fm]) {
+      const lane = k.el.querySelector('.sld-lane');
+      const box = lane.getBoundingClientRect();
+      const knob = k.el.querySelector('.sld-knob').getBoundingClientRect();
+      const at = { pointerId: 7, bubbles: true, cancelable: true,
+                   clientX: knob.left + knob.width / 2, clientY: box.top + box.height / 2 };
+      lane.dispatchEvent(new PointerEvent('pointerdown', at));
+      lane.dispatchEvent(new PointerEvent('pointerup', at));
+    }
+    sendTo = gate;
+    const drove = g4.tick(0)?.set ?? [];
+    const ctrls = [...new Set(drove.map(([c]) => c))];
+    d.assert('the four sliders drive four different controllers',
+      ctrls.length === 4 && [CUTOFF, RESO, BANDWIDTH, FM].every((c) => ctrls.includes(c)),
+      `CC ${ctrls.sort((a, b) => a - b).join(', ') || 'nothing'}`);
 
     // ⚠️ THE NAME OF THIS CHECK WAS TRUE UNTIL THE CUTOFF MOVED. Both sliders
     // used to open at the patch's own neutral; the cutoff now opens where the
@@ -1025,8 +1110,9 @@
      * before this line and the gate sends up to one message per controller per
      * 20 ms. What can honestly be in flight is whatever left within one round
      * trip, so the allowance is computed from the round trip this page has just
-     * MEASURED rather than guessed: 45 ms at two sliders every 20 ms is four
-     * or five, and on a slow link it is more, correctly.
+     * MEASURED rather than guessed: 45 ms at one controller every 20 ms is two
+     * or three, doubled for a second controller a hand may be on, and on a slow
+     * link it is more, correctly.
      */
     const w = wire.stats();
     const inFlight = Math.ceil(((Number.isFinite(rtt) ? rtt : 60) / SEND_GATE_MS) * 2) + 1;
@@ -1129,7 +1215,7 @@
       d.assert('while a hand runs its symbol is lit, and the slider beside it is untouched',
         h.lit.mine === 'on' && h.lit.other === 'off' && h.lit.pressed === 'true'
         && h.lit.glyph !== h.lit.otherGlyph && h.lit.starts === 1
-        && d.api.logs.some((l) => l.msg.includes('an invisible hand has the cutoff slider')),
+        && d.api.logs.some((l) => l.msg.includes('cutoff is moving by itself')),
         `the driven symbol is ${h.lit.glyph} and the one beside it ${h.lit.otherGlyph}, `
         + `its row reads ${h.lit.mine} against ${h.lit.other}, and the log has the line`);
       /**
@@ -1299,7 +1385,7 @@
       { id: 'you', label: 'Browser', kind: 'here', tech: 'browser',
         join: false,
         children: [
-          { id: 'sliders', label: 'sliders', sub: 'cutoff, resonance', tech: 'browser',
+          { id: 'sliders', label: 'sliders', sub: '4 controllers', tech: 'browser',
         },
           { id: 'gate', label: 'send gate', sub: 'one value per 20ms', tech: 'browser',
         },
