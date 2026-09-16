@@ -366,24 +366,27 @@ export const DEMOS = [
   // positron.studio may not load at all. The relay is the difference between a
   // page that works and a page that cannot, rather than between a page that
   // measures and one that does not.
-  // ⚠️ `settleMs` HERE DOES BOTH OF ITS JOBS AGAIN, AND THE FIRST ONE COSTS
-  // NOTHING. The harness applies it to control 0 and to the first-assert
-  // budget. This page carried no controls at all for a while, so only the
-  // second use reached it; `Let it play itself` landed 2026-09-16 and control 0
-  // is back. The sleep after that press overlaps the boot rather than adding to
-  // it, because the page is booting the whole time. The number itself is sized
-  // by the second use and has not moved: a wasm scsynth boot, 31 buffer
-  // allocations, a definition, an eight-second ring fill, a 2.5 s level, two
-  // 700 ms ink samples, a 1.2 s deafness control and a 1.3 s tour probe before
-  // the page says anything at all.
+  // ⚠️ `settleMs` HERE IS CARRIED ENTIRELY BY ITS SECOND JOB, AND THAT HAS GONE
+  // BACK AND FORTH TWICE. The harness applies it to control 0 and to the
+  // first-assert budget. This page declared no controls, then declared
+  // `Automate` on 2026-09-16, then had it removed the same day — so control 0 is
+  // once again the transport's loop-way `.tbar-x`, which returns instantly and
+  // takes nothing from the sleep. The number is sized by the second use and has
+  // not moved through any of it: a wasm scsynth boot, 31 buffer allocations, a
+  // definition, an eight-second ring fill, a 2.5 s level, two 700 ms ink
+  // samples and a 1.2 s deafness control before the page says anything at all.
   { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
-    one: 'six live radio stations from Tallinn and Helsinki, granulated in the tab by hand or left to play themselves',
+    one: 'six live radio stations from Tallinn and Helsinki, granulated in the tab by hand, or by sliders that sweep themselves back and forth',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
   // The same machine as the row above with the instrument panel taken off: it
   // walks its own twelve sounds, moves its own blend, changes station on its own
   // and loops itself in time, and the only picture is a shader of what the
-  // granulator is doing rather than of what it sounds like. Both pages import
-  // `demo/shell/radio-gran.mjs` for the stations, the sounds and the lanes.
+  // granulator is doing rather than of what it sounds like. It imports the
+  // stations, the sounds and the lanes from `demo/shell/radio-gran.mjs`.
+  // ⚠️ AND IT IS THE ONLY PAGE THAT DOES, SINCE 2026-09-16. `/radio/` imported
+  // the same module while it had a tour of its own; the tour was removed on
+  // instruction and those were its only imports, so the two pages now share the
+  // module's subject and none of its code. See `archive/radio-automate/`.
   // ⚠️ `gl: true` PUTS IT IN `demo/verify-gl.mjs` RATHER THAN `demo/verify.mjs`:
   // the ordinary harness runs Chrome with --disable-gpu, where
   // getContext('webgl2') returns null and every assert here would be
@@ -508,7 +511,7 @@ export const DEMOS = [
   // ⚠️ `settleMs` sizes the wait after control 0 ONLY, and control 0 is `Play`,
   // which on a cold board brings Yoshimi up over ten to forty seconds.
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
-    one: 'sweep a big filter on a Raspberry Pi in another building, with two sliders that can also move themselves',
+    one: 'turn four knobs on a synthesizer in another building, and any of them can move by itself',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
 
   // 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is

@@ -59,10 +59,16 @@ entirely (*"remove bottom one"*, after I misread *"lower"* as "make it shorter"
 and shipped that); the standard transport bar in its own box with the LIVE chip
 and ⛶ in a real `loopSlot`; moved to the `vain` group.
 
-**`/radio/`**: `Automate` (off until pressed, hands back on `pointerdown` on the
-granulator, agent-built), IDA and Radio 1965 back, `dub` the default preset,
-short station labels, the wet/dry judder fixed, `speakers` out of the diagram.
-51/51.
+**`/radio/`**: `Automate` landed and was **removed the same day** on instruction
+(*"rm 'automate' button from radio demo (and functionaitu) and bring in
+automated sliders we made"*, agent-built both ways). The tour, its check and its
+three asserts are in `archive/radio-automate/`; the page declares no controls at
+all again, and all five sliders under the picture carry the kit's hand button
+instead. ⚠️ A sweep is not a tour: nothing walks the twelve sounds by itself any
+more, and the README says what else went. Also IDA and Radio 1965 back, `dub`
+the default preset, short station labels, the wet/dry judder fixed, `speakers`
+out of the diagram, and the reserved control slot no longer over-reserves by
+112 px above 720 px wide. **52/52.**
 
 **`/keys/`**: a diagram, press-to-sound `lag`, a `patch` label, the patch line
 gone. The diagram took four rounds and every round was a real renderer fault.
@@ -126,7 +132,10 @@ definitive answer available in seconds:
 press.** `settleMs` lands on control 0 only. Adding `Automate` moved the
 looper's single click from t+1 s to t+31 s, into the middle of another check,
 intermittently. The symptom is a failure in a check with nothing to do with what
-you added. In CLAUDE.md.
+you added. In CLAUDE.md. ⚠️ **AND IT MOVES BACK WHEN THE CONTROL LEAVES**:
+`Automate` was removed hours later and the same click returned to t+0. The
+repair that survived both is the one in the check itself, which confirms where
+it landed instead of assuming when the press arrives.
 
 **`d.button(id)` searched the control row only**, so any page that MOVES a
 control got null back. `/videoradio/` and `/tapes/` both move controls and had

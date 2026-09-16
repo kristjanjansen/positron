@@ -53,6 +53,11 @@ file by being finished or by being refused in writing, never by being forgotten.
   red); `.pos-seg` lifted out of `.tbar-loopgrp`, `.step` and `.pos-pick-cell`
   and measured byte for byte identical before and after; `createSlider({ hand:
   true })` with a specimen in `/kit/`; `/knobs/` turning it on for both sliders.
+  ✅ **AND `/radio/` TURNS IT ON FOR ALL FIVE, 2026-09-16**, on the instruction
+  that removed its `Automate` tour: the blend and the four settings. Three
+  asserts, one of which reads `msize` back off scsynth with `/s_get` at two
+  points of one reach, so the claim is on the far side of the wire rather than
+  about a handle. **52/52 green.**
   ⚠️ **STEP 6 IS OPEN**: a second movement preset, which exists to prove that
   adding one costs one row in `MOVES`, one glyph, one sentence and one index in
   `MOVE_TURN`, and turns the button into a three-way cycle with no new control.
@@ -304,6 +309,20 @@ file by being finished or by being refused in writing, never by being forgotten.
   whose routes are `sos`, `drive` and `spray`, so it sampled a control nothing
   moved and read a flat 0.000 every run. It reads the destination off the sound
   that is playing now.
+  🔴 **AND IT WAS REMOVED THE SAME DAY, ON INSTRUCTION:** *"rm 'automate' button
+  from radio demo (and functionaitu) and bring in automated sliders we made"*.
+  The button, the tour, its check and its three asserts are in
+  `archive/radio-automate/`; every slider under the picture now carries the
+  kit's own hand button instead. **52/52 green** after.
+  ⚠️ **WHAT WENT WITH IT IS NOT A DETAIL AND IS OPEN WORK IF ANYBODY WANTS IT
+  BACK.** A hand sweeps ONE lane between its two ends. `/radio/` can no longer
+  walk its twelve sounds by itself, move five controls in step, breathe the
+  blend against where the sound is (a hand takes the blend to 0 and to 1, which
+  the tour deliberately never did), or step what cannot be interpolated. Five
+  hands switched on at once are five independent sweeps, not an arrangement.
+  `/videoradio/` still does the whole thing unattended and was checked before a
+  line was removed: it carries its own inline copy of the tour clock and imports
+  nothing that went.
 
 - ~~**`/radio/` SHOULD MOVE BY ITSELF THE WAY `/videoradio/` DOES. ASKED
   2026-09-16:** *"can you have simular cool movement you had on videoradio to
@@ -551,6 +570,33 @@ file by being finished or by being refused in writing, never by being forgotten.
   swept. A blind replace would turn "we did not look" into a comma.
 
 ## Done, with what it was measured at
+
+- ✅ **THE PAGE IS A STACK OF BLOCKS AND THE STACK OWNS THE AIR BETWEEN THEM.**
+  Asked twice on 2026-09-16, the second time as a diagnosis rather than a
+  request: *"same vert space beween as we establised in knob (make a rule and
+  uptada others in bg: make it easy to change later)"*, then *"you can not
+  follow spacing tule. make reusable layout component?"*. `demo/shell/stack.mjs`
+  plus `.pos-stack` in `shell.css`; the number is `--pos-gap` on `:root` and
+  nothing else states it. MEASURED on 38 pages before and after: every gap
+  between two blocks is now exactly 40 px, where before there were 0, 10, 12,
+  14, 16, 18, 40 and 53.5. `/keys/` was the photograph (0.0 px between the
+  transport bar and the keyboard) and `/knobs/` was the reference and did not
+  move, gap for gap.
+
+- ✅ **AN IDLE LOOP PAIR WEARS THE SAME EDGE AS THE BUTTONS BESIDE IT.** Asked
+  2026-09-16 with a photograph: *"global: loop buton borders as rest of
+  button"*, the fourth report about this pair. MEASURED on `/draw/` before the
+  repair: the pair read `rgb(106, 114, 128)` (`--dim2`, text grey) while every
+  rate button and every ordinary button read `rgb(43, 53, 70)` (`--line2`). The
+  repair was to DELETE the declaration rather than restate a colour: both halves
+  are `<button>` and the base rule already gives them the edge. `/draw/` now
+  asserts it, and the assert goes red when the old declaration is put back.
+
+- ✅ **`/keys/` OPENS ON `AddSynth Morph`.** Asked as *"addsynth morph as default
+  patch"*. Bank 115, program 32, addressed by bank and program rather than by a
+  position in a flattened list of 911. It is SENT as well as pointed at, and the
+  page says in its log which patch it opened on, or says so when that bank and
+  program are not in the board's library.
 
 - ✅ **FLUIDSYNTH AND HEXTER ARE OFF THE BOARD AND OUT OF THE PAGE**, to
   `archive/box-fluidsynth-hexter/`. Asked as *"lets remove fluidynth and hexter

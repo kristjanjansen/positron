@@ -421,6 +421,30 @@ to recover.
   that was `ffmpeg -f avfoundation`, whose TCC subject is the terminal;
   `audiotap` disclaims responsibility and is its own subject, measured working
   from an ssh-started process.
+- 🔴 **YOSHIMI DOES NOT USE THE GENERAL MIDI CONTROLLER MAP, AND ASKING IT FOR A
+  VIBRATO GETS A SLIDER THAT DOES NOTHING.** In General MIDI, 76 and 77 are
+  vibrato rate and depth. In the ZynAddSubFX family they are **FM amplitude** and
+  **resonance centre**, and the rest of the extended set is 71 filter Q, 74
+  filter cutoff, 75 bandwidth, 78 resonance bandwidth. MEASURED 2026-09-16 with
+  `node rig/box/wobble-test.mjs`, one note held throughout and every controller
+  read twice at one value first: CC 76, CC 77 and the mod wheel move the pitch
+  by **0.2 cents** at every value, which is the tracker's own noise. There is no
+  vibrato on this instrument to have a rate. What 75 and 76 DO move is large —
+  bandwidth takes the beating between partials from 225 cents at 6 Hz to 114
+  cents at 0.8 Hz, FM amplitude takes it from 149 cents to 0.2 — so `/knobs/`
+  carries those two beside cutoff and resonance.
+  ⚠️ **AND `AddSynth Morph` MOVES ON ITS OWN, WHICH BREAKS A HELD-NOTE FLOOR.**
+  Two takes at one value, four seconds apart, differ by **0.58 octaves** of
+  brightness. A timbre claim about a controller on that patch needs
+  `cc-test.mjs`, which re-triggers the note and so resets the morph; a pitch
+  claim is safe, because its floor is a fifth of a cent.
+  ⚠️ **THE FIRST TWO BUILDS OF THAT TOOL MEASURED THE WRONG QUANTITY AND PASSED
+  THEIR FLOOR PERFECTLY.** A vibrato is a pitch wobble and both early builds
+  measured LEVEL: one saturated its crossing counter and reported 19.15 Hz to
+  four figures about every controller at every value, the next read **0.85 Hz
+  for a 2.0 Hz drive**. A floor proves an instrument does not invent movement.
+  Only a KNOWN signal proves it can see any, which is why that file grades its
+  analyser on synthetic tones before it says a word about the board.
 - 🔴 **A CHANNEL COUNT CANNOT BE INFERRED FROM A PAYLOAD.** 960 int16s is a
   valid 20 ms mono frame AND a valid 10 ms stereo one; guessing wrong plays an
   octave down, which sounds like a broken instrument rather than a broken
