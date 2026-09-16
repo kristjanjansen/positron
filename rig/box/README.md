@@ -317,6 +317,18 @@ the old behaviour stays one message away for a wedged board; and a holder that
 **stops talking** must lose its claim, which is the fault `/box/`'s switch-off
 was written for in the first place.
 
+🔴 **AND SINCE 2026-09-16 `/box/` NO LONGER DRAWS THE GRANULATOR, ON
+INSTRUCTION.** *"there is no ui to control it"*, which was true: the page had a
+box for it in its diagram, a `let insert` following the board's reports, and a
+log line on every ordinary visit saying the granulator was NOT in the sound.
+⚠️ **Everything on this page is unaffected.** The board half is untouched,
+`/grains/` still switches the insert on, and `/box/` still sends
+`fx.pappus {on:false, onlyIfIdle:true}` on connect and still logs the refusal
+when a live `grains` tab holds it. What went is the picture and the narration,
+not the message: an undrawn insert is not an absent one, and the -6.1 dBFS drone
+above is what a page that stopped asking would sound like.
+`archive/box-pappus/` and `plan-box-pappus.md`.
+
 ## What still needs the board
 
 Named rather than faked, because a fake that passes is worse than a gap written
