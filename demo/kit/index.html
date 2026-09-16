@@ -127,7 +127,90 @@
     }
   }
 
-  // ── buttons ─────────────────────────────────────────────────────────────
+  // The four specimen badges, by state, so the geometry asserts at the bottom
+  // can measure them. ⚠️ DECLARED HERE RATHER THAN BESIDE THE BLOCK: this
+  // section moved to the top of the page and its `const` stayed behind, so the
+  // build read it in its dead zone, `section()` swallowed the throw into
+  // `failed`, and the page died much later on an empty map. A block that moves
+  // takes what it needs with it.
+  const presSpec = new Map();
+
+  /**
+   * 🔴 THE NEWEST COMPONENT GOES AT THE TOP OF THIS PAGE. Instructed
+   * 2026-09-16: *"in kit move online stuff to topmost item (all new should land
+   * top, make rule)"*.
+   *
+   * This page is read by somebody checking what the kit has, and what they do
+   * not know about is what arrived since they last looked. Appending put the
+   * newest thing behind every component they already knew, at the bottom of a
+   * long scroll, which is the one place it cannot be found by accident. The
+   * front page settled the same question the same way and for the same reason.
+   *
+   * ⚠️ A SECTION TITLE IS UPPERCASE, and `.kit-h` renders it so whatever is
+   * typed. Type it uppercase anyway, so the source reads like the page.
+   * ⚠️ AND MOVING A BLOCK MOVES EVERY BUTTON AFTER IT. `verify.mjs` presses by
+   * position, so re-run `node demo/verify.mjs kit` and diff the assert count
+   * after any reorder.
+   */
+  section('ONLINE, OFFLINE, COMING ONLINE',
+    'Four states, not three: a thing nobody has asked yet is not offline, which is '
+    + 'the same rule caps.mjs follows when it answers "unknown" about a browser it '
+    + 'could not probe. Green means it spoke inside the time it promised to speak in, '
+    + 'and the two greys are told apart by ink rather than hue: a solid dot is a '
+    + 'measurement, a hollow ring is nobody having looked.',
+    `createPresence({ of: 'the board' }).set('online')
+presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the four`,
+    (box) => {
+      for (const s of PRESENCE_STATES) {
+        const p = createPresence({ state: s });
+        presSpec.set(s, p.el);
+        box.append(p.el);
+      }
+    });
+
+  section('a presence dot inside something else',
+    'The same component with mode "dot": the ring alone, and the words CLIPPED '
+    + 'rather than removed, so the accessible name is still the whole sentence and a '
+    + 'change is still announced. It is an inline box with no margins, so it drops '
+    + 'into a button, a readout key or a row of machines without any of them knowing '
+    + 'what it is.',
+    `createPresence({ of: 'the board', mode: 'dot', state: 'online' })`,
+    (box) => {
+      const b = el('button', '', null, { type: 'button' });
+      b.append(createPresence({ of: 'the board', mode: 'dot', state: 'online' }).el,
+        document.createTextNode(' switch it on'));
+      b.style.cssText = 'display:inline-flex;align-items:center;gap:7px';
+      box.append(b);
+
+      // In a readout key, where a page already prints what a machine is doing.
+      const r = el('div', 'pos-readout');
+      for (const [k, v, u, s] of [['relay', '1', '/16', 'online'], ['board', '', 'ms', 'unknown']]) {
+        const c = el('div', 'pos-cell');
+        const key = el('div', 'pos-k');
+        key.style.cssText = 'display:flex;align-items:center;gap:5px';
+        key.append(createPresence({ of: k, mode: 'dot', state: s }).el, document.createTextNode(k));
+        const val = el('span', 'pos-v', v || null);
+        if (s === 'unknown') val.dataset.state = 'pending';
+        if (u) val.append(el('span', 'pos-u', u));
+        c.append(key, val); r.append(c);
+      }
+      r.style.flex = '1 1 100%';
+      box.append(r);
+
+      // A row of machines, which is the shape /knobs/, /box/, /grains/ and
+      // /rack/ all want and all draw differently today.
+      const list = el('div', '');
+      list.style.cssText = 'flex:1 1 100%;display:grid;gap:6px;font:400 12px/1 var(--mono);color:var(--dim)';
+      for (const [name, s] of [['studio-1', 'online'], ['the board', 'coming'],
+        ['the Mac', 'offline'], ['the headset', 'unknown']]) {
+        const row = el('div', '');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px';
+        row.append(createPresence({ of: name, mode: 'dot', state: s }).el, document.createTextNode(name));
+        list.append(row);
+      }
+      box.append(list);
+    });
+
   section('buttons', '',
     `el('button', '', 'ordinary', { type: 'button' })
 el('button', 'pos-pri', 'the primary one', { type: 'button' })`,
@@ -936,99 +1019,6 @@ an even number of cells · nothing measured yet is an em dash, never 0`,
   // is watching. The specimens below are FOUR SEPARATE BADGES rather than one
   // pressed through four states, because the checks at the bottom measure them
   // and a check that drives a control is a check a visitor watches happen.
-  const presSpec = new Map();
-  section('online, offline, coming online',
-    'Four states, not three: a thing nobody has asked yet is not offline, which is '
-    + 'the same rule caps.mjs follows when it answers "unknown" about a browser it '
-    + 'could not probe. Green means it spoke inside the time it promised to speak in, '
-    + 'and the two greys are told apart by ink rather than hue: a solid dot is a '
-    + 'measurement, a hollow ring is nobody having looked.',
-    `createPresence({ of: 'the board' }).set('online')
-presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the four`,
-    (box) => {
-      for (const s of PRESENCE_STATES) {
-        const p = createPresence({ state: s });
-        presSpec.set(s, p.el);
-        box.append(p.el);
-      }
-    });
-
-  section('a presence dot inside something else',
-    'The same component with mode "dot": the ring alone, and the words CLIPPED '
-    + 'rather than removed, so the accessible name is still the whole sentence and a '
-    + 'change is still announced. It is an inline box with no margins, so it drops '
-    + 'into a button, a readout key or a row of machines without any of them knowing '
-    + 'what it is.',
-    `createPresence({ of: 'the board', mode: 'dot', state: 'online' })`,
-    (box) => {
-      const b = el('button', '', null, { type: 'button' });
-      b.append(createPresence({ of: 'the board', mode: 'dot', state: 'online' }).el,
-        document.createTextNode(' switch it on'));
-      b.style.cssText = 'display:inline-flex;align-items:center;gap:7px';
-      box.append(b);
-
-      // In a readout key, where a page already prints what a machine is doing.
-      const r = el('div', 'pos-readout');
-      for (const [k, v, u, s] of [['relay', '1', '/16', 'online'], ['board', '', 'ms', 'unknown']]) {
-        const c = el('div', 'pos-cell');
-        const key = el('div', 'pos-k');
-        key.style.cssText = 'display:flex;align-items:center;gap:5px';
-        key.append(createPresence({ of: k, mode: 'dot', state: s }).el, document.createTextNode(k));
-        const val = el('span', 'pos-v', v || null);
-        if (s === 'unknown') val.dataset.state = 'pending';
-        if (u) val.append(el('span', 'pos-u', u));
-        c.append(key, val); r.append(c);
-      }
-      r.style.flex = '1 1 100%';
-      box.append(r);
-
-      // A row of machines, which is the shape /knobs/, /box/, /grains/ and
-      // /rack/ all want and all draw differently today.
-      const list = el('div', '');
-      list.style.cssText = 'flex:1 1 100%;display:grid;gap:6px;font:400 12px/1 var(--mono);color:var(--dim)';
-      for (const [name, s] of [['studio-1', 'online'], ['the board', 'coming'],
-        ['the Mac', 'offline'], ['the headset', 'unknown']]) {
-        const row = el('div', '');
-        row.style.cssText = 'display:flex;align-items:center;gap:8px';
-        row.append(createPresence({ of: name, mode: 'dot', state: s }).el, document.createTextNode(name));
-        list.append(row);
-      }
-      box.append(list);
-    });
-
-  section('a badge that follows a heartbeat',
-    'The picture is the component; the rule beside it is a pure function, so the '
-    + 'number belongs to whoever knows the heartbeat. The board sends box.alive every '
-    + 'five seconds and would pass everyMs 5000; this one is set to two so it can be '
-    + 'watched. Press "it spoke" and it goes green, then leave it alone and it turns '
-    + 'itself grey two beats later, with nothing here counting anything.',
-    `const p = createPresence({ of: 'the board' });
-p.follow({ everyMs: 5000, comingMs: 45000 });   // the board's own beat
-p.seen();                                        // a box.alive arrived
-p.coming();                                      // a synth is starting`,
-    (box) => {
-      const o = out('waiting');
-      const p = createPresence({
-        of: 'the board',
-        onChange: (s, why) => { o.textContent = `${s}${why ? ` · ${why}` : ''}`; },
-      });
-      const start = () => p.follow({ everyMs: 2000, comingMs: 8000 });
-      start();
-      o.textContent = p.state();
-      const row = el('div', 'pos-controls');
-      for (const [name, act] of [
-        ['it spoke', () => p.seen()],
-        ['start it', () => p.coming(true)],
-        ['forget it', start],
-      ]) {
-        const b = el('button', '', name, { type: 'button' });
-        b.addEventListener('click', act);
-        row.append(b);
-      }
-      box.append(p.el, row, o);
-    });
-
-  // ── colour ──────────────────────────────────────────────────────────────
   section('what the colours mean',
     '',
     `grey = not played · slate = played, unmeasurable

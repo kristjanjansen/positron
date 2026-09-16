@@ -760,6 +760,20 @@ TOLD its own room and remember it: the alarm fires with no request, and
 shared and everything around it is partitioned, ask who owns the sharing** — the
 bug was a fact true of every part and of no part's author.
 
+🔴 **THE NEWEST COMPONENT GOES AT THE TOP OF `/kit/`, AND ITS HEADING IS
+UPPERCASE.** Instructed 2026-09-16: *"in kit move online stuff to topmost item
+(all new should land top, make rule)"* and *"always uppercase"*. That page is
+read by somebody checking what the kit has, and what they do not know about is
+what arrived since they last looked; appending put the newest thing at the
+bottom of a long scroll, behind everything they already knew. The front page
+settled the same question the same way. `.kit-h` renders a heading uppercase
+whatever is typed, so type it uppercase and the source reads like the page.
+⚠️ **A BLOCK THAT MOVES TAKES WHAT IT NEEDS WITH IT.** Moving one to the top
+left its `const` behind, so the build read it in its dead zone, `section()`
+swallowed the throw into `failed`, and the page died much later on an empty map
+with a message about a different line. The page reported `this block did not
+build` to a reader before the suite did.
+
 ✅ **`/kit/` IS MACHINE-GRADED NOW, AND THIS LINE SAID OTHERWISE FOR WEEKS.**
 It used to say the page carried no `mount()` and no asserts, so the one page
 whose whole job is to make component drift visible was the one page the suite
