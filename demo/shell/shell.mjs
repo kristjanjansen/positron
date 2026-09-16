@@ -169,10 +169,14 @@ export function mount({
   // failed to render rather than as nothing being there.
   if (!controls.length) cbar.hidden = true;
   const handlers = new Map();
+  // every control this shell made, by id, so `button(id)` survives a page
+  // moving one somewhere else. See the note on `button` below.
+  const made = new Map();
   for (const c of controls) {
     const b = el('button', c.primary ? 'pos-pri' : '', c.label);
     b.type = 'button';
     b.dataset.id = c.id;
+    made.set(c.id, b);
     // 🔴 A GLYPH BUTTON IS A SQUARE, AND THE SHELL DECIDES IT — NOT THE PAGE.
     // Three pages carried `.pos-controls button.ico { width: 34px; height: 34px }`
     // in their own <style>, and `mount()` has never put an `ico` class on
@@ -378,7 +382,23 @@ export function mount({
      * which is also the first moment they can be true.
      */
     run: (id) => handlers.get(id)?.(),
-    button: (id) => cbar.querySelector(`[data-id="${id}"]`),
+    /**
+     * A control this shell built, by id, WHEREVER THE PAGE HAS PUT IT.
+     *
+     * 🔴 IT USED TO SEARCH THE CONTROL ROW ONLY, AND MOVING A BUTTON BROKE IT
+     * SILENTLY. Pages move controls on purpose and are told to: `/videoradio/`
+     * moved `Run in VR` under its sentence, `/tapes/` moves its own row, and
+     * `/radio/` moved `Automate` into the granulator block on instruction. The
+     * button still worked; `d.button(id)` returned null, so every check that
+     * read its state reported `no button` about a control plainly on the page.
+     * MEASURED as three red asserts the moment `Automate` moved.
+     *
+     * ⚠️ A MAP BUILT AT MOUNT, NOT A DOCUMENT QUERY. `[data-id]` is not unique
+     * to this row: a transport bar's extras carry one too, and a page could
+     * easily own a third. The shell knows exactly which elements it made, so it
+     * remembers them instead of going looking.
+     */
+    button: (id) => made.get(id) || cbar.querySelector(`[data-id="${id}"]`),
     /** Empty the log and the `logs` array together. A control that clears what
      *  a page HOLDS should clear what the page SAID about it too, or the lines
      *  left behind describe a state that no longer exists. */

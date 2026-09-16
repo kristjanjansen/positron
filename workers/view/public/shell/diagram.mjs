@@ -963,8 +963,24 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
     const i = backs.indexOf(l);
     const dy = bottom + LANE_FIRST + level[i] * step;
     deepest = Math.max(deepest, dy);
-    const sx = fm.cx - ATTACH_OFF, tx = tm.cx + ATTACH_OFF;
-    const sy = fm.y + fm.h, ty = tm.y + tm.h + EDGE_OUT + 1;
+    /**
+     * 🔴 A RETURN PATH LANDS ON THE BOX IT REACHES, NOT ON THE MACHINE AROUND
+     * IT. This used the containers (`fm`, `tm`), so on `/box/` the sound came
+     * back from the bottom edge of `Raspberry Pi` and arrived at the bottom
+     * edge of `Cloudflare`, with nothing joining it to `capture` or to `sound
+     * back`. REPORTED in exactly those terms: *"capture should conntect to
+     * sound back and that should connet to playout"*.
+     *
+     * ⚠️ A FORWARD LINK ALREADY DID THIS. `at.get(id)` resolves a child to the
+     * child and a top-level node to itself, so the two halves of the picture
+     * were disagreeing about what a link connects, and only the return half was
+     * wrong. Where a link names a whole machine, `f` IS `fm` and nothing moves.
+     * ⚠️ IT CROSSES THE CONTAINER'S OWN EDGE, which is correct rather than
+     * untidy: the line is going into that machine, and stopping at the wall
+     * would say it arrives at the building rather than at the thing inside it.
+     */
+    const sx = f.cx - ATTACH_OFF, tx = t.cx + ATTACH_OFF;
+    const sy = f.y + f.h, ty = t.y + t.h + EDGE_OUT + 1;
     const d = acrossLane(sx, sy, tx, ty, dy, 1);
     const budget = laneBudget(sx, tx);
     const lab = wrapLines(l.label, budget, 1, measure.link);
@@ -1370,6 +1386,12 @@ function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PA
     title: [lab.full, sub.full].filter(Boolean).join(', '),
   };
   if (n.note) out.note = String(n.note);
+  // ⚠️ CARRIED THROUGH TO THE RENDER NODE EXPLICITLY. `box()` builds a fresh
+  // object rather than spreading the spec, so a flag the author sets is invisible
+  // to the painter unless it is copied here. `set` went missing exactly that way
+  // and read as "the option does nothing".
+  if (n.set) out.set = true;
+  if (n.join === false) out.join = false;
   if (ks.length) {
     let ky = top + own + HEAD_GAP;
     out.kids = ks.map((c) => {
@@ -1407,11 +1429,26 @@ function s(tag, attrs, text) {
  * 🔴 ONE HEADING, ONE WORDING, ONE PLACE. Every page that explains itself ends
  * with the same picture under the same three words, and the moment that is
  * typed per page it becomes "How this works" on one, "How it works" on the
- * next and "how this works" on a third — which is a reader having to notice
- * that they are the same thing. It is a constant because it is a promise the
- * site makes, not a label a page chooses.
+ * next and "how this works" on a third. That is not a hypothetical: it was
+ * MEASURED across the tree on 2026-09-16 and there were THREE treatments in
+ * six pages. `items`, `radio`, `replay` and `station` passed `how: true` and
+ * got this constant; `crate` typed `title: 'how it works'` and got its own
+ * lowercase heading; `grains` had no heading at all. It is a constant because
+ * it is a promise the site makes, not a label a page chooses.
+ *
+ * 🔴 AND THE WORDING IS `it`, NOT `this`, DECIDED 2026-09-16 ON A DIRECT ASK.
+ * Three reasons, in the order they matter:
+ *   · "How it works" is the settled English phrase. A reader recognises it
+ *     without parsing, which is the whole job of a heading read once.
+ *   · `it` ALREADY HAS THE RIGHT REFERENT ON THESE PAGES. Every `what`
+ *     paragraph uses it for the demo: *"It keeps taking a few seconds of
+ *     whatever is on air"*. `this` introduces a second pointer at the same
+ *     thing, in a heading, three inches below the first one.
+ *   · `this` is doing a job POSITION already does. The diagram is last on the
+ *     page it belongs to, so nothing else could be meant, and a word that
+ *     disambiguates something never ambiguous is a word to cut.
  */
-export const HOW = 'How this works';
+export const HOW = 'How it works';
 
 /**
  * @param {object} [o]
@@ -1809,6 +1846,19 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
         // order the boxes so that every pair the reader sees side by side is a
         // pair a direction has been stated for. `api.ties` is how a page checks
         // that it did, and /kit/ shows both halves of this gap on purpose.
+        /**
+         * 🔴 `join: false` DRAWS NOTHING BETWEEN THEM AT ALL, which is a third
+         * answer and was asked for on sight: *"no connections between
+         * keyboard/playout and and notesout/soundback"*.
+         *
+         * The three are now: an ARROW (the default, they feed each other), a
+         * BRACKET (`set: true`, they are parts of one machine and the drawing
+         * says so), and NOTHING (`join: false`). The last is right where the
+         * container's own box already carries the whole relationship: `Browser`
+         * holds a keyboard and a playout, and a line between them adds no fact,
+         * it just gives the eye something to follow that leads nowhere.
+         */
+        if (n.join === false) { for (const k of n.kids) field.append(nodeGroup(k)); continue; }
         const stepped = new Set();
         for (const l of L.links) {
           if (l.sib) stepped.add(`${l.from}|${l.to}`).add(`${l.to}|${l.from}`);
@@ -1818,13 +1868,32 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
           if (stepped.has(`${a.id}|${b.id}`)) continue;
           const ax = a.x + a.w / 2, bx = b.x + b.w / 2;
           const y0 = a.y + a.h, y1 = b.y;
+          /**
+           * 🔴 AN ARROWHEAD, AND THIS REVERSES WHAT THE BLOCK ABOVE ARGUES.
+           * Instructed 2026-09-16 with a screenshot of `video`, `cue log` and
+           * `timeline` joined by bare lines: *"need arrowheads between inner
+           * boxes (make it a rule)"*.
+           *
+           * The old reasoning was that a head claims an ORDER between the parts
+           * of one machine that the drawing does not know. True, and it is the
+           * wrong thing to optimise: a reader meeting a headed line, then a
+           * headless one, then a headed one down a single column does not read
+           * "this pair is unordered", they read a head that fell off. That was
+           * REPORTED on `/station/` and now again here.
+           *
+           * ⚠️ SO THE DEFAULT FLIPS AND THE ESCAPE HATCH IS EXPLICIT. A
+           * container whose children really are a SET rather than a chain says
+           * `set: true` and gets brackets, which is the one case the old rule
+           * was right about and the only one it should ever have covered.
+           */
           field.append(s('path', {
-            class: 'pos-dg-tie',
+            class: n.set ? 'pos-dg-tie' : 'pos-dg-tie pos-dg-tie-arrow',
+            ...(n.set ? {} : { 'marker-end': `url(#${uid}-f)` }),
             d: Math.abs(ax - bx) < 0.5
               ? `M${r1(ax)} ${r1(y0)} L${r1(ax)} ${r1(y1)}`
               : tieElbow(ax, y0, bx, y1),
           }));
-          ties++;
+          if (n.set) ties++;
         }
         for (const k of n.kids) field.append(nodeGroup(k));
       } else field.append(nodeGroup(n));

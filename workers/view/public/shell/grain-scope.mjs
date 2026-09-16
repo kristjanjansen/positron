@@ -354,13 +354,17 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      *
      * On `/radio/` the wave stops and the GRAINS carry on being drawn
      * across the held span, so a stopped picture is still a live one: the thing
-     * that moves is the instrument reading the seconds again and again. On
-     * `/tapes/` there is no granulator, so the same freeze is a picture that
-     * simply stopped, reported as *"visualization just stops on looping
-     * tapes"*. Same call, same code, opposite result, and the difference is
-     * whether anything is still arriving to draw.
-     * So the caller declares it. `freezeOnLoop: false` keeps the clock running,
-     * which keeps the wave scrolling under the marks.
+     * that moves is the instrument reading the seconds again and again.
+     *
+     * ⚠️ THE EXAMPLE THIS NOTE USED TO GIVE HAS CHANGED SIDES, AND THE OPTION IS
+     * WHY IT COULD. `/tapes/` passed `false`, because its loop was made of SEEKS:
+     * the file really was still playing, so a picture that stopped was claiming
+     * a silence that did not happen, reported as *"visualization just stops on
+     * looping tapes"*. That page keeps its lap in a ring now and plays it from
+     * there, so the picture is a fixed piece of sound with a line crossing it,
+     * and it freezes like `/radio/` does. No page passes `false` today. The
+     * option stays because the question it answers is real: whether anything is
+     * still arriving to draw is a fact about the caller, not about this file.
      */
     // 🔴 ONE `now()`, READ ONCE. The line this replaced carried a warning saying
     // exactly that and the `freezeOnLoop` edit broke it anyway: two calls a
@@ -682,6 +686,31 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
           ctx.beginPath(); ctx.moveTo(W - 0.5, 0); ctx.lineTo(W - 0.5, H); ctx.stroke();
         }
       }
+    }
+
+    /**
+     * 🔴 A LINE SAYING WHAT THIS PICTURE IS, AND IT WAS DEAD CODE UNTIL NOW.
+     * `source(name)` has existed and been called by `/radio/` for weeks and the
+     * string was assigned and never drawn: a component with a setter and no
+     * reader, which is the same shape as a control that looks live and is
+     * inert. FOUND 2026-09-16 while answering why `/tapes/` shows an empty box
+     * on most of its recordings.
+     *
+     * ⚠️ IT IS STATIC TEXT IN A FIXED CORNER, which is what makes it allowed at
+     * all. CLAUDE.md forbids anything that redraws every frame from changing
+     * how much room it takes; this changes only when the page sets it, and it
+     * is drawn INSIDE the canvas, so it cannot reflow the page whatever it says.
+     */
+    if (sourceName) {
+      ctx.save();
+      ctx.globalAlpha = 1;
+      // ⚠️ `--dim`, NOT `--line`. `--line` is the colour of a grid rule on a
+      // dark ground and a sentence in it is not readable; this has to be read.
+      ctx.fillStyle = C.dim;
+      ctx.font = `11px ${getComputedStyle(canvas).fontFamily || 'monospace'}`;
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(sourceName, 8, H - 7);
+      ctx.restore();
     }
 
     // ── the loop's playhead ──────────────────────────────────────────────

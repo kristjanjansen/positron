@@ -405,7 +405,7 @@ button.pos-pri[data-busy="1"] {
    38 px square like ▶ and ❚❚, not words in a pill: a row that mixes the two
    reads as a toolbar with a stray form control in it. The label a page passes
    is the glyph; `aria` carries the word for anyone who cannot see it. */
-.tbar-x, .tbar-loop {
+.tbar-x, .tbar-loop, .tbar-slot {
   flex: none; width: var(--tbar-btn); height: var(--tbar-btn); padding: 0;
   display: grid; place-items: center; font-size: 15px; line-height: 1;
 }
@@ -415,7 +415,7 @@ button.pos-pri[data-busy="1"] {
    they count, which a label never does. Quiet rather than coloured: colour on
    the bar is spent on the thing that is running, and a place you can go should
    not compete with it. */
-.tbar-x.tbar-word, .tbar-loop.tbar-word {
+.tbar-x.tbar-word, .tbar-loop.tbar-word, .tbar-slot.tbar-word {
   width: auto; min-width: 0; padding: 0 11px;
   /* ⚠️ 500, NOT 600. At 600 `LOOP` was the heaviest ink on a bar whose job is
      to be furniture around a playhead — it read as the thing to press, which it
@@ -423,7 +423,8 @@ button.pos-pri[data-busy="1"] {
   font: 500 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim);
 }
-.tbar-x.tbar-word:hover, .tbar-loop.tbar-word:hover { color: var(--fg); background: var(--card2); }
+.tbar-x.tbar-word:hover, .tbar-loop.tbar-word:hover,
+.tbar-slot.tbar-word:hover { color: var(--fg); background: var(--card2); }
 
 /* RECORD IS RED, and armed rather than shouting: a filled red dot on a dark
    face. It is the one control on the bar that starts WRITING something, and the
@@ -1326,6 +1327,23 @@ video[hidden] { display: none; }
   gap: 12px; padding: 5px 14px; line-height: 1.4; align-items: baseline;
   border-bottom: 1px solid #ffffff08;
 }
+/* 🔴 A ROW THAT CAN BE PRESSED SAYS SO, AND SAYS IT QUIETLY. `/crate/` makes
+   its files playable by pressing a row; nothing else in the table changes, on
+   instruction (*"no table rework"*). So: a pointer, a face that lifts on hover,
+   and the shell's own focus ring for a keyboard. No glyph and no extra column.
+   ⚠️ `text-align: inherit` and `font: inherit` because a `role="button"` row is
+   still a div here, but a page could hand this a real button and the cells must
+   not suddenly centre themselves. */
+.pos-tbl-row.pick { cursor: pointer; }
+.pos-tbl-row.pick:hover { background: var(--card2); }
+.pos-tbl-row.pick:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
+/* 🔴 THE ROW THAT IS PLAYING. Asked for: *"i do not see which one is actiev on
+   table"*. A left edge and a lit name rather than a filled row: the table is a
+   list to read, and a block of colour across it would make the live row the
+   loudest thing on the page instead of the clearest. `--hi` is this site's one
+   accent and this is the one thing on the page that is happening. */
+.pos-tbl-row.on { box-shadow: inset 2px 0 0 var(--hi); background: var(--card2); }
+.pos-tbl-row.on .pos-tbl-c.hi { color: var(--hi); }
 .pos-tbl-body > .pos-tbl-row:last-child { border-bottom: 0; }
 /* The heading is the one row that is not a record, so it says so by weight and
    by case rather than by a rule under it — which every other row has too. */
@@ -1906,19 +1924,77 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    two stacked. `position: relative` on hover/focus lifts the pressed one over
    its neighbour, or the shared edge belongs to whichever came last in source
    order and a focused left button looks clipped. */
+/* 🔴 AN EMPTY MEMBER STILL EATS A GAP, AND THAT IS WHY THE LAST CONTROL SAT
+   FURTHER FROM THE EDGE THAN FROM THE TOP. MEASURED on `/videoradio/`, whose
+   bar ends in a ⛶: 9 px from the top, 9 from the bottom, 9 from the left and
+   **17 from the right**. Reported as *"eqal top righ bottom padding"*.
+   The bar is `display: flex; gap: 8px; padding: 8px`, and after the last real
+   control come `.tbar-rates` and `.tbar-badge`, both zero wide and both still
+   separated by a gap: 8 + 8 + 1 of border is the 17.
+   ⚠️ IT IS THE SAME FAULT AS AN EMPTY READOUT PAINTING ITS OWN BORDER, which
+   `shell.css` already fixes further up: a container with nothing in it must not
+   take up room, and neither must a flex child. Both of these are empty on more
+   pages than before, because a rate lattice of one now draws no buttons at all.
+   ⚠️ `:empty` IS LIVE, so the badge reappears the moment it is given text. */
+.tbar-rates:empty, .tbar-badge:empty { display: none; }
 .tbar-loopgrp { flex: none; display: flex; align-items: center; }
 .tbar-loopgrp > * { border-radius: 0; }
 .tbar-loopgrp > :first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
 .tbar-loopgrp > :last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
 .tbar-loopgrp > * + * { margin-left: -1px; }
+/* 🔴 THE GLYPH HALF IS A SQUARE, AND IT HAD STOPPED BEING ONE. Asked with the
+   same screenshot: *"arrow button square size"*. `.tbar-x` is `--tbar-btn` both
+   ways, but `.tbar-word` (which the WORD half needs) sets `width: auto` and
+   side padding, and the two selectors have equal weight — so whichever the
+   cascade reached last decided the arrow's width. Stating the square here, on a
+   selector carrying the group, settles it: the half that is a glyph is
+   `--tbar-btn` wide however the word half is styled.
+   ⚠️ IT IS SCOPED TO `:not(.tbar-word)` so a page that puts a WORD in this slot
+   still gets a word-shaped button. The rule is about glyphs, not about
+   position. */
+.tbar-loopgrp > .tbar-x:not(.tbar-word),
+.tbar-loopgrp > .tbar-slot:not(.tbar-word) {
+  width: var(--tbar-btn); min-width: var(--tbar-btn); padding: 0;
+}
 /* 🔴 BOTH SEGMENTS SHARE ONE EDGE COLOUR, OR THE PAIR IS NOT A PAIR.
    PHOTOGRAPHED with LOOP lit: a solid `--fg` pill next to a button whose border
    is `--line2` on a `--card2` face, which against the bar's own `--card` is
    almost invisible. The two measure the same 34 px high, so nothing was wrong
    with the sizes; what read as a smaller button was a block of white beside a
    hole. `--dim2` is the border the lit half already uses, so the unlit half
-   borrows it and the group reads as one control with one segment on. */
-.tbar-loopgrp > .tbar-x { border-color: var(--dim2); }
+   borrows it and the group reads as one control with one segment on.
+
+   🔴 AND IT WAS WRITTEN FOR ONE STATE OUT OF THREE, WHICH IS WHY IT CAME BACK.
+   PHOTOGRAPHED AGAIN 2026-09-16, with no loop running: *"loop buttons should
+   have same border color"*. `LOOP` idle keeps the bar's ordinary button border
+   and the → beside it was pinned to `--dim2` by the rule above, so the pair the
+   rule exists to join was mismatched in exactly the state a visitor sees first.
+   It had been reasoned about with the loop ON, where `.tbar-loop[data-loop=on]`
+   paints its own `--fg` edge and the mismatch is the point.
+   The fix is to state it once for BOTH segments rather than to nudge one of
+   them toward the other: whatever the idle edge is, both halves wear it, and
+   only a segment that is armed or running overrides it below. */
+.tbar-loopgrp > .tbar-x,
+.tbar-loopgrp > .tbar-loop,
+.tbar-loopgrp > .tbar-slot { border-color: var(--dim2); }
+/* 🔴 AND A DISABLED SEGMENT KEEPS THE EDGE. IT FADES ITS INK AND NOTHING ELSE.
+   PHOTOGRAPHED A THIRD TIME, 2026-09-16: *"borders are different colors. do
+   not."*, on a pair whose CSS plainly gave both halves `--dim2`. The rule was
+   right and something else was doing it: `button[disabled] { opacity: .4 }`
+   fades the WHOLE button, and a border at 40% over the bar's own face is a
+   different colour from the same border at 100% beside it. `/replay/` disables
+   its way button on purpose, so that pair is mismatched whenever the page is
+   doing exactly what it was asked to do.
+   ⚠️ THE SIGNAL MOVES TO THE INK RATHER THAN BEING DROPPED. A control that is
+   unavailable still has to say so, and this project already has the answer in
+   writing for the videoradio control row: fade the ink, never the box. The
+   glyph goes to `--dim2` against `--fg`, the edge stays put, and the reason is
+   on the button's own `title` where `looper.sayTooLong()` already writes it. */
+.tbar-loopgrp > [disabled] {
+  opacity: 1;
+  color: var(--dim2);
+  cursor: default;
+}
 .tbar-loopgrp > :hover, .tbar-loopgrp > :focus-visible { position: relative; z-index: 1; }
 /* 🔴 A LOOP IS GREY, NOT YELLOW, AND THAT IS ABOUT WHAT `--hi` IS FOR. ASKED
    FOR: *"find another color for loop button enabled bg and loop info viz
@@ -1961,6 +2037,10 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    piece of the container's furniture rather than as a line carrying something.
    The head is the channel that says "no order here"; the weight is not. */
 .pos-dg-tie { stroke: var(--dim); stroke-width: 1.1; stroke-linecap: round; fill: none; }
+/* 🔴 A HEADED INNER CONNECTOR IS THE SAME INK AS A DECLARED ARROW, or the head
+   reads as a different KIND of link rather than the same one. Only the marker
+   is added; weight, colour and cap all stay. */
+.pos-dg-tie-arrow { stroke: var(--dim); stroke-width: 1.1; fill: none; }
 /* 🔴 HOVER IS EASED, BECAUSE AT ZERO IT READS AS A FAULT. The fill and the
    stroke both change the instant a pointer crosses a box, and with six boxes in
    a row a reader sweeping across them gets six hard flashes — reported as

@@ -65,7 +65,8 @@ import { el } from './shell.mjs';
  * @returns {{el:HTMLElement, set:(rows:object[])=>void, add:(row:object)=>void,
  *            clear:(msg?:string)=>void, count:()=>number, columns:Column[]}}
  */
-export function createTable({ columns, cap = 1000, empty = 'nothing yet', note = '' } = {}) {
+export function createTable({ columns, cap = 1000, empty = 'nothing yet', note = '',
+                              onPick = null } = {}) {
   if (!Array.isArray(columns) || !columns.length) {
     throw new Error('createTable: columns are the whole point, so declare some');
   }
@@ -110,6 +111,9 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
   wrap.append(body);
   let n = 0;
 
+  // Every row element now on screen, and the data it was built from, so a
+  // caller can light one after a repaint. See `mark`.
+  const els = [], shown = [];
   const blank = (msg) => {
     body.textContent = '';
     // 🔴 AN EMPTY STRING MEANS SAY NOTHING, AND SAYING NOTHING MEANS NO
@@ -129,6 +133,35 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
     if (!n) { body.textContent = ''; if (head) head.hidden = false; }
     const row = el('div', 'pos-tbl-row');
     if (note && r[note]) row.title = String(r[note]);
+    /**
+     * 🔴 A ROW A CALLER CAN ACT ON, WITHOUT THE TABLE KNOWING WHAT THE ACTION
+     * IS. Asked for on `/crate/` 2026-09-16: *"no table rework. just make
+     * clickin files playable"*, and the second half of that sentence is the
+     * design. The component gains one callback and no opinion: no play glyph,
+     * no chevron, no second column.
+     *
+     * ⚠️ A `<button>` ROW, NOT A DIV WITH A CLICK HANDLER. A clickable div is
+     * unreachable by keyboard and invisible to a screen reader, and this is a
+     * list somebody may be working through with tab.
+     * ⚠️ AND IT DOES NOT SWALLOW A LINK. A cell may already be an anchor
+     * (`link:`), which is a different destination from the row's own action, so
+     * a press that lands on one is left alone rather than being turned into a
+     * row press.
+     */
+    els.push(row); shown.push(r);
+    if (onPick) {
+      row.setAttribute('role', 'button');
+      row.tabIndex = 0;
+      row.classList.add('pick');
+      const go = (e) => {
+        if (e.target?.closest?.('a')) return;
+        onPick(r, row);
+      };
+      row.addEventListener('click', go);
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); }
+      });
+    }
     for (const c of columns) {
       const v = r[c.key];
       const text = v == null || v === '' ? '' : String(v);
@@ -155,9 +188,22 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
     el: wrap,
     add,
     set(rows) {
-      body.textContent = ''; n = 0;
+      body.textContent = ''; n = 0; els.length = 0; shown.length = 0;
       if (!rows?.length) { blank(); return; }
       for (const r of rows) add(r);
+    },
+    /**
+     * 🔴 WHICH ROW IS THE LIVE ONE, DECIDED BY THE CALLER AND DRAWN BY THE
+     * TABLE. Asked for on `/crate/` 2026-09-16: *"i do not see which one is
+     * actiev on table"*.
+     *
+     * ⚠️ IT TAKES A PREDICATE OVER THE ROW DATA, NOT AN INDEX. A page repaints
+     * this list whenever the store changes, and an index survives exactly until
+     * a row is added at the top, which `/crate/` does on every upload. Asking
+     * the caller "is THIS row the one" is the only form that survives a repaint.
+     */
+    mark(is) {
+      els.forEach((e, i) => e.classList.toggle('on', !!is && !!is(shown[i], i)));
     },
     clear: blank,
     count: () => n,
