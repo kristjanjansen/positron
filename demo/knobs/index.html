@@ -470,10 +470,46 @@
    * about whatever was in the stream before it.
    */
   let noteAt = 0, releasedAt = 0;
+
+  /**
+   * 🔴 A PATCH COMES OFF AN SD CARD, AND A NOTE SENT BEFORE IT LANDS IS LOST.
+   * REPORTED TWICE AS *"No sound in knobs"*, and MEASURED over the relay with
+   * no page in the way: select then note back to back gives peak 0.0000, and
+   * select, wait 900 ms, then note gives 0.0213 on the same patch and the same
+   * note. `yoshimi-test.mjs` and `cc-test.mjs` both wait, each with a comment
+   * saying an .xiz is read off an SD card and parsed. This page sent them in
+   * one breath and was silent for it.
+   *
+   * ⚠️ THE FIRST FIX FOR THIS REPORT WAS REAL AND WAS NOT THIS. A page that
+   * found yoshimi already running never sent a note at all. Fixing that made
+   * the note arrive, and it arrived too early, which looks identical from a
+   * chair: no sound, no error, every counter correct.
+   */
+  const PATCH_SETTLE_MS = 900;
+  async function selectAndHold() {
+    sendId({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
+    await wait(PATCH_SETTLE_MS);
+    holdNote();
+  }
+
   function holdNote() {
     sendId({ type: 'note.on', note: NOTE, vel: VEL, channel: 0 });
     noteAt = performance.now();
     peak = 0;
+    /**
+     * 🔴 AND IF IT MAKES NO SOUND, THE PAGE SAYS SO. Every counter on this page
+     * reads correct while the board streams silence, which is how the fault
+     * above survived two reports: the stream arrives at fifty frames a second
+     * whether or not anything is sounding. A held note that produces nothing is
+     * a fault and belongs in the log, which is where this page's real faults
+     * are reported.
+     */
+    const asked = noteAt;
+    setTimeout(() => {
+      if (asked !== noteAt || releasedAt > noteAt) return;   // a newer note, or it was released
+      if (peak > 0.002) return;
+      d.log('the note is not sounding: the board is streaming silence. Press stop and play again, or check nothing else is holding the instrument', 'bad');
+    }, 1800);
   }
 
   async function startNote() {
@@ -496,8 +532,7 @@
          * note, and this branch had confused the two.
          */
         armed = true;
-        sendId({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
-        holdNote();
+        await selectAndHold();
         d.log(`yoshimi was already up, so nothing was restarted. ${PATCH} is loaded and one note is held. Drag the sliders`, 'hi');
       } else if (status && status.ok) {
         // 🔴 DO NOT AUTOSTART OVER SOMEBODY. There is one JACK graph and one
@@ -509,8 +544,7 @@
         const r = await ask({ type: 'audio.start', source: 'yoshimi' }, 'audio.started', 60000);
         if (r?.ok) {
           armed = true;
-          sendId({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
-          holdNote();
+          await selectAndHold();
           d.log(`${PATCH} is loaded and one note is held. Drag the sliders`, 'hi');
         } else {
           // A recovery action is not free, and a wedged jackd cannot be
