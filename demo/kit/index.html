@@ -1413,10 +1413,11 @@ green = inside what it promised · amber/red = later`,
   const px = (e, side) => Number.parseFloat(getComputedStyle(e)[`border${side}Width`]);
   // ⚠️ AND THE SECOND HALF OF WHAT JOINED MEANS IS WHERE IT SITS: at the FOOT,
   // under the BIG gap rather than the small one between two ordinary rows.
-  // There are two gaps in this project and only two, 40 and 120, and the big
-  // one is spent once per page on exactly this: where the page stops being an
-  // instrument and starts being an account of one. Declared on `.pos-report`
-  // and on `.pos-body`'s bottom margin, which collapse rather than add.
+  // There is ONE gap in this project, 40 px, and this surface takes it like
+  // everything else. It is stated on `.pos-report` as well as on `.pos-body`'s
+  // bottom margin because the surface sits outside the body, where the rhythm
+  // on that element's children cannot reach it; the two collapse rather than
+  // add.
   {
     const rep = joinedSpec?.foot;
     const ro = joinedSpec?.readoutEl.getBoundingClientRect();
@@ -1429,7 +1430,7 @@ green = inside what it promised · amber/red = later`,
     d.assert('joined is one box at the foot of the page, with the two halves one pixel apart',
       !!rep && rep.classList.contains('pos-report')
       && rep.contains(joinedSpec.readoutEl) && rep.contains(joinedSpec.logEl)
-      && Math.abs(seam - 1) <= 0.5 && Math.abs(foot - 120) <= 0.5
+      && Math.abs(seam - 1) <= 0.5 && Math.abs(foot - 40) <= 0.5
       && outer === 1 && inner[0] === 0 && inner[1] === 0,
       `${foot.toFixed(1)} px under the page · seam ${seam.toFixed(1)} px · `
       + `one edge of ${outer} px round both, ${inner.join(' and ')} inside`);
@@ -1452,10 +1453,10 @@ green = inside what it promised · amber/red = later`,
     const above = mid && ro ? mid.top - ro.bottom : -1;
     const below = mid && lo ? lo.top - mid.bottom : -1;
     const own = splitSpec ? px(splitSpec.readoutEl, 'Top') === 1 && px(splitSpec.logEl, 'Top') === 1 : false;
-    d.assert('split leaves two surfaces: the small gap above the page, the big one before the foot',
+    d.assert('split leaves two surfaces, with the page\u2019s one gap above and below',
       own && splitSpec.report === null
       && !splitSpec.readoutEl.closest('.pos-report') && !splitSpec.logEl.closest('.pos-report')
-      && Math.abs(above - 40) <= 0.5 && Math.abs(below - 120) <= 0.5,
+      && Math.abs(above - 40) <= 0.5 && Math.abs(below - 40) <= 0.5,
       `${above.toFixed(1)} px above the page and ${below.toFixed(1)} px below it, ${own ? 'two edges' : 'NOT two edges'}`);
   }
 
