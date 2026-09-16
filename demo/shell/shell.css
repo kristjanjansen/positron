@@ -347,6 +347,53 @@ button.pos-pri[data-busy="1"] {
 .pos-line.warn .pos-m { color: var(--warn); }
 .pos-line.ok .pos-m { color: var(--ok); }
 
+/* ── readout and log, joined ──────────────────────────────────────────── */
+/* 🔴 ONE SURFACE, THE READOUT SITTING ON TOP OF THE LOG, AT THE FOOT OF THE
+   PAGE. Asked for 2026-09-16: *"combine readout with log component, put it top
+   of it. they can be used split or also be the same thing in bottom of page"*.
+   `mount({ joined: true })` picks it and `createReport()` builds it; the split
+   pair is still the default, so a page that does not ask keeps its layout to
+   the element.
+
+   🔴 WHAT SEPARATES THE TWO HALVES IS 1 px OF `--line`, AND THAT IS NOT A
+   DIVIDER. The standing rule is that separation is spacing, and that a line is
+   a second channel saying what the spacing already said — and it is a rule
+   about the gap BETWEEN surfaces, which is the 22 px rhythm at
+   `.pos-body > * + *`. Inside ONE surface there is no rhythm to repeat: the
+   readout is already a mosaic of cells on a line-coloured ground, with exactly
+   1 px of `--line` showing through between every pair of them. The log joins
+   that mosaic as one more tile, so the seam above it is the SAME seam the
+   cells already have, drawn by the same `gap` on the same background. Air here
+   would be the thing that reads wrong: two boxes with 22 px between them are
+   two surfaces, and two surfaces is the split arrangement.
+
+   ⚠️ THE BORDER MOVES OUT, IT IS NOT DRAWN TWICE. The children give up their
+   own border and radius to this box, so a joined surface has ONE edge. Nested
+   1 px borders would put a double rule round the log and a stray one under the
+   readout, which is the "old UI creeping in" band from `/typist/` in a new
+   place.
+
+   ⚠️ AND A HALF-EMPTY ONE DRAWS NO SEAM. A `display: none` child takes no
+   `gap` in a flex column, so a report holding only a log, or only a readout,
+   is one bordered box with nothing hanging off it. A report holding NEITHER is
+   never appended: `createReport()` returns no `foot` at all, because a
+   container with nothing in it must not paint its edges. */
+.pos-report {
+  display: flex; flex-direction: column;
+  gap: 1px; background: var(--line); border: 1px solid var(--line);
+  border-radius: 4px; overflow: hidden;
+  /* the same 22 px every other surface takes from `.pos-body > * + *`; it is
+     the page's rhythm, typed here because the report is a sibling of the body
+     rather than a child of it, exactly as `.pos-log` already is */
+  margin-top: 22px;
+}
+/* `display: flex` beats the UA's `[hidden]` rule. The readout and the control
+   row are both already patched for the same trap, and both cost a band of dead
+   space nobody wrote before they were. */
+.pos-report[hidden] { display: none; }
+.pos-report > .pos-readout,
+.pos-report > .pos-log { border: 0; border-radius: 0; margin: 0; }
+
 /* ── transport bar ────────────────────────────────────────────────────── */
 /* WRAP. Measured at 390 px (iPhone) this row overflowed its own card by 94 px
    and by 164 px at 320 — and body{overflow-x:hidden} CLIPPED 2x and 4x off the
@@ -2117,10 +2164,10 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    sentence nobody wrote, and it happens whenever both halves are the same grey.
    ⚠️ THE TRACKING IS SAFE HERE AND WOULD NOT BE ON THE WORD, whose box is
    reserved in `ch` and would overflow by one space per character. */
-.pos-pres-of {
-  font: 500 10px/1 var(--mono); letter-spacing: .1em;
-  text-transform: uppercase; color: var(--dim2);
-}
+/* The subject's name is no longer its own element: it is part of the one
+   string the word carries, so it fades with the state rather than sitting
+   still while half the label changes under it. */
+
 /* The reserve. `min-width` rather than `width`, so a page that hands it a word
    longer than it declared grows rather than clipping — a truncated state word
    would be the one failure this box exists to prevent, in a new costume. */
