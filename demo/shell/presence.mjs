@@ -1,0 +1,342 @@
+// demo/shell/presence.mjs — is the thing on the other end there?
+//
+// Four pages ask this question and four pages answer it differently. `/knobs/`
+// waits six seconds and writes a log line, `/grains/` waits for a `box.hello`
+// and enables its buttons, `/box/` watches for the same message and draws an
+// instrument row, `/rack/` waits on an agent on a Mac that may simply be off.
+// None of them can SHOW the answer without reading the log, and none of them
+// distinguishes the two greys: a thing that has gone quiet, and a thing nobody
+// has asked yet.
+//
+// 🔴 FOUR STATES, NOT THREE, AND THE FOURTH IS THE HONEST ONE. CLAUDE.md is
+// explicit that "we did not look" must not read as "it is missing", which is
+// why `caps.mjs` answers `unknown` and why `unknown` never blocks anything.
+// A badge that opens on `offline` is a page asserting a measurement it has not
+// taken, about hardware in another building, in the two seconds before the
+// first heartbeat lands. It is wrong exactly when somebody is watching.
+//
+//   unknown   nothing has answered and not enough time has passed to say
+//   coming    something is on its way up, and this is the state that moves
+//   online    it spoke inside the time it promised to speak in
+//   offline   it was there and has gone quiet, or it was listened for and never came
+//
+// 🔴 THE PICTURE IS HERE; THE POLICY IS A PURE FUNCTION BESIDE IT, AND THE
+// NUMBER BELONGS TO WHOEVER KNOWS THE HEARTBEAT. `presenceOf` takes a last-seen
+// time and an expected interval and returns one of those four words. It holds
+// no clock, no socket and no element, so the whole of the rule is gradable by
+// `node demo/shell/presence-test.mjs` rather than by watching a board in
+// another building and wondering. The board beats every 5 s (`rig/box/box.mjs`
+// sends `box.alive` on a 5000 ms interval), so a page passes `everyMs: 5000`
+// and does not invent a rule of its own.
+//
+// ⚠️ `lastSeenAt` IS WHEN YOU HEARD IT, NOT THE STAMP INSIDE THE MESSAGE. Every
+// envelope on this project's relay carries `at`, written by the SENDER with its
+// own `Date.now()`, and a board whose clock runs three minutes fast would read
+// as freshly heard from forever after it died. Call `seen()` when the message
+// arrives. A `lastSeenAt` later than `now` is answered `unknown` rather than
+// `online`, because a measurement from the future is a mis-measurement and this
+// file's whole subject is not dressing one of those up as a fact.
+
+/** The four, most-present first. The order is the one the kit shows them in. */
+export const PRESENCE_STATES = ['online', 'coming', 'offline', 'unknown'];
+
+/**
+ * What a visitor reads. Plain words, no jargon, and none of them is a
+ * mechanism: a person who has never heard of a heartbeat can read all four.
+ * A page may shorten them (`says: { coming: 'starting' }`), which also shortens
+ * the badge, because the reserved width is measured off whatever it can say.
+ */
+export const SAYS = {
+  online: 'online',
+  coming: 'coming online',
+  offline: 'offline',
+  unknown: 'no word yet',
+};
+
+/** How many expected beats may be missed before it is called gone. */
+export const MISSES = 2;
+
+/**
+ * One of `PRESENCE_STATES`, from a last-seen time and the interval the thing
+ * promised to speak on. Pure: no clock, no DOM, no socket.
+ *
+ * @param {object}  o
+ * @param {number}  o.now          this moment, in ms, from the same clock as the rest
+ * @param {number}  o.everyMs      how often it is expected to speak. REQUIRED
+ * @param {?number} o.lastSeenAt   when it last spoke, or null if never
+ * @param {number}  o.misses       beats it may miss before it is called gone
+ * @param {?number} o.since        when this page started listening, or null
+ * @param {?number} o.comingSince  when a deliberate start began, or null
+ * @param {?number} o.comingMs     how long that start is allowed to take, null for no limit
+ */
+export function presenceOf({
+  now,
+  everyMs,
+  lastSeenAt = null,
+  misses = MISSES,
+  since = null,
+  comingSince = null,
+  comingMs = null,
+} = {}) {
+  if (!Number.isFinite(now)) {
+    throw new Error('presence: `now` must be a time in ms. Pass Date.now().');
+  }
+  /**
+   * 🔴 NO DEFAULT FOR `everyMs`. A default of one second would call a board
+   * with a five-second heartbeat offline between every beat, which is a badge
+   * that flickers grey on working hardware and sends somebody to look at the
+   * hardware. The interval is a fact about the far end and only the page knows
+   * it, so a page that has not said what it is has a bug and hears about it on
+   * the first call rather than in the field.
+   */
+  if (!Number.isFinite(everyMs) || everyMs <= 0) {
+    throw new Error('presence: `everyMs` must say how often the thing speaks, in ms '
+      + '(the board beats every 5000). There is no safe default for it.');
+  }
+  if (!Number.isFinite(misses) || misses < 1) {
+    throw new Error('presence: `misses` must be at least 1. Zero would call it gone '
+      + 'the instant a beat is due, and a beat is never exactly on time.');
+  }
+
+  const window = misses * everyMs;
+
+  // Heard from the future: two clocks, not one measurement. See the header.
+  if (lastSeenAt != null && lastSeenAt > now) return 'unknown';
+
+  if (lastSeenAt != null && now - lastSeenAt < window) return 'online';
+
+  /**
+   * ⚠️ COMING LOSES TO `online` AND BEATS BOTH GREYS. A synth coming up on the
+   * board takes ten to forty seconds, and for all of it the honest answer is
+   * that something is happening. It must not read as offline, which would make
+   * every press of Play look like a dead button for half a minute.
+   * ⚠️ AND IT IS ALLOWED AN EXPIRY, because a thing that has been "coming
+   * online" for ten minutes is not coming online. `comingMs: null` means the
+   * page will clear it itself, which is right where the page gets a reply that
+   * tells it the attempt failed.
+   */
+  const starting = comingSince != null && comingSince <= now
+    && (comingMs == null || now - comingSince < comingMs);
+  if (starting) return 'coming';
+
+  // It spoke once and has stopped. This is a measurement, so it is grey INK
+  // rather than grey absence: see the note on the two greys in shell.css.
+  if (lastSeenAt != null) return 'offline';
+
+  // Never heard, but listened for long enough that silence is an answer.
+  if (since != null && now - since >= window) return 'offline';
+
+  // Never heard, and not yet listened for long enough to say anything at all.
+  return 'unknown';
+}
+
+/**
+ * The same four words, read off a WebSocket rather than off a heartbeat.
+ *
+ * `openWire` in `wire.mjs` already knows three of the things a page needs and
+ * every page re-derives them: `state()` is the raw `readyState`, `stats()`
+ * carries `refusal` (why the last upgrade was refused, when the relay could be
+ * asked) and `reconnects`. This turns those into a state and a sentence, so a
+ * page gets a socket badge in one line instead of four handlers.
+ *
+ * ⚠️ A SOCKET AND THE THING AT THE FAR END ARE TWO SUBJECTS AND GET TWO BADGES.
+ * The relay being reachable says nothing about whether the board is plugged in,
+ * and `/knobs/` proves it: the socket opens in 200 ms and the board may be off.
+ * Use this for the relay, `presenceOf` for whoever is meant to be in the room.
+ *
+ * ⚠️ A CLOSED SOCKET IS `offline` EVEN WHEN A RETRY IS SCHEDULED, on purpose.
+ * Right now nothing can be reached, which is what a reader wants to know;
+ * `openWire` backs off at 300 ms, so the badge turns to `coming` on its own
+ * within a third of a second of the retry firing.
+ */
+export function wirePresence({ ready = null, refusal = null, reconnects = 0 } = {}) {
+  if (ready == null) return { state: 'unknown', why: 'no socket has been opened' };
+  if (ready === 0) {
+    return { state: 'coming', why: reconnects > 0 ? 'the socket is coming back' : 'the socket is opening' };
+  }
+  if (ready === 1) return { state: 'online', why: null };
+  if (ready === 2) return { state: 'offline', why: 'the socket is closing' };
+  if (ready === 3) return { state: 'offline', why: refusal };
+  throw new Error(`presence: readyState ${ready} is not one of 0, 1, 2, 3. `
+    + 'Pass `wire.state()`, which answers exactly those.');
+}
+
+/**
+ * A badge, or a dot inside something else.
+ *
+ * 🔴 ONE COMPONENT, TWO MODES, AND THE ONLY DIFFERENCE IS WHAT IS VISIBLE.
+ * `mode: 'badge'` shows a dot, an optional fixed name and the word.
+ * `mode: 'dot'` shows the dot alone and CLIPS the words rather than removing
+ * them, so the accessible name is still "the board coming online" and the live
+ * region still announces a change. A dot whose meaning exists only in colour is
+ * a dot a screen reader cannot read at all, and `display: none` is exactly how
+ * that happens by accident.
+ *
+ * 🔴 NOTHING HERE CHANGES SIZE WHILE IT REDRAWS. Two separate guards, because
+ * there are two ways this could move: the animated part is the dot's FILL and
+ * the only property that animates is `opacity`, which cannot affect layout; and
+ * the word sits in a box whose `min-width` is reserved at build time from the
+ * longest thing this instance can ever say, measured in `ch` of the mono face
+ * it is set in. So the badge is the same width in all four states and the same
+ * width at every moment of the animation. Graded in `/kit/`, by measuring four
+ * badges rather than by pressing one through four states.
+ *
+ * ⚠️ NO LETTER-SPACING ON THE WORD. `ch` is the advance of `0`, and letter
+ * spacing adds to every advance, so a tracked-out word would overflow a reserve
+ * computed in `ch` by exactly one space per character. `.tbar-live` is tracked
+ * and gets away with it because its word never changes.
+ */
+export function createPresence({
+  of = '',
+  mode = 'badge',
+  says = {},
+  state = 'unknown',
+  why = null,
+  showName = null,
+  onChange = null,
+} = {}) {
+  if (mode !== 'badge' && mode !== 'dot') {
+    throw new Error(`presence: mode is 'badge' or 'dot', not ${JSON.stringify(mode)}.`);
+  }
+  const words = { ...SAYS, ...says };
+  for (const s of PRESENCE_STATES) {
+    if (typeof words[s] !== 'string' || !words[s]) {
+      throw new Error(`presence: there is no word for "${s}". Every state a badge can reach needs one.`);
+    }
+    if (words[s].includes('—')) {
+      throw new Error(`presence: "${words[s]}" carries an em dash, and this is read by a visitor.`);
+    }
+  }
+  const named = showName == null ? (mode === 'badge' && !!of) : (showName && !!of);
+
+  const root = document.createElement('span');
+  root.className = 'pos-pres';
+  root.dataset.mode = mode;
+  // `status` + polite: a change is announced once, when it happens. It changes
+  // on a transition and never on a tick, so this is not a thing that talks over
+  // somebody sixty times a second.
+  root.setAttribute('role', 'status');
+  root.setAttribute('aria-live', 'polite');
+
+  const dot = document.createElement('i');
+  dot.className = 'pos-pres-dot';
+  dot.setAttribute('aria-hidden', 'true');
+  root.append(dot);
+
+  if (named) {
+    const n = document.createElement('b');
+    n.className = 'pos-pres-of';
+    n.textContent = of;
+    root.append(n);
+  }
+
+  const word = document.createElement('span');
+  word.className = 'pos-pres-w';
+  // The reserve. Whatever this instance can say, at its longest, in characters
+  // of its own monospace face. A page that shortens the words gets a shorter
+  // badge for free, and a page that lengthens one cannot make the badge twitch.
+  const widest = Math.max(...PRESENCE_STATES.map((s) => words[s].length));
+  word.style.setProperty('--pres-ch', String(widest));
+  root.append(word);
+
+  let now = null, note = null;
+  let timer = null, f = null;
+
+  function title() {
+    const base = of ? `${of} · ${words[now]}` : words[now];
+    return note ? `${base} · ${note}` : base;
+  }
+
+  function paint() {
+    root.dataset.state = now;
+    word.textContent = words[now];
+    root.title = title();
+  }
+
+  function set(next, reason = null) {
+    if (!PRESENCE_STATES.includes(next)) {
+      throw new Error(`presence: "${next}" is not one of ${PRESENCE_STATES.join(', ')}.`);
+    }
+    const changed = next !== now || (reason ?? null) !== note;
+    now = next;
+    note = reason ?? null;
+    paint();
+    // Only on a real change: a callback per tick is a log line per tick, which
+    // is the "slop log" this project already has a rule about.
+    if (changed && onChange) onChange(now, note);
+    return api;
+  }
+
+  function derive() {
+    set(presenceOf({ now: Date.now(), ...f }), f.why);
+  }
+
+  const api = {
+    el: root,
+    set,
+    state: () => now,
+    why: () => note,
+    says: (s = now) => words[s],
+    /** The reserved width, in characters. Handy in a check. */
+    reserve: () => widest,
+
+    /**
+     * Derive the state from a heartbeat instead of being told it.
+     *
+     * Idempotent: calling it again replaces the rule and the timer. It derives
+     * ONCE before starting the timer, so a bad `everyMs` throws here rather
+     * than inside an interval where nothing would ever see it.
+     */
+    follow(opts = {}) {
+      api.stop();
+      f = {
+        everyMs: opts.everyMs,
+        misses: opts.misses ?? MISSES,
+        comingMs: opts.comingMs ?? null,
+        since: opts.since === undefined ? Date.now() : opts.since,
+        lastSeenAt: opts.lastSeenAt ?? null,
+        comingSince: opts.comingSince ?? null,
+        why: opts.why ?? null,
+      };
+      derive();
+      // Fast enough that "gone" is noticed within a second of the deadline,
+      // slow enough that nothing is doing arithmetic at frame rate.
+      const tick = Math.min(1000, Math.max(200, f.everyMs / 4));
+      timer = setInterval(derive, tick);
+      return api;
+    },
+
+    /** It spoke. Stamp it with YOUR clock, at the moment it arrived. */
+    seen(at = Date.now()) {
+      if (!f) throw new Error('presence: seen() needs follow() first, which is where the heartbeat interval is.');
+      f.lastSeenAt = at;
+      f.comingSince = null;             // it is here; it is not on its way any more
+      derive();
+      return api;
+    },
+
+    /** A deliberate start began, or ended without arriving. */
+    coming(on = true, at = Date.now()) {
+      if (!f) throw new Error('presence: coming() needs follow() first.');
+      f.comingSince = on ? at : null;
+      derive();
+      return api;
+    },
+
+    /** A standing reason, kept across ticks. `wirePresence`'s `why` goes here. */
+    because(text) {
+      if (f) f.why = text ?? null;
+      else note = text ?? null;
+      if (f) derive(); else paint();
+      return api;
+    },
+
+    stop() {
+      if (timer != null) { clearInterval(timer); timer = null; }
+      return api;
+    },
+  };
+
+  set(state, why);
+  return api;
+}
