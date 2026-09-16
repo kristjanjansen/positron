@@ -12,14 +12,14 @@
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createMidi } from '/shell/midi.mjs';
 
-  // The studio Mac's room. `/box/` is this same page pointed at a Raspberry Pi —
+  // The studio Mac's room. `/keys/` is this same page pointed at a Raspberry Pi —
   // which is the argument: what crosses the relay is a note NUMBER, so neither
   // end knows what kind of machine the other one is.
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'm1-1';
   // `?relay=ws://127.0.0.1:8899` points this page at a relay on the LAN, which
   // is the only way to tell "the sound is bad" from "the PATH to the sound is
-  // bad" — the two have opposite fixes and look identical from here. /box/ has
+  // bad" — the two have opposite fixes and look identical from here. /keys/ has
   // had this override since it was written.
   const RELAY = `${q.get('relay') || 'wss://ws.positron.studio'}/room/${ROOM}/ws`;
   const ID = Math.random().toString(36).slice(2, 8);
@@ -39,7 +39,7 @@
     // `repeat(auto-fit, minmax(96px, 1fr))`, so at this page's ~740 px it takes
     // SEVEN per line and a nine-cell row wrapped, leaving two cells and a hole.
     // The two that went: `instrument` was a structural constant here (this page
-    // is the Ableton one; `/box/` is the Pi), and a cell that cannot change
+    // is the Ableton one; `/keys/` is the Pi), and a cell that cannot change
     // teaches a reader to skip the row — and at 105 px it drew `Ablet…`, which
     // is worse than absent. `frames` was an odometer; `rate` is the same
     // quantity where it can still say something.

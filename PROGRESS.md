@@ -2217,7 +2217,7 @@ finished: `text` (1,222 lines), `automation` (1,765, to be renamed **memento**),
 
 `picker` (a stepper cannot choose one of 878 — the name IS the control, over an
 invisible native select), `messages`, `panel`, `grain-scope`, `pointer-adapter`.
-`/box/` had its own `[aria-pressed]` rule repainting every `createChoice` on the
+`/keys/` had its own `[aria-pressed]` rule repainting every `createChoice` on the
 page — same specificity, later in the cascade.
 
 ⚠️ **Five ways a CSS rule can be present and inert** cost three attempts at one
@@ -2297,7 +2297,7 @@ zero sample jumps over 0.25. Over the relay: same pitch to a tenth of a Hz, same
 peak, zero jumps. Suite green. The defect was downstream of all of it —
 `pcm-playout` trimmed ~15 ms mid-note on ordinary jitter (floor 60 ms, slack
 15 ms, frames in 20 ms lumps). Found by putting a number on the cushion:
-`0 ran dry, 1 trimmed` in 2.2 s. ⚠️ `/box/` and `grains` had the same defect,
+`0 ran dry, 1 trimmed` in 2.2 s. ⚠️ `/keys/` and `grains` had the same defect,
 unreported, for as long as they have existed. LESSONS #52.
 
 **Stereo, announced and checked.** `audioChannels` + `frameMs`, and the receiver
@@ -2305,13 +2305,13 @@ verifies one against the other. Proved by shipping a liar: 14/14 → 13/14, whic
 also exposed the page correcting itself and being un-corrected by the next
 status reply. LESSONS #53.
 
-**`studio-1` was full at 16/16** and refused the board for hours while `/box/`
+**`studio-1` was full at 16/16** and refused the board for hours while `/keys/`
 was down — orphaned harness Chromes of mine, four profile groups, 118 processes.
 A redeploy does NOT clear it (hibernated sockets are restored). The relay now
 reclaims idle sockets when a room is full. LESSONS #56.
 
 **UI, four rounds:** `grains` rebuilt around six named patches with the
-randomiser choosing between them (LESSONS #59); `/box/`'s duplicate General MIDI
+randomiser choosing between them (LESSONS #59); `/keys/`'s duplicate General MIDI
 collapsed and its hand-built radio rows replaced with `createChoice` (#60); a
 slider group that shares columns — every label, lane and value at one x, lanes
 250 px against 96 on a phone (#57); and a zoomed screenshot that measured

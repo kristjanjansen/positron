@@ -1,8 +1,8 @@
-# plan-box-pappus: take the granulator out of `/box/`, and say what is left
+# plan-box-pappus: take the granulator out of `/keys/`, and say what is left
 
 🔴 **SECOND PASS, 2026-09-16. THE TWO THINGS §2 KEPT ARE BOTH GONE, AND §9
 GAINED AN ANSWER.** Instructed as *"get rid of both"*, quoting this file's own
-exceptions back at it. `/box/` no longer sends `fx.pappus {on:false,
+exceptions back at it. `/keys/` no longer sends `fx.pappus {on:false,
 onlyIfIdle:true}`, so the string `pappus` appears **0 times** in
 `rig/box/listen.html`; the guarantee that message carried moved onto the BOARD,
 which now drops an insert whose page has stopped talking. And ERR's 1965 archive
@@ -10,13 +10,13 @@ left the board entirely. §2, §3 and §9 below are marked where they are now
 history. The board keeps its granulator: *"keep pi granulator for grains"*.
 
 Asked for 2026-09-16: *"plan and remove pappus from the
-http://127.0.0.1:8890/box/ signal path. there is no ui to control it. arhvice
+http://127.0.0.1:8890/keys/ signal path. there is no ui to control it. arhvice
 it. update diagram as well. captutre: should be more techical, JACK etc. can we
 sampled (renamed to the collection name), hexter, yoshimi side by side in pi box
 in diagram"*.
 
-`/box/` is `rig/box/listen.html`, served at `/box/`, deployed as
-`workers/view/public/box/index.html`. The board's code is `rig/box/`.
+`/keys/` is `rig/box/listen.html`, served at `/keys/`, deployed as
+`workers/view/public/keys/index.html`. The board's code is `rig/box/`.
 
 ---
 
@@ -40,7 +40,7 @@ and `pappusFx(false)` undoes both and re-connects the instrument straight to
 -ar 48000 -ac 1 -`, whose stdout `box.mjs` cuts into 960-sample frames and sends
 over the relay.
 
-**On `/box/` today it is drawn, reported, and cannot be touched.** The page has
+**On `/keys/` today it is drawn, reported, and cannot be touched.** The page has
 had no control for it since the reverb replaced it; what is left is a box in the
 diagram between `instruments` and `capture`, a `let insert` that follows what
 the board says, two log lines that narrate it, and one message on connect.
@@ -60,13 +60,13 @@ with no control for a thing opens by talking about it.
 subject is the same granulator running in a tab and on the Raspberry Pi. It
 sends `fx.pappus {on:true}` from its own handler, polls `params.state`, and
 compares the two. Deleting the board half breaks a deployed page. The ask is
-about `/box/`'s signal path, and the board is not `/box/`.
+about `/keys/`'s signal path, and the board is not `/keys/`.
 
 ⚠️ **REVERSED 2026-09-16, AND THE REASONING IS KEPT BECAUSE THE FAULT IS REAL.**
-This section said `/box/` keeps sending `fx.pappus {on:false, onlyIfIdle:true}`
+This section said `/keys/` keeps sending `fx.pappus {on:false, onlyIfIdle:true}`
 on connect, because that message is what MAKES the removal true rather than
 merely undrawn: an insert left behind by a `/grains/` tab that was simply closed
-goes on wrapping whatever `/box/` plays and feeds its own delay. MEASURED
+goes on wrapping whatever `/keys/` plays and feeds its own delay. MEASURED
 2026-09-12, a steady -6.1 dBFS subsonic drone while `box.alive` reported
 `voices: 0`. It also kept one log line for the case where the board REFUSES,
 because a diagram that says nothing in the one situation where it is wrong is a
@@ -74,7 +74,7 @@ confident lie.
 
 🔴 **BOTH ARE GONE, AND THE GUARANTEE IS STRONGER FOR IT.** The instruction was
 *"get rid of both"*. The argument above has a hole that it does not see: it makes
-the guarantee depend on somebody opening `/box/`, and nobody has to. A tab closed
+the guarantee depend on somebody opening `/keys/`, and nobody has to. A tab closed
 at midnight left the board granulating itself until the next person happened to
 load a page that sent one message.
 
@@ -129,7 +129,7 @@ next person does not have to re-derive that `positron-space` exists.
 ⚠️ **AND THE `archive` SOURCE THAT USED TO SIT IN THIS TABLE IS GONE,
 2026-09-16.** It played ERR's 1965 radio archive into the JACK graph on
 `-stream_loop -1`, so it never ended: ffmpeg into `snd-aloop`, `alsa_in` out the
-other side as `err1965`. No page offered it, `/box/`'s description stopped
+other side as `err1965`. No page offered it, `/keys/`'s description stopped
 claiming it weeks ago, and every connection this repo opens to ERR appears in a
 public broadcaster's audience measurement. `archive/box-pappus/box-err.js` has
 it, with `source.search`, `source.load` and `source.clear`.
@@ -200,7 +200,7 @@ the notes, which is where there is room for them.
 - `README.md`: what it was in this page, what it cost, what is NOT archived.
 - `page-half.js`: the removed page code verbatim, in the order it stood.
 
-Nothing under `rig/box/` moves. The archive records what `/box/` used to draw
+Nothing under `rig/box/` moves. The archive records what `/keys/` used to draw
 and say, not what the board can do.
 
 ---
@@ -212,7 +212,7 @@ and say, not what the board can do.
 3. `rig/box/listen.html`: the diagram, the insert reporting, the stale comments.
 4. `demo/manifest.mjs`: the `one` line, which says "1965 radio, and a granulator
    over both" and is false on both counts.
-5. Mirror `listen.html` into `workers/view/public/box/index.html` and
+5. Mirror `listen.html` into `workers/view/public/keys/index.html` and
    `manifest.mjs` into `workers/view/public/manifest.mjs`, by hand, byte for
    byte. No build, no deploy.
 6. `node demo/check-html.mjs rig/box/listen.html`, and read `dg.cuts` out of a
@@ -231,7 +231,7 @@ and say, not what the board can do.
 4. The ERR archive out of `pappus.mjs`, `box.mjs` and `jacksynth.mjs`, into
    `archive/box-pappus/pappus-err.js` and `box-err.js`. `pappus-test.mjs` and
    `pappus-live.mjs` lose the sections that drove it.
-5. Mirror `listen.html` into `workers/view/public/box/index.html` by hand.
+5. Mirror `listen.html` into `workers/view/public/keys/index.html` by hand.
    No build, no deploy. ⚠️ `demo/manifest.mjs` was NOT touched this pass: its
    `one` line was already corrected in the first one, and another agent was
    editing that file.
@@ -242,7 +242,7 @@ and say, not what the board can do.
 
 ## 8. What a person has to do on the board
 
-**For the first pass: nothing.** `/box/` is served from this repo and from
+**For the first pass: nothing.** `/keys/` is served from this repo and from
 `workers/view/public/`; the board ran `box.mjs` unchanged, and the removal was a
 change to what a browser draws and asks for.
 
@@ -250,7 +250,7 @@ change to what a browser draws and asks for.
 IT HAPPENS.** `box.mjs`, `pappus.mjs`, `jacksynth.mjs`, `insert-test.mjs`,
 `pappus-test.mjs` and `pappus-live.mjs` all changed. Until they are on the
 board, the insert is still only cleared by a message that no page sends any
-more, which is **worse than before this work**: `/box/` has stopped policing it
+more, which is **worse than before this work**: `/keys/` has stopped policing it
 and the board has not started. Sequenced, not simultaneous, and that is the one
 thing to know before shipping the page without the board.
 
@@ -278,7 +278,7 @@ once.
 line; *"keep pi granulator for grains"* keeps the board's engine. What is left
 open is below.
 
-- 🔴 **`/box/` has a diagram and a six-sentence `what`, and that `what` carries
+- 🔴 **`/keys/` has a diagram and a six-sentence `what`, and that `what` carries
   four em dashes.** CLAUDE.md says a page with a diagram carries a ONE line
   `what`, that it is the index's own `one` line verbatim, and that there are no
   em dashes anywhere a reader looks. This page breaks all of that today and it
@@ -292,7 +292,7 @@ open is below.
   column. That is `diagram.mjs`'s deliberate equal-height rule and changing it
   reaches every page that draws a picture.
 - **The reverb has no box**, see §3.
-- **`/kit/` is not machine-graded and `/box/` is `built: false`**, so the only
+- **`/kit/` is not machine-graded and `/keys/` is `built: false`**, so the only
   thing that reports a bad label or an unroutable link on this page is its own
   log line off `dg.cuts`.
 
@@ -301,7 +301,7 @@ open is below.
 
 ## 10. What was measured, and how
 
-`/box/` is `built: false`, so `demo/verify.mjs` never opens it and nothing turns
+`/keys/` is `built: false`, so `demo/verify.mjs` never opens it and nothing turns
 red. The diagram was read directly out of a headless Chrome pointed at the dev
 server with **a dead relay**, `?relay=ws://127.0.0.1:9`, so no room was joined,
 no board was asked anything and nothing outside this machine was touched.
@@ -314,7 +314,7 @@ no board was asked anything and nothing outside this machine was touched.
 | shipped | 0 | 2 | row |
 | shipped, 390 px | 0 | 2 | column |
 
-`node demo/check-html.mjs rig/box/listen.html workers/view/public/box/index.html`
+`node demo/check-html.mjs rig/box/listen.html workers/view/public/keys/index.html`
 parses both copies. The two files are byte-identical, checked with `md5`.
 
 ### The second pass, 2026-09-16

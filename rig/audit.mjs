@@ -5,8 +5,8 @@
 //   node rig/audit.mjs pro --fix    print the commands that would close the gap
 //
 // 🔴 WHY THIS EXISTS. `setup.sh` installs `alsa-utils curl git` and node. That
-// is all it has ever installed. Every instrument on the board — JACK,
-// FluidSynth, hexter, Yoshimi, SuperCollider, its sc3-plugins, ffmpeg — was put
+// is all it has ever installed. Every instrument on the board — JACK, Yoshimi,
+// SuperCollider, its sc3-plugins, ffmpeg — was put
 // there BY HAND at some point and written down nowhere, so a fresh Pi would
 // come up with the service running and every instrument reporting
 // "unavailable", which reads as a code fault.
@@ -38,10 +38,12 @@ export const MACHINES = {
     // this sandbox. CLAUDE.md has the sweep.
     apt: [
       ['jackd2',            '1.9.22~dfsg-4',        'the audio graph every instrument is patched into; the insert lives on it'],
-      ['fluidsynth',        '2.4.4+dfsg-1+deb13u2', 'the sampled instrument, and the only one that can write to a pipe'],
-      ['fluid-soundfont-gm','3.1-5.3',              'FluidR3_GM.sf2 — the sounds fluidsynth plays; a soundfont is data, not a binary'],
-      ['dssi-host-jack',    '1.1.1~dfsg0-7',        'the host hexter runs inside; hexter is a plugin and cannot run alone'],
-      ['hexter',            null,                   'the DX7, with its four factory cartridges'],
+      // 🔴 FOUR PACKAGES LEFT THIS LIST ON 2026-09-16 and they are named here so
+      // a rebuilt board does not quietly get them back: `fluidsynth`,
+      // `fluid-soundfont-gm`, `dssi-host-jack` and `hexter`. Nothing on the
+      // board spawns either instrument any more, so installing them costs
+      // 141 MB of soundfont and a plugin host for something that cannot be
+      // reached. `archive/box-fluidsynth-hexter/` has the code and the reason.
       ['yoshimi',           '2.3.3.3-1',            '911 instruments in 24 banks, as its own JACK client'],
       ['yoshimi-data',      null,                   'those banks; without it yoshimi starts and has nothing to play'],
       ['supercollider',     '1:3.13.0+repack-3',    'scsynth and sclang — what pappus, the granular engine, runs in'],
@@ -59,8 +61,6 @@ export const MACHINES = {
       ['/opt/positron-box/rig/box/box.mjs',  'the service itself. ⚠️ NOT ~/positron — that copy is stale and reading it tells you nothing'],
       ['/opt/positron-box/rig/vis/v3dpipe',  'the shader renderer, COMPILED ON THE BOARD by push.sh when its source is newer'],
       ['/etc/systemd/system/positron-box.service', 'what makes it come back after a power cut'],
-      ['/usr/share/sounds/sf2/FluidR3_GM.sf2', 'the soundfont, by the path fluidsynth is given'],
-      ['/usr/lib/dssi/hexter.so',            'the DX7 plugin the DSSI host loads'],
     ],
     devices: [
       ['/dev/video11', 'the hardware H.264 encoder. ⚠️ SINGLE AND EXCLUSIVE — when it wedges nothing kills it and recovery is a reboot'],

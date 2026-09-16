@@ -5,14 +5,14 @@
 // was simply CLOSED goes on wrapping whatever the next page plays and feeds its
 // own delay: MEASURED 2026-09-12, a steady -6.1 dBFS subsonic drone while
 // `box.alive` reported `voices: 0`, true about notes and false about sound.
-// Until 2026-09-16 the thing that cleared it was `/box/` sending `fx.pappus
+// Until 2026-09-16 the thing that cleared it was `/keys/` sending `fx.pappus
 // {on:false, onlyIfIdle:true}` on load. That message is gone, with the last of
 // the granulator on that page, so THE BOARD CLEANS UP AFTER ITSELF now. A
 // guarantee that used to depend on somebody opening a second page was never a
 // guarantee, because nobody had to open one.
 //
 // The guard lives on the board and the board is the only end that can be
-// graded: `/box/` is `rig/box/listen.html`, it is `built: false`, it publishes
+// graded: `/keys/` is `rig/box/listen.html`, it is `built: false`, it publishes
 // no `__demo` and `demo/verify.mjs` cannot see it. A guard nothing can grade is
 // a guard that will rot, so this is the harness.
 //
@@ -28,7 +28,7 @@
 // sent ANY message, and "the tab was closed" is visible to it only as "that
 // `from` stopped talking". So the test opens TWO connections. One pretends to
 // be `/grains/` (asks for the insert and keeps polling, exactly as that page
-// does) and one pretends to be `/box/` (which now sends nothing at all and only
+// does) and one pretends to be `/keys/` (which now sends nothing at all and only
 // watches). One socket doing both would pass vacuously, because a client is
 // never held off by its own claim.
 //
@@ -39,7 +39,7 @@
 //   3  NEGATIVE CONTROL: a live page KEEPS its insert past the board's window.
 //      A board that swept on a plain timer fails here, and it is the only case
 //      that can tell "cleans up after itself" from "drops it after 15 s".
-//   4  and a second page merely ARRIVING changes nothing. `/box/` used to send
+//   4  and a second page merely ARRIVING changes nothing. `/keys/` used to send
 //      a message here; it sends none, and the insert must survive that.
 //   5  THE DROP: the `/grains/` connection CLOSES and the board takes the
 //      insert out on its own, announced on `box.alive`, with nobody asking.
@@ -121,7 +121,7 @@ async function client(label) {
 console.log(`\n== the insert, and the board taking it out by itself · room "${ROOM}" ==`);
 
 let grainsTab = await client('as-grains');
-// 🔴 CONNECTED AND SILENT FOR THE WHOLE RUN. This is what `/box/` is now: a page
+// 🔴 CONNECTED AND SILENT FOR THE WHOLE RUN. This is what `/keys/` is now: a page
 // that joins the room and asks the board for nothing about the granulator. If a
 // check below needed it to speak, the thing being graded would not be the board
 // cleaning up after itself.
@@ -152,7 +152,7 @@ ok('and the board says WHO asked for it, which nothing could see before',
 // 🔴 THE WHOLE REPORTING HALF TURNS ON THIS, AND SO DOES CASE 5. A page that
 // has to ASK finds out when it next polls; a page that is told finds out in
 // five seconds, and the page that needs telling is the one that did NOT make
-// the change. `/box/` reads nothing about the insert any more, so this channel
+// the change. `/keys/` reads nothing about the insert any more, so this channel
 // is now what `insert-test` itself watches.
 {
   const b = await boxTab.beat((m) => m.fx !== undefined, 12000);
@@ -187,7 +187,7 @@ ok('and the board says WHO asked for it, which nothing could see before',
     beats.length >= 3 && dropped.length === 0,
     `${beats.length} heartbeats over ${Math.round((HELD_MS + 2 * BEAT_MS) / 1000)} s, ${dropped.length} of them without the insert · the board's window is ${HELD_MS / 1000} s`);
   // ── 4. and a second page ARRIVING changes nothing ───────────────────────
-  // `/box/` used to send `fx.pappus {on:false, onlyIfIdle:true}` right here, on
+  // `/keys/` used to send `fx.pappus {on:false, onlyIfIdle:true}` right here, on
   // connect. It sends nothing now, and this is the assert that says so: if this
   // half ever speaks again, the case above stops being about the board.
   ok('the box half sent nothing at all, so what held the insert was the grains half being alive',

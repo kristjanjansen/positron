@@ -20,7 +20,10 @@
   // 🔴 NO GRANULATOR ANYWHERE IN HERE. It came out of the board's signal path
   // on 2026-09-16 (archive/box-pappus/), and this page has never had one.
   import { mount, guard } from '/shell/shell.mjs';
-  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createSlider, createSliderGroup, HAND_YIELD_MS } from '/shell/slider.mjs';
+  // The sweep's own lap, so a check waiting for it cannot fall out of step with
+  // it the next time somebody changes how fast a hand moves.
+  import { MOVES } from '/shell/hand.mjs';
   import { createPresence } from '/shell/presence.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -894,14 +897,19 @@
     const a = cutoff.hand, b = reso.hand;
     if (!a || !b) return;
     const rowOf = (s) => s.el.querySelector('.sld-hand-row');
-    const knobOf = (s) => getComputedStyle(s.el.querySelector('.sld-knob')).backgroundColor;
+    const glyphOf = (s) => getComputedStyle(s.el.querySelector('.sld-hand')).color;
     const startedWith = reso.get();
     const startsBefore = handStarts;
 
     a.press();                                   // off -> sweep. One press, like a person's
     const lit = {
       mine: rowOf(cutoff).dataset.hand, other: rowOf(reso).dataset.hand,
-      knob: knobOf(cutoff), otherKnob: knobOf(reso),
+      // 🔴 THE GLYPH'S COLOUR, NOT THE HANDLE'S. Instructed 2026-09-16: *"do not
+      // change slider playhead color when automated ... just color it yellow
+      // when enabled (the symbol)"*. The handle is the same yellow whoever is
+      // moving it, which is the point: a slider being driven should look like a
+      // slider, and the thing that says a page is driving it is the button.
+      glyph: glyphOf(cutoff), otherGlyph: glyphOf(reso),
       pressed: cutoff.el.querySelector('.sld-hand').getAttribute('aria-pressed'),
       // ⚠️ A CEILING IS ONLY A CEILING IF IT IS RUNNING DOWN. Reading the
       // constant would assert the source rather than the behaviour.
@@ -926,11 +934,22 @@
     const atPointer = cutoff.get();
     send('pointerup', px(0.40));
     const onLift = cutoff.get();
-    // ⚠️ 400 ms RATHER THAN THE 200 THE PLAN ASKS FOR, AND IT IS ARITHMETIC.
-    // A reach leaves rest with no speed and no acceleration, so 200 ms into a
-    // 1.87 s reach is about three of this lane's 127 steps. 400 ms is about
-    // nine, which is a movement rather than a rounding.
-    await wait(400);
+    /**
+     * ⚠️ THE WAIT IS DERIVED, AND A CONSTANT HERE WENT RED THE HOUR THE LAP GOT
+     * SLOWER. It was 400 ms, chosen as about nine of this lane's 127 steps at a
+     * 2.2 s lap. The lap is 7 s now, on instruction, and 400 ms is two things at
+     * once: shorter than the hand's OWN 1200 ms yield, so the hand has not even
+     * taken the slider back yet, and too little travel to see if it had. Both
+     * numbers belong to the hand, so both are read from it: wait out the yield,
+     * then a tenth of a lap, which is about twelve steps at any speed.
+     */
+    // ⚠️ `MOVES` IS A LIST OF PAIRS, NOT A MAP, and reading it as a map returned
+    // undefined and fell through to a default that happened to work. A fallback
+    // that hides a wrong lookup is worse than no fallback.
+    const sweepLapMs = (MOVES.find(([name]) => name === 'sweep') || [])[1]?.lapMs;
+    if (!sweepLapMs) throw new Error('knobs: the sweep preset has no lapMs, so this check cannot size its wait');
+    const resumeMs = HAND_YIELD_MS + sweepLapMs / 10;
+    await wait(resumeMs);
     const resumed = cutoff.get();
 
     // ── C2. the keyboard, which goes through set() ──────────────────────────
@@ -1096,19 +1115,22 @@
     if (SELFCHECK && handRun) {
       const h = handRun;
       /**
-       * 🔴 A. UNMISTAKABLE, ON THREE CHANNELS, BECAUSE ONE CHANNEL IS WHAT
-       * FAILED LAST TIME. The button says "this slider is automated" even while
-       * the handle is standing still at a turn; the handle says "the page is
-       * moving THIS one right now"; the log says when it started, which is the
-       * only channel that survives a screenshot taken a minute later. The
-       * comparison is against the slider beside it rather than against a
-       * remembered colour, which is what having two of them buys.
+       * 🔴 A. UNMISTAKABLE, ON TWO CHANNELS, AND IT WAS THREE UNTIL THE HANDLE
+       * WAS TOLD TO STOP CHANGING. The symbol lights while the slider is
+       * automated, even at a turn where the handle is standing still, and the
+       * log says when it started, which is the only channel that survives a
+       * screenshot taken a minute later.
+       * ⚠️ THE HANDLE IS DELIBERATELY NOT ONE OF THEM ANY MORE: a slider being
+       * driven should look like a slider, and a handle that changes shape while
+       * it moves reads as one that has broken. The comparison is against the
+       * slider beside it rather than a remembered colour, which is what having
+       * two of them buys.
        */
-      d.assert('while a hand runs, its button is lit, its handle is hollow and the slider beside it is neither',
+      d.assert('while a hand runs its symbol is lit, and the slider beside it is untouched',
         h.lit.mine === 'on' && h.lit.other === 'off' && h.lit.pressed === 'true'
-        && h.lit.knob !== h.lit.otherKnob && h.lit.starts === 1
+        && h.lit.glyph !== h.lit.otherGlyph && h.lit.starts === 1
         && d.api.logs.some((l) => l.msg.includes('an invisible hand has the cutoff slider')),
-        `the driven handle is ${h.lit.knob} and the one beside it ${h.lit.otherKnob}, `
+        `the driven symbol is ${h.lit.glyph} and the one beside it ${h.lit.otherGlyph}, `
         + `its row reads ${h.lit.mine} against ${h.lit.other}, and the log has the line`);
       /**
        * 🔴 B. PER SLIDER, AND THIS IS A NEGATIVE CONTROL: it fails if the hand
@@ -1128,7 +1150,7 @@
         h.heldByPointer && h.heldByKey && h.heldByPage
         && h.onLift === h.atPointer && h.keyStuck === h.afterKey && h.pageStuck === 12,
         `the pointer left it at ${h.atPointer} and it was still there on the lift, `
-        + `an arrow key left it at ${h.afterKey} and it stayed for 400 ms, `
+        + `an arrow key left it at ${h.afterKey} and it stayed, `
         + `and the page put it at 12 and it stayed at ${h.pageStuck}`);
       /**
        * ⚠️ YIELD, NOT OFF. Nothing pressed the button, so the hand picks the

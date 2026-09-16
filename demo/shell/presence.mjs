@@ -2,7 +2,7 @@
 //
 // Four pages ask this question and four pages answer it differently. `/knobs/`
 // waits six seconds and writes a log line, `/grains/` waits for a `box.hello`
-// and enables its buttons, `/box/` watches for the same message and draws an
+// and enables its buttons, `/keys/` watches for the same message and draws an
 // instrument row, `/rack/` waits on an agent on a Mac that may simply be off.
 // None of them can SHOW the answer without reading the log, and none of them
 // distinguishes the two greys: a thing that has gone quiet, and a thing nobody

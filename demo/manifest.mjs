@@ -436,7 +436,7 @@ export const DEMOS = [
   { name: 'strip', group: 'timeline', act: 0, created: '2026-09-04', built: true,
     one: 'deep time, uncertain dates, and a statistic that names what it dropped',
     tags: ['timeline', 'canvas'] },
-  // The studio Mac as an instrument: the same page as /box/, pointed at a
+  // The studio Mac as an instrument: the same page as /keys/, pointed at a
   // different machine. What crosses the relay is a note NUMBER, so neither end
   // knows what kind of computer the other one is.
   //
@@ -449,7 +449,7 @@ export const DEMOS = [
     tags: ['Ableton Live', 'CoreMIDI', 'CoreAudio tap', 'relay', 'PCM'] },
 
   // 🔴 THE GRANULATOR, ON ITS OWN PAGE, and the split is the point. It used to
-  // be an INSERT on /box/ wrapping the instruments — and a grain cloud has no
+  // be an INSERT on /keys/ wrapping the instruments — and a grain cloud has no
   // note-off, so releasing a key swapped one drone for another and every
   // instrument's envelope, attack and patch character were washed out before
   // you heard them. The patch selector and the die both stopped doing anything
@@ -504,11 +504,11 @@ export const DEMOS = [
   // asking for an ack. plan-controller.md has the arithmetic and the reasons.
   // ⚠️ `room: 'fixed'` because `studio-1` is the ADDRESS OF THE RASPBERRY PI.
   // A private room does not give a second client its own board: there is one
-  // JACK graph and one instrument, so this page and `/box/` take turns.
+  // JACK graph and one instrument, so this page and `/keys/` take turns.
   // ⚠️ `settleMs` sizes the wait after control 0 ONLY, and control 0 is `Play`,
   // which on a cold board brings Yoshimi up over ten to forty seconds.
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
-    one: 'sweep a big filter on a Raspberry Pi in another building, with two sliders and no keyboard',
+    one: 'sweep a big filter on a Raspberry Pi in another building, with two sliders an invisible hand can take over',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
 
   // 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is
@@ -588,18 +588,31 @@ export const DEMOS = [
   // under demo/<name>/ that demo/verify.mjs runs", and neither is that. `page`
   // is what makes a row clickable anyway.
 
-  // rig/box/listen.html, deployed to /box/ by workers/view/build.mjs. The Pi
-  // in the other building, played from here: its own instrument library, a
-  // random hour of 1965 Estonian radio, and pappus chewing either one up.
-  { name: 'box', group: 'instruments', act: 4, created: '2026-09-10', built: false, page: '/box/',
+  /**
+   * 🔴 THE SLUG IS `keys`, RENAMED FROM `box` ON 2026-09-16 ON INSTRUCTION. The
+   * deployed `/keys/` is GONE: a link anybody kept 404s and no redirect has been
+   * written, exactly as with `radio1965` -> `radio` the same day.
+   *
+   * ⚠️ `src` DID NOT MOVE, AND THAT IS THE DECISION RATHER THAN AN OVERSIGHT.
+   * `rig/box/listen.html` is the board's own listener: it sits beside the code
+   * `push.sh` ships to the Raspberry Pi, and `LAYOUT.md` rule 2 names this file
+   * as the example of a page that lives with its hardware. Moving it to
+   * `demo/keys/index.html` would make `built: true` the obvious next step, and
+   * that would open a shared board in another building on every run of the
+   * suite, dozens of times a day. A demo's identity is its SLUG; the slug moved
+   * and the file did not, which is the cheap half of a rename and the whole of
+   * what a visitor sees. `rig/box/` keeps its name because the BOARD is still
+   * the box — `box.mjs`, `box.hello`, `box.alive`.
+   */
+  // rig/box/listen.html, deployed to /keys/ by workers/view/build.mjs.
+  { name: 'keys', group: 'instruments', act: 4, created: '2026-09-10', built: false, page: '/keys/',
     src: 'rig/box/listen.html',
-    // ⚠️ THIS LINE WAS STALE ON BOTH COUNTS AND NOTHING TYPE-CHECKS A SENTENCE.
-    // It read 'its instruments, 1965 radio, and a granulator over both'. The
-    // page has offered no archive source for weeks, and the granulator came out
-    // on 2026-09-16 (`archive/box-pappus/`, `plan-box-pappus.md`). What is left
-    // is the thing the page actually is: three programs on a board, played from
-    // here.
-    one: 'play three instruments on a Raspberry Pi in another building, and hear what it makes come back',
+    // ⚠️ THIS LINE HAS NOW BEEN STALE TWICE AND NOTHING TYPE-CHECKS A SENTENCE.
+    // It read 'its instruments, 1965 radio, and a granulator over both' after
+    // both of those left, then 'three instruments' after two of the three left
+    // on 2026-09-16 (`archive/box-fluidsynth-hexter/`). There is one, and the
+    // page's own `what` is this line verbatim.
+    one: 'play an instrument on a Raspberry Pi in another building, and hear the sound it makes come back',
     tags: ['WS', 'relay', 'PCM', 'live board'] },
 
   // A CHECKUP, not a player — and that is what makes it shippable. The playing

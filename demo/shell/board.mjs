@@ -1,0 +1,338 @@
+// demo/shell/board.mjs — the Raspberry Pi, from a browser.
+//
+// Two pages play the same board over the same relay: `/keys/` sends notes and
+// `/knobs/` sends controller values. Everything between the two of them was
+// written twice — joining the room, working out which socket in it is the
+// board, reading the 12-byte frame header, converting int16 to float, raising
+// the `pcm-playout` worklet, choosing a cushion, checking that a frame is the
+// shape the board says it is, and keeping a presence badge honest.
+//
+// 🔴 IT IS THE BETTER OF THE TWO HALVES, NEVER THE AVERAGE. Where the two pages
+// disagreed, the one that had thought about it wins, and each case is named
+// below. `/keys/` hand-rolled its WebSocket and as a result could not tell a
+// FULL ROOM from a DEAD RELAY — a browser cannot read the HTTP status of a
+// refused upgrade, so both arrive as the same silent close, and the relay
+// answers the seventeenth socket `503 room full (16)` with nobody able to hear
+// it. `openWire` asks `/stats` and says which it was. It also mints a new `from`
+// per connection, counts what it sent against what came back, and THROWS on a
+// payload field the envelope would overwrite. `/keys/` had none of that.
+// It also never checked a frame's shape and never learned which socket the
+// board was; both are here.
+//
+// 🔴 WHAT IT DOES NOT OWN. The page keeps its own instrument: which verbs it
+// sends, what its log calls things, what it does with a frame after the playout
+// has it. This is the wire, the sound coming back, and whether anybody is
+// there. CLAUDE.md: a control that exists in one page and nowhere else is a
+// component that has not been noticed yet.
+
+import { openWire } from './wire.mjs';
+import { createPresence } from './presence.mjs';
+
+/** The board fixes these (rig/box/synth.mjs) and NOTHING in the chain
+ *  resamples, so a page that asks for a different rate gets a pitch error and a
+ *  ring that fills faster than it drains. */
+export const BOARD_RATE = 48000;
+export const BOARD_FRAME_MS = 20;
+export const BOARD_CHANNELS = 1;
+
+/** Where the worklet lives. One string, so a page cannot hold a stale path. */
+export const PLAYOUT_URL = '/proto/jam/playout-worklet.js';
+
+/** Bytes of header before the samples: a sequence number and the board's own
+ *  `performance.now()`. The samples start at 12. */
+export const FRAME_HEADER_BYTES = 12;
+
+/**
+ * Open a board.
+ *
+ * @param {string} room        the relay room. `studio-1` is the ADDRESS OF THE
+ *                             RASPBERRY PI, not a rendezvous a page invented.
+ * @param {string} [relay]     override the relay base, for a local worker.
+ * @param {string} [of]        what the presence badge calls it.
+ * @param {number} [cushionMs] the playout floor. See the note on it below.
+ * @param {number} [maxCushionMs]
+ * @param {number} [everyMs]   the board's heartbeat, 5 s. The badge THROWS
+ *                             without one rather than guessing: a short guess
+ *                             calls a working board gone between beats and
+ *                             sends somebody to look at hardware that is fine.
+ * @param {number} [comingMs]  how long a cold start may take before the badge
+ *                             stops saying "on its way".
+ * @param {function} [log]     `d.log`.
+ * @param {function} [onPcm]   `(f32, { peak, seq, samples })` after the playout
+ *                             has been given the frame. The page's own business.
+ * @param {function} [onMessage] every JSON message that is not this page's echo.
+ * @param {function} [onOpen]  the socket opened.
+ */
+export function createBoard({
+  room,
+  relay = undefined,
+  of = 'Raspberry Pi',
+  rate = BOARD_RATE,
+  frameMs = BOARD_FRAME_MS,
+  channels = BOARD_CHANNELS,
+  cushionMs = 100,
+  maxCushionMs = 250,
+  everyMs = 5000,
+  comingMs = 45000,
+  log = () => {},
+  onPcm = null,
+  onMessage = () => {},
+  onOpen = () => {},
+} = {}) {
+  if (!room) throw new Error('board: a room is required. `studio-1` is the address of the Raspberry Pi.');
+
+  // ── the badge ─────────────────────────────────────────────────────────────
+  const pres = createPresence({ of });
+  pres.follow({ everyMs, comingMs });
+  pres.checking();                    // a question is out before anything answers
+
+  /**
+   * 🔴 ONLY THE BOARD COUNTS AS THE BOARD, AND ONE OF THESE PAGES GOT THIS
+   * WRONG FOR REAL. The relay is VERBATIM: everything in the room reaches
+   * everybody, so marking presence on any message that is not our own echo
+   * paints the badge green when another tab, another page, or a harness run is
+   * in the room while the Raspberry Pi is unplugged. A badge that somebody else
+   * can satisfy is worse than no badge, because it is wrong in precisely the
+   * case it exists for.
+   *
+   * The board is identified by the two messages only it sends — `box.hello`
+   * when it joins and `box.alive` every five seconds. Its `from` is per SOCKET,
+   * so it is learned rather than assumed, and learned again when it reconnects.
+   * ⚠️ AND AUDIO COUNTS TOO. Nothing else puts PCM into this room, and frames
+   * arrive fifty times a second against a heartbeat every five.
+   */
+  let boardFrom = null;
+
+  // ── audio ─────────────────────────────────────────────────────────────────
+  let ctx = null, playout = null;
+  let bufferedMs = 0, starved = 0, trimmed = 0, breaks = -1;
+  let frames = 0, lost = 0, lastSeq = -1, firstFrameAt = 0, peak = 0;
+  let told = null;                    // what `box.hello` announced, if we heard it
+  let chIn = channels, shapeChecked = false, shapeWrong = 0, shapeSaid = '';
+
+  async function startAudio() {
+    if (ctx) return ctx;
+    // ⚠️ ASK FOR THE BOARD'S RATE, BECAUSE NOTHING IN THIS CHAIN RESAMPLES. The
+    // worklet writes the board's samples straight into a ring drained at the
+    // context's own rate: on an output running at 44.1 kHz the pitch is wrong
+    // by the ratio AND the ring fills faster than it drains, so the latency
+    // guard trims several times a second. Periodic clicking, and every readout
+    // green throughout, because frames per second is unaffected.
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: rate, latencyHint: 'interactive' });
+    // ⚠️ Fire and move on. `resume()` waits on a user gesture in a real browser
+    // and NEVER REJECTS, so awaiting it is a hang rather than an error.
+    ctx.resume().catch(() => { /* a suspended context is allowed. Sound is late, not broken */ });
+    // A REQUEST, not a guarantee: a browser may hand back its device rate
+    // anyway. No readout cell for it — a cell reading 48000 forever is a
+    // constant wearing a measurement's clothes. It speaks when it has something
+    // to say.
+    if (ctx.sampleRate !== rate) {
+      log(`this browser runs audio at ${ctx.sampleRate} Hz and the board sends ${rate}. Nothing in the chain resamples, so the pitch will be off by ${(rate / ctx.sampleRate).toFixed(3)}x and you will hear clicks`, 'bad');
+    }
+    await ctx.audioWorklet.addModule(PLAYOUT_URL);
+    playout = new AudioWorkletNode(ctx, 'pcm-playout',
+      { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+    playout.connect(ctx.destination);
+    /**
+     * 🔴 THE COUNTERS EXISTED ALL ALONG AND NO PAGE HAD EVER READ ONE. They are
+     * posted every 250 ms from inside the worklet; `/rack/` sounded noisy for an
+     * hour while six separate measurements said its stream was perfect, because
+     * the defect was downstream of every quantity being measured. A statistic
+     * nobody displays is not instrumentation.
+     */
+    playout.port.onmessage = (e) => {
+      const st = e.data?.stats; if (!st) return;
+      bufferedMs = st.bufferedMs;
+      starved = st.underruns; trimmed = st.trimEvents;
+      const b = starved + trimmed;
+      if (b !== breaks) {
+        const first = breaks < 0;
+        breaks = b;
+        // ONE number for a page to show and TWO words for the log, because the
+        // two want OPPOSITE fixes: running dry wants a bigger cushion and being
+        // trimmed wants a smaller one.
+        if (!first) log(`${starved} ran dry, ${trimmed} trimmed · cushion ${Math.round(bufferedMs)} ms`, 'warn');
+      }
+    };
+    /**
+     * The cushion is OURS, not the browser's, which is the whole reason to
+     * carry the samples rather than use WebRTC.
+     *
+     * ⚠️ THE DEFAULT IS THE SMALLER ONE AND A PAGE MAY RAISE IT. MEASURED off
+     * this relay with a node client and no browser in the way: 992 frames in
+     * 20 s, nothing lost, mean gap exactly 20.0 ms, p90 29.5, p99 43.5, worst
+     * single gap 83.6 ms. A cushion has no restoring force, so the floor
+     * RATCHETS when it is proved too small rather than being chosen once.
+     */
+    playout.port.postMessage({ cmd: 'floor', ms: cushionMs, adaptive: true, maxMs: maxCushionMs });
+    return ctx;
+  }
+
+  /**
+   * The shape of what arrived, checked rather than inferred.
+   *
+   * 🔴 A CHANNEL COUNT CANNOT BE READ OFF A PAYLOAD. 960 int16s is a valid
+   * 20 ms mono frame AND a valid 10 ms stereo one, and guessing wrong plays an
+   * octave down, which sounds like a broken instrument rather than a broken
+   * header. The studio Mac sends stereo and this board sends mono, and both are
+   * on this relay at once.
+   *
+   * ⚠️ THE BOARD ANNOUNCES IT IN `box.hello`, WHICH IT SENDS WHEN IT JOINS, SO
+   * A PAGE THAT JOINS LATER NEVER HEARS IT, and there is no verb that asks for
+   * it again. So the expectation is the board's PUBLISHED framing and the
+   * arriving frames are checked against it: `samples / channels / rate` has to
+   * come out at the frame length claimed. A live announcement overrides the
+   * expectation the moment one arrives.
+   */
+  function checkShape(samples) {
+    if (shapeChecked) return;
+    shapeChecked = true;
+    const want = told?.frameMs ?? frameMs;
+    const implied = (samples / chIn / rate) * 1000;
+    shapeSaid = `${samples} samples a frame works out at ${implied.toFixed(1)} ms as ${chIn === 2 ? 'stereo' : 'mono'}, against the ${want} ms ${told ? 'the board announced' : 'the board publishes'}`;
+    if (Math.abs(implied - want) <= want * 0.02) return;
+    const real = Math.max(1, Math.min(2, Math.round(samples / ((want / 1000) * rate))));
+    shapeWrong++;
+    chIn = real;
+    playout?.port.postMessage({ cmd: 'inChannels', n: real });
+    log(`${shapeSaid} · playing it as ${real === 2 ? 'stereo' : 'mono'} instead`, 'warn');
+  }
+
+  function onBinary(buf) {
+    const s = new DataView(buf).getUint32(0, true);
+    // ⚠️ A COUNTER IS ONLY EVIDENCE ON THE FAR SIDE OF A BOUNDARY. This counts
+    // gaps in the BOARD's own sequence, so it measures what the relay dropped
+    // rather than what this page asked for. Byte 4 carries the board's own
+    // `performance.now()`.
+    pres.seen();
+    pres.checking(false);
+    if (lastSeq >= 0 && s > lastSeq + 1) lost += s - lastSeq - 1;
+    lastSeq = s;
+    frames++;
+    if (!firstFrameAt) firstFrameAt = performance.now();
+    const pcm = new Int16Array(buf, FRAME_HEADER_BYTES);
+    checkShape(pcm.length);
+    const f32 = new Float32Array(pcm.length);
+    // 🔴 THE LOUDEST SAMPLE, BECAUSE A FRAME COUNT CANNOT TELL SOUND FROM
+    // SILENCE. The board captures its JACK graph continuously, so frames arrive
+    // at fifty a second whether or not a note is sounding: `104 frames of audio`
+    // read green through a reported silence. A level is the quantity in
+    // question and a count is one adjacent to it.
+    let hi = 0;
+    for (let i = 0; i < pcm.length; i++) {
+      f32[i] = pcm[i] / 32768;
+      const a = f32[i] < 0 ? -f32[i] : f32[i];
+      if (a > hi) hi = a;
+    }
+    if (hi > peak) peak = hi;
+    // ⚠️ THE PAGE IS TOLD BEFORE THE BUFFER IS TRANSFERRED, because posting it
+    // to the worklet DETACHES it. A page reading `f32` after the post would get
+    // a zero-length array and no error at all.
+    onPcm?.(f32, { peak: hi, seq: s, samples: pcm.length });
+    playout?.port.postMessage({ pcm: f32 }, [f32.buffer]);
+  }
+
+  // ── the socket ────────────────────────────────────────────────────────────
+  const waiters = [];
+
+  const wire = openWire(room, {
+    base: relay,
+    onOpen: () => onOpen(),
+    onClose: () => log('socket closed · reconnecting'),
+    onMessage: (got) => {
+      if (got.kind === 'binary') { onBinary(got.data); return; }
+      if (got.kind !== 'json') return;
+      if (got.msg.from === wire.stats().from) return;    // our own line, echoed back
+      heard(got.msg);
+    },
+  });
+
+  /**
+   * ⚠️ A QUESTION AND ITS ANSWER CARRY THE SAME `type` ON THIS RELAY. The relay
+   * is a broadcast, so another listener merely ASKING looks exactly like the
+   * board answering. The board stamps every answer with `re`, the id of the
+   * message it answers, which is the only thing that tells them apart.
+   */
+  function heard(m) {
+    for (let i = waiters.length - 1; i >= 0; i--) {
+      const w = waiters[i];
+      if (w.type !== m.type) continue;
+      if (w.re && m.re !== w.re) continue;
+      clearTimeout(w.timer); waiters.splice(i, 1); w.resolve(m);
+    }
+    // The board's stream announcement, if this page was connected when it
+    // joined. A measurement outranks a repeated claim, so this only re-opens
+    // the question when the claim CHANGES.
+    if (m.type === 'box.hello' && m.audioChannels) {
+      if (!told || told.audioChannels !== m.audioChannels || told.frameMs !== m.frameMs) {
+        told = { audioChannels: m.audioChannels, frameMs: m.frameMs };
+        chIn = m.audioChannels === 2 ? 2 : 1;
+        shapeChecked = false;
+        playout?.port.postMessage({ cmd: 'inChannels', n: chIn });
+        log(`the board says it sends ${chIn === 2 ? 'two channels' : 'one channel'} at ${m.frameMs} ms a frame`);
+      }
+    }
+    if (m.type === 'box.hello' || m.type === 'box.alive') boardFrom = m.from || boardFrom;
+    if (m.from && m.from === boardFrom) { pres.seen(); pres.checking(false); }
+    onMessage(m);
+  }
+
+  /** Fire and forget. Returns the message's id, so a caller can match a reply
+   *  itself, or null if the roof refused it or the socket is not open. */
+  function send(msg) {
+    const out = wire.send(msg);
+    if (!out?.sent) return null;
+    try { return JSON.parse(out.line).id; } catch { return null; }
+  }
+
+  /**
+   * Wait for the next reply of a type, resolving null on a timeout rather than
+   * hanging. A page that waits forever looks like a page that is still loading,
+   * and "nobody answered" is the answer these pages most often have to give.
+   */
+  function waitFor(type, ms, re = null) {
+    return new Promise((resolve) => {
+      const w = { type, re, resolve };
+      w.timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); resolve(null); }, ms);
+      waiters.push(w);
+    });
+  }
+
+  async function ask(msg, type, ms = 8000) {
+    // The id first, so the wait is for THIS answer rather than for the next
+    // message of the same shape. On a shared board that can be somebody else's
+    // question, or the reply to it.
+    const id = send(msg);
+    if (!id) return null;
+    return waitFor(type, ms, id);
+  }
+
+  return {
+    /** the presence badge. `chip: board.presence.el` on a transport bar. */
+    presence: pres,
+    /** the openWire handle, for `stats()`, `state()` and `ping()`. */
+    wire,
+    send,
+    ask,
+    waitFor,
+    startAudio,
+    ping: (ms) => wire.ping(ms),
+    state: () => wire.state(),
+    /** which socket in the room is the board, or null if it has not spoken. */
+    boardFrom: () => boardFrom,
+    ctx: () => ctx,
+    playout: () => playout,
+    /** Everything measured, in one object, so a page's readout and its checks
+     *  read the same numbers rather than two copies that can disagree. */
+    stats: () => ({
+      frames, lost, peak, firstFrameAt,
+      bufferedMs, starved, trimmed, breaks,
+      framesPerSec: firstFrameAt ? frames / Math.max(0.001, (performance.now() - firstFrameAt) / 1000) : 0,
+      channels: chIn, shapeChecked, shapeWrong, shapeSaid,
+      told,
+    }),
+    /** `peak` is a running maximum; a page timing one note resets it. */
+    resetPeak: () => { peak = 0; },
+    close: () => { pres.stop(); wire.close(); },
+  };
+}

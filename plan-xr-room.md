@@ -8,7 +8,7 @@
 ## 0. The short answer
 
 **Positional audio: yes, and we are unusually well placed for it** — every other
-page hands sound to a `<video>` element and loses it, while `/box/` and `/rack/`
+page hands sound to a `<video>` element and loses it, while `/keys/` and `/rack/`
 already carry raw samples into a worklet we own. Panning something you already
 hold is one node; panning a media element is a fight.
 

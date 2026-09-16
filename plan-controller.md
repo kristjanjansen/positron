@@ -300,7 +300,7 @@ header, and every row of it has a consequence in §4.
 Separate, and these are the four changes:
 
 1. **A new verb family `ctl.*` on the board**, so the note path is untouched and
-   the two can be reasoned about independently. `/box/` keeps working with no
+   the two can be reasoned about independently. `/keys/` keeps working with no
    change, and the existing `cc` verb stays exactly as it is.
 2. **A send gate in the browser**, with `cc-adapter.mjs`'s three rules.
 3. **A coalescer on the board**: hold the newest value per controller, drain on
@@ -498,7 +498,7 @@ Slider to heard, adding the legs up:
 ```
 
 🔴 **The cushion is more than half of it and it is a choice, not a physical
-limit.** That is the honest headline. `/box/`'s own paragraph says "about a
+limit.** That is the honest headline. `/keys/`'s own paragraph says "about a
 tenth of a second" and its `lag` cell includes the cushion, so the cell has
 always read higher than the sentence.
 
@@ -509,7 +509,7 @@ has read off the running service.
 
 ### 5.3 What would be measured to confirm it
 
-🔴 **`/box/`'s trick does not transfer**, and this is the trap. Its `lag` arms
+🔴 **`/keys/`'s trick does not transfer**, and this is the trap. Its `lag` arms
 on a key press after 8 frames below a peak of 0.02 and closes on the first frame
 above it. A filter sweep happens **on top of a note that is already sounding**,
 so there is no silence to arm in and no onset to close on. Copying that code
@@ -549,11 +549,11 @@ default.
 
 ## 6 · The page
 
-### 6.1 Where it lives, and why not beside `/box/`
+### 6.1 Where it lives, and why not beside `/keys/`
 
 **`demo/knob/index.html`, `built: true`, `room: 'fixed'`.**
 
-`/box/` is `built: false` with a `src:` because it belongs with the hardware,
+`/keys/` is `built: false` with a `src:` because it belongs with the hardware,
 and the price of that is written in CLAUDE.md: `demo/verify.mjs` cannot see it,
 it publishes no asserts, and its diagram reports its own cuts to a log line
 because no harness will ever read them. `/grains/` and `/rack/` both reach real
@@ -661,7 +661,7 @@ Browser                    Cloudflare                  Raspberry Pi
 
 - `Browser` and `Cloudflare` take **`join: false`**: a slider does not feed the
   playout, and one relay object drawn twice by role has its direction in the
-  arrows already. `/box/` does exactly this and the flag was added after
+  arrows already. `/keys/` does exactly this and the flag was added after
   `notes out` and `sound back` were rejected as captions rather than names.
 - `Raspberry Pi` takes the **default arrow** between its children, because
   `virmidi -> Yoshimi -> capture` is a real chain and inner boxes get arrowheads
@@ -708,9 +708,9 @@ both are free.
 
 ### 6.6 🔴 What the page must NOT do
 
-- **Never start audio on load.** `/box/` autostarts FluidSynth on
+- **Never start audio on load.** `/keys/` autostarts FluidSynth on
   `{ok:false, reason:'nothing playing'}` and that is fine for a page whose whole
-  job is that instrument. This page would take the board away from `/box/` and
+  job is that instrument. This page would take the board away from `/keys/` and
   `/grains/` silently, which is the granulator fight in a new costume. Ask
   `audio.status` on load, say in words what is playing, and start on a press.
 - **Never run a self-check for a visitor.** The gate's arithmetic and the
@@ -743,7 +743,7 @@ own smoothing may cover it; if it does not, the SuperCollider voice takes a
 float and a `Lag.kr`.
 
 🔴 **3. One board, one JACK graph, one instrument.** `demo/verify.mjs` says it
-in those words. Opening this page while somebody has `/box/` open takes their
+in those words. Opening this page while somebody has `/keys/` open takes their
 instrument. **Mitigation:** do not autostart, report what is running, and add
 `audio.start {onlyIfIdle:true}` mirroring `fx.pappus`, which already refuses out
 loud with the holder and both ages in the reply.
@@ -822,7 +822,7 @@ a 500 ms restatement goes out with nothing moving.
 ### Step 2 · The board's coalescer and meter.
 
 `ctl.set` and `ctl.meter` in `box.mjs`. The existing `cc` verb is untouched, so
-`/box/` cannot regress.
+`/keys/` cannot regress.
 
 **Grade:** `rig/box/ctl-test.mjs` against a running box, two connections.
 Send 500 `ctl.set` in one second and assert `in === 500`, `out <= 200`,
@@ -888,6 +888,6 @@ Needs a person, because it changes how every existing page's start behaves.
   rather than guessing.
 - **Is there an idle stop for a held instrument?** Only the archive source has
   one. A page left open on a second monitor holds Yoshimi indefinitely.
-- **Does `/box/` want the same two sliders?** It has no filter control at all
+- **Does `/keys/` want the same two sliders?** It has no filter control at all
   today. If step 0 lands, adding them there is small, and the argument against is
-  that `/box/`'s subject is a keyboard.
+  that `/keys/`'s subject is a keyboard.

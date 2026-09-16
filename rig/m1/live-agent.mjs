@@ -5,7 +5,7 @@
 // The same shape as `rig/box/box.mjs`, on a different machine: notes arrive over
 // the relay, an instrument somewhere else makes the sound, and the samples come
 // back down the same socket. The page does not know or care which machine is at
-// the far end — `demo/rack` and `/box/` are the same page with a different room.
+// the far end — `demo/rack` and `/keys/` are the same page with a different room.
 //
 // Two native tools do the actual work, both in ~/positron-rack/bin:
 //   midisend  — notes out over CoreMIDI to IAC Driver Bus 1, which Live listens on

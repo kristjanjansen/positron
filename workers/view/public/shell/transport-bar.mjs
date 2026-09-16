@@ -45,6 +45,35 @@ export function createTransportBar(host, deck, {
   // nobody had a reason to press.
   loop: wantLoop = true,
   /**
+   * 🔴 `false` LEAVES THE PLAY BUTTON OFF, AND IT IS THE THIRD OF THIS FAMILY
+   * AFTER `scrub: false` AND `loop: false`. Asked for 2026-09-16: *"bring
+   * transport bar to keys but no play button, just online badge"*.
+   *
+   * WHY A BAR MAY HAVE NO TOGGLE. Play, pause and seek are all claims about a
+   * POSITION inside a sound: somewhere it has got to, somewhere it could be
+   * put instead. `/keys/` has none. A note sounds while a key is held, there is
+   * nothing to start, nothing to resume, and stopping is not a state the page
+   * can be in. A toggle there would be a control whose only honest behaviour is
+   * to do nothing, which is the shape of control this project calls a lie. What
+   * the bar still carries is the thing that IS true of the source: whether the
+   * instrument in the other building is answering. That is the chip.
+   *
+   * ⚠️ IT DISARMS EVERY OTHER CLAIM THAT DEPENDED ON PLAYING, rather than
+   * leaving them to read false by luck. `api.toggles` says so in one boolean so
+   * a check can ask; `api.playing` is FORCED false rather than derived, because
+   * a deck nobody starts can still be playing if a page started it another way
+   * and the bar has no business reporting that as its own state; the space bar
+   * stops being a play/pause key, because a key that toggles an absent button
+   * is worse than a missing shortcut; and the end-stop never arms, since there
+   * is no end to arrive at.
+   * ⚠️ AND `demo/verify.mjs` READS `api.toggles` BEFORE ITS PLAY DRILL. That
+   * drill clicks `.tbar-toggle` and asserts the position advanced, so without
+   * the flag a bar with no toggle would take the harness red on a page where
+   * nothing is wrong. There is no such page in the suite today, since `/keys/`
+   * is `built: false`, and the guard is here because the next one will be.
+   */
+  toggle: wantToggle = true,
+  /**
    * 🔴 WHAT TAKES THE LOOP BUTTON'S PLACE ON A BAR THAT HAS NO LOOP. Asked for
    * in those words, 2026-09-16: *"just replace looper with fullscreen button
    * (make component slot-able)"*, for `/videoradio/`, whose bar wants a ⛶ where
@@ -348,13 +377,13 @@ export function createTransportBar(host, deck, {
    * ⚠️ NO GROUP WHEN THERE IS NOTHING TO GROUP: a lone LOOP button goes
    * straight on the bar, so every page that declares no extras is untouched.
    */
-  const loopPair = loopExtraEls.size && wantLoop ? el('div', 'tbar-loopgrp') : null;
+  const loopPair = loopExtraEls.size && wantLoop ? el('div', 'tbar-loopgrp pos-seg') : null;
   if (loopPair) loopPair.append(loopBtn, ...loopExtraEls.values());
   if (chip && live) {
     throw new Error('createTransportBar: chip and live want the same position '
       + '(pass live: false, the chip can say LIVE itself if that is the fact)');
   }
-  bar.append(toggle, ...extraEls.values(), scrub, ...(chip ? [chip] : live ? [liveChip] : [time]),
+  bar.append(...(wantToggle ? [toggle] : []), ...extraEls.values(), scrub, ...(chip ? [chip] : live ? [liveChip] : [time]),
     // the loop's position: whatever was put in the slot, or the loop itself
     ...(loopSlotEls.size ? [...loopSlotEls.values()]
       : loopPair ? [loopPair] : [...(wantLoop ? [loopBtn] : []), ...loopExtraEls.values()]),
@@ -527,7 +556,10 @@ export function createTransportBar(host, deck, {
     // paused and the bar seeking it, and a PAUSE glyph over a moving playhead
     // is a control lying about the state it is in.
     const playing = rolling();
-    toggle.dataset.state = playing ? 'playing' : atEnd ? 'ended' : 'paused';
+    // The glyph is the toggle's own state and there is no toggle to carry it on
+    // a bar built without one. Painting a detached button is not an error, it is
+    // silence, so it is skipped rather than written into nothing.
+    if (wantToggle) toggle.dataset.state = playing ? 'playing' : atEnd ? 'ended' : 'paused';
     // 🔴 THE WRAP, RATE-LIMITED, AND THE LIMIT IS NOT A SAFETY MARGIN — IT IS
     // THE FIX. A seek is not instant on every kind of deck, so the frame after
     // one is asked for can still report a position past the end, which asks
@@ -627,7 +659,7 @@ export function createTransportBar(host, deck, {
 
   function hitEnd() {
     endTimer = null;
-    if (!endStop || !deck.playing?.()) return;
+    if (!endStop || !wantToggle || !deck.playing?.()) return;
     // A running loop owns the wrap, and its end may BE the end of the source,
     // which is the one case where this timer and that wrap are due at the same
     // instant. Pausing here would stop a loop that is working.
@@ -642,7 +674,7 @@ export function createTransportBar(host, deck, {
 
   function armEnd() {
     clearEnd();
-    if (!endStop || !seekable || !(deck.playing?.() ?? false)) return;
+    if (!endStop || !wantToggle || !seekable || !(deck.playing?.() ?? false)) return;
     const rate = typeof deck.rate === 'function' ? deck.rate() : deck.rate;
     if (!(rate > 0)) return;                       // paused or reversed: no end to reach
     const t = deck.transport;
@@ -1091,7 +1123,10 @@ export function createTransportBar(host, deck, {
     const span = b - a;
     const cur = deck.position();
     const step = e.shiftKey ? span * 0.1 : span * 0.02;
-    if (e.key === ' ') { e.preventDefault(); deck.playing?.() ? cmd.pause() : cmd.play(); }
+    // ⚠️ NOT ON A BAR WITH NO TOGGLE. The space bar is the keyboard's name for
+    // the play button, so on a page that has none it would be a shortcut to a
+    // control nobody can see, and on `/keys/` the space bar is over a piano.
+    if (e.key === ' ') { if (!wantToggle) return; e.preventDefault(); deck.playing?.() ? cmd.pause() : cmd.play(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); doSeek(Math.min(b, cur + step)); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); doSeek(Math.max(a, cur - step)); }
     else if (/^[0-9]$/.test(e.key)) { e.preventDefault(); doSeek(fracToPos(Number(e.key) / 10)); }
@@ -1102,7 +1137,14 @@ export function createTransportBar(host, deck, {
   // ── published for CDP; the plan's whole point ───────────────────────────
   const api = {
     get position() { return deck.position(); },
-    get playing() { return deck.playing?.() ?? false; },
+    /** ⚠️ FORCED FALSE ON A BAR WITH NO TOGGLE rather than derived. Nothing on
+     *  such a bar can start the deck, so "is the transport playing" is a
+     *  question about this bar with one answer; reporting a deck a page happened
+     *  to start elsewhere would be the bar claiming a state it does not own. */
+    get playing() { return wantToggle ? (deck.playing?.() ?? false) : false; },
+    /** whether this bar has a play button at all. `demo/verify.mjs` reads it
+     *  before pressing one. */
+    get toggles() { return wantToggle; },
     get rate() { return typeof deck.rate === 'function' ? deck.rate() : deck.rate; },
     get range() { return deck.range; },
     get rangeGen() { return deck.rangeGen?.() ?? 0; },

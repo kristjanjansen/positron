@@ -561,10 +561,26 @@ for (const t of targets) {
     meta.readoutOptOut ? 'the page itself is the readout' : meta.keys.join(','));
 
   if (meta.hasT) {
-    const t0 = await ev('({ pos: __demo.transport.position, playing: __demo.transport.playing, seekable: __demo.transport.seekable, lattice: __demo.transport.lattice, rate: __demo.transport.rate })');
+    const t0 = await ev('({ pos: __demo.transport.position, playing: __demo.transport.playing, seekable: __demo.transport.seekable, lattice: __demo.transport.lattice, rate: __demo.transport.rate, toggles: __demo.transport.toggles !== false })');
     ok('transport published', typeof t0.pos === 'number', `pos ${t0.pos}`);
     ok('rate lattice from caps', t0.lattice === null || Array.isArray(t0.lattice), JSON.stringify(t0.lattice));
 
+    /**
+     * 🔴 A BAR MAY HAVE NO PLAY BUTTON, AND THIS DRILL IS THE WHOLE REASON THAT
+     * OPTION HAD TO ANNOUNCE ITSELF. `transport-bar.mjs` takes `toggle: false`
+     * for a page whose sound has no position to start or resume — `/keys/`
+     * holds a note while a key is down and has nothing to play. Clicking a
+     * `.tbar-toggle` that was never appended throws on `null`, and asserting
+     * that the position advanced would fail on a page where nothing is wrong.
+     *
+     * ⚠️ `!== false` RATHER THAN A TRUTH TEST, so a bar built before the option
+     * existed — where the getter is `undefined` — still gets the drill. A new
+     * property must not silently switch checks off on every page that predates
+     * it, which is the shape of loss this suite has already had once: 27
+     * asserts became 17, every one of them green.
+     */
+    if (!t0.toggles) console.log('        this bar has no play button, so the play/pause drill is skipped');
+    else {
     // play advances position
     await ev('document.querySelector(".tbar-toggle").click()');
     await sleep(500);
@@ -578,6 +594,7 @@ for (const t of targets) {
     await sleep(300);
     const b = await ev('__demo.transport.position');
     ok('pause holds position', !(await ev('__demo.transport.playing')) && Math.abs(b - a) < 1, `${a.toFixed(1)} == ${b.toFixed(1)}`);
+    }
 
     // seek via the keyboard table the component owns
     if (t0.seekable) {

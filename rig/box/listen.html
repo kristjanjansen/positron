@@ -7,19 +7,20 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* ⚠️ IT HAS TO WIDEN. A flex row of fixed-width buttons on a phone leaves a
-     column of stragglers down the left and empty space beside them; the
-     instrument names are different lengths, so nothing lines up. Same fix as
-     the slider group: let the row own the width and share it out. */
-  /* ⚠️ THE ROW LAYS OUT GROUPS, NOT BUTTONS. It used to be a flex row of
-     individual buttons with a 6 px gap and `flex: 1 1 auto` on each, which is
-     why three mutually exclusive instruments read as three unrelated controls.
-     The instruments are one `createChoice` now and the row only has to space
-     the GROUPS apart. */
+  /* 🔴 THIS BLOCK SHRANK ON 2026-09-16 WITH THE INSTRUMENT ROW. What went with
+     it: the breathing `[data-busy]` state and its keyframes (a JACK instrument
+     took ten to forty seconds to come up and a button that just sat there read
+     as a dead click), the `:disabled` look the lock wore, the die, and `.patch`,
+     whose line was removed earlier. All of them styled controls this page no
+     longer has. ⚠️ AND THE BLOCK WAS UNBALANCED: a stray closing brace after
+     the `.pick` rule, and a media query that was never closed. CSS forgives
+     both silently, which is why it survived. */
+  /* ⚠️ THE ROW LAYS OUT GROUPS, NOT BUTTONS, and it has to WIDEN. A flex row of
+     fixed-width controls on a phone leaves a column of stragglers down the left
+     and empty space beside them. Let the row own the width and share it out. */
   .pick { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0 0 14px;
           width: 100%; }
-  }
-  /* ⚠️ 18 px, NOT 6. `reverb [dry|room|hall] chorus [off|light|wide]` at a 6 px
+  /* ⚠️ 18 px, NOT 6. `reverb [off|room|hall] chorus [off|light|wide]` at a 6 px
      gap put the word CHORUS hard against the `hall` button, so the two groups
      read as one row of six options with a stray word in the middle. The gap
      between two groups has to be bigger than the gap inside one, or there are
@@ -27,85 +28,43 @@
   .pick .fx, .pos-controls .fx { display: inline-flex; gap: 18px; align-items: center; margin-left: auto;
                                  flex-wrap: wrap; }
   .fxhost { display: flex; align-items: center; }
-  .pos-controls .fx .lab { color: var(--dim2); font: 500 11px/1 var(--mono); letter-spacing: .06em;
-                         text-transform: uppercase; margin: 0 2px 0 0; }
-  .pos-controls button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
-  .pos-controls button.die:disabled, .pos-controls .fx button:disabled {
-    opacity: .35; cursor: default; border-color: var(--line); }
   /* ⚠️ FOCUS MUST NOT WEAR THE ARMED COLOUR. The shell's global rule is
-     `:focus-visible { outline: 2px solid var(--hi) }` — the same green the
-     armed state uses — so a focused-but-OFF switch was indistinguishable from
-     an armed one, and read as an effect that was in the sound while the log
-     said bypassed. Focus goes grey; green means armed and nothing else. */
+     `:focus-visible { outline: 2px solid var(--hi) }`, the same green the
+     chosen state uses, so a focused-but-OFF switch was indistinguishable from
+     an armed one and read as an effect that was in the sound while the log said
+     bypassed. Focus goes grey; green means chosen and nothing else. */
   .pos-controls .fx button:focus:not(:focus-visible),
   .pick button:focus:not(:focus-visible) { outline: none; }
   .pos-controls .fx button:focus-visible,
   .pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
-  /* and the switch says which it is in words, so nobody has to read a colour */
-  .pick .fx .lab { margin: 0 2px 0 0; }
-  .pick button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
-  .pick button.die:disabled { opacity: .35; cursor: default; border-color: var(--line); }
-  .pick button:disabled { opacity: .35; cursor: default; border-color: var(--line); }
-  /* ⚠️ A FOCUS RING IS NOT A SELECTION. After clicking, the effect switch kept
-     a yellow outline that read as "armed" while it was in fact bypassed —
-     sitting one row from a genuinely armed instrument wearing the same colour.
-     Pointer clicks lose the ring; keyboard focus keeps it, which is who needs
-     it. */
-  .pick button:focus:not(:focus-visible) { outline: none; }
-  .pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
-  .pick .lab { flex: none; color: var(--dim2); font: 500 11px/1 var(--mono);
-               letter-spacing: .06em; text-transform: uppercase; margin-right: 4px; }
   /* 🔴 NO `[aria-pressed]` RULE HERE. There was one, and it was the bug: it has
      the same specificity as the kit's `.pos-choice button[aria-pressed="true"]`
      and sits later in the cascade, so EVERY createChoice on this page — reverb
      and chorus included — silently lost the kit's chosen state and wore this
      page's instead. One meaning, one definition, in shell.css. */
-  /* Starting a JACK instrument takes ten to forty seconds — jackd, the synth,
-     a capture, then the port wiring. A button that just sits there reads as a
-     dead click, so it breathes until the box confirms. */
-  .pick button[data-busy] {
-    color: var(--hi); border-color: var(--hi);
-    animation: box-wait 1.1s ease-in-out infinite;
-  }
-  @keyframes box-wait {
-    0%, 100% { background: color-mix(in oklab, var(--hi)  6%, var(--card2)); }
-    50%      { background: color-mix(in oklab, var(--hi) 26%, var(--card2)); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .pick button[data-busy] { animation: none; background: color-mix(in oklab, var(--hi) 16%, var(--card2)); }
-  }
-  .patch { font: 400 12px/1.6 var(--mono); color: var(--dim); }
-  .patch b { color: var(--hi); font-weight: 400; }
-  /* ⚠️ LAST IN THE FILE ON PURPOSE. These have the same specificity as the
-     desktop rules above (`.pick .fx` is 0,2,0), so source order is the whole
-     of the cascade here — written earlier, `align-items: stretch` lost to
-     `align-items: center` and the controls stayed 113 px wide on a phone
-     while the computed style said column. */
   /* ⚠️ THE ROW HAS TO STACK TOO, or the kit's phone rules do nothing visible.
      `createChoice` puts its label on top and takes 100% of ITS OWN BOX at this
-     width — but the boxes were still side by side in a flex row, so instrument
-     got 172 px, reverb 113 and chorus 120 of a 390 px screen. MEASURED. A
-     component can only fill what its container gives it. */
+     width — but the boxes were still side by side in a flex row, so the groups
+     got 172 px, 113 and 120 of a 390 px screen. MEASURED. A component can only
+     fill what its container gives it.
+     ⚠️ AND BOTH CONTAINERS: reverb and chorus are appended to `.pos-controls`,
+     not to `.pick`, so a rule written for `.pick .fx` alone left them narrow
+     while the row beside them went full width.
+     ⚠️ AND `display` IS PART OF IT. This once set flex-direction, align-items
+     and gap and not display, and the computed display came back `block`, so all
+     three were inert and the two groups touched at a measured 0 px while the
+     stylesheet said 22. A flex property on a non-flex box is not an error, it
+     is silence.
+     ⚠️ LAST IN THE FILE ON PURPOSE. These have the same specificity as the
+     desktop rules above (`.pick .fx` is 0,2,0), so source order is the whole of
+     the cascade here. */
   @media (max-width: 560px) {
     .pick { flex-direction: column; align-items: stretch; gap: 22px; }
-    /* ⚠️ BOTH CONTAINERS. The reverb and chorus row is appended to
-       `.pos-controls`, not to `.pick` — so a rule written for `.pick .fx` alone
-       left them at 113 px and 120 px of a 390 px screen while the instrument
-       row beside them went full width. Two homes, two selectors. */
-    /* ⚠️ 22 px BETWEEN GROUPS AGAINST 4 px INSIDE ONE. At an even 10 px the
-       CHORUS label sat as close to the reverb buttons ABOVE it as to its own
-       buttons below, so it read as belonging to neither — a label has to be
-       nearer the thing it labels than the thing it follows, or there are no
-       groups, only a column of controls. */
-    /* ⚠️ `display` IS PART OF IT. This set flex-direction, align-items and gap
-       and not display — and the computed display came back `block`, so all
-       three were inert and the two groups touched at a measured 0 px while the
-       stylesheet said 22. A flex property on a non-flex box is not an error,
-       it is silence. */
     .pick .fx, .pos-controls .fx, .fxhost {
       display: flex; margin-left: 0; width: 100%; flex-direction: column;
       align-items: stretch; gap: 22px;
     }
+  }
 </style>
 
 <script type="module">
@@ -115,15 +74,54 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createMidi } from '/shell/midi.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  /**
+   * 🔴 THE SOCKET, THE SOUND AND THE BADGE COME FROM THE KIT NOW, 2026-09-16.
+   * This page and `/knobs/` play the same board over the same relay and both
+   * hand-rolled the same six things. `demo/shell/board.mjs` is the better of the
+   * two halves rather than the average: the WebSocket in here was hand-rolled
+   * and could not tell a full room from a dead relay, never checked that a frame
+   * was the shape the board says it is, and never worked out which socket in the
+   * room WAS the board — all three of which the other page had.
+   */
+  import { createBoard } from '/shell/board.mjs';
 
   const q = new URLSearchParams(location.search);
+  // `studio-1` is the ADDRESS OF THE RASPBERRY PI, not a rendezvous this page
+  // invented, which is why the manifest row says `room: 'fixed'`.
   const ROOM = q.get('room') || 'studio-1';
-  const RELAY = q.get('relay') || 'wss://ws.positron.studio';
-  const ID = 'web-' + Math.random().toString(36).slice(2, 8);
+  const INSTRUMENT = 'yoshimi';
 
   const d = mount({
-    name: 'box',
-    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back what comes back, so the delay you hear is a real journey of about a tenth of a second. Buffer is how much sound this page is holding in hand before playing it, and a dropout is a moment that ran out or had to be cut — one click each. Play the a-to-k row, the drawn keys, or a MIDI keyboard; z and x move the octave. Reverb and chorus are made on the board — this page only sends the numbers.',
+    /**
+     * 🔴 THE SLUG IS `keys`, RENAMED FROM `box` ON 2026-09-16 ON INSTRUCTION.
+     * The deployed `/keys/` is GONE, so a link anybody kept 404s and no redirect
+     * has been written. The FILE did not move and that is deliberate: it lives
+     * beside the board it plays, `rig/box/push.sh` ships that board, and a row
+     * with `built: false` plus a `src:` is the pattern `LAYOUT.md` names for
+     * exactly this page. Moving it under `demo/` would invite `built: true`,
+     * which would put a shared Raspberry Pi in another building into every run
+     * of the suite, dozens of times a day.
+     */
+    name: 'keys',
+    /**
+     * 🔴 ONE LINE, BECAUSE THIS PAGE HAS A DIAGRAM AT THE BOTTOM OF IT, AND IT
+     * IS `manifest.mjs`'s OWN LINE VERBATIM. A paragraph and a picture of the
+     * machinery are two explanations of one thing and the paragraph is the
+     * weaker: it describes what a reader can point at an inch below. Verbatim,
+     * so arriving from the index does not mean reading one claim twice in two
+     * wordings that can drift apart.
+     *
+     * ⚠️ WHAT THE PARAGRAPH SAID IS REHOMED, NOT DELETED, which is the half of
+     * this rule that is easy to skip. The journey and the cushion are boxes and
+     * notes in the picture. The keys to press are on the keyboard's own pad,
+     * whose octave buttons already read `down one octave (z)` and `up one
+     * octave (x)`. Whether a MIDI keyboard was found is a log line, said once,
+     * when it is known. Where the reverb is made is the `JACK` box's note.
+     * ⚠️ AND THE PARAGRAPH CARRIED THREE EM DASHES, on a page a visitor reads.
+     */
+    what: 'Play an instrument on a Raspberry Pi in another building, and hear the sound it makes come back.',
 
     // ⚠️ `frames`, `rate` and `midi` ALL WENT, and two of the three deserve a
     // word. `frames` was an odometer. `midi` sat at `1` forever, which is the
@@ -137,7 +135,7 @@
     // the row — the guard is a WARNING now, fired when the rate leaves the
     // band, which is the only moment the number was ever worth reading.
     //
-    // `delay`, `buffer` and `dropouts` are new. /box/ carried the same cushion
+    // `delay`, `buffer` and `dropouts` are new. This page carried the cushion
     // as `rack` with NO number on it at all — which is how `rack` sounded wrong
     // for an hour while six measurements said it was fine (LESSONS #52).
     // ⚠️ `delay` AND `round trip` BOTH WENT, and the reason is not that they
@@ -185,6 +183,20 @@
     // defect this row already fixed once, when `rate` read 50.1 every run of
     // every day.
     readout: { buffer: 'ms', lag: 'ms', 'frames/s': '', lost: '' },
+    /**
+     * 🔴 THE NUMBERS AND THE LOG ARE ONE SURFACE AT THE FOOT OF THIS PAGE.
+     * Asked for 2026-09-16: *"plush readout+logs"*, and `/knobs/` and `/kit/`
+     * already do it. Split, the four cells sat above the keys and the log sat
+     * under them, so the two things that answer "what is this doing" were at
+     * opposite ends of the page with the instrument between them: pressing a
+     * key and reading `lag` meant looking away from your own hands, and a line
+     * about the board arrived a screen below the cell it explains.
+     * ⚠️ THE ROW IS UNCHANGED AND STILL EVEN. Joining moves the block, it does
+     * not edit it: `buffer`, `lag`, `frames/s` and `lost` are the same four
+     * cells in the same order, so no cell was dropped and nothing had to be
+     * traded to keep the count even.
+     */
+    joined: true,
     // NO PAGE CONTROLS. Octave down, octave up and notes off used to be here,
     // which put all three at the TOP of the page, a hand's width above the keys
     // they act on. They are the keyboard's own controls and the keyboard draws
@@ -194,23 +206,16 @@
   });
   guard(d);
 
-  // ── instruments, chosen at runtime ───────────────────────────────────────
-  // Above the patch controls: the instrument decides what a patch number even
-  // MEANS, so choosing it after choosing a patch is backwards.
+  // ── the patch row ────────────────────────────────────────────────────────
+  // It held the instrument choice as well until 2026-09-16; see the block below
+  // where that row used to be built.
   const picks = el('div', 'pick');
-  // ⚠️ NO LABEL HERE. `createChoice` draws its own, so the page adding one drew
-  // `INSTRUMENT INSTRUMENT` — the cost of half-moving a hand-built row onto a
-  // component: the markup the component replaces has to go, not just the part
-  // that looked broken.
   const controls = document.querySelector('.pos-controls');
   if (controls) controls.parentNode.insertBefore(picks, controls);
   else d.el.append(picks);
-  // Pinned right on the instrument row: a patch belongs to the instrument, and
-  // choosing one is the next thing you do after choosing the other.
-  // drawInstruments() inserts new instrument buttons before this block.
   const fxWrap = el('span', 'fx');
   // 🔴 A STEPPER IS NOT A WAY TO CHOOSE ONE OF 878. Yoshimi's library on this
-  // board is 878 reachable instruments and hexter's cartridges are 128, and the
+  // board is 878 reachable instruments and the
   // old control was `‹ random ›` with the name printed BESIDE it as dead text —
   // so the name had the useful half of a list (you can read where you are) and
   // none of the other half (you can go somewhere). The name is the control now:
@@ -227,12 +232,14 @@
     onPick: (i) => { idx = pickIndex(i); chosen = true; showPatch(); sendPatch(); },
   });
   fxWrap.append(step.el);
-  // ⚠️ ATTACHED HERE. The line that put `fxWrap` into the row lived inside the
-  // effect block that was removed, so `picks.insertBefore(b, fxWrap)` threw
-  // — "the node before which the new node is to be inserted is not a child of
-  // this node" — at module scope, before a single instrument button was drawn.
-  // A page with a readout of dashes and one error line, which is what a cut
-  // that takes a neighbour's setup line with it looks like.
+  // ⚠️ ATTACHED HERE, AND THE REASON OUTLIVED THE THING IT WAS ABOUT. The line
+  // that put `fxWrap` into the row once lived inside a block that was removed,
+  // so `picks.insertBefore(b, fxWrap)` threw — "the node before which the new
+  // node is to be inserted is not a child of this node" — at module scope,
+  // before anything was drawn. A page with a readout of dashes and one error
+  // line, which is what a cut that takes a neighbour's setup line with it looks
+  // like. That is exactly the cut being made again here, so it stays attached
+  // at the top level where nothing else can carry it away.
   picks.append(fxWrap);
   // A press is what makes the patch line true — see showPatch().
 
@@ -248,10 +255,9 @@
   // LOG line now, which is where a thing that happened belongs.
   let saidUnchosen = false;
 
-  let ctx = null, playout = null, ws = null, seq = 0;
-  let rtt = null, cushionMs = 0, breaks = -1, rateWarned = false;
-  let frames = 0, lost = 0, last = -1, avail = null, current = null, idx = 0, lastBank = -1;
-  let bytes = 0, firstFrame = 0, pingAt = 0, autoStarted = false;
+  let rateWarned = false;
+  let avail = null, current = null, idx = 0, lastBank = -1;
+  let autoStarted = false, saidMissing = false;
   /**
    * Press to sound: when a key went down, and whether we are still waiting for
    * the sound it made.
@@ -270,76 +276,50 @@
   const LAG_ARM_QUIET = 8;      // ~160 ms of silence before a press can be timed
   const LAG_GIVE_UP_MS = 2000;
   const LAG_ON = 0.02;          // peak that counts as the note having started
-  let soundfonts = [];
 
-  const send = (m) => ws?.readyState === 1 && ws.send(JSON.stringify(
-    { id: Math.random().toString(36).slice(2), type: '', ...m, from: ID, at: Date.now(), seq: seq++ }));
+  // ⚠️ THE ENVELOPE IS THE KIT'S. `wire.mjs` writes `from`, `at` and `seq` AFTER
+  // the message is spread and THROWS when a payload field would be overwritten
+  // by one — a bug this project has paid for once, when a start offset called
+  // `at` became a timestamp and the board seeked to second 1,789,103,743,118.
+  // The hand-rolled line that used to sit here had no such guard.
+  const send = (m) => board.send(m);
 
   // ── patch names ──────────────────────────────────────────────────────────
-  // Two kinds of instrument, and they need different walks.
+  // 🔴 THE BOARD ENUMERATES, THIS PAGE RENDERS. Yoshimi's library on this board
+  // is 911 instruments in 24 banks; the banks are numbered 5, 10, 15 … 120
+  // rather than 0, 1, 2, and the slots inside them are sparse — the Rhodes bank
+  // holds 26 patches spread across slots 1…68. Walking 0…127 lands on an empty
+  // slot most of the time, and Yoshimi's answer to an empty slot is to carry on
+  // playing what it had. So the BOX enumerates, because it is the only end that
+  // can see the files, and this page steps through the list it is sent:
+  // `voices.list` -> `voices.listed`, and then one entry per press.
   //
-  // hexter and the sampled instruments carry a FIXED TABLE — 128 DX7 voices in
-  // one flat cartridge, 128 General MIDI programs — which is the same on every
-  // board, so it lives here. One continuous number is the whole story: hexter
-  // has no banks at all and the GM soundfont has only bank 0 plus 128 for
-  // drums, so a separate bank control would be clutter for two instruments out
-  // of three.
+  // ⚠️ THERE USED TO BE A SECOND KIND, AND IT LEFT WITH THE INSTRUMENTS THAT
+  // NEEDED IT. hexter and the sampled instrument carried FIXED TABLES — 128 DX7
+  // voices in one flat cartridge, 128 General MIDI programs — which are the same
+  // on every board, so the names lived in this file. Both tables are in
+  // `archive/box-fluidsynth-hexter/page-half.js`.
   //
-  // Yoshimi is not like that, and pretending it was is what made its patch
-  // buttons do nothing. Its library on this board is 911 instruments in 24
-  // banks; the banks are numbered 5, 10, 15 … 120 rather than 0, 1, 2, and the
-  // slots inside them are sparse — the Rhodes bank holds 26 patches spread
-  // across slots 1…68. Walking 0…127 lands on an empty slot most of the time,
-  // and Yoshimi's answer to an empty slot is to carry on playing what it had.
-  // So the BOX enumerates, because it is the only end that can see the files,
-  // and this page steps through the list it is sent: `voices.list` ->
-  // `voices.listed`, and then one entry per press.
-  const GM = ('Grand Piano,Bright Piano,Electric Grand,Honky-tonk,Electric Piano 1,Electric Piano 2,Harpsichord,Clavi,'
-   + 'Celesta,Glockenspiel,Music Box,Vibraphone,Marimba,Xylophone,Tubular Bells,Dulcimer,'
-   + 'Drawbar Organ,Percussive Organ,Rock Organ,Church Organ,Reed Organ,Accordion,Harmonica,Tango Accordion,'
-   + 'Nylon Guitar,Steel Guitar,Jazz Guitar,Clean Guitar,Muted Guitar,Overdrive Guitar,Distortion Guitar,Guitar Harmonics,'
-   + 'Acoustic Bass,Finger Bass,Pick Bass,Fretless Bass,Slap Bass 1,Slap Bass 2,Synth Bass 1,Synth Bass 2,'
-   + 'Violin,Viola,Cello,Contrabass,Tremolo Strings,Pizzicato,Harp,Timpani,'
-   + 'String Ens 1,String Ens 2,Synth Strings 1,Synth Strings 2,Choir Aahs,Voice Oohs,Synth Voice,Orchestra Hit,'
-   + 'Trumpet,Trombone,Tuba,Muted Trumpet,French Horn,Brass Section,Synth Brass 1,Synth Brass 2,'
-   + 'Soprano Sax,Alto Sax,Tenor Sax,Baritone Sax,Oboe,English Horn,Bassoon,Clarinet,'
-   + 'Piccolo,Flute,Recorder,Pan Flute,Blown Bottle,Shakuhachi,Whistle,Ocarina,'
-   + 'Square Lead,Saw Lead,Calliope,Chiff,Charang,Voice Lead,Fifths,Bass+Lead,'
-   + 'New Age Pad,Warm Pad,Polysynth Pad,Choir Pad,Bowed Pad,Metallic Pad,Halo Pad,Sweep Pad,'
-   + 'Rain,Soundtrack,Crystal,Atmosphere,Brightness,Goblins,Echoes,Sci-Fi,'
-   + 'Sitar,Banjo,Shamisen,Koto,Kalimba,Bagpipe,Fiddle,Shanai,'
-   + 'Tinkle Bell,Agogo,Steel Drums,Woodblock,Taiko,Melodic Tom,Synth Drum,Reverse Cymbal,'
-   + 'Fret Noise,Breath Noise,Seashore,Bird Tweet,Telephone,Helicopter,Applause,Gunshot').split(',');
-
-  // hexter loads all four DX7 factory cartridges; ROM1A voice 11 is E.PIANO 1,
-  // and programs are zero-indexed, so that is program 10.
-  const DX7 = ('BRASS 1,BRASS 2,BRASS 3,STRINGS 1,STRINGS 2,STRINGS 3,ORCHESTRA,PIANO 1,PIANO 2,PIANO 3,'
-   + 'E.PIANO 1,GUITAR 1,GUITAR 2,SYN-LEAD 1,BASS 1,BASS 2,E.ORGAN 1,PIPES 1,HARPSICH 1,CLAV 1,'
-   + 'VIBE 1,MARIMBA,KOTO,FLUTE 1,ORCH-CHIME,TUB BELLS,STEEL DRUM,TIMPANI,REFS WHISL,VOICE 1,TRAIN,TAKE OFF').split(',');
-
-  // The box's own list, when the instrument has one. Empty means "walk the
-  // fixed table above".
+  // The box's own list. Empty means it has not arrived yet, which is every
+  // moment before the board answers and is not the same as "there is none".
   let patches = [], banksInList = 0, chosen = false;
   const listed = () => patches.length > 0;
 
   const bankOf = (i) => (i >> 7) & 63, progOf = (i) => i & 127;
-  const span = () => (listed() ? patches.length : current === 'hexter' ? 128 : 48 * 128);
-  const patchName = (i) => {
-    if (listed()) return patches[i]?.name ?? '—';
-    const p = progOf(i);
-    if (current === 'hexter') return DX7[p] ?? `voice ${p + 1}`;
-    if (current?.startsWith('fluid')) return GM[p] ?? `program ${p}`;
-    return `program ${p}`;
-  };
+  // ⚠️ 128 IS THE WAITING NUMBER, not a claim about the instrument. Before the
+  // list lands there is nothing to walk but program numbers, and one bank of
+  // them is the widest honest guess. The instant `voices.listed` arrives the
+  // real length takes over.
+  const span = () => (listed() ? patches.length : 128);
+  const patchName = (i) => (listed() ? patches[i]?.name ?? '—' : `program ${progOf(i)}`);
   /** Dropdown index -> patch index. They coincide: a listed instrument is
-   *  walked by list position, and a fixed table is walked by program within
-   *  bank 0, which is the same number. */
+   *  walked by list position, and before the list lands it is walked by program
+   *  within bank 0, which is the same number. */
   const pickIndex = (i) => i;
 
-  /** The list the dropdown offers. For Yoshimi that is the board's own
-   *  enumeration; for a fixed table it is bank 0, which is the only bank whose
-   *  programs have names. ⚠️ The ARROWS can still walk past the end of this
-   *  into higher banks — `show()` leaves the select alone when the index is
+  /** The list the dropdown offers: the board's own enumeration once it has
+   *  arrived, and bare program numbers until then. ⚠️ The ARROWS can still walk
+   *  past the end of this — `show()` leaves the select alone when the index is
    *  outside it, rather than pointing at the wrong row. */
   function refreshPicker() {
     const names = listed() ? patches.map((e) => e.name ?? '—')
@@ -381,176 +361,118 @@
     setTimeout(() => send({ type: 'voice.select', channel: 0, program: progOf(idx) }), changed ? 120 : 0);
   }
 
-  // ── audio ────────────────────────────────────────────────────────────────
-  async function startAudio() {
-    if (ctx) return;
-    // ⚠️ ASK FOR 48 kHz, BECAUSE NOTHING IN THIS CHAIN RESAMPLES.
-    // The box fixes `RATE = 48000` (rig/box/synth.mjs) and the worklet writes
-    // those samples straight into a ring drained at the context's own rate. On
-    // an output running at 44.1 kHz the pitch is wrong by the ratio AND the
-    // ring fills faster than it drains, so the latency guard trims the oldest
-    // samples back to the floor several times a second — periodic clicking.
-    //
-    // And the readout would stay green throughout: its fault cell is frames per
-    // second, which is unaffected. That is this project's oldest shape of
-    // failure — a stream that looks identical to a working one from every angle
-    // except the samples.
-    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000, latencyHint: 'interactive' });
-    // A REQUEST, not a guarantee: a browser may hand back its device rate
-    // anyway. No readout cell for it — a cell that reads `48000` forever is a
-    // constant wearing a measurement's clothes, and it teaches the reader to
-    // skip the row. It only speaks when it has something to say.
-    if (ctx.sampleRate !== 48000) {
-      d.log(`this browser runs audio at ${ctx.sampleRate} Hz and the board sends 48000 — pitch will be off by ${(48000 / ctx.sampleRate).toFixed(3)}x and you will hear clicks`, 'bad');
-    }
-    // ⚠️ Fire and move on. `resume()` waits on a user gesture in a real browser
-    // and NEVER REJECTS, so awaiting it here is a hang rather than an error —
-    // it would stop the worklet ever loading and the page would look fine.
-    ctx.resume().catch(() => { /* a suspended context is allowed; sound is late, not broken */ });
-    await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
-    playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
-    playout.connect(ctx.destination);
-    // 🔴 THE COUNTERS EXISTED ALL ALONG AND NO PAGE HAD EVER READ ONE. They are
-    // posted every 250 ms from inside the worklet; `rack` sounded noisy for an
-    // hour while six separate measurements said its stream was perfect, because
-    // the defect was downstream of every quantity being measured. A statistic
-    // nobody displays is not instrumentation.
-    playout.port.onmessage = (e) => {
-      const st = e.data?.stats; if (!st) return;
-      cushionMs = st.bufferedMs;
+  // ── the board ────────────────────────────────────────────────────────────
+  //
+  // 🔴 EVERYTHING BETWEEN THIS PAGE AND THE RASPBERRY PI IS `board.mjs`. The
+  // socket, the reconnect, the presence, the 12-byte frame header, the
+  // conversion to float, the `pcm-playout` worklet, the cushion, its counters
+  // and the check that a frame is the shape the board says it is. What is left
+  // here is what this page is about: which verbs it sends, what it does with a
+  // frame after the playout has it, and what its log calls things.
+  //
+  // ⚠️ THE CUSHION IS 100 ms HERE AND 160 ON `/knobs/`, AND THAT IS DELIBERATE
+  // rather than drift. This page reports `lag` — press to sound — and every
+  // millisecond of cushion is a millisecond of it. `/knobs/` holds one note and
+  // sweeps a filter over it, where a click is the thing a listener cannot
+  // ignore and 60 ms more delay is not. Two pages, two trades, one component.
+  const board = createBoard({
+    room: ROOM,
+    relay: q.get('relay') || undefined,
+    of: 'Raspberry Pi',
+    cushionMs: 100,
+    maxCushionMs: 250,
+    log: (line, kind) => d.log(line, kind),
+    onOpen: () => {
+      d.log(`joined ${ROOM}`, 'hi');
+      // 🔴 THIS PAGE ASKS THE BOARD FOR NOTHING IT CANNOT CONTROL, AND THAT IS
+      // A CHANGE. It used to send one message about an effect it did not draw
+      // and had no switch for, to clear one left behind by another page. The
+      // BOARD does that for itself now. It drops an effect whose page has
+      // stopped talking, so nothing here has to police somebody else's tab.
+      // `rig/box/box.mjs` holds that rule and `rig/box/insert-test.mjs` grades
+      // it; `rig/box/README.md` says what left this page and why.
+      send({ type: 'audio.status' });
+    },
+    onPcm: (f32, { peak }) => {
+      const st = board.stats();
       d.set('buffer', Math.round(st.bufferedMs));
-      const b = st.underruns + st.trimEvents;
-      if (b !== breaks) {
-        const first = breaks < 0;
-        breaks = b;
-        // ⚠️ NO CELL OF ITS OWN ANY MORE: it is summed into `lost` where the
-        // frames the wire dropped are counted, because both answer one question.
-        // The line below is what still tells the two apart, and it is the half
-        // that matters: they want OPPOSITE fixes.
-        // Two opposite faults, so the LINE says which: running dry wants a
-        // bigger cushion and being trimmed wants a smaller one.
-        if (!first) d.log(`${st.underruns} ran dry, ${st.trimEvents} trimmed — cushion ${Math.round(st.bufferedMs)} ms`, 'warn');
+      /**
+       * 🔴 PRESS TO SOUND, CLOSED HERE, ON THE FRAME THAT CARRIES THE NOTE.
+       * `+ bufferedMs` because this frame has ARRIVED and has not been heard:
+       * the playout is deliberately holding that much audio in front of it.
+       * Reporting arrival alone would flatter the number by the whole cushion,
+       * which is the same mistake as quoting a candidate pair RTT as media
+       * latency, and this repo has made that one before.
+       */
+      if (peak < LAG_ON) quietFrames++;
+      else {
+        if (pressAt) {
+          d.set('lag', Math.round(performance.now() - pressAt + st.bufferedMs));
+          pressAt = 0;
+        }
+        quietFrames = 0;
       }
-    };
-    // The cushion is OURS, not the browser's — which is the whole reason to
-    // carry the samples ourselves rather than use WebRTC. 100 ms adaptive to
-    // 250 for the reason measured on `rack`'s path: 60 ms is under the worst
-    // single arrival gap this relay produces (108.6 ms), and a cushion has no
-    // restoring force, so only a floor that grows when it is proved too small
-    // is safe over a long session.
-    playout.port.postMessage({ cmd: 'floor', ms: 100, adaptive: true, maxMs: 250 });
-  }
+      if (pressAt && performance.now() - pressAt > LAG_GIVE_UP_MS) pressAt = 0;
+      if (st.frames % 10 !== 0) return;
+      // ⚠️ ONE CELL FOR BOTH KINDS OF MISSING, and the log is where they are
+      // told apart. `lost` is frames the wire never delivered; `breaks` is the
+      // playout running dry or being trimmed. A reader wants to know whether
+      // what they are hearing is intact, which is one question.
+      const gone = st.lost + Math.max(0, st.breaks);
+      d.set('lost', gone, gone ? 'bad' : 'ok');
+      // 50/s is one clean source. Anything above it is TWO instruments
+      // streaming into one socket, which is what a garbled stream sounds like
+      // — so this cell is a fault detector, not decoration.
+      const fps = st.framesPerSec;
+      // The guard without the cell. Two sources interleaved into one socket
+      // reads as roughly double the rate, and that is the only thing this
+      // number has ever had to say.
+      if (Math.abs(fps - 50) >= 6 && !rateWarned) {
+        rateWarned = true;
+        d.log(`${fps.toFixed(1)} frames a second arriving where one clean source is 50 — `
+              + (fps > 56 ? 'that is two instruments streaming at once' : 'frames are going missing'), 'bad');
+      }
+      /**
+       * 🔴 FRAMES A SECOND, AND THIS CELL HAS NOW BEEN REMOVED AND PUT BACK
+       * TWICE. It went because it read `50.1` on every run of every day, and a
+       * cell that never moves teaches a reader to skip the row. `lag` took its
+       * place on 2026-09-16 and lasted about twenty minutes: *"what is lag? its
+       * empty. replace?"*, then *"frames/s was ok"*. Both are here now, because
+       * `lag` fills the moment somebody presses a key and `frames/s` fills the
+       * moment a board is answering, and those are different questions.
+       */
+      d.set('frames/s', fps.toFixed(1));
+    },
+    onMessage: (m) => heard(m),
+  });
 
-  // Drawn IMMEDIATELY rather than on a reply: gating the selector on the box's
-  // answer left the page with no buttons at all whenever the box was busy.
-  // A radio row: exactly one instrument is armed, and it is armed on load
-  // rather than after the first click — a page that shows no selection while
-  // something IS playing is lying about its own state.
-  // ⚠️ THE BOX NAMES THE SAMPLED INSTRUMENT BY ITS FILE. `audio.started` sends
-  // `soundfont: …/FluidR3_GM.sf2` and this page reduced that to `FluidR3_GM` —
-  // which never equalled the source name `fluidsynth`, so an equality test
-  // armed NOTHING whenever the sampled instrument was the one playing. There is
-  // one sampled button now, so anything that is not a known JACK source is it.
-  const arm = (name) => {
-    if (!instPick) return;
-    const src = !name ? null : (name === 'hexter' || name === 'yoshimi') ? name : 'fluidsynth';
-    const i = instOpts.findIndex(([, v]) => v.src === src);
-    // `set` is QUIET here: arming is reporting what the board says is playing,
-    // not choosing — firing onPick would start the instrument all over again.
-    if (i >= 0) instPick.set(i, true);
-    // Nothing playing has no armed button, and `createChoice` cannot say "none"
-    // — so say it here rather than leave a stale one lit.
-    else instPick.buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
-  };
-  let instPick = null, instOpts = [];
-  function drawInstruments() {
-    // 🔴 ONE SEGMENTED GROUP, FROM THE KIT. These were loose flex buttons with
-    // a 6 px gap, so three mutually exclusive choices read as three unrelated
-    // controls — the exact complaint `choice.mjs` was written to answer, on the
-    // page that complaint came from. Worse, the page's own
-    // `.pick button[aria-pressed="true"]` then repainted the kit's chosen state
-    // for the reverb and chorus rows too: same specificity as
-    // `.pos-choice button[aria-pressed="true"]` and later in the cascade, so
-    // every `createChoice` on this page silently lost its own look.
-    const opts = [];
-    instPick?.el.remove();
-    instPick = null;
-    // 🔴 ONE SAMPLED INSTRUMENT, NOT ONE PER FILE. This drew a button for every
-    // soundfont on the board under its raw filename, so the row read
-    // `FluidR3_GM` `sf_GMbank` `hexter` `yoshimi` — two of which are the SAME
-    // instrument, General MIDI, twice, named after the files they happen to
-    // live in. A visitor reading that has to know what a soundfont is before
-    // they can tell that two of the four choices are one choice.
-    //
-    // They are picked between here instead of shown: the fullest General MIDI
-    // set wins, because that is the only difference a listener could name.
-    const best = soundfonts.slice().sort((a, b) =>
-      (/fluidr3/i.test(b.name) ? 1 : 0) - (/fluidr3/i.test(a.name) ? 1 : 0)
-      || (b.bytes || 0) - (a.bytes || 0))[0];
-    /**
-     * 🔴 THE BOARD IS LOCKED TO YOSHIMI. Instructed 2026-09-16: *"just lock to
-     * yoshimi (disable sampled and hexter in box ui)"*.
-     *
-     * There is ONE JACK graph, ONE capture and ONE room, so whatever is playing
-     * is what every listener on every page hears. Changing instrument here
-     * takes it away from anybody else mid note, and it did: `/knobs/` was found
-     * refusing to start because somebody had pressed `sampled` from this row,
-     * and that page cannot work at all without yoshimi's filter.
-     *
-     * ⚠️ DISABLED WITH THE REASON ON THEIR FACE, NEVER REMOVED. `caps.mjs`
-     * settles this for the whole project: a control that vanishes says the
-     * feature does not exist, which is a different and false statement. The
-     * board still has FluidSynth and hexter, they still work, and the day the
-     * capture stops being shared they come back by deleting `LOCKED`.
-     */
-    const LOCKED = 'yoshimi';
-    const WHY_LOCKED = 'one instrument at a time, and /knobs/ needs this one';
-    opts.push(['sampled', { src: 'fluidsynth', slow: false, off: WHY_LOCKED, msg:
-      best ? { type: 'audio.start', source: 'fluidsynth', soundfont: best.path }
-           : { type: 'audio.start', source: 'fluidsynth' } }]);
-    for (const k of ['hexter', 'yoshimi']) {
-      if (avail && avail[k] === false) continue;
-      opts.push([k, { src: k, slow: true, off: k === LOCKED ? null : WHY_LOCKED,
-                      msg: { type: 'audio.start', source: k } }]);
-    }
-    instOpts = opts;
-    instPick = createChoice({
-      label: 'instrument',
-      options: opts,
-      onPick: async (v, label, i) => {
-        // The lock, enforced where the press lands rather than only in the
-        // paint: a disabled button that still acts is the shape of control this
-        // project calls a lie.
-        if (v.off) { d.log(`${label} is off: ${v.off}`, 'warn'); return; }
-        await startAudio();
-        arm(v.src);
-        // Starting a JACK instrument takes ten to forty seconds, so the button
-        // breathes until the board confirms — a control that just sits there
-        // reads as a dead click.
-        if (v.slow) { instPick.buttons[i].dataset.busy = '1'; d.log(`${label}: starting`, 'hi'); }
-        send({ type: 'audio.stop' });
-        setTimeout(() => send(v.msg), 400);
-      },
-    });
-    /**
-     * ⚠️ `createChoice` DISABLES ALL OR NONE, so the lock is applied to the
-     * buttons it built. The reason goes in `title`, which is what a hand on a
-     * mouse gets, and in `aria-disabled` alongside the real `disabled`, so it
-     * is announced rather than simply unreachable.
-     */
-    opts.forEach(([label, v], i) => {
-      const b = instPick.buttons[i];
-      if (!b || !v.off) return;
-      b.disabled = true;
-      b.dataset.off = '1';
-      b.title = `${label} is on the board and switched off here: ${v.off}`;
-      b.setAttribute('aria-disabled', 'true');
-    });
-    picks.insertBefore(instPick.el, fxWrap);
-    arm(armed);
-  }
-  let armed = null;
-  drawInstruments();
+  const pres = board.presence;
+  const startAudio = () => board.startAudio();
+
+  /**
+   * 🔴 THERE IS NO INSTRUMENT ROW, SINCE 2026-09-16, AND THE ROW IS NOT HIDDEN
+   * — THE INSTRUMENTS ARE GONE FROM THE BOARD.
+   *
+   * It offered `sampled`, `hexter` and `yoshimi`, exactly one armed at a time.
+   * The board has ONE jackd, ONE capture and ONE room, so pressing one of those
+   * buttons took the sound away from every other listener on every other page,
+   * mid note. It happened: `/knobs/` was found refusing to start because
+   * somebody had pressed `sampled` here, and that page cannot work at all
+   * without yoshimi's filter.
+   *
+   * ⚠️ THIS IS NOT THE `caps.mjs` CASE, WHICH IS WHY THE CONTROL LEFT RATHER
+   * THAN BEING DISABLED. That rule is about a control for a feature that EXISTS
+   * and this browser cannot reach, where vanishing would say the feature does
+   * not exist. Here the feature genuinely does not exist any more: FluidSynth
+   * and hexter are out of `rig/box/jacksynth.mjs`, out of `rig/audit.mjs`, and
+   * a board asked for either answers `unknown source`. A disabled button for
+   * something that is not there is furniture.
+   * ⚠️ AND A CHOICE OF ONE IS NOT A CHOICE. What is left is the instrument, and
+   * the page says so in its own paragraph and in the picture at the bottom.
+   * `archive/box-fluidsynth-hexter/page-half.js` has the row.
+   * ⚠️ `INSTRUMENT` IS DECLARED AT THE TOP OF THIS MODULE, beside the room,
+   * because that is where the facts about what this page is pointed at live.
+   */
 
   // ── the keyboard, from the shell ─────────────────────────────────────────
   // ── the space the note falls into ───────────────────────────────────────
@@ -663,180 +585,93 @@
     onPorts: (n) => d.log(n ? `${n} MIDI input${n > 1 ? 's' : ''} — play it` : 'no MIDI keyboard attached; the drawn keys and the a-to-k row still play', n ? 'hi' : 'info'),
   });
 
-  // ── the socket ───────────────────────────────────────────────────────────
-  function connect() {
-    ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
-    ws.binaryType = 'arraybuffer';
-    ws.onopen = () => {
-      d.log(`joined ${ROOM}`, 'hi');
-      // 🔴 THIS PAGE ASKS THE BOARD FOR NOTHING IT CANNOT CONTROL, AND THAT IS
-      // A CHANGE. It used to send one message about an effect it did not draw
-      // and had no switch for, to clear one left behind by another page. The
-      // BOARD does that for itself now. It drops an effect whose page has
-      // stopped talking, so nothing here has to police somebody else's tab.
-      // `rig/box/box.mjs` holds that rule and `rig/box/insert-test.mjs` grades
-      // it; `rig/box/README.md` says what left this page and why.
-      send({ type: 'sf.list' });
-      send({ type: 'audio.status' });
-    };
-    // The relay's Durable Object can be restarted under us; without this the
-    // page keeps its buttons and answers nobody, which looks like a dead box.
-    ws.onclose = () => { d.log('socket closed — reconnecting'); setTimeout(connect, 1000); };
-    ws.onerror = () => {};
-    ws.onmessage = (e) => {
-      if (typeof e.data !== 'string') {
-        const s = new DataView(e.data).getUint32(0, true);
-        if (last >= 0 && s > last + 1) lost += s - last - 1;
-        last = s; frames++;
-        if (!firstFrame) firstFrame = performance.now();
-        const pcm = new Int16Array(e.data, 12);
-        const f32 = new Float32Array(pcm.length);
-        let sum = 0, peak = 0;
-        for (let i = 0; i < pcm.length; i++) {
-          f32[i] = pcm[i] / 32768; sum += f32[i] * f32[i];
-          const a = f32[i] < 0 ? -f32[i] : f32[i];
-          if (a > peak) peak = a;
-        }
-        bytes += e.data.byteLength;
-        /**
-         * 🔴 PRESS TO SOUND, CLOSED HERE, ON THE FRAME THAT CARRIES THE NOTE.
-         * `+ cushionMs` because this frame has ARRIVED and has not been heard:
-         * the playout is deliberately holding that much audio in front of it.
-         * Reporting arrival alone would flatter the number by the whole cushion,
-         * which is the same mistake as quoting a candidate pair RTT as media
-         * latency, and this repo has made that one before.
-         */
-        if (peak < LAG_ON) quietFrames++;
-        else {
-          if (pressAt) {
-            d.set('lag', Math.round(performance.now() - pressAt + cushionMs));
-            pressAt = 0;
-          }
-          quietFrames = 0;
-        }
-        if (pressAt && performance.now() - pressAt > LAG_GIVE_UP_MS) pressAt = 0;
-        if (frames % 10 === 0) {
-          const secs = (performance.now() - firstFrame) / 1000;
-          // ⚠️ ONE CELL FOR BOTH KINDS OF MISSING, and the log is where they are
-          // told apart. `lost` is frames the wire never delivered; `breaks` is
-          // the playout running dry. A reader wants to know whether what they
-          // are hearing is intact, which is one question.
-          const gone = lost + Math.max(0, breaks);
-          d.set('lost', gone, gone ? 'bad' : 'ok');
-          // 50/s is one clean source. Anything above it is TWO instruments
-          // streaming into one socket, which is what a garbled stream sounds
-          // like — so this cell is a fault detector, not decoration.
-          const fps = frames / Math.max(0.001, secs);
-          // The guard without the cell — see the readout comment. Two sources
-          // interleaved into one socket reads as roughly double the rate, and
-          // that is the only thing this number has ever had to say.
-          if (Math.abs(fps - 50) >= 6 && !rateWarned) {
-            rateWarned = true;
-            d.log(`${fps.toFixed(1)} frames a second arriving where one clean source is 50 — `
-                  + (fps > 56 ? 'that is two instruments streaming at once' : 'frames are going missing'), 'bad');
-          }
-          /**
-           * 🔴 FRAMES A SECOND, AND THIS CELL HAS NOW BEEN REMOVED AND PUT BACK
-           * TWICE. It went because it read `50.1` on every run of every day, and
-           * a cell that never moves teaches a reader to skip the row. `lag` took
-           * its place on 2026-09-16 and lasted about twenty minutes: *"what is
-           * lag? its empty. replace?"*, then *"frames/s was ok"*.
-           *
-           * ⚠️ AND `lag` WAS RIGHT TO GO, FOR A REASON WORTH KEEPING. It is half
-           * a round trip plus the cushion, and the round trip comes from a ping
-           * the BOARD answers. With no board there, or before the first pong,
-           * there is nothing to print, so the honest value is an em dash. A cell
-           * whose normal state on a page nobody has connected is blank is worse
-           * than a constant: a constant at least says the machine is running.
-           * The lag is still computed and still in the log when it matters.
-           */
-          d.set('frames/s', fps.toFixed(1));
-        }
-        playout?.port.postMessage({ pcm: f32 }, [f32.buffer]);
+  // ── what the board says ──────────────────────────────────────────────────
+  //
+  // Every JSON message from the room that is not this page's own echo. The
+  // socket, the reconnect and the "which one of these is the board" question
+  // are `board.mjs`'s; this is what this page does with an answer.
+  function heard(m) {
+    // ⚠️ `box.hello` IS STILL READ AND IT IS NOT A CHOICE ANY MORE. The board
+    // reports what it can raise, and with one instrument the only thing worth
+    // doing with the answer is SAYING SO when the answer is no — which is a
+    // different and more useful page than one whose buttons silently do
+    // nothing. `sf.list` went with the sampled instrument.
+    if (m.type === 'box.hello') {
+      avail = m.instruments ?? null;
+      if (avail && avail[INSTRUMENT] === false && !saidMissing) {
+        saidMissing = true;
+        d.log(`the board answered but ${INSTRUMENT} is not installed on it, so nothing here will make a sound`, 'bad');
+      }
+    }
+    // The box's own library. It arrives once per instrument change and is
+    // ~34 KB for Yoshimi, well inside the relay's 256 KiB per message.
+    if (m.type === 'voices.listed') {
+      if (m.source !== current) { /* an answer about an instrument we left */ }
+      else if (m.ok && m.banks?.length) {
+        patches = [];
+        for (const b of m.banks) for (const p of b.patches)
+          patches.push({ bank: b.bank, bankName: b.name, program: p.program, name: p.name });
+        banksInList = m.bankCount ?? m.banks.length;
+        idx = 0; lastBank = -1;
+        refreshPicker();
+        showPatch();
+        d.log(`${m.source}: ${patches.length} patches in ${m.bankCount} banks`, 'hi');
+        // The board checked its own bank map against its own files. Saying
+        // nothing here would leave a list that is quietly wrong looking
+        // exactly like one that is right.
+        if (m.stale) d.log('the board\'s bank list disagrees with the files on its disk', 'bad');
+      }
+      // `fixed` means the instrument simply has no library to read and this
+      // page's own table is the right answer — not a failure worth a line.
+      else if (m.reason && !m.fixed) d.log(`patches: ${m.reason}`, 'bad');
+    }
+    // Somebody chose a patch — this page, or another listener in the same
+    // room. Following it is what keeps two people looking at one instrument.
+    if (m.type === 'voice.selected' && m.ok && listed()) {
+      const at = patches.findIndex((p) => p.bank === m.bank && p.program === m.program);
+      if (at >= 0) { idx = at; chosen = true; showPatch(); }
+    }
+    if (m.type === 'audio.started') {
+      // Nothing playing on arrival: start the instrument rather than present
+      // a page whose keys do nothing and say nothing about why.
+      // ⚠️ IT TAKES TEN TO FORTY SECONDS on a cold board, so the page says so
+      // rather than looking hung. The presence badge on the transport carries
+      // the same fact where somebody is already looking.
+      if (!m.ok && m.reason === 'nothing playing' && !autoStarted) {
+        autoStarted = true;
+        pres.coming();
+        d.log(`nothing was playing on the board. Starting ${INSTRUMENT}, which takes ten to forty seconds`, 'hi');
+        send({ type: 'audio.start', source: INSTRUMENT });
         return;
       }
-      let m; try { m = JSON.parse(e.data); } catch { return; }
-      if (m.from === ID) return;
-      // ONE CLOCK, both stamps: the box's performance.now() and ours share no
-      // origin, so this is timed entirely here and contains no clock offset.
-      // The ping still runs — it is how this page knows the board is answering
-      // at all — it just has no cell of its own any more.
-      if (m.type === 'box.pong' && pingAt) { rtt = Math.round(performance.now() - pingAt); pingAt = 0; }
-      if (m.type === 'box.hello') { avail = m.instruments ?? null; drawInstruments(); send({ type: 'sf.list' }); }
-      if (m.type === 'sf.listed') { soundfonts = m.soundfonts || []; drawInstruments(); }
-      // The box's own library. It arrives once per instrument change and is
-      // ~34 KB for Yoshimi, well inside the relay's 256 KiB per message.
-      if (m.type === 'voices.listed') {
-        if (m.source !== current) { /* an answer about an instrument we left */ }
-        else if (m.ok && m.banks?.length) {
-          patches = [];
-          for (const b of m.banks) for (const p of b.patches)
-            patches.push({ bank: b.bank, bankName: b.name, program: p.program, name: p.name });
-          banksInList = m.bankCount ?? m.banks.length;
-          idx = 0; lastBank = -1;
-          refreshPicker();
-          showPatch();
-          d.log(`${m.source}: ${patches.length} patches in ${m.bankCount} banks`, 'hi');
-          // The board checked its own bank map against its own files. Saying
-          // nothing here would leave a list that is quietly wrong looking
-          // exactly like one that is right.
-          if (m.stale) d.log('the board\'s bank list disagrees with the files on its disk', 'bad');
-        }
-        // `fixed` means the instrument simply has no library to read and this
-        // page's own table is the right answer — not a failure worth a line.
-        else if (m.reason && !m.fixed) d.log(`patches: ${m.reason}`, 'bad');
-      }
-      // Somebody chose a patch — this page, or another listener in the same
-      // room. Following it is what keeps two people looking at one instrument.
-      if (m.type === 'voice.selected' && m.ok && listed()) {
-        const at = patches.findIndex((p) => p.bank === m.bank && p.program === m.program);
-        if (at >= 0) { idx = at; chosen = true; showPatch(); }
-      }
-      if (m.type === 'audio.started') {
-        for (const c of picks.querySelectorAll('button')) delete c.dataset.busy;
-        // Nothing playing on arrival: start the cheap instrument rather than
-        // present a page where every control does nothing until you guess that
-        // one of the buttons is a prerequisite.
-        if (!m.ok && m.reason === 'nothing playing' && !autoStarted) {
-          autoStarted = true;
-          d.log('nothing was playing — starting the sampled instrument', 'hi');
-          send({ type: 'audio.start', source: 'fluidsynth' });
-          return;
-        }
-        if (m.ok) {
-          current = m.source; lastBank = -1;
-          // Arm by what the BOX reports, not by what was clicked — the box is
-          // the authority on which instrument is sounding, and a page that
-          // joins mid-session has clicked nothing.
-          armed = m.soundfont ? m.soundfont.replace(/.*\//, '').replace(/\.sf[23]$/i, '') : m.source;
-          arm(armed);
+      if (m.ok) {
+        current = m.source; lastBank = -1;
+        pres.coming(false);
 
-          // An insert can only reach a JACK instrument. FluidSynth writes to a
-          // ⚠️ ASK THE BOX, DO NOT KEEP A LIST. This was a list of instrument
-          // names, so every new source meant remembering to add it here — and
-          // forgetting meant a control that silently refused to arm on a page
-          // that could not say why. Whether an insert can wrap something is a
-          // property of the SOURCE, and the box reports it.
-          spaceRow.hidden = m.jack === false;
-          if (m.jack === false) d.log(`${m.source} writes to a pipe rather than to the audio graph the reverb sits on, so there is no space to put it in`, 'warn');
-          else sendSpace();
-          // A new instrument means a new library. Drop the old one FIRST, or
-          // the arrows keep walking the previous instrument's list until the
-          // reply lands — stepping through names that belong to something else.
-          patches = []; idx = 0; banksInList = 0; chosen = false;
-          // The fixed table belongs to the instrument that just came up, so the
-          // dropdown has to be rebuilt even when no list arrives.
-          refreshPicker();
-          showPatch();
-          send({ type: 'voices.list', source: m.source });
-          d.log(`playing ${m.source}`, 'hi');
-        }
-        // ⚠️ NOT `d.set('playing', ...)`. There is no `playing` cell — the shell
-        // catches it and logs "readout 'playing' was not declared in mount()",
-        // which is what a visitor saw instead of the reason the start failed.
-        else d.log(`failed: ${m.reason}`, 'bad');
+        // ⚠️ ASK THE BOX, DO NOT KEEP A LIST. This was a list of instrument
+        // names, so every new source meant remembering to add it here — and
+        // forgetting meant a control that silently refused to arm on a page
+        // that could not say why. Whether an insert can wrap something is a
+        // property of the SOURCE, and the box reports it.
+        spaceRow.hidden = m.jack === false;
+        if (m.jack === false) d.log(`${m.source} writes to a pipe rather than to the audio graph the reverb sits on, so there is no space to put it in`, 'warn');
+        else sendSpace();
+        // A new instrument means a new library. Drop the old one FIRST, or
+        // the arrows keep walking the previous instrument's list until the
+        // reply lands — stepping through names that belong to something else.
+        patches = []; idx = 0; banksInList = 0; chosen = false;
+        // The fixed table belongs to the instrument that just came up, so the
+        // dropdown has to be rebuilt even when no list arrives.
+        refreshPicker();
+        showPatch();
+        send({ type: 'voices.list', source: m.source });
+        d.log(`playing ${m.source}`, 'hi');
       }
-    };
+      // ⚠️ NOT `d.set('playing', ...)`. There is no `playing` cell — the shell
+      // catches it and logs "readout 'playing' was not declared in mount()",
+      // which is what a visitor saw instead of the reason the start failed.
+      else d.log(`failed: ${m.reason}`, 'bad');
+    }
   }
   // z / x shift the octave too, because a keyboard player's hands are already
   // on the keys and reaching for a 26 px button under them is a lost note. The
@@ -847,12 +682,85 @@
     if (k === 'z' || k === 'x') kb.shiftOctave(k === 'z' ? -1 : 1);
   });
 
-  // Steering round trip, every few seconds. This is the CONTROL plane, not the
-  // audio: what a key press costs to reach the board, before anything is made.
-  setInterval(() => { if (ws?.readyState === 1 && !pingAt) { pingAt = performance.now(); send({ type: 'box.ping' }); } }, 4000);
+  /**
+   * 🔴 THE PING IS GONE, AND IT WENT BECAUSE NOTHING READ IT. This page sent
+   * `box.ping` every four seconds and timed the `box.pong`, into a variable no
+   * cell showed and no check asked for — the readout is four even cells and
+   * none of them was a round trip. A counter nobody displays is not
+   * instrumentation, and this one could never have filled anyway: the board
+   * answers `box.pong` with an `at` field, `at` is an ENVELOPE field, so its own
+   * formatter refuses the reply and the handler throws. Asked directly, the
+   * board answers `box.error: "at" is an envelope field`.
+   *
+   * ⚠️ WHAT IT WAS FOR IS STILL ANSWERED, BY TWO BETTER THINGS. The presence
+   * badge on the bar says whether the Raspberry Pi is speaking, from the
+   * board's own five-second heartbeat and from the audio itself. `openWire`
+   * asks `/stats` when an upgrade is refused and says whether the room was full
+   * or the relay unreachable, which is a question a ping cannot answer at all.
+   * `board.ping()` is still there for a page that wants the number.
+   */
+
+  /**
+   * Reachable from a probe, the way `window.__knobs` is on the other page.
+   * `frames` is how much stream has arrived and `peak` is whether any of it was
+   * a sound: a page that can only be asked "did frames arrive" cannot tell a
+   * held note from silence, and the board captures its graph continuously, so
+   * frames arrive at fifty a second whether or not anything is sounding.
+   */
+  window.__keys = {
+    get frames() { return board.stats().frames; },
+    get peak() { return board.stats().peak; },
+    get present() { return pres.state(); },
+    get playing() { return current; },
+  };
+
+  // ── the transport ────────────────────────────────────────────────────────
+  //
+  // 🔴 A BAR WITH NO PLAY BUTTON. Asked for 2026-09-16: *"bring transport bar to
+  // keys but no play button, just online badge"*.
+  //
+  // There is nothing here for a toggle to do. A note sounds while a key is held
+  // and stops when it is let go: there is no position to resume from, nothing
+  // to seek to, and no end to arrive at. What the bar is here for is the one
+  // fact about this source that is not a number and that a visitor most needs —
+  // whether the instrument in the other building is answering at all.
+  //
+  // ⚠️ THE CHIP AND `live` ARE THE SAME SLOT AND THE COMPONENT REFUSES BOTH.
+  // A `LIVE` chip says this source has no end, which is true here and is not
+  // the fact worth having: a page whose board is unplugged is still, in that
+  // sense, live.
+  // ⚠️ `everyMs` AND `comingMs` ARE THE BOARD'S OWN NUMBERS and are set inside
+  // `board.mjs`: 5 s is what `rig/box/box.mjs` beats at, and 45 s is how long
+  // yoshimi takes to come up on a cold board.
+  //
+  // The deck is a clock nobody reads. Every deck needs a range; nothing on this
+  // page shows one, and nothing stops when it ends.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, 86400000] });
+  const bar = createTransportBar(d.el, deck, {
+    chip: pres.el,       // whether the board is answering, in the chip's place
+    toggle: false,       // a held note has nothing to start or resume
+    scrub: false,        // and no position inside it to seek to
+    loop: false,         // there is no passage to hear twice
+    endStop: false,      // nor an end to stop at
+  });
+  // 🔴 THE BAR GOES ABOVE THE KEYS, AND `prepend` IS WHAT DOES IT.
+  // `createTransportBar` APPENDS, so without this it lands under the keyboard
+  // and the picture: the badge is the first thing to read on arriving, because
+  // it decides whether pressing anything will do something at all. `prepend`
+  // MOVES a node already in the document rather than copying it.
+  //
+  // ⚠️ AND THE FIRST ATTEMPT WAS `d.el.insertBefore(bar.el, picks)`, WHICH
+  // THREW AND TOOK THE WHOLE PAGE WITH IT: "the node before which the new node
+  // is to be inserted is not a child of this node". `picks` is inserted into
+  // `.pos-controls`'s parent, which is the BODY, while `d.el` is `.pos-body` —
+  // two different parents, and `insertBefore` needs the child's real one. That
+  // is the THIRD time this exact error has been thrown on this page, and the
+  // comment beside `picks.append(fxWrap)` is about the previous two. The
+  // symptom is total: a readout of dashes, one red line, no keyboard and no
+  // picture, because the throw happens at module scope.
+  d.el.prepend(bar.el);
 
   showPatch();
-  connect();
   d.ready();
 
   /**
@@ -917,76 +825,79 @@
                 + 'because one box carrying both directions could not be read.' },
         ] },
       /**
-       * 🔴 THREE INSTRUMENTS, NOT ONE BOX CALLED `instruments`, AND `set: true`
-       * BECAUSE THEY ARE ALTERNATIVES. Asked for 2026-09-16: *"can we sampled
-       * (renamed to the collection name), hexter, yoshimi side by side in pi
-       * box"*. Exactly one of them is up at any moment, so a default arrowhead
-       * between them would claim that `FluidR3 GM` feeds `hexter`. A bracket
-       * says they are parts of one machine, which is the true statement.
+       * 🔴 ONE INSTRUMENT, AND THE BOARD IS A CHAIN AGAIN. It held three boxes
+       * with `set: true` — a BRACKET, which is what says "these are parts of
+       * one machine" rather than "these feed each other" — because exactly one
+       * of `FluidR3 GM`, `hexter` and `yoshimi` was up at any moment and an
+       * arrowhead between them would have claimed that the first fed the
+       * second. Two of the three left the board on 2026-09-16, so there are no
+       * alternatives left to bracket and every gap here is a real step.
+       * `dg.ties` is 0 now, where it was 2.
        *
-       * ⚠️ `capture` IS THE EXCEPTION AND IT IS DECLARED. Each instrument has a
-       * link to it, so the gap `yoshimi` shares with it gets an arrow rather
-       * than a bracket and the other two run as lanes inside the container.
-       * `dg.ties` is 2, which is what the two bracketed gaps are.
+       * 🔴 AND `JACK` AND `ffmpeg` ARE TWO BOXES, WHICH IS `/knobs/`'s SHAPE.
+       * This was one box called `capture` with `ffmpeg, JACK` underneath it,
+       * and that is a sub doing a diagram's job: the fact that the synth is not
+       * wired to a loudspeaker but to a sound server, and that something else
+       * reads it out of there, was a phrase instead of a thing a reader can
+       * point at. Asked for on the other page in those words, *"should it break
+       * into 2 boxes (jack / ffmpeg)"*, and it is right on both.
        *
-       * ⚠️ AND THE NOTE ARROW LANDS ON THE MACHINE, NOT ON A BOX. A note goes
-       * to whichever instrument is running, which the picture cannot know, so
-       * pointing it at one of the three would be a guess drawn as a fact.
+       * ⚠️ `tech: 'raspberry'`, NOT `'board'`. `raspberry` is in `TECH_HUE` and
+       * `board` never was, so this box had been taking whatever the rotation
+       * handed it — a different colour from the same machine drawn on `/knobs/`.
+       *
+       * ⚠️ THE NOTE ARROW LANDS ON `yoshimi` AND NOT ON THE MACHINE, and that
+       * is what the removal bought. It used to point at the container, because
+       * a note goes to whichever instrument is running and the picture could not
+       * know which — pointing at one of three would have been a guess drawn as
+       * a fact. There is one, so the arrow can say where the note actually goes.
+       *
+       * ⚠️ THE REVERB IS STILL NOT DRAWN, and now it is a decision rather than
+       * a lack of room. `positron-space` is a Csound insert that lives ON the
+       * JACK graph, so a box for it beside `JACK` would put a reader in doubt
+       * about which side of which the sound passes. It is in the `JACK` note,
+       * which is where a fact you cannot see belongs.
        */
-      { id: 'pi', label: 'Raspberry Pi', sub: 'another building', kind: 'device', tech: 'board',
-        set: true,
+      { id: 'pi', label: 'Raspberry Pi', sub: 'another building', kind: 'device', tech: 'raspberry',
         children: [
-          // 🔴 THE COLLECTION, BY NAME. The button on this page says `sampled`,
-          // because one button beats four filenames a visitor has to know what
-          // a soundfont is to read. The picture has room for the real thing:
-          // 141 MB of General MIDI, and the board prefers this file over
-          // anything else it finds.
-          { id: 'sf', label: 'FluidR3 GM', sub: 'FluidSynth',
-            note: 'The 128 General MIDI programs and a drum bank, 141 MB of samples played by '
-                + '**FluidSynth** as a JACK client. It is loaded whole, because FluidSynth '
-                + 'streams nothing from disk.' },
-          { id: 'hexter', label: 'hexter', sub: 'DSSI, DX7',
-            note: 'A Yamaha DX7 with its four factory ROM cartridges, 128 voices, run under '
-                + '**jack-dssi-host**. Six-operator FM, so a patch is a set of ratios and '
-                + 'envelopes rather than a recording.' },
-          { id: 'yoshimi', label: 'yoshimi', sub: 'ZynAddSubFX',
-            note: 'A fork of **ZynAddSubFX** carrying 911 patches in 24 banks on this board. '
-                + 'The board enumerates them and sends the list, because it is the only end '
-                + 'that can see the files.' },
-          { id: 'cap', label: 'capture', sub: 'ffmpeg, JACK',
-            note: '**ffmpeg** reads the JACK client the running instrument is wired into and '
-                + 'writes raw 16-bit samples at 48 kHz. Many ports into one input sum, so a '
-                + 'stereo instrument arrives here as one channel.' },
+          { id: 'yoshimi', label: 'yoshimi', sub: 'software synth',
+            note: 'The one instrument on this board, carrying 911 patches in 24 banks. The '
+                + 'board enumerates them and sends the list, because it is the only end that '
+                + 'can see the files.' },
+          { id: 'jack', label: 'JACK', sub: 'sound server',
+            note: 'Every program on this board that makes or reads sound is a client of one '
+                + '**jackd**, wired together by name. The reverb and chorus are a **Csound** '
+                + 'insert patched in here, which is why they cost this page nothing.' },
+          { id: 'ffmpeg', label: 'ffmpeg', sub: '20ms pieces',
+            note: 'Reads the graph as a JACK client and writes raw 16-bit samples at 48 kHz. '
+                + 'Many ports into one input sum, so a stereo instrument arrives as one '
+                + 'channel rather than as its left side.' },
         ] },
     ],
-    // 🔴 ONE WAY ROUND, AND IT IS A RING. Out along the top: keys, notes, the
-    // board. Down the board: whichever instrument is up, then capture. Back
-    // along the bottom: audio, playout. Every arrow points the way the signal
-    // actually travels, and nothing meets in the middle.
+    // 🔴 ONE WAY ROUND, AND IT IS A RING. Out along the top: keys, notes,
+    // yoshimi. Down the board: the sound server, then the capture. Back along
+    // the bottom: audio, playout. Every arrow points the way the signal actually
+    // travels, and nothing meets in the middle.
     links: [
       { from: 'keys', to: 'down', label: 'note on/off',
         note: 'A few bytes of JSON per key, over a **WebSocket**. Half the round trip of one '
             + 'of these is half of what the **lag** cell reports.' },
-      { from: 'down', to: 'pi', label: 'note on/off',
+      { from: 'down', to: 'yoshimi', label: 'note on/off',
         note: 'The same message, copied on. The board writes it as raw MIDI bytes to a '
-            + '**snd-virmidi** device, which **aconnect** has already routed to whichever '
-            + 'instrument is up.' },
+            + '**snd-virmidi** device, which **aconnect** has already routed to the synth.' },
       // ⚠️ NO LABELS INSIDE A CONTAINER. The gap two stacked children share is
       // sixteen pixels tall, so a name in it runs under both boxes;
       // `createDiagram` refuses one and reports it. What travels is in the note.
-      { from: 'sf', to: 'cap',
-        note: 'Audio on the **JACK** graph, inside the board. Nothing crosses a network here '
-            + 'and nothing is encoded.' },
-      { from: 'hexter', to: 'cap',
-        note: 'The same wire, made by one **jack_connect** when the instrument came up. Only '
-            + 'one of the three is running, so only one of these carries anything.' },
-      { from: 'yoshimi', to: 'cap',
-        note: 'Both channels of a stereo instrument go into the one input, which is what '
-            + 'makes the mono that comes back a sum rather than the left side.' },
+      { from: 'yoshimi', to: 'jack',
+        note: 'Two ports, left and right, registered on the graph when the instrument came '
+            + 'up. Nothing crosses a network here and nothing is encoded.' },
+      { from: 'jack', to: 'ffmpeg',
+        note: 'One **jack_connect** per channel into a single input. The sum is what makes '
+            + 'the mono that comes back honest rather than half the instrument.' },
       // ⚠️ NO LABEL ON THE RETURN PATH. It runs back under the row rather than
       // between two boxes, and `createDiagram` reported both of these at a width
-      // of -444: there is no room there for a name. The box it arrives at is
-      // called `sound back`, which is the label, in the one place it fits.
+      // of -444: there is no room there for a name. What travels is in the note,
+      // where there is a sentence's worth of room for it.
       // 🔴 `back: true` ON BOTH RETURN LINKS, AND WITHOUT IT THE PICTURE WAS
       // UNREADABLE. It is an AUTHOR flag, not something the layout works out: a
       // link with no `back` is placed as a forward step, so these two were laid
@@ -995,7 +906,7 @@
       // Browser. Reported as *"what is this thing on left of playout?"* and
       // *"how sound gets back from pi to browser? no connector on this"*.
       // Flagged, they run in a lane under the row and arrive at the bottom edge.
-      { from: 'cap', to: 'up', back: true,
+      { from: 'ffmpeg', to: 'up', back: true,
         note: 'Twenty milliseconds of samples at a time, declared with a channel count: a '
             + 'frame cannot be read without one, since the same bytes are a valid mono frame '
             + 'and a valid stereo one.' },
@@ -1004,7 +915,7 @@
             + 'audio that cushion holds back before any of it is heard.' },
     ],
   }, { how: true, atEnd: true });
-  // 🔴 THE PICTURE SAYS WHAT IT COULD NOT DRAW. `/box/` is `built: false`, so no
+  // 🔴 THE PICTURE SAYS WHAT IT COULD NOT DRAW. `/keys/` is `built: false`, so no
   // harness ever opens it and there is nothing to turn red: a label that had to
   // be shortened or a link that could not be routed would otherwise be invisible
   // to the one person who can fix it. A log line is the only channel this page

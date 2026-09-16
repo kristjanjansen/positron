@@ -121,9 +121,11 @@ ships: SuperSonic took TINY's 64,733 B six times and refused LITE's 74,733 five
 (`research/supercollider-browser-2026-09.md` §10). The alternative — LITE at
 both ends — has no browser to run in.
 
-**The price, measured on this board today rather than quoted.** A chord held on
-fluidsynth through the insert, `pin1` at its default 0.7 so the grains enter at
-RESONATOR, sweeping that stage's wet mix:
+**The price, measured on this board rather than quoted.** A chord held on the
+instrument through the insert, `pin1` at its default 0.7 so the grains enter at
+RESONATOR, sweeping that stage's wet mix. ⚠️ The run was taken on FluidSynth,
+which left this board on 2026-09-16 (`archive/box-fluidsynth-hexter/`); the
+numbers are about the granulator stage rather than about what fed it:
 
 | a chord held, through TINY | rms | peak |
 |---|---:|---:|
