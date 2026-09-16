@@ -494,6 +494,23 @@ export const DEMOS = [
     one: 'one granulator, running in this page and on a Raspberry Pi at once, with a blend between them',
     tags: ['SuperCollider', 'WebAssembly', 'relay', 'PCM', 'live board'] },
 
+  // 🔴 CONTROLLERS, NOT NOTES, AND THE TWO ARE DIFFERENT KINDS OF TRAFFIC. A
+  // note is an EDGE: on and off are two halves of one object and losing either
+  // wedges the instrument. A controller value is a LEVEL: every message is a
+  // complete statement of where a knob is, the last one is the only one that
+  // stays true, and losing one is harmless the instant the next arrives. So
+  // this page coalesces instead of queueing, sends at most one value per slider
+  // per 20 ms, and states the whole console again every 500 ms rather than
+  // asking for an ack. plan-controller.md has the arithmetic and the reasons.
+  // ⚠️ `room: 'fixed'` because `studio-1` is the ADDRESS OF THE RASPBERRY PI.
+  // A private room does not give a second client its own board: there is one
+  // JACK graph and one instrument, so this page and `/box/` take turns.
+  // ⚠️ `settleMs` sizes the wait after control 0 ONLY, and control 0 is `Play`,
+  // which on a cold board brings Yoshimi up over ten to forty seconds.
+  { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
+    one: 'sweep a big filter on a Raspberry Pi in another building, then loop the sweep so your hands play themselves',
+    tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
+
   // 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is
   // a DOCUMENT — "~2 KB of GLSL plus ~200 bytes of parameters reproduces it at
   // any resolution" — and works out when generated code may cross a wire. This

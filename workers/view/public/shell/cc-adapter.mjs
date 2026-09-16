@@ -580,3 +580,112 @@ export function makeCcVoice(ctx, { destination = ctx.destination, drone = true, 
     dispose() { try { osc && osc.stop(); lfo && lfo.stop(); } catch {} },
   };
 }
+
+// ---------------------------------------------------------------------------
+// THE SEND GATE — what a hand on a slider is allowed to put on the wire.
+//
+// 🔴 A DIFFERENT PROBLEM FROM `makeCcCapture`, AND THE DIFFERENCE IS WHO IS
+// WAITING. That one thins a RECORDING: it may hold a sample back for 100 ms
+// because nothing downstream is listening yet, and the endpoint arrives at
+// `flush()`. This one feeds a synth in another building while a finger is
+// moving, so a held-back value is a filter that has not moved yet, and 100 ms
+// of that is audible.
+//
+// The rules are the same three and they are this file's, not new:
+//   1. THE ENDPOINT IS NEVER GATED. The last value of a gesture is the one that
+//      stays true forever, so it always goes.
+//   2. THE GATE IS PER CONTROLLER. Two hands on two sliders must not thin each
+//      other; one controller's turn is not another's.
+//   3. SWITCHES ARE NEVER GATED. A dropped pedal is the CC analogue of a stuck
+//      note. `SWITCHES` above is the list.
+//
+// What is new is the ARITHMETIC, and it is sized against the board rather than
+// against a feeling: the board cuts audio into 20 ms frames, so a controller
+// that changes twice inside one frame cannot be heard twice. One message per
+// controller per frame is therefore the most that can matter, and everything
+// above it is load nobody hears.
+//
+// ⚠️ EVERY DUE CONTROLLER TRAVELS IN ONE MESSAGE. Two sliders moving together
+// are `{ set: [[74, 91], [71, 40]] }`, not two messages: the relay's budget is
+// counted in MESSAGES, and a message carrying two pairs costs the same as one
+// carrying one.
+//
+// 🔴 AND A FULL STATEMENT EVERY `restateMs`, WHICH IS THE ONLY REPAIR A LEVEL
+// PLANE NEEDS. A lost note wedges an instrument and needs a journal; a lost
+// control is harmless the instant the next one arrives, and harmful forever
+// only if it was the last. Restating the whole console periodically fixes that
+// case without an ack, a sequence number or a retransmit queue.
+// ---------------------------------------------------------------------------
+
+/** One message per controller per audio frame. The board's frame is 20 ms. */
+export const SEND_GATE_MS = 20;
+/** How often the whole console is restated, even with nothing moving. */
+export const RESTATE_MS = 500;
+
+/**
+ * @param gateMs     one message per controller per this many ms
+ * @param restateMs  full-console restatement cadence
+ * @returns an object whose `put` records a move and whose `tick` returns the
+ *          message to send, or null. Pure: it holds no socket and no clock, so
+ *          `demo/shell/cc-send-test.mjs` grades it with neither.
+ */
+export function makeCcSend({ gateMs = SEND_GATE_MS, restateMs = RESTATE_MS } = {}) {
+  const live = new Map();          // controller -> the value last SENT
+  const pending = new Map();       // controller -> {v, end, isSwitch} not yet sent
+  const lastSent = new Map();      // controller -> when this controller last went
+  let lastRestate = null;
+  const stats = { offered: 0, sent: 0, messages: 0, thinned: 0, restated: 0 };
+
+  return {
+    stats,
+    get live() { return new Map(live); },
+
+    /**
+     * A hand moved. `end` marks the last value of a gesture, which is what
+     * `createSlider`'s `onChange` is and what `onInput` is not.
+     */
+    put(controller, value, { end = false } = {}) {
+      stats.offered++;
+      const c = controller | 0;
+      pending.set(c, { v: clamp7(value), end, isSwitch: SWITCHES.has(c) });
+    },
+
+    /**
+     * Called on a frame or a timer. Returns `{ set: [[controller, value], …] }`
+     * for everything due now, or null when there is nothing to say.
+     */
+    tick(tMs) {
+      const set = [];
+      for (const [c, p] of [...pending]) {
+        const last = lastSent.get(c);
+        const due = last === undefined || tMs - last >= gateMs;
+        // rules 1 and 3: neither waits for the gate
+        if (!due && !p.end && !p.isSwitch) { stats.thinned++; continue; }
+        pending.delete(c);
+        lastSent.set(c, tMs);
+        live.set(c, p.v);
+        set.push([c, p.v]);
+      }
+      if (set.length) {
+        stats.sent += set.length;
+        stats.messages++;
+        lastRestate = tMs;
+        return { set };
+      }
+      // rule 4: the console, restated, so a lost LAST value repairs itself
+      if (live.size && (lastRestate === null || tMs - lastRestate >= restateMs)) {
+        lastRestate = tMs;
+        stats.messages++;
+        stats.restated++;
+        return { set: [...live].map(([c, v]) => [c, v]), restate: true };
+      }
+      return null;
+    },
+
+    /** Forget everything, for a page that has just reconnected. */
+    reset() {
+      live.clear(); pending.clear(); lastSent.clear(); lastRestate = null;
+      for (const k of Object.keys(stats)) stats[k] = 0;
+    },
+  };
+}
