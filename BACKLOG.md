@@ -15,6 +15,44 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- ✅ **DONE, AND IT WAS THE SAME FAULT `/replay/` HAD THIS WEEK.** LOOP marked
+  two positions on a deck of 1965 and wrapped the PLAYHEAD between them while
+  the film ran on to its end: the bar wraps by seeking, and with no `command` a
+  seek goes to the deck rather than to the thing making the picture. Every verb
+  drives the element now and the deck follows, with `mediaMaster` anchored to
+  whichever clip is up, so a mark on the line is an offset into the film.
+  MEASURED against a local stand-in film with zero bytes from ERR: the picture
+  ran 4.00 to 6.43 s and came back 4 times in 12 s, against 6.90 to 18.46 s and
+  0 times with the `command` taken away, which is the reported bug exactly.
+  ✅ **AND THE SPACE ABOVE `NEWSREEL | RADIO`**: the block carried a `margin`
+  shorthand whose implied `margin-top: 0` beat `.pos-body > * + *` on source
+  order, so it sat at 14 px under the line. It takes the shell's 22 px now.
+
+- 🔴 **`/reel/` CAN BE GRADED WITHOUT ERR, AND THE RECIPE IS PROVEN BUT NOT IN
+  THE REPO.** The loop above was measured by intercepting every `*err.ee*`
+  request in CDP: the item API is fulfilled with
+  `{data:{media:{src:{hls:'<local>/film.m3u8'}}}}` and everything else to that
+  host is failed before it leaves the browser, with the stand-in film made by
+  `ffmpeg -f lavfi -i testsrc ... -f hls -hls_time 2 -hls_playlist_type vod`.
+  That is `demo/fake-station.mjs`'s trick for the other half of the problem, and
+  it would take `/reel/` from ungradable to gradable the same way. Promoting it
+  to `demo/fake-arhiiv.mjs` plus a `standInFor` entry in `verify.mjs` is the
+  open work; `floor`, `flipper` and `now` want the same thing.
+
+- ✅ **DONE. IT WAS THE GRAIN SCOPE'S OWN CAPTION ON `/radio/`, AND IT SAID
+  `Pappus, chewing the radio`.** Asked as *"rm 'pappus chewin radio' erc
+  label"*, and `erc` is `src`: `createGrainScope` has a `source(name)` setter
+  that paints one line of text inside the bottom-left of its canvas. The page
+  set it twice. `the radio, as it arrives` at the top, then this one the moment
+  the granulator came up, about a second later. The second call is deleted.
+  ⚠️ THE FIRST CALL STAYS AND IS STILL TRUE: that canvas is fed from
+  `srcNode` through `analyser`, which is the station's own audio for the whole
+  life of the page, so nothing about the picture changes when Pappus starts.
+  ⚠️ Why two sessions could not find it: the quoted phrase is not a string
+  anywhere. `chewin` had to be searched short and case-insensitively, and the
+  word a reader sees is `chewing`. Nothing reads the caption back, so no assert
+  and no readout cell carried it either.
+
 - ✅ **DONE, AS ONE CONTROL THAT IS OFF UNTIL PRESSED.** `Let it play itself`
   runs the same tour `/videoradio/` runs: 22 s on a sound, 9 s sliding to the
   next, the blend breathing 0.25 to 0.92, and the fader and four settings
@@ -42,12 +80,20 @@ file by being finished or by being refused in writing, never by being forgotten.
   `/radio/` is the one you play by hand, so whatever it gets has to be something
   a person can take back the moment they touch a control.~~
 
-- **`/draw/`: DEFAULT ZOOM 2.0, AND THE BLUE LINE CANNOT BE SEEN. ASKED
+- ~~**`/draw/`: DEFAULT ZOOM 2.0, AND THE BLUE LINE CANNOT BE SEEN. ASKED
   2026-09-16:** *"draw timeline: zoom 2.0 by default. find a way to see blue
   line on drawing (no enough contrast am blue on white). perhaps on drawing no
   blue line, fade it in when stopped and fade my drawed line into some
   semitransparent state"*. The last sentence is a suggested mechanism rather
-  than the requirement: the requirement is that both lines can be told apart.
+  than the requirement: the requirement is that both lines can be told apart.~~
+  DONE 2026-09-16, the suggested mechanism and it works. The strip opens at
+  twice `fit()`, so half the recording is on screen. While a hand is down the
+  reading is not drawn at all; lifting it fades the capture to 0.26 over 260 ms
+  while the reading fades to full. MEASURED off the pad's own pixels: the two
+  lines are **3.47:1** apart where they were **1.40:1**, and with a hand down
+  there are **0 blue pixels**. 23/23 before and **26/26 after**, 11 page
+  asserts to 14. Sabotage: `OPEN_ZOOM` 1, `READ.live` 1 and `INK.settled` 0.5
+  each take their own assert red.
 
 - **`/items/`: FIXED HEIGHT ON THE LIST BOX, AND NO EMPTY MESSAGE. ASKED
   2026-09-16 WITH A SCREENSHOT:** *"have fixed height on this box / table and rm
