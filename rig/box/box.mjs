@@ -600,6 +600,43 @@ function stopAudio() {
   return { ok: true, was, frames: sentFrames };
 }
 
+// ------------------------------------------------------------- control plane
+//
+// 🔴 COALESCE, DO NOT QUEUE. A backlog of note messages has to be played out,
+// because every one of them is an event that happened. A backlog of CONTROLLER
+// messages is a stack of statements about where one knob is, and all but the
+// last are already wrong. Queueing them would walk the filter through positions
+// the hand has left, late, which is worse than skipping them.
+//
+// The drain is a timer rather than a write per message so that a burst arriving
+// in one tick costs ONE MIDI write per controller. `DRAIN_MS` is well under the
+// 20 ms audio frame, so a value that matters is never held long enough to be
+// heard as lateness.
+const DRAIN_MS = 5;
+const ctl = { pending: new Map(), timer: null, ch: 0, in: 0, out: 0, folded: 0, since: Date.now() };
+
+function ctlDrain() {
+  if (ctl.timer) return;                         // one drain in flight is enough
+  ctl.timer = setTimeout(() => {
+    ctl.timer = null;
+    if (!ctl.pending.size) return;
+    // ⚠️ NO INSTRUMENT IS NOT AN ERROR AND IS NOT A BACKLOG EITHER. Holding
+    // values for an instrument that may never start is how a knob turned before
+    // `audio.start` arrives at the synth ten minutes later.
+    if (!inst) { ctl.pending.clear(); return; }
+    for (const [c, v] of ctl.pending) { inst.cc(ctl.ch, c, v); ctl.out++; }
+    ctl.pending.clear();
+  }, DRAIN_MS);
+  ctl.timer.unref?.();
+}
+
+/** What the page displays: what arrived, what was written, what was overtaken. */
+function ctlMeter() {
+  const forMs = Date.now() - ctl.since;
+  return { in: ctl.in, out: ctl.out, folded: ctl.folded, forMs,
+           on: inst ? inst.source : null, channel: ctl.ch };
+}
+
 // ---------------------------------------------------------------- requests
 //
 // Every verb that changes the rig has a PLAN twin that changes nothing, so a
@@ -728,6 +765,43 @@ async function handle(msg) {
       }
       return reply('voice.selected', { ok: false, reason: 'no instrument running' });
     }
+    /**
+     * 🔴 THE CONTROL PLANE, WHICH IS A DIFFERENT KIND OF TRAFFIC FROM `cc`.
+     *
+     * `cc` below is EDGE-shaped in practice: one verb, one write, one ack, and
+     * a page that sends fifty of them a second gets fifty acks back. A hand on
+     * a slider is LEVEL-shaped: every message is a complete statement of where
+     * the controller is, the last one is the only one that stays true, and an
+     * ack per value is fifty messages a second spent telling a page something
+     * it can see by listening.
+     *
+     * So this verb takes a BATCH, folds it, and writes at most one value per
+     * controller per drain. `folded` is the number that was overtaken on the
+     * way, and it is reported rather than hidden: a control plane that silently
+     * drops is the shape every failure here takes.
+     *
+     * ⚠️ THE EXISTING `cc` VERB IS UNTOUCHED, so `/box/` cannot regress. Two
+     * verbs, two disciplines, one instrument.
+     * ⚠️ AND THE LAST VALUE SENT IS THE LAST VALUE WRITTEN. A fold that kept
+     * the FIRST of a burst would leave the filter behind the finger for as long
+     * as the burst lasted, which is the bug that reads as latency.
+     */
+    case 'ctl.set': {
+      if (!Array.isArray(msg.set)) return reply('ctl.ack', { ok: false, reason: 'ctl.set wants set: [[controller, value], ...]' });
+      ctl.ch = msg.channel ?? ctl.ch;
+      for (const pair of msg.set) {
+        if (!Array.isArray(pair) || pair.length < 2) continue;
+        const c = pair[0] | 0, v = Math.max(0, Math.min(127, pair[1] | 0));
+        ctl.in++;
+        if (ctl.pending.has(c)) ctl.folded++;      // this one overtook another
+        ctl.pending.set(c, v);
+      }
+      ctlDrain();
+      // NO ACK PER VALUE. `ctl.meter` says what happened, once a second.
+      return;
+    }
+    case 'ctl.meter':
+      return reply('ctl.meter', ctlMeter());
     case 'cc': {
       // Yoshimi answers CC 74 (cutoff) and 71 (resonance) for real; hexter has
       // no filter at all but takes CC 16/17/18/19/80/81 as operator coarse
@@ -1359,6 +1433,17 @@ function connect() {
 // is the cheapest place to say who the granulator belongs to, because a page
 // learns about a change it did not make without asking for anything.
 setInterval(() => send({ type: 'box.alive', name: NAME, upSec: Math.round((Date.now() - since) / 1000), audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null, voices: synth?.voices ?? 0, frames: sentFrames, ...insertState() }), 5000).unref?.();
+
+// The control plane's own report, once a second and ONLY while something is
+// moving. A page can hear the filter and cannot see what the board wrote, so
+// `in` against `out` is the only place a fold is visible from the outside, and
+// a report on a silent plane is a message a second spent saying nothing.
+let ctlSaid = { in: 0, out: 0 };
+setInterval(() => {
+  if (ctl.in === ctlSaid.in && ctl.out === ctlSaid.out) return;
+  ctlSaid = { in: ctl.in, out: ctl.out };
+  send({ type: 'ctl.meter', ...ctlMeter() });
+}, 1000).unref?.();
 
 /**
  * ⚠️ Sweep orphans at startup. Audio children (jackd, a synth, an ffmpeg
