@@ -40,13 +40,20 @@ file by being finished or by being refused in writing, never by being forgotten.
   `/rack/` reads `d.logs.length` at line 255, on exactly the branch that runs
   when the studio Mac is off, so it throws a TypeError there.
 
-- 🔴 **STEP 0 OF `plan-controller.md` IS STILL UNMEASURED, AND IT IS THAT PLAN'S
-  OWN LOAD-BEARING UNKNOWN.** Nobody has established that Yoshimi's CC 74 and 71
-  actually move `Analog Filter 1` on this board. §7.1 says the failure is
-  silent: every counter on `/knobs/` reads correct while the sound does not
-  change. It needs a person to say the board is free, because it starts audio.
-  Steps 4 (the diagram), 5 (the measurements), 6 (the SuperCollider voice) and 7
-  (`audio.start {onlyIfIdle:true}`) are also outstanding.
+- ✅ **STEP 0 IS ANSWERED, ON THE REAL BOARD, 2026-09-16.** `rig/box/cc-test.mjs`
+  holds note 40 on bank 95 program 6 and measures the spectral centroid of what
+  comes back. **CC 74 moves it 6.18 octaves**, 162 Hz to 11727 Hz, monotonically
+  brighter, against a measured drift floor of 0.03 octaves from the negative
+  control (the same patch twice with the controller unmoved). **CC 71 moves it
+  1.12 octaves**, monotonically darker, while the PEAK doubles, 0.046 to 0.094,
+  which is what resonance does: it narrows the band and concentrates the energy.
+  So the plan's load-bearing unknown is closed and both sliders are real.
+  ⚠️ Steps 4 (the diagram), 5 (the measurements), 6 (the SuperCollider voice)
+  and 7 (`audio.start {onlyIfIdle:true}`) are still outstanding.
+
+- **`audio.status` ANSWERS `audio.started`.** Not a bug, but it cost nine
+  seconds of silence and a report that no board was in the room while writing
+  `cc-test.mjs`. Anything waiting on the name of the QUESTION waits forever.
 
 - **PAPPUS LEAVES `/box/`'S SIGNAL PATH, AND THE DIAGRAM SAYS WHAT IS THERE.
   ASKED 2026-09-16:** *"plan and remove pappus from the
