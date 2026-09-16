@@ -248,10 +248,20 @@ export function createPresence({
   root.setAttribute('role', 'status');
   root.setAttribute('aria-live', 'polite');
 
+  /**
+   * 🔴 THE DOT FOLLOWS THE WORDS. Asked 2026-09-16: *"online bange: dot should
+   * not appear before text"*. Leading with it made the badge open with a mark
+   * that means nothing until the phrase beside it is read, and on a row of
+   * machines it put a column of coloured dots where the names should start. The
+   * words say what it is, the dot says how it stands.
+   * ⚠️ IT IS STILL APPENDED FIRST IN THE SOURCE AND MOVED BY ORDER, so the
+   * `mode: 'dot'` case keeps a dot with the words clipped beside it rather than
+   * a clipped word with a dot after it, which would leave the box a pixel wide
+   * and the dot outside it.
+   */
   const dot = document.createElement('i');
   dot.className = 'pos-pres-dot';
   dot.setAttribute('aria-hidden', 'true');
-  root.append(dot);
 
   /**
    * 🔴 THE NAME AND THE STATE ARE ONE STRING. Instructed 2026-09-16:
@@ -277,7 +287,7 @@ export function createPresence({
   const phrase = (x) => (named ? `${of} ${words[x]}` : words[x]);
   const widest = Math.max(...reach.map((x) => phrase(x).length));
   word.style.setProperty('--pres-ch', String(widest));
-  root.append(word);
+  root.append(word, dot);
 
   let now = null, note = null;
   let timer = null, f = null;
