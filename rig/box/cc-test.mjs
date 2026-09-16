@@ -89,6 +89,23 @@ ws.onopen = async () => {
     }
     send({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM });
     await wait(900);                     // an .xiz comes off an SD card
+    /**
+     * 🔴 FROM A KNOWN STATE, OR THE FLOOR IS NOT A FLOOR. This measured the
+     * controller under test and left every OTHER controller wherever the last
+     * person to touch the instrument had left it. A run after somebody had been
+     * playing read a negative control of 0.83 OCTAVES between two identical
+     * takes, against 0.03 on a quiet board, which makes every number under it
+     * meaningless. `yoshimi-test.mjs` starts from `audio.stop` for the same
+     * reason and says so.
+     * ⚠️ CC 121 is reset-all-controllers, the continuous-side panic, and it is
+     * in `cc-adapter.mjs` as `RESET_ALL_CONTROLLERS`. After it, both of the ones
+     * this page drives are put at the middle by hand, because "reset" means the
+     * patch's own default and not necessarily 64.
+     */
+    send({ type: 'ctl.set', channel: 0, set: [[121, 0]] });
+    await wait(250);
+    send({ type: 'ctl.set', channel: 0, set: [[74, 64], [71, 64]] });
+    await wait(250);
 
     // ── the negative control FIRST, so the floor is known before any claim ──
     console.log('\nthe floor: the same patch, the same note, the controller unmoved');
@@ -101,7 +118,9 @@ ws.onopen = async () => {
 
     // ── the sweep ────────────────────────────────────────────────────────
     console.log(`\nCC ${CTRL}, five positions`);
-    const steps = [0, 32, 64, 96, 127];
+    // `--steps 0,8,16,24` asks a finer question than the five-point sweep: where
+    // in the travel does a controller stop doing anything a listener can hear.
+    const steps = (arg('steps', '') || '0,32,64,96,127').split(',').map(Number).filter((n) => Number.isFinite(n));
     const got = [];
     for (const v of steps) {
       const m = await at(v);

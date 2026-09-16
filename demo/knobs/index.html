@@ -59,6 +59,21 @@
   // 64 is neutral: the value is an offset around whatever the patch's own
   // filter is set to, so the middle of the lane leaves the patch alone.
   const CUTOFF = 74, RESO = 71, NEUTRAL = 64;
+  /**
+   * 🔴 THE CUTOFF OPENS AT 100, NOT AT THE MIDDLE. Asked 2026-09-16: *"cutoff
+   * 100 by default"*, after *"cutoff below 38 is nada"*.
+   *
+   * 64 is where the patch's own maker left it, which is the honest place to
+   * start a control that changes somebody else's instrument, and it is not the
+   * useful one: MEASURED on this board, the centroid at 64 is about 1.6 kHz and
+   * at 0 it is 183 Hz, so the bottom third of the travel lives under what a
+   * phone or a laptop speaker reproduces at all. Somebody who opens this page
+   * and drags down hears nothing happen and concludes the page is broken.
+   * ⚠️ IT IS A STARTING POSITION, NOT A LIMIT. The whole range is still there
+   * and the dark end is still reachable; what changed is where a hand lands
+   * before it has learned anything.
+   */
+  const CUTOFF_HOME = 100;
   // Bank 95 program 6 is `Analog Filter 1`, read off the live board's own
   // `voices.list` on 2026-09-16 (878 patches, 24 banks, bank map not stale).
   // Bank select is CC 32 and the board reads that number out of Yoshimi's own
@@ -99,6 +114,18 @@
      * is `skipped`.
      */
     readout: { sent: '/s', skipped: '/s', played: '/s', 'round trip': 'ms', buffer: 'ms', lost: '' },
+    /**
+     * 🔴 THE NUMBERS AND THE LOG ARE ONE SURFACE AT THE FOOT OF THIS PAGE.
+     * Asked for 2026-09-16, and this is the page it was asked about. Split,
+     * the six cells sat above the sliders and the log sat under them, so the
+     * two things that answer "what is this doing" were at opposite ends of the
+     * page with the instrument in between: dragging a slider and reading
+     * `skipped` meant looking away from your own hand, and a log line about the
+     * board arrived a screen below the cell it explains. Joined, the counters
+     * and the record are one block under the sliders, which is where you are
+     * already looking once you have started dragging.
+     */
+    joined: true,
     /**
      * 🔴 THE ORDER IS LOAD-BEARING. `settleMs` lands on control 0 and nowhere
      * else, so the slow one goes first: Play opens the audio graph, asks the
@@ -161,7 +188,7 @@
   // of the page, not furniture beside it, and the harness cannot press a slider
   // anyway.
   const cutoff = createSlider({
-    label: 'cutoff', aria: 'filter cutoff', min: 0, max: 127, step: 1, value: NEUTRAL,
+    label: 'cutoff', aria: 'filter cutoff', min: 0, max: 127, step: 1, value: CUTOFF_HOME,
     onInput: (v) => move(CUTOFF, v),
     onChange: (v) => land(CUTOFF, v),
   });
@@ -623,9 +650,12 @@
     // the handles coming home.
     if (MAY_PLAY && armed) sendId({ type: 'note.panic' });
     releasedAt = performance.now();
-    cutoff.set(NEUTRAL, { glideMs: 240 });
+    // Home is where each slider opened, which is not the same number for the
+    // two of them: the cutoff opens where the filter can be heard and the
+    // resonance opens where its maker left it.
+    cutoff.set(CUTOFF_HOME, { glideMs: 240 });
     reso.set(NEUTRAL, { glideMs: 240 });
-    d.log(`stopped: every note released and both sliders back to ${NEUTRAL}, which leaves the patch as its maker set it`);
+    d.log(`stopped: every note released, cutoff back to ${CUTOFF_HOME} and resonance to ${NEUTRAL}`);
   }
 
   // Reachable from a probe, the way `window.__hls` and `window.__strip` are on
@@ -679,9 +709,13 @@
       both?.set?.length === 2 && g3.stats.messages === 1,
       both ? `${g3.stats.messages} message carrying ${both.set.length} values` : 'nothing went out');
 
-    d.assert('both sliders start where the patch’s own filter already is',
-      cutoff.get() === NEUTRAL && reso.get() === NEUTRAL,
-      `cutoff ${cutoff.get()}, resonance ${reso.get()}, and ${NEUTRAL} is no change`);
+    // ⚠️ THE NAME OF THIS CHECK WAS TRUE UNTIL THE CUTOFF MOVED. Both sliders
+    // used to open at the patch's own neutral; the cutoff now opens where the
+    // filter can actually be heard, so the claim is about each slider's own
+    // home rather than about one number.
+    d.assert('each slider opens at its own home, and the cutoff\u2019s is where it can be heard',
+      cutoff.get() === CUTOFF_HOME && reso.get() === NEUTRAL,
+      `cutoff ${cutoff.get()} where the filter can be heard, resonance ${reso.get()} where its maker left it`);
   }
 
   /**
@@ -721,7 +755,7 @@
       thinned: gate.stats.thinned - before.thinned,
       ended: gate.live.get(CUTOFF),
     };
-    cutoff.set(NEUTRAL, { quiet: true });
+    cutoff.set(CUTOFF_HOME, { quiet: true });
   }
 
   function checkAll() {
