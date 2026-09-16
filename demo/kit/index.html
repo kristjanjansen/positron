@@ -1412,11 +1412,11 @@ green = inside what it promised · amber/red = later`,
   // seam proves the gap is the mosaic's, the widths prove there is one edge.
   const px = (e, side) => Number.parseFloat(getComputedStyle(e)[`border${side}Width`]);
   // ⚠️ AND THE SECOND HALF OF WHAT JOINED MEANS IS WHERE IT SITS: at the FOOT,
-  // 44 px under the page rather than the 22 px between two ordinary rows. That
-  // number is the diagram's, for the diagram's reason — a surface the page
-  // hands over to is a new part of the page, not another row in it — and it is
-  // declared once, on `.pos-report` in shell.css. It is measured here from a
-  // real `.pos-body`, and the split block below measures the 22 it is NOT.
+  // under the BIG gap rather than the small one between two ordinary rows.
+  // There are two gaps in this project and only two, 40 and 120, and the big
+  // one is spent once per page on exactly this: where the page stops being an
+  // instrument and starts being an account of one. Declared on `.pos-report`
+  // and on `.pos-body`'s bottom margin, which collapse rather than add.
   {
     const rep = joinedSpec?.foot;
     const ro = joinedSpec?.readoutEl.getBoundingClientRect();
@@ -1429,16 +1429,16 @@ green = inside what it promised · amber/red = later`,
     d.assert('joined is one box at the foot of the page, with the two halves one pixel apart',
       !!rep && rep.classList.contains('pos-report')
       && rep.contains(joinedSpec.readoutEl) && rep.contains(joinedSpec.logEl)
-      && Math.abs(seam - 1) <= 0.5 && Math.abs(foot - 44) <= 0.5
+      && Math.abs(seam - 1) <= 0.5 && Math.abs(foot - 120) <= 0.5
       && outer === 1 && inner[0] === 0 && inner[1] === 0,
       `${foot.toFixed(1)} px under the page · seam ${seam.toFixed(1)} px · `
       + `one edge of ${outer} px round both, ${inner.join(' and ')} inside`);
   }
 
-  // 13 — and the default is still two surfaces with the page between them, at
-  // the shell's own 22 px. Both halves of the claim matter: 22 px is the
-  // rhythm every other element on every page gets, and it is what would read
-  // wrong inside a joined box.
+  // 13 — and the default is still two surfaces with the page between them. The
+  // readout is part of the flow above the body and takes the SMALL gap; the log
+  // is the foot and takes the BIG one, which is the same gap a joined report
+  // gets, so the two arrangements agree about where the page ends.
   // ⚠️ THE TWO GAPS COME FROM DIFFERENT RULES AND ONLY ONE OF THEM IS THE
   // READOUT'S. Above the page it is `.pos-readout`'s own bottom margin; below
   // the page it is `.pos-body`'s, which is why the stand-in in that block IS a
@@ -1452,10 +1452,10 @@ green = inside what it promised · amber/red = later`,
     const above = mid && ro ? mid.top - ro.bottom : -1;
     const below = mid && lo ? lo.top - mid.bottom : -1;
     const own = splitSpec ? px(splitSpec.readoutEl, 'Top') === 1 && px(splitSpec.logEl, 'Top') === 1 : false;
-    d.assert('split leaves two surfaces, each with its own edge and the page rhythm between them',
+    d.assert('split leaves two surfaces: the small gap above the page, the big one before the foot',
       own && splitSpec.report === null
       && !splitSpec.readoutEl.closest('.pos-report') && !splitSpec.logEl.closest('.pos-report')
-      && Math.abs(above - 22) <= 0.5 && Math.abs(below - 22) <= 0.5,
+      && Math.abs(above - 40) <= 0.5 && Math.abs(below - 120) <= 0.5,
       `${above.toFixed(1)} px above the page and ${below.toFixed(1)} px below it, ${own ? 'two edges' : 'NOT two edges'}`);
   }
 
