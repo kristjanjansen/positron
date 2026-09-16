@@ -462,6 +462,10 @@
   // The page's own sliders are only driven under `?selfcheck=1`, because a
   // scripted sweep would fight a hand that is already on one.
   function freeChecks() {
+    // 🔴 GATED TOO, for the reason in `checkAll`. These cost a visitor nothing
+    // and move nothing, and they still put lines in the box where this page's
+    // real faults are reported. The rule is not "cheap checks may run".
+    if (!SELFCHECK) return;
     // Rule 1, and it is the only failure that matters for a level control: if
     // the LAST value of a gesture is held back, the filter stays wrong forever.
     const g1 = makeCcSend();
@@ -530,6 +534,23 @@
   }
 
   function checkAll() {
+    /**
+     * 🔴 NOT FOR A VISITOR. NOT ONE OF THEM, EVER. PHOTOGRAPHED 2026-09-16 on a
+     * phone, on the deployed site, with no query string: two red FAIL lines in
+     * the log under the sliders, on a page where nothing was wrong.
+     *
+     * This ran on every press of Play, which is a REAL person's press, and then
+     * graded the board against conditions only a harness creates. `the board
+     * wrote to the synth what this page put on the wire` needs controller
+     * traffic, and somebody who has pressed play and not yet touched a slider
+     * has made none: the board pushes its counters only when they MOVE, so the
+     * page had nothing to read and said so in red.
+     *
+     * CLAUDE.md's rule is the whole of the answer and it has no exceptions.
+     * `demo/verify.mjs` appends `selfcheck=1`, so the suite still grades
+     * everything, and a visitor gets the page.
+     */
+    if (!SELFCHECK) return;
     // ── reachable with no board at all ───────────────────────────────────
     d.assert('the page reached the relay', wire.state() === 1,
       wire.state() === 1 ? `open in ${ROOM}` : `readyState ${wire.state()}${wire.stats().refusal ? ` · ${wire.stats().refusal}` : ''}`);
@@ -584,8 +605,17 @@
     d.assert('the board wrote to the synth what this page put on the wire',
       !!meter && meter.in > 0 && meter.out > 0 && meter.out <= meter.in,
       meter ? `${meter.in} values arrived, ${meter.out} written, ${meter.folded} overtaken on the way` : 'the board reported no counters');
+    /**
+     * ⚠️ `-1` IS NOT A READING AND MUST NOT READ AS A FAILURE. `breaks` opens
+     * at -1 meaning the worklet has not reported yet, which is neither `=== 0`
+     * nor `> 0` — so this asserted false and printed `no breaks` as its own
+     * detail, a check contradicting itself in the same line. PHOTOGRAPHED on a
+     * phone. A quantity nobody has measured yet is said in those words.
+     */
     d.assert('the cushion neither ran dry nor overflowed', breaks === 0,
-      breaks > 0 ? `${starved} ran dry, ${trimmed} trimmed, cushion now ${Math.round(bufMs)} ms` : 'no breaks');
+      breaks < 0 ? 'the playout has not reported yet, so there is nothing to say'
+        : breaks > 0 ? `${starved} ran dry, ${trimmed} trimmed, cushion now ${Math.round(bufMs)} ms`
+        : 'no breaks');
   }
 
   // Finer than the gate, so a value it held back is never held much longer than
