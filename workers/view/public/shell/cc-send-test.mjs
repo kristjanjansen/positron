@@ -151,5 +151,41 @@ const CUT = 74, RES = 71;      // filter cutoff and resonance, the two sliders
     `${g.stats.messages} messages a second, ${share.toFixed(1)}% of 1000/s`);
 }
 
+// ── 10. what was offered is what was sent or was overtaken ────────────────
+// 🔴 THE COUNTER THIS CHECK EXISTS FOR WAS WRONG AND NOTHING COULD DISAGREE
+// WITH IT. `thinned` counted ticks rather than values, so a page that ticks
+// more often than a hand moves reported more thinning for the same gesture.
+// A conservation law is what makes that visible.
+{
+  const g = makeCcSend();
+  for (let t = 0; t <= 500; t++) {            // a hand at ~60 Hz, a pump at 100 Hz
+    if (t % 16 === 0) g.put(CUT, t & 127);
+    if (t % 10 === 0) g.tick(t);
+  }
+  g.tick(100000);                              // drain anything still held
+  const st = g.stats;
+  ok('offered is sent plus overtaken, with nothing unaccounted for',
+    st.offered === st.sent + st.thinned,
+    `${st.offered} offered = ${st.sent} sent + ${st.thinned} overtaken`);
+
+  // NEGATIVE CONTROL, and it is the bug in one line: ticking more often must
+  // not raise the count by itself, because the hand did not move any faster.
+  const slow = makeCcSend();
+  for (let t = 0; t <= 500; t++) {
+    if (t % 16 === 0) slow.put(CUT, t & 127);
+    if (t % 50 === 0) slow.tick(t);
+  }
+  slow.tick(100000);
+  // ⚠️ THE DIRECTION IS THE CLAIM, AND WRITING IT AS "ABOUT THE SAME" WAS
+  // WRONG. Draining less often really does let more values overtake each other,
+  // so the two counts SHOULD differ and the slow one should be larger. What
+  // must never happen is the opposite: ticking MORE often reporting MORE
+  // thinning, which is what the old counter did, because it was counting the
+  // page's timer rather than the hand.
+  ok('ticking more often reports LESS thinning, never more',
+    st.thinned <= slow.stats.thinned,
+    `${st.thinned} overtaken at 100 Hz against ${slow.stats.thinned} at 20 Hz, from the same hand`);
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? ` · ${fail} FAILED` : ''}\n`);
 process.exit(fail ? 1 : 0);
