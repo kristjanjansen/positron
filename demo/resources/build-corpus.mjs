@@ -2144,6 +2144,45 @@ if (amended.length !== THESIS_ROWS && !ONLY) {
   if (mute.length) throw new Error(`amended with no reason given: ${mute.map((x) => x.id).join(', ')}`);
 }
 
+// ── how long each recording runs ────────────────────────────────────────────
+//
+// 🔴 MEASURED BY A SEPARATE SCRIPT AND MERGED HERE, WHICH IS THE ONLY WAY A
+// LENGTH GETS INTO THIS FILE. Asked for as *"just measure file lengths"* and
+// *"and write to corpus json"*. `demo/resources/measure-durations.mjs` asks each
+// media file once, gently, and writes `durations.json`; this reads that file. It
+// is not done inline because a length is a fact about a MEDIA HOST and the rest
+// of this build is facts about catalogues: folding them together would mean
+// re-asking archive.org for headers every time somebody wanted to change a date.
+//
+// ⚠️ A ROW THAT WAS ASKED AND WOULD NOT SAY GETS `durationMs: null` RATHER THAN
+// NOTHING. A page can then tell "nobody has measured this" from "this file does
+// not carry its length", which are different things to say in a gutter.
+const durations = (() => {
+  const p = join(HERE, 'durations.json');
+  if (!existsSync(p)) return null;
+  try { return JSON.parse(readFileSync(p, 'utf8')); }
+  catch (e) { log(`  durations.json is unreadable, so no lengths: ${e.message}`); return null; }
+})();
+{
+  const rows = durations?.items || {};
+  let put = 0, empty = 0;
+  for (const it of items) {
+    const d = rows[it.id];
+    if (!d) continue;
+    it.durationMs = d.ms ?? null;
+    if (d.ms) put++; else empty++;
+  }
+  // ⚠️ NAMED, NOT COUNTED AWAY. A length written down for a row that is no
+  // longer in the corpus means the two files have drifted, and the way that
+  // shows up otherwise is a page quietly drawing one fewer tape.
+  const orphans = Object.keys(rows).filter((id) => !items.some((x) => x.id === id));
+  if (orphans.length && !ONLY) {
+    log(`  ${orphans.length} measured length(s) for rows that are not in this corpus: `
+      + orphans.slice(0, 3).join(', ') + (orphans.length > 3 ? ' …' : ''));
+  }
+  if (durations) log(`\ndurations: ${put} rows carry a length, ${empty} were asked and would not say`);
+}
+
 const dated = items.filter((x) => x.when.earliest != null);
 const doc = {
   subject: 'Erkki Kurenniemi (1941–2017)',
@@ -2167,11 +2206,25 @@ const doc = {
     heldIn: ['proto/deck/ingest.mjs', 'demo/resources/build-corpus.mjs'],
     rows: amended.map((x) => ({ id: x.id, edtf: x.when.edtf, how: x.when.how })),
   },
+  // 🔴 WHERE THE LENGTHS CAME FROM, BESIDE THE LENGTHS. `/tapes/` draws every
+  // recording as wide as it is long, so a duration is load-bearing on a
+  // picture: this says which program read them, when, and how many rows have
+  // one. A page can print that instead of implying the numbers were always
+  // there.
+  durations: durations ? {
+    source: durations.generator,
+    how: durations.how,
+    measured: durations.generated,
+    what: durations.what,
+    known: items.filter((x) => x.durationMs > 0).length,
+    refused: items.filter((x) => 'durationMs' in x && !(x.durationMs > 0)).length,
+  } : null,
   counts: {
     items: items.length,
     sources: sources.length,
     dated: dated.length,
     withFile: items.filter((x) => x.file).length,
+    withDuration: items.filter((x) => x.durationMs > 0).length,
     unreachable: items.filter((x) => x.http !== 200).length,
     behind: items.reduce((n, x) => n + (x.count || 1), 0),
   },
