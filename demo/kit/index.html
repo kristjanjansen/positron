@@ -134,6 +134,7 @@
   // `failed`, and the page died much later on an empty map. A block that moves
   // takes what it needs with it.
   const presSpec = new Map();
+  let presLive = null;        // one badge that can change, measured over time
 
   /**
    * 🔴 THE NEWEST COMPONENT GOES AT THE TOP OF THIS PAGE. Instructed
@@ -161,11 +162,23 @@
     `createPresence({ of: 'the board' }).set('online')
 presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the four`,
     (box) => {
+      // ⚠️ `can: [s]` IS WHAT MAKES THIS ROW EVENLY SPACED. Each of these will
+      // only ever say its own word, so holding room for `coming online` put a
+      // different amount of empty space after each one and the gaps read as
+      // arbitrary. A badge that can really change says nothing here and keeps
+      // the full reserve, which is what the width check below drives.
       for (const s of PRESENCE_STATES) {
-        const p = createPresence({ state: s });
+        const p = createPresence({ state: s, can: [s] });
         presSpec.set(s, p.el);
         box.append(p.el);
       }
+      // One badge that CAN change, for the check at the bottom: the claim is
+      // that a badge does not twitch as ITS OWN state moves, which is about one
+      // badge over time and not about four badges side by side.
+      presLive = createPresence({ state: 'online' });
+      presLive.el.style.position = 'absolute';
+      presLive.el.style.visibility = 'hidden';
+      box.append(presLive.el);
     });
 
   section('a presence dot inside something else',
@@ -1182,12 +1195,22 @@ green = inside what it promised · amber/red = later`,
   // and this way nothing a visitor is looking at moves while it is graded,
   // which is the other rule: a check that mutates is the test.
   {
-    const w = [...presSpec].map(([s, e]) => [s, e.getBoundingClientRect().width]);
-    const spread = w.length > 1 ? Math.max(...w.map((x) => x[1])) - Math.min(...w.map((x) => x[1])) : -1;
-    d.assert('a presence badge is the same width in all four states',
+    // 🔴 ONE BADGE, WALKED. This compared four badges side by side, which is a
+    // different claim and a weaker one: what must never happen is a badge
+    // changing width UNDER A READER as the thing it watches comes and goes.
+    // Four fixed specimens now sit at their own widths on purpose, so comparing
+    // them would measure the reserve rather than the guarantee.
+    const w = [];
+    for (const s of PRESENCE_STATES) {
+      presLive.set(s);
+      w.push([s, presLive.el.getBoundingClientRect().width]);
+    }
+    presLive.set('online');
+    const spread = Math.max(...w.map(([, x]) => x)) - Math.min(...w.map(([, x]) => x));
+    d.assert('one badge is the same width in all four of its states',
       w.length === 4 && spread <= 0.5,
       w.length === 4 ? `${w.map(([s, x]) => `${s} ${x.toFixed(1)}`).join(' · ')} px, spread ${spread.toFixed(2)}`
-                     : `${w.length} badges were found, so nothing was compared`);
+                     : `${w.length} states were measured, so nothing was compared`);
   }
 
   // 8 — 🔴 AND THE ANIMATION CANNOT MOVE ANYTHING EITHER, which is a separate

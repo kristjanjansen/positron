@@ -50,7 +50,10 @@ export const SAYS = {
   online: 'online',
   coming: 'coming online',
   offline: 'offline',
-  unknown: 'no word yet',
+  // ⚠️ `unknown`, NOT `no word yet`. Instructed 2026-09-16 with a screenshot:
+  // *"last is UNKNOWN"*. The old wording described the BADGE's situation rather
+  // than the thing's, which is a label talking about itself.
+  unknown: 'unknown',
 };
 
 /** How many expected beats may be missed before it is called gone. */
@@ -191,6 +194,17 @@ export function createPresence({
   mode = 'badge',
   says = {},
   state = 'unknown',
+  /**
+   * 🔴 WHICH STATES THIS BADGE CAN EVER SHOW, because the reserve below is the
+   * longest word among them and a badge that will only ever say one word should
+   * not hold room for three. A live badge leaves this alone and keeps its
+   * no-twitch guarantee; a fixed specimen passes its own single state and sits
+   * at its own width, which is what makes a ROW of them evenly spaced.
+   * REPORTED 2026-09-16 with a screenshot of four specimens: *"same spacing
+   * between"*, and the uneven look was each of them reserving room for
+   * `coming online`.
+   */
+  can = null,
   why = null,
   showName = null,
   onChange = null,
@@ -235,7 +249,8 @@ export function createPresence({
   // The reserve. Whatever this instance can say, at its longest, in characters
   // of its own monospace face. A page that shortens the words gets a shorter
   // badge for free, and a page that lengthens one cannot make the badge twitch.
-  const widest = Math.max(...PRESENCE_STATES.map((s) => words[s].length));
+  const reach = Array.isArray(can) && can.length ? can.filter((x) => PRESENCE_STATES.includes(x)) : PRESENCE_STATES;
+  const widest = Math.max(...reach.map((x) => words[x].length));
   word.style.setProperty('--pres-ch', String(widest));
   root.append(word);
 
