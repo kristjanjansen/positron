@@ -28,7 +28,7 @@
     // ⚠️ THREE SENTENCES, and it had quietly become five — describing a pink
     // line and a yellow mark that are both gone now. A description that
     // advertises things the page no longer draws is worse than a short one.
-    what: 'Press record, then draw a line with a finger or a mouse: the page keeps every sample the browser gave it, and a thinned-out record of the same line, which is what a recording of a gesture normally is. White is everything that happened and blue is what a player rebuilds from that record, so press play or drag the bar and the white line follows the cursor instead of showing you the part that has not happened yet. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far each reading sits from what happened, and how much of what you see no sample attests at all.',
+    what: 'Press record, then draw a line with a finger or a mouse: the page keeps every sample the browser gave it, and a thinned-out record of the same line, which is what a recording of a gesture normally is. While your hand is down the only line on the pad is yours; lift it and yours fades to a ghost while blue fades in over it, which is what a player rebuilds from that record and what the bar plays back. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far each reading sits from what happened, and how much of what you see no sample attests at all.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     //
@@ -431,11 +431,66 @@
   // asserting the conclusion the numbers are there to reach.
   const C = { guess: '#7aa2f7', apart: '#ff7ab6' };
 
+  // ── the two lines take turns ─────────────────────────────────────────────
+  // 🔴 WHILE YOUR HAND IS DOWN THERE IS ONE LINE ON THE PAD. Reported as *"find
+  // a way to see blue line on drawing (no enough contrast am blue on white)"*.
+  // The reconstruction was drawn at half weight ON TOP of the capture, so
+  // everywhere the two agree the blue landed on white ink rather than on the
+  // pad and came out a pale blue nobody can separate from the white under it.
+  // MEASURED off this canvas, in `check()` below: those two colours are 1.4:1
+  // apart, where 3:1 is the floor for a graphic somebody is meant to make out.
+  //
+  // So they take turns. Drawing, the capture is at full weight and the reading
+  // is not drawn at all — there is nothing to confuse it with. Lift the hand
+  // and the capture fades back to `INK.settled` while the reading fades in to
+  // full: the blue is then on the PAD's ground almost everywhere, the two
+  // measure 3.5:1 apart, and the fat grey band underneath still says where
+  // your hand went. That holds while it is playing too, which is when the
+  // difference between the two lines is the thing you are watching.
+  //
+  // ⚠️ 0.26 IS A TRADE AND BOTH SIDES OF IT ARE MEASURED, on this pad's own
+  // ground: at 0.42 the capture wins its fight with the reading again and the
+  // two read 2.1:1 apart, and at 0.20 the capture is down to 1.7:1 against the
+  // pad it is drawn on and stops being a line you can follow. At 0.26 the two
+  // lines are 3.5:1 apart and the capture holds 2.1:1 against the ground. 3:1
+  // is the floor for a graphic somebody is meant to make out, and it is what
+  // the check below holds the picture to.
+  const FADE_MS = 260;
+  const INK = { live: 1, settled: 0.26 };    // the capture, hand down and after
+  const READ = { live: 0, settled: 1 };      // the reconstruction, the same two
+
   // ⚠️ DECLARED BEFORE THE PAD, because the pad PAINTS as it is built and its
   // paint calls this page's overlay — a `let` below it is in its temporal dead
   // zone at exactly that moment, and the page dies before `ready`.
   let dirty = true;          // the derived record is stale
   let drawnPoints = 0, drawn = [], drawnApart = [];
+  // ⚠️ AND SO ARE THESE, FOR THE SAME REASON — and `handDown` is the page's own
+  // flag rather than `pad.drawing()`, which would read the pad from inside the
+  // pad's first paint and throw before `ready`.
+  let handDown = false;      // a pointer is on the pad right now
+  let settleAt = 0;          // when it came up; 0 means nothing has been drawn
+
+  /** 0 while the hand is down, 1 once the picture has settled, and the whole
+   *  crossover in between. One number, so the two lines can never disagree
+   *  about which state the page is in. */
+  function phase() {
+    if (handDown) return 0;
+    if (!settleAt) return 1;
+    return Math.min(1, (performance.now() - settleAt) / FADE_MS);
+  }
+  // ⚠️ NOT `mix` — that name is already a POINT between two samples, forty
+  // lines up, and two of those in one file is the kind of collision a page
+  // finds by refusing to parse.
+  const cross = (a, b, u) => a + (b - a) * u;
+  // 🔴 AND THE CAPTURE ONLY STEPS BACK IF THERE IS SOMETHING TO STEP BACK FOR.
+  // Drawing with record OFF stores nothing, so no reading fades in and there
+  // is nothing for your line to make room for: it stays at full weight, which
+  // is what it did before any of this. PHOTOGRAPHED while building it, with
+  // the record button never pressed: a ghost of a line on an empty pad with no
+  // second line anywhere reads as the page losing what you drew.
+  const hasReading = () => drawn.length > 1;
+  const inkAlpha = () => (hasReading() ? cross(INK.live, INK.settled, phase()) : INK.live);
+  const readAlpha = () => cross(READ.live, READ.settled, phase());
 
   // ── the pad ──────────────────────────────────────────────────────────────
   // The surface is `demo/shell/xy-pad.mjs`: it owns the capture, it draws it,
@@ -488,14 +543,21 @@
     // with record OFF draws, and leaves whatever was recorded before intact —
     // otherwise arming, drawing, and then idly touching the pad would silently
     // throw the take away.
+    // ⚠️ `handDown` IS SET FOR EVERY GESTURE, ARMED OR NOT. Which line the pad
+    // shows is a question about the hand, not about the record: drawing with
+    // record off still has to be one line at full weight, or the last take's
+    // blue sits on top of a gesture it knows nothing about.
     onStart: () => {
+      handDown = true;
       traceIsTake = recording;
       if (recording) { evidence = pad.trace(); ghost = null; dirty = true; }
     },
     onDone: () => {
-      if (!recording) return;
+      handDown = false;
+      settleAt = performance.now();
+      if (!recording) { pad.repaint(); return; }
       growing = false;
-      render(); publish(); check();
+      render(); publish(); reframe(); check();
     },
     value: () => ghost,
     // 🔴 A REPLAY REDRAWS THE LINE, IT DOES NOT DRAW ON TOP OF IT. Asked for,
@@ -522,6 +584,9 @@
     // right now", which is the only time the line must show everything
     // regardless of where the playhead is.
     upTo: () => inkLimit(),
+    // how strongly the capture is drawn: full while your hand is down, a ghost
+    // of itself once the reading has faded in over it. See `INK` above.
+    ink: () => inkAlpha(),
     overlay: (ctx, v) => paintSecondReading(ctx, v),
     // 🔴 NO MARK. The white line now stops AT the playhead, so its end IS the
     // cursor — a ringed dot on top of that point is a second indicator for one
@@ -619,16 +684,19 @@
     // two`, `times worse`) and the picture could not say which of three lines
     // was the subject. `drawnApart` is still computed on every recompute,
     // because the check below grades it; only the stroke is gone.
-    // 🔴 HALF-TRANSPARENT. Asked for, and it settles a fight the picture was
-    // having with itself: white is what happened and blue is a reading OF it,
-    // so blue drawn at full weight over white reads as a second, competing
-    // fact. At 0.5 the white shows through wherever the two agree — which is
-    // most of the line — and the blue only becomes visible where it DEPARTS.
-    // The page is about the difference, so the difference is what the ink
-    // spends itself on.
+    // 🔴 IT USED TO BE DRAWN AT HALF WEIGHT AND THAT IS THE BUG THIS PAGE WAS
+    // REPORTED FOR. The reasoning was that white is what happened and blue is a
+    // reading OF it, so the white should show through wherever the two agree
+    // and the blue should only become visible where it DEPARTS. What it
+    // produced was blue ink on white ink, 1.4:1 apart, and a reader who could
+    // not tell which line was which anywhere. The weight the reading is drawn
+    // at now is `READ`, which is 0 while a hand is down and 1 after: the
+    // capture is what steps back, not the reading.
+    const alpha = readAlpha();
+    if (alpha <= 0) return;                  // a hand is down: your line alone
     const cut = inkLimit();
     ctx.save();
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = alpha;
     ctx.strokeStyle = C.guess; ctx.lineWidth = 1.6;
     ctx.beginPath();
     let first = true;
@@ -648,7 +716,7 @@
     // for a stretch of line it is not drawing — a count on screen that does not
     // match the line under it.
     ctx.save();
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = alpha;
     ctx.fillStyle = C.guess;
     for (const p of stored) {
       if (cut !== null && p.at > cut) break;
@@ -683,6 +751,12 @@
   let growTick = 0;
   function growFrame() {
     requestAnimationFrame(growFrame);
+    // ⚠️ THE CROSSOVER NEEDS FRAMES AND NOTHING ELSE WOULD ASK FOR THEM. The
+    // pad repaints when a sample arrives, when the playhead moves or when this
+    // page tells it to — and the moment the two lines trade places is exactly
+    // the moment none of those three is happening. A fade nobody paints is a
+    // jump, which is what it looked like before this line.
+    if (phase() < 1) pad.repaint();
     if (!growing) return;
     const now = performance.now();
     if (now - growTick < 40) return;       // 25 a second is smooth and cheap
@@ -691,6 +765,9 @@
     publish();
     const end = deck.range[1];
     if (Number.isFinite(end) && end > 0) deck.seek(end);
+    // AFTER the seek, never before: the view is framed on where the playhead
+    // is, and one tick earlier it is still on the sample before this one.
+    reframe();
     view?.strip?.invalidate();
   }
   requestAnimationFrame(growFrame);
@@ -756,6 +833,8 @@
   function reset() {
     growing = false;
     traceIsTake = false;
+    handDown = false;
+    settleAt = 0;
     pad.clear();
     evidence = pad.trace();
     stored = []; splitX = []; splitY = [];
@@ -763,6 +842,7 @@
     render();
     publish();
     deck.seek(0);
+    reframe();
     view.strip.invalidate();
   }
 
@@ -798,6 +878,45 @@
     ],
   });
 
+  /**
+   * 🔴 THE TIMELINE OPENS AT TWICE THE FIT. Asked for as *"draw timeline: zoom
+   * 2.0 by default"*. Fitting puts the whole recording on screen, and the
+   * whole of a three second gesture in a strip this wide is two lanes of
+   * wobble: the corners round off, and the one thing these lanes exist to show
+   * — that a fast corner is a steep edge here and only a bend up on the pad —
+   * is drawn too small to read. At twice that, half the recording is on screen
+   * at twice the detail.
+   *
+   * ⚠️ IT IS THE STRIP'S OWN ZOOM, so a wheel with ctrl or shift held moves it
+   * from here, and a view somebody has moved is left alone: this is called
+   * when the RECORDING changes under the view, never when a knob changes what
+   * is drawn in it.
+   *
+   * ⚠️ AND EVERY CALLER IS BELOW THE STRIP. `view` is a `const` declared above,
+   * so reading it from anything the pad runs during its first paint would
+   * throw, which is the same trap the `let`s near the top of this page carry a
+   * note about.
+   */
+  const OPEN_ZOOM = 2;
+  const FIT_PAD = 0.04;              // what `fit()` leaves over: 2% either side
+  function reframe() {
+    const end = deck.range[1];
+    if (!(end > 0)) return null;
+    const span = (end * (1 + FIT_PAD)) / OPEN_ZOOM;
+    const pos = deck.position();
+    // WHERE THE PLAYHEAD SITS IN THAT WINDOW. The strip's own answer is 0.38,
+    // which leaves most of the view for what is ahead. Two things bend it:
+    // there is nothing before a recording starts or after it ends, so the
+    // window stays inside it rather than spending a third of the strip on
+    // empty time; and the playhead never goes past 0.78, because the strip
+    // scrolls it back the moment it crosses its own follow edge at 0.82 and
+    // the two of us would then fight 25 times a second under a moving hand.
+    const lo = -end * (FIT_PAD / 2), hi = end * (1 + FIT_PAD / 2) - span;
+    const origin = Math.min(Math.max(pos - span * 0.38, lo), Math.max(lo, hi));
+    const at = Math.min(0.78, (pos - origin) / span);
+    return view.strip.frame(pos, span, at);
+  }
+
   // ⚠️ ONE POSITION SURFACE PER PAGE. The strip seeks on press AND on drag,
   // which the bar's slider does not — two horizontal time axes at different
   // scales, both scrubbing, is a contradiction rather than a redundancy.
@@ -830,7 +949,7 @@
     if (on) {
       pad.clear(); evidence = []; stored = []; splitX = []; splitY = [];
       ghost = null; dirty = true; traceIsTake = true;
-      render(); publish(); deck.seek(0); view.strip.invalidate();
+      render(); publish(); deck.seek(0); reframe(); view.strip.invalidate();
     }
     d.log(on ? 'recording · draw on the pad' : 'stopped', on ? 'hi' : undefined);
   }
@@ -1091,22 +1210,120 @@
     // frame before the seek and report a mark that is there as missing.
     pad.paint();
 
+    // 🔴 THE TIMELINE OPENS AT TWICE THE FIT, AND IT IS GRADED AGAINST THE FIT
+    // ITSELF rather than against a pixels-per-second somebody wrote down. A
+    // number typed into an assert would go stale the first time the strip's
+    // gutter or this page's width changed, and it would agree with the code it
+    // is grading for the wrong reason. `fit()` is the component's own answer
+    // to "the whole recording, exactly"; this page's opening view has to be
+    // twice it. ⚠️ It MEASURES BY MOVING and puts the view back, which is the
+    // one kind of mutation a check here is allowed: a visitor sees both of
+    // these views, and the one they are left in is the one they came for.
+    // 🔴 AND THE 2 BELOW IS TYPED A SECOND TIME ON PURPOSE. Written as
+    // `- OPEN_ZOOM` it passed with `OPEN_ZOOM` set to 1, which is this
+    // project's oldest trap in a new costume: a check derived from the same
+    // constant as the code catches a typo in the arithmetic and can never
+    // catch the page opening at the wrong zoom. PROVED by setting it to 1 and
+    // watching this line stay green. The literal is the ASK — *"zoom 2.0 by
+    // default"* — and the constant is the implementation of it; they are two
+    // different things and they are allowed to disagree, which is the point.
+    const zoomed = reframe().pxPerSecond;
+    const fitted = view.strip.fit().pxPerSecond;
+    reframe();
+    d.assert('the timeline opens at twice the whole recording, not fitted to it',
+      fitted > 0 && Math.abs(zoomed / fitted - 2) < 0.02,
+      `${zoomed.toFixed(1)} px a second against ${fitted.toFixed(1)} fitted · `
+      + `${(zoomed / fitted).toFixed(2)}x · ${Math.round(deck.range[1])} ms of gesture`);
+
     // ⚠️ NOTHING IN THE SUITE LOOKS AT INK, so this page has to. A right answer
     // in a cell over a blank pad is the defect this project has hit twice.
     //
-    // 🔴 NEAR-WHITE, not "red or green over 60". The pad draws a grid and its
-    // axis names now, and a test loose enough to count those is a test a blank
-    // pad can pass. The captured line is the only near-white ink on the
-    // surface, which is why the pad keeps its own furniture dim.
-    const px = pad.ctx.getImageData(0, 0, pad.el.width, pad.el.height).data;
-    let lit = 0, markPx = 0;
-    for (let i = 0; i < px.length; i += 4) {
-      const r = px[i], g = px[i + 1], b = px[i + 2];
-      if (r > 200 && g > 200 && b > 200) lit++;
-      else if (r > 200 && g > 150 && g < 240 && b < 100) markPx++;   // --hi #ffd400
-    }
-    d.assert('there is a line on the pad, not just numbers in cells', lit > 4000,
-      `${lit} lit pixels`);
+    // 🔴 AND IT IS NO LONGER "NEAR-WHITE". The capture is knocked back to
+    // `INK.settled` the moment a hand comes up, so a test for `r > 200` is now
+    // a test for a line that is being drawn RIGHT NOW rather than a test for a
+    // line. What separates the two of them at every weight is COLOUR: the
+    // capture is grey, its three channels within a few of each other, and the
+    // reading is blue, its blue channel far above its red. The only other ink
+    // on the pad is the grid, which sits at 29 on every channel and is under
+    // the floor below, so a blank pad still cannot pass.
+    //
+    // It hands back the two lines' actual colours as well as their sizes, and
+    // it takes the COMMONEST value in each bucket rather than the brightest
+    // or the bluest. 🔴 THE BRIGHTEST WAS TRIED FIRST AND IT IS A THRESHOLD IN
+    // DISGUISE: a line that crosses itself lays the capture down twice in that
+    // one spot, so the brightest grey is the densest crossing rather than the
+    // line, and how many crossings there are is up to whoever drew it. The
+    // commonest value is the stroke's own core — every other pixel of either
+    // line is a part-covered edge of it, and each of those values occurs a
+    // handful of times where the core occurs thousands. That is what makes the
+    // contrast below a measurement of the picture rather than arithmetic on
+    // the constants that drew it.
+    const count = () => {
+      const px = pad.ctx.getImageData(0, 0, pad.el.width, pad.el.height).data;
+      let grey = 0, blue = 0;
+      const greys = new Map(), blues = new Map();
+      const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+      for (let i = 0; i < px.length; i += 4) {
+        const r = px[i], g = px[i + 1], b = px[i + 2];
+        if (b - r > 40 && g > r) { blue++; bump(blues, (r << 16) | (g << 8) | b); }
+        // ⚠️ 12, AND IT WAS 20 FOR ONE RUN. The capture's own pixels sit 9
+        // apart on those two channels; at 20 the bucket also caught the pixels
+        // where a blue EDGE lands on the capture, and reported the contrast
+        // between the reading and a mixture of the two, which is a colour
+        // nothing on this page draws.
+        else if (r > 45 && Math.abs(b - r) < 12) { grey++; bump(greys, (r << 16) | (g << 8) | b); }
+      }
+      const modal = (m) => {
+        let best = -1, key = 0;
+        for (const [k, n] of m) if (n > best) { best = n; key = k; }
+        return [(key >> 16) & 255, (key >> 8) & 255, key & 255];
+      };
+      return { grey, blue, capture: modal(greys), reading: modal(blues) };
+    };
+    const mid = count();
+    d.assert('there is a line on the pad, not just numbers in cells', mid.grey > 4000,
+      `${mid.grey} pixels of line`);
+
+    // ── THE TWO LINES CAN BE TOLD APART, AT BOTH MOMENTS ──────────────────
+    //
+    // 🔴 WHAT WAS REPORTED WAS A CONTRAST, SO WHAT IS GRADED IS A CONTRAST.
+    // *"find a way to see blue line on drawing (no enough contrast am blue on
+    // white)"*. The reading used to be drawn at half weight over the capture,
+    // which put blue ink on white ink everywhere the two agreed; the number
+    // below says how far apart those two colours were, and it is the reason
+    // the page now draws one line at a time.
+    //
+    // ⚠️ BOTH STATES ARE FORCED, NOT WAITED FOR. `phase()` is a function of
+    // `handDown` and `settleAt` and of nothing else, so each end of the
+    // crossover can be asked for directly and painted. Neither is a state
+    // invented for the check: one is what a visitor sees with a finger down,
+    // the other is what they see a quarter of a second after lifting it.
+    const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+    const lum = (p) => 0.2126 * lin(p[0]) + 0.7152 * lin(p[1]) + 0.0722 * lin(p[2]);
+    const apartness = (p, q) => {
+      const a1 = lum(p), a2 = lum(q);
+      return (Math.max(a1, a2) + 0.05) / (Math.min(a1, a2) + 0.05);
+    };
+    const asHex = (p) => '#' + p.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('');
+    const fadeFrom = settleAt;
+    handDown = true; pad.paint();
+    const down = count();
+    handDown = false; settleAt = performance.now() - FADE_MS; pad.paint();
+    const up = count();
+    d.assert('while a hand is down there is one line on the pad, and it is yours',
+      down.blue === 0 && down.grey > 4000 && down.capture[0] > 200,
+      `${down.grey} pixels of your line at ${asHex(down.capture)}, and ${down.blue} of anything blue`);
+    // The arrangement this replaced, composited from the capture this run
+    // actually measured: the reading at half weight over the line underneath
+    // it. Labelled as the old one in the message, because it is computed
+    // rather than painted.
+    const was = [0, 1, 2].map((i) => 0.5 * parseInt(C.guess.slice(1 + i * 2, 3 + i * 2), 16) + 0.5 * down.capture[i]);
+    const tellApart = apartness(up.capture, up.reading);
+    d.assert('lift it and the two lines are far enough apart to be told apart',
+      up.blue > 500 && up.grey > 4000 && tellApart >= 3,
+      `your line ${asHex(up.capture)} against the reading ${asHex(up.reading)} · ${tellApart.toFixed(2)}:1, `
+      + `where drawing the reading at half weight over the capture gave ${asHex(was)} against `
+      + `${asHex(down.capture)} · ${apartness(was, down.capture).toFixed(2)}:1`);
     // 🔴 THE LINE'S END IS THE PLAYHEAD NOW, so that is what gets checked.
     // This assert used to count yellow pixels for a ringed dot; the dot is gone
     // because the white line stops at the cursor and two indicators for one
@@ -1121,39 +1338,32 @@
     // a count would be a threshold tuned until it passed, and it could not tell
     // "the line is short because the cursor is early" from "the line failed to
     // draw". Early < middle < end, and end is the whole line back.
-    // ⚠️ BOTH LINES, NOT JUST THE WHITE ONE. The blue reconstruction grows with
-    // the cursor too, and a check that only watched the white one would stay
-    // green while blue silently went back to being drawn to the end — which is
-    // the exact defect this pairing exists to prevent, because a blue line
-    // running past the white one reads as a RECONSTRUCTION ERROR rather than as
-    // a drawing bug. ⚠️ Blue is counted by its own shape, not by "not white":
-    // it is drawn at half alpha over a dark ground, so it is dim and blue-
-    // dominant, and a loose test would count the pad's own grid.
-    const inkAt = (t) => {
-      deck.seek(t); pad.paint();
-      const d2 = pad.ctx.getImageData(0, 0, pad.el.width, pad.el.height).data;
-      let white = 0, blue = 0;
-      for (let i = 0; i < d2.length; i += 4) {
-        const r = d2[i], g = d2[i + 1], b = d2[i + 2];
-        if (r > 200 && g > 200 && b > 200) white++;
-        else if (b > 90 && b - r > 25 && g > r) blue++;
-      }
-      return { white, blue };
-    };
-    const whiteAt = (t) => inkAt(t).white;
+    // ⚠️ BOTH LINES, NOT JUST YOURS. The reading grows with the cursor too, and
+    // a check that only watched the capture would stay green while the reading
+    // silently went back to being drawn to the end — which is the exact defect
+    // this pairing exists to prevent, because a blue line running past the
+    // capture reads as a RECONSTRUCTION ERROR rather than as a drawing bug.
+    // ⚠️ AND IT IS MEASURED IN THE SETTLED PICTURE, which is the state left
+    // above: with a hand down there is no reading to watch at all, so this
+    // would be grading the wrong half of the page.
+    const inkAt = (t) => { deck.seek(t); pad.paint(); return count(); };
     const end = deck.range[1];
     const a = inkAt(end * 0.25), b2 = inkAt(end * 0.6), c2 = inkAt(end);
     deck.seek(end / 2); pad.paint();
     d.assert('both lines stop where the cursor is, so the cursor needs no mark of its own',
-      a.white < b2.white && b2.white < c2.white && a.white > 0
+      a.grey < b2.grey && b2.grey < c2.grey && a.grey > 0
       && a.blue < b2.blue && b2.blue < c2.blue && a.blue > 0,
-      `white ${a.white} -> ${b2.white} -> ${c2.white} and blue ${a.blue} -> ${b2.blue} -> ${c2.blue} `
+      `your line ${a.grey} -> ${b2.grey} -> ${c2.grey} and the reading ${a.blue} -> ${b2.blue} -> ${c2.blue} `
       + `at a quarter, three fifths and the end, `
       + `over ${Math.round(end)} ms`);
+    // and the crossover goes back to wherever it had got to, so a check that
+    // ran inside a quarter of a second does not leave the picture finished
+    settleAt = fadeFrom;
   }
 
   render();
   publish();
+  reframe();          // the empty page opens at the zoom a recording will use
   d.ready();
 </script>
 </html>

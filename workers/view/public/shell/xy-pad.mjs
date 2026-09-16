@@ -41,7 +41,9 @@
 //     recorded is still what was recorded, and it is what lets a caller
 //     replaying its own capture redraw the line under its playhead instead of
 //     retracing a finished drawing, where the replay and the original are the
-//     same pixels.
+//     same pixels. `ink` is the same kind of thing for WEIGHT: a capture drawn
+//     at a third of full strength is still the capture, and a caller putting a
+//     second line over it needs the one underneath to stop competing.
 //
 // STYLING. Five rules, prepended to <head> so shell.css and any page's own
 // <style> both override them on source order. They want hoisting into
@@ -106,9 +108,16 @@ function fmtFor(a) {
  *                    TIMESTAMP. See the note above `paint`; null draws all of
  *                    it, which is the default and what a pad with no playhead
  *                    over it always wants.
+ * @param o.ink       () => number — how strongly to draw the capture, 0 to 1,
+ *                    asked once a frame. Default 1, which is what a pad with
+ *                    nothing drawn over it always wants. A caller putting a
+ *                    SECOND reading of the same gesture on top knocks the
+ *                    capture back with this so the two can be told apart:
+ *                    a line drawn over white ink reads as one line in two
+ *                    shades, whatever colour it is.
  */
 export function createXyPad(host, {
-  label = '', x, y, onStart, onInput, onDone, value, overlay, upTo, gesture = true,
+  label = '', x, y, onStart, onInput, onDone, value, overlay, upTo, ink, gesture = true,
   showMark = true,
 } = {}) {
   ensureCss();
@@ -258,7 +267,15 @@ export function createXyPad(host, {
     // position zero no part of the gesture has happened yet.
     const limit = upTo ? upTo() : null;
     const capped = Number.isFinite(limit);
-    if (trace.length > 1 && (!capped || limit >= trace[0].at)) {
+    // ⚠️ `ink` IS READ INSIDE A save/restore OF ITS OWN. A `globalAlpha` left
+    // standing would be inherited by the overlay below, so a caller that dims
+    // the capture would silently dim its own second reading by the same
+    // amount — and the two would stay exactly as hard to tell apart as they
+    // were, which is the one thing the option exists to fix.
+    const weight = ink ? Math.max(0, Math.min(1, ink())) : 1;
+    if (trace.length > 1 && weight > 0 && (!capped || limit >= trace[0].at)) {
+      ctx.save();
+      ctx.globalAlpha = weight;
       ctx.strokeStyle = C.trace; ctx.lineWidth = 6;
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       ctx.beginPath();
@@ -269,6 +286,7 @@ export function createXyPad(host, {
         const [a, b] = px(p.x, p.y); ctx.lineTo(a, b);
       }
       ctx.stroke();
+      ctx.restore();
     }
 
     // whatever the caller makes of the same gesture, over the top
