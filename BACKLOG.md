@@ -15,6 +15,29 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- **THE TIMELINE DRAWS THE LOOP. ASKED 2026-09-16:** *"timeline global feature:
+  draw loop boundaries (depends on loop cycle state) and add light transclucent
+  shade on loop area on timeline. same colors in waveforms loop handling btw"*.
+  A kit feature rather than a page one: the strip shows where the loop is, with
+  its two edges and a translucent wash between them, and it follows the loop's
+  CYCLE STATE, which is the three the transport bar already has (off, one mark
+  down and armed, running). The colours are the ones the wave already uses for a
+  loop, read from one place rather than typed a second time here.
+
+- 🔴 **`/draw/` CLAIMS TWO THINGS A REAL HAND REFUTES, AND BOTH ARE STILL
+  ASSERTED.** Found 2026-09-16 from a photograph of a visitor's log. `one record
+  of a moving point beats two records of a moving number, at every rate this
+  page offers` read **0.5x to 0.9x** on a scribble at 100 ms, so two records
+  were CLOSER at every rate on the ladder; the suite's smooth synthetic drag
+  reads 2.0x to 7.6x the other way. `the playhead puts the hand where the record
+  says it was` failed on its third clause, `held > rec * 5`: refusing to
+  interpolate cost **3.9x** rather than 5x, because a coarse record leaves
+  interpolation less to rescue. Both thresholds are UNCHANGED on purpose, since
+  a threshold widened until it goes green cannot be told from a page that works.
+  The question for the page is whether the claim is about any gesture or about a
+  smooth one, and the honest answer may be to grade it per gesture and say which
+  kind of line it was.
+
 - ✅ **DONE, AND IT WAS THE SAME FAULT `/replay/` HAD THIS WEEK.** LOOP marked
   two positions on a deck of 1965 and wrapped the PLAYHEAD between them while
   the film ran on to its end: the bar wraps by seeking, and with no `command` a
