@@ -138,7 +138,20 @@
      * What is left is the whole claim in four numbers: what went out, what the
      * board wrote, how far away it is, and how much sound is in hand.
      */
-    readout: { sent: '/s', played: '/s', 'round trip': 'ms', buffer: 'ms' },
+    /**
+     * 🔴 THE TWO COUNTERS NAME THE SAME UNIT NOW, AND RENAMING THEM IS WHAT
+     * SHOWED THEY DID NOT. Asked 2026-09-16: *"sent? 'cc out'?"*. `sent`
+     * counted MESSAGES and `played` counted VALUES, and one message carries
+     * both sliders, so a two handed sweep read 50 against 100 and the gap was
+     * the packing rather than anything lost. Two numbers a reader is invited to
+     * compare have to be in the same unit or the comparison is a trap.
+     * ⚠️ `played` IS NOT `slices in`, which was the other half of the question.
+     * It is what the BOARD wrote to the synth, read off its own counter, so it
+     * is the far end of the control path and not the near end of the audio one.
+     * Sound arriving is a different measurement and `buffer` is the one that
+     * says whether it is healthy.
+     */
+    readout: { 'cc out': '/s', 'cc played': '/s', 'round trip': 'ms', buffer: 'ms' },
     /**
      * 🔴 THE NUMBERS AND THE LOG ARE ONE SURFACE AT THE FOOT OF THIS PAGE.
      * Asked for 2026-09-16, and this is the page it was asked about. Split,
@@ -470,7 +483,7 @@
       const now = performance.now();
       if (meter && now > meterAt) playedPerSec = (m.out - meter.out) / ((now - meterAt) / 1000);
       meter = m; meterAt = now;
-      d.set('played', Math.max(0, Math.round(playedPerSec)));
+      d.set('cc played', Math.max(0, Math.round(playedPerSec)));
     }
   }
 
@@ -491,7 +504,9 @@
   setInterval(() => {
     const now = performance.now(), dt = (now - t0) / 1000;
     if (dt < 1) return;
-    d.set('sent', Math.round((wireMsgs - m0) / dt));
+    // VALUES, not messages: one message carries both sliders, so counting
+    // messages here put this cell in a different unit from the one beside it.
+    d.set('cc out', Math.round((gate.stats.sent - m0) / dt));
     // ⚠️ STILL COUNTED WITH NO CELL TO SHOW IT. `skipped` and `lost` came off
     // the row and neither stopped being measured: what your hand made that did
     // not go is still the difference between what the gate was offered and what
@@ -499,7 +514,7 @@
     // reader through the log, which is where something that only moves when
     // there is a fault belongs.
     const skipped = Math.round((gate.stats.thinned - k0) / dt);
-    t0 = now; m0 = wireMsgs; k0 = gate.stats.thinned;
+    t0 = now; m0 = gate.stats.sent; k0 = gate.stats.thinned;
     if (!frames) return;
     const gone = pcmMissing + Math.max(0, breaks);
     if (gone > lastGone) {
@@ -1023,9 +1038,9 @@
    */
   const dg = createDiagram(d.el, {
     caption: 'Your hand makes more positions than the wire needs to carry, so the page sends a '
-      + 'thinned version of your gesture: sent counts what left this browser, played counts '
-      + 'what the board wrote to the synth, and the difference is what your hand made and the '
-      + 'page did not send.',
+      + 'thinned version of your gesture: cc out counts the values that left this browser, cc '
+      + 'played counts the ones the board wrote to the synth, and the difference between them '
+      + 'is what went missing between here and there.',
     nodes: [
       /**
        * 🔴 `join: false`, BECAUSE THESE THREE ARE NOT A CHAIN. REPORTED
