@@ -416,7 +416,13 @@
        * from somebody else's machine, and this picture's subject is what
        * Cloudflare does with either.
        */
-      { id: 'onair', label: 'studio', sub: 'not ours', kind: 'device', tech: 'station',
+      // 🔴 `set: true`. Inner connectors grew arrowheads by default on
+      // 2026-09-16, which is right for a chain and wrong here: this box holds a
+      // live mount and a pile of recordings that already exist, and neither
+      // produces the other. The declared arrows below still draw heads; only
+      // the gap nobody declared across stays a bracket, which is what a bracket
+      // has always meant.
+      { id: 'onair', label: 'studio', sub: 'not ours', kind: 'device', tech: 'station', set: true,
         children: [
           { id: 'mount', label: 'mount', sub: 'endless http', tech: 'station',
             note: 'One connection that never closes. Nothing downstream can seek in it, which '
@@ -431,7 +437,9 @@
                 + 'the station is actually playing today, and nothing here knows or cares '
                 + 'which machine they were on.' },
         ] },
-      { id: 'cf', label: 'Cloudflare', sub: 'the only part we run', kind: 'cloud', tech: 'cloudflare',
+      // `set: true` for the same reason: the two buckets sit side by side and
+      // neither feeds the other. See the note on `studio` above.
+      { id: 'cf', label: 'Cloudflare', sub: 'the only part we run', kind: 'cloud', tech: 'cloudflare', set: true,
         children: [
           { id: 'chunks', label: 'chunks', sub: 'R2, 10s', tech: 'file',
             note: 'Ten second mp3 files written while a show is on air, sitting beside the '
