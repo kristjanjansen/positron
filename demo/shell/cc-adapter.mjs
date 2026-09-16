@@ -647,6 +647,18 @@ export function makeCcSend({ gateMs = SEND_GATE_MS, restateMs = RESTATE_MS } = {
     put(controller, value, { end = false } = {}) {
       stats.offered++;
       const c = controller | 0;
+      /**
+       * 🔴 A VALUE IS THINNED WHEN ANOTHER OVERTAKES IT, NOT WHEN A TICK FINDS
+       * IT EARLY. This counted on the tick side, so it counted TICKS THAT FOUND
+       * A VALUE NOT DUE rather than values nobody ever sent, and a page that
+       * ticks more often than a hand moves counted the same held value again on
+       * every tick. `/knobs/` pumps every 10 ms AND on every input, so its
+       * `skipped` cell read high: a number about the page's own timer wearing
+       * the label of a number about your hand. `offered` is now exactly `sent`
+       * plus `thinned` plus whatever is still waiting, which is a conservation
+       * the test can disagree with.
+       */
+      if (pending.has(c)) stats.thinned++;
       pending.set(c, { v: clamp7(value), end, isSwitch: SWITCHES.has(c) });
     },
 
@@ -660,7 +672,7 @@ export function makeCcSend({ gateMs = SEND_GATE_MS, restateMs = RESTATE_MS } = {
         const last = lastSent.get(c);
         const due = last === undefined || tMs - last >= gateMs;
         // rules 1 and 3: neither waits for the gate
-        if (!due && !p.end && !p.isSwitch) { stats.thinned++; continue; }
+        if (!due && !p.end && !p.isSwitch) continue;   // held, not thinned: see `put`
         pending.delete(c);
         lastSent.set(c, tMs);
         live.set(c, p.v);

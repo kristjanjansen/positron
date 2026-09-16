@@ -15,6 +15,31 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- **SLIDER AUTOMATION, PLANNED AND NOT BUILT. ASKED 2026-09-16:** *"plan a work
+  on slider automation each slider can possibly have a mode button like loop
+  does (also looking similar in right) that allow pick 'invsible hand' moving
+  slider. I want to have himanline, real abalog knob / slider feel and curve.
+  See also draw. We can starr with simple sweep back and forth but be ready to
+  more movement presets and maybe custom too in future. When you fix knobs demo
+  add it to silders. Single sidebutton, on and off atm"*. `plan-slider-automation.md`,
+  six steps, the first of which decides whether the human feel is real before a
+  pixel moves.
+
+- 🔴 **`/draw/` AND `/grains/` PUT SLIDERS IN `.pos-controls`, AND THE HARNESS
+  PRESSES EVERY BUTTON IN THERE.** Found while planning the automation, by
+  reading rather than by a failure. Neither page declares them in its `controls`
+  array: both build the row themselves (`demo/draw/index.html:990`,
+  `demo/grains/index.html:1140`), which is a legitimate thing to do and puts
+  them in the selector `verify.mjs` presses on every demo on every run. Today
+  that is harmless. The moment either page gains a control that reaches the
+  board, a suite run drives a shared Raspberry Pi. The rule is that a control
+  inside `.pos-controls` is a control the harness will press, and it wants a
+  page-level assert rather than a memory.
+
+- **A SECOND VIEWPORT META IN `proto/flipper/index.html`.** `build.mjs` inserts
+  the line its comment says the proto lacks, and the proto has since gained its
+  own. Harmless to a browser and untrue in the code.
+
 - 🔴 **TWO HOSTS ARE STILL INDEXABLE: `moq.` AND `feedback.positron.studio`.**
   The noindex work of 2026-09-16 covered `positron.studio` and shipped
   (`robots.txt` from the Worker, `X-Robots-Tag` on every response, the meta tag
