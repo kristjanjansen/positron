@@ -1,11 +1,11 @@
 // demo/shell/pos-choice.mjs — one of these, and the others are not.
 //
 // 🔴 THE THIRD HAND-BUILT COPY OF THIS. `mirror` builds a labelled row of
-// mutually exclusive buttons, `/box/` builds one, and `/kit/` already carried a
+// mutually exclusive buttons, `/keys/` builds one, and `/kit/` already carried a
 // note saying so — that the sandbox existed to make exactly this kind of drift
 // visible, and here it was. So it becomes a component.
 //
-// ⚠️ NO STATE WORD ON THE BUTTON. `/box/` inherited a `::after` that appended
+// ⚠️ NO STATE WORD ON THE BUTTON. `/keys/` inherited a `::after` that appended
 // " on" or " off" to each option, from when the row was a single pappus toggle
 // where that made sense. On a three-way pos-choice it renders `dry off`,
 // `room on`, and — worst — `off on`. WHICH ONE IS CHOSEN IS ALREADY SAID BY
@@ -37,7 +37,7 @@ export function createChoice({ label, options, at = 0, onPick } = {}) {
   // ⚠️ `step` IS THE JOIN, and it is reused rather than reimplemented. The 1 px
   // border overlap, the outer-only corners and the raise-on-hover all live in
   // that one block; a second copy here is the drift this page exists to catch.
-  const seg = el('span', 'step pos-choice-seg');
+  const seg = el('span', 'step pos-seg pos-choice-seg');
   wrap.append(seg);
 
   const buttons = options.map(([name], i) => {

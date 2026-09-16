@@ -28,7 +28,7 @@ import { el } from './shell.mjs';
  * @returns {{el: HTMLElement, buttons: HTMLButtonElement[], disabled: (v:boolean)=>void}}
  */
 export function createStepper({ prev, next, random, what = 'it', cls = '' }) {
-  const wrap = el('span', `step ${cls}`.trim());
+  const wrap = el('span', `step pos-seg ${cls}`.trim());
   const mk = (label, title, fn, cls = '') => {
     const b = el('button', cls, label, { type: 'button', title });
     b.onclick = fn;
