@@ -39,6 +39,24 @@ export function createTransportBar(host, deck, {
   // nobody had a reason to press.
   loop: wantLoop = true,
   /**
+   * 🔴 WHAT TAKES THE LOOP BUTTON'S PLACE ON A BAR THAT HAS NO LOOP. Asked for
+   * in those words, 2026-09-16: *"just replace looper with fullscreen button
+   * (make component slot-able)"*, for `/videoradio/`, whose bar wants a ⛶ where
+   * `/radio/` has LOOP.
+   *
+   * ⚠️ IT IS A SEPARATE OPTION FROM `loopExtras` BECAUSE THOSE TWO MEAN
+   * DIFFERENT THINGS, and reusing one for the other would be a name that lies.
+   * A `loopExtras` button acts ON a loop and is hidden until there is one; a
+   * `loopSlot` button has nothing to do with looping and is simply what this bar
+   * keeps in that position. `/videoradio/`'s ⛶ is not a loop control that
+   * happens to be visible, it is the only thing in that slot.
+   *
+   * Same declaration shape as `extras`: `{ id, label, aria, title, onPress }`.
+   * Reachable afterwards as `bar.slot(id)`, so a check can press the real
+   * control and a page can relabel one.
+   */
+  loopSlot = [],
+  /**
    * 🔴 BUTTONS THAT BELONG TO THE LOOP, SHOWN ONLY WHILE ONE IS RUNNING.
    * `extras` sit by the play toggle and are always there, which is right for a
    * transport verb like record and wrong for a thing that can only act on a
@@ -171,6 +189,42 @@ export function createTransportBar(host, deck, {
     loopExtraEls.set(x.id, b);
   }
 
+  /**
+   * 🔴 A BAR MAY NOT DECLARE BOTH A LOOP AND SOMETHING IN THE LOOP'S PLACE.
+   * They render into one position, so the two together are an author asking for
+   * a layout that does not exist, and the failure without this would be silent:
+   * whichever came last in the append would win and the other would simply not
+   * be on screen. Refuse at construction, where the stack still says who asked.
+   */
+  if (loopSlot.length && wantLoop) {
+    throw new Error('createTransportBar: loopSlot needs loop: false'
+      + ` (${loopSlot.length} button(s) asked for the loop's place while the loop is on)`);
+  }
+  const loopSlotEls = new Map();
+  for (const x of loopSlot) {
+    /**
+     * 🔴 `tbar-slot`, NOT `tbar-x`, AND THE REASON IS THE HARNESS. `verify.mjs`
+     * presses `.pos-controls button, .tbar-x` on every page, because `.tbar-x`
+     * means "a button the PAGE put in the transport" and those are worth
+     * exercising. This slot is not that: `/videoradio/` keeps a ⛶ in it, and a
+     * suite that presses it leaves the page full screen for every check after
+     * it, including the page's own full screen check, which would then find
+     * somebody already full screen and decline to grade. The loop button is
+     * kept out of that selector for exactly the same reason and says so in
+     * `shell.css`.
+     * ⚠️ IT LOOKS IDENTICAL. `shell.css` gives `.tbar-slot` the same rule as
+     * `.tbar-x`; what differs is who presses it, not what it is.
+     */
+    const b = el('button', 'tbar-slot', x.label,
+      { type: 'button', 'aria-label': x.aria || x.id });
+    b.dataset.id = x.id;
+    if (x.title) b.title = x.title;
+    // ⚠️ NEVER HIDDEN. That is the whole difference from `loopExtras`, which
+    // wait for a loop to act on.
+    b.addEventListener('click', () => x.onPress?.(b));
+    loopSlotEls.set(x.id, b);
+  }
+
   const extraEls = new Map();
   for (const x of extras) {
     // `word: true` says the label is a WORD, not a glyph — it gets width from
@@ -253,7 +307,9 @@ export function createTransportBar(host, deck, {
   const loopPair = loopExtraEls.size && wantLoop ? el('div', 'tbar-loopgrp') : null;
   if (loopPair) loopPair.append(loopBtn, ...loopExtraEls.values());
   bar.append(toggle, ...extraEls.values(), scrub, ...(live ? [liveChip] : [time]),
-    ...(loopPair ? [loopPair] : [...(wantLoop ? [loopBtn] : []), ...loopExtraEls.values()]),
+    // the loop's position: whatever was put in the slot, or the loop itself
+    ...(loopSlotEls.size ? [...loopSlotEls.values()]
+      : loopPair ? [loopPair] : [...(wantLoop ? [loopBtn] : []), ...loopExtraEls.values()]),
     rates, badge);
   host.append(bar);
 
@@ -291,7 +347,24 @@ export function createTransportBar(host, deck, {
     lattice = latticeFor(deck);
     rates.replaceChildren();
     rateChoice = null;
-    if (lattice && lattice.length) {
+    /**
+     * 🔴 `> 1`, NOT `length`. A LATTICE OF ONE IS NOT A CHOICE AND MUST DRAW
+     * NOTHING. Found on `/replay/` 2026-09-16 and reported as *"what this
+     * disconnected 1 does here?"* with a screenshot: its cue lane declared
+     * `caps: { rates: [1] }`, the intersection came out as `[1]`, and
+     * `createChoice` rendered a radio group with a single member, which is one
+     * armed yellow button beside LOOP with nothing to choose it against.
+     *
+     * ⚠️ THE RULE WAS ALREADY WRITTEN AND WAS HONOURED FOR THE WRONG CASE. The
+     * note on `latticeFor` says a deck with no rate lattice shows nothing
+     * rather than a lone 1, and this guard enforced it only for an ABSENT
+     * lattice. A lattice that exists and holds one value reaches the reader as
+     * exactly the thing that note forbids.
+     * ⚠️ CHECKED BEFORE CHANGING IT: `demo/jam/` and `demo/kit/` are the only
+     * other places declaring a single rate, and neither asserts on the row, so
+     * both simply stop drawing a button nobody could press meaningfully.
+     */
+    if (lattice && lattice.length > 1) {
       rateChoice = createChoice({
         // 🔴 NO `x`. Five buttons reading `0.25x 0.5x 1x 1.5x 2x` spend a fifth
         // of their width on a letter that is the same on every one of them —
@@ -856,6 +929,8 @@ export function createTransportBar(host, deck, {
      * cannot press, which is how `/radio/`'s ways went ungraded.
      */
     loopExtra: (id) => loopExtraEls.get(id) || null,
+    /** a `loopSlot` button by id. Always on the bar; see the option. */
+    slot: (id) => loopSlotEls.get(id) || null,
   };
   if (window.__demo) window.__demo.transport = api;
 
@@ -875,6 +950,8 @@ export function createTransportBar(host, deck, {
     /** a `loopExtras` button by id. It is hidden unless a loop is running, or
      *  it was declared `always`, in which case it is always on the bar. */
     loopExtra: (id) => loopExtraEls.get(id) || null,
+    /** a `loopSlot` button by id. Always on the bar; see the option. */
+    slot: (id) => loopSlotEls.get(id) || null,
     note,
     destroy() {
       stop();

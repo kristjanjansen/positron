@@ -37,6 +37,13 @@
 // expressible, and the line between them is an argument about the engine:
 // `Select.kr` indices, gate figures and chords cannot be interpolated, and
 // pretending otherwise plays a chord nobody wrote.
+//
+// 🔴 AND SO IS THE TOUR CLOCK AT THE BOTTOM, ADDED 2026-09-16 WHEN `/radio/`
+// WAS ASKED FOR THE SAME MOVEMENT. `/videoradio/` still carries its own inline
+// copy of that arithmetic and should be moved onto this one; the numbers are
+// the same numbers and two of them are already in two files. That is the same
+// warning as the one above about the twelve sounds, and it is here rather than
+// in a commit message because nothing type-checks a duplicate.
 
 import { spec } from './pappus-mod.mjs';
 import { setParam, GATE0 } from './pappus.mjs';
@@ -62,18 +69,34 @@ export const BUF_SECONDS = 8;
 // ⚠️ TWO OF THESE ARE AAC, NOT MP3. `mp3-stream.mjs` picks its frame scanner off
 // the response's `content-type`, so no page has to know which is which, and no
 // URL here claims a container.
-// 🔴 IDA IS GONE, ON REQUEST FROM THE PEOPLE WHOSE SERVER IT IS. Their operator
-// reported roughly 100 concurrent clients, their limit, traced to
-// positron.studio. Two mounts had been moved to the front of this array an hour
-// earlier, which made them the default every page opens and every harness run
-// connects to. Do not add them back without asking them first.
+// 🔴 IDA IS BACK, 2026-09-16, ON INSTRUCTION: *"bring ida's back to radio (if
+// single listener)"* and *"bring ida to videoradio too"*. The condition in the
+// first message is the whole argument. It was removed because their operator
+// counted roughly 100 concurrent clients against their limit and traced them
+// here; the relay now holds ONE upstream connection per mount and fans it out,
+// so the number they count is one however many people are listening.
+// `workers/shout/worker.mjs` carries the measurement and the caveat that the
+// operator has not been re-asked.
+//
+// 🔴 AND THEY ARE LAST IN THIS ARRAY, WHICH IS NOT A PREFERENCE. What made the
+// original mistake expensive was not carrying these mounts, it was one line
+// that moved them to the FRONT: every page opens the first entry it finds, so
+// reordering an array pointed every visitor and every harness run at their
+// server at once. At 320 kbit/s they are 2.5x the weight of anything else here.
+// Do not move them up.
 export const STATIONS = [
   // Radio 1965 removed 2026-09-15 at the uuu.ee operator's request.
-  ['Klassikaraadio', 'klassikaraadio', 128],
-  ['Vikerraadio', 'vikerraadio', 128],
-  ['Raadio 2', 'raadio2', 128],
-  ['Raadio 4', 'raadio4', 128],
-  ['Raadio Tallinn', 'raadiotallinn', 128],
+  ['Klassika', 'klassikaraadio', 128],
+  ['Viker', 'vikerraadio', 128],
+  ['R2', 'raadio2', 128],
+  ['R4', 'raadio4', 128],
+  ['Tallinn', 'raadiotallinn', 128],
+  ['Ida TLL', 'ida-tallinn', 320],
+  ['Ida HEL', 'ida-helsinki', 320],
+  // Back, last, 2026-09-16. See the note in `workers/shout/worker.mjs`: the
+  // relay holds one upstream per mount now, so this is one listener at their
+  // server however many people are on this site.
+  ['Radio 1965', 'radio1965', 128],
 ];
 
 export const RELAY = 'https://shout.positron.studio';
@@ -926,3 +949,59 @@ export function createFeatures(analyser, sampleRate) {
  */
 export const winPos = (p, ringSeconds, bufSeconds = BUF_SECONDS) =>
   Math.min(1, Math.max(0, (p ?? 0) * ringSeconds / bufSeconds));
+
+// ── the tour: a page working its own instrument ────────────────────────────
+//
+// 🔴 EVERY PHASE IS A FUNCTION OF THE CLOCK AND NOTHING IS AN ACCUMULATOR.
+// `pappus-mod.mjs` makes the argument and it applies to anything left running
+// for hours: a late tick, a dropped tick or a backgrounded tab costs
+// RESOLUTION and never POSITION, because the next tick still reads the tour
+// exactly where it should be. A counter incremented per tick comes back from a
+// minimised window playing a sound it should have left twenty minutes ago.
+//
+// ⚠️ THE ARITHMETIC IS PURE AND TAKES NO ENGINE, so a page can grade it with
+// nothing running. `tourAt` is total: every real `elapsedMs` and every `n >= 1`
+// answers, including a negative elapsed, which is what a page that seeds the
+// clock BACKWARDS to open on the sound already loaded hands it.
+export const DWELL_MS = 22000;          // how long one sound is held
+export const MORPH_MS = 9000;           // how long the slide into the next takes
+export const SLOT_MS = DWELL_MS + MORPH_MS;
+
+/**
+ * Which two sounds this instant is between, and how far across.
+ *
+ * `within` is 0..1 through one slot, `k` is 0 for the whole dwell and then
+ * 0..1 across the morph, `a` is the sound being left and `b` the one being
+ * gone to. Feed `k` to `morphOf`.
+ *
+ * @param {number} elapsedMs  since the tour was started
+ * @param {number} n          how many sounds there are
+ */
+export function tourAt(elapsedMs, n, { dwellMs = DWELL_MS, morphMs = MORPH_MS } = {}) {
+  const slotMs = dwellMs + morphMs;
+  const dwellFrac = dwellMs / slotMs;
+  const pos = elapsedMs / slotMs;
+  const slot = Math.floor(pos);
+  const within = pos - slot;
+  const count = Math.max(1, n | 0);
+  const a = ((slot % count) + count) % count;
+  const b = (a + 1) % count;
+  const k = within <= dwellFrac ? 0 : (within - dwellFrac) / (1 - dwellFrac);
+  return { slot, within, a, b, k };
+}
+
+/**
+ * 🔴 THE BLEND IS A FUNCTION OF WHERE THE TOUR IS, NOT A FREE-RUNNING SHAPE,
+ * and the difference is legible rather than cosmetic. It opens from the station
+ * toward the granulator over the first half of a sound and comes back over the
+ * second, so the handover between two sounds always happens while the station
+ * is still audible. A sine on a clock of its own eventually puts the deepest
+ * part of the granulator exactly on a crossover, which is the one moment the
+ * instrument has least to say.
+ *
+ * ⚠️ NEITHER END IS 0 OR 1. At 0 the granulator is inaudible and any picture of
+ * it is drawing something nobody is hearing; at 1 the station is gone and what
+ * is left is an instrument with no material.
+ */
+export const breathe = (within, lo, hi) =>
+  lo + (hi - lo) * (0.5 - 0.5 * Math.cos(2 * Math.PI * within));
