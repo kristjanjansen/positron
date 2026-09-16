@@ -20,9 +20,30 @@
            color: var(--dim); margin: 0 0 12px; max-width: 66ch; }
   .kit-n code { font-family: var(--mono); font-size: .92em; }
   .kit-n code { color: var(--fg); }
+  /* 🔴 A SECTION IS ONE BLOCK OF THE PAGE, AND THAT IS NOT A TIDY-UP. `.pos-body`
+     is a `.pos-stack` now, which puts the project's one gap between every pair
+     of its children — and this page used to append a heading, a note, a snippet
+     and a box to it as FOUR children, ninety-eight in all, so every title would
+     have sat 40 px from the sentence under it. A heading and the thing it
+     names are one pair; the stack has nothing to say about the inside of a
+     block, which is exactly the escape demo/shell/stack.mjs names. */
+  .kit-sec > .kit-h { margin-top: 0; }
   .kit-box { border: 1px solid var(--line); border-radius: 4px; background: var(--card);
-             padding: 14px; margin: 0 0 8px; display: flex; flex-wrap: wrap;
+             padding: 14px; margin: 0; display: flex; flex-wrap: wrap;
              gap: 10px; align-items: center; }
+  /* The three blocks in the layout specimen, so a gap has something to be
+     measured between. They are deliberately plain: what is being shown is the
+     air, not the boxes. */
+  .kit-blk { border: 1px dashed var(--line2); border-radius: 4px; color: var(--dim2);
+             font: 400 11px/1 var(--mono); text-align: center; padding: 18px 0; }
+  /* 🔴 THE DEFECT, KEPT ALIVE ON PURPOSE. `.kbd { margin: 0 0 10px }` in
+     shell.css is what put a keyboard flush against a transport bar on `/keys/`:
+     a `margin` shorthand's implied `margin-top: 0`, at (0,1,0), beating a
+     rhythm rule that was (0,1,0) too. This class is that shorthand, in a page
+     stylesheet, which is the worst case there is — it loads after shell.css, so
+     source order is on its side and only specificity can beat it. The check at
+     the bottom measures the gap above it. */
+  .kit-tight { margin: 0 0 10px; }
   .kit-src { font: 400 11px/1.6 var(--mono); color: var(--dim2); white-space: pre-wrap;
              margin: 0 0 6px; padding-left: 2px; }
   /* ⚠️ GREY, NOT `--hi`. This is what the control beside it last reported, and
@@ -87,6 +108,7 @@
 
 <script type="module">
   import { mount, el, createReport } from '/shell/shell.mjs';
+  import { createStack } from '/shell/stack.mjs';
   import { createStepper } from '/shell/stepper.mjs';
   import { createSlider, createSliderGroup, GLIDE_MS, HAND_YIELD_MS } from '/shell/slider.mjs';
   import { MOVE_GLYPH, MOVE_OFF, MOVE_SAYS } from '/shell/hand.mjs';
@@ -146,11 +168,19 @@
    * was. Both lists are asserted at the bottom.
    */
   function section(title, note, src, build) {
-    body.append(el('h2', 'kit-h', title));
-    if (note) body.append(el('p', 'kit-n', note));
-    if (src) body.append(el('pre', 'kit-src', src));
+    // 🔴 ONE ELEMENT PER SECTION, WHICH IS WHAT `.pos-body` BEING A STACK ASKS
+    // FOR. These four used to be four children of the page, and a stack puts
+    // the project's one gap between every pair of its children — so a title
+    // would have stood 40 px away from the sentence explaining it. A heading,
+    // its note, its snippet and its specimen are one block; the air belongs
+    // BETWEEN blocks. See demo/shell/stack.mjs.
+    const sec = el('section', 'kit-sec');
+    body.append(sec);
+    sec.append(el('h2', 'kit-h', title));
+    if (note) sec.append(el('p', 'kit-n', note));
+    if (src) sec.append(el('pre', 'kit-src', src));
     const box = el('div', 'kit-box');
-    body.append(box);
+    sec.append(box);
     try { build(box); built.push(title); }
     catch (e) {
       failed.push(`${title}: ${e.message}`);
@@ -178,6 +208,13 @@
   // at the bottom. ⚠️ SAME REASON AS THE LINE ABOVE: the block that fills these
   // is the newest one and so it is the topmost one, and a `const` left where
   // the block used to be is read in its dead zone.
+  // The layout specimens. ⚠️ DECLARED UP HERE, not beside the block that fills
+  // them: this is the newest section and therefore the topmost one, and this
+  // page has already been taken out once by a `const` left where a block used
+  // to be and then read in its dead zone.
+  let stackSpec = null, emptySpec = null, emptyBlock = null;
+  const stackBlocks = [];
+
   let joinedSpec = null;      // a readout on top of a log, one surface
   let logOnlySpec = null;     // joined, with no readout declared
   let neitherSpec = null;     // joined, with neither — there is nothing to draw
@@ -204,6 +241,39 @@
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
+  section('BLOCKS OF A PAGE, AND THE AIR BETWEEN THEM',
+    'A page is a stack of blocks and the stack owns the space between them, so no page '
+    + 'has to know the number and none of them can get it wrong. The gap is set once, as '
+    + '--pos-gap in the stylesheet, and it is put on both sides of every pair: a block '
+    + 'cannot add to it with a margin of its own and cannot take it away, which is what '
+    + 'used to happen. A block with nothing in it takes no space at all. Two things a '
+    + 'page still owns: what goes inside a block, and the order the blocks are added in.',
+    `const page = createStack(d.el);          // mount() has already made this one
+page.add(bar.el, picks, keyboard.el);    // the order of the page, in one line
+const row = page.stack();                // a block that is itself a column`,
+    (box) => {
+      box.classList.add('kit-wide');
+      stackSpec = createStack(undefined, 'kit-stackspec');
+      for (const [t, cls] of [['a block', ''], ['another', ''],
+                              ['and one whose own class says margin: 0 0 10px', 'kit-tight']]) {
+        const b = el('div', `kit-blk${cls ? ' ' + cls : ''}`, t);
+        stackBlocks.push(b);
+        stackSpec.add(b);
+      }
+      box.append(stackSpec.el);
+
+      // ⚠️ THE EMPTY CASE IS ITS OWN SPECIMEN, because what it has to show is
+      // an ABSENCE: two blocks with one gap between them and a third element
+      // between those two that costs nothing. Putting it in the stack above
+      // would have made the row read as four blocks with a hole in it.
+      box.append(el('p', 'kit-cap', 'with a block that never got filled'));
+      emptySpec = createStack(undefined, 'kit-stackspec');
+      emptySpec.add(el('div', 'kit-blk', 'a block'));
+      emptyBlock = el('div', 'kit-blk');          // nothing in it, ever
+      emptySpec.add(emptyBlock, el('div', 'kit-blk', 'the next block'));
+      box.append(emptySpec.el);
+    });
+
   section('READOUT AND LOG, JOINED OR SPLIT',
     'The numbers a page is showing now and the record of what it did are one component '
     + 'with two arrangements. Split is the default and is what every page here already '
@@ -438,7 +508,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   // ── a slider that moves by itself ───────────────────────────────────────
-  section('a slider with an invisible hand',
+  section('A SLIDER THAT CAN MOVE ITSELF',
     'Press ' + MOVE_GLYPH.sweep + ' and the handle sweeps by itself, back and forth, with a real '
     + 'reach and a pause at each end rather than a triangle wave. While it runs the '
     + 'handle is drawn hollow, because nobody is holding it. Grab it, use the arrow '
@@ -1554,6 +1624,52 @@ green = inside what it promised · amber/red = later`,
     neitherSpec && neitherSpec.foot === null
       ? 'no surface was returned, so there is no box to paint'
       : 'an empty surface was returned and would draw its own two edges');
+
+  // 16 — 🔴 THE GAP IS THE STACK'S, AND A BLOCK CANNOT ARGUE WITH IT. The third
+  // specimen carries `margin: 0 0 10px` in this page's own stylesheet, which
+  // loads AFTER shell.css — the exact shape that put a keyboard flush against a
+  // transport bar on `/keys/` and measured 0.0 px. A shorthand's implied
+  // `margin-top: 0` is (0,1,0) and the stack's rule is (0,2,0), so it loses on
+  // weight rather than on source order, which is the whole reason the rule is
+  // written the way it is.
+  // ⚠️ THE NUMBER IS READ OFF THE DOCUMENT, never typed here. A check that
+  // types 40 grades this page against a figure it invented; `--pos-gap` is the
+  // one place the project states it, so the check has to ask for it too.
+  {
+    const want = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--pos-gap'));
+    const gaps = [];
+    for (let i = 1; i < stackBlocks.length; i++) {
+      gaps.push(+(stackBlocks[i].getBoundingClientRect().top
+        - stackBlocks[i - 1].getBoundingClientRect().bottom).toFixed(1));
+    }
+    const asked = stackBlocks.length
+      ? getComputedStyle(stackBlocks[stackBlocks.length - 1]).marginTop : '?';
+    d.assert('every block in a stack is one gap from the one before it, whatever margin it carries',
+      Number.isFinite(want) && want > 0 && gaps.length === 2
+      && gaps.every((g) => Math.abs(g - want) <= 0.5),
+      `--pos-gap is ${want} px and the gaps read ${gaps.join(' and ')} px · `
+      + `the block asking for margin-top 0 computes ${asked}`);
+  }
+
+  // 17 — 🔴 AND A BLOCK WITH NOTHING IN IT TAKES NO GAP. This is the `/typist/`
+  // band in a third costume: an empty container that draws nothing and still
+  // spends a screenful of air, or paints its own two borders as a rule nobody
+  // wrote. Two blocks with an unfilled one between them must sit ONE gap apart,
+  // not two — and the unfilled one must be out of the layout entirely rather
+  // than merely invisible, which is the difference the display value reports.
+  {
+    const want = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--pos-gap'));
+    const kids = emptySpec ? [...emptySpec.el.children] : [];
+    const across = kids.length === 3
+      ? +(kids[2].getBoundingClientRect().top - kids[0].getBoundingClientRect().bottom).toFixed(1) : -1;
+    const gone = emptyBlock ? getComputedStyle(emptyBlock).display === 'none' : false;
+    d.assert('a block that never got filled takes no room and no gap',
+      gone && kids.length === 3 && Math.abs(across - want) <= 0.5,
+      `the two blocks around it are ${across} px apart, which is one gap of ${want} px · `
+      + `the empty one computes display ${emptyBlock ? getComputedStyle(emptyBlock).display : '?'}`);
+  }
 
   d.ready();
 

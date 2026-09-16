@@ -37,9 +37,11 @@
      carried `margin: 14px 0 4px`, so the two column headings sat tight under
      the line and the strip and the day below it read as one block.
      ⚠️ `margin-bottom`, NEVER the `margin` shorthand. The shorthand's implied
-     `margin-top: 0` BEATS `.pos-body > * + *` on source order at the same
+     `margin-top: 0` used to BEAT the rhythm on source order at the same
      specificity, which is exactly how this page lost the rhythm in the first
-     place and how the transport bar lost it on every page in the project. */
+     place and how the transport bar lost it on every page in the project.
+     `.pos-stack` closed that as a class in 2026-09-16 by outweighing a single
+     class rather than out-sitting it, and the habit is still the right one. */
   .picked { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px;
             font: 500 12px/1.6 var(--mono); color: var(--dim); margin-bottom: 4px; }
   /* TWO COLUMNS ON A PHONE TOO. Stacked, the second archive reads as a

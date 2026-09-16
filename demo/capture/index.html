@@ -8,8 +8,8 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* No vertical margins in here: the gap between the picture, the segment row
-     and the transport bar is `.pos-body > * + *` in shell.css, one rhythm for
-     every page. */
+     and the transport bar is `.pos-stack` in shell.css, one rhythm for every
+     page, and this page's blocks are in one because `.pos-body` is a stack. */
   video, canvas.src { width: 100%; max-width: 440px; display: block; background: #000;
                       border: 1px solid var(--line); border-radius: 3px; }
   .segs { font: 500 10px/1.6 var(--mono); color: var(--dim2);

@@ -733,12 +733,17 @@
    * page; only the ink is gone. A mode that BUILT less would be a second page
    * wearing this one's name.
    */
+  // ⚠️ THE RHYTHM IS `.pos-stack` AND IT OWNS BOTH SIDES OF EVERY GAP, so a
+  // page taking the air out has to say both. This read `.pos-body > * + *`,
+  // which stopped existing when the rhythm became a property of a container
+  // rather than a rule about one element's children, and an override that
+  // matches nothing is silence rather than an error.
   const BARE = new URLSearchParams(location.search).get('bare') === '1';
   if (BARE) {
     const css = document.createElement('style');
     css.textContent = `.pos-head, .pos-what, .pos-controls, .pos-readout, .pos-log { display: none !important; }
       body { padding: 0 !important; }
-      .pos-body > * + * { margin-top: 0 !important; }
+      .pos-stack > * { margin-top: 0 !important; margin-bottom: 0 !important; }
       .vr-pane { border: 0; border-radius: 0; }`;
     document.head.append(css);
   }

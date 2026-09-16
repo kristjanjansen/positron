@@ -18,24 +18,48 @@
   /* ⚠️ THE ROW LAYS OUT GROUPS, NOT BUTTONS, and it has to WIDEN. A flex row of
      fixed-width controls on a phone leaves a column of stragglers down the left
      and empty space beside them. Let the row own the width and share it out. */
-  .pick { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0 0 14px;
-          width: 100%; }
+  /* ⚠️ NO MARGIN OF ITS OWN. This row carried `margin: 0 0 14px` and it was one
+     of the three measured ways a block fell out of the page's rhythm: the row
+     was spliced onto `document.body`, where nothing set the gaps, so its own
+     14 px became the distance between the patch and the page. The gap belongs
+     to `.pos-stack`, which every block of this page is in now. */
+  /* 🔴 THE ROW SAYS WHERE ITS GROUPS SIT, NOT EACH GROUP. Every `.fx`
+     carried `margin-left: auto`, which is one group's claim on all the free
+     space in its line, and that is only ever right while there is one group.
+     There are two now. MEASURED at 1200 px: the page is 688 px wide inside its
+     padding, the patch group is 325 and reverb plus chorus is 406, so they
+     cannot share a line and they wrap — the patch on the first, the effects on
+     the second, each right aligned. That is the intended picture and it is
+     stated once here instead of twice, where a line that DID have room would
+     have had two margins dividing it between them. */
+  .pick { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0;
+          width: 100%; justify-content: flex-end; }
   /* ⚠️ 18 px, NOT 6. `reverb [off|room|hall] chorus [off|light|wide]` at a 6 px
      gap put the word CHORUS hard against the `hall` button, so the two groups
      read as one row of six options with a stray word in the middle. The gap
      between two groups has to be bigger than the gap inside one, or there are
      no groups. */
-  .pick .fx, .pos-controls .fx { display: inline-flex; gap: 18px; align-items: center; margin-left: auto;
-                                 flex-wrap: wrap; }
-  .fxhost { display: flex; align-items: center; }
+  /* ⚠️ ONE CONTAINER NOW, AND THE SECOND ONE WAS NEVER VISIBLE. These selectors
+     read `.pick .fx, .pos-controls .fx` because reverb and chorus were appended
+     into the shell's control row while the patch sat in `.pick`. That row is
+     `hidden` on this page — it declares no controls — so the pair it held could
+     not be seen in any state. Both `.fx` spans are in `.pick` now. */
+  .pick .fx { display: inline-flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  /* 🔴 AND `display` BEATS THE UA'S `[hidden]`, WHICH IS WHY THIS LINE
+     EXISTS. `shell.css` already carries this trap twice, on `.pos-controls` and
+     on `.pos-readout`: a rule that sets `display` outweighs `[hidden] { display:
+     none }`, so `spaceRow.hidden = true` set the attribute and changed nothing.
+     MEASURED here the moment reverb and chorus moved into this row: with no
+     board answering and `hidden` on the span, it still laid out 406 px wide at
+     y 306. It was invisible before only because the row AROUND it was hidden,
+     which means the page has never had a working switch for these two. */
+  .pick .fx[hidden] { display: none; }
   /* ⚠️ FOCUS MUST NOT WEAR THE ARMED COLOUR. The shell's global rule is
      `:focus-visible { outline: 2px solid var(--hi) }`, the same green the
      chosen state uses, so a focused-but-OFF switch was indistinguishable from
      an armed one and read as an effect that was in the sound while the log said
      bypassed. Focus goes grey; green means chosen and nothing else. */
-  .pos-controls .fx button:focus:not(:focus-visible),
   .pick button:focus:not(:focus-visible) { outline: none; }
-  .pos-controls .fx button:focus-visible,
   .pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
   /* 🔴 NO `[aria-pressed]` RULE HERE. There was one, and it was the bug: it has
      the same specificity as the kit's `.pos-choice button[aria-pressed="true"]`
@@ -47,9 +71,9 @@
      width — but the boxes were still side by side in a flex row, so the groups
      got 172 px, 113 and 120 of a 390 px screen. MEASURED. A component can only
      fill what its container gives it.
-     ⚠️ AND BOTH CONTAINERS: reverb and chorus are appended to `.pos-controls`,
-     not to `.pick`, so a rule written for `.pick .fx` alone left them narrow
-     while the row beside them went full width.
+     ⚠️ AND IT USED TO NEED TWO CONTAINERS, because reverb and chorus were
+     appended into the shell's control row rather than into this one. They are
+     both in `.pick` now, so `.pick .fx` is the whole of it.
      ⚠️ AND `display` IS PART OF IT. This once set flex-direction, align-items
      and gap and not display, and the computed display came back `block`, so all
      three were inert and the two groups touched at a measured 0 px while the
@@ -60,8 +84,8 @@
      the cascade here. */
   @media (max-width: 560px) {
     .pick { flex-direction: column; align-items: stretch; gap: 22px; }
-    .pick .fx, .pos-controls .fx, .fxhost {
-      display: flex; margin-left: 0; width: 100%; flex-direction: column;
+    .pick .fx {
+      display: flex; width: 100%; flex-direction: column;
       align-items: stretch; gap: 22px;
     }
   }
@@ -197,11 +221,15 @@
      * traded to keep the count even.
      */
     joined: true,
-    // NO PAGE CONTROLS. Octave down, octave up and notes off used to be here,
-    // which put all three at the TOP of the page, a hand's width above the keys
-    // they act on. They are the keyboard's own controls and the keyboard draws
-    // them now — see the pad in demo/shell/keyboard.mjs. The row below is not
-    // empty: the space and chorus settings are appended into it further down.
+    // NO PAGE CONTROLS, AND THE ROW REALLY IS EMPTY. Octave down, octave up and
+    // notes off used to be here, which put all three at the TOP of the page, a
+    // hand's width above the keys they act on. They are the keyboard's own
+    // controls and the keyboard draws them now — see the pad in
+    // demo/shell/keyboard.mjs.
+    // ⚠️ THE LINE HERE USED TO SAY THE ROW WAS NOT EMPTY, because reverb and
+    // chorus were appended into it. They were, and they could not be seen:
+    // `mount()` hides a control row that was declared with nothing in it, and
+    // nothing ever cleared that. Both live in the patch row now.
     controls: [],
   });
   guard(d);
@@ -209,10 +237,15 @@
   // ── the patch row ────────────────────────────────────────────────────────
   // It held the instrument choice as well until 2026-09-16; see the block below
   // where that row used to be built.
+  // 🔴 IT IS NOT PUT ANYWHERE HERE, AND THAT IS THE CHANGE. This row used to
+  // splice itself in with `controls.parentNode.insertBefore(picks, controls)`,
+  // which puts it on `document.body` beside the shell's own blocks — where the
+  // vertical rhythm did not reach, because that rhythm was a rule about the
+  // children of ONE element. MEASURED before the repair: 16 px under the head,
+  // 14 px over the page, and 0.0 px between the transport bar and the keyboard.
+  // The order of this page is now stated in ONE line, further down, where all
+  // three of its blocks exist: see `d.stack.add`.
   const picks = el('div', 'pick');
-  const controls = document.querySelector('.pos-controls');
-  if (controls) controls.parentNode.insertBefore(picks, controls);
-  else d.el.append(picks);
   const fxWrap = el('span', 'fx');
   // 🔴 A STEPPER IS NOT A WAY TO CHOOSE ONE OF 878. Yoshimi's library on this
   // board is 878 reachable instruments and the
@@ -545,8 +578,22 @@
   // query that puts these controls full width on a phone, which is why reverb
   // and chorus stayed 113 px wide on a 390 px screen while the row above them
   // went full width. Measured twice before the cause was the style attribute.
-  if (controls) { controls.classList.add('fxhost'); controls.append(spaceRow); }
-  else d.el.append(spaceRow);
+  //
+  // 🔴 IN THE PATCH ROW, AND UNTIL 2026-09-16 THESE TWO CONTROLS COULD NOT BE
+  // SEEN AT ALL. They were appended into `.pos-controls`, and this page declares
+  // `controls: []`, so `mount()` had already set `hidden` on that row — for the
+  // right reason, since a row with nothing in it paints a band of dead space.
+  // Nothing ever cleared it. `spaceRow.hidden = m.jack === false` was toggling a
+  // child of an element that was `display: none`, so reverb and chorus were
+  // invisible in every state the page has, on every visit. FOUND by reading the
+  // computed display off a real browser while measuring this page's gaps:
+  // `.pos-controls` came back 0 px high and `none`.
+  // ⚠️ THE FIX IS NOT TO UN-HIDE THE SHELL'S ROW. Two reasons: the row would
+  // then open the page ABOVE the transport bar, and the order asked for is the
+  // bar first; and these two belong with the patch, which is the other thing
+  // you set and then leave alone. The page's own CSS already styles `.pick .fx`
+  // exactly as it styled `.pos-controls .fx`, phone rules included.
+  picks.append(spaceRow);
 
   /**
    * Stamp a key press, but only where the answer would mean something.
@@ -612,10 +659,40 @@
         for (const b of m.banks) for (const p of b.patches)
           patches.push({ bank: b.bank, bankName: b.name, program: p.program, name: p.name });
         banksInList = m.bankCount ?? m.banks.length;
-        idx = 0; lastBank = -1;
+        lastBank = -1;
+        /**
+         * 🔴 THE PAGE OPENS ON A PATCH IT CHOSE, AND IT CHOOSES `AddSynth
+         * Morph`. Asked for 2026-09-16: *"addsynth morph as default patch"*.
+         * Before this the index simply went to 0, which is whatever the board
+         * happened to enumerate first (`Arpeggio1`), and the board went on
+         * playing whatever it had loaded at startup — so the name in the
+         * control and the sound coming back were about two different patches.
+         *
+         * ⚠️ A BANK AND A PROGRAM, NOT A NAME OR A POSITION. Yoshimi's banks
+         * here are numbered 5, 10, 15 … 120 and their slots are sparse, so an
+         * index into the flattened list moves the moment a file is added to any
+         * bank before this one, and a name match breaks on a rename. The pair
+         * is the instrument's own address for the patch and was read off the
+         * board's `voices.list`.
+         * ⚠️ AND IT IS SENT, NOT JUST POINTED AT. A default nothing loaded is a
+         * default in name only. `chosen` goes true with it, which is what stops
+         * the "it is playing whatever it loaded at startup" line from being
+         * written about a patch this page did choose.
+         */
+        const OPENS_ON = { bank: 115, program: 32 };
+        const at = patches.findIndex((p) => p.bank === OPENS_ON.bank && p.program === OPENS_ON.program);
+        idx = at >= 0 ? at : 0;
         refreshPicker();
+        if (at >= 0) { chosen = true; sendPatch(); }
         showPatch();
         d.log(`${m.source}: ${patches.length} patches in ${m.bankCount} banks`, 'hi');
+        // ⚠️ SAID WHEN IT IS NOT TRUE, TOO. A page that opens on a patch it
+        // asked for and a page that opens on one it could not find look
+        // identical from outside, and the second one is the one worth knowing
+        // about: the board's library has changed under this page.
+        if (at >= 0) d.log(`opening on ${patchName(idx)}`, 'hi');
+        else d.log(`bank ${OPENS_ON.bank} program ${OPENS_ON.program} is not in this board's library, `
+          + `so the patch row opens on ${patchName(idx)}`, 'warn');
         // The board checked its own bank map against its own files. Saying
         // nothing here would leave a list that is quietly wrong looking
         // exactly like one that is right.
@@ -758,7 +835,19 @@
   // comment beside `picks.append(fxWrap)` is about the previous two. The
   // symptom is total: a readout of dashes, one red line, no keyboard and no
   // picture, because the throw happens at module scope.
-  d.el.prepend(bar.el);
+  //
+  // 🔴 SO THE ORDER OF THIS PAGE IS ONE LINE, AND THERE IS NO `prepend` AND NO
+  // `insertBefore` LEFT TO GET WRONG. `d.stack` is the page's own blocks as a
+  // stack (demo/shell/stack.mjs); `add` puts them in the order they are written
+  // and MOVES the two that are already children, which is what `append` does to
+  // a node that is in the document. The order was asked for on 2026-09-16: the
+  // bar first, because whether the board is answering decides whether pressing
+  // anything will do something at all; then the patch; then the keys.
+  // ⚠️ AND THE AIR BETWEEN THEM IS NOT THIS PAGE'S BUSINESS ANY MORE. The stack
+  // gives all three the project's one gap, so the 0.0 px that was photographed
+  // between the bar and the keyboard cannot come back here or anywhere else:
+  // it was `.kbd { margin: 0 0 10px }` beating a rhythm rule of equal weight.
+  d.stack.add(bar.el, picks, kb.el);
 
   showPatch();
   d.ready();

@@ -1625,6 +1625,52 @@ green = inside what it promised · amber/red = later`,
       ? 'no surface was returned, so there is no box to paint'
       : 'an empty surface was returned and would draw its own two edges');
 
+  // 16 — 🔴 THE GAP IS THE STACK'S, AND A BLOCK CANNOT ARGUE WITH IT. The third
+  // specimen carries `margin: 0 0 10px` in this page's own stylesheet, which
+  // loads AFTER shell.css — the exact shape that put a keyboard flush against a
+  // transport bar on `/keys/` and measured 0.0 px. A shorthand's implied
+  // `margin-top: 0` is (0,1,0) and the stack's rule is (0,2,0), so it loses on
+  // weight rather than on source order, which is the whole reason the rule is
+  // written the way it is.
+  // ⚠️ THE NUMBER IS READ OFF THE DOCUMENT, never typed here. A check that
+  // types 40 grades this page against a figure it invented; `--pos-gap` is the
+  // one place the project states it, so the check has to ask for it too.
+  {
+    const want = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--pos-gap'));
+    const gaps = [];
+    for (let i = 1; i < stackBlocks.length; i++) {
+      gaps.push(+(stackBlocks[i].getBoundingClientRect().top
+        - stackBlocks[i - 1].getBoundingClientRect().bottom).toFixed(1));
+    }
+    const asked = stackBlocks.length
+      ? getComputedStyle(stackBlocks[stackBlocks.length - 1]).marginTop : '?';
+    d.assert('every block in a stack is one gap from the one before it, whatever margin it carries',
+      Number.isFinite(want) && want > 0 && gaps.length === 2
+      && gaps.every((g) => Math.abs(g - want) <= 0.5),
+      `--pos-gap is ${want} px and the gaps read ${gaps.join(' and ')} px · `
+      + `the block asking for margin-top 0 computes ${asked}`);
+  }
+
+  // 17 — 🔴 AND A BLOCK WITH NOTHING IN IT TAKES NO GAP. This is the `/typist/`
+  // band in a third costume: an empty container that draws nothing and still
+  // spends a screenful of air, or paints its own two borders as a rule nobody
+  // wrote. Two blocks with an unfilled one between them must sit ONE gap apart,
+  // not two — and the unfilled one must be out of the layout entirely rather
+  // than merely invisible, which is the difference the display value reports.
+  {
+    const want = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--pos-gap'));
+    const kids = emptySpec ? [...emptySpec.el.children] : [];
+    const across = kids.length === 3
+      ? +(kids[2].getBoundingClientRect().top - kids[0].getBoundingClientRect().bottom).toFixed(1) : -1;
+    const gone = emptyBlock ? getComputedStyle(emptyBlock).display === 'none' : false;
+    d.assert('a block that never got filled takes no room and no gap',
+      gone && kids.length === 3 && Math.abs(across - want) <= 0.5,
+      `the two blocks around it are ${across} px apart, which is one gap of ${want} px · `
+      + `the empty one computes display ${emptyBlock ? getComputedStyle(emptyBlock).display : '?'}`);
+  }
+
   d.ready();
 
 </script>

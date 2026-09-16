@@ -344,34 +344,46 @@ button.pos-pri[data-busy="1"] {
    (`document.body`) and on the page's own blocks (`.pos-body`). An insert, an
    append and a wrapper are all inside one of those now.
 
-   ⚠️ BOTH SIDES, AND THAT IS THE HALF THAT IS EASY TO SKIP. Zeroing the bottom
-   margin is what makes the gap EXACTLY the gap: under the old rule a
+   ⚠️ BOTH SIDES, AND THAT IS THE HALF THAT IS EASY TO SKIP. Owning the top
+   margin as well is what makes the gap EXACTLY the gap: under the old rule a
    neighbour's larger bottom margin collapsed through and won, which is how
    `/vclick/` measured 53.5 px between its field and its transport bar while
    every other gap on it read 40.
 
+   🔴 THE GAP IS WRITTEN ON THE BLOCK ABOVE IT, AND THE FIRST ATTEMPT PUT IT
+   ON THE BLOCK BELOW. That version worked everywhere except where it mattered.
+   `.pos-head + *` was supposed to keep the smaller distance under the title,
+   and MEASURED it did not: on `/knobs/`, `/keys/`, `/score/` and `/typist/` a
+   HIDDEN element sits between the head and the first real block — a readout a
+   page declared `null`, or a control row declared with nothing in it — so `+`
+   matched a `display: none` box and the block a visitor can actually see took
+   the full 40. The head's distance is stated by the HEAD now, which no
+   invisible neighbour can come between.
+   ⚠️ AND IT FIXES TWO MORE CASES FOR FREE, because a `display: none` element
+   generates no box and no margin: a hidden block in the middle of a stack
+   leaves ONE gap rather than two, and a hidden FIRST block leaves no gap at
+   the top of the page at all.
+
    ⚠️ AND THE SPECIFICITY IS THE MECHANISM, NOT TIDINESS. `:not(:first-child)`
-   is (0,2,0) and `:not(:last-child):not(.pos-head)` is (0,3,0), so a
-   component's own `margin` shorthand — every one of which is a single class —
-   loses on weight rather than on where its rule happens to sit. That is the
-   `.kbd` defect above, the `.tbar` one CLAUDE.md records, and the `.pos-dg` one
-   recorded further down this file, closed as a class.
+   is (0,2,0) and the bottom rule is (0,4,0), so a component's own `margin`
+   shorthand — every one of which is a single class — loses on weight rather
+   than on where its rule happens to sit. That is the `.kbd` defect above, the
+   `.tbar` one CLAUDE.md records, and the `.pos-dg` one recorded further down
+   this file, closed as a class.
 
    ⚠️ A PAIR THAT BELONGS TIGHT IS ONE BLOCK, NOT A SMALLER GAP. Put the two
    elements in a plain container and put that in the stack; the inside of a
    block is the block's own business. demo/shell/stack.mjs carries the argument
-   and the `createStack()` a page uses to build one. */
-.pos-stack > :not(:first-child) { margin-top: var(--pos-gap); }
-.pos-stack > :not(:last-child):not(.pos-head) { margin-bottom: 0; }
-/* 🔴 THE MASTHEAD IS THE PAGE'S NAME, NOT ONE OF ITS BLOCKS, AND IT IS THE ONE
-   EXCEPTION. It carries its own 12 px of padding and 16 px of margin — 28 px in
-   all — and `/knobs/` is the page whose spacing was called correct with exactly
-   that distance under its title. So the head keeps its own margin (it is
-   excluded from the zeroing above) and what follows it asks for nothing, which
-   lets the two collapse to the head's number instead of adding to it.
-   ⚠️ ONE PLACE, SO `.xr .pos-head`'s TIGHTER 10 px STILL WORKS: the distance
-   is stated by the head in both cases rather than by the thing under it. */
-.pos-stack > .pos-head + * { margin-top: 0; }
+   and the `createStack()` a page uses to build one.
+
+   🔴 TWO ELEMENTS ARE EXCLUDED AND BOTH ARE HEADINGS. A heading belongs to
+   what follows it, so it declares its own distance to the thing it names: the
+   masthead keeps the 12 px of padding and 16 px of margin that `/knobs/` was
+   called correct with, and the `How it works` heading keeps the 14 px that
+   holds it against its picture. Nothing else on a page gets to have an
+   opinion. */
+.pos-stack > :not(:last-child):not(.pos-head):not(.pos-how) { margin-bottom: var(--pos-gap); }
+.pos-stack > :not(:first-child) { margin-top: 0; }
 /* 🔴 A BLOCK WITH NOTHING IN IT TAKES NO GAP. This is the `/typist/` band in a
    third costume: an empty `.pos-readout` painted its own two borders as a
    2 px full-width rule nobody wrote, and an empty `.pos-controls` left a band
@@ -483,8 +495,8 @@ button.pos-pri[data-busy="1"] {
    🔴 WHAT SEPARATES THE TWO HALVES IS 1 px OF `--line`, AND THAT IS NOT A
    DIVIDER. The standing rule is that separation is spacing, and that a line is
    a second channel saying what the spacing already said — and it is a rule
-   about the gap BETWEEN surfaces, which is the 22 px rhythm at
-   `.pos-body > * + *`. Inside ONE surface there is no rhythm to repeat: the
+   about the gap BETWEEN surfaces, which is the rhythm `.pos-stack` owns.
+   Inside ONE surface there is no rhythm to repeat: the
    readout is already a mosaic of cells on a line-coloured ground, with exactly
    1 px of `--line` showing through between every pair of them. The log joins
    that mosaic as one more tile, so the seam above it is the SAME seam the
@@ -541,12 +553,18 @@ button.pos-pri[data-busy="1"] {
    lattice did not exist. The scrub was the only flexible child, so it collapsed
    to its 40 px minimum: a seek control you cannot seek with. Wrapping needs no
    media query — the scrub's flex-basis decides when there is no longer room. */
-/* ⚠️ NO MARGIN OF ITS OWN — the rhythm at `.pos-body > * + *` owns the gap.
+/* ⚠️ NO MARGIN OF ITS OWN — `.pos-stack` owns the gap, on both sides of it.
    This carried `margin: 0 0 8px`, and the shorthand's `margin-top: 0` BEAT the
    rhythm rule: same specificity (0,1,0), later in the file, so source order
    decided it. MEASURED on /click/, the four gaps down the page read
    0 · 22 · 4 · 22 px — reported as "you are not respecting vertical spacing.
-   again", and it was the shell doing it, on every page with a transport bar. */
+   again", and it was the shell doing it, on every page with a transport bar.
+   ⚠️ A BAR THAT PUT ITS MARGIN BACK COULD NOT DO THAT ANY MORE, which is the
+   point of the stack rule being (0,2,0) and (0,4,0): the same shorthand on
+   `.kbd` was still winning on `/keys/` in 2026-09-16 and measured 0.0 px
+   between the bar and the keyboard. Specificity closed it for every component
+   at once. The line here stays because a margin nothing can see is still a
+   line nobody should have to reason about. */
 /* 🔴 ONE ROW, SO EVERY BAR IN THE PROJECT IS THE SAME HEIGHT. It wrapped, and
    what wrapped was whichever member happened not to fit — so `tapes` had two
    rows, `replay` had one, and two pages side by side disagreed about how tall a
@@ -1840,12 +1858,13 @@ video[hidden] { display: none; }
    that survives greyscale for exactly as long as the pointer is over it.      */
 
 /* The standing heading over a page's own explanation — see diagram.mjs's HOW.
-   ⚠️ It carries NO margin of its own: `.pos-body > * + *` owns the gap between
-   siblings, and an element with both gets the two added together. */
-/* 🔴 THE GAP UNDER A DIAGRAM'S HEADING IS THE HEADING'S, BECAUSE THE SHELL'S
-   RHYTHM CANNOT REACH IT. `.pos-body > * + *` gives 22 px between siblings and
-   would have covered this — except `.pos-dg` sets `margin: 0 0 14px`, which
-   zeroes its own top and, at equal specificity and later in the file, wins. So
+   🔴 THE GAP UNDER A DIAGRAM'S HEADING IS THE HEADING'S, AND IT IS ONE OF THE
+   TWO THINGS `.pos-stack` EXCLUDES BY NAME. A heading belongs to what follows
+   it, so the 14 px below is a claim about this pair rather than about the
+   page's rhythm, and the stack leaves this element's `margin-bottom` alone for
+   exactly that reason. It was found the hard way: `.pos-dg` sets
+   `margin: 0 0 14px`, which zeroes its own top and, at equal specificity and
+   later in the file, used to win over the rhythm. So
    the heading sat about nine pixels off the box: close enough to read as a
    label stuck to it rather than a title over it. ⚠️ THIS IS THE `margin` HALF
    OF THE RULE THE SHELL AVOIDS ON PURPOSE — a gap written on one of the two
@@ -1885,16 +1904,11 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
    against `/radio/`, which uses the standing heading and therefore looked
    right. 44 in both cases, declared in one place. */
 .pos-body > .pos-dg { margin-top: 44px; }
-/* 🔴 THE HEADING AND ITS PICTURE ARE ONE PAIR, AND THE DISTANCE IS STATED ON
-   THE PICTURE. Both of them are blocks of a `.pos-stack` now — the standing
-   heading and the figure sit on `document.body` when a diagram is `atEnd`, and
-   in `.pos-body` when it is not — so `.pos-how`'s own `margin-bottom: 14px` is
-   zeroed by the stack like every other child's, and the 40 px gap would have
-   opened between a title and the thing it names. This is the ONE distance on a
-   demo page that is a claim about two adjacent elements rather than about the
-   page's rhythm, which is why it is allowed to be typed. (0,2,0) and after the
-   rule above, so it holds in both placements. */
-.pos-how + .pos-dg { margin-top: 14px; }
+/* ⚠️ AND `.pos-how` KEEPS ITS OWN `margin-bottom` FOR EXACTLY THIS PAIR. It is
+   one of the two elements the stack rule excludes: a heading belongs to what
+   follows it, so the 14 px above is the heading's claim about its own picture
+   rather than the page's rhythm. Without the exclusion the stack would have put
+   the full gap between a title and the thing it names. */
 .pos-dg-t[hidden] { display: none; }
 /* `display: block` because an inline svg sits on a text baseline and leaves a
    few pixels of descender space under it, which reads as a caption that has
@@ -2234,10 +2248,28 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    paints its own `--fg` edge and the mismatch is the point.
    The fix is to state it once for BOTH segments rather than to nudge one of
    them toward the other: whatever the idle edge is, both halves wear it, and
-   only a segment that is armed or running overrides it below. */
-.tbar-loopgrp > .tbar-x,
-.tbar-loopgrp > .tbar-loop,
-.tbar-loopgrp > .tbar-slot { border-color: var(--dim2); }
+   only a segment that is armed or running overrides it below.
+
+   🔴 AND THE FOURTH REPORT SAID THE PAIR WAS MATCHED TO EACH OTHER AND TO
+   NOTHING ELSE, SO THE DECLARATION IS GONE. Photographed 2026-09-16 with the
+   rate group beside it: *"global: loop buton borders as rest of button"*.
+   MEASURED on `/draw/` before anything was changed — loop pair
+   **rgb(106, 114, 128)**, which is `--dim2`, against **rgb(43, 53, 70)** for
+   every rate button and every ordinary button on the page, which is `--line2`.
+   The rule above was right about ONE thing (say it once for both) and wrong
+   about the value: `--dim2` is text grey, it is two and a half times lighter
+   than a button edge, and the pair read as a different kind of control sitting
+   in a row of buttons.
+   ⚠️ SO THERE IS NO RULE HERE ANY MORE, AND THAT IS THE REPAIR RATHER THAN A
+   GAP. Both halves are `<button>`, and `button { border: 1px solid var(--line2) }`
+   at the top of this file already states the idle edge ONCE for BOTH of them —
+   and for the rate group, and for everything else. Re-stating a colour here
+   would be a second place for the same fact to be written, which is how the
+   pair drifted away from the bar in the first place.
+   ⚠️ THE STATES BELOW ARE UNTOUCHED AND ARE THE POINT OF THE ARRANGEMENT: a
+   loop that is ARMED or RUNNING overrides its own edge, and the rate group's
+   armed member keeps its yellow outline. Idle is the only state the two halves
+   are asked to share. */
 /* 🔴 AND A DISABLED SEGMENT KEEPS THE EDGE. IT FADES ITS INK AND NOTHING ELSE.
    PHOTOGRAPHED A THIRD TIME, 2026-09-16: *"borders are different colors. do
    not."*, on a pair whose CSS plainly gave both halves `--dim2`. The rule was

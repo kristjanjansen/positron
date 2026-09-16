@@ -97,9 +97,10 @@
   .two > div { min-width: 0; }
   .two h4 { margin: 0 0 6px; font: 600 10px/1 var(--mono); letter-spacing: .1em;
             text-transform: uppercase; color: var(--dim2); }
-  /* ⚠️ NO `margin` HERE. Setting even `margin: 0` overrides the shell's
-     `.pos-body > * + *` on source order and collapses the gap above this
-     block — which is how this page ended up with 0 · 22 · 4 · 22 px down it. */
+  /* ⚠️ NO `margin` HERE. Setting even `margin: 0` used to override the shell's
+     rhythm on source order and collapse the gap above this block, which is how
+     this page ended up with 0 · 22 · 4 · 22 px down it. `.pos-stack` outweighs
+     a single class now, so it would no longer show; the habit stands. */
   .sc { max-height: calc(12 * 1.75em + 22px); overflow: auto;
         font: 400 11px/1.75 var(--mono); background: var(--card);
         border: 1px solid var(--line); border-radius: 4px; padding: 10px 0; }

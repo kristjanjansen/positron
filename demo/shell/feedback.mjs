@@ -198,8 +198,8 @@ export async function sendNote({ slug = '', text = '', name = '', tries = 8 } = 
  * looking at it may change how much room it takes — a panel unfolding under the
  * title would push a canvas, a readout, a transport bar and a log down the page
  * every time it opened. And the shell's vertical rhythm lives on
- * `.pos-body > * + *`, so anything dropped inside the page would take a 22 px
- * gap it has no business taking. Fixed and outside, the page does not move.
+ * `.pos-stack`, so anything dropped inside the page would take the project's
+ * one gap, which it has no business taking. Fixed and outside, nothing moves.
  */
 export function openFeedback(d, { slug = '' } = {}) {
   let ui = document.querySelector('.pos-fb');
