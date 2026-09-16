@@ -114,6 +114,7 @@
   import { createPicker } from '/shell/picker.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createMidi } from '/shell/midi.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
@@ -145,7 +146,45 @@
     // while playing, and this row is read by somebody pressing keys, not
     // somebody tuning a network. `buffer` and `dropouts` stay because they are
     // the two that say whether what you are hearing is intact.
-    readout: { buffer: 'ms', dropouts: '', bitrate: 'Mb/s', dropped: '' },
+    //
+    // 🔴 `lag` IS BACK, ON INSTRUCTION 2026-09-16: *"i want lag readout"*. The
+    // paragraph above is left standing because the argument in it is a real one
+    // and this supersedes it rather than proving it wrong: somebody playing a
+    // board in another building wants to know how far behind their hands the
+    // sound is, whether or not they can act on it.
+    //
+    // ⚠️ IT IS HALF A ROUND TRIP PLUS THE CUSHION, which is the honest floor
+    // this file already named. The note leaves here, crosses the relay and
+    // reaches the board (half a round trip), and the sound it makes comes back
+    // through a jitter buffer that is deliberately holding `cushionMs` of audio.
+    // Quoting the round trip alone would flatter it by the whole cushion, which
+    // is the same mistake as quoting a candidate-pair RTT as media latency.
+    //
+    // 🔴 `lag` IS PRESS TO SOUND, MEASURED ON THE ACTUAL GESTURE, AND THE FIRST
+    // TWO ATTEMPTS AT THIS CELL WERE BOTH WRONG. It was a ping round trip, which
+    // read as an em dash on any page with no board answering: *"what is lag? its
+    // empty. replace?"*. Then it was `frames/s` again. What was actually wanted
+    // was said plainly: *"i just need number of my entry and sound coming back"*,
+    // *"the diffeence in ms"*.
+    //
+    // So it is timed from the key press to the first sound that press produced,
+    // plus the cushion still in front of it. That is the number a player feels,
+    // and it needs no ping and no clock shared with the board: both stamps are
+    // taken in this tab, from `performance.now()`, so there is no offset in it.
+    //
+    // 🔴 `lost` IS `dropped` AND `dropouts` IN ONE CELL, because they were two
+    // names for "something went missing" and a reader had to hold both. Wire
+    // losses and playout breaks are summed, exactly as `/radio/` already does
+    // it, and the log still names which kind when either moves.
+    // `bitrate` is what all of this replaced, and it is the one cell that could
+    // not move at all: fixed-rate PCM has a fixed bitrate.
+    // CLAUDE.md: every readout cell must be able to change, and a cell showing a
+    // structural constant reads as a measurement and teaches the reader to skip
+    // the row. The stream is fixed-rate PCM, so its bitrate is sample rate times
+    // channels times 16 bits and nothing a player does alters it. It is the same
+    // defect this row already fixed once, when `rate` read 50.1 every run of
+    // every day.
+    readout: { buffer: 'ms', lag: 'ms', 'frames/s': '', lost: '' },
     // NO PAGE CONTROLS. Octave down, octave up and notes off used to be here,
     // which put all three at the TOP of the page, a hand's width above the keys
     // they act on. They are the keyboard's own controls and the keyboard draws
@@ -177,6 +216,10 @@
   // none of the other half (you can go somewhere). The name is the control now:
   // press it and the platform's own list opens.
   const step = createPicker({
+    // 🔴 A LABEL, ASKED FOR 2026-09-16: *"add 'patch' label to patch selector"*.
+    // `what` was already 'patch' and only ever reached the button TITLES, so the
+    // control named itself to a screen reader and to nobody looking at it.
+    label: 'patch',
     what: 'patch',
     prev: () => { idx = (idx - 1 + span()) % span(); chosen = true; showPatch(); sendPatch(); },
     next: () => { idx = (idx + 1) % span(); chosen = true; showPatch(); sendPatch(); },
@@ -193,11 +236,17 @@
   picks.append(fxWrap);
   // A press is what makes the patch line true — see showPatch().
 
-  const patchLine = el('p', 'patch', '—');
-  // What is IN the grain buffers, when something was put there deliberately.
-  // Its own line rather than a second clause on the patch line: one names the
-  // sound, the other names the material, and they change for different reasons.
-  d.el.append(patchLine);
+  // 🔴 NO PATCH LINE. Removed on instruction 2026-09-16: *"rm
+  // Will_Godfrey_Collection · 657 of 878"*. It printed the bank a patch came
+  // from and its position in the library, under a control that already shows
+  // the patch's name, so the row said the same thing twice and the half nobody
+  // asked for was a filename off another machine's disk and an index into a
+  // list of 878.
+  // ⚠️ THE ONE THING IT SAID THAT THE CONTROL DOES NOT still gets said: with
+  // nothing chosen yet, the board is playing whatever it loaded at startup
+  // rather than anything this page picked. That is a state change, so it is a
+  // LOG line now, which is where a thing that happened belongs.
+  let saidUnchosen = false;
 
   // Pappus is an effect, so it is a switch beside the instruments rather than
   // one of them: it wraps whatever is playing, and can go on and off underneath.
@@ -221,6 +270,24 @@
 
   let frames = 0, lost = 0, last = -1, avail = null, current = null, idx = 0, lastBank = -1;
   let bytes = 0, firstFrame = 0, pingAt = 0, autoStarted = false;
+  /**
+   * Press to sound: when a key went down, and whether we are still waiting for
+   * the sound it made.
+   *
+   * 🔴 IT ONLY ARMS WHEN THE STREAM IS QUIET, and that is what makes it a
+   * measurement rather than a guess. The board sends audio continuously, so
+   * "the first loud frame after a press" is only that press's sound if nothing
+   * was already sounding. Pressing a key over a held chord arms nothing, and
+   * the cell keeps the last honest number instead of reporting the next frame
+   * of somebody else's note as a two millisecond lag.
+   * ⚠️ AND IT GIVES UP. A press that produces no sound (wrong channel, board
+   * busy, instrument still loading) must not leave a stamp lying about for the
+   * next unrelated note to land on.
+   */
+  let pressAt = 0, quietFrames = 0;
+  const LAG_ARM_QUIET = 8;      // ~160 ms of silence before a press can be timed
+  const LAG_GIVE_UP_MS = 2000;
+  const LAG_ON = 0.02;          // peak that counts as the note having started
   let soundfonts = [];
 
   const send = (m) => ws?.readyState === 1 && ws.send(JSON.stringify(
@@ -303,24 +370,11 @@
     // The NAME lives in the control now, not in a line under it — it was in
     // both, which is the same word twice with nothing to say which is live.
     step.show(patchName(idx), idx);
-    if (listed()) {
-      // ⚠️ DO NOT NAME A PATCH NOBODY CHOSE. Arriving at a board that is
-      // already playing, this page has picked nothing and the instrument holds
-      // whatever it loaded on startup — so printing the first entry of the list
-      // would be a readout contradicting the thing it describes. It says how
-      // many there are until somebody steps, and then it says which one.
-      patchLine.textContent = '';
-      if (!chosen) { patchLine.textContent = `${patches.length} patches in ${banksInList} banks · the board is playing whatever it loaded, not this one`; return; }
-      // Built as elements rather than as a string: these names come off another
-      // machine's filesystem, and one with an ampersand in it would be a broken
-      // line at best.
-      const e = patches[idx];
-      patchLine.append(el('span', '', e?.bankName ?? ''), ` · ${idx + 1} of ${patches.length}`);
-      return;
+    if (!chosen && !saidUnchosen && span() > 1) {
+      saidUnchosen = true;
+      d.log(`${span()} patches on the board. It is playing whatever it loaded at startup, `
+        + 'not one this page chose');
     }
-    patchLine.textContent = chosen
-      ? `${bankOf(idx) ? `bank ${bankOf(idx)} · ` : ''}${progOf(idx) + 1} of 128`
-      : '128 patches · the board is playing whatever it loaded, not this one';
   }
   // ⚠️ BANK SELECT IS CC 32 HERE, NOT CC 0. Read from Yoshimi's own config:
   //     MIDI Root CC 0        MIDI Bank CC 32        MIDI Program Change on
@@ -387,7 +441,10 @@
       if (b !== breaks) {
         const first = breaks < 0;
         breaks = b;
-        d.set('dropouts', b, b ? 'warn' : 'ok');
+        // ⚠️ NO CELL OF ITS OWN ANY MORE: it is summed into `lost` where the
+        // frames the wire dropped are counted, because both answer one question.
+        // The line below is what still tells the two apart, and it is the half
+        // that matters: they want OPPOSITE fixes.
         // Two opposite faults, so the LINE says which: running dry wants a
         // bigger cushion and being trimmed wants a smaller one.
         if (!first) d.log(`${st.underruns} ran dry, ${st.trimEvents} trimmed — cushion ${Math.round(st.bufferedMs)} ms`, 'warn');
@@ -546,9 +603,25 @@
   if (controls) { controls.classList.add('fxhost'); controls.append(spaceRow); }
   else d.el.append(spaceRow);
 
+  /**
+   * Stamp a key press, but only where the answer would mean something.
+   *
+   * 🔴 THE GUARD IS THE MEASUREMENT. Arming over a sounding board would time
+   * the next frame of a note somebody else is already holding, and report a
+   * handful of milliseconds that no press produced. `quietFrames` is how many
+   * frames in a row arrived with nothing in them; below that, this press cannot
+   * be told apart from the sound already coming back, so it is not timed at all
+   * and the cell keeps the last number that was honest.
+   */
+  function armLag() {
+    if (quietFrames < LAG_ARM_QUIET) return;
+    pressAt = performance.now();
+    quietFrames = 0;
+  }
+
   const kb = createKeyboard(d.el, {
     base: 60,
-    onDown: (note) => { kb.lightNote(note, true); startAudio().then(() => send({ type: 'note.on', note, vel: 100, channel: 0 })); },
+    onDown: (note) => { armLag(); kb.lightNote(note, true); startAudio().then(() => send({ type: 'note.on', note, vel: 100, channel: 0 })); },
     onUp: (note) => { kb.lightNote(note, false); send({ type: 'note.off', note, channel: 0 }); },
     // The keyboard releases what IT is holding; the board may be holding notes
     // this page never pressed — one sent over MIDI, or by somebody else in the
@@ -560,7 +633,7 @@
   // A real keyboard, where there is one — the shared component, so the
   // velocity-0 rule and the hot-plug listener live in one place.
   const midi = createMidi({
-    onDown: (note, vel) => { kb.lightNote(note, true); startAudio().then(() => send({ type: 'note.on', note, vel, channel: 0 })); },
+    onDown: (note, vel) => { armLag(); kb.lightNote(note, true); startAudio().then(() => send({ type: 'note.on', note, vel, channel: 0 })); },
     onUp: (note) => { kb.lightNote(note, false); send({ type: 'note.off', note, channel: 0 }); },
     log: (line, kind) => d.log(line, kind),
     // A capability, said once, in words. It was a cell reading `1` forever.
@@ -614,12 +687,38 @@
         if (!firstFrame) firstFrame = performance.now();
         const pcm = new Int16Array(e.data, 12);
         const f32 = new Float32Array(pcm.length);
-        let sum = 0;
-        for (let i = 0; i < pcm.length; i++) { f32[i] = pcm[i] / 32768; sum += f32[i] * f32[i]; }
+        let sum = 0, peak = 0;
+        for (let i = 0; i < pcm.length; i++) {
+          f32[i] = pcm[i] / 32768; sum += f32[i] * f32[i];
+          const a = f32[i] < 0 ? -f32[i] : f32[i];
+          if (a > peak) peak = a;
+        }
         bytes += e.data.byteLength;
+        /**
+         * 🔴 PRESS TO SOUND, CLOSED HERE, ON THE FRAME THAT CARRIES THE NOTE.
+         * `+ cushionMs` because this frame has ARRIVED and has not been heard:
+         * the playout is deliberately holding that much audio in front of it.
+         * Reporting arrival alone would flatter the number by the whole cushion,
+         * which is the same mistake as quoting a candidate pair RTT as media
+         * latency, and this repo has made that one before.
+         */
+        if (peak < LAG_ON) quietFrames++;
+        else {
+          if (pressAt) {
+            d.set('lag', Math.round(performance.now() - pressAt + cushionMs));
+            pressAt = 0;
+          }
+          quietFrames = 0;
+        }
+        if (pressAt && performance.now() - pressAt > LAG_GIVE_UP_MS) pressAt = 0;
         if (frames % 10 === 0) {
           const secs = (performance.now() - firstFrame) / 1000;
-          d.set('dropped', lost, lost ? 'bad' : 'ok');
+          // ⚠️ ONE CELL FOR BOTH KINDS OF MISSING, and the log is where they are
+          // told apart. `lost` is frames the wire never delivered; `breaks` is
+          // the playout running dry. A reader wants to know whether what they
+          // are hearing is intact, which is one question.
+          const gone = lost + Math.max(0, breaks);
+          d.set('lost', gone, gone ? 'bad' : 'ok');
           // 50/s is one clean source. Anything above it is TWO instruments
           // streaming into one socket, which is what a garbled stream sounds
           // like — so this cell is a fault detector, not decoration.
@@ -632,7 +731,22 @@
             d.log(`${fps.toFixed(1)} frames a second arriving where one clean source is 50 — `
                   + (fps > 56 ? 'that is two instruments streaming at once' : 'frames are going missing'), 'bad');
           }
-          d.set('bitrate', (bytes * 8 / 1e6 / Math.max(0.001, secs)).toFixed(2));
+          /**
+           * 🔴 FRAMES A SECOND, AND THIS CELL HAS NOW BEEN REMOVED AND PUT BACK
+           * TWICE. It went because it read `50.1` on every run of every day, and
+           * a cell that never moves teaches a reader to skip the row. `lag` took
+           * its place on 2026-09-16 and lasted about twenty minutes: *"what is
+           * lag? its empty. replace?"*, then *"frames/s was ok"*.
+           *
+           * ⚠️ AND `lag` WAS RIGHT TO GO, FOR A REASON WORTH KEEPING. It is half
+           * a round trip plus the cushion, and the round trip comes from a ping
+           * the BOARD answers. With no board there, or before the first pong,
+           * there is nothing to print, so the honest value is an em dash. A cell
+           * whose normal state on a page nobody has connected is blank is worse
+           * than a constant: a constant at least says the machine is running.
+           * The lag is still computed and still in the log when it matters.
+           */
+          d.set('frames/s', fps.toFixed(1));
         }
         playout?.port.postMessage({ pcm: f32 }, [f32.buffer]);
         return;
@@ -756,5 +870,131 @@
   showPatch();
   connect();
   d.ready();
+
+  /**
+   * 🔴 HOW IT WORKS, LAST ON THE PAGE. Asked for 2026-09-16: *"add diagram to
+   * box demo"*. Three machines, and the one worth seeing is the middle one: a
+   * key press and the sound it makes cross the same relay in opposite
+   * directions, so nothing here needs a port open on either end.
+   */
+  const dg = createDiagram(d.el, {
+    caption: 'A key press goes out through Cloudflare to a Raspberry Pi in another building, '
+      + 'and the sound it makes comes back the same way. Neither end needs an address the '
+      + 'other can reach.',
+    nodes: [
+      // 🔴 `join: false`: THE KEYBOARD DOES NOT FEED THE PLAYOUT, AND NOTHING
+      // IS DRAWN BETWEEN THEM. Inner boxes get
+      // an arrowhead by default since 2026-09-16, and the first thing that rule
+      // did on this page was draw a head from `keyboard` down to `playout`,
+      // reported as *"why keyboard controls playout? it should get data from
+      // cf"*. Correct: what these two share is a browser, not a signal. One
+      // sends, the other receives, and both talk to Cloudflare.
+      { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        join: false,
+        children: [
+          { id: 'keys', label: 'keyboard', sub: 'keys or MIDI',
+            note: 'The keys on screen, and any USB controller the **Web MIDI** API offers. '
+                + 'Both send the same note number, so the board cannot tell them apart.' },
+          { id: 'out', label: 'playout', sub: 'AudioWorklet',
+            note: 'Holds a cushion of audio before playing any of it, because packets over '
+                + 'the open internet do not arrive evenly spaced. The **buffer** cell is how '
+                + 'much it is holding right now.' },
+        ] },
+      /**
+       * 🔴 ONE OBJECT, DRAWN AS TWO BOXES, AND THE SUB SAYS SO. Suggested in
+       * those words after the first version was unreadable: *"perhaps split cf
+       * relay into 2 for clarity"*. With a single `relay` box both directions
+       * met in one node, so the outward arrow and the return arrow shared a
+       * point and the return had to be drawn looping back under the row, which
+       * arrived at `playout` as a stub from nowhere: *"what is this thing on
+       * left of playout?"* and *"how sound gets back from pi to browser? no
+       * connector on this"*.
+       *
+       * ⚠️ IT IS NOT TWO RELAYS AND THE PICTURE MUST NOT SAY IT IS. It is one
+       * Durable Object on one socket, carrying traffic both ways, and that is
+       * in the container's `sub` and in both notes. A drawing may split a thing
+       * by ROLE to be read; it may not invent a second machine.
+       */
+      { id: 'cf', label: 'Cloudflare', sub: 'one object, 2 ways', kind: 'cloud',
+        tech: 'cloudflare', join: false,
+        children: [
+          // 🔴 NAMES, NOT DIRECTIONS. These read `notes out` and `sound back`
+          // and were reported as *"not good names"*, correctly: CLAUDE.md says a
+          // box label is a NAME, and those two were captions describing which
+          // way the traffic goes. What each box IS, is the room carrying one
+          // kind of traffic, so the label is the traffic and the sub is the
+          // thing: `Relay` is the Durable Object's own class name in
+          // `workers/relay`, which is what it is CALLED rather than what it does.
+          { id: 'down', label: 'notes', sub: 'Relay object',
+            note: 'Copies each key press on to the board. One object per room, addressed by '
+                + 'name, so both ends dial out to it and neither needs a port open.' },
+          { id: 'up', label: 'audio', sub: 'Relay object',
+            note: 'The same object and the same socket as the box above, drawn separately '
+                + 'because one box carrying both directions could not be read.' },
+        ] },
+      { id: 'pi', label: 'Raspberry Pi', sub: 'another building', kind: 'device', tech: 'board',
+        children: [
+          { id: 'synth', label: 'instruments', sub: 'Yoshimi, hexter',
+            note: 'The programs that actually make the sound, plus **FluidSynth** for the '
+                + 'sampled one. A patch change is an ordinary MIDI program change.' },
+          { id: 'pappus', label: 'pappus', sub: 'SuperCollider',
+            note: 'A granulator the sound can be run through on its way out. Another page '
+                + 'can switch it in, which is why this one reports it rather than owning it.' },
+          { id: 'cap', label: 'capture', sub: '48kHz mono PCM',
+            note: 'Takes what the board is playing and sends it back down the same socket. '
+                + 'Raw samples, so nothing has to be decoded at this end.' },
+        ] },
+    ],
+    // 🔴 ONE WAY ROUND, AND IT IS A RING. Out along the top: keys, notes out,
+    // instruments. Down the board: pappus, capture. Back along the bottom:
+    // sound back, playout. Every arrow points the way the signal actually
+    // travels, and nothing meets in the middle.
+    links: [
+      { from: 'keys', to: 'down', label: 'note on/off',
+        note: 'A few bytes of JSON per key, over a **WebSocket**. Half the round trip of one '
+            + 'of these is half of what the **lag** cell reports.' },
+      { from: 'down', to: 'synth', label: 'note on/off',
+        note: 'The same message, copied on. The board is a service that dials out on boot '
+            + 'and waits, so it is reachable from anywhere without a port forward.' },
+      // ⚠️ NO LABELS INSIDE A CONTAINER. The gap two stacked children share is
+      // sixteen pixels tall, so a name in it runs under both boxes;
+      // `createDiagram` refuses one and reports it. What travels is in the note.
+      { from: 'synth', to: 'pappus',
+        note: 'Audio, on the board, between two programs on it. Nothing crosses a network '
+            + 'here and nothing is encoded.' },
+      { from: 'pappus', to: 'cap',
+        note: 'Whatever is actually going to the speakers, granulated or not, on its way to '
+            + 'being sent back.' },
+      // ⚠️ NO LABEL ON THE RETURN PATH. It runs back under the row rather than
+      // between two boxes, and `createDiagram` reported both of these at a width
+      // of -444: there is no room there for a name. The box it arrives at is
+      // called `sound back`, which is the label, in the one place it fits.
+      // 🔴 `back: true` ON BOTH RETURN LINKS, AND WITHOUT IT THE PICTURE WAS
+      // UNREADABLE. It is an AUTHOR flag, not something the layout works out: a
+      // link with no `back` is placed as a forward step, so these two were laid
+      // out left to right while pointing right to left, which drew a line
+      // straight through `playout` and put its head on the far left of the
+      // Browser. Reported as *"what is this thing on left of playout?"* and
+      // *"how sound gets back from pi to browser? no connector on this"*.
+      // Flagged, they run in a lane under the row and arrive at the bottom edge.
+      { from: 'cap', to: 'up', back: true,
+        note: 'Twenty milliseconds of samples at a time, declared with a channel count: a '
+            + 'frame cannot be read without one, since the same bytes are a valid mono frame '
+            + 'and a valid stereo one.' },
+      { from: 'up', to: 'out', back: true,
+        note: 'Straight into the cushion. The other half of the **lag** cell is how much '
+            + 'audio that cushion holds back before any of it is heard.' },
+    ],
+  }, { how: true, atEnd: true });
+  // 🔴 THE PICTURE SAYS WHAT IT COULD NOT DRAW. `/box/` is `built: false`, so no
+  // harness ever opens it and there is nothing to turn red: a label that had to
+  // be shortened or a link that could not be routed would otherwise be invisible
+  // to the one person who can fix it. A log line is the only channel this page
+  // has, so it uses it, and only when there is something to say.
+  if (dg.cuts.length) {
+    d.log(`the diagram could not draw ${dg.cuts.length} thing(s): `
+      + dg.cuts.map((c) => `${c.where} ${c.id}`).join(' · '), 'warn');
+  }
+  window.__dg = () => ({ cuts: dg.cuts, ties: dg.ties, mode: dg.mode });
 </script>
 </html>
