@@ -38,7 +38,7 @@
 // file's whole subject is not dressing one of those up as a fact.
 
 /** The four, most-present first. The order is the one the kit shows them in. */
-export const PRESENCE_STATES = ['online', 'coming', 'offline', 'unknown'];
+export const PRESENCE_STATES = ['online', 'checking', 'coming', 'offline', 'unknown'];
 
 /**
  * What a visitor reads. Plain words, no jargon, and none of them is a
@@ -48,6 +48,22 @@ export const PRESENCE_STATES = ['online', 'coming', 'offline', 'unknown'];
  */
 export const SAYS = {
   online: 'online',
+  /**
+   * 🔴 `checking` IS NOT `coming online`, AND THE DIFFERENCE IS WHAT WE KNOW.
+   * Instructed 2026-09-16: *"its not 'coming online', it is likely online we
+   * just check it"*. A page that has just opened is asking a question about a
+   * thing that was probably there all along; a page showing `coming` is saying
+   * the thing is on its way up, which is a claim nobody has made yet.
+   *
+   * So the badge reads on two axes. COLOUR says what is known: green for a
+   * thing that spoke, grey for a thing that has not. MOTION says something is
+   * happening: a question is out, or an instrument is starting. Grey and moving
+   * is us; green and moving is it.
+   * ⚠️ IT EXISTS BECAUSE THE STILL ALTERNATIVE LIES BY OMISSION. Asking takes
+   * 300 ms when the board answers and about six seconds when it does not, and
+   * six seconds of a motionless dot reads as a page that has stopped.
+   */
+  checking: 'checking',
   coming: 'coming online',
   offline: 'offline',
   // ⚠️ `unknown`, NOT `no word yet`. Instructed 2026-09-16 with a screenshot:
@@ -256,16 +272,55 @@ export function createPresence({
 
   let now = null, note = null;
   let timer = null, f = null;
+  // A question is out. It outranks a derived `unknown` and nothing else: the
+  // moment anything actually answers, what it said is the better fact.
+  let asking = false;
 
   function title() {
     const base = of ? `${of} · ${words[now]}` : words[now];
     return note ? `${base} · ${note}` : base;
   }
 
+  /**
+   * 🔴 THE WORD CHANGES BY FADING THROUGH, AND THE REASONS ARE ALL ABOUT WHEN
+   * IT HAPPENS. Asked 2026-09-16: *"how to animate online status srtings when
+   * they change?"*.
+   *
+   * A state change is an EVENT, not a clock: it happens when something actually
+   * happened, so unlike a live number this is allowed to move at all. What it
+   * may not do is any of the three things this repo has already been bitten by.
+   * It cannot change width, because the reserve holds the widest word this badge
+   * can say and the swap happens inside it. It cannot slide, because a slide
+   * needs room to slide through and this box has none. And it cannot be slow:
+   * 90 ms out, swap, 90 ms back is under a fifth of a second, which is enough to
+   * catch an eye that was elsewhere and too short to sit and watch.
+   *
+   * ⚠️ THE TEXT IS SWAPPED AT THE TROUGH, not at either end, so a reader never
+   * sees two words in the same place. It is one element rather than two crossing
+   * over, because two would need absolute positioning inside a reserve that is
+   * already doing that job.
+   * ⚠️ AND A SCREEN READER HEARS IT WITHOUT ANY OF THIS: the badge is a live
+   * region, so the word is announced on change whether or not it faded.
+   */
+  const WORD_FADE_MS = 90;
+  let fading = null;
+
   function paint() {
     root.dataset.state = now;
-    word.textContent = words[now];
     root.title = title();
+    const next = words[now];
+    if (word.textContent === next) return;
+    // First paint, or a browser that says no: swap it and say nothing more.
+    if (!word.textContent || matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+      word.textContent = next;
+      return;
+    }
+    clearTimeout(fading);
+    word.style.opacity = '0';
+    fading = setTimeout(() => {
+      word.textContent = next;
+      word.style.opacity = '';
+    }, WORD_FADE_MS);
   }
 
   function set(next, reason = null) {
@@ -283,7 +338,11 @@ export function createPresence({
   }
 
   function derive() {
-    set(presenceOf({ now: Date.now(), ...f }), f.why);
+    const d = presenceOf({ now: Date.now(), ...f });
+    // ⚠️ ONLY OVER `unknown`. Asking while the board is already answering would
+    // hide a live heartbeat behind a question nobody needs the answer to, and
+    // asking while it is KNOWN silent would erase a measurement that was taken.
+    set(asking && d === 'unknown' ? 'checking' : d, f.why);
   }
 
   const api = {
@@ -331,6 +390,13 @@ export function createPresence({
     },
 
     /** A deliberate start began, or ended without arriving. */
+    /** A question is out and no answer has come back. Grey, and moving. */
+    checking(on = true) {
+      asking = !!on;
+      derive();
+      return api;
+    },
+
     coming(on = true, at = Date.now()) {
       if (!f) throw new Error('presence: coming() needs follow() first.');
       f.comingSince = on ? at : null;

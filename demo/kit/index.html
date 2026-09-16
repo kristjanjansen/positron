@@ -1207,10 +1207,11 @@ green = inside what it promised · amber/red = later`,
     }
     presLive.set('online');
     const spread = Math.max(...w.map(([, x]) => x)) - Math.min(...w.map(([, x]) => x));
-    d.assert('one badge is the same width in all four of its states',
-      w.length === 4 && spread <= 0.5,
-      w.length === 4 ? `${w.map(([s, x]) => `${s} ${x.toFixed(1)}`).join(' · ')} px, spread ${spread.toFixed(2)}`
-                     : `${w.length} states were measured, so nothing was compared`);
+    d.assert('one badge is the same width in every state it can be in',
+      w.length === PRESENCE_STATES.length && spread <= 0.5,
+      w.length === PRESENCE_STATES.length
+        ? `${w.map(([s, x]) => `${s} ${x.toFixed(1)}`).join(' · ')} px, spread ${spread.toFixed(2)}`
+        : `${w.length} states were measured of ${PRESENCE_STATES.length}, so nothing was compared`);
   }
 
   // 8 — 🔴 AND THE ANIMATION CANNOT MOVE ANYTHING EITHER, which is a separate
@@ -1222,7 +1223,11 @@ green = inside what it promised · amber/red = later`,
   {
     const after = (s) => getComputedStyle(presSpec.get(s).querySelector('.pos-pres-dot'), '::after');
     const moving = PRESENCE_STATES.filter((s) => (after(s).animationName || 'none') !== 'none');
-    const name = moving.length === 1 ? after(moving[0]).animationName : null;
+    // Both moving states are meant to share ONE keyframe, so take the name only
+    // when they agree: two different animations here would be two ways of
+    // saying "something is happening", which is the drift this page exists for.
+    const names = new Set(moving.map((x) => after(x).animationName));
+    const name = names.size === 1 ? [...names][0] : null;
     // Every declaration in every keyframe of it, out of the one stylesheet.
     const props = new Set();
     for (const sheet of document.styleSheets) {
@@ -1234,8 +1239,16 @@ green = inside what it promised · amber/red = later`,
       }
     }
     const only = props.size > 0 && [...props].every((p) => p === 'opacity');
-    d.assert('only the state that is coming online animates, and it animates nothing but opacity',
-      moving.join(',') === 'coming' && only,
+    /**
+     * 🔴 THE TWO AXES, AS A CHECK. Colour says what is KNOWN and motion says
+     * something is HAPPENING, so exactly two states move: `checking`, which is
+     * this page asking, and `coming`, which is the instrument starting. The
+     * three settled ones are still. Both moving states share one keyframe, and
+     * that keyframe may touch nothing but opacity, or a breathing dot could
+     * shove its neighbour once every eighty frames.
+     */
+    d.assert('exactly the two unsettled states move, and they move nothing but opacity',
+      moving.join(',') === 'checking,coming' && only,
       `${moving.length ? moving.join(', ') : 'nothing'} moves · ${name || 'no keyframes'} touches `
       + `${props.size ? [...props].join(', ') : 'nothing this page can read'}`);
   }
@@ -1252,8 +1265,8 @@ green = inside what it promised · amber/red = later`,
         Math.round(Number(a.opacity)), a.animationName || 'none'].join(' ');
     };
     const inks = PRESENCE_STATES.map(ink);
-    d.assert('and the four are told apart by the dot alone, with the word covered up',
-      new Set(inks).size === 4,
+    d.assert('and the five are told apart by the dot alone, with the word covered up',
+      new Set(inks).size === PRESENCE_STATES.length,
       PRESENCE_STATES.map((s, i) => `${s}: ${inks[i]}`).join(' · '));
   }
 

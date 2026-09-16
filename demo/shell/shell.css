@@ -2133,6 +2133,9 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
      reserve above is unchanged. No letter-spacing, for the same reason the
      reserve exists. */
   text-transform: uppercase;
+  /* The fade the word changes through. 90 ms each way, opacity only: a state
+     change is an event and may move, and this box has no room to slide in. */
+  transition: opacity 90ms linear;
 }
 
 .pos-pres[data-state="online"]  { color: var(--ok); }
@@ -2151,6 +2154,18 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 /* grey, not green: the word is the half a reader takes at face value, so the
    only full-strength statement belongs to a thing that actually answered */
 .pos-pres[data-state="coming"]  .pos-pres-w { color: var(--dim); }
+
+/* 🔴 CHECKING: GREY, AND MOVING. The colour says what is known and the motion
+   says something is happening, so grey-and-moving is us asking and
+   green-and-moving is the instrument starting. The ring is the same grey as the
+   fill, for the reason the coming dot's ring is the same green as its. */
+.pos-pres[data-state="checking"] { color: var(--dim2); }
+.pos-pres[data-state="checking"] .pos-pres-dot { border-color: var(--dim2); }
+.pos-pres[data-state="checking"] .pos-pres-dot::after {
+  background: var(--dim2);
+  animation: pos-pres-breathe 1400ms ease-in-out infinite;
+}
+.pos-pres[data-state="checking"] .pos-pres-w { color: var(--dim); }
 
 .pos-pres[data-state="offline"] { color: var(--dim2); }
 .pos-pres[data-state="offline"] .pos-pres-w { color: var(--dim); }
