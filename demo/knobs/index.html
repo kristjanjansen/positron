@@ -21,6 +21,7 @@
   // on 2026-09-16 (archive/box-pappus/), and this page has never had one.
   import { mount, guard } from '/shell/shell.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createPresence } from '/shell/presence.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { makeCcSend, SEND_GATE_MS, RESTATE_MS } from '/shell/cc-adapter.mjs';
@@ -171,7 +172,9 @@
     onInput: (v) => move(RESO, v),
     onChange: (v) => land(RESO, v),
   });
-  d.el.append(createSliderGroup([cutoff, reso], { pair: true }).el);
+  // Named, because it is moved below the transport once that exists. See there.
+  const knobs = createSliderGroup([cutoff, reso], { pair: true });
+  d.el.append(knobs.el);
 
   // ── audio ─────────────────────────────────────────────────────────────────
   let ctx = null, playout = null;
@@ -355,6 +358,11 @@
         d.log(`the board says it sends ${chIn === 2 ? 'two channels' : 'one channel'} at ${m.frameMs} ms a frame`);
       }
     }
+    // ANY message from the board is proof it is there, not just the one this
+    // page happened to ask for. `box.alive` is the heartbeat the interval above
+    // is sized for, and an answer to a question counts just as much.
+    pres.seen();
+    pres.checking(false);
     if (m.type === 'audio.started') {
       boardAnswered = true;
       playing = m.ok ? m.source : null;
@@ -447,8 +455,28 @@
   // stops when it ends.
   const deck = createDeck({ items: [], adapters: {}, range: [0, 86400000] });
 
+  /**
+   * 🔴 THE BADGE REPLACES THE LIVE CHIP. Asked 2026-09-16: *"use online badge on
+   * knobs"*, *"on knobs: replace live"*.
+   *
+   * That slot held a chip whose one fact was that this source has no end, which
+   * is true and is not the fact somebody watching this page needs. The
+   * instrument is in another building and the question is whether it is
+   * answering. The two would be two claims about one source in one position, so
+   * the bar refuses both.
+   *
+   * ⚠️ `everyMs` IS THE BOARD'S OWN HEARTBEAT, 5 s, and the component throws
+   * without it rather than guessing: a shorter guess would call a working board
+   * gone between beats and send somebody to look at hardware that is fine.
+   * ⚠️ `comingMs` IS 45 s BECAUSE THAT IS HOW LONG YOSHIMI TAKES on a cold
+   * board, ten to forty seconds, measured on this one.
+   */
+  const pres = createPresence({ of: 'board' });
+  pres.follow({ everyMs: 5000, comingMs: 45000 });
+  pres.checking();          // a question is out before anything has answered
+
   const bar = createTransportBar(d.el, deck, {
-    live: true,          // a chip, not a clock: this source has no end
+    chip: pres.el,       // whether the board is answering, in the chip's place
     scrub: false,        // there is no position in a held note to seek to
     loop: false,         // asked for, and recording comes back as its own thing
     endStop: false,      // the note is held until somebody stops it
@@ -462,6 +490,14 @@
       seek: (pos) => deck.seek(pos),
     },
   });
+
+  // 🔴 THE SLIDERS SIT UNDER THE TRANSPORT. Asked 2026-09-16: *"put sliders
+  // below transport"*. They were built before the bar and so were drawn above
+  // it, which put the instrument's controls before the thing that starts it:
+  // you met two sliders that did nothing, and the reason they did nothing was
+  // further down the page. `append` MOVES a node already in the document, so
+  // this is a reordering rather than a second copy.
+  d.el.append(knobs.el);
 
   /**
    * One note, and the moment it started, because the audio check below cannot
@@ -718,9 +754,14 @@
     d.assert('the transport offers no position and no loop, because a held note has neither',
       !d.el.querySelector('.tbar-loop') && bar.el.dataset.scrub !== '1',
       `${d.el.querySelector('.tbar-loop') ? 'a LOOP button is on the bar' : 'no loop'} · scrub ${bar.el.dataset.scrub}`);
-    d.assert('the bar says this source has no end rather than counting down to one',
-      !!bar.el.querySelector('.tbar-live') && !bar.el.querySelector('.tbar-time'),
-      bar.el.querySelector('.tbar-live') ? 'LIVE, and no clock' : 'no LIVE chip');
+    // ⚠️ THIS READ THE `LIVE` CHIP UNTIL THE BADGE REPLACED IT. The claim has not
+    // weakened: there is still no clock, because a held note has no position to
+    // count towards, and the slot now carries the fact actually worth having.
+    d.assert('the bar carries the board\u2019s presence where a clock would be, and no clock',
+      !!bar.el.querySelector('.pos-pres') && !bar.el.querySelector('.tbar-time'),
+      bar.el.querySelector('.pos-pres')
+        ? `the badge reads "${bar.el.querySelector('.pos-pres-w')?.textContent || ''}", and there is no clock`
+        : 'no presence badge in the bar');
     d.assert('this page makes no sound of its own',
       !!ctx && !!playout, 'every sample it can play arrived over the socket');
 

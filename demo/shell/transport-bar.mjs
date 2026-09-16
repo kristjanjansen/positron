@@ -105,6 +105,15 @@ export function createTransportBar(host, deck, {
    * on this site means a drawn record rather than a recording.
    */
   loopWays = false,
+  /**
+   * 🔴 AN ELEMENT IN THE LIVE CHIP'S PLACE. `/knobs/` asked for it in those
+   * words: *"on knobs: replace live"*. That position holds the one fact about
+   * the source that is not a number, and on a page playing an instrument in
+   * another building the fact worth having there is whether the instrument is
+   * answering at all. A `LIVE` chip and a presence badge are two claims about
+   * one source in one slot, so the bar takes either and refuses both.
+   */
+  chip = null,
   // A LIVE DECK HAS NO END. The bar arms a one-shot at range[1] and, when it
   // fires, pauses the deck and parks the playhead there — right for a
   // recording, wrong for a window whose right-hand end is the present moment,
@@ -341,7 +350,11 @@ export function createTransportBar(host, deck, {
    */
   const loopPair = loopExtraEls.size && wantLoop ? el('div', 'tbar-loopgrp') : null;
   if (loopPair) loopPair.append(loopBtn, ...loopExtraEls.values());
-  bar.append(toggle, ...extraEls.values(), scrub, ...(live ? [liveChip] : [time]),
+  if (chip && live) {
+    throw new Error('createTransportBar: chip and live want the same position '
+      + '(pass live: false, the chip can say LIVE itself if that is the fact)');
+  }
+  bar.append(toggle, ...extraEls.values(), scrub, ...(chip ? [chip] : live ? [liveChip] : [time]),
     // the loop's position: whatever was put in the slot, or the loop itself
     ...(loopSlotEls.size ? [...loopSlotEls.values()]
       : loopPair ? [loopPair] : [...(wantLoop ? [loopBtn] : []), ...loopExtraEls.values()]),
