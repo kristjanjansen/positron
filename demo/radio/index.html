@@ -4482,7 +4482,12 @@
     // `applyPatch` writes all four again, and everything else besides.
     applyPatch(patch, { silent: true });
     setWet(wet);
-    scope.source('Pappus, chewing the radio');
+    // ⚠️ THE SCOPE'S LABEL IS NOT RE-SET HERE, ON INSTRUCTION 2026-09-16.
+    // It used to become 'Pappus, chewing the radio' the moment the granulator
+    // started. The wave in that canvas is fed from `srcNode` through `analyser`
+    // and is the station's own audio for the whole life of the page, so the
+    // label set at the top, 'the radio, as it arrives', stays true. Do not add
+    // a second name for the same picture.
 
     // ── the controls, and the ORDER is the argument ─────────────────────────
     // Picture, then the blend, then what the granulator is doing. The fader sits
