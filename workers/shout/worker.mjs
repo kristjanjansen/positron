@@ -44,20 +44,31 @@ const IDA = 'https://broadcast.idaidaida.net/listen';
 
 const STATIONS = {
   /**
-   * 🔴 `radio` IS REMOVED, ON REQUEST, 2026-09-15. Same report as IDA: the
-   * operator of the uuu.ee server found roughly 100 concurrent clients against
-   * their limit, traced to positron.studio. Ours.
+   * 🔴 RADIO 1965 IS BACK, 2026-09-16, ON INSTRUCTION AND ON THE SAME CONDITION
+   * AS IDA: *"bring back radio65 stream as last. we are single user
+   * connected?"*. The answer is yes, and it is read off the code below rather
+   * than remembered: `Mount` holds ONE upstream connection per station and
+   * copies it to every subscriber, so `upstreamConnections` is 1 however many
+   * people are listening. `GET /tee/radio1965` reports it.
    *
-   * ⚠️ THE LOAD WAS THE CHECKS, NOT THE VISITORS. Every `verify.mjs radio`
-   * and every `verify-gl.mjs videoradio` opens a live mount, and those were run
-   * dozens of times in one evening. A relay entry is a standing claim on
-   * somebody else's bandwidth and a harness that opens it is a claim made
-   * automatically, over and over, by nobody in particular.
+   * WHAT IT WAS REMOVED FOR, 2026-09-15: the operator of the uuu.ee server
+   * found roughly 100 concurrent clients against their limit, traced to
+   * positron.studio. Ours. THE LOAD WAS THE CHECKS, NOT THE VISITORS: every
+   * `verify.mjs radio` and every `verify-gl.mjs videoradio` opened a live mount,
+   * dozens of times in one evening. `demo/fake-station.mjs` ended that half of
+   * it: the suite now runs against a stand-in and opens nothing of anybody's.
    *
-   * ⚠️ DO NOT ADD IT BACK WITHOUT ASKING THEM. The recordings at `/rec/` are a
-   * different host and a different shape of request (one file, not a held
-   * connection) and are left alone.
+   * ⚠️ THE OPERATOR HAS NOT BEEN RE-ASKED, and that is worth saying rather than
+   * implying consent from a mechanism. What changed is the SIZE of the claim,
+   * not their permission.
+   * ⚠️ AND IT IS LAST IN THE PAGE'S LIST, which is the half that actually
+   * caused the damage: a page opens the first entry it finds, so being at the
+   * front is what put every visitor and every run on one volunteer's server.
+   * ⚠️ IT IS PLAIN HTTP ON PORT 8001 AND NEVER TLS. That is the whole reason
+   * this worker exists for this mount: a page on https cannot fetch it directly.
    */
+  // Estonian Centre of Contemporary Music's community station (uuu.ee).
+  radio1965: 'http://live.uuu.ee:8001/radio1965',
   // ERR's five public radio streams, 128 kbps MP3.
   vikerraadio: `${ERR}/vikerraadio.mp3`,
   raadio2: `${ERR}/raadio2.mp3`,
@@ -65,19 +76,33 @@ const STATIONS = {
   raadio4: `${ERR}/raadio4.mp3`,
   raadiotallinn: `${ERR}/raadiotallinn.mp3`,
   /**
-   * 🔴 IDA IS REMOVED, ON REQUEST FROM THE PEOPLE WHOSE SERVER IT IS.
-   * 2026-09-15: their operator reported roughly 100 concurrent clients, their
-   * limit, with the connections traced to positron.studio. That is us. These
-   * two mounts had been moved to the FRONT of the station list an hour before,
-   * which made them the default every visitor and every harness run opens, and
-   * at 320 kbit/s they are 2.5 times the weight of any other mount here.
+   * 🔴 IDA IS BACK, 2026-09-16, ON INSTRUCTION AND ON ONE CONDITION THE USER
+   * SET THEMSELVES: *"bring ida's back to radio (if single listener)"*.
    *
-   * ⚠️ DO NOT ADD THEM BACK WITHOUT ASKING THEM FIRST. The allowlist is the
-   * only thing that bounds this, and a station in it is a standing claim on
-   * somebody else's bandwidth. What made this expensive was not the relay, it
-   * was defaulting to it: one line reordering an array put every page on their
-   * server at once.
+   * WHAT IT WAS REMOVED FOR, 2026-09-15: their operator reported roughly 100
+   * concurrent clients against their limit, traced to positron.studio. That was
+   * us. Two mounts had been moved to the FRONT of the station list an hour
+   * before, which made them the default every visitor and every harness run
+   * opens, and at 320 kbit/s they are 2.5x the weight of any other mount here.
+   *
+   * WHAT CHANGED: `Mount` below. This worker opened a fresh `fetch(upstream)`
+   * per request when that happened, so a hundred browsers were a hundred
+   * clients at the broadcaster. It now holds ONE connection per mount in a
+   * Durable Object addressed by `idFromName(station)` and copies the bytes to
+   * every subscriber, so the number the operator counts is one however many
+   * people are listening, plus one per harness run that overlaps it.
+   * `GET /tee/ida-tallinn` reports `upstreamConnections`, and it must read 1.
+   *
+   * ⚠️ THE OPERATOR HAS NOT BEEN RE-ASKED. That is worth saying plainly rather
+   * than implying consent from a mechanism: what has changed is the size of the
+   * claim, not their permission. `hello@idaidaida.net` still costs one email,
+   * and this file already recommends it further down.
+   * ⚠️ AND THEY GO AT THE BACK OF THE LIST, WHICH IS THE OTHER HALF. The damage
+   * was caused by defaulting to them, not by carrying them: a page opens the
+   * first entry it finds. Nothing here may move them forward.
    */
+  'ida-tallinn': `${IDA}/tallinn/stream`,
+  'ida-helsinki': `${IDA}/helsinki/stream`,
 };
 
 // Everything a client needs to read about the stream, including the ICY fields
