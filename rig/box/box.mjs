@@ -24,7 +24,7 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          pappusFx, pappusAvailable, pappusPanic, stopPappus, sourceFeed,
          spaceFx, spaceSet, spaceClamp, spaceState, stopSpace } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
-import { openPappus, errSearch, errItem, errExcerpt, loadBuffers, errStatus, CHARACTER_NAMES } from './pappus.mjs';
+import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { readdirSync, statSync, realpathSync } from 'node:fs';
@@ -67,13 +67,16 @@ let fxOn = false;          // pappus inserted between the instrument and the cap
  * Raspberry Pi and until 2026-09-14 neither of them could see it happening.
  *
  * `/grains/` switches the granulator ON, because the granulator is its entire
- * subject. `/box/` switches it OFF on load, and that is right and stays right:
- * an insert left in by a `grains` tab that was simply CLOSED goes on wrapping
- * whatever `/box/` plays and feeds its own delay — MEASURED 2026-09-12, a
- * steady -6.1 dBFS subsonic drone while `box.alive` reported `voices: 0`.
+ * subject. `/box/` used to switch it OFF on load, so whichever page you opened
+ * last won, SILENTLY, and the other one went on drawing a picture that was no
+ * longer true.
  *
- * So whichever page you opened last won, SILENTLY, and the other one went on
- * drawing a picture that was no longer true. ⚠️ That is the worst shape there
+ * ⚠️ `/box/` SENDS NOTHING ABOUT THE INSERT SINCE 2026-09-16 and has no
+ * granulator on it at all. What its message was protecting against is real. An
+ * insert left in by a `grains` tab that was simply CLOSED goes on wrapping
+ * whatever the next page plays and feeds its own delay, MEASURED 2026-09-12 at
+ * a steady -6.1 dBFS subsonic drone while `box.alive` reported `voices: 0`.
+ * `sweepInsert()` below is where that guarantee lives now. ⚠️ That is the worst shape there
  * is, and it is the reason the first half of this is REPORTING rather than
  * arbitration: arbitration that hides a conflict converts a visible problem
  * into an invisible one. The board knows the truth about its own insert; the
@@ -99,7 +102,24 @@ let fxAsked = null;        // { by, at, on } — the last client to change it
  * tab is three messages inside this window and a closed one is zero.
  */
 const clientSeen = new Map();          // from -> ms
-const INSERT_HELD_MS = 15000;          // ~3 of `/grains/`'s 4 s polls
+/**
+ * How long a client may be silent before the board stops counting it as there.
+ *
+ * 🔴 CHECKED AGAINST `/grains/` RATHER THAN CHOSEN. That page has ONE
+ * `setInterval(…, 4000)` and the first thing in it is `hello()`, which sends
+ * `params.state` unconditionally whenever the socket is open. So a tab that is
+ * merely sitting there with nobody touching it is a message every 4 s. With
+ * the insert in it also re-sends `grain.report {on:true}` on the same tick, and
+ * `source.set` until the board has answered once. So a live tab is at least 3
+ * and usually 7 messages inside this window and a CLOSED one is exactly zero,
+ * which is the only difference this board can actually see.
+ *
+ * 15 s is 3.75 of those polls. One poll lost to the relay's own caps therefore
+ * costs nothing, and two do not either. ⚠️ The margin is what the number is
+ * FOR: a window of 4 or 5 s would be arithmetically enough and would drop the
+ * insert out from under a live page the first time a poll went missing.
+ */
+const INSERT_HELD_MS = 15000;          // 3.75 of `/grains/`'s 4 s polls
 const stillHere = (who) => !!who && (Date.now() - (clientSeen.get(who) ?? 0)) < INSERT_HELD_MS;
 /** What the box will say about its own insert, to anybody who asks or listens. */
 function insertState() {
@@ -111,15 +131,80 @@ function insertState() {
     fxHeld: fxOn && !!fxAsked?.on && stillHere(by),
   };
 }
+
+/**
+ * 🔴 THE BOARD CLEANS UP AFTER ITSELF, BECAUSE SINCE 2026-09-16 NOTHING ELSE
+ * DOES.
+ *
+ * `/box/` used to send `fx.pappus {on:false, onlyIfIdle:true}` on connect, and
+ * that one message was the whole guarantee: an insert left behind by a
+ * `/grains/` tab that was simply CLOSED goes on wrapping whatever the next page
+ * plays and feeds its own delay. MEASURED 2026-09-12, a steady -6.1 dBFS
+ * subsonic drone while `box.alive` reported `voices: 0`, true about notes and
+ * false about sound. The page has no granulator on it at all now, so it no
+ * longer sends that message, and a guarantee that depended on somebody opening
+ * a second page was never a guarantee anyway: nobody had to open one.
+ *
+ * ⚠️ AND THERE IS NO "A PEER LEFT" SIGNAL TO PREFER TO A TIMER. Looked for
+ * rather than assumed: `workers/relay/src/index.js` forwards every frame
+ * VERBATIM and never parses one, so the Durable Object does not know any
+ * client's `from`; its `webSocketClose()` is an empty method and emits nothing;
+ * and `openWire` in `demo/shell/wire.mjs` sends no farewell on unload. The
+ * relay's `/room/<name>/stats` does report a per-socket idle time, but the
+ * array is anonymous and sorted, so it cannot say WHICH socket stopped. Making
+ * the relay announce a departure means teaching it to read messages, which is
+ * the one thing that file refuses to do.
+ *
+ * So it is an idle rule, on the only evidence the board has: a client that is
+ * still there keeps talking. See `INSERT_HELD_MS` for where 15 s comes from.
+ *
+ * ⚠️ IT NEVER FIGHTS A LIVE PAGE. A granulator nobody is talking to is still
+ * one somebody is listening to, and `/grains/` polls every 4 s whether or not
+ * anyone touches it, so a page that is open and quiet is indistinguishable from
+ * one being played, which is correct.
+ */
+let sweeping = false;
+async function sweepInsert(why) {
+  if (!fxOn || sweeping) return null;
+  const by = fxAsked?.by ?? null;
+  if (stillHere(by)) return null;
+  const quietMs = by && clientSeen.has(by) ? Date.now() - clientSeen.get(by) : null;
+  sweeping = true;
+  try {
+    const r = await pappusFx(false, { instrumentPort: inst?.port, instrumentPortR: inst?.portR,
+                                      onLog: (l) => log('pappus:', l) });
+    if (!r.ok) { log(`the insert would not come out: ${r.reason}`); return null; }
+    // ⚠️ THE SAME THREE ASSIGNMENTS AS THE `fx.pappus` HANDLER'S OFF PATH, and
+    // they have to stay the same three. A sweep that cleared the patching and
+    // left `fxOn` true would put the insert straight back on the next
+    // instrument change, which is the failure wearing a new hat.
+    fxOn = false;
+    fxAsked = null;
+    madeSource = null;
+    log(`insert dropped: ${by ?? 'nobody'} ${quietMs === null ? 'never spoke' : `went quiet ${Math.round(quietMs / 1000)} s ago`}`
+      + `. the board waits ${INSERT_HELD_MS / 1000} s. ${why}`);
+    // 🔴 SAID ON THE HEARTBEAT, NOT ON A VERB OF ITS OWN. Every page in this
+    // room already reads `box.alive` for exactly this, because it carries
+    // `insertState()`, and a new message type would be a second authority on
+    // one fact. Sending the beat NOW rather than waiting up to 5 s for the next
+    // one is the whole difference.
+    send(alive());
+    return r;
+  } finally { sweeping = false; }
+}
+
 /**
  * The generated material, when a page has asked for one.
  *
- * 🔴 NOT `grainSource`, WHICH IS THE ARCHIVE. That one is a minute of 1965
- * written into the grain buffer from disk; this is a sound BUILT on the board,
- * right now, from the same description a browser is building it from
- * (plan-twins §4a). Two things called "source" in one file is how a rename
- * costs an afternoon, so the difference is written down here rather than
- * inferred from which handler set it.
+ * A sound BUILT on the board, right now, from the same description a browser is
+ * building it from (plan-twins §4a). `/grains/` sends the spec and both ends
+ * make the same sines, which is the whole comparison that page exists for.
+ *
+ * ⚠️ THERE USED TO BE A SECOND THING CALLED A SOURCE HERE, and it was a minute
+ * of ERR's 1965 archive pulled to disk and written into the grain buffers. It
+ * left on 2026-09-16 with the rest of the archive path; `archive/box-pappus/`
+ * has it. Two things called "source" in one file is how a rename costs an
+ * afternoon, so the one that is left says what it is.
  */
 let madeSource = null;     // { spec, partials, top } while PosSource is feeding pappus
 let lastHeard = Date.now();
@@ -129,15 +214,6 @@ let lastHeard = Date.now();
 // stopped when the insert was switched off would be a drift you could hear stop.
 let pap = null;
 const pappus = () => (pap ||= openPappus({ onLog: (l) => log('pappus:', l) }));
-// What is IN the grain buffers, if anything was put there deliberately. Null
-// means the buffers hold whatever the input recorded, which is the ordinary
-// insert case.
-let grainSource = null;
-// What the archive source is playing, when it is the source. Reported in
-// `audio.started` so the page can name it, and null the moment anything else
-// starts — a title left behind by a source that stopped is a page lying about
-// what you are hearing.
-let archiveNow = null;
 
 // ── the picture, on its own socket ───────────────────────────────────────────
 //
@@ -201,21 +277,14 @@ function sendFrame(unit, key) {
 }
 
 /**
- * ⚠️ AN INFINITE LOOP AGAINST SOMEBODY ELSE'S CDN IS NOT A FEATURE.
+ * 🔴 THE ARCHIVE SOURCE THIS IDLE STOP WAS WRITTEN FOR IS GONE, 2026-09-16.
  *
- * `-stream_loop -1` keeps the broadcast from ending, which is right while a
- * person is listening — the box is an OBJECT rather than a SESSION and is meant
- * to still be playing at three in the morning. But an archive source left
- * running in an empty room pulls ERR's segments forever for nobody: about
- * 28 MB an hour, continuously, from a public broadcaster we were already
- * blocked by once today. "Still playing" and "still downloading" are the same
- * act here, and only one of them is the point.
- *
- * So the archive — and ONLY the archive; a synth costs nobody anything — stops
- * when the room has been empty for a while. The relay's own `/stats` answers
- * how many sockets are in the room, and the box is one of them.
+ * It played ERR's 1965 radio archive into the JACK graph on `-stream_loop -1`,
+ * so it never ended, and this stopped it once the room had been empty for five
+ * minutes: about 28 MB an hour, continuously, out of a public broadcaster, for
+ * nobody. The whole path went instead. `archive/box-pappus/` has it and says
+ * why. The picture's idle stop below is the same idea and is still live.
  */
-const ARCHIVE_IDLE_MS = 5 * 60e3;
 // ⚠️ THE PICTURE NEEDS THIS MORE THAN THE ARCHIVE DID, and it did not have it.
 // The mirror page asks the box to draw AS SOON AS IT LOADS, so one visit leaves
 // the renderer and the hardware encoder running for ever — measured: 25% of the
@@ -225,7 +294,6 @@ const ARCHIVE_IDLE_MS = 5 * 60e3;
 // listening to a picture nobody is watching, where a broadcast might reasonably
 // play on.
 const VIDEO_IDLE_MS = 2 * 60e3;
-let archiveWatch = null, aloneSince = null;
 let videoWatch = null, videoAloneSince = null;
 
 /** How many sockets are in a room, or null when the relay will not say. */
@@ -236,24 +304,6 @@ async function roomSockets(room) {
     return (await r.json()).sockets ?? null;
   } catch { return null; }
 }
-
-function watchArchiveListeners() {
-  if (archiveWatch) return;
-  aloneSince = null;
-  archiveWatch = setInterval(async () => {
-    if (inst?.source !== 'archive') return stopArchiveWatch();
-    const sockets = await roomSockets(ROOM);
-    if (sockets === null) return;              // cannot tell; do not act on a guess
-    if (sockets > 1) { aloneSince = null; return; }
-    aloneSince ??= Date.now();
-    if (Date.now() - aloneSince < ARCHIVE_IDLE_MS) return;
-    log(`archive: nobody has been in ${ROOM} for ${Math.round(ARCHIVE_IDLE_MS / 60000)} min — stopping rather than streaming ERR to an empty room`);
-    send({ type: 'audio.stopped', source: 'archive', reason: 'nobody listening' });
-    stopAudio();
-  }, 60e3);
-  archiveWatch.unref?.();
-}
-function stopArchiveWatch() { if (archiveWatch) { clearInterval(archiveWatch); archiveWatch = null; aloneSince = null; } }
 
 /**
  * ⚠️ A SOCKET IS NOT A VIEWER, AND COUNTING SOCKETS DOES NOT WORK.
@@ -386,30 +436,6 @@ function sendPcm(int16) {
   sentFrames++;
 }
 
-/**
- * Which broadcast, and where in it.
- *
- * A slug if one is named, otherwise one drawn at random from the cached list of
- * 1965 — which costs the archive NOTHING, because that list is on this box's
- * disk and a year that ended sixty years ago does not change. Then somewhere
- * past the announcer at the top, and far enough from the end that there is
- * something to hear.
- */
-async function archiveSource(msg) {
-  let slug = msg?.slug;
-  let picked = null;
-  if (!slug) {
-    const list = await errSearch({ limit: 100 });
-    if (!list.items?.length) throw new Error('the archive returned no 1965 audio');
-    picked = list.items[Math.floor(Math.random() * list.items.length)];
-    slug = picked.slug;
-  }
-  const item = await errItem(slug);
-  const atSec = Number.isFinite(msg?.atSec) ? msg.atSec : 60 + Math.floor(Math.random() * 600);
-  archiveNow = { slug: item.slug, title: item.title, date: item.date, atSec };
-  return { hls: item.hls, atSec, ...archiveNow };
-}
-
 let spaceWas = false;     // an insert that was on before an instrument change
 async function startAudio(source = 'synth', msg = null) {
   // ⚠️ REPLACE, do not refuse. This used to return {already:true} when
@@ -419,9 +445,17 @@ async function startAudio(source = 'synth', msg = null) {
   // arriving and 5,495 dropped at the relay. It sounds like corruption and it
   // is two instruments talking over each other.
   if (starting) return { ok: false, reason: `already starting ${starting}`, starting };
-  // A title left behind by a source that has stopped is a page lying about what
-  // you are hearing, so it goes the moment anything else starts.
-  if (source !== 'archive') archiveNow = null;
+  // 🔴 A NEW INSTRUMENT DOES NOT INHERIT AN INSERT NOBODY IS HOLDING. The line
+  // further down re-patches a switched-on insert onto whatever comes up, which
+  // is right for the page that asked for it and wrong for everyone else: it is
+  // how a granulator left behind by a closed tab ends up wrapping the next
+  // person's yoshimi. The heartbeat's sweep would catch it within five seconds
+  // anyway; doing it HERE means those five seconds are not audible.
+  // ⚠️ IT DROPS A STALE INSERT, NEVER A LIVE ONE. A `/grains/` tab that is open
+  // and quiet keeps its insert across an instrument change somebody else
+  // started, which is the stomp `onlyIfIdle` exists to prevent. The board says
+  // so in this call's own reply, in `fx` and `fxBy`.
+  await sweepInsert('an instrument was asked for');
   const running = inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null;
   if (running) {
     // ⚠️ AND SAY WHAT IT IS PLAYING. This early return used to answer
@@ -429,13 +463,9 @@ async function startAudio(source = 'synth', msg = null) {
     // something already running got a reply with no port and no title — which
     // reads as "started, and playing nothing". A reply about a running source
     // must describe it as fully as the reply that started it.
-    // ⚠️ THE ARCHIVE IS NEVER "ALREADY RUNNING". Pressing 1965 again means
-    // "play me something else" — there are 543 of them and the one thing the
-    // button can do is choose. Short-circuiting here made a second press a
-    // no-op that reported success, which reads as a broken button.
-    if (running === source && source !== 'fluidsynth' && source !== 'archive') {
+    if (running === source && source !== 'fluidsynth') {
       return { ok: true, already: true, source: running, jack: !!inst?.jack, port: inst?.port ?? null,
-               ...insertState(), archive: source === 'archive' ? archiveNow : null };
+               ...insertState() };
     }
     log(`switching ${running} -> ${source}`);
     // 🔴 REMEMBER THE INSERT BEFORE STOPPING, because stopAudio() switches it
@@ -455,20 +485,10 @@ async function startAudio(source = 'synth', msg = null) {
   // a snd-virmidi device that aconnect routes to their sequencer port.
   if (JACK_SYNTHS[source]) {
     if (!jackSynthAvailable(source)) return { ok: false, reason: `${source} is not installed on this box` };
-    // The archive is a source like any other, but it needs to be TOLD WHAT TO
-    // PLAY before it can start. Resolving it here rather than inside the synth
-    // table keeps the table a description of processes and keeps the network
-    // in one place — which is also the place that holds off when ERR says no.
-    let extra = {};
-    if (source === 'archive') {
-      try { extra = await archiveSource(msg); }
-      catch (e) { return { ok: false, reason: e.message, holdingOff: !!e.holdingOff }; }
-      log(`archive: ${extra.date} · ${extra.title} · from ${extra.atSec} s`);
-    }
     starting = source;
     log(`starting ${source} (jack chain) ...`);
     let r;
-    try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l), soundfont: msg?.soundfont, ...extra }); }
+    try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l), soundfont: msg?.soundfont }); }
     finally { starting = null; }
     if (!r.ok) { log(`${source} failed: ${r.reason}`); return r; }
     inst = r;
@@ -493,10 +513,8 @@ async function startAudio(source = 'synth', msg = null) {
       if (!sr?.ok) log(`space did not survive the instrument change — ${sr?.reason}`);
       spaceWas = false;
     }
-    if (source === 'archive') watchArchiveListeners();
     return { ok: true, source, jack: true, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec,
-             channels: r.channels, ...insertState(), archive: source === 'archive' ? archiveNow : null,
-             idleStopMin: source === 'archive' ? ARCHIVE_IDLE_MS / 60000 : undefined };
+             channels: r.channels, ...insertState() };
   }
 
 
@@ -587,8 +605,6 @@ async function startAudio(source = 'synth', msg = null) {
 
 function stopAudio() {
   const was = inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null;
-  stopArchiveWatch();             // nothing to watch once nothing is playing
-  archiveNow = null;
   aseq = 0;                       // a new source restarts the sequence
   if (inst) { inst.stop(); inst = null; }
   if (stopSynth) { stopSynth(); stopSynth = null; synth = null; }
@@ -677,19 +693,16 @@ async function handle(msg) {
       if (!synth && !inst) await startAudio('fluidsynth', {});
       if (inst) inst.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
       else synth?.noteOn(msg.note, msg.vel ?? 100);
-      // With material loaded, the SAME key also pitches a grain voice, so the
-      // granulator is played rather than merely switched on. Eight voices,
-      // oldest stolen. The feeder instrument is still sounding into the insert
-      // and is inaudible, because a loaded buffer has recording switched off —
-      // so one key press is one sound, not two.
-      if (grainSource && fxOn) pappus().notes.on(msg.note, msg.vel ?? 100);
+      // ⚠️ A KEY NO LONGER PITCHES A GRAIN VOICE, AND THAT WENT WITH THE
+      // ARCHIVE. It did so only with material LOADED into the buffers, which
+      // was the ERR excerpt path and nothing else: with the granulator merely
+      // recording its input, a key press is one sound already. The voices are
+      // still there and `params.set gates` still opens them.
       return reply('note.ack', { note: msg.note, channel: msg.channel ?? 0,
-        grains: !!(grainSource && fxOn),
-        on: grainSource && fxOn ? 'pappus' : inst ? inst.source : 'synth' });
+        on: inst ? inst.source : 'synth' });
     case 'note.off':
       if (inst) inst.noteOff(msg.channel ?? 0, msg.note);
       else if (synth) synth.noteOff(msg.note);
-      if (grainSource && fxOn) pappus().notes.off(msg.note);
       return reply('note.ack', { note: msg.note });
     case 'note.panic':
       if (inst) inst.panic();
@@ -866,11 +879,13 @@ async function handle(msg) {
       });
       // 🔴 `onlyIfIdle` — "take it out, UNLESS somebody is still using it".
       //
-      // This is the second half of the two-pages-fight repair and it is
-      // deliberately the smaller half. `/box/` sends it on load: it still
-      // clears an insert left behind by a tab that CLOSED, which is the real
-      // fault it was written for, and it no longer removes one that a `grains`
-      // tab is looking at right now.
+      // ⚠️ NOTHING IN THIS REPO SENDS IT ANY MORE. `/box/` did, on load, and
+      // that page has no granulator on it since 2026-09-16; `sweepInsert()`
+      // applies the same liveness rule on the board's own clock, so the message
+      // is no longer how an orphaned insert gets cleared. It is kept because it
+      // is still a correct thing for a person or another program to ask, and
+      // because it reads the liveness verdict OUT LOUD, which the sweep cannot
+      // do for a caller that wants an answer now.
       //
       // ⚠️ IT REFUSES OUT LOUD. `ok: true, on: true, kept: true` with the
       // holder and the ages in the reply, so the page can say "another tab
@@ -998,7 +1013,7 @@ async function handle(msg) {
       // With material loaded the keyboard owns the eight grain voices, so the
       // roll leaves `pitches`/`gates` alone rather than pulling the instrument
       // out from under whoever is playing it.
-      const r = pappus().roll(Number.isInteger(msg.seed) ? msg.seed : undefined, { voices: !grainSource });
+      const r = pappus().roll(Number.isInteger(msg.seed) ? msg.seed : undefined, { voices: true });
       // Movement is on by default once there is something to move. It is not a
       // control the page offers — see `params.drift` for why it exists at all.
       //
@@ -1052,8 +1067,9 @@ async function handle(msg) {
     // instrument happened to be running. One spec, expanded by ONE function
     // (`partialsOf`, imported by both ends), rendered here by `PosSource.sc`.
     //
-    // ⚠️ NOT `source.load`, WHICH IS THE ARCHIVE. That writes a minute of 1965
-    // into the grain buffer from disk. This one generates.
+    // ⚠️ THIS ONE GENERATES. There used to be a second verb here that wrote a
+    // minute of ERR's 1965 archive into the grain buffer from disk; it left on
+    // 2026-09-16 and this is the only material path now.
     //
     // ⚠️ AND THE INSTRUMENT COMES OUT OF THE INPUT, RATHER THAN BEING STOPPED.
     // scsynth fills its input bus from JACK before any synth runs, so an
@@ -1117,11 +1133,12 @@ async function handle(msg) {
     }
     case 'params.state':
       return reply('params.state', {
-        ok: fxOn, roll: pap?.current() ?? null, drift: pap?.driftStats() ?? null, source: grainSource,
+        ok: fxOn, roll: pap?.current() ?? null, drift: pap?.driftStats() ?? null,
         // 🔴 WHAT IT IS CHEWING, for a page that joined after somebody else set
-        // it. `made` is the generated material (plan-twins §4a) and `source`
-        // above is the archive — two different answers to "what is in the
-        // buffer", and a page that cannot tell them apart draws the wrong one.
+        // it. ⚠️ There used to be a second answer beside this one, `source`,
+        // which was the minute of ERR's archive loaded into the buffers. That
+        // path left on 2026-09-16, so `made` is now the only material the board
+        // can be given and the ambiguity is gone with it.
         made: madeSource ? { ...madeSource, engine: pap?.sourceState() ?? null } : null,
         // Which voice slots are open and at what interval. ⚠️ This is what the
         // box SENT, not what the engine did with it — a count on this side of
@@ -1174,85 +1191,15 @@ async function handle(msg) {
       return reply('params.set', { ok: true, cmd, args, centred: centred ? centred.join(' ') : null });
     }
 
-    // ── 1965, as grain material ──────────────────────────────────────────
-    //
-    // ⚠️ The AUDIO archive, not the video one. ERR's 298 video items from 1965
-    // are `FILM 16mm m/v negatiiv helita` — silent film negatives — so
-    // granulating those granulates nothing, which is a failure this engine has
-    // already had once.
-    case 'source.search': {
-      // ⚠️ A REFUSAL IS AN ANSWER, NOT A CRASH. This used to let the fetch throw
-      // and the box replied `box.error` — which no client was listening for, so
-      // the page and the harness both sat for their full timeout and reported
-      // "no box in this room" about a box that was answering fine. ERR blocked
-      // this board's address on 2026-09-11 and that is exactly what it looked
-      // like from the outside.
-      try {
-        const s = await errSearch({ limit: Math.min(msg.limit ?? 100, 100), page: msg.page ?? 1 });
-        if (s.cached) log(`source.search: ${s.items.length} of ${s.total} from the local list — the archive was not asked`);
-        return reply('source.found', { ok: true, ...s, archive: errStatus() });
-      } catch (e) {
-        log(`source.search: ${e.message}`);
-        return reply('source.found', { ok: false, reason: e.message, holdingOff: !!e.holdingOff, archive: errStatus() });
-      }
-    }
-    // Pull an excerpt and put it in the grain buffers. This is what turns the
-    // insert into an instrument: with material in the buffer and recording
-    // switched OFF, the granulator plays what you loaded rather than whatever
-    // happens to be going into it.
-    case 'source.load': {
-      if (!fxOn) return reply('source.loaded', { ok: false, reason: 'pappus is not switched on' });
-      let item;
-      try { item = await errItem(msg.slug); }
-      catch (e) {
-        log(`source.load: ${e.message}`);
-        return reply('source.loaded', { ok: false, reason: e.message, holdingOff: !!e.holdingOff, archive: errStatus() });
-      }
-      // 60 s because that is exactly the grain buffer's length. Asking for more
-      // is silently truncated by the read, which reads as "the end of my
-      // excerpt is missing" rather than as a limit.
-      const dur = Math.min(msg.dur ?? 60, 60);
-      // ⚠️ The offset and length are part of the NAME. Without them two
-      // different minutes of the same programme are one file, so the cache
-      // would hand back the first excerpt for every later request — a stale
-      // answer that is real audio, which is the kind nobody notices.
-      const atSec = msg.atSec ?? 0;
-      const out = `/tmp/err-${msg.slug.slice(0, 40).replace(/[^a-z0-9-]/gi, '')}-${atSec}-${dur}.wav`;
-      // ⚠️ `atSec`, NOT `at`. `at` IS THE ENVELOPE'S TIMESTAMP: `format()` in
-      // wire.mjs spreads the message FIRST and then writes `from`/`at`/`seq`
-      // over it, so a field called `at` never survives the send. This asked
-      // ffmpeg to seek to second 1,789,103,743,118 of a 45-minute broadcast —
-      // and ffmpeg answered with sixty seconds of real audio anyway, from
-      // wherever it decided that was, so nothing anywhere read as broken while
-      // the one control this feature has did nothing at all. Second time in
-      // this file: `voices.listed`'s `source` was eaten by the same spread.
-      const ex = await errExcerpt({ hls: item.hls, atSec, durSec: dur, out });
-      const r = loadBuffers(pappus(), out);
-      // ⚠️ CLOSE THE ROLLED VOICES. A roll opens about half of the eight grain
-      // voices at pitches of its own, and those keep sounding — so a key press
-      // was adding a NINTH voice to a chord that was already going, and moved
-      // the sound by four hundredths of an octave. Measured, not reasoned:
-      // 515 Hz against 531 Hz for a key an octave apart, which reads as a
-      // keyboard that does nothing.
-      //
-      // Loading material is therefore also the moment the keyboard takes the
-      // voices over, and it has to start from silence to own them.
-      pappus().notes.panic();
-      grainSource = { slug: item.slug, title: item.title, date: item.date, atSec, dur, tookMs: ex.tookMs };
-      log(`loaded ${item.date} · ${item.title} · ${dur} s from ${atSec} s ${ex.cached ? '(from the local copy)' : `in ${ex.tookMs} ms`}`);
-      return reply('source.loaded', { ok: true, ...grainSource, ...r, cached: ex.cached });
-    }
-    // Give the buffers back to the input. Named rather than implied, because
-    // "the granulator is recording again" is not something a listener can hear
-    // until the material has been overwritten.
-    case 'source.clear':
-      // The lock has to come off with the source. Leaving it on holds the
-      // buffer against the very input that is being given back to it, so
-      // recording would read as on and the sound would never change again —
-      // see loadBuffers for what `lock` and `src` each actually do.
-      if (pap) { pap.send('mlock', 0); pap.send('nlock', 0); pap.send('msrc', 2); pap.send('nsrc', 2); pap.notes.panic(); }
-      grainSource = null;
-      return reply('source.cleared', { ok: true, recording: 'stereo' });
+    // 🔴 THE THREE VERBS THAT PUT ERR'S 1965 ARCHIVE IN THE GRAIN BUFFERS
+    // LEFT ON 2026-09-16: `source.search`, `source.load`, `source.clear`.
+    // No page in `demo/` sent any of them, and every connection this repo opens
+    // to ERR appears in a public broadcaster's audience measurement, so an
+    // unused path to their archive from a board nobody is watching was exposure
+    // with no benefit. `archive/box-pappus/` has the code and the reasoning.
+    // ⚠️ `source.set` BELOW IS NOT THAT and did not go: it is the sound BUILT
+    // on the board from a spec, which is what `/grains/` feeds the granulator.
+
     // ── the picture ──────────────────────────────────────────────────────
     case 'video.start': {
       if (video) return reply('video.started', { ok: true, already: true, room: VIDEO_ROOM, ...videoShape() });
@@ -1331,8 +1278,7 @@ async function handle(msg) {
     // here as well as in `fx.pappus` and the heartbeat.
     case 'audio.status':
       return reply('audio.started', inst ? { ok: true, source: inst.source, jack: !!inst.jack, ...insertState(),
-                                            soundfont: inst.soundfont ?? null,
-                                            archive: inst.source === 'archive' ? archiveNow : null }
+                                            soundfont: inst.soundfont ?? null }
         : stopSynth ? { ok: true, source: 'synth', ...insertState() }
         : audio ? { ok: true, source: 'capture', ...insertState() }
         : { ok: false, reason: 'nothing playing', ...insertState() });
@@ -1432,7 +1378,27 @@ function connect() {
 // could see the other change it; a heartbeat that already says what is playing
 // is the cheapest place to say who the granulator belongs to, because a page
 // learns about a change it did not make without asking for anything.
-setInterval(() => send({ type: 'box.alive', name: NAME, upSec: Math.round((Date.now() - since) / 1000), audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null, voices: synth?.voices ?? 0, frames: sentFrames, ...insertState() }), 5000).unref?.();
+// ⚠️ ONE SHAPE, ONE PLACE. `sweepInsert()` sends this too, the moment it drops
+// an insert, so a page does not wait up to five seconds to be told. Two copies
+// of this object is how a field ends up on one of them.
+function alive() {
+  return { type: 'box.alive', name: NAME, upSec: Math.round((Date.now() - since) / 1000),
+           audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null,
+           voices: synth?.voices ?? 0, frames: sentFrames, ...insertState() };
+}
+setInterval(() => {
+  // 🔴 SWEEP BEFORE THE BEAT, NOT AFTER IT. `sweepInsert` is async and sends
+  // its own beat when it drops something, so ordering it first means the room
+  // never gets a heartbeat announcing an insert the board has already decided
+  // is orphaned. It returns immediately when there is nothing to do, which is
+  // every beat but one.
+  // ⚠️ `.catch` IS NOT DECORATION HERE. This one is not awaited, so a throw out
+  // of `pappusFx` would be an UNHANDLED rejection on a timer, and an unhandled
+  // rejection takes the whole service down. Same reason `handle()` is wrapped.
+  sweepInsert('the page that asked for it stopped talking')
+    .catch((e) => log('the insert sweep threw:', e.message));
+  send(alive());
+}, 5000).unref?.();
 
 // The control plane's own report, once a second and ONLY while something is
 // moving. A page can hear the filter and cannot see what the board wrote, so

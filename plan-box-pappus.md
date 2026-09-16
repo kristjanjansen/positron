@@ -1,5 +1,14 @@
 # plan-box-pappus: take the granulator out of `/box/`, and say what is left
 
+🔴 **SECOND PASS, 2026-09-16. THE TWO THINGS §2 KEPT ARE BOTH GONE, AND §9
+GAINED AN ANSWER.** Instructed as *"get rid of both"*, quoting this file's own
+exceptions back at it. `/box/` no longer sends `fx.pappus {on:false,
+onlyIfIdle:true}`, so the string `pappus` appears **0 times** in
+`rig/box/listen.html`; the guarantee that message carried moved onto the BOARD,
+which now drops an insert whose page has stopped talking. And ERR's 1965 archive
+left the board entirely. §2, §3 and §9 below are marked where they are now
+history. The board keeps its granulator: *"keep pi granulator for grains"*.
+
 Asked for 2026-09-16: *"plan and remove pappus from the
 http://127.0.0.1:8890/box/ signal path. there is no ui to control it. arhvice
 it. update diagram as well. captutre: should be more techical, JACK etc. can we
@@ -45,6 +54,7 @@ with no control for a thing opens by talking about it.
 
 ## 2. What must NOT be removed, and why
 
+✅ **STILL TRUE, AND RE-CONFIRMED ON INSTRUCTION 2026-09-16.**
 🔴 **`rig/box/pappus.mjs`, `pappusFx()` and the `fx.pappus` handler in
 `box.mjs` all stay on the board.** `/grains/` is a live, built demo whose entire
 subject is the same granulator running in a tab and on the Raspberry Pi. It
@@ -52,23 +62,42 @@ sends `fx.pappus {on:true}` from its own handler, polls `params.state`, and
 compares the two. Deleting the board half breaks a deployed page. The ask is
 about `/box/`'s signal path, and the board is not `/box/`.
 
-🔴 **`/box/` keeps sending `fx.pappus {on:false, onlyIfIdle:true}` on connect.**
-This is the thing that MAKES the removal true rather than merely undrawn. An
-insert left behind by a `/grains/` tab that was simply closed goes on wrapping
-whatever `/box/` plays and feeds its own delay: MEASURED 2026-09-12, a steady
--6.1 dBFS subsonic drone while `box.alive` reported `voices: 0`. Deleting the
-message would take the picture and the sound in opposite directions, which is
-the failure this repo has a shelf of rules about. `onlyIfIdle` stays too, so a
-live `/grains/` tab is not stamped on by somebody opening `/box/`.
+⚠️ **REVERSED 2026-09-16, AND THE REASONING IS KEPT BECAUSE THE FAULT IS REAL.**
+This section said `/box/` keeps sending `fx.pappus {on:false, onlyIfIdle:true}`
+on connect, because that message is what MAKES the removal true rather than
+merely undrawn: an insert left behind by a `/grains/` tab that was simply closed
+goes on wrapping whatever `/box/` plays and feeds its own delay. MEASURED
+2026-09-12, a steady -6.1 dBFS subsonic drone while `box.alive` reported
+`voices: 0`. It also kept one log line for the case where the board REFUSES,
+because a diagram that says nothing in the one situation where it is wrong is a
+confident lie.
 
-🔴 **One log line survives, for the case where the board refuses.** The refusal
-answers `ok:true, on:true, kept:true` with the holder and the ages. If `/box/`
-said nothing there, its diagram would be a confident lie in exactly the one
-situation where it is wrong. `rig/box/README.md` promises that both pages say so
-in words, and that promise is kept.
+🔴 **BOTH ARE GONE, AND THE GUARANTEE IS STRONGER FOR IT.** The instruction was
+*"get rid of both"*. The argument above has a hole that it does not see: it makes
+the guarantee depend on somebody opening `/box/`, and nobody has to. A tab closed
+at midnight left the board granulating itself until the next person happened to
+load a page that sent one message.
 
-So the shape is: **the page stops discussing the granulator, and keeps the one
-message and the one line that are about its OWN sound.**
+**So the board cleans up after itself.** `sweepInsert()` in `box.mjs` runs on the
+five-second heartbeat and again at the top of `startAudio()`: if the insert is in
+and the client that asked for it has not been heard from inside
+`INSERT_HELD_MS`, it comes out, and a `box.alive` carrying `insertState()` goes
+out at once rather than on the next beat.
+
+🔴 **A REAL SIGNAL WAS LOOKED FOR FIRST AND THERE IS NONE.** Read rather than
+assumed. `workers/relay/src/index.js` forwards every frame verbatim and never
+parses one, so its Durable Object does not know any client's `from`; its
+`webSocketClose()` is an empty method; `openWire` in `demo/shell/wire.mjs` sends
+no farewell. `/room/<name>/stats` reports per-socket idle times in an anonymous
+sorted array, so it cannot say WHICH socket left.
+
+🔴 **AND THE NUMBER IS CHECKED, NOT CHOSEN.** `/grains/` has one
+`setInterval(…, 4000)` whose first line is `hello()`, sending `params.state`
+unconditionally whenever the socket is open. 15 s is 3.75 of those polls, so one
+or two lost to the relay's caps cost nothing, and a closed tab is zero.
+
+So the shape is: **the page stops discussing the granulator entirely, and the
+board takes responsibility for its own sound.**
 
 ---
 
@@ -96,6 +125,14 @@ Two things this makes exact, and both go in the diagram:
 ⚠️ **The reverb is in this path and is NOT being drawn.** It is a fifth box in a
 container that is about to hold four, and nobody asked for it. Named here so the
 next person does not have to re-derive that `positron-space` exists.
+
+⚠️ **AND THE `archive` SOURCE THAT USED TO SIT IN THIS TABLE IS GONE,
+2026-09-16.** It played ERR's 1965 radio archive into the JACK graph on
+`-stream_loop -1`, so it never ended: ffmpeg into `snd-aloop`, `alsa_in` out the
+other side as `err1965`. No page offered it, `/box/`'s description stopped
+claiming it weeks ago, and every connection this repo opens to ERR appears in a
+public broadcaster's audience measurement. `archive/box-pappus/box-err.js` has
+it, with `source.search`, `source.load` and `source.clear`.
 
 ---
 
@@ -182,23 +219,64 @@ and say, not what the board can do.
    headless Chrome pointed at a DEAD relay (`?relay=ws://127.0.0.1:9`) so no
    room is joined and no board is touched.
 
+### The second pass, 2026-09-16
+
+1. `rig/box/listen.html`: the message, the flag, the log line, every mention.
+   `grep -c pappus` must answer 0.
+2. `rig/box/box.mjs`: `sweepInsert()`, on the heartbeat and at the top of
+   `startAudio()`, so the guarantee lives where the sound does.
+3. `rig/box/insert-test.mjs`: rewritten for the new rule, with the negative
+   control that separates "cleans up after itself" from "drops it on a timer".
+   **Not run.** It touches a shared instrument in another building.
+4. The ERR archive out of `pappus.mjs`, `box.mjs` and `jacksynth.mjs`, into
+   `archive/box-pappus/pappus-err.js` and `box-err.js`. `pappus-test.mjs` and
+   `pappus-live.mjs` lose the sections that drove it.
+5. Mirror `listen.html` into `workers/view/public/box/index.html` by hand.
+   No build, no deploy. ⚠️ `demo/manifest.mjs` was NOT touched this pass: its
+   `one` line was already corrected in the first one, and another agent was
+   editing that file.
+6. `node demo/check-html.mjs` on both copies, `node --check` on every module,
+   and `dg.cuts` at two widths against the dead relay again.
+
 ---
 
 ## 8. What a person has to do on the board
 
-**Nothing, for the page.** `/box/` is served from this repo and from
-`workers/view/public/`; the board runs `box.mjs`, which is unchanged. The
-removal is a change to what a browser draws and asks for.
+**For the first pass: nothing.** `/box/` is served from this repo and from
+`workers/view/public/`; the board ran `box.mjs` unchanged, and the removal was a
+change to what a browser draws and asks for.
 
-⚠️ And the board's own copy is not this checkout anyway: `positron-box.service`
-executes `/opt/positron-box/`, and `~/positron` on the board is stale. If
-anything under `rig/box/` is ever changed for this, it reaches the board only
-through `push.sh` / `setup.sh`, and `md5sum` against `/opt/positron-box/rig/box/`
-is what says the deploy landed. Not needed here.
+🔴 **FOR THE SECOND PASS: A PUSH, AND THE BOARD-SIDE CHANGE IS NOT TRUE UNTIL
+IT HAPPENS.** `box.mjs`, `pappus.mjs`, `jacksynth.mjs`, `insert-test.mjs`,
+`pappus-test.mjs` and `pappus-live.mjs` all changed. Until they are on the
+board, the insert is still only cleared by a message that no page sends any
+more, which is **worse than before this work**: `/box/` has stopped policing it
+and the board has not started. Sequenced, not simultaneous, and that is the one
+thing to know before shipping the page without the board.
+
+    cd rig/box && ./push.sh                 # finds the board, writes /opt, restarts
+    ssh positron@<ip> md5sum /opt/positron-box/rig/box/box.mjs
+    md5 -q rig/box/box.mjs                  # the two must match
+
+⚠️ **THE SERVICE RUNS FROM `/opt/positron-box/`, NOT FROM `~/positron`.**
+`provision.sh` unpacks into `~/positron` and `setup.sh` copies that to `/opt`;
+the copy in `~/positron` is stale and has no `pappus.mjs` at all, so reading it
+tells you nothing about what is running. `push.sh` writes to `/opt` directly and
+prints the md5 of what landed, because "it deployed" and "it says it deployed"
+have been different things here before.
+
+⚠️ **AND A RESTART STOPS WHATEVER IS PLAYING.** `./push.sh --no-restart` ships
+without that, and the new sweep then starts on the next restart rather than at
+once.
 
 ---
 
 ## 9. Left open, on purpose
+
+⚠️ **THE TWO EXCEPTIONS THIS SECTION USED TO NAME WERE BOTH DECIDED ON
+2026-09-16 AND ARE DONE.** *"get rid of both"* took the message and the log
+line; *"keep pi granulator for grains"* keeps the board's engine. What is left
+open is below.
 
 - 🔴 **`/box/` has a diagram and a six-sentence `what`, and that `what` carries
   four em dashes.** CLAUDE.md says a page with a diagram carries a ONE line
@@ -238,3 +316,29 @@ no board was asked anything and nothing outside this machine was touched.
 
 `node demo/check-html.mjs rig/box/listen.html workers/view/public/box/index.html`
 parses both copies. The two files are byte-identical, checked with `md5`.
+
+### The second pass, 2026-09-16
+
+Same method, same dead relay, same two widths, read with `window.__dg()` out of
+a headless Chrome pointed at the dev server at `?relay=ws://127.0.0.1:9`. The
+BEFORE column is the page as it stood at `141d7f3`, served from a temporary copy
+so both readings came from one browser in one run.
+
+| | `cuts` | `ties` | `mode` |
+|---|---|---|---|
+| before, 1280 px | 0 | 2 | row |
+| before, 390 px | 0 | 2 | column |
+| after, 1280 px | 0 | 2 | row |
+| after, 390 px | 0 | 2 | column |
+
+Nothing in this pass touched `createDiagram`, so 0 was expected. It was read
+rather than assumed, because a comment removal that takes a neighbour's setup
+line with it is exactly how the first pass broke the instrument row.
+
+`grep -c pappus rig/box/listen.html` answers **0**, and the deployed copy
+matches byte for byte. `node rig/box/pappus-test.mjs` is **23/23** with no
+network at all, and `node rig/box/pappus-live.mjs --self-test` is **18/18**
+with no relay and no board.
+
+🔴 **`rig/box/insert-test.mjs` WAS REWRITTEN AND NOT RUN.** It touches a shared
+instrument in another building and nobody had said the board was free.

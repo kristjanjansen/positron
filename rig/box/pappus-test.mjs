@@ -6,10 +6,8 @@
 // Two of these are NEGATIVE CONTROLS — they run the OLD formulas and require
 // the check to REJECT them. A check nobody has seen fail is a check you do not
 // know you have.
-import { rollPappus, driftValues, driftTarget, mulberry32, PARAMS, MODES, DRIFT, CHARACTERS, CHARACTER_NAMES,
-         errSearch, errExcerpt, errStatus } from './pappus.mjs';
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rollPappus, driftValues, driftTarget, mulberry32, PARAMS, MODES, DRIFT, CHARACTERS, CHARACTER_NAMES }
+  from './pappus.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -291,103 +289,17 @@ console.log('\n== the centre the drift circles ==');
      `keys: ${Object.keys(v).join(',') || 'none'}`);
 }
 
-// ── being gentle with somebody else's archive ────────────────────────────────
+// 🔴 A SECTION CALLED "GENTLE WITH THE ARCHIVE" STOOD HERE AND LEFT ON
+// 2026-09-16, WITH THE THING IT WAS GENTLE WITH. It counted requests against a
+// stubbed `fetch` and proved three real properties of the ERR path: the 1965
+// search was read from disk rather than re-asked, an excerpt already cut was
+// not cut again, and a refusal produced a backoff rather than another request.
+// All three were bought after ERR blocked this board on 2026-09-11.
 //
-// ERR blocked this board on 2026-09-11 after a day of testing — connection
-// refused from the Pi while the same host answered 200 from a laptop. These
-// check the three things that caused it. Every one of them counts REQUESTS, on
-// a stubbed `fetch`, because "it seemed faster" is not evidence about traffic.
-console.log('\n== gentle with the archive ==');
-
-const realFetch = globalThis.fetch;
-const stub = (impl) => { globalThis.fetch = impl; };
-const restore = () => { globalThis.fetch = realFetch; };
-
-// 13. A closed year is asked for ONCE, ever.
-{
-  let calls = 0;
-  const rows = { activeList: { audioCount: 543, data: [{ type: 'audio', data: [
-    { url: 'a-slug', date: '1965-01-10', heading: 'a programme', lead: '' },
-  ] }] } };
-  stub(async () => { calls++; return { ok: true, status: 200, headers: new Headers(), json: async () => rows }; });
-  const dir = mkdtempSync(`${tmpdir()}/pappus-test-`);
-  const before = process.env.XDG_CACHE_HOME;
-  // ⚠️ CLEAR IT FIRST, NOT ONLY AFTERWARDS. Cleaning up only at the end left
-  // the file behind whenever a run died early, and the NEXT run then saw zero
-  // requests where it expected one and read FAILED — a test that fails because
-  // the last one passed. Watched it happen once; a cache test has to own both
-  // ends of the cache.
-  const stale = `${errStatus().cacheDir}/search--2208988800--2177452801-1-1.json`;
-  rmSync(stale, { force: true });
-  try {
-    // The cache directory is chosen at import time, so this cannot redirect it —
-    // which is the honest thing to say: the test asks the REAL cache whether it
-    // asks twice, using a year nothing else uses.
-    const YEAR = { from: -2208988800, to: -2177452801 };     // 1900, so no real run collides
-    const a = await errSearch({ ...YEAR, limit: 1 });
-    const b = await errSearch({ ...YEAR, limit: 1 });
-    ok('a year that ended sixty years ago is fetched once, not twice',
-       calls === 1 && b.cached === true, `${calls} request(s) for two asks · second was cached=${b.cached}`);
-    ok('and the cached answer is the same answer', a.total === b.total && a.items[0]?.slug === b.items[0]?.slug,
-       `${b.total} items, first ${b.items[0]?.slug}`);
-  } finally {
-    restore();
-    if (before === undefined) delete process.env.XDG_CACHE_HOME;
-    rmSync(dir, { recursive: true, force: true });
-    // Do not leave a fake 1900 in the real cache. A test that litters the thing
-    // it is testing is a test that changes the next run.
-    rmSync(stale, { force: true });
-  }
-}
-
-// 14. An excerpt already on disk is not pulled again.
-//     This is the heavy one: `errExcerpt` runs ffmpeg against their HLS, so one
-//     "load" is a stream of segment fetches with no `fetch` call to notice.
-{
-  const out = `${tmpdir()}/pappus-test-excerpt.wav`;
-  writeFileSync(out, Buffer.alloc(4096));       // bigger than a header, so it counts
-  const r = await errExcerpt({ hls: 'https://example.invalid/none.m3u8', atSec: 0, durSec: 60, out,
-                               ffmpeg: '/nonexistent-ffmpeg' });
-  // ⚠️ The ffmpeg path is deliberately not a program. If the cache is ever
-  // bypassed this throws ENOENT rather than passing quietly, so the test cannot
-  // succeed for the wrong reason.
-  ok('an excerpt already on disk is served locally, and ffmpeg is never run',
-     r.cached === true && r.tookMs === 0, `cached=${r.cached}`);
-  rmSync(out, { force: true });
-}
-
-// 15. NEGATIVE CONTROL for the same check: a file too small to be an excerpt
-//     must NOT be treated as one, or a failed pull caches itself forever.
-{
-  const out = `${tmpdir()}/pappus-test-stub.wav`;
-  writeFileSync(out, Buffer.alloc(44));         // a bare WAV header: a failed pull
-  let threw = null;
-  try { await errExcerpt({ hls: 'https://example.invalid/none.m3u8', out, ffmpeg: '/nonexistent-ffmpeg' }); }
-  catch (e) { threw = e; }
-  ok('NEGATIVE CONTROL: a truncated excerpt is re-pulled rather than served',
-     threw !== null, threw ? 'it tried to pull it again, as it should' : 'it served a 44-byte file as audio');
-  rmSync(out, { force: true });
-}
-
-// 16. A refusal stops the asking. The guard that did not exist is the reason
-//     the block happened at all.
-{
-  let calls = 0;
-  stub(async () => { calls++; return { ok: false, status: 429, headers: new Headers(), json: async () => ({}) }; });
-  try {
-    const YEAR = { from: -2208988800, to: -2177452800 };    // a year with no cache file
-    let first = null, second = null;
-    try { await errSearch({ ...YEAR, limit: 1 }); } catch (e) { first = e; }
-    try { await errSearch({ ...YEAR, limit: 1 }); } catch (e) { second = e; }
-    ok('a 429 is not answered with another request', calls === 1,
-       `${calls} request(s) after two asks into a refusing archive`);
-    ok('...and the second ask says it is holding off, rather than failing',
-       second?.holdingOff === true, second?.message ?? 'no error at all');
-    ok('the hold-off is reportable, so a page can say why nothing happened',
-       errStatus().holdingOff === true && errStatus().forMs > 0,
-       `${Math.round(errStatus().forMs / 1000)} s · ${errStatus().lastError}`);
-  } finally { restore(); }
-}
+// The whole path went instead of the tests. `archive/box-pappus/pappus-err.js`
+// has the code those checks were about, and the checks themselves are in
+// `git show 141d7f3^:rig/box/pappus-test.mjs`. If anything here ever talks to
+// somebody else's archive again, take them back out of there first.
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);
