@@ -391,10 +391,12 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
       // A window that caught nothing is not a loop. It happens when nothing was
       // actually playing at the press, and saying so is better than looping
       // silence and letting somebody wonder.
-      if (n < ctx.sampleRate * 0.25) {
-        log('nothing was playing, so there is nothing to loop', 'warn');
-        return 0;
-      }
+      // 🔴 SILENTLY, ON INSTRUCTION 2026-09-16: *"rm all loop messages."*. It
+      // said `nothing was playing, so there is nothing to loop`, which is true
+      // and is a sentence about a loop. The caller gets 0 and the button goes
+      // back to `off`, which is the same fact in the two channels that already
+      // carry it.
+      if (n < ctx.sampleRate * 0.25) return 0;
       const b = ctx.createBuffer(channels, n, ctx.sampleRate);
       const start = ringOrder(ring);
       for (let c = 0; c < channels; c++) {
@@ -463,7 +465,9 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
       startVoice(api.headFrac());     // pick the sound up where it already is
       const lap = lapTo - lapFrom;
       onWay?.(name, lap);
-      if (!quiet) log(`${LOOP_SAYS[name]} (${lap.toFixed(2)} s a lap)`, 'hi');
+      // The button's own face says which way the next lap runs, and the sound
+      // says it louder than any line of prose could. See above.
+
     },
     /** One press of the button glued to LOOP: → then ← then ⇆ then → again.
      *  ⚠️ A WAY THAT IS NOT IN `LOOP_TURN` LANDS ON THE FIRST: pressing after

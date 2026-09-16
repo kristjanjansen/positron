@@ -219,12 +219,11 @@
   bar = createTransportBar(d.el, deck, {
     scrub: false,
     command,
-    // A wrap fires every lap and is not news; the two marks being set and taken
-    // off are, because a reader cannot read the numbers off the band.
-    onLoop: (what, a, b) => {
-      if (what === 'set') d.log(`looping ${(a / 1000).toFixed(1)}s to ${(b / 1000).toFixed(1)}s of the show`);
-      else if (what === 'off') d.log('the loop is off');
-    },
+    // 🔴 NOTHING IS LOGGED ABOUT THE LOOP, ON INSTRUCTION 2026-09-16: *"rm all
+    // loop messages."*. This said which seconds were being looped and when it
+    // came off, on the argument that a reader cannot read the numbers off the
+    // band. The band, the button and the picture carry it, and a line of prose
+    // beside them is a fourth channel saying what three already say.
   });
 
   createStripView(d.el, deck, { size: 'default', lanes: [{
