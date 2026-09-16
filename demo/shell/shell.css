@@ -2059,3 +2059,115 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-dg-link, .pos-dg-llab { transition: stroke 140ms ease, fill 140ms ease; }
 .pos-dg-l[data-on] .pos-dg-link { stroke: var(--fg); }
 .pos-dg-l[data-on] .pos-dg-llab { fill: var(--fg); }
+
+/* ── presence: online, offline, coming online — shell/presence.mjs ──────────
+   🔴 GREEN AND TWO GREYS, AND THE COLOUR SAYS HOW IT LANDED. This project's
+   standing rule is that a mark's colour says how something landed rather than
+   which lane it is in, and a presence badge is that rule applied to a
+   heartbeat: green means it spoke inside the time it promised to speak in, and
+   grey means it did not. It is not identity, and the subject's name is carried
+   by the label beside it, exactly the way a lane's identity is carried by its
+   row.
+
+   🔴 AND `coming` IS NEVER FULL-STRENGTH GREEN, WHICH IS THE WHOLE OF THE
+   RECONCILIATION. Colouring an unchecked thing as if it passed is an assertion
+   nobody made, so the fill on a thing that is still coming up breathes between
+   0.18 and 0.62 and never reaches 1. A solid still green dot is the only thing
+   on the page that means "it answered". Pale and moving means "on its way".
+
+   🔴 AND THE TWO GREYS ARE TOLD APART BY INK, NOT BY HUE. `offline` is a SOLID
+   grey dot: somebody listened and heard nothing, which is a measurement.
+   `unknown` is a HOLLOW ring: nobody has looked yet, which is not. Hollow is
+   less ink for less knowledge, and it is readable with no colour at all.
+
+   🔴 NOTHING IN HERE CAN CHANGE THE ELEMENT'S SIZE. The only animated property
+   is `opacity` on the fill, which has no effect on layout; the footprint is the
+   ring, which never animates; and the word sits in a box whose `min-width` is
+   reserved from the longest word that badge can say. `--pres-ch` is written by
+   `createPresence` at build time and is a COUNT OF CHARACTERS, which is why
+   nothing here sets letter-spacing: `ch` is the advance of `0`, and tracking
+   would add one space per character on top of a reserve that did not budget
+   for it. */
+.pos-pres {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 500 11px/1 var(--mono);
+  vertical-align: -1px;               /* sits on the baseline of a word beside it */
+  white-space: nowrap;
+  cursor: default;
+}
+/* The footprint. 8 px, `flex: none`, and it is the same box in all four states
+   and at every moment of the animation. */
+.pos-pres-dot {
+  position: relative; flex: none;
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 1px solid currentColor;
+  background: none;
+}
+/* The fill, drawn over the ring rather than inside it, so a full state is one
+   solid disc with no seam. `inset: -1px` is the border box from the padding
+   box, which is what an absolutely positioned child is measured against. */
+.pos-pres-dot::after {
+  content: ''; position: absolute; inset: -1px;
+  border-radius: 50%; background: currentColor;
+  opacity: 1;
+}
+/* The subject's name, which never changes. Tracked-out small caps so that a
+   name and a state cannot be read as one phrase: `the board no word yet` is a
+   sentence nobody wrote, and it happens whenever both halves are the same grey.
+   ⚠️ THE TRACKING IS SAFE HERE AND WOULD NOT BE ON THE WORD, whose box is
+   reserved in `ch` and would overflow by one space per character. */
+.pos-pres-of {
+  font: 500 10px/1 var(--mono); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim2);
+}
+/* The reserve. `min-width` rather than `width`, so a page that hands it a word
+   longer than it declared grows rather than clipping — a truncated state word
+   would be the one failure this box exists to prevent, in a new costume. */
+.pos-pres-w {
+  display: inline-block; text-align: left;
+  min-width: calc(var(--pres-ch, 0) * 1ch);
+}
+
+.pos-pres[data-state="online"]  { color: var(--ok); }
+.pos-pres[data-state="online"]  .pos-pres-w { color: var(--ok); }
+
+.pos-pres[data-state="coming"]  { color: var(--ok); }
+/* the ring is quieter than an online one, so the two are apart even in the
+   brightest frame of the breath */
+.pos-pres[data-state="coming"] .pos-pres-dot {
+  border-color: color-mix(in oklab, var(--ok) 55%, transparent);
+}
+.pos-pres[data-state="coming"] .pos-pres-dot::after { animation: pos-pres-breathe 1400ms ease-in-out infinite; }
+/* grey, not green: the word is the half a reader takes at face value, so the
+   only full-strength statement belongs to a thing that actually answered */
+.pos-pres[data-state="coming"]  .pos-pres-w { color: var(--dim); }
+
+.pos-pres[data-state="offline"] { color: var(--dim2); }
+.pos-pres[data-state="offline"] .pos-pres-w { color: var(--dim); }
+
+.pos-pres[data-state="unknown"] { color: var(--dim2); }
+.pos-pres[data-state="unknown"] .pos-pres-dot::after { opacity: 0; }
+.pos-pres[data-state="unknown"] .pos-pres-w { color: var(--dim2); }
+
+@keyframes pos-pres-breathe {
+  0%, 100% { opacity: .18; }
+  50%      { opacity: .62; }
+}
+/* A thing on its way up still has to be distinguishable from a thing that is
+   there, with no motion at all. Half way up the breath, held. */
+@media (prefers-reduced-motion: reduce) {
+  .pos-pres[data-state="coming"] .pos-pres-dot::after { animation: none; opacity: .45; }
+}
+
+/* Inside something else: the dot alone. The words are CLIPPED rather than
+   removed, so the accessible name is still the whole sentence and the live
+   region still announces a change. `display: none` would take both away, which
+   is how a dot ends up meaning something only to people who can see it. */
+.pos-pres[data-mode="dot"] .pos-pres-w,
+.pos-pres[data-mode="dot"] .pos-pres-of {
+  position: absolute; width: 1px; height: 1px;
+  min-width: 0; margin: 0; padding: 0; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.pos-pres[data-mode="dot"] { gap: 0; }

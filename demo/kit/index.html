@@ -70,6 +70,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createTable } from '/shell/table.mjs';
+  import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
 
@@ -928,6 +929,105 @@ an even number of cells · nothing measured yet is an em dash, never 0`,
       box.style.display = 'block'; box.append(r);
     });
 
+  // ── presence ────────────────────────────────────────────────────────────
+  // 🔴 FOUR STATES, AND THE FOURTH IS THE HONEST ONE. A badge that opens on
+  // `offline` is a page asserting a measurement of hardware in another building
+  // that it has not taken, and it is wrong exactly in the two seconds somebody
+  // is watching. The specimens below are FOUR SEPARATE BADGES rather than one
+  // pressed through four states, because the checks at the bottom measure them
+  // and a check that drives a control is a check a visitor watches happen.
+  const presSpec = new Map();
+  section('online, offline, coming online',
+    'Four states, not three: a thing nobody has asked yet is not offline, which is '
+    + 'the same rule caps.mjs follows when it answers "unknown" about a browser it '
+    + 'could not probe. Green means it spoke inside the time it promised to speak in, '
+    + 'and the two greys are told apart by ink rather than hue: a solid dot is a '
+    + 'measurement, a hollow ring is nobody having looked.',
+    `createPresence({ of: 'the board' }).set('online')
+presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the four`,
+    (box) => {
+      for (const s of PRESENCE_STATES) {
+        const p = createPresence({ state: s });
+        presSpec.set(s, p.el);
+        box.append(p.el);
+      }
+    });
+
+  section('a presence dot inside something else',
+    'The same component with mode "dot": the ring alone, and the words CLIPPED '
+    + 'rather than removed, so the accessible name is still the whole sentence and a '
+    + 'change is still announced. It is an inline box with no margins, so it drops '
+    + 'into a button, a readout key or a row of machines without any of them knowing '
+    + 'what it is.',
+    `createPresence({ of: 'the board', mode: 'dot', state: 'online' })`,
+    (box) => {
+      const b = el('button', '', null, { type: 'button' });
+      b.append(createPresence({ of: 'the board', mode: 'dot', state: 'online' }).el,
+        document.createTextNode(' switch it on'));
+      b.style.cssText = 'display:inline-flex;align-items:center;gap:7px';
+      box.append(b);
+
+      // In a readout key, where a page already prints what a machine is doing.
+      const r = el('div', 'pos-readout');
+      for (const [k, v, u, s] of [['relay', '1', '/16', 'online'], ['board', '', 'ms', 'unknown']]) {
+        const c = el('div', 'pos-cell');
+        const key = el('div', 'pos-k');
+        key.style.cssText = 'display:flex;align-items:center;gap:5px';
+        key.append(createPresence({ of: k, mode: 'dot', state: s }).el, document.createTextNode(k));
+        const val = el('span', 'pos-v', v || null);
+        if (s === 'unknown') val.dataset.state = 'pending';
+        if (u) val.append(el('span', 'pos-u', u));
+        c.append(key, val); r.append(c);
+      }
+      r.style.flex = '1 1 100%';
+      box.append(r);
+
+      // A row of machines, which is the shape /knobs/, /box/, /grains/ and
+      // /rack/ all want and all draw differently today.
+      const list = el('div', '');
+      list.style.cssText = 'flex:1 1 100%;display:grid;gap:6px;font:400 12px/1 var(--mono);color:var(--dim)';
+      for (const [name, s] of [['studio-1', 'online'], ['the board', 'coming'],
+        ['the Mac', 'offline'], ['the headset', 'unknown']]) {
+        const row = el('div', '');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px';
+        row.append(createPresence({ of: name, mode: 'dot', state: s }).el, document.createTextNode(name));
+        list.append(row);
+      }
+      box.append(list);
+    });
+
+  section('a badge that follows a heartbeat',
+    'The picture is the component; the rule beside it is a pure function, so the '
+    + 'number belongs to whoever knows the heartbeat. The board sends box.alive every '
+    + 'five seconds and would pass everyMs 5000; this one is set to two so it can be '
+    + 'watched. Press "it spoke" and it goes green, then leave it alone and it turns '
+    + 'itself grey two beats later, with nothing here counting anything.',
+    `const p = createPresence({ of: 'the board' });
+p.follow({ everyMs: 5000, comingMs: 45000 });   // the board's own beat
+p.seen();                                        // a box.alive arrived
+p.coming();                                      // a synth is starting`,
+    (box) => {
+      const o = out('waiting');
+      const p = createPresence({
+        of: 'the board',
+        onChange: (s, why) => { o.textContent = `${s}${why ? ` · ${why}` : ''}`; },
+      });
+      const start = () => p.follow({ everyMs: 2000, comingMs: 8000 });
+      start();
+      o.textContent = p.state();
+      const row = el('div', 'pos-controls');
+      for (const [name, act] of [
+        ['it spoke', () => p.seen()],
+        ['start it', () => p.coming(true)],
+        ['forget it', start],
+      ]) {
+        const b = el('button', '', name, { type: 'button' });
+        b.addEventListener('click', act);
+        row.append(b);
+      }
+      box.append(p.el, row, o);
+    });
+
   // ── colour ──────────────────────────────────────────────────────────────
   section('what the colours mean',
     '',
@@ -1081,7 +1181,86 @@ green = inside what it promised · amber/red = later`,
     && narrow.arrows === 3 && narrow.ties === 1,
     `left to right: ${tally(wide)} · one column: ${tally(narrow)}`);
 
-  // 7 — 🔴 NOTHING DRAGS THE PAGE SIDEWAYS. `min-width: 0` missing from a
+  // 7 — 🔴 THE PRESENCE BADGE IS THE SAME WIDTH IN ALL FOUR STATES, which is
+  // this project's standing rule about anything that redraws: a live sentence
+  // under a picture reflowed between three and four lines and was reported as
+  // "a horrible jump of content each time it updates". A badge whose word goes
+  // from `online` to `coming online` would shove whatever sits to its right
+  // every time a board answered.
+  //
+  // ⚠️ FOUR BADGES, NOT ONE PRESSED THROUGH FOUR STATES. The claim is identical
+  // and this way nothing a visitor is looking at moves while it is graded,
+  // which is the other rule: a check that mutates is the test.
+  {
+    const w = [...presSpec].map(([s, e]) => [s, e.getBoundingClientRect().width]);
+    const spread = w.length > 1 ? Math.max(...w.map((x) => x[1])) - Math.min(...w.map((x) => x[1])) : -1;
+    d.assert('a presence badge is the same width in all four states',
+      w.length === 4 && spread <= 0.5,
+      w.length === 4 ? `${w.map(([s, x]) => `${s} ${x.toFixed(1)}`).join(' · ')} px, spread ${spread.toFixed(2)}`
+                     : `${w.length} badges were found, so nothing was compared`);
+  }
+
+  // 8 — 🔴 AND THE ANIMATION CANNOT MOVE ANYTHING EITHER, which is a separate
+  // claim from the one above: the reserve fixes the four states against each
+  // other, this fixes every frame of the breathing dot against itself. Read off
+  // the KEYFRAMES rather than off two measurements a moment apart, because a
+  // property that moves the layout for one frame in eighty is a defect two
+  // rects would only catch by luck.
+  {
+    const after = (s) => getComputedStyle(presSpec.get(s).querySelector('.pos-pres-dot'), '::after');
+    const moving = PRESENCE_STATES.filter((s) => (after(s).animationName || 'none') !== 'none');
+    const name = moving.length === 1 ? after(moving[0]).animationName : null;
+    // Every declaration in every keyframe of it, out of the one stylesheet.
+    const props = new Set();
+    for (const sheet of document.styleSheets) {
+      let rules = [];
+      try { rules = [...sheet.cssRules]; } catch { continue; }   // never cross-origin here
+      for (const r of rules) {
+        if (r.type !== CSSRule.KEYFRAMES_RULE || r.name !== name) continue;
+        for (const k of r.cssRules) for (const p of k.style) props.add(p);
+      }
+    }
+    const only = props.size > 0 && [...props].every((p) => p === 'opacity');
+    d.assert('only the state that is coming online animates, and it animates nothing but opacity',
+      moving.join(',') === 'coming' && only,
+      `${moving.length ? moving.join(', ') : 'nothing'} moves · ${name || 'no keyframes'} touches `
+      + `${props.size ? [...props].join(', ') : 'nothing this page can read'}`);
+  }
+
+  // 9 — the four states are told apart by the DOT, not by the word beside it.
+  // Two states that differ only in their label are two states nobody reads,
+  // which undoes the whole reason there are four. Measured ink: the ring's
+  // colour, the fill's colour, the fill's opacity and whether it moves.
+  {
+    const ink = (s) => {
+      const dot = presSpec.get(s).querySelector('.pos-pres-dot');
+      const a = getComputedStyle(dot, '::after');
+      return [getComputedStyle(dot).borderTopColor, a.backgroundColor,
+        Math.round(Number(a.opacity)), a.animationName || 'none'].join(' ');
+    };
+    const inks = PRESENCE_STATES.map(ink);
+    d.assert('and the four are told apart by the dot alone, with the word covered up',
+      new Set(inks).size === 4,
+      PRESENCE_STATES.map((s, i) => `${s}: ${inks[i]}`).join(' · '));
+  }
+
+  // 10 — 🔴 A DOT WHOSE MEANING IS ONLY A COLOUR IS A DOT A SCREEN READER
+  // CANNOT READ. `display: none` on the word is how that happens by accident,
+  // so the embedded mode CLIPS it instead: still in the accessibility tree,
+  // still in the live region, and out of the flow so it costs the host nothing.
+  {
+    const dotMode = document.querySelector('.kit-box .pos-pres[data-mode="dot"]');
+    const wordEl = dotMode?.querySelector('.pos-pres-w');
+    const readable = !!wordEl && getComputedStyle(wordEl).display !== 'none'
+      && wordEl.textContent.trim().length > 0;
+    const wide = dotMode ? dotMode.getBoundingClientRect().width : -1;
+    d.assert('an embedded dot still says its state in words, and still takes only a dot of room',
+      readable && wide > 0 && wide <= 10,
+      dotMode ? `says "${wordEl.textContent}", lays out ${wide.toFixed(1)} px wide`
+              : 'no embedded dot was found, so nothing was compared');
+  }
+
+  // 11 — 🔴 NOTHING DRAGS THE PAGE SIDEWAYS. `min-width: 0` missing from a
   // scrolling row makes it push the whole document instead of scrolling inside
   // itself: MEASURED at 390 px, a tabs row produced 141 px of page overflow.
   // The document, not the element, is the thing to measure, because the element

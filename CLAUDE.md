@@ -760,12 +760,19 @@ TOLD its own room and remember it: the alarm fires with no request, and
 shared and everything around it is partitioned, ask who owns the sharing** — the
 bug was a fact true of every part and of no part's author.
 
-🔴 **`/kit/` IS NOT MACHINE-GRADED.** `node demo/verify.mjs kit` answers
-"nothing for this harness to verify": the page carries no `mount()` and no
-asserts. So the one page whose whole job is to make component drift visible is
-the one page the suite cannot see, and anything demonstrated there has to be
-measured another way (CDP device emulation was used for the tabs). Giving it a
-`mount()` is open work.
+✅ **`/kit/` IS MACHINE-GRADED NOW, AND THIS LINE SAID OTHERWISE FOR WEEKS.**
+It used to say the page carried no `mount()` and no asserts, so the one page
+whose whole job is to make component drift visible was the one page the suite
+could not see, and anything demonstrated there had to be measured another way.
+`node demo/verify.mjs kit` is **22/22** with 15 page asserts, and they are the
+kind only that page can make: a badge measuring the same width in all four of
+its states (spread 0.02 px), an animation that touches opacity and nothing that
+could move a neighbour, two greys told apart by ink rather than hue, an
+embedded dot laying out 8.0 px and still saying its state in words.
+⚠️ **THE LESSON IS ABOUT THIS FILE RATHER THAN ABOUT THE PAGE.** A rule that
+tells an author their work cannot be graded is a rule that stops them trying,
+and this one outlived its own truth. A claim here about what a harness can do
+is checkable in one command, so check it before repeating it.
 
 ## Conventions
 
