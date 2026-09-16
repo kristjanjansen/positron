@@ -987,8 +987,9 @@
    * under the controls rather than in front of them.
    */
   const dg = createDiagram(d.el, {
-    caption: 'A hand moves faster than a filter can be heard to change, so what leaves this '
-      + 'page is thinner than what your hand made: sent is what went, skipped is the rest.',
+    caption: 'Your hand makes more positions than the wire needs to carry, so the page sends a '
+      + 'thinned version of your gesture: SENT counts what went out, SKIPPED counts what was '
+      + 'overtaken before its turn, and PLAYED counts what the board wrote to the synth.',
     nodes: [
       /**
        * 🔴 `join: false`, BECAUSE THESE THREE ARE NOT A CHAIN. REPORTED
@@ -1008,17 +1009,17 @@
         join: false,
         children: [
           { id: 'sliders', label: 'sliders', sub: 'cutoff, resonance', tech: 'browser',
-            note: 'Two ordinary range inputs. What they carry is MIDI control change 74 and '
-                + '71, which is what a hardware filter knob has sent since the 1980s, so '
-                + 'nothing here has to be translated at the far end.' },
+            note: 'Two ordinary range inputs, dragged with a finger or a mouse. Each one sends '
+                + 'a MIDI control change, numbers 74 and 71, which is what the cutoff and '
+                + 'resonance knobs on a synthesiser have sent since the 1980s.' },
           { id: 'gate', label: 'send gate', sub: 'one value per 20ms', tech: 'browser',
-            note: 'A finger reports faster than a filter can answer, so at most one value per '
-                + 'controller per 20 ms frame goes out. The last value of a gesture is never '
-                + 'dropped: it is the one that stays true.' },
+            note: 'A dragging finger reports about a hundred positions a second, far more than '
+                + 'a filter can be heard to follow. This keeps only the newest value for each '
+                + 'slider and sends one every 20 milliseconds.' },
           { id: 'playout', label: 'playout', sub: 'AudioWorklet, 160ms', tech: 'sound',
-            note: 'Holds a cushion before playing any of it, because frames arrive in lumps: '
-                + 'p50 20.0 ms, worst gap 83.6 ms. Too small is a click, too large is a '
-                + 'filter that answers late.' },
+            note: 'Sound crosses the internet in uneven bursts, so this collects 160 '
+                + 'milliseconds before playing any and plays out of that store. Run it empty '
+                + 'and you hear a gap; fill it too deep and the filter answers late.' },
         ] },
       // ⚠️ NO `sub` ON A CONTAINER. Asked 2026-09-16: *"rm outer boxes descs not
       // helpful"*. `phone or laptop`, `one object` and `in another building` were
@@ -1030,46 +1031,51 @@
           // is, so `Relay object` said the kind twice and spent a third of the
           // label's width doing it.
           { id: 'relay', label: 'Relay', sub: 'Durable Object', tech: 'cloudflare',
-            note: 'Copies every message to everybody else in the room and reads none of '
-                + 'them. That is why this page learns which socket is the board rather than '
-                + 'trusting that anything arriving is from it.' },
+            note: 'A small program at Cloudflare that holds a room open and copies every '
+                + 'message to everyone else in it, without reading any of them. It exists '
+                + 'because a browser cannot dial a Raspberry Pi behind a home router.' },
         ] },
       { id: 'pi', label: 'Raspberry Pi', kind: 'box', tech: 'board',
         children: [
           { id: 'yoshimi', label: 'yoshimi', sub: 'ZynAddSubFX', tech: 'sound',
-            note: 'A software synth holding one note, with a patch whose filter answers CC 74. '
-                + 'MEASURED on this board: the controller moves the brightness 6.18 octaves, '
-                + 'from 162 Hz to 11.7 kHz.' },
+            note: 'A software synthesiser, free and open, holding one note for as long as you '
+                + 'let it. Its filter follows controller 74: measured here, the sliders move '
+                + 'the sound from 162 Hz to 11.7 kHz, about six octaves.' },
           { id: 'capture', label: 'capture', sub: 'ffmpeg, JACK', tech: 'board',
-            note: 'Reads the JACK graph the synth plays into and cuts it into 20 ms frames of '
-                + '48 kHz mono. It runs whether or not a note is sounding, which is why a '
-                + 'frame count cannot tell sound from silence.' },
+            note: 'The synth plays into JACK, the sound system Linux studios use, and ffmpeg '
+                + 'reads it from there and cuts it into 20 millisecond pieces. It records '
+                + 'continuously, so pieces keep arriving even when nothing is playing.' },
         ] },
     ],
     links: [
       { from: 'sliders', to: 'gate',
-        note: 'Every move is offered and most are dropped: a value nobody sent is one another '
-            + 'overtook before its turn came round. A release is never dropped.' },
+        note: 'Every position your finger passes through is offered here, and most are thrown '
+            + 'away because a newer one arrives first. The position you let go on is always '
+            + 'kept, since that is the one that stays true.' },
       { from: 'gate', to: 'relay', label: 'ctl.set',
-        note: 'One message carries every controller that is due, because the relay counts '
-            + 'messages rather than values. A two handed sweep is about 5% of what it allows.' },
+        note: 'Both sliders travel in one message rather than two, because the relay limits how '
+            + 'many messages a page may send rather than how much they carry. Sweeping both at '
+            + 'once uses about a twentieth of that allowance.' },
       // ⚠️ `CC`, NOT `CC 74, CC 71`. Asked for after a screenshot showed it
       // wrapping onto two lines over the gap between two machines. Which
       // controllers travel is in the note and on the sliders themselves; what
       // the arrow has room to say is what KIND of thing is crossing.
       { from: 'relay', to: 'yoshimi', label: 'CC',
-        note: 'The board folds whatever arrived and writes at most one value per controller '
-            + 'every 5 ms as three raw MIDI bytes. A backlog of knob positions is not played '
-            + 'out, because all but the last are already wrong.' },
+        note: 'The board writes each value to the synth as three raw MIDI bytes. If several '
+            + 'arrive at once it keeps only the last for each slider, because the earlier ones '
+            + 'describe a position your hand has already left.' },
       { from: 'yoshimi', to: 'capture',
-        note: 'The synth plays into a JACK graph rather than a speaker, so the board makes '
-            + 'this sound whether or not anybody is listening to it.' },
+        note: 'The synth is not connected to a loudspeaker: its output goes straight into the '
+            + 'recorder. The Raspberry Pi makes this sound whether or not anyone is listening '
+            + 'to it.' },
       { from: 'capture', to: 'relay', label: '48kHz mono', back: true,
-        note: 'Fifty frames a second, each with a twelve byte header carrying its own number. '
-            + 'A gap in those numbers is what the LOST cell counts.' },
+        note: 'Fifty pieces of sound a second, each stamped with a number so the far end can '
+            + 'tell whether any went missing on the way. The LOST cell above counts gaps in '
+            + 'those numbers.' },
       { from: 'relay', to: 'playout', back: true,
-        note: 'The same room and the same socket the controls went out on. Audio in this room '
-            + 'is the board and nothing else, which is how the badge knows it is there.' },
+        note: 'The sound comes back down the same connection the slider values went out on. '
+            + 'Nothing else sends audio into this room, so its arrival is also how the page '
+            + 'knows the Raspberry Pi is still there.' },
     ],
     // ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC. Put
     // inside it they are silently ignored, and the page shipped with no heading
