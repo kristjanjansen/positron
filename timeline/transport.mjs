@@ -2569,10 +2569,38 @@ export function createDeck({
     transport.seek(span[0]);
   }
   let rangeGen = 0;
+  /**
+   * 🔴 THE LOOP, PUBLISHED ON THE DECK SO THE PICTURE CAN DRAW IT. Asked for
+   * 2026-09-16: *"timeline global feature: draw loop boundaries (depends on
+   * loop cycle state) and add light transclucent shade on loop area on
+   * timeline"*.
+   *
+   * The loop itself belongs to the transport BAR, which is right: the bar owns
+   * the three presses, the wrap and the live window, and it keeps only two
+   * numbers. But a strip drawing the same deck had no way to learn about it,
+   * and every page with both was drawing a picture of time with the loop
+   * missing from it. The deck is the one object the two share, so the bar
+   * publishes here and anything drawing this deck can read it.
+   *
+   * ⚠️ IT IS A VIEW, NOT A MECHANISM. Nothing in this file acts on it: the deck
+   * does not wrap, does not seek and does not know what a lap is. Writing a
+   * loop here does not make one.
+   */
+  let loopView = null;
   return {
     transport, sched, items, adapters, range: span, hostName: host.name,
     /** getter, not a frozen number: setRange() can move it (v0.5). */
     get durationMs() { return durationMs; },
+    /** `{a, b, state}` while a bar has a loop on this deck, else null.
+     *  `state` is the bar's own three: 'armed' (one mark down, and on a live
+     *  deck a window still filling) or 'on'. There is no 'off': off is null. */
+    get loopView() { return loopView; },
+    setLoopView(v) {
+      loopView = v && v.a != null
+        ? { a: v.a, b: v.b ?? null, state: v.state || 'armed', filling: !!v.filling }
+        : null;
+      return loopView;
+    },
     /** how many times the range has moved — a positional reader (a cursor
      *  client, a scrubber) can cheaply notice it must re-derive. */
     rangeGen: () => rangeGen,

@@ -17,6 +17,12 @@
 import { observePosition } from '/timeline/transport.mjs';
 import { el } from './shell.mjs';
 import { createChoice } from './choice.mjs';
+// 🔴 ONE TABLE FOR WHICH WAY A LOOP RUNS, AND IT ALREADY EXISTS. `looper.mjs`
+// owns the vocabulary because it owns the audio version of this control; a
+// second copy of the three glyphs here is how two pages end up disagreeing
+// about what the middle one means. `looper.mjs` imports nothing, so this is a
+// leaf dependency and not a cycle.
+import { WAY_GLYPH, WAY_SAYS, LOOP_TURN, LOOP_WAYS } from './looper.mjs';
 
 /**
  * `scrub: false` — ONE POSITION SURFACE PER PAGE.
@@ -81,6 +87,24 @@ export function createTransportBar(host, deck, {
    * LOOP, which is why the group below exists.
    */
   loopExtras = [],
+  /**
+   * 🔴 THE THREE DIRECTIONS, FOR A LOOP THE DECK ITSELF PLAYS. Asked for
+   * 2026-09-16: *"in draw allow < > <> loop mode"*.
+   *
+   * A page with an `AudioContext` gets this from `looper.mjs`, which mirrors a
+   * kept buffer and plays the copy. A page whose loop is a DECK has no buffer
+   * to mirror, and the deck cannot help: `transport.setRate` throws on a
+   * negative rate in as many words, `negative rate unsupported in v0`. So the
+   * bar drives a reversed lap itself, from its own clock, seeking the deck
+   * frame by frame while it is paused. See `startLap` below.
+   *
+   * ⚠️ NOT FOR A MEDIA-BACKED PAGE. `/replay/` refused these on the argument
+   * that a picture only runs forwards, and that argument still holds wherever
+   * the deck is a FOLLOWER of an element: seeking it backwards fights whatever
+   * is mastering it. This is for a deck that IS the thing being played, which
+   * on this site means a drawn record rather than a recording.
+   */
+  loopWays = false,
   // A LIVE DECK HAS NO END. The bar arms a one-shot at range[1] and, when it
   // fires, pauses the deck and parks the playhead there — right for a
   // recording, wrong for a window whose right-hand end is the present moment,
@@ -128,6 +152,10 @@ export function createTransportBar(host, deck, {
    * starts keeping it NOW. The bar holds no audio of its own.
    */
   onLoop = null,
+  /** `(way)` — 'round' | 'back' | 'pingpong', when the direction button is
+   *  pressed. A page that says what its loop is doing elsewhere reads it here;
+   *  the button's own face already carries the state. */
+  onWay = null,
   /**
    * How much live sound one loop may hold, in milliseconds.
    *
@@ -177,8 +205,15 @@ export function createTransportBar(host, deck, {
   // not a side control, and putting it in `.pos-controls` would have said it was
   // something you do to the page rather than to the playhead. They sit next to
   // the toggle and are returned by id so a page can relabel or disable one.
+  let wayAt = 0;                                  // an index into LOOP_TURN
+  const wayName = () => LOOP_WAYS[LOOP_TURN[wayAt]][1];
+  const wayEntry = {
+    id: 'way', label: WAY_GLYPH[LOOP_WAYS[LOOP_TURN[0]][1]], always: true,
+    aria: 'which way the loop plays', title: WAY_SAYS[LOOP_WAYS[LOOP_TURN[0]][1]],
+    onPress: () => cycleWay(),
+  };
   const loopExtraEls = new Map();
-  for (const x of loopExtras) {
+  for (const x of (loopWays ? [wayEntry, ...loopExtras] : loopExtras)) {
     const b = el('button', 'tbar-x', x.label,
       { type: 'button', 'aria-label': x.aria || x.id, 'aria-pressed': 'false' });
     b.dataset.id = x.id;
@@ -475,7 +510,10 @@ export function createTransportBar(host, deck, {
       timeNow.textContent = clock(pos, absolute);
       timeAll.textContent = seekable ? clock(range[1] - range[0], false) : '';
     }
-    const playing = deck.playing?.() ?? false;
+    // `rolling()`, not `deck.playing()`: a reversed lap runs with the deck
+    // paused and the bar seeking it, and a PAUSE glyph over a moving playhead
+    // is a control lying about the state it is in.
+    const playing = rolling();
     toggle.dataset.state = playing ? 'playing' : atEnd ? 'ended' : 'paused';
     // 🔴 THE WRAP, RATE-LIMITED, AND THE LIMIT IS NOT A SAFETY MARGIN — IT IS
     // THE FIX. A seek is not instant on every kind of deck, so the frame after
@@ -485,7 +523,9 @@ export function createTransportBar(host, deck, {
     // not free — rate-limit it.*
     // ⚠️ AND ONLY WHILE ROLLING. Wrapping a paused deck would drag the playhead
     // back under somebody who is scrubbing inside their own loop.
-    if (loopA != null && loopB != null && playing && pos >= loopB) {
+    // ⚠️ NOT WHILE THE LAP DRIVER HAS IT. That loop owns both edges and wraps
+    // on its own clock; this one would wrap it a second time at the far end.
+    if (!lapRaf && loopA != null && loopB != null && playing && pos >= loopB) {
       const t = performance.now();
       if (t - lastWrap > 150) { lastWrap = t; doSeek(loopA); onLoop?.('wrap', loopA, loopB); }
     }
@@ -614,7 +654,12 @@ export function createTransportBar(host, deck, {
   // well defined in this library in a way it is not for a media element: a
   // backward seek replays each event exactly once.
   toggle.addEventListener('click', () => {
+    // A reversed lap is playing even though the deck is not, so pausing one is
+    // stopping the driver rather than pausing a transport that is already
+    // stopped. Pressing play again picks the lap up where it left off.
+    if (lapRaf) { stopLap(); return; }
     if (deck.playing?.()) return cmd.pause();
+    if (loopA != null && loopB != null && wayName() !== 'round') return startLap();
     if (endStop && (atEnd || (seekable && deck.position() >= range[1]))) leaveEnd(range[0]);
     cmd.play();
   });
@@ -779,6 +824,84 @@ export function createTransportBar(host, deck, {
     startLoop(loopA, fillEnds);
   }
 
+  /**
+   * 🔴 A LAP THE BAR DRIVES ITSELF, BECAUSE THE DECK WILL NOT RUN BACKWARDS.
+   * `transport.setRate` throws `negative rate unsupported in v0`, so `←` and
+   * `⇆` cannot be a rate. What they are instead: the deck is PAUSED and this
+   * seeks it once a frame from the bar's own clock, which is the same
+   * arithmetic `looper.mjs` does to a buffer and is the only place in this file
+   * that owns a frame loop.
+   *
+   * ⚠️ `observePosition` KEEPS TICKING WHILE THE DECK IS PAUSED (it is a plain
+   * rAF, checked rather than assumed), so the clock, the fill and the head in
+   * this bar follow a reversed lap without a second painter.
+   * ⚠️ AND THE TOGGLE HAS TO KNOW. `deck.playing()` is false for the whole of a
+   * reversed lap, so `rolling()` below is what everything in this file asks
+   * instead: a bar showing PAUSE over a moving playhead is a control lying
+   * about the state it is in.
+   */
+  let lapRaf = 0, lapAt = 0, lapPrev = 0;
+  const rolling = () => (deck.playing?.() ?? false) || !!lapRaf;
+
+  function lapRate() {
+    const r = typeof deck.targetRate === 'function' ? deck.targetRate() : deck.targetRate;
+    const n = Math.abs(Number(r));
+    return n > 0 ? n : 1;
+  }
+
+  function startLap() {
+    stopLap();
+    if (loopA == null || loopB == null || loopB - loopA <= 0) return;
+    if (deck.playing?.()) cmd.pause();
+    // Pick the lap up where the playhead already is, so changing direction
+    // mid-loop does not jump the sound or the picture back to a mark.
+    const span = loopB - loopA;
+    const at = Math.min(Math.max(deck.position(), loopA), loopB);
+    const into = wayName() === 'back' ? loopB - at : at - loopA;
+    lapAt = performance.now() - into / lapRate();
+    lapPrev = into;
+    lapRaf = requestAnimationFrame(driveLap);
+  }
+
+  function stopLap() {
+    if (lapRaf) cancelAnimationFrame(lapRaf);
+    lapRaf = 0;
+  }
+
+  function driveLap(now) {
+    lapRaf = 0;
+    if (loopA == null || loopB == null || wayName() === 'round') return;
+    const span = loopB - loopA;
+    if (!(span > 0)) return;
+    const gone = Math.max(0, (now - lapAt) * lapRate());
+    let pos;
+    if (wayName() === 'back') {
+      const p = gone % span;
+      if (p < lapPrev) onLoop?.('wrap', loopA, loopB);
+      lapPrev = p;
+      pos = loopB - p;
+    } else {
+      const p = gone % (span * 2);
+      if (p < lapPrev) onLoop?.('wrap', loopA, loopB);
+      lapPrev = p;
+      pos = p < span ? loopA + p : loopB - (p - span);
+    }
+    doSeek(pos);
+    lapRaf = requestAnimationFrame(driveLap);
+  }
+
+  /** One press of the button glued to LOOP: the three directions, in turn. */
+  function cycleWay() {
+    wayAt = (wayAt + 1) % LOOP_TURN.length;
+    const name = wayName();
+    const b = loopExtraEls.get('way');
+    if (b) { b.textContent = WAY_GLYPH[name]; b.title = WAY_SAYS[name]; b.setAttribute('aria-label', WAY_SAYS[name]); }
+    onWay?.(name);
+    if (loopA == null || loopB == null) return;      // it acts on the NEXT loop
+    if (name === 'round') { stopLap(); if (!deck.playing?.()) cmd.play(); }
+    else startLap();
+  }
+
   /** Both marks are known: arm the loop, go back to its start and roll. */
   function startLoop(a, b) {
     filling = false; fillEnds = null;
@@ -787,8 +910,9 @@ export function createTransportBar(host, deck, {
     loopA = a; loopB = b;
     drawLoop();
     clearNote();
-    if (!(deck.playing?.() ?? false)) cmd.play();
     doSeek(loopA);
+    if (wayName() === 'round') { if (!(deck.playing?.() ?? false)) cmd.play(); }
+    else startLap();
     onLoop?.('set', loopA, loopB);
   }
 
@@ -808,6 +932,13 @@ export function createTransportBar(host, deck, {
     // case needs no fourth colour and no stylesheet of its own. What the live
     // case adds is the blink, which is opacity and takes no room.
     loopBtn.dataset.loop = on ? 'on' : loopA != null ? 'armed' : 'off';
+    // 🔴 AND THE PICTURE IS TOLD. The bar owns the loop and keeps two numbers;
+    // a strip drawing the same deck had no way to learn about them, so every
+    // page with both drew a picture of time with the loop missing from it.
+    // `deck.setLoopView` is the one object the two share. The state published
+    // is the same word this button is wearing.
+    deck.setLoopView?.(loopA == null ? null
+      : { a: loopA, b: loopB, state: on ? 'on' : 'armed', filling });
     // they act on a loop, so they exist while there is one and not before —
     // unless they were declared `always`, which means they act on the NEXT one.
     for (const b of loopExtraEls.values()) if (!b.dataset.always) b.hidden = !on;
@@ -824,6 +955,7 @@ export function createTransportBar(host, deck, {
 
   function clearLoop(why) {
     const wasLive = live && loopA != null;
+    stopLap();
     loopA = loopB = null;
     filling = false; fillEnds = null;
     clearFill();
@@ -967,6 +1099,9 @@ export function createTransportBar(host, deck, {
     /** null when there is none; `[a, b]` while one is running. The harness
      *  grades the loop from here rather than from the button's label. */
     get loop() { return loopA != null && loopB != null ? [loopA, loopB] : null; },
+    /** which way the next lap runs: 'round' | 'back' | 'pingpong'. A check
+     *  reads this rather than the glyph on the button. */
+    get way() { return wayName(); },
     get loopArmed() { return loopA != null && loopB == null; },
     /** live only: the window is open and the live edge is filling it. */
     get loopFilling() { return filling; },
@@ -1024,6 +1159,7 @@ export function createTransportBar(host, deck, {
     note,
     destroy() {
       stop();
+      stopLap();          // a frame loop outliving its bar seeks a dead deck
       clearEnd();
       clearFill();
       setBlink(false);

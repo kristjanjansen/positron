@@ -949,6 +949,15 @@
   // exactly this one control.
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
+    /**
+     * 🔴 THE THREE DIRECTIONS, ASKED FOR 2026-09-16: *"in draw allow < > <>
+     * loop mode"*. `/replay/` refused them and was right to: a picture only
+     * runs forwards and reversing sound needs a buffer. Neither applies here.
+     * What plays on this page is a RECORD of a hand, read through a deck at
+     * whatever position the transport asks for, so a lap backwards is the same
+     * record read the other way and the line simply draws itself in reverse.
+     */
+    loopWays: true,
     extras: [{ id: 'rec', title: 'Record', label: '\u25CF',
                onClick: () => setRecording(!recording) }],
   });

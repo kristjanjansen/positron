@@ -14,6 +14,17 @@ import { el } from './shell.mjs';
 
 export const SIZES = { mini: 'strip-mini', default: 'strip', deep: 'strip-deep', auto: 'strip-auto' };
 
+/** One token, read once, with the library's own fallback if there is no
+ *  stylesheet. `grain-scope.mjs` reads the same `--dim2` for the same marks,
+ *  which is what makes a loop on the wave and a loop on the line one picture
+ *  rather than two greys that happen to be close. */
+function tok(name, fallback) {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  } catch { return fallback; }
+}
+
 export function createStripView(host, deck, { size = 'default', lanes = [], ...opts } = {}) {
   const cls = SIZES[size] || SIZES.default;
   const canvas = el('canvas', `pos-strip ${cls}`);
@@ -26,6 +37,9 @@ export function createStripView(host, deck, { size = 'default', lanes = [], ...o
     // follows them when a lane is added or removed at runtime
     autoHeight: size === 'auto' || undefined,
     ...opts,
+    // the page's own theme still wins, and a page that says nothing gets the
+    // loop grey the waveform already uses
+    theme: { loop: tok('--dim2', '#6a7280'), ...(opts.theme || {}) },
   });
   if (lanes.length) strip.setLanes(lanes);
 
