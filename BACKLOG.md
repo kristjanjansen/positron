@@ -15,6 +15,39 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **`box.ping` IS BROKEN ON THE BOARD AND `/box/`'s `rtt` CAN NEVER FILL.**
+  Found 2026-09-16 while building `/knobs/`. It replies `box.pong` with an `at`
+  field, `at` is an ENVELOPE field, so the board's own `format()` throws and the
+  handler answers `box.error` instead. `rig/box/listen.html` times a pong that
+  never arrives. `/knobs/` works around it with `openWire.ping()`, which is the
+  relay round trip with the Durable Object never woken and needs no board at
+  all, but the board's verb is still wrong.
+
+- **`ctlMeter()` DOES NOT REPORT `ctrls`.** `plan-controller.md` §4.2 specifies
+  `{in, out, folded, ctrls}` and step 2 shipped `{in, out, folded, forMs, on,
+  channel}`. Without the map, a page cannot assert that the last value it sent
+  is the last value the board holds, and a page that reconnects cannot re-sync
+  from the board's own state. A small change to `rig/box/box.mjs`.
+
+- ⚠️ **`/rack/` MAY BE CLIPPING AT FULL SCALE, UNVERIFIED.** It posts an
+  `Int16Array` straight into `pcm-playout`, whose ring is a `Float32Array` that
+  stores what it is given; `/box/` divides by 32768 first. Noticed while reading
+  the playout for `/knobs/`, not measured. ⚠️ That page's own comment records
+  *"it sounded noisy for an hour while six measurements said the stream was
+  perfect"*, which is what this would look like.
+
+- ⚠️ **`d.logs` DOES NOT EXIST**, only `window.__demo.logs` and `d.api.logs`.
+  `/rack/` reads `d.logs.length` at line 255, on exactly the branch that runs
+  when the studio Mac is off, so it throws a TypeError there.
+
+- 🔴 **STEP 0 OF `plan-controller.md` IS STILL UNMEASURED, AND IT IS THAT PLAN'S
+  OWN LOAD-BEARING UNKNOWN.** Nobody has established that Yoshimi's CC 74 and 71
+  actually move `Analog Filter 1` on this board. §7.1 says the failure is
+  silent: every counter on `/knobs/` reads correct while the sound does not
+  change. It needs a person to say the board is free, because it starts audio.
+  Steps 4 (the diagram), 5 (the measurements), 6 (the SuperCollider voice) and 7
+  (`audio.start {onlyIfIdle:true}`) are also outstanding.
+
 - **PAPPUS LEAVES `/box/`'S SIGNAL PATH, AND THE DIAGRAM SAYS WHAT IS THERE.
   ASKED 2026-09-16:** *"plan and remove pappus from the
   http://127.0.0.1:8890/box/ signal path. there is no ui to control it. arhvice
@@ -32,6 +65,27 @@ file by being finished or by being refused in writing, never by being forgotten.
   pipeline -- you tell me what is feasible. initially like 2 sliders only (filer
   / resonance?) to show off the pipeline. do plan and report it here in
   detail when ready"*. A PLAN, reported in detail, before any code.
+  `plan-controller.md` is that plan and its build order has eight steps.
+  **Steps 1, 2 and 3 are built.** Step 1 is the send gate in
+  `demo/shell/cc-adapter.mjs` (`makeCcSend`), graded 13/13 by
+  `node demo/shell/cc-send-test.mjs`. Step 2 is `ctl.set` and `ctl.meter` in
+  `rig/box/box.mjs`. Step 3 is `/knobs/` (the slug is `knobs`, asked for on
+  2026-09-16, not the plan's `knob`), 14 asserts, 20/20 through
+  `node demo/verify.mjs knobs`.
+  ⚠️ **NOT DONE, AND NAMED SO THEY ARE NOT LOST.** Step 0 was SKIPPED: nobody
+  has measured whether Yoshimi's CC 74 and 71 actually move a chosen patch on
+  this board, which plan-controller §2.4 calls the single load-bearing unknown
+  and §7.1 says fails SILENTLY, with every counter on the page reading correct
+  while the sound does not change. Step 4 is the diagram. Step 5 is the
+  measurements (`lag` by a centroid crossing, the board's own frame stamp read
+  for the first time, the cushion priced at 100 ms and at 60). Step 6 is the
+  SuperCollider voice, only if step 0 says it is needed. Step 7 is
+  `audio.start {onlyIfIdle:true}`.
+  🔴 **AND NOTHING HAS EVER BEEN SENT TO THE BOARD FROM ANY OF IT.** A person
+  has not said the board is free, so `/knobs/` holds every board action back
+  under `?selfcheck=1` and the suite has never started Yoshimi. The first
+  person to press Play on a free board is the first time this path makes a
+  sound.
 
 - **THE LOOP SAYS NOTHING IN WORDS. ASKED 2026-09-16 WITH A SCREENSHOT OF THE
   BADGE:** *"rm all loop messages."*. The bar's notes (`the two marks are in the
