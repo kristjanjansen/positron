@@ -487,18 +487,41 @@
     const best = soundfonts.slice().sort((a, b) =>
       (/fluidr3/i.test(b.name) ? 1 : 0) - (/fluidr3/i.test(a.name) ? 1 : 0)
       || (b.bytes || 0) - (a.bytes || 0))[0];
-    opts.push(['sampled', { src: 'fluidsynth', slow: false, msg:
+    /**
+     * 🔴 THE BOARD IS LOCKED TO YOSHIMI. Instructed 2026-09-16: *"just lock to
+     * yoshimi (disable sampled and hexter in box ui)"*.
+     *
+     * There is ONE JACK graph, ONE capture and ONE room, so whatever is playing
+     * is what every listener on every page hears. Changing instrument here
+     * takes it away from anybody else mid note, and it did: `/knobs/` was found
+     * refusing to start because somebody had pressed `sampled` from this row,
+     * and that page cannot work at all without yoshimi's filter.
+     *
+     * ⚠️ DISABLED WITH THE REASON ON THEIR FACE, NEVER REMOVED. `caps.mjs`
+     * settles this for the whole project: a control that vanishes says the
+     * feature does not exist, which is a different and false statement. The
+     * board still has FluidSynth and hexter, they still work, and the day the
+     * capture stops being shared they come back by deleting `LOCKED`.
+     */
+    const LOCKED = 'yoshimi';
+    const WHY_LOCKED = 'one instrument at a time, and /knobs/ needs this one';
+    opts.push(['sampled', { src: 'fluidsynth', slow: false, off: WHY_LOCKED, msg:
       best ? { type: 'audio.start', source: 'fluidsynth', soundfont: best.path }
            : { type: 'audio.start', source: 'fluidsynth' } }]);
     for (const k of ['hexter', 'yoshimi']) {
       if (avail && avail[k] === false) continue;
-      opts.push([k, { src: k, slow: true, msg: { type: 'audio.start', source: k } }]);
+      opts.push([k, { src: k, slow: true, off: k === LOCKED ? null : WHY_LOCKED,
+                      msg: { type: 'audio.start', source: k } }]);
     }
     instOpts = opts;
     instPick = createChoice({
       label: 'instrument',
       options: opts,
       onPick: async (v, label, i) => {
+        // The lock, enforced where the press lands rather than only in the
+        // paint: a disabled button that still acts is the shape of control this
+        // project calls a lie.
+        if (v.off) { d.log(`${label} is off: ${v.off}`, 'warn'); return; }
         await startAudio();
         arm(v.src);
         // Starting a JACK instrument takes ten to forty seconds, so the button
@@ -508,6 +531,20 @@
         send({ type: 'audio.stop' });
         setTimeout(() => send(v.msg), 400);
       },
+    });
+    /**
+     * ⚠️ `createChoice` DISABLES ALL OR NONE, so the lock is applied to the
+     * buttons it built. The reason goes in `title`, which is what a hand on a
+     * mouse gets, and in `aria-disabled` alongside the real `disabled`, so it
+     * is announced rather than simply unreachable.
+     */
+    opts.forEach(([label, v], i) => {
+      const b = instPick.buttons[i];
+      if (!b || !v.off) return;
+      b.disabled = true;
+      b.dataset.off = '1';
+      b.title = `${label} is on the board and switched off here: ${v.off}`;
+      b.setAttribute('aria-disabled', 'true');
     });
     picks.insertBefore(instPick.el, fxWrap);
     arm(armed);
