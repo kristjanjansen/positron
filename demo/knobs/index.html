@@ -214,12 +214,29 @@
         if (!first) d.log(`${starved} ran dry, ${trimmed} trimmed · cushion ${Math.round(bufMs)} ms`, 'warn');
       }
     };
-    // The cushion is OURS, not the browser's, which is the whole reason to
-    // carry the samples rather than use WebRTC. 100 ms with a ratchet to 250:
-    // 60 ms is under the worst single arrival gap this relay produces
-    // (108.6 ms measured), and a cushion has no restoring force, so only a
-    // floor that grows when it is proved too small is safe over a long session.
-    playout.port.postMessage({ cmd: 'floor', ms: 100, adaptive: true, maxMs: 250 });
+    /**
+     * The cushion is OURS, not the browser's, which is the whole reason to carry
+     * the samples rather than use WebRTC.
+     *
+     * 🔴 160 ms, RAISED FROM 100 ON A MEASUREMENT AND A REPORT. Reported
+     * 2026-09-16 while listening: *"some vobbly sound, cutoffs, not nice"*, with
+     * a log full of `ran dry` and `trimmed`. MEASURED off this relay the same
+     * minute, 992 frames in 20 s with a node client and no browser in the way:
+     * nothing was lost and the mean gap was exactly 20.0 ms, but p90 was 29.5,
+     * p99 was 43.5 and the worst single gap was 83.6 ms. A 100 ms cushion has
+     * 16 ms left after a lump like that, and the page's own older note records a
+     * 108.6 ms gap, which a 100 ms cushion cannot survive at all.
+     *
+     * ⚠️ NOTHING IS BEING LOST ON THE WIRE, which is what makes this a cushion
+     * decision rather than a network one: the frames all arrive, some of them
+     * in lumps. A cushion has no restoring force, so the floor still ratchets
+     * when it is proved too small.
+     * ⚠️ AND IT COSTS WHAT IT COSTS: 60 ms more between a hand and the sound,
+     * on a path whose round trip is about 45 ms. The trade is a filter that
+     * answers a little later against one that clicks, and a click is the one a
+     * listener cannot ignore.
+     */
+    playout.port.postMessage({ cmd: 'floor', ms: 160, adaptive: true, maxMs: 400 });
   }
 
   /**
@@ -471,7 +488,12 @@
    * ⚠️ `comingMs` IS 45 s BECAUSE THAT IS HOW LONG YOSHIMI TAKES on a cold
    * board, ten to forty seconds, measured on this one.
    */
-  const pres = createPresence({ of: 'board' });
+  // 🔴 THE NAME IS WHAT THE THING IS CALLED. Asked 2026-09-16: *"'rasperry pi
+  // online'"*. `board` is this repo's own shorthand for it, which is the kind of
+  // private vocabulary CLAUDE.md keeps out of anything a visitor reads, and it
+  // is vaguer than the truth: the page already says a Raspberry Pi in another
+  // building, and the diagram on /box/ calls the same machine by the same name.
+  const pres = createPresence({ of: 'Raspberry Pi' });
   pres.follow({ everyMs: 5000, comingMs: 45000 });
   pres.checking();          // a question is out before anything has answered
 

@@ -2149,7 +2149,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    reaches full and never stops moving, so the state is carried by MOTION, which
    a still dot cannot imitate. Two greens in one 8 px dot is a seam a reader
    sees before they read anything. */
-.pos-pres[data-state="coming"] .pos-pres-dot { border-color: var(--ok); }
+.pos-pres[data-state="coming"] .pos-pres-dot { border-color: transparent; }
 .pos-pres[data-state="coming"] .pos-pres-dot::after { animation: pos-pres-breathe 1400ms ease-in-out infinite; }
 /* grey, not green: the word is the half a reader takes at face value, so the
    only full-strength statement belongs to a thing that actually answered */
@@ -2160,7 +2160,12 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    green-and-moving is the instrument starting. The ring is the same grey as the
    fill, for the reason the coming dot's ring is the same green as its. */
 .pos-pres[data-state="checking"] { color: var(--dim2); }
-.pos-pres[data-state="checking"] .pos-pres-dot { border-color: var(--dim2); }
+/* 🔴 NO RING ON A MOVING DOT. Asked 2026-09-16: *"coming online / checking: no
+   border"*. A ring is a fixed edge and the fill inside it is breathing, so the
+   two read as a dot rattling inside a hoop rather than as one thing pulsing.
+   The settled states keep their ring, which is what carries `unknown` as a
+   hollow one. */
+.pos-pres[data-state="checking"] .pos-pres-dot { border-color: transparent; }
 .pos-pres[data-state="checking"] .pos-pres-dot::after {
   background: var(--dim2);
   animation: pos-pres-breathe 1400ms ease-in-out infinite;
