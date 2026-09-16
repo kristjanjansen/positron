@@ -10,12 +10,13 @@
   /* The table's own rows carry the columns; this is only the line under it that
      says what an agent should ask for.
      🔴 NO `margin`, AND THE FIRST VERSION HAD ONE. `margin: 0` here looks like
-     tidiness and is a page overruling the shell: `.pos-body > * + *` and
-     `.where` have the SAME specificity, so the page's stylesheet wins on order
-     and the 22 px between the table and this line became 0. MEASURED at 0, then
-     at 22 with this removed. CLAUDE.md: vertical spacing is a rule, not a
-     per-page decision, and the rhythm lives on the gap between siblings so that
-     no element can disagree with its neighbour about it. */
+     tidiness and was a page overruling the shell: the rhythm rule and `.where`
+     had the SAME specificity, so the page's stylesheet won on order and the gap
+     between the table and this line became 0. MEASURED at 0, then at the full
+     gap with this removed. `.pos-stack` outweighs a single class since
+     2026-09-16, so the same mistake would now be silent rather than visible,
+     which is a reason to keep this line rather than to delete it: a margin that
+     does nothing is still a claim nobody should have to check. */
   .where {
     font: 400 11px/1.6 var(--mono); color: var(--dim2);
     overflow-wrap: anywhere;

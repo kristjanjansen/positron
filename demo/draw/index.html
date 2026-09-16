@@ -1401,6 +1401,44 @@
     settleAt = fadeFrom;
   }
 
+  /**
+   * 🔴 THE LOOP PAIR WEARS THE SAME EDGE AS EVERY OTHER BUTTON ON THE BAR, AND
+   * THIS PAGE IS WHERE THAT CAN BE SAID. Reported four separate times, the last
+   * one 2026-09-16 with a photograph of this exact row: *"global: loop buton
+   * borders as rest of button"*. MEASURED here before the repair — the pair read
+   * `rgb(106, 114, 128)` while the rate buttons beside it read `rgb(43, 53, 70)`,
+   * which is text grey against a button edge, two and a half times lighter.
+   *
+   * ⚠️ IDLE ONLY, AND THE ARMED RATE IS CHECKED AS THE CONTROL. A state is
+   * allowed to override its own edge: a running loop paints `--fg` and the
+   * armed rate keeps its yellow outline. If this check simply demanded that
+   * every button on the bar match, it would go red on the thing that is working
+   * — so it asserts the two idle families are EQUAL and that the armed rate is
+   * DIFFERENT, which is the pair of claims that can tell the defect from the
+   * design.
+   * ⚠️ `/draw/` is the only demo in the suite that draws a loop pair at all:
+   * `/radio/` and `/tapes/` are the other two and both reach a server that is
+   * not ours.
+   */
+  {
+    const bc = (e) => (e ? getComputedStyle(e).borderColor : 'none');
+    const grp = document.querySelector('.tbar-loopgrp');
+    const loopBtn = grp?.querySelector('.tbar-loop');
+    const wayBtn = grp ? [...grp.children].find((c) => c !== loopBtn) : null;
+    const rates = [...document.querySelectorAll('.tbar-rates button')];
+    const idleRate = rates.find((b) => b.getAttribute('aria-pressed') !== 'true');
+    const armedRate = rates.find((b) => b.getAttribute('aria-pressed') === 'true');
+    const was = loopBtn?.dataset.loop;
+    if (loopBtn) loopBtn.dataset.loop = 'off';
+    const edges = [bc(loopBtn), bc(wayBtn), bc(idleRate)];
+    const armedEdge = bc(armedRate);
+    if (loopBtn && was) loopBtn.dataset.loop = was;
+    d.assert('an idle loop pair wears the same edge as the rate buttons beside it',
+      !!grp && !!loopBtn && !!wayBtn && !!idleRate && !!armedRate
+      && edges.every((c) => c === edges[0]) && armedEdge !== edges[0],
+      `LOOP ${edges[0]} · way ${edges[1]} · a rate ${edges[2]} · the armed rate ${armedEdge}`);
+  }
+
   render();
   publish();
   reframe();          // the empty page opens at the zoom a recording will use
