@@ -843,6 +843,34 @@
      * that creeps back in the next time somebody reaches for the transport,
      * because a scrub and an end are what a transport USUALLY has.
      */
+    /**
+     * 🔴 THE PICTURE IS LAST AND CARRIES THE STANDING HEADING, AND THIS PAGE
+     * SHIPPED WITH NEITHER. REPORTED 2026-09-16 with a screenshot: *"no heading
+     * on diagram. and not last in page. breaking the rules afgain and afain"*.
+     *
+     * The cause was that `how` and `atEnd` are `createDiagram`'s THIRD argument
+     * and had been written inside the spec, where they are two unread keys
+     * rather than an error. Nothing could see it: not the parser, not `cuts`,
+     * not the suite. So it is a check now, and it is about the page rather than
+     * about the call, because the next way to get this wrong will not be the
+     * same way.
+     */
+    const kids = [...document.body.children].map((e) => e.className.split(' ')[0]);
+    const fig = kids.lastIndexOf('pos-dg');
+    /**
+     * 🔴 AND THE PICTURE REPORTS ITS OWN DAMAGE. `createDiagram` collects every
+     * label it had to shorten, every note over about forty words and every
+     * arrow it could not route, and a page that never reads that list ships a
+     * cut label looking exactly like a picture that is fine.
+     */
+    d.assert('nothing in the picture was cut, shortened or left undrawn',
+      (dg.cuts?.length ?? 0) === 0,
+      (dg.cuts?.length ?? 0) === 0 ? `${dg.ties ?? 0} tie(s), nothing reported`
+        : dg.cuts.map((c) => `${c.id}: ${c.shown}`).join(' · '));
+    d.assert('the picture is the last thing on the page, under the standing heading',
+      fig === kids.length - 1 && kids[fig - 1] === 'pos-how'
+        && document.querySelector('.pos-how')?.textContent === 'How it works',
+      `${kids.join(' -> ')} · heading "${document.querySelector('.pos-how')?.textContent || 'none'}"`);
     d.assert('the transport offers no position and no loop, because a held note has neither',
       !d.el.querySelector('.tbar-loop') && bar.el.dataset.scrub !== '1',
       `${d.el.querySelector('.tbar-loop') ? 'a LOOP button is on the bar' : 'no loop'} · scrub ${bar.el.dataset.scrub}`);
@@ -959,8 +987,6 @@
    * under the controls rather than in front of them.
    */
   const dg = createDiagram(d.el, {
-    how: true,
-    atEnd: true,
     caption: 'A hand moves faster than a filter can be heard to change, so what leaves this '
       + 'page is thinner than what your hand made: sent is what went, skipped is the rest.',
     nodes: [
@@ -971,13 +997,13 @@
                 + '71, which is what a hardware filter knob has sent since the 1980s, so '
                 + 'nothing here has to be translated at the far end.' },
           { id: 'gate', label: 'send gate', sub: 'one value per 20ms', tech: 'browser',
-            note: 'A finger reports faster than the board can be heard to answer, so at most '
-                + 'one value per controller per audio frame goes out. The last value of a '
-                + 'gesture is never held back, because that is the one that stays true.' },
+            note: 'A finger reports faster than a filter can answer, so at most one value per '
+                + 'controller per 20 ms frame goes out. The last value of a gesture is never '
+                + 'dropped: it is the one that stays true.' },
           { id: 'playout', label: 'playout', sub: 'AudioWorklet, 160ms', tech: 'sound',
-            note: 'Holds a cushion of sound before playing any of it, because frames arrive '
-                + 'in lumps: measured p50 20.0 ms and a worst gap of 83.6 ms. Too small a '
-                + 'cushion is a click and too large is a filter that answers late.' },
+            note: 'Holds a cushion before playing any of it, because frames arrive in lumps: '
+                + 'p50 20.0 ms, worst gap 83.6 ms. Too small is a click, too large is a '
+                + 'filter that answers late.' },
         ] },
       { id: 'cf', label: 'Cloudflare', sub: 'one object', kind: 'cloud', tech: 'cloudflare',
         children: [
@@ -1019,7 +1045,12 @@
         note: 'The same room and the same socket the controls went out on. Audio in this room '
             + 'is the board and nothing else, which is how the badge knows it is there.' },
     ],
-  });
+    // ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC. Put
+    // inside it they are silently ignored, and the page shipped with no heading
+    // and the picture sitting above the log: both rules broken at once, and
+    // neither the harness nor `cuts` can see it, because a spec with two extra
+    // keys is not an error. Every other page with a diagram passes them here.
+  }, { how: true, atEnd: true });
 
   d.ready();
 </script>
