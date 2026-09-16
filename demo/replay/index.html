@@ -17,26 +17,53 @@
   import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+  // The kit's own vocabulary for a loop's direction. Imported rather than
+  // retyped so the glyph on this page and the glyph on `/radio/` and `/tapes/`
+  // cannot drift apart. See the way button further down for why this page shows
+  // one and cannot work it.
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
   import { ARCHIVE, CUES, cueItems } from '/shell/archive.mjs';
 
   const d = mount({
     name: 'replay',
-    what: 'A 190-second show stored in Cloudflare R2, played with the eight cues it '
-      + 'was recorded with. Press Load + play: each cue\'s mark on the strip turns '
-      + 'green as the picture reaches it. late by and worst are how far the cues '
-      + 'landed from the moment the recording says they belong at, and apart is how '
-      + 'far the timeline and the picture have drifted from each other.',
+    /**
+     * 🔴 ONE SENTENCE, AND IT IS THE INDEX'S OWN LINE. A page with a diagram
+     * explains itself twice if it also carries a paragraph: the picture under
+     * the controls says what the machinery is, and prose an inch above it says
+     * the same thing in a weaker channel. Taken from the `one` line in
+     * `demo/manifest.mjs`, so somebody arriving from the index is not told the
+     * same thing in two wordings that can drift apart.
+     */
+    what: 'A 190 s show off R2, played with the eight cues it was recorded with.',
     // `media` left this row — the picture's own clock, which the transport bar
     // already prints beside the duration. `worst` took the slot, because a
     // median on its own hides the one bad fire that is the reason to look.
     readout: { fired: '', 'late by': 'ms', worst: 'ms', apart: 'ms' },
-    controls: [
-      { id: 'load', label: 'Load + play', primary: true },
-    ],
+    /**
+     * 🔴 NO CONTROLS OF ITS OWN. ASKED 2026-09-16: *"rm load and play,
+     * transport play should do it"*. `Load + play` was a second play button
+     * standing next to the transport's own, and the two disagreed about what
+     * they meant: one fetched a manifest and started a picture, the other moved
+     * a playhead over nothing. The bar's ▸ does both now, through `command`
+     * below, which is the hook the component already had for a page that owns
+     * the thing being played.
+     */
   });
   guard(d);
+
+  /**
+   * The harness says whether anybody is collecting the answer. The loop check
+   * further down DRIVES the transport: it sets a loop, presses play and moves
+   * the playhead, which is fine when a machine is grading the page and rude
+   * when a person is watching a show. `demo/verify.mjs` appends `selfcheck=1`.
+   * ⚠️ SO A VISIT ASSERTS A STRICT SUBSET, the way `/crate/` already does. The
+   * suite total is stable because the flag is on for every run of it; what
+   * changes is what a person opening the page by hand pays for.
+   */
+  const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const video = el('video', '', null, { playsinline: '', muted: '', preload: 'auto' });
   video.muted = true;
@@ -45,7 +72,23 @@
   // ── the cue lane: the media is the master, the deck is the score ─────────
   const fires = [];
   const cueAdapter = {
-    caps: { rates: [1], continuous: false, assertOnSeek: true },
+    /**
+     * 🔴 NO `rates` HERE, AND THE LONE YELLOW `1` IS WHAT IT USED TO DRAW.
+     * REPORTED 2026-09-16: *"what this disconnected 1 does here?"*. This lane
+     * declared `rates: [1]`, the transport bar intersects every declared
+     * lattice and renders the result as a radio group, and a lattice of one
+     * option is a radio group of one button: a single armed `1` sitting beside
+     * LOOP with nothing to choose it against. That is the structural constant
+     * wearing a measurement's clothes that CLAUDE.md throws a readout cell out
+     * for, and the bar's own comment already says a deck with NO lattice must
+     * show nothing rather than a lone 1. It draws nothing for a missing lattice
+     * and a button for a lattice of one, which is the same defect by a second
+     * route.
+     * ⚠️ AND THE CLAIM WAS NEVER WORTH MAKING. This page's playhead follows a
+     * media element and never drives it, so there is no speed to arm: a cue
+     * fires where the picture is, at whatever speed the picture is running.
+     */
+    caps: { continuous: false, assertOnSeek: true },
     actuate(payload) {
       // error is measured in MEDIA time, which is the only clock that means
       // anything for a recording
@@ -68,11 +111,122 @@
     range: [0, ARCHIVE.durationMs],
   });
 
+  let master = null, hls = null, bar = null;
+  let loaded = false, booted = false, pressedAt = 0;
+
+  // NATIVE HLS ONLY ON WEBKIT, gated on ManagedMediaSource. `canPlayType(
+  // 'application/vnd.apple.mpegurl')` answers "maybe" in Chrome as well as
+  // Safari, so the old `if (canPlayType(...))` put Chrome on the native path,
+  // where `video.src = <m3u8>` sits at readyState 0 forever. Headless Chrome
+  // answers "" and takes the hls.js branch, which is why the suite stayed green
+  // over a page that was dead in the browser a human uses. Same rule as
+  // src/low-latency-player.js.
+  const NATIVE_HLS = 'ManagedMediaSource' in window
+    && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+
+  /** Point the element at the show. Once, on the first press of ▸. */
+  function attach() {
+    if (loaded) return;
+    loaded = true;
+    armVideo(video);
+    const url = ARCHIVE.hls;
+    if (NATIVE_HLS) {
+      video.src = url;                       // WebKit plays HLS natively
+    } else if (window.Hls && window.Hls.isSupported()) {
+      hls = new window.Hls({ enableWorker: true });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(window.Hls.Events.ERROR, (_e, data) => {
+        if (data.fatal) d.log(`hls fatal ${data.type}/${data.details}`, 'bad');
+      });
+    } else {
+      d.fail(new Error('no HLS support'));
+      return;
+    }
+    // MEDIA IS THE MASTER: the deck follows currentTime, it does not drive it
+    master = mediaMaster(deck, video, {
+      anchorMs: 0,
+      onCorrection: (c) => d.log(`correction ${JSON.stringify(c).slice(0, 90)}`),
+    });
+    boot();
+  }
+
+  /**
+   * 🔴 THE PAGE OWNS WHAT IS BEING PLAYED, SO THE BAR ASKS IT RATHER THAN THE
+   * DECK. This is the whole repair for *"transport loops but video does not,
+   * time keeps increasing"*, reported 2026-09-16.
+   *
+   * The bar's loop wraps by SEEKING, and with no `command` a seek goes to the
+   * deck. The deck here is a FOLLOWER of the picture: `mediaMaster` reads
+   * `currentTime` and bends the playhead onto it, so a seek written to the
+   * follower was undone by the master's next tick, within a quarter of a
+   * second, silently. What a visitor saw was the playhead snapping back at
+   * every lap while the show kept running and the clock kept climbing, which
+   * looks like a broken loop and was a loop written to the wrong end of the
+   * chain. Every verb now drives the element; the deck follows, as it always
+   * did.
+   */
+  const command = {
+    play: () => {
+      const first = !loaded;
+      attach();
+      if (!pressedAt) pressedAt = performance.now();
+      // The picture starts where the playhead already is. Somebody who dragged
+      // the strip to sixty seconds and then pressed ▸ means sixty seconds, and
+      // before the first press there is no element to have written it to.
+      if (first) {
+        const at = Math.max(0, deck.position());
+        if (at > 1) { try { video.currentTime = at / 1000; } catch { /* no data yet */ } }
+      }
+      // 🔴 FIRED, NEVER AWAITED. `play()` waits on a user gesture in a real
+      // browser and does NOT reject when it is refused, so awaiting it here is
+      // a hang rather than an error. Sound and picture are allowed to be late;
+      // the playhead is not.
+      playOrPrompt(video, d);
+      // And the playhead answers the press at once. Without this the transport
+      // sits still for as long as the first segment takes to arrive, which
+      // reads as a dead button; `mediaMaster` re-anchors it on the picture the
+      // moment there is one, which is what its jump rule exists for.
+      deck.play();
+    },
+    pause: () => { video.pause(); deck.pause(); },
+    seek: (pos) => {
+      const ms = Math.max(0, pos);
+      if (loaded) { try { video.currentTime = ms / 1000; } catch { /* no data yet */ } }
+      return deck.seek(ms);
+    },
+  };
+
+  /**
+   * 🔴 NO WAY BUTTON ON THIS PAGE AT ALL. Instructed 2026-09-16: *"when page
+   * does no support looper modes (relay) rm the loop mode button"*.
+   *
+   * It was here, disabled, with the reason on its face, on the argument that a
+   * control saying what it cannot do beats one that looks live and is inert.
+   * That argument is about a control which is unavailable RIGHT NOW and will
+   * work later, which is what `looper.sayTooLong()` handles: a loop longer than
+   * the ring becomes loopable again when you mark a shorter one. This one could
+   * never work. A picture only runs forwards, playing a lap backwards needs the
+   * sound kept in an `AudioBuffer`, and this page has no `AudioContext` on it.
+   * A permanently impossible control is not a disabled control, it is furniture,
+   * and the honest form of "this page cannot do that" is its absence.
+   */
+
   // ONE POSITION SURFACE. The strip below is a time axis that seeks on press
   // and on drag; the bar's slider is a second one at a different scale, and two
   // stacked is a contradiction rather than a redundancy. Play, pause, the clock
   // and the keyboard table stay.
-  createTransportBar(d.el, deck, { scrub: false });
+  bar = createTransportBar(d.el, deck, {
+    scrub: false,
+    command,
+    // A wrap fires every lap and is not news; the two marks being set and taken
+    // off are, because a reader cannot read the numbers off the band.
+    onLoop: (what, a, b) => {
+      if (what === 'set') d.log(`looping ${(a / 1000).toFixed(1)}s to ${(b / 1000).toFixed(1)}s of the show`);
+      else if (what === 'off') d.log('the loop is off');
+    },
+  });
+
   createStripView(d.el, deck, { size: 'default', lanes: [{
       id: 'cue', kind: 'cue', height: 44, as: 'ticks',
       // idToColor('cue') came out near-black on the dark ground, so the ticks
@@ -105,58 +259,6 @@
     d.set('worst', errs[errs.length - 1]);
   }
 
-  let master = null, hls = null;
-
-  // NATIVE HLS ONLY ON WEBKIT, gated on ManagedMediaSource. `canPlayType(
-  // 'application/vnd.apple.mpegurl')` answers "maybe" in Chrome as well as
-  // Safari, so the old `if (canPlayType(...))` put Chrome on the native path,
-  // where `video.src = <m3u8>` sits at readyState 0 forever. Headless Chrome
-  // answers "" and takes the hls.js branch, which is why the suite stayed green
-  // over a page that was dead in the browser a human uses. Same rule as
-  // src/low-latency-player.js.
-  const NATIVE_HLS = 'ManagedMediaSource' in window
-    && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
-
-  d.on('load', async () => {
-    armVideo(video);
-    if (master) { playOrPrompt(video, d); return; }
-    const url = ARCHIVE.hls;
-    if (NATIVE_HLS) {
-      video.src = url;                       // WebKit plays HLS natively
-    } else if (window.Hls && window.Hls.isSupported()) {
-      hls = new window.Hls({ enableWorker: true });
-      hls.loadSource(url);
-      hls.attachMedia(video);
-      hls.on(window.Hls.Events.ERROR, (_e, data) => {
-        if (data.fatal) d.log(`hls fatal ${data.type}/${data.details}`, 'bad');
-      });
-    } else {
-      d.fail(new Error('no HLS support'));
-      return;
-    }
-    // MEDIA IS THE MASTER: the deck follows currentTime, it does not drive it
-    master = mediaMaster(deck, video, {
-      anchorMs: 0,
-      onCorrection: (c) => d.log(`correction ${JSON.stringify(c).slice(0, 90)}`),
-    });
-    // bounded wait for real metadata — readyState 0 at press time is a race,
-    // not a broken manifest
-    await new Promise((res) => {
-      if (video.readyState > 0) return res();
-      const t = setTimeout(res, 8000);
-      video.addEventListener('loadedmetadata', () => { clearTimeout(t); res(); }, { once: true });
-    });
-    // start the deck FROM the picture. mediaMaster reads currentTime and never
-    // writes it, so if the two start apart the cues fire against the wrong
-    // frame — which is exactly what a 12.4 s desync looked like.
-    deck.seek(video.currentTime * 1000);
-    await playOrPrompt(video, d);
-    d.log(`playing ${url.split('/').slice(-2).join('/')} · readyState ${video.readyState} · dur ${video.duration?.toFixed?.(1)}s · ${CUES.length} cues`);
-    // The checks read what this control just produced, so this is the first
-    // moment they can be true — and a button for them would make them optional.
-    await d.run('check');
-  });
-
   // WATCHDOG. media-master's own rule L2: inside jumpMs an error is frame
   // quantisation and syncs; past it the element has MOVED and it must seek.
   // Enforced here too, and shown, so a drift is never hidden inside the cue
@@ -171,10 +273,137 @@
     const mediaMs = video.currentTime * 1000;
     const off = mediaMs - deck.position();
     d.set('apart', off, Math.abs(off) > 250 ? 'bad' : 'ok');
-    if (Math.abs(off) > 250) { deck.seek(mediaMs); d.log(`pulled the timeline back ${off.toFixed(0)} ms onto the picture`, 'bad'); }
+    // 🔴 AND IT ONLY PULLS WHILE THE SHOW IS ROLLING. Dragging a PAUSED
+    // playhead onto the picture takes the scrub out from under whoever is
+    // doing it, which is the same rule the bar's own wrap follows. It also
+    // moved the deck under the shared "pause holds position" check, where the
+    // playhead is read twice 300 ms apart and must not have moved between them.
+    if (deck.playing?.() && Math.abs(off) > 250) {
+      deck.seek(mediaMs);
+      d.log(`pulled the timeline back ${off.toFixed(0)} ms onto the picture`, 'bad');
+    }
   }, 400);
 
+  /** The first press of ▸ leads here: wait for a real picture, then grade. */
+  async function boot() {
+    if (booted) return;
+    booted = true;
+    // bounded wait for real metadata — readyState 0 at press time is a race,
+    // not a broken manifest
+    if (video.readyState === 0) {
+      await new Promise((res) => {
+        const t = setTimeout(res, 8000);
+        video.addEventListener('loadedmetadata', () => { clearTimeout(t); res(); }, { once: true });
+      });
+    }
+    // ⚠️ THE DECK IS NOT SEEKED ONTO THE PICTURE HERE, AND IT USED TO BE. That
+    // line raced the shared keyboard-seek check, which moves the playhead about
+    // half a second after the first press: whichever landed second won, and the
+    // page could drag the playhead back to zero under a seek somebody had just
+    // asked for. `mediaMaster`'s jump rule already owns this, which is the
+    // whole reason that module exists.
+    d.log(`playing ${ARCHIVE.hls.split('/').slice(-2).join('/')} · readyState ${video.readyState}`
+      + ` · dur ${video.duration?.toFixed?.(1)}s · ${CUES.length} cues`);
+    // The checks read what the press just produced, so this is the first moment
+    // they can be true — and a button for them would make them optional.
+    await d.run('check');
+  }
+
+  // ── grading the loop ─────────────────────────────────────────────────────
+  // One lap, and long enough that a picture which ignores the loop is obvious
+  // rather than arguable: with the loop working the element never passes `b`,
+  // and without it the element is a full second past by the time the sampling
+  // stops.
+  const LOOP_MS = 900;
+  const SAMPLE_MS = 2000;
+  // What the wrap can honestly cost. The bar wraps from its own paint at 60 Hz
+  // once the playhead reaches `b`, and the playhead is re-anchored on the
+  // picture four times a second, so a third of a second is slack rather than
+  // tolerance. A picture that is not being looped at all is a second past this.
+  const LOOP_SLACK_MS = 350;
+  /**
+   * ⚠️ THE HARNESS DRIVES THIS TRANSPORT FOR THE FIRST TWO SECONDS, and a page
+   * that grabs it in that window breaks two of the shared checks rather than
+   * its own: `verify.mjs` presses ▸, presses it again, and reads the playhead
+   * twice 300 ms apart to prove a pause holds. Setting a loop in the middle of
+   * that starts the show again underneath it. Measured from the first press
+   * rather than from load, because the press is what starts the sequence.
+   */
+  const GUARD_MS = 2400;
+
+  async function gradeLoop() {
+    if (!SELFCHECK) return { skip: true };
+    while (performance.now() < pressedAt + GUARD_MS) await sleep(100);
+    const cap = performance.now() + 8000;
+    while (video.readyState < 2 && performance.now() < cap) await sleep(100);
+    if (video.readyState < 2) {
+      return { pass: false, detail: `no picture arrived to loop · readyState ${video.readyState}` };
+    }
+    // Where the loop goes. Anywhere with room for a lap in front of it; a loop
+    // whose end runs past the show is cleared by the bar the instant it is made.
+    let a = Math.round(video.currentTime * 1000);
+    if (a + LOOP_MS > ARCHIVE.durationMs - 2000) a = 20000;
+    const b = a + LOOP_MS;
+    // PRESSED THE WAY A FINGER PRESSES IT. Marking the two ends by hand would
+    // grade a private variable instead of the control on the bar.
+    command.seek(a); bar.api.pressLoop();
+    command.seek(b); bar.api.pressLoop();
+    if (!bar.api.loop) return { pass: false, detail: 'the loop did not take' };
+    // Bounded wait for the picture to actually move: a seek into a part of the
+    // show that is not buffered yet is a wait, not a failure.
+    const go = performance.now() + 4000;
+    const from = video.currentTime;
+    while (video.currentTime <= from && performance.now() < go) await sleep(80);
+    let maxCt = video.currentTime;
+    const end = performance.now() + SAMPLE_MS;
+    while (performance.now() < end) {
+      maxCt = Math.max(maxCt, video.currentTime);
+      await sleep(60);
+    }
+    bar.api.pressLoop();                     // take it off again
+    const ceiling = (b + LOOP_SLACK_MS) / 1000;
+    const ran = maxCt - a / 1000;
+    return {
+      // BOTH HALVES, or a picture that never played would pass this by standing
+      // still: a maximum that never moved is inside every ceiling there is.
+      pass: ran > 0.4 && maxCt <= ceiling,
+      detail: `the picture ran ${ran.toFixed(2)} s from the loop start and reached `
+        + `${maxCt.toFixed(2)} s, against a ceiling of ${ceiling.toFixed(2)} s`,
+    };
+  }
+
   d.on('check', async () => {
+    /**
+     * 🔴 THE SLOW ONE FIRST, ON PURPOSE. `verify.mjs` stops collecting 400 ms
+     * after the last assert, so a check that pauses for two seconds in the
+     * MIDDLE loses every assert after the pause. A first assert sitting behind
+     * a wait is the case `settleMs` covers, and the manifest declares one.
+     */
+    const lp = await gradeLoop();
+    if (!lp.skip) d.assert('the picture stays inside the loop', lp.pass, lp.detail);
+
+    /**
+     * 🔴 THE PICTURE GRADES ITSELF, AND IT IS ASSERTED HERE RATHER THAN AT LOAD
+     * BECAUSE AT LOAD IT COST THIS PAGE SEVEN OF ITS TEN ASSERTS. `createDiagram`
+     * collects every label it had to shorten, every note over about forty words
+     * and every link it could not route, on `cuts`.
+     *
+     * ⚠️ MEASURED 2026-09-16, and it read GREEN the whole time it was broken:
+     * `page asserted something · 3`, on a page with ten. `verify.mjs`'s
+     * first-assert budget only runs while the count is still at the shell's own
+     * two, so an assert fired at load disarms it; the stabiliser then waits
+     * 400 ms, sees no growth, and stops collecting. Every check below this one
+     * sits behind `GUARD_MS`, which is 2.4 s after the first press, so they all
+     * landed after the harness had stopped listening. This is the trap already
+     * written down in `BACKLOG.md`, met in the wild.
+     * ⚠️ THE COST IS HONEST AND SMALL: a visitor who never presses play does
+     * not grade the diagram. The suite always presses, so the number a run is
+     * diffed against is still the whole set.
+     */
+    d.assert('the diagram drew every name and every arrow whole',
+      dg.cuts.length === 0,
+      dg.cuts.map((c) => `${c.where} ${c.id}`).join(' · ') || 'nothing cut, nothing refused');
+
     // assert the MANIFEST, not the video's readiness: readyState depends on how
     // fast R2 answered, which is not what this demo is about
     let mOk = false, mStatus = 0;
@@ -188,6 +417,24 @@
     d.assert('all eight cues are in the score',
       (deck.reduceAt?.('cue', ARCHIVE.durationMs)?.count ?? 0) === CUES.length,
       `${deck.reduceAt?.('cue', ARCHIVE.durationMs)?.count} of ${CUES.length}`);
+    /**
+     * 🔴 THERE IS A LOOP AND THERE IS NO WAY BUTTON, AND BOTH HALVES ARE THE
+     * CLAIM. Asserting only the absence would pass on a bar that failed to draw
+     * anything at all, which is the vacuous shape CLAUDE.md keeps naming: a
+     * page with a broken transport would read as a page that correctly leaves
+     * out a control. Read off the DOM, not off the options that built it.
+     */
+    {
+      const loopBtn = document.querySelector('.tbar-loop');
+      const ways = document.querySelectorAll('.tbar-loopgrp .tbar-x').length;
+      d.assert('a loop, and no way button, because a picture only runs forwards',
+        !!loopBtn && ways === 0,
+        `${loopBtn ? 'LOOP is on the bar' : 'NO LOOP BUTTON AT ALL'} · `
+        + `${ways} way button(s) beside it`);
+    }
+    d.assert('no speed picker, because nothing here has a speed to arm',
+      bar.api.lattice === null && document.querySelectorAll('.tbar-rates button').length === 0,
+      `lattice ${JSON.stringify(bar.api.lattice)} · ${document.querySelectorAll('.tbar-rates button').length} buttons`);
     if (fires.length) {
       const errs = fires.map((f) => Math.abs(f.errMs)).sort((a, b) => a - b);
       const p50 = errs[Math.floor(errs.length * 0.5)];
@@ -198,6 +445,87 @@
         + ` (the picture is at ${video.currentTime.toFixed(1)} s)`);
     }
   });
+
+  /**
+   * 🔴 THE DIAGRAM IS LAST ON THE PAGE AND CARRIES THE STANDING HEADING. It is
+   * reference: read once, on purpose, by somebody who has already pressed ▸ and
+   * wants to know what is behind it. Above the controls it would delay the one
+   * thing a first visitor came for.
+   */
+  const dg = createDiagram(d.el, {
+    caption: 'The picture is the clock. Everything else on this page follows where it has got to.',
+    nodes: [
+      { id: 'cf', label: 'Cloudflare', sub: 'R2 bucket', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          { id: 'playlist', label: 'playlist', sub: 'm3u8 text',
+            note: 'Text naming every four second file of the show, in order. It is fetched '
+                + 'once, because a recording that has already finished never grows.' },
+          { id: 'segs', label: 'segments', sub: '4s each',
+            note: 'The show itself, cut into four second files at the moment it was '
+                + 'recorded. A seek fetches the one file the playhead landed in.' },
+        ] },
+      // 🔴 `set: true`: THESE FOUR ARE NOT ONE CHAIN, AND A HEAD BETWEEN EVERY
+      // PAIR WOULD SAY THEY WERE. `diagram.mjs` now puts an arrowhead on an
+      // inner connector by default, asked for 2026-09-16, and that is right
+      // wherever the boxes really do feed each other. Here `hls.js` to `video`
+      // to `timeline` is a chain and all three are DECLARED below, so they draw
+      // as real arrows with heads. `cue log` is not in that flow at all: it is
+      // a file this page ships, read once, and nothing upstream produces it. An
+      // automatic head from `video` to `cue log` would be a claim nothing in
+      // this page supports.
+      { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser', set: true,
+        children: [
+          { id: 'hls', label: 'hls.js', sub: 'MediaSource',
+            note: 'Fetches the files the playlist names and appends them to a '
+                + '**MediaSource** buffer. Safari has no need of it: **ManagedMediaSource** '
+                + 'means WebKit plays the playlist itself and this never loads.' },
+          { id: 'video', label: 'video', sub: 'one element',
+            note: 'Muted, and decoding whatever is in the buffer. Its currentTime is the '
+                + 'only clock on this page that means anything.' },
+          // 🔴 WHERE THE CUES COME FROM, WHICH THIS PICTURE DID NOT SAY.
+          // Reported 2026-09-16: *"does not say where from the cues come"*. The
+          // drawing had Cloudflare handing over a playlist and segments and
+          // nothing else, so a reader could only conclude the cues came from
+          // there too. They did not: they were called by hand while the show
+          // was going out, written to a cue log at that moment, and they ship
+          // with this page as a module rather than being fetched from R2.
+          { id: 'cues', label: 'cue log', sub: '8, in the page',
+            note: 'Eight cues an operator called while the show went out on 2026-08-26, each '
+                + 'stamped with how far into the recording it happened. Hard coded into this '
+                + 'page as a JavaScript module: no Durable Object, nothing fetched.' },
+          { id: 'clock', label: 'timeline', sub: '8 cues, 1 loop',
+            note: 'Holds the eight cues at the moment each was called, and the two marks a '
+                + 'loop runs between. A lap coming round writes **video** currentTime, '
+                + 'which is what makes the picture turn round with the playhead.' },
+        ] },
+    ],
+    links: [
+      { from: 'playlist', to: 'hls', label: 'file names',
+        note: 'Under a kilobyte of text, listing the files and how long each one runs. The '
+            + 'player turns that list into a duration it can seek inside before a single '
+            + 'frame is fetched.' },
+      { from: 'segs', to: 'hls', label: '4s of video',
+        note: 'Ordinary HTTP GETs, one per file, and only for the part of the show being '
+            + 'watched. Seeking to the end of a 190 second recording fetches one file '
+            + 'rather than 48.' },
+      { from: 'hls', to: 'video',
+        note: 'Bytes appended below JavaScript, which is why a locked phone keeps playing: '
+            + 'nothing on the page runs between one frame and the next.' },
+      { from: 'video', to: 'clock',
+        note: 'Where the picture has actually got to, read from **timeupdate** four times a '
+            + 'second and from **requestVideoFrameCallback** once per presented frame. The '
+            + '**timeline** is bent onto it and never the other way round.' },
+      // 🔴 NO ARROW FROM `cue log` TO `timeline`, AND THE COMPONENT IS WHAT
+      // DECIDED THAT. It was declared and `createDiagram` refused it on `cuts`
+      // in both orderings: the gap those two neighbours share is already
+      // carrying `video` to `timeline`, and a second line down one gap is
+      // exactly the confusion the router exists to avoid. Refused in writing
+      // rather than dropped quietly, which is how it was noticed at all.
+      // ⚠️ THE FACT IS NOT LOST, it moved to where there is room for it. The
+      // box is named, it is inside `Browser`, the tie says it is part of the
+      // same machine, and its note carries what the arrow would have said.
+    ],
+  }, { how: true, atEnd: true });
 
   d.log(`${ARCHIVE.durationMs / 1000}s show · cues at ${CUES.map((c) => (c.offsetMs / 1000).toFixed(1)).join(', ')}s`);
   d.ready();
