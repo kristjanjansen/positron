@@ -77,9 +77,7 @@
 
   const d = mount({
     name: 'knobs',
-    what: 'Two sliders here move a filter on a Raspberry Pi in another building, and what you hear is the sound that board is making, sent back twenty milliseconds at a time. '
-        + 'Press play and the note is held until you stop it, which also releases every note the board has; the middle of each slider leaves the patch as its maker set it, so start there and drag. '
-        + 'A hand moves faster than a filter can be heard to change, so the page sends at most one value per slider every 20 ms: sent is what went out this second, skipped is what your hand made that the page did not send, and played is what the board wrote to the synth.',
+    what: 'Two sliders move a filter on a Raspberry Pi in another building, and what you hear is that board. Press play and the note is held until you stop it, which releases every note the board has. At most one value per slider goes out every 20 ms: sent is what went, skipped is what your hand made that did not, played is what the board wrote.',
     /**
      * Six cells, and every one of them moves.
      *

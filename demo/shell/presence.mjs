@@ -253,20 +253,29 @@ export function createPresence({
   dot.setAttribute('aria-hidden', 'true');
   root.append(dot);
 
-  if (named) {
-    const n = document.createElement('b');
-    n.className = 'pos-pres-of';
-    n.textContent = of;
-    root.append(n);
-  }
-
+  /**
+   * 🔴 THE NAME AND THE STATE ARE ONE STRING. Instructed 2026-09-16:
+   * *"rasperry pi online: all same string, shuould animat in same time (no
+   * 'fixed' device name)"*.
+   *
+   * They were two elements, and the name was held still while only the state
+   * faded. That reads as half a label twitching: `RASPBERRY PI` sitting fixed
+   * while `ONLINE` dissolves under it is two things where a reader sees one
+   * phrase. One element, one fade, one colour.
+   * ⚠️ THE RESERVE NOW COVERS THE WHOLE PHRASE, name included, or the badge
+   * would twitch on exactly the pages that name their subject.
+   * ⚠️ AND NO LETTER-SPACING ON IT. The tracking used to live on the name,
+   * where width did not matter; inside the reserve it would overflow by a space
+   * per character, which is why the word never had it.
+   */
   const word = document.createElement('span');
   word.className = 'pos-pres-w';
   // The reserve. Whatever this instance can say, at its longest, in characters
   // of its own monospace face. A page that shortens the words gets a shorter
   // badge for free, and a page that lengthens one cannot make the badge twitch.
   const reach = Array.isArray(can) && can.length ? can.filter((x) => PRESENCE_STATES.includes(x)) : PRESENCE_STATES;
-  const widest = Math.max(...reach.map((x) => words[x].length));
+  const phrase = (x) => (named ? `${of} ${words[x]}` : words[x]);
+  const widest = Math.max(...reach.map((x) => phrase(x).length));
   word.style.setProperty('--pres-ch', String(widest));
   root.append(word);
 
@@ -308,7 +317,7 @@ export function createPresence({
   function paint() {
     root.dataset.state = now;
     root.title = title();
-    const next = words[now];
+    const next = phrase(now);
     if (word.textContent === next) return;
     // First paint, or a browser that says no: swap it and say nothing more.
     if (!word.textContent || matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
