@@ -88,7 +88,8 @@
 <script type="module">
   import { mount, el, createReport } from '/shell/shell.mjs';
   import { createStepper } from '/shell/stepper.mjs';
-  import { createSlider, createSliderGroup, GLIDE_MS } from '/shell/slider.mjs';
+  import { createSlider, createSliderGroup, GLIDE_MS, HAND_YIELD_MS } from '/shell/slider.mjs';
+  import { MOVE_GLYPH, MOVE_OFF, MOVE_SAYS } from '/shell/hand.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createCard, createCardGrid } from '/shell/card.mjs';
@@ -166,6 +167,12 @@
   // takes what it needs with it.
   const presSpec = new Map();
   let presLive = null;        // one badge that can change, measured over time
+
+  // The pair in the invisible hand block: one slider with a hand and one
+  // without, held so the checks at the bottom can compare them. ⚠️ DECLARED
+  // HERE for the reason the two lines above give: a `let` left beside a block
+  // that moves is read in its dead zone.
+  let handSpec = null;
 
   // The three arrangements of the readout and the log, for the geometry checks
   // at the bottom. ⚠️ SAME REASON AS THE LINE ABOVE: the block that fills these
@@ -312,7 +319,7 @@ presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the four`,
       r.style.flex = '1 1 100%';
       box.append(r);
 
-      // A row of machines, which is the shape /knobs/, /box/, /grains/ and
+      // A row of machines, which is the shape /knobs/, /keys/, /grains/ and
       // /rack/ all want and all draw differently today.
       const list = el('div', '');
       list.style.cssText = 'flex:1 1 100%;display:grid;gap:6px;font:400 12px/1 var(--mono);color:var(--dim)';
@@ -428,6 +435,30 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
         row.append(b);
       }
       box.append(g.el, row, o);
+    });
+
+  // ── a slider that moves by itself ───────────────────────────────────────
+  section('a slider with an invisible hand',
+    'Press ' + MOVE_GLYPH.sweep + ' and the handle sweeps by itself, back and forth, with a real '
+    + 'reach and a pause at each end rather than a triangle wave. While it runs the '
+    + 'handle is drawn hollow, because nobody is holding it. Grab it, use the arrow '
+    + 'keys or move it from the page and it hands over in one frame, then picks the '
+    + 'movement up from wherever you left it. The slider beside it has no hand, which '
+    + 'is how you can see the hand belongs to one slider rather than to the page.',
+    `createSlider({ label: 'cutoff', min: 0, max: 127, step: 1, hand: true, onHand })`,
+    (box) => {
+      const o = out('press the button on the right of the lane');
+      const a = createSlider({
+        label: 'cutoff', min: 0, max: 127, step: 1, value: 100, hand: true,
+        onInput: (v) => { o.textContent = `cutoff ${v}`; },
+        onHand: (s) => { o.textContent = s.says; },
+      });
+      const b = createSlider({
+        label: 'no hand', min: 0, max: 127, step: 1, value: 64,
+        onInput: (v) => { o.textContent = `no hand ${v}`; },
+      });
+      handSpec = { withHand: a, without: b };
+      box.append(createSliderGroup([a, b]).el, o);
     });
 
   // ── radio row ───────────────────────────────────────────────────────────
@@ -635,7 +666,7 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
         onOctave: (n) => { o.textContent = `octave moved · leftmost note is now ${n}`; },
         // The keyboard has already released every key it was holding by the
         // time this runs. It is here for a page whose sound is made somewhere
-        // the component cannot reach — on /box/ it is a message to the board.
+        // the component cannot reach — on /keys/ it is a message to the board.
         onPanic: () => { o.textContent = 'notes off'; },
       });
       box.append(o);
@@ -1223,6 +1254,45 @@ green = inside what it promised · amber/red = later`,
     pairGroups.length
       ? `${pairGroups.length} paired group(s), ${pairCols} column(s), worst ${pairWorst} px within one`
       : 'no paired group was found, so nothing was compared');
+
+  // 2b. 🔴 THE INVISIBLE HAND'S BUTTON, MEASURED RATHER THAN LOOKED AT, AND
+  // NOTHING HERE PRESSES IT. A visit to this page must assert a strict subset:
+  // everything gradable from what is already on the screen runs, and anything
+  // that would start a movement does not. The plumbing claims are graded on
+  // `/knobs/` behind `?selfcheck=1`, which is the page that has two sliders and
+  // a real send gate to compare them with.
+  {
+    const row = handSpec?.withHand.el.querySelector('.sld-hand-row');
+    const btn = row?.querySelector('.sld-hand');
+    const laneR = row?.querySelector('.sld-lane')?.getBoundingClientRect();
+    const btnR = btn?.getBoundingClientRect();
+    const seam = laneR && btnR ? Math.round(btnR.x - (laneR.x + laneR.width)) : NaN;
+    const cs = btn ? getComputedStyle(btn) : null;
+    const laneCs = row ? getComputedStyle(row.querySelector('.sld-lane')) : null;
+    d.assert('a hand button is joined to its lane, one pixel over, with the corners rounded only outside',
+      !!row && row.classList.contains('pos-seg') && seam === -1
+      && cs.borderTopRightRadius === '4px' && cs.borderTopLeftRadius === '0px'
+      && laneCs.borderTopRightRadius === '0px' && laneCs.borderTopLeftRadius === '4px'
+      && Math.round(btnR.height) === Math.round(laneR.height),
+      row ? `seam ${seam} px, lane corners ${laneCs.borderTopLeftRadius}/${laneCs.borderTopRightRadius}, `
+        + `button ${cs.borderTopLeftRadius}/${cs.borderTopRightRadius}, both ${Math.round(btnR.height)} px high`
+        : 'no hand row was built');
+    // 🔴 AND THE WRAPPER IS CONDITIONAL, WHICH IS A REAL CASUALTY AND NOT A
+    // PREFERENCE. `/grains/` selects `.fade > .sld > .sld-lane` with a CHILD
+    // combinator, so an unconditional row would stop that matching in silence
+    // and take the lane back to its standalone 96 px.
+    // ⚠️ AND NO HAND BUTTON MAY SIT IN A CONTROL ROW: `verify.mjs` presses
+    // `.pos-controls button` on every demo on every run.
+    d.assert('a slider with no hand has no wrapper, and no hand button sits in a control row',
+      !!handSpec && !handSpec.without.el.querySelector('.sld-hand-row')
+      && handSpec.without.el.firstElementChild?.nextElementSibling?.classList.contains('sld-lane')
+      && !document.querySelector('.pos-controls .sld-hand')
+      && handSpec.without.hand === null && handSpec.withHand.hand !== null,
+      handSpec
+        ? `the plain slider's second child is its own ${handSpec.without.el.children[1]?.className}, `
+          + `and ${document.querySelectorAll('.pos-controls .sld-hand').length} hand buttons are in a control row`
+        : 'the block did not build');
+  }
 
   // 3 — the readout specimen. An odd count leaves the last row short, and a
   // cell with nothing in it must show one em dash with its unit HIDDEN: an

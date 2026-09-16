@@ -3,7 +3,7 @@
 // ‹ | Brass 1 | ›    ⚅
 //
 // 🔴 WHY THIS EXISTS AND `stepper.mjs` WAS NOT ENOUGH. A stepper over a list of
-// three is fine. Over `/box/`'s patch library it is not: Yoshimi alone reaches
+// three is fine. Over `/keys/`'s patch library it is not: Yoshimi alone reaches
 // 878 instruments, and "press › eight hundred times" is not a way to choose
 // anything. The name in the middle was already being drawn beside the stepper
 // as dead text — it had the list's most useful property, which is that you can
@@ -79,7 +79,7 @@ export function createPicker({ label, what = 'it', prev, next, random, onPick, c
   // `step` is the join — the 1 px border overlap, the outer-only corners and
   // the hover raise all live in that one block. Third component to reuse it
   // rather than write a fourth copy of a segmented row.
-  const seg = el('span', 'step pos-pick-seg');
+  const seg = el('span', 'step pos-seg pos-pick-seg');
   wrap.append(seg);
 
   const mk = (text, title, fn, k = '') => {
