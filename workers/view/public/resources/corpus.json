@@ -1,6 +1,6 @@
 {
  "subject": "Erkki Kurenniemi (1941–2017)",
- "generated": "2026-09-15T15:04:22.151Z",
+ "generated": "2026-09-16T00:44:10.147Z",
  "generator": "demo/resources/build-corpus.mjs",
  "note": "Every row is a POINTER to something somebody else holds: a title, a date, who holds it, its identifier there, one URL and a licence. Nothing is copied. Statuses and CORS were observed on the date above, not assumed.",
  "inputs": [
@@ -91,11 +91,20 @@
    }
   ]
  },
+ "durations": {
+  "source": "demo/resources/measure-durations.mjs",
+  "how": "ffprobe version 9.0.1 Copyright (c) 2007-2026 the FFmpeg developers",
+  "measured": "2026-09-16T00:43:37.305Z",
+  "what": "How long each recording in corpus.json actually runs, read off the file itself. One request per file, once, at least two seconds apart, reading the header rather than the recording.",
+  "known": 26,
+  "refused": 0
+ },
  "counts": {
   "items": 334,
   "sources": 17,
   "dated": 275,
   "withFile": 129,
+  "withDuration": 26,
   "unreachable": 6,
   "behind": 11685
  },
@@ -1487,7 +1496,8 @@
    "cors": true,
    "note": "Ojanen 2020 (printed pp. 88 to 89): premiered with Salmenhaara’s White Label at the Jyväskylän Kesä festival on 11 July 1963. Kurenniemi, interviewed in 2004, tied the recording session to the studio’s move down to the Porthania cellar, \"which could have happened at the end of 1962\"; the university’s annual report for 1963 to 1964 puts that move in the fall of 1963. The master tape carries no date markings, and it is photographed at zenodo:3601403",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 770208
   },
   {
    "id": "lahteilla:thing/37",
@@ -1573,7 +1583,8 @@
    "cors": true,
    "note": null,
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 651598
   },
   {
    "id": "fng:618550",
@@ -1631,7 +1642,8 @@
    "cors": true,
    "note": "Ojanen 2020 (printed p. 89): a tape collage made as a tribute to the Swedish composer Jan Bark, who taught a composition course in Helsinki that August. Five people made it, parts of it were recorded in various locations, Chydenius directed it and Kurenniemi spliced the final work",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 73169
   },
   {
    "id": "fng:622205",
@@ -1747,7 +1759,8 @@
    "cors": true,
    "note": "Ojanen 2020 (printed pp. 110 to 111): Numminen used the University Studio in early 1964 to prepare for the academic singing contest of 4 April 1964, and produced a background tape of concrete and electronic sounds to accompany his voice through the Laulukone, an electronic sound-processing unit built with Kullervo Aura and Kurenniemi’s assistance. The background tape was released in 2005 on More Arctic Hysteria (Love LXCD 647), not on the 2002 compilation (p. 111 n. 189)",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 500976
   },
   {
    "id": "wd:Q115918918",
@@ -1979,7 +1992,8 @@
    "cors": true,
    "note": null,
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 389004
   },
   {
    "id": "wd:Q115918862",
@@ -2177,7 +2191,8 @@
    "cors": true,
    "note": "Ojanen 2020 (printed p. 180): \"the two-piece tape music work Saharan uni I & II (1967, realized with Kari Hakala)\" · recorded in the University Studio at Vironkatu and mixed in the Yle sound-control room at Kulttuuritalo · premiered 9 February 1968 at the Sähköshokki-ilta, Amos Anderson Art Museum, where the Integrated Synthesizer made its last known public appearance · a recording of the 8 February 1968 rehearsal survives (p. 100 n. 160)",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 445257
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3",
@@ -2207,7 +2222,8 @@
    "cors": true,
    "note": "Ojanen 2020 (printed p. 180): \"the two-piece tape music work Saharan uni I & II (1967, realized with Kari Hakala)\" · recorded in the University Studio at Vironkatu and mixed in the Yle sound-control room at Kulttuuritalo · premiered 9 February 1968 at the Sähköshokki-ilta, Amos Anderson Art Museum · a recording of the 8 February 1968 rehearsal survives (p. 100 n. 160)",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 396669
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
@@ -2237,7 +2253,8 @@
    "cors": true,
    "note": "Ojanen 2020 (printed p. 121): Kurenniemi selected three segments from a tape he had recorded with the Andromatic and spliced them together without further processing, for the commissioned album Perspectives ’68: Music in Finland (Love Records LRLP 4), released in November 1968 for the centenary of the Helsinki student union. The draft contents were discussed on 30 May 1968 and the contract settled on 19 June 1968; the draft is deposited at zenodo:4290689. An excerpt was reissued in 1970 on Wigwam’s Tombstone Valentine",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 282096
   },
   {
    "id": "fng:619102",
@@ -2323,7 +2340,8 @@
    "cors": true,
    "note": "Ojanen 2020 (printed p. 216): \"The Sähkökvartetti (instrument) was used in several live performances by Sähkökvartetti (the band), but only three recordings have survived.\" The piece was improvised and \"the duration and structure of which varied from one performance to another\" (p. 114), running from a few minutes to an hour and a half. The band played about fifteen times between August 1968 and November 1970",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 96157
   },
   {
    "id": "fng:619030",
@@ -2777,7 +2795,8 @@
    "cors": true,
    "note": "Ojanen 2020 (printed p. 138): \"The two-part piece Inventio-Outventio (1970), which was realized in the fall of 1970, consists of Kurenniemi’s arrangement of Johann Sebastian Bach’s Invention No. 13 in A minor (BWV 784) for the DIMI-A, and the tape collage Outventio realized jointly by Kurenniemi and Ruohomäki in a separate session.\" The Bach arrangement is the only work he composed solely with the DIMI-A. An annotated video of the master tape is deposited at zenodo:1469722",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 235076
   },
   {
    "id": "lahteilla:thing/209",
@@ -3734,7 +3753,8 @@
    "cors": true,
    "note": "MISATTRIBUTED ON THE CD, and Ojanen 2020 says so (printed p. 205 n. 402): the two Sähkösoittimen ääniä tracks are Sähkökvartetti and DIMI-A parts from the sessions for the radio play Vihreä eläin (1971), recorded by Donner with Kurenniemi, Ruohomäki and Vesterinen in Yle’s Fabianinkatu studio (p. 141). \"On the CD the tracks are credited to Kurenniemi and the DIMI-A track is introduced as the Sähkökvartetti recording. Vihreä eläin is not mentioned as the origin of the sound material.\" The CD numbers them #1 and #4; which of the two files is which is not established here",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 170475
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3",
@@ -3764,7 +3784,8 @@
    "cors": true,
    "note": "MISATTRIBUTED ON THE CD, and Ojanen 2020 says so (printed p. 205 n. 402): the two Sähkösoittimen ääniä tracks are Sähkökvartetti and DIMI-A parts from the sessions for the radio play Vihreä eläin (1971), recorded by Donner with Kurenniemi, Ruohomäki and Vesterinen in Yle’s Fabianinkatu studio (p. 141). \"Vihreä eläin is not mentioned as the origin of the sound material.\" Of the CD pair, #4 is \"the original radio-play session recording without the latter overdubs\" (p. 206 n. 403); which of the two files is #4 is not established here",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 162144
   },
   {
    "id": "doi:10.7551/mitpress/10014.003.0013",
@@ -3935,7 +3956,8 @@
    "cors": true,
    "note": "Ojanen 2020 (printed pp. 138 and 180): \"Mix Master Universe (1973, realized with Jukka Ruohomäki)\", one of Ruutsalo’s tape collages, built from DIMI-A sounds and produced as a spontaneous process without a prescribed plan. The thesis names no part 2",
    "via": "proto/deck/corpus.json",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 829832
   },
   {
    "id": "lahteilla:thing/193",
@@ -8027,7 +8049,8 @@
    "cors": true,
    "note": null,
    "doi": "10.5281/zenodo.5801697",
-   "licenceRef": "cc-by-4.0"
+   "licenceRef": "cc-by-4.0",
+   "durationMs": 236881
   },
   {
    "id": "openalex:W4318011683",
@@ -8314,7 +8337,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "282 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 282096
   },
   {
    "id": "ia:videoplayback-14_202304/Erkki Kurenniemi - On-Off.mp3",
@@ -8343,7 +8367,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "770 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 770208
   },
   {
    "id": "ia:videoplayback-14_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3",
@@ -8372,7 +8397,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "170 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 170475
   },
   {
    "id": "ia:videoplayback-14_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3",
@@ -8401,7 +8427,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "162 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 162144
   },
   {
    "id": "lahteilla:julkaisu/Erkki_Kurenniemi_A_Man_From_The_Future.pdf",
@@ -9503,7 +9530,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "282 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 282122
   },
   {
    "id": "ia:videoplayback-14_202304/videoplayback (11).mp4",
@@ -9532,7 +9560,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "73 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 73004
   },
   {
    "id": "ia:videoplayback-13_202304/videoplayback (11).mp4",
@@ -9561,7 +9590,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "73 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 73004
   },
   {
    "id": "ia:videoplayback-14_202304/videoplayback (12).mp4",
@@ -9590,7 +9620,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "296 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 295520
   },
   {
    "id": "ia:videoplayback-14_202304/videoplayback (13).mp4",
@@ -9619,7 +9650,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "402 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 401821
   },
   {
    "id": "ia:videoplayback-13_202304/videoplayback (13).mp4",
@@ -9648,7 +9680,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "402 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 401821
   },
   {
    "id": "ia:videoplayback-14_202304/videoplayback (14).mp4",
@@ -9677,7 +9710,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "626 s",
-   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/"
+   "licenceRef": "https://creativecommons.org/publicdomain/mark/1.0/",
+   "durationMs": 626335
   },
   {
    "id": "mb:recording/bbe738b0-3f23-41ce-8c7d-995def5ddbbd",
@@ -9793,7 +9827,8 @@
    "httpFrom": "url",
    "cors": true,
    "note": "3149 s",
-   "licenceRef": "not stated"
+   "licenceRef": "not stated",
+   "durationMs": 3148880
   },
   {
    "id": "yle-api:programs",

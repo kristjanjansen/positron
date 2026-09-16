@@ -12,6 +12,7 @@ import { rm, readFile } from 'node:fs/promises';
 import { serve, PORT as HTTP_PORT } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
 import { claimProfile } from './harness-profile.mjs';
+import { startStation } from './fake-station.mjs';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 // 🔴 A FIXED PORT IS A SHARED MUTABLE GLOBAL, and this file still had two of
@@ -105,6 +106,37 @@ if (peersAtStart.length) {
   console.log('   A demo that needs the relay, the board or bandwidth can read RED for that reason alone.');
   console.log('   Run any failing demo ALONE before believing it: node demo/verify.mjs <slug>');
 }
+
+/**
+ * 🔴 `/radio/` IS GRADED AGAINST A STAND-IN, NEVER AGAINST A BROADCASTER, AND
+ * THE HARNESS DOES IT RATHER THAN THE PERSON REMEMBERING TO.
+ *
+ * Every station that page offers is an ERR mount, and ERR told us our listeners
+ * were corrupting their audience figures: the standing rule is that a connection
+ * to one is opened only when a PERSON is going to listen. That made the page's
+ * own thirty-four checks unrunnable, so `node demo/verify.mjs radio` either
+ * never happened or happened at somebody else's expense. `demo/fake-station.mjs`
+ * serves real MP3 frames with real ICY headers at the page's own `?base=`, so
+ * the decode path, the loop and the whole self-check run against a mount that is
+ * nobody's radio station.
+ *
+ * ⚠️ IT IS AUTOMATIC BECAUSE THE ALTERNATIVE IS A RULE SOMEBODY HAS TO
+ * REMEMBER, and a rule that is only in a document is a rule that gets broken on
+ * the day somebody is in a hurry. `DEMO_QUERY=base=…` still wins, because
+ * `URLSearchParams.get` returns the first occurrence and `DEMO_QUERY` is put
+ * first: that is the escape hatch for somebody who has been ASKED to check the
+ * real relay.
+ */
+const standInFor = new Set(['radio']);
+const needStandIn = all.some((t) => standInFor.has(t.name));
+const station = needStandIn ? startStation({ port: 0, quiet: true }) : null;
+if (needStandIn && !station) {
+  console.log('⚠️  the stand-in station needs ffmpeg and could not be built, so `radio` '
+    + 'will be graded against nothing rather than against ERR.');
+}
+if (station) await new Promise((r) => station.on('listening', r));
+const STAND_IN = station ? `http://127.0.0.1:${station.address().port}` : null;
+if (STAND_IN) console.log(`stand-in station ${STAND_IN} (nobody's radio)`);
 
 // DEMO_BASE=https://positron.studio node demo/verify.mjs  -> verify the DEPLOY
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
@@ -501,7 +533,8 @@ for (const t of targets) {
   // ⚠️ EVERY DEMO GETS IT AND ALMOST NONE READ IT, which is the point — the flag
   // is a fact about the run, not a per-demo setting to keep in step. A page that
   // needs it opts in by reading it.
-  const q = [process.env.DEMO_QUERY, own, 'selfcheck=1'].filter(Boolean).join('&');
+  const q = [process.env.DEMO_QUERY, own, 'selfcheck=1',
+    STAND_IN && standInFor.has(t.name) ? `base=${STAND_IN}` : ''].filter(Boolean).join('&');
   const query = q ? `?${q}` : '';
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1400);
@@ -632,9 +665,11 @@ for (const t of targets) {
 
   // 🔴 A PAGE WHOSE CONTROL IS STILL RUNNING HAS NOT FINISHED, AND THE HARNESS
   // USED TO WALK OFF ANYWAY. The press loop sleeps a fixed 650 ms after each
-  // button and does not await the handler, so a control that takes longer —
-  // `seek`'s sweep is five jumps at 700 ms — was still working while the
-  // stabiliser below decided the page had nothing more to say. It did not show
+  // button and does not await the handler, so a control that takes longer was
+  // still working while the stabiliser below decided the page had nothing more
+  // to say. The case that found it was the retired `seek` page, kept at
+  // archive/demos/seek-index.html, whose sweep was five jumps at 700 ms
+  // apiece. It did not show
   // up before because every such page carried a "Run the checks" BUTTON, which
   // gave the checks a slot of their own; taking those buttons off the pages
   // (they are harness machinery showing through, `shout` argues it) took the
@@ -784,4 +819,7 @@ await Promise.race([
   new Promise((r) => chrome.once('exit', r)),
   new Promise((r) => setTimeout(r, 3000)),
 ]);
+// The stand-in goes with the run. A station left listening on a port is the
+// small version of the thing this harness exists to avoid.
+station?.close();
 process.exit(fail ? 1 : 0);

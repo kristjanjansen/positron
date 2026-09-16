@@ -1,0 +1,194 @@
+{
+ "what": "How long each recording in corpus.json actually runs, read off the file itself. One request per file, once, at least two seconds apart, reading the header rather than the recording.",
+ "generator": "demo/resources/measure-durations.mjs",
+ "how": "ffprobe version 9.0.1 Copyright (c) 2007-2026 the FFmpeg developers",
+ "generated": "2026-09-16T00:43:37.305Z",
+ "counts": {
+  "known": 26,
+  "refused": 0
+ },
+ "items": {
+  "ia:20210908_20210908_1925/YLE.Time.and.Matter.4of5.The.Future.Is.Not.What.It.Used.To.Be.avi": {
+   "ms": 3148880,
+   "format": "avi",
+   "kbps": 2517,
+   "bytes": 990701568,
+   "at": "2026-09-16T00:43:37.305Z"
+  },
+  "ia:computer-music-1966-dir.-erkki-kurenniemi/Computer Music( 1966) dir. Erkki Kurenniemi.mp4": {
+   "ms": 389004,
+   "format": "mov,mp4,m4a,3gp,3g2,mj2",
+   "kbps": 380,
+   "bytes": 18475192,
+   "at": "2026-09-16T00:41:37.137Z"
+  },
+  "ia:videoplayback_20221202_1653/videoplayback.mp4": {
+   "ms": 282122,
+   "format": "mov,mp4,m4a,3gp,3g2,mj2",
+   "kbps": 184,
+   "bytes": 6483728,
+   "at": "2026-09-16T00:42:43.571Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3": {
+   "ms": 282096,
+   "format": "mp3",
+   "kbps": 128,
+   "bytes": 4513581,
+   "at": "2026-09-16T00:41:50.213Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3": {
+   "ms": 235076,
+   "format": "mp3",
+   "kbps": 64,
+   "bytes": 1880745,
+   "at": "2026-09-16T00:41:58.673Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3": {
+   "ms": 73169,
+   "format": "mp3",
+   "kbps": 320,
+   "bytes": 2926897,
+   "at": "2026-09-16T00:41:26.952Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3": {
+   "ms": 829832,
+   "format": "mp3",
+   "kbps": 64,
+   "bytes": 6638792,
+   "at": "2026-09-16T00:42:12.331Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - On-Off.mp3": {
+   "ms": 770208,
+   "format": "mp3",
+   "kbps": 128,
+   "bytes": 12323373,
+   "at": "2026-09-16T00:41:17.216Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3": {
+   "ms": 445257,
+   "format": "mp3",
+   "kbps": 64,
+   "bytes": 3562195,
+   "at": "2026-09-16T00:41:41.571Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3": {
+   "ms": 396669,
+   "format": "mp3",
+   "kbps": 64,
+   "bytes": 3173493,
+   "at": "2026-09-16T00:41:45.897Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3": {
+   "ms": 170475,
+   "format": "mp3",
+   "kbps": 128,
+   "bytes": 2727739,
+   "at": "2026-09-16T00:42:03.082Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3": {
+   "ms": 162144,
+   "format": "mp3",
+   "kbps": 128,
+   "bytes": 2594349,
+   "at": "2026-09-16T00:42:08.059Z"
+  },
+  "ia:videoplayback-13_202304/Erkki Kurenniemi - Virsi (64 kbps).mp3": {
+   "ms": 651598,
+   "format": "mp3",
+   "kbps": 64,
+   "bytes": 5212924,
+   "at": "2026-09-16T00:41:22.568Z"
+  },
+  "ia:videoplayback-13_202304/M.A. Numminen & Erkki Kurenniemi - Oigu-S (64 kbps).mp3": {
+   "ms": 500976,
+   "format": "mp3",
+   "kbps": 64,
+   "bytes": 4007948,
+   "at": "2026-09-16T00:41:32.151Z"
+  },
+  "ia:videoplayback-13_202304/M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä (64 kbps).mp3": {
+   "ms": 96157,
+   "format": "mp3",
+   "kbps": 64,
+   "bytes": 769391,
+   "at": "2026-09-16T00:41:54.207Z"
+  },
+  "ia:videoplayback-13_202304/videoplayback (11).mp4": {
+   "ms": 73004,
+   "format": "mov,mp4,m4a,3gp,3g2,mj2",
+   "kbps": 229,
+   "bytes": 2086094,
+   "at": "2026-09-16T00:42:52.388Z"
+  },
+  "ia:videoplayback-13_202304/videoplayback (13).mp4": {
+   "ms": 401821,
+   "format": "mov,mp4,m4a,3gp,3g2,mj2",
+   "kbps": 253,
+   "bytes": 12683439,
+   "at": "2026-09-16T00:43:07.289Z"
+  },
+  "ia:videoplayback-14_202304/Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3": {
+   "ms": 282096,
+   "format": "mp3",
+   "kbps": 128,
+   "bytes": 4513581,
+   "at": "2026-09-16T00:42:21.123Z"
+  },
+  "ia:videoplayback-14_202304/Erkki Kurenniemi - On-Off.mp3": {
+   "ms": 770208,
+   "format": "mp3",
+   "kbps": 128,
+   "bytes": 12323373,
+   "at": "2026-09-16T00:42:25.444Z"
+  },
+  "ia:videoplayback-14_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3": {
+   "ms": 170475,
+   "format": "mp3",
+   "kbps": 128,
+   "bytes": 2727739,
+   "at": "2026-09-16T00:42:29.813Z"
+  },
+  "ia:videoplayback-14_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3": {
+   "ms": 162144,
+   "format": "mp3",
+   "kbps": 128,
+   "bytes": 2594349,
+   "at": "2026-09-16T00:42:34.161Z"
+  },
+  "ia:videoplayback-14_202304/videoplayback (11).mp4": {
+   "ms": 73004,
+   "format": "mov,mp4,m4a,3gp,3g2,mj2",
+   "kbps": 229,
+   "bytes": 2086094,
+   "at": "2026-09-16T00:42:48.118Z"
+  },
+  "ia:videoplayback-14_202304/videoplayback (12).mp4": {
+   "ms": 295520,
+   "format": "mov,mp4,m4a,3gp,3g2,mj2",
+   "kbps": 529,
+   "bytes": 19553647,
+   "at": "2026-09-16T00:42:57.225Z"
+  },
+  "ia:videoplayback-14_202304/videoplayback (13).mp4": {
+   "ms": 401821,
+   "format": "mov,mp4,m4a,3gp,3g2,mj2",
+   "kbps": 253,
+   "bytes": 12683439,
+   "at": "2026-09-16T00:43:02.289Z"
+  },
+  "ia:videoplayback-14_202304/videoplayback (14).mp4": {
+   "ms": 626335,
+   "format": "mov,mp4,m4a,3gp,3g2,mj2",
+   "kbps": 364,
+   "bytes": 28525240,
+   "at": "2026-09-16T00:43:13.691Z"
+  },
+  "zenodo:5801697": {
+   "ms": 236881,
+   "format": "mpeg",
+   "kbps": 7623,
+   "bytes": 225705984,
+   "at": "2026-09-16T00:42:16.753Z"
+  }
+ }
+}
