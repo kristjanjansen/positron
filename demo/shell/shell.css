@@ -2191,7 +2191,13 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    for it. */
 .pos-pres {
   position: relative;
-  display: inline-flex; align-items: center; gap: 6px;
+  /* 🔴 10 px BETWEEN THE DOT AND THE WORDS, UP FROM 6. Asked 2026-09-16 with a
+     crop of the two: *"add more scace between"*. Six was the gap between two
+     parts of one word; these are two different kinds of thing, a state you read
+     as a colour and a phrase you read as text, and they were close enough to
+     look like one clipped label. A gap is fixed, so it costs the no-twitch
+     reserve nothing: every state still measures the same width. */
+  display: inline-flex; align-items: center; gap: 10px;
   font: 500 11px/1 var(--mono);
   vertical-align: -1px;               /* sits on the baseline of a word beside it */
   white-space: nowrap;
