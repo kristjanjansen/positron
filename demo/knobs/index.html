@@ -176,7 +176,7 @@
   // ── audio ─────────────────────────────────────────────────────────────────
   let ctx = null, playout = null;
   let bufMs = 0, starved = 0, trimmed = 0, breaks = -1;
-  let frames = 0, pcmMissing = 0, lastPcmSeq = -1, firstFrameAt = 0;
+  let frames = 0, pcmMissing = 0, lastPcmSeq = -1, firstFrameAt = 0, peak = 0;
   let told = null;                       // the board's own announcement, if we heard it
   let chIn = BOARD_CHANNELS, shapeChecked = false, shapeWrong = 0, shapeSaid = '';
 
@@ -264,7 +264,18 @@
     checkShape(pcm.length);
     if (!playout) return;
     const f32 = new Float32Array(pcm.length);
-    for (let i = 0; i < pcm.length; i++) f32[i] = pcm[i] / 32768;
+    // 🔴 THE LOUDEST SAMPLE, BECAUSE A FRAME COUNT CANNOT TELL SOUND FROM
+    // SILENCE. The board captures its JACK graph continuously, so frames arrive
+    // at fifty a second whether or not a note is sounding: `104 frames of audio`
+    // read green through the whole of the silence reported above. A level is the
+    // quantity in question and a count is one adjacent to it.
+    let hi = 0;
+    for (let i = 0; i < pcm.length; i++) {
+      f32[i] = pcm[i] / 32768;
+      const a = f32[i] < 0 ? -f32[i] : f32[i];
+      if (a > hi) hi = a;
+    }
+    if (hi > peak) peak = hi;
     playout.port.postMessage({ pcm: f32 }, [f32.buffer]);
   }
 
@@ -452,6 +463,19 @@
     },
   });
 
+  /**
+   * One note, and the moment it started, because the audio check below cannot
+   * ask "was there a sound" without knowing whether anything was meant to be
+   * sounding. `peak` is reset here so the answer is about THIS note rather than
+   * about whatever was in the stream before it.
+   */
+  let noteAt = 0, releasedAt = 0;
+  function holdNote() {
+    sendId({ type: 'note.on', note: NOTE, vel: VEL, channel: 0 });
+    noteAt = performance.now();
+    peak = 0;
+  }
+
   async function startNote() {
     await startAudio();
     await measureRtt();
@@ -459,8 +483,22 @@
 
     if (MAY_PLAY) {
       if (status && status.ok && status.source === 'yoshimi') {
-        d.log('yoshimi is already up on the board, so nothing is being restarted');
+        /**
+         * 🔴 AND IT STILL HAS TO PLAY A NOTE. REPORTED 2026-09-16: *"No sound
+         * in the knobs. There used to be sound when you moved your own knobs,
+         * but now there ain't."*
+         *
+         * This branch armed the page and sent nothing, so the only press that
+         * ever made a sound was one that STARTED yoshimi. Once the board was
+         * left running, which is what every measurement of it does, every press
+         * landed here and the page went quiet while reporting that all was
+         * well. Not restarting an instrument is not the same as not playing a
+         * note, and this branch had confused the two.
+         */
         armed = true;
+        sendId({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
+        holdNote();
+        d.log(`yoshimi was already up, so nothing was restarted. ${PATCH} is loaded and one note is held. Drag the sliders`, 'hi');
       } else if (status && status.ok) {
         // 🔴 DO NOT AUTOSTART OVER SOMEBODY. There is one JACK graph and one
         // instrument, so starting here stops whatever `/box/` or `/grains/` is
@@ -472,7 +510,7 @@
         if (r?.ok) {
           armed = true;
           sendId({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
-          sendId({ type: 'note.on', note: NOTE, vel: VEL, channel: 0 });
+          holdNote();
           d.log(`${PATCH} is loaded and one note is held. Drag the sliders`, 'hi');
         } else {
           // A recovery action is not free, and a wedged jackd cannot be
@@ -494,10 +532,19 @@
     // notes this page never pressed, so the message has to go out as well as
     // the handles coming home.
     if (MAY_PLAY && armed) sendId({ type: 'note.panic' });
+    releasedAt = performance.now();
     cutoff.set(NEUTRAL, { glideMs: 240 });
     reso.set(NEUTRAL, { glideMs: 240 });
     d.log(`stopped: every note released and both sliders back to ${NEUTRAL}, which leaves the patch as its maker set it`);
   }
+
+  // Reachable from a probe, the way `window.__hls` and `window.__strip` are on
+  // other pages: `frames` is how much stream has arrived and `peak` is whether
+  // any of it was a sound. A page that can only be asked "did frames arrive"
+  // cannot tell a held note from silence, which is the fault this pair exists
+  // to make visible from outside.
+  window.__knobs = { get frames() { return frames; }, get peak() { return peak; },
+                     get armed() { return armed; } };
 
   // ── the checks ────────────────────────────────────────────────────────────
   //
@@ -558,6 +605,14 @@
    */
   let sweep = null;
   async function sweepChecks() {
+    // 🔴 ASK FOR THE COUNTERS, DO NOT WAIT TO BE TOLD. The board pushes
+    // `ctl.meter` once a second and ONLY while something is moving, which is
+    // right for a page a person is watching and wrong for a check: whether the
+    // push lands before the asserts run is a race, and it read red about a
+    // board that was writing every value correctly. `ctl.meter` is also a
+    // request verb, and the sweep below takes long enough that the answer is
+    // always in hand by the time anything is claimed.
+    if (MAY_PLAY) sendId({ type: 'ctl.meter' });
     const before = { offered: gate.stats.offered, messages: gate.stats.messages, thinned: gate.stats.thinned };
     const steps = 60, ms = 600;
     const t = performance.now();
@@ -659,7 +714,28 @@
       shapeChecked && !shapeWrong, shapeSaid || 'no frame has arrived yet');
     d.assert('the sample rate it sends is the one this page plays at',
       ctx?.sampleRate === RATE, `context ${ctx?.sampleRate} Hz against ${RATE} Hz from the board`);
-    d.assert('sound came back while the note was held', frames > 20, `${frames} frames of audio`);
+    /**
+     * 🔴 ONLY WHEN A NOTE IS ACTUALLY BEING HELD. The harness drives this
+     * transport itself, and stop here is a PANIC, so a drill that presses play
+     * and then stop leaves nothing sounding: asking for a sound after that is
+     * asking the page to answer for a note somebody released. The claim is
+     * skipped in words rather than failed, the way `/replay/` skips its loop
+     * check, because a check that cannot be answered and a check that answered
+     * badly must not look the same.
+     * ⚠️ AND IT IS A LEVEL, NOT A COUNT. The board captures its JACK graph
+     * continuously, so frames arrive at fifty a second whether or not anything
+     * is sounding, and `104 frames of audio` read green through a reported
+     * silence.
+     */
+    if (noteAt && releasedAt < noteAt) {
+      d.assert('sound came back while the note was held, and it was not silence',
+        frames > 20 && peak > 0.005,
+        frames <= 20 ? `only ${frames} frames arrived`
+          : `${frames} frames, loudest sample ${peak.toFixed(4)} of full scale`);
+    } else {
+      d.log(noteAt ? 'the note was released before the checks ran, so there was nothing to hear'
+        : 'no note was held, so this run cannot say whether sound comes back');
+    }
     d.assert('the relay dropped none of it', pcmMissing === 0, `${pcmMissing} missing of ${frames + pcmMissing}`);
     d.assert('the board wrote to the synth what this page put on the wire',
       !!meter && meter.in > 0 && meter.out > 0 && meter.out <= meter.in,
