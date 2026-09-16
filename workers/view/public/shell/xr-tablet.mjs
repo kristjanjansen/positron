@@ -117,7 +117,20 @@ export const DEFAULT_CONTROLS = [
     unit: '%',
     min: 0,
     max: 100,
-    value: 75,
+    /**
+     * 🔴 A FALLBACK, AND THE ROOM'S OWN NUMBER OVERRIDES IT AT CONSTRUCTION.
+     * This carried `75` beside `xr-room.mjs`'s own `0.75`, which is the shared
+     * measurement in two files this repo keeps paying for: dimming the dots in
+     * one place left the slider reading 75 over dots drawn at 52.5, so the
+     * control lied the moment the page opened.
+     * ⚠️ IT CANNOT BE AN IMPORT. `xr-room.mjs` imports THIS file, so reading
+     * `GRID` from there is a cycle and the module evaluates to nothing: it
+     * cost a page its whole run, reported as `0 asserts`. `createXRTablet`
+     * reads `ctx.room.gridAlpha` instead, which is a value at call time rather
+     * than a name at load time.
+     */
+    value: 53,
+    from: (ctx) => (Number.isFinite(ctx?.room?.gridAlpha) ? Math.round(ctx.room.gridAlpha * 100) : null),
     apply: (v, ctx) => ctx?.room?.setGrid?.({ alpha: v / 100 }),
   },
   /**
@@ -624,7 +637,17 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
   const g = canvas.getContext('2d');
   // ⚠️ SLIDERS ONLY. A button has no value to hold, and one in here would print
   // as `"leave": null` in every line that reports what the tablet is showing.
-  const values = new Map(SLIDERS.map((c) => [c.key, c.value]));
+  /**
+   * ⚠️ `from(ctx)` LETS A CONTROL ASK THE THING IT DRIVES WHERE IT ALREADY IS,
+   * at call time, so its opening position cannot be a second copy of a number
+   * declared somewhere else. The `floor dots` slider uses it to read the room's
+   * own `gridAlpha`. `null` means the control has no opinion and its typed
+   * `value` stands, which is what every other control does.
+   */
+  const values = new Map(SLIDERS.map((c) => {
+    const asked = typeof c.from === 'function' ? c.from(hostCtx) : null;
+    return [c.key, Number.isFinite(asked) ? asked : c.value];
+  }));
   let version = 0, drawn = -1;
   let aimed = null;             // { u, v, i } while the pointer is on it
   let dragging = null;          // the control index the trigger took hold of

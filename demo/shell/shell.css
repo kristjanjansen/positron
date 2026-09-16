@@ -1745,6 +1745,25 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
   fill: color-mix(in oklab, var(--fg) 9%, var(--dg-fill, var(--card2)));
 }
 .pos-dg-n[data-on] .pos-dg-sub { fill: var(--dim); }
+/* 🔴 A CONTAINER HOVERS QUIETLY, BECAUSE IT HAS NOTHING TO SAY.
+   Reported 2026-09-16 with a photograph of `/crate/`: *"this hover is ugly"* —
+   pointing anywhere in the Cloudflare box lit its whole edge to `--fg` and put
+   a sheet behind three boxes, which is the loudest thing the picture can do in
+   answer to a question nobody asked. CLAUDE.md is explicit that a container
+   takes NO `note`: it is a machine, and its name and its children already say
+   what it is. So there is nothing under the picture for that flare to be
+   announcing.
+   ⚠️ IT STILL RESPONDS. Removing the hover entirely would make the biggest
+   target in the picture feel dead, and the container is what a reader sweeps
+   across on the way to a box. A stroke one step up from its own hue says "yes,
+   you are on something" and stops there.
+   ⚠️ AND ITS CHILDREN KEEP THEIR OWN. `[data-on]` is set on the node under the
+   pointer, so a box inside a lit container is still the brighter thing, which
+   is the order a reader needs. */
+.pos-dg-n[data-on] .pos-dg-cbox {
+  stroke: var(--dim2);
+  fill: color-mix(in oklab, var(--fg) 3%, transparent);
+}
 
 /* ── in a headset, the rows that cannot use it recede ─────────────────────────
  *

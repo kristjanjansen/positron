@@ -1,4 +1,4 @@
-# Backlog — what was asked for and not yet done
+# Backlog: what was asked for and not yet done
 
 🔴 **THIS FILE EXISTS BECAUSE REQUESTS WERE BEING LOST.** They were tracked in a
 session's head across a long run of small reports, which works until the run is
@@ -14,6 +14,16 @@ file by being finished or by being refused in writing, never by being forgotten.
 ---
 
 ## Open
+
+- **`/held/`: a `type scale` slider on the tablet.** Asked 2026-09-16: *"make it
+  a slider in left tablet (type scale) in vr (held)"*. Shipped today as two
+  constants, `SCALE_BIG 1.5` / `SCALE_SMALL 1.2`, which is 36/36. Making it a
+  control is kit work rather than page work: `createXRTablet` builds from
+  `DEFAULT_CONTROLS` and has no way for a page to add one of its own
+  (`const controls = DEFAULT_CONTROLS`). ⚠️ AND THE ROOM HAS A CEILING: at 2.5
+  the page's own check reported `talk reaches 7.9 m of the 7.5 m half-wall`, so
+  the slider's top end has to be bounded by the wall rather than by taste, or it
+  is a control that can put a word through a wall.
 
 - **A diagram assert AT LOAD can silently cost a slow page its whole run.**
   Found 2026-09-16 while giving `/crate/` a diagram: `verify.mjs`'s first-assert
@@ -77,7 +87,7 @@ file by being finished or by being refused in writing, never by being forgotten.
   2026-09-16: *"just measure file lenghts?"*, *"and write to corpus json?"*,
   *"i mean duration"*. MEASURED NOW: `demo/resources/corpus.json` holds 334
   items, 129 with a `file`, of which **26 are time-based** (16 `audio/mpeg`,
-  9 `video/mp4`, 1 `video/mpeg`) and **none of them has a duration field** —
+  9 `video/mp4`, 1 `video/mpeg`) and **none of them has a duration field**:
   there is `bytes` and nothing else. `/tapes/` therefore cannot draw a record
   as long as it actually is. The generator is
   `demo/resources/build-corpus.mjs`; the amendment has to go through it or
@@ -193,7 +203,7 @@ repeat, and several of these were asked for more than once.
   assert grades the distance the old one could not see: `no gap past a 1 s
   buffer` passes at 345 ms and at 990 ms alike. MEASURED on this desktop,
   **515 ms of sound in hand at the tightest against a 112 ms worst gap, 403 ms
-  spare** — and 515 is under the 600 ms floor here too, so the iPhone was not
+  spare**, and 515 is under the 600 ms floor here too, so the iPhone was not
   special and the per-station `floorMs` item below is the right next move.
   It doubles as the plumbing check: `tightest` is written only where the two
   cells are written, so a finite value proves they were fed rather than left at

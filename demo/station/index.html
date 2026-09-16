@@ -379,7 +379,11 @@
   // 🔴 THE PICTURE THAT ANSWERS "HOW DO LIVE AND FILES MIX", which was asked
   // twice in prose and is a drawing rather than a paragraph.
   const dg = createDiagram(d.el, {
-    title: 'how it works',
+    // ⚠️ NO `title`. `how: true` at the bottom of this call writes the standing
+    // heading, and this page carried its own from before that option existed:
+    // the two stacked as `HOW THIS WORKS` over `HOW IT WORKS`, photographed and
+    // reported. `createDiagram` refuses a title under `how` now and says so on
+    // `cuts`, which is what the check above reads.
     caption: 'A live show and an old recording are the same thing here: bytes in a bucket, '
       + 'named by a text file that is rewritten every few seconds.',
     nodes: [
@@ -403,15 +407,29 @@
        * one box that writes the playlist. `dg.ties` is asserted at 0 below, so
        * re-ordering these back cannot pass unnoticed.
        */
-      { id: 'onair', label: 'broadcast', sub: 'built, not in use', kind: 'device', tech: 'station',
+      /**
+       * 🔴 ONE MACHINE FOR WHERE A SHOW COMES FROM, LIVE OR KEPT. Asked
+       * 2026-09-16: *"merge archive and broadcast. 3 boxes in them"*, and it is
+       * right: they were two columns saying one thing, and the second had a
+       * single box in it so it drew as a tall empty slab. A recording that
+       * already exists and a broadcast going out now are both a show arriving
+       * from somebody else's machine, and this picture's subject is what
+       * Cloudflare does with either.
+       */
+      { id: 'onair', label: 'studio', sub: 'not ours', kind: 'device', tech: 'station',
         children: [
           { id: 'mount', label: 'mount', sub: 'endless http', tech: 'station',
             note: 'One connection that never closes. Nothing downstream can seek in it, which '
-                + 'is exactly why the segments beside it have to exist.' },
+                + 'is exactly why the segments beside it have to exist. Built and not in use: '
+                + 'nothing is broadcasting into this station yet.' },
           { id: 'seg', label: 'ffmpeg', sub: '-f segment, 10s', tech: 'encoder',
             note: 'Cuts a broadcast into ten second files as it arrives, with **-c copy**, so '
                 + 'nothing is decoded and nothing is re-encoded. It runs as a hook on the '
                 + 'broadcaster\'s machine: a Worker has no processes to run it in.' },
+          { id: 'mp3', label: 'mp3 files', sub: 'shows that exist', tech: 'file',
+            note: 'A finished show, as one file, wherever it happens to live. These are what '
+                + 'the station is actually playing today, and nothing here knows or cares '
+                + 'which machine they were on.' },
         ] },
       { id: 'cf', label: 'Cloudflare', sub: 'the only part we run', kind: 'cloud', tech: 'cloudflare',
         children: [
@@ -419,7 +437,7 @@
             note: 'Ten second mp3 files written while a show is on air, sitting beside the '
                 + 'recordings as ordinary objects. Nothing is broadcasting into this station '
                 + 'yet, so today these hold a test tone.' },
-          { id: 'prog', label: 'programmes', sub: 'R2, whole files', tech: 'file',
+          { id: 'prog', label: 'programmes', sub: 'R2, whole shows', tech: 'file',
             note: 'Recordings that already existed, and the shows that have finished. Never '
                 + 'cut up: the playlist points at byte ranges inside them with '
                 + '**#EXT-X-BYTERANGE**, so one file serves a hundred segments.' },
@@ -437,17 +455,17 @@
        * in"*. The picture had `chunks` arriving from the segmenter and
        * `programmes` arriving from `chunks` when a show ends, and no way at all
        * for a recording that was made before this station existed. Those are
-       * what it is actually playing today, and they come in by one POST each.
+       * what it is actually playing today.
        *
-       * ⚠️ `curl` IS WHAT DOES IT, so `curl` is what the box is called. CLAUDE.md
-       * says a label is a NAME and that a name is not jargon: inventing
-       * `uploader` here would be a friendly word for a thing nobody can search
-       * for, and it would hide which program makes the request.
+       * ⚠️ IT WAS A BOX CALLED `curl` FOR AN HOUR AND THAT WAS WRONG TWICE.
+       * Reported: *"what curl? its r2 inside cloudflare no?"*. `curl` is a
+       * COMMAND, and a machine in this drawing is a machine: naming the box
+       * after the program that happens to make the request put a tool where a
+       * computer belongs, and it left a childless machine drawn as a tall empty
+       * slab beside two that have boxes in them. The machine is wherever the
+       * recording is kept; `mp3 files` is what is on it; the POST is what
+       * TRAVELS, so it is on the arrow.
        */
-      { id: 'put', label: 'curl', sub: 'one POST per show', kind: 'device', tech: 'file',
-        note: 'Whoever has the recording posts it once. The Worker writes the mp3 and a '
-            + 'second small JSON file beside it listing where every frame starts, which is '
-            + 'what lets a playlist name byte ranges later.' },
       { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
         children: [
           { id: 'player', label: 'player', sub: 'hls.js or Safari', tech: 'browser',
@@ -470,10 +488,19 @@
             + 'often and a listener sits closer to the live edge; longer means fewer requests '
             + 'and a deeper cushion. At ten, a player holding three is about 30 seconds '
             + 'behind the sound.' },
-      { from: 'chunks', to: 'prog',
-        note: 'When the show ends, nothing moves and nothing is re-encoded. The same bytes '
-            + 'stop being the live edge and start being the archive, which is why this needs '
-            + 'no separate ingest for recordings of its own broadcasts.' },
+      /**
+       * 🔴 THE WORKER READS BOTH, AND THE PICTURE SAID CHUNKS BECAME
+       * PROGRAMMES. Reported 2026-09-16: *"does not worker receive both chunks
+       * and programmes (not chunks > programmes > worker)?"*. It does, and the
+       * old arrow was not merely a simplification, it was UNTRUE: closing a
+       * live show calls `/close`, which sets `open: false` on one slot in the
+       * schedule and touches no object at all. Nothing moves from one bucket to
+       * the other, ever. The drawing was claiming a transformation the code does
+       * not perform, which is the worst thing a drawing can do.
+       */
+      { from: 'chunks', to: 'wrk',
+        note: 'While a show is on air the playlist names these directly, one file per '
+            + 'segment. The Worker reads their lengths and nothing else of them.' },
       { from: 'sched', to: 'wrk',
         note: 'What plays when, read out of the Durable Object every time the playlist is '
             + 'written. A change to it is on air within a second.' },
@@ -488,10 +515,11 @@
       // name with an article on it, and it carried no note at all, so hovering
       // the one arrow a reader is most likely to ask about repeated its own
       // label. Reported as "what happens between cf and browser?".
-      { from: 'put', to: 'prog', label: 'whole mp3',
-        note: 'One **POST /programme** with the file in the body, and nothing after it: the '
-            + 'bytes are never cut up, copied or re-encoded. A forty minute show is one '
-            + 'object that a hundred segments point into.' },
+      { from: 'mp3', to: 'prog', label: 'whole mp3',
+        note: 'The whole file in one request body, and nothing after it: the bytes are never '
+            + 'cut up, copied or re-encoded. The Worker writes it and a small JSON file '
+            + 'beside it listing where every frame starts, which is what lets a playlist '
+            + 'name byte ranges into it later.' },
       { from: 'wrk', to: 'player', label: 'playlist text',
         note: 'Under a kilobyte of text, fetched again every few seconds because the live '
             + 'edge keeps moving. It names the bytes of the next ten seconds and carries no '
@@ -541,8 +569,34 @@
    * head that has gone missing rather than a bracket. That is what was reported,
    * and looking at the picture was the only way to find it.
    */
-  d.assert('and no line in it is missing its arrowhead', dg.ties === 0,
-    `${dg.ties} line${dg.ties === 1 ? '' : 's'} with no head`);
+  /**
+   * 🔴 ONE BRACKET, AND IT IS EXACTLY ONE, AND THAT NUMBER IS ARITHMETIC
+   * RATHER THAN TASTE.
+   *
+   * Cloudflare holds four boxes, so it has three gaps, and every real flow in
+   * it ENDS AT THE WORKER: the live chunks, the programmes and the schedule are
+   * all things the Worker reads. A node has two neighbours, so at most two of
+   * those three can sit in a gap; the third is always a lane, and one gap is
+   * always left with nothing declared across it.
+   *
+   * That gap is between the two R2 buckets, which is the honest place for a
+   * bracket: they are parts of one machine and nothing passes between them.
+   * ⚠️ IT USED TO SAY `=== 0`, AND GETTING THERE MEANT AN ARROW FROM `chunks`
+   * TO `programmes` THAT WAS NOT TRUE. Closing a live show calls `/close`,
+   * which sets `open: false` on one slot and touches no object at all. Nothing
+   * ever moves from one bucket to the other. A check that can only pass if the
+   * picture lies is worse than the thing it was checking for.
+   */
+  /**
+   * ⚠️ TWO NOW, NOT ONE, AND BOTH ARE COUNTED RATHER THAN TOLERATED. The
+   * studio's three boxes have two gaps and one flow (`mount` into `ffmpeg`),
+   * so the `mp3 files` beside them are bracketed: nothing passes between a
+   * recording that already exists and a live mount, which is the truth and is
+   * what a bracket means. Cloudflare's is the pair of buckets, above.
+   */
+  d.assert('two brackets in the picture, and every other line has a head', dg.ties === 2,
+    `${dg.ties} line${dg.ties === 1 ? '' : 's'} with no head, against the 2 that `
+    + 'the studio and the buckets each need');
 
   d.ready();
 </script>

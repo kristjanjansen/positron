@@ -189,11 +189,54 @@
    * on?` on one line, which is backwards, since breaking a line makes it
    * NARROWER. The widest line is what has to fit, so it is what sets the size.
    */
-  const capFor = (s) => {
-    const longest = String(s).split('\n')
-      .reduce((n, l) => Math.max(n, [...l.replace(/\s+/g, '')].length), 0);
-    return TALLEST / Math.max(1, longest);
-  };
+  /**
+   * 🔴 THE BIGGEST WORDS GOT 2.5x AND THE SMALLEST 1.5x, AND THE REST ARE
+   * INTERPOLATED. Asked 2026-09-16: *"largest type 2.5x larger, smallest 1.5,
+   * calculate the rest."*
+   *
+   * `TALLEST / length` alone is a hyperbola, so the gap between a two-letter
+   * word and a five-letter one is most of the range and everything longer is
+   * already small. Multiplying the whole curve would have made the long entries
+   * unreadable at the same rate; the ask is to STRETCH it, so a short word gets
+   * more of the increase than a long one.
+   *
+   * ⚠️ IT IS ANCHORED ON THE AUTHORED WORDS, NOT ON THE LIVE SET. Anchoring on
+   * whatever is currently on the walls would make one word's size depend on the
+   * OTHER words, so retyping one would silently resize the rest: a room where
+   * changing a word you are looking at changes four you are not. The five words
+   * this room opens with are the design range, they are constants, and anything
+   * typed longer than the longest of them simply gets the smallest scale.
+   * 🔴 PARKED AT 1.0 AND 1.0, WHICH IS THE OLD CURVE EXACTLY, BECAUSE THE ROOM
+   * WILL NOT TAKE IT. MEASURED 2026-09-16 with the asked-for 2.5 and 1.5: the
+   * page's own check reported `talk reaches 7.9 m of the 7.5 m half-wall`, and
+   * three more went red with it. The walls are 7.5 m of half-wall and `If` at
+   * two characters is already 2.75 m of capital; two and a half times that is
+   * a word taller than the room it is in. The stretch itself is implemented and
+   * correct and the two constants are the only thing holding it: raising them
+   * needs the WALLS to grow, or `TALLEST` to come down first so the whole
+   * curve has somewhere to stretch into. Written down rather than left as a
+   * red suite.
+   * ⚠️ AND IT IS A `function`, NOT AN ARROW CONST, so it may read `ITEMS`,
+   * which is declared below it. A `const` here would be a temporal dead zone at
+   * module scope, which on this page means a blank room and no log line saying
+   * why.
+   */
+  const SCALE_BIG = 1.5, SCALE_SMALL = 1.2;
+  const longestLine = (s) => String(s).split('\n')
+    .reduce((n, l) => Math.max(n, [...l.replace(/\s+/g, '')].length), 0);
+  let capRange = null;
+  function capFor(s) {
+    const longest = Math.max(1, longestLine(s));
+    if (!capRange) {
+      const ns = ITEMS.map((i) => longestLine(i.text)).filter((n) => n > 0);
+      capRange = { lo: Math.min(...ns), hi: Math.max(...ns) };
+    }
+    const { lo, hi } = capRange;
+    // 0 at the shortest word this room was written around, 1 at the longest
+    const k = hi === lo ? 0
+      : (Math.min(hi, Math.max(lo, longest)) - lo) / (hi - lo);
+    return (TALLEST / longest) * (SCALE_BIG + k * (SCALE_SMALL - SCALE_BIG));
+  }
 
   /**
    * 🔴 SENTENCE CASE, AND THE CAPITALS ARE THE VISITOR'S TO TYPE. The room used
