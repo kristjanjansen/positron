@@ -2224,3 +2224,150 @@ the PAGE asserted anything yet.
 count is stable" fails the same way, and would have shipped looking correct.
 What was needed was not a better heuristic for done, it was the one number that
 makes the question answerable.
+
+## 96. A page nobody may run is a page nobody can change (session 30)
+
+`/radio/` has thirty-seven checks of its own and a standing rule that it must
+not be run: every station it offers is an ERR mount, and ERR reported that our
+listeners were corrupting their audience figures. Both halves are right, and
+together they mean the page's decode path and its looper could be edited and
+could not be graded. That is not a careful state, it is an unmaintainable one:
+the next change to it either ships unverified or is paid for by a broadcaster.
+
+`demo/fake-station.mjs` is ninety lines and ends the dilemma. It serves real
+MP3 frames with real ICY headers, a real `icy-metaint` text channel and a
+`/health` route in the relay's own shape, paced at its own bitrate so arrival
+gaps and buffer depth mean what they mean on a live mount. The page already
+took `?base=`, so nothing in it had to change. **MEASURED: 48/48 green, against
+zero bytes from anybody's radio**, including the whole LOOP row, the mirror on
+samples, and the grain clock locking to a kept lap at 23.00000 whole laps.
+
+⚠️ AND THE HARNESS DOES IT RATHER THAN THE PERSON REMEMBERING TO. `verify.mjs`
+starts the stand-in itself whenever `radio` is in the run and appends the base
+for that demo alone, because a rule that lives only in a document is a rule that
+gets broken on the day somebody is in a hurry. `DEMO_QUERY` still overrides, for
+somebody who has been ASKED to check the real relay.
+
+⚠️ It grades OUR code and says nothing about ERR. A stand-in that answered
+everything perfectly would hide a mount that 403s, which is why the health route
+answers in the relay's shape rather than in a shape that always passes.
+
+🔴 **AND A STAND-IN'S OWN DEFECTS ARRIVE AS FINDINGS ABOUT THE PAGE, WHICH IS
+THE TRAP IT CARRIES.** Two in one evening, both caught because the page prints
+real numbers. Sending a fixed chunk per `setInterval` tick sends at the rate the
+TIMER fires, and node's timers run a millisecond or two late: the page read
+**125 kbit/s against the 128 declared**, a listener lost 23 ms of cushion a
+second, and `the cushion outlasts the worst gap in it` went red about a page
+that was working. Paced against the clock instead (bytes OWED since the
+connection opened, plus Icecast's 64 KB burst) it reads 128 vs 128 and holds
+**589 ms of cushion against a 55 ms worst gap**, which is the same shape the
+real relay measured at 515 ms.
+
+⚠️ The second was in the PAGE and was real: `tightest` folded in every reading
+from the moment audio started arriving, so the smallest number it ever saw was
+the queue part way through being BUILT. On the open internet the first lump
+hides it; on a local link it does not. It is measured after the player's own
+four second `startedAt` window now, which is the same boundary `mp3-stream.mjs`
+uses to call a dropped block `skipped` rather than `dropped`.
+
+## 97. A measurement that every visitor repeats is a measurement nobody made (session 30)
+
+`/tapes/` draws each recording as wide as it is long, and nothing in the corpus
+carried a length. So the page opened twenty-four media elements at
+`preload = 'metadata'` on every visit, drew the run at a guess, and corrected
+itself over the following seconds. Every visitor paid archive.org for the same
+twenty-four answers, and the first thing anybody saw was a picture of the wrong
+length.
+
+A duration is a fact about a file. It is measured ONCE, by a program, and
+written down: `demo/resources/measure-durations.mjs` asks each of the
+twenty-six with ffprobe, one at a time, two seconds apart, with
+`-probesize 65536` so it reads a header rather than half a recording, and
+`build-corpus.mjs` merges the answers into `corpus.json` as `durationMs`. All
+26 answered, including a 990 MB AVI and a 225 MB MPEG program stream. The page
+now draws the true run in its first frame and asks nobody for anything.
+
+⚠️ THE FALLBACK STAYS AND RUNS FOR NOBODY. A corpus rebuilt without the
+durations step would otherwise silently draw a run of guesses.
+
+⚠️ AND `--offline` MADE IT SAFE TO DO. `build-corpus.mjs --offline` rebuilds
+from its cache and asks no source anything: MEASURED byte for byte identical to
+the committed file apart from the timestamp, so the durations could be merged
+through the generator without a full harvest that might have dropped a row.
+
+## 98. A check that works the instrument takes the page away from its visitor (session 31)
+
+`/tapes/` opened a twelve megabyte recording from archive.org, played it, and
+looped it four ways inside three seconds of every visit, because its self-checks
+had never been gated. Reported three times. The first two repairs were both real
+and both about something else: one shut the sound gate, so nothing reached the
+speakers; the other removed twenty-four duration probes, so the widths came off
+the corpus. A page can be inaudible, ask nobody for a duration, and still spend a
+visitor's bandwidth and run its transport in front of them.
+
+The rule is now absolute and in CLAUDE.md: a self-check never runs for a visitor,
+gated on `?selfcheck=1`, default off, no page is an exception. Both excuses that
+were used here are recorded with what they cost. *"Nobody is holding this one"*
+was `/videoradio/`'s, and it was true of everything the check does except the
+one thing that mattered: the check presses full screen, so somebody who pressed
+play and then ⛶ had their own full screen taken away about twenty seconds later.
+That was reported twice as a mystery timer and was open for two sessions,
+because 22 s is also the tour's dwell and 71 s the station clock, so the real
+cause hid behind two innocent ones.
+
+⚠️ **A VISIT ASSERTS A STRICT SUBSET, and the suite must walk the visitor's path
+FIRST.** The obvious shape is `select(0, { load: SELFCHECK })`, and it is wrong
+in the way that let this live: the suite would then take a different path from
+the visitor, so the one claim worth checking would be true only on runs nothing
+was watching. Every run now walks the cold path and records what it found, then
+the suite opens a file on purpose.
+
+⚠️ **AND THE TEST IS MUTATION, NOT COST.** `/tapes/`'s zoom check called
+`openFinish()` one frame into the opening animation, so the self-moving zoom
+somebody had asked for was being destroyed by the thing grading it. Ask of every
+check: if a person were watching this page, would they see it happen?
+
+## 99. Three faults in one symptom, and each had a measurement available in seconds (session 31)
+
+`/crate/` was asked to play a file when a row is pressed. It was reported broken
+twice after being called fixed, and all three causes were mine:
+
+1. **CSS pasted INSIDE a rule.** The new `.pick` and `.on` rules landed between
+   `.pos-tbl-row {` and its declarations. Nested rules are ignored, so every
+   visual change was inert and the row's own layout was broken at the same time.
+   One look at the file showed the brace.
+2. **`key` is not `name`.** The sidecar carries both. `key` is
+   `vain-dev/<stamp>/audio.wav` and answers **200**; `name` is the uploader's
+   original filename and answers **404**. The URL was built from `name`. Two
+   `curl`s against our own store settled it.
+3. **The failure was silent**, so it presented as a transport bug: the element
+   never reached `canplay`, the deck kept its one millisecond range, and the
+   playhead sat at the end while the log said `playing …`.
+
+Each was cheap to measure and expensive to reason about, and reasoning is what
+produced two wrong reports. The repo already says it: measure the quantity in
+question. The corollary this session adds is that **a page must not report an
+action it did not manage to take** — the log line went out before anything had
+loaded, which is what made two different bugs look like one.
+
+## 100. A convention only works if it is legible, and the tie was not (session 31)
+
+Boxes inside one machine were tied with a headless line, on the sound argument
+that a head claims an order the drawing does not know. It was reported as a
+missing arrowhead on `/station/`, and again on `/replay/`: a headed line, then a
+headless one, then a headed one down a single column reads as a head that fell
+off, not as "this pair is unordered".
+
+The default reversed. There are three answers now and a container picks one: an
+ARROW (they feed each other), `set: true` for a BRACKET (parts of one machine
+that do not), and `join: false` for NOTHING, which is right where the container's
+own box already carries the whole relationship. `/box/`'s `Browser` holds a
+keyboard and a playout; a line between them adds no fact and gives the eye
+something to follow that leads nowhere.
+
+⚠️ Two mechanical traps came with it, both costing runs. A flag added to a node
+must be **carried to the render node**: `box()` builds a fresh object rather than
+spreading the spec, so `set` was invisible to the painter and read as an option
+that did nothing. And `back: true` is an **author flag that nothing infers**: a
+return link without it is laid out as a forward step, which drew a line straight
+through `playout` and put its head on the far left of the Browser.

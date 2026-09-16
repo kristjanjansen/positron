@@ -892,7 +892,7 @@ there, stop and ask.** Surveyed:
 | tag input with suggestions | 🔴 **no** | no `<datalist>` anywhere |
 | checkbox / toggle | 🔴 **no** | substitute: a two-option `createChoice`, or an `aria-pressed` button |
 | status badge | 🔴 **no component** | CSS only — `.pos-tag` (`shell.css:452`), `.tbar-badge` (`:405`), `.pos-hw-tag` (`:245`) |
-| card grid | 🔴 **no** | closest is 8 lines of page CSS at `demo/seek/index.html:14` |
+| card grid | 🔴 **no** | closest was 8 lines of page CSS in the retired `seek` page, now at `archive/demos/seek-index.html:14` |
 
 **Six missing components for one page.** ⚠️ `demo/kit/index.html` has no form
 section **because there are no form components** — this would be the project's

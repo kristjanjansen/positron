@@ -15,6 +15,110 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- ✅ **DONE, AS ONE CONTROL THAT IS OFF UNTIL PRESSED.** `Let it play itself`
+  runs the same tour `/videoradio/` runs: 22 s on a sound, 9 s sliding to the
+  next, the blend breathing 0.25 to 0.92, and the fader and four settings
+  visibly travelling while the slide is on. The clock is SHARED now, exported
+  from `radio-gran.mjs` rather than copied. A hand on the sound row takes it
+  straight back on `pointerdown`, so nothing can move under a finger, and the
+  log says *"the instrument is yours now"*. MEASURED 47/48 before (one stale
+  red, see below) and **51/51 after**. Sabotage: deleting the hand-back call
+  takes that assert red while the other stays green, so the two discriminate.
+  ⚠️ **IT DOES NOT CHANGE STATION, AND THAT WAS REFUSED ON PURPOSE**: the page
+  carries a standing *"do not switch channels if I do not"*, and every mount
+  belongs to a broadcaster whose listener figures count what we open.
+  ⚠️ **AND IT FOUND A CHECK THAT HAD BEEN RED FOR REAL**: `the station moves the
+  granulator` hard-coded `msize` on the argument that `four seconds ago` routes
+  the follower onto grain length. True until the page was told to open on `dub`,
+  whose routes are `sos`, `drive` and `spray`, so it sampled a control nothing
+  moved and read a flat 0.000 every run. It reads the destination off the sound
+  that is playing now.
+
+- ~~**`/radio/` SHOULD MOVE BY ITSELF THE WAY `/videoradio/` DOES. ASKED
+  2026-09-16:** *"can you have simular cool movement you had on videoradio to
+  the radio granulator too?"*, to be done in the background. `/videoradio/` is
+  the same machine with the decisions given to a clock: a tour sliding from one
+  sound to the next, a blend that breathes, a station that changes on its own.
+  `/radio/` is the one you play by hand, so whatever it gets has to be something
+  a person can take back the moment they touch a control.~~
+
+- **`/draw/`: DEFAULT ZOOM 2.0, AND THE BLUE LINE CANNOT BE SEEN. ASKED
+  2026-09-16:** *"draw timeline: zoom 2.0 by default. find a way to see blue
+  line on drawing (no enough contrast am blue on white). perhaps on drawing no
+  blue line, fade it in when stopped and fade my drawed line into some
+  semitransparent state"*. The last sentence is a suggested mechanism rather
+  than the requirement: the requirement is that both lines can be told apart.
+
+- **`/items/`: FIXED HEIGHT ON THE LIST BOX, AND NO EMPTY MESSAGE. ASKED
+  2026-09-16 WITH A SCREENSHOT:** *"have fixed height on this box / table and rm
+  empty message"*. The box holding the published items grows from nothing to
+  however many rows there are, so everything under it moves, and when it holds
+  none it says *"nothing published yet"* inside a bordered box that is itself
+  the message.
+
+- 🔴 **41 PAGES STILL RUN THEIR SELF-CHECKS FOR VISITORS. SWEEP THEM.** The rule
+  landed in CLAUDE.md 2026-09-16 (*"rip those selfchecks out of user experience
+  and make rule about it"*) and four pages obey it: `/radio/`, `/crate/`,
+  `/tapes/` and `/videoradio/`. COUNTED off the tree, every page that calls
+  `d.assert(` and contains no `selfcheck` gate:
+  blocks, capture, click, cues, draw, feedback, flipper, floor, grains, held,
+  instrument, items, jam, keep, kit, lanes, llhls, looper, loops, memento,
+  mirror, moq, now, patch, rack, record, reel, replay, resources, room, score,
+  seek, show, station, strip, take, transport, typist, vclick, webrtc, wire.
+  ⚠️ **NOT ALL 41 ARE HARMFUL AND THE SWEEP IS NOT MECHANICAL.** A read-only
+  assert over data the page already holds costs a visitor nothing and should
+  keep running. What has to move behind the gate is anything that opens a file,
+  makes a sound, presses a control, or moves the picture. The test is CLAUDE.md's:
+  if a person were watching this page, would they see it happen? Pages worth
+  reading first are the ones that record, upload or play: take, keep, record,
+  memento, capture, replay, mirror, grains, jam.
+
+
+- 🔴 **`/tapes/` NEEDS A STAND-IN LIKE `demo/fake-station.mjs`.** Its harness
+  pulls real recordings off archive.org, so every run spends somebody else's
+  bandwidth, and 2026-09-16 the instruction was *"stil: super careful with
+  external sources, better avoid"*. `fake-station.mjs` did exactly this job for
+  `/radio/` and took it from ungradable to 48/48 at no cost to anybody. What is
+  needed here is smaller: a local host serving a few short MP3s with the right
+  `content-length`, `accept-ranges` and CORS headers, and a `?base=` on the page
+  the way `/radio/` already has. Until it exists, `node demo/verify.mjs tapes`
+  is a thing to run once before shipping, not in a loop.
+
+- 🔴 **THE LOOPER CANNOT OWN A LOOP ON A MEDIA ELEMENT, AND `/replay/` IS THE
+  FIRST PAGE THAT NEEDED ONE. REFUSED IN WRITING 2026-09-16.** Asked as *"does
+  not have global loop button with mode, just a single loop. it shoudl be global
+  no?"*. `demo/shell/looper.mjs` owns a loop by HOLDING THE SOUND: the ring, the
+  kept `AudioBuffer`, the mirrored copy, the joined copy, one
+  `AudioBufferSourceNode` reading a lap. Backwards and there-and-back exist at
+  all only because the samples can be reversed, which is exactly what no media
+  element can do. `/replay/` loops a `<video>` with no `AudioContext` anywhere
+  on the page, so it was given the kit's BUTTON and not the kit's mechanism: the
+  same `→`, in the same `tbar-loopgrp` glued to LOOP, disabled with the reason
+  on it, the way `looper.sayTooLong()` already greys a loop longer than the ring.
+  What would remove this line is a second mechanism inside `looper.mjs` for a
+  loop whose material is frames rather than samples. It can honestly offer
+  `round` and `half` (`video.playbackRate`), and it can never offer `back` or
+  `pingpong` without decoding the whole lap into memory, which for 190 s of
+  video is not a thing to do on a phone.
+
+- 🔴 **`/tapes/` AND `/radio/` DRAW A LOOP DIFFERENTLY, AND RADIO IS THE ONE
+  THAT IS RIGHT. ASKED 2026-09-16:** *"tapes viz handles loop differently than
+  radio. is this same component?! radio should be it"*. Both draw through
+  `demo/shell/grain-scope.mjs`, so the divergence is options or call order
+  rather than two pictures. Radio's behaviour is the one to keep.
+
+  ⚠️ `HANDOFF.md` (session 29) and the `shout` line further down this file
+  CONTRADICT EACH OTHER on exactly that point, so neither is evidence.
+
+- **`/videoradio/`: REMOVE the 3-D scene from the desktop page. ASKED
+  2026-09-16:** *"also lower 3d scene in desktop page"*, then, against the
+  deployed result, *"i still see 3d viz below top one. remove bottom one"*.
+  ⚠️ THE FIRST MESSAGE WAS READ AS "make it shorter" AND SHIPPED AS 240px ->
+  150px. It meant the LOWER of the two pictures. The second message settles it:
+  the sea goes, and it goes to `archive/videoradio-xr/` with the headset half it
+  was built to stand in for.
+
+
 - **`/held/`: a `type scale` slider on the tablet.** Asked 2026-09-16: *"make it
   a slider in left tablet (type scale) in vr (held)"*. Shipped today as two
   constants, `SCALE_BIG 1.5` / `SCALE_SMALL 1.2`, which is 36/36. Making it a
@@ -24,6 +128,15 @@ file by being finished or by being refused in writing, never by being forgotten.
   the page's own check reported `talk reaches 7.9 m of the 7.5 m half-wall`, so
   the slider's top end has to be bounded by the wall rather than by taste, or it
   is a control that can put a word through a wall.
+
+- ✅ **MET IN THE WILD ON `/replay/`, 2026-09-16, AND IT COST 7 OF 10 ASSERTS
+  WHILE READING GREEN.** The page reported `page asserted something · 3`. Its
+  diagram asserted at load, which disarmed the first-assert budget; every check
+  below it sits behind a 2.4 s guard, so they all landed after the harness had
+  stopped collecting. Moving that one assert behind the first slow one took it
+  to 22/22 and 10 page asserts. **The general item below is still open**: nothing
+  in the harness says which pages are near this edge, and `/station/` still
+  asserts at load.
 
 - **A diagram assert AT LOAD can silently cost a slow page its whole run.**
   Found 2026-09-16 while giving `/crate/` a diagram: `verify.mjs`'s first-assert
@@ -67,54 +180,32 @@ file by being finished or by being refused in writing, never by being forgotten.
 - **`v2in: station`, asked 2026-09-16.** NOT UNDERSTOOD, and written down
   verbatim rather than guessed at. Ask before working it.
 
-- 🔴 **`shout` OPENS ONE UPSTREAM PER CLIENT. IT DOES NOT TEE, AND THAT IS WHY
-  ERR COUNTS US AS MANY LISTENERS.** READ OFF THE CODE 2026-09-16, not
-  remembered: `workers/shout/worker.mjs:291` does a fresh `fetch(upstream)` on
-  every request and hands the body straight back, with
-  `cf: { cacheEverything: false, cacheTtl: 0 }` because a cached radio stream is
-  a contradiction. So the relay is a pass-through and **N browsers are N
-  listeners at the broadcaster**, plus one per harness tab and one per orphaned
-  Chrome. Asked 2026-09-16: *"we have single listener atm, no?"* and the answer
-  is no, not by design. The fix is a Durable Object holding ONE upstream
-  connection per mount and teeing it to every subscriber, which would make this
-  whole site exactly one listener per mount however many people are on it.
-  `workers/shout/NOTES.md` already says a DO is *"worth doing if this is not
-  enough"*; ERR's corrupted listener statistics are the evidence that it is not.
-  ⚠️ It also has to handle the last subscriber leaving, or the tee becomes a
-  permanent listener that nobody is hearing, which is worse than what we have.
+- **`/radio/` has an assert that excuses itself, seen 2026-09-16 on the first
+  run against the stand-in.** `the transport can stop the stream · nothing was
+  playing to stop` passed green while grading nothing. The harness pauses the
+  transport a few steps earlier (`pause holds position`), so by the time the
+  page's own check runs there is nothing left to stop. It is the shape CLAUDE.md
+  names: an assert that excuses itself is worse than no assert, because it reads
+  green in exactly the case it exists to catch. Fix it by having the check START
+  the stream itself, or by saying in words that this run could not grade it.
 
-- 🔴 **MEASURE THE MEDIA DURATIONS AND WRITE THEM INTO `corpus.json`.** Asked
-  2026-09-16: *"just measure file lenghts?"*, *"and write to corpus json?"*,
-  *"i mean duration"*. MEASURED NOW: `demo/resources/corpus.json` holds 334
-  items, 129 with a `file`, of which **26 are time-based** (16 `audio/mpeg`,
-  9 `video/mp4`, 1 `video/mpeg`) and **none of them has a duration field**:
-  there is `bytes` and nothing else. `/tapes/` therefore cannot draw a record
-  as long as it actually is. The generator is
-  `demo/resources/build-corpus.mjs`; the amendment has to go through it or
-  through a script it records in `amended`, never by hand-editing the JSON.
-- **`/videoradio/` in a headset: stage A is written, stage B is not, and NEITHER
-  HAS EVER BEEN RUN.** `xr-panel.mjs` takes a `surface`, `/videoradio/` has a
-  Run in VR control and a sea (a second `makeField` in the session's context fed
-  the same bytes as the window's, on a 36 m plane with a world-space radial
-  fade). Its two asserts go through `preview()` and open nothing, but they live
-  INSIDE `/videoradio/`, which no harness may open, so they will not run until
-  somebody deliberately runs that page. Stage B is the displaced mesh and the
-  skirts. `plan-videoradio-xr.md` §5.
-  ⚠️ The audio half is ANSWERED: see CLAUDE.md, measured on a Quest 2026-09-16.
-- **`/tapes/`: the lane height is right and NOTHING GRADES IT.** The 2026-09-15
-  ask *"add 2x height to timeline (same tape h)"* is implemented at
-  `demo/tapes/index.html` (`height: 64, barPad: 21` gives 22 px of tape), and no
-  assert reads a drawn bar height, so it regresses silently. The other four
-  asks from that day are DONE 2026-09-16, each with a check proved by sabotage.
-- **`/videoradio/`: blend several stations at once, and loop far more.**
-  *"way more looping. can you blend multiple station loops?"*. Today one mount
-  is decoded at a time and one loop buffer is kept. Several stations looping
-  against each other is a different instrument and a real one: the relay
-  carries eight mounts and two of them are IDA. Not started.
-- **Video art reading for `/videoradio/`.** *"look for video art inspiration"*.
-  The scan landscape now in the page came from the Rutt-Etra processor and the
-  Vasulkas, which was applied rather than researched. A proper look at what
-  else is worth stealing has not been done.
+- **The looper is a kit module and is in no `/kit/` section.**
+  `demo/shell/looper.mjs` is used by `/radio/` and `/tapes/`, and `/kit/` has no
+  transport bar at all, so the way button that cycles → ← ⇆ is demonstrated
+  nowhere. CLAUDE.md says build from `/kit/` and say so when you cannot: this is
+  saying so. It needs a transport-bar section on that page, which is more than a
+  component drop, and `/kit/` is the one page the suite cannot grade.
+
+- ✅ **THE TEE IS BUILT AND THIS LINE WAS DANGEROUSLY STALE.** It said `shout`
+  opens one upstream per client and does not tee, READ OFF THE CODE 2026-09-16.
+  That was true of an older `worker.mjs` and false by the time it was written:
+  session 29 shipped `class Mount`, one Durable Object per station holding ONE
+  upstream and copying it to every subscriber, with `?direct=1` deliberately not
+  offered. `GET /tee/<id>` reports `upstreamConnections`, which must read 1
+  whenever anybody is listening.
+  ⚠️ **A STALE LINE HERE CONTRADICTED `HANDOFF.md` FOR A DAY**, and the next
+  person to ask *"are we a single listener?"* had two files disagreeing. Read
+  the code; neither document is evidence.
 
 - 🔴 **THE STATION NEEDS TEN MINUTES OF A REAL IPHONE, AND THE PROBE IS BUILT.**
   Open <https://positron-probe-station.kristjan-jansen.workers.dev/> on the
@@ -171,14 +262,231 @@ file by being finished or by being refused in writing, never by being forgotten.
 - **The em dash sweep is all but done.** 418 reader-facing strings across 62
   files, and the two FORMATTERS that were stamping a fresh one onto every
   failing assert (`shell.mjs`'s assert log and `verify.mjs`'s ok/FAIL printer),
-  which no sweep of strings could have reached. What remains is only what was
-  agent-held at the time: `radio` (23), `tapes` (4), `resources` (2), and
-  four in `shell.mjs` that are not the formatter.
+  which no sweep of strings could have reached. `tapes` (3) is done, 2026-09-16.
+  What remains is `radio` (about 23), `resources` (2), and four in `shell.mjs`
+  that are not the formatter.
+  🔴 **AND A WARNING FOR WHOEVER FINISHES IT: NOT EVERY EM DASH IN `radio` IS
+  PROSE.** Counted while sweeping `tapes`: a good half of radio's are the
+  NO-VALUE MARK — `${G.gates ?? '—'}`, `HTTP ${m.status || '—'}` — which is
+  CLAUDE.md's own convention for a number nothing measured and MUST NOT be
+  swept. A blind replace would turn "we did not look" into a comma.
 
 ## Done, with what it was measured at
 
+- ✅ **IDA AND RADIO 1965 ARE BACK, LAST IN THE LIST, ON THE TEE.** Asked as
+  *"bring ida's back to radio (if single listener)"*, *"bring ida to videoradio
+  too"* and *"bring back radio65 stream as last. we are single user connected?"*.
+  The condition was checked off the code, not remembered. NEITHER OPERATOR HAS
+  BEEN RE-ASKED: what changed is the size of the claim, not their permission.
+  Both are LAST because being at the front is what did the damage.
+
+- ✅ **THE `/videoradio/` HEADSET HALF AND ITS SEA ARE ARCHIVED**, to
+  `archive/videoradio-xr/` with the plan and a README of what the three device
+  runs bought. Stage B was never written and now never will be here.
+
+- ✅ **A RATE LATTICE OF ONE DRAWS NOTHING.** `buildRates()` tested
+  `lattice.length`, so a cue lane declaring `caps: { rates: [1] }` produced a
+  single armed radio button with nothing to choose it against: *"what this
+  disconnected 1 does here?"*. Checked before changing it that `jam` and `kit`
+  are the only other single-rate declarations and neither asserts on the row.
+
+
+- ✅ **`/seek/` IS RETIRED.** *"rm seek demo"*. `git mv` to
+  `archive/demos/seek-index.html`, its row out of `DEMOS`, and 5 real slug
+  references swept of 30 slug-shaped candidates: the manifest row, the manifest
+  prose that paired it with `replay`, a `verify.mjs` comment citing its 700 ms
+  sweep, and a plan pointer. The other 25 are `st.reason === 'seek'` in the
+  transport and history in old plans, which an archive is allowed to keep.
+  ⚠️ IT ORPHANED NO COVERAGE, checked rather than assumed: its comment claimed
+  *"exactly one page has to prove it works"* about the shared loop check, and
+  `replay`, `radio` and `tapes` all press `pressLoop()` and assert on the wrap.
+  MEASURED after: 46 rows, 43 built, `seek` absent, scratch build passes with no
+  missing import, and the archived page still parses.
+
+- ✅ **`/replay/`, ALL SIX.** 18/18 before, 22/22 after; page asserts 6 to 10.
+  The lone yellow `1` was a rate radio group with ONE option, from a cue lane
+  declaring `caps: { rates: [1] }`. The loop bug was real: the bar wraps by
+  seeking, the deck is a `mediaMaster` FOLLOWER of the video, so every wrap was
+  undone by the master's next tick while the clock climbed. It passes
+  `command: { play, pause, seek }` now, the way `/tapes/` already did. Load and
+  Play are gone, the transport's play does it. `what` is the manifest's `one`
+  line. A diagram, `cuts` asserted at 0. Sabotage: deleting the one line that
+  writes `video.currentTime` takes it red at `1.99 s against a ceiling of 1.25`.
+  ⚠️ THE LOOPER WAS REFUSED IN WRITING AND CORRECTLY: it owns a direction by
+  holding the sound, and `/replay/` loops a `<video>` with no `AudioContext` on
+  the page. It got the kit's BUTTON without the kit's mechanism, disabled with
+  the reason on its face. The lift is in this file.
+
+- ✅ **ISOLATED DEPLOYS, PLANNED AND ANSWERED NO.** `plan-isolated-deploys.md`.
+  46% of deployed bytes are shared and 45 of 46 pages import `shell.mjs`, so
+  per-slug subdomains cost 44 Workers and about 179 MB a deploy to buy TIMING
+  isolation over code that stays shared BY SOURCE. `wrangler versions upload
+  --preview-alias` instead, which is wired as `workers/view/preview.mjs` and
+  MEASURED at 11 s with production untouched.
+
 ⚠️ These stay. A struck line is how a repeat request is recognised as a
 repeat, and several of these were asked for more than once.
+
+- ✅ **DONE. `/replay/`, ALL SIX, ASKED 2026-09-16 WITH A SCREENSHOT.**
+  MEASURED: **18/18 before, 22/22 after**, `node demo/verify.mjs replay`.
+  1. *"transport loops but video does not, time keeps increasing"* was real and
+     is fixed. The bar wraps a loop by SEEKING, and with no `command` a seek
+     goes to the deck; the deck on that page is a FOLLOWER of the picture, so
+     `mediaMaster` undid every wrap within a quarter of a second while the show
+     ran on. The page now passes `command`, so play, pause and seek all drive
+     the `<video>` and the deck follows, which is what `/tapes/` already did.
+     GRADED: the check sets a loop through the real button, plays two laps and
+     watches `video.currentTime`. Green it reads *the picture ran 0.81 s from
+     the loop start and reached 95.81 s, against a ceiling of 96.25 s*; with the
+     one line that seeks the element deleted it reads **1.99 s against a ceiling
+     of 1.25 s** and goes red.
+  2. *"what this disconnected 1 does here?"* was the rate radio group with ONE
+     option in it, from the cue lane declaring `caps.rates: [1]`. The lane no
+     longer declares a lattice, because a playhead that follows a picture has no
+     speed to arm. The bar's half of it is open above.
+  3. *"rm load and play, transport play should do it"*. Gone. ▸ attaches the
+     manifest, starts the picture and starts the playhead; `play()` is fired and
+     never awaited. The page now declares no controls at all.
+  4. *"does not have global loop button with mode, just a single loop"*. The
+     kit's `→` is on the bar in the kit's group, disabled with the reason on it.
+     The refusal and what would lift it are open above.
+  5. *"desc: single sentence only"*. The `what` is the index's own `one` line.
+  6. *"add 'how it works' section"*. A `createDiagram` picture, last on the page,
+     seven boxes in two machines, asserting its own `cuts` at 0.
+  ⚠️ The manifest row grew `settleMs: 6000`: with no controls the page's checks
+  hang off a press the harness makes BEFORE its control loop, and that number is
+  what sizes the wait for a page's first assert.
+
+- ✅ **DONE. THE L
+- ✅ **SESSION 31 CLEARED THESE, ALL DEPLOYED AT `b2bddd2-092128-ad26`.**
+  The full account, with what each one cost, is in `HANDOFF.md`.
+
+- ✅ **`/videoradio/` VR IS TO BE ARCHIVED. ASKED 2026-09-16:** *"arvhice
+  videoradio vr, it did not worked out"*. The headset half comes out of the live
+  page and goes to `archive/`: the `Run in VR` control and its row, `makeXR`,
+  `xrPreview`, the `createXRPanels` import, the session's own sea and the two
+  asserts that go through `preview()`. The WINDOW sea stays, because the same
+  message asks for it to be changed rather than removed.
+
+- ✅ **MOVE `/videoradio/` TO THE `vain` GROUP. ASKED 2026-09-16:** *"move
+  videoradio to vain group"*. Front-page grouping, in `demo/shell/manifest.mjs`.
+
+- ✅ **REMOVE THE LEAVE-FULL-SCREEN BUTTON ON `/videoradio/`. ASKED 2026-09-16:**
+  *"rm \"back from fullcreen\" button in videoraio"*. The `⤡` in the bottom
+  left of the pane (`outBtn`).
+
+- ✅ **THE LOOP PAIR IS TWO DIFFERENT BORDERS AND THE ARROW IS NOT SQUARE. ASKED
+  2026-09-16 WITH A SCREENSHOT:** *"loop buttons should have same border color.
+  arrow button square size"*. In the picture `LOOP` carries a dim border and the
+  → glued to it carries a bright one, so one control reads as two, and the arrow
+  half is wider than it is tall. `demo/shell/looper.mjs` owns both.
+
+- ✅ **`dub` AS THE DEFAULT PRESET. ASKED 2026-09-16:** *"dub as default preset"*.
+
+- ✅ **THE PLAY BUTTON CHANGES SIZE WHEN IT BECOMES PAUSE. ASKED 2026-09-16 WITH A
+  SCREENSHOT:** *"play button is always square"*. `▶` and `❚❚` are different
+  widths, so a button sized by its content resizes on every press.
+
+- ✅ **`/videoradio/` SHOULD USE THE STANDARD TRANSPORT BAR. ASKED 2026-09-16 WITH
+  A SCREENSHOT:** *"use standard transport bar here (LIVE badge as in radio).
+  fullscreen button replaces loop"*. Today it has a hand-rolled `.vr-bar` of two
+  buttons, which is the fourth-copy-of-a-component failure CLAUDE.md names.
+  `createTransportBar` with `live: true` draws the LIVE chip `/radio/` uses, and
+  the ⛶ goes in the slot the LOOP button occupies there.
+
+- ✅ **`/tapes/` STILL LOADS AND PLAYS ON PAGE LOAD. REPORTED 2026-09-16 AGAINST
+  THE DEPLOY**, <https://positron.studio/tapes/>: *"tapes still does some
+  loading and playback on page load"*, and *"omg you still do not get it"*,
+  which is the second half of the report and says this has been asked before.
+  ⚠️ THE LAST SESSION FIXED A DIFFERENT THING AND CLAIMED THIS ONE. What it
+  removed was twenty-four `preload = 'metadata'` requests to archive.org, and
+  the handoff then wrote *"the page opens NO media elements at load"*. A visitor
+  is still getting sound and still getting a fetch, so whatever is doing it was
+  never the thing that was measured.
+
+- ✅ **CHROME DROPS OUT OF FULL SCREEN WHEN THE RADIO SOURCE CHANGES. NAMED
+  2026-09-16:** *"chrome drops out of fullscreen when radio source changes. just
+  take it as a fact and try to work to avoid it. or do tests around to replicate
+  and find solution."* This is almost certainly the same fault as the standing
+  *"`/videoradio/` drops out of full screen after 22 to 25 seconds"* item, which
+  has been open since session 28 and unexplained: the tour changes station on
+  roughly that period, so the clock everyone was looking for was the station
+  rotation rather than a timer.
+  ⚠️ **THE TERMS OF THE WORK WERE SET WITH IT AND THEY ARE NOT OPTIONAL:** *"be
+  very gentle make sure proxy tee work and no assersions on live items. this is
+  very gentle r&d"*. So: no assert loops against live mounts, and whatever is
+  built has to confirm the tee is still holding one upstream.
+
+- ✅ **`/box/`: A DIAGRAM, A LAG READOUT, AND DROP THE COLLECTION LINE. ASKED
+  2026-09-16:** *"add diagram to box demo. i want lag readout. rm
+  Will_Godfrey_Collection · 657 of 878"*, then *"add 'patch' label to patch
+  selector"*.
+
+- ✅ **`/crate/`: CLICKING A FILE PLAYS IT. ASKED 2026-09-16:** *"no table rework.
+  just make clickin files playable"*. Narrows the older three-part ask to one
+  part and explicitly refuses the rest: leave the table alone.
+
+- ✅ **`/tapes/`: THE NO-WAVEFORM LINE IS UNREADABLE AND THE EMPTY BOX LOOKS
+  BROKEN. ASKED 2026-09-16:** *"what does it mean. many kureniemis do not
+  play"*, against `Computer Music: its host will not share this file with a
+  page, so it plays with no waveform`, printed in the log's FAULT colour with a
+  blank bordered box above it.
+
+- ✅ **`/replay/` DOES NOT SAY WHERE THE CUES COME FROM. ASKED 2026-09-16:**
+  *"https://positron.studio/replay/ does not say where from the cues come"*.
+  The page draws eight operator cues on the strip and nothing on it says who
+  made them or when.
+
+ENGTHS ARE MEASURED AND THEY ARE IN THE CORPUS.** Asked as
+  *"also do measure file lengths gently and write to corpus and use them"*.
+  `demo/resources/measure-durations.mjs` asked all 26 time-based files with
+  ffprobe, ONE AT A TIME, two seconds apart, at `-probesize 65536` so it reads a
+  header rather than half a recording: **26 of 26 answered**, including a 990 MB
+  AVI (52 min) and a 225 MB MPEG program stream (4 min). They live in
+  `demo/resources/durations.json`, `build-corpus.mjs` merges them, and
+  `corpus.json` now carries `durationMs` on those 26 rows and a `durations`
+  block saying who measured them and when.
+  ⚠️ MERGED THROUGH THE GENERATOR WITH `--offline`, which asks no source
+  anything: MEASURED byte for byte identical to the committed file apart from
+  its timestamp, then 26 rows changed and every change was the new field alone.
+  ⚠️ AND `/tapes/` USES THEM: the run is drawn at its real length in the first
+  frame and the page opens no media elements at load. It was twenty-four
+  `preload = 'metadata'` requests to archive.org on every visit, correcting the
+  picture over the following seconds. 24 of 24 measured, 1.2 to 13.8 minutes.
+
+- ✅ **DONE. THE LOOPING UI IS GLOBAL AND `/tapes/` HAS IT.** Asked as *"make it
+  use same looping ui as radio (make it global)"*. `demo/shell/looper.mjs` owns
+  the ring, the kept buffer, the mirror, the voice, the head fraction and the
+  button that cycles → ← ⇆; `/radio/` lost 222 lines to it and `/tapes/` gained
+  the whole instrument. MEASURED: radio **48/48** against the stand-in and tapes
+  **37/37**, with the tape's own check proving backwards is the same samples
+  mirrored (4 of 4) and a sabotage of `reversedCopy` taking it red.
+  ⚠️ `/tapes/` keeps the FIRST LAP off the tape and plays every lap after it off
+  the ring, because a media element has no negative playback rate.
+
+- ✅ **DONE. THE DRAWN TAPE HEIGHT IS GRADED, IN PIXELS.** The 2026-09-15 ask
+  *"add 2x height to timeline (same tape h)"* was implemented and graded by
+  nothing. The check scans the canvas for the tallest run of ink inside the lane
+  rather than re-deriving `height - barPad * 2`, which would have been comparing
+  an answer with itself: **22 px of tape over 122 columns in a 64 px lane**, and
+  `barPad: 8` takes it to 48 px and red.
+
+- ✅ **DONE. `/tapes/` SAYS IT IS LOADING, AND THE PICTURE MOVES ITSELF.** Asked
+  as *"Loading on entry, selfmiving zoom"*. The name line says `finding the
+  recordings` until there is something to name, the strip pulses until it has
+  bars, and once the run is known the window opens on the WHOLE two and a half
+  hours and closes onto an hour over 1.2 s, then slides along with the tape and
+  stops at both ends of the run. MEASURED: **38 frames from 142 minutes wide
+  down to 60, 16 of them in between**; a playhead at 118.5 min brings the window
+  from -1.2 to 81.2 min. Both stop the instant a hand touches the strip, and
+  both go red under sabotage.
+
+- ✅ **DONE, AND IT UNBLOCKED A PAGE NOBODY WAS ALLOWED TO RUN.**
+  `demo/fake-station.mjs` is an Icecast mount that is nobody's radio station:
+  real MP3 frames, real ICY headers, a real text channel, a `/health` route in
+  the relay's shape, paced at 128 kbit/s. `verify.mjs` starts it itself whenever
+  `radio` is in the run. **48/48 green with zero bytes from ERR**, which is how
+  the looper refactor was graded at all.
 
 - ✅ **DONE. Space between the walk buttons and the scrub knob.** *"add space
   between"*, with a picture of them almost touching. `.tbar-head` is 10 px wide
