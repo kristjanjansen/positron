@@ -274,8 +274,20 @@ button.pos-pri[data-busy="1"] {
    margin, because a lone element should not carry a gap to nothing. 22px is
    a comfortable read at a laptop's distance and scales up in the headset
    block below. */
-.pos-body { margin: 0 0 22px; }
-.pos-body > * + * { margin-top: 22px; }
+/* 🔴 TWO GAPS IN THE WHOLE PROJECT, AND ONLY TWO. Instructed 2026-09-16: *"use
+   vetical space heights ~40 ~120 px. (small,big) only. big onlu before
+   (readout)logs"*. Everything between siblings takes the small one. The big one
+   is spent once per page, on the gap before the surface that reports what
+   happened, because that is where the page stops being an instrument and starts
+   being an account of one.
+   ⚠️ IT WAS 22 AND 44, WHICH IS TWO STEPS OF THE SAME SIZE. A rhythm whose
+   large gap is twice its small one does not read as two kinds of separation; it
+   reads as an accident. Three times apart is a decision a reader can see.
+   ⚠️ AND THE BOTTOM MARGIN IS THE BIG ONE, so a page with a joined report and a
+   page with a split log get the same gap before their foot: the report's own
+   margin collapses with this rather than adding to it. */
+.pos-body { margin: 0 0 120px; }
+.pos-body > * + * { margin-top: 40px; }
 .pos-body:empty { display: none; }
 /* ⚠️ And the things the SHELL stacks, for the same reason: the readout, the
    control bar and the log are siblings of the body, not children of it.
@@ -291,7 +303,10 @@ button.pos-pri[data-busy="1"] {
    ⚠️ SO WHATEVER FOLLOWS THE PAGE TAKES ITS GAP FROM `.pos-body`, and the
    joined surface at `.pos-report` does the same rather than typing its own 22.
    A shared measurement in two places is a measurement that will disagree. */
-.pos-readout { margin-bottom: 22px; }
+/* Small: a readout ABOVE the body is part of the page's flow rather than its
+   foot, so it takes the ordinary gap. The big one belongs to the surface at the
+   bottom, whichever arrangement a page chose. */
+.pos-readout { margin-bottom: 40px; }
 
 /* a refused play() must be visible, not a black rectangle */
 /* Outlined, not filled: this is a fallback, and a second solid yellow button
@@ -393,9 +408,10 @@ button.pos-pri[data-busy="1"] {
   display: flex; flex-direction: column;
   gap: 1px; background: var(--line); border: 1px solid var(--line);
   border-radius: 4px; overflow: hidden;
-  /* 🔴 44 px ABOVE IT, NOT THE PAGE'S 22, AND THE NUMBER IS DECLARED HERE AND
-     NOWHERE ELSE. Asked for on sight, 2026-09-16: *"add more space on top of
-     readoutslog"*.
+  /* 🔴 THE BIG GAP, AND IT IS THE ONLY PLACE THE BIG GAP IS SPENT. 120 px
+     against the page's 40, instructed 2026-09-16: *"use vetical space heights
+     ~40 ~120 px. (small,big) only. big onlu before (readout)logs"*. It was 44
+     against 22, which is two steps of one size rather than two kinds of gap.
      It is the diagram's number and it is the diagram's reason. `.pos-body >
      .pos-dg` already sits 44 px below what precedes it, because a picture of
      the machinery is a new PART of the page rather than another row in it, and

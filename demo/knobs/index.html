@@ -1039,10 +1039,18 @@
       // taking whatever the rotation handed it.
       { id: 'pi', label: 'Raspberry Pi', kind: 'box', tech: 'raspberry',
         children: [
-          { id: 'yoshimi', label: 'yoshimi', sub: 'ZynAddSubFX', tech: 'sound',
-            note: 'A software synthesiser, free and open, holding one note for as long as you '
-                + 'let it. Its filter follows controller 74: measured here, the sliders move '
-                + 'the sound from 162 Hz to 11.7 kHz, about six octaves.' },
+          /**
+           * ⚠️ THE SUB SAYS WHAT KIND OF PROGRAM IT IS, NOT WHERE IT CAME FROM.
+           * It read `ZynAddSubFX`, which is the synth Yoshimi was forked from
+           * and means nothing to anybody who has not met it. Asked 2026-09-16:
+           * *"explain yoshimi: supercolooder etc"*. The lineage is in the note,
+           * where there is room to say what it is FOR, and it is set against
+           * SuperCollider because this board runs that too, for `/grains/`.
+           */
+          { id: 'yoshimi', label: 'yoshimi', sub: 'software synth', tech: 'sound',
+            note: 'A synthesiser that is a program rather than a box, forked from ZynAddSubFX '
+                + 'and carrying 878 ready made sounds. SuperCollider on this same board is the '
+                + 'other kind: one is played, the other is written.' },
           /**
            * 🔴 TWO BOXES, BECAUSE THEY ARE TWO PROGRAMS. Asked 2026-09-16:
            * *"should it break into 2 boxes (jack / ffmpeg)"*. One box called
