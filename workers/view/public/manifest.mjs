@@ -209,8 +209,8 @@ export const DEMOS = [
 
   // The only network-free row in Act 3, and the act's simplest complete
   // instance: make a recording yourself, then scrub it. Everything after this
-  // adds exactly one thing — `record` adds disk economics, `replay` and `seek`
-  // add a pre-existing show and an exact fold, `show` adds a real WebRTC hop.
+  // adds exactly one thing — `record` adds disk economics, `replay` adds a
+  // pre-existing show, `show` adds a real WebRTC hop.
   //
   // settleMs does TWO jobs here and only the second one matters. The harness
   // gives it to control 0 (`Use the camera`), which needs none of it; what
@@ -246,12 +246,23 @@ export const DEMOS = [
   { name: 'record', group: 'capture', act: 3, created: '2026-09-04', built: true,
     one: 'record in segments and ship each one, so disk stays flat',
     tags: ['MediaRecorder', 'R2'] },
-  { name: 'replay', group: 'capture', act: 3, created: '2026-09-04', built: true,
+  // 🔴 `settleMs` HERE IS NOT FOR A SLOW CONTROL, BECAUSE THIS PAGE HAS NO
+  // CONTROLS. The Load button was removed on instruction and the transport's
+  // own ▸ does the loading, so the page's checks hang off a press the harness
+  // makes before the control loop rather than inside it. `verify.mjs` uses this
+  // number twice, and the second use is what is wanted: the wait for a page's
+  // FIRST assert. Replay's first assert is the loop check, which has to let the
+  // shared transport checks finish, then play two laps of a real picture and
+  // watch where it gets to.
+  { name: 'replay', group: 'capture', act: 3, created: '2026-09-04', built: true, settleMs: 6000,
     one: 'a 190 s show off R2, played with the eight cues it was recorded with',
     tags: ['HLS', 'R2', 'timeline'] },
-  { name: 'seek', group: 'capture', act: 3, created: '2026-09-04', built: true,
-    one: 'seek inside that recording; the fold at any position must be exact',
-    tags: ['HLS', 'R2', 'timeline'] },
+  // `seek` was a demo and is archived at archive/demos/seek-index.html, removed
+  // 2026-09-16 on instruction. It played this same show and asked the timeline
+  // which cues had happened by any position, 24 asks around the eight cues plus
+  // a five-stop jump sweep, and it counted a cue firing more than 1.5 s after
+  // its own moment as a retroactive burst. The loop button it graded is still
+  // graded: `replay`, `radio` and `tapes` all press it and assert on the wrap.
 
   { name: 'looper', group: 'instruments', act: 4, created: '2026-09-04', built: true,
     one: 'a keyboard into a WebAudio synth, then loop what you played',
@@ -355,15 +366,18 @@ export const DEMOS = [
   // positron.studio may not load at all. The relay is the difference between a
   // page that works and a page that cannot, rather than between a page that
   // measures and one that does not.
-  // ⚠️ `settleMs` HERE DOES ONE JOB, NOT TWO, AND THAT IS WHY IT WENT UP. The
-  // harness applies it to control 0 and to the first-assert budget; this page
-  // declares no controls at all now (the granulator comes up with the sound
-  // rather than behind a button), so only the second use reaches it — and it has
-  // to cover a wasm scsynth boot, 31 buffer allocations, a definition, a 2.5 s
-  // level, two 700 ms ink samples and a 1.2 s deafness control before the page
-  // says anything at all.
+  // ⚠️ `settleMs` HERE DOES BOTH OF ITS JOBS AGAIN, AND THE FIRST ONE COSTS
+  // NOTHING. The harness applies it to control 0 and to the first-assert
+  // budget. This page carried no controls at all for a while, so only the
+  // second use reached it; `Let it play itself` landed 2026-09-16 and control 0
+  // is back. The sleep after that press overlaps the boot rather than adding to
+  // it, because the page is booting the whole time. The number itself is sized
+  // by the second use and has not moved: a wasm scsynth boot, 31 buffer
+  // allocations, a definition, an eight-second ring fill, a 2.5 s level, two
+  // 700 ms ink samples, a 1.2 s deafness control and a 1.3 s tour probe before
+  // the page says anything at all.
   { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
-    one: 'six live radio stations from Tallinn and Helsinki, decoded frame by frame in the tab',
+    one: 'six live radio stations from Tallinn and Helsinki, granulated in the tab by hand or left to play themselves',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
   // The same machine as the row above with the instrument panel taken off: it
   // walks its own twelve sounds, moves its own blend, changes station on its own
@@ -378,20 +392,20 @@ export const DEMOS = [
   // control 0, and behind it sit a relay health call, a decoder, a wasm scsynth,
   // 31 buffer allocations, a definition, an eight-second ring fill and then a
   // burst of checks that drives a morph, a loop and a station change.
-  // ⚠️ `xr: true` AND THE `WebXR` TAG ARE NOT A CLAIM THAT IT NEEDS A HEADSET.
-  // `xr` puts `?xr=1` on the link, which scrolls the Run in VR control under
-  // the visitor's thumb and focuses it; the tag says what the page uses. `xr`
-  // is not in `caps.mjs`'s HARD set, so neither of them un-links the row on a
-  // laptop, which is right: the page is a picture in a window first and a floor
-  // you stand on second.
-  // 🔴 IN THE HEADSET GROUP, ON INSTRUCTION 2026-09-16: *"move videoradio to
-  // vr"*. It was under `väin` with the radio it is made of, which is where it
-  // came from; what it IS now is a sea you stand in, and the group a visitor
-  // finds it in should say what they will get rather than what it grew out of.
-  { name: 'videoradio', group: 'xr', act: 5, created: '2026-09-15', built: true,
-    gl: true, xr: true, settleMs: 45000,
+  // 🔴 BACK UNDER `väin`, ON INSTRUCTION 2026-09-16: *"move videoradio to vain
+  // group"*. It moved to the headset group earlier the same day, on the
+  // argument that a group should say what a visitor will GET rather than what
+  // the page grew out of. The headset half has since been archived on
+  // instruction — *"arvhice videoradio vr, it did not worked out"* — so what a
+  // visitor gets is a picture in a window, made of the radio next to it, and
+  // `väin` is where that belongs.
+  // ⚠️ `xr` AND THE `WebXR` TAG WENT WITH IT. There is no Run in VR control to
+  // scroll under a thumb any more, and a tag naming an API the page no longer
+  // calls is a description that has drifted from the thing it describes.
+  { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true,
+    gl: true, settleMs: 45000,
     one: 'the same radio and granulator, playing itself, drawn as the instrument rather than as the sound',
-    tags: ['WebGL2', 'WebXR', 'Icecast', 'WebAudio', 'live'] },
+    tags: ['WebGL2', 'Icecast', 'WebAudio', 'live'] },
   // The other end of the same station: what it broadcast, kept. A broadcast at
   // the bitrate their own server records is 57.6 MB an hour, which does not fit
   // through a Worker in one request on this zone, so it goes in pieces of
