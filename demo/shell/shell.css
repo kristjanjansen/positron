@@ -1175,7 +1175,13 @@ video[hidden] { display: none; }
   padding: 0 10px; height: 26px; cursor: pointer; white-space: nowrap;
   -webkit-touch-callout: none; touch-action: manipulation;
 }
-.pos-fb-btn:hover { color: var(--hi); border-color: var(--line2); }
+/* 🔴 IT LIGHTENS, IT DOES NOT LIGHT UP. Asked 2026-09-16: *"feedback hover:
+   ligtgray not yellow"*. `--hi` is this site's yellow and it means THE ONE
+   THING THIS PAGE IS ABOUT: the record button, the armed rate, the grains a
+   granulator is making. A feedback button is furniture beside the title, and
+   painting it in the page's own accent on hover promoted it above whatever the
+   page exists to show. Brighter ink is the whole of what a hover has to say. */
+.pos-fb-btn:hover { color: var(--fg); border-color: var(--line2); }
 
 /* 🔴 CENTRED ON A DESKTOP, AT THE TOP ON A PHONE, AND THE SPLIT IS THE
    KEYBOARD. It was `flex-start` everywhere, so on a wide screen the panel hung
@@ -1849,8 +1855,17 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
    ⚠️ AND ITS CHILDREN KEEP THEIR OWN. `[data-on]` is set on the node under the
    pointer, so a box inside a lit container is still the brighter thing, which
    is the order a reader needs. */
+/* 🔴 IT LIGHTENS IN ITS OWN COLOUR, IT DOES NOT GO GREY. REPORTED 2026-09-16:
+   *"outer boxes should ligthen up on hover, currently they gray out"*, and that
+   is exactly what a flat `--dim2` did: a machine drawn in its own hue, orange
+   for Cloudflare and blue for the board, LOST that hue the moment a pointer
+   touched it. Hovering is the one moment a reader is asking which machine this
+   is, so it was answering by throwing the answer away.
+   ⚠️ MIXED INTO `--dg-stroke`, WHICH IS THE BOX'S OWN EDGE COLOUR, the same way
+   the inner boxes already mix into `--dg-fill` rather than replacing it. The
+   fallback is what an untinted container had before hues existed. */
 .pos-dg-n[data-on] .pos-dg-cbox {
-  stroke: var(--dim2);
+  stroke: color-mix(in oklab, var(--fg) 34%, var(--dg-stroke, var(--line2)));
   fill: color-mix(in oklab, var(--fg) 3%, transparent);
 }
 
