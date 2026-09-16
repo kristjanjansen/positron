@@ -7,6 +7,16 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
+  /* 🔴 THE DESCRIPTION RECEDES, ASKED FOR AS *"desc (2x smaller)"* alongside
+     the page order, 2026-09-16. The shell sets `.pos-what` at 13.5px and half
+     of that is 6.75px, which nobody can read, so this is 10px: the SMALLEST
+     SIZE THIS PROJECT USES ANYWHERE, rather than a number invented for one
+     page. Line height goes up as the size comes down, because a long paragraph
+     set small and tight is where a reader loses their line.
+     ⚠️ A PAGE-LOCAL RULE, AND IT SAYS SO. `.pos-what` is the shell's element
+     and every other page keeps 13.5px; this is one page making a claim about
+     its own paragraph, which is what CLAUDE.md asks a deviation to do. */
+  .pos-what { font-size: 10px; line-height: 1.7; }
   /* The pad styles itself — it is `demo/shell/xy-pad.mjs` now, not a canvas
      this page dresses. What is left here is layout: the row under the transport
      that carries the knob and the one destructive button, pushed to the far end
@@ -38,7 +48,18 @@
     // as they read: what was kept, what was invented · how far the one record
     // is off and at worst · how far the same gesture is off when it is written
     // down as two records instead, and by what factor that is worse.
+    // 🔴 PUBLISHED, NOT DRAWN, ON INSTRUCTION 2026-09-16. Asked for by pasting
+    // the whole row back with `rm` in front of it, and the page order that came
+    // with it has no readout in it: description, knobs, pad, transport,
+    // timeline, log. The numbers are not lost and the machine contract is
+    // unchanged (`__demo.readout` still carries all six, and `verify.mjs` still
+    // asserts the page declares them); what goes is a row of six figures above
+    // a page whose whole subject is two lines you can see the difference
+    // between. ⚠️ NOT `readout: null`, which is a page saying it HAS no numbers.
+    // This one has six and has put them where they can be read against the
+    // thing they describe.
     readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px', 'as two': 'px', 'times worse': '\u00d7' },
+    showReadout: false,
     // 🔴 NOTHING DRAWS FOR YOU. There was a `Draw one for me` control that
     // synthesised a Lissajous, and it was there because the harness could not
     // draw — `element.click()` fires no pointer events. It is gone, button and
@@ -988,6 +1009,22 @@
   row.append(knobs.el, clear);
   d.el.append(row);
 
+  // 🔴 THE ORDER DOWN THE PAGE, GIVEN AS A LIST 2026-09-16: description, the
+  // two knobs, the pad, the transport, the timeline, the log. Each component
+  // appends itself to the body as it is built, so the order the page is
+  // ASSEMBLED in is the order it was drawn in; this states the order it is READ
+  // in, once, in one place. `append` moves a node that is already in the
+  // document, so this is a reordering rather than a second copy of anything.
+  // ⚠️ THE KNOBS MOVE ABOVE THE PAD, which reverses the note above them: they
+  // used to sit under the picture they change, on the argument that a control
+  // below what it moves is read in the order it is used. The knobs are now the
+  // settings you draw AT rather than the ones you correct afterwards.
+  // ⚠️ AND THE ROW IS ONE `.pos-controls`, MOVED WHOLE. `verify.mjs` presses
+  // the buttons in it in DOM order, so moving the row changes where the row is
+  // and not which press is control 0, which is the trap that moved another
+  // page's single harness press by thirty seconds.
+  d.el.append(row, pad.el, bar.el, view.el);
+
   // ── the page checks itself, once, on the first line you finish ───────────
   // Not on every `pointerup`: `d.assert` appends, so checking on each one would
   // grow the count without end and make "diff the per-demo assert count" —
@@ -996,8 +1033,29 @@
   // ⚠️ AND NOT ON A THRESHOLD OF LINE QUALITY. What is graded below is a real
   // gesture, so it can be slow, fast, short or scribbled; every check here is
   // about the RELATIONSHIP between the two records, which holds for any line.
+  /**
+   * 🔴 NOT FOR A VISITOR. NOT ONE OF THEM, EVER. CLAUDE.md's standing rule,
+   * and this page was one of the forty-one still breaking it.
+   *
+   * PHOTOGRAPHED 2026-09-16: a visitor's log carrying two red FAIL lines about
+   * a record of a moving point and a playhead, after drawing one line. Nothing
+   * on the page was broken. What the checks below do is seek the transport
+   * twenty times, walk five sampling rates, move the view and read the pad's
+   * pixels, all in front of somebody who came to draw a line, and then report
+   * on it in the box where this page's real faults are reported.
+   *
+   * ⚠️ AND THE RED WAS NOT NOISE, WHICH IS WHY GATING IT IS ONLY HALF AN
+   * ANSWER. Both claims hold for the suite's smooth synthetic drag and were
+   * refuted by a real hand: at 100 ms a scribble makes two records CLOSER than
+   * one at every rate on the ladder (0.5x to 0.9x), and refusing to interpolate
+   * costs 3.9x rather than the 5x the second check requires. That belongs in
+   * `BACKLOG.md` as a question about the claim, not in a threshold quietly
+   * loosened until it goes green.
+   */
+  const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
   let checked = false;
   function check() {
+    if (!SELFCHECK) return;
     if (checked || evidence.length < 40 || stored.length < 4) return;
     checked = true;
 
