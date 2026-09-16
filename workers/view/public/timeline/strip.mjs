@@ -1565,8 +1565,26 @@ export function createStrip(canvas, deck, opts = {}) {
        */
       const nameOnly = subs.length === 0;
       const swatchH = nameOnly ? 9 : Math.min(14, L.height - 12);
+      /**
+       * 🔴 A ONE LINE LANE IS CENTRED ON ITS OWN SWATCH. Asked for 2026-09-16
+       * with a screenshot of two lanes named `x` and `y`: *"vertically center
+       * single row lane labels wiuth left border"*.
+       *
+       * The name and the mark beside it were placed by two constants measured
+       * for a lane with sub-labels under it, so on a lane with none the word sat
+       * a few pixels above the middle of the bar it belongs to and the pair read
+       * as two things that had drifted apart. Both are now centred on the lane,
+       * and the text is centred against the swatch by its own ASCENT rather than
+       * by a number typed here, so it stays centred if the font ever moves.
+       * ⚠️ A LANE WITH SUB-LABELS IS UNCHANGED. There the name is the first of
+       * several lines and the swatch spans all of them, so centring the name
+       * would pull it off the top line it heads.
+       */
+      const swatchY = nameOnly
+        ? L.y + Math.round((L.height - swatchH) / 2)
+        : L.y + 6;
       ctx.fillStyle = st.color || T.ink; ctx.globalAlpha = 0.9;
-      ctx.fillRect(SWATCH_X, L.y + (nameOnly ? 3 : 6), 3, Math.max(4, swatchH));
+      ctx.fillRect(SWATCH_X, swatchY, 3, Math.max(4, swatchH));
       /**
        * 🔴 THE NAME CARRIES THE LANE'S OWN COLOUR, mixed toward the ink rather
        * than set to it. The swatch has always been coloured and the name was
@@ -1588,8 +1606,14 @@ export function createStrip(canvas, deck, opts = {}) {
       // ⚠️ THE NAME SITS HIGHER WHEN IT IS ALONE. `GUT_NAME_Y` was measured for
       // a name with lines beneath it, so on a lane with none the word hung low
       // in its own row with all the air above it.
-      ctx.fillText(clip(String(L.label ?? L.id), gutRoom(TEXT_X)), TEXT_X,
-        L.y + (nameOnly ? GUT_NAME_Y - 3 : GUT_NAME_Y));
+      const name = clip(String(L.label ?? L.id), gutRoom(TEXT_X));
+      let nameY = L.y + GUT_NAME_Y;
+      if (nameOnly) {
+        const m = ctx.measureText(name);
+        const asc = m.actualBoundingBoxAscent || 7;
+        nameY = swatchY + swatchH / 2 + asc / 2;
+      }
+      ctx.fillText(name, TEXT_X, nameY);
       // the per-lane label GUTTER states the lane's own clock and whether it is
       // AUDIBLE — proto/instrument's two ideas, which nothing else carried.
       let all = subs;
