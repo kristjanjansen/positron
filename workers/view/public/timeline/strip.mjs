@@ -1054,6 +1054,11 @@ export function createStrip(canvas, deck, opts = {}) {
     theme: {
       bg: '#0b0d12', axis: '#232838', axisMinor: '#181c27', ink: '#c9d2e4', dim: '#7a8291',
       playhead: '#ffffff', wall: '#ff9f43', lane: '#151a24', gutter: '#0f1319',
+      // The loop's furniture, and it is the SAME GREY THE WAVE USES for the
+      // same thing: `--dim2` where there is a stylesheet, this fallback where
+      // there is not. A loop drawn in one colour on the wave and another on the
+      // line is two pictures of one state.
+      loop: '#6a7280',
       ...(opts.theme || {}),
     },
     gutterPx: opts.gutter ?? 92,
@@ -1616,6 +1621,63 @@ export function createStrip(canvas, deck, opts = {}) {
     ctx.restore();
   }
 
+  /**
+   * 🔴 THE LOOP ON THE LINE. Asked for 2026-09-16: *"draw loop boundaries
+   * (depends on loop cycle state) and add light transclucent shade on loop area
+   * on timeline. same colors in waveforms loop handling btw"*.
+   *
+   * The cycle state is the bar's own, read off `deck.loopView`, and it decides
+   * what is drawn rather than what colour it is:
+   *
+   *   armed   one mark down. ONE edge, and the wash runs from it to the
+   *           playhead, so it grows as the material it will hold arrives.
+   *           `grain-scope` draws exactly this on the wave, for the same
+   *           reason: between the two presses the button has nothing else to
+   *           show for itself.
+   *   on      both marks. TWO edges and a wash that stands still.
+   *   off     `loopView` is null and nothing is drawn.
+   *
+   * ⚠️ THE WASH GOES UNDER EVERYTHING AND THE EDGES OVER IT. A band painted on
+   * top of the lanes would dim the material it is there to point at, and edges
+   * painted under them would disappear behind a full bar.
+   * ⚠️ `loop: false` in the options turns it off for a strip that is a MAP
+   * rather than a transport, the same escape `playhead: false` already is.
+   */
+  function loopNow() {
+    if (opts.loop === false) return null;
+    const v = deck.loopView;
+    if (!v || v.a == null) return null;
+    const on = v.b != null;
+    const far = on ? v.b : S.pos;
+    return { on, at: v.a, from: Math.min(v.a, far), to: Math.max(v.a, far) };
+  }
+
+  function drawLoopBand(g) {
+    const L = loopNow();
+    if (!L) return;
+    const ax = x(L.from), bx = x(L.to);
+    if (!(bx - ax > 0.5)) return;
+    g.save();
+    // 0.12 is the wave's own alpha for this band, not a number chosen here.
+    g.globalAlpha = 0.12; g.fillStyle = T.loop;
+    g.fillRect(ax, 0, bx - ax, S.contentH);
+    g.restore();
+  }
+
+  function drawLoopEdges(g) {
+    const L = loopNow();
+    if (!L) return;
+    const w = plotW();
+    g.save();
+    g.strokeStyle = T.loop; g.lineWidth = 1; g.globalAlpha = 1; g.setLineDash([]);
+    for (const t of L.on ? [L.from, L.to] : [L.at]) {
+      const px = Math.round(x(t)) + 0.5;
+      if (px < -1 || px > w + 1) continue;
+      g.beginPath(); g.moveTo(px, 0); g.lineTo(px, S.contentH); g.stroke();
+    }
+    g.restore();
+  }
+
   function drawCursors() {
     const w = plotW();
     ctx.save();
@@ -1797,6 +1859,7 @@ export function createStrip(canvas, deck, opts = {}) {
       g.fillRect(0, L.y, plotW(), L.height - 1);
       g.globalAlpha = 1;
     }
+    drawLoopBand(g);
     drawAxis();
     // DRAW ORDER IS FIDELITY ORDER (proto/paths' legibility trick): a lane
     // declaring a higher tier goes down FIRST, wider and fainter, so attested
@@ -1813,6 +1876,7 @@ export function createStrip(canvas, deck, opts = {}) {
         }
       } catch (e) { note(L.id, e); }
     }
+    drawLoopEdges(g);
     drawCursors();
     if (S.hover && opts.tooltip !== false) drawTooltip(g);
     g.restore();
