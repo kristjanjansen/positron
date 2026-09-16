@@ -831,38 +831,6 @@
     return n ? { mean: sum / n, worst, n } : null;
   }
 
-  /**
-   * 🔴 CLEAR REALLY CLEARS, AND IT DID NOT. MEASURED 2026-09-13, pressing it
-   * after a take: the pad went from 33306 lit pixels to 0 and the STRIP BELOW
-   * IT stayed at 1423, still drawing the whole gesture — so the drawing
-   * vanished while the recording of it sat there untouched. The playhead stayed
-   * parked at 1600 ms as well, in a range that had just gone back to empty, so
-   * the bar read `0:01.600 / 0:08.000` for a page with nothing in it. A control
-   * that looks like it reset the page and did not is worse than no control.
-   *
-   * ⚠️ THE READOUT GOES EMPTY, NOT TO ZERO. `rebuild()` writes '' for every
-   * cell with nothing behind it and the shell draws one em dash with the unit
-   * hidden. A zero would read as a very confident measurement of nothing.
-   *
-   * ⚠️ AND `checked` IS DELIBERATELY NOT RESET. `d.assert` appends, so a page
-   * that re-checked after every Clear would grow its own assert count without
-   * end — and diffing that count is this project's cheapest regression test.
-   */
-  function reset() {
-    growing = false;
-    traceIsTake = false;
-    handDown = false;
-    settleAt = 0;
-    pad.clear();
-    evidence = pad.trace();
-    stored = []; splitX = []; splitY = [];
-    ghost = null; dirty = true;
-    render();
-    publish();
-    deck.seek(0);
-    reframe();
-    view.strip.invalidate();
-  }
 
   // While it is PLAYING the mark moves between the attested samples, which fire
   // ten times a second at the default rate — a mark that only moved on a fire
@@ -1006,13 +974,21 @@
       onInput: (v) => { smooth = v / 100; render(); deck.assertAt(deck.position(), KIND); },
     }),
   ], { pair: true });
-  // The destructive one, at the far end of the row — deleting what you just
-  // made must not sit shoulder to shoulder with the thing that changes it.
-  const clear = el('button', '', 'Clear', { type: 'button', 'data-end': '1' });
-  clear.addEventListener('click', reset);
-
+  /**
+   * 🔴 THERE IS NO CLEAR BUTTON. Asked for 2026-09-16: *"no need for clear
+   * butotn in draw"*, and the page agrees with the instruction: arming the
+   * record button ALREADY empties the pad, the two records, the strip and the
+   * playhead, so Clear was a second way to do a thing the only other control
+   * does on its way to doing something useful.
+   *
+   * ⚠️ WHAT WENT WITH IT WAS A REAL LESSON AND IT LIVES ON THE ARMING PATH NOW.
+   * Clear used to empty the pad and leave the strip below it still drawing the
+   * whole gesture: 33306 lit pixels went to 0 while the strip held 1423 and the
+   * playhead sat parked in a range that had just gone back to empty. A control
+   * that looks like it reset the page and did not is worse than no control.
+   */
   const row = el('div', 'pos-controls foot');
-  row.append(knobs.el, clear);
+  row.append(knobs.el);
   d.el.append(row);
 
   // 🔴 THE ORDER DOWN THE PAGE, GIVEN AS A LIST 2026-09-16: description, the
