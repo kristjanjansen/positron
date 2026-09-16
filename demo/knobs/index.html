@@ -1108,9 +1108,18 @@
            * SuperCollider because this board runs that too, for `/grains/`.
            */
           { id: 'yoshimi', label: 'yoshimi', sub: 'software synth', tech: 'sound',
-            note: 'A synthesiser that is a program rather than a box, forked from ZynAddSubFX '
-                + 'and carrying 878 ready made sounds. SuperCollider on this same board is the '
-                + 'other kind: one is played, the other is written.' },
+            /**
+             * ⚠️ NO SUPERCOLLIDER IN HERE. It said `SuperCollider on this same
+             * board is the other kind`, meaning to place Yoshimi by contrast,
+             * and it did the opposite: *"do not get sc thing, is yoshimi
+             * sc-based on no?"*. It is not, it is C++ and forked from
+             * ZynAddSubFX, and naming a second program inside a note about the
+             * first invites a relationship that does not exist. A note explains
+             * the box it is on.
+             */
+            note: 'A synthesiser that is a program rather than a box, with 878 ready made '
+                + 'sounds on this board. You do not build a sound here: you pick one and send '
+                + 'it notes and controller values, as you would a keyboard.' },
           /**
            * 🔴 TWO BOXES, BECAUSE THEY ARE TWO PROGRAMS. Asked 2026-09-16:
            * *"should it break into 2 boxes (jack / ffmpeg)"*. One box called
