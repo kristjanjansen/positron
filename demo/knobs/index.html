@@ -1035,16 +1035,33 @@
                 + 'message to everyone else in it, without reading any of them. It exists '
                 + 'because a browser cannot dial a Raspberry Pi behind a home router.' },
         ] },
-      { id: 'pi', label: 'Raspberry Pi', kind: 'box', tech: 'board',
+      // `raspberry` is in `TECH_HUE` and `board` never was, so this box had been
+      // taking whatever the rotation handed it.
+      { id: 'pi', label: 'Raspberry Pi', kind: 'box', tech: 'raspberry',
         children: [
           { id: 'yoshimi', label: 'yoshimi', sub: 'ZynAddSubFX', tech: 'sound',
             note: 'A software synthesiser, free and open, holding one note for as long as you '
                 + 'let it. Its filter follows controller 74: measured here, the sliders move '
                 + 'the sound from 162 Hz to 11.7 kHz, about six octaves.' },
-          { id: 'capture', label: 'capture', sub: 'ffmpeg, JACK', tech: 'board',
-            note: 'The synth plays into JACK, the sound system Linux studios use, and ffmpeg '
-                + 'reads it from there and cuts it into 20 millisecond pieces. It records '
-                + 'continuously, so pieces keep arriving even when nothing is playing.' },
+          /**
+           * 🔴 TWO BOXES, BECAUSE THEY ARE TWO PROGRAMS. Asked 2026-09-16:
+           * *"should it break into 2 boxes (jack / ffmpeg)"*. One box called
+           * `capture` with `ffmpeg, JACK` under it was a sub doing a diagram's
+           * job: the fact that the synth is not wired to a loudspeaker but to a
+           * sound server, and that something else reads it from there, was a
+           * sentence in a note instead of a thing a reader can point at.
+           * ⚠️ IT ALSO EVENS THE PICTURE. The Browser holds three boxes and the
+           * board held two, and containers are drawn to one height, so the
+           * board's spare row was blank ground in every machine beside it.
+           */
+          { id: 'jack', label: 'JACK', sub: 'sound server', tech: 'sound',
+            note: 'The sound system Linux studios use, which lets separate programs pass audio '
+                + 'to each other as if they were patched with cables. The synth plays into it '
+                + 'rather than into a loudspeaker, so nothing in the room hears this.' },
+          { id: 'ffmpeg', label: 'ffmpeg', sub: '20ms pieces', tech: 'sound',
+            note: 'Takes the sound out of JACK and cuts it into 20 millisecond slices of raw '
+                + 'samples, 48 kHz and one channel, uncompressed. It runs continuously, so '
+                + 'slices keep arriving even when no note is sounding.' },
         ] },
     ],
     links: [
@@ -1064,15 +1081,28 @@
         note: 'The board writes each value to the synth as three raw MIDI bytes. If several '
             + 'arrive at once it keeps only the last for each slider, because the earlier ones '
             + 'describe a position your hand has already left.' },
-      { from: 'yoshimi', to: 'capture',
-        note: 'The synth is not connected to a loudspeaker: its output goes straight into the '
-            + 'recorder. The Raspberry Pi makes this sound whether or not anyone is listening '
-            + 'to it.' },
-      { from: 'capture', to: 'relay', label: '48kHz mono', back: true,
-        note: 'Fifty pieces of sound a second, each stamped with a number so the far end can '
+      { from: 'yoshimi', to: 'jack',
+        note: 'The synth writes its sound into the sound server rather than to an output. The '
+            + 'Raspberry Pi is making this noise whether or not anybody is connected to hear '
+            + 'it.' },
+      { from: 'jack', to: 'ffmpeg',
+        note: 'A connection made once when the board starts, the software equivalent of '
+            + 'plugging a cable from the synth into a recorder.' },
+      /**
+       * ⚠️ BOTH HALVES OF THE RETURN CARRY THE SAME LABEL, BECAUSE THE SAME
+       * THING IS TRAVELLING. Reported 2026-09-16: *"47khz mono on one sound
+       * connector, other nothing, not good. its PCM slices?"*. It is: raw
+       * samples, uncompressed, in 20 ms slices. One arrow said the format and
+       * the next said nothing, which reads as two different journeys.
+       * The rate and the channel count moved into ffmpeg's own note, where
+       * there is room for them and where they describe the thing that chose
+       * them.
+       */
+      { from: 'ffmpeg', to: 'relay', label: 'PCM slices', back: true,
+        note: 'Fifty slices of sound a second, each stamped with a number so the far end can '
             + 'tell whether any went missing on the way. The LOST cell above counts gaps in '
             + 'those numbers.' },
-      { from: 'relay', to: 'playout', back: true,
+      { from: 'relay', to: 'playout', label: 'PCM slices', back: true,
         note: 'The sound comes back down the same connection the slider values went out on. '
             + 'Nothing else sends audio into this room, so its arrival is also how the page '
             + 'knows the Raspberry Pi is still there.' },
