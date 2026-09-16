@@ -15,6 +15,41 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- **PAPPUS LEAVES `/box/`'S SIGNAL PATH, AND THE DIAGRAM SAYS WHAT IS THERE.
+  ASKED 2026-09-16:** *"plan and remove pappus from the
+  http://127.0.0.1:8890/box/ signal path. there is no ui to control it. arhvice
+  it. update diagram as well. captutre: should be more techical, JACK etc. can
+  we sampled (renamed to the collection name), hexter, yoshimi side by side in
+  pi box in diagram"*. Four things: Pappus out of the path and archived, the
+  diagram redrawn, the capture box named in real technology (JACK), and the
+  three instruments drawn side by side inside the board.
+
+- **A CONTROLLER PERFORMANCE SYNTH ON THE BOARD, PLANNED FIRST. ASKED
+  2026-09-16:** *"do reseach on 'controller perfomance' synth that shows off the
+  cc slider controls, keyboard is not that important. can be yoshimi patch or
+  smth where controllers play heavy role, moog-y stuff, huge fitler etc. need to
+  show how we handle cc in pi. use infra similar to box demo but a separate
+  pipeline -- you tell me what is feasible. initially like 2 sliders only (filer
+  / resonance?) to show off the pipeline. do plan and report it here in
+  detail when ready"*. A PLAN, reported in detail, before any code.
+
+- **THE LOOP SAYS NOTHING IN WORDS. ASKED 2026-09-16 WITH A SCREENSHOT OF THE
+  BADGE:** *"rm all loop messages."*. The bar's notes (`the two marks are in the
+  same place`, `this source has no end to come back to`) and the pages' own log
+  lines about looping. The control's face already carries the state.
+
+- **ONE PRESS IS ENOUGH, AND THE END CLOSES THE LOOP. ASKED 2026-09-16:** *"when
+  not playing and prssing loop, playback should start. if not pressing loop
+  again and playback reaches the end, mark loop right mark as end and consider
+  the state 'loop engaged'"*. This is also what the screenshot above is a
+  symptom of: pressing LOOP twice on a stopped transport puts both marks in the
+  same place, because nothing moved between them.
+
+- **`/draw/` GETS THE THREE LOOP DIRECTIONS. ASKED 2026-09-16:** *"in draw allow
+  < > <> loop mode"*. `/replay/` refused them for a reason that does not hold
+  here: a picture only runs forwards and reversing sound needs an AudioBuffer,
+  while this page replays a RECORD through a deck, which reads either way.
+
 - **THE TIMELINE DRAWS THE LOOP. ASKED 2026-09-16:** *"timeline global feature:
   draw loop boundaries (depends on loop cycle state) and add light transclucent
   shade on loop area on timeline. same colors in waveforms loop handling btw"*.

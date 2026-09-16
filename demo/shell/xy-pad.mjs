@@ -242,11 +242,16 @@ export function createXyPad(host, {
     ctx.fillStyle = C.card;
     ctx.fillRect(0, 0, W, H);
 
-    // quarters, faint: enough to read the surface as two axes rather than a box
+    // 🔴 HALVES, NOT QUARTERS: A 2x2 GRID. Decided 2026-09-16, *"2x2 grid is ok
+    // in draw canvas"*. Three faint lines each way read as ruled paper and
+    // invited the eye to count cells on a surface where nothing is measured in
+    // cells; one line each way says the same thing the grid is for, which is
+    // that this is two axes rather than a box, and says it with a quarter of
+    // the ink. The centre is also the one position on the pad a reader can name.
     ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let i = 1; i < 4; i++) {
-      const gx = Math.round((i * W) / 4) + 0.5, gy = Math.round((i * H) / 4) + 0.5;
+    {
+      const gx = Math.round(W / 2) + 0.5, gy = Math.round(H / 2) + 0.5;
       ctx.moveTo(gx, 0); ctx.lineTo(gx, H);
       ctx.moveTo(0, gy); ctx.lineTo(W, gy);
     }
