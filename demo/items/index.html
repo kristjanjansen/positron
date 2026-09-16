@@ -942,11 +942,34 @@
       // second announcement would show as a different one; in a side room both
       // are null, and `null === null` is the same claim — nothing went out on
       // either wake.
+      /**
+       * 🔴 THE BASELINE IS THE ROW ONCE THE FIRST WAKE HAS FINISHED, NOT THE
+       * INSTANT IT WENT LIVE, AND THAT RACE MADE THIS RED ON THE LIVE PAGE
+       * WHILE THE SUITE STAYED GREEN. PHOTOGRAPHED 2026-09-16:
+       * `FAIL and that second wake goes out to nobody · still stamped 11:35:01`.
+       *
+       * The worker publishes in two steps: `status = 'new'` first, then the
+       * announcement, then `announced_at`. `live` was captured on the first of
+       * those, so in the ANNOUNCING room it could be read with the stamp still
+       * null, and comparing it against the row after shelving then reported a
+       * second notification that never happened. Nothing was wrong with the
+       * store: the shelve path touches neither `announce()` nor that column.
+       *
+       * ⚠️ AND IT IS THE DOCUMENTED TRAP, not bad luck. CLAUDE.md: a Durable
+       * Object's input gate does NOT cover a non-storage await, and `announce()`
+       * is a `fetch`. A read can and does land between those two writes.
+       * ⚠️ WHICH IS ALSO WHY THE SUITE COULD NOT SEE IT. Announcing is an
+       * allowlist of one room, so in a harness room both values are null and
+       * `null === null` passes however the race falls. The only run that can
+       * fail this is a real one on `/items/`.
+       */
+      const settled = await until(id, (it) => it.status !== 'new' || wasTold(it), 4000) || live;
       d.assert('and that second wake goes out to nobody: one notification, not two',
-        !!put && !!live && put.announced_at === live.announced_at,
-        put && live
-          ? (put.announced_at ? `still stamped ${clock(put.announced_at)}`
-                              : 'nothing was announced on either wake, which is this room\u2019s rule')
+        !!put && !!settled && put.announced_at === settled.announced_at,
+        put && settled
+          ? (put.announced_at
+              ? `still stamped ${clock(put.announced_at)}, the one the publish left`
+              : 'nothing was announced on either wake, which is this room\u2019s rule')
           : 'nothing to compare');
 
       // 5 — the store's own record of how close both wakes were. Read across

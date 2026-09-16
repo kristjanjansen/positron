@@ -189,13 +189,20 @@
   // by the engine that fired them". Nothing is drawn that no check covers —
   // the notes and the material spec also go out, and they are left off rather
   // than crowding the one arrow that carries the page's subject.
-  createDiagram(d.head, {
-    // 🔴 NO TITLE. It sat directly under the page's own name — two headings
-    // stacked, the second explaining the first — and it drove the diagram hard
-    // against them, which is the vertical-spacing rule broken by a component
-    // that was given a heading it did not need. The diagram is the first thing
-    // on the page and its boxes say what it is; a caption above a picture that
-    // is about to explain itself is a label on a label.
+  // 🔴 AT THE END, UNDER THE STANDING HEADING, LIKE EVERY OTHER DIAGRAM.
+  // Instructed 2026-09-16: *"use same title on all diagrams"*. This page was
+  // the last outlier and it was an outlier twice: it drew into `d.head`, so the
+  // picture came FIRST, and it carried no heading at all.
+  //
+  // ⚠️ THE OLD REASONING WAS SOUND AND ONLY ABOUT THE OLD POSITION. It said a
+  // title here would sit directly under the page's own name, two headings
+  // stacked with the second explaining the first, and that a caption above a
+  // picture about to explain itself is a label on a label. All true of a
+  // diagram at the top. Moving it to the bottom is what makes the heading
+  // right rather than redundant, and it is what CLAUDE.md asks for anyway: a
+  // diagram is REFERENCE, read once, on purpose, by somebody who has already
+  // pressed the thing.
+  createDiagram(d.el, {
     // The paragraph that was in `what`, cut to the part the drawing cannot
     // say. Hovering a box replaces this line with what that box does, which is
     // why there is no tooltip anywhere on this page.
@@ -249,7 +256,7 @@
       { from: 'pi', to: 'cf', label: 'sound and grains', back: true },
       { from: 'cf', to: 'you', label: 'sound back', back: true },
     ],
-  });
+  }, { how: true, atEnd: true });
 
   // ── state ────────────────────────────────────────────────────────────────
   let me = null;                       // this connection's id, to drop our own echo
