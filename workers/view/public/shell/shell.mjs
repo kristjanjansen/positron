@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = 'b82f6d8-142239-6e4f';
+export const BUILD = 'f2c9ab7-160512-8f0c';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.

@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  // demo/knobs/index.html, plan-controller.md step 3.
+  //
+  // Two sliders, one filter, one Raspberry Pi. The subject is CONTINUOUS
+  // CONTROL, not notes: every message is a complete statement of where a knob
+  // is, the last one is the only one that stays true, and losing one is
+  // harmless the instant the next arrives. That is why this page has a send
+  // gate and a restatement rather than an ack, and why it counts what it did
+  // NOT send as carefully as what it did.
+  //
+  // 🔴 NO GRANULATOR ANYWHERE IN HERE. It came out of the board's signal path
+  // on 2026-09-16 (archive/box-pappus/), and this page has never had one.
+  import { mount, guard } from '/shell/shell.mjs';
+  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import {
+    makeCcSend, makeCcCapture, seriesFromRows, valueAt, foldRows, isInterpolableKey,
+    keyOf, ST_CC, SEND_GATE_MS, RESTATE_MS,
+  } from '/shell/cc-adapter.mjs';
+  import { openWire } from '/shell/wire.mjs';
+
+  const q = new URLSearchParams(location.search);
+  // `studio-1` is the ADDRESS OF THE RASPBERRY PI, not a rendezvous this page
+  // invented, which is why the manifest row says `room: 'fixed'`.
+  const ROOM = q.get('room') || 'studio-1';
+  /**
+   * 🔴 A HARNESS PRESS MUST NOT TAKE A SHARED INSTRUMENT AWAY FROM A PERSON.
+   *
+   * `demo/verify.mjs` presses every control on every run, dozens of times a
+   * day, and pressing play here starts Yoshimi on a board in another building.
+   * There is ONE JACK graph and ONE instrument on it, so a suite run would
+   * silently stop whatever `/box/` or `/grains/` was doing. plan-controller
+   * §6.6 says never start audio on load for exactly that reason; a scripted
+   * press is not a load, it is worse, because it happens far more often.
+   *
+   * So under `?selfcheck=1` this page does everything except put a note, a
+   * patch or a controller value on the board, and it SAYS SO in the log and in
+   * an assert. `?board=1` alongside it is the deliberate opt-in for somebody
+   * who has been told the board is free.
+   *
+   * ⚠️ A visitor is unaffected: neither flag is set, so pressing play does the
+   * whole thing.
+   */
+  const SELFCHECK = q.get('selfcheck') === '1';
+  const MAY_PLAY = !SELFCHECK || q.get('board') === '1';
+
+  // The two controllers this page is about. 74 is Brightness and 71 is
+  // Harmonic Intensity in the MIDI specification, and in the ZynAddSubFX family
+  // Yoshimi belongs to they reach a part's filter cutoff and its resonance.
+  // 64 is neutral: the value is an offset around whatever the patch's own
+  // filter is set to, so the middle of the lane leaves the patch alone.
+  const CUTOFF = 74, RESO = 71, NEUTRAL = 64;
+  // Bank 95 program 6 is `Analog Filter 1`, read off the live board's own
+  // `voices.list` on 2026-09-16 (878 patches, 24 banks, bank map not stale).
+  // Bank select is CC 32 and the board reads that number out of Yoshimi's own
+  // config, so nothing here has to know it.
+  const BANK = 95, PROGRAM = 6, PATCH = 'Analog Filter 1';
+  // One note, held. A repeating note would retrigger the patch's own filter
+  // envelope and fight the slider, which would make the page about the wrong
+  // thing.
+  const NOTE = 40, VEL = 96;
+  // The board fixes 48000 Hz and 960-sample frames (rig/box/synth.mjs), and
+  // NOTHING in this chain resamples.
+  const RATE = 48000;
+  // What the board publishes about its own stream. Checked against the frames
+  // that actually arrive; see `checkShape`.
+  const BOARD_FRAME_MS = 20, BOARD_CHANNELS = 1;
+  /**
+   * 🔴 ONE PASS IS TEN SECONDS, AND THE LINE NEVER GROWS OR SHRINKS.
+   *
+   * The deck's range is the page's one fixed window and the loop is whatever
+   * you mark inside it. A range that followed the recording would move under
+   * the loop marks, the clock and the scrub every time a hand let go of a
+   * slider, and none of those three can say what changed. Ten seconds is long
+   * enough for a filter gesture with a shape to it and short enough to sit
+   * through twice while deciding where the loop goes.
+   */
+  const PASS_MS = 10000;
+
+  const d = mount({
+    name: 'knobs',
+    what: 'Two sliders here move a filter on a Raspberry Pi in another building, and what you hear is the sound that board is making, sent back twenty milliseconds at a time. '
+        + 'Press play to hold one note and drag: the page records what your hands did, LOOP plays that gesture back over and over, forwards or backwards or both ways, and pause is a panic that releases every note and brings both sliders home to the middle. '
+        + 'A hand moves faster than a filter can be heard to change, so the page sends at most one value per slider every 20 ms: sent is what went out this second, skipped is what was made and not sent, and played is what the board wrote to the synth.',
+    /**
+     * Six cells, and every one of them moves.
+     *
+     * `sent` and `skipped` are the console, counted in this page. `played` is
+     * the board, counted on the far side of the wire, which is the only side
+     * that can answer for it. `round trip` and `buffer` are the two biggest
+     * terms in how late the sound is, and `lost` is whether anything vanished
+     * on the way.
+     *
+     * ⚠️ NO CELL CHANGED WHEN THE TRANSPORT LANDED, AND THAT WAS CHECKED RATHER
+     * THAN ASSUMED. `skipped` was the one at risk: it used to mean only what a
+     * hand made, and a gesture playing itself offers values through the same
+     * gate. It still moves and it still means the same thing, so the `what`
+     * paragraph names both authors rather than the row losing a measurement.
+     * Where the playhead is inside a loop is a position, and this page now has
+     * a position surface for that, which is the transport's own scrub.
+     *
+     * ⚠️ NO `lag` CELL YET. plan-controller §6.3 wants one and §5.3 says how to
+     * take it: a spectral centroid crossing, because `/box/`'s silence-to-onset
+     * trick cannot work on a sweep that happens on top of a note already
+     * sounding. That is step 5 of the build order, and a cell that can never
+     * fill teaches a reader to skip the row.
+     * ⚠️ AND NOT THE BOARD'S `folded` EITHER, though §4.2 asks for a counter on
+     * every stage that discards. The board drains every 5 ms and this page
+     * sends at most one value per 20 ms, so `folded` reads 0 forever, which is
+     * a constant wearing a measurement's clothes. The page's OWN discard is the
+     * one that moves, because a pointer really does outrun the gate, and that
+     * is `skipped`.
+     */
+    readout: { sent: '/s', skipped: '/s', played: '/s', 'round trip': 'ms', buffer: 'ms', lost: '' },
+    /**
+     * 🔴 NO `.pos-controls` ROW AT ALL, AND THAT IS THE POINT OF THIS VERSION.
+     * The page used to carry a hand-made `Play` and a hand-made `Panic`, which
+     * is a transport spelled out in two buttons. CLAUDE.md says transport UI is
+     * `transport-bar.mjs` and nothing else, and that a control existing on one
+     * page and nowhere else is a component nobody has noticed yet. Both are now
+     * the bar's own play toggle: play holds the note, pause is the panic.
+     *
+     * 🔴 SO THE ONE THING THE HARNESS PRESSES HERE IS THE BAR'S DIRECTION
+     * BUTTON. `verify.mjs` presses `.pos-controls button, .tbar-x` in DOM order
+     * and lands `settleMs` on the first of them, and with this row empty the
+     * first is the `→ ← ⇆` button `loopWays` puts beside LOOP. That is where
+     * the twenty seconds go, and the page's own drive runs inside them; see
+     * `selfDrive`.
+     *
+     * 🔴 NO KEYBOARD. The ask says the keyboard is not the point, and one held
+     * note is all a filter needs.
+     */
+  });
+  guard(d);
+
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // ── the send gate ─────────────────────────────────────────────────────────
+  //
+  // From `demo/shell/cc-adapter.mjs`, which already owns this subject and is
+  // graded without a browser by `node demo/shell/cc-send-test.mjs`. Three rules
+  // come with it: the endpoint of a gesture is never held back, the gate is per
+  // controller, and switches are never gated. This page has no switch; the rule
+  // still applies to the first one anybody adds.
+  //
+  // 🔴 AND A GESTURE PLAYING ITSELF GOES THROUGH THE SAME GATE AS A HAND. There
+  // is one discipline on this wire and the board sees one kind of traffic: a
+  // second path for replay would be a second set of rules nobody measured.
+  const gate = makeCcSend();
+  // `onInput` is a move and `onChange` is the endpoint, which is exactly the
+  // gate's `end` flag. That is the whole reason the flag exists.
+  const move = (c, v) => { gate.put(c, v); pump(); };
+  const land = (c, v) => { gate.put(c, v, { end: true }); pump(); };
+
+  let armed = false;              // an instrument is running, so values mean something
+  let held = false;               // a note of ours is sounding on the board
+  let wireMsgs = 0;               // messages that actually went on the wire
+  let heldBack = 0;               // messages the gate made that this page chose not to send
+  let saidHold = false;
+
+  function pump() {
+    const out = gate.tick(performance.now());
+    if (!out) return;
+    if (!armed || !MAY_PLAY) {
+      heldBack++;
+      if (!saidHold && !armed) {
+        saidHold = true;
+        d.log('these values are remembered, not sent: nothing is playing on the board yet. Press play, and the whole console goes out within half a second of the synth coming up');
+      }
+      return;
+    }
+    // ⚠️ EVERY DUE CONTROLLER IN ONE MESSAGE. Two sliders moving together are
+    // one `ctl.set`, not two: the relay's budget is counted in messages, and a
+    // message carrying two pairs costs the same as one carrying one.
+    const r = wire.send({ type: 'ctl.set', channel: 0, set: out.set });
+    if (r?.sent) wireMsgs++;
+  }
+
+  // ── the line the gesture lives on ─────────────────────────────────────────
+  //
+  // 🔴 NO ADAPTERS AND NO SCHEDULED ITEMS, ON PURPOSE. The deck here is a
+  // clock, a range and a loop, and the replay is read off the recorded SERIES
+  // at the playhead rather than actuated from the log's knots. The capture
+  // thins a drag to about one value every hundred milliseconds, so a deck
+  // firing those knots would put a 10 Hz staircase on a resonant filter, which
+  // is audible as a zipper. `valueAt` draws the line between them instead and
+  // the send gate paces it at 50 a second. One writer, and it is this.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, PASS_MS] });
+
+  // The capture's clock IS the playhead: where a value sits in the record is
+  // where the line had got to when a hand made it. `makeCcCapture` counts in
+  // microseconds, which is the only reason these two exist.
+  const posToUs = (pos) => pos * 1000;
+  const usToPos = (us) => us / 1000;
+  const capture = makeCcCapture({ ch: 0 });
+  let series = new Map();           // controller key -> knots, for `valueAt`
+  const lastWriteAt = new Map();    // controller -> the position it last wrote at
+  let stalled = 0;                  // values offered with no new room on the line
+
+  function reindex() {
+    // Rows can arrive out of order: `flush()` logs a held-back sample at ITS
+    // own moment, which is earlier than the release that asked for it.
+    series = seriesFromRows([...capture.rows].sort((a, b) => a.at - b.at), usToPos);
+  }
+
+  /**
+   * One value into the record, if a hand made it and the line has new room.
+   *
+   * 🔴 `handOn` IS WHAT SEPARATES A RECORD FROM AN ECHO. The replay writes to
+   * the same sliders, and a page that recorded its own playback would grow the
+   * record on every lap. Only a real gesture is captured, so the two paths
+   * cannot feed each other.
+   * 🔴 AND A SAMPLE THE LINE HAS NO NEW ROOM FOR IS DROPPED AT THE DOOR. Two
+   * values at one position are two answers to one question, which no record can
+   * hold, and the capture's throttle assumes a clock that only goes forward.
+   */
+  function write(c, v, force = false) {
+    if (!handOn) return;
+    const pos = deck.position();
+    const last = lastWriteAt.get(c);
+    if (last !== undefined && !(pos > last)) { stalled++; return; }
+    lastWriteAt.set(c, pos);
+    capture.cc7(c, v, posToUs(pos), force ? { force: true } : undefined);
+  }
+
+  // ── the sliders ───────────────────────────────────────────────────────────
+  //
+  // Appended to the body rather than to a control row: they are the subject of
+  // the page, not furniture beside it, and the harness cannot press a slider
+  // anyway.
+  const cutoff = createSlider({
+    label: 'cutoff', aria: 'filter cutoff', min: 0, max: 127, step: 1, value: NEUTRAL,
+    onInput: (v) => { move(CUTOFF, v); write(CUTOFF, v); },
+    onChange: (v) => { land(CUTOFF, v); write(CUTOFF, v, true); release(); },
+  });
+  const reso = createSlider({
+    label: 'resonance', aria: 'filter resonance', min: 0, max: 127, step: 1, value: NEUTRAL,
+    onInput: (v) => { move(RESO, v); write(RESO, v); },
+    onChange: (v) => { land(RESO, v); write(RESO, v, true); release(); },
+  });
+  const knobs = createSliderGroup([cutoff, reso], { pair: true });
+  d.el.append(knobs.el);
+
+  /**
+   * 🔴 A HAND ON A SLIDER TAKES THE GESTURE BACK. `/radio/`'s Automate does
+   * exactly this and for the same reason: a control that moves under your
+   * finger is a page arguing with you about who is playing.
+   *
+   * ⚠️ `pointerdown` AND `keydown`, NEVER `click`. A click arrives at the END
+   * of a press, so a gesture that yielded on it would have a whole drag's worth
+   * of time to move the handle under the finger. Capture phase, so it runs
+   * before the slider's own handler.
+   * ⚠️ AND IT DOES NOT HAND FORWARD AGAIN BY ITSELF. Pressing play or marking
+   * a new loop is what starts the gesture playing; letting go of a slider is
+   * not, because letting go is how a drag ENDS and the thing you just drew
+   * would immediately be overwritten by the thing you drew before it.
+   */
+  let handOn = false, replayOn = false, yields = 0;
+  function grab() {
+    handOn = true;
+    lastWriteAt.clear();
+    if (!replayOn) return;
+    replayOn = false;
+    yields++;
+    d.log('the sliders are yours now, so the gesture has stopped playing itself');
+  }
+  function release() {
+    if (!handOn) return;
+    handOn = false;
+    // rule 1 of the capture discipline: the last sample of a gesture is logged
+    // at ITS own moment, never at the moment the gate noticed the drag ended.
+    capture.flush(posToUs(deck.position()));
+    reindex();
+  }
+  knobs.el.addEventListener('pointerdown', grab, { capture: true });
+  knobs.el.addEventListener('keydown', grab, { capture: true });
+  knobs.el.addEventListener('pointerup', release, { capture: true });
+  knobs.el.addEventListener('pointercancel', release, { capture: true });
+
+  /**
+   * The gesture, read at the playhead and sent the way a hand is sent.
+   *
+   * 🔴 IT IS DRIVEN BY THE PLAYHEAD MOVING, NOT BY `deck.playing()`. A reversed
+   * lap runs with the deck PAUSED and the transport bar seeking it once a
+   * frame, because `transport.setRate` throws `negative rate unsupported in
+   * v0`. So the honest test is whether the position changed, which is also true
+   * while somebody drags the scrub, and dragging the scrub across a filter
+   * sweep is a real thing to want.
+   */
+  let replayWrites = 0, lastReplayPos = null;
+  const shown = new Map();          // controller -> the value last put, so an unmoved
+                                    // gesture does not offer the gate the same number
+  function replayTick() {
+    if (!replayOn || handOn || !series.size) return;
+    const pos = deck.position();
+    if (lastReplayPos !== null && Math.abs(pos - lastReplayPos) < 0.5) return;
+    lastReplayPos = pos;
+    for (const [key, s] of series) {
+      const m = /^cc:\d+:(\d+)$/.exec(key);
+      if (!m || !isInterpolableKey(key)) continue;
+      const v14 = valueAt(s, pos);
+      if (v14 === null) continue;
+      const c = +m[1];
+      // `seriesFromRows` keeps a 7-bit controller as `value7 << 7`, so the line
+      // it interpolates is in 14-bit units and this is the only place that has
+      // to know it.
+      const v7 = Math.max(0, Math.min(127, Math.round(v14 / 128)));
+      if (shown.get(c) === v7) continue;
+      shown.set(c, v7);
+      gate.put(c, v7);
+      replayWrites++;
+      const sld = c === CUTOFF ? cutoff : c === RESO ? reso : null;
+      // ⚠️ `quiet`, or the handle moving would call `onInput`, which would send
+      // the value a second time and record it as a gesture.
+      sld?.set(v7, { quiet: true });
+    }
+  }
+
+  // ── audio ─────────────────────────────────────────────────────────────────
+  let ctx = null, playout = null;
+  let bufMs = 0, starved = 0, trimmed = 0, breaks = -1;
+  let frames = 0, pcmMissing = 0, lastPcmSeq = -1, firstFrameAt = 0;
+  let told = null;                       // the board's own announcement, if we heard it
+  let chIn = BOARD_CHANNELS, shapeChecked = false, shapeWrong = 0, shapeSaid = '';
+
+  async function startAudio() {
+    if (ctx) return;
+    // ⚠️ ASK FOR 48 kHz. The board sends 48000 and the worklet writes those
+    // samples into a ring drained at the context's own rate, so a mismatch is
+    // both a pitch error and a ring that fills faster than it empties.
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: RATE, latencyHint: 'interactive' });
+    // ⚠️ Fire and move on. `resume()` waits on a user gesture in a real browser
+    // and never rejects, so awaiting it is a hang rather than an error.
+    ctx.resume().catch(() => { /* a suspended context is allowed. Sound is late, not broken */ });
+    if (ctx.sampleRate !== RATE) {
+      d.log(`this browser runs audio at ${ctx.sampleRate} Hz and the board sends ${RATE}. Nothing in the chain resamples, so the pitch will be off by ${(RATE / ctx.sampleRate).toFixed(3)}x`, 'bad');
+    }
+    await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
+    playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+    playout.connect(ctx.destination);
+    playout.port.onmessage = (e) => {
+      const st = e.data?.stats; if (!st) return;
+      bufMs = st.bufferedMs;
+      d.set('buffer', Math.round(st.bufferedMs));
+      starved = st.underruns; trimmed = st.trimEvents;
+      const b = starved + trimmed;
+      if (b !== breaks) {
+        const first = breaks < 0;
+        breaks = b;
+        // One cell for both, because a reader wants to know whether what they
+        // are hearing is intact, which is one question. The LINE says which,
+        // because the two want opposite fixes: running dry wants a bigger
+        // cushion and being trimmed wants a smaller one.
+        if (!first) d.log(`${starved} ran dry, ${trimmed} trimmed · cushion ${Math.round(bufMs)} ms`, 'warn');
+      }
+    };
+    // The cushion is OURS, not the browser's, which is the whole reason to
+    // carry the samples rather than use WebRTC. 100 ms with a ratchet to 250:
+    // 60 ms is under the worst single arrival gap this relay produces
+    // (108.6 ms measured), and a cushion has no restoring force, so only a
+    // floor that grows when it is proved too small is safe over a long session.
+    playout.port.postMessage({ cmd: 'floor', ms: 100, adaptive: true, maxMs: 250 });
+  }
+
+  /**
+   * The shape of what arrived, checked rather than inferred.
+   *
+   * 🔴 A CHANNEL COUNT CANNOT BE READ OFF A PAYLOAD. 960 int16s is a valid
+   * 20 ms mono frame AND a valid 10 ms stereo one, and guessing wrong plays an
+   * octave down, which sounds like a broken instrument rather than a broken
+   * header. The Mac sends stereo and this board sends mono, and both are on
+   * this relay at once.
+   *
+   * ⚠️ THE BOARD ANNOUNCES IT IN `box.hello`, WHICH IT SENDS WHEN IT JOINS, SO
+   * A PAGE THAT JOINS LATER NEVER HEARS IT. There is no verb that asks for it
+   * again. So the page states the board's published framing as its expectation
+   * and CHECKS the arriving frames against it: `samples / channels / rate` has
+   * to come out at the frame length claimed. A live announcement overrides the
+   * expectation the moment one arrives.
+   */
+  function checkShape(samples) {
+    if (shapeChecked) return;
+    shapeChecked = true;
+    const want = told?.frameMs ?? BOARD_FRAME_MS;
+    const implied = (samples / chIn / RATE) * 1000;
+    shapeSaid = `${samples} samples a frame works out at ${implied.toFixed(1)} ms as ${chIn === 2 ? 'stereo' : 'mono'}, against the ${want} ms ${told ? 'the board announced' : 'the board publishes'}`;
+    if (Math.abs(implied - want) <= want * 0.02) return;
+    const real = Math.max(1, Math.min(2, Math.round(samples / ((want / 1000) * RATE))));
+    shapeWrong++;
+    chIn = real;
+    playout?.port.postMessage({ cmd: 'inChannels', n: real });
+    d.log(`${shapeSaid} · playing it as ${real === 2 ? 'stereo' : 'mono'} instead`, 'warn');
+  }
+
+  function onPcm(buf) {
+    const s = new DataView(buf).getUint32(0, true);
+    // ⚠️ A COUNTER IS ONLY EVIDENCE ON THE FAR SIDE OF A BOUNDARY. This counts
+    // gaps in the BOARD's own sequence, so it measures what the relay dropped
+    // rather than what this page asked for. Byte 4 carries the board's own
+    // `performance.now()`, which step 5 will read to separate the network's
+    // share of the delay from the board's.
+    if (lastPcmSeq >= 0 && s > lastPcmSeq + 1) pcmMissing += s - lastPcmSeq - 1;
+    lastPcmSeq = s;
+    frames++;
+    if (!firstFrameAt) firstFrameAt = performance.now();
+    const pcm = new Int16Array(buf, 12);
+    checkShape(pcm.length);
+    if (!playout) return;
+    const f32 = new Float32Array(pcm.length);
+    for (let i = 0; i < pcm.length; i++) f32[i] = pcm[i] / 32768;
+    playout.port.postMessage({ pcm: f32 }, [f32.buffer]);
+  }
+
+  // ── the socket ────────────────────────────────────────────────────────────
+  //
+  // 🔴 `openWire`, NOT A HAND-ROLLED WebSocket. `rig/box/listen.html` rolls its
+  // own and as a result cannot tell a full room from a dead relay: a browser
+  // cannot read the HTTP status of a refused upgrade, so both arrive as the
+  // same silent close. `openWire` asks `/stats` and says which it was. It also
+  // mints a new `from` per connection, counts what it sent against what came
+  // back, and refuses a payload field the envelope would overwrite.
+  const waiters = [];
+  let boardAnswered = false, playing = null, boardSaid = '';
+  let meter = null, meterAt = 0, playedPerSec = 0;
+  let rtt = null;
+
+  const wire = openWire(ROOM, {
+    base: q.get('relay') || undefined,
+    onOpen: () => { d.log(`joined ${ROOM}`, 'hi'); askStatus(); },
+    onClose: () => d.log('socket closed · reconnecting'),
+    onMessage: (got) => {
+      if (got.kind === 'binary') { onPcm(got.data); return; }
+      if (got.kind !== 'json') return;
+      if (got.msg.from === wire.stats().from) return;   // our own line, echoed back
+      heard(got.msg);
+    },
+  });
+
+  function sendId(m) {
+    const out = wire.send(m);
+    if (!out?.sent) return null;
+    try { return JSON.parse(out.line).id; } catch { return null; }
+  }
+  /**
+   * Wait for the next reply of a type, resolving null on a timeout rather than
+   * hanging. A page that waits forever looks like a page that is still loading,
+   * and "nobody answered" is the answer this page most often has to give.
+   */
+  function waitFor(type, ms, re = null) {
+    return new Promise((resolve) => {
+      const w = { type, re, resolve };
+      w.timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); resolve(null); }, ms);
+      waiters.push(w);
+    });
+  }
+  async function ask(m, type, ms = 8000) {
+    // The id first, so the wait is for THIS answer rather than for the next
+    // message of the same shape. On a shared board that can be somebody else's
+    // question, or the reply to it.
+    const id = sendId(m);
+    if (!id) return null;
+    return waitFor(type, ms, id);
+  }
+
+  /**
+   * ⚠️ A QUESTION AND ITS ANSWER CARRY THE SAME `type` ON THIS RELAY. The relay
+   * is a broadcast, so another listener merely ASKING looks exactly like the
+   * board answering. The board stamps every answer with `re`, the id of the
+   * message it answers, which is the only thing that tells them apart.
+   */
+  function heard(m) {
+    for (let i = waiters.length - 1; i >= 0; i--) {
+      const w = waiters[i];
+      if (w.type !== m.type) continue;
+      if (w.re && m.re !== w.re) continue;
+      clearTimeout(w.timer); waiters.splice(i, 1); w.resolve(m);
+    }
+    // The board's stream announcement, if this page happened to be connected
+    // when it joined. A measurement outranks a repeated claim, so this only
+    // re-opens the question when the claim CHANGES.
+    if (m.type === 'box.hello' && m.audioChannels) {
+      if (!told || told.audioChannels !== m.audioChannels || told.frameMs !== m.frameMs) {
+        told = { audioChannels: m.audioChannels, frameMs: m.frameMs };
+        chIn = m.audioChannels === 2 ? 2 : 1;
+        shapeChecked = false;
+        playout?.port.postMessage({ cmd: 'inChannels', n: chIn });
+        d.log(`the board says it sends ${chIn === 2 ? 'two channels' : 'one channel'} at ${m.frameMs} ms a frame`);
+      }
+    }
+    if (m.type === 'audio.started') {
+      boardAnswered = true;
+      playing = m.ok ? m.source : null;
+      // The board's own words for the not-playing case. A recovery action is
+      // not free and a wedged jackd cannot be restarted from a page, so the
+      // reason is reported verbatim rather than translated into a guess.
+      boardSaid = m.ok ? `${m.source} is playing on the board` : `the board answered: ${m.reason}`;
+    }
+    // The coalescer's own counters, pushed once a second while anything is
+    // moving. A REQUEST of the same type carries no counts, which is how the
+    // two are told apart without an id.
+    if (m.type === 'ctl.meter' && typeof m.out === 'number') {
+      const now = performance.now();
+      if (meter && now > meterAt) playedPerSec = (m.out - meter.out) / ((now - meterAt) / 1000);
+      meter = m; meterAt = now;
+      d.set('played', Math.max(0, Math.round(playedPerSec)));
+    }
+  }
+
+  async function askStatus() {
+    const r = await ask({ type: 'audio.status' }, 'audio.started', 6000);
+    if (!r) {
+      // plan-controller §7.7: say it in these words, within a named timeout,
+      // rather than showing a live-looking slider that does nothing.
+      d.log(`no board answered in ${ROOM} within six seconds. The sliders still work and nothing is going anywhere`, 'warn');
+      return null;
+    }
+    d.log(boardSaid, r.ok ? 'hi' : 'warn');
+    return r;
+  }
+
+  // ── what the numbers are counted over ─────────────────────────────────────
+  let t0 = performance.now(), m0 = 0, k0 = 0;
+  setInterval(() => {
+    const now = performance.now(), dt = (now - t0) / 1000;
+    if (dt < 1) return;
+    d.set('sent', Math.round((wireMsgs - m0) / dt));
+    d.set('skipped', Math.round((gate.stats.thinned - k0) / dt));
+    t0 = now; m0 = wireMsgs; k0 = gate.stats.thinned;
+    // ⚠️ NOT SET UNTIL SOMETHING HAS ARRIVED. A counter pre-set to 0 reads as a
+    // very confident measurement of nothing, and with no board there is nothing
+    // that could have been lost. `sent` and `skipped` are rates and are
+    // different: 0 a second is a true statement about a console nobody is
+    // moving.
+    if (!frames) return;
+    const gone = pcmMissing + Math.max(0, breaks);
+    d.set('lost', gone, gone ? 'bad' : 'ok');
+  }, 1000);
+
+  // The network alone, with the relay's Durable Object never woken: the runtime
+  // answers `ping` with `pong` for free out of its hibernation autoresponse.
+  // ⚠️ NOT `box.ping`. The board replies `box.pong` with an `at` field, and
+  // `at` is an envelope field, so the board's own formatter refuses it and the
+  // handler throws. Asked directly, the board answers
+  // `box.error: "at" is an envelope field`. The obvious round trip verb answers
+  // nothing on the board as it runs today.
+  async function measureRtt() {
+    const ms = await wire.ping(2500);
+    if (ms === null) return;
+    rtt = ms;
+    d.set('round trip', Math.round(ms));
+  }
+  setInterval(measureRtt, 4000);
+
+  // ── the transport ─────────────────────────────────────────────────────────
+  //
+  // 🔴 PLAY HOLDS THE NOTE AND PAUSE IS THE PANIC. Asked for in those words:
+  // *"use standard transport for play and stop, stop is a panic"*. A pause that
+  // panics is not what a pause usually means, so it is worth saying plainly:
+  // pressing pause releases every note the board is holding, brings both
+  // sliders back to the middle of their travel, and stops the line. There is no
+  // separate red button, because a page with one instrument and one held note
+  // has exactly one thing to stop.
+  //
+  // 🔴 AND THE END OF A PASS IS A PAUSE, SO IT IS A PANIC TOO. `transport-bar`
+  // pauses and parks at `range[1]`, which means a page nobody is watching stops
+  // holding a note after ten seconds instead of sounding until the tab closes.
+  // A loop keeps running: the bar does not end-stop a loop it is wrapping.
+  let passGen = 0;
+  let laps = 0, panics = 0;
+  // Under `?selfcheck=1` only: the harness drives this transport itself before
+  // it presses anything else, so the page has to know when it has been left
+  // alone. See `selfDrive`.
+  let commands = 0, lastTouch = performance.now();
+  const touched = () => { commands++; lastTouch = performance.now(); };
+
+  const bar = createTransportBar(d.el, deck, {
+    /**
+     * 🔴 THE THREE DIRECTIONS, AND THIS PAGE IS THE SECOND TO ASK FOR THEM.
+     * `/draw/` was the first. What plays here is a RECORD of two hands read at
+     * whatever position the transport asks for, so a lap backwards is the same
+     * gesture read the other way: the filter opens where it closed. The bar
+     * drives that lap itself, because `transport.setRate` throws
+     * `negative rate unsupported in v0`.
+     */
+    loopWays: true,
+    /**
+     * 🔴 WHO OWNS POSITION. The deck is not a follower here, so `command` is
+     * not about a master somewhere else: it is where play and pause pick up the
+     * two things the deck cannot know about, which are a synth in another
+     * building and a note that has to stop.
+     */
+    command: {
+      play: () => { touched(); startPass(); },
+      pause: () => { touched(); panic('paused'); },
+      seek: (pos) => deck.seek(pos),
+    },
+    onLoop: (what, a, b) => {
+      if (what === 'set') {
+        replayOn = true; lastReplayPos = null; laps = 0;
+        d.log(`looping ${((b - a) / 1000).toFixed(2)} s of what your hands did`, 'hi');
+      } else if (what === 'wrap') laps++;
+      else if (what === 'off') d.log('the loop is off, and the sliders are yours again');
+    },
+    onWay: (w) => {
+      touched();
+      d.log(`the loop plays ${w === 'round' ? 'forwards' : w === 'back' ? 'backwards' : 'there and back'}`);
+    },
+  });
+
+  /**
+   * Play: the line moves at once and the board catches up.
+   *
+   * 🔴 THE TRANSPORT IS NOT MADE TO WAIT FOR A SYNTH. Bringing Yoshimi up on a
+   * cold board takes ten to forty seconds, and a play button that does nothing
+   * visible for that long is a play button somebody presses again. The playhead
+   * starts immediately and `bringUp` runs beside it; `passGen` is what cancels
+   * a bring-up that a panic has overtaken, so a note cannot arrive after the
+   * thing that was meant to stop it.
+   */
+  function startPass() {
+    const gen = ++passGen;
+    replayOn = true;
+    lastReplayPos = null;
+    shown.clear();
+    if (deck.position() >= deck.range[1] - 1) deck.seek(deck.range[0]);
+    deck.play();
+    bringUp(gen);
+  }
+
+  async function bringUp(gen) {
+    await startAudio();
+    await measureRtt();
+    const status = boardAnswered ? { ok: playing !== null, source: playing } : await askStatus();
+    if (gen !== passGen) return;              // panicked while the board was answering
+    if (!MAY_PLAY) {
+      d.log('a check is running, so nothing has been sent to the board: it is shared hardware and somebody may be using it. Add ?board=1 to let this press through', 'warn');
+      return;
+    }
+    if (status && status.ok && status.source === 'yoshimi') {
+      d.log('yoshimi is already up on the board, so nothing is being restarted');
+      armed = true;
+      hold(gen);
+    } else if (status && status.ok) {
+      // 🔴 DO NOT AUTOSTART OVER SOMEBODY. There is one JACK graph and one
+      // instrument, so starting here stops whatever `/box/` or `/grains/` is
+      // doing. Say what is running and let a person decide.
+      d.log(`${status.source} is playing on the board and this page will not stop it. Nothing here is going anywhere until it is free`, 'warn');
+    } else if (status) {
+      d.log(`starting yoshimi on the board and loading ${PATCH}. This takes ten to forty seconds`);
+      const r = await ask({ type: 'audio.start', source: 'yoshimi' }, 'audio.started', 60000);
+      if (gen !== passGen) return;
+      if (r?.ok) {
+        armed = true;
+        sendId({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
+        hold(gen);
+      } else {
+        // A recovery action is not free, and a wedged jackd cannot be restarted
+        // from a page. Report the reason verbatim and stop.
+        d.log(`the board could not start yoshimi${r?.reason ? ` · ${r.reason}` : ' and did not say why'}`, 'bad');
+      }
+    }
+  }
+
+  function hold(gen) {
+    if (gen !== passGen || !armed || !MAY_PLAY) return;
+    sendId({ type: 'note.on', note: NOTE, vel: VEL, channel: 0 });
+    held = true;
+    d.log(`${PATCH} is loaded and one note is held. Drag the sliders`, 'hi');
+  }
+
+  /**
+   * Pause, which on this page is the panic.
+   *
+   * The board may be holding notes this page never pressed, so the message has
+   * to go out as well as the handles coming home: `note.panic` releases
+   * everything, and 64 is where the patch's own filter is, so the sliders
+   * arriving there leave the sound as its maker set it.
+   */
+  function panic(why) {
+    passGen++;                       // anything still coming up is no longer wanted
+    replayOn = false;
+    deck.pause();
+    if (MAY_PLAY && armed) sendId({ type: 'note.panic' });
+    held = false;
+    // Not `quiet`: the handles coming home is also the board being told, and
+    // `set` fires one `onInput` and one `onChange` however long the glide is.
+    cutoff.set(NEUTRAL, { glideMs: 240 });
+    reso.set(NEUTRAL, { glideMs: 240 });
+    shown.clear();
+    panics++;
+    d.log(`${why}: every note released and both sliders back to ${NEUTRAL}, which leaves the patch as its maker set it`);
+  }
+
+  // Finer than the gate, so a value it held back is never held much longer than
+  // the gate's own 20 ms, and so the 500 ms restatement has a clock to ride on
+  // with nothing moving. The replay reads the playhead on the same tick, which
+  // keeps one writer on the console.
+  setInterval(() => { replayTick(); pump(); }, 10);
+
+  // ── the checks ────────────────────────────────────────────────────────────
+  //
+  // 🔴 NOTHING HERE OPENS A SOCKET, MAKES A SOUND, MOVES A CONTROL OR MOVES THE
+  // PICTURE FOR A VISITOR. The rules the page's wiring depends on are
+  // arithmetic and are graded on scratch objects with a clock supplied by the
+  // caller, so they cost a visit nothing and still run when the board is down.
+  // The page's own sliders and its own transport are only driven under
+  // `?selfcheck=1`, because a scripted drag would fight a hand already on one.
+  function freeChecks() {
+    // 🔴 GATED TOO, for the reason in `checkAll`. These cost a visitor nothing
+    // and move nothing, and they still put lines in the box where this page's
+    // real faults are reported. The rule is not "cheap checks may run".
+    if (!SELFCHECK) return;
+    // Rule 1, and it is the only failure that matters for a level control: if
+    // the LAST value of a gesture is held back, the filter stays wrong forever.
+    const g1 = makeCcSend();
+    g1.put(CUTOFF, 10); const first = g1.tick(0);
+    g1.put(CUTOFF, 20); const mid = g1.tick(1);
+    g1.put(CUTOFF, 30, { end: true }); const last = g1.tick(2);
+    d.assert('the last value of a drag is never held back, whatever the clock says',
+      !!first && mid === null && last?.set?.[0]?.[1] === 30,
+      `a move ${mid === null ? 'inside the gate was held' : 'was not held'} and the release went out at ${last?.set?.[0]?.[1]}`);
+
+    // Rule 4, the whole repair a level plane needs. No ack, no sequence number,
+    // no retransmit queue: state the console again and a lost last value fixes
+    // itself within half a second.
+    const g2 = makeCcSend();
+    g2.put(CUTOFF, 100); g2.tick(0);
+    const quiet = g2.tick(RESTATE_MS - 1);
+    const again = g2.tick(RESTATE_MS);
+    d.assert(`with nothing moving, the whole console is stated again every ${RESTATE_MS} ms`,
+      quiet === null && again?.restate === true && again.set.length === 1,
+      again ? `nothing to say at ${RESTATE_MS - 1} ms, and ${again.set.length} controller restated at ${RESTATE_MS}` : 'nothing was restated');
+
+    // The relay's budget is counted in MESSAGES, so two sliders moving together
+    // have to cost one message rather than two.
+    const g3 = makeCcSend();
+    g3.put(CUTOFF, 91); g3.put(RESO, 40);
+    const both = g3.tick(0);
+    d.assert('two sliders moving together travel in one message',
+      both?.set?.length === 2 && g3.stats.messages === 1,
+      both ? `${g3.stats.messages} message carrying ${both.set.length} values` : 'nothing went out');
+
+    d.assert('both sliders start where the patch’s own filter already is',
+      cutoff.get() === NEUTRAL && reso.get() === NEUTRAL,
+      `cutoff ${cutoff.get()}, resonance ${reso.get()}, and ${NEUTRAL} is no change`);
+
+    /**
+     * The loop's own arithmetic, on a scratch capture with a clock this check
+     * supplies. A record is a handful of values a tenth of a second apart, and
+     * what a loop plays is the LINE between them: a page that replayed the
+     * values themselves would put a 10 Hz staircase on a resonant filter, which
+     * is heard as a zipper rather than as a sweep.
+     */
+    const g4 = makeCcCapture({ ch: 0 });
+    g4.cc7(CUTOFF, 0, 0);
+    g4.cc7(CUTOFF, 100, 200000);            // 200 ms later, a knot either side
+    const s4 = seriesFromRows(g4.rows, usToPos).get(keyOf(ST_CC, CUTOFF));
+    const mid4 = s4 ? valueAt(s4, 100) / 128 : null;
+    d.assert('a gesture is read BETWEEN the values it logged, not at them',
+      !!s4 && isInterpolableKey(s4.key) && Math.abs(mid4 - 50) < 0.5,
+      s4 ? `two values 200 ms apart read ${mid4.toFixed(1)} halfway between them`
+        : 'no series was built from the record');
+  }
+
+  /**
+   * A drag, driven the way a finger drives one: the handle is painted and the
+   * page's own `onInput` handler runs for every position, then one `onChange`
+   * for the release. Behind `?selfcheck=1`, because it moves the picture.
+   *
+   * ⚠️ THE CEILING IS COMPUTED FROM THE TIME THE SWEEP ACTUALLY TOOK, not from
+   * the time it was asked to take. A check that depends on when something
+   * landed has to confirm where it landed.
+   */
+  let sweep = null;
+  async function sweepChecks() {
+    const before = { offered: gate.stats.offered, messages: gate.stats.messages, thinned: gate.stats.thinned };
+    const steps = 60, ms = 600;
+    const t = performance.now();
+    for (let i = 0; i <= steps; i++) {
+      const v = Math.round(NEUTRAL + (127 - NEUTRAL) * (i / steps));
+      cutoff.set(v, { quiet: true });      // the handle, painted, no callbacks
+      move(CUTOFF, v); write(CUTOFF, v);   // what a pointermove does
+      await wait(ms / steps);
+    }
+    land(CUTOFF, 127); write(CUTOFF, 127, true);   // what a pointerup does
+    const took = performance.now() - t;
+    sweep = {
+      took,
+      offered: gate.stats.offered - before.offered,
+      messages: gate.stats.messages - before.messages,
+      thinned: gate.stats.thinned - before.thinned,
+      ended: gate.live.get(CUTOFF),
+    };
+  }
+
+  /** The second lane, so the record has two controllers in it and a loop moves
+   *  both handles. Shorter than the cutoff sweep and in the other direction. */
+  async function resoChecks() {
+    const steps = 30, ms = 300, to = 8;
+    for (let i = 0; i <= steps; i++) {
+      const v = Math.round(NEUTRAL + (to - NEUTRAL) * (i / steps));
+      reso.set(v, { quiet: true });
+      move(RESO, v); write(RESO, v);
+      await wait(ms / steps);
+    }
+    land(RESO, to); write(RESO, to, true);
+  }
+
+  /**
+   * 🔴 THE PAGE DRIVES ITS OWN TRANSPORT, AND IT WAITS ITS TURN FIRST.
+   *
+   * `verify.mjs` presses `.tbar-toggle` twice within half a second before it
+   * presses anything else, to prove that play advances the position and pause
+   * holds it. Those are real presses on real controls and this page answers
+   * them honestly, which means the second one panics. Only after that is there
+   * a transport free for the page to record a gesture on.
+   *
+   * So the drive waits for the transport to have been commanded and then left
+   * alone. That wait is what makes the order between the harness and the page
+   * deterministic without either one knowing about the other: the harness's
+   * last press is the direction button, which carries this demo's `settleMs`,
+   * so everything below runs inside twenty seconds the suite is already
+   * spending.
+   */
+  const QUIET_MS = 1200;
+  let gest = null;
+  async function selfDrive() {
+    const t0d = performance.now();
+    for (;;) {
+      const quiet = performance.now() - lastTouch >= QUIET_MS;
+      const waited = performance.now() - t0d;
+      if (quiet && (commands >= 3 || waited > 6000)) break;
+      if (waited > 30000) break;
+      await wait(100);
+    }
+
+    // 1 · press the play button a hand would press, and give the board its
+    //     chance to answer. With no `?board=1` nothing is sent, so nothing is
+    //     waited for either.
+    if (!bar.api.playing) bar.el.querySelector('.tbar-toggle')?.click();
+    if (MAY_PLAY) for (let i = 0; i < 80 && !armed; i++) await wait(100);
+
+    // 2 · mark where the gesture starts, make it, and mark where it ends. The
+    //     second press is what closes the loop and starts it running.
+    bar.api.pressLoop();
+    const rows0 = capture.rows.length, raw0 = capture.rawLane.length;
+    grab();
+    await sweepChecks();
+    await resoChecks();
+    release();
+    bar.api.pressLoop();
+    const loop = bar.api.loop;
+
+    // 3 · watch it play itself. Two seconds, because a there-and-back lap of a
+    //     nine hundred millisecond loop comes round once in one thousand eight
+    //     hundred.
+    const w0 = replayWrites;
+    let minPos = Infinity, maxPos = -Infinity, minCut = 128, maxCut = -1;
+    for (let i = 0; i < 40; i++) {
+      await wait(50);
+      const p = deck.position();
+      if (p < minPos) minPos = p;
+      if (p > maxPos) maxPos = p;
+      const c = cutoff.get();
+      if (c < minCut) minCut = c;
+      if (c > maxCut) maxCut = c;
+    }
+    // A wrap is rate limited to one every 150 ms on a forward loop, so the
+    // playhead can be a little past the end mark at the instant it is sampled.
+    const slack = 250;
+    gest = {
+      way: bar.api.way,
+      rows: capture.rows.length - rows0,
+      raw: capture.rawLane.length - raw0,
+      writes: replayWrites - w0,
+      spread: maxCut - minCut,
+      series: series.size,
+      console: foldRows(capture.rows).size,
+      laps,
+      a: loop ? loop[0] : null, b: loop ? loop[1] : null,
+      minPos, maxPos,
+      inside: !!loop && minPos >= loop[0] - slack && maxPos <= loop[1] + slack,
+      wasOn: replayOn,
+    };
+
+    // 4 · a hand on a slider takes it back, and a synthetic pointer is the only
+    //     way to ask that question: `element.click()` fires no pointer events,
+    //     which is exactly why the listener is on `pointerdown`.
+    cutoff.el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    gest.yielded = gest.wasOn && !replayOn && yields > 0;
+    cutoff.el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+
+    // 5 · and the page is put back where a visitor would find it: no loop,
+    //     nothing held, both sliders in the middle.
+    if (bar.api.loop) bar.api.pressLoop();
+    panic('the check is finished');
+    await wait(120);
+    gest.afterPanic = { cut: cutoff.get(), res: reso.get(), playing: bar.api.playing };
+
+    checkAll();
+  }
+
+  function checkAll() {
+    /**
+     * 🔴 NOT FOR A VISITOR. NOT ONE OF THEM, EVER. PHOTOGRAPHED 2026-09-16 on a
+     * phone, on the deployed site, with no query string: two red FAIL lines in
+     * the log under the sliders, on a page where nothing was wrong.
+     *
+     * This ran on every press of Play, which is a REAL person's press, and then
+     * graded the board against conditions only a harness creates. `the board
+     * wrote to the synth what this page put on the wire` needs controller
+     * traffic, and somebody who has pressed play and not yet touched a slider
+     * has made none: the board pushes its counters only when they MOVE, so the
+     * page had nothing to read and said so in red.
+     *
+     * CLAUDE.md's rule is the whole of the answer and it has no exceptions.
+     * `demo/verify.mjs` appends `selfcheck=1`, so the suite still grades
+     * everything, and a visitor gets the page.
+     */
+    if (!SELFCHECK) return;
+    // ── reachable with no board at all ───────────────────────────────────
+    d.assert('the page reached the relay', wire.state() === 1,
+      wire.state() === 1 ? `open in ${ROOM}` : `readyState ${wire.state()}${wire.stats().refusal ? ` · ${wire.stats().refusal}` : ''}`);
+    d.assert('the relay answered a round trip with nothing woken at the far end',
+      Number.isFinite(rtt), rtt === null ? 'no pong came back' : `${Math.round(rtt)} ms`);
+    // The relay echoes verbatim to the sender, so the difference between what
+    // went out and what came back is this socket's drop count, with no
+    // cooperation from anybody. A few can be in flight at check time.
+    const w = wire.stats();
+    d.assert('the relay delivered the control messages this page sent',
+      w.sent > 0 && w.sent - w.echoed <= 3,
+      `${w.echoed} of ${w.sent} came back${w.refused ? `, ${w.refused} refused by this page as too big` : ''}`);
+    // Both branches. A board that is off is the ordinary case, and a page that
+    // only asserts the happy path has no coverage on those days.
+    // ⚠️ `d.api.logs`, NOT `d.logs`. The mount API does not carry the array;
+    // only `window.__demo` does, and `d.api` is that object. `/rack/` reads
+    // `d.logs.length` in exactly this position and throws a TypeError on the
+    // branch where the far end is off, which is the branch that runs on the
+    // ordinary day.
+    d.assert('it says whether a board answered in this room',
+      boardAnswered ? !!boardSaid : d.api.logs.some((l) => l.msg.includes('no board answered')),
+      boardAnswered ? boardSaid : `nothing answered in ${ROOM}, and the log says so`);
+    d.assert('this page makes no sound of its own',
+      !!ctx && !!playout, 'every sample it can play arrived over the socket');
+
+    // ── the gate, driven through the page’s own sliders ───────────────
+    if (sweep) {
+      // 50 a second is the gate, plus one for the release and a little slack
+      // for a browser that did not hand the timer back on time.
+      const ceiling = Math.ceil(sweep.took / SEND_GATE_MS) + 4;
+      d.assert(`a fast drag is thinned to one value per slider every ${SEND_GATE_MS} ms`,
+        sweep.offered >= 40 && sweep.thinned > 0 && sweep.messages <= ceiling && sweep.messages >= 4,
+        `${sweep.offered} positions in ${Math.round(sweep.took)} ms became ${sweep.messages} messages, ceiling ${ceiling}`);
+      d.assert('and the position the hand stopped at was sent anyway',
+        sweep.ended === 127, `the drag ended at 127 and the gate holds ${sweep.ended}`);
+      if (!MAY_PLAY) {
+        d.assert('a scripted press does not take a shared instrument away from whoever is using it',
+          wireMsgs === 0 && !armed && heldBack > 0,
+          `the gate made ${gate.stats.messages} messages, ${heldBack} were held back and ${wireMsgs} went on the wire`);
+      }
+    }
+
+    // ── the loop, which is a loop OF THE GESTURE ─────────────────────────
+    if (gest) {
+      d.assert('a drag is recorded as a handful of values, not as every position it passed',
+        gest.rows > 2 && gest.raw > gest.rows * 2 && gest.series === 2 && gest.console === 2,
+        `${gest.raw} positions became ${gest.rows} values on ${gest.series} controllers, `
+          + `${(gest.raw / Math.max(1, gest.rows)).toFixed(1)} to 1, with ${stalled} dropped for having no new room on the line`);
+      d.assert('a loop of that gesture moves the sliders with nobody touching them',
+        gest.spread > 8 && gest.writes > 10,
+        `the cutoff handle crossed ${gest.spread} of 127 by itself, and ${gest.writes} values went out through the same gate a hand goes through`);
+      d.assert(`the loop comes round inside its own two marks, running ${gest.way}`,
+        gest.laps >= 1 && gest.inside,
+        gest.a === null ? 'no loop was ever set'
+          : `${gest.laps} lap${gest.laps === 1 ? '' : 's'}, playhead ${gest.minPos.toFixed(0)} to `
+            + `${gest.maxPos.toFixed(0)} ms inside marks at ${gest.a.toFixed(0)} and ${gest.b.toFixed(0)}`);
+      d.assert('a hand on a slider takes the gesture back',
+        gest.yielded,
+        gest.yielded ? `it stopped playing itself on the first pointerdown, ${yields} time${yields === 1 ? '' : 's'} in this run`
+          : 'it went on writing under a hand');
+      d.assert('pause is a panic: nothing held, and both sliders home',
+        gest.afterPanic.cut === NEUTRAL && gest.afterPanic.res === NEUTRAL
+          && !gest.afterPanic.playing && !held,
+        `cutoff ${gest.afterPanic.cut}, resonance ${gest.afterPanic.res}, `
+          + `the line ${gest.afterPanic.playing ? 'still rolling' : 'stopped'}, ${panics} panic${panics === 1 ? '' : 's'}`);
+    }
+
+    // ── only answerable with a board ─────────────────────────────────────
+    if (!armed) return;
+    d.assert('an instrument named itself', playing === 'yoshimi', String(playing));
+    d.assert('the shape of a frame is checked against what the board publishes, not read off its size',
+      shapeChecked && !shapeWrong, shapeSaid || 'no frame has arrived yet');
+    d.assert('the sample rate it sends is the one this page plays at',
+      ctx?.sampleRate === RATE, `context ${ctx?.sampleRate} Hz against ${RATE} Hz from the board`);
+    d.assert('sound came back while the note was held', frames > 20, `${frames} frames of audio`);
+    d.assert('the relay dropped none of it', pcmMissing === 0, `${pcmMissing} missing of ${frames + pcmMissing}`);
+    d.assert('the board wrote to the synth what this page put on the wire',
+      !!meter && meter.in > 0 && meter.out > 0 && meter.out <= meter.in,
+      meter ? `${meter.in} values arrived, ${meter.out} written, ${meter.folded} overtaken on the way` : 'the board reported no counters');
+    /**
+     * ⚠️ `-1` IS NOT A READING AND MUST NOT READ AS A FAILURE. `breaks` opens
+     * at -1 meaning the worklet has not reported yet, which is neither `=== 0`
+     * nor `> 0`, so this asserted false and printed `no breaks` as its own
+     * detail, a check contradicting itself in the same line. PHOTOGRAPHED on a
+     * phone. A quantity nobody has measured yet is said in those words.
+     */
+    d.assert('the cushion neither ran dry nor overflowed', breaks === 0,
+      breaks < 0 ? 'the playout has not reported yet, so there is nothing to say'
+        : breaks > 0 ? `${starved} ran dry, ${trimmed} trimmed, cushion now ${Math.round(bufMs)} ms`
+        : 'no breaks');
+  }
+
+  freeChecks();
+  // ⚠️ THE DRIVE IS NOT AWAITED AND ITS FAILURE HAS TO BE VISIBLE. Every assert
+  // below the first line of `selfDrive` lives inside it, so a throw in there
+  // would take thirteen checks off the run and leave nothing at all to read:
+  // the suite would report a shorter list, which is the shape this project has
+  // paid for twice.
+  if (SELFCHECK) selfDrive().catch((e) => d.log(`the page's own drive stopped: ${e?.message || e}`, 'bad'));
+  d.ready();
+</script>
+</html>
