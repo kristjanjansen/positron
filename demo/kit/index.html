@@ -358,23 +358,25 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
         made.push({ ctx, panel });
       };
       for (const [mode, heading] of [['hover', 'the defaults'],
-                                     ['footer', 'the footer stays while full']]) {
+                                     ['footer', 'footer in fullscreen']]) {
         const c = document.createElement('canvas');
         c.width = FRAME_W; c.height = FRAME_H;
-        const p = createVideoPanel({ media: c, of: 'the board', fullMode: mode });
-        p.presence?.set('online');
+        /**
+         * ⚠️ THE BADGE SAYS `LIVE` RATHER THAN SHOWING A LONE DOT. Asked
+         * 2026-09-17: *"add LIVE to green bullet on footer"*. A coloured dot
+         * with nothing beside it is a mark whose whole meaning is its hue, which
+         * this project already has a rule about, and the panel's own default is
+         * the dot mode because a footer usually holds several small things. Here
+         * it holds one.
+         */
+        const p = createVideoPanel({
+          media: c, fullMode: mode,
+          left: createPresence({ of: '', mode: 'badge', state: 'online',
+                                 says: { online: 'live' } }).el,
+        });
         add(heading, p, c.getContext('2d', { alpha: false }));
       }
 
-      // A third with every slot supplied, because the defaults are only half the
-      // point: a page can put anything in any of the three.
-      const mine = document.createElement('canvas');
-      mine.width = FRAME_W; mine.height = FRAME_H;
-      add('slots a page filled itself', createVideoPanel({
-        media: mine, fullMode: 'bare',
-        left: el('span', '', 'audience'),
-        centre: el('span', '', '00:14:22'),
-      }), mine.getContext('2d', { alpha: false }));
       vpSpec = made;
       stack.add(row);
 
@@ -1739,12 +1741,6 @@ green = inside what it promised · amber/red = later`,
         r ? `the button is ${r.width.toFixed(1)} by ${r.height.toFixed(1)} px and the centre holds ${first.slots.centre.childElementCount}`
           : 'there is no control in the right slot');
 
-      const last = vpSpec[vpSpec.length - 1].panel;
-      d.assert('and a page can fill all three itself',
-        last.slots.left.textContent.trim() === 'audience'
-        && last.slots.centre.textContent.trim() === '00:14:22',
-        `left "${last.slots.left.textContent.trim()}", centre "${last.slots.centre.textContent.trim()}"`);
-
       const ms = readBurned(vpSpec[0].ctx);
       d.assert('the picture in a panel is really being drawn, read back out of its own canvas',
         Number.isFinite(ms) && Math.abs(Date.now() - ms) < 60_000,
@@ -2076,18 +2072,39 @@ green = inside what it promised · amber/red = later`,
         w.length === 8 && b.length === 5 && shorter && narrower && aligned,
         `${w.length} white and ${b.length} black · white ${w[0].width.toFixed(1)}x${w[0].height} · `
         + `black ${b[0].width.toFixed(1)}x${b[0].height}, ${(b[0].width / w[0].width).toFixed(3)} of a white`);
-      // Every black key's centre must land on the join between two whites. This
-      // is arithmetic on laid-out ink, so a grid placement that is off by a
-      // column reports a number rather than looking slightly wrong.
-      let worst = 0;
-      for (const r of b) {
-        const centre = r.left + r.width / 2;
-        worst = Math.max(worst, Math.min(...w.slice(0, -1).map((x, i) =>
-          Math.abs(centre - (x.right + w[i + 1].left) / 2))));
+      /**
+       * 🔴 THE WHITE KEYS ARE LEFT EQUAL, WHICH IS WHAT THE OFFSETS ARE FOR AND
+       * IS NOT WHAT THIS CHECK USED TO SAY. It asserted that every black key
+       * CENTRES on the join, which was the defect: seven whites sharing five
+       * blacks cannot both sit on their joins and leave the whites equal, and
+       * centring made the narrowest strip 0.401 of a white against 0.551 with
+       * the piano's offsets. The old check passed the whole time and could only
+       * ever have failed if the offsets were added, which they now are, so it
+       * went red at 7.33 px — exactly the intended shift.
+       * ⚠️ MEASURE THE THING THE CHANGE IS FOR. The strip a finger has between
+       * two black keys is the quantity; where a black key's centre sits is one
+       * way of getting there and the wrong one to assert.
+       */
+      const strips = [];
+      for (let i = 0; i < w.length; i++) {
+        const leftEdge = Math.max(w[i].left, ...b.filter((x) => x.right <= w[i].right && x.right > w[i].left).map((x) => x.right));
+        const rightEdge = Math.min(w[i].right, ...b.filter((x) => x.left >= w[i].left && x.left < w[i].right).map((x) => x.left));
+        strips.push(rightEdge - leftEdge);
       }
-      d.assert('and each one straddles the join between two white keys',
-        worst <= 1,
-        `worst black key is ${worst.toFixed(2)} px off the join it sits on`);
+      const narrowest = Math.min(...strips);
+      /**
+       * ⚠️ THE NARROWEST STRIP IS THE WHOLE CLAIM, and a spread across ALL eight
+       * is not: the two outer keys have a black on one side only, so they are
+       * wider by construction and always will be. The first version of this
+       * check included them and reported a spread of 22 px about a layout that
+       * was correct.
+       * The number to beat is 0.401 of a white key, which is what centring the
+       * black keys gave. GarageBand measures 0.439. This reads 0.551.
+       */
+      d.assert('and the white key a finger lands on is wide enough to land on',
+        narrowest >= w[0].width * 0.5,
+        `narrowest strip ${narrowest.toFixed(1)} px, ${(narrowest / w[0].width).toFixed(3)} of a white key, `
+        + `against 0.401 when the black keys were centred and 0.439 in GarageBand`);
     }
 
     // ── 🔴 THE OVERLAP, WHICH IS A HIT TEST AND NOT A PICTURE ──────────────

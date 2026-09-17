@@ -265,12 +265,44 @@ export function createKeyboard(host, {
   // key before it there is no join to straddle, so the pull-back is taken off
   // and it sits flush at the left. Nothing in this project does that today; it
   // is one line and the alternative is half a key hanging outside the row.
+  /**
+   * 🔴 A REAL PIANO DOES NOT CENTRE ITS BLACK KEYS ON THE JOINS, AND THIS ONE
+   * DID. From `research/piano-key-proportions-2026-09.md`, 2026-09-17. Seven
+   * white keys have to share five black ones, so the two groups cannot both sit
+   * on their joins and leave the whites equal: centring makes D, G and A **59
+   * per cent** of C's back width, where a piano keeps every white within 8 per
+   * cent of every other.
+   *
+   * The offsets are fractions of the black key's own width: C# and D# by a
+   * sixth, F# and A# by a quarter, G# not at all, outward from the middle of the
+   * group. MEASURED on this component at 390 px with the layout applied from a
+   * harness: the narrowest white strip goes **19.67 px to 27.00** and the spread
+   * between strips **14.66 to 2.44**, while the row width stays 413 px and the
+   * hit test stays at 0 misses in 15 probes. Nothing about the fit changes.
+   *
+   * ⚠️ IT IS READ OFF THE PITCH CLASS, NOT THE LETTER. A caller may pass its own
+   * `map`, so keying this on `w`/`e`/`t`/`y`/`u` would break the promise that a
+   * keyboard can be built from any letters. The note's distance above its own C
+   * is what decides which of the five a sharp is.
+   * ⚠️ AND EVERY MUSIC APP EXAMINED THAT DRAWS A PIANO OFFSETS THEM, except
+   * LMMS. GarageBand uses a single constant, ±4.0 pt, on both phone and tablet;
+   * Ardour's own shift table works out to exactly the sixths and quarters used
+   * here. The pair is kept rather than a constant because a constant gives
+   * 24.56 px of narrowest strip against 27.00, at identical cost.
+   */
+  const SHARP_OFF = { 1: -1 / 6, 3: 1 / 6, 6: -1 / 4, 8: 0, 10: 1 / 4 };
+
   let whites = 0;
   for (const k of keys) {
     const sharp = sharps.has(k);
     const b = make('div', `k${sharp ? ' sharp' : ''}`);
     label(b, k);
     b.style.gridColumn = String(whites + 1);
+    if (sharp) {
+      const pc = ((map[k] % 12) + 12) % 12;
+      const off = SHARP_OFF[pc];
+      if (off) b.style.setProperty('--k-off', String(off));
+    }
     if (sharp && whites === 0) b.style.transform = 'none';
     if (!sharp) whites++;
     els.set(k, b);

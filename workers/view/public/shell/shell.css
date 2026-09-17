@@ -983,8 +983,15 @@ video[hidden] { display: none; }
    since it opens a stacking context. A sharp that opens a keyboard has the
    transform removed from JavaScript and keeps the z-index, so it sits flush at
    the left instead of hanging half outside the row. */
+/* 🔴 AND `--k-off` MOVES IT OFF THE JOIN, WHICH IS WHERE A REAL PIANO PUTS IT.
+   `keyboard.mjs` sets a unitless fraction of the black key's own width per
+   sharp: a sixth for C# and D#, a quarter for F# and A#, nothing for G#. The
+   width it is a fraction of is the key minus the 3 px column gap, which is the
+   amount of WHITE the key actually eats. MEASURED: identical to the arithmetic
+   within 0.001 px at 390 and at 1400. */
 .k.sharp { align-self: start; height: 46px; width: 66%; justify-self: start;
-           transform: translateX(calc(-50% - 1.5px)); z-index: 2;
+           transform: translateX(calc(-50% - 1.5px + var(--k-off, 0) * (100% - 3px)));
+           z-index: 2;
            background: #0e1219; border-color: var(--line); }
 /* the pitch on top, the keystroke underneath: the pitch is what moves when the
    octave shifts, and it is what a player is looking for */
@@ -2687,15 +2694,18 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
      bottom left and bottom right without a second radius to keep in step. */
   overflow: hidden;
 }
-/* 🔴 THE SAME GROUND AS THE LOG, NOT BLACK. Asked 2026-09-17 with a photograph
-   of a panel above a log: *"make video panel canvas bg same as log panel"*. A
-   `#000` well under a page whose surfaces are all `--card` reads as a hole
-   rather than as a box that has not been filled yet, and the two boxes on that
-   screen were plainly different colours. What a picture sits ON is the page's
-   own surface; what a picture IS still arrives as pixels. */
+/* 🔴 THE SAME GROUND AS ITS OWN FOOTER, AND `--card2` IS THAT GROUND. Asked
+   twice: first *"make video panel canvas bg same as log panel"*, which took it
+   off `#000` and onto `--card`, and then, with a photograph of the two halves
+   still differing: *"same bg color!!! take lower one"*.
+   `--card` is #11151d and `--card2` is #151b26, so a well in the first under a
+   footer in the second is two greys a few points apart, which reads as a
+   printing fault rather than as a decision. The lower half wins because it is
+   the one with content in it: the picture well is empty until a frame arrives,
+   and an empty box should look like the box it belongs to. */
 .pos-vp-stage {
   position: relative;
-  background: var(--card);
+  background: var(--card2);
   /* A picture with nothing in it yet is still a picture-shaped hole rather than
      a collapsed line, which is what `/kit/` shows and what a page looks like
      before its first frame. */
