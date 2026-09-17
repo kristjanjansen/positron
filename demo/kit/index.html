@@ -270,18 +270,9 @@
    * after any reorder.
    */
   section('ONLINE, OFFLINE, AND WHO ELSE HAS HOLD OF IT',
-    'Five states, and the last one is the honest one: a thing nobody has asked yet is '
-    + 'not offline, which is the same rule caps.mjs follows when it answers "unknown" '
-    + 'about a browser it could not probe. Green means it spoke inside the time it '
-    + 'promised to speak in, and the two greys are told apart by ink rather than hue: a '
-    + 'solid dot is a measurement, a hollow ring is nobody having looked. '
-    + 'A second question rides the same badge, because on a shared instrument the room '
-    + 'is not what people contend over and your own second tab is another client: the '
-    + 'word says whether somebody else has hold of it, and whether that somebody is a '
-    + 'person or a harness. That greys the WORD and never the dot, because a grey dot '
-    + 'already means nobody has looked. In "dot" mode it is the ring alone with the '
-    + 'words clipped rather than removed, so it drops into a button, a readout key or a '
-    + 'row of machines and still reads as a whole sentence to a screen reader.',
+    'Five states, because a thing nobody has asked about yet is not offline, and a second '
+    + 'question riding the same badge: whether somebody else has hold of it, and whether '
+    + 'that somebody is a person or a harness.',
     `createPresence({ of: 'the board' }).set('online')
 createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } }).busy('tool')
 createPresence({ of: 'the board', mode: 'dot', state: 'online' })
@@ -394,12 +385,9 @@ presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
    * after any reorder.
    */
   section('BLOCKS OF A PAGE, AND THE AIR BETWEEN THEM',
-    'A page is a stack of blocks and the stack owns the space between them, so no page '
-    + 'has to know the number and none of them can get it wrong. The gap is set once, as '
-    + '--pos-gap in the stylesheet, and it is put on both sides of every pair: a block '
-    + 'cannot add to it with a margin of its own and cannot take it away, which is what '
-    + 'used to happen. A block with nothing in it takes no space at all. Two things a '
-    + 'page still owns: what goes inside a block, and the order the blocks are added in.',
+    'A page is a stack of blocks and the stack owns the air between them, set once as '
+    + '--pos-gap and put on both sides of every pair, so a block can neither add to the gap '
+    + 'nor take it away.',
     `const page = createStack(d.el);          // mount() has already made this one
 page.add(bar.el, picks, keyboard.el);    // the order of the page, in one line
 const row = page.stack();                // a block that is itself a column`,
@@ -428,12 +416,8 @@ const row = page.stack();                // a block that is itself a column`,
 
   section('READOUT AND LOG, JOINED OR SPLIT',
     'The numbers a page is showing now and the record of what it did are one component '
-    + 'with two arrangements. Split is the default and is what every page here already '
-    + 'does: the readout above the controls, the log under the page. Joined makes them a '
-    + 'single surface at the foot, the readout sitting on top of the log, with one border '
-    + 'round both and the same one pixel of line colour between them that already runs '
-    + 'between two readout cells. A joined surface missing one half draws one border and '
-    + 'no seam, and one missing both is never put on the page at all.',
+    + 'with two arrangements: split above and below the page, or joined into a single '
+    + 'surface at its foot.',
     `mount({ readout: { sent: '/s', lost: '' }, joined: true })   // one surface, at the foot
 mount({ readout: { sent: '/s', lost: '' } })                 // two surfaces, the default
 createReport({ readout, showLog: false, joined: true })      // the same pair, standalone`,
@@ -549,10 +533,8 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
 
   // ── two across, and a glide ─────────────────────────────────────────────
   section('two across, and a patch that glides',
-    'Above 720 px the pair shares six columns instead of stacking; below it, it '
-    + 'falls back to the stacked three, because side by side there is nothing to '
-    + 'line up. Press a sound and the handles travel rather than teleport. The '
-    + 'value itself lands at once, so nothing downstream waits for the picture.',
+    'Above 720 px the pair shares six columns instead of stacking, and pressing a sound '
+    + 'makes the handles travel rather than teleport while the value itself lands at once.',
     `createSliderGroup([...], { pair: true })
 s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     (box) => {
@@ -629,12 +611,9 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
 
   // ── tabs ────────────────────────────────────────────────────────────────
   section('the parts of one page',
-    'Not a choice. That one is a segmented box for options you arm; these are places you go, and '
-    + 'drawing two different acts the same way is what this page exists to catch. The open one is '
-    + 'marked by colour and a bar under the word: no box, no borders. A part that exists and is not '
-    + 'built stays in the row, named and unpressable, because hiding it would say it does not exist. '
-    + 'The row scrolls sideways rather than wrapping, and each tab is a #link, so switching keeps the '
-    + 'page, and whatever it is playing, alive.',
+    'Not a choice but a place you go, so the open one is marked by colour and a bar under '
+    + 'the word, and a part that is not built stays in the row named and unpressable, '
+    + 'because hiding it would say it does not exist.',
     `createTabs({ tabs: [{id:'air',label:'On air'}, {id:'past',label:'Archive',disabled:true}, …] })`,
     (box) => {
       const o = out('air');
@@ -687,12 +666,9 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
   }));
 
   section('a link with room in it',
-    'A grey box, a name, one line about what is behind it, and the tags along the bottom. It is the '
-    + 'only component here set in sans: everything else is monospace because the fixed width lines '
-    + 'values up with each other, and a card holds a name and a sentence, which line up with nothing. '
-    + 'The rows below are the real front-page entries, so this sandbox cannot drift away from the '
-    + 'index it looks like. Nothing truncates. A card that is taller than its neighbours is a '
-    + 'description that is too long, and hiding that behind an ellipsis would only move the problem.',
+    'A grey box, a name, one line about what is behind it and the tags along the bottom, '
+    + 'set in the only sans face on this page because a card holds a sentence rather than a '
+    + 'value.',
     '',
     (box) => {
       box.classList.add('kit-wide');
@@ -702,11 +678,9 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   section('...and the same cards in a phone\u2019s width',
-    'Two columns at 375 px and up, which is every phone anyone owns, and one below that. The floor is '
-    + '`min(100%, 170px)` rather than a bare `170px`: a bare floor wider than the screen does not fall '
-    + 'back to one column, it makes a column wider than the page and the whole document scrolls '
-    + 'sideways. That is the defect the tab row shipped and this page caught, and it is invisible '
-    + 'until something does not fit.',
+    'Two columns at 375 px and up and one below that, with the floor written min(100%, 170px), '
+    + 'because a bare floor wider than the screen makes a column wider than the page and scrolls the '
+    + 'whole document sideways.',
     '', (box) => {
       box.classList.add('kit-wide');
       for (const w of [375, 320]) {
@@ -721,12 +695,9 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   section('a card that cannot be pressed, and a card with buttons',
-    'A page the browser in front of you cannot run still gets a card, with the reason in words where '
-    + 'the tags would be \u2014 a row that simply vanishes says the thing does not exist, which is a '
-    + 'different and false statement. The last one carries buttons, and that changes what it is: a '
-    + '`<button>` inside an `<a>` is invalid HTML and browsers resolve the press ambiguously, so a '
-    + 'card with buttons moves the link onto its title and stops being one big target with smaller '
-    + 'targets inside it.',
+    'A page this browser cannot run still gets a card with the reason in words, and a '
+    + 'card carrying buttons moves its link onto the title, because a button inside a link '
+    + 'is invalid HTML that browsers resolve ambiguously.',
     '', (box) => {
       box.classList.add('kit-wide');
       const o = out('nothing pressed');
@@ -748,11 +719,9 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
 
   // ── a choice that has not arrived yet ───────────────────────────────────
   section('a choice whose effect is a second away',
-    'Some controls act on something that cannot answer immediately. A speed button on a live '
-    + 'stream is the case this was built for: about six tenths of a second of sound is already '
-    + 'scheduled when you press it, so the old speed goes on playing and the button looks broken. '
-    + 'Marking it pending says the press landed and the wait is real; the option stays chosen '
-    + 'throughout, because chosen and arrived are two different facts.',
+    'Marking a press pending says it landed while the thing it acts on catches up, which '
+    + 'is what a speed button on a live stream needs when six tenths of a second of sound '
+    + 'is already scheduled.',
     `c.pending(i)   // and c.pending(null) when it lands`,
     (box) => {
       const o = out('at 1x');
@@ -776,14 +745,9 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
 
   // ── text field ──────────────────────────────────────────────────────────
   section('a line of text, or four',
-    'The label sits on top of the box rather than beside it, so a row of fields has one left edge '
-    + 'and the labels form a column of their own. A field asks for the width of a sentence or the '
-    + 'width of a word; on a phone every one of them takes the whole row, because half of a mono '
-    + 'line is about twenty characters and a title is longer than that. Ask for rows and it becomes '
-    + 'a box that many lines deep, in the reading face rather than the mono one, with the browser’s '
-    + 'spell checker and sentence capitals switched on: a one-line field holds a value that has to '
-    + 'come back unchanged, and a four-line one holds prose. This is the one control that keeps the '
-    + 'iOS magnifier and the selection handles, which everything else here turns off.',
+    'The label sits on top of the box so a row of fields has one left edge, and asking '
+    + 'for rows turns it into prose in the reading face with the spell checker on, which is '
+    + 'the one control here that keeps the iOS magnifier.',
     `createField({ label: 'title', value: 'Rehearsal moved', grow: 'wide' })
 createField({ label: 'tags', placeholder: 'comma separated' })
 createField({ label: 'message', rows: 4, grow: 'wide' })`,
@@ -940,16 +904,9 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
   }
 
   section('a flow diagram',
-    'A picture of where the signal goes, for a page whose subject is a path ' +
-    'rather than a number. The page hands over a list of boxes and a list of ' +
-    'arrows and nothing else; every position on screen is worked out from ' +
-    'those. Hover a box and the line under the picture says what that box ' +
-    'does, in a sentence the box itself does not repeat. There is no tooltip ' +
-    'anywhere in this component, native or hand-built, on purpose. Colour says ' +
-    'WHICH MACHINE a box is and nothing else: the filled one is the browser ' +
-    'you are reading this in, the one with a broken edge is a computer ' +
-    'somebody rents, the heavy one is a machine in a room. A box drawn inside ' +
-    'another takes its colour, because it runs there.',
+    'A picture of where the signal goes, laid out entirely from a list of boxes and a '
+    + 'list of arrows, where colour says which machine a box is and hovering one says what '
+    + 'it does in the line underneath.',
     `createDiagram(host, {
   title: 'a key press, and what it costs',
   caption: 'one line under the picture',
@@ -984,13 +941,9 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
     }));
 
   section('a label that does not fit',
-    'A box is filled, a word is never allowed to run out past a border, and a ' +
-    'word too wide for the box on its own is broken inside the word. What is ' +
-    'left over becomes an ellipsis on the last line. The whole string ' +
-    'stays on the box for a screen reader, though nothing draws it any more: ' +
-    'a cut is a label that is too long, which is a thing to go and fix rather ' +
-    'than to hide behind a hover. The line under the picture is the point of ' +
-    'this block: it names what was shortened.',
+    'A word is never allowed to run past a border and what is left over becomes an '
+    + 'ellipsis, and the line under the picture names what was shortened, because a cut is '
+    + 'a label to go and fix rather than to hide behind a hover.',
     '',
     (box) => diagramCase(box, {
       title: 'four boxes, three of them badly written',
@@ -1020,13 +973,9 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
   // names; stacked, the same arrow would cross the words `Raspberry Pi` on
   // the way in, so it stops at the machine.
   section('a box inside a box',
-    'A machine and the programs on it are not one thing, and a `sub` under a ' +
-    'name draws them as one. A box can hold boxes instead: they are measured ' +
-    'like any other box and the container is measured from them plus its ' +
-    'padding, so nothing here is a guess. An arrow can name the machine or ' +
-    'one program on it, and a program takes the colour of the machine it ' +
-    'runs in. The hue says where something runs, so a box inside a purple ' +
-    'one is purple.',
+    'A machine and the programs on it are not one thing, so a box can hold boxes: the '
+    + 'container is measured from its children, and a program takes the colour of the '
+    + 'machine it runs in.',
     `nodes: [{ id: 'pi', label: 'Raspberry Pi', kind: 'device', children: [
             { id: 'synth', label: 'synthesiser', sub: 'plays the note' },
             { id: 'rec',   label: 'recorder',    sub: 'keeps a minute' }] }]
@@ -1072,15 +1021,9 @@ links: [{ from: 'you', to: 'synth', label: 'note number' },   // into a box INSI
   // boxes nothing was declared between still has its tie, which is what makes
   // this a picture of the rule rather than of a special case.
   section('an arrow between two boxes in one machine',
-    'Boxes inside one container used to be tied together with a plain line ' +
-    'and nothing else, and an arrow asked for between two of them was thrown ' +
-    'away with a warning nobody read. It is drawn now, and it takes the tie\'s ' +
-    'place rather than being drawn over it. Two boxes next to each other get ' +
-    'the arrow in the gap they already share; one that reaches past the box ' +
-    'between them gets a lane inside the machine, because down the middle it ' +
-    'would pass straight through a box it never visits. Neither carries a ' +
-    'name: the gap is a few pixels tall, so the direction is the whole ' +
-    'message and what travels goes in the note you get by hovering it.',
+    'An arrow between two boxes in one machine takes the tie\'s place rather than being '
+    + 'drawn over it, in the gap the two share or in a lane inside the machine when it has '
+    + 'to reach past the box between them.',
     `children: [{ id: 'in',    label: 'the capture' },
            { id: 'synth', label: 'synthesiser' },
            { id: 'rec',   label: 'recorder' }]
@@ -1131,10 +1074,8 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
     });
 
   section('two return paths that must not overlap',
-    'A return path runs UNDER the row, never back between the boxes. Two ' +
-    'lines between the same pair of boxes and the eye cannot tell the way out ' +
-    'from the way home. Two of them go at different depths, shortest nearest ' +
-    'the boxes, so neither is hidden under the other.',
+    'A return path runs under the row rather than back between the boxes, and two of them '
+    + 'go at different depths so that neither is hidden under the other.',
     '',
     (box) => diagramCase(box, {
       title: 'sound out, and two things sent back',
@@ -1166,14 +1107,9 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // apart was drawn at the midpoint, i.e. under that box. Seeing one width
   // could not have caught it, so the block shows both.
   section('a branch, and the box it must not be drawn through',
-    'The same four settings go to a copy of the machine in this page and out ' +
-    'to a copy on a board somewhere else, so one box has two arrows leaving ' +
-    'it. An arrow that reaches past the box in its way is routed round the ' +
-    'outside rather than drawn through it: over the row when the picture runs ' +
-    'left to right, and down the right-hand side when it is stacked, which is ' +
-    'the side the return paths do not use. The same description is drawn twice ' +
-    'here, at a laptop width and at a phone width, because this is the one ' +
-    'case where the two disagreed.',
+    'An arrow that reaches past the box in its way is routed round the outside rather '
+    + 'than through it, drawn here at two widths because this is the one case where the two '
+    + 'disagreed.',
     '',
     (box) => {
       const branch = {
@@ -1211,10 +1147,8 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
     });
 
   section('the same picture at the width of a phone',
-    'Below about 560 px the whole thing becomes one column, top to bottom, in ' +
-    'the order the signal takes, and the return paths move to the left-hand ' +
-    'gutter. A left-to-right diagram on a phone is a diagram nobody reads. ' +
-    'Nothing in the description changes; only the drawing does.',
+    'Below about 560 px the whole picture becomes one column in the order the signal '
+    + 'takes, because a left-to-right diagram on a phone is a diagram nobody reads.',
     '',
     (box) => diagramCase(box, {
       title: 'a key press, and what it costs',
@@ -1244,10 +1178,9 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // check against another page's copy of it, which is the one thing this page
   // exists to make possible.
   section('rows in columns you declare',
-    'Every column is named by the caller: a width or a share of what is left, an '
-    + 'alignment, a link, and whether the text may be cut. It THROWS unless exactly '
-    + 'one column grows, because two growing columns is a layout nobody asked for '
-    + 'and none is a table that does not fill its box.',
+    'Every column is named by the caller, and it throws unless exactly one of them grows, '
+    + 'because two growing columns is a layout nobody asked for and none is a table that '
+    + 'does not fill its box.',
     `createTable({ columns: [
   { key: 'dir',  width: 52, hi: true },
   { key: 'text', grow: true },
