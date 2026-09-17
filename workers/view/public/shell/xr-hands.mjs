@@ -152,7 +152,22 @@ const DEG = 180 / Math.PI;
  *        shipper — `createShipper` holds for 2 s and entering an immersive
  *        session is exactly when timers stop being generous.
  */
-export function createXRHands({ tablet = null, log = () => {}, say = () => {} } = {}) {
+/**
+ * @param {object} [o]
+ * @param {object|null} [o.tablet]   the tablet component, or null for none.
+ * @param {() => boolean} [o.tabletShown]
+ *   🔴 IS THE TABLET ACTUALLY IN THE SCENE THIS FRAME. It is a PREDICATE rather
+ *   than a flag because the answer moves: a page decides whether it wants the
+ *   slab, and a passthrough session refuses it whatever the page decided
+ *   (`environmentBlendMode`, never the session's name). Without this the hands
+ *   go on hit-testing a slab nobody can see — `over` goes true when the ray
+ *   crosses where it WOULD be, and a page that refuses a grab while the ray is
+ *   on the tablet silently stops working for a reason there is nothing on
+ *   screen to explain. That is an invisible control eating presses, which is
+ *   the exact failure shape this repo keeps paying for.
+ */
+export function createXRHands({ tablet = null, tabletShown = () => true,
+  log = () => {}, say = () => {} } = {}) {
   const state = {
     sources: 0,            // how many were in inputSources
     tracked: 0,            // how many were in trackedSources
@@ -362,7 +377,11 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
       }
 
       // ── the tablet ──────────────────────────────────────────────────────
-      state.tabletM = tabletSrc ? holdM(tabletSrc.m) : null;
+      // ⚠️ NOTHING IS HIT-TESTED AGAINST A SLAB THAT IS NOT DRAWN. See
+      // `tabletShown` at the top of this function for what that costs when it
+      // is got wrong.
+      const shown = !!tablet && tabletShown() !== false;
+      state.tabletM = (shown && tabletSrc) ? holdM(tabletSrc.m) : null;
       if (state.tabletM) {
         at('the tablet placed',
           `on ${tabletSrc.where}:${tabletSrc.handedness}`
@@ -382,7 +401,7 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
       // ninety presses, and index 0 is the registry's own `xr-standard-trigger`
       // rather than a guess — see BUTTON above.
       const down = !!pointSrc?.src.gamepad?.buttons?.[BUTTON.trigger]?.pressed;
-      if (tablet) {
+      if (tablet && shown) {
         tablet.aim(state.hit);
         if (down && !state.trigger) tablet.press(state.hit);
         else if (down) tablet.drag(state.hit);

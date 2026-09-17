@@ -27,10 +27,56 @@ import { join } from 'node:path';
 import { pickQuad, uvToPixels } from './xr-pick.mjs';
 import {
   controlAt, valueFromU, DEFAULT_CONTROLS, TABLET, MONO_ADV,
-  isButton, btnLabelW, createXRTablet,
+  isButton, btnLabelW, createXRTablet, QUIT_CONTROL,
 } from './xr-tablet.mjs';
-import { holdM, GRIP_PARTS, FACE_TILT, BODY_PROFILE } from './xr-room.mjs';
+import { holdM, GRIP_PARTS, FACE_TILT, BODY_PROFILE, boundaryOf, wallYaw } from './xr-room.mjs';
 import { dedupe, SAME_THING_M } from './xr-hands.mjs';
+
+/**
+ * 🔴 A COPY OF `xr-tablet.mjs` WITH EXTRA CONTROLS IN ITS ARRAY, LOADED FOR
+ * REAL. Every layout number in that module is derived at load from
+ * `DEFAULT_CONTROLS`, so pushing onto the array afterwards changes the list and
+ * not the canvas — the rows would be laid out for a shorter tablet and the hit
+ * test would answer about a row that is off the bottom. Rewriting the source
+ * and importing it is the only way to ask the real arithmetic a question about
+ * a different list. The "one line" test at the bottom of this file already did
+ * exactly this; it is a function now because the button needs it too.
+ *
+ * @param {string} lines  control literals, inserted at the TOP of the array
+ * @param {string} tail   control literals, inserted at the BOTTOM of it
+ */
+async function moduleWith(lines = '', tail = '') {
+  const src = readFileSync(new URL('./xr-tablet.mjs', import.meta.url), 'utf8');
+  const head = 'export const DEFAULT_CONTROLS = [\n';
+  let marked = src.replace(head, `${head}${lines}`);
+  if (tail) {
+    // ⚠️ THE ARRAY'S OWN CLOSING BRACKET, FOUND FROM ITS OPENING ONE. A plain
+    // `replace('\n];\n')` matches the first such line in the FILE, which is
+    // whatever happens to be declared above — and the insert would land in
+    // somebody else's literal while still producing a module that loads.
+    const at = marked.indexOf(head);
+    const close = marked.indexOf('\n];\n', at);
+    marked = `${marked.slice(0, close + 1)}${tail}${marked.slice(close + 1)}`;
+  }
+  const tmp = join(tmpdir(), `xr-tablet-${process.pid}-${Math.random().toString(36).slice(2)}.mjs`);
+  try {
+    writeFileSync(tmp, marked);
+    return { mod: await import(`file://${tmp}`), why: '' };
+  } catch (e) { return { mod: null, why: `${e.name}: ${e.message}` }; }
+  finally { try { rmSync(tmp); } catch { /* it may not have been written */ } }
+}
+
+/**
+ * 🔴 THE TABLET WITH ITS BUTTON BACK, WHICH IS THE ONLY PLACE THE BUTTON KIND
+ * STILL EXISTS. `QUIT_CONTROL` came off `DEFAULT_CONTROLS` on 2026-09-17 — one
+ * way out of a session, and it is a hold on any controller button, not a slab
+ * in your other hand. The KIND it is the only instance of costs a branch in the
+ * layout, the hit test, the input and the state, so it is graded against a copy
+ * of the module that still ships it rather than left as four untested branches.
+ * ⚠️ This is what the module looks like if somebody appends the control again,
+ * which is the documented way to put it back in a scene.
+ */
+const WITH_QUIT = await moduleWith('', '  QUIT_CONTROL,\n');
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -342,19 +388,33 @@ const at = (target) => {
 // cannot be made to fire is a way out that is not there — both of them are
 // arithmetic on a clock and a rectangle, and both are graded here rather than
 // on a head.
-const BTN_C = DEFAULT_CONTROLS.find(isButton);
+// ⚠️ THE CONTROL AND THE MODULE IT LIVES IN ARE BOTH THE COPY'S. Reading
+// `QUIT_CONTROL` from the shipped module and hit-testing it against the
+// shipped `controlAt` would ask a tablet laid out for one row about a second
+// row, and the honest answer to that is `null` — which is what it said before
+// this line existed.
+const QT = WITH_QUIT.mod;
+const QCONTROLS = QT?.DEFAULT_CONTROLS ?? [];
+const BTN_C = QCONTROLS.find(isButton) ?? null;
 /** The middle of the button's own rectangle, in the tablet's u,v. */
 const btnUV = () => {
-  const i = DEFAULT_CONTROLS.indexOf(BTN_C);
-  const top = TABLET.rowsTop + i * TABLET.rowH + (TABLET.rowContent - TABLET.btn.h) / 2;
-  return { u: (TABLET.btn.x + TABLET.btn.w / 2) / TABLET.designW,
-           v: (top + TABLET.btn.h / 2) / TABLET.designH };
+  const i = QCONTROLS.indexOf(BTN_C);
+  const top = QT.TABLET.rowsTop + i * QT.TABLET.rowH + (QT.TABLET.rowContent - QT.TABLET.btn.h) / 2;
+  return { u: (QT.TABLET.btn.x + QT.TABLET.btn.w / 2) / QT.TABLET.designW,
+           v: (top + QT.TABLET.btn.h / 2) / QT.TABLET.designH };
 };
 {
+  ok('the shipped tablet has no way out on it any more, and the button kind is still gradable',
+     !DEFAULT_CONTROLS.some(isButton) && !!BTN_C && BTN_C.key === QUIT_CONTROL.key
+     && BTN_C.leaves === true,
+     !QT ? `the copy would not load: ${WITH_QUIT.why}`
+         : `shipped: [${DEFAULT_CONTROLS.map((c) => c.key).join(', ')}]`
+           + ` · graded against a copy carrying "${BTN_C?.label}"`);
+
   const mid = btnUV();
-  const at = controlAt(mid.u, mid.v);
+  const at = QT.controlAt(mid.u, mid.v);
   ok('the last row of the tablet is the way out, and it is a button rather than a slider',
-     !!at && at.control === BTN_C && isButton(at.control) && at.i === DEFAULT_CONTROLS.length - 1,
+     !!at && at.control === BTN_C && isButton(at.control) && at.i === QCONTROLS.length - 1,
      at ? `${at.control.key} · "${at.control.label}" · held ${at.control.hold} ms` : 'nothing there');
 
   // 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THE WHOLE DESIGN RESTS ON. A slider
@@ -363,13 +423,13 @@ const btnUV = () => {
   // of air its focus ring sits in, from the gap below it, and from the margins
   // either side. Four places you never meant to press, on the one control whose
   // press cannot be taken back.
-  const i = DEFAULT_CONTROLS.indexOf(BTN_C);
-  const top = TABLET.rowsTop + i * TABLET.rowH + (TABLET.rowContent - TABLET.btn.h) / 2;
-  const vAt = (py) => py / TABLET.designH;
-  const above = controlAt(mid.u, vAt(top - TABLET.kit.btnRingOffset));
-  const below = controlAt(mid.u, vAt(top + TABLET.btn.h + TABLET.kit.rowGap / 2));
-  const leftOf = controlAt((TABLET.btn.x / 2) / TABLET.designW, mid.v);
-  const rightOf = controlAt((TABLET.designW - TABLET.btn.x / 2) / TABLET.designW, mid.v);
+  const i = QCONTROLS.indexOf(BTN_C);
+  const top = QT.TABLET.rowsTop + i * QT.TABLET.rowH + (QT.TABLET.rowContent - QT.TABLET.btn.h) / 2;
+  const vAt = (py) => py / QT.TABLET.designH;
+  const above = QT.controlAt(mid.u, vAt(top - QT.TABLET.kit.btnRingOffset));
+  const below = QT.controlAt(mid.u, vAt(top + QT.TABLET.btn.h + QT.TABLET.kit.rowGap / 2));
+  const leftOf = QT.controlAt((QT.TABLET.btn.x / 2) / QT.TABLET.designW, mid.v);
+  const rightOf = QT.controlAt((QT.TABLET.designW - QT.TABLET.btn.x / 2) / QT.TABLET.designW, mid.v);
   ok('...and only its own rectangle is it: not the ring\'s air, the gap, or the margins',
      above === null && below === null && leftOf === null && rightOf === null,
      `above ${above === null} · below ${below === null} · left ${leftOf === null} · right ${rightOf === null}`);
@@ -378,8 +438,8 @@ const btnUV = () => {
   // the same monospace assumption `HEAD_W` makes, checked against a different
   // box. The PAGE measures the real face against this number.
   ok('the button is wide enough for the words on it',
-     btnLabelW(BTN_C) <= TABLET.btn.w,
-     `"${BTN_C.label}" needs ${btnLabelW(BTN_C).toFixed(0)} of ${TABLET.btn.w} design px`);
+     btnLabelW(BTN_C) <= QT.TABLET.btn.w,
+     `"${BTN_C.label}" needs ${btnLabelW(BTN_C).toFixed(0)} of ${QT.TABLET.btn.w} design px`);
 }
 
 // ── the hold, with no clock to wait for ───────────────────────────────────
@@ -395,13 +455,19 @@ globalThis.document = {
   createElement: () => ({ width: 0, height: 0, getContext: () => ({}) }),
 };
 globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
+
+// ⚠️ EVERY TABLET BELOW IS THE COPY'S, NOT THE SHIPPED MODULE'S. The hold, the
+// abort and the `applyAll` guard are all properties of the BUTTON KIND, and the
+// shipped list has no button on it since 2026-09-17 — driving the shipped
+// `createXRTablet` at the button's coordinates would press empty canvas and
+// every one of these checks would pass vacuously.
 {
   const hit = (uv) => ({ t: 0.3, u: uv.u, v: uv.v, front: true });
   const mid = btnUV();
   const SPAN = BTN_C.hold;
   const build = () => {
     let left = 0;
-    const t = createXRTablet({ ctx: { left: () => { left++; } } });
+    const t = QT.createXRTablet({ ctx: { left: () => { left++; } } });
     return { t, fired: () => t.fired(), leftCount: () => left };
   };
 
@@ -467,7 +533,7 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
   // too many things in it.
   {
     let dots = null, left = 0;
-    const t = createXRTablet({ ctx: { room: { setGrid: ({ alpha }) => { dots = alpha; } }, left: () => { left++; } } });
+    const t = QT.createXRTablet({ ctx: { room: { setGrid: ({ alpha }) => { dots = alpha; } }, left: () => { left++; } } });
     t.applyAll();
     ok('opening a session pushes the sliders and does NOT fire the way out',
        dots !== null && left === 0 && t.fired().length === 0,
@@ -502,32 +568,113 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
   // the module with ONE line added to its array, imported and measured. The
   // canvas grows by exactly one row, the new row hit-tests, and the fingerprint
   // counts three.
-  const src = readFileSync(new URL('./xr-tablet.mjs', import.meta.url), 'utf8');
   const line = "  { key: 'probe', label: 'probe', unit: 'x', min: 0, max: 10, value: 5, apply: () => {} },\n";
-  const marked = src.replace('export const DEFAULT_CONTROLS = [\n',
-                             `export const DEFAULT_CONTROLS = [\n${line}`);
-  const tmp = join(tmpdir(), `xr-tablet-one-line-${process.pid}.mjs`);
-  let three = null, why = '';
-  try {
-    writeFileSync(tmp, marked);
-    three = await import(`file://${tmp}`);
-  } catch (e) { why = `${e.name}: ${e.message}`; }
-  finally { try { rmSync(tmp); } catch { /* it may not have been written */ } }
+  const { mod: two, why } = await moduleWith(line);
 
-  const grew = three && three.TABLET.designH === TABLET.designH + TABLET.rowH;
-  const rowMid = three
-    ? three.controlAt(0.5, (TABLET.rowsTop + 2 * TABLET.rowH + TABLET.rowContent / 2) / three.TABLET.designH)
+  const grew = two && two.TABLET.designH === TABLET.designH + TABLET.rowH;
+  // The SECOND row of the copy, which is the control that was already there.
+  // ⚠️ The line is inserted at the TOP, so the new control is row 0 and the
+  // shipped one moves down — which is the half of "one line" worth checking,
+  // because a layout that only ever appends never has to move anything.
+  const rowMid = two
+    ? two.controlAt(0.5, (TABLET.rowsTop + TABLET.rowH + TABLET.rowContent / 2) / two.TABLET.designH)
     : null;
   ok('a second control of a kind that already exists really is ONE LINE',
-     !!three && three.TABLET.controls.length === DEFAULT_CONTROLS.length + 1 && grew
-     && three.TABLET.fingerprint.includes('3 control(s)')
-     && three.TABLET.fingerprint.includes('probe 0..10x')
-     && rowMid?.control?.key === BTN_C.key
-     && Math.abs(three.TABLET.lane.w - TABLET.lane.w) < 1e-9,
-     three
-       ? `${three.TABLET.controls.length} controls · ${TABLET.designH} -> ${three.TABLET.designH} design px`
-         + ` · the lane is still ${three.TABLET.lane.w} · ${three.TABLET.fingerprint.match(/\[[^\]]*\]/)?.[0]}`
+     !!two && two.TABLET.controls.length === DEFAULT_CONTROLS.length + 1 && grew
+     && two.TABLET.fingerprint.includes(`${DEFAULT_CONTROLS.length + 1} control(s)`)
+     && two.TABLET.fingerprint.includes('probe 0..10x')
+     && rowMid?.control?.key === DEFAULT_CONTROLS[0].key
+     && Math.abs(two.TABLET.lane.w - TABLET.lane.w) < 1e-9,
+     two
+       ? `${two.TABLET.controls.length} controls · ${TABLET.designH} -> ${two.TABLET.designH} design px`
+         + ` · the lane is still ${two.TABLET.lane.w} · ${two.TABLET.fingerprint.match(/\[[^\]]*\]/)?.[0]}`
        : `the copy would not load: ${why}`);
+}
+
+// ── which of your room's surfaces get dots ────────────────────────────────
+//
+// 🔴 THE DOUBLED FLOOR, GRADED WITHOUT A HEADSET. Reported 2026-09-17 as
+// *"window seems to have doubled dots somehow when having moving panels"*. The
+// grid writes no depth and nothing opaque stands between its quads, so every
+// surface handed to it is superimposed on every other one in the same look — a
+// bed at 0.5 m over a floor at 0 is two parallel dot fields in one place. The
+// list below is the eleven surfaces a Quest 3 reported in this repo on
+// 2026-09-13, by name, so this is the real shape of the problem rather than an
+// invented one.
+{
+  const q = (label, y, vertical) => ({ label, y, vertical });
+  const room = [
+    q('floor', 0.00, false), q('ceiling', 2.45, false),
+    q('wall', 1.2, true), q('wall', 1.2, true), q('wall', 1.2, true), q('wall', 1.2, true),
+    q('door', 1.0, true), q('window', 1.3, true),
+    q('bed', 0.52, false), q('shelf', 1.10, false), q('shelf', 1.55, false),
+  ];
+  const shell = boundaryOf(room);
+  const flat = shell.filter((x) => !x.vertical);
+  ok('dots go on the room, not on what is standing in it',
+     shell.length === 8 && flat.length === 2
+     && flat.some((x) => x.label === 'floor') && flat.some((x) => x.label === 'ceiling')
+     && !shell.some((x) => ['bed', 'shelf'].includes(x.label)),
+     `${room.length} surfaces in, ${shell.length} dotted: [${shell.map((x) => x.label).join(', ')}]`);
+
+  // 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THIS RULE COULD EASILY GET WRONG.
+  // Exactly ONE horizontal surface may be the ground. A rule that kept every
+  // horizontal plane below head height would keep the bed and draw the bug it
+  // was written to remove.
+  const twoLow = boundaryOf([q('other', 0.00, false), q('other', 0.45, false)]);
+  ok('...and only ONE surface is ever the ground, even with nothing labelled',
+     twoLow.length === 1 && twoLow[0].y === 0,
+     `two unlabelled horizontals at 0.00 and 0.45 m · kept the one at ${twoLow[0].y.toFixed(2)}`);
+
+  // 🔴 NEGATIVE CONTROL: a runtime that classifies nothing must not end up with
+  // an empty room. An empty shell reads as "your room has no surfaces", which
+  // is a claim about somebody's room made out of our own failure to sort one.
+  const blind = [{ label: 'unlabelled', y: 0, vertical: false }];
+  ok('...and a runtime that says nothing useful still gets its surfaces drawn',
+     boundaryOf(blind).length === 1 && boundaryOf([]).length === 0,
+     'one unlabelled surface stays one; an empty list stays empty');
+}
+
+// ── which way round your room is ──────────────────────────────────────────
+//
+// 🔴 THE ANGLE A BRICK HAS TO BE TURNED BY TO MEET A REAL WALL SQUARELY.
+// Reported 2026-09-17 about `/blocks/`: *"in xr blocks are angled against wall,
+// rotated a bit, not fully against wall"*. Nothing rotated the bricks; the
+// bricks are square to the REFERENCE SPACE and the room is not.
+{
+  const DEG = Math.PI / 180;
+  /** A wall whose normal points at `deg`, `area` square metres of it. */
+  const wall = (deg, area = 6) => ({
+    vertical: true, size: [area / 2, 2], n: [Math.sin(deg * DEG), 0, Math.cos(deg * DEG)],
+  });
+  const four = (deg) => [wall(deg), wall(deg + 90), wall(deg + 180), wall(deg + 270)];
+
+  const got = wallYaw(four(17));
+  ok('four walls of a room turned 17° say the room is turned 17°',
+     Math.abs(got / DEG - 17) < 0.01,
+     `${(got / DEG).toFixed(3)}° from four normals 90° apart`);
+
+  // 🔴 NEGATIVE CONTROL, AND IT IS THE ONE A PLAIN MEAN FAILS. Four directions
+  // ninety degrees apart average to NOTHING — north and east average to
+  // north-east, and all four cancel — so an implementation that did not fold by
+  // four would read 45° here, or 0, or whatever the rounding gave it.
+  const square = wallYaw(four(0));
+  ok('...and a room square to the headset asks for no turn at all',
+     Math.abs(square) < 1e-9, `${(square / DEG).toFixed(6)}°`);
+
+  // 🔴 NEGATIVE CONTROL: no walls is 0, and 0 is what every page did before
+  // this function existed. A room nobody measured must not turn anything.
+  ok('...and with nothing measured it asks for no turn either',
+     wallYaw([]) === 0 && wallYaw([{ vertical: false, n: [0, 1, 0], size: [4, 4] }]) === 0,
+     'an empty list and a floor both read 0');
+
+  // 🔴 AREA IS THE WEIGHT, AND THIS IS WHAT SAYS SO. One 8 m² wall at 20°
+  // against a 0.2 m² sliver at 40°: the answer has to sit next to the wall, not
+  // half way between them. An unweighted mean would read 30°.
+  const mixed = wallYaw([{ ...wall(20), size: [4, 2] }, { ...wall(40), size: [0.1, 2] }]);
+  ok('...and a big wall outvotes a sliver beside a door',
+     Math.abs(mixed / DEG - 20) < 1.2 && Math.abs(mixed / DEG - 30) > 8,
+     `8 m² at 20° and 0.2 m² at 40° give ${(mixed / DEG).toFixed(2)}°, and an unweighted mean would give 30°`);
 }
 
 {

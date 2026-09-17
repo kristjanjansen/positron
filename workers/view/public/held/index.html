@@ -134,13 +134,7 @@
   import { buildText, ensureFont, DISPLAY, DISPLAY_WEIGHT, SPREAD } from './text.mjs';
   import { createXRControllers } from '/shell/xr-controller.mjs';
   import { createXRQuit } from '/shell/xr-quit.mjs';
-  // ⚠️ `HELD_RGB` IS IMPORTED RATHER THAN RETYPED, and it is the same constant
-  // the pointer already uses for "I have hold of this". A word the trigger has
-  // taken hold of goes the colour the ray goes, so the mark is the ray's own
-  // meaning carried onto the thing it landed on rather than a second vocabulary
-  // this page invented. Typing `1.0, 0.83, 0.0` here instead would be a shared
-  // measurement in two files, which is a measurement that will disagree.
-  import { createXRRay, eyeFromView, HELD_RGB } from '/shell/xr-ray.mjs';
+  import { createXRRay, eyeFromView } from '/shell/xr-ray.mjs';
 
   // ── the room ──────────────────────────────────────────────────────────────
   // 15 m across. A word sits ON a wall plane or a little way out from it, and
@@ -287,7 +281,20 @@
   const INK_ALPHA = 0.94;
   /** What a word is normally set in, and what one the trigger has hold of is. */
   const INK_RGB = [1, 1, 1];
-  const MARK_RGB = HELD_RGB;
+  /**
+   * 🔴 THE MARK'S COLOUR LIVES HERE NOW, AND IT USED TO BE THE RAY'S.
+   * It was `HELD_RGB` imported from `xr-ray.mjs` — the same yellow the pointer
+   * went when it had hold of something — on the argument that a marked word
+   * should be the ray's own meaning carried onto the thing it landed on. That
+   * argument died on 2026-09-17, when the ray became grey everywhere and
+   * `HELD_RGB` became WHITE: importing it would have painted a marked word the
+   * same white as every unmarked one, so the one thing this page's trigger does
+   * would have become invisible while every line of code still read as correct.
+   * ⚠️ The page's own check is what would have caught it — it counts pixels of
+   * the mark's colour against the ink's — which is why the number is worth
+   * having in one place that a shader and a check both read.
+   */
+  const MARK_RGB = [1.0, 0.83, 0.0];
 
   const d = mount({
     name: 'held',
@@ -306,7 +313,8 @@
       + 'keys to walk, and click a word to type your own over it, which grows '
       + 'as you shorten it. In a headset the sticks glide and turn, the trigger '
       + 'lights up the word you are pointing at so you can type over it, and '
-      + 'Run in AR puts the words in your own room. The letters stay sharp '
+      + 'Run in AR shrinks the whole room to fit yours and stands the words in '
+      + 'it. The letters stay sharp '
       + 'however close you walk, because a word is kept as a distance to its '
       + 'own edge rather than as a picture of itself.',
     // ⚠️ FOUR CELLS, ALL OF WHICH MOVE. A count of the words was the obvious
@@ -595,13 +603,45 @@ void main() {
   const built = [];       // {item, t, o, r, u, w, h, mpp}
   let fontReport = null;
 
+  /**
+   * 🔴 HOW BIG THE ROOM IS RIGHT NOW, AS ONE NUMBER. 1 on the page and in VR,
+   * `AR_SCALE` in passthrough.
+   *
+   * Reported 2026-09-17: *"texts in xr seems to be behind to walls sometime"*.
+   * This room is 15 m across with capitals up to 2.75 m tall, which is right
+   * for a room the page invents and is wrong for the one you are standing in:
+   * in passthrough the words are placed 7.5 m out, which is through the wall of
+   * any ordinary room. Nothing occludes them — a Quest composites passthrough
+   * without depth by default — so they are visible AND outside the room, which
+   * is exactly what "behind the walls" looks like from inside one.
+   *
+   * ⚠️ IT IS A UNIFORM SCALE, SO THE TYPOGRAPHY IS UNTOUCHED. Every position
+   * and every quad moves by one factor, so the relative sizes — which are the
+   * whole argument of this page — are identical and the room is simply smaller.
+   * ⚠️ AND IT SCALES ABOUT EYE HEIGHT, NOT ABOUT THE FLOOR. Scaling y about 0
+   * would take words standing at 1.3 to 3.5 m down to knee height, so you would
+   * be reading a room that had sunk. About `EYE_Y` they stay level with you.
+   * ⚠️ NOTHING IS RE-RASTERISED. `buildText` works in the word's own units and
+   * `place` is the only thing that knows about metres, so changing this is one
+   * pass of arithmetic over the list rather than eleven glyph atlases.
+   *
+   * 🔴 THE NUMBER IS A GUESS UNTIL A HEADSET SAYS OTHERWISE, and it is one
+   * constant so it can be moved in one place. 0.30 puts the walls at 2.25 m and
+   * the tallest capital at 0.83 m — a room you can stand in the middle of and
+   * still turn all the way round, which is what this page is. What it is NOT is
+   * a measurement of YOUR room: `plane-detection` would answer that and this
+   * page does not ask for it.
+   */
+  const AR_SCALE = 0.30;
+  let roomK = 1;
+
   function place(item, t) {
     const wall = WALLS[item.wall];
-    const w = t.wM, h = t.hM;
+    const w = t.wM * roomK, h = t.hM * roomK;
     const o = [
-      wall.c[0] + wall.right[0] * item.u + wall.nrm[0] * item.out,
-      item.y,
-      wall.c[2] + wall.right[2] * item.u + wall.nrm[2] * item.out,
+      (wall.c[0] + wall.right[0] * item.u + wall.nrm[0] * item.out) * roomK,
+      EYE_Y + (item.y - EYE_Y) * roomK,
+      (wall.c[2] + wall.right[2] * item.u + wall.nrm[2] * item.out) * roomK,
     ];
     return {
       item, t, o,
@@ -610,8 +650,30 @@ void main() {
       w, h,
       // one field texel in metres — what the readout's `magnified` is against,
       // and it comes from the same place the quad's size did
-      texelM: t.texelM ?? t.mpp,
+      texelM: (t.texelM ?? t.mpp) * roomK,
     };
+  }
+
+  /**
+   * Put the room at a size, in place.
+   *
+   * ⚠️ IT REPLACES THE OBJECTS IN `built`, so anything holding one has to be
+   * caught up — the same hazard `retext` already documents about the mark and
+   * the word being carried out of a session. Returns the factor it is at, so a
+   * check and a log line read the same value rather than two.
+   */
+  function setRoomScale(k) {
+    if (k === roomK) return roomK;
+    roomK = k;
+    for (let i = 0; i < built.length; i++) {
+      const was = built[i];
+      const nb = place(was.item, was.t);
+      built[i] = nb;
+      if (marked === was) marked = nb;
+      if (editing === was) editing = nb;
+      if (xrPending === was) xrPending = nb;
+    }
+    return roomK;
   }
 
   async function buildAll() {
@@ -920,10 +982,46 @@ void main() {
    * pending flag is cleared before the work rather than after it.
    */
   let liveWaiting = false;
+  /**
+   * 🔴 THE SESSION'S OWN rAF IN A HEADSET, AND THIS IS THE WHOLE OF THE BUG
+   * REPORTED 2026-09-17: *"text input appears in vr/ar but 3d type does not
+   * change nof after submit nor realtime"*.
+   *
+   * `window.requestAnimationFrame` DOES NOT FIRE while an immersive session is
+   * running — this repo has that written down in `demo/videoradio/index.html`
+   * and it is why every headset page here drives its picture from
+   * `session.requestAnimationFrame`. The rebuild above was scheduled on the
+   * WINDOW's, so inside a session the callback was queued and never ran: the
+   * wall never changed.
+   *
+   * ⚠️ AND IT LATCHED, WHICH IS WHY THE SECOND HALF OF THE REPORT IS THE SAME
+   * BUG. `liveWaiting` is set true before the callback and cleared inside it,
+   * so the first keystroke in a session parked it true FOREVER and every later
+   * keystroke returned at the first line. That is also why "after submit"
+   * failed: Return does not rebuild anything, it closes the field — the text on
+   * the wall is whatever the last `retext` put there, and in a session there
+   * had never been one.
+   *
+   * ⚠️ THE COALESCING IS THE POINT AND IT SURVIVES. `retext` rasterises a glyph
+   * atlas and uploads a texture; doing that inside the keydown of somebody
+   * typing quickly queues one upload per keystroke and the field goes sticky.
+   * One rebuild per drawn frame collapses a burst to what the eye can see —
+   * whichever clock is drawing.
+   */
+  const onNextFrame = (fn) => {
+    // ⚠️ ASK FOR THE METHOD, DO NOT ASSUME THE OBJECT HAS IT. The check block
+    // at the bottom of this page stands a stub in for `xrSession` — it has an
+    // `end` and nothing else — and an optional call on a missing method would
+    // schedule NOTHING and latch `liveWaiting`, which is the bug this function
+    // exists to fix, reintroduced by the thing grading it.
+    if (typeof xrSession?.requestAnimationFrame === 'function') {
+      xrSession.requestAnimationFrame(() => fn());
+    } else requestAnimationFrame(() => fn());
+  };
   function liveRetext() {
     if (liveWaiting || !editing) return;
     liveWaiting = true;
-    requestAnimationFrame(() => {
+    onNextFrame(() => {
       liveWaiting = false;
       if (!editing) return;
       const nb = retext(editing, typeEl.value);
@@ -1173,6 +1271,18 @@ void main() {
       // bug rather than as a session one.
       xrBlend = session.environmentBlendMode || '';
       clearAlpha = xrBlend === 'opaque' ? 1 : 0;
+      // 🔴 THE ROOM SHRINKS TO FIT YOURS, AND THE TEST IS THE BLEND MODE.
+      // *"texts in xr seems to be behind to walls sometime"* — see `AR_SCALE`.
+      // ⚠️ NOT THE SESSION'S NAME. CLAUDE.md records that a session can be
+      // called `immersive-ar` and still composite `opaque`, and then there is
+      // no real room behind the page to be inside of: shrinking it on the name
+      // would put a small room in a black void for no reason anybody could see.
+      const composited = xrBlend === 'alpha-blend' || xrBlend === 'additive';
+      const k = setRoomScale(composited ? AR_SCALE : 1);
+      if (composited) {
+        d.log(`your room is smaller than this one, so it is at ${(k * 100).toFixed(0)}% `
+          + `— the walls stand ${(R * k).toFixed(2)} m out instead of ${R}`, 'hi');
+      }
       // ⚠️ ASKED OF THE SESSION, NOT OF THE REQUEST. `optionalFeatures` says what
       // was wanted; `domOverlayState` says what was granted, and the two differ
       // on every runtime that does not implement it.
@@ -1200,14 +1310,16 @@ void main() {
       // ⚠️ THE LABEL IS ON THE CONTROLLER, so this line says what the sticks do
       // and lets the badge speak for itself. A log line is behind your face in
       // an immersive session; it is the one place an instruction cannot be read.
+      // ⚠️ NO LABEL AND NO BUTTON PASSED. The defaults are the site's decision —
+      // any button, held three seconds — and a page that retypes them can
+      // disagree with the module about how somebody leaves it.
       xrQuit = createXRQuit(gl, {
-        label: 'Quit',
         onQuit: () => { d.log('held to quit, leaving', 'hi'); session.end().catch(() => {}); },
       });
       d.log('left stick glides, right stick turns in steps, and the trigger '
         + (overlay || sysKeyboard ? 'types over whatever you are pointing at'
           : 'marks whatever you are pointing at, to type when you come out')
-        + '; hold the button under your thumb to leave', 'hi');
+        + '; hold any controller button for three seconds to leave', 'hi');
       // 🔴 `overlay` IS THE ONE MEASUREMENT THAT SETTLES WHAT THIS PAGE SHOULD
       // DO, AND IT IS PUBLISHED SO A HARNESS CAN READ IT. Whether a runtime will
       // put a text field inside an immersive session is a fact about the runtime
@@ -1228,6 +1340,13 @@ void main() {
       session.addEventListener('select', xrAim);
       session.addEventListener('end', () => {
         xrSession = null; clearAlpha = 1; overlay = false; sysKeyboard = false;
+        setRoomScale(1);              // the page's own room is the full-size one
+        // ⚠️ A REBUILD QUEUED ON THE SESSION'S OWN rAF NEVER RUNS ONCE THE
+        // SESSION HAS GONE, and the flag it set would stay true for the rest of
+        // the page's life — every later keystroke would return at the first
+        // line of `liveRetext` and the wall would stop following the field. The
+        // window loop restarts below, so the next keystroke schedules again.
+        liveWaiting = false;
         xrQuit?.reset();
         if (window.__demo.xr) window.__demo.xr.presenting = false;
         d.log('back on the page', 'hi'); requestAnimationFrame(frame);
@@ -1253,12 +1372,19 @@ void main() {
     } catch (e) { d.log(`${mode} did not start: ${e.message}`, 'bad'); }
   }
 
-  // 🔴 ONE LABELLED BUTTON, HELD — and "any button leaves" is gone. That rule
-  // made every button a trap: you could not rest a thumb anywhere, and the page
-  // never said which button had done it. `xr-quit.mjs` puts the words on the
-  // controller, fills a ring while you hold, and cancels the moment you let go.
-  // The dead-man's switch below is unchanged and is NOT this: it covers the
+  // 🔴 ONE WAY OUT: ANY BUTTON, HELD FOR THREE SECONDS. A TAP on any button
+  // used to leave, which made every button a trap — you could not rest a thumb
+  // anywhere, and the page never said which button had done it. The button was
+  // never the fault; the tap was. `xr-quit.mjs` fills a ring at the controller
+  // while you hold, and cancels to zero the moment you let go.
+  // ⚠️ The dead-man's switch above is unchanged and is NOT this: it covers the
   // case where the page threw and there is no ring to hold.
+  //
+  // 🔴 AND NOTHING DRAWS A CONTROLLER ANY MORE. 2026-09-17: *"rm controller
+  // geometry/tablet on all (only if i am ask on specific demo so keep that code
+  // ready to pop into scene)"*. `demo/shell/xr-controller.mjs` is untouched and
+  // `xrControllers.want()` still fetches, reads and uploads the model, so the
+  // hands come back with one line in the per-eye loop below.
   const xrControllers = createXRControllers(gl, { log: (m) => d.log(m) });
   const xrAimRay = createXRRay(gl);
   const aimLand = new Map();
@@ -1363,7 +1489,8 @@ void main() {
       // front of your own hand; drawn in a second pass they would need the
       // depth buffer this one already has.
       if (grips.length) {
-        xrControllers.draw(eyeVP, grips);
+        // The hands would be drawn here: `xrControllers.draw(eyeVP, grips);`
+        // See the note by `xrControllers` for why they are not.
         xrQuit?.draw(eyeVP, grips.map((h) => h.grip), eyeFromView(eyeView));
       }
       // ⚠️ THE RAY IS DRAWN PER EYE AND TURNED IN THE VERTEX SHADER. A ribbon
@@ -2114,6 +2241,60 @@ void main() {
         + `${unkLit ? 'the word lit' : 'THE WORD DID NOT LIGHT'}, `
         + `session ended ${endedUnk} time(s)`);
 
+      /**
+       * 🔴 THE WALL FOLLOWS THE KEYSTROKE *INSIDE A SESSION*, WHICH IS WHAT IT
+       * DID NOT DO. Reported 2026-09-17: *"text input appears in vr/ar but 3d
+       * type does not change nof after submit nor realtime"*. `liveRetext`
+       * scheduled its rebuild on `window.requestAnimationFrame`, which does not
+       * fire while an immersive session is running — so the callback was queued
+       * and never ran, the flag it had set stayed true, and every later
+       * keystroke returned at the first line.
+       *
+       * ⚠️ THE STUB COUNTS THE CALLS AND THEN RUNS THEM, so this grades BOTH
+       * halves: that the work was handed to the session's clock rather than the
+       * window's, and that the wall really changed when it ran. A check that
+       * only counted the schedule would pass on a rebuild that threw.
+       * ⚠️ AND IT IS A NEGATIVE CONTROL AS WELL: `winFrames` must stay at zero.
+       * Scheduling on both clocks would look identical from the wall.
+       */
+      {
+        const keepWord = target.item.text;
+        let sessFrames = 0, winFrames = 0;
+        const realRaf = window.requestAnimationFrame;
+        window.requestAnimationFrame = (fn) => { winFrames++; return realRaf.call(window, fn); };
+        const queued = [];
+        xrSession = { end: () => Promise.resolve(),
+          requestAnimationFrame: (fn) => { sessFrames++; queued.push(fn); return 1; } };
+        openTyping(target, 'the check', { keepMark: true });
+        typeEl.value = 'ELK';
+        liveRetext();                       // one keystroke
+        typeEl.value = 'ELKS';
+        liveRetext();                       // ...and another, before the first ran
+        const coalesced = sessFrames;
+        for (const fn of queued.splice(0)) fn(0, null);
+        const wallNow = built.find((b) => b.item.text === 'ELKS') || null;
+        // ...and a third, to prove the flag cleared rather than latching.
+        typeEl.value = 'ELM';
+        liveRetext();
+        const again = sessFrames;
+        for (const fn of queued.splice(0)) fn(0, null);
+        const wallAfter = built.find((b) => b.item.text === 'ELM') || null;
+        const editingNow = editing;
+        closeTyping();
+        window.requestAnimationFrame = realRaf;
+        d.assert('typing inside a headset session changes the wall, on the session’s own clock',
+          coalesced === 1 && winFrames === 0 && !!wallNow
+          && again === 2 && !!wallAfter && editingNow === wallAfter,
+          `two keystrokes asked the session for ${coalesced} frame and the window for ${winFrames}`
+          + ` · the wall read "${wallNow ? wallNow.item.text : 'UNCHANGED'}"`
+          + ` · a third keystroke asked for ${again - coalesced} more and the wall read`
+          + ` "${wallAfter ? wallAfter.item.text : 'UNCHANGED'}"`
+          + ` · the field is on ${editingNow ? `"${editingNow.item.text}"` : 'nothing'},`
+          + ` ${editingNow === wallAfter ? 'the same object the wall has' : 'a DIFFERENT object from the wall’s'}`);
+        // Put the word back, through the same path that changed it.
+        if (editingNow) retext(editingNow, keepWord);
+      }
+
       overlay = keepOverlay; sysKeyboard = keepSys;
       pos = keepPos; turn = keepTurn;
       markWord(null); xrPending = null;
@@ -2145,6 +2326,54 @@ void main() {
           ? `with a field allowed, the same press opened it on "${target.item.text}" `
             + `rather than marking, and left ${markedToo ? 'a word lit as well' : 'nothing lit'}`
           : 'the press did not open the field on the word it landed on');
+    }
+
+    /**
+     * 🔴 IN PASSTHROUGH THE ROOM FITS A ROOM. Reported 2026-09-17: *"texts in
+     * xr seems to be behind to walls sometime"*. This room is 15 m across and
+     * an ordinary one is four, so every word was standing outside the walls you
+     * are actually looking at — and a Quest composites passthrough with no
+     * depth, so they stayed visible out there, which is what "behind the walls"
+     * looks like from inside.
+     *
+     * ⚠️ THREE THINGS, AND THE THIRD IS THE ONE THAT IS EASY TO GET WRONG. The
+     * words have to come INSIDE; their sizes have to come with them, or the
+     * room shrinks around type that does not and the words collide; and the
+     * whole thing has to scale about EYE HEIGHT rather than about the floor, or
+     * a room of words standing between 1.3 and 3.5 m sinks to knee height and
+     * you end up reading your own feet.
+     * ⚠️ A HEADSET IS STILL WHAT SAYS WHETHER 30% IS THE RIGHT NUMBER. What is
+     * graded here is that the arithmetic does what it claims, in both
+     * directions, and that going back leaves the page exactly as it was.
+     */
+    {
+      const before = built.map((b) => ({ o: [...b.o], w: b.w, h: b.h }));
+      setRoomScale(AR_SCALE);
+      const small = built.map((b, i) => ({ b, was: before[i] }));
+      // ⚠️ AGAINST WHAT IT WAS, NOT AGAINST `R`. A word sits along a wall and can
+      // stand off it, so the furthest one is out at a CORNER — `hypot(u, R+out)`
+      // — and `R * AR_SCALE` is a bound it was never inside at full size either.
+      // Measuring the shrink against the room's own reach is the quantity in
+      // question; the absolute ceiling beside it is what makes it fit a room.
+      const reachWas = Math.max(...before.map((w) => Math.hypot(w.o[0], w.o[2])));
+      const reach = Math.max(...small.map(({ b }) => Math.hypot(b.o[0], b.o[2])));
+      const sized = small.every(({ b, was }) => Math.abs(b.w - was.w * AR_SCALE) < 1e-6
+        && Math.abs(b.h - was.h * AR_SCALE) < 1e-6);
+      const eyeKept = small.every(({ b, was }) =>
+        Math.abs(b.o[1] - (EYE_Y + (was.o[1] - EYE_Y) * AR_SCALE)) < 1e-6);
+      const lowest = Math.min(...small.map(({ b }) => b.o[1]));
+      setRoomScale(1);
+      const back = built.every((b, i) => Math.abs(b.o[0] - before[i].o[0]) < 1e-9
+        && Math.abs(b.o[1] - before[i].o[1]) < 1e-9 && Math.abs(b.o[2] - before[i].o[2]) < 1e-9
+        && Math.abs(b.w - before[i].w) < 1e-9 && Math.abs(b.h - before[i].h) < 1e-9);
+      d.assert('in passthrough the whole room fits inside a real one, type and all',
+        Math.abs(reach - reachWas * AR_SCALE) < 1e-6 && reach < 3 && sized && eyeKept
+        && lowest > 0.9 && back,
+        `the furthest word stands ${reach.toFixed(2)} m out instead of ${reachWas.toFixed(2)} m,`
+        + ` which is inside an ordinary room`
+        + ` · every quad is ${(AR_SCALE * 100).toFixed(0)}% of its size: ${sized}`
+        + ` · the lowest word is at ${lowest.toFixed(2)} m, so it scaled about eye height and not the floor`
+        + ` · and coming back out restored every word exactly: ${back}`);
     }
 
     // Both eyes share a framebuffer and a clear ignores the viewport; that is

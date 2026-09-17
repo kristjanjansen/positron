@@ -30,13 +30,27 @@
 export const RELAY_BASE = 'wss://ws.positron.studio';
 export const HTTP_BASE = 'https://ws.positron.studio';
 
-// Read from workers/relay/src/index.js rather than typed twice: a description
-// that can disagree with the config is worse than none.
+/**
+ * 🔴 EVERY NUMBER HERE WAS WRONG, UNDER A COMMENT SAYING IT COULD NOT BE. It
+ * claimed to be read from the worker rather than typed twice, and it was typed
+ * twice: 4x low on bytes, 8x on sockets, 16x on bandwidth and 16.7x on the
+ * message rate. Corrected 2026-09-17 against the relay's OWN declaration at
+ * `GET /room/<name>/stats`, which is the authority and answers
+ * `{"maxBytes":1024000,"maxSockets":128,"bytesPerSec":8388608,"msgPerSec":1000}`.
+ *
+ * ⚠️ A CONSTANT THAT CLAIMS TO BE DERIVED AND IS NOT is worse than one that
+ * admits it is a copy, because the claim stops anybody checking. The honest
+ * version is this: it is a copy, the relay reports the truth at `/stats`, and
+ * anything that MATTERS should ask rather than read this.
+ * ⚠️ AND THE DIRECTION OF THE ERROR MATTERS. Every value was too SMALL, so a
+ * page reading these refuses work the relay would have accepted, and a capacity
+ * story built on them understates the room by more than an order of magnitude.
+ */
 export const LIMITS = {
-  maxBytes: 256 * 1024,
-  maxSockets: 16,
-  bytesPerSec: 512 * 1024,
-  msgPerSec: 60,
+  maxBytes: 1_024_000,
+  maxSockets: 128,
+  bytesPerSec: 8 * 1024 * 1024,
+  msgPerSec: 1000,
 };
 
 /**
