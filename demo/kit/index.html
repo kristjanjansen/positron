@@ -34,7 +34,24 @@
   /* The three blocks in the layout specimen, so a gap has something to be
      measured between. They are deliberately plain: what is being shown is the
      air, not the boxes. */
-  .kit-blk { border: 1px dashed var(--line2); border-radius: 4px; color: var(--dim2);
+  /* 🔴 A SPECIMEN'S EDGE IS LIGHTER THAN A REAL BORDER, AND IT IS ITS OWN TOKEN.
+     Asked 2026-09-17 with a screenshot: *"make border a bit lighter here"*. The
+     shell's line colours are `--line` #1f2937 and `--line2` #2b3546, and the
+     next thing up the scale is `--dim2` #6a7280, which is the caption's ink and
+     far too strong for a dashed box that is not part of what is being shown.
+     There is nothing between them, so this page names its own, once, here.
+     ⚠️ IT IS NOT A SHELL TOKEN ON PURPOSE. Nothing outside this sandbox draws a
+     dashed specimen edge, and putting it in shell.css would offer every page a
+     colour with no meaning attached to it. */
+  :root { --kit-edge: #3a465c; }
+  /* A row of specimens INSIDE a titled group. `.kit-box` is the flex row that
+     used to hold these directly; once a group has a heading the box holds the
+     group and the row needs the layout the box was providing.
+     ⚠️ MEASURED BEFORE THIS EXISTED: the class was used and never defined, so
+     five badges laid out as inline text and ran together into one band with
+     their dots touching the word before them. */
+  .kit-row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+  .kit-blk { border: 1px dashed var(--kit-edge); border-radius: 4px; color: var(--dim2);
              font: 400 11px/1 var(--mono); text-align: center; padding: 18px 0; }
   /* 🔴 THE DEFECT, KEPT ALIVE ON PURPOSE. `.kbd { margin: 0 0 10px }` in
      shell.css is what put a keyboard flush against a transport bar on `/keys/`:
@@ -82,14 +99,23 @@
      `margin-bottom` rather than anything the log asks for — so a stand-in with
      a margin typed here would be this page inventing the number it then grades
      itself against. */
-  .kit-mid { border: 1px dashed var(--line2); border-radius: 4px; color: var(--dim2);
+  .kit-mid { border: 1px dashed var(--kit-edge); border-radius: 4px; color: var(--dim2);
              font: 400 11px/1 var(--mono); text-align: center; padding: 26px 0; }
   /* ⚠️ AND NO RULE HERE RESETTING WHAT FOLLOWS A CAPTION. The split specimen
      below is measured, and its gaps are the shell's own 22 px: a `margin-top:
      0` typed here would make this page move the thing it is grading, which is
      the same mistake as a check that mutates. */
+  /* 🔴 AND A GAP UNDERNEATH, BECAUSE THERE WAS NONE. REPORTED 2026-09-17 with a
+     screenshot of a caption sitting on the dashed edge of the box it labels:
+     *"what is this crap? ... you are breaking you own rules in this example you
+     made for preventing"*, which is exactly right. MEASURED on the live page:
+     all FOUR captions read a gap of 0.0 px to their specimen, so this was never
+     one section. `line-height: 1` makes the caption's box tight to its letters,
+     and the specimen below starts at its edge, so uppercase text at 9.5 px
+     touches a border a pixel away. The caption belongs to the thing under it,
+     so it owns both sides of its own air. */
   .kit-cap { font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
-             color: var(--dim2); margin: 0; }
+             color: var(--dim2); margin: 0 0 10px; }
   /* A caption belongs to the specimen UNDER it, so the air goes above the
      caption rather than below it. Nothing measured passes through this gap:
      the two numbers graded in the split block are readout-to-page and
@@ -230,6 +256,75 @@
   let joinedPage = null, splitPage = null;
 
   /**
+   * 🔴 NEWEST AT THE TOP, AND THE TWO PRESENCE BLOCKS ARE ONE. Asked 2026-09-17:
+   * *"bring online offline up in kit and merge busy/test into it"*. They were
+   * two sections because the busy words were built second, and that is a fact
+   * about the order the work happened in rather than about the component: one
+   * badge answers both questions, so a reader meeting it twice has to work out
+   * that it is the same thing.
+   *
+   * ⚠️ A SECTION TITLE IS UPPERCASE, and `.kit-h` renders it so whatever is
+   * typed. Type it uppercase anyway, so the source reads like the page.
+   * ⚠️ AND MOVING A BLOCK MOVES EVERY BUTTON AFTER IT. `verify.mjs` presses by
+   * position, so re-run `node demo/verify.mjs kit` and diff the assert count
+   * after any reorder.
+   */
+  section('ONLINE, OFFLINE, AND WHO ELSE HAS HOLD OF IT',
+    'Five states, and the last one is the honest one: a thing nobody has asked yet is '
+    + 'not offline, which is the same rule caps.mjs follows when it answers "unknown" '
+    + 'about a browser it could not probe. Green means it spoke inside the time it '
+    + 'promised to speak in, and the two greys are told apart by ink rather than hue: a '
+    + 'solid dot is a measurement, a hollow ring is nobody having looked. '
+    + 'A second question rides the same badge, because on a shared instrument the room '
+    + 'is not what people contend over and your own second tab is another client: the '
+    + 'word says whether somebody else has hold of it, and whether that somebody is a '
+    + 'person or a harness. That greys the WORD and never the dot, because a grey dot '
+    + 'already means nobody has looked.',
+    `createPresence({ of: 'the board' }).set('online')
+createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } }).busy('tool')
+presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+
+      // ⚠️ `can: [s]` IS WHAT MAKES THIS ROW EVENLY SPACED. Each of these will
+      // only ever say its own word, so holding room for `coming online` put a
+      // different amount of empty space after each one and the gaps read as
+      // arbitrary. A badge that can really change says nothing here and keeps
+      // the full reserve, which is what the width check below drives.
+      const states = el('div', 'kit-row');
+      for (const s of PRESENCE_STATES) {
+        const p = createPresence({ state: s, can: [s] });
+        presSpec.set(s, p.el);
+        states.append(p.el);
+      }
+      // One badge that CAN change, for the check at the bottom: the claim is
+      // that a badge does not twitch as ITS OWN state moves, which is about one
+      // badge over time and not about five badges side by side.
+      presLive = createPresence({ state: 'online' });
+      presLive.el.style.position = 'absolute';
+      presLive.el.style.visibility = 'hidden';
+      states.append(presLive.el);
+
+      const busy = el('div', 'kit-row');
+      for (const [kind, label] of [[null, 'nobody'], ['page', 'a person'], ['tool', 'a harness']]) {
+        // Born in its state rather than switched into it: `busy()` fades over
+        // 90 ms, and a fixed specimen has nothing to fade from.
+        const p = createPresence({ of: 'Raspberry Pi', state: 'online', can: ['online'],
+                                   busyWords: { page: 'in use', tool: 'under test' }, busy: kind });
+        busySpec.set(label, p.el);
+        busy.append(p.el);
+      }
+
+      // ⚠️ `stack.titled`, NOT A HAND-ROLLED CAPTION. That is what this section
+      // is demonstrating twice over: the heading and what it labels are ONE
+      // block, and the component owns both distances.
+      stack.titled('IS IT ANSWERING', states);
+      stack.titled('AND HAS SOMEBODY ELSE GOT HOLD OF IT', busy);
+      box.append(stack.el);
+    });
+
+  /**
    * 🔴 THE NEWEST COMPONENT GOES AT THE TOP OF THIS PAGE. Instructed
    * 2026-09-16: *"in kit move online stuff to topmost item (all new should land
    * top, make rule)"*.
@@ -246,27 +341,6 @@
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
-  section('WHO ELSE IS DRIVING THIS, AND WHETHER IT IS A PERSON',
-    'A badge that says a thing is answering does not say whether somebody else has '
-    + 'hold of it, and on a shared instrument that is the fact you need: the room is '
-    + 'not what people contend over, the instrument is, and your own second tab is '
-    + 'another client. A harness is told apart from a person because every client here '
-    + 'says what kind of thing it is, so a suite run driving a real page cannot pass '
-    + 'for somebody sitting down at it. It refines the online word rather than '
-    + 'replacing the state: a thing that has stopped answering is offline either way.',
-    `createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } })
-  .busy('tool')      // -> "Raspberry Pi under test"`,
-    (box) => {
-      for (const [kind, label] of [[null, 'nobody'], ['page', 'a person'], ['tool', 'a harness']]) {
-        // Born in its state rather than switched into it: `busy()` fades over
-        // 90 ms, and a fixed specimen has nothing to fade from.
-        const p = createPresence({ of: 'Raspberry Pi', state: 'online', can: ['online'],
-                                   busyWords: { page: 'in use', tool: 'under test' }, busy: kind });
-        busySpec.set(label, p.el);
-        box.append(p.el);
-      }
-    });
-
   section('BLOCKS OF A PAGE, AND THE AIR BETWEEN THEM',
     'A page is a stack of blocks and the stack owns the space between them, so no page '
     + 'has to know the number and none of them can get it wrong. The gap is set once, as '
@@ -356,34 +430,6 @@ createReport({ readout, showLog: false, joined: true })      // the same pair, s
       splitPage = el('div', 'pos-body kit-mid', 'the page goes here');
       box.append(el('p', 'kit-cap', 'split, which is the default'),
         splitSpec.top, splitPage, splitSpec.foot);
-    });
-
-  section('ONLINE, OFFLINE, COMING ONLINE',
-    'Four states, not three: a thing nobody has asked yet is not offline, which is '
-    + 'the same rule caps.mjs follows when it answers "unknown" about a browser it '
-    + 'could not probe. Green means it spoke inside the time it promised to speak in, '
-    + 'and the two greys are told apart by ink rather than hue: a solid dot is a '
-    + 'measurement, a hollow ring is nobody having looked.',
-    `createPresence({ of: 'the board' }).set('online')
-presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the four`,
-    (box) => {
-      // ⚠️ `can: [s]` IS WHAT MAKES THIS ROW EVENLY SPACED. Each of these will
-      // only ever say its own word, so holding room for `coming online` put a
-      // different amount of empty space after each one and the gaps read as
-      // arbitrary. A badge that can really change says nothing here and keeps
-      // the full reserve, which is what the width check below drives.
-      for (const s of PRESENCE_STATES) {
-        const p = createPresence({ state: s, can: [s] });
-        presSpec.set(s, p.el);
-        box.append(p.el);
-      }
-      // One badge that CAN change, for the check at the bottom: the claim is
-      // that a badge does not twitch as ITS OWN state moves, which is about one
-      // badge over time and not about four badges side by side.
-      presLive = createPresence({ state: 'online' });
-      presLive.el.style.position = 'absolute';
-      presLive.el.style.visibility = 'hidden';
-      box.append(presLive.el);
     });
 
   section('a presence dot inside something else',
@@ -1504,6 +1550,22 @@ green = inside what it promised · amber/red = later`,
     d.assert('and it says which of the three it is, in words',
       new Set(said.map(([, t]) => t)).size === 3,
       said.map(([l, t]) => `${l}: "${t}"`).join(' · '));
+
+    /**
+     * 🔴 THE WORD GREYS AND THE DOT DOES NOT, and both halves are the claim.
+     * A grey dot would say nobody has looked, which is what `checking` and
+     * `unknown` use it for, so a busy board would become indistinguishable from
+     * one we know nothing about. Asserting only the word would let the dot drift
+     * grey and nothing would catch it.
+     */
+    const ink = (el2, sel) => getComputedStyle(el2.querySelector(sel)).color;
+    const idle = busySpec.get('nobody'), person = busySpec.get('a person'), tool = busySpec.get('a harness');
+    d.assert('the busy word is greyer than the word it qualifies, and the dot is not',
+      ink(person, '.pos-pres-w') === ink(tool, '.pos-pres-w')
+      && ink(person, '.pos-pres-w') !== ink(idle, '.pos-pres-w')
+      && ink(person, '.pos-pres-dot') === ink(idle, '.pos-pres-dot'),
+      `word ${ink(idle, '.pos-pres-w')} -> ${ink(person, '.pos-pres-w')} · `
+      + `dot ${ink(idle, '.pos-pres-dot')} -> ${ink(person, '.pos-pres-dot')}`);
   }
 
   // 8 — 🔴 AND THE ANIMATION CANNOT MOVE ANYTHING EITHER, which is a separate
