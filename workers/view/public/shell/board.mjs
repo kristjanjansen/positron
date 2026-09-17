@@ -179,6 +179,39 @@ export function createBoard({
     // ⚠️ Fire and move on. `resume()` waits on a user gesture in a real browser
     // and NEVER REJECTS, so awaiting it is a hang rather than an error.
     ctx.resume().catch(() => { /* a suspended context is allowed. Sound is late, not broken */ });
+    /**
+     * 🔴 AND IF IT NEVER STARTS, THE PAGE SAYS SO. REPRODUCED 2026-09-17 while
+     * chasing *"Knobs is silent"*: with the browser's ordinary autoplay policy
+     * and no user activation, the context stays `suspended`, the worklet is
+     * built, frames keep arriving at fifty a second with a healthy peak, every
+     * counter reads correct, `buffer` sits at 0 ms and NOTHING PLAYS. MEASURED
+     * on the deployed page: arrived peak 0.136, output peak 0.000.
+     *
+     * That is the worst shape a fault can have here, and this module already
+     * carries the same lesson about the board streaming silence. A suspended
+     * context is a normal thing that happens to real people — a tab restored on
+     * load, a gesture that did not count, an iPhone deciding otherwise — and the
+     * only honest thing a page can do is name it, because no counter it displays
+     * can.
+     * ⚠️ IT IS NOT AN ERROR AND MUST NOT READ AS ONE while it is merely late.
+     * `resume()` is fired and not awaited, so a context is briefly suspended on
+     * every single start. The line waits a beat and speaks only if it is STILL
+     * not running, and `statechange` takes it back when it starts.
+     */
+    let saidSuspended = false;
+    const watchState = () => {
+      if (!ctx) return;
+      if (ctx.state === 'running') {
+        if (saidSuspended) { saidSuspended = false; log('the browser let the sound start'); }
+        return;
+      }
+      if (saidSuspended) return;
+      saidSuspended = true;
+      log(`the sound is built and arriving but this browser has not let it start: the audio is ${ctx.state}. `
+        + 'Press play again, or click anywhere on the page', 'bad');
+    };
+    ctx.addEventListener('statechange', watchState);
+    setTimeout(watchState, 600);
     // A REQUEST, not a guarantee: a browser may hand back its device rate
     // anyway. No readout cell for it — a cell reading 48000 forever is a
     // constant wearing a measurement's clothes. It speaks when it has something
@@ -394,6 +427,9 @@ export function createBoard({
      *  read the same numbers rather than two copies that can disagree. */
     stats: () => ({
       frames, lost, peak, firstFrameAt,
+      /** `running`, `suspended` or null before there is a context at all. A page
+       *  that wants to assert it is playing has to ask this, not the counters. */
+      audioState: ctx ? ctx.state : null,
       bufferedMs, starved, trimmed, breaks,
       framesPerSec: firstFrameAt ? frames / Math.max(0.001, (performance.now() - firstFrameAt) / 1000) : 0,
       channels: chIn, shapeChecked, shapeWrong, shapeSaid,
