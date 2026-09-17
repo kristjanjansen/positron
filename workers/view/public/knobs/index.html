@@ -24,12 +24,11 @@
   // The sweep's own lap, so a check waiting for it cannot fall out of step with
   // it the next time somebody changes how fast a hand moves.
   import { MOVES } from '/shell/hand.mjs';
-  import { createPresence } from '/shell/presence.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { makeCcSend, SEND_GATE_MS, RESTATE_MS } from '/shell/cc-adapter.mjs';
-  import { openWire } from '/shell/wire.mjs';
+  import { createBoard } from '/shell/board.mjs';
 
   const q = new URLSearchParams(location.search);
   // `studio-1` is the ADDRESS OF THE RASPBERRY PI, not a rendezvous this page
@@ -64,23 +63,27 @@
   // filter is set to, so the middle of the lane leaves the patch alone.
   const CUTOFF = 74, RESO = 71, NEUTRAL = 64;
   /**
-   * 🔴 75 AND 76 ARE NOT WHAT THE MIDI SPECIFICATION CALLS THEM, AND THE ASK
-   * THAT PRODUCED THEM WAS FOR A VIBRATO. In General MIDI, 76 and 77 are
-   * vibrato rate and depth. Yoshimi does not implement those: its extended
-   * controllers are 71 filter Q, 74 filter cutoff, 75 bandwidth, 76 FM
-   * amplitude, 77 and 78 resonance. So a slider labelled vibrato would have
-   * been a control that moves and does nothing.
+   * 🔴 THREE SLIDERS, BECAUSE THIS INSTRUMENT HAS THREE CONTINUOUS CONTROLS YOU
+   * CAN HEAR ON A HELD NOTE. It had four for an hour on 2026-09-17: bandwidth
+   * (CC 75) and FM amplitude (CC 76) went in after a measurement said both moved
+   * the sound by four to nine times their own floor, and came straight back out
+   * on *"they do nada and added some noisy wobble"*. Both halves of that are
+   * right, and it is worth being clear about why the measurement was not:
+   * bandwidth's effect IS a wobble, 225 cents of beating between partials, and
+   * a tracker that asks whether the sound MOVES cannot tell a control anybody
+   * wants from a noise generator.
    *
-   * MEASURED on this board with `node rig/box/wobble-test.mjs`, one note held
-   * throughout, each controller read twice at one value first so every claim has
-   * a floor under it. CC 76 and 77 and the mod wheel move the pitch by 0.2 cents
-   * at every value, which is the pitch tracker's own noise: there is no vibrato
-   * here to have a rate. What 75 and 76 do move is large. Bandwidth takes the
-   * beating between the oscillator's partials from 225 cents wide at 6 Hz down
-   * to 114 cents at 0.8 Hz, and FM amplitude takes it from 149 cents to 0.2,
-   * which is a tone that shimmers becoming a tone that sits still.
+   * What is left is what survived being measured against its own floor with the
+   * takes interleaved, which is the only honest design on a patch that drifts
+   * on its own (`node rig/box/wobble-test.mjs --ctrl 7,11,77,78 --reps 3`):
+   *   CC 7 volume        level 0.0000 -> 0.0375, spread inside one arm 0.0000
+   *   CC 11 expression   level 0.0000 -> 0.0466, spread 0.0005 — the same thing
+   *   CC 77, CC 78       resonance: nothing, 2 Hz of brightness against 4 of spread
+   *   CC 1 mod wheel     nothing, 82 Hz against 150 of spread
+   * Yoshimi does not implement the General MIDI vibrato controllers at all, so
+   * there was never a vibrato here to offer.
    */
-  const BANDWIDTH = 75, FM = 76;
+  const VOLUME = 7;
   /**
    * 🔴 THE CUTOFF OPENS AT 100, NOT AT THE MIDDLE. Asked 2026-09-16: *"cutoff
    * 100 by default"*, after *"cutoff below 38 is nada"*.
@@ -127,7 +130,7 @@
     // sentence and a visitor believes it. `manifest.mjs`'s own line moved in the
     // same change, verbatim, so arriving from the index does not mean reading
     // the same claim twice in two wordings.
-    what: 'Turn four knobs on a synthesizer in another building, and any of them can move by itself.',
+    what: 'Turn three knobs on a synthesizer in another building, and any of them can move by itself.',
     /**
      * Six cells, and every one of them moves.
      *
@@ -307,258 +310,95 @@
     onChange: (v) => land(RESO, v),
   });
   /**
-   * The oscillator's two, under the filter's two. `AddSynth Morph` answers both
-   * of them strongly, which is not true of every patch in the board's library:
-   * bandwidth needs partials to spread and FM amplitude needs a modulator to
-   * scale, and a patch with neither will leave these handles moving over a
-   * sound that does not change. That is a fact about the patch rather than about
-   * the page, and the log line under Play names the patch for that reason.
+   * ⚠️ IT OPENS AT 100 RATHER THAN AT THE MIDDLE, for the same reason the cutoff
+   * does: 64 is where the patch's own maker left it, and a level control that
+   * starts halfway down means the first thing anybody hears is quieter than the
+   * instrument actually is. The whole range is still there.
    */
-  const bandwidth = createSlider({
-    label: 'bandwidth', aria: 'oscillator bandwidth', min: 0, max: 127, step: 1, value: NEUTRAL,
-    hand: true, onHand: handSaid('bandwidth'),
-    onInput: (v) => move(BANDWIDTH, v),
-    onChange: (v) => land(BANDWIDTH, v),
-  });
-  const fm = createSlider({
-    label: 'fm depth', aria: 'FM amplitude', min: 0, max: 127, step: 1, value: NEUTRAL,
-    hand: true, onHand: handSaid('fm depth'),
-    onInput: (v) => move(FM, v),
-    onChange: (v) => land(FM, v),
+  const volume = createSlider({
+    label: 'volume', aria: 'part volume', min: 0, max: 127, step: 1, value: 100,
+    hand: true, onHand: handSaid('volume'),
+    onInput: (v) => move(VOLUME, v),
+    onChange: (v) => land(VOLUME, v),
   });
   // Named, because it is moved below the transport once that exists. See there.
-  const knobs = createSliderGroup([cutoff, reso, bandwidth, fm], { pair: true });
+  const knobs = createSliderGroup([cutoff, reso, volume], { pair: true });
   d.el.append(knobs.el);
 
   // ── audio ─────────────────────────────────────────────────────────────────
-  let ctx = null, playout = null;
-  let bufMs = 0, starved = 0, trimmed = 0, breaks = -1;
-  let frames = 0, pcmMissing = 0, lastPcmSeq = -1, firstFrameAt = 0, peak = 0;
-  let told = null;                       // the board's own announcement, if we heard it
-  let chIn = BOARD_CHANNELS, shapeChecked = false, shapeWrong = 0, shapeSaid = '';
+  /**
+   * 🔴 EVERYTHING BETWEEN THIS PAGE AND THE RASPBERRY PI IS `board.mjs`, AND IT
+   * WAS NOT UNTIL 2026-09-17. Asked that day: *"Ahould board.mjs used by both?
+   * Make inra close as possible on keys and knobs"*. The component was written
+   * the day before to be shared and a report said both pages were on it; only
+   * `/keys/` was. This page still carried its own socket, its own
+   * AudioContext, its own worklet, its own cushion, its own frame counters and
+   * its own shape check, which is the same six things twice.
+   *
+   * ⚠️ WHAT IS LEFT HERE IS WHAT IS ACTUALLY THIS PAGE'S: which verbs it sends,
+   * what it does with a frame after the playout has it, and what its log calls
+   * things. The cushion stays a per-page number and that is not drift: 160 ms
+   * here, where one note is held under a filter sweep and a click is the thing a
+   * listener cannot ignore, against 100 on `/keys/`, which reports press to
+   * sound and pays for every millisecond of it.
+   */
+  let rtt = null;
+  let boardAnswered = false, playing = null, boardSaid = '';
+  let meter = null, meterAt = 0, playedPerSec = 0;
+  let lastBreaks = -1;
 
-  async function startAudio() {
-    if (ctx) return;
-    // ⚠️ ASK FOR 48 kHz. The board sends 48000 and the worklet writes those
-    // samples into a ring drained at the context's own rate, so a mismatch is
-    // both a pitch error and a ring that fills faster than it empties.
-    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: RATE, latencyHint: 'interactive' });
-    // ⚠️ Fire and move on. `resume()` waits on a user gesture in a real browser
-    // and never rejects, so awaiting it is a hang rather than an error.
-    ctx.resume().catch(() => { /* a suspended context is allowed. Sound is late, not broken */ });
-    if (ctx.sampleRate !== RATE) {
-      d.log(`this browser runs audio at ${ctx.sampleRate} Hz and the board sends ${RATE}. Nothing in the chain resamples, so the pitch will be off by ${(RATE / ctx.sampleRate).toFixed(3)}x`, 'bad');
-    }
-    await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
-    playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
-    playout.connect(ctx.destination);
-    playout.port.onmessage = (e) => {
-      const st = e.data?.stats; if (!st) return;
-      bufMs = st.bufferedMs;
-      d.set('buffer', Math.round(st.bufferedMs));
-      starved = st.underruns; trimmed = st.trimEvents;
-      const b = starved + trimmed;
-      if (b !== breaks) {
-        const first = breaks < 0;
-        breaks = b;
-        // One cell for both, because a reader wants to know whether what they
-        // are hearing is intact, which is one question. The LINE says which,
-        // because the two want opposite fixes: running dry wants a bigger
-        // cushion and being trimmed wants a smaller one.
-        if (!first) d.log(`${starved} ran dry, ${trimmed} trimmed · cushion ${Math.round(bufMs)} ms`, 'warn');
-      }
-    };
+  const board = createBoard({
+    room: ROOM,
+    relay: q.get('relay') || undefined,
+    of: 'Raspberry Pi',
     /**
-     * The cushion is OURS, not the browser's, which is the whole reason to carry
-     * the samples rather than use WebRTC.
-     *
      * 🔴 160 ms, RAISED FROM 100 ON A MEASUREMENT AND A REPORT. Reported
      * 2026-09-16 while listening: *"some vobbly sound, cutoffs, not nice"*, with
      * a log full of `ran dry` and `trimmed`. MEASURED off this relay the same
      * minute, 992 frames in 20 s with a node client and no browser in the way:
      * nothing was lost and the mean gap was exactly 20.0 ms, but p90 was 29.5,
      * p99 was 43.5 and the worst single gap was 83.6 ms. A 100 ms cushion has
-     * 16 ms left after a lump like that, and the page's own older note records a
-     * 108.6 ms gap, which a 100 ms cushion cannot survive at all.
-     *
+     * 16 ms left after a lump like that.
      * ⚠️ NOTHING IS BEING LOST ON THE WIRE, which is what makes this a cushion
-     * decision rather than a network one: the frames all arrive, some of them
-     * in lumps. A cushion has no restoring force, so the floor still ratchets
-     * when it is proved too small.
-     * ⚠️ AND IT COSTS WHAT IT COSTS: 60 ms more between a hand and the sound,
-     * on a path whose round trip is about 45 ms. The trade is a filter that
-     * answers a little later against one that clicks, and a click is the one a
-     * listener cannot ignore.
+     * decision rather than a network one: the frames all arrive, some of them in
+     * lumps. A cushion has no restoring force, so the floor still ratchets when
+     * it is proved too small.
+     * ⚠️ AND IT COSTS WHAT IT COSTS: 60 ms more between a hand and the sound, on
+     * a path whose round trip is about 45 ms. The trade is a filter that answers
+     * a little later against one that clicks.
      */
-    playout.port.postMessage({ cmd: 'floor', ms: 160, adaptive: true, maxMs: 400 });
-  }
-
-  /**
-   * The shape of what arrived, checked rather than inferred.
-   *
-   * 🔴 A CHANNEL COUNT CANNOT BE READ OFF A PAYLOAD. 960 int16s is a valid
-   * 20 ms mono frame AND a valid 10 ms stereo one, and guessing wrong plays an
-   * octave down, which sounds like a broken instrument rather than a broken
-   * header. The Mac sends stereo and this board sends mono, and both are on
-   * this relay at once.
-   *
-   * ⚠️ THE BOARD ANNOUNCES IT IN `box.hello`, WHICH IT SENDS WHEN IT JOINS, SO
-   * A PAGE THAT JOINS LATER NEVER HEARS IT. There is no verb that asks for it
-   * again. So the page states the board's published framing as its expectation
-   * and CHECKS the arriving frames against it: `samples / channels / rate` has
-   * to come out at the frame length claimed. A live announcement overrides the
-   * expectation the moment one arrives.
-   */
-  function checkShape(samples) {
-    if (shapeChecked) return;
-    shapeChecked = true;
-    const want = told?.frameMs ?? BOARD_FRAME_MS;
-    const implied = (samples / chIn / RATE) * 1000;
-    shapeSaid = `${samples} samples a frame works out at ${implied.toFixed(1)} ms as ${chIn === 2 ? 'stereo' : 'mono'}, against the ${want} ms ${told ? 'the board announced' : 'the board publishes'}`;
-    if (Math.abs(implied - want) <= want * 0.02) return;
-    const real = Math.max(1, Math.min(2, Math.round(samples / ((want / 1000) * RATE))));
-    shapeWrong++;
-    chIn = real;
-    playout?.port.postMessage({ cmd: 'inChannels', n: real });
-    d.log(`${shapeSaid} · playing it as ${real === 2 ? 'stereo' : 'mono'} instead`, 'warn');
-  }
-
-  function onPcm(buf) {
-    const s = new DataView(buf).getUint32(0, true);
-    // ⚠️ A COUNTER IS ONLY EVIDENCE ON THE FAR SIDE OF A BOUNDARY. This counts
-    // gaps in the BOARD's own sequence, so it measures what the relay dropped
-    // rather than what this page asked for. Byte 4 carries the board's own
-    // `performance.now()`, which step 5 will read to separate the network's
-    // share of the delay from the board's.
-    // Audio in this room is the board and nothing else, and it arrives fifty
-    // times a second against a heartbeat every five.
-    pres.seen();
-    pres.checking(false);
-    if (lastPcmSeq >= 0 && s > lastPcmSeq + 1) pcmMissing += s - lastPcmSeq - 1;
-    lastPcmSeq = s;
-    frames++;
-    if (!firstFrameAt) firstFrameAt = performance.now();
-    const pcm = new Int16Array(buf, 12);
-    checkShape(pcm.length);
-    if (!playout) return;
-    const f32 = new Float32Array(pcm.length);
-    // 🔴 THE LOUDEST SAMPLE, BECAUSE A FRAME COUNT CANNOT TELL SOUND FROM
-    // SILENCE. The board captures its JACK graph continuously, so frames arrive
-    // at fifty a second whether or not a note is sounding: `104 frames of audio`
-    // read green through the whole of the silence reported above. A level is the
-    // quantity in question and a count is one adjacent to it.
-    let hi = 0;
-    for (let i = 0; i < pcm.length; i++) {
-      f32[i] = pcm[i] / 32768;
-      const a = f32[i] < 0 ? -f32[i] : f32[i];
-      if (a > hi) hi = a;
-    }
-    if (hi > peak) peak = hi;
-    playout.port.postMessage({ pcm: f32 }, [f32.buffer]);
-  }
-
-  // ── the socket ────────────────────────────────────────────────────────────
-  //
-  // 🔴 `openWire`, NOT A HAND-ROLLED WebSocket. `rig/box/listen.html` rolls its
-  // own and as a result cannot tell a full room from a dead relay: a browser
-  // cannot read the HTTP status of a refused upgrade, so both arrive as the
-  // same silent close. `openWire` asks `/stats` and says which it was. It also
-  // mints a new `from` per connection, counts what it sent against what came
-  // back, and refuses a payload field the envelope would overwrite.
-  const waiters = [];
-  let boardAnswered = false, playing = null, boardSaid = '';
-  // Which socket in this room is the board. Learned from the two messages only
-  // it sends, never assumed, and relearned when it reconnects.
-  let boardFrom = null;
-  let meter = null, meterAt = 0, playedPerSec = 0;
-  let rtt = null;
-
-  const wire = openWire(ROOM, {
-    base: q.get('relay') || undefined,
+    cushionMs: 160,
+    maxCushionMs: 400,
+    log: (line, kind) => d.log(line, kind),
     onOpen: () => { d.log(`joined ${ROOM}`, 'hi'); askStatus(); },
-    onClose: () => d.log('socket closed · reconnecting'),
-    onMessage: (got) => {
-      if (got.kind === 'binary') { onPcm(got.data); return; }
-      if (got.kind !== 'json') return;
-      if (got.msg.from === wire.stats().from) return;   // our own line, echoed back
-      heard(got.msg);
-    },
-  });
-
-  function sendId(m) {
-    const out = wire.send(m);
-    if (!out?.sent) return null;
-    try { return JSON.parse(out.line).id; } catch { return null; }
-  }
-  /**
-   * Wait for the next reply of a type, resolving null on a timeout rather than
-   * hanging. A page that waits forever looks like a page that is still loading,
-   * and "nobody answered" is the answer this page most often has to give.
-   */
-  function waitFor(type, ms, re = null) {
-    return new Promise((resolve) => {
-      const w = { type, re, resolve };
-      w.timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); resolve(null); }, ms);
-      waiters.push(w);
-    });
-  }
-  async function ask(m, type, ms = 8000) {
-    // The id first, so the wait is for THIS answer rather than for the next
-    // message of the same shape. On a shared board that can be somebody else's
-    // question, or the reply to it.
-    const id = sendId(m);
-    if (!id) return null;
-    return waitFor(type, ms, id);
-  }
-
-  /**
-   * ⚠️ A QUESTION AND ITS ANSWER CARRY THE SAME `type` ON THIS RELAY. The relay
-   * is a broadcast, so another listener merely ASKING looks exactly like the
-   * board answering. The board stamps every answer with `re`, the id of the
-   * message it answers, which is the only thing that tells them apart.
-   */
-  function heard(m) {
-    for (let i = waiters.length - 1; i >= 0; i--) {
-      const w = waiters[i];
-      if (w.type !== m.type) continue;
-      if (w.re && m.re !== w.re) continue;
-      clearTimeout(w.timer); waiters.splice(i, 1); w.resolve(m);
-    }
-    // The board's stream announcement, if this page happened to be connected
-    // when it joined. A measurement outranks a repeated claim, so this only
-    // re-opens the question when the claim CHANGES.
-    if (m.type === 'box.hello' && m.audioChannels) {
-      if (!told || told.audioChannels !== m.audioChannels || told.frameMs !== m.frameMs) {
-        told = { audioChannels: m.audioChannels, frameMs: m.frameMs };
-        chIn = m.audioChannels === 2 ? 2 : 1;
-        shapeChecked = false;
-        playout?.port.postMessage({ cmd: 'inChannels', n: chIn });
-        d.log(`the board says it sends ${chIn === 2 ? 'two channels' : 'one channel'} at ${m.frameMs} ms a frame`);
+    onPcm: () => {
+      const st = board.stats();
+      d.set('buffer', Math.round(st.bufferedMs));
+      // One cell for both kinds of missing, because a reader wants to know
+      // whether what they are hearing is intact, which is one question. The LINE
+      // says which, because the two want opposite fixes: running dry wants a
+      // bigger cushion and being trimmed wants a smaller one.
+      if (st.breaks !== lastBreaks) {
+        const first = lastBreaks < 0;
+        lastBreaks = st.breaks;
+        if (!first) d.log(`${st.starved} ran dry, ${st.trimmed} trimmed · cushion ${Math.round(st.bufferedMs)} ms`, 'warn');
       }
-    }
-    // ANY message from the board is proof it is there, not just the one this
-    // page happened to ask for. `box.alive` is the heartbeat the interval above
-    // is sized for, and an answer to a question counts just as much.
-    /**
-     * 🔴 ONLY THE BOARD COUNTS AS THE BOARD. This called `seen()` on ANY message
-     * that was not our own echo, and the relay is VERBATIM: everything in the
-     * room reaches everybody. So another tab of this page, or `/keys/`, or
-     * `/grains/`, or a harness run, would have painted the badge green while
-     * the Raspberry Pi was unplugged. A presence badge that can be satisfied by
-     * somebody else in the room is worse than no badge, because it is wrong in
-     * precisely the case it exists for.
-     *
-     * The board is identified by the messages only it sends: it says
-     * `box.hello` when it joins and `box.alive` every five seconds. Its `from`
-     * is per SOCKET, so it is learned rather than assumed, and it is learned
-     * again whenever the board reconnects under a new one.
-     * ⚠️ AND AUDIO COUNTS TOO. A stream of PCM frames is the board playing, and
-     * nothing else puts audio into this room, so `onPcm` marks it seen as well.
-     * That matters because the frames arrive fifty times a second and a
-     * heartbeat only every five.
-     */
-    if (m.type === 'box.hello' || m.type === 'box.alive') boardFrom = m.from || boardFrom;
-    if (m.from && m.from === boardFrom) { pres.seen(); pres.checking(false); }
+    },
+    onMessage: (m) => heard(m),
+  });
+  const pres = board.presence;
+  const sendId = (m) => board.send(m);
+  const ask = (m, type, ms) => board.ask(m, type, ms);
+  const wire = board.wire;
+
+  // ── what this page does with what it hears ───────────────────────────────
+  //
+  // `board.mjs` has already done the parts that are true of any page talking to
+  // this board: it drops this page's own echo, resolves whatever `ask()` is
+  // waiting for, learns which socket in the room IS the board and marks it seen,
+  // and takes the board's announced framing over the published default. What is
+  // below is only what this page does with an answer.
+  function heard(m) {
     if (m.type === 'audio.started') {
       boardAnswered = true;
       playing = m.ok ? m.source : null;
@@ -606,8 +446,9 @@
     // there is a fault belongs.
     const skipped = Math.round((gate.stats.thinned - k0) / dt);
     t0 = now; m0 = gate.stats.sent; k0 = gate.stats.thinned;
-    if (!frames) return;
-    const gone = pcmMissing + Math.max(0, breaks);
+    const st = board.stats();
+    if (!st.frames) return;
+    const gone = st.lost + Math.max(0, st.breaks);
     if (gone > lastGone) {
       d.log(`${gone - lastGone} slice${gone - lastGone === 1 ? '' : 's'} of sound went missing on the way`, 'bad');
       lastGone = gone;
@@ -680,9 +521,10 @@
   // private vocabulary CLAUDE.md keeps out of anything a visitor reads, and it
   // is vaguer than the truth: the page already says a Raspberry Pi in another
   // building, and the diagram on /keys/ calls the same machine by the same name.
-  const pres = createPresence({ of: 'Raspberry Pi' });
-  pres.follow({ everyMs: 5000, comingMs: 45000 });
-  pres.checking();          // a question is out before anything has answered
+  // ⚠️ THE BADGE IS `board.mjs`'s, not one made here. It knows which socket in
+  // the room is actually the board, which is the thing a hand-rolled badge on
+  // this page got wrong: the relay is verbatim, so any other tab in the room
+  // used to paint it green.
 
   const bar = createTransportBar(d.el, deck, {
     chip: pres.el,       // whether the board is answering, in the chip's place
@@ -740,7 +582,7 @@
   function holdNote() {
     sendId({ type: 'note.on', note: NOTE, vel: VEL, channel: 0 });
     noteAt = performance.now();
-    peak = 0;
+    board.resetPeak();
     /**
      * 🔴 AND IF IT MAKES NO SOUND, THE PAGE SAYS SO. Every counter on this page
      * reads correct while the board streams silence, which is how the fault
@@ -752,13 +594,13 @@
     const asked = noteAt;
     setTimeout(() => {
       if (asked !== noteAt || releasedAt > noteAt) return;   // a newer note, or it was released
-      if (peak > 0.002) return;
+      if (board.stats().peak > 0.002) return;
       d.log('the note is not sounding: the board is streaming silence. Press stop and play again, or check nothing else is holding the instrument', 'bad');
     }, 1800);
   }
 
   async function startNote() {
-    await startAudio();
+    await board.startAudio();
     await measureRtt();
     const status = boardAnswered ? { ok: playing !== null, source: playing } : await askStatus();
 
@@ -814,7 +656,7 @@
     // fight the glide below within one frame, which is a page arguing with
     // itself in front of somebody, and stop here means stop. It goes before the
     // `set` calls so the homing glide is the last thing that touches a handle.
-    for (const k of [cutoff, reso, bandwidth, fm]) k.hand?.stop('pause');
+    for (const k of [cutoff, reso, volume]) k.hand?.stop('pause');
     // The sliders come back to neutral, which is where the patch's own filter
     // is, and the board is told to release every note. The board may be holding
     // notes this page never pressed, so the message has to go out as well as
@@ -825,8 +667,9 @@
     // two of them: the cutoff opens where the filter can be heard and the
     // resonance opens where its maker left it.
     cutoff.set(CUTOFF_HOME, { glideMs: 240 });
-    for (const k of [reso, bandwidth, fm]) k.set(NEUTRAL, { glideMs: 240 });
-    d.log(`stopped: every note released, cutoff back to ${CUTOFF_HOME} and the other three to ${NEUTRAL}`);
+    volume.set(100, { glideMs: 240 });
+    reso.set(NEUTRAL, { glideMs: 240 });
+    d.log(`stopped: every note released, and the three sliders back where they opened`);
   }
 
   // Reachable from a probe, the way `window.__hls` and `window.__strip` are on
@@ -834,7 +677,8 @@
   // any of it was a sound. A page that can only be asked "did frames arrive"
   // cannot tell a held note from silence, which is the fault this pair exists
   // to make visible from outside.
-  window.__knobs = { get frames() { return frames; }, get peak() { return peak; },
+  window.__knobs = { get frames() { return board.stats().frames; },
+                     get peak() { return board.stats().peak; },
                      get armed() { return armed; } };
 
   // ── the checks ────────────────────────────────────────────────────────────
@@ -871,13 +715,13 @@
       quiet === null && again?.restate === true && again.set.length === 1,
       again ? `nothing to say at ${RESTATE_MS - 1} ms, and ${again.set.length} controller restated at ${RESTATE_MS}` : 'nothing was restated');
 
-    // The relay's budget is counted in MESSAGES, so four sliders moving together
-    // have to cost one message rather than four.
+    // The relay's budget is counted in MESSAGES, so three sliders moving
+    // together have to cost one message rather than three.
     const g3 = makeCcSend();
-    g3.put(CUTOFF, 91); g3.put(RESO, 40); g3.put(BANDWIDTH, 12); g3.put(FM, 118);
+    g3.put(CUTOFF, 91); g3.put(RESO, 40); g3.put(VOLUME, 118);
     const both = g3.tick(0);
-    d.assert('four sliders moving together travel in one message',
-      both?.set?.length === 4 && g3.stats.messages === 1,
+    d.assert('three sliders moving together travel in one message',
+      both?.set?.length === 3 && g3.stats.messages === 1,
       both ? `${g3.stats.messages} message carrying ${both.set.length} values` : 'nothing went out');
 
     /**
@@ -899,7 +743,7 @@
      * this one asserts each slider is still at its own home, and it would be
      * asserting this check's leftovers otherwise.
      */
-    for (const k of [cutoff, reso, bandwidth, fm]) {
+    for (const k of [cutoff, reso, volume]) {
       const lane = k.el.querySelector('.sld-lane');
       const box = lane.getBoundingClientRect();
       const knob = k.el.querySelector('.sld-knob').getBoundingClientRect();
@@ -911,8 +755,8 @@
     sendTo = gate;
     const drove = g4.tick(0)?.set ?? [];
     const ctrls = [...new Set(drove.map(([c]) => c))];
-    d.assert('the four sliders drive four different controllers',
-      ctrls.length === 4 && [CUTOFF, RESO, BANDWIDTH, FM].every((c) => ctrls.includes(c)),
+    d.assert('the three sliders drive three different controllers',
+      ctrls.length === 3 && [CUTOFF, RESO, VOLUME].every((c) => ctrls.includes(c)),
       `CC ${ctrls.sort((a, b) => a - b).join(', ') || 'nothing'}`);
 
     // ⚠️ THE NAME OF THIS CHECK WAS TRUE UNTIL THE CUTOFF MOVED. Both sliders
@@ -1178,7 +1022,7 @@
         ? `the badge reads "${bar.el.querySelector('.pos-pres-w')?.textContent || ''}", and there is no clock`
         : 'no presence badge in the bar');
     d.assert('this page makes no sound of its own',
-      !!ctx && !!playout, 'every sample it can play arrived over the socket');
+      !!board.ctx() && !!board.playout(), 'every sample it can play arrived over the socket');
 
     // ── the gate, driven through the page’s own sliders ───────────────
     if (SELFCHECK && sweep) {
@@ -1269,9 +1113,10 @@
     if (!armed) return;
     d.assert('an instrument named itself', playing === 'yoshimi', String(playing));
     d.assert('the shape of a frame is checked against what the board publishes, not read off its size',
-      shapeChecked && !shapeWrong, shapeSaid || 'no frame has arrived yet');
+      board.stats().shapeChecked && !board.stats().shapeWrong,
+      board.stats().shapeSaid || 'no frame has arrived yet');
     d.assert('the sample rate it sends is the one this page plays at',
-      ctx?.sampleRate === RATE, `context ${ctx?.sampleRate} Hz against ${RATE} Hz from the board`);
+      board.ctx()?.sampleRate === RATE, `context ${board.ctx()?.sampleRate} Hz against ${RATE} Hz from the board`);
     /**
      * 🔴 ONLY WHEN A NOTE IS ACTUALLY BEING HELD. The harness drives this
      * transport itself, and stop here is a PANIC, so a drill that presses play
@@ -1287,14 +1132,15 @@
      */
     if (noteAt && releasedAt < noteAt) {
       d.assert('sound came back while the note was held, and it was not silence',
-        frames > 20 && peak > 0.005,
-        frames <= 20 ? `only ${frames} frames arrived`
-          : `${frames} frames, loudest sample ${peak.toFixed(4)} of full scale`);
+        board.stats().frames > 20 && board.stats().peak > 0.005,
+        board.stats().frames <= 20 ? `only ${board.stats().frames} frames arrived`
+          : `${board.stats().frames} frames, loudest sample ${board.stats().peak.toFixed(4)} of full scale`);
     } else {
       d.log(noteAt ? 'the note was released before the checks ran, so there was nothing to hear'
         : 'no note was held, so this run cannot say whether sound comes back');
     }
-    d.assert('the relay dropped none of it', pcmMissing === 0, `${pcmMissing} missing of ${frames + pcmMissing}`);
+    d.assert('the relay dropped none of it', board.stats().lost === 0,
+      `${board.stats().lost} missing of ${board.stats().frames + board.stats().lost}`);
     d.assert('the board wrote to the synth what this page put on the wire',
       !!meter && meter.in > 0 && meter.out > 0 && meter.out <= meter.in,
       meter ? `${meter.in} values arrived, ${meter.out} written, ${meter.folded} overtaken on the way` : 'the board reported no counters');
@@ -1318,11 +1164,11 @@
      * repair is matching the rate, not padding it.
      */
     d.assert('the cushion never ran dry, which is the half a cushion can fix',
-      starved === 0,
-      breaks < 0 ? 'the playout has not reported yet, so there is nothing to say'
-        : `${starved} ran dry, ${trimmed} trimmed, cushion now ${Math.round(bufMs)} ms`);
-    if (trimmed > 0) {
-      d.log(`the playout trimmed ${trimmed} time${trimmed === 1 ? '' : 's'}: the board's clock and `
+      board.stats().starved === 0,
+      board.stats().breaks < 0 ? 'the playout has not reported yet, so there is nothing to say'
+        : `${board.stats().starved} ran dry, ${board.stats().trimmed} trimmed, cushion now ${Math.round(board.stats().bufferedMs)} ms`);
+    if (board.stats().trimmed > 0) {
+      d.log(`the playout trimmed ${board.stats().trimmed} time${board.stats().trimmed === 1 ? '' : 's'}: the board's clock and `
         + 'this browser\u2019s drift apart, so the cushion grows until it is cut back', 'warn');
     }
   }
@@ -1385,7 +1231,7 @@
       { id: 'you', label: 'Browser', kind: 'here', tech: 'browser',
         join: false,
         children: [
-          { id: 'sliders', label: 'sliders', sub: '4 controllers', tech: 'browser',
+          { id: 'sliders', label: 'sliders', sub: '3 controllers', tech: 'browser',
         },
           { id: 'gate', label: 'send gate', sub: 'one value per 20ms', tech: 'browser',
         },

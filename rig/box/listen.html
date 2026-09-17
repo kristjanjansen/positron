@@ -23,37 +23,6 @@
      was spliced onto `document.body`, where nothing set the gaps, so its own
      14 px became the distance between the patch and the page. The gap belongs
      to `.pos-stack`, which every block of this page is in now. */
-  /* 🔴 THE ROW SAYS WHERE ITS GROUPS SIT, NOT EACH GROUP. Every `.fx`
-     carried `margin-left: auto`, which is one group's claim on all the free
-     space in its line, and that is only ever right while there is one group.
-     There are two now. MEASURED at 1200 px: the page is 688 px wide inside its
-     padding, the patch group is 325 and reverb plus chorus is 406, so they
-     cannot share a line and they wrap — the patch on the first, the effects on
-     the second, each right aligned. That is the intended picture and it is
-     stated once here instead of twice, where a line that DID have room would
-     have had two margins dividing it between them. */
-  .pick { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0;
-          width: 100%; justify-content: flex-end; }
-  /* ⚠️ 18 px, NOT 6. `reverb [off|room|hall] chorus [off|light|wide]` at a 6 px
-     gap put the word CHORUS hard against the `hall` button, so the two groups
-     read as one row of six options with a stray word in the middle. The gap
-     between two groups has to be bigger than the gap inside one, or there are
-     no groups. */
-  /* ⚠️ ONE CONTAINER NOW, AND THE SECOND ONE WAS NEVER VISIBLE. These selectors
-     read `.pick .fx, .pos-controls .fx` because reverb and chorus were appended
-     into the shell's control row while the patch sat in `.pick`. That row is
-     `hidden` on this page — it declares no controls — so the pair it held could
-     not be seen in any state. Both `.fx` spans are in `.pick` now. */
-  .pick .fx { display: inline-flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-  /* 🔴 AND `display` BEATS THE UA'S `[hidden]`, WHICH IS WHY THIS LINE
-     EXISTS. `shell.css` already carries this trap twice, on `.pos-controls` and
-     on `.pos-readout`: a rule that sets `display` outweighs `[hidden] { display:
-     none }`, so `spaceRow.hidden = true` set the attribute and changed nothing.
-     MEASURED here the moment reverb and chorus moved into this row: with no
-     board answering and `hidden` on the span, it still laid out 406 px wide at
-     y 306. It was invisible before only because the row AROUND it was hidden,
-     which means the page has never had a working switch for these two. */
-  .pick .fx[hidden] { display: none; }
   /* ⚠️ FOCUS MUST NOT WEAR THE ARMED COLOUR. The shell's global rule is
      `:focus-visible { outline: 2px solid var(--hi) }`, the same green the
      chosen state uses, so a focused-but-OFF switch was indistinguishable from
@@ -63,31 +32,18 @@
   .pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
   /* 🔴 NO `[aria-pressed]` RULE HERE. There was one, and it was the bug: it has
      the same specificity as the kit's `.pos-choice button[aria-pressed="true"]`
-     and sits later in the cascade, so EVERY createChoice on this page — reverb
-     and chorus included — silently lost the kit's chosen state and wore this
-     page's instead. One meaning, one definition, in shell.css. */
+     and sits later in the cascade, so every createChoice on this page silently
+     lost the kit's chosen state and wore this page's instead. One meaning, one
+     definition, in shell.css. */
   /* ⚠️ THE ROW HAS TO STACK TOO, or the kit's phone rules do nothing visible.
      `createChoice` puts its label on top and takes 100% of ITS OWN BOX at this
      width — but the boxes were still side by side in a flex row, so the groups
      got 172 px, 113 and 120 of a 390 px screen. MEASURED. A component can only
      fill what its container gives it.
-     ⚠️ AND IT USED TO NEED TWO CONTAINERS, because reverb and chorus were
-     appended into the shell's control row rather than into this one. They are
-     both in `.pick` now, so `.pick .fx` is the whole of it.
-     ⚠️ AND `display` IS PART OF IT. This once set flex-direction, align-items
-     and gap and not display, and the computed display came back `block`, so all
-     three were inert and the two groups touched at a measured 0 px while the
-     stylesheet said 22. A flex property on a non-flex box is not an error, it
-     is silence.
-     ⚠️ LAST IN THE FILE ON PURPOSE. These have the same specificity as the
-     desktop rules above (`.pick .fx` is 0,2,0), so source order is the whole of
-     the cascade here. */
+     ⚠️ LAST IN THE FILE ON PURPOSE. This has the same specificity as the
+     desktop rules above, so source order is the whole of the cascade here. */
   @media (max-width: 560px) {
     .pick { flex-direction: column; align-items: stretch; gap: 22px; }
-    .pick .fx {
-      display: flex; width: 100%; flex-direction: column;
-      align-items: stretch; gap: 22px;
-    }
   }
 </style>
 
@@ -290,6 +246,7 @@
 
   let rateWarned = false;
   let avail = null, current = null, idx = 0, lastBank = -1;
+  let listing = null;              // the id of the patch-list request we sent
   let autoStarted = false, saidMissing = false;
   /**
    * Press to sound: when a key went down, and whether we are still waiting for
@@ -417,6 +374,12 @@
     log: (line, kind) => d.log(line, kind),
     onOpen: () => {
       d.log(`joined ${ROOM}`, 'hi');
+      // ⚠️ A RECONNECT IS A NEW BOARD UNTIL IT SAYS OTHERWISE. The guard in the
+      // `audio.started` handler skips everything when the source has not
+      // changed; without clearing it here, a page that lost its socket while
+      // the board restarted would keep a patch list belonging to a process that
+      // no longer exists.
+      current = null;
       // 🔴 THIS PAGE ASKS THE BOARD FOR NOTHING IT CANNOT CONTROL, AND THAT IS
       // A CHANGE. It used to send one message about an effect it did not draw
       // and had no switch for, to clear one left behind by another page. The
@@ -460,7 +423,17 @@
       // The guard without the cell. Two sources interleaved into one socket
       // reads as roughly double the rate, and that is the only thing this
       // number has ever had to say.
-      if (Math.abs(fps - 50) >= 6 && !rateWarned) {
+      /**
+       * 🔴 NOT BEFORE THERE IS ENOUGH TO DIVIDE BY. `framesPerSec` is frames
+       * over the time since the FIRST frame, so at one and a half seconds in it
+       * is measuring a window that includes the page still waking up: MEASURED
+       * on four separate loads, it read 6.9, 6.9, 7.9 and 6.9 frames a second
+       * and put a red line in the log saying frames were going missing, while
+       * `lost` read 0 and the very same page settled at 50.0 a moment later.
+       * The log box is where this page's real faults are reported, so a false
+       * alarm there costs more than a missing one.
+       */
+      if (st.frames > 250 && Math.abs(fps - 50) >= 6 && !rateWarned) {
         rateWarned = true;
         d.log(`${fps.toFixed(1)} frames a second arriving where one clean source is 50 — `
               + (fps > 56 ? 'that is two instruments streaming at once' : 'frames are going missing'), 'bad');
@@ -508,92 +481,16 @@
    */
 
   // ── the keyboard, from the shell ─────────────────────────────────────────
-  // ── the space the note falls into ───────────────────────────────────────
-  // 🔴 AN INSERT THAT PASSES THE DRY SIGNAL, AND THE DIFFERENCE IS NOTE-OFF.
-  // The one that used to sit here REPLACED the signal, so releasing a key
-  // swapped one drone for another and every instrument's envelope, attack and
-  // patch character were washed out before you heard them. That is why the
-  // patch arrows and the die both stopped doing anything audible. A reverb adds
-  // a tail, so the note still stops when you let go. `rig/box/README.md` has
-  // the rest of that story.
-  //
-  // ⚠️ THIS IS A CSOUND INSERT ON THE JACK GRAPH, `positron-space`, and it is
-  // the one stage between the instrument and the capture that this page can
-  // actually reach. It is deliberately not drawn: it would be a fifth box in a
-  // container drawn to hold four, and nobody asked for it.
-  //
-  // ⚠️ THE BOARD RENDERS, THE PAGE SENDS NUMBERS — the same split `mirror` uses
-  // for its shader knobs. Nothing is processed in this page: it plays what
-  // arrives and no more.
-  // ⚠️ `off`, NOT `dry`. This row said `dry · room · hall` beside a chorus row
-  // saying `off · light · wide` — the same idea in two words, one of which you
-  // have to already know. And it IS off: `mix: 0` with the chorus off sends
-  // `on: false`, so the insert comes out of the graph rather than sitting in it
-  // doing nothing. One vocabulary across two adjacent controls.
-  const SPACE = [
-    ['off',  { mix: 0,    room: 0.2, damp: 6000 }],
-    ['room', { mix: 0.26, room: 0.35, damp: 7000 }],
-    ['hall', { mix: 0.4,  room: 0.8, damp: 4500 }],
-  ];
-  const CHORUS = [['off', 0], ['light', 0.35], ['wide', 0.7]];
-  // ⚠️ BOTH OFF AT THE START, so the first thing you hear is the INSTRUMENT.
-  // This opened on `room` — a little reverb by default, on the argument that
-  // dry is a test rather than a sound. That argument is about mixing a record;
-  // this page exists to let you hear what a Raspberry Pi three hundred metres
-  // away is making, and putting an effect in front of it on arrival means the
-  // first patch you press is not the patch. Nothing is in the graph until you
-  // put it there.
-  let spaceAt = 0, chorusAt = 0;
-
-  // ⚠️ `createChoice`, NOT SIX LOOSE BUTTONS. This row built its own by hand and
-  // it showed: no grouping, so three choices read as three unrelated controls;
-  // the wrong corner on every button; and a `::after` that appended ' on' or
-  // ' off' to each one, inherited from when this was a single toggle — so a
-  // three-way row rendered `dry off`, `room on`, `off on`. Which one is chosen
-  // is already said by colour and by aria-pressed.
-  const spaceRow = el('span', 'fx');
-
-  /** One message, the whole state. Clamped again at the far end. */
-  function sendSpace() {
-    const [, p] = SPACE[spaceAt];
-    send({ type: 'fx.space', on: spaceAt > 0 || chorusAt > 0,
-           mix: p.mix, room: p.room, damp: p.damp, chorus: CHORUS[chorusAt][1] });
-  }
-  const spacePick = createChoice({
-    // ⚠️ `reverb`, NOT `space`. "Space" is what it does to your ear and "reverb"
-    // is what it is called by everyone who has met one; a visitor who knows the
-    // word gets no help from the poetic one, and a visitor who does not is no
-    // better off either.
-    label: 'reverb', options: SPACE.map(([n]) => [n, n]), at: spaceAt,
-    onPick: (_v, name, i) => { spaceAt = i; sendSpace(); d.log(`space ${name}`); },
-  });
-  const chorusPick = createChoice({
-    label: 'chorus', options: CHORUS.map(([n]) => [n, n]), at: chorusAt,
-    onPick: (_v, name, i) => { chorusAt = i; sendSpace(); d.log(`chorus ${name}`); },
-  });
-  spaceRow.append(spacePick.el, chorusPick.el);
-  spaceRow.hidden = true;             // shown when an instrument that can be wrapped is up
-  // ⚠️ A CLASS, NOT INLINE STYLE. This set `display` and `align-items` on the
-  // element, and an inline style beats every stylesheet — including the media
-  // query that puts these controls full width on a phone, which is why reverb
-  // and chorus stayed 113 px wide on a 390 px screen while the row above them
-  // went full width. Measured twice before the cause was the style attribute.
-  //
-  // 🔴 IN THE PATCH ROW, AND UNTIL 2026-09-16 THESE TWO CONTROLS COULD NOT BE
-  // SEEN AT ALL. They were appended into `.pos-controls`, and this page declares
-  // `controls: []`, so `mount()` had already set `hidden` on that row — for the
-  // right reason, since a row with nothing in it paints a band of dead space.
-  // Nothing ever cleared it. `spaceRow.hidden = m.jack === false` was toggling a
-  // child of an element that was `display: none`, so reverb and chorus were
-  // invisible in every state the page has, on every visit. FOUND by reading the
-  // computed display off a real browser while measuring this page's gaps:
-  // `.pos-controls` came back 0 px high and `none`.
-  // ⚠️ THE FIX IS NOT TO UN-HIDE THE SHELL'S ROW. Two reasons: the row would
-  // then open the page ABOVE the transport bar, and the order asked for is the
-  // bar first; and these two belong with the patch, which is the other thing
-  // you set and then leave alone. The page's own CSS already styles `.pick .fx`
-  // exactly as it styled `.pos-controls .fx`, phone rules included.
-  picks.append(spaceRow);
+  // 🔴 REVERB AND CHORUS ARE GONE, 2026-09-17, ON INSTRUCTION: *"Rm chorus
+  // reverb from keys ui and board"*. They drove a Csound insert called
+  // `positron-space` on the board's JACK graph, and the board no longer carries
+  // it either, so a page that offered them would be offering a control with
+  // nothing at the far end.
+  // ⚠️ THEY HAD BEEN INVISIBLE FOR WEEKS and were only reviewable at all
+  // because 2026-09-16 moved them out of a control row this page declares
+  // empty, which `mount()` had already hidden. The lesson worth keeping is that
+  // one: a control nobody can see cannot be judged, so it survives by accident
+  // rather than on merit. `archive/keys-space/` has what they did.
 
   /**
    * Stamp a key press, but only where the answer would mean something.
@@ -652,7 +549,7 @@
     }
     // The box's own library. It arrives once per instrument change and is
     // ~34 KB for Yoshimi, well inside the relay's 256 KiB per message.
-    if (m.type === 'voices.listed') {
+    if (m.type === 'voices.listed' && m.re && m.re === listing) {
       if (m.source !== current) { /* an answer about an instrument we left */ }
       else if (m.ok && m.banks?.length) {
         patches = [];
@@ -722,6 +619,26 @@
         return;
       }
       if (m.ok) {
+        /**
+         * 🔴 ONLY WHEN THE INSTRUMENT ACTUALLY CHANGED, AND THIS IS A NO-SOUND
+         * BUG RATHER THAN A TIDINESS ONE. The relay forwards verbatim to the
+         * whole room and the board REPLIES to the room, so an `audio.started`
+         * arrives here every time ANYBODY asks the board what it is playing:
+         * a second person on this page, a probe from a terminal, `/knobs/`
+         * opening. Each one used to drop this page's patch list, ask for it
+         * again and then send `voice.select` when it came back — and a
+         * `voice.select` makes Yoshimi load an .xiz, which kills the note you
+         * are holding. So somebody else opening a page took the sound away from
+         * you, with nothing on screen to say why.
+         * MEASURED 2026-09-17: one page load, three `opening on AddSynth Morph`
+         * lines and three patch loads, caused by probes in another process.
+         */
+        // ⚠️ ON THE SOURCE ALONE, NOT ON WHETHER A LIST HAS ARRIVED YET. The
+        // first guard here also required `patches.length`, and the duplicates
+        // land within about fifty milliseconds of each other — long before the
+        // list comes back — so all three got through and the page still loaded
+        // the patch three times. MEASURED before and after.
+        if (current === m.source) { pres.coming(false); return; }
         current = m.source; lastBank = -1;
         pres.coming(false);
 
@@ -730,9 +647,6 @@
         // forgetting meant a control that silently refused to arm on a page
         // that could not say why. Whether an insert can wrap something is a
         // property of the SOURCE, and the box reports it.
-        spaceRow.hidden = m.jack === false;
-        if (m.jack === false) d.log(`${m.source} writes to a pipe rather than to the audio graph the reverb sits on, so there is no space to put it in`, 'warn');
-        else sendSpace();
         // A new instrument means a new library. Drop the old one FIRST, or
         // the arrows keep walking the previous instrument's list until the
         // reply lands — stepping through names that belong to something else.
@@ -741,7 +655,20 @@
         // dropdown has to be rebuilt even when no list arrives.
         refreshPicker();
         showPatch();
-        send({ type: 'voices.list', source: m.source });
+        /**
+         * 🔴 KEEP THE ID, BECAUSE A REPLY THAT IS NOT OURS IS NOT OURS. The
+         * relay is a broadcast and the board answers into the room, so every
+         * `voices.list` ANYBODY sends comes back to this page as a
+         * `voices.listed` — a second person on this page, `/knobs/` opening, a
+         * probe from a terminal. Each one used to be treated as this page's own
+         * answer, and the handler ends by sending `voice.select`, which makes
+         * Yoshimi load an .xiz and kills the note you are holding.
+         * MEASURED 2026-09-17: three `opening on AddSynth Morph` lines in one
+         * page load, 20 ms apart, with three patch loads behind them. Guarding
+         * the `audio.started` side first was not enough and the count did not
+         * move, which is what sent the search here.
+         */
+        listing = send({ type: 'voices.list', source: m.source });
         d.log(`playing ${m.source}`, 'hi');
       }
       // ⚠️ NOT `d.set('playing', ...)`. There is no `playing` cell — the shell
