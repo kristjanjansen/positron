@@ -212,7 +212,7 @@ export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
 export function createKeyboard(host, {
   base = 60, map = QWERTY_CHROMATIC, sharps = SHARP_KEYS,
   onDown = () => {}, onUp = () => {}, keys: keyOpts = null,
-  onPanic = null, onOctave = null, minBase = 24, maxBase = 96,
+  onPanic = null, onOctave = null, minBase = 24, maxBase = 96, letters = true,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
   const keys = keyOpts || Object.keys(map);
@@ -226,8 +226,13 @@ export function createKeyboard(host, {
   const label = (b, k) => {
     b.textContent = '';
     const nn = document.createElement('span'); nn.className = 'kn'; nn.textContent = noteName(noteOf(k));
-    const kk = document.createElement('span'); kk.className = 'kk'; kk.textContent = k;
-    b.append(nn, kk);
+    b.append(nn);
+    // ⚠️ THE LETTER IS ONLY DRAWN IF IT DOES SOMETHING. A key labelled `a` that
+    // does nothing when you press `a` is worse than a key with no letter on it.
+    if (letters) {
+      const kk = document.createElement('span'); kk.className = 'kk'; kk.textContent = k;
+      b.append(kk);
+    }
   };
   const keyOf = (note) => keys.find((k) => noteOf(k) === note) ?? null;
   const make = (tag, cls, text, attrs) => {
@@ -510,9 +515,20 @@ export function createKeyboard(host, {
   const onKeyUp = (e) => { const k = e.key.toLowerCase(); if (k in map) release(k, 'key'); };
   // A tab that loses focus never sees keyup, which is a stuck note.
   const onBlur = () => { for (const k of [...held]) release(k, 'key'); };
-  addEventListener('keydown', onKeyDown);
-  addEventListener('keyup', onKeyUp);
-  addEventListener('blur', onBlur);
+  /**
+   * 🔴 THE LETTER ROW IS OPTIONAL, BECAUSE TWO KEYBOARDS ON ONE PAGE BOTH HEAR
+   * IT. Added 2026-09-17 for `/kit/`, which now shows a full-width keyboard and
+   * a narrow one side by side: both bind `window`, so one press of `a` sounded
+   * two notes and lit two keys, which in a gallery reads as a broken component
+   * rather than as two components doing what they were told.
+   * ⚠️ THE DRAWN LETTERS GO WITH IT. A key labelled `a` that does nothing when
+   * you press `a` is worse than a key with no letter on it.
+   */
+  if (letters) {
+    addEventListener('keydown', onKeyDown);
+    addEventListener('keyup', onKeyUp);
+    addEventListener('blur', onBlur);
+  }
 
   const api = {
     el, keysEl, pad,
@@ -583,9 +599,11 @@ export function createKeyboard(host, {
      */
     destroy() {
       api.panic();
-      removeEventListener('keydown', onKeyDown);
-      removeEventListener('keyup', onKeyUp);
-      removeEventListener('blur', onBlur);
+      if (letters) {
+        removeEventListener('keydown', onKeyDown);
+        removeEventListener('keyup', onKeyUp);
+        removeEventListener('blur', onBlur);
+      }
       keysEl.removeEventListener('touchmove', onTouchMove);
       el.remove();
     },
