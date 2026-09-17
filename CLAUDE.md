@@ -461,8 +461,19 @@ to recover.
   filter cutoff, 75 bandwidth, 78 resonance bandwidth. MEASURED 2026-09-16 with
   `node rig/box/wobble-test.mjs`, one note held throughout and every controller
   read twice at one value first: CC 76, CC 77 and the mod wheel move the pitch
-  by **0.2 cents** at every value, which is the tracker's own noise. There is no
-  vibrato on this instrument to have a rate. What 75 and 76 DO move is large —
+  by **0.2 cents** at every value, which is the tracker's own noise.
+  ⚠️ **THAT WAS FIRST WRITTEN AS "THERE IS NO VIBRATO ON THIS INSTRUMENT" AND
+  THAT WAS WRONG, TWICE OVER.** Challenged 2026-09-17 with *"Sure there is no
+  lfo?"*, which was the right question. It had been measured on ONE patch, so a
+  patch with no LFO configured was being reported as a fact about Yoshimi; and it
+  tracked PITCH only, so an amplitude LFO would have read as flat however obvious
+  it was to a listener. MEASURED on `Trem Lead` (bank 110, program 8) with a
+  level analyser graded on synthetic tremolo first: a real **21 to 25% deep**
+  tremolo at about **1 Hz**, and 1.2 cents of pitch wobble against 0.2 on
+  `AddSynth Morph`. **THE LFOs ARE THERE.** What is true is the narrower claim:
+  no controller reaches one. CC 76, CC 77 and the mod wheel leave that patch's
+  tremolo rate and depth inside their own floor, so a slider labelled LFO speed
+  still has nothing to drive. What 75 and 76 DO move is large —
   bandwidth takes the beating between partials from 225 cents at 6 Hz to 114
   cents at 0.8 Hz, FM amplitude takes it from 149 cents to 0.2 — so `/knobs/`
   carries those two beside cutoff and resonance.
