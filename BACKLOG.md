@@ -15,6 +15,18 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **THE BOARD HAS TO BECOME PORTABLE, PACKAGEABLE AND PLUGGABLE.** Asked
+  2026-09-17: the setup should be *"repeatable"* so *"my friends can also use
+  it"*, and the open architectural question is *"Is it a board which a single
+  person only uses for its own use? Or is it multi-user? How much it can take
+  input from different users via relay, there are the limits."* Production may
+  not be this checkout. A PLAN is being written; nothing is built.
+  ⚠️ The multi-user question is not hypothetical and has already cost sound
+  twice: `/knobs/` was found refused because a visitor had pressed `sampled`,
+  and `/keys/` reloaded its patch every time anybody else in the room asked the
+  board a question, because the relay forwards VERBATIM to everyone. One jackd,
+  one capture, one instrument, one room.
+
 - 🔴 **THE BOARD'S OUTPUT LEVEL HAS COLLAPSED, AND IT IS NOT THE PAGE, NOT MIDI,
   AND NOT THE INSTRUMENT.** Reported 2026-09-17: *"There is no sound on knobs"*.
   MEASURED the same hour, over the relay with no browser in the way: every patch,

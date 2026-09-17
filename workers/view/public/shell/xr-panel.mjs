@@ -60,10 +60,17 @@ export const touchOf = (isHeld, isAimed) => (isHeld ? TOUCH.held : isAimed ? TOU
 //      GL_INVALID_OPERATION (1282) for it and DREW CORRECTLY ANYWAY, because
 //      the linker happened to pick the same slot. So it is called before the
 //      link and `gl.getError()` is read on the first frame and published.
-//   5. THE WAY OUT BELONGS TO THE PAGE. Any controller button ends the session,
-//      plus a dead-man's switch that ends it if nothing has been drawn after
-//      4 s. "Press the Meta button" is not an answer a page gets to give about
-//      its own bug.
+//   5. THE WAY OUT BELONGS TO THE PAGE. A long hold on ANY controller button
+//      ends the session, with a ring at the controller filling while you hold
+//      (`xr-quit.mjs`) — plus a dead-man's switch that ends it if nothing has
+//      been drawn after 4 s. "Press the Meta button" is not an answer a page
+//      gets to give about its own bug.
+//      ⚠️ THE TWO ARE NOT THE SAME THING AND ONLY ONE IS AN EXIT. The hold is
+//      for a person who wants out; the dead-man's switch is for a page that has
+//      stopped being able to offer one. 2026-09-17 removed every OTHER exit
+//      here — the grip, and the tablet's own button — and deliberately kept
+//      that guard, because without it a throw in the entry path leaves a live
+//      session with nothing drawing, no way out and no log line.
 //
 // ⚠️ AND THE LINES THAT SAY WHERE IT HUNG CANNOT BE ON A BATCHED SHIPPER.
 // `createShipper` holds for 2 s and entering an immersive session is exactly
@@ -233,22 +240,52 @@ function placeFacing(headMat, headPos, wM, hM, dist, yaw) {
 /**
  * The same quad, at a centre somebody else chose, turned to face a head.
  *
- * 🔴 YAW ONLY, AND UPRIGHT. A panel that tips to meet a head looking down from
- * above reads as falling over — a picture on a stand does not lean back when
- * you stand up. The vertical column is world +Y, unconditionally, and the only
- * thing the head contributes is which way round the thing points.
+ * 🔴 BOTH AXES SINCE 2026-09-17, AND IT WAS YAW ONLY. Instructed: *"make them
+ * always look at me not only horiz but also vertic"*. The old rule and its
+ * reason are kept here because the reason was a real one and it lost on a
+ * measurement nobody had: it said a panel that tips to meet a head looking down
+ * from above reads as FALLING OVER, because a picture on a stand does not lean
+ * back when you stand up. That is true of a picture standing on a floor. These
+ * panels hang in mid-air at head height and can be pushed to 3 m up or pulled
+ * to 0.45 m off the ground by the thumbstick, and at either of those a
+ * world-upright rectangle is a plane you are reading at an angle — the text in
+ * its footer keystones and the picture foreshortens. A thing hanging in the air
+ * has no floor to be upright against.
+ *
+ * ⚠️ IT IS STILL A ROTATION AND NEVER A SKEW. The three columns are an
+ * orthonormal basis built from one direction, so the quad stays a rectangle and
+ * `pickQuad` — which reads exactly these columns — keeps answering about the
+ * shape that is drawn.
+ *
+ * ⚠️ AND THE ROLL IS PINNED TO WORLD UP, WHICH IS THE HALF THAT MUST NOT
+ * FOLLOW THE HEAD. Tilt your head sideways and a panel that matched it would
+ * rotate in your view and stay rotated when you straighten up. `right` is
+ * perpendicular to world up, so the panel's horizon is the room's.
  *
  * 🔴 AND IT IS AIMED AT THE HEAD, NOT AT THE CONTROLLER THAT PLACED IT. The
  * viewer is the head; aiming at the hand points the panel at your own wrist.
  */
 export function facing(c, headPos, wM, hM) {
-  let fx = c[0] - headPos.x, fz = c[2] - headPos.z;
-  const l = Math.hypot(fx, fz);
-  if (l < 1e-4) { fx = 0; fz = -1; } else { fx /= l; fz /= l; }
+  // The panel's own +Z: from its centre back to the head, which is the
+  // direction the quad's face has to point.
+  let nx = headPos.x - c[0], ny = headPos.y - c[1], nz = headPos.z - c[2];
+  let l = Math.hypot(nx, ny, nz);
+  if (l < 1e-4) { nx = 0; ny = 0; nz = 1; l = 1; }
+  nx /= l; ny /= l; nz /= l;
+  // right = worldUp x normal. Degenerate only when the head is directly above
+  // or below the centre, where there is no horizon to line up with and any
+  // perpendicular will do for the frame it lasts.
+  let rx = nz, ry = 0, rz = -nx;
+  const rl = Math.hypot(rx, ry, rz);
+  if (rl < 1e-4) { rx = 1; ry = 0; rz = 0; } else { rx /= rl; ry /= rl; rz /= rl; }
+  // up = normal x right, which is a unit vector because the two are orthonormal
+  const ux = ny * rz - nz * ry;
+  const uy = nz * rx - nx * rz;
+  const uz = nx * ry - ny * rx;
   return new Float32Array([
-    -fz * wM, 0, fx * wM, 0,
-    0, hM, 0, 0,
-    -fx, 0, -fz, 0,
+    rx * wM, ry * wM, rz * wM, 0,
+    ux * hM, uy * hM, uz * hM, 0,
+    nx, ny, nz, 0,
     c[0], c[1], c[2], 1,
   ]);
 }
@@ -266,12 +303,22 @@ export function barOf(M, hM, barW, barH, gap) {
   // column 0 over the panel's width — and the width is the length of it.
   const w = Math.hypot(M[0], M[1], M[2]) || 1;
   const rx = M[0] / w, ry = M[1] / w, rz = M[2] / w;
+  // 🔴 THE PANEL'S OWN UP, NOT WORLD UP — AND THIS BROKE THE MOMENT PANELS
+  // STARTED TO PITCH. The bar used to be `(0, barH, 0)` dropped along world
+  // −Y, which is the same thing while every panel is world-upright and is a
+  // handle floating OUT OF the panel's plane the moment one tips: it would hang
+  // in front of a panel tilted down at you and behind one tilted up, and
+  // `pickQuad` would answer about a rectangle in a different plane from the one
+  // being drawn. Both come off column 1 now, so the bar is in the picture's
+  // plane at every angle by construction.
+  const h = Math.hypot(M[4], M[5], M[6]) || 1;
+  const ux = M[4] / h, uy = M[5] / h, uz = M[6] / h;
   const drop = hM / 2 + gap + barH / 2;
   return new Float32Array([
     rx * barW, ry * barW, rz * barW, 0,
-    0, barH, 0, 0,
+    ux * barH, uy * barH, uz * barH, 0,
     M[8], M[9], M[10], 0,
-    M[12], M[13] - drop, M[14], 1,
+    M[12] - ux * drop, M[13] - uy * drop, M[14] - uz * drop, 1,
   ]);
 }
 
@@ -289,19 +336,28 @@ export const PLACE = {
   near: 0.55, far: 6.0,
   lowest: 0.45,            // the CENTRE's lowest y above the floor
   highest: 3.0,
-  // ⚠️ THE BAR'S THREE NUMBERS, SET BY LOOKING AT IT IN A HEADSET. The first
-  // guess was 0.42 of the width, 45 mm tall, 22 mm clear — and in the headset it
-  // read as a second object competing with the picture rather than as a handle
-  // on it. Asked for narrower, shorter and further off: **0.28 of the width,
-  // 32 mm, 38 mm clear**. A handle should be findable and unremarkable; the
-  // picture is the thing you came to look at.
-  // ⚠️ The gap grew as the bar shrank, deliberately — a smaller handle sitting
-  // closer reads as part of the frame, and the whole reason it is separate is
-  // that "the ray on the picture" and "the ray on the handle" have to be
-  // different gestures.
-  barH: 0.032,             // the grab bar's height
-  barGap: 0.038,           // air between the panel's lower edge and the bar
-  barShare: 0.28,          // how much of the panel's width the bar spans
+  // 🔴 THE BAR'S THREE NUMBERS, AND IT HAS BEEN HALVED TWICE BY EYE IN A
+  // HEADSET. Instructed 2026-09-17: *"retuce movebar size under panel 2x."*
+  //
+  //   first guess   0.42 of the width, 45 mm tall, 22 mm clear
+  //   2026-09-16    0.28 of the width, 32 mm tall, 38 mm clear
+  //   2026-09-17    0.14 of the width, 16 mm tall, 30 mm clear
+  //
+  // On the shipped 1.28 m panel that is **358 mm x 32 mm becoming 179 mm x
+  // 16 mm** — half in each direction, a quarter of the area. A handle should be
+  // findable and unremarkable; the picture is the thing you came to look at.
+  //
+  // ⚠️ THE GAP CAME DOWN AND NOT BY HALF. It had GROWN as the bar shrank, on
+  // the argument that a small handle sitting close reads as part of the frame
+  // rather than as a separate thing to aim at — that argument still holds, so
+  // 38 mm of air under a 16 mm bar would be more than twice the handle's own
+  // height and the thing would read as floating loose. 30 mm keeps it clearly
+  // separate without setting it adrift.
+  // ⚠️ AND THE BAR IS STILL A SEPARATE GESTURE FROM THE PICTURE. That is the
+  // whole reason it exists; making it smaller does not make it the picture.
+  barH: 0.016,             // the grab bar's height
+  barGap: 0.030,           // air between the panel's lower edge and the bar
+  barShare: 0.14,          // how much of the panel's width the bar spans
   pushPerSec: 1.6,         // metres a second, on a fully pushed thumbstick
   stickDead: 0.25,         // below this the stick is at rest
 };
@@ -425,14 +481,13 @@ export function createXRPanels({
   let gl = null, prog = null, quad = null, U = null;
   let barProg = null, barU = null;
   let session = null, space = null, arMode = false;
-  // 🔴 THE WAY OUT IS A HOLD ON ONE BUTTON, NOT A TAP ON ANY OF THEM. Every
-  // other immersive page here already reads that way; this one still exited on
-  // whatever button happened to be pressed, which is the design `xr-quit.mjs`
-  // was written to replace. The difference is not politeness: a page whose exit
-  // is any button is a page you leave by accident while reaching for something,
-  // and it gives no warning that it is about to happen. The badge is on the
-  // controller, it says what the button does, and the ring shows how far the
-  // hold has got so a release cancels something visible.
+  // 🔴 THE WAY OUT IS A HOLD, AND THE BUTTON WAS NEVER THE POINT. This page once
+  // exited on a TAP of whatever button happened to be pressed, so you left it by
+  // accident while reaching for something and it gave no warning. It then exited
+  // on one NAMED button, held, which fixed the accident and asked somebody
+  // wearing a headset to find a particular button by feel. Since 2026-09-17 it
+  // is ANY button, HELD, with a ring at the controller filling while you hold:
+  // nothing is reachable by accident and there is nothing to be told.
   let theQuit = null;
 
   /**
@@ -452,9 +507,10 @@ export function createXRPanels({
     if (theQuit !== null || quitFailed || !gl) return theQuit;
     try {
       theQuit = createXRQuit(gl, {
-        // Guarded by `armed` for the same reason every other exit is: the press
-        // that opened this page's own button may still be down as the session
-        // starts, and an exit that fires on entry is a session nobody gets into.
+        // Guarded by `armed`: the press that opened this page's own button may
+        // still be down as the session starts, and an exit that fires on entry
+        // is a session nobody gets into. That guard matters more now that ANY
+        // button advances the hold, because the button still down IS one.
         onQuit: () => {
           if (!armed) return;
           beacon('held the quit button · leaving');
@@ -523,7 +579,15 @@ export function createXRPanels({
    * Taking input away instead would be a session with no visible way out, which
    * is the failure `room: null` already has a warning about.
    */
-  const wantHands = roomOpt.hands !== false;
+  // 🔴 AND THE DEFAULT IS NOW OFF. 2026-09-17: *"rm controller
+  // geometry/tablet on all (only if i am ask on specific demo so keep that code
+  // ready to pop into scene)"*. It was `!== false`, so every page got plastic
+  // controllers unless it said otherwise; it is `=== true` now, so a page gets
+  // them only by asking. The drawing code is untouched and lives where it
+  // always did — `GRIP_PARTS` and `loadModel` in `demo/shell/xr-room.mjs`, and
+  // the stand-in meshes in `demo/shell/xr-controller.mjs` — so putting them
+  // back into one scene is `hands: true` and nothing else.
+  const wantHands = roomOpt.hands === true;
   /**
    * 🔴 `tablet: false` TAKES THE SLAB OFF THE LEFT HAND TOO.
    * `hands: false` stopped the controller models and the tablet stayed, because
@@ -536,7 +600,16 @@ export function createXRPanels({
    * away has one visible exit instead of two, which is why this is a switch a
    * page asks for rather than the default.
    */
-  const wantTablet = roomOpt.tablet !== false;
+  // 🔴 OFF BY DEFAULT TOO, SAME INSTRUCTION, SAME DAY. The slab and its slider
+  // are kept whole in `demo/shell/xr-tablet.mjs` and are one `tablet: true`
+  // away from being back in a scene.
+  // 🔴 AND NEVER IN PASSTHROUGH, WHATEVER A PAGE ASKS FOR. 2026-09-17: *"slider
+  // is ok. but again, do not show it on any vr/xr when showing ar scenes"*.
+  // The test is `arMode`, which is read off `environmentBlendMode` and NOT off
+  // the session's name — CLAUDE.md records that a session can be called
+  // `immersive-ar` and still composite `opaque`, and gating on the name would
+  // hide the tablet in a session that is drawing an opaque room.
+  const wantTablet = roomOpt.tablet === true;
   const roomBg = Array.isArray(roomOpt.bg) ? roomOpt.bg : null;
   const roomDoc = room ? roomOf(roomSeed) : null;
   // ⚠️ THE DOCUMENT IS STILL ROLLED FROM THE SEED EVEN WHEN NOTHING IS DRAWN
@@ -559,9 +632,23 @@ export function createXRPanels({
   // room is a page hanging one rectangle in an empty session, and a tablet in
   // a void is a thing with nothing to be near.
   const theTablet = theRoom ? createXRTablet({ ctx: { room: theRoom } }) : null;
+  // ⚠️ THE ROOM IS GIVEN THE TABLET EVEN WHERE IT IS NOT SHOWN. `setTablet` is
+  // what uploads its face when the version moves; whether the slab is DRAWN is
+  // `tabletM`, and `setInput` below nulls that unless the page asked for it and
+  // this is not a passthrough session. `applyAll()` is what puts the floor dots
+  // at the strength the slider declares rather than at a default, so it has to
+  // run whether anybody can see the slider or not.
   if (theTablet) { theRoom.setTablet(theTablet); theTablet.applyAll(); }
   const theHands = theRoom
-    ? createXRHands({ tablet: theTablet, log, say: beacon }) : null;
+    ? createXRHands({
+      tablet: theTablet,
+      // The same answer the room is given below: the page asked for it, and
+      // this is not a passthrough session. A slab nobody can see must not eat
+      // the trigger — see `tabletShown` in xr-hands.mjs.
+      tabletShown: () => wantTablet && !arMode,
+      log,
+      say: beacon,
+    }) : null;
 
   /**
    * 🔴 WHICH CALL, NOT WHETHER. `gl.getError()` returns the FIRST error since
@@ -846,9 +933,16 @@ export function createXRPanels({
   Object.defineProperty(state, 'quit', {
     enumerable: true,
     get: () => (theQuit && quitReady
-      ? { built: true, button: theQuit.button, label: theQuit.label,
+      // ⚠️ `button` IS `'any'` SINCE 2026-09-17, not an index, so a check that
+      // asked `Number.isInteger(button)` is asking about the design that was
+      // replaced. `holdMs` is published beside it because with every button
+      // live the hold length is the only thing between a resting thumb and the
+      // session ending, which makes it the number worth asserting on.
+      ? { built: true, button: theQuit.button, holdMs: theQuit.holdMs,
+          label: theQuit.label, pressed: theQuit.pressed,
           holding: theQuit.holding, progress: theQuit.progress }
-      : { built: false, button: null, label: null, holding: false, progress: 0,
+      : { built: false, button: null, holdMs: null, label: null, pressed: null,
+          holding: false, progress: 0,
           why: theQuit?.why || (quitFailed ? 'it threw on construction' : 'never built') }),
   });
   if (panels[0]?.canvas) state.panelPixels = { w: panels[0].canvas.width, h: panels[0].canvas.height };
@@ -1140,7 +1234,7 @@ export function createXRPanels({
     beacon(`session created · ${mode} · blend ${session.environmentBlendMode || 'not reported'} · refresh ${session.frameRate || 'not reported'}`
       + ` · picture ${liveOn && panels.some((p) => p.live) ? 'RENDERED LIVE in this session' : 'uploaded from a canvas'}`
       + ` · walls ${wantSky ? 'on' : 'off'} · objects ${wantThings ? 'on' : 'off'}`);
-    log('you are in it · the grip or any face button comes back out', 'ok');
+    log('you are in it · hold any controller button for three seconds to come back out', 'ok');
 
     session.addEventListener('end', () => {
       state.presenting = false; state.mode = 'window';
@@ -1152,20 +1246,10 @@ export function createXRPanels({
         + ` · ${state.grabbed} panel move(s)`);
       try { onEnd?.(); } catch { /* the page's business */ }
     });
-    // 🔴 ANY CONTROLLER BUTTON LEAVES — defect 5. The trigger and the grip have
-    // their own events; everything else is read off the gamepad in the frame
-    // loop. ARMED ONLY ONCE NOTHING IS PRESSED, because the press that opened
-    // this page's button may still be down as the session starts, and an exit
-    // that fires on entry is a session nobody can get into.
-    const leave = (why) => {
-      if (!armed) return;
-      beacon(`${why} · leaving`);
-      session?.end().catch(() => {});
-    };
-    // 🔴 TRIGGER GRABS, GRIP LEAVES — the same split `scene` already settled
-    // on, for the same reason: a page must keep a way out that belongs to it,
-    // and dragging needs a button, so the two cannot be the same button. Both
-    // used to exit here, which left nothing to drag with.
+    // 🔴 THE TRIGGER GRABS AND NOTHING HERE LEAVES. There was a `leave()` in
+    // this scope, called from `squeezestart`, and it is gone with every other
+    // exit on 2026-09-17: the one way out is `xr-quit.mjs`'s long hold, which
+    // is armed by the same `armed` flag below.
     // 🔴 A PRESS THAT LANDS ON THE TABLET BELONGS TO THE TABLET. Without this
     // the same trigger would move a slider AND drag the panel across the room,
     // two things from one press, one of which you did not ask for.
@@ -1208,7 +1292,12 @@ export function createXRPanels({
       }
       grabbing = null;
     });
-    session.addEventListener('squeezestart', () => leave('grip'));
+    // 🔴 THE GRIP NO LONGER LEAVES, AND NEITHER DOES ANYTHING ELSE ON THIS
+    // PAGE. 2026-09-17: *"make one general way to get out ... no other exit
+    // methods/ui's for now."* `squeezestart` ended the session here, which was
+    // an exit nothing on screen ever named and which sat next to the trigger
+    // people drag panels with. The one way out is a long hold on any button,
+    // with a ring at the controller saying how far it has got.
     // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
     // session started, the room is black and staying black: end it and say so
     // rather than leaving somebody standing in it.
@@ -1384,7 +1473,21 @@ export function createXRPanels({
         gl.uniformMatrix4fv(barU.model, false,
           barOf(placed[i], p.h ?? 0.75, bw * tch.scale, PLACE.barH * tch.scale, PLACE.barGap));
         gl.uniform1f(barU.aspect, bw / PLACE.barH);
-        gl.uniform3fv(barU.col, held ? [1.0, 0.83, 0.0] : [0.42 * tch.lit, 0.50 * tch.lit, 0.60 * tch.lit]);
+        // 🔴 MONOCHROME, LIGHTENING UP WHEN NEEDED. Instructed 2026-09-17:
+        // *"make it monochrome, just lightening up when needed."* It was a
+        // cold blue-grey at rest and YELLOW with hold of something, and the
+        // yellow is the site's "this is the thing that is running" colour spent
+        // on a handle. A handle has one thing to say and it is HOW IT LANDED —
+        // nothing, the ray is on it, you have hold of it — which is three
+        // brightnesses of one grey and needs no hue at all. It is the same
+        // decision the pointer took on the same day, so the ray and the thing
+        // it lands on now answer in the same channel.
+        // ⚠️ `tch.lit` IS THE SCALE AND IT IS NOT LINEAR IN THE GREY. 1.00,
+        // 1.35 and 1.80 against a 0.50 base gives 0.50, 0.68 and 0.90, which
+        // stays inside the range rather than clipping to white at the aimed
+        // step and having nothing left for held.
+        const g = Math.min(1, 0.50 * tch.lit);
+        gl.uniform3fv(barU.col, [g, g, g]);
         gl.uniform1f(barU.alpha, held ? 1 : 0.85);
         gl.drawArrays(gl.TRIANGLES, 0, quad.count);
       });
@@ -1421,6 +1524,10 @@ export function createXRPanels({
 
     // Arm the way out once every button is up — or after 3 s regardless, so a
     // stuck button cannot be the reason somebody is trapped.
+    // ⚠️ THIS GUARD MATTERS MORE NOW THAT EVERY BUTTON IS LIVE. The press that
+    // opened this page's own button may still be down as the session starts,
+    // and it IS one of the buttons the hold counts, so without this the session
+    // would end about three seconds after it began.
     if (!armed) {
       let anyDown = false;
       for (const src of session.inputSources) {
@@ -1578,7 +1685,7 @@ export function createXRPanels({
       theRoom.setInput({
         ...seen,
         ...(wantHands ? {} : { hands: [] }),
-        ...(wantTablet ? {} : { tabletM: null, hit: null }),
+        ...(wantTablet && !arMode ? {} : { tabletM: null, hit: null }),
       });
     }
 
@@ -1613,7 +1720,7 @@ export function createXRPanels({
     // as you turning, on a page whose whole subject is two pictures held side by
     // side. Billboarding is only harmless while you are the one moving it.
     //
-    // ⚠️ YAW ONLY, UPRIGHT, AND AIMED AT THE HEAD — see `facing`.
+    // ⚠️ BOTH AXES, ROLL PINNED TO THE ROOM, AND AIMED AT THE HEAD — see `facing`.
     if (grabbing && placed && grabbing.src) {
       const rp = frame.getPose(grabbing.src.targetRaySpace, space);
       if (rp) {

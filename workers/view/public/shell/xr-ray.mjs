@@ -36,17 +36,27 @@
  *  ⚠️ Exported because the check below and the shader must agree about them,
  *  and a test that re-types its subject's constants grades nothing. */
 export const FADE_IN = 0.10, FADE_OUT = 0.45;
-/** The default aim colour, and the colour of a ray with hold of something.
- *  One meaning for colour across the site: this is HOW IT LANDED, not which
- *  hand it is — which hand is answered by the tablet being on the other one. */
-export const AIM_RGB = [0.42, 0.78, 0.76];
-export const HELD_RGB = [1.0, 0.83, 0.0];
-/** ...and the same pair for a page that has no colour to spend. `floor` is 1965
- *  newsreel put through one luma and a coloured pointer would be the only hue
- *  in the archive — so the ray says "I have hold of this" by getting LIGHTER
- *  rather than by changing hue, which is the same channel doing the same job. */
-export const MONO_AIM = [0.55, 0.55, 0.55];
-export const MONO_HELD = [1.0, 1.0, 1.0];
+/**
+ * 🔴 THE RAY IS GREY, EVERYWHERE, AND THERE IS NO WAY TO MAKE IT ANYTHING ELSE.
+ * Instructed 2026-09-17: *"use global rays, (white, ends faded). when something
+ * active happens lighten them up. no coloring of rays, grayscale."*
+ *
+ * It used to be teal at rest and yellow with hold of something, with a second
+ * grey pair beside it for `floor`, which is one pointer with two looks: you
+ * learn the colour again per page, and a hue on a pointer is a hue that is not
+ * available to say how something LANDED. Now the only channel the ray has is
+ * how BRIGHT it is, which is the same channel doing the same job on every page,
+ * and a page cannot opt out — `draw` takes no colour at all.
+ *
+ * ⚠️ `MONO_AIM` AND `MONO_HELD` ARE THE SAME TWO VALUES AND ARE KEPT AS NAMES
+ * ONLY. They were `floor`'s private pair; now that every ray is grey there is
+ * nothing private about them, and a page importing either gets what the module
+ * would have used anyway.
+ */
+export const AIM_RGB = [0.55, 0.55, 0.55];
+export const HELD_RGB = [1.0, 1.0, 1.0];
+export const MONO_AIM = AIM_RGB;
+export const MONO_HELD = HELD_RGB;
 /** Half-width at full taper, in metres. 9 mm reads as a line at 2 m and is
  *  still visible at 12; a box at 4 mm was invisible past about 6. */
 export const RAY_W = 0.009;
@@ -188,9 +198,12 @@ export function createXRRay(gl) {
      * @param pose    the controller's target-ray matrix (column-major 16)
      * @param len     metres to draw. To what it has hold of, else what it is
      *                on, else a fixed reach — the host owns that rule.
-     * @param held    true while the trigger has hold of something
+     * @param held    something ACTIVE is happening on this ray — a hit, a grab,
+     *                a press. The ribbon lightens from grey to white; it never
+     *                changes hue, because it has none. There is deliberately no
+     *                `colour` parameter: see the note by AIM_RGB.
      */
-    draw({ vp, view = null, eyePos = null, pose, len = 2.4, held = false, colour = null }) {
+    draw({ vp, view = null, eyePos = null, pose, len = 2.4, held = false }) {
       if (!pose) return;
       const e = eyePos || (view && eyeFromView(view));
       if (!e) return;
@@ -203,7 +216,7 @@ export function createXRRay(gl) {
       gl.uniform3f(L.eye, e[0], e[1], e[2]);
       gl.uniform1f(L.len, len);
       gl.uniform1f(L.w, RAY_W);
-      const c = colour || (held ? HELD_RGB : AIM_RGB);
+      const c = held ? HELD_RGB : AIM_RGB;
       gl.uniform3f(L.col, c[0], c[1], c[2]);
       gl.uniform2f(L.fade, FADE_IN, FADE_OUT);
       gl.enable(gl.BLEND);

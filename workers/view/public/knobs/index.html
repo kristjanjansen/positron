@@ -633,8 +633,22 @@
     const asked = noteAt;
     setTimeout(() => {
       if (asked !== noteAt || releasedAt > noteAt) return;   // a newer note, or it was released
-      if (board.stats().peak > 0.002) return;
-      d.log('the note is not sounding: the board is streaming silence. Press stop and play again, or check nothing else is holding the instrument', 'bad');
+      /**
+       * 🔴 THE THRESHOLD WAS 0.002 AND THAT IS INSIDE THE BROKEN RANGE.
+       * MEASURED 2026-09-17 over the relay with no browser in the way: a note
+       * that is working reads about 0.045 of full scale, and a board in the
+       * state reported that day reads 0.0010 to 0.0035 for every patch, every
+       * velocity, and through an instrument restart. So 0.002 sat in the middle
+       * of the fault it exists to catch, and whether it fired depended on which
+       * take you got. 0.01 has better than 3x of margin on both sides.
+       * ⚠️ AND IT IS NOT SILENCE. A gain stage between the synth and the capture
+       * had collapsed, which is audible as nothing but measures as a small
+       * number rather than a zero, so the line says too quiet rather than
+       * silent. A page that says the wrong thing about a real fault sends
+       * somebody looking in the wrong place.
+       */
+      if (board.stats().peak > 0.01) return;
+      d.log(`the note is sounding far too quietly to hear: the loudest sample coming back is ${board.stats().peak.toFixed(4)} of full scale, where a working note is about 0.045. Nothing in this page can fix that — it is the board's own level`, 'bad');
     }, 1800);
   }
 

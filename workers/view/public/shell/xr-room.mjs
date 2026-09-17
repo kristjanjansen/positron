@@ -843,6 +843,95 @@ const GLOW_OFF = { col: [1, 1, 1], at: [0, 0, 0], radius: 1, amp: 0 };
 export const FADE_MS = 900;
 
 /**
+ * 🔴 WHICH DETECTED SURFACES GET DOTS: THE ROOM'S SHELL, NOT ITS FURNITURE.
+ *
+ * Reported 2026-09-17: *"window seems to have doubled dots somehow when having
+ * moving panels (mirror demo)"*. The grid is drawn with `depthMask(false)` and
+ * nothing opaque between the surfaces, so every quad handed to it is
+ * superimposed on every other one in the same look — and a Quest 3 hands over
+ * ELEVEN, measured on 2026-09-13 in this repo: `door 1 · ceiling 1 · wall 4 ·
+ * window 1 · bed 1 · shelf 2 · floor 1`. A bed at 0.5 m and a floor at 0 are
+ * two parallel dot fields at two heights, in the same place on screen, at
+ * slightly different scales. That is a doubled floor, and it is the only
+ * mechanism in this module that can draw one.
+ *
+ * ⚠️ IT IS A HYPOTHESIS UNTIL A HEADSET SAYS SO. It was NOT reproduced here:
+ * `xrPreview` on this laptop renders one dot field per eye with no doubling at
+ * any zoom (checked down to single pixels), because a window session detects no
+ * planes at all and falls back to the page's own single floor. What is certain
+ * is the superimposition; what is unconfirmed is that it is what somebody saw.
+ *
+ * The rule: **every VERTICAL plane, the LOWEST horizontal one, and the ceiling.**
+ * Those are the surfaces a room is made of. A table, a bed, a shelf or a couch
+ * is a thing standing in the room, and dotting it says the room's ground is
+ * there — which is a false statement about where the floor is, made in the one
+ * channel this page uses to say where the floor is.
+ *
+ * ⚠️ AND IT FALLS BACK TO EVERYTHING RATHER THAN TO NOTHING. A runtime that
+ * labels nothing and reports no orientation would otherwise leave the shell
+ * empty, and an empty shell reads as "your room has no surfaces" — which is a
+ * claim about somebody's room made out of our own inability to classify one.
+ */
+export function boundaryOf(quads) {
+  if (!quads.length) return quads;
+  const vertical = quads.filter((q) => q.vertical);
+  const flat = quads.filter((q) => !q.vertical);
+  const named = (n) => flat.filter((q) => q.label === n);
+  // The floor: the one the headset called a floor, else the lowest surface
+  // there is. A room has exactly one, whatever is standing on it.
+  const floorQ = named('floor')[0]
+    || flat.reduce((lo, q) => (lo === null || q.y < lo.y ? q : lo), null);
+  // The ceiling: only where it is named. Guessing the highest horizontal plane
+  // would promote the top of a wardrobe, and a dotted wardrobe lid over your
+  // head is the same superimposition in the other direction.
+  const ceilQ = named('ceiling')[0] || null;
+  const shell = [...vertical];
+  for (const q of [floorQ, ceilQ]) if (q && !shell.includes(q)) shell.push(q);
+  return shell.length ? shell : quads;
+}
+
+/**
+ * 🔴 WHICH WAY ROUND YOUR ROOM IS, IN RADIANS, FROM THE WALLS THE HEADSET
+ * MEASURED. Zero when there are none, and zero is the old behaviour exactly.
+ *
+ * Reported 2026-09-17 about `/blocks/`: *"in xr blocks are angled against wall,
+ * rotated a bit, not fully against wall"*. The bricks are axis-aligned to the
+ * REFERENCE SPACE, whose yaw is wherever the headset happened to be looking
+ * when the session started; a real wall is at whatever angle the builder put
+ * it. The two agree only by luck, so a brick pushed up to a wall meets it
+ * corner-first. Nothing was rotated by mistake — the room was.
+ *
+ * ⚠️ MODULO A QUARTER TURN, AND THAT IS THE WHOLE TRICK. Four walls give four
+ * normals ninety degrees apart, so a plain mean of their angles is meaningless
+ * (north and east average to north-east). Folding by 4 maps all four onto one
+ * direction, and the circular mean of THAT is the room's orientation: the
+ * answer is in [-45°, +45°], which is the smallest turn that squares a grid up
+ * with the walls.
+ *
+ * ⚠️ WEIGHTED BY AREA. A 3 m wall says more about which way a room faces than a
+ * 40 cm sliver beside a door, and an unweighted mean lets the sliver argue as
+ * loudly as the wall.
+ *
+ * ⚠️ AND A PLANE'S NORMAL IS ITS OWN +Y, NOT ITS +Z. WebXR lays a plane in the
+ * X-Z of its `planeSpace`, so the normal is column 1 of its pose. Reading
+ * column 2 gives a direction lying IN the wall, which is a yaw that is wrong by
+ * ninety degrees — and at a quarter turn that is the one error this function
+ * cannot see, because it folds by four.
+ */
+export function wallYaw(quads) {
+  let sx = 0, sy = 0;
+  for (const q of quads) {
+    if (!q.vertical || !q.n) continue;
+    const a = Math.atan2(q.n[0], q.n[2]);
+    const w = Math.max(0, (q.size?.[0] ?? 1) * (q.size?.[1] ?? 1));
+    sx += w * Math.cos(4 * a);
+    sy += w * Math.sin(4 * a);
+  }
+  if (Math.hypot(sx, sy) < 1e-9) return 0;
+  return Math.atan2(sy, sx) / 4;
+}
+
+/**
  * Ask for this ALONGSIDE the required features, never instead of them.
  *
  * 🔴 REAL ROOM DATA IS OPTIONAL AND IT MUST NOT GATE THE GRID. A headset whose
@@ -1138,16 +1227,30 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // keeps paying for.
     state: 'not asked',
     why: '',             // the browser's own word for a refusal
-    count: 0,
+    count: 0,            // how many surfaces the headset reported
+    // ⚠️ HOW MANY OF THEM ACTUALLY GET DOTS, which is a different number and
+    // has to be said separately: "your room reported 11 surfaces" and "the grid
+    // is drawn on 6 of them" are two facts, and one of them is a decision this
+    // page made. See `boundaryOf`.
+    dotted: 0,
     labels: {},          // semanticLabel -> how many
     floorY: 0,
+    // ⚠️ RADIANS, AND 0 MEANS "NO WALLS WERE MEASURED" RATHER THAN "YOUR ROOM
+    // IS SQUARE TO THE HEADSET". Those are different and a page that wants to
+    // know which asks `count`/`labels.wall` as well. See `wallYaw`.
+    yaw: 0,
     from: 'the page',
     note: '',
     short: '',
   };
   let planeQuads = [];
+  // 🔴 THE SUBSET OF THEM THAT IS THE ROOM'S SHELL, WHICH IS WHAT GETS DOTS.
+  // See `boundaryOf`. Kept beside the full list rather than replacing it,
+  // because `planes.count` is a fact about your room and this is a decision
+  // about the picture — collapsing the two would make "your headset reported
+  // nothing" and "your headset reported only furniture" the same finding.
+  let planeShell = [];
   let saidKey = '', saidTimes = 0, planeFails = 0;
-
   function describe(quiet = false) {
     // ⚠️ THE WORDS ARE READ OFF THE SAME CONSTANT THE FLOOR IS BUILT FROM. A
     // description that can disagree with its config is worse than none, and
@@ -1158,10 +1261,12 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     if (planes.state === 'yours') {
       const bits = Object.entries(planes.labels).map(([k, v]) => `${k} ${v}`).join(' · ');
       const walls = planes.labels.wall || 0;
-      planes.note = `${planes.count} surface(s) from your room · ${bits} · grid is on them, floor at y=${planes.floorY.toFixed(2)} m`
+      planes.note = `${planes.count} surface(s) from your room · ${bits}`
+        + ` · the dots are on ${planes.dotted} of them — every wall, the floor and the ceiling, and nothing standing on the floor`
+        + `, floor at y=${planes.floorY.toFixed(2)} m`
         + (walls ? ` · ${walls} of them are walls, and those are the only walls this page draws`
                  : ' · NO wall surfaces came back, so there are no dotted walls');
-      planes.short = `floor: your room\n${planes.count} surfaces, ${walls} walls`;
+      planes.short = `floor: your room\n${planes.dotted} of ${planes.count} dotted`;
       planes.from = 'your room';
     } else if (planes.state === 'none') {
       // 🔴 THIS MESSAGE BLAMED THE WRONG THING AND SENT SOMEBODY LOOKING AT
@@ -1212,7 +1317,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       planes.short = 'floor: this page\nnot asked yet';
       planes.from = 'the page';
     }
-    const key = `${planes.state}|${planes.count}|${Object.keys(planes.labels).sort().join(',')}`;
+    const key = `${planes.state}|${planes.count}|${planes.dotted}|${Object.keys(planes.labels).sort().join(',')}`;
     if (key === saidKey || saidTimes >= 8) return;
     saidKey = key;
     // ⚠️ THE FIRST DESCRIPTION IS SILENT. It is written before any session
@@ -1282,15 +1387,37 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
         // The plane's own space has the surface in its XZ, so the unit quad's
         // local +Y has to become the plane's +Z and its local +Z the normal.
         const L = new Float32Array([w, 0, 0, 0, 0, 0, d, 0, 0, 1, 0, 0, cx, 0, cz, 1]);
-        quads.push({ m: mul(pose.transform.matrix, L), size: [w, d], origin: [cx, cz] });
         const label = plane.semanticLabel || plane.orientation || 'unlabelled';
-        labels[label] = (labels[label] || 0) + 1;
         const y = pose.transform.position.y;
-        if (plane.orientation === 'horizontal' && (lowest === null || y < lowest)) lowest = y;
+        // ⚠️ `orientation` IS THE RUNTIME'S OWN WORD AND IT CAN BE MISSING.
+        // Where it is, a wall is `vertical`; where it is not, the plane's own
+        // up — column 1 of its pose — is read instead, so a runtime that
+        // answers about geometry and not about semantics still gets classified.
+        // Falling back to "horizontal" would put every unlabelled wall into the
+        // competition for which surface is the floor.
+        const pm = pose.transform.matrix;
+        const upY = pm[5];
+        const vertical = plane.orientation
+          ? plane.orientation === 'vertical'
+          : Math.abs(upY) < 0.5;
+        quads.push({ m: mul(pm, L), size: [w, d], origin: [cx, cz], label, y, vertical,
+          // The plane's own +Y in world, which is its normal — see `wallYaw`.
+          n: [pm[4], pm[5], pm[6]] });
+        labels[label] = (labels[label] || 0) + 1;
+        if (!vertical && (lowest === null || y < lowest)) lowest = y;
         if (label === 'floor') lowest = y;
       }
       planeQuads = quads;
+      // 🔴 THE DOTS GO ON THE ROOM'S SHELL, NOT ON EVERYTHING THE HEADSET SAW.
+      // See `boundaryOf` for the doubled-floor this exists to stop.
+      planeShell = boundaryOf(quads);
       planes.count = quads.length;
+      planes.dotted = planeShell.length;
+      // 🔴 WHICH WAY ROUND YOUR ROOM IS, so a page that puts square things in it
+      // can line them up with the walls rather than with the reference space.
+      // See `wallYaw`; it is 0 with no walls, which is what every page did
+      // before this existed.
+      planes.yaw = wallYaw(quads);
       planes.labels = labels;
       // 🔴 AN EMPTY SET ON THE FIRST FRAMES IS NOT AN ANSWER, AND CALLING IT
       // ONE MADE THIS PAGE BLAME SPACE SETUP FOR THE SECOND TIME. MEASURED on
@@ -1401,7 +1528,10 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       // runtime's business rather than ours.
       gl.disable(gl.CULL_FACE);
       gl.bindVertexArray(quad.vao);
-      const surfaces = planeQuads.length ? planeQuads : ownRoom;
+      // 🔴 YOUR ROOM'S SHELL WHERE THE HEADSET MEASURED ONE, THE PAGE'S OWN
+      // FLOOR WHERE IT DID NOT. `planeShell` is `planeQuads` minus the
+      // furniture — see `boundaryOf`.
+      const surfaces = planeShell.length ? planeShell : ownRoom;
       for (const s of surfaces) {
         gl.uniformMatrix4fv(U.model, false, s.m);
         gl.uniform2f(U.size, s.size[0], s.size[1]);
@@ -1538,6 +1668,22 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   function drawInner({ proj, view, tSec = 0, doc = null, clear = true, ar = false,
                        aimed = null, held = null, ray: rayIn = null, aimedDist = 0,
                        eye = null, grid = true, touch = null,
+                       /**
+                        * 🔴 WHICH WAY ROUND THE THINGS STAND, IN RADIANS, ADDED
+                        * TO EVERY ONE OF THEM. Default 0, which is every page's
+                        * behaviour before this existed.
+                        *
+                        * A page whose objects are BOXES has to line them up with
+                        * the room, and the room is not square to the reference
+                        * space — reported on `/blocks/` as *"in xr blocks are
+                        * angled against wall, rotated a bit, not fully against
+                        * wall"*. `planes.yaw` is the angle; this is where it
+                        * lands. ⚠️ ONE angle for all of them, never per thing:
+                        * the whole point is that they agree with each other and
+                        * with the walls, and a per-thing rotation would put the
+                        * page back where it started.
+                        */
+                       yaw = 0,
                        sky = true, bg = null, glow = null } = {}) {
     if (!ok) return;
     // ⚠️ THE POINTER COMES FROM `setInput` UNLESS A PAGE OVERRIDES IT. One
@@ -1627,7 +1773,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       // one is pale" rather than "that one is under your pointer".
       const tch = touch ? touch(held?.i === i, aimed === i) : { lit: 1, scale: 1 };
       gl.uniformMatrix4fv(L.model, false,
-        modelM(t.x, t.y, t.z, t.s * tch.scale, t.rx, t.ry + tSec * t.spin));
+        modelM(t.x, t.y, t.z, t.s * tch.scale, t.rx, t.ry + yaw + tSec * t.spin));
       const c = shadeRGB(t.c);
       gl.uniform3fv(L.col, [c[0] * tch.lit, c[1] * tch.lit, c[2] * tch.lit]);
       gl.drawArrays(gl.TRIANGLES, 0, cube.count);
@@ -1640,7 +1786,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       gl.uniformMatrix4fv(NB.view, false, view);
       fadeOn(bk);
       things.forEach((t, i) => {
-        gl.uniformMatrix4fv(NB.model, false, modelM(t.x, t.y, t.z, t.s, t.rx, t.ry + tSec * t.spin));
+        gl.uniformMatrix4fv(NB.model, false, modelM(t.x, t.y, t.z, t.s, t.rx, t.ry + yaw + tSec * t.spin));
         const c = shadeRGB(t.c);
         const lit = held?.i === i ? 1.8 : (aimed === i ? 1.35 : 1);
         gl.uniform3fv(NB.col, [c[0] * lit, c[1] * lit, c[2] * lit]);
@@ -1870,11 +2016,18 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       };
       models.set(key, entry);
       const tGpu = performance.now() - t2;
-      say(`controllers · ${profile} ${handedness} drawn from its real model`
+      say(`controllers · ${profile} ${handedness} loaded from its real model`
         + ` · ${m.stats.bytes} bytes fetched in ${tFetch.toFixed(0)} ms`
         + ` · read in ${tParse.toFixed(1)} ms into ${m.count} vertices from ${m.stats.primitives} primitives`
         + ` · texture ${m.stats.imageBytes} bytes, decoded and uploaded in ${tGpu.toFixed(1)} ms`);
-      if (!modelSaid) { modelSaid = true; log('your real controllers are being drawn, from their own models', 'ok'); }
+      // 🔴 IT SAYS WHAT LOADED, NOT WHAT IS ON SCREEN — AND IT SAID THE SECOND
+      // FOR ONE DAY AFTER IT STOPPED BEING TRUE. This line read "your real
+      // controllers are being drawn, from their own models" and was printed by
+      // `/blocks/` in a window that draws no controller at all, because the
+      // geometry came out of every scene on 2026-09-17 while the model is still
+      // fetched (see `warmModel`). A log line is a page talking to a reader, and
+      // this file cannot see whether anything draws what it loaded.
+      if (!modelSaid) { modelSaid = true; log('your controller\u2019s own model loaded, ready to be drawn', 'ok'); }
       return entry;
     } catch (e) {
       models.set(key, false);
@@ -1942,8 +2095,26 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     if (Number.isFinite(alpha)) gridAlpha = Math.max(0, Math.min(1, alpha));
   }
 
+  /**
+   * 🔴 FETCH, READ AND UPLOAD A CONTROLLER MODEL WITHOUT DRAWING ONE.
+   *
+   * Added 2026-09-17, when the controller geometry came out of every scene
+   * (*"rm controller geometry/tablet on all"*). Until then the ONLY thing that
+   * ever loaded a model was `drawInner` seeing a hand — so a page that draws no
+   * hands never fetches the `.glb`, never runs `readGLB`, never decodes the
+   * texture and never uploads it, and all four of those would first happen on
+   * the first frame of somebody's one headset session if the models are ever
+   * put back. That is exactly where a pending `gl.getError()` costs a run.
+   *
+   * ⚠️ IT DRAWS NOTHING AND IT IS NOT A SCENE OBJECT. It is the same
+   * `loadModel` the draw path calls, reached by name instead of by a hand
+   * appearing, so the suite can keep grading the path on real hardware while
+   * the picture stays empty. `room.controllers` answers for it either way.
+   */
+  const warmModel = (profile, handedness = 'left') => loadModel(profile, handedness);
+
   const room = {
-    attach, draw, applyLook, retire, observePlanes, markAsked,
+    attach, draw, applyLook, retire, observePlanes, markAsked, warmModel,
     setInput, setTablet, setGrid, planes, grid: GRID, parts: GRIP_PARTS, tabletSize: TABLET,
   };
   // ⚠️ GETTERS, NOT COPIES. `look` is what a page compares before and after a
@@ -1957,13 +2128,18 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   // there are any, the page's own five quads when there are not. Exposed
   // because the snapping is code only a headset can reach, and a list a
   // harness can read is the difference between "it should work" and a number.
-  Object.defineProperty(room, 'surfaces', { get: () => (planeQuads.length ? planeQuads : ownRoom), enumerable: true });
+  Object.defineProperty(room, 'surfaces', { get: () => (planeShell.length ? planeShell : ownRoom), enumerable: true });
+  // ⚠️ AND EVERYTHING THE HEADSET REPORTED, BESIDE IT. `surfaces` is what gets
+  // dots; this is what your room has. A check that could only see the first
+  // cannot tell "the headset found nothing" from "the headset found only
+  // furniture", which is the collapse this file keeps writing about.
+  Object.defineProperty(room, 'allSurfaces', { get: () => planeQuads, enumerable: true });
   // What the tablet cost to hand to the card, the FIRST time. Published rather
   // than logged only, because "it is free" should be a number somebody can read
   // back rather than a belief this file holds about itself.
   Object.defineProperty(room, 'tabletUploadMs', { get: () => tabletUploadMs, enumerable: true });
   Object.defineProperty(room, 'gridAlpha', { get: () => gridAlpha, enumerable: true });
-  // 🔴 WHAT THE CONTROLLERS ARE ACTUALLY DRAWN FROM, as a word. Three answers,
+  // 🔴 WHAT A CONTROLLER WOULD BE DRAWN FROM, as a word. Three answers,
   // not two: `not asked` (no controller has been seen), `model` (the real one),
   // `stand-in` (unknown profile, or the fetch failed). A boolean would collapse
   // "we have not looked" into "there is none", which is the collapse this
