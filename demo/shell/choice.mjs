@@ -30,7 +30,16 @@ import { el } from './shell.mjs';
  *            disabled:(v:boolean)=>void, buttons:HTMLButtonElement[]}}
  */
 export function createChoice({ label, options, at = 0, onPick } = {}) {
-  let chosen = Math.max(0, Math.min(options.length - 1, at));
+  /**
+   * 🔴 `at: -1` MEANS NOTHING IS CHOSEN YET, AND IT IS A REAL STATE. Added
+   * 2026-09-17 for `/stage/`, where the control room asks the audience a
+   * question: a question that arrives with an answer already given is a question
+   * nobody was asked, and clamping -1 up to 0 was quietly answering it for them.
+   * ⚠️ IT IS THE SAME ARGUMENT `presence.mjs` MAKES ABOUT `unknown`. A thing
+   * nobody has answered is not the first option, the way a thing nobody has
+   * asked about is not offline.
+   */
+  let chosen = at < 0 ? -1 : Math.max(0, Math.min(options.length - 1, at));
 
   const wrap = el('span', 'pos-choice');
   if (label) wrap.append(el('span', 'pos-choice-l', label));

@@ -7,15 +7,28 @@
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON · stage</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The control room's form: the question and its options in a row that wraps,
+     with the send controls under it. Nothing here is a component because
+     nothing else on the site asks a question yet; when a second page does, this
+     is what gets lifted. */
+  .stage-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .stage-send { display: flex; gap: 12px; align-items: center; }
+</style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createPresence } from '/shell/presence.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
 
   const q = new URLSearchParams(location.search);
+  // Reachable from a check, and from a probe: what the control room sent and
+  // where it landed.
+  let stageAsk = null;
 
   /**
    * 🔴 THE PICTURE IS GENERATED HERE AND COMES FROM NOBODY'S SERVER. CLAUDE.md
@@ -116,9 +129,94 @@
    * came off, because three names over one list and one form is furniture.
    * Three genuinely different views of one show is the case it was built for.
    */
+  const byId = new Map(panels.map((p) => [p.id, p]));
   const tabs = createTabs({ tabs: TABS.map(({ id, label }) => ({ id, label })) });
   for (const p of panels) tabs.panel(p.id).append(p.panel.el);
   d.stack.add(tabs.el);
+
+  /**
+   * 🔴 THE CONTROL ROOM ASKS THE AUDIENCE SOMETHING, AND THE QUESTION LANDS IN
+   * THE PANEL'S FOOTER. Asked 2026-09-17: a message *"about upcoming interaction
+   * to the audience that the viewer parses as interactive thing audience can
+   * do... like radiobuttons"*, with the shape given as
+   * `Meaning of life [Be | Not to be]`.
+   *
+   * ⚠️ IT GOES IN THE CENTRE SLOT, WHICH THE PANEL LEFT EMPTY ON PURPOSE. That
+   * component ships a status on the left and a way to go full on the right and
+   * nothing in the middle, because no answer is right for every page. This is
+   * what a middle is for.
+   * ⚠️ AND IT IS `createChoice`, NOT A ROW OF BUTTONS. One of these and the
+   * others are not, with a label in front, is exactly that component, and this
+   * project already has three hand-built copies of it in its history.
+   */
+  const audience = byId.get('audience').panel;
+  let asked = null;
+
+  function ask(title, options) {
+    const choice = createChoice({
+      label: title,
+      options: options.map((o) => [o, o]),
+      // ⚠️ NOTHING IS CHOSEN AT THE START. `createChoice` opens on index 0, and
+      // a question that arrives with an answer already given is a question
+      // nobody was asked. -1 leaves every option unpressed.
+      at: -1,
+      // What a viewer picks is not recorded yet, on instruction: *"later the
+      // recording user clicks but lets do it later"*. The seam is here.
+      onPick: (_v, name) => d.log(`somebody in the audience chose ${name}`),
+    });
+    const slot = audience.slots.centre;
+    slot.textContent = '';
+    slot.append(choice.el);
+    // A question replaces the one before it, which is what was asked for. What
+    // happens when there is nothing left to ask is deliberately not decided:
+    // *"dunno about clearing"*.
+    asked = { title, options, el: choice.el };
+    // ⚠️ THE FADE IS OPACITY ONLY. A question appearing in a footer must not
+    // change how much room the footer takes, or the picture above it jumps.
+    choice.el.style.opacity = '0';
+    requestAnimationFrame(() => {
+      choice.el.style.transition = 'opacity 220ms ease';
+      choice.el.style.opacity = '1';
+    });
+    d.log(`asked the audience: ${title}`, 'hi');
+  }
+
+  // ── the control room's form ───────────────────────────────────────────────
+  const room = tabs.panel('controlroom');
+  const title = createField({ label: 'question', placeholder: 'Meaning of life', grow: 'wide' });
+  const opts = [
+    createField({ label: 'option', placeholder: 'Be' }),
+    createField({ label: 'option', placeholder: 'Not to be' }),
+    createField({ label: 'option', placeholder: '' }),
+  ];
+  const form = el('div', 'stage-form');
+  form.append(title.el, ...opts.map((o) => o.el));
+
+  const taken = () => opts.map((o) => o.value().trim()).filter(Boolean);
+  const send = (delayMs) => {
+    const t = title.value().trim() || 'Meaning of life';
+    const o = taken();
+    if (o.length < 2) { d.log('a question needs at least two options', 'warn'); return; }
+    if (!delayMs) { ask(t, o); return; }
+    /**
+     * ⚠️ THE DELAY IS FOR TESTING AND IT SAYS SO ON THE BUTTON. Asked for as
+     * *"make send not | send in 10s for testing"*: the two tabs are two halves
+     * of one page, so posting from here and watching it arrive there needs the
+     * posting to happen after you have moved. Ten seconds is long enough to
+     * switch tabs and short enough to wait through.
+     */
+    d.log(`asking in ${delayMs / 1000} seconds, so there is time to move to the audience`);
+    setTimeout(() => ask(t, o), delayMs);
+  };
+
+  const row = el('div', 'stage-send');
+  const now = el('button', 'pos-pri', 'send', { type: 'button' });
+  now.onclick = () => send(0);
+  const later = el('button', '', 'send in 10s', { type: 'button' });
+  later.onclick = () => send(10_000);
+  row.append(now, later);
+  room.append(form, row);
+  stageAsk = { ask, send, form, audience, get asked() { return asked; } };
 
   /**
    * The drawing loop. `burn` is the project's own test picture and it takes a
