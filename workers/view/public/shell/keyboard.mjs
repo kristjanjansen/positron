@@ -43,114 +43,142 @@
 //
 // ── A FINGER, 2026-09-17 ────────────────────────────────────────────────────
 //
-// Three things this had never done, asked for together because each one needs
-// the one before it.
+// This was a flat row of thirteen equal slivers that only a mouse could use.
+// Four rounds of real phone reports later it is a piano that scrolls.
 //
-// 🔴 A KEY IS AS WIDE AS IT IS TALL ON A PHONE, AND THE ROW SCROLLS. MEASURED
-// on `/knobs/` at 390 CSS px before the change: thirteen keys across 358 px of
-// page, **24.77 px each**, against a 44 px minimum touch target. That is a
-// keyboard you cannot hit. The floor is `--k-min` and the keys keep `flex: 1`,
-// so a wide screen still divides the room between them and nothing about the
-// desktop layout moves; a narrow one hits the floor and overflows, and the row
-// is a scroller.
+// 🔴 IT IS A PIANO NOW, NOT A CHROMATIC ROW. Eight white keys in a grid, five
+// black ones RAISED over the boundaries between them, narrower and shorter and
+// painted on top, which is the shape everybody already knows how to read. The
+// black key's column is worked out from the map rather than hard-coded, so a
+// caller that passes a different set of letters still gets a keyboard.
+//   ⚠️ THE OVERLAP IS A HIT-TEST PROBLEM AND IT SOLVES ITSELF. A raised black
+//   key covers the top corners of the two whites beside it, so a finger aiming
+//   at C# lands on a point that is inside C and inside C# at once. The hit test
+//   is `document.elementFromPoint`, which returns the TOPMOST element, and the
+//   black keys are the topmost because they are painted last. Nothing had to be
+//   written for it; what had to be written is the assert. MEASURED while trying
+//   to break it: TWO things in `shell.css` deliver that priority and either one
+//   alone is enough, so a single sabotage of either reads green. The assert has
+//   to sample BOTH sides of a black key, because the white on its left is
+//   covered by DOM order in every arrangement and only the right side depends
+//   on the stacking at all.
 //
-// 🔴 SLIDING ACROSS THE KEYS PLAYS THEM. That is what a piano does and this
-// could not, because every key called `setPointerCapture` ON ITSELF — so the
-// first key a finger touched owned the gesture and no other key ever saw it.
-// The capture moves to the ROW: one pointer, hit-tested against whatever is
-// under it, releasing the note it leaves and sounding the note it enters.
-// Capture is still needed, and on the row it is the thing that makes a finger
-// dragged off the bottom of the keyboard still deliver its `pointerup`.
+// 🔴 A SWIPE SCROLLS THE ROW AND PLAYS NOTHING. A DRAG PLAYS ONLY ONCE A NOTE
+// IS ALREADY SOUNDING. Instructed in those words: *"Drag to play happens when
+// playing is there"*. One horizontal gesture across the keys has to mean two
+// opposite things, and this is the rule that separates them. The numbers are
+// `SWIPE_FRAMES` and `SWIPE_PX` below.
 //
-// 🔴 AND A FINGER THAT SLID TO THE EDGE KEEPS GOING. Wider keys mean about
-// five of thirteen are on screen, so reaching the rest cannot need a second
-// gesture while a note is held. Sliding into the band at either end scrolls the
-// row under the finger, which sounds each key it brings in.
-//   ⚠️ ARMED BY TRAVEL, NOT BY POSITION, and that is what keeps it from
-//   fighting the hold below. A finger PUT DOWN in the band does not scroll; a
-//   finger that ARRIVED there by sliding does. So the outermost key can still
-//   be held, and a glissando does not stop at the screen edge.
+// 🔴 AND THE SCROLLING IS THE PLATFORM'S, NOT OURS. `touch-action: pan-x` on
+// the row hands the gesture to the browser, which brings its own momentum and
+// its own rubber-band at the ends for nothing. The edge-hold autoscroll that
+// used to live here is GONE: it existed because `touch-action: none` meant a
+// finger could not move the row at all, and a hand-rolled ramp beside a native
+// scroller is two answers to one question.
 //
-// 🔴 AND A KEY HELD PAST A SECOND RETRIGGERS ITSELF. `press`/`release` are the
-// one funnel every route goes through — a finger, the QWERTY row, a page
-// calling `api.press` — so the hold belongs here rather than in a page, and all
-// of them get it.
-//   ⚠️ THE WHOLE SAFETY STORY IS `notes off`, ON INSTRUCTION. There is no
-//   ceiling and no dead-man's timer: the pad already carries a button that
-//   releases everything and calls the page's `onPanic`, and a stuck retrigger
-//   is one tap from over. What IS here is the cheap half that falls out of the
-//   code anyway — a `pointerup`, a `pointercancel`, a lost capture, an octave
-//   shift and a window blur all run the ordinary release path, and the ordinary
-//   release path stops the retrigger.
-//   ⚠️ A RECORDER WOULD ATTACH AT `press`/`release` AND NOWHERE ELSE. Every
-//   note this component produces, by any route and including a retrigger, is
-//   exactly one call to each. That is the seam; nothing is built on it here.
+// ── WHAT WAS HERE AND IS NOT ─────────────────────────────────────────────────
+//
+// 🔴 HOLD-TO-RETRIGGER IS REMOVED, ASKED FOR AND THEN UNASKED. *"Rm
+// retriggering"*. The measurement it produced is worth more than the feature
+// and is kept here because nothing else records it. MEASURED on the board in
+// `studio-1` on 2026-09-17, one note, twice, amplitude envelope of a 3 s hold
+// against the same note retriggered every 250 ms:
+//   · It made NO audible pulse on either patch this project uses. Peak to dip
+//     1.07 to 1.16, against a held note's own floor of 1.04 to 1.13. The two
+//     ranges overlap, so there is no rhythm in it to hear.
+//   · What it moved was the LEVEL, in opposite directions. `AddSynth Morph`
+//     came out 1.7x LOUDER retriggered, because its release tail outlives a
+//     250 ms period and the tails stack. `Analog Filter 1` came out 2.9x
+//     QUIETER, because it takes about two seconds to swell and a repeat never
+//     lets it get there.
+//   · Neither patch is plucked, so the pizzicato case is UNVERIFIED and nothing
+//     on that board can answer it.
+// The one piece of machinery worth remembering: `press()` and `release()` are
+// the single funnel every note goes through, by every route. That is where a
+// recorder attaches, and it is why the hold could be added and removed in one
+// place.
 
 /**
- * 🔴 74 px, WHICH IS THE KEY'S OWN HEIGHT AND EXACTLY 3.0x WHAT WAS THERE.
- * MEASURED 2026-09-17 at 390 CSS px: 24.77 px a key. 74 is 1.68x Apple's 44 pt
- * minimum target and 1.54x Android's 48 dp, so a finger that lands off-centre
- * is still on the key it aimed at. It is also square, which is the reason to
- * prefer it over any neighbouring number: the key's height is already 74 and a
- * second measurement that agrees with one already on the page cannot drift
- * away from it.
- * ⚠️ IT IS A FLOOR, NOT A WIDTH. Thirteen keys at 74 plus twelve 3 px gaps is
- * 998 px, so anything narrower than that scrolls and anything wider divides the
- * room evenly as before. The switch is in `shell.css`, on a CONTAINER query
- * plus `(pointer: coarse)`: the first asks how much room the keyboard has
- * rather than how wide the window is, and the second catches a phone held
- * sideways, where there is room and there is still a finger.
+ * 🔴 49 px, WHICH IS TWO THIRDS OF 74. Asked for in those words: *"Keys 2/3 on
+ * wideneds"*. The history in one line, all MEASURED at 390 CSS px on
+ * `/knobs/`: thirteen equal keys at **24.77 px**, then thirteen at 74, now
+ * eight white keys at 49.
+ * ⚠️ AND 44 px IS THE FLOOR THIS IS NOW CLOSE TO. Apple's minimum touch target
+ * is 44 pt and Android's is 48 dp; 49 clears the first by 5 px and the second
+ * by 1. There is no room left underneath it, so the next request to make the
+ * keys smaller is a request to make them too small to hit, and that is worth
+ * saying before it arrives rather than after.
+ * ⚠️ IT IS A FLOOR, NOT A WIDTH, and it is UNCONDITIONAL now. It used to be
+ * armed by a container query and `(pointer: coarse)` so that a desktop layout
+ * could not move; with eight columns instead of thirteen a white key is wider
+ * than 49 px in any container over about 413 px, so the floor only ever binds
+ * on a narrow one and the two queries were inert. One rule, no breakpoint.
  */
-export const KEY_MIN_PX = 74;
+export const KEY_MIN_PX = 49;
 
 /**
- * The band at each end of the row that scrolls, and how fast.
- *
- * 🔴 44 px IS A FINGER. It is the same number as Apple's minimum touch target,
- * which is the project's standing unit for "a finger's worth of screen", and it
- * is 0.59 of a key — so the outer half of the outermost key scrolls and the
- * inner half does not, which is a boundary a hand can feel.
- *
- * 🔴 90 TO 600 px/s IS 1.2 TO 7.8 KEYS A SECOND, on a 77 px slot. The bottom
- * is a deliberate crawl for placing the row; the top crosses the whole
- * thirteen-key run in 1.6 s, which is a fast glissando and not a jump. It ramps
- * with how far into the band the finger is, so the speed is chosen by the hand
- * rather than by a mode.
- *
- * 🔴 AND 24 px OF TRAVEL ARMS IT — a third of a key. Below that is the wobble
- * of a finger resting on glass, which must not scroll a keyboard somebody is
- * holding a note on.
+ * 🔴 A BLACK KEY IS TWO THIRDS OF A WHITE ONE, WHICH IS WIDER THAN A PIANO'S.
+ * A real piano's black key is 13.7 mm against 23.5, so 0.58. This is 0.66, the
+ * same two thirds the whites were just taken to, so the page carries one ratio
+ * instead of two.
+ * ⚠️ AND IT IS STILL THE SMALLEST TARGET ON THE PAGE. 0.66 of 49 is 32 px,
+ * which is under the 44 px minimum and cannot be fixed by widening it further
+ * without the keyboard ceasing to look like a keyboard. Two things pay for it:
+ * a black key is 46 px TALL, so the target is 32 by 46 rather than 32 square,
+ * and it WINS the overlap, so a finger that is half on C and half on C# gets
+ * C#. That is the honest cost of piano geometry and it is a trade rather than
+ * an oversight.
  */
-export const EDGE_PX = 44;
-const SCROLL_MIN = 90, SCROLL_MAX = 600;
-const ARM_PX = 24;
+export const BLACK_RATIO = 0.66;
 
 /**
- * 🔴 A SECOND, THEN FOUR A SECOND.
+ * 🔴 WHAT SEPARATES A SWIPE FROM A PRESS: 10 px OF SIDEWAYS TRAVEL INSIDE THE
+ * FIRST TWO ANIMATION FRAMES.
  *
- * `HOLD_MS` 1000: a whole note at 120 bpm is 2 s and a half note is 1 s, so a
- * second is past every duration ordinary playing produces and a player who
- * never wants this will never meet it. It is also the number the request used
- * ("longer than x sec"), and a round second is a threshold somebody can feel
- * coming rather than discover.
+ * A finger that lands and covers 10 px before the verdict is a swipe. The row
+ * scrolls and NOTHING SOUNDS: there is no note to release, because the note was
+ * never sent. A finger that is still there at the verdict is a press. Its note
+ * sounds, and from that moment the row is frozen under it and sliding across
+ * the keys plays them, which is the glissando.
  *
- * `RETRIG_MS` 250: four a second, which is sixteenth notes at 120 bpm. Faster
- * reads as a broken note rather than a pulse, and on an instrument at the far
- * end of a relay it also stops being separable from its own round trip.
+ * `SWIPE_PX` 10: Chrome's own touch slop, the distance it waits before starting
+ * a scroll, is about 8 px. Ten is just over it, and a resting finger's wobble on
+ * glass is 2 to 4 px and never trips it.
  *
- * ⚠️ WHAT IT COSTS. Each retrigger is one `note.off` and one `note.on`, so a
- * held key is 8 messages a second to whatever the page is driving. The relay's
- * own limits, READ from `workers/relay/src/index.js` on 2026-09-17, are 1000
- * messages a second with a burst of 2000 — so a hand holding every key it can
- * reach is under one per cent of the budget. (CLAUDE.md still quotes 60 and
- * 120; those were raised and the note there is stale.)
+ * 🔴 `SWIPE_FRAMES` 2, AND FRAMES RATHER THAN MILLISECONDS IS THE POINT.
+ * Two frames is the shortest window that can see more than one touch sample,
+ * and touch is sampled at the display's own rate, so the same COUNT is the same
+ * number of samples on every screen. MEASURED here at 60 Hz: **33 ms**, against
+ * **48 ms** for a 30 ms deadline, because a deadline in milliseconds rounds up
+ * to the next frame anyway and often skips one. On a 120 Hz phone it is about
+ * 17 ms; that is UNVERIFIED, since nothing here has a phone.
+ * ⚠️ AND THE SPEED IT SEPARATES AT MOVES WITH THE SCREEN: 10 px in two frames
+ * is about 300 px/s at 60 Hz and 600 px/s at 120 Hz. A flick meant to throw a
+ * row is 800 px/s and up, so both sit under it, but the margin is thinner on a
+ * fast screen and that is the honest cost of tying the window to frames.
+ * ⚠️ THE BIAS IS DELIBERATE AND IT IS TOWARD THE SWIPE, on instruction: a stray
+ * note goes to a shared instrument in another building, and a scroll that
+ * needed a second try costs nobody anything.
  *
- * ⚠️ AND A NOTE-OFF FIRST IS NOT OPTIONAL. A second `note.on` for a note that
- * is already sounding is a new voice on a polyphonic synth, and the first one
- * is then holding with nothing left to release it.
+ * 🔴 AND THE NOTE WAITS FOR THE VERDICT RATHER THAN BEING TAKEN BACK. That is
+ * the whole trade in this feature and both halves of it are real.
+ *   · WHAT IT COSTS: MEASURED from `pointerdown` to the key lighting, six takes
+ *     each on `/knobs/`. A finger: median **33 ms**. A mouse: median **0.1 ms**,
+ *     because nothing on a desktop can steal a drag and a mouse never waits.
+ *     On `/knobs/` press to sound is about 190 ms already (36 ms round trip,
+ *     153 ms of cushion, both MEASURED and both printed on the page), so this
+ *     is +17%. On `/instrument/`, which makes its own sound in this browser,
+ *     33 ms is most of the latency there is.
+ *   · WHAT THE OTHER ONE WOULD HAVE COST: sounding on `pointerdown` and
+ *     releasing when the gesture turns out to be a swipe. Zero added latency,
+ *     and every swipe sends a `note.on` and a `note.off` about 30 ms apart over
+ *     the relay to a Raspberry Pi in another building. MEASURED on that board:
+ *     both patches take longer than 40 ms to reach level, so the blip would be
+ *     close to inaudible THERE and a plain click on `/instrument/`'s local
+ *     WebAudio. It is still two messages and a note nobody asked for.
  */
-export const HOLD_MS = 1000;
-export const RETRIG_MS = 250;
+export const SWIPE_PX = 10;
+export const SWIPE_FRAMES = 2;
 
 /** QWERTY as a piano octave: the home row is white, the row above holds sharps. */
 export const QWERTY_CHROMATIC = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12 };
@@ -172,16 +200,12 @@ export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
  * @param maxBase  They stop at the ends rather than wrapping: a keyboard that
  *                 jumps from the bottom of the range to the top on one press
  *                 reads as a fault.
- * @param holdMs   how long a key must be held before it starts retriggering,
- *                 and how often it does. `holdMs: 0` turns it off for a page
- *                 whose instrument cannot take it. Both default to the numbers
- *                 argued for at the top of this file; they are arguments rather
- *                 than constants so a page's own check can grade the machinery
- *                 without spending a second and a quarter of a harness run
- *                 inside one assert.
- * @param retrigMs
+ * @param swipeFrames  the verdict window and the distance that decides it,
+ * @param swipePx      argued for at the top of this file. They are arguments
+ *                     only so a page's own check can drive both branches
+ *                     deliberately; no page passes them.
  * @returns {{el, keysEl, pad, noteOf, keyOf, press, release, base, shiftOctave,
- *            panic, lightNote, notes, retriggering, timing}}
+ *            panic, lightNote, notes, timing, destroy}}
  *          `el` is the WHOLE component — keys plus pad — so a page that places
  *          it by hand places both. `keysEl` is the key row alone.
  */
@@ -189,7 +213,7 @@ export function createKeyboard(host, {
   base = 60, map = QWERTY_CHROMATIC, sharps = SHARP_KEYS,
   onDown = () => {}, onUp = () => {}, keys: keyOpts = null,
   onPanic = null, onOctave = null, minBase = 24, maxBase = 96,
-  holdMs = HOLD_MS, retrigMs = RETRIG_MS,
+  swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
   const keys = keyOpts || Object.keys(map);
   const noteOf = (k) => base + map[k];
@@ -216,17 +240,39 @@ export function createKeyboard(host, {
 
   const el = make('div', 'kbd');
   const keysEl = make('div', 'keys');
-  // the pulse lasts exactly one retrigger, so the number lives in one place
-  el.style.setProperty('--retrig-ms', `${retrigMs}ms`);
   const els = new Map();
   const letterOf = new Map();         // element -> letter, for the hit test
+
+  // ── where a key goes ─────────────────────────────────────────────────────
+  //
+  // 🔴 THE GRID HAS ONE COLUMN PER WHITE KEY AND THE BLACK ONES SIT ON THE
+  // JOINS. A white takes the next free column. A black takes the column that
+  // STARTS at the boundary it belongs on, and `shell.css` pulls it back by half
+  // its own width plus half a gap, so it straddles the join the way a piano's
+  // does. Both are read off the map rather than hard-coded, so a caller that
+  // passes its own letters still gets a keyboard rather than a pile.
+  //
+  // ⚠️ THE COLUMN COUNT IS PUBLISHED AS `--k-cols`, because a stylesheet cannot
+  // count the children. It is the number of WHITE keys, which is 8 for an
+  // octave and not 13.
+  //
+  // ⚠️ AND A KEYBOARD THAT OPENS ON A SHARP KEEPS IT ON THE EDGE. With no white
+  // key before it there is no join to straddle, so the pull-back is taken off
+  // and it sits flush at the left. Nothing in this project does that today; it
+  // is one line and the alternative is half a key hanging outside the row.
+  let whites = 0;
   for (const k of keys) {
-    const b = make('div', `k${sharps.has(k) ? ' sharp' : ''}`);
+    const sharp = sharps.has(k);
+    const b = make('div', `k${sharp ? ' sharp' : ''}`);
     label(b, k);
+    b.style.gridColumn = String(whites + 1);
+    if (sharp && whites === 0) b.style.transform = 'none';
+    if (!sharp) whites++;
     els.set(k, b);
     letterOf.set(b, k);
     keysEl.append(b);
   }
+  keysEl.style.setProperty('--k-cols', String(Math.max(1, whites)));
   el.append(keysEl);
 
   // ── a finger on the keys ─────────────────────────────────────────────────
@@ -238,15 +284,19 @@ export function createKeyboard(host, {
   //
   // ⚠️ `document.elementFromPoint`, NOT the event's target. Under capture the
   // target IS the row for the whole gesture, so it says nothing about which key
-  // is under the finger; the hit test is the only thing that does. It is also
-  // what lets the row scroll UNDER a still finger and change the note.
+  // is under the finger. It is also what gives a raised black key priority
+  // where it covers a white one, for free: it returns the TOPMOST element.
   //
   // ⚠️ AND THE CAPTURE IS WRAPPED. A `PointerEvent` built in script is
   // untrusted and `setPointerCapture` throws on it, so a page's own check could
   // not drive this path at all. Nothing downstream needs the capture to have
-  // succeeded — it buys a pointerup from outside the element, which a scripted
-  // gesture does not need because it aims its own events.
-  const touches = new Map();   // pointerId -> {key, x, y, x0, y0, armed}
+  // succeeded.
+  //
+  // 🔴 A TOUCH IS UNDECIDED WHEN IT LANDS. `playing` is false until the verdict
+  // and NO NOTE HAS BEEN SENT; `moveTo` refuses to sound anything while it is
+  // false, so an undecided finger crossing three keys is silent. A mouse or a
+  // stylus is decided at birth, because nothing can take a drag away from one.
+  const touches = new Map();   // pointerId -> {key, x, y, x0, y0, playing, timer}
 
   function keyAtPoint(x, y) {
     const t = document.elementFromPoint(x, y);
@@ -257,90 +307,117 @@ export function createKeyboard(host, {
 
   /** Is any OTHER finger still on this key? Two fingers on one key are one note. */
   const heldByAnother = (k, self) => {
-    for (const t of touches.values()) if (t !== self && t.key === k) return true;
+    for (const t of touches.values()) if (t !== self && t.playing && t.key === k) return true;
     return false;
   };
 
+  /**
+   * Move a gesture onto a key, sounding and releasing as it goes. While the
+   * gesture is undecided this only remembers where the finger is: `playing` is
+   * what makes it audible, which is the whole of *"drag to play happens when
+   * playing is there"*.
+   */
   function moveTo(t, k) {
     if (!t || t.key === k) return;
     const was = t.key;
     t.key = k;
+    if (!t.playing) return;
     if (was != null && !heldByAnother(was, t)) release(was, 'pointer');
     if (k != null) press(k, 'pointer');
   }
 
-  const scrollable = () => keysEl.scrollWidth - keysEl.clientWidth > 1;
-
-  /** px/s, signed. 0 when the finger is outside the band, off the row, or there is nowhere to go. */
-  function edgeVelocity(t) {
-    if (!t.armed || !scrollable()) return 0;
-    const r = keysEl.getBoundingClientRect();
-    // Off the top or the bottom of the keys is not playing, so it is not scrolling either.
-    if (t.y < r.top || t.y > r.bottom) return 0;
-    const fromLeft = t.x - r.left, fromRight = r.right - t.x;
-    const d = Math.min(fromLeft, fromRight);
-    if (d > EDGE_PX) return 0;
-    const depth = Math.min(1, Math.max(0, (EDGE_PX - d) / EDGE_PX));
-    const v = SCROLL_MIN + (SCROLL_MAX - SCROLL_MIN) * depth;
-    return fromLeft < fromRight ? -v : v;
+  /**
+   * 🔴 THE VERDICT IS TIMED ON `requestAnimationFrame`, AND A `setTimeout`
+   * MEASURED 3.4x LATE. This was `setTimeout(startPlaying, 30)` and MEASURED
+   * 2026-09-17 in headless Chrome: a bare `setTimeout(30)` on the same page
+   * lands at 30 to 32 ms, and the SAME call made from inside a `pointerdown`
+   * handler during a touch lands at **101 ms**, four takes, 100.5 to 101.9.
+   * Chrome's renderer scheduler deprioritises timer queues for about 100 ms
+   * after a touch begins, so the one clock that must not be late during a touch
+   * is the one that stops working during one. Animation frames are on the
+   * compositor's path and are not deprioritised.
+   * ⚠️ THE SYMPTOM IS THE THING TO REMEMBER: every number in the code was
+   * right, the constant said 30, and the instrument was 100 ms late. A timer
+   * read against a stopwatch on an idle page proves nothing about a timer set
+   * while a finger is down.
+   */
+  function armVerdict(id, t) {
+    let frames = 0;
+    const step = () => {
+      t.raf = 0;
+      if (touches.get(id) !== t || t.playing) return;
+      if (++frames >= swipeFrames) startPlaying(t);
+      else t.raf = requestAnimationFrame(step);
+    };
+    t.raf = requestAnimationFrame(step);
   }
 
-  let raf = 0, lastFrame = 0;
-  function tick(now) {
-    raf = 0;
-    // First frame of a gesture has no previous timestamp; capped so a tab that
-    // was away does not jump the row a screen and a half on one frame.
-    const dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0;
-    lastFrame = now;
-    let v = 0;
-    // One row, so one finger drives it: the first one in a band wins. Two
-    // fingers in opposite bands would otherwise cancel, which reads as a jam.
-    for (const t of touches.values()) { v = edgeVelocity(t); if (v) break; }
-    if (v && dt) {
-      const before = keysEl.scrollLeft;
-      keysEl.scrollLeft = before + v * dt;
-      // The row moved under every finger, not only the one in the band.
-      if (keysEl.scrollLeft !== before) for (const t of touches.values()) moveTo(t, keyAtPoint(t.x, t.y));
-    }
-    if (touches.size) raf = requestAnimationFrame(tick);
-    else lastFrame = 0;
+  /** The verdict went to the press: sound whatever the finger is on, and keep the row still. */
+  function startPlaying(t) {
+    if (t.playing) return;
+    t.playing = true;
+    if (t.raf) { cancelAnimationFrame(t.raf); t.raf = 0; }
+    if (t.key != null) press(t.key, 'pointer');
   }
-  // ⚠️ THE LOOP STARTS WHEN A FINGER ARMS, NOT WHEN ONE GOES DOWN. Started on
-  // pointerdown it ran for the whole of every held note, and `edgeVelocity`
-  // reads `scrollWidth` and a bounding rect, so a key held on a desktop where
-  // nothing can scroll was paying for a forced layout sixty times a second to
-  // be told there is nowhere to go.
-  const startTicking = () => { if (!raf) raf = requestAnimationFrame(tick); };
+
+  /** The verdict went to the swipe: forget the gesture and let the browser scroll. */
+  function abandon(id) {
+    const t = touches.get(id);
+    if (!t) return;
+    if (t.raf) cancelAnimationFrame(t.raf);
+    touches.delete(id);
+    if (t.playing && t.key != null && !heldByAnother(t.key, t)) release(t.key, 'pointer');
+  }
 
   keysEl.addEventListener('pointerdown', (e) => {
     const k = keyAtPoint(e.clientX, e.clientY);
-    if (k == null) return;                       // the 3 px between two keys
+    if (k == null) return;                       // the gap between two keys
     try { keysEl.setPointerCapture(e.pointerId); } catch { /* a scripted event; see above */ }
-    const t = { key: null, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, armed: false };
+    const t = { key: k, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY,
+                playing: false, raf: 0 };
     touches.set(e.pointerId, t);
-    moveTo(t, k);
+    if (e.pointerType === 'touch') armVerdict(e.pointerId, t);
+    else startPlaying(t);
   });
 
   keysEl.addEventListener('pointermove', (e) => {
     const t = touches.get(e.pointerId);
     if (!t) return;                              // a mouse crossing the keys with no button down
     t.x = e.clientX; t.y = e.clientY;
-    if (!t.armed && Math.hypot(t.x - t.x0, t.y - t.y0) >= ARM_PX) { t.armed = true; startTicking(); }
+    // ⚠️ THE DISTANCE IS SIDEWAYS ONLY. The row scrolls sideways, so only
+    // sideways travel can be a swipe; a finger that slides DOWN off the keys is
+    // leaving the keyboard, which is a different thing and already handled.
+    if (!t.playing && Math.abs(t.x - t.x0) >= swipePx) { abandon(e.pointerId); return; }
     moveTo(t, keyAtPoint(t.x, t.y));
   });
+
+  // 🔴 ONCE A NOTE IS SOUNDING THE BROWSER MUST NOT TAKE THE GESTURE, AND
+  // `touch-action` CANNOT SAY THAT. It is read once when the finger lands and
+  // cannot be changed mid-gesture, so `pan-x` leaves the browser free to start
+  // scrolling at any later moment — which would arrive as a `pointercancel` in
+  // the middle of a glissando. A non-passive `touchmove` that calls
+  // `preventDefault` while anything is playing is the only thing that stops it,
+  // and it is the reason `touch-action: pan-x` and this listener are one
+  // mechanism rather than two.
+  // ⚠️ IT MUST NOT FIRE WHILE UNDECIDED. Preventing the default during the
+  // verdict window would stop the scroll that a swipe is asking for, before we
+  // have decided it is a swipe.
+  const onTouchMove = (e) => {
+    for (const t of touches.values()) if (t.playing) { e.preventDefault(); return; }
+  };
+  keysEl.addEventListener('touchmove', onTouchMove, { passive: false });
 
   // ⚠️ `lostpointercapture` IS IN HERE ON PURPOSE. A capture taken away by the
   // browser mid-gesture delivers no pointerup and no pointercancel, and the
   // note it was holding would sound until something else stopped it.
-  const endTouch = (e) => {
-    const t = touches.get(e.pointerId);
-    if (!t) return;
-    touches.delete(e.pointerId);
-    if (t.key != null && !heldByAnother(t.key, t)) release(t.key, 'pointer');
-  };
+  // ⚠️ AND `pointercancel` IS THE BROWSER SAYING IT TOOK THE GESTURE FOR A
+  // SCROLL. It runs the same path: whatever was sounding stops, and what was
+  // never sounded never was.
+  const endTouch = (e) => abandon(e.pointerId);
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     keysEl.addEventListener(type, endTouch);
   }
+
 
   // ── the pad ──────────────────────────────────────────────────────────────
   // ⚠️ NO WORD AT ALL. It was `octave` once before the pair — better than a word
@@ -376,74 +453,22 @@ export function createKeyboard(host, {
   host.append(el);
 
   const held = new Set();
-  // letter -> {wait, every, how, on} for a key that is being held. Every entry
-  // is removed by `release`, which is the only way a note here ever stops.
-  const holds = new Map();
 
+  // 🔴 ONE FUNNEL. Every note this component produces goes through exactly one
+  // `press` and one `release`, by every route there is: a finger, a slide
+  // across the keys, the letter row, a page calling `api.press`. That is what
+  // let hold-to-retrigger be added and removed in one place, and it is where a
+  // recorder would attach if the loop idea in `BACKLOG.md` is ever built.
   function press(k, how = 'key') {
     if (!(k in map) || held.has(k)) return;
     held.add(k);
     onDown(noteOf(k), how);
-    if (!holdMs || how === 'panic') return;
-    const h = { how, on: false, every: 0, wait: 0 };
-    h.wait = setTimeout(() => startRetrigger(k, h), holdMs);
-    holds.set(k, h);
   }
 
   function release(k, how = 'key') {
     if (!held.has(k)) return;
-    stopRetrigger(k);
     held.delete(k);
     onUp(noteOf(k), how);
-  }
-
-  /**
-   * ⚠️ IT REPORTS THE `how` THE NOTE STARTED WITH, not a fourth word. A page
-   * branching on `how` is branching on where the note came from, and a
-   * retriggered note came from the same finger the first one did — a new value
-   * would take every page down an unwritten branch for a note that is not a new
-   * kind of note.
-   * 🔴 AND THE COMPONENT HAS TO DRAW THE PULSE, BECAUSE THE PAGE'S LIGHT
-   * CANNOT. MEASURED 2026-09-17 by polling the key's classes every 10 ms
-   * through a two second hold: the `down` class changed **once**, at the start.
-   * A page's `onUp` and `onDown` land in the same tick, so `lightNote` turns
-   * the fill off and on again before anything is painted, and a retriggering
-   * key looks exactly like a held one. That is the worst case for a feature
-   * whose instrument is in another building: with the board down, a page with
-   * this running and a page with nothing running are the same picture.
-   * So `.retrig` is a ring that says the mode is on, and `.beat` is restarted
-   * on every hit — `remove`, a forced reflow, `add` — which is the only way to
-   * replay a CSS animation and the only way to keep the picture in step with
-   * the notes rather than with its own clock.
-   */
-  function startRetrigger(k, h) {
-    if (!held.has(k) || holds.get(k) !== h) return;
-    h.on = true;
-    els.get(k)?.classList.add('retrig');
-    const beat = () => {
-      const b = els.get(k);
-      if (!b) return;
-      b.classList.remove('beat');
-      void b.offsetWidth;                  // or the animation is never restarted
-      b.classList.add('beat');
-    };
-    beat();
-    h.every = setInterval(() => {
-      if (!held.has(k)) { stopRetrigger(k); return; }
-      const n = noteOf(k);
-      onUp(n, h.how);
-      onDown(n, h.how);
-      beat();
-    }, retrigMs);
-  }
-
-  function stopRetrigger(k) {
-    const h = holds.get(k);
-    if (!h) return;
-    holds.delete(k);
-    clearTimeout(h.wait);
-    clearInterval(h.every);
-    els.get(k)?.classList.remove('retrig', 'beat');
   }
 
   // An octave button at the end of the range that still looks pressable is a
@@ -531,9 +556,10 @@ export function createKeyboard(host, {
       // pressed would otherwise keep its `key` and send a second note-off on
       // lift, or re-press on its next move — which is a keyboard that starts
       // playing again immediately after being told to stop.
+      for (const t of touches.values()) if (t.raf) cancelAnimationFrame(t.raf);
       touches.clear();
       for (const k of [...held]) release(k, 'panic');
-      for (const b of els.values()) b.classList.remove('down', 'retrig');
+      for (const b of els.values()) b.classList.remove('down');
       onPanic?.();
     },
     /** paint a key. `who` is 'self' or 'remote'; they are different colours. */
@@ -544,10 +570,8 @@ export function createKeyboard(host, {
     },
     /** every note this keyboard can produce, for a caller that needs the range */
     notes: () => keys.map(noteOf),
-    /** the letters whose held note has started retriggering, for a page's own check */
-    retriggering: () => [...holds].filter(([, h]) => h.on).map(([k]) => k),
     /** what this keyboard was built with, so a check can grade the numbers as well as the machinery */
-    timing: { holdMs, retrigMs, edgePx: EDGE_PX, keyMinPx: KEY_MIN_PX },
+    timing: { swipeFrames, swipePx, keyMinPx: KEY_MIN_PX, blackRatio: BLACK_RATIO },
     /**
      * ⚠️ THREE LISTENERS OF THIS COMPONENT'S ARE ON `window`, NOT ON ITS OWN
      * ELEMENT, so removing the element does not remove the keyboard: `a`..`k`
@@ -562,7 +586,7 @@ export function createKeyboard(host, {
       removeEventListener('keydown', onKeyDown);
       removeEventListener('keyup', onKeyUp);
       removeEventListener('blur', onBlur);
-      cancelAnimationFrame(raf); raf = 0;
+      keysEl.removeEventListener('touchmove', onTouchMove);
       el.remove();
     },
   };

@@ -15,6 +15,24 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **A NEW DEMO CALLED `stage`, ASKED FOR 2026-09-17.** Verbatim, because the
+  detail in it is the specification:
+  *"V1 There are three tabs: audience controlroom archive."*
+  *"V2 do generic videe panel, witn l c r slots. Right slot by default is
+  fullcreen button (square!). Left is online status by defaul. No center
+  default. On fullscreen have two modes in api: just fullscreen and close
+  fullscreen butyon on right corner on pointer activity and mode where footer
+  stays"*
+  *"V2 use theee panels on stage tabs each as same testvideo playing"*
+  *"Make a generic component with"* — THE MESSAGE ENDS THERE, mid sentence, and
+  the rest has been asked for rather than guessed at.
+  ⚠️ `tabs.mjs` already exists and is in `/kit/` and in NO page: it was on
+  `/items/` for one commit and taken off because three names over one list and
+  one form is furniture. `stage` would be its first real use, which is the test
+  that component has never had.
+  ⚠️ AND THE PANEL IS THE REUSABLE HALF. Three panels on three tabs playing one
+  test video is the demonstration, not the point.
+
 - 🔴 **A SUBJECT FROM OUTSIDE ENGLISH IS UNREADABLE IN THE FEEDBACK ROOM.** Mail
   headers arrive MIME-encoded and nothing decodes them, so a note from Estonia
   opens `[ok] =?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=`. That is the FIRST thing a reader
