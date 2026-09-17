@@ -161,7 +161,7 @@ export function createBoard({
   let boardFrom = null;
 
   // ── audio ─────────────────────────────────────────────────────────────────
-  let ctx = null, playout = null;
+  let ctx = null, playout = null, meterNode = null, meterBuf = null;
   let bufferedMs = 0, starved = 0, trimmed = 0, breaks = -1;
   let frames = 0, lost = 0, lastSeq = -1, firstFrameAt = 0, peak = 0;
   let told = null;                    // what `box.hello` announced, if we heard it
@@ -223,6 +223,26 @@ export function createBoard({
     playout = new AudioWorkletNode(ctx, 'pcm-playout',
       { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
     playout.connect(ctx.destination);
+    /**
+     * 🔴 A METER ON WHAT LEAVES, BECAUSE EVERY NUMBER THESE PAGES SHOW IS ABOUT
+     * WHAT ARRIVES. Frames, lost, cushion, and a peak computed from the bytes as
+     * they come in are all upstream of the speaker, and 2026-09-17 was spent
+     * inside that gap: a page reporting fifty frames a second, a healthy peak,
+     * `lost 0` and a full cushion, while nothing at all was audible. Three
+     * separate causes were found that day and each one presented identically.
+     *
+     * An analyser on the playout's OWN output answers the question a person is
+     * actually asking. It costs one node and no callback: `getFloatTimeDomainData`
+     * is pulled when somebody looks, rather than pushing anything.
+     * ⚠️ IT IS TAPPED IN PARALLEL, not inserted. An analyser passes audio through
+     * unchanged, but putting one in the path makes the sound depend on a
+     * measurement, and a meter that can break what it measures is worse than no
+     * meter.
+     */
+    meterNode = ctx.createAnalyser();
+    meterNode.fftSize = 1024;
+    playout.connect(meterNode);
+    meterBuf = new Float32Array(meterNode.fftSize);
     /**
      * 🔴 THE COUNTERS EXISTED ALL ALONG AND NO PAGE HAD EVER READ ONE. They are
      * posted every 250 ms from inside the worklet; `/rack/` sounded noisy for an
@@ -438,6 +458,19 @@ export function createBoard({
       driver: pres.driver,
       driverAgoMs: droveAt ? performance.now() - droveAt : null,
     }),
+    /**
+     * The loudest sample LEAVING the graph right now, 0 to 1, or null when there
+     * is no graph yet. This is the only number here that a person can check
+     * against their ears.
+     */
+    outLevel() {
+      if (!meterNode || !meterBuf) return null;
+      meterNode.getFloatTimeDomainData(meterBuf);
+      let hi = 0;
+      for (const v of meterBuf) { const a = v < 0 ? -v : v; if (a > hi) hi = a; }
+      return hi;
+    },
+
     /** `peak` is a running maximum; a page timing one note resets it. */
     resetPeak: () => { peak = 0; },
     close: () => { pres.stop(); wire.close(); },
