@@ -15,6 +15,19 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **A QUICK RECORD AND LOOP ON THE KEYBOARD.** Asked 2026-09-17 alongside
+  hold-to-retrigger and explicitly deferred in the same breath: *"we could also
+  do quc rec/loop thing later"*. Nothing is built. **The seam is named and it is
+  the only one**: `press()` and `release()` in `demo/shell/keyboard.mjs` are the
+  single funnel every note goes through — a finger, a slide across the keys, the
+  QWERTY row, a page calling `api.press`, and every repeat of a held key — so a
+  recorder attaches there and nowhere else. `/looper/` already captures from its
+  own `onDown`/`onUp`, which is the same seam one layer out, and
+  `demo/shell/looper.mjs` owns what a loop IS for the two pages that have one.
+  ⚠️ **ASK WHAT IS BEING LOOPED BEFORE BUILDING IT.** `/looper/` loops NOTES and
+  `/knobs/` would loop SOUND coming back off a board in another building, and
+  those are different machines wearing one word.
+
 - 🔴 **INCOMING EMAIL AT `positron@positron.studio`.** Asked 2026-09-17: *"In bg
   work on incoming enail using cf see ../trip of deals collection.
   positron@positron.studio"*. Cloudflare Email Routing and an Email Worker,

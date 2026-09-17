@@ -895,13 +895,85 @@ video[hidden] { display: none; }
 /* --- the shared on-screen keyboard (demo/shell/keyboard.mjs) --------------
    One meaning for colour, as everywhere else: `down` is a note YOU are
    playing, `remote` is one somebody else is. */
+/* 🔴 A KEY HAS A FLOOR ON A PHONE, AND THE ROW SCROLLS RATHER THAN THE KEYS
+   SHRINKING. MEASURED on /knobs/ at 390 CSS px before this landed: 358 px of
+   page, thirteen keys, **24.77 px each** — against a 44 px minimum touch
+   target, so every key was half a finger wide. The floor is 74 px, which is
+   the key's own height and exactly 3.0x that; keyboard.mjs carries the
+   argument for the number.
+
+   ⚠️ `flex: 1` STAYS, AND THAT IS WHAT KEEPS THE DESKTOP LAYOUT WHERE IT IS.
+   The keys still divide whatever room there is; `min-width` only stops them
+   dividing it below a finger. Thirteen at 74 plus twelve 3 px gaps is 998 px,
+   so a container wider than that was already giving them more than the floor
+   and nothing about it moves. MEASURED at 1280: 50.14 px a key before and
+   after.
+
+   🔴 THE SWITCH IS A CONTAINER QUERY FIRST, A MEDIA QUERY SECOND, AND BOTH ARE
+   NEEDED. The question is how much room THIS KEYBOARD has, which is not the
+   same as how wide the window is — /kit/ draws one inside a section box that
+   is 328 px wide on a 390 px phone and 656 px wide on a laptop. So the primary
+   test is `@container`. `(pointer: coarse)` is the second arm because a phone
+   held sideways has 844 px of room and still has a finger, and because it is a
+   capability test rather than a user-agent one. They set the same value, so
+   either firing is enough.
+   ⚠️ AND THE CONTAINER ARM IS THE ONE A HARNESS CAN REACH. `demo/verify.mjs`
+   runs desktop Chrome with no touch emulation, so `(pointer: coarse)` is false
+   for the whole suite; a check that narrows a HOLDER can still grade the phone
+   layout, which is why /kit/ can assert this at all.
+
+   ⚠️ `overscroll-behavior-x: contain` OR THE ROW HANDS ITS LEFTOVER SCROLL TO
+   THE PAGE, and on iOS a horizontal overscroll at the left edge is the
+   back-navigation gesture — a glissando that leaves the site.
+
+   ⚠️ NO SCROLLBAR. A classic scrollbar adds ~15 px to the box on the platforms
+   that draw one, so the keyboard would be a different height on Windows from
+   on macOS. What says there is more is the key cut off at the edge, which is
+   always there because 358 px holds 4.65 keys. */
 .keys { display: flex; gap: 3px; margin: 0 0 10px; touch-action: none;
-        -webkit-touch-callout: none; }
-.k { flex: 1; min-width: 0; height: 74px; border-radius: 4px; background: var(--card2);
+        -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+        --k-min: 0px;
+        overflow-x: auto; overscroll-behavior-x: contain; scroll-behavior: auto;
+        scrollbar-width: none; }
+.keys::-webkit-scrollbar { display: none; }
+/* the container the query below asks about is `.kbd`, declared once, further
+   down this file with the rest of the component's own box */
+@container (max-width: 560px) { .keys { --k-min: 74px; } }
+@media (pointer: coarse) { .keys { --k-min: 74px; } }
+/* ⚠️ THE `0px` FALLBACK IS LOAD-BEARING. `.k` is a global selector and `--k-min`
+   is declared on `.keys`, so a `.k` outside a keyboard resolves the variable to
+   nothing — and an invalid `min-width` falls back to `auto`, which on a flex
+   item is the CONTENT-based minimum rather than zero. That is the opposite of
+   what this rule has always said. */
+.k { flex: 1; min-width: var(--k-min, 0px); height: 74px; border-radius: 4px; background: var(--card2);
      border: 1px solid var(--line2); display: grid; grid-template-rows: auto 1fr auto;
      justify-items: center; padding: 6px 0;
      font: 500 10px/1 var(--mono); color: var(--dim2); cursor: pointer;
      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* 🔴 A KEY HELD PAST A SECOND RETRIGGERS ITSELF, AND THIS IS THE ONLY THING
+   THAT SAYS SO. MEASURED 2026-09-17: through a two second hold the `down`
+   class changed ONCE. A page's `onUp` and `onDown` for a retrigger land in the
+   same tick, so its own `lightNote` turns the fill off and straight back on
+   with no paint in between — a retriggering key and a held key were the same
+   picture, on pages whose instrument is in another building and may not be
+   answering.
+
+   ⚠️ `currentColor`, NOT `--hi`. A lit key is already filled with `--hi`, so a
+   ring in that colour is invisible exactly when it is needed. `.k` carries
+   `--dim2` and `.k.down` carries the near-black the fill is read against, so
+   one declaration is legible on both.
+
+   The ring says the mode is on; the collapse says a note just fired, and it is
+   restarted from the retrigger itself rather than looped on its own clock, so
+   it cannot drift out of step with what you are hearing. The reduced-motion
+   rule above turns the collapse off and leaves the ring, which is the right
+   half to keep. */
+.k.retrig { box-shadow: inset 0 0 0 2px currentColor; }
+.k.retrig.beat { animation: k-beat var(--retrig-ms, 250ms) linear 1; }
+@keyframes k-beat {
+  from { box-shadow: inset 0 0 0 10px currentColor; }
+  to   { box-shadow: inset 0 0 0 2px currentColor; }
+}
 /* the pitch on top, the keystroke underneath: the pitch is what moves when the
    octave shifts, and it is what a player is looking for */
 .k .kn { grid-row: 1; color: var(--dim); font-weight: 500; }
@@ -1825,7 +1897,12 @@ video[hidden] { display: none; }
    ⚠️ THE PAD BELONGS TO THE KEYBOARD, so the gap above it is small (4 px) and
    the gap that used to sit under the keys moves to the pair as a whole. Two
    things 10 px apart are two things; 4 px apart they are one. */
-.kbd { margin: 0 0 10px; }
+/* 🔴 AND IT IS THE CONTAINER THE KEY-WIDTH QUERY ASKS. `.keys` picks its floor
+   from how much room the KEYBOARD has rather than from how wide the window is,
+   because /kit/ draws one in a 328 px box on a phone and a 656 px box on a
+   laptop, and a media query cannot tell those apart. `inline-size` only, so the
+   height is still taken from the keys inside it. */
+.kbd { margin: 0 0 10px; container-type: inline-size; }
 .kbd .keys { margin-bottom: 4px; }
 
 .kpad { --kpad-h: 26px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

@@ -753,14 +753,27 @@ to recover.
   un-evictable forever. `GET /room/<name>/stats` now prints per-socket idle.
   **Check `curl .../stats` before diagnosing any "cannot connect" on this
   relay**, and kill stray `user-data-dir=/tmp/...` Chromes.
-- **The relay's own token bucket is readable off the wire**, and it is exact:
-  at both 120 and 300 msg/s, three runs delivered **298 messages in three
-  seconds** — `MSG_BURST` 120 plus 3 s at `MSG_PER_SEC` 60. The sender is told
-  NOTHING when this bites: no error, no close, no backpressure. Only a
-  per-connection counter in the payload can see it. The Durable Object hop
-  itself costs **1–2 ms at p50** over the runtime's `ping`/`pong` autoresponse,
-  and a full 16-socket room costs the sender **8 ms at p50** over an empty one
-  with zero loss (`demo/perf-wire.mjs`).
+- 🔴 **THE RELAY'S LIMITS ARE 1000 msg/s, A 2000 BURST AND 128 SOCKETS, AND
+  THIS ENTRY SAID 60, 120 AND 16 FOR MONTHS AFTER THEY WERE RAISED.** READ from
+  `workers/relay/src/index.js`, whose own comments say *"was 60 — one knob turn
+  is ~60/s on its own"* and *"was 16, which a handful of browser tabs could
+  fill"*; `GET /room/<name>/stats` reports the same. `demo/shell/wire.mjs`
+  carried the same four stale numbers under a comment claiming it could not
+  disagree with the worker, and was corrected on 2026-09-17.
+  ⚠️ **THE DIRECTION MATTERS.** Every stale number was too SMALL, so anything
+  reading them refuses work the relay would accept and any capacity argument
+  built on them understates a room by more than an order of magnitude. A design
+  was nearly throttled on this: a keyboard glissando and a held retrigger were
+  budgeted against 60/s and come to about 16 and 8 msg/s, which is under one per
+  cent of the real budget.
+  **What is still true and is the part worth keeping:** the token bucket is
+  readable off the wire and exact, and the sender is told NOTHING when it bites.
+  No error, no close, no backpressure, and only a per-connection counter in the
+  payload can see it. ⚠️ A gap counter cannot: a flood measured on 2026-09-17
+  delivered 2030 of 6000 and reported `lost 0`, because the loss was a tail
+  rather than a hole. The Durable Object hop costs **1-2 ms at p50** over the
+  runtime's `ping`/`pong` autoresponse, and a full room costs the sender about
+  **8 ms at p50** over an empty one with zero loss (`demo/perf-wire.mjs`).
 - **`ingest.positron.studio` is the only tokenless write path.** Server-minted
   session ids, per-segment/session/address caps enforced in a DO, 6-hour TTL
   with a cron sweep. `selfrec` stays token-gated; keep the two separate.
