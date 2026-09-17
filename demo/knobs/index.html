@@ -117,7 +117,23 @@
   // `voices.list` on 2026-09-16 (878 patches, 24 banks, bank map not stale).
   // Bank select is CC 32 and the board reads that number out of Yoshimi's own
   // config, so nothing here has to know it.
-  const BANK = 95, PROGRAM = 6, PATCH = 'Analog Filter 1';
+  /**
+   * 🔴 `AddSynth Morph`, NOT `Analog Filter 1`. Asked 2026-09-17 once the sound
+   * finally arrived: *"the patch is dull, ged prev one back"*. This page had
+   * always opened on 95/6, so the one being asked for is the one from `/keys/`,
+   * chosen there on 2026-09-16 and archived with that page: bank 115, program
+   * 32. The keyboard came across from `/keys/` and the patch it was played on
+   * should have come with it.
+   * ⚠️ IT IS A BANK AND A PROGRAM, never a name or a position in a list. The
+   * board's banks are numbered 5, 10, 15 and up with sparse slots, so an index
+   * into a flattened list of 911 moves the moment a file is added anywhere
+   * before it, and a name match breaks on a rename.
+   * ⚠️ AND IT MOVES ON ITS OWN, which is a feature here and a trap for a
+   * measurement: two takes at one value four seconds apart differ by 0.58
+   * octaves of brightness. That is why it sounds alive and why
+   * `rig/box/wobble-test.mjs` has to interleave its takes on it.
+   */
+  const BANK = 115, PROGRAM = 32, PATCH = 'AddSynth Morph';
   // One note, held. A repeating note would retrigger the patch's own filter
   // envelope and fight the slider, which would make the page about the wrong
   // thing.
