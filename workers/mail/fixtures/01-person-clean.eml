@@ -1,0 +1,20 @@
+Received: from mail-wr1-x42a.google.com (mail-wr1-x42a.google.com [2a00:1450:4864:20::42a])
+	by mx.cloudflare.net with ESMTPS id 4c2f9a1b8e
+	for <positron@positron.studio>; Wed, 17 Sep 2026 09:14:02 +0000
+Authentication-Results: mx.cloudflare.net;
+	dkim=pass header.d=gmail.com header.s=20230601 header.b=IRdayjbb;
+	dmarc=pass header.from=gmail.com policy.dmarc=none;
+	spf=none (mx.cloudflare.net: no SPF records found for
+	postmaster@mail-wr1-x42a.google.com) smtp.helo=mail-wr1-x42a.google.com;
+	spf=pass (mx.cloudflare.net: domain of maarja@gmail.com designates
+	2a00:1450:4864:20::42a as permitted sender) smtp.mailfrom=maarja@gmail.com;
+	arc=none smtp.remote-ip=2a00:1450:4864:20::42a
+From: Maarja Tamm <maarja@gmail.com>
+To: positron@positron.studio
+Subject: =?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=
+Message-ID: <CAFq8Zt9wQ2mE@mail.gmail.com>
+Date: Wed, 17 Sep 2026 12:14:01 +0300
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Saw the radio page, it plays on my phone. Thanks for building it.

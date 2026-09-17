@@ -1,0 +1,11 @@
+Authentication-Results: mx.cloudflare.net;
+	spf=fail (mx.cloudflare.net: domain of sender@nodmarc.example does not
+	designate 203.0.113.77 as permitted sender) smtp.mailfrom=sender@nodmarc.example;
+	dkim=pass header.d=bulkmailer.example header.s=b1 header.b=55667788;
+	dmarc=none header.from=nodmarc.example
+From: Sender <sender@nodmarc.example>
+To: positron@positron.studio
+Subject: about your website ranking
+Message-ID: <seo-1@nodmarc.example>
+
+We can improve your search position in thirty days.

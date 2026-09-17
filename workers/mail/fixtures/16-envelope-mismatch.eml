@@ -1,0 +1,13 @@
+Return-Path: <bounces+7712@mailer.example>
+Authentication-Results: mx.cloudflare.net;
+	spf=pass (mx.cloudflare.net: domain of bounces+7712@mailer.example designates
+	198.51.100.90 as permitted sender) smtp.mailfrom=bounces+7712@mailer.example;
+	dkim=pass header.d=friendly.example header.s=s1 header.b=abcd1234;
+	dmarc=pass header.from=friendly.example policy.dmarc=none;
+	arc=none
+From: Kai <kai@friendly.example>
+To: positron@positron.studio
+Subject: sent through a service, by a person
+Message-ID: <kai-1@friendly.example>
+
+I use a sending service, so the envelope and the header disagree.

@@ -1,0 +1,11 @@
+Authentication-Results: mx.cloudflare.net;
+	spf=none (mx.cloudflare.net: no SPF records found for
+	postmaster@bare.example) smtp.mailfrom=post@bare.example;
+	dkim=none;
+	dmarc=none header.from=bare.example
+From: Post <post@bare.example>
+To: positron@positron.studio
+Subject: a domain that publishes nothing at all
+Message-ID: <bare-1@bare.example>
+
+No SPF record, no signature, no DMARC record. Nobody vouched for this.

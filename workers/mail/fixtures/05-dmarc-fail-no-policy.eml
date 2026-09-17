@@ -1,0 +1,11 @@
+Authentication-Results: mx.cloudflare.net;
+	spf=fail (mx.cloudflare.net: domain of billing@bank.example does not
+	designate 203.0.113.9 as permitted sender) smtp.mailfrom=billing@bank.example;
+	dkim=none;
+	dmarc=fail header.from=bank.example
+From: Billing <billing@bank.example>
+To: positron@positron.studio
+Subject: Your invoice is overdue
+Message-ID: <inv-771@bank.example>
+
+Please settle the attached invoice.

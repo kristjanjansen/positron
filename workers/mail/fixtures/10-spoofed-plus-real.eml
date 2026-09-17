@@ -1,0 +1,15 @@
+Authentication-Results: mx.cloudflare.net.evil-mx.example;
+	spf=pass (a stamp the sender wrote about itself) smtp.mailfrom=ceo@bank.example;
+	dkim=pass header.d=bank.example header.s=s1 header.b=0000ffff;
+	dmarc=pass header.from=bank.example policy.dmarc=none
+Authentication-Results: mx.cloudflare.net;
+	dmarc=fail header.from=bank.example policy.dmarc=reject;
+	spf=fail (mx.cloudflare.net: domain of x@evil-mx.example does not designate
+	203.0.113.9 as permitted sender) smtp.mailfrom=x@evil-mx.example;
+	dkim=none
+From: The CEO <ceo@bank.example>
+To: positron@positron.studio
+Subject: quick favour
+Message-ID: <spoof-2@evil-mx.example>
+
+Are you at your desk?

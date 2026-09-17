@@ -1,0 +1,11 @@
+Authentication-Results: mx.cloudflare.net;
+	dmarc=fail (p=none sp=reject dis=none) header.from=sub.tolerant.example;
+	spf=fail (mx.cloudflare.net: 203.0.113.44 is not permitted)
+	smtp.mailfrom=post@sub.tolerant.example;
+	dkim=none
+From: Post <post@sub.tolerant.example>
+To: positron@positron.studio
+Subject: a note from a badly configured domain
+Message-ID: <sp-1@sub.tolerant.example>
+
+This domain publishes p=none and sp=reject.

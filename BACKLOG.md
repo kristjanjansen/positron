@@ -15,6 +15,21 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **A SUBJECT FROM OUTSIDE ENGLISH IS UNREADABLE IN THE FEEDBACK ROOM.** Mail
+  headers arrive MIME-encoded and nothing decodes them, so a note from Estonia
+  opens `[ok] =?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=`. That is the FIRST thing a reader
+  sees, and this is a mailbox for a person writing in their own language.
+  ⚠️ It is a small decoder and it is not free: RFC 2047 has two encodings, folded
+  words that must be joined without the whitespace between them, and charsets
+  that are not UTF-8.
+
+- ⚠️ **THE PRIMARY SPAM SIGNAL MAY NOT ARRIVE AT ALL, AND ONLY REAL MAIL SETTLES
+  IT.** `workerd#6740` reports `Authentication-Results` ABSENT from a real Worker
+  delivery, with only an `ARC-Authentication-Results` carrying `arc=none`. The
+  classifier answers `unknown` in that case, which never rejects and never reads
+  as clean, and two fixtures are that shape. UNVERIFIED for this zone: the first
+  real message through `positron@positron.studio` is the measurement.
+
 - 🔴 **A QUICK RECORD AND LOOP ON THE KEYBOARD.** Asked 2026-09-17 alongside
   hold-to-retrigger and explicitly deferred in the same breath: *"we could also
   do quc rec/loop thing later"*. Nothing is built. **The seam is named and it is

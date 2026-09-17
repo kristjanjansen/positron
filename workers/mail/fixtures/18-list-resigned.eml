@@ -1,0 +1,14 @@
+Authentication-Results: mx.cloudflare.net;
+	dkim=fail header.d=author.example header.s=a1 header.b=deadbeef;
+	dkim=pass header.d=list.example header.s=l1 header.b=cafebabe;
+	spf=pass (mx.cloudflare.net: domain of bounce@list.example designates
+	198.51.100.60 as permitted sender) smtp.mailfrom=bounce@list.example;
+	dmarc=pass header.from=author.example policy.dmarc=none;
+	arc=pass smtp.remote-ip=198.51.100.60
+List-Id: A mailing list <devs.list.example>
+From: An Author <writer@author.example>
+To: devs@list.example
+Subject: [devs] the list broke my signature and re-signed it
+Message-ID: <list-1@author.example>
+
+A list that rewrites a subject breaks the original signature. This is normal.

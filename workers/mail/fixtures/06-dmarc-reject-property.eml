@@ -1,0 +1,11 @@
+Authentication-Results: mx.cloudflare.net;
+	dmarc=fail header.from=paypal.example policy.dmarc=reject;
+	spf=fail (mx.cloudflare.net: domain of bounce@evil-mx.example does not
+	designate 203.0.113.9 as permitted sender) smtp.mailfrom=bounce@evil-mx.example;
+	dkim=fail header.d=paypal.example header.s=s1 header.b=ffff0000
+From: PayPal <service@paypal.example>
+To: positron@positron.studio
+Subject: Confirm your account
+Message-ID: <fake-1@evil-mx.example>
+
+Click here to confirm.

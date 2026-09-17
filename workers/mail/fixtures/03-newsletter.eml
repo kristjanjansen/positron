@@ -1,0 +1,16 @@
+Authentication-Results: mx.cloudflare.net;
+	dkim=pass header.d=news.example header.s=s1 header.b=aa11bb22;
+	dmarc=pass header.from=news.example policy.dmarc=quarantine;
+	spf=pass (mx.cloudflare.net: domain of bounce-9182@news.example designates
+	198.51.100.7 as permitted sender) smtp.mailfrom=bounce-9182@news.example;
+	arc=none
+List-Unsubscribe: <https://news.example/u/9182>, <mailto:u-9182@news.example>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+List-Id: Example weekly <weekly.news.example>
+Precedence: bulk
+From: Example Weekly <weekly@news.example>
+To: positron@positron.studio
+Subject: Your weekly roundup
+Message-ID: <9182.news@news.example>
+
+Ten things you can do with a web worker.

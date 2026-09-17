@@ -88,6 +88,7 @@ node demo/verify.mjs llhls ladder        # just these, by slug
 node demo/verify-native.mjs              # THE IPHONE CODE PATH — verify.mjs cannot reach it
 node demo/fake-station.mjs               # an Icecast mount that is nobody's radio
 node demo/shell/looper-test.mjs          # the looper's arithmetic, no browser
+node workers/mail/test.mjs               # what arrives at positron@ is spam or a person
 node demo/resources/measure-durations.mjs   # how long each recording is, asked once
 node demo/verify-safari.mjs              # desktop Safari over WebDriver, both engines
 DEMO_BASE=https://positron.studio node demo/verify.mjs      # against the deploy
