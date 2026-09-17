@@ -61,36 +61,103 @@ file by being finished or by being refused in writing, never by being forgotten.
 Quoted verbatim below because this arrived as one dictated block and the detail
 in it is the specification. **General, across every VR/AR page:**
 
-- 🔴 **ONE WAY OUT, AND IT IS THE ONLY ONE.** *"all vr/ar general  make one
+✅ **BUILT 2026-09-17, AND NOT ONE LINE OF IT IS CONFIRMED IN A HEADSET.**
+Everything below is done in code and graded where a laptop can grade it —
+`node demo/verify-gl.mjs` reads **162/162** (`blocks` 47 page asserts, `held`
+33, `floor` 29, `mirror` 34, `videoradio` 2) and
+`node demo/shell/xr-pick-test.mjs` reads **48 ok, 0 failed** — but every claim
+about how any of it LOOKS through a Quest is unverified. What was measured and
+what still needs a device is written against each line.
+
+- ✅ **ONE WAY OUT, AND IT IS THE ONLY ONE.** *"all vr/ar general  make one
   general way to get out. hold down any controller button for looooong enough
   then it quits. no other exit methods/ui's for now."* ⚠️ This replaces the
   current any-button-ends-the-session rule, which is written into CLAUDE.md as
   a safety property — a long hold is still a way the PAGE owns, so the rule
   survives, but the dead-man's timer and the tablet's quit button are not
   exits any more.
-- **Rays are global and grey.** *"use global rays, (white, ends faded). when
+  ✅ **DONE, AND THE DEAD-MAN'S TIMER IS DELIBERATELY KEPT.** It is not a
+  user-facing exit: it ends a session that has drawn NOTHING after four seconds,
+  which is the case where the page threw and there is no ring, no badge and no
+  render loop to draw one. CLAUDE.md records exactly what removing it puts back
+  — a live session, nothing drawing, no way out, no log line. Every OTHER exit
+  is gone: the grip on `/mirror/`, the tablet's `Hold to leave`, and the tap on
+  any button. `xr-quit.mjs` takes **any button held 3 s**, with the ring drawn
+  on BOTH hands from the first millisecond and cancelling to zero on release.
+  ⚠️ **THE TRIGGER IS A BUTTON, AND ON `/blocks/` AND `/mirror/` IT IS ALSO THE
+  DRAG.** A drag held past three seconds ends the session. The ring is the only
+  warning and it is visible the whole time. **UNVERIFIED — if that turns out to
+  be intolerable in a headset, excluding index 0 is one line** and the assert
+  that would have to change says so by name.
+- ✅ **Rays are global and grey.** *"use global rays, (white, ends faded). when
   something active happens lighten them up. no coloring of rays, grayscale."*
-- **No controller geometry, no tablet, anywhere.** *"rm controller
+- ✅ **No controller geometry, no tablet, anywhere.** *"rm controller
   geometry/tablet on all (only if i am ask on specific demo so keep that code
   ready to pop into scene)"*. Keep both components, unreferenced and ready.
-- **The tablet keeps existing, without its quit button.** *"rm quit button from
+- ✅ **The tablet keeps existing, without its quit button.** *"rm quit button from
   tablet but keep that component around"*.
-- **The slider stays, but never in an AR scene.** *"slider is ok. but again, do
+- ✅ **The slider stays, but never in an AR scene.** *"slider is ok. but again, do
   not show it on any vr/xr when showing ar scenes"*.
-- **Dots follow the room.** *"map dots to room geometry always"*.
-- **Doubled dots with moving panels.** *"window seems to have doubled dots
-  somehow when having moving panels (mirror demo)"*.
-- **Panels face the viewer in both axes.** *"make them always look at me not
+- ✅ **Dots follow the room.** *"map dots to room geometry always"*.
+- ⚠️ **Doubled dots with moving panels. NOT REPRODUCED; ONE CAUSE REMOVED.**
+  *"window seems to have doubled dots somehow when having moving panels (mirror
+  demo)"*. It was not reproduced from here: `mirror`'s own off-screen preview
+  draws ONE dot field per eye at every zoom down to single pixels, because a
+  window session detects no planes and falls back to the page's single floor.
+  What is certain is the mechanism that CAN produce one, and it is gone. The
+  grid writes no depth and nothing opaque stands between its quads, so every
+  detected surface is superimposed on every other one in the same look — and a
+  Quest 3 handed over ELEVEN in this repo on 2026-09-13: `door 1 · ceiling 1 ·
+  wall 4 · window 1 · bed 1 · shelf 2 · floor 1`. A bed at 0.5 m over a floor at
+  0 is two parallel dot fields at two heights in one place. `boundaryOf` in
+  `xr-room.mjs` dots the room's SHELL only: every wall, the lowest horizontal
+  surface, and the ceiling. **A headset has to confirm it; if the doubling is
+  still there, suspect stereo before geometry.**
+- ✅ **Panels face the viewer in both axes.** *"make them always look at me not
   only horiz but also vertic"*.
-- **The move bar is half the size and monochrome.** *"retuce movebar size under
+- ✅ **The move bar is half the size and monochrome.** *"retuce movebar size under
   panel 2x. make it monochrome, just lightening up when needed."*
 
 **`/held/`:** *"text input appears in vr/ar but 3d type does not change nof after
 submit nor realtime"* and *"texts in xr seems to be behind to walls sometime"*.
 
+✅ **THE FIRST IS FOUND, FIXED AND GRADED, AND IT WAS ONE LINE.** `liveRetext`
+scheduled its rebuild on `window.requestAnimationFrame`, which does not fire
+while an immersive session is running — so in a headset the callback was queued
+and never ran, and the flag it had set stayed true for good, so every LATER
+keystroke returned at the first line. That is both halves of the report: nothing
+in realtime, and nothing on submit either, because Return does not rebuild
+anything, it closes the field. It uses the session's own rAF now. **MEASURED:
+reverting the fix takes the new check red with `the wall read UNCHANGED`, twice.**
+
+⚠️ **THE SECOND IS A DIAGNOSIS PLUS A GUESSED NUMBER.** The room is 15 m across
+with capitals up to 2.75 m tall, so in passthrough every word stood 7.5 m out —
+through the wall of any ordinary room. A Quest composites passthrough with no
+depth, so they stay visible out there, which is what "behind the walls" looks
+like from inside one. The whole room now scales by `AR_SCALE` (0.30) in a
+session that really composites, about EYE HEIGHT rather than about the floor, so
+the words stay level with you instead of sinking to knee height. **The factor is
+one constant and it is a guess; a headset has to say whether 30% is right.** The
+honest alternative is `plane-detection`, which this page does not ask for.
+
 **`/blocks/`:** *"in xr blocks are angled against wall, rotated a bit, not fully
 against wall"*, and on the joystick reaching through walls, *"no, keeep them,
 som some hilite or smt when pushed against wall"*.
+
+✅ **BOTH BUILT.** Nothing rotates a brick: the bricks are square to the
+REFERENCE SPACE, whose yaw is wherever the headset was looking when the session
+started, and a real wall is at whatever angle somebody built it at. `wallYaw` in
+`xr-room.mjs` reads the angle off the measured walls — a circular mean folded by
+a quarter turn, weighted by area — the brick grid snaps and clamps in that
+frame, and the room draws every thing turned by it. It is **0 with no walls
+measured**, so the window and every VR session are byte-for-byte what they were.
+The push through a wall is KEPT, and the brick brightens and grows the moment it
+reaches one.
+⚠️ **THE ANGLE IS WHAT A HEADSET HAS TO CONFIRM.** `wallYaw` is graded under
+`node` with three negative controls and the page grades a drop in a room turned
+23°; what nobody here can check is whether a Quest's plane normals come back on
+the axis this reads them from. If the bricks end up 90° out, that is the +Y
+versus +Z reading and the comment above `wallYaw` names it.
 
 - 🔴 **`/keys/` IS ARCHIVED AND ITS KEYBOARD MOVES TO `/knobs/`.** Instructed
   2026-09-17: *"keys seems to be dead. bring keyboard to knobs and archive

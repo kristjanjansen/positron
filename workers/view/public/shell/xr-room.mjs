@@ -1262,7 +1262,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       const bits = Object.entries(planes.labels).map(([k, v]) => `${k} ${v}`).join(' · ');
       const walls = planes.labels.wall || 0;
       planes.note = `${planes.count} surface(s) from your room · ${bits}`
-        + ` · the dots are on ${planes.dotted} of them — every wall, the floor and the ceiling, and nothing standing on the floor`
+        + ` · the dots are on ${planes.dotted} of them: every wall, the floor and the ceiling, and nothing standing on the floor`
         + `, floor at y=${planes.floorY.toFixed(2)} m`
         + (walls ? ` · ${walls} of them are walls, and those are the only walls this page draws`
                  : ' · NO wall surfaces came back, so there are no dotted walls');

@@ -1280,8 +1280,8 @@ void main() {
       const composited = xrBlend === 'alpha-blend' || xrBlend === 'additive';
       const k = setRoomScale(composited ? AR_SCALE : 1);
       if (composited) {
-        d.log(`your room is smaller than this one, so it is at ${(k * 100).toFixed(0)}% `
-          + `— the walls stand ${(R * k).toFixed(2)} m out instead of ${R}`, 'hi');
+        d.log(`your room is smaller than this one, so this one is at ${(k * 100).toFixed(0)}%. `
+          + `The walls stand ${(R * k).toFixed(2)} m out instead of ${R}`, 'hi');
       }
       // ⚠️ ASKED OF THE SESSION, NOT OF THE REQUEST. `optionalFeatures` says what
       // was wanted; `domOverlayState` says what was granted, and the two differ

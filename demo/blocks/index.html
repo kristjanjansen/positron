@@ -152,12 +152,16 @@
     // true; none of it is what somebody arriving here needs, and the generative
     // half is coming back as its own thing. What is left is CLAUDE.md's three:
     // what this is, what to press, what the numbers mean.
+    // ⚠️ THE SMALL SCREEN ON THE LEFT HAND IS GONE FROM THE SCENE (2026-09-17)
+    // and so is the controller geometry, so the sentence that named them had to
+    // go with them: a description that has drifted is worse than a missing one
+    // because a visitor believes it. What is left is what you do.
     what: 'Square bricks on a dotted floor, all of them a whole number of units '
-      + 'across. Drag to look and the arrow keys to walk; in a headset your right '
-      + 'hand points and your left carries a small screen, the trigger picks a '
-      + 'brick up and the thumbstick pushes it nearer or further. Let one go and '
-      + 'it snaps to the grid, settles onto whatever is under it, and stops at '
-      + 'the walls rather than going through them.',
+      + 'across. Drag to look and the arrow keys to walk; in a headset a ray '
+      + 'from your hand picks a brick up with the trigger and the thumbstick '
+      + 'pushes it nearer or further, lighting it when it reaches a wall. Let '
+      + 'one go and it snaps to a grid squared up with the room, settles onto '
+      + 'whatever is under it, and comes to rest against the walls.',
     // 🔴 FOUR CELLS, DOWN FROM EIGHT, AND FOUR OF THE OLD ONES COULD NOT MOVE.
     // `seed`, `things` and `refused` were written once at load and then sat
     // there; `round trip` only changed on a roll, and the roll is not a button
@@ -254,20 +258,24 @@
     return { vao, count: 6 };
   }
   /**
-   * 🔴 THREE WAYS OUT OF A ROOM, AND ONE PLACE THAT SAYS WHICH ONE FIRED.
+   * 🔴 ONE WAY OUT OF A ROOM, AND ONE PLACE THAT SAYS WHAT FIRED.
    *
-   *   · the grip on either controller          — nothing has to be drawn for it
-   *   · a dead-man's switch at 4 s             — nothing has to be held for it
-   *   · "Hold to leave" on the tablet          — the one you can SEE
+   *   · a long hold on ANY controller button   — the only one a person uses
+   *   · a dead-man's switch at 4 s             — not an exit, a guard
    *
-   * The third is new and it ADDS to the other two rather than replacing them.
-   * It cannot replace them: it is drawn on a tablet that only exists once a
-   * grip pose has resolved, so it has two conditions in front of it, and an
-   * exit with conditions is not an exit. What it buys is that the way out stops
-   * being folklore — "any controller button except the trigger" is a thing you
-   * have to be told, and a button with the words on it is not.
+   * 2026-09-17: *"make one general way to get out. hold down any controller
+   * button for looooong enough then it quits. no other exit methods/ui's for
+   * now."* The grip used to leave and so did a button on the tablet; both are
+   * gone, and so is the tablet. What is left is `demo/shell/xr-quit.mjs`: hold
+   * anything for three seconds and a ring at the controller fills while you do.
    *
-   * ⚠️ AND THE LOG HAS TO NAME WHICH. Three exits that all print "session
+   * ⚠️ THE DEAD-MAN'S SWITCH IS NOT AN EXIT AND IT STAYS. It ends a session
+   * that has drawn NOTHING after four seconds, which is the case where the page
+   * threw and there is no ring, no badge and no render loop to draw one.
+   * CLAUDE.md records what it prevents: a live session, nothing drawing, no way
+   * out and no log line. Removing it would put that back.
+   *
+   * ⚠️ AND THE LOG HAS TO NAME WHICH. Two endings that both print "session
    * ended" make a page that cannot tell you why it ended, which is the same
    * defect as the run where "the button was never pressed" and "the button
    * threw" were one observation. `leftBy` is set by whichever fired and read
@@ -290,6 +298,23 @@
   // is the whole reason it is a module. `say` is the BEACON, never the batched
   // shipper: the room's lines about your real floor arrive while a session is
   // starting, which is exactly when a 2 s timer stops being generous.
+  /**
+   * 🔴 TWO THINGS THAT ARE BUILT AND NOT DRAWN, 2026-09-17.
+   * *"rm controller geometry/tablet on all (only if i am ask on specific demo
+   * so keep that code ready to pop into scene)"*. Both are switches rather than
+   * deletions, and both are false: the controller stand-ins and the real models
+   * live in `demo/shell/xr-room.mjs` (`GRIP_PARTS`, `loadModel`), the slab in
+   * `demo/shell/xr-tablet.mjs`. Flip one to `true` and the thing is back in
+   * this scene with no other edit.
+   * ⚠️ THE INPUT IS NOT TOUCHED BY EITHER. Poses, the pointer and every button
+   * still arrive, so the ray still points, things can still be grabbed and the
+   * way out still draws at the grip. Taking the input away instead would be a
+   * session with no visible way out, which is the failure this repo has already
+   * paid for twice.
+   */
+  const SHOW_HANDS = false;
+  const SHOW_TABLET = false;
+
   let room = null, tablet = null, xrHands = null, xrQuit = null;
   if (gl) {
     quad = unitQuad();
@@ -312,7 +337,21 @@
     // `xr-hands.mjs`, which is handed the session every frame; this is only how
     // this page learns it was that exit, so the `end` handler can name it
     // instead of printing one line for all three.
-    tablet = createXRTablet({ ctx: { room, left: () => leaving('the tablet\u2019s button') } });
+    // 🔴 BUILT AND NOT SHOWN. 2026-09-17: *"rm controller geometry/tablet on
+    // all (only if i am ask on specific demo so keep that code ready to pop
+    // into scene)"*. The component is whole in `demo/shell/xr-tablet.mjs` and
+    // is still constructed here, because `applyAll()` below is what puts the
+    // floor dots at the strength the slider declares rather than at a default —
+    // the slab is simply not handed to the room to draw. Putting it back is
+    // `SHOW_TABLET = true` and nothing else.
+    // ⚠️ AND ITS WAY OUT IS GONE FROM IT, so there is no `left` notification to
+    // wire: the one exit is the long hold on any button, below.
+    tablet = createXRTablet({ ctx: { room } });
+    // ⚠️ HANDED TO THE ROOM EVEN THOUGH NOTHING DRAWS IT, and that is not an
+    // oversight. `setTablet` is what lets the room UPLOAD the face to the card
+    // when its version moves; whether the slab is DRAWN is `tabletM`, which
+    // `SHOW_TABLET` decides below. Skipping this left the upload path
+    // uncovered, and the check that reads `tabletUploadMs` said so in one run.
     room.setTablet(tablet);
     tablet.applyAll();          // the dots start where the slider says, not at a default
     // 🔴 ONE INPUT PATH, AND IT CANNOT TELL VR FROM AR. Every controller, the
@@ -411,9 +450,39 @@
     if (!room || !doc) return;
     room.draw({
       proj, view, tSec, doc, clear: doClear, ar: arMode, eye, sky: false,
-      aimed, held, aimedDist, ray: xrOk ? rayNow : null, touch: touchOf,
+      // 🔴 THE BRICKS ARE SQUARE TO YOUR ROOM, NOT TO THE HEADSET. Reported
+      // 2026-09-17: *"in xr blocks are angled against wall, rotated a bit, not
+      // fully against wall"*. `planes.yaw` is 0 until a headset reports walls,
+      // so the window and every VR session are unchanged. See `roomYaw` below.
+      yaw: roomYaw(),
+      aimed, held, aimedDist, ray: xrOk ? rayNow : null,
+      touch: drawTouch,
     });
   }
+
+  /**
+   * 🔴 THE THIRD STATE: A BRICK PUSHED UP AGAINST A WALL.
+   *
+   * `touchOf` from the kit answers about the RAY — nothing, aimed, held — and
+   * the thumbstick can push a held brick straight through a wall and out of the
+   * room. That push is KEPT (*"no, keeep them, som some hilite or smt when
+   * pushed against wall"*); what it lacked was any sign it had happened, so a
+   * brick you shoved away looked exactly like a brick you had lost.
+   *
+   * ⚠️ BRIGHTER AND BIGGER, IN THE TWO CHANNELS EVERY OTHER "the ray is on
+   * this" ANSWER ALREADY USES, so it reads as one more step along a scale
+   * somebody has learned rather than as a new vocabulary. Not a colour: colour
+   * on this site says how something LANDED, and "you have pushed it as far as
+   * it goes" is exactly that, in the channel that already carries it.
+   *
+   * ⚠️ NAMED RATHER THAN INLINE SO THE CHECK CAN DRIVE THE SAME FUNCTION. A
+   * check that rebuilt this arithmetic would be grading its own copy.
+   */
+  const drawTouch = (isHeld, isAimed) => {
+    const t = touchOf(isHeld, isAimed);
+    if (!isHeld || !atWall) return t;
+    return { lit: t.lit * 1.45, scale: t.scale * 1.04 };
+  };
 
   // ── applying a room, which is the only way the room ever changes ────────
   /**
@@ -486,6 +555,49 @@
   const PLATE = 2.4;
 
   /**
+   * 🔴 WHICH WAY ROUND THE BRICK GRID IS, IN RADIANS. Zero until a headset
+   * reports walls, and zero is exactly what this page did before 2026-09-17.
+   *
+   * Reported that day: *"in xr blocks are angled against wall, rotated a bit,
+   * not fully against wall"*. Nothing rotates the bricks — they are axis-
+   * aligned to the REFERENCE SPACE, whose yaw is wherever the headset happened
+   * to be looking when the session started, and a real wall is at whatever
+   * angle somebody built it at. `wallYaw` in `xr-room.mjs` reads the angle off
+   * the walls the headset measured; it is graded under `node` by
+   * `demo/shell/xr-pick-test.mjs`, including the negative control that a room
+   * already square asks for no turn.
+   */
+  const roomYaw = () => room?.planes?.yaw || 0;
+  /** World x,z into the brick grid's own frame, and back. */
+  const toGrid = (x, z, a = roomYaw()) => {
+    const c = Math.cos(-a), s = Math.sin(-a);
+    return [x * c - z * s, x * s + z * c];
+  };
+  const fromGrid = (x, z, a = roomYaw()) => toGrid(x, z, -a);
+
+  /**
+   * 🔴 IS THE THING IN YOUR HAND UP AGAINST A WALL, OR PAST ONE.
+   * Asked for 2026-09-17 alongside keeping the push that does it: *"no, keeep
+   * them, som some hilite or smt when pushed against wall"*. The thumbstick can
+   * shove a held brick straight out of the room and that stays — what was
+   * missing is any sign that it had happened, so a brick you pushed away looked
+   * exactly like a brick you had lost.
+   * ⚠️ MEASURED IN THE GRID'S OWN FRAME, so the test is against the wall you
+   * can see rather than against an axis of the headset's.
+   */
+  let atWall = false;
+  function pushedToWall(i) {
+    const t = doc?.things?.[i];
+    if (!t) return false;
+    const half = halfOf(t);
+    const [gx, gz] = toGrid(t.x, t.z);
+    // At the wall, not merely near it: the clamp `settleDrop` applies on release
+    // is `PLATE - half`, so this is true from the moment a push reaches the
+    // place a drop would put it back to.
+    return Math.abs(gx) >= PLATE - half - 1e-6 || Math.abs(gz) >= PLATE - half - 1e-6;
+  }
+
+  /**
    * Where a brick goes when you let go of it.
    *
    * 🔴 THREE RULES, IN THIS ORDER, AND THE ORDER IS THE WHOLE THING. Snap to
@@ -522,16 +634,33 @@
     // against it, which is what a wall is for. The floor is the same rule with
     // one side: nothing sits below its own half-height.
     const clamp = (v) => Math.max(-PLATE + half, Math.min(PLATE - half, v));
-    let x = clamp(snap1(me.x)), z = clamp(snap1(me.z));
+    // 🔴 SNAPPED AND CLAMPED IN THE GRID'S OWN FRAME, WHICH IS THE ROOM'S.
+    // The grid used to be the reference space's axes, so a brick let go near a
+    // real wall came to rest on a lattice at whatever angle the headset had
+    // been facing at session start — *"angled against wall, rotated a bit, not
+    // fully against wall"*. `roomYaw()` is 0 with no walls measured, so the
+    // window and every VR session get byte-for-byte what they had.
+    // ⚠️ THE OVERLAP TEST IS AXIS-ALIGNED, so the other things have to be in
+    // the SAME frame or it would be comparing a rotated box with an unrotated
+    // one. Every brick shares one yaw, so rotating them all is exact rather
+    // than approximate.
+    const a = roomYaw();
+    const others = doc.things.map((t, k) => {
+      if (k === i) return t;
+      const [ox, oz] = toGrid(t.x, t.z, a);
+      return { ...t, x: ox, z: oz };
+    });
+    const [mgx, mgz] = toGrid(me.x, me.z, a);
+    let x = clamp(snap1(mgx)), z = clamp(snap1(mgz));
     let y = Math.max(half, snap1(me.y));
     for (let pass = 0; pass < DROP_PASSES; pass++) {
       let worst = null, deepest = 1e-6;
       for (let k = 0; k < doc.things.length; k++) {
         if (k === i) continue;
-        const o = overlapOf({ ...me, x, y, z }, doc.things[k]);
+        const o = overlapOf({ ...me, x, y, z }, others[k]);
         if (!o) continue;
         const ax = leastAxis(o);
-        if (o['o' + ax] > deepest) { deepest = o['o' + ax]; worst = { o, ax, other: doc.things[k] }; }
+        if (o['o' + ax] > deepest) { deepest = o['o' + ax]; worst = { o, ax, other: others[k] }; }
       }
       if (!worst) break;
       const ax = worst.ax;
@@ -557,9 +686,11 @@
       else if (ax === 'z') z = clamp(away(next));
       else y = Math.max(half, away(next));
     }
-    const went = Math.hypot(x - me.x, y - me.y, z - me.z);
+    // ...and back into the world, which is the frame the document is written in.
+    const [wx, wz] = fromGrid(x, z, a);
+    const went = Math.hypot(wx - me.x, y - me.y, wz - me.z);
     if (went < 1e-4) return 0;
-    return moveThing(i, x, y, z) ? went : 0;
+    return moveThing(i, wx, y, wz) ? went : 0;
   }
   // The old name, because three call sites and two asserts use it and a rename
   // here buys nothing.
@@ -742,8 +873,8 @@
     // it, `demo/verify-gl.mjs` covers the models on every run of the suite, on
     // real ANGLE, and a visitor with no headset can see their controller.
     room.setInput({
-      hands: [{ m, handedness: 'left', profile: 'meta-quest-touch-plus' }],
-      pointer: null, tabletM: holdM(m), hit: null,
+      hands: SHOW_HANDS ? [{ m, handedness: 'left', profile: 'meta-quest-touch-plus' }] : [],
+      pointer: null, tabletM: SHOW_TABLET ? holdM(m) : null, hit: null,
     });
   }
 
@@ -1106,6 +1237,7 @@
       }
       if (!rayNow) return;
       held = pick(rayNow.o, rayNow.dir);
+      atWall = held ? pushedToWall(held.i) : false;
       shipNow(held ? `grabbed thing ${held.i} at ${held.dist.toFixed(2)} m` : 'trigger · nothing under the pointer');
     });
     session.addEventListener('selectend', () => {
@@ -1126,21 +1258,20 @@
         send({ type: 'scene.room', doc });
       }
       held = null;
+      atWall = false;
     });
     // 🔴 "BOTH GRIPS" ASSUMED TWO CONTROLLERS, AND ONE IS NORMAL. Reported
     // from the headset: a gesture that cannot be made is not a gesture, and it
     // was the only way to accept an update. The A/X button carries it now —
     // one hand, one press, and it exists on every Touch controller.
-    // 🔴 THE GRIP NO LONGER LEAVES, AND NEITHER DOES THE TABLET. Both were real
-    // and both had a condition in front of them — the grip is invisible, and a
-    // button on a slab needs the slab, the hand it is on, and a grip pose that
-    // resolved. The way out is one labelled button under your thumb with a ring
-    // that fills while you hold it, on whichever controller you picked up.
+    // 🔴 THE ONE WAY OUT, AND NO LABEL OR BUTTON IS PASSED. The defaults are
+    // the site's decision — any button, held three seconds — and a page that
+    // retypes them is a page that can disagree with the module about how
+    // somebody leaves it.
     // ⚠️ The dead-man's switch below is unchanged and is NOT this: it covers
     // the case where nothing ever drew, which is where no ring exists to hold.
     xrQuit = createXRQuit(gl, {
-      label: 'Quit',
-      onQuit: () => leaveNow('held the button under your thumb'),
+      onQuit: () => leaveNow('held a controller button for three seconds'),
     });
     // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
     // session started, the room is black and staying black; end it and say so
@@ -1288,7 +1419,20 @@
     // `handedness` answers it: the right hand points, the left carries the
     // tablet, and the fallback when there is only one of them is written down.
     const inp = xrHands.observe(frame, xrSpace, session);
-    room?.setInput(inp);
+    // ⚠️ THE MODELS ARE STRIPPED HERE AND NOTHING ELSE IS. `inp.hands` is what
+    // the room DRAWS; `pointer`, `pointerSrc` and the buttons below are read
+    // off `inp` either way. See SHOW_HANDS at the top of this file.
+    // 🔴 AND THE SLAB IS NEVER IN A PASSTHROUGH SCENE, WHATEVER `SHOW_TABLET`
+    // SAYS. 2026-09-17: *"slider is ok. but again, do not show it on any vr/xr
+    // when showing ar scenes"*. The test is `arMode`, which is read off
+    // `environmentBlendMode` when the session starts and NOT off the session's
+    // name — a session can be called `immersive-ar` and composite `opaque`, and
+    // then there is no room of yours to keep clear.
+    room?.setInput({
+      ...inp,
+      ...(SHOW_HANDS ? {} : { hands: [] }),
+      ...(SHOW_TABLET && !arMode ? {} : { tabletM: null, hit: null }),
+    });
     const src = inp.pointerSrc;
     if (inp.pointer && src) {
       const { m, o, dir } = inp.pointer;
@@ -1307,6 +1451,17 @@
         const push = (ax[AXIS.stickY] ?? ax[1] ?? 0);
         if (Math.abs(push) > 0.15) held.dist = clamp(held.dist - push * 0.05, MIN_HOLD, 8);
         moveThing(held.i, o[0] + dir[0] * held.dist, o[1] + dir[1] * held.dist, o[2] + dir[2] * held.dist);
+        // 🔴 SAY SO WHEN THE PUSH HAS REACHED THE WALL. The thumbstick can shove
+        // a brick out of the room and that is KEPT; what it lacked was any sign
+        // it had happened. Read after the move, so the flag is about where the
+        // brick IS rather than about where it was a frame ago — and said in the
+        // log ONCE per crossing, never per frame, because 90 lines a second is
+        // the relay's ceiling and a log nobody can read.
+        const wallNow = pushedToWall(held.i);
+        if (wallNow !== atWall) {
+          atWall = wallNow;
+          d.log(wallNow ? 'that one is up against the wall' : 'back inside the room');
+        }
       }
       rayNow = { o, dir, m };
       if (!held) {
@@ -1742,6 +1897,99 @@
       moveThing(2, before.x, before.y, before.z);
     }
 
+    /**
+     * 🔴 THE BRICK GRID IS SQUARE TO YOUR ROOM, NOT TO THE HEADSET. Reported
+     * 2026-09-17: *"in xr blocks are angled against wall, rotated a bit, not
+     * fully against wall"*. Nothing rotates a brick — they are axis-aligned to
+     * the reference space, whose yaw is wherever the headset was looking when
+     * the session started, and a real wall is at whatever angle it was built
+     * at. `wallYaw` in `xr-room.mjs` reads the angle off the measured walls;
+     * this is the page putting a brick down in a room turned 23° and asking
+     * where it lands.
+     *
+     * ⚠️ THE ROOM'S ANGLE IS STOOD IN FOR HERE, AND IT HAS TO BE. There is no
+     * headset on this machine, so `planes.yaw` is 0 and the whole rotated path
+     * would never run — a check on the shipped value would be green about code
+     * nobody reached. It is put back immediately afterwards.
+     * ⚠️ AND THE NEGATIVE CONTROL IS THE LOAD-BEARING HALF: the same brick at
+     * yaw 0 must NOT land where it lands at 23°. Without that, a `settleDrop`
+     * that ignored the yaw entirely would pass the lattice test, because a
+     * lattice measured in the frame it was snapped in is a tautology.
+     */
+    {
+      const A = 23 * Math.PI / 180;
+      const was = room.planes.yaw;
+      const i = 3, keep = { ...doc.things[i] };
+      const place = (yaw) => {
+        room.planes.yaw = yaw;
+        moveThing(i, 1.13, keep.s / 2, -0.77);
+        pushClear(i);
+        return { ...doc.things[i] };
+      };
+      const turned = place(A);
+      const square = place(0);
+      room.planes.yaw = was;
+      moveThing(i, keep.x, keep.y, keep.z);
+      // In the grid's own frame the brick has to sit a whole number of units
+      // off its own half-size, the same rule the un-rotated check above uses.
+      // ⚠️ AND THE TOLERANCE IS THE DOCUMENT'S OWN QUANTISATION, NOT ZERO.
+      // `moveThing` stores through `r4`, which rounds to 0.1 mm, and a position
+      // that is exact in the grid's frame is not exact after being rotated into
+      // the world, rounded, and rotated back: MEASURED, 19 micrometres, which
+      // is 3.8e-5 of a unit. The un-rotated check above can use 1e-6 because
+      // nothing rotates between the snap and the store. A tolerance of half a
+      // millimetre is two orders under the 0.5 m grid and an order over the
+      // rounding, so it can still catch a brick that missed by a whole unit.
+      const GRID_EPS = 1e-3;
+      const off = (v, t) => Math.abs(((v - t.s / 2) / UNIT) - Math.round((v - t.s / 2) / UNIT));
+      const onGrid = (v, t) => off(v, t) < GRID_EPS;
+      const c = Math.cos(-A), sn = Math.sin(-A);
+      const gx = turned.x * c - turned.z * sn, gz = turned.x * sn + turned.z * c;
+      const moved = Math.hypot(turned.x - square.x, turned.z - square.z);
+      d.assert('a brick dropped in a room turned 23° lands on a grid turned 23° with it',
+        onGrid(gx, turned) && onGrid(gz, turned)
+        && Math.abs(gx) <= PLATE && Math.abs(gz) <= PLATE && moved > 1e-3,
+        `in the room's own frame it sits at ${gx.toFixed(3)}, ${gz.toFixed(3)} on ${UNIT} m units`
+        + ` (off the lattice by ${(off(gx, turned) * UNIT * 1000).toFixed(3)} and`
+        + ` ${(off(gz, turned) * UNIT * 1000).toFixed(3)} mm, against a ${(GRID_EPS * UNIT * 1000).toFixed(1)} mm allowance)`
+        + ` · square to the headset the same drop lands ${moved.toFixed(3)} m away, so the turn is doing something`);
+    }
+
+    /**
+     * 🔴 A BRICK PUSHED UP AGAINST A WALL SAYS SO, AND IS STILL PUSHED THERE.
+     * Asked for 2026-09-17 in one line: *"no, keeep them, som some hilite or
+     * smt when pushed against wall"* — the thumbstick shoving a held brick out
+     * of the room is KEPT, and the thing that was missing is any sign of it.
+     *
+     * ⚠️ IT GRADES THE LOOK AS WELL AS THE FLAG. A boolean nothing reads is the
+     * inert-control failure this repo keeps paying for, so this drives the same
+     * `touch` function `room.draw` is handed and asks whether the brick really
+     * comes out brighter and bigger than one merely held.
+     */
+    {
+      const i = 4, keep = { ...doc.things[i] };
+      const half = halfOf(doc.things[i]);
+      const wasHeld = held, wasWall = atWall;
+      moveThing(i, 0, half, 0);
+      const inside = pushedToWall(i);
+      moveThing(i, PLATE - half, half, 0);
+      const onIt = pushedToWall(i);
+      // Past it, which is where the thumbstick can put one and where it stays.
+      moveThing(i, PLATE + 1.5, half, 0);
+      const past = pushedToWall(i);
+      // ...and what that looks like, through the same function the draw uses.
+      held = { i, dist: 1 }; atWall = true;
+      const lit = drawTouch(true, false);
+      atWall = false;
+      const plain = drawTouch(true, false);
+      held = wasHeld; atWall = wasWall;
+      moveThing(i, keep.x, keep.y, keep.z);
+      d.assert('a brick pushed against the wall is still pushed there, and lights up saying so',
+        !inside && onIt && past && lit.lit > plain.lit && lit.scale > plain.scale,
+        `at the middle of the room ${inside} · at the wall ${onIt} · 1.5 m past it ${past} (it is not stopped)`
+        + ` · held reads ${plain.lit.toFixed(2)} bright, against the wall ${lit.lit.toFixed(2)}`);
+    }
+
     // ⚠️ THE THING ON YOUR HAND IS GRADED HERE TOO, AND IT IS ALL ARITHMETIC.
     // The tablet's pose, the slider's ends and the floor are `Float32Array(16)`s
     // and three divisions; only the PICTURE needs a headset. Leaving them to
@@ -1925,23 +2173,54 @@
       let q = null;
       {
         let fired = 0;
-        q = createXRQuit(gl, { label: 'Quit', onQuit: () => { fired++; } });
-        const pad = (down) => [{ gamepad: { buttons: [{}, {}, {}, {}, { pressed: down }], axes: [0, 0, 0, 0] } }];
+        // ⚠️ NO LABEL AND NO BUTTON PASSED, so this grades the SHIPPED
+        // defaults. A check that names its own label and its own index passes
+        // whatever the module's defaults become, which is a check about the
+        // check.
+        q = createXRQuit(gl, { onQuit: () => { fired++; } });
+        // Six buttons, so the one pressed can be moved around. Index 4 is A/X
+        // on a Touch controller; index 0 is the trigger.
+        const pad = (down, i = 4) => [{ gamepad: {
+          buttons: Array.from({ length: 6 }, (_, k) => ({ pressed: down && k === i })),
+          axes: [0, 0, 0, 0] } }];
+        const HALF = q.holdMs / 2000;            // seconds to reach half the hold
         const onPress = q.update(pad(true), 0);
-        const halfWay = q.update(pad(true), 0.45);
+        const halfWay = q.update(pad(true), HALF);
         const letGo = q.update(pad(false), 0.01);
         d.assert('the way out takes a hold: a press, or letting go part-way, does nothing',
           onPress === 0 && halfWay > 0.4 && halfWay < 0.6 && letGo === 0 && fired === 0,
           `pressed ${(onPress * 100).toFixed(0)}% · half way ${(halfWay * 100).toFixed(0)}% · `
           + `let go ${(letGo * 100).toFixed(0)}% · fired ${fired} times`);
 
+        // 🔴 ANY BUTTON, AND THIS IS THE ASSERT THAT SAYS SO. Instructed
+        // 2026-09-17: *"hold down any controller button for looooong enough
+        // then it quits"*. The check that used to sit here named button 4, so
+        // it would have passed unchanged on a module that still answered to
+        // that one button alone — which is the whole of what changed.
+        // ⚠️ AND THE TRIGGER IS IN THE LIST ON PURPOSE. It is also what drags a
+        // brick here, so if this ever has to be narrowed, index 0 is the one
+        // that would go and this line is where that decision would show up.
+        const each = [0, 1, 3, 4, 5].map((i) => {
+          q.reset();
+          q.update(pad(true, i), 0);
+          const p = q.update(pad(true, i), HALF);
+          q.update(pad(false, i), 0.01);
+          return { i, p };
+        });
+        d.assert('...and every button on the controller advances the same hold, not one named one',
+          each.every((e) => e.p > 0.4 && e.p < 0.6) && q.button === 'any',
+          `${each.map((e) => `${e.i}:${(e.p * 100).toFixed(0)}%`).join(' · ')} · asked for "${q.button}"`);
+        q.reset();
+        fired = 0;
+        q.update(pad(true), 0);
+
         // 🔴 AND THE RING HAS TO SAY HOW FAR THROUGH YOU ARE, or the hold is a
         // button that does nothing for nine tenths of a second. The quantity is
         // the progress the badge is DRAWN from, read back off the object rather
         // than off the number that was fed in.
-        q.update(pad(true), 0.45);
+        q.update(pad(true), HALF);
         const mid = q.progress;
-        q.update(pad(true), 0.30);
+        q.update(pad(true), HALF * 0.66);
         const later = q.progress;
         d.assert('...and the ring fills as far as the hold has got, and no further',
           mid > 0.4 && mid < 0.6 && later > mid && later < 1,
@@ -1949,39 +2228,45 @@
 
         // ⚠️ AND IT FIRES ONCE. `session.end()` is async, so a ring that stayed
         // full for three more frames would ask three times.
-        q.update(pad(true), 1.0);
-        q.update(pad(true), 1.0);
+        q.update(pad(true), q.holdMs / 1000);
+        q.update(pad(true), q.holdMs / 1000);
         d.assert('...and held the whole way it fires once, and only once',
           fired === 1 && q.progress === 1,
           `${fired} time(s) after the hold completed, and two frames more`);
 
-        // ⚠️ THE BUTTON IS NAMED, because "a button under your thumb" is a
-        // promise about a specific index and the label has to match what a
-        // wearer is actually holding.
-        d.assert('the way out is on the near face button, on either hand',
-          q.button === 4 && /QUIT/i.test(q.label),
-          `button ${q.button} of the xr-standard mapping, labelled "${q.label}"`);
+        // 🔴 THE HOLD HAS TO BE LONG ENOUGH TO BE A DECISION. Every button on
+        // the controller is live, so the only thing between a thumb resting
+        // somewhere and the session ending is this number — and the label has
+        // to say that holding is what does it, because there is no longer one
+        // button to name.
+        d.assert('the way out is a long hold on any button, and it says so',
+          q.button === 'any' && q.holdMs >= 2000 && /hold/i.test(q.label),
+          `hold any button for ${(q.holdMs / 1000).toFixed(1)} s, labelled "${q.label}"`);
       }
 
       /**
-       * 🔴 TWO VISIBLE EXITS, AND NOTHING ASSERTED THIS, WHICH IS HOW ONE OF
-       * THEM VANISHED. The tablet's `Hold to leave` was taken out in favour of
-       * the controller badge, the suite stayed green because it only ever
-       * graded the badge, and the next person in a headset could not get out.
-       * REPORTED in those words.
+       * 🔴 ONE VISIBLE EXIT, AND THIS ASSERT REVERSED ON 2026-09-17. It used to
+       * read "there are two ways out you can SEE, not one" and it was written
+       * because one of them had silently vanished — the tablet's `Hold to
+       * leave` was swapped for the controller badge and the suite stayed green,
+       * so the next person in a headset could not get out.
+       *
+       * The instruction is now the opposite and it is explicit: *"make one
+       * general way to get out ... no other exit methods/ui's for now."* So the
+       * check keeps its shape and swaps its sign — what it grades is still that
+       * the number of visible exits is the number somebody decided on, rather
+       * than however many happen to be wired today.
        *
        * ⚠️ IT GRADES THE FIELD THAT ACTUALLY ENDS THE SESSION, not the label.
-       * `xr-hands.mjs` drains the tablet's fired controls and acts only on the
-       * ones carrying `leaves`, so a button that draws, fills its ring and
-       * reports itself is still inert without it. One missing field is the
-       * whole difference and it cannot be seen by looking.
+       * `xr-hands.mjs` acts only on tablet controls carrying `leaves`, so this
+       * counts that field and not the words on the slab.
        */
       const exits = (tablet.controls || []).filter((c) => c.leaves);
-      d.assert('there are two ways out you can SEE, not one',
-        exits.length === 1 && /leave/i.test(exits[0].label) && !!q?.label,
-        exits.length
-          ? `the tablet's "${exits[0].label}" and the controller's "${q?.label}"`
-          : 'the tablet has no exit on it, so the controller badge is the only one');
+      d.assert('there is exactly one way out, and it is the hold on the controller',
+        exits.length === 0 && !!q?.label,
+        exits.length === 0
+          ? `the tablet carries no exit · the only one is "${q?.label}"`
+          : `the tablet still has ${exits.length}: ${exits.map((c) => c.label).join(', ')}`);
 
       tablet.set(c0.key, was); tablet.draw();
 
@@ -2035,22 +2320,31 @@
 
     // 🔴 THE REAL CONTROLLER MODEL, GRADED WITHOUT A HEADSET — and this is the
     // only place it can be. The fetch, the reader, the texture decode and the
-    // third shader program all run here because the window draws a preview
-    // controller, so a laptop exercises every step that would otherwise first
-    // run on the first frame of somebody's one headset session.
+    // upload all run on this laptop rather than first running on the first
+    // frame of somebody's one headset session, which is exactly where a pending
+    // `gl.getError()` costs a run.
+    //
+    // 🔴 ASKED FOR BY NAME NOW, BECAUSE NOTHING DRAWS A CONTROLLER ANY MORE.
+    // The window used to draw a preview controller and that is what pulled the
+    // model in; the geometry came out of every scene on 2026-09-17, so the load
+    // had to stop being a side effect of drawing one. `room.warmModel` is the
+    // same `loadModel` the draw path calls, reached by name — the picture stays
+    // empty and the path stays covered.
     //
     // ⚠️ LAST IN THIS HANDLER, BEHIND A BOUNDED WAIT. `verify.mjs` stops
     // collecting 400 ms after the last assert, so a pause mid-way silently
     // loses everything after it — this one has nothing after it. And the wait
     // is bounded because a model that never arrives has to REPORT that, not
     // hang here: the page falls back to the stand-in and the assert says which.
+    room?.warmModel?.('meta-quest-touch-plus', 'left');
     for (let i = 0; i < 60 && (room?.controllers === 'not asked' || room?.controllers === 'loading'); i++) {
       await new Promise((r) => setTimeout(r, 100));
     }
-    d.assert('your controller is drawn from its real model, not a stand-in',
+    d.assert('your controller’s real model loads and uploads here, not on a headset’s first frame',
       room?.controllers === 'model',
-      `drawn from: ${room?.controllers} · ${TABLET.controls.length && room?.controllers === 'model'
-        ? 'the vendored meta-quest-touch-plus mesh' : 'the primitive stand-in, and the tablet says so'}`);
+      room?.controllers === 'model'
+        ? 'the vendored meta-quest-touch-plus mesh, fetched, read and uploaded on this machine'
+        : `it would fall back to the primitive stand-in: ${room?.controllers}`);
   });
 
   window.__demo.gl = { renderer: rendererName, ok: !!gl };

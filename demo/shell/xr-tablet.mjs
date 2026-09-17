@@ -41,11 +41,17 @@
 // below, and `xr-pick-test.mjs` asserts that the fingerprint carries none of
 // those words either. The requirement was that the controller interface be
 // identical in both modes, and the way to satisfy that is structural: the code
-// cannot tell them apart, so it cannot drift. ⚠️ That is why the way-out button
-// below does not END anything — it raises `leaves` and `xr-hands.mjs`, which is
+// cannot tell them apart, so it cannot drift. ⚠️ That is why `QUIT_CONTROL`
+// does not END anything — it raises `leaves` and `xr-hands.mjs`, which is
 // the one module handed the session every frame, performs it. A control that
 // called `session.end()` from here would put a session into the file whose
 // whole claim is that it has none.
+//
+// 🔴 AND THAT CONTROL IS OFF THE SHIPPED LIST SINCE 2026-09-17: *"rm quit
+// button from tablet but keep that component around"*. It is still here, whole
+// and exported, one `DEFAULT_CONTROLS` line away from being back. The tablet
+// ships one control, the floor-dots slider, and the way out of a session is a
+// long hold on any controller button (`demo/shell/xr-quit.mjs`).
 //
 // ⚠️ INCLUDING THE CONTRAST, WHICH IS THE ONE PLACE IT WAS TEMPTING. Over
 // passthrough the tablet composites onto a lit room; in an opaque session onto
@@ -59,7 +65,7 @@
 // than chosen: Quest reserves the palm-pinch gesture on both hands and has an
 // open bug (webxr-hand-input#117, since 2022) where reaching for it fires a
 // spurious `select`. A slider that moves is reversible by moving it back — and
-// the way out is behind a HOLD for exactly the same reason, see `HOLD_MS`.
+// the button kind is behind a HOLD for exactly the same reason, see `HOLD_MS`.
 // `plan-xr-hands` §3.3.
 
 /**
@@ -110,6 +116,44 @@ const HOLD_MS = 800;
 // because a test reads the field rather than the fallback. Moving the constant
 // is the fix; typing 800 twice is what CLAUDE.md forbids.
 
+/**
+ * 🔴 THE TABLET'S WAY OUT, TAKEN OFF THE TABLET ON 2026-09-17 AND KEPT WHOLE.
+ * Instructed in one line: *"rm quit button from tablet but keep that component
+ * around"*, alongside *"make one general way to get out ... no other exit
+ * methods/ui's for now"*. The one way out of every immersive page here is now a
+ * long hold on ANY controller button — `demo/shell/xr-quit.mjs` — and this was
+ * the second visible exit beside it.
+ *
+ * ⚠️ IT IS NOT DELETED, BECAUSE IT IS THE ONLY BUTTON THIS SURFACE HAS. The
+ * tablet supports two KINDS of control and the button kind cost a branch in the
+ * layout, the hit test, the input and the state; removing the one instance of it
+ * would leave four branches with nothing exercising them. `xr-pick-test.mjs`
+ * loads a copy of this module with this control appended and grades the kind
+ * against that, which is the same trick the "one line" test already used.
+ *
+ * ⚠️ TO PUT IT BACK IN A SCENE: append it to `DEFAULT_CONTROLS`. Every layout
+ * number below is derived from that array — the canvas grows by exactly one row
+ * and the lane does not move — and `leaves` is what `xr-hands.mjs` acts on.
+ * Nothing else has to change.
+ *
+ * `apply` is a NOTIFICATION. The session is ended by `xr-hands.mjs`, which is
+ * handed the session every frame; a page learns it was this one and can say so
+ * rather than printing the same line for all its exits.
+ */
+export const QUIT_CONTROL = {
+  key: 'left',
+  kind: 'button',
+  label: 'Hold to leave',
+  // ⚠️ `leaves` IS WHAT ENDS THE SESSION. `xr-hands.mjs` drains this tablet's
+  // fired controls every frame and acts only on the ones carrying it, so a
+  // button without it is a button that draws, fills its ring, reports itself
+  // and does nothing. That is the inert-control failure this repo keeps
+  // paying for, and it is one missing field away at all times.
+  leaves: true,
+  hold: HOLD_MS,
+  apply: (_v, ctx) => ctx?.left?.(),
+};
+
 export const DEFAULT_CONTROLS = [
   {
     key: 'grid',
@@ -133,39 +177,8 @@ export const DEFAULT_CONTROLS = [
     from: (ctx) => (Number.isFinite(ctx?.room?.gridAlpha) ? Math.round(ctx.room.gridAlpha * 100) : null),
     apply: (v, ctx) => ctx?.room?.setGrid?.({ alpha: v / 100 }),
   },
-  /**
-   * 🔴 BACK, AND IT SHOULD NEVER HAVE BEEN A SWAP. It was taken out in favour
-   * of the controller badge in `xr-quit.mjs`, and the argument written here was
-   * that this button has two conditions in front of it (a tablet that has
-   * drawn, on a controller whose grip pose resolved) and an exit with
-   * conditions is not an exit. Every word of that is true and the conclusion
-   * was wrong: it argues for the badge being ADDED, not for this being removed.
-   * REPORTED from a real Quest, in these words: **"i was not able to get out"**.
-   *
-   * ⚠️ TWO VISIBLE EXITS IS NOT A DUPLICATE, IT IS THE POINT. They fail in
-   * different ways. The badge needs a gamepad button the runtime maps where
-   * this project expects; this needs a slab that has been drawn. A room you
-   * cannot leave is the worst failure an immersive page has, so the way out is
-   * the one control that is allowed to be said twice.
-   *
-   * `apply` is a NOTIFICATION. The session is ended by `xr-hands.mjs`, which is
-   * handed the session every frame; a page learns it was this one and can say
-   * so rather than printing the same line for all its exits.
-   */
-  {
-    key: 'left',
-    kind: 'button',
-    label: 'Hold to leave',
-    // ⚠️ `leaves` IS WHAT ENDS THE SESSION. `xr-hands.mjs` drains this tablet's
-    // fired controls every frame and acts only on the ones carrying it, so a
-    // button without it is a button that draws, fills its ring, reports itself
-    // and does nothing. That is the inert-control failure this repo keeps
-    // paying for, and it is one missing field away at all times.
-    leaves: true,
-    hold: HOLD_MS,
-    apply: (_v, ctx) => ctx?.left?.(),
-  },
 ];
+
 
 /** A control's kind. Absent means the kind that was here first. */
 export const kindOf = (c) => c?.kind || 'slider';

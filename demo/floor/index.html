@@ -1325,24 +1325,19 @@
       grab = null; dragSource = null; holdStill = false;
       if (wasClick && hover >= 0) playTile(hover);
     });
-      // 🔴 ANY BUTTON BUT THE TRIGGER LEAVES. The trigger is the floor-drag, so
-      // it is the one thing that cannot also be the exit; everything else is.
-      // Grip, thumbstick, A, B, X, Y — whichever a person finds first is the
-      // right one, which is the whole point of "any". "Press the Meta button"
-      // is not an answer a page gets to give about its own bug, and neither is
-      // "press the specific button we chose and did not tell you about".
-      // ⚠️ THE GRIP NO LONGER LEAVES. It was invisible — nothing on screen ever
-      // said the grip did anything — and on this page the grip is next to the
-      // trigger you drag the floor with. The way out is the badge on the
-      // controller now; see `xr-quit.mjs`.
+      // 🔴 ONE WAY OUT: HOLD ANY BUTTON FOR THREE SECONDS. Nothing else on this
+      // page ends a session. The trigger drags the floor AND advances the hold,
+      // which is the one collision in this design and is written down in
+      // `xr-quit.mjs`: the ring fills in front of you from the first
+      // millisecond, so a drag about to become an exit says so, and letting go
+      // takes it back to zero.
       xrQuit = createXRQuit(gl, {
-        label: 'Quit',
-        onQuit: () => endVR('held the button', session),
+        onQuit: () => endVR('held a controller button for three seconds', session),
       });
       session.addEventListener('end', () => {
         xrSession = null; d.log('left VR', 'hi'); requestAnimationFrame(frame);
       });
-      d.log('in VR: trigger drags the floor, rest your look to play, GRIP to leave', 'hi');
+      d.log('in VR: trigger drags the floor, rest your look to play, hold any button for three seconds to leave', 'hi');
       // 🔴 A DEAD-MAN'S SWITCH. If nothing has been drawn 6 s after the session
       // started, something threw where nothing was reporting and the wearer is
       // standing in a black room with no way out. MEASURED elsewhere in this
@@ -1599,7 +1594,14 @@
         if (h.grip) {
           const gf = new Float32Array(h.grip);
           gf[12] -= shift[0]; gf[14] -= shift[1];
-          xrCons.draw({ vp: viewVP, grip: gf, profile: h.profile, handedness: h.hand });
+          // 🔴 NO CONTROLLER IS DRAWN ANY MORE. 2026-09-17: *"rm controller
+          // geometry/tablet on all (only if i am ask on specific demo so keep
+          // that code ready to pop into scene)"*. `demo/shell/xr-controller.mjs`
+          // is untouched and `xrCons.want()` below still fetches and uploads the
+          // model, so putting the hands back is one line here:
+          //   xrCons.draw({ vp: viewVP, grip: gf, profile: h.profile, handedness: h.hand });
+          // ⚠️ THE WAY OUT STILL DRAWS AT THE GRIP. It is the one thing in here
+          // that must never depend on there being a model to hang it on.
           // ⚠️ THE EYE COMES OUT OF `vm`, the matrix that is doing the
           // projecting, so the badge faces the eye it is drawn for rather than
           // one of them for both — see the disparity note by the ribbon below.
@@ -1612,13 +1614,11 @@
         // eye position out of the view matrix it is handed, so passing the one
         // that is doing the projecting gets the drag offset for free rather
         // than making this a second place it has to be applied correctly.
-        xrRay.draw({
-          vp: viewVP, view: vm, pose: pf, len: h.len,
-          // lighter while it has hold of the floor. Colour on this page says
-          // nothing — everything goes through one luma — so the ray reports its
-          // state in the only channel it has, which is how bright it is.
-          colour: h.held ? MONO_HELD : MONO_AIM,
-        });
+        // ⚠️ NO COLOUR IS PASSED ANY MORE AND NONE CAN BE. The ray is grey on
+        // every page since 2026-09-17 and lightens when something active
+        // happens, which is what `held` says — this page's own mono pair became
+        // the module's only pair. See the note by AIM_RGB in xr-ray.mjs.
+        xrRay.draw({ vp: viewVP, view: vm, pose: pf, len: h.len, held: h.held });
       }
     }
   }
