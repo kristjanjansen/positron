@@ -13,6 +13,13 @@ get the proportion of regular and sharp/flats right"*. Nothing in the repo was
 changed: the proposed layout was applied from the harness, over the shipped
 stylesheet, and measured.
 
+**§5 answers the same questions against real MUSIC SOFTWARE** rather than web
+keyboards: GarageBand on both an iPhone and an iPad, measured to the pixel off
+screenshots whose device and scale are established, plus MuseScore, Ardour and
+LMMS read from source, plus the KORG, Moog, Ableton and ROLI apps. It changes
+nothing in the recommendation. GarageBand's black key is **0.649** of its white
+one against our 0.66, and **it offsets its black keys by a constant 4.0 pt**.
+
 Every claim below is tagged **MEASURED** (this machine did it), **READ** (a
 source says so, linked at the end), or **INFERRED** (reasoned from something
 measured or read, not itself checked).
@@ -34,6 +41,12 @@ measured or read, not itself checked).
   directory listings.
 - Our own component was measured against a local server in the scratchpad, with
   no relay, no board and no room joined.
+- **§5 was added later the same day** and cost: one call to Apple's public
+  `itunes.apple.com/lookup` API, **one load per screenshot** from Apple's
+  screenshot CDN (contact sheets at a small size to find which images contain a
+  keyboard, then the keyboard-bearing ones at native resolution), one Apple
+  support page, and five source files from GitHub. No app was installed, no
+  account used, nothing clicked.
 
 ---
 
@@ -278,15 +291,10 @@ slivers between them. **MEASURED**, and the surprise survived the check.
   Check Point `UserCheck` portal redirect at `192.168.1.2` and then timed out.
   Its substance is quoted second hand in the sources below and is not relied on
   for any number here.
-- **Native mobile apps (GarageBand for iOS, Ableton Note, Korg Module and the
-  rest): UNVERIFIED, no number.** Nothing here can install or drive an iOS app.
-  What would establish it: a full resolution screenshot from a device whose
-  width in points is known, then measuring the black and white key runs in
-  pixels. The ratio alone needs only the screenshot, since a ratio survives any
-  uniform scale.
-- **Desktop DAW keyboards (Ableton Live, Logic, MuseScore): UNVERIFIED.** The
-  first two have no readable source. MuseScore has, and the file was not located
-  in two API calls; a shallow clone would find it.
+- **Native mobile apps and desktop DAWs: ANSWERED IN §5**, which was added on
+  the same day after the reader pointed out that everything in this section is a
+  web toy or a teaching page. The route that made it measurable is the one
+  guessed at here: a screenshot at a resolution that identifies the device.
 
 ---
 
@@ -355,6 +363,12 @@ Three things are worth being precise about:
 ## 4 · The recommendation, with the numbers it is based on
 
 **Keep every width and every height. Move the five black keys.**
+
+⚠️ **§5 re-tested this recommendation against real music software** (GarageBand,
+MuseScore, Ardour, LMMS, the KORG and Moog apps) after the web survey above was
+correctly called out as a field of toys. Nothing here changed. The witnesses got
+better: GarageBand's own black key is 0.649 of its white one against our 0.66,
+and it offsets its black keys on both the iPhone and the iPad.
 
 All three rows below are **MEASURED** on our own component at a 390 px viewport,
 in one page, by applying the candidate layout over the shipped stylesheet from
@@ -453,7 +467,265 @@ Four notes for whoever implements it:
 
 ---
 
-## 5 · Sources
+## 5 · Music software, which is the witness that counts (added 2026-09-17)
+
+Everything in §2 is a web page. Reported by the reader in one line: *"i assumed
+you look into music app keyboards?"*, and the point is right. react-piano and
+musicca are teaching pages and toys; what a phone instrument should be measured
+against is GarageBand, the KORG and Moog apps, and the keyboards inside real
+DAWs. This section is the answer, and **it does not change the recommendation in
+§4. It strengthens it.**
+
+### 5.0 What a screenshot can and cannot establish
+
+There are two different claims and they need different evidence.
+
+- **A RATIO and an OFFSET survive any uniform scale.** Any undistorted
+  screenshot answers "is the black key 0.6 or 0.8 of the white one" and "are the
+  black keys centred". A perspective render or a tilted marketing composite
+  answers neither, and three of the images opened here are exactly that.
+- **A SIZE IN POINTS needs the device and the capture scale.** The chain used
+  below: Apple requires an exact pixel size for each App Store screenshot slot,
+  so an image that comes back at **2208 x 1242** is in the 5.5 inch slot
+  (iPhone 8 Plus, **736 x 414 pt at @3x**), and one at **2732 x 2048** is in the
+  12.9 inch iPad Pro slot (**1366 x 1024 pt at @2x**). Several of the source
+  filenames name the device outright: `..._iPhone8Plus55_...`,
+  `2._Alchemy-iPhone55-USA.png`, `2._Alchemy-129G2-USA.png`,
+  `Model_D_iPhone_5_5in-02.png`, `Simulator_Screen_Shot_-_iPhone_8_Plus_-_...`.
+  ⚠️ **The chain has one assumption and it is stated rather than hidden**: that
+  the image is a real full screen capture and not a composite drawn at the same
+  dimensions. For GarageBand it is safe (Apple's own app, pure UI, no device
+  frame, no marketing text, the two shots agree with each other at two different
+  scales). Where it is not safe, no point value is given below.
+
+Everything measured here comes from **one load per image** through Apple's own
+screenshot CDN, plus **five source files** read from GitHub.
+
+### 5.1 GarageBand for iPhone, MEASURED
+
+The whole geometry, read off the pixels of the 5.5 inch screenshot and divided
+by 3. Key edges were found by run length encoding a scanline, so these are edge
+positions rather than estimates.
+
+| | pixels (@3x) | points |
+|---|---|---|
+| white key, visible width | 171 | **57.0 pt** |
+| white key, pitch | 174 | **58.0 pt** |
+| white key, length | 422 | **140.7 pt** |
+| black key, width | 111 | **37.0 pt** |
+| black key, length | 245 | **81.7 pt** |
+| **black / white width** | 111 / 171 | **0.649** |
+| **black / white length** | 245 / 422 | **0.581** |
+| white keys across the 736 pt screen | | **12.7** |
+
+**It offsets its black keys, and by a constant.** Black key centre minus the
+join between the two white keys it sits on, MEASURED:
+
+| C# | D# | F# | G# | A# |
+|---|---|---|---|---|
+| -12 px | +12 px | -12 px | **0** | +12 px |
+| -4.0 pt | +4.0 pt | -4.0 pt | dead centre | +4.0 pt |
+
+So GarageBand has the real instrument's SHAPE (the outer sharps of each group
+pushed outward, G# centred) with ONE magnitude rather than the piano's two. It
+is not the `B/12` optimum: 4.0 pt is 11 percent of its own black key width,
+where the optimum would be 16.7 percent in the two-black group and 25 percent in
+the three-black group. Its white strips come out **35 / 29 / 35 pt** and
+**35 / 25 / 25 pt / 35 pt**, a spread of 10 pt.
+
+### 5.2 GarageBand for iPad, MEASURED, and the offset is the same 4.0 pt
+
+The same app on a 1366 x 1024 pt screen. **It draws TWO STACKED KEYBOARD ROWS**
+covering different octaves (the screenshot labels the upper row C4, C5, C6 and
+the lower row C2, C3, C4), which is a different answer to "an octave does not
+fit" from anything in §2.
+
+| | pixels (@2x) | points |
+|---|---|---|
+| white key, visible width | 130 | **65.0 pt** |
+| white key, pitch | 132 | **66.0 pt** |
+| white key, length | 546 | **273.0 pt** |
+| black key, width | 78 | **39.0 pt** |
+| black key, length | 345 | **172.5 pt** |
+| **black / white width** | 78 / 130 | **0.600** |
+| **black / white length** | 345 / 546 | **0.632** |
+| white keys per row | | **20.7**, and there are two rows |
+
+Offsets: **-8, +8, -8, 0, +8 px**, which at @2x is **the same ±4.0 pt as the
+iPhone**. That is worth stating plainly: **GarageBand's black key offset is a
+fixed 4.0 pt on both devices, not a fraction of the key width.** The key itself
+grows by 14 percent from phone to tablet and the offset does not move.
+
+### 5.3 Desktop, READ from source, which beats any screenshot
+
+| | black / white width | black / white height | black keys centred? |
+|---|---|---|---|
+| **MuseScore 4** | **0.667** of the visible white | **0.656** | **no**, a table of five offsets |
+| **Ardour 8** | **0.80** | **0.667** | **no**, exactly mathpages' `B/6` solution |
+| **LMMS** | **0.80** | **0.667** | **yes**, centred |
+
+**MuseScore 4** (`pianokeyboardview.cpp`): white key 30.0 plus 2.0 of spacing,
+black key 20.0, white height 128.0, black height 84.0, and
+
+```cpp
+constexpr qreal offsets[12] {
+    0.0, -13.0, 0.0, -7.0, 0.0, 0.0, -13.0, 0.0, -10.0, 0.0, -7.0, 0.0
+};
+```
+
+applied against the left edge of the FOLLOWING white key. Worked through, the
+five black keys land at **-2, +4, -2, +1, +4** from their joins on a 32 unit
+pitch (**INFERRED**, arithmetic from the source). That is asymmetric, and it is
+asymmetric because it approximates the OTHER classical answer: all twelve
+semitones on one uniform lattice, the same scheme as webaudio-keyboard in §2.1.
+Its `m_keyWidthScaling` is a user setting, so the key size is the reader's
+choice and the keyboard scrolls.
+
+**Ardour 8** (`pianokeyboard.cc`) is the one that lands exactly on a named rung
+of the mathpages ladder:
+
+```cpp
+int black_key_width = key_width * 0.8;
+// black_key_left_shift(): C# 2/3, D# 1/3, F# 2/3, G# 1/2, A# 1/3
+```
+
+Those shifts put the black centres at **-B/6, +B/6, -B/6, 0, +B/6**
+(**INFERRED**, arithmetic), which gives white strips of `W-2B/3` for C, D, E, F
+and B and `W-5B/6` for G and A. That is mathpages' **`B/6` solution**, verbatim:
+*"set c=d=e=f=b=(W-2B/3) and g=a=(W-5B/6)"*. Ardour also **shrinks its keys to
+fit** rather than scrolling: `key_width = width / number_of_white_keys`.
+
+**LMMS** (`PianoView.cpp`) is the counter-example on the desktop side:
+`PW_WHITE_KEY_WIDTH 10`, `PW_BLACK_KEY_WIDTH 8`, heights 57 and 38, and a hit
+test that treats the black key as straddling the boundary by half its width on
+each side, which is centred.
+
+⚠️ **Ableton Live, Logic, Bitwig, Reason and the big sampler plugins are NOT
+established here, and no number should be guessed for them.** They have no
+readable source, and the only images of them available are marketing shots and
+manual figures at unknown window scale and unknown display scaling. A RATIO
+could still be taken from one, because a ratio survives scale, but only from an
+image that is a true unscaled capture, and no such image was obtained. What
+would establish it: a screenshot taken on a machine where the window size is
+known, or the application open in front of somebody who can measure it. The
+three above were chosen instead precisely because their source can be read,
+which is better evidence than any screenshot.
+
+### 5.4 The apps that do not draw a piano at all
+
+This is the part of the field that §2 could not have found, because no web
+keyboard does it.
+
+- **Ableton Note**: **no piano keyboard appears in any of the six of its seven
+  App Store screenshots that loaded**. Melodies are entered on a pad grid.
+  (**INFERRED** that the product has no piano keyboard anywhere; screenshots are
+  what was seen.) An app from the company that makes Live answers "a piano
+  octave does not fit on a phone" by not drawing a piano.
+- **KORG iM1 (iPad), MEASURED**: a **chromatic strip**, not a piano. White and
+  black keys are the same length to within 3 px (**232 px** for a black,
+  **229 px** for a white, both running the full height of the row) and sit side
+  by side in one row. The light keys are
+  **82 px = 41.0 pt** wide and the dark keys are **91 px = 45.5 pt**, so **the
+  accidentals are WIDER than the naturals**, and the white key front edges are
+  unevenly spaced (173 px from C to D, 87 px from E to F) because the exposed
+  strips are equalised instead. It is the shape our own keyboard abandoned on
+  2026-09-17, drawn by KORG, with the ratio inverted.
+- **Animoog Z (Moog)**: a row of equal width cells filtered by a SCALE control,
+  with labels reading G2, G#2, A#2, C3, C#3 (a scale, not a chromatic run).
+  ⚠️ **The cell width could NOT be established**: a marketing banner covers the
+  left of the strip and the cell separators are dark on dark, below any
+  threshold that also separates the keys. What would establish it: a capture
+  with the banner off, or the app on a device.
+- **ROLI Seaboard 5D**: a continuous playing surface rather than discrete keys.
+  Its own App Store caption (**READ**) says *"A control panel allows real-time
+  octave shifting and XY modulation"*.
+- **KORG Module**: a photo real **3D perspective render** of a grand piano
+  keyboard. The offsets in it are the instrument's own, because it is a picture
+  of the instrument. ⚠️ **No number can be taken from it**: the keyboard recedes
+  in perspective, so key widths are not comparable across the image. An `Octave
+  ◀ ▶` control sits at its left.
+- **GarageBand itself has a non-piano mode.** Apple's user guide (**READ**): the
+  Scale button changes the display so that *"the keyboard changes to show note
+  bars rather than keys"*.
+
+### 5.5 What they do when an octave does not fit on a phone
+
+Five different answers, and our component has picked one of them.
+
+| answer | who does it |
+|---|---|
+| octave stepper buttons | GarageBand (*"Octave Down"* / *"Octave Up"*, READ), KORG Module (`Octave ◀ ▶`), KORG iM1 (`− OCTAVE +`), **positron** |
+| scroll the row | GarageBand (a *"Scroll"* mode, READ), MuseScore (READ, source), **positron** (a horizontal scroller) |
+| shrink the keys to fit | Ardour (READ, source: `key_width = width / number_of_white_keys`) |
+| two stacked rows of different octaves | GarageBand on iPad (MEASURED) |
+| do not draw a piano | Ableton Note (pad grid), Animoog Z and KORG iM1 (chromatic strips), Seaboard (continuous surface), GarageBand's own Scale mode (note bars) |
+
+🔴 **And one finding here is about our own component rather than about
+proportion.** GarageBand resolves the swipe versus glissando conflict by making
+it **a mode the player chooses**: one button cycles *"Glissando"* (the default),
+*"Scroll"* and *"Pitch"* (**READ**, Apple's user guide, and the button is
+visible in the screenshot reading `GLISSANDO` with three dots under it).
+`demo/shell/keyboard.mjs` resolves the same conflict with an automatic verdict in
+the first two animation frames. Both are defensible and they are NOT the same
+bargain: ours costs a measured 33 ms before a note sounds on a touch and never
+asks the player anything, theirs costs a control and a decision and has zero
+latency. Both are worth knowing about, and GarageBand went the other way.
+
+⚠️ The control names for KORG Module, KORG iM1 and Animoog Z in the table above
+were read off their screenshots rather than out of a manual, so they are the
+labels on the buttons and not a description of what the buttons do.
+
+### 5.6 The 44 pt question, answered by Apple's own app
+
+**GarageBand breaks Apple's own 44 pt guidance on its black keys, on both
+devices** (MEASURED):
+
+| | black key width | against Apple's 44 pt |
+|---|---|---|
+| GarageBand, iPhone | **37.0 pt** | **16 percent under** |
+| GarageBand, iPad | **39.0 pt** | 11 percent under |
+| KORG iM1, iPad | 45.5 pt | over (but it is not a piano) |
+| **positron**, 390 px phone | **32.33 px** | 27 percent under |
+
+So §3's conclusion holds and is now made by a better witness: the piano black key
+is a target that real music software, including Apple's, does not hold to 44 pt.
+We are further under than GarageBand is, and the reason is that our white key is
+49 px against its 57 pt: the ratio we apply, 0.66, is barely different from its
+0.649.
+
+⚠️ **One number of ours is genuinely worse than GarageBand's and §4 fixes it.**
+The narrowest white strip, as a fraction of the white key:
+
+| | narrowest white strip | as a fraction of its own white key |
+|---|---|---|
+| GarageBand, iPhone | 25.0 pt of 57.0 | **0.439** |
+| **positron, shipped** | 19.67 px of 49.0 | **0.401** |
+| **positron, §4 recommendation** | 27.00 px of 49.0 | **0.551** |
+
+### 5.7 What this does to the recommendation
+
+**Nothing changes in §4, and two things about it get firmer.**
+
+1. **Keep `BLACK_RATIO` at 0.66.** GarageBand's own phone keyboard is **0.649**
+   and its iPad keyboard 0.600, MuseScore is 0.667, Ardour and LMMS are 0.80.
+   The piano's 0.583 is the bottom of the field, not the middle of it. Our 0.66
+   now has the best possible witness.
+2. **Keep the height ratio at 0.622.** GarageBand 0.581 and 0.632, MuseScore
+   0.656, Ardour and LMMS 0.667.
+3. **Offset the black keys.** Of the six pieces of real music software examined
+   here, every one that draws a piano at all offsets them except LMMS:
+   GarageBand twice, MuseScore, Ardour, and KORG Module by being a picture of an
+   instrument. Ours and LMMS are the two that centre.
+4. **Keep the `B/6` and `B/4` pair rather than copying GarageBand's constant.**
+   A constant `(B-gap)/6` on all four outer sharps, which is GarageBand's and
+   Ardour's scheme, would take our narrowest white strip from 19.67 px to
+   **24.56 px**. The `B/6` and `B/4` pair takes it to **27.00 px**
+   (**INFERRED** for the first, **MEASURED** for the second). Both are large
+   improvements; the pair is better by 2.4 px and costs exactly the same nothing.
+
+---
+
+## 6 · Sources
 
 - [Musical keyboard, Wikipedia](https://en.wikipedia.org/wiki/Musical_keyboard):
   octave span 164-165 mm, black 13.7 mm, white 23.5 mm, and the sentence about C,
@@ -478,3 +750,21 @@ Four notes for whoever implements it:
   the 44 x 44 point sentence, verbatim.
 - [WCAG 2.2, Understanding SC 2.5.8 Target Size (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html):
   24 by 24 CSS pixels, Level AA, and the five exceptions.
+
+Added for §5:
+
+- **Apple's App Store screenshot metadata**, through the public
+  `itunes.apple.com/lookup` API, for GarageBand (408709785), KORG Module
+  (1048875111), KORG Module Pro (932191687), KORG iM1 (966030326), KORG Gadget 3
+  (791077159), Moog Model 15 (1041465860), Minimoog Model D (1339418001),
+  Animoog Z (1586841361), Ableton Note (1633243177), Seaboard 5D (1173937855)
+  and AUM (1055636344). The images themselves came from Apple's screenshot CDN,
+  one load each.
+- [GarageBand for iPhone User Guide, Play the Keyboard](https://support.apple.com/guide/garageband-iphone/play-the-keyboard-chs39282dbe/ios):
+  the Octave Down and Octave Up buttons, the Glissando / Scroll / Pitch modes,
+  Sustain, the Arpeggiator, and the Scale button's note bars.
+- [MuseScore 4](https://github.com/musescore/MuseScore),
+  `src/notationscene/qml/MuseScore/NotationScene/pianokeyboard/pianokeyboardview.cpp`.
+- [Ardour](https://github.com/Ardour/ardour), `gtk2_ardour/pianokeyboard.cc`.
+- [LMMS](https://github.com/LMMS/lmms), `src/gui/instrument/PianoView.cpp` and
+  `include/PianoView.h`.

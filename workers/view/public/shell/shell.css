@@ -2665,11 +2665,26 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    so a centre slot drifts as a status word changes length, and this project has
    a standing rule against anything that moves while you look at it. Equal outer
    columns pin the middle whatever is beside it. */
+/* 🔴 THE PROJECT'S STANDARD BOX, WHICH THIS WAS NOT. Reported 2026-09-17 with a
+   photograph: *"videopanel footer missing right bottom left borders and should
+   have our std box border radius on bottomleft/right"*.
+   MEASURED before the change: the border and the radius were both THERE, at
+   1 px `--line2` and 8 px. What was wrong is that they were nobody else's
+   numbers. Every other surface on this site is `1px solid var(--line)` at 4 px
+   — `.pos-log`, `.pos-tbl`, `.kit-box`, every button — so a panel at 8 px in a
+   lighter line read as a different kind of object, and against `--card2` on a
+   phone the corners looked square and the edge looked absent.
+   ⚠️ THE 8 px CAME FROM `/mirror/`'s `.pane`, which is where this component's
+   shape was copied from and which carries no border at all. Copying the radius
+   without the rest of the box is how one page's decision becomes a component's
+   inconsistency. */
 .pos-vp {
   display: block;
   background: var(--card2);
-  border: 1px solid var(--line2);
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  /* The footer's corners are clipped to the box's, which is what gives it its
+     bottom left and bottom right without a second radius to keep in step. */
   overflow: hidden;
 }
 /* 🔴 THE SAME GROUND AS THE LOG, NOT BLACK. Asked 2026-09-17 with a photograph
