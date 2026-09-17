@@ -1752,9 +1752,10 @@
       // sabotage: with the badge's `compile` made to throw, this check stayed
       // GREEN until the module was made to compile it up front.
       const q = window.__demo?.xrState?.quit ?? xr.state.quit;
-      d.assert('the way out is a hold on one named button, drawn where the hand is',
-        !!q?.built && Number.isInteger(q.button) && typeof q.label === 'string' && q.label.length > 0,
-        q?.built ? `button ${q.button} of the xr-standard mapping, labelled "${q.label}"`
+      d.assert('the way out is a long hold on any button, drawn where the hand is',
+        !!q?.built && q.button === 'any' && q.holdMs >= 2000
+        && typeof q.label === 'string' && /hold/i.test(q.label),
+        q?.built ? `hold any button for ${(q.holdMs / 1000).toFixed(1)} s, labelled "${q.label}"`
                  : `nothing on screen says how to leave: ${q?.why ?? 'no answer'}`);
       // ⚠️ ASSERT ON THE ERROR FLAG, HERE TOO. A Quest reported 1282 on its
       // first frame and DREW CORRECTLY ANYWAY; the only way that is ever caught
@@ -1829,14 +1830,34 @@
         d.assert('and it cannot be pushed somewhere you could not walk to it',
           reach <= PLACE.far + 1e-3 && c2[1] >= PLACE.lowest - 1e-3 && c2[1] <= PLACE.highest + 1e-3,
           `shoved to 20 m away and 4 m under the floor, it stopped at ${reach.toFixed(2)} m out and ${c2[1].toFixed(2)} m up`);
-        // ⚠️ AND IT FACES YOU, YAW ONLY. A panel that tips to meet a head
-        // looking down from above reads as falling over.
-        const M2 = facing(c2, { x: 0, y: 2.4, z: 0 }, W_M, H_M);
-        d.assert('a panel you put down faces you, and stays upright doing it',
-          Math.abs(M2[4]) < 1e-6 && Math.abs(M2[6]) < 1e-6 && Math.abs(M2[5] - H_M) < 1e-6
-          && Math.abs(M2[9]) < 1e-6,
-          `its up is (${M2[4].toFixed(3)}, ${M2[5].toFixed(3)}, ${M2[6].toFixed(3)}) with the head 0.8 m above it`
-          + ` · its normal tilts ${(Math.asin(Math.abs(M2[9])) * 180 / Math.PI).toFixed(1)}° out of level`);
+        /**
+         * 🔴 IT FACES YOU IN BOTH AXES, AND THIS CHECK REVERSED ON 2026-09-17.
+         * It used to assert the opposite — that a panel stays world-upright
+         * whatever height the head is at — and the instruction is explicit:
+         * *"make them always look at me not only horiz but also vertic"*.
+         *
+         * ⚠️ THE NUMBER THAT MATTERS IS THE ANGLE BETWEEN THE PANEL'S NORMAL
+         * AND THE LINE TO THE HEAD, and it has to be zero. Checking "its up is
+         * no longer world up" would pass on a panel tipped the WRONG WAY, which
+         * is the same picture with the sign flipped and is exactly what a
+         * hand-built basis gets wrong.
+         *
+         * ⚠️ AND THE ROLL IS STILL PINNED. `right` must stay level or a panel
+         * tilted to meet you also leans sideways, and nothing about a head
+         * being higher than a picture says the horizon moved.
+         */
+        const eyeAt = { x: 0, y: 2.4, z: 0 };
+        const M2 = facing(c2, eyeAt, W_M, H_M);
+        const toHead = [eyeAt.x - c2[0], eyeAt.y - c2[1], eyeAt.z - c2[2]];
+        const tl = Math.hypot(...toHead) || 1;
+        const aim = (M2[8] * toHead[0] + M2[9] * toHead[1] + M2[10] * toHead[2]) / tl;
+        const rise = Math.hypot(M2[0], M2[1], M2[2]) ? M2[1] / Math.hypot(M2[0], M2[1], M2[2]) : 1;
+        const upLen = Math.hypot(M2[4], M2[5], M2[6]);
+        d.assert('a panel you put down faces you in both axes, and keeps the room’s horizon',
+          aim > 0.99999 && Math.abs(rise) < 1e-6 && Math.abs(upLen - H_M) < 1e-6,
+          `its face is ${(Math.acos(Math.max(-1, Math.min(1, aim))) * 180 / Math.PI).toFixed(2)}° off the line to a head`
+          + ` ${(eyeAt.y - c2[1]).toFixed(2)} m above it, and it tilts ${(Math.asin(Math.abs(M2[9])) * 180 / Math.PI).toFixed(1)}° out of level to do it`
+          + ` · its own across stays level (rise ${rise.toFixed(6)})`);
       }
 
       // The far pane, only if the board answered. A lane with nothing to say
