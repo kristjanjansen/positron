@@ -506,7 +506,11 @@ export function createReport({
     return r;
   }
 
-  const rep = el('div', 'pos-report');
+  // `pos-glue` is the LOOK (one border, a 1 px seam, children giving up their
+  // own edges) and is shared with any other glued pair; `pos-report` is only
+  // this box's own position on the page. Two classes because they are two
+  // facts, and the second one is the half that is not reusable.
+  const rep = el('div', 'pos-glue pos-report');
   rep.append(readoutEl);
   if (showLog) rep.append(logEl);
   if (!readoutEl.hidden || showLog) { r.report = rep; r.foot = rep; }

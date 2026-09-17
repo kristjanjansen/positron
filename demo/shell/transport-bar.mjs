@@ -86,6 +86,27 @@ export function createTransportBar(host, deck, {
    */
   toggle: wantToggle = true,
   /**
+   * 🔴 THE CLOCK IS OPTIONAL, AND A PAGE WITH A STRIP IS WHY. Asked 2026-09-18:
+   * *"rm times from transport bar"*, on a page whose strip already carries the
+   * position — the second half of the same report that took the slider off it
+   * (*"no need for slider / times in transport lane"*).
+   *
+   * This is the standing "one position surface per page" rule reaching the one
+   * control it had not reached. `scrub: false` already takes off the bar's
+   * SLIDER where a strip is present, on the reasoning that two horizontal time
+   * axes at different scales, stacked, is a contradiction rather than a
+   * redundancy. The clock is the same quantity a third time, in digits: the
+   * strip has a playhead, a ruler with numbers on it, and a gutter, so
+   * `0:04.120 / 3:00.000` beside it is a number nobody reads off the bar.
+   *
+   * ⚠️ IT DEFAULTS ON, because a bar with NO strip is the common case and there
+   * the clock is the only thing that can say where you are.
+   * ⚠️ AND IT DOES NOT TOUCH THE LIVE CHIP OR A PAGE'S OWN `chip`, which sit in
+   * the same slot and carry a different fact. Those are already exclusive of
+   * each other and of the clock; this only says the clock's own case is off.
+   */
+  time: wantTime = true,
+  /**
    * 🔴 WHAT TAKES THE LOOP BUTTON'S PLACE ON A BAR THAT HAS NO LOOP. Asked for
    * in those words, 2026-09-16: *"just replace looper with fullscreen button
    * (make component slot-able)"*, for `/videoradio/`, whose bar wants a ⛶ where
@@ -395,7 +416,8 @@ export function createTransportBar(host, deck, {
     throw new Error('createTransportBar: chip and live want the same position '
       + '(pass live: false, the chip can say LIVE itself if that is the fact)');
   }
-  bar.append(...(wantToggle ? [toggle] : []), ...extraEls.values(), scrub, ...(chip ? [chip] : live ? [liveChip] : [time]),
+  bar.append(...(wantToggle ? [toggle] : []), ...extraEls.values(), scrub,
+    ...(chip ? [chip] : live ? [liveChip] : wantTime ? [time] : []),
     // the loop's position: whatever was put in the slot, or the loop itself
     ...(loopSlotEls.size ? [...loopSlotEls.values()]
       : loopPair ? [loopPair] : [...(wantLoop ? [loopBtn] : []), ...loopExtraEls.values()]),

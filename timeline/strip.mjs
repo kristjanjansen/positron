@@ -1877,10 +1877,25 @@ export function createStrip(canvas, deck, opts = {}) {
     g.beginPath(); g.rect(0, 0, plotW(), S.height); g.clip();
     const t0 = tAt(0), t1 = tAt(plotW());
     // lane backgrounds first, so bands read against their own row
+    //
+    // 🔴 THE BAND IS ITS LANE'S FULL HEIGHT, AND THE 1 px IT USED TO GIVE BACK
+    // WAS A BLACK RULE BETWEEN EVERY PAIR OF LANES. Reported 2026-09-18 with a
+    // photograph: *"black horiz lines on timeline are pointless"*. Lanes tile
+    // exactly — `layout()` does `y += L.height` with nothing between them — so
+    // painting `height - 1` left one unpainted row per lane, and what showed
+    // through it was `T.bg`, which is DARKER than the band. Nobody drew those
+    // lines and nothing in the file mentioned them: they were the shape of a
+    // gap, not a decision.
+    // ⚠️ AND IT IS THE STANDING RULE, not a taste. `shell.css` already says
+    // separation is spacing and a line is a second channel repeating it, and
+    // here there was not even spacing to repeat: a lane is already told apart
+    // by its name in the gutter, its swatch and its own marks, which is three
+    // channels before any rule is drawn. The bands still alternate against
+    // `T.bg` at 0.55 alpha, so the rows remain legible as rows.
     for (const L of S.lanes) {
       if (!L.show) continue;
       g.fillStyle = T.lane; g.globalAlpha = 0.55;
-      g.fillRect(0, L.y, plotW(), L.height - 1);
+      g.fillRect(0, L.y, plotW(), L.height);
       g.globalAlpha = 1;
     }
     drawLoopBand(g);

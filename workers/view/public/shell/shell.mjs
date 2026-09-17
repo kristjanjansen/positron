@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = 'd7e0921-212112-a4f6';
+export const BUILD = 'c56528f-214655-8769';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -506,7 +506,11 @@ export function createReport({
     return r;
   }
 
-  const rep = el('div', 'pos-report');
+  // `pos-glue` is the LOOK (one border, a 1 px seam, children giving up their
+  // own edges) and is shared with any other glued pair; `pos-report` is only
+  // this box's own position on the page. Two classes because they are two
+  // facts, and the second one is the half that is not reusable.
+  const rep = el('div', 'pos-glue pos-report');
   rep.append(readoutEl);
   if (showLog) rep.append(logEl);
   if (!readoutEl.hidden || showLog) { r.report = rep; r.foot = rep; }

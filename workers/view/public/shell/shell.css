@@ -521,6 +521,45 @@ button.pos-pri[data-busy="1"] {
 .pos-line.warn .pos-m { color: var(--warn); }
 .pos-line.ok .pos-m { color: var(--ok); }
 
+/* ── two surfaces glued into one (.pos-glue) ──────────────────────────────
+   🔴 THE LOOK `.pos-report` INVENTED, NAMED, BECAUSE A SECOND PAIR ASKED FOR
+   IT. Asked 2026-09-18: *"do same treatment as for readout/logs for transport
+   + timeline: can be separate or glued togehter"*. That is this project's own
+   standing rule one level down and it is written a few hundred lines above
+   this one, about `.pos-seg`: a LOOK that exists in more than one place is a
+   utility nobody has noticed yet.
+
+   What it is: blocks in a column with ONE border round the lot, `1px` of
+   `--line` showing between them as a seam, and the children giving up their
+   own border and radius to the box. The seam is the flex `gap` over a
+   line-coloured ground, so it is the same seam the readout's own cells already
+   have rather than a rule anybody draws.
+
+   🔴 AND THE SEAM IS NOT A DIVIDER, WHICH IS THE OBJECTION IT HAS TO ANSWER.
+   The standing rule is that separation is SPACING and a line repeating it is a
+   second channel. That rule is about the gap BETWEEN surfaces, which is the
+   rhythm `.pos-stack` owns. Inside ONE surface there is no rhythm to repeat,
+   and air is what would read wrong: two boxes 22 px apart ARE two surfaces,
+   which is the separate arrangement and is still the default.
+
+   ⚠️ THE CHILD RULE IS DOUBLE-CLASSED ON PURPOSE. `.pos-glue > *` weighs
+   (0,1,0), exactly what `.pos-strip` and `.tbar` weigh for their own
+   `border`/`border-radius`, so which one won would come down to where each sits
+   in this file. That is the specificity trap this stylesheet already records
+   three times — on `.tbar`, on `.pos-dg` and on the keyboard, where a
+   component's own margin shorthand silently beat the page rhythm and measured
+   0.0 px. `.pos-glue.pos-glue` weighs (0,2,0) and cannot lose to a component,
+   whatever order anybody adds one in. */
+.pos-glue {
+  display: flex; flex-direction: column;
+  gap: 1px; background: var(--line); border: 1px solid var(--line);
+  border-radius: 4px; overflow: hidden;
+}
+/* `display: flex` beats the UA's `[hidden]` rule, the same patch the readout,
+   the control row and the report all already carry. */
+.pos-glue[hidden] { display: none; }
+.pos-glue.pos-glue > * { border: 0; border-radius: 0; margin: 0; }
+
 /* ── readout and log, joined ──────────────────────────────────────────── */
 /* 🔴 ONE SURFACE, THE READOUT SITTING ON TOP OF THE LOG, AT THE FOOT OF THE
    PAGE. Asked for 2026-09-16: *"combine readout with log component, put it top
@@ -552,10 +591,9 @@ button.pos-pri[data-busy="1"] {
    is one bordered box with nothing hanging off it. A report holding NEITHER is
    never appended: `createReport()` returns no `foot` at all, because a
    container with nothing in it must not paint its edges. */
+/* ⚠️ THE SURFACE ITSELF IS `.pos-glue` ABOVE, and this rule is what is left
+   that belongs to a REPORT rather than to any glued pair: where it sits. */
 .pos-report {
-  display: flex; flex-direction: column;
-  gap: 1px; background: var(--line); border: 1px solid var(--line);
-  border-radius: 4px; overflow: hidden;
   /* The page's one gap, stated here because this surface sits OUTSIDE
      `.pos-body` and the rhythm on that element's children cannot reach it.
      It was 44, then 120, and is now the same 40 everything else gets: a foot
@@ -576,12 +614,8 @@ button.pos-pri[data-busy="1"] {
      it. `/kit/` measures both and reports the two numbers. */
   margin: var(--pos-gap) 0 0;
 }
-/* `display: flex` beats the UA's `[hidden]` rule. The readout and the control
-   row are both already patched for the same trap, and both cost a band of dead
-   space nobody wrote before they were. */
-.pos-report[hidden] { display: none; }
-.pos-report > .pos-readout,
-.pos-report > .pos-log { border: 0; border-radius: 0; margin: 0; }
+/* the `[hidden]` patch and the children's give-up-your-border rule are both
+   `.pos-glue`'s now, and reach this box because it carries that class */
 
 /* ── transport bar ────────────────────────────────────────────────────── */
 /* WRAP. Measured at 390 px (iPhone) this row overflowed its own card by 94 px
@@ -2800,3 +2834,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    control before it, not against the box, and that gap is already the row's own. */
 .tbar > .pos-pres:first-child,
 .pos-vp-foot .pos-vp-l > .pos-pres:first-child { margin-left: 6px; }
+
+/* the two specimen blocks in the GLUE section: a surface needs something with
+   a height in it, and a readout with one line is the smallest honest one */
+.kit-glue-demo { padding: 10px 12px; color: var(--dim); }

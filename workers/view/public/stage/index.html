@@ -27,6 +27,7 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
 
@@ -118,9 +119,22 @@
         of: t.label.toLowerCase(),
         left: createPresence({ of: '', mode: 'badge', state: 'online',
                                says: { online: 'live' } }).el,
-        // Three modes, one per tab, so the page demonstrates all of them rather
-        // than describing two of them.
-        fullMode: ['hover', 'footer', 'bare'][i],
+        /**
+         * 🔴 EVERY SCREEN GOES FULL, AND KEEPS A FOOTER WHILE IT IS. Asked
+         * 2026-09-18: *"all stage videoscreens need to go to fullscreeen with
+         * footer variats"*. It used to rotate all three modes, one per tab, so
+         * that the page demonstrated `bare` as well — and `bare` is the one
+         * that takes the footer AWAY, which on this page takes the LIVE badge
+         * with it. A screen showing a live room, full, with nothing saying it
+         * is live is the thing the badge exists to prevent.
+         * ⚠️ BOTH REMAINING VARIANTS ARE STILL SHOWN, and which tab gets which
+         * is a reason rather than a rotation: the audience and the archive keep
+         * the footer up (`footer`), because the badge and the transport are
+         * what you are there to read, and the control room hides it until you
+         * move (`hover`), because an operator wants the picture clean and the
+         * controls on demand.
+         */
+        fullMode: t.id === 'controlroom' ? 'hover' : 'footer',
       }),
     };
   });
@@ -227,8 +241,17 @@
    * adapters offers none, which is why this one names an adapter that plays
    * nothing and only says what rates it can be played at.
    */
-  createTransportBar(tabs.panel('archive'), archiveDeck, {
-    live: false, scrub: false, absolute: false, clock: false,
+  /**
+   * 🔴 NO SLIDER AND NO CLOCK, BECAUSE THE STRIP UNDER IT IS THE POSITION.
+   * Asked twice: *"no need for slider / times in transport lane"*, then
+   * *"rm times from transport bar"* when the times were still there. They were
+   * still there because this call passed `clock: false`, which the bar has
+   * never had as an option and so did nothing at all — a setting that reads as
+   * correct in the source and cannot be seen to be inert from outside. The
+   * option is `time` and it is now real.
+   */
+  const bar = createTransportBar(tabs.panel('archive'), archiveDeck, {
+    live: false, scrub: false, absolute: false, time: false,
   });
 
   const VIDEO_LANE = {
@@ -256,7 +279,26 @@
   const strip = createStripView(tabs.panel('archive'), archiveDeck, {
     size: 'auto', gutter: 110, lanes: [VIDEO_LANE],
   });
-  const relane = () => strip.strip.setLanes([VIDEO_LANE, ...OPTIONS.map(laneFor)]);
+  // The count is kept here because the strip reports no lane list of its own,
+  // and a check that samples between lanes has to be able to say it HAD lanes.
+  let laneCount = 1;
+  const relane = () => {
+    const list = [VIDEO_LANE, ...OPTIONS.map(laneFor)];
+    laneCount = list.length;
+    strip.strip.setLanes(list);
+  };
+
+  /**
+   * 🔴 THE BAR AND THE STRIP ARE ONE SURFACE. Asked 2026-09-18: *"do same
+   * treatment as for readout/logs for transport + timeline: can be separate or
+   * glued togehter"*. They are the strongest case there is for it: the strip
+   * shows a position and the bar drives the same position, so two bordered
+   * boxes with the page rhythm between them state that they are two things.
+   * `createGlue` re-parents both into one box with a 1 px seam.
+   * ⚠️ The order is the order they were already in, bar then strip, so gluing
+   * them changes what they look like and not where they are.
+   */
+  tabs.panel('archive').append(createGlue(bar.el, strip.el));
 
   /**
    * 🔴 THE QUESTION GOES TO THE AUDIENCE AND BACK TO THE CONTROL ROOM. Asked
@@ -464,7 +506,7 @@
    * exceptions, and the two arguments that were used to make exceptions are both
    * answered in that file. Everything below reads what is already on screen.
    */
-  function checks() {
+  async function checks() {
     if (q.get('selfcheck') !== '1') return;
 
     d.assert('three panels, one for each tab', panels.length === 3 && tabs.el.querySelectorAll('.pos-vp').length === 3,
@@ -555,6 +597,74 @@
       near, Number.isFinite(ms)
         ? `the burned clock reads ${new Date(ms).toISOString().slice(11, 23)}, ${Math.abs(Date.now() - ms)} ms from now`
         : 'nothing decoded out of the canvas, so the panel is not showing the picture');
+
+    /**
+     * 🔴 NO BLACK RULE BETWEEN LANES, MEASURED IN PIXELS OFF THE STRIP ITSELF.
+     * Reported 2026-09-18 with a photograph: *"black horiz lines on timeline
+     * are pointless"*. The cause was `fillRect(0, L.y, w, L.height - 1)` in
+     * `timeline/strip.mjs`, which left exactly one unpainted row per lane and
+     * showed the darker canvas ground through it. Nobody drew those lines.
+     *
+     * ⚠️ IT SAMPLES A COLUMN, NOT A POINT. One pixel at one x could land on a
+     * mark, a grid line or the loop band and read dark for a reason that is not
+     * this one; a column read down the middle of the plot, with the darkest row
+     * compared against the band around it, cannot. The test is that no row
+     * inside the lanes is darker than the lane ground by more than a mark would
+     * be, which is what a rule drawn in the background colour would be.
+     * ⚠️ AND IT IS A NEGATIVE CONTROL AWAY FROM BEING DECORATION: put the `- 1`
+     * back in strip.mjs and this goes red, which is how it was confirmed.
+     */
+    /**
+     * ⚠️ THE TAB HAS TO BE THE ONE IN FRONT BEFORE THE CANVAS HAS A SIZE. The
+     * first build of this check sampled while `audience` was showing, so the
+     * archive panel was `hidden`, its canvas laid out at zero and the loop ran
+     * over **0 rows** — which reported `undefined` rather than failing on the
+     * thing it was measuring. A check that cannot see its subject has to say
+     * so, and the row count in the message is what says it.
+     */
+    tabs.go('archive');
+    /**
+     * 🔴 AND THE STRIP HAS TO HAVE LANES TO HAVE A BOUNDARY BETWEEN THEM. The
+     * first version of this check ran with the archive holding its ONE video
+     * lane, so there was no pair of lanes anywhere in the picture and the
+     * sample could not have seen a rule if one had been drawn. MEASURED by
+     * sabotage: putting the `- 1` back in `timeline/strip.mjs` left this assert
+     * green with the same three numbers, which is the whole lesson — a check
+     * whose subject is absent reads exactly like a check that passed.
+     * ⚠️ IT ASKS A REAL QUESTION, through the page's own `ask()`, rather than
+     * pushing into `OPTIONS` behind it. The lanes a visitor sees are the ones
+     * this grades.
+     */
+    ask('a question the check asked', ['one', 'two']);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const sc = strip.el;
+    const sctx = sc.getContext('2d');
+    // Down the middle of the plot, clear of the gutter and of the axis, in the
+    // canvas's OWN pixels: reading a device ratio off a rect is what broke when
+    // the rect was zero, and the backing store is the thing being sampled.
+    const col = Math.round(sc.width * 0.72);
+    const top = Math.round(sc.height * 0.25);
+    const lum = [];
+    for (let y = top; y < sc.height - 2; y++) {
+      const [r, g2, b] = sctx.getImageData(col, y, 1, 1).data;
+      lum.push(r + g2 + b);
+    }
+    // The band is the typical row; a rule would be a row far below it.
+    const sorted = [...lum].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const darkest = sorted[0];
+    d.assert('no black rule between the lanes',
+      // 🔴 THE THRESHOLD IS BETWEEN TWO MEASURED STATES, NOT A GUESS. Fixed
+      // 2026-09-18 with the band painted full height and again with the `- 1`
+      // put back: **a drop of 0 against a drop of 21**, over 74 rows either
+      // way. 8 sits between them with room on both sides.
+      // ⚠️ IT WAS 24 FIRST, WHICH IS A NUMBER THAT PASSES THE DEFECT. It was
+      // picked while this check had no lanes to look at, so both states read
+      // identically and any threshold looked as good as any other. A tolerance
+      // chosen against a blind measurement is a tolerance chosen against
+      // nothing.
+      laneCount >= 3 && lum.length > 20 && median - darkest < 8,
+      `${laneCount} lanes, and over ${lum.length} rows the lane ground reads ${median} and the darkest row ${darkest}, a drop of ${median - darkest}`);
   }
 
   // The frame counter has to have moved before the picture can be read back, so
