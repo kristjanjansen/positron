@@ -569,13 +569,31 @@
   // this page got wrong: the relay is verbatim, so any other tab in the room
   // used to paint it green.
 
+  /**
+   * 🔴 NO PLAY BUTTON AND NO TEST TONE. Instructed 2026-09-17: *"sound does not
+   * start with keyboar when i have not pressed play. remove thay button and test
+   * tone. i just ned to push keyboard to start sound"*.
+   *
+   * Both were there for the same reason and it stopped being a good one the
+   * moment this page gained a keyboard. Play armed the page, woke the
+   * instrument and held one note so the sliders had something to act on; with
+   * keys on the page, the note you want is the one you press, and a control
+   * whose whole job is to make a sound BEFORE you play anything is a second way
+   * in that a visitor has to discover. Somebody who pressed a key first got
+   * silence and no explanation, which is exactly the report.
+   * ⚠️ THE BAR STAYS, because the presence badge lives in it. `toggle: false`
+   * disarms everything that depended on playing rather than leaving it to read
+   * false by luck: `api.playing` is forced false, the space bar stops being a
+   * play key, and `demo/verify.mjs` reads `api.toggles` before its play drill.
+   */
   const bar = createTransportBar(d.el, deck, {
+    toggle: false,
     chip: pres.el,       // whether the board is answering, in the chip's place
     scrub: false,        // there is no position in a held note to seek to
     loop: false,         // asked for, and recording comes back as its own thing
     endStop: false,      // the note is held until somebody stops it
     command: {
-      play: () => { deck.play(); startNote(); },
+      play: () => { deck.play(); },
       // 🔴 STOP IS A PANIC, ASKED FOR IN THOSE WORDS. It is not a pause that
       // could be resumed: it releases every note the board is holding, which
       // may include notes this page never pressed, and brings both sliders home
@@ -616,11 +634,25 @@
    * the newest matters; a note is an event, and a note held back is a key that
    * did nothing.
    */
+  /**
+   * 🔴 A KEY IS THE ONLY WAY IN NOW, so the first one has to do everything Play
+   * used to: start the audio, wake the instrument if nothing is running, load
+   * the patch, and only then sound the note. `ready` is that work, done once.
+   * ⚠️ IT IS AWAITED BEFORE THE NOTE RATHER THAN RACED WITH IT. MEASURED
+   * 2026-09-16 over the relay with no page in the way: `voice.select` and
+   * `note.on` back to back give peak 0.0000, and the same pair 900 ms apart give
+   * 0.0213 on the same patch and the same note. An .xiz comes off an SD card.
+   * ⚠️ AND A SECOND KEY PRESSED WHILE THE FIRST IS STILL WAKING JOINS THE SAME
+   * promise rather than starting a second instrument.
+   */
+  let readying = null;
+  const ready = () => (readying ||= firstKey());
+
   const kb = createKeyboard(d.el, {
     base: 60,
     onDown: (note) => {
       kb.lightNote(note, true);
-      board.startAudio().then(() => sendId({ type: 'note.on', note, vel: VEL, channel: 0 }));
+      ready().then(() => sendId({ type: 'note.on', note, vel: VEL, channel: 0 }));
     },
     onUp: (note) => {
       kb.lightNote(note, false);
@@ -653,6 +685,12 @@
    * chair: no sound, no error, every counter correct.
    */
   const PATCH_SETTLE_MS = 900;
+  /** The patch, and the wait an .xiz off an SD card needs. No note. */
+  async function selectPatch() {
+    sendId({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
+    await wait(PATCH_SETTLE_MS);
+  }
+
   async function selectAndHold() {
     sendId({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
     await wait(PATCH_SETTLE_MS);
@@ -691,6 +729,46 @@
       if (board.stats().peak > 0.01) return;
       d.log(`the note is sounding far too quietly to hear: the loudest sample coming back is ${board.stats().peak.toFixed(4)} of full scale, where a working note is about 0.045. Nothing in this page can fix that — it is the board's own level`, 'bad');
     }, 1800);
+  }
+
+  /**
+   * Everything the first key press has to do before a note can sound. It
+   * replaces what the Play button did, minus the held test tone: the note you
+   * hear is the key you pressed.
+   */
+  async function firstKey() {
+    await board.startAudio();
+    await measureRtt();
+    const status = boardAnswered ? { ok: playing !== null, source: playing } : await askStatus();
+    if (!MAY_PLAY) {
+      d.log('a check is running, so nothing has been sent to the board: it is shared hardware and somebody may be using it. Add ?board=1 to let this press through', 'warn');
+      return;
+    }
+    if (status && status.ok && status.source === 'yoshimi') {
+      armed = true;
+      await selectPatch();
+      d.log(`yoshimi was already up. ${PATCH} is loaded, so play the keys and drag the sliders`, 'hi');
+      return;
+    }
+    if (status && status.ok) {
+      // 🔴 DO NOT AUTOSTART OVER SOMEBODY. There is one JACK graph and one
+      // instrument, so starting here stops whatever `/grains/` is doing. Say
+      // what is running and let a person decide.
+      d.log(`${status.source} is playing on the board and this page will not stop it. Nothing here is going anywhere until it is free`, 'warn');
+      return;
+    }
+    if (!status) return;
+    d.log(`starting yoshimi on the board and loading ${PATCH}. This takes ten to forty seconds`);
+    const r = await ask({ type: 'audio.start', source: 'yoshimi' }, 'audio.started', 60000);
+    if (r?.ok) {
+      armed = true;
+      await selectPatch();
+      d.log(`${PATCH} is loaded, so play the keys and drag the sliders`, 'hi');
+    } else {
+      // A recovery action is not free, and a wedged jackd cannot be restarted
+      // from a page. Report the reason verbatim and stop.
+      d.log(`the board could not start yoshimi${r?.reason ? ` · ${r.reason}` : ' and did not say why'}`, 'bad');
+    }
   }
 
   async function startNote() {

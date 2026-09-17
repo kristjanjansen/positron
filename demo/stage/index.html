@@ -12,6 +12,7 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createPresence } from '/shell/presence.mjs';
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -30,7 +31,11 @@
    */
   const TABS = [
     { id: 'audience', label: 'Audience' },
-    { id: 'controlroom', label: 'Control room' },
+    // ⚠️ ONE WORD. Asked 2026-09-17: *"controlroom -> single word"*. A tab row
+    // scrolls sideways rather than wrapping, so every two-word name spends a
+    // whole word's width of a phone's screen on a space, and the three names
+    // here are the page's navigation rather than its prose.
+    { id: 'controlroom', label: 'Controlroom' },
     { id: 'archive', label: 'Archive' },
   ];
 
@@ -78,9 +83,23 @@
        * none of either. The centre is left empty because there is no answer
        * that is right for every panel, and `/kit/` shows one filled.
        */
+      /**
+       * 🔴 IT SAYS `LIVE`, NOT NOTHING. Asked 2026-09-17 with a photograph of a
+       * lone green dot: *"add \u201cLIVE\u201d next to dot"*. The panel's own
+       * default left slot is a DOT, which is right for a footer holding several
+       * small things and wrong when it is the only thing there: a coloured dot
+       * with no word beside it is a mark whose whole meaning is its hue, and
+       * this project already has that rule written down about the badge.
+       * ⚠️ `says`, RATHER THAN A LABEL BESIDE IT. The component reserves the
+       * width of the widest phrase it can ever show and fades the word through
+       * on a change, so a word supplied from outside would twitch and a word
+       * given to the badge cannot.
+       */
       panel: createVideoPanel({
         media: c,
         of: t.label.toLowerCase(),
+        left: createPresence({ of: '', mode: 'badge', state: 'online',
+                               says: { online: 'live' } }).el,
         // Three modes, one per tab, so the page demonstrates all of them rather
         // than describing two of them.
         fullMode: ['hover', 'footer', 'bare'][i],
