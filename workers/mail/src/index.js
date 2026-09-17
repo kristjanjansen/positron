@@ -85,18 +85,45 @@ async function readRaw(message) {
 }
 
 /** The first text part of a mail, without pulling in a MIME parser. */
+/**
+ * 🔴 ONE ALTERNATIVE, NOT ALL OF THEM. MEASURED on the first real message ever
+ * to arrive here, 2026-09-17: a Gmail message reading `hello!` came out as
+ *
+ *     hello!
+ *
+ *     <div dir="ltr">hello!</div>
+ *
+ * because this dropped the boundary and `Content-` lines and then kept every
+ * part. A `multipart/alternative` carries the SAME words twice on purpose, once
+ * as text and once as HTML, and a reader wants the first of those and never the
+ * second.
+ *
+ * ⚠️ IT IS STILL NOT A MIME PARSER AND DOES NOT PRETEND TO BE. It finds the
+ * boundary from the `Content-Type` header, takes the parts, and returns the
+ * first whose own type is `text/plain`, falling back to the first part at all.
+ * What it does NOT do is decode `quoted-printable` or `base64` bodies, or walk a
+ * nested multipart: those are named here rather than half-implemented, because a
+ * half-implemented decoder produces mojibake that reads as a broken sender.
+ */
 function firstText(raw) {
-  // Headers end at the first blank line. Everything after it is the body as
-  // far as this worker is concerned: a multipart message yields its boundary
-  // lines too, and they are dropped below rather than parsed.
   const split = raw.indexOf('\r\n\r\n');
-  const body = split < 0 ? raw : raw.slice(split + 4);
-  return body
-    .split(/\r?\n/)
-    .filter((l) => !/^--/.test(l) && !/^Content-[A-Za-z-]+:/i.test(l))
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  if (split < 0) return raw.trim();
+  const head = raw.slice(0, split);
+  const body = raw.slice(split + 4);
+
+  const boundary = (head.match(/boundary="?([^";\r\n]+)"?/i) || [])[1];
+  const strip = (part) => {
+    // A part has its own headers, ended by its own blank line.
+    const at = part.indexOf('\r\n\r\n');
+    return at < 0 ? part : part.slice(at + 4);
+  };
+  if (boundary) {
+    const parts = body.split(`--${boundary}`).slice(1, -1);
+    const plain = parts.find((p) => /content-type:\s*text\/plain/i.test(p.slice(0, 400)));
+    const chosen = plain ?? parts[0];
+    if (chosen) return strip(chosen).replace(/\n{3,}/g, '\n\n').trim();
+  }
+  return body.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /** A header, undecoded. Values arrive MIME-encoded (`=?utf-8?B?…?=`) and this
