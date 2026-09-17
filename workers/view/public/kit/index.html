@@ -83,8 +83,25 @@
      sharing a row with the thing it reports on has to be told apart by colour
      alone, and colour is already carrying whether a control is armed.
      `flex: 1 1 100%` in a wrapping row is the whole mechanism. */
+  /* 🔴 THE OUTPUT LINE IS THE BOX'S FOOTER, NOT A LINE FLOATING UNDER IT. Asked
+     2026-09-17 with a photograph: *"space top of 'nothing pressed'. make this
+     kit example box a component to get similar example component. make that
+     bottom text have border on top of it like videpanel"*.
+     It sat flush against the specimen above it with no air and no edge, so a
+     readout and the control it describes read as one undifferentiated block.
+     `video-panel.mjs` had already solved this exact shape: one box, a hairline,
+     and the row that reports sitting under it. This is the same, so the two
+     surfaces on the site that pair a thing with what it says about itself look
+     the same.
+     ⚠️ NEGATIVE MARGINS, because the box carries 14 px of padding and a footer
+     has to reach its edges. The bottom corners are rounded to match, rather than
+     clipping the box, which would cut anything a specimen deliberately overflows.
+     ⚠️ THE TOP MARGIN IS 4 AND NOT 14: the box is a flex row with a 10 px gap,
+     so the gap and the margin add to the 14 the padding uses everywhere else. */
   .kit-out { font: 500 12px/1.6 var(--mono); color: var(--dim); min-height: 1.6em;
-             flex: 1 1 100%; }
+             flex: 1 1 100%;
+             margin: 4px -14px -14px; padding: 10px 14px;
+             border-top: 1px solid var(--line); border-radius: 0 0 4px 4px; }
   /* A block holding a diagram is not a row of controls: the picture wants the
      whole width and the report under it wants the line below, so these two
      turn the flex row off rather than fighting it with `flex: 1 1 100%` on
