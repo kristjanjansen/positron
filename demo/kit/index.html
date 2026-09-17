@@ -318,10 +318,8 @@
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
-  section('A PICTURE, AND THREE SLOTS UNDER IT',
-    'A panel is a picture and a footer with a left, a centre and a right, where the left '
-    + 'says whether the thing feeding it is answering and the right makes it fill the '
-    + 'screen, both without a page writing either.',
+  section('VIDEO PANEL',
+    'A picture, with a status, an empty middle and a fullscreen button under it.',
     `createVideoPanel({ media: canvas, of: 'the board' })
 createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode: 'footer' })`,
     (box) => {
@@ -391,9 +389,7 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
     });
 
   section('ONLINE, OFFLINE, AND WHO ELSE HAS HOLD OF IT',
-    'Five states, because a thing nobody has asked about yet is not offline, and a second '
-    + 'question riding the same badge: whether somebody else has hold of it, and whether '
-    + 'that somebody is a person or a harness.',
+    'Five states, and whether somebody else is holding it: a person, or a harness.',
     `createPresence({ of: 'the board' }).set('online')
 createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } }).busy('tool')
 createPresence({ of: 'the board', mode: 'dot', state: 'online' })
@@ -506,9 +502,7 @@ presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
    * after any reorder.
    */
   section('BLOCKS OF A PAGE, AND THE AIR BETWEEN THEM',
-    'A page is a stack of blocks and the stack owns the air between them, set once as '
-    + '--pos-gap and put on both sides of every pair, so a block can neither add to the gap '
-    + 'nor take it away.',
+    'The stack owns the air between blocks, so a block cannot change it.',
     `const page = createStack(d.el);          // mount() has already made this one
 page.add(bar.el, picks, keyboard.el);    // the order of the page, in one line
 const row = page.stack();                // a block that is itself a column`,
@@ -542,9 +536,7 @@ const row = page.stack();                // a block that is itself a column`,
     });
 
   section('READOUT AND LOG, JOINED OR SPLIT',
-    'The numbers a page is showing now and the record of what it did are one component '
-    + 'with two arrangements: split above and below the page, or joined into a single '
-    + 'surface at its foot.',
+    'The numbers now and the record of what happened, split or joined into one surface.',
     `mount({ readout: { sent: '/s', lost: '' }, joined: true })   // one surface, at the foot
 mount({ readout: { sent: '/s', lost: '' } })                 // two surfaces, the default
 createReport({ readout, showLog: false, joined: true })      // the same pair, standalone`,
@@ -642,8 +634,7 @@ el('button', 'pos-pri', 'primary', { type: 'button' })`,
 
   // ── stepper ─────────────────────────────────────────────────────────────
   section('stepper',
-    'Back and forward, with a middle slot that holds nothing, a jump to anywhere, or the '
-    + 'current one by name with the whole list behind it.',
+    'Back and forward, with a middle that holds nothing, a jump, or the one you are on.',
     `createStepper({ what: 'look', prev, next, random })
 createStepper({ what: 'look', prev, next, pick: { options: names, at, onPick } })`,
     (box) => {
@@ -724,8 +715,7 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
 
   // ── two across, and a glide ─────────────────────────────────────────────
   section('two across, and a patch that glides',
-    'Above 720 px the pair shares six columns instead of stacking, and pressing a sound '
-    + 'makes the handles travel rather than teleport while the value itself lands at once.',
+    'Above 720 px they share six columns, and a new sound makes the handles travel.',
     `createSliderGroup([...], { pair: true })
 s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     (box) => {
@@ -799,9 +789,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
 
   // ── tabs ────────────────────────────────────────────────────────────────
   section('the parts of one page',
-    'Not a choice but a place you go, so the open one is marked by colour and a bar under '
-    + 'the word, and a part that is not built stays in the row named and unpressable, '
-    + 'because hiding it would say it does not exist.',
+    'Places you go, not options you arm: colour and a bar mark the open one.',
     `createTabs({ tabs: [{id:'air',label:'On air'}, {id:'past',label:'Archive',disabled:true}, …] })`,
     (box) => {
       const o = out('air');
@@ -854,9 +842,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
   }));
 
   section('a link with room in it',
-    'A grey box, a name, one line about what is behind it and the tags along the bottom, '
-    + 'set in the only sans face on this page because a card holds a sentence rather than a '
-    + 'value.',
+    'A grey box, a name, one line about what is behind it, and tags along the bottom.',
     '',
     (box) => {
       box.classList.add('kit-wide');
@@ -866,9 +852,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   section('...and the same cards in a phone\u2019s width',
-    'Two columns at 375 px and up and one below that, with the floor written min(100%, 170px), '
-    + 'because a bare floor wider than the screen makes a column wider than the page and scrolls the '
-    + 'whole document sideways.',
+    'Two columns at 375 px and up, one below, with the floor written min(100%, 170px).',
     '', (box) => {
       box.classList.add('kit-wide');
       for (const w of [375, 320]) {
@@ -883,9 +867,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   section('a card that cannot be pressed, and a card with buttons',
-    'A page this browser cannot run still gets a card with the reason in words, and a '
-    + 'card carrying buttons moves its link onto the title, because a button inside a link '
-    + 'is invalid HTML that browsers resolve ambiguously.',
+    'A page this browser cannot run keeps its card, with the reason where the tags go.',
     '', (box) => {
       box.classList.add('kit-wide');
       const o = out('nothing pressed');
@@ -907,9 +889,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
 
   // ── a choice that has not arrived yet ───────────────────────────────────
   section('a choice whose effect is a second away',
-    'Marking a press pending says it landed while the thing it acts on catches up, which '
-    + 'is what a speed button on a live stream needs when six tenths of a second of sound '
-    + 'is already scheduled.',
+    'Pending says the press landed while the thing it acts on catches up.',
     `c.pending(i)   // and c.pending(null) when it lands`,
     (box) => {
       const o = out('at 1x');
@@ -933,9 +913,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
 
   // ── text field ──────────────────────────────────────────────────────────
   section('a line of text, or four',
-    'The label sits on top of the box so a row of fields has one left edge, and asking '
-    + 'for rows turns it into prose in the reading face with the spell checker on, which is '
-    + 'the one control here that keeps the iOS magnifier.',
+    'The label sits on top of the box, so a row of fields has one left edge.',
     `createField({ label: 'title', value: 'Rehearsal moved', grow: 'wide' })
 createField({ label: 'tags', placeholder: 'comma separated' })
 createField({ label: 'message', rows: 4, grow: 'wide' })`,
@@ -970,8 +948,7 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
   // and are already at the length the house rule allows. A gallery of controls
   // is the right home for what a control does.
   section('keyboard',
-    'An octave of piano keys with a pad under them, where a swipe scrolls the row without '
-    + 'sounding anything and a press followed by a slide plays across the keys.',
+    'An octave of piano keys: a swipe scrolls the row, a press then a slide plays.',
     `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })
 createKeyboard(parent, { letters: false })   // a second one on the same page`,
     (box) => {
@@ -1137,9 +1114,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
   }
 
   section('a flow diagram',
-    'A picture of where the signal goes, laid out entirely from a list of boxes and a '
-    + 'list of arrows, where colour says which machine a box is and hovering one says what '
-    + 'it does in the line underneath.',
+    'Where the signal goes, laid out from a list of boxes and a list of arrows.',
     `createDiagram(host, {
   title: 'a key press, and what it costs',
   caption: 'one line under the picture',
@@ -1174,9 +1149,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
     }));
 
   section('a label that does not fit',
-    'A word is never allowed to run past a border and what is left over becomes an '
-    + 'ellipsis, and the line under the picture names what was shortened, because a cut is '
-    + 'a label to go and fix rather than to hide behind a hover.',
+    'A word never runs past a border, and the line underneath names what was cut.',
     '',
     (box) => diagramCase(box, {
       title: 'four boxes, three of them badly written',
@@ -1206,9 +1179,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
   // names; stacked, the same arrow would cross the words `Raspberry Pi` on
   // the way in, so it stops at the machine.
   section('a box inside a box',
-    'A machine and the programs on it are not one thing, so a box can hold boxes: the '
-    + 'container is measured from its children, and a program takes the colour of the '
-    + 'machine it runs in.',
+    'A machine and the programs on it are not one thing, so a box holds boxes.',
     `nodes: [{ id: 'pi', label: 'Raspberry Pi', kind: 'device', children: [
             { id: 'synth', label: 'synthesiser', sub: 'plays the note' },
             { id: 'rec',   label: 'recorder',    sub: 'keeps a minute' }] }]
@@ -1254,9 +1225,7 @@ links: [{ from: 'you', to: 'synth', label: 'note number' },   // into a box INSI
   // boxes nothing was declared between still has its tie, which is what makes
   // this a picture of the rule rather than of a special case.
   section('an arrow between two boxes in one machine',
-    'An arrow between two boxes in one machine takes the tie\'s place rather than being '
-    + 'drawn over it, in the gap the two share or in a lane inside the machine when it has '
-    + 'to reach past the box between them.',
+    'It takes the tie\'s place rather than being drawn over it.',
     `children: [{ id: 'in',    label: 'capture' },
            { id: 'synth', label: 'synthesiser' },
            { id: 'rec',   label: 'recorder' }]
@@ -1307,8 +1276,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
     });
 
   section('two return paths that must not overlap',
-    'A return path runs under the row rather than back between the boxes, and two of them '
-    + 'go at different depths so that neither is hidden under the other.',
+    'A return path runs under the row, and two of them go at different depths.',
     '',
     (box) => diagramCase(box, {
       title: 'sound out, and two things sent back',
@@ -1340,9 +1308,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // apart was drawn at the midpoint, i.e. under that box. Seeing one width
   // could not have caught it, so the block shows both.
   section('a branch, and the box it must not be drawn through',
-    'An arrow that reaches past the box in its way is routed round the outside rather '
-    + 'than through it, drawn here at two widths because this is the one case where the two '
-    + 'disagreed.',
+    'An arrow that reaches past a box is routed round it, never through it.',
     '',
     (box) => {
       const branch = {
@@ -1380,8 +1346,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
     });
 
   section('the same picture at the width of a phone',
-    'Below about 560 px the whole picture becomes one column in the order the signal '
-    + 'takes, because a left-to-right diagram on a phone is a diagram nobody reads.',
+    'Below 560 px it becomes one column, in the order the signal takes.',
     '',
     (box) => diagramCase(box, {
       title: 'a key press, and what it costs',
@@ -1411,9 +1376,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // check against another page's copy of it, which is the one thing this page
   // exists to make possible.
   section('rows in columns you declare',
-    'Every column is named by the caller, and it throws unless exactly one of them grows, '
-    + 'because two growing columns is a layout nobody asked for and none is a table that '
-    + 'does not fill its box.',
+    'Every column is named by the caller, and exactly one of them must grow.',
     `createTable({ columns: [
   { key: 'dir',  width: 52, hi: true },
   { key: 'text', grow: true },
