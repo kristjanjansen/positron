@@ -221,6 +221,37 @@ export function createPresence({
    * `coming online`.
    */
   can = null,
+  /**
+   * 🔴 A SECOND FACT ON THE SAME BADGE, AND IT REFINES `online` RATHER THAN
+   * REPLACING IT. Asked 2026-09-17: *"one board per person, private room. - so
+   * do we need occupied status on online badge?"*, and then *"can we mark
+   * agent-messing specially so we can distinguish"*.
+   *
+   * The answer to the first is yes, and not for the reason it looks like. One
+   * board per person does not make this state unreachable, because the room is
+   * not the unit of contention: the INSTRUMENT is, and your own second tab is
+   * another client. MEASURED 2026-09-17 on this relay: a parked tab restating
+   * `CC 7 = 22` every 500 ms held a shared synth a fortieth of its level, and
+   * nothing anywhere said so, which is why it read as a hardware fault.
+   *
+   * ⚠️ IT IS A REFINEMENT OF `online`, NOT A SIXTH STATE. The presence word
+   * answers "is it answering", which outranks everything: a board that has gone
+   * offline is offline whether or not somebody was driving it a second ago.
+   * ⚠️ AND THE RESERVE COVERS THESE TOO, so the badge cannot twitch when the
+   * word changes. That is the whole reason this is done with words rather than
+   * with a mark appearing beside the badge.
+   */
+  busyWords = null,
+  /**
+   * Which kind is driving AT BUILD, for a fixed specimen. A live badge leaves
+   * this alone and calls `busy()`.
+   * ⚠️ IT EXISTS BECAUSE `busy()` FADES, and a fade is 90 ms during which the
+   * element still holds the old word. `/kit/`'s three specimens were built and
+   * then switched, and the check that reads them ran inside that trough and
+   * reported all three saying `online`. The page was right and the check was
+   * early. A specimen that is born in its state has nothing to transition from.
+   */
+  busy = null,
   why = null,
   showName = null,
   onChange = null,
@@ -284,8 +315,26 @@ export function createPresence({
   // of its own monospace face. A page that shortens the words gets a shorter
   // badge for free, and a page that lengthens one cannot make the badge twitch.
   const reach = Array.isArray(can) && can.length ? can.filter((x) => PRESENCE_STATES.includes(x)) : PRESENCE_STATES;
-  const phrase = (x) => (named ? `${of} ${words[x]}` : words[x]);
-  const widest = Math.max(...reach.map((x) => phrase(x).length));
+  const busySay = busyWords && typeof busyWords === 'object' ? busyWords : null;
+  if (busySay) {
+    for (const [k, v] of Object.entries(busySay)) {
+      if (typeof v !== 'string' || !v) throw new Error(`presence: busyWords.${k} must be a word.`);
+      if (v.includes('—')) throw new Error(`presence: "${v}" carries an em dash, and this is read by a visitor.`);
+    }
+  }
+  // `busy` names which kind of client is driving, or null. It only ever changes
+  // the word while the state is `online`.
+  let busyKind = busy || null;
+  const wordFor = (x) => (x === 'online' && busyKind && busySay?.[busyKind]) || words[x];
+  const phrase = (x) => (named ? `${of} ${wordFor(x)}` : wordFor(x));
+  // The reserve has to cover every phrase this badge can EVER say, which
+  // includes the busy variants: a reserve measured on the idle words would let
+  // the badge grow the first time somebody else touched the instrument, which
+  // is the twitch the reserve exists to prevent.
+  const widest = Math.max(...reach.map((x) => phrase(x).length),
+    ...(busySay && reach.includes('online')
+      ? Object.values(busySay).map((w) => (named ? `${of} ${w}`.length : w.length))
+      : [0]));
   word.style.setProperty('--pres-ch', String(widest));
   root.append(dot, word);
 
@@ -296,7 +345,7 @@ export function createPresence({
   let asking = false;
 
   function title() {
-    const base = of ? `${of} · ${words[now]}` : words[now];
+    const base = of ? `${of} · ${wordFor(now)}` : wordFor(now);
     return note ? `${base} · ${note}` : base;
   }
 
@@ -444,6 +493,25 @@ export function createPresence({
       derive();
       return api;
     },
+
+    /**
+     * Somebody else is driving the thing this badge is about, or nobody is.
+     * `kind` is one of the keys of `busyWords`, or null for nobody.
+     * ⚠️ IT DOES NOT TOUCH PRESENCE. A board being driven is still offline if it
+     * has stopped answering, and this only ever changes the word while the state
+     * is `online`.
+     */
+    busy(kind = null) {
+      const next = kind && busySay?.[kind] ? kind : null;
+      if (next === busyKind) return api;
+      busyKind = next;
+      root.dataset.busy = next || '';
+      paint();
+      return api;
+    },
+
+    /** Which kind is driving, or null. */
+    get driver() { return busyKind; },
 
     /** A standing reason, kept across ticks. `wirePresence`'s `why` goes here. */
     because(text) {

@@ -87,14 +87,40 @@ export const randomId = (n = 16) => {
  * alternative — the value quietly becoming a timestamp — is the failure that
  * cost the afternoon. Name the field something else: `atSec`, `sentBy`, `n`.
  */
-const ENVELOPE = ['from', 'at', 'seq'];
-export function format(msg, { from, seq, at = Date.now(), id = randomId() }) {
+const ENVELOPE = ['from', 'at', 'seq', 'by'];
+
+/**
+ * 🔴 WHO IS SENDING THIS, IN THE ONLY SENSE THIS RELAY CAN ANSWER. Asked
+ * 2026-09-17, about a badge that says somebody else is driving the instrument:
+ * *"what is 'you' me as user in single widow or the agent messing with
+ * verificiations etc. can we mark agent-messing specially so we can
+ * distinguish"*.
+ *
+ * IDENTITY IS IMPOSSIBLE HERE and pretending otherwise would be the worse
+ * answer. `from` is minted per SOCKET and is a random id, so your other tab and
+ * a stranger are indistinguishable by it, and nothing on this relay
+ * authenticates anybody. What IS possible is that every client we write says
+ * what KIND of thing it is, because we write all of them.
+ *
+ * `page` is a person looking at something. `tool` is a harness, a probe or a
+ * script, and it is the one worth telling apart: a run of `demo/verify.mjs`
+ * drives a real page and would otherwise be indistinguishable from a person
+ * sitting down at it. A page under `?selfcheck=1` therefore declares `tool`,
+ * which is the exact case that prompted the question.
+ * ⚠️ IT IS A DECLARATION, NOT A CREDENTIAL. Anything may claim anything, and
+ * that is fine: this exists so a page can say something useful about traffic it
+ * already receives, not to keep anybody out.
+ */
+export const KINDS = ['page', 'tool'];
+export function format(msg, { from, seq, at = Date.now(), id = randomId(), by = null }) {
   for (const k of ENVELOPE) {
     if (Object.hasOwn(msg, k)) {
       throw new Error(`wire: "${k}" is an envelope field, so ${msg.type || 'this message'} would lose it. Rename the payload field (e.g. "${k}Sec", "${k}Value").`);
     }
   }
-  return JSON.stringify({ id, type: '', ...msg, from, at, seq });
+  // `by` is left OUT when it is the default, so the common case costs no bytes
+  // and an old reader sees exactly what it saw before.
+  return JSON.stringify({ id, type: '', ...msg, from, at, seq, ...(by && by !== 'page' ? { by } : {}) });
 }
 
 /**
@@ -130,7 +156,20 @@ export function openWire(room, {
   onOpen = () => {},
   onClose = () => {},
   reconnect = true,
+  /**
+   * What kind of client this is. See `KINDS`. A browser page leaves it alone
+   * and gets `page`; a harness, a probe or a node script passes `tool`.
+   * ⚠️ A PAGE BEING DRIVEN BY THE HARNESS IS A TOOL, and it knows: every demo
+   * the suite opens carries `?selfcheck=1`, which is read here rather than left
+   * to each page to remember.
+   */
+  by = null,
 } = {}) {
+  const KIND = by || (typeof location !== 'undefined'
+    && new URLSearchParams(location.search).get('selfcheck') === '1' ? 'tool' : 'page');
+  if (!KINDS.includes(KIND)) {
+    throw new Error(`wire: by is one of ${KINDS.join(', ')}, not ${JSON.stringify(KIND)}.`);
+  }
   const url = `${base}/room/${room}/ws`;
   let pong = null;
   const seen = new Map();               // from -> last seq, for gap detection
@@ -225,7 +264,7 @@ export function openWire(room, {
    *  rather than a rendering of them — or null if the roof refused it. */
   function send(msg) {
     if (ws?.readyState !== 1) return null;
-    const line = format(msg, { from: stats.from, seq: stats.seq });
+    const line = format(msg, { from: stats.from, seq: stats.seq, by: KIND });
     const bytes = utf8(line);
     if (bytes > LIMITS.maxBytes) {
       // The relay would drop this silently and count it somewhere we cannot

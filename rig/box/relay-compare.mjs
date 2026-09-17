@@ -20,7 +20,7 @@ const FROM = `cmp-${randomId(6)}`;
 let seq = 0;
 const ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
 ws.binaryType = 'arraybuffer';
-const send = (m) => ws.send(format(m, { from: FROM, seq: seq++ }));
+const send = (m) => ws.send(format(m, { from: FROM, seq: seq++, by: 'tool' }));
 
 let replies = [], onFrame = null;
 ws.onmessage = (e) => {

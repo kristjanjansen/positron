@@ -550,7 +550,7 @@ const sayCondition = (c) => {
 
 const ws = new WebSocket(`${arg('relay', RELAY_BASE)}/room/${ROOM}/ws`);
 ws.binaryType = 'arraybuffer';
-const send = (m) => { const id = randomId(); ws.send(format(m, { from: FROM, seq: seq++, id })); return id; };
+const send = (m) => { const id = randomId(); ws.send(format(m, { from: FROM, seq: seq++, id, by: 'tool' })); return id; };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let frames = [], replies = [], lastSeq = -1, gaps = 0, allFrames = 0;

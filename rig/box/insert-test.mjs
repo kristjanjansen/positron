@@ -86,7 +86,7 @@ async function client(label) {
     ws.onerror = () => rej(new Error(`could not reach ${RELAY}`));
     setTimeout(() => rej(new Error('the relay did not open in 8 s')), 8000);
   });
-  const send = (m) => { const line = format(m, { from, seq: seq++ }); ws.send(line); sent++; return JSON.parse(line).id; };
+  const send = (m) => { const line = format(m, { from, seq: seq++, by: 'tool' }); ws.send(line); sent++; return JSON.parse(line).id; };
   /**
    * Ask, and wait for the answer to THIS question.
    *

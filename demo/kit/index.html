@@ -196,6 +196,11 @@
   // `failed`, and the page died much later on an empty map. A block that moves
   // takes what it needs with it.
   const presSpec = new Map();
+  // ⚠️ DECLARED WITH THE OTHERS, NOT INSIDE THE BLOCK. A block that moved to the
+  // top of this page once left its `const` behind, the build read it in its dead
+  // zone, `section()` swallowed the throw, and the page died much later on an
+  // empty map with a message about a different line.
+  const busySpec = new Map();
   let presLive = null;        // one badge that can change, measured over time
 
   // The pair in the invisible hand block: one slider with a hand and one
@@ -241,6 +246,27 @@
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
+  section('WHO ELSE IS DRIVING THIS, AND WHETHER IT IS A PERSON',
+    'A badge that says a thing is answering does not say whether somebody else has '
+    + 'hold of it, and on a shared instrument that is the fact you need: the room is '
+    + 'not what people contend over, the instrument is, and your own second tab is '
+    + 'another client. A harness is told apart from a person because every client here '
+    + 'says what kind of thing it is, so a suite run driving a real page cannot pass '
+    + 'for somebody sitting down at it. It refines the online word rather than '
+    + 'replacing the state: a thing that has stopped answering is offline either way.',
+    `createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } })
+  .busy('tool')      // -> "Raspberry Pi under test"`,
+    (box) => {
+      for (const [kind, label] of [[null, 'nobody'], ['page', 'a person'], ['tool', 'a harness']]) {
+        // Born in its state rather than switched into it: `busy()` fades over
+        // 90 ms, and a fixed specimen has nothing to fade from.
+        const p = createPresence({ of: 'Raspberry Pi', state: 'online', can: ['online'],
+                                   busyWords: { page: 'in use', tool: 'under test' }, busy: kind });
+        busySpec.set(label, p.el);
+        box.append(p.el);
+      }
+    });
+
   section('BLOCKS OF A PAGE, AND THE AIR BETWEEN THEM',
     'A page is a stack of blocks and the stack owns the space between them, so no page '
     + 'has to know the number and none of them can get it wrong. The gap is set once, as '
@@ -1454,6 +1480,30 @@ green = inside what it promised · amber/red = later`,
       w.length === PRESENCE_STATES.length
         ? `${w.map(([s, x]) => `${s} ${x.toFixed(1)}`).join(' · ')} px, spread ${spread.toFixed(2)}`
         : `${w.length} states were measured of ${PRESENCE_STATES.length}, so nothing was compared`);
+
+    /**
+     * 🔴 AND THE SAME GUARANTEE HAS TO SURVIVE THE BUSY WORDS, which is the
+     * reason they are words on the badge rather than a mark beside it. A mark
+     * that appears when somebody starts driving would change the badge's width
+     * in a transport bar, and the reserve here is measured over every phrase
+     * this badge can ever say, busy variants included. Sabotage: drop the busy
+     * phrases out of the `widest` calculation in presence.mjs and this goes red
+     * by about four characters.
+     */
+    const bw = [...busySpec].map(([label, el2]) => [label, el2.getBoundingClientRect().width]);
+    const bs = bw.length > 1 ? Math.max(...bw.map(([, x]) => x)) - Math.min(...bw.map(([, x]) => x)) : -1;
+    d.assert('a badge is the same width whether nobody, a person or a harness is driving it',
+      bw.length === 3 && bs <= 0.5,
+      bw.length === 3
+        ? `${bw.map(([l, x]) => `${l} ${x.toFixed(1)}`).join(' · ')} px, spread ${bs.toFixed(2)}`
+        : `${bw.length} specimens of 3, so nothing was compared`);
+
+    // And that they actually SAY different things, because three badges the
+    // same width could equally be three badges saying nothing.
+    const said = [...busySpec].map(([l, el2]) => [l, el2.querySelector('.pos-pres-w').textContent.trim()]);
+    d.assert('and it says which of the three it is, in words',
+      new Set(said.map(([, t]) => t)).size === 3,
+      said.map(([l, t]) => `${l}: "${t}"`).join(' · '));
   }
 
   // 8 — 🔴 AND THE ANIMATION CANNOT MOVE ANYTHING EITHER, which is a separate
