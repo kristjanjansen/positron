@@ -279,9 +279,12 @@
     + 'is not what people contend over and your own second tab is another client: the '
     + 'word says whether somebody else has hold of it, and whether that somebody is a '
     + 'person or a harness. That greys the WORD and never the dot, because a grey dot '
-    + 'already means nobody has looked.',
+    + 'already means nobody has looked. In "dot" mode it is the ring alone with the '
+    + 'words clipped rather than removed, so it drops into a button, a readout key or a '
+    + 'row of machines and still reads as a whole sentence to a screen reader.',
     `createPresence({ of: 'the board' }).set('online')
 createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } }).busy('tool')
+createPresence({ of: 'the board', mode: 'dot', state: 'online' })
 presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
     (box) => {
       box.classList.add('kit-wide');
@@ -316,11 +319,60 @@ presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
         busy.append(p.el);
       }
 
+      /**
+       * The same component with `mode: 'dot'`: the ring alone, with the words
+       * CLIPPED rather than removed, so the accessible name is still the whole
+       * sentence and a change is still announced. It is an inline box with no
+       * margins, so it drops into a button, a readout key or a row of machines
+       * without any of them knowing what it is.
+       */
+      const inButton = el('button', '', null, { type: 'button' });
+      inButton.append(createPresence({ of: 'the board', mode: 'dot', state: 'online' }).el,
+        document.createTextNode(' switch it on'));
+      inButton.style.cssText = 'display:inline-flex;align-items:center;gap:7px';
+
+      // In a readout key, where a page already prints what a machine is doing.
+      const inReadout = el('div', 'pos-readout');
+      for (const [k, v, u, st] of [['relay', '1', '/16', 'online'], ['board', '', 'ms', 'unknown']]) {
+        const c = el('div', 'pos-cell');
+        const key = el('div', 'pos-k');
+        key.style.cssText = 'display:flex;align-items:center;gap:5px';
+        key.append(createPresence({ of: k, mode: 'dot', state: st }).el, document.createTextNode(k));
+        const val = el('span', 'pos-v', v || null);
+        if (st === 'unknown') val.dataset.state = 'pending';
+        if (u) val.append(el('span', 'pos-u', u));
+        c.append(key, val); inReadout.append(c);
+      }
+
+      // A row of machines, which is the shape /knobs/, /grains/ and /rack/ all
+      // want and all draw differently today.
+      const machines = el('div', '');
+      machines.style.cssText = 'display:grid;gap:6px;font:400 12px/1 var(--mono);color:var(--dim)';
+      for (const [name, st] of [['studio-1', 'online'], ['the board', 'coming'],
+        ['the Mac', 'offline'], ['the headset', 'unknown']]) {
+        const row = el('div', '');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px';
+        row.append(createPresence({ of: name, mode: 'dot', state: st }).el, document.createTextNode(name));
+        machines.append(row);
+      }
+      // ⚠️ THE READOUT NEEDS A WIDTH OR ITS CELLS STACK. `.pos-readout` is a
+      // flex row whose cells grow, so in a narrow box two cells sit on top of
+      // each other and stop looking like a readout at all. It had `flex: 1 1
+      // 100%` when it lived in a section of its own; inside a row of three
+      // specimens it takes a basis instead.
+      inReadout.style.flex = '1 1 300px';
+      const dots = el('div', 'kit-row');
+      // Top, not centre: three specimens of different heights centred on each
+      // other reads as three things floating rather than three things in a row.
+      dots.style.alignItems = 'flex-start';
+      dots.append(inButton, inReadout, machines);
+
       // ⚠️ `stack.titled`, NOT A HAND-ROLLED CAPTION. That is what this section
-      // is demonstrating twice over: the heading and what it labels are ONE
-      // block, and the component owns both distances.
+      // is demonstrating three times over: the heading and what it labels are
+      // ONE block, and the component owns both distances.
       stack.titled('IS IT ANSWERING', states);
       stack.titled('AND HAS SOMEBODY ELSE GOT HOLD OF IT', busy);
+      stack.titled('THE SAME BADGE AS A DOT, INSIDE SOMETHING ELSE', dots);
       box.append(stack.el);
     });
 
@@ -430,49 +482,6 @@ createReport({ readout, showLog: false, joined: true })      // the same pair, s
       splitPage = el('div', 'pos-body kit-mid', 'the page goes here');
       box.append(el('p', 'kit-cap', 'split, which is the default'),
         splitSpec.top, splitPage, splitSpec.foot);
-    });
-
-  section('a presence dot inside something else',
-    'The same component with mode "dot": the ring alone, and the words CLIPPED '
-    + 'rather than removed, so the accessible name is still the whole sentence and a '
-    + 'change is still announced. It is an inline box with no margins, so it drops '
-    + 'into a button, a readout key or a row of machines without any of them knowing '
-    + 'what it is.',
-    `createPresence({ of: 'the board', mode: 'dot', state: 'online' })`,
-    (box) => {
-      const b = el('button', '', null, { type: 'button' });
-      b.append(createPresence({ of: 'the board', mode: 'dot', state: 'online' }).el,
-        document.createTextNode(' switch it on'));
-      b.style.cssText = 'display:inline-flex;align-items:center;gap:7px';
-      box.append(b);
-
-      // In a readout key, where a page already prints what a machine is doing.
-      const r = el('div', 'pos-readout');
-      for (const [k, v, u, s] of [['relay', '1', '/16', 'online'], ['board', '', 'ms', 'unknown']]) {
-        const c = el('div', 'pos-cell');
-        const key = el('div', 'pos-k');
-        key.style.cssText = 'display:flex;align-items:center;gap:5px';
-        key.append(createPresence({ of: k, mode: 'dot', state: s }).el, document.createTextNode(k));
-        const val = el('span', 'pos-v', v || null);
-        if (s === 'unknown') val.dataset.state = 'pending';
-        if (u) val.append(el('span', 'pos-u', u));
-        c.append(key, val); r.append(c);
-      }
-      r.style.flex = '1 1 100%';
-      box.append(r);
-
-      // A row of machines, which is the shape /knobs/, /keys/, /grains/ and
-      // /rack/ all want and all draw differently today.
-      const list = el('div', '');
-      list.style.cssText = 'flex:1 1 100%;display:grid;gap:6px;font:400 12px/1 var(--mono);color:var(--dim)';
-      for (const [name, s] of [['studio-1', 'online'], ['the board', 'coming'],
-        ['the Mac', 'offline'], ['the headset', 'unknown']]) {
-        const row = el('div', '');
-        row.style.cssText = 'display:flex;align-items:center;gap:8px';
-        row.append(createPresence({ of: name, mode: 'dot', state: s }).el, document.createTextNode(name));
-        list.append(row);
-      }
-      box.append(list);
     });
 
   section('buttons', '',
