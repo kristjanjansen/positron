@@ -1,0 +1,25 @@
+{
+  "name": "positron-mail",
+  // positron@positron.studio — a door for somebody who is not on a page.
+  //
+  // 🔴 IT WRITES INTO THE FEEDBACK ROOM RATHER THAN A STORE OF ITS OWN. Asked
+  // 2026-09-17: *"I just need an email address people can contact. That's it.
+  // And uh, the agent should be reading it and maybe act on it."* The second
+  // sentence decides the design. Something an agent reads already exists and is
+  // already read on a schedule, so a second store would be a second habit to
+  // remember and the one that gets forgotten. Mail lands where feedback lands.
+  //
+  // ⚠️ IT SPEAKS THE PAGE'S OWN SHAPE over the relay rather than reaching into
+  // the recorder: `feedback.say`, into room `feedback`, exactly as
+  // `demo/shell/feedback.mjs` does. So `positron-feedback` needs no change, no
+  // new endpoint and no shared secret, and its rule that a room is never chosen
+  // by a caller's parameter is untouched.
+  //
+  // ⚠️ AND IT STORES NO BYTES. A message is read, summarised to a bounded note
+  // and dropped. Nothing keeps a raw mail, an attachment or an IP address, which
+  // is the retention story the feedback room already has.
+  "main": "src/index.js",
+  "workers_dev": false,
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": true }
+}
