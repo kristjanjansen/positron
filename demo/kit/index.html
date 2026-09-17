@@ -8,8 +8,13 @@
 <title>POSITRON · kit</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
+  /* ⚠️ 10 px UNDER THE TITLE, NOT 4. Asked 2026-09-17 with a photograph: *"add
+     bit more space afrer title and before examplebox"*. A heading at 10.5 px
+     with `line-height: 1` has a box tight to its letters, so 4 px of margin is
+     about two pixels of visible air and the sentence under it read as a second
+     line of the heading. */
   .kit-h { font: 600 10.5px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
-           color: var(--hi); margin: 30px 0 4px; }
+           color: var(--hi); margin: 30px 0 10px; }
   /* ⚠️ PROSE IS SANS HERE, EVERYTHING ELSE STAYS MONO. This page is read rather
      than operated: a paragraph explaining why a control looks the way it does
      is not a value, a key or a line of code, and setting it in the same
@@ -28,8 +33,12 @@
      names are one pair; the stack has nothing to say about the inside of a
      block, which is exactly the escape demo/shell/stack.mjs names. */
   .kit-sec > .kit-h { margin-top: 0; }
+  /* ⚠️ AND AIR ABOVE THE BOX, for the same reason and in the same breath. The
+     snippet above it is mono at 11 px and the box's own border starts at its
+     last line, so the code and the specimen read as one block when they are a
+     description and the thing described. */
   .kit-box { border: 1px solid var(--line); border-radius: 4px; background: var(--card);
-             padding: 14px; margin: 0; display: flex; flex-wrap: wrap;
+             padding: 14px; margin: 14px 0 0; display: flex; flex-wrap: wrap;
              gap: 10px; align-items: center; }
   /* The three blocks in the layout specimen, so a gap has something to be
      measured between. They are deliberately plain: what is being shown is the
