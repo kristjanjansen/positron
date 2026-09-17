@@ -819,26 +819,26 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
 createField({ label: 'tags', placeholder: 'comma separated' })
 createField({ label: 'message', rows: 4, grow: 'wide' })`,
     (box) => {
-      const o = out('');
-      const a = createField({ label: 'title', value: 'Rehearsal moved to Thursday', grow: 'wide',
-        onInput: (v) => { o.textContent = `title · ${v.length} characters`; } });
-      const b = createField({ label: 'tags', placeholder: 'comma separated',
-        onInput: (v) => { o.textContent = `tags · ${v.split(',').filter((s) => s.trim()).length}`; } });
-      const c = createField({ label: 'off', value: 'not now' });
-      c.disabled(true);
+      const a = createField({ label: 'title', value: 'Rehearsal moved to Thursday', grow: 'wide' });
+      const b = createField({ label: 'tags', placeholder: 'comma separated' });
       // The specimen for the box behind every demo's Feedback button.
       const m = createField({ label: 'message', rows: 4, grow: 'wide',
-        placeholder: 'what worked, what did not, what is missing',
-        onInput: (v) => { o.textContent = `message · ${v.split('\n').length} lines, ${v.length} characters`; } });
+        placeholder: 'what worked, what did not, what is missing' });
       /**
-       * ⚠️ A BUTTON ON TOP, FOR HEIGHT. Asked 2026-09-17: *"add buitton on top
-       * examples"*. The slider block already carries one for the same reason: a
-       * field is only ever seen beside the controls it sits with, and whether a
-       * single-line box lines up with a button is a thing to look at rather than
-       * to reason about. It does nothing.
+       * ⚠️ A BUTTON FOR HEIGHT, AT THE BOTTOM AND ON THE RIGHT. Asked 2026-09-17:
+       * *"align to bottom (button, for height and move to right"*. It is here to
+       * be compared against, and a comparison needs the two things to share an
+       * edge: a button floating at the top of a row of fields lines up with
+       * nothing. The slider block carries one for the same reason.
+       * ⚠️ AND THE `out` LINE IS GONE, with the disabled field. *"rm message · 1
+       * lines, 8 characters"* and *"rm off button"*. A live count of what you
+       * have typed says nothing about the component, and a field is the one
+       * control on this page whose state you can read by looking at it.
        */
-      box.append(el('button', '', 'button, for height', { type: 'button' }),
-        a.el, b.el, c.el, m.el, o);
+      const height = el('button', '', 'button, for height', { type: 'button' });
+      height.style.cssText = 'margin-left:auto;align-self:flex-end';
+      box.style.alignItems = 'flex-end';
+      box.append(a.el, b.el, m.el, height);
     });
 
   // ── keyboard ────────────────────────────────────────────────────────────
