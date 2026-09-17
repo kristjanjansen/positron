@@ -15,6 +15,32 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **INCOMING EMAIL AT `positron@positron.studio`.** Asked 2026-09-17: *"In bg
+  work on incoming enail using cf see ../trip of deals collection.
+  positron@positron.studio"*. Cloudflare Email Routing and an Email Worker,
+  modelled on how `/Users/s32863/personal/trip` collects deals from mail. A plan
+  is being written at `plan-incoming-email.md`; nothing is built and no DNS or
+  zone setting has been touched.
+  ⚠️ **WHAT THE ADDRESS IS FOR IS THE LOAD-BEARING QUESTION AND THE ASK DOES NOT
+  ANSWER IT.** `../trip` collects travel deals and this project has no deals. The
+  candidates it does have are the feedback room, `workers/items`,
+  `workers/backlog` and the device log.
+
+- 🔴 **YOSHIMI HAS NO ENVELOPE OR GLIDE CONTROLLERS EITHER, MEASURED
+  2026-09-17.** With a keyboard on `/knobs/` the interesting controllers should
+  be the ones that act when a note STARTS, and `rig/box/note-test.mjs` was
+  written for exactly that: short played notes, rise and fall measured,
+  values interleaved. CC 73 attack, CC 72 release and CC 5 portamento time all
+  move the rise by 1 to 3 ms against 8 to 18 ms of spread inside one arm, and the
+  peak by less than its own noise. Nothing. Together with the held-note runs that
+  rules out 1, 5, 7, 11, 72, 73, 76, 77 and 78, and leaves 74 cutoff, 71
+  resonance, 75 bandwidth (rejected as noisy) and 7/11 level (rejected as
+  pointless).
+  ⚠️ **AND `note-test.mjs` NEVER MEASURED A FALL AT ALL** — every take reported
+  `not enough takes gave a number`, so that half of the tool is a broken
+  collector and its verdict on release is worth nothing either way. Fix the tail
+  detection before trusting it.
+
 - 🔴 **THE BOARD HAS TO BECOME PORTABLE, PACKAGEABLE AND PLUGGABLE.** Asked
   2026-09-17: the setup should be *"repeatable"* so *"my friends can also use
   it"*, and the open architectural question is *"Is it a board which a single
