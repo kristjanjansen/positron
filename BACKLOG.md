@@ -15,6 +15,31 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **`/keys/` STILL HAS NO SOUND.** Reported again 2026-09-17: *"Keyboard does
+  not have sound"*, after a fix that was real and evidently not this one — any
+  other client's `voices.list` was being treated as this page's own answer, and
+  the handler ends by re-selecting the patch, which makes Yoshimi load an .xiz
+  and kills the note you are holding. Three loads a visit, now one.
+  ⚠️ **EVERY MEASUREMENT SO FAR HAS BEEN UPSTREAM OF THE FAULT.** Frames, buffer,
+  cushion, lost, and a peak computed from the bytes as they arrive: all green,
+  all measuring what ARRIVED rather than what the audio graph OUTPUTS. That is
+  the `pcm-playout` trim bug's exact shape, where six measurements were green and
+  the defect sat downstream of every one of them. The next move is to hook
+  `AudioWorkletNode.prototype.connect` before the page loads, put an analyser on
+  what reaches the destination, and read THAT.
+  ⚠️ And four ways in all produced sound under CDP — a click locally, a click on
+  the deploy, a computer key, and a browser with the real autoplay policy — so
+  whatever this is, it is not reproduced by any of them.
+
+- 🔴 **THE `/knobs/` VOLUME SLIDER COMES OUT.** Reported 2026-09-17: *"Volume
+  alider is pointless on knobs, replace"*. It went in because it was the only
+  third controller that measured as a clean mover, and measuring as a mover is
+  not the same as being worth a slider. That is twice on this page: bandwidth and
+  FM amplitude moved the sound by four to nine times their own floor and were
+  *"nada ... noisy wobble"*. Check whether the board accepts pitch bend, which
+  would be unmistakable and is not a wobble; if it does not, the honest answer is
+  two sliders rather than a third that fills a slot.
+
 - 🔴 **`/knobs/` MUST USE `board.mjs`, WHICH IT DOES NOT.** Asked 2026-09-17:
   *"Ahould board.mjs used by both? Make inra close as possible on keys and
   knobs"*. The component was written on 2026-09-16 to be shared and the report
