@@ -2750,3 +2750,18 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    CLAUDE.md already records twice that `.ico` needs its own size; this is the
    third place, and the first outside a `.step` row. */
 .pos-vp button.ico { width: 34px; padding: 0; font-size: 15px; line-height: 1; }
+
+/* 🔴 A BADGE THAT OPENS A ROW NEEDS MORE ROOM ON ITS LEFT THAN A BUTTON DOES.
+   Asked 2026-09-17 with a photograph: *"more left margin when online status in
+   is box / next to button etc"*.
+   A surface's padding is set for the tallest thing in it. The transport bar's
+   inset is 9 px, which is right for a 34 px button because the button fills the
+   row and its own edge is what you see. A dot is 8 px and sits centred, so it
+   carries about 22 px of air above and below and 9 px to its left, and the eye
+   reads that as a mark pushed against the wall rather than one placed in the
+   box. 6 px more brings it to 15, which is between the two and looks deliberate
+   at both ends.
+   ⚠️ ONLY WHEN IT IS FIRST. A badge further along a row is measured against the
+   control before it, not against the box, and that gap is already the row's own. */
+.tbar > .pos-pres:first-child,
+.pos-vp-foot .pos-vp-l > .pos-pres:first-child { margin-left: 6px; }
