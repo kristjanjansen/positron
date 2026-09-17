@@ -171,53 +171,92 @@
    */
   const SHOW_MS = 3 * 60 * 1000;
   const archive = byId.get('archive');
-  const archiveDeck = createDeck({ items: [], adapters: {}, range: [0, SHOW_MS] });
+  const archiveDeck = createDeck({
+    range: [0, SHOW_MS],
+    // One item and one adapter, so the bar has a kind to read rates off. The
+    // adapter plays nothing: what it exists to say is that this recording can be
+    // played at these speeds.
+    items: [{ at: 0, kind: 'show', id: 'show', payload: {} }],
+    adapters: { show: { caps: { rates: [0.5, 1, 1.5, 2] }, actuate: () => {} } },
+  });
 
   /**
    * A made-up audience, deterministic so two visits agree. A real one arrives
    * over the relay from the page the viewer pressed, which is the same seam
    * `onPick` names above and is deliberately not built yet.
    */
-  const ANSWERS = (() => {
-    let seed = 20260917;
-    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-    const out = [];
-    for (const [at, opts] of [[42_000, ['Be', 'Not to be']], [128_000, ['Yes', 'No', 'Later']]]) {
-      const n = 18 + Math.floor(rnd() * 20);
-      for (let i = 0; i < n; i++) {
-        out.push({ at: at + Math.round(rnd() * 26_000), pick: opts[Math.floor(rnd() * opts.length)] });
-      }
-    }
-    return out.sort((a, b) => a.at - b.at);
-  })();
+  /**
+   * 🔴 THE ANSWERS ARE REAL AND THERE ARE NONE UNTIL SOMEBODY PRESSES ONE.
+   * Instructed 2026-09-17: *"do not simulater answers. do record them"*, which
+   * replaces the invented set this page shipped with an hour earlier. An archive
+   * that opens with thirty-eight answers nobody gave is a picture of nothing,
+   * and it is the kind of thing that reads as working until you look.
+   *
+   * ⚠️ THE SHOW'S CLOCK STARTS WHEN THE PAGE DOES. There is no recording behind
+   * this yet, so "when in the show" is time since load, which is the only honest
+   * origin available: it makes the archive a recording OF THIS VISIT rather than
+   * of something that never happened.
+   * ⚠️ ONE LANE PER OPTION, asked for in the same minute: *"each answer opton
+   * different lane"*. In one lane the marks count answers over time and say
+   * nothing else; split by option they show which way the room went. The lanes
+   * appear as questions are asked, in the order the options were offered.
+   */
+  const showStart = performance.now();
+  /**
+   * 🔴 THE RECORDING'S CLOCK IS THE WALL CLOCK IT WAS MADE AT. Asked 2026-09-17:
+   * *"also time of video start should be one we started vide"*. The archive's
+   * frame used to burn in the PLAYHEAD, so scrubbing to the start showed
+   * 00:00:00, which is a stopwatch rather than a recording. A show has a time it
+   * happened at, and the whole reason `pattern.mjs` burns a clock is that a
+   * frame should say when it is from.
+   */
+  const showWallStart = Date.now();
+  const ANSWERS = [];
+  const OPTIONS = [];
 
-  createTransportBar(archive.panel.el.parentNode || tabs.panel('archive'), archiveDeck, {
-    // A recording has a position, so this bar keeps everything the live one gave
-    // up: a play toggle, a loop, and rates.
-    live: false,
+  /**
+   * ⚠️ NO SLIDER AND NO CLOCK. Asked 2026-09-17: *"no need for slider / times in
+   * transport lane"*. The strip below carries the position, and this project
+   * already has the rule in `transport-bar.mjs`'s own header: two horizontal
+   * time axes stacked at different scales with no way to tell they are the same
+   * axis. The strip is the better of the two, so the bar keeps only what the
+   * strip has not got.
+   * ⚠️ THE RATES ARE THE BAR'S OWN RADIO GROUP, from `choice.mjs`, and they
+   * appear because the deck DECLARES them. They are rendered from the
+   * intersection of every `caps.rates` a kind declares, so a deck with no
+   * adapters offers none, which is why this one names an adapter that plays
+   * nothing and only says what rates it can be played at.
+   */
+  createTransportBar(tabs.panel('archive'), archiveDeck, {
+    live: false, scrub: false, absolute: false, clock: false,
   });
 
-  createStripView(tabs.panel('archive'), archiveDeck, {
-    size: 'auto', gutter: 110,
-    lanes: [
+  const VIDEO_LANE = {
       /**
        * ⚠️ THE TOP LANE IS THE RECORDING ITSELF, as one span from end to end.
        * It is what the marks below are positions IN, so it goes first and it is
        * the only lane that is not an event.
        */
-      { id: 'video', kind: 'video', label: 'video', height: 30, as: 'spans',
-        color: '#6f7d94', barPad: 4,
-        rows: () => [{ at: 0, id: 'show', kind: 'video', payload: { durMs: SHOW_MS } }],
-        labelOf: () => 'the show',
-        describeRow: () => ['the recording', `${Math.round(SHOW_MS / 1000)} seconds`] },
+    id: 'video', kind: 'video', label: 'video', height: 30, as: 'spans',
+    color: '#6f7d94', barPad: 4,
+    rows: () => [{ at: 0, id: 'show', kind: 'video', payload: { durMs: SHOW_MS } }],
+    labelOf: () => 'the show',
+    describeRow: () => ['the recording', `${Math.round(SHOW_MS / 1000)} seconds`],
+  };
       // Every answer is its own mark, which is what was asked for: a count would
       // say how many and never when, and when is the whole reason for a lane.
-      { id: 'answers', kind: 'answer', label: 'answers', height: 34, as: 'ticks',
-        width: 2, color: '#ffd400', terse: true,
-        rows: () => ANSWERS.map((a, i) => ({ at: a.at, id: `a${i}`, kind: 'answer', payload: a })),
-        describeRow: (r) => [r.payload?.pick || '', `${(r.at / 1000).toFixed(1)}s`] },
-    ],
+  const laneFor = (opt) => ({
+    id: `opt-${opt}`, kind: 'answer', label: opt, height: 26, as: 'ticks',
+    width: 2, color: '#ffd400', terse: true,
+    rows: () => ANSWERS.filter((a) => a.pick === opt)
+      .map((a, i) => ({ at: a.at, id: `${opt}-${i}`, kind: 'answer', payload: a })),
+    describeRow: (r) => [r.payload?.pick || '', `${(r.at / 1000).toFixed(1)}s`],
   });
+
+  const strip = createStripView(tabs.panel('archive'), archiveDeck, {
+    size: 'auto', gutter: 110, lanes: [VIDEO_LANE],
+  });
+  const relane = () => strip.strip.setLanes([VIDEO_LANE, ...OPTIONS.map(laneFor)]);
 
   /**
    * 🔴 THE QUESTION GOES TO THE AUDIENCE AND BACK TO THE CONTROL ROOM. Asked
@@ -243,7 +282,14 @@
         at: -1,
         // What a viewer picks is not recorded yet, on instruction: *"later the
         // recording user clicks but lets do it later"*. The seam is here.
-        onPick: (_v, name) => d.log(`${id === 'audience' ? 'somebody in the audience' : 'the control room'} chose ${name}`),
+        onPick: (_v, name) => {
+          // Only the audience answers. The control room's copy is disabled
+          // below, so this cannot fire from there, and the guard says so anyway.
+          if (id !== 'audience') return;
+          ANSWERS.push({ at: Math.round(performance.now() - showStart), pick: name });
+          relane();
+          d.log(`somebody in the audience chose ${name}`);
+        },
       });
       /**
        * ⚠️ THE CONTROL ROOM SEES THE QUESTION AND CANNOT ANSWER IT. Asked
@@ -257,6 +303,10 @@
     // A question replaces the one before it, which is what was asked for. What
     // happens when there is nothing left to ask is deliberately not decided:
     // *"dunno about clearing"*.
+    // A new question's options get lanes of their own, empty until somebody
+    // answers, so the archive shows what was ASKED as well as what came back.
+    for (const o of options) if (!OPTIONS.includes(o)) OPTIONS.push(o);
+    relane();
     asked = { title, options };
     d.log(`asked the audience: ${title}`, 'hi');
   }
@@ -387,7 +437,7 @@
     const f = Math.round(ms / 16.7);
     if (f === lastDrawn) return;
     lastDrawn = f;
-    burn(archiveCtx, FRAME_W, FRAME_H, f, { hue: videoHue(0), ms: Math.round(ms) });
+    burn(archiveCtx, FRAME_W, FRAME_H, f, { hue: videoHue(0), ms: showWallStart + Math.round(ms) });
   };
   paintArchive(0);
   /**
