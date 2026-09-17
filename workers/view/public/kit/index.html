@@ -60,6 +60,11 @@
      five badges laid out as inline text and ran together into one band with
      their dots touching the word before them. */
   .kit-row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+  /* Three panels across, wrapping to one column where a panel gets the full
+     width anyway. `min-width: 0` or they refuse to shrink below their content
+     and drag the page sideways, which is the defect the tab row shipped. */
+  .kit-vps { align-items: flex-start; }
+  .kit-vp { flex: 1 1 240px; min-width: 0; }
   /* ⚠️ NOTHING HERE UNDOES A COMPONENT'S MARGIN ANY MORE, because no component
      has one. That was the first fix and it was the wrong one: a sandbox
      cancelling a side effect leaves the side effect everywhere else. The margins
@@ -183,6 +188,8 @@
   import { createField } from '/shell/field.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
+  import { createVideoPanel, FULL_MODES } from '/shell/video-panel.mjs';
+  import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -267,6 +274,8 @@
   let stepperPick = null;
   // The narrow keyboard, for the check that it really overflows.
   let kbNarrow = null;
+  // The video panels, for the checks that their slots and their picture are real.
+  let vpSpec = null;
   let presLive = null;        // one badge that can change, measured over time
 
   // The pair in the invisible hand block: one slider with a hand and one
@@ -309,6 +318,76 @@
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
+  section('A PICTURE, AND THREE SLOTS UNDER IT',
+    'A panel is a picture and a footer with a left, a centre and a right, where the left '
+    + 'says whether the thing feeding it is answering and the right makes it fill the '
+    + 'screen, both without a page writing either.',
+    `createVideoPanel({ media: canvas, of: 'the board' })
+createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode: 'footer' })`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+
+      /**
+       * 🔴 THE PICTURE IS THIS PROJECT'S OWN AND COMES FROM NOBODY'S SERVER.
+       * `pattern.mjs` is drawn into a canvas here, so the specimen needs no
+       * network, cannot 403, and looks the same on every run. CLAUDE.md's rule
+       * about external sources has been broken twice; a gallery is the last
+       * place to break it a third time.
+       * ⚠️ ONE CANVAS PER PANEL AND ONE LOOP. A canvas cannot be in two places,
+       * so the master is drawn once a frame and blitted, which is what `/stage/`
+       * does with three of them.
+       */
+      const master = document.createElement('canvas');
+      master.width = FRAME_W; master.height = FRAME_H;
+      const mctx = master.getContext('2d', { alpha: false });
+
+      /**
+       * ⚠️ THREE ACROSS, NOT THREE DOWN. A panel is 16 by 9 and a page wide, so
+       * three of them stacked is three screens of scrolling to compare things
+       * that differ in one row of controls. Side by side they are compared at a
+       * glance, which is what a gallery is for, and they wrap to one column on a
+       * phone where the full width is what a panel actually gets.
+       */
+      const row = el('div', 'kit-row kit-vps');
+      const made = [];
+      const add = (heading, panel, ctx) => {
+        const cell = el('div', 'kit-vp');
+        cell.append(el('p', 'kit-cap', heading), panel.el);
+        row.append(cell);
+        made.push({ ctx, panel });
+      };
+      for (const [mode, heading] of [['hover', 'the defaults'],
+                                     ['footer', 'the footer stays while full']]) {
+        const c = document.createElement('canvas');
+        c.width = FRAME_W; c.height = FRAME_H;
+        const p = createVideoPanel({ media: c, of: 'the board', fullMode: mode });
+        p.presence?.set('online');
+        add(heading, p, c.getContext('2d', { alpha: false }));
+      }
+
+      // A third with every slot supplied, because the defaults are only half the
+      // point: a page can put anything in any of the three.
+      const mine = document.createElement('canvas');
+      mine.width = FRAME_W; mine.height = FRAME_H;
+      add('slots a page filled itself', createVideoPanel({
+        media: mine, fullMode: 'bare',
+        left: el('span', '', 'audience'),
+        centre: el('span', '', '00:14:22'),
+      }), mine.getContext('2d', { alpha: false }));
+      vpSpec = made;
+      stack.add(row);
+
+      let n = 0;
+      const draw = () => {
+        burn(mctx, FRAME_W, FRAME_H, n++, { hue: videoHue(0) });
+        for (const m of made) m.ctx.drawImage(master, 0, 0);
+        requestAnimationFrame(draw);
+      };
+      requestAnimationFrame(draw);
+      box.append(stack.el);
+    });
+
   section('ONLINE, OFFLINE, AND WHO ELSE HAS HOLD OF IT',
     'Five states, because a thing nobody has asked about yet is not offline, and a second '
     + 'question riding the same badge: whether somebody else has hold of it, and whether '
@@ -1642,6 +1721,42 @@ green = inside what it promised · amber/red = later`,
      */
     const ink = (el2, sel) => getComputedStyle(el2.querySelector(sel)).color;
     const idle = busySpec.get('nobody'), person = busySpec.get('a person'), tool = busySpec.get('a harness');
+    /**
+     * 🔴 THE PANEL'S DEFAULTS ARE THE COMPONENT'S WHOLE ARGUMENT, so they are
+     * what is checked: a page that writes neither still gets something that says
+     * whether its source is answering and something that fills the screen.
+     * ⚠️ AND THE PICTURE IS READ BACK OUT OF THE PANEL'S OWN CANVAS. A canvas
+     * that is blank and one that is painting look identical to every counter,
+     * and `pattern.mjs` burns a clock into the frame precisely so a page can ask.
+     */
+    if (vpSpec) {
+      const first = vpSpec[0].panel;
+      const btn = first.slots.right.querySelector('button');
+      const r = btn?.getBoundingClientRect();
+      d.assert('a panel comes with a status on the left and a square control on the right',
+        !!first.slots.left.querySelector('.pos-pres') && !!r && Math.abs(r.width - r.height) <= 0.5
+        && first.slots.centre.childElementCount === 0,
+        r ? `the button is ${r.width.toFixed(1)} by ${r.height.toFixed(1)} px and the centre holds ${first.slots.centre.childElementCount}`
+          : 'there is no control in the right slot');
+
+      const last = vpSpec[vpSpec.length - 1].panel;
+      d.assert('and a page can fill all three itself',
+        last.slots.left.textContent.trim() === 'audience'
+        && last.slots.centre.textContent.trim() === '00:14:22',
+        `left "${last.slots.left.textContent.trim()}", centre "${last.slots.centre.textContent.trim()}"`);
+
+      const ms = readBurned(vpSpec[0].ctx);
+      d.assert('the picture in a panel is really being drawn, read back out of its own canvas',
+        Number.isFinite(ms) && Math.abs(Date.now() - ms) < 60_000,
+        Number.isFinite(ms) ? `the burned clock is ${Math.abs(Date.now() - ms)} ms from now`
+          : 'nothing decoded, so the canvas is not showing the picture');
+
+      let threw = false;
+      try { first.mode('enormous'); } catch { threw = true; }
+      d.assert(`a fullscreen mode outside ${FULL_MODES.join(', ')} is refused rather than ignored`,
+        threw, threw ? 'it throws' : 'it accepted a mode that does not exist');
+    }
+
     /**
      * 🔴 THE STEPPER'S MIDDLE IS REALLY A LIST, not a label that looks like one.
      * A cell that draws the right name with an empty or disabled select behind
