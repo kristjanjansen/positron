@@ -324,6 +324,10 @@ export function createPresence({
   }
   // `busy` names which kind of client is driving, or null. It only ever changes
   // the word while the state is `online`.
+  // ⚠️ AND THE ATTRIBUTE IS SET AT BUILD TOO, not only by `busy()`. The
+  // stylesheet greys the word off `data-busy`, so a badge born busy said the
+  // right words in the right colour of the wrong state: the check comparing
+  // inks read them identical and was right to.
   let busyKind = busy || null;
   const wordFor = (x) => (x === 'online' && busyKind && busySay?.[busyKind]) || words[x];
   const phrase = (x) => (named ? `${of} ${wordFor(x)}` : wordFor(x));
@@ -336,6 +340,7 @@ export function createPresence({
       ? Object.values(busySay).map((w) => (named ? `${of} ${w}`.length : w.length))
       : [0]));
   word.style.setProperty('--pres-ch', String(widest));
+  if (busyKind) root.dataset.busy = busyKind;
   root.append(dot, word);
 
   let now = null, note = null;

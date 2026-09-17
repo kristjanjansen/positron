@@ -101,6 +101,41 @@ export function createStack(host, cls) {
       return api;
     },
     /**
+     * 🔴 A HEADING AND WHAT IT LABELS, AS ONE BLOCK. Asked for 2026-09-17:
+     * *"add heading support for createStack and stop messing around"*, after a
+     * screenshot of a caption sitting on the dashed edge of the box it labelled.
+     *
+     * The rule this implements was already written at the top of this file: a
+     * pair that belongs tight is ONE BLOCK, not a smaller gap. Every page that
+     * needed one was rolling it by hand, and `/kit/` rolled it wrong: MEASURED
+     * on the live page, all FOUR of its captions read a gap of 0.0 px to their
+     * specimen, because a caption with `line-height: 1` has a box tight to its
+     * letters and the thing under it starts at that edge.
+     *
+     * So the component owns both distances: the small one between a heading and
+     * what it labels, and the ordinary one between this group and its
+     * neighbours. A page states a title and its blocks, and can get neither
+     * wrong.
+     * ⚠️ THE SECTION IS ITSELF A STACK, so several blocks under one heading are
+     * spaced by the same rhythm as everything else. The heading is excluded from
+     * it by name in shell.css, the way `.pos-head` and `.pos-how` already are,
+     * and carries its own smaller margin instead.
+     */
+    titled(text, ...blocks) {
+      const sec = document.createElement('section');
+      sec.className = `${STACK} pos-sec`;
+      const h = document.createElement('h3');
+      h.className = 'pos-sec-h';
+      // Uppercased by the stylesheet whatever is typed, and typed uppercase on
+      // the page anyway so the source reads like what it renders.
+      h.textContent = text;
+      sec.append(h);
+      for (const b of blocks) if (b) sec.append(b.el || b);
+      el.append(sec);
+      return sec;
+    },
+
+    /**
      * A nested stack, added to this one and returned: one block of the page
      * that is itself a column of blocks, at the same gap.
      */

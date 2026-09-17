@@ -382,8 +382,26 @@ button.pos-pri[data-busy="1"] {
    called correct with, and the `How it works` heading keeps the 14 px that
    holds it against its picture. Nothing else on a page gets to have an
    opinion. */
-.pos-stack > :not(:last-child):not(.pos-head):not(.pos-how) { margin-bottom: var(--pos-gap); }
+/* ⚠️ `.pos-sec-h` JOINS THE TWO NAMED EXCLUSIONS. A heading belongs to what
+   follows it and carries its own smaller margin, so it must not also take the
+   full gap: with it, `stack.titled()` would put 40 px between a label and the
+   thing it labels, which is the same defect the shell already fixed once for
+   the page's own head. */
+.pos-stack > :not(:last-child):not(.pos-head):not(.pos-how):not(.pos-sec-h) { margin-bottom: var(--pos-gap); }
 .pos-stack > :not(:first-child) { margin-top: 0; }
+
+/* 🔴 THE HEADING `stack.titled()` DRAWS, AND ITS ONE JOB IS THE GAP UNDER IT.
+   10 px, not the rhythm's 40: the pair is one block and this is the distance
+   INSIDE it. MEASURED before this existed, on four captions in `/kit/` that
+   each rolled their own: 0.0 px, so the label sat on the border of the box it
+   named. */
+.pos-sec-h {
+  font: 600 9.5px/1 var(--mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--dim2);
+  margin: 0 0 10px;
+}
 /* 🔴 A BLOCK WITH NOTHING IN IT TAKES NO GAP. This is the `/typist/` band in a
    third costume: an empty `.pos-readout` painted its own two borders as a
    2 px full-width rule nobody wrote, and an empty `.pos-controls` left a band
@@ -1509,9 +1527,19 @@ video[hidden] { display: none; }
    cramped between two tracked ones: the words run together into one band of
    caps. The `margin-right` below still cancels exactly one letter-space, so the
    gap is 28 px of ink to ink rather than 28 px of boxes. */
+/* 🔴 AND THE AIR UNDER THE BAR IS THE BAR'S, NOT THE PANEL'S. Asked 2026-09-17
+   with a screenshot: *"move active bottomborder up closer to tab title and have
+   more space under it"*. The two halves are one relationship: the underline
+   marks the chosen tab, so it belongs to the WORD and should sit near it, and
+   everything below the bar is a different part of the page and should be
+   further away. Before this the tab box was 30 px tall with a 6 px pad, which
+   put 13 px of nothing between the letters and their own mark and 0 px between
+   that mark and the panel, so the underline read as a rule across the top of
+   the content rather than as part of the tab. */
 .pos-tabs-bar {
   display: flex; gap: 28px; overflow-x: auto;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  margin-bottom: 18px;
 }
 .pos-tabs-bar::-webkit-scrollbar { display: none; }
 /* ⚠️ `margin-right: -.1em` IS NOT A NUDGE, IT IS THE LETTER-SPACE COMING BACK.
@@ -1525,7 +1553,7 @@ video[hidden] { display: none; }
    one changes the other changes with it. */
 .pos-tabs-t {
   flex: 0 0 auto; white-space: nowrap;
-  background: none; border: 0; border-radius: 0; height: 30px; padding: 0 0 6px;
+  background: none; border: 0; border-radius: 0; height: 22px; padding: 0 0 3px;
   font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); cursor: pointer;
   margin-right: -.1em;
@@ -2469,6 +2497,22 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   animation: pos-pres-breathe 1400ms ease-in-out infinite;
 }
 .pos-pres[data-state="checking"] .pos-pres-w { color: var(--dim); }
+
+/* 🔴 THE WORD GREYS, THE DOT DOES NOT. Asked 2026-09-17: *"sgould not under
+   test / in use be gray?"*. Half of it, and the half that is not matters.
+   The WORD greys because it is a qualifier rather than the state: somebody else
+   having hold of the instrument is a different fact from whether it answered,
+   and it should not read with the same weight as the thing it qualifies.
+   The DOT stays green because the board IS answering, and grey on this badge
+   already means something else: `checking` and `unknown` are grey precisely to
+   say nobody has looked. A grey dot for a board that is talking to us would
+   make "it is busy" and "we have no idea whether it is there" look identical,
+   which is the one confusion this component was built to prevent.
+   ⚠️ THIS IS THE `coming` PATTERN, ALREADY IN THIS FILE: green dot, grey word,
+   for a state that is known and qualified. One rule, no new colour, and no new
+   meaning for an existing one. */
+.pos-pres[data-busy="page"] .pos-pres-w,
+.pos-pres[data-busy="tool"] .pos-pres-w { color: var(--dim); }
 
 .pos-pres[data-state="offline"] { color: var(--dim2); }
 .pos-pres[data-state="offline"] .pos-pres-w { color: var(--dim); }
