@@ -25,6 +25,9 @@
   import { createPresence } from '/shell/presence.mjs';
   import { createField } from '/shell/field.mjs';
   import { createChoice } from '/shell/choice.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -152,6 +155,71 @@
    * project already has three hand-built copies of it in its history.
    */
   /**
+   * 🔴 THE ARCHIVE IS A RECORDING, SO NOTHING IN IT MOVES BY ITSELF. Asked
+   * 2026-09-17: *"in archive video is stopped. transport (playpause / loop /
+   * rates) below it. usersubmitted answers appear in lanes as marks... top lane
+   * is video block. scrubbing moves video back and forth."*
+   *
+   * ⚠️ ITS PICTURE IS DRAWN FROM THE PLAYHEAD, NOT FROM THE CLOCK. The other two
+   * panels blit whatever the live loop last painted; this one paints the frame
+   * that belongs to wherever the transport is, so dragging the strip really does
+   * move the picture. `pattern.mjs` burns a clock into the frame, which is what
+   * makes that visible rather than something to take on trust.
+   * ⚠️ THE ANSWERS ARE INVENTED FOR NOW, on instruction: *"you can simulate it
+   * atm"*. They are generated once from a fixed seed so the picture is the same
+   * on every visit, and the seam where real ones would arrive is named below.
+   */
+  const SHOW_MS = 3 * 60 * 1000;
+  const archive = byId.get('archive');
+  const archiveDeck = createDeck({ items: [], adapters: {}, range: [0, SHOW_MS] });
+
+  /**
+   * A made-up audience, deterministic so two visits agree. A real one arrives
+   * over the relay from the page the viewer pressed, which is the same seam
+   * `onPick` names above and is deliberately not built yet.
+   */
+  const ANSWERS = (() => {
+    let seed = 20260917;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const out = [];
+    for (const [at, opts] of [[42_000, ['Be', 'Not to be']], [128_000, ['Yes', 'No', 'Later']]]) {
+      const n = 18 + Math.floor(rnd() * 20);
+      for (let i = 0; i < n; i++) {
+        out.push({ at: at + Math.round(rnd() * 26_000), pick: opts[Math.floor(rnd() * opts.length)] });
+      }
+    }
+    return out.sort((a, b) => a.at - b.at);
+  })();
+
+  createTransportBar(archive.panel.el.parentNode || tabs.panel('archive'), archiveDeck, {
+    // A recording has a position, so this bar keeps everything the live one gave
+    // up: a play toggle, a loop, and rates.
+    live: false,
+  });
+
+  createStripView(tabs.panel('archive'), archiveDeck, {
+    size: 'auto', gutter: 110,
+    lanes: [
+      /**
+       * ⚠️ THE TOP LANE IS THE RECORDING ITSELF, as one span from end to end.
+       * It is what the marks below are positions IN, so it goes first and it is
+       * the only lane that is not an event.
+       */
+      { id: 'video', kind: 'video', label: 'video', height: 30, as: 'spans',
+        color: '#6f7d94', barPad: 4,
+        rows: () => [{ at: 0, id: 'show', kind: 'video', payload: { durMs: SHOW_MS } }],
+        labelOf: () => 'the show',
+        describeRow: () => ['the recording', `${Math.round(SHOW_MS / 1000)} seconds`] },
+      // Every answer is its own mark, which is what was asked for: a count would
+      // say how many and never when, and when is the whole reason for a lane.
+      { id: 'answers', kind: 'answer', label: 'answers', height: 34, as: 'ticks',
+        width: 2, color: '#ffd400', terse: true,
+        rows: () => ANSWERS.map((a, i) => ({ at: a.at, id: `a${i}`, kind: 'answer', payload: a })),
+        describeRow: (r) => [r.payload?.pick || '', `${(r.at / 1000).toFixed(1)}s`] },
+    ],
+  });
+
+  /**
    * 🔴 THE QUESTION GOES TO THE AUDIENCE AND BACK TO THE CONTROL ROOM. Asked
    * 2026-09-17: *"controlroom should also see poll"*. Somebody who has just sent
    * a question should see what they sent in the form the audience sees it, not
@@ -177,6 +245,13 @@
         // recording user clicks but lets do it later"*. The seam is here.
         onPick: (_v, name) => d.log(`${id === 'audience' ? 'somebody in the audience' : 'the control room'} chose ${name}`),
       });
+      /**
+       * ⚠️ THE CONTROL ROOM SEES THE QUESTION AND CANNOT ANSWER IT. Asked
+       * 2026-09-17: *"disable controlroom q's buttons in ui"*. The operator's
+       * copy is there so they can check what they sent, and a live control in it
+       * would put the person asking into their own audience.
+       */
+      if (id !== 'audience') choice.disabled(true);
       show(byId.get(id).panel, choice.el);
     }
     // A question replaces the one before it, which is what was asked for. What
@@ -288,11 +363,46 @@
   let frames = 0;
   function tick() {
     burn(mctx, FRAME_W, FRAME_H, frames, { hue: videoHue(0) });
-    for (const p of panels) p.ctx.drawImage(master, 0, 0);
+    // ⚠️ THE ARCHIVE IS NOT FED FROM HERE. It is a recording: its picture comes
+    // from wherever its transport is, which is what makes scrubbing visible.
+    for (const p of panels) if (p.id !== 'archive') p.ctx.drawImage(master, 0, 0);
     frames++;
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
+
+  /**
+   * 🔴 THE ARCHIVE'S PICTURE IS A FUNCTION OF ITS PLAYHEAD. Drag the strip and
+   * the burned clock in the frame moves with it, forwards or back, which is the
+   * whole of *"scrubbing moves video back and forth"*. Nothing here is a video
+   * file yet: the frame is generated for the position, which is a simulation and
+   * says so.
+   * ⚠️ IT REDRAWS ON A POSITION CHANGE RATHER THAN EVERY FRAME. A stopped
+   * recording that repaints sixty times a second is a page doing work to show
+   * the same picture, and this one is stopped by default.
+   */
+  const archiveCtx = archive.ctx;
+  let lastDrawn = -1;
+  const paintArchive = (ms) => {
+    const f = Math.round(ms / 16.7);
+    if (f === lastDrawn) return;
+    lastDrawn = f;
+    burn(archiveCtx, FRAME_W, FRAME_H, f, { hue: videoHue(0), ms: Math.round(ms) });
+  };
+  paintArchive(0);
+  /**
+   * ⚠️ IT READS `position()` ON A FRAME RATHER THAN USING `observePosition`.
+   * That helper hands back `{ pos, nowUs }` and reaches for `transport.clock.now()`,
+   * which this deck does not expose: MEASURED as `TypeError: Cannot read
+   * properties of undefined (reading 'now')` the first time this ran. A
+   * recording only has to repaint when its playhead moves, and the guard above
+   * makes a still frame cost one comparison.
+   */
+  const followArchive = () => {
+    paintArchive(archiveDeck.position());
+    requestAnimationFrame(followArchive);
+  };
+  requestAnimationFrame(followArchive);
 
   // Every panel's default badge is told the same thing, because they all show
   // the same picture and it is this page drawing it.
@@ -381,7 +491,15 @@
         false, `it threw: ${e.message}`);
     });
 
-    const ms = readBurned(panels[2].ctx);
+    /**
+     * ⚠️ IT READS THE AUDIENCE, NOT THE ARCHIVE. The archive is a recording now:
+     * its frame is drawn for wherever the playhead is, so its burned clock is
+     * the show's time rather than the wall's, and asserting it against `now`
+     * measured the wrong thing. It went red at `nothing decoded` the moment the
+     * archive stopped following the live loop, which is the check noticing a
+     * change in meaning rather than a defect.
+     */
+    const ms = readBurned(panels[0].ctx);
     const near = Number.isFinite(ms) && Math.abs(Date.now() - ms) < 60_000;
     d.assert('the picture in the last panel is the test picture, read back out of it',
       near, Number.isFinite(ms)
