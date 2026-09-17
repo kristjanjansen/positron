@@ -480,7 +480,7 @@ export function createKeyboard(host, {
   const downBtn = mkOct('−', 'down one octave (z)', -1);
   const upBtn = mkOct('+', 'up one octave (x)', 1);
   pad.append(octPair);
-  const panicBtn = make('button', 'kpad-right', 'notes off', {
+  const panicBtn = make('button', 'kpad-right', 'Notes off', {
     type: 'button', title: 'stop every note that is still sounding',
   });
   panicBtn.onclick = () => api.panic();

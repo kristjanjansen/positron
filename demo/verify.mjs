@@ -546,7 +546,24 @@ for (const t of targets) {
     if (!ready) await sleep(150);
   }
   ok('__demo.ready', ready);
-  if (!ready) { console.log(`        failed: ${await ev('window.__demo && window.__demo.failed')}`); continue; }
+  if (!ready) {
+    console.log(`        failed: ${await ev('window.__demo && window.__demo.failed')}`);
+    /**
+     * 🔴 AND WHAT THE CONSOLE SAID, BECAUSE THIS IS EXACTLY WHEN IT MATTERS.
+     * The `no console errors` check runs much later and this `continue` skips
+     * it, so a page that dies before `ready` reported ONE line — `failed: null`
+     * — and threw its actual reason away. MEASURED 2026-09-17: two separate
+     * dangling references on `/stage/`, each an ordinary ReferenceError sitting
+     * in the console, each taking a round of manual bisecting to find, because
+     * the harness knew and did not say.
+     * ⚠️ A page that never becomes ready is the one case where the console is
+     * the whole story: there are no asserts to read, no readout to inspect, and
+     * `failed` is only set by a page that got far enough to set it.
+     */
+    for (const e of errors.slice(0, 5)) console.log(`        console: ${String(e).split('\n')[0].slice(0, 160)}`);
+    if (!errors.length) console.log('        console: nothing, so it is hanging rather than throwing');
+    continue;
+  }
 
   const meta = await ev('({ name: __demo.name, keys: Object.keys(__demo.readout), hasT: !!__demo.transport, readoutOptOut: !!__demo.readoutOptOut })');
   ok('identity matches manifest', meta.name === t.name, meta.name);
