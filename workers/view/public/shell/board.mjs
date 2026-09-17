@@ -198,17 +198,51 @@ export function createBoard({
      * every single start. The line waits a beat and speaks only if it is STILL
      * not running, and `statechange` takes it back when it starts.
      */
+    /**
+     * 🔴 ANY GESTURE RESUMES IT, AND THIS IS THE WHOLE BUG. PHOTOGRAPHED
+     * 2026-09-17 on an iPhone: `sound out 0.000`, `buffer 0 ms`, and the page's
+     * own log saying *"the audio is suspended. Press play again, or click
+     * anywhere on the page"*. Clicking anywhere did nothing, because nothing was
+     * listening: `resume()` was fired exactly once, inside `startAudio`, and if
+     * that call did not take there was no second chance for the rest of the
+     * page's life. The page printed instructions it could not honour.
+     *
+     * ⚠️ WEBKIT NEEDS THE CALL INSIDE A GESTURE HANDLER, not merely after one
+     * has happened, and it will not resume a context on its own however many
+     * times somebody taps. So every gesture the document sees gets one attempt
+     * while the context is not running, and the listeners take themselves off as
+     * soon as it is.
+     * ⚠️ `touchend` AS WELL AS `pointerdown`. iOS grants activation on some
+     * events and not others, and the cheap thing is to try on all of them rather
+     * than to be clever about which.
+     * ⚠️ AND THEY ARE PASSIVE AND CAPTURING, so they cannot block a scroll and
+     * cannot be swallowed by a control that stops propagation.
+     */
+    const GESTURES = ['pointerdown', 'touchend', 'mousedown', 'keydown'];
+    const offGestures = () => {
+      for (const g of GESTURES) document.removeEventListener(g, tryResume, true);
+    };
+    function tryResume() {
+      if (!ctx || ctx.state === 'running') { offGestures(); return; }
+      ctx.resume().then(watchState).catch(() => { /* still not allowed; the next gesture tries again */ });
+    }
+    for (const g of GESTURES) document.addEventListener(g, tryResume, { capture: true, passive: true });
+
     let saidSuspended = false;
     const watchState = () => {
       if (!ctx) return;
       if (ctx.state === 'running') {
+        offGestures();
         if (saidSuspended) { saidSuspended = false; log('the browser let the sound start'); }
         return;
       }
       if (saidSuspended) return;
       saidSuspended = true;
+      // ⚠️ THE LINE PROMISES SOMETHING THE PAGE NOW DOES. It said "click
+      // anywhere" while nothing listened for a click, which is worse than saying
+      // nothing: it sent somebody tapping at a page that could not answer.
       log(`the sound is built and arriving but this browser has not let it start: the audio is ${ctx.state}. `
-        + 'Press play again, or click anywhere on the page', 'bad');
+        + 'Tap anywhere on the page and it will start', 'bad');
     };
     ctx.addEventListener('statechange', watchState);
     setTimeout(watchState, 600);
