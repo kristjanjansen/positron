@@ -802,13 +802,12 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
   // and are already at the length the house rule allows. A gallery of controls
   // is the right home for what a control does.
   section('keyboard',
-    'Thirteen keys, played with the letter row a to k, and a pad under them for '
-    + 'the octave and for stopping everything. A finger dragged across the keys '
-    + 'glides from note to note, and sliding to either end scrolls the row, so '
-    + 'the whole range is reachable on a phone where only five keys fit. Hold '
-    + 'one key for a second and it starts playing itself four times a second '
-    + 'until you let go.',
-    `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic, holdMs, retrigMs })`,
+    'An octave of piano keys, played with the letter row a to k, and a pad under '
+    + 'them for the octave and for stopping everything. Swipe the keys sideways '
+    + 'and the row scrolls without sounding anything; press one and hold it, and '
+    + 'from then on sliding across the keys plays them. A mouse never waits, '
+    + 'because nothing on a desktop can take a drag away from one.',
+    `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })`,
     (box) => {
       const o = out('');
       const holder = el('div', '', null); holder.style.width = '100%';
@@ -1789,21 +1788,23 @@ green = inside what it promised · amber/red = later`,
   // ⚠️ AND THEY BUILD THEIR OWN KEYBOARDS RATHER THAN DRIVING THE SPECIMEN.
   // The specimen sits in a box that is ~656 px wide on a laptop and 328 px on a
   // phone, and the phone layout is the thing to grade. A throwaway one in a
-  // holder of a stated width asks the question directly — and it is a CONTAINER
-  // query rather than a media query precisely so that this works: a harness
-  // cannot narrow the window, and it can always narrow a div.
+  // holder of a stated width asks the question directly.
   if (new URLSearchParams(location.search).get('selfcheck') === '1') {
-    const { createKeyboard, KEY_MIN_PX, EDGE_PX } = await import('/shell/keyboard.mjs');
+    const { createKeyboard, KEY_MIN_PX, BLACK_RATIO, SWIPE_PX } = await import('/shell/keyboard.mjs');
     const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+    const frames = (n) => new Promise((r) => {
+      const step = () => (--n <= 0 ? r() : requestAnimationFrame(step));
+      requestAnimationFrame(step);
+    });
     const probes = [];
     // On top of the page and out of the flow: it must be hit-testable, since
     // `document.elementFromPoint` is what decides which key a finger is on, and
     // a holder below the fold has no points to test.
-    // 🔴 AND THEY MUST NOT OVERLAP EACH OTHER. The first version stacked all
-    // four at `top: 0`, so the LAST one built was the one under every point and
+    // 🔴 AND THEY MUST NOT OVERLAP EACH OTHER. The first version stacked them
+    // all at `top: 0`, so the LAST one built was the one under every point and
     // three checks measured "no note was produced at all" about keyboards that
-    // were working — with the width asserts passing either way, because those
-    // read geometry rather than hit-test it. `top` is an argument now.
+    // were working, with the width asserts passing either way because those
+    // read geometry rather than hit-test it. `top` is an argument.
     const build = (width, top, opts = {}) => {
       const holder = el('div', '', null);
       holder.style.cssText = `position:fixed;top:${top}px;left:0;z-index:9999;width:${width}px;background:var(--bg)`;
@@ -1817,134 +1818,169 @@ green = inside what it promised · amber/red = later`,
       probes.push({ kb, holder, log });
       return { kb, holder, log };
     };
-    const keyRect = (kb, i) => kb.keysEl.querySelectorAll('.k')[i].getBoundingClientRect();
-    const mid = (kb, i) => { const r = keyRect(kb, i); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
-    const touch = (kb, type, p, id = 3) => kb.keysEl.dispatchEvent(new PointerEvent(type, {
-      bubbles: true, pointerId: id, pointerType: 'touch', clientX: p.x, clientY: p.y, isPrimary: true }));
+    const keyEls = (kb) => [...kb.keysEl.querySelectorAll('.k')];
+    const whitesOf = (kb) => keyEls(kb).filter((k) => !k.classList.contains('sharp'));
+    const blacksOf = (kb) => keyEls(kb).filter((k) => k.classList.contains('sharp'));
+    // ⚠️ LOW ON THE KEY, CLEAR OF THE BLACKS. A point at a white key's centre is
+    // inside a raised black one near the top; every gesture below aims at the
+    // bottom third, which is white and nothing else.
+    const lowOn = (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.bottom - 12 }; };
+    const touch = (kb, type, p, id = 3, kind = 'touch') => kb.keysEl.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, pointerId: id, pointerType: kind, clientX: p.x, clientY: p.y, isPrimary: true }));
 
     const phone = build(390, 0);
     const desk = build(1100, 130);
 
     // ── the width, and the negative control that proves it is a FLOOR ───────
-    // MEASURED before this landed: 24.77 px a key at 390 CSS px, against a
-    // 44 px minimum touch target. The pair of arms matters more than either
-    // number: a fixed width would pass the first and fail the second, and it
-    // would take every desktop keyboard in the project with it.
-    const phoneW = keyRect(phone.kb, 0).width;
-    const deskW = keyRect(desk.kb, 0).width;
+    // MEASURED before any of this: 24.77 px a key at 390 CSS px, then 74, now
+    // 49 on instruction. The pair of arms matters more than either number: a
+    // fixed width would pass the first and fail the second.
+    const phoneW = whitesOf(phone.kb)[0].getBoundingClientRect().width;
+    const deskW = whitesOf(desk.kb)[0].getBoundingClientRect().width;
     const rowScrolls = phone.kb.keysEl.scrollWidth - phone.kb.keysEl.clientWidth;
     const deskScrolls = desk.kb.keysEl.scrollWidth - desk.kb.keysEl.clientWidth;
     const pushes = phone.holder.scrollWidth - phone.holder.clientWidth;
-    d.assert('on a phone a key is a finger wide and the ROW scrolls, never the page',
-      phoneW >= KEY_MIN_PX - 0.5 && rowScrolls > 100 && pushes <= 1,
-      `390 px holder · ${phoneW.toFixed(2)} px a key, ${rowScrolls} px of row to scroll, `
+    d.assert('on a phone a white key is a finger wide and the ROW scrolls, never the page',
+      phoneW >= KEY_MIN_PX - 0.5 && phoneW < KEY_MIN_PX + 2 && rowScrolls > 20 && pushes <= 1,
+      `390 px holder · ${phoneW.toFixed(2)} px a white key, ${rowScrolls} px of row to scroll, `
       + `${pushes} px pushed sideways`);
     d.assert('NEGATIVE CONTROL: it is a floor, so a wide one still divides the room and does not scroll',
       deskW > KEY_MIN_PX && deskScrolls <= 1,
-      `1100 px holder · ${deskW.toFixed(2)} px a key, ${deskScrolls} px of row to scroll`);
-    desk.kb.destroy();       // nothing below this hit-tests it, and it is 1100 px of cover
+      `1100 px holder · ${deskW.toFixed(2)} px a white key, ${deskScrolls} px of row to scroll`);
 
-    // ── the glissando ──────────────────────────────────────────────────────
-    // 🔴 THIS IS WHAT `setPointerCapture` ON EACH KEY MADE IMPOSSIBLE. The
-    // order is the whole assert: a note must be released BEFORE the next one
-    // sounds, or a sweep across the keys leaves every key it touched holding.
-    touch(phone.kb, 'pointerdown', mid(phone.kb, 0));
-    touch(phone.kb, 'pointermove', mid(phone.kb, 1));
-    touch(phone.kb, 'pointermove', mid(phone.kb, 2));
-    touch(phone.kb, 'pointerup', mid(phone.kb, 2));
-    const slid = phone.log.join(' ');
-    d.assert('a finger slid across the keys releases the note it leaves and sounds the note it enters',
-      slid === 'on60 off60 on61 off61 on62 off62',
-      slid || 'no note was produced at all');
-
-    // ── the edge, and the arming rule that keeps it out of the hold's way ──
-    // Both halves in one assert because they are one claim: the row follows a
-    // finger that ARRIVED at the end, and ignores one that was PUT DOWN there.
-    // Without the second half, holding the outermost key would scroll it away.
-    phone.log.length = 0;
-    phone.kb.keysEl.scrollLeft = 0;
-    const row = phone.kb.keysEl.getBoundingClientRect();
-    const edge = { x: row.right - 3, y: row.top + 20 };
-    // ⚠️ THE STILL FINGER WOBBLES, AND WITHOUT THAT THIS HALF CANNOT FAIL. A
-    // finger put down and held sends `pointermove` continuously on real glass;
-    // a check that sends none arms nothing whatever the distance is set to.
-    // MEASURED by setting the arming distance to 0: with no wobble the assert
-    // stayed green, with the wobble it goes red.
-    touch(phone.kb, 'pointerdown', edge, 11);
-    for (let i = 0; i < 6; i++) {
-      touch(phone.kb, 'pointermove', { x: edge.x - (i % 2 ? 4 : 0), y: edge.y + (i % 3) }, 11);
-      await nap(25);
+    // ── the sharps: raised, narrower, and centred on the joins ─────────────
+    {
+      const w = whitesOf(phone.kb).map((e) => e.getBoundingClientRect());
+      const b = blacksOf(phone.kb).map((e) => e.getBoundingClientRect());
+      const shorter = b.every((r) => r.height < w[0].height - 10);
+      const narrower = b.every((r) => Math.abs(r.width / w[0].width - BLACK_RATIO) < 0.02);
+      const aligned = b.every((r) => r.top === w[0].top);
+      d.assert('the sharps are raised: shorter than a white key, narrower, and sitting on its top edge',
+        w.length === 8 && b.length === 5 && shorter && narrower && aligned,
+        `${w.length} white and ${b.length} black · white ${w[0].width.toFixed(1)}x${w[0].height} · `
+        + `black ${b[0].width.toFixed(1)}x${b[0].height}, ${(b[0].width / w[0].width).toFixed(3)} of a white`);
+      // Every black key's centre must land on the join between two whites. This
+      // is arithmetic on laid-out ink, so a grid placement that is off by a
+      // column reports a number rather than looking slightly wrong.
+      let worst = 0;
+      for (const r of b) {
+        const centre = r.left + r.width / 2;
+        worst = Math.max(worst, Math.min(...w.slice(0, -1).map((x, i) =>
+          Math.abs(centre - (x.right + w[i + 1].left) / 2))));
+      }
+      d.assert('and each one straddles the join between two white keys',
+        worst <= 1,
+        `worst black key is ${worst.toFixed(2)} px off the join it sits on`);
     }
-    const heldStill = Math.round(phone.kb.keysEl.scrollLeft);
-    touch(phone.kb, 'pointerup', edge, 11);
-    phone.kb.keysEl.scrollLeft = 0;
-    touch(phone.kb, 'pointerdown', mid(phone.kb, 0), 12);
-    touch(phone.kb, 'pointermove', edge, 12);
-    await nap(160);
-    const slidIn = Math.round(phone.kb.keysEl.scrollLeft);
-    touch(phone.kb, 'pointerup', edge, 12);
-    d.assert(`sliding into the ${EDGE_PX} px band at the end scrolls the row, and pressing in it and holding does not`,
-      slidIn > 40 && heldStill === 0,
-      `slid in: ${slidIn} px in 160 ms · put down and held: ${heldStill} px`);
 
-    // ── the hold ───────────────────────────────────────────────────────────
-    // 🔴 THE MACHINERY IS GRADED FAST AND THE SHIPPED NUMBERS ARE GRADED
-    // SEPARATELY. A keyboard built with the real 1000 ms would put a second and
-    // a quarter of dead time inside one assert, and `verify.mjs` stops
-    // collecting when the count stops growing — so the honest split is a quick
-    // one for the behaviour and a plain read for the constants. Without the
-    // second assert this would pass with the defaults changed to anything.
-    const fast = build(390, 130, { holdMs: 80, retrigMs: 50 });
-    fast.kb.press('a', 'key');
-    await nap(55);
-    const beforeThreshold = fast.log.length;
-    await nap(230);
-    const running = fast.kb.retriggering().join('');
-    const during = fast.log.length;
-    fast.kb.release('a', 'key');
-    // ⚠️ READ IN THE SAME TICK AS THE RELEASE, or this half cannot fail: the
-    // repeat's own interval also stops itself the moment it finds the key no
-    // longer held, so a reading taken one interval later is green whether or
-    // not `release` does its job. MEASURED by taking the call out of `release`:
-    // with the delayed read the assert stayed green, with this one it goes red.
-    const stillRetriggering = fast.kb.retriggering().length;
-    await nap(120);
-    const afterRelease = fast.log.length;
-    d.assert('a key held past the threshold retriggers itself, and letting go of it stops it',
-      beforeThreshold === 1 && during >= 5 && running === 'a' && stillRetriggering === 0
-      && fast.log[fast.log.length - 1] === 'off60' && afterRelease === during + 1,
-      `1 event at 55 ms, ${during} by 285 ms (80 ms then every 50), `
-      + `${afterRelease - during} more after letting go, ${stillRetriggering} left retriggering`);
-    d.assert('and the keyboard the page actually ships holds for a second and then repeats four times a second',
-      phone.kb.timing.holdMs === 1000 && phone.kb.timing.retrigMs === 250,
-      `holds ${phone.kb.timing.holdMs} ms, then every ${phone.kb.timing.retrigMs} ms · `
-      + `8 messages a second to whatever the page is driving`);
+    // ── 🔴 THE OVERLAP, WHICH IS A HIT TEST AND NOT A PICTURE ──────────────
+    // A raised black key covers the top corners of both whites beside it, so a
+    // point up there is inside two keys at once and only paint order decides
+    // which note a finger gets. The assert is here because that is an accident
+    // of `z-index` that a future stacking context would undo silently, and the
+    // symptom would be a keyboard that plays C when you aim at C sharp.
+    {
+      const b0 = blacksOf(phone.kb)[0].getBoundingClientRect();
+      const nameAt = (x, y) => {
+        const hit = document.elementFromPoint(x, y);
+        const k = hit && hit.closest('.k');
+        return k && phone.kb.keysEl.contains(k) ? k.querySelector('.kn').textContent : null;
+      };
+      // 🔴 BOTH SIDES, AND THE RIGHT ONE IS THE HARD ONE. A sharp straddles two
+      // whites, and the white on its RIGHT comes LATER in the DOM, so with
+      // equal stacking that one paints over the sharp and takes the note.
+      // MEASURED by setting `z-index: 0` on the sharps: a one-sided version of
+      // this assert stayed green, because the left half is covered by DOM order
+      // alone and only the right half needs the z-index at all.
+      const overC = nameAt(b0.left + 2, b0.top + 6);
+      const overD = nameAt(b0.right - 2, b0.top + 6);
+      const belowL = nameAt(b0.left + 2, b0.bottom + 8);
+      const belowR = nameAt(b0.right - 2, b0.bottom + 8);
+      d.assert('where a raised sharp covers a white key the sharp wins, on BOTH sides, and only where it covers',
+        overC === 'C#4' && overD === 'C#4' && belowL === 'C4' && belowR === 'D4',
+        `over its left white: ${overC} · over its right white: ${overD} · `
+        + `below it: ${belowL} then ${belowR}`);
+    }
+
+    // ── 🔴 A SWIPE SCROLLS AND PLAYS NOTHING; A PRESS PLAYS AND THEN SLIDES ─
+    // The two halves are one assert because they are one rule: *"drag to play
+    // happens when playing is there"*. Splitting them would let a keyboard that
+    // plays nothing at all pass the first half.
+    {
+      phone.log.length = 0;
+      phone.kb.keysEl.scrollLeft = 0;
+      const start = lowOn(whitesOf(phone.kb)[0]);
+      // A swipe: lands and leaves before the verdict.
+      // ⚠️ IT WAITS OUT THE VERDICT WINDOW BEFORE READING THE COUNT, or the
+      // whole half is vacuous. MEASURED by disabling the distance test: with
+      // the reading taken in the same tick the assert stayed green, because
+      // nothing has sounded yet in EITHER case that early. What proves the
+      // gesture was abandoned is that the verdict comes and goes in silence.
+      touch(phone.kb, 'pointerdown', start, 41);
+      touch(phone.kb, 'pointermove', { x: start.x + SWIPE_PX + 6, y: start.y }, 41);
+      touch(phone.kb, 'pointermove', { x: start.x + 160, y: start.y }, 41);
+      await frames(4);
+      const swipeNotes = phone.log.length;
+      touch(phone.kb, 'pointerup', { x: start.x + 160, y: start.y }, 41);
+      const swipeTotal = phone.log.length;
+      // a press: lands and stays past the verdict, then slides
+      phone.log.length = 0;
+      touch(phone.kb, 'pointerdown', start, 42);
+      const beforeVerdict = phone.log.length;
+      await frames(4);
+      const afterVerdict = phone.log.join(' ');
+      touch(phone.kb, 'pointermove', lowOn(whitesOf(phone.kb)[1]), 42);
+      touch(phone.kb, 'pointermove', lowOn(whitesOf(phone.kb)[2]), 42);
+      touch(phone.kb, 'pointerup', lowOn(whitesOf(phone.kb)[2]), 42);
+      const slid = phone.log.join(' ');
+      d.assert('a finger that leaves at once is a swipe and is silent; one that stays plays, and then slides',
+        swipeNotes === 0 && swipeTotal === 0 && beforeVerdict === 0 && afterVerdict === 'on60'
+        && slid === 'on60 off60 on62 off62 on64 off64',
+        `swipe: ${swipeTotal} note(s) · press: nothing at ${SWIPE_PX}+ px, "${afterVerdict}" after the verdict, `
+        + `then "${slid}"`);
+    }
+
+    // ⚠️ AND A MOUSE NEVER WAITS. Nothing on a desktop can take a drag away, so
+    // there is no verdict to wait for and the note is immediate. Without this
+    // the frame-counted window could be applied to every pointer and only a
+    // person with a mouse would notice.
+    {
+      phone.log.length = 0;
+      const p0 = lowOn(whitesOf(phone.kb)[3]);
+      touch(phone.kb, 'pointerdown', p0, 43, 'mouse');
+      const atOnce = phone.log.join(' ');
+      touch(phone.kb, 'pointermove', lowOn(whitesOf(phone.kb)[4]), 43, 'mouse');
+      touch(phone.kb, 'pointerup', lowOn(whitesOf(phone.kb)[4]), 43, 'mouse');
+      d.assert('a mouse sounds its note on the way down and glissandos with no wait at all',
+        atOnce === 'on65' && phone.log.join(' ') === 'on65 off65 on67 off67',
+        `on pointerdown: "${atOnce || '(nothing)'}" · whole gesture: "${phone.log.join(' ')}"`);
+    }
 
     // 🔴 AND `notes off` HAS TO REACH IT, BECAUSE IT IS THE WHOLE SAFETY STORY.
-    // There is no ceiling and no dead-man's timer here on purpose; the pad's
-    // third button is the way out, so it is the one thing that must not be
-    // allowed to rot. The finger is left DOWN across the press, which is the
-    // case that was wrong first: the pointer kept its key and re-pressed it.
-    // ⚠️ AND IT READS THE LIT KEY BEFORE PRESSING, OR IT PASSES VACUOUSLY. The
-    // first version asserted only that nothing was lit AFTERWARDS, which is
-    // also what a keyboard that never sounded a note reports — and that is
-    // exactly the state the overlapping holders above had put it in, so it read
-    // green while three of its neighbours read red for the same cause.
+    // The finger is left DOWN across the press, which is the case that was
+    // wrong first: the pointer kept its key and re-pressed it on the next move.
+    // ⚠️ IT READS THE LIT KEY BEFORE PRESSING, OR IT PASSES VACUOUSLY: nothing
+    // lit afterwards is also what a keyboard that never sounded reports, and
+    // that is exactly the state overlapping holders once put it in.
     const panicky = build(390, 260);
-    touch(panicky.kb, 'pointerdown', mid(panicky.kb, 0), 21);
-    const started = panicky.kb.keysEl.querySelectorAll('.k.down').length;
-    panicky.kb.padButtons[2].click();
-    const stopped = panicky.kb.keysEl.querySelectorAll('.k.down, .k.retrig').length;
-    panicky.log.length = 0;
-    touch(panicky.kb, 'pointermove', mid(panicky.kb, 1), 21);
-    touch(panicky.kb, 'pointerup', mid(panicky.kb, 1), 21);
-    d.assert('notes off stops everything even with a finger still on the keys, and the finger cannot start it again',
-      started === 1 && stopped === 0 && panicky.log.length === 0,
-      `${started} key lit by the finger, ${stopped} left after notes off · `
-      + `${panicky.log.length} notes from the finger that was still down`);
+    {
+      const p0 = lowOn(whitesOf(panicky.kb)[0]);
+      touch(panicky.kb, 'pointerdown', p0, 21, 'mouse');
+      const started = panicky.kb.keysEl.querySelectorAll('.k.down').length;
+      panicky.kb.padButtons[2].click();
+      const stopped = panicky.kb.keysEl.querySelectorAll('.k.down').length;
+      panicky.log.length = 0;
+      touch(panicky.kb, 'pointermove', lowOn(whitesOf(panicky.kb)[1]), 21, 'mouse');
+      touch(panicky.kb, 'pointerup', lowOn(whitesOf(panicky.kb)[1]), 21, 'mouse');
+      d.assert('notes off stops everything even with a finger still on the keys, and the finger cannot start it again',
+        started === 1 && stopped === 0 && panicky.log.length === 0,
+        `${started} key lit by the finger, ${stopped} left after notes off · `
+        + `${panicky.log.length} notes from the finger that was still down`);
+    }
 
     for (const p of probes) p.kb.destroy();
   }
+
 
   d.ready();
 

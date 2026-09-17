@@ -510,6 +510,21 @@ export const DEMOS = [
   // JACK graph and one instrument, so this page and `/keys/` take turns.
   // ⚠️ `settleMs` sizes the wait after control 0 ONLY, and control 0 is `Play`,
   // which on a cold board brings Yoshimi up over ten to forty seconds.
+  /**
+   * 🔴 THE FIRST PAGE TO USE `tabs.mjs`, WHICH HAS EXISTED WITH NO CALLER. It
+   * was on `/items/` for one commit and taken off, because three names over one
+   * list and one form is furniture. Three genuinely different views of one show
+   * is the case it was written for, and a component with no user is a component
+   * nothing grades.
+   */
+  // ⚠️ `capture`, NOT `video`. There is no `video` group and `byGroup` THREW
+  // rather than quietly dropping the row, which is the whole reason that check
+  // exists: an ungrouped demo still renders a complete-looking front page and
+  // the only way to notice is to count. Caught by the build on the first run.
+  { name: 'stage', group: 'capture', act: 4, created: '2026-09-17', built: true,
+    one: 'three views of one show, each a panel with the same picture in it',
+    tags: ['canvas', 'tabs', 'fullscreen'] },
+
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
     one: 'play a synthesizer in another building, and turn its knobs while you do',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },

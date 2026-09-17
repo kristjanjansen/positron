@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON · stage</title>
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTabs } from '/shell/tabs.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
+
+  const q = new URLSearchParams(location.search);
+
+  /**
+   * 🔴 THE PICTURE IS GENERATED HERE AND COMES FROM NOBODY'S SERVER. CLAUDE.md
+   * is explicit and it has been broken twice: *"super careful with external
+   * sources, better avoid"*, said about a harness that pulled recordings from
+   * archive.org on every run. A test picture that a page draws itself costs no
+   * bandwidth, needs no network, cannot 403, and is the same on every run.
+   *
+   * `pattern.mjs` is the one generated test picture in this project and nothing
+   * else draws one. It carries a clock, a frame counter and a burned-in check
+   * pattern that `readBurned` can read back, so a panel showing it is a panel
+   * whose picture can be GRADED rather than merely looked at.
+   */
+  const TABS = [
+    { id: 'audience', label: 'Audience' },
+    { id: 'controlroom', label: 'Control room' },
+    { id: 'archive', label: 'Archive' },
+  ];
+
+  const d = mount({
+    name: 'stage',
+    what: 'Three views of one show, each a panel with the same picture in it.',
+    // ⚠️ NO CONTROLS ROW. The tabs are the navigation and the panels carry
+    // their own, so a declared-empty row would paint a band of dead space.
+    controls: [],
+    readout: { panels: '', frames: '/s' },
+  });
+
+  /**
+   * ONE SOURCE, THREE PANELS. Asked for as *"use theee panels on stage tabs
+   * each as same testvideo playing"*, and the word that matters is SAME: one
+   * canvas is drawn once a frame and all three panels show it.
+   *
+   * ⚠️ A CANVAS CANNOT BE IN THREE PLACES, so the three panels each get their
+   * own `<canvas>` and one drawing loop paints the master and blits it to each.
+   * The alternative is `captureStream()` into three `<video>` elements, which
+   * is one encode and three decodes for a picture nobody is sending anywhere.
+   */
+  const master = document.createElement('canvas');
+  master.width = FRAME_W; master.height = FRAME_H;
+  const mctx = master.getContext('2d', { alpha: false });
+
+  const panels = TABS.map((t, i) => {
+    const c = document.createElement('canvas');
+    c.width = FRAME_W; c.height = FRAME_H;
+    return {
+      id: t.id,
+      canvas: c,
+      ctx: c.getContext('2d', { alpha: false }),
+      /**
+       * ⚠️ EVERY PANEL TAKES THE DEFAULTS, which is the point of the block: a
+       * page that wants a picture with a status and a way to make it big writes
+       * none of either. The centre is left empty because there is no answer
+       * that is right for every panel, and `/kit/` shows one filled.
+       */
+      panel: createVideoPanel({
+        media: c,
+        of: t.label.toLowerCase(),
+        // Three modes, one per tab, so the page demonstrates all of them rather
+        // than describing two of them.
+        fullMode: ['hover', 'footer', 'bare'][i],
+      }),
+    };
+  });
+
+  /**
+   * ⚠️ `createTabs` BUILDS ITS OWN PANELS AND HANDS THEM BACK. A page fills
+   * them; it does not supply them. That is what keeps the tab's own markup, its
+   * `role="tabpanel"` and its hidden state in one place rather than half here.
+   * ⚠️ AND THIS IS THAT COMPONENT'S FIRST REAL USE. It has been in `/kit/` and
+   * on no page since it was written: it went on `/items/` for one commit and
+   * came off, because three names over one list and one form is furniture.
+   * Three genuinely different views of one show is the case it was built for.
+   */
+  const tabs = createTabs({ tabs: TABS.map(({ id, label }) => ({ id, label })) });
+  for (const p of panels) tabs.panel(p.id).append(p.panel.el);
+  d.stack.add(tabs.el);
+
+  /**
+   * The drawing loop. `burn` is the project's own test picture and it takes a
+   * frame number, so the clock in the corner is real rather than decorative.
+   * ⚠️ IT DRAWS WHILE THE TAB IS VISIBLE AND STOPS WHEN IT IS NOT.
+   * `requestAnimationFrame` already pauses in a background tab, which is the
+   * behaviour wanted rather than something to work around.
+   */
+  let frames = 0, t0 = performance.now(), fps = 0;
+  function tick() {
+    burn(mctx, FRAME_W, FRAME_H, frames, { hue: videoHue(0) });
+    for (const p of panels) p.ctx.drawImage(master, 0, 0);
+    frames++;
+    const dt = (performance.now() - t0) / 1000;
+    if (dt >= 1) {
+      fps = frames / dt;
+      d.set('frames', fps.toFixed(1));
+      frames = 0; t0 = performance.now();
+    }
+    requestAnimationFrame(tick);
+  }
+  d.set('panels', panels.length);
+  requestAnimationFrame(tick);
+
+  // Every panel's default badge is told the same thing, because they all show
+  // the same picture and it is this page drawing it.
+  for (const p of panels) p.panel.presence?.set('online');
+
+  /**
+   * 🔴 NOTHING HERE OPENS A SOCKET, MAKES A SOUND OR PRESSES A CONTROL, and it
+   * is gated anyway. CLAUDE.md: a self-check never runs for a visitor, no
+   * exceptions, and the two arguments that were used to make exceptions are both
+   * answered in that file. Everything below reads what is already on screen.
+   */
+  function checks() {
+    if (q.get('selfcheck') !== '1') return;
+
+    d.assert('three panels, one for each tab', panels.length === 3 && tabs.el.querySelectorAll('.pos-vp').length === 3,
+      `${tabs.el.querySelectorAll('.pos-vp').length} panels in ${TABS.length} tabs`);
+
+    /**
+     * 🔴 THE FULLSCREEN BUTTON IS SQUARE, MEASURED RATHER THAN DECLARED. Asked
+     * for in those words with the brackets: *"(square!)"*. A button whose width
+     * comes from its glyph is a different width in every font, so this is the
+     * kind of claim that is true on the machine it was written on and false on
+     * somebody else's.
+     */
+    const btn = panels[0].panel.slots.right.querySelector('button');
+    const r = btn?.getBoundingClientRect();
+    d.assert('the fullscreen button is square', !!r && Math.abs(r.width - r.height) <= 0.5,
+      r ? `${r.width.toFixed(1)} by ${r.height.toFixed(1)} px` : 'there is no button in the right slot');
+
+    // The defaults are the component's whole argument: a page that wants a
+    // status and a way to go full writes neither.
+    const p0 = panels[0].panel;
+    d.assert('left is a status and right is a control, with nothing in the middle by default',
+      !!p0.slots.left.querySelector('.pos-pres') && !!p0.slots.right.querySelector('button')
+      && p0.slots.centre.childElementCount === 0,
+      `left ${p0.slots.left.childElementCount}, centre ${p0.slots.centre.childElementCount}, right ${p0.slots.right.childElementCount}`);
+
+    // A mode nobody named is a mode nobody can debug, so the component throws.
+    let threw = false;
+    try { p0.mode('enormous'); } catch { threw = true; }
+    d.assert('a fullscreen mode it does not know is refused rather than ignored', threw,
+      threw ? 'it throws' : 'it accepted a mode that does not exist');
+
+    /**
+     * 🔴 AND THE PICTURE IS REALLY BEING DRAWN, WHICH IS THE ONE CHECK ONLY THIS
+     * PAGE CAN MAKE. A canvas that is blank and a canvas that is painting look
+     * identical to every counter: the loop runs, the frame number rises, and
+     * `drawImage` of an empty source throws nothing. So this reads the check
+     * pattern BACK out of a panel's own canvas, which is what `pattern.mjs`
+     * burns it in for.
+     * ⚠️ IT READS A PANEL, NOT THE MASTER. The master is what the loop draws;
+     * a panel is what a visitor sees, and the blit between them is exactly the
+     * step that could be missing.
+     */
+    /**
+     * ⚠️ IT RETURNS A TIMESTAMP IN MILLISECONDS, OR NULL, and the first version
+     * of this check asserted on `got.ok` and `got.bits`, which do not exist. It
+     * read `undefined bits read` and went red for the right reason by luck
+     * rather than by design. A check has to be written against what a function
+     * actually returns, which is one look at the function.
+     */
+    const ms = readBurned(panels[2].ctx);
+    const near = Number.isFinite(ms) && Math.abs(Date.now() - ms) < 60_000;
+    d.assert('the picture in the last panel is the test picture, read back out of it',
+      near, Number.isFinite(ms)
+        ? `the burned clock reads ${new Date(ms).toISOString().slice(11, 23)}, ${Math.abs(Date.now() - ms)} ms from now`
+        : 'nothing decoded out of the canvas, so the panel is not showing the picture');
+  }
+
+  // The frame counter has to have moved before the picture can be read back, so
+  // the checks wait for a few frames rather than racing the first one.
+  let warmed = 0;
+  const warm = () => { if (++warmed >= 6) checks(); else requestAnimationFrame(warm); };
+  requestAnimationFrame(warm);
+
+  d.ready();
+  guard(d);
+</script>
