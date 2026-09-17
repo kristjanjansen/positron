@@ -425,7 +425,15 @@ button.pos-pri[data-busy="1"] {
    not jump when its first line arrives. */
 .pos-stack > div:empty, .pos-stack > section:empty, .pos-stack > p:empty,
 .pos-stack > figure:empty, .pos-stack > ul:empty, .pos-stack > ol:empty { display: none; }
-.pos-body { margin: 0 0 var(--pos-gap); }
+/* 🔴 NO MARGIN OF ITS OWN. Instructed 2026-09-17: *"do not do component
+   sideeffects like this. make a rule"*, after `.pos-readout`'s standalone
+   margin leaked into `/kit/` and made a sandbox row 33 px taller than its own
+   tallest child. A component that carries a gap carries it EVERYWHERE, including
+   into the places it was never meant for, and whoever places it then has to know
+   to undo it. The stack owns every gap between blocks, on both sides, and that
+   is the whole reason `demo/shell/stack.mjs` exists. `mount()` makes `.pos-body`
+   a stack child, so it gets its gap from above rather than giving itself one. */
+.pos-body { margin: 0; }
 .pos-body:empty { display: none; }
 /* ⚠️ And the things the SHELL stacks, for the same reason: the readout, the
    control bar and the log are siblings of the body, not children of it.
@@ -441,10 +449,12 @@ button.pos-pri[data-busy="1"] {
    ⚠️ SO WHATEVER FOLLOWS THE PAGE TAKES ITS GAP FROM `.pos-body`, and the
    joined surface at `.pos-report` does the same rather than typing its own 22.
    A shared measurement in two places is a measurement that will disagree. */
-/* Small: a readout ABOVE the body is part of the page's flow rather than its
-   foot, so it takes the ordinary gap. The big one belongs to the surface at the
-   bottom, whichever arrangement a page chose. */
-.pos-readout { margin-bottom: var(--pos-gap); }
+/* 🔴 AND THE READOUT CARRIES NONE EITHER, for the reason above. It is a stack
+   child on every page that has one, so the gap under it is the stack's. This
+   margin is what leaked: MEASURED in `/kit/`, a specimen readout inside a
+   sandbox row made the row 99 px tall against a tallest child of 66, and the
+   33 px was a fact about a page somewhere else. */
+.pos-readout { margin-bottom: 0; }
 
 /* a refused play() must be visible, not a black rectangle */
 /* Outlined, not filled: this is a fallback, and a second solid yellow button
@@ -599,8 +609,13 @@ button.pos-pri[data-busy="1"] {
    was paying for. ⚠️ It still wraps under 560 px, on purpose: there the rate
    group takes a row of its own and fills it, which is the phone layout the
    media query further down exists for. */
+/* ⚠️ 14 px, NOT 8. Asked 2026-09-17 with a photograph of `/knobs/`: *"add more
+   space beween"*, about the play button sitting hard against the badge beside
+   it. 8 px is right between two controls of the same kind, and wrong between a
+   control and a thing that only reports: the pair read as one object, and the
+   dot looked like part of the button. */
 .tbar {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   background: var(--card); border: 1px solid var(--line);
   /* 🔴 ONE PADDING ON BOTH AXES, AND THE THREE NUMBERS BELOW ARE ONE SUM.
      MEASURED with the bar mounted in headless Chrome: the play toggle sat at

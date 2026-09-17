@@ -60,6 +60,10 @@
      five badges laid out as inline text and ran together into one band with
      their dots touching the word before them. */
   .kit-row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+  /* ⚠️ NOTHING HERE UNDOES A COMPONENT'S MARGIN ANY MORE, because no component
+     has one. That was the first fix and it was the wrong one: a sandbox
+     cancelling a side effect leaves the side effect everywhere else. The margins
+     came off the components instead, and `.pos-stack` gives the gap. */
   /* A phone's width, on any screen. 320 px is narrower than an iPhone SE's 375
      and the commonest 390 and 412, so what overflows here overflows on all of
      them. The border says where the box ends, because a scroller whose edge is
@@ -506,8 +510,18 @@ createReport({ readout, showLog: false, joined: true })      // the same pair, s
       // a real `.pos-body` again, because the gap under a split log belongs to
       // the body rather than to the log; a plain div here would measure nothing
       splitPage = el('div', 'pos-body kit-mid', 'page');
-      box.append(el('p', 'kit-cap', 'split, which is the default'),
-        splitSpec.top, splitPage, splitSpec.foot);
+      /**
+       * 🔴 IN A STACK, BECAUSE A REAL PAGE IS ONE. The gaps this block measures
+       * used to come from the components' own margins, and those came off on
+       * 2026-09-17 so that a component cannot impose a gap on whoever places it.
+       * A specimen assembled by hand in a box then had no gaps at all and its
+       * own check said so, at `0.0 px above the page`. The fix is not to give
+       * the margins back: it is for the specimen to be arranged the way the
+       * thing it depicts is arranged.
+       */
+      const splitStack = createStack(undefined, 'kit-col');
+      splitStack.add(splitSpec.top, splitPage, splitSpec.foot);
+      box.append(el('p', 'kit-cap', 'split, which is the default'), splitStack.el);
 
       /**
        * 🔴 THE CELLS THEMSELVES, FOLDED IN FROM A SECTION OF THEIR OWN. Asked
