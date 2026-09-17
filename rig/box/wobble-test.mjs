@@ -84,6 +84,54 @@ const answer = (id, type, ms = 9000) => reply(type, ms, (r) => r.re === id);
 const RATE = 48000;
 
 /**
+ * 🔴 A TREMOLO IS A LEVEL WOBBLE AND A VIBRATO IS A PITCH ONE, AND THIS FILE
+ * MEASURED ONLY THE SECOND. Asked 2026-09-17 after it reported that this
+ * instrument has no LFO: *"Sure there is no lfo?"*. The right question, because
+ * the claim was over-general in two ways at once. It was measured on ONE patch,
+ * `AddSynth Morph`, so a patch with no LFO configured proves nothing about the
+ * instrument. And it tracked PITCH, so an amplitude LFO would have read as flat
+ * no matter how obvious it was to a listener.
+ *
+ * The envelope is one level per 20 ms slice, which sees anything under 25 Hz.
+ * Smoothed over five slices before counting, because without that the crossing
+ * counter rides slice-to-slice noise at very nearly Nyquist and reports the same
+ * saturated number about everything: the FIRST build of this file did exactly
+ * that and read 19.15 Hz to four figures about every controller at every value.
+ */
+function levelWobble(pcm) {
+  const N = Math.floor(RATE * 0.02);
+  const raw = [];
+  for (let o = 0; o + N <= pcm.length; o += N) {
+    let s = 0;
+    for (let i = 0; i < N; i++) s += pcm[o + i] * pcm[o + i];
+    raw.push(Math.sqrt(s / N) / 32768);
+  }
+  const W = 5;
+  const lvl = [];
+  for (let i = 0; i + W <= raw.length; i++) {
+    let s = 0;
+    for (let j = 0; j < W; j++) s += raw[i + j];
+    lvl.push(s / W);
+  }
+  const n = lvl.length;
+  if (n < 24) return { hz: NaN, depth: NaN, mean: NaN };
+  const mean = lvl.reduce((a, b) => a + b, 0) / n;
+  const xs = lvl.map((_, i) => i - (n - 1) / 2);
+  const sxx = xs.reduce((a, x) => a + x * x, 0) || 1;
+  const slope = xs.reduce((a, x, i) => a + x * lvl[i], 0) / sxx;
+  const r = lvl.map((v, i) => v - (mean + slope * xs[i]));
+  const rms = Math.sqrt(r.reduce((a, v) => a + v * v, 0) / n);
+  const gate = rms * 0.4;
+  let cross = 0, side = 0;
+  for (const v of r) {
+    if (v > gate) { if (side < 0) cross++; side = 1; }
+    else if (v < -gate) { if (side > 0) cross++; side = -1; }
+  }
+  const secs = n * 0.02;
+  return { hz: (cross / 2) / secs, depth: mean ? rms / mean : 0, mean };
+}
+
+/**
  * The pitch of each 2048-sample window, by autocorrelation, every 512 samples.
  * A 20 ms slice is far too short to ask about a 130 Hz note directly: one slice
  * holds about two and a half cycles and an FFT of it resolves 50 Hz, which is
@@ -185,6 +233,27 @@ function selfTest() {
   ok('it reads 6.0 Hz as 6.0 Hz', Math.abs(fast.hz - 6) < 0.9, `${fast.hz.toFixed(2)} Hz`);
   ok('it tells 40 cents from 8', shallow.cents < slow.cents / 2, `${shallow.cents.toFixed(1)} against ${slow.cents.toFixed(1)}`);
   ok('and it does not need a big wobble to find the rate', Math.abs(shallow.hz - 6) < 0.9, `${shallow.hz.toFixed(2)} Hz at 8 cents deep`);
+
+  // The LEVEL analyser, on tones whose tremolo is known exactly.
+  const am = (hz, depth, secs = 5) => {
+    const n = Math.round(RATE * secs), out = new Int16Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / RATE;
+      const g = 1 + depth * Math.sin(2 * Math.PI * hz * t);
+      out[i] = Math.round(9000 * g * Math.sin(2 * Math.PI * 130.81 * t));
+    }
+    return out;
+  };
+  const flatL = levelWobble(am(0, 0));
+  const trem4 = levelWobble(am(4.0, 0.35));
+  const trem7 = levelWobble(am(7.0, 0.35));
+  console.log('the level analyser, on tones whose tremolo is known exactly');
+  console.log(`      no tremolo             ${flatL.hz.toFixed(2)} Hz · ${(flatL.depth * 100).toFixed(1)}%`);
+  console.log(`      4.0 Hz, 35%            ${trem4.hz.toFixed(2)} Hz · ${(trem4.depth * 100).toFixed(1)}%`);
+  console.log(`      7.0 Hz, 35%            ${trem7.hz.toFixed(2)} Hz · ${(trem7.depth * 100).toFixed(1)}%`);
+  ok('a steady tone has no tremolo', flatL.depth < 0.03, `${(flatL.depth * 100).toFixed(1)}% of level noise`);
+  ok('it reads a 4 Hz tremolo as 4 Hz', Math.abs(trem4.hz - 4) < 0.6, `${trem4.hz.toFixed(2)} Hz`);
+  ok('and a 7 Hz one as 7 Hz', Math.abs(trem7.hz - 7) < 0.9, `${trem7.hz.toFixed(2)} Hz`);
 }
 
 /** Put the controller at `v` and watch the note that is already sounding. */
@@ -200,8 +269,10 @@ async function at(ctrl, v) {
   // ⚠️ `wobble` RETURNS NULL when the note has no pitch to track, and spreading
   // a null leaves a take whose fields are silently absent rather than a take
   // that says it could not answer. A bandwidth of 0 does exactly that.
-  const w = wobble(joinCap()) || { hz: NaN, cents: NaN, hz0: NaN };
-  return { ...w, ...measure(cap) };
+  const joined = joinCap();
+  const w = wobble(joined) || { hz: NaN, cents: NaN, hz0: NaN };
+  const L = levelWobble(joined);
+  return { ...w, ...measure(cap), tremHz: L.hz, tremDepth: L.depth };
 }
 
 ws.onopen = async () => {
@@ -240,7 +311,9 @@ ws.onopen = async () => {
         const sd = (xs) => Math.sqrt(mean(xs.map((x) => (x - mean(xs)) ** 2)));
         for (const [what, f, unit] of [['brightness', (m) => m.centroid, 'Hz'],
                                        ['level', (m) => m.peak, ''],
-                                       ['pitch wobble', (m) => m.cents || 0, 'cents']]) {
+                                       ['pitch wobble', (m) => m.cents || 0, 'cents'],
+                                       ['tremolo rate', (m) => m.tremHz || 0, 'Hz'],
+                                       ['tremolo depth', (m) => (m.tremDepth || 0) * 100, '%']]) {
           const lo = pick(arms.lo, f), hi = pick(arms.hi, f);
           const spread = Math.max(sd(lo), sd(hi));
           const gap = Math.abs(mean(hi) - mean(lo));
