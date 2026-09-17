@@ -194,7 +194,21 @@
      * Sound arriving is a different measurement and `buffer` is the one that
      * says whether it is healthy.
      */
-    readout: { 'cc out': '/s', 'cc played': '/s', 'round trip': 'ms', buffer: 'ms' },
+    /**
+     * 🔴 `sound out` REPLACES `cc played`, AND IT IS THE CELL THIS PAGE HAS
+     * NEEDED ALL DAY. Every other number here is about bytes ARRIVING — frames,
+     * the cushion, the round trip — and 2026-09-17 was spent inside the gap that
+     * leaves: three separate causes of silence were found, and every one of them
+     * presented as a page whose counters all read correct. This is the loudest
+     * sample LEAVING the audio graph, which is the only number on the page that
+     * can be checked against a pair of ears.
+     * ⚠️ `cc played` WAS THE ONE TO GO. It reads the board's own coalescer and
+     * is blank until somebody moves a controller, so it was empty exactly when a
+     * visitor most wanted the page to say something, and what it reports is
+     * already implied by `cc out` beside it.
+     * ⚠️ AND THE COUNT STAYS EVEN, which `mount()` throws over.
+     */
+    readout: { 'cc out': '/s', 'sound out': '', 'round trip': 'ms', buffer: 'ms' },
     /**
      * 🔴 THE NUMBERS AND THE LOG ARE ONE SURFACE AT THE FOOT OF THIS PAGE.
      * Asked for 2026-09-16, and this is the page it was asked about. Split,
@@ -376,6 +390,17 @@
     onPcm: () => {
       const st = board.stats();
       d.set('buffer', Math.round(st.bufferedMs));
+      /**
+       * ⚠️ EVERY TENTH FRAME, WHICH IS FIVE TIMES A SECOND. A readout cell is a
+       * fixed box so it cannot reflow, but reading an analyser fifty times a
+       * second to paint a number nobody can follow at that rate is work for
+       * nothing. Five is fast enough to look live and slow enough to read.
+       */
+      if (st.frames % 10 === 0) {
+        const out = board.outLevel();
+        // Nothing measured prints as an em dash, never as a confident 0.
+        d.set('sound out', out === null ? '' : out.toFixed(3), out > 0.002 ? 'ok' : 'warn');
+      }
       // One cell for both kinds of missing, because a reader wants to know
       // whether what they are hearing is intact, which is one question. The LINE
       // says which, because the two want opposite fixes: running dry wants a
@@ -416,7 +441,7 @@
       const now = performance.now();
       if (meter && now > meterAt) playedPerSec = (m.out - meter.out) / ((now - meterAt) / 1000);
       meter = m; meterAt = now;
-      d.set('cc played', Math.max(0, Math.round(playedPerSec)));
+      void playedPerSec;   // still measured, and reported through the log rather than a cell
     }
   }
 
