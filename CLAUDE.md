@@ -46,6 +46,39 @@ not yet done**, `LESSONS.md` for why the rules below exist,
 goes** — including the two renames that were priced and rejected, so they are
 not re-litigated.
 
+## Pushing needs the PERSONAL GitHub account, and it is not the active one
+
+🔴 **`git push` ANSWERS `Repository not found`, AND THAT IS AN AUTH FAILURE
+WEARING A 404.** Two accounts are logged in here — `Kristjan-Jansen_enefit`,
+which is ACTIVE, and `kristjanjansen`, which owns `github.com/kristjanjansen/
+positron`. GitHub returns 404 rather than 403 for a private repo the caller
+cannot see, so the message says the repository does not exist when what it means
+is that this token may not look at it. It cost most of a session, spread over
+three sittings, because "not found" reads as a wrong remote URL or a deleted
+repo, and both were checked before the accounts were.
+
+```sh
+gh auth switch --user kristjanjansen     # the account that owns the repo
+git push origin HEAD
+gh auth switch --user Kristjan-Jansen_enefit   # put it back, ASKED FOR 2026-09-17
+```
+
+⚠️ **SWITCH BACK.** The active account is machine-wide and the work one is the
+default for a reason; leaving it on the personal account changes what every
+other repository on this laptop authenticates as.
+⚠️ **THE KEYCHAIN SHORTCUT DOES NOT WORK HERE AND WAS TRIED.** Storing the
+personal token against `username=kristjanjansen` so the URL could carry the user
+and survive a switch: `git credential-osxkeychain get` reads the entry back, and
+`git credential fill` finds nothing, because the helper on PATH and the one git
+resolves out of Xcode's `gitconfig` are different binaries. `git credential
+approve` does not fix it either. SSH is not a way round it as things stand —
+`ssh -T git@github.com` answers `Permission denied (publickey)`, so there is no
+key on the personal account yet. Adding one is the only thing that would remove
+this dance.
+⚠️ **AND THE COMMITS ARE AUTHORED WITH THE WORK ADDRESS.** `user.email` here is
+`Kristjan.Jansen@enefit.ee`, on a personal repository. Nothing was changed about
+that, because attribution is not a thing to alter without being asked.
+
 ## Run and check
 
 ```sh
