@@ -511,7 +511,7 @@ export const DEMOS = [
   // ⚠️ `settleMs` sizes the wait after control 0 ONLY, and control 0 is `Play`,
   // which on a cold board brings Yoshimi up over ten to forty seconds.
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
-    one: 'turn three knobs on a synthesizer in another building, and any of them can move by itself',
+    one: 'play a synthesizer in another building, and turn its knobs while you do',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
 
   // 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is
@@ -592,31 +592,22 @@ export const DEMOS = [
   // is what makes a row clickable anyway.
 
   /**
-   * 🔴 THE SLUG IS `keys`, RENAMED FROM `box` ON 2026-09-16 ON INSTRUCTION. The
-   * deployed `/keys/` is GONE: a link anybody kept 404s and no redirect has been
-   * written, exactly as with `radio1965` -> `radio` the same day.
+   * 🔴 `keys` IS RETIRED, 2026-09-17: *"keys seems to be dead. bring keyboard to
+   * knobs and archive keys"*. The page is at `archive/keys/`, its keyboard is on
+   * `/knobs/`, and the deployed `/keys/` is gone with no redirect written — the
+   * same as `radio1965` and `box` before it.
    *
-   * ⚠️ `src` DID NOT MOVE, AND THAT IS THE DECISION RATHER THAN AN OVERSIGHT.
-   * `rig/box/listen.html` is the board's own listener: it sits beside the code
-   * `push.sh` ships to the Raspberry Pi, and `LAYOUT.md` rule 2 names this file
-   * as the example of a page that lives with its hardware. Moving it to
-   * `demo/keys/index.html` would make `built: true` the obvious next step, and
-   * that would open a shared board in another building on every run of the
-   * suite, dozens of times a day. A demo's identity is its SLUG; the slug moved
-   * and the file did not, which is the cheap half of a rename and the whole of
-   * what a visitor sees. `rig/box/` keeps its name because the BOARD is still
-   * the box — `box.mjs`, `box.hello`, `box.alive`.
+   * ⚠️ IT WAS `box` UNTIL 2026-09-16 and `rig/box/` keeps its name, because the
+   * BOARD is still the box: `box.mjs`, `box.hello`, `box.alive`. What left
+   * `rig/box/` is one HTML file; everything `push.sh` ships to the Raspberry Pi
+   * is untouched.
+   * ⚠️ AND IT NEVER HAD A HARNESS. `node demo/verify.mjs keys` answered `nothing
+   * for this harness to verify` for its whole life, because it was not a built
+   * demo — which is how it could be silent for a visitor while every counter it
+   * displayed read correct. `archive/keys/README.md` has what was and was not
+   * proved about that silence.
    */
-  // rig/box/listen.html, deployed to /keys/ by workers/view/build.mjs.
-  { name: 'keys', group: 'instruments', act: 4, created: '2026-09-10', built: false, page: '/keys/',
-    src: 'rig/box/listen.html',
-    // ⚠️ THIS LINE HAS NOW BEEN STALE TWICE AND NOTHING TYPE-CHECKS A SENTENCE.
-    // It read 'its instruments, 1965 radio, and a granulator over both' after
-    // both of those left, then 'three instruments' after two of the three left
-    // on 2026-09-16 (`archive/box-fluidsynth-hexter/`). There is one, and the
-    // page's own `what` is this line verbatim.
-    one: 'play an instrument on a Raspberry Pi in another building, and hear the sound it makes come back',
-    tags: ['WS', 'relay', 'PCM', 'live board'] },
+
 
   // A CHECKUP, not a player — and that is what makes it shippable. The playing
   // page (rig/m1/play.html) needs a peer with Ableton open, so it

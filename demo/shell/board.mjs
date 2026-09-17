@@ -1,6 +1,13 @@
 // demo/shell/board.mjs — the Raspberry Pi, from a browser.
 //
-// Two pages play the same board over the same relay: `/keys/` sends notes and
+// ⚠️ ONE PAGE USES THIS NOW. `/keys/` was retired on 2026-09-17 (`archive/keys/`)
+// and `/knobs/` moved onto this module the same day, which is the opposite order
+// from the one this header was written in. The reasoning below is kept because
+// it is about WHY the merge was worth making and which half won each argument,
+// and because the next page that plays a board should start here rather than
+// hand-rolling the same six things a third time.
+//
+// Two pages played the same board over the same relay: `/keys/` sent notes and
 // `/knobs/` sends controller values. Everything between the two of them was
 // written twice — joining the room, working out which socket in it is the
 // board, reading the 12-byte frame header, converting int16 to float, raising

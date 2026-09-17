@@ -21,6 +21,7 @@
   // on 2026-09-16 (archive/box-pappus/), and this page has never had one.
   import { mount, guard } from '/shell/shell.mjs';
   import { createSlider, createSliderGroup, HAND_YIELD_MS } from '/shell/slider.mjs';
+  import { createKeyboard } from '/shell/keyboard.mjs';
   // The sweep's own lap, so a check waiting for it cannot fall out of step with
   // it the next time somebody changes how fast a hand moves.
   import { MOVES } from '/shell/hand.mjs';
@@ -83,7 +84,20 @@
    * Yoshimi does not implement the General MIDI vibrato controllers at all, so
    * there was never a vibrato here to offer.
    */
-  const VOLUME = 7;
+  /**
+   * 🔴 VOLUME CAME OUT ON 2026-09-17: *"knobs work but volume is pointless.
+   * remove and bring 2 interestin cc's"*. It went in the same day because it was
+   * the only third controller that measured as a clean mover — level 0.0000 to
+   * 0.0375 against a spread of 0.0000 inside one arm — and measuring as a mover
+   * is not the same as being worth a slider. That is twice on this page, after
+   * bandwidth and FM amplitude, and the two failures have one cause: every
+   * controller measurement taken here HELD ONE NOTE for the whole run, which is
+   * blind by construction to everything that acts when a note STARTS. With a
+   * keyboard on the page that family is exactly where the interesting ones live,
+   * so `rig/box/note-test.mjs` plays short notes and measures the envelope
+   * instead. The two replacements are chosen from that and are not in yet: the
+   * board went off the relay before the run.
+   */
   /**
    * 🔴 THE CUTOFF OPENS AT 100, NOT AT THE MIDDLE. Asked 2026-09-16: *"cutoff
    * 100 by default"*, after *"cutoff below 38 is nada"*.
@@ -130,7 +144,7 @@
     // sentence and a visitor believes it. `manifest.mjs`'s own line moved in the
     // same change, verbatim, so arriving from the index does not mean reading
     // the same claim twice in two wordings.
-    what: 'Turn three knobs on a synthesizer in another building, and any of them can move by itself.',
+    what: 'Play a synthesizer in another building, and turn its knobs while you do.',
     /**
      * Six cells, and every one of them moves.
      *
@@ -309,20 +323,8 @@
     onInput: (v) => move(RESO, v),
     onChange: (v) => land(RESO, v),
   });
-  /**
-   * ⚠️ IT OPENS AT 100 RATHER THAN AT THE MIDDLE, for the same reason the cutoff
-   * does: 64 is where the patch's own maker left it, and a level control that
-   * starts halfway down means the first thing anybody hears is quieter than the
-   * instrument actually is. The whole range is still there.
-   */
-  const volume = createSlider({
-    label: 'volume', aria: 'part volume', min: 0, max: 127, step: 1, value: 100,
-    hand: true, onHand: handSaid('volume'),
-    onInput: (v) => move(VOLUME, v),
-    onChange: (v) => land(VOLUME, v),
-  });
   // Named, because it is moved below the transport once that exists. See there.
-  const knobs = createSliderGroup([cutoff, reso, volume], { pair: true });
+  const knobs = createSliderGroup([cutoff, reso], { pair: true });
   d.el.append(knobs.el);
 
   // ── audio ─────────────────────────────────────────────────────────────────
@@ -548,7 +550,44 @@
   // you met sliders that did nothing, and the reason they did nothing was
   // further down the page. `append` MOVES a node already in the document, so
   // this is a reordering rather than a second copy.
-  d.el.append(knobs.el);
+  //
+  // 🔴 AND THE KEYBOARD SITS UNDER THE SLIDERS, 2026-09-17: *"bring keyboard to
+  // knobs and archive keys"*. `/keys/` is the page this came from and it is
+  // retired; what it did that this page did not is play notes, and the sliders
+  // are worth more with something to play them against. The order is the order
+  // you use it in: start the instrument, set the sound, play it.
+  //
+  // ⚠️ `d.stack.add`, NOT `append`. `demo/shell/stack.mjs` owns the gap between
+  // blocks on a page, and a node appended straight to `d.el` gets the rhythm
+  // because `d.el` IS the stack. Both forms work; this one says which.
+  d.stack.add(knobs.el);
+
+  /**
+   * 🔴 A KEY PRESSED WHILE THE PAGE HOLDS ITS OWN NOTE IS A SECOND VOICE, NOT A
+   * REPLACEMENT. This page holds one note so the sliders have something to act
+   * on, and that note stays held while you play: Yoshimi is polyphonic and the
+   * board sums whatever is sounding. Pressing stop releases everything, the
+   * page's note included.
+   * ⚠️ IT STARTS THE AUDIO, because a key is a gesture and this page's other
+   * gesture is Play. Somebody who presses a key first should hear it rather
+   * than discover a second control they were supposed to press.
+   * ⚠️ AND IT GOES OUT UNGATED. `makeCcSend` thins CONTROLLER values, where only
+   * the newest matters; a note is an event, and a note held back is a key that
+   * did nothing.
+   */
+  const kb = createKeyboard(d.el, {
+    base: 60,
+    onDown: (note) => {
+      kb.lightNote(note, true);
+      board.startAudio().then(() => sendId({ type: 'note.on', note, vel: VEL, channel: 0 }));
+    },
+    onUp: (note) => {
+      kb.lightNote(note, false);
+      sendId({ type: 'note.off', note, channel: 0 });
+    },
+    onPanic: () => { sendId({ type: 'note.panic' }); d.log('every note released'); },
+  });
+  d.stack.add(kb.el);
 
   /**
    * One note, and the moment it started, because the audio check below cannot
@@ -656,7 +695,7 @@
     // fight the glide below within one frame, which is a page arguing with
     // itself in front of somebody, and stop here means stop. It goes before the
     // `set` calls so the homing glide is the last thing that touches a handle.
-    for (const k of [cutoff, reso, volume]) k.hand?.stop('pause');
+    for (const k of [cutoff, reso]) k.hand?.stop('pause');
     // The sliders come back to neutral, which is where the patch's own filter
     // is, and the board is told to release every note. The board may be holding
     // notes this page never pressed, so the message has to go out as well as
@@ -667,9 +706,9 @@
     // two of them: the cutoff opens where the filter can be heard and the
     // resonance opens where its maker left it.
     cutoff.set(CUTOFF_HOME, { glideMs: 240 });
-    volume.set(100, { glideMs: 240 });
     reso.set(NEUTRAL, { glideMs: 240 });
-    d.log(`stopped: every note released, and the three sliders back where they opened`);
+    kb.panic();
+    d.log(`stopped: every note released and both sliders back where they opened`);
   }
 
   // Reachable from a probe, the way `window.__hls` and `window.__strip` are on
@@ -715,13 +754,13 @@
       quiet === null && again?.restate === true && again.set.length === 1,
       again ? `nothing to say at ${RESTATE_MS - 1} ms, and ${again.set.length} controller restated at ${RESTATE_MS}` : 'nothing was restated');
 
-    // The relay's budget is counted in MESSAGES, so three sliders moving
-    // together have to cost one message rather than three.
+    // The relay's budget is counted in MESSAGES, so two sliders moving together
+    // have to cost one message rather than two.
     const g3 = makeCcSend();
-    g3.put(CUTOFF, 91); g3.put(RESO, 40); g3.put(VOLUME, 118);
+    g3.put(CUTOFF, 91); g3.put(RESO, 40);
     const both = g3.tick(0);
-    d.assert('three sliders moving together travel in one message',
-      both?.set?.length === 3 && g3.stats.messages === 1,
+    d.assert('two sliders moving together travel in one message',
+      both?.set?.length === 2 && g3.stats.messages === 1,
       both ? `${g3.stats.messages} message carrying ${both.set.length} values` : 'nothing went out');
 
     /**
@@ -743,7 +782,7 @@
      * this one asserts each slider is still at its own home, and it would be
      * asserting this check's leftovers otherwise.
      */
-    for (const k of [cutoff, reso, volume]) {
+    for (const k of [cutoff, reso]) {
       const lane = k.el.querySelector('.sld-lane');
       const box = lane.getBoundingClientRect();
       const knob = k.el.querySelector('.sld-knob').getBoundingClientRect();
@@ -755,8 +794,8 @@
     sendTo = gate;
     const drove = g4.tick(0)?.set ?? [];
     const ctrls = [...new Set(drove.map(([c]) => c))];
-    d.assert('the three sliders drive three different controllers',
-      ctrls.length === 3 && [CUTOFF, RESO, VOLUME].every((c) => ctrls.includes(c)),
+    d.assert('each slider drives its own controller',
+      ctrls.length === 2 && [CUTOFF, RESO].every((c) => ctrls.includes(c)),
       `CC ${ctrls.sort((a, b) => a - b).join(', ') || 'nothing'}`);
 
     // ⚠️ THE NAME OF THIS CHECK WAS TRUE UNTIL THE CUTOFF MOVED. Both sliders
@@ -1231,7 +1270,7 @@
       { id: 'you', label: 'Browser', kind: 'here', tech: 'browser',
         join: false,
         children: [
-          { id: 'sliders', label: 'sliders', sub: '3 controllers', tech: 'browser',
+          { id: 'sliders', label: 'controls', sub: 'keys, 2 knobs', tech: 'browser',
         },
           { id: 'gate', label: 'send gate', sub: 'one value per 20ms', tech: 'browser',
         },

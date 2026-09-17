@@ -12,7 +12,8 @@
 // guarantee, because nobody had to open one.
 //
 // The guard lives on the board and the board is the only end that can be
-// graded: `/keys/` is `rig/box/listen.html`, it is `built: false`, it publishes
+// graded: `/keys/` was `rig/box/listen.html`, retired 2026-09-17 to
+// `archive/keys/`. It was `built: false`, it published
 // no `__demo` and `demo/verify.mjs` cannot see it. A guard nothing can grade is
 // a guard that will rot, so this is the harness.
 //

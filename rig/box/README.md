@@ -299,7 +299,8 @@ visible problem into an invisible one.
 ### 🔴 The board cleans up after itself now (2026-09-16)
 
 `/keys/` has no granulator on it at all since 2026-09-16, not even the message:
-`grep -c pappus rig/box/listen.html` answers **0**. So the guarantee moved onto
+`grep -c pappus archive/keys/listen.html` answers **0** (the page was retired
+on 2026-09-17). So the guarantee moved onto
 the board, where it should always have been. A guarantee that depended on
 somebody opening a second page was never a guarantee, because nobody had to open
 one.
@@ -351,7 +352,11 @@ person or another program to ask, and because it reads the liveness verdict
 **out loud**, as `ok:true, on:true, kept:true` with the holder and both ages,
 which the sweep cannot do for a caller that wants an answer now.
 
-⚠️ **`/keys/` is `listen.html`, it is `built: false`, and `demo/verify.mjs`
+⚠️ **`/keys/` WAS RETIRED 2026-09-17 and is at `archive/keys/`.** Its keyboard is
+on `/knobs/`, which IS a built demo at 35/35 — so the gap described below is
+closed for the page that replaced it. What follows is kept because it is the
+reason the gap existed at all.
+⚠️ **`/keys/` was `listen.html`, it was `built: false`, and `demo/verify.mjs`
 cannot see it**: it publishes no `__demo` and has zero asserts. That is why the
 guard lives on the BOARD and why there is a harness for it:
 **`node rig/box/insert-test.mjs --room studio-1`**, with two connections (one

@@ -15,30 +15,58 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
-- 🔴 **`/keys/` STILL HAS NO SOUND.** Reported again 2026-09-17: *"Keyboard does
-  not have sound"*, after a fix that was real and evidently not this one — any
-  other client's `voices.list` was being treated as this page's own answer, and
-  the handler ends by re-selecting the patch, which makes Yoshimi load an .xiz
-  and kills the note you are holding. Three loads a visit, now one.
-  ⚠️ **EVERY MEASUREMENT SO FAR HAS BEEN UPSTREAM OF THE FAULT.** Frames, buffer,
-  cushion, lost, and a peak computed from the bytes as they arrive: all green,
-  all measuring what ARRIVED rather than what the audio graph OUTPUTS. That is
-  the `pcm-playout` trim bug's exact shape, where six measurements were green and
-  the defect sat downstream of every one of them. The next move is to hook
-  `AudioWorkletNode.prototype.connect` before the page loads, put an analyser on
-  what reaches the destination, and read THAT.
-  ⚠️ And four ways in all produced sound under CDP — a click locally, a click on
-  the deploy, a computer key, and a browser with the real autoplay policy — so
-  whatever this is, it is not reproduced by any of them.
+### XR, asked for 2026-09-17, in one message
 
-- 🔴 **THE `/knobs/` VOLUME SLIDER COMES OUT.** Reported 2026-09-17: *"Volume
-  alider is pointless on knobs, replace"*. It went in because it was the only
-  third controller that measured as a clean mover, and measuring as a mover is
-  not the same as being worth a slider. That is twice on this page: bandwidth and
-  FM amplitude moved the sound by four to nine times their own floor and were
-  *"nada ... noisy wobble"*. Check whether the board accepts pitch bend, which
-  would be unmistakable and is not a wobble; if it does not, the honest answer is
-  two sliders rather than a third that fills a slot.
+Quoted verbatim below because this arrived as one dictated block and the detail
+in it is the specification. **General, across every VR/AR page:**
+
+- 🔴 **ONE WAY OUT, AND IT IS THE ONLY ONE.** *"all vr/ar general  make one
+  general way to get out. hold down any controller button for looooong enough
+  then it quits. no other exit methods/ui's for now."* ⚠️ This replaces the
+  current any-button-ends-the-session rule, which is written into CLAUDE.md as
+  a safety property — a long hold is still a way the PAGE owns, so the rule
+  survives, but the dead-man's timer and the tablet's quit button are not
+  exits any more.
+- **Rays are global and grey.** *"use global rays, (white, ends faded). when
+  something active happens lighten them up. no coloring of rays, grayscale."*
+- **No controller geometry, no tablet, anywhere.** *"rm controller
+  geometry/tablet on all (only if i am ask on specific demo so keep that code
+  ready to pop into scene)"*. Keep both components, unreferenced and ready.
+- **The tablet keeps existing, without its quit button.** *"rm quit button from
+  tablet but keep that component around"*.
+- **The slider stays, but never in an AR scene.** *"slider is ok. but again, do
+  not show it on any vr/xr when showing ar scenes"*.
+- **Dots follow the room.** *"map dots to room geometry always"*.
+- **Doubled dots with moving panels.** *"window seems to have doubled dots
+  somehow when having moving panels (mirror demo)"*.
+- **Panels face the viewer in both axes.** *"make them always look at me not
+  only horiz but also vertic"*.
+- **The move bar is half the size and monochrome.** *"retuce movebar size under
+  panel 2x. make it monochrome, just lightening up when needed."*
+
+**`/held/`:** *"text input appears in vr/ar but 3d type does not change nof after
+submit nor realtime"* and *"texts in xr seems to be behind to walls sometime"*.
+
+**`/blocks/`:** *"in xr blocks are angled against wall, rotated a bit, not fully
+against wall"*, and on the joystick reaching through walls, *"no, keeep them,
+som some hilite or smt when pushed against wall"*.
+
+- 🔴 **`/keys/` IS ARCHIVED AND ITS KEYBOARD MOVES TO `/knobs/`.** Instructed
+  2026-09-17: *"keys seems to be dead. bring keyboard to knobs and archive
+  keys"*. The silence was never reproduced from here — four ways in under CDP
+  all made sound — and the page is being retired rather than debugged further,
+  which is the user's call and closes it.
+  ⚠️ `rig/box/listen.html` is the file. It must NOT move under `demo/`: the
+  LAYOUT rule about a page that belongs with its hardware is what keeps a shared
+  Raspberry Pi in another building out of every run of the suite.
+
+- 🔴 **TWO INTERESTING CONTROLLERS FOR `/knobs/`, AND VOLUME COMES OUT.**
+  Instructed 2026-09-17: *"knobs work but volume is pointless. remove and bring 2
+  interestin cc's"*. ⚠️ **A KEYBOARD CHANGES WHICH CONTROLLERS ARE EVEN
+  MEASURABLE.** Every controller test on this page so far held ONE note for the
+  whole run, which is correct for a page with no keyboard and blind to anything
+  that acts when a note STARTS: attack, release and portamento cannot show up in
+  a held-note measurement at all. Re-measure with notes being re-triggered.
 
 - 🔴 **`/knobs/` MUST USE `board.mjs`, WHICH IT DOES NOT.** Asked 2026-09-17:
   *"Ahould board.mjs used by both? Make inra close as possible on keys and
