@@ -1,0 +1,14 @@
+Return-Path: <>
+Auto-Submitted: auto-replied
+X-Auto-Response-Suppress: All
+Authentication-Results: mx.cloudflare.net;
+	spf=pass (mx.cloudflare.net: domain of noreply@corp.example designates
+	198.51.100.30 as permitted sender) smtp.mailfrom=noreply@corp.example;
+	dkim=none;
+	dmarc=none header.from=corp.example
+From: Anna Korp <anna@corp.example>
+To: positron@positron.studio
+Subject: Out of office: Re: hello
+Message-ID: <ooo-4471@corp.example>
+
+I am away until the 29th.

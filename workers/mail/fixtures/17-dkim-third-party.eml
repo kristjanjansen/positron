@@ -1,0 +1,10 @@
+Authentication-Results: mx.cloudflare.net;
+	spf=pass (mx.cloudflare.net: domain of send@relay.example designates
+	198.51.100.12 as permitted sender) smtp.mailfrom=send@relay.example;
+	dkim=pass header.d=relay.example header.s=r1 header.b=99887766
+From: Someone <someone@other.example>
+To: positron@positron.studio
+Subject: signed by the relay, not by the author
+Message-ID: <relay-1@relay.example>
+
+Nothing here vouches for other.example, and no DMARC result was stamped.

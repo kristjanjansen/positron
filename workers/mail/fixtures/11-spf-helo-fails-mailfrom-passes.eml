@@ -1,0 +1,14 @@
+Authentication-Results: mx.cloudflare.net;
+	spf=fail (mx.cloudflare.net: 203.0.113.4 is not permitted to use
+	out7.mailer.example) smtp.helo=out7.mailer.example;
+	spf=pass (mx.cloudflare.net: domain of hei@sober.example designates
+	203.0.113.4 as permitted sender) smtp.mailfrom=hei@sober.example;
+	dkim=pass header.d=sober.example header.s=k2 header.b=1234abcd;
+	dmarc=pass header.from=sober.example policy.dmarc=none;
+	arc=none
+From: Hei <hei@sober.example>
+To: positron@positron.studio
+Subject: found a typo on the front page
+Message-ID: <typo-1@sober.example>
+
+The kit page says 43 demos and the index lists 46 rows.

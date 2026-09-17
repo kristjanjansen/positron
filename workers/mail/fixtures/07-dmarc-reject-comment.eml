@@ -1,0 +1,11 @@
+Authentication-Results: mx.cloudflare.net;
+	dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=paypal.example;
+	spf=softfail (mx.cloudflare.net: transitioning domain of
+	bounce@evil-mx.example) smtp.mailfrom=bounce@evil-mx.example;
+	dkim=none
+From: PayPal <service@paypal.example>
+To: positron@positron.studio
+Subject: Account limited
+Message-ID: <fake-2@evil-mx.example>
+
+Verify now.

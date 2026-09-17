@@ -1,0 +1,12 @@
+Authentication-Results: mx.cloudflare.net;
+	dkim=pass header.d=kodu.example header.s=k1 header.b=Qz9ab12x;
+	dmarc=pass header.from=kodu.example policy.dmarc=none;
+	spf=none (mx.cloudflare.net: no SPF records found for
+	postmaster@kodu.example) smtp.mailfrom=jaan@kodu.example;
+	arc=none
+From: Jaan <jaan@kodu.example>
+To: positron@positron.studio
+Subject: a question about the tapes page
+Message-ID: <20260917.9f21@kodu.example>
+
+How were the lengths measured? I could not find it written down.
