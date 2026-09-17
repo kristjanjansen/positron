@@ -72,6 +72,59 @@ const DIE_SVG = `<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="tr
  *            options:(names:string[], at?:number)=>void,
  *            disabled:(v:boolean)=>void}}
  */
+/**
+ * 🔴 THE MIDDLE OF A SEGMENTED ROW, AS A THING YOU CAN CHOOSE FROM. Extracted
+ * 2026-09-17 so `stepper.mjs` can have one too, asked for as *"stepper: want
+ * middle pne selectable like synth patches"*. It was written here first, for
+ * the patch row, and a second copy in the stepper is exactly the drift `/kit/`
+ * exists to catch: this project already has three hand-built segmented rows in
+ * its history and one of them is why `createChoice` exists.
+ *
+ * OUR PAINT, THE PLATFORM'S LIST. The visible half is a span we draw, so it
+ * takes the row's font and its ellipsis; the working half is a real `<select>`
+ * laid over it, so the list is the one the operating system already knows how
+ * to show, including on a phone where a hand-built menu is a small disaster.
+ */
+export function createValueCell({ what = 'it', onPick } = {}) {
+  const cell = el('span', 'pos-pick-cell');
+  const name = el('span', 'pos-pick-n', '—');
+  const select = el('select', 'pos-pick-sel', '', { 'aria-label': `choose a ${what}` });
+  select.onchange = () => onPick?.(select.selectedIndex);
+  cell.append(name, select);
+
+  const show = (label_, i) => {
+    name.textContent = label_ ?? '—';
+    // ⚠️ THE TITLE IS THE WHOLE NAME. The cell ellipsizes at a fixed width, so
+    // the only place a long name survives is the tooltip.
+    cell.title = label_ ?? '';
+    if (Number.isInteger(i) && i >= 0 && i < select.options.length) select.selectedIndex = i;
+  };
+  const options = (names, at = 0) => {
+    select.textContent = '';
+    for (const n of names) select.append(el('option', '', n));
+    const i = names.length ? Math.max(0, Math.min(names.length - 1, at)) : -1;
+    if (i >= 0) select.selectedIndex = i;
+    /**
+     * 🔴 AND IT DRAWS THE NAME IT JUST SELECTED. IT DID NOT, AND THE CONTROL
+     * READ `—` FOREVER. PHOTOGRAPHED on `/mirror/`: a LOOK picker with ten
+     * shaders in it, a shader running, and a long em dash where the name goes.
+     * The list was handed over correctly, `selectedIndex` was set correctly, and
+     * the VISIBLE half was never told, so the cell kept the placeholder it is
+     * built with until somebody pressed an arrow.
+     * ⚠️ IT IS NOT THE CALLER'S JOB TO CALL `show()` AFTERWARDS. Two pages did
+     * and one did not, which is the definition of a thing that belongs in the
+     * component.
+     */
+    name.textContent = i >= 0 ? names[i] : '—';
+    cell.title = i >= 0 ? names[i] : '';
+    // A list of one has nowhere to go; a list of none is not a list yet.
+    const usable = names.length > 1;
+    select.disabled = !usable;
+    cell.dataset.flat = usable ? '' : '1';
+  };
+  return { el: cell, name, select, show, options };
+}
+
 export function createPicker({ label, what = 'it', prev, next, random, onPick, cls = '' } = {}) {
   const wrap = el('span', `pos-pick ${cls}`.trim());
   if (label) wrap.append(el('span', 'pos-pick-l', label));
@@ -98,11 +151,8 @@ export function createPicker({ label, what = 'it', prev, next, random, onPick, c
   for (const b of [back, fwd]) centreSymbol(b);
 
   // The middle slot: our paint, the platform's list.
-  const cell = el('span', 'pos-pick-cell');
-  const name = el('span', 'pos-pick-n', '—');
-  const select = el('select', 'pos-pick-sel', '', { 'aria-label': `choose a ${what}` });
-  select.onchange = () => onPick?.(select.selectedIndex);
-  cell.append(name, select);
+  const { el: cell, name, select, show: drawCell, options: fillCell } =
+    createValueCell({ what, onPick });
 
   seg.append(back, cell, fwd);
 
@@ -122,44 +172,10 @@ export function createPicker({ label, what = 'it', prev, next, random, onPick, c
     buttons,
     select,
     /** Draw the current one. `i` keeps the invisible select in step with it. */
-    show: (label_, i) => {
-      name.textContent = label_ ?? '—';
-      // ⚠️ THE TITLE IS THE WHOLE NAME. The cell ellipsizes at a fixed width, so
-      // the only place a long name survives is the tooltip.
-      cell.title = label_ ?? '';
-      if (Number.isInteger(i) && i >= 0 && i < select.options.length) select.selectedIndex = i;
-    },
+    show: drawCell,
     /** Replace the list. The board's library arrives over the wire, so this is
      *  called long after the control is on screen. */
-    options: (names, at = 0) => {
-      select.textContent = '';
-      for (const n of names) select.append(el('option', '', n));
-      const i = names.length ? Math.max(0, Math.min(names.length - 1, at)) : -1;
-      if (i >= 0) select.selectedIndex = i;
-      /**
-       * 🔴 AND IT DRAWS THE NAME IT JUST SELECTED. IT DID NOT, AND THE CONTROL
-       * READ `—` FOREVER.
-       *
-       * PHOTOGRAPHED on `/mirror/`: a LOOK picker with ten shaders in it, a
-       * shader running, and a long em dash where the name goes. The list was
-       * handed over correctly, `selectedIndex` was set correctly, and the
-       * VISIBLE half was never told — so the cell kept the placeholder it is
-       * built with until somebody pressed ‹ or ›, at which point the name
-       * appeared and the control looked as though it had been fine all along.
-       *
-       * ⚠️ IT IS NOT THE PAGE'S JOB TO CALL `show()` AFTERWARDS. Two pages did
-       * and one did not, which is the definition of a thing that belongs in the
-       * component: this function already knows the names and already knows
-       * which one is current, so a caller repeating it is a second place for
-       * the same fact to be written and a second place for it to be forgotten.
-       */
-      name.textContent = i >= 0 ? names[i] : '—';
-      cell.title = i >= 0 ? names[i] : '';
-      // A list of one has nowhere to go; a list of none is not a list yet.
-      const usable = names.length > 1;
-      select.disabled = !usable;
-      cell.dataset.flat = usable ? '' : '1';
-    },
+    options: fillCell,
     disabled: (v) => {
       buttons.forEach((b) => { b.disabled = !!v; });
       select.disabled = !!v || select.options.length < 2;
