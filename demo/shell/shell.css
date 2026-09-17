@@ -182,7 +182,16 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 button, .pos-btn {
   font: 500 13px/1 var(--mono); color: var(--fg);
   background: var(--card2); border: 1px solid var(--line2);
-  border-radius: 4px; padding: 0 14px; height: 34px; cursor: pointer;
+  /* 🔴 18 px, NOT 14. Asked 2026-09-17: *"Cratechoice add more x spaing
+     (general rule on buttons design)"*, and it is stated here rather than on
+     `createChoice`, because a choice is a row of ordinary buttons and a padding
+     that belongs to one component is a padding the next component gets wrong.
+     A segmented row is where it shows worst: the options sit border to border,
+     so the only air a word has is its own padding, and at 14 px three short
+     words like `dry room hall` read as one band of text with lines through it.
+     ⚠️ IT IS THE HORIZONTAL ONE ONLY. `height: 34px` is the touch target and is
+     shared with the slider lane and the transport bar, so it does not move. */
+  border-radius: 4px; padding: 0 18px; height: 34px; cursor: pointer;
   -webkit-tap-highlight-color: rgba(255,212,0,.12);
   /* 🔴 A LONG PRESS ON A CONTROL IS ALWAYS A MIS-PRESS, NEVER A COPY.
      Holding a button on iPhone raised the text loupe and dropped selection
