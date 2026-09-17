@@ -210,11 +210,20 @@
 
   // ── the control room's form ───────────────────────────────────────────────
   const room = tabs.panel('controlroom');
-  const title = createField({ label: 'question', placeholder: 'Meaning of life', grow: 'wide' });
+  /**
+   * ⚠️ FILLED IN, NOT HINTED AT. Asked 2026-09-17: *"fill sample q sending with
+   * same stuff you haev in hints"*. A form whose fields are all placeholders is
+   * a form nobody can press Send on without typing first, which on a page whose
+   * whole point is watching a question arrive puts a chore in front of the
+   * demonstration. The third option stays empty, because a question with two
+   * answers and room for a third says more about the control than three filled
+   * ones would.
+   */
+  const title = createField({ label: 'question', value: 'Meaning of life', grow: 'wide' });
   const opts = [
-    createField({ label: 'option', placeholder: 'Be' }),
-    createField({ label: 'option', placeholder: 'Not to be' }),
-    createField({ label: 'option', placeholder: '' }),
+    createField({ label: 'option', value: 'Be' }),
+    createField({ label: 'option', value: 'Not to be' }),
+    createField({ label: 'option', placeholder: 'and a third, if you like' }),
   ];
   /**
    * ⚠️ THE QUESTION ON ONE ROW, THE OPTIONS ON THE NEXT. Asked 2026-09-17:
@@ -231,8 +240,12 @@
 
   const taken = () => opts.map((o) => o.value().trim()).filter(Boolean);
   const send = (delayMs) => {
-    const t = title.value().trim() || 'Meaning of life';
+    const t = title.value().trim();
     const o = taken();
+    // ⚠️ NO SILENT FALLBACK TO THE SAMPLE. It used to send `Meaning of life`
+    // when the field was empty, so clearing the question and pressing Send asked
+    // the audience something nobody had typed.
+    if (!t) { d.log('a question needs something to ask', 'warn'); return; }
     if (o.length < 2) { d.log('a question needs at least two options', 'warn'); return; }
     if (!delayMs) { ask(t, o); return; }
     /**
