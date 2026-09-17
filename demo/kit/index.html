@@ -51,6 +51,12 @@
      five badges laid out as inline text and ran together into one band with
      their dots touching the word before them. */
   .kit-row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+  /* A phone's width, on any screen. 320 px is narrower than an iPhone SE's 375
+     and the commonest 390 and 412, so what overflows here overflows on all of
+     them. The border says where the box ends, because a scroller whose edge is
+     invisible reads as a row that has been cut off. */
+  .kit-phone { width: 320px; max-width: 100%; border: 1px dashed var(--kit-edge);
+               border-radius: 4px; padding: 8px; }
   .kit-blk { border: 1px dashed var(--kit-edge); border-radius: 4px; color: var(--dim2);
              font: 400 11px/1 var(--mono); text-align: center; padding: 18px 0; }
   /* 🔴 THE DEFECT, KEPT ALIVE ON PURPOSE. `.kbd { margin: 0 0 10px }` in
@@ -229,6 +235,8 @@
   const busySpec = new Map();
   // The stepper whose middle is a value, for the check that it really is one.
   let stepperPick = null;
+  // The narrow keyboard, for the check that it really overflows.
+  let kbNarrow = null;
   let presLive = null;        // one badge that can change, measured over time
 
   // The pair in the invisible hand block: one slider with a hand and one
@@ -396,8 +404,14 @@ const row = page.stack();                // a block that is itself a column`,
     (box) => {
       box.classList.add('kit-wide');
       stackSpec = createStack(undefined, 'kit-stackspec');
-      for (const [t, cls] of [['a block', ''], ['another', ''],
-                              ['and one whose own class says margin: 0 0 10px', 'kit-tight']]) {
+      // ⚠️ NO ARTICLE ON A SPECIMEN'S LABEL. Asked 2026-09-17 as `a block ->
+      // block`. CLAUDE.md already carries this rule for diagram labels, where a
+      // label is a NAME and names do not take articles: `a granulator` reads as
+      // the start of a sentence somebody did not finish. A specimen in this
+      // sandbox is the same kind of thing, and the article was doing the same
+      // nothing.
+      for (const [t, cls] of [['block', ''], ['another', ''],
+                              ['margin: 0 0 10px', 'kit-tight']]) {
         const b = el('div', `kit-blk${cls ? ' ' + cls : ''}`, t);
         stackBlocks.push(b);
         stackSpec.add(b);
@@ -410,9 +424,9 @@ const row = page.stack();                // a block that is itself a column`,
       // would have made the row read as four blocks with a hole in it.
       box.append(el('p', 'kit-cap', 'with a block that never got filled'));
       emptySpec = createStack(undefined, 'kit-stackspec');
-      emptySpec.add(el('div', 'kit-blk', 'a block'));
+      emptySpec.add(el('div', 'kit-blk', 'block'));
       emptyBlock = el('div', 'kit-blk');          // nothing in it, ever
-      emptySpec.add(emptyBlock, el('div', 'kit-blk', 'the next block'));
+      emptySpec.add(emptyBlock, el('div', 'kit-blk', 'next block'));
       box.append(emptySpec.el);
     });
 
@@ -441,7 +455,7 @@ createReport({ readout, showLog: false, joined: true })      // the same pair, s
       // declares: 44 px, the diagram's number, rather than the 22 px between
       // two ordinary rows. Without a `.pos-body` here there is nothing for that
       // distance to be measured from.
-      joinedPage = el('div', 'pos-body kit-mid', 'the page goes here');
+      joinedPage = el('div', 'pos-body kit-mid', 'page');
       box.append(el('p', 'kit-cap', 'joined'), joinedPage, joinedSpec.foot);
 
       // ── joined, with only one of the two ────────────────────────────────
@@ -465,17 +479,42 @@ createReport({ readout, showLog: false, joined: true })      // the same pair, s
       splitSpec.line('holding a note', null, 2480);
       // a real `.pos-body` again, because the gap under a split log belongs to
       // the body rather than to the log; a plain div here would measure nothing
-      splitPage = el('div', 'pos-body kit-mid', 'the page goes here');
+      splitPage = el('div', 'pos-body kit-mid', 'page');
       box.append(el('p', 'kit-cap', 'split, which is the default'),
         splitSpec.top, splitPage, splitSpec.foot);
+
+      /**
+       * 🔴 THE CELLS THEMSELVES, FOLDED IN FROM A SECTION OF THEIR OWN. Asked
+       * 2026-09-17: *"rm separate readout cells, merge with newer one"*. A
+       * readout was shown twice on this page: once as half of a surface and once
+       * as a row of cells two screens away, so a reader met the same component
+       * twice and had to work out they were the same thing. Same defect as the
+       * presence badge, in the other half of the page.
+       */
+      const cells = el('div', 'pos-readout');
+      for (const [k, v, u, state] of [['latency', '26.2', 'ms', 'ok'], ['holes', '3', '', 'warn'],
+                                      ['lost', '0', '', ''], ['worst', '', 'ms', 'pending']]) {
+        const c = el('div', 'pos-cell');
+        c.append(el('div', 'pos-k', k));
+        // ⚠️ THE UNIT GOES INSIDE THE VALUE, which is what shell.mjs does:
+        // `.pos-v` is display:block, so a unit beside it as a SIBLING drops to a
+        // line of its own with the value's whole line-height between them. The
+        // sandbox existing to catch drift and then drifting itself is the joke
+        // that writes itself.
+        const val = el('span', 'pos-v', v);
+        if (state) val.dataset.state = state;
+        if (u) val.append(el('span', 'pos-u', u));
+        c.append(val); cells.append(c);
+      }
+      box.append(el('p', 'kit-cap', 'the cells on their own, an even number of them'), cells);
     });
 
   section('buttons', '',
     `el('button', '', 'ordinary', { type: 'button' })
-el('button', 'pos-pri', 'the primary one', { type: 'button' })`,
+el('button', 'pos-pri', 'primary', { type: 'button' })`,
     (box) => {
       box.append(el('button', '', 'ordinary', { type: 'button' }));
-      const p = el('button', 'pos-pri', 'the primary one', { type: 'button' }); box.append(p);
+      const p = el('button', 'pos-pri', 'primary', { type: 'button' }); box.append(p);
       const dis = el('button', '', 'disabled', { type: 'button' }); dis.disabled = true; box.append(dis);
       const busy = el('button', '', 'working', { type: 'button' }); busy.dataset.busy = '1'; box.append(busy);
     });
@@ -491,7 +530,7 @@ createStepper({ what: 'look', prev, next, pick: { options: names, at, onPick } }
       const stack = createStack(undefined, 'kit-col');
       const names = ['kaleidoscope', 'rings', 'weave', 'drift'];
 
-      const o1 = out('nothing pressed yet');
+      const o1 = out('nothing pressed');
       let a1 = 0;
       const show1 = () => { o1.textContent = `${a1} · ${names[a1]}`; };
       const rolled = createStepper({
@@ -540,7 +579,7 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
         onInput: (v) => { o.textContent = `damp ${v} Hz`; } });
       const c = createSlider({ label: 'off', min: 0, max: 1, step: 0.1, value: 0.5 });
       c.disabled(true);
-      box.append(el('button', '', 'a button, for height', { type: 'button' }), a.el, b.el, c.el, o);
+      box.append(el('button', '', 'button, for height', { type: 'button' }), a.el, b.el, c.el, o);
     });
 
   // ── several sliders ─────────────────────────────────────────────────────
@@ -608,7 +647,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     + 'holding it, and it hands over in one frame the moment you touch it.',
     `createSlider({ label: 'cutoff', min: 0, max: 127, step: 1, hand: true, onHand })`,
     (box) => {
-      const o = out('press the button on the right of the lane');
+      const o = out('not moved');
       const a = createSlider({
         label: 'cutoff', min: 0, max: 127, step: 1, value: 100, hand: true,
         onInput: (v) => { o.textContent = `cutoff ${v}`; },
@@ -791,7 +830,15 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
       const m = createField({ label: 'message', rows: 4, grow: 'wide',
         placeholder: 'what worked, what did not, what is missing',
         onInput: (v) => { o.textContent = `message · ${v.split('\n').length} lines, ${v.length} characters`; } });
-      box.append(a.el, b.el, c.el, m.el, o);
+      /**
+       * ⚠️ A BUTTON ON TOP, FOR HEIGHT. Asked 2026-09-17: *"add buitton on top
+       * examples"*. The slider block already carries one for the same reason: a
+       * field is only ever seen beside the controls it sits with, and whether a
+       * single-line box lines up with a button is a thing to look at rather than
+       * to reason about. It does nothing.
+       */
+      box.append(el('button', '', 'button, for height', { type: 'button' }),
+        a.el, b.el, c.el, m.el, o);
     });
 
   // ── keyboard ────────────────────────────────────────────────────────────
@@ -802,16 +849,16 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
   // and are already at the length the house rule allows. A gallery of controls
   // is the right home for what a control does.
   section('keyboard',
-    'An octave of piano keys, played with the letter row a to k, and a pad under '
-    + 'them for the octave and for stopping everything. Swipe the keys sideways '
-    + 'and the row scrolls without sounding anything; press one and hold it, and '
-    + 'from then on sliding across the keys plays them. A mouse never waits, '
-    + 'because nothing on a desktop can take a drag away from one.',
-    `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })`,
+    'An octave of piano keys with a pad under them, where a swipe scrolls the row without '
+    + 'sounding anything and a press followed by a slide plays across the keys.',
+    `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })
+createKeyboard(parent, { letters: false })   // a second one on the same page`,
     (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
       const o = out('');
+
       const holder = el('div', '', null); holder.style.width = '100%';
-      box.append(holder);
       const kb = createKeyboard(holder, {
         base: 60,
         onDown: (n) => { kb.lightNote(n, true); o.textContent = `note ${n} down`; },
@@ -819,10 +866,37 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
         onOctave: (n) => { o.textContent = `octave moved · leftmost note is now ${n}`; },
         // The keyboard has already released every key it was holding by the
         // time this runs. It is here for a page whose sound is made somewhere
-        // the component cannot reach — on /keys/ it is a message to the board.
+        // the component cannot reach.
         onPanic: () => { o.textContent = 'notes off'; },
       });
-      box.append(o);
+
+      /**
+       * 🔴 THE SAME COMPONENT IN A PHONE'S WIDTH, WHERE IT SCROLLS. Asked
+       * 2026-09-17: *"kit keyboard: add example with mobiel overflow"*. The keys
+       * have a floor of 49 px and never shrink below it, so a narrow box shows
+       * about seven of the thirteen and the row becomes a scroller. On a desktop
+       * the block above never reaches that state, so the behaviour every phone
+       * gets was the one thing this gallery could not show.
+       * ⚠️ 320 px, WHICH IS NARROWER THAN ANY PHONE ANYBODY OWNS. An iPhone SE
+       * is 375 and the commonest screens are 390 and 412, so a specimen that
+       * overflows at 320 overflows on all of them, with room to spare.
+       * ⚠️ `letters: false`, BECAUSE BOTH KEYBOARDS HEAR THE LETTER ROW. They
+       * bind `window`, so one press of `a` sounded two notes and lit two keys,
+       * which in a gallery reads as a broken component rather than as two
+       * components doing exactly what they were told.
+       */
+      const narrow = el('div', 'kit-phone');
+      const kb2 = createKeyboard(narrow, {
+        base: 60, letters: false,
+        onDown: (n) => { kb2.lightNote(n, true); o.textContent = `note ${n} down, in the narrow one`; },
+        onUp: (n) => { kb2.lightNote(n, false); o.textContent = `note ${n} up, in the narrow one`; },
+      });
+      kbNarrow = kb2;
+
+      stack.titled('AT FULL WIDTH', holder);
+      stack.titled('IN A PHONE\u2019S WIDTH, WHERE IT SCROLLS', narrow);
+      stack.add(o);
+      box.append(stack.el);
     });
 
   // ── picker ──────────────────────────────────────────────────────────────
@@ -1062,7 +1136,7 @@ links: [{ from: 'you', to: 'synth', label: 'note number' },   // into a box INSI
     'An arrow between two boxes in one machine takes the tie\'s place rather than being '
     + 'drawn over it, in the gap the two share or in a lane inside the machine when it has '
     + 'to reach past the box between them.',
-    `children: [{ id: 'in',    label: 'the capture' },
+    `children: [{ id: 'in',    label: 'capture' },
            { id: 'synth', label: 'synthesiser' },
            { id: 'rec',   label: 'recorder' }]
 links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
@@ -1082,7 +1156,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
             note: 'One board running **three programs at once**, with sound moving '
                 + 'between them and never leaving the machine.',
             children: [
-              { id: 'in', label: 'the capture', sub: 'the microphone',
+              { id: 'in', label: 'capture', sub: 'the microphone',
                 note: 'Reads the room. What it hears goes **two ways at once**, which '
                     + 'is why one arrow is in the gap and one is in a lane.' },
               { id: 'synth', label: 'synthesiser', sub: 'plays the note',
@@ -1226,17 +1300,27 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
     (box) => {
       box.classList.add('kit-wide');
       const t = createTable({
+        /**
+         * 🔴 A MIDDOT JOINING TWO FACTS IN ONE CELL IS TWO COLUMNS. Asked
+         * 2026-09-17: *"make rule not to middot in tables. its a separate col"*.
+         * This specimen read `14:42:24 · Rehearsal moved to Thursday`, which is
+         * a time and a message glued together, and a table that does that gives
+         * up everything a table is for: the times no longer line up with each
+         * other, nothing can be right-aligned, and a long message pushes its own
+         * timestamp off the screen.
+         */
         columns: [
           { key: 'dir', width: 52, label: 'state', hi: true },
+          { key: 'at', width: 62, label: 'at' },
           { key: 'text', grow: true, label: 'what happened' },
           { key: 'sent', width: 42, label: 'sent', align: 'right' },
         ],
         empty: 'nothing yet',
       });
       t.set([
-        { dir: 'live', text: '14:42:24 \u00b7 Rehearsal moved to Thursday', sent: 'sent' },
-        { dir: 'away', text: '13:29:16 \u00b7 Doors at seven, not half past', sent: '' },
-        { dir: 'wait', text: '13:02:09 \u00b7 A title long enough to show what a growing column does with it', sent: '' },
+        { dir: 'live', at: '14:42:24', text: 'Rehearsal moved to Thursday', sent: 'sent' },
+        { dir: 'away', at: '13:29:16', text: 'Doors at seven, not half past', sent: '' },
+        { dir: 'wait', at: '13:02:09', text: 'A title long enough to show what a growing column does with it', sent: '' },
       ]);
       box.append(t.el);
       // 🔴 THE NEGATIVE CONTROL, ON THE PAGE. The throw is this component's one
@@ -1258,28 +1342,6 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // unmeasured prints as `0` or as a lone unit — `''`, `null` and `NaN` all
   // become one em dash with the unit hidden, because a zero reads as a very
   // confident measurement and a bare `%` reads as a number that went missing.
-  section('readout cells',
-    '',
-    `d.set('latency', 26.2);  d.set('holes', 3, 'warn')
-an even number of cells · nothing measured yet is an em dash, never 0`,
-    (box) => {
-      const r = el('div', 'pos-readout');
-      for (const [k, v, u, state] of [['latency', '26.2', 'ms', 'ok'], ['holes', '3', '', 'warn'], ['lost', '0', '', ''], ['worst', '', 'ms', 'pending']]) {
-        const c = el('div', 'pos-cell');
-        c.append(el('div', 'pos-k', k));
-        // ⚠️ THE UNIT GOES INSIDE THE VALUE, which is what shell.mjs does —
-        // `.pos-v` is display:block, so a unit next to it as a SIBLING drops to a
-        // line of its own with the value's whole line-height between them. The
-        // sandbox existing to catch drift and then drifting itself is the joke
-        // that writes itself; it is nested now, like the real one.
-        const val = el('span', 'pos-v', v);
-        if (state) val.dataset.state = state;
-        if (u) val.append(el('span', 'pos-u', u));
-        c.append(val); r.append(c);
-      }
-      box.style.display = 'block'; box.append(r);
-    });
-
   // ── presence ────────────────────────────────────────────────────────────
   // 🔴 FOUR STATES, AND THE FOURTH IS THE HONEST ONE. A badge that opens on
   // `offline` is a page asserting a measurement of hardware in another building

@@ -40,7 +40,15 @@
     // ⚠️ NO CONTROLS ROW. The tabs are the navigation and the panels carry
     // their own, so a declared-empty row would paint a band of dead space.
     controls: [],
-    readout: { panels: '', frames: '/s' },
+    /**
+     * 🔴 NO READOUT. Asked 2026-09-17 as *"rm 3 frames"*, and both cells deserved
+     * it for the same reason: `panels` read 3 on every visit and `frames` read
+     * 60.0, which is the rule this project already has in writing. A cell showing
+     * a structural constant reads as a measurement and teaches a reader to skip
+     * the row. The shell hides the box when a page declares none, so there is no
+     * empty surface painting its own edges either.
+     */
+    readout: null,
   });
 
   /**
@@ -100,20 +108,15 @@
    * `requestAnimationFrame` already pauses in a background tab, which is the
    * behaviour wanted rather than something to work around.
    */
-  let frames = 0, t0 = performance.now(), fps = 0;
+  // The frame number is still counted, because `burn` needs one and the check
+  // below waits on it. It is simply not shown: nothing about it moves.
+  let frames = 0;
   function tick() {
     burn(mctx, FRAME_W, FRAME_H, frames, { hue: videoHue(0) });
     for (const p of panels) p.ctx.drawImage(master, 0, 0);
     frames++;
-    const dt = (performance.now() - t0) / 1000;
-    if (dt >= 1) {
-      fps = frames / dt;
-      d.set('frames', fps.toFixed(1));
-      frames = 0; t0 = performance.now();
-    }
     requestAnimationFrame(tick);
   }
-  d.set('panels', panels.length);
   requestAnimationFrame(tick);
 
   // Every panel's default badge is told the same thing, because they all show

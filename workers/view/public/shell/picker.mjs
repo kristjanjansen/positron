@@ -99,7 +99,41 @@ export function createValueCell({ what = 'it', onPick } = {}) {
     cell.title = label_ ?? '';
     if (Number.isInteger(i) && i >= 0 && i < select.options.length) select.selectedIndex = i;
   };
+  /**
+   * 🔴 THE WIDTH COMES FROM THE WIDEST NAME IN THE LIST, NOT FROM A CONSTANT.
+   * Asked 2026-09-17 with a picture of `‹ kaleidoscope ›`: *"w should be set on
+   * widest member ("..." too wide ones)"*.
+   *
+   * The fixed width was already right about the thing that matters, and the
+   * comment in shell.css says it: a cell that sizes to its CURRENT text moves
+   * the arrows every time you step, so the control you are about to press again
+   * is not where it was. What was wrong was the number. 13 ch and 22 ch were
+   * guesses at a phone and a desktop, so a list of short names sat in a box half
+   * empty and a list of long ones ellipsised inside a row with room to spare.
+   * Reserving the widest MEMBER keeps the no-movement guarantee and spends
+   * exactly the room the list needs.
+   *
+   * ⚠️ IT SETS THE CUSTOM PROPERTY, NOT `width`. The one-column phone rule sets
+   * `width: auto` on this cell, and an inline `width` would beat it and drag the
+   * row off a small screen. Setting `--pick-w` lets the base rule use it and
+   * lets the phone rule still win.
+   * ⚠️ AND IT IS CAPPED, which is what the ellipsis is for. A 60 character name
+   * would make a control nothing else on the page could sit beside, so past the
+   * cap the name is cut and the whole of it stays in the title.
+   */
+  const MAX_CH = 24;
+  const MIN_CH = 8;
+  const fitWidth = (names) => {
+    const widest = names.reduce((n, s2) => Math.max(n, [...s2].length), 0);
+    // One spare character, because a proportional fallback face is wider than
+    // the mono one this is measured in.
+    const ch = Math.min(MAX_CH, Math.max(MIN_CH, widest + 1));
+    cell.style.setProperty('--pick-w', `${ch}ch`);
+    return ch;
+  };
+
   const options = (names, at = 0) => {
+    fitWidth(names);
     select.textContent = '';
     for (const n of names) select.append(el('option', '', n));
     const i = names.length ? Math.max(0, Math.min(names.length - 1, at)) : -1;
