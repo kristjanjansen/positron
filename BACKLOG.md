@@ -15,6 +15,27 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **THE FIVE BLACK KEYS SIT IN THE WRONG PLACES, AND MOVING THEM COSTS
+  NOTHING.** From `research/piano-key-proportions-2026-09.md`, 2026-09-17. A real
+  piano does not centre its black keys on the joins between whites; ours does, to
+  0.00 px, and it is one of only two implementations surveyed that does. The
+  offsets are `B/6` for C# and D#, `B/4` for F# and A#, and dead centre for G#.
+  MEASURED on our own component at 390 px with the candidate layout applied from
+  a harness: the narrowest white strip goes **19.67 px to 27.00**, the spread
+  between strips **14.66 px to 2.44**, the row width and the hit test both
+  UNCHANGED. So the phone fit, `KEY_MIN_PX` and every assert about overflow are
+  untouched.
+  ⚠️ **THE WIDTHS ARE RIGHT AND SHOULD NOT MOVE.** 0.66 and the 0.622 height
+  ratio are both mid-field. What is wrong is only where the five sit.
+  ⚠️ AND OUR 32.33 px BLACK KEY IS THE LARGEST OF THE FOUR MEASURED, so the
+  target-size worry is settled: a piano black key is a routine exception, we
+  clear the 24 px WCAG AA floor, and 44 px would take the row from 413 to 554 and
+  a phone from 7.6 visible white keys to 5.6.
+  §4.1 has four implementation notes, including reading the offset off the pitch
+  class rather than the letter so the generic-map promise survives, and
+  re-deriving the stacking assert, which currently samples symmetrically about
+  the join and so cannot see the change.
+
 - 🔴 **A NEW DEMO CALLED `stage`, ASKED FOR 2026-09-17.** Verbatim, because the
   detail in it is the specification:
   *"V1 There are three tabs: audience controlroom archive."*
