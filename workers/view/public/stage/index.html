@@ -176,6 +176,33 @@
      * rather than by design. A check has to be written against what a function
      * actually returns, which is one look at the function.
      */
+    /**
+     * 🔴 GOING FULL SETS THE STATE, BY WHICHEVER ROUTE IT TOOK. This is the
+     * check the iPhone bug needed and did not have: `fullscreen.mjs` has two
+     * paths, and the fallback one is a class change with NO EVENT, so a panel
+     * that learned its state only from `fullscreenchange` was correct on a
+     * laptop and silently wrong on the one platform the fallback exists for.
+     * PHOTOGRAPHED before this: the picture in a 16 by 9 box at the top of an
+     * iPhone with the page showing through underneath.
+     * ⚠️ IT IS GATED WITH EVERYTHING ELSE HERE. `/videoradio/` once pressed full
+     * screen in a check that ran for visitors and took somebody out of their own
+     * full screen about twenty seconds after they pressed play.
+     */
+    const p1 = panels[1].panel;
+    p1.full(true).then(() => {
+      const on = p1.el.dataset.full;
+      const stage = getComputedStyle(p1.el.querySelector('.pos-vp-stage'));
+      const ratio = stage.aspectRatio;
+      return p1.full(false).then(() => {
+        d.assert('going full sets the state and gives the picture the whole box, by either route',
+          !!on && ratio !== '16 / 9' && !p1.el.dataset.full,
+          `full read "${on || '(nothing)'}" with aspect-ratio ${ratio}, and came back to "${p1.el.dataset.full || '(nothing)'}"`);
+      });
+    }).catch((e) => {
+      d.assert('going full sets the state and gives the picture the whole box, by either route',
+        false, `it threw: ${e.message}`);
+    });
+
     const ms = readBurned(panels[2].ctx);
     const near = Number.isFinite(ms) && Math.abs(Date.now() - ms) < 60_000;
     d.assert('the picture in the last panel is the test picture, read back out of it',

@@ -2623,19 +2623,33 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 
 
 /* ── a video panel: a picture and three slots under it — shell/video-panel.mjs ──
-   🔴 THE FOOTER IS A THREE COLUMN GRID, NOT A FLEX ROW WITH SPACE BETWEEN.
-   `space-between` puts the middle item wherever the widths of its neighbours
-   leave it, so a centre slot drifts as a presence word changes length, and this
-   project has a standing rule against anything that moves while you look at it.
-   A grid with equal outer columns pins the middle to the middle whatever is
-   beside it. */
-.pos-vp { display: block; }
+   🔴 ONE BOX, NOT TWO THINGS NEAR EACH OTHER. Asked 2026-09-17 after looking at
+   `/mirror/`: *"See how mirror video panel connects and see how they connect.
+   Keep footer upper border"*. That page had it right first and this component
+   had it wrong: the footer sat OUTSIDE the picture's box with a margin, so a
+   status dot and a button floated under a frame rather than belonging to it.
+   `/mirror/`'s `.pane` is one rounded box holding the canvas and a `.bar` with a
+   `border-top`, which is the same shape `createReport` uses when it joins a
+   readout to a log: one border round both, one hairline between.
+   ⚠️ THIS IS NOT THE "SEPARATION IS SPACING, NOT LINES" RULE BEING BROKEN. That
+   rule is about the gap BETWEEN blocks on a page. This line is INSIDE one block
+   and says the two halves are one thing, which is the opposite claim.
+
+   🔴 AND THE FOOTER IS A THREE COLUMN GRID, NOT A FLEX ROW WITH SPACE BETWEEN.
+   `space-between` puts the middle item wherever its neighbours' widths leave it,
+   so a centre slot drifts as a status word changes length, and this project has
+   a standing rule against anything that moves while you look at it. Equal outer
+   columns pin the middle whatever is beside it. */
+.pos-vp {
+  display: block;
+  background: var(--card2);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  overflow: hidden;
+}
 .pos-vp-stage {
   position: relative;
   background: #000;
-  border: 1px solid var(--line2);
-  border-radius: 4px;
-  overflow: hidden;
   /* A picture with nothing in it yet is still a picture-shaped hole rather than
      a collapsed line, which is what `/kit/` shows and what a page looks like
      before its first frame. */
@@ -2653,7 +2667,9 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 12px;
-  margin-top: 10px;
+  padding: 7px 9px;
+  background: var(--card2);
+  border-top: 1px solid var(--line);
 }
 .pos-vp-slot { min-width: 0; display: flex; align-items: center; }
 .pos-vp-l { justify-content: flex-start; }
@@ -2672,17 +2688,19 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-vp[data-full="hover"] .pos-vp-close { opacity: 1; pointer-events: auto; }
 .pos-vp[data-full="hover"][data-idle="1"] .pos-vp-close { opacity: 0; pointer-events: none; }
 
-/* Full, by either route: the real API sets its own backdrop, the fallback cover
-   is a fixed box. Both need the picture to fill what it is given. */
-.pos-vp[data-full] .pos-vp-stage { aspect-ratio: auto; height: 100%; border: 0; border-radius: 0; }
+/* Full, by either route. `/mirror/` solved this shape first: the PANE is what
+   goes full, so the picture has to be told to fill it and the bar has to keep
+   its row. */
+.pos-vp[data-full] { border: 0; border-radius: 0; background: #000; }
+.pos-vp[data-full] .pos-vp-stage { aspect-ratio: auto; height: 100%; }
 .pos-vp[data-full="bare"] .pos-vp-foot,
 .pos-vp[data-full="hover"] .pos-vp-foot { display: none; }
 /* ⚠️ `footer` KEEPS THE ROW, which is the whole difference between it and the
-   other two, so it is laid over the bottom of the picture rather than pushed
-   under it where there is no room. */
-.pos-vp[data-full="footer"] { display: flex; flex-direction: column; height: 100%; }
-.pos-vp[data-full="footer"] .pos-vp-stage { flex: 1 1 auto; min-height: 0; }
-.pos-vp[data-full="footer"] .pos-vp-foot { flex: 0 0 auto; margin: 0; padding: 10px 14px; background: var(--card); }
+   other two. A grid of `1fr auto` gives the picture everything left over and
+   the row its own height, which is what `/mirror/` does. */
+.pos-vp[data-full="footer"] { display: grid; grid-template-rows: 1fr auto; height: 100%; }
+.pos-vp[data-full="footer"] .pos-vp-stage { min-height: 0; }
+.pos-vp[data-full="footer"] .pos-vp-foot { padding: 10px 14px; }
 
 /* 🔴 SQUARE, AND `.ico` ALONE DOES NOT DO IT HERE. That class is scoped
    `.step button.ico`, so outside a segmented row it matches nothing and the

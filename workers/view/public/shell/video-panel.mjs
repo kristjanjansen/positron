@@ -149,11 +149,29 @@ export function createVideoPanel({
       if (isFull(root)) showClose();
       return fullMode;
     },
-    /** Go full, or come back. Returns what actually happened. */
+    /**
+     * Go full, or come back. Returns what actually happened.
+     *
+     * 🔴 IT SYNCS THE STATE ITSELF RATHER THAN WAITING TO BE TOLD, AND THAT WAS
+     * THE IPHONE BUG. PHOTOGRAPHED 2026-09-17: the picture in a 16 by 9 box at
+     * the top of the screen, the page's own readout and tabs showing through
+     * underneath, and the two slots stranded at the far edges.
+     *
+     * `watch()` listens for `fullscreenchange` and `webkitfullscreenchange`, and
+     * NEITHER FIRES ON THE FALLBACK PATH. An iPhone has no element Fullscreen
+     * API at all, so `fullscreen.mjs` covers the screen with a fixed element
+     * instead, and that is a class change with no event behind it. So on the one
+     * platform the fallback exists for, the attribute every rule below keys on
+     * was never set: the stage kept its aspect ratio, the footer sat under it,
+     * and the rest of the cover was transparent.
+     * ⚠️ THE EVENT PATH STAYS TOO. A real fullscreen can end without this page
+     * asking, by Escape or a phone gesture, and only the event knows about that.
+     */
     async full(want = true) {
       const was = isFull(root);
       if (want === was) return was;
       if (want) await fsToggle(root); else await fsExit(root);
+      syncFull();
       return isFull(root);
     },
     isFull: () => isFull(root),
@@ -161,14 +179,19 @@ export function createVideoPanel({
     support,
   };
 
-  // ⚠️ THE STATE IS READ BACK, NEVER ASSUMED. A browser can leave fullscreen
-  // without this page asking: Escape, a phone gesture, a tab switch. The class
-  // that styles it therefore follows the BROWSER rather than the last call.
-  fsWatch(root, (full, how) => {
+  /**
+   * ⚠️ THE STATE IS READ BACK, NEVER ASSUMED. `isFull` asks the document and the
+   * element's own class, so this follows what is actually true rather than what
+   * was last requested. Called from both paths: after this page asks, and when
+   * the browser tells us.
+   */
+  function syncFull(how = 'class') {
+    const full = isFull(root);
     root.dataset.full = full ? fullMode : '';
     if (full) showClose(); else { clearTimeout(idleTimer); root.dataset.idle = ''; }
     onFull(full, how);
-  });
+  }
+  fsWatch(root, (full, how) => syncFull(how));
 
   return api;
 }
