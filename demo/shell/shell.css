@@ -2685,9 +2685,16 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    shape was copied from and which carries no border at all. Copying the radius
    without the rest of the box is how one page's decision becomes a component's
    inconsistency. */
+/* 🔴 `--card`, THE SAME AS EVERY OTHER BOX. Reported three times, the last with
+   a photograph of a panel stacked above a transport bar: *"boxes bg STILLLLLL
+   not same"*. Each earlier fix made the panel's two HALVES agree with each
+   other and left the panel disagreeing with the bar under it. The log, the
+   table, the sandbox box and the transport bar are all `--card`, so a panel in
+   `--card2` was one surface out of step with the site, and stacking it directly
+   on a bar is where that shows. */
 .pos-vp {
   display: block;
-  background: var(--card2);
+  background: var(--card);
   border: 1px solid var(--line);
   border-radius: 4px;
   /* The footer's corners are clipped to the box's, which is what gives it its
@@ -2702,10 +2709,13 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    footer in the second is two greys a few points apart, which reads as a
    printing fault rather than as a decision. The lower half wins because it is
    the one with content in it: the picture well is empty until a frame arrives,
-   and an empty box should look like the box it belongs to. */
+   and an empty box should look like the box it belongs to.
+   ⚠️ BOTH ARE `--card` NOW, which is that argument taken one step further: the
+   halves agreeing with each other was never enough while the whole disagreed
+   with the box beneath it. */
 .pos-vp-stage {
   position: relative;
-  background: var(--card2);
+  background: var(--card);
   /* A picture with nothing in it yet is still a picture-shaped hole rather than
      a collapsed line, which is what `/kit/` shows and what a page looks like
      before its first frame. */
@@ -2731,7 +2741,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  background: var(--card2);
+  background: var(--card);
   border-top: 1px solid var(--line);
 }
 .pos-vp-slot { min-width: 0; display: flex; align-items: center; }
