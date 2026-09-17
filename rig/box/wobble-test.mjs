@@ -48,6 +48,15 @@ const HOLD_MS = Number(arg('hold', 4000));
 // held controller is a different reading and has to say so.
 const WITH = (arg('with', '') || '').split(',').filter(Boolean)
   .map((p) => p.split('=').map(Number));
+/**
+ * 🔴 `--reps N` INTERLEAVES THE TWO VALUES INSTEAD OF TAKING ONE THEN THE OTHER,
+ * WHICH IS THE ONLY HONEST DESIGN ON A PATCH THAT DRIFTS. `AddSynth Morph` moves
+ * 0.58 octaves of brightness between two takes at ONE value four seconds apart,
+ * so lo-then-hi puts the whole drift inside the comparison and calls it an
+ * effect. Alternating lo, hi, lo, hi averages the drift into both arms, and the
+ * spread WITHIN each arm is the floor the difference has to clear.
+ */
+const REPS = Number(arg('reps', 0));
 const FROM = `wob-${randomId(6)}`;
 
 let seq = 0, pass = 0, fail = 0;
@@ -217,6 +226,42 @@ ws.onopen = async () => {
     send({ type: 'note.on', channel: 0, note: NOTE, vel: 100 });
     await wait(1500);
 
+
+    if (REPS) {
+      for (const CTRL of CTRLS) {
+        console.log(`\nCC ${CTRL}, ${REPS} takes at each value, alternating`);
+        const arms = { lo: [], hi: [] };
+        for (let i = 0; i < REPS; i++) {
+          arms.lo.push(await at(CTRL, LO));
+          arms.hi.push(await at(CTRL, HI));
+        }
+        const pick = (a, f) => a.map(f);
+        const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+        const sd = (xs) => Math.sqrt(mean(xs.map((x) => (x - mean(xs)) ** 2)));
+        for (const [what, f, unit] of [['brightness', (m) => m.centroid, 'Hz'],
+                                       ['level', (m) => m.peak, ''],
+                                       ['pitch wobble', (m) => m.cents || 0, 'cents']]) {
+          const lo = pick(arms.lo, f), hi = pick(arms.hi, f);
+          const spread = Math.max(sd(lo), sd(hi));
+          const gap = Math.abs(mean(hi) - mean(lo));
+          const d = (n) => unit === 'Hz' ? n.toFixed(0) : n.toFixed(unit ? 1 : 4);
+          // The floor is the spread WITHIN an arm. A gap smaller than the noise
+          // each arm already carries is not a difference anybody can hear.
+          ok(`CC ${CTRL} moves the ${what}`, gap > spread * 2 && spread > 0,
+            `${d(mean(lo))} at ${LO} against ${d(mean(hi))} at ${HI} ${unit}, `
+            + `a gap of ${d(gap)} against ${d(spread)} of spread inside one arm`);
+        }
+        send({ type: 'ctl.set', channel: 0, set: [[CTRL, 64]] });
+        await wait(300);
+      }
+      send({ type: 'note.off', channel: 0, note: NOTE });
+      send({ type: 'note.panic' });
+      send({ type: 'ctl.set', channel: 0, set: [[121, 0]] });
+      await wait(300);
+      console.log(`\n${pass}/${pass + fail} green\n`);
+      ws.close();
+      process.exit(0);
+    }
 
     for (const CTRL of CTRLS) {
       console.log(`\nCC ${CTRL}`);

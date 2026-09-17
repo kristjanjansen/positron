@@ -15,6 +15,39 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **`/knobs/` MUST USE `board.mjs`, WHICH IT DOES NOT.** Asked 2026-09-17:
+  *"Ahould board.mjs used by both? Make inra close as possible on keys and
+  knobs"*. The component was written on 2026-09-16 to be shared and the report
+  said both pages were on it; that report was wrong and this session repeated
+  it. `/keys/` is its only caller. `/knobs/` still hand-rolls its socket, its
+  AudioContext, its worklet, its cushion and its frame counters, which is the
+  same six things twice and is exactly how the two pages came to disagree about
+  what a board is.
+
+- 🔴 **NO SOUND ON `/keys/`.** Reported 2026-09-17: *"No aound on keys. Knobs
+  ok."*. `/knobs/` is playing from the same board over the same relay in the same
+  room, so whatever this is sits in the page rather than in the board, the room
+  or the instrument. Both pages moved onto `demo/shell/board.mjs` on 2026-09-16
+  and `/keys/` also had its order changed and its transport bar stripped of its
+  play button the same day.
+
+- 🔴 **THE TWO NEW `/knobs/` CONTROLLERS COME OUT AND TWO OTHERS GO IN.**
+  Reported 2026-09-17: *"Rm vibrato vontilw, they do nada and added some noisy
+  wobble. Use other ccs."*. These are `bandwidth` (CC 75) and `fm depth`
+  (CC 76), shipped the same day off a held-note pitch measurement that said both
+  move the sound by four to nine times their own floor. A listener says they do
+  nothing and add noise, and a listener outranks that measurement: what it
+  graded was MOVEMENT, and a controller can move a number a tracker can see
+  while making no difference anybody wants. Pick the replacements by ear as well
+  as by `cc-test.mjs`.
+
+- 🔴 **REVERB AND CHORUS LEAVE `/keys/` AND LEAVE THE BOARD.** Reported
+  2026-09-17: *"Rm chorus reverb from keys ui and board"*. They had been
+  invisible for weeks (appended into a control row the page declares empty) and
+  were put back into the patch row on 2026-09-16, which is what made them
+  reviewable. The board half is `rig/box/box.mjs`, so this is a push to
+  `/opt/positron-box/` as well as a page edit.
+
 - 🔴 **THE PLAYOUT TRIMS BECAUSE TWO CLOCKS DISAGREE, AND NO CUSHION SIZE CURES
   IT.** Found 2026-09-16 while chasing *"some vobbly sound, cutoffs, not nice"*.
   The arrival jitter is measured and is now covered: 992 frames in 20 s, nothing
