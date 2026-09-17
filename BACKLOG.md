@@ -15,6 +15,35 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **THE BOARD'S OUTPUT LEVEL HAS COLLAPSED, AND IT IS NOT THE PAGE, NOT MIDI,
+  AND NOT THE INSTRUMENT.** Reported 2026-09-17: *"There is no sound on knobs"*.
+  MEASURED the same hour, over the relay with no browser in the way: every patch,
+  every velocity, peak **0.0010 to 0.0035** of full scale where the same probe
+  read **0.0445** earlier the same day. About 40x down, which is inaudible.
+  What was ruled out, each by a measurement rather than by reasoning:
+  - **The page and the browser.** An analyser tapped onto the audio graph's
+    OUTPUT reads peak 0.0018 against 0.0035 arriving, context `running` at
+    48 kHz with a 164 ms cushion. The graph plays what it is given. This is the
+    measurement every previous round of this bug was missing.
+  - **MIDI level.** CC 7 volume and CC 11 expression at 127 change nothing.
+  - **The instrument.** Three notes sum to 2.6x one note, so Yoshimi is working;
+    the spectrum is right, only the level is wrong. An `audio.stop` and
+    `audio.start` over the relay did not fix it.
+  So the fault is on the board between Yoshimi's output and the capture: the
+  JACK graph or the capture's gain. ⚠️ **IT NEEDS THE STUDIO LAN.** The board
+  dials out to the relay, so it is reachable for verbs and unreachable for
+  diagnosis: `ssh positron@192.168.1.213` does not answer from outside.
+
+- 🔴 **THE BOARD CANNOT BE RECOVERED OR DIAGNOSED REMOTELY, AND THAT IS THE REAL
+  GAP.** Its verbs are `audio.start/stop/status`, `voice.*`, `note.*`, `ctl.*`,
+  `fx.pappus`, `params.*`, `patch.*`, `ports.get`, `video.*`, `box.ping`. None
+  restarts the SERVICE, and `ports.get` reports ALSA sequencer MIDI ports rather
+  than the JACK audio graph. So a board whose audio path has drifted is a board
+  nobody can fix or even look at without being in the building — while every
+  page that depends on it reports green counters at an inaudible level. Two
+  verbs would close it: one that reports `jack_lsp -c` and the connection list,
+  and one that rebuilds the audio graph.
+
 ### XR, asked for 2026-09-17, in one message
 
 Quoted verbatim below because this arrived as one dictated block and the detail
