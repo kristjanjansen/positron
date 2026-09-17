@@ -176,6 +176,7 @@
 <script type="module">
   import { mount, el, createReport } from '/shell/shell.mjs';
   import { createStack } from '/shell/stack.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createStepper } from '/shell/stepper.mjs';
   import { createSlider, createSliderGroup, GLIDE_MS, HAND_YIELD_MS } from '/shell/slider.mjs';
   import { MOVE_GLYPH, MOVE_OFF, MOVE_SAYS } from '/shell/hand.mjs';
@@ -318,6 +319,16 @@
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
+  section('GLUE',
+    'Blocks as one surface: one border, a hairline seam, no gap.',
+    `createGlue(bar.el, strip.el)
+createGlue(readout, log)   // the look mount({ joined: true }) builds`,
+    (box) => {
+      const a = el('div', 'kit-glue-demo', 'a block');
+      const b = el('div', 'kit-glue-demo', 'and another');
+      box.append(createGlue(a, b));
+    });
+
   section('VIDEO PANEL',
     'A picture, with a status, an empty middle and a fullscreen button under it.',
     `createVideoPanel({ media: canvas, of: 'the board' })

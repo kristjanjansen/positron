@@ -54,6 +54,24 @@ file by being finished or by being refused in writing, never by being forgotten.
   ⚠️ AND THE PANEL IS THE REUSABLE HALF. Three panels on three tabs playing one
   test video is the demonstration, not the point.
 
+- 🔴 **A REAL GMAIL MESSAGE PUTS ITS HTML HALF IN THE ROOM BESIDE ITS TEXT,
+  AND 51 GREEN FIXTURES DID NOT SEE IT.** MEASURED 2026-09-17 on the message at
+  19:54:32, which reads in the room as the word `hello!` and then, under it,
+  `<div dir="ltr">hello!</div>`. Those are the two halves of one
+  `multipart/alternative`, and dropping the second is the entire reason
+  `firstText()` in `workers/mail/src/index.js` exists: its own header says a
+  reader "wants the first of those and never the second". On this message its
+  boundary split did not take and it fell through to returning the whole body.
+  ⚠️ **THE FIXTURES ARE THE LESSON, NOT THE PARSER.** Twenty of them pass,
+  including multipart ones, so whatever a real Gmail boundary does differently is
+  a shape nobody wrote down: a `\n` where the code splits on `\r\n`, a nested
+  `multipart/mixed` around the `alternative`, or a terminator the `.slice(1, -1)`
+  does not match. **Capture the raw message before touching the code** — this was
+  found by reading the room rather than by a test, and a guess at the cause is
+  another fixture that passes while real mail does not.
+  ⚠️ The file already names what it deliberately does NOT do (quoted-printable,
+  base64, nested multipart) and one of those may be the answer rather than a bug.
+
 - 🔴 **A SUBJECT FROM OUTSIDE ENGLISH IS UNREADABLE IN THE FEEDBACK ROOM.** Mail
   headers arrive MIME-encoded and nothing decodes them, so a note from Estonia
   opens `[ok] =?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=`. That is the FIRST thing a reader
@@ -62,12 +80,21 @@ file by being finished or by being refused in writing, never by being forgotten.
   words that must be joined without the whitespace between them, and charsets
   that are not UTF-8.
 
-- ⚠️ **THE PRIMARY SPAM SIGNAL MAY NOT ARRIVE AT ALL, AND ONLY REAL MAIL SETTLES
-  IT.** `workerd#6740` reports `Authentication-Results` ABSENT from a real Worker
-  delivery, with only an `ARC-Authentication-Results` carrying `arc=none`. The
-  classifier answers `unknown` in that case, which never rejects and never reads
-  as clean, and two fixtures are that shape. UNVERIFIED for this zone: the first
-  real message through `positron@positron.studio` is the measurement.
+- ⚠️ **THE PRIMARY SPAM SIGNAL MAY NOT ARRIVE AT ALL, AND REAL MAIL HAS NOW
+  LANDED WITHOUT SETTLING IT.** `workerd#6740` reports `Authentication-Results`
+  ABSENT from a real Worker delivery, with only an `ARC-Authentication-Results`
+  carrying `arc=none`. The classifier answers `unknown` in that case, which never
+  rejects and never reads as clean, and two fixtures are that shape.
+  ⚠️ **TWO REAL MESSAGES ARRIVED 2026-09-17** from Gmail, at 19:54:32 and
+  19:56:17, and the room shows the second prefixed `[ok]` and the first prefixed
+  with nothing. `labelOf` cannot return an empty label, so the unprefixed one is
+  a message from BEFORE the labelling build rather than a verdict, and only the
+  19:56 entry says anything at all about the classifier. **What is still not
+  known is WHICH signal decided it**: a prefix of `[ok]` is the same four
+  characters whether `Authentication-Results` was read or inferred from ARC, so
+  the room cannot answer the question this item is about. The measurement is the
+  worker's own log for that delivery, or one message sent with the verdict's
+  chips widened so the reason travels with it.
 
 - 🔴 **A QUICK RECORD AND LOOP ON THE KEYBOARD.** Asked 2026-09-17 alongside
   hold-to-retrigger and explicitly deferred in the same breath: *"we could also

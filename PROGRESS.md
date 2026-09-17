@@ -1,3 +1,61 @@
+# Session 32 — a rule nobody drew, a look that existed four times, and a setting that was never real (2026-09-18)
+
+**THE BLACK LINES ON THE TIMELINE WERE THE SHAPE OF A GAP, NOT A DECISION.**
+Reported with a photograph: *"black horiz lines on timeline are pointless"*.
+`timeline/strip.mjs` painted each lane's band at `L.height - 1` while `layout()`
+tiles lanes with `y += L.height` and nothing between them, so every lane gave
+back one unpainted row and what showed through it was the canvas ground, which
+is DARKER than the band. Nobody wrote those rules and no comment mentioned them.
+They are the standing "separation is spacing" rule being broken by arithmetic
+rather than by an author, and there was not even spacing to repeat: a lane is
+already told apart by its name in the gutter, its swatch and its own marks.
+
+🔴 **AND THE CHECK WRITTEN TO PROVE IT WAS BLIND, WHICH IS THE REAL FINDING.**
+`/stage/` now samples a column of the strip and compares the darkest row against
+the lane ground. The first build of it passed, and passed IDENTICALLY with the
+defect put back — same three numbers — because the archive strip holds ONE lane
+until a question is asked, so there was no boundary anywhere in the picture. A
+check whose subject is absent reads exactly like a check that passed.
+⚠️ **AND THE TOLERANCE WAS PICKED WHILE IT WAS BLIND.** 24, against a real
+separation of **0 against 21**: a number that passes the defect, chosen when both
+states read the same and so any number looked as good as any other. It asks a
+real question through the page's own `ask()` now, reports its lane count in the
+message, and 8 sits between the two measured states. Sabotage takes it red.
+
+**A LOOK THAT EXISTED IN FOUR PLACES IS NOW A COMPONENT.** Asked as *"do same
+treatment as for readout/logs for transport + timeline: can be separate or glued
+togehter"*. `.pos-report` had it (one border round the lot, 1 px of `--line` as a
+seam, children giving up their own edges), `video-panel.mjs`'s footer had it,
+`.kit-out` was written against `video-panel` explicitly *"like videpanel"*, and
+the transport bar plus the strip is the fourth. `.pos-glue` in shell.css and
+`demo/shell/glue.mjs`; `.pos-report` is now that class plus the one declaration
+that is its own, which is where it sits on the page.
+⚠️ **THE CHILD RULE IS DOUBLE-CLASSED ON PURPOSE.** `.pos-glue > *` weighs
+(0,1,0), exactly what `.pos-strip` and `.tbar` weigh for their own border, so
+which won would come down to source order. That is the specificity trap this
+stylesheet already records three times. `.pos-glue.pos-glue > *` cannot lose.
+⚠️ **AND A GLUE OF ONE BLOCK IS THAT BLOCK.** A box round a single child is a
+second border over the one it has, which is the doubled-edge defect at the other
+end of the same idea.
+
+🔴 **`clock: false` WAS BEING PASSED AND HAS NEVER BEEN AN OPTION.** Asked
+*"rm times from transport bar"* — the second time, after *"no need for slider /
+times in transport lane"* had taken the slider off and left the clock. The times
+were still there because `/stage/` set a key the bar does not read: a setting
+that looks correct in the source, changes nothing, and cannot be seen to be inert
+from outside. The option is `time`, it defaults ON because a bar with no strip
+needs its clock, and `/stage/` passes `time: false`.
+
+**EVERY STAGE SCREEN GOES FULL AND KEEPS A FOOTER.** *"all stage videoscreens
+need to go to fullscreeen with footer variats"*. It rotated all three modes, one
+per tab, and the third is `bare`, which takes the footer away and the LIVE badge
+with it. Both footer variants are still shown and which tab gets which is a
+reason rather than a rotation: the control room hides its footer until you move,
+the audience and the archive keep theirs up.
+
+MEASURED: `/stage/` 21/21, `/kit/` 45/45 with 30 blocks built, and 132/132 across
+the seven other strip-bearing pages.
+
 # Session 27 — the Marinetti detour, and what was actually found (2026-09-15)
 
 ⚠️ **A NOTE, NOT A PLAN.** `/held/` briefly carried words from Marinetti's
