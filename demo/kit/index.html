@@ -227,6 +227,8 @@
   // zone, `section()` swallowed the throw, and the page died much later on an
   // empty map with a message about a different line.
   const busySpec = new Map();
+  // The stepper whose middle is a value, for the check that it really is one.
+  let stepperPick = null;
   let presLive = null;        // one badge that can change, measured over time
 
   // The pair in the invisible hand block: one slider with a hand and one
@@ -480,20 +482,49 @@ el('button', 'pos-pri', 'the primary one', { type: 'button' })`,
 
   // ── stepper ─────────────────────────────────────────────────────────────
   section('stepper',
-    '',
-    `createStepper({ what: 'patch', prev, next, random })`,
+    'Back and forward, with a middle slot that holds nothing, a jump to anywhere, or the '
+    + 'current one by name with the whole list behind it.',
+    `createStepper({ what: 'look', prev, next, random })
+createStepper({ what: 'look', prev, next, pick: { options: names, at, onPick } })`,
     (box) => {
-      const o = out('nothing pressed yet');
-      let at = 0;
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
       const names = ['kaleidoscope', 'rings', 'weave', 'drift'];
-      const show = () => { o.textContent = `${at} · ${names[at]}`; };
-      const s = createStepper({
+
+      const o1 = out('nothing pressed yet');
+      let a1 = 0;
+      const show1 = () => { o1.textContent = `${a1} · ${names[a1]}`; };
+      const rolled = createStepper({
         what: 'look',
-        prev: () => { at = (at + names.length - 1) % names.length; show(); },
-        next: () => { at = (at + 1) % names.length; show(); },
-        random: () => { at = Math.floor(Math.random() * names.length); show(); },
+        prev: () => { a1 = (a1 + names.length - 1) % names.length; show1(); },
+        next: () => { a1 = (a1 + 1) % names.length; show1(); },
+        random: () => { a1 = Math.floor(Math.random() * names.length); show1(); },
       });
-      box.append(s.el, o);
+      const r1 = el('div', 'kit-row');
+      r1.append(rolled.el, o1);
+
+      /**
+       * ⚠️ THE SAME MIDDLE AS THE PATCH ROW, AND THE SAME CODE. `createValueCell`
+       * lives in `picker.mjs` and both use it, so a fix to the cell reaches both
+       * rather than one of them drifting. The arrows still step; the middle says
+       * where you are and opens the platform's own list.
+       */
+      const o2 = out('kaleidoscope');
+      let a2 = 0;
+      const picked = createStepper({
+        what: 'look',
+        prev: () => { a2 = (a2 + names.length - 1) % names.length; sync2(); },
+        next: () => { a2 = (a2 + 1) % names.length; sync2(); },
+        pick: { options: names, at: 0, onPick: (i) => { a2 = i; sync2(); } },
+      });
+      function sync2() { picked.show(names[a2], a2); o2.textContent = `${a2} · ${names[a2]}`; }
+      stepperPick = picked;
+      const r2 = el('div', 'kit-row');
+      r2.append(picked.el, o2);
+
+      stack.titled('A JUMP IN THE MIDDLE', r1);
+      stack.titled('OR THE ONE YOU ARE ON, WITH THE LIST BEHIND IT', r2);
+      box.append(stack.el);
     });
 
   // ── slider ──────────────────────────────────────────────────────────────
@@ -572,12 +603,9 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
 
   // ── a slider that moves by itself ───────────────────────────────────────
   section('A SLIDER THAT CAN MOVE ITSELF',
-    'Press ' + MOVE_GLYPH.sweep + ' and the handle sweeps by itself, back and forth, with a real '
-    + 'reach and a pause at each end rather than a triangle wave. While it runs the '
-    + 'handle is drawn hollow, because nobody is holding it. Grab it, use the arrow '
-    + 'keys or move it from the page and it hands over in one frame, then picks the '
-    + 'movement up from wherever you left it. The slider beside it has no hand, which '
-    + 'is how you can see the hand belongs to one slider rather than to the page.',
+    'Press ' + MOVE_GLYPH.sweep + ' and the handle sweeps by itself with a real reach and a pause at '
+    + 'each end rather than a triangle wave, drawn hollow while it runs because nobody is '
+    + 'holding it, and it hands over in one frame the moment you touch it.',
     `createSlider({ label: 'cutoff', min: 0, max: 127, step: 1, hand: true, onHand })`,
     (box) => {
       const o = out('press the button on the right of the lane');
@@ -1502,6 +1530,20 @@ green = inside what it promised · amber/red = later`,
      */
     const ink = (el2, sel) => getComputedStyle(el2.querySelector(sel)).color;
     const idle = busySpec.get('nobody'), person = busySpec.get('a person'), tool = busySpec.get('a harness');
+    /**
+     * 🔴 THE STEPPER'S MIDDLE IS REALLY A LIST, not a label that looks like one.
+     * A cell that draws the right name with an empty or disabled select behind
+     * it is the exact failure `picker.mjs` records on `/mirror/`: the control
+     * looked correct and could not be used. So this asserts the working half.
+     */
+    const sel = stepperPick?.select;
+    d.assert('the stepper\u2019s middle really opens a list, and the arrows still step it',
+      !!sel && sel.options.length === 4 && !sel.disabled
+      && stepperPick.el.querySelectorAll('button').length === 2,
+      sel ? `${sel.options.length} options, ${sel.disabled ? 'disabled' : 'usable'}, `
+        + `${stepperPick.el.querySelectorAll('button').length} arrows, showing "${stepperPick.el.querySelector('.pos-pick-n').textContent}"`
+        : 'the stepper has no select at all');
+
     d.assert('the busy word is greyer than the word it qualifies, and the dot is not',
       ink(person, '.pos-pres-w') === ink(tool, '.pos-pres-w')
       && ink(person, '.pos-pres-w') !== ink(idle, '.pos-pres-w')

@@ -16,6 +16,7 @@
 // its baseline, which is the whole complaint about the die.
 
 import { el } from './shell.mjs';
+import { createValueCell } from './picker.mjs';
 
 /**
  * @param {object} o
@@ -25,9 +26,13 @@ import { el } from './shell.mjs';
  *                                 just the two arrows, corners still correct
  * @param {string} [o.what]        what is being stepped, for the titles
  * @param {string} [o.cls]         extra class on the wrapper
- * @returns {{el: HTMLElement, buttons: HTMLButtonElement[], disabled: (v:boolean)=>void}}
+ * @param {object} [o.pick]        make the middle a VALUE you can choose from,
+ *   the way a patch row does: `{ options: string[], at, onPick(i) }`. It
+ *   replaces `random`, because the middle is one slot.
+ * @returns {{el: HTMLElement, buttons: HTMLButtonElement[], disabled: (v:boolean)=>void,
+ *            show?: (name:string, i:number)=>void, options?: (names:string[], at?:number)=>void}}
  */
-export function createStepper({ prev, next, random, what = 'it', cls = '' }) {
+export function createStepper({ prev, next, random, what = 'it', cls = '', pick = null }) {
   const wrap = el('span', `step pos-seg ${cls}`.trim());
   const mk = (label, title, fn, cls = '') => {
     const b = el('button', cls, label, { type: 'button', title });
@@ -40,10 +45,28 @@ export function createStepper({ prev, next, random, what = 'it', cls = '' }) {
   // control's own height so `‹` and `›` are 34x34 and the group reads as one
   // object rather than as three things that happen to be adjacent.
   const buttons = [mk('‹', `the ${what} before this one`, prev, 'ico')];
-  // ⚠️ OPTIONAL, AND THE CORNERS STILL HAVE TO BE RIGHT WITHOUT IT. A stepper
-  // is useful over a list of two, where a jump means nothing. CSS rounds by
-  // :first-child/:last-child, so dropping the middle needs no special case.
-  if (random) {
+  /**
+   * 🔴 THE MIDDLE IS A SLOT, AND IT HOLDS ONE OF THREE THINGS. Asked 2026-09-17:
+   * *"stepper: want middle pne selectable like synth patches"*.
+   *
+   *   nothing  two arrows, for a list of two where a jump means nothing
+   *   random   a jump along the same axis, which is why it sits between them
+   *   pick     the CURRENT one, named, with the whole list behind it
+   *
+   * `pick` is the patch row's middle, and it is the same code rather than a
+   * copy: `createValueCell` was lifted out of `picker.mjs` for this. A second
+   * implementation of a segmented middle is precisely the drift `/kit/` exists
+   * to catch, and this project has already shipped three hand-built segmented
+   * rows before anybody noticed.
+   * ⚠️ CSS ROUNDS BY `:first-child`/`:last-child`, so whichever of the three the
+   * middle is, the outer corners come out right with no special case.
+   */
+  let cell = null;
+  if (pick) {
+    cell = createValueCell({ what, onPick: pick.onPick });
+    wrap.append(cell.el);
+    if (Array.isArray(pick.options)) cell.options(pick.options, pick.at ?? 0);
+  } else if (random) {
     // Spelled out, because "what does the middle one do" is a question a symbol
     // cannot answer, and it is the only one of the three that is not obvious.
     buttons.push(mk('random', `jump to any ${what}`, random));
@@ -52,6 +75,11 @@ export function createStepper({ prev, next, random, what = 'it', cls = '' }) {
   return {
     el: wrap,
     buttons,
-    disabled: (v) => buttons.forEach((b) => { b.disabled = v; }),
+    ...(cell ? { show: cell.show, options: cell.options, select: cell.select } : {}),
+    disabled: (v) => {
+      buttons.forEach((b) => { b.disabled = v; });
+      // A cell with one option has nowhere to go and stays disabled either way.
+      if (cell) cell.select.disabled = !!v || cell.select.options.length < 2;
+    },
   };
 }
