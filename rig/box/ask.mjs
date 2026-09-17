@@ -36,7 +36,7 @@ ws.onopen = () => {
   // no source at all and fell back to the built-in synth, reporting ok:true for
   // an instrument nobody asked for, which is the worst kind of wrong.
   const wrap = body ? (VERB.startsWith('patch.') ? { patch: body } : body) : {};
-  ws.send(format({ type: VERB, ...wrap }, { from: FROM, seq: seq++ }));
+  ws.send(format({ type: VERB, ...wrap }, { from: FROM, seq: seq++, by: 'tool' }));
 };
 
 ws.onmessage = (e) => {

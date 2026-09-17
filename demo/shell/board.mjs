@@ -89,9 +89,59 @@ export function createBoard({
   if (!room) throw new Error('board: a room is required. `studio-1` is the address of the Raspberry Pi.');
 
   // ── the badge ─────────────────────────────────────────────────────────────
-  const pres = createPresence({ of });
+  /**
+   * 🔴 THE BADGE CARRIES A SECOND FACT: IS ANYBODY ELSE DRIVING THIS. Asked
+   * 2026-09-17 and answered in two steps, because the first answer was not good
+   * enough. *"one board per person, private room. - so do we need occupied
+   * status on online badge?"* — yes, because the room is not the unit of
+   * contention. The INSTRUMENT is, and your own second tab is another client.
+   * Then: *"what is 'you' me as user in single widow or the agent messing with
+   * verificiations etc. can we mark agent-messing specially so we can
+   * distinguish"* — which is why there are two words rather than one.
+   *
+   * MEASURED 2026-09-17 and this is what it is for: a parked tab restating
+   * `CC 7 = 22` every 500 ms held a shared synth at a fortieth of its level for
+   * hours. Nothing on any page said so, the counters all read correct, and it
+   * was hunted as a hardware fault. `under test` is the same fault wearing a
+   * harness: `demo/verify.mjs` drives a real page, and without the declaration
+   * in `wire.mjs` a suite run and a person sitting down are identical from here.
+   */
+  const pres = createPresence({
+    of,
+    busyWords: { page: 'in use', tool: 'under test' },
+  });
   pres.follow({ everyMs, comingMs });
   pres.checking();                    // a question is out before anything answers
+
+  /**
+   * How long a client counts as still driving after its last message.
+   * ⚠️ LONGER THAN `RESTATE_MS`, WHICH IS 500. `cc-adapter.mjs` restates the
+   * whole console every half second with nothing moving, so a page parked on a
+   * slider sends at exactly that cadence; a window shorter than it would blink
+   * the badge on and off rather than reporting a held instrument.
+   */
+  const DRIVING_MS = 1500;
+  let droveAt = 0, droveBy = null, saidDriver = null;
+  // What COUNTS as driving: changing the instrument, rather than asking it
+  // something. A page polling `audio.status` is a spectator.
+  const DRIVES = new Set(['ctl.set', 'note.on', 'note.off', 'note.panic',
+                          'voice.select', 'params.set', 'params.random',
+                          'fx.pappus', 'source.set']);
+
+  function driverTick() {
+    const on = droveAt && performance.now() - droveAt < DRIVING_MS;
+    const kind = on ? droveBy : null;
+    pres.busy(kind);
+    if (kind !== saidDriver) {
+      // A state change, which is what the log is for. Not a number and not a
+      // sentence that rewrites itself: it moves when something happened.
+      if (kind === 'tool') log('a harness is driving this instrument, so what you hear is a check rather than a person', 'warn');
+      else if (kind === 'page') log('somebody else is driving this instrument: another window, which may be one of yours');
+      else if (saidDriver) log('the instrument is yours again');
+      saidDriver = kind;
+    }
+  }
+  setInterval(driverTick, 250);
 
   /**
    * 🔴 ONLY THE BOARD COUNTS AS THE BOARD, AND ONE OF THESE PAGES GOT THIS
@@ -250,6 +300,17 @@ export function createBoard({
       if (got.kind === 'binary') { onBinary(got.data); return; }
       if (got.kind !== 'json') return;
       if (got.msg.from === wire.stats().from) return;    // our own line, echoed back
+      /**
+       * ⚠️ NOT THE BOARD, AND NOT US. The board's own replies come back through
+       * here too and are not somebody driving it; neither is a page merely
+       * asking a question. `by` is the sender's own declaration of what kind of
+       * client it is, absent for an older page, which reads as `page`.
+       */
+      if (DRIVES.has(got.msg.type) && got.msg.from && got.msg.from !== boardFrom) {
+        droveAt = performance.now();
+        droveBy = got.msg.by === 'tool' ? 'tool' : 'page';
+        driverTick();
+      }
       heard(got.msg);
     },
   });
@@ -337,6 +398,9 @@ export function createBoard({
       framesPerSec: firstFrameAt ? frames / Math.max(0.001, (performance.now() - firstFrameAt) / 1000) : 0,
       channels: chIn, shapeChecked, shapeWrong, shapeSaid,
       told,
+      /** Who else is driving the instrument: 'page', 'tool', or null. */
+      driver: pres.driver,
+      driverAgoMs: droveAt ? performance.now() - droveAt : null,
     }),
     /** `peak` is a running maximum; a page timing one note resets it. */
     resetPeak: () => { peak = 0; },

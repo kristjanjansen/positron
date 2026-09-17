@@ -37,7 +37,7 @@ ws.binaryType = 'arraybuffer';
 // be in it, and a failure reply carries none of the fields a content match
 // would key on. Waiting on `type` alone read another client's answer once and
 // then waited ninety seconds for one that had already arrived.
-const send = (m) => { const id = randomId(); ws.send(format(m, { from: FROM, seq: seq++, id })); return id; };
+const send = (m) => { const id = randomId(); ws.send(format(m, { from: FROM, seq: seq++, id, by: 'tool' })); return id; };
 const answer = (id, type, ms = 8000) => reply(type, ms, (r) => r.re === id);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 

@@ -21,7 +21,7 @@ const ok = (n, cond, detail = '') => { cond ? pass++ : fail++; console.log(`  ${
 const RELAY = arg('relay', RELAY_BASE);
 const ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
 ws.binaryType = 'arraybuffer';
-const send = (m) => ws.send(format(m, { from: FROM, seq: seq++ }));
+const send = (m) => ws.send(format(m, { from: FROM, seq: seq++, by: 'tool' }));
 
 let frames = [], replies = [], lastSeq = -1, gaps = 0;
 ws.onmessage = (e) => {
