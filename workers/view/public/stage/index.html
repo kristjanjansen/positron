@@ -12,8 +12,10 @@
      with the send controls under it. Nothing here is a component because
      nothing else on the site asks a question yet; when a second page does, this
      is what gets lifted. */
-  .stage-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
-  .stage-send { display: flex; gap: 12px; align-items: center; }
+  .stage-box { background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+               padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .stage-form { display: flex; flex-direction: column; gap: 12px; }
+  .stage-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 </style>
 
 <script type="module">
@@ -149,36 +151,61 @@
    * others are not, with a label in front, is exactly that component, and this
    * project already has three hand-built copies of it in its history.
    */
-  const audience = byId.get('audience').panel;
+  /**
+   * 🔴 THE QUESTION GOES TO THE AUDIENCE AND BACK TO THE CONTROL ROOM. Asked
+   * 2026-09-17: *"controlroom should also see poll"*. Somebody who has just sent
+   * a question should see what they sent in the form the audience sees it, not
+   * trust the form they typed it into.
+   * ⚠️ TWO INSTANCES, because an element cannot be in two places, built from one
+   * description so the two cannot drift.
+   * ⚠️ THE ARCHIVE GETS NONE. It is finished shows, and a live question there is
+   * a control that answers nothing.
+   */
+  const SHOWN_ON = ['audience', 'controlroom'];
   let asked = null;
 
   function ask(title, options) {
-    const choice = createChoice({
-      label: title,
-      options: options.map((o) => [o, o]),
-      // ⚠️ NOTHING IS CHOSEN AT THE START. `createChoice` opens on index 0, and
-      // a question that arrives with an answer already given is a question
-      // nobody was asked. -1 leaves every option unpressed.
-      at: -1,
-      // What a viewer picks is not recorded yet, on instruction: *"later the
-      // recording user clicks but lets do it later"*. The seam is here.
-      onPick: (_v, name) => d.log(`somebody in the audience chose ${name}`),
-    });
-    const slot = audience.slots.centre;
-    slot.textContent = '';
-    slot.append(choice.el);
+    for (const id of SHOWN_ON) {
+      const choice = createChoice({
+        label: title,
+        options: options.map((o) => [o, o]),
+        // ⚠️ NOTHING IS CHOSEN AT THE START. `createChoice` opens on index 0,
+        // and a question arriving with an answer already given is a question
+        // nobody was asked. -1 leaves every option unpressed.
+        at: -1,
+        // What a viewer picks is not recorded yet, on instruction: *"later the
+        // recording user clicks but lets do it later"*. The seam is here.
+        onPick: (_v, name) => d.log(`${id === 'audience' ? 'somebody in the audience' : 'the control room'} chose ${name}`),
+      });
+      show(byId.get(id).panel, choice.el);
+    }
     // A question replaces the one before it, which is what was asked for. What
     // happens when there is nothing left to ask is deliberately not decided:
     // *"dunno about clearing"*.
-    asked = { title, options, el: choice.el };
-    // ⚠️ THE FADE IS OPACITY ONLY. A question appearing in a footer must not
-    // change how much room the footer takes, or the picture above it jumps.
-    choice.el.style.opacity = '0';
-    requestAnimationFrame(() => {
-      choice.el.style.transition = 'opacity 220ms ease';
-      choice.el.style.opacity = '1';
-    });
+    asked = { title, options };
     d.log(`asked the audience: ${title}`, 'hi');
+  }
+
+  /**
+   * Put a question in a panel's middle.
+   * ⚠️ IT FADES IN AND RISES A LITTLE. Asked as *"fadein/move poll in from
+   * bottom (a bit)"*. 8 px: enough to read as arriving, too little to read as
+   * sliding.
+   * ⚠️ OPACITY AND `transform` ONLY, WHICH IS THE CONSTRAINT. Both are
+   * composited and neither changes how much room the footer takes, and a
+   * question that grew its box would push the picture above it.
+   */
+  function show(panel, node) {
+    const slot = panel.slots.centre;
+    slot.textContent = '';
+    slot.append(node);
+    node.style.opacity = '0';
+    node.style.transform = 'translateY(8px)';
+    requestAnimationFrame(() => {
+      node.style.transition = 'opacity 260ms ease, transform 260ms ease';
+      node.style.opacity = '1';
+      node.style.transform = 'none';
+    });
   }
 
   // ── the control room's form ───────────────────────────────────────────────
@@ -189,8 +216,18 @@
     createField({ label: 'option', placeholder: 'Not to be' }),
     createField({ label: 'option', placeholder: '' }),
   ];
+  /**
+   * ⚠️ THE QUESTION ON ONE ROW, THE OPTIONS ON THE NEXT. Asked 2026-09-17:
+   * *"options on its own row in contrrolroom"*. In one wrapping row the question
+   * and two options sat together and the third fell to a line of its own, which
+   * reads as three fields and a stray.
+   */
   const form = el('div', 'stage-form');
-  form.append(title.el, ...opts.map((o) => o.el));
+  const askRow = el('div', 'stage-row');
+  askRow.append(title.el);
+  const optRow = el('div', 'stage-row');
+  optRow.append(...opts.map((o) => o.el));
+  form.append(askRow, optRow);
 
   const taken = () => opts.map((o) => o.value().trim()).filter(Boolean);
   const send = (delayMs) => {
@@ -209,14 +246,22 @@
     setTimeout(() => ask(t, o), delayMs);
   };
 
-  const row = el('div', 'stage-send');
-  const now = el('button', 'pos-pri', 'send', { type: 'button' });
+  const row = el('div', 'stage-row');
+  const now = el('button', 'pos-pri', 'Send', { type: 'button' });
   now.onclick = () => send(0);
-  const later = el('button', '', 'send in 10s', { type: 'button' });
+  const later = el('button', '', 'Send in 10s', { type: 'button' });
   later.onclick = () => send(10_000);
   row.append(now, later);
-  room.append(form, row);
-  stageAsk = { ask, send, form, audience, get asked() { return asked; } };
+  /**
+   * ⚠️ THE FORM IS IN A BOX. Asked 2026-09-17: *"put it into box"*. Loose fields
+   * on the page background read as part of the page rather than as one thing you
+   * fill in and send. It is the project's standard surface: `--card` at 4 px
+   * with a `--line` edge, the same as the log and the table.
+   */
+  const box = el('div', 'stage-box');
+  box.append(form, row);
+  room.append(box);
+  stageAsk = { ask, send, form, shownOn: SHOWN_ON, get asked() { return asked; } };
 
   /**
    * The drawing loop. `burn` is the project's own test picture and it takes a

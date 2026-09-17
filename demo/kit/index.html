@@ -623,13 +623,13 @@ createReport({ readout, showLog: false, joined: true })      // the same pair, s
     });
 
   section('buttons', '',
-    `el('button', '', 'ordinary', { type: 'button' })
-el('button', 'pos-pri', 'primary', { type: 'button' })`,
+    `el('button', '', 'Ordinary', { type: 'button' })
+el('button', 'pos-pri', 'Primary', { type: 'button' })`,
     (box) => {
-      box.append(el('button', '', 'ordinary', { type: 'button' }));
-      const p = el('button', 'pos-pri', 'primary', { type: 'button' }); box.append(p);
-      const dis = el('button', '', 'disabled', { type: 'button' }); dis.disabled = true; box.append(dis);
-      const busy = el('button', '', 'working', { type: 'button' }); busy.dataset.busy = '1'; box.append(busy);
+      box.append(el('button', '', 'Ordinary', { type: 'button' }));
+      const p = el('button', 'pos-pri', 'Primary', { type: 'button' }); box.append(p);
+      const dis = el('button', '', 'Disabled', { type: 'button' }); dis.disabled = true; box.append(dis);
+      const busy = el('button', '', 'Working', { type: 'button' }); busy.dataset.busy = '1'; box.append(busy);
     });
 
   // ── stepper ─────────────────────────────────────────────────────────────
@@ -691,7 +691,7 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
         onInput: (v) => { o.textContent = `damp ${v} Hz`; } });
       const c = createSlider({ label: 'off', min: 0, max: 1, step: 0.1, value: 0.5 });
       c.disabled(true);
-      box.append(el('button', '', 'button, for height', { type: 'button' }), a.el, b.el, c.el, o);
+      box.append(el('button', '', 'Button, for height', { type: 'button' }), a.el, b.el, c.el, o);
     });
 
   // ── several sliders ─────────────────────────────────────────────────────
@@ -934,7 +934,7 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
        * have typed says nothing about the component, and a field is the one
        * control on this page whose state you can read by looking at it.
        */
-      const height = el('button', '', 'button, for height', { type: 'button' });
+      const height = el('button', '', 'Button, for height', { type: 'button' });
       height.style.cssText = 'margin-left:auto;align-self:flex-end';
       box.style.alignItems = 'flex-end';
       box.append(a.el, b.el, m.el, height);
