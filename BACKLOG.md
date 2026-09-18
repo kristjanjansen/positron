@@ -15,6 +15,49 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **A THREE HOUR SHOW BREAKS THE R2 PATH BY A FACTOR OF 45, AND THE DECISION
+  IS THE BITRATE. ASKED 2026-09-18:** *"What we do with r2 save? Show can be
+  3hr"*. MEASURED against the caps in the code rather than estimated:
+  - **3h at 800 kbit/s is 1.08 GB.** At 300 it is 415 MiB, at 500 it is 691 MiB,
+    at 2 Mbit/s it is 2.70 GB. **This is the number everything else follows
+    from, and it is the one thing nobody has chosen.**
+  - **`ingest` open tier is out**: 24 MiB a session is **4.2 minutes** at
+    800 kbit/s, and its 6 hour TTL would delete a 3 hour show three hours after
+    it ended.
+  - **`ingest` trusted tier fits on paper**: 5 GiB a segment, no session cap, no
+    TTL. It is blocked by the half-wired defect in this file, and it mints a
+    SERVER-side id, so the archive link has to be carried to whoever watches.
+  - ✅ **`selfrec` is the right worker and the ask already described it.**
+    Client-chosen key is a STABLE URL, which is *"single feed and single file,
+    what you can overwrite"* word for word; no caps, no TTL, a sha256 per chunk
+    that R2 verifies server side, an IndexedDB buffer so a three hour upload
+    survives a blip, and a manifest carrying `missing`.
+  🔴 **AND PLAYBACK MUST CHANGE, WHICH IS NOT OPTIONAL AT THIS SIZE.** `fetchBack`
+  builds ONE Blob: a gigabyte cannot go in memory. `proto/selfrec/indexer.mjs`
+  plus Range and MSE is the path, and it is already written.
+  ⚠️ **5,400 chunks AT A 2s TIMESLICE**, which is where `ingest`'s dense
+  sequence becomes a liability: one refused piece poisons every later one.
+  selfrec's buffer and retry is the answer to that, not a bigger cap.
+  🔴 **CLOUDFLARE STREAM RECORDING IS NOT THE ESCAPE.** WHIP records nothing at
+  all, and the RTMPS path bills STORAGE MINUTES against a 1000 minute account
+  cap: a 3 hour show is 180, so **five shows fill it and new live streams are
+  refused**. That is an outage rather than a bill.
+
+- 🔴 **WHAT `follow` DOES ON A THREE HOUR STRIP. ASKED 2026-09-18:** *"What to
+  do with follow"*. At 1280 px a three hour recording is **8.3 seconds per
+  pixel**: a question that stood two minutes is 14 px wide and an answer tick is
+  sub-pixel, so the whole show fitting on screen is exactly the view in which
+  nothing can be read.
+  ⚠️ **SO FOLLOW IS NOT A PREFERENCE AT THIS LENGTH, IT IS WHAT MAKES A ZOOMED
+  VIEW USABLE**, and the strip already has it: `setFollow`, and a `follow()`
+  that reports `engaged: on && !userScrolled`, so a drag disengages it and
+  nothing fights the hand. `/now/`, `/click/` and `/instrument/` pass
+  `follow: true` already.
+  ⚠️ **THE OPEN PART IS WHAT IT FOLLOWS.** During playback it follows the
+  playhead. There is no second answer yet for a LIVE show, where the archive
+  tab is not playing anything.
+
+
 - 🔴 **THE ARCHIVE'S PLAYHEAD MOVES AND ITS PICTURE DOES NOT, AND THE FIX IS
   ALREADY IN THIS REPO.** MEASURED 2026-09-18 on `/stage/`: seeking the archive
   from 0.794s to 3.177s moves `currentTime` to both positions EXACTLY, and
