@@ -18,7 +18,6 @@
   .stage-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 </style>
 
-<script src="/proto/remixer/hls.min.js"></script>
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createTabs } from '/shell/tabs.mjs';
@@ -366,6 +365,31 @@
        */
       const NATIVE_HLS = 'ManagedMediaSource' in window
         && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+      /**
+       * 🔴 AND IT IS FETCHED HERE RATHER THAN IN THE HEAD, BECAUSE HLS IS NOT
+       * WHAT THIS PAGE IS. Asked directly: *"but why hls when we play
+       * webrtc??"*. It is not in the streaming path at all. The chain is ERR's
+       * HLS into a `<video>`, that video into the canvas, and the CANVAS over
+       * WebRTC: hls.js stops at the video element and nothing downstream of the
+       * canvas has heard of it. ERR publishes its archive as HLS and offers
+       * nothing else, so it is the source's format rather than a choice.
+       *
+       * ⚠️ IT WAS A BLOCKING `<script>` IN THE HEAD AND THAT WAS WRONG:
+       * **618 KB** on every visit to a page where it is used only behind
+       * `?bg=`. Loaded on demand it costs nothing to anybody who does not ask
+       * for an ERR background, and on Safari and iPhone it is never fetched at
+       * all, because `ManagedMediaSource` means WebKit plays the playlist
+       * itself.
+       */
+      if (!NATIVE_HLS && !window.Hls) {
+        await new Promise((res, rej) => {
+          const tag = document.createElement('script');
+          tag.src = '/proto/remixer/hls.min.js';
+          tag.onload = res;
+          tag.onerror = () => rej(new Error('hls.js did not load'));
+          document.head.append(tag);
+        });
+      }
       if (NATIVE_HLS) {
         v.src = url;
       } else if (window.Hls && window.Hls.isSupported()) {
