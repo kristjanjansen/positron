@@ -6,6 +6,13 @@ results/
 *.mp4
 *.nut
 *.webm
+# 🔴 EXCEPT THE ONE FILM THE SITE ACTUALLY SERVES. `*.mp4` is right for the
+# recordings and captures this repo generates, and it silently excluded a
+# deliberate ASSET: `/stage/`'s background reached the deployed edge and would
+# have been absent from every clone, because `build.mjs` copies the WORKING TREE
+# rather than the index. An asset live on the edge and missing from the repo is
+# the kind of gap nobody notices until somebody clones it.
+!demo/resources/*.mp4
 src/.last-input
 auto.crt
 auto.key
