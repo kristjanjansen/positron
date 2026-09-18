@@ -69,6 +69,34 @@ export async function putWhole(blob, { log = () => {} } = {}) {
   return { url: j.manifest, session: sess.session, expiresAt: sess.expiresAt, bytes: blob.size };
 }
 
+/**
+ * Prove a stored object is READABLE, which a 200 on the PUT does not.
+ *
+ * 🔴 "UPLOADED" AND "READABLE" ARE TWO CLAIMS AND ONLY ONE OF THEM IS THE ONE
+ * ANYBODY CARES ABOUT. A PUT answering 200 says a worker accepted the bytes. It
+ * does not say the object is retrievable at the public URL, and the gap between
+ * those two is exactly where a recording goes missing while every log line reads
+ * fine. `proto/selfrec/participant.html` makes both claims separately and this
+ * is that discipline in one function.
+ *
+ * ⚠️ IT REPORTS THE LENGTH RATHER THAN ONLY A BOOLEAN, because a 200 on a HEAD
+ * with `content-length: 0` is the failure this is for: the object exists and is
+ * empty. A caller comparing that against what it sent is making the real check.
+ *
+ * @returns {Promise<{ok: boolean, status: number, bytes: number|null}>}
+ */
+export async function proveReadable(url) {
+  try {
+    const r = await fetch(url, { method: 'HEAD' });
+    const len = r.headers.get('content-length');
+    return { ok: r.ok, status: r.status, bytes: len == null ? null : Number(len) };
+  } catch {
+    // A network failure is not a readable object either, and it must not throw
+    // into a stop handler whose whole job is to report what landed.
+    return { ok: false, status: 0, bytes: null };
+  }
+}
+
 /** Fetch a stored recording back as one Blob, so playback provably comes from R2. */
 export async function fetchBack(manifestUrl, mime, { log = () => {} } = {}) {
   const r = await fetch(manifestUrl);

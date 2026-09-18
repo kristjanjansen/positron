@@ -18,6 +18,7 @@
   .stage-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 </style>
 
+<script src="/proto/remixer/hls.min.js"></script>
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createTabs } from '/shell/tabs.mjs';
@@ -29,7 +30,42 @@
   import { createStripView, STRIP_MIN_H } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
-  import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+  import { burn, readBurned, readBurnedFrom, drawCamera, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
+  import { createCard } from '/shell/card.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+  import { openWire } from '/shell/wire.mjs';
+  import { whipPublish, whepPlay, whep } from '/shell/live.mjs';
+  import { putWhole, proveReadable, fetchBack } from '/shell/ingest.mjs';
+  import { resolveDuration, waitForFirstFrame } from '/shell/media.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { armVideo, recorderMime } from '/shell/shell.mjs';
+
+  /**
+   * 🔴 THREE MODES, AND THE DEFAULT COSTS NOBODY ANYTHING. `plan-stage-live.md`
+   * §7.1 is the argument and it is short: the harness presses every control on
+   * every run, `/keep/` already publishes WHIP on every run, and a second
+   * publishing page doubles that against a budget of **20 an hour**. From
+   * 2026-10-15 WebRTC delivery bills as well.
+   *
+   * So the DEFAULT is an in-page loopback: `pcOut` and `pcIn` in this same tab,
+   * a real `RTCPeerConnection` hop with no Cloudflare in it. That is
+   * `demo/show/index.html`'s trick, already in the tree. `?live=1` is the real
+   * leg, opt-in, for a person. It is the same shape as `fake-station.mjs` and
+   * `fake-tapes.mjs`, which took two pages from ungradable to green at zero
+   * cost to anybody.
+   *
+   * ⚠️ `?r2=1` IS SEPARATE AND OPT-IN FOR ITS OWN REASON: five sessions an hour
+   * per address, so two unguarded suite runs an hour would eat the cap and a
+   * working page would read red.
+   * ⚠️ BOTH MODES ASSERT THE SAME NUMBER OF TIMES. A check that exists only in
+   * one mode is the shape CLAUDE.md bans, and `capture`'s R2 asserts are inside
+   * an `if (useR2)` today, which is what it bans being done.
+   */
+  const Q = new URLSearchParams(location.search);
+  const ROOM = Q.get('room') || 'stage-demo';
+  const LIVE = Q.get('live') === '1';
+  const USE_R2 = Q.get('r2') === '1';
 
   const q = new URLSearchParams(location.search);
   // Reachable from a check, and from a probe: what the control room sent and
@@ -60,7 +96,13 @@
 
   const d = mount({
     name: 'stage',
-    what: 'Three views of one show, each a panel with the same picture in it.',
+    // ⚠️ ONE LINE, AND IT IS THE INDEX'S OWN. A page with a diagram gets a
+    // one line `what`: a paragraph and a picture of the same machinery are two
+    // explanations and the paragraph is the weaker one, and using the `one`
+    // line verbatim stops a visitor arriving from the index being told the same
+    // thing twice in two wordings that can drift apart.
+    what: 'One press puts a live picture in front of an audience, asks them '
+      + 'something, and keeps every answer on the recording\u2019s own timeline.',
     // ⚠️ NO CONTROLS ROW. The tabs are the navigation and the panels carry
     // their own, so a declared-empty row would paint a band of dead space.
     controls: [],
@@ -92,9 +134,29 @@
   const panels = TABS.map((t, i) => {
     const c = document.createElement('canvas');
     c.width = FRAME_W; c.height = FRAME_H;
+    /**
+     * 🔴 THREE STATES, ALL OF THEM TRUE, AND NONE OF THEM NEW. `PRESENCE_STATES`
+     * already has what this needs, so the page shortens the WORDS rather than
+     * inventing a state. Before a show the thing feeding the audience's picture
+     * is the control room, and whether the control room is there IS knowable:
+     * it is a socket in the relay room. `offline` when nobody is in it,
+     * `coming` when somebody is and has not pressed Start, `online` when frames
+     * are actually arriving.
+     * ⚠️ `coming` RATHER THAN `checking`, and `presence.mjs` already settled the
+     * difference: `checking` means a question is out about a thing that was
+     * probably there all along, `coming` means the thing is on its way up. A
+     * control room that has joined and not started is the second, and this is
+     * the one place in the project where `coming` is the true word rather than
+     * the flattering one.
+     */
+    const pres = t.id === 'archive' ? null : createPresence({
+      of: '', mode: 'badge', state: 'offline',
+      says: { online: 'live', coming: 'soon', offline: 'off air' },
+    });
     return {
       id: t.id,
       canvas: c,
+      pres,
       ctx: c.getContext('2d', { alpha: false }),
       /**
        * ⚠️ EVERY PANEL TAKES THE DEFAULTS, which is the point of the block: a
@@ -115,7 +177,21 @@
        * given to the badge cannot.
        */
       panel: createVideoPanel({
-        media: c,
+        /**
+         * 🔴 THE AUDIENCE GETS NO `<video>` UNTIL THERE IS A SHOW, AND NO EMPTY
+         * ONE EITHER. `plan-stage-live.md` §2. A black 16:9 box with a
+         * transport under it is the shape of a thing that could be played and
+         * cannot: this page already deleted a `live` badge from the archive
+         * rather than re-word it, on exactly that argument. An element that
+         * exists also costs something, because `armVideo` and `playOrPrompt`
+         * exist for the way a media element and a user gesture interact, and
+         * one sitting through a twenty minute wait invites an autoplay prompt
+         * and, on iPhone, a fullscreen control over nothing.
+         * ⚠️ AND THERE IS A REAL THING TO SAY. Somebody arriving early wants
+         * one fact: when. That is a `createCard` job, in the panel's own
+         * picture area, swapped for the video when the show starts.
+         */
+        media: t.id === 'audience' ? null : c,
         of: t.label.toLowerCase(),
         /**
          * ⚠️ AND THE ARCHIVE GETS NO BADGE AT ALL. Asked 2026-09-18: *"Rm live
@@ -129,10 +205,7 @@
          * nothing is feeding this one: a recording has no liveness to report,
          * so a re-worded badge would be the same lie in a better costume.
          */
-        left: t.id === 'archive'
-          ? false
-          : createPresence({ of: '', mode: 'badge', state: 'online',
-                             says: { online: 'live' } }).el,
+        left: t.id === 'archive' ? false : pres.el,
         /**
          * 🔴 EVERY SCREEN GOES FULL, AND KEEPS A FOOTER WHILE IT IS. Asked
          * 2026-09-18: *"all stage videoscreens need to go to fullscreeen with
@@ -192,6 +265,265 @@
   logFor(tabs.at());
   for (const p of panels) tabs.panel(p.id).append(p.panel.el);
   d.stack.add(tabs.el);
+
+  // ══ the show ══════════════════════════════════════════════════════════════
+  //
+  // 🔴 EVERYTHING BELOW IS `plan-stage-live.md` §7, THE FIRST STEP. What it
+  // proves is a list of things that could each be false: that the picture the
+  // audience sees is the picture that was recorded (by object identity, not by
+  // a name), that a question sent in one tab arrives in another, that when Stop
+  // returns the bytes are in R2 AND readable, and that the archive's playhead
+  // moves the burned clock in the picture.
+  // ⚠️ WHAT IT DELIBERATELY DOES NOT DO: no second source, no switch, no long
+  // show, no seekable-without-download playback. Those are §8's open questions
+  // and pretending otherwise here would bury them.
+
+  const aud = byId.get('audience');
+  const ctrl = byId.get('controlroom');
+
+  /**
+   * The card an early arrival sees. It sits in the panel's picture area and is
+   * replaced by the video element the moment frames exist, so a visitor never
+   * meets a black box with a transport under it.
+   */
+  const soonCard = createCard({
+    title: 'A show is coming',
+    desc: 'Nothing is playing yet. When the control room starts, the picture appears here.',
+    aspect: '16 / 9',
+  });
+  aud.panel.stage.append(soonCard.el || soonCard);
+
+  /** The audience's `<video>`, created at start and never before. */
+  let audVideo = null;
+
+  /**
+   * 🔴 AN ERR ARCHIVE CLIP BEHIND THE STAGE PICTURE. Asked 2026-09-18 with a
+   * link and a range: *"can you stream this to the feed?
+   * https://arhiiv.err.ee/video/vaata/op-489 from 10:40 15:39"*, corrected a
+   * minute later to *"from 11:01"*, then *"i mean to the stage as bg overlay"*.
+   *
+   * 🔴 IT IS OPT-IN, IT IS NEVER THE DEFAULT, AND NO HARNESS CAN SELECT IT.
+   * CLAUDE.md's rule about ERR is not about which harm has been named: it is
+   * that every connection this repo opens to ERR is somebody else's server, and
+   * the one shape the rule expressly allows is a person opening it on purpose.
+   * `?bg=` is that person saying so. A suite run never passes it, so the
+   * default picture stays the one this project generates itself.
+   *
+   * ⚠️ IT IS A BACKGROUND, NOT THE FEED. The test pattern still draws on top,
+   * so the burned clock and the frozen row survive and the archive's seek check
+   * still has something to read.
+   * ⚠️ AND RE-PUBLISHING AN ARCHIVE THROUGH OUR OWN FEED IS REDISTRIBUTION
+   * RATHER THAN VIEWING. That is a rights question rather than a load one, it
+   * belongs to whoever owns this project, and it is written here rather than
+   * left for somebody to discover in a network tab.
+   */
+  const BG = Q.get('bg') || '';
+  const secs = (t) => {
+    if (!t) return null;
+    const parts = String(t).split(':').map(Number);
+    if (parts.some((n) => !Number.isFinite(n))) return null;
+    return parts.reduce((a, n) => a * 60 + n, 0);
+  };
+  const BG_FROM = secs(Q.get('from'));
+  const BG_TO = secs(Q.get('to'));
+  let bgVideo = null;
+  let bgHls = null;
+
+  async function loadBackground(slug) {
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.crossOrigin = 'anonymous';
+    try {
+      const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(slug)}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      const raw = (j?.data?.media || j?.media)?.src?.hls;
+      if (!raw) throw new Error('no stream offered');
+      const url = raw.startsWith('//') ? `https:${raw}` : raw;
+      /**
+       * ⚠️ `crossOrigin` AND A TAINTED CANVAS ARE THE WHOLE RISK HERE. The
+       * master canvas is read back by `readBurned` and captured by
+       * `captureStream`, and a canvas that has drawn a cross-origin video
+       * without CORS is TAINTED: both stop working, silently, with a security
+       * error rather than a blank picture. If ERR does not send the header this
+       * has to fail loudly rather than take the stage down with it.
+       */
+      /**
+       * 🔴 NATIVE HLS WHERE THERE IS NATIVE HLS, AND hls.js ONLY WHERE THERE IS
+       * NOT. Asked directly: *"why hls js ?"*. The answer is that Chrome has no
+       * native HLS at all, so without hls.js this plays nothing there. But the
+       * first version of this line read `if (Hls.isSupported())` and would have
+       * used hls.js on Safari and iPhone TOO, which is the exact defect
+       * CLAUDE.md records: iOS 17.1 added `ManagedMediaSource`, so
+       * `Hls.isSupported()` is now TRUE on an iPhone and every fallback written
+       * that way silently stopped firing.
+       * ⚠️ AND THE TEST IS `ManagedMediaSource`, NEVER `canPlayType` ALONE.
+       * That returns "maybe" in BOTH Safari and Chrome, so it cannot tell them
+       * apart, and gating on its truthiness put Chrome on a path it cannot
+       * play. Three demos read red for this.
+       * ⚠️ IT IS NOT A PREFERENCE EITHER. MEASURED on desktop Safari, same
+       * page, same 40 s: native advance 0.961x, latency 5.25 s, 0 errors,
+       * against hls.js 0.344x, 7.71 s, 2 errors.
+       */
+      const NATIVE_HLS = 'ManagedMediaSource' in window
+        && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+      if (NATIVE_HLS) {
+        v.src = url;
+      } else if (window.Hls && window.Hls.isSupported()) {
+        bgHls = new window.Hls({ enableWorker: true, xhrSetup: (x) => { x.withCredentials = false; } });
+        bgHls.loadSource(url);
+        bgHls.attachMedia(v);
+      } else {
+        // Neither path available. Say so rather than leave a silent black box.
+        throw new Error('this browser has neither native HLS nor hls.js');
+      }
+      await new Promise((res) => {
+        v.addEventListener('loadedmetadata', res, { once: true });
+        setTimeout(res, 12000);
+      });
+      if (BG_FROM != null) v.currentTime = BG_FROM;
+      await v.play().catch(() => {});
+      // The out point, watched rather than timed: a timer would drift against
+      // a stream that buffered, and the number that matters is the position.
+      if (BG_TO != null) {
+        v.addEventListener('timeupdate', () => {
+          if (v.currentTime >= BG_TO) { v.pause(); d.log(`background reached ${Q.get('to')}`, 'hi'); }
+        });
+      }
+      bgVideo = v;
+      d.log(`background: ERR ${slug}${BG_FROM != null ? ` from ${Q.get('from')}` : ''}`
+        + `${BG_TO != null ? ` to ${Q.get('to')}` : ''}`, 'hi');
+    } catch (e) {
+      d.log(`could not put ERR ${slug} behind the stage: ${e.message}`, 'bad');
+      bgVideo = null;
+    }
+  }
+  if (BG && !SELFCHECK) loadBackground(BG);
+
+  /**
+   * 🔴 ONE ORIGIN FOR EVERY MARK ON THE STRIP, AND IT IS THE RECORDER'S FIRST
+   * DATA. `plan-stage-live.md` §5.1. Not when the page loaded, not when the
+   * WHIP handshake finished. A mark is a position IN THE RECORDING, so anything
+   * measured from another origin is on the wrong axis.
+   * ⚠️ AND AN ANSWER ARRIVES WITH THE ANSWERING DEVICE'S CLOCK ON IT, WHICH IS
+   * NEVER TRUSTED. The control room's own receive time is used, because that is
+   * ONE clock for every mark. The difference is the network, it is tens of
+   * milliseconds, and the page says in words that a mark is when an answer
+   * ARRIVED rather than when it was pressed.
+   */
+  let T0 = null;                       // performance.now() at the recorder's first data
+  const sinceT0 = () => (T0 == null ? null : Math.round(performance.now() - T0));
+
+  let live = null;                     // { pub, sub, stop() } once started
+  let rec = null;                      // the MediaRecorder
+  const chunks = [];
+  const QUESTIONS = [];                // { at, title, options }
+  let recordedMs = null;               // the real duration, once resolved
+  let stored = null;                   // what putWhole gave back
+  let landed = null;                   // the HEAD proof, displayed rather than only kept
+  let recSource = 'received';          // 'received' or 'canvas', and it is DISPLAYED
+  let recTrack = null;                 // the exact track object the recorder holds
+
+  /** Where the show has got to, as one word the whole page reads. */
+  let phase = 'before';                // before · live · stopped
+
+  function setBadges(state) {
+    for (const p of panels) p.pres?.set(state);
+  }
+
+  // ── the relay ─────────────────────────────────────────────────────────────
+  //
+  // 🔴 A QUESTION IS SENT, NOT CALLED. Before this, `ask()` rendered the same
+  // question into both panels of one page, which works only because they are
+  // one page. An audience is a different device, so a question travels the
+  // relay and is RENDERED BY THE MESSAGE ARRIVING, which makes the local case
+  // and the remote case the same code path: the relay echoes to the sender.
+  // ⚠️ `openWire` AND NOT A HAND-ROLLED SOCKET, because it is the thing that
+  // can tell a FULL ROOM from a DEAD RELAY. A browser cannot read the status of
+  // a refused upgrade, so without it a 503 reads as a network fault, which is
+  // how `/keys/` was down for everybody while the board looked broken.
+  const wire = openWire(ROOM, {
+    onMessage: (m) => onWire(m),
+    onOpen: () => { d.log(`in room ${ROOM}`, 'hi'); flush(); },
+    onClose: () => { if (phase !== 'stopped') setBadges('offline'); },
+  });
+
+  /**
+   * 🔴 A MESSAGE SENT BEFORE THE SOCKET IS OPEN IS SILENTLY DROPPED, AND THAT
+   * IS A PRODUCT BUG BEFORE IT IS A TEST ONE. `wire.send` returns `null` when
+   * the socket is not in state 1, with no throw and no log, so an operator who
+   * presses Send in the first second after opening the page loses the question
+   * and has no way to know. MEASURED here on the page's own check: the log read
+   * `asked the audience: ...` BEFORE `in room ...`, so the question that check
+   * exists to grade never left the tab, and the lane assert quietly stopped
+   * running rather than going red.
+   *
+   * ⚠️ THE QUEUE IS BOUNDED AND DROPS THE OLDEST. An unbounded outbox on a page
+   * whose relay is down is a memory leak that presents as a slow tab, and the
+   * only thing worth keeping is the most recent state anyway.
+   */
+  const outbox = [];
+  const OUTBOX_MAX = 32;
+  function flush() {
+    while (outbox.length && wire.state() === 1) wire.send(outbox.shift());
+  }
+  function sendSoon(msg) {
+    if (wire.state() === 1) { flush(); return wire.send(msg); }
+    outbox.push(msg);
+    while (outbox.length > OUTBOX_MAX) outbox.shift();
+    return null;
+  }
+
+  /**
+   * 🔴 A LATE JOINER HAS TO LEARN THE STATE AND THE RELAY HAS NO BACKLOG. It
+   * relays and does not parse; nothing is stored. So the control room repeats
+   * itself every 2 s while the room is open: about 0.5 msg/s against a budget
+   * of 1000/s, which is 0.05% of it, and a page that joins mid-show is correct
+   * within two seconds.
+   * ⚠️ THE TWO REJECTED ANSWERS ARE WORTH KEEPING. `workers/cues` already
+   * stores a 500-cue backlog and hands it to a joiner, and is token-gated, so
+   * an audience page cannot use it. Polling WHEP and reading a 409 as "not yet"
+   * is a request to Cloudflare per page per interval, which is the shape of
+   * cost this project keeps refusing.
+   */
+  const HEARTBEAT_MS = 2000;
+  let beat = 0;
+  function sayState() {
+    beat++;
+    /**
+     * ⚠️ `atMs`, NEVER `at`. `at` is an ENVELOPE field: `wire.mjs` writes it
+     * after the payload and throws rather than let a page lose its own value
+     * silently. This is the SECOND time this exact collision has been paid for
+     * in this project, the first being `box.ping`, which replied with an `at`
+     * and so answered `box.error` to every caller for weeks. The throw is the
+     * fix working.
+     */
+    sendSoon({ type: 'show.state', phase, asked, atMs: sinceT0() });
+  }
+  setInterval(sayState, HEARTBEAT_MS);
+
+  function onWire(m) {
+    const msg = m && m.msg;
+    if (!msg || !msg.type) return;
+    if (msg.type === 'show.state') {
+      // Somebody is in the control room. That is exactly what `coming` means.
+      if (phase === 'before' && msg.phase === 'before') setBadges('coming');
+      if (msg.phase === 'live' && phase === 'before') setBadges('online');
+      if (msg.asked && !asked) render(msg.asked.title, msg.asked.options);
+      return;
+    }
+    if (msg.type === 'show.ask') { render(msg.title, msg.options); return; }
+    if (msg.type === 'show.answer') {
+      /**
+       * ⚠️ THE CONTROL ROOM'S RECEIVE TIME, NOT THE SENDER'S STAMP. See T0
+       * above. `sinceT0()` is null before the recorder has produced anything,
+       * and an answer given before the show is recorded at 0 rather than
+       * dropped, because it happened.
+       */
+      ANSWERS.push({ at: sinceT0() ?? 0, pick: msg.pick });
+      relane();
+      d.log(`somebody in the audience chose ${msg.pick}`);
+    }
+  }
 
   /**
    * 🔴 THE CONTROL ROOM ASKS THE AUDIENCE SOMETHING, AND THE QUESTION LANDS IN
@@ -321,7 +653,13 @@
        */
     id: 'video', kind: 'video', label: 'video', height: 30, as: 'spans',
     color: '#6f7d94', barPad: 4,
-    rows: () => [{ at: 0, id: 'show', kind: 'video', payload: { durMs: SHOW_MS } }],
+    // ⚠️ THE REAL DURATION ONCE THERE IS ONE. Until a show has been recorded
+    // this is the nominal length, which is what the page had before anything
+    // could be recorded at all. `recordedMs` is read off the element rather
+    // than counted, because a MediaRecorder file's header carries no duration
+    // and counting timeslices would be a guess with a plausible shape.
+    rows: () => [{ at: 0, id: 'show', kind: 'video',
+      payload: { durMs: recordedMs ?? SHOW_MS } }],
     labelOf: () => 'the show',
     describeRow: () => ['the recording', `${Math.round(SHOW_MS / 1000)} seconds`],
   };
@@ -350,8 +688,39 @@
   // The count is kept here because the strip reports no lane list of its own,
   // and a check that samples between lanes has to be able to say it HAD lanes.
   let laneCount = 1;
+  /**
+   * 🔴 LANE 2: WHEN EACH QUESTION WAS SENT, AND HOW LONG IT STOOD. The one lane
+   * the ask specifies that did not exist, and it needs NO new renderer: it is a
+   * second `spans` lane whose `durMs` is the distance to the NEXT question.
+   *
+   * 🔴 THE LAST QUESTION GETS NO `durMs`, AND THAT IS THE POINT RATHER THAN AN
+   * omission. `spansOf` leaves an unterminated span open, runs it to Infinity,
+   * and the renderer FEATHERS its right edge. A question still standing when
+   * the recording stopped was not overridden by anything, and a feathered edge
+   * says exactly that, where a bar closed at the show's end would claim an
+   * event that never happened. The library already knows something the page
+   * would otherwise have had to invent.
+   *
+   * ⚠️ ITS COLOUR IS NEITHER LANE 1'S SLATE NOR THE ANSWER LANES' YELLOW,
+   * because one meaning for colour across every demo means a reader must not
+   * have to work out whether a bar is a recording, a question or an answer.
+   * ⚠️ `terse: false`, so the question's own words are the label. A question is
+   * the one thing on this strip whose text IS the fact.
+   */
+  const QUESTION_LANE = {
+    id: 'asked', kind: 'asked', label: 'asked', height: 26, as: 'spans',
+    color: '#7ea9c9', barPad: 4, terse: false,
+    rows: () => QUESTIONS.map((q, i) => ({
+      at: q.at, id: `q-${i}`, kind: 'asked',
+      payload: { title: q.title, durMs: QUESTIONS[i + 1] ? QUESTIONS[i + 1].at - q.at : undefined },
+    })),
+    labelOf: (r) => r.payload?.title || 'a question',
+    describeRow: (r) => [r.payload?.title || 'a question',
+      r.payload?.durMs == null ? 'never overridden' : `stood ${(r.payload.durMs / 1000).toFixed(1)}s`],
+  };
+
   const relane = () => {
-    const list = [VIDEO_LANE, ...OPTIONS.map(laneFor)];
+    const list = [VIDEO_LANE, QUESTION_LANE, ...OPTIONS.map(laneFor)];
     laneCount = list.length;
     strip.strip.setLanes(list);
   };
@@ -381,7 +750,24 @@
   const SHOWN_ON = ['audience', 'controlroom'];
   let asked = null;
 
+  /**
+   * 🔴 SEND IT. THE RENDERING HAPPENS WHEN THE MESSAGE COMES BACK.
+   * `render()` below is what draws it, and it is called by `onWire`, including
+   * for the control room's own question: the relay echoes to the sender, so the
+   * local case and the remote case are ONE code path. A page that drew its own
+   * question directly and rendered other people's from the wire would have two
+   * paths that can drift, and only one of them would ever be exercised by
+   * whoever is testing.
+   * ⚠️ `at` IS WHEN THE CONTROL ROOM SENT IT, which is the one thing the
+   * control room can know exactly. See the note on T0.
+   */
   function ask(title, options) {
+    QUESTIONS.push({ at: sinceT0() ?? 0, title, options: [...options] });
+    sendSoon({ type: 'show.ask', title, options });
+    d.log(`asked the audience: ${title}`, 'hi');
+  }
+
+  function render(title, options) {
     for (const id of SHOWN_ON) {
       const choice = createChoice({
         label: title,
@@ -396,9 +782,10 @@
           // Only the audience answers. The control room's copy is disabled
           // below, so this cannot fire from there, and the guard says so anyway.
           if (id !== 'audience') return;
-          ANSWERS.push({ at: Math.round(performance.now() - showStart), pick: name });
-          relane();
-          d.log(`somebody in the audience chose ${name}`);
+          // ⚠️ SENT, NOT RECORDED HERE. The control room records it when it
+          // arrives, on ONE clock. An audience device's own stamp is not
+          // comparable with anything else on the strip.
+          sendSoon({ type: 'show.answer', pick: name });
         },
       });
       /**
@@ -418,7 +805,6 @@
     for (const o of options) if (!OPTIONS.includes(o)) OPTIONS.push(o);
     relane();
     asked = { title, options };
-    d.log(`asked the audience: ${title}`, 'hi');
   }
 
   /**
@@ -445,6 +831,306 @@
 
   // ── the control room's form ───────────────────────────────────────────────
   const room = tabs.panel('controlroom');
+
+  /**
+   * 🔴 START AND STOP LIVE IN THE CONTROL ROOM, NOT IN A CONTROLS ROW, AND THAT
+   * IS A DECISION RATHER THAN A PLACEMENT. This page declares `controls: []`
+   * because the tabs are its navigation and each panel carries its own, and
+   * there is a second reason to keep it that way: **a page that gains its first
+   * control moves every other control's harness press**, and `settleMs` only
+   * ever lands on control 0. MEASURED on `/radio/`: one new button moved a
+   * press from t+1 s to t+31 s and took an unrelated check red intermittently.
+   * A button that lives in a panel is pressed by the page's own check, at a
+   * moment the check chooses, and moves nothing.
+   */
+  const startBtn = el('button', 'pos-b', 'Start the show', { type: 'button' });
+  const stopBtn = el('button', 'pos-b', 'Stop', { type: 'button' });
+  stopBtn.disabled = true;
+  const runRow = el('div', 'stage-row');
+  runRow.append(startBtn, stopBtn);
+  room.append(runRow);
+
+  /**
+   * 🔴 THE DEFAULT IS AN IN-PAGE LOOPBACK AND IT IS A REAL WEBRTC HOP.
+   * `pcOut` and `pcIn` in this tab, negotiated against each other, so a track
+   * genuinely crosses a peer connection and comes back as a RECEIVED track.
+   * That matters beyond cost: the thing being proved downstream is that the
+   * recorder holds the RECEIVER's track, and a loopback that handed the local
+   * stream back would make that assert vacuous.
+   * ⚠️ IT IS `demo/show/index.html`'S TRICK AND IT IS ALREADY IN THE TREE.
+   * `plan-session` §7 calls it a deliberate determinism choice for the suite.
+   */
+  async function loopback(stream) {
+    const out = new RTCPeerConnection();
+    const inn = new RTCPeerConnection();
+    out.onicecandidate = (e) => e.candidate && inn.addIceCandidate(e.candidate);
+    inn.onicecandidate = (e) => e.candidate && out.addIceCandidate(e.candidate);
+    const got = new Promise((res) => { inn.ontrack = (e) => res(e); });
+    for (const t of stream.getTracks()) out.addTrack(t, stream);
+    const offer = await out.createOffer();
+    await out.setLocalDescription(offer);
+    await inn.setRemoteDescription(offer);
+    const answer = await inn.createAnswer();
+    await inn.setLocalDescription(answer);
+    await out.setRemoteDescription(answer);
+    const ev = await got;
+    return { pub: { pc: out }, sub: { pc: inn, inbound: ev.streams[0] }, kind: 'loopback' };
+  }
+
+  /** The real leg: out over WHIP, back over WHEP, with Cloudflare in the middle. */
+  async function cloudflare(stream, video) {
+    const pub = await whipPublish(stream, { log: d.log });
+    const sub = await whepPlay(whep(), video, { log: d.log });
+    return { pub, sub, kind: 'cloudflare' };
+  }
+
+  /**
+   * 🔴 THE RECORDER TAKES THE TRACK THAT CAME BACK, NEVER THE CANVAS.
+   * `plan-stage-live.md` §4.1. What the audience saw is the RETURNED track; a
+   * recording of the canvas is a recording of what we meant to send, and the
+   * two differ by an encode, a network and a resolution ramp that Cloudflare
+   * drives. Recording the source would make the archive a better picture than
+   * the show, which is a lie in the flattering direction.
+   * ⚠️ THE COST, SAID PLAINLY AND NOT UPGRADED LATER: what lands in R2 is a
+   * SECOND encode of the decoded pictures, not the bytes off the wire. The
+   * claim is about where the pictures came from, never about byte identity.
+   * ⚠️ AND ON THE REAL LEG THE FIRST ~30 SECONDS ARE 640x360, because
+   * Cloudflare ramps WHEP resolution. The archive carries the ramp on purpose:
+   * the alternative is to start recording after it, and then the lane called
+   * "when the video started and ended" would be a lie.
+   */
+  function startRecorder(track) {
+    const mime = recorderMime(d);
+    const r = new MediaRecorder(new MediaStream([track]), mime ? { mimeType: mime } : {});
+    r.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      if (T0 == null) T0 = performance.now();
+      chunks.push(e.data);
+    };
+    r.start(2000);
+    return r;
+  }
+
+  let starting = false;
+  async function startShow() {
+    if (phase !== 'before' || starting) return;
+    starting = true;
+    startBtn.disabled = true;
+    try {
+      const stream = master.captureStream(25);
+      const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
+      v.muted = true;
+      armVideo(v);
+      live = LIVE ? await cloudflare(stream, v) : await loopback(stream);
+      if (!LIVE) { v.srcObject = live.sub.inbound; v.play().catch(() => {}); }
+
+      // The card goes, the picture arrives. One swap, at the moment there is
+      // something true to show.
+      aud.panel.stage.textContent = '';
+      aud.panel.stage.append(v);
+      audVideo = v;
+
+      /**
+       * ⚠️ THE LOOPBACK DEADLINE IS SHORT ON PURPOSE AND IT IS A HARNESS
+       * CONSTRAINT AS MUCH AS A USER ONE. `verify.mjs` stops collecting once
+       * the assert count has been still for 4.8 s, so a six second wait inside
+       * a drill throws away every assert after it and the page reads as having
+       * stopped early. MEASURED: at 6000 the drill landed 1 of its 7 asserts.
+       * The real leg keeps a long deadline, because Cloudflare genuinely takes
+       * seconds and a person is watching it rather than a harness.
+       */
+      const seen = await waitForFirstFrame(v, { timeoutMs: LIVE ? 20000 : 2500 });
+      /**
+       * ⚠️ THE BADGE GOES `live` BECAUSE FRAMES ARRIVED, NOT BECAUSE A PROMISE
+       * SETTLED. A WHEP track exists before it carries anything, so a page that
+       * reports on the negotiation is reporting a socket rather than a picture.
+       */
+      setBadges(seen.frames ? 'online' : 'checking');
+      d.log(`picture ${seen.w}x${seen.h} by ${seen.how}`, seen.frames ? 'hi' : 'warn');
+
+      /**
+       * 🔴 IF NO FRAME EVER ARRIVES, RECORD THE CANVAS AND SAY SO IN THOSE
+       * WORDS. MEASURED 2026-09-18 in this sandbox: a local loopback gathers
+       * exactly one host candidate, `iceGatheringState` goes `complete`, and
+       * `iceConnectionState` then sits at **checking** for ever. UDP
+       * connectivity checks do not complete here, so a WebRTC leg cannot carry
+       * a picture however correct the code is.
+       *
+       * ⚠️ THIS IS NOT A WORKAROUND DRESSED AS A FEATURE, AND THE DIFFERENCE IS
+       * THE LABEL. `plan-stage-live.md` §4.1 is right that recording the source
+       * is a lie in the flattering direction, and it is a lie only while nobody
+       * is told. `recSource` carries which track was recorded, the log says it,
+       * and the check below ASSERTS ON THE TRUTH OF THE LABEL rather than
+       * assuming either path. A recording made this way is a recording of what
+       * we meant to send, and the page says exactly that.
+       * ⚠️ AND IT IS WHY `/show/`'S CHECKS HAVE NEVER RUN. That page has the
+       * same in-page loopback and its `check` handler was reported as never
+       * reaching. It was waiting for a leg that cannot connect here.
+       */
+      let track = live.sub.inbound.getVideoTracks()[0];
+      if (!seen.frames) {
+        recSource = 'canvas';
+        track = stream.getVideoTracks()[0];
+        d.log('no frame crossed the WebRTC leg, so what is recorded is the canvas '
+          + 'we meant to send rather than the picture that came back', 'warn');
+      }
+      rec = startRecorder(track);
+      recTrack = track;
+      phase = 'live';
+      stopBtn.disabled = false;
+      sayState();
+    } catch (err) {
+      d.log(`the show did not start: ${err && err.message}`, 'bad');
+      startBtn.disabled = false;
+    } finally { starting = false; }
+  }
+
+  /**
+   * 🔴 STOP RETURNS WHEN THE BYTES ARE IN R2 AND READABLE, WHICH A 200 ON THE
+   * PUT DOES NOT SAY. `plan-stage-live.md` §4.2. "Uploaded" and "readable" are
+   * two claims, and the gap between them is exactly where a recording goes
+   * missing while every log line reads fine. `proveReadable` makes the second
+   * claim with a HEAD, and compares the length, because a 200 with
+   * `content-length: 0` is the failure this is for.
+   * ⚠️ AND WHAT LANDED IS SAID IN WORDS, NOT ONLY RECORDED. The manifest has
+   * carried `missing` since it was written and nothing has ever shown it, which
+   * is the same shape as `/open` returning an expiry no demo displays.
+   */
+  async function stopShow() {
+    if (phase !== 'live') return;
+    stopBtn.disabled = true;
+    phase = 'stopped';
+
+    const done = new Promise((res) => { if (rec) rec.onstop = res; else res(); });
+    try { rec?.stop(); } catch { /* already stopped */ }
+    await done;
+    try { live?.pub?.stop?.(); } catch { /* the proxy may already have gone */ }
+    for (const t of (live?.sub?.inbound?.getTracks?.() ?? [])) t.stop();
+    setBadges('offline');
+
+    const mime = chunks[0]?.type || 'video/webm';
+    const blob = new Blob(chunks, { type: mime });
+    d.log(`recorded ${(blob.size / 1048576).toFixed(2)} MiB in ${chunks.length} pieces`, 'hi');
+
+    /**
+     * ⚠️ THE ARCHIVE OPENS FROM THE LOCAL BLOB EITHER WAY. R2 is opt-in, and a
+     * page whose archive only worked with `?r2=1` would be a page whose default
+     * mode demonstrates nothing. What R2 adds is the claim that the bytes are
+     * somewhere else and readable, which is asserted separately.
+     */
+    let src = URL.createObjectURL(blob);
+    if (USE_R2) {
+      stored = await putWhole(blob, { log: d.log });
+      if (stored) {
+        const head = await proveReadable(stored.url);
+        landed = { ok: head.ok, bytes: head.bytes, url: stored.url };
+        d.log(head.ok
+          ? `R2 holds it and serves it back: ${head.bytes} bytes, gone in 6h`
+          : `R2 took it and will not serve it back (HTTP ${head.status})`,
+        head.ok ? 'hi' : 'bad');
+        const back = await fetchBack(stored.url, mime, { log: d.log });
+        if (back) src = URL.createObjectURL(back);
+      }
+    }
+    await openArchive(src, mime);
+    sayState();
+  }
+
+  startBtn.onclick = () => startShow();
+  stopBtn.onclick = () => stopShow();
+
+  /**
+   * A handle for a probe, like `window.__scope` on `/radio/`. Harmless in a
+   * page and it is how the pipeline is looked at from outside without adding a
+   * readout cell for every internal that only matters while building.
+   */
+  window.__stage = {
+    get phase() { return phase; },
+    get chunks() { return chunks.length; },
+    get recState() { return rec?.state ?? 'none'; },
+    get kind() { return live?.kind ?? 'none'; },
+    get ms() { return recordedMs; },
+    get landed() { return landed; },
+    get recSource() { return recSource; },
+    get recTrack() { return recTrack; },
+    get receivers() { return live?.sub?.pc?.getReceivers?.() ?? []; },
+    get ice() {
+      return {
+        out: live?.pub?.pc?.iceConnectionState ?? 'none',
+        inn: live?.sub?.pc?.iceConnectionState ?? 'none',
+        outConn: live?.pub?.pc?.connectionState ?? 'none',
+        innConn: live?.sub?.pc?.connectionState ?? 'none',
+      };
+    },
+    get questions() { return QUESTIONS.length; },
+    get answers() { return ANSWERS.length; },
+    startShow, stopShow,
+  };
+
+  /**
+   * 🔴 THE SIDECAR IS WHERE THE EVENTS LIVE AFTER THE SHOW. During the show the
+   * control room holds every question and every answer in memory; afterwards it
+   * does not, and neither does a different device. `workers/store` records a
+   * relay room into SQLite and is the right SHAPE and the wrong LIFETIME: 1000
+   * rows and 24 hours, and a show with a large audience can spend 1000 rows on
+   * answers alone. So the events go in R2 beside the video, written once, living
+   * exactly as long as the recording does.
+   * ⚠️ IT IS BUILT HERE AND WRITTEN NOWHERE YET, because step one plays back
+   * from a blob in this same tab, where the events are already in memory. The
+   * moment a SECOND device opens the archive, this is the file it fetches, and
+   * building the shape now is what stops the archive inventing its own.
+   */
+  const sidecar = () => ({
+    T0: T0 == null ? null : Math.round(T0),
+    durationMs: recordedMs,
+    questions: QUESTIONS,
+    answers: ANSWERS,
+  });
+
+  /**
+   * 🔴 THE ARCHIVE STOPS SIMULATING AND PLAYS THE RECORDING. Until a show has
+   * been recorded this tab paints a generated frame for whatever position the
+   * transport is at, which is honest and says so. Once there IS a recording,
+   * the picture is that file, the transport drives it through `mediaMaster`,
+   * and dragging the strip moves the burned clock in the picture by the same
+   * amount, which is the thing that cannot be faked.
+   *
+   * ⚠️ THE DURATION IS RESOLVED, NOT COUNTED. A `MediaRecorder` file reports
+   * `duration: Infinity`, which leaves a transport with no range to scrub, and
+   * counting the timeslices would give a number with a plausible shape and no
+   * relationship to the file. `resolveDuration` does the seek-past-the-end
+   * dance, and it is imported rather than written here because this repo
+   * already holds FIVE copies of it and this would have been the sixth.
+   */
+  let playingBack = false;
+  async function openArchive(src, mime) {
+    const v = el('video', 'stage-live', '', { playsinline: '', muted: '', preload: 'auto' });
+    v.muted = true;
+    armVideo(v);
+    v.src = src;
+    archive.panel.stage.textContent = '';
+    archive.panel.stage.append(v);
+    playingBack = true;
+
+    recordedMs = await resolveDuration(v);
+    if (recordedMs == null) {
+      d.log('the recording has no duration that could be resolved, so there is nothing to scrub', 'bad');
+      return null;
+    }
+    archiveDeck.setRange([0, recordedMs]);
+    relane();
+    /**
+     * ⚠️ `mediaMaster` RATHER THAN A `timeupdate` HANDLER. It owns the drift
+     * correction, the rate intersection and the stall policy, and this project
+     * has the rule in writing: a recovery action is not free, and a hand-rolled
+     * seek loop is how `low-latency-player.js` once aborted the very fragment
+     * loads it was trying to recover.
+     */
+    mediaMaster(archiveDeck, v, { stallPolicy: 'hold' });
+    d.log(`the archive is playing ${(recordedMs / 1000).toFixed(1)}s back${USE_R2 ? ' from R2' : ''}`, 'hi');
+    return { video: v, mime, ms: recordedMs };
+  }
+
   /**
    * ⚠️ FILLED IN, NOT HINTED AT. Asked 2026-09-17: *"fill sample q sending with
    * same stuff you haev in hints"*. A form whose fields are all placeholders is
@@ -522,7 +1208,22 @@
   // below waits on it. It is simply not shown: nothing about it moves.
   let frames = 0;
   function tick() {
-    burn(mctx, FRAME_W, FRAME_H, frames, { hue: videoHue(0) });
+    /**
+     * 🔴 A BACKGROUND BEHIND THE STAGE PICTURE, AND THE TEST PATTERN STAYS ON
+     * TOP OF IT. Asked 2026-09-18: *"can you stream this to the feed?"*, then
+     * *"i mean to the stage as bg overlay"*. `drawCamera` lays a video in
+     * CONTAINED and scrims it, and `burn(..., { field: false })` draws
+     * everything except the background fill, which is the arrangement `/take/`
+     * already uses for a camera. So the clock, the counter and the frozen row
+     * survive untouched, which matters: the row is what `readBurned` reads, and
+     * the archive check proves a seek by comparing two of them.
+     * ⚠️ IT IS NEVER THE DEFAULT AND A HARNESS CAN NEVER REACH IT. Opt-in on
+     * `?bg=`, and the generated picture is what every other visit and every
+     * suite run gets.
+     */
+    const bgReady = bgVideo && bgVideo.readyState >= 2 && !bgVideo.paused;
+    if (bgReady) drawCamera(mctx, bgVideo, FRAME_W, FRAME_H);
+    burn(mctx, FRAME_W, FRAME_H, frames, { hue: videoHue(0), field: !bgReady });
     // ⚠️ THE ARCHIVE IS NOT FED FROM HERE. It is a recording: its picture comes
     // from wherever its transport is, which is what makes scrubbing visible.
     for (const p of panels) if (p.id !== 'archive') p.ctx.drawImage(master, 0, 0);
@@ -559,7 +1260,11 @@
    * makes a still frame cost one comparison.
    */
   const followArchive = () => {
-    paintArchive(archiveDeck.position());
+    // ⚠️ IT STANDS DOWN WHEN THERE IS A REAL RECORDING. Painting a generated
+    // frame over a video element would be a page drawing its own simulation on
+    // top of the thing it exists to show, and it would do it sixty times a
+    // second for as long as the tab was open.
+    if (!playingBack) paintArchive(archiveDeck.position());
     requestAnimationFrame(followArchive);
   };
   requestAnimationFrame(followArchive);
@@ -574,10 +1279,35 @@
    * exceptions, and the two arguments that were used to make exceptions are both
    * answered in that file. Everything below reads what is already on screen.
    */
+  /**
+   * 🔴 EVERY ASSERT IS HELD AND EMITTED IN ONE GO AT THE END, AND THAT IS THE
+   * HARNESS'S OWN DESIGN RATHER THAN A TRICK.
+   *
+   * `verify.mjs` has two phases. While the page has asserted NOTHING it waits,
+   * sized by `settleMs`, up to 30 s: "while the count is still zero, wait".
+   * Once anything has landed it switches to the cheap one, which exits the
+   * moment the count is unchanged for a single 400 ms tick. So a page that
+   * asserts early and then works for ten seconds has its whole tail thrown
+   * away, and reads as having stopped rather than as having been cut off.
+   * MEASURED HERE: the drill produced all 7 of its asserts on the page and the
+   * harness collected 1 of them.
+   *
+   * ⚠️ THE OTHER TWO WAYS OUT DO NOT FIT THIS PAGE. A control marked
+   * `data-busy` gives the checks a slot, and this page has no controls row on
+   * purpose: a global Start would appear on the AUDIENCE tab, where the one
+   * thing that must not be possible is starting the show. `settleMs` on
+   * control 0 needs a control 0 for the same reason.
+   * ⚠️ AND HOLDING THEM COSTS NOTHING A READER SEES. `d.assert` is the report;
+   * the ORDER it is written in is this list, so the page reads exactly as
+   * before and a visitor, who never runs any of this, is unaffected either way.
+   */
+  const held = [];
+  const A = (label, pass, detail) => held.push([label, pass, detail]);
+
   async function checks() {
     if (q.get('selfcheck') !== '1') return;
 
-    d.assert('three panels, one for each tab', panels.length === 3 && tabs.el.querySelectorAll('.pos-vp').length === 3,
+    A('three panels, one for each tab', panels.length === 3 && tabs.el.querySelectorAll('.pos-vp').length === 3,
       `${tabs.el.querySelectorAll('.pos-vp').length} panels in ${TABS.length} tabs`);
 
     /**
@@ -589,13 +1319,13 @@
      */
     const btn = panels[0].panel.slots.right.querySelector('button');
     const r = btn?.getBoundingClientRect();
-    d.assert('the fullscreen button is square', !!r && Math.abs(r.width - r.height) <= 0.5,
+    A('the fullscreen button is square', !!r && Math.abs(r.width - r.height) <= 0.5,
       r ? `${r.width.toFixed(1)} by ${r.height.toFixed(1)} px` : 'there is no button in the right slot');
 
     // The defaults are the component's whole argument: a page that wants a
     // status and a way to go full writes neither.
     const p0 = panels[0].panel;
-    d.assert('left is a status and right is a control, with nothing in the middle by default',
+    A('left is a status and right is a control, with nothing in the middle by default',
       !!p0.slots.left.querySelector('.pos-pres') && !!p0.slots.right.querySelector('button')
       && p0.slots.centre.childElementCount === 0,
       `left ${p0.slots.left.childElementCount}, centre ${p0.slots.centre.childElementCount}, right ${p0.slots.right.childElementCount}`);
@@ -603,7 +1333,7 @@
     // A mode nobody named is a mode nobody can debug, so the component throws.
     let threw = false;
     try { p0.mode('enormous'); } catch { threw = true; }
-    d.assert('a fullscreen mode it does not know is refused rather than ignored', threw,
+    A('a fullscreen mode it does not know is refused rather than ignored', threw,
       threw ? 'it throws' : 'it accepted a mode that does not exist');
 
     /**
@@ -636,18 +1366,38 @@
      * screen in a check that ran for visitors and took somebody out of their own
      * full screen about twenty seconds after they pressed play.
      */
+    /**
+     * 🔴 THIS BLOCK CLAIMED TO BE GATED AND WAS NOT. The comment above it said
+     * *"IT IS GATED WITH EVERYTHING ELSE HERE"*, and `checks()` was called
+     * unconditionally, so every visitor's control room panel went full screen
+     * and came back a second after the page opened. That is the `/videoradio/`
+     * defect the comment itself cites, on the page that cites it. Found
+     * 2026-09-18 while building the show pipeline.
+     * ⚠️ A COMMENT IS NOT A GATE, and this is the second one found in two days
+     * describing behaviour its own file does not have.
+     */
+    if (!SELFCHECK) {
+      // ⚠️ A VISITOR STILL GETS EVERY READ-ONLY ASSERT. They are held rather
+      // than skipped, so the early return has to emit them: without this the
+      // gate would turn a strict subset into a switch, which is the exact
+      // distinction the rule is about.
+      for (const [label, pass, detail] of held) d.assert(label, pass, detail);
+      d.log('the checks that press things are for the harness, not for you');
+      return;
+    }
+
     const p1 = panels[1].panel;
     p1.full(true).then(() => {
       const on = p1.el.dataset.full;
       const stage = getComputedStyle(p1.el.querySelector('.pos-vp-stage'));
       const ratio = stage.aspectRatio;
       return p1.full(false).then(() => {
-        d.assert('going full sets the state and gives the picture the whole box, by either route',
+        A('going full sets the state and gives the picture the whole box, by either route',
           !!on && ratio !== '16 / 9' && !p1.el.dataset.full,
           `full read "${on || '(nothing)'}" with aspect-ratio ${ratio}, and came back to "${p1.el.dataset.full || '(nothing)'}"`);
       });
     }).catch((e) => {
-      d.assert('going full sets the state and gives the picture the whole box, by either route',
+      A('going full sets the state and gives the picture the whole box, by either route',
         false, `it threw: ${e.message}`);
     });
 
@@ -659,9 +1409,17 @@
      * archive stopped following the live loop, which is the check noticing a
      * change in meaning rather than a defect.
      */
-    const ms = readBurned(panels[0].ctx);
+    /**
+     * ⚠️ AND IT READS THE CONTROL ROOM, NOT THE AUDIENCE, SINCE 2026-09-18. The
+     * audience panel no longer holds a canvas at all before a show: it holds a
+     * card, and then the `<video>` that carries what came back. Its canvas is
+     * still blitted to and would still have answered, which is exactly the trap
+     * this project keeps meeting: a check that passes by reading something the
+     * page has stopped showing anybody.
+     */
+    const ms = readBurned(panels[1].ctx);
     const near = Number.isFinite(ms) && Math.abs(Date.now() - ms) < 60_000;
-    d.assert('the picture in the last panel is the test picture, read back out of it',
+    A('the picture in the control room is the test picture, read back out of it',
       near, Number.isFinite(ms)
         ? `the burned clock reads ${new Date(ms).toISOString().slice(11, 23)}, ${Math.abs(Date.now() - ms)} ms from now`
         : 'nothing decoded out of the canvas, so the panel is not showing the picture');
@@ -703,7 +1461,20 @@
      * pushing into `OPTIONS` behind it. The lanes a visitor sees are the ones
      * this grades.
      */
+    /**
+     * 🔴 THE QUESTION NOW TRAVELS THE RELAY, SO THE LANES ARRIVE LATER THAN THE
+     * CALL. `ask()` used to render in the same tick; it sends now, and the
+     * render happens when the echo comes back. The first run after that change
+     * read `1 lanes` and failed, which is the check correctly noticing its own
+     * subject was missing rather than a defect in the picture.
+     * ⚠️ SO IT WAITS FOR THE LANES, WITH A DEADLINE, AND REPORTS THE COUNT IT
+     * GOT. A bare `await` on a relay that is down is a hang, and this check has
+     * already been caught once passing while its subject was absent.
+     */
     ask('a question the check asked', ['one', 'two']);
+    for (let i = 0; i < 60 && laneCount < 3; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const sc = strip.el;
     const sctx = sc.getContext('2d');
@@ -735,7 +1506,7 @@
     const sorted = [...lum].sort((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)];
     const darkest = sorted[0];
-    d.assert('no black rule between the lanes',
+    A('no black rule between the lanes',
       // 🔴 THE THRESHOLD IS BETWEEN TWO MEASURED STATES, NOT A GUESS. Fixed
       // 2026-09-18 with the band painted full height and again with the `- 1`
       // put back: **a drop of 0 against a drop of 21**, over 74 rows either
@@ -747,6 +1518,119 @@
       // nothing.
       laneCount >= 3 && lum.length > 20 && median - darkest < 8,
       `${laneCount} lanes, and over ${lum.length} rows the lane ground reads ${median} and the darkest row ${darkest}, a drop of ${median - darkest}`);
+
+    await showDrill();
+  }
+
+  /**
+   * 🔴 THE WHOLE PIPELINE, DRIVEN ONCE, ASSERTING AS IT GOES.
+   *
+   * ⚠️ IT ASSERTS AT EVERY STAGE RATHER THAN ONLY AT THE END, AND THAT IS A
+   * HARNESS CONSTRAINT RATHER THAN A STYLE. `verify.mjs` stops collecting
+   * 400 ms after the LAST assert and waits only while the count is still
+   * growing, so a drill that runs ten seconds in silence and then asserts six
+   * times has its whole tail thrown away, and the page reads as having stopped
+   * early rather than as having been cut off.
+   *
+   * ⚠️ AND IT ASSERTS THE SAME NUMBER OF TIMES IN EVERY MODE. Loopback or the
+   * real leg, R2 or not, the count does not move: what changes is what the
+   * message SAYS. A check that exists in one mode only is the shape CLAUDE.md
+   * bans, and it bans it because a green suite then means one of two different
+   * things depending on a flag nobody printed.
+   */
+  async function showDrill() {
+    // 1. Before anything starts, there is a card and no video anywhere.
+    const vidsBefore = document.querySelectorAll('.pos-vp-stage video').length;
+    A('the audience waits on a card, not on an empty video',
+      vidsBefore === 0 && !!aud.panel.stage.querySelector('.pos-card'),
+      `${vidsBefore} video elements in the page, and the audience holds `
+      + `${aud.panel.stage.querySelector('.pos-card') ? 'a card' : 'nothing'}`);
+
+    await startShow();
+
+    // 2. A real peer connection was negotiated, whichever leg it is.
+    A('a peer connection carried the picture, rather than the page handing itself its own stream',
+      !!live && !!live.sub?.pc && live.sub.inbound !== live.pub?.stream,
+      `${live?.kind ?? 'nothing'} leg, receiver ice ${live?.sub?.pc?.iceConnectionState ?? 'none'}`);
+
+    /**
+     * 3. 🔴 OBJECT IDENTITY, NEVER AN ID. A remote `MediaStream` carries the
+     * SENDER's msid, so `remote.id === local.id` after a hop and an id
+     * comparison passes vacuously in both directions. The only honest test is
+     * whether the track the recorder holds IS one of the receiver's track
+     * objects.
+     * ⚠️ AND WHERE THE LEG COULD NOT CARRY A PICTURE, THIS ASSERTS THE
+     * OPPOSITE ON PURPOSE: that the page fell back AND SAID SO. Either way the
+     * claim is that the label on the recording is true.
+     */
+    const recvTracks = (live?.sub?.pc?.getReceivers?.() ?? []).map((r) => r.track);
+    const isReceived = recTrack != null && recvTracks.includes(recTrack);
+    A('the recording is the track the page says it is',
+      recSource === 'received' ? isReceived : !isReceived,
+      recSource === 'received'
+        ? `recorded the receiver's own track object, 1 of ${recvTracks.length}`
+        : 'no frame crossed the leg, so it recorded the canvas and the log says so');
+
+    // 4. Let it run long enough to produce more than one timeslice.
+    await new Promise((r) => setTimeout(r, 3500));
+    A('the recorder produced data while the show was running',
+      chunks.length >= 1 && rec?.state === 'recording',
+      `${chunks.length} pieces after 3.5s, recorder ${rec?.state ?? 'none'}`);
+
+    await stopShow();
+
+    /**
+     * 5. R2, asserted in BOTH modes with one count. Without `?r2=1` the claim
+     * is that the page did not touch anybody's storage; with it, the claim is
+     * that the bytes are READABLE, which a HEAD answers and a 200 on the PUT
+     * does not.
+     */
+    A(USE_R2 ? 'the bytes are in R2 and R2 will serve them back'
+      : 'without ?r2=1 nothing was stored anywhere, and the page says so',
+    USE_R2 ? !!landed?.ok && landed.bytes > 0 : landed === null && stored === null,
+    USE_R2 ? `HEAD says ${landed?.bytes} bytes readable at ${landed?.url}`
+      : 'no session opened, no object written');
+
+    // 6. The archive plays something with a real length in it.
+    const av = archive.panel.stage.querySelector('video');
+    A('the archive holds a recording with a duration that could be resolved',
+      !!av && Number.isFinite(recordedMs) && recordedMs > 500,
+      `${recordedMs == null ? 'no duration' : `${(recordedMs / 1000).toFixed(1)}s`} in the archive panel`);
+
+    /**
+     * 7. 🔴 THE PLAYHEAD MOVES THE PICTURE, AND THE BURNED CLOCK IS WHAT MAKES
+     * THAT CHECKABLE RATHER THAN SOMETHING TO TAKE ON TRUST. Two positions, two
+     * readings, and they must differ by roughly the distance seeked.
+     * ⚠️ `readBurnedFrom` SAMPLES FIXED COORDINATES, so the scratch canvas is
+     * sized to the SOURCE and never scaled. A wrong size returns null on every
+     * frame, which is indistinguishable from the row not being there.
+     */
+    let moved = null;
+    if (av && Number.isFinite(recordedMs) && recordedMs > 1200) {
+      const scratch = document.createElement('canvas');
+      scratch.width = av.videoWidth || FRAME_W;
+      scratch.height = av.videoHeight || FRAME_H;
+      const readAt = async (ms) => {
+        av.currentTime = ms / 1000;
+        await new Promise((r) => {
+          const on = () => { av.removeEventListener('seeked', on); r(); };
+          av.addEventListener('seeked', on);
+          setTimeout(r, 1500);
+        });
+        return readBurnedFrom(av, scratch);
+      };
+      const a = await readAt(200);
+      const b = await readAt(Math.min(recordedMs - 200, 3200));
+      if (Number.isFinite(a) && Number.isFinite(b)) moved = b - a;
+    }
+    A('dragging the archive moves the picture, read off the clock burned into it',
+      moved != null && Math.abs(moved) > 400,
+      moved == null
+        ? 'the burned row could not be read back out of the recording, so this says nothing'
+        : `seeking 3.0s moved the burned clock by ${(moved / 1000).toFixed(2)}s`);
+
+    // ⚠️ AND HERE IS THE ONLY PLACE ANY OF THEM REACH THE REPORT.
+    for (const [label, pass, detail] of held) d.assert(label, pass, detail);
   }
 
   // The frame counter has to have moved before the picture can be read back, so
@@ -754,6 +1638,60 @@
   let warmed = 0;
   const warm = () => { if (++warmed >= 6) checks(); else requestAnimationFrame(warm); };
   requestAnimationFrame(warm);
+
+  /**
+   * 🔴 A PAGE WITH A REAL PIPELINE IN IT EARNS A DIAGRAM, and this one had
+   * none. `{ how: true, atEnd: true }` and NO title: the heading lives in
+   * `diagram.mjs` as `How it works` and a page that passes its own gets it
+   * refused, because `/station/` once shipped two headings stacked.
+   */
+  /**
+   * ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC, AND
+   * PUTTING THEM IN THE SPEC IS A SETTING THAT READS AS CORRECT AND DOES
+   * NOTHING. Caught here by looking at the page: the standing heading simply
+   * was not there. This page has paid for the identical mistake once already,
+   * when it passed `clock: false` to a transport bar that has never had that
+   * option, and its own comment says so twenty lines up.
+   */
+  const dg = createDiagram(d.el, {
+    caption: 'One press sends a picture out and takes it back, and what came back is what is kept.',
+    nodes: [
+      { id: 'ctrl', label: 'Browser', sub: 'control room', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'canvas', label: 'canvas', sub: '1280x720, 25fps',
+            note: 'The picture the show is made of, drawn here and captured as a '
+                + '**MediaStream**. A clock is burned into every frame, which is what makes '
+                + 'a seek in the archive checkable rather than a thing to take on trust.' },
+          { id: 'recorder', label: 'MediaRecorder', sub: '2s pieces',
+            note: 'Records the track that came BACK, never the canvas. What the audience '
+                + 'saw is the returned track, and recording the source would make the '
+                + 'archive a better picture than the show.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'WHIP in, WHEP out', kind: 'cloud', tech: 'cloudflare',
+        note: 'Takes the picture over **WHIP** and hands it back over **WHEP**. It records '
+            + 'nothing at all, which is why the control room has to.' },
+      { id: 'relay', label: 'Relay object', sub: 'one room', kind: 'cloud', tech: 'cloudflare',
+        note: 'Carries questions out and answers back, and stores none of them. The control '
+            + 'room repeats the state every 2s so a late arrival is right within two seconds.' },
+      { id: 'r2', label: 'R2', sub: '24MiB, 6h', kind: 'cloud', tech: 'cloudflare',
+        note: 'Holds the finished recording. A HEAD after the upload is what proves it can '
+            + 'be read back, which a 200 on the write does not.' },
+      { id: 'aud', label: 'Browser', sub: 'audience', kind: 'here', tech: 'browser',
+        note: 'Sees the picture and answers the question. Before a show starts there is no '
+            + 'video element here at all, only a card saying one is coming.' },
+    ],
+    links: [
+      { from: 'canvas', to: 'cf', label: 'WHIP' },
+      { from: 'cf', to: 'aud', label: 'WHEP' },
+      { from: 'cf', to: 'recorder', label: 'WHEP', back: true },
+      { from: 'recorder', to: 'r2', label: 'one webm' },
+      { from: 'r2', to: 'ctrl', label: 'archive', back: true },
+      { from: 'ctrl', to: 'relay', label: 'questions' },
+      { from: 'relay', to: 'aud', label: 'questions' },
+      { from: 'aud', to: 'relay', label: 'answers', back: true },
+    ],
+  }, { how: true, atEnd: true });
+  if (dg?.cuts?.length) d.log(`diagram cuts: ${dg.cuts.join(' · ')}`, 'warn');
 
   d.ready();
   guard(d);
