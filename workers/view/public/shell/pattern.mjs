@@ -234,11 +234,30 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // is to say they were decoration that cost legibility and gave nothing back.
   // A picture whose whole job is to be READ off a small pane has room for two
   // labelled numbers and no more.
-  // ONE SIZE FOR BOTH NUMBERS. They are the same kind of thing — a clock — and
-  // drawing one bigger said one mattered more. 84 leaves the epoch's 13
-  // characters at 13 x 0.6 x 84 = 655 px, well inside the 1160 the margins
-  // leave, and reads at the ~440 px these panes are actually shown at.
-  const NUM = 84, LBL = 32;
+  // ONE SIZE FOR BOTH NUMBERS. They are the same kind of thing, a clock, and
+  // drawing one bigger said one mattered more.
+  //
+  // 🔴 TWO COLUMNS SINCE 2026-09-18, ASKED FOR IN THOSE WORDS: *"can onscreen
+  // time counters be bit smaller so it filts to 2 cols?"*. They were stacked,
+  // which spent 235 px of height on two numbers and left the top third of the
+  // frame carrying nothing else.
+  //
+  // 64 rather than 84 is what makes the pair fit side by side, and the
+  // arithmetic is the same as before: the epoch is 13 characters, so
+  // 13 x 0.6 x 64 = **499 px**, and the local clock is 12, so **461 px**. Two
+  // columns plus the 60 px gutter is 1020 of the 1160 the margins leave, with
+  // 140 px spare. At 84 they came to 655 and 604, which is 1319 and does not
+  // fit at any gutter.
+  // ⚠️ IT IS STILL BIG. 64 px on a 1280 frame is 5% of the width per line, and
+  // these panes are shown at about 440 px, where it reads as ~22 px. The rule
+  // this frame is built on is that everything on it can be read off a small
+  // pane, and two columns at 64 clears that where four stacked lines at 84 was
+  // spending the room to say it twice.
+  const NUM = 64, LBL = 28;
+  // Where the second column starts: the first column's widest line plus the
+  // gutter. Derived rather than typed, so a change to NUM cannot silently
+  // overlap the two.
+  const COL2 = PAD + Math.round(13 * 0.6 * NUM) + PAD;
   ctx.textBaseline = 'alphabetic';
   const d = new Date(ms);
   const second = Number.isFinite(opts.position)
@@ -253,19 +272,16 @@ export function burn(ctx, w, h, frame, opts = {}) {
           + `.${pad(d.getMilliseconds(), 3)}`,
       };
 
+  // One row of labels, one row of numbers, two columns.
   ctx.font = `bold ${LBL}px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
   ctx.fillText('ABSOLUTE', PAD, 95);
+  ctx.fillText(second.label, COL2, 95);
   ctx.font = `bold ${NUM}px ${MONO}`;
   ctx.fillStyle = '#fff';
-  ctx.fillText(String(ms), PAD, 185);
-
-  ctx.font = `bold ${LBL}px ${MONO}`;
-  ctx.fillStyle = `hsl(${hue} 55% 70%)`;
-  ctx.fillText(second.label, PAD, 240);
-  ctx.font = `bold ${NUM}px ${MONO}`;
+  ctx.fillText(String(ms), PAD, 168);
   ctx.fillStyle = '#e9eef7';
-  ctx.fillText(second.text, PAD, 330);
+  ctx.fillText(second.text, COL2, 168);
 
   // ── motion, and it MEANS something ───────────────────────────────────────
   // The block has to move, or a rate-controlled encoder dedupes a near-static
@@ -287,7 +303,11 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // BETWEEN the numbers and the row: it belongs with the things a person reads,
   // not tucked under the machine-readable row where it looked like part of it.
   ctx.fillStyle = `hsl(${hue} 85% 55%)`;
-  ctx.fillRect(((ms % SWEEP_MS) / SWEEP_MS) * (w - SQ), 430, SQ, SQ);
+  // ⚠️ MOVED UP WITH THE NUMBERS, 2026-09-18. Its comment says it belongs
+  // BETWEEN the numbers and the row, and the numbers now end 165 px higher, so
+  // leaving it at 430 would have parked it against the row it was moved away
+  // from. 300 is the midpoint of the gap it is meant to sit in.
+  ctx.fillRect(((ms % SWEEP_MS) / SWEEP_MS) * (w - SQ), 300, SQ, SQ);
   return ms;
 }
 
@@ -414,13 +434,19 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
   // These colours are NOT hue-rotated: `hue=` is applied first, to the source,
   // and drawtext paints after it. So #ffd400 here is the same #ffd400 the shell
   // uses, on every publisher, whatever its hue rotation.
-  const text = (t, y, size, colour) => [
+  // ⚠️ `x` IS A PARAMETER NOW, BECAUSE THE CANVAS DREW TWO COLUMNS AND THIS
+  // DREW ONE. The two have to LOOK the same or "one pattern, two renderings" is
+  // a claim nothing supports, and the x was hard coded to PAD.
+  const text = (t, x, y, size, colour) => [
     `drawtext=fontfile=${q(font)}`,
     `text=${q(t)}`,
-    `x=${PAD}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
+    `x=${x}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
     'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
-  const NUM = 84, LBL = 32;   // same sizes as the canvas
+  // SAME SIZES AND SAME COLUMNS AS THE CANVAS. 13 characters of epoch at
+  // 0.6 x 64 is 499 px, plus PAD either side, which is where column two starts.
+  const NUM = 64, LBL = 28;
+  const COL2 = PAD + Math.round(13 * 0.6 * NUM) + PAD;
   const LABEL = '0xFFD400';   // --hi
   const VALUE = '0xE9EEF7';   // the canvas's own near-white
   return [
@@ -434,7 +460,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     // There is no source label any more: the hue says which publisher this is,
     // and a name burned into a picture is a small text that cannot be read at
     // the size a demo shows it.
-    text('ABSOLUTE', 70, LBL, LABEL),
+    text('ABSOLUTE', PAD, 70, LBL, LABEL),
     // pts-derived, and the same instant the row encodes.
     //
     // In SECONDS, not milliseconds, where the canvas prints ms. Not a choice:
@@ -442,8 +468,8 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     // (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of
     // floating-point result to int failed" — measured on ffmpeg@7. The unit is
     // therefore printed beside the number rather than left to be guessed.
-    text(`%{pts\\:flt\\:${epoch}} s`, 120, NUM, VALUE),
-    text('LOCAL', 215, LBL, LABEL),
+    text(`%{pts\\:flt\\:${epoch}} s`, PAD, 143, NUM, VALUE),
+    text('LOCAL', COL2, 70, LBL, LABEL),
     // LEGIBLE — the publisher's own wall clock. %{pts:flt:…} is precise and
     // unreadable; this is the one a person checks against their own watch.
     // The two drifting apart is real information: it is encoder drift.
@@ -454,7 +480,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     // one level deeper than the one separating `gmtime` from its argument.
     // Measured against ffmpeg@7: `\\\:` renders 15:31:25, `\:` errors with
     // "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 265, NUM, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', COL2, 143, NUM, VALUE),
   ].join(',');
 }
 

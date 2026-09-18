@@ -112,12 +112,17 @@ function drawFilters({ epoch, hue = 0 }) {
   // light number, on a dark scrim rather than a white slab. Not hue-rotated —
   // `hue=` is applied to the source first and drawtext paints after it, so
   // #ffd400 is the shell's #ffd400 on every leg whatever its rotation.
-  const text = (t, y, size, colour) => [
+  // ⚠️ `x` IS A PARAMETER AND THERE ARE TWO COLUMNS, 2026-09-18. The canvas
+  // moved its two clocks side by side and shrank them from 84 to 64; this file
+  // is the SAME PICTURE drawn by ffmpeg, so it moves with it or the claim that
+  // there is one pattern with two renderings stops being true.
+  const text = (t, x, y, size, colour) => [
     `drawtext=fontfile=${q(FONT)}`, `text=${q(t)}`,
-    `x=${PAD}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
+    `x=${x}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
     'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
-  const NUM = 84, LBL = 32;   // same sizes as the canvas
+  const NUM = 64, LBL = 28;   // same sizes as the canvas
+  const COL2 = PAD + Math.round(13 * 0.6 * NUM) + PAD;   // 13 chars of epoch, plus a gutter
   const LABEL = '0xFFD400';
   const VALUE = '0xE9EEF7';
   return [
@@ -128,17 +133,17 @@ function drawFilters({ epoch, hue = 0 }) {
     // twice. No source label — the hue says which publisher this is, and a name
     // burned into a picture is a small text nobody can read at the size a demo
     // shows it.
-    text('ABSOLUTE', 70, LBL, LABEL),
+    text('ABSOLUTE', PAD, 70, LBL, LABEL),
     // pts-derived, the same instant the row encodes.
-    text(`%{pts\\:flt\\:${epoch}} s`, 120, NUM, VALUE),
-    text('LOCAL', 215, LBL, LABEL),
+    text(`%{pts\\:flt\\:${epoch}} s`, PAD, 143, NUM, VALUE),
+    text('LOCAL', COL2, 70, LBL, LABEL),
     // LEGIBLE — this box's own wall clock, for a human with a watch. The two
     // drifting apart is real information: it is encoder drift.
     // The triple backslash is not a typo: gmtime's strftime argument has to
     // survive drawtext's expansion parser, which splits `%{name:args}` on a
     // bare colon. Measured on ffmpeg@7 — `\\\:` renders 15:31:25, `\:` errors
     // with "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 265, NUM, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', COL2, 143, NUM, VALUE),
   ].join(',');
 }
 
