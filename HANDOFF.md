@@ -1,119 +1,121 @@
-# Handoff, 2026-09-18, session 33
+# Handoff, 2026-09-18, session 34
 
-**DEPLOYED AND CONFIRMED ON THE EDGE: `BUILD 561c9d6-095201-0b2c`.** Confirmed
-by reading the stamp back off `positron.studio`, not by the deploy saying so.
-The mail worker is live as version `50a78731` at 100%. 25 commits, working tree
-clean, 347 unpushed.
+**DEPLOYED AND CONFIRMED ON THE EDGE: `BUILD 8b06e8b-142710-e4a1`.** Confirmed by
+reading the stamp back off `positron.studio`, not by the deploy saying so. 9
+commits, working tree clean apart from a build stamp, 357 unpushed. 81 entries
+still open in `BACKLOG.md`.
 
-**The board is the one thing not deployed**, and it cannot be from here: it
+**The board is still the one thing not deployed**, and it cannot be from here: it
 answers over the relay and refuses ssh. `cd rig/box && ./push.sh`.
 
-## `/stage/` is a real virtual stage now
+## The two real finds were both in SHARED code, and both wore a page's clothes
 
-`plan-stage-live.md` §7, built on instruction with the M1 and the Raspberry Pi
-left out. **28/28**, up from 21, stable across repeated runs.
+🔴 **`mediaMaster` DOES NOT RUN ITSELF, AND `/stage/` NEVER TICKED IT.** Reported
+as *"there is not caret in arvhice playback"* and diagnosed wrongly TWICE as a
+MediaRecorder file carrying no cues. The file was fine the whole time. MEASURED:
+the element went to 1.00s of a 3.45s recording, `ended` false, `seekable`
+0.00..3.45, while the deck sat at 3.45s. The line that settled it was
+**`master ticks 0, backstop 0, driving false`**: printing three counters answered
+in one run what guessing had not in three.
+⚠️ **THE SEEK CHECK PASSED THROUGHOUT**, because it asks the ELEMENT where it
+went. Every assert about that archive sat on the one side of the join that
+worked.
+⚠️ **AND A SECOND GAP FELL OUT OF IT**: `mediaMaster` listened only for
+`timeupdate`, which a paused element never fires, and it produces no rvfc frames
+either. Seek a paused master and every sensor goes quiet at once. It listens for
+`seeked` now.
 
-One press negotiates a peer connection, records the track that came back,
-resolves a real duration and hands it to the archive, where the questions are
-spans whose width is how long each one stood and the last is left open because
-nothing overrode it. A question travels the relay and comes back as a lane, so
-the local case and the remote case are one code path.
+🔴 **BOTH ERR PAGES WERE BLIND TO THE REFUSAL BOUNDARY, AND ONLY SABOTAGE SAID
+SO.** With `fake-err.mjs`'s `serves()` forced to `return true` they read FULLY
+GREEN, because no assert in either page named a refusal, a 403 or a served
+segment. `/flipper/` had the blocked minutes in a READOUT CELL, and a cell is not
+an assert. Both assert it now and the same sabotage takes **4 red, 2 per page**,
+while the negative controls stay green. **Four instances of one pattern, counting
+`fake-tapes.mjs`: a stand-in makes a page runnable without making it graded.**
 
-**https://positron.studio/stage/** · an ERR clip behind the picture with
-`?bg=op-489&from=11:01&to=15:39` · `?live=1` for the real Cloudflare leg ·
-`?r2=1` to store it and prove it readable.
+## What landed
 
-## 🔴 Three things that are TRUE and unwelcome, none of them hidden
+**`/now/` and `/flipper/` contact nobody.** `demo/fake-err.mjs` is the third
+stand-in after `fake-station` and `fake-tapes`, and they were the last pair still
+pointed at a broadcaster. **58/58 with the only hosts being the dev server and
+the stand-in**, re-run independently rather than taken on report. It reproduces
+the REFUSALS, not just the stream.
+⚠️ **UNTIL THIS SESSION'S COMMIT, GIT HEAD HAD NO `errUrl` AT ALL**, so a fresh
+checkout of `/now/` would have gone to `live.err.ee`. The protection existed only
+in a working tree.
 
-**NO PICTURE CROSSES A WEBRTC LEG IN THIS SANDBOX.** MEASURED: a local loopback
-gathers exactly one host candidate, `iceGatheringState` reaches `complete`, and
-`iceConnectionState` then sits at **checking** for ever. UDP connectivity checks
-do not complete here. So the page records the canvas instead and SAYS SO in its
-log, and the identity check asserts the truth of that label rather than assuming
-either path.
-⚠️ **THIS ALSO EXPLAINS `/show/`**, whose `check` handler was reported as never
-reaching. Same in-page loopback, same wait for a leg that cannot connect. Nobody
-had joined the two facts.
+**`/now/` plays through a refused live edge**, which is exactly what ERR was
+measured doing to ETV: 7 asserts red and a black picture before, 0 red of 23
+after. `findServedEdge` came out of `/flipper/` into `err-live.mjs` and both
+pages call it.
 
-**THE ARCHIVE'S PLAYHEAD MOVES AND ITS PICTURE DOES NOT.** MEASURED: seeking
-from 0.794s to 3.177s moves `currentTime` to both positions EXACTLY, and
-`readBurnedFrom` returns the identical millisecond at both. The cause is the
-file: **MediaRecorder WebM carries no cues**, so a browser reports the position
-it was asked for and keeps the frame it already had.
-`proto/selfrec/indexer.mjs` is the answer and is already written.
-**`plan-stage-live.md` §10.6 is NOT met**: the check grades the playhead, which
-is the half the page is responsible for, and the page logs the other half in
-words.
+**`/flipper/` goes red against a server that is not there**: it read 8/8 at a
+closed port because `open or loading` was satisfied by `!!c.hls`. The repair is
+not a better instant, because `readyState` is an instant too and a WORKING page
+read `readyState=1` one line after a seek. **`totalVideoFrames` is cumulative and
+a seek does not reset it.**
 
-**A THREE HOUR SHOW BREAKS THE R2 PATH BY 45x.** 3h at 800 kbit/s is **1.08 GB**
-against a 24 MiB session cap, and that tier's 6 hour TTL would delete the show
-three hours after it ended. `selfrec` is the right worker and the original ask
-already described it: a client-chosen key is a stable URL, which is *"single
-feed and single file, what you can overwrite"* word for word.
-🔴 **THE BITRATE IS THE DECISION NOBODY HAS MADE**, and everything else follows
-from it. 300 kbit/s is 415 MiB, 800 is 1.08 GB, 2 Mbit/s is 2.70 GB. The table
-and the playback consequence are in `BACKLOG.md`.
+**A public domain film is behind the stage**, Melies' `Le Voyage dans la Lune`
+(1902), four minutes of twelve, 4.07 MB, **two independent public domain grounds**
+rather than one. Its audio was removed and that is a LICENCE decision: the 1902
+film is silent, so any sound on the upload is a modern score carrying its own
+copyright. That is the OPPOSITE call from the Dickson film it replaced, where the
+sound WAS the 1894 artefact and stripping it was the mistake.
+⚠️ **AND IT IS GRADED, NOT JUST DEPLOYED.** Forcing `field: true` so the flat
+fill paints over it leaves the element perfectly healthy (480x360, playhead
+advancing, no 404, no console error) and the frame spanning **0 of 255**.
+**Nothing else in the suite sees that one.**
 
-## What else landed
-
-**The whole backlog was audited against the code**, after three entries went
-stale in one day. **Sixteen were already finished.** The count was wrong too: 57
-was never right, because the `### XR` block is ONE request whose 48 sub-items
-are ordinary bullets at column zero. **50 are genuinely open.**
-
-**Forty pages stopped running their checks at the people reading them**, and the
-load-bearing fix was in the harness: `verify-gl.mjs` and `verify-quest.mjs`
-never appended `selfcheck=1`, so `/videoradio/`'s checks had been running
-NOWHERE for two sessions. `/floor/` was fetching ERR and playing a film on every
-visit.
-
-**`/tapes/` has a stand-in**, `demo/fake-tapes.mjs`: 38/38 with the only hosts
-contacted being the dev server and it.
-
-**The mail parser got the tests the classifier already had.** 75/75, up from 51,
-with both real Gmail messages as byte-exact fixtures. RFC 2047 subjects and
-bodies decode, and the verdict now names the stamp that decided it.
-
-**The board can be diagnosed from outside the building**: `jack.graph` reads and
-changes nothing, `jack.rebuild` is a diff rather than a teardown. 92/92, up from
-67, and unverified on hardware.
-
-**`research/err-stage-theatre-2026-09-18.md`**: 10,185 catalogue rows, 1928 to
-2026, **161 requests and no media of any kind**.
+**`/stage/` is 39/39, up from 28.** Also: follow tracks the write head during a
+show rather than the playhead; the archive opens on a 30s window with zoom out
+bounded at 4x it; start and stop are a transport bar; `How it works` moved into
+the control room and the archive; the recorder picks 700 kbit/s instead of the
+browser's 2,500; `diagram cuts: [object Object]` is gone.
 
 ## Rules that cost real time this session
 
-🔴 **A SEARCH THAT COMES BACK EMPTY IS EVIDENCE ABOUT THE SEARCH FIRST.** Nine
-em dashes were written as escapes, so every grep for the character answered
-clean about files that had them. That is the `timeline/transport.mjs` NUL lesson
-in a new costume, and it will keep arriving in new ones.
+🔴 **A SETTING THAT READS AS CORRECT AND DOES NOTHING, FOUR TIMES IN ONE DAY.**
+`mediaMaster` built and never ticked. `__demo.transport` being whichever bar was
+BUILT LAST rather than the one the page means. `verify.mjs` clicking
+`document.querySelector(".tbar-toggle")` while asserting about
+`__demo.transport`, which are the same element only on a one-bar page. And
+`.mp4` missing from `build.mjs`'s allowlist, so the film shipped its provenance
+JSON and not itself while the build said `copied 182 files`.
 
-🔴 **A COMMENT IS NOT A GATE, AND A SETTING IS NOT AN EFFECT.** `/stage/`'s
-checks CLAIMED to be gated in a comment and were not, so every visitor's control
-room went full screen a second after load, which is the `/videoradio/` defect
-the comment itself cites. And `how: true` passed inside the spec instead of the
-options is a setting that reads as correct and does nothing, which the same page
-had already paid for once with `clock: false`.
+🔴 **A CHECK IS BLIND AT THE WIDTH IT RUNS AT.** `/stage/` reported SIX diagram
+cuts on a phone and `nothing had to be shortened to fit` in the harness, on the
+same build. Then the diagrams moved into tab panels, where
+`getComputedTextLength()` answers 0 under a hidden ancestor and every string
+"fits". Assert on `dg.measured` first.
 
-🔴 **A SELECTOR THAT MATCHES NOTHING IS SILENT.** `/items/`'s fixed-height rule
-named a class the page stopped producing when it moved to `createTable`, and it
-was written TWO DAYS BEFORE the ask it appears to answer, so the code read as
-done and the entry read as open and both were right.
+🔴 **A LABEL THAT SPELLS A VALUE GOES STALE SILENTLY.** `the archive opens on a
+fifteen second window` outlived its constant by hours. Nothing type-checks a
+sentence.
 
-🔴 **WHEN A CHECK FAILS, SUSPECT ITS ROUTE BEFORE THE PAGE.** The archive seek
-took three wrong diagnoses: the deck is a FOLLOWER so `deck.seek` does nothing;
-a stale `seeked` from `resolveDuration` resolved the wait early; and only then
-did the real limitation appear. A check that drives a page by a route the page
-forbids is not testing the page.
+⚠️ **AN EXPIRED SEGMENT LOOKS EXACTLY LIKE A REFUSED ONE.** `err-live.mjs` fact 2
+says to probe only segments from the playlist just read, and that is necessary
+and NOT sufficient: a thirteen point sweep takes seconds and the window slides
+while it runs. MEASURED `#.......#####`, two boundaries drawn where there is one.
+Membership has to be checked at PROBE time.
 
-⚠️ **`verify.mjs` STOPS COLLECTING THE MOMENT THE COUNT IS UNCHANGED FOR ONE
-400 ms TICK**, not 4.8 s. A drill that works for twelve seconds had 1 of its 7
-asserts collected. On a page with no controls row the way out is to HOLD every
-assert and emit them together, because the harness waits while the count is
-still zero.
+⚠️ **I HID A BUILD FAILURE FROM MYSELF** with `node build.mjs >/dev/null 2>&1`,
+then lost a run to a `BG is not defined` that was my own unterminated comment
+swallowing two `const`s. Both mine, both avoidable.
 
-⚠️ **THREE RENDERERS OF ONE PICTURE AND NOTHING COMPARES THEM.** The ffmpeg
-copies turn a canvas baseline into a box top with a hand typed offset, and when
-the number shrank from 84 to 64 the offset stayed: the container drew it **25 px
-too low** and nothing said so, because that output is only ever seen inside a
-container.
+## Open and worth knowing
+
+- **`.gitignore` had a blanket `*.mp4`**, so the first film reached the deployed
+  edge and would have been absent from every clone: `build.mjs` copies the
+  WORKING TREE rather than the index. There is an exception for
+  `demo/resources` now.
+- **The harness still points `/now/` at the default arrangement** rather than at
+  `/wall`. That is a choice this time, not a setting standing in for a fix:
+  `/flipper/` at `/wall` grades a picture playing through a wall and `/now/` on
+  the default grades one at a live edge, so both modes run every time.
+- **A dead server leaves `/flipper/`'s first control busy for the harness's full
+  40 s cap**, because `await c.media.play()` on an element whose source never
+  loads neither resolves nor rejects. Pre-existing, not fixed.
+- **Five requests for a different project** arrived mid-session (a gig calendar:
+  sidebar top border, a 100% dark selection outline, remove a dark underline,
+  remove a sold-out strikethrough, translucent sold-out titles). They are NOT in
+  this repo and nothing was done for them.
