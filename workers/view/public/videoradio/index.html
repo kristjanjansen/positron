@@ -115,9 +115,14 @@
    * two sessions, because 22 s is also the tour's dwell and 71 s the station
    * clock, so the real cause was hidden behind two innocent ones.
    *
-   * `demo/verify.mjs` appends `selfcheck=1`. `demo/verify-gl.mjs` appends no
-   * query of its own, which is what the old default was really serving; that is
-   * a harness to fix rather than a reason to work a visitor's controls.
+   * `demo/verify.mjs` appends `selfcheck=1`. ✅ **AND SO DOES
+   * `demo/verify-gl.mjs` SINCE 2026-09-18**, which is the harness this comment
+   * used to name as needing a fix. Until then it appended no query of its own,
+   * so this page's checks ran NOWHERE for two sessions: the gate was honoured
+   * and the only harness that can reach a `gl: true` page never set the flag.
+   * 🔴 THE CONSEQUENCE IS NOT FREE. `node demo/verify-gl.mjs videoradio` now
+   * really does run these checks, and this page rotates four ERR mounts, so
+   * that command is not a development-loop command.
    */
   const CHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
 

@@ -1424,8 +1424,8 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // repair is to CUT the weakest cell, never to pad with a blank: every odd
   // readout has one, usually a constant or something a neighbour implies.
   // `mount()` throws on an odd count so the suite catches it. And nothing
-  // unmeasured prints as `0` or as a lone unit — `''`, `null` and `NaN` all
-  // become one em dash with the unit hidden, because a zero reads as a very
+  // unmeasured prints as `0` or as a lone unit: `''`, `null` and `NaN` all
+  // become an EMPTY cell with the unit hidden, because a zero reads as a very
   // confident measurement and a bare `%` reads as a number that went missing.
   // ── presence ────────────────────────────────────────────────────────────
   // 🔴 FOUR STATES, AND THE FOURTH IS THE HONEST ONE. A badge that opens on
@@ -1564,9 +1564,13 @@ green = inside what it promised · amber/red = later`,
   }
 
   // 3 — the readout specimen. An odd count leaves the last row short, and a
-  // cell with nothing in it must show one em dash with its unit HIDDEN: an
-  // empty value beside a standing `%` reads as a number that went missing, and
-  // a pre-set 0 reads as a very confident measurement of nothing.
+  // cell with nothing in it must be EMPTY with its unit HIDDEN: an empty value
+  // beside a standing `%` reads as a number that went missing, and a pre-set 0
+  // reads as a very confident measurement of nothing.
+  // ⚠️ THIS COMMENT SAID "one em dash" UNTIL 2026-09-18, THREE MONTHS AFTER THE
+  // PLACEHOLDER WAS REMOVED. The assert below was right the whole time: it asks
+  // whether the UNIT is hidden and never what the cell draws, which is why it
+  // stayed green while the sentence above it described a different page.
   const cells = [...document.querySelectorAll('.kit-box .pos-readout .pos-cell')];
   const pending = cells.map((c) => c.querySelector('.pos-v[data-state="pending"]')).filter(Boolean);
   const unitShown = pending.some((v) => {
