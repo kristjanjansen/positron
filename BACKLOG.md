@@ -145,23 +145,17 @@ file by being finished or by being refused in writing, never by being forgotten.
   assert going red at 7.33 px, so it is a check proved against both states
   rather than against one.
 
-- 🔴 **A NEW DEMO CALLED `stage`, ASKED FOR 2026-09-17.** Verbatim, because the
-  detail in it is the specification:
-  *"V1 There are three tabs: audience controlroom archive."*
-  *"V2 do generic videe panel, witn l c r slots. Right slot by default is
-  fullcreen button (square!). Left is online status by defaul. No center
-  default. On fullscreen have two modes in api: just fullscreen and close
-  fullscreen butyon on right corner on pointer activity and mode where footer
-  stays"*
-  *"V2 use theee panels on stage tabs each as same testvideo playing"*
-  *"Make a generic component with"* — THE MESSAGE ENDS THERE, mid sentence, and
-  the rest has been asked for rather than guessed at.
-  ⚠️ `tabs.mjs` already exists and is in `/kit/` and in NO page: it was on
-  `/items/` for one commit and taken off because three names over one list and
-  one form is furniture. `stage` would be its first real use, which is the test
-  that component has never had.
-  ⚠️ AND THE PANEL IS THE REUSABLE HALF. Three panels on three tabs playing one
-  test video is the demonstration, not the point.
+- ✅ **`/stage/` IS BUILT AND THIS LINE OUTLIVED IT BY A DAY.** Every clause of
+  the dictated spec is met and MEASURED: three tabs, three panels each showing
+  the same generated test picture, `node demo/verify.mjs stage` at **21/21**
+  including `three panels, one for each tab` and `the fullscreen button is
+  square, 34.0 by 34.0 px`. The sentence that ENDED MID-WAY, *"Make a generic
+  component with"*, was answered without being guessed at: it is
+  `demo/shell/video-panel.mjs`, with l/c/r slots, `left` defaulting to presence,
+  `right` to a square fullscreen button, an empty centre, and `FULL_MODES =
+  ['hover', 'footer', 'bare']` covering the two modes the message did describe.
+  ⚠️ And `tabs.mjs` finally has its first real use, which the entry correctly
+  predicted was the test that component had never had.
 
 - ✅ **THE GMAIL HTML HALF WAS ALREADY FIXED, AND THE REAL FINDING IS THAT
   NOTHING GRADED IT. SETTLED 2026-09-18 BY CAPTURING THE MESSAGE.** The raw of
@@ -188,7 +182,7 @@ file by being finished or by being refused in writing, never by being forgotten.
   endings had been normalised to LF matched no `\r\n\r\n` and returned its own
   headers as the body.
 
-- ✅ **A SUBJECT FROM OUTSIDE ENGLISH IS DECODED, 2026-09-18. NOT DEPLOYED.**
+- ✅ **A SUBJECT FROM OUTSIDE ENGLISH IS DECODED AND DEPLOYED, 2026-09-18.**
   RFC 2047 in `workers/mail/src/body.mjs`: both encodings, adjacent words joined
   with no space added between them, and charsets that are not UTF-8. Graded on
   the exact string from the entry above this one, `=?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=`,
@@ -203,11 +197,11 @@ file by being finished or by being refused in writing, never by being forgotten.
   newline could forge a line of our own output. That is the only place in this
   worker where a stranger's text reaches a structured format, and there is an
   assert that plants exactly that and requires it not to work.
-  🔴 **IT IS IN THE REPO AND NOT ON THE EDGE.** `npx wrangler deploy` in
-  `workers/mail` was refused by this machine's permission classifier, so nothing
-  above is live and the next real message still arrives undecoded.
+  ✅ **DEPLOYED 2026-09-18** as version `50a78731` at 100%. This entry carried a
+  red line saying it was in the repo and not on the edge, which was true for
+  about an hour and then was not.
 
-- ✅ **THE VERDICT NOW SAYS WHICH SIGNAL DECIDED IT, 2026-09-18. NOT DEPLOYED.**
+- ✅ **THE VERDICT SAYS WHICH SIGNAL DECIDED IT, DEPLOYED 2026-09-18.**
   `auth.via` already held the answer and went only to `console.log`, where nobody
   was looking. It is a chip now: `[ok · via Authentication-Results]` against
   `[ok · via ARC]`, so the four characters that could not tell the two apart have
@@ -239,16 +233,17 @@ file by being finished or by being refused in writing, never by being forgotten.
   `/knobs/` would loop SOUND coming back off a board in another building, and
   those are different machines wearing one word.
 
-- 🔴 **INCOMING EMAIL AT `positron@positron.studio`.** Asked 2026-09-17: *"In bg
-  work on incoming enail using cf see ../trip of deals collection.
-  positron@positron.studio"*. Cloudflare Email Routing and an Email Worker,
-  modelled on how `/Users/s32863/personal/trip` collects deals from mail. A plan
-  is being written at `plan-incoming-email.md`; nothing is built and no DNS or
-  zone setting has been touched.
-  ⚠️ **WHAT THE ADDRESS IS FOR IS THE LOAD-BEARING QUESTION AND THE ASK DOES NOT
-  ANSWER IT.** `../trip` collects travel deals and this project has no deals. The
-  candidates it does have are the feedback room, `workers/items`,
-  `workers/backlog` and the device log.
+- ✅ **INCOMING EMAIL AT `positron@positron.studio` IS BUILT, DEPLOYED AND
+  RECEIVING. THE MOST STALE LINE IN THE FILE.** It said *"nothing is built and
+  no DNS or zone setting has been touched"*. `workers/mail/` is a complete Email
+  Worker routing mail into the feedback room over the relay, graded **75/75** on
+  20 spam fixtures and 8 body fixtures, live as version `50a78731`. The proof it
+  receives is elsewhere in this same file: the two real messages that arrived at
+  19:54:32 and 19:56:17 on 2026-09-17, which three other entries reason about.
+  ⚠️ **AND THE QUESTION THE ENTRY CALLED LOAD-BEARING WAS ANSWERED**, in
+  `wrangler.jsonc`'s own header, quoting the ask: *"I just need an email address
+  people can contact. That's it. And uh, the agent should be reading it"*. What
+  it is for is the feedback room, and that is why there is no second store.
 
 - 🔴 **YOSHIMI HAS NO ENVELOPE OR GLIDE CONTROLLERS EITHER, MEASURED
   2026-09-17.** With a keyboard on `/knobs/` the interesting controllers should
@@ -270,7 +265,9 @@ file by being finished or by being refused in writing, never by being forgotten.
   it"*, and the open architectural question is *"Is it a board which a single
   person only uses for its own use? Or is it multi-user? How much it can take
   input from different users via relay, there are the limits."* Production may
-  not be this checkout. A PLAN is being written; nothing is built.
+  not be this checkout. **THE PLAN IS WRITTEN, NOT "being written": `plan-portable-board.md`, 971
+  lines, and its own header says nothing in it is built.** Nothing IS built, so
+  the entry stands; only that clause was stale.
   ⚠️ The multi-user question is not hypothetical and has already cost sound
   twice: `/knobs/` was found refused because a visitor had pressed `sampled`,
   and `/keys/` reloaded its patch every time anybody else in the room asked the
@@ -423,55 +420,48 @@ reaches one.
 the axis this reads them from. If the bricks end up 90° out, that is the +Y
 versus +Z reading and the comment above `wallYaw` names it.
 
-- 🔴 **`/keys/` IS ARCHIVED AND ITS KEYBOARD MOVES TO `/knobs/`.** Instructed
-  2026-09-17: *"keys seems to be dead. bring keyboard to knobs and archive
-  keys"*. The silence was never reproduced from here — four ways in under CDP
-  all made sound — and the page is being retired rather than debugged further,
-  which is the user's call and closes it.
-  ⚠️ `rig/box/listen.html` is the file. It must NOT move under `demo/`: the
-  LAYOUT rule about a page that belongs with its hardware is what keeps a shared
-  Raspberry Pi in another building out of every run of the suite.
+- ✅ **`/keys/` IS ARCHIVED AND ITS KEYBOARD IS ON `/knobs/`, 2026-09-17.**
+  `archive/keys/` holds the page verbatim as it was retired; `demo/knobs/`
+  imports `createKeyboard`. Commit `27d135a`.
 
-- 🔴 **TWO INTERESTING CONTROLLERS FOR `/knobs/`, AND VOLUME COMES OUT.**
-  Instructed 2026-09-17: *"knobs work but volume is pointless. remove and bring 2
-  interestin cc's"*. ⚠️ **A KEYBOARD CHANGES WHICH CONTROLLERS ARE EVEN
-  MEASURABLE.** Every controller test on this page so far held ONE note for the
-  whole run, which is correct for a page with no keyboard and blind to anything
-  that acts when a note STARTS: attack, release and portamento cannot show up in
-  a held-note measurement at all. Re-measure with notes being re-triggered.
+- 🔴 **`/knobs/` NEEDS TWO REPLACEMENT CONTROLLERS, PICKED BY EAR. TWO ENTRIES
+  MERGED 2026-09-18 BECAUSE THEY WERE ONE ITEM IN TWO COSTUMES.** One said
+  *"two interesting controllers, and volume comes out"*; the other said *"the
+  two new controllers come out and two others go in"*. Both describe the same
+  outstanding move and keeping them apart is how somebody does it twice.
+  ✅ **WHAT HAS LANDED:** volume is out (2026-09-17), and so are the two that
+  were tried and rejected, `bandwidth` (CC 75, too noisy) and `fm depth`
+  (CC 76). The page carries `cutoff` (CC 74) and `resonance` (CC 71) and nothing
+  else, which is two sliders where four are wanted. `27d135a` says so in its own
+  message: *"VOLUME IS OUT AND ITS REPLACEMENTS ARE NOT IN YET, which is the
+  honest state."*
+  🔴 **WHAT IS LEFT AND WHAT BLOCKS IT:** choosing the replacements needs a
+  measurement with the notes being RE-TRIGGERED rather than held, and that is
+  blocked behind the broken fall detector in `rig/box/note-test.mjs` (see the
+  Yoshimi envelope entry). Fix the collector first: its `fallMs` has `NaN` in
+  both branches of its own ternary, so it can never report a number, which is
+  why every take said `not enough takes gave a number`.
 
-- 🔴 **`/knobs/` MUST USE `board.mjs`, WHICH IT DOES NOT.** Asked 2026-09-17:
-  *"Ahould board.mjs used by both? Make inra close as possible on keys and
-  knobs"*. The component was written on 2026-09-16 to be shared and the report
-  said both pages were on it; that report was wrong and this session repeated
-  it. `/keys/` is its only caller. `/knobs/` still hand-rolls its socket, its
-  AudioContext, its worklet, its cushion and its frame counters, which is the
-  same six things twice and is exactly how the two pages came to disagree about
-  what a board is.
+- ✅ **`/knobs/` USES `board.mjs`, 2026-09-17.** `createBoard` is imported and
+  drives the socket, the presence badge and the frame shape check. The page's
+  own comment dates it and quotes the ask: *"Ahould board.mjs used by both?"*.
 
-- 🔴 **NO SOUND ON `/keys/`.** Reported 2026-09-17: *"No aound on keys. Knobs
-  ok."*. `/knobs/` is playing from the same board over the same relay in the same
-  room, so whatever this is sits in the page rather than in the board, the room
-  or the instrument. Both pages moved onto `demo/shell/board.mjs` on 2026-09-16
-  and `/keys/` also had its order changed and its transport bar stripped of its
-  play button the same day.
+- ✅ **CLOSED BY ARCHIVAL RATHER THAN BY A FIX, AND THE DIFFERENCE MATTERS.**
+  `/keys/` no longer exists. Two real faults were found and fixed while chasing
+  it, and `archive/keys/README.md` records the honest ending: **the silence was
+  never reproduced** across four CDP routes.
+  🔴 **SO KEEP THE ONE INSTRUCTION IT LEFT FOR ITS SUCCESSOR.** If `/knobs/` is
+  ever reported silent, build this FIRST rather than reasoning about the graph:
+  hook `AudioWorkletNode.prototype.connect` and measure what actually reaches
+  the destination. Every previous round of this bug measured something adjacent
+  to the question.
 
-- 🔴 **THE TWO NEW `/knobs/` CONTROLLERS COME OUT AND TWO OTHERS GO IN.**
-  Reported 2026-09-17: *"Rm vibrato vontilw, they do nada and added some noisy
-  wobble. Use other ccs."*. These are `bandwidth` (CC 75) and `fm depth`
-  (CC 76), shipped the same day off a held-note pitch measurement that said both
-  move the sound by four to nine times their own floor. A listener says they do
-  nothing and add noise, and a listener outranks that measurement: what it
-  graded was MOVEMENT, and a controller can move a number a tracker can see
-  while making no difference anybody wants. Pick the replacements by ear as well
-  as by `cc-test.mjs`.
-
-- 🔴 **REVERB AND CHORUS LEAVE `/keys/` AND LEAVE THE BOARD.** Reported
-  2026-09-17: *"Rm chorus reverb from keys ui and board"*. They had been
-  invisible for weeks (appended into a control row the page declares empty) and
-  were put back into the patch row on 2026-09-16, which is what made them
-  reviewable. The board half is `rig/box/box.mjs`, so this is a push to
-  `/opt/positron-box/` as well as a page edit.
+- ✅ **REVERB AND CHORUS ARE OFF THE PAGE AND OFF THE BOARD, 2026-09-17.** They
+  are at `archive/keys-space/`. The board half is the one worth confirming and
+  it is confirmed: `box.mjs` records the reverb insert being removed, and no
+  verb, no CC 91 and no CC 93 for either survives in `box.mjs` or
+  `jacksynth.mjs`. The only `reverb`/`chorus` left under `demo/` is the generic
+  MIDI controller name table in `cc-adapter.mjs`, which is unrelated.
 
 - 🔴 **THE PLAYOUT TRIMS BECAUSE TWO CLOCKS DISAGREE, AND NO CUSHION SIZE CURES
   IT.** Found 2026-09-16 while chasing *"some vobbly sound, cutoffs, not nice"*.
@@ -490,7 +480,15 @@ versus +Z reading and the comment above `wallYaw` names it.
   readout is a SIBLING of it, so the query has always returned null: the class
   lands on nothing, the row is never moved into the upload block, and the
   `hidden` meant to keep four empty cells off the page until an upload runs is
-  never set. `mount()` now returns `readoutEl`, which is the one line repair.
+  never set. ⚠️ **AND THIS ENTRY USED TO END "mount() now returns readoutEl, which is the
+  one line repair", WHICH READS AS FINISHED AND IS NOT.** The SHELL half landed
+  and the PAGE was never changed: `demo/crate/index.html` still does
+  `d.el.querySelector('.pos-readout')`, and the readout is a sibling of the body
+  rather than a descendant, so that still returns null, the row is still never
+  moved, and the line that hides it still never runs. The one line repair is on
+  the page, `const readout = d.readoutEl;`, and it is outstanding.
+  🔴 A HALF-STRUCK ENTRY IS HOW THE REMAINDER GETS LOST. Found 2026-09-18 by
+  audit, and it is the reason this file was audited at all.
 
 - **`CLAUDE.md` SAYS AN UNMEASURED CELL DRAWS AN EM DASH.** `shell.mjs` has
   written EMPTY since 2026-09-13. Two comments in `/kit/` repeat the stale
