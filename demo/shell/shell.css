@@ -686,6 +686,16 @@ button.pos-pri[data-busy="1"] {
 .tbar-toggle[data-state="buffering"]::before { content: "◌"; }
 /* parked at the end: the button restarts, so it must not look like plain play */
 .tbar-toggle[data-state="ended"]::before { content: "↺"; font-size: 15px; }
+/* 🔴 A RECORD BUTTON IS THE SAME CONTROL WITH A DIFFERENT VERB ON IT, for a bar
+   whose press puts something on air rather than plays it back. The dot is RED
+   and is the one place in this stylesheet that says so in a literal colour: a
+   record control is a convention older than any of this, and a hue token would
+   make it agree with a theme instead of with every other record button anybody
+   has used. Stopping is a square, never a pause, because a show that has stopped
+   does not resume. */
+.tbar-toggle.tbar-rec::before { content: "●"; color: #e5484d; font-size: 15px; }
+.tbar-toggle.tbar-rec[data-state="playing"]::before { content: "■"; color: #e5484d; font-size: 13px; }
+.tbar-toggle.tbar-rec[data-state="ended"]::before { content: "●"; color: #e5484d; font-size: 15px; }
 
 /* a page button that belongs to the transport — sits with the toggle, and is
    the SAME SQUARE as it. These are transport verbs, so they are glyphs on a

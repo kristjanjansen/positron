@@ -1,5 +1,52 @@
 ## Open
 
+- ✅ **DONE 2026-09-18 AND 09-19. `/stage/` REWORKED OVER SIXTEEN ASKS IN ONE
+  SITTING, EVERY ONE AGAINST A SCREENSHOT. 42/42, up from 39.**
+  **The picture.** *"add moer height (cut from sides)"*, a frame of the film with
+  *"i need this cut"*, then *"make video 5% higher and crop left rihht sides a
+  bit"*. The stage is **1280x1008**, which is the film's own 4:3 plus 5%: at
+  exactly 4:3 nothing is cropped, so a box 5% TALLER is what trims 5% off the
+  width. `cover` scales 360 to 1008, draws 1344 wide into 1280, and takes 32 px
+  off each side. One constant, `STAGE_OVER`.
+  **The test picture is gone from the screen.** *"i get blinkig on-screen
+  timecode etc stuff. rm it"*. It was the FALLBACK arm showing for the second
+  before the film decoded. A film that never arrives now leaves a flat field and
+  a line in the log rather than a clock nobody asked for.
+  **The film waits.** *"video sthould stop in control room in beginning"*. It
+  loads, shows its first frame and does not advance until the record button is
+  pressed. Asserted in BOTH directions, which is the half that matters: stopped
+  before, running after, and the second assert also checks the PANEL changed
+  rather than only the element's own playhead.
+  **The controls.** *"rm 'live' from transport bar in controlroom and add
+  timeline. questin adding below it"*, *"replace play with record button in
+  controlroom"*, *"rm soon. off air / on air"*, *"can y rm this recording"*.
+  ⚠️ **ONE ASK WAS RETRACTED BY THE NEXT MESSAGE** (*"move play / stop to the
+  video footer... rm transport bar"*, then *"nope"*) and is recorded here so
+  nobody builds it from the transcript.
+  🔴 **`verb: 'record'` IS A KIT OPTION, NOT A PAGE HACK**: same element, same
+  `.tbar-toggle`, same `data-state`, so `verify.mjs`'s play drill and every other
+  page are untouched. A red ● and a red ■, and the red is literal rather than a
+  token, because a record button agreeing with a theme instead of with every
+  other record button is worse.
+  **Two bugs found by looking rather than by the suite.**
+  🔴 **A STRIP BUILT IN A HIDDEN TAB PANEL MEASURES A CANVAS OF ZERO WIDTH**, so
+  the `fit(0, 30s)` it is given does not take: the control room axis read **30 to
+  55 seconds** on a page where nothing had happened. It was blamed on follow
+  chasing a creeping playhead TWICE before the panel's width was suspected. Both
+  strips re-fit when their tab is shown, and there is an assert on the left edge
+  as well as the span, because a 30 s window sitting at 28 s has the right span.
+  ⚠️ Same family as the diagram measuring every string as fitting inside a hidden
+  panel, which is still open above.
+  🔴 **`.mp4` WAS MISSING FROM `demo/server.mjs`'s MIME TABLE**, so the film was
+  served as `application/octet-stream` locally. The comment above that table
+  predicts exactly this class of bug. Deployed it was always fine, which is what
+  makes it invisible.
+  ⚠️ **AND A MEASUREMENT I NEARLY WROTE DOWN WAS WORTHLESS.** A `<video>` that
+  never left `readyState 0` was read as a preload bug and two comments were
+  written claiming it; the tab was `visibilityState: hidden`, where Chrome defers
+  media entirely. Both comments were corrected to say what was actually measured.
+  **A browser tab I cannot see is not an instrument.**
+
 - ✅ **DONE 2026-09-18. THE 4:3 FILM WINS THE FRAME AND CROPS, AND THE OVERLAY
   CAME OFF.** Asked as *"stage: make 4:3 video win and crop"*, then *"rm video
   overlay"*, then *"show local dev link to it"*. **40/40, up from 39.**
