@@ -880,6 +880,7 @@
    */
   let archiveMedia = null;
   let archiveMaster = null;       // the mediaMaster, so a check can read its counters
+  let archiveUrl = null;          // the blob URL the archive is playing, so a new run can revoke it
   const archiveCommand = {
     play: () => (archiveMedia ? archiveMedia.play().catch(() => {}) : archiveDeck.play()),
     pause: () => (archiveMedia ? archiveMedia.pause() : archiveDeck.pause()),
@@ -1416,8 +1417,60 @@
   }
 
   let starting = false;
+  /**
+   * 🔴 A NEW RUN CLEARS THE LAST ONE. Asked 2026-09-19. A `Clear` button under
+   * the archive timeline was asked for first and then withdrawn in favour of
+   * this: *"Ok no clear. New run clears"*. It is the better answer and the
+   * reason is the project's own rule about controls. A Clear button is a second
+   * thing to find, it is available at moments when there is nothing to clear,
+   * and it asks somebody to tidy up before they can do the thing they came to
+   * do. Pressing record already means *start again*, so it can mean it fully.
+   * ⚠️ **EVERYTHING A RUN LEAVES BEHIND GOES, NOT THE VISIBLE HALF.** The
+   * recording, its blob URL, the questions, the answers, the option lanes, the
+   * recorder's pieces, the resolved duration and the R2 receipts. A reset that
+   * cleared the picture and left the answers would put the last show's marks on
+   * the next show's timeline, which is the worst of both.
+   * ⚠️ **AND THE BLOB URL IS REVOKED RATHER THAN DROPPED.** A blob URL holds its
+   * blob alive until it is revoked, so five runs would mean five recordings in
+   * memory with four of them unreachable.
+   */
+  function clearRun() {
+    archiveMaster?.dispose?.();
+    archiveMaster = null;
+    if (archiveMedia) { try { archiveMedia.pause(); } catch { /* already gone */ } }
+    archiveMedia = null;
+    if (archiveUrl) { URL.revokeObjectURL(archiveUrl); archiveUrl = null; }
+    playingBack = false;
+    // The card comes back, which is the same swap `openArchive` does in reverse:
+    // there is no recording again, so there is no video element again either.
+    archive.panel.stage.textContent = '';
+    archive.panel.stage.append(noTape.el || noTape);
+    chunks.length = 0;
+    QUESTIONS.length = 0;
+    ANSWERS.length = 0;
+    OPTIONS.length = 0;
+    asked = null;
+    // The question comes off both footers. `show()` puts it in a panel's centre
+    // slot, so emptying that slot is the same swap in reverse, and a poll left
+    // standing from a show that has ended is a control somebody can still press.
+    for (const id of SHOWN_ON) byId.get(id).panel.slots.centre.textContent = '';
+    T0 = null; recordedMs = null; stored = null; landed = null;
+    recTrack = null; askedBps = null; recSource = 'received';
+    archiveDeck.setRange([0, SHOW_MS]);
+    archiveDeck.seek(0);
+    showDeck.seek(0);
+    relane();
+    strip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
+    roomStrip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
+    d.log('a new run: the last recording, its questions and its answers are gone', 'hi');
+  }
+
   async function startShow() {
-    if (phase !== 'before' || starting) return;
+    if (phase === 'live' || starting) return;
+    // A second press of record is a new show, so whatever the last one left has
+    // to go before this one starts writing over it.
+    if (phase !== 'before') clearRun();
+    phase = 'before';
     starting = true;
     showDeck.play();
     /**
@@ -1543,6 +1596,10 @@
      * somewhere else and readable, which is asserted separately.
      */
     let src = URL.createObjectURL(blob);
+    // Kept so the NEXT run can revoke it. A blob URL holds its blob alive until
+    // it is revoked, and a page that records five shows would be holding five
+    // recordings in memory with four of them unreachable.
+    archiveUrl = src;
     if (USE_R2) {
       stored = await putWhole(blob, { log: d.log });
       if (stored) {
@@ -1553,7 +1610,7 @@
           : `R2 took it and will not serve it back (HTTP ${head.status})`,
         head.ok ? 'hi' : 'bad');
         const back = await fetchBack(stored.url, mime, { log: d.log });
-        if (back) src = URL.createObjectURL(back);
+        if (back) { URL.revokeObjectURL(archiveUrl); src = URL.createObjectURL(back); archiveUrl = src; }
       }
     }
     await openArchive(src, mime);
@@ -2773,6 +2830,49 @@
     A('the archive has a caret, and it is at a playhead that moves while the recording plays',
       caretMoved != null && caretMoved > 100 && caretLit != null && caretLit > 30,
       caretDetail);
+
+    /**
+     * 🔴 A NEW RUN CLEARS THE LAST ONE, AND IT IS DRIVEN THROUGH THE BUTTON. A
+     * `Clear` control was asked for and withdrawn in favour of this, so the
+     * record press is the only route to it and a check that called `clearRun()`
+     * directly would be grading a function the page no longer reaches that way.
+     * ⚠️ **IT ASSERTS THE WHOLE SWEEP, NOT THE VISIBLE HALF.** The picture going
+     * back to its card is the easy half; the one that would rot silently is the
+     * answers, because a stale mark on a new show's timeline looks exactly like
+     * a real one. This reads the archive panel, both lists, the option lanes and
+     * the poll in both footers.
+     * ⚠️ **AND IT DOES NOT WAIT FOR A SHOW TO COME UP.** `clearRun` runs on the
+     * first line of `startShow`, before any await, so the state to read is there
+     * within a frame of the press. Waiting for a peer connection here would put
+     * seconds between two asserts, which is what the harness's settle is
+     * measured against.
+     */
+    {
+      const before = {
+        questions: QUESTIONS.length, answers: ANSWERS.length, options: OPTIONS.length,
+        video: !!archive.panel.stage.querySelector('video'),
+      };
+      showToggle?.click();
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const polls = SHOWN_ON.filter((id) => byId.get(id).panel.slots.centre.children.length);
+      const after = {
+        questions: QUESTIONS.length, answers: ANSWERS.length, options: OPTIONS.length,
+        video: !!archive.panel.stage.querySelector('video'),
+        card: !!archive.panel.stage.querySelector('.pos-card'),
+      };
+      A('a new run clears the recording, the questions and the answers',
+        before.video && before.questions > 0
+        && !after.video && after.card && after.questions === 0
+        && after.answers === 0 && after.options === 0 && polls.length === 0,
+        `before: ${before.questions} question(s), ${before.answers} answer(s), `
+        + `${before.options} option lane(s), a recording in the panel. `
+        + `after one press: ${after.questions}, ${after.answers}, ${after.options}, `
+        + `${after.video ? 'still a recording' : 'the card is back'}, `
+        + `${polls.length} poll(s) left in a footer`);
+      // Put the page back where the drill found it rather than leaving a show
+      // running behind every other check's back.
+      await stopShow();
+    }
 
     /**
      * 🔴 AND IT REFUSES TO READ AN UNMEASURED DIAGRAM, WHICH IS NOW THE EASY

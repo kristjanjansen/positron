@@ -1,11 +1,28 @@
 ## Open
 
-- 🔴 **TWO ASKS FROM 2026-09-19 NOT DONE, BOTH ON `/stage/`.**
-  *"add Clear button under archvie timeline"*. Nothing built. The archive's glued
-  bar and strip are where it goes, under the strip; what it clears has to be
-  decided in one line before it is built (the recording, the questions and
-  answers, or both), because a Clear that empties more than somebody expected is
-  worse than none.
+- ✅ **DONE 2026-09-19. A NEW RUN CLEARS THE LAST ONE, AND THERE IS NO CLEAR
+  BUTTON.** Asked as *"add Clear button under archvie timeline"*, then withdrawn
+  and replaced the same minute: *"Ok no clear. New run clears"*. The second
+  answer is the better one for the reason this project already has in writing
+  about controls: a Clear button is a second thing to find, it is available at
+  moments when there is nothing to clear, and it asks somebody to tidy up before
+  they can do the thing they came to do. Pressing record already means *start
+  again*.
+  ⚠️ **A SECOND PRESS DID NOTHING AT ALL BEFORE THIS.** `startShow` returned
+  early unless `phase === 'before'`, so once a show had stopped the record button
+  was inert. That was not reported and was found while wiring the clear.
+  🔴 **EVERYTHING A RUN LEAVES GOES, NOT THE VISIBLE HALF**: the recording, its
+  blob URL (revoked, or five runs hold five recordings alive), the questions, the
+  answers, the option lanes, the recorder's pieces, the resolved duration, the R2
+  receipts, and the poll standing in both footers. Clearing the picture and
+  leaving the answers would put the last show's marks on the next show's
+  timeline, which is worse than not clearing at all.
+  ✅ **GRADED THROUGH THE BUTTON AND PROVED BY SABOTAGE.** 43/43, up from 42.
+  Disabling the call takes it red reading `1, 0, 2, still a recording, 2 poll(s)
+  left in a footer`, which is the defect in the detail line rather than a bare
+  fail.
+
+- 🔴 **ONE ASK FROM 2026-09-19 NOT DONE, ON `/stage/`.**
   *"videpanel borders are mess"*, with a zoomed crop of a rounded corner meeting
   a straight seam. **NOT REPRODUCED AND NOT FIXED.** What was ruled out by
   reading the computed styles on the page: `.pos-vp` carries the only radius and
