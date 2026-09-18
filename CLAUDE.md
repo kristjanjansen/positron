@@ -1056,6 +1056,18 @@ is checkable in one command, so check it before repeating it.
   100° band on `--hi`. One `PAD` off every edge. A camera is CONTAINED, never
   covered or stretched: iOS ignores a resolution request and returns portrait,
   where stretching squashes a face and cover shows 32% of the frame.
+  ⚠️ **AND A FILM IS NOT A CAMERA: `drawCamera` TAKES `fit: 'cover'` SINCE
+  2026-09-18**, asked for on `/stage/` as *"make 4:3 video win and crop"*. The
+  rule above is unchanged and is still the DEFAULT; what it is about is a
+  subject somebody framed and a shape the page does not control, and neither is
+  true of a film composed to fill its own frame. The arithmetic says the same:
+  a camera at 720x1280 into 1280x720 keeps 32%, a 4:3 film keeps **75%**, and
+  contain was laying 160 px of flat field down each side of it. **`scrim` is a
+  second option and defaults to the same 0.55**: it exists so a burned clock
+  stays readable on top, so a caller that draws nothing on top passes 0 rather
+  than dimming its own picture by more than half for furniture that is not
+  there. `/stage/` is the only caller of either; the five camera pages take the
+  defaults and read 82/82 unchanged.
 - 🔴 **A PAGE WITH TWO BARS MUST SAY WHICH ONE IS ITS TRANSPORT: `publish:
   false`.** `__demo.transport` is the only handle a CDP check has, and every bar
   claimed it unconditionally, so it was whichever bar was BUILT LAST, which is a

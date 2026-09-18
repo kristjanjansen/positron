@@ -1,4 +1,42 @@
 ## Open
+
+- ✅ **DONE 2026-09-18. THE 4:3 FILM WINS THE FRAME AND CROPS, AND THE OVERLAY
+  CAME OFF.** Asked as *"stage: make 4:3 video win and crop"*, then *"rm video
+  overlay"*, then *"show local dev link to it"*. **40/40, up from 39.**
+  ⚠️ **THE SECOND LINE HAD TWO READINGS AND THEY WERE OPPOSITE WORK**, so it
+  was put to the user rather than guessed. The film is what the user themselves
+  called the *"bg overlay"*, so it could mean delete the film; the test pattern
+  is what was drawn ON TOP of the film, so it could equally mean take the
+  pattern off. The answer was the pattern. **The tell was that the first line
+  has no subject under the other reading**: with the film deleted there is no
+  4:3 video on the page to win anything.
+  🔴 **`drawCamera` GAINED `fit: 'cover'` AND `scrim`, AND THE CAMERA DEFAULT IS
+  UNTOUCHED.** Every argument in that function is about a CAMERA, whose subject
+  is a face somebody framed: cropping throws away the part a person put
+  themselves in, and 720x1280 into 1280x720 keeps 32%. A FILM is the opposite on
+  both counts, 480x360 into 1280x720 keeps **75%**, and contain was spending
+  160 px of flat field down each side. Five camera pages pass the options and
+  are byte-for-byte what they were: `take capture show stage` reads **82/82**.
+  🔴 **THE BURNED CLOCK LEAVES THE FEED WITH THE PATTERN, AND TWO THINGS READ
+  IT.** `readBurned` on a panel was an assert and is REHOMED, not dropped: the
+  claim it was really making is its own comment's, *"the blit between them is
+  exactly the step that could be missing"*, so eight points must now read
+  IDENTICAL in the panel and the master and the picture must MOVE. One claim
+  across both arms rather than a branch. `readBurnedFrom` on the archive's
+  recording degrades to `null`, which its assert already tolerates because it
+  grades the PLAYHEAD.
+  ✅ **AND BOTH NEW CHECKS WERE PROVED BY SABOTAGE, SEPARATELY.** Putting the
+  pillars back (`fit` removed) takes **1 red** and names the signature, `spans 0
+  of 255 and averages 16 against a flat field at 16`; the other two film asserts
+  stay green, which is correct, because the film is still in the picture.
+  Stopping the blit into the control room takes **1 red** on the other one,
+  `104 apart at worst` and `changed by 0`, so both halves of it fire.
+  ⚠️ **THE EDGE COLUMN IS THE ONLY PLACE THE TWO ARRANGEMENTS DIFFER.** The
+  middle of the frame is identical under contain and cover, so a check sampling
+  the centre would have passed under both and graded nothing.
+  ⚠️ **AND THE GENERATED PICTURE IS STILL THE FALLBACK.** A film that 404s or
+  will not decode leaves `bgReady` false and that visit gets the full test
+  picture, rather than a black rectangle.
 - 🔴 **THE BACKGROUND FILM BECOMES GERMAN EXPRESSIONIST AND DANCE RELATED.
   ASKED 2026-09-18:** *"cool movie but use something from german expressionism,
   dance-related"*. Replaces the Dickson film. Same rules: two independent public
