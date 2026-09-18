@@ -15,6 +15,25 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+⚠️ **AUDITED 2026-09-18, ALL OF IT, AGAINST THE CODE RATHER THAN AGAINST ITS
+OWN WORDING.** Three entries went stale in one day, which is what prompted it.
+**43 entries are genuinely open. Sixteen were found already finished** and are
+marked ✅ with the evidence that showed it; thirteen of those were moved to the
+bottom of this file, and the rest were left where they stand.
+
+🔴 **AND THE COUNT ITSELF WAS WRONG BEFORE THE AUDIT, BY A LOT.** This file was
+reported as holding 57 open entries. It does not and did not: the `### XR`
+block below is ONE request that was dictated in one message, and its forty-eight
+sub-items are ordinary `- ` bullets at column zero, indistinguishable from
+top-level entries to anything counting them. Thirty-one of those forty-eight are
+already ✅. **Any count of this file that does not treat the XR block as one
+item is an overcount**, and that is a property of the file's own shape rather
+than of anybody's arithmetic.
+
+⚠️ A verdict of "done" here means somebody read the evidence. Where an entry is
+struck, the proof is in it.
+
+
 - 🔴 **THE 1969 PHOTO PEAK IN `archive/megatimeline/census.json` MAY BE AN
   ARTEFACT, AND IT IS THE KIND THAT LOOKS LIKE A FINDING.** Discovered
   2026-09-18 while harvesting the ERR catalogue: **undated items are all parked
@@ -85,88 +104,6 @@ file by being finished or by being refused in writing, never by being forgotten.
   thrown away the question it was asked.
 
 
-- ✅ **THE LIVE BADGE IS OFF THE ARCHIVE PANEL, 2026-09-18.** MEASURED across
-  the three panels: audience `live`, control room `live`, archive empty.
-  ⚠️ **NOT RE-WORDED TO `archive`, WHICH WAS THE TEMPTING FIX.** A presence
-  badge answers whether the thing feeding the picture is ANSWERING. Nothing
-  feeds this one: it is a recording of a show that finished, so there is no
-  liveness to report and a re-worded badge would be the same lie in a better
-  costume. `left: false` is the panel's own way of saying a slot has nothing to
-  put in it, and the footer keeps its other two.
-
-- ✅ **STAGE AND THEATRE OUT OF THE ERR ARCHIVES, 2026-09-18.**
-  `research/err-stage-theatre-2026-09-18.md`, 498 lines. **161 requests, all to
-  the catalogue, NO MEDIA OF ANY KIND**: no manifest, segment, mp3, mp4 or
-  thumbnail, and `vod.err.ee` / `heli.err.ee` / `arhiiv-images.err.ee` were never
-  contacted. Spaced 1.8 s, every response cached, and the API refused nothing.
-  **10,185 rows harvested complete** in the archive's own `Lavastuslik`
-  category (5,609 video, 4,576 audio), dated **1928-07-15 to 2026-09-14** over
-  84 distinct years, plus 30,243 or more photos, which is a floor because the
-  count saturates.
-  ⚠️ **IT IS A DOCUMENT AND NOT A `stage.json`, AND THE REASON IS THE FINDING.**
-  The rows were harvested and then measured: only **15.7%** say anything about a
-  stage, and `content=etendus` finds MORE theatre in `Kultuur` (2,377) than in
-  `Lavastuslik` (1,079), because one holds the productions and the other holds
-  the writing about them. There is no honest membership rule, so a corpus file
-  would have shipped a set already proved wrong. The recipe that regenerates the
-  rows in 22 requests is in the document.
-  🔴 **AND THE `keywords` PARAMETER IS INERT, WHICH IS A BROKEN COLLECTOR
-  CAUGHT BY ITS OWN TIDINESS.** Ten different theatre terms returned exactly
-  30,000 / 10,000 / 10,000 / 10,000. Identical numbers from ten different words
-  is not a finding, and a year-bounded control proved it. `category` and
-  `content` do work.
-  ⚠️ **THE METADATA SHAPE HAS MOVED** since `research/err-archives-2026-08.md`:
-  `metadata.technical[]` is now `metadata.data[]` with three groups, and
-  `makers` is empty on every audio item.
-
-- ✅ **THE ARCHIVE TIMELINE IS THREE TIMES HIGHER, AND IT IS NOT A RULE,
-  2026-09-18.** Four messages settled it: *"Make archive timeline 3x higher"*,
-  *"Make it a rule"*, *"Ita ok to have empty space in timelime, def min
-  height"*, then *"No rule just min height"*. MEASURED at **50 px** before and
-  **150 px** after, which is 3x to the pixel, and the floor is `STRIP_MIN_H` in
-  `demo/shell/strip.mjs` rather than a number typed on a page.
-  ⚠️ **A FLOOR, NEVER A HEIGHT.** Lanes needing more than 150 still get more, so
-  a page cannot clip its own content by asking for it, and the empty space under
-  the last lane was explicitly accepted rather than packed out.
-  ⚠️ **AND IT IS OPT-IN, WHICH THE MEASUREMENT DECIDED BEFORE THE RETRACTION
-  DID.** Every `auto` strip in the project was measured first: kit 44, stage 50,
-  draw 68, lanes 72, instrument 100, click 104, loops 116. A blanket floor would
-  have reshaped all seven, and `/kit/`'s 44 px specimen is 44 px on purpose.
-  🔴 **IT ALSO BROKE A CHECK, AND THE CHECK WAS RIGHT TO COMPLAIN.** `/stage/`'s
-  "no black rule between the lanes" assert sampled to the bottom of the canvas,
-  found the new empty ground under the last lane and reported a drop of 21.
-  `timeline/strip.mjs` now keeps `lanesH` (how far down anything was drawn)
-  apart from `contentH` (how tall the canvas is); they were one number until a
-  floor existed. The check bounds itself to `lanesH` and reads a drop of 0 over
-  63 rows, with its three lanes still present so the subject has not gone
-  missing.
-
-- ✅ **LOOP AND RATE ARE OFF THE ARCHIVE TRANSPORT, 2026-09-18.** MEASURED: no
-  loop button in the bar, 0 rate buttons. It is play and nothing else.
-  ⚠️ **THE TWO CAME OFF IN DIFFERENT PLACES AND THAT IS NOT AN INCONSISTENCY.**
-  `loop: false` is the bar's own option, beside `scrub: false` and `time:
-  false`. The RATES are not the bar's to refuse: they are the intersection of
-  every `caps.rates` its deck's kinds declare, and the bar already draws them
-  only when that intersection holds more than one value. So the honest way to
-  have none is for the DECK to stop claiming four, which is what its adapter now
-  says. A `rates: false` option would have put one fact in two places and let
-  them disagree.
-
-- ✅ **THE LOG IS OFF `/stage/`'S AUDIENCE TAB, 2026-09-18.** MEASURED: on the
-  audience tab the log reads `hidden: true, display: none`; on the archive tab
-  it reads `display: grid`. The other two tabs keep it, because they are worked
-  by the person running the show, who is who a log is for.
-  🔴 **AND `hidden` ALONE DID NOTHING, WHICH IS THE PART WORTH KEEPING.**
-  `.pos-log` sets `display: grid`, and ANY author rule beats the browser's own
-  `[hidden]`, so setting the property would have left a log on screen and a flag
-  that reads as set. `.pos-glue[hidden]` already existed three hundred lines up
-  in the same stylesheet for exactly this reason. `.pos-log[hidden]` now does
-  too, at (0,2,0) so it cannot lose to `.pos-log`.
-  ⚠️ **THE FIRST `go()` IS QUIET, SO `onPick` DOES NOT FIRE ON LOAD.** The page
-  opens on the audience tab, so leaving the initial state to the callback would
-  have shown the log to exactly the reader it is being taken from until they
-  touched a tab. It is applied once by hand.
-
 - 🔴 **`/reel/` OPENS TWO ERR CONNECTIONS ON EVERY VISIT, BEFORE ANYBODY PRESSES
   ANYTHING, AND IT IS NOT A SELF-CHECK.** Found 2026-09-18 during the self-check
   sweep and deliberately left alone, because it is outside what that sweep was
@@ -188,118 +125,6 @@ file by being finished or by being refused in writing, never by being forgotten.
   and answered it with a stand-in rather than by going dark.
 
 
-- ✅ **GLUE IS OUT OF THE DOCS AND THE FOUR REAL ONES ARE GLUED, 2026-09-18.**
-  Asked as *"i see no poiint in glue, it looks off and pointless in docs. just
-  glue the 4 we have properly"*, and the four were CONFIRMED rather than guessed
-  before any of it was written.
-  The `/kit/` section is gone, along with its two grey specimen boxes reading
-  `a block` and `and another` and the `.kit-glue-demo` rule that styled them. It
-  demonstrated the mechanism and none of the reason for it, which is what made
-  it read as furniture. `node demo/verify.mjs kit` is **45/45 before and after**,
-  so removing it moved no button the harness presses by position.
-  The four, each LOOKED AT rather than assumed, because the complaint was
-  visual: `/stage/` archive (bar + strip, already done), `/radio/` (bar + scope),
-  `/replay/` (bar + strip), `/tapes/` (scope + bar). 52/52, 60/60 and 45/45
-  green across them.
-  ⚠️ **`/tapes/` IS THE SCOPE AND THE BAR, NOT THE STRIP AND THE BAR.** Its
-  strip runs edge to edge past the page margins while the scope and bar are
-  inset, so a box round the strip and the bar would have to reconcile two widths
-  and put its seam across a block the tape's own picture already crosses.
-  ⚠️ **AND `createGlue` PUTS NOTHING ANYWHERE.** It re-parents its blocks into a
-  box and hands the box back, so a page that only calls it loses both blocks off
-  the page. Every one of these captures its anchor BEFORE the call, because a
-  node read after it can already be detached and `insertBefore` throws on that.
-
-- ✅ **THE FIVE BLACK KEYS ARE WHERE A PIANO PUTS THEM, AND THIS LINE OUTLIVED
-  THE WORK BY A DAY.** The move landed in `8bdd489` on 2026-09-17 and was never
-  struck off. VERIFIED BY MEASUREMENT 2026-09-18 rather than by reading the
-  diff: `SHARP_OFF` keys off the PITCH CLASS as §4.1 asked, `--k-off` is
-  consumed by `shell.css`, and `/kit/` reports the narrowest white strip at
-  **27.0 px, 0.551 of a white key**, against 0.401 when the keys were centred
-  and 0.439 in GarageBand. That is the predicted 27.00 to the digit.
-  ⚠️ **THE STACKING ASSERT WAS RE-DERIVED TOO, AND BETTER THAN ASKED.** The
-  worry was that it sampled symmetrically about the join and so could not see
-  the change. What shipped does not measure a centre at all: it measures the
-  STRIP a finger lands on between two black keys, which is the quantity the
-  offsets exist to change. Its own comment records the old centred-on-join
-  assert going red at 7.33 px, so it is a check proved against both states
-  rather than against one.
-
-- ✅ **`/stage/` IS BUILT AND THIS LINE OUTLIVED IT BY A DAY.** Every clause of
-  the dictated spec is met and MEASURED: three tabs, three panels each showing
-  the same generated test picture, `node demo/verify.mjs stage` at **21/21**
-  including `three panels, one for each tab` and `the fullscreen button is
-  square, 34.0 by 34.0 px`. The sentence that ENDED MID-WAY, *"Make a generic
-  component with"*, was answered without being guessed at: it is
-  `demo/shell/video-panel.mjs`, with l/c/r slots, `left` defaulting to presence,
-  `right` to a square fullscreen button, an empty centre, and `FULL_MODES =
-  ['hover', 'footer', 'bare']` covering the two modes the message did describe.
-  ⚠️ And `tabs.mjs` finally has its first real use, which the entry correctly
-  predicted was the test that component had never had.
-
-- ✅ **THE GMAIL HTML HALF WAS ALREADY FIXED, AND THE REAL FINDING IS THAT
-  NOTHING GRADED IT. SETTLED 2026-09-18 BY CAPTURING THE MESSAGE.** The raw of
-  both real messages was pulled from the sender's own mailbox and they are now
-  fixtures, byte for byte, at 542 and 539 bytes (Gmail's own size estimate for
-  each). Run against the SHIPPED `firstText`, the 19:54:32 message returns
-  exactly `hello!`. So the room entry was written by the build BEFORE the repair:
-  the two messages are two minutes apart, the deploy went out between them, and
-  the 19:56 message came out clean and labelled while the 19:54 one did not.
-  ✅ **AND THAT IS NO LONGER AN INFERENCE.** `wrangler deployments list` on
-  2026-09-18 reports the previous deployment created at **19:55:59.807Z**, which
-  falls between the two messages (19:54:32 and 19:56:17). The reasoning from the
-  fixtures and the deploy record agree, and they were arrived at independently.
-  ⚠️ **THE LESSON WAS THE ONE THE ENTRY PREDICTED, IN A PLACE NOBODY LOOKED.**
-  `firstText` lived inside `index.js` beside a `fetch` and a WebSocket, so
-  nothing could import it and it had ZERO asserts, while `spam.mjs` next door had
-  51. It is `workers/mail/src/body.mjs` now, graded by 8 body fixtures and a
-  sweep asserting that no message hands back any part of its own envelope. The
-  suite is **75/75**, up from 51.
-  ⚠️ AND THREE REAL DEFECTS CAME OUT OF WRITING THE FIXTURES, none of which the
-  room had shown: a nested `multipart/mixed` (an attachment) handed the whole
-  inner structure back as the person's words, a message with no closing
-  delimiter lost its only part to `slice(1, -1)`, and a message whose line
-  endings had been normalised to LF matched no `\r\n\r\n` and returned its own
-  headers as the body.
-
-- ✅ **A SUBJECT FROM OUTSIDE ENGLISH IS DECODED AND DEPLOYED, 2026-09-18.**
-  RFC 2047 in `workers/mail/src/body.mjs`: both encodings, adjacent words joined
-  with no space added between them, and charsets that are not UTF-8. Graded on
-  the exact string from the entry above this one, `=?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=`,
-  which now reads `kõige hästi`.
-  ⚠️ **THE BODY WAS BROKEN THE SAME WAY AND THE ENTRY DID NOT SAY SO.** A subject
-  is MIME-encoded because the alphabet forced it, and the same message's BODY
-  arrives `quoted-printable` or `base64` for the same reason, so decoding only
-  the subject would have left `K=C3=B5ige h=C3=A4sti` under a heading that now
-  reads correctly. Both halves are decoded and both are fixtures.
-  ⚠️ **AND A DECODED HEADER IS FLATTENED TO ONE LINE.** A subject is the first
-  line of a note whose other lines are the body, so an encoded word carrying a
-  newline could forge a line of our own output. That is the only place in this
-  worker where a stranger's text reaches a structured format, and there is an
-  assert that plants exactly that and requires it not to work.
-  ✅ **DEPLOYED 2026-09-18** as version `50a78731` at 100%. This entry carried a
-  red line saying it was in the repo and not on the edge, which was true for
-  about an hour and then was not.
-
-- ✅ **THE VERDICT SAYS WHICH SIGNAL DECIDED IT, DEPLOYED 2026-09-18.**
-  `auth.via` already held the answer and went only to `console.log`, where nobody
-  was looking. It is a chip now: `[ok · via Authentication-Results]` against
-  `[ok · via ARC]`, so the four characters that could not tell the two apart have
-  become a label that says which. Graded with the negative control that gives it
-  meaning: a fixture with a real stamp and one with only a forwarded ARC set must
-  come out DIFFERENT, and a message with no stamp at all must name no source
-  rather than invent one.
-  ⚠️ **IT IS EMITTED ON THE ORDINARY CASE TOO, BREAKING THIS FILE'S OWN RULE
-  ABOUT CHIPS ONLY WHERE THEY BEAR ON THE VERDICT, AND THAT IS DELIBERATE.** A
-  chip that appears only in the interesting case cannot be told apart from a
-  build that does not have the chip yet, which is the identical argument that put
-  `[ok]` on ordinary mail to begin with.
-  ⚠️ **WHAT IS STILL NOT KNOWN IS WHAT DECIDED THE 19:56 MESSAGE.** That cannot
-  be recovered from here: the room holds only the label, and the sender's copy
-  carries no `Authentication-Results` because the receiving side adds it. The
-  worker's own log for that delivery would answer it and observability is on.
-  The next message answers it by itself.
-
 - 🔴 **A QUICK RECORD AND LOOP ON THE KEYBOARD.** Asked 2026-09-17 alongside
   hold-to-retrigger and explicitly deferred in the same breath: *"we could also
   do quc rec/loop thing later"*. Nothing is built. **The seam is named and it is
@@ -312,18 +137,6 @@ file by being finished or by being refused in writing, never by being forgotten.
   ⚠️ **ASK WHAT IS BEING LOOPED BEFORE BUILDING IT.** `/looper/` loops NOTES and
   `/knobs/` would loop SOUND coming back off a board in another building, and
   those are different machines wearing one word.
-
-- ✅ **INCOMING EMAIL AT `positron@positron.studio` IS BUILT, DEPLOYED AND
-  RECEIVING. THE MOST STALE LINE IN THE FILE.** It said *"nothing is built and
-  no DNS or zone setting has been touched"*. `workers/mail/` is a complete Email
-  Worker routing mail into the feedback room over the relay, graded **75/75** on
-  20 spam fixtures and 8 body fixtures, live as version `50a78731`. The proof it
-  receives is elsewhere in this same file: the two real messages that arrived at
-  19:54:32 and 19:56:17 on 2026-09-17, which three other entries reason about.
-  ⚠️ **AND THE QUESTION THE ENTRY CALLED LOAD-BEARING WAS ANSWERED**, in
-  `wrangler.jsonc`'s own header, quoting the ask: *"I just need an email address
-  people can contact. That's it. And uh, the agent should be reading it"*. What
-  it is for is the feedback room, and that is why there is no second store.
 
 - 🔴 **YOSHIMI HAS NO ENVELOPE OR GLIDE CONTROLLERS EITHER, MEASURED
   2026-09-17.** With a keyboard on `/knobs/` the interesting controllers should
@@ -372,30 +185,6 @@ file by being finished or by being refused in writing, never by being forgotten.
   JACK graph or the capture's gain. ⚠️ **IT NEEDS THE STUDIO LAN.** The board
   dials out to the relay, so it is reachable for verbs and unreachable for
   diagnosis: `ssh positron@192.168.1.213` does not answer from outside.
-
-- ✅ **THE TWO VERBS ARE WRITTEN AND NEITHER HAS MET A JACK SERVER
-  (2026-09-18).** `jack.graph` reports `jack_lsp -c` as structure, a `pgrep -cx`
-  count of the five processes that make the sound, jackd's own command line,
-  what the box BELIEVES is running, and the chain it should have against the one
-  it has (`want`, `missing`, `extra`, `intact`). `jack.rebuild` patches the
-  DIFFERENCE and nothing else. Both answer in their own names, because
-  `audio.status` answering `audio.started` cost nine seconds and a false
-  conclusion that no board was in the room.
-  ⚠️ **THE SHARING DECISION, WRITTEN DOWN IN `rig/box/README.md`:** the board
-  cannot see a listener (the relay forwards verbatim, `webSocketClose()` is
-  empty, a page holding PCM says nothing), so the rebuild is a diff that runs
-  zero commands on a healthy graph, kills no process, says out loud who else is
-  in the room when it does cut a link, and refuses on `onlyIfIdle: true`. A
-  SERVICE restart is deliberately still not a verb: `audio.stop` then
-  `audio.start` already does that, at about thirteen seconds of silence for
-  everybody.
-  ⚠️ **UNVERIFIED.** No ssh from here, so nothing has been run against real
-  `jack_lsp` output. `node rig/box/test.mjs` is 92/92 with 25 new checks on the
-  parse and the chain against `fixtures/jack-lsp-c.txt`, and two deliberate
-  sabotages take it to 88/92 and 90/92. What is still open: that this board's
-  real `jack_lsp -c` parses as the fixture does, and that a real `jack_connect`
-  repairs a real drift. Deploy with `rig/box/push.sh` and confirm with the md5s
-  it prints, which now cover `jacksynth.mjs` as well as `box.mjs`.
 
 ### XR, asked for 2026-09-17, in one message
 
@@ -1642,3 +1431,239 @@ ENGTHS ARE MEASURED AND THEY ARE IN THE CORPUS.** Asked as
 - ✅ `shout` carries Radio 1965's recordings at `/rec/<name>.mp3`.
 - ✅ `NOTES` emptied, both essays moved to `research/`, `/notes/` no longer built.
 - ✅ `LESSONS.md` renumbering, and the rule about it.
+
+
+
+## Moved out of Open by the audit of 2026-09-18
+
+Struck because the work exists, with the evidence that showed it.
+
+- ✅ **THE LIVE BADGE IS OFF THE ARCHIVE PANEL, 2026-09-18.** MEASURED across
+  the three panels: audience `live`, control room `live`, archive empty.
+  ⚠️ **NOT RE-WORDED TO `archive`, WHICH WAS THE TEMPTING FIX.** A presence
+  badge answers whether the thing feeding the picture is ANSWERING. Nothing
+  feeds this one: it is a recording of a show that finished, so there is no
+  liveness to report and a re-worded badge would be the same lie in a better
+  costume. `left: false` is the panel's own way of saying a slot has nothing to
+  put in it, and the footer keeps its other two.
+
+- ✅ **STAGE AND THEATRE OUT OF THE ERR ARCHIVES, 2026-09-18.**
+  `research/err-stage-theatre-2026-09-18.md`, 498 lines. **161 requests, all to
+  the catalogue, NO MEDIA OF ANY KIND**: no manifest, segment, mp3, mp4 or
+  thumbnail, and `vod.err.ee` / `heli.err.ee` / `arhiiv-images.err.ee` were never
+  contacted. Spaced 1.8 s, every response cached, and the API refused nothing.
+  **10,185 rows harvested complete** in the archive's own `Lavastuslik`
+  category (5,609 video, 4,576 audio), dated **1928-07-15 to 2026-09-14** over
+  84 distinct years, plus 30,243 or more photos, which is a floor because the
+  count saturates.
+  ⚠️ **IT IS A DOCUMENT AND NOT A `stage.json`, AND THE REASON IS THE FINDING.**
+  The rows were harvested and then measured: only **15.7%** say anything about a
+  stage, and `content=etendus` finds MORE theatre in `Kultuur` (2,377) than in
+  `Lavastuslik` (1,079), because one holds the productions and the other holds
+  the writing about them. There is no honest membership rule, so a corpus file
+  would have shipped a set already proved wrong. The recipe that regenerates the
+  rows in 22 requests is in the document.
+  🔴 **AND THE `keywords` PARAMETER IS INERT, WHICH IS A BROKEN COLLECTOR
+  CAUGHT BY ITS OWN TIDINESS.** Ten different theatre terms returned exactly
+  30,000 / 10,000 / 10,000 / 10,000. Identical numbers from ten different words
+  is not a finding, and a year-bounded control proved it. `category` and
+  `content` do work.
+  ⚠️ **THE METADATA SHAPE HAS MOVED** since `research/err-archives-2026-08.md`:
+  `metadata.technical[]` is now `metadata.data[]` with three groups, and
+  `makers` is empty on every audio item.
+
+- ✅ **THE ARCHIVE TIMELINE IS THREE TIMES HIGHER, AND IT IS NOT A RULE,
+  2026-09-18.** Four messages settled it: *"Make archive timeline 3x higher"*,
+  *"Make it a rule"*, *"Ita ok to have empty space in timelime, def min
+  height"*, then *"No rule just min height"*. MEASURED at **50 px** before and
+  **150 px** after, which is 3x to the pixel, and the floor is `STRIP_MIN_H` in
+  `demo/shell/strip.mjs` rather than a number typed on a page.
+  ⚠️ **A FLOOR, NEVER A HEIGHT.** Lanes needing more than 150 still get more, so
+  a page cannot clip its own content by asking for it, and the empty space under
+  the last lane was explicitly accepted rather than packed out.
+  ⚠️ **AND IT IS OPT-IN, WHICH THE MEASUREMENT DECIDED BEFORE THE RETRACTION
+  DID.** Every `auto` strip in the project was measured first: kit 44, stage 50,
+  draw 68, lanes 72, instrument 100, click 104, loops 116. A blanket floor would
+  have reshaped all seven, and `/kit/`'s 44 px specimen is 44 px on purpose.
+  🔴 **IT ALSO BROKE A CHECK, AND THE CHECK WAS RIGHT TO COMPLAIN.** `/stage/`'s
+  "no black rule between the lanes" assert sampled to the bottom of the canvas,
+  found the new empty ground under the last lane and reported a drop of 21.
+  `timeline/strip.mjs` now keeps `lanesH` (how far down anything was drawn)
+  apart from `contentH` (how tall the canvas is); they were one number until a
+  floor existed. The check bounds itself to `lanesH` and reads a drop of 0 over
+  63 rows, with its three lanes still present so the subject has not gone
+  missing.
+
+- ✅ **LOOP AND RATE ARE OFF THE ARCHIVE TRANSPORT, 2026-09-18.** MEASURED: no
+  loop button in the bar, 0 rate buttons. It is play and nothing else.
+  ⚠️ **THE TWO CAME OFF IN DIFFERENT PLACES AND THAT IS NOT AN INCONSISTENCY.**
+  `loop: false` is the bar's own option, beside `scrub: false` and `time:
+  false`. The RATES are not the bar's to refuse: they are the intersection of
+  every `caps.rates` its deck's kinds declare, and the bar already draws them
+  only when that intersection holds more than one value. So the honest way to
+  have none is for the DECK to stop claiming four, which is what its adapter now
+  says. A `rates: false` option would have put one fact in two places and let
+  them disagree.
+
+- ✅ **THE LOG IS OFF `/stage/`'S AUDIENCE TAB, 2026-09-18.** MEASURED: on the
+  audience tab the log reads `hidden: true, display: none`; on the archive tab
+  it reads `display: grid`. The other two tabs keep it, because they are worked
+  by the person running the show, who is who a log is for.
+  🔴 **AND `hidden` ALONE DID NOTHING, WHICH IS THE PART WORTH KEEPING.**
+  `.pos-log` sets `display: grid`, and ANY author rule beats the browser's own
+  `[hidden]`, so setting the property would have left a log on screen and a flag
+  that reads as set. `.pos-glue[hidden]` already existed three hundred lines up
+  in the same stylesheet for exactly this reason. `.pos-log[hidden]` now does
+  too, at (0,2,0) so it cannot lose to `.pos-log`.
+  ⚠️ **THE FIRST `go()` IS QUIET, SO `onPick` DOES NOT FIRE ON LOAD.** The page
+  opens on the audience tab, so leaving the initial state to the callback would
+  have shown the log to exactly the reader it is being taken from until they
+  touched a tab. It is applied once by hand.
+
+- ✅ **GLUE IS OUT OF THE DOCS AND THE FOUR REAL ONES ARE GLUED, 2026-09-18.**
+  Asked as *"i see no poiint in glue, it looks off and pointless in docs. just
+  glue the 4 we have properly"*, and the four were CONFIRMED rather than guessed
+  before any of it was written.
+  The `/kit/` section is gone, along with its two grey specimen boxes reading
+  `a block` and `and another` and the `.kit-glue-demo` rule that styled them. It
+  demonstrated the mechanism and none of the reason for it, which is what made
+  it read as furniture. `node demo/verify.mjs kit` is **45/45 before and after**,
+  so removing it moved no button the harness presses by position.
+  The four, each LOOKED AT rather than assumed, because the complaint was
+  visual: `/stage/` archive (bar + strip, already done), `/radio/` (bar + scope),
+  `/replay/` (bar + strip), `/tapes/` (scope + bar). 52/52, 60/60 and 45/45
+  green across them.
+  ⚠️ **`/tapes/` IS THE SCOPE AND THE BAR, NOT THE STRIP AND THE BAR.** Its
+  strip runs edge to edge past the page margins while the scope and bar are
+  inset, so a box round the strip and the bar would have to reconcile two widths
+  and put its seam across a block the tape's own picture already crosses.
+  ⚠️ **AND `createGlue` PUTS NOTHING ANYWHERE.** It re-parents its blocks into a
+  box and hands the box back, so a page that only calls it loses both blocks off
+  the page. Every one of these captures its anchor BEFORE the call, because a
+  node read after it can already be detached and `insertBefore` throws on that.
+
+- ✅ **THE FIVE BLACK KEYS ARE WHERE A PIANO PUTS THEM, AND THIS LINE OUTLIVED
+  THE WORK BY A DAY.** The move landed in `8bdd489` on 2026-09-17 and was never
+  struck off. VERIFIED BY MEASUREMENT 2026-09-18 rather than by reading the
+  diff: `SHARP_OFF` keys off the PITCH CLASS as §4.1 asked, `--k-off` is
+  consumed by `shell.css`, and `/kit/` reports the narrowest white strip at
+  **27.0 px, 0.551 of a white key**, against 0.401 when the keys were centred
+  and 0.439 in GarageBand. That is the predicted 27.00 to the digit.
+  ⚠️ **THE STACKING ASSERT WAS RE-DERIVED TOO, AND BETTER THAN ASKED.** The
+  worry was that it sampled symmetrically about the join and so could not see
+  the change. What shipped does not measure a centre at all: it measures the
+  STRIP a finger lands on between two black keys, which is the quantity the
+  offsets exist to change. Its own comment records the old centred-on-join
+  assert going red at 7.33 px, so it is a check proved against both states
+  rather than against one.
+
+- ✅ **`/stage/` IS BUILT AND THIS LINE OUTLIVED IT BY A DAY.** Every clause of
+  the dictated spec is met and MEASURED: three tabs, three panels each showing
+  the same generated test picture, `node demo/verify.mjs stage` at **21/21**
+  including `three panels, one for each tab` and `the fullscreen button is
+  square, 34.0 by 34.0 px`. The sentence that ENDED MID-WAY, *"Make a generic
+  component with"*, was answered without being guessed at: it is
+  `demo/shell/video-panel.mjs`, with l/c/r slots, `left` defaulting to presence,
+  `right` to a square fullscreen button, an empty centre, and `FULL_MODES =
+  ['hover', 'footer', 'bare']` covering the two modes the message did describe.
+  ⚠️ And `tabs.mjs` finally has its first real use, which the entry correctly
+  predicted was the test that component had never had.
+
+- ✅ **THE GMAIL HTML HALF WAS ALREADY FIXED, AND THE REAL FINDING IS THAT
+  NOTHING GRADED IT. SETTLED 2026-09-18 BY CAPTURING THE MESSAGE.** The raw of
+  both real messages was pulled from the sender's own mailbox and they are now
+  fixtures, byte for byte, at 542 and 539 bytes (Gmail's own size estimate for
+  each). Run against the SHIPPED `firstText`, the 19:54:32 message returns
+  exactly `hello!`. So the room entry was written by the build BEFORE the repair:
+  the two messages are two minutes apart, the deploy went out between them, and
+  the 19:56 message came out clean and labelled while the 19:54 one did not.
+  ✅ **AND THAT IS NO LONGER AN INFERENCE.** `wrangler deployments list` on
+  2026-09-18 reports the previous deployment created at **19:55:59.807Z**, which
+  falls between the two messages (19:54:32 and 19:56:17). The reasoning from the
+  fixtures and the deploy record agree, and they were arrived at independently.
+  ⚠️ **THE LESSON WAS THE ONE THE ENTRY PREDICTED, IN A PLACE NOBODY LOOKED.**
+  `firstText` lived inside `index.js` beside a `fetch` and a WebSocket, so
+  nothing could import it and it had ZERO asserts, while `spam.mjs` next door had
+  51. It is `workers/mail/src/body.mjs` now, graded by 8 body fixtures and a
+  sweep asserting that no message hands back any part of its own envelope. The
+  suite is **75/75**, up from 51.
+  ⚠️ AND THREE REAL DEFECTS CAME OUT OF WRITING THE FIXTURES, none of which the
+  room had shown: a nested `multipart/mixed` (an attachment) handed the whole
+  inner structure back as the person's words, a message with no closing
+  delimiter lost its only part to `slice(1, -1)`, and a message whose line
+  endings had been normalised to LF matched no `\r\n\r\n` and returned its own
+  headers as the body.
+
+- ✅ **A SUBJECT FROM OUTSIDE ENGLISH IS DECODED AND DEPLOYED, 2026-09-18.**
+  RFC 2047 in `workers/mail/src/body.mjs`: both encodings, adjacent words joined
+  with no space added between them, and charsets that are not UTF-8. Graded on
+  the exact string from the entry above this one, `=?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=`,
+  which now reads `kõige hästi`.
+  ⚠️ **THE BODY WAS BROKEN THE SAME WAY AND THE ENTRY DID NOT SAY SO.** A subject
+  is MIME-encoded because the alphabet forced it, and the same message's BODY
+  arrives `quoted-printable` or `base64` for the same reason, so decoding only
+  the subject would have left `K=C3=B5ige h=C3=A4sti` under a heading that now
+  reads correctly. Both halves are decoded and both are fixtures.
+  ⚠️ **AND A DECODED HEADER IS FLATTENED TO ONE LINE.** A subject is the first
+  line of a note whose other lines are the body, so an encoded word carrying a
+  newline could forge a line of our own output. That is the only place in this
+  worker where a stranger's text reaches a structured format, and there is an
+  assert that plants exactly that and requires it not to work.
+  ✅ **DEPLOYED 2026-09-18** as version `50a78731` at 100%. This entry carried a
+  red line saying it was in the repo and not on the edge, which was true for
+  about an hour and then was not.
+
+- ✅ **THE VERDICT SAYS WHICH SIGNAL DECIDED IT, DEPLOYED 2026-09-18.**
+  `auth.via` already held the answer and went only to `console.log`, where nobody
+  was looking. It is a chip now: `[ok · via Authentication-Results]` against
+  `[ok · via ARC]`, so the four characters that could not tell the two apart have
+  become a label that says which. Graded with the negative control that gives it
+  meaning: a fixture with a real stamp and one with only a forwarded ARC set must
+  come out DIFFERENT, and a message with no stamp at all must name no source
+  rather than invent one.
+  ⚠️ **IT IS EMITTED ON THE ORDINARY CASE TOO, BREAKING THIS FILE'S OWN RULE
+  ABOUT CHIPS ONLY WHERE THEY BEAR ON THE VERDICT, AND THAT IS DELIBERATE.** A
+  chip that appears only in the interesting case cannot be told apart from a
+  build that does not have the chip yet, which is the identical argument that put
+  `[ok]` on ordinary mail to begin with.
+  ⚠️ **WHAT IS STILL NOT KNOWN IS WHAT DECIDED THE 19:56 MESSAGE.** That cannot
+  be recovered from here: the room holds only the label, and the sender's copy
+  carries no `Authentication-Results` because the receiving side adds it. The
+  worker's own log for that delivery would answer it and observability is on.
+  The next message answers it by itself.
+
+- ✅ **INCOMING EMAIL AT `positron@positron.studio` IS BUILT, DEPLOYED AND
+  RECEIVING. THE MOST STALE LINE IN THE FILE.** It said *"nothing is built and
+  no DNS or zone setting has been touched"*. `workers/mail/` is a complete Email
+  Worker routing mail into the feedback room over the relay, graded **75/75** on
+  20 spam fixtures and 8 body fixtures, live as version `50a78731`. The proof it
+  receives is elsewhere in this same file: the two real messages that arrived at
+  19:54:32 and 19:56:17 on 2026-09-17, which three other entries reason about.
+  ⚠️ **AND THE QUESTION THE ENTRY CALLED LOAD-BEARING WAS ANSWERED**, in
+  `wrangler.jsonc`'s own header, quoting the ask: *"I just need an email address
+  people can contact. That's it. And uh, the agent should be reading it"*. What
+  it is for is the feedback room, and that is why there is no second store.
+
+- ✅ **THE TWO VERBS ARE WRITTEN AND NEITHER HAS MET A JACK SERVER
+  (2026-09-18).** `jack.graph` reports `jack_lsp -c` as structure, a `pgrep -cx`
+  count of the five processes that make the sound, jackd's own command line,
+  what the box BELIEVES is running, and the chain it should have against the one
+  it has (`want`, `missing`, `extra`, `intact`). `jack.rebuild` patches the
+  DIFFERENCE and nothing else. Both answer in their own names, because
+  `audio.status` answering `audio.started` cost nine seconds and a false
+  conclusion that no board was in the room.
+  ⚠️ **THE SHARING DECISION, WRITTEN DOWN IN `rig/box/README.md`:** the board
+  cannot see a listener (the relay forwards verbatim, `webSocketClose()` is
+  empty, a page holding PCM says nothing), so the rebuild is a diff that runs
+  zero commands on a healthy graph, kills no process, says out loud who else is
+  in the room when it does cut a link, and refuses on `onlyIfIdle: true`. A
+  SERVICE restart is deliberately still not a verb: `audio.stop` then
+  `audio.start` already does that, at about thirteen seconds of silence for
+  everybody.
+  ⚠️ **UNVERIFIED.** No ssh from here, so nothing has been run against real
+  `jack_lsp` output. `node rig/box/test.mjs` is 92/92 with 25 new checks on the
+  parse and the chain against `fixtures/jack-lsp-c.txt`, and two deliberate
+  sabotages take it to 88/92 and 90/92. What is still open: that this board's
+  real `jack_lsp -c` parses as the fixture does, and that a real `jack_connect`
+  repairs a real drift. Deploy with `rig/box/push.sh` and confirm with the md5s
+  it prints, which now cover `jacksynth.mjs` as well as `box.mjs`.
