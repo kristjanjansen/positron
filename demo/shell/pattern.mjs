@@ -169,18 +169,38 @@ const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
  * The bars are the point, not a compromise: a phone held upright IS a tall
  * picture, and a 16:9 box either lies about that or throws two thirds of it
  * away. Returns false if the source has no dimensions yet.
+ *
+ * 🔴 AND `fit: 'cover'` IS THE OPT-OUT, FOR A SOURCE THAT IS NOT A CAMERA.
+ * Asked 2026-09-18 about `/stage/`'s film: *"make 4:3 video win and crop"*.
+ * Every argument above is about a CAMERA, whose subject is a face somebody
+ * framed and whose shape the page does not control: cropping it throws away
+ * the part a person put themselves in. A FILM is the opposite on both counts.
+ * Its subject is composed to fill its own frame, 480x360 into 1280x720 scales
+ * 2.00x and keeps **75% of the picture** rather than 32%, and what contain
+ * gives instead is two black pillars over a third of the width. The rule for
+ * cameras is unchanged and is still the default; this is a second case, not a
+ * softening of the first.
+ * ⚠️ `scrim` IS SEPARATE AND DEFAULTS TO THE SAME 0.55. It exists so the
+ * burned clock stays readable ON TOP, so a caller that draws nothing on top
+ * passes 0: dimming a picture by 55% for the sake of furniture that is not
+ * there is a page darkening itself for no reason.
  */
-export function drawCamera(ctx, src, w, h) {
+export function drawCamera(ctx, src, w, h, opts = {}) {
   const sw = src.videoWidth || src.naturalWidth || src.width || 0;
   const sh = src.videoHeight || src.naturalHeight || src.height || 0;
+  const scrim = opts.scrim ?? 0.55;
   ctx.fillStyle = FIELD;
   ctx.fillRect(0, 0, w, h);
   if (!sw || !sh) return false;
-  const scale = Math.min(w / sw, h / sh);
+  const scale = opts.fit === 'cover'
+    ? Math.max(w / sw, h / sh)
+    : Math.min(w / sw, h / sh);
   const dw = sw * scale, dh = sh * scale;
   ctx.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh);
-  ctx.fillStyle = 'rgba(13,16,23,0.55)';
-  ctx.fillRect(0, 0, w, h);
+  if (scrim > 0) {
+    ctx.fillStyle = `rgba(13,16,23,${scrim})`;
+    ctx.fillRect(0, 0, w, h);
+  }
   return true;
 }
 
