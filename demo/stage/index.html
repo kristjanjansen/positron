@@ -30,7 +30,7 @@
   import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
-  import { burn, readBurned, readBurnedFrom, drawCamera, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
+  import { burn, readBurned, readBurnedFrom, drawCamera, FRAME_W, FRAME_H, videoHue, PAD } from '/shell/pattern.mjs';
   import { createCard } from '/shell/card.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
@@ -1777,6 +1777,52 @@
       `it went out to ${(outSpan / 1000).toFixed(1)}s against a bound of `
       + `${(maxSpanMs() / 1000).toFixed(1)}s, stopped by ${stoppedBy}`
       + `${recordedMs == null ? ' (no recording yet, so the bound is the nominal show)' : ''}`);
+
+    /**
+     * 🔴 IS THE FILM ACTUALLY IN THE PICTURE. It became the DEFAULT background
+     * on 2026-09-18, so every visitor sees it or fails to, and nothing graded
+     * it: `loadBackground` could have thrown, the file could have 404'd, the
+     * element could have stalled, and the page would have drawn its flat field
+     * and looked entirely correct. That is the shape this project keeps paying
+     * for, and the `.mp4` the build silently declined to copy earlier the same
+     * day is the same story one step upstream.
+     *
+     * 🔴 IT ASKS THE PICTURE THE RIGHT QUESTION, WHICH IS NOT "IS THERE A VIDEO
+     * ELEMENT". `burn()` takes `field: !bgReady`: with a background ready it
+     * SKIPS the flat fill and the film shows through, and without one it paints
+     * `FIELD`, one flat colour. So the discriminator is whether the frame is
+     * still flat where the pattern does not draw, and that is a fact about the
+     * pixels rather than about the element.
+     * ⚠️ BOTH HALVES OR NEITHER. A frame with spread in it proves something is
+     * behind the pattern; a `currentTime` that ADVANCED proves it is a film
+     * running rather than one frame decoded and stuck. Either alone passes for
+     * the wrong reason.
+     */
+    let bgReadyAt = null;
+    for (let i = 0; i < 100 && !(bgVideo && bgVideo.readyState >= 2); i++) {
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    const tA = bgVideo ? bgVideo.currentTime : null;
+    await new Promise((r) => setTimeout(r, 600));
+    const tB = bgVideo ? bgVideo.currentTime : null;
+    // A band below the middle, inside the pattern's own PAD, where the field
+    // would otherwise be one colour edge to edge.
+    let lo = 255, hi = 0;
+    if (bgVideo && bgVideo.readyState >= 2) {
+      const band = mctx.getImageData(PAD, Math.round(FRAME_H * 0.62), FRAME_W - PAD * 2, 1).data;
+      for (let i = 0; i < band.length; i += 4) {
+        const l = (band[i] * 0.299 + band[i + 1] * 0.587 + band[i + 2] * 0.114);
+        if (l < lo) lo = l; if (l > hi) hi = l;
+      }
+      bgReadyAt = Math.round(hi - lo);
+    }
+    A('the public domain film is really behind the stage, and it is running',
+      bgReadyAt != null && bgReadyAt > 25 && tA != null && tB > tA,
+      bgVideo
+        ? `${bgVideo.videoWidth}x${bgVideo.videoHeight}, the playhead went `
+          + `${tA.toFixed(2)}s to ${tB.toFixed(2)}s, and one row of the frame spans `
+          + `${bgReadyAt} of 255 in luminance where a flat field spans 0`
+        : 'no background element was ever created');
 
     const p1 = panels[1].panel;
     p1.full(true).then(() => {
