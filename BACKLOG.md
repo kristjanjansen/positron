@@ -15,6 +15,57 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **THE ARCHIVE'S PLAYHEAD MOVES AND ITS PICTURE DOES NOT, AND THE FIX IS
+  ALREADY IN THIS REPO.** MEASURED 2026-09-18 on `/stage/`: seeking the archive
+  from 0.794s to 3.177s moves `currentTime` to both positions EXACTLY, and
+  `readBurnedFrom` returns the identical millisecond at both.
+  🔴 **THE CAUSE IS THE FILE, NOT THE PAGE.** MediaRecorder WebM carries no cues
+  and no SeekHead, so a browser reports the position it was asked for and keeps
+  showing the frame it already had. Every seek control on that tab is therefore
+  honest about where it is and wrong about what it shows.
+  ✅ **`proto/selfrec/indexer.mjs` IS THE ANSWER AND IT IS WRITTEN**: a
+  zero-dependency EBML parser that walks the clusters and emits
+  `[{tMs, chunkSeq, offsetInChunk, byteOffset}]`, so replay becomes Range
+  requests plus MSE. `plan-stage-live.md` §4.5 names it as what replaces the
+  blob and step one deliberately did not build it.
+  ⚠️ **THE CHECK SAYS THE TRUE THING RATHER THAN THE FLATTERING ONE.** It grades
+  the playhead, which is the half the page is responsible for, and the page logs
+  the other half in words. Asserting the picture would be a permanently red
+  suite; asserting nothing would be dropping the claim the page was built to
+  make. **`plan-stage-live.md` §10.6 is therefore NOT met.**
+
+
+- ✅ **THE TEST FRAME'S LAYOUT, REWORKED IN SEVEN ASKS ON 2026-09-18.** Two
+  clocks side by side at 64 px, numbers sitting on the row with the same `PAD`
+  above the bed as below it, labels 80 px up, and a **30x30** square at the top
+  `PAD` from the edge, crossing the run between the strip's own margins.
+  ⚠️ **EVERY NUMBER IS DERIVED FROM `PAD` AND `ROW`, NEVER TYPED**, which is
+  what made the asks composable: *"same space as the timecode"* is one constant
+  in both places rather than two 60s that can drift.
+  ⚠️ **AND THE SQUARE TOOK THREE GOES**, which is worth keeping: *"same h and w
+  as timecode strip h"* has two honest readings, the black bed at 96 and the
+  white blocks at 56, and it was neither. A number settled it.
+  🔴 **ALL THREE RENDERERS MOVED TOGETHER**: `burn()`, `ffmpegFilters()` and
+  `workers/pub/container/server.mjs`. **A REAL DRIFT WAS FOUND DOING IT**: the
+  ffmpeg copies convert a canvas BASELINE into a box TOP with a hand typed
+  offset, and when the number shrank from 84 to 64 the offset stayed, so the
+  container drew it **25 px too low** and nothing said so. Derived now, from the
+  0.774 ratio read back off the numbers the file shipped with.
+  ⚠️ **NOTHING COMPARES THE THREE RENDERINGS.** That is the standing risk here,
+  and it is why the drift above survived: the container's output is only ever
+  seen inside a container.
+
+- 🔴 **THE CONTROL ROOM'S START AND STOP BECOME A STANDARD TRANSPORT BAR. ASKED
+  2026-09-18:** *"start the show | stop: standard trasport bar"*. Two ad-hoc
+  `<button>`s were built for it, which is the fourth-copy mistake CLAUDE.md
+  names: build from `/kit/` and stop and ask rather than hand-roll a control
+  that exists.
+  ⚠️ **`/radio/` IS THE SHAPE**, not `/replay/`: `live: true` replaces the clock
+  with a LIVE chip, and the toggle is start and stop rather than a claim about a
+  position inside a recording, which is the distinction `transport-bar.mjs`'s
+  own header is about.
+
+
 - 🔴 **AN ERR ARCHIVE CLIP AS THE STAGE SOURCE. ASKED 2026-09-18:** *"can you
   stream this to the feed? https://arhiiv.err.ee/video/vaata/op-489 from 10:40
   15:39"*. A 4 minute 59 second excerpt, played into the feed the control room

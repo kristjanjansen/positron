@@ -123,6 +123,23 @@ function drawFilters({ epoch, hue = 0 }) {
   ].join(':');
   const NUM = 64, LBL = 28;   // same sizes as the canvas
   const COL2 = PAD + Math.round(13 * 0.6 * NUM) + PAD;   // 13 chars of epoch, plus a gutter
+  // 🔴 ffmpeg's `y` IS THE TOP OF THE TEXT BOX AND THE CANVAS'S IS THE
+  // BASELINE, SO ONE HAS TO BE CONVERTED INTO THE OTHER. It was a pair of hand
+  // typed numbers, and on 2026-09-18 the canvas moved to a 64 px number while
+  // this kept the offset that belonged to an 84 px one: the number was drawn
+  // **25 px too low** and nothing said so, because no check compares the two
+  // renderings and this one is only ever seen in a container.
+  // 0.774 is that ratio, read back off the numbers this file shipped with
+  // (32 px label offset 25, 84 px number offset 65).
+  const top = (baseline, size) => Math.round(baseline - 0.774 * size);
+  // The canvas's own baselines, so the two cannot drift apart again.
+  const NUM_Y = ROW.Y - 20 - PAD;
+  // ⚠️ 80 RATHER THAN 68, ASKED FOR 2026-09-18: *"incr a liitle bit space
+  // betwen labels and timecode numbers"*. What an eye reads as the gap is not
+  // this number: it is this number LESS the number's cap height, which at 64 px
+  // is about 50. So 68 was an 18 px gap and 80 is a 30 px one, which is the
+  // "little bit" and not the near doubling the figures suggest.
+  const LBL_Y = NUM_Y - 80;
   const LABEL = '0xFFD400';
   const VALUE = '0xE9EEF7';
   return [
@@ -133,17 +150,17 @@ function drawFilters({ epoch, hue = 0 }) {
     // twice. No source label — the hue says which publisher this is, and a name
     // burned into a picture is a small text nobody can read at the size a demo
     // shows it.
-    text('ABSOLUTE', PAD, 70, LBL, LABEL),
+    text('ABSOLUTE', PAD, top(LBL_Y, LBL), LBL, LABEL),
     // pts-derived, the same instant the row encodes.
-    text(`%{pts\\:flt\\:${epoch}} s`, PAD, 143, NUM, VALUE),
-    text('LOCAL', COL2, 70, LBL, LABEL),
+    text(`%{pts\\:flt\\:${epoch}} s`, PAD, top(NUM_Y, NUM), NUM, VALUE),
+    text('LOCAL', COL2, top(LBL_Y, LBL), LBL, LABEL),
     // LEGIBLE — this box's own wall clock, for a human with a watch. The two
     // drifting apart is real information: it is encoder drift.
     // The triple backslash is not a typo: gmtime's strftime argument has to
     // survive drawtext's expansion parser, which splits `%{name:args}` on a
     // bare colon. Measured on ffmpeg@7 — `\\\:` renders 15:31:25, `\:` errors
     // with "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', COL2, 143, NUM, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', COL2, top(NUM_Y, NUM), NUM, VALUE),
   ].join(',');
 }
 
