@@ -46,6 +46,26 @@ against 21**, so the number picked would have passed the defect it exists to
 catch. Thresholds go BETWEEN two measured states, and the sabotage that produces
 the second state is not optional.
 
+## 🔴 THE BACKGROUND FEEDBACK POLL IS GONE, ON INSTRUCTION
+
+Removed 2026-09-18: *"Rm backround feedback poll"*. It was a session cron at
+`13,43 * * * *` that read `/feedback/` and said one line when the room was
+quiet. **Do not recreate it without being asked.**
+
+⚠️ **NOTHING ABOUT `/feedback/` ITSELF CHANGED.** The room still collects, the
+mail worker still posts into it, and `workers/feedback` is untouched. What went
+away is the timer that looked. So the room is now checked when somebody asks,
+which means a genuinely new entry can sit there unread — that is the accepted
+trade, not an oversight to fix.
+
+⚠️ **THE WATERMARK, so a manual check can tell new from old:** 3 entries held,
+newest `2026-09-17T19:56:17.682Z` on `mail`. Everything at or before that has
+been reported. One command:
+
+```sh
+curl -s --max-time 12 "https://feedback.positron.studio/feedback?room=feedback&format=text"
+```
+
 ## What is open
 
 `BACKLOG.md` is the list. Two entries were added this session from the feedback
