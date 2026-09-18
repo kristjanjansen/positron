@@ -37,6 +37,9 @@ import { WAY_GLYPH, WAY_SAYS, LOOP_TURN, LOOP_WAYS } from './looper.mjs';
  */
 export function createTransportBar(host, deck, {
   absolute = false, scrub: wantScrub = true, extras = [], fmt = null, live = false, publish = true,
+  // 'play' (the default) or 'record': what the toggle's glyph says it does. See
+  // the note on the toggle itself.
+  verb = 'play',
   // 🔴 `false` LEAVES THE LOOP BUTTON OFF, the way `scrub: false` already
   // leaves the slider off. A loop is a claim that hearing a passage twice is
   // worth a control, and that is true of a tape and of a live window and false
@@ -261,7 +264,19 @@ export function createTransportBar(host, deck, {
   };
   const bar = el('div', 'tbar');
 
-  const toggle = el('button', 'tbar-toggle', '', { type: 'button', 'aria-label': 'play/pause' });
+  /**
+   * 🔴 `verb: 'record'` MAKES THE TOGGLE A RECORD BUTTON. Asked 2026-09-18 for
+   * `/stage/`: *"replace play with record button in controlroom"*. A control
+   * room's one press does not start playback of anything, it puts a show on air
+   * and writes it down, and a ▶ on it was describing the wrong verb.
+   * ⚠️ IT IS A CLASS AND A LABEL, NOT A SECOND BUTTON. The element, its
+   * `.tbar-toggle` class, its `data-state` and everything that presses it are
+   * untouched, so `demo/verify.mjs`'s play drill and every page holding the bar
+   * keep working. Only the glyph and what a screen reader hears change.
+   */
+  const RECORD = verb === 'record';
+  const toggle = el('button', `tbar-toggle${RECORD ? ' tbar-rec' : ''}`, '',
+    { type: 'button', 'aria-label': RECORD ? 'record/stop' : 'play/pause' });
   const scrub = el('div', 'tbar-scrub', '', { role: 'slider', tabindex: '0', 'aria-label': 'position' });
   const fill = el('div', 'tbar-fill');
   const headDot = el('div', 'tbar-head');
