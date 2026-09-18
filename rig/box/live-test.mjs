@@ -54,6 +54,14 @@ ws.onopen = async () => {
   try {
     console.log(`room ${ROOM}\n`);
     console.log('the box answers');
+    // ⚠️ THIS CHECK COULD NOT PASS BETWEEN 2026-09-16 AND 2026-09-18, AND IT
+    // WAS NOT THIS FILE'S FAULT. The board's pong carried an `at` field, `at`
+    // is an envelope field, `format()` throws on the collision, and the handler
+    // answered `box.error` instead. So the reply never arrived and this read
+    // as a board that was not there. The board sends `pongAt` now.
+    // ⚠️ THE FIELD IS NOT READ HERE AND MUST NOT BE. The board's clock and this
+    // process's clock share no origin, so a round trip is only measurable in
+    // ONE clock: see `relay-compare.mjs`, which times it in its own.
     send({ type: 'box.ping' });
     const pong = await reply('box.pong');
     ok('box.ping -> box.pong', !!pong);

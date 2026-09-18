@@ -21,6 +21,7 @@ import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.m
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          pappusFx, pappusAvailable, pappusPanic, stopPappus, sourceFeed,
+         jackGraph, jackChain, jackRebuild,
        } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
@@ -1166,7 +1167,110 @@ async function handle(msg) {
         : stopSynth ? { ok: true, source: 'synth', ...insertState() }
         : audio ? { ok: true, source: 'capture', ...insertState() }
         : { ok: false, reason: 'nothing playing', ...insertState() });
-    case 'box.ping':    return reply('box.pong', { at: Date.now() });
+    // 🔴 `pongAt`, NOT `at`, AND THIS VERB HAD REPLIED TO NOBODY SINCE IT WAS
+    // WRITTEN. `at` is an ENVELOPE field (`wire.mjs`), `format()` throws on the
+    // collision by design, the throw was caught by the handler wrapper below and
+    // answered as `box.error`. So the obvious round trip verb on this board
+    // answered an error to every caller, and `/keys/` timed it into a variable
+    // no cell showed. Found 2026-09-16, fixed 2026-09-18. It is the same
+    // collision `grain.marks` names two hundred lines up, which is the one
+    // place in this file that got the rename right.
+    // ⚠️ NOTHING READS THE FIELD AND NOTHING SHOULD. `live-test.mjs`,
+    // `relay-compare.mjs` and `yoshimi-test.mjs` all time the round trip in
+    // THEIR OWN clock, which is the only clock that can measure it: this
+    // process's `Date.now()` and a caller's share no origin, so subtracting
+    // them is meaningless. It is sent because a reply carrying nothing but its
+    // own type is hard to tell from an echo.
+    case 'box.ping':    return reply('box.pong', { pongAt: Date.now() });
+
+    // ── looking at the board, and putting its graph back ──────────────────
+    //
+    // 🔴 THE REPORT COMES FIRST, AND IT IS THE IMPORTANT ONE. A verb that
+    // CHANGES the board before anybody can SEE the board turns a diagnosis into
+    // a second fault, and on a board with one jackd, one capture and one room
+    // the second fault is heard by whoever is listening in another building.
+    // So `jack.graph` reads and writes nothing, and `jack.rebuild` carries the
+    // graph from before and after itself, so pressing it is a diff rather than
+    // a leap.
+    //
+    // 🔴 EACH ANSWERS IN ITS OWN NAME. `audio.status` answers `audio.started`,
+    // and that cost nine seconds and a wrong conclusion: a caller waiting on the
+    // obvious reply name waited out its timeout and reported that no board was
+    // in the room, about a board that had answered immediately. `ctl.meter`,
+    // `fx.pappus` and `video.params` already answer in their own names, and
+    // these two do the same.
+    case 'jack.graph': {
+      const g = jackGraph();
+      const chain = jackChain({ instrumentPort: inst?.port, instrumentPortR: inst?.portR,
+                                insert: fxOn, source: !!madeSource, graph: g });
+      // 🔴 WHAT THE BOARD BELIEVES, BESIDE WHAT THE GRAPH SAYS. The pairing is
+      // the diagnosis and neither half is one on its own: the level collapse of
+      // 2026-09-17 is a board reporting a healthy instrument while the audio a
+      // page hears is 40x down, which is two statements that disagree. Only one
+      // of them was ever visible from outside the building.
+      return reply('jack.graph', {
+        ...g,
+        believes: { source: inst?.source ?? null, port: inst?.port ?? null, portR: inst?.portR ?? null,
+                    jack: !!inst?.jack, material: madeSource ? 'generated' : null, ...insertState() },
+        chain,
+      });
+    }
+    case 'jack.rebuild': {
+      // 🔴 WHO ELSE IS ON THIS BOARD, AND WHAT THIS DOES ABOUT IT. WRITTEN
+      // DOWN BECAUSE IT IS A DECISION RATHER THAN AN IMPLEMENTATION DETAIL.
+      //
+      // The board cannot see a listener. `workers/relay` forwards every frame
+      // verbatim and never parses one, its `webSocketClose()` is empty, and a
+      // page holding a PCM stream says nothing. That is the same absence
+      // `sweepInsert()` is written around, looked for there rather than
+      // assumed. So asking permission is not available, and a verb that
+      // pretended to ask would be worse than one that does not.
+      //
+      // Three things instead, and the first two are what make the third rare.
+      // It is a DIFF: a graph that is already right runs zero commands, so the
+      // ordinary case of somebody pressing recover on a healthy board is
+      // inaudible. It KILLS NOTHING: no process is restarted under a listener,
+      // only links are patched. And when it does have to cut a link it says so
+      // out loud, with who asked and who else the board has heard from inside
+      // the same 15 s window the insert uses. An arbitration nobody
+      // can see is worse than none, which this board settled once already in
+      // `fx.pappus`.
+      //
+      // ⚠️ AND A SERVICE RESTART IS DELIBERATELY NOT A VERB HERE. A process
+      // that kills itself over the relay cannot report what happened, systemd
+      // restarts it anyway (`Restart=always`), and the recovery actually asked
+      // for is the graph. `audio.stop` then `audio.start` already rebuilds the
+      // whole chain including the capture, at the cost of about thirteen
+      // seconds of silence for everybody in the room.
+      const wantPlan = msg.plan === true || DRY;
+      const others = [...clientSeen.entries()]
+        .filter(([who, t]) => who !== msg.from && Date.now() - t < INSERT_HELD_MS)
+        .map(([who, t]) => ({ by: who, heardAgoSec: Math.round((Date.now() - t) / 1000) }));
+      // ⚠️ `ok: true, kept: true`, THE SAME REFUSAL SHAPE AS `fx.pappus`, and
+      // a caller has to read `kept`. A refusal is not an error: the board is
+      // fine, it declined on the caller's own instruction, and answering
+      // `ok: false` would read as a board that could not do it.
+      if (!wantPlan && msg.onlyIfIdle === true && others.length) {
+        return reply('jack.rebuild', {
+          ok: true, kept: true, changed: 0, steps: [], others,
+          chain: jackChain({ instrumentPort: inst?.port, instrumentPortR: inst?.portR,
+                             insert: fxOn, source: !!madeSource }),
+          reason: `${others.length} other client${others.length === 1 ? '' : 's'} heard from inside ${INSERT_HELD_MS / 1000} s`
+                + '. Send jack.rebuild without onlyIfIdle to do it anyway',
+        });
+      }
+      const r = jackRebuild({ instrumentPort: inst?.port, instrumentPortR: inst?.portR,
+                              insert: fxOn, source: !!madeSource, plan: wantPlan,
+                              onLog: (l) => log('jack:', l) });
+      // The journal is the one record that survives a board nobody can reach.
+      // Say what was asked, by whom, how many links moved and who else was in
+      // the room, in one line, so a person reading `journalctl` afterwards can
+      // attribute an interruption somebody reported by ear.
+      log(`jack.rebuild${wantPlan ? ' (plan)' : ''} by ${msg.from ?? 'nobody'}: `
+        + `${r.changed} link${r.changed === 1 ? '' : 's'} moved, ${others.length} other client(s) in the room`
+        + `${r.reason ? `. ${r.reason}` : ''}`);
+      return reply('jack.rebuild', { ...r, others, dry: DRY });
+    }
     default: return false;      // another client's traffic; the relay is verbatim
   }
 }

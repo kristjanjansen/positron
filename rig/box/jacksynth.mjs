@@ -48,6 +48,24 @@ const sh = (cmd) => { try { return execSync(cmd, { encoding: 'utf8', stdio: ['ig
 const have = (bin) => { try { execFileSync('which', [bin], { stdio: 'pipe' }); return true; } catch { return false; } };
 
 /**
+ * The ports of this board's audio path, named ONCE.
+ *
+ * They were typed in three places: `startJackSynth` wired `posbox:input_1` as a
+ * literal, `pappusFx` declared its own copies, and `sourceFeed` a third pair. A
+ * port name typed twice is a report and a re-patch that can describe different
+ * graphs, which is exactly the failure `jackGraph()` below exists to catch, so
+ * the report and the wiring now read the same five strings.
+ *
+ * `posbox` is the ffmpeg capture's JACK client name: the frames a page HEARS
+ * are whatever is summed into `posbox:input_1`, so that port is the end of the
+ * chain and the one thing every question here is really about.
+ */
+const CAP_CLIENT = 'posbox';
+const CAP = `${CAP_CLIENT}:input_1`;
+const SCIN = 'SuperCollider:in_1', SCIN2 = 'SuperCollider:in_2';
+const SCOUT = 'SuperCollider:out_1', SCOUT2 = 'SuperCollider:out_2';
+
+/**
  * The instruments this module knows how to raise.
  *
  * 🔴 ONE INSTRUMENT, SINCE 2026-09-16. FluidSynth and hexter stood here and are
@@ -160,9 +178,6 @@ export function pappusAvailable() {
 }
 
 export async function pappusFx(on, { instrumentPort, instrumentPortR, onLog } = {}) {
-  const CAP = 'posbox:input_1';
-  const SCIN = 'SuperCollider:in_1', SCIN2 = 'SuperCollider:in_2';
-  const SCOUT = 'SuperCollider:out_1', SCOUT2 = 'SuperCollider:out_2';
   if (!on) {
     if (instrumentPort) {
       sh(`jack_disconnect "${instrumentPort}" ${SCIN} 2>/dev/null`);
@@ -256,7 +271,6 @@ export async function pappusFx(on, { instrumentPort, instrumentPortR, onLog } = 
  * where it is, and `pappusFx` still owns the other end of the insert.
  */
 export function sourceFeed(on, { instrumentPort, instrumentPortR, onLog } = {}) {
-  const SCIN = 'SuperCollider:in_1', SCIN2 = 'SuperCollider:in_2';
   if (!instrumentPort) return { ok: true, instrument: null, fed: false };
   // `on` here means "the generated source is the material", so the INSTRUMENT
   // is disconnected. Named for what is being asked for rather than for what is
@@ -324,6 +338,248 @@ export function stopPappus() {
 export function jackSynthAvailable(name) {
   const d = JACK_SYNTHS[name];
   return !!d && d.needs.every(have);
+}
+
+// ── looking at the graph, and putting it back ────────────────────────────────
+//
+// 🔴 NOTHING ON THIS BOARD EVER REPORTED THE JACK AUDIO GRAPH, AND THAT IS
+// WHERE ITS LEVEL FAULTS LIVE. `ports.get` answers with the ALSA SEQUENCER,
+// which is MIDI, so the audio path was visible only over ssh. The board dials
+// OUT to the relay and answers verbs from any network; `ssh positron@…` needs
+// the studio LAN. So on 2026-09-17 the output peak fell from 0.0445 to 0.0010,
+// about 40x, with the page, the MIDI level and the instrument each ruled out by
+// measurement, and the one remaining suspect was the one thing nobody outside
+// the building could look at.
+//
+// ⚠️ THE REPORT COMES FIRST AND IT CHANGES NOTHING. `jackGraph` and `jackChain`
+// only read. `jackRebuild` is the only thing here that writes, and it writes
+// the DIFF rather than re-running a sequence of commands: see its own comment
+// for why that is what makes it safe to send at a board somebody else is
+// listening to.
+// ⚠️ NONE OF IT HAS RUN ON THE BOARD. Written 2026-09-18 from a laptop that
+// cannot reach it, against `jack_lsp -c` output as this file's existing code
+// already parses it. The parse is graded by `node rig/box/test.mjs`, on
+// captured text rather than on a server.
+
+/**
+ * `jack_lsp -c` as structure: a port on its own line, each of its connections
+ * indented under it.
+ *
+ * ⚠️ EXPORTED SO IT CAN BE GRADED WITHOUT A BOARD. It is the only part of this
+ * section that is pure, the indentation is the whole of the format, and a
+ * parser that silently drops a line would report a healthy graph about a broken
+ * one, which is the exact shape of failure this board keeps producing.
+ * `fixtures/jack-lsp-c.txt` and `node rig/box/test.mjs` grade it.
+ *
+ * A connection list is SYMMETRIC: both ends name each other. So a SINK's entry
+ * is the list of everything feeding it, which is the question every answer
+ * below is built out of.
+ */
+export function parseJackLsp(text) {
+  const rows = [];
+  for (const line of String(text).split('\n')) {
+    if (!line.trim()) continue;
+    // An indented line belongs to the port above it. A leading-space line with
+    // no port above it is malformed output rather than a connection, so it is
+    // dropped rather than given an invented parent.
+    if (/^\s/.test(line)) rows.at(-1)?.connected.push(line.trim());
+    else rows.push({ port: line.trim(), connected: [] });
+  }
+  return rows;
+}
+
+/** `jack_lsp -c` and what can be read beside it, as an object. */
+export function jackGraph() {
+  if (!have('jack_lsp')) {
+    return { ok: false, server: 'unknown', reason: 'jack_lsp is not installed on this board',
+             ports: [], graph: [], procs: null, jackd: null };
+  }
+  const graph = parseJackLsp(sh('jack_lsp -c 2>/dev/null'));
+  // An empty listing means NO SERVER rather than no ports, and that is this
+  // file's own established reading: `startJackSynth` decides whether to raise
+  // jackd on exactly this test, and its comment says why it asks JACK rather
+  // than the process table.
+  const server = graph.length ? 'up' : 'down';
+
+  /**
+   * How many of each, so a graph that looks right can still be shown to be the
+   * wrong one. Two yoshimis and the capture is patched to whichever registered
+   * its port first; a scsynth that outlived a service restart keeps its ports
+   * and answers nobody. `sweepOrphans()` in box.mjs exists for that and runs
+   * only at startup, so a board that has been up for a week has never swept.
+   *
+   * ⚠️ `pgrep -cx`, NEVER `-f`. CLAUDE.md, and it cost twenty minutes twice:
+   * `pgrep -f <pattern>` matches the asking command's own line and answers
+   * about itself.
+   */
+  const procs = {};
+  for (const n of ['jackd', 'yoshimi', 'sclang', 'scsynth', 'ffmpeg']) {
+    const c = sh(`pgrep -cx ${n} 2>/dev/null`).trim();
+    procs[n] = c === '' ? 0 : Number(c) || 0;
+  }
+  // ⚠️ `-a` ADDS THE COMMAND LINE; THE MATCH IS STILL `-x`, on the name. Worth
+  // having because the rate and the period the server was started with are in
+  // it, and everything downstream assumes them: the capture asks ffmpeg for
+  // `-ar 48000` whatever jackd is actually running at.
+  // ⚠️ DECLARED, NOT MEASURED. This is what jackd was ASKED for on its command
+  // line, which is not necessarily what it settled on, and a server somebody
+  // else started is in this string too. Anything wanting the truth has to ask
+  // the server.
+  const jackd = sh('pgrep -ax jackd 2>/dev/null').split('\n')[0]?.trim() || null;
+  const rateArgs = jackd ? [...jackd.matchAll(/-r\s+(\d+)/g)].map((m) => Number(m[1])) : [];
+  return {
+    ok: server === 'up',
+    server,
+    ports: graph.map((p) => p.port),
+    graph,
+    procs,
+    jackd,
+    declaredRate: rateArgs.at(-1) ?? null,
+    declaredPeriod: jackd ? Number(jackd.match(/-p\s+(\d+)/)?.[1]) || null : null,
+    ...(server === 'down' ? { reason: 'jack_lsp lists no ports at all, so there is no server to look at' } : {}),
+  };
+}
+
+/**
+ * What the graph SHOULD be for the thing that is playing, and what it is.
+ *
+ * 🔴 THE WIRING WRITTEN AS A FACT, ONCE, RATHER THAN AS TWO SEQUENCES OF
+ * COMMANDS. `startJackSynth` step 4 and `pappusFx` each build this chain by
+ * running connects in an order; neither can answer "is it still like that?"
+ * afterwards, and until now nothing could. The edge list below is the same
+ * wiring stated as what must be true, so the report and the repair share one
+ * description and a third copy cannot drift.
+ *
+ * The scope is deliberately narrow: the edges into the two SINKS this board's
+ * audio path has, the capture and the granulator's inputs. `system:playback_*`,
+ * a monitor, anything a person patched by hand elsewhere on the graph, are none
+ * of this function's business and are neither reported as wrong nor touched.
+ */
+export function jackChain({ instrumentPort, instrumentPortR, insert = false, source = false, graph = null } = {}) {
+  const g = graph ?? jackGraph();
+  const rows = g.graph ?? [];
+  const sourcesOf = (port) => rows.find((p) => p.port === port)?.connected ?? [];
+  const present = (port) => rows.some((p) => p.port === port);
+
+  const want = [];
+  if (instrumentPort) {
+    if (!insert) {
+      // Both channels into one input, which SUMS in JACK. That is deliberate
+      // and measured: mono-left read a note at 1661 Hz where mono-sum read
+      // 2029 Hz, an apparent 0.29-octave difference that was the wiring.
+      want.push([instrumentPort, CAP]);
+      if (instrumentPortR) want.push([instrumentPortR, CAP]);
+    } else {
+      // ⚠️ WITH GENERATED MATERIAL THE INSTRUMENT IS DELIBERATELY UNPLUGGED,
+      // so a rebuild must not put it back. scsynth fills its input bus from
+      // JACK at the top of every block, so an instrument still patched to
+      // `SuperCollider:in_1` is SUMMED with `PosSource`'s output and the
+      // granulator chews a third material neither end can describe. That is
+      // what `sourceFeed` exists to prevent.
+      if (!source) {
+        want.push([instrumentPort, SCIN]);
+        if (instrumentPortR) want.push([instrumentPortR, SCIN2]);
+      }
+      want.push([SCOUT, CAP], [SCOUT2, CAP]);
+    }
+  }
+  const has = ([from, to]) => sourcesOf(to).includes(from);
+  const missing = want.filter((e) => !has(e));
+
+  // Anything ELSE feeding those sinks. This is the half that re-running the
+  // connect commands can never find: a link that should not be there sums into
+  // the capture, and nothing downstream can tell it from the instrument. The
+  // granulator's inputs are swept whenever its ports exist at all, insert on or
+  // off, because `pappusFx(false)` disconnects them for the same reason.
+  const sinks = [CAP, ...(present(SCIN) ? [SCIN, SCIN2] : [])];
+  const extra = [];
+  for (const sink of sinks) {
+    for (const src of sourcesOf(sink)) {
+      if (!want.some(([f, t]) => f === src && t === sink)) extra.push([src, sink]);
+    }
+  }
+  return {
+    want, missing, extra,
+    intact: !!instrumentPort && missing.length === 0 && extra.length === 0,
+    // Named separately because they are three different faults with three
+    // different repairs, and a caller reading one boolean cannot tell them
+    // apart: no instrument at all, a capture that has gone, a graph that drifted.
+    capture: { port: CAP, present: present(CAP), sources: sourcesOf(CAP) },
+    insert: { port: SCIN, present: present(SCIN), on: !!insert,
+              sources: sourcesOf(SCIN), out: sourcesOf(CAP).filter((s) => s.startsWith('SuperCollider:')) },
+    instrumentPort: instrumentPort ?? null,
+    instrumentPortR: instrumentPortR ?? null,
+    material: source ? 'generated' : null,
+  };
+}
+
+/**
+ * Put the graph back, and nothing else.
+ *
+ * 🔴 IT IS A DIFF, NOT A TEARDOWN, AND THAT IS THE WHOLE SAFETY ARGUMENT. This
+ * board has ONE jackd, ONE capture and ONE room, and the relay forwards
+ * verbatim, so a recovery verb is heard by whoever is listening in another
+ * building. A graph that is already right therefore runs ZERO commands and
+ * nobody hears anything; the only thing this can ever cut is a link that should
+ * not be there, and the only thing it can ever add is a link that should.
+ *
+ * ⚠️ IT KILLS NOTHING. No `pkill`, no restart of jackd, yoshimi or sclang, and
+ * no service restart. Every step is one `jack_connect` or `jack_disconnect`,
+ * which this file already relies on being instant: bypassing the insert under a
+ * playing instrument is the same operation and is a re-patch rather than a
+ * rebuild of anything. An instrument picker was removed from this board for
+ * being a control that took the sound away from somebody else, and a verb that
+ * killed a process to recover a patchbay would be that control wearing a
+ * recovery label.
+ *
+ * ⚠️ DISCONNECT FIRST, THEN CONNECT, WHICH IS THE ORDER `pappusFx` ALREADY
+ * USES. It costs a gap of a few milliseconds in the capture where a wrong
+ * source is removed before the right one lands, and the alternative is a moment
+ * with both live, which is the louder wrong and is the shape of the mono-sum
+ * bug this file has already paid for once.
+ *
+ * ⚠️ `plan: true` RUNS NOTHING and returns the same steps. Every verb that
+ * changes this rig has a twin that changes nothing (`patch.plan` against
+ * `patch.apply`), because a wrong patch is SILENT and a plan is not.
+ */
+export function jackRebuild({ instrumentPort, instrumentPortR, insert = false, source = false,
+                              plan = false, graph = null, onLog } = {}) {
+  const at = { instrumentPort, instrumentPortR, insert, source };
+  // ⚠️ `graph` IS FOR THE PLAN PATH AND FOR THE TESTS. The APPLIED path reads
+  // the graph back itself below, because the whole value of `after` is that it
+  // was measured after the commands ran rather than predicted before them.
+  const before = jackChain({ ...at, graph });
+  if (!instrumentPort) {
+    return { ok: false, plan, changed: 0, steps: [], before, after: before,
+             reason: 'nothing is playing on the JACK graph, so there is no chain to rebuild. Send audio.start first' };
+  }
+  if (!before.capture.present) {
+    // The capture is an ffmpeg inside `startJackSynth`'s closure, so no amount
+    // of patching brings it back. Say which verbs do, rather than running a
+    // list of connects against a port that is not there and reporting failure.
+    return { ok: false, plan, changed: 0, steps: [], before, after: before,
+             reason: `${CAP} is not on the graph: the capture process is gone, and only audio.stop then audio.start raises it again` };
+  }
+  const steps = [
+    ...before.extra.map(([f, t]) => ({ act: 'disconnect', from: f, to: t, cmd: `jack_disconnect "${f}" "${t}"` })),
+    ...before.missing.map(([f, t]) => ({ act: 'connect', from: f, to: t, cmd: `jack_connect "${f}" "${t}"` })),
+  ];
+  if (plan) {
+    onLog?.(steps.length ? `${steps.length} step${steps.length === 1 ? '' : 's'} would run, nothing did` : 'the graph is already what it should be');
+    return { ok: true, plan: true, changed: 0, steps, before, after: before };
+  }
+  for (const s of steps) {
+    // ⚠️ THE TEXT TRAVELS, NOT A BOOLEAN. `jack_connect` answers non-empty on
+    // failure AND on "already connected", and those are opposite facts that no
+    // exit status here tells apart.
+    s.said = sh(`${s.cmd} 2>&1`).trim() || null;
+    onLog?.(`${s.act} ${s.from} -> ${s.to}${s.said ? ` (${s.said})` : ''}`);
+  }
+  // 🔴 `ok` IS THE GRAPH READ BACK, NOT THE COMMANDS HAVING RUN. Printing "ok"
+  // is not evidence (CLAUDE.md); a `jack_connect` to a port that vanished
+  // between the read and the write answers on stderr and changes nothing.
+  const after = jackChain(at);
+  return { ok: after.intact, plan: false, changed: steps.length, steps, before, after };
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -460,20 +716,20 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   if (ready && def.settle) await wait(def.settle);
 
   // 3. capture — raw s16 on stdout, read straight into the frame pump
-  const cap = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'jack', '-i', 'posbox',
+  const cap = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'jack', '-i', CAP_CLIENT,
     '-f', 's16le', '-ar', String(RATE), '-ac', '1', '-'], { stdio: ['ignore', 'pipe', 'pipe'] });
   procs.push(cap);
   // Same again for the capture's own client, rather than 2.5 s of hoping.
   const t0cap = Date.now();
   while (Date.now() - t0cap < 8000) {
-    if (sh('jack_lsp 2>/dev/null').includes('posbox:input_1')) break;
+    if (sh('jack_lsp 2>/dev/null').includes(CAP)) break;
     await wait(200);
   }
 
   // 4. wire the instrument's output into the capture client
   const port = sh('jack_lsp').split('\n').find((p) => def.portMatch.test(p));
   if (!port) { procs.forEach((p) => p.kill()); return { ok: false, reason: `${name} registered no JACK port`, log: log.slice(-300) }; }
-  sh(`jack_connect "${port}" posbox:input_1`);
+  sh(`jack_connect "${port}" ${CAP}`);
   // ⚠️ AND THE RIGHT CHANNEL, WHICH WAS GOING NOWHERE. `portMatch` finds ONE
   // port, and for a stereo instrument that is the left one — so the capture was
   // mono-LEFT rather than mono-SUM and everything panned right was silently
@@ -484,7 +740,7 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   let portR = null;
   if (def.portMatch2) {
     portR = sh('jack_lsp').split('\n').find((p) => def.portMatch2.test(p));
-    if (portR) sh(`jack_connect "${portR}" posbox:input_1`);
+    if (portR) sh(`jack_connect "${portR}" ${CAP}`);
     else onLog?.(`${name}: no right channel found — the capture is one channel of a stereo source`);
   }
 

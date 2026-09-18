@@ -107,12 +107,18 @@ echo "== what landed, against what was sent"
 # line is not evidence that a copy happened (CLAUDE.md).
 # ⚠️ THE ENGINE'S md5 IS THE ONE FROM THE EXTENSIONS PATH, not from $DEST — see
 # the block above. Printing $DEST's copy is printing a file nothing reads.
-ssh "$USER_@$IP" "md5sum $DEST/rig/box/box.mjs $DEST/rig/box/pappus.mjs \
+# ⚠️ `jacksynth.mjs` IS IN THIS LIST SINCE 2026-09-18 AND WAS NOT BEFORE. It
+# holds the JACK graph: the chain, the insert's patching, the `jack.graph`
+# report and the `jack.rebuild` repair. A deploy that landed
+# box.mjs and not this one would answer the new verbs with `ReferenceError` on
+# a board nobody can ssh to. An md5 that covers one of two changed files is a
+# confirmation that can be true while the deploy is broken.
+ssh "$USER_@$IP" "md5sum $DEST/rig/box/box.mjs $DEST/rig/box/jacksynth.mjs $DEST/rig/box/pappus.mjs \
   $DEST/rig/box/norns/run-pappus.scd \
   $SC_EXT/pappus/lib/Engine_Pappus.sc $SC_EXT/pappus/lib/PosSource.sc 2>/dev/null"
-md5sum "$SRC/box.mjs" "$SRC/pappus.mjs" "$SRC/norns/run-pappus.scd" \
+md5sum "$SRC/box.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/norns/run-pappus.scd" \
   "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc" 2>/dev/null \
-  || md5 -r "$SRC/box.mjs" "$SRC/pappus.mjs" "$SRC/norns/run-pappus.scd" \
+  || md5 -r "$SRC/box.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/norns/run-pappus.scd" \
      "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc"
 
 if [ "$RESTART" = 1 ]; then
