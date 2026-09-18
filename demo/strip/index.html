@@ -22,6 +22,10 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { zoomCeilingPps, ulpMs, DATE_WALL_MS, tickLOD } from '/timeline/strip.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
+  // Every check below reads the frame that is already on screen except one,
+  // which has to zoom to two other spans to make its comparison. That one takes
+  // the view away from whoever set it, so it waits for a harness.
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const YEAR = 365.2425 * 24 * 3600 * 1000;
   const SPAN = 2000 * YEAR;                 // two millennia, so the ladder has work to do
@@ -267,7 +271,14 @@
     // are the same picture, so a glyph feature that had stopped working would
     // read as a crowded view. Zoom in far enough and more characters appear;
     // zoom out and they go again. Neither end alone can say that.
-    {
+    //
+    // 🔴 WHICH IS ALSO WHY IT IS THE ONE BEHIND THE GATE. It is the only check
+    // on this page that cannot be made from the frame already drawn: it fits
+    // the whole two millennia, then the last century, then puts back what was
+    // there. Saved and restored inside one task, so nothing paints in between,
+    // and that is a promise about today's renderer rather than a property of
+    // the check. Zooming is what a reader is doing on this page.
+    if (SELFCHECK) {
       const saved = strip.view();
       const glyphs = () => {
         strip.draw();

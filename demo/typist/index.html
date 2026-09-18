@@ -168,6 +168,13 @@
     makeTextOpAdapter, deriveOp, selectOp, foldOps, toJsonl, fromJsonl,
     OP_INSERT, OP_DELETE, OP_SELECT,
   } from '/shell/text-adapter.mjs';
+  // 🔴 `check()` RUNS AT LOAD, BEFORE THE PAGE IS HANDED OVER EMPTY, SO ITS
+  // COSTLY HALF WAS RUNNING FOR EVERY VISITOR. Two of its checks drive the page
+  // rather than read it: one zooms the strip to two other spans, the other
+  // drags the playhead to three moments and reads the box back at each. The
+  // rest are arithmetic over a recording that is already in the file and cost
+  // nobody anything.
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const KIND = 'text-op';
   const RATES = [0.25, 0.5, 1, 2, 4];
@@ -830,7 +837,7 @@
     // its room used to leave a bare tick, and now it leaves a faded dot, so a
     // mark that went missing altogether would show up here as a shortfall
     // rather than as a tidier picture.
-    {
+    if (SELFCHECK) {
       const st = view.strip;
       const saved = st.view();
       const at = (pxPerSecond) => {
@@ -918,22 +925,28 @@
 
     // Drag to three quiet places and read the BOX back — the browser's own
     // value and selection, not ours.
-    const probes = quietProbes(3);
-    let restored = 0;
-    const seen = [];
-    for (const pos of probes) {
-      deck.seek(pos);
+    // 🔴 THIS ONE DRAGS FOR YOU, WHICH IS THE THING A VISITOR CAME TO DO. It
+    // seeks three times and waits two frames after each, so the playhead walks
+    // and the text box rewrites itself three times in front of somebody who has
+    // pressed nothing, on a page whose whole subject is that dragging works.
+    if (SELFCHECK) {
+      const probes = quietProbes(3);
+      let restored = 0;
+      const seen = [];
+      for (const pos of probes) {
+        deck.seek(pos);
+        await nextFrame();
+        const want = deck.reduceAt(KIND, pos);
+        const got = { text: keys.value, selection: [keys.selectionStart, keys.selectionEnd] };
+        seen.push(`${(pos / 1000).toFixed(2)}s ${got.text.length}ch [${got.selection}]`);
+        if (same(want, got)) restored++;
+      }
+      d.assert('drag to any moment and the box holds that moment, cursor included',
+        probes.length === 3 && restored === 3,
+        `${restored} of ${probes.length} · ${seen.join(' · ')}`);
+      deck.seek(0);
       await nextFrame();
-      const want = deck.reduceAt(KIND, pos);
-      const got = { text: keys.value, selection: [keys.selectionStart, keys.selectionEnd] };
-      seen.push(`${(pos / 1000).toFixed(2)}s ${got.text.length}ch [${got.selection}]`);
-      if (same(want, got)) restored++;
     }
-    d.assert('drag to any moment and the box holds that moment, cursor included',
-      probes.length === 3 && restored === 3,
-      `${restored} of ${probes.length} · ${seen.join(' · ')}`);
-    deck.seek(0);
-    await nextFrame();
 
     // ── against the browser's own text ────────────────────────────────────
     const truth = header && header.truth;

@@ -21,6 +21,12 @@
   import { mediaMaster } from '/timeline/media-master.mjs';
   import { CHANNELS, NATIVE_HLS, readPlaylist, probeSegment, wallHandler, clockOf }
     from '/shell/err-live.mjs';
+  // 🔴 THIS PAGE IS POINTED AT A PUBLIC BROADCASTER, SO THE GATE IS NOT ABOUT
+  // TIDINESS. Every connection opened here lands in ERR's listener statistics,
+  // and the drill below opens thirty of them in two-byte range asks plus a
+  // ten-minute back-seek that pulls a whole other stretch of the window off
+  // their servers. A visitor gets the live edge and nothing else.
+  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
 
   const CHANNEL = CHANNELS[0];                 // ETV. One channel: see below.
   const REACH_MS = 120 * 60 * 1000;            // what ERR advertises; measured below
@@ -38,8 +44,7 @@
       + 'costs to reach you. ERR keeps roughly the last two hours, so press anywhere '
       + 'on the line to watch from that moment instead, and LIVE returns to the edge. '
       + 'The margin of the live row says how far behind the picture is, how much of '
-      + 'the window you have watched, and whether ERR refused any of the instants the '
-      + 'page asked for; the grey row under it is what ERR says was on.',
+      + 'the window you have watched; the grey row under it is what ERR says was on.',
     // NO READOUT. Four cells above the picture repeated what the rows already
     // say and put the page's headline number — how far behind the picture is —
     // as far from the line that draws it as the layout allows. The distance is in
@@ -342,24 +347,32 @@
     await toLive();
     await waitForCatchUp();
     await sampleMovement();     // both ends move, and the playhead tracks the picture
-    await pauseTest();          // a paused picture stops the line, not the present
-    await sweep();
-    // WALK THE WINDOW ONCE, on purpose and in the open. This is the thing the
-    // page is about — that the last two hours are still there — and with no
-    // control to press it has to be shown rather than offered. It also leaves
-    // the picture row with two stretches and a GAP between them, which is that
-    // row's whole subject: a gap is where a seek skipped.
-    backTest(10 * 60 * 1000);
-    // WAIT FOR THE JUMP BEFORE RETURNING. hls.js keeps reporting the old
-    // instant until fragments for the new one arrive, so going back to live
-    // 900 ms later erased the 600 s error before the master had seen it — the
-    // seek worked, the assert about it could not, and the page reported
-    // "0 jumps since the seek" about a jump it had just made.
-    await waitForCatchUp();
-    await toLive();
-    await liveTest();
-    d.log('walked back into the window and returned. The break in the top row is where that seek skipped');
-    openView(deck.position());
+    // 🔴 THE WALK IS A CHECK, AND IT USED TO RUN FOR EVERY LISTENER. It reads
+    // as the page demonstrating itself, which is exactly the argument
+    // `/videoradio/` lost: a check that does what the page does is still a
+    // check, and this one pauses the picture, asks ERR for thirty instants it
+    // was never going to play, and yanks the view ten minutes back and forward
+    // again about twenty seconds into a visit. Under a harness it is the whole
+    // subject; for a person the line, the schedule and the live edge already
+    // are.
+    await ifSelfcheck(async () => {
+      await pauseTest();          // a paused picture stops the line, not the present
+      await sweep();
+      // WALK THE WINDOW ONCE. It leaves the picture row with two stretches and
+      // a GAP between them, which is that row's whole subject: a gap is where a
+      // seek skipped.
+      backTest(10 * 60 * 1000);
+      // WAIT FOR THE JUMP BEFORE RETURNING. hls.js keeps reporting the old
+      // instant until fragments for the new one arrive, so going back to live
+      // 900 ms later erased the 600 s error before the master had seen it — the
+      // seek worked, the assert about it could not, and the page reported
+      // "0 jumps since the seek" about a jump it had just made.
+      await waitForCatchUp();
+      await toLive();
+      await liveTest();
+      d.log('walked back into the window and returned. The break in the top row is where that seek skipped');
+      openView(deck.position());
+    }, { log: d.log, say: 'press anywhere on the line to walk back into the window' });
     checks();
   }
 
@@ -653,29 +666,36 @@
     d.assert('the playhead advances with the picture',
       advance.moved > 1000 && advance.moved < 2500 && (master?.stats().syncs ?? 0) > 0,
       `${advance.moved} ms over ${advance.wall} ms, ${master?.stats().syncs ?? 0} syncs`);
-    d.assert('every probed instant was inside the playlist just read',
-      probes.length > 0 && probes.every((p) => p.fromPlaylist),
-      `${probes.length} points, all from the playlist just read`);
-    d.assert('the probe stayed under its own cap',
-      probesIssued <= PROBE_CAP, `${probesIssued} of ${PROBE_CAP}`);
-    d.assert('pausing the picture stops the line and not the present',
-      evid.paused === true && evid.wallKeptGoing === true,
-      `deck paused ${evid.paused}, present still moving ${evid.wallKeptGoing}`);
-    d.assert('a back-seek is expressed as an instant inside the window',
-      evid.asked != null && evid.asked >= deck.range[0] && evid.asked <= deck.range[1]
-        && Math.abs((evid.landed ?? 0) - evid.asked) < 1500,
-      evid.asked ? `asked ${new Date(evid.asked).toTimeString().slice(0, 8)}, clock read ${new Date(evid.landed).toTimeString().slice(0, 8)}` : 'not asked');
-    d.assert('a back-seek moves the line at once, not by drifting',
-      evid.lineAt != null && evid.asked != null && Math.abs(evid.lineAt - evid.asked) < 1500,
-      evid.lineAt == null ? 'no line reading'
-        : `${Math.round(evid.lineAt - evid.asked)} ms from what was asked, read synchronously`);
-    d.assert('a frame from the asked-for instant was actually shown',
-      evid.caughtUp != null && evid.caughtUp < 4000,
-      evid.caughtUp == null ? 'no frame from there within 4.5 s'
-        : `${evid.caughtUp} ms from the request to a frame carrying that timestamp`);
-    d.assert('returning to live restores the gap',
-      evid.behindAfterLive != null && evid.behindAfterLive < 30000,
-      `${((evid.behindAfterLive ?? 0) / 1000).toFixed(1)} s behind`);
+    // 🔴 THESE SEVEN GO WITH THE DRILL, AND THAT PAIRING IS THE RULE RATHER
+    // THAN A CONVENIENCE. Their evidence comes from the pause, the sweep and
+    // the back-seek above; left ungated they would read `evid.asked == null`
+    // and write seven red FAIL lines into a visitor's log about checks that
+    // were deliberately not run, which is worse than saying nothing.
+    if (SELFCHECK) {
+      d.assert('every probed instant was inside the playlist just read',
+        probes.length > 0 && probes.every((p) => p.fromPlaylist),
+        `${probes.length} points, all from the playlist just read`);
+      d.assert('the probe stayed under its own cap',
+        probesIssued <= PROBE_CAP, `${probesIssued} of ${PROBE_CAP}`);
+      d.assert('pausing the picture stops the line and not the present',
+        evid.paused === true && evid.wallKeptGoing === true,
+        `deck paused ${evid.paused}, present still moving ${evid.wallKeptGoing}`);
+      d.assert('a back-seek is expressed as an instant inside the window',
+        evid.asked != null && evid.asked >= deck.range[0] && evid.asked <= deck.range[1]
+          && Math.abs((evid.landed ?? 0) - evid.asked) < 1500,
+        evid.asked ? `asked ${new Date(evid.asked).toTimeString().slice(0, 8)}, clock read ${new Date(evid.landed).toTimeString().slice(0, 8)}` : 'not asked');
+      d.assert('a back-seek moves the line at once, not by drifting',
+        evid.lineAt != null && evid.asked != null && Math.abs(evid.lineAt - evid.asked) < 1500,
+        evid.lineAt == null ? 'no line reading'
+          : `${Math.round(evid.lineAt - evid.asked)} ms from what was asked, read synchronously`);
+      d.assert('a frame from the asked-for instant was actually shown',
+        evid.caughtUp != null && evid.caughtUp < 4000,
+        evid.caughtUp == null ? 'no frame from there within 4.5 s'
+          : `${evid.caughtUp} ms from the request to a frame carrying that timestamp`);
+      d.assert('returning to live restores the gap',
+        evid.behindAfterLive != null && evid.behindAfterLive < 30000,
+        `${((evid.behindAfterLive ?? 0) / 1000).toFixed(1)} s behind`);
+    }
     d.assert('the programme spans are contiguous and named',
       programmes.length > 0 && programmes.every((p, i) =>
         p.name && (i === 0 || programmes[i - 1].end === p.at)),

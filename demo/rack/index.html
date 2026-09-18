@@ -11,6 +11,10 @@
   import { mount, guard } from '/shell/shell.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createMidi } from '/shell/midi.mjs';
+  // The drill behind the button below holds two notes down on a studio Mac in
+  // another building for 2.2 seconds. A hidden button kept that away from a
+  // visitor by accident of layout; this keeps it away by construction.
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
 
   // The studio Mac's room. `/keys/` is this same page pointed at a Raspberry Pi —
   // which is the argument: what crosses the relay is a note NUMBER, so neither
@@ -240,44 +244,51 @@
     await startAudio();
     started = true;
     d.log('listening · press a key');
-    const before = frames;
-    send({ type: 'note.on', note: 60, vel: 110 });
-    send({ type: 'note.on', note: 64, vel: 100 });
-    await new Promise((r) => setTimeout(r, 2200));
-    const during = frames - before;
-    send({ type: 'note.off', note: 60 }); send({ type: 'note.off', note: 64 });
+    // 🔴 EVERYTHING BELOW SOUNDS A THIRD NOBODY ASKED FOR, IN A ROOM SOMEBODY
+    // ELSE MAY BE SITTING IN. The button is hidden from a visitor and `?checks=1`
+    // brings it back, so a person debugging this page used to get the drill as
+    // well as the connection; now they get the connection, and `?checks=1&selfcheck=1`
+    // gets both.
+    await ifSelfcheck(async () => {
+      const before = frames;
+      send({ type: 'note.on', note: 60, vel: 110 });
+      send({ type: 'note.on', note: 64, vel: 100 });
+      await new Promise((r) => setTimeout(r, 2200));
+      const during = frames - before;
+      send({ type: 'note.off', note: 60 }); send({ type: 'note.off', note: 64 });
 
-    d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
-    // Both branches, because a studio Mac that is off is the ordinary case and a
-    // page that only asserts the happy path has no coverage on those days.
-    // Both branches, and BOTH now read state rather than paint — the sentence
-    // this used to inspect was duplicating the paragraph above it and is gone.
-    d.assert('it says whether anything is at the far end', answered ? namedItself : d.logs.length > 0,
-      answered ? `${instrument} named itself` : 'nothing is answering, and the log says so');
-    if (answered) {
-      d.assert('an instrument named itself', !!instrument, String(instrument));
-      // Both halves: that it was TOLD, and that the telling survived a check.
-      d.assert('it was told how many channels, not left to guess', !!told?.audioChannels,
-        `announced ${told?.audioChannels} at ${told?.frameMs} ms a frame`);
-      // Three things the far end ANNOUNCES and this page CHECKS rather than
-      // trusts: how many channels, how long a frame is, and what rate it is at.
-      d.assert('the sample rate it sends is the one this page plays at',
-        !!told?.rate && told.rate === RATE && ctx?.sampleRate === RATE,
-        `sent ${told?.rate} Hz · context ${ctx?.sampleRate} Hz`);
-      d.assert('the frame length agrees with the channel count', chChecked && !chCorrected,
-        chCorrected ? `it said ${claim}, the frames say ${chIn} · playing ${chIn}`
-                    : `${chIn === 2 ? 'stereo' : 'mono'} checks out against ${told?.frameMs} ms`);
-      d.assert('sound came back while keys were held', during > 20, `${during} frames of audio in 2.2 s`);
-      d.assert('the relay dropped none of it', missing === 0, `${missing} missing of ${frames}`);
-      d.assert('this page makes no sound of its own', !!ctx && !!playout, 'every sample arrived over the socket');
-      // 🔴 THE ONE THE STREAM CANNOT ANSWER. The samples measured bit-clean off
-      // the relay while the page still sounded wrong, so the only place left
-      // for a click to come from is this cushion running dry or being trimmed.
-      d.assert('the cushion neither starved nor overflowed', breaks === 0,
-        breaks > 0 ? `${starved} ran dry, ${trimmed} trimmed, cushion now ${Math.round(bufMs)} ms` : 'no breaks');
-    } else {
-      d.assert('silence is reported as silence', !frames, `${frames} frames`);
-    }
+      d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
+      // Both branches, because a studio Mac that is off is the ordinary case and a
+      // page that only asserts the happy path has no coverage on those days.
+      // Both branches, and BOTH now read state rather than paint — the sentence
+      // this used to inspect was duplicating the paragraph above it and is gone.
+      d.assert('it says whether anything is at the far end', answered ? namedItself : d.logs.length > 0,
+        answered ? `${instrument} named itself` : 'nothing is answering, and the log says so');
+      if (answered) {
+        d.assert('an instrument named itself', !!instrument, String(instrument));
+        // Both halves: that it was TOLD, and that the telling survived a check.
+        d.assert('it was told how many channels, not left to guess', !!told?.audioChannels,
+          `announced ${told?.audioChannels} at ${told?.frameMs} ms a frame`);
+        // Three things the far end ANNOUNCES and this page CHECKS rather than
+        // trusts: how many channels, how long a frame is, and what rate it is at.
+        d.assert('the sample rate it sends is the one this page plays at',
+          !!told?.rate && told.rate === RATE && ctx?.sampleRate === RATE,
+          `sent ${told?.rate} Hz · context ${ctx?.sampleRate} Hz`);
+        d.assert('the frame length agrees with the channel count', chChecked && !chCorrected,
+          chCorrected ? `it said ${claim}, the frames say ${chIn} · playing ${chIn}`
+                      : `${chIn === 2 ? 'stereo' : 'mono'} checks out against ${told?.frameMs} ms`);
+        d.assert('sound came back while keys were held', during > 20, `${during} frames of audio in 2.2 s`);
+        d.assert('the relay dropped none of it', missing === 0, `${missing} missing of ${frames}`);
+        d.assert('this page makes no sound of its own', !!ctx && !!playout, 'every sample arrived over the socket');
+        // 🔴 THE ONE THE STREAM CANNOT ANSWER. The samples measured bit-clean off
+        // the relay while the page still sounded wrong, so the only place left
+        // for a click to come from is this cushion running dry or being trimmed.
+        d.assert('the cushion neither starved nor overflowed', breaks === 0,
+          breaks > 0 ? `${starved} ran dry, ${trimmed} trimmed, cushion now ${Math.round(bufMs)} ms` : 'no breaks');
+      } else {
+        d.assert('silence is reported as silence', !frames, `${frames} frames`);
+      }
+    }, { log: d.log, say: 'connected · press a key to hear the far end' });
   });
 
   connect();
