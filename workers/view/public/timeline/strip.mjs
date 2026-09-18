@@ -1045,6 +1045,9 @@ export function createStrip(canvas, deck, opts = {}) {
     // about certainty widens the net, it does not fabricate.
     certainty: opts.certainty || 'possible',
     follow: opts.follow !== false, followEdge: opts.followEdge ?? 0.82, followBack: opts.followBack ?? 0.28,
+    // WHAT follow tracks. null means the playhead, which is every page that
+    // has ever used this. See the comment over `followPos`.
+    followTarget: opts.followTarget || null,
     userScrolled: false, dragging: false, hover: null, pos: 0,
     wallAnchor: null,                 // {pos, wall} — the dual cursor's origin
     width: 0, height: 0, dpr: 1,
@@ -1229,11 +1232,33 @@ export function createStrip(canvas, deck, opts = {}) {
    *      double's resolution for every `absolute` deck we ship. Nobody had
    *      zoomed there, so nobody had seen it.
    *  Reported, never silent. */
+  /**
+   * 🔴 AND A FLOOR, WHICH DID NOT EXIST AT ALL UNTIL 2026-09-18. Everything
+   * above is about zooming IN, where a double runs out of resolution and the
+   * component has to say so. Zooming OUT was bounded at 1e-30 px/s, which is
+   * not a bound: a reader could wheel until a three second recording was a
+   * thousandth of a pixel with nothing on screen and no way back but a control
+   * they had to know about. `maxSpan` (ms) is the widest view a page will hand
+   * out, and it is reported on `S.zoom.by` the same way the ceiling is, because
+   * a limit that stops the picture without saying why reads as a broken wheel.
+   * ⚠️ IT DEFAULTS TO OFF. Thirteen pages use a strip and none of them asked
+   * for this, so an unasked-for bound would be exactly the `armWall` mistake:
+   * a default nobody wanted, arriving in seven pages at once.
+   */
+  function floorPps() {
+    const span = typeof opts.maxSpan === 'function' ? opts.maxSpan() : opts.maxSpan;
+    return Number.isFinite(span) && span > 0 ? (plotW() * 1000) / span : 0;
+  }
   function capPps(pps, tAtCursor) {
     const ceil = zoomCeilingPps(tAtCursor);
-    const capped = Math.max(1e-30, Math.min(pps, 1e7, ceil));
+    const floor = floorPps();
+    const capped = Math.max(1e-30, floor, Math.min(pps, 1e7, ceil));
     S.zoom = { pps: capped, wanted: pps, ceilingPps: ceil, ulpMs: ulpMs(tAtCursor),
-               clamped: capped < pps * (1 - 1e-12), by: capped >= 1e7 ? 'hard-cap' : capped < 1e7 && ceil <= 1e7 && capped >= ceil * (1 - 1e-12) ? 'float-resolution' : null };
+               clamped: capped < pps * (1 - 1e-12) || capped > pps * (1 + 1e-12),
+               floorPps: floor || null,
+               by: floor && capped <= floor * (1 + 1e-12) && pps < floor ? 'max-span'
+                 : capped >= 1e7 ? 'hard-cap'
+                   : capped < 1e7 && ceil <= 1e7 && capped >= ceil * (1 - 1e-12) ? 'float-resolution' : null };
     return capped;
   }
   function setView(v) {
@@ -1284,10 +1309,45 @@ export function createStrip(canvas, deck, opts = {}) {
   // is a PAGE. It stays where it is until the playhead crosses followEdge, then
   // flips once. Any user scroll/drag/zoom disengages follow entirely, and only
   // a control (setFollow(true)) re-engages it.
+  /**
+   * WHAT follow tracks, which is not always the playhead.
+   *
+   * The rule is: follow tracks THE NEWEST FACT ON THE STRIP. During playback
+   * that is the playhead, and for every page before `/stage/` there was nothing
+   * else it could be, so `S.pos` was hard-coded here and read as the whole rule.
+   * A strip watching a show being RECORDED has a newest fact and no playhead at
+   * all: nothing is playing, `deck.position()` is 0 or stale, and follow sat
+   * still while questions and answers arrived off the right edge.
+   *
+   * A page names its own target and may change it mid-run, which is what a show
+   * ending is. `wallPos()` anchored at the recorder's start IS the write head,
+   * so the usual target is `() => wallPos() ?? S.pos`: it hands back to the
+   * playhead by itself the moment the wall cursor is disarmed.
+   *
+   * A target that returns null or a non-finite number falls back to the
+   * playhead rather than parking the view at NaN, because a page whose clock
+   * has not started yet must not be a page whose strip has stopped working.
+   */
+  function followPos() {
+    if (!S.followTarget) return S.pos;
+    const t = S.followTarget();
+    return Number.isFinite(t) ? t : S.pos;
+  }
   function followTick() {
     if (!S.follow || S.userScrolled) return;
-    const px = x(S.pos), w = plotW();
+    const px = x(followPos()), w = plotW();
     if (px > w * S.followEdge || px < 0) S.view.scrollX += px - w * S.followBack;
+  }
+  /**
+   * Pass null to go back to the playhead. It re-engages nothing on its own: a
+   * reader who has dragged the strip stays dragged, because the handover at the
+   * end of a show must not yank the view out of somebody's hand.
+   */
+  function setFollowTarget(fn) {
+    S.followTarget = typeof fn === 'function' ? fn : null;
+    followTick();
+    invalidate();
+    return !!S.followTarget;
   }
   function setFollow(on) {
     S.follow = !!on;
@@ -1311,6 +1371,17 @@ export function createStrip(canvas, deck, opts = {}) {
     S.wallAnchor = { pos: posMs, wall: (typeof performance !== 'undefined' ? performance.now() : Date.now()) };
     invalidate();
     return S.wallAnchor;
+  }
+  /**
+   * The honest counterpart of `armWall`. A wall cursor left armed after the
+   * thing it was measuring has stopped counts how long ago you finished, which
+   * the comment below already calls noise on a fixture. There was no way to put
+   * it away, so a page that armed one was stuck with it.
+   */
+  function disarmWall() {
+    S.wallAnchor = null;
+    invalidate();
+    return null;
   }
   function wallPos() {
     if (!S.wallAnchor) return null;
@@ -1390,6 +1461,9 @@ export function createStrip(canvas, deck, opts = {}) {
       view: { ...S.view }, lod: tickLOD(S.view.pxPerSecond),
       pos: S.pos, wall: wallPos(), gapMs: wallPos() === null ? null : +(wallPos() - S.pos).toFixed(1),
       follow: S.follow, followEngaged: S.follow && !S.userScrolled,
+      // WHERE follow is looking, so a check can tell the two targets apart
+      // rather than inferring it from a view that moved.
+      followPos: followPos(), followsPlayhead: !S.followTarget,
       errors: S.errors.slice(),
     };
   }
@@ -2378,11 +2452,26 @@ export function createStrip(canvas, deck, opts = {}) {
 
   // -- the loop --------------------------------------------------------------
   // The strip owns no transport tick. It repaints when the deck moves or when
-  // something it drew changed — never on a timer of its own.
+  // something it drew changed, never on a timer of its own.
+  //
+  // 🔴 AN ARMED WALL IS SOMETHING IT DREW THAT CHANGED, AND THIS ASKED
+  // `deck.playing()` AS WELL UNTIL 2026-09-18. A wall cursor is a REAL TIME
+  // cursor: once armed it moves whether or not a deck is playing, so gating its
+  // repaint on the deck froze a clock on screen at a time that was no longer
+  // the time. Nobody had met it, because the three pages that arm a wall all
+  // arm it on play.
+  // ⚠️ `/stage/` IS WHERE IT BITES. It arms the wall at the RECORDER's start to
+  // follow the write head, with nothing playing at all: the deck sits at 0, so
+  // the old condition was false on every frame, the strip never redrew, and
+  // `followTick` never ran. A live show's strip would have stood still while
+  // its own rows arrived, and every part of it would have looked correct.
+  // ⚠️ THE COST IS A REPAINT A FRAME FOR AS LONG AS A WALL IS ARMED, and the
+  // way out is `disarmWall()`, which exists for this. A page whose wall has
+  // stopped meaning anything should put it away rather than keep a stale one.
   function loop() {
     if (S.disposed) return;
     const p = deck.position ? deck.position() : 0;
-    if (S.dirty || p !== S.pos || (S.wallAnchor && (deck.playing ? deck.playing() : false))) draw();
+    if (S.dirty || p !== S.pos || S.wallAnchor) draw();
     S.raf = requestAnimationFrame(loop);
   }
 
@@ -2413,7 +2502,8 @@ export function createStrip(canvas, deck, opts = {}) {
     view: () => ({ ...S.view }), setView, fit, frame, zoomAt,
     zoomIn: (f = 1.5) => zoomAt(f), zoomOut: (f = 1.5) => zoomAt(1 / f),
     setFollow, follow: () => ({ on: S.follow, engaged: S.follow && !S.userScrolled }),
-    armWall, wallPos, gapMs: () => (wallPos() === null ? null : wallPos() - S.pos),
+    setFollowTarget, followPos,
+    armWall, disarmWall, wallPos, gapMs: () => (wallPos() === null ? null : wallPos() - S.pos),
     /** E3: the strip asks the DECK. It never filters rows itself, so an
      *  evidence-only view is the deck refusing to serve, not a hidden layer. */
     setEvidence(p) {
