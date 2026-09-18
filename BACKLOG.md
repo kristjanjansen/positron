@@ -15,6 +15,25 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **`workers/ingest`'s TRUSTED TIER IS HALF-WIRED, AND IT DECIDES HOW LONG A
+  SHOW CAN BE.** Found 2026-09-18 while planning `/stage/`. `/open` resolves its
+  caps from the TIER (`TIERS[tier] || TIERS.open`), and `/seg` then reads the
+  FLAT `LIMITS` in four places. So a token-holding caller is given the trusted
+  TTL and is still refused at 24 MiB a segment, 45 segments and 64 MiB an hour.
+  ⚠️ It reads as correct at both ends: `/open` genuinely consults the tier, and
+  `/seg`'s constants are genuinely the published caps. Only holding the two
+  together shows that the tier stops applying the moment anything is uploaded.
+  🔴 This is load-bearing for the live `/stage/` plan, because it is what sets
+  the maximum length of a recorded show.
+
+- ⚠️ **`workers/selfrec` COMPARES A SECRET WITH `!==` AND ACCEPTS IT IN A QUERY
+  STRING.** Found 2026-09-18. A plain inequality is not a constant-time
+  comparison, and a secret in a query string lands in logs and referrers.
+  ⚠️ **AND THE TWO WORKERS DISAGREE ABOUT IT IN WRITING**: `workers/ingest`'s
+  own `lab/tier-test.mjs` asserts that the same secret in a query string must
+  NOT grant trust. One of the two is wrong on purpose and neither says which.
+
+
 ⚠️ **AUDITED 2026-09-18, ALL OF IT, AGAINST THE CODE RATHER THAN AGAINST ITS
 OWN WORDING.** Three entries went stale in one day, which is what prompted it.
 **43 entries are genuinely open. Sixteen were found already finished** and are
@@ -63,46 +82,52 @@ struck, the proof is in it.
   backlog entry asked for is moot; the wording is not.
 
 
-- 🔴 **`/stage/` BECOMES A REAL VIRTUAL STAGE, PLANNED AND RESEARCHED FIRST.
-  ASKED 2026-09-18, IN ONE DICTATED BLOCK.** Quoted at length because the detail
-  IS the specification and because it names its own uncertainties, which are the
-  part a plan must not quietly resolve:
-  *"I want this stage thing to be real, to actually be useful in a virtual stage
-  performance... Audience at first sees nothing. Maybe there is a message of
-  upcoming event, or maybe there is nothing in a video. The control room has a
-  button to start, play basically, but it has to do with our streaming pipeline.
-  So I guess WebRTC is the best choice, the compromise. Look up all the research
-  we have done on with different formats. So start a WebRTC feed. I'm not sure
-  where to source it from. Should it be generated in control room browser just to
-  get it going? Or I think we also have a container to do it. We also have M1,
-  which we could remotely control with OBS. I'm not sure OBS works on Raspberry
-  Pi, or maybe it does. So investigate what options. Maybe there is a switch. But
-  at first we could do just control room browser sending it over to the
-  Cloudflare WebRTC. Then use our storage solution. Because you remember WebRTC
-  currently doesn't have recording. So I guess control room has to do it as well
-  to push things to S2. R2, I mean. And then finally archive is playing it back,
-  whatever was saved to R2. For now just keep it as kind of a single feed and
-  single file, what you can overwrite maybe. So when the control room stops, all
-  those chunks of the feed, they have to end up in R2, and archive should be
-  playable. And all those events, those polls, etc., they have to be in a
-  timeline, in archive timeline."*
-  **The archive timeline is specified exactly and is not a guess:** first lane is
-  when the video started and ended; second lane is bars marking when each poll or
-  multiple choice was SENT and how long it stood before the next one overrode it;
-  then one, two or three lanes in the SAME COLOUR carrying the audience
-  responses.
-  Closing instruction: *"make a plan and do a good research how we could use our
-  always capture utilities that we have, make it reusable as much as possible."*
-  ⚠️ **THE RECORDING CONSTRAINT IS ALREADY MEASURED IN THIS REPO AND MUST NOT BE
-  RE-DERIVED OR RE-TESTED.** CLAUDE.md: WHIP ingest RECORDS NOTHING, direct
-  tested over 183 s against a recording-enabled input, 26 polls, zero assets.
-  Stream-WebRTC is delivery only. So whatever records has to record itself, which
-  is exactly what the ask concluded independently.
-  ⚠️ **A PLAN, NOT A BUILD.** The ask says plan and research. It also names four
-  possible sources (control room browser, the container, the M1 under OBS, the
-  Raspberry Pi) and says it is not sure which: a plan that picks one silently has
-  thrown away the question it was asked.
-
+- 🔴 **`/stage/` BECOMES A REAL VIRTUAL STAGE. PLANNED 2026-09-18, NOT BUILT.**
+  `plan-stage-live.md`, 1025 lines. The ask is quoted in full there. Nothing was
+  built, deployed, or spent; no Stream minute was used.
+  ✅ **THE SOURCE QUESTION THE ASK REFUSED TO SETTLE IS ANSWERED WITH A
+  RECOMMENDATION AND ITS REASONS: the control room browser first.** `whipPublish`
+  is already a kit module, the credential-hiding proxy is already deployed, and
+  `/keep/` already publishes WHIP on every suite run, so it costs nothing to
+  try. It also keeps ONE CLOCK at both ends, because the publisher burns the
+  time into the picture and the same machine reads it back; every other source
+  puts the burner on another machine and buys a weaker claim.
+  ✅ **SECOND SOURCE NAMED: the M1 under OBS.** `rig/obs-pro/stream.mjs` already
+  publishes WHIP to this exact live input, MEASURED at connect 3.6 s, 876 frames,
+  **0 skipped**, and 4K30 on software x264 at 6.2 Mbit/s with 0 dropped. What is
+  missing is only a bridge to its obs-websocket from outside that building, and
+  the pattern for one exists at p50 ~65 ms.
+  🔴 **OBS ON A RASPBERRY PI: NO, AND THE REASON IS PACKAGING RATHER THAN
+  HARDWARE.** Debian passes `-DENABLE_WEBRTC=FALSE` in both trixie and sid
+  because `libdatachannel` is not packaged at all, so `apt install obs-studio`
+  gives OBS with NO WHIP output. Behind that: OBS wants GL 3.3 and V3D gives
+  3.1, no headless mode, no CEF on ARM. The Pi's WHIP path would be ffmpeg, and
+  the board runs 7.1.5 while the WHIP muxer arrived in **8.0**. Determined by
+  reading Debian's packaging source and the FFmpeg commit, WITHOUT touching the
+  board.
+  ✅ **AND THE RECORDING HALF IS ALREADY WRITTEN, IN A PLACE NOBODY LOOKED.**
+  `proto/selfrec/` implements every guarantee the ask asks for: an IndexedDB
+  elastic buffer so a chunk survives a dead tab, a per-chunk sha256 handed to R2
+  for server-side verification, a HEAD availability proof, and a manifest
+  carrying `missing`. It also has `indexer.mjs`, a pure-JS EBML cluster indexer
+  that makes a long recording seekable by Range and MSE with no ffmpeg. The
+  ask's own words *"single file you can overwrite"* are exactly what selfrec's
+  client-chosen key gives and what `ingest`'s server-minted id does not.
+  ✅ **LANE 2 IS THE ONLY NEW DRAWING AND IT NEEDS NO NEW RENDERER.** `/stage/`
+  already draws lane 1 and lanes 3..n. Lane 2 is a `spans` lane with `durMs` to
+  the next question, and the LAST question is left unterminated so the strip
+  feathers its right edge, which says `never overridden` correctly.
+  🔴 **WHAT IS NOT KNOWN, WITH WHAT EACH COSTS TO FIND OUT:** whether a canvas
+  source survives the operator switching tabs (rAF throttles to ~1 Hz in
+  background; one publish and one look, and it decides whether a browser can run
+  a show unattended); whether Cloudflare accepts a SECOND WHIP publish to one
+  input and what becomes of the first, which is what *"maybe there is a switch"*
+  turns on; whether CF transcodes WHIP to WHEP at all; and whether a token may
+  live in the control room, which decides whether a show can exceed about four
+  minutes and changes what `/stage/` IS, because the control room stops being a
+  page anybody can open.
+  ⚠️ **AN AUDIENCE CEILING NOBODY HAS DECIDED:** 128 relay sockets, if answers
+  travel the relay.
 
 - 🔴 **`/reel/` OPENS TWO ERR CONNECTIONS ON EVERY VISIT, BEFORE ANYBODY PRESSES
   ANYTHING, AND IT IS NOT A SELF-CHECK.** Found 2026-09-18 during the self-check
