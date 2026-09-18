@@ -671,7 +671,12 @@
    * the thing a reader came to look at is not a bound, it is a bug: a three
    * minute show under a sixty second ceiling could never be seen whole.
    */
-  const ARCHIVE_WINDOW_MS = 15 * 1000;
+  /**
+   * ⚠️ 30s SINCE 2026-09-18, FROM A SCREENSHOT OF THE ZOOM SOMEBODY ACTUALLY
+   * WANTED: *"zoom around this level"*, with the strip's own readout showing
+   * `30 s`. It was 15, which was my number rather than a measured one.
+   */
+  const ARCHIVE_WINDOW_MS = 30 * 1000;
   const ZOOM_OUT = 4;
   /**
    * ⚠️ ONE EXPRESSION, BECAUSE THE CHECK READS IT TOO. It was written twice for
@@ -1747,8 +1752,12 @@
      */
     const spanOf = () => (strip.strip.state.width - strip.strip.state.gutterPx)
       * 1000 / strip.strip.view().pxPerSecond;
-    A('the archive opens on a fifteen second window',
-      Math.abs(spanOf() - ARCHIVE_WINDOW_MS) < 1500,
+    // ⚠️ THE LABEL DOES NOT SPELL THE NUMBER. It read "a fifteen second window"
+    // and the constant moved the same day, which is a sentence that goes stale
+    // silently: nothing type-checks a label, and a description that has drifted
+    // is worse than none because a reader believes it.
+    A('the archive opens on the window it declares',
+      Math.abs(spanOf() - ARCHIVE_WINDOW_MS) < ARCHIVE_WINDOW_MS * 0.1,
       `${(spanOf() / 1000).toFixed(1)}s on screen, against ${ARCHIVE_WINDOW_MS / 1000}s asked for`);
 
     if (!SELFCHECK) {
