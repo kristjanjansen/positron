@@ -1,3 +1,82 @@
+# Session 34: the file was never the problem, and two pages were green about nothing (2026-09-18)
+
+**THE ARCHIVE'S MISSING CARET WAS DIAGNOSED WRONGLY TWICE AS A MEDIARECORDER
+LIMITATION, AND THE FILE WAS FINE THE WHOLE TIME.** `mediaMaster` does not run
+itself: its docstring says to call it from the rAF loop you already run, and
+`/crate/` carries the same warning in a comment. `/stage/` built the object and
+drove it ZERO times, so the archive's deck had never once been driven by its
+element. MEASURED: the element went to 1.00s of a 3.45s recording, `ended`
+false, `seekable` 0.00..3.45, while the deck sat at 3.45s. What settled it was
+printing three counters, **`master ticks 0, backstop 0, driving false`**: one run
+against three rounds of guessing. The page's own seek check passed throughout,
+because it asks the ELEMENT where it went, so every assert about that archive sat
+on the one side of the join that worked. A second gap fell out of the first:
+`mediaMaster` listened only for `timeupdate`, which a paused element never fires,
+and it produces no rvfc frames either, so seeking a paused master silences every
+sensor it has at once.
+
+**BOTH ERR PAGES WERE FULLY GREEN AGAINST A STAND-IN THAT REFUSED NOTHING.** No
+assert in `/now/` or `/flipper/` named a refusal, a 403 or a served segment;
+`/flipper/` had the blocked minutes in a readout cell, and a cell is not an
+assert. Both assert it now, and the same sabotage takes **4 red, 2 per page**,
+while the negative controls stay green, which is the half that proves the
+instrument rather than the finding. That is four instances of one pattern
+counting `fake-tapes.mjs`: **a stand-in makes a page runnable without making it
+graded.** `/now/` also gained a path for a refused live edge, which is exactly
+what ERR was measured doing to ETV: 7 asserts red and a black picture before, 0
+of 23 after. `/flipper/` read 8/8 against a closed port because `open or loading`
+was satisfied by `!!c.hls`, and the repair is not a better instant, because
+`readyState` is an instant too and a WORKING page read `readyState=1` one line
+after a seek. `totalVideoFrames` is cumulative and a seek does not reset it.
+
+**58/58 with the only hosts contacted being the dev server and the stand-in**,
+re-run independently rather than taken on report. Until this session's commit,
+git HEAD contained no `errUrl` at all, so a fresh checkout of `/now/` would have
+gone to `live.err.ee`: the protection existed only in a working tree.
+
+**THE BITRATE NOBODY HAD CHOSEN WAS THE BROWSER'S, AND IT WAS THE WORST ROW IN
+THE TABLE.** `/stage/` passed no rate at all. MEASURED by deleting the rate again
+and reading `videoBitsPerSecond` back: **2,500 kbit/s, so 3.38 GB for a three
+hour show**, worse than the 2 Mbit/s row anyone would have picked as the
+extravagant end, and 134x the 24 MiB an `ingest` session may hold. It is 700
+kbit/s of picture and 96 of sound now. What decided it was not the file size,
+which is free at every row: the upload loop is ROUND TRIP bound, draining about
+1.9 pieces a second whatever the bitrate, so the headroom is set by the
+timeslice. The first answer to this was 1.167 Mbit/s, a real measurement of the
+wrong thing: that is the rate of an artefact recorded at a REQUEST of 1200, and a
+rate somebody asked for is not a default.
+
+**A PUBLIC DOMAIN FILM WENT BEHIND THE STAGE AND THE SECOND CHOICE OF SOUND WAS
+THE OPPOSITE OF THE FIRST.** Melies' `Le Voyage dans la Lune` (1902), four
+minutes of twelve, 4.07 MB, on two independent grounds: published 1902, and an
+explicit dedication on the source item. Its audio was removed because the 1902
+film is SILENT, so any sound on the upload is a modern score carrying its own
+copyright, and keeping it would have quietly reduced a two ground claim to one.
+The film it replaced went the other way: the Dickson Experimental Sound Film's
+audio WAS the 1894 artefact and stripping it was the mistake. Two better looking
+candidates were rejected for having one ground: Wigman's `Hexentanz` survives
+only as an extract of a 1930 Bundesarchiv film, and every `Metropolis` online is
+uploader asserted or a rip of a restoration with fresh rights.
+
+**AND IT IS GRADED RATHER THAN JUST DEPLOYED, WHICH TOOK TWO SABOTAGES TO EARN.**
+Pointing the default at a missing file is caught by the 404 as well as the
+assert. Forcing `field: true` so the flat fill paints over the film is caught by
+NOTHING ELSE IN THE SUITE: the element stays perfectly healthy at 480x360 with
+its playhead advancing, no 404, no console error, and the frame spans **0 of
+255**. That is the whole argument for measuring pixels rather than objects, and
+it is the same lesson `/flipper/` bought with `!!c.hls` on the same day.
+
+**THE THREE FAILURES WORTH THE SPACE.** A check built to catch the follow
+regression read 32/32 against a `followPos` sabotaged to ignore its target,
+because `followsPlayhead` reports the SETTING rather than the behaviour and a
+window chasing a playhead 90s away moved 17,119 px, which passes "it moved" with
+room to spare. A diagram check read `nothing had to be shortened to fit` while
+six things were cut on a phone, and then moved into tab panels where
+`getComputedTextLength()` answers 0 under a hidden ancestor and every string
+"fits". And I hid a build failure from myself with `>/dev/null 2>&1`, then lost a
+run to a `BG is not defined` that was my own unterminated comment swallowing two
+`const`s.
+
 # Session 32 — a rule nobody drew, a look that existed four times, and a setting that was never real (2026-09-18)
 
 **THE BLACK LINES ON THE TIMELINE WERE THE SHAPE OF A GAP, NOT A DECISION.**
