@@ -286,13 +286,36 @@ export function mediaMaster(deck, source, {
     return d;
   }
 
-  /** attach the L4 backstop to whichever element is currently mastering */
+  /**
+   * Attach the L4 backstop to whichever element is currently mastering.
+   *
+   * 🔴 `seeked` AS WELL AS `timeupdate`, ADDED 2026-09-18, AND THE MISSING ONE
+   * WAS A REAL BUG IN EVERY PAGE THAT SEEKS A PAUSED MASTER. A paused element
+   * fires NO `timeupdate`, and it produces no frames, so `requestVideoFrame-
+   * Callback` is silent too. Seek one and every sensor this module has goes
+   * quiet at once: `tick()` never runs, L5 never re-anchors, and the deck holds
+   * the position it had while the picture sits somewhere else entirely.
+   * ⚠️ MEASURED on `/stage/`'s archive: asked back to 1.00s of a 3.45s
+   * recording, the ELEMENT went to 1.00s, `ended` false, `seekable` 0.00..3.45,
+   * and the DECK stayed at 3.45s. It was reported as *"there is not caret in
+   * arvhice playback"* and diagnosed twice as a MediaRecorder limitation, which
+   * it is not: the file seeks perfectly and nothing was listening.
+   * ⚠️ IT IS THE ONE EVENT THAT MEANS "THE POSITION MOVED AND NOTHING ELSE
+   * WILL TELL YOU". While playing it is redundant, because `timeupdate` follows
+   * within a frame or two; while paused it is the only thing there is.
+   */
   function attach(el) {
     attachRvfc(el || null);
     if (!attachTimeupdate || el === attachedTo) return;
-    if (attachedTo && attachedTo.removeEventListener) attachedTo.removeEventListener('timeupdate', backstop);
+    if (attachedTo && attachedTo.removeEventListener) {
+      attachedTo.removeEventListener('timeupdate', backstop);
+      attachedTo.removeEventListener('seeked', backstop);
+    }
     attachedTo = el || null;
-    if (attachedTo && attachedTo.addEventListener) attachedTo.addEventListener('timeupdate', backstop);
+    if (attachedTo && attachedTo.addEventListener) {
+      attachedTo.addEventListener('timeupdate', backstop);
+      attachedTo.addEventListener('seeked', backstop);
+    }
   }
   function backstop() { S.backstopTicks++; tick(); }
 
