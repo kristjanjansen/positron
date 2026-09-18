@@ -93,7 +93,17 @@
      one PAINTS its edges on purpose — an empty table saying there is nothing in
      it yet is the point, not a stray band left by a container with no
      children. */
-  .logbox .pos-msgs {
+  /* 🔴 THIS RULE NAMED `.pos-msgs` AND THE PAGE STOPPED PRODUCING ONE. It was
+     written 2026-09-14, two days BEFORE the ask it looks like it answers, and
+     the page moved to `createTable` in between: the table's root is `.pos-tbl`
+     and its scrolling body is `.pos-tbl-body`, so this styled nothing at all
+     while reading as done. Found 2026-09-18 by audit. That is CLAUDE.md's
+     component-swap rule firing for the third recorded time: a swap moves every
+     selector that named the old one, and a selector matching nothing is silent.
+     ⚠️ `height`, NOT `max-height`. The component's own default is
+     `max-height: var(--tbl-h, 420px)`, which still grows from nothing to full
+     and moves everything under it, which is the whole thing the ask was about. */
+  .logbox .pos-tbl-body {
     height: calc(8 * (17px + 6px + 1px));
     min-height: 0; max-height: none;
   }
@@ -287,7 +297,13 @@
       // to the phones rather than what happened in the store.
       { key: 'sent', width: 42, align: 'right' },
     ],
-    empty: 'nothing published yet',
+    /* 🔴 NO EMPTY MESSAGE. Asked 2026-09-16 with a screenshot: *"have fixed
+       height on this box / table and rm empty message"*. The box now holds its
+       height whether or not there is anything in it, so a line of prose saying
+       there is nothing in it is a second channel repeating what the empty box
+       already shows. `createTable` appends no element at all for an empty
+       string, so there is no padded div painting its own space either. */
+    empty: '',
   });
   const logbox = el('div', 'logbox');
   logbox.append(log.el);
