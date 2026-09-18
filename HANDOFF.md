@@ -1,9 +1,14 @@
 # Handoff, 2026-09-18, session 33
 
-**COMMITTED, NOT DEPLOYED.** Eight commits, working tree clean. Nothing in this
-session has reached the edge, the mail worker or the board. What that means for
-each is written against it below, because "done" and "live" are different words
-and this file has conflated them before.
+**DEPLOYED, 2026-09-18.** The site is live at BUILD `77a9d9d-072604-1fb2`,
+confirmed ON THE EDGE by `deploy.mjs` rather than assumed, and the mail worker
+is live as version `50a78731` at 100%. The tree was clean when both went out, so
+neither shipped anybody's in-flight work.
+🔴 **THE BOARD IS THE ONE THING STILL NOT DEPLOYED**, and it cannot be from
+here: it answers over the relay and refuses ssh. See below.
+⚠️ **"Leave err alone"**, instructed 2026-09-18. Nothing in this session probed
+an ERR mount and nothing should. The two ERR items below are written down and
+left alone deliberately.
 
 ## Seven backlog items were asked for at once, and one arrived mid-session
 
@@ -64,16 +69,14 @@ contacted being the dev server and the stand-in.
 white strip **27.0 px, 0.551 of a white key**, against 0.401 centred. Exactly
 the predicted figure.
 
-## 🔴 Three things that need a person
+## 🔴 What still needs a person
 
-**The mail worker is in the repo and not on the edge.** `npx wrangler deploy` in
-`workers/mail` was refused by this machine's permission classifier. Until
-somebody runs it, a subject from Estonia still arrives as
-`=?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=` and no label says which signal decided.
-
-```sh
-cd workers/mail && env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN npx wrangler deploy
-```
+⚠️ **THE MAIL DECODER IS LIVE AND HAS NOT YET MET A REAL MESSAGE.** It is
+graded by 75 asserts including both real Gmail messages as fixtures, but nothing
+has arrived at `positron@positron.studio` since it went out. The next one
+settles it, and it settles the auth question too, because the verdict now names
+the stamp that decided it. Read the room with the command in the watermark
+section.
 
 **The board code has never met a JACK server.** It answers over the relay and
 refuses ssh from here, so `jack.graph` and `jack.rebuild` are unverified on
@@ -86,10 +89,6 @@ node rig/box/ask.mjs --room studio-1 jack.graph
 
 If `jack.graph` comes back as nothing at all, the board is still on the old
 build: an unknown verb falls through to `default` and is answered with silence.
-
-**The site is built and not deployed.** Stamp `26c9bca-071552-1fb2`.
-⚠️ A deploy from `workers/view` ships whatever is in that directory, so tell
-anybody else working in this checkout first.
 
 ## 🔴 Two things that now cost somebody else, and did not before
 

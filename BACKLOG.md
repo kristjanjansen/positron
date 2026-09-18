@@ -15,6 +15,16 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **THE LOG COMES OFF `/stage/`'S AUDIENCE TAB. ASKED 2026-09-18:** *"rm logs
+  from stage audience"*. An audience is the one tab on that page whose reader is
+  not the person running the show, and a log is a developer's surface: it is
+  where this project puts faults, build stamps and timings, none of which an
+  audience has any use for or any way to act on.
+  ⚠️ **THE OTHER TABS ARE NOT COVERED BY THIS.** The control room and the
+  archive are read by the person running the thing, which is exactly who a log
+  is for. The ask names one tab.
+
+
 - 🔴 **`/reel/` OPENS TWO ERR CONNECTIONS ON EVERY VISIT, BEFORE ANYBODY PRESSES
   ANYTHING, AND IT IS NOT A SELF-CHECK.** Found 2026-09-18 during the self-check
   sweep and deliberately left alone, because it is outside what that sweep was
@@ -99,6 +109,10 @@ file by being finished or by being refused in writing, never by being forgotten.
   exactly `hello!`. So the room entry was written by the build BEFORE the repair:
   the two messages are two minutes apart, the deploy went out between them, and
   the 19:56 message came out clean and labelled while the 19:54 one did not.
+  ✅ **AND THAT IS NO LONGER AN INFERENCE.** `wrangler deployments list` on
+  2026-09-18 reports the previous deployment created at **19:55:59.807Z**, which
+  falls between the two messages (19:54:32 and 19:56:17). The reasoning from the
+  fixtures and the deploy record agree, and they were arrived at independently.
   ⚠️ **THE LESSON WAS THE ONE THE ENTRY PREDICTED, IN A PLACE NOBODY LOOKED.**
   `firstText` lived inside `index.js` beside a `fetch` and a WebSocket, so
   nothing could import it and it had ZERO asserts, while `spam.mjs` next door had
