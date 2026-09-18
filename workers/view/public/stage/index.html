@@ -325,27 +325,39 @@
    */
   /**
    * 🔴 AND THE DEFAULT BACKGROUND IS NOT ERR, SINCE 2026-09-18. Asked as
-   * *"turn on the err feed in the bg"*, then settled a message later with *"i
-   * just need some video there. look for suitable PD sources? can be historic
-   * stuff or whatever"*. That second sentence dissolves the problem: the ask
-   * was never ERR, it was a picture, and a public domain film on our own origin
-   * costs a broadcaster nothing and raises no rights question to hand back.
+   * *"turn on the err feed in the bg"*, then settled with *"i just need some
+   * video there. look for suitable PD sources?"*. That second sentence
+   * dissolves the problem: the ask was never ERR, it was a picture, and a
+   * public domain film on our own origin costs a broadcaster nothing and raises
+   * no rights question to hand back to anybody.
    *
-   * ⚠️ THE FIRST ONE WAS THE DICKSON EXPERIMENTAL SOUND FILM (1894) AND IT HAS
-   * BEEN REMOVED on instruction, pending a German Expressionist, dance related
-   * replacement. What is worth keeping from choosing it: it was picked on TWO
-   * independent public domain grounds rather than one, and the ON THEME
-   * candidate was REJECTED for having only a weak one. `corpus.json` holds
-   * Kurenniemi's own `Computer Music (1966)`, which would have been perfect
-   * here and is marked `licenceConfidence: LOW`, `holder: uploaded by a member
-   * of the public`. A public domain mark self-asserted by an anonymous uploader
-   * on a 1966 Finnish film is not a clearance.
-   * ⚠️ AND WHATEVER REPLACES IT IS FETCHED ONCE AND SERVED FROM OUR OWN ORIGIN.
-   * A public domain film on archive.org is still archive.org's server, which is
-   * the standing rule about external sources and the reason `/tapes/` needed a
-   * stand-in.
+   * 🔴 IT IS `Le Voyage dans la Lune`, MELIES, 1902, AND IT HAS TWO INDEPENDENT
+   * PUBLIC DOMAIN GROUNDS RATHER THAN ONE: published 1902, so copyright has
+   * expired in every jurisdiction, AND the source item carries an explicit
+   * public domain mark. `demo/resources/moon-1902.json` records both, the
+   * source item, and the in and out points of the excerpt.
+   *
+   * ⚠️ **THE AUDIO WAS REMOVED AND THAT IS A LICENCE DECISION, NOT A SIZE
+   * ONE.** The 1902 film is SILENT, so any sound on the upload is a modern
+   * score, and a modern score carries its own copyright on top of a public
+   * domain picture. Keeping it would have quietly reduced a two ground claim to
+   * one. It is the OPPOSITE call from the film this replaced: the Dickson
+   * Experimental Sound Film's audio was the 1894 artefact itself, and removing
+   * it there was the mistake.
+   *
+   * ⚠️ **TWO BETTER LOOKING CANDIDATES WERE REJECTED FOR HAVING ONE GROUND.**
+   * Mary Wigman's `Hexentanz` is the exact answer to the German Expressionist
+   * dance brief and survives only as an extract of a 1930 Bundesarchiv film, in
+   * copyright in Germany until 2044, published nowhere as a free file.
+   * `Metropolis` is US public domain by age and still in copyright in Germany,
+   * and every copy of it online is uploader-asserted or a rip of a restoration
+   * that carries fresh rights of its own.
+   *
+   * ⚠️ **AND IT IS SERVED FROM OUR OWN ORIGIN, FETCHED ONCE.** A public domain
+   * film on archive.org is still archive.org's server, which is the standing
+   * rule about external sources and the reason `/tapes/` needed a stand-in.
    */
-  const DEFAULT_BG = '';
+  const DEFAULT_BG = '/resources/moon-1902.mp4';
   const BG = Q.get('bg') || DEFAULT_BG;
   const secs = (t) => {
     if (!t) return null;
