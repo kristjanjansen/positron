@@ -67,6 +67,15 @@ export const FULL_MODES = ['hover', 'footer', 'bare'];
 export function createVideoPanel({
   media = null, of = '', left, right, centre = null,
   fullMode = 'hover', onFull = () => {},
+  /**
+   * 🔴 THE SHAPE OF THE PICTURE BOX, WHEN IT IS NOT 16:9. Added 2026-09-18 for
+   * `/stage/`, whose film and canvas are both 4:3: *"add moer height (cut from
+   * sides)"*. Without it the box stays 16:9 and `object-fit: contain` puts the
+   * pillars back one level out, in CSS, where the page cannot see them.
+   * ⚠️ IT IS A CSS RATIO STRING, THE SAME SPELLING AS THE STYLESHEET'S, and
+   * `null` leaves the stylesheet alone. A page passing nothing is untouched.
+   */
+  aspect = null,
 } = {}) {
   if (!FULL_MODES.includes(fullMode)) {
     throw new Error(`video panel: fullMode is one of ${FULL_MODES.join(', ')}, not ${JSON.stringify(fullMode)}.`);
@@ -74,6 +83,7 @@ export function createVideoPanel({
 
   const root = el('div', 'pos-vp');
   const stage = el('div', 'pos-vp-stage');
+  if (aspect) stage.style.aspectRatio = aspect;
   if (media) stage.append(media.el || media);
   root.append(stage);
 

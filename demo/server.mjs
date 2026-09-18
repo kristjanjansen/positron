@@ -29,6 +29,17 @@ const MIME = {
   // that gets blamed on the page. (`.glb` is absent on purpose: the controller
   // models have always been served as octet-stream and browsers do not check.)
   '.woff2': 'font/woff2',
+  /**
+   * 🔴 MEDIA, ADDED 2026-09-18. `/stage/`'s film was served from here as
+   * `application/octet-stream`, which is the bug the comment above predicts: the
+   * deploy sets the type from the extension by itself, so a missing entry is
+   * invisible until somebody develops against this server, and then it looks
+   * like a browser being fussy about a page.
+   * ⚠️ IT IS NOT CREDITED WITH A FIX. The stall that led here was a HIDDEN TAB
+   * deferring media, not the content type, and the honest claim for this line is
+   * the narrow one: serving an mp4 as a byte stream is wrong on its own terms.
+   */
+  '.mp4': 'video/mp4', '.webm': 'video/webm', '.mp3': 'audio/mpeg',
 };
 
 /**
