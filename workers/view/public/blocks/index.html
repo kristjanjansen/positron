@@ -470,19 +470,27 @@
    * pushed against wall"*); what it lacked was any sign it had happened, so a
    * brick you shoved away looked exactly like a brick you had lost.
    *
-   * ⚠️ BRIGHTER AND BIGGER, IN THE TWO CHANNELS EVERY OTHER "the ray is on
-   * this" ANSWER ALREADY USES, so it reads as one more step along a scale
-   * somebody has learned rather than as a new vocabulary. Not a colour: colour
-   * on this site says how something LANDED, and "you have pushed it as far as
-   * it goes" is exactly that, in the channel that already carries it.
+   * 🔴 BRIGHTER ONLY. NOTHING ON THIS PAGE CHANGES SIZE. INSTRUCTED 2026-09-19:
+   * *"do not make blcoks bigger on hilite, just lighen them up"*. The kit's
+   * `TOUCH` table moves two channels and its own comment argues that size is the
+   * half that matters in a headset; that argument is about a PANEL, which is a
+   * flat slab at a fixed distance, and it does not survive being applied to a
+   * brick. A brick has a size that MEANS something: it sits on a lattice, it is
+   * pushed against a wall, it is judged against its neighbours, and growing it
+   * by 7% while somebody is placing it moves the thing they are aiming with.
+   * ⚠️ THE KIT TABLE IS UNTOUCHED AND THAT IS DELIBERATE. `xr-panel.mjs` uses it
+   * for panels, where the reasoning still holds and nobody asked for a change.
+   * This page takes the brightness and drops the scale.
+   * ⚠️ Not a colour either: colour on this site says how something LANDED, and
+   * "you have pushed it as far as it goes" is exactly that.
    *
    * ⚠️ NAMED RATHER THAN INLINE SO THE CHECK CAN DRIVE THE SAME FUNCTION. A
    * check that rebuilt this arithmetic would be grading its own copy.
    */
   const drawTouch = (isHeld, isAimed) => {
     const t = touchOf(isHeld, isAimed);
-    if (!isHeld || !atWall) return t;
-    return { lit: t.lit * 1.45, scale: t.scale * 1.04 };
+    const lit = isHeld && atWall ? t.lit * 1.45 : t.lit;
+    return { lit, scale: 1 };
   };
 
   // ── applying a room, which is the only way the room ever changes ────────
@@ -1303,6 +1311,23 @@
     const pose = frame.getViewerPose(xrSpace);
     if (!pose) return;
     xrFrames++; publishXR();
+    /**
+     * 🔴 ADVANCE THE WAY OUT. REPORTED 2026-09-19: *"i was not able to get
+     * out"*, and this one line is the whole reason. This page BUILT the quit
+     * badge and DREW it every frame and never once called `update`, so the hold
+     * could not advance, `onQuit` could not fire, and there was no way out of
+     * this page in a headset at all.
+     * ⚠️ **IT LOOKED COMPLETELY CORRECT FROM EVERY SIDE.** The object existed,
+     * the badge compiled, the ring was drawn at both hands every frame, and the
+     * page's own checks read a way out as present. `/held/`, `/floor/` and
+     * `xr-panel.mjs` all had the call; only this page was missing it, so no
+     * shared code was wrong and nothing could disagree with anything.
+     * ⚠️ `xr-quit-test.mjs` NOW REFUSES A PAGE THAT DRAWS A WAY OUT IT NEVER
+     * ADVANCES, because the defect is a MISSING line and nothing in a browser
+     * can see one of those.
+     */
+    const quitDt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
+    xrQuit?.update(session.inputSources, quitDt);
     if (ship && xrFrames % 120 === 0) ship(`${xrFrames} frames this session · worst gap in-session ${worst.toFixed(1)} ms`);
     if (frameViews === 0) frameViews = pose.views.length;
     const layer = session.renderState.baseLayer;
@@ -1986,9 +2011,26 @@
       held = wasHeld; atWall = wasWall;
       moveThing(i, keep.x, keep.y, keep.z);
       d.assert('a brick pushed against the wall is still pushed there, and lights up saying so',
-        !inside && onIt && past && lit.lit > plain.lit && lit.scale > plain.scale,
+        !inside && onIt && past && lit.lit > plain.lit,
         `at the middle of the room ${inside} · at the wall ${onIt} · 1.5 m past it ${past} (it is not stopped)`
         + ` · held reads ${plain.lit.toFixed(2)} bright, against the wall ${lit.lit.toFixed(2)}`);
+      /**
+       * 🔴 AND NOTHING CHANGES SIZE, IN ANY OF THE FOUR STATES. Instructed
+       * 2026-09-19: *"do not make blcoks bigger on hilite, just lighen them
+       * up"*. This is the assert the instruction needs, because the scale it
+       * forbids lives in a SHARED kit table that this page only overrides: a
+       * later edit to `TOUCH` would put the growth back here with nothing in
+       * this file changing, and the page would silently start moving bricks
+       * under somebody's hand again.
+       */
+      const sizes = [drawTouch(false, false), drawTouch(false, true), drawTouch(true, false)];
+      held = { i, dist: 1 }; atWall = true;
+      sizes.push(drawTouch(true, false));
+      held = wasHeld; atWall = wasWall;
+      d.assert('a brick never changes size, whatever the ray is doing to it',
+        sizes.every((t) => t.scale === 1),
+        `untouched ${sizes[0].scale} · aimed at ${sizes[1].scale} · held ${sizes[2].scale}`
+        + ` · against the wall ${sizes[3].scale}, and brightness carries all four`);
     }
 
     // ⚠️ THE THING ON YOUR HAND IS GRADED HERE TOO, AND IT IS ALL ARITHMETIC.

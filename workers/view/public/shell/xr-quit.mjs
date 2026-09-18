@@ -192,21 +192,20 @@ export function createXRQuit(gl, { label = 'Hold to quit', button = ANY_BUTTON,
       g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f);
       g.stroke();
     }
-    // ⚠️ THE LABEL IS INSIDE THE RING, not under it. A caption below the badge
-    // is a second thing to find at arm's length; inside, the ring is a frame
-    // round the word and the whole badge is one object.
-    g.fillStyle = '#ffffff';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    const words = label.split(' ');
-    const lines = words.length > 2
-      ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')]
-      : words;
-    const size = lines.length > 1 ? PX * 0.115 : PX * 0.15;
-    g.font = `600 ${size}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-    lines.forEach((ln, i) => {
-      g.fillText(ln, cx, cy + (i - (lines.length - 1) / 2) * size * 1.25);
-    });
+    /**
+     * 🔴 NO WORDS ON IT. INSTRUCTED 2026-09-19: *"hold any controller button
+     * down long enough it shows circular coundown (no labels) and quites"*.
+     * The label was the whole discoverability argument this badge was built on,
+     * and it lost to the thing it was competing with: a word floating at your
+     * hand is furniture you read once and then look past for the rest of the
+     * session, in a picture whose whole point is what is in front of you.
+     * ⚠️ **SO THE GESTURE IS THE DOCUMENTATION.** Press anything and keep
+     * pressing it: the arc appears on the first millisecond and fills, which
+     * tells a person holding a button that holding it is doing something,
+     * without asking them to read at arm's length.
+     * ⚠️ `label` IS STILL ACCEPTED AND STILL REPORTED, so a page that wants to
+     * SAY what its way out is can put it in its own log. Nothing draws it.
+     */
   }
 
   function ensure() {
@@ -289,7 +288,10 @@ export function createXRQuit(gl, { label = 'Hold to quit', button = ANY_BUTTON,
     // ⚠️ FAINT UNTIL IT IS BEING USED. A badge at full strength on every
     // controller, all the time, is a label competing with whatever the page is
     // about; at a third it is a thing you notice when you look at your hand.
-    gl.uniform1f(L.a, held > 0 ? 1 : 0.34);
+    // Full strength: it is only ever on screen while somebody is holding a
+    // button, and a countdown at a third of its opacity is a countdown somebody
+    // has to squint at to find out whether it is running.
+    gl.uniform1f(L.a, 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     return true;
   }
@@ -377,6 +379,18 @@ export function createXRQuit(gl, { label = 'Hold to quit', button = ANY_BUTTON,
      */
     draw(vp, grips, eye) {
       if (!ensure() || !grips?.length || !eye) return false;
+      /**
+       * 🔴 NOTHING IS DRAWN UNTIL SOMETHING IS BEING HELD. With the label gone
+       * an idle badge is a blank square hanging off both controllers, which is
+       * worse than the word it replaced: it says nothing and it is still in the
+       * way. The countdown IS the badge now, so there is no badge until there
+       * is a countdown.
+       * ⚠️ AND THE ARC STILL STARTS ON THE FIRST MILLISECOND, which is the
+       * property a drag-to-quit page depends on: on `/blocks/` the trigger both
+       * drags a brick and advances this hold, so a drag that is about to end the
+       * session has to say so while there is still time to let go.
+       */
+      if (!held) return false;
       paint(this.progress);
       let any = false;
       for (const m of grips) if (m && drawAt(vp, m, eye)) any = true;
