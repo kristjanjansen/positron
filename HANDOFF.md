@@ -1,87 +1,135 @@
-# Handoff, 2026-09-18, session 32
+# Handoff, 2026-09-18, session 33
 
-**DEPLOYED.** Confirm the BUILD stamp on the edge before asking anybody to
-retest: the edge serves the previous build for a few seconds after a deploy, so
-"still broken" and "the fix never loaded" are the same observation until the
-stamp changes.
+**COMMITTED, NOT DEPLOYED.** Eight commits, working tree clean. Nothing in this
+session has reached the edge, the mail worker or the board. What that means for
+each is written against it below, because "done" and "live" are different words
+and this file has conflated them before.
+
+## Seven backlog items were asked for at once, and one arrived mid-session
+
+All eight are finished. Two of them were finished before the session started and
+nobody had struck the line off, which is its own lesson: **a backlog entry is a
+claim about the world that goes stale exactly like a comment does.**
+
+**435/435 green** across the twenty local pages this session touched, in one
+run: `kit radio tapes replay resources strip typist vclick show loops score
+transport patch draw instrument looper take record capture memento`. The pages
+that need ERR, a relay, Cloudflare or the board were deliberately not run and
+are named where that matters.
 
 ## What landed
 
-**A component, `demo/shell/glue.mjs`.** Blocks as ONE surface: one border round
-the lot, 1 px of `--line` as a seam, children giving up their own border and
-radius. `.pos-glue` in shell.css is the look; `.pos-report` is now that class
-plus the single declaration that is its own (where it sits on the page).
-`/stage/` glues its transport bar to its strip. It is at the TOP of `/kit/`,
-which is the convention for a new component.
-⚠️ **`createGlue()` OF ONE BLOCK RETURNS THAT BLOCK**, and of none returns
-`null`, because a container with nothing in it must not paint its edges.
-⚠️ **THE CHILD RULE IS `.pos-glue.pos-glue > *` AND THE DOUBLING IS LOAD
-BEARING.** A single class ties with `.pos-strip` and `.tbar` and would be
-decided by source order, which is the trap this stylesheet already records three
-times.
+**The mail parser has the tests the classifier already had.** `firstText` lived
+inside `index.js` beside a `fetch` and a WebSocket, so nothing could import it
+and it had ZERO asserts, while `spam.mjs` next door had 51. That is the whole
+story of how a real Gmail message put its HTML half in the feedback room while
+the suite was green. It is `workers/mail/src/body.mjs` now. **75/75, up from 51.**
+⚠️ **THE HTML HALF WAS ALREADY FIXED AND THE ROOM ENTRY WAS OLD.** Both real
+messages were captured from the sender's own mailbox and are fixtures now, byte
+for byte at 542 and 539 bytes. Run against the SHIPPED code the 19:54 message
+returns exactly `hello!`. The deploy went out between the two messages, which is
+also why one is labelled `[ok]` and the other is not.
+⚠️ **WRITING THE FIXTURES FOUND THREE REAL DEFECTS THE ROOM HAD NEVER SHOWN**:
+an attachment wraps the words in a second multipart and the whole inner
+structure came back as the message; a message with no closing delimiter lost its
+only part to `slice(1, -1)`; and one whose line endings had been normalised
+matched no `\r\n\r\n` and returned its own headers as the body.
 
-**No more black rules between lanes** (`timeline/strip.mjs`). The band is its
-lane's full height; it was `L.height - 1` against lanes that tile exactly, so
-every lane gave back one row of darker canvas ground.
+**RFC 2047, so a subject from outside English is readable.** And the BODY with
+it: a subject is encoded because the alphabet forced it, and the same message's
+body is quoted-printable for the same reason, so decoding only the subject would
+have put correct words over mojibake.
 
-**`createTransportBar` takes `time: false`.** `/stage/` was passing
-`clock: false`, which the bar has never read.
+**The verdict says which signal decided it.** `auth.via` held that the whole
+time and went only to `console.log`. `[ok · via Authentication-Results]` against
+`[ok · via ARC]`, with the negative control that gives it meaning.
 
-**`/stage/`**: every screen goes fullscreen with a footer variant, answers are
-recorded rather than invented, one lane per option, and the frame burns the
-show's real wall-clock start.
+**The board can be looked at from outside the building.** `box.ping` replied
+with an `at` field, `at` is an envelope field, so `format()` threw and the verb
+had replied to nobody since it was written. Two new verbs: `jack.graph` reads
+and changes nothing, `jack.rebuild` is a diff rather than a teardown and kills
+no process. **92/92, up from 67**, two sabotages take it to 88 and 90.
 
-## 🔴 Two things to read before touching a check
+**Forty pages stopped running their checks at the people reading them.** The
+gate is a kit module now, `demo/shell/selfcheck.mjs`.
 
-**A CHECK WHOSE SUBJECT IS ABSENT READS AS A CHECK THAT PASSED.** The new
-"no black rule between the lanes" assert on `/stage/` passed, and passed with
-IDENTICAL numbers when the defect was put back, because the archive strip holds
-one lane until a question is asked and there was no boundary in the picture at
-all. It asks a real question through the page's own `ask()` first now and
-reports its lane count in the message, so a future blind run says so.
+**`/tapes/` has a stand-in, `demo/fake-tapes.mjs`.** 38/38 with the only hosts
+contacted being the dev server and the stand-in.
 
-**AND A TOLERANCE CHOSEN AGAINST A BLIND MEASUREMENT IS CHOSEN AGAINST
-NOTHING.** That check's threshold was 24 while the real separation is **0
-against 21**, so the number picked would have passed the defect it exists to
-catch. Thresholds go BETWEEN two measured states, and the sabotage that produces
-the second state is not optional.
+**Glue left the docs and started doing its job.** `/stage/`, `/radio/`,
+`/replay/`, `/tapes/`.
 
-## 🔴 THE BACKGROUND FEEDBACK POLL IS GONE, ON INSTRUCTION
+**The five black keys were already where a piano puts them** (`8bdd489`,
+2026-09-17). Verified by measurement rather than by reading the diff: narrowest
+white strip **27.0 px, 0.551 of a white key**, against 0.401 centred. Exactly
+the predicted figure.
 
-Removed 2026-09-18: *"Rm backround feedback poll"*. It was a session cron at
-`13,43 * * * *` that read `/feedback/` and said one line when the room was
-quiet. **Do not recreate it without being asked.**
+## 🔴 Three things that need a person
 
-⚠️ **NOTHING ABOUT `/feedback/` ITSELF CHANGED.** The room still collects, the
-mail worker still posts into it, and `workers/feedback` is untouched. What went
-away is the timer that looked. So the room is now checked when somebody asks,
-which means a genuinely new entry can sit there unread — that is the accepted
-trade, not an oversight to fix.
-
-⚠️ **THE WATERMARK, so a manual check can tell new from old:** 3 entries held,
-newest `2026-09-17T19:56:17.682Z` on `mail`. Everything at or before that has
-been reported. One command:
+**The mail worker is in the repo and not on the edge.** `npx wrangler deploy` in
+`workers/mail` was refused by this machine's permission classifier. Until
+somebody runs it, a subject from Estonia still arrives as
+`=?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=` and no label says which signal decided.
 
 ```sh
-curl -s --max-time 12 "https://feedback.positron.studio/feedback?room=feedback&format=text"
+cd workers/mail && env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN npx wrangler deploy
 ```
 
-## What is open
+**The board code has never met a JACK server.** It answers over the relay and
+refuses ssh from here, so `jack.graph` and `jack.rebuild` are unverified on
+hardware and say so in their own comments.
 
-`BACKLOG.md` is the list. Two entries were added this session from the feedback
-room rather than from a conversation:
+```sh
+cd rig/box && ./push.sh            # writes /opt/positron-box, restarts, prints md5s
+node rig/box/ask.mjs --room studio-1 jack.graph
+```
 
-- **A real Gmail message puts its HTML half in the room beside its text.** 51
-  fixtures green, found by reading `/feedback/`. **Capture the raw message before
-  touching `firstText()`** — a guess at the cause is another fixture that passes
-  while real mail does not.
-- **The mail auth question is still open.** Two real messages arrived; the room
-  shows `[ok]` on the second and nothing on the first (a pre-labelling build, not
-  a verdict). A four-character prefix cannot say WHICH signal decided it.
+If `jack.graph` comes back as nothing at all, the board is still on the old
+build: an unknown verb falls through to `default` and is answered with silence.
 
-## Rules that cost time this session
+**The site is built and not deployed.** Stamp `26c9bca-071552-1fb2`.
+⚠️ A deploy from `workers/view` ships whatever is in that directory, so tell
+anybody else working in this checkout first.
 
-🔴 **`node demo/verify.mjs` WITH NO ARGUMENTS RUNS `/tapes/`, WHICH FETCHES REAL
-RECORDINGS FROM ARCHIVE.ORG.** I started one and killed it. CLAUDE.md forbids it
-in a development loop and the bare command is how you do it by accident. Name the
-pages: `node demo/verify.mjs stage kit radio knobs replay`.
+## 🔴 Two things that now cost somebody else, and did not before
+
+**`node demo/verify-gl.mjs videoradio` costs ERR.** `verify-gl.mjs` and
+`verify-quest.mjs` never appended `selfcheck=1`; only `verify.mjs` did. So
+`/videoradio/`'s checks had been running NOWHERE for two sessions. They run now,
+and that page rotates four ERR mounts.
+
+**`/reel/` opens two `arhiiv.err.ee` connections on every visit**, before
+anything is pressed, and it is NOT a self-check: it is the page's deliberate
+opening state, commented and argued for. The sweep left it alone because it is
+outside what a sweep may decide. It is the `/tapes/` shape wearing a better
+motive, and the decision is editorial.
+
+## Rules that cost real time this session
+
+🔴 **A CHECK THAT GRADES ONE HALF OF A FILE PROVES NOTHING ABOUT THE OTHER
+HALF.** 51 green asserts sat beside a parser with none, in the same directory,
+for as long as both existed. The question that finds this is not "is this
+tested" but **"which of the things in here can be imported, and which cannot"**.
+The untestable half is the half with no seam, and a seam is what a test needs.
+
+🔴 **A GUARD THAT FIRES ON AN ACCURATE COMMENT TEACHES ITS AUTHOR TO WRITE A
+WORSE COMMENT.** The purity check read the whole file including its prose, so
+`body.mjs` failed it for the word WebSocket inside a sentence explaining that
+the parser had been moved OUT of the file which holds one. It strips comments
+now, and there is a control that plants a real call and requires it to be
+caught, because a stripper is a thing that can be wrong.
+
+⚠️ **A LITERAL CONTROL BYTE IN A SOURCE FILE IS THE `timeline/transport.mjs`
+TRAP IN A NEW COSTUME.** A character class holding the real bytes rather than
+`\u0000` and `\u001f` works perfectly, and a NUL among them makes BSD grep call
+the whole file binary, so every search of it answers nothing at all. It happened
+twice in one session: once in `body.mjs` and once in this file, while writing
+this paragraph about it. Escapes, always.
+
+⚠️ **"I CANNOT SSH TO IT" IS STILL NOT "IT IS DOWN", AND I SAID THE FIRST AND
+NEARLY MEANT THE SECOND.** Port 22 on the board did not answer, which is in
+CLAUDE.md as the wrong question to ask. One relay question answered immediately.
+
+⚠️ **CONFIRM WHICH FOUR BEFORE GLUING FOUR.** `createGlue` had exactly one
+caller, twenty pages carry both a strip and a transport bar, and a sweep on that
+reading would have touched half the project for a request that said four.
