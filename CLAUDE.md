@@ -93,6 +93,7 @@ node demo/verify.mjs llhls ladder        # just these, by slug
 node demo/verify-native.mjs              # THE IPHONE CODE PATH — verify.mjs cannot reach it
 node demo/fake-station.mjs               # an Icecast mount that is nobody's radio
 node demo/fake-tapes.mjs                 # an archive that is nobody's archive
+node demo/fake-err.mjs                   # a live edge that is nobody's broadcaster
 node demo/shell/looper-test.mjs          # the looper's arithmetic, no browser
 node workers/mail/test.mjs               # what arrives at positron@ is spam or a person
 node demo/resources/measure-durations.mjs   # how long each recording is, asked once
@@ -196,6 +197,30 @@ tell you a recording is 403ing out there.
 stand-in serving every recording at HALF its corpus length still reads 38/38,
 and one serving SILENCE reads 38/38 too. Both are in `BACKLOG.md`.
 
+✅ **AND `/now/` AND `/flipper/` HAVE THEIRS SINCE 2026-09-18, WHICH WAS THE
+LAST PAIR STILL POINTED AT A BROADCASTER.** `demo/fake-err.mjs` is an HLS live
+edge that is nobody's broadcaster: a master, a media playlist sliding with wall
+clock at 2 s a segment over a 2 h window, one `PROGRAM-DATE-TIME`, MPEG-TS that
+really decodes, Range, `#EXT-X-DISCONTINUITY` at the pool's one seam, the
+schedule endpoint and the five radio mounts. `demo/shell/err-live.mjs` gained
+`errUrl()` and a `?base=`, and `/flipper/` now imports `CHANNELS` from it rather
+than holding a fourth copy. **MEASURED, AND RE-RUN INDEPENDENTLY: `now` and
+`flipper` together 52/52 with the only hosts contacted being the dev server and
+the stand-in.** Cold build 55.4 s and 105 MB, cached in the system temporary
+directory. ⚠️ **IT REPRODUCES THE REFUSALS, NOT JUST THE STREAM**: 403 with no
+`access-control-allow-origin`, in the three shapes measured on 2026-09-06,
+verified by a 13-point sweep.
+🔴 **AND BOTH PAGES ARE BLIND TO THEM.** Switching the refusal off entirely
+leaves both fully green and changes only the harness's own summary line, `+33
+upstream refusals` becoming `+3`. Corroborated separately: **no assert in either
+page names a refusal, a 403 or a served segment.** So the boundary neither page
+can work without is graded by nothing, which is the same hole already recorded
+twice for `fake-tapes.mjs`. In `BACKLOG.md`.
+⚠️ **NO BURNED CLOCK IN THAT PICTURE, AND THE REASON IS ALREADY IN THIS FILE.**
+`ffmpegFilters()` needs `drawtext`, which needs libfreetype, and the ffmpeg on
+PATH here reports zero `drawtext` filters. `src/publish.sh` pins `ffmpeg@7` for
+exactly this and says so in a comment.
+
 🔴 **AND THE COST IS NOT OURS TO PAY. ERR SAID SO, 2026-09-16, RELAYED TO
 KRISTJAN:** *"ERRil oli ka probleem, et nende kuulajastatistika läheb sassi"* —
 their LISTENER STATISTICS were being corrupted by us. That is a different and
@@ -218,6 +243,37 @@ flake, and for A/B'ing a failure that the rules already say is external. The
 answer to "is it red because of me or because of them" is: SAY BOTH ARE
 POSSIBLE AND MOVE ON.
 
+
+✅ **AND THE HOLE A STAND-IN LEAVES IS CLOSED BY SABOTAGING IT, NOT BY READING
+IT.** 2026-09-18, on `/now/` and `/flipper/`: both were FULLY GREEN against
+`demo/fake-err.mjs` with its `serves()` forced to `return true`, because no
+assert in either page named a refusal, a 403 or a served segment. `/flipper/`
+had the blocked minutes in a READOUT CELL, and a cell is not an assert. Four
+instances of one pattern now, counting the two on `fake-tapes.mjs`: **a stand-in
+makes a page runnable without making it graded.** The fix is the same every
+time: break the stand-in on purpose, and whatever stays green was never being
+measured. Both pages assert it now, and the same sabotage takes 4 red.
+⚠️ **AND A NEGATIVE CONTROL IS THE HALF THAT PROVES THE INSTRUMENT.** A page
+that reported a boundary whatever it was shown would pass "a boundary was
+found". `fake-err.mjs` wears three measured shapes at once, so both pages survey
+all three channels and assert BOTH that a walled channel is found AND that a
+channel refusing nothing is reported as refusing nothing. The first goes red
+under the sabotage; the second stays green, which is correct.
+🔴 **A SEGMENT THAT EXPIRED LOOKS LIKE A SEGMENT THAT WAS REFUSED, AND
+MEMBERSHIP HAS TO BE CHECKED AT PROBE TIME.** `err-live.mjs` fact 2 says only
+ever probe segments from the playlist just read. That is necessary and NOT
+sufficient: a thirteen point sweep takes seconds, the window slides while it
+runs, and the OLDEST point comes back 403 for the other reason. MEASURED:
+`#.......#####`, two boundaries drawn where there is one. Drop points no longer
+in the freshest playlist, and say how many were dropped.
+
+🔴 **A COUNTER BEATS A STATE WHEN A CHECK RUNS NEXT TO AN EVENT.** `/flipper/`
+read 8/8 against a closed port because `the selected channel is open or loading`
+was satisfied by `!!c.hls`, true the instant `new Hls()` returns. The repair is
+not a better instant: `readyState` is an instant too, and a WORKING page read
+`readyState=1` because the check runs one line after a seek, which empties the
+buffer. **`totalVideoFrames` counts what the element has EVER decoded and a seek
+does not reset it.** Ask what has happened, not what is happening.
 
 🔴 **A SELF-CHECK NEVER RUNS FOR A VISITOR. NOT ONE, NOT EVER, ON ANY PAGE.**
 Instructed 2026-09-16: *"rip those selfchecks out of user experience and make
@@ -1000,6 +1056,20 @@ is checkable in one command, so check it before repeating it.
   100° band on `--hi`. One `PAD` off every edge. A camera is CONTAINED, never
   covered or stretched: iOS ignores a resolution request and returns portrait,
   where stretching squashes a face and cover shows 32% of the frame.
+- 🔴 **A PAGE WITH TWO BARS MUST SAY WHICH ONE IS ITS TRANSPORT: `publish:
+  false`.** `__demo.transport` is the only handle a CDP check has, and every bar
+  claimed it unconditionally, so it was whichever bar was BUILT LAST, which is a
+  fact about source order rather than a statement about the page. `/stage/` grew
+  a second on 2026-09-18 (a live show in the control room, a recording in the
+  archive) and the wrong one won by being further down the file.
+  ⚠️ **AND THE DRILL PRESSED A DIFFERENT BAR FROM THE ONE IT GRADED.**
+  `verify.mjs` clicked `document.querySelector(".tbar-toggle")` while every
+  assert around it read `__demo.transport`: the same element only while a page
+  has exactly one bar. DOM order and build order are routinely different on a
+  tabbed page. It presses `__demo.transport.el`'s own toggle now, and `el` was
+  added to the api object for it, which the file's own comment already demanded:
+  a control reachable from the return value and not from `api` is a control the
+  harness cannot press.
 - Transport UI is `demo/shell/transport-bar.mjs` and nothing else. Playhead from
   `observePosition`, seek only via `deck.seek()`, rates from intersected
   `caps.rates`.
@@ -1460,6 +1530,30 @@ is checkable in one command, so check it before repeating it.
   fixes is not ugliness: a pad, a strip, a transport bar, a knob row and a log
   with nothing between them read as ONE dense block, and a reader cannot tell
   which control belongs to which picture.
+- 🔴 **follow TRACKS THE NEWEST FACT ON THE STRIP, WHICH IS NOT ALWAYS THE
+  PLAYHEAD.** Every page before `/stage/` followed the playhead because there
+  was nothing else it could be, and the rule was written into `followTick` as
+  `S.pos`. A tab watching a show being RECORDED has a newest fact and no
+  playhead: nothing is playing, the deck sits at 0, and the strip stood still
+  while its own rows arrived. `followTarget` (option, or `setFollowTarget(fn)`)
+  names it; `armWall(0)` at the recorder's start makes `wallPos()` the write
+  head, and `() => wallPos()` is both cases written once, because `disarmWall()`
+  hands back to the playhead by itself.
+  ⚠️ **AND AN ARMED WALL MEANS THE PICTURE MOVES.** The strip repainted on
+  `wallAnchor && deck.playing()`, so a real-time cursor was frozen whenever no
+  deck was running and the whole feature was inert with every line of it
+  correct. It repaints on `S.wallAnchor` alone now, and a page whose wall has
+  stopped meaning anything puts it away rather than keeping a stale one.
+  ⚠️ **A WINDOW IS A CEILING, NOT A WIDTH.** At 1280 px a three hour recording
+  is 8.3 s per pixel, so the view in which the whole show fits is the view in
+  which nothing in it reads. Open on `min(length, window)`, so a short piece
+  still fits whole.
+  ⚠️ **AND `followsPlayhead` REPORTS THE SETTING, NOT THE BEHAVIOUR.** A check
+  built on it, on a finite `followPos` and on a window that MOVED read 32/32
+  against a `followPos` sabotaged to ignore the target entirely: the harness had
+  seeked the playhead to 90 s, so the number was large and real, and a window
+  chasing it moved 17,119 px. Compare `followPos` against the WRITE HEAD and
+  require the write head to be on screen.
 - **One position surface per page.** A page with a strip passes
   `createTransportBar(…, { scrub: false })`: two horizontal time axes at
   different scales, stacked, is not a redundancy but a contradiction. The

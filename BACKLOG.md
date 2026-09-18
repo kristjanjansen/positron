@@ -1,62 +1,16 @@
-# Backlog: what was asked for and not yet done
-
-🔴 **THIS FILE EXISTS BECAUSE REQUESTS WERE BEING LOST.** They were tracked in a
-session's head across a long run of small reports, which works until the run is
-long: two were dropped and the second report of one was *"do you have it in yr
-backlog or you keep losing them"*. A request that arrives while other work is in
-flight goes in HERE first and is worked from here, not from memory.
-
-⚠️ **Not the same file as `HANDOFF.md`.** That one is the state of the project at
-the end of a session, written once. This is a queue, written the moment
-something is asked for and struck off the moment it is done. A line leaves this
-file by being finished or by being refused in writing, never by being forgotten.
-
----
-
 ## Open
+- 🔴 **THE BACKGROUND FILM BECOMES GERMAN EXPRESSIONIST AND DANCE RELATED.
+  ASKED 2026-09-18:** *"cool movie but use something from german expressionism,
+  dance-related"*. Replaces the Dickson film. Same rules: two independent public
+  domain grounds where possible, fetched once, served from our own origin, and
+  `demo/resources/dickson-1894.json`'s successor records the provenance.
 
-- 🔴 **A THREE HOUR SHOW BREAKS THE R2 PATH BY A FACTOR OF 45, AND THE DECISION
-  IS THE BITRATE. ASKED 2026-09-18:** *"What we do with r2 save? Show can be
-  3hr"*. MEASURED against the caps in the code rather than estimated:
-  - **3h at 800 kbit/s is 1.08 GB.** At 300 it is 415 MiB, at 500 it is 691 MiB,
-    at 2 Mbit/s it is 2.70 GB. **This is the number everything else follows
-    from, and it is the one thing nobody has chosen.**
-  - **`ingest` open tier is out**: 24 MiB a session is **4.2 minutes** at
-    800 kbit/s, and its 6 hour TTL would delete a 3 hour show three hours after
-    it ended.
-  - **`ingest` trusted tier fits on paper**: 5 GiB a segment, no session cap, no
-    TTL. It is blocked by the half-wired defect in this file, and it mints a
-    SERVER-side id, so the archive link has to be carried to whoever watches.
-  - ✅ **`selfrec` is the right worker and the ask already described it.**
-    Client-chosen key is a STABLE URL, which is *"single feed and single file,
-    what you can overwrite"* word for word; no caps, no TTL, a sha256 per chunk
-    that R2 verifies server side, an IndexedDB buffer so a three hour upload
-    survives a blip, and a manifest carrying `missing`.
-  🔴 **AND PLAYBACK MUST CHANGE, WHICH IS NOT OPTIONAL AT THIS SIZE.** `fetchBack`
-  builds ONE Blob: a gigabyte cannot go in memory. `proto/selfrec/indexer.mjs`
-  plus Range and MSE is the path, and it is already written.
-  ⚠️ **5,400 chunks AT A 2s TIMESLICE**, which is where `ingest`'s dense
-  sequence becomes a liability: one refused piece poisons every later one.
-  selfrec's buffer and retry is the answer to that, not a bigger cap.
-  🔴 **CLOUDFLARE STREAM RECORDING IS NOT THE ESCAPE.** WHIP records nothing at
-  all, and the RTMPS path bills STORAGE MINUTES against a 1000 minute account
-  cap: a 3 hour show is 180, so **five shows fill it and new live streams are
-  refused**. That is an outage rather than a bill.
-
-- 🔴 **WHAT `follow` DOES ON A THREE HOUR STRIP. ASKED 2026-09-18:** *"What to
-  do with follow"*. At 1280 px a three hour recording is **8.3 seconds per
-  pixel**: a question that stood two minutes is 14 px wide and an answer tick is
-  sub-pixel, so the whole show fitting on screen is exactly the view in which
-  nothing can be read.
-  ⚠️ **SO FOLLOW IS NOT A PREFERENCE AT THIS LENGTH, IT IS WHAT MAKES A ZOOMED
-  VIEW USABLE**, and the strip already has it: `setFollow`, and a `follow()`
-  that reports `engaged: on && !userScrolled`, so a drag disengages it and
-  nothing fights the hand. `/now/`, `/click/` and `/instrument/` pass
-  `follow: true` already.
-  ⚠️ **THE OPEN PART IS WHAT IT FOLLOWS.** During playback it follows the
-  playhead. There is no second answer yet for a LIVE show, where the archive
-  tab is not playing anything.
-
+- 🔴 **A DIAGRAM CHECK IS BLIND AT THE WIDTH IT RUNS AT.** `/stage/` reported
+  **six cuts on a phone** and `nothing had to be shortened to fit` in the
+  harness, on the same build. A cut depends on MEASURED text width, so a desktop
+  run cannot see a phone's boxes. `/kit/` already has a `phone` case for
+  diagrams; nothing else does, and every page with a diagram is ungraded at the
+  width most people read it.
 
 - 🔴 **THE ARCHIVE'S PLAYHEAD MOVES AND ITS PICTURE DOES NOT, AND THE FIX IS
   ALREADY IN THIS REPO.** MEASURED 2026-09-18 on `/stage/`: seeking the archive
@@ -97,17 +51,6 @@ file by being finished or by being refused in writing, never by being forgotten.
   ⚠️ **NOTHING COMPARES THE THREE RENDERINGS.** That is the standing risk here,
   and it is why the drift above survived: the container's output is only ever
   seen inside a container.
-
-- 🔴 **THE CONTROL ROOM'S START AND STOP BECOME A STANDARD TRANSPORT BAR. ASKED
-  2026-09-18:** *"start the show | stop: standard trasport bar"*. Two ad-hoc
-  `<button>`s were built for it, which is the fourth-copy mistake CLAUDE.md
-  names: build from `/kit/` and stop and ask rather than hand-roll a control
-  that exists.
-  ⚠️ **`/radio/` IS THE SHAPE**, not `/replay/`: `live: true` replaces the clock
-  with a LIVE chip, and the toggle is start and stop rather than a claim about a
-  position inside a recording, which is the distinction `transport-bar.mjs`'s
-  own header is about.
-
 
 - 🔴 **AN ERR ARCHIVE CLIP AS THE STAGE SOURCE. ASKED 2026-09-18:** *"can you
   stream this to the feed? https://arhiiv.err.ee/video/vaata/op-489 from 10:40
@@ -1123,6 +1066,278 @@ versus +Z reading and the comment above `wallYaw` names it.
   guard is what the rest of this sweep has been doing by hand.
 
 ## Done, with what it was measured at
+
+- ✅ **BOTH PAGES ASSERT THE REFUSAL BOUNDARY NOW, AND THE SABOTAGE IS THE
+  PROOF.** 2026-09-18. `/flipper/` 8 page asserts to 11, `/now/` 20 to 23. With
+  `fake-err.mjs`'s `serves()` forced to `return true`: **4 red, 2 on each page**,
+  RE-RUN INDEPENDENTLY rather than taken on report, and the failure text is
+  legible at a glance (`............` where a working run draws `#######.....`).
+  The negative controls stay GREEN under the same sabotage, which is what they
+  are for. The evidence comes from a survey of all three channels, because the
+  one channel a page opens wears one of three shapes and a finder that always
+  answered "nothing is blocked" would read exactly like a quiet day.
+  ⚠️ **AN EXPIRED SEGMENT LOOKS LIKE A REFUSED ONE AND NEARLY BOUGHT A FLAKE.**
+  The first run read `#.......#####`, two boundaries where there is one: the
+  oldest probed point fell off the back of the window between the playlist read
+  and the ask. `err-live.mjs` fact 2 says to probe only segments from the
+  playlist just read, and that is necessary and NOT sufficient, because a
+  thirteen point sweep takes seconds and the window slides while it runs.
+  Membership has to be evaluated at PROBE time. Points no longer in the freshest
+  playlist are dropped and the count is printed.
+
+- ✅ **`/now/` PLAYS THROUGH A REFUSED LIVE EDGE.** `findServedEdge` came out of
+  `/flipper/` into `demo/shell/err-live.mjs` and both pages call it, so the
+  original is not the only caller. MEASURED against `fake-err.mjs`'s `/wall`:
+  **7 page asserts red and a black picture before, 0 red of 23 after**, reading
+  `53.1 min behind, and ERR refuses the newest 52.9 min`. LIVE now means the
+  newest frame ERR will hand over rather than the newest it lists. Two asserts
+  carry two bands, each naming which case it is in, because the page has two
+  honest answers.
+  ⚠️ **THE HARNESS STILL POINTS `/now/` AT THE DEFAULT ARRANGEMENT**, and this
+  time that is a choice rather than a setting standing in for a fix: `/flipper/`
+  at `/wall` grades a picture playing through a wall, `/now/` on the default
+  grades one at a live edge, so both modes run every time and each page's finder
+  is graded against all three shapes by its own survey. One line flips it.
+
+- ✅ **`/flipper/` GOES RED AGAINST A BROADCASTER THAT IS NOT THERE.** MEASURED
+  with `?base=` at a closed port: **4 page asserts red of 11**, where all 8 used
+  to pass. `the selected channel is open or loading` was satisfied by `!!c.hls`,
+  true the instant `new Hls()` returns. It is `the selected channel received
+  picture, not just an object` now: `etv 238 fragments, 6542 KB, 165 frames
+  decoded` when it works, `0 fragments, 0 KB, 0 frames decoded` when it does not.
+  ⚠️ **THE FRAME COUNT IS CUMULATIVE AND THAT IS THE WHOLE TRICK.** `readyState`
+  is an instant and the check runs one line after a seek, which empties the
+  buffer, so a WORKING page read `readyState=1`. `totalVideoFrames` counts what
+  the element has ever decoded and a seek does not reset it.
+
+- ✅ **DONE 2026-09-18. THE CARET BUG, AND IT WAS NEVER THE FILE.** Reported as
+  *"there is not caret in arvhice playback"* and diagnosed wrongly TWICE as
+  MediaRecorder carrying no cues.
+  🔴 **`mediaMaster` DOES NOT RUN ITSELF AND `/stage/` NEVER TICKED IT.** Its own
+  docstring says to call it from the rAF loop you already run and `/crate/`
+  carries the same warning; the page built the object and drove it zero times,
+  so the archive's deck was never once driven by its element. MEASURED: the
+  element went to 1.00s of a 3.45s recording, `ended` false, `seekable`
+  0.00..3.45, while the deck sat at 3.45s. **`master ticks 0, backstop 0,
+  driving false`** is the line that said it, and printing three counters settled
+  in one run what guessing had not in three.
+  ⚠️ **AND THE SEEK CHECK PASSED THROUGHOUT**, because it asks the ELEMENT where
+  it went. Every assert about that archive was on the one side of the join that
+  worked.
+  ⚠️ **A SECOND, REAL GAP IN SHARED CODE FOUND ON THE WAY**: `mediaMaster`
+  listened only for `timeupdate`, and a paused element fires none and produces
+  no rvfc frames either. Seek a paused master and every sensor goes quiet at
+  once. It listens for `seeked` too now. **`/stage/` is 38/38.**
+
+- ✅ **DONE 2026-09-18. THE AUDIENCE'S WAITING CARD IS GONE.** It said in two
+  sentences what the presence badge says in one word. The check that guarded it
+  CHANGED rather than going: it read `.pos-card`, and the claim was never about
+  a card, it is that the audience is shown no `<video>` before there is anything
+  in one.
+
+- ✅ **DONE 2026-09-18. `/stage/` GOT A BACKGROUND, AND IT IS NOT ERR.** Asked as
+  *"turn on the err feed in the bg"* and settled a message later with *"i just
+  need some video there. look for suitable PD sources? can be historic stuff or
+  whatever"*, which dissolved the whole problem: the ask was a picture, not a
+  broadcaster. **The Dickson Experimental Sound Film, 1894 or 1895**, the
+  earliest known film with live-recorded sound, which is on subject as well as
+  free: the first attempt to publish picture and sound together, behind a page
+  that publishes picture and sound together.
+  🔴 **CHOSEN ON TWO INDEPENDENT PUBLIC DOMAIN GROUNDS RATHER THAN ONE:**
+  published 1894, so copyright has expired everywhere, AND the Internet Archive
+  item carries an explicit dedication (`licenseurl`
+  `creativecommons.org/licenses/publicdomain/`).
+  ⚠️ **THE ON-THEME CANDIDATE WAS REJECTED AND THAT IS THE POINT.**
+  `corpus.json` holds Kurenniemi's own `Computer Music (1966)`, perfect for this
+  and marked `licenceConfidence: LOW`, `holder: uploaded by a member of the
+  public`. A public domain mark self-asserted by an anonymous uploader on a 1966
+  Finnish film is not a clearance. That field exists so the convenient answer
+  does not win for being convenient.
+  ⚠️ **FETCHED ONCE AND SERVED FROM OUR OWN ORIGIN.** `demo/resources/`, so
+  `/resources/dickson-1894.mp4`, same origin, no CORS, no visitor request
+  leaving this site. A public domain film on archive.org is still archive.org's
+  server. Provenance in `dickson-1894.json` beside it.
+  ⚠️ **11.4 MB to 2.33 MB, a 4.7x saving, SOUND KEPT.** It was stripped first on
+  the reasoning that the page mutes the background, which was wrong: the
+  live-recorded sound is the entire reason the film matters, and keeping it cost
+  0.54 MiB. A file is an artefact, not only an input to one page.
+  🔴 **AND THE BUILD SILENTLY DECLINED TO COPY IT.** `.mp4` was not on the
+  allowlist, so it shipped the provenance JSON, dropped the film, and reported
+  `copied 182 files`. The page would have carried a `<video>` pointing at a 404.
+  Third time that allowlist has failed that way, after `.webmanifest` and the
+  `dust` excerpts. `.mp4` and `.m4v` added.
+  ⚠️ **THE ERR ROUTE IS UNTOUCHED**: still opt-in on `?bg=<slug>`, still
+  unreachable by a harness, and the rights question it raises is still the
+  user's rather than answered by default.
+
+- ✅ **DONE 2026-09-18. `How it works` LIVES IN THE CONTROL ROOM AND THE
+  ARCHIVE.** Two instances from one spec, `atEnd: false` because `atEnd`
+  appends to `document.body` and ignores the host. The audience panel gets none.
+  🔴 **AND THE CUTS CHECK WOULD HAVE PASSED BY NEVER LOOKING.**
+  `getComputedTextLength()` answers 0 under a hidden ancestor, so a diagram in
+  an unselected tab reports NO CUTS however badly it is cut. The check asserts
+  `dg.measured` and selects each tab first. **MEASURED: both panels measured,
+  nothing cut.**
+
+- ✅ **DONE 2026-09-18. START AND STOP ARE A TRANSPORT BAR.** `live: true` so the
+  clock is a LIVE chip, `scrub: false`, `loop: false`, and `showDeck` really
+  runs, so the playhead is how long the show has been on air. **The check
+  PRESSES the bar rather than calling `startShow()`**, because a bar wired to
+  the wrong command would have left every assert below it green, measuring a
+  show only the check knew how to start.
+  🔴 **IT EXPOSED TWO REAL DEFECTS IN SHARED CODE.** `__demo.transport` was
+  whichever bar was BUILT LAST, so a page with two bars published the wrong one:
+  `publish: false` now lets a page say. And `verify.mjs` clicked
+  `document.querySelector(".tbar-toggle")` while asserting about
+  `__demo.transport`, which are the same element only on a one-bar page: it
+  presses the graded bar's own toggle now, and `el` was added to the api for it.
+  **MEASURED: `/stage/` 37/38, and 521/522 across the 21 demos that carry a
+  bar**, the one red being the rewind defect above.
+
+- ✅ **DONE 2026-09-18, FOUR SMALL ASKS ON `/stage/` IN ONE PASS.** **35/36**,
+  the one red being the rewind defect above.
+  - **The archive opens on a 15s window**, MEASURED at 15.0s on screen, and
+    **zoom out is bounded at 4x it**. That bound did not exist to be raised:
+    `capPps` floored at 1e-30 px/s, so a reader could wheel until a recording
+    was a thousandth of a pixel. `maxSpan` is a new strip option, OFF by
+    default so none of the other twelve strip pages move, and `/stage/` is its
+    first caller. Proved by asking for a thousandfold zoom out and asserting
+    where it stopped, with `S.zoom.by` naming `max-span` so a bound that fired
+    is distinguishable from a wheel that did nothing.
+    ⚠️ **THE BOUND TAKES THE RECORDING WHEN THE RECORDING IS LONGER**, because a
+    bound that hides the thing a reader came to look at is a bug rather than a
+    bound. And the expression lives in ONE place: it was written twice for one
+    run, once in the option and once in the assert grading it, and they
+    disagreed immediately.
+  - **`diagram cuts: [object Object]` is gone.** A cut is `{ id, where, full,
+    shown, width }` and the page joined the objects. `/kit/` had the formatting
+    all along, so a page had invented its own way of printing a structure
+    another page already printed properly. It is an ASSERT now, not a whispered
+    log line, which is how six survived a deploy unread.
+  - **And the six cuts were real, at PHONE width only.** Three subs were over
+    the box's ~14 characters: `1280x720, 25fps`, `700k, 2s pieces` and `WHIP in,
+    WHEP out`. One of the three had been added the same morning.
+  - **Every button is secondary.** `Send` no longer carries `pos-pri`.
+  - **The question defaults to "Kas Manfred MIM on olemas", Jah and Ei**, third
+    option left empty as before.
+
+- ✅ **DONE 2026-09-18. `/now/` AND `/flipper/` CONTACT NOBODY.**
+  `demo/fake-err.mjs`, the third stand-in after `fake-station.mjs` and
+  `fake-tapes.mjs`, and the last pair of pages still pointed at a broadcaster.
+  **MEASURED, and re-run independently rather than taken on report: 52/52 with
+  the only hosts contacted being the dev server and the stand-in.** Cold build
+  **55.4 s and 105 MB**, cached in the system temporary directory; the media
+  playlist is 126 KB over 3600 segments and 120.0 min.
+  `demo/shell/err-live.mjs` gained `errUrl()` and a `?base=`, `/now/`'s schedule
+  fetch routes through it (it is on `www.err.ee`, and was the one live URL left),
+  and `/flipper/` now imports `CHANNELS` rather than holding a fourth copy.
+  ⚠️ **IT REPRODUCES THE REFUSALS**: 403 with no `access-control-allow-origin`,
+  on rights-blocked segments AND on ones off the back of the window, in the three
+  shapes measured on 2026-09-06, verified by a 13-point sweep.
+  ⚠️ **NO BURNED CLOCK IN THE PICTURE.** `ffmpegFilters()` needs `drawtext`,
+  which needs libfreetype, and the ffmpeg on PATH reports zero of them.
+  `src/publish.sh` pins `ffmpeg@7` for this and says so. Skipped rather than
+  half-done.
+  ⚠️ **AND IT LEFT THREE HOLES BEHIND IT, ALL IN `## Open` ABOVE**, which is the
+  point of building the thing: a page nobody could run was a page nobody could
+  find holes in.
+
+- ✅ **AND ONE WAS FIXED ON THE SPOT: `/flipper/`'s CHECKS DID NOT RUN ON A
+  WALLED CHANNEL.** The `live` handler jumped to the newest served frame and
+  `return`ed past the `await d.run('check')` that is the only thing on the page
+  that runs them. **2 asserts against 8, and the suite read GREEN having graded
+  nothing.** It was invisible because which branch fires depends on what ERR
+  happens to be blocking that day. The jump is a function now and the checks sit
+  outside it, so none of its three exits can take them.
+
+- ✅ **DONE, AND THE NUMBER IT WAS DECIDED AGAINST WAS NOT IN THE TABLE.** *"What
+  we do with r2 save? Show can be 3hr"*, asked 2026-09-18. **THE PICTURE IS
+  700 kbit/s AND THE SOUND IS 96, SO A THREE HOUR SHOW IS 1.07 GB**, set on
+  `/stage/`'s recorder as `videoBitsPerSecond` and asserted.
+  🔴 **WHAT WAS THERE BEFORE WAS THE BROWSER'S DEFAULT, AND IT MEASURES
+  2,500 kbit/s.** The page passed no rate at all, so this was never a choice
+  between the rows of the table: MEASURED by deleting the rate again and reading
+  `videoBitsPerSecond` back off the recorder, three hours of the default is
+  **3.38 GB**, worse than the 2 Mbit/s row somebody would have picked as the
+  extravagant end, and **134x** the 24 MiB an `ingest` session may hold.
+  ⚠️ **AND THE FIRST ANSWER TO THIS WAS 1.167 Mbit/s, WHICH IS A REAL
+  MEASUREMENT OF THE WRONG THING.** That is the rate of
+  `proto/selfrec/artifacts/a1-concat.webm` (13,134,293 bytes over 90s), and
+  selfrec's own note says that file was recorded at a **request** of 1200 kbit/s.
+  A rate somebody asked for is not a default. It was believed for an hour
+  because it came off a real file with a real number beside it, and what
+  corrected it was breaking the assert on purpose.
+  **What decided the value, given that the file size is free:**
+  - **Money is not an axis.** 1.08 GB in R2 is about 1.6 cents a month and 5,400
+    writes about 2.4 cents a show. Every row from 691 MiB to 3.38 GB costs
+    nothing worth arguing over, and reaching for cost first is how this sat
+    undecided.
+  - 🔴 **THE SCARCE THING IS THE UPLOAD, AND IT IS ROUND-TRIP BOUND RATHER THAN
+    BANDWIDTH BOUND.** MEASURED in selfrec A2: 13 buffered pieces drained in
+    6,816 ms, 524 ms each, against a p50 verify of 483 ms. So an interrupted
+    show catches up at about **1.9 pieces a second whatever the bitrate is**,
+    and the headroom is set by how many pieces it makes. **At a 2s piece a three
+    hour show is 5,400 against 0.5/s of production: 3.8x. At 5s it is 2,160 and
+    9.5x.** So the long-show timeslice is **5s**, and it is not 5s on `/stage/`,
+    whose shows are seconds long and would produce no piece at all before being
+    stopped.
+  - ⚠️ **Seeking does not pay for the longer piece**: `proto/selfrec/indexer.mjs
+    --blocks` indexes per SimpleBlock, not per cluster.
+  - ⚠️ **Audio is not where a saving is and is not cut.** 96k over three hours is
+    130 MB of the 1.07 GB, and it is the only track carrying the question and
+    the answers. `/stage/` records one video track today, so `AUDIO_BPS` is
+    declared and deliberately NOT passed: a rate for a track that is not there
+    is a setting that reads as correct and does nothing, which this page has
+    already paid for twice.
+  ⚠️ **WHAT IS STILL OPEN IS THE PLAYBACK PATH, NOT THE NUMBER.** `fetchBack`
+  builds ONE Blob and a gigabyte cannot go in memory; `indexer.mjs` plus Range
+  and MSE is the answer and is written. `/stage/` uses the `ingest` open tier,
+  which is 4.2 minutes at this rate, so the worker swap to `selfrec` is
+  untouched by this entry.
+  ⚠️ **THE PROTO'S OWN DEFAULTS WERE LEFT ALONE ON PURPOSE.**
+  `proto/selfrec/participant.html` still defaults to `kbps=1200` and
+  `timeslice=2000`, because those are the values its recorded baselines were
+  measured at and changing them silently would invalidate its NOTES.
+
+- ✅ **DONE. follow TRACKS THE NEWEST FACT ON THE STRIP, WHICH DURING A SHOW IS
+  THE WRITE HEAD.** *"What to do with follow"*, asked 2026-09-18. The open half
+  was never the control, it was the TARGET: during playback it follows the
+  playhead, and a live show has no playhead at all.
+  🔴 **`followTarget` ON `createStripView`, PLUS `setFollowTarget(fn)` AT
+  RUNTIME.** Null means the playhead, which is what every page before `/stage/`
+  did. `/stage/` calls `armWall(0)` when the recorder starts, which makes
+  `wallPos()` the write head and draws it as the wall cursor, and passes
+  `() => wallPos()`. The handover at the end of the show is `setFollowTarget(null)`
+  plus the new `disarmWall()`, and it does NOT re-engage follow: somebody who
+  dragged the strip during the show stays where they dragged it.
+  🔴 **AND THE STRIP WOULD HAVE FROZEN, WHICH IS THE HALF THAT NEARLY SHIPPED
+  INERT.** Its loop repainted on `S.dirty || p !== S.pos || (wallAnchor &&
+  deck.playing())`. On this page nothing is playing while a show records, so
+  every term was false, the strip never redrew, and `followTick` never ran: a
+  live show's timeline would have stood still while its own rows arrived, with
+  every line of the new code correct. **An armed wall is a real-time cursor, so
+  it now repaints on `S.wallAnchor` alone** and the way out is `disarmWall()`.
+  ⚠️ **THE WINDOW IS A CEILING, NOT A WIDTH.** `LIVE_WINDOW_MS` is ten minutes,
+  and the view opens on `min(showLength, window)`: at 1280 px a three hour show
+  is 8.3 s per pixel, where a two minute question is 14 px and an answer is
+  sub-pixel, and ten minutes puts that question at about 240 px. A short show
+  fits whole and the window changes nothing, which is every show `/stage/` has
+  recorded.
+  🔴 **AND THE FIRST TWO ASSERTS WERE BLIND AND PASSED THE SABOTAGE 32/32.**
+  They checked `followsPlayhead === false`, a finite `followPos`, and a window
+  that MOVED. With `followPos` made to ignore the target and return the
+  playhead: `followsPlayhead` reports the SETTING rather than the behaviour so
+  it stayed true; the harness had seeked the playhead to 90s so `followPos` was
+  large and finite; and a window chasing a playhead 90s away moved **17,119 px**,
+  which passes "it moved" with room to spare. They compare `followPos` against
+  the WRITE HEAD now, and require the write head to be ON SCREEN at the end.
+  **MEASURED: `/stage/` 32/32, up from 28. Three deliberate sabotages take it to
+  30/32, 31/32 and 31/32**, and the failure text names the real symptom each
+  time (`sits -16446 px into a 576 px window`; `moved 0 px`; `reports 2500
+  kbit/s`). **404/404 across the other eighteen strip demos**, keep and take
+  included, which are the other pages that arm a wall.
+  ⚠️ `now` AND `flipper` WERE NOT RUN. They sweep ERR segments, and nothing
+  about this change is worth a public broadcaster's listener figures.
 
 - ✅ **DONE. `/tapes/` HAS A STAND-IN, AND `node demo/verify.mjs tapes` COSTS
   archive.org NOTHING.** Asked because that harness pulled twenty-four real
