@@ -91,6 +91,7 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
+  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
@@ -1414,14 +1415,16 @@
   /**
    * The heartbeat, and the round trip, on one message.
    *
-   * ⚠️ NOT `box.ping`. The board's pong is `reply('box.pong', { at: … })` and
-   * `at` is an envelope field, so the envelope refuses to format it and the
-   * handler throws — asked directly, the board answers `box.error: "at" is an
-   * envelope field`. So the obvious round trip verb answers NOTHING on the
-   * board as it runs today, and a page timing it reads an empty cell forever.
-   * `params.state` is the cheapest verb that always answers, answers with no
-   * work behind it, and is worth asking anyway — so the round trip is timed on
-   * a question this page was going to ask regardless.
+   * ⚠️ NOT `box.ping`, AND STILL NOT AFTER IT WAS REPAIRED. The board's pong
+   * was `reply('box.pong', { at: … })`, `at` is an envelope field, so the
+   * envelope refused to format it and the handler answered `box.error`. The
+   * obvious round trip verb answered NOTHING for two sessions and a page timing
+   * it read an empty cell forever. `rig/box/box.mjs` sends `pongAt` since
+   * 2026-09-18, which is in the repo and NOT yet on the board. This page still
+   * does not use it: `params.state` is the cheapest verb that always answers,
+   * answers with no work behind it, and is worth asking anyway, so the round
+   * trip is timed on a question this page was going to ask regardless. That
+   * costs the board one fewer message either way.
    */
   function hello() {
     stateAt = performance.now();
@@ -1851,8 +1854,26 @@
     // moment the board answers, and the harness can press this before it ends.
     for (let i = 0; i < 160 && enabling; i++) await wait(500);
     await local;
-    if (fxOn) await probeSound();
-    await probeLocal();
+    // 🔴 BOTH PROBES TAKE THE SOUND AWAY AND PUT IT BACK, so they wait for a
+    // harness. `probeSound` turns the material down to -60 dB on a Raspberry Pi
+    // in another building, empties the ring and waits for the head to come
+    // round: a hole of several seconds in a granulator somebody standing next
+    // to it is listening to, and in `/knobs/` too, because there is one board
+    // and one room on it. `probeLocal` does the same to this tab, dropping its
+    // master to zero for 700 ms. That is exactly the shape `/radio/` was
+    // reported for: a page proving a control works by working it while a person
+    // is listening.
+    //
+    // ⚠️ THEIR TWO ASSERTS GO WITH THEM rather than reading red on a working
+    // board. Everything else `checkAll` says is read off replies already in
+    // hand, so a visit still grades the engine, the material, the node order,
+    // the movement, the grain rate and the picture.
+    await ifSelfcheck(async () => {
+      if (fxOn) await probeSound();
+      await probeLocal();
+    }, { log: d.log, say: 'the two deafness checks turn the sound down and back up, on this page '
+      + 'and on the board, so they are left to the harness rather than made a hole in what '
+      + 'anybody is listening to' });
     checkAll();
   });
 
@@ -1931,7 +1952,9 @@
     // a stuck meter; a level that is EXACTLY zero when the master goes down and
     // loud again afterwards is a claim about this graph. research §10.5
     // measured 0.000000 at `amp 0` with everything else still running.
-    d.assert('the sound is this engine’s, and it stops exactly when its master does',
+    // Behind the gate with the probe that fills it in: with no measurement this
+    // would read red about a page that is working.
+    if (SELFCHECK) d.assert('the sound is this engine’s, and it stops exactly when its master does',
       !!papDeaf && papDeaf.loud > 0.0005 && papDeaf.silent === 0,
       papDeaf ? `${papDeaf.loud.toFixed(6)} playing against ${papDeaf.silent.toFixed(6)} with the master down`
         : 'nothing has been measured yet. Press “Switch it on”');
@@ -1945,6 +1968,9 @@
     // fine. Each state asserts what it can answer for and says which it was.
     // Diff the count against the BRANCH: silent 9, answering-but-not-sounding 10,
     // sounding 17. MEASURED 2026-09-14, 17/17 with the board live.
+    // ⚠️ THOSE ARE THE HARNESS'S NUMBERS. A visit is two short in every branch,
+    // because the two deafness checks take the sound away to make their
+    // measurement and so are held back with the probes that fill them in.
     // ⚠️ IT WAS 16 BEFORE THE LEFT PANE BECAME REAL SUPERCOLLIDER, and the four
     // asserts it had about a hand-written worklet became five about an engine:
     // that it IS SuperCollider running the board's graph, that a second
@@ -1992,7 +2018,9 @@
     // require the quiet arm to be QUIET — with the material driven from this
     // page there is something to turn down, so "it was already droning" stops
     // being an excuse the check has to accept.
-    d.assert(probe?.how === 'material'
+    // Same again: the material probe is what fills `probe` in, so the claim goes
+    // where the measurement goes.
+    if (SELFCHECK) d.assert(probe?.how === 'material'
       ? 'the board is making the sound this page described, and stops when it is turned down'
       : 'sound comes back from the board while a key is held',
       !!probe && probe.held > 0.002 && (probe.how === 'material' ? probe.quiet < probe.held * 0.5 : true),

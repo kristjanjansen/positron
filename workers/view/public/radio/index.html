@@ -216,6 +216,7 @@
   import { icyDemuxer } from '/shell/icy.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   // ⚠️ `HAND_YIELD_MS` IS IMPORTED RATHER THAN TYPED. The self-check waits out
   // part of the hand's own yield after a synthetic lift, and a constant typed
@@ -918,6 +919,22 @@
   // the reserved block is not a special case that has to be kept in step.
   const granSlot = el('div', 'gran-slot');
   scope.el.after(granSlot);
+
+  /**
+   * 🔴 THE BAR AND THE PICTURE IT DRIVES ARE ONE SURFACE. Asked 2026-09-18:
+   * *"just glue the 4 we have properly"*. Gluing is a CLAIM that two blocks are
+   * one object, which is true here and is not true of most neighbours: this bar
+   * has no scrub of its own precisely because the picture below it IS the
+   * position surface, so the page rhythm's 22 px between them was drawing a gap
+   * across the middle of a single control.
+   *
+   * ⚠️ IT IS INSERTED WHERE THE PICTURE WAS, NOT APPENDED. `createGlue`
+   * re-parents the blocks into a box and hands it back WITHOUT putting it
+   * anywhere, so a page that only calls it loses both blocks off the page. The
+   * slot that reserves room for the granulator's controls has to stay below,
+   * which is what the insertion point is for.
+   */
+  d.el.insertBefore(createGlue(bar.el, scope.el), granSlot);
 
   // ── neither box draws until there is sound ─────────────────────────────────
   //

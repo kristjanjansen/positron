@@ -28,6 +28,7 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
+  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
 
   const INGEST = 'https://ingest.positron.studio';
   const SEG_MS = 2000;
@@ -211,6 +212,9 @@
 
   // ── playback, on the timeline ───────────────────────────────────────────
   let deck = null, master = null, playable = null;
+  // The length `play` resolved, kept so the check below can assert over it
+  // instead of assembling the recording a second time to ask again.
+  let lastDur = null;
 
   /**
    * MediaRecorder timeslice chunks concatenate into one playable WebM — the
@@ -256,6 +260,7 @@
     armVideo(video);
     const dur = await assemble();
     if (dur == null) { d.log('could not resolve a duration · no range to scrub', 'bad'); return; }
+    lastDur = dur;
     d.set('length', Math.round(dur * 100) / 100);
     video.style.display = '';
     canvas.style.display = 'none';
@@ -286,17 +291,28 @@
       d.assert('every segment reached R2', uploaded.size === closed, `${uploaded.size}/${closed}`);
       d.assert('manifest is public', !!manifestUrl, String(manifestUrl));
     }
-    // playback is what makes this a timeline demo rather than a recorder
-    const dur = await assemble();
+    // 🔴 THE COSTLY HALF, AND IT IS THE HALF A VISITOR WOULD WATCH HAPPEN.
+    // `assemble()` builds the blob again and hands `video.src` a fresh object
+    // URL, which snaps the picture back to the start of a recording somebody is
+    // in the middle of. With `?r2=1` it pulls every segment out of R2 a second
+    // time as well, for a number the page already has, and the seek after it
+    // drags the playhead to the middle of the take. Both wait for a harness.
+    //
+    // ⚠️ THE DURATION ITSELF IS NOT COSTLY, so its assert runs for everybody:
+    // `play` resolved it a moment ago and it is in the readout. Re-asking is
+    // the cost, not the claim.
+    const dur = SELFCHECK ? await assemble() : lastDur;
     d.assert('the recording resolves a duration', dur != null && dur > 0,
       dur == null ? 'Infinity' : `${dur.toFixed(2)}s`);
-    if (dur != null && deck) {
+    ifSelfcheck(() => {
+      if (dur == null || !deck) return;
       const before = deck.position?.() ?? 0;
       deck.seek(Math.round(dur * 500));
       const after = deck.position?.() ?? 0;
       d.assert('the deck seeks inside the recording', after !== before || after > 0,
         `${before} -> ${after}`);
-    }
+    }, { log: d.log, say: 'the seek check would drag the playhead off what you are watching, '
+      + 'so it is left to the harness · drag the bar yourself and the picture follows' });
   });
 
   d.log(useR2

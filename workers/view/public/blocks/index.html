@@ -47,6 +47,7 @@
   import { createXRTablet, valueFromU, TABLET } from '/shell/xr-tablet.mjs';
   import { createXRQuit } from '/shell/xr-quit.mjs';
   import { eyeFromView } from '/shell/xr-ray.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   // ── the room is a module now ────────────────────────────────────────────
   // 🔴 THE PICTURE AND THE RULES ABOUT IT LIVE IN demo/shell/xr-room.mjs. The
@@ -2437,14 +2438,25 @@
 
   // A room to stand in before anything is pressed, so the stage is never empty.
   await roll(424242);
-  await selfCheck();
-  // 🔴 AND BACK TO THE ROOM THE PAGE OPENED WITH. The note above `selfCheck`
-  // claimed a visitor is left standing where they arrived, and it was wrong:
-  // `again` does end on the seed it started from, but the `roll` check ahead of
-  // it had already moved off 424242 onto a random one. So the room a visitor
-  // was left in was the third of three they had watched slide past. This line
-  // is what makes that note true.
-  await roll(424242);
+  /**
+   * 🔴 AND NOT FOR A VISITOR. `selfCheck` rolls a random room, rolls two more to
+   * compare seeds, sweeps sixty-four of them, pushes bricks about and fetches a
+   * controller mesh — so somebody who opened this page watched three rooms slide
+   * past before they could look at one. The note above used to end by saying a
+   * visitor is left standing where they arrived, which was true only because a
+   * second `roll(424242)` put the room back afterwards: the fix for a room
+   * changing under a reader was another change to the room.
+   * ⚠️ THE RESTORING ROLL GOES WITH IT. With nothing rolled there is nothing to
+   * put back, and rebuilding the same seed a second time is a room being made
+   * twice for no reason anybody can see.
+   */
+  if (SELFCHECK) {
+    await selfCheck();
+    await roll(424242);
+  } else {
+    d.log('the checks roll rooms and sweep seeds, so they are for the harness. '
+        + 'This is seed 424242, and it stays until you roll another');
+  }
   // The checks are done and the room has stopped changing, so it can be looked
   // at. One appearance, faded rather than cut.
   stage.classList.remove('warming');

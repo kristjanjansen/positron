@@ -40,6 +40,10 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
+  // One check here drags the playback to the middle of the recording a moment
+  // after somebody pressed Play it back. Everything else it asserts is in hand
+  // by then, so only that one moves.
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   // THE WHOLE CHAIN IN ONE PAGE: a source goes live over WebRTC, the FAR END of
   // that hop is what gets recorded, and the recording is played back on the
@@ -464,16 +468,22 @@
     // the seek has to move the PICTURE, not just the vector: a deck that seeks
     // alone reads green while the video plays on, which is the failure the
     // wrapper above exists to prevent
-    const mid = Math.round((duration ?? 0) * 500);
-    dk?.seek(mid);
-    // poll rather than sleep: currentTime is set synchronously but may land on
-    // a keyframe, and a fixed 400 ms sleep is exactly the gap after which the
-    // harness stops collecting
-    for (let i = 0; i < 6 && Math.abs(back.currentTime * 1000 - mid) > 400; i++) {
-      await new Promise((r) => setTimeout(r, 50));
+    // 🔴 AND IT IS THE ONE CHECK HERE THAT A PERSON WOULD SEE HAPPEN. It drags
+    // their playback to the middle a second after they pressed Play it back,
+    // which reads as the page losing its place. The strip under it is a
+    // position surface; scrubbing is theirs to do.
+    if (SELFCHECK) {
+      const mid = Math.round((duration ?? 0) * 500);
+      dk?.seek(mid);
+      // poll rather than sleep: currentTime is set synchronously but may land on
+      // a keyframe, and a fixed 400 ms sleep is exactly the gap after which the
+      // harness stops collecting
+      for (let i = 0; i < 6 && Math.abs(back.currentTime * 1000 - mid) > 400; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      d.assert('the seek moves the picture', !!dk && Math.abs(back.currentTime * 1000 - mid) < 400,
+        `${Math.round(back.currentTime * 1000)} ms ~ ${mid} ms`);
     }
-    d.assert('the seek moves the picture', !!dk && Math.abs(back.currentTime * 1000 - mid) < 400,
-      `${Math.round(back.currentTime * 1000)} ms ~ ${mid} ms`);
     // the archive is a FILE, not a live stream: a page that quietly replayed the
     // live element would pass every assert above and show nothing archived
     d.assert('playback is off the recording, not the live stream',

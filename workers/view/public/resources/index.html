@@ -43,6 +43,9 @@
   // fluid column, and everything this page has to say is fitted to that shape
   // rather than laid out again here.
   import { createTable } from '/shell/table.mjs';
+  // One assert here opens a second file. Every other one reads the list this
+  // page is already showing, so those keep running for everybody.
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   // Built by `demo/resources/build-corpus.mjs`, which asks seventeen archives
   // and writes down what each one answered. The deck's own shorter list is
@@ -423,15 +426,21 @@
     // quietly disagree about what exists. Checking it from this end costs one
     // fetch of a file that is already deployed, and turns a silent drift into
     // a red run.
-    const deckRes = await fetch(DECK);
-    const deck = deckRes.ok ? await deckRes.json() : null;
-    const have = new Set(items.map((it) => it.id));
-    const lost = (deck?.items || []).filter((it) => !have.has(it.id));
-    d.assert('everything the deck plays is in this list',
-      deck !== null && lost.length === 0,
-      deck === null ? `${DECK} answered ${deckRes.status}`
-        : lost.length ? `${lost.length} of ${deck.items.length} missing — first ${lost[0].id}`
-        : `all ${deck.items.length} of the deck's rows are here`);
+    // ⚠️ AND THAT FETCH IS WHY IT IS THE ONE CHECK BEHIND THE GATE. It is a
+    // second list, downloaded for nobody: a reader of this page never sees a
+    // row of it. The drift it guards against happens when the corpus is BUILT,
+    // so a harness run catches it at exactly the same moment a visit would.
+    if (SELFCHECK) {
+      const deckRes = await fetch(DECK);
+      const deck = deckRes.ok ? await deckRes.json() : null;
+      const have = new Set(items.map((it) => it.id));
+      const lost = (deck?.items || []).filter((it) => !have.has(it.id));
+      d.assert('everything the deck plays is in this list',
+        deck !== null && lost.length === 0,
+        deck === null ? `${DECK} answered ${deckRes.status}`
+          : lost.length ? `${lost.length} of ${deck.items.length} missing — first ${lost[0].id}`
+          : `all ${deck.items.length} of the deck's rows are here`);
+    }
 
     // 🔴 FOURTEEN DATES HERE REST ON A BOOK, AND THEY WERE ONE BUILD AWAY FROM
     // BEING ERASED. They were hand-written into a generated file, so the next

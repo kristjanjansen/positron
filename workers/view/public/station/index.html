@@ -13,6 +13,10 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
+  // Two things here cost a listener something and neither is the radio: a range
+  // GET nobody plays, and a forty-two second wait held open after they pressed
+  // play so a second round of checks has a programme boundary to find.
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const STATION = 'https://positron-station.kristjan-jansen.workers.dev';
   const PLAYLIST = `${STATION}/station.m3u8`;
@@ -300,8 +304,15 @@
     // the only control the harness gives `settleMs`, so slow work has to be
     // inside its handler for that wait to cover it. Forty seconds is one
     // programme, which is what "it crossed a boundary" needs to become true.
-    await new Promise((r) => setTimeout(r, 42000));
-    await d.run('check-playback');
+    // 🔴 AND A LISTENER IS NOT KEPT WAITING FOR IT. The second phase asserts
+    // over a listener's own playback, so it is free to measure and expensive to
+    // arrange: it needs them to still be here in forty-two seconds, and if they
+    // pause at ten it writes four red lines into their log about a stream that
+    // is fine.
+    if (SELFCHECK) {
+      await new Promise((r) => setTimeout(r, 42000));
+      await d.run('check-playback');
+    }
   }
 
   let timer = setInterval(poll, POLL_MS);
@@ -323,7 +334,11 @@
     // its real subject unmeasured. CLAUDE.md's rule about a check that pauses
     // mid-way losing every assert after it, in a second costume. A probe that
     // could not be made is a FAILED assert, never a missing one.
-    const br = pl.match(/#EXT-X-BYTERANGE:(\d+)@(\d+)\n(\S+)/);
+    // 🔴 THE FOUR ABOVE READ A PLAYLIST THE POLL ALREADY HAS, SO THEY COST A
+    // LISTENER NOTHING AND KEEP RUNNING. This one asks the station for bytes
+    // that go nowhere near the speakers, which is a request made only because
+    // something is grading the page.
+    const br = SELFCHECK && pl.match(/#EXT-X-BYTERANGE:(\d+)@(\d+)\n(\S+)/);
     if (br) {
       const [, len, off, uri] = br;
       try {

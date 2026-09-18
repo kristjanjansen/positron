@@ -17,6 +17,7 @@
   import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   // The kit's own vocabulary for a loop's direction. Imported rather than
   // retyped so the glyph on this page and the glyph on `/radio/` and `/tapes/`
@@ -25,6 +26,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
   import { ARCHIVE, CUES, cueItems } from '/shell/archive.mjs';
+  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
 
   const d = mount({
     name: 'replay',
@@ -61,8 +63,11 @@
    * ⚠️ SO A VISIT ASSERTS A STRICT SUBSET, the way `/crate/` already does. The
    * suite total is stable because the flag is on for every run of it; what
    * changes is what a person opening the page by hand pays for.
+   * ⚠️ THE FLAG COMES FROM `shell/selfcheck.mjs` NOW, not from a line of this
+   * page's own. It was one line per page for four pages and the other
+   * forty-one never grew it; one import is greppable, so a sweep can answer
+   * which pages have never been looked at.
    */
-  const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const video = el('video', '', null, { playsinline: '', muted: '', preload: 'auto' });
@@ -226,13 +231,29 @@
     // beside them is a fourth channel saying what three already say.
   });
 
-  createStripView(d.el, deck, { size: 'default', lanes: [{
+  const strip = createStripView(d.el, deck, { size: 'default', lanes: [{
       id: 'cue', kind: 'cue', height: 44, as: 'ticks',
       // idToColor('cue') came out near-black on the dark ground, so the ticks
       // were there but invisible. latch + firedColor is built into the ticks
       // renderer: a cue turns green once the playhead has passed it.
       color: '#ffd400', width: 2.5, latch: true, firedColor: '#8fd6a8',
     }] });
+
+  /**
+   * 🔴 THE BAR AND THE STRIP ARE ONE SURFACE. Asked 2026-09-18: *"just glue the
+   * 4 we have properly"*. This page is the clearest case of the four: the bar
+   * above already passes `scrub: false` BECAUSE the strip below it is the
+   * position surface, so the two have been one control for months with the page
+   * rhythm drawing 22 px of ground through the middle of it.
+   *
+   * ⚠️ THE ANCHOR IS READ BEFORE THE GLUE, NEVER AFTER. `createGlue` re-parents
+   * its blocks, so a node captured as `strip.el.nextSibling` is fine and one
+   * captured as `bar.el.nextSibling` AFTER the call points at a detached node
+   * and `insertBefore` throws. `null` is append, which is what a pair at the
+   * end of the page wants.
+   */
+  const afterStrip = strip.el.nextSibling;
+  d.el.insertBefore(createGlue(bar.el, strip.el), afterStrip);
 
   /**
    * 🔴 THIS USED TO BE A LINE OF PROSE UNDER THE PICTURE, and it rewrote itself
@@ -405,9 +426,18 @@
 
     // assert the MANIFEST, not the video's readiness: readyState depends on how
     // fast R2 answered, which is not what this demo is about
-    let mOk = false, mStatus = 0;
-    try { const r = await fetch(ARCHIVE.hls, { cache: 'no-store' }); mStatus = r.status; mOk = r.ok; } catch (e) { d.log(String(e), 'bad'); }
-    d.assert('archive manifest reachable', mOk, `HTTP ${mStatus} · readyState ${video.readyState}`);
+    //
+    // ⚠️ IT IS A SECOND REQUEST FOR A FILE THE PLAYER ALREADY HAS, AND
+    // `no-store` MAKES SURE OF IT. Small, on our own R2, and still a fetch this
+    // page makes only in order to grade itself, on somebody else's connection.
+    // The rule covers the whole cost rather than the audible part of it, so it
+    // waits for a harness.
+    await ifSelfcheck(async () => {
+      let mOk = false, mStatus = 0;
+      try { const r = await fetch(ARCHIVE.hls, { cache: 'no-store' }); mStatus = r.status; mOk = r.ok; } catch (e) { d.log(String(e), 'bad'); }
+      d.assert('archive manifest reachable', mOk, `HTTP ${mStatus} · readyState ${video.readyState}`);
+    }, { log: d.log, say: 'the manifest is not asked for a second time just to grade it · '
+      + `the picture arrived, readyState ${video.readyState}` });
     d.assert('media is the transport master', !!master);
     d.assert('deck range is the show length', deck.durationMs === ARCHIVE.durationMs, `${deck.durationMs} ms`);
     // ⚠️ THIS WAS `deck.eventsOf ? true : true`, which is an assert that cannot
