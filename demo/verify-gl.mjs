@@ -212,7 +212,17 @@ if (!targets.length) {
 
 for (const t of targets) {
   console.log(`\n[${t.name}]`);
-  const query = process.env.DEMO_QUERY ? `?${process.env.DEMO_QUERY}` : '';
+  // 🔴 `selfcheck=1`, THE SAME FLAG `verify.mjs` APPENDS, AND THIS FILE DID NOT.
+  // A self-check never runs for a visitor, so a page reads that flag and keeps
+  // anything that opens a file, makes a sound, presses a control or moves the
+  // picture behind it. Every gl demo was left out of that: `videoradio` already
+  // carried the gate and said so in its own comment — *"verify-gl.mjs appends no
+  // query of its own, which is a harness to fix rather than a reason to work a
+  // visitor's controls"* — and the gate meant its checks ran nowhere at all.
+  // ⚠️ AFTER `DEMO_QUERY`, because `URLSearchParams.get` returns the first
+  // occurrence and an override has to win, which is how verify.mjs orders it.
+  const q = [process.env.DEMO_QUERY, 'selfcheck=1'].filter(Boolean).join('&');
+  const query = `?${q}`;
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1500);
 

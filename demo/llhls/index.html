@@ -17,6 +17,7 @@
 <script type="module">
   import { mount, guard, el, armVideo, playOrPrompt, matchAspect, BUILD } from '/shell/shell.mjs';
   import { llhls, holdPublisher, waitForManifest } from '/shell/live.mjs';
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
 
   const d = mount({
@@ -226,8 +227,17 @@
 
   d.on('check', async () => {
     d.assert('publisher held by this page', badge.dataset.on === '1', badge.textContent);
-    const r = await fetch(llhls(), { cache: 'no-store' }).then((x) => x.status).catch(() => 0);
-    d.assert('manifest is being served', r === 200, `HTTP ${r}`);
+    // 🔴 THE ONLY LINE IN THIS CHECK THAT ASKS CLOUDFLARE ANYTHING, so it is the
+    // only one behind the flag. Everything else here reads what the page is
+    // already holding — the badge, the player, the last latency sample — and
+    // costs a listener nothing. This one is a second request for a playlist the
+    // player is fetching every couple of seconds anyway, which is a small cost
+    // and still a cost somebody else pays.
+    await ifSelfcheck(async () => {
+      const r = await fetch(llhls(), { cache: 'no-store' }).then((x) => x.status).catch(() => 0);
+      d.assert('manifest is being served', r === 200, `HTTP ${r}`);
+    }, { log: d.log, say: 'the manifest check is for the harness · the player is reading that '
+      + 'playlist itself, and the numbers above come from it' });
     d.assert('player attached', !!player);
     if (last) {
       // 2.4-4.0 s is what rig/ measured for this config; the assert is looser
