@@ -64,6 +64,11 @@ a hue now.
 **The quit badge lost its words.** Nothing is drawn until something is held; the
 arc is the badge.
 
+**A new run clears the last one on `/stage/`**, and there is no Clear control:
+the recording, its blob URL, the questions, the answers, the option lanes and the
+poll standing in both footers. 43/43, and disabling the call takes it red with
+the defect in the detail line.
+
 ## Rules that cost real time this session
 
 🔴 **A STRIP BUILT INSIDE A HIDDEN TAB PANEL MEASURES A CANVAS OF ZERO WIDTH**,
@@ -96,12 +101,17 @@ the dev server, and then it looks like a browser being fussy about a page.
 
 ## Open and worth knowing
 
-- **Two asks from this session are NOT done**, both on `/stage/`, both in
-  `BACKLOG.md` at the top. *"add Clear button under archvie timeline"*: nothing
-  built, and what it clears needs deciding in one line first. *"videpanel borders
-  are mess"*: **not reproduced**. The computed styles rule out the obvious
-  candidates, and two attempts to place the crop both landed on the wrong
-  element. Ask which page and which element before changing any radius.
+- **One ask from this session is NOT done**: *"videpanel borders are mess"*,
+  **not reproduced**. The computed styles rule out the obvious candidates
+  (`.pos-vp` carries the only radius and clips with `overflow: hidden`, the stage
+  and footer have none, and the control room's boxes sit 22 px apart rather than
+  the 1 px the crop shows), and two attempts to place the crop both landed on the
+  wrong element. Ask which page and which element before changing any radius.
+- **A `Clear` button was asked for and withdrawn the same minute** in favour of
+  *"New run clears"*, which is built and graded. Worth knowing because a second
+  press of record **did nothing at all** before this: `startShow` returned early
+  unless `phase === 'before'`, so once a show had stopped the button was inert.
+  Nobody reported that; it was found while wiring the clear.
 - **`/stage/`'s film loads over a dev server that does not honour Range.** It
   works, because the file is faststart and 4 MB, but nothing here has tested it
   over a slow link.
