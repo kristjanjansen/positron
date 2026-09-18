@@ -176,7 +176,6 @@
 <script type="module">
   import { mount, el, createReport } from '/shell/shell.mjs';
   import { createStack } from '/shell/stack.mjs';
-  import { createGlue } from '/shell/glue.mjs';
   import { createStepper } from '/shell/stepper.mjs';
   import { createSlider, createSliderGroup, GLIDE_MS, HAND_YIELD_MS } from '/shell/slider.mjs';
   import { MOVE_GLYPH, MOVE_OFF, MOVE_SAYS } from '/shell/hand.mjs';
@@ -194,6 +193,7 @@
   import { createTable } from '/shell/table.mjs';
   import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
 
   /**
@@ -319,16 +319,6 @@
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
-  section('GLUE',
-    'Blocks as one surface: one border, a hairline seam, no gap.',
-    `createGlue(bar.el, strip.el)
-createGlue(readout, log)   // the look mount({ joined: true }) builds`,
-    (box) => {
-      const a = el('div', 'kit-glue-demo', 'a block');
-      const b = el('div', 'kit-glue-demo', 'and another');
-      box.append(createGlue(a, b));
-    });
-
   section('VIDEO PANEL',
     'A picture, with a status, an empty middle and a fullscreen button under it.',
     `createVideoPanel({ media: canvas, of: 'the board' })
@@ -1976,7 +1966,9 @@ green = inside what it promised · amber/red = later`,
   // The specimen sits in a box that is ~656 px wide on a laptop and 328 px on a
   // phone, and the phone layout is the thing to grade. A throwaway one in a
   // holder of a stated width asks the question directly.
-  if (new URLSearchParams(location.search).get('selfcheck') === '1') {
+  // ⚠️ THE FLAG IS `shell/selfcheck.mjs`'s NOW, read the same way on every page
+  // rather than re-derived here. Same value, same moment, one place to grep.
+  if (SELFCHECK) {
     const { createKeyboard, KEY_MIN_PX, BLACK_RATIO, SWIPE_PX } = await import('/shell/keyboard.mjs');
     const nap = (ms) => new Promise((r) => setTimeout(r, ms));
     const frames = (n) => new Promise((r) => {
