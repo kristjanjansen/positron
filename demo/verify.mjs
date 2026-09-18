@@ -13,6 +13,7 @@ import { serve, PORT as HTTP_PORT } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
 import { claimProfile } from './harness-profile.mjs';
 import { startStation } from './fake-station.mjs';
+import { startTapes } from './fake-tapes.mjs';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 // 🔴 A FIXED PORT IS A SHARED MUTABLE GLOBAL, and this file still had two of
@@ -108,10 +109,10 @@ if (peersAtStart.length) {
 }
 
 /**
- * 🔴 `/radio/` IS GRADED AGAINST A STAND-IN, NEVER AGAINST A BROADCASTER, AND
+ * 🔴 TWO PAGES ARE GRADED AGAINST STAND-INS, NEVER AGAINST THE REAL THING, AND
  * THE HARNESS DOES IT RATHER THAN THE PERSON REMEMBERING TO.
  *
- * Every station that page offers is an ERR mount, and ERR told us our listeners
+ * Every station `/radio/` offers is an ERR mount, and ERR told us our listeners
  * were corrupting their audience figures: the standing rule is that a connection
  * to one is opened only when a PERSON is going to listen. That made the page's
  * own thirty-four checks unrunnable, so `node demo/verify.mjs radio` either
@@ -120,23 +121,49 @@ if (peersAtStart.length) {
  * the decode path, the loop and the whole self-check run against a mount that is
  * nobody's radio station.
  *
+ * 🔴 AND `/tapes/` IS THE SAME PROBLEM WITHOUT THE BROADCASTER, WHICH IS WHY IT
+ * WENT UNNOTICED FOR LONGER. It plays twenty-four recordings off archive.org,
+ * and the argument that this was safe, *"it uses archive.org, not ERR"*, got
+ * the reply *"stil: super careful with external sources, better avoid"*. The
+ * rule is about whose server it is, not about which harm has been named yet. A
+ * plain `node demo/verify.mjs` with no arguments pulled real recordings down,
+ * which is the way it happens by accident. `demo/fake-tapes.mjs` serves the same
+ * paths at the lengths `corpus.json` measured.
+ *
  * ⚠️ IT IS AUTOMATIC BECAUSE THE ALTERNATIVE IS A RULE SOMEBODY HAS TO
  * REMEMBER, and a rule that is only in a document is a rule that gets broken on
  * the day somebody is in a hurry. `DEMO_QUERY=base=…` still wins, because
  * `URLSearchParams.get` returns the first occurrence and `DEMO_QUERY` is put
  * first: that is the escape hatch for somebody who has been ASKED to check the
- * real relay.
+ * real relay or the real archive.
  */
-const standInFor = new Set(['radio']);
-const needStandIn = all.some((t) => standInFor.has(t.name));
-const station = needStandIn ? startStation({ port: 0, quiet: true }) : null;
-if (needStandIn && !station) {
-  console.log('⚠️  the stand-in station needs ffmpeg and could not be built, so `radio` '
-    + 'will be graded against nothing rather than against ERR.');
+/** slug -> the `?base=` its page is pointed at, filled in as each one comes up. */
+const standIn = new Map();
+const standIns = [];
+if (all.some((t) => t.name === 'radio')) {
+  const station = startStation({ port: 0, quiet: true });
+  if (!station) {
+    console.log('⚠️  the stand-in station needs ffmpeg and could not be built, so `radio` '
+      + 'will be graded against nothing rather than against ERR.');
+  } else {
+    await new Promise((r) => station.on('listening', r));
+    standIn.set('radio', `http://127.0.0.1:${station.address().port}`);
+    standIns.push(station);
+    console.log(`stand-in station ${standIn.get('radio')} (nobody's radio)`);
+  }
 }
-if (station) await new Promise((r) => station.on('listening', r));
-const STAND_IN = station ? `http://127.0.0.1:${station.address().port}` : null;
-if (STAND_IN) console.log(`stand-in station ${STAND_IN} (nobody's radio)`);
+if (all.some((t) => t.name === 'tapes')) {
+  const archive = startTapes({ port: 0, quiet: true });
+  if (!archive) {
+    console.log('⚠️  the stand-in archive needs ffmpeg and could not be built, so `tapes` '
+      + 'will be graded against nothing rather than against archive.org.');
+  } else {
+    await new Promise((r) => archive.on('listening', r));
+    standIn.set('tapes', `http://127.0.0.1:${archive.address().port}`);
+    standIns.push(archive);
+    console.log(`stand-in archive ${standIn.get('tapes')} (nobody's archive)`);
+  }
+}
 
 // DEMO_BASE=https://positron.studio node demo/verify.mjs  -> verify the DEPLOY
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
@@ -213,9 +240,34 @@ let edgeMisses = [];   // LL-HLS live-edge part 404s: expected churn, capped
 // allowance stays correct for whatever asks next.
 let probed = [];
 const reqUrl = new Map();   // requestId -> url, so a failure can be attributed
+/**
+ * 🔴 WHOSE SERVERS A DEMO ACTUALLY TOUCHED, COUNTED. `DEMO_HOSTS=1`.
+ *
+ * The standing rule here is about whose server a run spends, and until this
+ * existed there was no way to check it: a page pointed at a stand-in and a page
+ * pointed at the real thing produce identical output. This is the instrument,
+ * and it is `Network.requestWillBeSent`, which fires for every request the
+ * renderer makes rather than for the ones a page remembered to log.
+ *
+ *   DEMO_HOSTS=1 node demo/verify.mjs tapes
+ *
+ * ⚠️ OFF BY DEFAULT AND PRINTED PER DEMO. Most demos here legitimately talk to
+ * the relay, to Cloudflare or to ERR, so a line on every run would be noise
+ * around the one run where it is the answer.
+ */
+const SHOW_HOSTS = process.env.DEMO_HOSTS === '1';
+let hostHits = new Map();
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
-  if (m.method === 'Network.requestWillBeSent') reqUrl.set(m.params.requestId, m.params.request?.url || '');
+  if (m.method === 'Network.requestWillBeSent') {
+    const u = m.params.request?.url || '';
+    reqUrl.set(m.params.requestId, u);
+    if (SHOW_HOSTS) {
+      // `data:` and `blob:` have no host and are this machine's own memory.
+      try { const h = new URL(u).host; if (h) hostHits.set(h, (hostHits.get(h) || 0) + 1); }
+      catch { /* not a URL with a host */ }
+    }
+  }
   if (m.method === 'Runtime.exceptionThrown') {
     errors.push(m.params.exceptionDetails?.exception?.description || m.params.exceptionDetails?.text);
   }
@@ -477,6 +529,7 @@ const ok = (label, cond, detail) => {
 for (const t of targets) {
   console.log(`\n[${t.name}]`);
   errors = []; failedReqs = []; abortedReqs = []; edgeMisses = []; probed = []; reqUrl.clear();
+  hostHits = new Map();
   // DEMO_QUERY appends to every page, so a BRANCH can be verified rather than
   // only the default. Added when moq's publisher started PROBING for a codec:
   // the probe picks AV1, every recorded MoQ number was taken on VP8, and a
@@ -534,7 +587,7 @@ for (const t of targets) {
   // is a fact about the run, not a per-demo setting to keep in step. A page that
   // needs it opts in by reading it.
   const q = [process.env.DEMO_QUERY, own, 'selfcheck=1',
-    STAND_IN && standInFor.has(t.name) ? `base=${STAND_IN}` : ''].filter(Boolean).join('&');
+    standIn.has(t.name) ? `base=${standIn.get(t.name)}` : ''].filter(Boolean).join('&');
   const query = q ? `?${q}` : '';
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1400);
@@ -820,6 +873,10 @@ for (const t of targets) {
     + (probed.length ? `  (+${probed.length} upstream refusal${probed.length > 1 ? 's' : ''} the demos probe for`
       + `${probedOk ? ', expected' : ` — OVER the ceiling of ${PROBE_CEILING}`})` : ''));
   ok('no failed requests', failedReqs.length === 0, failedReqs.slice(0, 2).join(' | ') || '0');
+  if (SHOW_HOSTS) {
+    const hosts = [...hostHits.entries()].sort((x, y) => y[1] - x[1]);
+    console.log(`        hosts: ${hosts.length ? hosts.map(([h, n]) => `${h} x${n}`).join(', ') : 'none'}`);
+  }
   if (abortedReqs.length) {
     console.log(`        (${abortedReqs.length} aborted on teardown — expected for a media page)`);
   }
@@ -853,7 +910,7 @@ await Promise.race([
   new Promise((r) => chrome.once('exit', r)),
   new Promise((r) => setTimeout(r, 3000)),
 ]);
-// The stand-in goes with the run. A station left listening on a port is the
-// small version of the thing this harness exists to avoid.
-station?.close();
+// The stand-ins go with the run. A server left listening on a port is the small
+// version of the thing this harness exists to avoid.
+for (const s of standIns) s.close();
 process.exit(fail ? 1 : 0);
