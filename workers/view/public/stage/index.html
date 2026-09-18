@@ -82,6 +82,13 @@
    * else draws one. It carries a clock, a frame counter and a burned-in check
    * pattern that `readBurned` can read back, so a panel showing it is a panel
    * whose picture can be GRADED rather than merely looked at.
+   *
+   * ⚠️ AND SINCE *"rm video overlay"* ON 2026-09-18 IT IS THE FALLBACK RATHER
+   * THAN THE FEED. What a visit normally shows is the public domain film, alone
+   * and cropped to fill, with nothing drawn over it; the generated picture is
+   * what a visit gets when the film 404s, stalls or will not decode. Both are
+   * this project's own bytes off this project's own origin, so the paragraph
+   * above is unchanged in the only respect it was written about.
    */
   const TABS = [
     { id: 'audience', label: 'Audience' },
@@ -1543,21 +1550,33 @@
   let frames = 0;
   function tick() {
     /**
-     * 🔴 A BACKGROUND BEHIND THE STAGE PICTURE, AND THE TEST PATTERN STAYS ON
-     * TOP OF IT. Asked 2026-09-18: *"can you stream this to the feed?"*, then
-     * *"i mean to the stage as bg overlay"*. `drawCamera` lays a video in
-     * CONTAINED and scrims it, and `burn(..., { field: false })` draws
-     * everything except the background fill, which is the arrangement `/take/`
-     * already uses for a camera. So the clock, the counter and the frozen row
-     * survive untouched, which matters: the row is what `readBurned` reads, and
-     * the archive check proves a seek by comparing two of them.
-     * ⚠️ IT IS NEVER THE DEFAULT AND A HARNESS CAN NEVER REACH IT. Opt-in on
-     * `?bg=`, and the generated picture is what every other visit and every
-     * suite run gets.
+     * 🔴 THE FILM IS THE PICTURE, AND NOTHING IS DRAWN ON TOP OF IT. Asked
+     * 2026-09-18: *"make 4:3 video win and crop"*, then *"rm video overlay"*.
+     * It used to be a BACKGROUND with the test pattern over it, which is the
+     * arrangement `/take/` uses for a camera, and both halves of that are gone:
+     * `fit: 'cover'` lets the 4:3 film win the 16:9 frame and lose its top and
+     * bottom instead of gaining two black pillars, and `burn` is not called at
+     * all, so there is no clock, no counter and no frozen row over it.
+     * ⚠️ `scrim: 0` GOES WITH IT AND IS NOT A SEPARATE TASTE DECISION. The 55%
+     * scrim exists to keep a burned clock readable on top of a picture; with
+     * nothing on top it is a page dimming itself by more than half for the sake
+     * of furniture that is not there.
+     *
+     * 🔴 AND THE GENERATED PICTURE IS THE FALLBACK, WHICH IS WHY `burn` IS
+     * STILL HERE. A film that 404s, stalls or fails to decode leaves `bgReady`
+     * false, and that visit gets the full test picture exactly as before rather
+     * than a black rectangle. The two arms are the same one line they always
+     * were; what changed is that the film arm now draws the film alone.
+     * ⚠️ SO THE BURNED CLOCK IS NO LONGER IN THE FEED WHEN A FILM IS UP, and
+     * two things downstream read it: `readBurned` on a panel, and
+     * `readBurnedFrom` on the archive's recording. The first is rehomed onto a
+     * claim that holds in both arms and is checked below; the second degrades
+     * to `null`, which its own assert already tolerates because it grades the
+     * PLAYHEAD rather than the picture.
      */
     const bgReady = bgVideo && bgVideo.readyState >= 2 && !bgVideo.paused;
-    if (bgReady) drawCamera(mctx, bgVideo, FRAME_W, FRAME_H);
-    burn(mctx, FRAME_W, FRAME_H, frames, { hue: videoHue(0), field: !bgReady });
+    if (bgReady) drawCamera(mctx, bgVideo, FRAME_W, FRAME_H, { fit: 'cover', scrim: 0 });
+    else burn(mctx, FRAME_W, FRAME_H, frames, { hue: videoHue(0) });
     // ⚠️ THE ARCHIVE IS NOT FED FROM HERE. It is a recording: its picture comes
     // from wherever its transport is, which is what makes scrubbing visible.
     for (const p of panels) if (p.id !== 'archive') p.ctx.drawImage(master, 0, 0);
@@ -1797,15 +1816,14 @@
      * day is the same story one step upstream.
      *
      * 🔴 IT ASKS THE PICTURE THE RIGHT QUESTION, WHICH IS NOT "IS THERE A VIDEO
-     * ELEMENT". `burn()` takes `field: !bgReady`: with a background ready it
-     * SKIPS the flat fill and the film shows through, and without one it paints
-     * `FIELD`, one flat colour. So the discriminator is whether the frame is
-     * still flat where the pattern does not draw, and that is a fact about the
-     * pixels rather than about the element.
+     * ELEMENT". With no film the loop paints the generated picture, whose field
+     * is `FIELD`, one flat colour edge to edge between the things it draws. So
+     * the discriminator is whether a row of the frame is still flat, and that is
+     * a fact about the pixels rather than about the element.
      * ⚠️ BOTH HALVES OR NEITHER. A frame with spread in it proves something is
-     * behind the pattern; a `currentTime` that ADVANCED proves it is a film
-     * running rather than one frame decoded and stuck. Either alone passes for
-     * the wrong reason.
+     * in the picture; a `currentTime` that ADVANCED proves it is a film running
+     * rather than one frame decoded and stuck. Either alone passes for the wrong
+     * reason.
      */
     let bgReadyAt = null;
     for (let i = 0; i < 100 && !(bgVideo && bgVideo.readyState >= 2); i++) {
@@ -1825,13 +1843,52 @@
       }
       bgReadyAt = Math.round(hi - lo);
     }
-    A('the public domain film is really behind the stage, and it is running',
+    A('the public domain film is really in the stage picture, and it is running',
       bgReadyAt != null && bgReadyAt > 25 && tA != null && tB > tA,
       bgVideo
         ? `${bgVideo.videoWidth}x${bgVideo.videoHeight}, the playhead went `
           + `${tA.toFixed(2)}s to ${tB.toFixed(2)}s, and one row of the frame spans `
           + `${bgReadyAt} of 255 in luminance where a flat field spans 0`
         : 'no background element was ever created');
+
+    /**
+     * 🔴 AND THE 4:3 FILM WINS THE 16:9 FRAME RATHER THAN SITTING IN PILLARS.
+     * Asked 2026-09-18: *"make 4:3 video win and crop"*. Deploying this without
+     * grading it is the exact shape last session paid for on the film itself,
+     * where forcing the flat fill over it left every counter healthy and the
+     * picture gone.
+     * ⚠️ **IT MEASURES THE EDGE COLUMN, WHICH IS WHERE THE TWO ARRANGEMENTS
+     * DIFFER AND THE ONLY PLACE THEY DO.** 480x360 contained in 1280x720 leaves
+     * a 160 px pillar of flat `FIELD` down each side and the middle of the frame
+     * looks identical either way, so a check that sampled the centre would pass
+     * under both and grade nothing.
+     * ⚠️ **A PICTURE CAN BE FLAT AND STILL BE A PICTURE, WHICH IS WHY THERE ARE
+     * TWO WAYS TO PASS.** A film frame that is dark at the edge reads as one
+     * value, the same shape as a pillar; what it cannot do is read as one value
+     * that is `FIELD` to within a point. So the column passes by VARYING, or by
+     * being flat at a luminance the field never has. A pillar is neither.
+     */
+    let edgeSpread = null, edgeLum = null;
+    if (bgVideo && bgVideo.readyState >= 2) {
+      const col = mctx.getImageData(6, 0, 1, FRAME_H).data;
+      let clo = 255, chi = 0, sum = 0;
+      for (let i = 0; i < col.length; i += 4) {
+        const l = col[i] * 0.299 + col[i + 1] * 0.587 + col[i + 2] * 0.114;
+        if (l < clo) clo = l; if (l > chi) chi = l;
+        sum += l;
+      }
+      edgeSpread = Math.round(chi - clo);
+      edgeLum = Math.round(sum / (col.length / 4));
+    }
+    // `FIELD` is '#0d1017', which is luminance 16. A pillar is that value with
+    // no spread at all, read straight off the constant rather than typed twice.
+    const fieldLum = Math.round(13 * 0.299 + 16 * 0.587 + 23 * 0.114);
+    A('the film is cropped to fill the frame, so it reaches the left edge',
+      edgeSpread != null && (edgeSpread > 2 || Math.abs(edgeLum - fieldLum) > 6),
+      edgeSpread == null
+        ? 'there was no film to measure'
+        : `the column 6 px in spans ${edgeSpread} of 255 and averages ${edgeLum}, `
+          + `against a flat field at ${fieldLum}`);
 
     const p1 = panels[1].panel;
     p1.full(true).then(() => {
@@ -1864,12 +1921,53 @@
      * this project keeps meeting: a check that passes by reading something the
      * page has stopped showing anybody.
      */
-    const ms = readBurned(panels[1].ctx);
-    const near = Number.isFinite(ms) && Math.abs(Date.now() - ms) < 60_000;
-    A('the picture in the control room is the test picture, read back out of it',
-      near, Number.isFinite(ms)
-        ? `the burned clock reads ${new Date(ms).toISOString().slice(11, 23)}, ${Math.abs(Date.now() - ms)} ms from now`
-        : 'nothing decoded out of the canvas, so the panel is not showing the picture');
+    /**
+     * 🔴 AND IT NO LONGER READS A BURNED CLOCK, SINCE *"rm video overlay"* ON
+     * 2026-09-18. This asserted `readBurned(panels[1].ctx)` against `now`, which
+     * grades the blit only while the thing being blitted is the generated
+     * pattern. With a film in the feed there is no clock in the picture at all,
+     * so that check would have gone red on a page that is working, which is the
+     * worst kind of red there is.
+     * ⚠️ **IT IS ONE CLAIM ACROSS BOTH ARMS RATHER THAN A BRANCH.** Whatever is
+     * being drawn, the same eight points must read the SAME in the panel as in
+     * the master, and the picture must MOVE. That is the blit and the loop,
+     * which is what the old check was really about: its own comment says *"the
+     * blit between them is exactly the step that could be missing"*.
+     * ⚠️ **BOTH HALVES OR NEITHER, AND EACH CATCHES WHAT THE OTHER CANNOT.** A
+     * match alone passes when the master is blank, because a blank panel
+     * matches a blank master perfectly. Movement alone passes when the panel is
+     * showing an old picture of its own. Neither is worth anything on its own.
+     * ⚠️ **AND IT SAMPLES LUMINANCE AT FIXED FRACTIONS, NOT A SUM.** A sum over
+     * the frame is the statistic CLAUDE.md records `/mirror/` being blinded by:
+     * three cosines 120 degrees apart sum to a constant. Eight points that each
+     * have to agree cannot be satisfied by a coincidence in the aggregate.
+     */
+    const SAMPLE = [[0.12, 0.20], [0.31, 0.47], [0.50, 0.31], [0.68, 0.62],
+      [0.84, 0.44], [0.22, 0.75], [0.77, 0.18], [0.41, 0.86]];
+    const lumAtOf = (ctx) => SAMPLE.map(([fx, fy]) => {
+      const px = ctx.getImageData(Math.round(FRAME_W * fx), Math.round(FRAME_H * fy), 1, 1).data;
+      return Math.round(px[0] * 0.299 + px[1] * 0.587 + px[2] * 0.114);
+    });
+    /**
+     * ⚠️ THE TWO READS ARE IN ONE TASK, WHICH IS WHAT MAKES THE MATCH EXACT.
+     * `tick` writes the master and blits it inside one animation frame, and no
+     * frame can run between two synchronous `getImageData` calls, so the panel
+     * is holding precisely the master frame being read. A tolerance here would
+     * be hiding a real difference rather than absorbing jitter.
+     */
+    const roomCtx = panels[1].ctx;
+    const roomA = lumAtOf(roomCtx);
+    const masterA = lumAtOf(mctx);
+    await new Promise((r) => setTimeout(r, 250));
+    const roomB = lumAtOf(roomCtx);
+    const blitted = roomA.every((v, i) => v === masterA[i]);
+    const worst = Math.max(...roomA.map((v, i) => Math.abs(v - masterA[i])));
+    const changedBy = Math.max(...roomA.map((v, i) => Math.abs(v - roomB[i])));
+    A('the control room shows what the loop drew, and the picture is moving',
+      blitted && changedBy > 0,
+      `eight points read ${blitted ? 'identical' : `${worst} apart at worst`} in the panel and `
+      + `the master, and the picture changed by ${changedBy} of 255 over 250 ms `
+      + `(${bgVideo && bgVideo.readyState >= 2 ? 'the film' : 'the generated picture'})`);
 
     /**
      * 🔴 NO BLACK RULE BETWEEN LANES, MEASURED IN PIXELS OFF THE STRIP ITSELF.
@@ -2457,8 +2555,8 @@
         children: [
           { id: 'canvas', label: 'canvas', sub: '720p, 25fps',
             note: 'The picture the show is made of, drawn here and captured as a '
-                + '**MediaStream**. A clock is burned into every frame, which is what makes '
-                + 'a seek in the archive checkable rather than a thing to take on trust.' },
+                + '**MediaStream**. It carries a public domain film cropped to fill the '
+                + 'frame, and a visit that cannot load it gets a generated test picture.' },
           { id: 'recorder', label: 'MediaRecorder', sub: '700k, 2s',
             note: 'Records the track that came BACK, never the canvas. What the audience '
                 + 'saw is the returned track, and recording the source would make the '
