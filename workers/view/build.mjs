@@ -371,8 +371,15 @@ function demoFiles() {
   // ⚠️ AN ALLOWLIST FAILS SILENTLY BY DESIGN, which is the point of it; what
   // was missing is that nothing ASKED whether every local URL in a page has a
   // file behind it. `checkImports()` does that for modules only.
+  // 🔴 `.mp4` ADDED 2026-09-18 FOR THE SAME REASON `.m4a` IS HERE, AND IT
+  // FAILED IN THE SAME SILENT WAY FIRST. `/stage/` gained a public domain film
+  // as its default background; the build copied the film's provenance JSON
+  // beside it and declined the film, so the page would have shipped with a
+  // `<video>` pointing at a 404 and the build would have said `copied 182
+  // files` about it. That is the `.webmanifest` story again, third time.
   const OK = new Set(['.html', '.mjs', '.js', '.css', '.json', '.webmanifest',
                       '.m4a', '.mp3', '.opus', '.ogg', '.wav', '.webm',
+                      '.mp4', '.m4v',
                       '.png', '.jpg', '.jpeg', '.svg', '.webp']);
   for (const d of DEMO_MANIFEST) {
     if (!d.built) continue;

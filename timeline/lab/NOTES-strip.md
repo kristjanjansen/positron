@@ -27,13 +27,14 @@ import { createStrip } from '/timeline/strip.mjs';
 
 const strip = createStrip(canvas, deck, {
   lanes: [...], view: {originTime, pxPerSecond, scrollX},
-  evidence, follow, gutter, hud, absolute,
+  evidence, follow, followTarget, gutter, hud, absolute,
   onSeek, onHover, onFollowChange, deckPolicy,
 });
 ```
 
 Returns: `setLanes/lanes/show`, `view/setView/fit/zoomAt/zoomIn/zoomOut`,
-`setFollow/follow`, `armWall/wallPos/gapMs`, `setEvidence/evidence`,
+`setFollow/follow/setFollowTarget/followPos`,
+`armWall/disarmWall/wallPos/gapMs`, `setEvidence/evidence`,
 `setCertainty/certainty`, `spanStates(id)`, `narrowable(id)`,
 `aggregateStat(id)`, `readout/invalidate/draw`, `timeToX/xToTime/tickLOD`,
 `inkOf(id, {mode})`/`ink`, `dispose`.
@@ -155,10 +156,22 @@ ERR domain is the same magnitude as an epoch stamp.
   is decoration. Never re-anchored implicitly: that would erase exactly the
   quantity it exists to show. `armWall(pos)` is the explicit re-arm.
 * **Follow-mode** is a **page flip**, not a re-centre: the window stays put
-  until the playhead crosses `followEdge` (0.82), then jumps once. demo9
-  re-centred every frame and fought the user — the recorded failure. Any
-  scroll/pan/wheel sets `userScrolled` and disengages; only `setFollow(true)`
-  re-engages, and `onFollowChange` lets the client light its button.
+  until the followed position crosses `followEdge` (0.82), then jumps once.
+  demo9 re-centred every frame and fought the user, which is the recorded
+  failure. Any scroll/pan/wheel sets `userScrolled` and disengages; only
+  `setFollow(true)` re-engages, and `onFollowChange` lets the client light its
+  button.
+* **What follow TRACKS is the newest fact on the strip, which is not always the
+  playhead.** `followTarget` (option, or `setFollowTarget(fn)` at runtime) names
+  it; null means the playhead, which is what every page did before `/stage/`.
+  A strip watching a show being RECORDED has a newest fact and no playhead:
+  nothing is playing, so follow sat still while rows arrived off the right edge.
+  `wallPos()` anchored at the recorder's start IS the write head, so the usual
+  target is `() => wallPos() ?? S.pos`, which hands back to the playhead by
+  itself when the wall cursor is disarmed. A target returning null or NaN falls
+  back to the playhead rather than parking the view at NaN. `report().followPos`
+  and `report().followsPlayhead` say where it is looking, so a check can tell
+  the two targets apart instead of inferring it from a view that moved.
 * **Evidence** is asked of the deck (`setEvidence` forwards to
   `deck.setEvidence` unless `deckPolicy:false`, for a client that owns the
   choice itself), and `evidenceAccounting()` supplies the invented-percentage

@@ -281,16 +281,23 @@
   const ctrl = byId.get('controlroom');
 
   /**
-   * The card an early arrival sees. It sits in the panel's picture area and is
-   * replaced by the video element the moment frames exist, so a visitor never
-   * meets a black box with a transport under it.
+   * 🔴 NO WAITING CARD. Asked 2026-09-18, quoting both its lines back: *"rm A
+   * show is coming / Nothing is playing yet. When the control room starts, the
+   * picture appears here."* It said in two sentences what the presence badge
+   * beside it says in one word and what an empty stage says by being empty, and
+   * it was the first thing a visitor read on a page whose subject is a picture.
+   * ⚠️ **WHAT IT WAS FOR IS STILL TRUE AND IS HANDLED ELSEWHERE.** The reason
+   * written here was that a visitor must not meet a black box with a transport
+   * under it. The panel keeps its 16 by 9 picture area and the audience has no
+   * transport at all, so there is no black box to explain; the badge already
+   * reads `offline`, `coming` or `online`, which is the same fact in the place
+   * a reader looks for it.
+   * ⚠️ **AND THE CHECK THAT GUARDED IT CHANGED RATHER THAN GOING.** It read
+   * `.pos-card`, so deleting the card alone would have taken the page red, and
+   * deleting the assert alone would have dropped the claim it exists to make.
+   * The claim was never about a card: it is that the audience is shown no
+   * `<video>` before there is anything in one.
    */
-  const soonCard = createCard({
-    title: 'A show is coming',
-    desc: 'Nothing is playing yet. When the control room starts, the picture appears here.',
-    aspect: '16 / 9',
-  });
-  aud.panel.stage.append(soonCard.el || soonCard);
 
   /** The audience's `<video>`, created at start and never before. */
   let audVideo = null;
@@ -316,7 +323,30 @@
    * belongs to whoever owns this project, and it is written here rather than
    * left for somebody to discover in a network tab.
    */
-  const BG = Q.get('bg') || '';
+  /**
+   * 🔴 AND THE DEFAULT BACKGROUND IS NOT ERR, SINCE 2026-09-18. Asked as
+   * *"turn on the err feed in the bg"*, then settled a message later with *"i
+   * just need some video there. look for suitable PD sources? can be historic
+   * stuff or whatever"*. That second sentence dissolves the problem: the ask
+   * was never ERR, it was a picture, and a public domain film on our own origin
+   * costs a broadcaster nothing and raises no rights question to hand back.
+   *
+   * ⚠️ THE FIRST ONE WAS THE DICKSON EXPERIMENTAL SOUND FILM (1894) AND IT HAS
+   * BEEN REMOVED on instruction, pending a German Expressionist, dance related
+   * replacement. What is worth keeping from choosing it: it was picked on TWO
+   * independent public domain grounds rather than one, and the ON THEME
+   * candidate was REJECTED for having only a weak one. `corpus.json` holds
+   * Kurenniemi's own `Computer Music (1966)`, which would have been perfect
+   * here and is marked `licenceConfidence: LOW`, `holder: uploaded by a member
+   * of the public`. A public domain mark self-asserted by an anonymous uploader
+   * on a 1966 Finnish film is not a clearance.
+   * ⚠️ AND WHATEVER REPLACES IT IS FETCHED ONCE AND SERVED FROM OUR OWN ORIGIN.
+   * A public domain film on archive.org is still archive.org's server, which is
+   * the standing rule about external sources and the reason `/tapes/` needed a
+   * stand-in.
+   */
+  const DEFAULT_BG = '';
+  const BG = Q.get('bg') || DEFAULT_BG;
   const secs = (t) => {
     if (!t) return null;
     const parts = String(t).split(':').map(Number);
@@ -328,10 +358,33 @@
   let bgVideo = null;
   let bgHls = null;
 
+  /** A path or a full URL is a FILE; anything else is an ERR archive slug. */
+  const isFileSource = (s) => /^https?:\/\/|^\//.test(s);
+
   async function loadBackground(slug) {
     const v = document.createElement('video');
     v.muted = true; v.playsInline = true; v.crossOrigin = 'anonymous';
     try {
+      /**
+       * ⚠️ THE FILE ROUTE IS FIVE LINES AND THE ERR ROUTE IS SIXTY, which is
+       * the clearest argument for the default there is. No archive API, no
+       * HLS, no 618 KB of hls.js, no CORS question and no tainted canvas: a
+       * `<video>` with a `src` on the same origin as the page.
+       * ⚠️ IT LOOPS, because the film is 2 m 45 s and a show is longer.
+       */
+      if (isFileSource(slug)) {
+        v.src = slug;
+        v.loop = true;
+        await new Promise((res) => {
+          v.addEventListener('loadedmetadata', res, { once: true });
+          setTimeout(res, 8000);
+        });
+        if (BG_FROM != null) v.currentTime = BG_FROM;
+        await v.play().catch(() => {});
+        bgVideo = v;
+        d.log(`background: ${slug.split('/').pop()}, ${v.videoWidth}x${v.videoHeight}`, 'hi');
+        return;
+      }
       const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(slug)}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
@@ -417,11 +470,18 @@
       d.log(`background: ERR ${slug}${BG_FROM != null ? ` from ${Q.get('from')}` : ''}`
         + `${BG_TO != null ? ` to ${Q.get('to')}` : ''}`, 'hi');
     } catch (e) {
-      d.log(`could not put ERR ${slug} behind the stage: ${e.message}`, 'bad');
+      d.log(`could not put ${slug} behind the stage: ${e.message}`, 'bad');
       bgVideo = null;
     }
   }
-  if (BG && !SELFCHECK) loadBackground(BG);
+  /**
+   * 🔴 THE GATE IS ABOUT WHOSE SERVER IT IS, NOT ABOUT WHETHER A CHECK IS
+   * RUNNING. The local film loads for everybody including a harness: it is this
+   * page's own picture now, it is 11 MB on the same origin, and gating it would
+   * leave the one thing a visitor always sees graded by nothing. The ERR route
+   * stays exactly as it was, opt-in and never reachable by a suite run.
+   */
+  if (BG && (isFileSource(BG) || !SELFCHECK)) loadBackground(BG);
 
   /**
    * 🔴 ONE ORIGIN FOR EVERY MARK ON THE STRIP, AND IT IS THE RECORDER'S FIRST
@@ -446,6 +506,7 @@
   let landed = null;                   // the HEAD proof, displayed rather than only kept
   let recSource = 'received';          // 'received' or 'canvas', and it is DISPLAYED
   let recTrack = null;                 // the exact track object the recorder holds
+  let askedBps = null;                 // the rate the recorder SAYS it is using
 
   /** Where the show has got to, as one word the whole page reads. */
   let phase = 'before';                // before · live · stopped
@@ -580,6 +641,35 @@
    * on every visit, and the seam where real ones would arrive is named below.
    */
   const SHOW_MS = 3 * 60 * 1000;
+  /**
+   * 🔴 THE WINDOW THE ARCHIVE OPENS ON, AND HOW FAR OUT A READER MAY PULL.
+   * Asked 2026-09-18: *"zoom arhvie to 15s and allow to zoom out 4x more"*.
+   *
+   * ⚠️ IT REPLACES A TEN MINUTE CEILING WRITTEN EARLIER THE SAME DAY, and the
+   * reasoning under that one still holds: at 1280 px a three hour recording is
+   * 8.3 seconds per pixel, so the view in which a whole show fits is the view
+   * in which nothing in it can be read. What changed is the number, which was
+   * mine and is now the one that was asked for.
+   *
+   * 🔴 AND ZOOM OUT HAD NO BOUND AT ALL BEFORE THIS, which is why the ask had
+   * to create one to raise. `capPps` floored at 1e-30 px/s, so a reader could
+   * wheel until a recording was a thousandth of a pixel with nothing on screen.
+   * `maxSpan` is the strip's new floor and this is its first caller.
+   * ⚠️ IT TAKES THE RECORDING IF THE RECORDING IS LONGER. A bound that hides
+   * the thing a reader came to look at is not a bound, it is a bug: a three
+   * minute show under a sixty second ceiling could never be seen whole.
+   */
+  const ARCHIVE_WINDOW_MS = 15 * 1000;
+  const ZOOM_OUT = 4;
+  /**
+   * ⚠️ ONE EXPRESSION, BECAUSE THE CHECK READS IT TOO. It was written twice for
+   * one run, once in the strip's option and once in the assert grading it, and
+   * they disagreed immediately: before a show there is no recording, so the
+   * bound is the nominal three minutes rather than sixty seconds, and the check
+   * called a correct page wrong. A shared measurement written in two places is
+   * a measurement that will disagree.
+   */
+  const maxSpanMs = () => Math.max(ARCHIVE_WINDOW_MS * ZOOM_OUT, (recordedMs ?? SHOW_MS) * 1.05);
   const archive = byId.get('archive');
   const archiveDeck = createDeck({
     range: [0, SHOW_MS],
@@ -682,6 +772,7 @@
    * archive is still the generated simulation and the deck IS the only clock.
    */
   let archiveMedia = null;
+  let archiveMaster = null;       // the mediaMaster, so a check can read its counters
   const archiveCommand = {
     play: () => (archiveMedia ? archiveMedia.play().catch(() => {}) : archiveDeck.play()),
     pause: () => (archiveMedia ? archiveMedia.pause() : archiveDeck.pause()),
@@ -736,7 +827,15 @@
   const strip = createStripView(tabs.panel('archive'), archiveDeck, {
     size: 'auto', gutter: 110, lanes: [VIDEO_LANE], minHeight: STRIP_MIN_H,
     onSeek: (ms) => archiveCommand.seek(ms),
+    // A FUNCTION, not a number: the widest useful view changes the moment a
+    // recording resolves a real length, and a constant read once at
+    // construction would bound the archive by the nominal show it replaced.
+    maxSpan: () => maxSpanMs(),
   });
+  // It opens on the window rather than on the deck's range, which `fit()` would
+  // otherwise give it: three minutes of nominal show before anything has been
+  // recorded, where a question mark is a pixel.
+  strip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
   // The count is kept here because the strip reports no lane list of its own,
   // and a check that samples between lanes has to be able to say it HAD lanes.
   let laneCount = 1;
@@ -776,6 +875,53 @@
     laneCount = list.length;
     strip.strip.setLanes(list);
   };
+
+  /**
+   * 🔴 WHAT follow FOLLOWS WHILE A SHOW IS RUNNING. Asked 2026-09-18: *"What to
+   * do with follow"*, and the open half was never the control, it was the
+   * target. The strip has had `setFollow` all along and every page before this
+   * one followed THE PLAYHEAD, because on those pages there was nothing else it
+   * could be.
+   *
+   * 🔴 THIS TAB HAS A NEWEST FACT AND NO PLAYHEAD. Nothing is playing while a
+   * show is being recorded: `archiveMedia` is null, the deck sits at 0, and the
+   * strip sat still while questions and answers arrived off the right edge. The
+   * thing that is moving is the RECORDER, and the strip already knew how to say
+   * where that has got to: `armWall(0)` at the moment recording starts makes
+   * `wallPos()` the write head, and draws it as the wall cursor.
+   *
+   * ⚠️ SO THE RULE IS ONE RULE, NOT TWO: follow tracks the newest fact on the
+   * strip. During playback that is the playhead, during a show it is the write
+   * head, and `() => wallPos() ?? pos` is both of them written once. It hands
+   * back by itself when the wall is disarmed, and the explicit handover below
+   * is belt and braces rather than the mechanism.
+   *
+   * ⚠️ AND THE GAP BETWEEN THE TWO CURSORS BECOMES A REAL NUMBER HERE, which is
+   * the first time on this page: how far behind the show somebody watching the
+   * archive has got to.
+   */
+  function followWriteHead() {
+    const st = strip.strip;
+    st.armWall(0);
+    st.setFollowTarget(() => st.wallPos());
+    st.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
+    st.setFollow(true);
+  }
+  /**
+   * The show has stopped, so the write head has, and a wall cursor that goes on
+   * counting is measuring how long ago it finished. The whole recording is the
+   * subject now, so the view fits it rather than holding a window on it.
+   * ⚠️ IT DOES NOT RE-ENGAGE follow. `follow()` reports `engaged: on &&
+   * !userScrolled`, so somebody who dragged the strip during the show stays
+   * where they dragged it: a handover that yanks the view out of a hand is the
+   * demo9 failure the strip was built to avoid, arriving one level up.
+   */
+  function followPlayhead() {
+    const st = strip.strip;
+    st.setFollowTarget(null);
+    st.disarmWall();
+    st.fit(0, recordedMs ?? SHOW_MS);
+  }
 
   /**
    * 🔴 THE BAR AND THE STRIP ARE ONE SURFACE. Asked 2026-09-18: *"do same
@@ -885,22 +1031,54 @@
   const room = tabs.panel('controlroom');
 
   /**
-   * 🔴 START AND STOP LIVE IN THE CONTROL ROOM, NOT IN A CONTROLS ROW, AND THAT
-   * IS A DECISION RATHER THAN A PLACEMENT. This page declares `controls: []`
-   * because the tabs are its navigation and each panel carries its own, and
-   * there is a second reason to keep it that way: **a page that gains its first
-   * control moves every other control's harness press**, and `settleMs` only
-   * ever lands on control 0. MEASURED on `/radio/`: one new button moved a
-   * press from t+1 s to t+31 s and took an unrelated check red intermittently.
-   * A button that lives in a panel is pressed by the page's own check, at a
-   * moment the check chooses, and moves nothing.
+   * 🔴 START AND STOP ARE A TRANSPORT BAR. Asked twice, 2026-09-18: *"start the
+   * show | stop: standard trasport bar"*, then *"start the show | stop: use
+   * regular control bar"*. They were two hand-built `<button>`s, which is the
+   * fourth-copy mistake CLAUDE.md names in as many words: build from `/kit/`,
+   * and a control that exists in one page and nowhere else is a component
+   * nobody has noticed yet.
+   *
+   * 🔴 `live: true`, SO THE CLOCK IS A LIVE CHIP RATHER THAN A DURATION. A show
+   * has a length only once it has stopped, and a bar counting toward a nominal
+   * end would be claiming a finish time nobody has set. `/radio/` is the shape
+   * rather than `/replay/`, and that distinction is what `transport-bar.mjs`'s
+   * own header is about.
+   * ⚠️ `scrub: false` AND `loop: false` FOR THE SAME REASON: a live show has no
+   * position to drag to and no passage worth hearing twice.
+   *
+   * 🔴 AND ITS DECK REALLY RUNS, WHICH IS WHY THE BAR IS HONEST. `showDeck`
+   * plays when the show starts and pauses when it stops, so the playhead is how
+   * long the show has been on air, read off the same clock everything else
+   * uses. A bar wired to a deck that never moves would be a play button whose
+   * only true behaviour is to look pressed.
    */
-  const startBtn = el('button', 'pos-b', 'Start the show', { type: 'button' });
-  const stopBtn = el('button', 'pos-b', 'Stop', { type: 'button' });
-  stopBtn.disabled = true;
-  const runRow = el('div', 'stage-row');
-  runRow.append(startBtn, stopBtn);
-  room.append(runRow);
+  const showDeck = createDeck({
+    range: [0, SHOW_MS],
+    items: [{ at: 0, kind: 'show', id: 'show', payload: {} }],
+    // One rate, so the bar draws no rate row: a live show has one speed.
+    adapters: { show: { caps: { rates: [1] }, actuate: () => {} } },
+  });
+  const showBar = createTransportBar(room, showDeck, {
+    live: true, scrub: false, loop: false, absolute: false,
+    /**
+     * 🔴 `publish: false`, AND THIS IS THE LOAD-BEARING LINE. `__demo.transport`
+     * is the only handle the suite has, and every bar used to claim it
+     * unconditionally, so it was whichever bar was built LAST rather than the
+     * one the page means. This page has two: a live show here and a recording
+     * with a real position in the archive. The one that can answer "where are
+     * we in it" is the archive, so the archive keeps the name.
+     * ⚠️ AND THE HARNESS PRESSES THE PUBLISHED BAR'S OWN TOGGLE NOW rather than
+     * the first `.tbar-toggle` in the document, which on a tabbed page is a
+     * different element. Without that fix this bar would have been pressed by
+     * the play drill and STARTED A SHOW in the middle of the page's own checks.
+     */
+    publish: false,
+    command: {
+      play: () => startShow(),
+      pause: () => stopShow(),
+      seek: () => {},        // a live show has nowhere to seek to
+    },
+  });
 
   /**
    * 🔴 THE DEFAULT IS AN IN-PAGE LOOPBACK AND IT IS A REAL WEBRTC HOP.
@@ -955,18 +1133,86 @@
    * How long a piece is. Named because the CHECK reads it too: a seek lands on
    * the nearest decodable frame, so the keyframe spacing this sets is also the
    * honest tolerance for "did the picture move to where I asked".
+   *
+   * ⚠️ IT STAYS AT 2s HERE AND THE THREE HOUR ANSWER IS 5s, WHICH IS NOT A
+   * CONTRADICTION. The pieces a show makes are what an interrupted upload has
+   * to catch up on, and the uploader is ROUND-TRIP BOUND rather than bandwidth
+   * bound: MEASURED in selfrec A2, 13 buffered pieces drained in 6,816 ms, 524
+   * ms each, against a p50 verify of 483 ms. So recovery runs at about 1.9
+   * pieces a second whatever the bitrate is. At 2s a three hour show is 5,400
+   * pieces against 1.9/s of drain and 0.5/s of production, which is 3.8x of
+   * headroom; at 5s it is 2,160 pieces and 9.5x. A show HERE is seconds long,
+   * where a 5s piece means the recorder has produced nothing at all when it is
+   * stopped, so the number that is right for three hours is wrong for this page.
+   * ⚠️ AND SEEKING DOES NOT PAY FOR IT: `proto/selfrec/indexer.mjs --blocks`
+   * indexes per SimpleBlock, so a longer piece is not a coarser seek.
    */
   const SLICE_MS = 2000;
 
+  /**
+   * 🔴 THE BITRATE IS A DECISION, AND UNTIL 2026-09-18 IT WAS THE BROWSER'S.
+   * This passed no rate at all, so the recorder used its default.
+   * 🔴 MEASURED, BY TAKING THE RATE BACK OUT AND READING `videoBitsPerSecond`
+   * OFF THE RECORDER: THE DEFAULT HERE IS 2,500 kbit/s. Three hours of that is
+   * **3.38 GB**, which is worse than every row of the table in `BACKLOG.md`,
+   * including the 2 Mbit/s one somebody would have picked as the extravagant
+   * end. It is 134x the 24 MiB an `ingest` session may hold.
+   * ⚠️ THE FIRST VERSION OF THIS COMMENT SAID 1.167 Mbit/s and was wrong in a
+   * way worth keeping. That is the measured rate of
+   * `proto/selfrec/artifacts/a1-concat.webm`, and selfrec's own note says that
+   * file was recorded at a REQUEST of 1200 kbit/s. A rate somebody asked for is
+   * not a default, and the number was believed for an hour because it came off
+   * a real file with a real measurement beside it.
+   *
+   * 🔴 THE FILE SIZE IS NOT WHAT DECIDED IT, BECAUSE THE FILE SIZE IS FREE.
+   * 1.08 GB in R2 is about 1.6 cents a month, and 5,400 writes is about 2.4
+   * cents a show. Every row of the table from 691 MiB to 3.38 GB costs nothing
+   * worth arguing over, so the money axis is the wrong one and reaching for it
+   * first is how this sat undecided.
+   * ⚠️ WHAT IT COSTS IS THE UPLOAD, AND THAT ARITHMETIC IS OVER `SLICE_MS`.
+   *
+   * ⚠️ 700k OF PICTURE IS A DELIBERATE STEP UNDER A DEFAULT THAT IS 3.6x IT, on
+   * a mostly still stage where a viewer will not see the difference and a three
+   * hour archive will. 500 total would force the picture to about 400k, where
+   * VP8 smears the moment anybody moves, and the archive is watched more than
+   * once.
+   * ⚠️ AUDIO IS NOT WHERE A SAVING IS AND IS NOT CUT: 96k over three hours is
+   * 130 MB of the 1.07 GB, and it is the only track carrying the question and
+   * the answers.
+   */
+  const VIDEO_BPS = 700_000;
+  const AUDIO_BPS = 96_000;
+
   function startRecorder(track) {
     const mime = recorderMime(d);
-    const r = new MediaRecorder(new MediaStream([track]), mime ? { mimeType: mime } : {});
+    const stream = new MediaStream([track]);
+    /**
+     * ⚠️ A RATE IS PASSED ONLY FOR A TRACK THAT IS ACTUALLY THERE. This stream
+     * is one VIDEO track today, so `audioBitsPerSecond` beside it would be a
+     * setting that reads as correct and does nothing, which is the mistake this
+     * page has already paid for twice: `clock: false` on a bar that has no such
+     * option, and `how` passed inside the spec instead of the options.
+     * `AUDIO_BPS` is declared and applies the day a show carries sound.
+     */
+    const bits = {};
+    if (stream.getVideoTracks().length) bits.videoBitsPerSecond = VIDEO_BPS;
+    if (stream.getAudioTracks().length) bits.audioBitsPerSecond = AUDIO_BPS;
+    const r = new MediaRecorder(stream, mime ? { mimeType: mime, ...bits } : bits);
     r.ondataavailable = (e) => {
       if (!e.data || !e.data.size) return;
       if (T0 == null) T0 = performance.now();
       chunks.push(e.data);
     };
     r.start(SLICE_MS);
+    /**
+     * ⚠️ WHAT IT SAYS IT GOT, NOT WHAT IT WAS ASKED FOR. A `MediaRecorder`
+     * reflects the rate it will actually use, and a browser is free to answer a
+     * different number. Printing the request would be this page reporting its
+     * own intention back to itself.
+     */
+    askedBps = Math.round(r.videoBitsPerSecond || 0);
+    d.log(`recording the picture at ${(askedBps / 1000).toFixed(0)} kbit/s in `
+      + `${SLICE_MS / 1000}s pieces`);
     return r;
   }
 
@@ -974,7 +1220,7 @@
   async function startShow() {
     if (phase !== 'before' || starting) return;
     starting = true;
-    startBtn.disabled = true;
+    showDeck.play();
     try {
       const stream = master.captureStream(25);
       const v = el('video', 'stage-live', '', { playsinline: '', muted: '' });
@@ -1035,12 +1281,12 @@
       }
       rec = startRecorder(track);
       recTrack = track;
+      followWriteHead();
       phase = 'live';
-      stopBtn.disabled = false;
       sayState();
     } catch (err) {
       d.log(`the show did not start: ${err && err.message}`, 'bad');
-      startBtn.disabled = false;
+      showDeck.pause();   // it never got on air, so the bar goes back to start
     } finally { starting = false; }
   }
 
@@ -1057,7 +1303,7 @@
    */
   async function stopShow() {
     if (phase !== 'live') return;
-    stopBtn.disabled = true;
+    showDeck.pause();
     phase = 'stopped';
 
     const done = new Promise((res) => { if (rec) rec.onstop = res; else res(); });
@@ -1095,8 +1341,6 @@
     sayState();
   }
 
-  startBtn.onclick = () => startShow();
-  stopBtn.onclick = () => stopShow();
 
   /**
    * A handle for a probe, like `window.__scope` on `/radio/`. Harmless in a
@@ -1183,6 +1427,7 @@
     }
     archiveDeck.setRange([0, recordedMs]);
     relane();
+    followPlayhead();
     /**
      * ⚠️ `mediaMaster` RATHER THAN A `timeupdate` HANDLER. It owns the drift
      * correction, the rate intersection and the stall policy, and this project
@@ -1190,7 +1435,7 @@
      * seek loop is how `low-latency-player.js` once aborted the very fragment
      * loads it was trying to recover.
      */
-    mediaMaster(archiveDeck, v, { stallPolicy: 'hold' });
+    archiveMaster = mediaMaster(archiveDeck, v, { stallPolicy: 'hold' });
     archiveMedia = v;           // from here the bar and the strip drive the file
     d.log(`the archive is playing ${(recordedMs / 1000).toFixed(1)}s back${USE_R2 ? ' from R2' : ''}`, 'hi');
     return { video: v, mime, ms: recordedMs };
@@ -1205,10 +1450,10 @@
    * answers and room for a third says more about the control than three filled
    * ones would.
    */
-  const title = createField({ label: 'question', value: 'Meaning of life', grow: 'wide' });
+  const title = createField({ label: 'question', value: 'Kas Manfred MIM on olemas', grow: 'wide' });
   const opts = [
-    createField({ label: 'option', value: 'Be' }),
-    createField({ label: 'option', value: 'Not to be' }),
+    createField({ label: 'option', value: 'Jah' }),
+    createField({ label: 'option', value: 'Ei' }),
     createField({ label: 'option', placeholder: 'and a third, if you like' }),
   ];
   /**
@@ -1246,7 +1491,14 @@
   };
 
   const row = el('div', 'stage-row');
-  const now = el('button', 'pos-pri', 'Send', { type: 'button' });
+  /**
+   * ⚠️ SECONDARY, LIKE EVERYTHING ELSE ON THE PAGE. Asked 2026-09-18 with a
+   * photograph: *"All secodary buttons"*. `pos-pri` paints the yellow fill, and
+   * one yellow button beside an outlined one claims that sending now is the
+   * right answer and sending in ten seconds is the lesser one. They are two
+   * ways of doing the same thing.
+   */
+  const now = el('button', '', 'Send', { type: 'button' });
   now.onclick = () => send(0);
   const later = el('button', '', 'Send in 10s', { type: 'button' });
   later.onclick = () => send(10_000);
@@ -1292,6 +1544,24 @@
     // ⚠️ THE ARCHIVE IS NOT FED FROM HERE. It is a recording: its picture comes
     // from wherever its transport is, which is what makes scrubbing visible.
     for (const p of panels) if (p.id !== 'archive') p.ctx.drawImage(master, 0, 0);
+    /**
+     * 🔴 AND THE ARCHIVE'S MASTER IS DRIVEN FROM HERE, BECAUSE `mediaMaster`
+     * DOES NOT RUN ITSELF. Its own docstring says to call it from the rAF loop
+     * you already run, and `/crate/` carries the same warning in a comment:
+     * without this the object is BUILT and nothing happens. This page built it
+     * and never ticked it, so the archive's deck was never once driven by its
+     * element.
+     * ⚠️ IT WAS REPORTED AS *"there is not caret in arvhice playback"* AND
+     * DIAGNOSED WRONGLY TWICE, as a MediaRecorder file carrying no cues. The
+     * file is fine: MEASURED, the element went to 1.00s of a 3.45s recording,
+     * `ended` false, `seekable` 0.00..3.45, while the deck sat at 3.45s.
+     * `master ticks 0, backstop 0, driving false` is what finally said it, and
+     * printing those three counters took one run where guessing took three.
+     * ⚠️ THE SEEK CHECK ABOVE PASSED THROUGHOUT, because it asks the ELEMENT
+     * where it went. Every assert about this page's archive was on the one side
+     * of the join that worked.
+     */
+    archiveMaster?.tick();
     frames++;
     requestAnimationFrame(tick);
   }
@@ -1457,6 +1727,18 @@
      * ⚠️ A COMMENT IS NOT A GATE, and this is the second one found in two days
      * describing behaviour its own file does not have.
      */
+    /**
+     * ⚠️ READ ONLY, SO IT SITS ABOVE THE GATE AND A VISITOR GETS IT TOO. What
+     * the archive OPENS on is a fact about the page at rest: it needs no press,
+     * no zoom and no recording, and the checks below that zoom would destroy it
+     * if it were asked after them.
+     */
+    const spanOf = () => (strip.strip.state.width - strip.strip.state.gutterPx)
+      * 1000 / strip.strip.view().pxPerSecond;
+    A('the archive opens on a fifteen second window',
+      Math.abs(spanOf() - ARCHIVE_WINDOW_MS) < 1500,
+      `${(spanOf() / 1000).toFixed(1)}s on screen, against ${ARCHIVE_WINDOW_MS / 1000}s asked for`);
+
     if (!SELFCHECK) {
       // ⚠️ A VISITOR STILL GETS EVERY READ-ONLY ASSERT. They are held rather
       // than skipped, so the early return has to emit them: without this the
@@ -1466,6 +1748,23 @@
       d.log('the checks that press things are for the harness, not for you');
       return;
     }
+
+    /**
+     * 🔴 AND THE ZOOM OUT BOUND, PROVED BY ASKING FOR FAR MORE THAN IT ALLOWS.
+     * A floor that is never reached is a floor nobody can tell from no floor at
+     * all, so this asks for a thousandfold zoom out and asserts where it
+     * stopped. `S.zoom.by` names the limit that bit, which is how this tells a
+     * bound that fired from a wheel that did nothing.
+     */
+    strip.strip.zoomOut(1000);
+    const outSpan = spanOf();
+    const stoppedBy = strip.strip.state.zoom?.by ?? 'nothing';
+    strip.strip.fit(0, ARCHIVE_WINDOW_MS, { pad: 0 });
+    A('zoom out stops at the page\u2019s own bound, and says which limit stopped it',
+      Math.abs(outSpan - maxSpanMs()) < maxSpanMs() * 0.05 && stoppedBy === 'max-span',
+      `it went out to ${(outSpan / 1000).toFixed(1)}s against a bound of `
+      + `${(maxSpanMs() / 1000).toFixed(1)}s, stopped by ${stoppedBy}`
+      + `${recordedMs == null ? ' (no recording yet, so the bound is the nominal show)' : ''}`);
 
     const p1 = panels[1].panel;
     p1.full(true).then(() => {
@@ -1622,12 +1921,31 @@
   async function showDrill() {
     // 1. Before anything starts, there is a card and no video anywhere.
     const vidsBefore = document.querySelectorAll('.pos-vp-stage video').length;
-    A('the audience waits on a card, not on an empty video',
-      vidsBefore === 0 && !!aud.panel.stage.querySelector('.pos-card'),
-      `${vidsBefore} video elements in the page, and the audience holds `
-      + `${aud.panel.stage.querySelector('.pos-card') ? 'a card' : 'nothing'}`);
+    A('the audience is shown no video before there is anything in one',
+      vidsBefore === 0 && !aud.panel.stage.querySelector('video'),
+      `${vidsBefore} video elements in the page, and the audience panel holds `
+      + `${aud.panel.stage.children.length} child element(s), none of them a video`);
 
-    await startShow();
+    /**
+     * 🔴 PRESS THE CONTROL, DO NOT CALL THE FUNCTION. This said `await
+     * startShow()`, which grades the pipeline and says nothing about the thing
+     * a person touches. The two buttons became a transport bar on 2026-09-18,
+     * and a bar wired to the wrong command, or built with `toggle: false`, or
+     * never appended, would leave every assert below it green: they would all
+     * be measuring a show that only the check knows how to start.
+     * ⚠️ AND IT WAITS ON THE PAGE'S OWN STATE rather than on a timer, so a
+     * press that does nothing fails here rather than three asserts later.
+     */
+    const showToggle = showBar.el.querySelector('.tbar-toggle');
+    showToggle?.click();
+    for (let i = 0; i < 200 && phase !== 'live'; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    A('the transport bar in the control room is what starts the show',
+      !!showToggle && phase === 'live' && showDeck.playing(),
+      showToggle
+        ? `one press took the page to "${phase}" and the bar's deck is ${showDeck.playing() ? 'running' : 'stopped'}`
+        : 'the control room bar has no play button at all');
 
     // 2. A real peer connection was negotiated, whichever leg it is.
     A('a peer connection carried the picture, rather than the page handing itself its own stream',
@@ -1652,13 +1970,114 @@
         ? `recorded the receiver's own track object, 1 of ${recvTracks.length}`
         : 'no frame crossed the leg, so it recorded the canvas and the log says so');
 
-    // 4. Let it run long enough to produce more than one timeslice.
+    /**
+     * 4. 🔴 WHAT follow IS FOLLOWING, WHICH IS THE ONE THING THAT SEPARATES THE
+     * TWO TARGETS. A view that moved is not evidence on its own: it is what the
+     * OLD behaviour would do too, if anything were playing. The claim is that
+     * the window keeps up with a show while THE PLAYHEAD NEVER MOVES, and both
+     * halves are asserted together or neither means anything.
+     *
+     * ⚠️ IT ZOOMS IN FIRST, THE WAY A READER WOULD. At the window a visitor
+     * gets, the write head reaches the paging edge minutes in, which is the
+     * whole point of the window and no use to a check. Three seconds of view
+     * pages at 2.46s, inside the wait this drill was already taking.
+     * ⚠️ AND ZOOMING IS A ROUTE THE PAGE HAS: the strip zooms on a wheel and a
+     * pinch, and the backlog entry this answers says follow is what makes a
+     * ZOOMED view usable. The check is in the case the feature is for.
+     */
+    /**
+     * 🔴 AND BOTH OF THESE WERE BLIND WHEN FIRST WRITTEN, WHICH IS WHY THEY ARE
+     * SHAPED LIKE THIS. They asserted `followsPlayhead === false`, a finite
+     * `followPos` and a window that MOVED. SABOTAGED on purpose, making
+     * `followPos` ignore the page's target and return the playhead: the page
+     * read 32/32. `followsPlayhead` reports the SETTING rather than the
+     * behaviour, so it was true of a strip that then ignored the setting; the
+     * harness had seeked the playhead to 90s, so `followPos` was a large finite
+     * number; and a window chasing a playhead 90s away moved 17,119 px, which
+     * passed "it moved" with room to spare.
+     * ⚠️ SO THEY MEASURE THE QUANTITY IN QUESTION NOW: how far `followPos` is
+     * from the WRITE HEAD, and whether the write head is on screen at the end.
+     * A statistic that is satisfied by the defect is not a weak check, it is a
+     * blind one, and the only thing that told the difference was breaking it.
+     */
+    const st = strip.strip;
+    const rd0 = st.readout();
+    A('while a show is recording, follow tracks the write head and not the playhead',
+      rd0.followsPlayhead === false && rd0.wall !== null
+        && Math.abs(rd0.followPos - rd0.wall) < 250,
+      `follow is at ${(rd0.followPos / 1000).toFixed(2)}s, the write head at `
+      + `${(rd0.wall / 1000).toFixed(2)}s and the playhead at `
+      + `${(rd0.pos / 1000).toFixed(2)}s`);
+
+    st.fit(0, 3000, { pad: 0 });
+    const view0 = st.view();
+    const pos0 = st.readout().pos;
+
+    // 4b. Let it run long enough to produce more than one timeslice.
     await new Promise((r) => setTimeout(r, 3500));
+
+    const view1 = st.view();
+    const rd1 = st.readout();
+    const shifted = Math.round(view1.scrollX - view0.scrollX);
+    const headX = st.timeToX(rd1.wall ?? 0);
+    const plotW = st.state.width - st.state.gutterPx;
+    /**
+     * ⚠️ AND IT DOES NOT ASSERT THAT THE PLAYHEAD HELD STILL, THOUGH IT PRINTS
+     * IT. That clause read green twice and then red with visibly identical
+     * numbers: the shell's own keyboard-seek drill moves the playhead to 90s on
+     * the harness's schedule, and which side of this 3.5s window it lands on is
+     * not this page's business. CLAUDE.md has the general form in writing, that
+     * a check depending on WHEN a press lands must confirm where it landed
+     * rather than assume it.
+     * ⚠️ NOTHING IS LOST BY DROPPING IT. The discriminating term is `followPos`
+     * against the WRITE HEAD, and that is the one that took both sabotages red;
+     * the playhead clause never caught anything the write-head comparison did
+     * not already catch, and it imported a dependency on another drill's timing.
+     */
+    A('the window keeps the write head on screen while nobody is playing',
+      Math.abs(shifted) > 1 && headX >= 0 && headX <= plotW
+        && Math.abs(rd1.followPos - rd1.wall) < 250,
+      // ⚠️ EVERY TERM IS PRINTED. This read as a pass and then as a fail with
+      // visibly identical numbers, because the one term not in the detail was
+      // the one that moved. A failure nobody can attribute is not finished.
+      `moved ${shifted} px · write head ${((rd1.wall ?? 0) / 1000).toFixed(2)}s at `
+      + `${Math.round(headX)} px of ${Math.round(plotW)} · follow at `
+      + `${(rd1.followPos / 1000).toFixed(2)}s, ${Math.round(Math.abs(rd1.followPos - (rd1.wall ?? 0)))} ms off it `
+      + `· playhead ${(pos0 / 1000).toFixed(2)}s to ${(rd1.pos / 1000).toFixed(2)}s`);
+
     A('the recorder produced data while the show was running',
       chunks.length >= 1 && rec?.state === 'recording',
       `${chunks.length} pieces after 3.5s, recorder ${rec?.state ?? 'none'}`);
 
-    await stopShow();
+    /**
+     * ⚠️ THE RATE IS ASSERTED AS THE RECORDER'S OWN ANSWER, NOT AS THE NUMBER
+     * THIS PAGE ASKED FOR. `videoBitsPerSecond` reads back what the browser will
+     * actually use, so asserting it against the constant would be the page
+     * agreeing with itself. What is claimed is that a rate was CHOSEN: this
+     * passed none at all until 2026-09-18 and took the browser's default, which
+     * MEASURED 2,500 kbit/s here when this assert was proved by deleting the
+     * rate: 3.38 GB for a three hour show.
+     */
+    A('the recording runs at a bitrate this page chose, not at the browser default',
+      Number.isFinite(askedBps) && askedBps > 0 && askedBps < 1000000,
+      askedBps ? `the recorder reports ${(askedBps / 1000).toFixed(0)} kbit/s`
+        : 'the recorder reported no rate at all');
+
+    /**
+     * ⚠️ THE SAME PRESS, THE OTHER WAY, AND IT WAITS FOR THE ARCHIVE RATHER
+     * THAN FOR `phase`. `stopShow` sets `phase = 'stopped'` on its second line
+     * and then goes on to stop the recorder, put the bytes somewhere and
+     * resolve a duration. Polling the word would have released this drill
+     * before any of that, and the five asserts below it are all about the
+     * archive: they would have read a page that had not finished stopping.
+     */
+    showToggle?.click();
+    for (let i = 0; i < 300 && !(phase === 'stopped' && archiveMedia); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    A('the same press stops the show, and the bar goes back to where it started',
+      phase === 'stopped' && !showDeck.playing(),
+      `the page is "${phase}" and the bar's deck is ${showDeck.playing() ? 'still running' : 'stopped'}`);
 
     /**
      * 5. R2, asserted in BOTH modes with one count. Without `?r2=1` the claim
@@ -1671,6 +2090,18 @@
     USE_R2 ? !!landed?.ok && landed.bytes > 0 : landed === null && stored === null,
     USE_R2 ? `HEAD says ${landed?.bytes} bytes readable at ${landed?.url}`
       : 'no session opened, no object written');
+
+    /**
+     * ⚠️ AND THE HANDOVER, WHICH IS THE OTHER HALF OF THE SAME CLAIM. A target
+     * that never goes back is a page whose archive can no longer follow what it
+     * is playing, and that failure would be invisible: the strip would look
+     * exactly the same until somebody pressed play.
+     */
+    const rdEnd = strip.strip.readout();
+    A('when the show ends, follow hands back to the playhead and the wall cursor goes',
+      rdEnd.followsPlayhead === true && rdEnd.wall === null,
+      `follow is on the ${rdEnd.followsPlayhead ? 'playhead' : 'write head'} and the wall `
+      + `cursor is ${rdEnd.wall === null ? 'put away' : 'still counting'}`);
 
     // 6. The archive plays something with a real length in it.
     const av = archive.panel.stage.querySelector('video');
@@ -1786,6 +2217,129 @@
         + 'cues, so the browser reports the position and keeps the frame it had', 'warn');
     }
 
+    /**
+     * 🔴 IS THERE A CARET ON THE ARCHIVE WHILE IT PLAYS, AND DOES IT MOVE.
+     * REPORTED 2026-09-18: *"there is not caret in arvhice playback"*.
+     *
+     * ⚠️ IT SEPARATES THE TWO CAUSES RATHER THAN PICKING ONE, because they have
+     * opposite fixes and look identical from a chair. Either the DECK is not
+     * advancing, in which case the caret is drawn correctly and parked at zero,
+     * or it is advancing and nothing is PAINTED at it. The first is a transport
+     * defect and the second a drawing one.
+     * ⚠️ THE INK TEST IS AGAINST A NEIGHBOURING COLUMN, not against a colour.
+     * A caret is a 1.5 px bright line on a dark ground, so a column that is not
+     * brighter than the one 15 px beside it has no caret in it whatever the
+     * theme says the colour should be.
+     */
+    const masterNote = () => {
+      const st = archiveMaster && archiveMaster.stats ? archiveMaster.stats() : null;
+      if (!st) return 'none attached';
+      return `ticks ${st.ticks}, backstop ${st.backstopTicks}, driving ${st.driving}`;
+    };
+    let caretMoved = null, caretLit = null, caretDetail = 'there was no recording to play';
+    if (av && Number.isFinite(recordedMs) && recordedMs > 1200) {
+      /**
+       * 🔴 GET BACK TO THE START AND CONFIRM IT, BEFORE PLAYING. The first
+       * build of this fired `seek(0)` and played immediately, and read the
+       * playhead pinned at 3.46s of a 3.5s recording: the previous drill had
+       * left it near the end, so `play()` ran off the end inside the first
+       * frame and 800 ms of watching measured nothing. That is a check
+       * reporting a page defect it caused itself, which is the shape this file
+       * has already met three times on one seek.
+       * ⚠️ AND IF IT CANNOT GET BACK, THE CHECK SAYS SO IN THOSE WORDS rather
+       * than blaming the caret: a MediaRecorder WebM carries no cues, and
+       * whether a backwards seek lands is exactly the limitation this page
+       * already reports.
+       */
+      /**
+       * 🔴 WHICH HALF REFUSES: THE ELEMENT OR THE DECK. They have opposite
+       * fixes and look identical from a chair, and the earlier version of this
+       * check reported only the DECK's position, so "the recording would not
+       * rewind" was a claim about the half it happened to read.
+       * ⚠️ AND IT ASKS FOR 1.0s RATHER THAN 0. Seeking to zero is the one
+       * target a browser can satisfy by doing nothing, and `resolveDuration`
+       * has already thrown this element at 1e6 and back, so 0 is also where it
+       * might already be. A number in the middle is answerable only by really
+       * moving.
+       */
+      const REWIND_TO = 1.0;
+      archiveCommand.seek(REWIND_TO * 1000);
+      let rewound = false;
+      for (let i = 0; i < 40 && !rewound; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        rewound = Math.abs(st.readout().pos / 1000 - REWIND_TO) < 0.4;
+      }
+      if (!rewound) {
+        const el = Math.abs(av.currentTime - REWIND_TO) < 0.4;
+        caretDetail = `asked the archive back to ${REWIND_TO.toFixed(2)}s of `
+          + `${(recordedMs / 1000).toFixed(2)}s and it did not go: the ELEMENT is at `
+          + `${av.currentTime.toFixed(2)}s (${el ? 'it moved' : 'it refused'}, ended=${av.ended}, `
+          + `seekable=${av.seekable.length ? `${av.seekable.start(0).toFixed(2)}..${av.seekable.end(0).toFixed(2)}` : 'nothing'}) `
+          + `and the DECK is at ${(st.readout().pos / 1000).toFixed(2)}s, `
+          + `so ${el ? 'the deck is not following the element' : 'the file will not seek backwards'}`
+          + ` [master ${masterNote()}]`;
+      }
+      archiveCommand.play();
+      await new Promise((r) => setTimeout(r, 250));
+      const pA = st.readout().pos;
+      await new Promise((r) => setTimeout(r, 800));
+      const pB = st.readout().pos;
+      archiveCommand.pause();
+      caretMoved = pB - pA;
+
+      const dpr = st.state.dpr || 1;
+      const colOf = (px) => Math.round((st.state.gutterPx + px) * dpr);
+      const g = strip.el.getContext('2d');
+      const lumAt = (col) => {
+        if (col < 1 || col >= strip.el.width - 1) return null;
+        const d = g.getImageData(col, 0, 1, Math.max(1, strip.el.height - 2)).data;
+        let best = 0;
+        for (let i = 0; i < d.length; i += 4) best = Math.max(best, d[i] + d[i + 1] + d[i + 2]);
+        return best;
+      };
+      const here = lumAt(colOf(st.timeToX(pB)));
+      const away = lumAt(colOf(st.timeToX(pB) - 15));
+      caretLit = here != null && away != null ? here - away : null;
+      if (rewound) {
+        caretDetail = `the playhead went ${(pA / 1000).toFixed(2)}s to ${(pB / 1000).toFixed(2)}s `
+          + `and its column reads ${here ?? 'off canvas'} against ${away ?? 'off canvas'} 15 px away`;
+      }
+    }
+    A('the archive has a caret, and it is at a playhead that moves while the recording plays',
+      caretMoved != null && caretMoved > 100 && caretLit != null && caretLit > 30,
+      caretDetail);
+
+    /**
+     * 🔴 AND IT REFUSES TO READ AN UNMEASURED DIAGRAM, WHICH IS NOW THE EASY
+     * WAY TO GET A FALSE PASS. `getComputedTextLength()` answers 0 inside a
+     * `display: none` ancestor, so every string "fits" and a diagram in a
+     * hidden tab reports NO CUTS however badly it is cut. Both of these live in
+     * tab panels that are hidden until somebody selects them, so without
+     * `measured` this assert would have gone green by never having looked.
+     * `/kit/` names this failure in writing: it reads as a wrapping bug and is
+     * an attachment bug.
+     * ⚠️ SO THE CHECK SELECTS EACH TAB AND WAITS. The component re-renders
+     * itself on reveal through a `ResizeObserver`, which is what makes the
+     * picture correct for a visitor; this waits for that rather than assuming
+     * it, and puts the page back on the tab it found.
+     */
+    const wasAt = tabs.at();
+    for (const [where] of DIAGRAMS) {
+      tabs.go(where, { push: false });
+      for (let i = 0; i < 40 && !DIAGRAMS.find(([w]) => w === where)[1].measured; i++) {
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+    }
+    tabs.go(wasAt, { push: false });
+    const unmeasured = DIAGRAMS.filter(([, dg]) => !dg.measured).map(([w]) => w);
+    A('nothing in the diagram had to be shortened to fit, in either panel that carries it',
+      unmeasured.length === 0 && cutLines.length === 0,
+      unmeasured.length
+        ? `${unmeasured.join(' and ')} never measured any type, so a clean result there means nothing`
+        : cutLines.length
+          ? cutLines.join(' · ')
+          : `every label, sub and note fitted its box in both panels`);
+
     // ⚠️ AND HERE IS THE ONLY PLACE ANY OF THEM REACH THE REPORT.
     for (const [label, pass, detail] of held) d.assert(label, pass, detail);
   }
@@ -1798,9 +2352,9 @@
 
   /**
    * 🔴 A PAGE WITH A REAL PIPELINE IN IT EARNS A DIAGRAM, and this one had
-   * none. `{ how: true, atEnd: true }` and NO title: the heading lives in
-   * `diagram.mjs` as `How it works` and a page that passes its own gets it
-   * refused, because `/station/` once shipped two headings stacked.
+   * none. `how: true` and NO title: the heading lives in `diagram.mjs` as
+   * `How it works` and a page that passes its own gets it refused, because
+   * `/station/` once shipped two headings stacked.
    */
   /**
    * ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC, AND
@@ -1810,21 +2364,40 @@
    * when it passed `clock: false` to a transport bar that has never had that
    * option, and its own comment says so twenty lines up.
    */
-  const dg = createDiagram(d.el, {
+  /**
+   * 🔴 IT LIVES IN THE CONTROL ROOM AND THE ARCHIVE, NOT AT THE END OF THE
+   * PAGE. Asked 2026-09-18: *"move how it works to control room and archive"*.
+   * Under the tabs it belonged to all three panels and described none of them
+   * in particular, which on a tabbed page reads as a footnote to the navigation
+   * rather than an explanation of what you are looking at.
+   * ⚠️ **THIS DEPARTS FROM THE STANDING RULE AND CLAUDE.md WAS CHANGED WITH
+   * IT.** That rule says every diagram passes `{ how: true, atEnd: true }` and
+   * goes last on the page, and `atEnd` appends to `document.body` rather than
+   * to the host, so a panel needs `atEnd: false` or the picture leaves the tab.
+   * A rule and the code disagreeing is the failure this project keeps paying
+   * for, so they were changed together.
+   * ⚠️ **TWO INSTANCES FROM ONE DESCRIPTION**, the way the question already
+   * does it on this page: an element cannot be in two places, and two specs
+   * would drift.
+   * ⚠️ **AND THE AUDIENCE GETS NONE.** They are watching a show. How the
+   * picture reached them is the operator's question, and both panels that carry
+   * it are the operator's.
+   */
+  const DIAGRAM_SPEC = {
     caption: 'One press sends a picture out and takes it back, and what came back is what is kept.',
     nodes: [
       { id: 'ctrl', label: 'Browser', sub: 'control room', kind: 'here', tech: 'browser',
         children: [
-          { id: 'canvas', label: 'canvas', sub: '1280x720, 25fps',
+          { id: 'canvas', label: 'canvas', sub: '720p, 25fps',
             note: 'The picture the show is made of, drawn here and captured as a '
                 + '**MediaStream**. A clock is burned into every frame, which is what makes '
                 + 'a seek in the archive checkable rather than a thing to take on trust.' },
-          { id: 'recorder', label: 'MediaRecorder', sub: '2s pieces',
+          { id: 'recorder', label: 'MediaRecorder', sub: '700k, 2s',
             note: 'Records the track that came BACK, never the canvas. What the audience '
                 + 'saw is the returned track, and recording the source would make the '
                 + 'archive a better picture than the show.' },
         ] },
-      { id: 'cf', label: 'Cloudflare', sub: 'WHIP in, WHEP out', kind: 'cloud', tech: 'cloudflare',
+      { id: 'cf', label: 'Cloudflare', sub: 'WHIP / WHEP', kind: 'cloud', tech: 'cloudflare',
         note: 'Takes the picture over **WHIP** and hands it back over **WHEP**. It records '
             + 'nothing at all, which is why the control room has to.' },
       { id: 'relay', label: 'Relay object', sub: 'one room', kind: 'cloud', tech: 'cloudflare',
@@ -1847,8 +2420,19 @@
       { from: 'relay', to: 'aud', label: 'questions' },
       { from: 'aud', to: 'relay', label: 'answers', back: true },
     ],
-  }, { how: true, atEnd: true });
-  if (dg?.cuts?.length) d.log(`diagram cuts: ${dg.cuts.join(' · ')}`, 'warn');
+  };
+  /**
+   * ⚠️ `atEnd: false` IS THE WHOLE DIFFERENCE, AND IT IS NOT A STYLE CHOICE.
+   * With `atEnd` the component appends to `document.body` and the host is
+   * ignored, so a diagram asked to live in a tab would have appeared under the
+   * page instead, looking exactly like the thing that was just moved.
+   */
+  const dgRoom = createDiagram(tabs.panel('controlroom'), DIAGRAM_SPEC, { how: true });
+  const dgArchive = createDiagram(tabs.panel('archive'), DIAGRAM_SPEC, { how: true });
+  const DIAGRAMS = [['controlroom', dgRoom], ['archive', dgArchive]];
+  const cutLines = DIAGRAMS.flatMap(([where, dg]) =>
+    (dg?.cuts ?? []).map((c) => `${where}/${c.id}: its ${c.where} was cut to "${c.shown}"`));
+  if (cutLines.length) d.log(`the diagram shortened ${cutLines.length} to fit: ${cutLines.join(' · ')}`, 'warn');
 
   d.ready();
   guard(d);

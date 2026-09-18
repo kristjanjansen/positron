@@ -36,7 +36,7 @@ import { WAY_GLYPH, WAY_SAYS, LOOP_TURN, LOOP_WAYS } from './looper.mjs';
  * degraded badge — and gives up the slider.
  */
 export function createTransportBar(host, deck, {
-  absolute = false, scrub: wantScrub = true, extras = [], fmt = null, live = false,
+  absolute = false, scrub: wantScrub = true, extras = [], fmt = null, live = false, publish = true,
   // 🔴 `false` LEAVES THE LOOP BUTTON OFF, the way `scrub: false` already
   // leaves the slider off. A loop is a claim that hearing a passage twice is
   // worth a control, and that is true of a tape and of a live window and false
@@ -1170,6 +1170,15 @@ export function createTransportBar(host, deck, {
 
   // ── published for CDP; the plan's whole point ───────────────────────────
   const api = {
+    /**
+     * 🔴 THE BAR'S OWN ELEMENT, SO A CHECK CAN PRESS THIS BAR RATHER THAN THE
+     * FIRST ONE IN THE DOCUMENT. It was on the RETURN VALUE only, and the note
+     * further down this object states the principle it broke: a control
+     * reachable from one and not the other is a control the harness cannot
+     * press. With one bar per page `document.querySelector` happened to agree;
+     * `/stage/` has two and they are different elements.
+     */
+    el: bar,
     get position() { return deck.position(); },
     /** ⚠️ FORCED FALSE ON A BAR WITH NO TOGGLE rather than derived. Nothing on
      *  such a bar can start the deck, so "is the transport playing" is a
@@ -1225,7 +1234,23 @@ export function createTransportBar(host, deck, {
     /** a `loopSlot` button by id. Always on the bar; see the option. */
     slot: (id) => loopSlotEls.get(id) || null,
   };
-  if (window.__demo) window.__demo.transport = api;
+  /**
+   * 🔴 A PAGE WITH TWO BARS HAS TO SAY WHICH ONE IS ITS TRANSPORT, AND UNTIL
+   * 2026-09-18 IT COULD NOT. This line ran unconditionally, so `__demo.transport`
+   * was simply whichever bar was BUILT LAST, which is an ordering fact about
+   * the source rather than a statement about the page. `/stage/` gained a
+   * second bar (a live show in the control room beside a recording in the
+   * archive) and the wrong one won by being further down the file.
+   * ⚠️ IT IS THE ONLY HANDLE A CDP CHECK HAS, so getting it wrong does not show
+   * up as a missing feature: the suite presses one bar and asserts about
+   * another, which fails where nothing is wrong and can pass for the wrong
+   * reason just as easily.
+   * ⚠️ `publish: false` IS OPT-OUT RATHER THAN OPT-IN, because every page that
+   * predates this has exactly one bar and must keep publishing it without being
+   * edited. A new option that silently switched a check off on forty pages is a
+   * loss this suite has already taken once.
+   */
+  if (window.__demo && publish !== false) window.__demo.transport = api;
 
   const stop = observePosition(deck.transport, paint, { hz: 60 });
   syncRates();
