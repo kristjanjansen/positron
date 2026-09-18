@@ -25,6 +25,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
   import { ARCHIVE, CUES, cueItems } from '/shell/archive.mjs';
+  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
 
   const d = mount({
     name: 'replay',
@@ -61,8 +62,11 @@
    * ⚠️ SO A VISIT ASSERTS A STRICT SUBSET, the way `/crate/` already does. The
    * suite total is stable because the flag is on for every run of it; what
    * changes is what a person opening the page by hand pays for.
+   * ⚠️ THE FLAG COMES FROM `shell/selfcheck.mjs` NOW, not from a line of this
+   * page's own. It was one line per page for four pages and the other
+   * forty-one never grew it; one import is greppable, so a sweep can answer
+   * which pages have never been looked at.
    */
-  const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const video = el('video', '', null, { playsinline: '', muted: '', preload: 'auto' });
@@ -405,9 +409,18 @@
 
     // assert the MANIFEST, not the video's readiness: readyState depends on how
     // fast R2 answered, which is not what this demo is about
-    let mOk = false, mStatus = 0;
-    try { const r = await fetch(ARCHIVE.hls, { cache: 'no-store' }); mStatus = r.status; mOk = r.ok; } catch (e) { d.log(String(e), 'bad'); }
-    d.assert('archive manifest reachable', mOk, `HTTP ${mStatus} · readyState ${video.readyState}`);
+    //
+    // ⚠️ IT IS A SECOND REQUEST FOR A FILE THE PLAYER ALREADY HAS, AND
+    // `no-store` MAKES SURE OF IT. Small, on our own R2, and still a fetch this
+    // page makes only in order to grade itself, on somebody else's connection.
+    // The rule covers the whole cost rather than the audible part of it, so it
+    // waits for a harness.
+    await ifSelfcheck(async () => {
+      let mOk = false, mStatus = 0;
+      try { const r = await fetch(ARCHIVE.hls, { cache: 'no-store' }); mStatus = r.status; mOk = r.ok; } catch (e) { d.log(String(e), 'bad'); }
+      d.assert('archive manifest reachable', mOk, `HTTP ${mStatus} · readyState ${video.readyState}`);
+    }, { log: d.log, say: 'the manifest is not asked for a second time just to grade it · '
+      + `the picture arrived, readyState ${video.readyState}` });
     d.assert('media is the transport master', !!master);
     d.assert('deck range is the show length', deck.durationMs === ARCHIVE.durationMs, `${deck.durationMs} ms`);
     // ⚠️ THIS WAS `deck.eventsOf ? true : true`, which is an assert that cannot

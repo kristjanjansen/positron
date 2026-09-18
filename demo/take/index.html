@@ -43,6 +43,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
   import { burn, videoHue, drawCamera } from '/shell/pattern.mjs';
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
 
   const CAP_MS   = 10_000;   // a backstop, not the mechanism — stop is manual
   const SLICE_MS = 500;      // the timeslice we ask MediaRecorder for
@@ -709,32 +710,42 @@
       deck.durationMs === parts.reduce((a, p) => a + p.lenMs, 0),
       `${deck.durationMs} ms`);
 
-    const b = parts[1].startMs;
-    const before = await seekAndWait(Math.max(0, b - 400));
-    const inFirst = active;
-    const after = await seekAndWait(b + 400);
-    const inSecond = active;
+    // 🔴 THE SIX BELOW SEEK THIS PAGE'S OWN TRANSPORT, TWICE, so they wait for
+    // a harness. They fire the instant a second take lands, when somebody has
+    // just stopped recording and is looking at the line. What they do is jump
+    // the playhead across the join and back, which hands the picture from one
+    // take to the other in front of whoever asked for neither.
+    // The two above are arithmetic over the takes already on the line, so they
+    // cost nothing and run for everybody.
+    await ifSelfcheck(async () => {
+      const b = parts[1].startMs;
+      const before = await seekAndWait(Math.max(0, b - 400));
+      const inFirst = active;
+      const after = await seekAndWait(b + 400);
+      const inSecond = active;
 
-    d.assert('crossing a boundary hands the picture over',
-      inFirst === parts[0] && inSecond === parts[1],
-      `${b - 400} ms → take ${inFirst ? inFirst.n : '—'}, ${b + 400} ms → take ${inSecond ? inSecond.n : '—'}`);
-    d.assert('exactly one part is under the playhead',
-      parts.filter((p) => deck.position() >= p.startMs && deck.position() < p.startMs + p.lenMs).length === 1,
-      `at ${Math.round(deck.position())} ms`);
-    d.assert('the part under the playhead is the one driving the clock',
-      mm.key() === `take${inSecond ? inSecond.n : '?'}` && mm.driving(),
-      `${mm.key()}, driving ${mm.driving()}`);
-    d.assert('the new part plays its OWN time, not the line\'s',
-      Math.abs(parts[1].video.currentTime * 1000 - 400) < 300,
-      `${Math.round(parts[1].video.currentTime * 1000)} ms into take 2, `
-        + `which sits at ${Math.round(b)} ms on the line`);
-    d.assert('a seek reports what it actually got, not what it asked for',
-      !!after && Number.isFinite(after.got),
-      after ? `asked ${Math.round(after.asked)} ms, got ${Math.round(after.got)} ms, `
-              + `${Math.round(after.offMs)} ms apart` : 'no seeked event');
-    d.assert('the handover was recorded, not inferred',
-      handovers.some((h) => h.from === 1 && h.to === 2),
-      handovers.map((h) => `${h.from ?? '·'}→${h.to}@${Math.round(h.at)}`).join(' '));
+      d.assert('crossing a boundary hands the picture over',
+        inFirst === parts[0] && inSecond === parts[1],
+        `${b - 400} ms → take ${inFirst ? inFirst.n : '—'}, ${b + 400} ms → take ${inSecond ? inSecond.n : '—'}`);
+      d.assert('exactly one part is under the playhead',
+        parts.filter((p) => deck.position() >= p.startMs && deck.position() < p.startMs + p.lenMs).length === 1,
+        `at ${Math.round(deck.position())} ms`);
+      d.assert('the part under the playhead is the one driving the clock',
+        mm.key() === `take${inSecond ? inSecond.n : '?'}` && mm.driving(),
+        `${mm.key()}, driving ${mm.driving()}`);
+      d.assert('the new part plays its OWN time, not the line\'s',
+        Math.abs(parts[1].video.currentTime * 1000 - 400) < 300,
+        `${Math.round(parts[1].video.currentTime * 1000)} ms into take 2, `
+          + `which sits at ${Math.round(b)} ms on the line`);
+      d.assert('a seek reports what it actually got, not what it asked for',
+        !!after && Number.isFinite(after.got),
+        after ? `asked ${Math.round(after.asked)} ms, got ${Math.round(after.got)} ms, `
+                + `${Math.round(after.offMs)} ms apart` : 'no seeked event');
+      d.assert('the handover was recorded, not inferred',
+        handovers.some((h) => h.from === 1 && h.to === 2),
+        handovers.map((h) => `${h.from ?? '·'}→${h.to}@${Math.round(h.at)}`).join(' '));
+    }, { log: d.log, say: 'the six boundary checks jump the playhead across the join, so they are '
+      + 'left to the harness · drag the line over it yourself and watch the picture hand over' });
     paint();
   }
 

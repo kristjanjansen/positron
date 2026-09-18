@@ -163,6 +163,7 @@
   import { pickQuad } from '/shell/xr-pick.mjs';
   import { toggle as toggleFull, watch as watchFull, support as fullSupport } from '/shell/fullscreen.mjs';
   import { format, parse, randomId, RELAY_BASE } from '/shell/wire.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
@@ -1632,152 +1633,170 @@
       d.assert('there is a picture in it, not a flat field', spread > 60,
                `the widest colour channel spans ${spread} of 255`);
 
-      // ── the panels, graded on a laptop ──────────────────────────────────
+      // 🔴 THE SIX BELOW COST THIS PAGE THE NUMBER IT EXISTS TO REPORT, so they
+      // wait for a harness. Turning the panels on copies the picture and lays
+      // out five figures every frame, which is why they are off until a session
+      // needs them, and the preview compiles the whole room's shaders and draws
+      // fourteen per-eye frames into an off-screen canvas. Neither is anything a
+      // visitor asked for, and the first one quietly lowers the frame rate
+      // printed under the left-hand picture while they are reading it.
       //
-      // ⚠️ THE HALF THAT DOES NOT NEED A HEADSET IS GRADED WITHOUT ONE. That
-      // the picture lands on the panel and that the numbers are under it is
-      // ordinary code and can be checked here; what only a Quest can say — the
-      // frame rate it holds in a 3360x1760 framebuffer — is asserted by the
-      // controls above and by nothing on this machine. Leaving all of it to the
-      // device would mean the only test of it runs where nobody is watching.
-      wantPanel = true;
-      await new Promise((r) => setTimeout(r, 300));
-      // With no local renderer there is no frame callback to ride on, so draw
-      // it once directly rather than reporting an absent panel as a broken one.
-      if (!panelDrawn) drawPanel();
-      const readPanel = (pan) => {
-        let picSpread = 0, footInk = 0;
-        try {
-          const sc = pan.canvas.width / PANEL_W;          // device pixels per unit
-          // ⚠️ THE BOTTOM OF THE PICTURE, NOT ALL OF IT — and that is the same
-          // mistake this page already made once. panel.mjs writes its "nothing
-          // arriving yet" line across the middle, so a spread taken over the
-          // whole picture area would be measuring the TEXT and would pass just
-          // as well with no picture at all. A statistic that is high by
-          // construction over your subject is blind, not weak.
-          const pic = pan.ctx.getImageData(60 * sc, 200 * sc, 520 * sc, 130 * sc).data;
-          const lo = [255, 255, 255], hi = [0, 0, 0];
-          for (let i = 0; i < pic.length; i += 4) {
-            for (let k = 0; k < 3; k++) {
-              const v = pic[i + k];
-              if (v < lo[k]) lo[k] = v;
-              if (v > hi[k]) hi[k] = v;
+      // ⚠️ THE PICTURE'S OWN CHECKS ABOVE AND THE PANEL ARITHMETIC BELOW STILL
+      // RUN FOR EVERYBODY. Both are read out of what is already on this machine:
+      // one reads back the frame the page just drew, the other is pure geometry
+      // against the same functions a session calls.
+      if (SELFCHECK) {
+        // ── the panels, graded on a laptop ──────────────────────────────────
+        //
+        // ⚠️ THE HALF THAT DOES NOT NEED A HEADSET IS GRADED WITHOUT ONE. That
+        // the picture lands on the panel and that the numbers are under it is
+        // ordinary code and can be checked here; what only a Quest can say — the
+        // frame rate it holds in a 3360x1760 framebuffer — is asserted by the
+        // controls above and by nothing on this machine. Leaving all of it to the
+        // device would mean the only test of it runs where nobody is watching.
+        wantPanel = true;
+        await new Promise((r) => setTimeout(r, 300));
+        // With no local renderer there is no frame callback to ride on, so draw
+        // it once directly rather than reporting an absent panel as a broken one.
+        if (!panelDrawn) drawPanel();
+        const readPanel = (pan) => {
+          let picSpread = 0, footInk = 0;
+          try {
+            const sc = pan.canvas.width / PANEL_W;          // device pixels per unit
+            // ⚠️ THE BOTTOM OF THE PICTURE, NOT ALL OF IT — and that is the same
+            // mistake this page already made once. panel.mjs writes its "nothing
+            // arriving yet" line across the middle, so a spread taken over the
+            // whole picture area would be measuring the TEXT and would pass just
+            // as well with no picture at all. A statistic that is high by
+            // construction over your subject is blind, not weak.
+            const pic = pan.ctx.getImageData(60 * sc, 200 * sc, 520 * sc, 130 * sc).data;
+            const lo = [255, 255, 255], hi = [0, 0, 0];
+            for (let i = 0; i < pic.length; i += 4) {
+              for (let k = 0; k < 3; k++) {
+                const v = pic[i + k];
+                if (v < lo[k]) lo[k] = v;
+                if (v > hi[k]) hi[k] = v;
+              }
             }
-          }
-          picSpread = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
-          // And the footer strip really has ink in it: the numbers are half of
-          // what a panel is for, and a panel with a picture and no numbers is a
-          // decoration.
-          const foot = pan.ctx.getImageData(14 * sc, 346 * sc, (PANEL_W - 28) * sc, 40 * sc).data;
-          for (let i = 0; i < foot.length; i += 4) {
-            if (foot[i] > 90 || foot[i + 1] > 90 || foot[i + 2] > 90) footInk++;
-          }
-        } catch (e) { d.log(`a panel could not be read: ${String(e.message).slice(0, 60)}`, 'warn'); }
-        return { picSpread, footInk };
-      };
-      const here = readPanel(panelHere);
-      d.assert('the left panel carries this picture with its numbers under it',
-        here.picSpread > 30 && here.footInk > 200,
-        `the widest colour channel spans ${here.picSpread} of 255 · ${here.footInk} lit pixels in the footer`);
-      // 🔴 THE STRIP THE RENDERED PANEL WEARS INSTEAD OF A FOOTER, graded on its
-      // own. It is a different canvas from the one above and it is the ONLY
-      // place a number appears when the picture is drawn by the headset — so a
-      // strip that silently stopped being filled would take every number in
-      // there with it and leave a picture that looks perfect.
-      let stripInk = 0;
-      try {
-        const sc = footHere.canvas.width / PANEL_W;
-        const fd = footHere.ctx.getImageData(0, 0, footHere.canvas.width, footHere.canvas.height).data;
-        for (let i = 0; i < fd.length; i += 4) {
-          if (fd[i] > 90 || fd[i + 1] > 90 || fd[i + 2] > 90) stripInk++;
-        }
-        void sc;
-      } catch (e) { d.log(`the footer strip could not be read: ${String(e.message).slice(0, 60)}`, 'warn'); }
-      d.assert('and the rendered panel gets the same numbers on a strip of its own',
-        stripInk > 200, `${stripInk} lit pixels in it`);
-
-      // ── the room, drawn on this machine ─────────────────────────────────
-      //
-      // 🔴 EVERY PIXEL OF THE HEADSET'S PICTURE USED TO BE UNREACHABLE FROM
-      // HERE. The floor, the glow, the grab bars, the panel quads and the live
-      // renderer all live behind `requestSession`, so a shader that would not
-      // compile or an error flag left standing cost a headset run to find — and
-      // the owner gets one run. `preview` drives the SAME per-eye draw with a
-      // hand-made projection into an off-screen canvas: no compositor, no frame
-      // rate, nothing said about a device — only "does it draw, and is it
-      // clean", which are the two questions a laptop can answer.
-      let pv = null;
-      try { pv = await xr.preview({ frames: 14 }); }
-      catch (e) { d.log(`the room preview threw: ${String(e.message).slice(0, 70)}`, 'warn'); }
-      wantPanel = false;
-      // 🔴 WHAT ONE LIVE PASS COSTS, ON WHATEVER IS IN FRONT OF YOU. It is NOT
-      // a headset number and this line says so — a laptop's card tells you
-      // nothing about an Adreno, the same refusal demo/verify-gl.mjs makes
-      // about a software rasteriser. What it establishes is that the instrument
-      // works and what shape the cost has, so the one run that has to happen on
-      // the device produces a number somebody can already interpret.
-      if (pv?.ok) {
-        d.log(`the headset's own copy of the shader, timed here: ${pv.whereCost}`
-          + ` · ${pv.pixels ? `${pv.pixels.w}x${pv.pixels.h}` : 'unknown size'}`
-          + ' · this machine, not a headset', 'hi');
-        window.__demo.livePreview = {
-          gpuMs: pv.liveGpuMs, halfGpuMs: pv.liveHalfGpuMs, where: pv.whereCost,
-          timer: pv.gpuTimer, pixels: pv.pixels,
+            picSpread = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+            // And the footer strip really has ink in it: the numbers are half of
+            // what a panel is for, and a panel with a picture and no numbers is a
+            // decoration.
+            const foot = pan.ctx.getImageData(14 * sc, 346 * sc, (PANEL_W - 28) * sc, 40 * sc).data;
+            for (let i = 0; i < foot.length; i += 4) {
+              if (foot[i] > 90 || foot[i + 1] > 90 || foot[i + 2] > 90) footInk++;
+            }
+          } catch (e) { d.log(`a panel could not be read: ${String(e.message).slice(0, 60)}`, 'warn'); }
+          return { picSpread, footInk };
         };
+        const here = readPanel(panelHere);
+        d.assert('the left panel carries this picture with its numbers under it',
+          here.picSpread > 30 && here.footInk > 200,
+          `the widest colour channel spans ${here.picSpread} of 255 · ${here.footInk} lit pixels in the footer`);
+        // 🔴 THE STRIP THE RENDERED PANEL WEARS INSTEAD OF A FOOTER, graded on its
+        // own. It is a different canvas from the one above and it is the ONLY
+        // place a number appears when the picture is drawn by the headset — so a
+        // strip that silently stopped being filled would take every number in
+        // there with it and leave a picture that looks perfect.
+        let stripInk = 0;
+        try {
+          const sc = footHere.canvas.width / PANEL_W;
+          const fd = footHere.ctx.getImageData(0, 0, footHere.canvas.width, footHere.canvas.height).data;
+          for (let i = 0; i < fd.length; i += 4) {
+            if (fd[i] > 90 || fd[i + 1] > 90 || fd[i + 2] > 90) stripInk++;
+          }
+          void sc;
+        } catch (e) { d.log(`the footer strip could not be read: ${String(e.message).slice(0, 60)}`, 'warn'); }
+        d.assert('and the rendered panel gets the same numbers on a strip of its own',
+          stripInk > 200, `${stripInk} lit pixels in it`);
+
+        // ── the room, drawn on this machine ─────────────────────────────────
+        //
+        // 🔴 EVERY PIXEL OF THE HEADSET'S PICTURE USED TO BE UNREACHABLE FROM
+        // HERE. The floor, the glow, the grab bars, the panel quads and the live
+        // renderer all live behind `requestSession`, so a shader that would not
+        // compile or an error flag left standing cost a headset run to find — and
+        // the owner gets one run. `preview` drives the SAME per-eye draw with a
+        // hand-made projection into an off-screen canvas: no compositor, no frame
+        // rate, nothing said about a device — only "does it draw, and is it
+        // clean", which are the two questions a laptop can answer.
+        let pv = null;
+        try { pv = await xr.preview({ frames: 14 }); }
+        catch (e) { d.log(`the room preview threw: ${String(e.message).slice(0, 70)}`, 'warn'); }
+        wantPanel = false;
+        // 🔴 WHAT ONE LIVE PASS COSTS, ON WHATEVER IS IN FRONT OF YOU. It is NOT
+        // a headset number and this line says so — a laptop's card tells you
+        // nothing about an Adreno, the same refusal demo/verify-gl.mjs makes
+        // about a software rasteriser. What it establishes is that the instrument
+        // works and what shape the cost has, so the one run that has to happen on
+        // the device produces a number somebody can already interpret.
+        if (pv?.ok) {
+          d.log(`the headset's own copy of the shader, timed here: ${pv.whereCost}`
+            + ` · ${pv.pixels ? `${pv.pixels.w}x${pv.pixels.h}` : 'unknown size'}`
+            + ' · this machine, not a headset', 'hi');
+          window.__demo.livePreview = {
+            gpuMs: pv.liveGpuMs, halfGpuMs: pv.liveHalfGpuMs, where: pv.whereCost,
+            timer: pv.gpuTimer, pixels: pv.pixels,
+          };
+        }
+        d.assert('the room, the floor, the glow and the panels all draw on this machine',
+          !!pv?.ok && pv.spread > 40 && pv.litShare > 0.02,
+          pv?.ok
+            ? `the widest colour channel spans ${pv.spread} of 255 · ${(pv.litShare * 100).toFixed(1)}% of the frame has ink in it`
+              + ` · grab bars ${pv.bars ? 'compiled' : 'DID NOT COMPILE'} · picture ${pv.live ? 'rendered here' : 'copied in'}`
+            : `it did not draw: ${pv?.why ?? 'no answer'}`);
+        // 🔴 AND THE WAY OUT, WHICH IS THE ONE CONTROL A HEADSET RUN CANNOT
+        // RECOVER FROM BEING WRONG ABOUT. Everything else in here can be got out
+        // of by leaving, and leaving is this. It used to be a tap on ANY button:
+        // no warning, nothing on screen naming it, so reaching for a control
+        // could end the session and the gesture somebody needs most was the one
+        // they had to discover. It is a hold on one named button now, drawn on
+        // the controller with its own words and a ring that fills as you hold.
+        //
+        // ⚠️ IT IS GRADED HERE RATHER THAN BESIDE THE SESSION, and the difference
+        // is not tidiness. Written into `enterHeadset` it reported `no badge was
+        // built` on this laptop, which is a FALSE claim about the page dressed as
+        // a true one about the machine: with no headset there is no context, so
+        // nothing had been compiled yet and the check was grading the absence of
+        // a GPU. This block exists precisely because a preview builds the same
+        // context the headset would, so by here the question has an answer.
+        //
+        // ⚠️ AND IT GRADES THE COMPILE, NOT THE OBJECT. `createXRQuit` is lazy
+        // until its first draw, so an object alone proves nothing. PROVED by
+        // sabotage: with the badge's `compile` made to throw, this check stayed
+        // GREEN until the module was made to compile it up front.
+        const q = window.__demo?.xrState?.quit ?? xr.state.quit;
+        d.assert('the way out is a long hold on any button, drawn where the hand is',
+          !!q?.built && q.button === 'any' && q.holdMs >= 2000
+          && typeof q.label === 'string' && /hold/i.test(q.label),
+          q?.built ? `hold any button for ${(q.holdMs / 1000).toFixed(1)} s, labelled "${q.label}"`
+                   : `nothing on screen says how to leave: ${q?.why ?? 'no answer'}`);
+        // ⚠️ ASSERT ON THE ERROR FLAG, HERE TOO. A Quest reported 1282 on its
+        // first frame and DREW CORRECTLY ANYWAY; the only way that is ever caught
+        // before a device run is by a laptop reading the same flag.
+        d.assert('and it left no graphics error pending',
+          pv?.ok ? pv.glError === 0 : false,
+          pv?.ok ? pv.glWhere : 'nothing drew, so nothing was checked');
+        // 🔴 THE FAKE LIGHT HAS TO ANSWER TO THE PICTURE OR IT IS A DECORATION.
+        // A cell that cannot change teaches the reader to ignore it, and this one
+        // very nearly could not: the colour is three cosines 120° apart, which
+        // SUM TO A CONSTANT, so a mean taken the obvious way is grey whatever the
+        // picture does. The amplitude is read here against the picture that was
+        // actually on screen.
+        // ⚠️ AND STRICTLY INSIDE ITS RANGE, NOT MERELY WITHIN IT. A number pinned
+        // at its ceiling is a constant wearing a measurement's clothes — which is
+        // what this one did on its first run, and only a bound that excludes the
+        // end caught it.
+        d.assert('the light the picture throws on the floor is a measurement of that picture',
+          !!xr.state.glow && xr.state.glow.amp > 0.002 && xr.state.glow.amp < GLOW_MAX,
+          xr.state.glow
+            ? `rgb ${xr.state.glow.col.map((v) => v.toFixed(2)).join(', ')} at ${xr.state.glow.amp.toFixed(3)} of a possible ${GLOW_MAX}`
+            : 'nothing is lighting anything');
+      } else {
+        d.log('the panels and the room preview are not built for a visit \u00b7 six of the '
+          + 'checks wait for the harness so this page keeps the frame rate it exists to '
+          + 'report', 'hi');
       }
-      d.assert('the room, the floor, the glow and the panels all draw on this machine',
-        !!pv?.ok && pv.spread > 40 && pv.litShare > 0.02,
-        pv?.ok
-          ? `the widest colour channel spans ${pv.spread} of 255 · ${(pv.litShare * 100).toFixed(1)}% of the frame has ink in it`
-            + ` · grab bars ${pv.bars ? 'compiled' : 'DID NOT COMPILE'} · picture ${pv.live ? 'rendered here' : 'copied in'}`
-          : `it did not draw: ${pv?.why ?? 'no answer'}`);
-      // 🔴 AND THE WAY OUT, WHICH IS THE ONE CONTROL A HEADSET RUN CANNOT
-      // RECOVER FROM BEING WRONG ABOUT. Everything else in here can be got out
-      // of by leaving, and leaving is this. It used to be a tap on ANY button:
-      // no warning, nothing on screen naming it, so reaching for a control
-      // could end the session and the gesture somebody needs most was the one
-      // they had to discover. It is a hold on one named button now, drawn on
-      // the controller with its own words and a ring that fills as you hold.
-      //
-      // ⚠️ IT IS GRADED HERE RATHER THAN BESIDE THE SESSION, and the difference
-      // is not tidiness. Written into `enterHeadset` it reported `no badge was
-      // built` on this laptop, which is a FALSE claim about the page dressed as
-      // a true one about the machine: with no headset there is no context, so
-      // nothing had been compiled yet and the check was grading the absence of
-      // a GPU. This block exists precisely because a preview builds the same
-      // context the headset would, so by here the question has an answer.
-      //
-      // ⚠️ AND IT GRADES THE COMPILE, NOT THE OBJECT. `createXRQuit` is lazy
-      // until its first draw, so an object alone proves nothing. PROVED by
-      // sabotage: with the badge's `compile` made to throw, this check stayed
-      // GREEN until the module was made to compile it up front.
-      const q = window.__demo?.xrState?.quit ?? xr.state.quit;
-      d.assert('the way out is a long hold on any button, drawn where the hand is',
-        !!q?.built && q.button === 'any' && q.holdMs >= 2000
-        && typeof q.label === 'string' && /hold/i.test(q.label),
-        q?.built ? `hold any button for ${(q.holdMs / 1000).toFixed(1)} s, labelled "${q.label}"`
-                 : `nothing on screen says how to leave: ${q?.why ?? 'no answer'}`);
-      // ⚠️ ASSERT ON THE ERROR FLAG, HERE TOO. A Quest reported 1282 on its
-      // first frame and DREW CORRECTLY ANYWAY; the only way that is ever caught
-      // before a device run is by a laptop reading the same flag.
-      d.assert('and it left no graphics error pending',
-        pv?.ok ? pv.glError === 0 : false,
-        pv?.ok ? pv.glWhere : 'nothing drew, so nothing was checked');
-      // 🔴 THE FAKE LIGHT HAS TO ANSWER TO THE PICTURE OR IT IS A DECORATION.
-      // A cell that cannot change teaches the reader to ignore it, and this one
-      // very nearly could not: the colour is three cosines 120° apart, which
-      // SUM TO A CONSTANT, so a mean taken the obvious way is grey whatever the
-      // picture does. The amplitude is read here against the picture that was
-      // actually on screen.
-      // ⚠️ AND STRICTLY INSIDE ITS RANGE, NOT MERELY WITHIN IT. A number pinned
-      // at its ceiling is a constant wearing a measurement's clothes — which is
-      // what this one did on its first run, and only a bound that excludes the
-      // end caught it.
-      d.assert('the light the picture throws on the floor is a measurement of that picture',
-        !!xr.state.glow && xr.state.glow.amp > 0.002 && xr.state.glow.amp < GLOW_MAX,
-        xr.state.glow
-          ? `rgb ${xr.state.glow.col.map((v) => v.toFixed(2)).join(', ')} at ${xr.state.glow.amp.toFixed(3)} of a possible ${GLOW_MAX}`
-          : 'nothing is lighting anything');
       // ── picking a panel up, graded with no headset in the building ──────
       //
       // 🔴 THE ONE THING ON THIS PAGE THAT CANNOT BE TRIED WITHOUT A CONTROLLER,

@@ -34,6 +34,7 @@
   import { mediaMaster } from '/timeline/media-master.mjs';
   import { burn, readBurnedFrom, videoHue } from '/shell/pattern.mjs';
   import * as CC from '/shell/cc-adapter.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const d = mount({
     name: 'memento',
@@ -695,19 +696,35 @@
     }
     checked = true;
 
+    // 🔴 THE GATHERING BELOW WORKS THIS PAGE'S OWN TRANSPORT, AND IT STARTS THE
+    // INSTANT YOU LET GO OF THE KNOB. It pauses the clip, sends the line to five
+    // places along it, drops it in the middle of the pass, then plays a stretch:
+    // about seven seconds of the picture jumping about, asked for by nobody.
+    // That is the shape `/radio/` was reported for twice, a page proving its
+    // controls work by working them while somebody is using it. So it waits for
+    // a harness.
+    //
+    // ⚠️ A VISIT STILL ASSERTS EVERYTHING GRADABLE FROM THE PASS ITSELF: the
+    // record against the raw samples, the thinning ratio, the line beating a
+    // hold, the pedal's step, the re-state behind the playhead and the ink on
+    // the lane. Every one of those is read out of data this page already holds,
+    // so it costs nothing and it runs for everybody.
+    let still = null, marks = [], restored = null, mstat = null;
+    let probe = 0, wantAtProbe = 0;
+    const live = [];
+    if (SELFCHECK) {
     // ── everything slow, first ───────────────────────────────────────────
     video.pause(); deck.pause();
     await wait(150);
 
     // a still frame, so "the picture carries its own clock" is asked of a
     // frame that has certainly been presented
-    const still = pictureAt();
+    still = pictureAt();
 
     // THE SEEK SWEEP. Five places along the clip: ask the line to go there,
     // then read where the PICTURE says it is. Nothing in this comparison comes
     // from the page's own arithmetic — one side is the transport, the other is
     // fifty-six blocks of pixels.
-    const marks = [];
     const lo = LEAD_IN + 400, hi = LEAD_IN + clipMs - 400;
     for (let i = 0; i < 5; i++) {
       const asked = Math.round(lo + ((hi - lo) * i) / 4);
@@ -722,13 +739,13 @@
     // knob comes back to the line's value there — and count what was sent to
     // get it there, because "restore the console" and "replay the gesture" are
     // told apart by that number and by nothing else.
-    const probe = Math.round((s.pts[0].t + s.pts[s.pts.length - 1].t) / 2);
-    const wantAtProbe = CC.valueAt(s, probe) / 128;
+    probe = Math.round((s.pts[0].t + s.pts[s.pts.length - 1].t) / 2);
+    wantAtProbe = CC.valueAt(s, probe) / 128;
     const before = { replay: replayCount, assert: assertCount, reset: resetCount };
     deck.seek(probe);
     await seeked();
-    const restored = { knob: knobValue, replay: replayCount - before.replay,
-                       assert: assertCount - before.assert, reset: resetCount - before.reset };
+    restored = { knob: knobValue, replay: replayCount - before.replay,
+                 assert: assertCount - before.assert, reset: resetCount - before.reset };
 
     // THE CLIP AS CLOCK. Play a stretch and sample the picture against the line
     // while it rolls. The dead band is declared, so the number below is read
@@ -736,14 +753,17 @@
     deck.seek(LEAD_IN + 250);
     await seeked();
     deck.play(); if (present) video.play().catch(() => {});
-    const live = [];
     for (let i = 0; i < 14; i++) {
       await wait(90);
       const p = pictureAt();
       if (p && present && !video.paused) live.push(p.pos - deck.position());
     }
-    const mstat = mm ? mm.stats() : null;
-    video.pause(); deck.pause();
+    mstat = mm ? mm.stats() : null;
+    } else {
+      d.log('the seek sweep and the play stretch move the picture, so they are left to '
+        + 'the harness \u00b7 four of the twelve checks and the two burned-clock cells wait '
+        + 'for it', 'hi');
+    }
 
     // THE DEVIATION, AGAINST TWO READINGS OF THE SAME RECORD. ⚠️ Not against a
     // threshold: the harness draws a fast curve and a person draws a slow one,
@@ -812,7 +832,8 @@
     agreement = errs.length ? { typ: median(offs), worst: Math.max(...offs), n: errs.length } : null;
     const liveAbs = live.map(Math.abs);
 
-    d.assert('the clip carries its own clock, readable back out of its pixels',
+    // Read off a frame the sweep had paused and settled, so it goes with it.
+    if (SELFCHECK) d.assert('the clip carries its own clock, readable back out of its pixels',
       still !== null,
       still ? `the picture reads ${still.ms} · ${(still.pos / 1000).toFixed(3)}s on the line`
             : 'nothing decoded out of the row');
@@ -841,7 +862,7 @@
     // frames is what the mechanism promises: the burn is redrawn on a 40 ms
     // timer, the capture samples the canvas on its own cadence, and a decoder
     // presents the frame at or before the moment it was sent to.
-    d.assert('the picture and the line move together: the burned clock grades the mapping from outside',
+    if (SELFCHECK) d.assert('the picture and the line move together: the burned clock grades the mapping from outside',
       got.length === marks.length && spread !== null && spread <= 3 * FRAME_MS
         && Math.abs(median(errs)) <= 3 * FRAME_MS,
       `${got.length} of ${marks.length} seeks read · the picture sits `
@@ -880,7 +901,7 @@
         : `down at ${(pedDown.t / 1000).toFixed(2)}s and up at ${(pedUp.t / 1000).toFixed(2)}s reads `
           + `${pedAtMid} in between, not ${Math.round(127 / 2)}`);
 
-    d.assert('moving the line restores the knob instead of replaying the moves',
+    if (SELFCHECK) d.assert('moving the line restores the knob instead of replaying the moves',
       restored.knob !== null && Math.abs(restored.knob - wantAtProbe) <= 1
         && restored.replay === 0 && restored.reset >= 1,
       `at ${(probe / 1000).toFixed(2)}s the knob reads ${restored.knob} against `
@@ -896,7 +917,7 @@
           + `${afterStroke.knob} against ${afterStroke.want.toFixed(1)} on the line`
         : 'no pass');
 
-    d.assert('while the clip is under the playhead, the clip is the clock',
+    if (SELFCHECK) d.assert('while the clip is under the playhead, the clip is the clock',
       !!mstat && mstat.syncs > 0 && mstat.jumps === 0 && liveAbs.length > 0,
       mstat ? `${mediaSeeks} times the page sent the clip somewhere, then `
           + `${mstat.syncs} reads, ${mstat.corrections} correction`
@@ -910,7 +931,7 @@
       `${lit} lit samples`);
 
     paintReadout();
-    d.log('the picture against each ask, in ms: '
+    if (SELFCHECK) d.log('the picture against each ask, in ms: '
       + marks.map((m) => (m.picture === null ? '—' : (m.picture - m.asked).toFixed(0))).join(' · '));
     d.log(`${stalledSamples} sample${stalledSamples === 1 ? '' : 's'} were dropped at the door. `
       + 'The line was not moving under them');

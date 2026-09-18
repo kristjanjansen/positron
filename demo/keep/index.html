@@ -27,6 +27,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
 
   const W = 1280, H = FRAME_H;
   const CAP_MS = 10_000;   // a backstop, not the mechanism — stop is manual
@@ -514,46 +515,57 @@
       parts.filter((p) => deck.position() >= p.startMs && deck.position() < p.startMs + p.lenMs).length === 1,
       `at ${Math.round(deck.position())} ms`);
 
-    const readAt = async (pos) => {
-      deck.seek(pos);
-      await new Promise((r) => setTimeout(r, 700));
-      const p = partAt(pos);
-      return p ? readBurnedFrom(p.video, scratch) : null;
-    };
-    // BOTH PROBES INSIDE ONE TAKE. Across two takes this measures something
-    // else entirely and I had it wrong first: the burned clock is wall time, and
-    // the line BUTTS TAKES TOGETHER — the seconds between pressing stop and
-    // pressing record again are discarded by the line but not by the pixels. The
-    // first run read "playhead +3936 ms, picture +11118 ms": a 7.2 s gap
-    // faithfully recorded and correctly thrown away. Within one take there is no
-    // gap to confuse it with, so the comparison is clean.
-    const long = parts.reduce((a, b) => (b.lenMs > a.lenMs ? b : a));
-    const p1 = Math.round(long.startMs + long.lenMs * 0.2);
-    const p2 = Math.round(long.startMs + long.lenMs * 0.75);
-    const e1 = await readAt(p1), e2 = await readAt(p2);
-    if (e1 === null || e2 === null) {
-      d.assert('the clock in the picture moved with the playhead', false,
-        `could not read the row back at ${e1 === null ? p1 : p2} ms`);
-      return;
-    }
-    const err = (e2 - e1) - (p2 - p1);
-    d.set('drift', Math.round(err));
-    d.assert('the clock in the picture moved with the playhead',
-      Math.abs(err) <= FRAME_MS * 3,
-      `playhead +${p2 - p1} ms, picture +${e2 - e1} ms, ${err >= 0 ? '+' : ''}${Math.round(err)} ms apart`);
-
-    // AND THE GAP THE LINE THREW AWAY IS STILL IN THE PIXELS. Reading the last
-    // frame of one take against the first of the next recovers the wall-clock
-    // pause between them — the thing an end-to-end line cannot show. Reported,
-    // not asserted: it depends on how long a person waited.
-    if (parts.length >= 2) {
-      const endOf1 = await readAt(Math.round(parts[0].startMs + parts[0].lenMs - 200));
-      const startOf2 = await readAt(Math.round(parts[1].startMs + 120));
-      if (endOf1 !== null && startOf2 !== null) {
-        d.log(`the pause between take 1 and take 2 was ${((startOf2 - endOf1) / 1000).toFixed(2)}s `
-          + `. The line does not show it, the pixels still do`, 'hi');
+    // 🔴 EVERYTHING BELOW DRIVES THE PLAYHEAD, so it waits for a harness. It
+    // fires the moment a second take lands, and what it does is send the line
+    // to four places in a row, seven hundred milliseconds apart, to read a
+    // frame at each. That is the picture jumping about for three seconds in
+    // front of somebody who has just stopped recording. The two asserts above are
+    // arithmetic over the takes already on the line and cost nothing, so they
+    // run for everybody.
+    await ifSelfcheck(async () => {
+      const readAt = async (pos) => {
+        deck.seek(pos);
+        await new Promise((r) => setTimeout(r, 700));
+        const p = partAt(pos);
+        return p ? readBurnedFrom(p.video, scratch) : null;
+      };
+      // BOTH PROBES INSIDE ONE TAKE. Across two takes this measures something
+      // else entirely and I had it wrong first: the burned clock is wall time, and
+      // the line BUTTS TAKES TOGETHER — the seconds between pressing stop and
+      // pressing record again are discarded by the line but not by the pixels. The
+      // first run read "playhead +3936 ms, picture +11118 ms": a 7.2 s gap
+      // faithfully recorded and correctly thrown away. Within one take there is no
+      // gap to confuse it with, so the comparison is clean.
+      const long = parts.reduce((a, b) => (b.lenMs > a.lenMs ? b : a));
+      const p1 = Math.round(long.startMs + long.lenMs * 0.2);
+      const p2 = Math.round(long.startMs + long.lenMs * 0.75);
+      const e1 = await readAt(p1), e2 = await readAt(p2);
+      if (e1 === null || e2 === null) {
+        d.assert('the clock in the picture moved with the playhead', false,
+          `could not read the row back at ${e1 === null ? p1 : p2} ms`);
+        return;
       }
-    }
+      const err = (e2 - e1) - (p2 - p1);
+      d.set('drift', Math.round(err));
+      d.assert('the clock in the picture moved with the playhead',
+        Math.abs(err) <= FRAME_MS * 3,
+        `playhead +${p2 - p1} ms, picture +${e2 - e1} ms, ${err >= 0 ? '+' : ''}${Math.round(err)} ms apart`);
+
+      // AND THE GAP THE LINE THREW AWAY IS STILL IN THE PIXELS. Reading the last
+      // frame of one take against the first of the next recovers the wall-clock
+      // pause between them — the thing an end-to-end line cannot show. Reported,
+      // not asserted: it depends on how long a person waited.
+      if (parts.length >= 2) {
+        const endOf1 = await readAt(Math.round(parts[0].startMs + parts[0].lenMs - 200));
+        const startOf2 = await readAt(Math.round(parts[1].startMs + 120));
+        if (endOf1 !== null && startOf2 !== null) {
+          d.log(`the pause between take 1 and take 2 was ${((startOf2 - endOf1) / 1000).toFixed(2)}s `
+            + `. The line does not show it, the pixels still do`, 'hi');
+        }
+      }
+    }, { log: d.log, say: 'the clock check sends the line to four places to read a frame at each, '
+      + 'so it is left to the harness and drift stays blank \u00b7 drag the bar and watch the '
+      + 'number in the picture move with it' });
   }
 
   // ── pick up where the last tab left off ───────────────────────────────────
