@@ -15,6 +15,29 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **AN ERR ARCHIVE CLIP AS THE STAGE SOURCE. ASKED 2026-09-18:** *"can you
+  stream this to the feed? https://arhiiv.err.ee/video/vaata/op-489 from 10:40
+  15:39"*. A 4 minute 59 second excerpt, played into the feed the control room
+  publishes.
+  ⚠️ **THIS IS THE ONE SHAPE THE ERR RULE EXPRESSLY ALLOWS**, and it is worth
+  writing down so the next reader does not treat it as an exception being made.
+  CLAUDE.md's rule is *"open one only when a person is going to listen to it"*:
+  the harm it exists to prevent is a broadcaster's audience figures being
+  corrupted by unattended machines, and a deliberate attended one-off by the
+  person who owns the project is precisely the case it carves out. *"Leave err
+  alone"*, said earlier the same day, was about the automatic connections.
+  🔴 **SO IT IS NEVER THE DEFAULT SOURCE AND NEVER REACHED BY A HARNESS.** It is
+  opt-in on a query parameter, the generated test picture stays the default, and
+  no suite run may ever select it.
+  ⚠️ **AND TWO THINGS THE ASK DOES NOT MENTION.** Re-publishing a public
+  broadcaster's archive through our own Cloudflare feed is redistribution rather
+  than viewing, which is a rights question rather than a load one and is the
+  user's to answer, not an agent's. And **4:59 will not fit R2 on the open
+  tier**: 24 MiB a session is about four minutes at 800 kbit/s, so the recording
+  half of this either ends early or needs the trusted tier, whose caps are
+  half-wired (see the `workers/ingest` entry).
+
+
 - 🔴 **`workers/ingest`'s TRUSTED TIER IS HALF-WIRED, AND IT DECIDES HOW LONG A
   SHOW CAN BE.** Found 2026-09-18 while planning `/stage/`. `/open` resolves its
   caps from the TIER (`TIERS[tier] || TIERS.open`), and `/seg` then reads the

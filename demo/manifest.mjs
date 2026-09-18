@@ -521,9 +521,16 @@ export const DEMOS = [
   // rather than quietly dropping the row, which is the whole reason that check
   // exists: an ungrouped demo still renders a complete-looking front page and
   // the only way to notice is to count. Caught by the build on the first run.
-  { name: 'stage', group: 'capture', act: 4, created: '2026-09-17', built: true,
-    one: 'three views of one show, each a panel with the same picture in it',
-    tags: ['canvas', 'tabs', 'fullscreen'] },
+  // ⚠️ `settleMs` SIZES THE WAIT FOR THIS PAGE'S FIRST ASSERT, not a control-0
+  // press: it has no controls row on purpose. Its checks drive the whole live
+  // pipeline (publish, record, stop, store, play back, seek) and hold every
+  // assert until that is done, because `verify.mjs` stops collecting the moment
+  // the count is unchanged for one 400 ms tick. 25 s measured against a drill
+  // that takes about twelve.
+  { name: 'stage', group: 'capture', act: 4, created: '2026-09-17', built: true, settleMs: 25000,
+    one: 'one press puts a live picture in front of an audience, asks them something, '
+      + 'and keeps every answer on the recording\u2019s own timeline',
+    tags: ['WebRTC', 'canvas', 'tabs', 'R2'] },
 
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
     one: 'play a synthesizer in another building, and turn its knobs while you do',
