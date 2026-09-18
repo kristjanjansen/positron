@@ -15,15 +15,68 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
-- 🔴 **THE LOG COMES OFF `/stage/`'S AUDIENCE TAB. ASKED 2026-09-18:** *"rm logs
-  from stage audience"*. An audience is the one tab on that page whose reader is
-  not the person running the show, and a log is a developer's surface: it is
-  where this project puts faults, build stamps and timings, none of which an
-  audience has any use for or any way to act on.
-  ⚠️ **THE OTHER TABS ARE NOT COVERED BY THIS.** The control room and the
-  archive are read by the person running the thing, which is exactly who a log
-  is for. The ask names one tab.
+- 🔴 **STAGE PERFORMANCES AND THEATRE OUT OF THE ERR ARCHIVES, AS ONE FILE.
+  ASKED 2026-09-18:** *"Look up stage performances / theatre from err archives in
+  bg. I need single file"*.
+  ⚠️ **THIS SITS BESIDE *"Leave err alone"*, SAID THE SAME DAY, AND THEY ARE NOT
+  THE SAME ERR.** That instruction was about the LIVE MOUNTS, whose harm is
+  named and measured: a broadcaster's listener statistics are corrupted by
+  headless browsers holding a stream open. This is the CATALOGUE at
+  `arhiiv.err.ee`, which is a bounded number of metadata requests and streams
+  nothing. The later instruction is explicit and supersedes, and the distinction
+  is written here so nobody reads one as permission for the other.
+  ⚠️ **NO MEDIA IS FETCHED.** A catalogue row is a title, a date and an id. The
+  moment something plays a segment to check it, this becomes the thing the other
+  rule forbids.
 
+
+- ✅ **THE ARCHIVE TIMELINE IS THREE TIMES HIGHER, AND IT IS NOT A RULE,
+  2026-09-18.** Four messages settled it: *"Make archive timeline 3x higher"*,
+  *"Make it a rule"*, *"Ita ok to have empty space in timelime, def min
+  height"*, then *"No rule just min height"*. MEASURED at **50 px** before and
+  **150 px** after, which is 3x to the pixel, and the floor is `STRIP_MIN_H` in
+  `demo/shell/strip.mjs` rather than a number typed on a page.
+  ⚠️ **A FLOOR, NEVER A HEIGHT.** Lanes needing more than 150 still get more, so
+  a page cannot clip its own content by asking for it, and the empty space under
+  the last lane was explicitly accepted rather than packed out.
+  ⚠️ **AND IT IS OPT-IN, WHICH THE MEASUREMENT DECIDED BEFORE THE RETRACTION
+  DID.** Every `auto` strip in the project was measured first: kit 44, stage 50,
+  draw 68, lanes 72, instrument 100, click 104, loops 116. A blanket floor would
+  have reshaped all seven, and `/kit/`'s 44 px specimen is 44 px on purpose.
+  🔴 **IT ALSO BROKE A CHECK, AND THE CHECK WAS RIGHT TO COMPLAIN.** `/stage/`'s
+  "no black rule between the lanes" assert sampled to the bottom of the canvas,
+  found the new empty ground under the last lane and reported a drop of 21.
+  `timeline/strip.mjs` now keeps `lanesH` (how far down anything was drawn)
+  apart from `contentH` (how tall the canvas is); they were one number until a
+  floor existed. The check bounds itself to `lanesH` and reads a drop of 0 over
+  63 rows, with its three lanes still present so the subject has not gone
+  missing.
+
+- ✅ **LOOP AND RATE ARE OFF THE ARCHIVE TRANSPORT, 2026-09-18.** MEASURED: no
+  loop button in the bar, 0 rate buttons. It is play and nothing else.
+  ⚠️ **THE TWO CAME OFF IN DIFFERENT PLACES AND THAT IS NOT AN INCONSISTENCY.**
+  `loop: false` is the bar's own option, beside `scrub: false` and `time:
+  false`. The RATES are not the bar's to refuse: they are the intersection of
+  every `caps.rates` its deck's kinds declare, and the bar already draws them
+  only when that intersection holds more than one value. So the honest way to
+  have none is for the DECK to stop claiming four, which is what its adapter now
+  says. A `rates: false` option would have put one fact in two places and let
+  them disagree.
+
+- ✅ **THE LOG IS OFF `/stage/`'S AUDIENCE TAB, 2026-09-18.** MEASURED: on the
+  audience tab the log reads `hidden: true, display: none`; on the archive tab
+  it reads `display: grid`. The other two tabs keep it, because they are worked
+  by the person running the show, who is who a log is for.
+  🔴 **AND `hidden` ALONE DID NOTHING, WHICH IS THE PART WORTH KEEPING.**
+  `.pos-log` sets `display: grid`, and ANY author rule beats the browser's own
+  `[hidden]`, so setting the property would have left a log on screen and a flag
+  that reads as set. `.pos-glue[hidden]` already existed three hundred lines up
+  in the same stylesheet for exactly this reason. `.pos-log[hidden]` now does
+  too, at (0,2,0) so it cannot lose to `.pos-log`.
+  ⚠️ **THE FIRST `go()` IS QUIET, SO `onPick` DOES NOT FIRE ON LOAD.** The page
+  opens on the audience tab, so leaving the initial state to the callback would
+  have shown the log to exactly the reader it is being taken from until they
+  touched a tab. It is applied once by hand.
 
 - 🔴 **`/reel/` OPENS TWO ERR CONNECTIONS ON EVERY VISIT, BEFORE ANYBODY PRESSES
   ANYTHING, AND IT IS NOT A SELF-CHECK.** Found 2026-09-18 during the self-check

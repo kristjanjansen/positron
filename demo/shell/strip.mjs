@@ -14,6 +14,21 @@ import { el } from './shell.mjs';
 
 export const SIZES = { mini: 'strip-mini', default: 'strip', deep: 'strip-deep', auto: 'strip-auto' };
 
+/**
+ * A floor for an `auto` strip, in pixels, passed as `minHeight`.
+ *
+ * 🔴 ASKED FOR ON ONE PAGE AND DELIBERATELY NOT MADE A RULE. 2026-09-18:
+ * *"Make archive timeline 3x higher"*, then *"Ita ok to have empty space in
+ * timelime, def min height"*, then *"No rule just min height"*. `/stage/`'s
+ * archive strip MEASURED 50 px with its one lane, so three times it is 150.
+ * ⚠️ IT IS OPT-IN, AND THE MEASUREMENT IS WHY. Every `auto` strip in the
+ * project was measured before deciding: kit 44, stage 50, draw 68, lanes 72,
+ * instrument 100, click 104, loops 116. A blanket floor at 150 would have
+ * reshaped all seven, and `/kit/`'s 44 px specimen is 44 px ON PURPOSE. A
+ * default that changes six pages nobody asked about is not a default.
+ */
+export const STRIP_MIN_H = 150;
+
 /** One token, read once, with the library's own fallback if there is no
  *  stylesheet. `grain-scope.mjs` reads the same `--dim2` for the same marks,
  *  which is what makes a loop on the wave and a loop on the line one picture

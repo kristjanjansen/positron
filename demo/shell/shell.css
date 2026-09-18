@@ -510,6 +510,12 @@ button.pos-pri[data-busy="1"] {
 }
 /* NOT `display: none` when empty — see the floor above. It keeps its box. */
 .pos-log:empty::before { content: 'nothing logged yet'; color: var(--dim2); }
+/* 🔴 AND `hidden` HAS TO BE SAID HERE OR IT DOES NOTHING. The rule above sets
+   `display: grid`, and ANY author rule beats the browser's own `[hidden]`, so a
+   page setting `logEl.hidden = true` would get a log that is still on screen and
+   a property that reads as set. `.pos-glue[hidden]` exists three hundred lines
+   up for exactly this reason. (0,2,0) so it cannot lose to `.pos-log`. */
+.pos-log[hidden] { display: none; }
 .pos-line { display: contents; }
 .pos-t { color: var(--dim2); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 /* `min-width: 0` lets the 1fr column shrink; `overflow-wrap: anywhere` breaks a
