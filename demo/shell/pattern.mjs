@@ -272,16 +272,40 @@ export function burn(ctx, w, h, frame, opts = {}) {
           + `.${pad(d.getMilliseconds(), 3)}`,
       };
 
-  // One row of labels, one row of numbers, two columns.
+  /**
+   * 🔴 THE NUMBERS SIT ON TOP OF THE ROW, 2026-09-18, ASKED FOR AS *"move
+   * numbers down, on top of timecode"*. The two halves of this picture that a
+   * MACHINE and a PERSON read are now one block at the bottom: the row encodes
+   * the instant, the digits above it say the same instant in words, and the two
+   * can be compared by eye without crossing the frame.
+   * ⚠️ AND THE MIDDLE IS LEFT EMPTY ON PURPOSE. It is where a background goes:
+   * `drawCamera` lays a picture in behind all of this, and the furniture now
+   * frames it instead of sitting across it.
+   */
+  // 🔴 THE GAP ABOVE THE BED EQUALS THE GAP BELOW IT, AND BOTH ARE `PAD`.
+  // Asked 2026-09-18: *"same space between numbers and timecode as timecode
+  // and lower edge"*. The bed sits PAD off the bottom edge by construction, so
+  // the number's baseline sits PAD above its top. Derived from `PAD` rather
+  // than typed, because the whole frame's margins are that one number and an
+  // eye reads the difference between 60 and 59 as a mistake.
+  // ⚠️ THE BASELINE IS THE VISUAL BOTTOM HERE. These are digits and a colon,
+  // none of which descend, so there is nothing below the baseline to allow for.
+  const NUM_Y = ROW.Y - 20 - PAD;
+  // ⚠️ 80 RATHER THAN 68, ASKED FOR 2026-09-18: *"incr a liitle bit space
+  // betwen labels and timecode numbers"*. What an eye reads as the gap is not
+  // this number: it is this number LESS the number's cap height, which at 64 px
+  // is about 50. So 68 was an 18 px gap and 80 is a 30 px one, which is the
+  // "little bit" and not the near doubling the figures suggest.
+  const LBL_Y = NUM_Y - 80;
   ctx.font = `bold ${LBL}px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
-  ctx.fillText('ABSOLUTE', PAD, 95);
-  ctx.fillText(second.label, COL2, 95);
+  ctx.fillText('ABSOLUTE', PAD, LBL_Y);
+  ctx.fillText(second.label, COL2, LBL_Y);
   ctx.font = `bold ${NUM}px ${MONO}`;
   ctx.fillStyle = '#fff';
-  ctx.fillText(String(ms), PAD, 168);
+  ctx.fillText(String(ms), PAD, NUM_Y);
   ctx.fillStyle = '#e9eef7';
-  ctx.fillText(second.text, COL2, 168);
+  ctx.fillText(second.text, COL2, NUM_Y);
 
   // ── motion, and it MEANS something ───────────────────────────────────────
   // The block has to move, or a rate-controlled encoder dedupes a near-static
@@ -299,15 +323,27 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // read and no arithmetic. At 30 fps it still advances ~4 px a frame, which is
   // more motion than the row's low bits gave the encoder anyway.
   const SWEEP_MS = 10000;
-  const SQ = 52;
+  // 🔴 30 BY 30, SAID IN THOSE WORDS 2026-09-18: *"30x30 moving square"*.
+  // It was matched to the row's bed first, on *"square same h and w ans
+  // timecode strip h"*, which came out at 96 and was answered with *"square
+  // size is wrong"*. A strip has two heights a reader might mean, the black bed
+  // at 96 and the white blocks at 56, and neither was it. A number settles it.
+  // ⚠️ THE MARGINS ARE STILL DERIVED. *"distance from edges: same as timecode
+  // ones"* stands: it sits `PAD` off the top and crosses the run between the
+  // same left and right margins the strip respects.
+  const SQ = 30;
   // BETWEEN the numbers and the row: it belongs with the things a person reads,
   // not tucked under the machine-readable row where it looked like part of it.
   ctx.fillStyle = `hsl(${hue} 85% 55%)`;
-  // ⚠️ MOVED UP WITH THE NUMBERS, 2026-09-18. Its comment says it belongs
-  // BETWEEN the numbers and the row, and the numbers now end 165 px higher, so
-  // leaving it at 430 would have parked it against the row it was moved away
-  // from. 300 is the midpoint of the gap it is meant to sit in.
-  ctx.fillRect(((ms % SWEEP_MS) / SWEEP_MS) * (w - SQ), 300, SQ, SQ);
+  // 🔴 AND IT IS AT THE TOP NOW, WHERE THE CLOCKS USED TO BE. Asked 2026-09-18:
+  // *"move square to top in place of timecodes"*. It reads better there than
+  // between them: it is the one thing on this frame that can be read when the
+  // digits are too small to resolve, and the top edge is where an eye lands
+  // first. It still crosses the frame once every ten seconds of the burned
+  // clock, so two pictures of the same instant still put it in the same place.
+  // PAD from the top, and it crosses the run BETWEEN the margins rather than
+  // edge to edge, which is the strip's own left and right.
+  ctx.fillRect(PAD + ((ms % SWEEP_MS) / SWEEP_MS) * (w - 2 * PAD - SQ), PAD, SQ, SQ);
   return ms;
 }
 
@@ -447,6 +483,19 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
   // 0.6 x 64 is 499 px, plus PAD either side, which is where column two starts.
   const NUM = 64, LBL = 28;
   const COL2 = PAD + Math.round(13 * 0.6 * NUM) + PAD;
+  // 🔴 ffmpeg's `y` IS THE TOP OF THE TEXT BOX AND THE CANVAS'S IS THE
+  // BASELINE, SO ONE HAS TO BE CONVERTED INTO THE OTHER. It was a pair of hand
+  // typed numbers, and when the canvas moved to a 64 px number this kept the
+  // offset that belonged to an 84 px one: the number was drawn **25 px too
+  // low** and nothing said so, because no check compares the two renderings and
+  // this one is only ever seen inside a container. Derived now.
+  // 0.774 is that ratio, read back off the numbers this file shipped with
+  // (a 32 px label offset 25, an 84 px number offset 65).
+  const top = (baseline, size) => Math.round(baseline - 0.774 * size);
+  // THE CANVAS'S OWN BASELINES, computed the same way, so the two renderings
+  // cannot drift apart again.
+  const NUM_Y = ROW.Y - 20 - PAD;
+  const LBL_Y = NUM_Y - 80;
   const LABEL = '0xFFD400';   // --hi
   const VALUE = '0xE9EEF7';   // the canvas's own near-white
   return [
@@ -460,7 +509,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     // There is no source label any more: the hue says which publisher this is,
     // and a name burned into a picture is a small text that cannot be read at
     // the size a demo shows it.
-    text('ABSOLUTE', PAD, 70, LBL, LABEL),
+    text('ABSOLUTE', PAD, top(LBL_Y, LBL), LBL, LABEL),
     // pts-derived, and the same instant the row encodes.
     //
     // In SECONDS, not milliseconds, where the canvas prints ms. Not a choice:
@@ -468,8 +517,8 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     // (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of
     // floating-point result to int failed" — measured on ffmpeg@7. The unit is
     // therefore printed beside the number rather than left to be guessed.
-    text(`%{pts\\:flt\\:${epoch}} s`, PAD, 143, NUM, VALUE),
-    text('LOCAL', COL2, 70, LBL, LABEL),
+    text(`%{pts\\:flt\\:${epoch}} s`, PAD, top(NUM_Y, NUM), NUM, VALUE),
+    text('LOCAL', COL2, top(LBL_Y, LBL), LBL, LABEL),
     // LEGIBLE — the publisher's own wall clock. %{pts:flt:…} is precise and
     // unreadable; this is the one a person checks against their own watch.
     // The two drifting apart is real information: it is encoder drift.
@@ -480,7 +529,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
     // one level deeper than the one separating `gmtime` from its argument.
     // Measured against ffmpeg@7: `\\\:` renders 15:31:25, `\:` errors with
     // "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', COL2, 143, NUM, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', COL2, top(NUM_Y, NUM), NUM, VALUE),
   ].join(',');
 }
 

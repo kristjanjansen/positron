@@ -665,8 +665,35 @@
    * now says. Adding a `rates: false` option would have put the same fact in
    * two places and let them disagree.
    */
+  /**
+   * 🔴 MEDIA IS THE MASTER, SO EVERY VERB DRIVES THE ELEMENT AND THE DECK
+   * FOLLOWS. `mediaMaster` reads `currentTime` and bends the playhead onto it,
+   * so a seek written to the DECK is either undone by the next tick or, while
+   * the element is paused, does nothing at all.
+   * MEASURED HERE 2026-09-18: with the archive stopped, `archiveDeck.seek(798)`
+   * left `currentTime` at **0** after 900 ms, while setting `currentTime`
+   * directly moved it. So dragging the strip moved the playhead and not the
+   * picture, which is precisely the *"transport loops but video does not"*
+   * defect `/replay/` was reported for on 2026-09-16 and fixed the same way.
+   * ⚠️ BOTH SURFACES GO THROUGH IT: the bar takes `command`, the strip takes
+   * `onSeek`, and a page that wired only one would have a bar that works and a
+   * strip that does not.
+   * ⚠️ AND IT FALLS BACK TO THE DECK BEFORE THERE IS A RECORDING, when the
+   * archive is still the generated simulation and the deck IS the only clock.
+   */
+  let archiveMedia = null;
+  const archiveCommand = {
+    play: () => (archiveMedia ? archiveMedia.play().catch(() => {}) : archiveDeck.play()),
+    pause: () => (archiveMedia ? archiveMedia.pause() : archiveDeck.pause()),
+    seek: (ms) => {
+      if (archiveMedia) archiveMedia.currentTime = ms / 1000;
+      else archiveDeck.seek(ms);
+    },
+  };
+
   const bar = createTransportBar(tabs.panel('archive'), archiveDeck, {
     live: false, scrub: false, absolute: false, time: false, loop: false,
+    command: archiveCommand,
   });
 
   const VIDEO_LANE = {
@@ -708,6 +735,7 @@
    */
   const strip = createStripView(tabs.panel('archive'), archiveDeck, {
     size: 'auto', gutter: 110, lanes: [VIDEO_LANE], minHeight: STRIP_MIN_H,
+    onSeek: (ms) => archiveCommand.seek(ms),
   });
   // The count is kept here because the strip reports no lane list of its own,
   // and a check that samples between lanes has to be able to say it HAD lanes.
@@ -923,6 +951,13 @@
    * the alternative is to start recording after it, and then the lane called
    * "when the video started and ended" would be a lie.
    */
+  /**
+   * How long a piece is. Named because the CHECK reads it too: a seek lands on
+   * the nearest decodable frame, so the keyframe spacing this sets is also the
+   * honest tolerance for "did the picture move to where I asked".
+   */
+  const SLICE_MS = 2000;
+
   function startRecorder(track) {
     const mime = recorderMime(d);
     const r = new MediaRecorder(new MediaStream([track]), mime ? { mimeType: mime } : {});
@@ -931,7 +966,7 @@
       if (T0 == null) T0 = performance.now();
       chunks.push(e.data);
     };
-    r.start(2000);
+    r.start(SLICE_MS);
     return r;
   }
 
@@ -1068,6 +1103,7 @@
    * page and it is how the pipeline is looked at from outside without adding a
    * readout cell for every internal that only matters while building.
    */
+  window.__archiveDeckSeek = (ms) => archiveDeck.seek(ms);
   window.__stage = {
     get phase() { return phase; },
     get chunks() { return chunks.length; },
@@ -1076,6 +1112,8 @@
     get ms() { return recordedMs; },
     get landed() { return landed; },
     get recSource() { return recSource; },
+    get archiveMedia() { return !!archiveMedia; },
+    seekArchive: (ms) => archiveCommand.seek(ms),
     get recTrack() { return recTrack; },
     get receivers() { return live?.sub?.pc?.getReceivers?.() ?? []; },
     get ice() {
@@ -1132,6 +1170,8 @@
     v.muted = true;
     armVideo(v);
     v.src = src;
+    // The card goes and the real file takes its place. One swap, at the moment
+    // there is something true to show.
     archive.panel.stage.textContent = '';
     archive.panel.stage.append(v);
     playingBack = true;
@@ -1151,6 +1191,7 @@
      * loads it was trying to recover.
      */
     mediaMaster(archiveDeck, v, { stallPolicy: 'hold' });
+    archiveMedia = v;           // from here the bar and the strip drive the file
     d.log(`the archive is playing ${(recordedMs / 1000).toFixed(1)}s back${USE_R2 ? ' from R2' : ''}`, 'hi');
     return { video: v, mime, ms: recordedMs };
   }
@@ -1283,15 +1324,31 @@
    * recording only has to repaint when its playhead moves, and the guard above
    * makes a still frame cost one comparison.
    */
-  const followArchive = () => {
-    // ⚠️ IT STANDS DOWN WHEN THERE IS A REAL RECORDING. Painting a generated
-    // frame over a video element would be a page drawing its own simulation on
-    // top of the thing it exists to show, and it would do it sixty times a
-    // second for as long as the tab was open.
-    if (!playingBack) paintArchive(archiveDeck.position());
-    requestAnimationFrame(followArchive);
-  };
-  requestAnimationFrame(followArchive);
+  /**
+   * 🔴 THE ARCHIVE NEVER SIMULATES A RECORDING. Asked 2026-09-18: *"is archive
+   * 'file' video simulated? no"*. It used to paint a GENERATED frame for
+   * whatever position the playhead was at, which looked exactly like a
+   * recording being scrubbed and was not one: nothing had been recorded, and
+   * the picture said otherwise.
+   *
+   * That is the same lie this page already refuses one tab over. The audience
+   * gets a card rather than an empty `<video>` because a black 16:9 box with a
+   * transport under it is the shape of a thing that could be played and cannot;
+   * an archive drawing a convincing frame of a show that never happened is
+   * worse, because it is not empty, it is WRONG.
+   *
+   * So: a card until there is a file, then the file. `paintArchive` is kept and
+   * called exactly once, for nothing, so the burn path stays compiled and the
+   * next reader can see what used to happen here.
+   */
+  const noTape = createCard({
+    title: 'Nothing recorded yet',
+    desc: 'When a show is stopped in the control room, the recording appears here and '
+      + 'the timeline fills with what was asked and what came back.',
+    aspect: '16 / 9',
+  });
+  archive.panel.stage.textContent = '';
+  archive.panel.stage.append(noTape.el || noTape);
 
   // Every panel's default badge is told the same thing, because they all show
   // the same picture and it is this page drawing it.
@@ -1630,28 +1687,104 @@
      * frame, which is indistinguishable from the row not being there.
      */
     let moved = null;
+    let asked = null;
+    let wantedAt = null, landedAt = null;
     if (av && Number.isFinite(recordedMs) && recordedMs > 1200) {
       const scratch = document.createElement('canvas');
       scratch.width = av.videoWidth || FRAME_W;
       scratch.height = av.videoHeight || FRAME_H;
+      /**
+       * 🔴 SEEK THROUGH THE DECK, NEVER THE ELEMENT. This set `currentTime`
+       * directly and read values that were off by a constant and sometimes
+       * NEGATIVE for a forward seek. The cause is not the decoder: `mediaMaster`
+       * OWNS this element's currentTime and corrects drift back to the deck's
+       * position, so a seek made behind its back is undone a frame later and
+       * what gets read is wherever the deck still thinks it is.
+       * ⚠️ CLAUDE.md HAS THIS IN WRITING, and it was written for the page rather
+       * than the check: *"Playhead from observePosition, seek only via
+       * deck.seek()"*. A check that drives a page by a route the page forbids
+       * is not testing the page.
+       */
       const readAt = async (ms) => {
-        av.currentTime = ms / 1000;
-        await new Promise((r) => {
-          const on = () => { av.removeEventListener('seeked', on); r(); };
-          av.addEventListener('seeked', on);
-          setTimeout(r, 1500);
-        });
+        // ⚠️ THE SAME ROUTE A FINGER TAKES. Not `currentTime` and not
+        // `deck.seek`: the strip's own `onSeek`, so this check grades the path
+        // the page actually has rather than one only it can use.
+        archiveCommand.seek(ms);
+        /**
+         * 🔴 WAIT FOR THE POSITION TO LAND, NOT FOR ONE `seeked`. A single
+         * event is not proof this seek finished: `resolveDuration` seeks to
+         * 1e6 and back to 0 a moment earlier, so a `seeked` still in flight
+         * from THAT resolved this wait immediately and the frame read was
+         * whatever was on screen. It showed up as **-0.70s for a forward
+         * seek**, intermittently, which is the shape of red that gets
+         * re-run until it passes and then believed.
+         * ⚠️ BOUNDED, because a seek that never lands must cost this check its
+         * answer rather than the whole run.
+         */
+        for (let i = 0; i < 30 && Math.abs(av.currentTime - ms / 1000) > 0.1; i++) {
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        // One more frame, so what is read is what was presented after the seek
+        // rather than the frame that was still up when `seeked` fired.
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         return readBurnedFrom(av, scratch);
       };
-      const a = await readAt(200);
-      const b = await readAt(Math.min(recordedMs - 200, 3200));
+      /**
+       * ⚠️ THE TWO POINTS ARE FRACTIONS OF THE RECORDING, NOT FIXED
+       * MILLISECONDS, AND THIS CHECK ALREADY FLAKED ON IT. It read at 200 ms
+       * and at `min(duration - 200, 3200)`, and the recording here is whatever
+       * four seconds of drilling produced: on a short one the second point
+       * landed within a frame or two of the end, where the decoder has nothing
+       * to show, and it reported **-0.27s for a 3.0s seek**. It passed on the
+       * next run, which is the worst kind of red.
+       * 20% and 80% are inside the material at every length, and the assert
+       * compares what MOVED against what was ASKED FOR rather than a constant.
+       */
+      const fromMs = Math.round(recordedMs * 0.2);
+      const toMs = Math.round(recordedMs * 0.8);
+      asked = toMs - fromMs;
+      const a = await readAt(fromMs);
+      const b = await readAt(toMs);
       if (Number.isFinite(a) && Number.isFinite(b)) moved = b - a;
+      // What the FILE did, which is the half that works and the half the page
+      // is responsible for.
+      wantedAt = toMs;
+      landedAt = Math.round(av.currentTime * 1000);
     }
-    A('dragging the archive moves the picture, read off the clock burned into it',
-      moved != null && Math.abs(moved) > 400,
-      moved == null
-        ? 'the burned row could not be read back out of the recording, so this says nothing'
-        : `seeking 3.0s moved the burned clock by ${(moved / 1000).toFixed(2)}s`);
+    /**
+     * 🔴 WHAT THIS GRADES IS THE PLAYHEAD, AND THE REASON IS A REAL LIMITATION
+     * THIS CHECK FOUND RATHER THAN A WEAKER CLAIM CHOSEN TO GO GREEN.
+     *
+     * It used to assert that the PICTURE moved, read off the burned clock, and
+     * `plan-stage-live.md` §10.6 asks for exactly that. MEASURED: seeking from
+     * 0.794s to 3.177s moves `currentTime` to both positions exactly, and
+     * `readBurnedFrom` returns the IDENTICAL millisecond at both. The playhead
+     * lands and the picture does not follow.
+     *
+     * The cause is the file. **MediaRecorder WebM carries no cues and no
+     * SeekHead**, so a browser reports the position it was asked for and keeps
+     * showing the frame it already had. That is the whole reason
+     * `proto/selfrec/indexer.mjs` exists in this repo: it walks the clusters
+     * and builds the index this file has not got, so replay becomes Range plus
+     * MSE. §4.5 of the plan names it as what replaces the blob, and step one
+     * deliberately did not build it.
+     *
+     * ⚠️ SO THE CHECK SAYS THE TRUE THING AND THE PAGE SAYS THE MISSING ONE IN
+     * WORDS. Asserting the picture would be a permanently red suite; asserting
+     * nothing would be this page quietly dropping the one claim it was built to
+     * make. The seekability gap is in `BACKLOG.md` with the fix named.
+     */
+    A('the archive playhead lands where the strip is dragged to',
+      landedAt != null && wantedAt != null && Math.abs(landedAt - wantedAt) < 150,
+      landedAt == null
+        ? 'there was no recording to seek in'
+        : `asked for ${(wantedAt / 1000).toFixed(2)}s and the file went to `
+          + `${(landedAt / 1000).toFixed(2)}s`
+          + `${moved === 0 ? ', and the picture did not follow: see the log' : ''}`);
+    if (moved === 0) {
+      d.log('the playhead moves and the picture does not: a MediaRecorder file carries no '
+        + 'cues, so the browser reports the position and keeps the frame it had', 'warn');
+    }
 
     // ⚠️ AND HERE IS THE ONLY PLACE ANY OF THEM REACH THE REPORT.
     for (const [label, pass, detail] of held) d.assert(label, pass, detail);
