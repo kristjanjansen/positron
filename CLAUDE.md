@@ -87,6 +87,7 @@ node demo/verify.mjs                     # every built demo (CDP, asserts on win
 node demo/verify.mjs llhls ladder        # just these, by slug
 node demo/verify-native.mjs              # THE IPHONE CODE PATH — verify.mjs cannot reach it
 node demo/fake-station.mjs               # an Icecast mount that is nobody's radio
+node demo/fake-tapes.mjs                 # an archive that is nobody's archive
 node demo/shell/looper-test.mjs          # the looper's arithmetic, no browser
 node workers/mail/test.mjs               # what arrives at positron@ is spam or a person
 node demo/resources/measure-durations.mjs   # how long each recording is, asked once
@@ -170,12 +171,25 @@ mistake: the ERR rule is written about a broadcaster's listener statistics, and
 it was read as though the SPECIFIC harm were the whole rule, so a harness that
 pulls twenty-four recordings off archive.org on every run was called safe.
 **The rule is about whose server it is, not about which harm has been named
-yet.** `node demo/verify.mjs tapes` fetches real recordings from archive.org and
-must not be run in a development loop. ⚠️ THE ANSWER IS A STAND-IN, and this
-repo already has the pattern: `demo/fake-station.mjs` is an Icecast mount that
-is nobody's radio, and it took `/radio/` from ungradable to 48/48 at zero cost
-to anybody. `/tapes/` has no equivalent yet; until it does, change the page,
-syntax-check it with `node demo/check-html.mjs`, and ship it.
+yet.**
+
+✅ **AND `/tapes/` HAS ITS STAND-IN SINCE 2026-09-18, SO THIS RULE NO LONGER
+COSTS ANYBODY A PAGE.** `demo/fake-tapes.mjs` is an archive that is nobody's
+archive: it reads its paths off `corpus.json` rather than a list, so it cannot
+drift from the page, and it tiles one 8 s MP3 BY THE BYTE to any length (48 kHz
+at 64 kbit/s makes `144*bitrate/rate` whole, 24.000 ms and 192 bytes a frame, so
+every wrap lands on a frame boundary and a Range reply needs no frame table).
+The 24 rows are 2 h 22 m and 68 MB, never allocated. `node demo/verify.mjs
+tapes` starts it and points the page at it with its own `?base=`:
+**MEASURED 38/38 with the only hosts contacted being the dev server and the
+stand-in.** The instrument is not blind, which is the half that makes the claim
+worth anything: pointed at a dead port the same run names that port and takes 5
+asserts red.
+⚠️ It grades OUR code, exactly as `fake-station.mjs` does. A stand-in cannot
+tell you a recording is 403ing out there.
+⚠️ **AND TWO HOLES IN `/tapes/`'S OWN CHECKS WERE FOUND BY SABOTAGING IT**: a
+stand-in serving every recording at HALF its corpus length still reads 38/38,
+and one serving SILENCE reads 38/38 too. Both are in `BACKLOG.md`.
 
 🔴 **AND THE COST IS NOT OURS TO PAY. ERR SAID SO, 2026-09-16, RELAYED TO
 KRISTJAN:** *"ERRil oli ka probleem, et nende kuulajastatistika läheb sassi"* —
@@ -206,6 +220,24 @@ rule about it"*. It is gated on `?selfcheck=1`, which `demo/verify.mjs` appends
 to every demo it opens, and the DEFAULT IS OFF. There is no page that is an
 exception, and the two arguments that were used to make exceptions are both
 answered below.
+
+✅ **THE GATE IS A KIT MODULE SINCE 2026-09-18: `demo/shell/selfcheck.mjs`, AND
+ALL FORTY PAGES ARE SWEPT.** Import `SELFCHECK`, or `ifSelfcheck(fn, { log,
+say })` where a visitor would otherwise be left with empty cells and no account
+of why. It was one line copied per page for four pages and the other forty-one
+never grew it; one import is greppable, which is the half that makes a sweep
+finishable. ⚠️ Sixteen pages needed NO change, because everything costly in them
+already sat behind the press a visitor makes, so they carry no `selfcheck`
+string and `grep -L selfcheck demo/*/index.html` still lists them. That grep is
+not a ledger of unswept pages.
+🔴 **AND `verify-gl.mjs` AND `verify-quest.mjs` DID NOT APPEND THE FLAG UNTIL
+THAT SWEEP.** Only `verify.mjs` did, so gating any `gl: true` page switched its
+checks off in every harness able to reach it, silently. `/videoradio/` had
+carried its own gate for two sessions with its checks running NOWHERE, and its
+comment named that file as *"a harness to fix rather than a reason to work a
+visitor's controls"*. Both append it now, after `DEMO_QUERY` so an override
+still wins. ⚠️ **`node demo/verify-gl.mjs videoradio` THEREFORE COSTS ERR NOW
+AND DID NOT BEFORE**: that page rotates four ERR mounts.
 
 ⚠️ **"NOBODY IS HOLDING THIS ONE" IS NOT AN EXCEPTION.** `/videoradio/` ran its
 checks by default on exactly that reasoning: the page moves its own blend,

@@ -29,6 +29,7 @@
   import { createTable } from '/shell/table.mjs';
   import { FEEDBACK_BASE, LIVE_ROOM, DEV_ROOM, roomFor, isLive, sendNote }
     from '/shell/feedback.mjs';
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
 
   // Which room this copy of the page reads is the same decision the button on
   // every other page makes about where it WRITES — one function, so the table
@@ -144,8 +145,22 @@
   (async () => {
     await load();
     describe();
-    await roundTrip();
-    await load();          // so the table shows what the round trip just wrote
+    /**
+     * 🔴 THE ROUND TRIP IS A HARNESS'S, NOT A READER'S. It wakes the recorder,
+     * opens a socket, sends a note and then polls the store until the row comes
+     * back — so anybody who opened this page to read what people have written
+     * was writing a row of their own into the list, on arrival, for as long as
+     * they were not on the published site. A check that adds to the thing it is
+     * checking is the shape CLAUDE.md names.
+     * ⚠️ THE SECOND `load()` GOES WITH IT, because its only job is to show the
+     * row the round trip just made. Without the write there is nothing new to
+     * fetch, and asking again is a second request for an answer already in hand.
+     */
+    await ifSelfcheck(async () => {
+      await roundTrip();
+      await load();        // so the table shows what the round trip just wrote
+    }, { log: d.log, say: 'the send-and-read-back check is for the harness, so nothing was '
+      + 'written into this room. The rows below are what other people wrote' });
 
     d.assert('the store answers', reachable, reachable ? `${held} held in ${ROOM}` : reason);
     d.assert('this page reads the room this origin writes to',

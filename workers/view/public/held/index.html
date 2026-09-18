@@ -135,6 +135,7 @@
   import { createXRControllers } from '/shell/xr-controller.mjs';
   import { createXRQuit } from '/shell/xr-quit.mjs';
   import { createXRRay, eyeFromView } from '/shell/xr-ray.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   // ── the room ──────────────────────────────────────────────────────────────
   // 15 m across. A word sits ON a wall plane or a little way out from it, and
@@ -1713,7 +1714,24 @@ void main() {
     // taller. `oo` and `oo` with two dots differ in nothing else, and the marks
     // sit clear of the letters with a blank row between, which is what makes the
     // band findable at all.
-    {
+    /**
+     * 🔴 EVERYTHING FROM HERE THAT DRAWS OR TYPES IS BEHIND THE FLAG, AND THE
+     * LINE BETWEEN THE TWO HALVES IS WHAT THE CHECK COSTS RATHER THAN WHAT IT
+     * PROVES. What stays: the frame counter, the font report, the ink in each
+     * box, the reach of every word, the matrices, the room scale, the pending
+     * GL error. All of that is read off what this page is already holding.
+     * What moves: every `probe`, which renders a word into an off-screen target
+     * and reads the pixels back, every `shot`, which is a 640x360 readback of
+     * the whole room and there is one PER WORD, and every `retext`, which types
+     * over a word on the wall and puts it back. On arrival that is dozens of
+     * GPU stalls and a wall whose words change, for somebody who came to read
+     * them.
+     */
+    if (!SELFCHECK) {
+      d.log('the checks that draw this room off screen and type over its words are for '
+          + 'the harness · what is left is read off what the page already holds');
+    }
+    if (SELFCHECK) {
       const pair = ['oo', 'öö'].map((text) => {
         const t = buildText(gl, { text, weight: DISPLAY_WEIGHT, px: 320, cap: 0.9 });
         const b = place({ text, wall: 'n', u: 0, y: 1.6, out: 0, cap: 0.9 }, t);
@@ -1765,7 +1783,7 @@ void main() {
     // a descender, so lit height is proportional to the size it was set at. A
     // word with a `g` in it would be taller for a reason that is not its length,
     // which is why the check reports the pixels rather than hiding them.
-    {
+    if (SELFCHECK) {
       const rows = built.filter((b) => b.item.cap).map((b) => {
         const p = probe(b, { dist: 6 });
         return { text: b.item.text, n: [...b.item.text].length,
@@ -1786,7 +1804,7 @@ void main() {
     // the one thing on this page that changes a size while somebody is looking,
     // so it is graded the same way: draw the word, type a shorter one over it,
     // draw again, and put the first one back.
-    {
+    if (SELFCHECK) {
       const before = built.find((b) => b.item.text === 'could');
       const was = probe(before, { dist: 6 }).height;
       const typed = retext(before, 'oh');
@@ -1900,9 +1918,14 @@ void main() {
     const big = built.filter((b) => b.item.cap)
       .reduce((a, b) => (b.item.cap > a.item.cap ? b : a));
     const five = built.find((b) => b.item.cap && [...b.item.text].length === 5);
-    const head = probe(big, { dist: 6 });
-    d.assert('a word is drawn', head.ink > 2000 && head.width > 80,
-      `${head.ink} lit pixels, ${head.width} across at 6 m`);
+    // ⚠️ `big` AND `five` STAY OUT HERE because several of the gated blocks below
+    // want them and a filter over six words costs nothing. The `probe` is what
+    // costs, so that is what moves.
+    if (SELFCHECK) {
+      const head = probe(big, { dist: 6 });
+      d.assert('a word is drawn', head.ink > 2000 && head.width > 80,
+        `${head.ink} lit pixels, ${head.width} across at 6 m`);
+    }
 
     // 🔴 THE CHECK WANTS THE PICTURE TO GET WORSE. A billboard swung round is
     // exactly as wide as it was; a word fixed to its wall narrows. Asking for
@@ -1915,7 +1938,7 @@ void main() {
     // probe below refuses to be believed unless the whole word is inside the
     // frame — CLAUDE.md's *check the instrument before believing the pattern*,
     // and it is one comparison rather than a cleverer statistic.
-    {
+    if (SELFCHECK) {
       const turns = [0, 35, 70].map((deg) => ({
         deg, p: probe(five, { dist: 12, yaw: deg * Math.PI / 180 }),
       }));
@@ -1932,7 +1955,7 @@ void main() {
     // 🔴 SHARPNESS, WITH THE CONTROL THAT MAKES IT MEAN SOMETHING. The same
     // word, same raster, same shader, same distance — one stored as a distance
     // and one as the picture it was rasterised from.
-    {
+    if (SELFCHECK) {
       const rows = [];
       for (const dist of [6, 2, 0.9, 0.35]) {
         const f = probe(big, { dist });
@@ -1961,7 +1984,7 @@ void main() {
     // gets wrong. ⚠️ Equal texels, not equal `px` — the field is half the
     // raster it came from, so `raw` at the same `px` would be handed four times
     // the bytes and the comparison would say nothing.
-    {
+    if (SELFCHECK) {
       // ⚠️ A FIVE-LETTER WORD RATHER THAN THE BIGGEST ONE. `disagree` divides by
       // the reference's ink, so a two-letter word gives it a small denominator
       // and a noisy answer about a letterform there is not much of.
@@ -2004,7 +2027,7 @@ void main() {
     // green asserts. This one runs the frame loop's own path into the same
     // off-screen target and asks whether the result looks like a room: a few
     // words and a floor, not a white wall and not an empty one.
-    {
+    if (SELFCHECK) {
       probeTarget(640, 360);
       gl.bindFramebuffer(gl.FRAMEBUFFER, probeFB);
       gl.viewport(0, 0, 640, 360);
@@ -2089,7 +2112,7 @@ void main() {
      * compared against itself before and after, with nothing derived from where
      * the word was supposed to be.
      */
-    {
+    if (SELFCHECK) {
       const shot = () => {
         probeTarget(640, 360);
         gl.bindFramebuffer(gl.FRAMEBUFFER, probeFB);
@@ -2158,7 +2181,7 @@ void main() {
      * moment that is non-null — so an `await` in here would park the page on a
      * still image for the rest of the run.
      */
-    {
+    if (SELFCHECK) {
       const keepPos = pos.slice(), keepTurn = turn;
       const keepRef = xrRefSpace, keepSession = xrSession;
       const keepOverlay = overlay, keepSys = sysKeyboard;

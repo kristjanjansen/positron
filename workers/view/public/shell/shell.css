@@ -2837,4 +2837,3 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 
 /* the two specimen blocks in the GLUE section: a surface needs something with
    a height in it, and a readout with one line is the smallest honest one */
-.kit-glue-demo { padding: 10px 12px; color: var(--dim); }

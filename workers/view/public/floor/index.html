@@ -70,6 +70,7 @@
   import { createXRControllers } from '/shell/xr-controller.mjs';
   import { createXRQuit } from '/shell/xr-quit.mjs';
   import { createProjector, VOICES } from '/shell/projector.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { toggle as toggleFull, exit as exitFull, watch as watchFull,
     support as fullSupport } from '/shell/fullscreen.mjs';
 
@@ -1725,7 +1726,20 @@
   //    mechanism — with it wrong, the tile the gesture is about darkens along
   //    with everything else and the page reads as fading out at random.
   //  · and a film takes the rest of the floor the rest of the way.
-  {
+  if (!SELFCHECK) {
+    d.log('the checks that paint over a tile, run the floor forward and start a film '
+        + 'are for the harness · the rest ran');
+  }
+
+  // 🔴 BEHIND THE FLAG, BECAUSE THE FIRST THING IT DOES IS PAINT OVER A TILE
+  // SOMEBODY IS LOOKING AT. Layer 0 of the texture array belongs to whichever
+  // film is nearest the camera by the time this runs, and `texSubImage3D` fills
+  // it with flat grey to have something uniform to measure. Nothing puts the
+  // picture back: that tile stays grey until the pool takes the layer for
+  // something else. Everything after it renders into an off-screen target,
+  // which costs nothing a visitor can see and is gated with it because it is
+  // the same block.
+  if (SELFCHECK) {
     const N = 64;
     const grey = new Uint8Array(TEX_W * TEX_H * 4).fill(128);
     for (let i = 3; i < grey.length; i += 4) grey[i] = 255;
@@ -1827,7 +1841,14 @@
   // TO FIRE. One frame further and this check would call playTile(), which
   // fetches from the archive — a check that needs the network is a check that
   // goes red when somebody else's server is slow.
-  {
+  // 🔴 AND THIS ONE RUNS THE PAGE FORWARD 1667 ms WHILE SOMEBODY IS WATCHING IT
+  // ARRIVE. `step()` is the frame loop's own body — it wraps the tiles, places
+  // the sound, pumps the image queue and advances every fade — so a hundred of
+  // them at load skips the fade-in a visitor came in on and leaves the tile
+  // alphas where a second and a half of looking would have put them. The dwell,
+  // the dim and the playing tile are put back; the fades are not, and cannot be
+  // without re-implementing the loop.
+  if (SELFCHECK) {
     const keep = { hover, dwell, dimAmt, playing };
     const lit = state.findIndex((t) => t.layer >= 0);
     hover = lit >= 0 ? lit : 0;
@@ -1982,7 +2003,14 @@
   // ⚠️ IT NEEDS THE NETWORK, so it goes red when ERR is down rather than when we
   // are — and the detail says which. That is worth more than a green suite that
   // has never played a frame.
-  {
+  // 🔴 AND THIS IS THE ONE THAT MUST NEVER HAVE RUN FOR A VISITOR. It clicks a
+  // tile, which asks arhiiv.err.ee for a film, loads it over HLS, plays it for
+  // up to six seconds and stops it — on arrival, unasked, on every visit. That
+  // is a request to a broadcaster's archive per page load and a film starting
+  // by itself in front of somebody who has not chosen one yet. The comment
+  // above already said "it needs the network"; what it did not say is who was
+  // paying for it.
+  if (SELFCHECK) {
     await new Promise((r) => setTimeout(r, 1500));       // let some tiles fade in
     const r = wrap.getBoundingClientRect();
     const cx = r.left + r.width / 2, cy = r.top + r.height * 0.72;

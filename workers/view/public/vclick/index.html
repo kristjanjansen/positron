@@ -36,6 +36,10 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { scoreDoc, quotation, scoreDocToJSONL } from '/timeline/score.mjs';
   import { csoundPart, compileCsound, tempoMap } from '/timeline/csound.mjs';
+  // Every check here is arithmetic over a score that is compiled in the page,
+  // except the last, which seeks. That one left the playhead parked inside the
+  // repeat on arrival, so the page opened somewhere nobody had asked to be.
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   // A WRITTEN SCORE, MADE SEEKABLE — demo/notes/uuu-positron.md §3, on the
   // container 04 introduces. vClick conducts an ensemble from a Csound score,
@@ -534,7 +538,11 @@
   }
 
   // A seek that lands inside the repeat: the position the score cannot describe.
-  {
+  // 🔴 AND IT DOES NOT PUT THE PLAYHEAD BACK, WHICH IS WHY IT IS GATED. The
+  // page opened with the line already halfway through the second pass, for a
+  // reason no visitor could see. The strip is a position surface and the
+  // paragraph says so; dragging there is theirs.
+  if (SELFCHECK) {
     const rep = structural.repeats[0];
     const use = rep && [...doc.uses]
       .filter((u) => Math.abs(Number(u.in) - rep.inBeat) < 1e-9
