@@ -1,0 +1,10 @@
+MIME-Version: 1.0
+Subject: cut short
+From: someone@example.com
+To: positron@positron.studio
+Content-Type: multipart/alternative; boundary="CUT-SHORT"
+
+--CUT-SHORT
+Content-Type: text/plain; charset="UTF-8"
+
+this is the only part and the message just stops

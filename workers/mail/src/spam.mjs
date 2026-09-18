@@ -512,6 +512,33 @@ export function classify({ headers, envelopeFrom = '', trusted = TRUSTED_AUTHSER
 /** The short form, in the order a reader scans. */
 function chipsFor(verdict, auth, markers, mismatch, policy) {
   const out = [verdict === 'clean' ? 'ok' : verdict];
+
+  /**
+   * 🔴 WHICH SIGNAL DECIDED THIS, ON EVERY MESSAGE, BECAUSE THE ROOM COULD NOT
+   * ANSWER IT. Two real messages arrived 2026-09-17 and the second came out
+   * `[ok]`. Four characters are the same four whether a real
+   * `Authentication-Results` was read or a forwarded `ARC-Authentication-Results`
+   * was believed instead, so the one question anybody had about the first real
+   * mail this worker ever graded was the one question its own output could not
+   * answer. `auth.via` had held the answer the whole time and went only to the
+   * console, where nobody was looking.
+   *
+   * ⚠️ IT IS EMITTED ON THE ORDINARY CASE TOO, WHICH BREAKS THIS FILE'S OWN RULE
+   * ABOUT CHIPS ONLY WHERE THEY BEAR ON THE VERDICT, AND THAT IS DELIBERATE.
+   * The rule exists so a good message does not wear an alarm. This is not an
+   * alarm, it is a provenance, and the argument for saying it every time is the
+   * same one that put `[ok]` on ordinary mail in the first place: a chip that
+   * appears only in the interesting case cannot be told apart from a build that
+   * does not have the chip yet.
+   *
+   * ⚠️ AND IT MATTERS BECAUSE THE PRIMARY SIGNAL MAY SIMPLY NOT ARRIVE.
+   * `workerd#6740` reports `Authentication-Results` absent from a real Worker
+   * delivery with only an ARC set carrying `arc=none` in its place. `via ARC`
+   * says a PREVIOUS hop concluded this and we forwarded its word for it.
+   */
+  if (auth.via === 'ar') out.push('via Authentication-Results');
+  else if (auth.via === 'arc') out.push('via ARC');
+
   if (verdict === 'unknown') {
     // ⚠️ THREE DIFFERENT SILENCES AND THEY ARE NOT THE SAME SILENCE. No stamp
     // at all is local delivery. A stamp from somebody we do not believe is a

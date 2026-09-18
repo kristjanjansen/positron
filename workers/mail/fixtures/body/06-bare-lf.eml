@@ -1,0 +1,17 @@
+MIME-Version: 1.0
+Subject: normalised on the way
+From: someone@example.com
+To: positron@positron.studio
+Content-Type: multipart/alternative; boundary="LF-ONLY"
+
+--LF-ONLY
+Content-Type: text/plain; charset="UTF-8"
+
+line endings were normalised somewhere
+
+--LF-ONLY
+Content-Type: text/html; charset="UTF-8"
+
+<div>line endings were normalised somewhere</div>
+
+--LF-ONLY--

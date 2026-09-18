@@ -1,0 +1,29 @@
+MIME-Version: 1.0
+Subject: with an attachment
+From: maarja@gmail.com
+To: positron@positron.studio
+Content-Type: multipart/mixed; boundary="OUTER-9a8b7c"
+
+--OUTER-9a8b7c
+Content-Type: multipart/alternative; boundary="INNER-1d2e3f"
+
+--INNER-1d2e3f
+Content-Type: text/plain; charset="UTF-8"
+
+the words a person wrote
+
+--INNER-1d2e3f
+Content-Type: text/html; charset="UTF-8"
+
+<div>the words a person wrote</div>
+
+--INNER-1d2e3f--
+
+--OUTER-9a8b7c
+Content-Type: application/pdf; name="invoice.pdf"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="invoice.pdf"
+
+JVBERi0xLjQKJcOkw7zDtsOfCg==
+
+--OUTER-9a8b7c--
