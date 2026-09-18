@@ -15,6 +15,76 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- 🔴 **THE 1969 PHOTO PEAK IN `archive/megatimeline/census.json` MAY BE AN
+  ARTEFACT, AND IT IS THE KIND THAT LOOKS LIKE A FINDING.** Discovered
+  2026-09-18 while harvesting the ERR catalogue: **undated items are all parked
+  on 1969-12-31**, whatever decade they actually belong to (sampled and found
+  spanning 1963 to 2003). So any query bounded to 1969 sweeps in the whole
+  undated pile, and a census built by year would show a spike there that is a
+  property of the CATALOGUE rather than of the century.
+  ⚠️ This is the shape CLAUDE.md warns about twice over: a partial result that
+  is too tidy, and measuring a quantity adjacent to the one in question. The
+  peak was committed as data. Re-check it before anything is built on it.
+
+
+- ⚠️ **`demo/verify.mjs` HAS A DEAD `isReady` AND A COMMENT DESCRIBING WHAT IT
+  WOULD HAVE DONE.** Found 2026-09-18 while auditing the diagram-assert entry.
+  `const isReady = ...` is declared and never used anywhere in the file, and the
+  25-line comment above it claims *"THE WAIT IS ARMED BY `d.ready()`, NOT BY THE
+  COUNT BEING ZERO"*, which the code below it does not do. So the harness's
+  stabiliser is documented as doing something it does not do, in the one file
+  whose job is deciding whether a page was graded. Either wire it up or delete
+  both.
+
+- ⚠️ **`/kit/` STILL CALLS A HEADED LINE A TIE.** Its caption says *"The line
+  between the last two boxes is a tie: nothing was declared there"*, and an
+  assert label says *"it replaces their tie"*. Since 2026-09-16 an undeclared
+  gap is drawn WITH an arrowhead and only `set: true` gives a bracket, so the
+  page teaching the convention describes the old one. The decision the old
+  backlog entry asked for is moot; the wording is not.
+
+
+- 🔴 **`/stage/` BECOMES A REAL VIRTUAL STAGE, PLANNED AND RESEARCHED FIRST.
+  ASKED 2026-09-18, IN ONE DICTATED BLOCK.** Quoted at length because the detail
+  IS the specification and because it names its own uncertainties, which are the
+  part a plan must not quietly resolve:
+  *"I want this stage thing to be real, to actually be useful in a virtual stage
+  performance... Audience at first sees nothing. Maybe there is a message of
+  upcoming event, or maybe there is nothing in a video. The control room has a
+  button to start, play basically, but it has to do with our streaming pipeline.
+  So I guess WebRTC is the best choice, the compromise. Look up all the research
+  we have done on with different formats. So start a WebRTC feed. I'm not sure
+  where to source it from. Should it be generated in control room browser just to
+  get it going? Or I think we also have a container to do it. We also have M1,
+  which we could remotely control with OBS. I'm not sure OBS works on Raspberry
+  Pi, or maybe it does. So investigate what options. Maybe there is a switch. But
+  at first we could do just control room browser sending it over to the
+  Cloudflare WebRTC. Then use our storage solution. Because you remember WebRTC
+  currently doesn't have recording. So I guess control room has to do it as well
+  to push things to S2. R2, I mean. And then finally archive is playing it back,
+  whatever was saved to R2. For now just keep it as kind of a single feed and
+  single file, what you can overwrite maybe. So when the control room stops, all
+  those chunks of the feed, they have to end up in R2, and archive should be
+  playable. And all those events, those polls, etc., they have to be in a
+  timeline, in archive timeline."*
+  **The archive timeline is specified exactly and is not a guess:** first lane is
+  when the video started and ended; second lane is bars marking when each poll or
+  multiple choice was SENT and how long it stood before the next one overrode it;
+  then one, two or three lanes in the SAME COLOUR carrying the audience
+  responses.
+  Closing instruction: *"make a plan and do a good research how we could use our
+  always capture utilities that we have, make it reusable as much as possible."*
+  ⚠️ **THE RECORDING CONSTRAINT IS ALREADY MEASURED IN THIS REPO AND MUST NOT BE
+  RE-DERIVED OR RE-TESTED.** CLAUDE.md: WHIP ingest RECORDS NOTHING, direct
+  tested over 183 s against a recording-enabled input, 26 polls, zero assets.
+  Stream-WebRTC is delivery only. So whatever records has to record itself, which
+  is exactly what the ask concluded independently.
+  ⚠️ **A PLAN, NOT A BUILD.** The ask says plan and research. It also names four
+  possible sources (control room browser, the container, the M1 under OBS, the
+  Raspberry Pi) and says it is not sure which: a plan that picks one silently has
+  thrown away the question it was asked.
+
+
 - ✅ **THE LIVE BADGE IS OFF THE ARCHIVE PANEL, 2026-09-18.** MEASURED across
   the three panels: audience `live`, control room `live`, archive empty.
   ⚠️ **NOT RE-WORDED TO `archive`, WHICH WAS THE TEMPTING FIX.** A presence
@@ -24,20 +94,30 @@ file by being finished or by being refused in writing, never by being forgotten.
   costume. `left: false` is the panel's own way of saying a slot has nothing to
   put in it, and the footer keeps its other two.
 
-- 🔴 **STAGE PERFORMANCES AND THEATRE OUT OF THE ERR ARCHIVES, AS ONE FILE.
-  ASKED 2026-09-18:** *"Look up stage performances / theatre from err archives in
-  bg. I need single file"*.
-  ⚠️ **THIS SITS BESIDE *"Leave err alone"*, SAID THE SAME DAY, AND THEY ARE NOT
-  THE SAME ERR.** That instruction was about the LIVE MOUNTS, whose harm is
-  named and measured: a broadcaster's listener statistics are corrupted by
-  headless browsers holding a stream open. This is the CATALOGUE at
-  `arhiiv.err.ee`, which is a bounded number of metadata requests and streams
-  nothing. The later instruction is explicit and supersedes, and the distinction
-  is written here so nobody reads one as permission for the other.
-  ⚠️ **NO MEDIA IS FETCHED.** A catalogue row is a title, a date and an id. The
-  moment something plays a segment to check it, this becomes the thing the other
-  rule forbids.
-
+- ✅ **STAGE AND THEATRE OUT OF THE ERR ARCHIVES, 2026-09-18.**
+  `research/err-stage-theatre-2026-09-18.md`, 498 lines. **161 requests, all to
+  the catalogue, NO MEDIA OF ANY KIND**: no manifest, segment, mp3, mp4 or
+  thumbnail, and `vod.err.ee` / `heli.err.ee` / `arhiiv-images.err.ee` were never
+  contacted. Spaced 1.8 s, every response cached, and the API refused nothing.
+  **10,185 rows harvested complete** in the archive's own `Lavastuslik`
+  category (5,609 video, 4,576 audio), dated **1928-07-15 to 2026-09-14** over
+  84 distinct years, plus 30,243 or more photos, which is a floor because the
+  count saturates.
+  ⚠️ **IT IS A DOCUMENT AND NOT A `stage.json`, AND THE REASON IS THE FINDING.**
+  The rows were harvested and then measured: only **15.7%** say anything about a
+  stage, and `content=etendus` finds MORE theatre in `Kultuur` (2,377) than in
+  `Lavastuslik` (1,079), because one holds the productions and the other holds
+  the writing about them. There is no honest membership rule, so a corpus file
+  would have shipped a set already proved wrong. The recipe that regenerates the
+  rows in 22 requests is in the document.
+  🔴 **AND THE `keywords` PARAMETER IS INERT, WHICH IS A BROKEN COLLECTOR
+  CAUGHT BY ITS OWN TIDINESS.** Ten different theatre terms returned exactly
+  30,000 / 10,000 / 10,000 / 10,000. Identical numbers from ten different words
+  is not a finding, and a year-bounded control proved it. `category` and
+  `content` do work.
+  ⚠️ **THE METADATA SHAPE HAS MOVED** since `research/err-archives-2026-08.md`:
+  `metadata.technical[]` is now `metadata.data[]` with three groups, and
+  `makers` is empty on every audio item.
 
 - ✅ **THE ARCHIVE TIMELINE IS THREE TIMES HIGHER, AND IT IS NOT A RULE,
   2026-09-18.** Four messages settled it: *"Make archive timeline 3x higher"*,
@@ -550,10 +630,6 @@ versus +Z reading and the comment above `wallYaw` names it.
   those two rows that reaches the board is the same hazard with nothing standing
   in front of it, which is what is left of this entry.
 
-- **A SECOND VIEWPORT META IN `proto/flipper/index.html`.** `build.mjs` inserts
-  the line its comment says the proto lacks, and the proto has since gained its
-  own. Harmless to a browser and untrue in the code.
-
 - 🔴 **TWO HOSTS ARE STILL INDEXABLE: `moq.` AND `feedback.positron.studio`.**
   The noindex work of 2026-09-16 covered `positron.studio` and shipped
   (`robots.txt` from the Worker, `X-Robots-Tag` on every response, the meta tag
@@ -645,14 +721,14 @@ versus +Z reading and the comment above `wallYaw` names it.
   seconds of silence and a report that no board was in the room while writing
   `cc-test.mjs`. Anything waiting on the name of the QUESTION waits forever.
 
-- **PAPPUS LEAVES `/keys/`'S SIGNAL PATH, AND THE DIAGRAM SAYS WHAT IS THERE.
-  ASKED 2026-09-16:** *"plan and remove pappus from the
-  http://127.0.0.1:8890/keys/ signal path. there is no ui to control it. arhvice
-  it. update diagram as well. captutre: should be more techical, JACK etc. can
-  we sampled (renamed to the collection name), hexter, yoshimi side by side in
-  pi box in diagram"*. Four things: Pappus out of the path and archived, the
-  diagram redrawn, the capture box named in real technology (JACK), and the
-  three instruments drawn side by side inside the board.
+- ✅ **PAPPUS IS OUT AND THE PAGE IS RETIRED, SO THIS IS CLOSED TWICE OVER.**
+  Three of the four asks landed before `/keys/` was archived: Pappus out of the
+  path (zero matches in the archived page, code at `archive/box-pappus/`), the
+  diagram redrawn, and the capture box named in real technology (`JACK`,
+  `ffmpeg`). ⚠️ **THE FOURTH IS IMPOSSIBLE AND IS REFUSED IN WRITING**: three
+  instruments side by side cannot be drawn, because FluidSynth and hexter left
+  the board on 2026-09-16 and a diagram of what is there has one instrument in
+  it.
 
 - **A CONTROLLER PERFORMANCE SYNTH ON THE BOARD, PLANNED FIRST. ASKED
   2026-09-16:** *"do reseach on 'controller perfomance' synth that shows off the
@@ -684,31 +760,32 @@ versus +Z reading and the comment above `wallYaw` names it.
   person to press Play on a free board is the first time this path makes a
   sound.
 
-- **THE LOOP SAYS NOTHING IN WORDS. ASKED 2026-09-16 WITH A SCREENSHOT OF THE
-  BADGE:** *"rm all loop messages."*. The bar's notes (`the two marks are in the
-  same place`, `this source has no end to come back to`) and the pages' own log
-  lines about looping. The control's face already carries the state.
+- ✅ **THE LOOP STOPPED TALKING, 2026-09-16 (`ca5c225`).** Both sentences are
+  off the transport badge and `looper.mjs` makes no `log()` call at all. What
+  survives is a `title` on a DISABLED button, which is a tooltip on a control
+  rather than a message about state.
+  ⚠️ Two pages still log about loops and were deliberately not swept: `/looper/`,
+  whose subject IS loops, and `/videoradio/`. Decide those separately or not at
+  all.
 
-- **ONE PRESS IS ENOUGH, AND THE END CLOSES THE LOOP. ASKED 2026-09-16:** *"when
-  not playing and prssing loop, playback should start. if not pressing loop
-  again and playback reaches the end, mark loop right mark as end and consider
-  the state 'loop engaged'"*. This is also what the screenshot above is a
-  symptom of: pressing LOOP twice on a stopped transport puts both marks in the
-  same place, because nothing moved between them.
+- ✅ **ONE PRESS IS ENOUGH AND THE END CLOSES THE LOOP, 2026-09-16 (`ca5c225`).**
+  Both halves in `transport-bar.mjs`: a press on a stopped deck with no mark
+  down plays, a press parked at the end restarts from the top, and
+  `closeAtEnd()` is called from the position watcher and from `hitEnd()`.
 
-- **`/draw/` GETS THE THREE LOOP DIRECTIONS. ASKED 2026-09-16:** *"in draw allow
-  < > <> loop mode"*. `/replay/` refused them for a reason that does not hold
-  here: a picture only runs forwards and reversing sound needs an AudioBuffer,
-  while this page replays a RECORD through a deck, which reads either way.
+- ✅ **`/draw/` HAS THE THREE LOOP DIRECTIONS, 2026-09-16 (`7d9a804`).**
+  `loopWays: true`, with the comment quoting the ask and naming the `/replay/`
+  contrast, which is the page that cannot have them.
 
-- **THE TIMELINE DRAWS THE LOOP. ASKED 2026-09-16:** *"timeline global feature:
-  draw loop boundaries (depends on loop cycle state) and add light transclucent
-  shade on loop area on timeline. same colors in waveforms loop handling btw"*.
-  A kit feature rather than a page one: the strip shows where the loop is, with
-  its two edges and a translucent wash between them, and it follows the loop's
-  CYCLE STATE, which is the three the transport bar already has (off, one mark
-  down and armed, running). The colours are the ones the wave already uses for a
-  loop, read from one place rather than typed a second time here.
+- ✅ **THE TIMELINE DRAWS THE LOOP, ALL FOUR REQUIREMENTS, 2026-09-16
+  (`7d9a804`).** `timeline/strip.mjs` reads `deck.loopView`, washes the band
+  under everything at `globalAlpha = 0.12` (the wave's own alpha for that band,
+  not a number chosen here), draws one edge armed and two when on, and nothing
+  when off.
+  ⚠️ One seam left, and it is small: the loop colour is declared in `strip.mjs`
+  rather than imported from the wave, so the two pictures match BY VALUE rather
+  than from one place. That is the shape of drift this project has been bitten
+  by before.
 
 - 🔴 **`/draw/` CLAIMS TWO THINGS A REAL HAND REFUTES, AND BOTH ARE STILL
   ASSERTED.** Found 2026-09-16 from a photograph of a visitor's log. `one record
@@ -818,12 +895,19 @@ versus +Z reading and the comment above `wallYaw` names it.
   asserts to 14. Sabotage: `OPEN_ZOOM` 1, `READ.live` 1 and `INK.settled` 0.5
   each take their own assert red.
 
-- **`/items/`: FIXED HEIGHT ON THE LIST BOX, AND NO EMPTY MESSAGE. ASKED
-  2026-09-16 WITH A SCREENSHOT:** *"have fixed height on this box / table and rm
-  empty message"*. The box holding the published items grows from nothing to
-  however many rows there are, so everything under it moves, and when it holds
-  none it says *"nothing published yet"* inside a bordered box that is itself
-  the message.
+- ✅ **`/items/` HAS ITS FIXED HEIGHT AND NO EMPTY MESSAGE, 2026-09-18. IT LOOKED
+  DONE FOR FOUR DAYS AND STYLED NOTHING.** MEASURED: the list box is **192 px**,
+  exactly eight rows, with or without anything in it, and no empty element is
+  rendered.
+  🔴 **THE RULE NAMED A CLASS THE PAGE HAD STOPPED PRODUCING.** It styled
+  `.logbox .pos-msgs`, written 2026-09-14, TWO DAYS BEFORE the ask it appears to
+  answer; in between the page moved to `createTable`, whose body is
+  `.pos-tbl-body`. A selector matching nothing is silent, so the code read as
+  done and the entry read as open and both were right. That is CLAUDE.md's
+  component-swap rule firing for the third recorded time.
+  ⚠️ **`height`, NOT `max-height`.** The component's own default is
+  `max-height: var(--tbl-h, 420px)`, which still grows from nothing to full and
+  moves everything under it, which is the entire thing the ask was about.
 
 - ✅ **THE FORTY PAGES ARE SWEPT, 2026-09-18.** (`seek` was in the list of 41
   and is retired, so forty.) The gate is a kit module now, `demo/shell/selfcheck.mjs`:
@@ -860,9 +944,19 @@ versus +Z reading and the comment above `wallYaw` names it.
   memento 14 to 10, capture 8 to 7, replay 10 to 8. Under `selfcheck=1` every
   count is identical to baseline, which is the property that says the harness
   lost nothing.
-  ⚠️ **WHAT IS LEFT.** The thirteen already-safe pages carry no `selfcheck`
-  string, so `grep -L selfcheck demo/*/index.html` still lists them and reads as
-  a ledger of unswept pages when it is not.
+  ⚠️ **WHAT IS LEFT, CORRECTED BY AUDIT 2026-09-18.** This said "thirteen" and
+  then listed sixteen; sixteen is right. Those pages carry no `selfcheck` string,
+  so `grep -L selfcheck demo/*/index.html` lists them and reads as a ledger of
+  unswept pages when it is not.
+  🔴 **AND THAT GREP RETURNS EIGHTEEN, NOT SIXTEEN. ONE OF THE TWO EXTRAS
+  MATTERS.** `demo/notes/index.html` is harmless (it fetches a local file).
+  **`demo/reel/index.html` is not**: it carries no gate at all and opens TWO
+  connections to `arhiiv.err.ee` at load, then attaches hls.js to both. That is
+  not a self-check, which is why the sweep correctly left it alone, and it is
+  the same cost wearing a different hat. It has its own entry above. What this
+  line is for is the honesty of the claim: forty pages were swept for
+  SELF-CHECKS, and that is not the same statement as "no page reaches ERR
+  unasked".
 
 - 🔴 **`node demo/verify-gl.mjs videoradio` NOW COSTS ERR, AND IT DID NOT
   BEFORE.** Consequence of the harness fix above, written down because it is
@@ -890,29 +984,31 @@ versus +Z reading and the comment above `wallYaw` names it.
   on the page, so it was given the kit's BUTTON and not the kit's mechanism: the
   same `→`, in the same `tbar-loopgrp` glued to LOOP, disabled with the reason
   on it, the way `looper.sayTooLong()` already greys a loop longer than the ring.
+  ⚠️ **THAT PARAGRAPH IS STALE AND WOULD SEND THE NEXT READER LOOKING FOR A
+  BUTTON THAT IS NOT THERE. CORRECTED 2026-09-18.** The disabled button was
+  REMOVED entirely on 2026-09-16, on the instruction *"when page does no support
+  looper modes (relay) rm the loop mode button"*, with the reasoning that a
+  permanently impossible control is furniture rather than a disabled control.
+  The REFUSAL above still stands unchanged; only the description of what
+  `/replay/` shows was wrong.
   What would remove this line is a second mechanism inside `looper.mjs` for a
   loop whose material is frames rather than samples. It can honestly offer
   `round` and `half` (`video.playbackRate`), and it can never offer `back` or
   `pingpong` without decoding the whole lap into memory, which for 190 s of
   video is not a thing to do on a phone.
 
-- 🔴 **`/tapes/` AND `/radio/` DRAW A LOOP DIFFERENTLY, AND RADIO IS THE ONE
-  THAT IS RIGHT. ASKED 2026-09-16:** *"tapes viz handles loop differently than
-  radio. is this same component?! radio should be it"*. Both draw through
-  `demo/shell/grain-scope.mjs`, so the divergence is options or call order
-  rather than two pictures. Radio's behaviour is the one to keep.
+- ✅ **`/tapes/` AND `/radio/` DRAW THE LOOP THE SAME WAY, AND RADIO IS THE ONE
+  THAT SURVIVED.** The divergence was real: session 28 shipped
+  `freezeOnLoop: false` on `/tapes/` plus both loop calls on one line. It was
+  undone in `415f3a6`. The three calls are now in the same places in the same
+  order on both pages, and both share the same `onLoopPos`.
+  ⚠️ The entry warned that `HANDOFF.md` and another line in this file
+  CONTRADICTED each other on the point, so neither was evidence. The code was,
+  and it was read rather than argued about.
 
-  ⚠️ `HANDOFF.md` (session 29) and the `shout` line further down this file
-  CONTRADICT EACH OTHER on exactly that point, so neither is evidence.
-
-- **`/videoradio/`: REMOVE the 3-D scene from the desktop page. ASKED
-  2026-09-16:** *"also lower 3d scene in desktop page"*, then, against the
-  deployed result, *"i still see 3d viz below top one. remove bottom one"*.
-  ⚠️ THE FIRST MESSAGE WAS READ AS "make it shorter" AND SHIPPED AS 240px ->
-  150px. It meant the LOWER of the two pictures. The second message settles it:
-  the sea goes, and it goes to `archive/videoradio-xr/` with the headset half it
-  was built to stand in for.
-
+- ✅ **THE 3-D SCENE IS OFF THE DESKTOP `/videoradio/`, 2026-09-16 (`31f1744`).**
+  The sea that stood under the screen and the headset half are both at
+  `archive/videoradio-xr/`.
 
 - **`/held/`: a `type scale` slider on the tablet.** Asked 2026-09-16: *"make it
   a slider in left tablet (type scale) in vr (held)"*. Shipped today as two
@@ -956,21 +1052,32 @@ versus +Z reading and the comment above `wallYaw` names it.
   right for that page and leaves the trap for the next one. Decide whether
   `/kit/` should keep demonstrating the mixed form.
 
-- 🔴 **SWEEP EVERY DIAGRAM FOR SPELLED-OUT QUANTITIES.** CLAUDE.md now says a
-  number in a `sub` or a label is written short (`10s`, not `ten seconds`),
-  reported 2026-09-16 on `/station/`. Only that page has been looked at. Every
-  other page with a diagram needs the same read.
+- ✅ **THE DIAGRAM SWEEP IS DONE, 2026-09-18, AND IT WAS ALMOST EMPTY.** All
+  eight pages carrying a `createDiagram` were dumped, every `sub` and `label`.
+  The only real hit was `/grains/`, twice: `four settings` is now `4 settings`.
+  `/station/`, which is what prompted the rule, was already short-form.
+  ⚠️ **A COUNT IS NOT A MEASUREMENT AND WAS LEFT ALONE**: `one worker, one
+  bucket`, `one element`, `one value per 20ms` all read as prose about how many
+  things there are rather than as a figure to be read at a glance, which is what
+  the rule is about.
 
-- **`/earshot/` reported `null view(s)` on a real Quest.** MEASURED 2026-09-16:
-  the session line reads `session drawing · blend opaque · null view(s)` on a
-  run that then drew 3322 frames in stereo at 90 fps, so the count is being read
-  before the first animation frame has one. Same family as CLAUDE.md's
-  `baseLayer` rule. `blend opaque` was right.
-- **`/earshot/`'s hands check calls a FAIL on something nobody has done yet.**
-  MEASURED on the same run: `FAIL hands · "the ray on the tablet" has not
-  happened 25.0 s in` at 56.6 s, and the ray landed on the tablet at 67.1 s.
-  Nobody had pointed at it, which is not a failure. A lane with no feedback must
-  not count as a failure (CLAUDE.md); it should say it is still waiting.
+- ✅ **MOOT: `/earshot/` IS ARCHIVED.** It was a demo for one evening and is at
+  `archive/demos/earshot-index.html`. The offending line survives only there,
+  and the pattern does NOT exist in the shared XR modules: `xr-panel.mjs` sets
+  the view count inside the frame and reports it on the same line.
+
+- 🔴 **A CHECK CALLS `FAIL` ON SOMETHING NOBODY IS OBLIGED TO DO, AND IT IS NOT
+  ON THE ARCHIVED PAGE. RE-AIMED 2026-09-18.** This was filed against
+  `/earshot/`, which has since been archived, and closing it on that basis would
+  have been wrong: the check lives in the KIT, at `demo/shell/xr-hands.mjs`,
+  which is imported by `blocks`, `xr-room`, `xr-tablet`, `xr-panel`, `xr-pick`
+  and `hand.mjs`. It still emits `FAIL hands ... has not happened` with a `bad`
+  log line, off a table of things a wearer is under no obligation to do (one row
+  is `the ray on the tablet` after 25 s).
+  ⚠️ The message was SOFTENED since the report, so it now names both readings
+  instead of diagnosing. That is not the fix. The word `FAIL` about an
+  unperformed optional gesture is the thing, and a page that says FAIL at a
+  person who has done nothing wrong is teaching them to ignore it.
 
 - **`v2in: station`, asked 2026-09-16.** NOT UNDERSTOOD, and written down
   verbatim rather than guessed at. Ask before working it.
@@ -1065,6 +1172,24 @@ versus +Z reading and the comment above `wallYaw` names it.
   NO-VALUE MARK — `${G.gates ?? '—'}`, `HTTP ${m.status || '—'}` — which is
   CLAUDE.md's own convention for a number nothing measured and MUST NOT be
   swept. A blind replace would turn "we did not look" into a comma.
+  🔴 **AND THE SWEEP'S OWN INSTRUMENT COULD NOT SEE NINE OF THEM. FOUND
+  2026-09-18.** Seven prose em dashes were written `\u2014` in string literals,
+  so every grep for the character answered clean about files that had them. That
+  is `timeline/transport.mjs`'s NUL lesson in a new costume: **a search that
+  comes back empty is evidence about the search first.** All seven are fixed
+  (`keep` x4, `instrument`, `click`, `jam`); the two remaining escapes in `keep`
+  are no-value marks and are meant to stay.
+  🔴 **`corpus.json` CARRIES 58 EM DASHES IN FIELDS TWO PAGES RENDER, AND THAT
+  IS THE BIG ONE.** `title` 39, `note` 17, `licence` 2, across **152 of 334
+  rows**. `/resources/` puts `title`, the licence and the note straight into its
+  table; `/tapes/` prints `it.title` into its log and onto its marks. They are
+  GENERATED, by 84 string literals in `demo/resources/build-corpus.mjs`, so the
+  fix is there and not in the JSON, and `--offline` rebuilds without asking
+  anybody's server. ⚠️ A further 110 sit in `holder`, which nothing displays;
+  leave them.
+  ⚠️ **AND A PATTERN WORTH COPYING RATHER THAN A DEFECT:**
+  `demo/shell/presence.mjs` THROWS when an em dash would reach a visitor. That
+  guard is what the rest of this sweep has been doing by hand.
 
 ## Done, with what it was measured at
 

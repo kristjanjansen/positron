@@ -440,7 +440,7 @@
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
     extras: [{ id: 'rec', label: '\u25CF', aria: 'Record', primary: true,
-               title: `stop when you like \u2014 ${CAP_MS / 1000}s cap`,
+               title: `stop when you like. ${CAP_MS / 1000}s cap`,
                onClick: () => (recording ? stopRecording() : startRecording()) }],
   });
   const view = createStripView(d.el, deck, {
@@ -478,7 +478,7 @@
       d.assert('the clock survived the round trip', readable > 0,
         `${readable} clean of ${readable + unreadable} read, now ${live.videoWidth}x${live.videoHeight}`);
       d.assert('the format was negotiated, not assumed', !!parts[0]?.mime, parts[0]?.mime || '\u2014');
-      d.assert('the take is seekable \u2014 a finite range, not Infinity',
+      d.assert('the take is seekable: a finite range, not Infinity',
         Number.isFinite(deck.durationMs) && deck.durationMs > 0, `${deck.durationMs} ms`);
       // TWO SLOTS, ALWAYS. `capture` puts its R2 asserts inside `if (useR2)`, so
       // its count changes with the mode — the shape CLAUDE.md bans, and stable
@@ -494,7 +494,7 @@
     }
     if (parts.length >= 2 && !didClock) { didClock = true; await clockChecks(); }
     else if (parts.length < 2) {
-      d.log(`${parts.length} take on the line \u2014 the clock check needs a second one. Press record again.`);
+      d.log(`${parts.length} take on the line. The clock check needs a second one, so press record again.`);
     }
   }
 
@@ -508,7 +508,7 @@
    * of the pixels at each, and assert it advanced by as much as the playhead did.
    */
   async function clockChecks() {
-    d.assert('takes are laid end to end \u2014 no gap, no overlap',
+    d.assert('takes are laid end to end: no gap, no overlap',
       parts.every((p, i) => (i === 0 ? p.startMs === 0 : p.startMs === parts[i - 1].startMs + parts[i - 1].lenMs)),
       parts.map((p) => `${p.n}@${p.startMs}+${p.lenMs}`).join(' '));
     d.assert('exactly one take is under the playhead',
