@@ -89,6 +89,11 @@ ws.onopen = async () => {
   try {
     console.log(`room ${ROOM}\n`);
     console.log('the box answers');
+    // ⚠️ IT DID NOT, FROM 2026-09-16 TO 2026-09-18, AND THE REASON WAS THE
+    // BOARD. Its pong carried an `at` field, which is an envelope field, so the
+    // board's own `format()` threw and the handler answered `box.error`. This
+    // line therefore read as "no board in the room" about a board that was
+    // answering every other verb. The field is `pongAt` now and is not read.
     ok('box.ping -> box.pong', !!(await answer(send({ type: 'box.ping' }), 'box.pong')));
 
     console.log('\nyoshimi starts');

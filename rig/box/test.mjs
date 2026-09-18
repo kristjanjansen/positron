@@ -7,6 +7,7 @@
 // gap that is written down.
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
 import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM } from './yoshimi.mjs';
+import { parseJackLsp, jackChain, jackRebuild } from './jacksynth.mjs';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
@@ -193,6 +194,81 @@ ok('and rootsAgree goes false', (() => {
   return yoshimiPatches({ dir: cfg }).rootsAgree === false;
 })());
 rmSync(tmp, { recursive: true, force: true });
+
+// ── the JACK audio graph ─────────────────────────────────────────────────────
+//
+// 🔴 THE PART OF THE RECOVERY VERBS A LAPTOP CAN GRADE, AND THE REST IS NAMED
+// AS UNVERIFIED IN THE README. `jack.graph` and `jack.rebuild` were written
+// 2026-09-18 against a board that does not answer ssh from here, so nothing
+// below has met a JACK server. What it does check is the half where the bugs
+// would be silent: a parser that drops a line reports a healthy graph about a
+// broken one, and a chain that calls a drifted graph intact is a recovery verb
+// that does nothing and says it worked.
+console.log('jack: the connection list');
+const jackText = readFileSync(new URL('./fixtures/jack-lsp-c.txt', import.meta.url), 'utf8');
+const jackRows = parseJackLsp(jackText);
+is('every port is a row', jackRows.length, 7);
+is('a port with no connections has none', jackRows.find((r) => r.port === 'system:capture_1').connected, []);
+is('the capture names both sources', jackRows.find((r) => r.port === 'posbox:input_1').connected,
+   ['yoshimi:left', 'yoshimi:right']);
+is('an indented line is never a port', jackRows.some((r) => /^\s/.test(r.port)), false);
+
+console.log('jack: what the chain should be');
+const yosh = { instrumentPort: 'yoshimi:left', instrumentPortR: 'yoshimi:right' };
+const graph = { graph: jackRows };
+const dry = jackChain({ ...yosh, graph });
+is('a healthy graph is intact', dry.intact, true);
+is('and wants exactly two links', dry.want.length, 2);
+is('with nothing missing', dry.missing, []);
+is('and nothing extra', dry.extra, []);
+is('the capture is on the graph', dry.capture.present, true);
+
+// The NEGATIVE CONTROLS. Each one is a real failure this board has had, and
+// without them `intact` could be hard-coded true and still read green.
+const halfRows = parseJackLsp(jackText.replace(/^yoshimi:right\n   posbox:input_1\n/m, 'yoshimi:right\n')
+                                      .replace('   yoshimi:right\n', ''));
+const half = jackChain({ ...yosh, graph: { graph: halfRows } });
+is('a missing right channel is not intact', half.intact, false);
+is('and it is named', half.missing, [['yoshimi:right', 'posbox:input_1']]);
+const strayRows = parseJackLsp(jackText.replace('posbox:input_1\n   yoshimi:left',
+                                                'posbox:input_1\n   ghost:out_1\n   yoshimi:left'));
+const stray = jackChain({ ...yosh, graph: { graph: strayRows } });
+is('a stray source summed into the capture is not intact', stray.intact, false);
+is('and it is named', stray.extra, [['ghost:out_1', 'posbox:input_1']]);
+is('while nothing reads as missing', stray.missing, []);
+const goneRows = parseJackLsp(jackText.replace(/^posbox:input_1\n(   .*\n)*/m, ''));
+is('a capture that has gone is reported', jackChain({ ...yosh, graph: { graph: goneRows } }).capture.present, false);
+is('nothing playing is not intact either', jackChain({ graph }).intact, false);
+
+console.log('jack: the insert, and the material');
+// With the granulator in, the instrument feeds IT and it feeds the capture,
+// so the same healthy-looking graph above is wrong, which is the whole reason
+// the chain is computed from the board's state rather than from the ports.
+const ins = jackChain({ ...yosh, insert: true, graph });
+is('the insert wants four links', ins.want.length, 4);
+is('and the direct pair now reads as extra', ins.extra,
+   [['yoshimi:left', 'posbox:input_1'], ['yoshimi:right', 'posbox:input_1']]);
+// 🔴 THE ONE A REBUILD COULD SILENTLY UNDO. `/grains/` unplugs the instrument
+// from the granulator on purpose, because scsynth sums its input bus with the
+// generated material. A rebuild that put it back would restore a third sound
+// neither end can describe, and every readout would go on saying the two were
+// comparable.
+const made = jackChain({ ...yosh, insert: true, source: true, graph });
+is('generated material leaves the instrument unplugged', made.want.length, 2);
+ok('and never asks for it back',
+   !made.want.some(([f]) => f.startsWith('yoshimi:')) && !made.missing.some(([f]) => f.startsWith('yoshimi:')));
+
+console.log('jack: the repair, planned only');
+const planned = jackRebuild({ ...yosh, insert: true, plan: true, graph });
+is('a plan runs nothing', planned.changed, 0);
+is('it disconnects before it connects', planned.steps.map((s) => s.act),
+   ['disconnect', 'disconnect', 'connect', 'connect', 'connect', 'connect']);
+ok('and every step is a patch, never a kill',
+   planned.steps.every((s) => /^jack_(dis)?connect /.test(s.cmd)));
+is('a healthy graph plans nothing at all', jackRebuild({ ...yosh, plan: true, graph }).steps.length, 0);
+is('with no instrument there is nothing to rebuild', jackRebuild({ plan: true, graph }).ok, false);
+is('a missing capture says which verbs raise it',
+   /audio\.stop then audio\.start/.test(jackRebuild({ ...yosh, plan: true, graph: { graph: goneRows } }).reason ?? ''), true);
 
 console.log(`\n${pass}/${pass + fail} green`);
 process.exit(fail ? 1 : 0);

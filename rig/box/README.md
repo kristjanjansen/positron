@@ -420,6 +420,100 @@ years ago, a floor between requests, and a backoff that stopped asking when ERR
 said no. **Read those before writing anything like it again.** The tests that
 graded them are in `git show 141d7f3^:rig/box/pappus-test.mjs`.
 
+## 🔴 Looking at the board, and putting its graph back (2026-09-18)
+
+The board answers verbs from any network and `ssh positron@192.168.1.213` only
+answers on the studio LAN, so until now a fault in the audio path was visible
+only to somebody in the building. `ports.get` reports the ALSA **sequencer**,
+which is MIDI, and nothing ever reported the JACK **audio** graph, which is where this
+board's level faults live. On 2026-09-17 the output peak fell from 0.0445 to
+0.0010, about 40x, with the page, the MIDI level and the instrument each ruled
+out by measurement. The one suspect left was the one thing nobody outside could
+look at.
+
+Two verbs close it, and they answer **in their own names**. `audio.status`
+answers `audio.started`, which cost nine seconds and a wrong conclusion once: a
+caller waiting on the obvious reply name waits out its timeout and reports that
+no board is in the room, about a board that answered immediately.
+
+```sh
+node ask.mjs --room studio-1 jack.graph                      # reads, changes nothing
+node ask.mjs --room studio-1 jack.rebuild '{"plan":true}'    # the steps, run none
+node ask.mjs --room studio-1 jack.rebuild                    # patch the difference
+node ask.mjs --room studio-1 jack.rebuild '{"onlyIfIdle":true}'
+```
+
+`jack.graph` answers `jack.graph`: `jack_lsp -c` as structure (`graph`, a port
+and everything connected to it), the flat `ports`, a `pgrep -cx` count of
+`jackd`, `yoshimi`, `sclang`, `scsynth` and `ffmpeg`, jackd's own command line
+with the rate and period it was **asked** for, `believes`, which is what the box
+thinks is running including the insert and its holder, and `chain`, which is `want`,
+`missing`, `extra` and `intact` for the capture and the granulator's inputs.
+The pairing is the diagnosis: a board reporting a healthy instrument while the
+audio is 40x down is two statements that disagree, and only one of them used to
+be visible.
+
+`jack.rebuild` answers `jack.rebuild` and carries `before` and `after`, so
+pressing it is a diff rather than a leap.
+
+**The decision about interrupting somebody else, since one jackd, one capture
+and one room means a recovery verb is heard in another building.** The board
+cannot see a listener: `workers/relay` forwards every frame verbatim and never
+parses one, its `webSocketClose()` is empty, and a page holding a PCM stream
+says nothing. That absence is looked up rather than assumed: it is the same one
+`sweepInsert()` is written around. So asking permission is not available, and a
+verb that pretended to ask would be worse. Instead:
+
+- **It is a diff, not a teardown.** A graph that is already what it should be
+  runs zero commands, so pressing recover on a healthy board is inaudible.
+- **It kills nothing.** No `pkill`, no restart of jackd, yoshimi, sclang or the
+  service. Every step is one `jack_connect` or `jack_disconnect`, which this
+  code already relies on being instant. Bypassing the insert under a playing
+  instrument is the same operation. An instrument picker was removed from this
+  board for being a control that took the sound away from somebody else, and a
+  recovery verb that killed a process would be that control in a new hat.
+- **It says so out loud when it does cut a link**, with who asked and who else
+  the board has heard from inside the insert's own 15 s window, in the reply and
+  in the journal. `onlyIfIdle: true` refuses instead, `ok: true, kept: true`,
+  the same refusal shape `fx.pappus` already uses.
+- **A service restart is deliberately not a verb.** A process that kills itself
+  over the relay cannot report what happened, systemd restarts it anyway, and
+  the recovery actually asked for is the graph. `audio.stop` then `audio.start`
+  already rebuilds the whole chain including the capture, at about thirteen
+  seconds of silence for everybody in the room.
+
+⚠️ **NOT ONE LINE OF THIS HAS MET A JACK SERVER.** Written from a laptop that
+cannot reach the board. What is graded is the half where a bug would be silent:
+`node rig/box/test.mjs` is 92/92 with 25 checks on the `jack_lsp -c` parse and
+the chain, including a stray source summed into the capture, a missing right
+channel, a capture that has gone, and the case where generated material means
+the instrument must stay unplugged. Two deliberate sabotages take it 88/92 and
+90/92. What is unverified: that `jack_lsp -c`'s real output on this board parses
+as the fixture does, that `pgrep -ax jackd` carries the rate and period, and
+that a real `jack_connect` repairs a real drift.
+
+**Deploying it.** The service runs from `/opt/positron-box`, never from
+`~/positron`, and the copy there is stale.
+
+```sh
+./push.sh                      # finds the board on ssh, ships, restarts, prints md5s
+./push.sh 192.168.1.213        # if the address is known
+```
+
+Confirm it landed by the md5s `push.sh` prints, which now cover
+**`jacksynth.mjs` as well as `box.mjs`**. This change touches both, and a
+deploy that landed one of them would answer the new verbs with a
+`ReferenceError` on a board nobody can ssh to. Then, from anywhere:
+
+```sh
+ssh positron@<ip> md5sum /opt/positron-box/rig/box/{box,jacksynth}.mjs
+node ask.mjs --room studio-1 jack.graph
+```
+
+If `jack.graph` comes back as nothing at all, the board is running the old
+build: an unknown verb falls through to `default` and is answered with silence,
+because the relay broadcasts verbatim and most traffic on it is somebody else's.
+
 ## What still needs the board
 
 Named rather than faked, because a fake that passes is worse than a gap written
@@ -438,8 +532,9 @@ down:
 | `alsa.mjs` | parse `aconnect -l`, resolve names, plan, apply. Pure where it can be |
 | `synth.mjs` | the built-in instrument, importing `demo/shell/rhodes.mjs` |
 | `box.mjs` | the service: relay socket, request handlers, synth and capture |
+| `jacksynth.mjs` | the JACK graph: raising the chain, the granular insert, and since 2026-09-18 reporting the graph and patching its difference |
 | `ask.mjs` | a terminal client — the proof that the browser is not the interface |
-| `test.mjs` | 38 checks, no hardware |
+| `test.mjs` | 92 checks, no hardware (counted 2026-09-18 by running it, not remembered) |
 | `insert-test.mjs` | against a running box: that the granulator goes in, stays in while its page is alive, and comes out BY ITSELF when that page closes. Written 2026-09-16 and not yet run |
 | `norns/writedefs.scd` | compiles `pappus-<rung>.scsyndef` and `possource.scsyndef` on the board, for `/grains/` to load in a browser |
 | `live-test.mjs` | 13 checks against a running box, over the real relay |
@@ -447,6 +542,7 @@ down:
 | `setup.sh` | run once on the Pi |
 | `positron-box.service` | `Restart=always`, `StartLimitIntervalSec=0` |
 | `fixtures/aconnect-l.txt` | a rig that does not exist, so the rest can be checked |
+| `fixtures/jack-lsp-c.txt` | a JACK graph that does not exist, for the same reason |
 
 The envelope is `demo/shell/wire.mjs`, **imported rather than copied** — the same
 file the pages use, so a change to the shape cannot reach only one end.

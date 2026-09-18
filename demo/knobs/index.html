@@ -501,11 +501,14 @@
 
   // The network alone, with the relay's Durable Object never woken: the runtime
   // answers `ping` with `pong` for free out of its hibernation autoresponse.
-  // ⚠️ NOT `box.ping`. The board replies `box.pong` with an `at` field, and
-  // `at` is an envelope field, so the board's own formatter refuses it and the
-  // handler throws. Asked directly, the board answers
-  // `box.error: "at" is an envelope field`. The obvious round trip verb answers
-  // nothing on the board as it runs today.
+  // ⚠️ NOT `box.ping`, AND STILL NOT AFTER IT WAS REPAIRED. That verb replied
+  // with an `at` field, `at` is an envelope field, so the board's own formatter
+  // refused it and the handler answered `box.error` instead, for two sessions
+  // and to every caller. `rig/box/box.mjs` sends `pongAt` since 2026-09-18, which
+  // is in the repo and NOT yet on the board. Either way this line stays: the
+  // relay's runtime answers `ping` with `pong` out of its hibernation
+  // autoresponse, so this measures the network with the Durable Object never
+  // woken and with no board in the room at all.
   async function measureRtt() {
     const ms = await wire.ping(2500);
     if (ms === null) return;
