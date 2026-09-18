@@ -775,7 +775,12 @@ for (const t of targets) {
   console.log(`\n[${t.name}]`);
   errors = []; failedReqs = []; abortedReqs = []; edgeMisses = []; probed = []; reqUrl.clear();
   const sinceT = Date.now();
-  const query = process.env.DEMO_QUERY ? `?${process.env.DEMO_QUERY}` : '';
+  // `selfcheck=1` for the same reason verify.mjs appends it: a page keeps
+  // anything that opens a file, makes a sound, presses a control or moves the
+  // picture behind that flag, so a harness that does not set it grades a page
+  // with its checks switched off. ⚠️ DEMO_QUERY goes first, so an override wins.
+  const q = [process.env.DEMO_QUERY, 'selfcheck=1'].filter(Boolean).join('&');
+  const query = `?${q}`;
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   // A headset over USB is slower to first paint than a local Chrome; the wait
   // is bounded below anyway, this is just the floor.

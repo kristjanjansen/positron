@@ -22,6 +22,7 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck, observePosition } from '/timeline/transport.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const d = mount({
     name: 'draw',
@@ -1033,8 +1034,12 @@
    * costs 3.9x rather than the 5x the second check requires. That belongs in
    * `BACKLOG.md` as a question about the claim, not in a threshold quietly
    * loosened until it goes green.
+   *
+   * ⚠️ THE FLAG COMES FROM `shell/selfcheck.mjs` NOW, NOT FROM A LINE OF ITS OWN
+   * HERE. Four pages each had their own copy and the other forty-one never grew
+   * one; one import is what makes a `grep -L selfcheck` over the demo pages an
+   * answer to "which ones have never been swept".
    */
-  const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
   let checked = false;
   function check() {
     if (!SELFCHECK) return;
@@ -1419,8 +1424,17 @@
    * ⚠️ `/draw/` is the only demo in the suite that draws a loop pair at all:
    * `/radio/` and `/tapes/` are the other two and both reach a server that is
    * not ours.
+   *
+   * 🔴 AND IT IS BEHIND THE FLAG, BECAUSE IT WORKS A CONTROL TO TAKE ITS
+   * READING. `loopBtn.dataset.loop = 'off'` is the LOOP button being set to a
+   * state nobody asked for so its idle edge can be measured, and putting it back
+   * only happens where there was something to put back — a button that arrived
+   * with no `data-loop` at all is left saying `off`. That is the whole shape the
+   * rule is about: a check that reaches into what a visitor is looking at.
+   * Everything else this page asserts is already gated; this block was outside
+   * `check()` and ran on every visit.
    */
-  {
+  if (SELFCHECK) {
     const bc = (e) => (e ? getComputedStyle(e).borderColor : 'none');
     const grp = document.querySelector('.tbar-loopgrp');
     const loopBtn = grp?.querySelector('.tbar-loop');

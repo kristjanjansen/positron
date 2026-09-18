@@ -13,6 +13,7 @@
   import { openWire } from '/shell/wire.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'instrument-demo';
   const ID = Math.random().toString(36).slice(2, 8);
@@ -336,7 +337,15 @@
   // asserts nothing about it ships three ungraded controls. The effect needs no
   // click — `shiftOctave` returns the new leftmost note and every key's printed
   // name moves with it.
-  {
+  //
+  // 🔴 AND THAT IS EXACTLY WHY IT IS BEHIND THE FLAG. Working the octave pad is
+  // working a control: every key on the keyboard is renamed, twice, on a page
+  // somebody opened to play it. It happens to be synchronous, so no frame is
+  // painted in the middle of it and nobody would catch it in the act — which is
+  // an argument about luck rather than about what the check does. The rule is
+  // that a self-check never runs for a visitor, and the four asserts above stay
+  // because they only read what this page already holds.
+  if (SELFCHECK) {
     const wasBase = kb.base;
     const wasName = kb.keysEl.querySelector('.kn')?.textContent ?? '';
     const moved = kb.shiftOctave(1);
