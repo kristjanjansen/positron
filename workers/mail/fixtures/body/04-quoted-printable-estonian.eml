@@ -1,0 +1,19 @@
+MIME-Version: 1.0
+Subject: =?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=
+From: maarja@example.ee
+To: positron@positron.studio
+Content-Type: multipart/alternative; boundary="EE-BOUND-01"
+
+--EE-BOUND-01
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+K=C3=B5ige h=C3=A4sti, aga =C3=BCks asi on katki. T=C3=A4nan!
+
+--EE-BOUND-01
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div>K=C3=B5ige h=C3=A4sti</div>
+
+--EE-BOUND-01--

@@ -1,0 +1,18 @@
+MIME-Version: 1.0
+Subject: =?UTF-8?Q?k=C3=B5ige_h=C3=A4sti?=
+From: maarja@example.ee
+To: positron@positron.studio
+Content-Type: multipart/alternative; boundary="EE-BOUND-02"
+
+--EE-BOUND-02
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: base64
+
+S8O1aWdlIGjDpHN0aSwgYWdhIMO8a3MgYXNpIG9uIGthdGtpLiBUw6RuYW4h
+
+--EE-BOUND-02
+Content-Type: text/html; charset="UTF-8"
+
+<div>ignored</div>
+
+--EE-BOUND-02--

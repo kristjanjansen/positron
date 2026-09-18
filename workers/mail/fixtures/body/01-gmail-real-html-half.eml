@@ -1,0 +1,19 @@
+MIME-Version: 1.0
+Date: Thu, 17 Sep 2026 22:54:17 +0300
+Message-ID: <CABW4oj20r32jsHhL_Z==jXsFER7rsvvFPZSphKZGm-sg471HNQ@mail.gmail.com>
+Subject: test
+From: Kristjan Jansen <kristjan.jansen@gmail.com>
+To: positron@positron.studio
+Content-Type: multipart/alternative; boundary="0000000000003b1304065bb326a4"
+
+--0000000000003b1304065bb326a4
+Content-Type: text/plain; charset="UTF-8"
+
+hello!
+
+--0000000000003b1304065bb326a4
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr">hello!</div>
+
+--0000000000003b1304065bb326a4--
