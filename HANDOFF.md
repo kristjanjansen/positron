@@ -1,6 +1,6 @@
 # Handoff, 2026-09-18, session 33
 
-**DEPLOYED, 2026-09-18.** The site is live at BUILD `77a9d9d-072604-1fb2`,
+**DEPLOYED, 2026-09-18.** The site is live at BUILD `0a96865-080511-704d`,
 confirmed ON THE EDGE by `deploy.mjs` rather than assumed, and the mail worker
 is live as version `50a78731` at 100%. The tree was clean when both went out, so
 neither shipped anybody's in-flight work.
@@ -102,6 +102,28 @@ anything is pressed, and it is NOT a self-check: it is the page's deliberate
 opening state, commented and argued for. The sweep left it alone because it is
 outside what a sweep may decide. It is the `/tapes/` shape wearing a better
 motive, and the decision is editorial.
+
+## The queue was audited end to end, and it was not the size it said
+
+**43 entries are genuinely open, not 57.** Sixteen were found already finished.
+The `### XR` block is ONE dictated request whose 48 sub-items are ordinary
+bullets at column zero, so anything counting lines counts them as entries; 31 of
+those are already struck. That is written at the top of `BACKLOG.md` where the
+next person counting will meet it.
+
+🔴 **THE TWO FINDINGS WORTH MORE THAN THE STRIKES:**
+
+**Nine em dashes were written `\u2014`**, so every grep for the character
+answered clean about files that had them. Seven were prose a reader sees. All
+fixed. The general form is the keeper: **a search that comes back empty is
+evidence about the search before it is evidence about the code.** And
+`corpus.json` carries **58 more in fields two pages actually render**, across
+152 of 334 rows; they are generated, so the repair is in `build-corpus.mjs`.
+
+**`/items/` had a rule that styled nothing.** It named `.logbox .pos-msgs`,
+written two days BEFORE the ask it appears to answer, and the page moved to
+`createTable` in between. A selector matching nothing is silent, so the code
+read as done and the entry read as open and both were right.
 
 ## Rules that cost real time this session
 
