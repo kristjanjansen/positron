@@ -490,9 +490,13 @@ versus +Z reading and the comment above `wallYaw` names it.
   🔴 A HALF-STRUCK ENTRY IS HOW THE REMAINDER GETS LOST. Found 2026-09-18 by
   audit, and it is the reason this file was audited at all.
 
-- **`CLAUDE.md` SAYS AN UNMEASURED CELL DRAWS AN EM DASH.** `shell.mjs` has
-  written EMPTY since 2026-09-13. Two comments in `/kit/` repeat the stale
-  version.
+- ✅ **THE EM DASH WORDING IS GONE FROM ALL THREE PLACES, 2026-09-18.** The
+  code has rendered an EMPTY cell since 2026-09-13 and three comments went on
+  describing an em dash: `CLAUDE.md` and two in `/kit/`.
+  ⚠️ **THE ASSERT WAS RIGHT THE WHOLE TIME, WHICH IS WHY NOBODY NOTICED.** It
+  asks whether the UNIT is hidden and never what the cell draws, so it stayed
+  green while the sentence directly above it described a different page. A check
+  that does not test the thing a comment claims cannot defend the comment.
 
 - **SLIDER AUTOMATION, PLANNED AND NOT BUILT. ASKED 2026-09-16:** *"plan a work
   on slider automation each slider can possibly have a mode button like loop
