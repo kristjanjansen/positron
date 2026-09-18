@@ -15,6 +15,15 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- ✅ **THE LIVE BADGE IS OFF THE ARCHIVE PANEL, 2026-09-18.** MEASURED across
+  the three panels: audience `live`, control room `live`, archive empty.
+  ⚠️ **NOT RE-WORDED TO `archive`, WHICH WAS THE TEMPTING FIX.** A presence
+  badge answers whether the thing feeding the picture is ANSWERING. Nothing
+  feeds this one: it is a recording of a show that finished, so there is no
+  liveness to report and a re-worded badge would be the same lie in a better
+  costume. `left: false` is the panel's own way of saying a slot has nothing to
+  put in it, and the footer keeps its other two.
+
 - 🔴 **STAGE PERFORMANCES AND THEATRE OUT OF THE ERR ARCHIVES, AS ONE FILE.
   ASKED 2026-09-18:** *"Look up stage performances / theatre from err archives in
   bg. I need single file"*.

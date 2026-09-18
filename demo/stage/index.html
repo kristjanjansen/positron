@@ -117,8 +117,22 @@
       panel: createVideoPanel({
         media: c,
         of: t.label.toLowerCase(),
-        left: createPresence({ of: '', mode: 'badge', state: 'online',
-                               says: { online: 'live' } }).el,
+        /**
+         * ⚠️ AND THE ARCHIVE GETS NO BADGE AT ALL. Asked 2026-09-18: *"Rm live
+         * badge from arcive videofooter"*. That tab plays a RECORDING of a show
+         * that finished, so a badge reading `live` on it is a status that
+         * cannot ever be false, which is the shape of control this project
+         * calls a lie. `false` is the panel's own way of saying a slot has
+         * nothing to put in it, and the footer keeps its other two.
+         * ⚠️ NOT `says: { online: 'archive' }` INSTEAD. A presence badge
+         * answers whether the thing feeding the picture is ANSWERING, and
+         * nothing is feeding this one: a recording has no liveness to report,
+         * so a re-worded badge would be the same lie in a better costume.
+         */
+        left: t.id === 'archive'
+          ? false
+          : createPresence({ of: '', mode: 'badge', state: 'online',
+                             says: { online: 'live' } }).el,
         /**
          * 🔴 EVERY SCREEN GOES FULL, AND KEEPS A FOOTER WHILE IT IS. Asked
          * 2026-09-18: *"all stage videoscreens need to go to fullscreeen with
