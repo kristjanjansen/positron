@@ -52,6 +52,34 @@
   // to keep true.
   const CORPUS = '/resources/corpus.json';
 
+  /**
+   * 🔴 WHERE THE RECORDINGS ARE FETCHED FROM, AND IT IS archive.org UNLESS
+   * SOMEBODY SAYS OTHERWISE. This is the same escape hatch `/radio/` has, in
+   * the same shape and for the same reason.
+   *
+   * Every recording here is on somebody else's server, and the standing
+   * instruction is *"stil: super careful with external sources, better avoid"*,
+   * said in reply to the argument that archive.org is safe because it is not
+   * ERR. So `node demo/verify.mjs tapes` used to pull real recordings off a
+   * public archive on every run, including the runs where somebody typed no
+   * arguments at all. `demo/fake-tapes.mjs` serves the same paths at the same
+   * lengths from this machine, and the harness points the page at it.
+   *
+   * ⚠️ IT REWRITES THE PATH AND NOTHING ELSE. `corpus.json` is untouched, the
+   * list is the same list, and `it.file` still says where a recording really
+   * lives, which is what the `served from somewhere else` check below reads.
+   * Only the URL the media element is opened at moves.
+   *
+   * ⚠️ AND A VISIT IS BYTE FOR BYTE WHAT IT WAS. With no `base` the parameter is
+   * empty and `srcOf` hands back `it.file`, so nothing about a page nobody has
+   * pointed anywhere changes.
+   */
+  const BASE = (new URLSearchParams(location.search).get('base') || '').replace(/\/+$/, '');
+  const srcOf = (it) => {
+    if (!BASE || !it?.file) return it?.file;
+    try { return BASE + new URL(it.file).pathname; } catch { return it.file; }
+  };
+
   const d = mount({
     name: 'tapes',
     // ⚠️ REWRITTEN WITH THE AXIS. It described a picture of DATES: "as wide as
@@ -401,7 +429,7 @@
       // A host that simply never answers would otherwise hold the queue for the
       // life of the page.
       setTimeout(() => { if (!lengths.has(it.id)) done(GUESS, false); }, 12000);
-      probe.src = it.file;
+      probe.src = srcOf(it);
     };
     one();
   }
@@ -1085,7 +1113,7 @@
      * whoever is reading it.
      */
     if (!audio.src && tapes[cur]) {
-      audio.src = tapes[cur].file;
+      audio.src = srcOf(tapes[cur]);
       d.log(`opening ${tapes[cur].title}`);
     }
     armAnalyser();
@@ -1307,7 +1335,7 @@
      * of the slider is a statement about the RECORDING, not about what has
      * been downloaded.
      */
-    if (load) audio.src = it.file;
+    if (load) audio.src = srcOf(it);
     else {
       const ms = lengths.get(it.id)?.ms;
       if (ms > 1000) tapeDeck.setRange([0, Math.round(ms)]);
@@ -1642,7 +1670,7 @@
     if (retried || !audio.crossOrigin || !tapes[cur]) return false;
     retried = true;
     audio.crossOrigin = null;
-    audio.src = tapes[cur].file;
+    audio.src = srcOf(tapes[cur]);
     /**
      * 🔴 SAID IN THE PICTURE AND NOT ONLY IN THE LOG, AND NOT IN THE FAULT
      * COLOUR. Reported 2026-09-16: *"what does it mean. many kureniemis do not
@@ -1780,7 +1808,7 @@
     coldSrc = audio.src;
     // The checks need a recording, so they open one deliberately, which is the
     // same line `start()` runs when a finger lands on play.
-    if (SELFCHECK) audio.src = tapes[cur].file;
+    if (SELFCHECK) audio.src = srcOf(tapes[cur]);
     /**
      * 🔴 THE WALK BUTTONS ON A STOPPED MACHINE, GRADED HERE BECAUSE HERE IT IS
      * FREE. ‹ and › point the element at another file and back, and the wait
@@ -1812,6 +1840,12 @@
     const undated = items.filter((it) => playable(it) && it.when?.earliest == null).length;
     d.log(`${items.length} records, ${tapes.length} of them playable`
       + `${undated ? `. ${undated} of those have no date and cannot be on the axis` : ''}`, 'hi');
+    // 🔴 SAID OUT LOUD, BECAUSE EVERY OTHER LINE IN THIS LOG IS ABOUT
+    // archive.org. A run pointed somewhere else that did not say so would
+    // report a recording opening, a length, a loop and a waveform, all of them
+    // about a stand-in, in the words it uses for the real thing.
+    if (BASE) d.log(`these recordings are coming from ${BASE}, not from the archive they `
+      + 'are listed at. Nothing here is a fact about anybody else\'s server');
     d.log(fromCorpus === tapes.length
       ? `every length came with the list, so nothing was asked of anybody's server: `
         + `${hm(schedule[schedule.length - 1]?.to ?? 0)} of tape`
