@@ -17,6 +17,7 @@
   import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   // The kit's own vocabulary for a loop's direction. Imported rather than
   // retyped so the glyph on this page and the glyph on `/radio/` and `/tapes/`
@@ -230,13 +231,29 @@
     // beside them is a fourth channel saying what three already say.
   });
 
-  createStripView(d.el, deck, { size: 'default', lanes: [{
+  const strip = createStripView(d.el, deck, { size: 'default', lanes: [{
       id: 'cue', kind: 'cue', height: 44, as: 'ticks',
       // idToColor('cue') came out near-black on the dark ground, so the ticks
       // were there but invisible. latch + firedColor is built into the ticks
       // renderer: a cue turns green once the playhead has passed it.
       color: '#ffd400', width: 2.5, latch: true, firedColor: '#8fd6a8',
     }] });
+
+  /**
+   * 🔴 THE BAR AND THE STRIP ARE ONE SURFACE. Asked 2026-09-18: *"just glue the
+   * 4 we have properly"*. This page is the clearest case of the four: the bar
+   * above already passes `scrub: false` BECAUSE the strip below it is the
+   * position surface, so the two have been one control for months with the page
+   * rhythm drawing 22 px of ground through the middle of it.
+   *
+   * ⚠️ THE ANCHOR IS READ BEFORE THE GLUE, NEVER AFTER. `createGlue` re-parents
+   * its blocks, so a node captured as `strip.el.nextSibling` is fine and one
+   * captured as `bar.el.nextSibling` AFTER the call points at a detached node
+   * and `insertBefore` throws. `null` is append, which is what a pair at the
+   * end of the page wants.
+   */
+  const afterStrip = strip.el.nextSibling;
+  d.el.insertBefore(createGlue(bar.el, strip.el), afterStrip);
 
   /**
    * 🔴 THIS USED TO BE A LINE OF PROSE UNDER THE PICTURE, and it rewrote itself

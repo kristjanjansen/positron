@@ -44,6 +44,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { createLooper } from '/shell/looper.mjs';
 
   // The same file `/resources/` reads. ONE corpus, two pictures of it: that
@@ -1652,6 +1653,25 @@
   // its face: a way reached from the code and a way reached by pressing cannot
   // then disagree about what is showing.
   looper.bind(bar);
+
+  /**
+   * 🔴 THE PICTURE AND THE BAR THAT DRIVES IT ARE ONE SURFACE. Asked
+   * 2026-09-18: *"just glue the 4 we have properly"*.
+   *
+   * ⚠️ THE PAIR IS THE SCOPE AND THE BAR, NOT THE STRIP AND THE BAR, AND THAT
+   * IS NOT A SHORTCUT. The strip on this page runs edge to edge past the page
+   * margins while the scope and the bar are inset, so a box drawn round the
+   * strip and the bar would have to reconcile two widths, and the seam between
+   * them would sit across a block the tape's own picture already crosses. The
+   * scope sits directly above the bar at the same width and the bar drives it,
+   * which is the claim gluing makes.
+   *
+   * ⚠️ THE ANCHOR IS READ BEFORE THE GLUE. `createGlue` re-parents its blocks,
+   * so a node captured after the call can be detached and `insertBefore` throws
+   * on it. `null` means append, which is what a pair at the end wants.
+   */
+  const afterBar = bar.el.nextSibling;
+  d.el.insertBefore(createGlue(scope.el, bar.el), afterBar);
 
   audio.addEventListener('loadedmetadata', () => {
     const ms = Math.round((audio.duration || 0) * 1000);

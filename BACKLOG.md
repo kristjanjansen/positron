@@ -15,26 +15,63 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
-- 🔴 **THE FIVE BLACK KEYS SIT IN THE WRONG PLACES, AND MOVING THEM COSTS
-  NOTHING.** From `research/piano-key-proportions-2026-09.md`, 2026-09-17. A real
-  piano does not centre its black keys on the joins between whites; ours does, to
-  0.00 px, and it is one of only two implementations surveyed that does. The
-  offsets are `B/6` for C# and D#, `B/4` for F# and A#, and dead centre for G#.
-  MEASURED on our own component at 390 px with the candidate layout applied from
-  a harness: the narrowest white strip goes **19.67 px to 27.00**, the spread
-  between strips **14.66 px to 2.44**, the row width and the hit test both
-  UNCHANGED. So the phone fit, `KEY_MIN_PX` and every assert about overflow are
-  untouched.
-  ⚠️ **THE WIDTHS ARE RIGHT AND SHOULD NOT MOVE.** 0.66 and the 0.622 height
-  ratio are both mid-field. What is wrong is only where the five sit.
-  ⚠️ AND OUR 32.33 px BLACK KEY IS THE LARGEST OF THE FOUR MEASURED, so the
-  target-size worry is settled: a piano black key is a routine exception, we
-  clear the 24 px WCAG AA floor, and 44 px would take the row from 413 to 554 and
-  a phone from 7.6 visible white keys to 5.6.
-  §4.1 has four implementation notes, including reading the offset off the pitch
-  class rather than the letter so the generic-map promise survives, and
-  re-deriving the stacking assert, which currently samples symmetrically about
-  the join and so cannot see the change.
+- 🔴 **`/reel/` OPENS TWO ERR CONNECTIONS ON EVERY VISIT, BEFORE ANYBODY PRESSES
+  ANYTHING, AND IT IS NOT A SELF-CHECK.** Found 2026-09-18 during the self-check
+  sweep and deliberately left alone, because it is outside what that sweep was
+  allowed to touch. `play(openOn, true)` runs at load: it asks the archive API
+  for a newsreel and the radio programme paired with it, then attaches hls.js to
+  BOTH, which pulls two playlists and their first segments. The page's own
+  comment says why, and the reason is a good one: *"Open on a day where BOTH
+  survive, so the thing this page does is visible before anyone presses
+  anything"*.
+  ⚠️ **IT IS THE `/tapes/` SHAPE WEARING A BETTER MOTIVE.** The self-check rule
+  does not reach it because no check is running; what reaches it is the ERR rule,
+  which is about whose server it is rather than about which mechanism opened the
+  socket. Every one of those connections appears in a public broadcaster's
+  audience measurement, and this one fires for every visitor and every reload
+  rather than only under a harness.
+  ⚠️ **SO THE DECISION IS EDITORIAL AND IS NOT AN AGENT'S TO MAKE**: an opening
+  frame that shows what the page is, against a page that opens dark until
+  somebody asks. Worth knowing before choosing: `/radio/` faced the same trade
+  and answered it with a stand-in rather than by going dark.
+
+
+- ✅ **GLUE IS OUT OF THE DOCS AND THE FOUR REAL ONES ARE GLUED, 2026-09-18.**
+  Asked as *"i see no poiint in glue, it looks off and pointless in docs. just
+  glue the 4 we have properly"*, and the four were CONFIRMED rather than guessed
+  before any of it was written.
+  The `/kit/` section is gone, along with its two grey specimen boxes reading
+  `a block` and `and another` and the `.kit-glue-demo` rule that styled them. It
+  demonstrated the mechanism and none of the reason for it, which is what made
+  it read as furniture. `node demo/verify.mjs kit` is **45/45 before and after**,
+  so removing it moved no button the harness presses by position.
+  The four, each LOOKED AT rather than assumed, because the complaint was
+  visual: `/stage/` archive (bar + strip, already done), `/radio/` (bar + scope),
+  `/replay/` (bar + strip), `/tapes/` (scope + bar). 52/52, 60/60 and 45/45
+  green across them.
+  ⚠️ **`/tapes/` IS THE SCOPE AND THE BAR, NOT THE STRIP AND THE BAR.** Its
+  strip runs edge to edge past the page margins while the scope and bar are
+  inset, so a box round the strip and the bar would have to reconcile two widths
+  and put its seam across a block the tape's own picture already crosses.
+  ⚠️ **AND `createGlue` PUTS NOTHING ANYWHERE.** It re-parents its blocks into a
+  box and hands the box back, so a page that only calls it loses both blocks off
+  the page. Every one of these captures its anchor BEFORE the call, because a
+  node read after it can already be detached and `insertBefore` throws on that.
+
+- ✅ **THE FIVE BLACK KEYS ARE WHERE A PIANO PUTS THEM, AND THIS LINE OUTLIVED
+  THE WORK BY A DAY.** The move landed in `8bdd489` on 2026-09-17 and was never
+  struck off. VERIFIED BY MEASUREMENT 2026-09-18 rather than by reading the
+  diff: `SHARP_OFF` keys off the PITCH CLASS as §4.1 asked, `--k-off` is
+  consumed by `shell.css`, and `/kit/` reports the narrowest white strip at
+  **27.0 px, 0.551 of a white key**, against 0.401 when the keys were centred
+  and 0.439 in GarageBand. That is the predicted 27.00 to the digit.
+  ⚠️ **THE STACKING ASSERT WAS RE-DERIVED TOO, AND BETTER THAN ASKED.** The
+  worry was that it sampled symmetrically about the join and so could not see
+  the change. What shipped does not measure a centre at all: it measures the
+  STRIP a finger lands on between two black keys, which is the quantity the
+  offsets exist to change. Its own comment records the old centred-on-join
+  assert going red at 7.33 px, so it is a check proved against both states
+  rather than against one.
 
 - 🔴 **A NEW DEMO CALLED `stage`, ASKED FOR 2026-09-17.** Verbatim, because the
   detail in it is the specification:
@@ -54,47 +91,64 @@ file by being finished or by being refused in writing, never by being forgotten.
   ⚠️ AND THE PANEL IS THE REUSABLE HALF. Three panels on three tabs playing one
   test video is the demonstration, not the point.
 
-- 🔴 **A REAL GMAIL MESSAGE PUTS ITS HTML HALF IN THE ROOM BESIDE ITS TEXT,
-  AND 51 GREEN FIXTURES DID NOT SEE IT.** MEASURED 2026-09-17 on the message at
-  19:54:32, which reads in the room as the word `hello!` and then, under it,
-  `<div dir="ltr">hello!</div>`. Those are the two halves of one
-  `multipart/alternative`, and dropping the second is the entire reason
-  `firstText()` in `workers/mail/src/index.js` exists: its own header says a
-  reader "wants the first of those and never the second". On this message its
-  boundary split did not take and it fell through to returning the whole body.
-  ⚠️ **THE FIXTURES ARE THE LESSON, NOT THE PARSER.** Twenty of them pass,
-  including multipart ones, so whatever a real Gmail boundary does differently is
-  a shape nobody wrote down: a `\n` where the code splits on `\r\n`, a nested
-  `multipart/mixed` around the `alternative`, or a terminator the `.slice(1, -1)`
-  does not match. **Capture the raw message before touching the code** — this was
-  found by reading the room rather than by a test, and a guess at the cause is
-  another fixture that passes while real mail does not.
-  ⚠️ The file already names what it deliberately does NOT do (quoted-printable,
-  base64, nested multipart) and one of those may be the answer rather than a bug.
+- ✅ **THE GMAIL HTML HALF WAS ALREADY FIXED, AND THE REAL FINDING IS THAT
+  NOTHING GRADED IT. SETTLED 2026-09-18 BY CAPTURING THE MESSAGE.** The raw of
+  both real messages was pulled from the sender's own mailbox and they are now
+  fixtures, byte for byte, at 542 and 539 bytes (Gmail's own size estimate for
+  each). Run against the SHIPPED `firstText`, the 19:54:32 message returns
+  exactly `hello!`. So the room entry was written by the build BEFORE the repair:
+  the two messages are two minutes apart, the deploy went out between them, and
+  the 19:56 message came out clean and labelled while the 19:54 one did not.
+  ⚠️ **THE LESSON WAS THE ONE THE ENTRY PREDICTED, IN A PLACE NOBODY LOOKED.**
+  `firstText` lived inside `index.js` beside a `fetch` and a WebSocket, so
+  nothing could import it and it had ZERO asserts, while `spam.mjs` next door had
+  51. It is `workers/mail/src/body.mjs` now, graded by 8 body fixtures and a
+  sweep asserting that no message hands back any part of its own envelope. The
+  suite is **75/75**, up from 51.
+  ⚠️ AND THREE REAL DEFECTS CAME OUT OF WRITING THE FIXTURES, none of which the
+  room had shown: a nested `multipart/mixed` (an attachment) handed the whole
+  inner structure back as the person's words, a message with no closing
+  delimiter lost its only part to `slice(1, -1)`, and a message whose line
+  endings had been normalised to LF matched no `\r\n\r\n` and returned its own
+  headers as the body.
 
-- 🔴 **A SUBJECT FROM OUTSIDE ENGLISH IS UNREADABLE IN THE FEEDBACK ROOM.** Mail
-  headers arrive MIME-encoded and nothing decodes them, so a note from Estonia
-  opens `[ok] =?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=`. That is the FIRST thing a reader
-  sees, and this is a mailbox for a person writing in their own language.
-  ⚠️ It is a small decoder and it is not free: RFC 2047 has two encodings, folded
-  words that must be joined without the whitespace between them, and charsets
-  that are not UTF-8.
+- ✅ **A SUBJECT FROM OUTSIDE ENGLISH IS DECODED, 2026-09-18. NOT DEPLOYED.**
+  RFC 2047 in `workers/mail/src/body.mjs`: both encodings, adjacent words joined
+  with no space added between them, and charsets that are not UTF-8. Graded on
+  the exact string from the entry above this one, `=?utf-8?B?a8O1aWdlIGjDpHN0aQ==?=`,
+  which now reads `kõige hästi`.
+  ⚠️ **THE BODY WAS BROKEN THE SAME WAY AND THE ENTRY DID NOT SAY SO.** A subject
+  is MIME-encoded because the alphabet forced it, and the same message's BODY
+  arrives `quoted-printable` or `base64` for the same reason, so decoding only
+  the subject would have left `K=C3=B5ige h=C3=A4sti` under a heading that now
+  reads correctly. Both halves are decoded and both are fixtures.
+  ⚠️ **AND A DECODED HEADER IS FLATTENED TO ONE LINE.** A subject is the first
+  line of a note whose other lines are the body, so an encoded word carrying a
+  newline could forge a line of our own output. That is the only place in this
+  worker where a stranger's text reaches a structured format, and there is an
+  assert that plants exactly that and requires it not to work.
+  🔴 **IT IS IN THE REPO AND NOT ON THE EDGE.** `npx wrangler deploy` in
+  `workers/mail` was refused by this machine's permission classifier, so nothing
+  above is live and the next real message still arrives undecoded.
 
-- ⚠️ **THE PRIMARY SPAM SIGNAL MAY NOT ARRIVE AT ALL, AND REAL MAIL HAS NOW
-  LANDED WITHOUT SETTLING IT.** `workerd#6740` reports `Authentication-Results`
-  ABSENT from a real Worker delivery, with only an `ARC-Authentication-Results`
-  carrying `arc=none`. The classifier answers `unknown` in that case, which never
-  rejects and never reads as clean, and two fixtures are that shape.
-  ⚠️ **TWO REAL MESSAGES ARRIVED 2026-09-17** from Gmail, at 19:54:32 and
-  19:56:17, and the room shows the second prefixed `[ok]` and the first prefixed
-  with nothing. `labelOf` cannot return an empty label, so the unprefixed one is
-  a message from BEFORE the labelling build rather than a verdict, and only the
-  19:56 entry says anything at all about the classifier. **What is still not
-  known is WHICH signal decided it**: a prefix of `[ok]` is the same four
-  characters whether `Authentication-Results` was read or inferred from ARC, so
-  the room cannot answer the question this item is about. The measurement is the
-  worker's own log for that delivery, or one message sent with the verdict's
-  chips widened so the reason travels with it.
+- ✅ **THE VERDICT NOW SAYS WHICH SIGNAL DECIDED IT, 2026-09-18. NOT DEPLOYED.**
+  `auth.via` already held the answer and went only to `console.log`, where nobody
+  was looking. It is a chip now: `[ok · via Authentication-Results]` against
+  `[ok · via ARC]`, so the four characters that could not tell the two apart have
+  become a label that says which. Graded with the negative control that gives it
+  meaning: a fixture with a real stamp and one with only a forwarded ARC set must
+  come out DIFFERENT, and a message with no stamp at all must name no source
+  rather than invent one.
+  ⚠️ **IT IS EMITTED ON THE ORDINARY CASE TOO, BREAKING THIS FILE'S OWN RULE
+  ABOUT CHIPS ONLY WHERE THEY BEAR ON THE VERDICT, AND THAT IS DELIBERATE.** A
+  chip that appears only in the interesting case cannot be told apart from a
+  build that does not have the chip yet, which is the identical argument that put
+  `[ok]` on ordinary mail to begin with.
+  ⚠️ **WHAT IS STILL NOT KNOWN IS WHAT DECIDED THE 19:56 MESSAGE.** That cannot
+  be recovered from here: the room holds only the label, and the sender's copy
+  carries no `Authentication-Results` because the receiving side adds it. The
+  worker's own log for that delivery would answer it and observability is on.
+  The next message answers it by itself.
 
 - 🔴 **A QUICK RECORD AND LOOP ON THE KEYBOARD.** Asked 2026-09-17 alongside
   hold-to-retrigger and explicitly deferred in the same breath: *"we could also
@@ -166,15 +220,29 @@ file by being finished or by being refused in writing, never by being forgotten.
   dials out to the relay, so it is reachable for verbs and unreachable for
   diagnosis: `ssh positron@192.168.1.213` does not answer from outside.
 
-- 🔴 **THE BOARD CANNOT BE RECOVERED OR DIAGNOSED REMOTELY, AND THAT IS THE REAL
-  GAP.** Its verbs are `audio.start/stop/status`, `voice.*`, `note.*`, `ctl.*`,
-  `fx.pappus`, `params.*`, `patch.*`, `ports.get`, `video.*`, `box.ping`. None
-  restarts the SERVICE, and `ports.get` reports ALSA sequencer MIDI ports rather
-  than the JACK audio graph. So a board whose audio path has drifted is a board
-  nobody can fix or even look at without being in the building — while every
-  page that depends on it reports green counters at an inaudible level. Two
-  verbs would close it: one that reports `jack_lsp -c` and the connection list,
-  and one that rebuilds the audio graph.
+- ✅ **THE TWO VERBS ARE WRITTEN AND NEITHER HAS MET A JACK SERVER
+  (2026-09-18).** `jack.graph` reports `jack_lsp -c` as structure, a `pgrep -cx`
+  count of the five processes that make the sound, jackd's own command line,
+  what the box BELIEVES is running, and the chain it should have against the one
+  it has (`want`, `missing`, `extra`, `intact`). `jack.rebuild` patches the
+  DIFFERENCE and nothing else. Both answer in their own names, because
+  `audio.status` answering `audio.started` cost nine seconds and a false
+  conclusion that no board was in the room.
+  ⚠️ **THE SHARING DECISION, WRITTEN DOWN IN `rig/box/README.md`:** the board
+  cannot see a listener (the relay forwards verbatim, `webSocketClose()` is
+  empty, a page holding PCM says nothing), so the rebuild is a diff that runs
+  zero commands on a healthy graph, kills no process, says out loud who else is
+  in the room when it does cut a link, and refuses on `onlyIfIdle: true`. A
+  SERVICE restart is deliberately still not a verb: `audio.stop` then
+  `audio.start` already does that, at about thirteen seconds of silence for
+  everybody.
+  ⚠️ **UNVERIFIED.** No ssh from here, so nothing has been run against real
+  `jack_lsp` output. `node rig/box/test.mjs` is 92/92 with 25 new checks on the
+  parse and the chain against `fixtures/jack-lsp-c.txt`, and two deliberate
+  sabotages take it to 88/92 and 90/92. What is still open: that this board's
+  real `jack_lsp -c` parses as the fixture does, and that a real `jack_connect`
+  repairs a real drift. Deploy with `rig/box/push.sh` and confirm with the md5s
+  it prints, which now cover `jacksynth.mjs` as well as `box.mjs`.
 
 ### XR, asked for 2026-09-17, in one message
 
@@ -443,11 +511,22 @@ versus +Z reading and the comment above `wallYaw` names it.
   go. `build.mjs` guards against an anchor that VANISHES and cannot see one that
   became redundant.
 
-- 🔴 **`box.ping` IS BROKEN ON THE BOARD, AND NO PAGE SENDS IT ANY MORE.**
-  Found 2026-09-16 while building `/knobs/`. It replies `box.pong` with an `at`
-  field, `at` is an ENVELOPE field, so the board's own `format()` throws and the
-  handler answers `box.error` instead. The verb is still wrong and the fix is one
-  line in `rig/box/box.mjs`: name the field something that is not `at`.
+- ✅ **`box.ping` IS FIXED IN THE REPO AND IS NOT ON THE BOARD YET (2026-09-18).**
+  It sends `pongAt` now, one line in `rig/box/box.mjs`. The collision was
+  confirmed by reading rather than assumed: `wire.mjs` declares
+  `ENVELOPE = ['from', 'at', 'seq', 'by']` and `format()` throws on any payload
+  key in it, `reply()` spreads the body into the message, so `{ at: … }` threw
+  on every send and the wrapper in `ws.onmessage` answered `box.error`.
+  ⚠️ **UNVERIFIED ON HARDWARE.** `ssh positron@192.168.1.213` does not answer
+  from here, so this has never run on the board. The board IS in `studio-1` and
+  answered `audio.status` over the relay on 2026-09-18, so a deploy can be
+  confirmed with `node rig/box/ask.mjs --room studio-1 box.ping` the moment
+  somebody on the studio LAN runs `rig/box/push.sh`.
+  ⚠️ **NOTHING READ THE FIELD AND NOTHING SHOULD.** `live-test.mjs`,
+  `relay-compare.mjs` and `yoshimi-test.mjs` all waited on the REPLY, which is
+  what never came; each times the round trip in its own clock, which is the only
+  clock that can measure it. Their comments now say so.
+  ⚠️ Kept below because the page half is the part worth re-reading.
   ⚠️ **THE PAGE HALF IS DONE AND WAS NOT A WORKAROUND, IT WAS A DELETION.**
   `/keys/` timed a pong that never arrived into a variable NO CELL SHOWED and no
   check asked for, which is the more interesting half of this: a counter nobody
@@ -668,33 +747,59 @@ versus +Z reading and the comment above `wallYaw` names it.
   none it says *"nothing published yet"* inside a bordered box that is itself
   the message.
 
-- 🔴 **41 PAGES STILL RUN THEIR SELF-CHECKS FOR VISITORS. SWEEP THEM.** The rule
-  landed in CLAUDE.md 2026-09-16 (*"rip those selfchecks out of user experience
-  and make rule about it"*) and four pages obey it: `/radio/`, `/crate/`,
-  `/tapes/` and `/videoradio/`. COUNTED off the tree, every page that calls
-  `d.assert(` and contains no `selfcheck` gate:
-  blocks, capture, click, cues, draw, feedback, flipper, floor, grains, held,
-  instrument, items, jam, keep, kit, lanes, llhls, looper, loops, memento,
-  mirror, moq, now, patch, rack, record, reel, replay, resources, room, score,
-  seek, show, station, strip, take, transport, typist, vclick, webrtc, wire.
-  ⚠️ **NOT ALL 41 ARE HARMFUL AND THE SWEEP IS NOT MECHANICAL.** A read-only
-  assert over data the page already holds costs a visitor nothing and should
-  keep running. What has to move behind the gate is anything that opens a file,
-  makes a sound, presses a control, or moves the picture. The test is CLAUDE.md's:
-  if a person were watching this page, would they see it happen? Pages worth
-  reading first are the ones that record, upload or play: take, keep, record,
-  memento, capture, replay, mirror, grains, jam.
+- ✅ **THE FORTY PAGES ARE SWEPT, 2026-09-18.** (`seek` was in the list of 41
+  and is retired, so forty.) The gate is a kit module now, `demo/shell/selfcheck.mjs`:
+  it was one line copied into four pages and the other forty-one never grew it,
+  and one import is greppable, which is the half that makes a sweep finishable.
+  **Thirteen pages needed no change at all** and were left exactly alone, because
+  everything costly in them already sat behind the press a visitor makes:
+  click, cues, flipper, items, lanes, looper, loops, score, transport, moq, room,
+  webrtc, patch, wire, jam, record.
+  **The worst of what a visitor was paying for**, all of it now gated:
+  - `floor` fetched `arhiiv.err.ee` and played an HLS film for up to six seconds
+    ON EVERY VISIT, plus a grey upload over layer 0 of the live tile texture and
+    100 frame-loop steps.
+  - `now` fired up to 30 range GETs at ERR segments nobody was going to watch,
+    then a ten minute back-seek pulling a different stretch of the DVR.
+  - `blocks` rolled three rooms past the reader at load, then a fourth to undo it.
+  - `held` ran about twenty off-screen renders with `readPixels` and typed words
+    over the wall and back.
+  - `grains` dropped a SHARED Raspberry Pi's material to -60 dB and emptied its
+    ring, heard by whoever had `/knobs/` open in another building.
+  - `feedback` woke the recorder, opened a socket and WROTE A NOTE into the room.
+  - `mirror` laid out five figures every frame, lowering the frames per second
+    the page exists to report while somebody reads it.
+  🔴 **AND THE LOAD-BEARING FIX WAS IN THE HARNESS, NOT IN A PAGE.**
+  `verify-gl.mjs` and `verify-quest.mjs` NEVER APPENDED `selfcheck=1`; only
+  `verify.mjs` did. So gating any `gl: true` page would have switched its checks
+  off everywhere at once, silently. `/videoradio/` already carried its own gate
+  and its comment named this exact file as *"a harness to fix rather than a
+  reason to work a visitor's controls"*, which means its checks have been
+  running NOWHERE.
+  ⚠️ **PROVED, NOT CLAIMED.** `DEMO_QUERY=selfcheck=0` lands ahead of the
+  harness's own flag, so the page is a visitor's while the harness still presses
+  every control: blocks 47 to 8, held 33 to 15, draw 15 to 2, kit 38 to 30,
+  memento 14 to 10, capture 8 to 7, replay 10 to 8. Under `selfcheck=1` every
+  count is identical to baseline, which is the property that says the harness
+  lost nothing.
+  ⚠️ **WHAT IS LEFT.** The thirteen already-safe pages carry no `selfcheck`
+  string, so `grep -L selfcheck demo/*/index.html` still lists them and reads as
+  a ledger of unswept pages when it is not.
 
+- 🔴 **`node demo/verify-gl.mjs videoradio` NOW COSTS ERR, AND IT DID NOT
+  BEFORE.** Consequence of the harness fix above, written down because it is
+  exactly the kind of change that surprises somebody later. That page rotates
+  four ERR mounts and its checks had been running nowhere at all; they run now.
+  Every connection to an ERR mount appears in a public broadcaster's audience
+  measurement, so that command is not a development-loop command.
 
-- 🔴 **`/tapes/` NEEDS A STAND-IN LIKE `demo/fake-station.mjs`.** Its harness
-  pulls real recordings off archive.org, so every run spends somebody else's
-  bandwidth, and 2026-09-16 the instruction was *"stil: super careful with
-  external sources, better avoid"*. `fake-station.mjs` did exactly this job for
-  `/radio/` and took it from ungradable to 48/48 at no cost to anybody. What is
-  needed here is smaller: a local host serving a few short MP3s with the right
-  `content-length`, `accept-ranges` and CORS headers, and a `?base=` on the page
-  the way `/radio/` already has. Until it exists, `node demo/verify.mjs tapes`
-  is a thing to run once before shipping, not in a loop.
+- ⚠️ **A PRE-EXISTING FLAKE IN `/floor/`, IN A BLOCK NOBODY TOUCHED.** *"and
+  every one of them runs at the film's frame rate"* failed twice (`worst of 8 is
+  38.3 ms from 41.7`, the autocorrelation saturating at the top of its 20 to
+  80 ms lag range) then passed three times (`1.7 ms`). `createProjector` draws
+  `Math.random()` for its jitter and only about five clatters fit the 0.24 s
+  offline render, so the statistic is marginal by construction rather than
+  wrong. Found during the sweep.
 
 - 🔴 **THE LOOPER CANNOT OWN A LOOP ON A MEDIA ELEMENT, AND `/replay/` IS THE
   FIRST PAGE THAT NEEDED ONE. REFUSED IN WRITING 2026-09-16.** Asked as *"does
@@ -884,6 +989,33 @@ versus +Z reading and the comment above `wallYaw` names it.
   swept. A blind replace would turn "we did not look" into a comma.
 
 ## Done, with what it was measured at
+
+- ✅ **DONE. `/tapes/` HAS A STAND-IN, AND `node demo/verify.mjs tapes` COSTS
+  archive.org NOTHING.** Asked because that harness pulled twenty-four real
+  recordings on every run, including the runs where somebody typed no arguments
+  at all, against the 2026-09-16 instruction *"stil: super careful with external
+  sources, better avoid"*. `demo/fake-tapes.mjs` is the same answer
+  `fake-station.mjs` gave `/radio/`: real MP3 frames, real `content-length`,
+  `accept-ranges: bytes`, working Range replies and archive.org's CORS headers,
+  at the exact lengths `corpus.json` measured. `/tapes/` takes a `?base=` the way
+  `/radio/` does and `verify.mjs` starts the server and points the page at it.
+  **MEASURED: 38/38 green, 26 page asserts, and the only hosts the run touched
+  were the dev server and the stand-in.** The instrument is new too:
+  `DEMO_HOSTS=1 node demo/verify.mjs <slug>` prints the hosts each demo
+  contacted, off `Network.requestWillBeSent`, so "no bytes left this machine" is
+  checkable rather than claimed.
+  ⚠️ **AND IT EXPOSED TWO VACUOUS PASSES IN THE PAGE'S OWN CHECKS, WHICH ARE NOT
+  FIXED.** A stand-in serving every recording at HALF its corpus length reads
+  38/38, because every geometry assert takes its lengths from the corpus and
+  none of them ever compares that against the file the element loaded. And a
+  stand-in serving SILENCE also reads 38/38: `the page makes no sound until
+  somebody presses play` printed `ran 265 ms of tape at 0.000 and the speakers
+  got 0.0000`, which cannot tell a shut gate from nothing to gate, and
+  `backwards is the same samples mirrored` reported `4 of 4` zeros matching
+  zeros. Both need a real measurement to sit behind, and the tolerance for the
+  first one cannot be chosen here: the corpus durations came from ffprobe on a
+  header, so what a browser reports for the same file is unmeasured and may not
+  be measured without asking archive.org for the files.
 
 - ✅ **THE PAGE IS A STACK OF BLOCKS AND THE STACK OWNS THE AIR BETWEEN THEM.**
   Asked twice on 2026-09-16, the second time as a diagnosis rather than a
