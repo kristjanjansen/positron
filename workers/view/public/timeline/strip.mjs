@@ -1123,7 +1123,31 @@ export function createStrip(canvas, deck, opts = {}) {
     if (key !== S.gutterKey) { S.gutterKey = key; S.gutterPx = gutterWidthFor(S.width); }
     let y = S.axisH;
     for (const L of S.lanes) { L.y = y; if (L.show) y += L.height; }
-    S.contentH = y;
+    /**
+     * A FLOOR, AND EMPTY SPACE UNDER THE LANES IS THE POINT RATHER THAN A
+     * DEFECT. `autoHeight` takes exactly the height the lanes need, which is
+     * right until the lanes are few: a strip holding one lane comes out about
+     * fifty pixels tall, which is a sliver rather than a picture of a
+     * recording. `minHeight` is what a page uses to say the timeline is its
+     * subject and should look like one whatever it happens to hold.
+     * ⚠️ IT IS A FLOOR, NEVER A HEIGHT. Lanes that need more than it still get
+     * more, so a page cannot clip its own content by asking for this.
+     * ⚠️ AND THE GROUND IS PAINTED ACROSS THE WHOLE CANVAS, not to `contentH`,
+     * so the space below the last lane is the strip's own background rather
+     * than a hole showing the page through.
+     */
+    /**
+     * ⚠️ TWO NUMBERS, BECAUSE A CHECK THAT SAMPLES THE PICTURE NEEDS TO KNOW
+     * WHERE THE LANES STOP. `contentH` is how tall the canvas is; `lanesH` is
+     * how far down it anything was drawn. They were one number until a floor
+     * existed, and the first thing the floor broke was `/stage/`'s "no black
+     * rule between the lanes" assert: it sampled to the bottom of the canvas,
+     * found the empty ground below the last lane, and reported it as a rule.
+     * The check was right to be suspicious of a dark row and wrong about where
+     * its subject ends.
+     */
+    S.lanesH = y;
+    S.contentH = Math.max(y, opts.minHeight || 0);
   }
 
   /** The evidence policy every query resolves to. `undefined` means "let the

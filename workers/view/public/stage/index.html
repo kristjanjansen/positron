@@ -26,7 +26,7 @@
   import { createField } from '/shell/field.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
-  import { createStripView } from '/shell/strip.mjs';
+  import { createStripView, STRIP_MIN_H } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
@@ -117,8 +117,22 @@
       panel: createVideoPanel({
         media: c,
         of: t.label.toLowerCase(),
-        left: createPresence({ of: '', mode: 'badge', state: 'online',
-                               says: { online: 'live' } }).el,
+        /**
+         * ⚠️ AND THE ARCHIVE GETS NO BADGE AT ALL. Asked 2026-09-18: *"Rm live
+         * badge from arcive videofooter"*. That tab plays a RECORDING of a show
+         * that finished, so a badge reading `live` on it is a status that
+         * cannot ever be false, which is the shape of control this project
+         * calls a lie. `false` is the panel's own way of saying a slot has
+         * nothing to put in it, and the footer keeps its other two.
+         * ⚠️ NOT `says: { online: 'archive' }` INSTEAD. A presence badge
+         * answers whether the thing feeding the picture is ANSWERING, and
+         * nothing is feeding this one: a recording has no liveness to report,
+         * so a re-worded badge would be the same lie in a better costume.
+         */
+        left: t.id === 'archive'
+          ? false
+          : createPresence({ of: '', mode: 'badge', state: 'online',
+                             says: { online: 'live' } }).el,
         /**
          * 🔴 EVERY SCREEN GOES FULL, AND KEEPS A FOOTER WHILE IT IS. Asked
          * 2026-09-18: *"all stage videoscreens need to go to fullscreeen with
@@ -149,7 +163,33 @@
    * Three genuinely different views of one show is the case it was built for.
    */
   const byId = new Map(panels.map((p) => [p.id, p]));
-  const tabs = createTabs({ tabs: TABS.map(({ id, label }) => ({ id, label })) });
+  /**
+   * 🔴 THE AUDIENCE DOES NOT GET A LOG. Asked 2026-09-18: *"rm logs from stage
+   * audience"*. This page's three tabs have two different readers, and that is
+   * the whole reason: the control room and the archive are worked by the person
+   * running the show, who is exactly who a log is for, and the audience tab is
+   * the one surface here that a room full of other people looks at. A log is
+   * where this project puts faults, build stamps and timings. None of those are
+   * an audience's to read and none are theirs to act on.
+   *
+   * ⚠️ THE TABS ARE `#links` ON ONE PAGE, SO THERE IS ONE LOG AND IT IS THE
+   * SHELL'S. It is not per-panel and must not become so: a second log box inside
+   * a panel is a second surface saying what one already says, and `mount()`
+   * hides the shell's when a page wants none at all.
+   *
+   * ⚠️ AND THE FIRST `go()` IS QUIET, so `onPick` does NOT fire on load. The
+   * page opens on the audience tab, so leaving the initial state to the callback
+   * would show the log to precisely the reader it is being taken from, until
+   * they touched a tab. It is applied once, by hand, below.
+   */
+  const LOG_TABS = ['controlroom', 'archive'];
+  const logFor = (id) => { if (d.logEl) d.logEl.hidden = !LOG_TABS.includes(id); };
+
+  const tabs = createTabs({
+    tabs: TABS.map(({ id, label }) => ({ id, label })),
+    onPick: logFor,
+  });
+  logFor(tabs.at());
   for (const p of panels) tabs.panel(p.id).append(p.panel.el);
   d.stack.add(tabs.el);
 
@@ -191,7 +231,12 @@
     // adapter plays nothing: what it exists to say is that this recording can be
     // played at these speeds.
     items: [{ at: 0, kind: 'show', id: 'show', payload: {} }],
-    adapters: { show: { caps: { rates: [0.5, 1, 1.5, 2] }, actuate: () => {} } },
+    // ⚠️ ONE RATE, SO THE BAR DRAWS NO RATE ROW. A lattice of one is not a
+    // choice and `createTransportBar` already refuses to render it, which is
+    // the behaviour `/replay/` bought when a lone armed `1` turned up beside
+    // its LOOP. This is the deck saying what is true of an archive recording
+    // rather than the bar being told to hide something real.
+    adapters: { show: { caps: { rates: [1] }, actuate: () => {} } },
   });
 
   /**
@@ -250,8 +295,22 @@
    * correct in the source and cannot be seen to be inert from outside. The
    * option is `time` and it is now real.
    */
+  /**
+   * 🔴 NO LOOP AND NO RATES EITHER. Asked 2026-09-18: *"Rm liop and rare from
+   * archive transport"*. This bar is now play and nothing else, which is the
+   * whole of what an archive recording needs: it is a thing that happened once,
+   * at a speed, and there is no passage in it worth hearing twice at 0.25.
+   * ⚠️ THE TWO COME OFF IN DIFFERENT PLACES AND THAT IS NOT AN INCONSISTENCY.
+   * `loop: false` is the bar's own option, beside `scrub: false` and `time:
+   * false`. The RATES are not the bar's to refuse: they are the intersection of
+   * every `caps.rates` its deck's kinds declare, and the bar draws them only
+   * when that intersection holds more than one value. So the honest way to have
+   * none is for the deck to stop claiming four, which is what the adapter above
+   * now says. Adding a `rates: false` option would have put the same fact in
+   * two places and let them disagree.
+   */
   const bar = createTransportBar(tabs.panel('archive'), archiveDeck, {
-    live: false, scrub: false, absolute: false, time: false,
+    live: false, scrub: false, absolute: false, time: false, loop: false,
   });
 
   const VIDEO_LANE = {
@@ -276,8 +335,17 @@
     describeRow: (r) => [r.payload?.pick || '', `${(r.at / 1000).toFixed(1)}s`],
   });
 
+  /**
+   * 🔴 A FLOOR UNDER THE TIMELINE. Asked 2026-09-18: *"Make archive timeline 3x
+   * higher"*, then *"Ita ok to have empty space in timelime, def min height"*.
+   * MEASURED at 50 px with its one lane before this, so the floor is 150.
+   * ⚠️ A FLOOR RATHER THAN A HEIGHT, which is what the second message settles:
+   * once an answer lane is added per option the lanes need more than 150 and
+   * they get it. Below the floor the space under the last lane is empty, and
+   * that was explicitly accepted rather than packed out with something.
+   */
   const strip = createStripView(tabs.panel('archive'), archiveDeck, {
-    size: 'auto', gutter: 110, lanes: [VIDEO_LANE],
+    size: 'auto', gutter: 110, lanes: [VIDEO_LANE], minHeight: STRIP_MIN_H,
   });
   // The count is kept here because the strip reports no lane list of its own,
   // and a check that samples between lanes has to be able to say it HAD lanes.
@@ -644,8 +712,22 @@
     // the rect was zero, and the backing store is the thing being sampled.
     const col = Math.round(sc.width * 0.72);
     const top = Math.round(sc.height * 0.25);
+    /**
+     * 🔴 IT STOPS WHERE THE LANES STOP, NOT WHERE THE CANVAS STOPS. Since the
+     * strip took a `minHeight` there is empty ground under the last lane, which
+     * is darker than a lane band and is SUPPOSED to be there. Sampling to the
+     * bottom read that ground as a black rule and took this assert red on a
+     * picture with nothing wrong in it.
+     * ⚠️ `state.lanesH` IS IN CSS PIXELS AND THE SAMPLE IS IN THE BACKING
+     * STORE, so it is scaled by the device ratio the strip itself is using.
+     * Reading a ratio off anything else is what broke the first build of this
+     * check when the rect was zero.
+     */
+    const st = strip.strip.state;
+    const lanesBottom = Math.round((st.lanesH || 0) * (st.dpr || 1));
+    const stop = Math.min(sc.height - 2, lanesBottom - 1);
     const lum = [];
-    for (let y = top; y < sc.height - 2; y++) {
+    for (let y = top; y < stop; y++) {
       const [r, g2, b] = sctx.getImageData(col, y, 1, 1).data;
       lum.push(r + g2 + b);
     }
