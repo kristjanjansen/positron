@@ -95,6 +95,7 @@ node demo/fake-station.mjs               # an Icecast mount that is nobody's rad
 node demo/fake-tapes.mjs                 # an archive that is nobody's archive
 node demo/fake-err.mjs                   # a live edge that is nobody's broadcaster
 node demo/shell/looper-test.mjs          # the looper's arithmetic, no browser
+node demo/shell/xr-quit-test.mjs         # is there really a way out of every headset page
 node workers/mail/test.mjs               # what arrives at positron@ is spam or a person
 node demo/resources/measure-durations.mjs   # how long each recording is, asked once
 node demo/verify-safari.mjs              # desktop Safari over WebDriver, both engines
@@ -679,10 +680,32 @@ to recover.
   is exactly when timers stop being generous. `navigator.sendBeacon` survives
   it. The uncaught-error handler has to use it too, or the net meant to catch a
   silent failure is itself waiting on the timer that stopped.
-- **Anything immersive needs a way out that the PAGE owns.** Any controller
-  button ends the session, plus a dead-man's switch that ends it if nothing has
-  been drawn after 4 s. "Press the Meta button" is not an answer a page gets to
-  give about its own bug.
+- 🔴 **ANYTHING IMMERSIVE NEEDS A WAY OUT THAT THE PAGE OWNS, AND THERE IS ONE
+  OF THEM: `demo/shell/xr-quit.mjs`.** Hold ANY controller button for 3 s and a
+  white arc fills at your hand; let go and it cancels to zero. Plus a dead-man's
+  switch that ends a session where NOTHING has been drawn after 4 s, which is a
+  different failure and not a user-facing exit. "Press the Meta button" is not an
+  answer a page gets to give about its own bug.
+  🔴 **NO LABELS ON IT, 2026-09-19:** *"hold any controller button down long
+  enough it shows circular coundown (no labels) and quites"*. Nothing is drawn
+  until something is held: the arc IS the badge, and the gesture is the
+  documentation. It used to carry the word `Hold to quit`, which is furniture you
+  read once and look past for the rest of a session.
+  🔴 **AND A PAGE MUST `update()` IT, NOT ONLY `draw()` IT. THIS FAILED IN THE
+  WILD:** *"i was not able to get out"*, 2026-09-19. `/blocks/` built the badge,
+  compiled its shader and drew it at both hands every frame, and never once
+  called `update`, so the hold could not advance and **there was no way out of
+  that page at all**. Every other page had the line, so no shared code was wrong
+  and nothing could disagree with anything.
+  ⚠️ **`node demo/shell/xr-quit-test.mjs` REFUSES THAT SHAPE NOW**, because the
+  defect is a line that is NOT there and no browser check can see one: a harness
+  cannot enter a session, and in one, `update` not being called is
+  indistinguishable from nobody pressing a button.
+  ⚠️ **ITS FIRST BUILD WAS WORTHLESS AND ONLY SABOTAGE SAID SO.** It matched
+  `/\.update\s*\(/`, and `/blocks/` updates its room, its hands and its
+  document, so deleting the quit's own call left it fully green. It matches the
+  ARGUMENT now (`inputSources`, which nothing else is handed). That is the
+  substring rule below, met while writing a check that quoted it.
 - **`gl.clear` ignores the viewport.** Both eyes share one framebuffer, so a
   clear on the second view wipes what the first drew — black. Only the first
   eye clears; the rest clear DEPTH inside a `gl.scissor`, or the second eye

@@ -295,7 +295,22 @@
    * the mark's colour against the ink's — which is why the number is worth
    * having in one place that a shader and a check both read.
    */
-  const MARK_RGB = [1.0, 0.83, 0.0];
+  /**
+   * 🔴 GREY, NOT YELLOW, SINCE 2026-09-19: *"rm yellow color on hilite, just
+   * make them subtly grayer"*. A yellow word was a second meaning on the one
+   * channel this project reserves for how something LANDED, and on a wall of
+   * white words it was the loudest thing in the room for a state that only means
+   * "this is the one you are pointing at".
+   * ⚠️ **DIMMER RATHER THAN DIFFERENT.** The ink is white; the mark is the same
+   * white turned down. Nothing on this page has a hue now, which is what makes
+   * a word being marked read as a state of that word rather than as a different
+   * kind of word.
+   * ⚠️ **AND THE NUMBER IS READ BY THE CHECK TOO.** The page counts pixels of
+   * the mark against pixels of ink, so the value lives here once: a shader and a
+   * check that each carried their own copy would agree until somebody changed
+   * one.
+   */
+  const MARK_RGB = [0.62, 0.62, 0.62];
 
   const d = mount({
     name: 'held',
@@ -915,11 +930,23 @@ void main() {
     // room.
     const j = ITEMS.indexOf(b.item);
     if (j >= 0) ITEMS[j] = item;
-    // ⚠️ AND SO IS THE MARK. `retext` replaces the object in `built`, so a mark
-    // left pointing at the old one would compare unequal to everything drawn and
-    // the colour would come off a word nobody unmarked — a state that is set and
-    // has no way back, which is the worst kind.
-    if (marked === b) marked = nb;
+    /**
+     * 🔴 AN EDITED WORD GOES BACK TO WHITE. Instructed 2026-09-19: *"after edit
+     * restore white"*. The mark says "this is the one you are pointing at, and
+     * typing will replace it"; once the typing has happened that sentence is
+     * spent, and a word left grey afterwards is a state nobody can see the end
+     * of.
+     * ⚠️ IT USED TO BE CARRIED ONTO THE NEW OBJECT (`marked = nb`), for a reason
+     * that was right at the time and is worth keeping in view: `retext` replaces
+     * the object in `built`, so a mark left pointing at the OLD one compares
+     * unequal to everything drawn and the colour comes off a word nobody
+     * unmarked. Clearing it outright has the same effect and states the
+     * intention, where carrying it forward only to drop it later would not.
+     * ⚠️ IN A HEADSET THIS FIRES ON THE FIRST KEYSTROKE, because the room's own
+     * keyboard retexts per letter. That is the behaviour wanted: by then you are
+     * typing, so the mark has done its job.
+     */
+    if (marked === b) marked = null;
     // ⚠️ AND SO IS THE ONE BEING CARRIED OUT OF THE SESSION. A word typed over
     // with the headset's own keyboard is retexted on every keystroke, so by the
     // time the session ends the object the trigger stored is several rebuilds
@@ -2125,12 +2152,24 @@ void main() {
         const px = new Uint8Array(640 * 360 * 4);
         gl.readPixels(0, 0, 640, 360, gl.RGBA, gl.UNSIGNED_BYTE, px);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        // ⚠️ `> 128` on red is the words and not the floor — the dots are 0.64
-        // red through at most 0.62 of alpha, which cannot pass 104. Of those,
-        // the ones with no blue in them are the marked word.
+        /**
+         * ⚠️ `> 128` on red is the words and not the floor — the dots are 0.64
+         * red through at most 0.62 of alpha, which cannot pass 104.
+         * 🔴 AND THE MARK IS THE DIM ONES, NOT THE BLUELESS ONES. This read
+         * `px[i * 4 + 2] < 64`, which is a test for YELLOW, and it went red the
+         * moment the mark became grey: a grey pixel has as much blue as red, so
+         * every marked word read as unmarked and the check reported that no word
+         * had changed colour. The discriminator has to follow the colour it is
+         * discriminating.
+         * ⚠️ THE THRESHOLD IS DERIVED FROM THE TWO CONSTANTS, halfway between
+         * the ink and the mark as they actually come out of the shader. A number
+         * typed here would be a third copy of a value the page already holds
+         * twice, and it would drift the next time either moves.
+         */
+        const MID = 255 * ((MARK_RGB[0] + INK_RGB[0]) / 2) * INK_ALPHA;
         let ink = 0, lit = 0;
         for (let i = 0; i < 640 * 360; i++) {
-          if (px[i * 4] > 128) { ink++; if (px[i * 4 + 2] < 64) lit++; }
+          if (px[i * 4] > 128) { ink++; if (px[i * 4] < MID) lit++; }
         }
         return { ink, lit };
       };
@@ -2145,19 +2184,34 @@ void main() {
         markWord(b);
         const s = shot();
         tries.push({ text: b.item.text.split('\n')[0].slice(0, 12), ...s });
-        if (!pick && s.lit > 200 && s.ink - s.lit > 200) pick = { b, s };
+        if (!pick && s.lit > plain.lit + 400 && s.ink - s.lit > 200) pick = { b, s };
       }
       markWord(null);
       const off = shot();
       window.__demo.marking = { plain, tries, off };
+      /**
+       * 🔴 IT COMPARES SHOTS RATHER THAN DEMANDING A ZERO, AND THAT IS FORCED BY
+       * THE MARK BEING GREY. A yellow mark could be counted exactly, because
+       * nothing else on the page had that hue; a dim grey one shares its band
+       * with the ANTIALIASED EDGE of every white letter, so an unmarked room has
+       * a few hundred pixels in it by construction. Requiring zero would be
+       * requiring the type not to be antialiased.
+       * ⚠️ SO THE CLAIM IS A CHANGE, IN BOTH DIRECTIONS: marking a word puts a
+       * large number of pixels into the dim band, unmarking takes them out
+       * again, and the total ink does not move because the word is still there.
+       * The return half is the negative control: a page that marked everything
+       * and never unmarked would pass the first half perfectly.
+       */
+      const rose = pick ? pick.s.lit - plain.lit : 0;
+      const back = Math.abs(off.lit - plain.lit);
       d.assert('the trigger repaints the word it landed on, and leaves the rest white',
-        plain.lit === 0 && off.lit === 0 && !!pick
+        !!pick && rose > 400 && back < Math.max(40, plain.lit * 0.25)
         && Math.abs(pick.s.ink - plain.ink) < plain.ink * 0.1,
         pick
-          ? `nothing marked: ${plain.ink} lit pixels of ink and ${plain.lit} of them the `
-            + `mark's colour. Marking "${pick.b.item.text.split('\n')[0]}" turns `
-            + `${pick.s.lit} of ${pick.s.ink} that colour, leaving `
-            + `${pick.s.ink - pick.s.lit} white; unmarking puts ${off.lit} back`
+          ? `nothing marked: ${plain.ink} pixels of ink, ${plain.lit} of them in the `
+            + `mark's band (the edges of white type). Marking `
+            + `"${pick.b.item.text.split('\n')[0]}" puts ${rose} more there, leaving `
+            + `${pick.s.ink - pick.s.lit} white; unmarking comes back to within ${back}`
           : `no word changed colour where the picture could see it: `
             + tries.map((t) => `${t.text} ${t.lit}/${t.ink}`).join(' · '));
     }
