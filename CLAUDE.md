@@ -17,11 +17,16 @@ which was reverted within the hour. An instruction supersedes it. ⚠️ Only
 AND THE SAME WAY.** The deployed `/box/` is GONE and no redirect was written;
 119 references in 30 files moved. ⚠️ **`rig/box/` DID NOT MOVE AND MUST NOT.**
 The sweep matched the URL form `/box/`, never the word, because the BOARD is
-still the box: `rig/box/`, `box.mjs`, `box.hello`, `box.alive`, and
-`rig/box/listen.html` is still where the page lives. `LAYOUT.md` rule 2 names
-that file as the example of a page that belongs with its hardware, and moving it
-under `demo/` would invite `built: true`, which puts a shared Raspberry Pi in
-another building into every run of the suite.
+still the box: `rig/box/`, `box.mjs`, `box.hello`, `box.alive`.
+⚠️ **`rig/box/listen.html` IS GONE AND THIS SENTENCE SAID IT WAS STILL THERE.**
+It was the example named here of a page that belongs with its hardware, and it
+was RETIRED with `/keys/` on 2026-09-17; it is at `archive/keys/listen.html` and
+`LAYOUT.md` rule 2 no longer has a live example. **The rule it illustrated is
+untouched**: a page that drives hardware does not go under `demo/`, because that
+invites `built: true`, which puts a shared Raspberry Pi in another building into
+every run of the suite. Found 2026-09-18 by auditing the backlog, which is the
+second time in one day that a confident sentence in a file like this outlived
+the thing it described.
 ⚠️ **AND THAT BOARD HAS ONE INSTRUMENT SINCE 2026-09-16.** FluidSynth and hexter
 are at `archive/box-fluidsynth-hexter/`, out of `jacksynth.mjs` and out of
 `rig/audit.mjs`; a board asked for either answers `unknown source`. There is ONE
@@ -860,7 +865,13 @@ to recover.
   implies (`wire`'s `round trip` beside its `delivery`). Twelve pages were odd
   when this landed and every one got better. `mount()` THROWS on an odd count.
 - **Nothing unmeasured prints as `0`, and never as a lone unit.** `''`, `null`
-  and `NaN` all become one em dash with the unit hidden. An empty string used to
+  and `NaN` all become an EMPTY cell with the unit hidden.
+  ⚠️ **THIS SAID "ONE EM DASH" UNTIL 2026-09-18 AND THE CODE HAS SAID OTHERWISE
+  SINCE 2026-09-13.** `setCell` renders `''`. The placeholder WAS an em dash and
+  was removed on the reasoning written beside it: a cell does not have to show
+  that it is a cell, because the key above it and the box around it already say
+  so, and four dashes in a row read as four failed readings rather than four
+  cells waiting. Two copies of the old wording survive in `/kit/`. An empty string used to
   empty the cell and leave the unit standing alone — a `%` with no number in
   front of it, which reads as a value that went missing — and a page that
   pre-sets a counter to 0 is worse, because a zero reads as a very confident
