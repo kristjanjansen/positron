@@ -36,14 +36,25 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
+  // 🔴 THE THREE TELEVISION CHANNELS COME FROM THE KIT NOW, AND THIS FILE HELD
+  // THE FOURTH COPY OF THEM. `demo/shell/err-live.mjs` has said "both `flipper`
+  // and `now` import it" since it was promoted, and it was half true: `now`
+  // imported it and this page kept its own list three lines long. That is the
+  // shape CLAUDE.md warns about, a component nobody noticed was one, and it
+  // mattered the moment `?base=` arrived, because a hook in the module reaches
+  // one of the two pages that needs it. `errUrl` moves every ERR address this
+  // page opens, the radio mounts below included.
+  // 🔴 AND THE SWEEP THAT FINDS THE REFUSAL BOUNDARY LEFT THIS FILE ON
+  // 2026-09-18. It was `servedStart` here and it was the only one in the repo,
+  // so `/now/` had no path for a refused live edge at all and showed black.
+  // `findServedEdge` is the same arithmetic in `err-live.mjs`, called by both.
+  import { CHANNELS, errUrl, readPlaylist, findServedEdge, surveyChannels, describeSurvey }
+    from '/shell/err-live.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const DVR_MS = 2 * 60 * 60 * 1000;          // ERR keeps ~2 h
 
-  const TV = [
-    { id: 'etv', name: 'ETV', url: 'https://live.err.ee/live/etv.m3u8' },
-    { id: 'etv2', name: 'ETV2', url: 'https://live.err.ee/live/etv2.m3u8' },
-    { id: 'etvpluss', name: 'ETV+', url: 'https://live.err.ee/live/etvpluss.m3u8' },
-  ];
+  const TV = CHANNELS;
   const RADIO = [
     { id: 'vikerraadio', name: 'Vikerraadio' },
     { id: 'raadio2', name: 'Raadio 2' },
@@ -166,34 +177,8 @@
 
   async function servedStart(c) {
     try {
-      const master = await (await fetch(c.url, { cache: 'no-store' })).text();
-      const variant = master.split(/\r?\n/).find((l) => l && !l.startsWith('#'));
-      if (!variant) return null;
-      const plUrl = new URL(variant, c.url).href;
-      const pl = await (await fetch(plUrl, { cache: 'no-store' })).text();
-      const segs = pl.split(/\r?\n/).filter((l) => l && !l.startsWith('#'));
-      if (!segs.length) return null;
-      const dur = Number(pl.match(/#EXTINF:([\d.]+)/)?.[1]) || 2;
-      const last = segs.length - 1;
-      for (let k = 0; k < PROBE_STEPS; k++) {
-        const i = Math.max(0, last - Math.round((k * last) / (PROBE_STEPS - 1)));
-        const url = new URL(segs[i], plUrl).href;
-        // .ok is false for a 403 that DOES carry ACAO; .catch() is the 403 that
-        // does not, which is what ERR actually sends. Both mean "refused".
-        const served = await fetch(url, { headers: { range: 'bytes=0-1' }, cache: 'no-store' })
-          .then((r) => r.ok).catch(() => false);
-        if (!served) continue;
-        // The edge itself is served: leave the live-edge policy to hls.js
-        // rather than pinning a position on top of it.
-        if (k === 0) return { blockedMin: 0 };
-        const at = Math.max(0, i - Math.round(WALL_BACKOFF_S / dur));
-        // The SN, not the index: positions slide as the window rolls, and a
-        // later probe's index means nothing in the timeline hls.js is holding.
-        // The sequence number is the one coordinate both agree on.
-        const sn = Number(segs[at].match(/-(\d+)\.[a-z0-9]+$/)?.[1]);
-        return { position: at * dur, sn, blockedMin: ((last - at) * dur) / 60 };
-      }
-      return { blockedMin: ((last + 1) * dur) / 60, none: true };
+      const pl = await readPlaylist(c.url);
+      return await findServedEdge(pl, { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
     } catch { return null; }
   }
 
@@ -227,7 +212,17 @@
         // CONSECUTIVE failures, not three failures ever: a counter that never
         // resets turns three unlucky blips across an hour into a false wall.
         let wall = 0;
-        c.hls.on(window.Hls.Events.FRAG_LOADED, () => { wall = 0; });
+        // 🔴 BYTES THAT ARRIVED, COUNTED ON THE FAR SIDE OF THE WIRE. Until
+        // 2026-09-18 this page read 8/8 against a `?base=` pointed at a CLOSED
+        // PORT, because its one check of the selected channel was satisfied by
+        // `!!c.hls` — an object existing, which says nothing about whether a
+        // broadcaster answered. A fragment event fires only when a fragment
+        // came back, so it cannot be true of a server that is not there.
+        c.hls.on(window.Hls.Events.FRAG_LOADED, (_e, data) => {
+          wall = 0;
+          c.frags = (c.frags || 0) + 1;
+          c.bytes = (c.bytes || 0) + (data?.frag?.stats?.total || data?.stats?.total || 0);
+        });
         c.hls.on(window.Hls.Events.ERROR, (_e, x) => {
           if (x.details === 'fragLoadError' || x.details === 'fragLoadTimeOut') {
             if (++wall !== 3) return;
@@ -247,7 +242,7 @@
         d.log(`${c.id}: no HLS engine: neither native nor MSE`, 'bad');
       }
     } else {
-      c.media.src = `https://icecast.err.ee/${c.id}.mp3`;
+      c.media.src = errUrl(`https://icecast.err.ee/${c.id}.mp3`);
     }
     c.media.muted = false;
     await c.media.play().catch((e) => d.log(`${c.id} play refused: ${e.name}`, 'bad'));
@@ -268,7 +263,49 @@
   // liveSyncPosition when the newest 52 minutes are rights-blocked lands the
   // playhead in the blackout and kills a picture that was playing — so re-probe
   // (the boundary moves with the schedule) and say where it actually landed.
+  // 🔴 THE CHECKS ARE OUTSIDE THE JUMP, AND THE THREE EARLY RETURNS INSIDE IT
+  // ARE WHY. This handler is the only thing on the page that runs them, and
+  // every one of its exits was a `return` that took them with it. The exit that
+  // mattered is the one on the path this demo is ABOUT: a channel with a rights
+  // wall jumps to the newest served frame and returned there, so the six checks
+  // ran only on a channel with nothing blocked. MEASURED against a stand-in
+  // wearing the shapes ERR was measured with: **2 asserts and a green run**
+  // against 8 on a channel serving its edge. That is this project's worst
+  // failure shape, a green suite with no coverage, and it was invisible because
+  // which branch fires depends on what ERR happens to be blocking that day.
   d.on('live', async () => {
+    await jumpToServedLive();
+    await takeSurvey();
+    // The checks read what this control just produced, so this is the first
+    // moment they can be true. A button for them would make them optional.
+    await d.run('check');
+  });
+
+  // 🔴 THE THREE CHANNELS WEAR THREE DIFFERENT SHAPES, AND ASKING ALL THREE IS
+  // THE ONLY THING THAT SEPARATES A WORKING BOUNDARY FINDER FROM ONE THAT
+  // ANSWERS THE SAME WAY WHATEVER IT IS GIVEN. ERR was measured on 2026-09-06
+  // refusing ETV's newest 45 minutes, ETV2's oldest 78, and nothing at all on
+  // ETV+. A run that only ever asks the channel it opened sees one of those
+  // three, and a page that reported "nothing is blocked" about every channel
+  // would read exactly like a day when nothing was.
+  //
+  // ⚠️ IT IS SELF-CHECK WORK AND IT IS GATED. A visitor watching one channel
+  // has no use for what the other two refuse, and asking costs a playlist and a
+  // probe per channel on a public broadcaster's server. The channel that IS
+  // open is not asked twice: its answer came from `open()`.
+  let survey = null;
+  async function takeSurvey() {
+    if (!SELFCHECK) return;
+    const c = chans[sel];
+    const own = c.kind === 'tv' && c.served ? { id: c.id, name: c.name, ...c.served } : null;
+    const rows = await surveyChannels(TV.filter((ch) => ch.id !== own?.id),
+      { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
+    survey = TV.map((ch) => (own && ch.id === own.id ? own : rows.find((r) => r.id === ch.id)))
+      .filter(Boolean);
+    d.log(`what the broadcaster will serve: ${describeSurvey(survey)}`);
+  }
+
+  async function jumpToServedLive() {
     const c = chans[sel];
     // radio is a live icecast pipe: no DVR, no window, nothing to jump to
     if (c.kind !== 'tv') { d.log(`${c.id} is a live stream with no DVR`); return; }
@@ -288,10 +325,7 @@
     }
     const edge = c.hls.liveSyncPosition;
     if (Number.isFinite(edge)) { c.media.currentTime = edge; d.log('jumped to the live edge'); }
-    // The checks read what this control just produced, so this is the first
-    // moment they can be true — and a button for them would make them optional.
-    await d.run('check');
-  });
+  }
 
   setInterval(() => {
     const c = chans[sel];
@@ -339,9 +373,53 @@
       d.assert('no channel but the selected one is loaded', others.length === 0,
         others.map((c) => c.id).join(',') || 'none');
       const c = chans[sel];
-      d.assert('the selected channel is open or loading',
-        !c.media.paused || c.media.readyState > 0 || !!c.hls,
-        `${c.id} paused=${c.media.paused} readyState=${c.media.readyState}`);
+      // 🔴 EVIDENCE THAT A BROADCASTER ANSWERED, NOT THAT AN OBJECT EXISTS.
+      // This assert read `!c.media.paused || c.media.readyState > 0 || !!c.hls`
+      // until 2026-09-18, and `!!c.hls` is true the instant `new Hls()` returns.
+      // MEASURED with `?base=` at a CLOSED PORT: eight of eight green on a page
+      // showing nothing, and only the harness's own `no failed requests` caught
+      // it. A fragment event and a decoded frame both need bytes to have come
+      // back, and neither can be true of a server that is not there.
+      //
+      // ⚠️ THE FRAME COUNT IS CUMULATIVE AND THAT IS WHY IT IS THE RIGHT ONE.
+      // `readyState` is an instant, and this check runs one line after a seek,
+      // which empties the buffer: the page read `readyState=1` while working
+      // perfectly. `totalVideoFrames` counts everything the element has ever
+      // decoded and a seek does not reset it.
+      const q = c.media.getVideoPlaybackQuality?.();
+      const frames = q?.totalVideoFrames ?? c.media.webkitDecodedFrameCount ?? 0;
+      const buffered = c.media.buffered.length
+        ? c.media.buffered.end(c.media.buffered.length - 1) - c.media.buffered.start(0) : 0;
+      d.assert('the selected channel received picture, not just an object',
+        c.kind === 'tv' ? (c.frags || 0) > 0 && frames > 0 : buffered > 0,
+        c.kind === 'tv'
+          ? `${c.id} ${c.frags || 0} fragments, ${Math.round((c.bytes || 0) / 1024)} KB, ${frames} frames decoded`
+          : `${c.id} ${buffered.toFixed(1)} s buffered`);
+    }
+    // 🔴 THE REFUSAL BOUNDARY, ASSERTED RATHER THAN PUT IN A CELL. The blocked
+    // minutes have been in the readout since this page was written and a cell
+    // is not an assert: sabotaging the stand-in to serve every segment left
+    // this page fully green, because nothing here named a refusal, a 403 or a
+    // served segment. These three are what the page cannot work without.
+    if (SELFCHECK && survey) {
+      const reachable = survey.filter((r) => r && !r.unreachable);
+      const walled = reachable.filter((r) => r.position != null);
+      const open = reachable.filter((r) => r.edgeServed);
+      const asked = reachable.flatMap((r) => r.probes || []);
+      const no = asked.filter((p) => p.state === 'refused').length;
+      const yes = asked.filter((p) => p.state === 'served').length;
+      d.assert('the broadcaster refused some of what it listed and served the rest',
+        no > 0 && yes > 0,
+        `${no} refused and ${yes} served of ${asked.length} points asked`);
+      d.assert('a channel that refuses its newest minutes gets a start behind the boundary',
+        walled.length > 0 && walled.every((r) => r.blockedMin > 0
+          && r.probes.some((p) => p.state === 'refused')
+          && r.probes.some((p) => p.state === 'served')),
+        walled.length ? describeSurvey(walled) : 'no channel refused its live edge');
+      d.assert('a channel that refuses nothing is reported as refusing nothing',
+        open.length > 0 && open.every((r) => r.blockedMin === 0),
+        open.length ? `${open.map((r) => r.id).join(', ')} served the newest segment`
+          : 'no channel served its live edge');
     }
     d.log(`sel ${chans[sel].name} · dvr window ${d.api.readout.window} min`);
   });

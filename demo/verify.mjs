@@ -14,6 +14,7 @@ import { DEMOS } from './manifest.mjs';
 import { claimProfile } from './harness-profile.mjs';
 import { startStation } from './fake-station.mjs';
 import { startTapes } from './fake-tapes.mjs';
+import { startErr } from './fake-err.mjs';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 // 🔴 A FIXED PORT IS A SHARED MUTABLE GLOBAL, and this file still had two of
@@ -109,7 +110,7 @@ if (peersAtStart.length) {
 }
 
 /**
- * 🔴 TWO PAGES ARE GRADED AGAINST STAND-INS, NEVER AGAINST THE REAL THING, AND
+ * 🔴 FOUR PAGES ARE GRADED AGAINST STAND-INS, NEVER AGAINST THE REAL THING, AND
  * THE HARNESS DOES IT RATHER THAN THE PERSON REMEMBERING TO.
  *
  * Every station `/radio/` offers is an ERR mount, and ERR told us our listeners
@@ -129,6 +130,15 @@ if (peersAtStart.length) {
  * plain `node demo/verify.mjs` with no arguments pulled real recordings down,
  * which is the way it happens by accident. `demo/fake-tapes.mjs` serves the same
  * paths at the lengths `corpus.json` measured.
+ *
+ * 🔴 AND `/now/` AND `/flipper/` ARE THE SAME BROADCASTER AS `/radio/`, WHICH
+ * IS WHY THE LAST FULL SUITE SKIPPED BOTH IN WRITING. They sweep ERR's live HLS
+ * two bytes at a time to find where the rights refusals start, which is thirty
+ * probes on one page and eight per channel on the other, plus a ten minute
+ * back-seek that pulls another stretch of the window down. `demo/fake-err.mjs`
+ * serves the same playlists on the same sliding window, with the three refusal
+ * shapes ERR was measured to have, so both pages can be run as often as
+ * anybody likes.
  *
  * ⚠️ IT IS AUTOMATIC BECAUSE THE ALTERNATIVE IS A RULE SOMEBODY HAS TO
  * REMEMBER, and a rule that is only in a document is a rule that gets broken on
@@ -162,6 +172,42 @@ if (all.some((t) => t.name === 'tapes')) {
     standIn.set('tapes', `http://127.0.0.1:${archive.address().port}`);
     standIns.push(archive);
     console.log(`stand-in archive ${standIn.get('tapes')} (nobody's archive)`);
+  }
+}
+// ⚠️ ONE SERVER FOR BOTH PAGES, because it is one broadcaster. Two would build
+// the same hundred megabytes of picture twice and hold two copies of it open.
+const ERR_PAGES = ['now', 'flipper'];
+if (all.some((t) => ERR_PAGES.includes(t.name))) {
+  const err = startErr({ port: 0, quiet: true });
+  if (!err) {
+    console.log('⚠️  the stand-in broadcaster needs ffmpeg and could not be built, so `now` '
+      + 'and `flipper` will be graded against nothing rather than against ERR.');
+  } else {
+    await new Promise((r) => err.on('listening', r));
+    const at = `http://127.0.0.1:${err.address().port}`;
+    /**
+     * 🔴 THE TWO PAGES ARE POINTED AT TWO ARRANGEMENTS OF THE SAME BROADCASTER,
+     * BECAUSE THEY WANT OPPOSITE THINGS FROM IT AND BOTH OPEN CHANNEL 0.
+     *
+     * `/flipper/` is about finding where the rights refusals start: it sweeps
+     * back from the live edge, starts the picture ninety seconds behind the
+     * boundary and stops loading when it reaches it. None of that runs on a
+     * channel whose edge is served, so it gets `/wall`, which is the
+     * arrangement ERR was measured wearing on 2026-09-06.
+     *
+     * `/now/` is about a live picture on a line, and it has NO path for a
+     * refused live edge. Pointed at `/wall` it shows black and takes six
+     * asserts red, all downstream of a clock that never starts. So it gets the
+     * default arrangement, where channel 0 plays and the refusals are at the
+     * old end of the window where its sweep still finds them.
+     *
+     * ⚠️ THAT ASYMMETRY IS A FINDING ABOUT `/now/`, NOT A SETTING. It is in
+     * `BACKLOG.md`; the fix is `/flipper/`'s `servedStart` at startup.
+     */
+    standIn.set('now', at);
+    standIn.set('flipper', `${at}/wall`);
+    standIns.push(err);
+    console.log(`stand-in broadcaster ${at} (nobody's ERR)`);
   }
 }
 
@@ -257,6 +303,30 @@ const reqUrl = new Map();   // requestId -> url, so a failure can be attributed
  */
 const SHOW_HOSTS = process.env.DEMO_HOSTS === '1';
 let hostHits = new Map();
+
+/**
+ * 🔴 A RIGHTS REFUSAL IS RECOGNISED BY WHERE IT CAME FROM, AND THERE ARE TWO
+ * PLACES NOW. Both classifiers below used to test the URL for `live.err.ee`,
+ * which was the whole address of the only thing that sent one. `fake-err.mjs`
+ * sends the same 403 with the same missing `access-control-allow-origin` from
+ * `127.0.0.1`, so the day the harness stopped pointing these pages at ERR,
+ * every deliberate refusal became an unexplained console error and two pages
+ * that were working read red.
+ *
+ * ⚠️ IT IS THE STAND-IN'S OWN ADDRESS PLUS THE SEGMENT PATH, NOT A LOOPBACK
+ * TEST. Anything looser would swallow a real failure from the dev server, and
+ * the whole value of this bucket is that it is narrow enough to be trusted.
+ *
+ * ⚠️ AND IT IS GIVEN THE WHOLE LOG LINE, NOT ONLY `entry.url`. Chrome files a
+ * CORS violation with an EMPTY url and the address inside the message text, so
+ * a version of this that only read the url classified the `loadingFailed`
+ * events correctly and left the console entries for the same segments sitting
+ * in `errors`. MEASURED: 22 refusals recognised and `no console errors` still
+ * red, which reads as one bug and was two.
+ */
+const errRefusal = (s) => /live\.err\.ee/.test(s)
+  || (standIn.has('now') && s.includes(standIn.get('now'))
+      && /\/live\/[a-z0-9]+\/seg-\d+\.ts/.test(s));
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
   if (m.method === 'Network.requestWillBeSent') {
@@ -343,12 +413,13 @@ listeners.push((m) => {
       // something a reader of this suite needs to be told rather than have
       // folded into "expected churn".
       probed.push(e.url);
-    } else if (/live\.err\.ee/.test(`${e.url || ''} ${e.text || ''}`)
+    } else if (errRefusal(`${e.url || ''} ${e.text || ''}`)
                && /\b403\b|CORS|ERR_FAILED/.test(e.text || '')) {
-      // ERR refuses segments by PROGRAMME rights — 403 with no ACAO, so the
-      // browser reports CORS. 19 flipper probes for this deliberately and says
-      // in its readout how much was refused, so the requests are expected.
-      // Capped, not ignored: past the ceiling this is an outage, not rights.
+      // A rights refusal is a 403 with no ACAO, so the browser reports CORS.
+      // `flipper` probes for this deliberately and says in its readout how much
+      // was refused, and `now` walks its playhead into it on purpose; the
+      // requests are expected from both. Capped, not ignored: past the ceiling
+      // this is an outage, not rights.
       probed.push(e.url);
     } else errors.push(e.text);
   }
@@ -360,7 +431,7 @@ listeners.push((m) => {
     // rather than ignored.
     const url = reqUrl.get(m.params.requestId) || '';
     if (m.params.errorText === 'net::ERR_ABORTED') abortedReqs.push(m.params.errorText);
-    else if (m.params.corsErrorStatus && /live\.err\.ee/.test(url)) probed.push(url);
+    else if (m.params.corsErrorStatus && errRefusal(url)) probed.push(url);
     else failedReqs.push(`${m.params.errorText}${url ? ` ${url.slice(0, 70)}` : ''}`);
   }
 });
@@ -651,14 +722,26 @@ for (const t of targets) {
      */
     if (!t0.toggles) console.log('        this bar has no play button, so the play/pause drill is skipped');
     else {
+    /**
+     * 🔴 THE TOGGLE OF THE BAR THIS DRILL IS GRADING, NOT THE FIRST ONE IN THE
+     * DOCUMENT. This read `document.querySelector(".tbar-toggle")` while every
+     * assert around it reads `__demo.transport`, which is the same element only
+     * while a page has exactly ONE bar. `/stage/` grew a second on 2026-09-18,
+     * and the two disagree by construction: the DOM query takes whichever comes
+     * first in document order, and `__demo.transport` is whichever was BUILT
+     * last, so on a tabbed page they are routinely different bars. The drill
+     * would have pressed one control and asserted about another, which fails
+     * while nothing is wrong and passes for the wrong reason just as easily.
+     */
+    const TOGGLE = '__demo.transport.el.querySelector(".tbar-toggle")';
     // play advances position
-    await ev('document.querySelector(".tbar-toggle").click()');
+    await ev(`${TOGGLE}.click()`);
     await sleep(500);
     const t1 = await ev('({ pos: __demo.transport.position, playing: __demo.transport.playing })');
     ok('play advances position', t1.playing && t1.pos > t0.pos, `${t0.pos.toFixed(0)} -> ${t1.pos.toFixed(0)}`);
 
     // pause holds it
-    await ev('document.querySelector(".tbar-toggle").click()');
+    await ev(`${TOGGLE}.click()`);
     await sleep(300);
     const a = await ev('__demo.transport.position');
     await sleep(300);

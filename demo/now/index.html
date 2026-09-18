@@ -19,7 +19,8 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { formatTime } from '/timeline/strip.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
-  import { CHANNELS, NATIVE_HLS, readPlaylist, probeSegment, wallHandler, clockOf }
+  import { CHANNELS, NATIVE_HLS, readPlaylist, probeSegment, wallHandler, clockOf, errUrl,
+           findServedEdge, surveyChannels, describeSurvey }
     from '/shell/err-live.mjs';
   // 🔴 THIS PAGE IS POINTED AT A PUBLIC BROADCASTER, SO THE GATE IS NOT ABOUT
   // TIDINESS. Every connection opened here lands in ERR's listener statistics,
@@ -33,7 +34,26 @@
   const RANGE_HZ = 1;                          // both ends move, once a second
   const OPEN_SPAN_MS = 12 * 60 * 1000;         // the opening view
   const PROBE_POINTS = 13;
-  const PROBE_CAP = 30;                        // sweep + one bisect, hard stop
+  /**
+   * 🔴 EVERY TWO-BYTE ASK THIS PAGE MAKES IN ONE VISIT, CAPPED. It was 30, for
+   * a page whose only probing was the 13-point sweep plus a bisect. Since
+   * 2026-09-18 the page also asks where the live edge is before it plays, which
+   * is what stopped it showing black on a channel whose newest minutes are
+   * refused, so the budget is now: up to 8 at startup, up to 8 more each time
+   * LIVE is pressed on a channel with a wall (and never twice inside 20 s), 13
+   * for the sweep, and up to 9 for the two channels the self-check surveys.
+   * ⚠️ THE FIRST TWO ARE THE ONLY ONES A VISITOR PAYS, and on a channel that
+   * serves its live edge each of them is ONE request, because the sweep starts
+   * at the edge and stops the moment something is handed over.
+   */
+  const PROBE_CAP = 40;
+  const PROBE_STEPS = 8;                       // how far back the edge sweep walks
+  const WALL_BACKOFF_S = 90;                   // where to start behind a boundary
+  // Do not ask the same question twice in the same breath. ERR's boundary is a
+  // programme edge: it sits still for half an hour and then moves by however
+  // long that programme was, so re-probing per press is spending a broadcaster's
+  // bandwidth on an answer that has not changed.
+  const SERVED_FRESH_MS = 20000;
   const BAND = { green: [5000, 10000], amber: 20000 };
 
   const d = mount({
@@ -41,10 +61,12 @@
     what: 'One ERR television channel on a line whose right-hand end is the present '
       + 'moment. The white line is the frame on the glass and the orange one is now, '
       + 'and the distance between them, about seven seconds, is what a live picture '
-      + 'costs to reach you. ERR keeps roughly the last two hours, so press anywhere '
-      + 'on the line to watch from that moment instead, and LIVE returns to the edge. '
-      + 'The margin of the live row says how far behind the picture is, how much of '
-      + 'the window you have watched; the grey row under it is what ERR says was on.',
+      + 'costs to reach you. Where ERR refuses its newest minutes for rights the '
+      + 'picture starts behind that boundary instead and the distance is much larger, '
+      + 'and LIVE returns to the newest frame it will hand over. ERR keeps roughly the '
+      + 'last two hours, so press anywhere on the line to watch from that moment; the '
+      + 'margin of the live row says how far behind the picture is and how much of the '
+      + 'window you have seen, and the grey row under it is what was on.',
     // NO READOUT. Four cells above the picture repeated what the rows already
     // say and put the page's headline number — how far behind the picture is —
     // as far from the line that draws it as the layout allows. The distance is in
@@ -67,6 +89,10 @@
 
   let hls = null, master = null, clock = null, loadStopped = false;
   let edgeMs = now0, pdtMs = null, windowS = 0, playlist = null;
+  // What ERR will hand over at the edge, and when that was last asked. `served`
+  // carries `position` when something newer than it is refused; that is the
+  // whole difference between this page playing and this page showing black.
+  let served = null, servedAt = 0, survey = null;
   let watched = [];              // stretches actually seen: [{from, to}]
   let probes = [];               // {at, state} — one per two-byte ask
   let programmes = [];           // {at, end, name} from ERR's schedule
@@ -311,10 +337,28 @@
     setRange();
     loadSchedule();             // fires as soon as the window is known
 
+    // 🔴 ASK WHERE THE LIVE EDGE IS BEFORE PLAYING IT. ERR blocks live segments
+    // by PROGRAMME and was MEASURED refusing ETV's newest forty-five minutes.
+    // Until 2026-09-18 this page had no path for that at all: hls.js 403'd every
+    // fragment at the edge, the wall handler stopped loading, the page said one
+    // line and showed black, and six of its asserts went red downstream of a
+    // clock that never started. `/flipper/` had solved it and the solution was
+    // sitting in that page rather than in the kit. It is in `err-live.mjs` now
+    // and this is the other caller.
+    //
+    // ⚠️ ONE REQUEST ON A CHANNEL THAT SERVES ITS EDGE, which is the common
+    // case: the sweep begins at the newest segment and stops the moment
+    // something is handed over.
+    await askWhatIsServed(true);
+
     if (NATIVE_HLS) {
       glass.src = CHANNEL.url;
     } else if (window.Hls?.isSupported()) {
-      hls = window.__hls = new window.Hls({ enableWorker: true });
+      // START BEHIND THE BOUNDARY WHEN THERE IS ONE. `startPosition` is the
+      // only lever that works here: hls.js picks the live edge by itself
+      // otherwise, and the live edge is exactly what is refused.
+      hls = window.__hls = new window.Hls({ enableWorker: true,
+        ...(served?.position != null ? { startPosition: served.position } : {}) });
       // NO CATCH-UP AND NO LATENCY TARGET. Being about seven seconds behind is
       // the medium here, not a defect; the page's job is to draw that distance,
       // not to close it. A back-seek must STICK rather than be yanked forward.
@@ -358,6 +402,7 @@
     await ifSelfcheck(async () => {
       await pauseTest();          // a paused picture stops the line, not the present
       await sweep();
+      await takeSurvey();
       // WALK THE WINDOW ONCE. It leaves the picture row with two stretches and
       // a GAP between them, which is that row's whole subject: a gap is where a
       // seek skipped.
@@ -461,6 +506,37 @@
   // MEMBERSHIP IS THE DISCRIMINATOR. A segment that has fallen off the back of
   // the window answers exactly like a rights refusal — 403, no ACAO — so only
   // segments in the playlist just read are ever asked about.
+
+  /** Where the newest frame ERR will serve is, kept for `SERVED_FRESH_MS`. */
+  async function askWhatIsServed(force = false) {
+    if (!playlist) return served;
+    if (!force && served && performance.now() - servedAt < SERVED_FRESH_MS) return served;
+    const found = await findServedEdge(playlist,
+      { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
+    if (!found) return served;
+    const wasWall = served?.position != null;
+    served = found; servedAt = performance.now();
+    probesIssued += found.probes.length;
+    if (found.none) {
+      d.log('ERR refuses every point asked across the whole window (rights)', 'bad');
+    } else if (found.position != null && !wasWall) {
+      d.log(`ERR refuses the newest ${Math.round(found.blockedMin)} min of ${CHANNEL.name} `
+        + `(rights) · starting ${WALL_BACKOFF_S} s behind that boundary`, 'bad');
+    } else if (found.edgeServed && wasWall) {
+      d.log(`${CHANNEL.name}: ERR serves to the live edge again`);
+    }
+    return served;
+  }
+
+  /** The instant LIVE should go to, or null when the engine's own edge is fine.
+   *  A channel that served its edge is never re-probed: there is nothing to
+   *  avoid, and asking again would spend a broadcaster's bandwidth on it. */
+  async function servedLiveTarget() {
+    if (served?.position == null) return null;
+    await askWhatIsServed();
+    return served?.position != null && Number.isFinite(served.startAt) ? served.startAt : null;
+  }
+
   async function sweep() {
     const pl = playlist;
     if (!pl?.segs?.length) return;
@@ -482,6 +558,25 @@
     view.strip.invalidate();
   }
 
+  // 🔴 THE OTHER TWO CHANNELS, ASKED THE SAME QUESTION ONCE. ERR was measured
+  // on 2026-09-06 refusing ETV's newest 45 minutes, ETV2's oldest 78, and
+  // nothing at all on ETV+, and a boundary finder that always answered "nothing
+  // is blocked" would be indistinguishable from a quiet day on the one channel
+  // this page plays. Three shapes in one run is what separates them.
+  // ⚠️ SELF-CHECK WORK, GATED. A visitor watching ETV has no use for what ETV2
+  // is refusing, and asking costs a playlist and a probe on somebody else's
+  // server. The channel this page IS playing is not asked twice.
+  async function takeSurvey() {
+    const own = served ? { id: CHANNEL.id, name: CHANNEL.name, ...served } : null;
+    const rows = await surveyChannels(CHANNELS.filter((ch) => ch.id !== own?.id),
+      { steps: PROBE_STEPS, backoffS: WALL_BACKOFF_S });
+    probesIssued += rows.reduce((n, r) => n + (r.probes?.length || 0), 0);
+    survey = CHANNELS
+      .map((ch) => (own && ch.id === own.id ? own : rows.find((r) => r.id === ch.id)))
+      .filter(Boolean);
+    d.log(`what ERR will serve: ${describeSurvey(survey)}`);
+  }
+
   // ── what was on ───────────────────────────────────────────────────────────
   async function loadSchedule() {
     // ERR's broadcast day starts at 05:45 local, so a two-hour window that
@@ -496,7 +591,12 @@
     const out = (await Promise.all(wanted.map(async (day) => {
       const rows = [];
       try {
-        const u = `https://www.err.ee/api/tvSchedule/getTimelineSchedule`
+        // THROUGH `errUrl` LIKE EVERY OTHER ERR ADDRESS ON THIS PAGE. The
+        // schedule is on `www.err.ee` rather than `live.err.ee`, which is
+        // exactly why it is easy to leave behind: it is the one request here
+        // that is not a playlist or a segment, and a page pointed at a stand-in
+        // with one live URL still in it is a page that contacts ERR.
+        const u = errUrl('https://www.err.ee/api/tvSchedule/getTimelineSchedule')
           + `?day=${day.getDate()}&month=${day.getMonth() + 1}&year=${day.getFullYear()}&channel=${CHANNEL.id}`;
         const j = await (await fetch(u)).json();
         // The response is the schedule itself — a top-level array of entries
@@ -552,8 +652,13 @@
     // where this control is asking to go.
     if (loadStopped) { hls?.startLoad(); loadStopped = false; }
     if (glass.paused) await glass.play().catch(() => {});
+    // 🔴 LIVE MEANS THE NEWEST FRAME ERR WILL SERVE, NOT THE NEWEST ONE IT
+    // LISTS. Jumping to `liveSyncPosition` where the newest forty-five minutes
+    // are refused lands the playhead in the blackout and kills a picture that
+    // was playing, which is `/flipper/`'s hardest-won line and was missing here.
+    const wall = await servedLiveTarget();
     for (let i = 0; i < 20; i++) {
-      const l = clock?.live();
+      const l = wall ?? clock?.live();
       if (l != null) {
         // THROUGH THE ONE SEEK PATH, so the line moves at once here too, and
         // then BRING THE VIEW BACK. Returning the picture to the live edge
@@ -660,9 +765,22 @@
       pdtMs ? new Date(pdtMs).toTimeString().slice(0, 8) : 'none');
     d.assert('the window is about the advertised two hours',
       windowS > 3600 && windowS < 9000, `${(windowS / 60).toFixed(1)} min`);
-    d.assert('the playhead is behind the present by a live picture\'s worth',
-      behindMs() != null && behindMs() > 1000 && behindMs() < 30000,
-      `${((behindMs() ?? 0) / 1000).toFixed(1)} s`);
+    // 🔴 TWO BANDS, BECAUSE THE PAGE HAS TWO HONEST ANSWERS. On a channel that
+    // serves its live edge the gap is a live picture's worth, about seven
+    // seconds. On one that refuses its newest minutes the picture is deliberately
+    // behind the boundary, and the distance is what ERR is refusing: asserting
+    // seven seconds there would fail a page doing exactly the right thing, and
+    // widening the band to admit it would stop the assert saying anything.
+    const bNow = behindMs();
+    const wallNow = served?.position != null ? served : null;
+    d.assert('the playhead is behind the present by what ERR leaves open',
+      bNow != null && (wallNow
+        ? Math.abs(bNow / 1000 - wallNow.blockedMin * 60) < 180
+        : bNow > 1000 && bNow < 30000),
+      wallNow
+        ? `${(bNow / 60000).toFixed(1)} min behind, and ERR refuses the newest `
+          + `${wallNow.blockedMin.toFixed(1)} min`
+        : `${((bNow ?? 0) / 1000).toFixed(1)} s, live edge served`);
     d.assert('the playhead advances with the picture',
       advance.moved > 1000 && advance.moved < 2500 && (master?.stats().syncs ?? 0) > 0,
       `${advance.moved} ms over ${advance.wall} ms, ${master?.stats().syncs ?? 0} syncs`);
@@ -692,9 +810,51 @@
         evid.caughtUp != null && evid.caughtUp < 4000,
         evid.caughtUp == null ? 'no frame from there within 4.5 s'
           : `${evid.caughtUp} ms from the request to a frame carrying that timestamp`);
-      d.assert('returning to live restores the gap',
-        evid.behindAfterLive != null && evid.behindAfterLive < 30000,
-        `${((evid.behindAfterLive ?? 0) / 1000).toFixed(1)} s behind`);
+      // The same two bands as the assert above, for the same reason: LIVE goes
+      // to the newest frame ERR will HAND OVER, which on a walled channel is
+      // behind the boundary rather than at the edge of the playlist.
+      d.assert('returning to live restores the gap ERR leaves open',
+        evid.behindAfterLive != null && (wallNow
+          ? Math.abs(evid.behindAfterLive / 1000 - wallNow.blockedMin * 60) < 180
+          : evid.behindAfterLive < 30000),
+        wallNow ? `${(evid.behindAfterLive / 60000).toFixed(1)} min behind, `
+          + `${wallNow.blockedMin.toFixed(1)} min refused`
+          : `${((evid.behindAfterLive ?? 0) / 1000).toFixed(1)} s behind`);
+
+      // 🔴 THE REFUSAL BOUNDARY, ASSERTED. Sabotaging the stand-in to serve
+      // every segment used to leave this page fully green: no assert named a
+      // refusal, a 403 or a served segment, and the only thing that moved was a
+      // count in the harness summary. Finding that boundary is most of what
+      // this page IS, so it is what the page now asserts.
+      // ⚠️ MEMBERSHIP AGAIN, AND AT THE RIGHT INSTANT THIS TIME. The sweep only
+      // ever asks about segments that were in the playlist it read, which is
+      // what tells a rights refusal from one that has fallen off the back of
+      // the window. But the window keeps moving while thirteen probes go out,
+      // so the OLDEST point can expire between the read and the ask and come
+      // back refused for the other reason. MEASURED: `#.......#####`, one
+      // refusal at the old end of a channel refusing its newest minutes, which
+      // is two boundaries where there is one. Points no longer in the freshest
+      // playlist are dropped rather than counted.
+      const live = new Set((playlist?.segs || []).map((s) => s.sn));
+      const inWindow = probes.filter((p) => p.sn == null || live.has(p.sn));
+      const seq = inWindow.map((p) => p.state);     // sorted by instant already
+      const flips = seq.filter((s, i) => i > 0 && s !== seq[i - 1]).length;
+      d.assert('the refusals are one unbroken run at one end of the window',
+        seq.includes('refused') && seq.includes('served') && flips === 1,
+        `${seq.map((s) => (s === 'served' ? '.' : '#')).join('')} · oldest on the left`
+        + `${inWindow.length < probes.length ? `, ${probes.length - inWindow.length} expired since` : ''}`);
+      const reachable = (survey || []).filter((r) => r && !r.unreachable);
+      const walled = reachable.filter((r) => r.position != null);
+      const open = reachable.filter((r) => r.edgeServed);
+      d.assert('a channel that refuses its newest minutes gets a start behind the boundary',
+        walled.length > 0 && walled.every((r) => r.blockedMin > 0
+          && r.probes.some((p) => p.state === 'refused')
+          && r.probes.some((p) => p.state === 'served')),
+        walled.length ? describeSurvey(walled) : 'no channel refused its live edge');
+      d.assert('a channel that refuses nothing is reported as refusing nothing',
+        open.length > 0 && open.every((r) => r.blockedMin === 0),
+        open.length ? `${open.map((r) => r.id).join(', ')} served the newest segment`
+          : 'no channel served its live edge');
     }
     d.assert('the programme spans are contiguous and named',
       programmes.length > 0 && programmes.every((p, i) =>
