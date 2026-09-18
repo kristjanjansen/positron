@@ -1,5 +1,72 @@
 ## Open
 
+- 🔴 **TWO ASKS FROM 2026-09-19 NOT DONE, BOTH ON `/stage/`.**
+  *"add Clear button under archvie timeline"*. Nothing built. The archive's glued
+  bar and strip are where it goes, under the strip; what it clears has to be
+  decided in one line before it is built (the recording, the questions and
+  answers, or both), because a Clear that empties more than somebody expected is
+  worse than none.
+  *"videpanel borders are mess"*, with a zoomed crop of a rounded corner meeting
+  a straight seam. **NOT REPRODUCED AND NOT FIXED.** What was ruled out by
+  reading the computed styles on the page: `.pos-vp` carries the only radius and
+  clips with `overflow: hidden`, `.pos-vp-stage` and `.pos-vp-foot` have no
+  radius of their own, and the three boxes in the control room sit 22 px apart
+  rather than the 1 px the crop shows. So the crop is of something INSIDE a box,
+  and the likeliest candidate is `createGlue`'s seam between the transport bar
+  and the strip. ⚠️ Ask which page and which element before changing any radius:
+  two attempts to place it from the crop alone both landed on the wrong element.
+
+- ✅ **DONE 2026-09-19. THERE WAS NO WAY OUT OF `/blocks/` IN A HEADSET, AND IT
+  WAS ONE MISSING LINE.** Reported as *"i was not able to get out"*. The page
+  built the quit badge, compiled its shader and drew it at both hands every
+  frame, and **never once called `update`**, so the hold could not advance and
+  `onQuit` could not fire. `/held/`, `/floor/` and `xr-panel.mjs` all had the
+  call, so no shared code was wrong and nothing in the repo could disagree with
+  anything.
+  🔴 **`node demo/shell/xr-quit-test.mjs` IS NEW AND IT REFUSES THAT SHAPE**, 9
+  checks. The defect is a line that is NOT there, which no browser check can see:
+  a harness cannot enter an immersive session, and inside one, `update` not being
+  called is indistinguishable from nobody pressing a button.
+  🔴 **ITS FIRST BUILD WAS WORTHLESS AND ONLY SABOTAGE SAID SO.** It matched
+  `/\.update\s*\(/`, and `/blocks/` updates its room, its hands and its
+  document, so putting the real bug back left it **fully green**. It matches the
+  ARGUMENT now — `inputSources`, which nothing else in this repo is handed — and
+  the same sabotage takes it red. A second negative control was added for the
+  hole the first one could not see: a file that updates three other things.
+  ✅ **AND THE BADGE LOST ITS WORDS**, asked as *"circular coundown (no
+  labels)"*. Nothing is drawn until something is held; the arc is the badge.
+  `xr-quit-test.mjs` asserts there is no `fillText` left in the module, because a
+  comment saying so is exactly the claim this project keeps finding stale.
+  ⚠️ **STILL UNCONFIRMED IN A HEADSET.** Nobody here has one. What is now true is
+  that the call exists and the ring is drawn; that it FIRES is still a claim only
+  a Quest can settle.
+
+- ✅ **DONE 2026-09-19. `/blocks/` BRIGHTENS AND NEVER GROWS.** Asked as *"do not
+  make blcoks bigger on hilite, just lighen them up"*. The kit's `TOUCH` table
+  moves brightness AND size, and its own comment argues size is the half that
+  matters in a headset; that argument is about a PANEL and does not survive being
+  applied to a brick, whose size means something (it sits on a lattice, it is
+  pushed against a wall, it is judged against its neighbours).
+  ⚠️ **THE KIT TABLE IS UNTOUCHED ON PURPOSE** — `xr-panel.mjs` still uses it for
+  panels, where nobody asked for a change. The page takes the brightness and
+  drops the scale.
+  ✅ **AND THERE IS AN ASSERT ON ALL FOUR STATES**, because the scale it forbids
+  lives in shared code this page only overrides: a later edit to `TOUCH` would
+  put the growth back with nothing in `/blocks/` changing.
+
+- ✅ **DONE 2026-09-19. `/held/`'s MARK IS GREY AND COMES OFF AFTER AN EDIT.**
+  Asked as *"rm yellow color on hilite, just make them subltu grayer. after edit
+  restore white"*. `MARK_RGB` is the ink turned down rather than a hue, so
+  nothing on that page has a colour now; `retext` clears the mark instead of
+  carrying it onto the rebuilt word.
+  🔴 **AND THE PAGE'S OWN CHECK WAS KEYED ON THE YELLOW.** It counted marked
+  pixels as `blue < 64`, which is a test for yellow, so the first run reported
+  *no word changed colour* about a page that was working. The discriminator is
+  derived from the two constants now, and it compares SHOTS rather than demanding
+  a zero, because a dim grey shares its band with the antialiased edge of every
+  white letter: MEASURED **971** such pixels in an unmarked room, **13002** more
+  when a word is marked, and **0** difference after unmarking.
+
 - ✅ **DONE 2026-09-18 AND 09-19. `/stage/` REWORKED OVER SIXTEEN ASKS IN ONE
   SITTING, EVERY ONE AGAINST A SCREENSHOT. 42/42, up from 39.**
   **The picture.** *"add moer height (cut from sides)"*, a frame of the film with
