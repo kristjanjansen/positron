@@ -162,9 +162,9 @@ const WHEN = {
 		edtf: '2013', precision: 'year', how: 'the festival in the title is Made in Estonia Maraton 2013',
 		note: 'MIMproject at the Made in Estonia Maraton short form festival, with a piece called the resistance of material, remixed as a superbowl halftime show. Filmed and uploaded by Kanuti Gildi SAAL, so the recording is theirs.',
 	},
-	'eesti-ajalugu-ooper-intervjuu-2018.mp4': {
+	'eesti-ajalugu-ooper-intervjuu-2018-1080p.mp4': {
 		edtf: '2018-01', precision: 'month', how: 'the description says the conversation happened before the premiere, and the premiere was 2018-01-19',
-		note: 'Priit Raud in conversation with members of MIMproject ahead of the opera premiere. Twenty three minutes, the longest thing in this corpus. Filmed and uploaded by Kanuti Gildi SAAL, so the recording is theirs. This is the 720p rendition and a 1080p one exists: wrangler refuses a file over 300 MiB and the 1080p is 712 MB, so putting the better copy here needs an R2 access key and a multipart upload rather than a better download.',
+		note: 'Priit Raud in conversation with members of MIMproject ahead of the opera premiere. Twenty three minutes, the longest thing in this corpus. Filmed and uploaded by Kanuti Gildi SAAL, so the recording is theirs. The only row here that is not the file as it was downloaded: the 1080p master is 712 MB and wrangler refuses anything over 300 MiB, so this is that master re-encoded to 276 MB at 1450 kbit/s rather than the 720p rendition it briefly was. Measured against the master with SSIM at three points, the re-encode beats the 720p upscaled to the same frame every time.',
 	},
 };
 
@@ -202,7 +202,7 @@ const REMOVED = [
 // co-production and the tape still belong to whoever pointed the camera.
 const NOT_OURS = {
 	'materjali-vastupanu-remixed-2013.mp4': 'Kanuti Gildi SAAL',
-	'eesti-ajalugu-ooper-intervjuu-2018.mp4': 'Kanuti Gildi SAAL',
+	'eesti-ajalugu-ooper-intervjuu-2018-1080p.mp4': 'Kanuti Gildi SAAL',
 };
 
 const ms = (s) => Math.round(s * 1000);
@@ -266,6 +266,32 @@ const items = [
 	...measured.videos.map((v) => item(v, 'youtube')),
 	...measuredVimeo.videos.map((v) => item(v, 'vimeo')),
 ];
+
+/**
+ * 🔴 A `NOT_OURS` KEY THAT MATCHES NOTHING IS A ROW SILENTLY CREDITED TO US,
+ * AND THIS EXACT THING HAPPENED. The opera interview's file was renamed when
+ * the 1080p re-encode replaced the 720p rendition; `WHEN` was updated and this
+ * table was not. `item()` then read `NOT_OURS[v.file]` as undefined, handed the
+ * row `source: 'MIMproject'` and a `holder` saying it is ours, and the build
+ * printed nothing. A licence statement about somebody else's recording had
+ * flipped and every file still looked right.
+ *
+ * ⚠️ AND THE PAGE'S OWN CHECK COULD NOT SEE IT, which is the more useful half.
+ * It compared `theirs.length` against `counts.theirs`, and both are derived
+ * from the same field, so the pair agreed perfectly while being wrong together.
+ * That is CLAUDE.md's rule about a statistic that is constant by construction
+ * over its subject: not a weak measurement, a blind one. What caught it was the
+ * DETAIL line moving from `2 of 28` to `1 of 26`, read by a human.
+ *
+ * A key here is a claim that a specific file exists. Say so at build time.
+ */
+const byFile = new Set(items.map((i) => i.file.slice(BASE.length)));
+for (const key of Object.keys(NOT_OURS)) {
+	if (!byFile.has(key)) {
+		throw new Error(`build-mimproject: NOT_OURS names ${key}, and no measured file has that name. `
+			+ 'A key that matches nothing credits somebody else\'s recording to us, silently.');
+	}
+}
 
 items.sort((a, b) => (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity) || a.uploaded.localeCompare(b.uploaded));
 

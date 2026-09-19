@@ -3,7 +3,7 @@
   "pulled": "2026-09-19",
   "base": "https://positron-station.kristjan-jansen.workers.dev/media/mimproject/",
   "count": 10,
-  "totalBytes": 563295126,
+  "totalBytes": 552655641,
   "videos": [
     {
       "file": "electricity-generating-bike-2009.mp4",
@@ -150,7 +150,7 @@
       "duration": 973.4
     },
     {
-      "file": "eesti-ajalugu-ooper-intervjuu-2018.mp4",
+      "file": "eesti-ajalugu-ooper-intervjuu-2018-1080p.mp4",
       "title": "Kanuti Gildi SAAL / Rahvusooper Estonia / MIMproject: ooper \"Eesti ajalugu. Ehmatusest sündinud rahvas\" intervjuu",
       "date": "2018-01-30",
       "vimeo": "https://vimeo.com/253458245",
@@ -158,9 +158,9 @@
       "uploader": "Kanuti Gildi SAAL",
       "uploaderUrl": null,
       "description": "19. jaanuaril 2018 esietendus EV100 teatrisarja raames Rahvusooper Estonia, Kanuti Gildi SAALi ja MIMprojecti koostööprojekt - ooper \"Eesti ajalugu. Ehmatusest sündinud rahvas\". Priit Raud käis esietenduse eel vestlemas MIMprojecti liikmete Taavet Janseni, Maike Lond Malmborgi ja Raul Kelleriga. \nhttp://www.opera.ee/lavastus/eesti-ajalugu-ehmatusest-sundinud-rahvas/\nhttps://www.saal.ee/et/performance/4677\nhttp://www.mimproject.org/eesti-ajalugu-ooper",
-      "bytes": 286428718,
-      "width": 1280,
-      "height": 720,
+      "bytes": 275789233,
+      "width": 1920,
+      "height": 1080,
       "fps": 25,
       "vcodec": "h264",
       "duration": 1391.62

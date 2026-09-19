@@ -1,6 +1,6 @@
 {
  "subject": "MIMproject (Tallinn, 2005– ) and MIMstuudio (2014–2018)",
- "generated": "2026-09-19T09:09:54.355Z",
+ "generated": "2026-09-19T09:33:28.318Z",
  "generator": "demo/resources/build-mimproject.mjs",
  "note": "A SECOND corpus, and the opposite kind of thing from corpus.json. Every row there is a pointer to something somebody else holds. Every row here points at a file we hold ourselves, because the material is MIMproject own and mimproject.org has been down long enough that the two video sites were the last copies anybody could reach. Pulled from the project own YouTube channel and from Vimeo on 2026-09-19 and put in our R2 bucket. Two rows are recordings Kanuti Gildi SAAL made of co-productions, and they say so.",
  "inputs": [
@@ -53,7 +53,7 @@
   "withFile": 26,
   "withDuration": 26,
   "totalMs": 8169360,
-  "totalBytes": 1559931171,
+  "totalBytes": 1549291686,
   "ours": 24,
   "theirs": 2,
   "byVia": {
@@ -63,9 +63,9 @@
   "byPicture": {
    "272p25": 1,
    "360p25": 5,
-   "1080p25": 7,
+   "1080p25": 8,
    "480p25": 5,
-   "720p25": 5,
+   "720p25": 4,
    "1080p50": 3
   }
  },
@@ -724,7 +724,7 @@
    "note": "One scene from that presentation, set in Karja church."
   },
   {
-   "id": "mim:eesti-ajalugu-ooper-intervjuu-2018",
+   "id": "mim:eesti-ajalugu-ooper-intervjuu-2018-1080p",
    "title": "Kanuti Gildi SAAL / Rahvusooper Estonia / MIMproject: ooper \"Eesti ajalugu. Ehmatusest sündinud rahvas\" intervjuu",
    "kind": "video",
    "source": "Kanuti Gildi SAAL",
@@ -732,9 +732,9 @@
    "sourceId": "253458245",
    "url": "https://vimeo.com/253458245",
    "via": "vimeo",
-   "file": "https://positron-station.kristjan-jansen.workers.dev/media/mimproject/eesti-ajalugu-ooper-intervjuu-2018.mp4",
+   "file": "https://positron-station.kristjan-jansen.workers.dev/media/mimproject/eesti-ajalugu-ooper-intervjuu-2018-1080p.mp4",
    "fileType": "video/mp4",
-   "bytes": 286428718,
+   "bytes": 275789233,
    "count": 1,
    "when": {
     "edtf": "2018-01",
@@ -752,12 +752,12 @@
    "cors": true,
    "durationMs": 1391620,
    "picture": {
-    "width": 1280,
-    "height": 720,
+    "width": 1920,
+    "height": 1080,
     "fps": 25,
     "vcodec": "h264"
    },
-   "note": "Priit Raud in conversation with members of MIMproject ahead of the opera premiere. Twenty three minutes, the longest thing in this corpus. Filmed and uploaded by Kanuti Gildi SAAL, so the recording is theirs. This is the 720p rendition and a 1080p one exists: wrangler refuses a file over 300 MiB and the 1080p is 712 MB, so putting the better copy here needs an R2 access key and a multipart upload rather than a better download."
+   "note": "Priit Raud in conversation with members of MIMproject ahead of the opera premiere. Twenty three minutes, the longest thing in this corpus. Filmed and uploaded by Kanuti Gildi SAAL, so the recording is theirs. The only row here that is not the file as it was downloaded: the 1080p master is 712 MB and wrangler refuses anything over 300 MiB, so this is that master re-encoded to 276 MB at 1450 kbit/s rather than the 720p rendition it briefly was. Measured against the master with SSIM at three points, the re-encode beats the 720p upscaled to the same frame every time."
   },
   {
    "id": "mim:eesti-ajalugu-ehmatusest-sundinud-rahvas",
