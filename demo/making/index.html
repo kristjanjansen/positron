@@ -15,15 +15,27 @@
      than an override of its rule. */
   .pos-tbl { --tbl-h: max(260px, calc(100dvh - 620px)); }
 
-  /* 🔴 THE PICTURE IS CAPPED, AND THE REASON IS THE TABLE. The panel's box is
-     16:9, which at this page's width is 436 px tall — so with the title, the
-     paragraph and the readout above it, the first row of the list started below
-     the fold on a laptop. The list is the control surface of this page: a
-     player on top of a table nobody can see without scrolling is a player on
-     top of nothing. Height rather than a different ratio, because these
-     recordings are 4:3, 16:9 and one 654x480, and any single ratio pillarboxes
-     two thirds of them anyway. `object-fit: contain` does the rest. */
-  .pos-vp-stage { aspect-ratio: auto; height: min(40vh, 360px); }
+  /* 🔴 THE BOX IS 16:9 AND THE PICTURE FILLS IT, CROPPING. Asked for as *"make
+     video win 16:9"*. The shell's default is `contain` and CLAUDE.md says why:
+     iOS hands back portrait from a camera, where `cover` shows 32% of the frame
+     and stretching squashes a face. That rule is about a SUBJECT SOMEBODY
+     FRAMED at a shape the page does not control. These are finished pieces,
+     and the arithmetic is the same one `/stage/` was given `fit: 'cover'` for:
+     4:3 into 16:9 keeps 75%, and it was laying a flat field down both sides of
+     every one of them.
+
+     🔴 AND THE PANEL IS WIDTH-CAPPED SO THE TABLE STAYS ON SCREEN. A 16:9 box
+     at this page's full width is 436 px tall, which MEASURED on an 872 px
+     laptop put the first row of the list at y=866, below the fold. The list is
+     this page's control surface: a player on top of a table nobody can see
+     without scrolling is a player on top of nothing. So the HEIGHT leads and
+     the width follows the ratio, rather than the other way round, and the
+     footer under the picture keeps the picture's own width. */
+  .pos-vp {
+    width: min(100%, calc(min(46vh, 380px) * 16 / 9));
+    margin-inline: auto;
+  }
+  .pos-vp-stage > video { object-fit: cover; }
 
   /* 🔴 AN EMPTY PICTURE SAYS WHAT TO DO, AND `/stage/` BOUGHT THIS RULE: a
      blank box with a transport under it is the shape of a thing that could be
@@ -68,7 +80,16 @@
 
   const d = mount({
     name: 'making',
-    what: 'Twenty-eight MIMproject videos that outlived the project\'s own website, each one playing '
+    /**
+     * ⚠️ NO COUNT IN THIS SENTENCE, AND IT HAD ONE FOR AN HOUR. It read
+     * `Twenty-eight MIMproject videos` and went stale the first time a
+     * recording was taken out, which was the same day. A figure typed into
+     * prose is a second copy of something the corpus already knows, and
+     * CLAUDE.md's own opening paragraph carries the scar of a count nobody
+     * re-measured reading as a fact. The number is in the log line under the
+     * list, counted off the rows actually drawn.
+     */
+    what: 'The MIMproject videos that outlived the project\'s own website, each one playing '
         + 'from the table under the picture.',
     /**
      * Four cells, and every one of them changes when a different row is
@@ -335,6 +356,19 @@
         && undated.every((i) => i.when.edtf === null && i.when.earliest === null)
         && rows.filter((r) => r.when.precision === 'none').every((r) => r.shown === ''),
       `${undated.length} of ${corpus.counts.items} state no date`);
+
+    /**
+     * 🔴 THE PICTURE FILLS THE BOX RATHER THAN SITTING INSIDE IT, ASSERTED
+     * BECAUSE THE FAILURE IS SILENT. This is one page-level rule overriding a
+     * shell default, and CLAUDE.md records what that costs when the selector
+     * stops matching: `/radio/` swapped a component, one of three rules that
+     * named the old class was updated, and the JavaScript and the comment
+     * beside it both read as correct while the row snapped back. Reported three
+     * times. A letterboxed picture would read as nothing at all.
+     */
+    const fit = getComputedStyle(video).objectFit;
+    d.assert('the picture fills its 16:9 box rather than sitting inside it',
+      fit === 'cover', `object-fit ${fit}`);
 
     // Nothing below this line runs for a visitor: each one opens a file.
     if (!SELFCHECK) {
