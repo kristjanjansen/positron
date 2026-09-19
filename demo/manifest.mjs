@@ -316,6 +316,14 @@ export const DEMOS = [
   { name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true,
     one: 'every Kurenniemi recording that plays, laid end to end as one long tape',
     tags: ['timeline', 'uncertainty', 'archive'] },
+  // The other archive, and it is the opposite kind of thing from the two rows
+  // above. Those point at what fourteen institutions hold; this one points at
+  // files WE hold, because mimproject.org has been down long enough that two
+  // video sites were the last copies anybody could reach. Its corpus is a
+  // separate file for exactly that reason — see `build-mimproject.mjs`.
+  { name: 'making', group: 'mim', act: 5, created: '2026-09-19', built: true,
+    one: 'the MIMproject videos that outlived the project\'s own website, each one played from the table',
+    tags: ['archive', 'provenance', 'R2'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
   { name: 'deck', group: 'kurenniemi', act: 5, created: '2026-08-28', built: false, page: '/proto/deck/',
@@ -795,6 +803,7 @@ export const GROUPS = new Map([
   ['xr', 'in a headset'],
   ['vain', 'väin'],
   ['kurenniemi', 'kurenniemi'],
+  ['mim', 'mim'],
   ['instruments', 'instruments'],
   ['capture', 'capture'],
   ['timeline', 'timeline'],
