@@ -92,18 +92,24 @@
     what: 'The MIMproject videos that outlived the project\'s own website, each one playing '
         + 'from the table under the picture.',
     /**
-     * Four cells, and every one of them changes when a different row is
+     * Six cells, and every one of them changes when a different row is
      * pressed. A readout cell showing a structural constant reads as a
      * measurement and teaches a reader to ignore the row.
      *
-     * ⚠️ `when` IS THE DATE OF THE WORK AND NOT THE UPLOAD, which is the whole
-     * editorial claim of the corpus. Most of these went up years after the
-     * thing they show, so an upload date in this cell would be wrong on almost
-     * every row. Five rows have no date at all and the cell is EMPTY for them,
-     * which is the honest reading: nothing states when they happened, and an
-     * upload date is not an answer to that question.
+     * 🔴 `when` AND `uploaded` ARE TWO CELLS BECAUSE THEY ARE TWO FACTS, and
+     * putting them side by side is the clearest thing this page can say. `when`
+     * is the date of the WORK; `uploaded` is the day somebody got round to
+     * putting it on a video site, which for most of these is years later. The
+     * Karlsruhe clips are the extreme: made in 2008, uploaded in 2011.
+     * ⚠️ FIVE ROWS HAVE NO `when` AT ALL and that cell is EMPTY for them, while
+     * `uploaded` still reads. That is the honest pair: nothing states when they
+     * happened, an upload date is not an answer to that question, and the
+     * reader can see both of those at once.
+     * ⚠️ `via` IS HERE RATHER THAN IN THE TABLE because it is the third half of
+     * the same thought: which site the copy came off. It also keeps the count
+     * even, which `mount()` insists on.
      */
-    readout: { when: '', length: '', picture: '', size: 'MB' },
+    readout: { when: '', uploaded: '', via: '', length: '', picture: '', size: 'MB' },
     /**
      * 🔴 THE READOUT GOES TO THE FOOT WITH THE LOG, AND IT IS THE TABLE THAT
      * DECIDES THAT. With the default arrangement the four cells sit between the
@@ -249,6 +255,8 @@
     hint.remove();
     markChosen();
     d.set('when', r.shown);
+    d.set('uploaded', r.uploaded);
+    d.set('via', r.via);
     d.set('length', mmss(r.durationMs));
     d.set('picture', `${r.picture.width}x${r.picture.height}`);
     d.set('size', (r.bytes / 1e6).toFixed(1));
@@ -339,11 +347,30 @@
      * let "MIMproject" stand over the whole file because most of the file is
      * ours would be making a licence statement nobody checked.
      */
+    /**
+     * ⚠️ THE FIRST VERSION OF THIS CHECK WAS BLIND AND A REAL DEFECT WALKED
+     * PAST IT. It compared `theirs.length` against `counts.theirs`, and both
+     * are derived from the same field, so when the opera interview silently
+     * flipped to being credited to us the pair still agreed perfectly. Only the
+     * DETAIL line moving from `2 of 28` to `1 of 26` gave it away, read by a
+     * human. CLAUDE.md's rule exactly: a statistic that is constant by
+     * construction over its subject is not a weak measurement, it is a blind
+     * one.
+     *
+     * So this compares two fields that are maintained SEPARATELY: the note,
+     * which is editorial prose written by hand, against `source`, which comes
+     * from a lookup table. For them to agree by accident, the same mistake has
+     * to be made twice in two places.
+     */
+    const CREDIT = /Filmed and uploaded by ([^,.]+)/;
+    const credited = corpus.items.filter((i) => CREDIT.test(i.note || ''));
     const theirs = corpus.items.filter((i) => i.source !== 'MIMproject');
-    d.assert('the rows that are not ours say whose they are',
-      theirs.length === corpus.counts.theirs
-        && theirs.every((i) => i.licenceBy.includes(i.source) && !i.holder.startsWith('MIMproject')),
-      `${theirs.length} of ${corpus.counts.items} credited elsewhere`);
+    d.assert('a recording whose note credits somebody else has that somebody in its source',
+      credited.length > 0
+        && credited.length === theirs.length
+        && credited.every((i) => i.source === CREDIT.exec(i.note)[1]
+          && i.licenceBy.includes(i.source) && !i.holder.startsWith('MIMproject')),
+      `${credited.length} notes credit somebody else, ${theirs.length} rows do`);
 
     /**
      * ⚠️ THE NEGATIVE CONTROL FOR THE LINE ABOVE. A check that only counts the
