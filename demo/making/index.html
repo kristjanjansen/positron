@@ -135,11 +135,26 @@
   const video = el('video', '', null, { playsinline: '', preload: 'none' });
   const panel = createVideoPanel({
     media: video,
-    of: 'the bucket',
-    // 'footer' rather than 'hover': the presence dot is the one fact worth
-    // keeping on screen while the picture fills it, because a file that stops
-    // arriving mid-play looks exactly like a file that ended.
-    fullMode: 'footer',
+    /**
+     * 🔴 NO PRESENCE DOT. `left: null` rather than letting the component put
+     * its default one there, asked for on sight as *"no need for dot"*.
+     *
+     * ⚠️ AND THE FACT IT CARRIED IS NOT LOST, WHICH IS THE HALF THAT MATTERS.
+     * Deleting a display without rehoming what it said is how a page quietly
+     * stops reporting something. A file that will not load says so in the log,
+     * by name, and that line is the better surface for it anyway: it appears
+     * when something happened rather than sitting there being green.
+     *
+     * ⚠️ AND THE `set` CALLS WENT WITH IT rather than being left to
+     * optional-chain into nothing. `panel.presence?.set('online')` against a
+     * panel with no presence is three lines that read as live and do nothing,
+     * which is this repo's named hazard in its smallest form.
+     */
+    left: null,
+    // 'hover' now that the footer holds only the ⛶: a square in the corner
+    // that comes up on movement and fades, rather than a footer bar kept on
+    // screen for one button.
+    fullMode: 'hover',
   });
   d.stack.add(panel.el);
   const hint = el('div', 'mk-hint', 'press a recording below');
@@ -237,7 +252,6 @@
     d.set('length', mmss(r.durationMs));
     d.set('picture', `${r.picture.width}x${r.picture.height}`);
     d.set('size', (r.bytes / 1e6).toFixed(1));
-    panel.presence?.set('checking');
 
     deck.pause();
     deck.setRange([0, Math.max(1, r.durationMs)]);
@@ -268,7 +282,6 @@
   video.addEventListener('loadedmetadata', () => {
     const ms = Math.round((video.duration || 0) * 1000);
     if (ms > 0) deck.setRange([0, ms]);
-    panel.presence?.set('online');
     measured = ms;
   });
   /**
@@ -279,7 +292,6 @@
    */
   video.addEventListener('error', () => {
     if (!chosen) return;
-    panel.presence?.set('offline');
     d.log(`that file would not load: ${chosen.file}`, 'bad');
   });
 
