@@ -95,14 +95,6 @@ const WHEN = {
 		edtf: '2017-01-02', precision: 'day', how: 'the upload IS the work, so its date is the work date',
 		note: 'A new year greeting from MIMstuudio. The only row here where the upload date is the thing itself rather than a later publication of it.',
 	},
-	'we-mim-you-2017.mp4': {
-		edtf: '2017-03-13', precision: 'day', how: 'stated in the video own title',
-		note: 'A thank you to the people supporting MIMstuudio on Patreon. Music by Henri Hutt, Formuleerimata Fetish.',
-	},
-	'kogda-to-davno-kosmonautikapaev-2017.mp4': {
-		edtf: '2017-04-12', precision: 'day', how: 'stated in the video own title',
-		note: 'A teaser from Kosmonautikapaev, Cosmonautics Day, in MIMstuudio.',
-	},
 	'koreograafilise-materjali-esitlus.mp4': {
 		edtf: '2017-04-20', precision: 'day', how: 'stated in the video own description',
 		note: 'The second public presentation of the opera, in Kanuti Gildi SAAL. Dancers of the Estonian National Ballet performed the translation of Manfred MIMi legacy into body language, mixing classical movement with contemporary.',
@@ -175,6 +167,36 @@ const WHEN = {
 		note: 'Priit Raud in conversation with members of MIMproject ahead of the opera premiere. Twenty three minutes, the longest thing in this corpus. Filmed and uploaded by Kanuti Gildi SAAL, so the recording is theirs. This is the 720p rendition and a 1080p one exists: wrangler refuses a file over 300 MiB and the 1080p is 712 MB, so putting the better copy here needs an R2 access key and a multipart upload rather than a better download.',
 	},
 };
+
+/**
+ * 🔴 WHAT WAS PULLED AND THEN TAKEN OUT AGAIN, AND WHY THE ROW STAYS HERE.
+ * A corpus that silently shrinks is one nobody can audit: the difference
+ * between "this was never found" and "this was found and removed" is the whole
+ * value of an archive's index, and the count is the only thing a reader would
+ * have noticed. Each entry says where the original still is, so nothing here
+ * is a dead end.
+ *
+ * ⚠️ IT IS A NOTE, NOT A TOMBSTONE WITH THE FILE STILL BEHIND IT. The object is
+ * gone from the bucket and the URL answers 404.
+ */
+const REMOVED = [
+  {
+    file: 'we-mim-you-2017.mp4',
+    title: 'WE MIM YOU! (13.03.2017)',
+    url: 'https://www.youtube.com/watch?v=iTlDzYSoEps',
+    when: '2017-03-13',
+    removed: '2026-09-19',
+    why: 'taken out on instruction. The upload it was copied from is still on the channel.',
+  },
+  {
+    file: 'kogda-to-davno-kosmonautikapaev-2017.mp4',
+    title: 'Когда то давно (part) @Kosmonautikapäev 12.04.17',
+    url: 'https://www.youtube.com/watch?v=EcaRw-luy4U',
+    when: '2017-04-12',
+    removed: '2026-09-19',
+    why: 'taken out on instruction. The upload it was copied from is still on the channel.',
+  },
+];
 
 // Who holds the recording, where that is not us. The work can be a
 // co-production and the tape still belong to whoever pointed the camera.
@@ -260,6 +282,7 @@ const out = {
 	base: BASE,
 	site: 'http://www.mimproject.org/ — answers Cloudflare 522, the origin is down. The Wayback Machine holds 2843 page captures from 2009 to 2025 and no video or audio in any of them. archive.org holds no items at all for MIMproject, MIMstuudio or Manfred MIM.',
 	channel: measured.channel,
+	removed: REMOVED,
 	elsewhere: 'One more piece is on Vimeo and cannot be fetched: Pas Musique live at MIM Studio, 2016-01-27, vimeo.com/154239549, 28 minutes. It is Pas Musique own upload with video art by Tencu, and it answers 403 on its metadata to a logged-in session, so it is theirs to release rather than ours to copy.',
 	durations: {
 		source: 'ffprobe, on the files themselves, when they were pulled',

@@ -4,8 +4,8 @@
   "site": "http://www.mimproject.org/ (origin down since at least 2026-09)",
   "base": "https://positron-station.kristjan-jansen.workers.dev/media/mimproject/",
   "pulled": "2026-09-19",
-  "count": 18,
-  "totalBytes": 1002001423,
+  "count": 16,
+  "totalBytes": 996636045,
   "videos": [
     {
       "file": "mimproject100-window-mapping-2013.mp4",
@@ -141,36 +141,6 @@
       "fps": 50,
       "vcodec": "h264",
       "duration": 303.18
-    },
-    {
-      "file": "we-mim-you-2017.mp4",
-      "title": "WE MIM YOU! (13.03.2017)",
-      "date": "2017-03-13",
-      "youtube": "https://www.youtube.com/watch?v=iTlDzYSoEps",
-      "youtubeId": "iTlDzYSoEps",
-      "description": "thanks everybody who supports MIMstuudio in patreon.com!!\n\nmusic: Henri Hütt \"Formuleerimata Fetish\" \n\nhttps://www.facebook.com/mimstuudio/\nhttp://www.patreon.com/mimstuudio\nhttp://www.mimproject.org/",
-      "bytes": 2885952,
-      "source": "adaptive",
-      "width": 1280,
-      "height": 720,
-      "fps": 25,
-      "vcodec": "h264",
-      "duration": 27.93
-    },
-    {
-      "file": "kogda-to-davno-kosmonautikapaev-2017.mp4",
-      "title": "Когда то давно (part) @Kosmonautikapäev 12.04.17",
-      "date": "2017-04-12",
-      "youtube": "https://www.youtube.com/watch?v=EcaRw-luy4U",
-      "youtubeId": "EcaRw-luy4U",
-      "description": "a short teaser",
-      "bytes": 2479426,
-      "source": "adaptive",
-      "width": 654,
-      "height": 480,
-      "fps": 25,
-      "vcodec": "h264",
-      "duration": 32.72
     },
     {
       "file": "manfred-mimi-ooperi-partituuri-leid.mp4",

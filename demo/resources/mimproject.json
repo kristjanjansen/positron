@@ -1,13 +1,13 @@
 {
  "subject": "MIMproject (Tallinn, 2005– ) and MIMstuudio (2014–2018)",
- "generated": "2026-09-19T08:46:04.397Z",
+ "generated": "2026-09-19T09:09:54.355Z",
  "generator": "demo/resources/build-mimproject.mjs",
  "note": "A SECOND corpus, and the opposite kind of thing from corpus.json. Every row there is a pointer to something somebody else holds. Every row here points at a file we hold ourselves, because the material is MIMproject own and mimproject.org has been down long enough that the two video sites were the last copies anybody could reach. Pulled from the project own YouTube channel and from Vimeo on 2026-09-19 and put in our R2 bucket. Two rows are recordings Kanuti Gildi SAAL made of co-productions, and they say so.",
  "inputs": [
   {
    "path": "demo/resources/mimproject-measured.json",
    "generated": "2026-09-19",
-   "items": 18,
+   "items": 16,
    "from": "youtube"
   },
   {
@@ -20,34 +20,52 @@
  "base": "https://positron-station.kristjan-jansen.workers.dev/media/mimproject/",
  "site": "http://www.mimproject.org/ — answers Cloudflare 522, the origin is down. The Wayback Machine holds 2843 page captures from 2009 to 2025 and no video or audio in any of them. archive.org holds no items at all for MIMproject, MIMstuudio or Manfred MIM.",
  "channel": "https://www.youtube.com/channel/UCMfoZodKjev4UPpbd9NtitA",
+ "removed": [
+  {
+   "file": "we-mim-you-2017.mp4",
+   "title": "WE MIM YOU! (13.03.2017)",
+   "url": "https://www.youtube.com/watch?v=iTlDzYSoEps",
+   "when": "2017-03-13",
+   "removed": "2026-09-19",
+   "why": "taken out on instruction. The upload it was copied from is still on the channel."
+  },
+  {
+   "file": "kogda-to-davno-kosmonautikapaev-2017.mp4",
+   "title": "Когда то давно (part) @Kosmonautikapäev 12.04.17",
+   "url": "https://www.youtube.com/watch?v=EcaRw-luy4U",
+   "when": "2017-04-12",
+   "removed": "2026-09-19",
+   "why": "taken out on instruction. The upload it was copied from is still on the channel."
+  }
+ ],
  "elsewhere": "One more piece is on Vimeo and cannot be fetched: Pas Musique live at MIM Studio, 2016-01-27, vimeo.com/154239549, 28 minutes. It is Pas Musique own upload with video art by Tencu, and it answers 403 on its metadata to a logged-in session, so it is theirs to release rather than ours to copy.",
  "durations": {
   "source": "ffprobe, on the files themselves, when they were pulled",
   "measured": "2026-09-19",
   "what": "How long each recording actually runs, together with its picture size and frame rate. Read off the file rather than off a page about the file.",
-  "known": 28,
+  "known": 26,
   "refused": 0
  },
  "counts": {
-  "items": 28,
-  "dated": 23,
+  "items": 26,
+  "dated": 21,
   "undated": 5,
-  "withFile": 28,
-  "withDuration": 28,
-  "totalMs": 8230010,
-  "totalBytes": 1565296549,
-  "ours": 26,
+  "withFile": 26,
+  "withDuration": 26,
+  "totalMs": 8169360,
+  "totalBytes": 1559931171,
+  "ours": 24,
   "theirs": 2,
   "byVia": {
    "vimeo": 10,
-   "youtube": 18
+   "youtube": 16
   },
   "byPicture": {
    "272p25": 1,
    "360p25": 5,
    "1080p25": 7,
-   "480p25": 6,
-   "720p25": 6,
+   "480p25": 5,
+   "720p25": 5,
    "1080p50": 3
   }
  },
@@ -632,78 +650,6 @@
     "vcodec": "h264"
    },
    "note": "A new year greeting from MIMstuudio. The only row here where the upload date is the thing itself rather than a later publication of it."
-  },
-  {
-   "id": "mim:we-mim-you-2017",
-   "title": "WE MIM YOU! (13.03.2017)",
-   "kind": "video",
-   "source": "MIMproject",
-   "holder": "MIMproject — ours. The file is in our own R2 bucket; the only other copy anybody can reach is the youtube upload.",
-   "sourceId": "iTlDzYSoEps",
-   "url": "https://www.youtube.com/watch?v=iTlDzYSoEps",
-   "via": "youtube",
-   "file": "https://positron-station.kristjan-jansen.workers.dev/media/mimproject/we-mim-you-2017.mp4",
-   "fileType": "video/mp4",
-   "bytes": 2885952,
-   "count": 1,
-   "when": {
-    "edtf": "2017-03-13",
-    "earliest": 1489363200000,
-    "latest": 1489363200000,
-    "precision": "day",
-    "how": "stated in the video own title"
-   },
-   "uploaded": "2017-03-13",
-   "licence": "all rights reserved",
-   "licenceBy": "MIMproject, which made the work and uploaded it",
-   "licenceConfidence": "HIGH — this is our own material",
-   "http": 200,
-   "httpFrom": "probe",
-   "cors": true,
-   "durationMs": 27930,
-   "picture": {
-    "width": 1280,
-    "height": 720,
-    "fps": 25,
-    "vcodec": "h264"
-   },
-   "note": "A thank you to the people supporting MIMstuudio on Patreon. Music by Henri Hutt, Formuleerimata Fetish."
-  },
-  {
-   "id": "mim:kogda-to-davno-kosmonautikapaev-2017",
-   "title": "Когда то давно (part) @Kosmonautikapäev 12.04.17",
-   "kind": "video",
-   "source": "MIMproject",
-   "holder": "MIMproject — ours. The file is in our own R2 bucket; the only other copy anybody can reach is the youtube upload.",
-   "sourceId": "EcaRw-luy4U",
-   "url": "https://www.youtube.com/watch?v=EcaRw-luy4U",
-   "via": "youtube",
-   "file": "https://positron-station.kristjan-jansen.workers.dev/media/mimproject/kogda-to-davno-kosmonautikapaev-2017.mp4",
-   "fileType": "video/mp4",
-   "bytes": 2479426,
-   "count": 1,
-   "when": {
-    "edtf": "2017-04-12",
-    "earliest": 1491955200000,
-    "latest": 1491955200000,
-    "precision": "day",
-    "how": "stated in the video own title"
-   },
-   "uploaded": "2017-04-12",
-   "licence": "all rights reserved",
-   "licenceBy": "MIMproject, which made the work and uploaded it",
-   "licenceConfidence": "HIGH — this is our own material",
-   "http": 200,
-   "httpFrom": "probe",
-   "cors": true,
-   "durationMs": 32720,
-   "picture": {
-    "width": 654,
-    "height": 480,
-    "fps": 25,
-    "vcodec": "h264"
-   },
-   "note": "A teaser from Kosmonautikapaev, Cosmonautics Day, in MIMstuudio."
   },
   {
    "id": "mim:koreograafilise-materjali-esitlus",
