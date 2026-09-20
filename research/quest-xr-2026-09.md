@@ -76,7 +76,7 @@ them needing a headset to confirm:
   hardware-decoded on Quest 3 or 3S.** Software decode inside a 13.9 ms frame
   budget on a six-core part. The codec was chosen from a correct measurement on
   Safari — a laptop. AV1 is the right default here. (§4.3)
-- 🟠 **`rig/box/listen.html` never requests a sample rate**, and nothing in the
+- 🟠 **`rig/board/listen.html` never requests a sample rate**, and nothing in the
   chain resamples the box's 48 kHz PCM. On any 44.1 kHz output this pitches
   wrong *and* trims samples several times a second, while the page's own
   fault-detector cell stays green. Live today, on any Mac. (§4.2)
@@ -371,7 +371,7 @@ Widevine L1 per configuration.
 from the wrong device** — `AudioContext.baseLatency` 0.004 s on Quest 1 against
 ~0.045 s on Quest 2, reported by a developer with audible late playback and
 never answered by Meta. **No Quest 3 or 3S figure exists.** Given what
-`rig/box` is for, that is the number that decides whether a headset can host
+`rig/board` is for, that is the number that decides whether a headset can host
 anything interactive, and it has to be measured. Entering an immersive session
 does **not** suspend the AudioContext; background audio playback has been
 deliberate since Horizon OS v47.
@@ -543,7 +543,7 @@ The verdict is specific to positron, not general.
 - None of the deployed endpoints get easier. `ws.positron.studio` is a plain
   WebSocket; the box speaks JSON over it; `demo/shell/wire.mjs` is the single
   written-down envelope. A Unity client would be a *second* implementation of
-  that envelope, which is the exact thing `rig/box` avoided by importing
+  that envelope, which is the exact thing `rig/board` avoided by importing
   `wire.mjs` rather than copying it.
 - The generative half gets harder, not easier. Generated C# needs a compile
   step; generated JavaScript does not.
@@ -842,7 +842,7 @@ worse WebSocket jitter than a laptop on the same access point. `wire.mjs`'s
 `ping()` answers it, and it never wakes the Durable Object, so it times pure
 network.
 
-### 4.2 `rig/box/` — the Pi instrument
+### 4.2 `rig/board/` — the Pi instrument
 
 The page at `/keys/` opens a socket, sends `note.on` and `voice.select` as JSON,
 and receives **binary frames of 16-bit PCM at 48 000 Hz, 960 samples per frame,
@@ -854,9 +854,9 @@ All Chromium. ESTIMATED.
 
 **What is unchecked and is a real defect risk — and it is not headset-specific,
 it is just that a headset is where you would find it.** Nothing in the chain
-resamples. `rig/box/synth.mjs` fixes `RATE = 48000`; `proto/jam/playout-worklet.js`
+resamples. `rig/board/synth.mjs` fixes `RATE = 48000`; `proto/jam/playout-worklet.js`
 writes those samples into a ring that is drained at the AudioContext's
-`sampleRate`; and `rig/box/listen.html` creates the context with
+`sampleRate`; and `rig/board/listen.html` creates the context with
 `new AudioContext({ latencyHint: 'interactive' })` — **no `sampleRate`
 requested**. If the headset's audio output runs at 48 kHz, this is fine. If it
 runs at anything else, two things happen at once:
@@ -894,7 +894,7 @@ everything.
 figure anywhere is five years old and from the wrong devices** —
 `AudioContext.baseLatency` 0.004 s on Quest 1 against **~0.045 s on Quest 2**,
 reported by a developer with audible late playback, never answered by Meta. **No
-Quest 3 or 3S figure exists.** Given that `rig/box` exists to hit 98.7 ms note
+Quest 3 or 3S figure exists.** Given that `rig/board` exists to hit 98.7 ms note
 to ear over the internet, a 45 ms output stage would be **almost half the
 budget**, and it would be invisible in every readout the page currently draws.
 That is the single most important number to take off a borrowed headset after
@@ -1544,7 +1544,7 @@ cheap to settle. They are ordered by how much each would change a decision.
    generative-shader work, and the borrowed-hour experiment in §6 aims at it.
 3. **Quest 3/3S Web Audio output latency is not ~45 ms.** The only published
    figure for any Quest is five years old and from a Quest 2 (§4.2). At 45 ms
-   it is almost half of `rig/box`'s whole 98.7 ms note-to-ear budget, and no
+   it is almost half of `rig/board`'s whole 98.7 ms note-to-ear budget, and no
    readout on the page would show it.
 4. **`session.enabledFeatures` actually contains what §1.2 says it should** —
    specifically `camera-access` (or whatever Quest's token is) and `shared`. One
@@ -1590,7 +1590,7 @@ cheap to settle. They are ordered by how much each would change a decision.
 
 Both are independent of the purchase and both are already latent:
 
-1. **`rig/box/listen.html` should request `sampleRate: 48000`** and print
+1. **`rig/board/listen.html` should request `sampleRate: 48000`** and print
    `ctx.sampleRate` in its readout (§4.2). The bug is live today on any 44.1 kHz
    output device.
 2. **`openWire()` should distinguish a full room from a dead relay** (§5.3). A

@@ -26,9 +26,9 @@ than by the page:
 | one description, two engines | 72 sine partials at each end, this page's scsynth answering **6 notes at 131 Hz** and the board's the same |
 
 ⚠️ **AND THE BOARD IS ON TINY AGAIN, KNOWINGLY** — `PAPPUS_TINY=1` in
-`/etc/default/positron-box`, proved from the board's own `Engine_Pappus: TINY
+`/etc/default/positron-board`, proved from the board's own `Engine_Pappus: TINY
 graph` line. The price is the modal bank: at `pwet 1` TINY reads **exactly
-0.000000** where LITE reads 0.030–0.041. Recorded in `rig/box/norns/TINY.md`
+0.000000** where LITE reads 0.030–0.041. Recorded in `rig/board/norns/TINY.md`
 and `CHAIN.md` so it is a decision rather than a drift.
 
 ⚠️ **§6's two-pane comparison is STILL NOT DONE.** What changed is that the
@@ -116,7 +116,7 @@ true rather than to caption it away.
 lines of somebody else's engine, and a rung that skips four stages is a rung
 that makes those stages unreachable by anyone who did not already know them.
 
-✅ **DONE 2026-09-13 — `rig/box/norns/CHAIN.md`.** Every stage, its controls,
+✅ **DONE 2026-09-13 — `rig/board/norns/CHAIN.md`.** Every stage, its controls,
 what TINY has already taken out of it, and what removing it costs the sound.
 Three things it turned up that change the plan below:
 
@@ -186,7 +186,7 @@ compares by identity in sclang. `CHAIN.md` has the table and the recipe.
   frame AND a valid 10 ms stereo one.
 - 🔴 ~~**Two granulators, both ends.**~~ **WRONG, AND IT WAS ALREADY WRONG WHEN
   IT WAS WRITTEN — CORRECTED 2026-09-13.** Pappus is a pair (`m` and `n`) on
-  FULL. The board does not run FULL: `/etc/default/positron-box` sets
+  FULL. The board does not run FULL: `/etc/default/positron-board` sets
   `PAPPUS_TINY=1`, TINY implies LITE, and **LITE has one granulator** —
   `Engine_Pappus.sc:976`, `graw2 = if(lite) { DC.ar([0, 0]) }`. So "the board
   losing its" had already happened, on purpose, for the reason TINY exists.
@@ -301,7 +301,7 @@ disconnects one JACK link and leaves everything else standing.
   a step in the waveform, and a click on a granulator's INPUT is written into
   the ring and re-fired by every grain that later reads that spot.
 
-`rig/box/norns/PosSource.sc` is that definition. It writes to Pappus's own
+`rig/board/norns/PosSource.sc` is that definition. It writes to Pappus's own
 input bus (`context.in_b[0].index`), so the granulator picks it up with NO JACK
 RE-PATCH — and a re-patch is what made `fx.pappus` answer `ok` seven seconds
 before anything could be heard.
@@ -510,7 +510,7 @@ piece is worth:
   means anything, which is the same shape as §4a's own warning about measuring
   at the output.
 - ❌ **The `PAPPUS_BARE` negative control.** BARE is built and weighed but has
-  never been RUN as the board's rung — `/etc/default/positron-box` still says
+  never been RUN as the board's rung — `/etc/default/positron-board` still says
   `PAPPUS_TINY=1`, which §7 is explicit about. Running it means editing that
   file and restarting, so it is a deliberate act on a shared instrument rather
   than something to leave behind.

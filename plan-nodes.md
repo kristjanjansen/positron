@@ -24,7 +24,7 @@ Four things in this repo compose, and only two of them are graphs.
 
 | | what it really is | can a node editor drive it? |
 |---|---|---|
-| the ALSA/JACK patchbay on the Pi | a **directed graph of ports**, already half-expressed as a checkable document (`rig/box/alsa.mjs`) | **yes, today** |
+| the ALSA/JACK patchbay on the Pi | a **directed graph of ports**, already half-expressed as a checkable document (`rig/board/alsa.mjs`) | **yes, today** |
 | a page's own audio and shader chain | a **real node graph** — `connect()` is the wire — and entirely local | **yes, and it is the cheapest** |
 | the relay | a **broadcast bus** — every message goes to every socket in the room, by design | no; there is nothing to patch |
 | the timeline | a **temporal nest** — quotations placed in time, not outputs feeding inputs | no; its picture is the strip, and it already has one |
@@ -445,7 +445,7 @@ speculative.
 | box | what it takes and gives |
 |---|---|
 | **pappus** — a 2,030-line SuperCollider granular engine, 106 commands | audio in, audio out; a JACK **insert**. Rolled from a seed (`mulberry32`), steered by `params.set` |
-| the mirror shader (`demo/mirror`, `rig/box/video.mjs`) | a picture in, a picture out; three named knobs — `mirrors`, `grain`, `hue` — mapped to uniforms |
+| the mirror shader (`demo/mirror`, `rig/board/video.mjs`) | a picture in, a picture out; three named knobs — `mirrors`, `grain`, `hue` — mapped to uniforms |
 | the Csound compiler (`timeline/csound.mjs`) | a score in, timeline rows out |
 | the score container (`timeline/score.mjs`) | parts and uses in, a deck out |
 | a recorder (`MediaRecorder`, `workers/backlog`) | a stream in, a file or rows out |
@@ -464,7 +464,7 @@ Taken one at a time:
 
 **1. The ALSA MIDI patchbay — YES, and most of the work is done.**
 
-`rig/box/alsa.mjs` already carries the exact document a node editor would save:
+`rig/board/alsa.mjs` already carries the exact document a node editor would save:
 
 ```jsonc
 { "v": 1, "links": [ { "from": "circuit", "to": "microfreak", "carry": ["all"] } ] }
@@ -486,8 +486,8 @@ anything in §3.
 ⚠️ **`carry` is refused, not approximated** — an ALSA subscription carries every
 message class the source emits and there is no per-class flag, so a document
 asking for `["note"]` is rejected by name. A node editor must draw that refusal
-rather than quietly drawing a wire. DOCUMENTED in `rig/box/README.md`; the
-behaviour is at `rig/box/alsa.mjs:194-196`.
+rather than quietly drawing a wire. DOCUMENTED in `rig/board/README.md`; the
+behaviour is at `rig/board/alsa.mjs:194-196`.
 
 And this is exactly the shape Linux audio already builds: `qpwgraph` draws the
 PipeWire graph and saves **connection profiles** you can re-apply, while `helvum`
@@ -501,7 +501,7 @@ DOCUMENTED). The half users ask for is the persistent document, not the drawing
 Every JACK connection on the board today is a hard-coded shell string:
 `jack_connect "${instrumentPort}" posbox:input_1`, `jack_disconnect ${SCOUT}
 ${CAP}`, and seven more like them — **nine calls in all**, at
-`rig/box/jacksynth.mjs` lines 244–246, 290–291, 293, 488, 499 and 510. There is
+`rig/board/jacksynth.mjs` lines 244–246, 290–291, 293, 488, 499 and 510. There is
 no document, no plan twin and no report of what is connected — and
 **`fx.pappus` already had one defect of exactly this shape**:
 it answered `ok` when the JACK *port* appeared, about seven seconds before the
@@ -1390,7 +1390,7 @@ it; do not widen it silently.
 
 ### 5.4 Phase 3 — the JACK arm, which is worth building with no UI at all
 
-`rig/box/jack.mjs`: `jack_lsp -c` parsed the way `parseAconnect` parses
+`rig/board/jack.mjs`: `jack_lsp -c` parsed the way `parseAconnect` parses
 `aconnect -l`, pure and testable against a fixture on a laptop. Then a JACK arm
 in `plan()`/`apply()`, and the nine hard-coded `jack_connect`/`jack_disconnect`
 calls in `jacksynth.mjs` become one document.

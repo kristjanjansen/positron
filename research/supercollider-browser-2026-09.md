@@ -269,7 +269,7 @@ unsupported UGen). What was not proved is that this particular 2,030-line
 SynthDef compiles clean and sounds right. That is one command on the board:
 `SynthDescLib` / `SynthDef(...).writeDefFile`, then copy the file.
 
-⚠️ Pappus also holds one constraint of its own, 📄 from `rig/box/norns/README.md`:
+⚠️ Pappus also holds one constraint of its own, 📄 from `rig/board/norns/README.md`:
 one SynthDef "sitting close to **scsynth's fixed pool of 64 audio interconnect
 buffers**". SuperSonic exposes `maxWireBufs` (📄 default **64** — the same
 number). If Pappus is at the edge on the board it will be at the edge here, and
@@ -416,7 +416,7 @@ behaviour lives in details no block diagram carries.
   *Microsound*), `grain3`, `granule`, `syncgrain`, `sndwarp`, `fog`.
 - ⚠️ **`timeline/csound.mjs` is a SCORE COMPILER, not a Csound runtime.** It
   parses `t`/`i`/`s`/`m`/`n` statements into timeline rows. Nothing in this repo
-  runs Csound in a browser today, and `rig/box/csd/space.csd` runs on the board.
+  runs Csound in a browser today, and `rig/board/csd/space.csd` runs on the board.
   "We already have Csound" is true about the *format* and false about the
   *engine* — worth stating because the two get conflated.
 - ⚠️ Not booted here. Unlike SuperSonic, no probe was run.
@@ -833,7 +833,7 @@ dependency (§10.9).
 ### 10.0 The instrument, and the control that makes it trustworthy ✅
 
 The four rungs were compiled **on the board**, by the board's own sclang 3.13.0,
-from `/opt/positron-box`'s own `Engine_Pappus.sc`.
+from `/opt/positron-board`'s own `Engine_Pappus.sc`.
 
 ⚠️ **sclang `File.delete`s the definition it sends** (`SynthDef.sc` `doSend`,
 the `/d_load` branch), which is why `~/.local/share/SuperCollider/synthdefs/`
@@ -853,7 +853,7 @@ buffers and its own JACK client, builds one rung, writes the file and exits.
 assumed.** It is not `run-pappus.scd` with a line added — that file opens a
 `/pappus/cmd` door and posts `/pgrain` into the live box's own UDP socket. ✅
 Before and after all four compiles: one `sclang`, one `scsynth`, `PAPPUS_LITE=1`
-in `/etc/default/positron-box`, `systemctl is-active` → `active`, and
+in `/etc/default/positron-board`, `systemctl is-active` → `active`, and
 `jack_lsp` showing the same single `SuperCollider` client. The board was on LITE
 when this started and is on LITE now.
 
@@ -869,7 +869,7 @@ producing the same bytes is what makes the other three trustworthy.
 | LITE | 74,733 | `8a37f38c…` | 1,722 | 173 | 103 | 55 |
 | FULL | 121,425 | `43837b3e…` | 2,812 | 181 | 103 | 63 |
 
-✅ Every byte count and every UGen count matches `rig/box/norns/TINY.md`'s own
+✅ Every byte count and every UGen count matches `rig/board/norns/TINY.md`'s own
 weighing table exactly, which is a second independent agreement.
 
 ### 10.1 🔴 Does the real TINY graph load? ✅ YES
@@ -1107,7 +1107,7 @@ file. A cut made to save bytes that spends a wire buffer buys nothing.
 | open | why | the check |
 |---|---|---|
 | ⚠️ LITE's **wire-buffer** need | It never crosses `/d_recv`, so nothing refuses it for that reason. | Bisect `numWireBufs` on a native scsynth — the board prints `exceeded number of interconnect buffers` — or on a browser engine with no byte ceiling. Needs the engine restarted per rung, so not on the shared board mid-session. |
-| ⚠️ The **sound** matching the board's | Both ends were driven with different material: a 220 Hz oscillator here, an arpeggio through fluidsynth there. | The differential oracle §5 proposed, now unblocked: same `pfrq`/`pamp`, same `mrate` sweep, `rig/box/measure.mjs` at both ends. |
+| ⚠️ The **sound** matching the board's | Both ends were driven with different material: a 220 Hz oscillator here, an arpeggio through fluidsynth there. | The differential oracle §5 proposed, now unblocked: same `pfrq`/`pamp`, same `mrate` sweep, `rig/board/measure.mjs` at both ends. |
 | ⚠️ Anything on a **phone** | Measured only in headless Chrome on this Mac. | `demo/verify-native.mjs`; SuperSonic needs no COOP/COEP, so the route is already deployable. |
 | ⚠️ The **buffer contents** are this harness's, not the board's | The 17 grain windows are rebuilt here from the engine's own `Env([0,1,0],[p,1-p],\sine)` formula, and the gate is all 1s. They are not the board's bytes. | `/b_getn` off the board's scsynth and diff, if a sound comparison ever needs it. |
 | ⚠️ `snapwrite` / `snapread` | 📄 §2.3: `/b_write` and `/b_read` are on SuperSonic's unsupported list and typed to `never`. Unchanged by this. | IndexedDB via `/b_getn` and `/b_setn`, when somebody wants snapshots. |

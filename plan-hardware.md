@@ -6,7 +6,7 @@ being a Mac Pro running a headless browser, which is a large and expensive way t
 hold a MIDI cable.
 
 Read `rig/m1/README.md` first; every number below comes from it or
-from HANDOFF item 0. `demo/notes/hardware-box.md` is the prose version of the
+from HANDOFF item 0. `demo/notes/hardware-board.md` is the prose version of the
 same argument for a reader who does not work here. `plan-instrument.md` owns what
 the two instrument PAGES share and this plan owes it deference — nothing here
 changes a page.
@@ -662,7 +662,7 @@ transport arriving somewhere they should not, and a patch that says only "A -> B
 hides exactly that. Making the message classes explicit is what makes this better
 than cables rather than a metaphor for them.
 
-**Narrowed 2026-09-10, building `rig/box`: `carry` is not expressible in
+**Narrowed 2026-09-10, building `rig/board`: `carry` is not expressible in
 `aconnect`.** An ALSA subscription is unfiltered — it carries every message class
 the source emits, there is no per-class flag on the connection, and the
 sequencer's event filter is per *client*, governing what a client receives rather
@@ -713,7 +713,7 @@ the whole box, and the instrument does not need a kernel at all. FluidSynth's
 `file` audio driver is **realtime-paced** and writes to a pipe, so sound is made
 with no `/dev/snd`, no ALSA, no audio server and no mixer. Measured in an arm64
 container: 4.14 s of wall clock produced 3.92 s of audio, six programs on six
-channels, and the whole of `rig/box` ran there against the live relay —
+channels, and the whole of `rig/board` ran there against the live relay —
 **13/13 green, streaming, in Docker, with no sound hardware in existence.**
 
 The line falls between two things this plan treated as one:
@@ -736,7 +736,7 @@ Three consequences, none small:
   any serious SFZ or SoundFont set, which makes the cloud the *better* home for
   big libraries rather than a fallback.
 
-`box.mjs` needs no change to run there — it dials OUT, the one thing a
+`board.mjs` needs no change to run there — it dials OUT, the one thing a
 Cloudflare Container can do, and this repo already ships one in
 `workers/pub/container/`.
 
@@ -848,7 +848,7 @@ the whole box, and the instrument does not need a kernel at all. FluidSynth's
 `file` audio driver is **realtime-paced** and writes to a pipe, so sound is made
 with no `/dev/snd`, no ALSA, no audio server and no mixer. Measured in an arm64
 container: 4.14 s of wall clock produced 3.92 s of audio, six programs on six
-channels, and the whole of `rig/box` ran there against the live relay —
+channels, and the whole of `rig/board` ran there against the live relay —
 **13/13 green, streaming, in Docker, with no sound hardware in existence.**
 
 The line falls between two things this plan treated as one:
@@ -871,7 +871,7 @@ Three consequences, none small:
   any serious SFZ or SoundFont set, which makes the cloud the *better* home for
   big libraries rather than a fallback.
 
-`box.mjs` needs no change to run there — it dials OUT, the one thing a
+`board.mjs` needs no change to run there — it dials OUT, the one thing a
 Cloudflare Container can do, and this repo already ships one in
 `workers/pub/container/`.
 

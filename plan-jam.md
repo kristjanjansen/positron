@@ -70,7 +70,7 @@ twice on these pages.
 
 ✅ **`proto/looper/peer.mjs` runs unmodified in node.** `wsTransport` uses only
 the standard `WebSocket` API, and node has a global `WebSocket` (checked
-2026-09-14). `rig/box/ask.mjs` already joins a relay room from node in 57
+2026-09-14). `rig/board/ask.mjs` already joins a relay room from node in 57
 lines.
 
 So the second peer does not have to be a browser, and it should not be: *open

@@ -1,4 +1,4 @@
-# Typing in a headset, for `/held/`
+# Typing in a headset, for `/weight/`
 
 Written 2026-09-15, after this was reported from a real Quest:
 
@@ -106,19 +106,19 @@ and calls `focus()` on a text field from a `select` handler. That is exactly
 this page's gesture in exactly this page's session mode.
 
 Four costs, all READ from Meta's page and the specification, and all of them
-matter to `held` specifically:
+matter to `weight` specifically:
 
 1. **No key events.** There is nothing to intercept. You read `value`, or listen
-   for `input`. `held` already drives its wall from an `input` listener, so this
+   for `input`. `weight` already drives its wall from an `input` listener, so this
    costs nothing here.
 2. **Each showing overwrites the whole value.** The first key press replaces
-   everything in the field. INFERRED: for `held` that is survivable, because a
+   everything in the field. INFERRED: for `weight` that is survivable, because a
    word is replaced rather than edited, but it means the field's contents cannot
    be treated as a place to accumulate.
 3. **`visibilityState` goes to `"visible-blurred"` while the keyboard is up**,
    and the specification says animation frame callbacks MAY be throttled and
    input source poses are forced to null. INFERRED, and this is the real cost
-   for this page: `held`'s whole argument is that a word resizes **as you type
+   for this page: `weight`'s whole argument is that a word resizes **as you type
    it**, and if frames are throttled during typing then the thing the page
    exists to show is the thing you cannot watch. Nobody knows how hard Quest
    throttles. That is a measurement, and it needs the headset.
@@ -139,7 +139,7 @@ as it stands, and it is not one refactor away.** READ, from the file itself:
   for this at length and the argument is about the product, not about
   convenience: "Two pages showing two different tablets is also exactly what
   'the same interface in both kinds of session' forbids. One list, both pages,
-  both modes." A keyboard on `held` means either putting thirty keys into the
+  both modes." A keyboard on `weight` means either putting thirty keys into the
   list every page draws, or reversing that decision.
 - `controlAt(u, v)` is **one-dimensional**:
   `Math.floor((py - rowsTop()) / rowH())`, one control per row, the row spanning
@@ -161,10 +161,10 @@ an opaque room; the site's own button style rather than a fourth invented one;
 the beacon lines that distinguish "I held it and nothing happened" into its
 three real causes; and a test file that grades the arithmetic under `node`.
 
-INFERRED cost: this is real work in a file `held` does not own and does not
+INFERRED cost: this is real work in a file `weight` does not own and does not
 currently import, and per CLAUDE.md the right move is to ask the owner of
 `xr-tablet.mjs` whether a key is a kind it should grow, rather than to build a
-second slab in `held`. It should not be started before 2a has been measured on a
+second slab in `weight`. It should not be started before 2a has been measured on a
 headset, because if 2a works this is redundant.
 
 ### 2c. Dictation
@@ -190,7 +190,7 @@ will open a field on the word you lit. See the open request in section 4.
 
 ## 3. What was changed, and why that much
 
-`demo/held/index.html` only. The trigger no longer ends the session under any
+`demo/weight/index.html` only. The trigger no longer ends the session under any
 circumstances.
 
 - **It marks.** The word the trigger lands on is repainted in `HELD_RGB`, which
@@ -233,7 +233,7 @@ which is the property the old code did not have: it had one path that worked and
 one that ejected you.
 
 **Do not build 2b yet.** It is the largest piece of work available, it lands in a
-file `held` does not own, and it is redundant if 2a works. It becomes the right
+file `weight` does not own, and it is redundant if 2a works. It becomes the right
 answer only if a headset run shows `sysKeyboard` false, or shows it true and the
 throttling in cost 3 makes typing unwatchable.
 
@@ -249,14 +249,14 @@ the room where 2d's discoverability problem can be fixed. That needs a
 
 ## 5. What a headset run would settle, and how to run it
 
-`held` carries the `WebXR` tag in `demo/manifest.mjs`, so the Quest harness picks
+`weight` carries the `WebXR` tag in `demo/manifest.mjs`, so the Quest harness picks
 it up by name. With a Quest attached over USB and developer mode on:
 
 ```sh
 node demo/verify-quest.mjs --self-test    # no device needed; MEASURED 3/3 green here
-node demo/verify-quest.mjs held           # the run that matters
-DEMO_BASE=https://positron.studio node demo/verify-quest.mjs held    # against the deploy
-ADB=/path/to/adb node demo/verify-quest.mjs held                     # if adb is not on PATH
+node demo/verify-quest.mjs weight           # the run that matters
+DEMO_BASE=https://positron.studio node demo/verify-quest.mjs weight    # against the deploy
+ADB=/path/to/adb node demo/verify-quest.mjs weight                     # if adb is not on PATH
 ```
 
 What that run answers, from the line the page logs on entry and from
@@ -276,10 +276,10 @@ headset can report.
 Two harness notes found while reading it, neither of them mine to fix:
 
 - `verify-quest.mjs` asserts `declares a readout` on
-  `Object.keys(__demo.readout).length > 0`. `held` declares `readout: null` on
+  `Object.keys(__demo.readout).length > 0`. `weight` declares `readout: null` on
   purpose, and `shell.mjs` publishes `__demo.readout` as `{}` plus a
   `__demo.readoutOptOut` flag that the harness does not consult. INFERRED: that
-  check will read red on `held` for a reason that is not `held`'s.
+  check will read red on `weight` for a reason that is not `weight`'s.
 - The harness presses controls in order, so on an XR page it presses `Run in VR`,
   waits, and then presses `Run in AR` while a session is live. INFERRED: the
   second press fails and is reported as a page log line rather than as a harness

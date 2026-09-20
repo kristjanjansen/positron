@@ -20,7 +20,7 @@ Companions, and each one decides something here rather than being background:
 numbers), `research/vr-sound-visual-2026-09.md` (what this station's audio
 actually is, measured), `plan-plate.md` (the VR floor, which is a different
 picture from this one and is gated on a different unknown),
-`plan-box-modulation.md` (the same modulator, on the Raspberry Pi),
+`plan-board-modulation.md` (the same modulator, on the Raspberry Pi),
 `demo/mirror/index.html` (the portable shader mechanism that exists today).
 
 ---
@@ -187,7 +187,7 @@ READ, `demo/shell/pappus-mod.mjs:26-28`, in full:
 The quantity that fixes 25 is `lagt = 0.02` inside `Engine_Pappus.sc`, a
 one-pole **in the consumer**. Everything the modulator writes is smoothed over
 20 ms on the far side of the message, so a 100 Hz write and a 50 Hz write arrive
-at the same audio. `plan-box-modulation.md §1.3` makes the same argument again
+at the same audio. `plan-board-modulation.md §1.3` makes the same argument again
 about the board and adds a second smoother, a 21.3 ms JACK period.
 
 **A shader has neither.** There is no one-pole between a uniform and a pixel.
@@ -709,7 +709,7 @@ keeps getting hurt.
 | 6 | 🔴 **the positional assert.** Push **two** synthetic grains into known, distinct buckets with everything else zero. Read back and assert the two brightest columns are at the expected x within tolerance, **in the right order and the right distance apart** | whether *live* grains are decoded from the right OSC field, because these are synthetic. One grain proves a deposit; two prove the axis. This is `radio`'s own `/pgrain` bug written as a check: a count could not tell you where a grain read, and a green suite hid it |
 | 7 | the live histogram is non-degenerate and lies **inside the lit range the page also draws** | a constant offset shared by the picture and the range, since both come from `winPos` |
 | 8 | 🔴 **the drop counter fires.** Flood one bucket past 255 in one frame on purpose and assert row 1's A channel is non-zero; assert it is zero in ordinary play | a drop upstream, in the board's OSC batcher or in `onReply`. That is a different boundary and needs its own counter |
-| 9 | 🔴 **the stationary control.** With `modulator.hold(true)`, row 2's B channel goes to zero for every destination and the **parameter part of the field stops moving while the grain marks keep arriving** | which of two moving destinations is which. `plan-box-modulation §4.2` states the general rule: every movement check needs a stationary control in the same reading |
+| 9 | 🔴 **the stationary control.** With `modulator.hold(true)`, row 2's B channel goes to zero for every destination and the **parameter part of the field stops moving while the grain marks keep arriving** | which of two moving destinations is which. `plan-board-modulation §4.2` states the general rule: every movement check needs a stationary control in the same reading |
 | 10 | the near and far sides can disagree: stop the engine, keep the modulator ticking, the band must keep sliding and the marks must stop | nothing about audibility. The engine can be running and silent |
 | 11 | sharpness follows flatness: sweep row 3 x=3 from its p10 anchor to its p90 anchor with everything else held, and assert a stated minimum change, **per channel** | whether it is legible to a person. That is not measurable and the page must not pretend |
 | 12 | the layout version in the texture equals the one the page compiled against | a layout that changed meaning without changing version |

@@ -36,10 +36,10 @@ hardware we have**. And the first thing to build is **two sliders**.
 
 ### 1.1 ✅ The `cc` verb exists and reaches a real synth today
 
-`rig/box/box.mjs:731` already has it, and the whole path is in place:
+`rig/board/board.mjs:731` already has it, and the whole path is in place:
 
 ```
-ctl message  ->  box.mjs handle()  ->  inst.cc(channel, ctrl, value)
+ctl message  ->  board.mjs handle()  ->  inst.cc(channel, ctrl, value)
              ->  jacksynth.mjs:1250  midi([0xb0 | ch, ctrl, value])
              ->  writeSync to /dev/snd/midiC<n>D0        (snd-virmidi)
              ->  ALSA sequencer, aconnect'ed to yoshimi  (jacksynth.mjs:1203)
@@ -47,9 +47,9 @@ ctl message  ->  box.mjs handle()  ->  inst.cc(channel, ctrl, value)
 ```
 
 Three bytes, one syscall, no library. ✅ Verified by reading
-`rig/box/jacksynth.mjs:1197-1250` and `rig/box/box.mjs:731-741`.
+`rig/board/jacksynth.mjs:1197-1250` and `rig/board/board.mjs:731-741`.
 
-⚠️ **And nothing in this repo has ever graded it.** `rig/box/yoshimi-test.mjs`
+⚠️ **And nothing in this repo has ever graded it.** `rig/board/yoshimi-test.mjs`
 grades the PATCH stepper by ear and carries a negative control; it never sends a
 CC. The comment above the verb asserts that Yoshimi answers 74 and 71 "for
 real". That assertion is untested here. §2.4 and §8 step 0 are about closing
@@ -112,7 +112,7 @@ arithmetic is only legible if the numbers a reader looks up are the real ones.
 ### 1.4 ✅ The board answers, and nothing is playing on it
 
 ```
-node rig/box/ask.mjs --room studio-1 audio.status
+node rig/board/ask.mjs --room studio-1 audio.status
 { "type": "audio.started", "ok": false, "reason": "nothing playing",
   "fx": null, "fxBy": "web-b5hyyq", "fxAgoSec": 313, "fxHeld": false }
 ```
@@ -170,7 +170,7 @@ them is a step a person has to approve, and **this plan needs none of them.**
 
 ### 2.2 The three that are ruled out, with the repo's own evidence
 
-**hexter is out.** `box.mjs:733` says it in one clause: "hexter has no filter at
+**hexter is out.** `board.mjs:733` says it in one clause: "hexter has no filter at
 all". It takes CC 16/17/18/19/80/81 as operator coarse frequency, which is a
 real live control and is not a filter.
 
@@ -179,9 +179,9 @@ duller. That is not the sound the ask describes.
 
 🔴 **The built-in `moog` is out, and it is the interesting rejection**, because
 it is the one thing here actually named after the target sound.
-`rig/box/synth.mjs:147-153` says its controls take effect "on the NEXT note,
+`rig/board/synth.mjs:147-153` says its controls take effect "on the NEXT note,
 like a real patch knob". A control that cannot be swept while a note sounds is
-the opposite of a controller performance. And `rig/box/README.md:150-158`
+the opposite of a controller performance. And `rig/board/README.md:150-158`
 records a measurement: four cascaded one-poles give loop gain `k*g^4`, and `g^4`
 collapses at low cutoff, **0.001 at fc 900 Hz and 0.011 at 2000**, so resonance
 "moves the peak 6% across its entire range". The README leaves it broken on
@@ -194,7 +194,7 @@ is installed, its 878 patches are readable, the MIDI path to it is wired, the
 `cc` verb already reaches it, and it starts headless from the service today:
 
 ```
-yoshimi -i -a -J -b=256          rig/box/jacksynth.mjs:146
+yoshimi -i -a -J -b=256          rig/board/jacksynth.mjs:146
 ```
 
 `-i` no GUI, `-a` ALSA MIDI so virmidi can reach it, `-J` JACK audio, `-b=256`
@@ -203,7 +203,7 @@ argument and none is needed**: a patch is chosen the way every patch on this
 board is chosen, by bank select on **CC 32** followed by a program change, which
 `voice.select` already does. The bank CC is read out of Yoshimi's own config
 rather than typed, because CC 0 moves the ROOT DIRECTORY and one wrong guess
-about that cost an hour once (`rig/box/yoshimi.mjs:115-119`).
+about that cost an hour once (`rig/board/yoshimi.mjs:115-119`).
 
 So loading the demo's patch is one message that already works:
 
@@ -259,7 +259,7 @@ ctl.set over a WebSocket      { type:'ctl.set', set:[[74,91],[71,40]] }
   |  ~110 bytes of JSON
 Relay Durable Object          workers/relay/src/index.js, fan-out verbatim
   |  measured +0.8 to +1.6 ms at p50 over the runtime's own ping
-box.mjs handle()              a fold into a map, no MIDI write yet
+board.mjs handle()              a fold into a map, no MIDI write yet
   |  a 5 ms drain timer writes at most one message per controller
 inst.cc()  ->  virmidi        three bytes, writeSync
   |
@@ -313,14 +313,14 @@ Not separate, and each of these has a reason:
 
 - 🔴 **Not a second socket.** The relay's bucket is per socket, so a second one
   would isolate the control plane from the audio plane. The board already does
-  exactly that for video, and `box.mjs:143-154` says why: at the OLD cap of
+  exactly that for video, and `board.mjs:143-154` says why: at the OLD cap of
   60 msg/s, audio alone was 50 of them and 30 video frames took the total to 80.
   **At 1000 msg/s that argument no longer holds** (§4.3 has the arithmetic), and
   a second socket costs a second entry in a room that is reclaimed only when it
   is full. Name the condition under which it becomes right instead: a sustained
   control rate above about 300/s, or an audio stream above 50 frames/s.
 - 🔴 **Not a second audio stream.** `startAudio` replaces rather than refuses,
-  and `box.mjs:417-419` records what happens when two sources stream at once:
+  and `board.mjs:417-419` records what happens when two sources stream at once:
   "100 msg/s against the relay's 60, measured 60 frames/s arriving and 5,495
   dropped". Two streams in one room also break every listener, because the
   playout keys on one sequence counter.
@@ -432,7 +432,7 @@ The board's socket, which carries audio and control on one bucket:
 | | board sends | of the allowance |
 |---|---|---|
 | audio, 50 frames of 1932 bytes | 50 msg/s, 96.6 KB/s | 5.0% of messages, **1.2%** of bytes |
-| `ctl.meter` 1/s + `box.alive` 0.2/s | 1.2 msg/s | 0.1% |
+| `ctl.meter` 1/s + `board.alive` 0.2/s | 1.2 msg/s | 0.1% |
 | **total** | **51.2 msg/s, 96.7 KB/s** | **5.1% / 1.2%** |
 
 `STRIKES` is 50 CONSECUTIVE overruns before a socket is closed with 1008, and a
@@ -517,7 +517,7 @@ would produce a cell that never updates, or worse, one that updates off an
 unrelated note.
 
 The quantity in question for a cutoff sweep is **brightness**, and this repo
-already has the instrument: `rig/box/measure.mjs` returns a spectral `centroid`
+already has the instrument: `rig/board/measure.mjs` returns a spectral `centroid`
 in Hz and `distance()` returns the gap in octaves.
 
 **Measurement 1, slider to heard.** Hold one note. Send `ctl.set {74: 0}` from a
@@ -533,7 +533,7 @@ both cost nothing, and the difference between them is the object's cost.
 
 🔴 **Measurement 3, the board's leg alone, and nobody has ever taken it.** The
 board writes `performance.now()` into every audio frame at byte offset 4
-(`box.mjs:382`), and `listen.html` deliberately never reads it. Differencing two
+(`board.mjs:382`), and `listen.html` deliberately never reads it. Differencing two
 of the BOARD's OWN stamps needs no shared clock at all, so a harness that sends
 a control and reads the stamp on the first frame whose centroid has moved gets
 the board's contribution with the network subtracted out. That separates "the
@@ -615,13 +615,13 @@ to stop looking at the row.
 |---|---|---|---|
 | `sent` | `/s` | control messages this page put on the wire | your hand, per second |
 | `played` | `/s` | `ctl.meter.out`, MIDI messages the board wrote | what the board did with it |
-| `rtt` | `ms` | `box.ping` to `box.pong` | the network alone |
+| `rtt` | `ms` | `board.ping` to `board.pong` | the network alone |
 | `lag` | `ms` | slider to heard, by the centroid crossing | the whole journey |
 | `buffer` | `ms` | the playout cushion | the biggest single term in `lag` |
 | `lost` | | relay drops + wire gaps + underruns + trims | whether anything vanished |
 
 `rtt` and `buffer` together explain most of `lag`, which is the point of having
-all three. ⚠️ `rtt` is already computed in `listen.html:760` from `box.pong` and
+all three. ⚠️ `rtt` is already computed in `listen.html:760` from `board.pong` and
 is displayed nowhere, so this costs nothing new.
 
 ### 6.4 The `what` paragraph
@@ -752,7 +752,7 @@ loud with the holder and both ages in the reply.
 CPU per second of audio with 24 notes across six parts. Yoshimi's additive
 engine with a big filter is heavier and scales with voices, and the granulator
 may be running at the same time on the TINY rung. **Mitigation:** one held note
-is the cheapest possible case, and `rig/box/bench.mjs` is the shape of the
+is the cheapest possible case, and `rig/board/bench.mjs` is the shape of the
 answer. Do not add voices without measuring.
 
 ⚠️ **5. A wedged audio device.** `startJackSynth` waits 8 s for
@@ -790,7 +790,7 @@ Each step is gradable on its own, and steps 0 to 2 need no page at all.
 
 ### Step 0 · Which patch, decided by measurement. No page, no page code.
 
-`rig/box/cc-test.mjs`, in the shape of `yoshimi-test.mjs`. For each candidate
+`rig/board/cc-test.mjs`, in the shape of `yoshimi-test.mjs`. For each candidate
 patch, hold note 40, send CC 74 at 0 / 32 / 64 / 96 / 127 with a settle between
 each, capture, and report `measure().centroid`.
 
@@ -821,15 +821,15 @@ a 500 ms restatement goes out with nothing moving.
 
 ### Step 2 · The board's coalescer and meter.
 
-`ctl.set` and `ctl.meter` in `box.mjs`. The existing `cc` verb is untouched, so
+`ctl.set` and `ctl.meter` in `board.mjs`. The existing `cc` verb is untouched, so
 `/keys/` cannot regress.
 
-**Grade:** `rig/box/ctl-test.mjs` against a running box, two connections.
+**Grade:** `rig/board/ctl-test.mjs` against a running box, two connections.
 Send 500 `ctl.set` in one second and assert `in === 500`, `out <= 200`,
 `folded === in - out`, and **the last value sent is the last value written**.
 Negative control: 5 messages 200 ms apart must give `folded === 0`.
 
-⚠️ Deploy with `push.sh`. The service runs from `/opt/positron-box/`, not from
+⚠️ Deploy with `push.sh`. The service runs from `/opt/positron-board/`, not from
 `~/positron/`, and `md5sum` is what proves a deploy landed.
 
 ### Step 3 · The page, controls and readout, no diagram.

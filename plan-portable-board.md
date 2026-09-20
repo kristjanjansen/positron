@@ -50,10 +50,10 @@ is really up.
 
 | file | what it really does |
 |---|---|
-| `rig/box/provision.sh` | sweeps the subnet for a host that answers ssh, `tar`s `rig/box` plus every module it imports over, runs `setup.sh`, then runs `test.mjs` and `bench.mjs` |
-| `rig/box/setup.sh` | installs `alsa-utils curl git` and node 24 from NodeSource, loads `snd-virmidi` and `snd-aloop`, copies to `/opt/positron-box`, writes `/etc/default/positron-box`, installs and enables the unit |
-| `rig/box/push.sh` | ships this checkout to `/opt/positron-box`, builds `rig/vis` on the board, copies the SuperCollider classes to the path `sclang` actually compiles, prints md5s, restarts |
-| `rig/box/positron-box.service` | `Restart=always`, `RestartSec=2`, `StartLimitIntervalSec=0`, hardening deliberately off with the bill written in the file |
+| `rig/board/provision.sh` | sweeps the subnet for a host that answers ssh, `tar`s `rig/board` plus every module it imports over, runs `setup.sh`, then runs `test.mjs` and `bench.mjs` |
+| `rig/board/setup.sh` | installs `alsa-utils curl git` and node 24 from NodeSource, loads `snd-virmidi` and `snd-aloop`, copies to `/opt/positron-board`, writes `/etc/default/positron-board`, installs and enables the unit |
+| `rig/board/push.sh` | ships this checkout to `/opt/positron-board`, builds `rig/vis` on the board, copies the SuperCollider classes to the path `sclang` actually compiles, prints md5s, restarts |
+| `rig/board/positron-board.service` | `Restart=always`, `RestartSec=2`, `StartLimitIntervalSec=0`, hardening deliberately off with the bill written in the file |
 
 `setup.sh` installs **four packages and node**. It does not install jackd,
 Yoshimi, Yoshimi's banks, SuperCollider, sc3-plugins, ffmpeg, v4l-utils or
@@ -76,7 +76,7 @@ inventory already exists and is already runnable.
 
 📄 READ, `rig/audit.mjs`. It declares eleven apt packages for `box` with the
 versions seen on a day it worked, three files that must exist, and two devices.
-It runs over ssh (`BOX_SSH`, default `positron@192.168.1.213`), asks the machine
+It runs over ssh (`BOARD_SSH`, default `positron@192.168.1.213`), asks the machine
 what it has, prints the difference, and `--fix` prints
 `sudo apt-get install -y --no-install-recommends <pkg>` for everything missing.
 Its own comment says it does not pin versions on purpose, and why:
@@ -91,7 +91,7 @@ two halves: the audit knows what is needed, `setup.sh` does not read it.
 
 ### 1.3 The graph, and the one instrument on it
 
-📄 READ, `rig/box/jacksynth.mjs`. The chain is
+📄 READ, `rig/board/jacksynth.mjs`. The chain is
 `jackd -d dummy` -> `yoshimi -i -a -J -b=256` -> `ffmpeg -f jack -i posbox -f s16le -ar 48000 -ac 1 -`,
 and MIDI reaches Yoshimi by writing three raw bytes to `/dev/snd/midiC<n>D0`
 (`snd-virmidi`), which `aconnect` routes to Yoshimi's ALSA client.
@@ -112,7 +112,7 @@ name the seam, which §6 does, because there is nothing to migrate.
 
 ### 1.4 The relay is already swappable at both ends, and this was a surprise
 
-📄 READ. `rig/box/box.mjs:45` takes `--relay` (default `RELAY_BASE` from
+📄 READ. `rig/board/board.mjs:45` takes `--relay` (default `RELAY_BASE` from
 `demo/shell/wire.mjs:30`). `demo/shell/board.mjs:57` takes a `relay` option and
 passes it as `base` to `openWire` at line 246. `demo/knobs/index.html:354` reads
 it off the query string: `relay: q.get('relay') || undefined`.
@@ -131,7 +131,7 @@ have to do, and what happens when their Pi is not identical to ours.**
 ### 2.1 This git checkout (what `provision.sh` does today)
 
 The friend clones the repo, runs `provision.sh`, and gets a board. 📄 READ,
-`provision.sh` ships `rig/box` plus every `../../` import resolved out of the
+`provision.sh` ships `rig/board` plus every `../../` import resolved out of the
 source, and `push.sh` additionally ships `rig/vis`.
 
 **Cost:** zero to build, because it is what exists.
@@ -145,8 +145,8 @@ hand it to somebody who does not work here.
 
 ### 2.2 A tarball plus an installer
 
-One archive containing `rig/box/`, `rig/vis/`, the `demo/shell/` modules
-`box.mjs` imports, `setup.sh` and the unit file. `provision.sh` already builds
+One archive containing `rig/board/`, `rig/vis/`, the `demo/shell/` modules
+`board.mjs` imports, `setup.sh` and the unit file. `provision.sh` already builds
 exactly this set (📄 READ, the `tar cf -` line reads the import list out of the
 source with `grep -ho "from '\.\./\.\./[^']*'"`), so the archive is a one-line
 change from a pipe to a file.
@@ -161,9 +161,9 @@ system packages are the problem and they are §2.5.
 
 ### 2.3 A Debian package
 
-`positron-box_<version>_all.deb` with `Depends: jackd2, yoshimi, yoshimi-data,
+`positron-board_<version>_all.deb` with `Depends: jackd2, yoshimi, yoshimi-data,
 supercollider, sc3-plugins, ffmpeg, alsa-utils, v4l-utils, nodejs (>= 22)`, a
-`postinst` that writes `/etc/default/positron-box` if it is absent and enables
+`postinst` that writes `/etc/default/positron-board` if it is absent and enables
 the unit, and `dpkg-statoverride` for nothing because the service runs as an
 ordinary user.
 
@@ -194,7 +194,7 @@ far the best experience of the five.
 re-flashing a card. It bakes in a hostname, an ssh host key (or has to regenerate
 one on first boot), a room name and possibly a wifi configuration. 🔴 And it is
 the option most likely to ship a **secret**: an image made from a working board
-carries that board's `~/.ssh`, its journal, its `/etc/default/positron-box`, and
+carries that board's `~/.ssh`, its journal, its `/etc/default/positron-board`, and
 anything in the shell history. An image has to be built from a clean install by a
 script, never captured from a machine that has been used.
 **Verdict:** the right eventual answer for a non-technical friend, and it must be
@@ -203,13 +203,13 @@ this board. Not first.
 
 ### 2.5 A container
 
-📄 READ, `rig/box/README.md` lines 108 to 119: the whole suite already passes
+📄 READ, `rig/board/README.md` lines 108 to 119: the whole suite already passes
 inside arm64 Linux with no `/dev/snd`, 13/13 against the live relay, with
-`docker run --platform linux/arm64 ... fsbox node box.mjs --room <room>`.
+`docker run --platform linux/arm64 ... fsbox node board.mjs --room <room>`.
 
 That is a real and useful fact and it is **not** a distribution answer for a
 board, for a reason the service file already spells out. 📄 READ,
-`positron-box.service`:
+`positron-board.service`:
 
 > `PrivateTmp=true` gave the service its own `/tmp`, so its jackd socket was
 > invisible to its own children after a restart. `ProtectSystem=strict` made
@@ -254,19 +254,19 @@ friend sees.
 
 ### 3.1 What exists
 
-📄 READ. `box.mjs` reads exactly two environment variables: `BOX_NAME` (line 38)
-and `BOX_AUDIO` (line 41). Everything else is argv: `--room`, `--name`, `--dry`,
+📄 READ. `board.mjs` reads exactly two environment variables: `BOARD_NAME` (line 38)
+and `BOARD_AUDIO` (line 41). Everything else is argv: `--room`, `--name`, `--dry`,
 `--once`, `--audio`, `--relay`. `ROOM` as an environment variable exists only at
-the systemd layer, where `positron-box.service:16` interpolates it into
-`--room ${ROOM}` from `EnvironmentFile=/etc/default/positron-box`.
+the systemd layer, where `positron-board.service:16` interpolates it into
+`--room ${ROOM}` from `EnvironmentFile=/etc/default/positron-board`.
 
 `setup.sh` writes that file **only if it is absent**:
 
 ```sh
-[ -f /etc/default/positron-box ] || cat > /etc/default/positron-box <<CFG
+[ -f /etc/default/positron-board ] || cat > /etc/default/positron-board <<CFG
 ROOM=$ROOM
-BOX_NAME=$(hostname)
-BOX_AUDIO=default
+BOARD_NAME=$(hostname)
+BOARD_AUDIO=default
 CFG
 ```
 
@@ -287,33 +287,33 @@ of `/knobs/` (📄 READ, `demo/knobs/index.html:37`,
 What happens then, 📄 READ from `demo/shell/board.mjs`:
 
 - `boardFrom` is set by **whichever board spoke last**: line 282,
-  `if (m.type === 'box.hello' || m.type === 'box.alive') boardFrom = m.from || boardFrom;`.
+  `if (m.type === 'board.hello' || m.type === 'board.alive') boardFrom = m.from || boardFrom;`.
   Two boards beat every 5 s, so the page's idea of which board it is talking to
   flaps twice a beat.
 - Binary frames count as presence **unconditionally** (lines 214 to 215), on the
   stated assumption "Nothing else puts PCM into this room."
 - Each board's `aseq` starts at 0 and counts independently (📄 READ,
-  `box.mjs:427`, and `aseq = 0` on every `stopAudio()`), so two interleaved
+  `board.mjs:427`, and `aseq = 0` on every `stopAudio()`), so two interleaved
   sequences make the page's `lost` counter meaningless and the playout ring
   receives two instruments' audio as if it were one.
 - Every verb reaches both boards, because the box filters only on "is it JSON"
-  and "is it not my own echo" (`box.mjs:1202-1206`). There is no target field.
+  and "is it not my own echo" (`board.mjs:1202-1206`). There is no target field.
 
-And `BOX_NAME=$(hostname)`. 📄 READ from today's own traffic: the studio board
+And `BOARD_NAME=$(hostname)`. 📄 READ from today's own traffic: the studio board
 reports `"name":"raspberrypi"`. A friend's Pi is also called `raspberrypi` unless
 they changed it, so the only human label on the wire does not distinguish them
 either.
 
 ### 3.3 What configuration has to become
 
-Nothing here needs a new file. `/etc/default/positron-box` is the right place and
+Nothing here needs a new file. `/etc/default/positron-board` is the right place and
 it survives a push. What it needs is:
 
 | key | today | should be |
 |---|---|---|
 | `ROOM` | defaults to `studio-1` | 🔴 **no default.** `setup.sh` refuses to write the file without one, and prints a suggestion derived from the hostname |
-| `BOX_NAME` | `$(hostname)` | keep, and add `BOX_ID`, minted once at install from `/proc/sys/kernel/random/uuid`, so two `raspberrypi`s are distinguishable on the wire |
-| `BOX_AUDIO` | `default` | keep. `arecord -l` lists the real ones |
+| `BOARD_NAME` | `$(hostname)` | keep, and add `BOX_ID`, minted once at install from `/proc/sys/kernel/random/uuid`, so two `raspberrypi`s are distinguishable on the wire |
+| `BOARD_AUDIO` | `default` | keep. `arecord -l` lists the real ones |
 | `BOX_RELAY` | not read (only `--relay`) | read it, so a friend on their own relay sets one line instead of editing a unit file |
 | `BOX_INSTRUMENT` | does not exist | which declaration from §6 this board runs. **One**, chosen at configuration time, never at runtime |
 
@@ -324,7 +324,7 @@ the case that actually happens. §4.4 is where the authentication question lands
 and the answer there is "not on this relay".
 
 **Credentials:** there are none today and that is a feature. 📄 READ,
-`rig/box/README.md:5`: *"Nothing here listens on a port, so there is no inbound
+`rig/board/README.md:5`: *"Nothing here listens on a port, so there is no inbound
 hole and it works from any network that allows outbound TLS."* Every design below
 that would add one is priced against losing that sentence.
 
@@ -346,7 +346,7 @@ controllers seen on the wire:
    d2ysxd ch0 cc71 = 63
    d2ysxd ch0 cc7  = 22
 ctl.meter  in 5387  out 5245  folded 25  on yoshimi  from box-u5pg1m
-box.alive  name raspberrypi  upSec 8180  audio yoshimi  voices 0  frames 330449  fx null
+board.alive  name raspberrypi  upSec 8180  audio yoshimi  voices 0  frames 330449  fx null
 ```
 
 An 8 s listen before it showed the same client `d2ysxd` sending
@@ -373,7 +373,7 @@ the wire is an exact zero, so the level measurement I could take answers nothing
 about the level bug. 🔴 **The measurement that separates them** is: take that
 client off the room (or wait for its tab to close), then send CC 7 = 127 and hold
 a note for a full second while reading the PCM RMS off the relay.
-`rig/box/live-test.mjs` already does RMS-before-note against RMS-after-note and
+`rig/board/live-test.mjs` already does RMS-before-note against RMS-after-note and
 is the tool for it.
 
 That is the whole multi-user argument in one observation, so the rest of this
@@ -392,7 +392,7 @@ above: a listener joins, receives 50 PCM frames a second with **zero sequence
 gaps**, and sends nothing. Ceiling is §5's 128 sockets.
 
 The one thing missing is that **nothing distinguishes a listener from a player**.
-Any socket in the room can send any verb (📄 READ, `box.mjs:1202-1226` filters
+Any socket in the room can send any verb (📄 READ, `board.mjs:1202-1226` filters
 only on JSON-ness and self-echo; the `params.set` comment at 1044 says so
 outright: *"the relay is tokenless, so anyone in the room can send it"*). So (b)
 is not a mode, it is a social convention, and today it is being broken by a tab.
@@ -402,11 +402,11 @@ it is the one that breaks. What breaks, each read out of the source:
 
 | what | where | what it does to a second player |
 |---|---|---|
-| one MIDI channel | `box.mjs:774`, `ctl.ch = msg.channel ?? ctl.ch` | last speaker wins the channel; everybody's CC lands wherever the last message said |
-| one coalescing map | `box.mjs:775-781` | two people moving the same controller fold into one write. `folded` counts it and never says whose value was lost |
-| one instrument, replaced not refused | `box.mjs:458-472` | `audio.start` with a different source kills the running one mid-note for everybody |
-| the auto-start | `box.mjs:667` | one person's first keypress raises a 13 s JACK chain for the room |
-| the start mutex | `box.mjs:62,446` | during that raise, everybody else's notes come back `{dropped:true, starting}` |
+| one MIDI channel | `board.mjs:774`, `ctl.ch = msg.channel ?? ctl.ch` | last speaker wins the channel; everybody's CC lands wherever the last message said |
+| one coalescing map | `board.mjs:775-781` | two people moving the same controller fold into one write. `folded` counts it and never says whose value was lost |
+| one instrument, replaced not refused | `board.mjs:458-472` | `audio.start` with a different source kills the running one mid-note for everybody |
+| the auto-start | `board.mjs:667` | one person's first keypress raises a 13 s JACK chain for the room |
+| the start mutex | `board.mjs:62,446` | during that raise, everybody else's notes come back `{dropped:true, starting}` |
 | one voice | `voice.select`, line 720 | one person's patch change is everybody's patch change |
 | `patch.clear` | line 654 | cuts **every** ALSA subscription on the board. No arguments, no scoping |
 | `params.random` | line 917 | turns parameter drift back on regardless of who turned it off |
@@ -431,7 +431,7 @@ Three changes, in increasing price.
    treatment.
 2. **A control-state report.** One verb answering "what is every controller set
    to, and which `from` set it, and how long ago". This is `insertState()`'s idea
-   (📄 READ, `box.mjs:122-133`, `fx`, `fxBy`, `fxAgoSec`, `fxHeld`) applied to
+   (📄 READ, `board.mjs:122-133`, `fx`, `fxBy`, `fxAgoSec`, `fxHeld`) applied to
    controllers instead of to the granulator. It would have made §4.1 visible on
    any page in one glance. 🔴 **This is the cheapest useful thing in the whole
    plan** and it is also §8's first verb, so it gets built once.
@@ -632,12 +632,12 @@ bandwidth and should be run once, deliberately, not in a loop.
 
 ### 6.1 What a declaration says today
 
-📄 READ, `rig/box/jacksynth.mjs`. `JACK_SYNTHS` is a table with one key, and a
+📄 READ, `rig/board/jacksynth.mjs`. `JACK_SYNTHS` is a table with one key, and a
 def may carry:
 
 | field | meaning |
 |---|---|
-| `needs: [bin]` | binaries that must be on `PATH`. `jackSynthAvailable` checks them and `box.hello` reports the result per instrument |
+| `needs: [bin]` | binaries that must be on `PATH`. `jackSynthAvailable` checks them and `board.hello` reports the result per instrument |
 | `spawn(opts)` / `spawnAll(opts)` | the process, or the several processes, that make the sound |
 | `portMatch`, `portMatch2` | regexes over `jack_lsp` for the left and right output ports |
 | `warmup` | ceiling in ms for the port to appear. Defaults 13000 for yoshimi, 6000 otherwise |
@@ -658,9 +658,9 @@ than a directory, and it has one entry.
 
 `pappusFx()` is a hand-written function with everything baked in: the port names
 `SuperCollider:in_1/in_2/out_1/out_2`, the availability test
-`['sclang','jackd'].every(have) && existsSync('/opt/positron-box/rig/box/norns/run-pappus.scd')`
+`['sclang','jackd'].every(have) && existsSync('/opt/positron-board/rig/board/norns/run-pappus.scd')`
 (an absolute path in a source file), the readiness line `PAPPUS READY`, and the
-OSC address `/pappus/cmd` on 57120. `sweepInsert()` in `box.mjs` is written
+OSC address `/pappus/cmd` on 57120. `sweepInsert()` in `board.mjs` is written
 around it by name. 📄 READ: the reverb that left on 2026-09-17 was a second
 hand-written function of the same shape, and the two **disagreed about the right
 channel for a month**, which is the whole argument for a seam:
@@ -676,9 +676,9 @@ channel for a month**, which is the whole argument for a seam:
 refuses the build when an import has no file), so the pattern is established.
 
 ```
-rig/box/clients/yoshimi.mjs
-rig/box/clients/pappus.mjs
-rig/box/clients/<a friend's thing>.mjs
+rig/board/clients/yoshimi.mjs
+rig/board/clients/pappus.mjs
+rig/board/clients/<a friend's thing>.mjs
 ```
 
 Each exports one default object. What it **must** state, and why each field is
@@ -719,7 +719,7 @@ re-learnable.**
   fields is **refused loudly and named**, never skipped. 📄 READ, `setup.sh`
   already applies exactly this rule to imports (*"REFUSE the install when one has
   no file"*) and `build.mjs` to the deployed site.
-- Run `needs` for each and report availability in `box.hello`, which already
+- Run `needs` for each and report availability in `board.hello`, which already
   carries `instruments: { synth, pappusFx, ...JACK_SYNTHS keys }`.
 - 🔴 **Availability is not a menu.** The instrument this board plays is
   `BOX_INSTRUMENT` from §3.3, chosen once at configuration. Everything else in
@@ -729,7 +729,7 @@ That last rule is the point where "pluggable" and "somebody took the sound away
 from me" are reconciled, and it deserves stating plainly: **the declaration
 directory makes the instrument a configuration choice, not a runtime choice.** A
 friend plugging a new synth into their own board edits one line of
-`/etc/default/positron-box`. A visitor to somebody's board cannot change it at
+`/etc/default/positron-board`. A visitor to somebody's board cannot change it at
 all. 📄 READ, the scar this avoids is in CLAUDE.md and in the README:
 `/knobs/` was found refusing to start because somebody had pressed `sampled` on
 another page.
@@ -737,7 +737,7 @@ another page.
 ⚠️ **An insert is different and can stay switchable**, because it is a re-patch
 rather than a process raise, and because `fx.pappus` already has the only
 ownership notion on the board and the board already sweeps an insert out when the
-page holding it stops talking (📄 READ, `sweepInsert()`, `box.mjs:167-194`,
+page holding it stops talking (📄 READ, `sweepInsert()`, `board.mjs:167-194`,
 `INSERT_HELD_MS = 15000`, which is 3.75 of `/grains/`'s 4 s polls).
 
 ### 6.5 What this does not solve
@@ -819,9 +819,9 @@ from outside the studio LAN.
 `patch.clear`, `audio.start`, `audio.stop`, `audio.status`, `note.on/off/panic`,
 `voices.list`, `voice.select`, `ctl.set`, `ctl.meter`, `cc`, `moog.patch`,
 `fx.pappus`, `params.random/drift/state/set`, `source.set`, `grain.report`,
-`video.start/shader/params/watching/stop/status`, `box.ping`.
+`video.start/shader/params/watching/stop/status`, `board.ping`.
 
-- **No verb restarts the service.** `grep` over `box.mjs` for
+- **No verb restarts the service.** `grep` over `board.mjs` for
   `restart|systemctl|reboot` returns comments only.
 - **No verb reports the JACK graph.** `ports.get` returns **ALSA sequencer MIDI
   ports** (📄 READ, `alsa.mjs:85`, `execFileSync('aconnect', ['-l'])`), addresses
@@ -830,7 +830,7 @@ from outside the studio LAN.
 - **`ctl.meter` counts and does not name.** MEASURED today: it reported
   `in 5387 out 5245 folded 25` while a client held CC 7 at 22, and said nothing
   about a controller, a value or a sender.
-- **What DOES work remotely, and is underused:** `rig/box/live-test.mjs` already
+- **What DOES work remotely, and is underused:** `rig/board/live-test.mjs` already
   drives a running board over the real relay and measures **RMS before a note
   against RMS after it**, for exactly the reason that matters here: *"a live,
   unmuted, enabled audio track carrying digital silence looks exactly like a
@@ -853,11 +853,11 @@ never `-f`, because `pgrep -f h264_v4l2m2m` matches its own ssh command line and
 answers "still held" about itself.
 
 **(b) `service.restart`.** 🔴 **This is nearly free and it is worth saying how.**
-📄 READ, `positron-box.service` has `Restart=always`, `RestartSec=2` and
+📄 READ, `positron-board.service` has `Restart=always`, `RestartSec=2` and
 `StartLimitIntervalSec=0` (in `[Unit]`, deliberately, with a comment saying
 systemd ignores it in `[Service]` with only a warning). So **`process.exit(1)` IS
 a service restart**, guaranteed, in two seconds, with no `sudo`, no polkit and no
-new privilege. `box.mjs` already exits cleanly on `--once` and on a signal.
+new privilege. `board.mjs` already exits cleanly on `--once` and on a signal.
 
 ⚠️ **And it is a loaded gun on a shared board**, because any socket in the room
 can send any verb. It must at minimum require the board's own `BOX_ID` in the
@@ -887,7 +887,7 @@ start" is the failure a friend will actually have.
 ⚖️ **Recommendation, clearly marked as judgement:** do §8.2(a) and (b) first
 because they are hours and they need nothing, then **Cloudflare Tunnel**, because
 the account is already there, the outbound-only posture matches the relay exactly
-(and so keeps `rig/box/README.md:5` true: *"there is no inbound hole and it works
+(and so keeps `rig/board/README.md:5` true: *"there is no inbound hole and it works
 from any network that allows outbound TLS"*), and a friend who followed §7.2
 already has an account for it. Tailscale is the better answer for a friend with
 no Cloudflare account, and the choice should be a `BOX_TUNNEL` line rather than a
@@ -930,7 +930,7 @@ Cheapest useful first. **Steps 1, 2, 3, 5 and 6 need nobody at the board.**
 1. **Fix `demo/shell/wire.mjs`'s `LIMITS`.** Four numbers, wrong by up to 16.7x,
    under a comment claiming they cannot be wrong, reported on 2026-09-16 and
    still there. Minutes. No board.
-2. **Add `graph.get` and `service.restart` to `box.mjs`.** §8.2(a) and (b). An
+2. **Add `graph.get` and `service.restart` to `board.mjs`.** §8.2(a) and (b). An
    hour or two. `service.restart` is `process.exit(1)` because the unit file
    already guarantees the rest. **No board needed to write them; a board is
    needed to prove they work**, and the board is currently unreachable for
@@ -942,14 +942,14 @@ Cheapest useful first. **Steps 1, 2, 3, 5 and 6 need nobody at the board.**
    takes a fresh Pi from "comes up silent" to "comes up playing". **No board**:
    it is testable in the arm64 container that already runs the suite.
 4. 🔴 **Take `studio-1` out of `setup.sh` as a default.** Refuse to write
-   `/etc/default/positron-box` without a room, and mint `BOX_ID`. §3.2 is a live
+   `/etc/default/positron-board` without a room, and mint `BOX_ID`. §3.2 is a live
    collision waiting for the first friend who follows the instructions. Minutes.
    **No board**, but it only takes effect on the next provision.
 5. **Cut the tarball.** §2.2. `provision.sh` already builds the file set; the
    change is a pipe to a file plus a README a friend can follow. Half a day.
    **No board.**
 6. **Name the client seam.** §6.3: move `JACK_SYNTHS`' one entry and `pappusFx`
-   into `rig/box/clients/`, make `ready()` required, make the instrument a
+   into `rig/board/clients/`, make `ready()` required, make the instrument a
    `BOX_INSTRUMENT` line rather than a verb. Do this **now, while there is one
    instrument and one insert**, because the cost only goes up. A day. **No
    board** to write, a board to prove.

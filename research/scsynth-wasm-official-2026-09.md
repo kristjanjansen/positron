@@ -19,7 +19,7 @@ refused outright when 65 of its oscillators have to be alive at once.**
 
 **RECOMMENDATION, in priority order:**
 
-1. 🔴 **Fix the comment in `rig/box/norns/Engine_Pappus.sc`, not the cut.** Keep
+1. 🔴 **Fix the comment in `rig/board/norns/Engine_Pappus.sc`, not the cut.** Keep
    TINY — the engine this repo actually vendors and ships is SuperSonic, its
    65,520-byte edge is real, and TINY at 64,733 fits it with 755 bytes to spare
    while LITE at 74,733 does not. What is wrong is the reason written down:
@@ -233,7 +233,7 @@ that does not. (This is the counter SuperSonic gets wrong — there,
 
 ## 5 · 🔴 The two rungs the whole question is about ✅ BOTH LOAD
 
-`rig/box/norns/Engine_Pappus.sc` line 22 cuts a compile-time rung out of a real
+`rig/board/norns/Engine_Pappus.sc` line 22 cuts a compile-time rung out of a real
 instrument because "wasm scsynth refuses a `/d_recv` over 64 KiB SILENTLY …
 and LITE compiles to 73,297 — 11.8% over". Here are all four rungs' weights,
 sent as definitions of exactly those sizes, one fresh engine each:
@@ -269,7 +269,7 @@ the numbers twice to notice.
 
 ⚠️ These are definitions of the same SIZE as the Pappus rungs, not the Pappus
 graph — `pappus.scsyndef` has still never been compiled (§14). The sizes are
-`rig/box/norns/TINY.md`'s own weighing table.
+`rig/board/norns/TINY.md`'s own weighing table.
 
 ---
 
@@ -346,7 +346,7 @@ because nobody ever wrote the line.
 
 ## 8 · 🔴 What this means for TINY — the flat verdict
 
-`Engine_Pappus.sc` line 22 and `rig/box/norns/TINY.md` both rest on one
+`Engine_Pappus.sc` line 22 and `rig/board/norns/TINY.md` both rest on one
 sentence:
 
 > wasm scsynth refuses a `/d_recv` over 64 KiB, silently (measured: 52,730 B

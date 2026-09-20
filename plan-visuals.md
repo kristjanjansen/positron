@@ -1,7 +1,7 @@
 # plan-visuals — generative pictures, and which side of the wire they are made on (2026-09-11)
 
 Companion to `plan-hardware.md` (the box), `research/quest-xr-2026-09.md` (the
-headset), and `rig/box/README.md` (the instrument that already exists). Written
+headset), and `rig/board/README.md` (the instrument that already exists). Written
 because the user asked one question with a shape this project has answered
 before, for sound: **some instruments render on the board and stream samples;
 others send only control signals and are synthesised in the browser. Does the
@@ -78,7 +78,7 @@ before the feature on purpose.
 ### 1.0 The audio lesson, restated as a test
 
 This project already learned the answer for sound, and the lesson is not "big
-things go on the server". It is sharper than that. From `rig/box/README.md`:
+things go on the server". It is sharper than that. From `rig/board/README.md`:
 
 - `demo/shell/rhodes.mjs` is **imported, not ported**, by the box. The same
   arithmetic runs in an AudioWorklet at `/carry/` and in node on the Pi. It can
@@ -188,7 +188,7 @@ a model) sends `{seed, params, clock}`; the viewer's browser owns the geometry,
 the shader and the post-processing. This is `carry` for pictures, and it is the
 default.
 
-The precedent is exact and it is already in this repo. `rig/box/pappus.mjs`
+The precedent is exact and it is already in this repo. `rig/board/pappus.mjs`
 carries a **seeded PRNG** (`mulberry32`) for one stated reason: *"an
 unrepeatable die is a die you cannot use… Every roll here carries the seed that
 produced it; passing it back reproduces the roll exactly."* A seed plus a
@@ -540,7 +540,7 @@ could measure*, and never let "no timer" collapse into "0 ms" — CLAUDE.md:
 ## 3. The Raspberry Pi 4B — MEASURED, on the board, today
 
 Board: `positron@192.168.1.213`, **Raspberry Pi 4 Model B Rev 1.5**, revision
-`b03115`. All of the following was taken **with `positron-box` running** —
+`b03115`. All of the following was taken **with `positron-board` running** —
 jackd, jack-dssi-host/hexter, scsynth/Pappus, sclang and ffmpeg all live — and
 the service was never stopped. Contention is reported rather than removed,
 because it is itself the answer to the user's question.
@@ -824,7 +824,7 @@ reproducibly, while 16,384 ran twice without incident.
 **Conclusion for the board: the node-native WebGPU path is not available today.**
 The working path is a small C program on EGL/GBM/GLES 3.1 that node spawns and
 reads pixels from over a pipe — which is *precisely* the shape `fluid.mjs`
-already uses for FluidSynth, and for the same reason. `rig/box` is a node
+already uses for FluidSynth, and for the same reason. `rig/board` is a node
 service that drives ordinary Linux tools; a renderer is one more tool.
 
 ### 3.6 The whole chain, sustained — and the verdict
@@ -850,7 +850,7 @@ MEASURED, 30 seconds, **alongside the live instruments**. During the run:
 | renderer RSS | **79 MB** |
 | temperature | 50.1 °C → 55.0 °C |
 | throttling | `throttled=0x0` — none |
-| **audio xruns during the run** | **0** (`journalctl -u positron-box`, 3-minute window) |
+| **audio xruns during the run** | **0** (`journalctl -u positron-board`, 3-minute window) |
 
 640×480 the same way: **75.0 fps** (render 7.13 ms, readback 2.73, write 3.47).
 
@@ -961,7 +961,7 @@ infrastructure that already exists, with no Stream minutes billed.
 ### 3.7 What was installed on the board, exactly
 
 Reported per the brief. All from Debian 13 main, all small, nothing was removed,
-nothing under `/opt/positron-box` was touched, and `positron-box` was never
+nothing under `/opt/positron-board` was touched, and `positron-board` was never
 stopped:
 
     mesa-utils mesa-utils-bin libgles2 libgles1 libgles-dev libegl-dev
@@ -1132,7 +1132,7 @@ asserted structurally, and §5.2 says how.
 2. **The page itself reports its renderer**, in the readout, always. A visitor
    on a software rasteriser is a real visitor and the page should say so rather
    than quietly being slow.
-3. **`rig/box/gl-test.mjs`** on the board — the C bench above, run over ssh,
+3. **`rig/board/gl-test.mjs`** on the board — the C bench above, run over ssh,
    asserting `GL_RENDERER` is `V3D` and not `llvmpipe`, and that the fps holds
    above a stated floor. Same trap, different machine.
 4. **⚠️ Measure the sound while the picture renders.** The §3.6 numbers were
@@ -1279,7 +1279,7 @@ time, WHEP at 67 ms with a p99 advantage, LL-HLS at 3.9 s for wallpaper.
 
 ### 5.5 Phase 4 — the board renders
 
-`rig/box/visuals.mjs`: a node module that spawns the EGL/GBM renderer, reads
+`rig/board/visuals.mjs`: a node module that spawns the EGL/GBM renderer, reads
 RGBA over a pipe, hands it to `h264_v4l2m2m`, and publishes the encoded frames
 onto the relay as binary — **the same shape `fluid.mjs` already uses for
 FluidSynth, and the same socket `audio.start` already uses for PCM.**
@@ -1349,7 +1349,7 @@ says who checks it.
     writing, with a policy and a test. Generated *shaders* are a separate and
     much smaller question, and the plan should keep them separate.
 12. **Every number in §3 can be re-taken in ten seconds.** The three C files are
-    on the board in `/tmp`; they belong in `rig/box/` if any of this proceeds.
+    on the board in `/tmp`; they belong in `rig/board/` if any of this proceeds.
 13. **The board stays a Pi 4 if it is ever to encode.** DOCUMENTED: BCM2712 has
     no H.264 block, encode or decode. `plan-hardware` §4 needs that exception
     written beside it before anyone buys a 5 for this.

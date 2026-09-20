@@ -260,7 +260,7 @@ build rather than a design.
    and needs no server, no audio device and no JACK — research §8.2 established
    that while generating a ladder of test definitions on the Pi after the Mac
    went to sleep. **A `.scsyndef` is a platform-independent binary.**
-2. **Carry it on the relay it already uses.** `rig/box/` is on `studio-1`. The
+2. **Carry it on the relay it already uses.** `rig/board/` is on `studio-1`. The
    bytes fit: 2,370 B against a 256 KiB message cap.
 3. 🔴 **DECLARE WHAT THE FRAME IS. Do not sniff it.** The board's relay already
    carries binary PCM, and CLAUDE.md's hardest-won message rule is that *a
@@ -335,7 +335,7 @@ What is genuinely against it:
   reason this is the right format for this project.
 
 **The next move, if there is one, is not a bigger page.** It is the board: send
-a definition from `/patch/` to `studio-1`, have `rig/box/` load it into the
+a definition from `/patch/` to `studio-1`, have `rig/board/` load it into the
 native scsynth, and hear the same file in two buildings. That is one afternoon,
 it needs the device free, and it is the only experiment that can turn
 `plan-twins`' claim from approximate to literal. Everything else here is
