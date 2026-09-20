@@ -345,6 +345,23 @@ export const DEMOS = [
     one: 'Held in Human, a mixed reality piece by Liis Vares and Taavet Jansen, drawn from its own score: '
       + 'eight scenes, a voice that outlives them, and the one scene the score gives no length',
     tags: ['timeline', 'uncertainty', 'canvas'] },
+  // 🔴 THE SECOND PAGE OFF ONE FILE, AND IT SITS HERE BECAUSE IT PLAYS ON THE
+  // AXIS THE ROW ABOVE ESTABLISHES. `held` draws the score's STRUCTURE on a
+  // line, with the maze as a break in pixels; this draws what one visit LOOKS
+  // like, on the same clock with the maze taken out. The sentence about the
+  // maze only makes sense second, which is why the story order is this way
+  // round rather than newest first.
+  // ⚠️ THE GROUP IS `timeline` AND NOT `xr`, WHICH IS WHERE THE ROW ABOVE SITS.
+  // `xr` renders as `in a headset` on the front page, and the whole subject of
+  // this one is that a flat screen does something a headset cannot. Filing it
+  // under a headset would be the front page contradicting the page.
+  { name: 'veil', group: 'timeline', act: 6, created: '2026-09-20', built: true,
+    // sizes the wait for the page's first assert, which sits behind one local
+    // read of a 99 KB file and one canvas layout.
+    settleMs: 4000,
+    one: 'Held in Human drawn flat, with the room dimmed and coloured on the score\'s own clock '
+      + 'while the intro types itself',
+    tags: ['timeline', 'uncertainty', 'canvas'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
   { name: 'deck', group: 'kurenniemi', act: 5, created: '2026-08-28', built: false, page: '/proto/deck/',
