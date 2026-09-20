@@ -1,3 +1,86 @@
+# Session 37: a dead website gave up 63 pictures, and four defects were found by looking (2026-09-20)
+
+**THE SESSION OPENED WITH A REQUEST FOR WORK THAT WAS ALREADY FINISHED.** *"in
+making rm glued readouts and add that info to table columns"* had been done by
+session 36 and was sitting in the tree UNDEPLOYED, while the edge still served
+the six-cell readout and a four column table. MEASURED with one `curl` and one
+`grep`. `HANDOFF.md` listed the page under "What is live", which was true of the
+tree and false of the edge, and there is no way to tell undeployed work from
+unstarted work from outside. **A row of that table is a claim about the edge and
+has to be measured against the edge.**
+
+**THE STANDING CLAIM THAT `archive.org has nothing of it` WAS WRONG.** The CDX
+index for mimproject.org holds **2843 captures, 778 unique URLs, 421 HTML pages,
+152 content pages, 2009-10-30 to 2026-02-09**, across FOUR sites on one domain.
+The claim was RIGHT about video and that half is now measured rather than
+assumed: **zero** mp4, mov, webm, mp3, wav or pdf in the entire index. All four
+hosts are dead at the DNS level, probed directly. `curl` answers `000`, not a
+404.
+
+**63 PICTURES RECOVERED INTO `positron-station/mimproject-images/`**, verified
+63/63 serving with exact byte counts and the stated content-type. 30 are 145x145
+thumbnails whose originals were never captured, flagged so nobody offers one as
+a picture. **196 more are referenced by an archived page and were never
+captured**, the bulk of them the opera production photography, and the Jetpack
+CDN copies those pages embedded are not in the Wayback Machine at all.
+
+**A NAMING BUG WAS CAUGHT BY DERIVING THE SAME FIELD TWICE FROM TWO DIFFERENT
+SOURCES.** The uploader named files from the URL's extension and the repo build
+names them from what the BYTES are; they disagreed on one object, a PNG served
+from a `.jpg` URL. That is the two-numbers-from-one-field rule met from the
+useful side: two INDEPENDENT derivations can disagree, and this one did.
+
+**FOUR OF THE FIRST 67 WERE ADVERTS FOR A THAI ONLINE CASINO.** Everything under
+`/wp-content/uploads/2025/01/` is DAGAS888. The survey asked what the DOMAIN had
+held, and a domain outlives the people who had it; `a 2025 revival` had been
+written into four files before anybody opened a picture. **A site coming back
+and a site being taken are the same shape in an index of URLs.** The build now
+THROWS on any row uploaded 2025 or later.
+
+**AN IPFS ANSWER WAS REPORTED AS FACT AND WAS THE INSTRUMENT FAILING.** Three
+probes came back 429, 406 and 301, written up as *addressed, not retrieved*.
+Every one was rate limiting or a redirect. With a real user-agent, a ranged GET
+rather than HEAD, and six seconds between calls, **five gateways answer 206**
+and both 77.9 MB works came down in under four seconds. They are a folder tree
+whose folder NAMES are the text, nineteen levels deep, with one MP3 each at
+**9:02, 44.1 kHz stereo, 170 kbit/s**. `elektron.art`'s own download buttons are
+both dead, because they point at the retired `cloudflare-ipfs.com`.
+
+**FOUR DEFECTS ON `/making/`, EVERY ONE FOUND BY POINTING A BROWSER AT THE PAGE
+AND EVERY ONE GREEN IN THE SUITE BEFOREHAND.**
+- `.mk-square` sat above `.pos-vp { width: 100% }` in the page's own `<style>`:
+  same specificity, earlier in the file, so a 460 px cap rendered **686 px** and
+  put the list under the fold. The computed `aspect-ratio` and `object-fit`
+  asserts were both correct throughout.
+- **An inline style beats every selector.** `shell.css` has carried
+  `.pos-vp[data-full] .pos-vp-stage { aspect-ratio: auto }` all along;
+  `createVideoPanel`'s `aspect` option wrote `stage.style.aspectRatio`, so a
+  panel that was given a shape could never give it up. **Fourth dead CSS rule
+  measured on this project.** It is `--vp-aspect` now.
+- **`[data-full]` matches an EMPTY attribute.** `syncFull` set `dataset.full =
+  ''` on exit, so a panel that had been full once kept `border: 0`,
+  `background: #000` and no aspect ratio for the rest of the page's life. It
+  survived because entering is what gets tested and the wrong state is the one
+  AFTER leaving.
+- **Thirty size cells read `0.0 MB`** for files of 3 KB to 30 KB. Every count,
+  total and corpus-against-itself check was green: the rows were present and the
+  numbers came off real byte counts.
+
+**AND A COMMENT WAS REFUTED BY THE SABOTAGE MEANT TO PROVE IT.** It claimed
+widening `.pos-vp-stage > video` to `> *` would crop every recovered picture. It
+does not: `shell.css`'s `> img` is (0,1,1) and `> *` is (0,1,0), so the img is
+safe and the VIDEO breaks instead. Corrected in the file, and the rule that
+really would crop is now the one proved to take the assert red. **Five
+sabotages, each taking exactly one assert.**
+
+**`/making/` WENT 24/24 TO 36/36** with `tabs.mjs`'s first use in a shipped page,
+a square picture box that is the same component as the video, and keyboard
+navigation added to `table.mjs` for every table on the site. **An arrow moves
+and does not open**, because `onPick` fetches and a held-down key would pull 63
+files. **218/218 across all ten pages** that use either changed component.
+
+---
+
 # Session 34: the file was never the problem, and two pages were green about nothing (2026-09-18)
 
 **THE ARCHIVE'S MISSING CARET WAS DIAGNOSED WRONGLY TWICE AS A MEDIARECORDER
@@ -137,14 +220,14 @@ the seven other strip-bearing pages.
 
 # Session 27 — the Marinetti detour, and what was actually found (2026-09-15)
 
-⚠️ **A NOTE, NOT A PLAN.** `/held/` briefly carried words from Marinetti's
+⚠️ **A NOTE, NOT A PLAN.** `/weight/` briefly carried words from Marinetti's
 `Zang Tumb Tumb` (1914) and they were replaced by `Kalevipoeg` on instruction.
 What was learned is worth keeping so nobody re-runs it.
 
 **The typographic argument was right and the words were wrong.** *Parole in
 libertà* (1913) is the claim that a word has a size, a weight and a place, and
 that setting one in a line at one size throws all three away — which is exactly
-what `/held/` is. `Zang Tumb Tumb` is that claim typeset. But its words are
+what `/weight/` is. `Zang Tumb Tumb` is that claim typeset. But its words are
 onomatopoeia for artillery at the siege of Adrianople, so the first question
 anybody asked, within a minute of the words going up, was **"what is zang?"** —
 and the honest answer is that a futurist was enjoying a bombardment. A room a
@@ -1390,7 +1473,7 @@ difference as if the granulators had made it. `BYPASS` pins all nine.
 
 ⚠️ **CORRECTED 2026-09-14: "with the board back on LITE" describes a state that
 lasted part of one evening, and this file then carried it as the board's standing
-state.** `/etc/default/positron-box` was put back to `PAPPUS_TINY=1` the same
+state.** `/etc/default/positron-board` was put back to `PAPPUS_TINY=1` the same
 night; the running service has had it in its environment since 22:47 on 09-13,
 the engine's own boot line says `Engine_Pappus: TINY graph`, and
 `Engine_Pappus.sc` is md5-identical in the repo, on the board's sclang class
@@ -1407,7 +1490,7 @@ unfillable buffer — visible as the suite going green once then red three times
 with no code between.
 
 ⚠️ **`PosSource` existed as a file and was wired to NOTHING** — `push.sh` never
-installed it, `run-pappus.scd` never loaded it, `box.mjs` had no `source.set`,
+installed it, `run-pappus.scd` never loaded it, `board.mjs` had no `source.set`,
 and `grains` had been sending `sourceMessage(SPEC)` into the void since it was
 written. With it wired: rms **0.008025 / peak −29.6 dBFS** against 0.000000 /
 −180.0 off, `where` meaning one thing at both ends (at `mscan 0.5`, `mbuflen 8`
@@ -1507,7 +1590,7 @@ rule; this file only says what happened.
 `research/uuu-integration-2026-09.md`. 🔴 **The premise was the first thing to
 push back on**: *"should there be more CV-to-MIDI"* assumes conversion, and
 conversion is usually the expensive way round. Four jobs get conflated and need
-different hardware — the network HEARS the gear (✅ solved twice, `rig/box` and
+different hardware — the network HEARS the gear (✅ solved twice, `rig/board` and
 `rig/m1`), the network PLAYS the gear (written, ⚠️ never tested on hardware),
 the network TURNS KNOBS (partly), the network READS the knobs (**nothing**).
 **If the ask is "let people hear the studio", row one is finished and you stop
@@ -1602,7 +1685,7 @@ draw 21/21, typist 22/22 then 16/16 after the readout came off, diagram 64/64,
 xr-pick 40/40, xr-glb 21/21, verify-gl 77/77, scene 37, mirror 32, quest
 `--self-test` 3/3, sixteen strip demos 297 asserts before and after, eleven
 demos 176/178 (the two red are `webrtc` under contention, 14/14 alone), ten
-demos 180/180, five demos 94/94, `rig/box/insert-test.mjs` 8/8.
+demos 180/180, five demos 94/94, `rig/board/insert-test.mjs` 8/8.
 
 ⚠️ **`now` is red and a one-request probe says why**: a 2-byte range GET on
 ETV's live edge answers **403 with `drm: true`** and no ACAO while the playlists
@@ -1739,7 +1822,7 @@ why the envelope axis is dead in every chain-running section (p 0.310 / 0.841 /
 0.902) while brightness survives only where the MATERIAL changes.
 
 🔴 **The drift was on for every capture and the harness could not see it.**
-`box.mjs` calls `pappus().startDrift()` after every roll, so `params.drift
+`board.mjs` calls `pappus().startDrift()` after every roll, so `params.drift
 {on:false}` followed by a roll is a NO-OP — and the file did exactly that
 everywhere, including on the line above the ladder's own roll. Signature, and it
 is exactly what a drift walking six parameters at 8 Hz under every capture
@@ -1750,7 +1833,7 @@ shown this; its typed `* 2` margin hid it.
 
 🔴 **`push.sh` had been shipping the engine to a path sclang never reads.**
 `Engine_Pappus.sc` and `CroneEngine.sc` are SuperCollider CLASSES, compiled from
-sclang's Extensions directory — `/opt/positron-box` is not on its class path at
+sclang's Extensions directory — `/opt/positron-board` is not on its class path at
 all. MEASURED: the new command answered `CroneEngine: no command 'report'` and
 `PAPPUS READY 106 commands` while the copy in `/opt` had it and matched the md5
 `push.sh` printed. Two copies, two md5s, and the one being verified was the one
@@ -1993,7 +2076,7 @@ as **-1** from one shared `DC.kr(-1)`, never 0: a real meter is an Amplitude and
 can never be negative, so the value itself separates "not built" from "broken",
 which zero cannot do.
 
-`rig/box/norns/CHAIN.md` is the prerequisite plan-twins set — a stage with no
+`rig/board/norns/CHAIN.md` is the prerequisite plan-twins set — a stage with no
 entry in it may not be skipped — and writing it changed the plan in three
 places: 🔴 **the chain can ALREADY be skipped at run time** (`oin1 1, pin1 0`
 sends a granulator straight to the output with no recompile, so what BARE buys
@@ -2314,8 +2397,8 @@ transports — it is scsynth's own OSC path, not the wasm shim. LESSONS #63.
 | **TINY** | **63,297** | **1,451** | **yes** |
 
 Four compile-time cuts (modal bank, string voices, shimmer, half the delay
-taps) — `rig/box/norns/TINY.md`. The board runs TINY too, via `PAPPUS_TINY=1`
-in `/etc/default/positron-box`, so the two ends are the identical graph rather
+taps) — `rig/board/norns/TINY.md`. The board runs TINY too, via `PAPPUS_TINY=1`
+in `/etc/default/positron-board`, so the two ends are the identical graph rather
 than two different instruments. ⚠️ Def size does not track UGen count and SC does
 not strip an unconnected UGen: the shimmer is ONE UGen and cost 236 bytes, four
 delay taps are ~28 and cost 2,894. LESSONS #64.
@@ -6648,7 +6731,7 @@ State when parked:
 
 Deployed `df826fb-100522-6725`. ⚠️ No suite total recorded: the last full
 `verify.mjs` run predates the diagram, card, transport and `blocks` work.
-Measured per demo: `tapes` 22/22, `blocks` 45/45, `held` 22/22, diagram-test
+Measured per demo: `tapes` 22/22, `blocks` 45/45, `weight` 22/22, diagram-test
 64 ok.
 
 **Renames.** `scene` -> `blocks`, `kurenniemi` -> `resources`, `aikajana` ->
@@ -6666,7 +6749,7 @@ stroke (`EDGE_TINT = 0.75`) and the fill stays near-grey (`BOX_TINT = 0.1`).
 readings do exist, are reachable and answer with CORS headers clear. **Not one
 copy carries a creator, a date or a licence.** Provenance is the blocker, not
 availability, and this project does not ship attested-only material it cannot
-attest. `held` uses Kalevipoeg instead, which is public domain, has a named
+attest. `weight` uses Kalevipoeg instead, which is public domain, has a named
 translator lineage and carries a cultural link the audience actually has.
 
 **The three failures worth the space.** A `[^}]*` regex ate three CSS rules above

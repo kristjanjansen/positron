@@ -1019,7 +1019,7 @@ Three causes, and the biggest one did not look like traffic:
    moment they started saying no, we asked faster.
 
 ⚠️ And **the refusal reached nobody**: the fetch threw, the box replied
-`box.error`, and no client was listening for that type — so the page spun and
+`board.error`, and no client was listening for that type — so the page spun and
 the harness sat out its full 30 s timeout reporting *"no box in this room"*
 about a box that was answering fine. A blocked dependency and a dead service
 looked identical.
@@ -1032,7 +1032,7 @@ traffic.
 
 ## 51. Asking the wrong instrument where the board is
 
-`positron-box.local` does not resolve from this sandbox (mDNS is multicast UDP),
+`positron-board.local` does not resolve from this sandbox (mDNS is multicast UDP),
 a ping sweep answered nothing useful, and grepping `arp -an` for Raspberry Pi
 MAC prefixes missed a board that was sitting on the subnet the whole time. One
 line found it in a minute: `nc -z <ip> 22` across the /24, then `ssh` and ask
@@ -1042,7 +1042,7 @@ its hostname.
 it" is never the same as "it is down"** — a thing said out loud today before
 checking. Ask the relay first; it needs no LAN.
 
-Second trap in the same hour: **the service runs from `/opt/positron-box/`, not
+Second trap in the same hour: **the service runs from `/opt/positron-board/`, not
 `~/positron/`**. `provision.sh` unpacks into the home directory and `setup.sh`
 copies that to `/opt`, which is what the unit file executes — so the copy in
 `~/positron` is stale, has no `pappus.mjs` at all, and reading it says nothing
@@ -1053,7 +1053,7 @@ things here before.
 ⚠️ **A third location, session 21: `push.sh` had been shipping the engine to a
 path sclang never reads.** `Engine_Pappus.sc` and `CroneEngine.sc` are
 SuperCollider CLASSES, compiled out of sclang's Extensions directory, and
-`/opt/positron-box` is not on its class path at all. MEASURED: the new command
+`/opt/positron-board` is not on its class path at all. MEASURED: the new command
 answered `CroneEngine: no command 'report'` while the copy in `/opt` had it and
 matched the md5 `push.sh` had printed — two copies, two md5s, and the one being
 verified was the one nobody compiles. **An md5 is evidence only about the copy
@@ -1117,7 +1117,7 @@ checks one against the other: `samples / channels / rate` must come out at
 `frameMs`. A mono stream mislabelled stereo lands at half of it. That turns a
 wrong header from something you hear into something you read.
 
-⚠️ The field is `audioChannels`, **not** `channels` — `box.mjs` already had
+⚠️ The field is `audioChannels`, **not** `channels` — `board.mjs` already had
 `channels` and it means MIDI channels (16, multitimbral). Two quantities under
 one name in one protocol is a bug waiting for somebody in a hurry.
 
@@ -2175,7 +2175,7 @@ that were correct all along.
 
 ## 94. Twenty-one green checks over a picture that had stopped moving (session 28)
 
-A readout was taken off `held` and one `d.set` was left behind. `d.set` THROWS on
+A readout was taken off `weight` and one `d.set` was left behind. `d.set` THROWS on
 a key `mount()` never declared, the call was inside `requestAnimationFrame`, and
 so the render loop died on its first frame. The page then reported **21/21
 green**, because every check on it grades a still image: the font loaded, the
@@ -2371,3 +2371,115 @@ spreading the spec, so `set` was invisible to the painter and read as an option
 that did nothing. And `back: true` is an **author flag that nothing infers**: a
 return link without it is laid out as a forward step, which drew a line straight
 through `playout` and put its head on the far left of the Browser.
+
+---
+
+## 101. Undeployed work and unstarted work look identical from outside (session 37)
+
+The session opened with a request for something session 36 had already built.
+`/making/`'s readout had become table columns in the tree and the edge still
+served the old page, so from Kristjan's browser there was nothing to
+distinguish finished-but-undeployed from never-started. He re-asked, and the
+correct answer was a deploy.
+
+`HANDOFF.md` made it worse rather than catching it: its **What is live** table
+listed the page with the new columns. That was true of the working tree and
+false of the edge, and a handoff is read by somebody who then acts on it.
+
+⚠️ **A row in a "what is live" table is a claim about the EDGE.** One `curl` and
+one `grep` settles it. This project already has the rule for build stamps,
+*confirm the stamp changed before asking anyone to retest*, and this is the
+same rule one level up: confirm the CONTENT changed before writing down that it
+is live.
+
+## 102. An inline style beats every selector, so a component that writes one deletes a rule (session 37)
+
+`shell.css` has carried `.pos-vp[data-full] .pos-vp-stage { aspect-ratio: auto }`
+since full screen was built. `createVideoPanel` later gained an `aspect` option
+for `/stage/`'s 4:3 film, implemented as `stage.style.aspectRatio = aspect`, and
+an inline style beats every selector in every stylesheet. So a panel that had
+been given a shape could never give it up: `/making/`'s 1:1 picture box stayed
+square on a 16:9 screen, the picture sat high, and `.pos-fsx` is
+`position: absolute` INSIDE that stage, so it rode up there with it.
+
+**Reported as two separate things** (*"center fullscreen images"* and *"put back
+from fullscreen to sceen corner"*) because that is how it looks. One cause.
+
+✅ The fix is a custom property: `stage.style.setProperty('--vp-aspect', aspect)`
+and `aspect-ratio: var(--vp-aspect, 16 / 9)` in the stylesheet, which keeps the
+value per instance and keeps it reachable by a rule.
+
+🔴 **This is the fourth dead CSS rule this project has measured**, after
+`.pos-pick`'s entire phone layout, `.pos-log { margin-top }`, and a branch
+comparing against a string a function never returns. The general form: **a rule
+that is present and inert reads exactly like one that works.** Point a browser
+at it and read the computed value.
+
+## 103. `[attr]` matches an empty attribute, so clear it by deleting (session 37)
+
+`video-panel.mjs` did `root.dataset.full = full ? fullMode : ''`, and every
+full screen rule in `shell.css` is written `.pos-vp[data-full] …`. An attribute
+selector matches on PRESENCE, so `data-full=""` still matched: a panel that had
+been full **once** kept `border: 0`, `background: #000` and a stage with no
+aspect ratio for the rest of the page's life.
+
+⚠️ **It survived because entering is what gets tested.** Every check anybody
+writes about full screen is about going in. The state that was wrong is the one
+AFTER coming back, and it is wrong in a way that reads as a design choice rather
+than as a fault. It was found by an assert that checked the panel took its own
+shape back, written for a different reason.
+
+## 104. A domain outlives the people who had it (session 37)
+
+A Wayback survey of mimproject.org pulled 67 pictures, and four of them were
+advertising for a Thai online casino: everything captured under
+`/wp-content/uploads/2025/01/`, after the domain had lapsed and been picked up
+for gambling SEO.
+
+Nothing in a CDX row says who owned the host that day. The survey asked what the
+DOMAIN had held, which is the only question an index of URLs can answer, and the
+2009-2023 captures and the 2025 ones are two different organisations wearing one
+name. **`a 2025 revival` was written into four files** before anybody opened a
+picture: the corpus note, the build script, the backlog and a memory.
+
+⚠️ **A site coming back and a site being taken are the same shape in an index of
+URLs.** Open the pictures. The build now throws on any row whose upload path is
+2025 or later, and carries `removed` so a later survey cannot quietly restore
+them.
+
+## 105. Three different refusal codes in a row is the instrument, not the content (session 37)
+
+Two 2021 works were addressed on IPFS. Probing `cloudflare-ipfs.com` gave `000`
+(that gateway is retired), and one `curl -I` each at `ipfs.io`,
+`trustless-gateway.link` and `w3s.link` gave **429, 406 and 301**. That was
+written up and reported as *addressed, not retrieved*, with the open question
+being whether anybody still pinned them.
+
+Every one of those three was rate limiting or a redirect. With a real
+user-agent, a **ranged GET rather than HEAD**, which is what those gateways
+throttle hardest, and six seconds between calls, five gateways answer 206 with
+a ZIP header, and both 77.9 MB files came down in under four seconds.
+
+⚠️ This is *a partial result that is too tidy is a broken collector* wearing new
+clothes. Three hosts refusing in three different ways is not three data points
+about the content; it is one data point about how you are asking. **Check the
+instrument before reporting an absence**, and an absence reported as fact is the
+expensive kind, because nobody re-runs it.
+
+## 106. An arrow key that also selects is a network request per row (session 37)
+
+`table.mjs` gained keyboard navigation. The tempting shape, an arrow that moves
+the selection the way a file browser does, would have been a defect on the exact
+page that asked for it: `/making/`'s `onPick` fetches a picture off the bucket,
+so holding the down arrow through 63 rows would pull 63 files nobody asked to
+see. That is this project's load-on-a-visit defect, already paid for three
+times, arriving through the keyboard.
+
+✅ **Arrows move focus, Enter opens.** Moving focus is free; opening is a
+decision, and a decision needs its own key. Asserted both ways: the focus moved
+AND nothing was opened.
+
+⚠️ The same change fixed a quieter thing. Every row had been `tabIndex = 0`, so
+tabbing past a 63-row table took sixty-three presses. A roving tabindex makes a
+list ONE stop. It is invisible in a screenshot and in every other check, and it
+is free to read off the DOM.

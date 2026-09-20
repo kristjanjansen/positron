@@ -39,7 +39,7 @@ That accounts for everything that executes. What remains is writing:
    `demo/manifest.mjs`, `built: true`. The build ENUMERATES `demo/`, so there is
    nothing to add to an allowlist.
 2. **A page that lives somewhere else** — because it belongs with the hardware,
-   like the box's listener in `rig/box/` — → a row with `built: false`,
+   like the box's listener in `rig/board/` — → a row with `built: false`,
    `page: '/slug/'` and **`src:`**. The build and the dev server both read `src`,
    so it is declared once. It used to need a hand-written line in each, in two
    files, with nothing to notice if only one was made.
@@ -113,7 +113,7 @@ That accounts for everything that executes. What remains is writing:
 
    🔴 **`checkCompiledDefs()`, for an artefact that can go STALE rather than
    missing.** `demo/grains/defs/*.scsyndef` are compiled by sclang **on the
-   Raspberry Pi** out of `rig/box/norns/Engine_Pappus.sc` and `PosSource.sc`;
+   Raspberry Pi** out of `rig/board/norns/Engine_Pappus.sc` and `PosSource.sc`;
    `/grains/` loads them into the tab and claims, in its own diagram, that the
    browser is running the graph the board is running. Edit the engine and the
    board recompiles on its next restart while the checked-in file does not — so

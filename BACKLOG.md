@@ -1,5 +1,1244 @@
 ## Open
 
+- ✅ **THE LINGO IS `board` EVERYWHERE IN THE REPO, 2026-09-20. THE BOARD ITSELF
+  IS NOT MIGRATED YET AND THAT IS THE ONE THING LEFT.** Instructed: *"and in
+  general change the lingo from box to board"*, which **reverses CLAUDE.md's
+  `rig/box/` DID NOT MOVE AND MUST NOT**, recorded there so nobody re-litigates
+  it from the old rule.
+  ✅ **777 occurrences in 110 files**: `rig/box/` to `rig/board/`, `box.mjs` to
+  `board.mjs`, the wire verbs `board.hello` / `board.alive` / `board.ping` /
+  `board.pong` / `board.error`, `positron-board.service`,
+  `/opt/positron-board`, `/etc/default/positron-board`, `BOARD_NAME` /
+  `BOARD_USER` / `BOARD_AUDIO` / `BOARD_SSH`, the JACK capture client
+  `posboard`, the room defaults `board-dev` / `board-test` / `board-prep`, the
+  socket prefix, and the prose. `plan-box-*.md` and `research/hardware-box.md`
+  moved too.
+  🔴 **WHAT DID NOT MOVE, AND IT IS THE `held` LESSON AGAIN**: `diagram.mjs`'s
+  `BOX_PAD_X`, `BOX_FS`, `BOX_ALIGN`, `BOX_TINT`, `BOX_MIN_W`, `BOX_MAX_W`,
+  `BOX_MAX_W_COL`, `BOX_TARGET_W`, which are **a box in a picture**;
+  `box-shadow`, which is CSS; `a music box` in `synth.mjs`; the GR2 **box on
+  SIGNAL's wireframe** in the norns engine; and all 14 `archive/` files, because
+  an archive records what was there.
+  🔴 **A SUBSTITUTION ORDER BUG CORRUPTED ONE WORD AND ONLY A HASH CAUGHT IT.**
+  `the box` was applied before `boxes`, so `the boxes` became **`the boardes`**.
+  It landed in `Engine_Pappus.sc`, and what found it was `build.mjs` REFUSING
+  the build because that file is **hashed source for the compiled SynthDefs
+  `/grains/` ships**. No test could have seen it; it is a comment.
+  ⚠️ **SO `Engine_Pappus.sc` AND `PosSource.sc` ARE REVERTED AND STILL SAY
+  `rig/box` IN THEIR COMMENTS.** That is deliberate: a file whose hash gates a
+  compiled artifact is not free to edit, and changing a comment in one costs a
+  recompile on real hardware. Anybody renaming them must recompile on the board
+  and re-take the hashes, and `build.mjs` prints the recipe.
+  ✅ **VERIFIED**: `rig/board/test.mjs` **92/92**, `presence-test.mjs` **29/29**,
+  `node demo/verify.mjs grains radio stage items making` **150/150**, every
+  board-facing page parses, and the deployed build resolves every import.
+
+- ✅ **`BOARD_ID` EXISTS, THE `studio-1` DEFAULT IS GONE, AND THE JOURNAL WILL
+  SURVIVE A REBOOT. IN THE REPO, NOT YET ON THE BOARD.**
+  🔴 **`setup.sh` NOW REFUSES WITHOUT A ROOM.** It read `${ROOM:-studio-1}`,
+  which pointed every board anybody installed at OUR room. The relay has no
+  authentication, no routing and no sender identity, so the room name is the
+  only isolation this stack has, and two boards in one flap `boardFrom` twice a
+  beat and interleave two `aseq` counters into a single playout ring.
+  `provision.sh` requires it too.
+  ✅ **`BOARD_ID` IS MINTED ONCE AT INSTALL** (`hostname` plus four random
+  bytes), written to `/etc/default/positron-board`, and **reported on
+  `board.hello` and `board.alive`** — because a config value nothing reads is an
+  inert control, which is this repo's named hazard. It is `null` rather than a
+  made-up default on a board provisioned before it existed, so such a board says
+  so instead of claiming an identity it was never given.
+  ⚠️ **THE OTHER THREE NAMES CANNOT DO THIS JOB**: `BOARD_NAME` is `hostname`,
+  which is `raspberrypi` on every fresh Pi; `FROM` is per socket and changes on
+  every reconnect; `ROOM` is a place rather than a thing in it.
+  ✅ **JOURNAL**: `Storage=persistent`, capped at 200M, written to
+  `/etc/systemd/journald.conf.d/positron.conf` by `setup.sh`.
+
+- ✅ **DONE 2026-09-20. THE BOARD IS MIGRATED AND VERIFIED ON THE WIRE.**
+  `rig/board/migrate-from-box.sh`, written because this is a MIGRATION and not a
+  push: the unit, the install path and the config file all change name, so
+  `push.sh` alone would write into a directory nothing executes and restart a
+  unit that does not exist, **and both halves would report success**.
+  ✅ **CHECKED WHO WAS LISTENING FIRST.** `room/studio-1/stats` reported
+  **1 socket**, which is the board's own ping. It was sounding an instrument
+  into a capture nobody was receiving (jackd 52 min, yoshimi 1:49, ffmpeg 1:42)
+  after a page called `saiv1p` drove the granulator and went quiet.
+  ✅ **WHAT LANDED**: code at `/opt/positron-board`, md5 identical at both ends
+  for `board.mjs` and `jacksynth.mjs`; `ROOM=studio-1` and `PAPPUS_TINY=1`
+  carried forward off the old file rather than defaulted; **`BOARD_ID=
+  raspberrypi-6827d41e` minted**; `positron-box` disabled, `positron-board`
+  active; the journal persistent and **`--list-boots` already shows 2**.
+  ✅ **THE ID IS ON THE WIRE, NOT JUST IN A FILE**: `ask.mjs listen` reads
+  `"id":"raspberrypi-6827d41e"` off a real `board.alive`. That is the check that
+  matters, because a config value nothing reads is an inert control.
+  ✅ **`jack.graph` ANSWERS FOR THE FIRST TIME.** It had never been on the
+  board: unknown verbs fall through `default: return false`, so the verb written
+  to diagnose the level collapse had been replying to nobody. It now reports
+  `ok: true`, `server: up`, and the graph `yoshimi:left` and `yoshimi:right`
+  both into **`posboard:input_1`**, with `posboard:input_2` unconnected, which
+  is the undeclared divisor-by-two visible on screen.
+  ✅ **AND IT MAKES SOUND, MEASURED RATHER THAN ASSUMED**: `cc-test.mjs` 4/4,
+  **peak 0.1393**, CC 74 moving brightness **5.59 octaves monotonically** over a
+  0.04 octave floor. That is 40x to 140x above the collapsed range, so the fault
+  is still not present.
+  🔴 **AND IT ANSWERS STEP 0 OF `plan-controller.md`, WHICH WAS SKIPPED AND IS
+  CALLED THE SINGLE LOAD-BEARING UNKNOWN**: *does Yoshimi's CC 74 actually move
+  a chosen patch on this board*. **Yes, 5.59 octaves, monotonic.**
+  ⚠️ **THE MEMORY LOCK WARNING IS CONFIRMED LIVE**: `Cannot lock down 107350048
+  byte memory area` from both yoshimi and ffmpeg on this very start.
+  ⚠️ **LEFT AS FOUND**: audio stopped, ffmpeg 0, yoshimi 0, jackd up, which is
+  its designed behaviour as a shared server that outlives an instrument.
+  **`/opt/positron-box` and the old unit are left on disk, disabled**, and the
+  rollback is one line the script prints.
+
+- ✅ **DONE 2026-09-20. THE TWO UNGRADED DIAGRAMS ARE GRADED, AND GRADING THEM
+  FOUND SIX REAL DEFECTS IN SECONDS.** Asked: *"fix diagrams"*.
+  `/items/` and `/radio/` called `createDiagram` as a statement and threw the
+  return away, so `cuts` went to nobody. Both capture it now and assert
+  `dg.cuts.length === 0`, which runs for every visitor because a diagram is on
+  the page whether or not anybody presses anything.
+  🔴 **WHAT IT IMMEDIATELY CAUGHT**: five notes over the forty word budget
+  (`store` 48, `fcm` 48, `stn` 51, `cf` **59**, `mod` 46) and one `sub` too wide
+  for its box (`a service worker`, now `service worker`). Every one was being
+  refused at the reader and reported to nobody. **The pictures looked finished.**
+  ✅ All six rewritten to fit, longest now 36 words, and the notes kept their
+  facts: `cf` still names both headers and what each buys.
+  ⚠️ **PROVED BY SABOTAGE**: one extra clause on `cf`'s note takes the assert
+  red and names `note cf`. `/items/` and `/radio/` **37/37 together**, +2
+  asserts, nothing lost.
+  ⚠️ **`/radio/` WAS RUN AND THAT IS ALLOWED NOW**: `node demo/verify.mjs radio`
+  starts `demo/fake-station.mjs` itself and contacted nobody's radio.
+
+- 🔴 **PORTABILITY: THE SMALLEST NEXT STEP IS KILLING THE `studio-1` DEFAULT
+  AND MINTING A `BOX_ID`.** Audited against the code 2026-09-20, not against the
+  plan.
+  **Built**: the `LIMITS` fix in `demo/shell/wire.mjs:48-53` (step 1, fixed in
+  the same commit that added the plan, so the plan text is stale); `jack.graph`
+  (step 2a) graded without hardware at **92/92** with two sabotages;
+  `jack.rebuild` partially (step 8.2c, link diff only, kills nothing); config
+  surviving a push; the relay swappable at both ends except `/grains/`.
+  **Refused in writing**: `service.restart`, because a process killing itself
+  over the relay cannot report what happened.
+  **Not built**: the package list from `rig/audit.mjs` (so a fresh Pi still
+  comes up silent), `BOX_ID`, the tarball, the client seam, a tunnel, `.deb` or
+  SD image, per-client MIDI channel, controller-state reporting, arbitration.
+  🔴 **CONFIRMED EXACTLY AS THE PLAN FEARED**: `workers/relay/src/index.js` has
+  no authentication, no routing and no sender identity, `webSocketClose()` is
+  empty, and `tokenless: true` is advertised. **The room name is the only
+  isolation primitive this stack has.**
+  ⚠️ **DRIFT THE OTHER WAY, BUILT AND NOT IN THE PLAN**: a "somebody else is
+  driving this" report on the page (`board.mjs:127-139`), a `by: 'page' | 'tool'`
+  field on the wire, and a room census on the board (`board.mjs:118-200`).
+  ✅ **THE RECOMMENDATION, WITH ITS REASON**: `rig/board/setup.sh:23` and `:88-96`,
+  `provision.sh:49`, `board.mjs:38-46`. Tens of lines, needs no board. **The
+  installer currently points every friend's board at OUR room**, where two
+  boards flap `boardFrom` twice a beat and interleave two `aseq` counters into
+  one playout ring, and `BOARD_NAME=$(hostname)` gives two Raspberry Pis the same
+  label today. Every later addressing idea depends on it, and the seam, the
+  tarball and the package list all end up editing the same
+  `/etc/default/positron-board` heredoc.
+- ✅ **DONE 2026-09-20. STEPPING A TABLE MOVES THE TABLE, NOT THE PAGE.**
+  Reported: *"do not make keyboard focused item move away from viewport of table
+  when keep using keyboard"*, against the keyboard navigation shipped hours
+  earlier.
+  🔴 **MEASURED: THE OLD CODE SCROLLED THE DOCUMENT ON 56 OF 62 STEPS.**
+  `focusRow` called `row.focus()` and then `row.scrollIntoView({ block:
+  'nearest' })`, and **both of those scroll every scrollable ancestor, the
+  document included**. So the table's own box slid up the window under the row,
+  which from a reader's side is the focused item leaving the table.
+  🔴 **AND THE OBVIOUS ASSERT WOULD HAVE PASSED THROUGH IT.** Under that
+  sabotage, `0 rows left the box`: scrolling the PAGE is one of the ways
+  `scrollIntoView` makes a row visible, so "the focused row is inside the
+  scroller" is true the whole time it is misbehaving. The check has to name
+  `window.scrollY`, which is the quantity that was actually wrong. That is the
+  measure-the-quantity-in-question rule with a very short lever.
+  ✅ **THE REPAIR IS `focus({ preventScroll: true })` PLUS ARITHMETIC ON THE
+  TABLE'S OWN `scrollTop`.** Nothing else is written, so the document cannot
+  move. A row of margin is kept above and below, clamped at the ends, because
+  `nearest` puts every new row flush against the boundary with nothing visible
+  beyond it.
+  🔴 **THE FIRST BUILD OF THE ARITHMETIC USED `offsetTop` AND WAS WRONG BY 579
+  PIXELS.** `.pos-tbl-body` is `position: static`, so a row's `offsetParent` is
+  some positioned ancestor further up the page rather than the scroller: the
+  number looked like a position inside the scrolled content and was a position
+  inside something else. Rects now, both read in one frame so the page's
+  position cancels out. **The comment claiming `offsetTop` was the robust
+  choice was written before it was measured, and is corrected in the file.**
+  ⚠️ **TWO ASSERTS, TWO SABOTAGES, ONE EACH**: the old calls back takes `page
+  moved on 56`, and `pad = 0` takes the margin check to `0 px above`.
+  **`/making/` 36/36 to 38/38, and 207/207 across all seven pages with a
+  table.**
+  ⚠️ **NOT REPRODUCED IN THE BROWSER, AND THE REASON IS WORTH KNOWING**: the
+  automation's key presses never reach the page at all. `document.activeElement`
+  was the right row and a document-level CAPTURE listener recorded nothing, so
+  16 presses did nothing. Synthetic `KeyboardEvent`s do fire the handler and are
+  what the checks use.
+
+- ✅ **DONE 2026-09-19. FOUR REQUESTS, AND THE LAST TWO WERE ONE BUG. `/making/`
+  24/24 TO 36/36.** *"rm these"*, *"allow keyboard nav in tables"*, *"center
+  fullscreen images"*, *"put back from fullscreen to sceen corner"*.
+
+  🔴 **THE FOUR PICTURES ARE ADVERTS FOR A THAI ONLINE CASINO, AND THE DOMAIN
+  WAS SQUATTED RATHER THAN REVIVED.** The screenshot named three; the fourth,
+  `z2.jpg`, was off the bottom of the crop and is the obvious twin of `b1.jpg`.
+  **Opening them settled it**: `b1.jpg` and `z2.jpg` are DAGAS888 slot-machine
+  banners in Thai, and `1708801678_e24161643a4698db5ae7.png` is that brand's
+  logo, with its `cropped-` variant the WordPress site icon made from it. All
+  four go, because removing three casino adverts and keeping the fourth is
+  worse than either.
+  🔴 **`a 2025 revival` WAS THE WRONG READING AND IT WAS WRITTEN IN FOUR
+  PLACES** before anybody looked at a picture: the corpus note, the build
+  script, this file and a memory. **A site coming back and a site being taken
+  are the same shape in an index of URLs.** Corrected everywhere.
+  ✅ **THE BUILD NOW THROWS on any row whose upload path is 2025 or later**,
+  with `removed` carried in the corpus so a later survey cannot quietly put them
+  back. Proved by putting one back. **63 objects serve, the four are 404.**
+
+  ✅ **KEYBOARD NAVIGATION IS IN `table.mjs`, SO EVERY TABLE HAS IT.** Arrows,
+  Page Up and Down, Home and End, Enter to open. Two decisions that matter:
+  🔴 **AN ARROW MOVES AND DOES NOT OPEN.** `onPick` on `/making/` fetches a
+  picture, so an arrow that picked would pull 63 files off the bucket for
+  somebody holding a key down. Asserted both ways: the focus moved AND nothing
+  opened.
+  🔴 **ROVING TABINDEX: ONE STOP FOR A LIST, NOT ONE PER ROW.** Every row was
+  `tabIndex = 0`, so tabbing past this table took sixty-three presses. Invisible
+  in a screenshot and in every other check.
+
+  🔴 **AND THE TWO FULLSCREEN REPORTS HAD ONE CAUSE.** The stage kept
+  `aspect-ratio: 1 / 1` on a 16:9 screen, so the picture sat high, and `.pos-fsx`
+  is `position: absolute` INSIDE that stage, so the way out rode up with it.
+  🔴 **THE RULE THAT SHOULD HAVE FIXED IT ALREADY EXISTED AND HAD NEVER RUN.**
+  `shell.css` has carried `.pos-vp[data-full] .pos-vp-stage { aspect-ratio:
+  auto }` all along; `createVideoPanel`'s `aspect` option, added later for
+  `/stage/`, wrote `stage.style.aspectRatio`, and **an inline style beats every
+  selector**. It is `--vp-aspect` now, read as `var(--vp-aspect, 16 / 9)`, so a
+  rule can still win. **Fourth dead rule this project has measured.**
+  🔴 **AND THE CHECK FOUND A SECOND, WORSE BUG NOBODY HAD SEEN: `[data-full]`
+  MATCHES AN EMPTY ATTRIBUTE.** `syncFull` set `dataset.full = ''` on exit, so a
+  panel that had been full ONCE kept `border: 0`, `background: #000` and a stage
+  with no aspect ratio for the rest of the page's life. It survived because
+  entering is what gets tested and the wrong state is the one AFTER leaving.
+  The attribute is deleted now. **Confirmed in a real browser**: after Escape,
+  no `data-full`, 460 px, `1 / 1`, border and radius back, stage no longer black.
+  ✅ **MEASURED IN FULL SCREEN**: stage 1216x773 filling the display, aspect
+  `auto`, picture centred, and the exit **12 px from the screen's right and
+  bottom** rather than from the box's.
+  ⚠️ **TWELVE ASSERTS ADDED, NOTHING LOST**, and **218/218 across all ten pages
+  that use `table.mjs` or `video-panel.mjs`**, which is the check that matters
+  for a kit change.
+
+- ✅ **DONE 2026-09-19. SIXTY-SEVEN PICTURES OUT OF THE WAYBACK MACHINE AND
+  INTO R2, AND THE CLAIM THAT THERE WAS NOTHING TO GET IS REFUTED.** Asked:
+  *"do deeper analysis on mimproject.org assets in archive. can you also do
+  image search and get them into r2 (separarte dir?)"*.
+  🔴 **THE STANDING NOTE SAID `archive.org has nothing of it`.** MEASURED off
+  the CDX index: **2843 captures, 778 unique URLs, 421 HTML pages, 152 content
+  pages, spanning 2009-10-30 to 2026-02-09.** It was wrong about pages and
+  pictures. ✅ **IT WAS RIGHT ABOUT VIDEO**, and that half is now measured
+  rather than assumed: **zero** mp4, mov, webm, mp3, wav or pdf in the entire
+  index, so the recordings really do survive only on YouTube and Vimeo.
+  ⚠️ **FOUR SITES LIVED ON ONE DOMAIN** and the survey had to separate them:
+  `mimproject.org` (Drupal to about 2013, then WordPress, then a 2025 revival),
+  `taavetjansen.mimproject.org` (23 portfolio works),
+  `opera.mimproject.org` (the Eesti ajalugu opera, et/en/ru, with a cast page
+  per singer), and `images.squarespace-cdn.com`, which is where the 2016 to
+  2019 pages embedded their pictures from.
+  🔴 **ALL FOUR HOSTS ARE DEAD AT THE DNS LEVEL**, probed directly. `curl`
+  answers `000`, not a 404 or a 500. `elektron.art` and `lab.elektron.art`, the
+  successor, both answer 200.
+  ✅ **IN THE BUCKET: `positron-station/mimproject-images/`**, a separate prefix
+  as asked, beside `mimproject/` and NOT inside it. 67 objects, 20.0 MB,
+  **verified 67/67 serving 200 or 206 with the exact byte count and the
+  content-type the corpus states**. The station worker's `sweep()` lists under
+  `live/` only, so the prefix is safe there.
+  ⚠️ **THIRTY OF THE SIXTY-SEVEN ARE 145x145 THUMBNAILS** and carry
+  `thumbnail: true`. The originals behind them were never captured. They are
+  held because they are the only surviving picture of those works and labelled
+  so nobody offers one as a picture.
+  🔴 **A NAMING BUG WAS CAUGHT BY BUILDING THE MANIFEST TWICE FROM TWO
+  DIFFERENT FIELDS.** The uploader named files from the URL's extension and the
+  repo build names them from what `file` says the BYTES are; they disagreed on
+  one object, a PNG served from a `.jpg` URL. That is CLAUDE.md's *two numbers
+  derived from one field agree while being wrong together* met from the other
+  side: two INDEPENDENT derivations can disagree, and this one did. The object
+  was re-put as `.png` and the `.jpg` key deleted, confirmed 404.
+  **In the repo**: `demo/resources/mimproject-images.json` (the corpus),
+  `mimproject-images-measured.json` (what was read off the bytes and the index),
+  `build-mimproject-images.mjs` (`--check` prints and writes nothing). Keyed by
+  `id`, never by file name, and a date is carried as `uploadedPath` rather than
+  as `when`.
+  https://positron-station.kristjan-jansen.workers.dev/media/mimproject-images/manifest.json
+
+- ✅ **DONE AND DEPLOYED 2026-09-19. `/making/`'s `picture` COLUMN ALIGNS
+  LEFT.** Asked: *"align picure to left in table"*. It is the odd one out among
+  the four right-aligned columns and that is the point: `uploaded`, `length`
+  and `size` are quantities that line up on their last digit, and `480x272` is
+  a SHAPE, with no last digit to line up on. Left puts every resolution's first
+  figure in one place, beside the left-aligned `via`. **24/24, the count
+  unmoved.** `BUILD ad85335-160149-dcb5`.
+
+- ✅ **DONE AND DEPLOYED 2026-09-19. `/making/`'s GLUED READOUTS ARE COLUMNS,
+  AND THE REASON IT HAD TO BE ASKED TWICE IS THE INTERESTING HALF.** Asked
+  *"in held rm glued readouts and add that info to table columns"*, corrected in
+  the next breath to *"i mean making"*. **The work was already finished in the
+  tree and the edge was still serving the old page**, so from outside there was
+  no way to tell it from undone work.
+  🔴 **MEASURED, NOT ASSUMED**: `curl https://positron.studio/making/` answered
+  `readout: { when, uploaded, via, length, picture, size }` and a FOUR column
+  table, while `demo/making/index.html` answered `readout: null` and SEVEN.
+  `joined: true` is what glued those six cells to the log at the foot, and it
+  survives on purpose, holding the log as one surface down there.
+  ⚠️ **AND `HANDOFF.md` LISTED THE PAGE UNDER "What is live".** It was true of
+  the tree and false of the edge. A row of that table is a claim about the edge
+  and has to be measured against the edge, which is one `curl` and one `grep`.
+  ✅ **DEPLOYED: `BUILD ad85335-155955-04f6`**, five files moved, and
+  `DEMO_BASE=https://positron.studio node demo/verify.mjs making` is **24/24
+  against the edge**. https://positron.studio/making/
+
+- ✅ **DONE 2026-09-19. `/held/` IS THE TIMELINE, AND THE PAGE UNDER IT IS
+  GONE.** Asked as *"try to get as much as possile of stuff to timeline. rm
+  sections / credits from end"*, then sharpened to *"NOT ON THIS CLOCK / WHAT
+  THE SCORE DOES NOT SETTLE, find to way to put it to tline"*, plus *"rm
+  readout from held"*. **43/43 to 45/45.**
+  ✅ **THE READOUT'S FOUR CELLS ARE EACH ON THE LINE THEY CROSS**: the scene is
+  the bar the playhead is inside at full strength, the room percentage is
+  written on its own curve, the tint lane now writes each table's name inside
+  its band as a knockout label 10 px in (two bands begin exactly where a break
+  stands, so a column would have eaten the first letter), and the voice is a bar
+  under the playhead.
+  ✅ **`NOT ON THIS CLOCK` BECAME A HATCHED REGION AT BOTH ENDS OF THE AXIS**,
+  the same 12 px column the maze gets, in pixels at every zoom. Drawing ONE
+  region at both ends is how the loop is stated rather than asserted: the two
+  ends are the same place.
+  ✅ **THE NINE REFUSALS ARE MARKS AT THE MOMENT EACH ONE BITES**, with the
+  gutters reading `open 4 of the 9`, `maze 3 of the 9`, `transition 2 of the 9`
+  and an assert requiring the three to sum to nine with nothing counted twice.
+  ⚠️ **WHAT WOULD NOT FIT ON THE LINE AND WHY**: a mark has ONE footer line and
+  these are two and three sentence refusals with sixteen readings between them,
+  so the line says WHERE each bites and how many readings it has, and the log
+  says what it is in full. **Pressing a mark seeks there and says the whole
+  refusal again at the foot of the log**, so the line is the index into them.
+  ⚠️ **THE CREDITS STAY A BLOCK AND STOPPED BEING A TABLE.** MEASURED at 390 px:
+  `.pos-tbl-row`'s 560 px floor cut `LIIS VARES, TAAVET JANSEN` and the
+  supporters mid word. Eleven cards now, three columns at 1280 and one on a
+  phone, nothing cut.
+  🔴 **AND A REAL DEFECT WAS FOUND WHILE LOOKING**: the opening view overran the
+  plot by about 17 px, so the end of the outro and the whole right hand column
+  were OFF SCREEN for a visitor. The harness was the only thing that had ever
+  seen the whole axis, because it calls `fit()` inside its own zoom check. The
+  page fits at load now.
+  ✅ Both new checks proved by sabotage: dropping one refusal from the placement
+  map takes the nine things check red while the log check stays green, which is
+  the right separation.
+
+- 🔴 **A TABLE OF PROSE SCROLLS SIDEWAYS ON A PHONE, AND THE KIT HAS NO
+  COMPONENT FOR ONE.** Found 2026-09-19 while building `/held/`, which has three
+  such tables.
+  `.pos-tbl-row { min-width: 560px }` under 620 px is right for what
+  `table.mjs` was built for, 122 archive records in columns a reader compares
+  down. It is wrong for a LABEL AND A PARAGRAPH, which is what a list of nine
+  ambiguities or seven readings is: there is nothing to compare down a column,
+  and a sentence that has to be dragged sideways is a sentence nobody reads.
+  ⚠️ **THE GAP IS A COMPONENT, NOT A MEDIA QUERY.** `table.mjs` is columns;
+  what is missing is a definition list, a term and its prose, which on a phone
+  stacks rather than scrolls. Three pages would use it today.
+  ⚠️ And the rule this project already has applies to whatever is built:
+  `min-width: 0` or a scrolling row drags the PAGE sideways instead of
+  scrolling, and 390 px once measured 141 px of page overflow.
+
+- ✅ **DONE 2026-09-19. THE MIDDOT IS OUT OF THE STRIP'S GUTTER.** Found by the
+  `/held/` agent, which dodged it by giving every lane exactly one sub-label
+  rather than letting it show. `timeline/strip.mjs` joined two or more
+  sub-labels with `' · '` in two places, one of them inside the width
+  measurement, so the fit test and the drawn string now use the same separator
+  and the test cannot answer about a line nobody draws.
+  ⚠️ The middots left in that file are debug HUD overlays from the archive
+  timeline research (aoristic Σ, provenance tiers), which no shipped demo
+  surface shows. Left on purpose.
+
+- ✅ **`/stage/`: THE FILM GETS ITS OWN TRANSPORT, IN THE PANEL FOOTER.** Asked
+  2026-09-19, five things in one line: *"stage: move video play / stop to
+  videopanel footer. mute (find utf8 symobls) is next to fullscreen. make video
+  transport indepencent of when show starts. make transportbar glueable to
+  videopanel footer. replace timeline-glued transport record button with start |
+  stop text labels (same w)"*.
+  **1. Play and stop move into the video panel's footer.** They belong to the
+  picture, and the footer is the row under the picture.
+  **2. Mute sits next to the fullscreen button**, as a symbol rather than the
+  word it is now. The `sound` choice landed this morning as `muted | on` in the
+  control room; it becomes a glyph in the footer's right slot beside the ⛶.
+  ⚠️ **THE GLYPH HAS TO BE ONE CHARACTER AND SHOULD RENDER MONOCHROME.**
+  `shell.mjs` treats a single non letter, non digit label as an icon and centres
+  it on its ink with `centreSymbol`, which is how ⛶ is handled. An emoji
+  presentation glyph comes out in colour and at a different weight from ⛶, which
+  is the pair it has to sit beside. Try the text style speakers (U+1F568,
+  U+1F56A) and the muted speaker (U+1F507) and LOOK at them next to ⛶ rather
+  than picking from a table.
+  **3. The film's transport is independent of the show.** Today the film plays
+  only from `startShow`, so there is no way to watch the picture without
+  recording a show. Those are two different things and the page should say so.
+  **4. A transport bar must be gluable to a video panel footer.** That is a KIT
+  change: `demo/shell/glue.mjs` joins blocks, and the panel's footer is not a
+  block it has ever been asked to join. `/reel/` glues a bar to a strip and
+  `createStripView` returns a `surface` for exactly that reason, so the shape
+  exists and the video panel needs its half of it.
+  **5. The timeline glued transport loses its record button for `start | stop`
+  text labels of the SAME WIDTH.** Two words, equal width, so the control does
+  not change size when it changes state, which is the rule this project already
+  has about a button that resizes under the pointer.
+  ⚠️ **TWO TRANSPORTS ON ONE PAGE MEANS `publish: false` ON ONE OF THEM**, which
+  CLAUDE.md already rules and `/stage/` already pays for: `__demo.transport` is
+  whichever bar was built last unless a page says which is which.
+  ⚠️ **AND THE HARNESS PRESSES `.tbar-x`**, so a film transport in a footer is
+  reachable by a run. Check what a run now costs in bytes from R2, since that
+  page just measured a visit at zero.
+  ✅ **DONE 2026-09-19. 49/49, AND `/kit/` 63/63.** Play and stop are in the
+  panel footer, mute is a glyph beside the ⛶, the film's transport is
+  independent of the show, a bar can be glued under a panel, and the show's
+  record button is `start | stop` at **65.19 px in both states**, equal by
+  construction (both words in the button, the inactive one `visibility:
+  hidden`, so it still claims its width) rather than by luck.
+  🔴 **THE TEXT STYLE SPEAKERS DO NOT EXIST ON THIS MACHINE AND THE SUGGESTION
+  TO USE THEM WAS MINE.** U+1F568, U+1F569 and U+1F56A each measure an ink box
+  of **13.23 px, identical to U+10FFFD**, the codepoint nothing has a glyph
+  for, and all three draw the same hollow tofu. ⚠️ **THE ADVANCE WIDTH CANNOT
+  TELL YOU THIS**: the panel's font is monospace, so tofu and a real glyph are
+  both 9.03 px wide. The ink box is the measurement that separates them.
+  The emoji speakers render in colour at 21 px of ink against the ⛶'s 9.86, and
+  U+FE0E changes nothing because there is no text glyph for it to select. Chosen:
+  **`♫` U+266B on, `⊘` U+2298 muted**, each of which reads alone rather than by
+  being compared with the state it is not in.
+  ✅ **AND `centreSymbol` WAS NEVER ON THE PANEL'S OWN ⛶**, which nobody could
+  see until a second glyph button sat beside it.
+  🔴 **`/kit/` CAUGHT A REAL BUG IN `panel.glue()` THAT `/stage/` DID NOT.** The
+  in place wrap remembered the panel's next sibling and re-inserted before it;
+  on the kit that sibling IS the bar being glued, `createGlue` moves it, and
+  `insertBefore` throws. It uses a comment node marker now. One caller passing
+  is not the same as the method working.
+  ✅ **THREE BARS ON ONE PAGE AND THE PAGE ASSERTS WHICH PUBLISHES**: the
+  archive's, because it answers where we are in the recording this page made,
+  and because a harness driving the film's bar would press play on a quarter of
+  a gigabyte. A run does not start the film by itself.
+  ✅ **THE ZERO SURVIVED**: a visit that presses nothing is 2,088.9 KiB and
+  **0 from R2**, up 30.8 KiB for the modules the page now imports. A harness run
+  is 13.0 MiB from R2, LOWER than this morning's 14.0, because the drill now
+  pauses the film on the way out.
+  🔴 **AND THE FILM'S BAR HAS NO SLIDER, SO THERE IS NO WAY TO CUE INTO THE
+  FILM.** `scrub: false`, because this tab already has a strip and CLAUDE.md's
+  one position surface rule is explicit that a 22 minute axis stacked 40 px
+  above a 30 second one is the contradiction it is written about. That is a
+  CONSEQUENCE rather than an oversight, and if cueing is wanted it is the rule
+  that has to be revisited.
+
+- 🔴 **A `back: true` LINK LANDS ON THE WRONG BOX WHEN TWO BOXES ARE STACKED IN
+  ONE COLUMN.** Photographed 2026-09-19 on `/weight/`'s new diagram and reported
+  as *"room does not go to controllers"*.
+  **The declaration was correct**: `{ from: 'room', to: 'headset', label: 'two
+  eye views', back: true }`. `headset` and `controllers` were two top level
+  boxes in one column, `headset` above. The return route runs under the row and
+  comes back up, and its arrowhead landed on `controllers`, the box UNDERNEATH
+  the one it names. So the picture said the page sends two eye views to a hand.
+  🔴 **THE DECLARATION AND THE DRAWING DISAGREED AND NOTHING NOTICED.** `cuts`
+  was empty and `ties` was 0, because the link WAS routed: it just arrived
+  somewhere else. A refused link is reported; a mis-aimed one is not. That is
+  the same class as the three arrows `/station/` lost silently, one step worse,
+  because this one draws a line that is actively false.
+  ⚠️ **`/weight/` WORKED AROUND IT RATHER THAN FIXING IT** by simplifying to one
+  device box, which is what was asked for in the same breath, so the bug is
+  still in `demo/shell/diagram.mjs` and the next stacked column will meet it.
+  ⚠️ **AND A CHECK FOR IT CANNOT READ THE DECLARATION**, which is what makes it
+  interesting: both ends are already in the spec, so an assert comparing spec
+  against spec passes. It has to read where the arrowhead was actually PUT, in
+  the geometry the module computes.
+
+- ✅ **`/stage/` DROPS THE MOON FILM, GOES 16:9, AND PLAYS THE MIM CHURCH
+  SCENE.** Asked 2026-09-19: *"rm going to the moon video in stage, video win to
+  16:9 and replace with mim sustsinable kirikutseen"*.
+  **What is there now**: `DEFAULT_BG = '/resources/moon-1902.mp4'`
+  (`demo/stage/index.html:411`), a **4.2 MB local** copy of the 1902 Melies
+  film, with a long comment block about its public domain provenance and the
+  fact that it is silent so any sound on an upload is a modern addition.
+  **What replaces it**:
+  `https://positron-station.kristjan-jansen.workers.dev/media/mimproject/mim-goes-sustainable-2011-kirikustseen.mp4`,
+  the church scene from a performance staged in a temporary theatre container at
+  the end of Kultuurikilomeeter in Tallinn's European Capital of Culture year,
+  in a theatre built from construction warming boxes that the audience powered.
+  720p25, **22 m 12 s, 253 MB**, ours.
+  🔴 **4 MB LOCAL BECOMES 253 MB REMOTE, AND THE PAGE CURRENTLY LOADS ITS FILM
+  FOR EVERYBODY INCLUDING THE HARNESS, ON PURPOSE.** The comment at line 580
+  says so in as many words. Swapping the source without changing that makes
+  every visit and every suite run pull a quarter of a gigabyte from R2. It is
+  OUR server, so this is not the ERR rule, but it is the visitor rule, and the
+  MIM brief is explicit: `preload="none"` until somebody presses, and nothing
+  loads on a visit. **Decide and say what a visit now costs.**
+  ⚠️ **AND THE DURATION IS ALREADY WRITTEN DOWN.** `durationMs` is in
+  `demo/resources/mimproject.json`, measured with ffprobe when the file was
+  pulled, so the transport has its range before a byte arrives. Do not ask the
+  element for a length that is already known. ⚠️ Read the corpus by `id`, never
+  by file name: a re-encode changed a name today and a table keyed by name
+  silently re-credited somebody's recording.
+  ⚠️ **AND IT LOOPS TODAY BECAUSE THE FILM IS 2 m 45 s AND A SHOW IS LONGER.**
+  At 22 m 12 s that reasoning is gone.
+  **16:9**: `STAGE_H = FRAME_W * 3 / 4 * STAGE_OVER` with `STAGE_OVER = 1.05`,
+  and the comment block above it records THREE messages from 2026-09-18 that
+  bought that shape (*"add moer height (cut from sides)"*, a frame with *"i need
+  this cut"*, *"make video 5% higher and crop left rihht sides a bit"*). Every
+  one of those was about a 4:3 film whose top and bottom were being thrown away
+  by a 16:9 box. The new film IS 16:9, so the argument retires with the film it
+  was about. ✅ The good half stays: it is ONE constant, and the panel, the
+  card, the canvas and every pixel check derive from it.
+  ⚠️ **CLAUDE.md RECORDS THE 4:3 DECISION** under `drawCamera`'s `fit: 'cover'`,
+  with the arithmetic that a 4:3 film keeps 75% against a camera's 32%. That
+  entry describes a page that will no longer have a 4:3 film, so it is amended
+  in the same edit, not left to go stale.
+  ⚠️ **AND THE MOON FILM'S OWN PROVENANCE COMMENT GOES WITH IT**, replaced by
+  what the new one needs: ours, the holder, and where it came from.
+  ⚠️ `demo/resources/moon-1902.mp4` and `.json` become unused. Say whether they
+  are deleted or kept, and why.
+  ✅ **DONE 2026-09-19.** 16:9 at 1280x720 with `STAGE_OVER` gone, the row taken
+  by `id`, the duration from the corpus, `preload="none"`, muted by default,
+  looping off, and the Estonian question proved across the relay by code points.
+  **MEASURED: a visit that presses nothing is 2,058.1 KiB and ZERO from R2.**
+  The moon mp4 is deleted and its provenance json is in
+  `archive/stage-moon-1902/` with a README saying why.
+
+- 🔴 **`/radio/` PASSES A `rates` OPTION THAT DOES NOT EXIST, AND A LONG COMMENT
+  DESCRIBES THE CONTROL IT BUYS.** Found 2026-09-19 by reading
+  `transport-bar.mjs` while moving the loop.
+  That page calls `createTransportBar` with `rates: [0.25, 0.5, 1]`. **`rates`
+  is not an option of that function**: it is not in the destructured parameter
+  list and there is no rest parameter, so it is dropped in silence. The page
+  declares no `caps` anywhere either, and its own adapter comment says `NO caps
+  AND SO NO RATE ROW`, so `.tbar-rates` is empty and hidden by `:empty`.
+  🔴 **SO THE COMMENT ABOVE THE CALL, `THE RATES ARE BACK, AND THEY DRIVE THE
+  LOOP RATHER THAN THE PLAYHEAD`, DESCRIBES A CONTROL THAT IS NOT ON THE PAGE**,
+  and the `onRate` handler beside it can never fire. A confident comment
+  outliving the thing it describes is the defect this project keeps finding in
+  its own files, and this is the second one today.
+  ⚠️ **READ, NOT MEASURED.** Nobody opened the page, because `/radio/` is the
+  page this project does not run without being asked. Two answers are possible
+  and they are different sizes of work: wire the rates up properly, or delete
+  the option and the comment and say the page has no rate row.
+
+- **`extra(id)` IS ON THE TRANSPORT BAR'S RETURN VALUE AND NOT ON `api`.** Found
+  the same way. By that file's own rule beside `loopExtra`, a control reachable
+  from the return value and not from `api` is a control a CDP check cannot
+  press on a page with more than one bar. Left alone on purpose, because adding
+  a member to `api` changes what every harness can see, and written down
+  instead.
+
+- 🔴 **TWO MORE DIAGRAMS ON THIS PROJECT ARE GRADED BY NOTHING.** Found
+  2026-09-19 while sweeping the return links: `/items/` and `/radio/` both throw
+  `createDiagram`'s return value away, so `cuts` and `ties` are computed and
+  discarded and neither picture has an assert. `/grains/` was the third and was
+  repaired in the same pass.
+  **What the repair is**: keep `const dg`, and add the line the other pages
+  already use word for word, `nothing in the picture was cut, shortened or left
+  undrawn`, reading `dg.cuts` and `dg.ties`.
+  ⚠️ **`/radio/` IS THE PAGE THIS PROJECT DOES NOT RUN WITHOUT BEING ASKED**, so
+  its assert can be added but not confirmed, and that has to be said plainly
+  rather than left for somebody to discover.
+  ⚠️ A picture that is not graded is the case CLAUDE.md already records for
+  `/station/`, where three real arrows went missing for two sessions because a
+  refusal was a `console.warn` nobody was reading.
+
+- ✅ **DONE 2026-09-19. THE OLD `/held/` IS `/weight/`, AND THE NAME `held` IS
+  FREE FOR THE NEW DEMO.** Instructed: *"name the demo held, rename old held to
+  weight and make largest type 1.5x larger and calculate others from there"*.
+  **What moved, about 136 occurrences**: `demo/held/` to `demo/weight/` by
+  `git mv`, the `manifest.mjs` row, `__demo.name`, the four `@font-face` URLs,
+  the two typeface aliases (`held-display` and `held-text` are now
+  `weight-display` and `weight-text`), the three vendored font lines in
+  `workers/view/build.mjs`, and every `/held/` in `demo/blocks/`, `demo/floor/`,
+  five `demo/shell/` modules, `CLAUDE.md`, `HANDOFF.md`, `LESSONS.md`,
+  `PROGRESS.md`, two `plan-*.md` and this file.
+  ✅ **THE SWEEP MATCHED THE URL AND THE SLUG AND NEVER THE WORD**, which is the
+  `box` to `keys` precedent exactly. 330 files hold the string `held` because it
+  is ordinary English, and every one of those that is a held chord, a held note
+  or a button already held is untouched. `archive/` is untouched, which is the
+  standing rule here.
+  ⚠️ **AND EVERY VERBATIM QUOTATION WAS LEFT AS IT WAS SAID.** Rewording
+  somebody's report to match a decision taken afterwards stops it being a
+  quotation, so *"held demo: click in vr"* and *"add how it works to held and
+  blocks"* still read as they were typed. The page carries one comment above its
+  `mount()` saying it was `/held/` until today and that those quotes are about
+  it, so a reader meeting one does not go looking on whatever page has the name
+  now.
+  ✅ **THE `/kit/` STRAGGLERS ARE FIXED**, once that file was free: the card's
+  `href`, its `title` and the slug list all read `weight` now, with a comment
+  saying why. It was the one place where this rename produced a LINK that opens
+  a different page rather than a 404, which is louder than a dead link and says
+  nothing about itself. The remaining mentions in `kit` and `shell.css` are
+  prose in comments and are accurate as history.
+  🔴 **AND THE DEPLOY ARTEFACT STILL HOLDS THE OLD PAGE.**
+  `workers/view/public/held/` is committed build output and was NOT regenerated,
+  because a build sweeps every other agent's uncommitted work into `public/`. A
+  scratch build was run instead and is clean: `weight/` with its three vendor
+  files, no `held/` anywhere, and the index linking `/weight/?xr=1`. So
+  `positron.studio/held/` serves the old page until somebody builds and deploys.
+  ⚠️ **THE OLD URL IS NOT A DEAD LINK, AND THAT IS WHAT MAKES THIS RENAME
+  DIFFERENT FROM THE OTHER TWO.** `/radio1965/` and `/box/` both 404 and neither
+  got a redirect. This one gets a live page that is not the one a kept link was
+  for, and nothing tells the reader they arrived at the wrong room. The renamed
+  page cannot answer it. **The question is for whoever builds the new `/held/`**:
+  either say one line about it on that page, or write the redirect this repo has
+  never written.
+  ⚠️ **42/42 WITH 37 PAGE ASSERTS, unchanged from before the rename**
+  (`node demo/verify-gl.mjs weight`). `node demo/shell/xr-quit-test.mjs` reads
+  33/33 and names `demo/weight/index.html`.
+
+- ✅ **DONE 2026-09-19. `/weight/`'s TYPE WENT UP BY HALF, AND IT IS ONE NUMBER.**
+  `TALLEST` is `5.5 * 1.5`, written as the multiplication so the instruction is
+  still readable in the file, and it is the only number on the page that sets a
+  size. Every word is still `TALLEST / length` stretched between two
+  multipliers, so nothing is authored per word and there is no second table to
+  disagree with the first. **The `what` and the `one` line did not change**,
+  because the relationship they describe (as big as it is short) did not: only
+  its scale did.
+  **MEASURED off the picture rather than off the arithmetic**, every word drawn
+  head-on from 6 m: `If` 219 px to **327 px**, which is **1.49x**, the largest
+  word and the one the instruction is about. `talk` 109 to 141, the five-letter
+  words 87 to 105. The room takes it: `talk` is the widest and reaches **7.0 m
+  of the 7.5 m half-wall** (it was 6.1), and the lowest word stands **0.16 m**
+  off the floor.
+  🔴 **THE STRETCH HAD BEEN ALMOST INERT AND NOBODY HAD NOTICED.** `capRange`
+  read every row of `ITEMS`, and the last row is a paragraph 78 characters long,
+  so the range was 2 to 78 rather than 2 to 5: the five words sat in the first
+  4% of the curve and every one of them came out within 1% of `SCALE_BIG`.
+  `SCALE_SMALL` was a constant nothing could reach. It reads only the rows that
+  get a `cap` now, which is what the comment beside it had always claimed.
+  ⚠️ **AND THAT IS THE ONLY REASON THE ROOM TOOK IT.** With the range broken, a
+  1.5x is flat across the curve and puts `talk` at 3.08 m of capital centred
+  1.5 m up, which is its foot 4 cm underground and its reach at 7.45 m of a
+  7.5 m wall. With it repaired the stretch does its job and `talk` lands at
+  2.68 m.
+  🔴 **TWO CHECKS WERE MEASURING SOMETHING ELSE AND THE BIGGER TYPE FOUND BOTH.**
+  The fit check only ever measured how far a word reached ALONG its wall, so a
+  word grown DOWN into the floor was invisible to it; it now measures both axes,
+  the floor against the cap band rather than the padded quad, and says so. And
+  the sharpness check authored four DISTANCES for a claim about MAGNIFICATION,
+  so it moved when the type did: 0.35 m from a 6.19 m capital is standing inside
+  the letterform, every sampled row came out all ink or all ground, and the
+  collector found no transition and reported an edge of **0 px**. It authors the
+  four magnifications now and works out the distance for each.
+  ✅ **THE LETTERS STILL RESOLVE, AND THAT IS MEASURED RATHER THAN ASSUMED.** At
+  3x, 10x, 23x and 60x the edge takes **2px, 1px, 1px, 1px**, which is what it
+  read at the old size. A distance field does not blur when it is blown up, and
+  the check that says so is now independent of how big the type is.
+  ⚠️ **NO NEIGHBOUR CHECK, AND THAT IS A DECISION.** Words here are allowed to
+  overlap: `out` stands one a little way off the wall in front of another and
+  `INK_ALPHA` exists so the one behind shows through. On the north wall the
+  paragraph and `talk` already cover each other at two depths, so a check
+  refusing two boxes in one place would be refusing the page. MEASURED instead:
+  `If` and `talk` share the north wall and their quads clear each other by about
+  **0.11 m**, which is roughly 1.2 m between the letters themselves.
+
+- 🔴 **`/keys/` AND `/radio/` HAVE A PHONE LAYOUT THAT CHANGED UNDER THEM AND
+  NOBODY HAS LOOKED.** Side effect of moving `.pos-pick`'s media block on
+  2026-09-19 so that it actually runs. Both pages carry pickers, so at 390 px
+  each now gets the label on top and the name stretching, which is what the
+  stylesheet always intended and what neither page has ever shown.
+  ⚠️ **NEITHER WAS RUN.** `/radio/` is the page this project does not verify
+  without being asked, and `/keys/` needs a Raspberry Pi in another building.
+  So this is a LOOK rather than a harness run: open each at 390 px and see
+  whether the row that was inline is better stacked. It probably is, since it
+  is the same treatment `.pos-choice` has had all along, but probably is not
+  measured.
+
+- 🔴 **A NAMED VALUE IN A PANEL FOOTER IS ON THREE PAGES AND IN THE KIT ZERO
+  TIMES.** Found 2026-09-19 by the `/weight/` agent while adding the footer that
+  was asked for, and reported rather than copied quietly, which is the only
+  reason it is countable.
+  **The two things being copied**: the regex that shortens what
+  `WEBGL_debug_renderer_info` returns, and the three CSS rules for a key and a
+  value inside a panel footer slot (`/mirror/`'s `.fact`).
+  **Where they are**: `/mirror/` first, `/weight/` second, `/blocks/` third as of
+  the same hour. CLAUDE.md's own words: a control that exists in one page and
+  nowhere else is a component that has not been noticed yet. Three is not a
+  near miss, it is the rule being broken while somebody watches.
+  ⚠️ **THE REGEX IS NOT COSMETIC AND IS THE PART MOST LIKELY TO DRIFT.** It
+  splits on `Renderer:` rather than on the first comma, because
+  `ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)` split
+  on a comma leaves the word `Apple`, which says nothing. A page that copies it
+  wrongly gets a cell that is confidently useless.
+  ⚠️ **AND THE FULL STRING MUST SURVIVE THE SHORTENING.** `/weight/` keeps it on
+  `window.__demo.gl.renderer` so `verify-gl`'s own renderer comparison still
+  passes. A component has to do the same or it breaks a harness nobody
+  remembered to check.
+  **What it would cover**: the shortening, the cell's shape, and the decision
+  that a page with nothing answering from anywhere gets NO presence dot in that
+  slot, which both `/weight/` and `/mirror/` reached independently because a badge
+  that can only ever read online is the one-honest-state control this project
+  calls a lie.
+
+- ✅ **`/reel/`'s LOOP GOES TO THE RIGHT END OF THE TRANSPORT.** Asked 2026-09-19:
+  *"reel: move loop to the right of transport"*.
+  **Why it moved in the first place, which matters because the page did not
+  change it.** `demo/shell/transport-bar.mjs:434` appends in one fixed order:
+  toggle, extras, scrub, then the chip or the live badge or the clock, then the
+  loop, then the rates and the badge. `/reel/` passes `scrub: false` (it has a
+  strip, and one position surface per page) and, since today, `time: false`. So
+  the two things that used to take the middle of that row are both gone, and
+  the loop packed left against the ‹ › it used to sit a clock away from. In the
+  earlier screenshot the clock was still there and LOOP was at the right end,
+  which is exactly the arrangement being asked for back.
+  ⚠️ **SO THIS IS THE BAR'S PROBLEM RATHER THAN `/reel/`'s.** Any page that
+  turns off both the scrub and the clock gets the same huddle, and the repair
+  is a rule about what takes the free space when nothing flexible is left in
+  the row, not a nudge on one page. `demo/shell/shell.css:2558` has
+  `.tbar-loopgrp { flex: none; display: flex }` to look at, and the `end: true`
+  control in `.pos-controls` is the precedent for how this project pushes one
+  thing right (`margin-left: auto`).
+  ⚠️ **CHECK THE OTHER BARS AFTER CHANGING IT**: `/tapes/`, `/radio/`,
+  `/replay/` and `/stage/` all mount one, and a rule about free space moves
+  every one of them.
+  ✅ **DONE 2026-09-19, AND IT MOVES EXACTLY ONE PAGE.** The loop slot's first
+  member is stamped `data-end="1"`, the same mechanism `shell.mjs` already uses
+  for `end: true` in `.pos-controls`, and `.tbar > [data-end="1"] { margin-left:
+  auto }` is scoped to the bar because the loop can be a DIV (the segmented
+  `[LOOP|→]` pair), which a `button` selector cannot reach.
+  **MEASURED, not reasoned**, at 1280 and at 390, on `/transport/` with the
+  other shapes reproduced structurally: `/reel/`'s LOOP goes from x=57 to
+  x=423.8, with 375.8 px of bar that had been standing empty to the right of
+  the rates. `/tapes/`, `/radio/`, `/replay/` and both `/stage/` bars are
+  identical to a tenth of a pixel, because flex-grow resolves the free space
+  before auto margins are distributed, so the stamp is inert wherever a slider
+  or a clock is present. The negative control is the rule deleted from the
+  CSSOM: the segmented case reads 390.8 with it and 57 without.
+  ⚠️ **A BAR WITH NO LOOP KEEPS PACKING LEFT**, deliberately: the boundary
+  belongs to the loop, so a row without one has no boundary. Extending it to the
+  rates would have moved both `/stage/` bars for a change nobody asked for.
+  ⚠️ **AND THE DEPLOYED COPIES NEED A BUILD.** The change is in `demo/shell/`,
+  so `cd workers/view && node build.mjs` before any deploy.
+
+- ✅ **`/weight/` AND `/blocks/` GET A `How it works`.** Asked 2026-09-19: *"add
+  how it works to held and blocks: browser block and controllers"*. Neither page
+  imports `diagram.mjs` today (`grep diagram.mjs` is 0 in both).
+  **The shape the ask names**: a `Browser` box and the controllers, which is
+  right for these two because NOTHING ELSE IS INVOLVED. There is no server, no
+  relay and no board: the page compiles a shader, the headset reports poses and
+  button presses, and everything happens on the machine in front of you. That is
+  a fact worth drawing on a pair of pages whose siblings all reach across a
+  network.
+  **The rules that will be got wrong if the section is skimmed**, all from
+  CLAUDE.md: `{ how: true, atEnd: true }` and NO title, the heading lives in
+  `diagram.mjs` and is never typed on a page, a label is a NAME with no article,
+  a `sub` is three or four words with quantities written short, a `note` is TWO
+  sentences saying what a reader cannot see and never describing how the picture
+  was made, notes NAME the technology (`WebXR`, `WebGL2`, `XRInputSource`), no
+  file paths and no warning emoji, a container takes no `note`, and boxes inside
+  one machine are joined with arrowheads unless the container passes
+  `set: true`. Check `dg.cuts` and fix what it reports.
+  ⚠️ **THE VISITOR'S MACHINE IS CALLED `Browser`**, which the ask already says,
+  and it is the rule: a reader meets that name on more than one diagram here.
+  ⚠️ **A PAGE WITH A DIAGRAM TAKES A ONE LINE `what`, AND BOTH ARE READY.** Both
+  were cut to one sentence earlier today, so this is the moment to make each
+  page's sentence and its `one` line in `demo/manifest.mjs` agree verbatim,
+  which is what the rule asks for.
+  ⚠️ **AND A DIAGRAM ADDS TWO ASSERTS**, the way `/floor/` and `/mirror/` just
+  did. `/weight/` is 40/40 with 35 page asserts, `/blocks/` 55/55 with 50.
+  ✅ **DONE 2026-09-19 on both, and one of them refused the shape it was
+  given.** `/weight/` draws `headset`, `controllers` and `Browser` holding `words`
+  and `room`, with the caption *"Nothing in this picture is on a network, and no
+  part of it is our server."*
+  🔴 **`/blocks/` DREW THE RELAY, AGAINST THE INSTRUCTION, AND WAS RIGHT.** The
+  ask said a browser and the controllers, on the argument that no server is
+  involved. True of `/weight/` and false here: that page opens
+  `wss://ws.positron.studio/room/...`, `apply()` is called from the message
+  handler and from nowhere else, and one of its own checks says the room changed
+  only when the message came back. A picture leaving the relay out would
+  contradict the page it is drawn on. Its caption carries what the ask was
+  after: *"One number makes the room. Nothing about it is kept anywhere."*
+  ⚠️ **`join: false` ON ITS `Browser`** because an undeclared gap is drawn as an
+  arrow, and an arrow from the generator to the room would claim a path that
+  does not exist: the room changes on the echo, never on the send.
+
+- ✅ **`/blocks/` LOSES ITS READOUT.** Asked 2026-09-19: *"blocks: rm
+  readout"*, one page after the same ask took `/floor/`'s away.
+  `demo/blocks/index.html:190` declares `{ 'to frame': 'ms', worst: 'ms',
+  moved: '', view: '' }`.
+  🔴 **NINE `d.set` CALLS GO WITH IT OR THE PAGE THROWS**: `setCell` throws on a
+  key the page never declared. They are at lines 1329, 1348, 1392, 1800, 1815,
+  1823, 1824, 2763 and 2764. `/floor/` had four and this has nine, so the sweep
+  is the same shape and twice the size, and `view` is written from five places.
+  ⚠️ **REHOME WHAT IS WORTH KEEPING, WHICH IS CLAUDE.md's RULE WHEN A DISPLAY
+  GOES.** `to frame` and `worst` are this page's own frame timing and are the
+  kind of number the log should carry when it changes rather than sixty times a
+  second; `view` is a state change (`window`, `headset`, `your room`) and a
+  state change belongs in the log at the moment it changes; `moved` is a count
+  of what your own hands did, which is visible in the room.
+  ⚠️ **AND THE ASSERTS MAY READ THEM.** Unlike `/floor/`, check before deleting:
+  `grep readout demo/blocks/index.html` and every `__demo.readout` reference,
+  because this page's checks are the most elaborate of the four.
+  ⚠️ `readout: null`, not an omitted field, so `verify.mjs`'s `readoutOptOut`
+  branch reads it as deliberate. `demo/verify-quest.mjs` gained the same branch
+  today, so a headset run will not go red on it either.
+  ✅ **DONE 2026-09-19.** `readout: null` and all nine `d.set` calls gone, with
+  no assert reading them. `to frame` goes to the log once per accepted room,
+  `worst` once in the session `end` handler where it is that session's own worst
+  gap rather than a maximum since page load, `view` through a `setView()` that
+  logs only on CHANGE (it was written from five places, which is a cell that can
+  be rewritten with the value it already had), and `moved` rides the line the
+  drop already wrote. All four are on `window.__demo.xr`, because a harness
+  reads numbers and cannot read prose.
+
+- ✅ **`/weight/` AND `/blocks/` GET A VIDEO FOOTER UNDER THEIR PICTURE.** Asked
+  2026-09-19, one page each minute: *"held: add videofooter with fullscreen
+  control and info what renders it"*, then *"blocks: add videofooter with
+  fullscreen control and info what renders it"*.
+  ⚠️ **THIS ANSWERS A QUESTION THAT WAS LEFT OPEN EARLIER TODAY.** When the
+  full-screen exit became a mode of `video-panel.mjs`, the open choice was
+  whether `/weight/` and `/floor/` adopt the panel for their bare canvas or keep
+  a mounted button on a bare cover. For `/weight/` the answer is now the panel.
+  **What goes in it**: the ⛶ is the panel's own default right slot, and the
+  left slot carries what renders the picture. **BOTH PAGES ALREADY KNOW THAT
+  FACT**: `demo/weight/index.html:383-388` and `demo/blocks/index.html:467-468`
+  each read `WEBGL_debug_renderer_info`'s `UNMASKED_RENDERER_WEBGL`, and
+  `/weight/` publishes it on `window.__demo.gl.renderer` and writes it to the log
+  once. So this is moving a fact from a line that scrolls away into a cell that
+  stays, not measuring anything new. `/mirror/` shows the same fact the same
+  way, which is where `Apple GPU` and `V3D 4.2.14.0` in the screenshots come
+  from.
+  ⚠️ **`/floor/` IS THE SAME SHAPE AND IS NOT ASKED FOR.** It reads the renderer
+  at `demo/floor/index.html:268` and fills the screen the same way. Do not do it
+  until somebody asks.
+  🔴 **AND THE SHELL'S ⛶ CONTROL SHOULD GO WHEN THE PANEL'S ARRIVES.**
+  `demo/weight/index.html:351` and `demo/blocks/index.html:182` each declare
+  `{ id: 'full', label: '⛶', end: true }`, and `/weight/`'s comment at line 342
+  explains why it stayed a shell control. Two full-screen buttons on one page is
+  the duplication this stream has already removed twice.
+  ⚠️ **REMOVING A CONTROL MOVES EVERY OTHER CONTROL'S HARNESS PRESS**, and this
+  page declares `settleMs: 8000` and `/blocks/` declares `settleMs: 6000`, and
+  that only ever lands on control 0. Work out what control 0 is before and after
+  on each and say it. `/weight/` was 40/40 with 35 page asserts and `/blocks/`
+  55/55 with 50, and each has an assert naming the full-screen button's place:
+  `/blocks/`'s says it is inside `.stage` and NOT in `.pos-controls`, precisely
+  so the harness cannot press it and leave full screen behind its own back.
+  ⚠️ **AND THE PAGE HAS `readout: null`**, on the argument that the room is the
+  readout. A footer under the picture is not a readout row, so that stands, but
+  the two should not end up saying the same thing.
+  ✅ **DONE 2026-09-19 on both.** The shell's ⛶ control is gone from each, the
+  panel's footer button fills the screen and `createFullscreenExit` inside the
+  picture brings you back, both at `fullMode: 'hover'` so two pages asked for in
+  the same minute are not two kinds of thing. Control 0 is `Run in VR` before
+  and after on both. `/weight/` 40/40 to 42/42, `/blocks/` 55/55 to 58/58.
+  🔴 **AND A TRAP ONLY `/blocks/` COULD HIT**: `controls: []` makes `mount()` set
+  `hidden` on `.pos-controls`, and that page prepends its button group into that
+  row, so without `d.controls.hidden = false` both session buttons would be in
+  the DOM, correctly enabled, and invisible. Its placement assert reads
+  `!d.controls.hidden` now, because a check that only counted them would have
+  passed straight through it.
+  ⚠️ **A DEAD GUARD WAS ON BOTH PAGES**: `if (fullSupport() === 'none')`, where
+  `support()` returns `'element'`, `'video'` or `false` and never that string.
+
+- ✅ **ONE WORDING FOR A STREAM COMING BACK, ON EVERY DIAGRAM, WITH A NOTE
+  WORTH READING.** Asked 2026-09-19: *"h.264 - unify label and longer desc on
+  all diagrams where stream back pcm or mp4 video"*.
+  **The survey, taken the same day.** Eleven pages draw a diagram and five of
+  them have a return link carrying sound or a picture, and every one says it
+  differently:
+  - `/crate/` `audio bytes`, and it HAS a note.
+  - `/grains/` `sound and grains` and `sound back`, neither with a note.
+  - `/knobs/` `PCM slices` twice, both with notes.
+  - `/mirror/` `H.264` twice, neither with a note.
+  - `/kit/`'s specimens say `sound back` and `sound`.
+  So a reader meeting two of these pages meets four names for one thing, which
+  is the exact failure CLAUDE.md's diagram rules are written against: a name
+  learned once should not be re-learned per page.
+  **What to settle**: the label for audio coming back and the label for video
+  coming back, chosen from what those things are CALLED, which the note rule
+  already asks for (`H.264`, `PCM`). Then every one of those links gets a note,
+  because a `label` is what TRAVELS and the note is what that actually is.
+  ⚠️ **A NOTE IS TWO SENTENCES AND `createDiagram` REPORTS ANYTHING OVER ABOUT
+  FORTY WORDS ON `cuts`.** "Longer" means the links that have no note get one,
+  not that the existing notes grow.
+  ⚠️ **AND THE LABEL HAS ABOUT FOURTEEN CHARACTERS.** `PCM slices` fits,
+  `H.264` fits, a sentence does not, and anything that does not fit is reported
+  on `cuts` rather than ellipsised at the reader.
+  ⚠️ `/kit/` carries diagram specimens, so it is part of this sweep.
+  ✅ **DONE 2026-09-19.** `H.264` for a picture coming back and `PCM` for sound,
+  on `/mirror/`, `/knobs/`, `/grains/` and `/kit/`'s three specimens, and every
+  one of those links now carries a note between 26 and 37 words. `/kit/`'s
+  copyable code sample was changed too, since that string is what an author
+  copies. `/kit/` 61/61 and `/mirror/` 45/45, both unchanged.
+  🔴 **`/crate/` IS THE EXCEPTION AND ITS OLD LABEL WAS PART OF THE PROBLEM.**
+  That arrow is an `<audio>` element reading an R2 object over HTTP with Range,
+  and the page accepts `audio/*`, so the file may be mp3, wav, m4a or anything
+  else a browser plays. A codec name there would be a guess. It reads
+  `audio file` now: `audio bytes` next to `PCM` reads as raw samples on a wire,
+  which is exactly what it is not.
+  🔴 **AND `/grains/`'s `sound and grains` REALLY WAS TWO PAYLOADS ON ONE
+  ARROW.** The board's grain reports ride the same socket as the samples all the
+  way to the browser, so the old pair of labels read as the grains stopping at
+  Cloudflare. Both halves are `PCM` now and the first note carries the reports.
+  ⚠️ **THE SURVEY IN THIS ENTRY WAS WRONG ABOUT `/knobs/`** and the correction
+  matters more than the error: it said both return links there had notes. They
+  had none, and neither did any other box on that page, because commit
+  `8bbad65` of 2026-09-16 took FOURTEEN notes out of that picture on the
+  instruction *"rm descs in outer boxes and hover bottom descs"*.
+  🔴 **SO ADDING TWO NOTES THERE REVERSES PART OF AN EARLIER INSTRUCTION, AND
+  IT NEEDS A WORD FROM KRISTJAN.** It was done because the 2026-09-19 ask is
+  later, is specific to a stream coming back, and names that page's own label.
+  Nothing else on the page regained a note. If the older instruction still
+  stands, the two notes come out of `/knobs/` and the label change stays.
+  ✅ **AND `/grains/` GAINED ITS FIRST DIAGRAM ASSERT**, +1, because it was the
+  only one of the eleven that threw `createDiagram`'s return value away, so its
+  picture was graded by nothing. Unconfirmed total: that page drives the
+  Raspberry Pi and was not run.
+
+- ✅ **WE BROKE `/mirror/`'s PANEL FOOTER, AND HALF OF WHAT IS IN IT WAS NEVER
+  ASKED FOR.** Reported 2026-09-19 with a crop: *"you broke video footer. i
+  never asked this info added"*.
+  **Two separate faults in one row.**
+  1. **Cells nobody asked for.** Before this session each footer carried
+     `picture` and `fps`. The move to `video-panel.mjs` added `clock` on the
+     near pane and `kbit/s` and `lost` on the far one. Nothing in the ask
+     mentioned them, and CLAUDE.md is explicit that a readout cell has to earn
+     its place. Take the footers back to `picture` and `fps`.
+     ⚠️ **AND DO NOT LOSE WHAT THEY SAID WITHOUT SAYING SO.** `lost` and the
+     bit rate are real facts about a link to another building. If they are worth
+     keeping they go where that page already puts facts about the session,
+     which is the log and the beacon, not into a row under a picture.
+  2. **The row does not fit.** In the crop the presence dot is drawn ON TOP of
+     the `PICTURE` label, and `1873` runs under the ⛶ rather than stopping
+     before it. So the left slot is overflowing its share and the right slot is
+     overlapping it rather than being pushed.
+     ⚠️ This is a `video-panel.mjs` question as much as a page one: the footer
+     is three slots and a page filled the left one with a row of cells that can
+     be wider than the slot. Decide whether the component clips, scrolls or
+     shrinks, and whether the right slot is allowed to be overlapped by
+     anything. Whatever it is, it is the same answer for `/stage/`, which also
+     uses this component.
+  ⚠️ **THE CROP IS THE FAR PANE ON A DESKTOP**, so this is not a phone-width
+  problem and will not be fixed by the 560 px rules.
+  ✅ **DONE 2026-09-19, AND THE CAUSE WAS ONE GRID LINE.** `.pos-vp-foot` was
+  `grid-template-columns: 1fr auto 1fr`. An `auto` track's growth limit is its
+  max-content and a flexible track only gets what is left, so a centre holding
+  more than the row can fit takes the whole row and **both `1fr` tracks resolve
+  to zero**, after which their contents paint over the neighbours. MEASURED
+  before: left slot 0 px with the presence dot 2 px inside the centre, right
+  slot 0 px with the ⛶ 2 px inside it, centre 288 px holding 427 px, identical
+  at 1280 and 390. It is `minmax(min-content, 1fr) auto minmax(min-content,
+  1fr)` now, so a side track can share spare room but can never shrink below
+  what it holds, and what gives instead is the centre, which is the slot a page
+  fills and the one that can scroll. `video-panel.mjs` is untouched, so
+  `/stage/` gets the same answer for free.
+  ✅ **AND THE CELLS ARE BACK TO `picture` AND `fps` ON BOTH PANES**, with all
+  three additions rehomed rather than deleted: `clock` to the log on both
+  edges, the bit rate once per stream, `lost` on the event with a 5 s floor so
+  a bad link cannot fill the box, and `window.__demo.link` as the machine copy.
+  ⚠️ The beacon gets the first loss and the totals only, because a 5 s beacon
+  is about 720 posts an hour into the ring buffer a headset run depends on
+  being able to read.
+
+<!-- ── second round on /mirror/, 2026-09-19, from a desktop screenshot ───── -->
+
+- ✅ **THE BUTTON GROUP DOES NOT READ AS A GROUP.** Reported 2026-09-19 with a
+  screenshot of `/mirror/` on a desktop: *"i do not see buttongroup vr xr"*.
+  Both buttons are there and both are correctly disabled; what is missing is the
+  GROUP. `.pos-bgroup-row` is `display: flex; gap: 8px`
+  (`demo/shell/shell.css:1531`), so `Run in VR` and `Run in AR` are two boxes
+  with air between them, which is exactly what two unrelated controls look like.
+  🔴 **`choice.mjs` ALREADY ANSWERED THIS AND THE ANSWER WAS NOT CARRIED OVER.**
+  Its header says it in as many words: *"AND IT IS ONE GROUP, NOT LOOSE BUTTONS.
+  Gaps between the options make three choices look like three unrelated
+  controls, and put the label further from what it labels than the options are
+  from each other. Segmented, the same way `stepper.mjs` does it: overlap the
+  borders by a pixel so a join is one line, round only the outer corners."*
+  The new component was built with a gap instead, so the complaint the choice
+  row was fixed for came back on the first page to use it.
+  🔴 **AND `/blocks/` CARRIES A LABEL THE OTHER THREE DO NOT. IT GOES.** Asked
+  2026-09-19: *"blocks: rm 'headset' label and use buttongroup for vr xr"*. That
+  page passes `createButtonGroup({ label: 'headset' })` and `/weight/`, `/floor/`
+  and `/mirror/` pass none, so one page wears a word the others do not, which is
+  the same drift in a smaller costume.
+  ⚠️ **AND IT POINTS AT SOMETHING GENERAL WORTH DECIDING WHILE THE COMPONENT IS
+  OPEN**: a CHOICE needs a label, because the options are answers and the label
+  is the question (`GRAIN: coarse, mid, fine`). A row of ACTIONS does not, because
+  each button already says what it does. `Run in VR` needs no heading.
+  ⚠️ **THIS IS GLOBAL AND IT WAS REPORTED TWICE WITHIN THE HOUR.** *"held: no
+  buttongroup of vr/xr"*, 2026-09-19, about a page that DOES use the component
+  (`demo/weight/index.html:1614`). Two sightings, one cause, and the second one
+  confirms the complaint is about what the component LOOKS like rather than
+  about whether a page adopted it. `/floor/` and `/blocks/` carry it too.
+  ⚠️ **AND A GROUP OF ACTIONS IS NOT A CHOICE**, so whatever the treatment is, a
+  reader must not think one of the two is selected. `aria-pressed` is what a
+  choice carries and a button group must not.
+  ✅ **DONE 2026-09-19.** The row is `step pos-seg pos-bgroup-row`, reusing the
+  one join this project has, and `.pos-bgroup-row` loses its `gap: 8px`.
+  MEASURED: join -1.00 px, outer corners 4px and 0px in the right places on a
+  pair and on a three.
+  ✅ **AND IT IS STILL NOT A CHOICE, ON TWO CHANNELS THAT ARE NOW MEASURED
+  RATHER THAN CLAIMED.** `aria-pressed` is never written, measured 0 of 3, so a
+  group can neither paint an armed option nor be announced as one; and the
+  buttons keep the control row's 13 px against a choice option's 11 px, measured
+  against the live specimen rather than a typed number. The join alone could not
+  carry that difference, because `/stage/` already ships a segmented choice with
+  nothing selected.
+  ✅ **AND `/blocks/`'s `headset` LABEL IS THAT PAGE'S OWN EDIT**, handled with
+  its other asks.
+
+- ✅ **MORE AIR UNDER THE HEADSET BUTTONS.** Asked in the same breath: *"add more
+  space under them"*. In the screenshot the group sits about 10 px above the
+  `LOOK` row, so the four knob rows and the two buttons read as one block of
+  six controls rather than as two kinds of thing.
+  ⚠️ `.pos-controls` is one flex row with one gap, so this is a claim about the
+  relationship between the group and what follows it rather than a number to
+  raise everywhere. CLAUDE.md's rhythm rule is the frame: a page that needs a
+  different gap somewhere says so in a comment.
+  ✅ **DONE 2026-09-19.** `.knobs` takes `flex-basis: 100%` and `margin-top:
+  14px`, which against `.pos-controls`' own 8 px row gap MEASURES 22 px, the
+  single vertical rhythm this project already uses between two blocks rather
+  than a new number.
+
+- ✅ **THE FOUR CONTROL ROWS ARE A 2x2 GRID.** Asked as *"look should controls
+  should be 2x2 controls grid"*. Today `.knobs` is `display: flex; flex-wrap:
+  wrap` (`demo/mirror/index.html:41`), so at this width `LOOK`, `MIRRORS` and
+  `GRAIN` share a line and `HUE` drops alone to the next one, which is the
+  ragged shape in the screenshot. Two columns by two rows: `LOOK` and `MIRRORS`
+  above, `GRAIN` and `HUE` below.
+  ⚠️ **THE PHONE LAYOUT IS ALREADY DECIDED AND MUST NOT REGRESS.** Line 43
+  already collapses `.knobs` to one column under 560 px, and `shell.css:1411`
+  puts each choice's label on top and gives the options the width. A 2x2 grid is
+  a claim about the WIDE case only.
+  ⚠️ **AND THE LABEL COLUMNS SHOULD LINE UP ONCE THERE ARE COLUMNS.** `LOOK`,
+  `MIRRORS`, `GRAIN` and `HUE` are four different widths; in a grid the two
+  rows' labels sit above each other, so a ragged left edge inside a column is
+  visible in a way it is not in a wrapped row.
+  ✅ **DONE 2026-09-19.** MEASURED at 1280: two 333 px columns, `LOOK MIRRORS`
+  over `GRAIN HUE`. At 390: one column, 358 px, unchanged from the phone layout
+  that was already decided.
+  ✅ **THE LABEL COLUMN IS A 48 px FLOOR AND NOT `ch`**, because the two label
+  types are different sizes (9.5 px tracked at .1em against 11 px at .06em), so
+  one `ch` rule reserves two widths and lines nothing up. MEASURED: all four
+  segments start 56 px into their cell, spread 0.0 px, and the new assert
+  compares the four offsets rather than trusting the number.
+
+<!-- ── three decisions taken 2026-09-19 when the stream closed, so the work
+     could start without another round trip. Each is stated where the entry
+     it settles says it was open. ────────────────────────────────────────── -->
+
+- ✅ **DECIDED, NOT ASKED: the three open choices in the entries above.**
+  1. **The fullscreen exit is ONE exported piece in `demo/shell/fullscreen.mjs`
+     that `demo/shell/video-panel.mjs` offers AS A MODE.** The instruction was
+     that it *"can just be a mode of fullscreen videopanel component"*, and a
+     mode is what a page author sees. The reason it is not ONLY a mode is
+     `/weight/` and `/floor/`, which cover the screen with a bare canvas and have
+     no panel: making them adopt `video-panel.mjs` is a page rewrite neither
+     asked for, and leaving them out is leaving the reported trap in place.
+  2. **`/reel/`'s scrub lands on the nearest film when the finger lifts**, with
+     the playhead following the finger at once, which is the `/tapes/` shape
+     (`demo/tapes/index.html:786-812`). Scrubbing WITHIN a film was the other
+     reading and it has no axis to happen on, because the strip's axis is a
+     year.
+  3. **The button group lives inside `.pos-controls`.** `demo/verify.mjs:811`
+     and `demo/verify-gl.mjs:243` both select `.pos-controls button` as a
+     DESCENDANT, so a wrapper keeps every button pressable, and a group outside
+     that row would silently stop being exercised.
+
+<!-- ── stream of 2026-09-19, collected before any of it is worked on ──────── -->
+
+- ✅ **A CAPABILITY THIS BROWSER DOES NOT HAVE IS NOT A FAILURE, IT IS THE
+  DEFAULT ANSWER.** Reported 2026-09-19 with a photograph of `/weight/` on an
+  iPhone: **`FAIL a headset was asked about, both ways · immersive-vr null,
+  immersive-ar null`**, and `ready · 14/15 checks`. *"having no capability is
+  not fail, its default info"*.
+  **The mechanism is one character.** `demo/weight/index.html:1162` does
+  `navigator.xr?.isSessionSupported('immersive-vr').then(v => vrKnown = v, ()
+  => vrKnown = false)`. On a browser with no `navigator.xr` at all the optional
+  chain returns `undefined`, no handler ever runs, and `vrKnown` stays `null`
+  forever. The assert at `demo/weight/index.html:2464` is `vrKnown !== null &&
+  arKnown !== null`, so **a browser that has no WebXR is scored as a page that
+  failed to ask**. iPhone Safari has no `navigator.xr`, which is every visitor
+  on a phone.
+  ⚠️ **THE SAME LINE IS IN TWO MORE PAGES**: `demo/blocks/index.html:1009-1010`
+  (`headsetKnown`, `arKnown`) and `demo/floor/index.html:1275`
+  (`headsetKnown`). `/blocks/` asserts on it at 1772 and 1784. Fix the shape,
+  not the one page.
+  **What the repair has to be:** the probe resolves to a THIRD value when there
+  is nothing to ask (`'absent'`, or `false` with the reason in words), the
+  assert is about having an ANSWER rather than about the answer being yes, and
+  the log line that goes with it is ordinary information rather than `bad`.
+  ⚠️ `demo/shell/caps.mjs` already holds this principle in writing and is the
+  precedent to copy: a probe that could not answer returns **`unknown`, which
+  never blocks**, because "we did not look" must not read as "it is missing".
+  What is missing is that no XR page uses it.
+  ⚠️ **AND THE ASSERT COUNT MOVES.** `/weight/` reads 15 checks; whatever replaces
+  this one has to be counted before and after, per CLAUDE.md's rule about assert
+  counts after any change.
+  ✅ **DONE 2026-09-19.** `demo/shell/xr-caps.mjs` answers in four states and
+  `absent` resolves in the same turn, which is the repair: a browser with no
+  WebXR is an ANSWER rather than a pending question. All four XR pages read it
+  and none keeps a probe of its own. `/weight/` 40/40, `/blocks/` 55/55,
+  `/mirror/` 43/43. The iPhone case was graded off the browser against
+  `createXrProbe(undefined)`, because desktop Chrome answers `no` rather than
+  `absent`.
+
+- ✅ **NOTHING IN THE LOG IS WHITE.** Asked 2026-09-19: *"do not color log items
+  white, keep it gray or red or whatever you hae in palette"*.
+  **Where it is**: `demo/shell/shell.css:525`, `.pos-line.hi .pos-m, .pos-log b
+  { color: var(--fg); font-weight: 500 }`. `--fg` is **`#e6e6e6`**, which is the
+  page's brightest ink and reads as white on a phone.
+  **The palette to choose from** (`shell.css:6-19`): `--fg #e6e6e6`, `--dim
+  #8b93a1` (the log's own body colour), `--dim2 #6a7280`, `--hi #ffd400`,
+  `--ok #8fd6a8`, `--warn #e0b060`, `--bad #e0908a`.
+  **Proposed**: `hi` keeps `font-weight: 500` and drops to `--fg2` or plain
+  `--dim` at weight 500, so emphasis is carried by WEIGHT rather than by a
+  brighter ink, and `ok` / `warn` / `bad` keep their three colours. Decide one
+  value and write down why, because this is the one line every page's log goes
+  through.
+  ⚠️ `.pos-log b` shares the selector, so any page writing `<b>` in a log line
+  moves with it.
+  ⚠️ The timestamp column `.pos-t` is already `--dim2` and is not in question.
+  ✅ **DONE 2026-09-19.** One grey token, `--fg2`, and the log's emphasis reads
+  **rgb(182,188,199)** against the page's **rgb(230,230,230)**, measured by a
+  new `/kit/` assert on a hidden specimen inside the real log rather than by
+  reading the stylesheet.
+
+- ✅ **A RUN IN VR OR RUN IN AR BUTTON IS DISABLED WHERE THERE IS NO HEADSET.**
+  Asked 2026-09-19: *"disable vr xr buttons when no capability"*. Today the
+  press is accepted and answered with a log line the visitor has to read to find
+  out nothing is going to happen (`demo/weight/index.html:1276-1281`, *"no headset
+  here. The window above is the same room"*), which is this project's own
+  definition of a control that lies.
+  **The four pages and their control ids**: `/weight/` `vr` and `ar`
+  (`demo/weight/index.html:347-348`), `/blocks/` `enter` and `ar` (180-181),
+  `/floor/` `vr` (201), `/mirror/` `xr` and `ar` (202-203).
+  **The handle already exists**: `d.button(id)` returns the element
+  (`demo/shell/shell.mjs:392`) and `button[disabled] { opacity: .4; cursor:
+  default }` is already styled (`demo/shell/shell.css:229`).
+  ⚠️ **IT CANNOT BE DECIDED AT LOAD AND LEFT.** `isSessionSupported` is a
+  promise, so the button starts enabled and is disabled when the answer
+  arrives. It depends on the entry above: with today's code the answer NEVER
+  arrives on a browser with no `navigator.xr`, which is exactly the case this
+  is for.
+  ⚠️ **A DISABLED BUTTON WITH NO REASON IS WORSE THAN AN ENABLED ONE.** Give it
+  a `title` saying why, the way `caps.mjs` un-links an index row with the reason
+  in words rather than making the row vanish.
+  ⚠️ **AND `verify.mjs` PRESSES EVERY CONTROL.** Disabling control 0 on a page
+  moves nothing, but a control that refuses a press changes what the drill can
+  reach, so re-read the per-page assert count on all four pages afterwards.
+  ✅ **DONE 2026-09-19.** `demo/shell/button-group.mjs`, inside `.pos-controls`
+  on all four pages, `prepend`ed so the ⛶ keeps its `end: true` position.
+  `enable(id, false, '')` THROWS, so a switched-off control cannot exist without
+  a reason, and `/kit/` has the negative control for it.
+  🔴 **AND IT COST TEN ASSERTS ON ONE PAGE AND SIX ON ANOTHER**, because the
+  harness reaches a page's checks by pressing its buttons. See CLAUDE.md, which
+  gained the rule the same day.
+
+- ✅ **THE FLOOR GRID DOTS GO A LITTLE SMALLER, GLOBALLY.** Asked 2026-09-19:
+  *"make floor grid dots a biiit smaller (global component)"*.
+  **One constant, one consumer**: `GRID.dot` at `demo/shell/xr-room.mjs:807` is
+  `0.005` (5 mm radius on a 0.125 m cell, so a dot is 8% of a cell), read once
+  into the shader at `demo/shell/xr-room.mjs:1498`. Nothing else in the repo
+  types a dot size.
+  ⚠️ **THIS IS THE SECOND REDUCTION AND THE COMMENT ABOVE IT RECORDS THE
+  FIRST**: 7 mm to 5 mm on 2026-09-16, asked as *"make them smaller (global vr
+  grid everywhere, same for xr)"*. Amend that comment rather than adding a
+  second one under it.
+  ⚠️ **A DOT SMALLER THAN A PIXEL FADES RATHER THAN ALIASES**, which the shader
+  comment at line 617 already says, so the floor should not start shimmering at
+  a grazing angle. Look at the flat page after the change, because the screen
+  shot that prompted this is the flat page, not a headset.
+  ✅ **DONE 2026-09-19.** `GRID.dot` 0.005 to 0.004, and the comment now carries
+  all three values so the ratio to the 12.5 cm cell is visible: 11%, 8%, 6.4%.
+
+- ✅ **THERE IS NO WAY OUT OF FULL SCREEN ON A PHONE, AND THE PAGE SAYS
+  `Esc to leave` TO SOMEBODY HOLDING A DEVICE WITH NO ESCAPE KEY.** Reported
+  2026-09-19 with a photograph of `/weight/` filling an iPhone: *"I can not leave
+  fullscreen on mobile"*. Asked for: *"make permanett squaer button with
+  fullscreen icon on bottom right when going to fullscreen in mobile. fade out
+  / it when no activity"*.
+  **Why there is nothing to press.** On an iPhone `toggle()` always takes the
+  faux path (`demo/shell/fullscreen.mjs`, no element Fullscreen API there), and
+  `.pos-faux-host .pos-faux` is `position: fixed; inset: 0; z-index: 60`
+  (`demo/shell/shell.css:1137`), so the cover is over the control row that holds
+  the ⛶ that got you in. The only exit wired is `keydown` Escape
+  (`fullscreen.mjs:103`), and `/weight/` and `/floor/` each hand-roll a badge that
+  SAYS Escape and then fades itself out after 4.5 s
+  (`demo/weight/index.html:356` and `1546-1556`, `demo/floor/index.html:210` and
+  `1359-1366`). So on a phone the page is a trap, and on a desktop the way out is
+  a sentence that erases itself.
+  🔴 **IT IS THE SAME RULE AS `xr-quit.mjs` IN A SECOND COSTUME.** CLAUDE.md
+  already says anything immersive needs a way out that the PAGE owns, and that
+  "press the Meta button" is not an answer a page gets to give about its own
+  bug. "Press Escape" on a phone is that answer verbatim.
+  **The component, and it goes in `demo/shell/fullscreen.mjs`** so that the six
+  callers (`weight`, `floor`, `mirror`, `blocks`, `stage`, `videoradio`, plus
+  `demo/shell/video-panel.mjs`) get it without writing it seven times:
+  - A square button, bottom right, carrying the ⛶ glyph, sized and centred the
+    way the shell's own icon control is (`shell.mjs:157-168` uses
+    `centreSymbol`, because ⛶ is drawn small and high in a box sized for a
+    capital).
+  - 🔴 **APPENDED INSIDE THE ELEMENT THAT WENT FULL, NEVER TO `document.body`.**
+    In real element fullscreen only that element's subtree is on screen, so a
+    button anywhere else is invisible on exactly the path where it is a fallback
+    rather than the only exit.
+  - Held off the corner by `env(safe-area-inset-*)`, or on an iPhone it lands
+    under the home indicator.
+  - `touch-action: manipulation` and `-webkit-touch-callout: none`, per the
+    measured loupe rule.
+  - **Fades out on inactivity and comes back on any pointer, touch or key**,
+    which is the ask. ⚠️ While it is faded it must be `pointer-events: none`, or
+    the bottom right corner of the picture silently exits full screen for
+    somebody who was reaching for the picture.
+  - The badges on `/weight/` and `/floor/` lose their Escape wording and either go
+    or become what the module draws. Two pages saying it two ways is what made
+    this a kit job.
+  ⚠️ **WHICH PATHS GET IT IS THE ONE OPEN CHOICE.** Faux always. Recommendation
+  is every path, because Android Chrome takes the ELEMENT path and has no
+  Escape key either, and a faded square costs a desktop nothing.
+  🔴 **AND IT IS NOT A NEW COMPONENT, IT IS A MODE. DIRECTED 2026-09-19:** *"that
+  “close fullcreen on mobile” standalone button can just be a mode of
+  fullscreen videopanel component"*. `demo/shell/video-panel.mjs` already owns
+  three of them (`FULL_MODES = ['hover', 'footer', 'bare']`) and already draws a
+  close button, fades it on idle and keeps it in the DOM rather than adding and
+  removing it. So the ask is a fourth mode, or `hover` taught that a phone has
+  no hovering pointer, rather than a second button in a second file that can
+  drift from the first.
+  ⚠️ **AND THAT LEAVES TWO PAGES WITH NOTHING, WHICH IS THE ONE THING TO SETTLE
+  BEFORE BUILDING IT.** `/weight/` and `/floor/` fill the screen with a BARE
+  CANVAS: they call `fullscreen.mjs` directly on their own wrapper and have no
+  video panel at all, which is exactly why each grew its own `Esc to leave`
+  badge. A mode on the panel does not reach them. Either they adopt
+  `video-panel.mjs` for their picture, which is the same direction `/mirror/`
+  was just given, or the mode's button is one exported piece that both the panel
+  and a bare cover can mount. **Ask which before writing it**, because the two
+  answers are different amounts of work on two pages that are otherwise not in
+  this stream.
+  ⚠️ **AND THE EXIT HAS TO BE PROVED BY PRESSING IT**, not by reading that it is
+  wired: this is the `/blocks/` failure, where the badge was built, compiled and
+  drawn every frame and never updated, so there was no way out at all.
+  ✅ **DONE 2026-09-19.** `createFullscreenExit(host)` in `fullscreen.mjs`,
+  mounted inside whatever went full, `pointer-events: none` while faded. It is
+  the video panel's `hover` mode too, so the way out and the way in wear the
+  same ⛶. Every `Esc to leave` badge is gone from `/weight/` and `/floor/`.
+  **Proved by sabotage**: removing `pointer-events: none` took `/kit/` to
+  `58/59, 1 FAILED`, which is the reported failure exactly.
+
+- 🔴 **A DESCRIPTION IS ONE SENTENCE, AND THE RULE IS GLOBAL.** Asked
+  2026-09-19: *"make global rule and implement per demo as we go: descs are
+  single sentences (do not stretch them with : ; -- etc)"*. So a description is
+  not allowed to buy a second clause with punctuation: no colon, no semicolon,
+  no dash, no *"and"* bolted on to carry a second fact.
+  ✅ **SCOPE IS SETTLED, ANSWERED 2026-09-19:** *"descs means text under the
+  title of each demo"*. That is the `what` paragraph, which `shell.mjs:111`
+  appends as `<p class="pos-what">` directly under the `h1`, and it is the same
+  string the index shows under each demo's name, because CLAUDE.md already rules
+  that a page with a diagram takes the `one` line from `demo/manifest.mjs`
+  verbatim. So BOTH move together and neither may be two sentences.
+  🔴 **THIS REPLACES THE STANDING THREE-SENTENCE RULE**, which is in CLAUDE.md
+  under *"THREE SENTENCES. A DESCRIPTION IS NOT AN ESSAY"*. That rule was itself
+  a cut from four, and it kept being broken: this is the third time shorter has
+  been asked for. One sentence, and the sentence may not be stretched with a
+  colon, a semicolon or a dash to smuggle a second clause into it.
+  **Today's `/weight/`** is the example of both being over: `one` is *"one
+  sentence broken across four walls, each word as big as it is short. Point at
+  one and type your own over it"* (two sentences, `demo/manifest.mjs:161`), and
+  `what` is **five** sentences (`demo/weight/index.html:326`) against a standing
+  three-sentence rule.
+  **When it is settled**: write the rule into CLAUDE.md beside the existing
+  `what` rules so the two cannot disagree, then apply it per demo as each page
+  comes up in this stream rather than in one sweep of 46 files.
 - ✅ **DONE 2026-09-19. A NEW RUN CLEARS THE LAST ONE, AND THERE IS NO CLEAR
   BUTTON.** Asked as *"add Clear button under archvie timeline"*, then withdrawn
   and replaced the same minute: *"Ok no clear. New run clears"*. The second
@@ -21,6 +1260,548 @@
   Disabling the call takes it red reading `1, 0, 2, still a recording, 2 poll(s)
   left in a footer`, which is the defect in the detail line rather than a bare
   fail.
+  ✅ **DONE 2026-09-19.** CLAUDE.md's three-sentence rule is replaced, and five
+  pages are cut to one sentence: `/mirror/` from four sentences and 62 words,
+  `/weight/` from five, `/floor/`, `/reel/` and `/blocks/` from three.
+
+<!-- ── /mirror/, the whole page, from the stream of 2026-09-19 ───────────── -->
+
+- ✅ **`/mirror/` HAS SIX ASKS AND THEY ARE ONE JOB.** Reported 2026-09-19 with
+  a photograph of the page on an iPhone. In order:
+  **1. The desc goes to one sentence.** Today `demo/mirror/index.html:174` is
+  **four** sentences and 62 words, and the photograph shows it taking the top
+  half of a phone screen before anything can be pressed. The index line
+  (`demo/manifest.mjs:133`, *"the same shader drawn by your browser and by a
+  Raspberry Pi, side by side"*) is already one sentence and is the obvious
+  candidate to become the page's `what` verbatim, which the diagram rule below
+  requires anyway.
+  **2. Add `How it works`.** The page imports no `diagram.mjs` at all. It takes
+  `{ how: true, atEnd: true }` and NO title, per CLAUDE.md. Boxes it will need:
+  `Browser` (the shader drawn here), `Relay object`, `Raspberry Pi` (the same
+  shader drawn there), and the H.264 video coming back. ⚠️ A page with a diagram
+  has a ONE LINE `what`, which is ask 1, so these two are the same edit.
+  **3. Use the video panel component.** Asked as *"use videopanel or whaever you
+  call it component"*. The page builds its on-page panes with `panel.mjs`
+  (`createPanel` / `createPanelFooter`, `demo/mirror/index.html:533-535`), which
+  draws a picture and a footer INTO A CANVAS. `demo/shell/video-panel.mjs` is
+  the DOM component with the three footer slots and the square fullscreen button
+  the rest of the project uses.
+  ⚠️ **THE CANVAS PANELS CANNOT ALL GO, AND THIS IS THE TRAP IN THIS ASK.**
+  `panel.mjs` exists because a panel hung in a headset is a TEXTURE: a
+  framebuffer has no text in it, so the footer has to be drawn as pixels and
+  uploaded (`demo/mirror/index.html:1152` uploads `footHere.canvas`). The flat
+  page's two panes are what move to `video-panel.mjs`; the XR panels keep
+  `panel.mjs`. Say which is which in a comment, or the next reader deletes the
+  wrong one.
+  **4. One controls group.** Asked as *"look,mirrort etc all into controls
+  group"*. `LOOK` is a kit `createPicker`; `MIRRORS`, `GRAIN` and `HUE` are
+  **hand-rolled** at `demo/mirror/index.html:345-357` with page-local `.knobs`,
+  `.knob` and `.seg` CSS at lines 38-70. `demo/shell/choice.mjs`'s own opening
+  comment names this page as one of the three hand-built copies that made it a
+  component, and the copy is still here. So: the three become `createChoice`,
+  and all four rows sit in one group with one label column.
+  ⚠️ **THE GROUP CONTAINER MAY NOT EXIST IN THE KIT AND THAT IS A DECISION, NOT
+  A DETAIL.** There is `createSliderGroup` (`demo/shell/slider.mjs:141`), and
+  there is `shareLabelColumn()`, which exists ONLY inside `/radio/`
+  (`demo/radio/index.html:4543`) and is the label-column machinery every one of
+  these rows wants. That is CLAUDE.md's *"a control that exists in one page and
+  nowhere else is a component that has not been noticed yet"*, word for word.
+  **Recommendation: lift `shareLabelColumn` into the kit as part of this**, and
+  do it in the shared pass before the page agents start.
+  **5. Radio buttons fill the width on a phone.** Asked as *"radiobuttons should
+  fill the w in mobile (like sliders)"*. The rule ALREADY EXISTS and this page
+  is not covered by it: `demo/shell/shell.css:1411-1433` puts the label on top
+  and gives `.pos-choice .step` the whole width at `max-width: 560px`, with
+  `flex: 1 0 auto` so options grow to share the row and scroll rather than wrap.
+  `.knob` matches none of those selectors. So ask 4 fixes ask 5 by itself, which
+  is the reason to do them together and the reason the kit rule exists.
+  **6. The VR and AR buttons get the same treatment as `/weight/`.** `/mirror/`
+  is the ONE XR page with no capability probe at all: `grep navigator.xr
+  demo/mirror/index.html` is empty, so `Run in VR` and `Run in AR`
+  (`demo/mirror/index.html:202-203`, ids `xr` and `ar`) are live buttons on a
+  phone that has no WebXR. Whatever shape the shared repair takes for `/weight/`,
+  `/blocks/` and `/floor/`, this page takes it too, and it needs the probe
+  adding rather than correcting.
+  ⚠️ **ASSERT COUNT.** This page is graded by `node demo/verify-gl.mjs mirror`,
+  not by the ordinary harness, and CLAUDE.md records that a control moving out
+  of `.pos-controls` on this exact page already took its count 9 to 7 while
+  reading green. Count before and after, and remember `verify-gl.mjs` now
+  appends `?selfcheck=1`.
+  ✅ **DONE 2026-09-19. 41/41 to 43/43**, the two new ones being the diagram's.
+  🔴 **A TEN ASSERT LOSS WAS CAUGHT BEFORE IT SHIPPED**: disabling the headset
+  buttons meant the harness could no longer reach `enterHeadset`, so both
+  session branches would have gone silent while the page read green.
+
+- ✅ **NO MIDDOTS IN ANYTHING A VISITOR READS, FIXED PER DEMO AS EACH ONE COMES
+  UP.** Asked 2026-09-19: *"avoid using middots in ui (can be fixed per demo as
+  we go)"*.
+  ⚠️ **THIS REVERSES A STANDING PREFERENCE AND THE OLD ONE IS QUOTED HERE SO IT
+  IS NOT RE-ARGUED.** `demo/shell/shell.mjs:313-318` carries a comment calling
+  `·` *"already this project's separator inside these same log lines"*, written
+  when the em dash sweep replaced 418 dashes and needed somewhere to put the
+  joins. The dash rule is untouched. What changed is that the replacement became
+  the new tic: a middot lets a line bolt a third and a fourth fact on instead of
+  ending, which is the same failure the dash rule is about.
+  **The size of it, measured**: **971** middots across `demo/*/index.html` and
+  `demo/shell/*.mjs`, in **45 of 46** pages. So it is not a sweep, and the ask
+  already says so: each page loses them when that page is being worked on.
+  **The shared half that is not per-page**, and it has to be decided first
+  because every page inherits it:
+  - `demo/shell/shell.mjs:318`, the assert formatter, `FAIL <label> · <detail>`.
+    Every failing assert on every page comes through this one line.
+  - `demo/shell/shell.mjs:60`, `document.title = 'POSITRON · <name>'`.
+  - `demo/shell/shell.mjs:403`, the tally, `ready · N/M checks`.
+  **What replaces it is the open question**: a full stop and a second sentence
+  where the two halves are really two facts, a line break in the log where they
+  are a list, or a readout cell where the second half was a number all along.
+  ⚠️ A detail line that is three middots long was never one sentence, so this is
+  an occasion to cut rather than to substitute a character.
+  🔴 **POINTED AT AGAIN THE SAME MINUTE, IN A SECOND PLACE:** *"see the middot
+  again"*, about `Apple GPU · locked 59.9 fps` in `/mirror/`'s panel footer. So
+  a footer is not a log line and it has the habit too. The joins there:
+  `demo/mirror/index.html:506` glues the footer's fields with `' · '`,
+  `demo/mirror/index.html:292` appends `' · locked'` to one of them, and
+  `demo/shell/presence.mjs:353-354` builds every presence title in the project
+  as `<what> · <state> · <note>`. A footer is a row of CELLS, which is what the
+  readout already knows: the separator exists because the cells were glued into
+  one string first, so the repair is to stop gluing rather than to pick a
+  different glue.
+  ⚠️ `<title>` is a third case and it is NOT a visitor-facing line in the same
+  sense: `mirror · positron` is in the browser tab. Decide it once with
+  `shell.mjs:60`, which writes the same thing for every shelled page.
+  ✅ **DONE 2026-09-19 for the shared half and for five pages.** `shell.mjs`
+  puts an assert's detail on its own indented line, the tally reads `ready,
+  N/M checks` and the tab is `POSITRON <name>`; `presence.mjs`, `wire.mjs`,
+  `xr-room.mjs` and `xr-panel.mjs` are swept. What is left in the five worked
+  pages is 2, 7, 1 and 0, all inside code comments or a `2·atan`.
+  🔴 **THIS ENTRY STAYS OPEN ON PURPOSE.** The shared half is finished and five
+  pages are clean; the other forty still have theirs, which is what was asked
+  for. It leaves this file when the last page is worked on, not before, and the
+  same is true of the one-sentence desc rule above it.
+
+- ✅ **AND THE WAY BACK FROM FULL SCREEN IS NEEDED ON `/mirror/` TOO.** Asked
+  2026-09-19 in the same breath as the page's other six: *"having
+  bak-from-fullscreen button here in mobile fullscreen as well"*.
+  ⚠️ **IT IS THE SAME COMPONENT AND A DIFFERENT HOLE.** `/mirror/` fills the
+  screen from its PANEL footer's ⛶ rather than from a shell control, and
+  `demo/shell/video-panel.mjs` already has three full modes, whose default
+  `hover` puts a close button in the top right *"when the pointer moves and
+  fades when it stops"*. On a phone there is no pointer that moves, so the way
+  out is behind a gesture the device does not make. That is the same defect as
+  the `Esc to leave` badge, one component further along.
+  **So the fullscreen exit component lands in BOTH places**: `fullscreen.mjs`
+  for a page that covers itself, and `video-panel.mjs`'s full modes for a panel
+  that covers the page. One button, one behaviour, two callers, or the two
+  drift the way the two panel components already have.
+  ✅ **DONE 2026-09-19.** No fourth mode was needed: `hover`'s close button
+  BECAME the shared piece, moving from a top right ✕ to a bottom right ⛶.
+
+- ✅ **THE VIDEO PANEL FOOTER GAINS A SECOND STOREY IN FULL SCREEN, AND THE
+  CONTROL GROUP GOES IN IT.** Asked 2026-09-19 with a photograph of `/mirror/`
+  filling an iPhone: *"extend videopanel footer in fullscreen so it can have
+  section below the footer bar (separaet with line). put controlgroup there"*.
+  **Where it goes**: `demo/shell/video-panel.mjs`, one more slot, and
+  `demo/shell/shell.css:2827` where `[data-full="footer"]` is already
+  `display: grid; grid-template-rows: 1fr auto`. It becomes `1fr auto auto`,
+  and the new row carries a 1 px top line.
+  **What the API looks like**: the page hands the panel an element (`under`, or
+  `tray`), and the panel shows it only while full in `footer` mode, because
+  off-screen the page already has its controls in the ordinary control group
+  above.
+  ⚠️ **THIS IS A LINE, AND THE STANDING RULE SAYS SEPARATION IS SPACING.**
+  CLAUDE.md is explicit: separation is spacing, not lines, and an empty box is a
+  line. This is a deliberate exception ASKED FOR, and the reason it survives the
+  rule is that full screen is the one place with no page rhythm around anything:
+  the bar and the controls are two different kinds of thing stacked edge to
+  edge, with no 22 px gap available to say so. Write that reason next to the
+  rule, or the next sweep deletes the line.
+  ⚠️ **IT REPLACES A FOURTH HAND-ROLLED COPY.** `/mirror/` already does this by
+  hand: `.bar` with `.knobs` inside it, laid out `1fr auto 1fr` only under
+  `.pane.pos-full` (`demo/mirror/index.html:88-105`). That is the page's own
+  footer, its own knobs and its own full-screen layout, none of which the kit
+  can see. The component has to do what that does before the page's copy goes.
+  ⚠️ **AND IT IS THE SAME CONTROL GROUP, NOT A SECOND ONE.** Moving one group
+  between two parents keeps one set of buttons, one state and one set of
+  asserts; building a full-screen copy means two rows that can disagree about
+  which option is chosen, which is the readout-in-two-files bug in a new place.
+  ✅ **DONE 2026-09-19.** `api.under(node)`, `[data-full="footer"]` now
+  `1fr auto auto` with the line above the new row and the reason written beside
+  it. `/mirror/` moves the SAME control row in and out, and its `onFull`
+  deliberately does not trust the panel that reported, because
+  `fullscreenchange` is a document event and both panels hear every one.
+
+<!-- ── /floor/, from the stream of 2026-09-19 ────────────────────────────── -->
+
+- ✅ **`/floor/` HAS FIVE ASKS.** Reported 2026-09-19 with a photograph of the
+  page on an iPhone.
+  **1. The caption goes to the top.** *"move active title comments to top"*.
+  `.fl-name` is `position: absolute; left: 0; right: 0; bottom: 0; height: 46px`
+  with a gradient running `transparent -> rgba(7,9,13,.92) 55%`
+  (`demo/floor/index.html:46-50`). Moving it to `top: 0` means the gradient
+  reverses too, or the caption sits on the wrong end of its own scrim.
+  ⚠️ **IT IS A FIXED BOX AND MUST STAY ONE**: the comment above it records that
+  it is rewritten on every frame the gaze moves, and a caption that can change
+  its own height would push the picture about while somebody is looking at it.
+  That is CLAUDE.md's rule about anything redrawing every frame.
+  ⚠️ **AND `.fl-out` IS ALREADY AT `top: 12px; right: 14px`**, so the caption
+  arriving at the top has to not collide with whatever the way out becomes.
+  **2. The date goes last and loses the yellow.** *"move date field last and
+  lose yellow"*. `demo/floor/index.html:1019` appends `b` (date), `span`
+  (title), `i` (series) in that order, and `.fl-name b { color: var(--hi) }` at
+  line 51 is the yellow. So: title, series, date, and the date takes an ink from
+  the palette that is not `--hi`. ⚠️ `--hi` is this project's one accent and is
+  spent on what is CHOSEN or LIVE, which a date is neither.
+  **3. The readout goes.** *"rm readout"*.
+  `demo/floor/index.html:184` declares `{ tiles: '', loaded: 'of 320', reach:
+  'm', fps: '' }`.
+  🔴 **FOUR `d.set` CALLS HAVE TO GO WITH IT OR THE PAGE THROWS**: `setCell`
+  throws if the page never declared the key (`demo/shell/shell.mjs:289`), and
+  the calls are at lines 1260 (`fps`), 1268 (`loaded`), 1269 (`reach`) and 1662
+  (`tiles`). Nothing else reads them: `grep readout demo/floor/index.html` is
+  that one line, and `verify-gl.mjs` does not read the readout at all.
+  ⚠️ **REHOME WHAT IT SAID, WHICH IS CLAUDE.md's RULE ABOUT DELETING A DISPLAY.**
+  `loaded 294 of 320` is the one of the four that is a live fact about whether
+  the floor is still filling in. The picture is about to get a panel footer on
+  the other pages in this stream, and a footer is where a number about the
+  picture belongs.
+  ⚠️ **AND THE DESC DESCRIBES THE CELLS BEING DELETED.** `demo/floor/index.html:173`
+  ends *"loaded is how many pictures are on the floor now and reach is how far
+  out they have got"*. The one-sentence rule takes that sentence anyway, so do
+  both in one edit rather than leaving a page that explains a row that is not
+  there.
+  **4. Add `How it works`.** The page imports no `diagram.mjs`. `{ how: true,
+  atEnd: true }`, no title. It will want `Browser`, ERR's archive and the HLS
+  the films arrive as. ⚠️ A page with a diagram takes a ONE LINE `what`, and the
+  index line at `demo/manifest.mjs:294` is already one sentence.
+  **5. The way back from full screen, on a phone.** *"add get back from
+  fullscreen button on mobile"*. Same component as the rest of the stream.
+  ⚠️ `/floor/` is one of the two pages that fill the screen with a BARE CANVAS
+  rather than a video panel, so it is the page that decides the open question on
+  that entry: adopt `video-panel.mjs`, or mount the mode's button on a bare
+  cover. Its `.fl-out` badge (`demo/floor/index.html:56-62`, `Esc to leave`,
+  fading after a few seconds) is what the button replaces, and the comment
+  beside it is worth keeping: *"asked twice: how do I get out"*, and the answer
+  had been going into the log, which is outside the cover.
+  ⚠️ **ASSERT COUNT**: graded by `node demo/verify-gl.mjs floor`. Removing the
+  readout removes nothing the asserts read, but the control row changes if the
+  way out becomes a control, which moves where the harness's single press lands.
+  ✅ **DONE 2026-09-19.** Caption at the top with the scrim mirrored, date last
+  in `--dim`, `readout: null` with all four `d.set` calls removed and `loaded`
+  rehomed to the log, diagram added, desc cut to the manifest line. The 124 px
+  reserved against `.fl-out` is gone, measured dead rather than assumed.
+
+<!-- ── /blocks/ and one global, from the stream of 2026-09-19 ───────────── -->
+
+- ✅ **THE 3-D SCENE MUST NOT BE SELECTABLE.** Reported 2026-09-19 with a
+  photograph of `/blocks/` on an iPhone: the canvas wearing a **blue selection
+  overlay with both iOS drag handles**, one at the top left of the picture and
+  one hanging below it into the log.
+  **Where the rule already is and why it missed**: `demo/shell/shell.css:205`
+  puts `user-select: none` and `-webkit-touch-callout: none` on `button`, and
+  the comment beside it is the measured loupe lesson. Nothing does it for a
+  `<canvas>`, so every picture on every page here is a long press away from
+  this.
+  ⚠️ **`user-select: none` ALONE IS NOT ENOUGH AND THIS PROJECT HAS MEASURED
+  IT**: the loupe is the magnifier rather than selection, and
+  `-webkit-touch-callout: none` is the one that suppresses it. Both, plus
+  `touch-action` as each page needs it.
+  ⚠️ **IT IS GLOBAL, NOT `/blocks/`.** A canvas is a picture in every case here,
+  and nobody has ever wanted to select one. Prose, readouts and the log keep
+  their selection, which is the rule already written at `.pos-strip`.
+  ⚠️ **BUT `touch-action` IS NOT GLOBAL.** A canvas you drag to look around
+  wants `none` or `manipulation`; one inside a scrolling page must not eat the
+  scroll. Set selection globally and leave `touch-action` per page.
+  ✅ **DONE 2026-09-19.** A global `canvas` rule in `shell.css` with both
+  properties, since `user-select` alone does not suppress the loupe.
+  `touch-action` is deliberately NOT global.
+
+- ✅ **THE BRICKS ON `/blocks/` DOUBLE IN EVERY DIRECTION.** Asked 2026-09-19:
+  *"make blocks 2x bigger in each direction"*.
+  **One constant**: `demo/shell/seed.mjs:49`, `export const UNIT = 0.5`, and
+  everything in the document format is a multiple of it (`s: round(u * UNIT)`,
+  positions `gx * UNIT + half`). Only `/blocks/` imports it.
+  🔴 **AND `PLATE` HAS TO MOVE WITH IT OR THE ROOM SHRINKS TO TWO BRICKS
+  ACROSS.** `demo/blocks/index.html:564` is `const PLATE = 2.4`, which is 4.8
+  units at 0.5 m; at 1.0 m the same plate is 2.4 bricks across, so a doubling of
+  the brick is a QUARTERING of the buildable floor in brick counts. The comment
+  above it already says *"the plate follows the brick"* and records the last
+  time this pair moved.
+  ⚠️ **THE UNIT'S OWN COMMENT IS THE HISTORY OF THIS EXACT ASK** and should be
+  amended rather than replaced: 0.2 m was called *"a handful of gravel"* after a
+  headset run and became 0.5 m. This is the same instinct going one step
+  further, and the reasoning to check afterwards is the same one, which is what
+  a brick feels like at arm's length.
+  ⚠️ **AND IT IS A SCENE-WIDE CHANGE, SO LOOK AT THE FLAT PAGE TOO.** The
+  photograph is the flat canvas, where the camera is fixed and bigger bricks
+  simply fill more of a 16:9 box.
+  ✅ **DONE 2026-09-19.** `UNIT` 0.5 to 1.0 and `PLATE` 2.4 to 4.8, both giving
+  9.6 bricks across, plus seven other constants rescaled with the arithmetic
+  written down and five deliberately left.
+
+- ✅ **AND `/blocks/` TAKES THE VR AND AR DISABLING.** Asked as *"do that vr/ar
+  disabling if needed"*. Control ids are `enter` and `ar`
+  (`demo/blocks/index.html:180-181`), and its probe is the same
+  `navigator.xr?.isSessionSupported` shape at lines 1009-1010, so it has the
+  `null` forever defect too.
+  ✅ **DONE 2026-09-19**, and `enter` was renamed `vr`, so the four pages no
+  longer have three spellings for one thing.
+
+- ✅ **A BUTTON GROUP IS A KIT COMPONENT, AND EVERY VR AND AR BUTTON TOUCHED IN
+  THIS STREAM MOVES TO IT.** Asked 2026-09-19: *"global: make buttongroup
+  component and convert all vr/ar buttons to it what we change so far"*.
+  **What exists and what does not**: `demo/shell/choice.mjs` is a segmented
+  group of buttons where exactly ONE is chosen, which is a different thing. A
+  button group is two or more buttons that each DO something, sharing a row and
+  a label column the way a choice does. Nothing in `demo/shell/` builds that
+  today, so every page hand-rolls it by listing controls in `mount({ controls })`
+  and letting the row lay them out.
+  **The pages in this stream and their ids**: `/weight/` `vr`, `ar`; `/blocks/`
+  `enter`, `ar`; `/floor/` `vr`; `/mirror/` `xr`, `ar`. ⚠️ Note `/blocks/` says
+  `enter` where the other three say `vr` or `xr`. Three spellings for one thing
+  is the drift the component removes.
+  ⚠️ **`verify.mjs` AND `verify-gl.mjs` PRESS `.pos-controls button`.** A group
+  that moves these buttons OUT of that row silently stops them being exercised,
+  which is the failure `/mirror/` has already paid for once, when a stepper
+  moved into the knob row and the count went 9 to 7 while the page read green.
+  So the group either lives inside `.pos-controls` or the harnesses learn about
+  it, and that is a decision to make before the page agents start.
+  ⚠️ **AND THE DISABLED STATE BELONGS TO THE GROUP.** The capability work above
+  is per-button `disabled` plus a reason in words; if the group owns the
+  buttons, it owns that API, and the four pages set it one way instead of four.
+  ✅ **DONE 2026-09-19.** `demo/shell/button-group.mjs`, on all four pages, and
+  on `/kit/` with seven asserts of which two were proved by sabotage.
+
+- **A `getPose` AT 90 Hz ON `/floor/` FOR A THING NOTHING DRAWS.** Found
+  2026-09-19 while moving that page to the mounted way out, and left in place on
+  purpose rather than quietly removed.
+  `demo/floor/index.html` resolves `h.grip` from `xframe.getPose(src.gripSpace,
+  xrRefSpace)` for every hand on every frame (around lines 1568 and 1580). Its
+  only reader USED to be the quit badge, which drew at the grip; the badge is
+  head locked now, so the only thing left that mentions `h.grip` is the
+  commented recipe for putting the controller model back.
+  ⚠️ **IT WAS LEFT BECAUSE OF A STANDING INSTRUCTION**, which is that the
+  controller model code stays ready to drop back in. Removing the pose would
+  make that recipe false, and rewriting the hands block was not what that agent
+  was sent to do.
+  **So this is a decision, not a defect**: either the recipe keeps its pose and
+  the cost is accepted and written down where the pose is resolved, or the
+  recipe is updated to say it needs one line back. Either way the cost should be
+  measured on a headset before anybody calls it small, because per hand per
+  frame at 90 Hz is the kind of number that is invisible on a laptop.
+
+<!-- ── two more, 2026-09-19, arriving after the first fan-out started ────── -->
+
+- ✅ **HOLDING ANY CONTROLLER BUTTON TO QUIT IS GLOBAL BEHAVIOUR, NOT A LINE A
+  PAGE REMEMBERS TO WRITE.** Asked 2026-09-19: *"global behaviour hold any
+  vr/xr controller button to quit"*.
+  **What exists**: `demo/shell/xr-quit.mjs` is the gesture and it is correct.
+  Four pages carry it, three by importing it (`/blocks/`, `/weight/`, `/floor/`)
+  and `/mirror/` through `demo/shell/xr-panel.mjs`. `demo/shell/xr-tablet.mjs`
+  imports it too.
+  **What is missing is the GUARANTEE**, and it cost a real failure five days
+  ago that is already in this file: `/blocks/` built the badge, compiled its
+  shader and drew it at both hands every frame, and never called `update`, so
+  the hold could not advance and there was no way out of that page at all.
+  Reported from a headset as *"i was not able to get out"*. Every other page had
+  the line, so no shared code was wrong and nothing in the repo could disagree
+  with anything. `node demo/shell/xr-quit-test.mjs` refuses that shape now by
+  matching the ARGUMENT (`inputSources`), which is a check standing in for a
+  thing the design should make impossible.
+  **So the ask is to move the gesture behind whatever a page already has to
+  call to be in a session at all**: mount, update and draw in one place, so a
+  page that enters immersive mode HAS the way out by construction rather than
+  by remembering three lines. `demo/shell/xr-controller.mjs`, `xr-hands.mjs` and
+  `xr-panel.mjs` are the candidates for where that seam already is.
+  ⚠️ **AND THE TEST HAS TO FOLLOW THE DESIGN.** If the page can no longer
+  forget, `xr-quit-test.mjs`'s current check is about a shape nobody writes any
+  more. It should then grade the SHARED path, and keep a negative control, or
+  it becomes a check that cannot fail.
+  ⚠️ **NO LABELS ON IT**, which is already the rule: nothing is drawn until
+  something is held, the arc is the badge, and the gesture is the
+  documentation.
+  🔴 **AND THE RING COMES OFF THE CONTROLLERS. DIRECTED 2026-09-19:** *"Hold-
+  to-quit: ui should not tied to controllers. it should be just front of me"*.
+  Today `draw(vp, grips, eye)` (`demo/shell/xr-quit.mjs:380`) paints the badge
+  at EVERY grip matrix, and returns early when there are no grips at all. The
+  reasoning written beside it is that the hold can start on either controller,
+  so a ring filling on the hand you are not pressing points at the wrong place.
+  That argument dies the moment the ring is head-locked: in front of you there
+  is one of it, it is where you are already looking, and WHICH hand started the
+  hold stops mattering.
+  ⚠️ **THE GESTURE IS UNCHANGED**: any controller button, held. Only the place
+  the countdown is drawn moves.
+  ⚠️ **AND IT TAKES THE `grips?.length` GUARD WITH IT**, which is a quiet gain:
+  a session driven by tracked HANDS rather than controllers has no grips, so
+  the badge could not be drawn there at all.
+  **The call sites that move**, and they are the whole blast radius:
+  `demo/weight/index.html:1545`, `demo/floor/index.html:1670`,
+  `demo/blocks/index.html:1748` and `demo/shell/xr-panel.mjs:1505`. The forward
+  direction comes out of the view matrix the page already passes, the same way
+  `eyeFromView` takes the position out of it, so no page has to start reporting
+  a head pose it was not reporting before.
+  ⚠️ `demo/shell/xr-quit-test.mjs` greps the module and the pages, so it has to
+  be re-aimed at whatever the new call looks like or it grades a shape nobody
+  writes.
+  ✅ **DONE 2026-09-19.** `mountXRQuit(gl, session)` puts its own callback on
+  `session.requestAnimationFrame`, so there is no `update` for a page to forget,
+  and the module ends the session itself whether the page passes `onQuit` or not
+  and whether that callback throws or not. The ring is one, head locked, 1.6 m
+  out, about 5 degrees across, drawn last with the depth test and the depth mask
+  off. `xr-quit-test.mjs` is 33/33 and sweeps every page for the pairing.
+  🔴 **AND `/blocks/` HAD A SECOND, INDEPENDENT REASON A HEADSET RUN WENT
+  WRONG**: `mul` was never defined on that page, so the old draw line was a
+  `ReferenceError` waiting inside the eye loop, which silently removes the
+  second eye, the `getError` check and the first frame beacon.
+  🔴 **AND THE SABOTAGE FOUND THE SUBSTRING TRAP AGAIN**: breaking the real call
+  in `xr-panel.mjs` left the check green, because that file's own header
+  sentence about `mountXRQuit(gl, session)` matched the regex. It strips
+  comments now.
+
+- ✅ **NOTHING POPS UP A MESSAGE IN A HEADSET.** Asked 2026-09-19: *"also
+  remove the notes/messagepopups from vrxr (noticed them in blocks)"*.
+  **What it is in `/blocks/`**: `setPanel(text, holdMs = 9000)` at
+  `demo/blocks/index.html:420`, a 768x192 canvas uploaded as a texture and hung
+  in the scene, with a yellow rule down its left edge. Eleven call sites, and
+  they fall into two kinds:
+  - **Development traffic**, which is the larger half: `✓ new look, fading in`,
+    `✗ new look refused`, `✓ new generator, applied, roll to see it`,
+    `● update ready, press A to take it` held for SIXTY seconds, and whatever a
+    developer pushes down the socket at line 816.
+  - **Notes to the person building**: `moved it clear of another thing 0.42 m`,
+    `moved a thing out of your face, thumbstick pushes what you hold`, and the
+    room's plane summary.
+  ⚠️ **THE COMMENT ABOVE IT IS RIGHT AND IS NOT A DEFENCE OF THIS.** It says the
+  2-D page is invisible inside a session, so anything you need to READ while
+  wearing the headset has to be drawn in the scene. True, and it argues for a
+  panel you can look at when you want one. It does not argue for text that
+  appears in front of you because something happened, which is what a popup is.
+  **What replaces each kind is the question to answer while doing it**: a note
+  about what your own hands just did is already visible (the thing moved), a
+  development message belongs in the log on the flat page and in the device log
+  at `https://pub.positron.studio/logs?format=text`, and a state a person may
+  want to read belongs on a surface they choose to look at.
+  ⚠️ **CHECK THE OTHER THREE XR PAGES FOR THE SAME HABIT** rather than only
+  `/blocks/`: `/weight/`, `/floor/` and `/mirror/`, plus `xr-panel.mjs` and
+  `xr-tablet.mjs`, which are shared.
+  ✅ **DONE 2026-09-19.** Ten call sites, each decided on the same test, and
+  everything worth keeping rehomed to the log and the device log rather than
+  deleted. With no caller left the surface went too: the canvas, `setPanel`, its
+  program, quad, texture and uniform cache, so **`/blocks/` now compiles no
+  shader of its own**.
+
+<!-- ── /reel/, from the stream of 2026-09-19 ─────────────────────────────── -->
+
+- ✅ **`/reel/` HAS FOUR ASKS AND THEY ARE THE SAME FOUR `/tapes/` ALREADY
+  ANSWERED.** Reported 2026-09-19 with a photograph of the page on an iPhone.
+  **1. Glue the transport to the timeline.** *"glue reel transport to
+  timeline"*. `demo/shell/glue.mjs` exists and `/radio/`, `/replay/`, `/stage/`
+  and `/tapes/` all use it; `/reel/` appends the bar (`demo/reel/index.html:384`)
+  and the strip (line 394) as two separate blocks, so the shell's 22 px rhythm
+  puts a gap between two surfaces that are one instrument.
+  **2. Prev and next buttons, like `/tapes/`.** *"add next prev buttons like in
+  tapes"*. The transport bar already takes them and `/tapes/` declares them at
+  `demo/tapes/index.html:1622-1623`: `extras: [{ id: 'prev', label: '‹', aria:
+  'the tape before this one', onClick: () => walk(-1) }, { id: 'next', ... }]`.
+  So this is an `extras` array and a `walk(±1)` over `items`, and `/reel/`
+  already has the stepping logic inside `play()`.
+  **3. No clock on the transport.** *"rm timecountes from transport"*. The bar
+  takes `time: false` already (`demo/shell/transport-bar.mjs:111`), so it is one
+  option.
+  ⚠️ **AND THE PHOTOGRAPH SHOWS WHY IT HAS TO GO RATHER THAN BE FORMATTED**:
+  the clock reads **`-2620080:00.000`** over **`525600:00.000`**. This page's
+  deck axis is the YEAR 1965, so its positions are dates, its zero is 1970 and
+  every position in it is a large negative number of minutes. 525600 minutes is
+  a year. Nothing is broken about the arithmetic. A clock is simply the wrong
+  instrument for this axis, which is what the bar's own comment about `time:
+  false` says.
+  **4. Make the scrub work.** *"maek scrub work"*.
+  **The mechanism**: `/reel/`'s `createStripView` declares NO `onSeek`
+  (`demo/reel/index.html:394-405`), and `timeline/strip.mjs:2123` falls back to
+  `deck.seek` when there is none. So a drag DOES move the playhead and nothing
+  else happens: no film is picked, nothing loads, nothing plays. From a finger
+  that is a scrub that does nothing.
+  ✅ **`/tapes/` IS THE WORKED ANSWER AND IT IS TWENTY LINES**
+  (`demo/tapes/index.html:786-812`): `onSeek` finds which item the position
+  falls in, seeks the deck AT ONCE so the line follows the finger, and defers
+  the expensive half (tearing down and rebuilding the media element) by 140 ms
+  of stillness, because loading on every call made the lane flash. Its comments
+  carry both halves of the reasoning.
+  ⚠️ **ONE DIFFERENCE THAT HAS TO BE DECIDED, AND IT IS WHY THIS IS NOT A
+  COPY.** `/tapes/` is a CONTINUOUS run: every position on its axis is inside
+  some tape. `/reel/`'s axis is a year of weekly broadcasts, so most positions
+  are between films, with nothing to play. Either a seek lands on the nearest
+  film to where you let go, or a seek inside a film's own span scrubs within it
+  and a seek outside one only moves the view. **Say which**, because the two
+  feel completely different under a finger.
+  ⚠️ **AND THE DESC IS THREE SENTENCES** (`demo/reel/index.html:173` area, the
+  photograph shows all of it), so the one-sentence rule applies here as it does
+  to every page in this stream.
+  ✅ **DONE 2026-09-19, and the fourth ask found a bigger thing than itself.**
+  Glued, ‹ › walking broadcast days, `time: false`, and a scrub that lands on
+  the nearest film by distance to its SPAN rather than its start.
+  🔴 **THE PAGE WAS ASKING ERR FOR A NEWSREEL ON EVERY VISIT**, from
+  `play(openOn, true)` on the load path. `select()` and `play()` are separate
+  verbs now and a visit, a step and a scrub across a stopped year open nothing.
+  Asserts 8 to 11, and CLAUDE.md gained the lesson.
+
+- ✅ **THE TIMELINE GAINS A FOOTER THAT SAYS WHAT YOU ARE POINTING AT, INSTEAD
+  OF DRAWING IT OVER THE PICTURE.** Asked 2026-09-19 with a photograph of
+  `/reel/` on an iPhone: *"add feature to timeline: footer section, looks like
+  glued that shows hovered info below timeline. try with demos that have
+  timeline we touched so far"*.
+  **What the photograph shows**: the tap tooltip covering the right half of the
+  strip, four lines deep, one of them cut mid word (`PÄEVAKAJA. Kaevanduse
+  miiti`), over the marks it is describing.
+  ⚠️ **CLAUDE.md ALREADY PREDICTED THIS AND THE STRIP'S OWN SOURCE SAYS IT
+  TWICE.** The tooltip rule is that it is drawn ON TOP of the thing it
+  describes, so it gets two or three short lines and never a sentence;
+  `timeline/strip.mjs:2039` repeats it, and its touch notes at 2246 say a finger
+  has no hover, so the tooltip has to be STICKY, which means *"a finger that is
+  still down covers the thing it is describing"*. A footer under the strip is
+  the way out of that trade rather than a nicer tooltip.
+  **The hooks already exist, which makes this small**: `opts.onHover(hit)` is
+  called on every hover change and on every clear (`timeline/strip.mjs:2332`,
+  `2408`, `2411`), and `opts.tooltip !== false` (line 2018) turns the drawn one
+  off. **Nothing in the repo passes either one today.**
+  **Shape**: a fixed-height box under the strip, joined with `createGlue` so the
+  two read as one surface, filled from `onHover`.
+  🔴 **FIXED HEIGHT, NOT `min-height`, AND THIS IS THE RULE IT LIVES UNDER.**
+  It is written on every hover change, so a box that can grow a line as the
+  finger moves would push the whole page while somebody is reading it. That is
+  the measured `grain-scope` defect and the same reason `.fl-name` on `/floor/`
+  is a fixed box. Reserve the tallest it can be and clip.
+  ⚠️ **AND IT SAYS SO WHEN NOTHING IS UNDER THE POINTER**, rather than
+  collapsing: an empty box that keeps its height is the readout rule, and a box
+  that vanishes takes the page with it.
+  ⚠️ **THE TOOLTIP DOES NOT AUTOMATICALLY GO.** On a desktop it is free and it
+  is next to the pointer. Decide whether a page with a footer passes
+  `tooltip: false`, or keeps both with the footer carrying the LONG half (the
+  title, the series) and the tooltip the two-line half. Do not ship both saying
+  the same thing.
+  **Where to try it**: `/reel/` is the only timeline page in this stream so far,
+  and it is the page that photographed badly. `/tapes/`, `/replay/`, `/stage/`
+  and `/radio/` also mount strips and are NOT in scope until they come up.
+  ✅ **DONE 2026-09-19, AND `/reel/` IS THE FIRST CALLER.** `createStripFooter`
+  plus `footer: true` on `createStripView`, glued under the canvas by the
+  component itself, fixed height with every row clipping rather than wrapping.
+  The strip's own hooks were already there and nothing in the repo had ever
+  passed either one. `/reel/` takes `{ lines: 3 }` and the drawn tooltip goes
+  off, which is the component's default once there is a footer, so the two can
+  never say the same thing.
+  ⚠️ **WHAT ACTUALLY CHANGED FOR A READER IS THE FAILURE MODE.** The
+  photographed tooltip was four lines because a long title WRAPPED at the
+  strip's 40 character budget, over the marks it was describing. The same title
+  is now one row under the picture, cut at the right edge.
+  ⚠️ **AND THE GLUE HAD TO MOVE.** `/reel/` glued `view.el`, which is still the
+  canvas; with a footer that would have torn the canvas out of the pair the
+  component built. It glues `view.surface` now, and the nesting does not double
+  the edge because `.pos-glue.pos-glue > *` is (0,2,0) and takes the inner box's
+  border and radius off. One border round three parts, two seams: the transport
+  bar, the timeline, and what you are pointing at.
+  ✅ Asserts 11 to 13, both new ones behind `ifSelfcheck` because moving a
+  pointer over a page is something a person would see, and both driving a real
+  `PointerEvent` on the canvas so the hit test and `describeRow` are inside the
+  check rather than beside it.
 
 - 🔴 **ONE ASK FROM 2026-09-19 NOT DONE, ON `/stage/`.**
   *"videpanel borders are mess"*, with a zoomed crop of a rounded corner meeting
@@ -37,7 +1818,7 @@
   WAS ONE MISSING LINE.** Reported as *"i was not able to get out"*. The page
   built the quit badge, compiled its shader and drew it at both hands every
   frame, and **never once called `update`**, so the hold could not advance and
-  `onQuit` could not fire. `/held/`, `/floor/` and `xr-panel.mjs` all had the
+  `onQuit` could not fire. `/weight/`, `/floor/` and `xr-panel.mjs` all had the
   call, so no shared code was wrong and nothing in the repo could disagree with
   anything.
   🔴 **`node demo/shell/xr-quit-test.mjs` IS NEW AND IT REFUSES THAT SHAPE**, 9
@@ -71,7 +1852,7 @@
   lives in shared code this page only overrides: a later edit to `TOUCH` would
   put the growth back with nothing in `/blocks/` changing.
 
-- ✅ **DONE 2026-09-19. `/held/`'s MARK IS GREY AND COMES OFF AFTER AN EDIT.**
+- ✅ **DONE 2026-09-19. `/weight/`'s MARK IS GREY AND COMES OFF AFTER AN EDIT.**
   Asked as *"rm yellow color on hilite, just make them subltu grayer. after edit
   restore white"*. `MARK_RGB` is the ink turned down rather than a hue, so
   nothing on that page has a colour now; `retext` clears the mark instead of
@@ -358,27 +2139,22 @@ struck, the proof is in it.
   ⚠️ **AN AUDIENCE CEILING NOBODY HAS DECIDED:** 128 relay sockets, if answers
   travel the relay.
 
-- 🔴 **`/reel/` OPENS TWO ERR CONNECTIONS ON EVERY VISIT, BEFORE ANYBODY PRESSES
-  ANYTHING, AND IT IS NOT A SELF-CHECK.** Found 2026-09-18 during the self-check
-  sweep and deliberately left alone, because it is outside what that sweep was
-  allowed to touch. `play(openOn, true)` runs at load: it asks the archive API
-  for a newsreel and the radio programme paired with it, then attaches hls.js to
-  BOTH, which pulls two playlists and their first segments. The page's own
-  comment says why, and the reason is a good one: *"Open on a day where BOTH
-  survive, so the thing this page does is visible before anyone presses
-  anything"*.
-  ⚠️ **IT IS THE `/tapes/` SHAPE WEARING A BETTER MOTIVE.** The self-check rule
-  does not reach it because no check is running; what reaches it is the ERR rule,
-  which is about whose server it is rather than about which mechanism opened the
-  socket. Every one of those connections appears in a public broadcaster's
-  audience measurement, and this one fires for every visitor and every reload
-  rather than only under a harness.
-  ⚠️ **SO THE DECISION IS EDITORIAL AND IS NOT AN AGENT'S TO MAKE**: an opening
-  frame that shows what the page is, against a page that opens dark until
-  somebody asks. Worth knowing before choosing: `/radio/` faced the same trade
-  and answered it with a stand-in rather than by going dark.
-
-
+- ✅ **DONE 2026-09-19, AND THIS ENTRY STAYED RED UNTIL 2026-09-20.** `/reel/`
+  no longer opens anything on load. The verb was split: `select()` moves the
+  playhead, frames the view and fills the caption and opens NOTHING; `play()`
+  is the only half that reaches ERR, and its callers are a press on a mark, a
+  press of play on a day already picked, and a step or a scrub that lands while
+  something is already playing. `demo/reel/index.html:616` and `:679`, and the
+  line at `:1033` records what it used to end with.
+  ⚠️ **THE AUDIT IS ONE COUNTED WRAPPER, NOT A READING.** Six of the nine
+  ERR-bound URLs were media `src` assignments rather than `fetch`, so a grep
+  for `fetch` would have found three of nine and called the page clean.
+  🔴 **THE LESSON IS ABOUT THIS FILE.** The work was done and reported in the
+  session handoff, and the backlog line describing the defect in the present
+  tense was never struck. **A line leaves this file by being finished or by
+  being refused in writing**, and one that outlives its own defect costs the
+  next reader a real investigation. Found by re-reading the open list rather
+  than by anything failing.
 - 🔴 **A QUICK RECORD AND LOOP ON THE KEYBOARD.** Asked 2026-09-17 alongside
   hold-to-retrigger and explicitly deferred in the same breath: *"we could also
   do quc rec/loop thing later"*. Nothing is built. **The seam is named and it is
@@ -394,7 +2170,7 @@ struck, the proof is in it.
 
 - 🔴 **YOSHIMI HAS NO ENVELOPE OR GLIDE CONTROLLERS EITHER, MEASURED
   2026-09-17.** With a keyboard on `/knobs/` the interesting controllers should
-  be the ones that act when a note STARTS, and `rig/box/note-test.mjs` was
+  be the ones that act when a note STARTS, and `rig/board/note-test.mjs` was
   written for exactly that: short played notes, rise and fall measured,
   values interleaved. CC 73 attack, CC 72 release and CC 5 portamento time all
   move the rise by 1 to 3 ms against 8 to 18 ms of spread inside one arm, and the
@@ -421,38 +2197,86 @@ struck, the proof is in it.
   board a question, because the relay forwards VERBATIM to everyone. One jackd,
   one capture, one instrument, one room.
 
-- 🔴 **THE BOARD'S OUTPUT LEVEL HAS COLLAPSED, AND IT IS NOT THE PAGE, NOT MIDI,
-  AND NOT THE INSTRUMENT.** Reported 2026-09-17: *"There is no sound on knobs"*.
-  MEASURED the same hour, over the relay with no browser in the way: every patch,
-  every velocity, peak **0.0010 to 0.0035** of full scale where the same probe
-  read **0.0445** earlier the same day. About 40x down, which is inaudible.
-  What was ruled out, each by a measurement rather than by reasoning:
-  - **The page and the browser.** An analyser tapped onto the audio graph's
-    OUTPUT reads peak 0.0018 against 0.0035 arriving, context `running` at
-    48 kHz with a 164 ms cushion. The graph plays what it is given. This is the
-    measurement every previous round of this bug was missing.
-  - **MIDI level.** CC 7 volume and CC 11 expression at 127 change nothing.
-  - **The instrument.** Three notes sum to 2.6x one note, so Yoshimi is working;
-    the spectrum is right, only the level is wrong. An `audio.stop` and
-    `audio.start` over the relay did not fix it.
-  So the fault is on the board between Yoshimi's output and the capture: the
-  JACK graph or the capture's gain. ⚠️ **IT NEEDS THE STUDIO LAN.** The board
-  dials out to the relay, so it is reachable for verbs and unreachable for
-  diagnosis: `ssh positron@192.168.1.213` does not answer from outside.
+- ✅ **THE MECHANISM IS REPRODUCED AND IT IS CC 7, MEASURED 2026-09-20. THE
+  FAULT DOES NOT REPRODUCE ON THE BOARD TODAY.** Reported 2026-09-17 as *"There
+  is no sound on knobs"*, at peak **0.0010 to 0.0035**.
+  🔴 **CC 7 BETWEEN 4 AND 32 PRODUCES 0.00113 TO 0.00330**, which matches the
+  report at both ends to two digits. Driven over the relay at bank 115 prog 32,
+  vel 110: `127 -> 0.09378`, `64 -> 0.00986`, `32 -> 0.00330`, `16 -> 0.00174`,
+  `8 -> 0.00128`, `4 -> 0.00113`, `0 -> 0.00000`.
+  🔴 **THE CURVE IS VIOLENTLY NON-LINEAR AND THAT IS WHY IT READS AS A BROKEN
+  INSTRUMENT.** Half travel is already a **9.5x** drop, so anything under about
+  a quarter lands inside the collapse range, and it is NOT silent. A control
+  left down sounds like a dead synth.
+  ✅ **THE BOARD IS HEALTHY NOW**: velocity sweep 0.0206 to 0.0794, patch sweep
+  0.0938 to **0.3659**. That is **27x to 366x above** the reported collapse, and
+  the historical healthy reference of 0.0445 sits between vel 60 and vel 90.
+  ✅ **THE INSTRUMENT WAS VALIDATED BEFORE ANY OF IT WAS BELIEVED**, by
+  bisection rather than by a reading: an independent ffmpeg tap of
+  `yoshimi:left`/`right` on the board read **-23.2 dB** while the relay read
+  **0.06906 = -23.22 dB**, and a second tap read **-17.6 dB** against
+  **0.13129 = -17.63 dB**. The board-side tap predicts the published level to
+  the decibel, so every number above is about the whole chain.
+  ⚠️ **IT DOES NOT EXPLAIN `CC 7 AT 127 CHANGES NOTHING`**, which needs either a
+  channel mismatch or something re-sending a low value, and neither is proved.
+  That is the remaining question, and it is a different one from the original.
+  ✅ **RULED OUT, EACH BY A MEASUREMENT**: the ALSA mixer is not in the path at
+  all (the capture is `ffmpeg -f jack`, purely in JACK); no audio package
+  installed since 2026-09-10; `pgrep -cx ffmpeg` was **0** before anything
+  started; `yoshimi.config` and the instance file hold no volume field;
+  `sendPcm` copies Int16 verbatim behind a 12 byte header with no gain; and
+  `jack_lsp -c` shows exactly the designed wiring.
+  ⚠️ **THE BOARD WAS LEFT CLEAN**: nothing playing, no service restarted, no
+  file changed, and nothing was playing before it started.
 
-### XR, asked for 2026-09-17, in one message
+- 🔴 **THE JOURNAL DOES NOT SURVIVE A REBOOT, AND IT TOOK THE 2026-09-17
+  EVIDENCE WITH IT.** Found 2026-09-20. `/var/log/journal/` is EMPTY: the
+  journal lives in `/run/log/journal` on tmpfs, and `journalctl --list-boots`
+  shows exactly ONE boot, 2026-09-19 09:09:32. **Every log line from the day the
+  level collapsed is gone.**
+  🔴 **AND `board.mjs:1252` SAYS THE OPPOSITE IN WRITING**: *"The journal is the
+  one record that survives a board nobody can reach"*. On this board it does
+  not. A confident comment outliving the thing it describes, on hardware.
+  ✅ **ONE LINE FIXES IT**: `Storage=persistent` in `journald.conf`, plus the
+  directory. It is why this investigation ends in a reproduced mechanism rather
+  than a proven history.
 
-Quoted verbatim below because this arrived as one dictated block and the detail
-in it is the specification. **General, across every VR/AR page:**
+- 🔴 **THE BOARD IS RUNNING A STALE, UNCOMMITTED SNAPSHOT, AND THE TWO VERBS
+  WRITTEN TO DIAGNOSE THIS BUG HAVE NEVER BEEN ON IT.** Found 2026-09-20.
+  `/opt/positron-board/rig/board/board.mjs` and `jacksynth.mjs` are both dated
+  **2026-09-17 05:31** and match no commit: `board.mjs` md5 `18ef04cd` on the
+  board against `6b978ef7` in the repo, `jacksynth.mjs` `e844ebff` against
+  `b07890c7`.
+  🔴 **SO `jack.graph` AND `jack.rebuild` GET NO REPLY AT ALL**, because unknown
+  verbs fall through `default: return false`, and `board.ping` still answers the
+  pre-session-33 envelope error. Both were written specifically for this fault.
+  ⚠️ **A DEPLOY IS THE HIGHEST-VALUE ACTION HERE AND WAS NOT TAKEN**, because it
+  touches a shared board in another building.
 
-✅ **BUILT 2026-09-17, AND NOT ONE LINE OF IT IS CONFIRMED IN A HEADSET.**
-Everything below is done in code and graded where a laptop can grade it —
-`node demo/verify-gl.mjs` reads **162/162** (`blocks` 47 page asserts, `held`
-33, `floor` 29, `mirror` 34, `videoradio` 2) and
-`node demo/shell/xr-pick-test.mjs` reads **48 ok, 0 failed** — but every claim
-about how any of it LOOKS through a Quest is unverified. What was measured and
-what still needs a device is written against each line.
+- 🔴 **THE CAPTURE DIVIDES BY TWO AND THE DIVISOR IS UNDECLARED.** Found
+  2026-09-20. ffmpeg's jack indev defaults `-channels` to **2**, so `posbox`
+  always registers `input_1` and `input_2`, `input_2` is never connected, and
+  `-ac 1` averages both. MEASURED: true summed level at `input_1` **-11.6 dB**,
+  published after the downmix **-17.6 dB**, exactly **6.0 dB** apart.
+  ⚠️ `(L+R)/2` is the correct mono downmix and that is luck, not design. Nothing
+  in `jacksynth.mjs` states or asserts the divisor is 2, and its comment calls
+  the result the mono-sum without mentioning the halving. **A change in that
+  ffmpeg default moves the board's output by an integer factor with no code
+  change**, which is the exact symptom shape just spent three sessions on.
 
+- ⚠️ **jackd HAS NO REALTIME PRIORITY AND NO MEMORY LOCKING.**
+  `/etc/security/limits.d/audio.conf.disabled` is disabled, dated 2026-09-10
+  20:54 which is the provisioning day, `ulimit -l` is 8192 KB, and every JACK
+  client prints `Cannot lock down 107350048 byte memory area`. `positron` is in
+  the `audio` group, so enabling the file would take effect. **Neither
+  `provision.sh` nor `setup.sh` sets these limits at all.**
+
+- 🔴 **`ctl.meter` NAMES NO CONTROLLER, NO VALUE AND NO SENDER, AND THAT IS WHAT
+  MADE THE LEVEL COLLAPSE A THREE-SESSION BUG.** `board.mjs:625` returns
+  `{in, out, folded, forMs, on, channel}`, so a part volume left at 8 is
+  invisible to every client on the relay. **One extra field would have turned
+  this into one question.** `plan-portable-board.md` §4.3.2, which the plan
+  itself calls the cheapest useful thing in it, and it has now been paid for.
 - ✅ **ONE WAY OUT, AND IT IS THE ONLY ONE.** *"all vr/ar general  make one
   general way to get out. hold down any controller button for looooong enough
   then it quits. no other exit methods/ui's for now."* ⚠️ This replaces the
@@ -502,7 +2326,7 @@ what still needs a device is written against each line.
 - ✅ **The move bar is half the size and monochrome.** *"retuce movebar size under
   panel 2x. make it monochrome, just lightening up when needed."*
 
-**`/held/`:** *"text input appears in vr/ar but 3d type does not change nof after
+**`/weight/`:** *"text input appears in vr/ar but 3d type does not change nof after
 submit nor realtime"* and *"texts in xr seems to be behind to walls sometime"*.
 
 ✅ **THE FIRST IS FOUND, FIXED AND GRADED, AND IT WAS ONE LINE.** `liveRetext`
@@ -560,7 +2384,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   honest state."*
   🔴 **WHAT IS LEFT AND WHAT BLOCKS IT:** choosing the replacements needs a
   measurement with the notes being RE-TRIGGERED rather than held, and that is
-  blocked behind the broken fall detector in `rig/box/note-test.mjs` (see the
+  blocked behind the broken fall detector in `rig/board/note-test.mjs` (see the
   Yoshimi envelope entry). Fix the collector first: its `fallMs` has `NaN` in
   both branches of its own ternary, so it can never report a number, which is
   why every take said `not enough takes gave a number`.
@@ -581,8 +2405,8 @@ versus +Z reading and the comment above `wallYaw` names it.
 
 - ✅ **REVERB AND CHORUS ARE OFF THE PAGE AND OFF THE BOARD, 2026-09-17.** They
   are at `archive/keys-space/`. The board half is the one worth confirming and
-  it is confirmed: `box.mjs` records the reverb insert being removed, and no
-  verb, no CC 91 and no CC 93 for either survives in `box.mjs` or
+  it is confirmed: `board.mjs` records the reverb insert being removed, and no
+  verb, no CC 91 and no CC 93 for either survives in `board.mjs` or
   `jacksynth.mjs`. The only `reverb`/`chorus` left under `demo/` is the generic
   MIDI controller name table in `cc-adapter.mjs`, which is unrelated.
 
@@ -621,7 +2445,15 @@ versus +Z reading and the comment above `wallYaw` names it.
   green while the sentence directly above it described a different page. A check
   that does not test the thing a comment claims cannot defend the comment.
 
-- **SLIDER AUTOMATION, PLANNED AND NOT BUILT. ASKED 2026-09-16:** *"plan a work
+- ✅ **SLIDER AUTOMATION IS BUILT AND LIVE. THIS LINE READ `PLANNED AND NOT
+  BUILT` UNTIL 2026-09-20 AND THE ✅ RECORD OF IT WAS FOUR LINES BELOW ITS OWN
+  TITLE.** Corrected after *"Slider autom is done no?"*, which it is: steps 1
+  to 5, `hand.mjs` 23/23, on `/knobs/`, `/radio/` and `/kit/`. Only step 6 (a
+  second movement preset) and "nobody has watched the curve yet" are open.
+  🔴 **A HEADING THAT CONTRADICTS ITS OWN ENTRY IS WORSE THAN A MISSING
+  ENTRY**, because it is what a skim reads and what a status brief repeats. It
+  was repeated in one, verbatim. Second stale line found in this file today.
+  ASKED 2026-09-16:** *"plan a work
   on slider automation each slider can possibly have a mode button like loop
   does (also looking similar in right) that allow pick 'invsible hand' moving
   slider. I want to have himanline, real abalog knob / slider feel and curve.
@@ -708,17 +2540,17 @@ versus +Z reading and the comment above `wallYaw` names it.
   go. `build.mjs` guards against an anchor that VANISHES and cannot see one that
   became redundant.
 
-- ✅ **`box.ping` IS FIXED IN THE REPO AND IS NOT ON THE BOARD YET (2026-09-18).**
-  It sends `pongAt` now, one line in `rig/box/box.mjs`. The collision was
+- ✅ **`board.ping` IS FIXED IN THE REPO AND IS NOT ON THE BOARD YET (2026-09-18).**
+  It sends `pongAt` now, one line in `rig/board/board.mjs`. The collision was
   confirmed by reading rather than assumed: `wire.mjs` declares
   `ENVELOPE = ['from', 'at', 'seq', 'by']` and `format()` throws on any payload
   key in it, `reply()` spreads the body into the message, so `{ at: … }` threw
-  on every send and the wrapper in `ws.onmessage` answered `box.error`.
+  on every send and the wrapper in `ws.onmessage` answered `board.error`.
   ⚠️ **UNVERIFIED ON HARDWARE.** `ssh positron@192.168.1.213` does not answer
   from here, so this has never run on the board. The board IS in `studio-1` and
   answered `audio.status` over the relay on 2026-09-18, so a deploy can be
-  confirmed with `node rig/box/ask.mjs --room studio-1 box.ping` the moment
-  somebody on the studio LAN runs `rig/box/push.sh`.
+  confirmed with `node rig/board/ask.mjs --room studio-1 board.ping` the moment
+  somebody on the studio LAN runs `rig/board/push.sh`.
   ⚠️ **NOTHING READ THE FIELD AND NOTHING SHOULD.** `live-test.mjs`,
   `relay-compare.mjs` and `yoshimi-test.mjs` all waited on the REPLY, which is
   what never came; each times the round trip in its own clock, which is the only
@@ -736,7 +2568,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   `{in, out, folded, ctrls}` and step 2 shipped `{in, out, folded, forMs, on,
   channel}`. Without the map, a page cannot assert that the last value it sent
   is the last value the board holds, and a page that reconnects cannot re-sync
-  from the board's own state. A small change to `rig/box/box.mjs`.
+  from the board's own state. A small change to `rig/board/board.mjs`.
 
 - ⚠️ **`/rack/` MAY BE CLIPPING AT FULL SCALE, UNVERIFIED.** It posts an
   `Int16Array` straight into `pcm-playout`, whose ring is a `Float32Array` that
@@ -749,7 +2581,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   `/rack/` reads `d.logs.length` at line 255, on exactly the branch that runs
   when the studio Mac is off, so it throws a TypeError there.
 
-- ✅ **STEP 0 IS ANSWERED, ON THE REAL BOARD, 2026-09-16.** `rig/box/cc-test.mjs`
+- ✅ **STEP 0 IS ANSWERED, ON THE REAL BOARD, 2026-09-16.** `rig/board/cc-test.mjs`
   holds note 40 on bank 95 program 6 and measures the spectral centroid of what
   comes back. **CC 74 moves it 6.18 octaves**, 162 Hz to 11727 Hz, monotonically
   brighter, against a measured drift floor of 0.03 octaves from the negative
@@ -785,7 +2617,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   **Steps 1, 2 and 3 are built.** Step 1 is the send gate in
   `demo/shell/cc-adapter.mjs` (`makeCcSend`), graded 13/13 by
   `node demo/shell/cc-send-test.mjs`. Step 2 is `ctl.set` and `ctl.meter` in
-  `rig/box/box.mjs`. Step 3 is `/knobs/` (the slug is `knobs`, asked for on
+  `rig/board/board.mjs`. Step 3 is `/knobs/` (the slug is `knobs`, asked for on
   2026-09-16, not the plan's `knob`), 14 asserts, 20/20 through
   `node demo/verify.mjs knobs`.
   ⚠️ **NOT DONE, AND NAMED SO THEY ARE NOT LOST.** Step 0 was SKIPPED: nobody
@@ -967,7 +2799,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   - `now` fired up to 30 range GETs at ERR segments nobody was going to watch,
     then a ten minute back-seek pulling a different stretch of the DVR.
   - `blocks` rolled three rooms past the reader at load, then a fourth to undo it.
-  - `held` ran about twenty off-screen renders with `readPixels` and typed words
+  - `weight` ran about twenty off-screen renders with `readPixels` and typed words
     over the wall and back.
   - `grains` dropped a SHARED Raspberry Pi's material to -60 dB and emptied its
     ring, heard by whoever had `/knobs/` open in another building.
@@ -1053,7 +2885,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   The sea that stood under the screen and the headset half are both at
   `archive/videoradio-xr/`.
 
-- **`/held/`: a `type scale` slider on the tablet.** Asked 2026-09-16: *"make it
+- **`/weight/`: a `type scale` slider on the tablet.** Asked 2026-09-16: *"make it
   a slider in left tablet (type scale) in vr (held)"*. Shipped today as two
   constants, `SCALE_BIG 1.5` / `SCALE_SMALL 1.2`, which is 36/36. Making it a
   control is kit work rather than page work: `createXRTablet` builds from
@@ -1569,7 +3401,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   a control that took the sound away from somebody in another building: `/knobs/`
   was found refusing to start because somebody had pressed `sampled`. Board
   restarted 22:44:41 and yoshimi confirmed up, `jack: true`, `yoshimi:left`,
-  50 frames/s. MEASURED that the deploy landed: `md5` of `box.mjs` and
+  50 frames/s. MEASURED that the deploy landed: `md5` of `board.mjs` and
   `jacksynth.mjs` identical board against local, and the board's own copy of
   that file answers `JACK_SYNTHS: yoshimi`.
   ⚠️ It found a real defect on the way past: `/grains/` asked the board for
@@ -1578,7 +3410,7 @@ versus +Z reading and the comment above `wallYaw` names it.
 
 - ✅ **THE `box` DEMO IS `keys`.** Asked as *"rename box demo to keys"*. 119
   references in 30 files, swept on the URL form rather than the word, so
-  `rig/box/` is untouched: the BOARD is still the box. The source file did not
+  `rig/board/` is untouched: the BOARD is still the box. The source file did not
   move and `LAYOUT.md` rule 2 is why. The deployed `/box/` is gone and no
   redirect was written, same as `radio1965`.
 
@@ -1939,7 +3771,7 @@ ENGTHS ARE MEASURED AND THEY ARE IN THE CORPUS.** Asked as
 - ✅ `/tapes/`: playhead off the map, loaded tape ringed and the rest dimmed, press
   a mark to load, rate control fixed, load blip gated, loop freezes the wave
   instead of rescaling it, labels legible with real padding.
-- ✅ `held`: the sentence across four walls, size from word length, sentence case,
+- ✅ `weight`: the sentence across four walls, size from word length, sentence case,
   textarea of three lines, live rebuild on every keystroke, readout removed.
 - ✅ Live loop with a blinking button and no scrollbar; frozen waveform playhead;
   both joined on `/radio/` and `/tapes/`.
@@ -1953,7 +3785,7 @@ ENGTHS ARE MEASURED AND THEY ARE IN THE CORPUS.** Asked as
   and the component added to `/kit/` with its negative control.
 - ✅ `/kit/`: mounts the shell, 8 asserts, graded by the suite for the first time.
 - ✅ `mirror`: hold-to-quit badge, and the LOOK control swapped to `createPicker`.
-- ✅ Readouts removed from `items`, `held`, `wire`.
+- ✅ Readouts removed from `items`, `weight`, `wire`.
 - ✅ `shout` carries Radio 1965's recordings at `/rec/<name>.mp3`.
 - ✅ `NOTES` emptied, both essays moved to `research/`, `/notes/` no longer built.
 - ✅ `LESSONS.md` renumbering, and the rule about it.
@@ -2178,7 +4010,7 @@ Struck because the work exists, with the evidence that showed it.
   DIFFERENCE and nothing else. Both answer in their own names, because
   `audio.status` answering `audio.started` cost nine seconds and a false
   conclusion that no board was in the room.
-  ⚠️ **THE SHARING DECISION, WRITTEN DOWN IN `rig/box/README.md`:** the board
+  ⚠️ **THE SHARING DECISION, WRITTEN DOWN IN `rig/board/README.md`:** the board
   cannot see a listener (the relay forwards verbatim, `webSocketClose()` is
   empty, a page holding PCM says nothing), so the rebuild is a diff that runs
   zero commands on a healthy graph, kills no process, says out loud who else is
@@ -2187,9 +4019,9 @@ Struck because the work exists, with the evidence that showed it.
   `audio.start` already does that, at about thirteen seconds of silence for
   everybody.
   ⚠️ **UNVERIFIED.** No ssh from here, so nothing has been run against real
-  `jack_lsp` output. `node rig/box/test.mjs` is 92/92 with 25 new checks on the
+  `jack_lsp` output. `node rig/board/test.mjs` is 92/92 with 25 new checks on the
   parse and the chain against `fixtures/jack-lsp-c.txt`, and two deliberate
   sabotages take it to 88/92 and 90/92. What is still open: that this board's
   real `jack_lsp -c` parses as the fixture does, and that a real `jack_connect`
-  repairs a real drift. Deploy with `rig/box/push.sh` and confirm with the md5s
-  it prints, which now cover `jacksynth.mjs` as well as `box.mjs`.
+  repairs a real drift. Deploy with `rig/board/push.sh` and confirm with the md5s
+  it prints, which now cover `jacksynth.mjs` as well as `board.mjs`.

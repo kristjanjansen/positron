@@ -1,12 +1,13 @@
 # positron
 
-Live at **https://positron.studio**. 43 shelled demos of 46 rows
-(2026-09-16, counted from `DEMOS` rather than remembered) — `tapes` is the newest:
-the 24 Kurenniemi recordings that play, laid END TO END as one long tape, each
-as wide as it really is. ⚠️ THE SENTENCE HERE DESCRIBED A DIFFERENT PICTURE for
-two sessions — a mark as wide as its DATE is vague, on a century — which is the
-axis that was replaced on 2026-09-15 and is exactly the drift CLAUDE.md's own
-rule is about. The lengths are measured and live in `corpus.json`. ⚠️ **`radio1965` IS NOW `radio`, RENAMED 2026-09-16 ON INSTRUCTION.**
+Live at **https://positron.studio**. 47 shelled demos of 49 rows
+(2026-09-20, counted from `DEMOS` rather than remembered). `making` and `held`
+are the newest, both 2026-09-19. `making` is the MIMproject archive: the
+recordings and the pictures that outlived the project's own website, on two
+tabs. ⚠️ THE FIGURES HERE READ `43 of 46` AND `tapes is the newest` FOR FOUR
+DAYS AND THREE DEMOS, which is the drift this file's own rule is about, and the
+count takes one command: `node -e "import('./demo/manifest.mjs').then(m =>
+console.log(m.DEMOS.length))"`. The lengths are measured and live in `corpus.json`. ⚠️ **`radio1965` IS NOW `radio`, RENAMED 2026-09-16 ON INSTRUCTION.**
 The slug, the directory and every reference moved together; the deployed
 `/radio1965/` is GONE, so any link anybody has kept 404s and a redirect has not
 been written. The line that stood here before said the slug was fixed and not to
@@ -15,10 +16,23 @@ which was reverted within the hour. An instruction supersedes it. ⚠️ Only
 `archive/` still says `radio1965`, on purpose: an archive records what was there.
 ⚠️ **AND `box` IS NOW `keys`, RENAMED 2026-09-16 ON INSTRUCTION, THE SAME DAY
 AND THE SAME WAY.** The deployed `/box/` is GONE and no redirect was written;
-119 references in 30 files moved. ⚠️ **`rig/box/` DID NOT MOVE AND MUST NOT.**
-The sweep matched the URL form `/box/`, never the word, because the BOARD is
-still the box: `rig/box/`, `box.mjs`, `box.hello`, `box.alive`.
-⚠️ **`rig/box/listen.html` IS GONE AND THIS SENTENCE SAID IT WAS STILL THERE.**
+119 references in 30 files moved. ⚠️ **`rig/box/` DID NOT MOVE THEN AND HAS
+MOVED NOW: IT IS `rig/board/`, RENAMED 2026-09-20 ON INSTRUCTION** (*"and in
+general change the lingo from box to board"*). The line here used to say the
+BOARD was still the box and that `rig/box/` must never move; an instruction
+supersedes it, the same way `radio1965` and `box` superseded their own rules.
+**777 occurrences moved in 110 files**: the directory, `board.mjs`, the wire
+verbs `board.hello` / `board.alive` / `board.ping` / `board.pong` /
+`board.error`, `positron-board.service`, `/opt/positron-board`,
+`/etc/default/positron-board`, `BOARD_NAME` / `BOARD_USER` / `BOARD_AUDIO`,
+the JACK capture client `posboard`, and the prose.
+🔴 **WHAT DID NOT MOVE, AND THIS IS THE `held` LESSON AGAIN**: `diagram.mjs`'s
+`BOX_PAD_X`, `BOX_FS`, `BOX_ALIGN`, `BOX_TINT`, `BOX_MIN_W`, `BOX_MAX_W`,
+`BOX_MAX_W_COL`, `BOX_TARGET_W` are about **a box in a picture**; `box-shadow`
+is CSS; and `archive/` keeps every `box` it ever had, because an archive
+records what was there. **The sweep matched the machine's names, never the
+word.**
+⚠️ **`rig/board/listen.html` IS GONE AND THIS SENTENCE SAID IT WAS STILL THERE.**
 It was the example named here of a page that belongs with its hardware, and it
 was RETIRED with `/keys/` on 2026-09-17; it is at `archive/keys/listen.html` and
 `LAYOUT.md` rule 2 no longer has a live example. **The rule it illustrated is
@@ -27,6 +41,23 @@ invites `built: true`, which puts a shared Raspberry Pi in another building into
 every run of the suite. Found 2026-09-18 by auditing the backlog, which is the
 second time in one day that a confident sentence in a file like this outlived
 the thing it described.
+🔴 **AND `held` IS NOW `weight`, RENAMED 2026-09-19 ON INSTRUCTION, AND THIS ONE
+IS NOT LIKE THE OTHER TWO.** *"name the demo held, rename old held to weight"*,
+because the NAME is being given to a different demo. So the old URL is not a
+dead link: `/held/` will be a live page showing something else, and a reader
+with a kept link arrives somewhere plausible and wrong with nothing to tell
+them. A 404 at least says no. ⚠️ **THE SWEEP MATCHED THE URL FORM `/held/` AND
+THE SLUG, NEVER THE WORD**, which is `rig/board/` again and was the whole risk:
+**330 files hold the string `held`** because it is ordinary English, and a held
+chord, a held note and a button already held are all untouched. About 136
+occurrences moved. ⚠️ **VERBATIM QUOTATIONS WERE LEFT AS THEY WERE SAID**, and
+`demo/weight/index.html` carries one line above its `mount()` saying so, because
+rewording somebody's report to match a later decision stops it being a
+quotation. ⚠️ **`/kit/`'s CARD WAS THE ONE STRAGGLER AND IS FIXED**: it carried a live
+`href: '/held/'`, which after this rename does not 404, it opens a DIFFERENT
+PAGE and says nothing about it. That is the one failure mode neither earlier
+rename here produced, because `/radio1965/` and `/box/` both simply died. A
+stale link is louder than a dead one.
 ⚠️ **AND THAT BOARD HAS ONE INSTRUMENT SINCE 2026-09-16.** FluidSynth and hexter
 are at `archive/box-fluidsynth-hexter/`, out of `jacksynth.mjs` and out of
 `rig/audit.mjs`; a board asked for either answers `unknown source`. There is ONE
@@ -98,6 +129,7 @@ node demo/shell/looper-test.mjs          # the looper's arithmetic, no browser
 node demo/shell/xr-quit-test.mjs         # is there really a way out of every headset page
 node workers/mail/test.mjs               # what arrives at positron@ is spam or a person
 node demo/resources/measure-durations.mjs   # how long each recording is, asked once
+node demo/resources/build-mimproject-images.mjs --check   # the recovered pictures, prints only
 node demo/verify-safari.mjs              # desktop Safari over WebDriver, both engines
 DEMO_BASE=https://positron.studio node demo/verify.mjs      # against the deploy
 
@@ -123,7 +155,7 @@ Clear with `POST /logs/clear`. `GET /status` blocks on the container's cold star
 
 ## Finding the box, and where its code actually lives
 
-**Ask port 22, not ARP and not mDNS.** `positron-box.local` does not resolve
+**Ask port 22, not ARP and not mDNS.** `positron-board.local` does not resolve
 from this sandbox (mDNS is multicast UDP), a ping sweep answers nothing useful,
 and guessing Raspberry Pi MAC prefixes in `arp -an` missed it outright — the
 board was there the whole time. One line finds it in about a minute:
@@ -133,17 +165,17 @@ for i in $(seq 1 254); do (nc -z -G 1 -w 1 192.168.1.$i 22 2>/dev/null && echo 1
 ssh positron@<ip> hostname -s            # it answers `raspberrypi`
 ```
 
-It also answers over the relay from any network — `node rig/box/ask.mjs --room
+It also answers over the relay from any network — `node rig/board/ask.mjs --room
 studio-1 audio.status` — so **"I cannot ssh to it" is never the same as "it is
 down"**, and saying the second because of the first is wrong. Ask the relay
 first; it needs no LAN.
 
-⚠️ **The service runs from `/opt/positron-box/`, NOT from `~/positron/`.**
+⚠️ **The service runs from `/opt/positron-board/`, NOT from `~/positron/`.**
 `provision.sh` unpacks into `~/positron` and `setup.sh` copies that to
-`/opt/positron-box`, which is what `positron-box.service` executes. The copy in
+`/opt/positron-board`, which is what `positron-board.service` executes. The copy in
 `~/positron` on the board is stale — it has no `pappus.mjs` at all — so editing
 or checking it tells you nothing about what is running. Compare `md5sum` against
-`/opt/positron-box/rig/box/` before believing a deploy landed.
+`/opt/positron-board/rig/board/` before believing a deploy landed.
 
 ## Rules that cost real time to learn
 
@@ -243,6 +275,28 @@ down is nobody running the page.
 flake, and for A/B'ing a failure that the rules already say is external. The
 answer to "is it red because of me or because of them" is: SAY BOTH ARE
 POSSIBLE AND MOVE ON.
+
+🔴 **AND THE WORST SHAPE IS NOT A HARNESS, IT IS A PAGE THAT OPENS SOMETHING ON
+LOAD. FOUND 2026-09-19 ON `/reel/`.** That page called `play(openOn, true)` on
+its load path, so **every visit** asked arhiiv.err.ee for a newsreel and that
+day's radio and then held a stream, for a first frame nobody had asked to see.
+The `armed` flag beside it suppressed `.play()` and never suppressed the FETCH,
+which is why it read as harmless. A harness run costs that too, and `/reel/` is
+`built: true`, so it was in every full suite.
+✅ **REPAIRED BY SPLITTING THE VERB.** `select()` moves the playhead, frames the
+view and fills the caption and opens NOTHING; `play()` is the only half that
+reaches ERR, and its callers are a press on a mark, a press of play on a day
+already picked, and a step or a scrub that lands while something is already
+playing. A visit, a step and a scrub across a stopped year are all somebody
+reading the line, and none of them is a listener.
+⚠️ **THE RULE IS NOT GATED ON THE HARNESS AND MUST NOT BE.** A page that behaves
+one way for `?selfcheck=1` and another way for a person is a page nothing
+grades. "Stepping while stopped opens nothing" is true for everybody.
+⚠️ **AND THE AUDIT IS ONE WRAPPER, NOT A READING.** Every URL that can leave for
+ERR goes through one counted function, so "a visit opens nothing" is an ASSERT
+over a counter rather than a claim about a file. Six of the nine were media
+source assignments rather than `fetch`, which a grep for `fetch` would have
+missed entirely.
 
 
 ✅ **AND THE HOLE A STAND-IN LEAVES IS CLOSED BY SABOTAGING IT, NOT BY READING
@@ -344,10 +398,57 @@ was never made. Write the line first, work from the file, strike it off when it
 is done. ⚠️ And a line leaves that file by being FINISHED or by being refused in
 writing. Never by going quiet.
 
+🔴 **A STREAM OF REQUESTS IS COLLECTED FIRST AND WORKED SECOND. ASKED FOR
+2026-09-19:** *"lets work demo by demo. i will give steam of request, you
+collect theb to backlog in detail and when done, do a parallelized effort to fix
+it all"*. So the rule above has a second half now, and it is about WHEN.
+- **While the requests are arriving, write and do not fix.** Every one lands
+  under `## Open` in `BACKLOG.md` as it is said: the words verbatim, the slug it
+  is about, the file it will touch, and whatever is already known that makes it
+  non-obvious. Fixing the first one while the fourth is being typed is how a
+  request gets answered with a change nobody can find later, and it spends a
+  page's verification budget before the page has stopped changing.
+- **When the stream ends, fan out.** One agent per page, because the pages are
+  independent. ⚠️ **ANYTHING SHARED IS DONE ONCE, BY ONE AGENT, BEFORE THE
+  PAGE AGENTS START**: a kit module, `shell.css`, a diagram rule, `manifest.mjs`.
+  Otherwise four agents write four versions of it in one checkout, which is the
+  hand-rolled control rule arriving by a different road.
+- 🔴 **AND THE AGENTS DO NOT COMMIT.** Already written below and it is worth
+  repeating here, because this arrangement is exactly the shape that breaks it:
+  agents report, the session commits, and a commit made while one is running
+  stages paths by name.
+- 🔴 **VERIFY ECONOMICALLY, WHICH IS AN INSTRUCTION AND NOT A PREFERENCE:**
+  *"make sure you do verify steps economically and do not drain the whole system
+  with rerunning suites"*. `node demo/check-html.mjs demo/<slug>/index.html`
+  parses a page with no browser at all and is the first answer. `node
+  demo/verify.mjs <slug> <slug>` runs ONLY the pages that were touched, and the
+  thing to look at is the per-page assert count against what it was, which is
+  the check this file already asks for after any control changes. A full suite
+  is dozens of Chromes and is not how you find out whether one page still works.
+  ⚠️ And a red run is not re-run to see if it goes green: the rules above
+  already say what an external red means.
+
 
 **Measure the quantity in question, not one adjacent to it.** An A/B where both
 arms share the bug returns "identical", which reads as "fine". Before running a
 comparison, ask what defect it could NOT detect.
+🔴 **AND THE SHARPEST FORM OF IT IS TWO NUMBERS DERIVED FROM ONE FIELD.
+MEASURED 2026-09-19 ON THE MIM CORPUS.** A build's lookup table was keyed by
+FILE NAME, a re-encode changed one name, one of two tables was updated and the
+other was not, so `NOT_OURS[file]` read `undefined` and **Kanuti Gildi SAAL's
+recording was silently re-credited to MIMproject**, with a `holder` field saying
+the file was ours. The build printed nothing and every file was present and
+correct.
+⚠️ **THE CHECK THAT SHOULD HAVE CAUGHT IT AGREED PERFECTLY WHILE BEING WRONG.**
+It compared `theirs.length` against `counts.theirs`, and BOTH ARE DERIVED FROM
+THE SAME FIELD, so the two halves moved together and the check passed. What
+actually found it was a human reading the harness's DETAIL line, where `2 of 28`
+had become `1 of 26`.
+✅ **THE REPAIR IS TWO INDEPENDENT SOURCES, WHICH IS THE WHOLE RULE**: the page
+now compares the NOTE, prose written by hand, against `source`, which comes from
+the lookup table, so the two can disagree. And the build THROWS on a key
+matching no measured file, proved by putting the old name back.
+⚠️ **KEY BY `id`, NEVER BY FILE NAME.** A name is a thing a re-encode changes.
 
 🔴 **A PAGE THAT GAINS ITS FIRST CONTROL MOVES EVERY OTHER CONTROL'S HARNESS
 PRESS, AND `settleMs` ONLY EVER LANDS ON CONTROL 0.** MEASURED 2026-09-16 on
@@ -360,6 +461,28 @@ the control you added, which is the worst place to start looking. **After adding
 or removing a control, re-run the page and diff the per-demo assert count**, and
 if a check depends on WHEN a press lands, have it confirm where it landed rather
 than assuming.
+
+🔴 **AND A CONTROL YOU DISABLE IS A CHECK THE HARNESS CAN NO LONGER REACH.
+MEASURED TWICE IN ONE DAY, 2026-09-19, ON TWO PAGES INDEPENDENTLY.** Both
+harnesses drive a page by clicking every button in `.pos-controls`, so a page
+whose checks sit behind a press loses them the moment that press stops
+happening. `disabled` is not a style, it is a `return` in front of the handler.
+- `/mirror/`: switching the VR and AR buttons off when the browser reports no
+  headset meant `enterHeadset` was never called, and **ten** asserts about both
+  session branches would have gone silent while the page read 41/41 green.
+  Caught before shipping; the page now drives whichever mode nobody reached,
+  behind `SELFCHECK`, with a map so a real press on a headset is never doubled.
+- `/blocks/`: the same change took **six**, and those were reported and replaced
+  rather than caught in advance. On a real headset all six come back.
+⚠️ **IT IS NOT A REASON TO LEAVE A LYING CONTROL ENABLED.** A button that cannot
+do the thing it names is the defect; this is the bill for fixing it. What it
+costs is that the checks behind it have to be reachable another way, which they
+always could have been, because a check that only a control can reach was
+already a check that nobody runs on a machine without that capability.
+⚠️ **AND A DISABLED CONTROL IS EXACTLY WHERE THE COUNT LIES QUIETEST.** The suite
+stays green either way: those asserts do not FAIL, they simply never run. Diff
+the per-page assert count after any change to what a control does, which is the
+rule above, and account for every one that moved.
 
 **A green suite can mean zero coverage.** `verify.mjs` reported 261/261 while a
 demo was fatally broken on iPhone, because desktop Chrome never enters that
@@ -511,6 +634,28 @@ WRONG answers. `timeline/lab/csound-oracle.mjs`; it skips cleanly where the
 reference is not installed, because a check nobody can run is a check nobody
 runs.
 
+🔴 **CHECK THE INSTRUMENT BEFORE REPORTING AN ABSENCE, AND THREE DIFFERENT
+REFUSALS IN A ROW ARE THE INSTRUMENT.** MEASURED 2026-09-19 on two works
+addressed on IPFS: one `curl -I` each at three gateways gave **429, 406 and
+301**, and that was written up and REPORTED as *addressed, not retrieved*, with
+the open question being whether anybody still pinned them. Every one was rate
+limiting or a redirect. With a real user-agent, a **ranged GET rather than
+HEAD** (HEAD is what those gateways throttle hardest) and six seconds between
+calls, five gateways answer 206 and both 77.9 MB files came down in **under four
+seconds**.
+⚠️ Three hosts refusing in three different ways is not three facts about the
+content, it is one fact about how you are asking. **An absence reported as fact
+is the expensive kind, because nobody re-runs it.**
+
+🔴 **AND A DOMAIN OUTLIVES THE PEOPLE WHO HAD IT.** A Wayback survey of
+mimproject.org returned 67 pictures and four were adverts for a Thai online
+casino: everything under `/uploads/2025/01/`, after the domain lapsed and was
+picked up for gambling SEO. Nothing in a CDX row says who owned the host that
+day, and **`a 2025 revival` was written into four files before anybody opened a
+picture**. A site coming back and a site being taken are the same shape in an
+index of URLs. Open the pictures; key any provenance claim on something other
+than the URL.
+
 **A partial result that is too tidy is a broken collector, not a finding.**
 Exactly 4 of 5 events, exactly 0 across every case, exactly nothing on the
 network scan. In one session: csound writes ANSI escapes so `grep '^EVT'` lost
@@ -554,7 +699,7 @@ to recover.
   vibrato rate and depth. In the ZynAddSubFX family they are **FM amplitude** and
   **resonance centre**, and the rest of the extended set is 71 filter Q, 74
   filter cutoff, 75 bandwidth, 78 resonance bandwidth. MEASURED 2026-09-16 with
-  `node rig/box/wobble-test.mjs`, one note held throughout and every controller
+  `node rig/board/wobble-test.mjs`, one note held throughout and every controller
   read twice at one value first: CC 76, CC 77 and the mod wheel move the pitch
   by **0.2 cents** at every value, which is the tracker's own noise.
   ⚠️ **THAT WAS FIRST WRITTEN AS "THERE IS NO VIBRATO ON THIS INSTRUMENT" AND
@@ -590,7 +735,7 @@ to recover.
   header. The Mac sends stereo, the board sends mono, **both are on the relay at
   once**. Senders declare `audioChannels` AND `frameMs`; receivers CHECK one
   against the other (`samples / channels / rate` must equal `frameMs`).
-  ⚠️ Not `channels` — `box.mjs` has that and it means MIDI channels.
+  ⚠️ Not `channels` — `board.mjs` has that and it means MIDI channels.
   And **a measurement outranks a repeated claim**: proved by shipping a liar,
   which exposed the page correcting itself and then being un-corrected by the
   next status reply repeating the same wrong number.
@@ -658,6 +803,35 @@ to recover.
   🔴 So an immersive page on this device may decode, granulate and play exactly
   as the window does. **Nothing about audio is a reason not to build `/videoradio/`
   into a headset.**
+- 🔴 **A PAGE CAN DIM THE REAL ROOM AND CANNOT TINT IT, AND THE PROOF IS
+  ARITHMETIC RATHER THAN AN API.** Worked out 2026-09-19 against the Held in
+  Human score, whose two channels are exactly these.
+  In an `alpha-blend` session the visitor sees `c*a + room*(1-a)`. **The room
+  only ever appears multiplied by `(1-a)`, ONE SCALAR SHARED BY ALL THREE
+  COLOUR CHANNELS.** So dimming is free and per channel gain is unreachable,
+  and a colour lookup table on the camera image is the smallest thing that
+  needs per channel gain.
+  ✅ **THE DIMMER IS ALREADY IN THIS REPO AND NOBODY NOTICED.**
+  `xr-room.mjs:1739` and `xr-panel.mjs:1410` both do `if (ar) gl.clearColor(0,
+  0, 0, 0)`. **That zero IS the opacity control**, and both ends of it are
+  already measured on a Quest here: `a = 0` is how four pages work, and `a = 1`
+  is the black room bug the rule below records.
+  ⚠️ **A COLOURED QUAD IS NOT A TINT, IT IS A LIFT**, and it spends the
+  dimmer's own budget. At 15% room with a green table, a green wash pins the
+  green channel above 0.85 everywhere and you get a green card with a ghost in
+  it.
+  ⚠️ **`XRRenderState` HAS NO KNOB FOR ANY OF THIS.** Read off Chromium 153 on
+  a `127.0.0.1` origin: `baseLayer`, `constructor`, `depthFar`, `depthNear`,
+  `inlineVerticalFieldOfView`, `layers`, and not one is about the environment.
+  The session REPORTS `environmentBlendMode` and does not take one.
+  ⚠️ **AND `navigator.xr` IS SECURE CONTEXT GATED**, so a probe on
+  `about:blank` answers "no WebXR here" for the wrong reason. That cost the
+  first attempt at this measurement.
+  ⚠️ `getCameraImage` exists in Chromium 153 and Quest Browser 40.1 shipped
+  passthrough camera, so the route is real and the price is the whole thing:
+  you obscure the compositor's passthrough, redraw the camera image yourself,
+  reproject it per eye without the compositor's scan out reprojection, and end
+  with a video backdrop rather than a room.
 - 🔴 **`alpha: false` on the WebGL context makes passthrough impossible.** The
   compositor puts the real room behind the page and can only do that through
   transparent pixels; with no alpha there is nothing to clear to zero and the
@@ -680,6 +854,21 @@ to recover.
   is exactly when timers stop being generous. `navigator.sendBeacon` survives
   it. The uncaught-error handler has to use it too, or the net meant to catch a
   silent failure is itself waiting on the timer that stopped.
+- 🔴 **AND SO DOES ANYTHING THAT FILLS A SCREEN, WHICH IS THE SAME RULE WITH NO
+  HEADSET IN IT.** Reported 2026-09-19 from an iPhone: *"I can not leave
+  fullscreen on mobile"*. `/weight/` and `/floor/` each drew a badge reading
+  `Esc to leave`, on a device with no Escape key, and then faded it out after a
+  few seconds; the faux cover is `position: fixed; inset: 0; z-index: 60`, so it
+  is over the control row holding the button that got you in. A phone was
+  therefore in a page it could not leave. "Press Escape" on a phone is "press
+  the Meta button" in a different accent, and both are answers a page does not
+  get to give about its own bug.
+  ⚠️ **THE EXIT IS A COMPONENT AND IT IS MOUNTED INSIDE THE ELEMENT THAT WENT
+  FULL.** In real element fullscreen nothing outside that subtree is on screen,
+  so a button anywhere else is invisible on exactly the path where it is the
+  fallback. It fades on inactivity and comes back on any pointer, touch or key,
+  and while it is faded it is `pointer-events: none`, or the corner of the
+  picture silently exits for somebody reaching for the picture.
 - 🔴 **ANYTHING IMMERSIVE NEEDS A WAY OUT THAT THE PAGE OWNS, AND THERE IS ONE
   OF THEM: `demo/shell/xr-quit.mjs`.** Hold ANY controller button for 3 s and a
   white arc fills at your hand; let go and it cancels to zero. Plus a dead-man's
@@ -732,6 +921,55 @@ to recover.
   precisely the browsers that need it. And the utility needs (0,2,0): MEASURED,
   a bare `.pos-faux` lost to a page's own `.pane { position: relative }` on source
   order and the cover stayed 338px wide inside its grid.
+- 🔴 **A MEDIA QUERY ADDS NO SPECIFICITY, SO A LATER PLAIN RULE BEATS IT AT
+  EVERY WIDTH. MEASURED 2026-09-19, AND THE RULE IT KILLED HAD NEVER RUN.**
+  `.pos-pick`'s entire phone layout sat in `@media (max-width: 560px)` at
+  `shell.css:1589`, and the plain `.pos-pick { display: inline-flex; height:
+  34px }` sat at line 2052. Same specificity, later in the file, so the plain
+  one won at 390 px as well as at 1280, and the picker had NEVER collapsed on a
+  phone in its life.
+  ⚠️ **IT WAS FOUND BY PUTTING TWO CONTROLS SIDE BY SIDE AND MEASURING BOTH.**
+  At 390 px the three choices went label on top at x=16 while `LOOK`'s segment
+  started at x=53, after an inline label. One of them obeyed the stylesheet and
+  one did not, which is visible in a screenshot and invisible in the source,
+  because the source says exactly what the author meant.
+  ⚠️ **THE FIX IS ORDER, NOT WEIGHT**: the media block moves after the section
+  it overrides. Raising specificity to win a fight with your own stylesheet is
+  how `.pos-faux` ended up needing `(0,2,0)`, and that one at least had a page's
+  rule to beat.
+  🔴 **AND A DEAD CSS RULE IS THE SECOND MOST EXPENSIVE KIND OF DEFECT HERE**,
+  after a dead JavaScript guard, for the same reason: it reads as done. Three
+  now, all measured rather than reviewed: this, `.pos-log { margin-top }` which
+  was inert for as long as it existed, and `if (fullSupport() === 'none')` on
+  `/weight/`, a branch comparing against a string that function never returns.
+  **Point a browser at it and measure the COMPUTED value**, which is the only
+  thing that knows which rule won.
+  🔴 **FOURTH, 2026-09-19, AND IT IS THE ONE A SELECTOR CANNOT WIN: AN INLINE
+  STYLE BEATS EVERY STYLESHEET.** `shell.css` has carried
+  `.pos-vp[data-full] .pos-vp-stage { aspect-ratio: auto }` since full screen
+  was built. `createVideoPanel` later gained an `aspect` option for `/stage/`'s
+  film, written as `stage.style.aspectRatio = aspect`, so a panel given a shape
+  could never give it up. `/making/`'s 1:1 picture box stayed square on a 16:9
+  screen, its picture sat high, and `.pos-fsx` is `position: absolute` INSIDE
+  that stage, so **the way out of full screen rode up there with it**. Reported
+  as two separate faults because that is how it looks.
+  ✅ **A COMPONENT THAT VARIES A PROPERTY PER INSTANCE SETS A CUSTOM PROPERTY,
+  NEVER THE PROPERTY.** `stage.style.setProperty('--vp-aspect', aspect)` and
+  `aspect-ratio: var(--vp-aspect, 16 / 9)`: per instance, and still reachable by
+  a rule. Writing `el.style.x` from a component is writing a rule nothing can
+  override, including the component's own stylesheet.
+
+- 🔴 **`[data-thing]` MATCHES AN EMPTY ATTRIBUTE, SO CLEAR IT BY DELETING.**
+  MEASURED 2026-09-19 in `video-panel.mjs`, which did `root.dataset.full = full
+  ? fullMode : ''`. Every full screen rule is written `.pos-vp[data-full] …`,
+  and an attribute selector matches on PRESENCE, so a panel that had been full
+  **once** kept `border: 0`, `background: #000` and a stage with no aspect ratio
+  for the rest of the page's life.
+  ⚠️ **IT SURVIVED BECAUSE ENTERING IS WHAT GETS TESTED.** Every check anybody
+  writes about a mode is about going INTO it; the state that is wrong is the one
+  after coming back, and it reads as a design choice rather than a fault. Found
+  by an assert that the panel took its own shape back, written for another
+  reason. `delete el.dataset.x`, never `= ''`.
 - **A long press on a control raises the iOS text LOUPE, and `user-select:
   none` does not stop it.** `-webkit-touch-callout: none` is the one that does.
   Photographed on `/keys/` and `/mirror/`: the magnifier over the piano keys and
@@ -739,6 +977,15 @@ to recover.
   along with `touch-action: manipulation`, which also drops the 300 ms
   double-tap wait so a key sounds when it is pressed. Prose, readouts and the
   log stay selectable — copying a number out of those is a real thing to want.
+  ⚠️ **AND A `<canvas>` IS NOT A CONTROL, WHICH IS HOW IT WAS MISSED FOR
+  MONTHS.** The rule above was written on `button` and nothing covered the
+  picture. PHOTOGRAPHED 2026-09-19 on `/blocks/`: the 3-D scene wearing a blue
+  selection overlay with both iOS drag handles, one of them hanging below the
+  canvas into the log. Instructed as *"3d scene nonselectable"*, and it is
+  global rather than per page, because a canvas here is always a picture and
+  nobody has ever wanted to select one. **The selection suppression is global,
+  `touch-action` is NOT**: a canvas you drag to look around wants it off, and a
+  canvas inside a page you scroll must not eat the scroll.
 - **iOS 17.1 added `ManagedMediaSource`**, so `Hls.isSupported()` is now TRUE on
   iPhone. Any fallback written `if (!Hls.isSupported() && canPlayType(...))`
   silently stopped firing.
@@ -1083,14 +1330,38 @@ is checkable in one command, so check it before repeating it.
   2026-09-18**, asked for on `/stage/` as *"make 4:3 video win and crop"*. The
   rule above is unchanged and is still the DEFAULT; what it is about is a
   subject somebody framed and a shape the page does not control, and neither is
-  true of a film composed to fill its own frame. The arithmetic says the same:
-  a camera at 720x1280 into 1280x720 keeps 32%, a 4:3 film keeps **75%**, and
-  contain was laying 160 px of flat field down each side of it. **`scrim` is a
-  second option and defaults to the same 0.55**: it exists so a burned clock
-  stays readable on top, so a caller that draws nothing on top passes 0 rather
-  than dimming its own picture by more than half for furniture that is not
-  there. `/stage/` is the only caller of either; the five camera pages take the
-  defaults and read 82/82 unchanged.
+  true of a film composed to fill its own frame. The arithmetic said the same:
+  a camera at 720x1280 into 1280x720 keeps 32%, the 4:3 film that bought this
+  option kept **75%**, and contain was laying 160 px of flat field down each
+  side of it. **`scrim` is a second option and defaults to the same 0.55**: it
+  exists so a burned clock stays readable on top, so a caller that draws nothing
+  on top passes 0 rather than dimming its own picture by more than half for
+  furniture that is not there. `/stage/` is the only caller of either; the five
+  camera pages take the defaults and read 82/82 unchanged.
+  ⚠️ **THE 4:3 FILM IS GONE SINCE 2026-09-19 AND THE RULE IS NOT.** That page
+  plays a 1280x720 MIMproject recording in a 1280x720 box now (*"video win to
+  16:9"*), where `cover` and `contain` agree to the pixel, so the one live
+  caller no longer demonstrates the option it asked for. It still passes
+  `cover`, for the reason above and because `?bg=` can point it at a corpus row
+  that is 4:3 or 480x272. **The numbers above are kept as the measurement that
+  bought the option, not as a description of what is on screen.** This entry
+  said `a 4:3 film keeps 75%` in the present tense for as long as that was
+  true, which is how a confident sentence outlives the thing it describes.
+- 🔴 **AND A PAGE NEVER RE-PUBLISHES `__demo.transport`, BECAUSE THE BAR
+  ALREADY DID AND THE RETURN VALUE IS NOT THE SAME OBJECT.**
+  `transport-bar.mjs` publishes its internal `api`; `createTransportBar` returns
+  a WRAPPER around that api. A page that assigns the return value over the top
+  hands the harness an object with no `position`, and `demo/verify.mjs` dies on
+  `t0.pos.toFixed` while the page itself looks perfect. Found 2026-09-19 on
+  `/making/`. The two objects being different is deliberate and is not the
+  defect; assuming they are the same is.
+  **The exact shape, so nobody has to re-derive it**: `createTransportBar`
+  returns `{ el, api, endStop, commanded, extra, loopExtra, slot, note, destroy
+  }`, and `publish: true` writes `api` to `__demo.transport`. `verify.mjs` reads
+  `__demo.transport.position` and `__demo.transport.el`, and both live on `api`.
+  ⚠️ **THE SYMPTOM IS THE WORST KIND**: the harness THROWS inside its own drill
+  rather than failing an assert, so the output names the harness and not the
+  page, and nothing in the per-page count moves to point at what changed.
 - 🔴 **A PAGE WITH TWO BARS MUST SAY WHICH ONE IS ITS TRANSPORT: `publish:
   false`.** `__demo.transport` is the only handle a CDP check has, and every bar
   claimed it unconditionally, so it was whichever bar was BUILT LAST, which is a
@@ -1136,7 +1407,24 @@ is checkable in one command, so check it before repeating it.
   rewrite, since one agent still held uncommitted work in a file the rewrite
   would have touched. **Agents report; the session commits.** And when a commit
   must be made while an agent is running, stage the paths by name — never
-  `git add -A`.
+
+  🔴 **AND STAGING BY NAME IS NOT ENOUGH WHILE A `git mv` IS STAGED. MEASURED
+  TWICE IN TEN MINUTES, 2026-09-19.** `git mv` STAGES the rename as it makes it,
+  so the index already holds somebody else's work before you touch it. A peer
+  session ran a plain `git commit` of its own file and swept all five paths of
+  an in-flight `/held/` to `/weight/` rename into a commit whose message was
+  about something else entirely, which is the exact failure this rule exists to
+  prevent, arriving from a direction the rule did not cover.
+  **The form that is safe is PATH LIMITED, not staged by name:**
+
+```sh
+git commit -F msg.txt -- demo/making/index.html      # only these paths, whatever else is in the index
+```
+
+  The repair, if it has already happened, is `git reset --soft HEAD~1` and then
+  the path-limited commit. ⚠️ **AND CHECK RATHER THAN ASSUME**: `git status`
+  showing your own file staged says nothing about what else is in there, and a
+  `git mv` leaves renames looking like `R078` rather than like edits.  `git add -A`.
 - Secrets never reach a log. The publisher redacts at the point of capture, so a
   secret split across two stderr chunks is still caught.
 - 🔴 **NO EM DASHES. ANYWHERE A READER LOOKS.** Not in `what`, not in a
@@ -1150,6 +1438,25 @@ is checkable in one command, so check it before repeating it.
   when the second half really is the first half named. ⚠️ THE TEST IS NOT
   PUNCTUATION, IT IS WHAT THE CLAUSE DOES: if it qualifies, gestures, or
   re-states, cut it; if it carries a fact, it deserves its own sentence.
+- 🔴 **AND NO MIDDOTS EITHER, WHICH IS THE SAME RULE ABOUT THE CHARACTER THAT
+  REPLACED THE DASH.** Instructed 2026-09-19: *"avoid using middots in ui (can
+  be fixed per demo as we go)"*, and pointed at again a minute later on a panel
+  footer reading `Apple GPU · locked 59.9 fps`. The em dash sweep moved 418
+  joins onto `·` and `shell.mjs`'s own comment called it *"already this
+  project's separator"*. That is how a tic survives a rule: it changes costume.
+  A middot lets a line bolt a third and a fourth fact on exactly the way a dash
+  bolts a second.
+  ⚠️ **A ROW OF FACTS IS CELLS, NOT ONE STRING WITH GLUE IN IT.** That is the
+  repair almost every time. A footer joining `picture`, `fps` and `locked` with
+  `' · '` had three cells and threw them away to make a sentence; the readout
+  already knows this and so does `table.mjs`. Stop gluing rather than choosing a
+  different glue.
+  ⚠️ **AND IT IS PER DEMO, NOT A SWEEP.** MEASURED on the day the rule was
+  written: **971** middots across `demo/*/index.html` and `demo/shell/*.mjs`, in
+  **45 of 46** pages. A page loses them when that page is being worked on, which
+  is what was asked for. The shared ones are different and are decided once:
+  the assert formatter, the tally line and `document.title` are all in
+  `shell.mjs` and reach every page.
 - 🔴 **A DIAGRAM IS WRITTEN TO A DIFFERENT RULE FROM PROSE, AND HERE IT IS.**
   - 🔴 **THE VISITOR'S MACHINE IS CALLED `Browser`. ALWAYS THAT WORD.** Not
     `your device`, not `this page`, not `here`. It is the name of the thing, a
@@ -1354,17 +1661,30 @@ is checkable in one command, so check it before repeating it.
   OCCASION TO CUT: the same paragraph doubled in length over four rounds of
   additions, because each one appended and none subtracted. Re-read the whole
   thing against the rule below, do not staple a clause on the end.
-- 🔴 **THREE SENTENCES. A DESCRIPTION IS NOT AN ESSAY.** The rule below says
-  three or four and it kept being broken — `grains` shipped a `what` of FIVE
-  long sentences that explained the granulator, defended why it has its own
+- 🔴 **ONE SENTENCE. A DESCRIPTION IS NOT AN ESSAY, AND IT IS NOT A PARAGRAPH
+  EITHER.** Instructed 2026-09-19: *"descs are single sentences (do not stretch
+  them with : ; -- etc)"*, and asked again in the same stream for page after
+  page. **`descs` is the text under the title**: the `what` that
+  `demo/shell/shell.mjs` appends as `<p class="pos-what">` directly under the
+  `h1`, and the `one` line in `demo/manifest.mjs` that the index shows under a
+  demo's name. They are the same string on any page with a diagram, by the rule
+  below, so they move together.
+  ⚠️ **AND THE SENTENCE MAY NOT BE STRETCHED.** No colon, no semicolon, no dash
+  buying a second clause, no *"and"* bolted on to carry a second fact. A
+  description that needs punctuation to fit is two descriptions, and the second
+  one is the one nobody asked for.
+  ⚠️ **THIS RULE SAID THREE SENTENCES UNTIL 2026-09-19, AND BEFORE THAT FOUR.**
+  Each cut was asked for, each was broken within a few pages, and the reason is
+  the same every time: a description is written while the page is fresh in the
+  author's head, when everything about it feels worth saying. `grains` shipped
+  FIVE long sentences that explained the granulator, defended why it has its own
   page, described the dice, and finished with what the board does unattended.
   Nobody read it, and the page it described was called *"mambo jumbo"* by the
-  person it was written for. A visitor wants: what this is, what to press, what
-  the numbers mean. Say it and stop. **No history, no justification for a design
-  decision, no account of what it used to be** — that belongs in a comment, in
-  LESSONS.md, or in a commit message, all of which are read by somebody who
-  asked. If a sentence exists to defend the page rather than to use it, delete
-  it.
+  person it was written for. A visitor wants to know what this is. What to press
+  is the control's own label, and what a number means is the readout key.
+  **No history, no justification for a design decision, no account of what it
+  used to be.** That belongs in a comment, in LESSONS.md, or in a commit
+  message, all of which are read by somebody who asked.
 - 🔴 **A COMPONENT SWAP MOVES EVERY SELECTOR THAT NAMED THE OLD ONE.**
   `/radio/`'s sound row went `createChoice` -> `createPicker` and one of the
   three rules keyed on the old class was updated. `shareLabelColumn()` went on
@@ -1408,6 +1728,21 @@ is checkable in one command, so check it before repeating it.
   wrong length first. ⚠️ **AMEND THE CORPUS WITH `--offline`**: it rebuilds from
   the cache, asks no source anything, and was MEASURED byte for byte identical
   to the committed file apart from its timestamp.
+- 🔴 **A TABLE IS NAVIGABLE FROM THE KEYBOARD, AND AN ARROW MOVES RATHER THAN
+  OPENS.** `table.mjs`, 2026-09-19, asked for as *"allow keyboard nav in
+  tables"*: arrows, Page Up and Down, Home and End, Enter to open.
+  🔴 **THE OBVIOUS SHAPE WOULD HAVE BEEN A DEFECT ON THE PAGE THAT ASKED FOR
+  IT.** An arrow that moved the SELECTION, the way a file browser does, calls
+  `onPick` per row, and `/making/`'s `onPick` fetches a picture off the bucket,
+  so a held-down arrow pulls 63 files nobody asked to see. That is the
+  load-on-a-visit defect, already paid for three times, arriving through the
+  keyboard. Moving focus is free; opening is a decision and gets its own key.
+  ⚠️ **AND A LIST IS ONE TAB STOP, NOT ONE PER ROW.** Every row was
+  `tabIndex = 0`, so tabbing past a 63-row table took sixty-three presses. A
+  roving tabindex fixes it, is invisible in a screenshot, and is free to read
+  off the DOM, so assert it, including the negative half: one row at 0 AND
+  every other at -1.
+
 - **Two more kit components, both 2026-09-15.** `table.mjs` — rows in columns
   the caller declares (`key`, `label`, `width | grow`, `align`, `link`, `hi`,
   `clip`, `hover`); it THROWS unless exactly one column grows. `tabs.mjs` —
