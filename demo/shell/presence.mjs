@@ -550,3 +550,56 @@ export function createPresence({
   set(state, why);
   return api;
 }
+
+/**
+ * A primary control that IS the status, rather than a button beside one.
+ *
+ * 🔴 ASKED FOR 2026-09-21: *"replace listen primary buttons to somehign that
+ * uses online status"*. A page that talks to an instrument in another room, or
+ * on another cable, has two facts to show and had been showing one: `Listen`
+ * says what pressing does and says nothing about whether anything answered. A
+ * visitor who pressed it and saw no movement could not tell a silent instrument
+ * from an absent one.
+ *
+ * ⚠️ **IT STAYS A PRESS, AND THAT IS NOT NEGOTIABLE.** A badge that connected
+ * on its own would open MIDI, or a socket, on a VISIT, which is the rule this
+ * project has paid for on four pages. So the control is a button whose face is
+ * a live badge: `unknown` before anybody asks, `checking` while it looks,
+ * then `online` or `offline` with a reason.
+ *
+ * ⚠️ **AND IT LIVES IN `.pos-controls`**, which is where `demo/verify.mjs`
+ * presses. A status control outside that row is a control no harness drives,
+ * and every check behind it would go silent while the suite stayed green.
+ *
+ * `of` names the thing, `press` is what the button does, and everything else is
+ * handed to `createPresence`. Returns the presence api with `el` being the
+ * BUTTON, plus `badge` for the element inside it.
+ */
+export function createPresenceButton({ of = '', press = () => {}, ...rest } = {}) {
+  const badge = createPresence({ of, mode: 'badge', ...rest });
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'pos-pri pos-presence-btn';
+  b.dataset.id = 'presence';
+  b.append(badge.el);
+  b.addEventListener('click', () => press());
+  /* ⚠️ THE BADGE'S OWN LIVE REGION STAYS. Wrapping it in a button must not take
+     the announcement away, so nothing here touches `aria-live`; what the button
+     adds is a name for the ACTION, which the badge cannot carry. */
+  b.setAttribute('aria-label', `check whether ${of || 'it'} is there`);
+  let this_;
+  /* 🔴 DELEGATED, NOT SPREAD. `{ ...badge }` reads every property ONCE at
+     spread time, so `get driver()` would have been frozen at whatever it was
+     the instant this was built and would never have changed again. A getter
+     that silently stops getting is the quietest kind of dead code there is. */
+  this_ = {
+    el: b, button: b, badge: badge.el,
+    set: (...a) => { badge.set(...a); return this_; },
+    busy: (...a) => { badge.busy(...a); return this_; },
+    because: (...a) => { badge.because(...a); return this_; },
+    stop: () => { badge.stop(); return this_; },
+    get state() { return badge.state; },
+    get driver() { return badge.driver; },
+  };
+  return this_;
+}
