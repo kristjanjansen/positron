@@ -20,6 +20,44 @@ describes is a reading, and it says so on its own face.
 
 ---
 
+## 🔴 What shipped is not what §1 and §5 recommend, and the document is kept anyway
+
+Amended 2026-09-20, the same day it was written, twice over. **Read this before
+§1 and §5, both of which describe a page that no longer exists.**
+
+1. **There is no `/veil/`.** Asked for as *"rm veil demo and integrate it into
+   held begore timeljne"*, so the picture is a 16:9 video panel above `/held/`'s
+   own line, on one deck, with the line still the page's only position surface.
+   §5's three reasons for a separate page were answered rather than overruled:
+   its readout became no readout at all, its scene picker became the line, and
+   its transport became `/held/`'s.
+2. 🔴 **Only ONE arithmetic is drawn, and it is `three gains`.** §1 recommends
+   drawing the same instant twice, side by side, so the reader can SEE what a
+   web page in a headset cannot do. That was built and then cut, on the reader's
+   verdict rather than on a measurement: *"I do not het 2scrrrns just go single
+   16;9 videopanel"*, then *"Single videopanel. I sid not get two panels
+   reasoning. Keep ot simple."* **The comparison had to be taught before it
+   could be looked at, and a reader not getting it is the verdict on the idea.**
+3. **The argument in §1 is still true and is kept here in full, which is what a
+   plan is for.** What survives on the page is one log line and the comment over
+   `TABLES` in `demo/held/index.html`. ⚠️ The wording is load bearing wherever it
+   appears: it is *a web page in a headset*, never *a headset*, because Held in
+   Human is a Unity application and really does put a colour table on the camera
+   image.
+4. **§2's eleven grey steps were required by the two-picture argument and are
+   not required by one.** A gain and a lift are indistinguishable on one flat
+   tone, so telling them apart needed a range; with nothing to tell apart, the
+   count is only a question of how the band reads. The page draws nine and
+   nothing depends on the number.
+5. **§6's sabotage list changes with it.** Checks 3 and 4 there compared the two
+   pictures and are gone. What now carries the page's main claim is *a colour
+   table is three gains, so under green the channels come apart and black stays
+   black*, with *under neutral the room keeps its own greys* as its negative
+   control, and both go red when `neutral` is made something other than the
+   identity.
+
+---
+
 ## 0. One line
 
 Two of the three things the ask names are the score's two channels and the
