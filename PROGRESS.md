@@ -1,3 +1,87 @@
+# Session 39: a third panel, a log the three of them share, and a signal chain measured end to end (2026-09-21)
+
+**A STREAM OF SEVEN REQUESTS ARRIVED WHILE THE HANDOFF WAS BEING READ, AND
+EVERY ONE WENT INTO `BACKLOG.md` BEFORE IT WAS WORKED ON.** That is the rule and
+this is the first session where it was exercised at that rate. Two of them
+corrected an earlier one mid-measurement, which is exactly why the rule exists:
+the cable moved twice and the readings before the move are still in the record
+rather than quietly replaced.
+
+**`/evo/` IS THE THIRD HARDWARE PANEL, 24/24, AND ITS LAYOUT IS THE WEAKEST OF
+THE THREE ON PURPOSE.** `/circuit/` was drawn from Novation's artwork at 800 dpi
+and the Model 12 was corrected twice by somebody looking at the mixer. Evolution
+Electronics no longer exists, there is no artwork, and the manual gives a
+NUMBERED LIST rather than a picture. So the counts are documented, the
+arrangement is the page's own arithmetic, and the page says so in its own header
+rather than presenting a guess as a drawing.
+🔴 **THE KEYS ARE DRAWN AT NOTES 47 TO 71, WHERE THE WIRE SAYS THEY ARE.** A 25
+key controller spans 48 to 72; this one is a semitone flat, and drawing it
+correctly would have hidden the one fact worth reporting. The page says it in a
+log line the first time a note below 48 arrives.
+🔴 **AND SIX MEASURED CONTROLLER NUMBERS BIND SIX OF THE EIGHT KNOBS IN ARRIVAL
+ORDER, WITH THE CC PRINTED UNDER EACH.** Nothing on the wire says which physical
+knob sent which number. Two knobs stay `unbound`, which is asserted, because
+filling them would be the `/circuit/` drum grid mistake again: reporting the
+instrument while looking like it was reporting the position.
+
+**`/rack/` IS `/model/`, AND THIS RENAME ENDS A STALE LINK RATHER THAN MAKING
+ONE.** For one day a kept link to `/rack/` opened the Model 12 instead of the
+Ableton demo it used to be, which is the `/held/` situation and the one failure
+worse than a dead link. After the next deploy it 404s.
+⚠️ **THE SWEEP MATCHED THE SLUG AND THE URL FORM, NEVER THE WORD.** `.rack-row`,
+`.rack-lane` and `const rack` all stayed, because a rack of channel strips is a
+rack. So did every mention of the Ableton demo that used to own the slug.
+
+**THE MIDI LOG IS A KIT MODULE BECAUSE THREE PAGES GREW ONE ON THE SAME DAY.**
+`demo/shell/midi-log.mjs`. The raw bytes are a column of their own and are never
+replaced by the reading beside them, which matters most on `/model/`, where a
+pan click's `0x44` is four counter clockwise and reads as sixty eight to anybody
+given only a number.
+🔴 **THE ROW IS ADDED BEFORE THE ROUTING.** A log fed afterwards lists only what
+the panel already understands, which is the opposite of what a log is for.
+Asserted on both pages by feeding a CC on channel 5 that neither routes
+anywhere.
+
+**THE CIRCUIT'S AUDIO IS CAPTURED AND THE WHOLE CHAIN IS MEASURED.**
+`research/fasttrack-capture-2026-09-21.md`. The left output goes to input 1,
+which is capture channel 1, 48 kHz and 16 bit. **With the Circuit's output and
+the interface gain both at maximum: peak -1.69 dBFS over 9.46 s and zero clipped
+samples of 454,144.**
+🔴 **THE CAPTURE WAS PROVED ALIVE BEFORE ANY SILENCE WAS INTERPRETED.** A denied
+microphone permission delivers exact zeros and a real converter has a floor, so
+`-52 dBFS` is the reading that says the permission is granted, the ADC is
+running and nothing is playing. Without that step, "the Circuit is silent" and
+"this recorder is deaf" are the same observation.
+⚠️ **AND CHANNEL 2 IS ITS OWN NOISE RATHER THAN CROSSTALK**, measured as a
+correlation of **+0.030** between the two captured channels rather than assumed
+from the 15 dB between them.
+
+**THE CIRCUIT PATCH FORMAT IS MEASURED AND DOCUMENTED AND THE TWO AGREE BYTE FOR
+BYTE.** 64 files on disk against Novation's Programmer's Reference v1.1: a nine
+byte header, 340 bytes of patch data, `F7`, 350 in total, name at addresses 0 to
+15, and all 64 are `Replace Current Patch` messages for Synth 1.
+🔴 **AN EDITOR NEEDS NO SysEx TO EDIT: 374 PARAMETERS ARE ADDRESSABLE LIVE**, 98
+by CC and 276 by NRPN.
+🔴 **AND `Replace Current Patch` AND `Replace Patch` DIFFER BY ONE BYTE AT
+OFFSET 6**, where the second writes flash on a device with no factory reset.
+
+🔴 **ONE OF THIS REPOSITORY'S OWN SENTENCES WAS WRONG AND IS FIXED.** The
+Circuit's master filter on CC 74 channel 16 was written up as *"not what any
+manual says"*. It is what the Programmer's Reference says, in a section called
+Session Control addressed to channel 16, and `plans/plan-circuit-model12.md`
+§3.5 had already tabulated that section out of the same document before the
+sentence was written. The measurement was always right. The claim about what is
+documented came from reading the USER GUIDE and generalising to *any manual*.
+
+**AND THE COUNT AT THE TOP OF `CLAUDE.md` WAS STALE AGAIN**, reading `47 of 49`
+against a real **51 of 53**, in the paragraph that warns about exactly that
+drift. `LAYOUT.md` was three facts stale as well: it still described `plans/` as
+23 files at the repository root.
+
+**NOTHING WAS COMMITTED AND NOTHING WAS DEPLOYED.**
+
+---
+
 # Session 38: four instruments stopped being documentation (2026-09-20 to 21)
 
 **WHAT WAS ATTACHED TO THIS MACHINE WAS UNKNOWN AT THE START AND IS MEASURED AT

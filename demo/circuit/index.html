@@ -298,6 +298,7 @@
   import { createPresenceButton } from '/shell/presence.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode } from '/shell/midi-decode.mjs';
+  import { createMidiLog } from '/shell/midi-log.mjs';
 
   /**
    * 🔴 A NOVATION CIRCUIT ON SCREEN. Two sources and they are kept apart on
@@ -316,9 +317,18 @@
   const MACRO_CC0 = 80;
   /**
    * 🔴 THE FILTER IS ALONE ON CHANNEL 16 AND EVERY MACRO IS ON CHANNEL 1.
-   * Measured, and it is the one fact about this instrument that nobody would
-   * guess: a layout binding the whole panel to one channel gets eight knobs and
-   * silently loses the one the guide calls always active.
+   * Measured, and a layout binding the whole panel to one channel gets eight
+   * knobs and silently loses the one the guide calls always active.
+   * ⚠️ **IT WAS WRITTEN UP AS `NOT WHAT ANY MANUAL SAYS` AND THAT WAS WRONG.**
+   * Corrected 2026-09-21 by reading Novation's Circuit Programmer's Reference
+   * Guide v1.1, which gives a whole **Session Control** section addressed to
+   * **MIDI channel 16** and puts the master filter in it as **CC 74**, with its
+   * resonance on **CC 71**. `plans/plan-circuit-model12.md` §3.5 had already
+   * tabulated that section out of the same document. So the measurement and the
+   * documentation agree, which is a stronger position than either alone, and
+   * the sentence claiming they disagreed was written without opening the one
+   * document that covers it. The USER GUIDE does not say it; the PROGRAMMER'S
+   * REFERENCE does, and those are two books.
    */
   const FILTER_CC = 74, FILTER_CH = 16;
   /** Measured: drums arrive on 10, synth 2 on 2. */
@@ -644,6 +654,14 @@
     }
   }
 
+  /**
+   * 🔴 WHAT ARRIVED, BESIDE THE PANEL IT MOVED. The table is a kit module
+   * because three pages grew one on the same day; the policy that a clock byte
+   * is counted and never listed lives in there with it.
+   */
+  const traffic = createMidiLog({ empty: 'press the status button, then play something' });
+  d.el.append(traffic.el);
+
   // ── what arrives ────────────────────────────────────────────────────────
 
   let access = null, clock = 0, anchored = false;
@@ -661,11 +679,21 @@
   function take(b) {
     const m = decode(b);
     if (m.status === 0xf8) { clock++; return; }
+    /**
+     * 🔴 EVERYTHING THAT IS NOT A FLOOD GETS A ROW, AND IT HAPPENS HERE, BEFORE
+     * ANY OF THE ROUTING BELOW. Asked 2026-09-21: *"add midi event logs to
+     * circuit and rack demos"*. Putting it after the routing would list only
+     * what this panel already understands, which is the opposite of what a log
+     * is for: the interesting message is the one the picture cannot place.
+     * ⚠️ THE FLOOD TEST MOVED UP ONE LINE AND NOTHING ELSE MOVED. `isFlood` is
+     * clock and active sensing, and Start is neither, so a Start still reaches
+     * the branch under this and still resets the bar.
+     */
+    if (!traffic.add(m)) return;
     /* 0xFA Start and 0xFB Continue. Named here rather than imported, because
        the half of this page that used to SEND them has gone to
        archive/circuit-midi-out/ and a listener still has to recognise one. */
     if (m.status === 0xfa || m.status === 0xfb) { clock = 0; anchored = true; return; }
-    if (m.flood) return;
 
     if (m.kind === 'control' && m.ch === 1
         && m.cc >= MACRO_CC0 && m.cc < MACRO_CC0 + 8) {
@@ -1017,6 +1045,26 @@
         Math.abs(card.left - page.left) <= 1 && Math.abs(card.right - page.right) <= 1,
         `left ${(card.left - page.left).toFixed(1)}, right ${(card.right - page.right).toFixed(1)}`);
     }
+
+    /**
+     * 🔴 THE LOG IS GRADED, BECAUSE A SURFACE NOTHING ASSERTS IS A SURFACE
+     * THAT CAN GO BLANK WITHOUT THE SUITE MOVING. Eleven messages went in
+     * above and two clock bytes did not.
+     */
+    d.assert('every message that is not a flood took a row',
+      traffic.count() === 11, `${traffic.count()} rows for 11 messages and 2 clocks`);
+
+    // ⚠️ THE HALF THAT MATTERS: a message this panel has NO PLACE for still
+    // gets a row. A log fed after the routing would be silent about exactly
+    // the traffic somebody opened it to find.
+    const wasRows = traffic.count();
+    take([0xb4, 100, 7]);                    // CC 100 on channel 5: nothing here places it
+    d.assert('and a message the panel cannot place is listed all the same',
+      traffic.count() === wasRows + 1 && traffic.el.textContent.includes('B4 64 07'),
+      `${traffic.count()} rows, looked for B4 64 07`);
+
+    d.assert('the clock bytes took no row at all',
+      !traffic.el.textContent.includes('F8'), `${traffic.count()} rows`);
 
     d.assert('no secret in this page', !location.href.includes('token'));
   });

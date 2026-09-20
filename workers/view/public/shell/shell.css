@@ -70,7 +70,7 @@
 
      🔴 **SO A ROW OF DIFFERENT CONTROLS CANNOT BE ALIGNED WITH `flex-end`
      UNLESS THEIR FURNITURE AGREES.** That is the whole rule, and it was
-     learned three times in one evening on /rack/, each time as a screenshot:
+     learned three times in one evening on /model/, each time as a screenshot:
      buttons sitting a label too low, two labels ending on different lines, and
      a lane starting 30 px below the button beside it.
 
@@ -326,7 +326,7 @@ canvas {
 }
 
 /* 🔴 DOUBLE-TAP ZOOM, ON A PAGE YOU PLAY WITH YOUR FINGERS. Photographed on
-   /rack/ on an iPhone: the page sitting at about 3x, one button filling the
+   /model/ on an iPhone: the page sitting at about 3x, one button filling the
    screen, keys running off both edges — which reads as a broken layout and is
    not one. MEASURED at 390x844: `document.scrollWidth` 390 against a 390 px
    window and NOTHING wider than the viewport, so there is no overflow to fix.
@@ -3595,7 +3595,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    over: the lane bottom with the button bottom, and the two labels with each
    other. Reported 2026-09-20 with a photograph: *"1 and solo label bottoms and
    slider / button bottoms need to line up"*.
-   ⚠️ **THIS REPLACES A PER PAGE MARGIN AND THAT IS THE POINT.** `/rack/` was
+   ⚠️ **THIS REPLACES A PER PAGE MARGIN AND THAT IS THE POINT.** `/model/` was
    lifting its button column by `--fdr-foot` to align to the lane, which worked
    only while the pads had nothing under them. The moment they gained a label
    the correction became the error. **Two controls that have to end on one line
@@ -3777,7 +3777,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    alignment lands the lanes, the buttons and the dials on one line with no
    per page arithmetic. **A page doing its own margin correction here is a page
    that will be wrong the moment a component gains a label**, which is exactly
-   how /rack/ broke: it lifted its button column by a foot's height, which was
+   how /model/ broke: it lifted its button column by a foot's height, which was
    right until the pads gained one of their own. */
 .pos-crow { display: flex; align-items: flex-end; gap: var(--ctl-gap); }
 /* A control that has to SPAN a column of n others: n surfaces plus n-1 steps. */

@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 THE CARD HUGS THE PANEL AND THE PANEL SCROLLS SIDEWAYS ON A PHONE.
+     Both decisions are `/circuit/`'s and both were paid for there over an
+     evening of screenshots, so they are copied deliberately rather than
+     re-derived: a keyboard is 25 keys wide and there is no phone width at
+     which that becomes a column of something else.
+     ⚠️ THE SCROLLER NEEDS `min-width: 0` OR IT DRAGS THE WHOLE PAGE SIDEWAYS.
+     Measured on this project at 390 px: `overflow-x` cannot shrink a flex item
+     below its content. The scrolling happens in this box or in the document,
+     and only one of those is a design. */
+  .evo-scroll { overflow-x: auto; min-width: 0; }
+  .evo {
+    display: flex; flex-direction: column;
+    width: 100%; min-width: max-content;
+    gap: 22px;
+    /* The foot is deeper than the sides, as on `/circuit/`: the bottom row is
+       keys, and a key carries no label under it to hold it off the edge. */
+    padding: 20px 20px 34px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 4px;
+  }
+  .evo-brands { display: flex; justify-content: space-between; }
+  .evo-brand { font-size: 13px; letter-spacing: 0.14em; color: var(--dim); }
+  /* Sentence case on every label, for `/circuit/`'s reason: the kit shouts a
+     pad's legend, which is right on a page of headings and wrong on a picture
+     of a panel. The two printed names are artwork and keep their case. */
+  .evo .pos-pad-top, .evo .pos-pad-bot { text-transform: none; }
+  .evo-panel { display: grid; justify-content: center; gap: 22px; }
+  .evo-top { display: flex; gap: 22px; align-items: flex-start; }
+  .evo-knobs { display: flex; gap: 10px; }
+  .evo-btns { display: flex; gap: 10px; }
+  /* 🔴 THE DISPLAY IS DRAWN AND IS NOT A CONTROL. A blue backlit LCD with a
+     three digit field and a small two digit one, per the manual. Nothing on
+     the wire reports what it is showing, so it shows what this page knows and
+     says so on hover rather than inventing a reading. */
+  .evo-lcd {
+    min-width: 92px; padding: 6px 10px; border: 1px solid var(--line);
+    border-radius: 3px; background: #0d1830; color: #8fb6ff;
+    font: 600 18px/1.1 var(--mono, ui-monospace, monospace);
+    display: flex; align-items: baseline; gap: 6px; justify-content: space-between;
+  }
+  .evo-lcd small { font-size: 11px; opacity: 0.75; }
+  .evo-lower { display: flex; gap: 22px; align-items: flex-end; }
+  .evo-wheels { display: flex; gap: 10px; }
+  /* 🔴 THE KEYS ARE A PICTURE, NOT A CONTROL SURFACE, AND THAT IS WHY THEY DO
+     NOT TAKE A POINTER. This keyboard has no sound engine in it: it is a
+     controller, so a key that lit when you pressed it on screen would be
+     claiming a thing happened somewhere. Nothing happens anywhere. The keys
+     light when the real ones are played and at no other time.
+     ⚠️ A DISABLED BUTTON WOULD BE THE WRONG TOOL. `disabled` is a `return` in
+     front of a handler and this project has already lost sixteen asserts to
+     one, twice in a day; these keys have no handler to guard. What is wanted
+     is a surface that never offered a press in the first place. */
+  .evo-keys { pointer-events: none; }
+  .evo-keys .kbd .pad { display: none; }
+  .evo-log { margin-top: 0; }
+</style>
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createPad } from '/shell/pad.mjs';
+  import { createFader } from '/shell/fader.mjs';
+  import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createMidiLog } from '/shell/midi-log.mjs';
+  import { createPresenceButton } from '/shell/presence.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { decode, noteName } from '/shell/midi-decode.mjs';
+
+  /**
+   * 🔴 AN EVOLUTION MK-425C ON SCREEN. The third hardware panel, and its two
+   * sources are kept apart exactly as `/circuit/` keeps its own, because they
+   * fail differently:
+   *   - **WHAT IT SENDS** is measured, off this desk through `/dump/` on
+   *     2026-09-20, and is in `measured-devices-2026-09-20.md`.
+   *   - **WHERE THE CONTROLS ARE** is READ, out of a 2006 Getting Started
+   *     guide, and is the weakest claim on this page.
+   * 🔴 **AND THAT SECOND HALF IS WEAKER HERE THAN ON EITHER OTHER PANEL.**
+   * `/circuit/` was laid out from Novation's own artwork at 800 dpi. Evolution
+   * Electronics no longer exists, there is no artwork to read, and the manual
+   * gives a NUMBERED LIST of controls rather than a picture of them. So the
+   * counts below are documented and the ARRANGEMENT is this page's arithmetic:
+   * eight knobs over ten buttons, wheels at the left of the keys, which is
+   * where every 25 key controller of that decade put them.
+   * ⚠️ **A COUNT IS NOT A LAYOUT**, which is the mistake the Model 12 page made
+   * and was corrected for twice by somebody looking at the object. Anybody with
+   * this keyboard in front of them should correct what is below.
+   */
+
+  /**
+   * 🔴 THE GLOBAL CHANNEL IS 2. MEASURED, on every stream but one stray pair,
+   * and it is the fact a layout for this keyboard would get wrong first.
+   * ⚠️ AND IT IS NOT A CONSTANT OF THE INSTRUMENT. Every controller on it can
+   * carry its own channel, set from the keypad, held in non volatile memory,
+   * and written down nowhere. One program button was measured sending on
+   * channel 1 while the other nine sent on 2. So this page listens on ALL
+   * channels and reports the channel it heard, rather than filtering on a
+   * number that is a setting somebody can change without a record.
+   */
+  const GLOBAL_CH = 2;
+
+  /**
+   * 🔴 25 KEYS, MEASURED AS NOTES 47 TO 71, WHICH IS A SEMITONE BELOW WHERE A
+   * 25 KEY CONTROLLER SITS. A C to C keyboard spans 48 to 72. This one is
+   * transposed by -1, and that is a fault which never announces itself: the
+   * instrument plays perfectly, in tune with itself, and a semitone flat
+   * against everything else in the building.
+   * ⚠️ **SO THE KEYS ARE DRAWN WHERE THE WIRE SAYS THEY ARE**, and the page
+   * says what the range means rather than quietly correcting it. Drawing 48 to
+   * 72 and shifting what arrives would hide the one thing worth reporting.
+   */
+  const KEY_LO = 47, KEYS = 25;
+
+  /**
+   * 🔴 SIX CONTROLLER NUMBERS FOR EIGHT KNOBS, AND WHICH KNOB IS WHICH IS NOT
+   * KNOWN. Measured: CC 84, 72, 74, 71, 93 and CC 5 all arrived from the knob
+   * row, and neither manual prints a default for any knob of any preset.
+   * ⚠️ **CC 74 IS `cutoff` AND CC 5 IS `portamento time` BY CONVENTION, AND
+   * THAT SAYS NOTHING ABOUT WHAT EITHER KNOB DOES.** This is the Yoshimi
+   * lesson, measured on real hardware here: the standard meaning of a
+   * controller number is a convention, never a fact about a device.
+   */
+  const KNOB_CC_SEEN = [84, 72, 74, 71, 93, 5];
+  const KNOBS = 8, BUTTONS = 10;
+
+  const d = mount({
+    name: 'evo',
+    what: 'An Evolution MK-425C on screen, moving when the real one moves.',
+    /* Four cells, and every one of them moves. `channel` is here rather than
+       as a constant in the prose precisely BECAUSE it is not a constant: one
+       button on this keyboard was measured answering on a different one. */
+    readout: { keys: '', velocity: '', bend: '', channel: '' },
+    /* 🔴 NO DECLARED CONTROL. The primary one is a presence button spliced
+       into `.pos-controls` below, which is where `demo/verify.mjs` presses. */
+    controls: [],
+  });
+  guard(d);
+
+  const root = el('div', 'evo');
+  const scroll = el('div', 'evo-scroll');
+  const panel = el('div', 'evo-panel');
+  const brands = el('div', 'evo-brands');
+  brands.append(el('div', 'evo-brand', 'evolution'), el('div', 'evo-brand', 'MK-425C'));
+  root.append(brands, panel);
+  scroll.append(root);
+  d.el.append(scroll);
+
+  // ── the top row: a display, then eight knobs ────────────────────────────
+
+  const top = el('div', 'evo-top');
+  const lcd = el('div', 'evo-lcd');
+  lcd.append(el('span', '', '---'), el('small', '', '--'));
+  lcd.title = 'a blue backlit LCD, three digits and a small two digit field. '
+    + 'Nothing it shows is on the wire, so this one shows nothing';
+  top.append(lcd);
+
+  /**
+   * 🔴 A KNOB CLAIMS A CONTROLLER NUMBER ONLY ONCE IT HAS HEARD ONE, AND THE
+   * POSITION IS STILL A GUESS. Eight knobs are drawn because the manual counts
+   * eight. Six controller numbers have ever been seen. Nothing on the wire says
+   * which physical knob sent which number, so this page binds them in the order
+   * they first arrive and LABELS each one with the number it took.
+   * ⚠️ **IT IS A DISCOVERY ORDER, NOT A MAP**, and that distinction is the
+   * `/circuit/` drum grid mistake in a new costume: that page coloured a pad by
+   * a note's position in a discovery map and so reported the instrument while
+   * looking like it was reporting the beat. Here the CC number under the knob
+   * is the fact and the knob it sits under is the guess, which is why the
+   * number is printed where a reader can see it disagree with their hand.
+   */
+  const knobs = [];
+  const knobCC = new Array(KNOBS).fill(null);
+  const knobRow = el('div', 'evo-knobs');
+  for (let i = 0; i < KNOBS; i++) {
+    const k = createKnob({
+      label: `${i + 1}`, sub: 'unbound', min: 0, max: 127, value: 0,
+      title: 'a fully assignable rotary. Which controller number this one sends '
+           + 'has never been measured, so it takes the next one heard',
+      disabled: true,
+    });
+    knobs.push(k);
+    knobRow.append(k.el);
+  }
+  top.append(knobRow);
+  panel.append(top);
+
+  // ── ten buttons, which are also the numeric keypad ──────────────────────
+
+  /**
+   * 🔴 EACH PRESS SENDS THREE MESSAGES, NOT ONE. Measured: a bank select LSB, a
+   * bank select MSB and then a program change. Nine buttons gave programs 1 to
+   * 9 on channel 2, which is the documented `Program / Bank preset` assignment
+   * behaving as written.
+   * ⚠️ **AND THE TENTH SENT PROGRAM 0 ON CHANNEL 1.** One button carries an
+   * explicit channel while the rest inherit the global one. It is unresolved,
+   * and it is why the program number rather than the channel decides which
+   * button lights here.
+   * ⚠️ IN EDIT MODE THESE TEN ARE THE KEYPAD, which is why the manual says you
+   * cannot select one by pressing it. They are controllers 11 to 20.
+   */
+  const buttons = [];
+  const btnRow = el('div', 'evo-btns');
+  for (let i = 0; i < BUTTONS; i++) {
+    const p = createPad({
+      label: `${i}`, tint: '#7fb2ff', latch: false, disabled: true,
+      title: `program ${i}, sent with a bank select pair in front of it. `
+           + 'In edit mode this is the keypad digit ' + i,
+    });
+    buttons.push(p);
+    btnRow.append(p.el);
+  }
+  panel.append(btnRow);
+
+  // ── the wheels and the keys ─────────────────────────────────────────────
+
+  const lower = el('div', 'evo-lower');
+  const wheels = el('div', 'evo-wheels');
+
+  /**
+   * 🔴 THE PITCH BEND WHEEL IS SEVEN BIT INSIDE A FOURTEEN BIT MESSAGE.
+   * Measured: 106 bend messages, **every one with an LSB of 0**, 63 distinct
+   * values. So 128 of the 16384 positions exist and the other 16256 cannot be
+   * reached. The assignment type is 14 bit; the wheel behind it is not.
+   * ⚠️ **AND IT DOES NOT REACH EITHER END, NOR RELIABLY REPORT CENTRE.** Raw
+   * range 0 to 13952, with only 6 of 106 messages reading exactly 8192. A
+   * layout that assumes a released wheel reports centre is asserting something
+   * this instrument does not do.
+   */
+  const bend = createFader({
+    label: 'pitch', min: 0, max: 16383, value: 8192,
+    title: 'pitch bend. Seven bit in a fourteen bit message, and it was measured '
+         + 'reaching 13952 rather than 16383',
+    disabled: true,
+  });
+  /** Measured: CC 1, values 57 to 127 seen, which is the documented default. */
+  const mod = createFader({
+    label: 'mod', min: 0, max: 127, value: 0,
+    title: 'the modulation wheel, CC 1', disabled: true,
+  });
+  wheels.append(bend.el, mod.el);
+
+  /**
+   * ⚠️ OCTAVE AND TRANSPOSE ARE DRAWN AND ARE LIT BY NOTHING. The manual gives
+   * 11 octaves of range from these two, and `/dump/` saw no octave shift at
+   * all: the 25 notes measured were one contiguous run, so whatever was pressed
+   * either did not take or was undone before anything was played. **The octave
+   * step is unmeasured**, and a button that moved this drawing on a guess would
+   * be a page inventing a fact about an instrument.
+   */
+  const octDown = createPad({ label: '-', bottom: 'octave', latch: false, disabled: true,
+    title: 'octave down. Nothing this sends has ever been captured' });
+  const octUp = createPad({ label: '+', bottom: 'octave', latch: false, disabled: true,
+    title: 'octave up. Nothing this sends has ever been captured' });
+  wheels.append(octDown.el, octUp.el);
+  lower.append(wheels);
+
+  /**
+   * 🔴 THE KIT'S KEYBOARD, NOT A FOURTH COPY OF ONE. `createKeyboard` already
+   * knows where a black key sits on the join, which this project measured
+   * against real piano proportions rather than centring them.
+   * ⚠️ IT TAKES A LETTER MAP because its other callers are played from a
+   * computer keyboard. This one is a picture of somebody else's instrument, so
+   * the letters are off and the map is 25 slots of nothing but a note offset.
+   */
+  const keyMap = {};
+  const keyNames = [];
+  for (let i = 0; i < KEYS; i++) { keyMap[`k${i}`] = i; keyNames.push(`k${i}`); }
+  const keysBox = el('div', 'evo-keys');
+  const kbd = createKeyboard(keysBox, {
+    base: KEY_LO, map: keyMap, keys: keyNames, letters: false,
+    minBase: KEY_LO, maxBase: KEY_LO,
+  });
+  lower.append(keysBox);
+  panel.append(lower);
+
+  // ── the MIDI event log ──────────────────────────────────────────────────
+
+  /**
+   * 🔴 WHAT ARRIVED, IN COLUMNS, BESIDE THE PANEL IT MOVED. Asked 2026-09-21:
+   * *"add midi event logs to circuit and rack demos"*, and this page was built
+   * the same hour, so it carries the same table.
+   * 🔴 **THE READING NEVER REPLACES THE BYTES.** That is `/dump/`'s whole
+   * design and the reason `midi-decode.mjs` returns both: a relative encoder
+   * reads as a position if all you have is an interpretation, and the panel
+   * above is exactly an interpretation.
+   * ⚠️ **CLOCK AND ACTIVE SENSING ARE COUNTED AND NEVER LISTED.** `decode`
+   * flags them as a flood. A table that printed them would be a table nobody
+   * can read a second after the button is pressed.
+   */
+  const traffic = createMidiLog({ empty: 'press the status button, then play something' });
+  d.el.append(traffic.el);
+
+  // ── what arrives ────────────────────────────────────────────────────────
+
+  let access = null;
+  let notes = 0, vLo = null, vHi = null, bendRaw = null;
+  const chSeen = new Set(), ccSeen = new Set(), offGrid = new Set();
+  let flatSaid = false;
+
+  function paint() {
+    d.set('keys', notes || '');
+    d.set('velocity', vLo === null ? '' : vLo === vHi ? String(vLo) : `${vLo}-${vHi}`);
+    d.set('bend', bendRaw === null ? '' : bendRaw);
+    d.set('channel', chSeen.size ? [...chSeen].sort((a, b) => a - b).join(',') : '');
+  }
+
+  function take(b) {
+    const m = decode(b);
+    /* The log refuses a flood itself and says so by returning false, which
+       is the one place that policy lives. */
+    if (!traffic.add(m)) return;
+    if (m.ch !== null) chSeen.add(m.ch);
+
+    if (m.kind === 'note on' || m.kind === 'note off') {
+      /**
+       * 🔴 EVERY RELEASE ON THIS KEYBOARD IS A NOTE ON AT VELOCITY 0. Measured
+       * 25 times, and **not one real `0x80` in the whole capture**. Anything
+       * treating `0x90` as "on" leaves all 25 keys hanging, which is the trap
+       * `midi-decode.mjs` exists to close, and this instrument is the live
+       * example of it. The decoder has already resolved it above.
+       */
+      const idx = m.note - KEY_LO;
+      if (idx < 0 || idx >= KEYS) {
+        if (!offGrid.has(m.note)) {
+          offGrid.add(m.note);
+          d.log(`${noteName(m.note)}, note ${m.note}, is outside the 25 keys this `
+              + 'panel draws, so it is listed and not lit', 'warn');
+        }
+        return;
+      }
+      if (m.kind === 'note on') {
+        notes++;
+        vLo = vLo === null ? m.d2 : Math.min(vLo, m.d2);
+        vHi = vHi === null ? m.d2 : Math.max(vHi, m.d2);
+        kbd.lightNote(m.note, true);
+        if (!flatSaid && m.note < 48) {
+          flatSaid = true;
+          d.log('this keyboard is playing a semitone below where a 25 key '
+              + 'controller sits, which is a transpose on the device rather '
+              + 'than anything on this page', 'warn');
+        }
+      } else {
+        kbd.lightNote(m.note, false);
+      }
+      paint();
+      return;
+    }
+
+    if (m.kind === 'pitch bend') {
+      bendRaw = (m.d2 << 7) | m.d1;
+      bend.set(bendRaw, { from: 'hardware' });
+      paint();
+      return;
+    }
+
+    if (m.kind === 'control' && m.cc === 1) {
+      mod.set(m.d2, { from: 'hardware' });
+      return;
+    }
+
+    if (m.kind === 'control' && (m.cc === 0 || m.cc === 32)) return;   // the bank pair
+
+    if (m.kind === 'program') {
+      const p = buttons[m.d1];
+      if (p) p.flash(160);
+      else d.log(`program ${m.d1} arrived and this panel draws ten buttons`, 'warn');
+      return;
+    }
+
+    if (m.kind === 'control') {
+      ccSeen.add(m.cc);
+      let slot = knobCC.indexOf(m.cc);
+      if (slot < 0) {
+        slot = knobCC.indexOf(null);
+        if (slot < 0) return;             // nine controller numbers, eight knobs
+        knobCC[slot] = m.cc;
+        const subEl = knobs[slot].el.querySelector('.pos-knob-sub');
+        if (subEl) subEl.textContent = `CC ${m.cc}`;
+        d.log(`CC ${m.cc} took knob ${slot + 1}, which is the order it arrived in `
+            + 'rather than where it is on the panel');
+      }
+      knobs[slot].set(m.d2, { from: 'hardware' });
+    }
+  }
+
+  async function open() {
+    if (!navigator.requestMIDIAccess) {
+      d.log('this browser has no Web MIDI, so nothing can reach this panel', 'warn');
+      return false;
+    }
+    try {
+      access = await navigator.requestMIDIAccess({ sysex: false });
+      for (const p of access.inputs.values()) {
+        /* 🔴 `port.open()`, WHICH THE SPECIFICATION SAYS IS IMPLICIT AND IS
+           NOT RELIABLE. Measured 2026-09-20: four live instruments read as an
+           empty room because every port sat `connected/closed`. A page with
+           closed ports is pixel for pixel a page watching a silent one. */
+        try { await p.open(); } catch { /* another client may hold it */ }
+        p.onmidimessage = (e) => take(Array.from(e.data));
+      }
+      return true;
+    } catch (e) {
+      d.log(`MIDI was refused: ${e.message}`, 'warn');
+      return false;
+    }
+  }
+
+  const pres = createPresenceButton({
+    of: 'MK-425C', state: 'unknown',
+    can: ['unknown', 'checking', 'online', 'offline'],
+    press: () => d.run('listen'),
+  });
+  d.controls.hidden = false;
+  d.controls.append(pres.el);
+
+  d.on('listen', async () => {
+    pres.set('checking');
+    if (await open()) {
+      /* ⚠️ ONLINE MEANS A PORT WITH THIS NAME ON IT, NOT THAT MIDI WAS GRANTED.
+         Permission is a fact about the browser and presence is a fact about the
+         desk, and reporting the first as the second says `online` about an
+         empty room. */
+      const seen = [...(access?.inputs?.values() ?? [])]
+        .filter((i) => /mk-?4\d\dc|evolution/i.test(i.name || ''));
+      pres.set(seen.length ? 'online' : 'offline',
+        seen.length ? null : 'nothing with MK-425C in its name is plugged in');
+      d.log('this page only listens. Play a key, turn a knob, move either wheel, '
+          + 'and the panel follows it.');
+      d.log(`the global channel was measured at ${GLOBAL_CH} rather than 1, and every `
+          + 'control on this keyboard can carry its own, so the channel column is '
+          + 'worth watching.');
+    } else {
+      pres.set('offline', 'this browser would not open MIDI');
+    }
+    if (SELFCHECK) await d.run('check');
+  });
+
+  // ── checks ──────────────────────────────────────────────────────────────
+
+  d.on('check', async () => {
+    const ch = GLOBAL_CH - 1;
+    take([0x90 | ch, 47, 96]);                       // lowest key, measured range
+    take([0x90 | ch, 71, 45]);                       // highest key
+    take([0x90 | ch, 71, 0]);                        // a release, as this keyboard sends one
+    take([0xe0 | ch, 0x00, 0x40]);                   // bend, LSB 0 as measured
+    take([0xb0 | ch, 1, 100]);                       // mod wheel
+    for (const cc of KNOB_CC_SEEN) take([0xb0 | ch, cc, 64]);
+    take([0xb0 | ch, 32, 0]); take([0xb0 | ch, 0, 0]); take([0xc0 | ch, 3]);   // a button
+    take([0xf8]); take([0xfe]);                      // floods
+
+    d.assert('a visit opened nothing', SELFCHECK ? true : access === null,
+      access ? 'access taken after a press' : 'no MIDI access taken');
+
+    d.assert('the keyboard is 25 keys and it is drawn where the wire says',
+      kbd.notes().length === KEYS && kbd.notes()[0] === KEY_LO,
+      `${kbd.notes().length} keys from ${kbd.notes()[0]}`);
+
+    /**
+     * 🔴 THE ONE THAT MATTERS ON THIS INSTRUMENT. A release arrives as a note
+     * on at velocity 0 and there is no `0x80` anywhere in its traffic, so a
+     * page that took `0x90` for "on" would hold every key it was ever sent.
+     */
+    /* ⚠️ COUNTED OFF THE PAINTED KEYS, because the keyboard publishes no list
+       of what is held and an assert written against a method it does not have
+       would be satisfied by that absence. Two keys were struck and the higher
+       one was released, so exactly one stays down. */
+    const held = () => keysBox.querySelectorAll('.down').length;
+    d.assert('a note on at velocity 0 releases the key it lit',
+      held() === 1, `${held()} keys held after two on and one release`);
+
+    d.assert('the lowest key is a semitone below where a 25 key controller sits',
+      KEY_LO === 47 && flatSaid, `base ${KEY_LO}, said ${flatSaid}`);
+
+    d.assert('the bend is read little endian and fourteen bit',
+      bendRaw === 8192, String(bendRaw));
+
+    // ⚠️ AND THE NEGATIVE HALF, because a reader that returned a plausible
+    // number for any input would pass the line above.
+    take([0xe0 | ch, 0x7f, 0x7f]);
+    d.assert('and a full scale bend reads 16383, not 255',
+      bendRaw === 16383, String(bendRaw));
+
+    d.assert('the modulation wheel is CC 1 and moved',
+      mod.hardwareMoves() > 0, `${mod.hardwareMoves()} moves`);
+
+    d.assert('six measured controller numbers took six of the eight knobs',
+      knobCC.filter((c) => c !== null).length === KNOB_CC_SEEN.length,
+      `${knobCC.filter((c) => c !== null).length} bound`);
+
+    d.assert('and two knobs stay unbound rather than being given a number',
+      knobCC.filter((c) => c === null).length === KNOBS - KNOB_CC_SEEN.length,
+      `${knobCC.filter((c) => c === null).length} unbound`);
+
+    d.assert('a program change lit a button and the bank pair in front of it did not',
+      buttons[3] && !knobCC.includes(0) && !knobCC.includes(32),
+      `knob numbers ${knobCC.filter(Boolean).join(',')}`);
+
+    d.assert('the channel heard is reported rather than assumed',
+      [...chSeen].includes(GLOBAL_CH), `channels ${[...chSeen].join(',')}`);
+
+    d.assert('no flood reached the table',
+      !traffic.el.textContent.includes('F8') && !traffic.el.textContent.includes('FE'),
+      `${traffic.count()} rows`);
+
+    d.assert('every row kept its raw bytes beside the reading',
+      Array.from(traffic.el.querySelectorAll('.pos-tbl-row:not(.pos-tbl-head)'))
+        .every((t) => /[0-9A-F]{2}/.test(t.textContent)), `${traffic.count()} rows`);
+
+    if (d.el.isConnected) {
+      const keys = keysBox.getBoundingClientRect();
+      const wheelR = wheels.getBoundingClientRect();
+      d.assert('the wheels stand to the left of the keys and end on their line',
+        wheelR.right <= keys.left + 1 && Math.abs(wheelR.bottom - keys.bottom) < 24,
+        `${(keys.left - wheelR.right).toFixed(1)} px apart, `
+        + `${(wheelR.bottom - keys.bottom).toFixed(1)} px of foot`);
+
+      /* The panel scrolls in its own box, never the document. Measured on this
+         project at 390 px as 141 px of page overflow when it does not. */
+      d.assert('the panel scrolls sideways inside its own box, not the page',
+        document.documentElement.scrollWidth <= window.innerWidth + 1,
+        `page ${document.documentElement.scrollWidth} against ${window.innerWidth}`);
+    }
+
+    d.assert('no secret in this page', !location.href.includes('token'));
+  });
+
+  paint();
+  d.ready();
+</script>
