@@ -760,15 +760,23 @@
   const bar = createTransportBar(d.el, deck, {
     absolute: true, scrub: false, endStop: false, live: true,
     /**
-     * 🔴 THE RATES ARE BACK, AND THEY DRIVE THE LOOP RATHER THAN THE PLAYHEAD.
-     * The note further down says this deck has no lattice because its position
-     * is wall clock, which is true and was the wrong conclusion: the rate row
-     * was never about the playhead here, it is about the seconds the page KEEPS.
-     * Under a loop these chew the loop; with no loop running they have nothing
-     * to act on, which is what `disabled` is for rather than absence.
+     * 🔴 NO RATE ROW, AND THIS PAGE SPENT WEEKS DESCRIBING ONE IT DID NOT HAVE.
+     * It passed `rates: [0.25, 0.5, 1]` with `onRate` beside it, under a
+     * confident note beginning *"THE RATES ARE BACK, AND THEY DRIVE THE LOOP
+     * RATHER THAN THE PLAYHEAD"*. **`rates` is not an option of
+     * `createTransportBar`**: it is not in the destructured parameter list and
+     * there is no rest parameter, so it was dropped in silence, `onRate` could
+     * never fire, and `.tbar-rates` was empty and hidden by `:empty` because the
+     * page declares no `caps` either.
+     *
+     * ⚠️ DELETED RATHER THAN WIRED UP, WHICH IS A CHOICE AND NOT THE SMALLER
+     * JOB. A playback rate is a claim about a POSITION inside a sound, and this
+     * deck's position is wall clock on a live stream. The thing the note wanted
+     * to slow down is the LOOP, and the loop already has its own control: one
+     * button glued to LOOP cycling → ← ⇆, right below. A second way to chew the
+     * same seconds, in a row that has never been on screen, is not a feature
+     * this page was missing.
      */
-    rates: [0.25, 0.5, 1],
-    onRate: (r) => looper.setRate(r),
     /**
      * 🔴 ONE BUTTON, GLUED TO THE RIGHT OF LOOP, CYCLING → ← ⇆. ASKED FOR IN
      * THOSE WORDS: *"looper mode is → | ← | ⇆ and its a part of loop button
