@@ -1,167 +1,127 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>mirror · positron</title>
+<title>mirror positron</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 14px; }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 720px) { .panes { grid-template-columns: 1fr; } }
-  .pane { position: relative; background: var(--card2); border-radius: 8px; overflow: hidden; }
-  .pane canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; }
-  .bar .lab { font: 500 11px/1 var(--mono); color: var(--dim); }
-  .bar .lab b { color: var(--hi); font-weight: 500; }
-  .pane .none {
+  /* The line a pane shows while it has no picture in it. It goes INSIDE the
+     panel's own picture area, which the kit already makes `position:
+     relative`, so it covers the picture and never the row of facts under it. */
+  .none {
     position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
     font: 400 12px/1.7 var(--mono); color: var(--dim); padding: 18px;
   }
-  /* The bar belongs to its pane, so the numbers sit with the ink they describe
-     rather than in a table somewhere else — which is what makes a legend
-     necessary. */
-  .bar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 7px 9px; background: var(--card2); border-top: 1px solid var(--line);
-    font: 400 11px/1.5 var(--mono); color: var(--dim);
+  /* 🔴 THE FOOTER IS A ROW OF CELLS, AND IT USED TO BE ONE GLUED STRING.
+     It read the renderer's name, then the word `locked`, then `29.9 fps`, all
+     strung onto one line with a separator between them, and the separator
+     existed only because the values had been joined before anybody asked what
+     they were. Reported on sight, with a photograph. A cell carries its own
+     key, so there is nothing left to join, and each value sits
+     in a box reserved for the widest reading it can ever show, so a digit
+     changing moves nothing beside it.
+     ⚠️ IT SCROLLS RATHER THAN DRAGGING THE PAGE SIDEWAYS. `overflow-x` cannot
+     shrink a flex item below its content without `min-width: 0`, and CLAUDE.md
+     records the measurement: 390 px of screen gave 141 px of document overflow
+     with that half missing. Both properties or neither.
+     ⚠️ AND IT IS NOT SELECTABLE. These numbers sit a thumb's width from the ⛶,
+     so every long press here is a miss rather than a copy: photographed on an
+     iPhone with selection handles dragged across `30.0 fps`. shell.css keeps
+     readouts selectable as a rule; this row is the exception because it is part
+     of a control strip. */
+  /* The control group: the four things that change both pictures.
+     🔴 TWO BY TWO, AND IT WAS A WRAPPED ROW. Asked as *"look should controls
+     should be 2x2 controls grid"*. `flex-wrap` fitted `LOOK`, `MIRRORS` and
+     `GRAIN` onto one line and dropped `HUE` alone underneath, which is a shape
+     nobody chose: it is whatever the four widths happened to add up to at this
+     window size, and it changes as the window moves. Two columns by two rows is
+     a decision, and `LOOK MIRRORS` over `GRAIN HUE` is the reading order the
+     controls are already in.
+     ⚠️ NOTHING HERE SAYS HOW WIDE A CONTROL IS. shell.css already puts each kit
+     row's label on top under 560 px and gives its options the whole width, so
+     the phone case only has to stop being two columns. A media query of this
+     page's own about widths would be a fourth copy of a decision the stylesheet
+     already makes for every page.
+     ⚠️ `flex-basis: 100%` IS WHAT PUTS IT ON ITS OWN LINE, and that is the
+     other half of the ask below: the group above can only have air under it if
+     there is something under it. */
+  .knobs {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px;
+    align-items: center; min-width: 0; flex-basis: 100%;
+    /* 🔴 MORE AIR UNDER THE HEADSET BUTTONS, AND THIS IS THE PAGE SAYING SO.
+       Asked as *"add more space under them"*: the two session buttons sat 8 px
+       above `LOOK`, which is `.pos-controls`' own gap, so six controls read as
+       one block instead of as two kinds of thing. `.pos-controls` is one flex
+       row with one gap, so raising it there would move every control row in the
+       project for a claim about this one relationship. 14 px on top of the
+       row's 8 makes 22, which is the single vertical rhythm `.pos-body` already
+       uses between two blocks, so this is the project's own number rather than
+       a new one. */
+    margin-top: 14px;
   }
-  .bar .n { color: var(--fg); }
-  .bar .sp { margin-left: auto; }
-  .bar button {
-    font: 400 11px/1 var(--mono); color: var(--dim);
-    background: transparent; border: 1px solid var(--line); border-radius: 4px;
-    padding: 4px 8px; cursor: pointer;
+  /* 🔴 ONE LABEL COLUMN, BECAUSE COLUMNS MAKE A RAGGED EDGE VISIBLE. In a
+     wrapped row nobody could see that `LOOK`, `MIRRORS`, `GRAIN` and `HUE` are
+     four different widths. Stacked in two columns their labels sit directly
+     above each other and every segment starts at a different x.
+     ⚠️ IT IS A PIXEL FLOOR, NOT `7ch`, AND THE REASON IS THAT THE TWO LABELS
+     ARE NOT THE SAME TYPE. `.pos-choice-l` is 9.5 px tracked at .1em and
+     `.pos-pick-l` is 11 px tracked at .06em, so one `ch`-based rule reserves
+     two different widths and lines nothing up. 48 px is `MIRRORS`, the widest
+     of the four, MEASURED in this browser rather than computed; the check in
+     this page compares the four left edges, so a label that outgrows it says so
+     rather than quietly going ragged again.
+     ⚠️ WIDE ONLY. Under 560 px both labels are `display: block` on their own
+     line and there is no column to share. */
+  .knobs .pos-choice-l, .knobs .pos-pick-l { min-width: 48px; }
+  @media (max-width: 560px) {
+    .knobs { grid-template-columns: 1fr; gap: 12px; width: 100%; }
+    .knobs .pos-choice-l, .knobs .pos-pick-l { min-width: 0; }
   }
-  .bar button:hover { color: var(--fg); border-color: var(--dim); }
-  .bar button.ico { font-size: 14px; line-height: 1; padding: 3px 8px; }
-  /* One row, two groups. They sit ABOVE both pictures because they change both
-     — a control that belongs to one pane goes in that pane's bar, and these do
-     not. */
-  .knobs { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; margin: 18px 0 16px; }
-  .knob { display: flex; align-items: center; gap: 8px; }
-  /* ⚠️ THE SAME KEY STYLE AS THE READOUT, copied from shell.css's `.pos-k` rather
-     than invented: these name a value the way every other label on every other
-     page here names one, and a second convention for the same job is how a set
-     of pages stops looking like one thing. */
-  .knob > span {
-    font: 500 9.5px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  .facts {
+    display: flex; align-items: baseline; gap: 14px; min-width: 0;
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  .facts::-webkit-scrollbar { display: none; }
+  .fact { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+  /* ⚠️ THE SAME KEY STYLE AS THE READOUT AND THE KIT'S OWN CONTROL LABELS,
+     copied from `.pos-k` rather than invented: these name a value the way every
+     other label in the project names one, and a second convention for one job
+     is how a set of pages stops looking like one thing. */
+  .fact-k {
+    font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
     color: var(--dim2);
   }
-  .knob .seg { display: flex; gap: -1px; }
-  .knob button {
-    font: 400 11px/1 var(--mono); color: var(--dim);
-    background: transparent; border: 1px solid var(--line);
-    padding: 5px 10px; cursor: pointer;
+  /* `tabular-nums` is what makes the reserved width exact: without it a 1 is
+     narrower than a 0 and the number still shifts inside its own box. */
+  .fact-v {
+    font: 400 11px/1.4 var(--mono); color: var(--fg);
+    font-variant-numeric: tabular-nums;
   }
-  .knob button:first-of-type { border-radius: 4px 0 0 4px; }
-  .knob button:last-of-type { border-radius: 0 4px 4px 0; }
-  /* ⚠️ OVERLAP, DO NOT DROP THE BORDER. The segmented look used
-     `border-left: none` on every button after the first, which is fine while
-     the chosen state is a FILL and wrong the moment it is a border: the chosen
-     pill would be missing its left edge and read as half-drawn. A -1px margin
-     puts the two borders on the same pixel, and z-index decides which is on
-     top — which is the chosen one. */
-  .knob button + button { margin-left: -1px; }
-  .knob button[aria-pressed="true"] {
-    color: var(--hi); border-color: var(--hi); background: transparent;
-    position: relative; z-index: 1;
-  }
-  /* ⚠️ Focus is GREY here. shell.css focuses with `var(--hi)`, the same colour
-     as the chosen state, so a focused-but-unchosen button read as chosen — the
-     exact trap the box page already paid for. */
-  .knob button:focus-visible { outline: 2px solid var(--dim); outline-offset: 1px; }
-  /* ⚠️ In fullscreen the PANE is the fullscreen element, so the canvas has to be
-     told to fill it — a canvas keeps its attribute size otherwise and sits in
-     the middle of a black screen at 640x360. `contain`, never `cover`: this is a
-     picture with a centre and cropping it is not a style choice.
-
-     ⚠️ AND THE GRID SIZES THE ROWS, NOT A GUESSED NUMBER. This said
-     `height: calc(100vh - 34px)` as well as `grid-template-rows: 1fr auto`,
-     which counts the bar TWICE: the grid reserves its real height and the
-     canvas then also reserves 34px of it, pushing the bar off the bottom of the
-     screen. The numbers were clipped away in fullscreen — the half that says
-     whether what you are looking at is arriving properly. `1fr` plus
-     `min-height: 0` lets the row be exactly what is left. */
-  .pane.pos-full { background: #000; display: grid; grid-template-rows: 1fr auto; }
-  .pane.pos-full canvas {
-    width: 100%; height: 100%; min-height: 0;
-    object-fit: contain; aspect-ratio: auto;
-  }
-  .pane.pos-full .bar { padding: 10px 14px; font-size: 12px; }
-  /* ⚠️ The knob row lives ABOVE both panes, which means it is not inside the
-     element that goes fullscreen — so it simply vanishes, and the picture you
-     went fullscreen to look at becomes the one you cannot change. It is moved
-     into the fullscreen pane's own bar instead.
-
-     ⚠️ AND A THREE-COLUMN GRID, NOT `margin: 0 auto`. Auto margins centre a
-     thing in what is LEFT OVER, and the numbers on the left are much wider than
-     the button on the right — so the knobs sat visibly right of centre on a
-     screen where the middle is the one place the eye expects them. `1fr auto
-     1fr` puts the middle column at the centre of the bar regardless of what
-     flanks it. */
-  .bar .knobs { margin: 0; gap: 18px; }
-  .bar .knob button { padding: 4px 9px; }
-  .pane.pos-full .bar {
-    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
-  }
-  /* The flex spacer has no job in a grid, and an empty cell would shift the
-     columns by one. */
-  .pane.pos-full .bar .sp { display: none; }
-  .pane.pos-full .bar .knobs { justify-self: center; }
-  .pane.pos-full .bar button.ico { justify-self: end; }
-  /* 🔴 TWO ROWS WHERE ONE WILL NOT FIT, and the knobs get the whole width.
-     Below this the three knob groups alone are wider than the screen, so a
-     one-line bar is not a thing that exists here and insisting on it is how the
-     numbers ended up over the buttons. The controls are the REASON this bar is
-     in fullscreen at all — the note above says so: without them "the picture
-     you went fullscreen to look at becomes the one you cannot change" — so they
-     take the row that can hold them, and the numbers sit above with the ⛶.
-     ⚠️ The breakpoint is where the one-line bar actually stops fitting, not a
-     device width. */
-  @media (max-width: 720px) {
-    .pane.pos-full .bar {
-      grid-template-columns: 1fr auto;
-      grid-template-areas: 'stat ico' 'knobs knobs';
-      row-gap: 8px;
-    }
-    .pane.pos-full .bar .left { grid-area: stat; overflow: hidden; }
-    .pane.pos-full .bar button.ico { grid-area: ico; }
-    .pane.pos-full .bar .knobs {
-      grid-area: knobs; justify-self: stretch;
-      display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px;
-    }
-  }
-  /* ⚠️ THE BAR IS ONE LINE OR IT IS NOT A BAR — ON A SCREEN WIDE ENOUGH FOR
-     ONE. Left to itself the flex row wraps, and a footer that becomes two lines
-     in fullscreen pushes the picture up and reads as a layout that has come
-     apart. The claim that followed — "nothing in here is long enough to need
-     wrapping" — was written on a laptop and is FALSE ON A PHONE, and the way it
-     failed is the worst available: `nowrap` plus a `1fr` column that cannot
-     shrink means the numbers OVERFLOW THEIR OWN COLUMN and paint on top of the
-     knobs. PHOTOGRAPHED in fullscreen on an iPhone: `Apple GPU · coarse ·
-     locked · 29.9 fps` drawn straight through the middle row of buttons, two
-     texts in one place, neither readable.
-     ⚠️ `min-width: 0` is the half that stops the overflow — a grid item's
-     default `min-width: auto` refuses to shrink below its content, which is
-     what turned "too narrow" into "on top of". The narrow layout below is the
-     half that keeps both things readable. */
-  .bar, .bar .left, .bar .stat, .bar .knobs, .lab { white-space: nowrap; }
-  .pane.pos-full .bar > * { min-width: 0; }
-  .bar .left { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  /* The numbers sit a thumb's width from the ⛶, so every long press here is a
-     miss rather than a copy — photographed on an iPhone, selection handles
-     dragged across "30.0 fps". shell.css keeps readouts selectable as a rule;
-     this bar is the exception because it is a control strip. */
-  .bar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-  /* In the bar the label is not a floating caption any more, so it drops the
-     plate it needed to stay readable over a picture. */
 </style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createPicker } from '/shell/picker.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { XR_MODE, canEnter, reasonFor, onXrCaps } from '/shell/xr-caps.mjs';
+  import { createPresence } from '/shell/presence.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+  // 🔴 TWO PANEL COMPONENTS, ON PURPOSE, AND NEITHER IS THE OTHER'S LEFTOVER.
+  // `video-panel.mjs` is the DOM panel and it draws the two panes on the FLAT
+  // PAGE: real elements, a footer of real cells, the kit's own fullscreen
+  // button and a second storey under it while it is full. `panel.mjs` draws a
+  // panel INTO A CANVAS, and that is what a panel hung in a HEADSET is: a
+  // framebuffer holds no text, so the footer there has to be laid out as pixels
+  // and uploaded as a texture every time a number moves. Neither can do the
+  // other's job, so deleting either one takes half this page with it.
+  import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createPanel, createPanelFooter, FOOT } from '/shell/panel.mjs';
   import { createXRPanels, beacon, facing, barOf, grabOffset, heldAt, PLACE } from '/shell/xr-panel.mjs';
   import { pickQuad } from '/shell/xr-pick.mjs';
-  import { toggle as toggleFull, watch as watchFull, support as fullSupport } from '/shell/fullscreen.mjs';
   import { format, parse, randomId, RELAY_BASE } from '/shell/wire.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
@@ -171,200 +131,321 @@
 
   const d = mount({
     name: 'mirror',
-    what: 'The same picture drawn twice from the same shader: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Put a headset on and both hang in front of you on a dotted floor, the left one drawn by the headset itself rather than copied across, and either can be picked up by the bar under it and moved. Under each is what it costs.',
+    // 🔴 ONE SENTENCE, AND IT IS THE INDEX'S OWN LINE, VERBATIM. A page with a
+    // diagram says what it is once and lets the picture at the bottom carry the
+    // machinery: a paragraph and a drawing of the same thing are two
+    // explanations and the paragraph is the weaker of them. This was FOUR
+    // sentences and 62 words, PHOTOGRAPHED on an iPhone as the top half of the
+    // screen before anything could be pressed.
+    what: 'The same shader drawn by your browser and by a Raspberry Pi, side by side.',
     // ⚠️ NO SHELL READOUT. Every number here belongs to ONE of the two pictures,
-    // so it goes in that picture's own bar rather than in a row above both —
+    // so it goes in that picture's own footer rather than in a row above both:
     // joining a figure to its ink across two elements is exactly what makes a
     // legend necessary, and a single row under two panes cannot say which pane
     // it means without repeating the word every time. The machine surface is
     // `__demo.panes`, set below.
     readout: {},
-    // ⚠️ ONE CONTROL, AND IT IS THE ONE THAT CANNOT HAPPEN BY ITSELF. The board
-    // is asked to draw on connect and the checks run themselves — see
-    // `runChecks` — because a page whose first act is asking you to press
-    // something is a page that shows you nothing, and demo/verify-gl.mjs
-    // therefore waits for `__demo.ready` rather than relying on a press.
-    // Entering a headset is the exception: `requestSession` needs a user
-    // gesture and there is no way to ask for one politely, so it gets a button.
-    //
-    // 🔴 IT IS DECLARED HERE RATHER THAN APPENDED TO THE ROW. `verify-gl.mjs`
-    // presses `.pos-controls button` and nothing else — a control anywhere else
-    // is never exercised and its asserts never run. This page has already paid
-    // for that once: the look stepper sat in the knob row for one revision and
-    // the assert count went 9 -> 7 while the page read GREEN.
-    // 🔴 BOTH KINDS OF SESSION, THE WAY `scene` OFFERS THEM. Passthrough is
-    // not a variant of VR here: it composites over your actual room, it is the
-    // only mode in which a Quest hands over the surfaces it has measured, and
-    // with the walls off it is where this page's floor and panels are doing the
-    // whole job. One entry path, one word different — see `enter` in
-    // shell/xr-panel.mjs.
-    controls: [
-      { id: 'xr', label: 'Run in VR' },
-      { id: 'ar', label: 'Run in AR' },
-    ],
+    /**
+     * 🔴 THE ROW IS FILLED BY THIS PAGE, AND IT IS STILL `.pos-controls`. Both
+     * harnesses press `.pos-controls button`, which is a DESCENDANT selector,
+     * so a group mounted inside that row keeps every button pressable while a
+     * row of controls anywhere else is a subject the suite cannot reach. This
+     * page has paid for that once already: the look stepper sat in the knob row
+     * for one revision and the assert count went 9 to 7 while the page read
+     * GREEN.
+     * ⚠️ `mount()` HIDES A ROW IT PUT NOTHING IN, which is the standing rule
+     * about a container with nothing in it not painting its edges. This one is
+     * filled a few lines down, so it is shown again rather than left as a band
+     * of dead space that is about to have five controls in it.
+     */
+    controls: [],
   });
   guard(d);
+  d.controls.hidden = false;
+
+  /**
+   * 🔴 THE TWO SESSION CONTROLS ARE ONE KIT COMPONENT NOW, AND THIS WAS THE ONE
+   * XR PAGE WITH NO CAPABILITY PROBE AT ALL. `Run in VR` and `Run in AR` were
+   * live buttons on a phone that has no WebXR, so the only way to find out was
+   * to press one and watch nothing happen. `xr-caps.mjs` answers `absent` in
+   * the same turn wherever there is nothing to ask, which is every iPhone, and
+   * the group switches the control off WITH THE REASON IN WORDS: a grey control
+   * with no explanation reads as a broken page rather than as a browser that
+   * cannot do the thing.
+   *
+   * 🔴 THE ID IS `vr` AND IT WAS `xr`. Four XR pages had three spellings for
+   * one control, so a check written against one could not be read against
+   * another.
+   *
+   * ⚠️ PREPENDED, NOT APPENDED, AND THE ORDER IS LOAD-BEARING. The harness
+   * presses this row in DOM order and `settleMs` only ever lands on control 0,
+   * so the session controls stay at the front of it.
+   */
+  const xrGroup = createButtonGroup({
+    buttons: [
+      { id: 'vr', label: 'Run in VR' },
+      { id: 'ar', label: 'Run in AR' },
+    ],
+    // Through `d.run`, so the handlers stay where handlers live: `d.on('vr')`
+    // and `d.on('ar')` below are registered the way every other control on
+    // every other page here is.
+    onPress: (id) => d.run(id),
+  });
+  d.controls.prepend(xrGroup.el);
+  // 🔴 SUBSCRIBED, NOT READ ONCE. `isSessionSupported` is a promise, so a
+  // button decided at load would be decided on `asking` every time. `onXrCaps`
+  // fires at once with what is known and again on every change, and `canEnter`
+  // counts `asking` as yes, so nothing is ever greyed out on a guess.
+  onXrCaps((c) => {
+    xrGroup.enable('vr', canEnter(c.vr), reasonFor(c.vr, 'vr'));
+    xrGroup.enable('ar', canEnter(c.ar), reasonFor(c.ar, 'ar'));
+  });
+
+  /**
+   * 🔴 TWO CELLS A FOOTER, AND FOR ONE SESSION THERE WERE FIVE. What a pane
+   * says under it is WHAT DREW IT and HOW FAST, which is what it said before
+   * anybody touched this page. The move to `video-panel.mjs` also added `clock`
+   * here and `kbit/s` and `lost` over there, and none of that was asked for:
+   * *"you broke video footer. i never asked this info added"*. A cell has to
+   * earn its place, and three of those five were earning a reader's attention
+   * without being anything a reader had come for.
+   *
+   * ⚠️ AND NONE OF THE THREE WAS DELETED, WHICH IS THE HALF THAT MATTERS.
+   * Whether this pane is running on its own count or on the board's, how many
+   * kbit/s are actually arriving and how many frames the relay dropped are all
+   * real, and the relay dropping frames with no error anywhere is the reason
+   * that counter exists at all. They are in the LOG and on the BEACON now,
+   * which is where this page already puts facts about a session: see
+   * `sayLinkRate`, `sayLinkLost` and the two lock lines.
+   *
+   * ⚠️ BOTH FOOTERS CARRY THE SAME TWO, ON PURPOSE. Two footers of different
+   * lengths under two pictures being compared read as two different kinds of
+   * thing, which is the argument the headset panels' own footers already lost.
+   *
+   * The third number in the triple is the width the value is held at, in
+   * characters, so a figure that changes every second cannot move the figure
+   * beside it.
+   *
+   * ⚠️ EVERY CELL IS ALWAYS DRAWN, EVEN BEFORE IT HAS A VALUE. Building a
+   * footer from only the facts that happen to be known means the first cell
+   * starts at the left edge and JUMPS right the moment a frame rate lands. An
+   * empty value under its own key says "not measured yet", which is true, where
+   * an absent cell says nothing at all and a zero would be a very confident
+   * measurement of nothing.
+   */
+  const FIELDS = {
+    here: [['picture', 'picture', 0], ['fps', 'fps', 5]],
+    box: [['picture', 'picture', 0], ['fps', 'fps', 5]],
+  };
+  const FMT = {
+    picture: (v) => String(v),
+    fps: (v) => v.toFixed(1),
+  };
+  // ⚠️ THE MACHINE COPY, WRITTEN FROM THE SAME VALUES IN THE SAME CALL. Two
+  // places that can disagree is how a readout ends up describing something the
+  // page is not doing. It is built HERE rather than further down because
+  // `relabel` writes into it while the panes are still being made, and this
+  // file has already been bitten three times by reading something before its
+  // line ran.
+  window.__demo.panes = { here: {}, box: {} };
 
   const panes = el('div', 'panes');
-  const mk = (title) => {
-    const p = el('div', 'pane');
+  /**
+   * One pane: a picture, a row of facts under it, and the way to fill the
+   * screen with it.
+   *
+   * 🔴 IT IS `video-panel.mjs` AND IT USED TO BE A HAND-ROLLED BAR. That bar
+   * carried its own fullscreen button, its own three-column layout, its own
+   * narrow-screen rearrangement and a routine that dragged the page's controls
+   * into it, every one of which the kit now owns. `fullMode: 'footer'` keeps
+   * the row of facts on screen while the panel is full, the ⛶ in that row is
+   * the way back out on a phone with no Escape key, and `under()` carries this
+   * page's own controls into a second storey beneath it.
+   */
+  const mk = (which) => {
     const c = el('canvas');
     c.width = W; c.height = H;
-    const lab = el('div', 'lab');
-    lab.innerHTML = title;
-    // The bar under each picture: that picture's numbers, and the one control
-    // that belongs to a picture rather than to the page.
-    const bar = el('div', 'bar');
-    // A group, so the label and the numbers occupy ONE cell when the bar
-    // becomes a three-column grid in fullscreen — otherwise the label takes a
-    // column of its own and the knobs stop being in the middle.
-    const left = el('span', 'left');
-    const nums = el('span', 'stat', '');
-    // Label first, numbers after: what drew it, then how it is going.
-    left.append(lab, nums);
-    // ⛶ U+26F6 SQUARE FOUR CORNERS — the conventional fullscreen glyph, and it
-    // renders as text rather than as an emoji, so it takes the bar's colour and
-    // sits on its baseline instead of arriving as a coloured picture at a size
-    // of its own. `title` and `aria-label` carry the meaning for anyone the
-    // glyph does not reach.
-    const full = el('button', 'ico', '⛶', { type: 'button', title: 'fullscreen', 'aria-label': 'fullscreen' });
-    // ⚠️ FULLSCREEN THE PANE, NOT THE CANVAS. A fullscreen canvas takes the bar
-    // with it or loses it entirely, and the numbers are the half that says
-    // whether what you are looking at is arriving properly.
-    // 🔴 `p.requestFullscreen?.()` WAS A BUTTON THAT DID NOTHING ON AN IPHONE.
-    // Safari there has no element Fullscreen API — not standard, not prefixed —
-    // so the optional chain skipped straight past it: no throw, no catch, no
-    // log line, no picture. An inert control that looks live is the failure
-    // this repo keeps writing rules about, and optional chaining is a good way
-    // to build one. shell/fullscreen.mjs tries the real API, falls back to a
-    // position:fixed cover that needs no API at all, and SAYS WHICH RAN.
-    full.onclick = async () => {
-      const how = await toggleFull(p);
-      syncFull();
-      if (how !== 'exit') d.log(`fullscreen · ${how === 'element' ? 'the browser\u2019s own' : 'drawn by the page, this browser has no fullscreen'}`);
-    };
-    watchFull(p, () => syncFull());
-    bar.append(left, el('span', 'sp'), full);
-    p.append(c);
-    const wrap = el('div', 'pane');
-    wrap.style.position = 'static';
-    panes.append(p);
-    p.append(bar);
-    return { p, c, lab, nums, full, left };
+    const factsEl = el('span', 'facts');
+    const facts = new Map();
+    for (const [key, label, reserve] of FIELDS[which]) {
+      const cell = el('span', 'fact');
+      const val = el('span', 'fact-v', '');
+      if (reserve) val.style.minWidth = `${reserve}ch`;
+      cell.append(el('span', 'fact-k', label), val);
+      factsEl.append(cell);
+      facts.set(key, val);
+    }
+    /**
+     * 🔴 ONLY THE FAR PANE GETS A PRESENCE DOT, AND THAT IS THE WHOLE POINT OF
+     * THE SLOT. The fact worth having about a Raspberry Pi in another building
+     * is whether it is answering. The same dot under the left picture would be
+     * a badge about the browser you are reading this in, which can never say
+     * anything but online, and a control with one honest state is the shape
+     * this project calls a lie.
+     */
+    const pres = which === 'box'
+      ? createPresence({ of: 'the Raspberry Pi', mode: 'dot', state: 'unknown' })
+      : null;
+    const panel = createVideoPanel({
+      media: c,
+      left: pres ? pres.el : false,
+      centre: factsEl,
+      fullMode: 'footer',
+      // 🔴 IT ASKS WHICH PANE IS FULL RATHER THAN BELIEVING THE ONE THAT
+      // SPOKE, AND THAT IS NOT TIDINESS. A `fullscreenchange` is a DOCUMENT
+      // event, so both panels hear every one of them: the pane going full
+      // reports `true` and the other reports `false` in the same turn, and
+      // whichever spoke last would have decided. With two panels on the page
+      // that means the second one hands the controls straight back out of the
+      // first, which is a row that vanishes at the moment it is needed.
+      onFull: () => handControls(),
+    });
+    panes.append(panel.el);
+    return { c, panel, facts, pres };
   };
-  // ⚠️ THE LABEL NAMES THE THING THAT DREW THE PICTURE, not the side of the
-  // screen it is on. "here" and "the box" say where to look; the chip says what
-  // you are looking at, which is the comparison the page exists to make. Until
-  // each end reports, it says what it can.
-  // ⚠️ SHORT ENOUGH FOR THE PANE IT SITS ON. "on a Raspberry Pi, over the
-  // internet" wrapped onto a second line across a 340-pixel pane, and a caption
-  // that needs two lines to say where a picture came from is covering the
-  // picture to do it. The journey is already in the paragraph above and in the
-  // kbit/s under the pane; the label only has to name the far end.
-  // ⚠️ NO ARTICLES IN A LABEL. "a Raspberry Pi" reads as prose in a slot that is
-  // a name — and next to a chip string like "Apple M2 Pro" the mismatch is
-  // obvious. A label names a thing; it does not introduce it.
+  // ⚠️ THE PICTURE NAMES THE THING THAT DREW IT, not the side of the screen it
+  // is on. "here" and "the box" say where to look; the chip says what you are
+  // looking at, which is the comparison the page exists to make. Until each end
+  // reports, it says what it can.
+  // ⚠️ NO ARTICLES. "a Raspberry Pi" reads as prose in a slot that is a name,
+  // and beside a chip string like "Apple M2 Pro" the mismatch is obvious.
   const WHERE = { here: 'your browser', box: 'Raspberry Pi' };
   const chip = { here: null, box: null };
+  /**
+   * ⚠️ NAME THE CHIP, NOT THE FIRST COMMA, AND DO IT FOR BOTH ENDS. Splitting
+   * "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)" on
+   * its first comma leaves the word "Apple", which says nothing at all; the part
+   * worth printing is what follows "Renderer:".
+   * ⚠️ AND IT IS CAPPED, because this is one cell in a row three slots wide. A
+   * driver is free to hand back forty characters, and a name that long pushes
+   * the row past what a half-page footer can show. 24 fits every string either
+   * end has been measured reporting, and a longer one is cut rather than
+   * allowed to take the whole footer.
+   */
+  const shortChip = (s) => {
+    const m = String(s).match(/Renderer:\s*([^,)]+)/)?.[1]
+      ?? String(s).replace(/^ANGLE \(|\)$/g, '');
+    return m.trim().slice(0, 24);
+  };
   // ⚠️ DECLARED HERE BECAUSE `relabel` READS IT, and `relabel` is called while
   // the panes are being built. A `let` further down is in the temporal dead
-  // zone until its line runs, so the first call threw at module scope — a blank
+  // zone until its line runs, so the first call threw at module scope: a blank
   // page, no asserts, and a harness reporting "the page reports no renderer".
   // Second time in this file; the first was `knobRow`.
   let lockedFrame = null, lockedAt = 0;
-  /**
-   * ⚠️ THE LABEL LIVES IN THE BAR, ALWAYS — not floating over the picture, and
-   * not only once you are in fullscreen. It was drawn on top of the thing it
-   * describes, which covers the corner of a picture whose whole point is to be
-   * compared with the one beside it; and it then MOVED into the bar in
-   * fullscreen, so the page had two layouts for one label and you learned the
-   * second one by accident.
-   *
-   * 🔴 AND IT SAID "a Raspberry Pi — a Raspberry Pi". The name falls back to the
-   * same string `WHERE` holds, so before the board reported its chip both
-   * halves were identical — visible in the screenshot that prompted this. The
-   * side is already named by WHICH PANE IT IS; the label only has to say what
-   * drew it.
-   */
-  function relabel(which) {
+
+  /** Write one pane's cells out of the machine copy, so the two cannot differ. */
+  function paintFacts(which) {
     const pane = which === 'here' ? local : far;
-    const known = chip[which];
-    const lock = which === 'here' && lockedFrame !== null ? ' · locked' : '';
-    pane.lab.innerHTML = '';
-    if (known) pane.lab.append(el('b', '', known), document.createTextNode(lock));
-    else pane.lab.append(document.createTextNode(WHERE[which] + lock));
+    const v = window.__demo.panes[which];
+    for (const [key] of FIELDS[which]) {
+      const val = pane.facts.get(key);
+      const has = v[key] !== null && v[key] !== undefined && v[key] !== ''
+        && !(typeof v[key] === 'number' && !Number.isFinite(v[key]));
+      val.textContent = has ? FMT[key](v[key]) : '';
+    }
   }
-  const local = mk('');
-  const far = mk('');
-  relabel('here'); relabel('box');
-  const farNone = el('div', 'none', 'Waiting…');
-  far.p.append(farNone);
-  d.el.prepend(panes);
 
   /**
-   * ⚠️ TWO KNOBS, AND THEY DRIVE BOTH PANES. A control that moved only the
-   * local picture would break the one claim this page makes — that the two
-   * sides are the same shader — and would do it invisibly, because the panes
-   * would simply stop matching and look like a bug. So each press sets the
-   * local uniform AND sends `video.params` to the box.
+   * 🔴 THE NAME AND THE CLOCK ARE TWO CELLS, AND THEY USED TO BE ONE STRING.
+   * The renderer's name had the word `locked` glued onto the end of it, and
+   * that glue is what let a third and a fourth fact be bolted on without
+   * anybody deciding to. Reported on sight with a photograph, twice in one
+   * minute.
    *
-   * They are the two things the paragraph already names: the kaleidoscope fold
-   * and the feedback. Three steps each rather than a slider, because a slider
-   * here is a hundred values nobody wants and a number nobody can repeat.
+   * 🔴 AND IT ONCE PRINTED THE SAME NAME TWICE IN ONE FOOTER. The chip falls
+   * back to the string `WHERE` holds, so before the board reported its own both
+   * halves read `Raspberry Pi`. Which side you are looking at is already said
+   * by WHICH PANE IT IS; the cell only has to name what drew it.
+   */
+  function relabel(which) {
+    window.__demo.panes[which].picture = chip[which] || WHERE[which];
+    paintFacts(which);
+  }
+  const local = mk('here');
+  const far = mk('box');
+  relabel('here'); relabel('box');
+  /**
+   * 🔴 THE DOT UNDER THE FAR PICTURE FOLLOWS THE FRAMES, NOT THE SOCKET. A
+   * relay that is reachable says nothing about whether a board in another
+   * building is plugged in, and the two are routinely different: the socket
+   * opens in about 200 ms and the encoder may be switched off. Thirty frames a
+   * second with thirty allowed to go missing is one second of silence, which is
+   * the same deadline this page already uses to unlock its own frame counter,
+   * written once rather than twice.
+   */
+  far.pres.follow({
+    everyMs: 1000 / 30, misses: 30, since: Date.now(),
+    why: 'nothing has answered in this room yet',
+  });
+  const farNone = el('div', 'none', 'Waiting…');
+  far.panel.stage.append(farNone);
+  d.stack.add(panes);
+
+  /**
+   * 🔴 ONE CONTROL GROUP, AND ALL FOUR ROWS COME OUT OF THE KIT. Asked as
+   * *"look,mirrort etc all into controls group"*. `LOOK` was already a
+   * `createPicker`; `MIRRORS`, `GRAIN` and `HUE` were HAND-ROLLED here with
+   * page-local `.knob` and `.seg` rules, and `choice.mjs`'s own opening comment
+   * names this page as one of the three hand-built copies that made it a
+   * component. The copy is gone and so is its CSS.
+   *
+   * 🔴 AND THE "FILL THE WIDTH ON A PHONE" ASK NEEDED NO CSS AT ALL. shell.css
+   * already puts a choice's label on top under 560 px and gives its options the
+   * whole row, growing to share it and scrolling rather than folding a word in
+   * half. `.knob` matched none of those selectors, which was the entire bug:
+   * converting to the component fixes it and a media query of this page's own
+   * would have been a fourth copy of the same decision.
+   */
+  const knobRow = el('div', 'knobs');
+
+  /**
+   * ⚠️ THREE CHOICES, AND THEY DRIVE BOTH PANES. A control that moved only the
+   * local picture would break the one claim this page makes, that the two sides
+   * are the same shader, and would do it invisibly: the panes would simply stop
+   * matching and look like a bug. So each press sets the local uniform AND
+   * sends `video.params` to the box.
    */
   // ⚠️ WIDE ENOUGH TO SEE FROM ACROSS THE ROOM. The first pair were 4/8/16
   // mirrors and three feedback amounts, and the three steps of each looked like
-  // the same picture in a slightly different mood — a control whose settings a
+  // the same picture in a slightly different mood: a control whose settings a
   // viewer cannot tell apart is a control that teaches nothing. These are
   // ranges chosen so the ends are unmistakable, and the middle of each is the
   // value the renderer ships with, so "mid mid mid" is the picture the rest of
   // this repo measured.
   const KNOBS = {
-    // 2 is a single fold — almost a mirror down the middle. 24 is a doily.
+    // 2 is a single fold, almost a mirror down the middle. 24 is a doily.
     mirrors: { label: 'mirrors', steps: [['2', 2], ['8', 8], ['24', 24]], at: 1 },
     // The noise frequency, which decides whether the shapes are continents or
     // filigree. An eightfold span, because a doubling is not visible here.
     grain:   { label: 'grain',   steps: [['coarse', 1.2], ['mid', 4], ['fine', 16]], at: 1 },
     // HOW FAR APART THE THREE COLOUR CHANNELS ARE. The colour is three cosines
-    // of the same field, offset by vec3(0, 0.33, 0.67) — a third of a turn each,
+    // of the same field, offset by vec3(0, 0.33, 0.67), a third of a turn each,
     // which is what makes a full rainbow. Scaling those offsets is the whole
     // palette in one number: near zero the three channels move together and the
     // picture is a duotone sweep; at 1 it is the rainbow; past 1 the offsets
     // wrap and the hues come back round in a different order.
     // ⚠️ 2.2 WAS NOT "WIDER", IT WAS THE SAME RAINBOW RESHUFFLED, and it looked
     // it. Three phases a third of a turn apart is the MAXIMUM colour separation
-    // there is — anything past that wraps and lands somewhere else on the
-    // circle with no more spread than before, which is why `mid` and `wide`
-    // were hard to tell apart. 1.5 is the interesting place instead: the green
-    // channel goes half a turn while red and blue come back to nearly the same
-    // phase, so the picture splits into two opposed colours — magenta against
-    // green — rather than running through all of them. Checked by sweeping
+    // there is: anything past that wraps and lands somewhere else on the circle
+    // with no more spread than before, which is why `mid` and `wide` were hard
+    // to tell apart. 1.5 is the interesting place instead: the green channel
+    // goes half a turn while red and blue come back to nearly the same phase,
+    // so the picture splits into two opposed colours, magenta against green,
+    // rather than running through all of them. Checked by sweeping
     // 0.12/0.45/1.0/1.5/1.8/2.2 and looking at the six.
     hue:     { label: 'hue',     steps: [['close', 0.12], ['full', 1], ['split', 1.5]], at: 1 },
   };
-  const knobRow = el('div', 'knobs');
-  for (const [key, k] of Object.entries(KNOBS)) {
-    const wrap = el('div', 'knob');
-    wrap.append(el('span', '', k.label));
-    const seg = el('div', 'seg');
-    k.buttons = k.steps.map(([text, value], idx) => {
-      const b = el('button', '', text, { type: 'button', 'aria-pressed': String(idx === k.at) });
-      b.onclick = () => choose(key, idx);
-      seg.append(b);
-      return b;
-    });
-    wrap.append(seg);
-    knobRow.append(wrap);
-  }
 
-  // 🔴 IN `.pos-controls`, AND THAT IS NOT A LAYOUT PREFERENCE. It sat in the
-  // knob row for one revision and the assert count went 9 -> 7 while the page
-  // read GREEN: `verify.mjs` presses `.pos-controls button, .tbar-x` and nothing
-  // else, so a control anywhere else is never exercised and its asserts never
-  // run. That is this project's oldest failure — a green suite over a path the
-  // suite cannot reach — committed by moving a button.
+  // 🔴 THE WHOLE GROUP GOES IN `.pos-controls`, AND THAT IS NOT A LAYOUT
+  // PREFERENCE. The look control sat in the knob row for one revision and the
+  // assert count went 9 to 7 while the page read GREEN: both harnesses press
+  // `.pos-controls button` and nothing else, so a control anywhere else is
+  // never exercised and its asserts never run. That is this project's oldest
+  // failure, a green suite over a path the suite cannot reach, committed by
+  // moving a button.
   //
-  // It is a STEPPER rather than a "next" because a list you can only walk
+  // It is a PICKER rather than a "next" because a list you can only walk
   // forwards through is one you have to go all the way round to revisit.
   {
     // 🔴 `createPicker`, NOT A STEPPER PLUS A SPAN. This was `createStepper` with
@@ -379,7 +460,7 @@
       const { name, body } = LOOKS[lookAt_];
       look.show(name, lookAt_);
       const okHere = window.__applyShader(body);
-      d.log(`“${name}” · ${okHere ? 'fading in here' : 'refused here'}`);
+      d.log(okHere ? `“${name}” is fading in here` : `“${name}” was refused here`);
       const open = ctl?.readyState === 1;
       let sent = false;
       if (open) { try { send({ type: 'video.shader', body }); sent = true; } catch { sent = false; } }
@@ -400,71 +481,75 @@
     // temporal dead zone: `Cannot access 'LOOKS' before initialization`, at
     // module scope, which means a blank page with no asserts and no log line
     // saying why. This file's own comments already record two of these.
-    const row = document.querySelector('.pos-controls');
-    if (row) { row.style.display = 'flex'; row.style.alignItems = 'center'; row.append(look.el); }
-    else knobRow.append(look.el);
+    knobRow.append(look.el);
     window.__lookPicker = look;
   }
 
-  // ⚠️ AFTER the row is built. `const knobRow` is in the temporal dead zone
-  // until its declaration runs, so inserting it earlier throws before anything
-  // is drawn — and a page that throws at module scope shows a blank frame with
-  // no log line to say why.
-  d.el.insertBefore(knobRow, panes);
+  for (const [key, k] of Object.entries(KNOBS)) {
+    k.control = createChoice({
+      // Typed here rather than in `KNOBS`, because the same word is the LOG's
+      // name for this control and a log line does not shout.
+      label: k.label.toUpperCase(),
+      options: k.steps,
+      at: k.at,
+      // The component owns which option is armed, so `choose` no longer writes
+      // `aria-pressed` anywhere: one state, one owner.
+      onPick: (value, name, i) => choose(key, i),
+    });
+    knobRow.append(k.control.el);
+  }
+  d.controls.append(knobRow);
 
   /**
-   * ⚠️ FOLLOW THE PICTURE INTO FULLSCREEN. The knobs sit above both panes,
-   * which is the right place while both are on screen and the wrong place the
-   * moment one of them fills it: the row is not inside the fullscreen element,
-   * so it disappears and the picture you went fullscreen to look at is the one
-   * you can no longer change. It moves into that pane's bar and comes back
-   * afterwards.
+   * 🔴 THE CONTROLS FOLLOW THE PICTURE INTO FULL SCREEN, AND IT IS THE SAME ROW
+   * MOVED RATHER THAN A SECOND COPY. Asked as *"extend videopanel footer in
+   * fullscreen so it can have section below the footer bar (separaet with
+   * line). put controlgroup there"*. Two rows of buttons that can disagree
+   * about which option is chosen would be a readout living in two files, so the
+   * panel takes this row, remembers where it came from and puts it back on the
+   * way out. Off screen it is in `.pos-controls`, which is where a visitor
+   * looks for it and where both harnesses can press it.
+   *
+   * ⚠️ ONE PANEL AT A TIME. A row cannot be in two places, so whichever pane is
+   * not full hands it back before the one that is takes it.
    */
-  /* ⚠️ ASK THE CLASS, NOT `document.fullscreenElement`. On the faux path there
-     IS no fullscreen element — the pane is a position:fixed cover and the
-     browser knows nothing about it — so keying off `fullscreenElement` left the
-     knobs upstairs and the label floating over the picture on every iPhone.
-     `.pos-full` is set by shell/fullscreen.mjs on both paths, which is the whole
-     reason it exists. Called from the button as well as from the event, because
-     the faux path fires no event. */
-  function syncFull() {
-    const pane = [local, far].find((p) => p.p.classList.contains('pos-full'));
-    if (pane) {
-      pane.p.querySelector('.bar').insertBefore(knobRow, pane.full);
-      // ⚠️ AND THE LABEL COMES DOWN TOO. It is drawn ON TOP of the picture,
-      // which is fine in a 340-pixel pane and wrong across a whole screen —
-      // a caption floating over the middle of the thing you went fullscreen to
-      // look at. In the bar it sits beside the numbers, which is where the rest
-      // of what this pane has to say already is.
-
-    } else {
-      for (const q of [local, far]) {
-
-      }
-      d.el.insertBefore(knobRow, panes);
+  let wasFull = false;
+  function handControls() {
+    const full = [local, far].find((pane) => pane.panel.isFull()) || null;
+    for (const pane of [local, far]) {
+      if (!full || pane.panel !== full.panel) pane.panel.under(null);
+    }
+    // ⚠️ ASKED BEFORE IT IS HANDED OVER. `under()` puts the row home and picks
+    // it up again, so calling it on a panel that already holds the row is a
+    // detach and a re-attach for nothing, and every fullscreen change reaches
+    // both panels.
+    if (full && full.panel.under() !== knobRow) full.panel.under(knobRow);
+    if (!!full !== wasFull) {
+      wasFull = !!full;
+      d.log(wasFull ? 'filling the screen with one pane, and the controls came with it'
+                    : 'back to the page');
     }
   }
-  document.addEventListener('fullscreenchange', syncFull);
-  document.addEventListener('webkitfullscreenchange', syncFull);
 
   /**
-   * A new picture, arriving over the same socket everything else here uses.
+   * One choice pressed, on both pictures.
    *
-   * ⚠️ COMPILE BEFORE COMMITTING TO IT. A shader that will not link must leave
-   * the running one alone — the alternative is a page that goes black because
-   * somebody typed a semicolon wrong, on a demo whose entire job is to be
-   * looked at.
+   * ⚠️ THE SOCKET IS ALLOWED TO BE SHUT. Every press sends to the board, and
+   * until a harness started pressing these they were only ever reached by a
+   * hand on a page whose socket was open. A throw out of a click handler is a
+   * control that looks like it worked and left an exception behind it, so the
+   * send is guarded and the local picture changes either way.
    */
   function choose(key, idx) {
     const k = KNOBS[key];
     k.at = idx;
-    k.buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(i === idx)));
     const value = k.steps[idx][1];
     // The local picture changes on the next frame; the box changes when the
     // message lands, which is a hop away. They converge, and the panes being
-    // briefly different IS the latency — the same thing the lock makes visible.
+    // briefly different IS the latency, the same thing the lock makes visible.
     P[key] = value;
-    send({ type: 'video.params', [key]: value });
+    try { send({ type: 'video.params', [key]: value }); }
+    catch { /* no board in the room, so nothing to send */ }
     d.log(`${k.label} ${k.steps[idx][0]}`, 'hi');
   }
   // The live values, one place, read by the render loop and sent to the box.
@@ -473,37 +558,13 @@
   window.__P = P;
 
   /**
-   * Each pane's own numbers, under it.
-   *
-   * ⚠️ AND `__demo.panes` IS THE MACHINE COPY, written from the same values in
-   * the same call — two places that can disagree is how a readout ends up
-   * describing something the page is not doing.
+   * Each pane's own numbers, under it, written through the machine copy so the
+   * two cannot come apart. `FIELDS`, `FMT` and `paintFacts` are up with the
+   * panes, where the cells are made.
    */
-  window.__demo.panes = { here: {}, box: {} };
-  // ⚠️ EVERY FIELD IS ALWAYS DRAWN, EVEN BEFORE IT HAS A VALUE. Building the bar
-  // from only the fields that happen to be known means the renderer name starts
-  // at the left edge and JUMPS right the moment the first frame rate lands — a
-  // second of text moving for no reason the reader can see. A dash holds the
-  // place instead, which is also honest: it says "not yet", where an absent
-  // field says nothing at all.
-  // ⚠️ NO `note` FIELD ANY MORE. The renderer's name moved to the label, where
-  // it belongs: the bar is measurements, and a name sitting among them read as
-  // one. What is left here can all change.
-  const FIELDS = {
-    here: [['fps', 'fps', (v) => v.toFixed(1)]],
-    box: [['fps', 'fps', (v) => v.toFixed(1)], ['kbit', 'kbit/s', (v) => v.toFixed(0)],
-          ['lost', 'lost', (v) => String(v)]],
-  };
   function stat(which, fields) {
-    const pane = which === 'here' ? local : far;
     Object.assign(window.__demo.panes[which], fields);
-    const v = window.__demo.panes[which];
-    pane.nums.innerHTML = FIELDS[which].map(([key, unit, fmt]) => {
-      // `note` is the only field with nothing to hold a place for — it is a
-      // name, not a measurement, and an empty one should take no room.
-      const shown = v[key] == null ? '' : fmt(v[key]);
-      return `<span class="n">${shown}</span>${unit ? ' ' + unit : ''}`;
-    }).filter(Boolean).join(' · ');
+    paintFacts(which);
   }
 
   // ── the panels that hang in a headset ───────────────────────────────────
@@ -1003,8 +1064,8 @@
   };
 
   if (!gl) {
-    local.p.append(el('div', 'none', 'this browser gave no WebGL2 context, so the left pane cannot be drawn here'));
-    d.log('no WebGL2 context · the left pane is unavailable on this browser', 'bad');
+    local.panel.stage.append(el('div', 'none', 'this browser gave no WebGL2 context, so the left pane cannot be drawn here'));
+    d.log('there is no WebGL2 context here, so the left pane cannot be drawn on this browser', 'bad');
     chip.here = 'no WebGL2';
     relabel('here');
   } else {
@@ -1013,13 +1074,9 @@
     // ⚠️ SAY WHICH RENDERER, ALWAYS. A visitor on a software rasteriser is a
     // real visitor, and a page that is quietly slow teaches nothing. It is also
     // what demo/verify-gl.mjs checks its own answer against.
-    // ⚠️ NAME THE CHIP, NOT THE FIRST COMMA. Splitting
-    // "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)"
-    // on its first comma leaves the word "Apple", which says nothing at all.
-    // The part worth printing is what follows "Renderer:".
-    const short = String(rendererName).match(/Renderer:\s*([^,)]+)/)?.[1]
-      ?? String(rendererName).replace(/^ANGLE \(|\)$/g, '');
-    chip.here = short.trim().slice(0, 32);
+    // The parse and the cap are `shortChip`, up with the names, because the
+    // board's string goes through exactly the same one.
+    chip.here = shortChip(rendererName);
     relabel('here');
 
     const pageK = makeKaleidoscope(gl, W, H);
@@ -1038,7 +1095,7 @@
       try {
         pageK.apply(body);
       } catch (e) {
-        d.log(`the new look would not compile, keeping this one · ${String(e.message).slice(0, 80)}`, 'warn');
+        d.log(`the new look would not compile, so this one stays. ${String(e.message).slice(0, 80)}`, 'warn');
         return false;
       }
       liveBody = body;
@@ -1047,11 +1104,11 @@
         catch (e) {
           // The headset's context refused what this one took. Said out loud
           // rather than left to look like a frozen panel.
-          d.log(`the headset's own copy refused the new look · ${String(e.message).slice(0, 60)}`, 'warn');
-          beacon(`FAIL live panel · the new look would not compile in the session's context: ${e.message}`);
+          d.log(`the headset's own copy refused the new look. ${String(e.message).slice(0, 60)}`, 'warn');
+          beacon(`FAIL live panel: the new look would not compile in the session's context, ${e.message}`);
         }
       }
-      d.log('a new look arrived · fading it in over 0.9 s');
+      d.log('a new look arrived. It fades in over 0.9 s');
       return true;
     };
 
@@ -1086,8 +1143,13 @@
         lockedFrame = null;
         i = Math.max(i, 1);
         relabel('here');
+        // 🔴 THE LOCK IS A STATE CHANGE AND IT GOES IN THE LOG, WHICH IS WHERE
+        // A STATE CHANGE GOES. It was a `clock` cell for one session and a
+        // the word `locked` glued onto the end of the renderer's name before
+        // that; neither was asked for. Both edges are said now, here and where a frame arrives,
+        // so the fact is still reported and it is reported when it moves.
         d.log('the box stopped sending. This pane is free-running again', 'warn');
-        stat('box', { fps: null, kbit: null });
+        stat('box', { fps: null });
       }
       // ONE CLOCK FOR BOTH RENDERERS. `uT` is a frame counter, not wall time —
       // the board drives it as i/30 — so the two ends only match if they are
@@ -1205,7 +1267,15 @@
    * reached — this project's oldest and most expensive failure. The labels
    * carry the mode so two runs can be held side by side rather than merged.
    */
+  // 🔴 WHICH MODES HAVE ALREADY BEEN GRADED, AND THIS IS NOT A CACHE. Both
+  // session controls are switched off on any browser that cannot open a
+  // session, which is every laptop and every phone, so the press that used to
+  // run the checks below never happens there any more. `runChecks` drives
+  // whichever mode nobody reached rather than letting a disabled control take a
+  // branch out of the run, and this is what stops the two ever both firing.
+  const graded = { 'immersive-vr': false, 'immersive-ar': false };
   async function enterHeadset(mode) {
+    graded[mode] = true;
     const ar = mode === 'immersive-ar';
     const who = ar ? 'passthrough' : 'VR';
     // ⚠️ WAIT FOR THE PROBE, NEVER RE-ASK IT. Whether this browser can show an
@@ -1228,8 +1298,8 @@
       // is silence cannot be trusted to its own internal care. The batched
       // shipper is no use here: entering a session is exactly when timers stop
       // being generous.
-      beacon(`FAIL enter(${mode}) · ${e.name}: ${e.message}`);
-      d.log(`entering failed · ${e.name}: ${e.message}`, 'bad');
+      beacon(`FAIL enter(${mode}): ${e.name}, ${e.message}`);
+      d.log(`entering failed. ${e.name}: ${e.message}`, 'bad');
       try { await xr.end(); } catch { /* it may never have started */ }
       startFlat();
     }
@@ -1257,8 +1327,8 @@
     d.assert('the panels hang over a floor whose dots fade out before it ends',
       !!R?.on && !!R.dots && R.dots.span / 2 === R.dots.fadeFar && R.dots.fadeNear < R.dots.fadeFar,
       R?.dots
-        ? `seed ${R.seed} · ${R.scenery} · ${R.dots.span} m of floor, dots fading from ${R.dots.fadeNear} to ${R.dots.fadeFar} m`
-        : 'no room · the panels would hang in nothing');
+        ? `seed ${R.seed}, ${R.scenery}, ${R.dots.span} m of floor, dots fading from ${R.dots.fadeNear} to ${R.dots.fadeFar} m`
+        : 'there is no room, so the panels would hang in nothing');
     // 🔴 "NO SURFACES" MUST NEVER BE DRAWN AS "NO WALLS". Real room data is
     // optional and it does not gate the grid: with none, the dots go on the
     // page's own floor and the page has to SAY that is what they are. The
@@ -1267,7 +1337,7 @@
     d.assert(`and it says whose floor the dotted grid is on, in ${who}`,
       typeof R?.note === 'string' && R.note.length > 10
       && ['not asked', 'waiting', 'refused', 'unreadable', 'none', 'yours'].includes(R.surfaces),
-      `${R?.surfaces} · ${R?.note}`);
+      `${R?.surfaces}, and it says: ${R?.note}`);
     // 🔴 THE CONTROLLER INTERFACE IS THE ROOM'S, NOT THIS PAGE'S, AND IT HAS NO
     // SESSION MODE IN IT. The same stand-ins, the same beam off the right
     // hand's target ray, the same tablet on the left — out of the same two
@@ -1327,17 +1397,17 @@
       d.assert(`and it holds the rate this headset promises, with the pictures on it (${who})`,
         xr.state.fps != null && xr.state.fps >= (promised ? promised * 0.9 : 55),
         `${fps ?? 'no rate measured'} a second against ${promised ? `${promised} promised` : 'a headset that will not say what it runs at, so 55 is only a stall floor'}`
-        + ` · picture ${xr.isLive() ? 'rendered here' : 'copied in'}`
-        + ` · copy ${xr.state.uploadCpuMs == null ? '—' : xr.state.uploadCpuMs.toFixed(2)} ms cpu`
-        + ` · render ${xr.state.liveCpuMs == null ? '—' : xr.state.liveCpuMs.toFixed(2)} ms cpu`
-        + ` · ${xr.state.liveWhereCost}`);
+        + `, picture ${xr.isLive() ? 'rendered here' : 'copied in'}`
+        + `, copy ${xr.state.uploadCpuMs == null ? 'not measured' : `${xr.state.uploadCpuMs.toFixed(2)} ms`} cpu`
+        + `, render ${xr.state.liveCpuMs == null ? 'not measured' : `${xr.state.liveCpuMs.toFixed(2)} ms`} cpu`
+        + `, ${xr.state.liveWhereCost}`);
       // ⚠️ ASSERT ON THE ERROR FLAG. A page will draw a right-looking picture
       // with an error pending — a Quest did exactly that, for an attribute
       // binding made one call too late, and nobody would have seen it by
       // looking.
       d.assert(`and it drew with no graphics error pending (${who})`,
         xr.state.glError === 0,
-        xr.state.glError === 0 ? 'clean' : `error ${xr.state.glError} · ${xr.state.glWhere}`);
+        xr.state.glError === 0 ? 'clean' : `error ${xr.state.glError} at ${xr.state.glWhere}`);
     } else if (can() === true) {
       // 🔴 A HEADSET THAT REFUSED IS NOT A LAPTOP, and the assert below would
       // have said it was. "There is no headset here" and "there is one and it
@@ -1350,11 +1420,11 @@
     } else {
       d.assert(`with no headset it says so and keeps drawing here (${who})`,
         !xr.state.presenting && (drewAny > 0 || !gl),
-        `${mode}: ${can()} · ${drewAny} frames drawn here`);
+        `${mode}: ${can()}, and ${drewAny} frames drawn here`);
     }
   }
-  d.on('xr', () => enterHeadset('immersive-vr'));
-  d.on('ar', () => enterHeadset('immersive-ar'));
+  d.on('vr', () => enterHeadset(XR_MODE.vr));
+  d.on('ar', () => enterHeadset(XR_MODE.ar));
 
 
   // ── the picture, from the board ──────────────────────────────────────────
@@ -1368,7 +1438,12 @@
   let seq = 0;
   const ctl = new WebSocket(`${RELAY_BASE}/room/${ROOM}/ws`);
   const send = (m) => { const id = randomId(); ctl.send(format(m, { from: FROM, seq: seq++, id })); return id; };
-  ctl.onopen = () => { d.log(`asking ${ROOM} what it can draw`); send({ type: 'video.status' }); };
+  ctl.onopen = () => {
+    d.log(`asking ${ROOM} what it can draw`);
+    // A question is out and no answer has come back: grey, and moving.
+    far.pres.checking(true);
+    send({ type: 'video.status' });
+  };
   ctl.onmessage = (e) => {
     if (typeof e.data !== 'string') return;
     const { kind, msg } = parse(e.data);
@@ -1395,14 +1470,14 @@
         // fault — it is the cue to ask. Anything else is worth a line.
         if (/no picture running/.test(msg.reason || '')) { askForPicture(); return; }
         d.log(`the box is not drawing: ${msg.reason}`, msg.available === false ? 'bad' : 'warn');
-
+        far.pres.checking(false).because(msg.reason || 'the board is not drawing');
         return;
       }
-      d.log(`the box is drawing ${msg.w}x${msg.h} at ${msg.fps} · ${(msg.bitrate / 1000).toFixed(0)} kbit/s`, 'hi');
+      d.log(`the box is drawing ${msg.w}x${msg.h} at ${msg.fps} a second, ${(msg.bitrate / 1000).toFixed(0)} kbit/s`, 'hi');
       // The box names its GPU the same way this page names yours. It arrives on
       // the second status at the latest, because the renderer prints it on its
       // own first line and the reply may be composed before that lands.
-      if (msg.renderer) { chip.box = msg.renderer; relabel('box'); }
+      if (msg.renderer) { chip.box = shortChip(msg.renderer); relabel('box'); }
       // ⚠️ TELL THE BOX WHAT THIS PAGE IS SET TO. The knobs only sent on a
       // press, so at load the page rendered its own defaults and the box
       // rendered ITS defaults — and the two agreed only because the numbers
@@ -1415,6 +1490,7 @@
       // `video.status` is answered to the whole room, so a second visitor's
       // question tore this one's decoder down and built it again — which showed
       // up as a bar reading "not arriving" next to a live frame rate.
+      far.pres.checking(false).because(null);
       if (!vws) openVideo(msg.room, msg);
     }
     if (msg.type === 'video.stopped') { d.log(`the box stopped after ${msg.frames ?? 0} frames`); closeVideo(); }
@@ -1447,6 +1523,50 @@
   }
 
   let vws = null, decoder = null, farFps = 0, farBytes = 0, farGaps = 0, farDecoded = 0, waitingForKey = true;
+
+  /**
+   * 🔴 WHAT THE LINK COSTS IS SAID IN THE LOG AND ON THE BEACON, NOT IN A ROW
+   * UNDER A PICTURE. `kbit/s` and `lost` were footer cells for one session and
+   * were never asked for. They are still worth having: the relay drops frames
+   * with NO error, no close and no backpressure, so a sequence number in the
+   * payload is the only witness there is, and a rate that has collapsed is the
+   * difference between a link that is working and one that is barely there.
+   *
+   * ⚠️ A RATE IS SAID ONCE AND A LOSS IS SAID WHEN IT HAPPENS. A line a second
+   * is the slop log this project already has a rule about, so the rate goes out
+   * on the first second of a stream and the totals go out when it stops. A loss
+   * is an EVENT, which is exactly what a log is for, with a floor under how
+   * often so a bad link cannot fill the box.
+   *
+   * ⚠️ AND THE BEACON, because a phone or a headset has no log anybody can
+   * read. That is where this page already ships the things it wants back from a
+   * device.
+   */
+  window.__demo.link = { kbit: null, lost: 0, frames: 0 };
+  let saidRate = false, saidLost = 0, saidLostAt = 0, beaconedLost = false;
+  function sayLinkRate(kbit) {
+    window.__demo.link.kbit = kbit;
+    window.__demo.link.frames = farDecoded;
+    if (saidRate) return;
+    saidRate = true;
+    d.log(`the box\u2019s picture is arriving at ${kbit.toFixed(0)} kbit/s`);
+  }
+  function sayLinkLost(n) {
+    window.__demo.link.lost = n;
+    const now = performance.now();
+    if (n === saidLost || now - saidLostAt < 5000) return;
+    saidLost = n; saidLostAt = now;
+    d.log(`the relay has dropped ${n} frame${n === 1 ? '' : 's'} of the box\u2019s picture`, 'warn');
+    // ⚠️ THE BEACON GETS THE FIRST ONE AND THE TOTAL, NEVER A LINE EVERY FIVE
+    // SECONDS. A tab left open on a lossy link would be 720 posts an hour into
+    // the ring buffer a headset run depends on being able to read, which is a
+    // diagnostic drowning the diagnostics. The first loss is the event worth
+    // shipping; the total goes out when the stream stops.
+    if (!beaconedLost) {
+      beaconedLost = true;
+      beacon(`mirror: the relay began dropping frames of the box\u2019s picture, ${n} so far`);
+    }
+  }
   // ⚠️ SAY THAT SOMEBODY IS WATCHING, so the box can stop when nobody is. It
   // cannot tell from its side: the relay reported seven sockets in the video
   // room while nothing was watching, because a test run that exits without a
@@ -1466,28 +1586,38 @@
     // locked would be two different claims wearing one label.
     lockedFrame = null;
     relabel('here');
-    // ⚠️ NO `note` HERE EITHER. The bar stopped rendering it when the renderer
-    // name moved to the label, but the write stayed — so `__demo.panes.box`
-    // carried "not arriving" beside a live 27.7 fps. Nothing on screen showed
-    // it, which is worse: the machine surface and the picture disagreed and
-    // only a harness would ever have noticed.
-    stat('box', { fps: null, kbit: null });
+    // ⚠️ THE MACHINE COPY IS WHAT THE FOOTER SAYS AND NOTHING MORE. It once
+    // carried "not arriving" beside a live 27.7 fps, because a field the bar
+    // had stopped drawing was still being written. Nothing on screen showed it,
+    // which is worse: the machine surface and the picture disagreed and only a
+    // harness would ever have noticed. What the LINK cost lives on
+    // `__demo.link`, under its own name, because it is not in this row.
+    stat('box', { fps: null });
+    // The totals, once, where the stream ended. A line nobody can read on a
+    // phone is also on the beacon, which is where that page reads it.
+    if (farDecoded > 0) {
+      d.log(`the box\u2019s picture stopped after ${farDecoded} frames, ${farGaps} lost`);
+      beacon(`mirror: the box\u2019s picture stopped after ${farDecoded} frames, ${farGaps} lost`);
+    }
     // ⚠️ "Waiting…" HAS TO BE TRUE. Saying it and then doing nothing is the
     // worst of both: a reader waits for something nobody is asking for. The
     // page re-asks, and the word is a promise it keeps.
     farNone.textContent = 'Waiting…';
+    far.pres.because('no frames are arriving from the board');
     scheduleRetry();
-    far.p.append(farNone);
+    far.panel.stage.append(farNone);
   }
 
   function openVideo(room, info) {
     closeVideo();
     if (typeof VideoDecoder !== 'function') {
       farNone.textContent = 'this browser has no WebCodecs, so the box’s picture cannot be decoded here';
-      d.log('no WebCodecs · the right pane is unavailable on this browser', 'bad');
+      d.log('there is no WebCodecs here, so the right pane cannot be decoded on this browser', 'bad');
       return;
     }
     waitingForKey = true; farDecoded = 0; farGaps = 0; farBytes = 0;
+    saidRate = false; saidLost = 0; saidLostAt = 0; beaconedLost = false;
+    window.__demo.link = { kbit: null, lost: 0, frames: 0 };
     decoder = new VideoDecoder({
       output: (vf) => {
         if (far.c.width !== vf.displayWidth) { far.c.width = vf.displayWidth; far.c.height = vf.displayHeight; }
@@ -1511,21 +1641,32 @@
       // ⚠️ THE COUNTER IS IN THE PAYLOAD BECAUSE A BINARY FRAME HAS NO
       // ENVELOPE, and the relay drops frames with no error, no close and no
       // backpressure. Measured: at 8 Mbit/s it lost 101 of 361 frames and
-      // nothing else on the path said so. This cell is the only witness.
-      if (last >= 0 && s > last + 1) { farGaps += s - last - 1; stat('box', { lost: farGaps }); }
+      // nothing else on the path said so. This counter is the only witness, and
+      // it reports into the log rather than into a cell under the picture.
+      if (last >= 0 && s > last + 1) { farGaps += s - last - 1; sayLinkLost(farGaps); }
       last = s;
       // The board's sequence number is its frame counter — see the comment at
       // `lockedFrame`. Taken here, before the decode, because a frame the
       // decoder refuses is still a frame the board drew.
       const wasFree = lockedFrame === null;
       lockedFrame = s; lockedAt = performance.now();
-      if (wasFree) relabel('here');
+      // It spoke, stamped with this clock at the moment it arrived. Cheap on
+      // purpose: it records the time and derives only when the answer could
+      // have changed.
+      far.pres.seen();
+      if (wasFree) {
+        relabel('here');
+        // The other edge of the state change above: this pane has stopped
+        // counting for itself and is now drawing the board's frame number, so
+        // anything still different between the two pictures is the pipeline.
+        d.log('this pane is locked to the board\u2019s frame number');
+      }
       farBytes += e.data.byteLength;
       // ⚠️ A DECODER MUST START ON A KEYFRAME. Feeding it a delta frame first
       // is an error it reports once and then stays broken through, so a joiner
       // waits — up to one second at this GOP, which is a GOP choice and not a
       // fault.
-      if (waitingForKey) { if (!key) return; waitingForKey = false; d.log('keyframe · the box’s picture starts here'); }
+      if (waitingForKey) { if (!key) return; waitingForKey = false; d.log('a keyframe arrived. The box\u2019s picture starts here'); }
       try {
         decoder.decode(new EncodedVideoChunk({
           type: key ? 'key' : 'delta',
@@ -1537,7 +1678,8 @@
       const now = performance.now();
       if (now - at >= 1000) {
         farFps = tick * 1000 / (now - at);
-        stat('box', { fps: farFps, kbit: farBytes * 8 / (now - at), lost: farGaps });
+        stat('box', { fps: farFps });
+        sayLinkRate(farBytes * 8 / (now - at));
         tick = 0; at = now; farBytes = 0;
       }
     };
@@ -1692,7 +1834,7 @@
         const here = readPanel(panelHere);
         d.assert('the left panel carries this picture with its numbers under it',
           here.picSpread > 30 && here.footInk > 200,
-          `the widest colour channel spans ${here.picSpread} of 255 · ${here.footInk} lit pixels in the footer`);
+          `the widest colour channel spans ${here.picSpread} of 255, with ${here.footInk} lit pixels in the footer`);
         // 🔴 THE STRIP THE RENDERED PANEL WEARS INSTEAD OF A FOOTER, graded on its
         // own. It is a different canvas from the one above and it is the ONLY
         // place a number appears when the picture is drawn by the headset — so a
@@ -1732,8 +1874,8 @@
         // the device produces a number somebody can already interpret.
         if (pv?.ok) {
           d.log(`the headset's own copy of the shader, timed here: ${pv.whereCost}`
-            + ` · ${pv.pixels ? `${pv.pixels.w}x${pv.pixels.h}` : 'unknown size'}`
-            + ' · this machine, not a headset', 'hi');
+            + `, at ${pv.pixels ? `${pv.pixels.w}x${pv.pixels.h}` : 'an unknown size'}`
+            + '. This machine, not a headset', 'hi');
           window.__demo.livePreview = {
             gpuMs: pv.liveGpuMs, halfGpuMs: pv.liveHalfGpuMs, where: pv.whereCost,
             timer: pv.gpuTimer, pixels: pv.pixels,
@@ -1742,8 +1884,8 @@
         d.assert('the room, the floor, the glow and the panels all draw on this machine',
           !!pv?.ok && pv.spread > 40 && pv.litShare > 0.02,
           pv?.ok
-            ? `the widest colour channel spans ${pv.spread} of 255 · ${(pv.litShare * 100).toFixed(1)}% of the frame has ink in it`
-              + ` · grab bars ${pv.bars ? 'compiled' : 'DID NOT COMPILE'} · picture ${pv.live ? 'rendered here' : 'copied in'}`
+            ? `the widest colour channel spans ${pv.spread} of 255, ${(pv.litShare * 100).toFixed(1)}% of the frame has ink in it`
+              + `, grab bars ${pv.bars ? 'compiled' : 'DID NOT COMPILE'}, picture ${pv.live ? 'rendered here' : 'copied in'}`
             : `it did not draw: ${pv?.why ?? 'no answer'}`);
         // 🔴 AND THE WAY OUT, WHICH IS THE ONE CONTROL A HEADSET RUN CANNOT
         // RECOVER FROM BEING WRONG ABOUT. Everything else in here can be got out
@@ -1793,7 +1935,7 @@
             ? `rgb ${xr.state.glow.col.map((v) => v.toFixed(2)).join(', ')} at ${xr.state.glow.amp.toFixed(3)} of a possible ${GLOW_MAX}`
             : 'nothing is lighting anything');
       } else {
-        d.log('the panels and the room preview are not built for a visit \u00b7 six of the '
+        d.log('the panels and the room preview are not built for a visit. Six of the '
           + 'checks wait for the harness so this page keeps the frame rate it exists to '
           + 'report', 'hi');
       }
@@ -1828,7 +1970,7 @@
           !!hitBar && !hitFace,
           hitBar
             ? `the bar answers at ${hitBar.t.toFixed(2)} m, ${(hitBar.u * 100).toFixed(0)}% across it`
-              + ` · the picture ${hitFace ? 'ALSO answered, which would be two things from one press' : 'did not'}`
+              + `, and the picture ${hitFace ? 'ALSO answered, which would be two things from one press' : 'did not'}`
             : 'the bar did not answer at all');
         // Now the grab: keep the offset, move the controller half a metre right
         // and a quarter up, and the panel must follow by exactly that.
@@ -1876,7 +2018,7 @@
           aim > 0.99999 && Math.abs(rise) < 1e-6 && Math.abs(upLen - H_M) < 1e-6,
           `its face is ${(Math.acos(Math.max(-1, Math.min(1, aim))) * 180 / Math.PI).toFixed(2)}° off the line to a head`
           + ` ${(eyeAt.y - c2[1]).toFixed(2)} m above it, and it tilts ${(Math.asin(Math.abs(M2[9])) * 180 / Math.PI).toFixed(1)}° out of level to do it`
-          + ` · its own across stays level (rise ${rise.toFixed(6)})`);
+          + `, and its own across stays level (rise ${rise.toFixed(6)})`);
       }
 
       // The far pane, only if the board answered. A lane with nothing to say
@@ -1885,11 +2027,220 @@
         d.assert('the box’s picture decoded here', farDecoded > 5, `${farDecoded} frames`);
         d.assert('and arrived without the relay dropping any', farGaps === 0, `${farGaps} lost`);
       } else {
-        d.log('box not sending · right pane has nothing to report', 'warn');
+        d.log('the box is not sending, so the right pane has nothing to report', 'warn');
+      }
+
+      /**
+       * 🔴 THE PICTURE REPORTS ITS OWN DAMAGE. `createDiagram` collects every
+       * label it had to shorten, every note over about forty words, every link
+       * it could not route and a title passed alongside `how`, and a page that
+       * never reads that list ships a cut label looking exactly like a picture
+       * that is fine.
+       */
+      d.assert('nothing in the picture was cut, shortened or left undrawn',
+        (dg.cuts?.length ?? 0) === 0,
+        (dg.cuts?.length ?? 0) === 0 ? `${dg.ties ?? 0} tie(s), nothing reported`
+          : dg.cuts.map((c) => `${c.id}: ${c.shown}`).join(', '));
+      /**
+       * 🔴 AND IT IS LAST, UNDER THE STANDING HEADING. `how` and `atEnd` are
+       * `createDiagram`'s THIRD argument, so writing them inside the spec gives
+       * two unread keys rather than an error: nothing can see it, not the
+       * parser, not `cuts`, not the suite. Another page shipped with no heading
+       * and its picture above the log for exactly that.
+       */
+      const kids = [...document.body.children].map((e) => e.className.split(' ')[0]);
+      const fig = kids.lastIndexOf('pos-dg');
+      d.assert('the picture is the last thing on the page, under the standing heading',
+        fig === kids.length - 1 && kids[fig - 1] === 'pos-how'
+          && document.querySelector('.pos-how')?.textContent === 'How it works',
+        `${kids.join(' -> ')}, heading "${document.querySelector('.pos-how')?.textContent || 'none'}"`);
+
+      /**
+       * 🔴 NOTHING IN A FOOTER IS DRAWN ON TOP OF ANYTHING ELSE, AND THIS IS
+       * THE REGRESSION THIS CHECK EXISTS FOR. Reported 2026-09-19 from a crop
+       * of the far pane on a DESKTOP: the presence dot was painted over the
+       * first label and a value ran under the ⛶. The cause was two rows of the
+       * footer's grid resolving to ZERO width, because an `auto` track's growth
+       * limit is its max-content and the flexible tracks beside it are only
+       * given what is left. MEASURED before the repair at 1280 px: left slot
+       * 0 px with the dot 2 px inside the centre, right slot 0 px with the
+       * button 2 px inside it.
+       * ⚠️ IT ASKS WHERE THE INK IS, NOT WHAT THE STYLESHEET SAYS. A rule that
+       * is present and inert reads exactly like one that works, which is why
+       * this measures two rectangles against a third rather than reading
+       * `grid-template-columns` back.
+       */
+      {
+        const bad = [], said = [];
+        for (const [name, pane] of [['here', local], ['box', far]]) {
+          const mid = pane.panel.foot.querySelector('.pos-vp-c').getBoundingClientRect();
+          const dot = pane.pres ? pane.pres.el.getBoundingClientRect() : null;
+          const btn = pane.panel.foot.querySelector('.pos-vp-r button')?.getBoundingClientRect() ?? null;
+          if (dot && dot.right > mid.left + 0.5) {
+            bad.push(`${name}: the dot is ${(dot.right - mid.left).toFixed(1)} px into the facts`);
+          }
+          if (btn && btn.left < mid.right - 0.5) {
+            bad.push(`${name}: the fullscreen button is ${(mid.right - btn.left).toFixed(1)} px into the facts`);
+          }
+          said.push(`${name} ${Math.round(mid.width)} px of facts between `
+            + `${dot ? Math.round(dot.width) : 0} and ${btn ? Math.round(btn.width) : 0}`);
+        }
+        d.assert('nothing in a panel footer is drawn on top of anything else',
+          bad.length === 0, bad.length ? bad.join(', ') : said.join(', '));
+      }
+      /**
+       * 🔴 THE FOUR CONTROL ROWS SHARE ONE LABEL COLUMN. Asked with the 2x2
+       * grid, because columns are what make a ragged left edge visible: `LOOK`,
+       * `MIRRORS`, `GRAIN` and `HUE` are four different widths and in a wrapped
+       * row nobody could see it. What is graded is the OFFSET of each segment
+       * inside its own cell, which is the same number at every width: 56 px in
+       * two columns, 0 px on a phone where the label goes on its own line.
+       * ⚠️ A PIXEL FLOOR CAN BE OUTGROWN, which is the whole reason this is a
+       * check rather than a comment. A label wider than the reserve pushes its
+       * own segment along and nothing else moves, so the row goes quietly
+       * ragged again and only a comparison can see it.
+       */
+      {
+        const rows = [...knobRow.children].map((c) => {
+          const lab = c.querySelector('.pos-choice-l, .pos-pick-l');
+          const seg = c.querySelector('.step');
+          return { name: lab ? lab.textContent : '?',
+                   at: +(seg.getBoundingClientRect().left - c.getBoundingClientRect().left).toFixed(1) };
+        });
+        const spread = Math.max(...rows.map((r) => r.at)) - Math.min(...rows.map((r) => r.at));
+        d.assert('the four control rows start their options at one place, so the labels share a column',
+          rows.length === 4 && spread < 0.5,
+          `${rows.map((r) => `${r.name} at ${r.at}`).join(', ')}, spread ${spread.toFixed(1)} px`);
+      }
+
+      // 🔴 A CONTROL THAT IS SWITCHED OFF STILL HAS ITS SUBJECT GRADED, AND
+      // WITHOUT THIS THE TWO SESSION BRANCHES WOULD HAVE LEFT THE RUN IN
+      // SILENCE. Both buttons go off on any browser that cannot open a session,
+      // so on this machine nothing presses them: ten asserts that used to fire
+      // on every run, gone, with the page still reading green. That is this
+      // project's oldest failure and it arrives here by way of a repair. The
+      // same call the button makes is made for whichever mode nobody reached;
+      // in a headset both controls are live, a visitor presses them, and this
+      // does nothing.
+      // ⚠️ BEHIND THE GATE. A self-check never runs for a visitor, and a
+      // visitor who could press these is a visitor for whom this is a no-op.
+      if (SELFCHECK) {
+        for (const mode of [XR_MODE.vr, XR_MODE.ar]) {
+          if (!graded[mode]) await enterHeadset(mode);
+        }
       }
 
       d.ready();
   }
+  /**
+   * 🔴 THE PICTURE GOES LAST AND IT IS REFERENCE. `{ how: true, atEnd: true }`
+   * and no title: the heading lives in `diagram.mjs` so no page can invent a
+   * second wording for it. A diagram is read once, on purpose, by somebody who
+   * has already watched the two pictures and wants to know what is behind
+   * them, which is under the controls rather than in front of them.
+   *
+   * ⚠️ BUILT BEFORE THE CHECKS START, because `runChecks` reads `dg` and a
+   * `const` below the line that reads it is this file's most repeated defect.
+   */
+  const dg = createDiagram(d.el, {
+    caption: 'What crosses is the shader text, not the picture: each end puts its own version '
+      + 'line on the same body, and only the board’s result comes back as video.',
+    nodes: [
+      /**
+       * ⚠️ `join: false`. These two are not a chain and an arrow between them
+       * would say they were: one draws a shader, the other draws frames that
+       * arrived from somewhere else, and they never touch. The container's own
+       * box already carries everything their neighbouring says.
+       * ⚠️ AND NO `sub` AND NO `note` ON A CONTAINER. A box holding other boxes
+       * is a machine, and the boxes inside it name it better than a phrase
+       * above them can.
+       */
+      { id: 'browser', label: 'Browser', kind: 'here', tech: 'browser', join: false,
+        children: [
+          { id: 'webgl', label: 'WebGL2', sub: 'left picture', tech: 'graphics',
+            note: 'One fragment shader, compiled here as GLSL ES 3.00 and reading its own last '
+              + 'frame back as a trail. Its clock is a frame counter rather than wall time.' },
+          { id: 'codecs', label: 'WebCodecs', sub: 'right picture', tech: 'graphics',
+            note: 'A hardware H.264 decoder, fed each frame as it lands and drawn straight onto '
+              + 'a canvas. It has to start on a keyframe, so a late joiner waits up to a second.' },
+        ] },
+      /**
+       * 🔴 ONE DURABLE OBJECT, DRAWN AS TWO BOXES BY ROLE. With a single box
+       * three arrows would meet at one node and the return would have to be
+       * routed back through the picture. Split by what each half carries it is
+       * a ring: out along the top, down the board, back along the bottom.
+       * ⚠️ IT IS NOT TWO RELAYS. A drawing may split a thing by role to be
+       * read; it may not invent a second machine, which is what `Relay object`
+       * under each of them is there to say.
+       */
+      { id: 'cf', label: 'Cloudflare', kind: 'cloud', tech: 'cloudflare', join: false,
+        children: [
+          { id: 'out', label: 'shader', sub: 'Relay object', tech: 'cloudflare',
+            note: 'The shader text crosses as one string and each end puts its own version line '
+              + 'on it. That is what makes the claim literal rather than two copies kept in step.' },
+          { id: 'back', label: 'video', sub: 'Relay object', tech: 'cloudflare',
+            note: 'A second socket, because the relay counts messages per socket and video would '
+              + 'crowd out the sound. Each frame carries a sequence number, the only witness to a '
+              + 'dropped one.' },
+        ] },
+      { id: 'pi', label: 'Raspberry Pi', kind: 'device', tech: 'raspberry',
+        children: [
+          { id: 'v3d', label: 'v3dpipe', sub: 'GLES 3.1', tech: 'graphics',
+            note: 'The board compiles the same body on its own graphics chip and draws 1280x720 '
+              + 'thirty times a second. Nothing in that picture is copied from this browser.' },
+          { id: 'enc', label: 'ffmpeg', sub: 'H.264, 2Mbit', tech: 'graphics',
+            // ⚠️ NO DEVICE PATH IN HERE. A note is read by a visitor, and the
+            // name of a node under /dev tells them nothing and tells a reader
+            // of the code something they could have grepped.
+            note: 'One hardware encoder, and it is a single exclusive device that a second '
+              + 'program cannot have. Its frames leave as raw H.264 with nothing wrapped '
+              + 'round them.' },
+        ] },
+    ],
+    // One way round, and it is a ring. Out along the top, down the board, back
+    // along the bottom. ⚠️ `back: true` IS AN AUTHOR FLAG and nothing infers
+    // it: without it a right to left link is laid out as a forward step and
+    // drawn through whatever stands in the way.
+    links: [
+      // ⚠️ BOTH HALVES OF A JOURNEY CARRY THE SAME LABEL, because the same
+      // thing is travelling. One arrow naming the format and the next saying
+      // nothing reads as two different journeys.
+      { from: 'webgl', to: 'out', label: 'GLSL' },
+      { from: 'out', to: 'v3d', label: 'GLSL' },
+      // 🔴 NO LABEL BETWEEN TWO BOXES IN ONE MACHINE, AND THE DRAWER REFUSES
+      // ONE. The gap two stacked children share is sixteen pixels tall and half
+      // a box wide, so a name in it either runs under both boxes or shrinks
+      // below being read. The direction is the whole message there and what
+      // travels goes in the note, which is read on hover with room for it.
+      { from: 'v3d', to: 'enc',
+        note: 'Raw RGBA out of the renderer and straight into the encoder, never touching a '
+          + 'file. One passes 1280x720 pixels a frame to the other thirty times a second.' },
+      /**
+       * 🔴 `H.264` IS THE PROJECT'S NAME FOR A PICTURE COMING BACK, SETTLED
+       * 2026-09-19: *"h.264 - unify label and longer desc on all diagrams where
+       * stream back pcm or mp4 video"*. Sound coming back is `PCM` on
+       * `/knobs/`, `/grains/` and the specimens in `/kit/`. This page already
+       * had the right word on both halves and had no note on either, which is
+       * the half that was missing: a label is WHAT TRAVELS, and the note is
+       * what that actually is.
+       * ⚠️ NEITHER NOTE REPEATS A BOX'S. `enc` already says the frames leave
+       * raw, `back` already says each one carries a sequence number, and
+       * `codecs` already says a joiner waits for a keyframe. What is left for
+       * these two is the number that was measured and the claim the page
+       * exists to make.
+       */
+      { from: 'enc', to: 'back', label: 'H.264', back: true,
+        note: 'One WebSocket message a frame, at 2 Mbit/s. That ceiling was measured rather '
+          + 'than chosen: at 8 the relay dropped 101 frames of 361 with no error, no close '
+          + 'and no backpressure.' },
+      { from: 'back', to: 'codecs', label: 'H.264', back: true,
+        note: 'This pane locks to the frame number that arrives, so the two pictures are '
+          + 'compared frame against frame. Anything still different between them is what the '
+          + 'encode and the network did to it.' },
+    ],
+    // ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC.
+  }, { how: true, atEnd: true });
+
   (async () => {
     for (let i = 0; i < 30 && farDecoded === 0; i++) await new Promise((r) => setTimeout(r, 400));
     if (farDecoded === 0) d.log('the box did not send in 12 s. Checking the left pane only', 'warn');
@@ -1901,7 +2252,7 @@
   // activation, so the button still has to be pressed. This only means you do
   // not have to find it, which through a headset is most of the work.
   if (new URLSearchParams(location.search).has('xr')) {
-    const b = d.button('xr');
+    const b = xrGroup.button('vr');
     if (b) { b.scrollIntoView({ block: 'center' }); setTimeout(() => b.focus(), 60); }
   }
 </script>

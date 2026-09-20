@@ -795,9 +795,19 @@ for (const t of targets) {
   ok('__demo.ready', ready);
   if (!ready) { console.log(`        failed: ${await ev('window.__demo && window.__demo.failed')}`); continue; }
 
-  const meta = await ev('({ name: __demo.name, keys: Object.keys(__demo.readout) })');
+  const meta = await ev('({ name: __demo.name, keys: Object.keys(__demo.readout), readoutOptOut: !!__demo.readoutOptOut })');
   ok('identity matches manifest', meta.name === t.name, meta.name);
-  ok('declares a readout', meta.keys.length > 0, meta.keys.join(','));
+  // ⚠️ THE SAME OPT-OUT `demo/verify.mjs` HAS, AND THIS FILE DID NOT GROW IT.
+  // A page may declare that it has nothing to put in a readout, and it says so
+  // with `readout: null` rather than by omitting the field, so "this page's
+  // subject is visible rather than numeric" cannot be confused with somebody
+  // forgetting. `verify.mjs` has read that flag since `/typist/` shipped; this
+  // harness went on asserting a readout, so `/floor/` dropping its four cells
+  // on 2026-09-19 would have taken this file red on a page where nothing is
+  // wrong. Two harnesses grading one rule two ways is the defect, not the page.
+  ok(meta.readoutOptOut ? 'declares that it has no readout, on purpose' : 'declares a readout',
+    meta.readoutOptOut || meta.keys.length > 0,
+    meta.readoutOptOut ? 'the page itself is the readout' : meta.keys.join(','));
 
   // Every control, in order, WITH A USER GESTURE — a multi-step demo does not
   // put its asserts behind the first button, and an XR demo cannot enter a

@@ -41,9 +41,15 @@
 // but there are two pages, so one of them would be wired and one would not —
 // which is a button that looks live on one page and is inert on the other.
 // `observe` is handed the session every frame, so both pages get it for free.
-// ⚠️ It is a THIRD way out, beside the page's own. It cannot be the only one: a
-// button drawn on a tablet that only exists once a grip pose has resolved has
-// two conditions in front of it, and an exit with conditions is not an exit.
+// ⚠️ It is a THIRD way out and it cannot be the only one: a button drawn on a
+// tablet that only exists once a grip pose has resolved has two conditions in
+// front of it, and an exit with conditions is not an exit.
+// ⚠️ THE FIRST TWO ARE NOT THE PAGE'S ANY MORE, WHICH IS THE SAME ARGUMENT THIS
+// NOTE MAKES, APPLIED TO THE HOLD. Since 2026-09-19 a long hold on any
+// controller button is mounted on the SESSION by `demo/shell/xr-quit.mjs` and
+// advanced by the session's own frame loop, for exactly the reason written
+// above: a page that has to remember a line is a page where one of them will
+// not, and `/blocks/` was the one that did not.
 
 import { pickQuad } from './xr-pick.mjs';
 import { holdM, GRIP_PARTS } from './xr-room.mjs';

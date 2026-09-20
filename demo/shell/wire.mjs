@@ -198,7 +198,7 @@ export function openWire(room, {
       const max = s2.limits?.maxSockets;
       stats.roomSockets = s2.sockets;
       stats.refusal = (max && s2.sockets >= max)
-        ? `the room is full · ${s2.sockets} of ${max} sockets, and the relay refuses the next one rather than dropping it`
+        ? `the room is full at ${s2.sockets} of ${max} sockets, and the relay refuses the next one rather than dropping it`
         : null;                       // reachable and not full: an ordinary network failure
     } catch (e) {
       stats.refusal = `the relay is unreachable (${e.message})`;
