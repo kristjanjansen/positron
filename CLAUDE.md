@@ -1,8 +1,11 @@
 # positron
 
-Live at **https://positron.studio**. 47 shelled demos of 49 rows
-(2026-09-20, counted from `DEMOS` rather than remembered). `making` and `held`
-are the newest, both 2026-09-19. `making` is the MIMproject archive: the
+Live at **https://positron.studio**. 51 shelled demos of 53 rows
+(2026-09-21, counted from `DEMOS` rather than remembered). `evo` is the newest,
+2026-09-21, and it is the third hardware panel after `circuit` and `model`.
+⚠️ **THIS READ `47 of 49` AND NAMED A DEMO FROM TWO DAYS EARLIER**, which is
+the same drift the warning below is about, arriving again in the same file that
+warns about it. The count is one command and it is written out below. `making` is the MIMproject archive: the
 recordings and the pictures that outlived the project's own website, on two
 tabs. ⚠️ THE FIGURES HERE READ `43 of 46` AND `tapes is the newest` FOR FOUR
 DAYS AND THREE DEMOS, which is the drift this file's own rule is about, and the
@@ -1867,7 +1870,7 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
   one list and one form is furniture. 🔴 **`min-width: 0` or a scrolling row
   drags the PAGE sideways instead of scrolling**: `overflow-x` cannot shrink a
   flex item below its content, and 390 px measured 141 px of page overflow.
-- 🔴 **A LAYOUT CLAIM IS A MEASUREMENT, AND `/rack/` WAS CORRECTED BY
+- 🔴 **A LAYOUT CLAIM IS A MEASUREMENT, AND `/model/` WAS CORRECTED BY
   SCREENSHOT TWELVE TIMES IN ONE EVENING.** Every one was plausible reasoning
   that a rect would have refused. The pattern is worth more than any of them:
   **when somebody reports what they SEE, the cause is usually one layer
@@ -1946,14 +1949,14 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
   FROM OUTSIDE IT: a value readout, a reserved top label slot, a name
   underneath.
   🔴 **SO A ROW OF DIFFERENT CONTROLS CANNOT BE ALIGNED BY A CALLER, AND THREE
-  SCREENSHOTS IN ONE EVENING PROVED IT.** `/rack/` was reported with buttons a
+  SCREENSHOTS IN ONE EVENING PROVED IT.** `/model/` was reported with buttons a
   label too low, then with two labels ending on different lines, then with a
   lane starting 30 px below the button beside it. Every one was the page doing
   arithmetic about a component's insides.
   ✅ **ONE HEAD AND ONE FOOT FOR EVERY CONTROL, PUBLISHED IN `shell.css`**, and
   then `.pos-crow` is plain `flex-end` and the browser does it. A page that
   writes its own margin correction here is a page that breaks the moment a
-  component gains a label, which is exactly what happened: `/rack/` lifted its
+  component gains a label, which is exactly what happened: `/model/` lifted its
   button column by a foot's height, which was right until the pads grew one.
   ⚠️ **A SLOT IS RESERVED EVEN WHEN EMPTY.** A pad with no top label still
   takes `--ctl-head`, or a grid whose downbeats are named has those pads
@@ -1964,7 +1967,7 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
   three. Counting two of them made a lane 115 px against the 145 it needed, and
   the error was exactly one reserved slot.
   🔴 **ASSERT THE ALIGNMENT, BECAUSE ARITHMETIC IN A COMMENT IS NOT EVIDENCE.**
-  `/rack/` grades three separate claims against real rects: lane top against
+  `/model/` grades three separate claims against real rects: lane top against
   the first button's top, lane bottom against the last button's bottom, and the
   two labels against each other. **Two of the three lined up while the third
   was 30 px out**, and a fourth run caught a dead selector in seconds when a

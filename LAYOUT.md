@@ -16,7 +16,7 @@ measured price of "fixing" them, so nobody re-litigates it from scratch.
 | | runs on | holds |
 |---|---|---|
 | `demo/` | **a browser** | the demo pages, the shared browser library (`shell/`), the harnesses that drive them, and the dev server |
-| `rig/` | **hardware we own** | the Raspberry Pi (`box/`), its renderer (`vis/`), the studio Mac (`m1/`), tools that talk to them |
+| `rig/` | **hardware we own** | the Raspberry Pi (`board/`), its renderer (`vis/`), the studio Mac (`m1/`), tools that talk to them |
 | `workers/` | **Cloudflare** | `relay`, `view`, `pub`, `backlog`, `ingest` — one directory each |
 | `timeline/` | **anywhere** | the library: decks, scores, the strip. Imported by pages and by node |
 | `src/` | **a shell** | the publisher and its stream tooling |
@@ -26,8 +26,8 @@ That accounts for everything that executes. What remains is writing:
 
 | | |
 |---|---|
-| `plan-*.md` | 23 documents that PROPOSE and argue. The `plan-` prefix is the folder |
-| `research/` | 20 documents that REPORT what is out there or what was measured |
+| `plans/` | **61** documents that PROPOSE and argue. They moved out of the root on 2026-09-20 on instruction, with `git mv`, and 129 files referencing one by name were rewritten |
+| `research/` | **41** documents that REPORT what is out there or what was measured |
 | `results/`, `studio/`, `archive/` | measurements and captures, mostly untracked |
 | `CLAUDE.md` `LESSONS.md` `PROGRESS.md` `HANDOFF.md` | the standing rules, why they exist, what was measured when, and where we are |
 
@@ -52,9 +52,9 @@ That accounts for everything that executes. What remains is writing:
 4. **Something that runs on the Pi or the Mac** → `rig/<machine>/`, and
    **declare its dependencies in `rig/audit.mjs`**. A machine set up by typing
    is a machine nobody can rebuild.
-5. **A document** → `plan-<thing>.md` if it argues for something,
-   `research/<thing>-<date>.md` if it reports. Then SAY SO in the reply: a path
-   in a commit message is not a report.
+5. **A document** → `plans/plan-<thing>.md` if it argues for something,
+   `research/<thing>-<date>.md` if it reports. Then REPORT IT IN FULL in the
+   reply: a path in a commit message is not a report, and neither is a filename.
 6. **Somebody else's binary that one page needs** → `demo/<slug>/vendor/`, and
    **listed BY NAME in `workers/view/build.mjs`**, licence text beside it.
    `demoFiles()` enumerates one directory level and only web extensions, so it
@@ -182,10 +182,14 @@ unprefixed ones (`.step`, `.sld`, `.choice`) are ever renamed, match
 `class="…"` attributes and CSS selectors, never a bare identifier. And syntax
 check every module before believing it worked.
 
-**And the 23 `plan-*.md` files stay at the root.** Moving them into `plan/` is
-MEASURED at **421 references** — 74 paths and 347 bare prose citations like
-`plan-score §1`, where the name is functioning as a name rather than a path. The
-`plan-` prefix is already doing the folder's job.
+**~~And the 23 `plan-*.md` files stay at the root.~~ DONE 2026-09-20 ON
+INSTRUCTION: they are in `plans/`.** The reasoning above priced the move at
+**421 references**, 74 paths and 347 bare prose citations like `plan-score §1`
+where the name functions as a name rather than a path, and rejected it. An
+instruction supersedes it, the same way `radio1965`, `box` and `rig/box/`
+superseded their own rules. The prose citations were left as citations and the
+**129 files holding a real path were rewritten**; `archive/` was deliberately
+left alone.
 
 ---
 

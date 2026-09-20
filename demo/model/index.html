@@ -265,6 +265,7 @@
   import { createFader } from '/shell/fader.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode, classifyEncoder, classifyBend } from '/shell/midi-decode.mjs';
+  import { createMidiLog } from '/shell/midi-log.mjs';
 
   /**
    * 🔴 WHAT THIS PAGE IS. One channel of a TASCAM Model 12, on screen, moving
@@ -337,7 +338,7 @@ const PAN_SCALE = 2;
 
 
   const d = mount({
-    name: 'rack',
+    name: 'model',
     what: 'A TASCAM Model 12 on screen, moving when the real one moves.',
     // SIX CELLS, all of which move. `steps` is the relative knob's whole story:
     // it counts clicks, because a relative encoder has no position to report.
@@ -704,7 +705,7 @@ const PAN_SCALE = 2;
 
   function tap(b) {
     if (!LOCAL || tapDead || SELFCHECK) return;
-    pending.push({ from: 'rack', bytes: b.map((n) => n.toString(16).toUpperCase().padStart(2, '0')).join(' ') });
+    pending.push({ from: 'model', bytes: b.map((n) => n.toString(16).toUpperCase().padStart(2, '0')).join(' ') });
     if (tapTimer) return;
     tapTimer = setTimeout(() => {
       const batch = pending; pending = []; tapTimer = 0;
@@ -713,6 +714,14 @@ const PAN_SCALE = 2;
         .catch(() => { tapDead = true; });
     }, 500);
   }
+
+  /**
+   * 🔴 WHAT ARRIVED, BESIDE THE DESK IT MOVED. A kit module: three pages grew
+   * one of these on the same day, and the rule about a clock byte being
+   * counted rather than listed lives in there rather than in each of them.
+   */
+  const traffic = createMidiLog({ empty: 'press Listen, then move something on the desk' });
+  d.el.append(traffic.el);
 
   /**
    * One message from the desk, routed by arithmetic.
@@ -727,6 +736,20 @@ const PAN_SCALE = 2;
     const m = decode(b);
     if (m.flood) return;
     tap(b);
+    /**
+     * 🔴 A ROW FOR EVERY MESSAGE, BEFORE ANY OF THE ARITHMETIC BELOW. Asked
+     * 2026-09-21: *"add midi event logs to circuit and rack demos"*.
+     * 🔴 **AND IT MATTERS MORE ON THIS PAGE THAN ON ANY OTHER, BECAUSE THIS
+     * DESK SENDS RELATIVE CLICKS.** A pan encoder's `0x44` is four counter
+     * clockwise and reads as sixty eight if all you have is a number. The
+     * panel above is an interpretation of these bytes; the column of hex is
+     * the bytes. Seeing both is how the interpretation was checked in the
+     * first place.
+     * ⚠️ EVERYTHING GETS A ROW, INCLUDING WHAT THIS PAGE DROPS. The routing
+     * below returns early on any channel but 1, so a log fed after it would be
+     * silent about exactly the traffic somebody is hunting.
+     */
+    traffic.add(m);
 
     // ── a fader. The pitch bend CHANNEL is the strip, and channel 9 is the
     // master, which is why this is checked before anything assumes channel 1.
@@ -1144,6 +1167,29 @@ const PAN_SCALE = 2;
           Math.abs(x - y) <= 1.5, `fader label ${x.toFixed(1)}, pad label ${y.toFixed(1)}`);
       }
     }
+
+    /**
+     * 🔴 THE LOG IS GRADED. A pan click is the case this page exists to make:
+     * `0x44` is four counter clockwise and reads as sixty eight to anybody
+     * given only a number, so the hex has to be in the table beside the
+     * reading, and an assert has to say it is there.
+     */
+    d.assert('the log kept the raw bytes of a relative pan click',
+      traffic.el.textContent.includes('B0 10 44'),
+      `${traffic.count()} rows, looked for B0 10 44`);
+
+    // ⚠️ THE HALF THAT MATTERS: the routing below returns early on any channel
+    // but 1, so a log fed after it would be silent about the traffic somebody
+    // opened it to find.
+    const wasRows = traffic.count();
+    take([0xb4, 100, 7]);                    // CC 100 on channel 5: routed nowhere
+    d.assert('and a message this page routes nowhere is listed all the same',
+      traffic.count() === wasRows + 1 && traffic.el.textContent.includes('B4 64 07'),
+      `${traffic.count()} rows, looked for B4 64 07`);
+
+    d.assert('no flood reached the log',
+      !traffic.el.textContent.includes('F8 ') && !traffic.el.textContent.includes('FE '),
+      `${traffic.count()} rows`);
 
     d.assert('no secret in this page', !location.href.includes('token'));
   });

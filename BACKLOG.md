@@ -1,5 +1,126 @@
 ## Open
 
+### Asked 2026-09-21, while session 39 was reading the handoff
+
+- ✅ **DONE AND MEASURED 2026-09-21, `research/fasttrack-capture-2026-09-21.md`.**
+  The Circuit's left output is on **capture channel 1**, 48 kHz 16 bit, and one
+  ffmpeg command with `pan=mono|c0=c0` records it. **With the Circuit's output
+  and the interface gain both at maximum: peak -1.69 dBFS over 9.46 s and zero
+  clipped samples of 454,144.** Channel 2 is unused and is its own noise rather
+  than crosstalk, measured as a correlation of +0.030. Asked: *"reseach
+  how to use fastreack pro to capture circuit output (i have mono cable r -> r
+  conntected)"*. The cable is already patched. What is known before starting:
+  `plans/plan-fasttrack-mk425c.md` §2.2 measured the interface as TWO CoreAudio
+  devices, the capture half being `AppleUSBAudioEngine:M-Audio:FastTrack
+  Pro:2111300:4`, **1 stream, 2 channels, 16 bit, a continuous 8000 to 48000
+  range sitting at 48000**. ⚠️ **A DEVICE INDEX IS A SHARED MUTABLE GLOBAL**,
+  already paid for once here on `-f avfoundation -i ":0"`, so every command
+  resolves by NAME. ⚠️ **AND SILENCE HAS TWO CAUSES THAT READ IDENTICALLY**: a
+  capture with no microphone permission and a Circuit that is not playing both
+  measure as a floor, which is the deafness trap `rig/m1/README.md` was caught
+  by. A negative control is part of the answer, not a nicety.
+
+- 🔴 **A SENTENCE IN THIS REPOSITORY WAS WRONG AND IS FIXED: THE CHANNEL 16
+  FILTER IS DOCUMENTED.** `HANDOFF.md` and `demo/circuit/index.html` both said
+  the Circuit's master filter on CC 74 channel 16 *"is not what any manual
+  says"*. Novation's **Circuit Programmer's Reference Guide v1.1** has a whole
+  **Session Control** section addressed to channel 16 with that filter in it,
+  and its resonance on CC 71.
+  ⚠️ **AND `plans/plan-circuit-model12.md` §3.5 HAD ALREADY TABULATED THAT
+  SECTION**, out of the same document, before the sentence was written. The
+  claim came from the USER GUIDE, which does not cover it, generalised to *any
+  manual*. The measurement was always right; only the sentence about what is
+  documented was wrong. ✅ Corrected in the page 2026-09-21.
+
+- 🔴 **THE UNIVERSAL PATCH BAY, ASKED 2026-09-21 AS A DESIGN QUESTION.** *"I
+  want to start bringing these pieces together... a system where you can freely
+  map one signal to another"*, scoped to **MIDI and audio for now** and designed
+  so video, 3D, multi-presence and shaders can join later. Four questions were
+  set with it: the data model, the dispatching and routing logic, how the
+  language for describing a connection is abstracted, and a small demo built
+  from what already exists.
+  ⚠️ **THE DEMO WAS NAMED IN THE ASK**: MIDI keyboard → routing → Novation
+  Circuit → audio capture → stream or record. Every one of those four is now
+  measured, three of them today.
+  ✅ **ANSWERED IN `plans/plan-patchbay.md`**, reported in full in the reply.
+
+- ✅ **DONE 2026-09-21. `/evo/`, THE EVOLUTION MK-425C AS A HARDWARE LAYOUT,
+  24/24 GREEN.** 16 page asserts. The keys are drawn at notes 47 to 71 where
+  the wire says they are rather than corrected to 48 to 72, and the page says
+  in its own log that the instrument is a semitone flat. Six measured
+  controller numbers bind six of the eight knobs **in arrival order, with the
+  CC printed under each**, because nothing on the wire says which physical knob
+  sent which number and a position is not a measurement. Two knobs stay
+  unbound, which is asserted. Asked
+  2026-09-21: *"sorry, fitft, do evolution mk425c demo named evo"*, then
+  *"demo: hw layout"*. Slug `evo`, `demo/evo/index.html`, a row in
+  `demo/manifest.mjs`, the third panel after `/circuit/` and the Model 12.
+  ⚠️ **MOST OF WHAT THIS KEYBOARD SENDS IS READ OUT OF A 2006 MANUAL AND NOT
+  MEASURED**: `plans/plan-fasttrack-mk425c.md` §4.3 calls that the hole in the
+  middle of the plan. What IS measured is that its encoders are **absolute, not
+  relative**, settled by the sign bit against real hardware.
+  ⚠️ **IT IS THE ONLY PIANO KEYBOARD IN THE BUILDING**, 25 velocity sensitive
+  keys, a pitch wheel, a modulation wheel and a pedal socket, so the layout has
+  a control type the other two panels do not.
+  ⚠️ **AND A LAYOUT DOES NOT GO IN `.pos-controls`**: `demo/verify.mjs` presses
+  every button in that row on every run, dozens of times a day.
+
+- ✅ **DONE 2026-09-21. `/rack/` IS `/model/`, 35/35 GREEN.** `git mv` of the
+  directory, the `manifest.mjs` row, and the references in `CLAUDE.md`,
+  `shell.css`, `measured-devices-2026-09-20.md` and `plans/plan-panel-layouts.md`.
+  ⚠️ **THE WORD `rack` STAYED WHEREVER IT WAS A WORD**: `.rack-row`,
+  `.rack-lane`, `const rack` and every mention of the Ableton demo that used to
+  own the slug. The sweep matched the URL form and the slug, never the word,
+  which is the `/held/` lesson. Asked 2026-09-21: *"rename rack to
+  model"*. The slug, `demo/rack/`, the `manifest.mjs` row and every reference
+  move together, which this repo has done four times and has a rule for.
+  ⚠️ **THE DEPLOYED `/rack/` IS STILL THE ABLETON DEMO**, because nothing from
+  session 38 has been deployed. So the sequence matters: after this rename and a
+  deploy, `/able/` is the Ableton demo, `/model/` is the Model 12 and `/rack/`
+  **404s**. ✅ That is the GOOD outcome and it is the `/held/` lesson: a dead
+  link says no, a stale one opens a different page and says nothing.
+  ⚠️ **MATCH THE SLUG AND THE URL FORM, NEVER THE WORD.** `rack` is ordinary
+  English and is also the name of the thing in `rig/m1/`, and `/able/`'s own
+  prose records that it used to be called `rack`. A verbatim quotation is not
+  reworded to match a later decision.
+  ⚠️ **AND `archive/` IS LEFT ALONE.**
+
+- ✅ **DONE 2026-09-21, ON THREE PAGES AND AS A KIT MODULE.**
+  `demo/shell/midi-log.mjs`, used by `/circuit/`, `/model/` and `/evo/`. Five
+  columns, the raw bytes never replaced by the reading beside them, and the
+  policy that a clock byte is counted and never listed lives in the module
+  rather than in each page.
+  🔴 **THE ROW IS ADDED BEFORE THE ROUTING, NOT AFTER**, so a message the panel
+  cannot place is still listed. That is asserted on both pages by feeding a CC
+  on channel 5 that neither page routes anywhere. Assert counts moved 19 to 22
+  on `/circuit/` and 24 to 27 on `/model/`, every one accounted for. Asked 2026-09-21: *"add
+  midi event logs to circuit and rack demos"*. `demo/circuit/index.html` and
+  `demo/model/index.html`. ⚠️ **THE DECODER ALREADY EXISTS AND IS GRADED**:
+  `demo/shell/midi-decode.mjs`, 47 asserts with no browser, written for
+  `/dump/`. This is a page using it, not a second reading of the same bytes.
+  ⚠️ **AND THE TWO PAGES FACE OPPOSITE DIRECTIONS**: `/circuit/` SENDS (note on,
+  note off, Start, Stop) and `/model/` RECEIVES (pan encoders, faders). A log that
+  does not say which way a message went is a log that cannot be read on either
+  page. ⚠️ A log line is something a visitor reads, so no file paths and no
+  warning emoji in it.
+
+- ✅ **RESEARCHED 2026-09-21, `plans/plan-circuit-editor.md`.** An editor needs
+  NO SysEx to edit: **374 parameters are addressable live, 98 by CC and 276 by
+  NRPN**, on channels 1, 2 and 16. The 64 pack files were measured byte for byte
+  and match the published format exactly. 🔴 **`Replace Current Patch` and
+  `Replace Patch` differ by ONE BYTE at offset 6, and the second one overwrites
+  flash on a device with no factory reset**, so an editor here must be unable to
+  express it. Nothing was sent to the device. Asked: *"also research circuit synth
+  editor"*. What is already in hand: `New Pack.circuitpack` holds **64 patches
+  of exactly 350 bytes**, each starting `F0 00 20 29 01 60`, which is a Novation
+  SysEx header and is a format that can be read here with no device at all.
+  ⚠️ **`demo/shell/midi.mjs` ASKS `{ sysex: false }`**, already an open line
+  below, so no page in this repo can send or receive one of these today.
+  ⚠️ **AND `/circuit/` CANNOT EXPRESS A PATCH CHANGE BY CONSTRUCTION**: its
+  `send()` has no path for a control change, a program change or SysEx, and that
+  guard is asserted on purpose.
+
+
 ### The instruments, 2026-09-21
 
 - 🔴 **`/circuit/`: HOW WIDE THE CARD SHOULD BE IS UNANSWERED, AND IT WAS ASKED
@@ -40,27 +161,27 @@
   which is the mistake already made once here: names were read as empties, and
   re-measuring gave **32 distinct fingerprints, none empty**.
 
-- **`/rack/`: ALIGN THE CHANNEL STRIP CONTENT TO THE BOTTOM.** *"tascam: align
-  channel strip content to bottom"*, `demo/rack/index.html`. ⚠️ The wrap is
+- **`/model/`: ALIGN THE CHANNEL STRIP CONTENT TO THE BOTTOM.** *"tascam: align
+  channel strip content to bottom"*, `demo/model/index.html`. ⚠️ The wrap is
   `align-items: stretch` ON PURPOSE and there is a comment saying so, so this
   is a change to what the strip does inside its own column rather than to the
   row. Re-read that comment before touching the row.
 
-- **`/rack/`: ALIGN MAIN AND SUB TO THE BOTTOM.** *"align main/sub to the
+- **`/model/`: ALIGN MAIN AND SUB TO THE BOTTOM.** *"align main/sub to the
   bottom"*, same file, the FX and master lane pinned right.
 
-- **`/rack/`: THE TITLE GOES RIGHT.** *"model 12: title to right"*. `/circuit/`
+- **`/model/`: THE TITLE GOES RIGHT.** *"model 12: title to right"*. `/circuit/`
   prints `NOVATION` left and `CIRCUIT` right because the panel does; the Model
   12 prints its maker's name on the right only.
 
-- **`/rack/`: `MAX_STEP = 8` IS A GUESS AND IT IS THE LAST ONE LEFT.** A SLOW
+- **`/model/`: `MAX_STEP = 8` IS A GUESS AND IT IS THE LAST ONE LEFT.** A SLOW
   turn was measured at magnitude 2 a detent. Nobody has measured a FAST spin, so
   the ceiling that stops a flick crossing the whole pan range is a number
   somebody chose. ⚠️ The way to measure it is `/dump/` plus one instruction to
   the user, which is how every other number on that page was got.
 
 - 🔴 **NEITHER NEW PAGE IS GRADED ON A PHONE.** `demo/verify.mjs` runs at
-  756 px and never enters the media query, so every phone rule in `/rack/` and
+  756 px and never enters the media query, so every phone rule in `/model/` and
   `/circuit/` is the fourth kind of dead CSS: it reads as done, nothing
   contradicts it, and the first person to find out is holding a phone. ⚠️ This
   is not specific to these two pages and is worth a harness width rather than

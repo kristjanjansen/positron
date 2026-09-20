@@ -227,6 +227,8 @@
   import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
   import { createTable } from '/shell/table.mjs';
+  import { createMidiLog } from '/shell/midi-log.mjs';
+  import { decode } from '/shell/midi-decode.mjs';
   import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -300,6 +302,10 @@
       d.log(`${title} did not build: ${e.message}`, 'bad');
     }
   }
+
+  // The MIDI log specimen's own state, declared out here for the reason the
+  // comment below gives: a block that moves must not leave its `const` behind.
+  let kitMidi = [], kitMidiListed = 0, kitMidiLog = null;
 
   // The four specimen badges, by state, so the geometry asserts at the bottom
   // can measure them. ⚠️ DECLARED HERE RATHER THAN BESIDE THE BLOCK: this
@@ -401,6 +407,34 @@
    * below gives: both harnesses press that row by position, so a new top block
    * with controls in it moves every other block's press.
    */
+  /**
+   * 🔴 NEWEST AT THE TOP, WHICH IS THE RULE. Somebody reading this page is
+   * checking what the kit has, and what they do not know about is what arrived
+   * since they last looked.
+   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the block below
+   * gives: both harnesses press that row by position.
+   */
+  section('MIDI LOG',
+    'What arrived on the wire, in columns, under the panel it moved. The raw bytes are a '
+    + 'column of their own and are never replaced by the reading beside them, because a '
+    + 'relative encoder reads as a position if all you have is an interpretation. A clock '
+    + 'byte is counted and never listed.',
+    `const log = createMidiLog({ empty: 'press Listen, then play something' })
+log.add(decode(bytes))     // false if it was a flood and was not listed`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const log = createMidiLog({ empty: 'nothing has arrived yet' });
+      box.append(log.el);
+      // A known stream, so the specimen shows real readings rather than a shape.
+      // ⚠️ THE LAST TWO ARE FLOODS AND MUST NOT APPEAR. The checks at the foot
+      // of this file read that back, which is what makes this a specimen rather
+      // than a picture of one.
+      kitMidi = [[0x90, 60, 100], [0x80, 60, 0], [0xb0, 74, 64],
+                 [0xe0, 0x00, 0x40], [0xb0, 80, 127], [0xf8], [0xfe]];
+      kitMidiListed = kitMidi.filter((b) => log.add(decode(b))).length;
+      kitMidiLog = log;
+    });
+
   section('GLUED TRANSPORT BAR',
     'A panel and its transport bar wrapped in one edge with a 1 px seam. The toggle holds '
     + 'both of its words at once, so it cannot change width when it changes state.',
@@ -3296,6 +3330,32 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
     }
   }
 
+  /**
+   * 🔴 THE MIDI LOG, GRADED HERE BECAUSE THIS IS THE PAGE THAT CAN SEE ALL OF
+   * IT AT ONCE. Seven messages went into the specimen and two of them are a
+   * clock byte and an active sensing byte.
+   */
+  if (kitMidiLog) {
+    d.assert('the log listed five of seven and refused both floods',
+      kitMidiListed === 5 && kitMidiLog.count() === 5,
+      `${kitMidiListed} added, ${kitMidiLog.count()} rows, of ${kitMidi.length} messages`);
+
+    // ⚠️ THE NEGATIVE HALF. A component that listed everything would pass the
+    // line above by counting differently, so this reads the rendered text.
+    const text = kitMidiLog.el.textContent;
+    d.assert('and neither flood byte is anywhere in the rendered table',
+      !text.includes('F8') && !text.includes('FE'), 'looked for F8 and FE');
+
+    d.assert('every row kept its raw bytes beside the reading',
+      text.includes('90 3C 64') && text.includes('C4, velocity 100'),
+      'looked for the hex and the reading of one note on');
+
+    // A pitch bend is the case where a reading and its bytes disagree most:
+    // little endian, fourteen bit, centre 8192.
+    d.assert('a pitch bend is listed as its bytes and read as its value',
+      text.includes('E0 00 40') && text.includes('8192'),
+      'looked for E0 00 40 and 8192');
+  }
 
   d.ready();
 

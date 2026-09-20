@@ -491,11 +491,15 @@ export const DEMOS = [
   // Multi-Output Device and Live's own output setting are all out of the path.
   // MEASURED over the relay: silence 0.00000, keys down -5.3 dBFS.
   /**
-   * 🔴 THE HARDWARE ON THE DESK, ON SCREEN. The name was freed on 2026-09-20
-   * when the Ableton page became `able`: *"rename old rack demo to able, make
-   * new rack demo with out hw layouts. start with model 12 single strip (1)"*.
-   * ⚠️ **A KEPT LINK TO `/rack/` NOW OPENS SOMETHING ELSE**, which is the
-   * `/held/` situation rather than the `radio1965` one. A 404 at least says no.
+   * 🔴 THE HARDWARE ON THE DESK, ON SCREEN. It was called `rack` for one day.
+   * The Ableton page gave that name up on 2026-09-20 — *"rename old rack demo
+   * to able, make new rack demo with out hw layouts. start with model 12
+   * single strip (1)"* — and this page gave it up again on 2026-09-21:
+   * *"rename rack to model"*.
+   * ✅ **SO `/rack/` 404s AND THAT IS THE GOOD OUTCOME.** For one day a kept
+   * link to it opened a DIFFERENT page and said nothing about it, which is the
+   * `/held/` situation and the one failure mode worse than a dead link. A 404
+   * says no. Nothing points at `/rack/` any more.
    * ⚠️ AND EVERY NUMBER IN IT IS MEASURED. TASCAM publishes no note numbers and
    * no controller numbers for Mackie Control at any firmware revision, so the
    * page is built on `measured-devices-2026-09-20.md` and would otherwise be
@@ -503,7 +507,7 @@ export const DEMOS = [
    */
   /**
    * 🔴 THE SECOND HARDWARE PANEL, AND IT WAS BUILT THE OTHER WAY ROUND FROM
-   * `rack`. That one was laid out from reasoning and corrected twice by
+   * `model`. That one was laid out from reasoning and corrected twice by
    * somebody looking at the mixer; this one starts from Novation's own artwork,
    * read at 800 dpi, with the MIDI bindings kept as a separate source.
    * ⚠️ **MOST OF THIS PANEL IS BOUND TO NOTHING AND SAYS SO.** Twenty two
@@ -514,7 +518,23 @@ export const DEMOS = [
     one: 'a Novation Circuit on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
-  { name: 'rack', group: 'instruments', act: 4, created: '2026-09-20', built: true,
+  /**
+   * 🔴 THE THIRD HARDWARE PANEL, AND ITS LAYOUT IS THE WEAKEST OF THE THREE.
+   * Asked 2026-09-21: *"do evolution mk425c demo named evo"*, *"demo: hw
+   * layout"*. `/circuit/` was drawn from Novation's own artwork at 800 dpi and
+   * the Model 12 was corrected twice by somebody looking at the mixer. Evolution
+   * Electronics no longer exists, there is no artwork, and the manual gives a
+   * NUMBERED LIST rather than a picture — so the counts are documented and the
+   * ARRANGEMENT is this page's own arithmetic, which it says on its face.
+   * ⚠️ WHAT IT SENDS IS MEASURED: global channel 2, keys 47 to 71 (a semitone
+   * flat), every release a note on at velocity 0, a seven bit pitch wheel in a
+   * fourteen bit message, and six controller numbers for eight knobs.
+   */
+  { name: 'evo', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+    one: 'an Evolution MK-425C on screen, moving when the real one moves',
+    tags: ['WebMIDI', 'CoreMIDI'] },
+
+  { name: 'model', group: 'instruments', act: 4, created: '2026-09-20', built: true,
     one: 'a TASCAM Model 12 on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI', 'Mackie Control'] },
 
