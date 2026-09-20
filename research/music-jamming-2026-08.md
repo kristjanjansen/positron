@@ -1,7 +1,7 @@
 # Networked music jamming — science, prior art, protocol options (2026-08-27)
 
 Marks: ✅ measured (ours) · 📄 documented (external, cited) · ⚠️ inferred.
-Companion to plan-timeline.md (C3 two-clock, C10 trace-vs-authoring, §5 MIDI
+Companion to plans/plan-timeline.md (C3 two-clock, C10 trace-vs-authoring, §5 MIDI
 stance) and research/timeline-own-prior-art-2026-08.md. Context for the
 proto/jam demos agent (port 8893) — its numbers get interpreted against this.
 

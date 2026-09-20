@@ -1,6 +1,6 @@
 # rig/vis — what the board can draw
 
-Three small C programs that produced every number in `plan-visuals.md` §3.
+Three small C programs that produced every number in `plans/plan-visuals.md` §3.
 ⚠️ **They were written into `/tmp` on the board and were one reboot from gone.**
 A measurement whose instrument cannot be rebuilt is an anecdote, so they live
 here now.
@@ -65,7 +65,7 @@ complexity, not resolution.**
 mainly for the 6–13% it is worth, but because under `ondemand` two runs of the
 same thing disagree by 7%: a GPU-bound workload does not look busy to a CPU
 governor, so the clock it gets depends on whatever ran just before it. That is
-how the first governor A/B in `plan-visuals.md` went wrong, and the mistake is
+how the first governor A/B in `plans/plan-visuals.md` went wrong, and the mistake is
 recorded there rather than quietly corrected.
 
 🔴 **None of this works on a Pi 5.** Broadcom removed the H.264 block from

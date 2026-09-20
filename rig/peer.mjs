@@ -19,7 +19,7 @@
 // thing the page exists to measure cannot be wrong there: the skew estimator
 // has nothing to estimate. 🔴 Every number this project has for peer-to-peer
 // skew is therefore LOOPBACK, and `HANDOFF.md` has carried "min-RTT skew over a
-// real link" as unmeasured since it was written. `plan-jam.md` P1.
+// real link" as unmeasured since it was written. `plans/plan-jam.md` P1.
 //
 // 🔴 AND IT NEEDED NO NEW PROTOCOL. `proto/looper/peer.mjs` is DOM-free by
 // design — a transport is two functions — and `wsTransport` uses only the
@@ -32,7 +32,7 @@
 // ⚠️ WHAT THIS CANNOT TELL YOU, said here because the number is the point.
 // The offset printed below is the estimator's OWN answer. It is not a
 // measurement of how right the estimator is — a clock cannot grade itself, and
-// reading agreement off the thing being graded is the circularity `plan-jam.md`
+// reading agreement off the thing being graded is the circularity `plans/plan-jam.md`
 // §4 P3 exists to avoid. What this DOES give honestly is the round trip, which
 // is measured entirely at this machine on one clock, and the estimator's
 // convergence, which is a fact about the estimator.

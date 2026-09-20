@@ -1,6 +1,6 @@
 // positron-station: one continuous source for a station that is a schedule.
 //
-// The whole design is in plan-station.md and the measurements behind it are in
+// The whole design is in plans/plan-station.md and the measurements behind it are in
 // research/station-one-source-2026-09.md. In one paragraph: the station is an
 // HLS media playlist whose segments are `#EXT-X-BYTERANGE` ranges into whole
 // programme files in R2. This worker writes about 600 bytes of text every

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ===========================================================================
-// POSITRON STUDIO — ENGINE (plan-studio.md §5 Session B)
+// POSITRON STUDIO — ENGINE (plans/plan-studio.md §5 Session B)
 //
 //   git pull && node studio/engine.mjs      →  http://127.0.0.1:8899/
 //

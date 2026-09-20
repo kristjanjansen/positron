@@ -1,7 +1,7 @@
 # Loops in the lineage — what the wrap point already cost (2026-08-28)
 
 Mined from elektronstudio v1–v4, tracker, wakeup-synth, the relay, and this repo.
-Companion to `plan-timeline.md` §8. Marks: ✅ read here · 📄 documented · ⚠️ inferred.
+Companion to `plans/plan-timeline.md` §8. Marks: ✅ read here · 📄 documented · ⚠️ inferred.
 
 ## THE HEADLINE: the wrap is not an event, it is the absence of one
 ✅ tracker schedules every loop as

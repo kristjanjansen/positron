@@ -24,7 +24,7 @@ Encoder (x264/-re pacing) or CF segmenter?
 
 ## Checkpoints
 
-- [start] Context read (plan.md §1, EDGE-LAG-NOTES.md, edge-lag-blocking.py, push-llhls.sh).
+- [start] Context read (plans/plan.md §1, EDGE-LAG-NOTES.md, edge-lag-blocking.py, push-llhls.sh).
   Note: baseline ALREADY has `-tune zerolatency` (⇒ rc-lookahead=0, sync-lookahead=0,
   sliced-threads, no mbtree, bf=0) — dispatch arm A is moot; replaced with its inverse (ARM2).
   Next: per-part-index analysis of existing runs; env checks.

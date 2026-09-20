@@ -3,7 +3,7 @@
 //   node rig/board/cc-test.mjs --room studio-1
 //   node rig/board/cc-test.mjs --room studio-1 --bank 95 --program 6
 //
-// 🔴 STEP 0 OF `plan-controller.md`, AND IT IS THAT PLAN'S OWN LOAD-BEARING
+// 🔴 STEP 0 OF `plans/plan-controller.md`, AND IT IS THAT PLAN'S OWN LOAD-BEARING
 // UNKNOWN. `/knobs/` can be green in every cell it has and still be a page
 // where nothing happens: the send gate is graded with no browser, the relay
 // echoes what it delivered, and the board reports what it wrote to the synth.

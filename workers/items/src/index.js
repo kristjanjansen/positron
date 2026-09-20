@@ -1,6 +1,6 @@
 // workers/items — an editorial item, scheduled by an alarm and announced by FCM.
 //
-// The clean-room half of `plan-radio-messages.md`: one Durable Object owns the
+// The clean-room half of `plans/plan-radio-messages.md`: one Durable Object owns the
 // items, the schedule and the send. What it replaces is a per-minute cron on a
 // VM polling MySQL and asking "is anything due?" — almost always told no.
 //

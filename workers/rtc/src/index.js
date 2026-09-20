@@ -339,7 +339,7 @@ export class RtcRoom {
   }
 
   // The death signal. In the one-to-many world a closed socket kills the
-  // broadcast (plan.md §10); here it is the FEATURE: dead publishers emit no
+  // broadcast (plans/plan.md §10); here it is the FEATURE: dead publishers emit no
   // track-level events and their SFU sessions 410 only at +31–47 s (measured,
   // plan-m2m §5.4) — this broadcast is what tells survivors to tracks/close.
   async webSocketClose(ws) { await this.dropped(ws); }

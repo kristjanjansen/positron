@@ -17,7 +17,7 @@ analysis; residual uncertainty ~±25 ms.
 
 ## Checkpoints
 
-- [start] Context read: plan.md (§1 blocking-reload rationale, §2.1 LL tag set, §5 clock),
+- [start] Context read: plans/plan.md (§1 blocking-reload rationale, §2.1 LL tag set, §5 clock),
   PROGRESS.md (midday ground truth + session-2 dispatch), rig/edge-lag.sh (polling metric:
   edge = last_PDT + tail_parts×0.5, lag = t1 − edge), rig/push-llhls.sh (reads /tmp/li_key.txt,
   burns encoder epoch, writes epoch.txt to an OLD session scratchpad path — note: scratchpad
@@ -30,7 +30,7 @@ analysis; residual uncertainty ~±25 ms.
   chmod 600. `.env` holds only CF_ACCOUNT_ID/CF_API_TOKEN/realtime pair — no uid there.
 - [clock t_pre-session] sntp: `+0.157835 ± 0.016362 time.apple.com`,
   `+0.158626 ± 0.016125 time.cloudflare.com` — clock ~+158 ms FAST (matches dispatch
-  ~+159). Convention (per plan.md §5): positive = local ahead of true UTC.
+  ~+159). Convention (per plans/plan.md §5): positive = local ahead of true UTC.
   Correction: corrected_lag = raw_lag − offset. Will re-sample immediately
   before/after each measurement run.
 - [fix] `push-llhls.sh` SCRATCH pointed at a dead prior-session scratchpad (dir gone;
@@ -83,7 +83,7 @@ analysis; residual uncertainty ~±25 ms.
   Next: relaunch encoder via edgelag-enc, verify 60 s survival, then main run.
 - [dead end + encoder death #3 explained] The renamed-binary dodge FAILS: the copied
   `edgelag-enc` dies instantly and silently (`-version` prints nothing, empty log) —
-  exactly the ThreatLocker endpoint-control pattern from plan.md §15 ("silent instant
+  exactly the ThreatLocker endpoint-control pattern from plans/plan.md §15 ("silent instant
   process death with zero forensics"). Unapproved binary path = killed. So "death #3"
   was ThreatLocker, not a pkill. Reverting to the approved /opt/homebrew ffmpeg@7 path
   (FF default unchanged). New mitigation: babysitter loop in scratchpad that restarts

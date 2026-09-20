@@ -12,7 +12,7 @@
 //
 // ── WHY THIS EXISTS, AND WHY IT IS NOT A SHADER ────────────────────────────
 //
-// `plan-audio-shader.md` §8 makes a measurement the first commit, and §2.3
+// `plans/plan-audio-shader.md` §8 makes a measurement the first commit, and §2.3
 // says why:
 //
 //   "The parameter row is on the NEAR side of the wire and the grain row is on

@@ -312,7 +312,7 @@ export function createBoard({
     meterBuf = new Float32Array(meterNode.fftSize);
     /**
      * 🔴 THE COUNTERS EXISTED ALL ALONG AND NO PAGE HAD EVER READ ONE. They are
-     * posted every 250 ms from inside the worklet; `/rack/` sounded noisy for an
+     * posted every 250 ms from inside the worklet; `/able/` sounded noisy for an
      * hour while six separate measurements said its stream was perfect, because
      * the defect was downstream of every quantity being measured. A statistic
      * nobody displays is not instrumentation.

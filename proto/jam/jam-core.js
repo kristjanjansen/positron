@@ -256,7 +256,7 @@ export function makeJam(opts) {
       const env = await (await fetch('/env.json')).json();
       // elektron-jam was retired 2026-09-04; positron-ws does the same job
       // tokenless (ws.positron.studio). The 34.5 ms p50 recorded in
-      // plan-looper.md was measured against elektron-jam and keeps that name.
+      // plans/plan-looper.md was measured against elektron-jam and keeps that name.
       const ws = new WebSocket(`wss://ws.positron.studio/room/duet-${session}-${mode}/ws`);
       ws.binaryType = 'arraybuffer';
       await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('do ws failed')); });

@@ -12,7 +12,7 @@ scores in `tarmoj/vclick`; line 12 of each reads `t 0 $REPTEMPO`, `#define` /
 a twelve-line macro pass in front and **both compile clean** — 56 rows / 2
 sections / 1 warning, and 25 rows / 2 sections / 0 warnings, every `i` line
 accounted for. So the gap is one small, known, testable thing. But
-`plan-uuu-local.md` calls itself *"not started, and mostly already true"*, and
+`plans/plan-uuu-local.md` calls itself *"not started, and mostly already true"*, and
 its P1 — one real score through the compiler — was **untrue at the first
 statement of the first file**, for a week, while 42/42 read green.
 
@@ -157,7 +157,7 @@ different from `stream` is not knowable from outside. 📄 The HLS wrapper page
 that does exist, `https://live.uuu.ee/stream/`, loads `hls.js@latest` from
 jsDelivr — an unpinned CDN dependency in a live performance path.
 
-### 1.3 What `plan-uuu-local.md` said that has since become true — or was never true
+### 1.3 What `plans/plan-uuu-local.md` said that has since become true — or was never true
 
 Read that file's status line before this table: *"not started, and mostly
 already true."*
@@ -367,7 +367,7 @@ about where the bytes live that `demo/notes/uuu-positron.md` already flags:
 
 📄 U:'s material is four unlike things: Csound scores (vClick), video files
 (VideoSync), Icecast mounts (radio), and musician positions
-(`location-music` + BLE RSSI from `MeeBlueReader`). 🔴 `plan-score.md` §1's rule
+(`location-music` + BLE RSSI from `MeeBlueReader`). 🔴 `plans/plan-score.md` §1's rule
 applies with force: **a common vocabulary across unlike things is a lie about
 all of them.** Only the first is score material. The rest belong in the
 container as parts, or nowhere.
@@ -430,7 +430,7 @@ plays it. **If the ask is "let people hear the studio", stop reading here.**
 🔴 **For any box with a MIDI DIN socket, MIDI is the answer and it is not
 close.**
 
-📄 From `plan-hardware.md` §3, which surveyed eight boards for this repo's own
+📄 From `plans/plan-hardware.md` §3, which surveyed eight boards for this repo's own
 purposes and cites its sources:
 
 - A USB-MIDI interface is **$15–40** and needs no driver.
@@ -468,7 +468,7 @@ connector by two orders of magnitude.** ✅ Measured in `rig/m1/README.md`
 | the Durable Object itself | 0.18 ms — noise |
 | DIN MIDI, one note | **0.96 ms** |
 
-So buying a better connector to fix a 69 ms path is `plan-hardware.md` §2's
+So buying a better connector to fix a 69 ms path is `plans/plan-hardware.md` §2's
 argument in a new costume: *measuring the quantity next to the one in question*.
 
 ⚠️ **One real caveat, and it is this repo's, not theirs.**
@@ -486,7 +486,7 @@ attaching one device and proving a note sounds.**
 
 ⚠️ And one open question this repo already wrote down: *"Does Chrome on Arm Linux
 enumerate MIDI OUTPUTS? There is field evidence of Linux Chromium returning an
-outputs map of length zero"* (`plan-hardware.md` §6). If the answer is no, the
+outputs map of length zero"* (`plans/plan-hardware.md` §6). If the answer is no, the
 Pi drives MIDI natively through ALSA raw MIDI instead — ✅ which `rig/board/` is
 already doing for its own synths (`alsa.mjs`, 238 lines).
 
@@ -555,7 +555,7 @@ gear rather than broken software.**
 
 Marks: 📄 where a figure comes from a vendor or spec, ✅ where it is arithmetic
 done here or a number this repo measured. Prices are ⚠️ list prices as of
-September 2026 from `plan-hardware.md`'s survey, not quotes, and they go stale.
+September 2026 from `plans/plan-hardware.md`'s survey, not quotes, and they go stale.
 
 | option | latency | jitter | what it gives up |
 |---|---|---|---|
@@ -707,7 +707,7 @@ own counters upward.
   it. The objection is that it does not reach a voltage, not that it is slow.
 - **Dante/AES67** — the right answer to a question nobody has asked yet, and the
   bill arrives before the benefit.
-- **Bela, Daisy, Teensy as the first box** — 📄 `plan-hardware.md` §3 already
+- **Bela, Daisy, Teensy as the first box** — 📄 `plans/plan-hardware.md` §3 already
   worked this through: Bela's *"under 1 ms round-trip audio latency"* is real and
   it is about the leg that is already small, its guarantee covers the audio
   thread and not the network stack, and Teensy and Daisy have no network at all.
@@ -777,7 +777,7 @@ top of assumptions.
    numbers appear in p7 (`-5.2`, `-5.3`, `-6.2`, `-7.2`, `-8.2`, `-9.2`) with
    comments saying *"don't show red for
    beat 3"*. That convention is not written down anywhere. **This repo must not
-   invent a meaning for it** (`plan-score.md` §1), so it has to be asked.
+   invent a meaning for it** (`plans/plan-score.md` §1), so it has to be asked.
 4. **Does anything else generate these scores**, or are they typed by hand?
 
 ### 5.2 About the click track in the room

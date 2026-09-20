@@ -459,7 +459,7 @@ thing that travels, so `1,701,983 B against 6,659 B` is not the comparison.
 A PNG decoder is larger than most PNGs. That second question was put to the
 repo the day after this was written, and the pass that rejected it did so by
 quoting the paragraph below — which is how a right answer to the wrong question
-costs a day. §9 is the second question, measured. `plan-patch.md` is the design.
+costs a day. §9 is the second question, measured. `plans/plan-patch.md` is the design.
 Nothing in §5 is withdrawn; it is SCOPED.**
 
 **For Pappus specifically: SuperSonic, and only because the SynthDef is the
@@ -715,7 +715,7 @@ JACK.
 §5 priced scsynth as a demo's sound engine. This is the question it did not ask:
 **can a synth definition travel as a message?** Built as `/patch/`,
 `node demo/verify.mjs patch`, **20 asserts from the page, all green**, no
-console errors. `plan-patch.md` holds the design and the open ends; the numbers
+console errors. `plans/plan-patch.md` holds the design and the open ends; the numbers
 are here because this file is where the mechanism was first measured.
 
 ### 9.1 What was measured ✅
@@ -755,7 +755,7 @@ loudness. Only an engine running the graph can catch that.
 ### 9.3 Two things worth keeping
 
 🔴 **A `.scsyndef` is a SAFER thing to send than a shader, structurally.**
-`plan-visuals.md` §1.2 requires a validator for generated GLSL — "no `while`,
+`plans/plan-visuals.md` §1.2 requires a validator for generated GLSL — "no `while`,
 bounded `for` counts, a compile timeout". A synth definition has **no control
 flow at all**: it is a list of blocks, each naming a class from a fixed table
 compiled into the engine, each wired only to blocks EARLIER in the list. The two

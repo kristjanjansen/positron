@@ -1,6 +1,6 @@
 # CHAIN — what is in Pappus, stage by stage, before anything is taken out
 
-Written 2026-09-13, and written FIRST on purpose. `plan-twins.md` §2 asks for a
+Written 2026-09-13, and written FIRST on purpose. `plans/plan-twins.md` §2 asks for a
 `PAPPUS_BARE` rung that skips everything after the grains, and the rule it sets
 is that **a stage with no entry in this file may not be skipped**. A rung that
 removes four stages makes them unfindable for anyone who did not already know
@@ -97,7 +97,7 @@ Things that are not obvious and have each cost a day:
 
   ⚠️ **This is the 2026-09-12 "no granulator parameter changes the returned
   audio" investigation, closed, and nothing was broken.** Every sweep in it was
-  taken at `sos 0`. Full table in `plan-twins.md`.
+  taken at `sos 0`. Full table in `plans/plan-twins.md`.
 - ⚠️ **`run 0` DOES NOT SILENCE IT, for the same reason.** The grain clock stops
   and the reports go to zero, and at `sos 0` the level does not move by one part
   in ten thousand over sixteen seconds — because what is coming out was never
@@ -213,7 +213,7 @@ count). Sits after COMP.
 ✅ **AND IT IS NOT NOISY**, which was carried as an open defect from 2026-09-12
 until it was re-measured on 2026-09-13: six arms at rest all read
 `0.000000 / -180.0 dBFS`, on a path proved live in the same run by a held note
-at `0.041883 / -22.3 dBFS`. Full table in `plan-twins.md` §8. ⚠️ Note this is
+at `0.041883 / -22.3 dBFS`. Full table in `plans/plan-twins.md` §8. ⚠️ Note this is
 the SEPARATE Csound reverb insert (`rig/board/csd/space.csd`), not this stage —
 the two are easy to confuse and the measurement was about the insert.
 
@@ -510,7 +510,7 @@ loads in a browser and is now one modest feature from not doing so — the next
 thing added to the granulator gets weighed before it ships, not after.
 
 ⚠️ **The board runs TINY, not BARE** (`/etc/default/positron-board`,
-`PAPPUS_TINY=1`), which `plan-twins.md` §7 is deliberate about. **TINY implies
+`PAPPUS_TINY=1`), which `plans/plan-twins.md` §7 is deliberate about. **TINY implies
 LITE, so the board has ONE granulator**, and every `grain.marks` it has ever
 sent carries `half: 0`. Anything that reads the `n…` half of a command on this
 board is reading a control that exists, takes a value and drives nothing.

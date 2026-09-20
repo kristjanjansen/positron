@@ -7,7 +7,7 @@ Agent notes. Checkpointed after every step. Port 8898 is mine. Own live input to
 
 ## Checkpoint 1 — context read (2026-08-25)
 
-Read plan.md, PROGRESS.md, run-arms.sh, measure-llhls.html, resilience.html, chaos.sh,
+Read plans/plan.md, PROGRESS.md, run-arms.sh, measure-llhls.html, resilience.html, chaos.sh,
 kill-test.sh, src/low-latency-player.js, results/*.jsonl heads.
 
 **Immediate finding in the run data (results/config.jsonl):** every `config` row is
@@ -44,7 +44,7 @@ then reproduce live with debug:true.
 ## Checkpoint 2 — Mystery 1 root cause PROVEN statically (22:01)
 
 Fetched the exact dist the page loads (`https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js`,
-jsdelivr resolves to **1.7.1** — the same version plan.md records for the runs). Its config merge
+jsdelivr resolves to **1.7.1** — the same version plans/plan.md records for the runs). Its config merge
 contains:
 
 ```js
@@ -191,7 +191,7 @@ runs m1-fixed-count / m1-fixed-duration):
 | fixed-duration | `liveSyncDuration:1.5, liveMaxLatencyDuration:6` | 1.5→2.5 s (one stall bump) | 6 s | **settles 2.4-2.5 s within ~20 s and stays** |
 
 Two bonus findings:
-- **plan.md open question 5 answered in passing:** `maxLiveSyncPlaybackRate: 1.05` DOES engage
+- **plans/plan.md open question 5 answered in passing:** `maxLiveSyncPlaybackRate: 1.05` DOES engage
   once the config is legal — fixed-count ct advances 2.09-2.11 s per 2.0 s wall (1.05×),
   latency ramps down smoothly. In the original runs it "never engaged" because the only arm that
   set it was the arm whose constructor threw.
@@ -391,7 +391,7 @@ case to ~35 s (still bounded below by pause + edge propagation).
   follow-up GET success:False). Nothing of mine remains on Cloudflare.
 - Artifacts left for the main session: this file; rig/config-arm-debug.html;
   rig/config-arm-resume.html; results/config-arm-session2.jsonl (M1 arm/fixed runs + full M2
-  traces + chaos markers). No edits to plan.md / PROGRESS.md / src/low-latency-player.js.
+  traces + chaos markers). No edits to plans/plan.md / PROGRESS.md / src/low-latency-player.js.
 
 ### TL;DR for merge
 1. **Mystery 1 ✅ solved+reproduced:** the config arm never played because `new Hls()` THROWS —

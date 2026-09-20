@@ -9,7 +9,7 @@ Spec: CONFIG-ARM-NOTES.md checkpoints 8+10. Baseline traces: results/config-arm-
 
 ## Checkpoint 1 — context read, backup made (2026-08-25)
 
-Read plan.md (§10, §1, §8 Q6), CONFIG-ARM-NOTES.md (checkpoints 8+10 = the spec),
+Read plans/plan.md (§10, §1, §8 Q6), CONFIG-ARM-NOTES.md (checkpoints 8+10 = the spec),
 PROGRESS.md session 3, src/low-latency-player.js (v5), rig/{chaos.sh, resilience.html,
 push-llhls.sh, collector.py, config-arm-resume.html}. Battery: AC, charging, 92%.
 

@@ -1,6 +1,6 @@
 # Meta Quest 3S, for this project (2026-09-11)
 
-> 🔴 **SUPERSEDED IN PART, 2026-09-12.** A headset arrived. `plan-xr.md` carries
+> 🔴 **SUPERSEDED IN PART, 2026-09-12.** A headset arrived. `plans/plan-xr.md` carries
 > what was MEASURED on it and it settles several things this document could only
 > tag UNCONFIRMED — the framebuffer (3360×1760, two views), the frame rate
 > (89.8 fps VR, 90.0 passthrough on an Adreno 740), the 1280×670 window, that
@@ -8,7 +8,7 @@
 > Browser's `navigator.xr` passes a nativeness gate. It also confirms §1.7
 > empirically: **the user agent says "Quest 3" on a 3S.**
 >
-> Where the two disagree, `plan-xr.md` wins — it was taken from the device.
+> Where the two disagree, `plans/plan-xr.md` wins — it was taken from the device.
 
 A buying question — a Quest 3S 128 GB from an Estonian retailer — asked against
 a stack that is all web, all measured, and all on Cloudflare. The intended use
@@ -1031,7 +1031,7 @@ than whole-app reload, a restricted plugin API instead of raw generated WebXR,
 instant local placeholders with the generated upgrade arriving later, voice for
 semantics and gesture for grounding, and rollback as a first-class feature.
 
-Most of that is already written down here — in `plan-voice.md`, for a different
+Most of that is already written down here — in `plans/plan-voice.md`, for a different
 medium, and better grounded. That document is about a spoken request turning
 into a MIDI keyboard split, and its rules are:
 
