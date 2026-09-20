@@ -1,5 +1,36 @@
 ## Open
 
+- 🔴 **IN FLIGHT: VIRTUAL LAYOUTS FOR THE CIRCUIT AND THE MODEL 12, PLANNED AS
+  CONTROL TYPES FIRST.** Asked 2026-09-20: *"Can we plan controls to compose
+  virtual layouts for both devices? Do not have to be physically supersimilar,
+  perhaps ee could use our sliders vertically. First what types of control we
+  need and then how to compose layouts."*
+  ⚠️ **THE ORDER IS THE INSTRUCTION**: what KINDS of control exist, then how a
+  layout is composed from them. Not a picture of each device.
+  ⚠️ **AND IT IS EXPLICITLY NOT A PHOTOGRAPH OF THE HARDWARE.** A vertical
+  slider where the Circuit has a knob is wanted, not resisted.
+  🔴 **ONE CONTROL TYPE IS ALREADY KNOWN TO BE MISSING AND IT IS NOT A SLIDER.**
+  MCU V-Pots and the jog wheel are RELATIVE: `0x01` is one click clockwise. The
+  kit has no relative encoder, and `cc-adapter.mjs`'s contract, that the last
+  value per controller is the truth, is false for one.
+
+- 🔴 **IN FLIGHT: `/veil/` IS REMOVED AND FOLDED INTO `/held/`, ABOVE THE
+  TIMELINE, AS ONE 16:9 VIDEO PANEL.** Asked 2026-09-20: *"rm veil demo and
+  integrate it into held begore timeljne. I do not het 2scrrrns just go single
+  16;9 videopanel"*.
+  🔴 **THIS OVERRULES THE `/veil/` AGENT'S CENTRAL DESIGN DECISION**, which was
+  to draw the same instant TWICE, by two arithmetics, so that the one real limit
+  in the material became the subject rather than a disclaimer. Collapsing to one
+  picture means **choosing which arithmetic is shown**, and the fact the second
+  pane carried has to survive somewhere else or be dropped on purpose.
+  ⚠️ **AND IT OVERRULES ITS SITING ARGUMENT TOO**: it put the work in its own
+  demo because `/held/` was instructed into `readout: null` and `controls: []`
+  the day before, and because `/held/`'s strip is already its one position
+  surface. Both of those constraints are still true and now have to be resolved
+  rather than avoided.
+  ⚠️ `/veil/` IS DEPLOYED. Removing the slug 404s it, the same as `radio1965`,
+  `box` and `keys`.
+
 - 🔴 **IN FLIGHT: NOVATION CIRCUIT (ORIGINAL) AND TASCAM MODEL 12, CONTROL AND
   INTEGRATION, WITH A COMPREHENSIVE MIDI MAP.** Asked 2026-09-20: *"i need to
   work on controlling and integrating novation circuit (original) and tascam
