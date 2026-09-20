@@ -737,7 +737,30 @@
       }
       const step = Math.floor(clock / CLOCKS_PER_STEP) % STEPS;
       grid.at(step % 8, track * 2 + Math.floor(step / 8))?.flash(140);
+      return;
     }
+
+    /* everything the panel has no place for, named once each */
+    sayUnplaced(m, b);
+  }
+
+  /**
+   * 🔴 ANYTHING THIS PAGE CANNOT PLACE IS SAID OUT LOUD, ONCE PER SHAPE.
+   * Asked 2026-09-21: *"when i touch pads in circuit to set up grid can you
+   * not get it?"*, which is a question about the WIRE and not about this
+   * page, and the only honest way to answer it is to show what arrives.
+   * ⚠️ **ONE LINE PER SHAPE, NOT PER MESSAGE.** A Circuit sends 24 clocks a
+   * quarter note, and a log that printed every unrecognised byte would be a
+   * log nobody can read within a second of pressing the button.
+   */
+  const unplaced = new Set();
+  function sayUnplaced(m, bytes) {
+    const shape = m.kind === 'control' ? `CC ${m.cc} on channel ${m.ch}`
+      : m.kind ? `${m.kind} on channel ${m.ch}`
+      : `status 0x${(bytes[0] ?? 0).toString(16)}`;
+    if (unplaced.has(shape)) return;
+    unplaced.add(shape);
+    d.log(`heard ${shape}, which this panel has no place for yet`);
   }
 
   async function open() {
