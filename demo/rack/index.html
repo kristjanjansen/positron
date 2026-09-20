@@ -89,6 +89,8 @@
      a button and a bare number it reads as exactly 8, which is too close.
      Doubling it here restores what the eye was expecting. */
   .rack-lane .pos-knob { margin-top: var(--ctl-gap); }
+  /* three faders shoulder to shoulder, ending on one line */
+  .strip-outs { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
   .rack-lane .strip-master { margin-top: auto; }
   /* 🔴 THE FADER BLOCK FALLS TO THE BOTTOM OF ITS STRIP, exactly as the FX
      fader falls to the bottom of the lane. Once the strips were stretched to
@@ -550,9 +552,36 @@ const PAN_SCALE = 2;
    * ⚠️ AND THE ORDER MIRRORS THE PANEL: the jog and the transport sit above the
    * faders in the master column, not beside them.
    */
+  /**
+   * 🔴 SUB AND MAIN STAND BESIDE THE FX FADER AND SEND NOTHING. Asked
+   * 2026-09-21: *"add sub and main sliders to right of fx but disabled"*.
+   * They are the two 60 mm faders on the right of the panel, and TASCAM's own
+   * enabled-controls diagram prints them WHITE while the FX fader is blue:
+   * in DAW control mode the FX fader is the master and these two move the
+   * analogue outputs only. Nothing of them reaches MIDI, which is why they are
+   * drawn and switched off rather than left out.
+   * ⚠️ **THIS IS THE SAME DECISION ALREADY MADE FOR MAIN AND SUB IN THE CHANNEL
+   * COLUMN**, and for the same reason: leaving them out would put the FX fader
+   * at the edge of the panel, which is false about the mixer.
+   * ⚠️ **AND A DISABLED CONTROL IS A CHECK THE HARNESS CANNOT REACH.** These
+   * two have nothing behind them to reach, which is the whole point of them,
+   * and the page asserts that rather than assuming it.
+   */
+  const OUTS = [['SUB', 'sub fader, the analogue sub output, nothing on MIDI'],
+                ['MAIN', 'main fader, the analogue main output, nothing on MIDI']];
+  const outs = OUTS.map(([label, title]) => createFader({
+    label, min: 0, max: 127, value: 100, disabled: true, title,
+  }));
+
   const lane = el('div', 'rack-lane');
   const masterStrip = el('div', 'strip-one strip-master');
-  masterStrip.append(master.el);
+  /* ⚠️ ITS OWN CLASS, NOT `.pos-crow`. The phone rules turn every `.pos-crow`
+     in this lane into a COLUMN, which is right for the jog above a transport
+     and wrong for three faders: stacked, they stop being a row of faders and
+     the lane grows three times its own height. */
+  const masterFaders = el('div', 'strip-outs');
+  masterFaders.append(master.el, ...outs.map((f) => f.el));
+  masterStrip.append(masterFaders);
 
   const wrap = el('div', 'rack-wrap');
   wrap.append(rackRow, lane);
@@ -1037,6 +1066,21 @@ const PAN_SCALE = 2;
       d.assert('every fader in the rack ends on the same line as the FX fader',
         Math.abs(chL.bottom - fxL.bottom) <= 1,
         `channel ends at ${chL.bottom.toFixed(1)}, FX at ${fxL.bottom.toFixed(1)}`);
+    }
+
+    // 🔴 SUB AND MAIN ARE DRAWN AND SEND NOTHING, asserted rather than assumed.
+    // A control that looks live and is inert is this project's named defect;
+    // one that looks inert and IS inert has to say so out loud, or the next
+    // person to read the page cannot tell which of the two it is.
+    {
+      const bottoms = [master, ...outs]
+        .map((f) => f.el.querySelector('.pos-fdr-lane').getBoundingClientRect().bottom);
+      const spread = Math.max(...bottoms) - Math.min(...bottoms);
+      d.assert('sub and main stand beside the FX fader, disabled, ending on its line',
+        outs.length === 2 && outs.every((f) => f.disabled()) && !master.disabled()
+        && spread <= 1,
+        `${outs.filter((f) => f.disabled()).length} of 2 off, `
+        + `ends spread ${spread.toFixed(1)} px`);
     }
 
     d.assert('the rack is eight strips and one master',
