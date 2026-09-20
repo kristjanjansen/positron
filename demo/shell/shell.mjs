@@ -233,6 +233,17 @@ export function mount({
     name,
     ready: false,
     failed: null,
+    /**
+     * How many benign browser notices `guard()` has swallowed. See
+     * `BENIGN_NOTICES` at the bottom of this file.
+     *
+     * 🔴 A FILTER NOBODY CAN COUNT IS A FILTER NOBODY CAN PROVE FIRES. The
+     * whole point of that filter is that a reader sees nothing, which is
+     * indistinguishable from a browser that never sent the notice and from a
+     * filter that was deleted. This number is the one place the difference is
+     * visible, and it is why the filter can be graded at all.
+     */
+    muted: 0,
     readout: Object.fromEntries(Object.keys(readout).map((k) => [k, null])),
     // the DECLARATION, so a harness can tell "no cells on purpose" from "none yet"
     readoutOptOut,
@@ -750,9 +761,62 @@ export function recorderMime(d, kinds = ['video/webm;codecs=vp9', 'video/webm;co
   return mime;
 }
 
+/**
+ * 🔴 WINDOW `error` EVENTS THAT ARE NOT FAULTS. EXACTLY TWO STRINGS, AND
+ * NOTHING IS MATCHED BY PREFIX, SUFFIX OR SUBSTRING.
+ *
+ * Both are the SAME browser notice in two spellings: the one every engine
+ * sends today, and the one Chrome sent before it was reworded. It means an
+ * observer callback resized something the observer was watching, so the layout
+ * loop did not settle in a single pass and the remaining notifications were
+ * delivered on the next frame instead. Nothing is lost, nothing is broken, and
+ * the next frame fixes it. There is no `e.error` behind it, because no
+ * exception was ever thrown: the browser is narrating its own scheduling.
+ *
+ * 🔴 WHY IT HAD TO BE FILTERED AT ALL. `guard()` turned every window `error`
+ * into `d.fail()`, which logs in the `bad` colour AND sets `__demo.failed`. So
+ * a page with a diagram, a grain scope or a strip in it could fill its own log
+ * with three copies of a browser scheduling note, in the colour reserved for a
+ * page that died. Three kit modules observe sizes, so that is almost any page,
+ * and mark the run failed in the one field a reader consults to find out
+ * whether it did. PHOTOGRAPHED 2026-09-20 with a log box holding nothing else:
+ * *"Excessive scary logging of nonsene"*. This project has already decided
+ * that this log must not cry wolf, over a single ⚠️ in `/items/`.
+ *
+ * 🔴 AND IT IS FILTERED HERE, WHERE IT ARRIVES, RATHER THAN AT EVERY OBSERVER.
+ * One test beats three modules each remembering to be careful, and a page that
+ * grows a fourth observer is covered without being told.
+ *
+ * ⚠️ THE CLASS IS NOT SWALLOWED. A window `error` with no `e.error` and a
+ * message this file does not recognise is still a real fault and still lands
+ * in the log in red: a `SecurityError` from a cross-origin script arrives in
+ * exactly that shape. Only these two strings are dropped, so the next page
+ * somebody mutes has to be muted on purpose, by name, here.
+ */
+export const BENIGN_NOTICES = new Set([
+  'ResizeObserver loop completed with undelivered notifications.',
+  'ResizeObserver loop limit exceeded',
+]);
+
+/**
+ * Is this window `error` event one of the notices above?
+ *
+ * ⚠️ IT ALSO REQUIRES `e.error` TO BE ABSENT. A page is free to `throw new
+ * Error('ResizeObserver loop limit exceeded')` from its own code, and that one
+ * carries a real Error object with a real stack. The notice never does.
+ */
+export function benignNotice(e) {
+  return !e?.error && BENIGN_NOTICES.has(String(e?.message ?? ''));
+}
+
 /** Surface a thrown error instead of a silently dead page. */
 export function guard(d) {
-  addEventListener('error', (e) => d.fail(e.error || e.message));
+  addEventListener('error', (e) => {
+    // Counted rather than logged, so the filter can be proved to fire. See the
+    // note on `muted` in the machine contract above.
+    if (benignNotice(e)) { if (window.__demo) window.__demo.muted++; return; }
+    d.fail(e.error || e.message);
+  });
   addEventListener('unhandledrejection', (e) => d.fail(e.reason));
 }
 

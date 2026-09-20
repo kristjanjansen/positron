@@ -22,8 +22,12 @@
 // ⚠️ FIXED WIDTH, BECAUSE A CONTROL THAT RESIZES IS A CONTROL THAT MOVES.
 // Patch names here run from `Dig Rhodes` to `Vibraphone Soft 2`, and a cell
 // that fits its text makes the two arrows and the die jump sideways every time
-// you step — so the thing you are about to press again is not where it was.
-// The cell is `--pick-w` wide and long names ellipsize.
+// you step, so the thing you are about to press again is not where it was.
+// `--pick-w` is the room RESERVED FOR THE NAME, and `shell.css` adds the cell's
+// own padding and edges on top of it before setting a width. It said "the cell
+// is `--pick-w` wide" until 2026-09-20, and that was the bug: the box was that
+// wide, so the padding came out of the name's share and a 9 ch reservation
+// showed six characters. Long names still ellipsize, past the cap below.
 //
 // ⚠️ THE DIE IS OUTSIDE THE GROUP. `stepper.mjs` argues the opposite for its
 // own `random`, and that argument still holds THERE: back/roll/forward are one
@@ -113,10 +117,15 @@ export function createValueCell({ what = 'it', onPick } = {}) {
    * Reserving the widest MEMBER keeps the no-movement guarantee and spends
    * exactly the room the list needs.
    *
-   * ⚠️ IT SETS THE CUSTOM PROPERTY, NOT `width`. The one-column phone rule sets
+   * ⚠️ IT SETS THE CUSTOM PROPERTY, NOT `width`. The phone rule sets
    * `width: auto` on this cell, and an inline `width` would beat it and drag the
    * row off a small screen. Setting `--pick-w` lets the base rule use it and
    * lets the phone rule still win.
+   * ⚠️ AND THE NUMBER IS CHARACTERS OF NAME, NOT PIXELS OF CONTROL. What the
+   * cell does with it, including how much padding goes round it, is
+   * `shell.css`'s to decide and is deliberately not known here: a padding
+   * written in both files is a padding that will disagree with itself, which is
+   * what `--sld-col` was created to stop.
    * ⚠️ AND IT IS CAPPED, which is what the ellipsis is for. A 60 character name
    * would make a control nothing else on the page could sit beside, so past the
    * cap the name is cut and the whole of it stays in the title.
