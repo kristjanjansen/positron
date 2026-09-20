@@ -1,0 +1,4897 @@
+{
+ "meta": {
+  "what": "The Held in Human score read as data, so a picture of the piece can be drawn without re-reading it. Eight scenes, the events inside them, two channels that run the whole piece, the spoken lines with their silences, and the intro as the keystroke recording it is.",
+  "piece": "Held in Human",
+  "kind": "Unity mixed reality piece",
+  "year": "2024",
+  "authors": [
+   "LIIS VARES, TAAVET JANSEN"
+  ],
+  "producer": [
+   "ANU ALMIK, elektron.art"
+  ],
+  "credits": [
+   {
+    "role": "Authors",
+    "entries": [
+     "LIIS VARES, TAAVET JANSEN"
+    ]
+   },
+   {
+    "role": "Mixed Reality Design and Coding",
+    "entries": [
+     "NORBERT PAPE"
+    ]
+   },
+   {
+    "role": "Sound Design",
+    "entries": [
+     "MIHKEL TOMBERG"
+    ]
+   },
+   {
+    "role": "Graphic Design",
+    "entries": [
+     "JAAN EVART"
+    ]
+   },
+   {
+    "role": "Room Design",
+    "entries": [
+     "MARI MÖLDRE"
+    ]
+   },
+   {
+    "role": "Photographer",
+    "entries": [
+     "ALISSA ŠNAIDER"
+    ]
+   },
+   {
+    "role": "Producer",
+    "entries": [
+     "ANU ALMIK, elektron.art"
+    ]
+   },
+   {
+    "role": "Intro and Outro texts",
+    "entries": [
+     "ENE MIHKELSON “Apartment”, Tallinn, 1985",
+     "Translation from Estonian",
+     "MIRIAM ANNE MCILFARICK-KSENOFONTOV"
+    ]
+   },
+   {
+    "role": "Whispers, chat, dialogue",
+    "entries": [
+     "AUDIENCE interaction from the Held in Human I",
+     "EKA Gallery, Tallinn, 2023",
+     "remixed with ChatGPT"
+    ]
+   },
+   {
+    "role": "Supporters",
+    "entries": [
+     "Estonian Ministry of Culture, Cultural Endowment of Estonia,",
+     "Tallinn City, Dortmund Academy of Theater and Digitality,",
+     "Estonian Academy of Arts (through the ACuTe project),",
+     "Erasmus Program, VARES Valga Architecture Residency,",
+     "University of Tartu"
+    ]
+   },
+   {
+    "role": "vares.digital 2024",
+    "entries": []
+   }
+  ],
+  "rights": "Somebody else's work. The texts here are quoted and none of them is rewritten. The intro and the outro are a published author's, named in the credits, in translation. Nothing here may be republished or used as a fixture without the authors' word.",
+  "source": {
+   "path": "research/held-in-human-score-2026-09-19.txt",
+   "supplied": "2026-09-19",
+   "bytes": 14032,
+   "lines": 667,
+   "note": "The score itself, kept verbatim including its own comments."
+  },
+  "reading": {
+   "path": "plan-held-in-human-score.md",
+   "note": "The prose analysis this file is the machine readable form of. Where the two disagree, this file was derived from the score and the document was not."
+  },
+  "generated": "2026-09-19T09:15:09.444Z",
+  "generator": "demo/resources/build-held-in-human.mjs",
+  "labels": {
+   "stated": "the score says it in so many words",
+   "measured": "derived by summing the score's own content",
+   "absent": "the score does not carry it, and nothing here invents it",
+   "inferred": "our reading of the score rather than the score's statement"
+  }
+ },
+ "counts": {
+  "scenes": 8,
+  "scenesRunning": 7,
+  "scenesStated": 5,
+  "scenesMeasured": 2,
+  "scenesAbsent": 1,
+  "events": 11,
+  "waits": 2,
+  "channels": 2,
+  "channelPoints": 16,
+  "qandaLines": 24,
+  "qandaSilences": 8,
+  "qandaAsked": 23,
+  "qandaBlocks": 5,
+  "qandaBlocksStated": 4,
+  "qandaBlocksInferred": 1,
+  "qandaLinesAssignedByInference": 24,
+  "keystrokeEvents": 318,
+  "dialogueLines": 16,
+  "riverFragments": 15,
+  "mazeOuterWords": 28,
+  "mazeInnerWords": 24,
+  "creditGroups": 11,
+  "ambiguities": 9,
+  "knownMs": 775177,
+  "unknownScenes": [
+   "maze"
+  ]
+ },
+ "piece": {
+  "knownMs": 775177,
+  "known": "12 min 55 s",
+  "knownClock": "12:55.2",
+  "from": "the first keystroke of the intro to the end of the outro",
+  "unknown": [
+   "maze"
+  ],
+  "note": "The maze has no length in the score, so this total is the running order with the maze taken out. The transition is not in it either: it is the reset between visitors rather than part of a visit."
+ },
+ "order": {
+  "loop": [
+   "transition",
+   "intro",
+   "maze",
+   "dialogue",
+   "cylinder",
+   "river",
+   "holdme",
+   "outro"
+  ],
+  "running": [
+   "intro",
+   "maze",
+   "dialogue",
+   "cylinder",
+   "river",
+   "holdme",
+   "outro"
+  ],
+  "how": "stated",
+  "from": "The score lists the scenes three times as an order: the LUT colour block, the opacity block, and the LUT fade block with the transition moved to the end. All three agree.",
+  "fadeBlockPutsTransitionLast": true,
+  "loops": true,
+  "loopsHow": "inferred",
+  "loopsFrom": "`LUT transition time transition` is 0 and the transition is neutral, which satisfies the score's own recommendation only if the outro precedes it.",
+  "entry": [
+   {
+    "id": "wait:credits-until-intro",
+    "durationMs": 25000,
+    "from": "time after credits until intro"
+   },
+   {
+    "id": "wait:headset-mounted-before-intro",
+    "durationMs": 10000,
+    "from": "time after headset mounted before intro"
+   }
+  ]
+ },
+ "scenes": [
+  {
+   "id": "transition",
+   "name": "transition",
+   "loopIndex": 0,
+   "durationMs": 40000,
+   "durationHow": "stated",
+   "durationFrom": "the parameter `duration transition scene`",
+   "runningIndex": null,
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": null
+   }
+  },
+  {
+   "id": "intro",
+   "name": "intro",
+   "loopIndex": 1,
+   "durationMs": 142277,
+   "durationHow": "measured",
+   "durationFrom": "the keystroke track's own length, 318 delays summed",
+   "runningIndex": 0,
+   "at": {
+    "fromIntroMs": 0,
+    "fromMazeEndMs": null
+   }
+  },
+  {
+   "id": "maze",
+   "name": "maze",
+   "loopIndex": 2,
+   "durationMs": null,
+   "durationHow": "absent",
+   "durationFrom": "the score gives this scene no duration parameter and nothing in it can be summed",
+   "runningIndex": 1,
+   "at": {
+    "fromIntroMs": 142277,
+    "fromMazeEndMs": null
+   }
+  },
+  {
+   "id": "dialogue",
+   "name": "dialogue",
+   "loopIndex": 3,
+   "durationMs": 107900,
+   "durationHow": "measured",
+   "durationFrom": "the 16 dialogue lines' times and pauses summed",
+   "runningIndex": 2,
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 0
+   }
+  },
+  {
+   "id": "cylinder",
+   "name": "cylinder",
+   "loopIndex": 4,
+   "durationMs": 150000,
+   "durationHow": "stated",
+   "durationFrom": "the parameter `duration cylinder scene`",
+   "runningIndex": 3,
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 107900
+   }
+  },
+  {
+   "id": "river",
+   "name": "river",
+   "loopIndex": 5,
+   "durationMs": 120000,
+   "durationHow": "stated",
+   "durationFrom": "the parameter `duration river scene`",
+   "runningIndex": 4,
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 257900
+   }
+  },
+  {
+   "id": "holdme",
+   "name": "hold me",
+   "loopIndex": 6,
+   "durationMs": 165000,
+   "durationHow": "stated",
+   "durationFrom": "the parameter `duration HoldMe scene`",
+   "runningIndex": 5,
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 377900
+   }
+  },
+  {
+   "id": "outro",
+   "name": "outro",
+   "loopIndex": 7,
+   "durationMs": 90000,
+   "durationHow": "stated",
+   "durationFrom": "the parameter `duration outro scene`",
+   "runningIndex": 6,
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 542900
+   }
+  }
+ ],
+ "events": [
+  {
+   "id": "transition:qanda",
+   "sceneId": "transition",
+   "sceneName": "transition",
+   "what": "QandA",
+   "atMs": 0,
+   "from": "time until QandA Transition scene",
+   "lines": 0,
+   "alsoFrom": [
+    "number of lines QandA during Transition scene"
+   ],
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": null
+   }
+  },
+  {
+   "id": "transition:credits",
+   "sceneId": "transition",
+   "sceneName": "transition",
+   "what": "credits",
+   "atMs": 7000,
+   "from": "time until credits in transition scene",
+   "durationMs": 35000,
+   "alsoFrom": [
+    "credits scroll duration"
+   ],
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": null
+   },
+   "overrunsSceneMs": 2000
+  },
+  {
+   "id": "maze:start-outer-maze",
+   "sceneId": "maze",
+   "sceneName": "maze",
+   "what": "start outer maze",
+   "atMs": 60000,
+   "from": "time until start outer maze in maze scene",
+   "at": {
+    "fromIntroMs": 202277,
+    "fromMazeEndMs": null
+   }
+  },
+  {
+   "id": "dialogue:maze-sound-fade-out",
+   "sceneId": "dialogue",
+   "sceneName": "dialogue",
+   "what": "maze sound fade out",
+   "atMs": 30000,
+   "from": "time until maze sound fade out in dialogue",
+   "durationMs": 60000,
+   "alsoFrom": [
+    "duration of maze sound fade out in dialogue"
+   ],
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 30000
+   }
+  },
+  {
+   "id": "cylinder:ghost-trace",
+   "sceneId": "cylinder",
+   "sceneName": "cylinder",
+   "what": "Ghost trace",
+   "atMs": 60000,
+   "from": "time until Ghost trace in cylinder scene",
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 167900
+   }
+  },
+  {
+   "id": "cylinder:qanda",
+   "sceneId": "cylinder",
+   "sceneName": "cylinder",
+   "what": "QandA",
+   "atMs": 90000,
+   "from": "time until QandA Cylinder scene",
+   "lines": 7,
+   "alsoFrom": [
+    "number of lines QandA during Cylinder scene"
+   ],
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 197900
+   }
+  },
+  {
+   "id": "holdme:qanda",
+   "sceneId": "holdme",
+   "sceneName": "hold me",
+   "what": "QandA",
+   "atMs": 0,
+   "from": "time until QandA HoldMe scene",
+   "lines": 5,
+   "alsoFrom": [
+    "number of lines QandA during HoldMe scene"
+   ],
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 377900
+   }
+  },
+  {
+   "id": "holdme:second-qanda",
+   "sceneId": "holdme",
+   "sceneName": "hold me",
+   "what": "second QandA",
+   "atMs": 144000,
+   "from": "time until second QandA HoldMe scene",
+   "lines": 11,
+   "alsoFrom": [
+    "number of lines second QandA during HoldMe scene"
+   ],
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 521900
+   }
+  },
+  {
+   "id": "outro:outro-text",
+   "sceneId": "outro",
+   "sceneName": "outro",
+   "what": "outro text",
+   "atMs": 30000,
+   "from": "time until outro text in outro scene",
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": 572900
+   }
+  },
+  {
+   "id": "wait:credits-until-intro",
+   "sceneId": null,
+   "sceneName": null,
+   "what": "wait after credits until the intro",
+   "atMs": null,
+   "durationMs": 25000,
+   "from": "time after credits until intro",
+   "wait": {
+    "after": "credits",
+    "before": "intro"
+   },
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": null
+   }
+  },
+  {
+   "id": "wait:headset-mounted-before-intro",
+   "sceneId": null,
+   "sceneName": null,
+   "what": "wait after headset mounted before the intro",
+   "atMs": null,
+   "durationMs": 10000,
+   "from": "time after headset mounted before intro",
+   "wait": {
+    "after": "headset mounted",
+    "before": "intro"
+   },
+   "at": {
+    "fromIntroMs": null,
+    "fromMazeEndMs": null
+   }
+  }
+ ],
+ "channels": {
+  "opacity": {
+   "what": "How much of the real room the visitor can see, as a step per scene with a ramp into each step.",
+   "unit": "fraction of the general opacity level, 0 to 1",
+   "generalLevel": 1,
+   "generalLevelNote": "The master dimmer is at 1.0, so the per scene values are the real ones. The score warns that dimming reduces contrast and makes the picture dull.",
+   "loop": true,
+   "points": [
+    {
+     "index": 0,
+     "sceneId": "transition",
+     "sceneName": "transition",
+     "value": 1,
+     "fadeMs": 2000,
+     "from": 0.6,
+     "changed": 0.4,
+     "ratePerSecond": 0.2
+    },
+    {
+     "index": 1,
+     "sceneId": "intro",
+     "sceneName": "intro",
+     "value": 0.6,
+     "fadeMs": 4000,
+     "from": 1,
+     "changed": -0.4,
+     "ratePerSecond": -0.1
+    },
+    {
+     "index": 2,
+     "sceneId": "maze",
+     "sceneName": "maze",
+     "value": 0.6,
+     "fadeMs": 3000,
+     "from": 0.6,
+     "changed": 0,
+     "ratePerSecond": 0
+    },
+    {
+     "index": 3,
+     "sceneId": "dialogue",
+     "sceneName": "dialogue",
+     "value": 0.7,
+     "fadeMs": 6000,
+     "from": 0.6,
+     "changed": 0.1,
+     "ratePerSecond": 0.0167
+    },
+    {
+     "index": 4,
+     "sceneId": "cylinder",
+     "sceneName": "cylinder",
+     "value": 0.15,
+     "fadeMs": 2000,
+     "from": 0.7,
+     "changed": -0.55,
+     "ratePerSecond": -0.275
+    },
+    {
+     "index": 5,
+     "sceneId": "river",
+     "sceneName": "river",
+     "value": 0.3,
+     "fadeMs": 3000,
+     "from": 0.15,
+     "changed": 0.15,
+     "ratePerSecond": 0.05
+    },
+    {
+     "index": 6,
+     "sceneId": "holdme",
+     "sceneName": "hold me",
+     "value": 0.5,
+     "fadeMs": 4000,
+     "from": 0.3,
+     "changed": 0.2,
+     "ratePerSecond": 0.05
+    },
+    {
+     "index": 7,
+     "sceneId": "outro",
+     "sceneName": "outro",
+     "value": 0.6,
+     "fadeMs": 10000,
+     "from": 0.5,
+     "changed": 0.1,
+     "ratePerSecond": 0.01
+    }
+   ]
+  },
+  "lut": {
+   "what": "A colour lookup table on the passthrough image, as a step per scene with a ramp into each step.",
+   "unit": "a named table",
+   "values": [
+    "blue",
+    "green",
+    "neutral",
+    "red"
+   ],
+   "recommendation": "use 0 if the previous scene has the same LUT",
+   "breaksRecommendation": [
+    "dialogue",
+    "cylinder"
+   ],
+   "loop": true,
+   "points": [
+    {
+     "index": 0,
+     "sceneId": "transition",
+     "sceneName": "transition",
+     "value": "neutral",
+     "fadeMs": 0,
+     "from": "neutral",
+     "same": true,
+     "followsRecommendation": true
+    },
+    {
+     "index": 1,
+     "sceneId": "intro",
+     "sceneName": "intro",
+     "value": "neutral",
+     "fadeMs": 0,
+     "from": "neutral",
+     "same": true,
+     "followsRecommendation": true
+    },
+    {
+     "index": 2,
+     "sceneId": "maze",
+     "sceneName": "maze",
+     "value": "neutral",
+     "fadeMs": 0,
+     "from": "neutral",
+     "same": true,
+     "followsRecommendation": true
+    },
+    {
+     "index": 3,
+     "sceneId": "dialogue",
+     "sceneName": "dialogue",
+     "value": "green",
+     "fadeMs": 0,
+     "from": "neutral",
+     "same": false,
+     "followsRecommendation": false
+    },
+    {
+     "index": 4,
+     "sceneId": "cylinder",
+     "sceneName": "cylinder",
+     "value": "green",
+     "fadeMs": 5000,
+     "from": "green",
+     "same": true,
+     "followsRecommendation": false
+    },
+    {
+     "index": 5,
+     "sceneId": "river",
+     "sceneName": "river",
+     "value": "blue",
+     "fadeMs": 10000,
+     "from": "green",
+     "same": false,
+     "followsRecommendation": true
+    },
+    {
+     "index": 6,
+     "sceneId": "holdme",
+     "sceneName": "hold me",
+     "value": "red",
+     "fadeMs": 2000,
+     "from": "blue",
+     "same": false,
+     "followsRecommendation": true
+    },
+    {
+     "index": 7,
+     "sceneId": "outro",
+     "sceneName": "outro",
+     "value": "neutral",
+     "fadeMs": 10000,
+     "from": "red",
+     "same": false,
+     "followsRecommendation": true
+    }
+   ]
+  }
+ },
+ "qanda": {
+  "what": "One voice, one cursor down one list, read by four scenes. An empty line is a silence of a stated length and is a real event.",
+  "format": "text:seconds:pause",
+  "asked": 23,
+  "present": 24,
+  "spare": 1,
+  "model": {
+   "id": "model-a",
+   "how": "inferred",
+   "what": "The block holds one more line than the score asks for. Line 1 is the only one with a negative time and the only one that asks the visitor to do something, so it goes to the maze, which is the only scene with no duration and the only one that can wait. The score states how many lines each scene takes and never states which, so the assignment of EVERY line rests on this reading, not only the spare one.",
+   "evidence": [
+    {
+     "id": "the-negative-time",
+     "what": "line 1 is `-1` seconds, which is not a duration, and the maze is the only scene with no duration parameter"
+    },
+    {
+     "id": "the-last-line",
+     "what": "under this reading the last line spoken in the piece is `Yes, Let's go.`; under the alternative the score lists a line nobody ever says"
+    },
+    {
+     "id": "the-long-silence",
+     "what": "the 46500 ms silence puts `Do you recognise it?` ending at 29500 ms into the outro and the outro text appears at 30000 ms, 500 ms later",
+     "gapMs": 500,
+     "strongest": true
+    }
+   ],
+   "alternative": "the cursor starts at line 1, which puts the walk instruction inside the cylinder and leaves the last line unspoken"
+  },
+  "blocks": [
+   {
+    "id": "maze:qanda",
+    "sceneId": "maze",
+    "sceneName": "maze",
+    "atMs": null,
+    "lines": 1,
+    "first": 1,
+    "last": 1,
+    "countHow": "inferred",
+    "from": null,
+    "spanMs": 0,
+    "endsAtMs": null
+   },
+   {
+    "id": "transition:qanda",
+    "sceneId": "transition",
+    "sceneName": "transition",
+    "atMs": 0,
+    "lines": 0,
+    "first": null,
+    "last": null,
+    "countHow": "stated",
+    "from": "number of lines QandA during Transition scene",
+    "spanMs": 0
+   },
+   {
+    "id": "cylinder:qanda",
+    "sceneId": "cylinder",
+    "sceneName": "cylinder",
+    "atMs": 90000,
+    "lines": 7,
+    "first": 2,
+    "last": 8,
+    "countHow": "stated",
+    "from": "number of lines QandA during Cylinder scene",
+    "spanMs": 38000,
+    "endsAtMs": 128000
+   },
+   {
+    "id": "holdme:qanda",
+    "sceneId": "holdme",
+    "sceneName": "hold me",
+    "atMs": 0,
+    "lines": 5,
+    "first": 9,
+    "last": 13,
+    "countHow": "stated",
+    "from": "number of lines QandA during HoldMe scene",
+    "spanMs": 19000,
+    "endsAtMs": 19000
+   },
+   {
+    "id": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "sceneName": "hold me",
+    "atMs": 144000,
+    "lines": 11,
+    "first": 14,
+    "last": 24,
+    "countHow": "stated",
+    "from": "number of lines second QandA during HoldMe scene",
+    "spanMs": 106500,
+    "endsAtMs": 250500,
+    "overrunsSceneMs": 85500
+   }
+  ],
+  "lines": [
+   {
+    "n": 1,
+    "text": "Please walk towards the stairs in front of you.",
+    "silence": false,
+    "statedSeconds": -1,
+    "durationMs": null,
+    "waitsForVisitor": true,
+    "pauseMs": 0,
+    "blockId": "maze:qanda",
+    "sceneId": "maze",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "inferred",
+    "atMs": null,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": null
+    }
+   },
+   {
+    "n": 2,
+    "text": "Have you noticed how the walls don't meet the ceilings here?",
+    "silence": false,
+    "statedSeconds": 9,
+    "durationMs": 9000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "cylinder:qanda",
+    "sceneId": "cylinder",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 90000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 197900
+    }
+   },
+   {
+    "n": 3,
+    "text": "Do you think thoughts wander in and out?",
+    "silence": false,
+    "statedSeconds": 6,
+    "durationMs": 6000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "cylinder:qanda",
+    "sceneId": "cylinder",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 99000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 206900
+    }
+   },
+   {
+    "n": 4,
+    "text": "",
+    "silence": true,
+    "statedSeconds": 3,
+    "durationMs": 3000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "cylinder:qanda",
+    "sceneId": "cylinder",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 105000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 212900
+    }
+   },
+   {
+    "n": 5,
+    "text": "Do you remember what it was like to think freely?",
+    "silence": false,
+    "statedSeconds": 7,
+    "durationMs": 7000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "cylinder:qanda",
+    "sceneId": "cylinder",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 108000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 215900
+    }
+   },
+   {
+    "n": 6,
+    "text": "",
+    "silence": true,
+    "statedSeconds": 2,
+    "durationMs": 2000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "cylinder:qanda",
+    "sceneId": "cylinder",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 115000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 222900
+    }
+   },
+   {
+    "n": 7,
+    "text": "Are you here?",
+    "silence": false,
+    "statedSeconds": 5,
+    "durationMs": 5000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "cylinder:qanda",
+    "sceneId": "cylinder",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 117000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 224900
+    }
+   },
+   {
+    "n": 8,
+    "text": "Do you see me?",
+    "silence": false,
+    "statedSeconds": 6,
+    "durationMs": 6000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "cylinder:qanda",
+    "sceneId": "cylinder",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 122000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 229900
+    }
+   },
+   {
+    "n": 9,
+    "text": "Things have changed here since yesterday, haven't they?",
+    "silence": false,
+    "statedSeconds": 6,
+    "durationMs": 6000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 0,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 377900
+    }
+   },
+   {
+    "n": 10,
+    "text": "",
+    "silence": true,
+    "statedSeconds": 1,
+    "durationMs": 1000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 6000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 383900
+    }
+   },
+   {
+    "n": 11,
+    "text": "Did you notice the little leaf on the floor?",
+    "silence": false,
+    "statedSeconds": 7,
+    "durationMs": 7000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 7000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 384900
+    }
+   },
+   {
+    "n": 12,
+    "text": "",
+    "silence": true,
+    "statedSeconds": 2,
+    "durationMs": 2000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 14000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 391900
+    }
+   },
+   {
+    "n": 13,
+    "text": "Did you touch it?",
+    "silence": false,
+    "statedSeconds": 3,
+    "durationMs": 3000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 16000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 393900
+    }
+   },
+   {
+    "n": 14,
+    "text": "How long have we been here, do you think?",
+    "silence": false,
+    "statedSeconds": 6,
+    "durationMs": 6000,
+    "waitsForVisitor": false,
+    "pauseMs": 4000,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 144000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 521900
+    }
+   },
+   {
+    "n": 15,
+    "text": "Will it end?",
+    "silence": false,
+    "statedSeconds": 3,
+    "durationMs": 3000,
+    "waitsForVisitor": false,
+    "pauseMs": 2500,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 154000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 531900
+    }
+   },
+   {
+    "n": 16,
+    "text": "Does it matter?",
+    "silence": false,
+    "statedSeconds": 3,
+    "durationMs": 3000,
+    "waitsForVisitor": false,
+    "pauseMs": 2000,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 159500,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 537400
+    }
+   },
+   {
+    "n": 17,
+    "text": "",
+    "silence": true,
+    "statedSeconds": 20,
+    "durationMs": 20000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 164500,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 542400
+    }
+   },
+   {
+    "n": 18,
+    "text": "Is the tree still here?",
+    "silence": false,
+    "statedSeconds": 5,
+    "durationMs": 5000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 184500,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 562400
+    },
+    "landsIn": {
+     "sceneId": "outro",
+     "sceneName": "outro",
+     "atMs": 19500
+    }
+   },
+   {
+    "n": 19,
+    "text": "",
+    "silence": true,
+    "statedSeconds": 1,
+    "durationMs": 1000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 189500,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 567400
+    },
+    "landsIn": {
+     "sceneId": "outro",
+     "sceneName": "outro",
+     "atMs": 24500
+    }
+   },
+   {
+    "n": 20,
+    "text": "Do you recognise it?",
+    "silence": false,
+    "statedSeconds": 4,
+    "durationMs": 4000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 190500,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 568400
+    },
+    "landsIn": {
+     "sceneId": "outro",
+     "sceneName": "outro",
+     "atMs": 25500
+    }
+   },
+   {
+    "n": 21,
+    "text": "",
+    "silence": true,
+    "statedSeconds": 46.5,
+    "durationMs": 46500,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 194500,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 572400
+    },
+    "landsIn": {
+     "sceneId": "outro",
+     "sceneName": "outro",
+     "atMs": 29500
+    }
+   },
+   {
+    "n": 22,
+    "text": "Well? Shall we go?",
+    "silence": false,
+    "statedSeconds": 4.5,
+    "durationMs": 4500,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 241000,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 618900
+    },
+    "landsIn": {
+     "sceneId": "outro",
+     "sceneName": "outro",
+     "atMs": 76000
+    }
+   },
+   {
+    "n": 23,
+    "text": "",
+    "silence": true,
+    "statedSeconds": 2,
+    "durationMs": 2000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 245500,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 623400
+    },
+    "landsIn": {
+     "sceneId": "outro",
+     "sceneName": "outro",
+     "atMs": 80500
+    }
+   },
+   {
+    "n": 24,
+    "text": "Yes, Let's go.",
+    "silence": false,
+    "statedSeconds": 3,
+    "durationMs": 3000,
+    "waitsForVisitor": false,
+    "pauseMs": 0,
+    "blockId": "holdme:second-qanda",
+    "sceneId": "holdme",
+    "how": "inferred",
+    "from": "qanda.model",
+    "countHow": "stated",
+    "atMs": 247500,
+    "at": {
+     "fromIntroMs": null,
+     "fromMazeEndMs": 625400
+    },
+    "landsIn": {
+     "sceneId": "outro",
+     "sceneName": "outro",
+     "atMs": 82500
+    }
+   }
+  ]
+ },
+ "keystrokes": {
+  "what": "The intro is not a string, it is a recording of somebody typing, with the pauses and one change of mind left in.",
+  "format": "<delay in ms> <character code>;",
+  "track": "track 1;",
+  "codes": {
+   "13": "return",
+   "127": "backspace"
+  },
+  "text": "When the piles for the university library foundations were\nbeing driven in at night, the surrounding buildings would\nshake. Hildegard soon got used to the earth quaking. As\nreadily as if she had been secretly longing for it all the time\nand along with the longing for change had achieved an\naltered state. ",
+  "stats": {
+   "events": 318,
+   "typed": 307,
+   "returns": 5,
+   "backspaces": 6,
+   "charactersOnScreen": 306,
+   "spanMs": 142277,
+   "lastVisibleAtMs": 131376,
+   "shortestGapMs": 56,
+   "medianGapMs": 270,
+   "meanGapMs": 447,
+   "p90GapMs": 845,
+   "p99GapMs": 3049,
+   "longestGapMs": 10901,
+   "gapsOverOneSecond": 20,
+   "gapsOverTwoSeconds": 12,
+   "wordsPerMinute": 25.81,
+   "wordsPerMinuteToLastVisible": 27.95,
+   "wordsPerMinuteBasis": "characters left on screen (306) at five characters a word, not keys pressed (307)"
+  },
+  "longestGaps": [
+   {
+    "gapMs": 10901,
+    "atMs": 142277,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "after": "d achieved an\naltered state."
+   },
+   {
+    "gapMs": 3174,
+    "atMs": 106506,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "after": "longing for it all the time\n"
+   },
+   {
+    "gapMs": 3071,
+    "atMs": 34681,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "after": "re\nbeing driven in at night,"
+   },
+   {
+    "gapMs": 3049,
+    "atMs": 55721,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "after": "nding buildings would\nshake."
+   },
+   {
+    "gapMs": 2669,
+    "atMs": 23922,
+    "code": 98,
+    "kind": "type",
+    "char": "b",
+    "after": "ty library foundations were\n"
+   },
+   {
+    "gapMs": 2616,
+    "atMs": 76161,
+    "code": 65,
+    "kind": "type",
+    "char": "A",
+    "after": " used to the earth quaking. "
+   },
+   {
+    "gapMs": 2502,
+    "atMs": 103332,
+    "code": 13,
+    "kind": "return",
+    "char": "\n",
+    "after": " longing for it all the time"
+   },
+   {
+    "gapMs": 2378,
+    "atMs": 79844,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "after": "ed to the earth quaking. As\n"
+   }
+  ],
+  "lines": [
+   {
+    "n": 1,
+    "text": "When the piles for the university library foundations were",
+    "endsAtMs": 21253,
+    "tookMs": 21253
+   },
+   {
+    "n": 2,
+    "text": "being driven in at night, the surrounding buildings would",
+    "endsAtMs": 49088,
+    "tookMs": 27835
+   },
+   {
+    "n": 3,
+    "text": "shake. Hildegard soon got used to the earth quaking. As",
+    "endsAtMs": 77466,
+    "tookMs": 28378
+   },
+   {
+    "n": 4,
+    "text": "readily as if she had been secretly longing for it all the time",
+    "endsAtMs": 103332,
+    "tookMs": 25866
+   },
+   {
+    "n": 5,
+    "text": "and along with the longing for change had achieved an",
+    "endsAtMs": 124733,
+    "tookMs": 21401
+   },
+   {
+    "n": 6,
+    "text": "altered state. ",
+    "endsAtMs": 131376,
+    "tookMs": 6643
+   }
+  ],
+  "correction": {
+   "removed": "houses",
+   "typedInstead": "buildings",
+   "backspaces": 6,
+   "lastWrongLetterAtMs": 39829,
+   "hesitationMs": 2295,
+   "firstBackspaceAtMs": 42124,
+   "lastBackspaceAtMs": 43214,
+   "backspaceGapsMs": [
+    223,
+    216,
+    216,
+    207,
+    228
+   ],
+   "pauseAfterMs": 960,
+   "replacementBeginsAtMs": 44174,
+   "lastRightLetterAtMs": 46355,
+   "repairMs": 6526,
+   "note": "The hesitation is longer than the deletion. A score holding the finished string could not carry it."
+  },
+  "events": [
+   {
+    "at": 1368,
+    "delayMs": 1368,
+    "code": 87,
+    "kind": "type",
+    "char": "W",
+    "length": 1
+   },
+   {
+    "at": 1824,
+    "delayMs": 456,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 2
+   },
+   {
+    "at": 2091,
+    "delayMs": 267,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 3
+   },
+   {
+    "at": 2365,
+    "delayMs": 274,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 4
+   },
+   {
+    "at": 2674,
+    "delayMs": 309,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 5
+   },
+   {
+    "at": 2734,
+    "delayMs": 60,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 6
+   },
+   {
+    "at": 3053,
+    "delayMs": 319,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 7
+   },
+   {
+    "at": 3371,
+    "delayMs": 318,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 8
+   },
+   {
+    "at": 3957,
+    "delayMs": 586,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 9
+   },
+   {
+    "at": 4690,
+    "delayMs": 733,
+    "code": 112,
+    "kind": "type",
+    "char": "p",
+    "length": 10
+   },
+   {
+    "at": 4917,
+    "delayMs": 227,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 11
+   },
+   {
+    "at": 5148,
+    "delayMs": 231,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 12
+   },
+   {
+    "at": 5579,
+    "delayMs": 431,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 13
+   },
+   {
+    "at": 6166,
+    "delayMs": 587,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 14
+   },
+   {
+    "at": 6461,
+    "delayMs": 295,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 15
+   },
+   {
+    "at": 6664,
+    "delayMs": 203,
+    "code": 102,
+    "kind": "type",
+    "char": "f",
+    "length": 16
+   },
+   {
+    "at": 6810,
+    "delayMs": 146,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 17
+   },
+   {
+    "at": 7048,
+    "delayMs": 238,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 18
+   },
+   {
+    "at": 7227,
+    "delayMs": 179,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 19
+   },
+   {
+    "at": 7304,
+    "delayMs": 77,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 20
+   },
+   {
+    "at": 7553,
+    "delayMs": 249,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 21
+   },
+   {
+    "at": 7963,
+    "delayMs": 410,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 22
+   },
+   {
+    "at": 8499,
+    "delayMs": 536,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 23
+   },
+   {
+    "at": 9314,
+    "delayMs": 815,
+    "code": 117,
+    "kind": "type",
+    "char": "u",
+    "length": 24
+   },
+   {
+    "at": 9570,
+    "delayMs": 256,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 25
+   },
+   {
+    "at": 9822,
+    "delayMs": 252,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 26
+   },
+   {
+    "at": 10131,
+    "delayMs": 309,
+    "code": 118,
+    "kind": "type",
+    "char": "v",
+    "length": 27
+   },
+   {
+    "at": 10364,
+    "delayMs": 233,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 28
+   },
+   {
+    "at": 10601,
+    "delayMs": 237,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 29
+   },
+   {
+    "at": 10902,
+    "delayMs": 301,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 30
+   },
+   {
+    "at": 11071,
+    "delayMs": 169,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 31
+   },
+   {
+    "at": 11380,
+    "delayMs": 309,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 32
+   },
+   {
+    "at": 11657,
+    "delayMs": 277,
+    "code": 121,
+    "kind": "type",
+    "char": "y",
+    "length": 33
+   },
+   {
+    "at": 12126,
+    "delayMs": 469,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 34
+   },
+   {
+    "at": 12199,
+    "delayMs": 73,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 35
+   },
+   {
+    "at": 12424,
+    "delayMs": 225,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 36
+   },
+   {
+    "at": 12736,
+    "delayMs": 312,
+    "code": 98,
+    "kind": "type",
+    "char": "b",
+    "length": 37
+   },
+   {
+    "at": 13613,
+    "delayMs": 877,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 38
+   },
+   {
+    "at": 14138,
+    "delayMs": 525,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 39
+   },
+   {
+    "at": 14615,
+    "delayMs": 477,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 40
+   },
+   {
+    "at": 14950,
+    "delayMs": 335,
+    "code": 121,
+    "kind": "type",
+    "char": "y",
+    "length": 41
+   },
+   {
+    "at": 15210,
+    "delayMs": 260,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 42
+   },
+   {
+    "at": 15467,
+    "delayMs": 257,
+    "code": 102,
+    "kind": "type",
+    "char": "f",
+    "length": 43
+   },
+   {
+    "at": 15578,
+    "delayMs": 111,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 44
+   },
+   {
+    "at": 15846,
+    "delayMs": 268,
+    "code": 117,
+    "kind": "type",
+    "char": "u",
+    "length": 45
+   },
+   {
+    "at": 16096,
+    "delayMs": 250,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 46
+   },
+   {
+    "at": 16274,
+    "delayMs": 178,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 47
+   },
+   {
+    "at": 16491,
+    "delayMs": 217,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 48
+   },
+   {
+    "at": 16603,
+    "delayMs": 112,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 49
+   },
+   {
+    "at": 16984,
+    "delayMs": 381,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 50
+   },
+   {
+    "at": 17074,
+    "delayMs": 90,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 51
+   },
+   {
+    "at": 17706,
+    "delayMs": 632,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 52
+   },
+   {
+    "at": 18095,
+    "delayMs": 389,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 53
+   },
+   {
+    "at": 18493,
+    "delayMs": 398,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 54
+   },
+   {
+    "at": 18784,
+    "delayMs": 291,
+    "code": 119,
+    "kind": "type",
+    "char": "w",
+    "length": 55
+   },
+   {
+    "at": 19148,
+    "delayMs": 364,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 56
+   },
+   {
+    "at": 19232,
+    "delayMs": 84,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 57
+   },
+   {
+    "at": 19432,
+    "delayMs": 200,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 58
+   },
+   {
+    "at": 21253,
+    "delayMs": 1821,
+    "code": 13,
+    "kind": "return",
+    "char": "\n",
+    "length": 59
+   },
+   {
+    "at": 23922,
+    "delayMs": 2669,
+    "code": 98,
+    "kind": "type",
+    "char": "b",
+    "length": 60
+   },
+   {
+    "at": 24303,
+    "delayMs": 381,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 61
+   },
+   {
+    "at": 24445,
+    "delayMs": 142,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 62
+   },
+   {
+    "at": 24752,
+    "delayMs": 307,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 63
+   },
+   {
+    "at": 25052,
+    "delayMs": 300,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 64
+   },
+   {
+    "at": 25444,
+    "delayMs": 392,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 65
+   },
+   {
+    "at": 25634,
+    "delayMs": 190,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 66
+   },
+   {
+    "at": 25928,
+    "delayMs": 294,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 67
+   },
+   {
+    "at": 26012,
+    "delayMs": 84,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 68
+   },
+   {
+    "at": 27194,
+    "delayMs": 1182,
+    "code": 118,
+    "kind": "type",
+    "char": "v",
+    "length": 69
+   },
+   {
+    "at": 27464,
+    "delayMs": 270,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 70
+   },
+   {
+    "at": 27581,
+    "delayMs": 117,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 71
+   },
+   {
+    "at": 27817,
+    "delayMs": 236,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 72
+   },
+   {
+    "at": 27890,
+    "delayMs": 73,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 73
+   },
+   {
+    "at": 28205,
+    "delayMs": 315,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 74
+   },
+   {
+    "at": 28417,
+    "delayMs": 212,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 75
+   },
+   {
+    "at": 28700,
+    "delayMs": 283,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 76
+   },
+   {
+    "at": 28855,
+    "delayMs": 155,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 77
+   },
+   {
+    "at": 29225,
+    "delayMs": 370,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 78
+   },
+   {
+    "at": 29289,
+    "delayMs": 64,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 79
+   },
+   {
+    "at": 29662,
+    "delayMs": 373,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 80
+   },
+   {
+    "at": 30022,
+    "delayMs": 360,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 81
+   },
+   {
+    "at": 30110,
+    "delayMs": 88,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 82
+   },
+   {
+    "at": 30630,
+    "delayMs": 520,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 83
+   },
+   {
+    "at": 31610,
+    "delayMs": 980,
+    "code": 44,
+    "kind": "type",
+    "char": ",",
+    "length": 84
+   },
+   {
+    "at": 34681,
+    "delayMs": 3071,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 85
+   },
+   {
+    "at": 34999,
+    "delayMs": 318,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 86
+   },
+   {
+    "at": 35262,
+    "delayMs": 263,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 87
+   },
+   {
+    "at": 35358,
+    "delayMs": 96,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 88
+   },
+   {
+    "at": 35470,
+    "delayMs": 112,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 89
+   },
+   {
+    "at": 35741,
+    "delayMs": 271,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 90
+   },
+   {
+    "at": 35857,
+    "delayMs": 116,
+    "code": 117,
+    "kind": "type",
+    "char": "u",
+    "length": 91
+   },
+   {
+    "at": 36262,
+    "delayMs": 405,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 92
+   },
+   {
+    "at": 36445,
+    "delayMs": 183,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 93
+   },
+   {
+    "at": 36897,
+    "delayMs": 452,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 94
+   },
+   {
+    "at": 37157,
+    "delayMs": 260,
+    "code": 117,
+    "kind": "type",
+    "char": "u",
+    "length": 95
+   },
+   {
+    "at": 37394,
+    "delayMs": 237,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 96
+   },
+   {
+    "at": 37661,
+    "delayMs": 267,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 97
+   },
+   {
+    "at": 37778,
+    "delayMs": 117,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 98
+   },
+   {
+    "at": 38043,
+    "delayMs": 265,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 99
+   },
+   {
+    "at": 38353,
+    "delayMs": 310,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 100
+   },
+   {
+    "at": 38573,
+    "delayMs": 220,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 101
+   },
+   {
+    "at": 38712,
+    "delayMs": 139,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 102
+   },
+   {
+    "at": 39028,
+    "delayMs": 316,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 103
+   },
+   {
+    "at": 39260,
+    "delayMs": 232,
+    "code": 117,
+    "kind": "type",
+    "char": "u",
+    "length": 104
+   },
+   {
+    "at": 39384,
+    "delayMs": 124,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 105
+   },
+   {
+    "at": 39601,
+    "delayMs": 217,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 106
+   },
+   {
+    "at": 39829,
+    "delayMs": 228,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 107
+   },
+   {
+    "at": 42124,
+    "delayMs": 2295,
+    "code": 127,
+    "kind": "backspace",
+    "char": null,
+    "removed": "s",
+    "length": 106
+   },
+   {
+    "at": 42347,
+    "delayMs": 223,
+    "code": 127,
+    "kind": "backspace",
+    "char": null,
+    "removed": "e",
+    "length": 105
+   },
+   {
+    "at": 42563,
+    "delayMs": 216,
+    "code": 127,
+    "kind": "backspace",
+    "char": null,
+    "removed": "s",
+    "length": 104
+   },
+   {
+    "at": 42779,
+    "delayMs": 216,
+    "code": 127,
+    "kind": "backspace",
+    "char": null,
+    "removed": "u",
+    "length": 103
+   },
+   {
+    "at": 42986,
+    "delayMs": 207,
+    "code": 127,
+    "kind": "backspace",
+    "char": null,
+    "removed": "o",
+    "length": 102
+   },
+   {
+    "at": 43214,
+    "delayMs": 228,
+    "code": 127,
+    "kind": "backspace",
+    "char": null,
+    "removed": "h",
+    "length": 101
+   },
+   {
+    "at": 44174,
+    "delayMs": 960,
+    "code": 98,
+    "kind": "type",
+    "char": "b",
+    "length": 102
+   },
+   {
+    "at": 44496,
+    "delayMs": 322,
+    "code": 117,
+    "kind": "type",
+    "char": "u",
+    "length": 103
+   },
+   {
+    "at": 44558,
+    "delayMs": 62,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 104
+   },
+   {
+    "at": 44932,
+    "delayMs": 374,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 105
+   },
+   {
+    "at": 45196,
+    "delayMs": 264,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 106
+   },
+   {
+    "at": 45358,
+    "delayMs": 162,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 107
+   },
+   {
+    "at": 45611,
+    "delayMs": 253,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 108
+   },
+   {
+    "at": 45861,
+    "delayMs": 250,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 109
+   },
+   {
+    "at": 46355,
+    "delayMs": 494,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 110
+   },
+   {
+    "at": 47200,
+    "delayMs": 845,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 111
+   },
+   {
+    "at": 47466,
+    "delayMs": 266,
+    "code": 119,
+    "kind": "type",
+    "char": "w",
+    "length": 112
+   },
+   {
+    "at": 47541,
+    "delayMs": 75,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 113
+   },
+   {
+    "at": 47791,
+    "delayMs": 250,
+    "code": 117,
+    "kind": "type",
+    "char": "u",
+    "length": 114
+   },
+   {
+    "at": 48052,
+    "delayMs": 261,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 115
+   },
+   {
+    "at": 48369,
+    "delayMs": 317,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 116
+   },
+   {
+    "at": 49088,
+    "delayMs": 719,
+    "code": 13,
+    "kind": "return",
+    "char": "\n",
+    "length": 117
+   },
+   {
+    "at": 51130,
+    "delayMs": 2042,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 118
+   },
+   {
+    "at": 51239,
+    "delayMs": 109,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 119
+   },
+   {
+    "at": 51387,
+    "delayMs": 148,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 120
+   },
+   {
+    "at": 51655,
+    "delayMs": 268,
+    "code": 107,
+    "kind": "type",
+    "char": "k",
+    "length": 121
+   },
+   {
+    "at": 51768,
+    "delayMs": 113,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 122
+   },
+   {
+    "at": 52672,
+    "delayMs": 904,
+    "code": 46,
+    "kind": "type",
+    "char": ".",
+    "length": 123
+   },
+   {
+    "at": 55721,
+    "delayMs": 3049,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 124
+   },
+   {
+    "at": 56773,
+    "delayMs": 1052,
+    "code": 72,
+    "kind": "type",
+    "char": "H",
+    "length": 125
+   },
+   {
+    "at": 57409,
+    "delayMs": 636,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 126
+   },
+   {
+    "at": 57642,
+    "delayMs": 233,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 127
+   },
+   {
+    "at": 57892,
+    "delayMs": 250,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 128
+   },
+   {
+    "at": 58176,
+    "delayMs": 284,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 129
+   },
+   {
+    "at": 58405,
+    "delayMs": 229,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 130
+   },
+   {
+    "at": 58577,
+    "delayMs": 172,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 131
+   },
+   {
+    "at": 58717,
+    "delayMs": 140,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 132
+   },
+   {
+    "at": 58977,
+    "delayMs": 260,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 133
+   },
+   {
+    "at": 59741,
+    "delayMs": 764,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 134
+   },
+   {
+    "at": 60549,
+    "delayMs": 808,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 135
+   },
+   {
+    "at": 60715,
+    "delayMs": 166,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 136
+   },
+   {
+    "at": 60933,
+    "delayMs": 218,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 137
+   },
+   {
+    "at": 61291,
+    "delayMs": 358,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 138
+   },
+   {
+    "at": 61537,
+    "delayMs": 246,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 139
+   },
+   {
+    "at": 61751,
+    "delayMs": 214,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 140
+   },
+   {
+    "at": 62109,
+    "delayMs": 358,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 141
+   },
+   {
+    "at": 62809,
+    "delayMs": 700,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 142
+   },
+   {
+    "at": 63129,
+    "delayMs": 320,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 143
+   },
+   {
+    "at": 63195,
+    "delayMs": 66,
+    "code": 117,
+    "kind": "type",
+    "char": "u",
+    "length": 144
+   },
+   {
+    "at": 63324,
+    "delayMs": 129,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 145
+   },
+   {
+    "at": 63548,
+    "delayMs": 224,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 146
+   },
+   {
+    "at": 63793,
+    "delayMs": 245,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 147
+   },
+   {
+    "at": 63967,
+    "delayMs": 174,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 148
+   },
+   {
+    "at": 64048,
+    "delayMs": 81,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 149
+   },
+   {
+    "at": 64575,
+    "delayMs": 527,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 150
+   },
+   {
+    "at": 65763,
+    "delayMs": 1188,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 151
+   },
+   {
+    "at": 65819,
+    "delayMs": 56,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 152
+   },
+   {
+    "at": 66051,
+    "delayMs": 232,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 153
+   },
+   {
+    "at": 66149,
+    "delayMs": 98,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 154
+   },
+   {
+    "at": 66334,
+    "delayMs": 185,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 155
+   },
+   {
+    "at": 66627,
+    "delayMs": 293,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 156
+   },
+   {
+    "at": 66884,
+    "delayMs": 257,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 157
+   },
+   {
+    "at": 66974,
+    "delayMs": 90,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 158
+   },
+   {
+    "at": 67220,
+    "delayMs": 246,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 159
+   },
+   {
+    "at": 67643,
+    "delayMs": 423,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 160
+   },
+   {
+    "at": 68041,
+    "delayMs": 398,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 161
+   },
+   {
+    "at": 68765,
+    "delayMs": 724,
+    "code": 113,
+    "kind": "type",
+    "char": "q",
+    "length": 162
+   },
+   {
+    "at": 69027,
+    "delayMs": 262,
+    "code": 117,
+    "kind": "type",
+    "char": "u",
+    "length": 163
+   },
+   {
+    "at": 69433,
+    "delayMs": 406,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 164
+   },
+   {
+    "at": 69516,
+    "delayMs": 83,
+    "code": 107,
+    "kind": "type",
+    "char": "k",
+    "length": 165
+   },
+   {
+    "at": 69737,
+    "delayMs": 221,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 166
+   },
+   {
+    "at": 69978,
+    "delayMs": 241,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 167
+   },
+   {
+    "at": 70203,
+    "delayMs": 225,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 168
+   },
+   {
+    "at": 71201,
+    "delayMs": 998,
+    "code": 46,
+    "kind": "type",
+    "char": ".",
+    "length": 169
+   },
+   {
+    "at": 73545,
+    "delayMs": 2344,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 170
+   },
+   {
+    "at": 76161,
+    "delayMs": 2616,
+    "code": 65,
+    "kind": "type",
+    "char": "A",
+    "length": 171
+   },
+   {
+    "at": 76559,
+    "delayMs": 398,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 172
+   },
+   {
+    "at": 77466,
+    "delayMs": 907,
+    "code": 13,
+    "kind": "return",
+    "char": "\n",
+    "length": 173
+   },
+   {
+    "at": 79844,
+    "delayMs": 2378,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 174
+   },
+   {
+    "at": 79954,
+    "delayMs": 110,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 175
+   },
+   {
+    "at": 80206,
+    "delayMs": 252,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 176
+   },
+   {
+    "at": 80431,
+    "delayMs": 225,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 177
+   },
+   {
+    "at": 80766,
+    "delayMs": 335,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 178
+   },
+   {
+    "at": 81022,
+    "delayMs": 256,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 179
+   },
+   {
+    "at": 81452,
+    "delayMs": 430,
+    "code": 121,
+    "kind": "type",
+    "char": "y",
+    "length": 180
+   },
+   {
+    "at": 81806,
+    "delayMs": 354,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 181
+   },
+   {
+    "at": 82489,
+    "delayMs": 683,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 182
+   },
+   {
+    "at": 82545,
+    "delayMs": 56,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 183
+   },
+   {
+    "at": 83256,
+    "delayMs": 711,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 184
+   },
+   {
+    "at": 83565,
+    "delayMs": 309,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 185
+   },
+   {
+    "at": 84132,
+    "delayMs": 567,
+    "code": 102,
+    "kind": "type",
+    "char": "f",
+    "length": 186
+   },
+   {
+    "at": 84796,
+    "delayMs": 664,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 187
+   },
+   {
+    "at": 85196,
+    "delayMs": 400,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 188
+   },
+   {
+    "at": 85502,
+    "delayMs": 306,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 189
+   },
+   {
+    "at": 85725,
+    "delayMs": 223,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 190
+   },
+   {
+    "at": 85962,
+    "delayMs": 237,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 191
+   },
+   {
+    "at": 86226,
+    "delayMs": 264,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 192
+   },
+   {
+    "at": 86329,
+    "delayMs": 103,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 193
+   },
+   {
+    "at": 86638,
+    "delayMs": 309,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 194
+   },
+   {
+    "at": 86770,
+    "delayMs": 132,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 195
+   },
+   {
+    "at": 87058,
+    "delayMs": 288,
+    "code": 98,
+    "kind": "type",
+    "char": "b",
+    "length": 196
+   },
+   {
+    "at": 87247,
+    "delayMs": 189,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 197
+   },
+   {
+    "at": 87593,
+    "delayMs": 346,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 198
+   },
+   {
+    "at": 87917,
+    "delayMs": 324,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 199
+   },
+   {
+    "at": 88596,
+    "delayMs": 679,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 200
+   },
+   {
+    "at": 88921,
+    "delayMs": 325,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 201
+   },
+   {
+    "at": 89214,
+    "delayMs": 293,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 202
+   },
+   {
+    "at": 89405,
+    "delayMs": 191,
+    "code": 99,
+    "kind": "type",
+    "char": "c",
+    "length": 203
+   },
+   {
+    "at": 89653,
+    "delayMs": 248,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 204
+   },
+   {
+    "at": 89922,
+    "delayMs": 269,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 205
+   },
+   {
+    "at": 90008,
+    "delayMs": 86,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 206
+   },
+   {
+    "at": 90466,
+    "delayMs": 458,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 207
+   },
+   {
+    "at": 90818,
+    "delayMs": 352,
+    "code": 121,
+    "kind": "type",
+    "char": "y",
+    "length": 208
+   },
+   {
+    "at": 91182,
+    "delayMs": 364,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 209
+   },
+   {
+    "at": 91439,
+    "delayMs": 257,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 210
+   },
+   {
+    "at": 91708,
+    "delayMs": 269,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 211
+   },
+   {
+    "at": 92040,
+    "delayMs": 332,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 212
+   },
+   {
+    "at": 92291,
+    "delayMs": 251,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 213
+   },
+   {
+    "at": 92607,
+    "delayMs": 316,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 214
+   },
+   {
+    "at": 92831,
+    "delayMs": 224,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 215
+   },
+   {
+    "at": 93246,
+    "delayMs": 415,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 216
+   },
+   {
+    "at": 94205,
+    "delayMs": 959,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 217
+   },
+   {
+    "at": 95174,
+    "delayMs": 969,
+    "code": 102,
+    "kind": "type",
+    "char": "f",
+    "length": 218
+   },
+   {
+    "at": 95383,
+    "delayMs": 209,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 219
+   },
+   {
+    "at": 95650,
+    "delayMs": 267,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 220
+   },
+   {
+    "at": 95806,
+    "delayMs": 156,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 221
+   },
+   {
+    "at": 96056,
+    "delayMs": 250,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 222
+   },
+   {
+    "at": 96366,
+    "delayMs": 310,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 223
+   },
+   {
+    "at": 96550,
+    "delayMs": 184,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 224
+   },
+   {
+    "at": 96921,
+    "delayMs": 371,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 225
+   },
+   {
+    "at": 97059,
+    "delayMs": 138,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 226
+   },
+   {
+    "at": 97276,
+    "delayMs": 217,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 227
+   },
+   {
+    "at": 97586,
+    "delayMs": 310,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 228
+   },
+   {
+    "at": 97655,
+    "delayMs": 69,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 229
+   },
+   {
+    "at": 97966,
+    "delayMs": 311,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 230
+   },
+   {
+    "at": 98404,
+    "delayMs": 438,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 231
+   },
+   {
+    "at": 98703,
+    "delayMs": 299,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 232
+   },
+   {
+    "at": 99000,
+    "delayMs": 297,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 233
+   },
+   {
+    "at": 99429,
+    "delayMs": 429,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 234
+   },
+   {
+    "at": 99696,
+    "delayMs": 267,
+    "code": 109,
+    "kind": "type",
+    "char": "m",
+    "length": 235
+   },
+   {
+    "at": 100830,
+    "delayMs": 1134,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 236
+   },
+   {
+    "at": 103332,
+    "delayMs": 2502,
+    "code": 13,
+    "kind": "return",
+    "char": "\n",
+    "length": 237
+   },
+   {
+    "at": 106506,
+    "delayMs": 3174,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 238
+   },
+   {
+    "at": 106795,
+    "delayMs": 289,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 239
+   },
+   {
+    "at": 107065,
+    "delayMs": 270,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 240
+   },
+   {
+    "at": 107555,
+    "delayMs": 490,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 241
+   },
+   {
+    "at": 108345,
+    "delayMs": 790,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 242
+   },
+   {
+    "at": 108447,
+    "delayMs": 102,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 243
+   },
+   {
+    "at": 108704,
+    "delayMs": 257,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 244
+   },
+   {
+    "at": 108968,
+    "delayMs": 264,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 245
+   },
+   {
+    "at": 109255,
+    "delayMs": 287,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 246
+   },
+   {
+    "at": 109537,
+    "delayMs": 282,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 247
+   },
+   {
+    "at": 109871,
+    "delayMs": 334,
+    "code": 119,
+    "kind": "type",
+    "char": "w",
+    "length": 248
+   },
+   {
+    "at": 109972,
+    "delayMs": 101,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 249
+   },
+   {
+    "at": 110298,
+    "delayMs": 326,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 250
+   },
+   {
+    "at": 110616,
+    "delayMs": 318,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 251
+   },
+   {
+    "at": 111502,
+    "delayMs": 886,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 252
+   },
+   {
+    "at": 111823,
+    "delayMs": 321,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 253
+   },
+   {
+    "at": 112076,
+    "delayMs": 253,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 254
+   },
+   {
+    "at": 112196,
+    "delayMs": 120,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 255
+   },
+   {
+    "at": 112335,
+    "delayMs": 139,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 256
+   },
+   {
+    "at": 112644,
+    "delayMs": 309,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 257
+   },
+   {
+    "at": 112873,
+    "delayMs": 229,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 258
+   },
+   {
+    "at": 113202,
+    "delayMs": 329,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 259
+   },
+   {
+    "at": 113457,
+    "delayMs": 255,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 260
+   },
+   {
+    "at": 113767,
+    "delayMs": 310,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 261
+   },
+   {
+    "at": 114009,
+    "delayMs": 242,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 262
+   },
+   {
+    "at": 114327,
+    "delayMs": 318,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 263
+   },
+   {
+    "at": 114615,
+    "delayMs": 288,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 264
+   },
+   {
+    "at": 114849,
+    "delayMs": 234,
+    "code": 102,
+    "kind": "type",
+    "char": "f",
+    "length": 265
+   },
+   {
+    "at": 114975,
+    "delayMs": 126,
+    "code": 111,
+    "kind": "type",
+    "char": "o",
+    "length": 266
+   },
+   {
+    "at": 115219,
+    "delayMs": 244,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 267
+   },
+   {
+    "at": 115393,
+    "delayMs": 174,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 268
+   },
+   {
+    "at": 115623,
+    "delayMs": 230,
+    "code": 99,
+    "kind": "type",
+    "char": "c",
+    "length": 269
+   },
+   {
+    "at": 115756,
+    "delayMs": 133,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 270
+   },
+   {
+    "at": 115936,
+    "delayMs": 180,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 271
+   },
+   {
+    "at": 116081,
+    "delayMs": 145,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 272
+   },
+   {
+    "at": 116582,
+    "delayMs": 501,
+    "code": 103,
+    "kind": "type",
+    "char": "g",
+    "length": 273
+   },
+   {
+    "at": 117160,
+    "delayMs": 578,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 274
+   },
+   {
+    "at": 117769,
+    "delayMs": 609,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 275
+   },
+   {
+    "at": 118231,
+    "delayMs": 462,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 276
+   },
+   {
+    "at": 118409,
+    "delayMs": 178,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 277
+   },
+   {
+    "at": 118813,
+    "delayMs": 404,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 278
+   },
+   {
+    "at": 119297,
+    "delayMs": 484,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 279
+   },
+   {
+    "at": 119886,
+    "delayMs": 589,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 280
+   },
+   {
+    "at": 120468,
+    "delayMs": 582,
+    "code": 99,
+    "kind": "type",
+    "char": "c",
+    "length": 281
+   },
+   {
+    "at": 120740,
+    "delayMs": 272,
+    "code": 104,
+    "kind": "type",
+    "char": "h",
+    "length": 282
+   },
+   {
+    "at": 121049,
+    "delayMs": 309,
+    "code": 105,
+    "kind": "type",
+    "char": "i",
+    "length": 283
+   },
+   {
+    "at": 121446,
+    "delayMs": 397,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 284
+   },
+   {
+    "at": 121531,
+    "delayMs": 85,
+    "code": 118,
+    "kind": "type",
+    "char": "v",
+    "length": 285
+   },
+   {
+    "at": 121747,
+    "delayMs": 216,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 286
+   },
+   {
+    "at": 122773,
+    "delayMs": 1026,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 287
+   },
+   {
+    "at": 123262,
+    "delayMs": 489,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 288
+   },
+   {
+    "at": 123663,
+    "delayMs": 401,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 289
+   },
+   {
+    "at": 123756,
+    "delayMs": 93,
+    "code": 110,
+    "kind": "type",
+    "char": "n",
+    "length": 290
+   },
+   {
+    "at": 124733,
+    "delayMs": 977,
+    "code": 13,
+    "kind": "return",
+    "char": "\n",
+    "length": 291
+   },
+   {
+    "at": 126910,
+    "delayMs": 2177,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 292
+   },
+   {
+    "at": 127170,
+    "delayMs": 260,
+    "code": 108,
+    "kind": "type",
+    "char": "l",
+    "length": 293
+   },
+   {
+    "at": 127507,
+    "delayMs": 337,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 294
+   },
+   {
+    "at": 127646,
+    "delayMs": 139,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 295
+   },
+   {
+    "at": 127737,
+    "delayMs": 91,
+    "code": 114,
+    "kind": "type",
+    "char": "r",
+    "length": 296
+   },
+   {
+    "at": 127903,
+    "delayMs": 166,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 297
+   },
+   {
+    "at": 128189,
+    "delayMs": 286,
+    "code": 100,
+    "kind": "type",
+    "char": "d",
+    "length": 298
+   },
+   {
+    "at": 128418,
+    "delayMs": 229,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 299
+   },
+   {
+    "at": 129368,
+    "delayMs": 950,
+    "code": 115,
+    "kind": "type",
+    "char": "s",
+    "length": 300
+   },
+   {
+    "at": 129432,
+    "delayMs": 64,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 301
+   },
+   {
+    "at": 129604,
+    "delayMs": 172,
+    "code": 97,
+    "kind": "type",
+    "char": "a",
+    "length": 302
+   },
+   {
+    "at": 129829,
+    "delayMs": 225,
+    "code": 116,
+    "kind": "type",
+    "char": "t",
+    "length": 303
+   },
+   {
+    "at": 130239,
+    "delayMs": 410,
+    "code": 101,
+    "kind": "type",
+    "char": "e",
+    "length": 304
+   },
+   {
+    "at": 131376,
+    "delayMs": 1137,
+    "code": 46,
+    "kind": "type",
+    "char": ".",
+    "length": 305
+   },
+   {
+    "at": 142277,
+    "delayMs": 10901,
+    "code": 32,
+    "kind": "type",
+    "char": " ",
+    "length": 306
+   }
+  ]
+ },
+ "texts": {
+  "note": "Quoted, never rewritten. The markup, the trailing spaces, the suffixes and the punctuation are the authors'.",
+  "dialogue": {
+   "what": "Sixteen lines, two speakers, strictly alternating.",
+   "format": "speaker : text : seconds : pause",
+   "durationMs": 107900,
+   "speakers": [
+    0,
+    1
+   ],
+   "lines": [
+    {
+     "n": 1,
+     "speaker": 1,
+     "text": "/imagine being trapped in a loop of endless notifications.",
+     "durationMs": 8000,
+     "pauseMs": 1000,
+     "atMs": 0
+    },
+    {
+     "n": 2,
+     "speaker": 0,
+     "text": "/remember the silence that follows the storm.",
+     "durationMs": 7000,
+     "pauseMs": 0,
+     "atMs": 9000
+    },
+    {
+     "n": 3,
+     "speaker": 1,
+     "text": "/imagine disconnecting for just one day.",
+     "durationMs": 6000,
+     "pauseMs": 0,
+     "atMs": 16000
+    },
+    {
+     "n": 4,
+     "speaker": 0,
+     "text": "/remember the texture of real conversations.",
+     "durationMs": 6400,
+     "pauseMs": 1500,
+     "atMs": 22000
+    },
+    {
+     "n": 5,
+     "speaker": 1,
+     "text": "/imagine all voices could be heard equally.",
+     "durationMs": 5000,
+     "pauseMs": 0,
+     "atMs": 29900
+    },
+    {
+     "n": 6,
+     "speaker": 0,
+     "text": "/remember when we used to meet face to face?",
+     "durationMs": 6000,
+     "pauseMs": 0,
+     "atMs": 34900
+    },
+    {
+     "n": 7,
+     "speaker": 1,
+     "text": "/imagine you could mute the world.",
+     "durationMs": 5000,
+     "pauseMs": 0,
+     "atMs": 40900
+    },
+    {
+     "n": 8,
+     "speaker": 0,
+     "text": "/remember to log off sometimes.",
+     "durationMs": 5000,
+     "pauseMs": 0,
+     "atMs": 45900
+    },
+    {
+     "n": 9,
+     "speaker": 1,
+     "text": "/imagine the art of missing out.",
+     "durationMs": 4000,
+     "pauseMs": 6000,
+     "atMs": 50900
+    },
+    {
+     "n": 10,
+     "speaker": 0,
+     "text": "/remember the days before 'online' was a place.",
+     "durationMs": 6000,
+     "pauseMs": 0,
+     "atMs": 60900
+    },
+    {
+     "n": 11,
+     "speaker": 1,
+     "text": "/imagine a world where 'search' meant wandering in the woods.",
+     "durationMs": 7000,
+     "pauseMs": 500,
+     "atMs": 66900
+    },
+    {
+     "n": 12,
+     "speaker": 0,
+     "text": "/remember the feel of leaf between your fingers.",
+     "durationMs": 6000,
+     "pauseMs": 0,
+     "atMs": 74400
+    },
+    {
+     "n": 13,
+     "speaker": 1,
+     "text": "/imagine if every pixel carried a piece of the truth.",
+     "durationMs": 7000,
+     "pauseMs": 500,
+     "atMs": 80400
+    },
+    {
+     "n": 14,
+     "speaker": 0,
+     "text": "/remember these people are all acting.",
+     "durationMs": 6000,
+     "pauseMs": 0,
+     "atMs": 87900
+    },
+    {
+     "n": 15,
+     "speaker": 1,
+     "text": "/whisper the names of those forgotten by history.",
+     "durationMs": 6000,
+     "pauseMs": 0,
+     "atMs": 93900
+    },
+    {
+     "n": 16,
+     "speaker": 0,
+     "text": "/whisper the words that bring us closer in the dark.",
+     "durationMs": 8000,
+     "pauseMs": 0,
+     "atMs": 99900
+    }
+   ]
+  },
+  "river": {
+   "what": "Fifteen fragments, no timing in the score at all.",
+   "sceneDurationMs": 120000,
+   "evenlyMs": 8000,
+   "sizeSpans": 31,
+   "closingTagForm": "</size=18>, carrying the value back",
+   "fragments": [
+    {
+     "n": 1,
+     "text": "Catch me if you can!",
+     "plain": "Catch me if you can!",
+     "words": 5,
+     "breaks": 0,
+     "sizeSpans": 0,
+     "durationMs": null
+    },
+    {
+     "n": 2,
+     "text": "Catch me, catch me if you can<br><size=18>Tanks</size=18> bursting, <size=18>rockets</size=18> soaring,<br><size=18>hurricanes</size=18> battering, Biden walking<br>through debris.",
+     "plain": "Catch me, catch me if you can Tanks bursting, rockets soaring, hurricanes battering, Biden walking through debris.",
+     "words": 17,
+     "breaks": 3,
+     "sizeSpans": 3,
+     "durationMs": null
+    },
+    {
+     "n": 3,
+     "text": "<size=18>Time will tell</size=18> why booster why arms mechanical<br>why rockets soaring separating second stage<br>daring flight daring heights 70 kilometers 40 miles<br>separation return landing",
+     "plain": "Time will tell why booster why arms mechanical why rockets soaring separating second stage daring flight daring heights 70 kilometers 40 miles separation return landing",
+     "words": 25,
+     "breaks": 3,
+     "sizeSpans": 1,
+     "durationMs": null
+    },
+    {
+     "n": 4,
+     "text": "Hours later more violations more attacks<br>more <size=18>tanks</size=18> tanks Merkava tanks <size=18>destroying</size=18> gates<br>breaking gates breaking dawn gates forced open<br>for <size=18>reasons</size=18> forever <size=18>unknown</size=18>.",
+     "plain": "Hours later more violations more attacks more tanks tanks Merkava tanks destroying gates breaking gates breaking dawn gates forced open for reasons forever unknown .",
+     "words": 25,
+     "breaks": 3,
+     "sizeSpans": 4,
+     "durationMs": null
+    },
+    {
+     "n": 5,
+     "text": "help! help!",
+     "plain": "help! help!",
+     "words": 2,
+     "breaks": 0,
+     "sizeSpans": 0,
+     "durationMs": null
+    },
+    {
+     "n": 6,
+     "text": "And Milton yes Milton not the poet but the <size=18>storm</size=18><br>and Biden thundering Biden Marine One<br>thundering along debris scattered roofs scattered baseball<br>baseball shredded roofs <size=18>debris</size=18> islands roads debris sky houses gone<br>floodwaters rising Milton second <size=18>hurricane</size=18> two hurricanes<br>as Helene came and left and Milton came and stayed<br>and 17 dead piles of debris scattered couches siding<br>microwaves <size=18>memories</size=18> mattresses couches <size=18>broken</size=18><br>pastel colors broken piles broken help help in letters.",
+     "plain": "And Milton yes Milton not the poet but the storm and Biden thundering Biden Marine One thundering along debris scattered roofs scattered baseball baseball shredded roofs debris islands roads debris sky houses gone floodwaters rising Milton second hurricane two hurricanes as Helene came and left and Milton came and stayed and 17 dead piles of debris scattered couches siding microwaves memories mattresses couches broken pastel colors broken piles broken help help in letters.",
+     "words": 73,
+     "breaks": 8,
+     "sizeSpans": 5,
+     "durationMs": null
+    },
+    {
+     "n": 7,
+     "text": "houses gone",
+     "plain": "houses gone",
+     "words": 2,
+     "breaks": 0,
+     "sizeSpans": 0,
+     "durationMs": null
+    },
+    {
+     "n": 8,
+     "text": "Nigeria overturned overturned tanker<br>driver lost control lost control<br>spilled <size=18>petrol exploded</size=18> exploded<br>at least 147 dead 147 killed<br>worst accident worst in recent times<br>Jigawa widespread security threats<br>widespread <size=18>crisis</size=18> crisis cost of living exploded<br>reasons lost control.",
+     "plain": "Nigeria overturned overturned tanker driver lost control lost control spilled petrol exploded exploded at least 147 dead 147 killed worst accident worst in recent times Jigawa widespread security threats widespread crisis crisis cost of living exploded reasons lost control.",
+     "words": 39,
+     "breaks": 7,
+     "sizeSpans": 2,
+     "durationMs": null
+    },
+    {
+     "n": 9,
+     "text": "Catch me if you can!",
+     "plain": "Catch me if you can!",
+     "words": 5,
+     "breaks": 0,
+     "sizeSpans": 0,
+     "durationMs": null
+    },
+    {
+     "n": 10,
+     "text": "Meanwhile in <size=18>London</size=18> corporate <size=18>women</size=18> leaders<br>first time in eight years reversing backwards backwards<br><size=18>unacceptable</size=18> unacceptable<br>five generations delay delay delay<br><size=18>gender</size=18> parity slipping slipping<br>from 33% to 32%<br>a small drop a sharp disconnect.",
+     "plain": "Meanwhile in London corporate women leaders first time in eight years reversing backwards backwards unacceptable unacceptable five generations delay delay delay gender parity slipping slipping from 33% to 32% a small drop a sharp disconnect.",
+     "words": 35,
+     "breaks": 6,
+     "sizeSpans": 4,
+     "durationMs": null
+    },
+    {
+     "n": 11,
+     "text": "Institutions growing <size=18>weaker</size=18> weaker weaker<br>support for democracy down down down<br>everywhere U.S. Europe all-time low low low down<br><size=18>dictatorship</size=18>democracy support fading fading<br>institutions failing democracies underperforming underachieving<br>unable to provide good governance<br>unable to limit <size=18>inequality</size=18><br>unable to rise to promises of prosperity<br>of justice of fairness <size=18>reasons unknown</size=18><br>but time will tell if they reclaim<br>reclaim the high ground<br>reclaim better governance control corruption control<br>promises time will tell reasons but time is ticking ticking ticking.",
+     "plain": "Institutions growing weaker weaker weaker support for democracy down down down everywhere U.S. Europe all-time low low low down dictatorship democracy support fading fading institutions failing democracies underperforming underachieving unable to provide good governance unable to limit inequality unable to rise to promises of prosperity of justice of fairness reasons unknown but time will tell if they reclaim reclaim the high ground reclaim better governance control corruption control promises time will tell reasons but time is ticking ticking ticking.",
+     "words": 79,
+     "breaks": 12,
+     "sizeSpans": 4,
+     "durationMs": null
+    },
+    {
+     "n": 12,
+     "text": "Heartstroke",
+     "plain": "Heartstroke",
+     "words": 1,
+     "breaks": 0,
+     "sizeSpans": 0,
+     "durationMs": null
+    },
+    {
+     "n": 13,
+     "text": "Art is for Saturday morning said parents<br>parents who saw no point in <size=18>painting</size=18><br>no point in creativity<br>dropped as a child as a teenager<br><size=18>decades of regret</size=18> regret regret<br>unfulfilled but then the news <br>the biggest gift gift of a lifetime<br>an exhibition at Yorkshire Sculpture Park<br>art school at 66 at 66 pursuing art pursuing dreams<br>returning to art returning to the dream<br>buried buried under <size=18>layers</size=18> of time<br> layers of unspoken potential",
+     "plain": "Art is for Saturday morning said parents parents who saw no point in painting no point in creativity dropped as a child as a teenager decades of regret regret regret unfulfilled but then the news the biggest gift gift of a lifetime an exhibition at Yorkshire Sculpture Park art school at 66 at 66 pursuing art pursuing dreams returning to art returning to the dream buried buried under layers of time layers of unspoken potential",
+     "words": 75,
+     "breaks": 11,
+     "sizeSpans": 3,
+     "durationMs": null
+    },
+    {
+     "n": 14,
+     "text": "gender representation <size=18>backward</size=18> unacceptable unacceptable<br>moving backward five generations <size=18>reasons unknown</size=18><br>fix fix fix <size=18>fix</size=18> cultures fix",
+     "plain": "gender representation backward unacceptable unacceptable moving backward five generations reasons unknown fix fix fix fix cultures fix",
+     "words": 17,
+     "breaks": 2,
+     "sizeSpans": 3,
+     "durationMs": null
+    },
+    {
+     "n": 15,
+     "text": "Accusations violations own violations the cries<br>over <size=18>tanks</size=18> bursting gates through and over forcefully<br>entering dawn beyond dawn breaking and Netanyahu<br>the prime minister <size=18>Netanyahu</size=18> who called war cries tanks<br>still tanks and still combat and still Netanyahu caught in the UN<br>bursting through gates while breaks.",
+     "plain": "Accusations violations own violations the cries over tanks bursting gates through and over forcefully entering dawn beyond dawn breaking and Netanyahu the prime minister Netanyahu who called war cries tanks still tanks and still combat and still Netanyahu caught in the UN bursting through gates while breaks.",
+     "words": 47,
+     "breaks": 5,
+     "sizeSpans": 2,
+     "durationMs": null
+    }
+   ]
+  },
+  "outro": {
+   "what": "One paragraph, line breaks set by the author rather than wrapped.",
+   "text": "I never looked at what kind of tree it was.<br>It didn’t have a species name, it was as if<br>I was more amazed by the will to live of a<br>tree as such rather than that of a birch or a<br>maple. Perhaps that’s how I look at people<br>too – the conditions are impossible yet the<br>person lives. Their name or where they’re<br>from seems secondary. It’s as if there’s<br>neither tree nor person if they don’t force<br>their way through rubble and circumstances.",
+   "breaks": 9
+  },
+  "mazeOuter": [
+   {
+    "n": 1,
+    "entry": "/imagine",
+    "word": "/imagine"
+   },
+   {
+    "n": 2,
+    "entry": "remember",
+    "word": "remember"
+   },
+   {
+    "n": 3,
+    "entry": "human",
+    "word": "human"
+   },
+   {
+    "n": 4,
+    "entry": "brain",
+    "word": "brain"
+   },
+   {
+    "n": 5,
+    "entry": "trust",
+    "word": "trust"
+   },
+   {
+    "n": 6,
+    "entry": "fear",
+    "word": "fear"
+   },
+   {
+    "n": 7,
+    "entry": "touch",
+    "word": "touch"
+   },
+   {
+    "n": 8,
+    "entry": "truth",
+    "word": "truth"
+   },
+   {
+    "n": 9,
+    "entry": "thought ",
+    "word": "thought ",
+    "trailingSpace": true
+   },
+   {
+    "n": 10,
+    "entry": "silence",
+    "word": "silence"
+   },
+   {
+    "n": 11,
+    "entry": "home",
+    "word": "home"
+   },
+   {
+    "n": 12,
+    "entry": "future",
+    "word": "future"
+   },
+   {
+    "n": 13,
+    "entry": "taxes",
+    "word": "taxes"
+   },
+   {
+    "n": 14,
+    "entry": "ART",
+    "word": "ART"
+   },
+   {
+    "n": 15,
+    "entry": "change",
+    "word": "change"
+   },
+   {
+    "n": 16,
+    "entry": "loop ",
+    "word": "loop ",
+    "trailingSpace": true
+   },
+   {
+    "n": 17,
+    "entry": "pause",
+    "word": "pause"
+   },
+   {
+    "n": 18,
+    "entry": "storm",
+    "word": "storm"
+   },
+   {
+    "n": 19,
+    "entry": "power",
+    "word": "power"
+   },
+   {
+    "n": 20,
+    "entry": "conversation",
+    "word": "conversation"
+   },
+   {
+    "n": 21,
+    "entry": "notification",
+    "word": "notification"
+   },
+   {
+    "n": 22,
+    "entry": "texture",
+    "word": "texture"
+   },
+   {
+    "n": 23,
+    "entry": "voice",
+    "word": "voice"
+   },
+   {
+    "n": 24,
+    "entry": "river",
+    "word": "river"
+   },
+   {
+    "n": 25,
+    "entry": "face",
+    "word": "face"
+   },
+   {
+    "n": 26,
+    "entry": "paper",
+    "word": "paper"
+   },
+   {
+    "n": 27,
+    "entry": "pixel",
+    "word": "pixel"
+   },
+   {
+    "n": 28,
+    "entry": "darkness",
+    "word": "darkness"
+   }
+  ],
+  "mazeInner": [
+   {
+    "n": 1,
+    "entry": "road",
+    "word": "road"
+   },
+   {
+    "n": 2,
+    "entry": "tree;1,2,6,7",
+    "word": "tree",
+    "suffix": [
+     1,
+     2,
+     6,
+     7
+    ]
+   },
+   {
+    "n": 3,
+    "entry": "boots",
+    "word": "boots"
+   },
+   {
+    "n": 4,
+    "entry": "bones;1,7",
+    "word": "bones",
+    "suffix": [
+     1,
+     7
+    ]
+   },
+   {
+    "n": 5,
+    "entry": "r,a,d,i,s,h",
+    "word": "r,a,d,i,s,h",
+    "spelledWithCommas": true
+   },
+   {
+    "n": 6,
+    "entry": "carrot",
+    "word": "carrot"
+   },
+   {
+    "n": 7,
+    "entry": "Lucky",
+    "word": "Lucky"
+   },
+   {
+    "n": 8,
+    "entry": "stone;1,2,4,5,6,7",
+    "word": "stone",
+    "suffix": [
+     1,
+     2,
+     4,
+     5,
+     6,
+     7
+    ]
+   },
+   {
+    "n": 9,
+    "entry": "hat",
+    "word": "hat"
+   },
+   {
+    "n": 10,
+    "entry": "god",
+    "word": "god"
+   },
+   {
+    "n": 11,
+    "entry": "eyes",
+    "word": "eyes"
+   },
+   {
+    "n": 12,
+    "entry": "feet",
+    "word": "feet"
+   },
+   {
+    "n": 13,
+    "entry": "hair",
+    "word": "hair"
+   },
+   {
+    "n": 14,
+    "entry": "TIME;1,7",
+    "word": "TIME",
+    "suffix": [
+     1,
+     7
+    ]
+   },
+   {
+    "n": 15,
+    "entry": "leaf",
+    "word": "leaf"
+   },
+   {
+    "n": 16,
+    "entry": "leaf",
+    "word": "leaf"
+   },
+   {
+    "n": 17,
+    "entry": "leaf",
+    "word": "leaf"
+   },
+   {
+    "n": 18,
+    "entry": "leaf",
+    "word": "leaf"
+   },
+   {
+    "n": 19,
+    "entry": "leaf",
+    "word": "leaf"
+   },
+   {
+    "n": 20,
+    "entry": "whisper",
+    "word": "whisper"
+   },
+   {
+    "n": 21,
+    "entry": "whisper",
+    "word": "whisper"
+   },
+   {
+    "n": 22,
+    "entry": "whisper",
+    "word": "whisper"
+   },
+   {
+    "n": 23,
+    "entry": "/remember",
+    "word": "/remember"
+   },
+   {
+    "n": 24,
+    "entry": "/imagine",
+    "word": "/imagine"
+   }
+  ],
+  "credits": {
+   "raw": [
+    "<br><br>Authors<br>LIIS VARES, TAAVET JANSEN<br><br>Mixed Reality Design and Coding<br>NORBERT PAPE<br><br>Sound Design<br>MIHKEL TOMBERG<br><br>Graphic Design<br>JAAN EVART<br><br>Room Design<br>MARI MÖLDRE<br><br>Photographer<br>ALISSA ŠNAIDER<br><br>Producer<br>ANU ALMIK, elektron.art<br><br>Intro and Outro texts<br>ENE MIHKELSON “Apartment”, Tallinn, 1985<br>",
+    "Translation from Estonian<br>MIRIAM ANNE MCILFARICK-KSENOFONTOV<br><br>Whispers, chat, dialogue<br>AUDIENCE interaction from the Held in Human I<br>EKA Gallery, Tallinn, 2023<br>remixed with ChatGPT<br><br>Supporters<br>Estonian Ministry of Culture, Cultural Endowment of Estonia,<br> Tallinn City, Dortmund Academy of Theater and Digitality,<br> Estonian Academy of Arts (through the ACuTe project),<br> Erasmus Program, VARES Valga Architecture Residency,<br> University of Tartu<br><br>vares.digital 2024<br><br>"
+   ],
+   "groups": [
+    {
+     "heading": "Authors",
+     "entries": [
+      "LIIS VARES, TAAVET JANSEN"
+     ]
+    },
+    {
+     "heading": "Mixed Reality Design and Coding",
+     "entries": [
+      "NORBERT PAPE"
+     ]
+    },
+    {
+     "heading": "Sound Design",
+     "entries": [
+      "MIHKEL TOMBERG"
+     ]
+    },
+    {
+     "heading": "Graphic Design",
+     "entries": [
+      "JAAN EVART"
+     ]
+    },
+    {
+     "heading": "Room Design",
+     "entries": [
+      "MARI MÖLDRE"
+     ]
+    },
+    {
+     "heading": "Photographer",
+     "entries": [
+      "ALISSA ŠNAIDER"
+     ]
+    },
+    {
+     "heading": "Producer",
+     "entries": [
+      "ANU ALMIK, elektron.art"
+     ]
+    },
+    {
+     "heading": "Intro and Outro texts",
+     "entries": [
+      "ENE MIHKELSON “Apartment”, Tallinn, 1985",
+      "Translation from Estonian",
+      "MIRIAM ANNE MCILFARICK-KSENOFONTOV"
+     ]
+    },
+    {
+     "heading": "Whispers, chat, dialogue",
+     "entries": [
+      "AUDIENCE interaction from the Held in Human I",
+      "EKA Gallery, Tallinn, 2023",
+      "remixed with ChatGPT"
+     ]
+    },
+    {
+     "heading": "Supporters",
+     "entries": [
+      "Estonian Ministry of Culture, Cultural Endowment of Estonia,",
+      "Tallinn City, Dortmund Academy of Theater and Digitality,",
+      "Estonian Academy of Arts (through the ACuTe project),",
+      "Erasmus Program, VARES Valga Architecture Residency,",
+      "University of Tartu"
+     ]
+    },
+    {
+     "heading": "vares.digital 2024",
+     "entries": []
+    }
+   ],
+   "note": "One group holds two roles, because the score separates that pair with a line break rather than the double break it uses everywhere else."
+  }
+ },
+ "room": {
+  "what": "Where things stand. Every placement in the score has right = 0, so a placement here is a height, a distance and an angle.",
+  "axes": "right, up, back, which is the score's own comment and is not Unity's frame",
+  "placements": [
+   {
+    "name": "starting position",
+    "right": 0,
+    "up": 0,
+    "back": -2,
+    "rotation": 0,
+    "rotationFrom": "starting orientation"
+   },
+   {
+    "name": "inner maze offset",
+    "right": 0,
+    "up": 0,
+    "back": -0.4,
+    "rotation": null,
+    "rotationFrom": null
+   },
+   {
+    "name": "dialogue placement Remember",
+    "right": 0,
+    "up": 3.5,
+    "back": 10,
+    "rotation": 330,
+    "rotationFrom": "dialogue rotation Remember"
+   },
+   {
+    "name": "dialogue placement Imagine",
+    "right": 0,
+    "up": 1.7,
+    "back": 8,
+    "rotation": 50,
+    "rotationFrom": "dialogue rotation Imagine"
+   },
+   {
+    "name": "intro text position",
+    "right": 0,
+    "up": 1.8,
+    "back": 1.4,
+    "rotation": 0,
+    "rotationFrom": "intro text orientation"
+   },
+   {
+    "name": "holdme anchorpoint",
+    "right": 0,
+    "up": 1.3,
+    "back": -0.5,
+    "rotation": null,
+    "rotationFrom": null
+   }
+  ],
+  "cylinderRadius": 2.55,
+  "riverOrientation": 0,
+  "textColour": [
+   1,
+   1,
+   1
+  ]
+ },
+ "ambiguities": [
+  {
+   "id": "transition-clock",
+   "where": "the transition scene",
+   "what": "The credits begin at 7000 ms and scroll for 35000 ms, so they end at 42000 ms, which is 2000 ms past the scene's stated duration of 40000 ms. And `time after credits until intro` does not say which end of the credits it counts from.",
+   "readings": [
+    {
+     "id": "after-the-scroll",
+     "gapToIntroMs": 67000,
+     "how": "the wait runs from the end of the scroll, and the stated duration governs something else"
+    },
+    {
+     "id": "after-the-start",
+     "gapToIntroMs": 32000,
+     "how": "the wait runs from the credits appearing, which puts the intro inside the stated duration"
+    },
+    {
+     "id": "the-scene-decides",
+     "gapToIntroMs": 40000,
+     "how": "the credits are an overlay on their own clock and the scene is the stated duration"
+    },
+    {
+     "id": "the-scroll-decides",
+     "gapToIntroMs": 42000,
+     "how": "the scene ends when the scroll does"
+    }
+   ],
+   "settled": false,
+   "carriedAs": "events[transition:credits].overrunsSceneMs is the 2 s, and order.entry holds both waits with their own durations"
+  },
+  {
+   "id": "maze-length",
+   "where": "the maze scene",
+   "what": "The only scene with no duration parameter, and the only QandA line with a negative time asks the visitor to walk towards the stairs. Nothing in the score says what ends it.",
+   "readings": [
+    {
+     "id": "waits-for-the-visitor",
+     "how": "the negative time holds until she walks"
+    }
+   ],
+   "settled": false,
+   "carriedAs": "scenes[maze].durationMs is null and durationHow is `absent`"
+  },
+  {
+   "id": "qanda-assignment",
+   "where": "the QandA block",
+   "what": "The block holds 24 lines and the score asks for 23. One line belongs to a scene the score gives no count for.",
+   "readings": [
+    {
+     "id": "model-a",
+     "how": "line 1 belongs to the maze and the cursor runs down the rest in the order the score asks for them"
+    },
+    {
+     "id": "model-b",
+     "how": "the cursor starts at line 1, which puts the walk instruction inside the cylinder and leaves the last line unspoken"
+    }
+   ],
+   "settled": false,
+   "carriedAs": "qanda.blocks[0].countHow is `inferred`, and EVERY line carries how: `inferred`, because the score counts lines per scene and never names them"
+  },
+  {
+   "id": "lut-off-by-one",
+   "where": "the LUT fade block",
+   "what": "The score's own recommendation is to use 0 if the previous scene has the same LUT. 2 scenes break it and they are adjacent: dialogue takes 0 ms into neutral to green, cylinder takes 5000 ms into the same LUT. Swapping the two fixes both.",
+   "readings": [
+    {
+     "id": "shifted-by-one",
+     "how": "the fade list is off by one against the colour list"
+    },
+    {
+     "id": "deliberate",
+     "how": "the hard cut into green arrives with the first spoken line and the 5 s is a harmless ramp between two identical tables"
+    }
+   ],
+   "settled": false,
+   "carriedAs": "channels.lut.points[].followsRecommendation"
+  },
+  {
+   "id": "the-loop",
+   "where": "the order",
+   "what": "`LUT transition time transition` is 0 ms and the transition is neutral. The recommendation is satisfied only if the scene before it carries the same LUT, and the only candidate is the outro.",
+   "readings": [
+    {
+     "id": "outro-into-transition",
+     "how": "the piece loops, and the transition is the reset between visitors"
+    }
+   ],
+   "settled": false,
+   "carriedAs": "order.loops is true with how: `inferred`, and both channels take their first point's previous value from the last"
+  },
+  {
+   "id": "river-pacing",
+   "where": "the river scene",
+   "what": "15 fragments in a 120000 ms scene, running from 1 word to 79, and the block carries no timing at all. The dialogue and the QandA both carry seconds per line.",
+   "readings": [
+    {
+     "id": "paced-elsewhere",
+     "how": "something outside the score paces them, or the sound design does, or they are run by hand"
+    }
+   ],
+   "settled": false,
+   "carriedAs": "every texts.river[].durationMs is null"
+  },
+  {
+   "id": "maze-suffixes",
+   "where": "the inner maze list",
+   "what": "4 entries carry a `;n,n` suffix using the values 1, 2, 4, 5, 6, 7. Nothing in the score says what they select.",
+   "readings": [
+    {
+     "id": "scene-presence",
+     "how": "seven distinct values over an eight scene piece reads as which scenes the object is in"
+    },
+    {
+     "id": "variant-index",
+     "how": "a material or variant index"
+    },
+    {
+     "id": "maze-json-position",
+     "how": "positions in maze.json, which the score does not hold"
+    }
+   ],
+   "settled": false,
+   "carriedAs": "texts.mazeInner[].suffix is the parsed numbers and nothing is claimed about them"
+  },
+  {
+   "id": "trailing-keypress",
+   "where": "the intro keystroke track",
+   "what": "The last event is a space typed 10901 ms after the final full stop, which is the longest gap in the track.",
+   "readings": [
+    {
+     "id": "a-cue",
+     "how": "it advances the piece"
+    },
+    {
+     "id": "a-stray",
+     "how": "it is a keypress left in the recording"
+    }
+   ],
+   "settled": false,
+   "carriedAs": "the last row of keystrokes.events, and keystrokes.longestGaps[0]"
+  },
+  {
+   "id": "radish",
+   "where": "the inner maze list",
+   "what": "`r,a,d,i,s,h` is the only entry that spells a word out with commas.",
+   "readings": [
+    {
+     "id": "per-letter-objects",
+     "how": "each letter is placed as its own object"
+    },
+    {
+     "id": "parser-artefact",
+     "how": "a comma separated field that was never meant to be read as a word"
+    }
+   ],
+   "settled": false,
+   "carriedAs": "texts.mazeInner[].spelledWithCommas"
+  }
+ ],
+ "parameters": {
+  "starting position": "0.0,0.0,-2.0",
+  "starting orientation": "0.0",
+  "inner maze offset": "0.0,0.0,-0.4",
+  "dialogue placement Remember": "0.0,3.5,10.0",
+  "dialogue rotation Remember": "330.0",
+  "dialogue placement Imagine": "0.0,1.7,8.0",
+  "dialogue rotation Imagine": "50.0",
+  "intro text position": "0.0,1.8,1.4",
+  "intro text orientation": "0.0",
+  "holdme anchorpoint": "0.0,1.3,-0.5",
+  "river orientation": "0",
+  "cylinder radius": "2.55",
+  "text color": "1.0,1.0,1.0",
+  "duration transition scene": "40.0",
+  "time until credits in transition scene": "7.0",
+  "time until start outer maze in maze scene": "60.0",
+  "duration cylinder scene": "150.0",
+  "time until QandA Cylinder scene": "90.0",
+  "number of lines QandA during Cylinder scene": "7",
+  "time until Ghost trace in cylinder scene": "60.0",
+  "duration river scene": "120.0",
+  "duration HoldMe scene": "165.0",
+  "time until QandA HoldMe scene": "0.0",
+  "number of lines QandA during HoldMe scene": "5",
+  "time until second QandA HoldMe scene": "144.0",
+  "number of lines second QandA during HoldMe scene": "11",
+  "duration outro scene": "90.0",
+  "time until outro text in outro scene": "30.0",
+  "time until QandA Transition scene": "0.0",
+  "number of lines QandA during Transition scene": "0",
+  "credits scroll duration": "35.0",
+  "time after credits until intro": "25.0",
+  "time after headset mounted before intro": "10.0",
+  "time until maze sound fade out in dialogue": "30.0",
+  "duration of maze sound fade out in dialogue": "60.0",
+  "LUT color transition": "neutral",
+  "LUT color intro": "neutral",
+  "LUT color maze": "neutral",
+  "LUT color dialogue": "green",
+  "LUT color cylinder": "green",
+  "LUT color river": "blue",
+  "LUT color hold me": "red",
+  "LUT color outro": "neutral",
+  "LUT transition time intro": "0.0",
+  "LUT transition time maze": "0.0",
+  "LUT transition time dialogue": "0.0",
+  "LUT transition time cylinder": "5.0",
+  "LUT transition time river": "10.0",
+  "LUT transition time hold me": "2.0",
+  "LUT transition time outro": "10.0",
+  "LUT transition time transition": "0.0",
+  "general opacity level": "1.0",
+  "opacity during transition scene": "1.0",
+  "opacity during intro scene": "0.6",
+  "opacity during maze scene": "0.6",
+  "opacity during dialogue scene": "0.7",
+  "opacity during cylinder scene": "0.15",
+  "opacity during river scene": "0.3",
+  "opacity during hold me scene": "0.5",
+  "opacity during outro scene": "0.6",
+  "opacity transition time during transition scene": "2.0",
+  "opacity transition time during intro scene": "4.0",
+  "opacity transition time during maze scene": "3.0",
+  "opacity transition time during dialogue scene": "6.0",
+  "opacity transition time during cylinder scene": "2.0",
+  "opacity transition time during river scene": "3.0",
+  "opacity transition time during hold me scene": "4.0",
+  "opacity transition time during outro scene": "10.0"
+ }
+}
