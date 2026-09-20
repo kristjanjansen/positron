@@ -202,6 +202,18 @@ find out whether somebody else's server is up.
 green here can still meet one out there.
 ⚠️ `DEMO_QUERY=base=…` overrides it, which is the escape hatch for somebody who
 has been ASKED to check the real relay.
+🔴 **AND A STAND-IN CANNOT BE USED AGAINST THE DEPLOY. MEASURED 2026-09-20.**
+`DEMO_BASE=https://positron.studio node demo/verify.mjs radio` starts
+`fake-station.mjs` on `127.0.0.1` and points the page at it, and Chrome refuses:
+*"Permission was denied for this request to access the `loopback` address
+space"*. A secure public origin may not fetch a loopback address. It reads as
+**4 red on a page where nothing is wrong**, two of them `no console errors` and
+`no failed requests`, which is the worst possible face for a harness artifact.
+⚠️ So `radio`, `tapes`, `now` and `flipper` are verified LOCALLY, and
+`DEMO_BASE` is for pages whose sources are already public. MEASURED both ways:
+`DEMO_BASE=… node demo/verify.mjs making items` is **61/61**, the same command
+with `radio` appended is **72/76**, and `node demo/verify.mjs radio` on its own
+is **14/14**.
 
 🔴 **AND IT IS NOT ONLY ERR. EVERY EXTERNAL SOURCE, 2026-09-16:** *"stil: super
 careful with external sources, better avoid"*, said in reply to

@@ -1,12 +1,22 @@
 # Handoff, 2026-09-20, session 37
 
-🔴 **DEPLOYED. The edge is on `BUILD ad85335-220332-f1f4`**, confirmed on the
+🔴 **DEPLOYED. The edge is on `BUILD b9fd523-084717-2192`**, confirmed on the
 edge by `deploy.mjs` itself, and
 `DEMO_BASE=https://positron.studio node demo/verify.mjs making` is **38/38
 against the edge**. Five deploys this session, each verified after it landed.
-**The working tree is NOT clean and nothing of this session is committed**: 110
-paths, including a STAGED `git mv` of `demo/held` to `demo/weight` inherited
-from session 36. 767 commits, still unpushed.
+✅ **THE TREE IS CLEAN AND EVERYTHING IS PUSHED.** Sessions 36 and 37 went out
+as **eight path-limited commits**, `60e2a2d..b9fd523` on
+`session-28-station-videoradio`, confirmed by fetching the remote rather than by
+trusting the push line. 189 paths and 46 staged renames from two sessions, which
+is exactly the shape a plain `git commit` would have mangled.
+⚠️ **THE PERSONAL ACCOUNT WAS ALREADY ACTIVE** when this session started, so the
+`Repository not found` dance did not happen. It is switched back to
+`Kristjan-Jansen_enefit` now, because the active account is machine-wide, **and
+that means the next push needs the switch again**.
+⚠️ **`user.email` IS THE PERSONAL ADDRESS FOR THIS REPO ONLY** since 2026-09-20.
+The 775 commits already pushed carry the work address and were NOT rewritten:
+rewriting pushed history to correct an author is a larger harm than the wrong
+address.
 
 🔴 **COMMIT PATH-LIMITED OR YOU WILL TAKE THE RENAME WITH YOU.**
 `git commit -F msg.txt -- <paths>`. `git add`-ing by name is NOT enough: the
