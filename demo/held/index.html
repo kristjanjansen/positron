@@ -963,17 +963,40 @@
 
     strip = view.strip;
 
-    /* 🔴 THE PICTURE, THE BAR AND THE LINE ARE ONE SURFACE, IN THAT ORDER.
-       Asked 2026-09-20 as *"integrate it into held begore timeljne"*, so the
-       picture stands above the line. Glued rather than stacked because one bar
-       now drives both of them off one deck: play moves the picture and the
-       playhead together, and two boxes 22 px apart would say they were two
-       instruments. ⚠️ `createGlue` SKIPS A NULL CHILD, so nothing here needs an
-       `if` around a block.
-       ⚠️ THE ANCHOR IS READ BEFORE THE GLUE, because `createGlue` re-parents
-       its blocks and a node captured after the call can be detached. */
+    /* 🔴 THE PICTURE IS ITS OWN BLOCK. THE BAR AND THE LINE ARE ONE SURFACE.
+       Asked 2026-09-20 as *"in bg: separate videopanel and transport"*, with a
+       photograph of the picture, an almost empty panel footer and the bar all
+       running together as one tall dark band. All three were glued, and the
+       line above this one used to say so: *"the picture, the bar and the line
+       are one surface"*, glued on 2026-09-20 because one bar drives the picture
+       and the playhead off one deck.
+       ⚠️ THAT ARGUMENT WAS TRUE AND IT PROVED TOO MUCH. A glue is a CLAIM that
+       two boxes are one object, and `glue.mjs` already names the one pair it is
+       written for: a strip sitting on the transport bar that drives it. One
+       deck is not the test, because a deck reaches every block on this page
+       including the log. What the picture and the bar actually share is a
+       clock, and the page rhythm between two surfaces does not deny that.
+       🔴 AND THE BAND IN THE PHOTOGRAPH WAS THE GLUE ITSELF. MEASURED at
+       1280 px before this change: the panel's footer is 55 px, the bar under it
+       52 px, the seam between them 1 px, and both are `--card`. That is 108 px
+       of unbroken card with one ⛶ near the top of it, and it reads as a single
+       empty band rather than as a footer and a transport. Unglued they are two
+       boxes 40 px apart, each with its own border.
+       ⚠️ THE FOOTER IS NOT EMPTY AND MUST NOT COLLAPSE. It carries the ⛶, which
+       is the way this picture gets big on a phone with no element fullscreen
+       API. 55 px is one control row: 34 px of button and the panel's own 10 px
+       of padding, the same as every other panel on the site.
+       ⚠️ `createGlue` SKIPS A NULL CHILD, so nothing here needs an `if` around a
+       block.
+       ⚠️ THE ANCHOR IS READ BEFORE THE GLUE, because `createGlue` re-parents its
+       blocks and a node captured after the call can be detached. And the
+       PICTURE goes in before the glue rather than before `view.surface`: the
+       bar is already a child of `d.el` at this point, so inserting against the
+       strip would land the picture between them. */
     const afterStrip = view.surface.nextSibling;
-    d.el.insertBefore(createGlue(panel.el, bar.el, view.surface), afterStrip);
+    const surface = createGlue(bar.el, view.surface);
+    d.el.insertBefore(surface, afterStrip);
+    d.el.insertBefore(panel.el, surface);
     size();
     draw();
     /* ⚠️ THE STAGE, NOT THE PANEL. The panel's own box includes a footer whose
