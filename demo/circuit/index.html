@@ -83,7 +83,10 @@
        *"add more padding to bottom of circuit panel"*. The bottom row of pads
        carries no label under it, so the same inset that looks right beside a
        printed name looks tight under a pad. */
-    padding: 20px; background: var(--card);
+    /* ⚠️ THE FOOT IS DEEPER THAN THE SIDES, ASKED FOR TWICE. The bottom row of
+       pads carries no label under it, so the inset that looks right beside a
+       printed name looks tight under a pad. */
+    padding: 20px 20px 34px; background: var(--card);
     border: 1px solid var(--line); border-radius: 4px;
   }
   .circ-brands { display: flex; justify-content: space-between; }
@@ -679,12 +682,22 @@
        * that says which tick is step one, so the first note heard becomes it.
        * That makes the SPACING right, which is the thing a reader is looking
        * at, and leaves the absolute step a guess. A Start resets it properly.
-       * ⚠️ **SIXTEEN STEPS ON TWO ROWS IS A CHOICE. WHICH TWO ROWS IS NOT.**
-       * Reported 2026-09-21: *"bassdrum is top 2 rows not bottom ones"*. The
-       * first build put them on rows 3 and 4 for no reason beyond the line it
-       * replaced having hard coded the bottom row, and the instrument puts a
-       * drum track's steps at the TOP of the pad area. The pattern LENGTH is
-       * still a choice: the device never says how long its pattern is.
+       * 🔴 **AND THE PATTERN ON SCREEN CANNOT BE THE PATTERN ON THE DEVICE.
+       * THIS PROJECT'S OWN RESEARCH SAYS SO AND IT WAS NOT READ BEFORE THIS WAS
+       * BUILT.** `plans/plan-device-layouts.md` §3.12: the Circuit documents
+       * **no per pad MIDI address for any of the thirty two**, and the pad grid
+       * is *a sequencer grid the device draws for itself*. What the instrument
+       * documents sending is four drum notes and a clock, 📄 DOC §3.2.
+       * ⚠️ So a bar's ORIGIN is not on the wire. Two things were reported as
+       * mismatches and only one of them was a bug: the ROW was wrong and is
+       * fixed, the STEP is anchored on the first hit heard because there is
+       * nothing better, and it will sit at an arbitrary rotation against what
+       * the hardware is lighting.
+       * ⚠️ **ONE CHEAP MEASUREMENT WOULD CLOSE IT**: if this Circuit sends
+       * `0xFA` Start when play is pressed, the line below anchors properly and
+       * the two line up. Nobody has looked, and `/dump/` answers it in ten
+       * seconds. The clock was measured running continuously whether anything
+       * is playing or not, which is why Start cannot be assumed.
        */
       if (!anchored) { clock = 0; anchored = true; }
       seenNotes.set(m.note, (seenNotes.get(m.note) ?? 0) + 1);
@@ -903,8 +916,13 @@
       const brand = brands.firstChild.getBoundingClientRect();
       const foot = card.bottom - lastPad.bottom;
       const inset = brand.left - card.left;
-      d.assert('the panel is as deep under its last pad as its printed name is in from the edge',
-        Math.abs(foot - inset) <= 1.5, `foot ${foot.toFixed(1)}, inset ${inset.toFixed(1)}`);
+      /* ⚠️ DEEPER, AND BY HOW MUCH IS THE CLAIM. "About the same" was the
+         earlier instruction and it changed; what has not changed is that the
+         number must be measured from the last PAD rather than read off the
+         stylesheet, because a reserved label slot sits between the two. */
+      d.assert('the panel is deeper under its last pad than it is wide at its printed name',
+        foot > inset && foot - inset <= 20,
+        `foot ${foot.toFixed(1)}, inset ${inset.toFixed(1)}`);
 
       /* 🔴 AND THE CARD LINES UP WITH EVERY OTHER BLOCK ON THE PAGE. This is
          the claim the corner photographs were about, and it is one subtraction
