@@ -94,13 +94,42 @@ number in it came off the wire through `/dump/`.
 - **The MK-425C's encoders are absolute, not relative.** The classifier said
   relative once and was wrong; it asks the sign bit now.
 
+## `/circuit/` sends now, and nobody has heard it
+
+The page drives the hardware: **note on, note off, MIDI Start and Stop**, and
+that is the entire list. Press **Listen**, arm a track, press pads.
+`Syn1` is channel 1, `Syn2` is channel 2, the four drums are channel 10 at notes
+60, 62, 64 and 65. The two `Sc` buttons arm nothing, because a sidechain is not
+something to play notes at.
+
+🔴 **NO RECORD, AND IT IS NOT A DISABLED BUTTON.** `send()` has no path for a
+control change, a program change or SysEx on any channel, so a record command
+**cannot be expressed** and deleting the `disabled` flag still cannot produce
+one. The check fires the guard on purpose with four shapes that could touch a
+recording or move a patch, and puts a negative control beside it: notes and
+transport really do go through, or a guard that refused everything would pass
+while making the page inert.
+
+🔴 **EVERY ASSERT GRADES THIS PAGE'S SIDE OF THE WIRE.** What was sent, what was
+refused, which track is armed. **A counter on the sending side is not evidence
+the device did anything.** Three things only the hardware can answer are in
+`BACKLOG.md`: whether the synths respond on channels 1 and 2, whether the drum
+notes are right, and whether Start is obeyed at all, given this Circuit was
+measured **sending its own clock continuously**, which makes it the master.
+⚠️ The pad to note map is a CHOICE, not a measurement: chromatic from 48, bottom
+row lowest, because three notes out of thirty two have ever been seen.
+
 ## Open, in priority order
 
 1. **The 32 user sessions off the Circuit.** Asked for, not done.
 2. **`origin/main`**, above.
-3. **`/rack/`: three layout asks are not done** — *"tascam: align channel strip
+3. **`/circuit/`: how wide the card should be, asked and not settled.** *"add
+   outer padding to fit w and get ~same padding on bottom"*. The card hugs at
+   about 600 px; filling a 1200 px window puts 300 px either side, so a matching
+   foot is 300 px deep. `BACKLOG.md` has the three readings and what each costs.
+4. **`/rack/`: three layout asks are not done** — *"tascam: align channel strip
    content to bottom"*, *"align main/sub to the bottom"*, *"model 12: title to
    right"*.
-4. **Nothing on either new page is graded on a phone.** The harness runs at
+5. **Nothing on either new page is graded on a phone.** The harness runs at
    756 px and never enters the media query, so every phone rule on `/rack/` and
    `/circuit/` is the fourth kind of dead CSS until something measures it.

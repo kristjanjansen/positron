@@ -2,6 +2,24 @@
 
 ### The instruments, 2026-09-21
 
+- 🔴 **`/circuit/`: HOW WIDE THE CARD SHOULD BE IS UNANSWERED, AND IT WAS ASKED
+  AS**: *"add outer padding to fit w and get ~same padding on bottom"*.
+  ⚠️ **THE READINGS ARE MATERIALLY DIFFERENT AND THE MEASUREMENT IS WHY.** The
+  card hugs its controls at about **600 px** and centres on the page. Making it
+  *fit the width* puts roughly **300 px either side on a 1200 px window**, so a
+  foot that matches the sides is a foot of 300 px, and every other instruction
+  this session has been to take whitespace OUT.
+  The three readings: **(a)** keep hugging and widen the even frame to about
+  40 px all round; **(b)** the card fills the window and the foot is MEASURED
+  against the real side gap, which grows with the window; **(c)** the card fills
+  the window and `--ctl-w` scales so the controls genuinely fit it, which
+  changes every 46 px in the page.
+  ⚠️ **(c) IS THE EXPENSIVE ONE.** 46 px is written into the pad grid, the side
+  columns, the top row's eight tracks and the octave pair, and four asserts
+  compare positions derived from it. It is doable and it is not a padding
+  change.
+
+
 - 🔴 **NOBODY HAS HEARD `/circuit/` PLAY A NOTE.** The page sends note on, note
   off and MIDI Start and Stop to an output matching `/circuit/i`, and every
   assert about it grades **this page's own side of the wire**: what was sent,
