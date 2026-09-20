@@ -577,7 +577,7 @@ export function createLooper({
      * (`loadScore` refuses to run without a resolver, in those words).
      *
      * Which is exactly why this is also the wire format for the remote looper
-     * (plan-looper.md §1). A committed layer is a value: ~6 KB of JSON that can
+     * (plans/plan-looper.md §1). A committed layer is a value: ~6 KB of JSON that can
      * take 30 ms or 300 ms to arrive without changing a note of what is heard,
      * because the receiving peer plays it from its own clock against a shared
      * epoch-anchored origin. Sending this object IS the loop plane.

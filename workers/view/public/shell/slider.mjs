@@ -147,6 +147,17 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
 /**
  * @param {object} o
  * @param {string} o.label     shown before the lane, uppercased by CSS
+ * @param {string} [o.sub]      a second, dimmer label under the first. Asked for
+ *   2026-09-20: *"let us have primary and secondary label on knobs and sliders
+ *   (h and w)"*, so all three controls carry the same pair.
+ *   🔴 **WHAT EACH ONE IS FOR, BECAUSE TWO LABELS THAT SAY THE SAME THING ARE
+ *   WORSE THAN ONE.** The primary names what the control MOVES, in the reader's
+ *   words: `cutoff`, `rate`, `CH1`. The secondary names what it IS on the
+ *   wire: `CC 74`, `PB 1`. A controller number is the fact somebody needs when
+ *   a knob does not do what its name says, and this project has already paid
+ *   for that once on Yoshimi, where CC 76 and 77 are FM amplitude and resonance
+ *   centre rather than the vibrato the standard map promises.
+ *   ⚠️ OMIT IT AND NOTHING IS DRAWN. No empty element, no reserved line.
  * @param {number} o.min
  * @param {number} o.max
  * @param {number} [o.step]    rounding applied to every value, default (max-min)/100
@@ -206,7 +217,7 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
  *   A state change belongs in the log and nowhere else: it is the only channel
  *   that survives a screenshot taken a minute later.
  */
-export function createSlider({ label, aria, min = 0, max = 1, step, value, unit = '',
+export function createSlider({ label, sub = '', aria, min = 0, max = 1, step, value, unit = '',
                                digits, warp, onInput, onChange, hand = false, onHand } = {}) {
   let span = max - min;
   let exp = warp === 'exp';
@@ -231,7 +242,19 @@ export function createSlider({ label, aria, min = 0, max = 1, step, value, unit 
 
   const wrap = el('span', 'sld');
   const head = el('span', 'sld-head');
-  const name = el('span', 'sld-l', label || '');
+  // 🔴 THE PAIR IS ONE COLUMN, NOT TWO SIBLINGS IN THE ROW. A slider is a
+  // three column grid and its group shares those columns across every row, so a
+  // second label added beside the first would take a column of its own and
+  // every slider in the group would move. Nested, the label column is exactly
+  // as wide as it was.
+  // ⚠️ AND IT IS ONLY WRAPPED WHEN THERE IS A SECOND LINE, because `/grains/`
+  // selects `.fade > .sld > .sld-lane` with a CHILD combinator and this
+  // project has already lost a selector to an unconditional wrapper once.
+  const name = el('span', 'sld-l', sub ? null : (label || ''));
+  if (sub) {
+    name.classList.add('sld-l-pair');
+    name.append(el('span', 'sld-l-p', label || ''), el('span', 'sld-l-s', sub));
+  }
   const lane = el('span', 'sld-lane', null, {
     // A real slider to anything that asks: a screen reader, and a keyboard.
     role: 'slider', tabindex: '0',

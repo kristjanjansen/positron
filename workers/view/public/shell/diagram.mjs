@@ -3,7 +3,7 @@
 // For a page whose subject is a PATH — a key press that leaves this browser,
 // crosses a rented computer, reaches a board in the studio and comes back as
 // sound — the `what` paragraph is describing a SHAPE, in prose, badly. This
-// draws the shape instead. plan-diagram.md is the brief; the decisions in it
+// draws the shape instead. plans/plan-diagram.md is the brief; the decisions in it
 // are taken and this file implements them rather than re-opening them.
 //
 //   const dg = createDiagram(host, {

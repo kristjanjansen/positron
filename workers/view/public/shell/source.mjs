@@ -2,7 +2,7 @@
 //
 // 🔴 WHY THIS EXISTS. `grains` draws two granulators side by side — one in the
 // page, one on a Raspberry Pi — and they sound nothing alike. Every reason is
-// structural (plan-twins.md), and the biggest by a distance is that they are
+// structural (plans/plan-twins.md), and the biggest by a distance is that they are
 // not chewing the same thing: the page granulates six sawtooth oscillators and
 // the board granulates whatever instrument happens to be running. A page that
 // puts two panes side by side is claiming they are comparable, and until the

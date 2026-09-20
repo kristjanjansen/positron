@@ -824,7 +824,7 @@ export function repeatsAsQuotations(compiled, { ref, quotation }) {
 }
 
 /**
- * A Csound score as a score-document PART (plan-score.md P1).
+ * A Csound score as a score-document PART (plans/plan-score.md P1).
  *
  * `compileCsound` already computes everything this needs; the only work here is
  * re-shaping it into the container's envelope, which is deliberately narrow:
