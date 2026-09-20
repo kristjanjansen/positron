@@ -85,8 +85,41 @@ export function createBoard({
   onPcm = null,
   onMessage = () => {},
   onOpen = () => {},
+  /**
+   * 🔴 WHETHER A HARNESS RUN MAY DRIVE THE BOARD. Default `'refuse'`.
+   *
+   * The board is a shared Raspberry Pi in another building, and `verify.mjs`
+   * presses every button in `.pos-controls` on every page on every run. So any
+   * control that reaches the board is a control a suite run works, and a suite
+   * run is dozens of Chromes. `/knobs/` has guarded itself with its own
+   * `MAY_PLAY` flag since it was built, and that is exactly the shape this
+   * moved here to fix: **a page-level guard protects the page that has one,
+   * which is never the page where the mistake gets made.** `/draw/` and
+   * `/grains/` build their own control rows and would not have carried it.
+   *
+   * ⚠️ IT REFUSES THE SEND, NOT THE SOCKET. A page under `?selfcheck=1` still
+   * joins the room, still hears the board, still reports presence and still
+   * grades everything that does not TOUCH the instrument. Refusing the
+   * connection would take those checks away and make the harness blind rather
+   * than polite.
+   *
+   * ⚠️ `?board=1` IS THE ESCAPE HATCH, the same shape as `DEMO_QUERY=base=…`
+   * for the stand-ins: somebody who has been asked to drive the real board
+   * passes it and the guard stands aside.
+   */
+  inSelfcheck = 'refuse',
 } = {}) {
   if (!room) throw new Error('board: a room is required. `studio-1` is the address of the Raspberry Pi.');
+  if (!['refuse', 'allow'].includes(inSelfcheck)) {
+    throw new Error(`board: inSelfcheck is 'refuse' or 'allow', not ${JSON.stringify(inSelfcheck)}`);
+  }
+
+  /** Is this run allowed to touch the instrument? Read once: a query string
+   *  does not change under a running page, and re-reading it per message would
+   *  make the answer depend on when it was asked. */
+  const q = new URLSearchParams(location.search);
+  const driving = !(q.get('selfcheck') === '1') || q.get('board') === '1' || inSelfcheck === 'allow';
+  let refused = 0;
 
   // ── the badge ─────────────────────────────────────────────────────────────
   /**
@@ -435,6 +468,20 @@ export function createBoard({
   /** Fire and forget. Returns the message's id, so a caller can match a reply
    *  itself, or null if the roof refused it or the socket is not open. */
   function send(msg) {
+    /**
+     * 🔴 THE GUARD, AND IT IS HERE RATHER THAN AT THE SOCKET. See
+     * `inSelfcheck` above. It says so ONCE rather than per message, because a
+     * page that sends a controller sixty times a second would otherwise bury
+     * its own log, and the count is on `refusedToBoard()` for a check to read.
+     */
+    if (!driving) {
+      if (refused === 0) {
+        log('this run may not drive the board, so nothing is being sent to it. '
+          + 'add board=1 to the address if you meant to', 'dim');
+      }
+      refused += 1;
+      return null;
+    }
     const out = wire.send(msg);
     if (!out?.sent) return null;
     try { return JSON.parse(out.line).id; } catch { return null; }
@@ -468,6 +515,9 @@ export function createBoard({
     /** the openWire handle, for `stats()`, `state()` and `ping()`. */
     wire,
     send,
+    /** Is this run allowed to touch the instrument, and how much it refused. */
+    driving: () => driving,
+    refusedToBoard: () => refused,
     ask,
     waitFor,
     startAudio,
