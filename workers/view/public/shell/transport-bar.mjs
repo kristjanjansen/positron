@@ -17,12 +17,42 @@
 import { observePosition } from '/timeline/transport.mjs';
 import { el } from './shell.mjs';
 import { createChoice } from './choice.mjs';
+// 🔴 THE `LIVE` CHIP IS A PRESENCE BADGE NOW, AND IT IS THE PROJECT'S ONE
+// ONLINE INDICATOR. See `ON_AIR` below for why a hand-rolled span was the
+// defect rather than the style.
+import { createPresence } from './presence.mjs';
 // 🔴 ONE TABLE FOR WHICH WAY A LOOP RUNS, AND IT ALREADY EXISTS. `looper.mjs`
 // owns the vocabulary because it owns the audio version of this control; a
 // second copy of the three glyphs here is how two pages end up disagreeing
 // about what the middle one means. `looper.mjs` imports nothing, so this is a
 // leaf dependency and not a cycle.
 import { WAY_GLYPH, WAY_SAYS, LOOP_TURN, LOOP_WAYS } from './looper.mjs';
+
+/**
+ * 🔴 WHAT A LIVE SOURCE'S BADGE SAYS, AND IT IS THE STANDARD INDICATOR WEARING
+ * THIS PAGE'S WORDS. `presence.mjs` takes a `says` override precisely so that
+ * `on air` costs a word rather than a component.
+ *
+ * ⚠️ THE FIVE WORDS ARE ABOUT THE SOURCE, NOT ABOUT THE PLAYER. `off air` is a
+ * claim that nothing is arriving any more, which is what a listener wants to
+ * know and what `LIVE` could never say. A page that has stopped listening on
+ * purpose has no measurement to report and goes back to `unknown` rather than
+ * accusing the station of dying.
+ * ⚠️ AND THE SET DECIDES THE WIDTH. `presence.mjs` reserves the widest phrase
+ * the badge can ever say, in characters, so `tuning in` at nine is what this
+ * badge is as wide as. `checking` is kept as a WORD because the component
+ * requires one for every state, and left out of `ON_AIR_CAN` because a
+ * transport bar asks nobody a question: it hears sound or it does not.
+ */
+export const ON_AIR = {
+  online: 'on air',
+  offline: 'off air',
+  coming: 'tuning in',
+  checking: 'checking',
+  unknown: 'unknown',
+};
+/** Which of those this badge can reach, which is what its width is measured on. */
+export const ON_AIR_CAN = ['online', 'coming', 'offline', 'unknown'];
 
 /**
  * `scrub: false` — ONE POSITION SURFACE PER PAGE.
@@ -407,14 +437,29 @@ export function createTransportBar(host, deck, {
    * have. REPORTED as *"transport timers are pointless here. what about LIVE
    * label"*, and they were: two numbers, neither of which anybody can act on.
    *
-   * ⚠️ IT SAYS `LIVE` AND NOTHING ELSE. It briefly read `SLOWED` at any armed
-   * rate other than 1, and that is a second channel saying what the rate radio
-   * group already says an inch to its right — the armed button IS the statement
-   * that you are not at 1x. How far behind is a number and belongs in a readout
-   * cell, which is the page's BEHIND. A chip carries one fact: this source has
-   * no end.
+   * ⚠️ IT CARRIES ONE FACT. It briefly read `SLOWED` at any armed rate other
+   * than 1, and that is a second channel saying what the rate radio group
+   * already says an inch to its right — the armed button IS the statement that
+   * you are not at 1x. How far behind is a number and belongs in a readout
+   * cell, which is the page's BEHIND.
+   *
+   * 🔴 AND THAT ONE FACT IS NOW MEASURED RATHER THAN DECLARED. Asked
+   * 2026-09-20: *"For videoradio use std online insicator with 'on air'. In
+   * other 'live' labesl too tim other demos"*. It was
+   * `el('span', 'tbar-live', 'LIVE')` — a word drawn because the page passed
+   * `live: true` at BUILD TIME, so it said LIVE whether or not a byte was
+   * arriving. That is two of this project's named hazards in one span: every
+   * readout cell must be able to change, and a control that looks live and is
+   * inert. A station that went off the air left the word standing.
+   * ⚠️ SO THE SWAP IS NOT A RENAME, AND A PAGE HAS TO FEED IT. `api.live` is
+   * the badge; a page calls `follow()` once and `seen()` whenever sound
+   * actually arrives. A page that feeds it nothing shows `unknown`, which is
+   * the honest state and never blocks anything. A badge wired to a constant
+   * would be the same lie in a better font.
    */
-  const liveChip = live ? el('span', 'tbar-live', 'LIVE') : null;
+  const liveChip = live
+    ? createPresence({ mode: 'badge', says: ON_AIR, can: ON_AIR_CAN, state: 'unknown' })
+    : null;
   /**
    * 🔴 LOOP IS ON EVERY BAR, AND IT IS THREE PRESSES OF ONE BUTTON.
    *
@@ -456,7 +501,8 @@ export function createTransportBar(host, deck, {
   if (loopPair) loopPair.append(loopBtn, ...loopExtraEls.values());
   if (chip && live) {
     throw new Error('createTransportBar: chip and live want the same position '
-      + '(pass live: false, the chip can say LIVE itself if that is the fact)');
+      + '(pass live: false, or drop the chip and feed api.live, which is the '
+      + 'same presence badge with the same words)');
   }
   // the loop's position: whatever was put in the slot, or the loop itself
   const endSide = loopSlotEls.size ? [...loopSlotEls.values()]
@@ -492,7 +538,7 @@ export function createTransportBar(host, deck, {
    */
   if (endSide[0]) endSide[0].dataset.end = '1';
   bar.append(...(wantToggle ? [toggle] : []), ...extraEls.values(), scrub,
-    ...(chip ? [chip] : live ? [liveChip] : wantTime ? [time] : []),
+    ...(chip ? [chip] : live ? [liveChip.el] : wantTime ? [time] : []),
     ...endSide, rates, badge);
   host.append(bar);
 
@@ -1272,6 +1318,19 @@ export function createTransportBar(host, deck, {
      * `/stage/` has two and they are different elements.
      */
     el: bar,
+    /**
+     * 🔴 THE `on air` BADGE, OR null ON A BAR THAT IS NOT LIVE. This is the
+     * whole of the page's side of the swap: `bar.api.live.follow({ everyMs })`
+     * once, and `.seen()` whenever sound ACTUALLY ARRIVES: a block decoded, a
+     * segment fetched, an ICY title. Never on a press, never on a timer, never
+     * on `deck.playing()`: all three are the page declaring the thing it was
+     * supposed to measure.
+     * ⚠️ IT IS ON THIS OBJECT AS WELL AS ON THE RETURN VALUE, by the rule
+     * written on `loopExtra` below: what `__demo.transport` cannot reach, a CDP
+     * check cannot grade, and the state of this badge is exactly the kind of
+     * claim a check should be reading rather than a class name.
+     */
+    live: liveChip,
     get position() { return deck.position(); },
     /** ⚠️ FORCED FALSE ON A BAR WITH NO TOGGLE rather than derived. Nothing on
      *  such a bar can start the deck, so "is the transport playing" is a
@@ -1356,6 +1415,8 @@ export function createTransportBar(host, deck, {
   return {
     el: bar,
     api,
+    /** the `on air` badge, or null. The same object as `api.live`; see there. */
+    live: liveChip,
     /** what this bar was built with — so a page can assert the setting it
      *  passed rather than an effect that has to be waited for. */
     endStop, commanded: !!command,
@@ -1373,6 +1434,9 @@ export function createTransportBar(host, deck, {
       clearEnd();
       clearFill();
       setBlink(false);
+      // `follow()` runs an interval of its own, and one outliving its bar is a
+      // timer deriving a state nothing will ever draw.
+      liveChip && liveChip.stop();
       offState && offState();
       removeEventListener('keydown', onKey);
       bar.remove();

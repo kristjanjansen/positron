@@ -25,6 +25,30 @@
 // machine and the program are two different things a link can reach: an arrow
 // may target a container or any box inside one.
 //
+// 🔴 AND AN ARROW THAT NAMES A BOX ARRIVES AT THAT BOX, IN BOTH LAYOUTS. In
+// one column it used to attach to the MACHINE whichever box it named, on a
+// measurement that is still true: a vertical run into a box inside a container
+// crosses that container's own name and every box stacked above the one it
+// wants. PHOTOGRAPHED 2026-09-19 on four pages at once — `WebGL2 -> shader`
+// drawn from the Browser's own edge, `films -> video` drawn machine to machine
+// ON A WIDE SCREEN, `store -> play` arriving beside `uploader`, `ffmpeg -> up`
+// leaving the Raspberry Pi. The line turns out of the box's SIDE instead and
+// runs in a lane, which is the one strip of ground that is empty: inside a
+// container's own padding when the picture is stacked, and in the gap between
+// two columns when it is not. A step between two whole machines is untouched
+// and still runs straight down the middle.
+// ⚠️ NOTHING GRADED THIS AND THAT IS WHY IT WAS WRONG EVERYWHERE. `cuts`
+// reports a link that was REFUSED, so a link routed to the wrong END read
+// clean through it: the picture is complete, every arrow is drawn, and each
+// one arrives somewhere plausible and false. `checkEnds` measures the first
+// and last point of every path AGAINST THE BOX THE AUTHOR NAMED and reports a
+// mismatch on `cuts`, so a page that already asserts `cuts.length === 0`
+// grades its own picture.
+// 🔴 A CONTAINER IS NEVER EMPTY EITHER, AND THAT IS REPORTED THE SAME WAY. An
+// author cannot SEE a missing box: every box in a picture is drawn to ONE
+// height, so a machine with nothing in it beside a machine with three boxes is
+// a tall empty slab. See CLAUDE.md.
+//
 // 🔴 TWO BOXES IN ONE CONTAINER ARE LINKED IN THE GAP THEY ALREADY SHARE, AND
 // THAT LINK REPLACES THE TIE BETWEEN THEM. It used to be dropped with a
 // warning, on the argument that routing it would mean a third rule for a
@@ -198,6 +222,10 @@ const TEXT_TINT = 0.62;
 // of these must not be tinted in the prose either, or the two channels disagree.
 // See `.pos-dg-n[data-kind="here"]` in shell.css.
 const HUELESS_KINDS = new Set(['here']);
+// The three words that say "this box is a MACHINE". A machine is drawn with
+// the programs on it inside it; one with nothing inside is reported. See the
+// check in `layout`.
+const MACHINE_KINDS = new Set(['here', 'cloud', 'device']);
 const tint = (deg, amt, onto) =>
   `color-mix(in oklab, hsl(${deg} 72% 62%) ${Math.round(amt * 100)}%, ${onto})`;
 
@@ -274,6 +302,25 @@ const STEP_OFF      = 9;    // a step's name, off to one side of its arrow
 // fork's branches separate at once and each gets the rest of the gap at its own
 // target's height — which is the room its name needs. See `stepElbow`.
 const STEP_TURN     = 16;
+/**
+ * 🔴 HOW A LINE REACHES A BOX THAT IS INSIDE A MACHINE, AND WHY IT COSTS
+ * PADDING. An arrow that names a program has to arrive AT THAT PROGRAM, and in
+ * one column every run is vertical: straight down the middle it would cross
+ * the machine's own name and every box stacked above the one it wants. So it
+ * turns out of the box's SIDE and runs in a lane inside the container's own
+ * padding, which is the only ground in there that is empty top to bottom.
+ * ⚠️ THE NUMBER IS THE LANE'S SPACING, and the padding grows by one of these
+ * for every lane the busiest picture needs — the same arithmetic `SIB_LANE`
+ * already does one level in. Ten leaves the run from the innermost lane to the
+ * box it arrives at at 14 px: four for the corner and six for the arrowhead,
+ * which is its own length. That is the measurement `SIB_LANE` was raised for.
+ */
+const DIVE_LANE     = 10;
+// how far a dive lane sits in from the container's own edge
+const DIVE_EDGE     = 4;
+// and how far a link hugs a machine's side in the row layout, where the ground
+// between two columns is empty and no padding has to be bought at all
+const DIVE_OUT      = 6;
 
 /** what the drawer assumes about type, when nothing has measured it yet */
 export const METRICS = {
@@ -570,6 +617,36 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   const cuts = Array.isArray(spec.cutsSink) ? [...spec.cutsSink] : [];
   const avail = Math.max(140, Math.floor(width));
 
+  // 🔴 A CONTAINER WITH NOTHING IN IT IS A REPORT, THE WAY A CUT LABEL IS.
+  // CLAUDE.md, 2026-09-20: a container is never empty, it holds at least one
+  // box. An author cannot SEE a missing box any more than they can see a
+  // missing arrow — the picture looks complete, the machine is drawn, and it
+  // takes a machine's worth of space to say a caption's worth of thing.
+  // ⚠️ WHAT MAKES A BOX A CONTAINER IS ITS `kind`, not an empty `children`.
+  // `here`, `cloud` and `device` are the three words that say "this is a
+  // MACHINE", and the rule's own escape hatch is the other half of that: if
+  // there is honestly nothing inside, it is not a container, so it is drawn as
+  // an ordinary box with no `kind` at all.
+  // ⚠️ AND IT IS COUNTED OFF THE BUILT NODES, never off the source. A regex
+  // sweep for this found ONE page where four are known, because a spec is a
+  // JavaScript object and `children` can be built, spread or conditional.
+  // 🔴 ONLY WHERE SOMETHING ELSE IN THE PICTURE HOLDS BOXES, WHICH IS THE
+  // WHOLE HARM. Every box in a diagram is drawn to ONE height, taken from the
+  // tallest, so a machine with nothing in it standing beside a machine with
+  // three boxes in it is a tall empty slab — /station/'s own comment records
+  // exactly that, about a box called `curl`. A picture where nothing nests has
+  // no slab in it: three machines the size of three boxes is what a diagram of
+  // three machines looks like, and reporting those would make the rule noise.
+  const nests = nodes.some((n) => n._kids.length);
+  for (const n of nodes) {
+    if (!nests || !MACHINE_KINDS.has(n.kind) || n._kids.length) continue;
+    cuts.push({ id: n.id, where: 'container',
+                full: `${n.label || n.id} is drawn as a ${n.kind} and holds no box`,
+                shown: 'EMPTY: a container holds at least one box. Name the thing that '
+                     + 'runs on this machine, or drop the kind and draw it as one box',
+                width: 0 });
+  }
+
   if (!nodes.length) {
     return { mode: 'row', width: avail, height: 0, boxW: 0, boxH: 0,
              nodes: [], links: [], cuts, cycle: false };
@@ -601,23 +678,15 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   const kidIx = new Map();
   for (const n of nodes) n._kids.forEach((c, i) => kidIx.set(c.id, i));
   const sibSpan = (l) => Math.abs(kidIx.get(l.to) - kidIx.get(l.from));
-  // how many lanes the busiest container needs, and therefore how far in from
-  // its edges every container holds its boxes
-  const laneCount = new Map();
-  for (const l of sibs) {
-    if (sibSpan(l) <= 1) continue;
-    const k = owner.get(l.from);
-    laneCount.set(k, (laneCount.get(k) || 0) + 1);
-  }
-  const maxLanes = laneCount.size ? Math.max(...laneCount.values()) : 0;
-  const childInset = CHILD_PAD + maxLanes * SIB_LANE;
-  // one gap for every container in the picture, because gaps of two sizes
-  // would read as a difference that means something
-  const childGap = sibs.some((l) => sibSpan(l) === 1) ? SIB_GAP : CHILD_GAP;
 
   // ── how wide a box gets, and whether the row layout is possible at all ──
   // The gaps give way before the boxes do: a narrow box cuts words, a narrow
   // gap only shortens an arrow.
+  // ⚠️ DECIDED BEFORE THE CONTAINERS ARE PADDED, which it was not until the
+  // dive lanes below needed it. Nothing here reads `childInset`: the box width
+  // comes from the column count and the gaps alone, so moving it up changes no
+  // number. What it buys is that a picture in ONE COLUMN can reserve room
+  // inside its containers that a picture in a row has no use for.
   let gapX = GAP_X_MAX;
   let boxW = (avail - (cols - 1) * gapX) / cols;
   while (boxW < BOX_TARGET_W && gapX > GAP_X_MIN) {
@@ -626,11 +695,6 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   }
   const mode = (avail >= COL_BREAK && boxW >= BOX_MIN_W) ? 'row' : 'column';
 
-  const backs = links.filter((l) => l.back);
-  let leftInset = 0;
-  let rightInset = 0;
-  let backBudget = 0, skipBudget = 0;
-  let colBoxW = 0;
   let order = null, rowOf = null;
   if (mode === 'column') {
     // Which box sits on which row is decided here rather than in placeColumn,
@@ -642,7 +706,60 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
       .map((o) => o.n);
     rowOf = new Map(order.map((n, r) => [n.id, r]));
     for (const c of kids) rowOf.set(c.id, rowOf.get(c._owner));
+  }
 
+  // how many lanes the busiest container needs, and therefore how far in from
+  // its edges every container holds its boxes
+  const laneCount = new Map();
+  for (const l of sibs) {
+    if (sibSpan(l) <= 1) continue;
+    const k = owner.get(l.from);
+    laneCount.set(k, (laneCount.get(k) || 0) + 1);
+  }
+  const maxLanes = laneCount.size ? Math.max(...laneCount.values()) : 0;
+  /**
+   * 🔴 AND THE LANES A LINK NEEDS TO REACH A BOX INSIDE A MACHINE. In one
+   * column a step used to attach to the MACHINE whichever box it named, on the
+   * measured ground that a vertical run into a box inside `Raspberry Pi` goes
+   * straight through the words `Raspberry Pi`. That is true and it made the
+   * picture lie: PHOTOGRAPHED on four pages at once, `WebGL2 -> shader` drawn
+   * from the Browser's own edge, `store -> play` arriving beside `uploader`.
+   * The run turns out of the box's SIDE instead and goes down the container's
+   * padding, which is empty from top to bottom, and that padding has to be
+   * bought here — before a box has a width, because the width depends on it.
+   *
+   * ⚠️ THE LEVELS COME FROM THE ORDER, NOT FROM PIXELS, and that is the only
+   * reason this can be answered this early. Where two dives overlap is decided
+   * by which rows and which boxes inside them they run between, and the y they
+   * end up at follows that order exactly. `backLevels` wants real distances,
+   * so the positions are scaled up: at row units its "1 px of shared ground is
+   * a join" tolerance would swallow a whole box.
+   */
+  const dives = mode === 'column'
+    ? links.filter((l) => !l.back && !skipsABox(l, rowOf)
+                       && (owner.has(l.from) || owner.has(l.to)))
+    : [];
+  const kidsOf = new Map(nodes.map((n) => [n.id, n._kids.length]));
+  const rank = (id) => {
+    const o = owner.get(id);
+    if (o == null) return rowOf.get(id) + 0.5;
+    return rowOf.get(id) + (kidIx.get(id) + 1) / (kidsOf.get(o) + 1);
+  };
+  const diveLevel = dives.length
+    ? backLevels(dives.map((l) => [rank(l.from) * 100, rank(l.to) * 100])) : [];
+  const diveLanes = diveLevel.length ? Math.max(...diveLevel) + 1 : 0;
+  const childInset = CHILD_PAD + maxLanes * SIB_LANE + diveLanes * DIVE_LANE;
+  // one gap for every container in the picture, because gaps of two sizes
+  // would read as a difference that means something
+  const childGap = sibs.some((l) => sibSpan(l) === 1) ? SIB_GAP : CHILD_GAP;
+
+  const backs = links.filter((l) => l.back);
+  let leftInset = 0;
+  let rightInset = 0;
+  let backBudget = 0, skipBudget = 0;
+  let colBoxW = 0;
+  let skips = [], backLevel = [], skipLevel = [];
+  if (mode === 'column') {
     // The return paths run down the LEFT of the column and the forward links
     // that skip a box down the RIGHT, so each gutter holds two things SIDE BY
     // SIDE and not one: the lanes the paths run in, and the names written
@@ -654,10 +771,19 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     // has a line through it reads as a name in the wrong place, which is what
     // it was.
     //
-    // The list's LENGTH is the worst case for the number of lanes — every path
-    // on a level of its own — and is used because the real levels need
-    // positions that need this width. It over-reserves when two paths share a
-    // lane; the alternative is laying the whole thing out twice.
+    // 🔴 AND IT RESERVES THE LANES THERE REALLY ARE, NOT ONE PER PATH. This
+    // used the list's LENGTH — every path on a level of its own — with a
+    // comment admitting it over-reserves whenever two of them share a lane,
+    // because the real levels were read off positions that needed this width
+    // first. They do not: where two paths overlap is decided by which BOXES
+    // they run between, and the y they end up at follows that order exactly.
+    // `laneSpan` below is the same question asked of the order rather than of
+    // the pixels, so the count is exact, the gutter holds what it draws, and
+    // every pixel it gives back goes into the boxes' own words.
+    // ⚠️ THE LEVELS ARE THEN HANDED TO `placeColumn` RATHER THAN RECOMPUTED.
+    // Two answers to one question is two answers that can disagree, and a
+    // gutter reserving fewer lanes than the drawer lays down is a line outside
+    // the picture.
     //
     // 🔴 A GUTTER IS SIZED BY WHAT ITS NAMES NEED, NEVER BY A SHARE OF THE
     // PICTURE. It used to be a flat 30% of the width: the name was wrapped to
@@ -668,21 +794,33 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     // beside it held 166 px for text needing 128. The name is measured WHOLE
     // here, before anything wraps it, so the number cannot be fed by its own
     // shortening.
-    const want = (list) => {
+    const want = (list, lanes) => {
       if (!list.length) return 0;
       let widest = 0;
       for (const l of list) {
         if (!l.label) continue;
         widest = Math.max(widest, measure.link(l.label));
       }
-      return Math.ceil(Math.min(widest, LINK_MAX)) + GUTTER_PAD + (list.length - 1) * LANE_STEP;
+      return Math.ceil(Math.min(widest, LINK_MAX)) + GUTTER_PAD + (lanes - 1) * LANE_STEP;
     };
     // and the floor, when there is not enough picture for everyone: the lanes
     // themselves still have to be somewhere, even with no room for a name
-    const lanesOnly = (list) => (list.length ? 8 + (list.length - 1) * LANE_STEP : 0);
-    const skips = links.filter((l) => skipsABox(l, rowOf));
-    leftInset = want(backs);
-    rightInset = want(skips);
+    const lanesOnly = (lanes) => (lanes ? 8 + (lanes - 1) * LANE_STEP : 0);
+    skips = links.filter((l) => skipsABox(l, rowOf));
+    // ⚠️ THE ENDS ARE PULLED IN BY A HAIR, so two paths that MEET at one box
+    // and turn away from each other are seen as not overlapping and share a
+    // lane. That is `ATTACH_OFF / 2` in pixels, one level up; here it is the
+    // same idea in the units the order is counted in.
+    const laneSpan = (l) => {
+      const a = rank(l.from) * 100, b = rank(l.to) * 100;
+      return a < b ? [a + 3, b - 3] : [a - 3, b + 3];
+    };
+    backLevel = backs.length ? backLevels(backs.map(laneSpan)) : [];
+    skipLevel = skips.length ? backLevels(skips.map(laneSpan)) : [];
+    const backLanes = backLevel.length ? Math.max(...backLevel) + 1 : 0;
+    const skipLanes = skipLevel.length ? Math.max(...skipLevel) + 1 : 0;
+    leftInset = want(backs, backLanes);
+    rightInset = want(skips, skipLanes);
 
     // 🔴 AND WHEN THE PICTURE IS TOO NARROW FOR ALL OF IT, THE BOXES' OWN
     // WORDS WIN. A diagram that shortens the names of the things it is about
@@ -701,7 +839,7 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     boxNeed = Math.min(Math.ceil(boxNeed) + BOX_PAD_X * 2, BOX_MAX_W_COL);
     const room = avail - PAD * 2 - boxNeed;
     if (leftInset + rightInset > room) {
-      const floorL = lanesOnly(backs), floorR = lanesOnly(skips);
+      const floorL = lanesOnly(backLanes), floorR = lanesOnly(skipLanes);
       const spare = Math.max(0, room - floorL - floorR);
       const over = (leftInset - floorL) + (rightInset - floorR);
       const k = over > 0 ? spare / over : 0;
@@ -710,10 +848,10 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     }
     // what is left of each gutter once its lanes have theirs — the width a
     // name in it actually gets, and the number `cuts` is reported against
-    const nameRoom = (inset, list) => (list.length
-      ? Math.max(0, inset - GUTTER_PAD - (list.length - 1) * LANE_STEP) : 0);
-    backBudget = nameRoom(leftInset, backs);
-    skipBudget = nameRoom(rightInset, skips);
+    const nameRoom = (inset, lanes) => (lanes
+      ? Math.max(0, inset - GUTTER_PAD - (lanes - 1) * LANE_STEP) : 0);
+    backBudget = nameRoom(leftInset, backLanes);
+    skipBudget = nameRoom(rightInset, skipLanes);
     colBoxW = Math.min(avail - leftInset - rightInset - PAD * 2, BOX_MAX_W_COL);
   }
 
@@ -788,11 +926,80 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     ? placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts,
                                ...shared })
     : placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
-                           backBudget, skipBudget, m, measure, cuts, ...shared });
+                           backBudget, skipBudget, m, measure, cuts,
+                           dives, diveLevel, diveLanes, backLevel, skipLevel, ...shared });
+
+  checkEnds(out, cuts);
 
   for (const n of nodes.concat(kids)) { delete n._lab; delete n._sub; }
   return { mode, boxW: w, boxH, cuts, cycle, gapX, ...out,
            ...(inside.length ? { inside } : {}) };
+}
+
+/** every (x, y) in a path string, in order. M, L and Q all take pairs. */
+function pathPoints(d) {
+  const nums = String(d || '').match(/-?\d+(?:\.\d+)?/g);
+  if (!nums || nums.length < 4) return null;
+  const pts = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) pts.push([+nums[i], +nums[i + 1]]);
+  return pts;
+}
+
+/** how far a point is from a box, 0 anywhere inside it */
+function gapToBox(p, b) {
+  const dx = Math.max(b.x - p[0], 0, p[0] - (b.x + b.w));
+  const dy = Math.max(b.y - p[1], 0, p[1] - (b.y + b.h));
+  return Math.hypot(dx, dy);
+}
+
+// How far outside a box an attachment is allowed to sit. Every one of them is
+// `EDGE_OUT` (2) or `EDGE_OUT + 1` (3) clear of the edge; six leaves room for
+// the rounding and for nothing else.
+const ATTACH_REACH = 6;
+
+/**
+ * 🔴 DID THE ARROW REACH THE BOX IT NAMES, OR THE MACHINE AROUND IT.
+ *
+ * NOTHING GRADED THIS AND IT WAS WRONG ON FOUR PAGES AT ONCE. `cuts` reports a
+ * link that was REFUSED, so a link routed to the wrong endpoint reads clean
+ * through it: the picture is complete, every arrow is drawn, and each one ends
+ * somewhere plausible and false. PHOTOGRAPHED 2026-09-19 on /mirror/, /floor/,
+ * /crate/ and /knobs/ — `WebGL2 -> shader` leaving the Browser's own edge,
+ * `films -> video` drawn machine to machine on a WIDE screen, `store -> play`
+ * arriving beside `uploader`, `ffmpeg -> up` leaving the Raspberry Pi.
+ *
+ * ⚠️ IT IS MEASURED OFF THE PATH, NEVER OFF THE ROUTER'S INTENTION. The
+ * drawing is the only thing a reader sees, so the question asked here is where
+ * the ink starts and stops: the first and last coordinate pair in the `d`
+ * string, against the rectangle of the box the author named. A check reading
+ * the variable the router chose would agree with the router by construction,
+ * which is the two-numbers-from-one-field defect in CLAUDE.md.
+ *
+ * ⚠️ AND IT GOES ON `cuts`, so every page that already asserts `cuts.length
+ * === 0` grades it with no page edit at all.
+ */
+export function checkEnds(out, cuts) {
+  const at = new Map();
+  for (const n of out.nodes || []) {
+    at.set(n.id, n);
+    for (const k of (n.kids || [])) at.set(k.id, k);
+  }
+  for (const l of out.links || []) {
+    const pts = pathPoints(l.d);
+    if (!pts) continue;
+    for (const [p, id, verb] of [[pts[0], l.from, 'leaves'],
+                                 [pts[pts.length - 1], l.to, 'reaches']]) {
+      const b = at.get(id);
+      if (!b) continue;
+      const gap = gapToBox(p, b);
+      if (gap <= ATTACH_REACH) continue;
+      cuts.push({ id: `${l.from} to ${l.to}`, where: 'link',
+                  full: l.label || l.note || `${l.from} to ${l.to}`,
+                  shown: `WRONG END: the line ${verb} a point ${Math.round(gap)} px off `
+                       + `${id}, which is the box it names`,
+                  width: Math.round(gap) });
+    }
+  }
 }
 
 function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts,
@@ -888,28 +1095,50 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
     if (!arrivals.has(l.to)) arrivals.set(l.to, []);
     arrivals.get(l.to).push(l);
   }
-  // 🔴 TWO LINES OF ROOM, NOT ONE, AND THAT IS THE WHOLE FIX THE SECOND TIME.
-  // Spreading arrivals by ONE line height was right about the mechanism and
-  // short by half: `wrapLines` is allowed two lines, a name sits ABOVE its own
-  // arrow, and both of station's arrivals into `player` wrap. So two two-line
-  // names 15 px apart still printed through each other, which is the same smear
-  // in a smaller font. `LINK_MAX_LINES` is the cap, so reserving it can never
-  // be too little, and where a name turns out to be one line the extra gap
-  // costs nothing but air.
-  const LINK_MAX_LINES = 2;
-  // 🔴 AND A THIRD TIME, BECAUSE NOT COLLIDING IS NOT THE SAME AS BEING APART.
-  // Two lines of room plus 6 px puts two two-line names 28 px apart, which is
-  // exactly enough that they do not overlap and reads as one clump: reported
-  // with a photograph of `playlist text` and `mp3 bytes` arriving at `player`,
-  // *"can we get connectors a bit separate?"*. The first two fixes were about a
-  // SMEAR and this one is about the gap being legible. 18 px of air rather than
-  // 6 is half a line between the blocks, so the eye takes them as two arrivals
-  // before it has read either name.
-  const spread = Math.max(ATTACH_OFF, Math.round(m.linkLh) * LINK_MAX_LINES + 18);
+  /**
+   * 🔴 AND THE ROOM THEY TAKE IS WHAT THEIR NAMES REALLY NEED, MEASURED.
+   *
+   * Two arrivals sitting ONE line apart printed through each other, because
+   * `wrapLines` is allowed two lines, a name sits ABOVE its own arrow, and
+   * both of /station/'s arrivals into `player` wrap. The repair reserved the
+   * CAP — two lines, every time — plus 18 px of air, so that two two-line
+   * names read as two arrivals rather than one clump, which is what *"can we
+   * get connectors a bit separate?"* asked for.
+   *
+   * ⚠️ AND THEN IT WAS TOO MUCH, WHICH IS THE SAME MISTAKE FROM THE OTHER
+   * END. Reserving the worst case put two arrivals 40 px apart on a box 48 px
+   * tall — one at each corner — for names that might be one line, or might not
+   * exist at all. Two arrows with NO names on them were held forty pixels
+   * apart to clear writing nobody had done. So the names are wrapped FIRST,
+   * here, and the spread is what the widest of them actually takes. Nothing
+   * about the air changes: it is the reservation that stops being a guess.
+   * ⚠️ THE BUDGET IS THE GAP BETWEEN THE MACHINES, which is fixed by their x
+   * alone, so it is known before a single link has been routed and this costs
+   * no second pass.
+   */
+  const labOf = new Map();
+  for (const l of links) {
+    if (l.back || overs.includes(l)) continue;
+    const fm = outer(l.from), tm = outer(l.to);
+    const budget = (tm.x - EDGE_OUT - 1) - (fm.x + fm.w + EDGE_OUT) - 1;
+    const lab = wrapLines(l.label, budget, 2, measure.link);
+    if (lab.cut) {
+      cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
+                  shown: lab.lines.join(' '), width: budget });
+    }
+    labOf.set(l, { lab, budget });
+  }
+  const AIR = 18;               // half a line between two blocks of name
+  const spreadOf = new Map();
+  for (const [to, list] of arrivals) {
+    let lines = 0;
+    for (const l of list) lines = Math.max(lines, labOf.get(l)?.lab.lines.length || 0);
+    spreadOf.set(to, Math.max(ATTACH_OFF, lines ? Math.round(m.linkLh) * lines + AIR : 0));
+  }
   const arriveAt = (l, t) => {
     const list = arrivals.get(l.to);
     if (!list || list.length < 2) return t.cy;
-    return t.cy + (list.indexOf(l) - (list.length - 1) / 2) * spread;
+    return t.cy + (list.indexOf(l) - (list.length - 1) / 2) * spreadOf.get(l.to);
   };
   /**
    * 🔴 AND EACH ARRIVAL TURNS DOWN AT ITS OWN x, WHICH IS THE OTHER HALF.
@@ -946,14 +1175,11 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
         const x2 = t.x - EDGE_OUT - 1, y2 = arriveAt(l, t);
         // the gap between the two MACHINES, which is the room the name has —
         // never the length of the line, which reaches further whenever one end
-        // of it is a box inside one of them
+        // of it is a box inside one of them. Wrapped in the pass above,
+        // because how many lines it came to is what decides how far apart two
+        // arrivals at one box have to sit.
         const ox1 = fm.x + fm.w + EDGE_OUT, ox2 = tm.x - EDGE_OUT - 1;
-        const budget = ox2 - ox1 - 1;
-        const lab = wrapLines(l.label, budget, 2, measure.link);
-        if (lab.cut) {
-          cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
-                      shown: lab.lines.join(' '), width: budget });
-        }
+        const { lab } = labOf.get(l);
         // 🔴 SIX PIXELS ABOVE THE LINE, AND NOW THAT IS ALL IT TAKES. The old
         // code measured the arrow's SLOPE and lifted each name clear of it,
         // then put the two names of a fork on opposite sides so they did not
@@ -967,18 +1193,43 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
                      lab, lx, ly: y2 - 6, anchor: 'middle', stack: 'up' });
         continue;
       }
-      // over the row, out of the source's TOP edge and down into the target's
-      // — off the MACHINE both ends, because a lane that dived into a box
-      // inside one would cross that container's own words on the way
+      /**
+       * Over the row, out of the source's TOP edge and down into the target's.
+       *
+       * 🔴 AND WHERE EITHER END NAMES A BOX INSIDE A MACHINE, IT GOES OUT THE
+       * SIDE INSTEAD. This ran off the MACHINE at both ends, for a reason that
+       * is still true: a lane coming down from above into a box inside a
+       * container would cross that container's own name and every box stacked
+       * over the one it wants. PHOTOGRAPHED 2026-09-19 on `/floor/` at full
+       * width, where `films -> video` was drawn machine to machine — the one
+       * arrow in that picture that reads as a fact and is not one, because
+       * both `films` and `video` sit inside machines that hold two boxes each.
+       * ⚠️ THE GROUND IT USES COSTS NOTHING. Between two columns there is
+       * already `gapX` of empty picture, so the line hugs the machine's side
+       * six pixels out and climbs there. No padding is bought and no box
+       * narrows, which is the opposite trade from the one column layout.
+       */
       const dy = top - LANE_FIRST - overLevel[o] * overStep;
-      const sx = fm.cx + ATTACH_OFF, tx = tm.cx - ATTACH_OFF;
+      const fKid = fm !== f, tKid = tm !== t;
+      const sx = fKid ? fm.x + fm.w + EDGE_OUT + DIVE_OUT : fm.cx + ATTACH_OFF;
+      const tx = tKid ? tm.x - EDGE_OUT - DIVE_OUT : tm.cx - ATTACH_OFF;
       const budget = laneBudget(sx, tx);
       const lab = wrapLines(l.label, budget, 1, measure.link);
       if (lab.cut) {
         cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
                     shown: lab.lines.join(' '), width: budget });
       }
-      drawn.push({ ...l, d: acrossLane(sx, fm.y, tx, tm.y - EDGE_OUT - 1, dy, -1),
+      let d;
+      if (!fKid && !tKid) d = acrossLane(sx, fm.y, tx, tm.y - EDGE_OUT - 1, dy, -1);
+      else {
+        const pts = [];
+        if (fKid) pts.push([f.x + f.w + EDGE_OUT, f.cy], [sx, f.cy], [sx, dy]);
+        else pts.push([sx, fm.y], [sx, dy]);
+        if (tKid) pts.push([tx, dy], [tx, t.cy], [t.x - EDGE_OUT - 1, t.cy]);
+        else pts.push([tx, dy], [tx, tm.y - EDGE_OUT - 1]);
+        d = roundedPath(pts);
+      }
+      drawn.push({ ...l, d,
                    lab, lx: (sx + tx) / 2, ly: dy - 5, anchor: 'middle',
                    stack: 'none', level: overLevel[o], depth: dy });
       continue;
@@ -1025,6 +1276,8 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
 
 function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
                              backBudget, skipBudget, m, measure, cuts,
+                             dives = [], diveLevel = [], diveLanes = 0,
+                             backLevel = [], skipLevel = [],
                              sibs, kidIx, sibSpan, childGap, childInset }) {
   // ⚠️ ONE COLUMN IS NOT THE ROW LAYOUT ROTATED. A horizontal diagram on a
   // phone is a diagram nobody reads, so below the break the steps stack top to
@@ -1043,16 +1296,42 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
   const bottom = PAD + placed.length * boxH + (placed.length - 1) * GAP_Y_COL;
   const right = x + w;
 
+  /**
+   * 🔴 A LINK ATTACHES TO THE BOX IT NAMES, IN THIS LAYOUT TOO. `outer` above
+   * resolves a box to the machine around it and every link in here used to go
+   * through it, so an arrow naming a program was drawn to the machine's edge.
+   * Where the run reaches a box SIDEWAYS — a return path out of the left
+   * gutter, a skip out of the right one — nothing was ever in the way: the
+   * only ground it crosses is the container's own padding, which is empty. The
+   * vertical steps are the ones that needed a lane, and they get one below.
+   */
+  const side = (id) => at.get(id);
+  // ⚠️ THE LEVELS ARRIVE FROM `layout`, WHICH ALREADY HAD TO KNOW THEM. The
+  // gutters are sized before a box has a width, so the number of lanes was
+  // worked out there; computing it a second time here from the pixels is two
+  // answers to one question, and the one that can be wrong is the one that
+  // lays lines down outside the gutter reserved for them.
   const backs = links.filter((l) => l.back);
-  const level = backLevels(backs.map((l) => {
-    const f = outer(l.from), t = outer(l.to);
-    return [f.cy - ATTACH_OFF / 2, t.cy + ATTACH_OFF / 2];
-  }));
+  const level = backLevel;
   const overs = links.filter((l) => skipsABox(l, rowOf));
-  const overLevel = backLevels(overs.map((l) => {
-    const f = outer(l.from), t = outer(l.to);
-    return [f.cy + ATTACH_OFF / 2, t.cy - ATTACH_OFF / 2];
-  }));
+  const overLevel = skipLevel;
+  // ⚠️ AND EVERY `bx` BELOW COUNTS LANES, NOT PATHS. These read the list's
+  // LENGTH while the gutter was reserved for the same worst case, so the two
+  // agreed by both being wrong. With the gutter sized to the lanes there
+  // really are, a `bx` still counting paths puts the shallowest lane a whole
+  // LANE_STEP inside the picture and draws it through its own name — which is
+  // the defect the gutter's own check was written for, arriving from the other
+  // side.
+  const backLanes = level.length ? Math.max(...level) + 1 : 0;
+  const overLanes = overLevel.length ? Math.max(...overLevel) + 1 : 0;
+  // Which lane inside a container each dive runs in. Level 0 is the shortest
+  // run and sits INNERMOST, a step from the boxes; a longer one moves out
+  // toward the container's edge and passes outside it. That is the right
+  // gutter's rule one level in, and it leaves the innermost lane `DIVE_LANE`
+  // plus `DIVE_EDGE` clear of the box it arrives at — four for the corner and
+  // six for the arrowhead.
+  const diveOf = new Map(dives.map((l, i) => [l, diveLevel[i]]));
+  const laneX = (l) => x + DIVE_EDGE + (diveLanes - 1 - (diveOf.get(l) || 0)) * DIVE_LANE;
   // 🔴 A STEP'S NAME TAKES THE ROW IT SITS IN, NOT HALF A BOX. Between two
   // stacked boxes is a gap that is EMPTY right across the picture, and the
   // only thing in it is one short vertical arrow. The budget used to be "the
@@ -1067,9 +1346,9 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
   // alternating. Which side is wider is not a guess: a left gutter pushes the
   // boxes right, so the room is usually on the left, and with no gutters at
   // all the two are equal and it stays where it has always been.
-  const laneR = backs.length ? PAD + 4 + (backs.length - 1) * LANE_STEP + 6 : PAD;
-  const laneL = overs.length
-    ? right + rightInset - 4 - (overs.length - 1) * LANE_STEP - 6 : avail - PAD;
+  const laneR = backLanes ? PAD + 4 + (backLanes - 1) * LANE_STEP + 6 : PAD;
+  const laneL = overLanes
+    ? right + rightInset - 4 - (overLanes - 1) * LANE_STEP - 6 : avail - PAD;
   const cx = placed[0].cx;
   const roomL = cx - STEP_OFF - laneR, roomR = laneL - (cx + STEP_OFF);
   const stepLeft = roomL > roomR;
@@ -1094,35 +1373,64 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
 
   const drawn = [];
   for (const l of links) {
-    // 🔴 IN ONE COLUMN EVERY LINK ATTACHES TO THE MACHINE, NEVER TO A BOX
-    // INSIDE IT — and the row layout is the opposite, for one reason that
-    // decides both. A container's own name sits at the TOP of it with its
-    // boxes under, so the ground between a container's edge and a box inside
-    // it is EMPTY sideways and FULL downwards. Here every run is vertical:
-    // MEASURED, an arrow drawn into a box inside `Raspberry Pi` ran straight
-    // through the words `Raspberry Pi` on its way, which is the same defect as
-    // a lane through its own name and has three checks of its own already.
-    // Left to right the same arrow crosses nothing but padding, so there it
-    // reaches the box it names.
-    const f = outer(l.from), t = outer(l.to);
+    const f = side(l.from), t = side(l.to);
+    const fm = outer(l.from), tm = outer(l.to);
     if (!l.back) {
       const o = overs.indexOf(l);
       if (o < 0) {
+        /**
+         * 🔴 A STEP REACHES THE BOX IT NAMES, AND WHERE THAT BOX IS INSIDE A
+         * MACHINE IT GETS THERE SIDEWAYS. This was a straight vertical at the
+         * MACHINE's centre whichever box the author named, on a measured
+         * ground that is still true: a vertical run into a box inside
+         * `Raspberry Pi` goes through the words `Raspberry Pi` and through
+         * every box stacked above the one it wants. What was wrong was the
+         * conclusion. The line turns out of the box's SIDE, runs down a lane
+         * in the container's own padding — the one strip in there that is
+         * empty top to bottom — crosses the gap between the machines in it,
+         * and turns in at the far box's side.
+         * ⚠️ A STEP BETWEEN TWO WHOLE MACHINES IS UNTOUCHED, to the digit: it
+         * has no box to reach past, so it stays the straight vertical down the
+         * middle that the one-column layout is built around, and a picture
+         * with nothing nested in it comes out exactly as it did.
+         */
         const down = rowOf.get(l.to) > rowOf.get(l.from);
-        const y1 = down ? f.y + f.h + EDGE_OUT : f.y - EDGE_OUT;
-        const y2 = down ? t.y - EDGE_OUT - 1 : t.y + t.h + EDGE_OUT + 1;
-        const lab = wrapLines(l.label, fwdBudget, 1, measure.link);
+        const dive = diveOf.has(l);
+        const bx = dive ? laneX(l) : 0;
+        const fKid = owner.has(l.from), tKid = owner.has(l.to);
+        const y1 = down ? fm.y + fm.h + EDGE_OUT : fm.y - EDGE_OUT;
+        const y2 = down ? tm.y - EDGE_OUT - 1 : tm.y + tm.h + EDGE_OUT + 1;
+        const midY = (y1 + y2) / 2;
+        // where the name goes, and it is always in the GAP between the two
+        // machines, never beside the part of the run that is inside one: that
+        // strip is a container's padding and a name in it sits on the boxes.
+        const nameX = dive ? bx + STEP_OFF : fm.cx + (stepLeft ? -STEP_OFF : STEP_OFF);
+        const nameAnchor = dive ? 'start' : (stepLeft ? 'end' : 'start');
+        const budget = dive
+          ? Math.min(LINK_MAX, Math.max(0, Math.floor(laneL - nameX)))
+          : fwdBudget;
+        const lab = wrapLines(l.label, budget, 1, measure.link);
         if (lab.cut) {
           cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
-                      shown: lab.lines.join(' '), width: fwdBudget });
+                      shown: lab.lines.join(' '), width: budget });
         }
-        const share = pairs.get(`${f.id}|${t.id}`) || [l];
-        const off = share.length < 2 ? 0
+        const share = pairs.get(`${fm.id}|${tm.id}`) || [l];
+        const off = share.length < 2 || dive ? 0
           : (share.indexOf(l) - (share.length - 1) / 2) * apart;
-        drawn.push({ ...l, d: `M${r1(f.cx)} ${r1(y1)} L${r1(f.cx)} ${r1(y2)}`,
-                     lab, lx: f.cx + (stepLeft ? -STEP_OFF : STEP_OFF),
-                     ly: (y1 + y2) / 2 + off + m.linkSize * 0.35,
-                     anchor: stepLeft ? 'end' : 'start', stack: 'none' });
+        let d;
+        if (!dive) d = `M${r1(fm.cx)} ${r1(y1)} L${r1(fm.cx)} ${r1(y2)}`;
+        else {
+          const pts = [];
+          if (fKid) pts.push([f.x - EDGE_OUT, f.cy], [bx, f.cy]);
+          else pts.push([fm.cx, y1], [fm.cx, midY], [bx, midY]);
+          if (tKid) pts.push([bx, t.cy], [t.x - EDGE_OUT - 1, t.cy]);
+          else pts.push([bx, midY], [tm.cx, midY], [tm.cx, y2]);
+          d = roundedPath(pts, SIB_CORNER);
+        }
+        drawn.push({ ...l, d,
+                     lab, lx: nameX,
+                     ly: (dive ? midY - 5 : (y1 + y2) / 2 + off) + m.linkSize * 0.35,
+                     anchor: nameAnchor, stack: 'none' });
         continue;
       }
       // 🔴 OUT OF THE RIGHT EDGE, DOWN THE RIGHT GUTTER, BACK IN AT THE RIGHT
@@ -1133,7 +1441,7 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
       // The lanes fill the RIGHT of the gutter and the names the left of it,
       // so a deeper path moves further right and never under a name — the
       // left gutter's rule, mirrored.
-      const bx = right + rightInset - 4 - (overs.length - 1 - overLevel[o]) * LANE_STEP;
+      const bx = right + rightInset - 4 - (overLanes - 1 - overLevel[o]) * LANE_STEP;
       const sy = f.cy + ATTACH_OFF / 2, ty = t.cy - ATTACH_OFF / 2;
       const sx = f.x + f.w + EDGE_OUT, tx = t.x + t.w + EDGE_OUT + 1;
       const lab = wrapLines(l.label, skipBudget, 1, measure.link);
@@ -1149,7 +1457,7 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
     const i = backs.indexOf(l);
     // the lanes fill the LEFT of the gutter and the names the right of it, so
     // a deeper path moves further left and never under a name
-    const bx = PAD + 4 + (backs.length - 1 - level[i]) * LANE_STEP;
+    const bx = PAD + 4 + (backLanes - 1 - level[i]) * LANE_STEP;
     const sy = f.cy - ATTACH_OFF / 2, ty = t.cy + ATTACH_OFF / 2;
     const sx = f.x - EDGE_OUT, tx = t.x - EDGE_OUT - 1;
     const lab = wrapLines(l.label, backBudget, 1, measure.link);
@@ -1311,6 +1619,49 @@ function placeSibs(sibs, at, { owner, kidIx, sibSpan, cuts }) {
   return drawn;
 }
 
+/**
+ * A line through a list of corners, every turn rounded the way every other
+ * line in the picture is.
+ *
+ * 🔴 IT EXISTS BECAUSE A DIVE HAS THREE TURNS AND THE THREE SHAPES ABOVE HAVE
+ * TWO. `acrossLane`, `sideLane` and `stepElbow` are each one fixed shape
+ * written out by hand, which is right while a shape is fixed: a link that
+ * leaves a box inside a machine, runs down that machine's padding, crosses the
+ * gap and turns into a box inside the next one has a different number of
+ * corners depending on which of its two ends names a program. Writing that as
+ * a fourth and fifth hand-rolled string is where two of them would drift apart.
+ *
+ * ⚠️ THE RADIUS IS CLAMPED PER CORNER, never once for the path. A dive turns
+ * inside a container's padding, where a run can be fourteen pixels long, and a
+ * 6 px corner on a 10 px run doubles back on itself. Each turn takes the
+ * smaller of the radius and half of each run it joins.
+ * ⚠️ AND A POINT THAT REPEATS ITS NEIGHBOUR IS DROPPED. A dive whose two ends
+ * happen to line up would otherwise ask for a turn through zero degrees, which
+ * renders as a dot of ink on the line.
+ */
+function roundedPath(pts, r = CORNER) {
+  const p = [];
+  for (const q of pts) {
+    const last = p[p.length - 1];
+    if (last && Math.abs(last[0] - q[0]) < 0.5 && Math.abs(last[1] - q[1]) < 0.5) continue;
+    p.push(q);
+  }
+  if (p.length < 2) return '';
+  let d = `M${r1(p[0][0])} ${r1(p[0][1])}`;
+  for (let i = 1; i < p.length - 1; i++) {
+    const [ax, ay] = p[i - 1], [bx, by] = p[i], [cx, cy] = p[i + 1];
+    const inLen = Math.hypot(bx - ax, by - ay);
+    const outLen = Math.hypot(cx - bx, cy - by);
+    const c = Math.min(r, inLen / 2, outLen / 2);
+    const ux = inLen ? (bx - ax) / inLen : 0, uy = inLen ? (by - ay) / inLen : 0;
+    const vx = outLen ? (cx - bx) / outLen : 0, vy = outLen ? (cy - by) / outLen : 0;
+    d += ` L${r1(bx - ux * c)} ${r1(by - uy * c)}`
+       + ` Q${r1(bx)} ${r1(by)} ${r1(bx + vx * c)} ${r1(by + vy * c)}`;
+  }
+  const end = p[p.length - 1];
+  return d + ` L${r1(end[0])} ${r1(end[1])}`;
+}
+
 function stepElbow(sx, sy, tx, ty, bx) {
   if (Math.abs(ty - sy) < 0.5) return `M${r1(sx)} ${r1(sy)} L${r1(tx)} ${r1(ty)}`;
   const vs = ty > sy ? 1 : -1;                 // down the picture, or up it
@@ -1359,16 +1710,27 @@ function sideLane(sx, sy, tx, ty, bx, hs, corner = CORNER) {
  * is WHICH STRINGS were measured, not how.
  */
 export function captionTexts(spec, nodes) {
-  // what the line will SAY for a box — its own sentence if it has one, its
-  // name if it does not. Reserving against the name while the pointer shows
-  // the sentence is the same defect as reserving against the box while the
-  // pointer shows the caption, one step further in.
-  const says = (n) => n?.note || n?.title || n?.label?.full || '';
+  // 🔴 WHAT THE LINE WILL SAY IS A `note` OR NOTHING, AND THE OLD FALLBACK WAS
+  // AN ECHO. It read `n.note || n.title || n.label.full`, so a box with no
+  // sentence wrote its own NAME into the line — under a box with that name
+  // printed an inch above it. Every container has no note BY RULE, so pointing
+  // at one printed `Raspberry Pi` under a box reading `Raspberry Pi`.
+  // PHOTOGRAPHED on /mirror/. It is worst on a phone, where there is no
+  // pointer to leave: whatever was last touched stays named indefinitely.
+  // ⚠️ SAYING NOTHING IS THE CAPTION, NEVER A COLLAPSED LINE. The caption is
+  // the first string in this list and stays reserved, so a box with no
+  // sentence simply leaves the line where it was.
+  const says = (n) => n?.note || '';
   const out = [spec?.caption || ''];
   for (const n of (nodes || [])) {
     out.push(says(n));
     for (const k of (n.kids || [])) out.push(says(k));
   }
+  // ⚠️ AND A LINK'S SENTENCE IS ONE OF THEM TOO, WHICH IT NEVER WAS. The line
+  // has held these since arrows became hoverable and the reservation never
+  // learned about them, so a note longer than the caption grew the block on
+  // hover — the exact jump this list exists to prevent.
+  for (const l of (spec?.links || [])) out.push(String(l?.note || ''));
   return out;
 }
 
@@ -1702,15 +2064,18 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
     // lines. A line under the picture is read in place, has room for a whole
     // sentence, and costs no positioning code at all.
     //
-    // ⚠️ AND IT SAYS SOMETHING THE BOX DOES NOT. It used to write the box's
-    // own name and sub — `Raspberry Pi — another granulator`, under a box
-    // reading `Raspberry Pi` / `another granulator` — so pointing at a box
-    // repeated it. `note` is a sentence about what that box is for here; with
-    // none written the name is still better than an empty line.
+    // ⚠️ AND IT SAYS SOMETHING THE BOX DOES NOT, OR IT SAYS NOTHING.
+    // It used to fall back to the box's own name and sub — `Raspberry Pi,
+    // another granulator`, under a box reading `Raspberry Pi` / `another
+    // granulator`. A container has no note BY RULE, so every container did
+    // that, and it was PHOTOGRAPHED on /mirror/. A line that repeats the box an
+    // inch above it is the third channel a legend is; with no sentence to add,
+    // the line keeps the caption, which is a fact the reader has not got yet.
     const show = () => {
       g.dataset.on = '1';
+      if (!n.note) return;
       cap.dataset.on = '1';
-      say(n.note || n.title || n.label.full);
+      say(n.note);
     };
     const hide = () => {
       delete g.dataset.on;
@@ -1818,11 +2183,18 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       // ⚠️ AND IT SAYS WHAT TRAVELS, not what the arrow is called. The label is
       // already on the picture; a hover that repeated it would be the third
       // channel carrying one fact, which is the mistake the boxes' own note
-      // exists to avoid. With no `note` written, the label is still better than
-      // an empty line.
-      const said = l.note || l.lab.full || `${l.from} to ${l.to}`;
-      lg.setAttribute('aria-label', said);
-      const lshow = () => { lg.dataset.on = '1'; cap.dataset.on = '1'; say(said); };
+      // exists to avoid. So with no `note` written the line KEEPS THE CAPTION,
+      // the same as a box with nothing to add. The old fallback ended at
+      // `wrk to player`, which is two ids out of the source.
+      // ⚠️ THE ACCESSIBLE NAME STILL FALLS BACK, because a thing with no name
+      // at all is worse to a screen reader than a clumsy one, and nobody sees it.
+      lg.setAttribute('aria-label', l.note || l.lab.full || `${l.from} to ${l.to}`);
+      const lshow = () => {
+        lg.dataset.on = '1';
+        if (!l.note) return;
+        cap.dataset.on = '1';
+        say(l.note);
+      };
       const lhide = () => { delete lg.dataset.on; resetCaption(); };
       lg.addEventListener('pointerenter', lshow);
       lg.addEventListener('pointerleave', lhide);

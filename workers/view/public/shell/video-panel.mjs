@@ -36,6 +36,132 @@ import {
 } from './fullscreen.mjs';
 
 /**
+ * 🔴 A NAMED VALUE IN A PANEL FOOTER, WHICH WAS ON THREE PAGES AND IN THE KIT
+ * ZERO TIMES. `/mirror/` has `.fact-k` / `.fact-v`, `/blocks/` has `.bl-gpu-k`
+ * / `.bl-gpu-v` and `/weight/` has `.hd-gpu-k` / `.hd-gpu-v`. Three copies of
+ * one thing, all saying `picture` over a renderer name, and `/blocks/`'s own
+ * comment already names the duplication. CLAUDE.md: a control that exists in
+ * one page and nowhere else is a component nobody has noticed yet.
+ *
+ * 🔴 AND IT GOES IN THE LEFT SLOT, WHICH IS WHAT `LEFT ALIGNED` MEANS HERE.
+ * Reported 2026-09-20 with a photograph of an iPhone: *"Align glmpu info to the
+ * left"*, over a footer reading `PICTURE Apple GPU   FPS 30.0` in the middle of
+ * a full width picture. The footer is a three track grid and the middle track
+ * is centred BY THE GRID, so no amount of alignment inside that slot moves it:
+ * a row that is to sit against the left edge has to be in the left track. That
+ * is also where `/blocks/` and `/weight/` already put theirs, so this makes the
+ * three agree rather than inventing a fourth arrangement.
+ *
+ * 🔴 A LABEL IS DROPPED WHEN THE VALUE ALREADY SAYS WHAT IT IS. Pass `label:
+ * ''` and no key is drawn. `Apple GPU` needs no word `PICTURE` in front of it;
+ * `30.0` without `FPS` is a bare number. So a row is allowed to be asymmetric,
+ * and that asymmetry is the point rather than something to tidy away.
+ *
+ * ⚠️ `reserve` IS IN CHARACTERS AND IT IS WHAT STOPS A ROW TWITCHING. A figure
+ * that changes every second must not be able to move the figure beside it, so
+ * the value box holds its widest reading from the start. `tabular-nums` is the
+ * other half: without it a `1` is narrower than a `0` and the number still
+ * shifts inside its own reserved box.
+ * ⚠️ AND A CELL IS ALWAYS DRAWN, EVEN WITH NOTHING IN IT. Building a row out of
+ * the facts that happen to be known means the first cell starts at the left
+ * edge and jumps right the moment a second one lands. An empty value under its
+ * own key says "not measured yet", which is true; a zero would be a very
+ * confident measurement of nothing.
+ *
+ * @param {Array<{key: string, label?: string, reserve?: number}>} fields
+ */
+export function createPanelValues(fields = []) {
+  if (!Array.isArray(fields) || !fields.length) {
+    throw new Error('panel values: pass at least one { key, label, reserve }. '
+      + 'A row with nothing in it is a box that paints its edges around nothing.');
+  }
+  shimPanelValues();
+  const root = document.createElement('span');
+  root.className = 'pos-vp-vals';
+  const vals = new Map();
+  for (const f of fields) {
+    const key = typeof f === 'string' ? f : f.key;
+    if (!key) throw new Error('panel values: every field needs a `key`.');
+    const label = typeof f === 'string' ? '' : (f.label ?? '');
+    const cell = document.createElement('span');
+    cell.className = 'pos-vp-cell';
+    if (label) {
+      const k = document.createElement('span');
+      k.className = 'pos-vp-k';
+      k.textContent = label;
+      cell.append(k);
+    }
+    const v = document.createElement('span');
+    v.className = 'pos-vp-v';
+    if (f.reserve) v.style.minWidth = `${f.reserve}ch`;
+    cell.append(v);
+    root.append(cell);
+    vals.set(key, v);
+  }
+  return {
+    el: root,
+    /** Write one cell. `null`, `undefined` and `''` all empty it. */
+    set(key, text) {
+      const v = vals.get(key);
+      if (!v) throw new Error(`panel values: there is no cell called "${key}".`);
+      v.textContent = text == null ? '' : String(text);
+      return v;
+    },
+    /** One cell's element, for a page that wants to measure it. */
+    cell: (key) => vals.get(key) || null,
+    keys: () => [...vals.keys()],
+  };
+}
+
+/**
+ * 🔴 A BRIDGE, AND IT RETIRES ITSELF. These four rules belong in `shell.css`
+ * beside the rest of `.pos-vp`, and this file could not put them there. So it
+ * asks the stylesheet whether it already carries them and adds them only if it
+ * does not: the day `.pos-vp-k` lands in `shell.css`, this injects nothing and
+ * can be deleted without anything changing. CLAUDE.md's rule about measuring
+ * the COMPUTED value rather than trusting the source is the same instinct: ask
+ * what the browser actually has, do not assume.
+ *
+ * ⚠️ A CROSS-ORIGIN SHEET CANNOT BE READ and throws on `cssRules`. Treated as
+ * "not ours", which is the safe answer: the worst case is one extra rule that
+ * loses to nothing, because these selectors exist nowhere else.
+ *
+ * THE BLOCK TO MOVE, VERBATIM, is `PANEL_VALUES_CSS` below.
+ */
+const PANEL_VALUES_CSS = `
+.pos-vp-vals {
+  display: flex; align-items: baseline; gap: 14px; min-width: 0;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.pos-vp-vals::-webkit-scrollbar { display: none; }
+.pos-vp-cell { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.pos-vp-k {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2);
+}
+.pos-vp-v {
+  font: 400 11px/1.4 var(--mono); color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}`;
+let shimmed = false;
+function shimPanelValues() {
+  if (shimmed || typeof document === 'undefined') return;
+  shimmed = true;
+  const has = [...document.styleSheets].some((s) => {
+    try {
+      return [...s.cssRules].some((r) => (r.selectorText || '').split(',')
+        .some((t) => t.trim() === '.pos-vp-k'));
+    } catch { return false; }
+  });
+  if (has) return;
+  const style = document.createElement('style');
+  style.dataset.shim = 'pos-vp-vals';
+  style.textContent = PANEL_VALUES_CSS;
+  document.head.append(style);
+}
+
+/**
  * How long the way out stays up after the last movement.
  *
  * ⚠️ IT IS `fullscreen.mjs`'s NUMBER NOW, NOT A SECOND ONE. This file used to
@@ -105,6 +231,14 @@ export function createVideoPanel({
    * `null` leaves the stylesheet alone. A page passing nothing is untouched.
    */
   aspect = null,
+  /**
+   * 🔴 NAMED VALUES, IN THE LEFT SLOT, WHICH IS WHERE LEFT ALIGNED LIVES.
+   * `[{ key, label, reserve }]`. See `createPanelValues` at the top of this
+   * file for why the label may be empty and why the row goes left rather than
+   * centre. They sit AFTER the presence dot when there is one, so the fact
+   * about the source still leads the row.
+   */
+  values = null,
 } = {}) {
   if (!FULL_MODES.includes(fullMode)) {
     throw new Error(`video panel: fullMode is one of ${FULL_MODES.join(', ')}, not ${JSON.stringify(fullMode)}.`);
@@ -160,6 +294,9 @@ export function createVideoPanel({
     return s;
   };
   const leftSlot = slot('pos-vp-l', left === undefined ? presence.el : (left || null));
+  // The named values ride in the left slot, beside whatever is already there.
+  const panelValues = values ? createPanelValues(values) : null;
+  if (panelValues) leftSlot.append(panelValues.el);
   const centreSlot = slot('pos-vp-c', centre);
   const rightSlot = slot('pos-vp-r', right === undefined ? fsBtn : (right || null));
   foot.append(leftSlot, centreSlot, rightSlot);
@@ -215,6 +352,8 @@ export function createVideoPanel({
     slots: { left: leftSlot, centre: centreSlot, right: rightSlot },
     /** The default badge, or null when a page supplied its own left slot. */
     presence,
+    /** The named value row, or null. `values.set('fps', '30.0')`. */
+    values: panelValues,
     /**
      * Join blocks UNDER this panel so the panel and they read as one surface.
      *

@@ -319,6 +319,32 @@
   });
   FS.watch(pane, () => {});
 
+  /**
+   * 🔴 THE BADGE WHERE THE CLOCK USED TO BE SAYS `on air`, AND WHAT MAKES IT
+   * TRUE IS BLOCKS ARRIVING. Asked 2026-09-20: *"For videoradio use std online
+   * insicator with 'on air'"*. It was a `LIVE` chip, a word drawn because this
+   * page passed `live: true` at build time, so it stood whether or not the
+   * mount behind it was sending anything. This page already knows better than
+   * that: `openStream` gives a mount nine seconds to produce a block and drops
+   * it if it does not, so the page has been measuring the thing the word was
+   * claiming and had nowhere to show it.
+   *
+   * ⚠️ FED FROM `stream.stats().blocks`, IN THE READOUT TICK BELOW, so it
+   * reports audio this page has in hand rather than a station it meant to open.
+   * ⚠️ `since: null`, because silence is not evidence until a stream is open,
+   * so before play the badge reads `unknown` rather than `off air`.
+   * ⚠️ AND `tuning in` EXPIRES ONE SECOND BEFORE THE PAGE GIVES UP ON THE
+   * MOUNT, which is the same fact told twice on purpose: the badge says `off
+   * air`, and a moment later the log says which mount was dropped and why.
+   */
+  const onAir = bar.api.live;
+  const onAirIdle = () => onAir.follow({ everyMs: 1000, misses: 4, since: null, comingMs: 8000 });
+  onAirIdle();
+  // blocks decoded off the open stream. -1 means there is no stream. A count is
+  // only comparable against itself, so every new stream starts from -1 or the
+  // old station's total would have to be passed before the badge said anything.
+  let heardMark = -1;
+
 
 
   // 🔴 NO IDLE FADE. It hid the control row after three seconds of no pointer,
@@ -1802,6 +1828,10 @@
   }
   function openStream() {
     closeStream();
+    // A mount has been asked for and nothing has come back yet, which is the
+    // one state between `unknown` and an answer. The mark starts over with it.
+    onAir.coming();
+    heardMark = -1;
     const mine = createMp3Stream(ctx, {
       url: srcOf(BASE, station),
       onTitle: (t) => { if (/[\p{L}\p{N}]/u.test(t)) d.log(`now playing: ${t}`, 'hi'); },
@@ -2564,6 +2594,15 @@
   // ── the readout, at human pace ─────────────────────────────────────────────
   let grainsSeen = 0, grainsAt = performance.now();
   setInterval(() => {
+    // 🔴 THE `on air` BADGE, AND IT IS FED ABOVE THE `started` GUARD ON
+    // PURPOSE. A stream that has gone away has to be noticed whether or not the
+    // page is still meant to be playing, and this is the one place that reads
+    // the block count at all.
+    {
+      const heard = stream ? stream.stats().blocks : -1;
+      if (heard > heardMark) onAir.seen();
+      heardMark = heard;
+    }
     // ⚠️ NOTHING IS WRITTEN BEFORE PLAY. A readout full of numbers over a page
     // that has not started is a row of confident measurements of nothing, and
     // mount() already draws a pending cell as empty rather than as a zero.
