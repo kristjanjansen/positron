@@ -62,13 +62,30 @@ parts of this document need a version you may not have.**
 ### 1.0 The headline, so nobody has to read the tables to get it
 
 🔴 **MODEL 12: THE MIDI MAP IN §4 IS IDENTICAL FROM V1.00 ONWARD. THE VERSION
-QUESTION DOES NOT BLOCK ANY RIGGING IN THIS PLAN.** 📄 DOC, and this is a
-reading of the COMPLETE cumulative release notes rather than a summary of them:
-across thirteen firmware versions, **not one entry mentions MIDI Clock, MTC,
-SPP, the MIDI ports, or the message set.** The only DAW control entry in the
-whole history is V1.30, which added three DAW names to a menu. MCU and HUI
-emulation, MIDI TIMECODE, MIDI CLOCK/SPP and the DIN thru behaviour were all
-there at launch. **Whatever version is on that unit, §4 describes it.**
+QUESTION DOES NOT BLOCK ANY RIGGING IN THIS PLAN.** Two independent checks,
+which is the point, because one of them is an argument from absence and on its
+own that is weak.
+
+1. 📄 DOC, the COMPLETE cumulative release notes read in full rather than
+   summarised: across every documented release from V1.01 to V1.50, **the
+   string "MIDI" does not appear once**. The only DAW control entry in the
+   whole history is V1.30, which added three DAW names to a menu.
+2. 🔴 **AND THE POSITIVE CHECK, WHICH IS THE ONE THAT SETTLES IT.** The
+   earliest Owner's Manual, document code 042100800, **internally dated
+   2020/01/27**, predates V1.01 and therefore describes the unit as it shipped.
+   It already documents MIDI TIME CODE, MIDI CLOCK/SPP and DAW CONTROL with six
+   DAWs, and its MIDI functions paragraph is **word for word identical** to the
+   current Rev H manual printed in 2026:
+   *"This unit can generate MIDI TIME CODE and MIDI CLOCK when the recorder is
+   playing back or recording. The generated MIDI data is output from the MIDI
+   OUT connector and simultaneously sent to a computer connected by USB."*
+   ⚠️ It also has **no** VAMP and **no** OUTPUT DELAY, which V1.10 and V1.20
+   added, so it really is the V1.00 baseline rather than an undated reprint.
+
+**Whatever version is on that unit, §4 describes it.** ⚠️ What cannot be ruled
+out is an undocumented byte level change TASCAM never wrote up. There is no
+evidence of one and no release note in this ecosystem would necessarily
+disclose it.
 
 ⚠️ **Two releases DO change things that matter to rigging, and one of them is a
 bug you could be sitting on.** §1.5 marks them. Neither is MIDI.
@@ -272,25 +289,37 @@ information, song information and the firmware version."*
 
 📄 DOC. Read first hand out of TASCAM Europe's cumulative release notes file,
 `Model12_v150_en.txt`, which carries the whole history in one document.
-⚠️ **The notes carry dates only from V1.30 onward.** Everything earlier is
-undated in TASCAM's own file, so no date is given here rather than a guessed
-one.
+
+⚠️ **TASCAM'S OWN FILE DATES NOTHING BEFORE V1.30.** The dates for V1.01 and
+V1.23 below were recovered from TASCAM's own US news pages through the Internet
+Archive, because **the live URLs now 404**. The approximate dates for V1.10 and
+V1.20 are 🌐 THIRD PARTY, from trade press reporting a TASCAM press release, and
+are marked with a tilde. **V1.11, V1.21 and V1.22 have no date from any
+source** and are left undated rather than interpolated.
 
 | version | date | what it brought | matters here |
 |---|---|---|---|
-| **1.00** | launch | the unit as shipped. DAW control with MCU and HUI, MIDI TIMECODE, MIDI CLOCK/SPP, DIN thru, 12 in / 10 out USB audio | 🔴 **the whole of §4 is already true here** |
-| **1.01** | undated | use on Windows with two-channel audio applications including OBS Studio. **WAV files are now created read-only** so a DAW cannot alter them | ⚠️ **one way**: *"Songs created using firmware V1.01 cannot be loaded by firmware V1.00"* |
-| **1.10** | undated | VAMP playback, **new metronome functions**, new count-in click pattern | ⚠️ **the metronome is what the MIDI Clock rides on**, §4.2 |
+| **1.00** | ~Feb 2020 | the unit as shipped. DAW control with MCU and HUI and **six** DAWs, MIDI TIMECODE, MIDI CLOCK/SPP, DIN to USB bridging, 12 in / 10 out USB audio | 🔴 **the whole of §4 is already true here** |
+| **1.01** | **7 May 2020** | use on Windows with two-channel audio applications including OBS Studio. **WAV files are now created read-only** so a DAW cannot alter them | ⚠️ **one way**: *"Songs created using firmware V1.01 cannot be loaded by firmware V1.00"* |
+| **1.10** | ~30 Jun 2020 | VAMP playback, **new metronome functions**, new count-in click pattern | ⚠️ **the metronome is what the MIDI Clock rides on**, §4.2 |
 | **1.11** | undated | *"The control precision of faders and knobs has been increased and made easier to use"* | ⚠️ ⚖️ possibly the resolution an MCU fader reports, §4.4 |
-| **1.20** | undated | **OUTPUT DELAY**, audio delay compensation for the MAIN mix USB and analog MAIN outputs | rigging |
+| **1.20** | ~16 Dec 2020 | **OUTPUT DELAY**, audio delay compensation for the MAIN mix USB and analog MAIN outputs | rigging |
 | **1.21** | undated | delay effect no longer has a short initial delay sound at long delay times | no |
 | **1.22** | undated | firmware revised *"to handle some IC changes"*. ⚠️ TASCAM's own note: *"If a Model12 is using firmware V1.21, there is no need to update it to V1.22"* | a hardware revision build, not an upgrade |
-| **1.23** | undated | 🔴 fixes a **V1.22 bug where USB audio mode STEREO MIX would not send output correctly to the computer**; fixes initialize not resetting STEREO MIX; improves S/N with EQ engaged | 🔴 **see the warning below** |
+| **1.23** | **15 Nov 2021** | 🔴 fixes a **V1.22 bug where USB audio mode STEREO MIX would not send output correctly to the computer**; fixes initialize not resetting STEREO MIX; improves S/N with EQ engaged | 🔴 **see the warning below** |
 | **1.30** | 8 Dec 2021 | **PreSonus Studio One, Cockos REAPER and Steinberg Cubasis 3.3 added to DAW control**; MAIN MIX PRE added to PHONE SOURCE; **OUTPUT PAD** for MAIN and SUB outputs | 🔴 **the only DAW control change in the product's life** |
 | **1.40** | 24 Aug 2023 | 🔴 **USB 1/2 return can now land on mixer channels 9/10 or the MAIN bus, not just channels 1/2**; track normalization from −20 to 0 dB; **analog input gain boost** | 🔴 rigging, see below |
 | **1.41** | 13 Sep 2023 | fixes **gain boost not being applied to channels 1-8 of the USB audio outputs to a computer** | 🔴 only bites if you are on 1.40 |
 | **1.42** | 3 Jun 2024 | operation stability | no |
 | **1.50** | 18 Jun 2025 | meter bridge display in the ModelMixer Settings Panel V2.20; **MAIN metering point on the LCD moved from MAIN post-fader to MAIN bus pre-fader**; stability | a metering change, not a signal change |
+
+🔴 **AND TASCAM CONTRADICTS ITSELF ABOUT WHEN VAMP ARRIVED.** The cumulative
+release notes put VAMP playback in **V1.10** and describe V1.11 as a fader and
+knob precision fix only. The V1.30 press release says *"a VAMP playback
+function was added with the V1.11 firmware update"*. **Both are TASCAM.** The
+release notes are the more granular document and are followed here, and the
+discrepancy is recorded rather than resolved, because resolving it would mean
+picking one on plausibility. It changes nothing in this plan: VAMP is not MIDI.
 
 🔴 **THE ONE TO CHECK FOR, IF YOU ARE ON AN EARLIER RELEASE: V1.22.** TASCAM's
 own words are that on V1.22, *"if USB audio mode: STEREO MIX was selected,
@@ -317,19 +346,52 @@ SD card**, which the manual describes as *"used when updating the unit system"*.
 The card is reachable from a computer through the unit's own **STORAGE** menu
 item, so no card reader is needed.
 
-🔴 **NO WINDOWS REQUIRED.** The transfer is USB mass storage and the flash
-happens on the unit. ⚠️ The Windows and macOS **ModelMixer Settings Panel** is a
+🔴 **NO WINDOWS AND NO MAC SOFTWARE REQUIRED.** The transfer is USB mass
+storage and the flash happens on the unit, driven by its own buttons. Any
+computer with a USB port can do step 3. ⚠️ The Windows and macOS **ModelMixer Settings Panel** is a
 separate thing, currently V2.20, and 📄 DOC gives its reason for existing on a
 Mac as update notifications and, since V2.20, a meter bridge display. It is not
 a driver.
 
-🔌 **The exact button combination to enter update mode is not in the Owner's
-Manual** and lives in TASCAM's per-release update instructions. Not reproduced
-here rather than guessed.
+📄 DOC, the full procedure, out of TASCAM's own `Model12_fw-update_en.pdf`,
+which is a separate document from the Owner's Manual. **The first draft of this
+section said the button combination was not published. It is, just not where I
+looked.**
 
-⚠️ **Updating touches the card the songs are on.** Back the SD card up first.
-That is not in any TASCAM warning found; it is ordinary caution about writing a
-system file into a folder that sits beside the recordings.
+1. Download the firmware and decompress it.
+2. **An SD card must be loaded.** Turn the unit on and connect it to the
+   computer over USB, **directly and not through a hub**, which is the same
+   instruction §6.10 records.
+3. MENU, then **STORAGE**, then **F4**. The unit mounts as a drive called
+   **`TASCAM_M`**.
+4. Copy the firmware file, named like `Model12_XXXX.XXX`, into the **`UTILITY`
+   folder**.
+5. Unmount properly, **F1**, power off.
+6. **Power on holding the `8` and stop buttons together.** That is update mode.
+7. Jog to the file and press the dial. The screen shows **the current version
+   on the left and the update version on the right**.
+8. **F4** starts it, **F1** cancels.
+9. Power cycle, then re-read the version by §1.4 to confirm it took.
+10. Reconnect and **delete the firmware file from `UTILITY`**.
+
+🔴 **AND THERE IS A MAC SPECIFIC TRAP IN TASCAM'S OWN DOCUMENT, WHICH MATTERS
+BECAUSE THIS IS NOW A MAC PLAN.** Copying the file from a Mac leaves a shadow
+file beside it whose name begins `._`. The instructions say to select the file
+**without** the `._` prefix. A `._Model12_XXXX.XXX` picked by mistake is a
+failed update with a confusing screen.
+
+🔴 **THE CAUTION IS ABOUT BRICKING, VERBATIM:**
+
+> *"Be careful not to let the power be interrupted during the update."*
+> *"Do not load or remove SD cards during the update."*
+> *"If the power is interrupted or an SD card is loaded or removed during the
+> update, the unit might become unstartable."*
+
+⚠️ **Nothing in TASCAM's documents says an update erases songs or settings**,
+and the update only writes into `UTILITY`. Backing the card up first is still
+ordinary caution rather than a documented requirement. The one documented file
+incompatibility runs the other way: a song written under V1.01 or later cannot
+be read by V1.00, so the risk is in **downgrading**, not upgrading.
 
 🔴 **AND NONE OF THE RIGGING IN §9 NEEDS THE UPDATE EITHER.** Every Model 12
 test in §9 works on V1.00. The update buys the USB return routing of 1.40 and,
@@ -838,7 +900,7 @@ is `MIDIIN2 (Model 12 MIDI)` and `MIDIOUT2 (Model 12 MIDI)`, also written
 ⚖️ INFERRED, because the manual never names it: there is a port 1, and it is
 the DIN pair. 🔌 NEEDS THE HARDWARE to read the actual strings.
 
-### 4.2 The general MIDI ports: a thru box with a clock bolted on
+### 4.2 The general MIDI ports: a USB MIDI interface with a clock bolted on
 
 📄 DOC, Owner's Manual rear panel:
 
@@ -853,6 +915,21 @@ the DIN pair. 🔌 NEEDS THE HARDWARE to read the actual strings.
 **So the DIN pair is a USB MIDI interface**: DIN IN goes to the computer, the
 computer goes to DIN OUT, and the unit's own generated clock is mixed into DIN
 OUT and sent to the computer as well.
+
+🔴 **AND "THRU" IN THAT CHART IS NOT A SOCKET. THERE IS NO MIDI THRU JACK ON
+THIS UNIT.** The word appears in the Remarks column of every row of the MIDI
+Implementation Chart and **nowhere else in the manual**, checked by searching
+the whole text. There are two DIN sockets, IN and OUT, and that is the lot.
+What "Thru" means in that column is the USB bridging described above, not a
+hardware path from DIN IN to DIN OUT. ⚖️ INFERRED, and worth stating because
+the word invites the other reading: **a message arriving on DIN IN goes to the
+computer and does not reappear on DIN OUT** unless the computer sends it back.
+
+⚠️ **THE MENU PATH IS A TOP LEVEL `MIDI` GROUP, NOT A CHILD OF `MTR`.** 📄 DOC,
+the manual's own menu structure table: `MTR` holds TRACK EDIT, AUTO PUNCH and
+A.PUNCH PRE ROLL, and `MIDI` is the next group down, holding MIDI TIME CODE and
+MIDI CLOCK/SPP. Checked because §9 test 3.1 tells somebody to go and switch one
+of them on.
 
 📄 DOC, the **MIDI Implementation Chart, chapter 14**, with the legend printed
 on the same page as `–: YES` and `—: NO`:
@@ -2063,6 +2140,26 @@ above to confirm the MIDI charts are unchanged:
   <https://cf.tascam.com/wp-content/uploads/downloads/products/tascam/model_12/model-12_om_efs_vh4.pdf>
 - Tascam Model 12 DAW Control Mode Manual, newest revision
   <https://cf.tascam.com/wp-content/uploads/downloads/products/tascam/model_12/e_model-12_daw_control_om_vc.pdf>
+- Tascam Model 12 firmware update procedure, the source for §1.6's steps, the
+  `._` shadow file trap and the bricking caution
+  <https://www.tascam.eu/sw/model12/Model12_fw-update_en.pdf>
+- Tascam Model 12 Owner's Manual, **document code 042100800, internally dated
+  2020/01/27**, the pre-V1.01 baseline that §1.0's positive check rests on
+  <https://www.avc-group.com/assets/products/Tascam/pdfs/tascam-um-model12.pdf>
+  ⚠️ Hosted by a distributor rather than by TASCAM, because TASCAM does not
+  serve superseded manual revisions. It is a TASCAM document by its own
+  document code and print date, and it is used for exactly one thing: showing
+  that MIDI TIME CODE, MIDI CLOCK/SPP and six DAW targets predate V1.01, while
+  VAMP and OUTPUT DELAY do not appear in it.
+- Tascam Model 12 announcement pages for V1.01 and V1.23, **recovered from the
+  Internet Archive because the live URLs now 404**, and the source for those
+  two dates in §1.5:
+  `web.archive.org/web/20200813105419/https://tascam.com/us/support/news/6247`
+  and
+  `web.archive.org/web/20211129000030/https://tascam.com/us/support/news/6754`
+- Tascam Model 12 V1.30 announcement, also via the Internet Archive, the source
+  for the six original DAW targets and for the VAMP discrepancy in §1.5:
+  `web.archive.org/web/20220118183810/https://tascam.com/us/support/news/6787`
 
 Platform documentation, for §6.3:
 
@@ -2100,6 +2197,10 @@ Weaker, and labelled as such wherever used:
   <https://www.soundonsound.com/reviews/tascam-model-12>
 - midi.guide Novation Circuit page, used only to corroborate CC 80 to 87
   <https://midi.guide/d/novation/circuit/>
+- Trade press for the approximate dates of Model 12 V1.10 and V1.20, which have
+  no date in any TASCAM document: Music Connection Magazine (30 June 2020) and
+  Music Instrument News (16 December 2020), both reporting a TASCAM press
+  release. Marked with a tilde in §1.5 for that reason.
 - Trade press for the Circuit's 1.0 to 1.5 feature lists and every date before
   1.6, since no Novation hosted changelog for that era survives: Synthtopia,
   KVR Audio, Sweetwater inSync, Attack Magazine, MusicRadar, Sonic State, Fact

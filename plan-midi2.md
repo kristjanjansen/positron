@@ -725,6 +725,46 @@ tables above are UNCONFIRMED beyond it. A four-person jam is ESTIMATED at 800
 inbound and 3,200 sends a second. **Nobody has measured a room under MIDI-shaped
 load at all**, and `demo/perf-wire.mjs` is the tool that would.
 
+### 5.3b Network MIDI 2.0 has no timestamps, and a 2011 standard beats it
+
+🌐 THIRD PARTY, read from the specification itself rather than from coverage.
+**M2-124-UM, "User Datagram Protocol for Universal MIDI Packets", v1.0,
+published 2024-11-20.** The word `timestamp` appears **zero** times in it.
+
+What it does carry: DNS-SD over mDNS for discovery, UDP session management
+(invitation, authentication, reset, NAK, bye), sequence numbers for loss
+detection and retransmission, and a ping with a 32-bit id purely for round trip
+measurement. Its scope is explicitly a LAN: *"Other IP transports like UDP over
+Bluetooth or the Internet are not supported by this specification."*
+
+Any timing in Network MIDI 2.0 therefore has to come from JR Timestamps carried
+as UMP messages inside the stream, and §2 already records that nothing
+implements those. Microsoft's own position, verbatim: *"Client applications
+should not send JR timestamps now or in the future."*
+
+🔴 **AND THE COMPARISON IS UNFLATTERING.** RFC 6295, "RTP Payload Format for
+MIDI", **June 2011, Proposed Standard**, gives every MIDI command a delta time,
+at the negotiated RTP clock rate rather than a fixed one, so **sample accurate
+timestamps are available**. It also carries a recovery journal that codes stream
+history back to a checkpoint, with the mandate that *"the MIDI performance
+rendered from an RTP MIDI stream sent over unreliable transport MUST NOT contain
+indefinite artifacts."* AppleMIDI adds full clock synchronisation on top: 64-bit
+timestamps in units of 100 microseconds, a three packet offset exchange at least
+once every 60 seconds, and Apple's own claim of **1 to 2 ms** accuracy on a
+local network.
+
+So a 2011 IETF standard and a 2010-era driver protocol both give per event
+timestamps, a shared clock with a measured offset, and loss recovery. The 2024
+Network MIDI 2.0 specification gives discovery, sessions, sequence numbers and a
+ping.
+
+⚠️ **WHAT THIS MEANS FOR US IS NOT "USE RTP MIDI".** It means the timing story
+is not a reason to move off our own relay, because the thing MIDI 2.0's own
+network transport would hand us is weaker than what we have. Our relay's Durable
+Object hop is 1 to 2 ms at p50, measured in this repo, which is the same order
+as AppleMIDI's whole claimed accuracy. **The reason to want timestamps is
+scheduling, and that is the timeline's job here and already is.**
+
 ### 5.4 "CF UDP": checked properly, and the answer is still no
 
 CLAUDE.md's measured line is *"a relay cannot live in a Container (no inbound
