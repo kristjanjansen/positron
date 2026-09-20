@@ -622,7 +622,28 @@ function stopAudio() {
 // 20 ms audio frame, so a value that matters is never held long enough to be
 // heard as lateness.
 const DRAIN_MS = 5;
-const ctl = { pending: new Map(), timer: null, ch: 0, in: 0, out: 0, folded: 0, since: Date.now() };
+/**
+ * 🔴 `last` IS WHAT THIS BOARD IS ACTUALLY SET TO, AND ITS ABSENCE COST THREE
+ * SESSIONS. The output level collapsed to 0.0010-0.0035 of full scale on
+ * 2026-09-17 and stayed unexplained until 2026-09-20, when driving CC 7 down
+ * over the relay reproduced both ends of that range to two digits: 32 gives
+ * 0.00330, 4 gives 0.00113. **A part volume left at 8 was invisible to every
+ * client**, because `ctlMeter` counted messages and named no controller, no
+ * value and no sender. Three counters that all read healthy while the one fact
+ * that mattered was not on the wire at all.
+ *
+ * ⚠️ IT RECORDS WHAT WAS WRITTEN, NOT WHAT ARRIVED. A value that was folded
+ * away was overtaken before it reached the instrument, so reporting it would be
+ * reporting a knob position the hand had already left. `out` counts the writes
+ * and `last` is where they left each controller.
+ *
+ * ⚠️ AND IT NAMES THE SENDER, because "who turned this down" is the other half
+ * of the question and a shared board has more than one hand on it. `from` is
+ * the relay's per-socket id, which changes on reconnect, so it answers "was
+ * that me" rather than "who is that person".
+ */
+const ctl = { pending: new Map(), last: new Map(), by: new Map(), timer: null, ch: 0,
+              in: 0, out: 0, folded: 0, since: Date.now() };
 
 function ctlDrain() {
   if (ctl.timer) return;                         // one drain in flight is enough
@@ -633,7 +654,13 @@ function ctlDrain() {
     // values for an instrument that may never start is how a knob turned before
     // `audio.start` arrives at the synth ten minutes later.
     if (!inst) { ctl.pending.clear(); return; }
-    for (const [c, v] of ctl.pending) { inst.cc(ctl.ch, c, v); ctl.out++; }
+    for (const [c, v] of ctl.pending) {
+      inst.cc(ctl.ch, c, v);
+      ctl.out++;
+      // Recorded at the WRITE, which is the only moment this board knows the
+      // instrument was actually told something.
+      ctl.last.set(c, { v, at: Date.now(), by: ctl.by.get(c) ?? null });
+    }
     ctl.pending.clear();
   }, DRAIN_MS);
   ctl.timer.unref?.();
@@ -642,9 +669,43 @@ function ctlDrain() {
 /** What the page displays: what arrived, what was written, what was overtaken. */
 function ctlMeter() {
   const forMs = Date.now() - ctl.since;
+  const now = Date.now();
+  /**
+   * 🔴 THE CONTROLLERS THIS BOARD IS SET TO, BY NUMBER, NEWEST FIRST. Sorted by
+   * when rather than by controller, because the question being asked is almost
+   * always "what did I just change" or "what did somebody else change".
+   * ⚠️ `name` IS ONLY FILLED WHERE IT IS KNOWN TO BE TRUE ON THIS INSTRUMENT.
+   * CLAUDE.md records that Yoshimi does NOT use the General MIDI map: 76 and 77
+   * are FM amplitude and resonance centre here, not vibrato rate and depth, and
+   * a confident wrong label is worse than none.
+   */
+  const set = [...ctl.last.entries()]
+    .map(([c, r]) => ({ ctrl: c, value: r.v, agoMs: now - r.at, by: r.by,
+                        name: CTL_NAMES[c] ?? null }))
+    .sort((a, b) => a.agoMs - b.agoMs);
   return { in: ctl.in, out: ctl.out, folded: ctl.folded, forMs,
-           on: inst ? inst.source : null, channel: ctl.ch };
+           on: inst ? inst.source : null, channel: ctl.ch,
+           set,
+           // 🔴 THE ONE THAT IS ALWAYS WORTH LOOKING AT FIRST. Volume is the
+           // controller that makes an instrument sound broken rather than
+           // different, and it is the one nobody thinks to check. `null` means
+           // this board has not been told a volume since it started, which is
+           // NOT the same as 127 and must not read as it.
+           volume: ctl.last.has(7) ? ctl.last.get(7).v : null };
 }
+
+/**
+ * Controller numbers whose meaning is MEASURED on this instrument, not assumed.
+ * 🔴 YOSHIMI DOES NOT USE THE GENERAL MIDI MAP and this table exists to stop
+ * anybody writing one from memory: 76 and 77 are FM amplitude and resonance
+ * centre in the ZynAddSubFX family, not vibrato rate and depth, and measuring
+ * them showed 0.2 cents of movement at every value, which is the tracker's own
+ * noise. Anything not listed here is reported by NUMBER, with no name.
+ */
+const CTL_NAMES = {
+  7: 'volume', 11: 'expression', 71: 'filter Q', 74: 'filter cutoff',
+  75: 'bandwidth', 76: 'FM amplitude', 77: 'resonance centre', 78: 'resonance bandwidth',
+};
 
 // ---------------------------------------------------------------- requests
 //
@@ -797,6 +858,7 @@ async function handle(msg) {
         ctl.in++;
         if (ctl.pending.has(c)) ctl.folded++;      // this one overtook another
         ctl.pending.set(c, v);
+        ctl.by.set(c, msg.from ?? null);           // whose hand was last on it
       }
       ctlDrain();
       // NO ACK PER VALUE. `ctl.meter` says what happened, once a second.
