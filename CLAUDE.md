@@ -1522,7 +1522,7 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
     wrong order. Notes belong on the boxes that do something and on the arrows
     between them. Reported as noise on three containers at once.
   - 🔴 **A DIAGRAM OPENS A SECTION AND SITS 44 px BELOW WHAT PRECEDES IT.**
-    Not the body's ordinary 22 px rhythm: a picture of the machinery is a new
+    Not the body's ordinary 40 px rhythm: a picture of the machinery is a new
     part of the page, the way `.pos-how` already is. The number is declared once
     in `shell.css` on `.pos-body > .pos-dg`, so a page that brings its own
     `title` and a page that uses the standing heading cannot end up at two
@@ -1969,12 +1969,32 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
   `.pos-controls[hidden]` already handles an empty control row that was leaving
   a 14 px band behind. A container with nothing in it must not paint its edges.
 - 🔴 **VERTICAL SPACING IS A RULE, NOT A PER-PAGE DECISION.** Elements on a demo
-  page do not sit tight against each other. `shell.css` sets ONE rhythm —
-  `.pos-body > * + * { margin-top: 22px }` — on the GAP BETWEEN siblings rather
-  than on each element's own margin, so a lone element carries no gap to
-  nothing and two adjacent ones cannot disagree about how much air is between
-  them. A page that needs a different gap somewhere is a page making a claim
-  about that one relationship, and it says so in a comment. ⚠️ The failure this
+  page do not sit tight against each other. `shell.css` sets ONE rhythm and a
+  page that needs a different gap somewhere is a page making a claim about that
+  one relationship, which it says so in a comment.
+  ⚠️ **THE SELECTOR AND THE NUMBER WRITTEN HERE WERE BOTH STALE AND WERE
+  CORRECTED 2026-09-20 BY READING THE STYLESHEET.** This said the rhythm was
+  `.pos-body > * + * { margin-top: 22px }`. It is **`--pos-gap: 40px`**,
+  declared once at `shell.css:49`, applied by `.pos-stack` as a `margin-bottom`
+  on every child but the last, with `margin-top: 0` forced on every child but
+  the first. `shell.css`'s own comment says why the old one went: `.pos-body >
+  * + *` reached ONE element's direct children and nothing else, it LOST to
+  `.kbd`'s (0,1,0) on source order, and a row spliced onto `document.body` got
+  no rhythm at all.
+  ⚠️ **IT IS OWNED ON BOTH SIDES BY A CONTAINER, WHICH IS THE PART THAT
+  MATTERS.** A sibling rule can be beaten by a page; a container that sets both
+  the bottom margin and the top one leaves nothing for a page to disagree with.
+  🔴 **AND A PAGE WITH NO SIBLINGS GETS NO RHYTHM, WHICH IS HOW `/held/` SHIPPED
+  GLUED.** MEASURED 2026-09-20: `.pos-body` had **exactly one child**, a single
+  `.pos-glue` holding the picture, the transport bar and the strip, so the gap
+  list came back EMPTY. The rule was working perfectly and had nothing to act
+  on. **Before hunting for a rule that lost, count the siblings**: two elements
+  touching usually means they are not siblings at all.
+  ⚠️ **`createGlue` IS FOR THE ONE PAIR IT WAS WRITTEN FOR**, a strip sitting on
+  the transport bar that drives it, and its own header says so. *"One deck
+  drives both"* is true of the log as well and proves too much. Inside a glue
+  the children give up their border and radius, so a picture in one has nothing
+  to say where its box ends. ⚠️ The failure this
   fixes is not ugliness: a pad, a strip, a transport bar, a knob row and a log
   with nothing between them read as ONE dense block, and a reader cannot tell
   which control belongs to which picture.
