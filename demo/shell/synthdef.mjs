@@ -2,7 +2,7 @@
 // both directions: written here, read back here, and upgraded from the old
 // layout to the one a 2026 SuperCollider writes.
 //
-// WHY THIS EXISTS. `plan-visuals.md` §1.2 says a fragment shader is a
+// WHY THIS EXISTS. `plans/plan-visuals.md` §1.2 says a fragment shader is a
 // DOCUMENT — "~2 KB of GLSL plus ~200 bytes of parameters reproduces it at any
 // resolution" — and that generated GLSL is a defensible thing to send across a
 // wire. The sound half of that argument had never been written down. A

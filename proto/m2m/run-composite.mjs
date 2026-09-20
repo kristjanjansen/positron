@@ -5,7 +5,7 @@
 // canvas 1280x720) + composite-viewer.html (own Chrome).
 //
 // ROUTE=A  composite page publishes canvas.captureStream via WHIP (in-page).
-//          Viewer plays WHEP (WHIP ingest is not HLS-playable, plan.md §2.2).
+//          Viewer plays WHEP (WHIP ingest is not HLS-playable, plans/plan.md §2.2).
 // ROUTE=B  CDP Page.startScreencast -> ffmpeg (mjpeg pipe) -> RTMPS.
 //          Viewer plays LL-HLS (RTMPS ingest is not WHEP-playable).
 //

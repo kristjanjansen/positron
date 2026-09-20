@@ -1,11 +1,11 @@
 # elektron-rtc build notes
 
 Working log for the phase-2 signaling worker (RtcRoom DO + SFU proxy + snapshot tiles).
-Spec: plan-m2m.md §3; template: workers/cues (deployed, untouched).
+Spec: plans/plan-m2m.md §3; template: workers/cues (deployed, untouched).
 
 ## Checkpoints
 
-- **2026-08-26 07:14** — Context read (plan-m2m.md, workers/cues/src/index.js, proto/m2m/server.py).
+- **2026-08-26 07:14** — Context read (plans/plan-m2m.md, workers/cues/src/index.js, proto/m2m/server.py).
   Tooling verified: node v25.9.0 (global WebSocket — no ws dep needed), wrangler 4.75.0 (homebrew),
   auth OK via `CLOUDFLARE_API_TOKEN` = `CF_API_TOKEN` from .env (same path the cues deploy used;
   account cached in workers/cues/.wrangler/cache). Created workers/rtc/. Next: source.

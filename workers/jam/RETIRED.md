@@ -13,7 +13,7 @@ storage" — so there was no Durable Object state to abandon, unlike `elektron-r
 (roster, perms, cuelog, tiles) or `elektron-view` (the durable ERR cache).
 
 The source is kept because the measured numbers cite it by name:
-**34.5–34.9 ms p50** (plan-looper.md, proto/jam/NOTES.md) against cues' 37.8 and
+**34.5–34.9 ms p50** (plans/plan-looper.md, proto/jam/NOTES.md) against cues' 37.8 and
 the SFU's 16.1. Those records keep the `elektron-jam` name — they say what was
 measured, and rewriting them would make them false.
 

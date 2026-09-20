@@ -19,7 +19,7 @@ Provenance marks: ✅ verified here / 📄 documented / ⚠️ inferred.
   **No rustup.rs installer was run and no machine change was made for the MoQ work** — builds use
   `PATH="/opt/homebrew/opt/rustup/bin:$PATH" cargo …`. (If ever removing rust entirely:
   `brew uninstall rustup && rm -rf ~/.rustup ~/.cargo`.)
-- Established (from plan.md, prior sessions):
+- Established (from plans/plan.md, prior sessions):
   - ✅ `draft-16.cloudflare.mediaoverquic.com` → 162.159.207.2; draft-14 → .5; draft-18 NXDOMAIN.
   - 📄 FETCH and GOAWAY unimplemented → live-edge fan-out only.
   - 📄 Auth = bearer token in URL path; tokens shown once at creation.
@@ -114,7 +114,7 @@ This is the ONLY way to create a relay until Cloudflare publishes the MoQ API pe
   `parking_lot_core` build scripts, exit 101 after ~2–20 s).
 - ✅ Root cause isolated with a 1-line C program: `cc t.c -o t && ./t` → **exit 137 (SIGKILL)**.
   **ThreatLocker** (running: system extension `com.threatlocker.app.agent`, PID 559) kills ANY
-  unapproved freshly compiled native binary — same mechanism that killed OBS (plan.md §15).
+  unapproved freshly compiled native binary — same mechanism that killed OBS (plans/plan.md §15).
   **Compiling rust (or C, or go) natively on this machine is a hard blocker. No bypass attempted**
   (per standing rule). Approved-path binaries (brew ffmpeg/mediamtx, rustup toolchain) run fine —
   the *compiler* runs; its *output* is killed.
@@ -368,7 +368,7 @@ decoded-frame-drawn-to-canvas wall time − burned wall time):
 - Sustained ✅ **30.3 fps at 1280x720 for the full 90 s** (STATS every 10 s: 303 frames/10 s
   flat), **0 checksum failures, 0 decode errors, 0 encoder drops**. Only the single first
   frame was join catch-up (1459 ms, open-group replay).
-- vs WebRTC (plan.md §2.2: 74 ms p50 / 83 p95 glass-to-glass): **~3x lower p50**. ⚠️ method
+- vs WebRTC (plans/plan.md §2.2: 74 ms p50 / 83 p95 glass-to-glass): **~3x lower p50**. ⚠️ method
   caveat: this rig measures burn→decoded-frame-on-canvas (no display); WHEP's number included
   display (`expectedDisplayTime`). Add ~one vsync (8–16 ms) for a fair comparison → ~35–42 ms
   effective — still comfortably under 74 ms. Coheres with §3.6: transport 17.9 + encode/

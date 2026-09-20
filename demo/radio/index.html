@@ -407,7 +407,7 @@
     // the sliders do to a grain, WHICH of the modulations come from the station
     // and which from this page. Every one of those is true, none of them is
     // something somebody arriving here has a use for, and all of them are
-    // written down in comments and in plan-radio.md where a reader who wants
+    // written down in comments and in plans/plan-radio.md where a reader who wants
     // them will look. What is left is the three things CLAUDE.md asks for:
     // what this is, what to move, what the numbers mean.
     // ⚠️ THE SECOND SENTENCE SAYS WHY THE PAGE IS EMPTY, and it is there
@@ -2840,7 +2840,7 @@
   let posMin = Infinity, posMax = -Infinity;
 
   /**
-   * 🔴 A CHORD OUT OF THE STATION — `plan-radio-sound.md` ①.
+   * 🔴 A CHORD OUT OF THE STATION — `plans/plan-radio-sound.md` ①.
    *
    * Pappus has EIGHT grain voices, each with its own gate and its own pitch in
    * semitones (`Engine_Pappus.sc:403-404`). `base = pitches[i]` at `:851` goes
@@ -2870,7 +2870,7 @@
    *
    * A patch here is the WHOLE sound, the way `/grains/`'s six are: which way
    * the read head moves, how long a grain is, which notes are open, and every
-   * setting of the chain underneath. `plan-radio-patches.md` derives all six
+   * setting of the chain underneath. `plans/plan-radio-patches.md` derives all six
    * from `rig/board/norns/Engine_Pappus.sc`; the numbers below are that file's,
    * corrected where building them showed the plan was wrong (see §the buffer).
    *
@@ -2892,7 +2892,7 @@
    * 🔴 THE BUFFER STAYS AT EIGHT SECONDS, AND THE PLAN SAID SIXTY. Read this
    * before raising it.
    *
-   * `plan-radio-patches.md §0.3` argues for holding `mbuflen` at 60 — the ring
+   * `plans/plan-radio-patches.md §0.3` argues for holding `mbuflen` at 60 — the ring
    * is allocated at 60 s (`pappus.mjs:33`) — and moving `mwinstart`/`mwinend`
    * instead, because `wlen` is both the RECORD length and the lap length
    * (`Engine_Pappus.sc:650`), so **switching a patch from 8 s to 45 hands the
@@ -4216,7 +4216,7 @@
   /**
    * What a hand says when it starts and stops, for the log and for nowhere else.
    *
-   * 🔴 SHORT, AND NOT IN THIS PROJECT'S OWN WORDS. `plan-slider-automation.md`
+   * 🔴 SHORT, AND NOT IN THIS PROJECT'S OWN WORDS. `plans/plan-slider-automation.md`
    * calls this an invisible hand and a visitor has never read it, so the line
    * says what happened to the control they can see. A state change belongs in
    * the log: it is the only channel that survives a screenshot taken a minute

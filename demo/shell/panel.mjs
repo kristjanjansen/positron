@@ -1,6 +1,6 @@
 // demo/shell/panel.mjs — a picture with a footer of real numbers under it.
 //
-// `plan-xr-room.md` §2 says the room's panels are "like `mirror`'s: a picture
+// `plans/plan-xr-room.md` §2 says the room's panels are "like `mirror`'s: a picture
 // with a footer of real numbers under it — that already exists as a design and
 // it reads well, so the room borrows rather than invents". This is that design,
 // extracted, so the borrowing is a module rather than a resemblance.
@@ -23,7 +23,7 @@
 // "press play". A panel that has nothing to say says so in words, because a
 // blank cell collapses "we did not look" and "we looked and it was fine".
 //
-// ⚠️ AND A PANEL THAT IS NOT LIVE SAYS SO. `plan-xr-room.md` §5.6: a frozen
+// ⚠️ AND A PANEL THAT IS NOT LIVE SAYS SO. `plans/plan-xr-room.md` §5.6: a frozen
 // frame reads as a broken stream. `state` is drawn where you cannot miss it.
 
 // 🔴 NO PAD AROUND THE PICTURE. A panel in a headset is a SCREEN, and a screen

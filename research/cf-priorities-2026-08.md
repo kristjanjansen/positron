@@ -1,7 +1,7 @@
 # Has Cloudflare abandoned streaming for AI? — Research findings (2026-08-26)
 
 Researched by web agent; all URLs verified at research time. Complements the hands-on
-measurements in plan.md / plan-m2m.md.
+measurements in plans/plan.md / plans/plan-m2m.md.
 
 ## Verdict
 

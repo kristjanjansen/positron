@@ -30,7 +30,7 @@ export const touchOf = (isHeld, isAimed) => (isHeld ? TOUCH.held : isAimed ? TOU
 // demo/shell/xr-panel.mjs — panel.mjs canvases, hung in front of you in a
 // headset, with the frame rate measured while you are standing in them.
 //
-// `plan-xr-room.md` §4.1 is the whole job: "One panel, one transport, measured.
+// `plans/plan-xr-room.md` §4.1 is the whole job: "One panel, one transport, measured.
 // Video→texture cost and fps against the known 89.8. No audio. Answers the
 // question the other seven panels depend on." This is the piece that enters the
 // session and draws the panel; the page supplies the picture.
@@ -221,7 +221,7 @@ const BAR_FS = `#version 300 es
  *
  * ⚠️ PLACED ONCE, IN THE ROOM — not head-locked. A panel that follows your face
  * cannot be looked away from, and looking away is the whole of the gaze-gating
- * in `plan-xr-room.md` §2. It is worth getting right now rather than rebuilding
+ * in `plans/plan-xr-room.md` §2. It is worth getting right now rather than rebuilding
  * when that arrives.
  *
  * Built by hand rather than by multiplying matrices: the quad's local +Z must
@@ -1623,7 +1623,7 @@ export function createXRPanels({
 
     // ── and the panels go to the card ─────────────────────────────────────
     // ⚠️ `texImage2D` EVERY FRAME, ON PURPOSE, because that is the cost
-    // `plan-xr-room.md` §2 asks about ("each panel is a texImage2D from a
+    // `plans/plan-xr-room.md` §2 asks about ("each panel is a texImage2D from a
     // <video> per frame — measure one panel first"). `texSubImage2D` after the
     // first upload would skip the reallocation and is the obvious next lever;
     // measure it against this number rather than instead of it.
@@ -1742,7 +1742,7 @@ export function createXRPanels({
       placed = panels.map((p, i) => placeFacing(
         hm, hp, p.w ?? 1.2, p.h ?? 0.75, p.dist ?? dist,
         // One panel is straight ahead; several fan out around you, which is
-        // where `plan-xr-room.md` §2 is going.
+        // where `plans/plan-xr-room.md` §2 is going.
         n === 1 ? 0 : (i - (n - 1) / 2) * fan));
       grabDist = panels[0]?.dist ?? dist;
     }

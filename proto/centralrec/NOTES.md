@@ -1,6 +1,6 @@
 # proto/centralrec — PROTO B: central per-participant recording (studio pulls all N)
 
-Stress-tests the plan-studio.md "Grid archive" decision (which chose PER-PARTICIPANT
+Stress-tests the plans/plan-studio.md "Grid archive" decision (which chose PER-PARTICIPANT
 SELF-RECORDING) by building the alternative honestly: ONE studio session subscribes to
 every participant's track through the deployed elektron-rtc Worker + Realtime SFU and
 runs a MediaRecorder per remote track. Records what the SFU DELIVERS.

@@ -471,7 +471,7 @@ log('\nOVERDUB — the second layer is played against what came out of the speak
 // ===========================================================================
 // X — THE SESSION: a loop is a VALUE, and two players of it agree
 // ===========================================================================
-// This is plan-looper.md's P0 gate, and it is the whole basis of the remote
+// This is plans/plan-looper.md's P0 gate, and it is the whole basis of the remote
 // looper: if a committed loop round-trips byte-identically and a second process
 // that has never seen the performance plays the SAME events at the SAME
 // positions, then sending it over a network is a delivery problem and not a
@@ -501,7 +501,7 @@ log('\nSESSION — save, reload, and prove the two players agree');
     `and it splits the way score.mjs demands: ${back1.score.quotations.length} quotations naming their sources by ref, ${back1.material.length} material entries carrying the notes — a quotation names its source by IDENTITY, never by object`);
   const perLayerBytes = Math.round(j1.length / looperA.layers.length);
   ok('X1', perLayerBytes < 20000,
-    `SIZE IS THE REMOTE ARGUMENT: ${perLayerBytes} B per layer. plan-looper.md §1 claims a committed loop is a value small enough that delivery latency is irrelevant; this is the number behind that claim`);
+    `SIZE IS THE REMOTE ARGUMENT: ${perLayerBytes} B per layer. plans/plan-looper.md §1 claims a committed loop is a value small enough that delivery latency is irrelevant; this is the number behind that claim`);
 
   // --- a second player, which has never seen the performance ---------------
   const onsetsB = [];

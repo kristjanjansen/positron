@@ -1,6 +1,6 @@
 # Visualising a live MP3 stream in VR — a throbbing, waving floor (2026-09-14)
 
-Companion to `research/quest-xr-2026-09.md` (the headset), `plan-visuals.md`
+Companion to `research/quest-xr-2026-09.md` (the headset), `plans/plan-visuals.md`
 (which side of the wire a picture is made on), and `demo/floor/index.html`
 (an infinite instanced WebXR floor that already exists).
 
@@ -283,7 +283,7 @@ play normally.** The relay at `shout.positron.studio` fixes both. Use it; set
 
 The **visual is in sync with the sound for free**, because both are downstream
 of the same media element — whatever the stream's buffering is (seconds), the
-analyser sees exactly the samples the ears get. This is `plan-visuals.md` §4.2's
+analyser sees exactly the samples the ears get. This is `plans/plan-visuals.md` §4.2's
 rule: *analysis is the right signal for anything that must look like the sound,
 computed in the browser, because that is the only place the picture and the
 sound are on one clock.*
@@ -441,7 +441,7 @@ width**. Geometry slow, light fast.
   are fragment-bound. DOCUMENTED, `research/quest-xr-2026-09.md` §1.3.
 - 🔴 **No full-resolution bloom. Ever, on a 3S.** ESTIMATED from repo numbers:
   one full-screen RGBA8 read+write at 3360×1760 is 47.3 MB/frame → **4.26 GB/s
-  at 90 fps per pass**. `UnrealBloomPass` is **12 passes** (`plan-visuals.md`
+  at 90 fps per pass**. `UnrealBloomPass` is **12 passes** (`plans/plan-visuals.md`
   §2.3, read from source) → **51 GB/s**, which exceeds a Quest 3S's *entire*
   42 GB/s memory bandwidth and most of a Quest 3's 68. **Downsample first:** at
   quarter resolution per axis one pass is 0.27 GB/s and twelve is 3.2 GB/s.

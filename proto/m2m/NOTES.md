@@ -6,7 +6,7 @@ measure per-directed-pair glass-to-glass latency with the house burned-pixel met
 
 ## Checkpoint 1 — API verified ✅ (2026-08-25 23:14)
 
-- Read plan.md §2.2 + entire rig/whep/ (NOTES, publish/play.html, server.py, run.mjs, analyze.py).
+- Read plans/plan.md §2.2 + entire rig/whep/ (NOTES, publish/play.html, server.py, run.mjs, analyze.py).
 - Fetched the official OpenAPI spec: `developers.cloudflare.com/realtime/static/realtime-api-2024-05-21.yaml`
   (saved understanding; base `https://rtc.live.cloudflare.com/v1`, bearer auth = app secret).
   Exact flow confirmed:
@@ -758,7 +758,7 @@ onto ONE 1280x720 canvas at 30 fps with a burned wall-clock row, and the
 CAPTURE of that canvas goes to a RECORDED Stream live input. Route A: the page
 itself publishes canvas.captureStream() via WHIP (pure browser). Route B
 (fallback): CDP screencast -> ffmpeg -> RTMPS to the same input. Known repo
-facts stacked against A's *recording* (📄 plan.md §2.2: Stream-WebRTC has "no
+facts stacked against A's *recording* (📄 plans/plan.md §2.2: Stream-WebRTC has "no
 recording" + no cross-protocol since 2022) — A is tested honestly, B is the
 expected archive path. Port 8895, udd prefix m2m-p3b, results
 results/m2m-p3b-*.jsonl, room p3b-<label> on the DEPLOYED Worker.
@@ -798,7 +798,7 @@ results/m2m-p3b-*.jsonl, room p3b-<label> on the DEPLOYED Worker.
 - **ROUTE A RECORDING: DOES NOT EXIST.** recording.mode=automatic on the live
   input; 26 polls of /live_inputs/{uid}/videos over 183 s of live WHIP + 241 s
   after DELETE+close: **zero video assets ever created** (not even
-  live-inprogress, which RTMPS mints within seconds). 📄 plan.md §2.2 "recording
+  live-inprogress, which RTMPS mints within seconds). 📄 plans/plan.md §2.2 "recording
   coming soon (2022)" for Stream-WebRTC confirmed ✅ by direct test in 2026.
   WHIP ingest is DELIVERY-only. -> Route B (RTMPS) is the archive path.
 
@@ -825,7 +825,7 @@ results/m2m-p3b-*.jsonl, room p3b-<label> on the DEPLOYED Worker.
   behind live edge and stock-config hls.js can only nudge (maxLatency 12 s >
   actual ~10 s, so no seek fires): steady live latency ~10.1 s. HONEST
   reading: LL-HLS *join/latency governance* is the v5 player's job (2.6-4 s
-  measured, plan.md §1); a show watches the composite through v5, not stock
+  measured, plans/plan.md §1); a show watches the composite through v5, not stock
   hls.js. Composite/encode side unaffected: drawFps 30, 0 sc drops.
 
 ## P3B Checkpoint P3 — ROUTE B MAIN ✅ + recording verified + cleanup (08:4x EEST)
@@ -1247,7 +1247,7 @@ Top-rendition frame grab measures 1920x1080 (ffprobe of stream: h264 High L4.0 3
 => Cloudflare TRANSCODES 4K down; delivery ceiling 1080p. AND: child playlist carries NO
 LL-HLS PART/SERVER-CONTROL tags (2.0 s full segments, TARGETDURATION 3) despite
 preferLowLatency=true — 4K input appears to also drop the LL tag set (720p rig had it,
-plan.md §2.1). Recording video id de0bf8a2110916bd302e006f1d9590f8 (delete at cleanup).
+plans/plan.md §2.1). Recording video id de0bf8a2110916bd302e006f1d9590f8 (delete at cleanup).
 
 ### Checkpoint 4K-WRAP — verdicts + cleanup ✅ (10:41 EEST)
 BONUS: the VOD recording of the 4K broadcast ALSO tops out at 1920x1080 (same 5-rung ladder),

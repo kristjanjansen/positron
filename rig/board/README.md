@@ -245,7 +245,7 @@ everything instead would leak clock and transport into a rig, which is most of
 what makes dawless setups painful and precisely what the document exists to
 control. Refusing is loud; over-connecting is silent.
 
-This narrows `plan-hardware.md` §8.4, which assumed `carry` was expressible.
+This narrows `plans/plan-hardware.md` §8.4, which assumed `carry` was expressible.
 Filtering needs a process in the middle that reads and re-emits — which also
 makes the board the timing path, the thing §8.4 warns against. **Unverified on real
 hardware**; first thing to check on the board.
@@ -382,7 +382,7 @@ shared instrument in another building and nobody had said the board was free.
 its diagram, a `let insert` following the board's reports, and a log line on
 every ordinary visit saying the granulator was NOT in the sound. The first pass
 (2026-09-16) took the picture and the narration; the second took the last
-message. `archive/box-pappus/` and `plan-board-pappus.md` have both.
+message. `archive/box-pappus/` and `plans/plan-board-pappus.md` have both.
 
 ## 🔴 ERR's 1965 archive left the board (2026-09-16)
 

@@ -1374,7 +1374,7 @@ function connect() {
     if (s.error) log(`  ALSA: ${s.error}${s.hint ? `\n  -> ${s.hint}` : ''}`);
     // ⚠️ `audioChannels` is NOT `channels` three lines down — that one is MIDI
     // channels (16, multitimbral). The board captures `arecord -c 1`, so it says
-    // ONE, and `demo/rack`'s Mac says two: both counts are on the relay at once
+    // ONE, and `demo/able`'s Mac says two: both counts are on the relay at once
     // and no page is left inferring which it is holding.
     send({ type: 'board.hello', name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports.length, dry: DRY, since,
            audioChannels: 1, frameMs: 1000 * FRAME / RATE,

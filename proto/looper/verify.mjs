@@ -270,7 +270,7 @@ const m6 = await evalJs(`(() => { const L = window.__L;
 console.log(`\n  M6 — the session, from the running page: ${m6.bytes} B, ${m6.perLayer} B/layer`);
 ok('M6', m6.identical && m6.quotations === m6.material && m6.trace && m6.saveBtn,
   `the loop a human just played serialises to ${m6.bytes} B (${m6.perLayer} B/layer), round-trips byte-identically, carries ${m6.quotations} quotations against ${m6.material} material entries and NO trace — ` +
-  `these are the exact bytes plan-looper.md's loop plane sends`);
+  `these are the exact bytes plans/plan-looper.md's loop plane sends`);
 
 await shot(join(HERE, 'shot-looper.png'));
 

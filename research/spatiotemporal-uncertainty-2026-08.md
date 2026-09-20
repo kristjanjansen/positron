@@ -981,7 +981,7 @@ Five rules the adapter follows:
 - **Transaction time** — SQL:2011's second axis (§6.1), "the catalogue said 1965
   until the 2019 re-dating". A third axis, real, and not this quarter's problem.
 - **`when` on spans.** `Span {at, dur}` does not exist in code (planned at
-  `plan-timeline.md:142-144`); a smeared *duration* is a genuinely harder object
+  `plans/plan-timeline.md:142-144`); a smeared *duration* is a genuinely harder object
   than a smeared instant and should not be designed before the span type is real.
 
 ## §9 — Supplement: late findings (a stalled sub-agent's work, recovered)

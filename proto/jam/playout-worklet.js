@@ -24,7 +24,7 @@
 //                  frame, and getting it wrong plays at half speed — an octave
 //                  down, which sounds like a broken instrument rather than a
 //                  broken header. It has to be ANNOUNCED. See the frameMs check
-//                  in demo/rack, which is what makes a wrong announcement
+//                  in demo/able, which is what makes a wrong announcement
 //                  visible rather than merely audible.
 //
 //                  Counters below are in RING samples (2 per frame):

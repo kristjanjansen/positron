@@ -5,7 +5,7 @@
 //   node rig/m1/pace-agent.mjs --jitter 25        the relay's jitter, reproduced
 //   node rig/m1/pace-agent.mjs --channels 2       dual-mono stereo, like Live's
 //
-// then open  http://127.0.0.1:8890/rack/?relay=ws://127.0.0.1:8899
+// then open  http://127.0.0.1:8890/able/?relay=ws://127.0.0.1:8899
 //
 // 🔴 WHY THIS EXISTS. `rack` sounded noisy, six measurements said the stream was
 // perfect, and the defect turned out to be a cushion downstream of every one of
@@ -173,7 +173,7 @@ function tick() {
 
 server.listen(PORT, '127.0.0.1', () => {
   log(`paced agent on ws://127.0.0.1:${PORT}  ·  ${CH === 1 ? 'mono' : 'stereo'} · ${FRAME_MS} ms frames · jitter ${JITTER} ms`);
-  log(`open  http://127.0.0.1:8890/rack/?relay=ws://127.0.0.1:${PORT}`);
+  log(`open  http://127.0.0.1:8890/able/?relay=ws://127.0.0.1:${PORT}`);
   if (!JITTER) log('⚠️  jitter 0 — run again with --jitter 40 as the negative control');
   tick();
 });

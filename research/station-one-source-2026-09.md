@@ -335,7 +335,7 @@ segment is a drift that accumulates for as long as the station is up. Alignment
 costs one pass over each object at ingest and removes the whole class.
 
 INFERRED from the format, not measured: this is also where
-`plan-vain-upload.md` §9's second condition bites. A **CBR** file indexes
+`plans/plan-vain-upload.md` §9's second condition bites. A **CBR** file indexes
 exactly; a **VBR** file with no Xing or VBRI header does not, and the index must
 come from a frame walk rather than from arithmetic. The frame walk is needed for
 alignment regardless, so it answers both at once.
@@ -411,7 +411,7 @@ segments:
 MEASURED against the real archive object at 17:42Z, a segment-sized Range GET
 from four offsets across the 86 MB file: **206 in 0.21 to 0.34 s time to first
 byte**, 0.27 to 0.41 s total. Well inside a ten-second segment budget. READ,
-`plan-vain-upload.md` §9 and <https://developers.cloudflare.com/r2/buckets/cors/>:
+`plans/plan-vain-upload.md` §9 and <https://developers.cloudflare.com/r2/buckets/cors/>:
 an R2 custom domain with a CORS policy returns CORS headers by itself, so the
 segments need no Worker at all. Native HLS does not need CORS; hls.js does.
 
@@ -559,7 +559,7 @@ silence.
 
 ---
 
-## 9. What this changes in `plan-vain-upload.md` §9
+## 9. What this changes in `plans/plan-vain-upload.md` §9
 
 READ, §9: *"A plain object with Range, from an R2 custom domain. No HLS, and no
 Worker in the read path."* Its reasons are about **archive playback of one

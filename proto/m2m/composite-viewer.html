@@ -24,7 +24,7 @@ video{width:960px;background:#000;display:block;border:1px solid #333}
 //   F2: featured tile "2" row  — abs (672, 40..96), blockW 9
 //   K : composite clock row    — abs (32, 600..648), blockW 12 -> composite draw -> viewer
 // mode=whep : WHEP recvonly against webRTCPlayback (route A — WHIP ingest is
-//             NOT playable as HLS, plan.md §2.2 cross-protocol block)
+//             NOT playable as HLS, plans/plan.md §2.2 cross-protocol block)
 // mode=hls  : LL-HLS via hls.js (route B — RTMPS ingest; WHEP is blocked the
 //             other way). Config arm from rig/measure-llhls.html + top-level
 //             lock. The DRIVER watches for parking and reloads (poll, never

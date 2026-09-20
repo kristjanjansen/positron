@@ -173,7 +173,7 @@ transport.mjs measured by SIGSTOP): 30 s frozen, **0 onsets fired, 1205 ticks an
 with, **0 burst on return**, and the phase error afterwards is one epoch ulp.
 Position is arithmetic; there was no accumulated state to be wrong.
 
-### The session — and plan-looper.md's P0 gate, passed locally
+### The session — and plans/plan-looper.md's P0 gate, passed locally
 `looper.toSession()` / `loadSession()`. A session is a **score plus the material
 its refs name**, and that split is score.mjs's rule showing through rather than a
 format decision: `loadScore` refuses to run without a resolver, in those words,
@@ -182,7 +182,7 @@ because *a quotation names its source by identity, never by object*.
 - **Byte-identical round-trip, twice** (once is not enough — the loops work
   found a null quotation id that became the string `"null"` and broke identity
   only on the *second* pass): 3,396 B for 2 layers / 12 notes.
-- **1,698 B per layer.** This is the number under plan-looper.md §1's claim that
+- **1,698 B per layer.** This is the number under plans/plan-looper.md §1's claim that
   a committed loop is a value small enough for delivery latency to be irrelevant.
 - **A session carries no TRACE.** The C10 cut again, and it is the right one for
   a wire format: the trace is the performer's own record, the quotation is the
@@ -222,7 +222,7 @@ folded into the performer's own timing. Saying so is the honest version.
 
 ---
 
-## REMOTE — two peers, one loop (`peer.mjs`, plan-looper.md P1)
+## REMOTE — two peers, one loop (`peer.mjs`, plans/plan-looper.md P1)
 
 ```
 node proto/looper/remote-measure.mjs   # simulated channel, 12 asserts

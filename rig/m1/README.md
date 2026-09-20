@@ -13,7 +13,7 @@
 
 # The rack — play Ableton Live from a browser (2026-09-12)
 
-**Live at <https://positron.studio/rack/>.** Press a key in a browser anywhere:
+**Live at <https://positron.studio/able/>.** Press a key in a browser anywhere:
 the note number crosses the relay, `live-agent.mjs` on the studio Mac hands it
 to Live over CoreMIDI, and a copy of what Live renders comes back down the same
 socket. `/keys/` is the SAME PAGE pointed at a Raspberry Pi — what crosses the
@@ -23,7 +23,7 @@ wire is a note number, so neither end knows what kind of machine the other is.
     rig/m1/audiotap.m       a Core Audio process tap — copies ONE app's output
     rig/m1/midisend.c       notes out over CoreMIDI, held open on stdin
     rig/m1/studio.positron.rack-agent.plist   keeps it running across reboots
-    demo/rack/index.html    the page
+    demo/able/index.html    the page
 
 ## 🔴 No BlackHole. No Multi-Output Device. No Live Preferences click.
 
@@ -795,7 +795,7 @@ difference between the two instruments and it is the reason to park rather than
 to automate harder.
 
 **The honest summary: it is a performance instrument, not an always-on one.**
-Wake it deliberately for a session; do not expect `/rack/` to be green on a
+Wake it deliberately for a session; do not expect `/able/` to be green on a
 random Tuesday. The page is built for that — it reports silence AS silence.
 
 ## To wake it again
@@ -806,11 +806,11 @@ cd ~/positron-rack && M1_SSH=local node rack-agent.mjs --room pro-1
 
 # from anywhere
 node rig/m1/live-check.mjs          # LIVE_HOST=<ip> if remote
-open https://positron.studio/rack/
+open https://positron.studio/able/
 ```
 
 To stop it: `pkill -f rack-agent.mjs` on the Mac, or close the terminal window.
-`/rack/` then shows *"Nobody is answering"*, which is correct and is asserted.
+`/able/` then shows *"Nobody is answering"*, which is correct and is asserted.
 
 ## If it is revisited, do these in this order
 
