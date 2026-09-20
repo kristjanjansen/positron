@@ -295,6 +295,7 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createKnob } from '/shell/knob.mjs';
   import { createPad, createPadGrid } from '/shell/pad.mjs';
+  import { createPresenceButton } from '/shell/presence.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode } from '/shell/midi-decode.mjs';
 
@@ -327,7 +328,12 @@
     name: 'circuit',
     what: 'A Novation Circuit on screen, moving when the real one moves.',
     readout: null,
-    controls: [{ id: 'listen', label: 'Listen', primary: true }],
+    /* 🔴 NO DECLARED CONTROL. The primary one is a presence button built
+       below and spliced into `.pos-controls`, which is where
+       `demo/verify.mjs` presses. A status control outside that row is a
+       control no harness drives, and every check behind it would go silent
+       while the suite stayed green. */
+    controls: [],
   });
   guard(d);
 
@@ -644,6 +650,12 @@
   /* 24 clocks a quarter note is the MIDI standard and was measured arriving
      from this device; six of them is a sixteenth. */
   const CLOCKS_PER_STEP = 6, STEPS = 16;
+  /* MEASURED arriving on channel 10, and documented at DOC 3.2. It left
+     with the sending half and had to come back: the LISTENER needs it to
+     tell one drum track from another. */
+  const DRUM_NOTES = [60, 62, 64, 65];
+  /* notes heard on the drum channel that this grid cannot place */
+  const offGrid = new Set();
   const seenNotes = new Map();
 
   function take(b) {
@@ -699,10 +711,32 @@
        * seconds. The clock was measured running continuously whether anything
        * is playing or not, which is why Start cannot be assumed.
        */
+      /**
+       * 🔴 A DRUM TRACK OWNS TWO ROWS, AND WHICH TWO COMES FROM THE NOTE.
+       * Reported 2026-09-21: *"dr2 is not sown on rows 3-4"*, one report
+       * after *"bassdrum is top 2 rows not bottom ones"*. Both are the same
+       * fact arriving in halves: the grid shows TWO drum tracks at once,
+       * sixteen steps each, Drum 1 on rows 1 and 2 and Drum 2 on rows 3
+       * and 4.
+       * ⚠️ **SO DRUM 3 AND DRUM 4 HAVE NOWHERE TO GO AND ARE NOT DRAWN.**
+       * Four tracks at sixteen steps is sixty four pads and there are
+       * thirty two. Lighting them somewhere would be this page inventing a
+       * layout for the third time tonight, so a hit on either says so in
+       * the log and lights nothing.
+       */
       if (!anchored) { clock = 0; anchored = true; }
       seenNotes.set(m.note, (seenNotes.get(m.note) ?? 0) + 1);
+      const track = DRUM_NOTES.indexOf(m.note);
+      if (track < 0 || track > 1) {
+        if (!offGrid.has(m.note)) {
+          offGrid.add(m.note);
+          d.log(`note ${m.note} is a drum this grid has no room for, so it `
+              + `is counted and not drawn`, 'warn');
+        }
+        return;
+      }
       const step = Math.floor(clock / CLOCKS_PER_STEP) % STEPS;
-      grid.at(step % 8, Math.floor(step / 8))?.flash(140);
+      grid.at(step % 8, track * 2 + Math.floor(step / 8))?.flash(140);
     }
   }
 
@@ -724,14 +758,42 @@
     }
   }
 
+  /**
+   * 🔴 THE BUTTON IS THE STATUS. Asked 2026-09-21: *"replace listen primary
+   * buttons to somehign that uses online status"*. `Listen` said what
+   * pressing would do and said nothing about whether anything answered, so a
+   * visitor who pressed it and saw no movement could not tell a silent
+   * Circuit from an absent one.
+   * ⚠️ **IT STAYS A PRESS.** A badge that opened MIDI on its own would be
+   * opening it on a VISIT, which is the rule four pages here have paid for.
+   */
+  const pres = createPresenceButton({
+    of: 'Circuit', state: 'unknown',
+    can: ['unknown', 'checking', 'online', 'offline'],
+    press: () => d.run('listen'),
+  });
+  d.controls.hidden = false;
+  d.controls.append(pres.el);
+
   d.on('listen', async () => {
+    pres.set('checking');
     if (await open()) {
+      /* ⚠️ ONLINE MEANS A PORT WITH THIS NAME ON IT, NOT THAT MIDI WAS
+         GRANTED. Permission is a fact about the browser; presence is a fact
+         about whether the instrument is plugged in, and reporting the first
+         as the second is how a page says `online` about an empty desk. */
+      const seen = [...(access?.inputs?.values() ?? [])]
+        .filter((i) => /circuit/i.test(i.name || ""));
+      pres.set(seen.length ? 'online' : 'offline',
+        seen.length ? null : 'nothing with Circuit in its name is plugged in');
       d.log('this page only listens. Turn a macro or the filter, or play a '
           + 'drum part, and the panel follows it.');
       d.log('turn a macro or the filter. The pads light where a note has been '
           + 'seen, which is three of thirty two so far.');
       d.log('this Circuit sends MIDI clock continuously, measured at about 122 bpm, '
           + 'whether anything is playing or not.');
+    } else {
+      pres.set('offline', 'this browser would not open MIDI');
     }
     if (SELFCHECK) await d.run('check');
   });

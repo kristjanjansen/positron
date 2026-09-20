@@ -3871,3 +3871,13 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 
 /* a centred face needs no bottom padding, or it sits above centre */
 .pos-pad-round .pos-pad-face { padding: 0 3px; }
+
+/* ── a primary control whose face is a live badge — shell/presence.mjs ─────
+   🔴 ASKED FOR 2026-09-21: *"replace listen primary buttons to somehign that
+   uses online status"*. The badge inside gives up its own box, because a box
+   inside a button is two edges saying one thing, which is the same rule
+   `.pos-glue` already applies to a strip on a transport bar. */
+.pos-presence-btn { display: inline-flex; align-items: center; }
+.pos-presence-btn .pos-pres {
+  background: none; border: 0; padding: 0; margin: 0; color: inherit;
+}
