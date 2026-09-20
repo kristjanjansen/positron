@@ -476,8 +476,8 @@ cannot see a misreading of the format, and there was one:
 **The sharpest part is the documentation.** The file warned in a comment that a
 mean-tempo shortcut "puts every later note 118 ms early". That 118 ms was
 `17.2609 − 17.1429` — the distance between **two wrong answers**. A confident,
-specific, load-bearing number, quoted in `SUMMARY.md`, `plan-score.md`,
-`plan-uuu-local.md` and `demo/notes/`, measuring nothing.
+specific, load-bearing number, quoted in `SUMMARY.md`, `plans/plan-score.md`,
+`plans/plan-uuu-local.md` and `demo/notes/`, measuring nothing.
 
 So: **when you implement somebody else's format, the reference implementation is
 the only thing that can grade you.** `brew install csound` and
@@ -1272,7 +1272,7 @@ already correct and had simply never been given room.
 
 ## 58. A zoomed screenshot is not a broken layout
 
-A phone photo of `/rack/` came back at about 3x: one button filling the screen,
+A phone photo of `/able/` came back at about 3x: one button filling the screen,
 keys running off both edges, text cut off — which reads as a layout that does
 not fit. MEASURED at 390x844: `document.scrollWidth` **390** against a **390 px**
 window and **nothing wider than the viewport**. There was no overflow. Safari
@@ -2483,3 +2483,47 @@ AND nothing was opened.
 tabbing past a 63-row table took sixty-three presses. A roving tabindex makes a
 list ONE stop. It is invisible in a screenshot and in every other check, and it
 is free to read off the DOM.
+
+## A reserved slot outlives the label it was reserved for (2026-09-21)
+
+`/circuit/`'s round buttons drifted 75 px down a five row column, and the cause
+was 15 px of reserved top label slot in every cell. The legends had come off
+those buttons earlier in the evening on a direct ask; the space they had been
+given did not come off with them. **Three separate times in one session a
+reserved slot outlived its label**, and each one presented as a layout that was
+almost right.
+
+⚠️ **IT ACCUMULATES, WHICH IS THE ONLY REASON IT WAS FOUND.** One row off by
+15 px reads as a styling opinion. Five rows off by 15 px each puts the last
+button clear of the grid entirely, which is what the photograph showed. A
+constant offset hides; a per-row offset announces itself at the bottom.
+
+✅ The repair is to delete the slot in the same change that deletes the label,
+and the check that catches it is a centre line assert between two columns that
+are supposed to share rows. It is cheap and it is exact.
+
+## An explicit width is not a promise inside a flex column
+
+The same buttons were photographed as **ellipses**: wide and short. A 41 px
+round pad sat in a 46 px wrapper, and came out neither 41 nor round.
+
+⚠️ **THE HONEST VERSION IS THAT TWO THINGS CHANGED AT ONCE AND THE CAUSE WAS
+NOT ISOLATED.** They were made pad sized AND the centring was removed in one
+edit, and they came out round. Which half did it was never measured. What is
+worth keeping is the shape of the repair: **at pad size there is nothing to
+centre and nothing to stretch**, so a whole class of cell arithmetic stops
+existing. A control that has to be centred inside a cell a different size from
+itself is a control with a bug waiting in it.
+
+## A screenshot is attributed to a build, exactly like a log line
+
+A photograph arrived captioned *"totlly messed up"* one minute after the fix for
+exactly that defect had landed, and its row pitch was off by 15 px a row, which
+is the number the fix removed. The picture was of the previous state.
+
+⚠️ **THIS IS THE `BUILD <sha>` RULE WITH NO STAMP AVAILABLE.** A device log can
+be attributed because every one opens with a build id; a screenshot cannot.
+**So the number goes first**: read the assert, say what it reads now, and say
+that the photograph predates it. Re-fixing a fixed thing because somebody
+photographed the old one is a whole cycle spent on nothing, and it ends with two
+changes stacked on one defect.

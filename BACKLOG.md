@@ -1,5 +1,110 @@
 ## Open
 
+### The instruments, 2026-09-21
+
+- 🔴 **THE 32 USER SESSIONS OFF THE CIRCUIT.** *"user sessions are mine. very
+  important"*. `New Pack.circuitpack` is backed up twice and verified by md5,
+  and it is the PACK: patches, samples, the pack's own session slots. The 32
+  sessions living on the device are a separate Components operation and nobody
+  has run it. ⚠️ **DO NOT READ A SESSION LIST AS EVIDENCE OF SESSION CONTENT**,
+  which is the mistake already made once here: names were read as empties, and
+  re-measuring gave **32 distinct fingerprints, none empty**.
+
+- **`/rack/`: ALIGN THE CHANNEL STRIP CONTENT TO THE BOTTOM.** *"tascam: align
+  channel strip content to bottom"*, `demo/rack/index.html`. ⚠️ The wrap is
+  `align-items: stretch` ON PURPOSE and there is a comment saying so, so this
+  is a change to what the strip does inside its own column rather than to the
+  row. Re-read that comment before touching the row.
+
+- **`/rack/`: ALIGN MAIN AND SUB TO THE BOTTOM.** *"align main/sub to the
+  bottom"*, same file, the FX and master lane pinned right.
+
+- **`/rack/`: THE TITLE GOES RIGHT.** *"model 12: title to right"*. `/circuit/`
+  prints `NOVATION` left and `CIRCUIT` right because the panel does; the Model
+  12 prints its maker's name on the right only.
+
+- **`/rack/`: `MAX_STEP = 8` IS A GUESS AND IT IS THE LAST ONE LEFT.** A SLOW
+  turn was measured at magnitude 2 a detent. Nobody has measured a FAST spin, so
+  the ceiling that stops a flick crossing the whole pan range is a number
+  somebody chose. ⚠️ The way to measure it is `/dump/` plus one instruction to
+  the user, which is how every other number on that page was got.
+
+- 🔴 **NEITHER NEW PAGE IS GRADED ON A PHONE.** `demo/verify.mjs` runs at
+  756 px and never enters the media query, so every phone rule in `/rack/` and
+  `/circuit/` is the fourth kind of dead CSS: it reads as done, nothing
+  contradicts it, and the first person to find out is holding a phone. ⚠️ This
+  is not specific to these two pages and is worth a harness width rather than
+  two pages' worth of asserts.
+
+
+### The /kit/ stream, 2026-09-20, collected while an agent held the file
+
+- **RM THE `slow drift` / `glass rain` / `deep hum` BUTTONS.** *"rm slow drift
+  etc butotns"*, `demo/kit/index.html` line ~1087 in `SLIDER GROUP, PAIRED`.
+  ⚠️ **THEY ARE THE SUBJECT OF THAT SECTION**: each loads a patch with
+  `{ quiet: true, glideMs: GLIDE_MS }`, which is the one thing it exists to
+  show. No assert reads them. Removing them without rewording the section
+  leaves a title claiming a demonstration that is gone.
+
+- **THE `SLIDER` SPECIMEN HAS NO HAND.** *"convert no hand slider to hand
+  slider"*. Pass `hand: true`.
+  ⚠️ **AND THEN ASK WHETHER `INVISIBLE HAND` IS STILL A SEPARATE SECTION.** Two
+  sections showing a handed slider is the duplication this page prevents. There
+  are asserts on `MOVE_GLYPH`, `MOVE_OFF`, `MOVE_SAYS` and `onHand`.
+
+- **RM THE `TAKE  Keep | Drop` GROUP.** *"rm"*, with a screenshot. It is
+  `demo/kit/index.html` twice: line 580 in the BUTTON GROUP section and line
+  713 as the second storey specimen inside VIDEO PANEL.
+
+- 🔴 **RM THE SECOND STOREY UNDER THE PANEL FOOTER.** *"rm a second storey under
+  the footer"*. It is `o.under` and `api.under()` in
+  `demo/shell/video-panel.mjs`, its rules at `shell.css:3289`, and its specimen
+  in `/kit/`.
+  ⚠️ **IT IS NOT UNUSED, AND THIS IS THE PART TO DECIDE BEFORE TOUCHING IT.**
+  `/mirror/` calls `full.panel.under(knobRow)` at line 526 and `under(null)` at
+  520, so the knob row moves into the second storey when that panel goes full.
+  It was added 2026-09-19 from a photograph of `/mirror/` filling an iPhone,
+  because in real element fullscreen nothing outside the full subtree is on
+  screen, **which is the same argument that put the way out of full screen
+  inside the picture.** Removing it takes `/mirror/`'s knobs off an iPhone in
+  full screen unless they are rehomed. **Say where they go first.**
+
+- **THE PRIMARY BUTTON IS MISSING FROM THE CONTROL ROW SPECIMEN.** *"primary
+  working button missing"*. That section shows `pos-pri` in its `src` snippet;
+  the specimen on the page does not appear to render a working primary.
+
+- **THE STEPPER SPECIMEN HAS NO RANDOM OPTION.** *"stepper misisng random butotn
+  optopn"*. `/knobs/` carries a Random button beside its patch selector and it
+  was asked for as *"just an option on component?"* earlier the same day, so
+  this is the kit not showing an option the component either has or should.
+  **Check whether `stepper.mjs` actually has it before adding a specimen for
+  something that does not exist.**
+
+- 🔴 **PARKED: THE HARDWARE UI, AND THE FIRST ATTEMPT WAS THE WRONG SHAPE.**
+  Asked 2026-09-20: *"can we start of hardware ui now? what you recommend first?
+  mk425c?"*, then *"ok but do just a small part of circuit. add pieces to kit as
+  well (bottom section). i want to verify ui first"*, then **three words that
+  killed it**: *"circuit has no vert fader"*, and *"do it later"*.
+  ⚠️ **THE MISTAKE IS WORTH KEEPING BECAUSE IT IS A KIND.** A vertical fader was
+  proposed for the Circuit's eight macros, which are eight ROTARY KNOBS. Every
+  number in `measured-devices-2026-09-20.md` was right and the control it was
+  drawn as was wrong, because a CC number says what travels and says nothing
+  about what a hand touches. **Measure the device, then look at it.**
+  ✅ `demo/shell/fader.mjs` EXISTS AND IS IMPORTED BY NOTHING. Kept because the
+  Model 12 really does have nine faders, measured sending pitch bend on channels
+  1 to 9. It has never been laid out in a browser and `shell.css` has no
+  `.pos-fdr` rules, so it is a guess until something points a browser at it.
+  🔴 **AND THE BLOCKING QUESTION IS A KIT QUESTION, WHICH CLAUDE.md SAYS TO ASK
+  RATHER THAN ANSWER: THERE IS NO ROTARY KNOB COMPONENT.** Nothing in
+  `demo/shell/` draws one and `/knobs/` does not use one either. So a Circuit
+  layout is either eight of a component that does not exist yet, or eight
+  ordinary sliders that do not look like the thing they are bound to. **Do not
+  quietly build a fourth copy of a control**: decide which, once.
+  ⚠️ **AND `/kit/` WAS ASKED FOR AT THE BOTTOM**, which contradicts the standing
+  rule that the newest component goes at the TOP. Deliberate: a component being
+  verified is not a component being adopted. Recorded here so it is not read as
+  drift when somebody finds it.
+
 - 🔴 **`midi.mjs` NEVER CALLS `port.open()`, AND THAT IS THE BUG THAT MADE A
   DESK OF FOUR LIVE INSTRUMENTS READ AS AN EMPTY ROOM.** Found 2026-09-20 on
   `/dump/` and fixed there; `demo/shell/midi.mjs`'s `wire(port)` has the same
@@ -125,7 +230,7 @@
   devices, and must never present the first as the second.
   ⚠️ **THE BOARD ALREADY HAS A MIDI PATH**: `rig/board/` uses `aconnect` to read
   and patch ALSA MIDI ports, `ctl.set` coalesces controller traffic at 5 ms, and
-  `demo/shell/cc-adapter.mjs` is the send gate. `plan-controller.md` is the
+  `demo/shell/cc-adapter.mjs` is the send gate. `plans/plan-controller.md` is the
   existing controller plan and its step 0 was answered today (CC 74 moves
   Yoshimi's brightness 5.59 octaves, monotonically).
 
@@ -1203,7 +1308,7 @@
   **peak 0.1393**, CC 74 moving brightness **5.59 octaves monotonically** over a
   0.04 octave floor. That is 40x to 140x above the collapsed range, so the fault
   is still not present.
-  🔴 **AND IT ANSWERS STEP 0 OF `plan-controller.md`, WHICH WAS SKIPPED AND IS
+  🔴 **AND IT ANSWERS STEP 0 OF `plans/plan-controller.md`, WHICH WAS SKIPPED AND IS
   CALLED THE SINGLE LOAD-BEARING UNKNOWN**: *does Yoshimi's CC 74 actually move
   a chosen patch on this board*. **Yes, 5.59 octaves, monotonic.**
   ⚠️ **THE MEMORY LOCK WARNING IS CONFIRMED LIVE**: `Cannot lock down 107350048
@@ -3096,13 +3201,13 @@
   ✅ **`proto/selfrec/indexer.mjs` IS THE ANSWER AND IT IS WRITTEN**: a
   zero-dependency EBML parser that walks the clusters and emits
   `[{tMs, chunkSeq, offsetInChunk, byteOffset}]`, so replay becomes Range
-  requests plus MSE. `plan-stage-live.md` §4.5 names it as what replaces the
+  requests plus MSE. `plans/plan-stage-live.md` §4.5 names it as what replaces the
   blob and step one deliberately did not build it.
   ⚠️ **THE CHECK SAYS THE TRUE THING RATHER THAN THE FLATTERING ONE.** It grades
   the playhead, which is the half the page is responsible for, and the page logs
   the other half in words. Asserting the picture would be a permanently red
   suite; asserting nothing would be dropping the claim the page was built to
-  make. **`plan-stage-live.md` §10.6 is therefore NOT met.**
+  make. **`plans/plan-stage-live.md` §10.6 is therefore NOT met.**
 
 
 - ✅ **THE TEST FRAME'S LAYOUT, REWORKED IN SEVEN ASKS ON 2026-09-18.** Two
@@ -3216,7 +3321,7 @@ struck, the proof is in it.
 
 
 - 🔴 **`/stage/` BECOMES A REAL VIRTUAL STAGE. PLANNED 2026-09-18, NOT BUILT.**
-  `plan-stage-live.md`, 1025 lines. The ask is quoted in full there. Nothing was
+  `plans/plan-stage-live.md`, 1025 lines. The ask is quoted in full there. Nothing was
   built, deployed, or spent; no Stream minute was used.
   ✅ **THE SOURCE QUESTION THE ASK REFUSED TO SETTLE IS ANSWERED WITH A
   RECOMMENDATION AND ITS REASONS: the control room browser first.** `whipPublish`
@@ -3311,7 +3416,7 @@ struck, the proof is in it.
   it"*, and the open architectural question is *"Is it a board which a single
   person only uses for its own use? Or is it multi-user? How much it can take
   input from different users via relay, there are the limits."* Production may
-  not be this checkout. **THE PLAN IS WRITTEN, NOT "being written": `plan-portable-board.md`, 971
+  not be this checkout. **THE PLAN IS WRITTEN, NOT "being written": `plans/plan-portable-board.md`, 971
   lines, and its own header says nothing in it is built.** Nothing IS built, so
   the entry stands; only that clause was stale.
   ⚠️ The multi-user question is not hypothetical and has already cost sound
@@ -3398,7 +3503,7 @@ struck, the proof is in it.
   MADE THE LEVEL COLLAPSE A THREE-SESSION BUG.** `board.mjs:625` returns
   `{in, out, folded, forMs, on, channel}`, so a part volume left at 8 is
   invisible to every client on the relay. **One extra field would have turned
-  this into one question.** `plan-portable-board.md` §4.3.2, which the plan
+  this into one question.** `plans/plan-portable-board.md` §4.3.2, which the plan
   itself calls the cheapest useful thing in it, and it has now been paid for.
 - ✅ **ONE WAY OUT, AND IT IS THE ONLY ONE.** *"all vr/ar general  make one
   general way to get out. hold down any controller button for looooong enough
@@ -3582,7 +3687,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   slider. I want to have himanline, real abalog knob / slider feel and curve.
   See also draw. We can starr with simple sweep back and forth but be ready to
   more movement presets and maybe custom too in future. When you fix knobs demo
-  add it to silders. Single sidebutton, on and off atm"*. `plan-slider-automation.md`,
+  add it to silders. Single sidebutton, on and off atm"*. `plans/plan-slider-automation.md`,
   six steps, the first of which decides whether the human feel is real before a
   pixel moves.
   ✅ **STEPS 1 TO 5 ARE BUILT, 2026-09-16.** `demo/shell/hand.mjs` and
@@ -3687,13 +3792,13 @@ versus +Z reading and the comment above `wallYaw` names it.
   `openWire`'s `/stats` question, which says whether a room was full or a relay
   unreachable, which a ping cannot answer at all.
 
-- **`ctlMeter()` DOES NOT REPORT `ctrls`.** `plan-controller.md` §4.2 specifies
+- **`ctlMeter()` DOES NOT REPORT `ctrls`.** `plans/plan-controller.md` §4.2 specifies
   `{in, out, folded, ctrls}` and step 2 shipped `{in, out, folded, forMs, on,
   channel}`. Without the map, a page cannot assert that the last value it sent
   is the last value the board holds, and a page that reconnects cannot re-sync
   from the board's own state. A small change to `rig/board/board.mjs`.
 
-- ⚠️ **`/rack/` MAY BE CLIPPING AT FULL SCALE, UNVERIFIED.** It posts an
+- ⚠️ **`/able/` MAY BE CLIPPING AT FULL SCALE, UNVERIFIED.** It posts an
   `Int16Array` straight into `pcm-playout`, whose ring is a `Float32Array` that
   stores what it is given; `/keys/` divides by 32768 first. Noticed while reading
   the playout for `/knobs/`, not measured. ⚠️ That page's own comment records
@@ -3701,7 +3806,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   perfect"*, which is what this would look like.
 
 - ⚠️ **`d.logs` DOES NOT EXIST**, only `window.__demo.logs` and `d.api.logs`.
-  `/rack/` reads `d.logs.length` at line 255, on exactly the branch that runs
+  `/able/` reads `d.logs.length` at line 255, on exactly the branch that runs
   when the studio Mac is off, so it throws a TypeError there.
 
 - ✅ **STEP 0 IS ANSWERED, ON THE REAL BOARD, 2026-09-16.** `rig/board/cc-test.mjs`
@@ -3736,7 +3841,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   pipeline -- you tell me what is feasible. initially like 2 sliders only (filer
   / resonance?) to show off the pipeline. do plan and report it here in
   detail when ready"*. A PLAN, reported in detail, before any code.
-  `plan-controller.md` is that plan and its build order has eight steps.
+  `plans/plan-controller.md` is that plan and its build order has eight steps.
   **Steps 1, 2 and 3 are built.** Step 1 is the send gate in
   `demo/shell/cc-adapter.mjs` (`makeCcSend`), graded 13/13 by
   `node demo/shell/cc-send-test.mjs`. Step 2 is `ctl.set` and `ctl.meter` in
@@ -4601,7 +4706,7 @@ versus +Z reading and the comment above `wallYaw` names it.
   the page. It got the kit's BUTTON without the kit's mechanism, disabled with
   the reason on its face. The lift is in this file.
 
-- ✅ **ISOLATED DEPLOYS, PLANNED AND ANSWERED NO.** `plan-isolated-deploys.md`.
+- ✅ **ISOLATED DEPLOYS, PLANNED AND ANSWERED NO.** `plans/plan-isolated-deploys.md`.
   46% of deployed bytes are shared and 45 of 46 pages import `shell.mjs`, so
   per-slug subdomains cost 44 Workers and about 179 MB a deploy to buy TIMING
   isolation over code that stays shared BY SOURCE. `wrangler versions upload

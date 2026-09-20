@@ -1,3 +1,78 @@
+# Session 38: four instruments stopped being documentation (2026-09-20 to 21)
+
+**WHAT WAS ATTACHED TO THIS MACHINE WAS UNKNOWN AT THE START AND IS MEASURED AT
+THE END.** `system_profiler SPUSBDataType` printed nothing and that was written
+down as "nothing attached". `ioreg` found **four devices**. An empty answer from
+one instrument is not an absence, and this is the same failure as the three
+gateway refusals recorded last session: **check the instrument before reporting
+an absence.**
+
+**`/dump/` IS WHY EVERY NUMBER BELOW IS A MEASUREMENT.** It prints every MIDI
+message a device sends, raw bytes beside a reading of them, and the readings come
+from `demo/shell/midi-decode.mjs`, which is pure and graded with no browser at
+all: **47 asserts, several of them negative controls**, including the real Model
+12 jog histogram as a regression case.
+🔴 **AND IT READ AN EMPTY ROOM WITH FOUR LIVE INSTRUMENTS IN IT.** The page never
+called `port.open()`. The specification says assigning `onmidimessage` opens a
+port implicitly and that is not reliable, so four plugged-in devices reported
+nothing, silently, with no error anywhere. `await p.open()` per port.
+
+**WHAT THE DEVICES ACTUALLY SEND**, in `measured-devices-2026-09-20.md`, which
+outranks the plan documents wherever they disagree:
+- **The Circuit's filter is CC 74 on CHANNEL 16.** The macros are CC 80-87 on
+  channel 1. No manual says the sixteen.
+- **The Model 12's pan encoders are relative and send magnitude 2 a detent** at
+  a slow turn. `MAX_STEP = 8` is a ceiling for a fast spin and is the one number
+  on that page still unmeasured.
+- **The MK-425C's encoders are ABSOLUTE.** The classifier called them relative
+  once, on a window guessed from the Mackie specification, and real hardware
+  sending 63 on a fast turn is what corrected it. It asks the **sign bit** now.
+- **The M-Audio Fast Track Pro sends nothing.** *"maudio does nada"*, confirmed
+  on the wire. It is an interface.
+
+**THE CIRCUIT IS BACKED UP AND VERIFIED TWICE.** `New Pack.circuitpack` in the
+repository root and at `kristjanjansen/packs`, private, **round tripped and md5
+compared**. The device has no factory reset, so three ordinary operations in
+Components are unrecoverable.
+🔴 **THE 32 USER SESSIONS ARE NOT IN IT AND THEY ARE THE PART THAT MATTERS**:
+*"user sessions are mine. very important"*. ⚠️ And session NAMES were read as
+evidence of session CONTENT, which is the same class of mistake as reading a URL
+as evidence of who owned a domain. Re-measured: **32 distinct fingerprints, not
+one empty.**
+
+**THREE CONTROLS JOINED THE KIT**, and the hard part was not any of them.
+`knob.mjs` drags vertically, which was researched rather than guessed: circular
+dragging is the historically fiddly one because the pointer leaves the knob and
+the angle jumps across its discontinuity. `pad.mjs` is one square button with
+optional labels over and under it, a latch, a tint, a half height and a round
+mode. `fader.mjs` is the horizontal slider turned 90°, value for value, with no
+fill, because the handle is the reading.
+🔴 **THE CONTRACT BETWEEN THEM IS FOUR CUSTOM PROPERTIES ON `:root`**, and it
+exists because two controls in a row could not line up otherwise. A control
+publishes **one head and one foot** and nothing else it grows may count.
+
+**TWO PANELS ARE DRAWN FROM THEM**: `/rack/` is the TASCAM Model 12 at 31/31,
+`/circuit/` is the Novation Circuit at 22/22. The Ableton demo gave up the
+`rack` slug and is `/able/`.
+⚠️ **AT DEMO SCALE ARRANGEMENT SURVIVES AND PROPORTION DOES NOT**, four times
+over: `prt/oct`, `Vel`, one knob size everywhere, and the CC numbers moving to
+hover. A panel redrawn at a third of its size keeps what is next to what and
+loses how big things are relative to each other.
+
+🔴 **THE EXPENSIVE HOUR WAS GIT AND IT IS NOT FULLY REPAIRED.** A failed `cd`
+meant a run of git commands executed in this repository: 57 staged plan renames
+were committed under a message about a Circuit pack, the branch was renamed, and
+it was pushed. Local is repaired and `archive/` was reverted, because a
+reference sweep had rewritten 7 files in there and **an archive records what was
+there**. `origin/main` still points at the wrong commit and needs one line from
+a person; `HANDOFF.md` has it.
+
+**AND THREE EDITS TONIGHT NEVER APPLIED.** Nested backticks in a heredoc threw
+at parse time, before `writeFileSync`, so the script printed nothing and changed
+nothing. **What caught all three was an assert still reporting the OLD number.**
+Every edit script since guards on the text it expects to find and throws when it
+is absent, which is the same rule as never guarding a patch on `includes()`.
+
 # Session 37: a dead website gave up 63 pictures, and four defects were found by looking (2026-09-20)
 
 **THE SESSION OPENED WITH A REQUEST FOR WORK THAT WAS ALREADY FINISHED.** *"in
@@ -1111,7 +1186,7 @@ be inferred from output envelopes, which is the measurement that failed and cost
 a session. It was un-struck at 18:54 because **that priced a different
 question**. What was asked: *do we need scsynth to make granular sound in a
 browser?* — no. What was never asked: **can a synth definition travel as a
-message, the way a shader does?** `plan-visuals.md` already makes that argument
+message, the way a shader does?** `plans/plan-visuals.md` already makes that argument
 for the graphics half; the audio equivalent had never been written down, which
 is why the analogy was available to be missed. 🔴 **And it repairs a claim this
 repo was already making** — `twins` said the worklet and the board's scsynth are
@@ -1628,7 +1703,7 @@ is unsupported, the tempo comes back `NaN`, `tempoMap` throws. With a
 twelve-line macro pass both compile clean (56 rows / 2 sections / 1 warning and
 25 rows / 2 sections / 0 warnings) — **and a bracket in p2 is silently wrong**.
 That is a third misreading in a compiler that was 22/22 green for months with
-two real defects, and `plan-uuu-local.md` calls itself *"not started, and mostly
+two real defects, and `plans/plan-uuu-local.md` calls itself *"not started, and mostly
 already true"* while its P1 was untrue at the first statement of the first file,
 for a week, at 42/42 green. 🔴 ✅ **The plan's "single most important unknown" is
 answered and the answer is no** — neither real score contains a single `m` or
@@ -2497,7 +2572,7 @@ Suite **449/449** after the sweep.
 
 ## Session 19 (2026-09-12) — a browser plays Ableton Live; a clean stream that sounded broken; four rounds of UI
 
-**`rack` is live** — <https://positron.studio/rack/>, 15/15. Notes cross the
+**`rack` is live** — <https://positron.studio/able/>, 15/15. Notes cross the
 relay, `rig/m1/live-agent.mjs` hands them to Live over CoreMIDI, and a Core
 Audio **process tap** returns a copy of what Live renders. No BlackHole, no
 Multi-Output Device, no Live Preferences click — the tap removes the one
@@ -2860,7 +2935,7 @@ and none on ours:
 **And the documented number was the gap between two wrong answers.** The file
 warned that a mean-tempo shortcut lands notes "118 ms early" — which is
 `17.2609 − 17.1429`, our wrong answer minus the naive one. Csound was in neither.
-That 118 ms was quoted in `SUMMARY.md`, `plan-score.md`, `plan-uuu-local.md`,
+That 118 ms was quoted in `SUMMARY.md`, `plans/plan-score.md`, `plans/plan-uuu-local.md`,
 `demo/notes/uuu-positron.md` and two source comments; all now corrected, with
 the session-10 PROGRESS entry MARKED rather than rewritten.
 
@@ -3008,7 +3083,7 @@ ESTIMATED +32 ms to the ear.
 
 ## Session 14 (2026-09-09) — one message shape, a history the relay refuses to keep, and what the relay actually costs (user: "read md's" → "implement demo" → "can you do perf tests?" → "save results to md's")
 
-Started from `plan-ws.md`, written that morning from a dictated brief. Four
+Started from `plans/plan-ws.md`, written that morning from a dictated brief. Four
 questions were settled by argument, one by measurement, and then the plan was
 built.
 
@@ -3770,7 +3845,7 @@ comparing the buttons against it left NONE selected exactly when someone is
 looking at the row deciding what to press. This was the `RATE 0×` finding from
 the first hour of the review, unfixed until the last.
 
-**`plan-glass.md`** — `requestVideoFrameCallback` as a fifth lane type, written
+**`plans/plan-glass.md`** — `requestVideoFrameCallback` as a fifth lane type, written
 and deliberately not started. Two things it pins down: a glass lane is a
 CAPTURE lane like MIDI in, not a schedule lane (audio and MIDI are told when to
 act; the compositor cannot be told, it only reports what it decided), and it is
@@ -3801,7 +3876,7 @@ lane it pushed the numbers out of the row entirely.
   a main-thread `setTimeout`; `createDeck` does not expose the host.
 - `createMidiLane` has been measured only through the IAC loopback to our own
   JS handler. No hardware synth has ever been on the other end.
-- `plan-glass.md` P0: fix the rVFC pair and re-measure every content anchor in
+- `plans/plan-glass.md` P0: fix the rVFC pair and re-measure every content anchor in
   the same breath.
 - Full suite 298/313 — 12 are this shell having no UDP egress, three are strip
   ink flakes that pass on a targeted re-run.
@@ -6132,7 +6207,7 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 - ✅ Asymmetry: "now" cues 0–1 ms; scheduled replay 33–67 ms early vs live;
   fireDelayMs reproduces live feel. Worker cuelog added (additive, verified).
 - proto/replay/{replay.html,run-record.mjs,run-measure.mjs,README.md};
-  plan.md §11b; research/timecode-sync-2026-08.md holds the industry synthesis.
+  plans/plan.md §11b; research/timecode-sync-2026-08.md holds the industry synthesis.
 
 ### mediamtx + catalog shim — ✅ ECOSYSTEM GAP CLOSED, local venue chain proven
 - ✅ ffmpeg WHIP → mediamtx MoQ → browser: 20.6 ms p50, audio A/V skew +12 ms,
@@ -6151,7 +6226,7 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 - ✅ HLS: 4K RTMPS ingest ACCEPTED, input recorded 3840x2160 — but transcoded,
   top rendition 1920x1080 (manifest + frame grab). No limits doc exists.
 - ✅ New trap: 4K ingest silently drops LL-HLS mode (no PART tags despite
-  preferLowLatency) — plan.md §2.1 trap #2. Cleanup verified, input deleted.
+  preferLowLatency) — plans/plan.md §2.1 trap #2. Cleanup verified, input deleted.
 
 ### MoQ audio spike — ✅ AUDIO WORKS: 32.6 ms, A/V skew −4 ms, zero sync logic
 - ✅ Chromium: audio g2g 32.6/41.6 ms ≈ video; 0 decode errors; skew p50 −3.8 ms
@@ -6216,7 +6291,7 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
   ee90ebba017e4a395a96961cea9f77f3 (/watch on the customer host). Burned rows
   decode at 100 % from the recording — the archive preserves latency evidence.
 - ✅ PLATFORM FACT direct-tested: WHIP ingest records NOTHING (recording-enabled
-  input, 183 s, zero assets) — Stream-WebRTC is delivery-only; plan.md §2.2
+  input, 183 s, zero assets) — Stream-WebRTC is delivery-only; plans/plan.md §2.2
   updated. Route A (in-page WHIP) = live monitor at 128 ms g2g; both outputs can
   run from one tab.
 - Composite chain: grid→composite 58–60 ms; grid→live-viewer full chain 128 ms
@@ -6247,7 +6322,7 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 - Platform data: CF never redelivers closed groups (republish catalog every 2 s;
   join ≈1.0 s); no pending-subscribes (retry needed); optimistic SUBSCRIBE_OK
   then ~10 s close. draft-16 NOT auth-only (SUBSCRIBE_NAMESPACE fixes discovery).
-- RUNBOOK §7; results/moq-media-e1.jsonl; 16 min active. plan-m2m §1.C + plan.md
+- RUNBOOK §7; results/moq-media-e1.jsonl; 16 min active. plan-m2m §1.C + plans/plan.md
   §2 table updated: MoQ = real candidate for the grid's live tiers.
 
 ### Phase 3d MoQ browser spike — ✅ POSITIVE, in 8 minutes
@@ -6320,13 +6395,13 @@ Ownership map (ports, notes, inputs):
   edge-lag-blocking.py per-part stats. Own input, port 8898, notes rig/PART2-NOTES.md.
 - **WHIP-ffmpeg interop (plan §8 Q3)**: ffmpeg 9 -f whip → whep-rig input
   (224558e8…), playback-verified via WHEP. Port 8896, notes rig/whep/WHIP-FFMPEG-NOTES.md.
-- **M2M plan**: research Realtime SFU + alternatives, owns NEW plan-m2m.md.
+- **M2M plan**: research Realtime SFU + alternatives, owns NEW plans/plan-m2m.md.
   No processes.
 - **M2M SFU prototype**: 3-way burned-pixel latency through the existing Realtime
   app, owns NEW proto/m2m/, port 8897, notes proto/m2m/NOTES.md.
 
 All agents: checkpoint after every step; kill only own processes by own stream-key/
-profile patterns (broad pkill banned after session-3 cross-kills); no plan.md/
+profile patterns (broad pkill banned after session-3 cross-kills); no plans/plan.md/
 PROGRESS.md edits (main session merges).
 
 ### WHIP-ffmpeg interop (Q3) — ✅ COMPLETE (first back, ~6 min): works out of the box
@@ -6338,9 +6413,9 @@ PROGRESS.md edits (main session merges).
   Quirk: teardown DELETE logs a cosmetic read error, exit 0.
 - **m2m unlock: a stationary studio ffmpeg feed can publish into the same WebRTC
   world as browser participants, today, with stock homebrew ffmpeg.** ⚠️ Lenient
-  profile matching is CF-specific — retest per SFU. plan.md §3.3 + §8 Q3 updated.
+  profile matching is CF-specific — retest per SFU. plans/plan.md §3.3 + §8 Q3 updated.
 
-### M2M plan — ✅ COMPLETE: plan-m2m.md written (§0–§6, provenance-tagged)
+### M2M plan — ✅ COMPLETE: plans/plan-m2m.md written (§0–§6, provenance-tagged)
 - Recommended: **hybrid** — Realtime SFU grid (selective pull, simulcast rid per
   tile size) + stage stream unchanged + `RtcRoom` DO beside workers/cues for
   roster/publish frames (SDP never touches signaling; thin secret-holding Worker
@@ -6400,7 +6475,7 @@ PROGRESS.md edits (main session merges).
   mid→participant BEFORE setRemoteDescription. One 3.1 s sender-side freeze seen
   once, identical at all receivers.
 - proto/m2m/ complete with README + how-to-run; zero new CF resources; cleanup
-  verified. plan-m2m.md §6 phase 1 marked done with numbers.
+  verified. plans/plan-m2m.md §6 phase 1 marked done with numbers.
 
 ### Part-2-late anomaly — ✅ SOLVED: CF segmenter hold-and-release, encoder exonerated
 - ✅ Verdict from 3 arms × n=70 + a decisive local FLV byte-timing tap (~12.5k tags):
@@ -6528,7 +6603,7 @@ corrects via sntp sampling; loop-lag and WHEP are same-machine so offset cancels
    (liveSyncDuration:1.5/liveMaxLatencyDuration:6) to get its resilience numbers
    vs the v6 player.
 8. ~~Part-2-late mystery~~ ✅ SOLVED session 4: CF segmenter hold-and-release cycle,
-   encoder exonerated by byte-timing tap — see plan.md §1 and the session-4 entry.
+   encoder exonerated by byte-timing tap — see plans/plan.md §1 and the session-4 entry.
 
 ---
 
@@ -6570,11 +6645,11 @@ Ownership map (so a resume knows who was doing what, where notes land):
 
 Clock at dispatch: −5.2 ms ± 22 ms (sntp). Camera present (lid open). Agents told:
 checkpoint to disk after every step, short runs before long runs, no edits to
-plan.md/PROGRESS.md (merged by main session afterwards).
+plans/plan.md/PROGRESS.md (merged by main session afterwards).
 
 ---
 
-Chronological journal of the build session. `plan.md` is the current-state reference;
+Chronological journal of the build session. `plans/plan.md` is the current-state reference;
 this file is what happened, in order, including the mistakes and dead ends.
 Provenance: ✅ measured here · 📄 documented by vendor · ⚠️ unverified.
 
@@ -6584,7 +6659,7 @@ Provenance: ✅ measured here · 📄 documented by vendor · ⚠️ unverified.
 
 - **Five parallel research agents** dispatched: Stream/LL-HLS, Realtime/WebRTC, MoQ,
   latency-measurement methods, ingest tooling + competitive baselines. All reports
-  distilled into `plan.md`. Session WebSearch budget (200) exhausted by them;
+  distilled into `plans/plan.md`. Session WebSearch budget (200) exhausted by them;
   raised to 1000 in `~/.claude/settings.json` for future sessions.
 - **"The experimental thing" identified: Media over QUIC.** Cloudflare relay
   provisioning API shipped 2026-07-31, free beta, draft-16 target, live-edge only

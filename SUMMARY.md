@@ -10,7 +10,7 @@ with an operator studio app as its first build and cultural-heritage archives
 ## Arc
 
 - **08-25→26, sessions 1–5** — the measurement campaign. Everything below is
-  ✅ measured, not believed (PROGRESS.md is the journal, plan.md the reference).
+  ✅ measured, not believed (PROGRESS.md is the journal, plans/plan.md the reference).
 - **08-26 evening** — planning wave: plan-m2m → plan-studio → plan-timeline
   (+ 9-amendment self-critique) → prior-art research (technical + artistic).
 - **08-27** — own prior-art mine (5 repos of previous experiments) +
@@ -98,7 +98,7 @@ with an operator studio app as its first build and cultural-heritage archives
   header**.
 
 - **09-09, session 14** — **one message shape, written down**, and the history
-  the relay refuses to keep. `plan-ws.md` was built: `demo/shell/wire.mjs` (the
+  the relay refuses to keep. `plans/plan-ws.md` was built: `demo/shell/wire.mjs` (the
   envelope — `type`/`from`/`at`/`seq` — plus the reconnect every positron page
   lacked), `workers/backlog` on `backlog.positron.studio` where **a recorder
   joins the room as an ordinary socket**, so the relay still parses nothing, and
@@ -137,15 +137,15 @@ polling lies about edge lag (+2.3 s); ThreatLocker kills unapproved binaries
 
 ## The plans
 
-- **plan.md** — streaming stack reference (transports, players, traps, mysteries
+- **plans/plan.md** — streaming stack reference (transports, players, traps, mysteries
   solved).
-- **plan-m2m.md** — hybrid: SFU grid + stage stream + RtcRoom DO; MoQ as
+- **plans/plan-m2m.md** — hybrid: SFU grid + stage stream + RtcRoom DO; MoQ as
   auto-upgrade tier; phases 1–3 COMPLETE, phase-4 backlog.
-- **plan-studio.md** — ThreatLocker-proof operator app: deployed web console +
+- **plans/plan-studio.md** — ThreatLocker-proof operator app: deployed web console +
   `node engine.mjs`; ~three buttons; MERGED V0 = timeline lib is the engine's
   event backbone (Sessions A/B/C; DoD: one command + one URL runs a show with a
   replay link, measurement suite stays green).
-- **plan-timeline.md** — THE substrate. Six-function transport + the missing
+- **plans/plan-timeline.md** — THE substrate. Six-function transport + the missing
   four (seek/pause/rate/window); Event + Span on one append-only log; reducers
   (`reduce(events≤t)`, property-tested vs play); adapters {capture, actuate,
   reducer, interpolate, caps}; laws: stamp at source, absolute ms, one render
@@ -204,7 +204,7 @@ frame-exact for vp8 but MSE refuses h264-in-WebM.
 year-searchable to 1908 (census: 448k items in 119 requests). Three instruments built: channel
 flipper (10–12 ms flips), archive remixer (1965 chords, 0–43 ms start spread), and the
 megatimeline (p95 9.7 ms flying 1908→2026, series query-lanes, honest precision smears).
-plan-megatimeline.md on the EKA/sitemap-vis basis.
+plans/plan-megatimeline.md on the EKA/sitemap-vis basis.
 
 **Timeline transport core** — `timeline/transport.mjs` + lab: vector+lookahead holds; worker tick
 is the default host (8.5 ms hidden vs main's 981 ms); audio lane sample-accurate (10 µs) and holds
@@ -275,7 +275,7 @@ Overdub compensation **67.40 → 0.00 ms**; the trap is that a *uniform* shift i
 no-op, so the notes move and the origin must not. "No stuck notes" comes from
 the **reducer**, not the wrap callback.
 
-**The remote looper** (`peer.mjs`, `plan-looper.md` P0+P1 done) — the claim was
+**The remote looper** (`peer.mjs`, `plans/plan-looper.md` P0+P1 done) — the claim was
 that a committed loop is a VALUE, so the network is used once per layer and
 never per note. It held: identical loops across links from 1.1 ms to 4700.8 ms,
 the cost of a slow link paid in PASSES rather than timing, and 25 % packet loss

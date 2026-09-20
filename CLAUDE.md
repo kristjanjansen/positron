@@ -115,6 +115,33 @@ this dance.
 `Kristjan.Jansen@enefit.ee`, on a personal repository. Nothing was changed about
 that, because attribution is not a thing to alter without being asked.
 
+## `New Pack.circuitpack` IS SOMEBODY'S ONLY COPY. DO NOT DELETE IT
+
+🔴 **A 3.3 MiB FILE IN THE REPOSITORY ROOT THAT IS NOT BUILD OUTPUT AND IS NOT
+A MISTAKE.** A complete backup of the Novation Circuit on this desk, taken
+2026-09-20 through Novation Components, and asked to live here: *"put
+.circuitpack to project root"*.
+🔴 **THE CIRCUIT HAS NO FACTORY RESET AND THEREFORE NO UNDO.** Three things
+replace its contents and all three are one press from the safe one: `Send to
+Circuit`, loading the Circuit Factory Pack, and a `Replace Patch` SysEx. If any
+of them is used and this file is gone, the work is gone.
+✅ **IT IS VERIFIED, NOT ASSUMED.** A `.circuitpack` is a zip. This one holds
+**164 files**: 32 sessions, 64 patches, 64 samples, and an `index.json` reading
+`product: circuit, version: 2.0`. `patch_0.syx` is exactly **350 bytes**
+starting `F0 00 20 29 01 60`.
+🔴 **AND ALL 32 SESSIONS ARE REAL WORK, WHICH WAS CHECKED AFTER GETTING IT
+WRONG.** The first reading treated the NAMES as the evidence and implied the
+ones still called `User Session` might be blanks. **They are not**, and the
+owner said so: *"user sessions are mine. very important"*. MEASURED: **32
+distinct fingerprints of 32**, not one a copy of another, **zero sessions
+entirely empty**, every one 84 to 89 per cent non-zero bytes, and the `User
+Session` rows sitting HIGHER than most of the named ones. **A name is a label
+somebody did not change. Content is the fact.**
+⚠️ **VERIFYING A BACKUP NEEDS NO DEVICE**: `unzip -l`, read `index.json`, check
+the session count, check one patch is 350 bytes. Fewer WAVs than sample rows is
+normal rather than damage. `plans/plan-circuit-patches.md` has the whole
+procedure and the list of what destroys patches.
+
 ## Run and check
 
 ```sh
@@ -691,7 +718,7 @@ to recover.
 ## Platform facts
 
 - **`rack` plays Ableton Live from a browser and it is LIVE (2026-09-12).**
-  <https://positron.studio/rack/>, 15/15. A note number crosses the relay,
+  <https://positron.studio/able/>, 15/15. A note number crosses the relay,
   `rig/m1/live-agent.mjs` hands it to Live over CoreMIDI, and a **Core Audio
   process tap** sends a copy of what Live renders back down the same socket —
   so Live keeps playing out of its own speakers while the page hears it too.
@@ -767,7 +794,7 @@ to recover.
   deaf, so its relay agent must live in a login session — the box is a service
   that dials out on boot, this is a performance instrument you wake on purpose.
   `rig/m1/README.md` has the measurements, the two traps and the
-  revisit order. `/rack/` stays live and reports silence AS silence.
+  revisit order. `/able/` stays live and reports silence AS silence.
 - **An avfoundation device INDEX is a shared mutable global, exactly like a
   fixed port.** `ffmpeg -f avfoundation -i ":0"` meant the microphone when
   `rig/m1/README.md` was written and means **BlackHole** today —
@@ -788,7 +815,7 @@ to recover.
 - 🔴 **AUDIO SURVIVES AN IMMERSIVE SESSION ON A QUEST, AND COSTS NOTHING.
   MEASURED 2026-09-16 by `/earshot/`, 68 s, 3322 frames, and every number here
   is off the device log rather than reasoned about.** The four questions
-  `plan-videoradio-xr.md` §11 refused to answer without a headset are answered:
+  `plans/plan-videoradio-xr.md` §11 refused to answer without a headset are answered:
   - **The `AudioContext` survives.** `running` before `requestSession`, through
     the whole session, and after it ends. It is never suspended by entering.
   - **The latencies do not move.** Window **48000 Hz, base 4.00 ms, out
@@ -1272,7 +1299,7 @@ is checkable in one command, so check it before repeating it.
 - 🔴 **A FINISHED PLAN IS REPORTED IN FULL, NOT HANDED OVER AS A FILENAME.**
   Instructed 2026-09-20: *"when plans done show them here in full details.
   write it into claude.md when plans getting ready"*. It is the same rule as
-  the URL one below, one document along: `plan-midi2.md` is the answer to
+  the URL one below, one document along: `plans/plan-midi2.md` is the answer to
   *"which file did you write"* and not to *"what did you find out"*.
   ⚠️ **AND A SUMMARY IS NOT THE REPORT EITHER.** What a plan is FOR is the
   findings, the numbers, the trade-offs and the recommendation with its reasons.
@@ -1284,9 +1311,18 @@ is checkable in one command, so check it before repeating it.
   from documentation rather than from a running thing says so, and names what
   would have to be plugged in, switched on or measured to turn a reading into a
   fact.
-  ⚠️ **THERE ARE 52 PLAN DOCUMENTS IN THIS REPO**, several over 1000 lines, and
-  a plan nobody reads is a plan that gets rewritten by the next person who needs
-  it. Reporting it in full when it is fresh is the only moment it is cheap.
+  🔴 **AND THEY LIVE IN `plans/` SINCE 2026-09-20, NOT IN THE REPOSITORY
+  ROOT.** Instructed: *"move plans to plans dir"*. **58 documents**, several over
+  1000 lines, moved with `git mv` so the history follows them. A new plan goes
+  in `plans/` and nowhere else.
+  ⚠️ **129 FILES REFERENCED ONE BY NAME AND EVERY ONE WAS REWRITTEN**, because a
+  path in a comment that no longer resolves is this project's most repeated
+  defect in its cheapest form. `archive/` was deliberately LEFT ALONE: an
+  archive records what was there, the same rule that keeps `box` and
+  `radio1965` spelled the old way inside it.
+  ⚠️ A plan nobody reads is a plan that gets rewritten by the next person who
+  needs it. Reporting it in full when it is fresh is the only moment it is
+  cheap.
 
 - 🔴 **A FINISHED PAGE IS HANDED OVER AS A URL, NOT AS A PATH.**
   `demo/radio/index.html` is not an answer to *"where is it"* — it is the
@@ -1831,6 +1867,114 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
   one list and one form is furniture. 🔴 **`min-width: 0` or a scrolling row
   drags the PAGE sideways instead of scrolling**: `overflow-x` cannot shrink a
   flex item below its content, and 390 px measured 141 px of page overflow.
+- 🔴 **A LAYOUT CLAIM IS A MEASUREMENT, AND `/rack/` WAS CORRECTED BY
+  SCREENSHOT TWELVE TIMES IN ONE EVENING.** Every one was plausible reasoning
+  that a rect would have refused. The pattern is worth more than any of them:
+  **when somebody reports what they SEE, the cause is usually one layer
+  under it**, and measuring first costs one throwaway assert.
+  - *"less h padding on strip"*: the padding was ALREADY equal at 14 px both
+    ways. MEASURED: strip 174.4 px, controls 102.0, **50.2 px of air each side
+    of the knob**, because the HEADING was 146 px. Changing the padding would
+    have moved 4 px of a 50 px gap and it would have been reported again.
+  - *"bottom uneven"*: `padding-bottom: 4px` sat on the scroller and nowhere
+    on the lane beside it. **A reservation that only one of two equal things
+    makes is a reservation that breaks them.**
+  - *"align content to bottom"*: `margin-top: auto` pushed ONE element down
+    and left everything above it where it was, which is what it says and not
+    what a reader sees.
+
+- 🔴 **THREE ALIGNMENTS THAT LOOK LIKE ONE ARE THREE ASSERTS.** Lane top
+  against the first button's top, lane bottom against the last button's
+  bottom, and the two labels under them against each other. **Two of the three
+  lined up while the third was 30 px out**, and later the boxes matched
+  perfectly while the faders inside them were 17 px apart. Arithmetic in a
+  comment is not evidence.
+  ⚠️ **AND MEASURE THE WORKING SURFACE, NOT THE WRAPPER.** A pad returns its
+  wrapper as `el` and exposes `button` separately. An assert reading `el`
+  reported a button 17 px low while the button was exactly right.
+
+- 🔴 **A COMPONENT'S INVISIBLE RESERVATIONS MUST BE PUBLISHED OR A CALLER WILL
+  GET THEM WRONG.** The distance between two stacked pads is THREE things:
+  this one's foot, the gap, and the next one's head, which is reserved even
+  when empty. Counting two of them made a lane 115 px against the 145 it
+  needed, and the error was exactly one reserved slot.
+  ⚠️ **AND A CUSTOM PROPERTY INHERITS DOWNWARD, NEVER SIDEWAYS.** `--fdr-foot`
+  declared on `.pos-fdr` was invisible to the button column BESIDE it, `var()`
+  fell back silently, the margin was never applied, and the source read as
+  correct. It belongs at `:root`.
+
+- 🔴 **A COMPONENT WHOSE VISIBLE EXTENT EXCEEDS ITS INTERACTIVE ELEMENT HAS TO
+  SAY SO TWICE.** A pad's labels are siblings of its button, so `:disabled`
+  dims the button and cannot reach them: two disabled pads read as live
+  because their names were at full strength. The wrapper carries the state as
+  well. **The same boundary caused three separate bugs in one evening**, which
+  makes it a shape rather than three slips.
+
+- 🔴 **A DEAD SELECTOR READS AS CORRECT, AND RENAMING A CLASS IS HOW ONE IS
+  BORN.** `.strip-body .pos-fdr` kept the old class name for one run after the
+  row became `.pos-crow`, so `--fdr-lane-h` fell back to its default and a lane
+  was 29 px short. **Caught in seconds because the alignment was asserted**,
+  which is the fifth dead rule this project has measured and the FIRST one
+  found by its own check rather than by somebody looking.
+
+- 🔴 **A `const` SHADOWS ITS WHOLE BLOCK FROM THE TOP, AND SEVEN ASSERTS WENT
+  SILENT ON IT.** A new check read an outer `lane` above an inner `const lane`
+  declared later in the same block: temporal dead zone, the check threw, and
+  the page reported **22/22 green** having previously been 29. **Asserts do not
+  fail when they stop running. Only the COUNT says so.**
+
+- ⚠️ **GLYPHS: PICK CHARACTERS WITH NO EMOJI FORM RATHER THAN ASKING FOR TEXT
+  PRESENTATION.** `⏪ ⏩ ⏹ ⏯ ⏺` default to emoji and render full colour at the
+  wrong size and baseline. Appending U+FE0E is honoured inconsistently, so it
+  looks right on one machine and wrong on another. `◄ ► ■ ●` have no emoji
+  form at all. ⚠️ `▶` U+25B6 DOES, despite being geometric; `►` U+25BA does
+  not.
+
+- 🔴 **A PHONE LAYOUT THIS PROJECT CANNOT GRADE MUST SAY SO.** `demo/verify.mjs`
+  runs at 756 px with no viewport override, so **every assert on a page passes
+  without ever entering its media query**. Checking the block is last in the
+  style element answers the failure this repo actually measured, where
+  `.pos-pick`'s phone layout sat above the plain rule that beat it and had
+  never run in its life. **Ordering is not behaviour.** Say which claims are
+  measured and which are read, or three green alignment asserts imply coverage
+  they do not have.
+
+- 🔴 **A HARDWARE CONTROL HAS A WORKING SURFACE AND FURNITURE, AND ONLY THE
+  FURNITURE VARIES. `--ctl-head` AND `--ctl-foot` ARE THE CONTRACT.** A fader's
+  working surface is its lane, a pad's is its button, a knob's is its dial.
+  Above and below each sits text that belongs to the control and is INVISIBLE
+  FROM OUTSIDE IT: a value readout, a reserved top label slot, a name
+  underneath.
+  🔴 **SO A ROW OF DIFFERENT CONTROLS CANNOT BE ALIGNED BY A CALLER, AND THREE
+  SCREENSHOTS IN ONE EVENING PROVED IT.** `/rack/` was reported with buttons a
+  label too low, then with two labels ending on different lines, then with a
+  lane starting 30 px below the button beside it. Every one was the page doing
+  arithmetic about a component's insides.
+  ✅ **ONE HEAD AND ONE FOOT FOR EVERY CONTROL, PUBLISHED IN `shell.css`**, and
+  then `.pos-crow` is plain `flex-end` and the browser does it. A page that
+  writes its own margin correction here is a page that breaks the moment a
+  component gains a label, which is exactly what happened: `/rack/` lifted its
+  button column by a foot's height, which was right until the pads grew one.
+  ⚠️ **A SLOT IS RESERVED EVEN WHEN EMPTY.** A pad with no top label still
+  takes `--ctl-head`, or a grid whose downbeats are named has those pads
+  sitting higher than the rest, which reads as a rendering fault rather than a
+  labelling choice.
+  ⚠️ **AND THE DISTANCE BETWEEN TWO STACKED CONTROLS IS THREE THINGS, NOT
+  ONE**: this one's foot, the gap, and the next one's head. `--ctl-step` is all
+  three. Counting two of them made a lane 115 px against the 145 it needed, and
+  the error was exactly one reserved slot.
+  🔴 **ASSERT THE ALIGNMENT, BECAUSE ARITHMETIC IN A COMMENT IS NOT EVIDENCE.**
+  `/rack/` grades three separate claims against real rects: lane top against
+  the first button's top, lane bottom against the last button's bottom, and the
+  two labels against each other. **Two of the three lined up while the third
+  was 30 px out**, and a fourth run caught a dead selector in seconds when a
+  renamed class left `--fdr-lane-h` falling back to its default. That is the
+  fifth dead rule this project has measured and the FIRST one caught by its own
+  check rather than by somebody looking.
+  ⚠️ And measure the BUTTON, not the wrapper. A pad returns its wrapper as
+  `el` and exposes `button` separately; an assert reading the wrapper reported
+  a button 17 px low while the button was exactly right.
+
 - 🔴 **BUILD FROM `/kit/`, AND SAY SO WHEN YOU CANNOT.** Before writing any new
   interface, look at what `demo/shell/` already has — slider, slider group,
   stepper, choice, keyboard, MIDI, transport bar, logger — and use it. Hand-
