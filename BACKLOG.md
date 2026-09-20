@@ -2,6 +2,18 @@
 
 ### The instruments, 2026-09-21
 
+- 🔴 **NOBODY HAS HEARD `/circuit/` PLAY A NOTE.** The page sends note on, note
+  off and MIDI Start and Stop to an output matching `/circuit/i`, and every
+  assert about it grades **this page's own side of the wire**: what was sent,
+  what was refused, which track is armed. ⚠️ **A COUNTER ON THE SENDING SIDE IS
+  NOT EVIDENCE THE DEVICE DID ANYTHING**, which is this project's oldest rule
+  about lanes wearing a new coat. What is still unknown: whether the synths
+  answer notes on channels 1 and 2, whether the drums answer 60/62/64/65 on
+  channel 10, and whether Start is obeyed at all given the Circuit was measured
+  **sending its own clock continuously**, which makes it the master.
+  ⚠️ The pad-to-note map is a CHOICE, not a measurement: chromatic from 48,
+  bottom row lowest, because three notes out of thirty two have ever been seen.
+
 - 🔴 **THE 32 USER SESSIONS OFF THE CIRCUIT.** *"user sessions are mine. very
   important"*. `New Pack.circuitpack` is backed up twice and verified by md5,
   and it is the PACK: patches, samples, the pack's own session slots. The 32

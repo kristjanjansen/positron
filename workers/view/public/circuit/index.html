@@ -34,24 +34,52 @@
      page overflow. The scrolling happens in this box or it happens in the
      document, and only one of those is a design. */
   .circ-scroll { overflow-x: auto; min-width: 0; }
+  /* 🔴 THE CARD IS NOT THE GRID, AND THAT SEPARATION IS THE WHOLE FIX.
+     Photographed 2026-09-21 with `NOVATION` sitting about twice as far from the
+     left edge as from the top: *"same top and left and rigtj paddings"*.
+     **A centred grid cannot give its first column the card's own inset**,
+     because `justify-content: center` splits the leftover width either side of
+     the tracks and that leftover lands between the border and the first
+     column. Nothing written on the brand could have fixed it.
+     ✅ So the card is a flex column that fills its container, the printed names
+     are a row that spans the CARD, and the controls are a grid inside it that
+     centres. The names sit at the padding and the panel sits in the middle,
+     which were never the same request.
+     ⚠️ **AND THE NAMES ARE ARTWORK ON THE CASE RATHER THAN A ROW OF CONTROLS.**
+     Having them in the control grid was what put them in a column in the first
+     place, and it is also what made six cells need explicit placement. */
   .circ {
-    /* ⚠️ BOTH, AND THEY DO NOT FIGHT. `width: 100%` wins wherever the container
-       is wider than the panel, which is what centres it on a desktop;
-       `min-width` wins below that and hands the overflow to the scroller. */
-    display: grid; width: 100%; min-width: max-content; justify-content: center;
-    grid-template-columns: var(--ctl-w) max-content var(--ctl-w);
+    display: flex; flex-direction: column; width: 100%; min-width: max-content;
+    gap: 22px;
+    /* ⚠️ ONE NUMBER ON THREE SIDES, TAKEN FROM THE TOP AND REDUCED: *"use top
+       one but reduce a bit"*. The foot keeps its own, because the bottom row of
+       pads has no label under it to hold it off the edge. */
+    /* ⚠️ THE FOOT IS ITS OWN NUMBER AND IT IS THE LARGEST. Asked 2026-09-21:
+       *"add more padding to bottom of circuit panel"*. The bottom row of pads
+       carries no label under it, so the same inset that looks right beside a
+       printed name looks tight under a pad. */
+    padding: 20px 20px 30px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 4px;
+  }
+  .circ-brands { display: flex; justify-content: space-between; }
+  .circ-panel {
     /* ⚠️ AIR. Asked 2026-09-21: *"tune whitespace between controls to add bit
        of air"*. Every gap on this page moved together in one edit, because the
        pad area's row pitch and the side column's row pitch are the same number
-       twice and a page where they disagree is the 7.5 px drift again. */
+       twice and a page where they disagree is the 7.5 px drift again.
+       ⚠️ `justify-content`, NOT `justify-items`: the first centres the whole
+       set of tracks, the second would centre each column inside its own track
+       and pull both side columns away from the pads. */
+    display: grid; justify-content: center;
+    grid-template-columns: var(--ctl-w) max-content var(--ctl-w);
     gap: 22px; align-items: start;
-    /* ⚠️ THE SAME INSET AT THE TOP AND BOTH SIDES. Asked 2026-09-21: *"same
-       padding top and left and right"*, after the sides were widened on their
-       own and left the printed names sitting closer to the top edge than to the
-       side ones. The foot keeps its own value because the bottom row of pads
-       has no label under it to hold it off the edge. */
-    padding: 24px 24px 20px; background: var(--card);
-    border: 1px solid var(--line); border-radius: 4px;
+    /* 🔴 ONE PITCH, DECLARED ONCE, INHERITED BY EVERY ROW AND COLUMN IN THE
+       PANEL. It was three separate 14s: the pad grid's, the side column's and
+       an 8 the top row inherited from `:root` without anybody noticing, which
+       is what put the Shift buttons on a 54 px pitch over pads on a 60 px one.
+       ⚠️ A SHARED MEASUREMENT IN THREE PLACES IS A MEASUREMENT THAT WILL
+       DISAGREE, which this project has already paid for once as `--sld-col`. */
+    --ctl-gap: 14px;
   }
   /* the macro row and the pad area centre in the same track */
   .circ-macros, .circ-mid { justify-self: center; }
@@ -70,18 +98,16 @@
      asked for neither: *"uppercalse all"*. At 11 px in a mono face beside a
      row of uppercase control labels, a lower case word reads as a different
      kind of thing rather than as branding. */
-  .circ-brand-l { grid-area: 1 / 1 / 2 / 2; }
-  .circ-brand-r { grid-area: 1 / 3 / 2 / 4; justify-self: end; }
-  .circ-vol     { grid-area: 2 / 1 / 3 / 2; }
-  .circ-macros  { grid-area: 2 / 2 / 3 / 3; }
-  .circ-filt    { grid-area: 2 / 3 / 3 / 4; }
+  .circ-vol     { grid-area: 1 / 1 / 2 / 2; }
+  .circ-macros  { grid-area: 1 / 2 / 2 / 3; }
+  .circ-filt    { grid-area: 1 / 3 / 2 / 4; }
   /* ⚠️ CLASSES, NOT `:first-of-type`. That pseudo class counts by TAG, and the
      first div in this grid is now a brand label, so neither column rule matched
      and both columns fell into the auto flow. It reported as a 336 px drift and
      as two different controls both sitting at x 608. */
-  .circ-left    { grid-area: 3 / 1 / 4 / 2; }
-  .circ-mid     { grid-area: 3 / 2 / 4 / 3; }
-  .circ-right   { grid-area: 3 / 3 / 4 / 4; }
+  .circ-left    { grid-area: 2 / 1 / 3 / 2; }
+  .circ-mid     { grid-area: 2 / 2 / 3 / 3; }
+  .circ-right   { grid-area: 2 / 3 / 3 / 4; }
   /* the knob row sits on the bottom of its own row, level with each other */
   .circ > .pos-knob { align-self: end; }
   /* 🔴 THE TOP ROW USES THE BODY'S GAP, SO ITS ENDS SIT OVER THE COLUMNS.
@@ -97,7 +123,7 @@
   /* 🔴 ONE ROUND BUTTON TO A PAD ROW. The cell is a pad's height and the circle
      centres in it, so a 41 px button and a 46 px pad still share a centre line.
      The gap is the pad area's, not the side column's. */
-  .circ-side-pads { display: flex; flex-direction: column; gap: 14px; }
+  .circ-side-pads { display: flex; flex-direction: column; gap: var(--ctl-gap); }
   /* 🔴 THESE CIRCLES ARE PAD SIZED, NOT 10 PER CENT SMALLER. Photographed
      2026-09-21 as ellipses: a 41 px round pad in a 46 px wrapper was being
      stretched across by the flex column's default `stretch`, so it came out
@@ -124,7 +150,6 @@
      piece, so the track row, the grid's columns and the grid's rows all move
      together and the across and down spacing cannot come apart again. */
   .circ-grid {
-    --ctl-gap: 14px;
     display: flex; flex-direction: column; gap: var(--ctl-gap);
   }
   /* 🔴 THE TRACK PADS GIVE UP THEIR LABEL SLOTS TOO. They carry their names on
@@ -135,7 +160,35 @@
      labelled. This row is a plain flex of pads and is outside that rule, which
      is the kind of gap a rule leaves when it is written for one container. */
   .circ-grid > .circ-row .pos-pad-top { display: none; }
-  .circ-row { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
+  /* 🔴 EIGHT COLUMNS, NOT EIGHT WIDTHS. Asked 2026-09-21: *"make top buttons
+     line up"*, photographed with `Tempo` and `Swing` sitting between pad
+     columns because each button had been sized to its own word.
+     ⚠️ **BOTH ROWS THAT USE THIS CLASS ARE EIGHT THINGS WIDE**: the Shift row
+     and the track row, and both sit over the pad grid, so one `repeat(8, …)`
+     makes all three agree by construction rather than by three numbers that
+     happen to match. On the panel these buttons really are pad width.
+     ⚠️ **AND THE PRICE IS PAID IN LABELS, WHICH IS THE RIGHT PLACE.** A word
+     that does not fit 46 px gets shortened by the author (`Session` is
+     `Sess`), never ellipsised at the reader. */
+  .circ-row {
+    display: grid; grid-template-columns: repeat(8, var(--ctl-w));
+    gap: var(--ctl-gap); align-items: flex-end;
+  }
+  /* 🔴 A GRID COLUMN IS NOT A WIDTH UNTIL THE CHILD IS TOLD. Photographed
+     2026-09-21 with `Oct` `Oct` `Tempo` overlapping each other: a button sized
+     to its own word is wider than a 46 px track, and a grid item wider than its
+     column OVERFLOWS it rather than shrinking, so eight buttons ran into each
+     other while the tracks underneath were perfectly even.
+     ⚠️ **`min-width: 0` IS THE HALF THAT DOES THE WORK.** `width: 100%` alone
+     loses to the content's own minimum, which is the same rule already written
+     down here for a scrolling flex row. */
+  .circ-row > .pos-pad-wrap, .circ-row .pos-pad { width: 100%; min-width: 0; }
+  /* 🔴 SEVEN CHILDREN OVER EIGHT COLUMNS, WHICH IS WHY THE ROW WOULD NOT LINE
+     UP. The two octave buttons live in one wrapper so they can share the
+     `prt/oct` legend above them, so the row has SEVEN items for EIGHT tracks
+     and every one after the pair was a column out. Nothing about the pair was
+     wrong; the grid was told eight and handed seven. */
+  .circ-row > .circ-pair { grid-column: span 2; }
 
   /* 🔴 THE MACROS ARE A ZIG ZAG, NOT A ROW. Odd numbers on the upper line, even
      numbers lower and offset right, so the eight interleave. Read off the panel
@@ -144,7 +197,10 @@
      **A straight row of eight, or two aligned rows of four, is a different
      instrument.** The offset is half a column plus half a gap, which is what
      interleaving means. */
-  .circ-macros { display: flex; gap: var(--ctl-gap); align-items: flex-start; }
+  /* ⚠️ THE MACRO ROW SETS ITS OWN GAP. Asked 2026-09-21: *"reduce x padding
+     around m knobs"*. A knob's box is wider than a pad's, so the same number
+     that is right between pads leaves the eight knobs looking loose. */
+  .circ-macros { display: flex; gap: 2px; align-items: flex-start; }
   .circ-macro-even { margin-top: 26px; }
 
   /* ⚠️ ONE KNOB SIZE EVERYWHERE. Asked 2026-09-21: *"single size knobs
@@ -174,7 +230,10 @@
      ⚠️ **A SHARED LABEL REPLACES THE SLOTS IT SPANS, IT DOES NOT SIT ABOVE
      THEM.** The comment here previously said the opposite and was wrong: it was
      reasoning about a pair standing alone, not about one in a row. */
-  .circ-pair-row { display: flex; gap: var(--ctl-gap); }
+  .circ-pair-row {
+    display: grid; grid-template-columns: repeat(2, var(--ctl-w));
+    gap: var(--ctl-gap);
+  }
   .circ-pair-row .pos-pad-top { display: none; }
 
 </style>
@@ -214,10 +273,95 @@
   const d = mount({
     name: 'circuit',
     what: 'A Novation Circuit on screen, moving when the real one moves.',
-    readout: null,
+    /* ⚠️ FOUR CELLS AND ALL FOUR MOVE. `armed` is which track a pad press is
+       addressed to, `output` is whether a Circuit was found, `sent` counts what
+       has actually left, `playing` is what this page last told the transport.
+       ⚠️ `playing` IS THIS PAGE'S CLAIM, NOT THE DEVICE'S STATE. There is no
+       reply to a transport byte, so the honest reading is "what was sent". */
+    readout: { armed: '', output: '', sent: '', playing: '' },
     controls: [{ id: 'listen', label: 'Listen', primary: true }],
   });
   guard(d);
+
+  /* 🔴 THIS BLOCK SITS ABOVE EVERY CONTROL IT SERVES, AND THAT IS NOT TIDINESS.
+     It was below them, and `DEST[i]` read from a pad's own `title` at BUILD
+     time threw a temporal dead zone error: `const` is hoisted and unreadable,
+     so the whole page died at mount with `__demo.ready` red and no page assert
+     ever running. Same shape as the `const lane` shadow on /rack/ that took
+     seven asserts silent. */
+  /**
+   * 🔴 THIS PAGE CAN NOW SEND, AND THE FIRST THING BUILT WAS THE THING THAT
+   * REFUSES. Asked 2026-09-21: *"make novation actually work, at least
+   * transport and pads ans instr select. no record!"*, from somebody who has
+   * spent this session protecting 32 sessions on a device with **no factory
+   * reset**. So `no record` is not a preference about a button, it is the
+   * constraint the sending half is built around.
+   * ⚠️ **IT IS AN ALLOWLIST, NOT A DISABLED BUTTON.** A button that is switched
+   * off is one edit away from being switched on, and the edit looks harmless.
+   * What stops a record arming here is that `send` has no path for anything
+   * except note on, note off and the three transport bytes: no control change,
+   * no program change, no SysEx, on any channel. A record command cannot be
+   * expressed, so it cannot be sent by accident.
+   * ⚠️ AND THE REFUSAL IS COUNTED AND PROVED. The check hands it a record-shaped
+   * message and asserts that it bounced, because a guard nobody has fired is a
+   * guard nobody knows about.
+   */
+  const OUT_NAME = /circuit/i;
+  const START = 0xfa, CONTINUE = 0xfb, STOP = 0xfc;
+  const SYNTH_CH = [0, 1];               // channels 1 and 2, zero based
+  const DRUM_NOTES = [60, 62, 64, 65];   // measured arriving on channel 10
+  let out = null, sent = 0, refused = 0;
+
+  function allowed(b) {
+    const s = b[0];
+    if (s === START || s === STOP || s === CONTINUE) return true;
+    const hi = s & 0xf0, ch = s & 0x0f;
+    if (hi !== 0x90 && hi !== 0x80) return false;
+    return SYNTH_CH.includes(ch) || ch === DRUM_CH - 1;
+  }
+  function send(bytes) {
+    if (!allowed(bytes)) {
+      refused++;
+      d.log(`refused to send ${bytes.map((b) => b.toString(16)).join(' ')}: `
+          + 'this page sends notes and transport, nothing else', 'warn');
+      return false;
+    }
+    sent++;
+    try { out?.send(bytes); } catch (e) { d.log(`send failed: ${e.message}`, 'warn'); }
+    d.set('sent', sent);
+    return true;
+  }
+
+  /**
+   * 🔴 WHICH TRACK IS ARMED IS THIS PAGE'S FACT, NOT THE DEVICE'S. Selecting a
+   * track on a Circuit has no MIDI binding anybody has measured, so pressing
+   * `Syn1` here does not move the hardware's own selection. What it does is
+   * decide **where the next pad press is addressed**, which is the half that is
+   * real and the half that makes the pads play the right instrument.
+   * ⚠️ SAYING IT PLAINLY IS THE POINT. A button claiming to select a track on
+   * the device, that does not, is the control this project calls a lie.
+   * ⚠️ THE TWO SIDECHAIN BUTTONS ADDRESS NOTHING and stay inert, because a
+   * sidechain is not an instrument to play notes at.
+   */
+  const DEST = [{ ch: 0 }, null, { ch: 1 }, null,
+                ...DRUM_NOTES.map((note) => ({ ch: DRUM_CH - 1, note }))];
+  let armed = 0;
+
+  function arm(i) {
+    if (!DEST[i]) return;
+    armed = i;
+    tracks.forEach((t, k) => t.set(k === i));
+    d.set('armed', TRACKS[i][1]);
+  }
+
+  /**
+   * ⚠️ A CHROMATIC RUN FROM 48, BOTTOM ROW LOWEST, AND IT IS A CHOICE RATHER
+   * THAN A MEASUREMENT. Three notes out of thirty two have ever been seen from
+   * this device, which is not a map, so the page picks a plain one and says so
+   * instead of implying the hardware agrees.
+   */
+  const noteFor = (x, y) => 48 + x + (3 - y) * 8;
+
 
   /**
    * 🔴 THE KNOB ROW SPANS THE WHOLE PANEL AND THE SIDE COLUMNS START BELOW IT.
@@ -251,8 +395,11 @@
    */
   const circ = el('div', 'circ');
   const circScroll = el('div', 'circ-scroll');
-  circ.append(el('div', 'circ-brand circ-brand-l', 'novation'),
-              el('div', 'circ-brand circ-brand-r', 'CIRCUIT'));
+  const panel = el('div', 'circ-panel');
+  const brands = el('div', 'circ-brands');
+  brands.append(el('div', 'circ-brand circ-brand-l', 'novation'),
+                el('div', 'circ-brand circ-brand-r', 'CIRCUIT'));
+  circ.append(brands, panel);
   const left = el('div', 'circ-side circ-left');
   const mid = el('div', 'circ-mid');
   const right = el('div', 'circ-side circ-right');
@@ -307,7 +454,7 @@
   filter.el.classList.add('circ-filt');
 
   // volume, macros, filter across the top; then the two columns and the middle.
-  circ.append(volume.el, macroRow, filter.el, left, mid, right);
+  panel.append(volume.el, macroRow, filter.el, left, mid, right);
 
   // ── the button row under the macros ─────────────────────────────────────
 
@@ -333,7 +480,7 @@
     ['oct-', 'Oct\u25BC', ''], ['oct+', 'Oct\u25B2', ''],
     ['tempo', 'Tempo', 'Tap'], ['swing', 'Swing', ''],
     ['clear', 'Clear', ''], ['dup', 'Dup', ''],
-    ['save', 'Save', 'Clear'], ['session', 'Session', 'Sessions'],
+    ['save', 'Save', 'Clear'], ['session', 'Sess', 'Sessions'],
   ];
   const btnRow = el('div', 'circ-row');
   const rowPads = {};
@@ -414,9 +561,14 @@
    * ⚠️ A SQUARE HOLDS MORE THAN A HALF DOES, but not much more: the face is
    * still 46 px against a 9 px mono word, which is why these stayed short.
    */
-  const tracks = TRACKS.map(([short, full]) => {
+  const tracks = TRACKS.map(([short, full], i) => {
+    /* ⚠️ THE TWO SIDECHAIN BUTTONS ARE DRAWN AND ARM NOTHING, because a
+       sidechain is not an instrument to play notes at. They stay pressable
+       and simply do not take the arming, which is what the panel does too. */
     const p = createPad({ label: short, tint: '#7fb2ff', latch: true,
-      aria: full, title: full });
+      aria: full, onPress: () => arm(i),
+      title: DEST[i] ? `${full}, a pad press is addressed here`
+                     : `${full}, which is not an instrument to play notes at` });
     trackRow.append(p.el);
     return p;
   });
@@ -446,7 +598,25 @@
   const LANE_TINT = ['#7fb2ff', '#8fd6a8', '#e0b060', '#e0908a'];
   const grid = createPadGrid({
     cols: 8, rows: 4,
-    pad: (x, y) => ({ tint: LANE_TINT[y], title: `pad ${x + 1} of row ${y + 1}` }),
+    /* 🔴 A PRESS SENDS A NOTE AND A RELEASE IS SENT WITH IT, on the same press.
+       A pad here is a button rather than a key: there is no press-and-hold to
+       read, so holding one would leave a note sounding on the hardware with
+       nothing on this page able to stop it. 120 ms of note, then note off.
+       ⚠️ THAT IS A REAL LIMITATION AND IT IS NOT THE PAD'S FAULT. A held note
+       needs a pointer-down and pointer-up pair, which `pad.mjs` does not
+       publish, and inventing one here would be the fourth copy of a control
+       this project has already paid for three times. */
+    pad: (x, y) => ({
+      tint: LANE_TINT[y], title: `pad ${x + 1} of row ${y + 1}`,
+      onPress: () => {
+        const dest = DEST[armed];
+        if (!dest) return;
+        const note = dest.note ?? noteFor(x, y);
+        if (send([0x90 | dest.ch, note, 0x64])) {
+          setTimeout(() => send([0x80 | dest.ch, note, 0]), 120);
+        }
+      },
+    }),
   });
   gridBlock.append(grid.el);
 
@@ -495,7 +665,25 @@
 
   for (const [host, list] of [[left, LEFT], [right, RIGHT]]) {
     for (const [id, face, full, above, round] of list) {
+      /**
+       * 🔴 RECORD IS SWITCHED OFF **AND** UNREACHABLE, WHICH ARE TWO DIFFERENT
+       * THINGS AND BOTH ARE WANTED. Switched off is what a reader sees. What
+       * actually protects the device is that `send` has no path that could arm
+       * a recording: no control change, no program change, no SysEx. Take this
+       * `disabled` away and nothing bad can still happen.
+       */
+      const isRecord = id === 'record';
       side[id] = createPad({
+        disabled: isRecord,
+        onPress: id === 'play' ? () => {
+          /* ⚠️ THE CIRCUIT WAS MEASURED SENDING ITS OWN CLOCK CONTINUOUSLY,
+             which makes it the master, and a master is entitled to ignore a
+             Start from us. The page sends it and reports what it sent; whether
+             the hardware obeys is a fact only the hardware can give back. */
+          const on = side.play.on();
+          send([on ? START : STOP]);
+          d.set('playing', on ? 'start sent' : 'stop sent');
+        } : () => {},
         /**
          * ⚠️ THE FACE FOR BOTH SHAPES. A round button with its name below it
          * read as a dot with a caption; the panel prints the word inside.
@@ -512,9 +700,15 @@
          */
         round, half: !round, tint: '#6a7280', latch: true,
         label: face, top: round ? '' : above, aria: full,
-        title: above
-          ? `${full}, and Shift plus it is ${above}. Never seen a byte from it`
-          : `${full}, and this page has never seen a byte from it`,
+        title: id === 'play'
+          ? 'Play, which sends MIDI Start and Stop. This Circuit was measured '
+            + 'sending its own clock, so it may be the master and ignore them'
+          : isRecord
+            ? 'Record, switched off on purpose. This page can send notes and '
+              + 'transport and nothing else, so a recording cannot be armed'
+            : above
+              ? `${full}, and Shift plus it is ${above}. Never seen a byte from it`
+              : `${full}, and this page has never seen a byte from it`,
       });
       // the rectangular one stays at the top of the column; the circles go in
       // the block that tracks the pad rows
@@ -563,6 +757,18 @@
         try { await p.open(); } catch { /* another client may hold it */ }
         p.onmidimessage = (e) => take(Array.from(e.data));
       }
+      for (const o of access.outputs.values()) {
+        if (!OUT_NAME.test(o.name || '')) continue;
+        try { await o.open(); out = o; } catch (e) {
+          d.log(`could not open ${o.name}: ${e.message}`, 'warn');
+        }
+        break;
+      }
+      d.set('output', out ? 'open' : '');
+      if (!out) {
+        d.log('no Circuit output was found, so the pads and the transport move '
+            + 'this page and reach no hardware', 'warn');
+      }
       return true;
     } catch (e) {
       d.log(`MIDI was refused: ${e.message}`, 'warn');
@@ -572,6 +778,11 @@
 
   d.on('listen', async () => {
     if (await open()) {
+      arm(0);
+      d.log('press a pad to play the armed track, and a track button to change '
+          + 'which one it is addressed to.');
+      d.log('record is switched off, and this page can send nothing but notes '
+          + 'and transport, so no recording can be armed from here.');
       d.log('turn a macro or the filter. The pads light where a note has been '
           + 'seen, which is three of thirty two so far.');
       d.log('this Circuit sends MIDI clock continuously, measured at about 122 bpm, '
@@ -630,10 +841,51 @@
      * and would pass for a control that was wired AND still described as
      * unwired. **A wording is not a fact about behaviour.**
      */
-    const unbound = [...Object.values(rowPads), ...Object.values(side), ...tracks];
+    /**
+     * 🔴 THE LIST SHRANK WHEN THREE THINGS WERE WIRED, AND THAT IS THE POINT OF
+     * KEEPING IT. Tracks, pads and the play button address the hardware now;
+     * everything still in here is drawn and reaches nothing, and it says so
+     * rather than being quietly bound by a guess later.
+     */
+    const bound = new Set(['play', 'record']);
+    const unbound = [...Object.values(rowPads),
+                     ...Object.entries(side).filter(([id]) => !bound.has(id)).map(([, p]) => p)];
     d.assert('the buttons nobody has measured are drawn and are lit by nothing',
       unbound.every((p) => p.presses() === 0 && !p.on()),
       `${unbound.length} controls drawn, none lit by a message`);
+
+    /**
+     * 🔴 THE REFUSAL IS FIRED ON PURPOSE, because a guard nobody has tripped is
+     * a guard nobody knows about. Four shapes that could touch a recording or a
+     * stored patch, one that is allowed, and the counter has to move for the
+     * first four and not for the fifth.
+     */
+    {
+      const before = { sent, refused };
+      const bad = [[0xb0, 0x5f, 0x7f],            // a control change, any control
+                   [0xc0, 0x01],                  // a program change
+                   [0xf0, 0x00, 0x20, 0x29, 0xf7], // SysEx, which is how a pack moves
+                   [0xb9, 0x07, 0x00]];           // a control change on the drum channel
+      bad.forEach(send);
+      const stopped = refused - before.refused;
+      const leaked = sent - before.sent;
+      d.assert('nothing that could arm a record or move a patch can be sent',
+        stopped === 4 && leaked === 0 && !!side.record.disabled?.(),
+        `${stopped} of 4 refused, ${leaked} leaked, record `
+        + `${side.record.disabled?.() ? 'off' : 'LIVE'}`);
+    }
+
+    /**
+     * ⚠️ AND THE ALLOWED SHAPES REALLY DO GO THROUGH, which is the negative
+     * control: a guard that refused everything would pass the assert above
+     * while making the page inert.
+     */
+    {
+      const before = sent;
+      send([0x90, 60, 0x64]); send([0x80, 60, 0]); send([START]); send([STOP]);
+      d.assert('notes and transport are not refused',
+        sent - before === 4, `${sent - before} of 4 sent`);
+    }
 
     /**
      * 🔴 THE BUTTON ROW IS ONE LINE, ASSERTED. Two comments in this file have
@@ -705,6 +957,35 @@
         && doc.scrollWidth <= doc.clientWidth + 1,
         `overflow-x ${cs.overflowX}, min-width ${cs.minWidth}, `
         + `page ${doc.scrollWidth} into ${doc.clientWidth}`);
+    }
+
+    // 🔴 EVERY TOP BUTTON STANDS OVER ITS OWN PAD COLUMN, measured. This is the
+    // check that was missing when the row was eight widths instead of eight
+    // columns, and again when the buttons overflowed the columns: both were
+    // reported from a photograph, and both are one subtraction.
+    {
+      const mid = (e) => { const r = e.getBoundingClientRect(); return r.left + r.width / 2; };
+      const top = ROW.map(([id]) => mid(rowPads[id].button));
+      const below = tracks.map((t) => mid(t.button));
+      const worst = Math.max(...top.map((x, i) => Math.abs(x - below[i])));
+      d.assert('every top button stands over its own pad column',
+        top.length === 8 && below.length === 8 && worst <= 1,
+        `worst ${worst.toFixed(1)} px across eight columns`);
+    }
+
+    // 🔴 THE PRINTED NAMES SIT THE SAME DISTANCE FROM THREE EDGES, measured
+    // rather than read off the stylesheet, because the defect that bought this
+    // was a padding that was right in the source and wrong on the screen: a
+    // centred grid was adding its leftover width in front of the first column.
+    {
+      const card = circ.getBoundingClientRect();
+      const l = brands.firstChild.getBoundingClientRect();
+      const r = brands.lastChild.getBoundingClientRect();
+      const insets = [l.left - card.left, card.right - r.right, l.top - card.top];
+      const spread = Math.max(...insets) - Math.min(...insets);
+      d.assert('the printed names sit the same distance from the top and both sides',
+        spread <= 1.5,
+        `left ${insets[0].toFixed(1)}, right ${insets[1].toFixed(1)}, top ${insets[2].toFixed(1)}`);
     }
 
     d.assert('no secret in this page', !location.href.includes('token'));
