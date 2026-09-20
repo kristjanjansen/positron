@@ -61,9 +61,20 @@
      ⚠️ `min-width: max-content` STAYS and is what keeps the phone case working:
      below the panel's own width the card is wider than the container and the
      scroller takes it. */
+  /* 🔴 THE CARD'S EDGES ARE THE PAGE'S EDGES. Asked 2026-09-21 with two corner
+     photographs: *"these corners to line up with the page content leftmost
+     rightmost edges"*, which is the answer to a question three earlier rounds
+     had been circling. The card is a block on this page like the log under it,
+     and two blocks whose left edges disagree read as a mistake whatever either
+     one is doing inside.
+     ⚠️ **SO THE CONTROLS ARE CENTRED AND THE CARD IS NOT, AND THOSE ARE TWO
+     DIFFERENT INSETS ON PURPOSE.** The printed names and the border sit at the
+     card's own 20 px; the panel sits in the middle of whatever is left. A
+     reader sees one inset for the box and one for the instrument, and asking
+     them to be the same number is asking a centred thing not to centre. */
   .circ {
     display: flex; flex-direction: column;
-    width: max-content; min-width: max-content; margin-inline: auto;
+    width: 100%; min-width: max-content;
     gap: 22px;
     /* ⚠️ ONE NUMBER ON THREE SIDES, TAKEN FROM THE TOP AND REDUCED: *"use top
        one but reduce a bit"*. The foot keeps its own, because the bottom row of
@@ -312,95 +323,10 @@
   const d = mount({
     name: 'circuit',
     what: 'A Novation Circuit on screen, moving when the real one moves.',
-    /* ⚠️ FOUR CELLS AND ALL FOUR MOVE. `armed` is which track a pad press is
-       addressed to, `output` is whether a Circuit was found, `sent` counts what
-       has actually left, `playing` is what this page last told the transport.
-       ⚠️ `playing` IS THIS PAGE'S CLAIM, NOT THE DEVICE'S STATE. There is no
-       reply to a transport byte, so the honest reading is "what was sent". */
-    readout: { armed: '', output: '', sent: '', playing: '' },
+    readout: null,
     controls: [{ id: 'listen', label: 'Listen', primary: true }],
   });
   guard(d);
-
-  /* 🔴 THIS BLOCK SITS ABOVE EVERY CONTROL IT SERVES, AND THAT IS NOT TIDINESS.
-     It was below them, and `DEST[i]` read from a pad's own `title` at BUILD
-     time threw a temporal dead zone error: `const` is hoisted and unreadable,
-     so the whole page died at mount with `__demo.ready` red and no page assert
-     ever running. Same shape as the `const lane` shadow on /rack/ that took
-     seven asserts silent. */
-  /**
-   * 🔴 THIS PAGE CAN NOW SEND, AND THE FIRST THING BUILT WAS THE THING THAT
-   * REFUSES. Asked 2026-09-21: *"make novation actually work, at least
-   * transport and pads ans instr select. no record!"*, from somebody who has
-   * spent this session protecting 32 sessions on a device with **no factory
-   * reset**. So `no record` is not a preference about a button, it is the
-   * constraint the sending half is built around.
-   * ⚠️ **IT IS AN ALLOWLIST, NOT A DISABLED BUTTON.** A button that is switched
-   * off is one edit away from being switched on, and the edit looks harmless.
-   * What stops a record arming here is that `send` has no path for anything
-   * except note on, note off and the three transport bytes: no control change,
-   * no program change, no SysEx, on any channel. A record command cannot be
-   * expressed, so it cannot be sent by accident.
-   * ⚠️ AND THE REFUSAL IS COUNTED AND PROVED. The check hands it a record-shaped
-   * message and asserts that it bounced, because a guard nobody has fired is a
-   * guard nobody knows about.
-   */
-  const OUT_NAME = /circuit/i;
-  const START = 0xfa, CONTINUE = 0xfb, STOP = 0xfc;
-  const SYNTH_CH = [0, 1];               // channels 1 and 2, zero based
-  const DRUM_NOTES = [60, 62, 64, 65];   // measured arriving on channel 10
-  let out = null, sent = 0, refused = 0;
-
-  function allowed(b) {
-    const s = b[0];
-    if (s === START || s === STOP || s === CONTINUE) return true;
-    const hi = s & 0xf0, ch = s & 0x0f;
-    if (hi !== 0x90 && hi !== 0x80) return false;
-    return SYNTH_CH.includes(ch) || ch === DRUM_CH - 1;
-  }
-  function send(bytes) {
-    if (!allowed(bytes)) {
-      refused++;
-      d.log(`refused to send ${bytes.map((b) => b.toString(16)).join(' ')}: `
-          + 'this page sends notes and transport, nothing else', 'warn');
-      return false;
-    }
-    sent++;
-    try { out?.send(bytes); } catch (e) { d.log(`send failed: ${e.message}`, 'warn'); }
-    d.set('sent', sent);
-    return true;
-  }
-
-  /**
-   * 🔴 WHICH TRACK IS ARMED IS THIS PAGE'S FACT, NOT THE DEVICE'S. Selecting a
-   * track on a Circuit has no MIDI binding anybody has measured, so pressing
-   * `Syn1` here does not move the hardware's own selection. What it does is
-   * decide **where the next pad press is addressed**, which is the half that is
-   * real and the half that makes the pads play the right instrument.
-   * ⚠️ SAYING IT PLAINLY IS THE POINT. A button claiming to select a track on
-   * the device, that does not, is the control this project calls a lie.
-   * ⚠️ THE TWO SIDECHAIN BUTTONS ADDRESS NOTHING and stay inert, because a
-   * sidechain is not an instrument to play notes at.
-   */
-  const DEST = [{ ch: 0 }, null, { ch: 1 }, null,
-                ...DRUM_NOTES.map((note) => ({ ch: DRUM_CH - 1, note }))];
-  let armed = 0;
-
-  function arm(i) {
-    if (!DEST[i]) return;
-    armed = i;
-    tracks.forEach((t, k) => t.set(k === i));
-    d.set('armed', TRACKS[i][1]);
-  }
-
-  /**
-   * ⚠️ A CHROMATIC RUN FROM 48, BOTTOM ROW LOWEST, AND IT IS A CHOICE RATHER
-   * THAN A MEASUREMENT. Three notes out of thirty two have ever been seen from
-   * this device, which is not a map, so the page picks a plain one and says so
-   * instead of implying the hardware agrees.
-   */
-  const noteFor = (x, y) => 48 + x + (3 - y) * 8;
-
 
   /**
    * 🔴 THE KNOB ROW SPANS THE WHOLE PANEL AND THE SIDE COLUMNS START BELOW IT.
@@ -600,14 +526,9 @@
    * ⚠️ A SQUARE HOLDS MORE THAN A HALF DOES, but not much more: the face is
    * still 46 px against a 9 px mono word, which is why these stayed short.
    */
-  const tracks = TRACKS.map(([short, full], i) => {
-    /* ⚠️ THE TWO SIDECHAIN BUTTONS ARE DRAWN AND ARM NOTHING, because a
-       sidechain is not an instrument to play notes at. They stay pressable
-       and simply do not take the arming, which is what the panel does too. */
+  const tracks = TRACKS.map(([short, full]) => {
     const p = createPad({ label: short, tint: '#7fb2ff', latch: true,
-      aria: full, onPress: () => arm(i),
-      title: DEST[i] ? `${full}, a pad press is addressed here`
-                     : `${full}, which is not an instrument to play notes at` });
+      aria: full, title: full });
     trackRow.append(p.el);
     return p;
   });
@@ -637,25 +558,7 @@
   const LANE_TINT = ['#7fb2ff', '#8fd6a8', '#e0b060', '#e0908a'];
   const grid = createPadGrid({
     cols: 8, rows: 4,
-    /* 🔴 A PRESS SENDS A NOTE AND A RELEASE IS SENT WITH IT, on the same press.
-       A pad here is a button rather than a key: there is no press-and-hold to
-       read, so holding one would leave a note sounding on the hardware with
-       nothing on this page able to stop it. 120 ms of note, then note off.
-       ⚠️ THAT IS A REAL LIMITATION AND IT IS NOT THE PAD'S FAULT. A held note
-       needs a pointer-down and pointer-up pair, which `pad.mjs` does not
-       publish, and inventing one here would be the fourth copy of a control
-       this project has already paid for three times. */
-    pad: (x, y) => ({
-      tint: LANE_TINT[y], title: `pad ${x + 1} of row ${y + 1}`,
-      onPress: () => {
-        const dest = DEST[armed];
-        if (!dest) return;
-        const note = dest.note ?? noteFor(x, y);
-        if (send([0x90 | dest.ch, note, 0x64])) {
-          setTimeout(() => send([0x80 | dest.ch, note, 0]), 120);
-        }
-      },
-    }),
+    pad: (x, y) => ({ tint: LANE_TINT[y], title: `pad ${x + 1} of row ${y + 1}` }),
   });
   gridBlock.append(grid.el);
 
@@ -704,25 +607,7 @@
 
   for (const [host, list] of [[left, LEFT], [right, RIGHT]]) {
     for (const [id, face, full, above, round] of list) {
-      /**
-       * 🔴 RECORD IS SWITCHED OFF **AND** UNREACHABLE, WHICH ARE TWO DIFFERENT
-       * THINGS AND BOTH ARE WANTED. Switched off is what a reader sees. What
-       * actually protects the device is that `send` has no path that could arm
-       * a recording: no control change, no program change, no SysEx. Take this
-       * `disabled` away and nothing bad can still happen.
-       */
-      const isRecord = id === 'record';
       side[id] = createPad({
-        disabled: isRecord,
-        onPress: id === 'play' ? () => {
-          /* ⚠️ THE CIRCUIT WAS MEASURED SENDING ITS OWN CLOCK CONTINUOUSLY,
-             which makes it the master, and a master is entitled to ignore a
-             Start from us. The page sends it and reports what it sent; whether
-             the hardware obeys is a fact only the hardware can give back. */
-          const on = side.play.on();
-          send([on ? START : STOP]);
-          d.set('playing', on ? 'start sent' : 'stop sent');
-        } : () => {},
         /**
          * ⚠️ THE FACE FOR BOTH SHAPES. A round button with its name below it
          * read as a dot with a caption; the panel prints the word inside.
@@ -739,15 +624,9 @@
          */
         round, half: !round, tint: '#6a7280', latch: true,
         label: face, top: round ? '' : above, aria: full,
-        title: id === 'play'
-          ? 'Play, which sends MIDI Start and Stop. This Circuit was measured '
-            + 'sending its own clock, so it may be the master and ignore them'
-          : isRecord
-            ? 'Record, switched off on purpose. This page can send notes and '
-              + 'transport and nothing else, so a recording cannot be armed'
-            : above
-              ? `${full}, and Shift plus it is ${above}. Never seen a byte from it`
-              : `${full}, and this page has never seen a byte from it`,
+        title: above
+          ? `${full}, and Shift plus it is ${above}. Never seen a byte from it`
+          : `${full}, and this page has never seen a byte from it`,
       });
       // the rectangular one stays at the top of the column; the circles go in
       // the block that tracks the pad rows
@@ -758,12 +637,19 @@
 
   // ── what arrives ────────────────────────────────────────────────────────
 
-  let access = null, clock = 0;
+  let access = null, clock = 0, anchored = false;
+  /* 24 clocks a quarter note is the MIDI standard and was measured arriving
+     from this device; six of them is a sixteenth. */
+  const CLOCKS_PER_STEP = 6, STEPS = 16;
   const seenNotes = new Map();
 
   function take(b) {
     const m = decode(b);
     if (m.status === 0xf8) { clock++; return; }
+    /* 0xFA Start and 0xFB Continue. Named here rather than imported, because
+       the half of this page that used to SEND them has gone to
+       archive/circuit-midi-out/ and a listener still has to recognise one. */
+    if (m.status === 0xfa || m.status === 0xfb) { clock = 0; anchored = true; return; }
     if (m.flood) return;
 
     if (m.kind === 'control' && m.ch === 1
@@ -778,10 +664,28 @@
       return;
     }
     if (m.kind === 'note on' && m.ch === DRUM_CH) {
-      // A note lights the pad it has been seen on, and nothing else.
-      let at = seenNotes.get(m.note);
-      if (at === undefined) { at = seenNotes.size; seenNotes.set(m.note, at); }
-      grid.at(at % 8, 3)?.flash(140);
+      /**
+       * 🔴 A HIT LIGHTS **WHEN** IT LANDED, NOT **WHICH NOTE** IT WAS. Reported
+       * 2026-09-21: *"i play drum beat on 1 5 9 13 but ui ticks lower left
+       * pad"*, and that is exactly what the old line did: the column came from
+       * the note's position in a discovery map, so one drum is always index 0
+       * and four hits a bar all lit the same pad. **It was reporting the
+       * instrument and looking like it was reporting the beat.**
+       * ✅ The column comes off the CLOCK now. This Circuit sends 24 per
+       * quarter note continuously, so six clocks is a sixteenth and sixteen of
+       * those is a bar, laid across the bottom two rows: eight and eight.
+       * ⚠️ **WHERE THE BAR STARTS IS ANCHORED ON THE FIRST HIT, BECAUSE A FREE
+       * RUNNING CLOCK HAS NO ORIGIN.** Without a Start byte there is nothing
+       * that says which tick is step one, so the first note heard becomes it.
+       * That makes the SPACING right, which is the thing a reader is looking
+       * at, and leaves the absolute step a guess. A Start resets it properly.
+       * ⚠️ **SIXTEEN STEPS ON TWO ROWS IS A CHOICE, NOT A MEASUREMENT.** The
+       * device never says how long its pattern is.
+       */
+      if (!anchored) { clock = 0; anchored = true; }
+      seenNotes.set(m.note, (seenNotes.get(m.note) ?? 0) + 1);
+      const step = Math.floor(clock / CLOCKS_PER_STEP) % STEPS;
+      grid.at(step % 8, 2 + Math.floor(step / 8))?.flash(140);
     }
   }
 
@@ -796,18 +700,6 @@
         try { await p.open(); } catch { /* another client may hold it */ }
         p.onmidimessage = (e) => take(Array.from(e.data));
       }
-      for (const o of access.outputs.values()) {
-        if (!OUT_NAME.test(o.name || '')) continue;
-        try { await o.open(); out = o; } catch (e) {
-          d.log(`could not open ${o.name}: ${e.message}`, 'warn');
-        }
-        break;
-      }
-      d.set('output', out ? 'open' : '');
-      if (!out) {
-        d.log('no Circuit output was found, so the pads and the transport move '
-            + 'this page and reach no hardware', 'warn');
-      }
       return true;
     } catch (e) {
       d.log(`MIDI was refused: ${e.message}`, 'warn');
@@ -817,11 +709,8 @@
 
   d.on('listen', async () => {
     if (await open()) {
-      arm(0);
-      d.log('press a pad to play the armed track, and a track button to change '
-          + 'which one it is addressed to.');
-      d.log('record is switched off, and this page can send nothing but notes '
-          + 'and transport, so no recording can be armed from here.');
+      d.log('this page only listens. Turn a macro or the filter, or play a '
+          + 'drum part, and the panel follows it.');
       d.log('turn a macro or the filter. The pads light where a note has been '
           + 'seen, which is three of thirty two so far.');
       d.log('this Circuit sends MIDI clock continuously, measured at about 122 bpm, '
@@ -881,50 +770,18 @@
      * unwired. **A wording is not a fact about behaviour.**
      */
     /**
-     * 🔴 THE LIST SHRANK WHEN THREE THINGS WERE WIRED, AND THAT IS THE POINT OF
-     * KEEPING IT. Tracks, pads and the play button address the hardware now;
-     * everything still in here is drawn and reaches nothing, and it says so
-     * rather than being quietly bound by a guess later.
+     * 🔴 THE PANEL IS DRAWN WHOLE AND MOST OF IT IS BOUND TO NOTHING, asserted
+     * so nobody quietly wires it by guess later.
+     * ⚠️ IT ASKS `presses`, NOT THE HOVER TEXT. Matching on the title string
+     * grades the sentence rather than the binding, and would pass for a control
+     * that was wired AND still described as unwired.
+     * 🔴 **THIS LIST WAS SHORTER FOR ONE COMMIT AND IS WHOLE AGAIN.** The
+     * sending half is at `archive/circuit-midi-out/`.
      */
-    const bound = new Set(['play', 'record']);
-    const unbound = [...Object.values(rowPads),
-                     ...Object.entries(side).filter(([id]) => !bound.has(id)).map(([, p]) => p)];
+    const unbound = [...Object.values(rowPads), ...Object.values(side), ...tracks];
     d.assert('the buttons nobody has measured are drawn and are lit by nothing',
       unbound.every((p) => p.presses() === 0 && !p.on()),
       `${unbound.length} controls drawn, none lit by a message`);
-
-    /**
-     * 🔴 THE REFUSAL IS FIRED ON PURPOSE, because a guard nobody has tripped is
-     * a guard nobody knows about. Four shapes that could touch a recording or a
-     * stored patch, one that is allowed, and the counter has to move for the
-     * first four and not for the fifth.
-     */
-    {
-      const before = { sent, refused };
-      const bad = [[0xb0, 0x5f, 0x7f],            // a control change, any control
-                   [0xc0, 0x01],                  // a program change
-                   [0xf0, 0x00, 0x20, 0x29, 0xf7], // SysEx, which is how a pack moves
-                   [0xb9, 0x07, 0x00]];           // a control change on the drum channel
-      bad.forEach(send);
-      const stopped = refused - before.refused;
-      const leaked = sent - before.sent;
-      d.assert('nothing that could arm a record or move a patch can be sent',
-        stopped === 4 && leaked === 0 && !!side.record.disabled?.(),
-        `${stopped} of 4 refused, ${leaked} leaked, record `
-        + `${side.record.disabled?.() ? 'off' : 'LIVE'}`);
-    }
-
-    /**
-     * ⚠️ AND THE ALLOWED SHAPES REALLY DO GO THROUGH, which is the negative
-     * control: a guard that refused everything would pass the assert above
-     * while making the page inert.
-     */
-    {
-      const before = sent;
-      send([0x90, 60, 0x64]); send([0x80, 60, 0]); send([START]); send([STOP]);
-      d.assert('notes and transport are not refused',
-        sent - before === 4, `${sent - before} of 4 sent`);
-    }
 
     /**
      * 🔴 THE BUTTON ROW IS ONE LINE, ASSERTED. Two comments in this file have
@@ -1034,11 +891,24 @@
     {
       const card = circ.getBoundingClientRect();
       const lastPad = grid.at(0, 3).button.getBoundingClientRect();
-      const firstCol = side.note.button.getBoundingClientRect();
+      /* ⚠️ AGAINST THE CARD'S OWN INSET, WHICH IS WHAT THE PRINTED NAME SITS
+         AT, AND NOT AGAINST THE FIRST CONTROL. That comparison read **foot 21,
+         side 43** and the 22 px between them was the leftover a centred panel
+         splits either side of itself. It moves with the window, so it was never
+         a number a padding could be set to. */
+      const brand = brands.firstChild.getBoundingClientRect();
       const foot = card.bottom - lastPad.bottom;
-      const left = firstCol.left - card.left;
-      d.assert('the panel is as deep under its last pad as it is wide at its side',
-        Math.abs(foot - left) <= 1.5, `foot ${foot.toFixed(1)}, side ${left.toFixed(1)}`);
+      const inset = brand.left - card.left;
+      d.assert('the panel is as deep under its last pad as its printed name is in from the edge',
+        Math.abs(foot - inset) <= 1.5, `foot ${foot.toFixed(1)}, inset ${inset.toFixed(1)}`);
+
+      /* 🔴 AND THE CARD LINES UP WITH EVERY OTHER BLOCK ON THE PAGE. This is
+         the claim the corner photographs were about, and it is one subtraction
+         per edge. */
+      const page = d.el.getBoundingClientRect();
+      d.assert('the panel box starts and ends where the rest of the page does',
+        Math.abs(card.left - page.left) <= 1 && Math.abs(card.right - page.right) <= 1,
+        `left ${(card.left - page.left).toFixed(1)}, right ${(card.right - page.right).toFixed(1)}`);
     }
 
     d.assert('no secret in this page', !location.href.includes('token'));
