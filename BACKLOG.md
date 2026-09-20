@@ -1,5 +1,79 @@
 ## Open
 
+- 🔴 **`/knobs/` CONTRIBUTES NOTHING TO THE SUITE, AND THIS FILE HAS CLAIMED
+  `14 asserts, 20/20` SINCE IT WAS BUILT.** Found 2026-09-20 while grading the
+  board guard. `node demo/verify.mjs knobs` reads **2 page asserts, both
+  injected by the shell** (the feedback button and the feedback dialog). The
+  page's own checks all live behind `startNote()`, which needs the board, and
+  the board is the thing a check may not touch. The `20/20` was taken with
+  `?board=1`.
+  ⚠️ **MEASURED WITH AND WITHOUT THE NEW KIT GUARD: 2 EITHER WAY**, so the
+  guard did not cause it. It has been like this since the page was written.
+  ⚠️ It is now 3, because the one assert that CAN run at load was added. The
+  rest wants a stand-in for the board, the way `fake-station.mjs` stands in for
+  a radio.
+
+- ✅ **DONE 2026-09-20, ALL FOUR, EACH PROVED BY BREAKING IT.** Asked as
+  *"do 1 2 and others"*.
+
+  ✅ **1. `ctl.meter` NAMES THE CONTROLLER, THE VALUE, THE AGE AND THE SENDER.**
+  It returned `{in, out, folded, forMs, on, channel}`: three counters that all
+  read healthy while a part volume left at 8 was invisible to every client,
+  which is what made the level collapse a three-session bug. It now carries
+  `set: [{ctrl, value, agoMs, by, name}]` newest first, plus `volume` as its own
+  field because that is the controller nobody thinks to check.
+  ⚠️ `name` is filled only from a MEASURED table: **Yoshimi does not use the
+  General MIDI map**, 76 and 77 are FM amplitude and resonance centre here, and
+  a confident wrong label is worse than none.
+  ⚠️ `volume: null` means never told, which is NOT 127 and must not read as it.
+  ✅ **PROVED ON THE REAL BOARD**: before anything, `volume: null`, `set: []`.
+  After driving CC 7 to 8, `ctrl 7 = 8, volume, by ask-sgz2p9` and `ctrl 74 =
+  40, filter cutoff`. **The three-session bug is now one question.** Restored to
+  127 and the meter followed, attributing it to the new sender while leaving
+  cutoff attributed to the old one.
+
+  ✅ **2. THE PACKAGE LIST IS ONE FILE WITH TWO READERS.** `rig/audit.mjs` held
+  twelve packages with versions and reasons; `setup.sh` installed FOUR. So a
+  board provisioned from this repo came up with no jackd, no yoshimi, no
+  SuperCollider, no csound and no ffmpeg — **silent** — while the list that knew
+  better was something you ran by hand afterwards against a board you already
+  had. `rig/board/packages.txt` now holds it, tab separated and plain text
+  because `setup.sh` must read it with `awk` on a Pi where node is one of the
+  things it is about to install. Every install is `--no-install-recommends`.
+  ✅ **RUN AGAINST THE REAL BOARD: all 15 `ok`**, including `libegl1` and
+  `libgbm1`, which I added and which turned out to be genuinely installed rather
+  than invented. It also found `/opt/positron-board/rig/vis/v3dpipe` **MISSING**:
+  the migration moved the tree and the renderer is built beside its source, so
+  there was no binary at the new path. Built, and the migration script gains the
+  step so it is not a loose end next time.
+
+  ✅ **3. `/radio/`'s `rates` IS DELETED, NOT WIRED UP.** It passed
+  `rates: [0.25, 0.5, 1]` with `onRate` beside it under a confident note. `rates`
+  is not an option of `createTransportBar`, so it was dropped in silence and
+  `onRate` could never fire. **Deleted rather than implemented**, which is the
+  larger job and the right one: a playback rate is a claim about a position
+  inside a sound, and this deck's position is wall clock on a live stream. The
+  loop already has its own control. **14/14, unchanged**, which confirms the
+  option did nothing.
+
+  ✅ **4. THE BOARD GUARD MOVED FROM A PAGE INTO THE KIT.** `createBoard` takes
+  `inSelfcheck`, default `'refuse'`: under `?selfcheck=1` it refuses to SEND to
+  the board, counts the refusals and says so once. It refuses the send and not
+  the socket, so a page still joins, still hears, still reports presence and
+  still grades everything that does not touch the instrument. `?board=1` stands
+  it aside.
+  🔴 **THE FIRST VERSION WAS GUARDED BY NOTHING AND THE SABOTAGE SAID SO.**
+  Flipping the default to `'allow'` left `/knobs/` fully green, because that
+  page's own `MAY_PLAY` holds every message whether or not the kit guards
+  anything. The assert that matters grades the KIT, and `/knobs/` is the only
+  page that opens a board so it is the only place it can be checked from.
+  🔴 **AND ITS FIRST TWO HOMES NEVER RAN**: inside `if (SELFCHECK && sweep)`,
+  where the sweep needs the board, so the assert about not touching the board
+  was gated behind touching it. At load now. **Flipping the default takes it red
+  with `driving true`.**
+
+
+
 - ✅ **THE LINGO IS `board` EVERYWHERE IN THE REPO, 2026-09-20. THE BOARD ITSELF
   IS NOT MIGRATED YET AND THAT IS THE ONE THING LEFT.** Instructed: *"and in
   general change the lingo from box to board"*, which **reverses CLAUDE.md's
