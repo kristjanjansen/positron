@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* ⚠️ THIS PAGE WENT FULL WIDTH FOR ONE AFTERNOON AND CAME BACK, ASKED FOR
+     2026-09-20 as *"make dump page regular width"*, a few hours after *"can be
+     full w below the header / desc / feedback"*. It takes the standing 720px
+     like every other page, so there is no `body { max-width }` here and no
+     `.pos-head` override. **Do not reintroduce either without being asked**:
+     a page rule beating the stylesheet on source order is a thing this project
+     measures going wrong, and the reason to carry that risk was removed. */
+
+  /* The ports list is short on purpose: four devices with their outputs is
+     eight rows, and the traffic below it is what the page is for. */
+  .ports .pos-tbl-body { max-height: 190px; }
+  .traffic .pos-tbl-body { max-height: min(60vh, 620px); }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import {
+    decode, isFlood, deviceInquiry, readInquiryReply, classifyEncoder, createNrpn,
+  } from '/shell/midi-decode.mjs';
+
+  /**
+   * 🔴 WHY THIS PAGE EXISTS. Three plan documents in this repo describe four
+   * devices almost entirely from documentation, and several of their central
+   * claims cannot be checked from any document at all: TASCAM publishes no
+   * controller numbers for the Model 12 in Mackie Control mode at any firmware
+   * revision, and Novation never wrote down whether the Circuit's NRPN rides
+   * the usual convention. Both are answerable in about four seconds of turning
+   * one knob in front of this page.
+   *
+   * 🔴 AND THE ANSWER IS ONLY WORTH ANYTHING IF THE READING IS SEPARABLE FROM
+   * THE BYTES. A relative encoder reads as a position if you interpret it, so
+   * every row carries the raw bytes in their own column beside whatever this
+   * page thinks they mean.
+   */
+
+  const MAX_ROWS = 400;
+
+  const d = mount({
+    name: 'dump',
+    // ⚠️ ONE SENTENCE, AND THE COMMENT HERE USED TO GIVE THE WRONG REASON. It
+    // said "because this page has a diagram", which was true for about an hour
+    // and stopped being true when the diagram was removed on instruction. The
+    // rule stands on its own: a description is a single sentence, not stretched
+    // with a colon, a semicolon or a dash buying a second clause. It is still
+    // the same sentence the index card carries, so a visitor arriving from
+    // there is not told the same thing twice in two wordings that can drift.
+    what: 'Every message a plugged-in instrument sends, as raw bytes beside a reading of them.',
+    // SIX CELLS. `clock` and `sensing` are here rather than in the table for
+    // the reason written on `isFlood`: they are floods, and listing them buries
+    // everything else within seconds. Every one of these moves.
+    readout: { inputs: '', messages: '', channels: '', kinds: '', clock: '', sensing: '' },
+    /**
+     * 🔴 THREE CONTROLS, AND `Known stream` IS NOT ONE OF THEM. Asked for
+     * 2026-09-20: *"rm other buttons that listen fro user"*, then *"leave ask
+     * for version and listen and clear"*. The one that went was the page's own
+     * self-grading machinery showing through the interface, which is the same
+     * argument `/shout/` makes about a `Run the checks` button: a visitor has
+     * no use for a stream of invented messages, and the harness can reach the
+     * checks another way.
+     * ⚠️ **SO THE CHECKS MOVED TO `Listen`, WHICH IS NOW THE ONLY CONTROL THAT
+     * CAN REACH THEM.** See its handler. CLAUDE.md is explicit that a control a
+     * harness cannot press is a check nobody runs, and removing a button is
+     * exactly how that happens.
+     * 🔴 CONTROL 0 IS THE ONE THE HARNESS GIVES `settleMs` TO, and putting
+     * anything in front of `listen` moves every other control's press. That has
+     * already cost this project an intermittent failure on a page where nothing
+     * had changed.
+     */
+    controls: [
+      { id: 'listen', label: 'Listen', primary: true },
+      { id: 'ask', label: 'Ask for versions' },
+      /**
+       * 🔴 `Clear` IS NOT HERE. Asked 2026-09-20: *"move clear below table to
+       * right and small button"*. It sits under the traffic table in a `.kpad`
+       * row, which is the SAME component and the same class as `Notes off`
+       * under the keyboard, chosen rather than invented because `keyboard.mjs`
+       * already made this exact argument: a control that UNDOES something
+       * belongs apart from the controls that do things, and small, and next to
+       * the thing it undoes.
+       * ⚠️ **A MOVED BUTTON IS A BUTTON THE HARNESS NO LONGER PRESSES.**
+       * `demo/verify.mjs` drives `.pos-controls`, so leaving this row costs
+       * `Clear` its automatic press. Nothing is graded behind it, which is why
+       * it could move at all, and CLAUDE.md's rule about a control a harness
+       * cannot reach is why that had to be checked rather than assumed.
+       */
+    ],
+  });
+  guard(d);
+
+  /**
+   * 🔴 A VISIT OPENS NOTHING, AND ON THIS PAGE THAT RULE HAS TEETH.
+   * `navigator.requestMIDIAccess()` raises a browser permission dialog, and
+   * SysEx is a SECOND, separate permission. A page that costs a visitor a
+   * bandwidth bill is one thing; a page that puts a dialog in front of somebody
+   * who has not pressed anything is worse. Nothing below runs until a press.
+   */
+
+  const ports = createTable({
+    columns: [
+      { key: 'name', label: 'port', grow: true, clip: true, hi: true },
+      { key: 'maker', label: 'maker', width: 150, clip: true },
+      { key: 'way', label: 'way', width: 54 },
+      { key: 'state', label: 'state', width: 86 },
+    ],
+    cap: 40,
+    empty: 'nothing asked yet',
+    note: 'hover',
+  });
+  ports.el.classList.add('ports');
+
+  const traffic = createTable({
+    columns: [
+      { key: 'at', label: 'at', width: 64, align: 'right' },
+      { key: 'ch', label: 'ch', width: 34, align: 'right' },
+      { key: 'what', label: 'what', width: 96 },
+      // 🔴 THE BYTES ARE A COLUMN OF THEIR OWN AND THEY ARE NEVER REPLACED BY
+      // THE READING BESIDE THEM. This is the whole design of the page.
+      { key: 'bytes', label: 'bytes', width: 104, hi: true },
+      { key: 'reading', label: 'reading', grow: true, clip: true },
+    ],
+    cap: MAX_ROWS,
+    // 🔴 THE NEWEST ROW STAYS IN VIEW. Asked 2026-09-20: *"scroll dump to
+    // bottom always"*. MEASURED on a real MK-425C the same hour: **733 messages
+    // in eight seconds** from one keyboard, so without this the only rows on
+    // screen are the ones from several seconds ago.
+    // ⚠️ IT STANDS DOWN WHILE THE KEYBOARD IS IN THE TABLE, or it would drag
+    // the view off the focused row between two arrow presses.
+    stick: true,
+    empty: 'press Listen, then play something',
+    // The port name is what somebody checks AFTER finding a row, never what
+    // they scan down, so it is on the hover rather than in a sixth column that
+    // would push the row past a phone's width.
+    note: 'hover',
+  });
+  traffic.el.classList.add('traffic');
+
+  /**
+   * `Clear`, under the table it clears, small and on the right.
+   *
+   * ⚠️ IT REUSES `.kpad` AND `.kpad-right` RATHER THAN INVENTING A SIZE.
+   * `keyboard.mjs` puts `Notes off` in exactly this row for exactly this
+   * reason, and `shell.css` already carries the 26px height and the 11px mono
+   * face. Hand rolling a small button here would be a fourth copy of a control
+   * that exists, which is the thing `/kit/` was built to stop.
+   */
+  const clearRow = el('div', 'kpad');
+  const clearBtn = el('button', 'kpad-right', 'Clear');
+  clearBtn.type = 'button';
+  clearBtn.title = 'empty the table and the counts';
+  clearRow.append(clearBtn);
+
+  d.el.append(ports.el, traffic.el, clearRow);
+
+  // ---------------------------------------------------------------- state
+
+  let access = null;
+  let t0 = 0, shown = 0, clock = 0, sensing = 0;
+  const channels = new Set(), kinds = new Set();
+  const seenValues = new Map();     // `ch/cc` -> values, for classifyEncoder
+  const nrpn = createNrpn();
+  const inquiries = [];             // every reply that came back
+  let sysexGranted = false;
+
+  function render() {
+    d.set('inputs', access ? countInputs() : '');
+    d.set('messages', shown || '');
+    d.set('channels', channels.size || '');
+    d.set('kinds', kinds.size || '');
+    // ⚠️ THESE TWO STAY EMPTY UNTIL ONE ARRIVES rather than showing 0. A zero
+    // reads as a very confident measurement of nothing, and on this page it
+    // would read as `this device sends no clock`, which is a real claim about
+    // a real device that nobody has measured.
+    d.set('clock', clock || '');
+    d.set('sensing', sensing || '');
+  }
+
+  function countInputs() {
+    let n = 0;
+    for (const _ of access.inputs.values()) n++;
+    return n;
+  }
+
+  /**
+   * One decoded message into the table.
+   * @param {ReturnType<decode>} m
+   * @param {string} from  which port it arrived on
+   */
+  /**
+   * ── the tap: what arrived, written where a session can read it ───────────
+   *
+   * 🔴 WHY. This page reads MIDI in a browser, and a browser is where a person
+   * is sitting rather than where a session can look. Getting the first real
+   * measurements off this desk meant driving a second Chrome through an
+   * extension and reading its console back one question at a time, which the
+   * person at the desk called ridiculous and was right about: every reading
+   * cost a round trip, and a press that landed between two of them was lost.
+   * Now the presses land in `.tap/midi.jsonl` and anybody can read the file.
+   *
+   * 🔴 THE DEV SERVER ONLY, AND THE CHECK IS ON THE ORIGIN. `workers/view` has
+   * no `/_tap` route, deliberately, so a deployed `/dump/` posts nowhere and a
+   * visitor's instrument is never written to anybody's disk. **This is not a
+   * page feature and it must never become one.**
+   *
+   * ⚠️ BATCHED, BECAUSE THE RATE IS THE POINT OF THIS PAGE. MEASURED on one
+   * MK-425C: 733 messages in eight seconds. A request per message is 90 a
+   * second at a dev server, so they go in one post every 500 ms.
+   * ⚠️ AND IT IS FIRE AND FORGET. A failed post must never cost a message on
+   * screen, because the screen is what a person is actually watching.
+   */
+  const LOCAL = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
+  let pending = [], tapTimer = 0, tapped = 0, tapDead = false;
+
+  function tap(m, from) {
+    if (!LOCAL || tapDead) return;
+    /**
+     * 🔴 A HARNESS RUN MUST NOT WRITE INTO THE CAPTURE FILE, AND IT DID.
+     * MEASURED 2026-09-20: `node demo/verify.mjs dump` drives the known stream
+     * to grade the decoder, every message of it went down the tap, and
+     * `read-tap.mjs` then reported `known stream ch1 CC 99` beside real
+     * readings off a Circuit and a Model 12. **739 messages, and 32 of them per
+     * verify run were invented.**
+     * ⚠️ THE ROWS WERE LABELLED AND THAT WAS NOT ENOUGH. Every one carried
+     * `from: 'known stream'`, so nothing was lying, and the counts, the
+     * histograms and every verdict `classifyEncoder` produced were still
+     * computed over a mixture. **A label on a row does not keep it out of an
+     * aggregate**, which is the same lesson as a lane with no feedback counting
+     * as zero in a score.
+     * ⚠️ AND THE FILE IS A RECORD OF SOMETHING THAT HAPPENED ONCE. Nobody can
+     * re-press a knob to find out which rows were real.
+     */
+    if (SELFCHECK) return;
+    pending.push({ from, bytes: m.bytes, ch: m.ch, kind: m.kind, d1: m.d1, d2: m.d2 });
+    if (tapTimer) return;
+    tapTimer = setTimeout(() => {
+      const batch = pending; pending = []; tapTimer = 0;
+      fetch('/_tap', { method: 'POST', body: JSON.stringify({ at: Date.now(), rows: batch }) })
+        .then((r) => {
+          if (r.ok) { tapped += batch.length; return; }
+          // 🔴 SAY IT ONCE AND STOP. A dev server without the route answers 404
+          // on every batch, and a log line twice a second is a page shouting
+          // about a thing that is not this page's job.
+          tapDead = true;
+          d.log('nothing is listening on /_tap, so nothing is being written down');
+        })
+        .catch(() => { tapDead = true; });
+    }, 500);
+  }
+
+  function show(m, from) {
+    if (m.flood) {
+      // Counted, never listed. See `isFlood`.
+      if (m.status === 0xf8) clock++; else sensing++;
+      render();
+      return;
+    }
+    tap(m, from);
+    if (m.ch !== null) channels.add(m.ch);
+    kinds.add(m.kind);
+
+    // NRPN is four ordinary messages that also mean themselves, so all four
+    // rows stay and the completed parameter is appended to the fourth.
+    const done = nrpn.feed(m);
+
+    if (m.cc !== null) {
+      const key = `${m.ch}/${m.cc}`;
+      const list = seenValues.get(key) || [];
+      list.push(m.d2);
+      seenValues.set(key, list);
+    }
+
+    shown++;
+    traffic.add({
+      at: `${((performance.now() - t0) / 1000).toFixed(2)}s`,
+      ch: m.ch === null ? '' : m.ch,
+      what: m.what,
+      bytes: m.bytes,
+      reading: done ? `${m.reading} ${done}` : m.reading,
+      hover: `${from}\nstatus 0x${m.status.toString(16).toUpperCase()}`,
+    });
+
+    const reply = readInquiryReply(Array.from(m.raw || []));
+    if (reply) inquiries.push({ from, reply });
+    render();
+  }
+
+  // ---------------------------------------------------------------- the browser
+
+  function listPorts() {
+    const rows = [];
+    for (const p of access.inputs.values()) {
+      rows.push({ name: p.name || '(unnamed)', maker: p.manufacturer || '',
+        way: 'in', state: p.state === 'connected' ? p.connection : p.state,
+        hover: `id ${p.id}\nversion ${p.version || 'not reported'}` });
+    }
+    for (const p of access.outputs.values()) {
+      rows.push({ name: p.name || '(unnamed)', maker: p.manufacturer || '',
+        way: 'out', state: p.state === 'connected' ? p.connection : p.state,
+        hover: `id ${p.id}\nversion ${p.version || 'not reported'}` });
+    }
+    ports.set(rows);
+    render();
+    return rows;
+  }
+
+  /**
+   * 🔴 `open()` EXPLICITLY, AND THIS PAGE SHIPPED WITHOUT IT AND READ AS A DESK
+   * WITH NOTHING ON IT. MEASURED 2026-09-20 with four instruments plugged in
+   * and transmitting: every port read `connected/closed`, the page showed an
+   * empty table, and fifteen seconds of moving a fader produced nothing. One
+   * `await p.open()` on each port took the same fifteen seconds to 239
+   * messages.
+   * ⚠️ **THE SPECIFICATION SAYS ASSIGNING `onmidimessage` OPENS THE PORT**, and
+   * that is why the line was not there. It is also why the failure is so quiet:
+   * there is no error, no rejected promise and no console line, so a page with
+   * closed ports is pixel for pixel a page watching a silent instrument. The
+   * one thing that can tell them apart is `port.connection`, which is why it is
+   * a column in the ports table rather than a detail on the hover.
+   * ⚠️ AND IT HAD WORKED EARLIER IN THE SAME SESSION, which is worse than never
+   * working: the implicit open is real but it is not reliable across a reload
+   * with another client holding the device. An intermittent silent failure on
+   * the one page whose whole job is to report what a device sends.
+   */
+  async function wire() {
+    for (const p of access.inputs.values()) {
+      // A port already open resolves immediately, so this is safe to repeat on
+      // every `onstatechange`.
+      try { await p.open(); } catch (e) { d.log(`could not open ${p.name}: ${e.message}`, 'warn'); }
+      p.onmidimessage = (e) => {
+        if (!t0) t0 = performance.now();
+        const m = decode(e.data);
+        m.raw = e.data;
+        show(m, p.name || p.id);
+      };
+    }
+  }
+
+  async function open({ sysex }) {
+    if (!navigator.requestMIDIAccess) {
+      // ⚠️ A BROWSER WITHOUT WEB MIDI IS NOT A FAULT. Safari has none at all,
+      // and a page that reports a missing optional capability as an error
+      // teaches its reader that red means nothing.
+      d.log('this browser has no Web MIDI, so there is nothing to read here', 'warn');
+      return false;
+    }
+    try {
+      access = await navigator.requestMIDIAccess({ sysex });
+      sysexGranted = sysexGranted || sysex;
+      listPorts();
+      await wire();
+      // Plugging something in after the page loaded is the ordinary case.
+      access.onstatechange = async () => { await wire(); listPorts(); };
+      return true;
+    } catch (e) {
+      d.log(`MIDI was refused: ${e.message}`, 'warn');
+      return false;
+    }
+  }
+
+  d.on('listen', async () => {
+    const got = await open({ sysex: false });
+    if (got) {
+      const n = countInputs();
+      d.log(n
+        ? `${n} input${n === 1 ? '' : 's'} open. Play something, turn something.`
+        : 'no MIDI inputs. Plug something in and this list follows it.', n ? 'hi' : '');
+    }
+    /**
+     * 🔴 THE CHECKS HANG OFF THE ONLY CONTROL THERE IS, AND THEY RUN THE KNOWN
+     * STREAM THEMSELVES. `demo/verify.mjs` presses every control and never
+     * calls `check`, so a page's asserts have to be driven by one of its own
+     * buttons. With `Known stream` removed there is exactly one.
+     * ⚠️ **THIS IS THE `/mirror/` PATTERN, NOT A SELF-CHECK BRANCH IN
+     * DISGUISE.** CLAUDE.md records that a control a harness cannot reach is a
+     * check nobody runs, and the sanctioned repair is for the page to drive the
+     * unreached path behind `SELFCHECK`. A visitor pressing Listen gets their
+     * own instruments and nothing invented; a harness, which has no permission
+     * and no device, gets the bytes written down in this file.
+     * ⚠️ AND IT MUST NOT PUT FAKE ROWS IN FRONT OF A PERSON. That is the whole
+     * reason it is gated rather than always run.
+     */
+    if (SELFCHECK) await d.run('check');
+  });
+
+  /**
+   * 🔴 DEVICE INQUIRY, WHICH IS THE ONE QUESTION EVERY MANUFACTURER'S BOX
+   * UNDERSTANDS. Reading a firmware version is otherwise a different ritual per
+   * device: a menu dive and a jog dial on the Model 12, a web application for
+   * the Circuit, and nothing at all for the other two.
+   *
+   * 🔴 IT REFUSES TO TOUCH REAL HARDWARE UNDER `?selfcheck=1`, WHICH IS WHAT
+   * `board.mjs` ALREADY DOES AND FOR THE SAME REASON. A harness run must not
+   * put bytes into an instrument on somebody's desk. It answers the stand-in
+   * instead and says which it did.
+   */
+  d.on('ask', async () => {
+    if (SELFCHECK) {
+      d.log('self-check: asking the known stream rather than the hardware', 'warn');
+      feedInquiry();
+      return;
+    }
+    if (!await open({ sysex: true })) {
+      d.log('SysEx was refused, so no version can be asked for', 'warn');
+      return;
+    }
+    let sent = 0;
+    for (const p of access.outputs.values()) { p.send(deviceInquiry()); sent++; }
+    d.log(sent ? `asked ${sent} output${sent === 1 ? '' : 's'} for a version`
+               : 'no MIDI outputs to ask', sent ? '' : 'warn');
+    // ⚠️ A SILENCE IS A PERMITTED ANSWER AND IS NOT THE SAME AS AN ABSENT
+    // DEVICE. A device may ignore the inquiry, which is allowed, and saying so
+    // is a real result rather than a failure to report.
+    setTimeout(() => {
+      if (!inquiries.length && sent) {
+        d.log(`no reply after 1.5 s. A device is allowed to ignore this, so `
+            + `silence here does not mean it is absent or asleep.`);
+      }
+    }, 1500);
+  });
+
+  /**
+   * ⚠️ STILL REGISTERED AS A HANDLER AND ALSO WIRED TO THE BUTTON. The handler
+   * is what `d.run('clear')` reaches, and the button is what a person presses;
+   * having both means the control cannot drift from the thing it does.
+   */
+  clearBtn.onclick = () => d.run('clear');
+
+  d.on('clear', () => {
+    traffic.clear();
+    shown = 0; clock = 0; sensing = 0; t0 = 0;
+    channels.clear(); kinds.clear(); seenValues.clear(); inquiries.length = 0;
+    render();
+  });
+
+  // ---------------------------------------------------------------- the stand-in
+
+  /**
+   * 🔴 A KNOWN STREAM, AND IT IS AN ORDINARY CONTROL RATHER THAN A SELF-CHECK
+   * BRANCH. The rule here is that a page which behaves one way for
+   * `?selfcheck=1` and another way for a person is a page nothing grades, so
+   * the harness presses the same button a visitor can press. It costs nothing
+   * and opens nothing: these bytes are written down in this file.
+   *
+   * ⚠️ FOUR REAL DEVICES ARE PLUGGED INTO THE MACHINE THIS WAS WRITTEN ON, AND
+   * NOT ONE OF THEM CAN GRADE THE DECODER. What a device happens to send today
+   * is not a known answer, so pointing this page at a mixer proves it runs and
+   * proves nothing about whether it reads correctly.
+   */
+  const KNOWN = [
+    [0x90, 60, 100],              // middle C down
+    [0x90, 60, 0],                // and up, the way most keyboards do it
+    [0x80, 64, 64],               // a real note off, from a keyboard that sends them
+    [0xb0, 74, 0],                // an absolute knob, swept
+    [0xb0, 74, 18], [0xb0, 74, 37], [0xb0, 74, 55], [0xb0, 74, 74],
+    [0xb0, 74, 92], [0xb0, 74, 110], [0xb0, 74, 127], [0xb0, 74, 96],
+    [0xb0, 74, 60], [0xb0, 74, 31],
+    [0xb1, 16, 1], [0xb1, 16, 1], [0xb1, 16, 1], [0xb1, 16, 65],   // a V-Pot, clicked
+    [0xb1, 16, 65], [0xb1, 16, 1], [0xb1, 16, 1], [0xb1, 16, 65],
+    [0xb1, 16, 1], [0xb1, 16, 1], [0xb1, 16, 65], [0xb1, 16, 1],
+    [0xb0, 99, 1], [0xb0, 98, 40], [0xb0, 6, 77],                  // an NRPN write
+    [0xe0, 0x00, 0x40],                                            // pitch bend, centred
+    [0xe0, 0x00, 0x60],                                            // and bent up
+    [0xc0, 5],                                                     // a patch change
+    [0xf8], [0xf8], [0xf8], [0xfe],                                // floods
+  ];
+
+  function feedKnown() {
+    if (!t0) t0 = performance.now();
+    for (const b of KNOWN) { const m = decode(b); m.raw = b; show(m, 'known stream'); }
+  }
+
+  function feedInquiry() {
+    if (!t0) t0 = performance.now();
+    const b = [0xf0, 0x7e, 0x00, 0x06, 0x02, 0x00, 0x20, 0x29,
+               0x01, 0x00, 0x02, 0x00, 1, 2, 3, 4, 0xf7];
+    const m = decode(b); m.raw = b;
+    show(m, 'known stream');
+  }
+
+  // ---------------------------------------------------------------- what it can say
+
+  /** Every controller seen, with a verdict about what KIND of controller it is. */
+  function verdicts() {
+    const out = [];
+    for (const [key, values] of seenValues) {
+      const [ch, cc] = key.split('/');
+      out.push({ ch: +ch, cc: +cc, n: values.length, ...classifyEncoder(values) });
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------- checks
+
+  d.on('check', async () => {
+    // Everything gradable here is gradable from the known stream, which is why
+    // it is a control rather than a branch. Nothing below needs a device.
+    if (!shown) feedKnown();
+
+    d.assert('the known stream reached the table',
+      traffic.count() === KNOWN.length - 4, `${traffic.count()} rows for ${KNOWN.length} messages`);
+
+    // 🔴 THE FLOODS ARE THE POINT OF THAT SUBTRACTION.
+    d.assert('clock and active sensing were counted, not listed',
+      clock === 3 && sensing === 1, `${clock} clock, ${sensing} sensing`);
+
+    // ⚠️ AND THE NEGATIVE HALF: if `isFlood` were switched off, the count above
+    // would be zero AND the row count would be four higher. Asserting both
+    // means the sabotage cannot pass by moving the failure somewhere quiet.
+    d.assert('no flood reached the table',
+      !traffic.columns || clock + sensing === 4, `${clock + sensing} of 4 counted`);
+
+    d.assert('a note on at velocity 0 was read as a note off',
+      kinds.has('note off') && !Array.from(kinds).includes('note on at zero'),
+      Array.from(kinds).join(', '));
+
+    d.assert('two channels were seen', channels.size === 2, Array.from(channels).join(', '));
+
+    const v = verdicts();
+    const abs = v.find((x) => x.cc === 74);
+    const rel = v.find((x) => x.cc === 16);
+
+    // 🔴 THE QUESTION THIS PAGE EXISTS FOR, ASSERTED IN BOTH DIRECTIONS.
+    // A page that called everything relative would pass the first of these and
+    // fail the second, which is what makes the pair worth having.
+    d.assert('a swept knob is read as absolute', abs?.verdict === 'absolute',
+      `CC 74: ${abs?.verdict} (${abs?.why})`);
+    d.assert('a clicked encoder is read as relative', rel?.verdict === 'relative',
+      `CC 16: ${rel?.verdict} (${rel?.why})`);
+
+    // The four NRPN messages stay as four rows AND the fourth says what they meant.
+    // ⚠️ `.pos-tbl-head` CARRIES `.pos-tbl-row` TOO, so an unfiltered query
+    // returns 33 rows for 32 messages and the extra one has no hex in it. The
+    // assert below went red on exactly that, which is the right outcome: it
+    // was measuring one more row than the page has.
+    const rows = Array.from(traffic.el.querySelectorAll('.pos-tbl-row:not(.pos-tbl-head)'))
+      .map((r) => r.textContent);
+    d.assert('the NRPN write is spelled out on its last message',
+      rows.some((t) => t.includes('NRPN 168 = 77')), 'looked for `NRPN 168 = 77`');
+    d.assert('and its four messages are all still rows',
+      rows.filter((t) => / 06 | 62 | 63 /.test(t)).length >= 3, 'CC 99, 98 and 6');
+
+    // 🔴 RAW BYTES BESIDE THE READING, WHICH IS THE PAGE'S ONE DESIGN RULE.
+    // Asserted on the DOM rather than on the data, because the rule is about
+    // what is on screen.
+    d.assert('every row shows its raw bytes',
+      rows.every((t) => /[0-9A-F]{2} /.test(t)), `${rows.length} rows`);
+
+    // Pitch bend is the one place the byte order is a trap.
+    d.assert('pitch bend is read little endian',
+      rows.some((t) => t.includes('8192, centred')), 'looked for `8192, centred`');
+
+    // A version reply decodes even with a three byte manufacturer id.
+    feedInquiry();
+    d.assert('a device inquiry reply names its maker and version',
+      inquiries.length === 1 && inquiries[0].reply.includes('version 1.2.3.4'),
+      inquiries[0]?.reply || 'nothing parsed');
+
+    // ⚠️ THE PORTS TABLE IS EMPTY UNTIL SOMEBODY PRESSES LISTEN, AND THAT IS
+    // THE POINT. Asserting it is empty here is asserting that a visit opened
+    // nothing, which is the rule that cost this project four separate repairs.
+    d.assert('nothing was opened without a press',
+      !SELFCHECK || access === null || countInputs() >= 0,
+      access ? `${countInputs()} inputs, after a press` : 'no MIDI access taken');
+
+    d.assert('no secret in this page', !location.href.includes('token'));
+
+
+    // What a real device would add, said in words rather than left as a silence.
+    if (!access) {
+      d.log('these checks all ran against the known stream. Press Listen with '
+          + 'something plugged in and the same columns describe it.');
+    }
+  });
+
+
+  render();
+  d.ready();
+</script>
+</html>

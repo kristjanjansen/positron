@@ -65,7 +65,23 @@ import { el } from './shell.mjs';
  * @returns {{el:HTMLElement, set:(rows:object[])=>void, add:(row:object)=>void,
  *            clear:(msg?:string)=>void, count:()=>number, columns:Column[]}}
  */
-export function createTable({ columns, cap = 1000, empty = 'nothing yet', note = '',
+/**
+ * @param {boolean} [o.stick]  keep the newest row in view as rows arrive.
+ *
+ * 🔴 FOR A TABLE THAT IS BEING WRITTEN TO WHILE SOMEBODY WATCHES IT. Asked for
+ * on `/dump/` 2026-09-20 as *"scroll dump to bottom always"*, where a keyboard
+ * can put 733 messages on screen in eight seconds and the newest row is the
+ * only one anybody is looking at. Every other table here is `set()` once from a
+ * corpus, so this is off by default and no existing page changes.
+ *
+ * ⚠️ IT STANDS DOWN WHILE THE KEYBOARD IS IN THE TABLE. `table.mjs` gained
+ * arrow key navigation on 2026-09-19 and it scrolls the focused row into view;
+ * a stick that fired on every arriving row would drag the view off that row
+ * between two presses, so the two controls would fight and the newer one would
+ * win at random. Focus inside the body means a person is steering, and steering
+ * outranks following.
+ */
+export function createTable({ columns, cap = 1000, empty = 'nothing yet', note = '', stick = false,
                               onPick = null } = {}) {
   if (!Array.isArray(columns) || !columns.length) {
     throw new Error('createTable: columns are the whole point, so declare some');
@@ -297,6 +313,10 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
     body.append(row);
     n++;
     while (n > cap) { body.firstChild.remove(); n--; }
+    // ⚠️ `scrollHeight` IS READ AFTER THE APPEND AND AFTER THE CAP TRIM, or it
+    // is the height of the table one row ago and the view lands one row short
+    // for as long as rows keep arriving.
+    if (stick && !body.contains(document.activeElement)) body.scrollTop = body.scrollHeight;
   }
 
   return {

@@ -72,6 +72,56 @@ export function serve(port = PORT) {
     // ⚠️ THE VALIDATION IS THE SAME SHAPE ON PURPOSE. If this one were looser,
     // a path that works here would be refused in production — which is the same
     // class of bug as the 404, wearing the opposite costume.
+    /**
+     * ── /_tap — what a plugged-in instrument sent, written where a session can
+     * read it ──────────────────────────────────────────────────────────────
+     *
+     * 🔴 WHY THIS EXISTS. `/dump/` reads MIDI in a browser, and a browser is
+     * somewhere a person is sitting rather than somewhere a session can look.
+     * Getting four measurements off a real desk on 2026-09-20 meant driving a
+     * second Chrome through an extension and reading its console back one
+     * question at a time, which the person at the desk called ridiculous and
+     * was right about: every reading cost a round trip, and a press that landed
+     * between two of them was simply lost.
+     *
+     * ⚠️ IT IS THE DEV SERVER ONLY AND IT MUST STAY THAT WAY. There is no such
+     * route in `workers/view/src/index.js`, deliberately, so a deployed
+     * `/dump/` posts nowhere and a visitor's instrument is never written to
+     * anybody's disk. That breaks this project's own LOCAL == DEPLOYED rule on
+     * purpose, and the reason is that the rule exists so a page cannot work in
+     * one place and fail in the other. **This is not a page feature.** It is a
+     * wire between a desk and a session, and the page works identically with
+     * nobody listening.
+     *
+     * ⚠️ APPEND, NEVER REPLACE. A capture is a recording of something that
+     * happened once and cannot be repeated by asking again, which is exactly
+     * the property that made the round trips expensive.
+     */
+    if (rel === '_tap' && req.method === 'POST') {
+      const chunks = [];
+      // A cap, because a keyboard can put 733 messages on the wire in eight
+      // seconds and nothing here needs to accept an unbounded body.
+      let n = 0;
+      for await (const c of req) {
+        n += c.length;
+        if (n > 4_000_000) { res.writeHead(413).end('too much'); return; }
+        chunks.push(c);
+      }
+      const { appendFileSync, mkdirSync } = await import('node:fs');
+      const dir = new URL('../.tap/', import.meta.url);
+      try { mkdirSync(dir, { recursive: true }); } catch { /* already there */ }
+      appendFileSync(new URL('midi.jsonl', dir), Buffer.concat(chunks) + '\n');
+      res.writeHead(204, { 'access-control-allow-origin': '*' }).end();
+      return;
+    }
+    if (rel === '_tap' && req.method === 'DELETE') {
+      const { writeFileSync, mkdirSync } = await import('node:fs');
+      const dir = new URL('../.tap/', import.meta.url);
+      try { mkdirSync(dir, { recursive: true }); } catch { /* already there */ }
+      writeFileSync(new URL('midi.jsonl', dir), '');
+      res.writeHead(204, { 'access-control-allow-origin': '*' }).end();
+      return;
+    }
     if (rel === 'err-img') {
       const q = new URL(req.url, 'http://localhost').searchParams;
       const f = q.get('f') || '';
