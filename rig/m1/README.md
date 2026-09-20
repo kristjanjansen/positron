@@ -80,7 +80,7 @@ once** and no page may assume. Each sender declares `audioChannels` *and*
 must come out at `frameMs` — so a wrong announcement is visible rather than
 merely audible.
 
-⚠️ The field is `audioChannels`, **not** `channels` — `box.mjs` already has
+⚠️ The field is `audioChannels`, **not** `channels` — `board.mjs` already has
 `channels` and it means MIDI channels (16, multitimbral).
 
 **Proved by breaking it.** An agent that announced 1 while sending 2 was run in
@@ -537,10 +537,10 @@ captured off BlackHole at -10.5 dB with the microphone at -8.9 as its control.
 **`midisend.c` is the missing link and is HALF verified.** It builds on the M1
 with the Command Line Tools, finds `IAC Driver Bus 1` and reports ready — but
 nothing has yet confirmed a note reaching Live through it, because that needs
-the track armed with monitoring In, which is `live-box.mjs`'s job. **Do not
+the track armed with monitoring In, which is `live-board.mjs`'s job. **Do not
 record it as working until a note moves Live's meter.**
 
-**Left to build — `live-box.mjs`:** join a relay room, turn `note.on`/`note.off`
+**Left to build — `live-board.mjs`:** join a relay room, turn `note.on`/`note.off`
 into lines on `midisend`'s stdin, and stream BlackHole back as 20 ms frames. Then
 `/keys/?room=pro-1` plays Live with no page changes, because the box page does not
 know what a Raspberry Pi is.

@@ -17,7 +17,7 @@
 // cached answer presented as a live one is the defect this repo keeps naming —
 // so the age is part of the payload, never omitted.
 
-// Node's own WebSocket — no `ws` dependency, the same choice rig/box/box.mjs
+// Node's own WebSocket — no `ws` dependency, the same choice rig/board/board.mjs
 // made. This repo has no build step and adding one module to run one socket is
 // not the way to start having one.
 import { execFile } from 'node:child_process';

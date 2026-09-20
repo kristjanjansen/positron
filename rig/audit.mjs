@@ -33,8 +33,8 @@ const run = promisify(execFile);
 export const MACHINES = {
   box: {
     what: 'the Raspberry Pi that IS the instrument',
-    ssh: process.env.BOX_SSH || 'positron@192.168.1.213',
-    // ⚠️ Ask port 22, not mDNS — `positron-box.local` does not resolve from
+    ssh: process.env.BOARD_SSH || 'positron@192.168.1.213',
+    // ⚠️ Ask port 22, not mDNS — `positron-board.local` does not resolve from
     // this sandbox. CLAUDE.md has the sweep.
     apt: [
       ['jackd2',            '1.9.22~dfsg-4',        'the audio graph every instrument is patched into; the insert lives on it'],
@@ -48,7 +48,7 @@ export const MACHINES = {
       ['yoshimi-data',      null,                   'those banks; without it yoshimi starts and has nothing to play'],
       ['supercollider',     '1:3.13.0+repack-3',    'scsynth and sclang — what pappus, the granular engine, runs in'],
       ['sc3-plugins',       null,                   'the extra UGens pappus uses; core SuperCollider is not enough for it'],
-      ['csound',            '1:6.18.1+dfsg-4',      'the reverb insert (rig/box/csd/space.csd). ⚠️ INSTALL WITH --no-install-recommends: the recommends pull tcl/tk onto a headless board'],
+      ['csound',            '1:6.18.1+dfsg-4',      'the reverb insert (rig/board/csd/space.csd). ⚠️ INSTALL WITH --no-install-recommends: the recommends pull tcl/tk onto a headless board'],
       ['ffmpeg',            '8:7.1.5-0+deb13u1+rpt2','encodes the camera and the rendered picture; h264_v4l2m2m is the hardware path'],
       ['alsa-utils',        '1.2.14-1+rpt1',        'aconnect, which is how MIDI ports are read and patched'],
       ['v4l-utils',         '1.30.1-1',             'v4l2-ctl — how the camera is asked what modes it has'],
@@ -58,9 +58,9 @@ export const MACHINES = {
     ],
     // Not packages: things this repo puts there, or that are built on arrival.
     files: [
-      ['/opt/positron-box/rig/box/box.mjs',  'the service itself. ⚠️ NOT ~/positron — that copy is stale and reading it tells you nothing'],
-      ['/opt/positron-box/rig/vis/v3dpipe',  'the shader renderer, COMPILED ON THE BOARD by push.sh when its source is newer'],
-      ['/etc/systemd/system/positron-box.service', 'what makes it come back after a power cut'],
+      ['/opt/positron-board/rig/board/board.mjs',  'the service itself. ⚠️ NOT ~/positron — that copy is stale and reading it tells you nothing'],
+      ['/opt/positron-board/rig/vis/v3dpipe',  'the shader renderer, COMPILED ON THE BOARD by push.sh when its source is newer'],
+      ['/etc/systemd/system/positron-board.service', 'what makes it come back after a power cut'],
     ],
     devices: [
       ['/dev/video11', 'the hardware H.264 encoder. ⚠️ SINGLE AND EXCLUSIVE — when it wedges nothing kills it and recovery is a reboot'],

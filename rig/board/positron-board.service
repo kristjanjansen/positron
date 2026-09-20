@@ -1,0 +1,42 @@
+[Unit]
+Description=positron board, the instrument, as a service
+Documentation=https://positron.studio/notes/hardware-board
+# The relay is reached over the network, so wait for it to be up rather than
+# merely configured. Restart=always covers the case where it is not.
+After=network-online.target sound.target
+Wants=network-online.target
+# Never give up restarting. In [Unit], not [Service] — systemd ignores it there
+# with only a warning, so the backstop silently would not apply.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=positron
+EnvironmentFile=/etc/default/positron-board
+WorkingDirectory=/opt/positron-board/rig/board
+ExecStart=/usr/bin/node /opt/positron-board/rig/board/board.mjs --room ${ROOM}
+
+# Nobody is in that room. Every failure this month needed a human standing at
+# the machine, so: come back from anything, forever, without rate-limiting
+# itself into a permanent stop.
+Restart=always
+RestartSec=2
+
+StandardOutput=journal
+StandardError=journal
+
+# ⚠️ THE HARDENING IS OFF, DELIBERATELY, AND HERE IS THE BILL.
+# This board's job is to run audio servers, and every one of these fought it:
+#   PrivateTmp=true        gave the service its own /tmp, so its jackd socket
+#                          was invisible to its own children after a restart
+#   ProtectSystem=strict   made /tmp read-only once PrivateTmp was off, so
+#                          jackd could not create that socket at all
+#   ProtectHome=read-only  blocked jackd's and SuperCollider's config writes
+# Each presented three processes downstream as "scsynth could not initialize
+# audio", which is a long way from the cause. JACK is a shared-socket system
+# with a per-user namespace; sandboxing it needs more care than it is worth on
+# a single-purpose board that runs one service.
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

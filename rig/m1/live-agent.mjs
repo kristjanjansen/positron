@@ -2,7 +2,7 @@
 //
 //   node rig/m1/live-agent.mjs --room m1-1
 //
-// The same shape as `rig/box/box.mjs`, on a different machine: notes arrive over
+// The same shape as `rig/board/board.mjs`, on a different machine: notes arrive over
 // the relay, an instrument somewhere else makes the sound, and the samples come
 // back down the same socket. The page does not know or care which machine is at
 // the far end — `demo/rack` and `/keys/` are the same page with a different room.
@@ -129,7 +129,7 @@ function startTap() {
  * it: samples / channels / rate must come out at frameMs, and a mono stream
  * mislabelled stereo lands at half of it.
  *
- * ⚠️ NOT `channels` — box.mjs already has that field and it means MIDI
+ * ⚠️ NOT `channels` — board.mjs already has that field and it means MIDI
  * channels (16, multitimbral). Two different quantities under one name in one
  * protocol is a bug waiting for someone in a hurry.
  */

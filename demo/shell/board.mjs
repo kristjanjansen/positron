@@ -35,7 +35,7 @@
 import { openWire } from './wire.mjs';
 import { createPresence } from './presence.mjs';
 
-/** The board fixes these (rig/box/synth.mjs) and NOTHING in the chain
+/** The board fixes these (rig/board/synth.mjs) and NOTHING in the chain
  *  resamples, so a page that asks for a different rate gets a pitch error and a
  *  ring that fills faster than it drains. */
 export const BOARD_RATE = 48000;
@@ -152,8 +152,8 @@ export function createBoard({
    * can satisfy is worse than no badge, because it is wrong in precisely the
    * case it exists for.
    *
-   * The board is identified by the two messages only it sends — `box.hello`
-   * when it joins and `box.alive` every five seconds. Its `from` is per SOCKET,
+   * The board is identified by the two messages only it sends — `board.hello`
+   * when it joins and `board.alive` every five seconds. Its `from` is per SOCKET,
    * so it is learned rather than assumed, and learned again when it reconnects.
    * ⚠️ AND AUDIO COUNTS TOO. Nothing else puts PCM into this room, and frames
    * arrive fifty times a second against a heartbeat every five.
@@ -164,7 +164,7 @@ export function createBoard({
   let ctx = null, playout = null, meterNode = null, meterBuf = null;
   let bufferedMs = 0, starved = 0, trimmed = 0, breaks = -1;
   let frames = 0, lost = 0, lastSeq = -1, firstFrameAt = 0, peak = 0;
-  let told = null;                    // what `box.hello` announced, if we heard it
+  let told = null;                    // what `board.hello` announced, if we heard it
   let chIn = channels, shapeChecked = false, shapeWrong = 0, shapeSaid = '';
 
   async function startAudio() {
@@ -321,7 +321,7 @@ export function createBoard({
    * header. The studio Mac sends stereo and this board sends mono, and both are
    * on this relay at once.
    *
-   * ⚠️ THE BOARD ANNOUNCES IT IN `box.hello`, WHICH IT SENDS WHEN IT JOINS, SO
+   * ⚠️ THE BOARD ANNOUNCES IT IN `board.hello`, WHICH IT SENDS WHEN IT JOINS, SO
    * A PAGE THAT JOINS LATER NEVER HEARS IT, and there is no verb that asks for
    * it again. So the expectation is the board's PUBLISHED framing and the
    * arriving frames are checked against it: `samples / channels / rate` has to
@@ -418,7 +418,7 @@ export function createBoard({
     // The board's stream announcement, if this page was connected when it
     // joined. A measurement outranks a repeated claim, so this only re-opens
     // the question when the claim CHANGES.
-    if (m.type === 'box.hello' && m.audioChannels) {
+    if (m.type === 'board.hello' && m.audioChannels) {
       if (!told || told.audioChannels !== m.audioChannels || told.frameMs !== m.frameMs) {
         told = { audioChannels: m.audioChannels, frameMs: m.frameMs };
         chIn = m.audioChannels === 2 ? 2 : 1;
@@ -427,7 +427,7 @@ export function createBoard({
         log(`the board says it sends ${chIn === 2 ? 'two channels' : 'one channel'} at ${m.frameMs} ms a frame`);
       }
     }
-    if (m.type === 'box.hello' || m.type === 'box.alive') boardFrom = m.from || boardFrom;
+    if (m.type === 'board.hello' || m.type === 'board.alive') boardFrom = m.from || boardFrom;
     if (m.from && m.from === boardFrom) { pres.seen(); pres.checking(false); }
     onMessage(m);
   }
