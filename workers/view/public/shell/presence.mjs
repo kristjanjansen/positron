@@ -579,7 +579,13 @@ export function createPresenceButton({ of = '', press = () => {}, ...rest } = {}
   const badge = createPresence({ of, mode: 'badge', ...rest });
   const b = document.createElement('button');
   b.type = 'button';
-  b.className = 'pos-pri pos-presence-btn';
+  /* ⚠️ SECONDARY, NOT PRIMARY. Asked 2026-09-21: *"secodard button for
+     status butotn"*. A primary button is the one thing a page wants you to
+     do, and checking whether an instrument is plugged in is not it: the
+     page is the instrument, and this is the thing you press once before
+     using it. Filling it in also made a status the loudest object on a page
+     whose whole subject is a panel. */
+  b.className = 'pos-presence-btn';
   b.dataset.id = 'presence';
   b.append(badge.el);
   b.addEventListener('click', () => press());
