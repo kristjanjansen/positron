@@ -215,7 +215,7 @@ that can lose something.
 
 `HANDOFF.md`: *"Needs the board — take turns, it is one Raspberry Pi."*
 That is a prose rule about a resource that already has a better mechanism
-attached to it. `rig/box/box.mjs`'s `clientSeen` map solved this properly for **tabs**:
+attached to it. `rig/board/board.mjs`'s `clientSeen` map solved this properly for **tabs**:
 
 > **NO TTL, NO RELEASE, NOTHING TO LEAK.** A lease nobody can clear is how
 > `studio-1` sat full for hours … a client that is still there keeps talking.
@@ -354,7 +354,7 @@ of the guards above can exist. Minimum useful contents:
   relay room, one `/dev/video11`. Isolating the *files* while every *device*
   stays shared moves the collision without reducing it, and doubles the checkout
   of a repo whose `rig/` is 65,703 files.
-- **A lock on the board.** See §5. `box.mjs` already argues this better than I
+- **A lock on the board.** See §5. `board.mjs` already argues this better than I
   can, and `studio-1` already paid for it.
 - **Splitting `CLAUDE.md` by deleting.** See §4 — LESSONS #80 is the counter-
   example and it cost somebody their afternoon.

@@ -335,7 +335,7 @@ was never near it.** `Engine_Pappus.sc` line 2121 is `}).add;`. `.add` calls
 Pappus ladder is above that** — BARE 43,551, TINY 64,733, LITE 74,733, FULL
 121,425 — so **all four have always gone to disk and come back via `/d_load`,
 and all four load on the board.** ⚠️ 📄 for the board itself: the Pi runs
-SuperCollider **3.13** (`rig/box/README.md:194`), whose `SynthDef.sc` carries
+SuperCollider **3.13** (`rig/board/README.md:194`), whose `SynthDef.sc` carries
 the identical `65535 div: 4`, and the measurement above was made against 3.14.1
 on another machine. §7 names the one-line check that closes this.
 

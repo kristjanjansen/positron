@@ -1,7 +1,7 @@
 # plan-voice — "split my keyboard, bass below, pads above"
 
 Status: **not started.** Written 2026-09-10 from a spoken request, against a box
-that now exists in `rig/box` (38/38 + 13/13 green) and a multitimbral instrument
+that now exists in `rig/board` (38/38 + 13/13 green) and a multitimbral instrument
 that was proved on arm64 Linux the same day.
 
 Read `plan-hardware.md` §8 first. This is §8.3 and §8.4 taken from a metaphor to
@@ -31,7 +31,7 @@ silently. §5 is about why that is the whole design and not a nicety.
 
 ## 1. What already exists, and what is missing
 
-Green today, in `rig/box`:
+Green today, in `rig/board`:
 
 - a **document that is checked before it is applied**, with a `plan` twin that
   changes nothing (`patch.plan` / `patch.apply`)

@@ -161,7 +161,7 @@ GitHub, and its `rig/m1/` has **no `live-check.mjs`, no
 "bring it all back up" recipe opens with `cd ~/positron && git pull`, which
 pulls from a bare repo on the same disk that nothing pushes to. The live copies
 are the four files in `~/positron-rack/`. This is CLAUDE.md's
-`/opt/positron-box` vs `~/positron` lesson in a second costume, and it will cost
+`/opt/positron-board` vs `~/positron` lesson in a second costume, and it will cost
 somebody the same hour.
 
 **There is no Live set.** MEASURED: no `.als` on the machine newer than
@@ -304,7 +304,7 @@ all.** The README's own numbers make this worth saying plainly: Ableton costs ab
 over the built-in synth** (29 → 58 ms key→ear, MEASURED), and everything heavy
 in this document exists to get audio **out** of Live, not to get notes **in**.
 The notes leg is a solved, cheap, fully-scriptable 7.5 ms. If the interesting
-product is "play a machine in the next room", `rig/box` already does it with a
+product is "play a machine in the next room", `rig/board` already does it with a
 service that dials out on boot. If the interesting product is specifically
 "**Ableton Live** is the instrument", then the audio path is the whole cost and
 it is worth paying. That question has not been asked out loud and it should be
@@ -1126,7 +1126,7 @@ sold as one.
    48 kHz"*, not *"negligible impact on Ableton's audio performance"*. Both
    appear in §3 and neither has a method behind it.
 8. **The question in §2.4 is answered out loud**: is the product *"play a
-   machine in the next room"* — which `rig/box` already does as a service that
+   machine in the next room"* — which `rig/board` already does as a service that
    survives a power cut — or is it *"**Ableton Live** is the instrument"*? Only
    the second justifies the audio path's whole cost, and it has never been said
    either way.

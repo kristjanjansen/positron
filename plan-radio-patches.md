@@ -77,12 +77,12 @@ controls, and (3) an answer to "can interestingness be measured".
 | `amp` `ingain` `run` `report` | 1 |
 
 That is **twenty-nine command names of the one hundred and seven the engine
-registers** (`rig/box/norns/README.md`, "Pappus registers 107 commands") — and
+registers** (`rig/board/norns/README.md`, "Pappus registers 107 commands") — and
 **twelve of the twenty-nine are the second granulator's**, which LITE compiled
 out (`:1013`, `graw2 = if(lite) { DC.ar([0,0]) }`; TINY implies LITE, `:218`).
 **Seventeen live controls.** Everything else is
 sitting at the compiled-in default in the `arg` list at
-`rig/box/norns/Engine_Pappus.sc:368–483`:
+`rig/board/norns/Engine_Pappus.sc:368–483`:
 
 - `swet = 0` — **the four-tap delay is off.**
 - `rverb = 0` — **the reverb is off** (`:2061`, `rverb 0` is an honest bypass).
@@ -182,7 +182,7 @@ seconds of zeros** — silence that looks exactly like a broken engine. Fix
 ## 1 · The upstream Pappus, mined
 
 Fetched 2026-09-14 from `https://github.com/FoundSoundsMM/Pappus` (the URL in
-`rig/box/norns/README.md:13`), at tree `060ea71a51dcbd067e0dc97a162d651b439bf4ff`:
+`rig/board/norns/README.md:13`), at tree `060ea71a51dcbd067e0dc97a162d651b439bf4ff`:
 `pappus.lua` (307,897 B, 7,508 lines), `lib/Engine_Pappus.sc` (98,469 B, 2,030
 lines), `README.md` (8,268 B). Line numbers below are in that `pappus.lua`.
 
@@ -829,7 +829,7 @@ RMS frames, 120 s.
 | **4** | **envelope autocorrelation, peak in lag 1–20 s** | does anything RECUR — freeze, loop, euclid, tap spacing | untested here, cheap, and it is the separator `plan-radio-sound` ③ already proposed |
 | **5** | **stereo width** — `1 − corr(L, R)` over 1 s frames, and side/mid RMS | `mspraymode` and `mspray` **by construction** (`:816`), and tap pans | ✅ has its own deaf-probe control built in: `mspraymode 2` must read ~0 |
 | **1** | **envelope depth** — 5th percentile ÷ median | continuous drone vs grains with gaps | ✅ **already measured in this repo**: 0.981 at `sos 0` against 0.000 at `sos 0.6` (CHAIN.md). ⚠️ but it is the wrong axis for THIS complaint — a scatter and a soundscape both have gaps |
-| **3** | **spectral centroid**, median and interquartile range over 1 s frames | brightness, and whether brightness MOVES | ✅ the code exists — `rig/box/measure.mjs:36–62`. ⚠️ **on live radio it measures the station.** Only meaningful on a frozen buffer (patch C's `mlock`), which is the control that makes it work |
+| **3** | **spectral centroid**, median and interquartile range over 1 s frames | brightness, and whether brightness MOVES | ✅ the code exists — `rig/board/measure.mjs:36–62`. ⚠️ **on live radio it measures the station.** Only meaningful on a frozen buffer (patch C's `mlock`), which is the control that makes it work |
 | 6 | silence ratio, frames below −60 dBFS | nothing musical — a safety net | catches the all-gates-shut failure that has bitten this repo three times |
 | 7 | onset rate and inter-arrival regularity, **from `/pgrain` AND from the audio** | intent vs audibility | ⚠️ **the pair is the measurement.** `pappus.mjs:149–153`: the graph fired 4–5 grains a window with the output bus at exactly 0.00000. A grain count alone has already been read as progress once |
 
@@ -843,7 +843,7 @@ quantity. That is *measure the quantity in question* in its purest form.
 ### 3.3 The negative controls — this is the part that decides whether it works
 
 Four arms, each repeated five times, because **one take of a stochastic
-instrument is not a measurement**. `rig/box/measure.mjs:90–107` already solves
+instrument is not a measurement**. `rig/board/measure.mjs:90–107` already solves
 the statistics: take the median as the condition's value and the **median
 distance from that median** as the floor any between-condition difference must
 clear. Its own header records why — three consecutive runs of `pappus-live.mjs`

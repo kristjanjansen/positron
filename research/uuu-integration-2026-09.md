@@ -283,7 +283,7 @@ U: already drive this from `tarmoj/CsoundRemote`, whose README describes
 screen device"* — which is `/keys/`'s shape, arrived at independently.
 
 **The bridge is a program that joins a relay room and writes datagrams.**
-✅ `rig/box/ask.mjs` is 57 lines and already does the first half — joins
+✅ `rig/board/ask.mjs` is 57 lines and already does the first half — joins
 `wss://ws.positron.studio/room/<name>/ws`, sends one envelope, prints the reply.
 The second half is `dgram.createSocket('udp4').send(...)`. Nothing in
 `workers/relay` needs to change: ✅ it is tokenless by design, and as deployed it
@@ -412,7 +412,7 @@ is most of the cost:
 
 | job | what it needs | is it solved here? |
 |---|---|---|
-| **the network HEARS the gear** | an audio input | ✅ twice — `rig/box` (`arecord` → relay) and `rig/m1` (process tap → relay) |
+| **the network HEARS the gear** | an audio input | ✅ twice — `rig/board` (`arecord` → relay) and `rig/m1` (process tap → relay) |
 | **the network PLAYS the gear** | notes out | ✅ written, ⚠️ **never tested on hardware** — §3.1 |
 | **the network TURNS KNOBS on the gear** | continuous control out | partly — `proto/automation`, and §3.2 |
 | **the network READS the gear's knobs** | continuous control in | nothing here does this |
@@ -420,7 +420,7 @@ is most of the cost:
 🔴 **The first row is the one that is already finished, and it is probably the
 one that matters most.** Getting a hardware synth's output onto a page in
 another building needs no MIDI and no CV at all: it is a class-compliant USB
-audio interface, a Raspberry Pi, and `rig/box/box.mjs` unchanged. ✅ That chain
+audio interface, a Raspberry Pi, and `rig/board/board.mjs` unchanged. ✅ That chain
 is running today — the board dials out to `wss://ws.positron.studio`, publishes
 `arecord -f S16_LE -r 48000 -c 1` in 20 ms frames at 50 frames/s, and `/keys/`
 plays it. **If the ask is "let people hear the studio", stop reading here.**
@@ -487,7 +487,7 @@ attaching one device and proving a note sounds.**
 ⚠️ And one open question this repo already wrote down: *"Does Chrome on Arm Linux
 enumerate MIDI OUTPUTS? There is field evidence of Linux Chromium returning an
 outputs map of length zero"* (`plan-hardware.md` §6). If the answer is no, the
-Pi drives MIDI natively through ALSA raw MIDI instead — ✅ which `rig/box/` is
+Pi drives MIDI natively through ALSA raw MIDI instead — ✅ which `rig/board/` is
 already doing for its own synths (`alsa.mjs`, 238 lines).
 
 ### 3.2 CV: what it is actually for, and the direction the question got backwards
@@ -674,7 +674,7 @@ own counters upward.
 1. **Ask §5.3 before spending anything.** The entire recommendation inverts if
    the gear is Eurorack.
 2. **If the ask is "let people hear it": it is already built.** A
-   class-compliant USB interface, a Pi, `rig/box/` unchanged. No MIDI, no CV.
+   class-compliant USB interface, a Pi, `rig/board/` unchanged. No MIDI, no CV.
 3. **If the ask is "let people play it": MIDI, on every box that has a socket.**
    $2–40 per instrument, 960 µs on the wire, against a 69 ms transport that
    dominates it by 70×. 🔴 And first, attach one device and prove `createMidiLane`

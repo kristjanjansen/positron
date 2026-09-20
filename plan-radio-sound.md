@@ -2,7 +2,7 @@
 
 > ⚠️ **NOTHING IN THIS FILE IS BUILT.** It is a proposal. No page, module or
 > definition has been changed; every value below is read off
-> `rig/box/norns/Engine_Pappus.sc` and has not been heard.
+> `rig/board/norns/Engine_Pappus.sc` and has not been heard.
 
 Live page today: <https://positron.studio/radio/>
 

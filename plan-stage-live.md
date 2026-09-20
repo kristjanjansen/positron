@@ -103,7 +103,7 @@ The 129th upgrade is answered `503 room full (128)`, which a browser reports as
 keep.
 
 ⚠️ **Two comments in the tree still say the old numbers** and are wrong rather
-than out of date: `rig/box/video.mjs:15` reasons from `MSG_PER_SEC` 60, and
+than out of date: `rig/board/video.mjs:15` reasons from `MSG_PER_SEC` 60, and
 `workers/store/src/index.js:13` says "sixteen slots". Both were true once.
 
 ### The board, read from `rig/audit.mjs`
@@ -113,7 +113,7 @@ ffmpeg **7.1.5** (`8:7.1.5-0+deb13u1+rpt2`, Debian Trixie), `/dev/video11` as a
 captures **1920×1080 MJPEG at 30 fps** and audio at a **fixed 16,000 Hz**
 (`plan-camera` §0). It already renders a generative shader headless and encodes
 it: **29.6 fps at 1280×720 for 18.6% user + 14.0% sys of 400%**, 30 s, alongside
-the running instruments, zero audio dropouts (`rig/box/video.mjs:10-11`).
+the running instruments, zero audio dropouts (`rig/board/video.mjs:10-11`).
 
 ---
 
@@ -386,7 +386,7 @@ And there are three more walls behind that one:
 - **The browser source does not exist on ARM at all** (no CEF build), which
   removes the one thing OBS would have been for.
 
-**What the board CAN do, and it is a lot.** `rig/box/video.mjs` already renders a
+**What the board CAN do, and it is a lot.** `rig/board/video.mjs` already renders a
 generative shader headless on the VideoCore and encodes it with the hardware
 encoder: **29.6 fps at 1280×720 for 18.6% user + 14.0% sys of 400%**, 30 s,
 alongside the running instruments, zero audio dropouts. The camera does
@@ -755,7 +755,7 @@ them are what §3's other three options are made of.
 | **the M1's OBS driver, three transports** | `rig/obs-pro/stream.mjs` | measured on all four legs; **WHIP connect 3.6 s, 876 frames, 0 skipped** |
 | **OBS in a Cloudflare Container** | `rig/obs-cloud/` (Dockerfile, worker, baked profile, plugin) | proven end to end; **the app was deleted**, rebuild is ~5 min plus a docker host |
 | **headless Linux OBS in Docker** | `rig/obs-docker/` | 1.08 GB image, 159 s build, full remote config from zero in 189 ms |
-| **the board's hardware H.264 encoder** | `rig/box/video.mjs` | 29.6 fps at 720p for 18.6% + 14.0% of 400%; **no WHIP muxer on that ffmpeg** |
+| **the board's hardware H.264 encoder** | `rig/board/video.mjs` | 29.6 fps at 720p for 18.6% + 14.0% of 400%; **no WHIP muxer on that ffmpeg** |
 | **the selfrec participant** | `proto/selfrec/participant.html` | IndexedDB buffer, sha256 per chunk, HEAD availability proof, a manifest with `missing` |
 | **the WebM cluster indexer** | `proto/selfrec/indexer.mjs` | pure JS, no ffmpeg, so it can run in a Worker |
 | **the WebM to fMP4 HLS repackager** | `proto/selfrec/repackage.mjs` | needs ffmpeg; carries the `-fps_mode vfr` trap |
