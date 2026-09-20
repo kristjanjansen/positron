@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* Three columns, as the panel has: a strip of buttons down each side and
+     everything else between them. */
+  /* 🔴 ONE GRID: three columns shared by both rows, which is the only way two
+     rows can agree about a `max-content` track. See the note in the script.
+     ⚠️ THE MIDDLE IS `max-content`, NOT `1fr`. `1fr` would stretch the button
+     rows to whatever the page gives them and the pads would drift apart from
+     the macros above them. */
+  /* 🔴 THE PANEL FILLS ITS CONTAINER AND ITS CONTROLS SIT IN THE MIDDLE.
+     Asked 2026-09-21: *"make circlit box fill the container and center the
+     controls"*. It was `inline-grid`, so the card shrank to its widest row and
+     sat against the left edge with a field of empty page beside it.
+     ⚠️ **`justify-content`, NOT `justify-items`.** The first centres the whole
+     set of tracks inside a now-wider grid, which keeps the three columns in the
+     arrangement the panel has. The second centres each column inside its own
+     track, which would pull both side columns away from the pads and undo the
+     centre line this page asserts. */
+  /* 🔴 THE PANEL SCROLLS SIDEWAYS ON A PHONE RATHER THAN SQUEEZING. Asked
+     2026-09-21: *"make it overflow on mobile"*. A Circuit is eight pads across
+     plus two columns of round buttons, and there is no width at which that
+     becomes a phone: shrinking it turns 46 px pads into something nobody can
+     hit, and wrapping it stops being a picture of a panel.
+     ⚠️ **THE SCROLLER NEEDS `min-width: 0` OR IT DRAGS THE WHOLE PAGE
+     SIDEWAYS.** Already measured on this project at 390 px: `overflow-x` cannot
+     shrink a flex item below its content, and a row without it took 141 px of
+     page overflow. The scrolling happens in this box or it happens in the
+     document, and only one of those is a design. */
+  .circ-scroll { overflow-x: auto; min-width: 0; }
+  .circ {
+    /* ⚠️ BOTH, AND THEY DO NOT FIGHT. `width: 100%` wins wherever the container
+       is wider than the panel, which is what centres it on a desktop;
+       `min-width` wins below that and hands the overflow to the scroller. */
+    display: grid; width: 100%; min-width: max-content; justify-content: center;
+    grid-template-columns: var(--ctl-w) max-content var(--ctl-w);
+    /* ⚠️ AIR. Asked 2026-09-21: *"tune whitespace between controls to add bit
+       of air"*. Every gap on this page moved together in one edit, because the
+       pad area's row pitch and the side column's row pitch are the same number
+       twice and a page where they disagree is the 7.5 px drift again. */
+    gap: 22px; align-items: start;
+    /* ⚠️ THE SAME INSET AT THE TOP AND BOTH SIDES. Asked 2026-09-21: *"same
+       padding top and left and right"*, after the sides were widened on their
+       own and left the printed names sitting closer to the top edge than to the
+       side ones. The foot keeps its own value because the bottom row of pads
+       has no label under it to hold it off the edge. */
+    padding: 24px 24px 20px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 4px;
+  }
+  /* the macro row and the pad area centre in the same track */
+  .circ-macros, .circ-mid { justify-self: center; }
+  /* 🔴 EVERY CELL IS PLACED, BECAUSE TWO NEW CHILDREN JOINED THE AUTO FLOW AND
+     SHIFTED ALL SIX. Adding the brand names moved the knob row into row 2 and
+     the columns into rows 3 and 4, which took three alignment asserts red at
+     once and reported a 336 px drift. **An implicit grid is a layout that any
+     new child can reorder**, and this one now has six children that must sit in
+     known places.
+     ⚠️ THE ASSERTS ARE WHY THIS TOOK ONE RUN RATHER THAN A SCREENSHOT. */
+  .circ-brand {
+    font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--dim2);
+    text-transform: uppercase; align-self: center;
+  }
+  /* ⚠️ BOTH UPPERCASE. The panel prints `novation` in lower case and the page
+     asked for neither: *"uppercalse all"*. At 11 px in a mono face beside a
+     row of uppercase control labels, a lower case word reads as a different
+     kind of thing rather than as branding. */
+  .circ-brand-l { grid-area: 1 / 1 / 2 / 2; }
+  .circ-brand-r { grid-area: 1 / 3 / 2 / 4; justify-self: end; }
+  .circ-vol     { grid-area: 2 / 1 / 3 / 2; }
+  .circ-macros  { grid-area: 2 / 2 / 3 / 3; }
+  .circ-filt    { grid-area: 2 / 3 / 3 / 4; }
+  /* ⚠️ CLASSES, NOT `:first-of-type`. That pseudo class counts by TAG, and the
+     first div in this grid is now a brand label, so neither column rule matched
+     and both columns fell into the auto flow. It reported as a 336 px drift and
+     as two different controls both sitting at x 608. */
+  .circ-left    { grid-area: 3 / 1 / 4 / 2; }
+  .circ-mid     { grid-area: 3 / 2 / 4 / 3; }
+  .circ-right   { grid-area: 3 / 3 / 4 / 4; }
+  /* the knob row sits on the bottom of its own row, level with each other */
+  .circ > .pos-knob { align-self: end; }
+  /* 🔴 THE TOP ROW USES THE BODY'S GAP, SO ITS ENDS SIT OVER THE COLUMNS.
+     Asked 2026-09-21: *"center filter to right circle buttons"*. It carried
+     `--ctl-gap` at 8 px while the body below it uses 14, so the volume knob and
+     the filter drifted inward from the two columns they belong over by 6 px
+     each. **The macro row and the button rows are already the same width**,
+     eight controls and seven gaps either way, so matching the outer gap is all
+     it takes. */
+  /* 14 px between the function row button and the block below it, which is the
+     same seam the middle column has between its button row and its pad area. */
+  .circ-side { display: flex; flex-direction: column; gap: 18px; }
+  /* 🔴 ONE ROUND BUTTON TO A PAD ROW. The cell is a pad's height and the circle
+     centres in it, so a 41 px button and a 46 px pad still share a centre line.
+     The gap is the pad area's, not the side column's. */
+  .circ-side-pads { display: flex; flex-direction: column; gap: 14px; }
+  /* 🔴 THESE CIRCLES ARE PAD SIZED, NOT 10 PER CENT SMALLER. Photographed
+     2026-09-21 as ellipses: a 41 px round pad in a 46 px wrapper was being
+     stretched across by the flex column's default `stretch`, so it came out
+     wide and short. Centring it in an over-tall cell was the wrong repair as
+     well, and left every one of them 7.5 px low, **measured five times over as
+     exactly 7.5**.
+     ⚠️ **AT PAD SIZE THERE IS NOTHING TO CENTRE AND NOTHING TO STRETCH.** One
+     button to a row, the same diameter as the pads it runs beside, which is
+     also what the panel has: the round buttons are not smaller than the pads on
+     a Circuit. The 10 per cent is a kit default for round pads in general and
+     is right where a circle sits among squares in one row. */
+  .circ-side-pads .pos-pad-round {
+    width: var(--ctl-w); height: var(--ctl-w); align-self: center;
+  }
+  /* 🔴 AND THE SLOTS GO, BECAUSE NOTHING IN THIS COLUMN USES ONE ANY MORE. The
+     legends came off the circles earlier and the reserved 15 px did not, so
+     every cell was 61 px against a 46 px pad row: **five rows, 75 px of
+     accumulated drift**, measured. Third time tonight a reserved slot has
+     outlived the label it was reserved for. */
+  .circ-side-pads .pos-pad-top { display: none; }
+  .circ-mid { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  /* 🔴 THE PAD AREA HAS ITS OWN, LARGER GAP. Asked 2026-09-21: *"increase pads
+     gap"*. It is set as a local `--ctl-gap` rather than as a `gap` on each
+     piece, so the track row, the grid's columns and the grid's rows all move
+     together and the across and down spacing cannot come apart again. */
+  .circ-grid {
+    --ctl-gap: 14px;
+    display: flex; flex-direction: column; gap: var(--ctl-gap);
+  }
+  /* 🔴 THE TRACK PADS GIVE UP THEIR LABEL SLOTS TOO. They carry their names on
+     the FACE, so the reserved top slot is 15 px of air that made their row
+     taller than a pad row, and every round button in the side columns came out
+     half a slot low: **7.5 px, measured, which is exactly half of 15**.
+     ⚠️ `createPadGrid` already collapses the slots for a grid where nothing is
+     labelled. This row is a plain flex of pads and is outside that rule, which
+     is the kind of gap a rule leaves when it is written for one container. */
+  .circ-grid > .circ-row .pos-pad-top { display: none; }
+  .circ-row { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
+
+  /* 🔴 THE MACROS ARE A ZIG ZAG, NOT A ROW. Odd numbers on the upper line, even
+     numbers lower and offset right, so the eight interleave. Read off the panel
+     at 800 dpi and confirmed from the rear photograph, where ten knob profiles
+     stand above the edge: two with pointers at the ends and eight without.
+     **A straight row of eight, or two aligned rows of four, is a different
+     instrument.** The offset is half a column plus half a gap, which is what
+     interleaving means. */
+  .circ-macros { display: flex; gap: var(--ctl-gap); align-items: flex-start; }
+  .circ-macro-even { margin-top: 26px; }
+
+  /* ⚠️ ONE KNOB SIZE EVERYWHERE. Asked 2026-09-21: *"single size knobs
+     weverywhre"*. Filter and Master Volume really are larger pots on the panel
+     and were drawn at 1.3, which put three diameters in one row and made the
+     row read as three kinds of control rather than one kind at two jobs.
+     **A panel reproduced at a tenth of its size cannot carry a panel's
+     proportions**, which is the same reason `Pattern Octave` became
+     `prt/oct`. The size difference is recorded in
+     `plans/plan-panel-layouts.md` and is not drawn. */
+
+  /* A legend printed over a PAIR of buttons rather than over one. It takes the
+     same face and the same reserved height as a pad's own top slot, so the
+     pair lines up with the single buttons beside it. */
+  .circ-pair { display: flex; flex-direction: column; }
+  .circ-pair-lab {
+    font: 500 9px/12px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--dim2); min-height: 12px; margin-bottom: calc(var(--ctl-head) - 12px);
+    text-align: center; white-space: nowrap;
+  }
+  /* 🔴 THE PADS INSIDE GIVE UP THEIR OWN TOP SLOTS, BECAUSE THE PAIR'S LEGEND
+     IS ALREADY ONE. Reported 2026-09-21: *"bottomalign buttns"*, showing Scale
+     and Shift sitting higher than the row between them. The pair was reserving
+     the label height TWICE, once for the shared legend and once inside each
+     pad, so it stood 15 px taller than a plain button; with `flex-end` on the
+     row, every plain button dropped by that much and the side columns did not.
+     ⚠️ **A SHARED LABEL REPLACES THE SLOTS IT SPANS, IT DOES NOT SIT ABOVE
+     THEM.** The comment here previously said the opposite and was wrong: it was
+     reasoning about a pair standing alone, not about one in a row. */
+  .circ-pair-row { display: flex; gap: var(--ctl-gap); }
+  .circ-pair-row .pos-pad-top { display: none; }
+
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createPad, createPadGrid } from '/shell/pad.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { decode } from '/shell/midi-decode.mjs';
+
+  /**
+   * 🔴 A NOVATION CIRCUIT ON SCREEN. Two sources and they are kept apart on
+   * purpose, because they fail differently:
+   *   - **WHAT IT SENDS** is measured, off this desk through `/dump/` on
+   *     2026-09-20, and is in `measured-devices-2026-09-20.md`.
+   *   - **WHERE THE CONTROLS ARE** is read, off Novation's own panel artwork at
+   *     800 dpi, and is in `plans/plan-panel-layouts.md`.
+   * ⚠️ **THE MODEL 12 PAGE LEARNED THIS THE EXPENSIVE WAY.** Its strip was laid
+   * out from reasoning and corrected twice by somebody looking at the object,
+   * because a CC number says what TRAVELS and says nothing about what a hand
+   * TOUCHES. This page starts from the artwork instead.
+   */
+
+  /** Measured. Macros are one block on channel 1. */
+  const MACRO_CC0 = 80;
+  /**
+   * 🔴 THE FILTER IS ALONE ON CHANNEL 16 AND EVERY MACRO IS ON CHANNEL 1.
+   * Measured, and it is the one fact about this instrument that nobody would
+   * guess: a layout binding the whole panel to one channel gets eight knobs and
+   * silently loses the one the guide calls always active.
+   */
+  const FILTER_CC = 74, FILTER_CH = 16;
+  /** Measured: drums arrive on 10, synth 2 on 2. */
+  const DRUM_CH = 10;
+
+  const d = mount({
+    name: 'circuit',
+    what: 'A Novation Circuit on screen, moving when the real one moves.',
+    readout: null,
+    controls: [{ id: 'listen', label: 'Listen', primary: true }],
+  });
+  guard(d);
+
+  /**
+   * 🔴 THE KNOB ROW SPANS THE WHOLE PANEL AND THE SIDE COLUMNS START BELOW IT.
+   * Reported 2026-09-21: *"scale is in the same height as oct etc buttons"*.
+   * The first build made three columns of the whole panel, so `Scale` began
+   * level with the macros and every button in both side columns sat one row too
+   * high. On the object the macros run across the top and the two columns of
+   * round buttons begin at the button row.
+   * ⚠️ IT IS A STRUCTURAL FACT, NOT A MARGIN. Pushing the columns down by the
+   * height of the knob row would be a number to keep in step with a row whose
+   * height depends on the knobs in it.
+   */
+  /**
+   * 🔴 ONE GRID, SIX CELLS, AND THE ROWS ARE NOT WRAPPED. Two grids with the
+   * same `max-content` column do NOT agree: each sizes its own track from its
+   * own contents, so the knob row measured the macros and the row below it
+   * measured the pads, and the filter sat 12 px left of the column it belongs
+   * over while the volume knob was exact. **A shared column has to be one
+   * grid.**
+   * ⚠️ THIS WAS THE SECOND ATTEMPT. The first replaced two flex rows with two
+   * grids, which made the intent clearer and changed the answer by 0 px.
+   */
+  /**
+   * ⚠️ THE INSTRUMENT WEARS ITS OWN NAMES, WHERE IT WEARS THEM. Asked
+   * 2026-09-21: *"add title to instument: left: novation, right circuit"*. On
+   * the panel `novation` is printed in the top left corner and `CIRCUIT` in the
+   * top right, above the two outer knobs.
+   * ⚠️ IT IS NOT THE PAGE'S TITLE REPEATED. The page is called `circuit` and
+   * says so above; this is the artwork, which is why the maker's name is on it
+   * and why the two sit at opposite ends rather than in the middle.
+   */
+  const circ = el('div', 'circ');
+  const circScroll = el('div', 'circ-scroll');
+  circ.append(el('div', 'circ-brand circ-brand-l', 'novation'),
+              el('div', 'circ-brand circ-brand-r', 'CIRCUIT'));
+  const left = el('div', 'circ-side circ-left');
+  const mid = el('div', 'circ-mid');
+  const right = el('div', 'circ-side circ-right');
+  circScroll.append(circ);
+  d.el.append(circScroll);
+
+  // ── the knobs ───────────────────────────────────────────────────────────
+
+  /**
+   * ⚠️ MASTER VOLUME IS DRAWN AND BOUND TO NOTHING. It is a pot with a printed
+   * pointer, alone at the far left under the logo, and **whether it transmits
+   * has never been measured**. Drawing it live would be a control that looks
+   * bound and is not; leaving it out would be a panel missing a knob.
+   */
+  const volume = createKnob({
+    label: 'volume', min: 0, max: 127, value: 96,
+    title: 'master volume, a pot. Whether it sends anything has not been measured',
+    disabled: true,
+  });
+
+  volume.el.classList.add('circ-vol');
+
+  const macros = [];
+  const macroRow = el('div', 'circ-macros');
+  for (let i = 0; i < 8; i++) {
+    const k = createKnob({
+      /**
+       * ⚠️ NO CONTROLLER NUMBER UNDER THE KNOB. Asked 2026-09-21: *"rm ccs,
+       * also from rack"*. A panel does not print the wire protocol on itself,
+       * and a reader looking at an instrument wants to know which knob this is,
+       * not which byte it sends.
+       * ⚠️ **THE NUMBER IS NOT LOST, IT MOVED TO THE HOVER**, which is where
+       * this page already puts the channel and whether the reading was measured
+       * or inferred. Somebody debugging a binding is somebody who will point at
+       * the control; somebody looking at the panel is not.
+       */
+      label: `M${i + 1}`,
+      min: 0, max: 127, value: 64,
+      title: `macro ${i + 1}, CC ${MACRO_CC0 + i} on channel 1, measured`,
+    });
+    // odd numbers up, even numbers down and offset: the zig zag.
+    if (i % 2 === 1) k.el.classList.add('circ-macro-even');
+    macros.push(k);
+    macroRow.append(k.el);
+  }
+
+  /** The filter is visibly larger on the panel and turns further. */
+  const filter = createKnob({
+    label: 'filter', min: 0, max: 127, value: 64,
+    title: `filter, CC ${FILTER_CC} on channel ${FILTER_CH}, measured`,
+  });
+  filter.el.classList.add('circ-filt');
+
+  // volume, macros, filter across the top; then the two columns and the middle.
+  circ.append(volume.el, macroRow, filter.el, left, mid, right);
+
+  // ── the button row under the macros ─────────────────────────────────────
+
+  /**
+   * ⚠️ THE GREY LEGEND ABOVE A BUTTON IS WHAT SHIFT PLUS THAT BUTTON DOES,
+   * confirmed twice from the guide's own glossary. It goes in the TOP label
+   * slot, which is what that slot is for.
+   * 🔴 **AND THE LAST PAIR DOES NOT RESOLVE.** The faces read `Save` and
+   * `Session`, the legends above them read `Clear` and `Sessions`, and what
+   * Shift plus Save actually does is not stated anywhere in the User Guide.
+   * The artwork is reproduced and the meaning is left alone.
+   */
+  /**
+   * ⚠️ THE OCTAVE BUTTONS CARRY A TRIANGLE, WHICH IS WHAT THE PANEL PRINTS.
+   * Asked 2026-09-21: *"butotn labels: oct+downwardstriangle etc"*. Two buttons
+   * both reading `Oct` are two identical controls as far as a reader is
+   * concerned, and the direction is the only thing telling them apart.
+   * ⚠️ U+25BC AND U+25B2 HAVE NO EMOJI FORM, unlike the media control block.
+   * That is now a standing rule in this kit after the transport glyphs and the
+   * invisible hand both rendered in colour.
+   */
+  const ROW = [
+    ['oct-', 'Oct\u25BC', ''], ['oct+', 'Oct\u25B2', ''],
+    ['tempo', 'Tempo', 'Tap'], ['swing', 'Swing', ''],
+    ['clear', 'Clear', ''], ['dup', 'Dup', ''],
+    ['save', 'Save', 'Clear'], ['session', 'Session', 'Sessions'],
+  ];
+  const btnRow = el('div', 'circ-row');
+  const rowPads = {};
+  for (const [id, label, above] of ROW) {
+    /**
+     * ⚠️ THE NAME IS ON THE BUTTON, NOT UNDER IT. Asked 2026-09-21: *"top
+     * buttons: move label to buttons"*, and the panel agrees: these eight carry
+     * their names printed on the face, while the grey Shift legends are the
+     * things printed above them. **The top slot stays for the legend**, which
+     * is what it was reserved for.
+     * ⚠️ AND A FACE THAT DOES NOT FIT NOW CUTS, because `.pos-pad-face` gained
+     * an ellipsis with this change. A cut face is the same signal a cut label
+     * is: the word is too long for a pad.
+     */
+    rowPads[id] = createPad({
+      half: true, label, top: above, tint: '#6a7280', latch: true,
+      aria: id,
+      title: `${label}, and this page has never seen a byte from it`,
+    });
+    btnRow.append(rowPads[id].el);
+  }
+
+  /**
+   * 🔴 `PATTERN OCTAVE` IS CENTRED OVER THE PAIR, NOT OVER ONE BUTTON. Reported
+   * 2026-09-21 with a screenshot: *"do not break prt/oct"*. It was in the first
+   * Oct pad's own top slot, where it is two words in a 46 px box against
+   * `white-space: nowrap`, so it ran out over its neighbour.
+   * ⚠️ **A LEGEND THAT SPANS TWO CONTROLS IS NOT A LABEL ON EITHER OF THEM**,
+   * and a pad's top slot cannot express that: the slot belongs to one pad by
+   * construction. The two are wrapped instead, and the pads keep their empty
+   * slots so they still line up with the six beside them.
+   */
+  const octPair = el('div', 'circ-pair');
+  /**
+   * ⚠️ `prt/oct`, NOT `Pattern Octave`. Asked 2026-09-21: *"do not break, use
+   * prt/oct"*. The panel prints the words in full across a pair of buttons that
+   * are 22 mm wide between them; on screen that pair is 100 px and the words
+   * are 90 of it, which is a legend filling its own row rather than labelling
+   * something. **A panel reproduced at a tenth of its size cannot carry a
+   * panel's typography**, and the hover has room for the full words.
+   */
+  const octLab = el('div', 'circ-pair-lab', 'prt/oct');
+  octPair.title = 'Pattern Octave, printed in full across the pair on the panel';
+  const octPads = el('div', 'circ-pair-row');
+  octPads.append(rowPads['oct-'].el, rowPads['oct+'].el);
+  octPair.append(octLab, octPads);
+  btnRow.prepend(octPair);
+  /**
+   * 🔴 SHIFT IS NOT IN THIS ROW, IT IS THE TOP OF THE RIGHT COLUMN. Reported
+   * 2026-09-21: *"shift is in the same lane"*, and it was being **drawn
+   * twice**: once here set apart with `margin-left: auto`, and again as the
+   * first button of the right column.
+   * ⚠️ THE PANEL RESEARCH SAYS BOTH THINGS AND THEY ARE NOT A CONTRADICTION. It
+   * sits apart from the other seven AND it is level with them, because it
+   * belongs to the column that runs down the right edge and that column starts
+   * at this row. **Reading one sentence and not the other is how a control gets
+   * built in two places.**
+   */
+  mid.append(btnRow);
+
+  // ── the track buttons and the grid ──────────────────────────────────────
+
+  /**
+   * ⚠️ SHORT NAMES, BECAUSE THE ELLIPSIS SAID SO. `Sidechain` is 50 px at this
+   * face and a pad is 46, so it cut. **A cut label is the signal that the word
+   * is in the wrong place**, and the answer is a shorter word rather than a
+   * wider pad: the full name is on the hover.
+   */
+  const TRACKS = [['Syn1', 'Synth 1'], ['SC', 'Sidechain'], ['Syn2', 'Synth 2'],
+                  ['SC', 'Sidechain'], ['Dr1', 'Drum 1'], ['Dr2', 'Drum 2'],
+                  ['Dr3', 'Drum 3'], ['Dr4', 'Drum 4']];
+  const trackRow = el('div', 'circ-row');
+  /**
+   * ⚠️ FULL SIZE, WITH THE NAME ON THE BUTTON. Asked 2026-09-21: *"second row
+   * of buttons are full size. add on-button labels support, align to bototm"*.
+   * These are the eight track selectors and they are the row a hand reaches for
+   * most, so they are squares rather than the half height the function row uses.
+   * ⚠️ A SQUARE HOLDS MORE THAN A HALF DOES, but not much more: the face is
+   * still 46 px against a 9 px mono word, which is why these stayed short.
+   */
+  const tracks = TRACKS.map(([short, full]) => {
+    const p = createPad({ label: short, tint: '#7fb2ff', latch: true,
+      aria: full, title: full });
+    trackRow.append(p.el);
+    return p;
+  });
+  /**
+   * 🔴 THE TRACK ROW AND THE GRID ARE ONE BLOCK. Reported 2026-09-21 with a
+   * screenshot: *"add same gap to grid, the one under the first row"*. The
+   * stack between blocks is 14 px and the grid's own rows are 8, so the seam
+   * between the selectors and the pads they select was almost twice every other
+   * seam in the grid, and read as a divider nobody drew.
+   * ⚠️ ON THE PANEL THEY REALLY ARE ONE THING: the track buttons are the top
+   * row of the pad area, not a separate row above it.
+   */
+  const gridBlock = el('div', 'circ-grid');
+  gridBlock.append(trackRow);
+  mid.append(gridBlock);
+
+  /**
+   * 🔴 THIRTY TWO PADS, AND WHICH PAD IS WHICH NOTE IS NOT KNOWN. Measured:
+   * drums arrive on **channel 10** as notes 60, 62 and 64, and synth 2 on
+   * channel 2. **Three notes out of thirty two pads is not a map**, so a press
+   * lights the pad only when its note has actually been seen, and the rest stay
+   * dark rather than being bound by a guess.
+   * ⚠️ THE COLOURS ARE THE FOUR TRACKS, which is what a Circuit's pads are lit
+   * by. That is the surface `pad.mjs`'s header says colour means lane identity
+   * on, and the reason is here: the hardware's pads really are coloured.
+   */
+  const LANE_TINT = ['#7fb2ff', '#8fd6a8', '#e0b060', '#e0908a'];
+  const grid = createPadGrid({
+    cols: 8, rows: 4,
+    pad: (x, y) => ({ tint: LANE_TINT[y], title: `pad ${x + 1} of row ${y + 1}` }),
+  });
+  gridBlock.append(grid.el);
+
+  // ── the two side columns ────────────────────────────────────────────────
+
+  /**
+   * 🔴 A ROUND BUTTON CARRIES ITS NAME INSIDE IT. Asked 2026-09-21: *"circle
+   * buttons: labels inside"*, and the panel agrees: these are printed on the
+   * face, while the grey Shift legends stay above.
+   * ⚠️ **SO THE NAME HAS TO FIT A CIRCLE, WHICH IS ABOUT FOUR CHARACTERS.** A
+   * round pad is 10 per cent smaller than a square one and a circle wastes its
+   * corners, so `Velocity` and `Patterns` cannot go on one. They are shortened
+   * and the full word is on the hover, which is the same answer `Sidechain` got
+   * an hour ago. **The ellipsis was the signal both times.**
+   * Each row is: id, face, full name, legend above, round.
+   */
+  const LEFT = [['scale', 'Scale', 'Scale', '', false],
+                ['note', 'Note', 'Note', 'Expand', true],
+                ['vel', 'Vel', 'Velocity', 'Fixed', true],
+                ['gate', 'Gate', 'Gate', '', true],
+                ['nudge', 'Ndg', 'Nudge', '', true],
+                ['length', 'Len', 'Length', 'Rate', true]];
+  const RIGHT = [['shift2', 'Shift', 'Shift', '', false],
+                 ['patterns', 'Patt', 'Patterns', '', true],
+                 ['mixer', 'Mix', 'Mixer', '', true],
+                 ['fx', 'FX', 'FX', '', true],
+                 ['record', '\u25CF', 'Record', '', true],
+                 ['play', '\u25BA', 'Play', '', true]];
+  const side = {};
+  /**
+   * 🔴 THE FIVE ROUND BUTTONS IN EACH COLUMN LINE UP WITH THE FIVE PAD ROWS.
+   * Asked 2026-09-21: *"circle buttons need to align vert with pads"*, and the
+   * panel agrees: the columns run down the sides of the pad area, one button to
+   * a row.
+   * ⚠️ **A CIRCLE IS SMALLER THAN A PAD, SO IT CENTRES IN A PAD SIZED CELL**
+   * rather than the column being packed tighter. Packing them would make five
+   * buttons at 41 px plus gaps fall short of five pads at 46, and the two
+   * columns would drift apart down the panel by 5 px a row.
+   * ⚠️ AND THE FIRST BUTTON IN EACH COLUMN IS NOT ONE OF THE FIVE: `Scale` and
+   * `Shift` belong to the function row above, which is why they are separated
+   * by the stack's own 14 px rather than by the pad gap.
+   */
+  const sidePads = { left: el('div', 'circ-side-pads'), right: el('div', 'circ-side-pads') };
+  left.append(sidePads.left);
+  right.append(sidePads.right);
+
+  for (const [host, list] of [[left, LEFT], [right, RIGHT]]) {
+    for (const [id, face, full, above, round] of list) {
+      side[id] = createPad({
+        /**
+         * ⚠️ THE FACE FOR BOTH SHAPES. A round button with its name below it
+         * read as a dot with a caption; the panel prints the word inside.
+         * 🔴 **AND NO TOP LEGEND ON A CIRCLE.** Asked 2026-09-21: *"rm top
+         * labels from circle buttons"*. `Expand`, `Fixed` and `Rate` are grey
+         * Shift legends on the hardware, and above a round button each one is a
+         * word wider than the thing it labels, in a column where the next
+         * button's legend is directly under the last one's. The panel has
+         * millimetres of clear panel to print into; this column has 8 px of gap.
+         * ⚠️ **THE LEGENDS ARE NOT LOST.** They stay on the rectangular buttons,
+         * where there is width for them, and every circle carries its own on
+         * the hover. What Shift plus that button does is a fact about the
+         * instrument, not a thing to drop because it will not fit.
+         */
+        round, half: !round, tint: '#6a7280', latch: true,
+        label: face, top: round ? '' : above, aria: full,
+        title: above
+          ? `${full}, and Shift plus it is ${above}. Never seen a byte from it`
+          : `${full}, and this page has never seen a byte from it`,
+      });
+      // the rectangular one stays at the top of the column; the circles go in
+      // the block that tracks the pad rows
+      if (round) (host === left ? sidePads.left : sidePads.right).append(side[id].el);
+      else host.prepend(side[id].el);
+    }
+  }
+
+  // ── what arrives ────────────────────────────────────────────────────────
+
+  let access = null, clock = 0;
+  const seenNotes = new Map();
+
+  function take(b) {
+    const m = decode(b);
+    if (m.status === 0xf8) { clock++; return; }
+    if (m.flood) return;
+
+    if (m.kind === 'control' && m.ch === 1
+        && m.cc >= MACRO_CC0 && m.cc < MACRO_CC0 + 8) {
+      // ⚠️ ABSOLUTE, UNLIKE THE MODEL 12'S PAN. Measured: a macro sweeps 0 to
+      // 127 and reports a position, so it is set rather than accumulated.
+      macros[m.cc - MACRO_CC0].set(m.d2, { from: 'hardware' });
+      return;
+    }
+    if (m.kind === 'control' && m.ch === FILTER_CH && m.cc === FILTER_CC) {
+      filter.set(m.d2, { from: 'hardware' });
+      return;
+    }
+    if (m.kind === 'note on' && m.ch === DRUM_CH) {
+      // A note lights the pad it has been seen on, and nothing else.
+      let at = seenNotes.get(m.note);
+      if (at === undefined) { at = seenNotes.size; seenNotes.set(m.note, at); }
+      grid.at(at % 8, 3)?.flash(140);
+    }
+  }
+
+  async function open() {
+    if (!navigator.requestMIDIAccess) {
+      d.log('this browser has no Web MIDI, so nothing can reach this panel', 'warn');
+      return false;
+    }
+    try {
+      access = await navigator.requestMIDIAccess({ sysex: false });
+      for (const p of access.inputs.values()) {
+        try { await p.open(); } catch { /* another client may hold it */ }
+        p.onmidimessage = (e) => take(Array.from(e.data));
+      }
+      return true;
+    } catch (e) {
+      d.log(`MIDI was refused: ${e.message}`, 'warn');
+      return false;
+    }
+  }
+
+  d.on('listen', async () => {
+    if (await open()) {
+      d.log('turn a macro or the filter. The pads light where a note has been '
+          + 'seen, which is three of thirty two so far.');
+      d.log('this Circuit sends MIDI clock continuously, measured at about 122 bpm, '
+          + 'whether anything is playing or not.');
+    }
+    if (SELFCHECK) await d.run('check');
+  });
+
+  // ── checks ──────────────────────────────────────────────────────────────
+
+  d.on('check', async () => {
+    for (let i = 0; i < 8; i++) take([0xb0, MACRO_CC0 + i, 20 + i * 12]);
+    take([0xbf, FILTER_CC, 100]);          // channel 16
+    take([0x99, 60, 0x60]);                // drums, channel 10
+    take([0xf8]); take([0xf8]);
+
+    d.assert('a visit opened nothing', SELFCHECK ? true : access === null,
+      access ? 'access taken after a press' : 'no MIDI access taken');
+
+    d.assert('eight macros are drawn and all eight are bound',
+      macros.length === 8 && macros.every((k) => k.hardwareMoves() > 0),
+      `${macros.filter((k) => k.hardwareMoves() > 0).length} of 8 moved`);
+
+    /**
+     * 🔴 THE FILTER IS ON CHANNEL 16 AND THE MACROS ARE ON 1, asserted because
+     * it is the one binding on this instrument that a reasonable layout gets
+     * wrong. A page listening on channel 1 alone would pass everything else.
+     */
+    d.assert('the filter answers on channel 16, not channel 1',
+      filter.hardwareMoves() > 0, `${filter.hardwareMoves()} moves`);
+    const before = filter.value();
+    take([0xb0, FILTER_CC, 5]);            // the same CC on channel 1
+    d.assert('and CC 74 on channel 1 does not move it',
+      filter.value() === before, `${filter.value()} after a channel 1 message`);
+
+    // ⚠️ A MACRO IS ABSOLUTE. The Model 12's pan is relative on the same
+    // protocol, so this is asserted rather than assumed.
+    d.assert('a macro takes its value as a position, not a step',
+      Math.round(macros[0].value()) === 20, String(Math.round(macros[0].value())));
+
+    d.assert('clock is counted and never drawn', clock === 2, `${clock} clock bytes`);
+
+    d.assert('the pad grid is four rows of eight', grid.pads.length === 4
+      && grid.pads[0].length === 8, `${grid.pads.length} by ${grid.pads[0].length}`);
+
+    /**
+     * 🔴 THE PANEL IS DRAWN WHOLE AND MOST OF IT IS BOUND TO NOTHING, which is
+     * deliberate and is asserted so nobody quietly binds it by guess. Twenty
+     * two buttons here have never sent a byte this page has seen.
+     */
+    /**
+     * 🔴 THE PANEL IS DRAWN WHOLE AND MOST OF IT IS BOUND TO NOTHING, asserted
+     * so nobody quietly wires it by guess later.
+     * ⚠️ IT ASKS `hardwareMoves`, NOT THE HOVER TEXT. The first version matched
+     * on the title string, which grades the sentence rather than the binding
+     * and would pass for a control that was wired AND still described as
+     * unwired. **A wording is not a fact about behaviour.**
+     */
+    const unbound = [...Object.values(rowPads), ...Object.values(side), ...tracks];
+    d.assert('the buttons nobody has measured are drawn and are lit by nothing',
+      unbound.every((p) => p.presses() === 0 && !p.on()),
+      `${unbound.length} controls drawn, none lit by a message`);
+
+    /**
+     * 🔴 THE BUTTON ROW IS ONE LINE, ASSERTED. Two comments in this file have
+     * now claimed it and one of them was wrong, which is exactly the case for
+     * measuring instead: the octave pair carries a legend the others do not,
+     * so it is the one thing in that row that can silently be a different
+     * height.
+     */
+    const tops = [side.scale.button, rowPads['oct-'].button, rowPads.tempo.button,
+                  rowPads.session.button, side.shift2.button]
+      .map((b) => b.getBoundingClientRect().top);
+    d.assert('every button in the top row sits on one line, legend or no legend',
+      Math.max(...tops) - Math.min(...tops) <= 1,
+      tops.map((t) => t.toFixed(0)).join(', '));
+
+    // The track row is squares and sits on one line of its own.
+    const tTops = tracks.map((p) => p.button.getBoundingClientRect());
+    d.assert('the track buttons are full size squares on one line',
+      tTops.every((r) => Math.abs(r.width - r.height) <= 1)
+      && Math.max(...tTops.map((r) => r.top)) - Math.min(...tTops.map((r) => r.top)) <= 1,
+      `${tTops[0].width.toFixed(0)} by ${tTops[0].height.toFixed(0)} px, ${tracks.length} of them`);
+
+    // 🔴 ONE GAP THROUGH THE WHOLE PAD AREA, measured rather than looked at:
+    // the seam under the track row and the seam between two grid rows.
+    {
+      const t = tracks[0].button.getBoundingClientRect();
+      const r0 = grid.at(0, 0).button.getBoundingClientRect();
+      const r1 = grid.at(0, 1).button.getBoundingClientRect();
+      d.assert('the gap under the track row is the same as the gap between grid rows',
+        Math.abs((r0.top - t.bottom) - (r1.top - r0.bottom)) <= 1,
+        `${(r0.top - t.bottom).toFixed(1)} px under the tracks, `
+        + `${(r1.top - r0.bottom).toFixed(1)} px between rows`);
+    }
+
+    // 🔴 THE TWO OUTER KNOBS SIT OVER THE TWO COLUMNS, measured. The panel puts
+    // Master Volume above the left edge and Filter above the right, and a 6 px
+    // drift is the kind of thing that reads as wrong without reading as broken.
+    {
+      const c = (e) => { const r = e.getBoundingClientRect(); return r.left + r.width / 2; };
+      d.assert('the filter is centred over the right column and the volume over the left',
+        Math.abs(c(filter.el) - c(side.patterns.button)) <= 1.5
+        && Math.abs(c(volume.el) - c(side.note.button)) <= 1.5,
+        `filter ${c(filter.el).toFixed(1)} against ${c(side.patterns.button).toFixed(1)}, `
+        + `volume ${c(volume.el).toFixed(1)} against ${c(side.note.button).toFixed(1)}`);
+    }
+
+    // 🔴 EACH ROUND BUTTON SHARES A CENTRE LINE WITH ITS PAD ROW, measured.
+    // A 41 px circle and a 46 px pad cannot be aligned by packing, only by
+    // giving the circle a pad sized cell to centre in.
+    {
+      const mid = (e) => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; };
+      const pairs = [[side.note, tracks[0]], [side.vel, grid.at(0, 0)],
+                     [side.gate, grid.at(0, 1)], [side.nudge, grid.at(0, 2)],
+                     [side.length, grid.at(0, 3)]];
+      const worst = Math.max(...pairs.map(([a, b]) => Math.abs(mid(a.button) - mid(b.button))));
+      d.assert('every round button shares a centre line with its pad row',
+        worst <= 1.5, `worst drift ${worst.toFixed(1)} px over five rows`);
+    }
+
+    // 🔴 THE PANEL SCROLLS AND THE PAGE DOES NOT, measured at whatever width
+    // this is running at. The second half is the one that matters: a scrolling
+    // row that forgot `min-width: 0` looks identical in a screenshot and takes
+    // the document sideways instead.
+    {
+      const cs = getComputedStyle(circScroll);
+      const doc = document.documentElement;
+      d.assert('the panel scrolls sideways inside its own box, not the page',
+        cs.overflowX === 'auto' && cs.minWidth === '0px'
+        && doc.scrollWidth <= doc.clientWidth + 1,
+        `overflow-x ${cs.overflowX}, min-width ${cs.minWidth}, `
+        + `page ${doc.scrollWidth} into ${doc.clientWidth}`);
+    }
+
+    d.assert('no secret in this page', !location.href.includes('token'));
+  });
+
+  d.ready();
+</script>
+</html>

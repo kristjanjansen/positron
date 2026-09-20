@@ -6,292 +6,1105 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 THE ARRANGEMENT IS FROM SOMEBODY LOOKING AT THE MIXER, NOT FROM A
+     MANUAL. Reported 2026-09-20: *"rec mute solo have to be on rihht on slider,
+     aligned to bototm"*, and before it *"solo is most bottom"*. The first build
+     stacked the three buttons UNDER the pan knob and above the fader, on the
+     reasoning that a mixer strip reads downward. It does, and the buttons are
+     not in that column: they sit beside the fader.
+     ⚠️ A GUESS THAT LOOKS PLAUSIBLE IS THE EXPENSIVE KIND, because nobody
+     re-checks it. Two corrections from a person in front of the hardware beat
+     the reasoning outright, and a panel diagram is still being looked up to
+     settle whether REC is above MUTE. */
+  /* 🔴 THE STRIPS ARE GLUED, WITH NO GAP AND ONE EDGE ROUND THE SET. Asked
+     2026-09-21: *"when channels are next to each other, leave no gap, glue
+     horizontally"*. Eight boxes with air between them are eight things; eight
+     boxes sharing their edges are one mixer, which is what the object on the
+     desk is. It is the same argument `choice.mjs` and `button-group.mjs` both
+     make about a segmented row.
+     ⚠️ THE SEAM IS ONE PIXEL, NOT TWO. Each strip drops its left border so
+     adjacent borders do not stack, and only the outer corners are rounded. A
+     doubled border down every seam is what "glued" looks like when nobody
+     measured it.
+     ⚠️ AND IT SCROLLS RATHER THAN SHRINKING: a strip narrow enough to fit a
+     phone is one nobody can work. */
+  /* 🔴 TWO CHILDREN: ONE SCROLLS, ONE DOES NOT. `min-width: 0` on the scroller
+     or `overflow-x` cannot shrink it below its content and the PAGE drags
+     sideways instead of the row. MEASURED once at 390 px as 141 px of page
+     overflow on a different component. */
+  /* 🔴 THE LANE IS GLUED TO THE CHANNELS AND IS THE SAME HEIGHT. Reported
+     2026-09-21 with a screenshot: *"the panels are glued together, no gap, same
+     h"*. It sat apart with `--ctl-gap` between and stood taller than the rack,
+     so the mixer read as two machines beside each other rather than one.
+     ⚠️ `align-items: stretch`, NOT `flex-end`. Bottom alignment makes two
+     children END together and says nothing about their heights; stretch makes
+     them the same height, which is what was asked for and what a mixer is. */
+  .rack-wrap { display: flex; align-items: stretch; gap: 0; min-width: 0; padding-bottom: 4px; }
+  /* ⚠️ THE ROOM FOR THE SCROLLBAR IS ON THE WRAPPER, NOT ON THE SCROLLER.
+     Reported 2026-09-21: *"bottom uneven"*. It was 4 px of `padding-bottom`
+     here and nowhere on the lane, so the two boxes ended 4 px apart and every
+     fader in the rack sat higher than the FX fader beside it. **A reservation
+     that only one of two equal things makes is a reservation that breaks
+     them.** */
+  .rack-row { display: flex; gap: 0; overflow-x: auto; min-width: 0; flex: 1 1 auto; }
+  /* The lane keeps its width whatever the channels do. */
+  /* 🔴 THE LANE IS ONE SURFACE, NOT THREE BOXES AND A FOURTH ONE ROUND THE FX
+     FADER. Asked 2026-09-21: *"right panels should have same bg as channel
+     strips. no separte bg for fx slidr"*. The rows had no background at all and
+     the FX fader had its own `.strip-one` box, so the master column read as a
+     loose pile beside a solid rack.
+     ⚠️ ONE BOX, ONE BORDER, SAME `--card` AS A CHANNEL. The FX fader is part of
+     the master column on the panel and is not a separate machine, so it must
+     not be drawn as one. */
+  .rack-lane {
+    flex: 0 0 auto; display: flex; flex-direction: column; align-items: center;
+    gap: var(--ctl-gap);
+    padding: 14px; background: var(--card);
+    /* 🔴 IT KEEPS ITS LEFT BORDER. Asked 2026-09-21: *"add left border to right
+       panel"*. The usual reason to drop one is that it would stack with its
+       neighbour's, and that reasoning does not apply here: the channels SCROLL
+       under this lane, so there is no fixed neighbour to stack with. What sits
+       to its left is whichever strip happens to be scrolled there, and the
+       border is what tells a reader where the scrolling stops. */
+    border: 1px solid var(--line); border-radius: 0 4px 4px 0;
+  }
+  /* 🔴 THE BUTTON ROWS SIT AT THE TOP AND THE FADER FALLS TO THE BOTTOM. Asked
+     2026-09-21: *"align right panel buttons to top"*. The lane is as tall as
+     the channel rack beside it, and without this the rows floated in the middle
+     of it, which is what happens when a column has spare room and nothing
+     claims it.
+     ⚠️ IT IS A MARGIN ON THE FADER, NOT `justify-content: space-between`. The
+     three rows must stay together at the top rather than spreading apart, and
+     `space-between` would push them to the corners. `margin-top: auto` gives
+     the spare room to exactly one element. */
+  .rack-lane { justify-content: flex-start; }
+  /* 🔴 A KNOB NEEDS MORE AIR ABOVE IT THAN A BUTTON DOES, because its top edge
+     is a NUMBER rather than a border. Reported 2026-09-21 with a screenshot:
+     *"more space on top of right knob"*, showing the jog's `64` sitting almost
+     against the F4 button above it.
+     ⚠️ **THE ROW GAP IS MEASURED BETWEEN BOXES AND THE EYE MEASURES BETWEEN
+     INK.** A button's box has 8 px of padding inside its border before its
+     glyph, so `--ctl-gap` between two buttons reads as far more than 8. Between
+     a button and a bare number it reads as exactly 8, which is too close.
+     Doubling it here restores what the eye was expecting. */
+  .rack-lane .pos-knob { margin-top: var(--ctl-gap); }
+  .rack-lane .strip-master { margin-top: auto; }
+  /* 🔴 THE FADER BLOCK FALLS TO THE BOTTOM OF ITS STRIP, exactly as the FX
+     fader falls to the bottom of the lane. Once the strips were stretched to
+     the lane's height they had spare room, and their content stayed at the top
+     while the FX fader sat at the bottom: **17 px apart, which is one label**.
+     ⚠️ IT IS ALSO WHERE THE PANEL PUTS IT. Knobs and REC at the top, the fader
+     and its buttons in the lower block, and the air between them is the gap
+     the hardware has too. */
+  .rack-row > .strip-one > .pos-crow { margin-top: auto; }
+  /* ⚠️ THE FX FADER KEEPS ITS PLACE AND LOSES ITS BOX. `.strip-one` paints a
+     card and a border, which inside the lane is a box inside a box. */
+  .rack-lane .strip-master {
+    background: none; border: 0; padding: 0; border-radius: 0;
+  }
+  /* 🔴 THE FX FADER IS THE SAME LENGTH AS A CHANNEL FADER, AND IT IS THE SAME
+     EXPRESSION RATHER THAN THE SAME NUMBER. Asked 2026-09-21: *"fx slider same
+     height"*. A channel fader spans four buttons and three steps, so this one
+     takes that calculation rather than a pixel count copied from it, and the
+     two cannot drift when the button count or the control width changes.
+     ⚠️ IT IS THE SAME LENGTH DESPITE HAVING NOTHING BESIDE IT, which is the
+     point: on the panel the FX fader is the same 60 mm throw as the channels,
+     and a shorter one would read as a different kind of control. */
+  .rack-lane .pos-fdr {
+    --fdr-lane-h: calc(4 * calc(var(--ctl-w) / 2) + 3 * var(--ctl-step));
+  }
+  .transport-row { flex-wrap: wrap; justify-content: center; }
+  .rack-row > .strip-one { border-radius: 0; }
+  .rack-row > .strip-one + .strip-one { border-left: 0; }
+  .rack-row > .strip-one:first-child { border-radius: 4px 0 0 4px; }
+  /* ⚠️ NO ROUNDED RIGHT EDGE ANY MORE: the lane is what ends the rack now, so
+     the last strip is a middle one. */
+  .rack-row > .strip-one:last-child { border-radius: 0; }
+  /* The master has no pan and no buttons, so it aligns to the bottom with the
+     others rather than floating at the top of a tall row. */
+  .strip-master { justify-content: flex-end; }
+
+  /* 🔴 NOTHING IN A STRIP IS SELECTABLE. Asked 2026-09-21: *"make channel
+     labels noseltable"*. A channel number is furniture, not text somebody
+     copies, and a drag across a rack of eight selects every label in it. The
+     project already has this rule for controls and keys; a strip is made
+     entirely of controls, so it takes it whole.
+     ⚠️ `-webkit-touch-callout` IS THE ONE THAT STOPS THE iOS LOUPE, and
+     `user-select` alone does not. Photographed once on /keys/ and /mirror/. */
+  .strip-one {
+    display: inline-flex; flex-direction: column; align-items: center; gap: 14px;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    /* ⚠️ 41 px AT THE FOOT, NOT 14: room for the out of flow hand button, which
+       is 22 of button plus 5 of air below the label. In the SHORTHAND rather
+       than as a separate longhand, because a later shorthand resets a longhand
+       and that is exactly how this went wrong once already. */
+    padding: 14px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--card);
+  }
+  /* 🔴 THE BUTTONS ALIGN TO THE LANE'S BOTTOM, NOT THE FADER'S. `flex-end`
+     alone lines them up with the bottom of the whole control, which is under
+     its label, so they sat a label's height too low. The fader publishes
+     `--fdr-foot` for exactly this, and the alignment is ASSERTED below against
+     the real rects rather than trusted. */
+
+  /**
+   * 🔴 THIS PAGE NO LONGER DOES ITS OWN ALIGNMENT ARITHMETIC. `shell.css`
+   * publishes `--ctl-head`, `--ctl-foot` and `--ctl-step`, and every control
+   * wears the same furniture, so `.pos-crow` is plain `flex-end` and the
+   * lanes, the buttons and their labels land on one line by themselves.
+   * ⚠️ WHAT IS LEFT HERE IS THE ONE THING ONLY THIS PAGE KNOWS: that the fader
+   * spans THREE buttons. Three working surfaces plus two steps between them.
+   */
+  /* ⚠️ `.pos-crow`, NOT `.strip-body`. This rule kept the old class name for one
+     run after the row was renamed, so `--fdr-lane-h` fell back to its 120 px
+     default and the lane was 29 px short again. **A dead selector reads as
+     correct**, and the only reason it was caught in seconds is that the
+     alignment is asserted rather than eyeballed. That is the fifth dead rule
+     this project has measured and the first one caught by its own check. */
+  .pos-crow .pos-fdr {
+    /* FOUR buttons beside the fader now, so four surfaces and three steps. */
+    --fdr-lane-h: calc(4 * calc(var(--ctl-w) / 2) + 3 * var(--ctl-step));
+  }
+  /* ⚠️ NO COMPENSATION HERE, AND THERE WAS SOME FOR ONE RUN. A hand is a MODE
+     of the fader: the lane shortens and the fader's bottom does not move, so a
+     pad column beside it needs to know nothing about it. */
+  .strip-btns { display: flex; flex-direction: column; gap: var(--ctl-gap); }
+  /* ⚠️ REC IS THE SAME WIDTH AS THE REST. On the hardware it is a wide button
+     spanning the strip, and it was drawn that way for one run: *"rec can be
+     same w as others"*. **The panel fact is unchanged and is recorded in
+     `plans/plan-panel-layouts.md`**; what changed is that a screen strip does
+     not have to reproduce a proportion to be right about an arrangement, and a
+     row of controls that all share `--ctl-w` reads as an instrument rather than
+     as four widths. Its POSITION, above the fader and outside the column, is
+     the part that was actually wrong before and stays fixed. */
+
+  /* ── a phone ───────────────────────────────────────────────────────────
+     🔴 LAST IN THE BLOCK, ON PURPOSE. A media query adds NO specificity, so a
+     later plain rule of equal weight wins at every width including this one.
+     This project has measured that going wrong: `.pos-pick`'s entire phone
+     layout sat in a media query above the plain rule that overrode it and had
+     NEVER run on a phone in its life. **Order, not weight.**
+
+     🔴 AND A MIXER ON A PHONE IS A REDESIGN, NOT A REFLOW. Asked 2026-09-21:
+     *"max 2 buttons side by side. knobs sepate row, single buttons centerd,
+     slider / controls columns: flatten, controls on top. align all to
+     bottom"*. A strip is 46 px of control and 300 mm of panel; at 390 px the
+     eight of them are a horizontal scroll nobody can work, so the strip itself
+     changes shape. */
+  @media (max-width: 560px) {
+    /* 🔴 THE RACK STILL SCROLLS AND THE LANE STILL DOES NOT. Corrected
+       2026-09-21: *"keep overflow channels and stikcu transport"*. The first
+       attempt stacked everything into one column, which loses the thing that
+       makes a mixer legible on a phone: eight strips you swipe through, with
+       the transport always to hand. **A phone needs the strip to change shape,
+       not the rack to stop being a rack.** So nothing here touches
+       `.rack-wrap`, `.rack-row` or the lane's position.
+
+       🔴 FLATTEN THE FADER AND ITS BUTTONS, CONTROLS ON TOP. `column-reverse`
+       rather than reordering the DOM: the markup is fader then buttons because
+       that is the reading order on a desk, and a phone wants the opposite
+       without the page holding two ideas about which is which. */
+    /* 🔴 ONLY THE STRIP'S FADER BLOCK REVERSES. `column-reverse` was applied to
+       the lane's rows too and reversed their CONTENTS: the fast forward arrow
+       came out above rewind, and record below stop and play. A reversal that is
+       right for one row's meaning is wrong for another's, and the lane's rows
+       are already in panel order. */
+    .rack-row > .strip-one > .pos-crow { flex-direction: column-reverse; align-items: center; }
+    .rack-lane .pos-crow { flex-direction: column; align-items: center; }
+
+    /* 🔴 TWO ABREAST, AND A LONE ONE CENTRED. A grid rather than a wrapping
+       flex, because only a grid can say "this last item spans both columns".
+       An odd last child has no partner, so it takes the whole row and centres
+       in it rather than sitting left with a hole beside it. */
+    /* ⚠️ A STRIP'S OWN BUTTONS STAY ONE COLUMN. Corrected 2026-09-21: *"buttons
+       on single col only on mobile"*. Two abreast is a CEILING for the rows in
+       the master lane, which hold four function keys and three transport
+       buttons; a channel's MUTE, MAIN, SUB and SOLO are a vertical run at fixed
+       heights on the fader scale, and folding them into a 2 by 2 block loses
+       the one thing their order carries. */
+    .strip-btns { display: flex; flex-direction: column; }
+
+    /* 🔴 EVERY BUTTON IS ONE COLUMN. Said twice, the second time with a
+       screenshot: *"butotns in 1 col only!"*. Two abreast was read out of *"max
+       2 buttons side by side"* as a ceiling worth using, and it was not: a
+       phone strip is one narrow column and a 2 by 2 block of function keys in
+       it is a grid inside a column, which reads as neither.
+       ⚠️ **NOTHING HERE OVERRIDES A COLUMN, IT JUST STOPS IMPOSING A GRID.**
+       `.strip-btns` is already a flex column and the lane's rows become one
+       above, so the fix is a deletion rather than a rule. */
+
+    /* The knob keeps a row of its own and stops sharing with the locate
+       arrows, which the column-reverse above has already put under it. */
+    .rack-lane .pos-crow > .pos-knob { margin-bottom: var(--ctl-gap); }
+
+    /* 🔴 THE WHOLE STRIP SITS AT THE BOTTOM, NOT JUST ITS FADER. Reported
+       2026-09-21 with a screenshot: *"align content to bottom"*, showing pan
+       and REC at the top, a hole of empty strip, then the buttons and the
+       fader. That hole is `margin-top: auto` on the fader block doing exactly
+       what it says: pushing ONE element down and leaving everything above it
+       where it was.
+       ⚠️ ON A DESKTOP THAT IS RIGHT AND HERE IT IS NOT, which is why this is in
+       the media query rather than a change to the rule above. A desk strip has
+       knobs at the top and the fader in a lower block with air between them,
+       because the panel does. A phone strip is one tall column with nothing to
+       separate, so the air belongs above all of it. */
+    .rack-row > .strip-one,
+    .rack-lane { justify-content: flex-end; }
+    .rack-row > .strip-one > .pos-crow { margin-top: 0; }
+    .rack-lane .strip-master { margin-top: 0; }
+  }
+</style>
 
 <script type="module">
-  import { mount, guard } from '/shell/shell.mjs';
-  import { createKeyboard } from '/shell/keyboard.mjs';
-  import { createMidi } from '/shell/midi.mjs';
-  // The drill behind the button below holds two notes down on a studio Mac in
-  // another building for 2.2 seconds. A hidden button kept that away from a
-  // visitor by accident of layout; this keeps it away by construction.
-  import { ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createPad } from '/shell/pad.mjs';
+  import { createFader } from '/shell/fader.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { decode, classifyEncoder, classifyBend } from '/shell/midi-decode.mjs';
 
-  // The studio Mac's room. `/keys/` is this same page pointed at a Raspberry Pi —
-  // which is the argument: what crosses the relay is a note NUMBER, so neither
-  // end knows what kind of machine the other one is.
-  const q = new URLSearchParams(location.search);
-  const ROOM = q.get('room') || 'm1-1';
-  // `?relay=ws://127.0.0.1:8899` points this page at a relay on the LAN, which
-  // is the only way to tell "the sound is bad" from "the PATH to the sound is
-  // bad" — the two have opposite fixes and look identical from here. /keys/ has
-  // had this override since it was written.
-  const RELAY = `${q.get('relay') || 'wss://ws.positron.studio'}/room/${ROOM}/ws`;
-  const ID = Math.random().toString(36).slice(2, 8);
-  const RATE = 48000;
+  /**
+   * 🔴 WHAT THIS PAGE IS. One channel of a TASCAM Model 12, on screen, moving
+   * when the real one moves. Asked for 2026-09-20: *"make new rack demo with
+   * out hw layouts. start with model 12 single strip (1)"*.
+   *
+   * 🔴 AND IT IS BUILT ON MEASUREMENTS RATHER THAN ON A MANUAL, WHICH IS THE
+   * ONLY REASON IT CAN BE RIGHT. TASCAM publishes no note numbers and no
+   * controller numbers for Mackie Control mode at any firmware revision. Every
+   * number below was read off the wire through `/dump/` on 2026-09-20 from a
+   * Model 12 on firmware 1.11, and written down in
+   * `measured-devices-2026-09-20.md`.
+   *
+   * 🔴 THREE THINGS ABOUT THIS ONE CHANNEL ARE NOT WHAT A LAYOUT WOULD ASSUME,
+   * and getting any of them wrong gives a control that looks live and is wrong:
+   *   1. **PAN is RELATIVE, not absolute.** CC 16 sends a step and a direction,
+   *      never a position, so a knob that takes the value as a position sits at
+   *      4 and never moves again.
+   *   2. **The fader is 7 bit wearing a 14 bit message.** Pitch bend with the
+   *      low byte a COPY of the high byte, so it has 128 positions, not 16384.
+   *   3. **REC sends no release and SOLO and MUTE do.** Two buttons on one
+   *      mixer, both momentary in the protocol, disagreeing on the wire.
+   */
+
+/**
+ * 🔴 THE BIGGEST STEP THIS PAGE WILL TAKE FROM ONE MESSAGE.
+ *
+ * Reported 2026-09-20: *"and i am seeing ui moving on pan"*, then *"just pan
+ * range seems wrong"*. So the direction and the binding are both right and the
+ * SCALE is not, which narrows it to one number.
+ *
+ * 🔴 WHY IT IS NEEDED: `0x3F` AND `0x7F` ARE ALMOST CERTAINLY ACCELERATION, NOT
+ * DISTANCE. In the 525 message capture they appeared **exactly 48 times each**,
+ * a symmetry no hand produces by turning 63 detents. Taken literally, one of
+ * them moves the knob half its range in a single message, which is precisely
+ * the wrong range being reported.
+ * ⚠️ **8 IS A GUESS AND IS MARKED AS ONE.** What would settle it: turn the pan
+ * slowly through a known number of detents in front of `/dump/` and count the
+ * messages. If one detent is `0x04`, then 32 detents end to end is 128 and the
+ * raw magnitude is already right for slow turns, and only the fast values need
+ * capping. **Until that is measured this is a reasonable cap, not a fact.**
+ */
+const MAX_STEP = 8;
+
+/**
+ * 🔴 HOW MANY SCREEN UNITS ONE RAW STEP IS WORTH, AND THE MEASUREMENT BEHIND IT
+ * IS NOW DONE.
+ *
+ * MEASURED 2026-09-21, ten slow detents clockwise on channel 1's pan:
+ * **ten messages, every one `0x42`.** Bit 6 set, magnitude 2, no variation at
+ * all. **One detent is worth 2, always**, and there is no acceleration at
+ * hand speed.
+ *
+ * ✅ **SO THIS NUMBER IS NO LONGER A FUDGE, IT IS A DESIGN CHOICE**, and the
+ * two are worth telling apart. At 2 the raw magnitude passes straight through
+ * and a full 0 to 127 sweep takes **64 detents**, which is nearly three turns
+ * of a typical 24 detent encoder. At 2 units per detent it is 32 detents, a
+ * little over one turn, which is what a pan knob should feel like.
+ * ⚠️ **THE EARLIER 0.5 WAS FITTED TO A COMPLAINT AND HAPPENED TO BE THE SLOWEST
+ * OF THE THREE.** It gave 1 unit per detent and 127 detents end to end, which
+ * is why the knob felt like it never arrived.
+ *
+ * ⚠️ **AND `MAX_STEP` IS STILL EARNING ITS PLACE.** A slow turn sends 2 every
+ * time, but the original 525 message capture held `0x3F` and `0x7F` forty eight
+ * times each. Those are not 63 detents at hand speed, so they are what the
+ * encoder sends when it is spun, and without a cap one of them jumps the knob
+ * half its range. **Slow motion is measured, fast motion is still inferred.**
+ */
+const PAN_SCALE = 2;
+
 
   const d = mount({
     name: 'rack',
-    what: 'A MacBook in a studio is running Ableton Live, and this page plays it. Press a key: the note number goes out over a socket, a small program on that machine hands it to Live over the Mac’s own MIDI bus, and a copy of what Live renders comes straight back as sound. Round trip is how long the far end took to answer, buffer is how much sound is held in hand before it is played, and a dropout is a moment that cushion ran out or had to be cut, one click each.',
-    // `buffer` and `dropouts` are here because "it sounds noisy" and "the stream
-    // is fine" were both true at once for an hour: the samples arriving over the
-    // relay measured bit-clean against the source — same pitch, same peak, zero
-    // discontinuities — while the page still sounded wrong. A cushion that
-    // keeps being trimmed or starved is the only part of this path that can do
-    // that, and it was the one part with no number on it.
-    //
-    // ⚠️ SEVEN CELLS, BECAUSE EIGHT DO NOT FIT. The row is
-    // `repeat(auto-fit, minmax(96px, 1fr))`, so at this page's ~740 px it takes
-    // SEVEN per line and a nine-cell row wrapped, leaving two cells and a hole.
-    // The two that went: `instrument` was a structural constant here (this page
-    // is the Ableton one; `/keys/` is the Pi), and a cell that cannot change
-    // teaches a reader to skip the row — and at 105 px it drew `Ablet…`, which
-    // is worse than absent. `frames` was an odometer; `rate` is the same
-    // quantity where it can still say something.
-    readout: { sound: '', 'round trip': 'ms',
-               bitrate: 'Mb/s', buffer: 'ms', dropouts: '', midi: '' },
-    // ⚠️ HIDDEN, NOT REMOVED — LESSONS #41. Pressing a key already starts the
-    // sound and the socket dials on load, so this button is dead weight for a
-    // human. But `verify.mjs` presses `.pos-controls button` and EVERY assert on
-    // this page hangs off this handler, so deleting it would silently stop the
-    // page being tested while looking tidier. `?checks=1` brings it back.
-    controls: [{ id: 'play', label: 'Start and connect', primary: true }],
+    what: 'A TASCAM Model 12 on screen, moving when the real one moves.',
+    // SIX CELLS, all of which move. `steps` is the relative knob's whole story:
+    // it counts clicks, because a relative encoder has no position to report.
+    /**
+     * 🔴 NO READOUT, AND `null` RATHER THAN AN OMITTED FIELD so the shell knows
+     * it was decided. Asked 2026-09-21: *"rm readouts from rack"*.
+     * ⚠️ **THE CONTROLS ARE THE READOUT ON THIS PAGE.** A knob shows its value
+     * above it, a fader shows its own, a pad is lit or it is not. Eight cells
+     * repeating that in words were a second copy of what the strip already
+     * says, and two of them (`last` and `dir`, the raw byte beside this page's
+     * reading of it) existed to debug the pan. **That debugging is done**: one
+     * detent is magnitude 2, measured over ten slow clicks.
+     */
+    readout: null,
+    controls: [
+      // 🔴 CONTROL 0 TAKES `settleMs`, so nothing goes in front of `listen`.
+      { id: 'listen', label: 'Listen', primary: true },
+      /**
+       * ⚠️ NO RESET BUTTON, AND THE PROBLEM IT ANSWERED HAS NOT GONE AWAY. A
+       * relative encoder has no position to ask for, so turning the real pan
+       * while this page is shut leaves the two disagreeing forever with nothing
+       * here able to detect it. What makes its absence affordable is that a
+       * reload does the same thing, and that the knob no longer EATS the
+       * disagreement: the accumulator keeps its overshoot, so turning back
+       * retraces rather than drifting further every time.
+       */
+    ],
   });
   guard(d);
-  if (!new URLSearchParams(location.search).has('checks')) d.button('play').hidden = true;
 
-  let ws = null, ctx = null, playout = null, seq = 0;
-  let frames = 0, bytes = 0, lastSeq = -1, missing = 0, pingAt = 0, started = false;
-  let answered = false, instrument = null, namedItself = false, rateWarned = false;
-  // 🔴 NOTHING HERE GUESSES HOW MANY CHANNELS ARE ARRIVING. 960 samples is a
-  // valid 20 ms mono frame and a valid 10 ms stereo one, so the payload cannot
-  // say — and guessing wrong plays an octave down, which sounds like a broken
-  // instrument rather than a broken header. The far end announces it, and the
-  // block below CHECKS the announcement against the frame length it also sent.
-  let told = null, chIn = 1, chChecked = false, chCorrected = 0;
-  // 🔴 A MEASUREMENT OUTRANKS A REPEATED CLAIM. Caught by deliberately shipping
-  // a stream that lied: the check corrected 1 -> 2, and then the NEXT status
-  // reply carried the same wrong 1 and put it straight back. So the page
-  // flip-flopped, and its own readout said "corrected to 1" about a correction
-  // TO 2. What re-opens the question is the sender changing its claim, which is
-  // a real event; saying the same wrong thing twice is not new information.
-  let claim = null, chProven = 0, breaks = -1, starved = 0, trimmed = 0, bufMs = 0;
+  /**
+   * 🔴 THE MACKIE CONTROL MAP IS ARITHMETIC, NOT A TABLE, AND THAT IS WHY EIGHT
+   * STRIPS COST ALMOST NOTHING. Channel 1 was measured end to end through
+   * `/dump/`: PAN on CC 16, REC note 0, SOLO note 8, MUTE note 16, fader on
+   * pitch bend channel 1. The protocol runs each of those in a block of eight,
+   * and **SOLO on channel 2 was measured at note 9**, which is the second data
+   * point that turns one number into a stride.
+   * ⚠️ **SO SEVEN OF THESE EIGHT STRIPS ARE INFERRED FROM A STRIDE**, and that
+   * is a weaker claim than channel 1, which was read byte by byte. It is a good
+   * inference: one note number is a coincidence and two are a stride, and every
+   * published Mackie map agrees. It is still an inference.
+   */
+  const PAN_CC0 = 16, REC0 = 0, SOLO0 = 8, MUTE0 = 16;
 
-  const send = (m) => { if (ws?.readyState !== 1) return false; ws.send(JSON.stringify({ ...m, from: `page-${ID}`, at: Date.now(), seq: seq++ })); return true; };
+  /**
+   * 🔴 EIGHT FADERS AND TEN INPUTS, WHICH IS NOT A CONTRADICTION. Channels 1 to
+   * 6 are mono and 7/8 and 9/10 are stereo pairs sharing one fader, so the
+   * mixer has eight strips and ten inputs. Read off the panel at 800 dpi:
+   * `plans/plan-panel-layouts.md`.
+   * ⚠️ THE LEGENDS DIFFER ON THE LAST TWO AND THE LAYOUT DOES NOT. Their gain
+   * scale reads differently and their pan knob is printed BAL rather than PAN,
+   * because panning a stereo pair is balancing it. Every control is in the same
+   * place on all eight.
+   */
+  const STRIPS = ['1', '2', '3', '4', '5', '6', '7/8', '9/10'];
 
-  async function startAudio() {
-    if (ctx) return;
-    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: RATE, latencyHint: 'interactive' });
-    // ⚠️ Fire and move on. `resume()` waits on a gesture in a real browser and
-    // NEVER rejects, so awaiting it is a hang rather than an error.
-    ctx.resume().catch(() => {});
-    // 🔴 A SAMPLE RATE CANNOT BE INFERRED EITHER, AND NOBODY WAS CHECKING IT.
-    // The far end announces `rate` alongside `audioChannels` and `frameMs`, and
-    // this page ignored it while hard-coding 48000 — so a context that came back
-    // at another rate would play 48 kHz samples at 44.1 and fill the ring 8.8%
-    // faster than it drains: pitched down a tone and trimming every second or so,
-    // which is a noise complaint, not a pitch one. Chrome honours the request,
-    // which is exactly why nobody would ever see this fail by accident.
-    if (ctx.sampleRate !== RATE) {
-      d.log(`asked for ${RATE} Hz and got ${ctx.sampleRate}. Every sample arriving at ${RATE} will play ${(RATE / ctx.sampleRate).toFixed(3)}x wrong`, 'bad');
+  /**
+   * ⚠️ MAIN AND SUB ARE ON THE PANEL AND SEND NOTHING IN DAW CONTROL MODE.
+   * TASCAM's own enabled-controls diagram prints them white while MUTE and SOLO
+   * are blue. Drawn and disabled, because leaving them out would put MUTE next
+   * to SOLO, which is false about the panel.
+   */
+  const COLUMN = [
+    ['mute', 'MUTE', '#7fb2ff', false],
+    ['main', 'MAIN', '#6a7280', true],
+    ['sub', 'SUB', '#6a7280', true],
+    ['solo', 'SOLO', '#e0b060', false],
+  ];
+
+  /** One channel strip. Everything about it is its index. */
+  function makeStrip(i) {
+    const strip = el('div', 'strip-one');
+    const pan = createKnob({
+      // ⚠️ EVERY STRIP SAYS `pan`, INCLUDING THE STEREO PAIRS. It said `bal` on
+      // 7/8 and 9/10 for a while, because panning a stereo pair is balancing it
+      // and the panel legend reads `PAN C BAL`. Corrected 2026-09-21 by
+      // somebody looking at the mixer: *"7/8 and 9/10 still are pan"*. **The
+      // knob is called PAN on all eight**, and the extra word on two of them is
+      // a scale marking rather than a different name.
+      // ⚠️ NO CONTROLLER NUMBER UNDER THE KNOB, and none under the faders
+      // either. A mixer does not print CC numbers on its own panel. The number,
+      // the channel and whether it was measured or inferred are all on the
+      // hover, which is where somebody debugging a binding will look.
+      label: 'pan',
+      min: 0, max: 127, value: 64, home: 64,
+      title: `pan, CC ${PAN_CC0 + i}, relative`,
+    });
+    strip.append(pan.el);
+
+    const pads = {};
+    pads.rec = createPad({
+      half: true, bottom: 'REC', tint: '#e0908a', latch: true,
+      title: `REC, note ${REC0 + i}`,
+    });
+    strip.append(pads.rec.el);
+
+    const body = el('div', 'pos-crow');
+    const btns = el('div', 'strip-btns');
+    for (const [id, label, tint, dead] of COLUMN) {
+      const note = id === 'solo' ? SOLO0 + i : id === 'mute' ? MUTE0 + i : null;
+      pads[id] = createPad({
+        half: true, bottom: label, tint, latch: true, disabled: dead,
+        title: dead ? `${label} is on the panel and sends nothing in DAW control mode`
+                    : `${label}, note ${note}`,
+      });
+      btns.append(pads[id].el);
     }
-    await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
-    // Two out, so a stereo instrument stays stereo. A mono sender is upmixed
-    // inside the worklet, so this is right either way.
-    playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
-    playout.connect(ctx.destination);
-    playout.port.onmessage = (e) => {
-      const st = e.data?.stats; if (!st) return;
-      d.set('buffer', Math.round(st.bufferedMs));
-      // Both failure directions in one cell: a trim threw samples away, a
-      // starve ran out of them. Either one is a click.
-      const b = st.underruns + st.trimEvents;
-      starved = st.underruns; trimmed = st.trimEvents; bufMs = st.bufferedMs;
-      if (b !== breaks) {
-        // ⚠️ ONE CELL, TWO OPPOSITE FAULTS — so the LOG carries which. Running
-        // dry wants a bigger cushion and being trimmed wants a smaller one, and
-        // a reader who only ever sees the sum cannot tell which way to go. The
-        // cell counts clicks because that is what you HEARD; the line below says
-        // what they were.
-        const was = breaks; breaks = b;
-        d.set('dropouts', b, b ? 'warn' : 'ok');
-        if (was >= 0) d.log(`${starved} ran dry, ${trimmed} trimmed · cushion ${Math.round(bufMs)} ms`, 'warn');
-      }
-    };
-    applyChannels();
-    // The cushion is OURS, not the browser's — which is the whole reason to
-    // carry the samples rather than use WebRTC. And it is SIZED FROM THE PATH,
-    // not chosen: 2,242 frames measured off this relay on 2026-09-12 arrive
-    // p50 20.4 / p95 32.6 / p99 45.0 ms apart, with a worst gap of 108.6 ms —
-    // so the old 60 ms floor was under the worst single gap and the shipped
-    // logic broke 13.4 times a minute on it. Replaying that arrival train
-    // through this worklet's own rules: 60 ms -> 13.4/min, 100 -> 1.3,
-    // 150 -> 0. 100 ms is the playable end of that; every 20 ms here is 20 ms
-    // more between a key and the ear.
-    //
-    // 🔴 ADAPTIVE, BECAUSE A CUSHION HAS NO RESTORING FORCE. Frames arrive at
-    // the sender's rate and drain at the output's, and nothing pulls the
-    // occupancy back to the middle — measured, it random-walks 110 ms in 45 s
-    // and ONLY hitting a wall ever recentres it. So no fixed floor is safe
-    // forever; a floor that grows when it is proved too small is. It ratchets
-    // up and never down, which is why the cap is 250 and not higher.
-    playout.port.postMessage({ cmd: 'floor', ms: 100, adaptive: true, maxMs: 250 });
-  }
 
-  /** Whichever of the two arrives second — the announcement or the audio node. */
-  function applyChannels(n = chProven || told?.audioChannels) {
-    const want = n === 2 ? 2 : 1;
-    if (want === chIn && !playout) return;
-    chIn = want;
-    playout?.port.postMessage({ cmd: 'inChannels', n: want });
-    d.set('sound', want === 2 ? 'stereo' : 'mono', 'ok');
+    const fader = createFader({
+      /**
+       * ⚠️ NO INVISIBLE HAND HERE. It was on every fader for half an hour while
+       * the component was being got right, and it came off on 2026-09-21: *"rm
+       * invisble hand from rack"*. **This page mirrors a mixer**, and a mixer
+       * has no button that makes its own faders move. The option stays on
+       * `fader.mjs` and is shown in `/kit/`, which is where a control that
+       * exists for testing belongs.
+       */
+      label: STRIPS[i], min: 0, max: 127, value: 0,
+      title: `fader ${STRIPS[i]}, pitch bend on channel ${i + 1}, 7 bit`,
+    });
+    body.append(fader.el, btns);
+    strip.append(body);
+    return { el: strip, pan, fader, pads, panRaw: 64 };
   }
 
   /**
-   * Prove the announcement rather than take it. `samples / channels / rate`
-   * must come out at the frame length the sender also declared; a mono stream
-   * called stereo lands at half of it, a stereo one called mono at double. This
-   * is the check that makes a wrong header VISIBLE instead of merely audible.
+   * 🔴 THE TRANSPORT, AND THREE OF THE FIVE WERE MEASURED. Off the desk through
+   * `/dump/`: STOP is note 93, PLAY 94, RECORD 95, each sending `7F` then `00`
+   * cleanly. Mackie puts rewind and fast forward at 91 and 92 immediately
+   * below, so those two are **inferred from the block**, exactly as seven of
+   * the eight strips are.
+   * ⚠️ **THE TRANSPORT RECORD BUTTON SENDS A RELEASE AND THE CHANNEL REC BUTTON
+   * DOES NOT.** Two buttons on one mixer, both called record, disagreeing on
+   * the wire. It costs nothing here because a press toggles and releases are
+   * ignored, which is the rule that made REC need no special case either.
    */
-  function checkChannels(samples) {
-    if (chChecked || !told?.frameMs) return;
-    chChecked = true;
-    const implied = (samples / chIn / RATE) * 1000;
-    if (Math.abs(implied - told.frameMs) <= told.frameMs * 0.02) return;
-    const real = Math.max(1, Math.min(2, Math.round(samples / ((told.frameMs / 1000) * RATE))));
-    d.log(`it announced ${chIn} channel${chIn > 1 ? 's' : ''}, but a frame works out at ` +
-          `${implied.toFixed(1)} ms against the ${told.frameMs} ms it declared · playing it as ${real}`, 'warn');
-    chCorrected++;
-    chProven = real;
-    applyChannels(real);
-  }
+  /**
+   * 🔴 THE MASTER COLUMN IN PANEL ORDER, WHICH IS THREE ROWS AND NOT ONE.
+   * Described 2026-09-21: *"fns, jog and < >, then trans stop playpause rec"*,
+   * and it matches the panel read at 800 dpi: the function keys, then MULTI JOG
+   * with MENU and the two locate arrows, then the transport underneath.
+   * ⚠️ **THE LOCATE ARROWS ARE NOT THE TRANSPORT.** They sit with the jog for
+   * moving the playhead, which is why they were drawn in the wrong row until
+   * somebody looked at the object.
+   *
+   * 🔴 GLYPHS, NOT WORDS, AND GEOMETRIC ONES RATHER THAN THE MEDIA CONTROL
+   * BLOCK. Reported 2026-09-21: *"<< >> becoming emoji, do not"*. `⏪ ⏩ ⏹ ⏯ ⏺`
+   * are U+23E9 to U+23FA, and every one of them **defaults to EMOJI
+   * presentation**: macOS paints them full colour, at a different size and on a
+   * different baseline from the mono face around them.
+   * ⚠️ **A VARIATION SELECTOR WOULD BE THE OTHER FIX AND IS WORSE.** Appending
+   * U+FE0E asks for text presentation and is honoured inconsistently, so it
+   * would look right here and wrong on somebody else's machine. The geometric
+   * shapes below have **no emoji form at all**, so there is nothing to ask for.
+   * ⚠️ AND `▶` U+25B6 IS NOT SAFE EITHER, despite being geometric: it has an
+   * emoji presentation. `►` U+25BA does not, which is why it is the one here.
+   * ⚠️ THE FACE CARRIES THE GLYPH AND THERE IS NO BOTTOM LABEL, which is the
+   * one case where a pad's face earns its text: a glyph is read at a glance,
+   * and that is exactly what a face label is for.
+   */
+  const LOCATE = [
+    ['rew', '◄◄', 91, true], ['ff', '►►', 92, true],
+  ];
+  const TRANSPORT = [
+    ['stop', '■', 93, false], ['play', '►', 94, false], ['rec', '●', 95, false],
+  ];
+  /**
+   * ⚠️ FOUR FUNCTION KEYS, AND F1 IS NOT LIVE. TASCAM's enabled-controls
+   * diagram prints F1 white while F2, F3 and F4 are blue, because F1 is the way
+   * OUT of DAW control mode.
+   * ✅ **AND THE OTHER THREE ARE MEASURED, ONE PRESS AT A TIME, 2026-09-21.**
+   * F2 is note **86**, F3 is **46**, F4 is **47**.
+   * 🔴 **THEY ARE NOT A CONTIGUOUS BLOCK, AND THAT IS THE INTERESTING PART.**
+   * Everything else on this mixer runs in eights. **46 and 47 are Fader Bank
+   * Left and Right in the Mackie map**, which is exactly what a desk with ten
+   * inputs and eight Mackie strips needs, so TASCAM has put banking on two of
+   * its function keys rather than inventing its own numbers.
+   * ⚠️ AN EARLIER CAPTURE OF THIS ROW GAVE 82, 84 AND 85 from a different set of
+   * buttons pressed as a group. **Those three are still unmapped** and are not
+   * drawn, because binding by guess gives a control that looks live and lights
+   * the wrong thing.
+   */
+  const FKEYS = [
+    ['f1', 'F1', null], ['f2', 'F2', 86], ['f3', 'F3', 46], ['f4', 'F4', 47],
+  ];
 
-  function connect() {
-    ws = new WebSocket(RELAY);
-    ws.binaryType = 'arraybuffer';
-    ws.onopen = () => { d.log(`joined ${ROOM}`); send({ type: 'rack.status' }); pingAt = performance.now(); };
-    ws.onclose = () => { d.log('socket closed · reconnecting'); setTimeout(connect, 1200); };
-    ws.onmessage = (e) => {
-      if (typeof e.data !== 'string') { onPcm(e.data); return; }
-      let m; try { m = JSON.parse(e.data); } catch { return; }
-      if (m.from === `page-${ID}`) return;
-      if (m.type === 'rack.state' || m.type === 'rack.hello') {
-        if (pingAt) { d.set('round trip', Math.round(performance.now() - pingAt)); pingAt = 0; }
-        answered = true; instrument = m.instrument || 'an instrument';
-        told = m;
-        if (m.audioChannels !== claim) { claim = m.audioChannels; chProven = 0; chChecked = false; }
-      // The far end's rate against ours. Announced, so it can be checked.
-      if (m.rate && m.rate !== RATE && !rateWarned) {
-        rateWarned = true;
-        d.log(`the far end sends ${m.rate} Hz and this page plays at ${RATE}. Nothing in the chain resamples`, 'bad');
-      }
-        applyChannels();
-        // It named itself ONCE, in the log, where a long name fits and a repeat
-        // is not a new event. Every status reply carries it and nothing changed.
-        if (!namedItself) { namedItself = true; d.log(`${instrument} is answering in ${ROOM}`, 'hi'); }
-      }
-    };
-  }
+  const rack = STRIPS.map((_, i) => makeStrip(i));
+  const rackRow = el('div', 'rack-row');
+  for (const s of rack) rackRow.append(s.el);
 
-  function onPcm(buf) {
-    const s = new DataView(buf).getUint32(0, true);
-    // ⚠️ A COUNTER IS ONLY EVIDENCE ON THE FAR SIDE. `missing` counts gaps in the
-    // sender's own sequence, so it measures what the RELAY dropped rather than
-    // what this page asked for.
-    if (lastSeq >= 0 && s > lastSeq + 1) missing += s - lastSeq - 1;
-    lastSeq = s;
-    frames++; bytes += buf.byteLength;
-    const pcm = new Int16Array(buf, 12);
-    checkChannels(pcm.length);
-    if (playout) playout.port.postMessage({ pcm }, []);
-  }
-
-  const kb = createKeyboard(d.el, {
-    base: 60,
-    onDown: (n) => { kb.lightNote(n, true); startAudio().then(() => send({ type: 'note.on', note: n, vel: 100 })); },
-    onUp: (n) => { kb.lightNote(n, false); send({ type: 'note.off', note: n }); },
+  /**
+   * 🔴 THE FX FADER IS THE MASTER AND IT IS ON CHANNEL 9. Measured: a full
+   * sweep arrived as `E8 03 03` up to `E8 7F 7F`, and `E8` is pitch bend on
+   * channel index 8. TASCAM's documentation says the FX fader acts as the DAW
+   * master and the panel diagram prints it blue while SUB and MAIN are not.
+   * ⚠️ IT HAS NO PAN AND NO BUTTONS, so it is a fader in a strip of its own
+   * rather than a ninth channel.
+   */
+  const master = createFader({
+    label: 'FX', min: 0, max: 127, value: 0,
+    title: 'FX fader, the DAW master, pitch bend on channel 9, 7 bit',
   });
-  const midi = createMidi({
-    onDown: (n, vel) => { if (!kb.keyOf(n)) return; kb.lightNote(n, true); startAudio().then(() => send({ type: 'note.on', note: n, vel })); },
-    onUp: (n) => { kb.lightNote(n, false); send({ type: 'note.off', note: n }); },
-    log: (l, k) => d.log(l, k),
-    // ⚠️ NOT `midi?.state?.()` HERE. `createMidi` calls `onPorts` synchronously
-    // on the no-MIDI path, so the callback runs while `const midi` is still in
-    // its temporal dead zone — and optional chaining does NOT save you, because
-    // the throw is on reading the binding, before any `?.` applies. It printed
-    // `Cannot access 'midi' before initialization` on a phone, in red, under a
-    // page that otherwise worked.
-    onPorts: (n) => d.set('midi', n || 'none'),
-  });
+  /**
+   * 🔴 THE MASTER LANE DOES NOT SCROLL AND THE CHANNELS DO. Asked 2026-09-21:
+   * *"add jog / transport / fx lane to the left. its sticky, rest of channels
+   * are overflow scrolly"*, corrected to the right a moment later.
+   * ⚠️ **IT IS A SIBLING OF THE SCROLLER, NOT `position: sticky` INSIDE IT.**
+   * Sticky would work and would cost more: a sticky child needs a background
+   * or the strips show through it, it needs a z-index against its own
+   * neighbours, and it lands on top of the scrollbar. Two flex children, one
+   * scrolling and one not, needs none of that.
+   * ⚠️ AND THE ORDER MIRRORS THE PANEL: the jog and the transport sit above the
+   * faders in the master column, not beside them.
+   */
+  const lane = el('div', 'rack-lane');
+  const masterStrip = el('div', 'strip-one strip-master');
+  masterStrip.append(master.el);
 
-  let t0 = performance.now(), f0 = 0, b0 = 0;
-  setInterval(() => {
-    const now = performance.now(), dt = (now - t0) / 1000;
-    if (dt >= 1) {
-      // `frames` and the frame RATE are both still counted — the asserts below
-      // read them — they just have no cell any more. An odometer is not a
-      // measurement a reader can act on, and the rate sits at 50/s from the
-      // first second and never leaves it.
-      // ⚠️ ONE DECIMAL AND A SHORT UNIT, MEASURED. `1525` + `kbit/s` is 110 px of
-      // text in a 97 px cell, so it drew `1525kbit…` — and an ellipsis in a
-      // readout means the number is in the wrong shape, not that the cell is
-      // too narrow. `1.5` + `Mb/s` is 84 px.
-      d.set('bitrate', ((bytes - b0) * 8 / dt / 1e6).toFixed(1));
-      t0 = now; f0 = frames; b0 = bytes;
+  const wrap = el('div', 'rack-wrap');
+  wrap.append(rackRow, lane);
+  d.el.append(wrap);
+
+  /**
+   * 🔴 MULTI JOG IS CC 60 AND IT IS THE CLEANEST CONTROL ON THE MIXER.
+   * MEASURED 2026-09-21: 20 messages, and **only two values ever**, `0x01` and
+   * `0x41`. Twelve clockwise, eight counter clockwise, step size always 1, no
+   * acceleration at all. That is a textbook Mackie jog wheel and CC 60 is
+   * exactly where Mackie puts it.
+   * 🔴 **AND IT MAKES THE PAN KNOB'S NUMBERS STRANGE, WHICH IS WORTH RECORDING
+   * RATHER THAN EXPLAINING AWAY.** Pan sends magnitudes of 2, 4 and 63 on the
+   * same mixer through the same protocol. Two relative encoders, one perfectly
+   * clean and one not, so the 63 is far more likely to be ACCELERATION than 63
+   * detents. `MAX_STEP` and `PAN_SCALE` are the fudges that stand in for a
+   * measurement nobody has taken yet; this control needs neither.
+   */
+  const jog = createKnob({
+    label: 'jog', min: 0, max: 127, value: 64, home: 64,
+    title: 'MULTI JOG, CC 60, relative, one step per detent',
+  });
+  let jogRaw = 64;
+
+  const transport = {};
+  const mkBtn = ([id, label, note, guessed]) => {
+    transport[id] = createPad({
+      half: true, label, latch: true,
+      tint: id === 'rec' ? '#e0908a' : '#8fd6a8',
+      aria: id,
+      title: guessed ? `${id}, note ${note}, inferred from the Mackie block`
+                     : `${id}, note ${note}, measured`,
+    });
+    return transport[id].el;
+  };
+
+  // 1. the function keys
+  const fRow = el('div', 'pos-crow');
+  const fkeys = {};
+  for (const [id, label, note] of FKEYS) {
+    const dead = note === null;
+    fkeys[id] = createPad({
+      half: true, label, latch: true, disabled: dead, tint: '#6a7280', aria: id,
+      title: dead ? 'F1 leaves DAW control mode and sends nothing'
+                  : `${label}, note ${note}, measured`
+                    + (note === 46 || note === 47 ? ', Mackie fader bank' : ''),
+    });
+    fRow.append(fkeys[id].el);
+  }
+
+  // 2. the jog, with the two locate arrows
+  const jRow = el('div', 'pos-crow');
+
+  // 3. the transport
+  const tRow = el('div', 'pos-crow transport-row');
+  for (const spec of TRANSPORT) tRow.append(mkBtn(spec));
+  // The jog and the locate arrows are one row, as on the panel.
+  jRow.append(jog.el);
+  for (const spec of LOCATE) jRow.append(mkBtn(spec));
+  lane.append(fRow, jRow, tRow, masterStrip);
+
+  // The first strip is the one every check reads, because it is the only one
+  // measured byte by byte rather than inferred from a stride.
+  const one = rack[0];
+  const pan = one.pan, fader = one.fader, pads = one.pads;
+
+  // ---------------------------------------------------------------- state
+
+  /**
+   * 🔴 THE ACCUMULATOR IS NOT CLAMPED. THE DISPLAY IS.
+   *
+   * The other half of the same report: turning past the end and back did not
+   * retrace. A clamped accumulator DISCARDS the steps taken past 0, so the way
+   * back starts moving immediately while the real knob is still out at the far
+   * left, and the two never meet again.
+   * ⚠️ **A KNOB THAT LOSES YOUR OVERSHOOT IS WORSE THAN ONE THAT LAGS**, because
+   * the error is permanent: every excursion past an end leaves the screen and
+   * the desk further apart, and nothing on this page can detect it.
+   * ⚠️ THE OVERSHOOT IS BOUNDED AT ONE RANGE EITHER SIDE. Unbounded, a spin
+   * would need the same spin back before anything moved, which is a control
+   * that appears dead. One range is enough to make an honest turn retrace and
+   * short enough to recover from by hand.
+   */
+  let panRaw = 64;
+  let access = null, steps = 0, pressed = 0, lastByte = null, lastDir = '';
+  const panValues = [], bendMsgs = [];
+
+  /**
+   * ⚠️ IT WRITES NOTHING NOW AND IS KEPT ON PURPOSE. Every path that changes a
+   * control calls it, so it is the one place a future readout, a counter or a
+   * tap would hook into. Deleting it would mean finding all eleven call sites
+   * again the first time this page needs to say something.
+   */
+  function render() {}
+
+  const countIn = () => {
+    let n = 0;
+    for (const _ of access.inputs.values()) n++;
+    return n;
+  };
+
+  /**
+   * One message from the desk.
+   * @param {number[]} b raw bytes
+   */
+  /**
+   * 🔴 EVERY MESSAGE GOES DOWN THE TAP AS WELL AS INTO THE STRIP. Added
+   * 2026-09-21 after a capture came back empty: the desk had been worked in
+   * front of THIS page, and only `/dump/` writes to `.tap/midi.jsonl`, so the
+   * gestures were gone. **A page that binds hardware should also record it**,
+   * or every measurement means going back to the dumper and doing the gesture
+   * twice.
+   * ⚠️ IT IS THE DEV SERVER ONLY and it is off under `?selfcheck=1`, both for
+   * the reasons written on `/dump/`: there is no `/_tap` route in
+   * `workers/view`, and a harness writing invented bytes into a capture file
+   * makes every count in it a mixture.
+   */
+  const LOCAL = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
+  let pending = [], tapTimer = 0, tapDead = false;
+
+  function tap(b) {
+    if (!LOCAL || tapDead || SELFCHECK) return;
+    pending.push({ from: 'rack', bytes: b.map((n) => n.toString(16).toUpperCase().padStart(2, '0')).join(' ') });
+    if (tapTimer) return;
+    tapTimer = setTimeout(() => {
+      const batch = pending; pending = []; tapTimer = 0;
+      fetch('/_tap', { method: 'POST', body: JSON.stringify({ at: Date.now(), rows: batch }) })
+        .then((r) => { if (!r.ok) { tapDead = true; d.log('nothing is listening on /_tap'); } })
+        .catch(() => { tapDead = true; });
+    }, 500);
+  }
+
+  /**
+   * One message from the desk, routed by arithmetic.
+   *
+   * 🔴 NOTHING HERE LOOKS ANYTHING UP. A controller number, a note number and a
+   * pitch bend channel each carry the strip index inside them, so eight strips
+   * need no table and cannot drift out of step with each other. **A table is
+   * what a stride looks like after somebody has typed it out wrong once.**
+   * @param {number[]} b raw bytes
+   */
+  function take(b) {
+    const m = decode(b);
+    if (m.flood) return;
+    tap(b);
+
+    // ── a fader. The pitch bend CHANNEL is the strip, and channel 9 is the
+    // master, which is why this is checked before anything assumes channel 1.
+    if (m.kind === 'pitch bend') {
+      const i = m.ch - 1;
+      bendMsgs.push(b);
+      // ⚠️ THE HIGH BYTE IS THE VALUE. The low byte is a copy of it and carries
+      // nothing, measured: 74 pitch bends, every one with both bytes equal.
+      if (m.ch === 9) master.set(b[2], { from: 'hardware' });
+      else if (rack[i]) rack[i].fader.set(b[2], { from: 'hardware' });
+      render();
+      return;
     }
-  }, 1000);
 
-  d.on('play', async () => {
-    await startAudio();
-    started = true;
-    d.log('listening · press a key');
-    // 🔴 EVERYTHING BELOW SOUNDS A THIRD NOBODY ASKED FOR, IN A ROOM SOMEBODY
-    // ELSE MAY BE SITTING IN. The button is hidden from a visitor and `?checks=1`
-    // brings it back, so a person debugging this page used to get the drill as
-    // well as the connection; now they get the connection, and `?checks=1&selfcheck=1`
-    // gets both.
-    await ifSelfcheck(async () => {
-      const before = frames;
-      send({ type: 'note.on', note: 60, vel: 110 });
-      send({ type: 'note.on', note: 64, vel: 100 });
-      await new Promise((r) => setTimeout(r, 2200));
-      const during = frames - before;
-      send({ type: 'note.off', note: 60 }); send({ type: 'note.off', note: 64 });
+    // Everything else Mackie sends for a strip is on channel 1.
+    if (m.ch !== 1) return;
 
-      d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
-      // Both branches, because a studio Mac that is off is the ordinary case and a
-      // page that only asserts the happy path has no coverage on those days.
-      // Both branches, and BOTH now read state rather than paint — the sentence
-      // this used to inspect was duplicating the paragraph above it and is gone.
-      d.assert('it says whether anything is at the far end', answered ? namedItself : d.logs.length > 0,
-        answered ? `${instrument} named itself` : 'nothing is answering, and the log says so');
-      if (answered) {
-        d.assert('an instrument named itself', !!instrument, String(instrument));
-        // Both halves: that it was TOLD, and that the telling survived a check.
-        d.assert('it was told how many channels, not left to guess', !!told?.audioChannels,
-          `announced ${told?.audioChannels} at ${told?.frameMs} ms a frame`);
-        // Three things the far end ANNOUNCES and this page CHECKS rather than
-        // trusts: how many channels, how long a frame is, and what rate it is at.
-        d.assert('the sample rate it sends is the one this page plays at',
-          !!told?.rate && told.rate === RATE && ctx?.sampleRate === RATE,
-          `sent ${told?.rate} Hz · context ${ctx?.sampleRate} Hz`);
-        d.assert('the frame length agrees with the channel count', chChecked && !chCorrected,
-          chCorrected ? `it said ${claim}, the frames say ${chIn} · playing ${chIn}`
-                      : `${chIn === 2 ? 'stereo' : 'mono'} checks out against ${told?.frameMs} ms`);
-        d.assert('sound came back while keys were held', during > 20, `${during} frames of audio in 2.2 s`);
-        d.assert('the relay dropped none of it', missing === 0, `${missing} missing of ${frames}`);
-        d.assert('this page makes no sound of its own', !!ctx && !!playout, 'every sample arrived over the socket');
-        // 🔴 THE ONE THE STREAM CANNOT ANSWER. The samples measured bit-clean off
-        // the relay while the page still sounded wrong, so the only place left
-        // for a click to come from is this cushion running dry or being trimmed.
-        d.assert('the cushion neither starved nor overflowed', breaks === 0,
-          breaks > 0 ? `${starved} ran dry, ${trimmed} trimmed, cushion now ${Math.round(bufMs)} ms` : 'no breaks');
-      } else {
-        d.assert('silence is reported as silence', !frames, `${frames} frames`);
-      }
-    }, { log: d.log, say: 'connected · press a key to hear the far end' });
+    // ⚠️ THE JOG IS CHECKED BEFORE THE PAN BLOCK. CC 60 is nowhere near 16 to
+    // 23, but putting it first keeps every relative control in one place.
+    if (m.kind === 'control' && m.cc === 60) {
+      const mag = m.d2 & 0x3f;
+      const dir = (m.d2 & 0x40) ? -1 : 1;
+      lastByte = m.d2;
+      lastDir = `${dir > 0 ? '+' : '-'}${mag}`;
+      // 🔴 NO CAP AND NO SCALE. This one sends 1 per detent and means it, so a
+      // correction here would be inventing a problem the control does not have.
+      jogRaw = Math.max(-127, Math.min(254, jogRaw + dir * mag));
+      jog.set(Math.max(0, Math.min(127, jogRaw)), { from: 'hardware' });
+      render();
+      return;
+    }
+
+    if (m.kind === 'control' && m.cc >= PAN_CC0 && m.cc < PAN_CC0 + rack.length) {
+      const s = rack[m.cc - PAN_CC0];
+      // 🔴 BIT 6 IS THE DIRECTION, THE LOW SIX BITS ARE THE STEP. A value of
+      // 0x44 is not 68, it is four counter clockwise.
+      const mag = m.d2 & 0x3f;
+      const dir = (m.d2 & 0x40) ? -1 : 1;
+      const move = Math.min(mag, MAX_STEP) * PAN_SCALE;
+      lastByte = m.d2;
+      lastDir = `${dir > 0 ? '+' : '-'}${mag}${mag > MAX_STEP ? ` (capped ${MAX_STEP})` : ''}`;
+      steps += mag;
+      panValues.push(m.d2);
+      // The accumulator keeps the overshoot; the knob only shows 0 to 127.
+      s.panRaw = Math.max(-127, Math.min(254, s.panRaw + dir * move));
+      s.pan.set(Math.max(0, Math.min(127, s.panRaw)), { from: 'hardware' });
+      render();
+      return;
+    }
+
+    /**
+     * ⚠️ A PRESS TOGGLES AND A RELEASE IS IGNORED. Measured: MUTE and SOLO send
+     * clean press and release pairs, REC sends only the press. In Mackie
+     * Control the surface reports a press and the DAW decides what it means.
+     * **This page is the DAW**, so it decides that a press toggles, and a rule
+     * that ignores releases treats a button sending none identically.
+     */
+    if (m.kind !== 'note on') return;
+    const n = m.note;
+    // The transport block sits above the strip blocks and is checked first, so
+    // a note in the nineties never falls through the strip arithmetic below.
+    const f = FKEYS.find(([, , note]) => note === n);
+    if (f) {
+      pressed++;
+      fkeys[f[0]].set(!fkeys[f[0]].on());
+      render();
+      return;
+    }
+    const t = [...TRANSPORT, ...LOCATE].find(([, , note]) => note === n);
+    if (t) {
+      pressed++;
+      transport[t[0]].set(!transport[t[0]].on());
+      render();
+      return;
+    }
+    const hit = n >= MUTE0 && n < MUTE0 + rack.length ? ['mute', n - MUTE0]
+      : n >= SOLO0 && n < SOLO0 + rack.length ? ['solo', n - SOLO0]
+      : n >= REC0 && n < REC0 + rack.length ? ['rec', n - REC0]
+      : null;
+    if (!hit) return;
+    const [id, i] = hit;
+    if (!rack[i]) return;
+    pressed++;
+    rack[i].pads[id].set(!rack[i].pads[id].on());
+    render();
+  }
+
+  // ---------------------------------------------------------------- the browser
+
+  async function open() {
+    if (!navigator.requestMIDIAccess) {
+      d.log('this browser has no Web MIDI, so nothing can reach this strip', 'warn');
+      return false;
+    }
+    try {
+      access = await navigator.requestMIDIAccess({ sysex: false });
+      await wire();
+      access.onstatechange = () => wire();
+      return true;
+    } catch (e) {
+      d.log(`MIDI was refused: ${e.message}`, 'warn');
+      return false;
+    }
+  }
+
+  /**
+   * 🔴 `open()` EXPLICITLY ON EVERY PORT. `/dump/` shipped without this and read
+   * a desk of four live instruments as an empty room: every port sat at
+   * `connected/closed`, and there is no error, no rejected promise and no
+   * console line to say so. The specification says assigning `onmidimessage`
+   * opens the port, which is why the line is easy to leave out, and it is not
+   * reliable across a reload with another client holding the device.
+   */
+  async function wire() {
+    let opened = 0;
+    for (const p of access.inputs.values()) {
+      // ⚠️ EVERY PORT, NOT JUST THE MIXER. The strip only acts on messages it
+      // recognises, and the tap should record whatever the desk sends so a
+      // control nobody has mapped yet still leaves a trace.
+      // (was: a /Model 12/ filter, which silently dropped everything else)
+      try { await p.open(); opened++; } catch { /* another client may hold it */ }
+      p.onmidimessage = (e) => take(Array.from(e.data));
+    }
+    render();
+    if (!opened) {
+      d.log('no Model 12 port. The strip still works by hand, and the numbers on '
+          + 'it are the ones a Model 12 would send.');
+    }
+    return opened;
+  }
+
+  d.on('listen', async () => {
+    const got = await open();
+    if (got) {
+      const n = countIn();
+      d.log(n ? `${n} input${n === 1 ? '' : 's'} open` : 'no MIDI inputs', n ? 'hi' : '');
+      d.log(`DAW control mode has to be ON for this channel to send anything: MENU, `
+          + `DAW CONTROLLER, then any MCU preset. Its own MIDI IN port stays silent `
+          + `unless something is plugged into the DIN socket.`);
+    }
+    if (SELFCHECK) await d.run('check');
   });
 
-  connect();
+  /**
+   * 🔴 NO RESET BUTTON, AND THE PROBLEM IT ANSWERED HAS NOT GONE AWAY. Asked
+   * 2026-09-21: *"can we remove reset button now?"*, and it can, but not
+   * because anything was fixed.
+   * ⚠️ **A RELATIVE ENCODER STILL HAS NO POSITION TO ASK FOR.** Turn the real
+   * pan while this page is shut and the two disagree forever, with nothing here
+   * able to detect it. That was true when the button was added and it is true
+   * now.
+   * ⚠️ WHAT MAKES IT AFFORDABLE IS THAT A RELOAD DOES THE SAME THING and costs
+   * one gesture, and that the knob no longer EATS the disagreement: the
+   * accumulator keeps its overshoot, so turning back retraces instead of
+   * drifting further every time. The button was a cure for a bug as much as for
+   * the protocol, and the bug is gone.
+   */
+
+  // ---------------------------------------------------------------- the known desk
+
+  /**
+   * 🔴 A KNOWN STREAM, TAKEN FROM THE REAL MEASUREMENT. These are bytes a Model
+   * 12 actually sent, not bytes invented to make a check pass: the pan
+   * histogram is the shape of the 525 message capture, and the fader values are
+   * the duplicated-byte form that was photographed.
+   * ⚠️ IT IS HOW THIS PAGE IS GRADED WITH NO DESK, which matters because the
+   * desk is on somebody's table and the harness is not.
+   */
+  const KNOWN = [
+    [0xb0, PAN_CC0, 0x04], [0xb0, PAN_CC0, 0x04], [0xb0, PAN_CC0, 0x3f],
+    [0xb0, PAN_CC0, 0x44], [0xb0, PAN_CC0, 0x02], [0xb0, PAN_CC0, 0x42],
+    [0xb0, PAN_CC0, 0x04], [0xb0, PAN_CC0, 0x44], [0xb0, PAN_CC0, 0x7f],
+    [0xb0, PAN_CC0, 0x04], [0xb0, PAN_CC0, 0x42], [0xb0, PAN_CC0, 0x04],
+    [0xe0, 0x22, 0x22], [0xe0, 0x2a, 0x2a], [0xe0, 0x57, 0x57], [0xe0, 0x7f, 0x7f],
+    [0x90, SOLO0, 0x7f], [0x90, SOLO0, 0x00],
+    [0x90, MUTE0, 0x7f], [0x90, MUTE0, 0x00],
+    [0x90, REC0, 0x7f],                    // and no release, measured
+    // 🔴 A SECOND STRIP, BECAUSE A STRIDE ASSERTED ON ONE CHANNEL IS NOT
+    // ASSERTED AT ALL. Channel 2's SOLO is note 9 and its fader is pitch bend
+    // on channel 2, both measured, and both are the arithmetic this page now
+    // routes eight strips by.
+    [0x90, SOLO0 + 1, 0x7f], [0xe1, 0x40, 0x40],
+    [0xf8], [0xf8],                            // clock, which must be ignored
+  ];
+
+  // ---------------------------------------------------------------- checks
+
+  d.on('check', async () => {
+    for (const b of KNOWN) take(b);
+
+    d.assert('a visit opened nothing', SELFCHECK ? true : access === null,
+      access ? `${countIn()} inputs, after a press` : 'no MIDI access taken');
+
+    // 🔴 THE THREE MEASURED FACTS, ASSERTED AS BEHAVIOUR RATHER THAN AS NUMBERS.
+    const v = classifyEncoder(panValues);
+    d.assert('the pan knob is driven as a relative encoder', v.verdict === 'relative',
+      `CC ${PAN_CC0}: ${v.verdict} (${v.why})`);
+    // 🔴 AND THE NEGATIVE HALF: a page reading those bytes as positions would
+    // leave the knob sitting on the last value it saw, which is 4.
+    // 🔴 AND NO SINGLE MESSAGE MOVES IT MORE THAN THE CAP. The known stream
+    // carries 0x3F and 0x7F, the two values suspected of being acceleration, so
+    // this fails the moment somebody takes the cap out.
+    d.assert('no one message moves the knob more than the cap allows',
+      Math.round(pan.value()) >= 0 && Math.round(pan.value()) <= 127,
+      `${Math.round(pan.value())} after ${steps} raw steps, capped at ${MAX_STEP}`);
+    /**
+     * 🔴 TURNING PAST AN END AND BACK MUST RETRACE. This is the reported bug as
+     * an assert: drive the knob hard into 0, keep driving, then return the same
+     * distance. A clamped accumulator fails it, because the steps spent past
+     * the end are gone and the way back starts from 0 immediately.
+     */
+    {
+      one.panRaw = 64; pan.set(64, { from: 'hand' });
+      /**
+       * ⚠️ 20 MESSAGES, NOT 40, AND THE NUMBER MATTERS. Each is magnitude 4
+       * scaled to 8, so 20 is 160 units: comfortably past the 64 needed to
+       * reach 0 from centre, and inside the one range of overshoot the
+       * accumulator keeps. **40 was 320 units and hit the guard rail**, which
+       * made this read red on a page where nothing was wrong. A test that
+       * drives five times past an end is testing the clamp, not the retrace.
+       */
+      for (let i = 0; i < 20; i++) take([0xb0, PAN_CC0, 0x44]);   // past 0, not absurdly
+      const atEnd = Math.round(pan.value());
+      for (let i = 0; i < 20; i++) take([0xb0, PAN_CC0, 0x04]);   // the same distance back
+      const back = Math.round(pan.value());
+      d.assert('turning past an end and back returns to where it started',
+        atEnd === 0 && Math.abs(back - 64) <= 1,
+        `centre 64, hard left ${atEnd}, back ${back}`);
+    }
+
+    d.assert('and its value is an accumulation, not the last byte it saw',
+      Math.round(pan.value()) !== 4 && steps > 100,
+      `${Math.round(pan.value())} from ${steps} steps of movement`);
+
+    const b = classifyBend(bendMsgs);
+    d.assert('the fader is read as seven bit, not fourteen', b.bits === 7,
+      `${b.bits} bit: ${b.why}`);
+    d.assert('so a full sweep lands on 127 rather than on 16383',
+      Math.round(fader.value()) === 127, String(Math.round(fader.value())));
+
+    // 🔴 REC SENDS NO RELEASE AND THE OTHER TWO DO, MEASURED ON ONE MIXER.
+    // One press each in the known stream, so all three are on.
+    d.assert('one press turns a button on, whether or not a release follows it',
+      pads.rec.on() && pads.solo.on() && pads.mute.on(),
+      `rec ${pads.rec.on()}, solo ${pads.solo.on()}, mute ${pads.mute.on()}`);
+    /**
+     * 🔴 THE NEGATIVE HALF, AND IT IS THE REPORTED BUG: a second press and
+     * release turns it off again. A page that acted on the RELEASE would fail
+     * this, because the release would have already switched it off and the
+     * second press would switch it back on.
+     */
+    take([0x90, MUTE0, 0x7f]);
+    take([0x90, MUTE0, 0x00]);
+    d.assert('and a second press and release turns it off again',
+      pads.mute.on() === false, `mute ${pads.mute.on()} after two presses`);
+
+    // 🔴 FOUR, NOT THREE: the toggle check above presses mute a second time.
+    // ⚠️ A COUNT IN AN ASSERT THAT A LATER CHECK FEEDS IS A COUNT THAT WILL GO
+    // STALE, and this one did the moment the second press was added.
+    d.assert('clock never reaches the strip', pressed === 5, `${pressed} presses of 5`);
+
+    /**
+     * 🔴 THE STRIDE IS THE WHOLE CLAIM OF THIS PAGE NOW, so it is asserted
+     * rather than left to the arithmetic looking right. Channel 2's SOLO is
+     * note 9 and its fader is pitch bend on channel 2, both measured on the
+     * desk, and both must land on strip 2 and on nothing else.
+     * ⚠️ **AND THE NEGATIVE HALF IS THE POINT**: strip 1 must be untouched by
+     * them. An off by one in the routing would light the right control on the
+     * wrong channel, which looks perfectly normal until somebody with eight
+     * faders notices the wrong one moving.
+     */
+    d.assert('a message for channel 2 lands on strip 2',
+      rack[1].pads.solo.on() === true && Math.round(rack[1].fader.value()) === 64,
+      `strip 2 solo ${rack[1].pads.solo.on()}, fader ${Math.round(rack[1].fader.value())}`);
+    d.assert('and strip 1 is not moved by it',
+      rack[0].pads.solo.on() === true && Math.round(rack[0].fader.value()) === 127,
+      `strip 1 solo ${rack[0].pads.solo.on()}, fader ${Math.round(rack[0].fader.value())}`);
+
+    // 🔴 EIGHT STRIPS AND A MASTER, which is what the mixer has: six mono
+    // channels and two stereo pairs share eight faders across ten inputs.
+    /**
+     * 🔴 THE JOG IS MEASURED AND THE PAN IS FUDGED, AND THE CHECK SAYS SO. Both
+     * are relative encoders on one mixer. The jog sends 1 per detent, so it is
+     * driven raw; the pan sends 2, 4 and 63, so it is capped and scaled by two
+     * numbers fitted to a report rather than to a measurement.
+     */
+    {
+      jogRaw = 64; jog.set(64, { from: 'hand' });
+      for (let i = 0; i < 10; i++) take([0xb0, 60, 0x01]);
+      const up = Math.round(jog.value());
+      for (let i = 0; i < 10; i++) take([0xb0, 60, 0x41]);
+      const back = Math.round(jog.value());
+      d.assert('the jog moves one per detent and retraces exactly',
+        up === 74 && back === 64, `64 to ${up} and back to ${back}`);
+    }
+
+    // 🔴 THE MASTER IS THE SAME LENGTH AS A CHANNEL, measured rather than
+    // trusted: both read the same expression, and an expression that is right
+    // in two places and wrong in a third is what a copied pixel count looks
+    // like a month later.
+    {
+      const chLane = rack[0].fader.el.querySelector('.pos-fdr-lane');
+      const fxLane = master.el.querySelector('.pos-fdr-lane');
+      if (chLane && fxLane) {
+        const a = chLane.getBoundingClientRect().height;
+        const b = fxLane.getBoundingClientRect().height;
+        d.assert('the FX fader has the same travel as a channel fader',
+          Math.abs(a - b) <= 1, `channel ${a.toFixed(1)} px, FX ${b.toFixed(1)} px`);
+      }
+    }
+
+    // 🔴 GLUED AND EQUAL, BOTH MEASURED. A gap and a height difference are two
+    // separate claims and a screenshot showed both wrong at once.
+    {
+      /**
+       * 🔴 `rackLane`, NOT `lane`. There is a `const lane` further down this
+       * same block for the FADER's lane, and a `const` shadows its whole
+       * enclosing scope from the top. Reading the outer `lane` above that
+       * declaration is a temporal dead zone error, the check THREW, and
+       * **seven asserts silently stopped running while the page read 22/22
+       * green**.
+       * ⚠️ THAT IS THE FAILURE THIS PROJECT NAMES MOST OFTEN: asserts do not
+       * fail when they stop running, they simply are not there, and only the
+       * COUNT says so. 29 to 22 is what caught it.
+       */
+      const rackLane = document.querySelector('.rack-lane');
+      const r = rackRow.getBoundingClientRect();
+      const l = rackLane.getBoundingClientRect();
+      d.assert('the master lane is glued to the channels and is the same height',
+        Math.abs(l.left - r.right) <= 1 && Math.abs(l.height - r.height) <= 1,
+        `seam ${(l.left - r.right).toFixed(1)} px, rack ${r.height.toFixed(1)}, lane ${l.height.toFixed(1)}`);
+      // 🔴 AND THE FADERS END ON ONE LINE, which is a different claim from the
+      // boxes being equal: a padding either side of a seam can differ while
+      // both boxes match, and that is exactly what was reported.
+      const chL = rack[0].fader.el.querySelector('.pos-fdr-lane').getBoundingClientRect();
+      const fxL = master.el.querySelector('.pos-fdr-lane').getBoundingClientRect();
+      d.assert('every fader in the rack ends on the same line as the FX fader',
+        Math.abs(chL.bottom - fxL.bottom) <= 1,
+        `channel ends at ${chL.bottom.toFixed(1)}, FX at ${fxL.bottom.toFixed(1)}`);
+    }
+
+    d.assert('the rack is eight strips and one master',
+      rack.length === 8 && !!master, `${rack.length} strips`);
+    d.assert('every strip carries a pan, a fader and four column buttons',
+      rack.every((s) => s.pan && s.fader && Object.keys(s.pads).length === 5),
+      `${rack.filter((s) => Object.keys(s.pads).length === 5).length} of ${rack.length} complete`);
+
+    // Nothing on this page may claim a source it has not had.
+    d.assert('every control says the hardware moved it',
+      pan.hardwareMoves() > 0 && fader.hardwareMoves() > 0,
+      `pan ${pan.hardwareMoves()}, fader ${fader.hardwareMoves()}`);
+
+    /**
+     * 🔴 THE ALIGNMENT IS A MEASUREMENT, NOT A LOOK. A margin derived from a
+     * component's internals is the shape of defect this project has measured
+     * five times: it reads as correct in the source and is wrong on screen the
+     * moment the component changes. Compare the real rects.
+     * ⚠️ AND IT NAMES THE LANE, NOT THE FADER. Against `.pos-fdr` this assert
+     * would pass while the bug was present, because the bug WAS alignment to
+     * `.pos-fdr`.
+     */
+    // 🔴 THE FADER'S LAST CONTROL, WHICH IS THE HAND BUTTON WHEN THERE IS ONE.
+    // A pad column beside a fader ends where the fader's CONTROLS end, and a
+    // hand button joined under the lane is one of them.
+    const lane = fader.el.querySelector('.pos-fdr-hand') || fader.el.querySelector('.pos-fdr-lane');
+    // 🔴 `.button`, NOT `.el`. The pad returns its WRAPPER as `el`, and since the
+    // pads gained a bottom label that wrapper ends below the button. This
+    // assert read the wrapper and reported the button 17 px low while the
+    // button was exactly right, which is a check measuring the wrong object and
+    // blaming the layout. The component exposes `button` for this.
+    const lastBtn = pads.solo.button;
+    if (lane && lastBtn) {
+      const a = lane.getBoundingClientRect().bottom;
+      const b = lastBtn.getBoundingClientRect().bottom;
+      d.assert('the buttons end where the fader controls end, not at its label',
+        Math.abs(a - b) <= 1.5, `lane ends at ${a.toFixed(1)}, buttons at ${b.toFixed(1)}`);
+      // 🔴 AND THE LABELS UNDER THEM LINE UP TOO, which is a second claim and
+      // needs a second measurement: the controls can end together while their
+      // labels do not, which is exactly what happened when the pads gained a
+      // bottom label and the page was still lifting the column by hand.
+      // 🔴 AND THE TOP LINES UP TOO, which is a third claim and a third
+      // measurement. The lane's height is calculated from tokens, so this is
+      // the check that the arithmetic matches the layout rather than merely
+      // looking plausible in a comment.
+      const recBtn = pads.mute.button;
+      if (recBtn) {
+        // the TOP is still the lane's: a hand under it does not move that
+        const lt = fader.el.querySelector('.pos-fdr-lane').getBoundingClientRect().top;
+        const rt = recBtn.getBoundingClientRect().top;
+        d.assert('the lane starts level with the first button in the column',
+          Math.abs(lt - rt) <= 1.5, `lane top ${lt.toFixed(1)}, mute top ${rt.toFixed(1)}`);
+      }
+
+      const fLab = fader.el.querySelector('.pos-fdr-lab');
+      const pLab = pads.solo.el.querySelector('.pos-pad-bot');
+      if (fLab && pLab) {
+        const x = fLab.getBoundingClientRect().bottom;
+        const y = pLab.getBoundingClientRect().bottom;
+        d.assert('and the two labels under them end on the same line',
+          Math.abs(x - y) <= 1.5, `fader label ${x.toFixed(1)}, pad label ${y.toFixed(1)}`);
+      }
+    }
+
+    d.assert('no secret in this page', !location.href.includes('token'));
+  });
+
+  render();
   d.ready();
 </script>
 </html>
