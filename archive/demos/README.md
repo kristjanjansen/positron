@@ -76,7 +76,7 @@ be the same observation.
 
 ## `rack-index.html`, retired 2026-09-11
 
-⚠️ **This is not what `/rack/` is now.** The slug is live again with a
+⚠️ **This is not what `/able/` is now.** The slug is live again with a
 different page, created 2026-09-12, which PLAYS Ableton Live from the browser.
 The file here is the page that held the slug before it.
 

@@ -350,8 +350,14 @@ export const DEMOS = [
     // sizes the wait for the page's first assert, which sits behind one local
     // read of a 99 KB file. Nothing here has a control to press.
     settleMs: 4000,
-    one: 'Held in Human, a mixed reality piece by Liis Vares and Taavet Jansen, '
-      + 'played back from its own score',
+    // ⚠️ THE NAMES CAME OUT OF THE DESCRIPTION ON 2026-09-20: *"rm by Liis
+    // Vares and Taavet Jansen,"*. **The attribution itself is untouched** and
+    // is two lines above, in the comment, and in
+    // `demo/resources/build-held-in-human.mjs`, which opens by saying the piece
+    // is somebody else's work. What went is a credit standing inside a one
+    // sentence description, where it spends half the sentence and pushes out
+    // what the page DOES.
+    one: 'Held in Human, played back from its own score',
     tags: ['timeline', 'uncertainty', 'canvas'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
@@ -373,7 +379,7 @@ export const DEMOS = [
   // ⚠️ `studio` IS GONE FROM THE LIST AND THERE WAS NOTHING TO ARCHIVE. It never
   // had a page: the row was a placeholder carrying `why: 'consumes 10 through
   // 14'`, which is a promise rather than a demo, and it had sat on the front
-  // page unbuilt since 2026-08-26. `plan-studio.md` still holds the argument
+  // page unbuilt since 2026-08-26. `plans/plan-studio.md` still holds the argument
   // for it, which is where a proposal belongs. A row for a page that does not
   // exist makes the list longer and the reader's odds worse.
   { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, settleMs: 26000,
@@ -484,7 +490,35 @@ export const DEMOS = [
   // renders while that audio carries on to the speakers — so BlackHole, the
   // Multi-Output Device and Live's own output setting are all out of the path.
   // MEASURED over the relay: silence 0.00000, keys down -5.3 dBFS.
-  { name: 'rack', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',
+  /**
+   * 🔴 THE HARDWARE ON THE DESK, ON SCREEN. The name was freed on 2026-09-20
+   * when the Ableton page became `able`: *"rename old rack demo to able, make
+   * new rack demo with out hw layouts. start with model 12 single strip (1)"*.
+   * ⚠️ **A KEPT LINK TO `/rack/` NOW OPENS SOMETHING ELSE**, which is the
+   * `/held/` situation rather than the `radio1965` one. A 404 at least says no.
+   * ⚠️ AND EVERY NUMBER IN IT IS MEASURED. TASCAM publishes no note numbers and
+   * no controller numbers for Mackie Control at any firmware revision, so the
+   * page is built on `measured-devices-2026-09-20.md` and would otherwise be
+   * guesswork.
+   */
+  /**
+   * 🔴 THE SECOND HARDWARE PANEL, AND IT WAS BUILT THE OTHER WAY ROUND FROM
+   * `rack`. That one was laid out from reasoning and corrected twice by
+   * somebody looking at the mixer; this one starts from Novation's own artwork,
+   * read at 800 dpi, with the MIDI bindings kept as a separate source.
+   * ⚠️ **MOST OF THIS PANEL IS BOUND TO NOTHING AND SAYS SO.** Twenty two
+   * buttons have never sent a byte anybody has captured, so they are drawn and
+   * marked rather than wired by guess.
+   */
+  { name: 'circuit', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+    one: 'a Novation Circuit on screen, moving when the real one moves',
+    tags: ['WebMIDI', 'CoreMIDI'] },
+
+  { name: 'rack', group: 'instruments', act: 4, created: '2026-09-20', built: true,
+    one: 'a TASCAM Model 12 on screen, moving when the real one moves',
+    tags: ['WebMIDI', 'CoreMIDI', 'Mackie Control'] },
+
+  { name: 'able', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',
     one: 'play Ableton Live on a studio Mac from here, with no virtual audio cable',
     tags: ['Ableton Live', 'CoreMIDI', 'CoreAudio tap', 'relay', 'PCM'] },
 
@@ -541,7 +575,7 @@ export const DEMOS = [
   // stays true, and losing one is harmless the instant the next arrives. So
   // this page coalesces instead of queueing, sends at most one value per slider
   // per 20 ms, and states the whole console again every 500 ms rather than
-  // asking for an ack. plan-controller.md has the arithmetic and the reasons.
+  // asking for an ack. plans/plan-controller.md has the arithmetic and the reasons.
   // ⚠️ `room: 'fixed'` because `studio-1` is the ADDRESS OF THE RASPBERRY PI.
   // A private room does not give a second client its own board: there is one
   // JACK graph and one instrument, so this page and `/keys/` take turns.
@@ -705,7 +739,7 @@ export const DEMOS = [
   // chain runs end to end — midisend -> IAC -> Live -> Arturia Stage-73 V2 ->
   // BlackHole — with a held chord reading -29.1 dB peak against a -91.0 dB
   // silence baseline, 61.9 dB of separation, and its checkup found the output
-  // clipping at full scale when nothing else had. rig/m1/ and plan-rack.md hold
+  // clipping at full scale when nothing else had. rig/m1/ and plans/plan-rack.md hold
   // the rest.
 ];
 
