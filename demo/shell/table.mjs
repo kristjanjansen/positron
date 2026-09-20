@@ -114,6 +114,69 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
   // Every row element now on screen, and the data it was built from, so a
   // caller can light one after a repaint. See `mark`.
   const els = [], shown = [];
+
+  /**
+   * Put the keyboard on one row, and say whether there was one to put it on.
+   *
+   * 🔴 IT SCROLLS THE TABLE'S OWN BOX AND NOTHING ELSE. Reported 2026-09-20:
+   * *"do not make keyboard focused item move away from viewport of table when
+   * keep using keyboard"*. This was `row.focus()` followed by
+   * `row.scrollIntoView({ block: 'nearest' })`, and **both of those scroll
+   * every scrollable ancestor, the document included**. So stepping through a
+   * list moved the page under the table as well as the row inside it, and the
+   * two scrolls fight: `focus()` goes first on its own heuristic, then
+   * `scrollIntoView` corrects from wherever that left things.
+   *
+   * ⚠️ `preventScroll: true` IS THE HALF THAT IS EASY TO MISS. Without it the
+   * arithmetic below is correct and then the browser scrolls anyway, because
+   * focusing an element is itself a scroll request.
+   *
+   * ⚠️ AND THE ROW IS KEPT OFF THE EDGE BY ONE ROW'S HEIGHT. `nearest` puts
+   * each new row flush against the boundary, so somebody stepping down reads
+   * the list from a row with nothing under it and no idea what is coming. A
+   * row of margin is the cheapest thing that makes a list feel navigable, and
+   * it costs nothing at the ends because the clamp below cannot scroll past
+   * them.
+   */
+  function focusRow(i) {
+    const row = els[i];
+    if (!row) return false;
+    row.focus({ preventScroll: true });
+    keepInView(row);
+    return true;
+  }
+
+  /**
+   * Bring one row inside the scrolling box, by moving THAT box only.
+   *
+   * 🔴 RECTS, NOT `offsetTop`, AND THE FIRST BUILD OF THIS USED `offsetTop` AND
+   * WAS WRONG BY 579 PIXELS. `offsetTop` is measured from the `offsetParent`,
+   * and `.pos-tbl-body` is `position: static`, so the offset parent is whatever
+   * positioned ancestor happens to be further up the page rather than the
+   * scroller. The number looked like a position inside the scrolled content and
+   * was a position inside something else entirely.
+   * ⚠️ A RECT IS MEASURED FROM THE VIEWPORT AND THAT DOES NOT MATTER HERE,
+   * because both rects are read in the same frame and only their DIFFERENCE is
+   * used. Where the page is cancels out.
+   * ⚠️ AND ONLY `scrollTop` IS WRITTEN, which is what keeps the document still.
+   */
+  function keepInView(row) {
+    const box = body;
+    if (box.scrollHeight <= box.clientHeight) return;
+    const b = box.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    // One row of margin, so a row reached by stepping is never flush against
+    // the boundary with nothing visible beyond it.
+    const pad = r.height;
+    let move = 0;
+    if (r.top - pad < b.top) move = (r.top - pad) - b.top;
+    else if (r.bottom + pad > b.bottom) move = (r.bottom + pad) - b.bottom;
+    if (!move) return;
+    // The clamp is what lets the margin be unconditional: at the first and last
+    // row there is nowhere to put it, and asking for it changes nothing.
+    const max = box.scrollHeight - box.clientHeight;
+    box.scrollTop = Math.max(0, Math.min(box.scrollTop + move, max));
+  }
   const blank = (msg) => {
     body.textContent = '';
     // 🔴 AN EMPTY STRING MEANS SAY NOTHING, AND SAYING NOTHING MEANS NO
@@ -151,15 +214,53 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
     els.push(row); shown.push(r);
     if (onPick) {
       row.setAttribute('role', 'button');
-      row.tabIndex = 0;
+      /**
+       * 🔴 ROVING TABINDEX: ONE STOP FOR THE WHOLE LIST, NOT ONE PER ROW.
+       * Every row used to be `tabIndex = 0`, which is correct for a handful and
+       * wrong for a corpus: `/making/` draws 63 pictures and 26 recordings, so
+       * tabbing past the table meant sixty-three presses to reach the thing
+       * after it. The list is ONE thing you tab into; the arrows move inside
+       * it. This is the pattern a listbox has had for thirty years and the
+       * reason it exists is exactly this.
+       */
+      row.tabIndex = els.length === 1 ? 0 : -1;
       row.classList.add('pick');
       const go = (e) => {
         if (e.target?.closest?.('a')) return;
         onPick(r, row);
       };
       row.addEventListener('click', go);
+      /**
+       * 🔴 ARROWS MOVE, ENTER OPENS, AND THEY MUST NOT BE THE SAME ACT. Asked
+       * for 2026-09-19: *"allow keyboard nav in tables"*.
+       *
+       * ⚠️ AN ARROW THAT PICKED WOULD BE A DISASTER ON EXACTLY THE PAGE THAT
+       * ASKED FOR THIS. `onPick` on `/making/` opens a file off the bucket, so
+       * holding the down arrow through 63 rows would fetch 63 pictures nobody
+       * asked to see — the load-on-visit defect this project has already paid
+       * for three times, arriving through the keyboard. Moving focus is free;
+       * opening is a decision, and Enter is where a decision goes.
+       *
+       * ⚠️ AND FOCUS IS MOVED WITH `preventDefault`, or the page scrolls under
+       * the arrow as well as the focus moving, which puts the row you just
+       * reached somewhere you did not expect.
+       */
       row.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); }
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); return; }
+        const step = { ArrowDown: 1, ArrowUp: -1, PageDown: 10, PageUp: -10 }[e.key];
+        const jump = e.key === 'Home' ? 0 : e.key === 'End' ? els.length - 1 : null;
+        if (step === undefined && jump === null) return;
+        e.preventDefault();
+        const here = els.indexOf(row);
+        const want = jump !== null ? jump : here + step;
+        focusRow(Math.max(0, Math.min(els.length - 1, want)));
+      });
+      /* The roving index follows the focus rather than leading it, so a row
+         reached by a mouse press or by a screen reader's own navigation
+         becomes the list's tab stop too. Without this, tabbing out and back
+         returns to whichever row happened to be first. */
+      row.addEventListener('focus', () => {
+        for (const other of els) other.tabIndex = other === row ? 0 : -1;
       });
     }
     for (const c of columns) {
@@ -208,5 +309,15 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
     clear: blank,
     count: () => n,
     columns,
+    /**
+     * Put the keyboard on a row, by index. For a page that wants the list ready
+     * to step through after it fills, and for a check that has to prove the
+     * arrows move something.
+     */
+    focusRow,
+    /** Which row has the keyboard, or -1. */
+    focused: () => els.findIndex((e) => e === document.activeElement),
+    /** The element that scrolls, so a check can read where the list is. */
+    scroller: () => body,
   };
 }
