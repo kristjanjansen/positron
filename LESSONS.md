@@ -2527,3 +2527,37 @@ be attributed because every one opens with a build id; a screenshot cannot.
 that the photograph predates it. Re-fixing a fixed thing because somebody
 photographed the old one is a whole cycle spent on nothing, and it ends with two
 changes stacked on one defect.
+
+
+## A padding cannot match a number that moves (2026-09-21)
+
+`/circuit/` was asked for a bottom inset matching its left one. MEASURED:
+**foot 21 px, side 43 px**, and the 22 px between them was the leftover width
+that `justify-content: center` splits either side of a centred grid inside a
+full width card. **That number changes with the window**, so no value written in
+the stylesheet could have matched it, and three earlier attempts at "make the
+paddings equal" had each moved a padding that was already correct.
+
+✅ The repair was structural: the card hugs its content, so all four insets are
+one declaration at every width. `min-width: max-content` keeps the phone case,
+where the card is wider than the container and the scroller takes the overflow.
+
+⚠️ **AND IT REVERSED AN EXPLICIT INSTRUCTION FROM AN HOUR EARLIER**, which is
+worth saying out loud rather than quietly doing: *"make the box fill the
+container"* and *"same top and left and right paddings"* cannot both hold while
+the controls are centred. **When two instructions are geometrically
+incompatible, the measurement is what decides which one was about the symptom.**
+
+## `d.setCell` does not exist, and eight asserts went silent on it
+
+The readout API a page calls is `d.set(key, value)`. `setCell` is the internal
+one and is not on the page object, so every call threw, the check handler died
+part way, and the suite read **17/17 green** having previously been 25.
+
+⚠️ **THE THROW WAS INVISIBLE FROM EVERY DIRECTION EXCEPT ONE.** `no console
+errors` read 0, nothing failed, and the page looked finished. What caught it was
+`page asserted something · 11` against 21, which is the per-page count this
+project already requires diffing after any change.
+⚠️ Third time in one session that an edit looked applied and was not: twice a
+script threw before `writeFileSync`, once an API name was wrong. **The count is
+the instrument. Read it every run, not just when something looks wrong.**

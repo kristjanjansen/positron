@@ -67,9 +67,41 @@ reference sweep had rewritten 7 files in there and **an archive records what was
 there**. `origin/main` still points at the wrong commit and needs one line from
 a person; `HANDOFF.md` has it.
 
+**`/circuit/` SENDS, AND THE THING THAT REFUSES WAS BUILT FIRST.** Asked for
+transport, pads and instrument select, and for **no record**, by somebody who
+has spent this session protecting 32 sessions on a device with no factory reset.
+So the constraint came first and the features were built inside it: `send()`
+carries note on, note off and the three transport bytes and nothing else, on any
+channel, so **a record command cannot be expressed**. The check fires that guard
+on purpose with four shapes that could touch a recording or move a patch, and
+asserts a negative control beside it, because a guard that refused everything
+would pass while making the page inert.
+🔴 **NOBODY HAS HEARD IT PLAY, AND EVERY ASSERT GRADES OUR SIDE OF THE WIRE.**
+Whether the synths answer on channels 1 and 2, whether the drums answer 60, 62,
+64 and 65, and whether Start is obeyed at all are facts only the device can
+give back. It was measured sending its own clock continuously, which makes it
+the master and entitled to ignore us.
+⚠️ **WHICH TRACK IS ARMED IS THIS PAGE'S FACT, NOT THE DEVICE'S.** Selecting a
+track on a Circuit has no measured MIDI binding, so the button decides where the
+next pad press is addressed and the page says so rather than implying the
+hardware moved.
+
+**AND A PADDING CANNOT MATCH A NUMBER THAT MOVES.** Four rounds went into making
+`/circuit/`'s insets equal, and the measurement that ended it was **foot 21 px
+against side 43 px**: the 22 px was the leftover width a centred grid splits
+either side of itself inside a full width card, and it changes with the window.
+The card hugs its content now, so all four insets are one declaration at every
+width. ⚠️ **THAT REVERSED AN EXPLICIT INSTRUCTION FROM AN HOUR EARLIER**, and
+that is the honest shape of it: *"make the box fill the container"* and *"same
+top and left and right paddings"* cannot both hold while the controls are
+centred.
+
 **AND THREE EDITS TONIGHT NEVER APPLIED.** Nested backticks in a heredoc threw
 at parse time, before `writeFileSync`, so the script printed nothing and changed
-nothing. **What caught all three was an assert still reporting the OLD number.**
+nothing. **What caught all three was an assert still reporting the OLD number.** A fourth
+was not an edit at all: `d.setCell` is not the page API, the check threw part
+way through, and the suite read **17/17 green** having been 25. `no console
+errors` read 0 throughout. **The per-page assert count is the instrument.**
 Every edit script since guards on the text it expects to find and throws when it
 is absent, which is the same rule as never guarding a patch on `includes()`.
 
