@@ -61,3 +61,4 @@ workers/pub/node_modules/
 *-sa.json
 *-sa.*.json
 positron-push-sa.json
+.tap/

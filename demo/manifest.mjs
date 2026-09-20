@@ -574,6 +574,23 @@ export const DEMOS = [
     one: 'play a synthesizer in another building, and turn its knobs while you do',
     tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
 
+  /**
+   * 🔴 THE INSTRUMENT FOR EVERY OTHER PAGE IN THIS GROUP, AND FOR THREE PLAN
+   * DOCUMENTS. Four devices sit on the desk this was written at, and the plans
+   * describing them are written almost entirely from documentation because
+   * several of their central facts are in no document: TASCAM publishes no
+   * controller numbers for the Model 12 in Mackie Control mode at any firmware
+   * revision, and Novation never wrote down whether the Circuit's NRPN rides
+   * the usual convention. Both are four seconds of turning a knob in front of
+   * this page.
+   * ⚠️ `WebMIDI` IS A SOFT CAPABILITY in `caps.mjs`, so this row stays linked on
+   * a browser with no MIDI at all. It has a known stream written into it and
+   * every check runs off that, so the page is worth opening on a phone.
+   */
+  { name: 'dump', group: 'instruments', act: 4, created: '2026-09-20', built: true,
+    one: 'every message a plugged-in instrument sends, as raw bytes beside a reading of them',
+    tags: ['WebMIDI', 'CoreMIDI', 'SysEx'] },
+
   // 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is
   // a DOCUMENT — "~2 KB of GLSL plus ~200 bytes of parameters reproduces it at
   // any resolution" — and works out when generated code may cross a wire. This
