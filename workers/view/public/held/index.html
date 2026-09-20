@@ -10,8 +10,8 @@
   import { mount, guard } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createGlue } from '/shell/glue.mjs';
-  import { createCard, createCardGrid } from '/shell/card.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -45,16 +45,19 @@
 
   const d = mount({
     name: 'held',
-    // ONE SENTENCE, AND IT IS THE INDEX CARD'S OWN LINE. This page carries a
-    // diagram, so the paragraph and the picture would be two explanations of
-    // one thing with the paragraph the weaker of them.
+    /* ONE SENTENCE, AND IT IS THE INDEX CARD'S OWN LINE. This page carries a
+       diagram, so the paragraph and the picture would be two explanations of
+       one thing with the paragraph the weaker of them.
+       ⚠️ IT WAS LONGER AND IT WAS CUT ON 2026-09-20, when the picture landed
+       above the line. The old one named the line's own lanes with a colon and
+       two commas, which is a description stretched to carry three facts, and it
+       described only half of what is now on the page. */
     what: 'Held in Human, a mixed reality piece by Liis Vares and Taavet Jansen, '
-      + 'drawn from its own score: eight scenes, a voice that outlives them, and '
-      + 'the one scene the score gives no length.',
+      + 'played back from its own score.',
     /**
-     * 🔴 NO READOUT, AND `null` RATHER THAN AN OMITTED FIELD, so the harness
-     * reads the opt out as deliberate. Instructed 2026-09-19: *"rm readout from
-     * held"*.
+     * 🔴 STILL NO READOUT, AND `null` RATHER THAN AN OMITTED FIELD, so the
+     * harness reads the opt out as deliberate. Instructed 2026-09-19: *"rm
+     * readout from held"*.
      *
      * ⚠️ WHAT THE FOUR CELLS SAID IS ON THE LINE, WHICH IS WHERE IT ALWAYS
      * BELONGED. They were the playhead's own report: which scene, how much of
@@ -65,10 +68,23 @@
      * now writes each table's NAME in its band, and a line being spoken is a
      * bar under the playhead. A row of cells re-saying that in words was the
      * same four facts twice.
+     *
+     * 🔴 AND THE PICTURE THAT ARRIVED ON 2026-09-20 DID NOT BRING ONE BACK.
+     * `/veil/` came into this page with six cells of its own, and the honest
+     * answer was to keep none of them rather than to undo an instruction by
+     * putting the row somewhere else: the panel footer is still a readout if it
+     * is filled with the playhead's report. `room`, `table` and the voice are
+     * the same four facts the line already draws at the playhead; what the
+     * intro has typed so far is the picture itself, in letters, an inch above.
+     * The footer carries the one control a picture needs, which is a way to
+     * make it big.
      */
     readout: null,
-    // NO CONTROLS BESIDE THE PAGE. The line is the control: it seeks on press
-    // and on drag, and the transport bar under it carries play.
+    /* NO CONTROLS BESIDE THE PAGE, AND THE PICTURE DID NOT ADD ONE. The line is
+       the control: it seeks on press and on drag, and the transport bar between
+       it and the picture carries play. `/veil/` had a scene picker because it
+       had no line to press; six names in a dropdown is a worse way to reach a
+       scene than a row of bars you can see. */
     controls: [],
   });
   guard(d);
@@ -190,9 +206,84 @@
    */
   const TINT = { neutral: '#8b93a1', green: '#7f9e8a', blue: '#7d94ad', red: '#ab8079' };
 
+  /* ── the picture over the line, and the one arithmetic in it ───────────────
+     🔴 A COLOUR LOOKUP TABLE IS THREE INDEPENDENT GAINS, and the picture
+     applies it as exactly that: the room's red, green and blue are multiplied
+     separately, and the result is dimmed by the other channel.
+
+         out = clamp(room * gain) * opacity
+
+     A flat canvas does that as easily as it dims, which is what makes a picture
+     of this piece possible at all on a screen.
+
+     ⚠️ A WEB PAGE IN A HEADSET COULD NOT, AND THAT IS A LIMIT OF THE WEB AND
+     NEVER OF THE WORK. A passthrough session composites a page over the room as
+     `c * a + room * (1 - a)`, so the real room only ever reaches the eye
+     multiplied by one scalar shared by all three colours: such a page can dim
+     the room and lay a colour over it, and cannot give its three channels three
+     different gains. Held in Human is a Unity application and really does put a
+     colour table on the camera image. The wording matters in both directions:
+     it is `a web page in a headset`, never `a headset`.
+
+     ⚠️ THE PAGE USED TO DRAW BOTH ARITHMETICS SIDE BY SIDE and it was cut on
+     2026-09-20, on the reader's verdict rather than on a measurement: *"I sid
+     not get two panels reasoning. Keep ot simple."* The comparison had to be
+     taught before it could be looked at. `plan-held-in-human-2d.md` §1 keeps
+     the whole argument, one log line at the foot of this file says the short of
+     it, and the picture draws what the score says.
+
+     🔴 THE FOUR TABLES ARE OUR READING OF FOUR WORDS. The score names
+     `neutral`, `green`, `blue` and `red` and carries no table, no curve, no
+     coefficient and no image, so every number below is this page's invention
+     and none of it is the piece's. There is a check at the foot that reads that
+     absence off the file rather than leaving it as a sentence.
+     ⚠️ `neutral` IS THE IDENTITY, AND THAT IS A READING TOO. In colour work a
+     neutral table is usually the one that changes nothing, so a neutral scene
+     here is the room's own tones with only the dimming on them.
+     ⚠️ NOT TO BE CONFUSED WITH `TINT` ABOVE, which is the four swatches the
+     tint LANE is drawn in. These are gains on a room; those are ink on a
+     chart. */
+  const TABLES = {
+    neutral: [1.00, 1.00, 1.00],
+    green:   [0.55, 1.05, 0.62],
+    blue:    [0.58, 0.82, 1.15],
+    red:     [1.15, 0.64, 0.58],
+  };
+
+  /* 🔴 THERE IS NO HONEST PICTURE OF THE GALLERY. The room is Mari Möldre's,
+     the maze geometry is not in the score, and a drawn stand-in that looked
+     like a room would be inventing a room design the file credits to somebody
+     else. A band of grey steps cannot be mistaken for one, and it has the
+     property a picture of a dimmed room needs: a RANGE of tones, so the table
+     and the dimming are visible across the whole of it rather than on a single
+     flat value that could be any of a dozen arithmetics.
+     ⚠️ NINE IS A CHOICE ABOUT HOW THE BAND READS, and nothing on this page
+     depends on the number. It was eleven while the page drew two arithmetics,
+     where the count was load bearing, because a gain and a lift are
+     indistinguishable on one tone and it took the darkest two steps to separate
+     them. There is one arithmetic now and nothing to separate. */
+  const STEPS = 9;
+  /** The flat part of the room, which is where the type stands. White on a step
+   *  band is unreadable at the bright end. */
+  const WALL = 0.42;
+
+  const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+  /** What a pixel of the room comes out as. */
+  const through = (v, opacity, gain) => [0, 1, 2].map((i) => clamp01(v[i] * gain[i]) * opacity);
+  const css = (rgb) => `rgb(${rgb.map((c) => Math.round(clamp01(c) * 255)).join(',')})`;
+  /** Rec. 709, which is what a display weights its three channels by. */
+  const lum = (rgb) => 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+
   // ── the picture, built once the score is in hand ──────────────────────────
   let strip = null, view = null, deck = null;
   let data = null;
+  /** The panel over the line, its canvas, and what the last draw laid out, so a
+   *  check can grade the picture a visitor is looking at rather than one of its
+   *  own making. */
+  let panel = null, canvas = null, g2 = null, drawn = null;
+  /** The picture's own box, in CSS pixels, and the key that says whether
+   *  anything it depends on has moved since the last frame. */
+  let W = 0, H = 0, dpr = 1, lastKey = '';
   /** Which scene the line is standing in, read by the scenes lane so the bar it
    *  is inside keeps its full strength while the rest step back. */
   let currentScene = null;
@@ -279,12 +370,31 @@
       .map(({ p, at }) => ({ at, from: p.from, value: p.value, fadeMs: p.fadeMs,
                              follows: p.followsRecommendation, sceneName: p.sceneName }))
       .sort((a, b) => a.at - b.at);
+    /**
+     * Which table is on the room at `t`, as the gains the picture multiplies
+     * by, and the name of the one a reader is mostly looking at.
+     *
+     * ⚠️ THE FADE IS A CROSSFADE BETWEEN TWO TABLES, WHICH IS A READING. The
+     * score gives each scene a transition time from the previous table to this
+     * one and does not say what happens in between. A straight blend of the two
+     * is the ordinary answer and it is the one taken here.
+     *
+     * 🔴 `name` IS THE TABLE THAT IS DOMINANT, NEVER THE ONE BEING FADED TO,
+     * AND NOTHING ON THIS PAGE PRINTS IT. It is the second source for the check
+     * at the foot: the name comes off the score's own steps and the colour
+     * comes off the pixels, so the two are able to disagree. The river's fade is
+     * ten seconds long, and a name read off the destination would say `blue`
+     * while the picture is still plainly green.
+     */
     const tintAt = (t) => {
-      if (!tintSteps.length) return null;
       let i = 0;
-      if (t < tintSteps[0].at) return tintSteps[0].from;
       while (i + 1 < tintSteps.length && tintSteps[i + 1].at <= t) i++;
-      return tintSteps[i].value;
+      const st = tintSteps[i], gone = Math.max(0, t - st.at);
+      const to = TABLES[st.value], from = TABLES[st.from] || to;
+      if (!(st.fadeMs > 0) || gone >= st.fadeMs) return { name: st.value, gain: to };
+      const k = gone / st.fadeMs;
+      return { name: k < 0.5 ? st.from : st.value,
+               gain: [0, 1, 2].map((j) => from[j] + (to[j] - from[j]) * k) };
     };
 
     // ── the voice ───────────────────────────────────────────────────────────
@@ -309,9 +419,54 @@
       .map(({ e, at }) => ({ ...e, at }));
     const mazeEvents = otherEvents.filter((e) => e.sceneId === 'maze');
 
-    // ── the intro, which is a recording of somebody typing ──────────────────
+    /* ── the intro, which is a recording of somebody typing ──────────────────
+       🔴 THE KEY, NOT THE CHANGE, AND THAT IS WHY THE CORRECTION SURVIVES. Six
+       backspaces delete `houses` so `buildings` can be typed instead, after a
+       hesitation longer than the deletion itself. A score holding the finished
+       string could not carry that and the picture would have nothing to
+       replay. */
     const keys = data.keystrokes.events;
     const correction = data.keystrokes.correction;
+    const introSpan = data.keystrokes.stats.spanMs;
+    /** The text as it stood at `t`. Rebuilt only when the number of events that
+     *  have landed changes, so a frame that types nothing costs nothing. */
+    let textCacheN = -1, textCache = '';
+    const introAt = (t) => {
+      let n = 0;
+      while (n < keys.length && keys[n].at <= t) n++;
+      if (n === textCacheN) return textCache;
+      let s = '';
+      for (let i = 0; i < n; i++) {
+        const k = keys[i];
+        if (k.kind === 'backspace') s = s.slice(0, -1);
+        else if (k.kind === 'return') s += '\n';
+        else s += k.char;
+      }
+      textCacheN = n; textCache = s;
+      return s;
+    };
+    const introText = introAt(introSpan);
+
+    // ── the outro, which is one paragraph with the author's own line breaks ──
+    const outroText = String(data.texts.outro.text).replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/?size=?\d*>/gi, '');
+    const outroTextAt = placedAt(data.events.find((e) => e.id === 'outro:outro-text').at);
+
+    /**
+     * WHAT IS SET ON THE ROOM AT `t`, AND IT IS TWO SURFACES BECAUSE THE SCORE
+     * NAMES TWO. The intro types itself and the outro paragraph appears 30 s
+     * into the outro. Everything else the voice says is a VOICE, and captioning
+     * it would invent a text surface the score does not have.
+     * 🔴 THE RIVER IS DRAWN AS NOTHING, ON PURPOSE. Fifteen fragments of one to
+     * seventy-nine words in a 120 s scene with no timing in the block at all.
+     * Pacing them to fill the scene would be this page deciding the one thing
+     * the score refuses to, which is `river-pacing` on the line below.
+     */
+    const textAt = (t) => {
+      if (t <= introSpan) return { text: introAt(t), caret: true };
+      if (t >= outroTextAt) return { text: outroText, caret: false };
+      return { text: '', caret: false };
+    };
 
     // ── the deck ────────────────────────────────────────────────────────────
     //
@@ -641,6 +796,109 @@
     const lanes = [scenesLane, tintLane, roomLane, keysLane, voiceLane, eventsLane,
                    openLane, seamLane, offLane];
 
+    /* ── the picture, which is one visit ─────────────────────────────────────
+       🔴 IT TAKES A CONTEXT RATHER THAN READING THE PAGE'S, SO THE CHECKS CAN
+       GRADE THE DRAWING WITHOUT MOVING THE PICTURE. Everything the picture is
+       is gradable from data already in hand, and the way it stays that way is
+       that a check paints the same function into an offscreen canvas at any
+       instant it likes. A visitor's picture stands exactly where they left it.
+
+       ⚠️ THE TYPE IS NOT GRADED AND NOT DIMMED. The score sets one white for
+       the whole piece, and the colour table is on the camera image rather than
+       on anything the page itself draws. So the channels act on the room and
+       the type stays white on top of it, which is what the piece does too. */
+    function paint(g, w, h, opacity, gain, text, caret) {
+      g.textBaseline = 'alphabetic';
+      const wallH = Math.round(h * 0.66);
+      const bandH = h - wallH;
+
+      g.fillStyle = css(through([WALL, WALL, WALL], opacity, gain));
+      g.fillRect(0, 0, w, wallH);
+      for (let i = 0; i < STEPS; i++) {
+        const v = i / (STEPS - 1);
+        const sx = Math.round((w * i) / STEPS);
+        const sw = Math.round((w * (i + 1)) / STEPS) - sx;
+        g.fillStyle = css(through([v, v, v], opacity, gain));
+        g.fillRect(sx, wallH, sw, bandH);
+      }
+
+      if (!text) return { wallH, bandH, lines: 0, size: 0 };
+
+      // ⚠️ THE TYPE SHRINKS UNTIL THE WHOLE OF IT FITS. The outro is ten lines
+      // set by the author and cutting the top of it would be a misquote, so the
+      // face gives way instead and only stops at a floor.
+      const pad = Math.max(8, Math.round(w * 0.035));
+      const availW = w - pad * 2, availH = wallH - pad * 2;
+      let size = Math.max(9, Math.min(20, Math.round(w / 40)));
+      let lines = [];
+      for (; size >= 8; size--) {
+        g.font = `${size}px ui-monospace, Menlo, monospace`;
+        lines = [];
+        for (const para of text.split('\n')) {
+          if (!para) { lines.push(''); continue; }
+          let line = '';
+          for (const word of para.split(' ')) {
+            const next = line ? `${line} ${word}` : word;
+            if (line && g.measureText(next).width > availW) { lines.push(line); line = word; }
+            else line = next;
+          }
+          lines.push(line);
+        }
+        if (lines.length * Math.round(size * 1.5) <= availH) break;
+      }
+      const lh = Math.round(size * 1.5);
+      const shown = lines.slice(Math.max(0, lines.length - Math.floor(availH / lh)));
+      g.fillStyle = '#ffffff';
+      let ty = pad + size;
+      for (const line of shown) { g.fillText(line, pad, ty); ty += lh; }
+      if (caret && shown.length) {
+        const tail = shown[shown.length - 1];
+        g.fillRect(pad + g.measureText(tail).width + 2, ty - lh - size + 2, 2, size);
+      }
+      return { wallH, bandH, lines: shown.length, size };
+    }
+
+    /* 🔴 ONE 16:9 PANEL, WHICH IS THE SHAPE THAT WAS ASKED FOR: *"just go
+       single 16;9 videopanel"*. The panel is the kit's, so the way to make the
+       picture big is the one every other picture on this site has, including
+       the fallback an iPhone needs because it has no element fullscreen API at
+       all.
+       ⚠️ NO PRESENCE DOT IN THE LEFT SLOT. The default badge asks whether the
+       thing feeding the picture is answering, and what feeds this one is a file
+       in this repository: a badge that could only ever read the same thing is
+       furniture. `/making/` took its out for the same reason.
+       ⚠️ AND NO VALUES ROW EITHER. See the note on `readout` at the top of this
+       file: every figure this picture could report is one the line already
+       draws at the playhead. */
+    canvas = document.createElement('canvas');
+    g2 = canvas.getContext('2d');
+    panel = createVideoPanel({ media: canvas, left: false });
+
+    /** The canvas is sized from the STAGE's own box rather than from the page,
+     *  because the stage is what carries the 16:9 and the stage is what gives
+     *  that up when the panel fills a screen. */
+    function size() {
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      const r = panel.stage.getBoundingClientRect();
+      W = Math.max(240, Math.round(r.width));
+      H = Math.max(140, Math.round(r.height));
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      lastKey = '';
+    }
+
+    function draw() {
+      const t = deck.position();
+      const opacity = roomAt(t);
+      const tint = tintAt(t);
+      const { text, caret } = textAt(t);
+      g2.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g2.clearRect(0, 0, W, H);
+      const geom = paint(g2, W, H, opacity, tint.gain, text, caret);
+      drawn = { t, opacity, tint, text, w: W, h: H, geom };
+      return drawn;
+    }
+
     // ── the bar, and the line under it as one surface ───────────────────────
     //
     // `scrub: false` because the line below is this page's position surface;
@@ -705,10 +963,47 @@
 
     strip = view.strip;
 
-    // THE ANCHOR IS READ BEFORE THE GLUE, because `createGlue` re-parents its
-    // blocks and a node captured after the call can be detached.
+    /* 🔴 THE PICTURE IS ITS OWN BLOCK. THE BAR AND THE LINE ARE ONE SURFACE.
+       Asked 2026-09-20 as *"in bg: separate videopanel and transport"*, with a
+       photograph of the picture, an almost empty panel footer and the bar all
+       running together as one tall dark band. All three were glued, and the
+       line above this one used to say so: *"the picture, the bar and the line
+       are one surface"*, glued on 2026-09-20 because one bar drives the picture
+       and the playhead off one deck.
+       ⚠️ THAT ARGUMENT WAS TRUE AND IT PROVED TOO MUCH. A glue is a CLAIM that
+       two boxes are one object, and `glue.mjs` already names the one pair it is
+       written for: a strip sitting on the transport bar that drives it. One
+       deck is not the test, because a deck reaches every block on this page
+       including the log. What the picture and the bar actually share is a
+       clock, and the page rhythm between two surfaces does not deny that.
+       🔴 AND THE BAND IN THE PHOTOGRAPH WAS THE GLUE ITSELF. MEASURED at
+       1280 px before this change: the panel's footer is 55 px, the bar under it
+       52 px, the seam between them 1 px, and both are `--card`. That is 108 px
+       of unbroken card with one ⛶ near the top of it, and it reads as a single
+       empty band rather than as a footer and a transport. Unglued they are two
+       boxes 40 px apart, each with its own border.
+       ⚠️ THE FOOTER IS NOT EMPTY AND MUST NOT COLLAPSE. It carries the ⛶, which
+       is the way this picture gets big on a phone with no element fullscreen
+       API. 55 px is one control row: 34 px of button and the panel's own 10 px
+       of padding, the same as every other panel on the site.
+       ⚠️ `createGlue` SKIPS A NULL CHILD, so nothing here needs an `if` around a
+       block.
+       ⚠️ THE ANCHOR IS READ BEFORE THE GLUE, because `createGlue` re-parents its
+       blocks and a node captured after the call can be detached. And the
+       PICTURE goes in before the glue rather than before `view.surface`: the
+       bar is already a child of `d.el` at this point, so inserting against the
+       strip would land the picture between them. */
     const afterStrip = view.surface.nextSibling;
-    d.el.insertBefore(createGlue(bar.el, view.surface), afterStrip);
+    const surface = createGlue(bar.el, view.surface);
+    d.el.insertBefore(surface, afterStrip);
+    d.el.insertBefore(panel.el, surface);
+    size();
+    draw();
+    /* ⚠️ THE STAGE, NOT THE PANEL. The panel's own box includes a footer whose
+       height never changes, so watching it would report the same number the
+       stage already reports and would miss nothing; watching the stage is one
+       fewer thing between the observer and the box the canvas has to match. */
+    new ResizeObserver(() => { size(); draw(); }).observe(panel.stage);
 
     /** What the footer says, for any hit. */
     /**
@@ -785,8 +1080,18 @@
       strip?.invalidate?.();
     };
     atLine(deck.position());
+    /* 🔴 ONE LOOP FOR BOTH SURFACES, BECAUSE THERE IS ONE CLOCK. The picture
+       and the line read the same `deck.position()` in the same frame, so they
+       cannot disagree about which instant they are showing.
+       ⚠️ AND EACH REDRAWS ONLY WHEN SOMETHING MOVED. `atLine` writes nothing
+       unless the scene changed; the picture repaints only when the instant or
+       its own width has. A raf loop that repainted a standing playhead would
+       burn a phone's battery to draw the same band twice. */
     (function follow() {
-      atLine(deck.position());
+      const t = deck.position();
+      atLine(t);
+      const key = `${Math.round(t)}|${W}|${H}`;
+      if (key !== lastKey) { lastKey = key; draw(); }
       requestAnimationFrame(follow);
     })();
 
@@ -835,9 +1140,25 @@
        out Ene Mihkelson's text keystroke by keystroke, and the sixteen
        dialogue lines ARE the audience interaction they name. Saying who wrote
        something a page is rendering is not a credit, it is the caption. */
-    d.log(`the text the keys lane types is ${roleOf('Intro and Outro texts')}, `
+    d.log(`the text the picture types and the keys lane draws is ${roleOf('Intro and Outro texts')}, `
       + `translated from Estonian by ${roleOf('Translation from Estonian')}`);
     d.log(`the dialogue, the whispers and the chat are ${roleOf('Whispers, chat, dialogue')}`);
+
+    /* ── what the picture is, and what it is not ────────────────────────────
+       ⚠️ THE LAST OF THESE IS ONE SENTENCE ON PURPOSE. It is what is left of a
+       whole second picture this page used to draw, and the instruction that
+       took that picture out allowed the fact one line here if it could be said
+       plainly. The reasoning is in the comment over `TABLES` and in
+       `plan-held-in-human-2d.md`, which is where somebody who wants it goes. */
+    d.log('the picture over the line is one visit: the room dimmed and coloured on the score\'s own '
+      + 'clock, with the intro typing itself over it. The room is a band of grey steps rather than '
+      + 'the gallery, which is Mari Möldre\'s and is not in the score.');
+    d.log(`the score names ${data.channels.lut.values.length} colour tables and defines none of them, `
+      + 'so the three numbers each one is given here are ours and not the piece\'s. Neutral is taken '
+      + 'to be the table that changes nothing, which is a reading as well.');
+    d.log('a colour table is three separate gains, which this flat picture applies the way the '
+      + 'piece\'s own Unity application does, and which a web page in a headset could not, because '
+      + 'a passthrough session lets the real room through by one number shared by red, green and blue');
 
     d.log(`the axis is the running order with the maze taken out, ${data.piece.knownClock} `
       + `from the first keystroke of the intro to the end of the outro. `
@@ -877,7 +1198,15 @@
        ⚠️ AND THE LABELS ARE ONE WORD EACH. A link label is laid out in the gap
        between two boxes, which is narrow enough that `line counts` broke in
        half; `parameters` broke INSIDE the word. What travels goes in the label
-       when a single word carries it and in the note when it does not. */
+       when a single word carries it and in the note when it does not.
+       🔴 ONE PAGE, ONE DIAGRAM, AND THIS IS THE ONE. `/veil/` arrived here on
+       2026-09-20 carrying a second picture of five boxes, and it is not drawn
+       and not merged into this one. What it was ABOUT was the difference
+       between two arithmetics, which is the argument that was cut; what is left
+       of it is `chan` to `head`, which this picture already had. Adding a
+       `Browser` box for the canvas above would be a third machine on a picture
+       whose caption is that the score is the piece, and the arrow into it would
+       be a lie: the page reads the score file, not Unity's passthrough. */
     const dg = createDiagram(d.el, {
       caption: 'The score is the piece: every length, every placement and every line is in the '
         + 'file, so changing a number in it changes what the next visitor walks into.',
@@ -990,11 +1319,13 @@
       && block.overrunsSceneMs === 85500,
       `${clock(last.at + last.durationMs)} on the axis, ${secs(block.overrunsSceneMs)} past hold me`);
     const recognise = voiceLines.find((l) => l.n === 20);
-    const outroText = placedEvents.find((e) => e.id === 'outro:outro-text');
+    // ⚠️ `outroEvent`, NOT `outroText`. That name belongs to the paragraph the
+    // picture sets, which is a string and is read a long way above this.
+    const outroEvent = placedEvents.find((e) => e.id === 'outro:outro-text');
     A('the outro text appears half a second after the voice asks whether you recognise it',
-      outroText.at - (recognise.at + recognise.durationMs) === 500,
-      `${outroText.at - (recognise.at + recognise.durationMs)} ms apart, at outro `
-      + `${secs(outroText.at - outroStart)}`);
+      outroEvent.at - (recognise.at + recognise.durationMs) === 500,
+      `${outroEvent.at - (recognise.at + recognise.durationMs)} ms apart, at outro `
+      + `${secs(outroEvent.at - outroStart)}`);
     A('every line\'s scene is a reading, and the page says so on every one of them',
       data.qanda.lines.every((l) => l.how === 'inferred')
       && data.counts.qandaLinesAssignedByInference === 24,
@@ -1029,7 +1360,131 @@
       && breaks[1].index - breaks[0].index === 1,
       breaks.map((p) => `${p.sceneName} ${p.fadeMs} ms`).join(', '));
 
-    // 4. the intro, which is a recording rather than a string
+    /* 4. the picture, graded on the pixels it paints
+       ────────────────────────────────────────────────────────────────────────
+       🔴 THE PIXELS ARE PAINTED OFF SCREEN, WHICH IS WHAT KEEPS THESE CHECKS
+       OUT OF THE GATE. `paint()` takes a context, so a check draws any instant
+       it likes into a canvas nobody is looking at and reads it back, and a
+       visitor's picture stands where they left it. The one check that reads the
+       CANVAS ON THE PAGE is behind the gate, because it has to move the
+       playhead to get there. */
+    const shot = (t, text = '') => {
+      const c = document.createElement('canvas');
+      c.width = 240; c.height = 160;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      const geom = paint(g, 240, 160, roomAt(t), tintAt(t).gain, text, false);
+      const px = (x, y) => {
+        const p = g.getImageData(x, y, 1, 1).data;
+        return [p[0] / 255, p[1] / 255, p[2] / 255];
+      };
+      const stepY = geom.wallH + Math.floor(geom.bandH / 2);
+      return {
+        step: (i) => px(Math.round((240 * (i + 0.5)) / STEPS), stepY),
+        /** the whole flat wall in one read, for a check that has to find the
+         *  brightest thing in it rather than sample a known point */
+        band: () => g.getImageData(0, 2, 240, Math.max(1, geom.wallH - 4)).data,
+        px, geom,
+      };
+    };
+    const introMid = 60000;          // the intro, holding neutral at 0.60
+    const cylinder = placedScenes.find((s) => s.id === 'cylinder');
+    const cylAt = cylinder.at + 95000;   // the room at 15% under the green table
+
+    const lutPoints = data.channels.lut.points;
+    A('the score names four colour tables and carries no definition of any of them',
+      data.channels.lut.values.length === 4
+      && lutPoints.every((p) => typeof p.value === 'string' && TABLES[p.value])
+      && !('table' in data.channels.lut) && !('luts' in data.channels.lut)
+      && lutPoints.every((p) => !('rgb' in p) && !('curve' in p)),
+      `${data.channels.lut.values.join(', ')}, and nothing but names`);
+    A('neutral is read as the table that changes nothing, so a neutral scene is the room dimmed',
+      TABLES.neutral.every((x) => x === 1),
+      `gain ${TABLES.neutral.join(', ')}`);
+    {
+      /* 🔴 THESE TWO ARE ONE INSTRUMENT AND THE FIRST IS THE NEGATIVE CONTROL.
+         A check that only found the channels apart under green would pass on
+         any difference at all, including a bug that tinted everything. Under
+         neutral the score asks for no colour, so the three channels have to
+         stay equal to the pixel and the band has to be the room's own tones
+         with the dimming on them. ⚠️ AND THE SECOND ASKS FOR BLACK TO STAY
+         BLACK, which is what separates a gain from a colour laid over the room:
+         a gain holds zero at zero however far it pushes the bright end. */
+      const s = shot(introMid);
+      const grey = [0, 3, 6, STEPS - 1].map((i) => s.step(i));
+      const off = Math.max(...grey.map((c) => Math.max(Math.abs(c[0] - c[1]),
+                                                       Math.abs(c[1] - c[2]))));
+      const top = s.step(STEPS - 1);
+      A('under neutral the room keeps its own greys, dimmed to what the score asks for',
+        off < 0.02 && Math.abs(lum(top) - roomAt(introMid)) < 0.03,
+        `channels within ${off.toFixed(3)} of each other, brightest step at `
+        + `${lum(top).toFixed(2)} against ${roomAt(introMid).toFixed(2)}`);
+
+      const c = shot(cylAt);
+      const bright = c.step(STEPS - 1), dark = c.step(0);
+      const tint = tintAt(cylAt), op = roomAt(cylAt);
+      A('and a colour table is three gains, so under green the channels come apart and black stays black',
+        tint.name === 'green' && Math.round(op * 100) === 15
+        && bright[1] - bright[0] > 0.03 && bright[1] - bright[2] > 0.02
+        && dark.every((x) => x < 0.05),
+        `the brightest step reads ${bright.map((x) => x.toFixed(2)).join(', ')} and the darkest `
+        + `${dark.map((x) => x.toFixed(2)).join(', ')}, at ${Math.round(op * 100)}% of the room`);
+    }
+    {
+      // ONE READ OF THE WHOLE WALL, not a read per pixel. `getImageData` called
+      // three thousand times is three thousand round trips into the compositor,
+      // and this check would take longer than the page it is grading.
+      const band = shot(cylAt, 'When the piles for the').band();
+      let best = [0, 0, 0];
+      for (let i = 0; i < band.length; i += 4) {
+        const p = [band[i] / 255, band[i + 1] / 255, band[i + 2] / 255];
+        if (lum(p) > lum(best)) best = p;
+      }
+      A('the type is the page\'s own white, because a colour table is on the room and not on what the page draws',
+        best.every((x) => x > 0.92),
+        `the brightest thing on the wall reads ${best.map((x) => x.toFixed(2)).join(', ')} while the `
+        + 'room under it is green');
+    }
+    {
+      /* 🔴 TWO SOURCES THAT ARE ABLE TO DISAGREE, WHICH IS THE WHOLE POINT OF
+         THIS ONE. The name comes off the score's own steps and the colour comes
+         off the pixels, so a picture that was a scene ahead of itself would
+         show here and nowhere else: every other check above reads pixels, and
+         pixels would be right. */
+      const river = placedScenes.find((s) => s.id === 'river');
+      const riverFade = lutPoints.find((p) => p.sceneId === 'river').fadeMs;
+      const first = shot(river.at).step(STEPS - 1);
+      A('a table still fading is the one on the room and not the one it is going to',
+        riverFade === 10000 && tintAt(river.at).name === 'green'
+        && tintAt(river.at + riverFade).name === 'blue' && first[1] > first[2],
+        `at the river's first frame the picture is ${tintAt(river.at).name} and its brightest step `
+        + `reads ${first.map((x) => x.toFixed(2)).join(', ')}, which is ${secs(riverFade)} from blue`);
+    }
+    A('the outro paragraph is set 30 s into the outro and not before, with the author\'s own breaks',
+      textAt(outroTextAt - 1).text === '' && textAt(outroTextAt).text === outroText
+      && outroText.split('\n').length === data.texts.outro.breaks + 1,
+      `at ${clock(outroTextAt)}, ${data.texts.outro.breaks + 1} lines`);
+    A('the river is set as the room alone, because the score gives its fragments no timing',
+      data.texts.river.fragments.every((f) => f.durationMs === null)
+      && textAt(placedScenes.find((s) => s.id === 'river').at + 60000).text === '',
+      `${data.counts.riverFragments} fragments, none of them timed`);
+    {
+      // A voice is a voice. Captioning it would invent a text surface the score
+      // does not have, so the picture sets nothing while one is speaking.
+      const speaking = voiceLines.find((l) => l.at > introSpan
+        && l.at + l.durationMs < outroTextAt && !l.silence);
+      A('and the voice is never set, because the score carries its lines as durations and no recording',
+        !!speaking && textAt(speaking.at + speaking.durationMs / 2).text === ''
+        && !data.qanda.lines.some((l) => 'audio' in l || 'file' in l),
+        `${data.counts.qandaLines} lines, ${data.counts.qandaSilences} of them silence, and no `
+        + 'recording anywhere in the file');
+    }
+    A('the picture was laid out at sixteen to nine and it is not empty',
+      !!drawn && drawn.w > 200 && drawn.h > 100 && drawn.geom.bandH > 10
+      && Math.abs(drawn.w / drawn.h - 16 / 9) < 0.08,
+      drawn ? `${drawn.w}x${drawn.h}, a band of ${STEPS} steps ${drawn.geom.bandH} px deep`
+        : 'nothing was drawn');
+
+    // 5. the intro, which is a recording rather than a string
     A('the keystroke track is exactly as long as the intro, and every mark is inside it',
       data.keystrokes.stats.spanMs === sceneById.get('intro').durationMs
       && keys.every((k) => k.at >= 0 && k.at <= MAZE_AT),
@@ -1039,8 +1494,17 @@
       && correction.backspaces === 6,
       `${correction.hesitationMs} ms of nothing, then ${correction.backspaces} backspaces in `
       + `${correction.lastBackspaceAtMs - correction.firstBackspaceAtMs} ms`);
+    A('and it is in the picture: houses at 39.8 s, buildings at 46.4 s',
+      introAt(correction.lastWrongLetterAtMs).endsWith('houses')
+      && introAt(correction.lastRightLetterAtMs).endsWith('buildings'),
+      `${JSON.stringify(introAt(correction.lastWrongLetterAtMs).slice(-28))} then `
+      + `${JSON.stringify(introAt(correction.lastRightLetterAtMs).slice(-28))}`);
+    A('and the whole track leaves the characters on screen that the score says it does',
+      introText.length === data.keystrokes.stats.charactersOnScreen
+      && introText === data.keystrokes.text,
+      `${introText.length} characters, ${data.keystrokes.stats.returns} line breaks`);
 
-    // 5. what the score refuses to decide, and what this page does about it
+    // 6. what the score refuses to decide, and what this page does about it
     //
     // 🔴 THE THREE PLACES HAVE TO ADD UP TO NINE, WITH NOTHING COUNTED TWICE.
     // This replaces a check that read `amb.count() === 9` off a table, and it
@@ -1080,7 +1544,7 @@
       offDrawn ? `${offDrawn.px} px at x ${offDrawn.left.toFixed(1)} and x ${offDrawn.right.toFixed(1)}`
         : 'neither end was drawn');
 
-    // 6. whose work this is
+    // 7. whose work this is
     // ⚠️ THE SUBJECT SURVIVED THE BLOCK IT USED TO LIVE IN. The credits came
     // off the page on 2026-09-19 and this check did not: the authors are in
     // the page's own first sentence, and the text's provenance is in the log,
@@ -1100,20 +1564,20 @@
       && /mihkelson/i.test(said) && /mcilfarick-ksenofontov/i.test(said),
       `${authors}, and the log names the text and its translator`);
 
-    // 7. the picture of the machinery, which grades itself
+    // 8. the picture of the machinery, which grades itself
     A('the diagram drew every name and every arrow whole', dg.cuts.length === 0,
       dg.cuts.map((c) => `${c.where} ${c.id}`).join(', ') || 'nothing cut, nothing refused');
     A('and no line in it is missing its arrowhead', dg.ties === 0,
       `${dg.ties} line${dg.ties === 1 ? '' : 's'} with no head`);
 
-    // 8. the strip's own gutters, which drop a line in silence when a lane is short
+    // 9. the strip's own gutters, which drop a line in silence when a lane is short
     const fit = strip.gutterFit();
     A('every lane says its own name and its own number, with nothing dropped',
       fit.every((f) => f.dropped === 0),
       fit.filter((f) => f.dropped).map((f) => `${f.id} dropped ${f.dropped}`).join(', ')
       || `${fit.length} lanes, nothing dropped`);
 
-    // 9. nothing here reaches outside this site
+    // 10. nothing here reaches outside this site
     A('a visit reads one file, and it is ours',
       offSite === 0 && fetched.length === 1 && fetched[0] === SRC,
       `${fetched.join(', ')}, ${offSite} off this site`);
@@ -1226,35 +1690,66 @@
         && mark.readings.every((x) => saidLast.includes(x.how)),
         openGeom ? `${saidLast.slice(0, 60)}…` : 'the open lane was never laid out');
 
-      /* 🔴 THE PICTURE ANSWERS FOR WHERE THE LINE IS STANDING, AND THIS IS THE
-         CHECK THAT USED TO READ FOUR CELLS. The readout went on 2026-09-19 and
-         its facts stayed: the scenes lane holds the bar the line is inside at
-         full strength, the room curve carries its percentage, the tint band
-         carries its table's name, and a line being spoken is a bar under the
-         playhead. So the four are graded where they now live, through the same
-         hooks the renderers use. Ninety-five seconds into the cylinder is where
-         the room is at fifteen per cent and the voice is asking whether you are
-         there. */
-      const cyl = placedScenes.find((s) => s.id === 'cylinder');
-      deck.seek(cyl.at + 95000);
+      /* 🔴 THE LINE ANSWERS FOR WHERE IT IS STANDING, AND THIS IS THE CHECK
+         THAT USED TO READ FOUR CELLS. The readout went on 2026-09-19 and its
+         facts stayed: the scenes lane holds the bar the line is inside at full
+         strength, the room curve carries its percentage, the tint band carries
+         its table's name, and a line being spoken is a bar under the playhead.
+         So the four are graded where they now live, through the same hooks the
+         renderers use. Ninety-five seconds into the cylinder is where the room
+         is at fifteen per cent and the voice is asking whether you are there.
+         ⚠️ IT WAS CALLED `the picture answers ...` UNTIL 2026-09-20, and that
+         name stopped being available the day a real picture landed above the
+         line. Two checks a line apart, one about the canvas and one about the
+         lanes, cannot both be about `the picture`. */
+      deck.seek(cylinder.at + 95000);
       atLine(deck.position());
       const at = deck.position();
       const spoken = voiceAtTime(at);
-      A('the picture answers for wherever the line is standing',
+      A('the line answers for wherever it is standing',
         currentScene === 'cylinder'
         && scenesLane.currentOf({ row: { payload: { id: 'cylinder' } } }) === true
-        && Math.round(roomAt(at) * 100) === 15 && tintAt(at) === 'green'
+        && Math.round(roomAt(at) * 100) === 15 && tintAt(at).name === 'green'
         && !!spoken && spoken.silence === false,
-        `${currentScene}, ${Math.round(roomAt(at) * 100)}% of the room, ${tintAt(at)}, `
+        `${currentScene}, ${Math.round(roomAt(at) * 100)}% of the room, ${tintAt(at).name}, `
         + `${spoken ? (spoken.silence ? 'a silence' : 'speaking') : 'nothing spoken'}`);
+
+      /* 🔴 THE CANVAS ON THE PAGE IS THE ONE THE TEN CHECKS ABOVE WERE
+         PAINTING, AND THIS IS THE ONLY CHECK THAT CAN SAY SO. Every one of them
+         reads a canvas nobody is looking at, which is what keeps them out of
+         this gate; if the picture a visitor sees were drawn by some other path,
+         all of them would be green about the wrong thing. It compares the same
+         step of the same instant on both canvases, so a `draw` that drifted
+         from `paint` takes it red.
+         ⚠️ IT ALSO GRADES THE JOIN THE MERGE MADE: the only thing that moved
+         the picture was a seek on the deck the LINE owns. One clock, two
+         surfaces.
+         ⚠️ AND IT REPLACES A CHECK THAT PRESSED A SCENE PICKER, which went with
+         the picker on 2026-09-20. That one graded a control; this grades the
+         join, which is the thing the merge could actually break. */
+      const live = draw();
+      const sx = Math.min(canvas.width - 1,
+        Math.round((W * (STEPS - 0.5)) / STEPS * dpr));
+      const sy = Math.min(canvas.height - 1,
+        Math.round((live.geom.wallH + live.geom.bandH / 2) * dpr));
+      const onPage = [...g2.getImageData(sx, sy, 1, 1).data].slice(0, 3).map((c) => c / 255);
+      const offPage = shot(live.t).step(STEPS - 1);
+      A('and the picture on the page is the one those checks were painting',
+        live.tint.name === 'green'
+        && [0, 1, 2].every((i) => Math.abs(onPage[i] - offPage[i]) < 0.02),
+        `on the page ${onPage.map((c) => c.toFixed(2)).join(', ')}, off screen `
+        + `${offPage.map((c) => c.toFixed(2)).join(', ')}`);
+
       deck.seek(0);
       atLine(deck.position());
+      lastKey = '';
+      draw();
     }, { log: d.log,
          // ⚠️ THE COUNT IS THE NUMBER OF CHECKS AND IT SAID `three` WHILE THERE
          // WERE FOUR: the pointer is one gesture and two of them. A sentence
          // that has drifted from the code it describes is worse than none.
-         say: 'five checks are not run for a visitor, because each of them moves the picture: '
-            + 'the zoom, the pointer, a press and the playhead' });
+         say: 'six checks are not run for a visitor, because each of them moves the picture or the '
+            + 'line: the zoom, the pointer, a press and the playhead' });
 
     d.ready();
   })().catch((e) => d.fail(e));
