@@ -48,8 +48,22 @@
      ⚠️ **AND THE NAMES ARE ARTWORK ON THE CASE RATHER THAN A ROW OF CONTROLS.**
      Having them in the control grid was what put them in a column in the first
      place, and it is also what made six cells need explicit placement. */
+  /* 🔴 THE CARD HUGS THE PANEL AND THE CARD IS WHAT CENTRES. MEASURED, which
+     is why this reverses `make circlit box fill the container` from earlier the
+     same evening: with the card full width and the panel centred inside it, the
+     leftover width was split either side of the controls, so the inset a reader
+     SEES on the left was **43 px against a 21 px foot** and it changed with the
+     window. No padding can match a number that moves.
+     ✅ Hugging makes all four insets one declaration: 20 px, everywhere, at
+     every width. The panel still sits in the middle of the page, which was what
+     `fill the container` was asking for; what it is no longer doing is
+     stretching a border out to the edges with nothing against it.
+     ⚠️ `min-width: max-content` STAYS and is what keeps the phone case working:
+     below the panel's own width the card is wider than the container and the
+     scroller takes it. */
   .circ {
-    display: flex; flex-direction: column; width: 100%; min-width: max-content;
+    display: flex; flex-direction: column;
+    width: max-content; min-width: max-content; margin-inline: auto;
     gap: 22px;
     /* ⚠️ ONE NUMBER ON THREE SIDES, TAKEN FROM THE TOP AND REDUCED: *"use top
        one but reduce a bit"*. The foot keeps its own, because the bottom row of
@@ -58,10 +72,21 @@
        *"add more padding to bottom of circuit panel"*. The bottom row of pads
        carries no label under it, so the same inset that looks right beside a
        printed name looks tight under a pad. */
-    padding: 20px 20px 30px; background: var(--card);
+    padding: 20px; background: var(--card);
     border: 1px solid var(--line); border-radius: 4px;
   }
   .circ-brands { display: flex; justify-content: space-between; }
+  /* 🔴 SENTENCE CASE ON EVERY LABEL AND EVERY BUTTON ON THIS PAGE. Asked
+     2026-09-21: *"all sentence case labels and buttons"*. The kit uppercases a
+     pad's legend, which is right on a page of readouts and section headings and
+     wrong on a picture of a panel: a Circuit prints `Tap` and `Sessions` in
+     mixed case, and eight shouted legends over eight shouted faces flattens the
+     difference between a name and a Shift function.
+     ⚠️ **THE TWO PRINTED NAMES ARE NOT LABELS AND KEEP THEIR CASE.** `NOVATION`
+     and `CIRCUIT` are artwork on the case, asked for uppercase in their own
+     right an hour earlier, and they are the one thing here a hand never
+     presses. */
+  .circ .pos-pad-top, .circ .pos-pad-bot, .circ-pair-lab { text-transform: none; }
   .circ-panel {
     /* ⚠️ AIR. Asked 2026-09-21: *"tune whitespace between controls to add bit
        of air"*. Every gap on this page moved together in one edit, because the
@@ -197,10 +222,24 @@
      **A straight row of eight, or two aligned rows of four, is a different
      instrument.** The offset is half a column plus half a gap, which is what
      interleaving means. */
-  /* ⚠️ THE MACRO ROW SETS ITS OWN GAP. Asked 2026-09-21: *"reduce x padding
-     around m knobs"*. A knob's box is wider than a pad's, so the same number
-     that is right between pads leaves the eight knobs looking loose. */
-  .circ-macros { display: flex; gap: 2px; align-items: flex-start; }
+  /* ⚠️ THE MACRO ROW SETS ITS OWN SPACING, AND IT IS THE ONLY ROW THAT DOES.
+     Asked 2026-09-21 in two passes: *"reduce x padding around m knobs"*, then
+     *"more spacy, extending a bit to leht and rigth and bottm more. other
+     stays"*. A knob's box is wider than a pad's, so neither the panel's 14 px
+     pitch nor the 2 px it was cut to is the right number here, and it is not
+     derivable from either.
+     ⚠️ **IT IS CENTRED IN ITS TRACK, SO THE GAP IS WHAT EXTENDS IT BOTH WAYS.**
+     Seven gaps widening by 8 px puts 28 px more knob row either side of the pad
+     area, which is the zig zag reaching past the pads the way the panel's does.
+     ⚠️ **AND THE FOOT IS ITS OWN, NOT THE PANEL'S.** The row below has to clear
+     the LOWER line of the zig zag, and that line hangs 26 px below the upper
+     one, so the panel's shared 22 px reads tight under this one row and correct
+     under every other. `other stays` is the instruction, and a margin here
+     touches nothing else. */
+  /* ⚠️ AND NO FOOT OF ITS OWN. Asked 2026-09-21: *"reduce space between macro
+     bs and lower stuff"*, which reverses the margin added a few minutes earlier
+     for *"bottm more"*. The panel's own 22 px is the whole gap now. */
+  .circ-macros { display: flex; gap: 10px; align-items: flex-start; }
   .circ-macro-even { margin-top: 26px; }
 
   /* ⚠️ ONE KNOB SIZE EVERYWHERE. Asked 2026-09-21: *"single size knobs
@@ -436,7 +475,7 @@
        * or inferred. Somebody debugging a binding is somebody who will point at
        * the control; somebody looking at the panel is not.
        */
-      label: `M${i + 1}`,
+      label: `${i + 1}`,
       min: 0, max: 127, value: 64,
       title: `macro ${i + 1}, CC ${MACRO_CC0 + i} on channel 1, measured`,
     });
@@ -549,8 +588,8 @@
    * is in the wrong place**, and the answer is a shorter word rather than a
    * wider pad: the full name is on the hover.
    */
-  const TRACKS = [['Syn1', 'Synth 1'], ['SC', 'Sidechain'], ['Syn2', 'Synth 2'],
-                  ['SC', 'Sidechain'], ['Dr1', 'Drum 1'], ['Dr2', 'Drum 2'],
+  const TRACKS = [['Syn1', 'Synth 1'], ['Sc', 'Sidechain'], ['Syn2', 'Synth 2'],
+                  ['Sc', 'Sidechain'], ['Dr1', 'Drum 1'], ['Dr2', 'Drum 2'],
                   ['Dr3', 'Drum 3'], ['Dr4', 'Drum 4']];
   const trackRow = el('div', 'circ-row');
   /**
@@ -642,7 +681,7 @@
   const RIGHT = [['shift2', 'Shift', 'Shift', '', false],
                  ['patterns', 'Patt', 'Patterns', '', true],
                  ['mixer', 'Mix', 'Mixer', '', true],
-                 ['fx', 'FX', 'FX', '', true],
+                 ['fx', 'Fx', 'FX', '', true],
                  ['record', '\u25CF', 'Record', '', true],
                  ['play', '\u25BA', 'Play', '', true]];
   const side = {};
@@ -986,6 +1025,20 @@
       d.assert('the printed names sit the same distance from the top and both sides',
         spread <= 1.5,
         `left ${insets[0].toFixed(1)}, right ${insets[1].toFixed(1)}, top ${insets[2].toFixed(1)}`);
+    }
+
+    // 🔴 THE FOOT IS THE SAME DEPTH AS THE SIDES, measured from the last thing
+    // drawn rather than from the stylesheet. A padding is what the box
+    // reserves; what a reader sees is the distance from the bottom PAD, and a
+    // reserved label slot under a row nobody labelled sits between the two.
+    {
+      const card = circ.getBoundingClientRect();
+      const lastPad = grid.at(0, 3).button.getBoundingClientRect();
+      const firstCol = side.note.button.getBoundingClientRect();
+      const foot = card.bottom - lastPad.bottom;
+      const left = firstCol.left - card.left;
+      d.assert('the panel is as deep under its last pad as it is wide at its side',
+        Math.abs(foot - left) <= 1.5, `foot ${foot.toFixed(1)}, side ${left.toFixed(1)}`);
     }
 
     d.assert('no secret in this page', !location.href.includes('token'));
