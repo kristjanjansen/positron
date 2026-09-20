@@ -1013,20 +1013,13 @@
   // reader` is `mp3-frames.mjs`, `a granulator` is the compiled Pappus graph,
   // `the movement` is `pappus-mod.mjs`. A picture drawn out of nouns the code
   // does not have is a picture of a program somebody meant to write.
-  createDiagram(d.el, {
+  const dg = createDiagram(d.el, {
     caption: 'The station only speaks plain http, so a secure page cannot fetch it at all.',
     nodes: [
       { id: 'stn', label: 'Icecast', sub: 'port 8001', kind: 'device', tech: 'station',
-        note: 'One mount run by the **Estonian Centre of Contemporary Music** in Tallinn, '
-            + 'sending **128 kbit/s MP3** that never ends. It is one volunteer server and it '
-            + 'goes down: on a day in September it took the connection and then sent nothing '
-            + 'at all, which is why this page can switch stations.' },
+        note: 'One mount run by the **Estonian Centre of Contemporary Music** in Tallinn, sending **128 kbit/s MP3** that never ends. It is one volunteer server and it goes down, which is why this page can switch stations.' },
       { id: 'cf', label: 'Cloudflare', sub: 'a CORS proxy', kind: 'cloud', tech: 'cloudflare',
-        note: 'Fetches the stream over plain http, which a secure page may not do itself, and '
-            + 'hands the same bytes on over https. It adds two headers the station omits: '
-            + '**allow-origin**, without which the page could hear the sound but never read '
-            + 'the samples, and **expose-headers**, without which the track title and bitrate '
-            + 'the station sends stay hidden from it.' },
+        note: 'Fetches the stream over plain http, which a secure page may not do, and hands the bytes on over https. It adds two headers the station omits: **allow-origin** for the samples, **expose-headers** for the track title.' },
       { id: 'page', label: 'browser', kind: 'here', tech: 'browser',
         note: 'Everything below runs in the browser you are reading this in, and **nothing '
             + 'goes back**: the station is not told you are here.',
@@ -1036,10 +1029,7 @@
                 + 'audio**. What comes out goes two ways: eight seconds of sound for '
                 + '**scsynth** to chew, and a measurement the **control clock** rides.' },
           { id: 'mod', label: 'control clock', sub: '25 Hz, OSC',
-            note: 'A plain **setInterval** at 25 Hz, whose every source is read from the '
-                + '**AudioContext** clock rather than counted up, so a late tick costs '
-                + 'resolution and never the beat. 25 Hz because **scsynth** puts each control '
-                + 'through a 20 ms **Lag.kr**, which throws away anything faster.' },
+            note: 'A plain **setInterval** at 25 Hz reading every source off the **AudioContext** clock rather than counting up, so a late tick costs resolution and never the beat. 25 Hz because **scsynth** puts each control through a 20 ms **Lag.kr**.' },
           { id: 'gran', label: 'scsynth', sub: 'SuperCollider', tech: 'sound',
             note: 'SuperCollider\u2019s real sound server, compiled to run in a **browser**. '
                 + 'It is handed one instrument at boot and **never rebuilt while it plays**.' },
@@ -1072,6 +1062,26 @@
       // granulator rather than about a speaker.
     ],
   }, { how: true, atEnd: true });
+
+  /**
+   * 🔴 THE PICTURE IS GRADED, AND UNTIL 2026-09-20 THIS PAGE THREW THE ONLY
+   * HANDLE ON IT AWAY. `createDiagram` RETURNS what it had to give up: a label
+   * that did not fit the box, a note over the word budget, a link it could not
+   * route. Every one of those is reported on `cuts` rather than ellipsised at
+   * the reader or dropped in silence, **because an author cannot see their own
+   * missing arrow**. Calling it as a statement and discarding the return meant
+   * nothing on this page could ever report any of that.
+   * ⚠️ THE FAILURE IT GUARDS IS NOT HYPOTHETICAL. `/station/` lost three real
+   * arrows for two sessions exactly this way: they were refused, the refusal
+   * went to a `console.warn` nobody read, and the picture looked complete while
+   * claiming a chain that does not exist.
+   * ⚠️ AND IT RUNS FOR EVERYBODY, because the diagram is on the page whether or
+   * not anybody presses anything, and reading its own geometry costs nothing.
+   */
+  d.assert('the diagram drew every name and every arrow whole',
+    dg.cuts.length === 0,
+    dg.cuts.map((c) => `${c.where} ${c.id}`).join(', ') || 'nothing cut, nothing refused');
+
 
   // ⚠️ THE FIRST PLAY MUST HAPPEN INSIDE THE GESTURE. A browser refuses
   // `audio.play()` from a timer, so the 1 Hz mirror below can keep the element
@@ -2798,7 +2808,7 @@
    * A patch here is the WHOLE sound, the way `/grains/`'s six are: which way
    * the read head moves, how long a grain is, which notes are open, and every
    * setting of the chain underneath. `plan-radio-patches.md` derives all six
-   * from `rig/box/norns/Engine_Pappus.sc`; the numbers below are that file's,
+   * from `rig/board/norns/Engine_Pappus.sc`; the numbers below are that file's,
    * corrected where building them showed the plan was wrong (see §the buffer).
    *
    * 🔴 `material` AND `chord` ARE GONE AS SEPARATE ROWS, AND THE SEVENTH IS NOT.

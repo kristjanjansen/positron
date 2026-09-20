@@ -1,7 +1,7 @@
 // demo/shell/presence.mjs — is the thing on the other end there?
 //
 // Four pages ask this question and four pages answer it differently. `/knobs/`
-// waits six seconds and writes a log line, `/grains/` waits for a `box.hello`
+// waits six seconds and writes a log line, `/grains/` waits for a `board.hello`
 // and enables its buttons, `/keys/` watches for the same message and draws an
 // instrument row, `/rack/` waits on an agent on a Mac that may simply be off.
 // None of them can SHOW the answer without reading the log, and none of them
@@ -25,8 +25,8 @@
 // time and an expected interval and returns one of those four words. It holds
 // no clock, no socket and no element, so the whole of the rule is gradable by
 // `node demo/shell/presence-test.mjs` rather than by watching a board in
-// another building and wondering. The board beats every 5 s (`rig/box/box.mjs`
-// sends `box.alive` on a 5000 ms interval), so a page passes `everyMs: 5000`
+// another building and wondering. The board beats every 5 s (`rig/board/board.mjs`
+// sends `board.alive` on a 5000 ms interval), so a page passes `everyMs: 5000`
 // and does not invent a rule of its own.
 //
 // ⚠️ `lastSeenAt` IS WHEN YOU HEARD IT, NOT THE STAMP INSIDE THE MESSAGE. Every
@@ -349,9 +349,19 @@ export function createPresence({
   // moment anything actually answers, what it said is the better fact.
   let asking = false;
 
+  // 🔴 TWO LINES, NOT A MIDDOT, AND A `title` REALLY DOES BREAK ON `\n`.
+  // Instructed 2026-09-19: no middots in anything a visitor reads. This one
+  // reached every presence badge in the project, and it was gluing three facts
+  // into one string: what the thing is, what it is doing, and the detail. The
+  // first two are one phrase and are joined the way the badge's own visible
+  // word already joins them, with a space (see `phrase` above, which has always
+  // done it that way, so the middot here disagreed with the badge an inch
+  // below it). The detail is a second fact and gets its own line, which is also
+  // what CLAUDE.md's tooltip rule asks for: two or three short lines, never a
+  // sentence with joins in it.
   function title() {
-    const base = of ? `${of} · ${wordFor(now)}` : wordFor(now);
-    return note ? `${base} · ${note}` : base;
+    const base = of ? `${of} ${wordFor(now)}` : wordFor(now);
+    return note ? `${base}\n${note}` : base;
   }
 
   /**
