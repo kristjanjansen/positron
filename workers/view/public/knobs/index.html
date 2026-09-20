@@ -429,6 +429,36 @@
     },
     onMessage: (m) => heard(m),
   });
+
+  /**
+   * 🔴 THE ONLY ASSERT THIS PAGE EMITS IN A SUITE RUN, AND IT IS AT LOAD FOR A
+   * MEASURED REASON. Everything else here lives behind `startNote()`, which
+   * needs the board, and the board is the thing a check may not touch. So
+   * `node demo/verify.mjs knobs` reads **2 page asserts, both injected by the
+   * shell**: this page contributes NOTHING to the suite, while `BACKLOG.md`
+   * has claimed `14 asserts, 20/20` since it was built. That number was taken
+   * with `?board=1`.
+   *
+   * ⚠️ AN ASSERT AT LOAD IS NORMALLY A HAZARD HERE and this one is not.
+   * LESSONS #95 records two asserts at t+0 blinding a whole run, because the
+   * harness stops collecting 400 ms after the count stops growing. That
+   * argument is about an early assert followed by a LATE one; this page has no
+   * late ones to lose.
+   *
+   * 🔴 WHAT IT GRADES IS THE KIT, NOT THIS PAGE. `MAY_PLAY` below holds every
+   * message whether or not `board.mjs` guards anything: flipping
+   * `createBoard`'s `inSelfcheck` default to `'allow'` leaves this page fully
+   * green while a suite run drives a shared Raspberry Pi. `/draw/` and
+   * `/grains/` build their own control rows and carry no `MAY_PLAY` at all, so
+   * the page where that mistake gets made is never the page holding the
+   * assert. This is the only page that opens a board, so it is the only place
+   * the kit can be checked from.
+   */
+  if (SELFCHECK && !MAY_PLAY) {
+    d.assert('the kit refuses to drive shared hardware under a check, so a page that forgets to guard itself is still safe',
+      board.driving() === false,
+      `createBoard says driving ${board.driving()}`);
+  }
   const pres = board.presence;
   const sendId = (m) => board.send(m);
   const ask = (m, type, ms) => board.ask(m, type, ms);
