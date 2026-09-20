@@ -44,4 +44,4 @@ is a shared resource and an agent spends it without meaning to.**
 ⚠️ `node workers/view/build.mjs` is allowed **only with `--out`**. The bare form
 rewrites `public/`, which is 120 committed files and the deploy artefact; it
 should cost a prompt, because it is a change to shared state. See `--out` in
-`build.mjs` and `plan-agents.md` §1.
+`build.mjs` and `plans/plan-agents.md` §1.

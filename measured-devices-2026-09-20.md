@@ -1,7 +1,7 @@
 # What is actually plugged into the M2 Mac, MEASURED 2026-09-20
 
 🔴 **EVERY LINE HERE IS MEASURED ON THIS MACHINE, NOT READ FROM A MANUAL.**
-`plan-circuit-model12.md`, `plan-device-layouts.md` and `plan-fasttrack-mk425c.md`
+`plans/plan-circuit-model12.md`, `plans/plan-device-layouts.md` and `plans/plan-fasttrack-mk425c.md`
 are written almost entirely from documentation and mark their claims as read.
 Where this file disagrees with one of them, this file wins.
 
@@ -173,7 +173,7 @@ Chrome, and the device list matches CoreMIDI's own enumeration read separately.
 | clock | none | `0xF8` continuously | 24 per quarter note |
 
 🔴 **THE MACROS ARE PLAIN CC AND NOT NRPN, AND THAT QUESTION WAS OPEN.**
-`plan-circuit-model12.md` could not settle whether the Circuit rides the usual
+`plans/plan-circuit-model12.md` could not settle whether the Circuit rides the usual
 CC 99 / 98 / 6 convention because Novation never wrote it down. **Zero NRPN
 sequences completed across every capture**, while 140 ordinary control changes
 did. The macros are 7 bit absolute and nothing more.
@@ -204,7 +204,7 @@ channel 1.
 🔴 **THE PITCH BEND WHEEL IS SEVEN BIT IN A FOURTEEN BIT MESSAGE.** 106 bend
 messages, **every one with an LSB of 0**, and 63 distinct MSB values. So 128 of
 the 16384 positions exist and the other 16256 are unreachable.
-`plan-fasttrack-mk425c.md` lists *"144 Pitch Bend (14-bit)"* from the manual and
+`plans/plan-fasttrack-mk425c.md` lists *"144 Pitch Bend (14-bit)"* from the manual and
 calls this the rig's only 14 bit gesture. **It is not.** The assignment type is
 14 bit; the wheel behind it is not.
 ⚠️ **Raw range 0 to 13952**, so it does not reach either end of the nominal
@@ -228,7 +228,7 @@ nothing patched in, silence is the only honest reading.
 ## TASCAM Model 12, firmware 1.11
 
 🔴 **THE PAN KNOBS SEND RELATIVE CLICKS, NOT POSITIONS. MEASURED, AND THIS WAS
-THE BIGGEST OPEN QUESTION IN `plan-circuit-model12.md`**, which says in so many
+THE BIGGEST OPEN QUESTION IN `plans/plan-circuit-model12.md`**, which says in so many
 words that **TASCAM publishes no note numbers and no CC numbers, anywhere, at
 any firmware revision**. 525 messages on `Model 12 DAW Control IN`, **CC 16,
 channel 1**, in DAW control mode on firmware **1.11**:
@@ -281,7 +281,7 @@ Model 12 DAW Control IN / OUT          Mackie Control
 Reported as *"nothing from tascam"*, and `MIDI IN` will stay silent forever
 unless something is plugged into its DIN socket. **The faders, knobs and
 transport come out of `DAW Control`, which transmits only in DAW control mode.**
-⚠️ **SO THE BIGGEST OPEN QUESTION IN `plan-circuit-model12.md` IS STILL OPEN**,
+⚠️ **SO THE BIGGEST OPEN QUESTION IN `plans/plan-circuit-model12.md` IS STILL OPEN**,
 and it is now one menu setting away: whether those pan knobs send absolute
 positions or MCU relative clicks. `classifyEncoder` answers it in about four
 seconds of turning one, and refuses to answer until the knob has been turned
@@ -289,7 +289,7 @@ BOTH ways, because one direction cannot tell the two apart.
 
 ## Model 12 in DAW control mode: the map, MEASURED
 
-🔴 **`plan-circuit-model12.md` SAYS THE NOTE NUMBERS AND CC NUMBERS BELOW HAD
+🔴 **`plans/plan-circuit-model12.md` SAYS THE NOTE NUMBERS AND CC NUMBERS BELOW HAD
 NEVER BEEN CHECKED AGAINST A MODEL 12 AND THAT EVERY ONE OF THEM NEEDED THE
 HARDWARE.** They have been checked now, on firmware **1.11**, through `/dump/`.
 
@@ -340,7 +340,7 @@ times, and **not one `90 00 00`**. SOLO and MUTE each sent a clean pair in the
 same capture, so this is the button and not the capture.
 ⚠️ **IT HAS A CONSEQUENCE FOR ANY LAYOUT BUILT ON THIS.** A REC bound as a
 momentary control latches on and never turns off, because the event that would
-turn it off never arrives. `plan-device-layouts.md` separates momentary from
+turn it off never arrives. `plans/plan-device-layouts.md` separates momentary from
 latching as T7 against T12, and this is a case where **the DEVICE decides which
 one it is** and the two buttons beside it decided differently.
 ⚠️ **AND IT IS NOT WHAT MACKIE CONTROL SPECIFIES**, where a surface sends 127 on
@@ -370,7 +370,7 @@ Note 0 sent `7F` three times and never once `00`. **Two buttons on one mixer,
 both called record, behaving differently on the wire.** Neither is a capture
 artefact: both were measured across several presses in separate captures.
 ⚠️ **SO A LAYOUT CANNOT DECIDE MOMENTARY AGAINST LATCHING PER DEVICE**, which is
-what `plan-device-layouts.md` assumes when it separates T7 from T12. It is per
+what `plans/plan-device-layouts.md` assumes when it separates T7 from T12. It is per
 CONTROL, and the same machine disagrees with itself.
 
 🔴 **AND THE FX FADER IS SEVEN BIT TOO**, `E8 03 03`, `E8 7F 7F`: the low byte
@@ -469,3 +469,37 @@ re-press a knob to find out which rows were real, which is what makes this worse
 than an ordinary wrong number.
 ✅ The tap is off under `?selfcheck=1`, and a full verify run now writes
 **nothing**, proved by clearing the file and running one.
+
+
+## The panel, read rather than guessed, 2026-09-21
+
+`plans/plan-panel-layouts.md` has all four devices. Two facts corrected a page
+that had been built on reasoning for two days, and **neither was visible in the
+MIDI**:
+
+🔴 **REC IS NOT IN THE BUTTON COLUMN.** It is a WIDE button above the fader,
+spanning the strip, with its own round indicator. `/rack/` had it as the first
+of three squares beside the fader.
+🔴 **THERE ARE FOUR BUTTONS BESIDE THE FADER, NOT THREE**: MUTE, MAIN, SUB,
+SOLO, top to bottom, at fixed heights on the fader scale. **MAIN and SUB send
+nothing in DAW control mode**, and TASCAM's own enabled-controls diagram prints
+them white while the other four are blue.
+⚠️ **SO THEY ARE DRAWN AND DISABLED, WHICH IS THE HONEST OPTION.** Leaving them
+out puts MUTE next to SOLO, which is false about the panel. Drawing them live
+would be a control that cannot do what it names.
+
+✅ **WHAT THE TWO DESK CORRECTIONS GOT RIGHT**, now read rather than reported:
+PAN is the last knob before the lower block, the buttons are beside the fader,
+and SOLO is the bottom of the column.
+
+🔴 **THERE IS NO SELECT BUTTON ON ANY CHANNEL.** Mackie Control specifies one on
+notes 24 to 31. This mixer has no control that can send it.
+⚠️ **AND F1 IS NOT LIVE WHILE F2, F3 AND F4 ARE.** F1 is the way OUT of DAW
+control mode. Four identical function buttons on screen would be one lie drawn
+four times.
+
+⚠️ **THE METHOD IS WORTH KEEPING**: `pdftotext` loses a diagram's geometry
+entirely, and on the page that matters the callout numbers are not in the text
+layer at all. `pdftoppm -r 800 -png` to crop a region and then LOOK at it is
+what worked, and every geometric claim in that plan is marked as seen rather
+than reconstructed from a callout list.
