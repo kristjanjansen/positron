@@ -27,35 +27,47 @@
 // everyone to ignore it. A version that moved is worth a line, not a refusal.
 
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 const run = promisify(execFile);
 
-export const MACHINES = {
-  box: {
+export /**
+ * The package list, parsed from the one file that holds it.
+ *
+ * ⚠️ TAB SEPARATED, and the `why` column may contain anything including commas
+ * and colons, which is why it is not CSV and not `:`-delimited.
+ * ⚠️ `nodesource` ROWS ARE KEPT. This audit checks what is INSTALLED, and node
+ * is installed whatever route it came by; only `setup.sh` cares about the
+ * difference, because only it has to do the installing.
+ */
+function readPackages() {
+  const raw = readFileSync(new URL('./board/packages.txt', import.meta.url), 'utf8');
+  const rows = raw.split('\n')
+    .filter((l) => l.trim() && !l.startsWith('#'))
+    .map((l) => l.split('\t'))
+    .filter((c) => c.length >= 4)
+    .map(([name, version, , why]) => [name, version === '-' ? null : version, why]);
+  if (!rows.length) throw new Error('rig/board/packages.txt parsed to nothing, so this audit would report a clean board by reading no packages at all');
+  return rows;
+}
+
+const MACHINES = {
+  board: {
     what: 'the Raspberry Pi that IS the instrument',
     ssh: process.env.BOARD_SSH || 'positron@192.168.1.213',
     // ⚠️ Ask port 22, not mDNS — `positron-board.local` does not resolve from
     // this sandbox. CLAUDE.md has the sweep.
-    apt: [
-      ['jackd2',            '1.9.22~dfsg-4',        'the audio graph every instrument is patched into; the insert lives on it'],
-      // 🔴 FOUR PACKAGES LEFT THIS LIST ON 2026-09-16 and they are named here so
-      // a rebuilt board does not quietly get them back: `fluidsynth`,
-      // `fluid-soundfont-gm`, `dssi-host-jack` and `hexter`. Nothing on the
-      // board spawns either instrument any more, so installing them costs
-      // 141 MB of soundfont and a plugin host for something that cannot be
-      // reached. `archive/box-fluidsynth-hexter/` has the code and the reason.
-      ['yoshimi',           '2.3.3.3-1',            '911 instruments in 24 banks, as its own JACK client'],
-      ['yoshimi-data',      null,                   'those banks; without it yoshimi starts and has nothing to play'],
-      ['supercollider',     '1:3.13.0+repack-3',    'scsynth and sclang — what pappus, the granular engine, runs in'],
-      ['sc3-plugins',       null,                   'the extra UGens pappus uses; core SuperCollider is not enough for it'],
-      ['csound',            '1:6.18.1+dfsg-4',      'the reverb insert (rig/board/csd/space.csd). ⚠️ INSTALL WITH --no-install-recommends: the recommends pull tcl/tk onto a headless board'],
-      ['ffmpeg',            '8:7.1.5-0+deb13u1+rpt2','encodes the camera and the rendered picture; h264_v4l2m2m is the hardware path'],
-      ['alsa-utils',        '1.2.14-1+rpt1',        'aconnect, which is how MIDI ports are read and patched'],
-      ['v4l-utils',         '1.30.1-1',             'v4l2-ctl — how the camera is asked what modes it has'],
-      ['nodejs',            '24.21.0-1nodesource1', 'the service itself; from NodeSource, not Debian, which ships an older one'],
-      ['build-essential',   null,                   'gcc, to build rig/vis on the board rather than cross-compiling'],
-      ['git',               null,                   'setup.sh wants it'],
-    ],
+    // 🔴 READ FROM `rig/board/packages.txt`, NOT LISTED HERE. This was a
+    // hand-kept array of twelve packages with versions and reasons, and
+    // `setup.sh` installed four — so the list that knew what a board needs and
+    // the script that builds one had never agreed, and a board provisioned from
+    // this repo came up silent. **One file, two readers**: the installer parses
+    // it with `awk` on a fresh Pi where node does not exist yet, and this parses
+    // it to check a board that already exists.
+    // ⚠️ IT THROWS ON AN EMPTY PARSE rather than reporting a clean audit. A
+    // regex that stopped matching would otherwise mean "no packages to check",
+    // which reads exactly like "nothing is missing".
+    apt: readPackages(),
     // Not packages: things this repo puts there, or that are built on arrival.
     files: [
       ['/opt/positron-board/rig/board/board.mjs',  'the service itself. ⚠️ NOT ~/positron — that copy is stale and reading it tells you nothing'],

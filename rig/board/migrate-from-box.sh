@@ -83,6 +83,21 @@ ssh "$USER_@$IP" "
   sed 's/^/     /' \$NEWCFG
 "
 
+echo "== 2b. the renderer, rebuilt at the NEW path"
+# 🔴 THE FIRST RUN OF THIS SCRIPT MISSED THIS AND `rig/audit.mjs` FOUND IT.
+# `push.sh` compiles rig/vis on the board when its source is newer than the
+# binary, and the binary lives beside its source — so moving the tree to a new
+# path leaves no binary at the new one. The service came up fine and visuals
+# would have reported unavailable, which is the quiet kind of broken.
+ssh "$USER_@$IP" 'cd /opt/positron-board/rig/vis 2>/dev/null && {
+  for t in v3dbench v3dpipe; do
+    if [ ! -x "$t" ] || [ "$t.c" -nt "$t" ]; then
+      gcc -O2 -o "$t" "$t.c" -lEGL -lGLESv2 -lgbm 2>&1 | head -3 && echo "   built $t"
+    fi
+  done
+  ls v3dpipe >/dev/null 2>&1 && echo "   renderer present" || echo "   NO v3dpipe — visuals will report unavailable"
+}'
+
 echo "== 3. the journal, so the next fault leaves a record"
 # MEASURED 2026-09-20: /var/log/journal was empty, the journal lived on tmpfs,
 # `journalctl --list-boots` showed one boot, and every line from the day the
