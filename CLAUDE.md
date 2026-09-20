@@ -1269,6 +1269,25 @@ is checkable in one command, so check it before repeating it.
 
 ## Conventions
 
+- 🔴 **A FINISHED PLAN IS REPORTED IN FULL, NOT HANDED OVER AS A FILENAME.**
+  Instructed 2026-09-20: *"when plans done show them here in full details.
+  write it into claude.md when plans getting ready"*. It is the same rule as
+  the URL one below, one document along: `plan-midi2.md` is the answer to
+  *"which file did you write"* and not to *"what did you find out"*.
+  ⚠️ **AND A SUMMARY IS NOT THE REPORT EITHER.** What a plan is FOR is the
+  findings, the numbers, the trade-offs and the recommendation with its reasons.
+  A reader who has to open the file to learn what was decided was handed a
+  filename with extra steps. Say what it concluded, what it measured, what it
+  refused and why, and what it could not settle.
+  ⚠️ **THE UNCERTAINTY IS PART OF THE REPORT, NOT A FOOTNOTE.** This project
+  keeps paying for confident sentences that outlived their facts. A plan written
+  from documentation rather than from a running thing says so, and names what
+  would have to be plugged in, switched on or measured to turn a reading into a
+  fact.
+  ⚠️ **THERE ARE 52 PLAN DOCUMENTS IN THIS REPO**, several over 1000 lines, and
+  a plan nobody reads is a plan that gets rewritten by the next person who needs
+  it. Reporting it in full when it is fresh is the only moment it is cheap.
+
 - 🔴 **A FINISHED PAGE IS HANDED OVER AS A URL, NOT AS A PATH.**
   `demo/radio/index.html` is not an answer to *"where is it"* — it is the
   answer to *"which file did you edit"*, and the reply to a working demo that
@@ -1475,6 +1494,28 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
     reader meets it on more than one diagram, and a name learned once should
     not be re-learned per page. The same goes for the other machines: `Cloudflare`,
     `Icecast`, `ffmpeg` are what those things are CALLED.
+  - 🔴 **A CONTAINER IS NEVER EMPTY. IT HOLDS AT LEAST ONE BOX.** Instructed
+    2026-09-20: *"General: do not do empty cludflare boxes, have inner boc with
+    worker or smth"*, after two were reported in one afternoon: `/floor/`'s
+    `Cloudflare` (`sub: image proxy`, no children) and `/blocks/`'s `Relay
+    object` and `controllers`. An empty container takes a machine's worth of
+    space and says a caption's worth of thing, so it reads as a gap in the
+    picture rather than as a part of it, and on a phone, where containers are
+    stacked full width, it is a screen of nothing.
+    ⚠️ **IT IS THE SAME RULE AS `a container takes no note`, FROM THE OTHER
+    END.** That one says the children already say what the machine is. This one
+    says there have to BE children for that to be true. With none, the `sub` is
+    doing a child's job and doing it worse, because a `sub` is three or four
+    words and a box has a name, a kind and a note.
+    ⚠️ **NAME THE THING THAT RUNS, NOT THE SERVICE IT RUNS ON.** `Cloudflare`
+    is a machine; what goes inside it is the worker (`workers/img`,
+    `workers/relay`, `workers/station`), a Durable Object, a bucket. The same
+    goes for `Browser`, which holds the elements, and for `Raspberry Pi`, which
+    holds the programs.
+    ⚠️ **AND IF THERE IS HONESTLY NOTHING INSIDE, IT IS NOT A CONTAINER**: draw
+    it as an ordinary box with a name, a `sub` and a `note`, which is what a
+    single thing has always been.
+
   - 🔴 **A CONTAINER TAKES NO `note`.** A box holding other boxes is a machine,
     and its name and the boxes inside it already say what it is. A paragraph on
     it repeats the children underneath it and is read before them, which is the
@@ -1754,6 +1795,31 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
   roving tabindex fixes it, is invisible in a screenshot, and is free to read
   off the DOM, so assert it, including the negative half: one row at 0 AND
   every other at -1.
+
+- 🔴 **A TABLE HEADING IS ONE LINE AND IT IS SHORT. IT NEVER WRAPS.**
+  Instructed 2026-09-20: *"Tablw headings aingle line, make rule to keep it
+  short"*, photographed on `/making/` with the `FILE` header rendered **one
+  letter per line** down four rows while its cell sat empty beside it.
+  🔴 **A WRAPPING HEADING IS NOT A TYPOGRAPHY PROBLEM, IT IS THE TABLE
+  REPORTING THAT ITS COLUMNS DO NOT FIT** — and reporting it in the one place a
+  reader cannot act on. `/making/` went from two fixed columns to six in one
+  change, 232 px of fixed width to 476, and the single growing column was handed
+  what was left. Nothing in the suite could catch it: the page reads 38/38 and
+  the harness runs at desktop width.
+  ⚠️ **SO THE HEADING IS `nowrap` AND THE LABEL IS BUDGETED.** A name that does
+  not fit is the AUTHOR's problem, reported to the author the way `createDiagram`
+  reports a label it had to cut, and never solved by wrapping it at the reader.
+  Four or five characters is a heading: `when`, `file`, `via`, `size`, `length`.
+  ⚠️ **AND A HEADING IS NOT A SENTENCE.** It names the column; the unit belongs
+  in the cell, the explanation belongs in the hover. `uploaded` over a date
+  column is right, `uploaded to the site` is a caption that happens to sit in a
+  heading row.
+  🔴 **THE OTHER HALF IS THAT SIX FIXED COLUMNS MAY SIMPLY NOT FIT A PHONE.**
+  `.pos-tbl-row` carries `min-width: 560px` so a row scrolls rather than
+  squeezes, and a row that has to be dragged sideways is already recorded here
+  as a thing nobody reads. **Fewer columns beats a wider minimum**, and the
+  columns to drop first are the ones somebody checks AFTER finding the row
+  rather than the ones they scan down.
 
 - **Two more kit components, both 2026-09-15.** `table.mjs` — rows in columns
   the caller declares (`key`, `label`, `width | grow`, `align`, `link`, `hi`,

@@ -1,5 +1,939 @@
 ## Open
 
+- 🔴 **IN FLIGHT: NOVATION CIRCUIT (ORIGINAL) AND TASCAM MODEL 12, CONTROL AND
+  INTEGRATION, WITH A COMPREHENSIVE MIDI MAP.** Asked 2026-09-20: *"i need to
+  work on controlling and integrating novation circuit (original) and tascam
+  model 12. See also features added in latest firmware. Make plan comprehenisvw
+  midi map etc."* A background agent is planning it.
+  ⚠️ **BOTH ARE HARDWARE NOBODY HERE CAN TEST WITHOUT THEM PLUGGED IN.** The
+  plan must say which claims are read off documentation and which would need the
+  devices, and must never present the first as the second.
+  ⚠️ **THE BOARD ALREADY HAS A MIDI PATH**: `rig/board/` uses `aconnect` to read
+  and patch ALSA MIDI ports, `ctl.set` coalesces controller traffic at 5 ms, and
+  `demo/shell/cc-adapter.mjs` is the send gate. `plan-controller.md` is the
+  existing controller plan and its step 0 was answered today (CC 74 moves
+  Yoshimi's brightness 5.59 octaves, monotonically).
+
+- 🔴 **IN FLIGHT: MIDI 2.0, THE BROWSER, AND WHETHER WE CAN SIMULATE IT HERE.**
+  Asked in the same breath: *"investigate midi2, browser and our setup to
+  test/similate it (via cf udp?) osc replacer?"*
+  🔴 **ONE CONSTRAINT IS ALREADY MEASURED AND WILL SHAPE THE ANSWER.**
+  CLAUDE.md: *a relay cannot live in a Container, there is no inbound QUIC, it
+  dials out only.* So **Cloudflare UDP is very likely a dead end** and the agent
+  must check rather than assume. WebTransport IS available and this project has
+  measured it: MoQ browser to relay to browser at p50 ~20 ms, and Safari 26.4
+  connects in 140 ms but deadlocks after ~16 MiB on WebKit bug 319818.
+  ⚠️ **AND THE EXISTING TRANSPORT IS THE BASELINE TO BEAT.** `workers/relay` is
+  a WebSocket Durable Object at 1000 msg/s, a 2000 burst and 128 sockets, with
+  the Durable Object hop costing 1 to 2 ms at p50. Any MIDI 2.0 or OSC
+  replacement has to be compared against that, not against nothing.
+
+- 🔴 **`/grains/`: GLUE THE READOUT TO THE LOG, AND PUT THE GRANULATOR NUMBERS
+  IN A READOUT AT THE TOP.** Asked 2026-09-20: *"Glue readouts to logs. For
+  granulator info use readouts in top"*, with a photograph of the four-cell
+  readout under the title and a hand-drawn `GRANULATOR ONE / TWO` block further
+  down listing `2.2 grains a second / 300 ms long / reading at 0.35`.
+  ⚠️ **`joined: true` IS THE GLUE** and `/making/` is the worked example: it
+  sends the readout to the foot with the log as one surface.
+  🔴 **AND THE GRANULATOR BLOCK IS THE `slop prose` SHAPE THIS PROJECT ALREADY
+  BANNED ON THIS VERY PAGE.** CLAUDE.md quotes `/grains/` generating *"both are
+  chewing the same saw, 72 sine partials over 6 notes"* and records the reader's
+  word for it. Three figures per granulator in running text is the same fault in
+  a quieter voice: **a figure goes in a readout cell**, which is a fixed box
+  with a reserved width, and this is exactly that.
+  ⚠️ **SIX CELLS, NOT SEVEN**, because `mount()` throws on an odd count. Two
+  granulators times three figures is six, which fits, and the existing four
+  (`board`, `sound`, `nudges`, `reading at`) have to be reconciled rather than
+  stacked on top: `reading at` is already one of the three being moved up.
+
+- 🔴 **`/grains/`'s TWO SCOPE PANES BECOME VIDEO PANELS, AND THE BOARD ONE GETS
+  THE ONLINE INDICATOR.** Asked 2026-09-20 with a photograph: *"Use videopanels
+  and online for pi"*.
+  ⚠️ **THEY ARE HAND-ROLLED TODAY.** `demo/grains/index.html:771`, a local
+  `card(title, sub)` that builds `div.pane > div.hd > b + span` and appends it
+  to `div.panes`. That is a fourth picture-box in a project that has
+  `video-panel.mjs`, which is exactly the *"a control that exists in one page
+  and nowhere else is a component that has not been noticed yet"* case.
+  ✅ **`createVideoPanel` ALREADY HAS EVERY PART THIS NEEDS**: a stage that
+  takes a canvas, an `aspect`, a footer, and a `left` slot that **defaults to a
+  presence dot** — which is the second half of the ask. `/making/` passes
+  `left: null` to suppress it precisely because a recording has nothing to be
+  online; a board in another building is the opposite case and is what the slot
+  was built for.
+  🔴 **AND THE BOARD PANE HAS SOMETHING REAL TO FEED IT.** `board.mjs` already
+  computes presence from frames arriving, and `/grains/` already talks to the
+  relay. **A badge wired to a constant would be the same lie in a better font**,
+  which is the same note as the `LIVE` chip entry.
+  ⚠️ **THE SUBTITLES CARRY MIDDOTS**: `SuperCollider in a tab · every grain
+  reported` at `:782` and `over the relay · every grain reported` at `:788`.
+  A panel footer is cells, not one string with glue in it, so this change
+  carries the per-demo middot sweep for the page.
+  ⚠️ **THE TWO HEADINGS DIFFER IN `WHERE` AND IN NOTHING ELSE**, which the
+  comment at `:778` says is the whole point of the page. Whatever the panels
+  become, that symmetry is the thing to preserve: the same picture, the same
+  caption, one running here and one on the board.
+
+- 🔴 **`/grains/`'s CONTROLS ARE GROUPED.** Asked 2026-09-20 with a photograph
+  of a phone showing one long ungrouped stack: the SOUND picker and its die,
+  then RATE, SIZE, WHERE and SPRAY as four loose sliders, then MATERIAL, then
+  PARTIALS. *"Controls to group"*.
+  ⚠️ **THE COMPONENT EXISTS AND THE PAGE ALREADY USES IT ONCE.**
+  `createSliderGroup` at `demo/shell/slider.mjs:141` wraps sliders in
+  `.sld-group`, with `pair: true` adding `.pos-pair`. `/grains/` builds
+  `knobRow = createSliderGroup([], { pair: true })` at `:511` for the four
+  granulator knobs, and then leaves `fade` (`:1120`) and `brightness`
+  (`:1146`, the PARTIALS slider) outside any group, with `createChoice` for
+  MATERIAL between them.
+  ⚠️ **SO THIS IS MOSTLY ADOPTION, NOT INVENTION** — but the grouping wanted is
+  probably by SUBJECT rather than by widget type: what the grains do (rate,
+  size, where, spray) against what they are made of (material, partials). The
+  photograph shows those two ideas interleaved, which is what makes the column
+  read as a list rather than as two decisions.
+  🔴 **AND THE PAGE PUTS SLIDERS IN `.pos-controls`, WHICH THE HARNESS
+  PRESSES.** `:1171` and `:1177` build `srcBar` and `fadeBar` as
+  `.pos-controls` rows by hand. That is already an open line here, and any
+  regrouping has to keep it in mind: a control that moves into or out of that
+  row changes what `verify.mjs` clicks. **Diff the per-page assert count.**
+  ⚠️ **`createSliderGroup` TAKES NO LABEL**, so a named group is either a new
+  option on it or a heading the page draws. **Decide it in the kit**: `/knobs/`
+  and `/radio/` both have slider stacks that would use the same thing, and a
+  heading invented on this page is the fourth-copy problem CLAUDE.md names.
+
+- 🔴 **FOURTH SIGHTING: `/knobs/`'s `PCM` ARROW LEAVES THE CONTAINER, NOT
+  `ffmpeg`.** Reported 2026-09-20 from a phone: *"Pcm should come out of ffmpeg
+  not pi, im mobile layout"*. Declared correctly at
+  `demo/knobs/index.html:1578`, `{ from: 'ffmpeg', to: 'up', label: 'PCM',
+  back: true }`, and drawn leaving the Raspberry Pi container.
+  🔴 **FOUR PAGES, ONE LINE, AND THE COUNT IS NOW THE ARGUMENT FOR FIXING IT
+  FIRST.** `/mirror/` (stacked), `/floor/` (WIDE, so it is not only phones),
+  `/crate/` and now `/knobs/`. Every one declares its links box to box and every
+  one draws them machine to machine in column mode. `diagram.mjs:644` gives
+  every child its owner's row.
+  ⚠️ **AND THE COMMENT AT `:1576` SHOWS THE AUTHOR ALREADY FIGHTING IT**: it
+  explains that unflagged return links put *"a head somewhere nobody can account
+  for"*, and that flagged ones *"run in a lane under the row and arrive at the
+  bottom edge"*. The flag is set correctly here; the endpoint is still wrong.
+  ⚠️ **THE SAME PHOTOGRAPH ALSO SHOWS TWO OTHER FILED BUGS**, which is worth
+  noting because it means one page hits three at once: the caption line under
+  the picture reads `Cloudflare`, echoing a container's own name, and the
+  Cloudflare box carries a tall empty area under its two children.
+
+- 🔴 **`/knobs/` OPENS WITH THE CUTOFF FULLY OPEN. ASKED AS 128, AND 128 DOES
+  NOT EXIST.** Said 2026-09-20: *"Knobs cutoff 128 by default"*.
+  ⚠️ **A MIDI CONTROLLER IS 0 TO 127**, seven bits, so 128 is one past the top.
+  The slider is already declared `min: 0, max: 127` at
+  `demo/knobs/index.html:345`, and `ctl.set` on the board clamps with
+  `Math.min(127, …)`. **So the value wanted is 127**, which is fully open, and
+  it is worth saying rather than silently substituting: somebody reading 128
+  later would look for an off-by-one that is not there.
+  ⚠️ **ONE CONSTANT**: `CUTOFF_HOME = 100` at `:115`. It is used by the slider's
+  `value`, by the reset at `:874` and by the assert at `:971`, so the assert
+  follows the constant and does not need editing.
+  ✅ **AND THE REASONING BEHIND 100 SURVIVES THE CHANGE.** The comment says the
+  bottom third of the travel is under what a phone or laptop speaker reproduces
+  at all — MEASURED on this board, centroid 183 Hz at 0 and about 1.6 kHz at 64
+  — so a hand that lands low hears nothing and concludes the page is broken.
+  127 is further from that end, not nearer, so the argument still holds and the
+  comment needs a number changed rather than a rewrite.
+  ⚠️ **IT IS A STARTING POSITION, NOT A LIMIT**, which the comment already says.
+  ⚠️ **AND THE BOARD IS SILENT UNDER A CHECK BY DESIGN NOW**, so verifying this
+  reads the slider's own value rather than the sound. `node demo/verify.mjs
+  knobs` contributes 3 asserts; the rest need `?board=1`.
+
+- 🔴 **EVERY DEMO'S INTRO BECOMES ONE SENTENCE. 34 OF 46 PAGES ARE NOT.** Asked
+  2026-09-20: *"Shorten all semos so far intros (what?) to single sentece"*.
+  **MEASURED, not estimated**: 46 pages declare a `what`, **12 are already one
+  sentence with no stretcher**, 34 are not.
+  ⚠️ **CLEAN TODAY**: `blocks, crate, floor, grains, knobs, making, mirror,
+  radio, replay, stage, veil, weight`. Every one of those was worked on in the
+  last few days, which is the whole pattern: the rule is kept on the page
+  somebody is editing and nowhere else.
+  🔴 **WORST FIRST, WITH THE NUMBERS**: `strip` 5 sentences / 96 words,
+  `memento` 4 / **132**, `now` 4 / 128, `patch` 4 / 115, `instrument` 4 / 79,
+  `webrtc` 4 / 75, `looper` 4 / 72, `rack` 3 / 95, `tapes` 3 / 88, `resources`
+  3 / 81, `show` 3 / 74, `cues` 3 / 73.
+  ⚠️ **AND THE STRETCHERS ARE THE TELL.** Nine of the twelve worst use a colon
+  or a semicolon to bolt a second thought on, which is exactly what the rule
+  forbids: *"a description that needs punctuation to fit is two descriptions,
+  and the second one is the one nobody asked for"*.
+  🔴 **THE `one` LINE IN `manifest.mjs` MOVES WITH IT ON ANY PAGE WITH A
+  DIAGRAM**, because the rule says they are the same string there. A page whose
+  `what` is cut and whose index line is not now says two different things to the
+  same visitor.
+  ⚠️ **THIS IS A GOOD FAN-OUT**: the pages are independent, one agent each, no
+  shared file except `manifest.mjs` — **which must be edited by ONE agent or
+  serialised**, or 34 edits land in one file from many places.
+
+- 🔴 **`/making/`'s TABLE COLLAPSES ITS GROWING COLUMN ON A NARROW SCREEN, AND
+  TODAY'S CHANGE CAUSED IT.** Photographed 2026-09-20: the `FILE` header
+  rendered one letter per line, `F I L E` stacked vertically, with the file cell
+  beside it empty.
+  🔴 **THE ARITHMETIC.** `file` is the one `grow: true` column. The six FIXED
+  columns now sum to **476 px** before gaps: `when` 84, `picture` 92, `via` 68,
+  `uploaded` 84, `length` 68, `size` 80. **Three of those six were added today**
+  when the readout became columns, taking the fixed total from 232 px to 476.
+  So the growing column is handed whatever is left, and below roughly 560 px
+  that is close to nothing.
+  ⚠️ **`.pos-tbl-row { min-width: 560px }` EXISTS AND WAS SUPPOSED TO PREVENT
+  EXACTLY THIS** by making the row scroll sideways instead of squeezing. The
+  photograph shows it squeezing, so either that rule is not reaching this table
+  or 560 is no longer enough for six fixed columns plus a readable name.
+  **Measure the computed width of `.pos-tbl-row` and of the `file` cell before
+  changing a number.**
+  ⚠️ **AND THE FIX IS PROBABLY NOT A WIDER `min-width`.** A row that scrolls
+  sideways is already the thing an open line in this file complains about for
+  prose tables. On a phone the honest answers are fewer columns, or a different
+  shape for narrow widths. `picture`, `via` and `uploaded` were added because
+  they are what somebody checks AFTER finding the file, which is an argument
+  for hiding them first when there is no room.
+  🔴 **THIS IS WHY A CHANGE GETS LOOKED AT ON A PHONE.** The page reads 38/38
+  green and the suite runs at desktop width, so nothing in it could have caught
+  a header wrapping letter by letter.
+
+- 🔴 **`/tapes/` IS RE-LAID OUT: TIMELINE UNDER THE PLAYER, A CLICKABLE TABLE
+  UNDER THE TIMELINE, AND THE `1/24 On-Off 1962-1963-07-11` LINE GOES.** Asked
+  2026-09-20 in three messages: *"Move timeline below player and add table below
+  timeline with tapes data and make it clickable"*, then *"Rm"* against that
+  line.
+  ⚠️ **THE LINE IS BUILT AT `demo/tapes/index.html:1352`**, three spans:
+  `${cur + 1}/${tapes.length}`, the title, and `when.edtf`. **Every one of those
+  three facts becomes a COLUMN** in the table being added, which is why they go
+  together: the line is a row of facts glued into a sentence, and
+  `createTable` is the surface that already knows better. The same rule took the
+  readout off `/making/` and turned it into columns.
+  ⚠️ **THE DATA IS ALREADY LOADED AND ALREADY RICH.** `/resources/corpus.json`,
+  read at `:1801`, and the page already holds `durationMs`, `title`, `when`, and
+  a measured length per tape at `:391`. `/making/` is the worked example of a
+  table whose rows play what you press, at 38/38.
+  ⚠️ **BLOCK ORDER TODAY**: strip at `:745`, bar at `:1548`, and `:1674` glues
+  the grain scope to the bar. So the move is not just a reorder, it has to
+  decide what stays glued to what. `createGlue` skips `null` children, so a
+  conditional block needs no `if`.
+  🔴 **`/tapes/` HAS A STAND-IN AND IT MUST KEEP WORKING.** `demo/fake-tapes.mjs`
+  reads its paths off `corpus.json` so it cannot drift from the page, and
+  `node demo/verify.mjs tapes` starts it and points the page at it. **Verify
+  with that, never against archive.org.** Current baseline is 38 asserts and
+  CLAUDE.md records TWO known holes in them: a stand-in serving every recording
+  at half its corpus length still reads green, and one serving silence does too.
+  **Do not widen that gap while moving things around.**
+  ⚠️ **AND THE PAGE'S OWN RULE IS THAT NOTHING MOVES ON ITS OWN.** The comment
+  at `:18` says two lines of title would shift the strip, which is why the line
+  is one fixed row. A table under the timeline is a fixed box, so it is
+  compatible, but the block that replaces the line must not be able to change
+  its own height.
+
+- 🔴 **`picker.mjs`'s `fitWidth` RESERVES A WIDTH THE CELL CANNOT USE, AND
+  PICKERS ARE NARROWER THAN THEY WERE.** Found 2026-09-20 by the `/veil/` agent,
+  by reading rather than by a failure. `fitWidth` sets `--pick-w: <widest+1>ch`
+  on `.pos-pick-cell`, which carries `padding: 0 10px` and
+  `box-sizing: border-box` in `shell.css`, so **`9ch` shows about six
+  characters**. `/veil/` renders `cylin…` and `hold …`.
+  🔴 **IT IS ALSO A REGRESSION**: `.pos-pick { --pick-w: 22ch }` at 620 px and
+  up is now beaten by a narrower INLINE value set on the cell, and an inline
+  value beats every selector. **Third instance of that exact fault today**,
+  after `video-panel.mjs`'s inline `aspect-ratio` and the `.mk-square` source
+  order bug.
+  ⚠️ **THE AGENT DID NOT FIX IT AND SAID WHY, CORRECTLY**: the fix needs a
+  custom property in `shell.css`, which it was told not to touch, and patching
+  the 20 px into `picker.mjs` would be the one-measurement-in-two-files mistake
+  this project already paid for with `--sld-col`.
+  ⚠️ **AND IT MAY BE THE REAL CAUSE OF A REPORT ALREADY IN THIS FILE.** Two
+  picker complaints came in today, both about the phone layout. Check this
+  before rewriting the `@media` grid.
+
+- ⚠️ **`demo/manifest.mjs`'s `held` ROW SAYS `group: 'xr'` WHILE THE COMMENT
+  ABOVE IT SAYS THE GROUP IS `timeline`.** Found 2026-09-20 by the `/veil/`
+  agent. One of the two is stale and it is not obvious which. Left untouched.
+  ⚠️ It matters more now: `floor` and `reel` are already queued to move out of
+  `xr` into an `archives` group, so `xr` is being re-read this week anyway.
+
+- 🔴 **THE TRANSPORT BAR LOSES ITS SLIDER AND CLOCKS, AND PREV/NEXT MOVE BESIDE
+  PLAY.** Asked 2026-09-20 against the waveform page: *"Rm thick gray bar below
+  wave vis"* and *"Rm progress slider and timers in trasp bar, move prev next to
+  play pause"*.
+  ⚠️ **TWO OF THE THREE ARE KIT CHANGES, NOT PAGE ONES.** `transport-bar.mjs`
+  already takes `scrub: false`, which is how a page with a strip turns the
+  slider off (the one-position-surface rule). What it has NO option for is
+  hiding the clock: `const time = el('output', 'tbar-time')` at `:397` is
+  unconditional. And `extras` are appended AFTER the toggle and BEFORE the
+  scrub at `:494`, so prev/next already sit beside play. **Check what the
+  photograph actually shows before moving anything**: the shot has them on the
+  same row already, with the clock and LOOP on the row below, which suggests the
+  complaint is the WRAP, not the order.
+  ⚠️ **A BAR WITH NO SLIDER AND NO CLOCK IS NEARLY `toggle: false` TERRITORY**,
+  which already exists for `/keys/` and which disarms the end-stop, the space
+  bar and `api.playing` rather than leaving them to read false by luck. Read
+  that note before inventing a second way to strip the bar.
+  🔴 **AND `demo/verify.mjs` READS `__demo.transport.position` AND CLICKS
+  `.tbar-toggle`.** Removing the clock must not remove what the harness reads.
+  Diff the per-page assert count.
+  ⚠️ **THE `thick gray bar below wave vis` NEEDS IDENTIFYING**, not guessing. It
+  is either the strip's own scrub lane or the bar's `.tbar-scrub` (`:307`, a div
+  with `role="slider"` holding a loop span, a fill and a head dot). Open the
+  page and read the computed box rather than pattern-matching from the picture.
+
+- 🔴 **`/items/`'s DIAGRAM HAS THREE EMPTY CONTAINERS. FOURTH PAGE, AND THE
+  RULE FOR IT WAS WRITTEN TODAY.** Reported 2026-09-20 with a photograph of
+  `Cloudflare` and `Firebase` as tall empty boxes: *"Add inner boxes"*.
+  ⚠️ **WHICH ONES**: `demo/items/index.html:1137` `Cloudflare`
+  (`sub: 'a Durable Object'`), `:1139` `Firebase` (`sub: 'Cloud Messaging'`),
+  `:1146` `iPhone` (`sub: 'on the homescreen'`). All `kind: cloud` or `device`
+  with no `children`. Only `browser` at `:1128` has any.
+  ⚠️ **AND EACH `sub` IS ALREADY NAMING THE CHILD IT DOES NOT HAVE.** `a Durable
+  Object` IS the box that belongs inside `Cloudflare`; `Cloud Messaging` is the
+  one inside `Firebase`. The rule written today says exactly this: with no
+  children the `sub` is doing a child's job and doing it worse, because a `sub`
+  is three or four words and a box has a name, a kind and a note.
+  ⚠️ **`iPhone` MAY BE THE CASE WHERE THE ANSWER IS NOT A CHILD.** `on the
+  homescreen` is a STATE of the phone, not a thing running in it. The rule's own
+  escape hatch applies: if there is honestly nothing inside, it is not a
+  container, so draw it as an ordinary box. **Do not invent a child to satisfy
+  the rule.**
+  🔴 **RUNNING COUNT OF PAGES WITH EMPTY CONTAINERS: FOUR KNOWN.** `/floor/`
+  (`Cloudflare`), `/blocks/` (`Relay object`, `controllers`), `/grains/` and now
+  `/items/` (three). **14 pages draw diagrams.**
+  🔴 **AND THE GREP SWEEP FOR THIS IS A BROKEN COLLECTOR, MEASURED.** A regex
+  over the node declarations reported **one** page, `/grains/`, on a run where
+  three of the four known offenders were already in hand. Node specs span lines
+  differently per page, so the pattern matches some and silently skips others.
+  **Do not take a count from it.** This project's own rule: a partial result
+  that is too tidy is a broken collector, not a finding. The honest sweep parses
+  the spec rather than the source, or the check lives in `createDiagram` itself
+  where the node objects are already built and `cuts` is already reported.
+
+- 🔴 **`/items/`: THE INSTALL AND NOTIFICATION BUTTONS DO NOTHING ON AN IPHONE,
+  AND ONE OF THEM IS THE PRIMARY CONTROL.** Reported 2026-09-20 from iOS with a
+  photograph: *"Thee butyons do nithing for me (ios). Secondary ones and do not
+  show when fo capability"*. `Add to the Home Screen` is drawn FILLED YELLOW,
+  `primary: true`, above a disabled `Install it first`.
+  🔴 **A PRIMARY BUTTON THAT CANNOT ACT IS THIS PROJECT'S NAMED HAZARD IN ITS
+  WORST FORM.** iOS Safari has no `beforeinstallprompt`, so there is no
+  programmatic install to offer, and Web Push there requires the page to be on
+  the Home Screen already. So the first thing a visitor meets on this page is
+  the brightest control on it, and it is inert.
+  ⚠️ **ASKED FOR: SECONDARY, AND HIDDEN WHERE THE CAPABILITY IS ABSENT.** Note
+  this cuts against `caps.mjs`'s standing rule, which un-links a row **with the
+  reason in words** because *"a vanished row says the demo does not exist, which
+  is a different and false statement"*. The instruction here is to hide. **Those
+  can both be right** — a missing DEMO needs explaining, a missing BUTTON on a
+  browser that cannot do the thing is just absent furniture — but write down
+  which rule applies to controls so the next page does not have to guess.
+  ⚠️ **AND IT IS A CAPABILITY TEST, NEVER A USER-AGENT CHECK.** `typeof
+  BeforeInstallPromptEvent`, `'Notification' in window`, `navigator.standalone`.
+  CLAUDE.md records a Quest 3 and a 3S being indistinguishable by UA, and the
+  iPhone fullscreen bug that came from branching on platform.
+  ⚠️ **THE TWO-BUTTON DESIGN IS DELIBERATE AND SHOULD SURVIVE**: the comment at
+  `:227` says installing and allowing are two acts on two different days, and
+  one control that silently becomes the other is one whose label you must
+  re-read to learn what it does.
+
+- 🔴 **`/items/`: STANDARD TABLE, THE TWO PUBLISH BUTTONS IN ONE ROW, AND
+  `Clear all` SMALL AND RIGHT UNDER THE TABLE.** Asked 2026-09-20: *"Use
+  standard table. Send in in smae row. Clear all is below table and small
+  variant (like under keyboard stop notes) in the right"*.
+  ⚠️ **IT ALREADY USES `createTable`**, `:291`, three columns `dir / text /
+  sent`. **What is not standard is the CONTENT**: `:375` builds
+  `text: clock(publish_at) + ' · ' + title`, gluing two facts into one cell with
+  the banned separator. CLAUDE.md is explicit: *"a row of facts is cells, not
+  one string with glue in it"*, and the readout *"already knows this and so does
+  `table.mjs`"*. **So this is a fourth column, not a new table.** Three more
+  middots sit in log lines on the same page at `:639`, `:685` and `:728`.
+  ⚠️ **THE SMALL VARIANT IS `.kpad`**, `shell.css:2224`: `--kpad-h: 26px`
+  against the standard 34, and **`.kpad-right { margin-left: auto }`** is
+  exactly the right alignment asked for. That is the `notes off` row under the
+  keyboard. It is not a kit component yet, which is worth deciding as part of
+  this rather than copying the two rules into `/items/`.
+  🔴 **`Clear all` MOVING OUT OF `.pos-controls` CHANGES WHAT THE HARNESS
+  PRESSES.** It is `{ id: 'clear', end: true }` today, so `verify.mjs` presses
+  it on every run. Moving it below the table takes it out of that row.
+  **Diff the per-page assert count afterwards and account for every one that
+  moved**, and remember a control the harness can no longer reach is a check
+  that never runs rather than one that fails.
+
+- 🔴 **TWO CONNECTORS ARRIVING AT ONE BOX SIT TOO FAR APART.** Asked
+  2026-09-20 against `/station/`'s wide diagram: *"Reduce distange of 'two
+  connectors going to same inner box'"*. Visible twice in that one picture: the
+  two returns into `Worker`, and the two forward lines into `player`, each pair
+  running in its own lane with a wide gap before they converge.
+  ⚠️ **IT IS LANE ALLOCATION IN `demo/shell/diagram.mjs`.** The gutter reserves
+  a lane per path, and the comment there says the list's LENGTH is used as the
+  worst case, *"every path on a level of its own"*, and that it **over-reserves
+  when two paths share a lane** because the alternative is laying the whole
+  thing out twice. **Two paths ending at the SAME box are the case where that
+  over-reservation is visible**, and they are also the case where they could sit
+  closest, because they are going to converge anyway.
+  ⚠️ **DO NOT MERGE THEM INTO ONE LINE.** They carry different things: into
+  `Worker` it is `chunks` and `programmes`, into `player` it is `playlist text`
+  and `mp3 bytes`. One line would say one thing arrives.
+
+- 🔴 **`/station/` SHOWS ITS PROGRAMME AS A TABLE, AND ITS LIVE CHIP BECOMES THE
+  ON AIR INDICATOR.** Asked 2026-09-20: *"Station: want to see pgrogramme in
+  table. Use onair status component"*.
+  ⚠️ **TODAY IT IS ONE LINE OF TEXT.** `demo/station/index.html:219`,
+  `nowLine.textContent = programme + ' · ' + title` — **and that middot is the
+  banned separator**, so this change carries the per-demo middot sweep for this
+  page with it. It polls `${STATION}/now.json` every tick and shows only what is
+  on RIGHT NOW.
+  ✅ **THE SCHEDULE IS ALREADY SERVED AND THE PAGE DOES NOT ASK FOR IT.**
+  `workers/station/worker.mjs:446`, `GET /schedule`, answers the Durable
+  Object's whole running order. **That is the table.** Nothing new has to be
+  built on the worker.
+  ⚠️ **`createTable` WANTS EXACTLY ONE GROWING COLUMN** and `cap`, `empty` and
+  `note: 'hover'` are the options the other pages use. The row that is on air
+  should be marked with `table.mark()`, which takes a predicate over the row
+  data rather than an index, because a schedule repaints.
+  ⚠️ **THE ON AIR HALF IS THE SAME JOB AS THE `LIVE` CHIP ENTRY ABOVE.**
+  `/station/` is one of the six pages passing `live: true`, and it has something
+  real to feed a presence badge: `now.json` answering, or not. **Do the two
+  together on this page** rather than swapping the chip and then rebuilding the
+  page under it.
+
+- 🔴 **`ResizeObserver loop completed with undelivered notifications` IS LOGGED
+  AS A FAULT, REPEATEDLY, AND IT IS NOT ONE.** Reported 2026-09-20 with a
+  photograph of a log box holding nothing else, three copies visible, in the
+  `bad` colour: *"Excessive scary logging of nonsene"*.
+  🔴 **WHERE IT COMES FROM**: `guard(d)` at `demo/shell/shell.mjs:755` turns
+  EVERY window `error` event into `d.fail(...)`, and `fail` at `:412` both logs
+  in `'bad'` **and sets `api.failed`**. Browsers fire that string as a window
+  `error` event, and it is a benign notice that an observer loop did not settle
+  in one pass. Nothing is broken when it appears.
+  ⚠️ **THREE KIT MODULES CREATE OBSERVERS**, so it can come from almost any
+  page: `diagram.mjs`, `grain-scope.mjs` and `timeline/strip.mjs`. It repeats
+  because the loop re-runs, so one page can fill its own log with it.
+  🔴 **IT ALSO SETS `api.failed`, WHICH THE HARNESS PRINTS** (`verify.mjs:674`).
+  So a benign browser notice marks a run as having failed, in the one field a
+  reader consults to find out whether a page died. **Check whether it has ever
+  been read as a real failure before deciding how loudly to filter it.**
+  🔴 **AND THIS IS THE LOG THE PROJECT ALREADY DECIDED MUST NOT CRY WOLF.**
+  CLAUDE.md, on a ⚠️ shipped in `/items/`'s log: *"the line was worth saying and
+  the emoji made an ordinary fact look like a fault on a page whose log is where
+  real faults are reported, which is the one place a false alarm costs
+  something."* This is worse than that emoji: it is not worth saying at all.
+  ⚠️ **FILTER IT WHERE IT ARRIVES, NOT AT EVERY OBSERVER.** One test in
+  `guard()` beats three modules each remembering to be careful, and a page that
+  gains a fourth observer is covered without being told.
+  ⚠️ **BUT DO NOT SWALLOW THE CLASS.** A window `error` with no `e.error` and a
+  message this project does not recognise is still a real fault. Match the
+  message exactly, and say in a comment why that one string is safe, or the
+  next silent page will be one somebody muted on purpose.
+
+- 🔴 **`/crate/`'s `audio file` ARROW LANDS ON THE WRONG BOX ON A PHONE. THIRD
+  SIGHTING OF THE SAME ROUTING BUG.** Asked 2026-09-20 with a photograph:
+  *"Audio file should connect to player on koble layout"*. It is declared
+  correctly at `demo/crate/index.html:1013`,
+  `{ from: 'store', to: 'play', label: 'audio file', back: true }`, and in the
+  picture it arrives at the Browser container beside the `uploader` row instead
+  of at `player`.
+  ⚠️ **SAME CAUSE AS `/mirror/` AND `/floor/`**, both reported today: in column
+  mode every child is given its owner's row (`diagram.mjs:644`), so two boxes
+  stacked in one container stop being distinguishable as endpoints. **Three
+  pages, one line.** Filed with those.
+
+- 🔴 **`why uploader connects to player directly?` HAS BEEN ASKED TWICE, AND
+  THE ANSWER IS IN A HOVER NOTE THAT A PHONE CANNOT SHOW.** Asked 2026-09-20;
+  previously reported with a photograph as *"audio bytes should go to player,
+  no? why uploader -> player??"*.
+  ✅ **THE PICTURE IS CORRECT AND THE ARROW IS AN ADDRESS, NOT AUDIO.**
+  `send -> play` carries the URL the archive answers with when the last piece is
+  accepted; the sound itself arrives on `store -> play`, the return arrow under
+  the row. Both are declared and both are right.
+  🔴 **SO THIS IS A COMMUNICATION DEFECT, NOT A DIAGRAM DEFECT, AND IT IS
+  STRUCTURAL.** The disambiguation lives entirely in that link's `note`, and a
+  sibling link **cannot carry a label** by rule: the gap two stacked boxes share
+  is sixteen pixels tall, so a name in it runs under both. A note is read ON
+  HOVER. **A phone has no hover.** The one reader who cannot reach the answer is
+  the one who has now asked the question twice from a phone.
+  ⚠️ **AND THE ARROW CANNOT SIMPLY GO.** The comment at `:975` records that it
+  was removed and put back within the hour: without it the Browser's two boxes
+  have no declared link, `diagram.mjs` brackets them with a headless tie, and
+  the page's own `no line in it is missing its arrowhead` assert went red on the
+  run that removed it.
+  ⚠️ **SO THE FIX IS ABOUT TOUCH, NOT ABOUT THIS PAGE**: a note that a finger
+  can reach. That is the same gap as the strip's tap tooltip, and the footer
+  `/reel/` was given for exactly this reason on 2026-09-19. **A diagram has no
+  such footer.** Decide once in `diagram.mjs`, for all 14 pages.
+
+- 🔴 **`/crate/`: HIDE THE EMPTY TABLE AND THE PLAYER, GLUE THE PLAYER TO THE
+  TABLE, DROP THE TITLE FIELD.** Asked 2026-09-20: *"Do not show empy files
+  table nor player when no files. Glue player to top of file table. Rm textfield
+  input"*, then *"In crate i mean"*. Four changes, one page, and they go with
+  the upload bar entry above because they are the same screen.
+  ⚠️ **1. THE EMPTY TABLE.** `createTable({ empty: '' })` at `:234` already
+  makes it say NOTHING when empty, and `table.mjs` is explicit that an empty
+  string means no element at all rather than a padded band. **So what is left on
+  screen is the HEADER ROW and the box**, which is a row of column names
+  describing rows that do not exist. That is the same fault the readout had on
+  this very page and the same fix: `:151` already does `readout.hidden = true`
+  until there is something to say. The table wants the same treatment.
+  ⚠️ **2. THE PLAYER.** `audio` at `:325` plus a transport bar built at `:333`,
+  both appended unconditionally. The bar's own deck opens at a 1 ms range, so
+  before anything is uploaded it is a transport for a sound that does not exist,
+  which is this project's named lie-shaped control.
+  ⚠️ **3. GLUE.** `demo/shell/glue.mjs` is the component: one border round the
+  lot, a 1 px seam, children giving up their own border and radius. **It skips
+  `null` children by design**, which is exactly right here, so
+  `createGlue(bar.el, table.el)` built only when there is a file needs no `if`
+  around the append. Note the ORDER asked for is player ON TOP of the table.
+  ⚠️ **4. THE TITLE FIELD GOES.** `createField` at `:211`, `label: 'title'`,
+  `placeholder: 'what this recording is'`. Its comment records that **empty is
+  already a real answer**: with nothing typed the filename is the title, *"which
+  is what happened before this field existed"*. So removing it restores the
+  behaviour the page had, and nothing downstream needs a fallback written,
+  because the fallback is what already runs. **Check the assert count**: if
+  anything grades the field, those asserts go with it and must be accounted for.
+  🔴 **AND `readout: { sent, pieces, speed, left }` IS FOUR CELLS**, hidden
+  until an upload runs. If the table and player hide too, a first visit is one
+  upload bar and nothing else, which is what was asked for on 2026-09-16
+  (*"what a visitor first meets is one box with one button and no furniture"*).
+  **This finishes that instruction rather than starting a new one.**
+
+- 🔴 **`/crate/`'s UPLOAD BECOMES ONE BAR THAT TAKES A DROP AND CARRIES ITS OWN
+  BUTTON.** Asked 2026-09-20 with a photograph of the dashed target above a
+  separate `Upload` button: *"Integrate into single upload bar that takes dragin
+  and has upload button"*.
+  ⚠️ **HALF OF THIS WAS ASKED FOR ON 2026-09-16 AND DONE AT THE BLOCK LEVEL**:
+  *"merge these on single block with single uplad button when clicked show data
+  on upload"*. `demo/crate/index.html:113` carries that comment. The readout was
+  moved inside and hidden until there is something to say. **What did not merge
+  is the picture**: the target and the button are still two surfaces stacked,
+  which is what the photograph shows.
+  🔴 **THE TARGET IS A RAW `<input type="file">` WITH CSS ON IT**, `:33`, a
+  dashed box 26 px tall in padding, styled through `::file-selector-button`.
+  That is why it reads as browser furniture: `CHOOSE FILE` and `no file
+  selected` are the USER AGENT's words, not ours, and they cannot be changed,
+  only hidden. **A single bar means owning those two strings**, which means the
+  input goes invisible behind a real control.
+  ✅ **DRAG-IN ALREADY WORKS AND MUST NOT BE LOST.** `:159-172`: `preventDefault`
+  on `dragover` and `drop`, **on the window too**, with an `.over` class set
+  from `dragenter` and cleared on `dragleave` and `drop`. The comment says why
+  it is a class and not `:hover` — *"a drag does not fire hover in every
+  browser"*. Any rebuild keeps all of that.
+  🔴 **AND THE UPLOAD BUTTON MUST STAY OUT OF `.pos-controls`.** `:98` is
+  explicit: `verify.mjs` presses every button in that row on every page on every
+  run, so an upload button wired as an ordinary control **would write to R2 from
+  every machine that runs the suite**. It lives in the page body, and the fence
+  that holds is `isTrusted` plus the server deciding the store from the token
+  and the origin. This is the FCM defect CLAUDE.md records at length.
+  ⚠️ **THERE IS NO KIT COMPONENT FOR THIS AND `/crate/` IS THE ONLY PAGE WITH
+  ONE.** CLAUDE.md: a control that exists in one page and nowhere else is a
+  component that has not been noticed yet. `workers/ingest` and `workers/vain`
+  both have write paths, so a second upload surface is plausible. **Decide
+  whether this becomes `demo/shell/upload.mjs` before building a second
+  bespoke one.**
+  ⚠️ `Upload` is deliberately NOT `pos-pri`: *"the primary thing on this page is
+  the box you drop into, and a filled yellow button beside it competes with the
+  target"*. If the two merge into one bar, that reasoning needs re-deciding
+  rather than carrying.
+
+- 🔴 **THE `LIVE` CHIP BECOMES THE STANDARD ONLINE INDICATOR, SAYING `on air`,
+  AND IT IS SIX PAGES NOT ONE.** Asked 2026-09-20: *"For videoradio use std
+  online insicator with 'on air'. In other 'live' labesl too tim other demos"*.
+  ⚠️ **WHAT EXISTS TODAY**: `transport-bar.mjs:417`,
+  `const liveChip = live ? el('span', 'tbar-live', 'LIVE') : null` — a
+  hand-rolled span with a hard-coded word, styled at `shell.css:906`. Six pages
+  pass `live: true` and get it: **`/videoradio/`, `/radio/`, `/station/`,
+  `/stage/`, `/llhls/`, `/take/`**.
+  ✅ **THE STANDARD INDICATOR IS `demo/shell/presence.mjs`**, already used by
+  `/kit/`, `/mirror/`, `/stage/`, `board.mjs` and `video-panel.mjs`. It has five
+  states (`online, checking, coming, offline, unknown`) and **already takes a
+  `says: { … }` override**, so `on air` is a word, not a new component.
+  🔴 **AND THE SWAP FIXES A REAL DEFECT, NOT JUST A LOOK.** `LIVE` is a static
+  label that is TRUE BY CONSTRUCTION: it is drawn because the page passed
+  `live: true` at build time, so it says `LIVE` whether or not anything is
+  arriving. That is this project's two named hazards at once — *every readout
+  cell must be able to change*, and *a control that looks live and is inert*.
+  A presence badge can say `on air`, and can also say the station went away,
+  which the chip cannot.
+  ⚠️ **SO THE WORK IS NOT A RENAME.** Each of the six has to hand the badge
+  something real to read: frames arriving, an ICY metadata tick, a segment
+  fetched. `presenceOf` wants `everyMs`, `lastSeenAt`, `misses` and `since`, and
+  a page that cannot answer those should show `unknown`, which never blocks and
+  is the honest state. **A badge wired to a constant would be the same lie in a
+  better font.**
+  ⚠️ **`/stage/` ALREADY USES BOTH**, presence and the `LIVE` chip, so it is the
+  page to look at first to see what the pair currently says twice.
+  ⚠️ **AND THE WIDTH IS RESERVED OFF THE WORDS.** `presence.mjs` measures its
+  reserved width from whatever the badge can say, so `on air` plus `offline`
+  plus `checking` decides the size. A shorter `says` set keeps the bar tight.
+
+- ✅ **RULE WRITTEN 2026-09-20: A CONTAINER IS NEVER EMPTY.** *"General: do not
+  do empty cludflare boxes, have inner boc with worker or smth"*. In `CLAUDE.md`
+  beside the existing *a container takes no `note`*, which is the same rule from
+  the other end: that one says the children say what the machine is, this one
+  says there have to BE children for that to be true. Name the thing that RUNS,
+  not the service it runs on. If there is honestly nothing inside, it is not a
+  container and should be an ordinary box.
+  ⚠️ **THE RULE IS WRITTEN AND THE TWO REPORTED OFFENDERS ARE NOT FIXED.**
+  `/floor/`'s `Cloudflare` (`sub: image proxy`, no children, and `workers/img`
+  is what belongs in it) and `/blocks/`'s `Relay object` and `controllers`.
+  Both are already filed above with the rest of those pages' diagram work.
+  ⚠️ **AND NOBODY HAS SWEPT THE OTHER TWELVE.** 14 pages call `createDiagram`;
+  two were reported because they were photographed. **Grep for a `children` key
+  that is absent or empty before assuming the rest are clean**, the same way the
+  `cuts` assert turned up six defects the moment it was switched on.
+  ⚠️ The agent building the Held in Human visualisation has been told.
+
+- 🔴 **`/reel/` LOSES ITS TIMELINE FOOTER, AND THIS REVERSES YESTERDAY'S
+  INSTRUCTION.** Asked 2026-09-20: *"No need for timeline footer nor tooltips
+  in reel"*.
+  🔴 **THE FOOTER WAS ASKED FOR ON 2026-09-19**, with a photograph of this exact
+  page on an iPhone: *"add feature to timeline: footer section, looks like glued
+  that shows hovered info below timeline"*. It is `footer: { lines: 3 }` at
+  `demo/reel/index.html:542`, and the long comment above it is the argument for
+  it. **Record the reversal in that comment rather than deleting it**, or the
+  next person restores the footer from reasoning that is still sitting there
+  reading as current. That has happened on this project more than once.
+  ✅ **THE TOOLTIP HALF IS ALREADY DONE AND NEEDS NOTHING.** `createStripView`
+  turns the tooltip off for any strip that has a footer, unless a page asks for
+  both. So `/reel/` has no tooltip today. **Removing the footer will bring the
+  tooltip BACK** unless it is also turned off explicitly, and the tooltip is the
+  thing the 2026-09-19 photograph was complaining about: sticky on a phone, four
+  lines deep, one cut mid word, covering the marks it described.
+  ⚠️ **SO "NEITHER" IS THE WORK**: drop the footer AND keep the tooltip off, and
+  then `/reel/` says nothing about what is under the pointer at all. That is a
+  coherent choice and it is not the default, so it has to be written down.
+
+- 🔴 **`/floor/` AND `/reel/` MOVE INTO AN `archives` GROUP ON THE FRONT PAGE.**
+  Asked 2026-09-20: *"Move floor and reel into archives group in index page"*.
+  Both are `group: 'xr'` today, `demo/manifest.mjs:280` and `:293`.
+  🔴 **THERE IS NO `archives` GROUP AND `GROUPS` THROWS ON AN UNKNOWN ONE.**
+  `manifest.mjs:824` lists nine: `xr, vain, kurenniemi, mim, instruments,
+  capture, timeline, transports, kit`. A row whose group is not in that map
+  makes the front page throw by design, *"the worst shape a demo can be in is
+  invisible"*. So this needs a tenth entry with a title, and the title is a
+  decision: the map's values are lowercase phrases (`in a headset`, `väin`,
+  `technologies`), not slugs.
+  ⚠️ **AND IT CHANGES WHAT `xr` MEANS.** Both pages are `xr: true` and `/floor/`
+  is `gl: true`, so they stay headset pages; what moves is which shelf they are
+  read off. Worth a sentence in the group's title so a reader is not surprised
+  to meet a headset demo under `archives`.
+  🔴 **CONFLICT: A BACKGROUND AGENT MAY BE EDITING `demo/manifest.mjs` RIGHT
+  NOW** for the Held in Human 2D visualisation, which needs a row if it lands as
+  its own demo. **Do this one AFTER that agent reports**, or two edits land in
+  one file from two places, which is the exact hazard CLAUDE.md's agent rules
+  exist for.
+
+- 🔴 **IN FLIGHT: A BASIC 2D VISUALISATION OF HELD IN HUMAN.** Asked
+  2026-09-20: *"In bg plan and implement basic held visualization in 2d. We have
+  typing info, hue, ligtness…"*. A background agent is planning and building it.
+  ⚠️ **THE MATERIAL IS ALREADY DATA AND ALREADY LOCAL**:
+  `demo/resources/held-in-human.json`, 99 KB, built by
+  `build-held-in-human.mjs`. It holds the two passthrough channels the ask
+  names (`lut`, which is the hue, and `opacity`, which is how much of the real
+  room is left), the 318-event keystroke recording, 24 spoken lines, eight
+  scenes and nine ambiguities carried as `settled: false`.
+  ⚠️ **AND THE PIECE'S OWN COLOUR ARITHMETIC IS ALREADY MEASURED**: a page can
+  DIM the real room and cannot TINT it, because in an `alpha-blend` session the
+  room only ever appears multiplied by one scalar shared by all three channels.
+  That is a fact about a HEADSET and this is 2D, where both channels are free.
+  **The visualisation must not quietly claim the piece can do something the
+  plan says it cannot.**
+  ⚠️ **NOT THE SAME THING AS `/held/`**, which is the score as a TIMELINE. This
+  is what the piece LOOKS like, which is a different question about the same
+  file.
+
+- ⚠️ **`/blocks/`'s DIAGRAM DRAWS TWO EMPTY CONTAINERS, WHICH IS WHY THE RELAY
+  READS AS UNEXPLAINED.** Noticed 2026-09-20 from a phone photograph while
+  answering *"Why relay in blocks/sticks?"*. `controllers` and `Relay object`
+  are both boxes with a `sub` and no children, so they occupy a machine's worth
+  of space and say a caption's worth of thing. **Same shape as `/floor/`'s empty
+  `Cloudflare`**, reported the same day, and the same rule: a container's name
+  and the boxes inside it are what say what it is.
+  ⚠️ **THE RELAY IS NOT DECORATIVE AND THE PICTURE SHOULD SHOW THAT.** The seed
+  goes out as `scene.room` and the page draws **the document that comes BACK**,
+  not the one it made (`demo/blocks/index.html:919-926`), and a dropped thing
+  ships the whole document again at `:1584`. The round trip IS the demo. A box
+  inside the relay naming what it does, or a label on the return arrow saying
+  the page draws what it receives, would answer the question the picture
+  currently raises.
+
+- 🔴 **`/blocks/` BECOMES `/sticks/`, AND THE BRICKS BECOME STICKS.** Asked
+  2026-09-20: *"Rename blocks demo to sticks. Render blocks outlines in white
+  make them 1.8 m high and make rhem 5x less w and h like. Find a way to turn
+  them into angles."* Four things, and they are one job because the name follows
+  the shape.
+
+  **1. THE RENAME.** `/blocks/` is deployed and `built: true`.
+  🔴 **THE SWEEP MATCHES THE URL FORM AND THE SLUG, NEVER THE WORD.** MEASURED:
+  **112** occurrences of `/blocks/`, but **251 files contain the string
+  `blocks`** because it is ordinary English and because `xr-room.mjs` and the
+  GL code talk about blocks of memory, uniform blocks and code blocks. This is
+  exactly `held` (330 files) and `box` (387) again.
+  ⚠️ **THE DEPLOYED `/blocks/` WILL 404** unless a redirect is written, which
+  none of `radio1965`, `box` or `held` got. Decide once rather than discover it.
+  ⚠️ **`archive/` KEEPS ITS `blocks`**, because an archive records what was
+  there.
+
+  **2. WHITE OUTLINES.** Today the bricks are shaded solids. *"Render blocks
+  outlines in white"*.
+
+  **3. THE SHAPE: 1.8 m TALL, A FIFTH AS WIDE AND DEEP.** The brick is a
+  **1.0 m cube** today, doubled from 0.5 m on 2026-09-19. A fifth is **0.2 m**,
+  so 0.2 x 1.8 x 0.2. That is a stick a person's height, which is why the demo
+  is being renamed.
+  🔴 **FIVE CONSTANTS WERE TUNED TO THE BRICK AND ARE WRITTEN DOWN AS SUCH.**
+  They must be re-derived, not carried:
+  - `MIN_HOLD 0.8` and `BUBBLE 0.9` at `:1226`, and the comment says why: a
+    thing's half-diagonal went 0.43 to 0.87 when the brick doubled, and 0.45 no
+    longer covered it. **A 0.2 x 1.8 x 0.2 stick has a half-diagonal of 0.91 m**,
+    so 0.9 no longer covers it either. This is the same defect one size along.
+  - the drag step and its ceiling, `:1802`, *"both doubled with the brick"*.
+  - `3.2 m/s`, `:1156`, which deliberately did NOT double, and the comment says
+    so. Check it still should not.
+  ⚠️ **AND THE GRID SNAP IS SQUARE TO YOUR ROOM, NOT THE HEADSET** (`:634`,
+  `:2463`), which is a reported fix. A non-cubic thing has an orientation the
+  cube did not, so the snap has to decide what to do with it.
+
+  **4. `Find a way to turn them into angles` NEEDS A WORD AND IS THE ONLY PART
+  NOT STARTED.** It reads three ways and they are different jobs: let a stick
+  take any YAW instead of snapping square to the room; let it LEAN off vertical;
+  or make the pieces L-shaped angle sections rather than straight sticks. The
+  third would fit the name least and change the physics most.
+
+  ⚠️ **THE WHOLE PAGE IS `gl: true` AND `xr: true`**, so
+  `node demo/verify-gl.mjs sticks` is the harness, and its six headset asserts
+  only run on a real device.
+
+- 🔴 **THE FEEDBACK DIALOG'S CLOSE `×` IS TOO SMALL.** Asked 2026-09-20: *"Make
+  feedback modal close x a bit larger"*. `demo/shell/shell.css:1806`,
+  `.pos-fb-x`.
+  ⚠️ **MEASURED TODAY**: glyph `font: 400 18px/1`, box **22 x 16 px**. Every
+  other button on the site is **34 px** tall, and `.pos-fsx`, the other lone
+  glyph control, is a **34 x 34** square. So this is the smallest pressable
+  thing in the project by a wide margin, on a control that appears over a modal
+  where nothing else can be pressed.
+  🔴 **AND ITS HEIGHT IS LOAD-BEARING, WHICH IS THE TRAP.** The comment above it
+  records a reported defect, *"reduce top padding to match horiz padding"*,
+  photographed with the title sitting about 30 px below an 18 px edge. The cause
+  was this button: `button` sets `height: 34px`, the rule reset the border, the
+  background and the padding and **never the height**, so the title row was
+  34 px tall around a 15.6 px line box and `align-items: center` put nine of
+  those pixels above the title. **Growing the height puts that back.**
+  ⚠️ **SO GROW THE GLYPH AND THE WIDTH, AND KEEP THE ROW THE TITLE'S HEIGHT** —
+  or give the button a larger hit area that does not affect layout, which is
+  what a negative margin or a pseudo-element does. The second is the honest fix
+  for a touch target and leaves the row alone.
+  ⚠️ **THE COMMENT ALSO CARRIES A CORRECTION WORTH NOT LOSING**: the note above
+  `.pos-fb-top` blamed baseline alignment and was wrong, *"which is how a fix
+  that reads correct can sit on top of the defect it names"*. Whatever is
+  changed, do not delete that.
+  ⚠️ **`/kit/` GRADES THE FEEDBACK DIALOG**, and every page has the button, so
+  this is one rule in the shell and checkable by computed size rather than by
+  eye.
+
+- 🔴 **`/floor/`'s DIAGRAM IS HARD TO FOLLOW, AND MOST OF IT IS THE COMPONENT
+  RATHER THAN THE PAGE.** Reported 2026-09-20 against the wide picture: *"Hard
+  to follow. Add worker box inside cf, and reconsider conmectors. Why films and
+  thimbnails are conmected? Films should travel too to browser, both images and
+  films agould go to 3d scene (perhaps single box inside browser box os
+  enough?)"*
+  🔴 **THE SPEC ALREADY SAYS WHAT WAS ASKED FOR, AND THE PICTURE DOES NOT SHOW
+  IT.** `demo/floor/index.html:1807-1814` declares exactly three links, all box
+  to box: `stills -> cf` (JPEG), `cf -> floor`, **`films -> video` (HLS)**. In
+  the photograph that HLS arrow is drawn from the TOP EDGE of the ERR container
+  across to the TOP EDGE of the Browser container. **So `films` does travel to
+  the browser; the routing draws it between the machines instead of between the
+  boxes.** That is the same fault as the stacked-layout entry above, now seen on
+  a WIDE screen, which widens that bug from "phones" to "everywhere".
+  🔴 **`thumbnails` AND `films` ARE NOT CONNECTED, THEY ARE BRACKETED, AND IT
+  WAS READ AS A CONNECTION BY THE PERSON WHO ASKED FOR ARROWHEADS.** The page
+  passes `set: true` at `:1780` with a comment saying these two are not a chain
+  and the bracket means *"two things the same archive holds"*. The report reads
+  it as a link anyway. **This is the tie-versus-arrowhead argument from
+  2026-09-16 arriving from the other side**: that time a headless line read as
+  a head that had fallen off, and the fix was to make arrows the default. A
+  bracket is still being read as a connector. Options are `join: false`, which
+  draws nothing and which CLAUDE.md already records as the right answer where a
+  container's own box carries the whole relationship, or a bracket that does not
+  look like a line.
+  🔴 **`Cloudflare` IS AN EMPTY CONTAINER WITH A `sub`.** *"Add worker box
+  inside cf"*. Every other machine in the picture holds boxes; this one holds a
+  caption, which is why it reads as a gap rather than a machine. It also breaks
+  the project's own rule that a container's name and the boxes inside it say
+  what it is — with nothing inside, the `sub` is doing a child's job. It is
+  `workers/img` in the repo.
+  ⚠️ **THE BROWSER MAY WANT ONE BOX INSTEAD OF TWO.** *"perhaps single box
+  inside browser box os enough?"*. Today `video` (one element) feeds `floor`
+  (WebGL2). Collapsing them loses the fact the caption is about — one element
+  and one texture, so one film at a time — so if they merge, that fact has to
+  survive somewhere.
+  ⚠️ **`/floor/` IS THE ONE PAGE NEVER OPENED IN A BROWSER.** It pulls 298
+  thumbnails and HLS from ERR's archive on every run, so this diagram must be
+  changed and SYNTAX CHECKED, never verified by loading the page.
+  `node demo/check-html.mjs demo/floor/index.html`.
+
+- 🔴 **TWICE THE SPACE UNDER THE `← DEMOS` LINK ON A PHONE.** Asked 2026-09-20:
+  *"Add 2x more space under demos backlink in mobile layout"*.
+  ⚠️ **THE NUMBERS, MEASURED**: `shell.css:75`, `.pos-back { margin-bottom:
+  10px }` is the phone value, because the file is mobile first, and
+  `@media (min-width: 600px)` raises it to **30px** at `:81`. So this is
+  10 to **20**, and desktop does not move.
+  🔴 **IT REVERSES A REASON WRITTEN INTO THE FILE**, which is why it is recorded
+  rather than just done. The comment at `:77` says *"the head is the only place
+  on the page with nothing to do, so it is where the page gets to breathe.
+  Phones keep the tight version — there the scarce thing is height, not
+  calm."* That argument is now overruled: whoever is reading a demo on a phone
+  is spending the first screen on a link they are not using. **Update the
+  comment with the change, or the next person restores 10px from the reasoning
+  still sitting there.**
+  ⚠️ **ONE RULE, EVERY PAGE.** `shell.mjs:65` appends `.pos-back` on every demo
+  that passes an `index`, so this is one number in the shell and not a sweep.
+  ⚠️ **AND THE FRONT PAGE IS DELIBERATELY NOT AFFECTED.** It has no back link,
+  which is why `.pos-head.pos-index { margin-top: 38px }` exists at `:93` — 38
+  being the link's own line plus its desktop margin. **If the phone number
+  moves, ask whether the index's phone top wants the same treatment**, or the
+  two will disagree on a phone the way they once did on a desktop.
+
+- 🔴 **THE LINE UNDER A DIAGRAM ECHOES A CONTAINER'S OWN NAME, WHICH IS ALREADY
+  ON SCREEN.** Reported 2026-09-20 with a photograph of `/mirror/` at 16:45:
+  the word `Raspberry Pi` sitting under a box labelled `Raspberry Pi`. *"Outer
+  boxes descs in bottom if chart are not useful. Rm ecerywhere where they are
+  copies of outer box titles"*.
+  🔴 **ONE LINE**: `demo/shell/diagram.mjs:1713`,
+  `say(n.note || n.title || n.label.full)`. A node with no `note` falls back to
+  its own TITLE, and **every container has no note by rule** — CLAUDE.md:
+  *"a container takes no `note`, a box holding other boxes is a machine, and its
+  name and the boxes inside it already say what it is"*. So the fallback prints
+  the one string the reader can already see an inch above.
+  ⚠️ **IT IS THE SAME DECISION THIS PROJECT HAS TAKEN TWICE ALREADY.** The
+  readout dropped its em dash placeholder because *"a cell does not have to show
+  that it is a cell"*, and `/held/`'s strip footer was given `empty: ''` for the
+  same reason. The honest fallback is the CAPTION, which is what the line holds
+  when nothing is hovered, or nothing at all.
+  ⚠️ **THE HEIGHT IS RESERVED AND MUST STAY RESERVED.** The comment at `:1344`
+  records that this line's box is measured over every string it can ever hold,
+  because a line that changes height moves the whole page under the pointer.
+  **Saying nothing must mean an empty line, never a collapsed one** — the same
+  shape as `/held/`'s footer, which measured 35 px with and without a hit.
+  ⚠️ **AND IT IS A PHONE PROBLEM MOST OF ALL.** There is no pointer to leave, so
+  whatever was last touched stays named under the picture indefinitely, which is
+  how this was photographed.
+  ⚠️ **FIXED ONCE IN THE COMPONENT, WHICH IS WHAT `everywhere` MEANS HERE**:
+  14 pages call `createDiagram`.
+
+- 🔴 **THE STACKED DIAGRAM CONNECTS THE WRONG THINGS, AND THE DESKTOP ONE IS
+  RIGHT.** Reported 2026-09-20 with both pictures side by side, `/mirror/`'s
+  `How it works` on an iPhone against the same diagram wide: *"Make mobile
+  layout as correct (what connector connects to what) as in desktop"*.
+  🔴 **WHAT IS WRONG, READ OFF THE TWO PHOTOGRAPHS.** Wide, every arrow names
+  two BOXES: `WebGL2 -> shader` (GLSL), `shader -> v3dpipe` (GLSL),
+  `v3dpipe -> ffmpeg`, and the two H.264 returns run `ffmpeg -> video` and
+  `video -> WebCodecs`. Stacked, the same links arrive at CONTAINERS and at the
+  wrong rows: the GLSL arrow leaves the Browser box as a whole rather than
+  WebGL2, the first H.264 return points into the Browser at the WebGL2 row
+  instead of WebCodecs, the second points at Cloudflare's `shader` row instead
+  of `video`, and the long return appears to leave `v3dpipe` rather than
+  `ffmpeg`. **Only the internal `v3dpipe -> ffmpeg` arrow is right in both.**
+  🔴 **THE SUSPECT IS ONE LINE**: `demo/shell/diagram.mjs:644`,
+  `for (const c of kids) rowOf.set(c.id, rowOf.get(c._owner))`. In column mode
+  every CHILD is given its OWNER's row, so two boxes stacked inside one
+  container share a row number and become indistinguishable as link endpoints.
+  That is exactly enough to explain all four wrong arrivals, and it explains why
+  the one correct arrow is the one between two children of the SAME container,
+  where the shared row is harmless.
+  ⚠️ **THIS IS THE OPEN `back: true` ENTRY, SEEN FROM THE OTHER SIDE.** That one
+  reads *"a `back: true` link lands on the wrong box when two boxes are stacked
+  in a column, `cuts` was empty and `ties` was 0, because the link WAS routed,
+  it just arrived somewhere else"*. Same file, same cause, and now with a
+  picture of it. **They are one job.**
+  🔴 **AND NOTHING GRADES IT.** `cuts` is empty because every link was routed,
+  so a diagram assert reads clean while the picture states a chain that does not
+  exist. `/station/` already lost three real arrows this way. Whatever fixes it
+  needs a check on WHICH endpoint a link reached, not on whether it reached one.
+  ⚠️ **COLUMN MODE IS WHAT A PHONE ALWAYS GETS**: `:627`,
+  `mode = (avail >= COL_BREAK && boxW >= BOX_MIN_W) ? 'row' : 'column'`. So
+  every diagram on the site is drawn this way on a phone, and `/mirror/` is
+  simply the one that was photographed. **Six pages carry a diagram.**
+
+- 🔴 **`/mirror/`'s PANEL FOOTER: DROP THE `PICTURE` LABEL AND ALIGN THE GPU
+  INFO LEFT.** Reported 2026-09-20 with a photograph of an iPhone at 16:41, the
+  footer reading `PICTURE Apple GPU   FPS 30.0` centred over a full width
+  kaleidoscope: *"Rm picture label on gpu info"* and *"Align glmpu info to the
+  left"*.
+  ⚠️ **WHERE IT IS**: `demo/mirror/index.html:236`, `FIELDS.here` and
+  `FIELDS.box` both `[['picture', 'picture', 0], ['fps', 'fps', 5]]` — the
+  second element of each triple is the LABEL. `relabel()` at `:361` writes the
+  GPU name into that cell via `shortChip()`, which caps it at 24 characters.
+  ⚠️ **THE LABEL IS THE WEAKEST THING IN THE ROW.** `Apple GPU` says what it is
+  without being told; `FPS 30.0` needs its label because a bare number does not.
+  So this is dropping ONE label, not both, and the row stops being symmetrical,
+  which is the thing to look at rather than argue about.
+  ⚠️ **TWO PANES USE THE SAME `FIELDS`**, `here` and `box`, so whatever is done
+  is done to both and the far pane's `Raspberry Pi` loses its label too.
+  ⚠️ **THE ALIGNMENT IS THE PANEL FOOTER'S, NOT THIS PAGE'S.** `video-panel.mjs`
+  owns the footer and three pages put a named value in one, which is already an
+  open line here: *"a named value in a panel footer is on three pages and in the
+  kit zero times"*. **Left-aligning is the moment to decide that once.**
+
+- 🔴 **CONFIRMED ON A SECOND PAGE: THE PICKER'S DIE IS STILL ON ITS OWN ROW.**
+  *"Random still in separate row"*, 2026-09-20, photographed on `/mirror/`'s
+  `LOOK` picker after the same report on `/radio/`'s `SOUND`. Same cause, same
+  fix, and it is the shared `@media (max-width: 560px)` block at
+  `shell.css:2171` making `.pos-pick` a one column grid. **Two of the four
+  picker pages now reported.** Filed with the `/radio/` entry above; this line
+  exists so the second sighting is not read as a second bug.
+
+- 🔴 **MORE X PADDING ON BUTTONS AND RADIO BUTTONS, AS A GENERAL RULE. ASKED
+  TWICE NOW, AND THE FIRST ANSWER ONLY MOVED THE BASE.** Said 2026-09-20: *"Ads
+  more x padsing to buttons / radiobuttons, general rule for ui betterment"*.
+  🔴 **THE SAME INSTRUCTION LANDED 2026-09-17** as *"Cratechoice add more x
+  spaing (general rule on buttons design)"*, and it produced `button, .pos-btn
+  { padding: 0 18px }` at `shell.css:199`, with a comment saying it is stated on
+  the base *"because a padding that belongs to one component is a padding the
+  next component gets wrong"*. **Every component then overrode it and got it
+  wrong anyway.** MEASURED across `shell.css`:
+  - `.pos-choice button` (the radio buttons the report names) **11 px**, `:1494`
+  - `.pos-choice .step button` on a phone **8 px**, `:1638`
+  - `.pos-bgroup-row button` **12 px**, `:1663`
+  - `.pos-pick-cell` **10 px**, `:2115`
+  - `.tbar` buttons **7 px**, `:921`
+  - `.xr button` **18 px**, `:1242`, the only one that followed
+  ⚠️ **SO THE BASE RULE IS DECORATION ON FIVE OF SIX SURFACES.** The comment
+  that bought it even names the case it is worst in: *"a segmented row is where
+  it shows worst, the options sit border to border, so the only air a word has
+  is its own padding"* — and that is exactly `.pos-choice`, sitting at 11.
+  ⚠️ **THE OVERRIDES ARE NOT ALL WRONG AND THAT IS THE WORK.** `.tbar`'s 7 px is
+  a bar of many small controls at `--tbar-btn` height, and the phone rules carry
+  `flex: 1 0 auto` to fit a row into 390 px, so raising them blindly will wrap a
+  row that currently fits. **Decide a scale, not a number**: what a full button
+  gets, what a segmented cell gets, what a compact bar gets, and then have the
+  components read it rather than each typing a figure.
+  ⚠️ **A SHARED MEASUREMENT IN TWO FILES IS A MEASUREMENT THAT WILL DISAGREE**,
+  which this project already paid for with `--sld-col`. A custom property is the
+  shape that has worked.
+  ⚠️ **GRADABLE IN `/kit/`**, which draws a choice, a button group, a picker and
+  a plain button on one page, so the scale can be asserted by measuring computed
+  padding across all four rather than by looking.
+
+- 🔴 **THE DIE SHOULD SIT ON THE PATCH SELECTOR'S OWN LINE ON A PHONE.**
+  Reported 2026-09-20 with a photograph of `/radio/` at 15:25, the die on a row
+  of its own under `‹ the sixteenth ›`: *"Random button shiuld be in the same
+  line with patch selecor - just an option on component?"*
+  ✅ **IT IS ALREADY AN OPTION ON THE COMPONENT**, and that half needs nothing:
+  `createPicker({ random })` in `demo/shell/picker.mjs:162`, appended to the
+  same `.pos-pick` wrapper as the segment at `:195`. `/radio/` passes it at
+  `demo/radio/index.html:4500`. On a desktop it is on the line already, because
+  `.pos-pick` is `inline-flex` with `gap: 8px` and cannot wrap.
+  🔴 **WHAT PUTS IT ON ITS OWN ROW IS THE PHONE BLOCK, AND IT IS DELIBERATE
+  CODE RATHER THAN AN ACCIDENT.** `shell.css:2171`, `@media (max-width: 560px)`,
+  makes `.pos-pick` a ONE COLUMN GRID (`grid-template-columns: 1fr`), so the
+  label, the segment and the die each get a row. The die then carries
+  `justify-self: start` at `:2178` under a comment saying it stays out of the
+  group and stays square, which is the choice being questioned.
+  ⚠️ **SO THE FIX IS THAT GRID, NOT A NEW API.** Something like two columns
+  (`1fr auto`) with the label spanning both, so the segment keeps the full width
+  it was given and the die sits at its right end on the same row.
+  ⚠️ **AND THIS BLOCK HAD NEVER RUN UNTIL 2026-09-19**, when the media query was
+  moved after the plain rule it was losing to on source order. So its phone
+  layout is about a day old and has had one pair of eyes on it, which is
+  probably why this is the first report.
+  ⚠️ **TWO OTHER PAGES USE THE SAME COMPONENT**: `/grains/` steps six patches
+  the same way, and `/keys/`'s and `/radio/`'s phone layouts are already an open
+  line here for the same reason. **Whatever is decided is decided once, in
+  `shell.css`, not per page.**
+  ⚠️ `/kit/` has a picker specimen, so the change is gradable there without
+  opening `/radio/`.
+
 - 🔴 **`/knobs/` CONTRIBUTES NOTHING TO THE SUITE, AND THIS FILE HAS CLAIMED
   `14 asserts, 20/20` SINCE IT WAS BUILT.** Found 2026-09-20 while grading the
   board guard. `node demo/verify.mjs knobs` reads **2 page asserts, both
