@@ -679,13 +679,17 @@
        * that says which tick is step one, so the first note heard becomes it.
        * That makes the SPACING right, which is the thing a reader is looking
        * at, and leaves the absolute step a guess. A Start resets it properly.
-       * ⚠️ **SIXTEEN STEPS ON TWO ROWS IS A CHOICE, NOT A MEASUREMENT.** The
-       * device never says how long its pattern is.
+       * ⚠️ **SIXTEEN STEPS ON TWO ROWS IS A CHOICE. WHICH TWO ROWS IS NOT.**
+       * Reported 2026-09-21: *"bassdrum is top 2 rows not bottom ones"*. The
+       * first build put them on rows 3 and 4 for no reason beyond the line it
+       * replaced having hard coded the bottom row, and the instrument puts a
+       * drum track's steps at the TOP of the pad area. The pattern LENGTH is
+       * still a choice: the device never says how long its pattern is.
        */
       if (!anchored) { clock = 0; anchored = true; }
       seenNotes.set(m.note, (seenNotes.get(m.note) ?? 0) + 1);
       const step = Math.floor(clock / CLOCKS_PER_STEP) % STEPS;
-      grid.at(step % 8, 2 + Math.floor(step / 8))?.flash(140);
+      grid.at(step % 8, Math.floor(step / 8))?.flash(140);
     }
   }
 
