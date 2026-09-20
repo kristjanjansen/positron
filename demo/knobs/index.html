@@ -112,7 +112,17 @@
    * and the dark end is still reachable; what changed is where a hand lands
    * before it has learned anything.
    */
-  const CUTOFF_HOME = 100;
+  // 🔴 127, THE TOP OF THE TRAVEL. Asked 2026-09-20 as *"Knobs cutoff 128 by
+  // default"*, and 128 does not exist: a MIDI controller is seven bits, 0 to
+  // 127, which is why the slider declares `max: 127` and why `ctl.set` on the
+  // board clamps with `Math.min(127, …)`. Saying so here rather than silently
+  // substituting, because somebody reading 128 later would hunt for an
+  // off-by-one that is not there.
+  // ⚠️ IT WAS 100, AND THE ARGUMENT FOR 100 SURVIVES RATHER THAN BEING
+  // OVERTURNED. The note below says the bottom third of the travel is under
+  // what a phone or a laptop speaker reproduces at all. 127 is further from
+  // that end, not nearer.
+  const CUTOFF_HOME = 127;
   // Bank 95 program 6 is `Analog Filter 1`, read off the live board's own
   // `voices.list` on 2026-09-16 (878 patches, 24 banks, bank map not stale).
   // Bank select is CC 32 and the board reads that number out of Yoshimi's own

@@ -12,6 +12,32 @@
   --hi: #ffd400;
   /* the gap between a slider's label column and its lane — see `.sld-group` */
   --sld-col: 12px;
+  /* 🔴 HOW MUCH AIR A WORD GETS INSIDE A CONTROL, AS A SCALE OF THREE RATHER
+     THAN AS SIX TYPED FIGURES. Asked twice, and the second ask was because the
+     first one did not take: 2026-09-17 put `padding: 0 18px` on the base
+     `button` with a comment saying a padding that belongs to one component is
+     a padding the next component gets wrong. Then every component
+     overrode it with a number of its own. MEASURED 2026-09-20, before this
+     block existed: `.pos-choice button` 11, the same button on a phone 8,
+     `.pos-bgroup-row button` 12, `.pos-pick-cell` 10, `.tbar-rates button` 7,
+     `.xr button` 18. Six values, one of which followed the rule.
+     A base declaration cannot win that argument, because a component that
+     wants a different number is not being careless: a segmented row really
+     does want less air than a button standing on its own, and a phone really
+     does want less than a desktop. What it must not do is INVENT one. Three
+     names, declared here, and a component picks the one it is:
+       --pad-btn   a button standing on its own, a word in a pill
+       --pad-seg   one cell of a segmented row, sharing edges with its
+                   neighbours, so its own padding is all the air a word has
+       --pad-bar   a control on the transport bar, which is dense on purpose
+     ⚠️ THE PHONE VALUE OF `--pad-seg` IS SMALLER AND THAT IS NOT DRIFT. At
+     390 px a segmented row carries `flex: 1 0 auto` so it fits rather than
+     wrapping, and padding is what decides whether four station names fit at
+     all. It is overridden once, at the foot of this file, beside the other
+     phone rules. */
+  --pad-btn: 18px;
+  --pad-seg: 14px;
+  --pad-bar: 11px;
   /* 🔴 THE ONE VERTICAL GAP IN THE PROJECT, AND IT IS DECLARED HERE ONLY.
      Every distance between two blocks of a page comes from this token, through
      `.pos-stack` below. Changing the spacing of the whole site is this line.
@@ -70,13 +96,27 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    below already separate it from the page; a line as well is a third channel
    saying what two are saying. Spacing kept, so nothing moves. */
 .pos-head { padding-bottom: 12px; margin-bottom: 16px; }
+/* 🔴 20 px UNDER IT ON A PHONE, UP FROM 10, ASKED FOR 2026-09-20 AS TWICE THE
+   SPACE. The line that stood here said phones keep the tight version because
+   there the scarce thing is height rather than calm, and that reasoning is now
+   OVERRULED rather than merely out of date: it is written down so nobody
+   restores 10 px from an argument that is still sitting in the file. What it
+   got wrong is that the back link is not a row of content whose height is being
+   paid for. It is one 11 px line of furniture at the top of every demo page,
+   and 10 px under it put it close enough to the page name to read as part of
+   the title rather than as a way out of the page.
+   ⚠️ THE DESKTOP VALUE DOES NOT MOVE. 30 px below, and the index's own 38 px,
+   are both unchanged and are in the block underneath.
+   ⚠️ AND THE INDEX IS DELIBERATELY NOT FOLLOWING THIS ONE. The front page has
+   no back link, so on a phone its name sits at the top of the body with no
+   furniture above it, which is what the phone ask above says is fine, and
+   giving it a margin would be inventing a number for a page nobody reported. */
 .pos-back {
   font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--dim2); text-decoration: none; display: inline-block; margin-bottom: 10px;
+  color: var(--dim2); text-decoration: none; display: inline-block; margin-bottom: 20px;
 }
 /* the head is the only place on the page with nothing to do, so it is where
-   the page gets to breathe. Phones keep the tight version — there the scarce
-   thing is height, not calm. */
+   the page gets to breathe. A phone gets less of it than a desktop, not none. */
 @media (min-width: 600px) {
   .pos-back { margin-bottom: 30px; }
   .pos-what { margin-top: 12px; }
@@ -195,8 +235,12 @@ button, .pos-btn {
      so the only air a word has is its own padding, and at 14 px three short
      words like `dry room hall` read as one band of text with lines through it.
      ⚠️ IT IS THE HORIZONTAL ONE ONLY. `height: 34px` is the touch target and is
-     shared with the slider lane and the transport bar, so it does not move. */
-  border-radius: 4px; padding: 0 18px; height: 34px; cursor: pointer;
+     shared with the slider lane and the transport bar, so it does not move.
+     ⚠️ AND IT IS `--pad-btn` RATHER THAN THE NUMBER, BECAUSE THE ARGUMENT
+     ABOVE LOST THE FIRST TIME IT WAS MADE. Every component overrode this line
+     with a figure of its own; the scale in `:root` is where those figures are
+     decided now, and this is the one that means "a button on its own". */
+  border-radius: 4px; padding: 0 var(--pad-btn); height: 34px; cursor: pointer;
   -webkit-tap-highlight-color: rgba(255,212,0,.12);
   /* 🔴 A LONG PRESS ON A CONTROL IS ALWAYS A MIS-PRESS, NEVER A COPY.
      Holding a button on iPhone raised the text loupe and dropped selection
@@ -756,7 +800,7 @@ button.pos-pri[data-busy="1"] {
    a plain `.tbar-word` one, so the `[data-state]` selector here is what makes
    sure a word button never draws a triangle beside its word. */
 .tbar-toggle.tbar-word {
-  width: auto; min-width: 0; padding: 0 11px;
+  width: auto; min-width: 0; padding: 0 var(--pad-bar);
   font: 500 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim);
 }
@@ -784,7 +828,7 @@ button.pos-pri[data-busy="1"] {
    the bar is spent on the thing that is running, and a place you can go should
    not compete with it. */
 .tbar-x.tbar-word, .tbar-loop.tbar-word, .tbar-slot.tbar-word {
-  width: auto; min-width: 0; padding: 0 11px;
+  width: auto; min-width: 0; padding: 0 var(--pad-bar);
   /* ⚠️ 500, NOT 600. At 600 `LOOP` was the heaviest ink on a bar whose job is
      to be furniture around a playhead — it read as the thing to press, which it
      is not. Tracked uppercase already carries enough weight to be a label. */
@@ -917,8 +961,20 @@ button.pos-pri[data-busy="1"] {
    move. ⚠️ Re-measure if the bar's type size or padding changes; a floor
    written as arithmetic over four other values looks more rigorous and is one
    font change away from being wrong in a way nobody thinks to check. */
+/* 🔴 AND ITS `padding: 0 7px` AND `font-size: 11px` HAD NOT APPLIED FOR AS
+   LONG AS THE RATES HAVE BEEN A `createChoice`. MEASURED 2026-09-20 on
+   `/click/` at 1280 px: every rate button computes `padding-left: 11px`, from
+   `.pos-choice button`. The two selectors weigh the same (0,1,1) and
+   `.pos-choice button` is written six hundred lines LATER, so it wins at every
+   width. That is this file's own recurring lesson arriving for the fifth
+   time, and the second one found in one day. The dead declarations are gone
+   rather than given a specificity that would win: a rate button IS one cell of
+   a segmented row, so it takes the same air as the rest of the scale and the
+   two rules now agree instead of racing.
+   ⚠️ WHAT IS LEFT HERE IS WHAT ONLY THE BAR KNOWS: how tall a control on it
+   is, and that a number must never be narrower than it is tall. */
 .tbar-rates button {
-  height: var(--tbar-btn); padding: 0 7px; font-size: 11px;
+  height: var(--tbar-btn);
   min-width: 30px;          /* the `x` is gone, so the floor came down with it */
   display: grid; place-items: center;
 }
@@ -1239,7 +1295,7 @@ video[hidden] { display: none; }
 .xr .pos-v { font-size: 22px; }
 .xr .pos-k { font-size: 11px; }
 .xr .pos-controls { gap: 10px; margin-bottom: 10px; }
-.xr button, .xr .pos-btn { height: 44px; font-size: 15px; padding: 0 18px; }
+.xr button, .xr .pos-btn { height: 44px; font-size: 15px; padding: 0 var(--pad-btn); }
 .xr .pos-head { margin-bottom: 10px; }
 .xr .pos-log { font-size: 12.5px; max-height: 9em; }
 
@@ -1491,7 +1547,7 @@ video[hidden] { display: none; }
    button that is twice as tall as its neighbours, so the row stops being a row.
    The name is the control's whole content; if it does not fit, the row scrolls
    or the names are too long, and neither is fixed by folding a word in half. */
-.pos-choice button { font: 500 11px/1 var(--mono); padding: 0 11px; white-space: nowrap; }
+.pos-choice button { font: 500 11px/1 var(--mono); padding: 0 var(--pad-seg); white-space: nowrap; }
 /* 🔴 AND THE ROW SCROLLS RATHER THAN THE PAGE. `overflow-x` cannot shrink a
    flex item below its content without `min-width: 0`, and CLAUDE.md records
    what happens when it is left off: 390 px measured 141 px of PAGE overflow,
@@ -1614,6 +1670,22 @@ video[hidden] { display: none; }
    options share it evenly: three equal targets under a heading, which is also
    the biggest each option can be for a thumb. */
 @media (max-width: 560px) {
+  /* 🔴 ONE CELL OF A SEGMENTED ROW GETS LESS AIR ON A PHONE, AND THIS IS THE
+     ONLY PLACE THAT IS DECIDED. The three names are declared in `:root` at the
+     top of the file; this overrides one of them for one width, so a component
+     never has to know it is on a phone. 12 px, up from the 8 that was typed on
+     the rule below: 8 was the smallest number that fitted four station names,
+     and the ask was for more air.
+     ⚠️ IT MUST STAY BELOW THE DESKTOP VALUE, AND IT IS NOT FREE. `flex: 1 0
+     auto` never shrinks a button below its word, so every pixel of padding
+     here is a pixel of a row that has to be dragged. MEASURED at 390 px:
+     `/click/`'s three rates still share the row whole at 12 px, with nothing to
+     scroll either way. But `/radio/`'s EIGHT stations go from 97 px of drag to
+     **161 px**. Eight names cannot fit 390 px at any padding, so this buys air
+     on every row that fits and costs 64 px of travel on the one row that never
+     did. That is the trade, said out loud; if it ever has to come back, this
+     line is the whole of it. */
+  :root { --pad-seg: 12px; }
   .pos-choice { display: grid; grid-template-columns: 1fr; gap: 4px; height: auto; align-items: stretch; }
   .pos-choice-l { display: block; }
   /* 🔴 IT SCROLLS, IT DOES NOT SHRINK. This was `flex: 1 1 0` — every option the
@@ -1635,7 +1707,7 @@ video[hidden] { display: none; }
     overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
   }
   .pos-choice .step::-webkit-scrollbar { display: none; }
-  .pos-choice .step button { flex: 1 0 auto; min-width: 0; padding: 0 8px; white-space: nowrap; }
+  .pos-choice .step button { flex: 1 0 auto; min-width: 0; padding: 0 var(--pad-seg); white-space: nowrap; }
 
   /* 🔴 THE PICKER'S HALF OF THIS IS NOT HERE, AND THAT IS NOT TIDINESS.
      It WAS here, and it never once ran: `.pos-pick`'s own block sits about five
@@ -1660,7 +1732,7 @@ video[hidden] { display: none; }
     overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
   }
   .pos-bgroup-row::-webkit-scrollbar { display: none; }
-  .pos-bgroup-row button { flex: 1 0 auto; min-width: 0; padding: 0 12px; }
+  .pos-bgroup-row button { flex: 1 0 auto; min-width: 0; padding: 0 var(--pad-seg); }
 }
 
 /* ── text field ───────────────────────────────────────────────────────────
@@ -1949,14 +2021,47 @@ video[hidden] { display: none; }
    ⚠️ The border is on the WRAPPER and the rules between rows are `#ffffff08`,
    the same near-invisible hairline the message list uses — a full-strength line
    between every row turns a hundred records into a grid of boxes. */
+/* 🔴 AND THE BOX IS WHAT SCROLLS SIDEWAYS, NOT THE LIST INSIDE IT. It was the
+   body, and the HEADING IS NOT IN THE BODY. It is the wrapper's other child,
+   so dragging a phone's table sideways moved the records and left the column
+   names where they were. A table whose headings do not travel with its columns
+   is a table that is lying about which column you are reading, which is worse
+   than the squeeze that was reported. Moving the x scroll up one level makes
+   the heading and the records one piece; the body still owns the y scroll, so
+   the heading still stays put while records move under it.
+   ⚠️ `overflow-y: hidden` RATHER THAN THE `hidden` SHORTHAND, because the
+   wrapper must not grow a second vertical scrollbar over the body's own. */
 .pos-tbl {
   border: 1px solid var(--line); border-radius: 4px; background: var(--card);
   font: 400 11px/1.55 var(--mono);
-  overflow: hidden;
+  overflow-x: auto; overflow-y: hidden;
+  /* 🔴 HOW LITTLE ROOM THE GROWING COLUMN MAY BE LEFT WITH. `table.mjs` builds
+     `--tbl-cols` and writes this into the one `1fr` track as `minmax(var
+     (--tbl-grow), 1fr)`, so the number is declared once, here, and a page that
+     really wants a narrower name column can say so on its own table.
+     PHOTOGRAPHED on `/making/`: `FILE` set ONE LETTER PER LINE with an empty
+     cell beside it. MEASURED afterwards, across widths, with the track written
+     `minmax(0, 1fr)`: the file column is 110 px at 1280, 90 at 700, 30 at 640,
+     **11 px at 621** where the heading goes four lines tall, and **0 px** at
+     620 and below. Six fixed columns adding up to 476 px cannot fit beside
+     anything in a 688 px page, and `minmax(0, …)` let the one flexible column
+     pay the whole bill down to nothing rather than saying so.
+     ⚠️ 96 px IS CHOSEN TO LEAVE TODAY'S DESKTOP EXACTLY WHERE IT IS: the same
+     `/making/` table measures 110 px there, so nothing that fits now starts
+     scrolling. Below that the table is dragged sideways instead of erasing a
+     column, which is the trade the phone rules already made. And `cuts()` in
+     `table.mjs` tells the AUTHOR the columns did not fit, because a row nobody
+     can read without dragging it is a column set to fix, not a layout to
+     admire. */
+  --tbl-grow: 96px;
 }
-/* ⚠️ THE BODY SCROLLS, NOT THE WRAPPER, so a header row stays put while the
-   records move under it. */
-.pos-tbl-body { max-height: var(--tbl-h, 420px); overflow-y: auto; }
+/* ⚠️ THE BODY OWNS THE VERTICAL SCROLL AND NOTHING ELSE. `min-width:
+   min-content` is what keeps it out of the horizontal one: without it the body
+   is exactly as wide as the box, its rows overflow it, and `overflow-y: auto`
+   computes `overflow-x` to `auto` as well, so the body would scroll sideways
+   under a heading that could not. As wide as its widest row, it has nothing to
+   scroll on x and the wrapper above does that job for both of them. */
+.pos-tbl-body { max-height: var(--tbl-h, 420px); overflow-y: auto; min-width: min-content; }
 /* 🔴 THE ROW IS AS SHORT AS ITS TEXT ALLOWS, BECAUSE THE BOX IS THE PAGE.
    REPORTED as *"page should fit more"* against a table of 334 records showing
    about twenty-three of them. `line-height` and the vertical padding are the
@@ -1970,8 +2075,17 @@ video[hidden] { display: none; }
    not the subject and the text ran into the box's own edge. 5 px still leaves a
    21 px row at this line-height, so the dense case loses nothing worth counting;
    14 px across is a clear gutter rather than a hairline. */
+/* 🔴 `min-content`, NOT A TYPED 560 px. The row used to carry `min-width:
+   560px` inside the phone block, which is a number with no relationship to the
+   columns a caller declared: `/making/` grew three columns in one day and its
+   fixed tracks went from 232 px to 476, so 560 stopped being a floor that held
+   anything and the grid overflowed it anyway. `min-content` is the sum of the
+   tracks, the gaps and the gutters, computed from the very list the caller
+   passed: the same measurement, in one place, in the one language that can
+   see it. It is also unconditional now: a table whose columns do not fit is
+   not a phone, it is a table whose columns do not fit. */
 .pos-tbl-row {
-  display: grid; grid-template-columns: var(--tbl-cols);
+  display: grid; grid-template-columns: var(--tbl-cols); min-width: min-content;
   gap: 12px; padding: 9px 14px 7px; line-height: 1.4; align-items: baseline;
   border-bottom: 1px solid #ffffff08;
 }
@@ -2021,6 +2135,17 @@ video[hidden] { display: none; }
      spans its border box, gutter included, so it reaches both edges. */
   border-bottom: 1px solid var(--line);
 }
+/* 🔴 A HEADING NEVER WRAPS, AND A HEADING THAT DOES NOT FIT IS THE AUTHOR'S
+   PROBLEM RATHER THAN THE READER'S. A wrapped heading is the table reporting
+   that its columns do not fit, in the one place a reader can do nothing about
+   it, and it does it by changing its own height, so the whole table jumps.
+   PHOTOGRAPHED on `/making/`: `FILE` set one letter per line, four rows tall.
+   ⚠️ IT IS CLIPPED, NOT ELLIPSISED, which is the same answer `createDiagram`
+   gives a label too long for its box: the full string is still in the cell's
+   text and `cuts()` in `table.mjs` names every heading that did not fit, so
+   the author is told exactly which column to rename or widen. An ellipsis here
+   would make a too-long heading feel handled. */
+.pos-tbl-head .pos-tbl-c { white-space: nowrap; overflow: hidden; }
 .pos-tbl-c { color: var(--dim); min-width: 0; overflow-wrap: anywhere; }
 .pos-tbl-c.r { text-align: right; }
 .pos-tbl-c.hi { color: var(--fg); }
@@ -2031,14 +2156,13 @@ video[hidden] { display: none; }
 .pos-tbl-a { color: var(--fg); text-decoration: none; }
 .pos-tbl-a:hover, .pos-tbl-a:focus-visible { text-decoration: underline; }
 .pos-tbl-empty { color: var(--dim2); padding: 8px 10px; }
-/* ⚠️ ON A PHONE THE FIXED TRACKS ARE MOST OF THE WIDTH. Every column keeps its
-   place and the table scrolls sideways as one piece, which keeps the columns
-   aligned — reflowing each row into a stack loses exactly the thing a table is
-   for. */
-@media (max-width: 620px) {
-  .pos-tbl-body { overflow-x: auto; }
-  .pos-tbl-row { min-width: 560px; }
-}
+/* ⚠️ THE PHONE BLOCK THAT USED TO SIT HERE IS GONE, AND NOTHING WAS LOST. It
+   said the fixed tracks are most of the width on a phone, so every column keeps
+   its place and the table scrolls sideways as one piece rather than reflowing
+   each row into a stack. That is still exactly what happens, at every width,
+   from `min-width: min-content` on the row and `overflow-x` on the box. What
+   it also said was `min-width: 560px`, and that is the half that had to go:
+   see the note on `.pos-tbl-row`. */
 
 .pos-msgs {
   font: 400 11px/1.55 var(--mono);
@@ -2102,7 +2226,23 @@ video[hidden] { display: none; }
    a cell that is 22 ch on a 360 px screen would push the row off the side.
    ⚠️ `ch` ON A MONOSPACE FACE IS EXACTLY CHARACTERS, which is why the unit is
    worth keeping: 22 ch fits `Vibraphone Soft 2` and `four seconds ago` whole,
-   and the longest name in `/keys/`'s Yoshimi library with one to spare. */
+   and the longest name in `/keys/`'s Yoshimi library with one to spare.
+
+   🔴 AND `--pick-w` IS THE ROOM THE NAME GETS, NOT THE WIDTH OF THE BOX ROUND
+   IT. It was both, and the box won: the cell is `box-sizing: border-box` with
+   padding either side, so `width: var(--pick-w)` spent the padding and the two
+   borders out of the very room the number was reserving. MEASURED 2026-09-20 on
+   `/veil/`, whose longest scene is `cylinder`: `picker.mjs` asked for 9 ch, the
+   cell came out 70.4 px, and 20 px of padding and 2 px of edge left 48.4 px,
+   which is 6.2 characters of this face. The page drew `cylin…` and `hold …`,
+   with a cell that had been sized to fit them whole.
+   ⚠️ THE PADDING IS NAMED ONCE AND READ TWICE, WHICH IS THE WHOLE REPAIR.
+   `--pick-pad` is declared below and used by both the `width` and the
+   `padding`, so they cannot disagree. It is the same fix `--sld-col` got, for
+   the same defect: a shared measurement typed in two places is a measurement
+   that will drift. And it is fixed HERE rather than in `picker.mjs`, which
+   would put one number in two files across a language boundary where nothing
+   can check it. */
 .pos-pick { display: inline-flex; align-items: center; gap: 8px; height: 34px; --pick-w: 13ch; }
 @media (min-width: 620px) { .pos-pick { --pick-w: 22ch; } }
 .pos-pick-l {
@@ -2112,7 +2252,22 @@ video[hidden] { display: none; }
 .pos-pick-cell {
   white-space: nowrap;
   position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  width: var(--pick-w); height: 34px; padding: 0 10px; box-sizing: border-box;
+  /* 🔴 `--pick-pad` IS DECLARED ON THE CELL, NOT ON `.pos-pick`, AND PUTTING IT
+     ON THE WRAPPER BROKE THE STEPPER. `createValueCell` is exported and
+     `stepper.mjs` uses one, so a `.pos-pick-cell` can live inside a bare
+     `.step` with no `.pos-pick` anywhere above it. With the token on the
+     wrapper, `var(--pick-pad)` there resolved to nothing, which makes BOTH the
+     `width` and the `padding` below invalid at computed-value time, so the
+     cell silently fell back to `width: auto` and no padding at all. MEASURED on
+     `/kit/` at 1280 px: the stepper's cell read `padding: 0px` and `width:
+     95.92px` from its own text, while the picker's read 14 px and 155.22 px, on
+     one page, from one rule. A custom property that is missing does not warn; it
+     deletes the declaration that used it. */
+  --pick-pad: var(--pad-seg);
+  /* the box is the name's room plus its own air and its own edges. See the
+     header. `2px` is the 1 px border either side; `box-sizing` is global. */
+  width: calc(var(--pick-w) + 2 * var(--pick-pad) + 2px);
+  height: 34px; padding: 0 var(--pick-pad); box-sizing: border-box;
   font: 500 13px/1 var(--mono); color: var(--fg);
   background: var(--card2); border: 1px solid var(--line2);
   /* ⚠️ THE ZEROED RADIUS AND THE ONE PIXEL OVERLAP ARE `.pos-seg`'S NOW. This
@@ -2167,15 +2322,38 @@ video[hidden] { display: none; }
    The decision itself is unchanged and is the same one the choice row makes:
    the label goes ON TOP so the control gets the whole width, and the NAME is
    what stretches, because the arrows and the die are fixed targets and the name
-   is the readout. */
+   is the readout.
+
+   🔴 THE DIE STAYS ON THE SEGMENT'S ROW, AND IT DID NOT. This block was
+   `grid-template-columns: 1fr`, so every child got a row of its own and the die
+   dropped UNDER the segment with `justify-self: start` parking it at the far
+   left, a whole row away from the arrows it works with. REPORTED on
+   `/radio/`'s SOUND row and `/mirror/`'s LOOK row. MEASURED at 390 px on
+   `/mirror/` before this: segment at y 216.5, die at y 254.5 and x 16, under
+   the LABEL rather than beside anything.
+   🔴 A WRAPPING FLEX ROW, NOT `1fr auto`, AND THE GRID WAS TRIED FIRST AND
+   MEASURED WRONG. Two explicit tracks exist whether or not anything is in
+   them, so the 8 px column gap was laid down for a die that was not there:
+   `/veil/` has no die and its segment measured **350 px in a 358 px row**, with
+   the missing 8 px sitting off the right hand end where nothing could be seen
+   to explain it. That is the shape of defect this file keeps paying for: a
+   rule that is right about the case it was written for and silently wrong about
+   the one beside it. A flex gap goes BETWEEN items that exist, so a picker with
+   no die measures the full width and one with a die gets the same 8 px the
+   desktop row uses, which is the gap that says the die is not a fourth segment.
+   ⚠️ THE LABEL TAKES THE WHOLE LINE, which is what makes the row wrap under it:
+   `flex: 0 0 100%` rather than a second rule about where anything else goes.
+   ⚠️ AND THE TWO GAPS ARE DIFFERENT NUMBERS: 4 px between the label and the
+   control it names, 8 px between the segment and the die. One `gap` with two
+   values rather than two rules. */
 @media (max-width: 560px) {
-  .pos-pick { display: grid; grid-template-columns: 1fr; gap: 4px; height: auto; width: 100%; }
-  .pos-pick-l { display: block; }
-  .pos-pick-seg { display: flex; width: 100%; }
+  .pos-pick { display: flex; flex-wrap: wrap; gap: 4px 8px; height: auto; width: 100%; }
+  .pos-pick-l { display: block; flex: 0 0 100%; }
+  .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
   .pos-pick-cell { width: auto; flex: 1 1 0; min-width: 0; }
   /* ⚠️ The die stays OUT of the group and stays SQUARE. It is a different kind
      of move from the arrows, and stretching it would say it was a third one. */
-  .pos-pick > .pos-pick-die { justify-self: start; }
+  .pos-pick > .pos-pick-die { flex: none; }
 }
 
 /* ⚠️ THE JOIN ITSELF IS `.pos-seg`, WHICH EVERY `.step` CARRIES. The overlapped

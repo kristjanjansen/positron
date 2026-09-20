@@ -80,8 +80,22 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
   }
 
   const wrap = el('div', 'pos-tbl');
+  /**
+   * 🔴 THE GROWING TRACK HAS A FLOOR, AND THE FLOOR IS NOT A NUMBER IN THIS
+   * FILE. `minmax(0, 1fr)` let the one flexible column pay for every fixed one
+   * until it was nothing at all: PHOTOGRAPHED on `/making/` with `FILE` set one
+   * letter per line beside an empty cell, and MEASURED afterwards at 0 px on a
+   * phone and 11 px at 621. `--tbl-grow` is declared in `shell.css` beside
+   * `.pos-tbl`, so the measurement lives with the rest of the layout and a page
+   * can override it on its own table without editing this component.
+   * ⚠️ AND THE ROW'S `min-width` IS `min-content`, NOT A TYPED WIDTH. With a
+   * floor in the track list, the sum of the tracks IS the smallest the row can
+   * be, so the browser computes what used to be typed as 560 px, from the very
+   * column list the caller passed, which is the one thing that cannot drift
+   * away from it.
+   */
   const tracks = columns
-    .map((c) => (c.grow ? 'minmax(0, 1fr)' : `${c.width || 80}px`))
+    .map((c) => (c.grow ? 'minmax(var(--tbl-grow), 1fr)' : `${c.width || 80}px`))
     .join(' ');
   wrap.style.setProperty('--tbl-cols', tracks);
 
@@ -319,5 +333,65 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
     focused: () => els.findIndex((e) => e === document.activeElement),
     /** The element that scrolls, so a check can read where the list is. */
     scroller: () => body,
+    /**
+     * 🔴 WHAT DID NOT FIT, REPORTED TO THE AUTHOR. The same answer
+     * `createDiagram` gives about a label too long for its box, and for the
+     * same reason: a heading that does not fit is a fact about the column list
+     * somebody declared, and the reader is the one person who can do nothing
+     * about it. `shell.css` stops a heading wrapping and clips it instead; this
+     * is the half that says which one was clipped.
+     *
+     * ⚠️ IT IS A METHOD, NOT A PROPERTY, BECAUSE A TABLE CANNOT MEASURE ITSELF
+     * UNTIL IT IS ON SCREEN. `createDiagram` measures its own text with a
+     * canvas and can answer while it is being built; a grid's track widths are
+     * the browser's answer to a box it has not been put in yet. So this is read
+     * after mount, from a page's own self-check.
+     *
+     * ⚠️ AND `measured` IS THE HALF THAT KEEPS IT HONEST. A table inside a tab
+     * nobody has opened, or one with no rows in it yet, has no layout at all
+     * and every cell reads zero wide, which would report every heading as cut,
+     * or with the test the other way round, report a broken table as clean.
+     * "We did not look" answers `measured: false` and no cuts, which is
+     * CLAUDE.md's rule about a probe that could not answer.
+     *
+     * @returns {{measured: boolean, width: number,
+     *            cuts: {id: string, where: 'label'|'columns',
+     *                   full: string, shown: string, width: number}[]}}
+     */
+    cuts() {
+      const seen = wrap.getBoundingClientRect().width;
+      const ref = head && !head.hidden ? head : els[0];
+      if (!seen || !ref) return { measured: false, width: seen, cuts: [] };
+      const out = [];
+      /**
+       * The columns against the box they were given. This is NOT automatically
+       * a fault: from `min-width: min-content` on the row, a table whose
+       * columns do not fit is dragged sideways rather than squeezed, and on a
+       * phone that is the intended answer and has been since the table existed.
+       * It is reported because on a wide screen it means the column list is too
+       * heavy for a 720 px page, and only the author can decide which column
+       * goes.
+       */
+      const over = wrap.scrollWidth - wrap.clientWidth;
+      if (over > 1) {
+        out.push({ id: 'the columns', where: 'columns',
+                   full: `${wrap.scrollWidth} px of columns`,
+                   shown: `${wrap.clientWidth} px of box`, width: Math.round(over) });
+      }
+      // A heading against its own column. `white-space: nowrap; overflow:
+      // hidden` in shell.css is what makes this readable: the cell lays the
+      // whole label out on one line and clips it, so the overflow is the exact
+      // number of pixels the author is short.
+      [...ref.children].forEach((cell, i) => {
+        const c = columns[i];
+        if (!c || !c.label) return;
+        const cut = cell.scrollWidth - cell.clientWidth;
+        if (cut > 1) {
+          out.push({ id: c.key, where: 'label', full: c.label,
+                     shown: `${cell.clientWidth} px of column`, width: Math.round(cut) });
+        }
+      });
+      return { measured: true, width: seen, cuts: out };
+    },
   };
 }

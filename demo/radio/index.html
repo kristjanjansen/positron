@@ -890,6 +890,33 @@
   // the `shareLabelColumn` lesson in a smaller costume.
   looper.bind(bar);
 
+  /**
+   * 🔴 THE BADGE WHERE THE CLOCK USED TO BE SAYS `on air`, AND WHAT MAKES IT
+   * TRUE IS SOUND ARRIVING. It was a `LIVE` chip: a word drawn because this
+   * page passed `live: true` at build time, so it stood whether or not a byte
+   * of this station had ever reached the browser. Half of these eight mounts
+   * are typically down, so the one thing the word claimed was the one thing it
+   * could not know.
+   *
+   * ⚠️ IT IS FED FROM BLOCKS DECODED, NOT FROM A PRESS. The 1 Hz tick below
+   * compares `stream.stats().blocks` against the last reading, so what the
+   * badge reports is audio this page actually has. On `?decode=0` the element
+   * owns the sound and its `currentTime` is the same evidence.
+   * ⚠️ AND SILENCE IS ONLY EVIDENCE ONCE SOMEBODY HAS ASKED FOR SOUND, which
+   * is what `since: null` says: before the first press the badge reads
+   * `unknown`, not `off air`. A station is not off the air because nobody in
+   * this browser is listening to it.
+   * ⚠️ `tuning in` EXPIRES. Eight seconds is this page's patience with a mount
+   * that accepted the connection and sent nothing, after which the honest word
+   * is `off air`. Without a limit a dead mount reads as one that is still
+   * coming up, for ever.
+   */
+  const onAir = bar.api.live;
+  const onAirIdle = () => onAir.follow({ everyMs: 1000, misses: 4, since: null, comingMs: 8000 });
+  onAirIdle();
+  // blocks decoded, or seconds the element has played. -1 means nothing is open.
+  let heardMark = -1;
+
   // ── the picture ────────────────────────────────────────────────────────────
   // 🔴 TWO PICTURES, AND THE COMPONENT CHOOSES BY WHAT IT IS GIVEN. Before the
   // granulator exists there are no grains to draw, so this is `feed()`: a
@@ -1104,7 +1131,14 @@
   // Capture-phase, so it runs BEFORE the bar's own handler flips the deck:
   // `deck.playing()` is still the state before this press.
   bar.el.addEventListener('click', () => {
-    if (deck.playing()) return;                 // this press is a pause
+    if (deck.playing()) {                       // this press is a pause
+      // Nothing is being asked for any more, so there is nothing to report: the
+      // badge goes back to `unknown` rather than accusing the station of having
+      // died because a listener stopped listening.
+      onAirIdle();
+      return;
+    }
+    onAir.coming();
     startListening();
   }, { capture: true });
 
@@ -1134,6 +1168,18 @@
     // `?decode=0` there is no queue of ours to starve and no frames of ours to
     // drop, so both cells go to one em dash rather than to a confident 0.
     const sst = DECODE && stream ? stream.stats() : null;
+    // 🔴 THE `on air` BADGE, FED BY WHAT ARRIVED SINCE THE LAST TICK. A count
+    // that went UP is audio this page has in hand; a count that stood still for
+    // four of these is a mount that has stopped sending. Nothing here asks
+    // whether the deck is playing, because that is the page's own intention and
+    // the badge is about the station.
+    {
+      const heard = DECODE
+        ? (sst ? sst.blocks : -1)
+        : (!audio.paused && audio.currentTime > 0 ? audio.currentTime : -1);
+      if (heard > heardMark) onAir.seen();
+      heardMark = heard;
+    }
     if (sst) {
       d.set('buffer', sst.buffered.toFixed(2));
       // `skipped` is deliberately NOT in here. It is the opening burst trim,
@@ -1598,6 +1644,15 @@
     nowEl.textContent = '';
     paintStations();
     if (!started) return;
+    /**
+     * 🔴 THE BADGE STARTS OVER, AND `heardMark` IS THE HALF THAT MATTERS. A
+     * new stream's block count begins at 0 while the old one's stood at several
+     * hundred, so a mark left where the last station finished would take
+     * minutes to be passed and the badge would read `off air` over a station
+     * that was playing perfectly. A count is only comparable against itself.
+     */
+    onAir.coming();
+    heardMark = -1;
     // The element has already been played once inside a real gesture, so the
     // browser allows this one; `currentTime` restarts, which is what `heard`
     // should say about a station you have just switched to.

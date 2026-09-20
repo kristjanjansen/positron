@@ -202,8 +202,13 @@ export function wirePresence({ ready = null, refusal = null, reconnects = 0 } = 
  *
  * ⚠️ NO LETTER-SPACING ON THE WORD. `ch` is the advance of `0`, and letter
  * spacing adds to every advance, so a tracked-out word would overflow a reserve
- * computed in `ch` by exactly one space per character. `.tbar-live` is tracked
- * and gets away with it because its word never changes.
+ * computed in `ch` by exactly one space per character.
+ * ⚠️ THE EXAMPLE THAT USED TO STAND HERE IS GONE, WHICH IS WHY THE LINE MOVED.
+ * It named `.tbar-live`, the transport bar's `LIVE` chip, as a tracked word
+ * that got away with it because its word never changed. That chip is one of
+ * these badges now (`ON_AIR` in `transport-bar.mjs`), so its word DOES change
+ * and there is no tracking left on it anywhere. The rule is untouched; only
+ * the thing it pointed at has stopped existing.
  */
 export function createPresence({
   of = '',

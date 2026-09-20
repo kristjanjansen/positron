@@ -25,11 +25,15 @@
 //   - a bold run that toggles on every marker turns one typo into a sentence
 //     that is bold from the mistake to the full stop, and reads as a decision.
 //
-// Nine of these are NEGATIVE CONTROLS: a check that cannot fail is a check that
-// is decoration, so each of the claims above is also run against an input
+//   - a link drawn to the MACHINE a box sits inside looks exactly like a link
+//     drawn to the box: every arrow is present, the picture is complete, and
+//     each one arrives somewhere plausible and false. Four pages at once.
+//
+// Thirteen of these are NEGATIVE CONTROLS: a check that cannot fail is a check
+// that is decoration, so each of the claims above is also run against an input
 // that must break it.
 
-import { assignColumns, backLevels, wrapLines, layout, captionTexts, boldParts, METRICS }
+import { assignColumns, backLevels, wrapLines, layout, captionTexts, boldParts, checkEnds, METRICS }
   from './diagram.mjs';
 
 let pass = 0, fail = 0;
@@ -384,15 +388,25 @@ console.log('\n== the line under the picture, and the height reserved for it =='
   // the next un-hover grew the page by 78 px, which is the exact jump the
   // reservation exists to prevent.
   const spec = { caption: 'a caption long enough to take three lines on a phone, '
-                        + 'which is the tallest this line will ever be' };
-  const nodes = [{ id: 'a', title: 'this page, one copy here', label: { full: 'this page' } },
-                 { id: 'b', title: '', label: { full: 'a copy here' } }];
+                        + 'which is the tallest this line will ever be',
+                 links: [{ from: 'a', to: 'b',
+                           note: 'what actually travels along this arrow, which is a '
+                               + 'sentence the line under the picture has held since '
+                               + 'arrows became hoverable' }] };
+  const nodes = [{ id: 'a', note: 'this page, one copy here', label: { full: 'this page' } },
+                 { id: 'b', title: 'a copy here', label: { full: 'a copy here' } }];
   const t = captionTexts(spec, nodes);
   ok('the height reserved under the picture counts the CAPTION, not only the boxes',
      t.includes(spec.caption), `${t.length} strings, the first is ${t[0].length} characters`);
   ok('and every box\'s own sentence, so hovering one cannot make it grow either',
-     t.includes(nodes[0].title) && t.includes(nodes[1].label.full),
+     t.includes(nodes[0].note),
      t.slice(1).map((x) => `"${x}"`).join(' · '));
+  // 🔴 A LINK'S SENTENCE IS ONE OF THE STRINGS THIS LINE HOLDS, and the
+  // reservation never knew about them: a note longer than the caption grew the
+  // block on hover, which is the jump the whole mechanism exists to prevent.
+  ok('and an arrow\'s sentence too, which the reservation used to miss entirely',
+     t.includes(spec.links[0].note),
+     `${t.length} strings for 2 boxes and 1 arrow`);
 }
 
 console.log('\n== an arrow\'s name gets the room that is actually beside it ==');
@@ -665,17 +679,42 @@ console.log('\n== a box inside a box ==');
 }
 
 {
-  // 🔴 STACKED, THE SAME ARROW STOPS AT THE MACHINE — and that is not an
-  // inconsistency, it is the same rule: a container's name is at the TOP of
-  // it, so a run coming down from above would cross the words `Raspberry Pi`
-  // on its way in. MEASURED on screen before this: it did exactly that.
+  /**
+   * 🔴 STACKED, THE SAME ARROW REACHES THE SAME BOX, AND IT GETS THERE DOWN
+   * THE CONTAINER'S PADDING.
+   *
+   * This used to assert the OPPOSITE — that in one column the line stops at
+   * the machine's edge — on a reason that is still true: a container's name is
+   * at the TOP of it, so a vertical run coming down the middle crosses the
+   * words `Raspberry Pi` on its way in, and every box stacked above the one it
+   * wants. What was wrong was the conclusion. PHOTOGRAPHED 2026-09-19 on four
+   * pages at once: `WebGL2 -> shader` drawn from the Browser's own edge,
+   * `store -> play` arriving beside `uploader`, `ffmpeg -> up` leaving the
+   * Raspberry Pi. An arrow that ends at the wrong box is a picture claiming a
+   * path the page does not have, which is the defect a refused link was
+   * already reported for.
+   *
+   * So the line turns out of the box's side and runs in a lane inside the
+   * container's own padding, which is the one strip in there that is empty
+   * from top to bottom. Both halves are asserted: it ARRIVES at the box, and
+   * nothing it draws inside the machine is anywhere near that machine's words.
+   */
   const L = layout(NEST, { width: 320, measure });
   const pi = boxOf(L, 'pi'), synth = boxOf(L, 'synth');
   const note = findLink(L, 'you', 'synth');
-  const end = pathPoints(note.d).at(-1);
-  ok('in one column it stops at the machine, clear of the container\'s own name',
-     L.mode === 'column' && end[1] <= pi.y && end[1] < pi.labY[0] && synth.y > pi.labY[0],
-     `it ends at y ${end[1]}, the machine starts at ${pi.y} and its name sits at ${pi.labY[0]}`);
+  const pts = pathPoints(note.d);
+  const end = pts.at(-1);
+  ok('in one column the arrow reaches the box it names, not the machine round it',
+     L.mode === 'column' && end[0] < synth.x && end[0] >= synth.x - 6
+       && end[1] >= synth.y && end[1] <= synth.y + synth.h,
+     `it ends at (${end[0]}, ${end[1]}); the box is x ${synth.x} y ${synth.y}`
+     + ` to ${synth.y + synth.h}, the machine's edge is ${pi.x}`);
+  const within = pts.filter((p) => p[1] >= pi.y && p[1] <= pi.y + pi.h);
+  ok('and every corner of it inside the machine is in the padding, left of the boxes',
+     within.length >= 2 && within.every((p) => p[0] >= pi.x && p[0] < synth.x)
+       && synth.y > pi.labY[0],
+     `${within.length} points between x ${Math.min(...within.map((p) => p[0]))} and `
+     + `${Math.max(...within.map((p) => p[0]))}, the boxes start at ${synth.x}`);
 }
 
 {
@@ -773,19 +812,36 @@ console.log('\n== the line under the picture says what a box DOES ==');
   // pointer shows the caption — one step further in, and it moves the page by
   // the difference.
   const L = layout(NEST, { width: 660, measure });
-  const t = captionTexts({ caption: 'a caption' }, L.nodes);
+  const t = captionTexts({ caption: 'a caption', links: NEST.links }, L.nodes);
   ok('the reserved list holds a box\'s SENTENCE, not its name',
      t.includes(NEST.nodes[0].note) && !t.includes(boxOf(L, 'you').title),
      `"${t[1]}" rather than "${boxOf(L, 'you').title}"`);
-  ok('and every box inside a container is in it too',
-     t.includes(boxOf(L, 'synth').title) && t.includes(boxOf(L, 'rec').title),
-     `${t.length} strings for ${L.nodes.length} boxes and 2 inside one of them`);
-  // 🔴 NEGATIVE CONTROL: a box with no sentence still has to be measured, or
-  // the list quietly loses boxes and the reservation is short for exactly the
-  // ones nobody wrote a sentence for.
-  ok('NEGATIVE CONTROL: a box with no sentence still contributes its name',
-     t.includes(boxOf(L, 'pi').title) && boxOf(L, 'pi').note === undefined,
-     `"${boxOf(L, 'pi').title}"`);
+  ok('and every box inside a container is one of the strings it counts',
+     t.length === 1 + L.nodes.length + 2 + NEST.links.length,
+     `${t.length} strings for ${L.nodes.length} boxes, 2 inside one of them, `
+     + `${NEST.links.length} arrows and the caption`);
+  /**
+   * 🔴 A BOX WITH NO SENTENCE SAYS NOTHING, AND IT USED TO SAY ITS OWN NAME.
+   * The line under the picture read `n.note || n.title || n.label.full`, so
+   * pointing at a box with no note printed the words already drawn an inch
+   * above it. PHOTOGRAPHED on /mirror/: `Raspberry Pi` under a box labelled
+   * `Raspberry Pi`. Every CONTAINER has no note by rule, so every container
+   * did it, and on a phone there is no pointer to leave: whatever was last
+   * touched stays named.
+   * ⚠️ THE LIST STILL HOLDS AN ENTRY FOR IT. Saying nothing means the line
+   * keeps the CAPTION, which is already the first string here, so the height
+   * stays reserved and the block cannot collapse.
+   */
+  ok('a box with no sentence contributes NO name, so the line cannot echo the box',
+     !t.includes(boxOf(L, 'pi').title) && !t.includes('Raspberry Pi')
+       && boxOf(L, 'pi').note === undefined,
+     `"${boxOf(L, 'pi').title}" is not one of the ${t.length} strings`);
+  // NEGATIVE CONTROL: the list is not simply empty of boxes — a box that DOES
+  // have a sentence is still counted, or the reservation would be short for
+  // exactly the ones somebody bothered to write.
+  ok('NEGATIVE CONTROL: a box that has a sentence is still measured',
+     t.filter(Boolean).includes(NEST.nodes[0].note),
+     `"${NEST.nodes[0].note}"`);
 }
 
 console.log('\n== bold, and nothing else ==');
@@ -815,6 +871,273 @@ console.log('\n== bold, and nothing else ==');
   ok('a sentence with no marks is one plain run',
      plain.length === 1 && !plain[0].bold && plain[0].text === 'no marks at all',
      `${plain.length} run`);
+}
+
+console.log('\n== which box a line actually reached, and what it crossed to get there ==');
+
+/**
+ * 🔴 NOTHING GRADED THIS AND FOUR PAGES WERE WRONG AT ONCE.
+ *
+ * `cuts` reports a link that was REFUSED, so a link routed to the WRONG END
+ * reads clean through it: every arrow is drawn, the picture is complete, and
+ * each one arrives somewhere plausible and false. PHOTOGRAPHED 2026-09-19 —
+ * `/mirror/`'s `WebGL2 -> shader` leaving the Browser's own edge, `/floor/`'s
+ * `films -> video` drawn machine to machine ON A WIDE SCREEN, `/crate/`'s
+ * `store -> play` arriving beside `uploader`, `/knobs/`'s `ffmpeg -> up`
+ * leaving the Raspberry Pi.
+ *
+ * The three machines below hold two boxes each and every link names a BOX, so
+ * every one of them is a case the old code got wrong. Both modes, because the
+ * two layouts were wrong for different reasons and `/floor/` proves a phone is
+ * not the only place it shows.
+ */
+const DIVES = {
+  nodes: [
+    { id: 'you', label: 'Browser', kind: 'here', children: [
+      { id: 'draw', label: 'a canvas', sub: 'WebGL2' },
+      { id: 'play', label: 'a player', sub: 'one element' },
+    ] },
+    { id: 'cf', label: 'Cloudflare', kind: 'cloud', children: [
+      { id: 'out', label: 'shader', sub: 'Relay object' },
+      { id: 'home', label: 'video', sub: 'Relay object' },
+    ] },
+    { id: 'pi', label: 'Raspberry Pi', kind: 'device', children: [
+      { id: 'gl', label: 'v3dpipe', sub: 'GLES 3.1' },
+      { id: 'enc', label: 'ffmpeg', sub: 'H.264' },
+    ] },
+  ],
+  links: [
+    { from: 'draw', to: 'out', label: 'GLSL' },
+    { from: 'out', to: 'gl', label: 'GLSL' },
+    { from: 'gl', to: 'enc' },
+    { from: 'enc', to: 'home', label: 'H.264', back: true },
+    { from: 'home', to: 'play', label: 'H.264', back: true },
+    // and one that reaches PAST a machine, which is the lane case in both
+    // layouts and the shape `/floor/` was photographed getting wrong
+    { from: 'draw', to: 'gl', label: 'the same' },
+  ],
+};
+
+/** how far a point is from a box, 0 anywhere inside it */
+const gapTo = (p, b) => Math.hypot(
+  Math.max(b.x - p[0], 0, p[0] - (b.x + b.w)),
+  Math.max(b.y - p[1], 0, p[1] - (b.y + b.h)));
+
+/** does a straight run enter a box, ignoring two pixels of its edge */
+const through = (a, b, r) => {
+  for (let i = 0; i <= 40; i++) {
+    const t = i / 40, px = a[0] + (b[0] - a[0]) * t, py = a[1] + (b[1] - a[1]) * t;
+    if (px > r.x + 2 && px < r.x + r.w - 2 && py > r.y + 2 && py < r.y + r.h - 2) return true;
+  }
+  return false;
+};
+
+/** every box that holds no other box: the ones a line may never be drawn over */
+const leaves = (L) => L.nodes.flatMap((n) => (n.kids && n.kids.length ? n.kids : [n]));
+
+for (const width of [1000, 390]) {
+  const L = layout(DIVES, { width, measure });
+  const drawn = L.links.filter((l) => !l.sib);
+  // ⚠️ MEASURED OFF THE PATH, NEVER OFF THE ROUTER'S INTENTION. The `d` string
+  // is the only thing a reader sees. A check reading the variable the router
+  // chose would agree with the router by construction, which is the
+  // two-numbers-from-one-field defect in CLAUDE.md.
+  const wrong = [];
+  for (const l of drawn) {
+    const p = pathPoints(l.d);
+    const f = boxOf(L, l.from), t = boxOf(L, l.to);
+    if (gapTo(p[0], f) > 6) wrong.push(`${l.from}->${l.to} leaves ${Math.round(gapTo(p[0], f))} px off ${l.from}`);
+    if (gapTo(p.at(-1), t) > 6) wrong.push(`${l.from}->${l.to} reaches ${Math.round(gapTo(p.at(-1), t))} px off ${l.to}`);
+  }
+  // five, because `gl -> enc` is two boxes in ONE machine and is drawn by
+  // `placeSibs` in the gap they already share
+  ok(`${L.mode}: every line starts and ends on the BOX it names, not the machine round it`,
+     drawn.length === 5 && !wrong.length,
+     wrong.length ? wrong.join(' · ') : `${drawn.length} links, every end within 6 px of its box`);
+
+  const crossed = [];
+  for (const l of L.links) {
+    const p = pathPoints(l.d);
+    for (const b of leaves(L)) {
+      if (b.id === l.from || b.id === l.to) continue;
+      for (let i = 0; i + 1 < p.length; i++) {
+        if (through(p[i], p[i + 1], b)) { crossed.push(`${l.from}->${l.to} over ${b.id}`); i = p.length; }
+      }
+    }
+  }
+  // 🔴 AND REACHING THE RIGHT BOX IS WORTH NOTHING IF IT IS DRAWN THROUGH
+  // ANOTHER ONE. That is the whole reason the old code attached to the machine:
+  // a vertical run into a box inside a container crosses the container's name
+  // and every box above the one it wants. The lane in the padding is what buys
+  // both halves, so both halves are asserted together.
+  ok(`${L.mode}: and not one of them is drawn through a box it does not name`,
+     !crossed.length, crossed.join(' · ') || `${L.links.length} lines, ${leaves(L).length} boxes`);
+
+  // and the lane it runs in is clear of the container's own words, which is
+  // the measurement that sent every link to the machine's edge in the first
+  // place
+  if (L.mode === 'column') {
+    const cf = L.nodes.find((n) => n.id === 'cf');
+    const inCf = pathPoints(findLink(L, 'draw', 'out').d)
+      .filter((p) => p[1] >= cf.y && p[1] <= cf.y + cf.h);
+    ok('column: the run inside a machine is in its padding, left of its name and its boxes',
+       inCf.length >= 2 && inCf.every((p) => p[0] >= cf.x && p[0] < cf.kids[0].x)
+         && cf.kids[0].x > cf.x,
+       `${inCf.length} points between x ${Math.min(...inCf.map((p) => p[0]))} and `
+       + `${Math.max(...inCf.map((p) => p[0]))}, boxes start at ${cf.kids[0].x}`);
+  }
+}
+
+{
+  /**
+   * 🔴 AND THE REPORT IS THE HALF THAT REACHES A PAGE. The two checks above
+   * run here and nowhere else; `layout` makes the same measurement itself and
+   * puts a mismatch on `cuts`, so every page that already asserts `cuts.length
+   * === 0` grades its own picture with no page edit at all.
+   *
+   * NEGATIVE CONTROL, and it is the whole point of this block: a report that
+   * fires whatever it is shown is not a report. The spec is sabotaged by
+   * naming a link end that is drawn nowhere near the box named — a container
+   * standing in for the box inside it, which is EXACTLY the defect that was
+   * photographed — and the count has to move.
+   */
+  for (const width of [1000, 390]) {
+    const good = layout(DIVES, { width, measure });
+    ok(`a picture whose lines reach their boxes reports nothing at ${width}`,
+       !good.cuts.some((c) => /WRONG END/.test(c.shown)),
+       `${good.cuts.length} cuts: ${good.cuts.map((c) => c.id).join(', ') || 'none'}`);
+  }
+
+  // The picture that was photographed, built by hand: one machine holding a
+  // box, another machine holding a box, and a line drawn from edge to edge
+  // between the two MACHINES while naming the two boxes. Every pixel of it is
+  // plausible and it is the exact shape of all four reports.
+  const wrongEnds = {
+    nodes: [
+      { id: 'cf', x: 0, y: 0, w: 200, h: 120,
+        kids: [{ id: 'out', x: 10, y: 40, w: 180, h: 30 }] },
+      { id: 'you', x: 0, y: 200, w: 200, h: 120,
+        kids: [{ id: 'play', x: 10, y: 250, w: 180, h: 30 }] },
+    ],
+    links: [{ from: 'out', to: 'play', d: 'M100 122 L100 197' }],
+  };
+  const said = [];
+  checkEnds(wrongEnds, said);
+  ok('NEGATIVE CONTROL: a line drawn machine to machine while naming two boxes is reported',
+     said.length === 2 && said.every((c) => /WRONG END/.test(c.shown))
+       && said[0].shown.includes('out') && said[1].shown.includes('play'),
+     said.map((c) => c.shown).join(' · ') || 'nothing reported');
+
+  const rightEnds = {
+    ...wrongEnds,
+    links: [{ from: 'out', to: 'play', d: 'M8 55 L4 55 L4 265 L8 265' }],
+  };
+  const quiet = [];
+  checkEnds(rightEnds, quiet);
+  ok('and the same two boxes reached down a lane report nothing',
+     !quiet.length, `${quiet.length} reported`);
+}
+
+console.log('\n== two arrows into one box sit as close as their names allow ==');
+
+{
+  /**
+   * 🔴 RESERVING THE WORST CASE IS THE SAME MISTAKE AS RESERVING TOO LITTLE.
+   *
+   * Two arrivals at one box share out that box's edge so their names do not
+   * print over each other, and the room was reserved at the CAP: two lines of
+   * link type, every time, plus 18 px of air. Reported on `/station/` with a
+   * photograph — *"two connectors arriving at one box sit too far apart"* — and
+   * the arithmetic says why. Forty pixels on a box forty-eight tall puts one
+   * head at each corner, and it was forty whether the names were two lines,
+   * one line, or not written at all.
+   *
+   * ⚠️ THE AIR IS UNCHANGED AND THAT IS DELIBERATE. 18 px rather than 6 was
+   * asked for in writing: two two-line names 28 px apart do not overlap and
+   * read as one clump. What is fixed is the guess in front of it.
+   */
+  const two = (labels) => layout({
+    nodes: [{ id: 'a', label: 'source A' }, { id: 'b', label: 'source B' },
+            { id: 'c', label: 'target' }],
+    links: [{ from: 'a', to: 'c', label: labels[0] },
+            { from: 'b', to: 'c', label: labels[1] }],
+  }, { width: 900, measure });
+  const heads = (L) => L.links.filter((l) => !l.back && !l.sib)
+    .map((l) => pathPoints(l.d).at(-1)[1]);
+  const apart = (labels) => {
+    const y = heads(two(labels));
+    return Math.abs(y[0] - y[1]);
+  };
+  const box = two(['', '']).nodes.find((n) => n.id === 'c');
+  ok('two arrows with no names on them are held apart by an arrowhead, not by a paragraph',
+     apart(['', '']) === 12,
+     `${apart(['', ''])} px apart on a box ${box.h} px tall`);
+  ok('two one-line names take one line of room and the air between them',
+     apart(['ok', 'no']) === Math.round(METRICS.linkLh) + 18,
+     `${apart(['ok', 'no'])} px apart`);
+  /**
+   * 🔴 NEGATIVE CONTROL, AND IT IS THE HALF THAT KEEPS THE OLD FIX ALIVE. A
+   * spread that simply got smaller would put two two-line names back through
+   * each other, which is the smear this mechanism was built for. Names long
+   * enough to wrap must still get two lines of room.
+   */
+  const long = ['playlist text', 'mp3 bytes and more'];
+  const wrapped = two(long).links.filter((l) => !l.back && !l.sib);
+  ok('NEGATIVE CONTROL: names that wrap still get two lines of room, and no less',
+     wrapped.every((l) => l.lab.lines.length === 2)
+       && apart(long) === Math.round(METRICS.linkLh) * 2 + 18,
+     `${apart(long)} px apart for ${wrapped.map((l) => l.lab.lines.length).join(' and ')} lines`);
+  ok('and it is strictly more room than a one-line pair, so the measurement is doing the work',
+     apart(long) > apart(['ok', 'no']) && apart(['ok', 'no']) > apart(['', '']),
+     `${apart(['', ''])} · ${apart(['ok', 'no'])} · ${apart(long)} px`);
+}
+
+console.log('\n== a container is never empty ==');
+
+{
+  /**
+   * 🔴 AN AUTHOR CANNOT SEE THEIR OWN MISSING BOX. CLAUDE.md, 2026-09-20: a
+   * container holds at least one box. An empty one takes a machine's worth of
+   * space and says a caption's worth of thing — every box in a picture is
+   * drawn to ONE height, taken from the tallest, so a machine with nothing in
+   * it beside a machine with three boxes is a tall empty slab. `/station/`'s
+   * own comment records exactly that, about a box it used to call `curl`.
+   */
+  const L = layout({
+    nodes: [
+      { id: 'you', label: 'Browser', kind: 'here', children: [{ id: 'page', label: 'this page' }] },
+      { id: 'cf', label: 'Cloudflare', sub: 'image proxy', kind: 'cloud' },
+    ],
+    links: [{ from: 'page', to: 'cf', label: 'JPEG' }],
+  }, { width: 660, measure });
+  const empty = L.cuts.filter((c) => c.where === 'container');
+  ok('a machine with no box in it is reported, beside one that holds a box',
+     empty.length === 1 && empty[0].id === 'cf' && /EMPTY/.test(empty[0].shown),
+     empty.map((c) => c.id).join(', ') || 'nothing reported');
+
+  // 🔴 NEGATIVE CONTROL ONE: give it a box and the report goes.
+  const filled = layout({
+    nodes: [
+      { id: 'you', label: 'Browser', kind: 'here', children: [{ id: 'page', label: 'this page' }] },
+      { id: 'cf', label: 'Cloudflare', kind: 'cloud', children: [{ id: 'img', label: 'workers/img' }] },
+    ],
+    links: [{ from: 'page', to: 'img', label: 'JPEG' }],
+  }, { width: 660, measure });
+  ok('NEGATIVE CONTROL: name what runs on the machine and nothing is reported',
+     !filled.cuts.filter((c) => c.where === 'container').length,
+     `${filled.cuts.length} cuts`);
+
+  /**
+   * 🔴 NEGATIVE CONTROL TWO, AND IT IS THE ONE THAT KEEPS THE RULE HONEST. A
+   * picture where NOTHING nests has no slab in it: three machines the size of
+   * three boxes is what a diagram of three machines looks like. Reporting
+   * those would make the rule noise, and noise is how a report stops being
+   * read. `TRIP` is the plan's own three-box example.
+   */
+  const flat = layout(TRIP, { width: 660, measure });
+  ok('NEGATIVE CONTROL: a picture where nothing nests is not three empty containers',
+     !flat.cuts.filter((c) => c.where === 'container').length,
+     `${flat.nodes.length} machines, ${flat.cuts.length} cuts`);
 }
 
 console.log(`\n${pass} ok, ${fail} failed\n`);

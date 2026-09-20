@@ -106,6 +106,25 @@
     },
   });
 
+  /**
+   * 🔴 THE BAR'S BADGE SAYS `on air`, AND WHAT MAKES THAT TRUE IS `now.json`
+   * ANSWERING. It used to be a `LIVE` chip: a word drawn because this page
+   * passed `live: true` at build time, so it stood whether or not the station
+   * was up. The badge is the project's standard online indicator and it can say
+   * the station went away, which is the fact a listener actually wants.
+   *
+   * ⚠️ IT IS THE STATION'S STATE, NOT THIS PAGE'S. The poll runs from load and
+   * never stops, so the badge answers "is there a programme playing out there"
+   * whether or not anybody here has pressed play. A badge that went `off air`
+   * because a visitor paused would be reporting on the visitor.
+   * ⚠️ TWO MISSES OF A TWO SECOND POLL, so four seconds of silence from the
+   * worker is what it takes to say so. Before the first answer it reads
+   * `unknown`, which is the honest state and is what the component's own note
+   * calls the fourth state: we have not looked yet.
+   */
+  const onAir = bar.api.live;
+  onAir.follow({ everyMs: POLL_MS, misses: 2, since: Date.now() });
+
 
   let hls = null, engine = 'none';
   let stalls = 0, crossed = 0, lastProgramme = null, playing = false;
@@ -216,6 +235,10 @@
     let now_ = null;
     try { now_ = await fetch(`${STATION}/now.json`, { cache: 'no-store' }).then((r) => r.json()); } catch { /* the station is allowed to be slow */ }
     if (now_ && !now_.error) {
+      // The station answered with a programme, which is the whole of the claim
+      // the badge above makes. Stamped with THIS clock at the moment the reply
+      // arrived, never with a time from inside the payload.
+      onAir.seen();
       nowLine.textContent = `${now_.programme} · ${now_.title || 'no title'}`;
       d.set('into', Math.round(now_.into * 10) / 10);
       if (lastProgramme && now_.programme !== lastProgramme) {
