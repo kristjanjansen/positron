@@ -57,7 +57,7 @@ export function mount({
   controls = [],         // [{id, label, primary?}]
   index = '/',
 } = {}) {
-  document.title = `POSITRON · ${name}`;
+  document.title = `POSITRON ${name}`;
   favicon();
   markHeadset();
 
@@ -310,12 +310,19 @@ export function mount({
   // unchanged, so per-demo counts are unaffected by this.
   function assert(label, pass, detail) {
     api.asserts.push({ label, pass: !!pass, detail: detail ?? null });
-    // ⚠️ `·`, NOT AN EM DASH, AND THIS ONE LINE STAMPED THEM EVERYWHERE. Every
-    // failing assert on every shelled page came through here, so a sweep of 418
-    // reader-facing strings could not have caught the formatter that puts one
-    // back on each of them. `·` is already this project's separator inside these
-    // same log lines.
-    if (!pass) log(`FAIL ${label}${detail !== undefined ? ` · ${detail}` : ''}`, 'bad');
+    // 🔴 A SECOND LINE, NOT A MIDDOT, AND THIS ONE LINE STAMPED THEM
+    // EVERYWHERE. Every failing assert on every shelled page comes through
+    // here, so a sweep of reader-facing strings cannot catch the formatter that
+    // puts one back on each of them: that is how the em dash sweep of 418
+    // joins ended up minting `·` at the same rate, under a comment in this
+    // file calling it "already this project's separator".
+    //
+    // The detail is not a second clause of the label, it is the evidence for
+    // it, so it goes on its own line. `.pos-m` is `pre-wrap` (see shell.css,
+    // which keeps it that way so the log can align itself with spaces), so a
+    // newline here is a newline on screen, and the two spaces indent the
+    // evidence under the claim.
+    if (!pass) log(`FAIL ${label}${detail !== undefined ? `\n  ${detail}` : ''}`, 'bad');
     return !!pass;
   }
 
@@ -400,7 +407,7 @@ export function mount({
       const bad = api.asserts.filter((a) => !a.pass).length;
       // one line, and it is a real message: how many checks this page ran on
       // itself and whether any of them are worth scrolling up for
-      log(n ? `ready · ${n - bad}/${n} checks` : 'ready', bad ? 'bad' : 'hi');
+      log(n ? `ready, ${n - bad}/${n} checks` : 'ready', bad ? 'bad' : 'hi');
     },
     fail: (e) => { api.failed = String(e?.stack || e); log(String(e?.message || e), 'bad'); },
     api,

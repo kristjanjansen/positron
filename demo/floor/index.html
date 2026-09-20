@@ -40,39 +40,66 @@
      element is. MEASURED at 294 of 298 tiles loaded and 60 fps, with the click
      hitting nothing — which is what sent the diagnosis looking at ERR. */
   .fl canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-  /* The title of whatever is under the pointer. A FIXED BOX: it is written on
-     every frame the gaze moves, and a caption that can change its own height
-     would push the picture about while somebody is looking at it. */
-  .fl-name { position: absolute; left: 0; right: 0; bottom: 0; height: 46px;
+  /* The title of whatever is under the pointer, AT THE TOP OF THE PICTURE since
+     2026-09-19: "move active title comments to top". A FIXED BOX: it is written
+     on every frame the gaze moves, and a caption that can change its own height
+     would push the picture about while somebody is looking at it.
+     ⚠️ THE SCRIM TURNS OVER WITH THE BOX. It ran clear at the top edge and
+     opaque from 55% down, which put the dark end under the words. Moved to the
+     top and left alone, the words would have been sitting on the clear half of
+     their own scrim, over whatever the floor happens to be showing.
+     ⚠️ AND IT TAKES THE WHOLE WIDTH AGAIN. It carried 124 px of right-hand
+     padding for one session, to keep a long title from running under the
+     `Esc to leave` badge that sat at `top: 12px; right: 14px`. That badge is
+     gone and its replacement is `.pos-fsx`, a 34 px square at `bottom: 12px;
+     right: 12px`. The caption holds y 0 to 46 and the button holds the last
+     46 px before the bottom edge, so the two can only meet in a box under about
+     92 px tall, and this one is never shorter than 280. */
+  .fl-name { position: absolute; left: 0; right: 0; top: 0; height: 46px;
              display: flex; align-items: center; gap: 10px; padding: 0 12px;
-             background: linear-gradient(transparent, rgba(7, 9, 13, .92) 55%);
+             background: linear-gradient(rgba(7, 9, 13, .92) 45%, transparent);
              font: 500 12px/1.3 var(--mono); color: var(--fg);
-             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .fl-name b { color: var(--hi); font-weight: 600; }
-  /* 🔴 THE WAY OUT, WHERE YOU CAN SEE IT. Asked twice: "how do I get out?" — and
+             white-space: nowrap; overflow: hidden; }
+  /* The title takes whatever room is left and the date keeps its own. The date
+     is LAST now, so without this a long title would push it off the end of the
+     box and the one part of the caption that is always the same length would be
+     the part that is always missing. */
+  .fl-name span, .fl-name i { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .fl-name i { color: var(--dim2); font-style: normal; }
+  /* 🔴 THE DATE IS NOT AN ACCENT. It was `--hi`, which is this project's one
+     accent and is spent on what is CHOSEN or LIVE. A date is neither: it is the
+     same fact for every tile on the floor, and painting it yellow made the one
+     constant in the caption the loudest thing in the picture. Asked for
+     2026-09-19: "move date field last and lose yellow". */
+  .fl-name b { color: var(--dim); font-weight: 500; flex: none; }
+  /* 🔴 THE WAY OUT, WHERE YOU CAN SEE IT. Asked twice: "how do I get out?", and
      the answer had been going into the LOG, which is outside the cover and so
      invisible at exactly the moment somebody needs it. A page that fills the
-     screen has to carry its own exit on the screen it filled. It fades after a
-     few seconds because it is an instruction, not a status. */
-  .fl-out { position: absolute; top: 12px; right: 14px; padding: 6px 10px;
-            background: rgba(7, 9, 13, .82); border: 1px solid var(--line);
-            border-radius: 4px; color: var(--fg);
-            font: 500 11px/1 var(--mono); letter-spacing: .04em;
-            opacity: 0; transition: opacity .6s linear; pointer-events: none; }
-  .fl-out[data-on="1"] { opacity: 1; }
-  .fl-name i { color: var(--dim2); font-style: normal; }
+     screen has to carry its own exit on the screen it filled.
+     🔴 AND THE BADGE THAT USED TO LIVE HERE SAID `Esc to leave` TO A PHONE.
+     Reported from an iPhone 2026-09-19: "I can not leave fullscreen on mobile".
+     An iPhone has no element Fullscreen API, so it always takes the faux cover,
+     which is `position: fixed; inset: 0` over the control row holding the ⛶
+     that got you in; and it has no Escape key to read the badge's advice with.
+     A word is not a way out. `createFullscreenExit` from `fullscreen.mjs` puts
+     a real button inside this box, bottom right, styled as `.pos-fsx` in
+     `shell.css`, and every rule the old badge had a reason for is in there:
+     it lives in the DOM and only its opacity moves, and it is
+     `pointer-events: none` while faded so the corner of the picture cannot
+     exit for somebody reaching for the picture. */
 </style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { mul, perspective } from '/shell/xr-room.mjs';
-  import { createXRRay, rayCheck, eyeFromView, MONO_AIM, MONO_HELD } from '/shell/xr-ray.mjs';
+  import { createXRRay, rayCheck, MONO_AIM, MONO_HELD } from '/shell/xr-ray.mjs';
   import { createXRControllers } from '/shell/xr-controller.mjs';
-  import { createXRQuit } from '/shell/xr-quit.mjs';
+  import { mountXRQuit } from '/shell/xr-quit.mjs';
   import { createProjector, VOICES } from '/shell/projector.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { toggle as toggleFull, exit as exitFull, watch as watchFull,
-    support as fullSupport } from '/shell/fullscreen.mjs';
+  import { toggle as toggleFull, watch as watchFull, support as fullSupport,
+    isFull, createFullscreenExit } from '/shell/fullscreen.mjs';
 
   // ── the field ───────────────────────────────────────────────────────────
   // 🔴 THE TILE IS 4:3, WHICH IS WHY THERE IS NO GAP. A square quad showing a
@@ -170,18 +197,38 @@
 
   const d = mount({
     name: 'floor',
-    what: 'Every 1965 newsreel in the ERR archive, face up on a disc of floor '
-      + 'you can walk over. Click or tap a tile to play it, drag to look and arrow keys '
-      + 'to move; in a headset either trigger clicks the same way, and dragging with it '
-      + 'pushes the floor around. Click what is playing to stop it. loaded is how many '
-      + 'pictures are on the '
-      + 'floor now and reach is how far out they have got.',
-    // ⚠️ FOUR CELLS. `playing` repeated the caption under the picture, which is
-    // right there and has room for the whole title; `fetching` is a number that
-    // is 8 whenever anything is happening and 0 otherwise, which is a state and
-    // not a measurement. What is left all moves and none of it is said anywhere
-    // else on the page.
-    readout: { tiles: '', loaded: 'of 320', reach: 'm', fps: '' },
+    /**
+     * 🔴 ONE SENTENCE, AND IT IS THE INDEX'S OWN LINE. A page with a diagram
+     * explains itself twice if it also carries a paragraph: the picture at the
+     * bottom says what the machinery is, and prose above it says the same thing
+     * in a weaker channel. Taken from the `one` line in `demo/manifest.mjs`, so
+     * somebody arriving from the index is not told the same thing in two
+     * wordings that can drift apart.
+     * ⚠️ WHAT WENT: four sentences, the last of which explained two readout
+     * cells. The row and the sentence about it were deleted in one edit,
+     * because a page describing a row that is not there is worse than a page
+     * describing nothing.
+     */
+    what: 'Every 1965 newsreel face up on a floor you walk over, and any of '
+      + 'them plays where it lies.',
+    /**
+     * 🔴 NO READOUT. ASKED FOR 2026-09-19: *"rm readout"*. It held `tiles`,
+     * `loaded`, `reach` and `fps`, and three of the four were about the loader
+     * rather than about the floor: how many slots had a picture, how far out
+     * the pictures reached, how fast the frame ran. None of that is what
+     * somebody came to this page for, and all of it sat above a picture that
+     * shows it directly.
+     * ⚠️ `loaded` WAS THE ONE LIVE FACT IN IT and it is not lost: the log says
+     * how many pictures are down and how far they reach at the moment the floor
+     * stops filling in. See `sayFilled` below. A counter that moves may not
+     * live in a sentence, so it is said when it has stopped moving.
+     * ⚠️ `null` RATHER THAN AN OMITTED FIELD, because the harness asks which
+     * one it is: a page that MEANT to have no readout and a page whose author
+     * forgot are the same DOM and a different claim. `createReport` hides a row
+     * with no cells in it, so nothing else is needed here to keep an empty box
+     * from painting its own border as a rule nobody wrote.
+     */
+    readout: null,
     // ⚠️ THE SAME ⛶ `mirror` USES, AND FOR THE SAME REASONS. U+26F6 SQUARE FOUR
     // CORNERS is the conventional glyph and renders as TEXT rather than as an
     // emoji, so it takes the bar's colour and sits on its baseline instead of
@@ -207,8 +254,7 @@
   const wrap = el('div', 'fl');
   const canvas = el('canvas');
   const nameEl = el('div', 'fl-name');
-  const outEl = el('div', 'fl-out', 'Esc to leave');
-  wrap.append(canvas, nameEl, outEl);
+  wrap.append(canvas, nameEl);
   d.el.append(wrap);
 
   const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, xrCompatible: true });
@@ -531,6 +577,25 @@
   // your head changes what is being fetched rather than what is fetched next
   // after everything already asked for.
   let inflight = 0, loadedCount = 0, reach = 0, dimAmt = 0;
+  /**
+   * 🔴 WHERE `loaded` WENT WHEN THE READOUT WAS REMOVED. It was the one cell of
+   * the four that was a live fact about this page rather than about its loader:
+   * whether the floor is still filling in. It cannot become a sentence, because
+   * a number that moves may not live in prose and this one moves every few
+   * frames. So it is said ONCE, at the moment it stops moving.
+   *
+   * ⚠️ THE LATCH IS THE COUNT, NOT A FLAG. Walking arms the loader again and it
+   * settles again somewhere new, which is a state change and worth a line; a
+   * settle that arrives at the same number said nothing new and is dropped. The
+   * alternative, a flag set once at the first settle, goes quiet for the rest of
+   * the visit exactly where somebody is walking into unloaded floor.
+   */
+  let saidFilled = -1;
+  function sayFilled() {
+    if (inflight || saidFilled === usedLayers.size) return;
+    saidFilled = usedLayers.size;
+    d.log(`${usedLayers.size} pictures on the floor, out to ${reach.toFixed(1)} m`);
+  }
   function pump() {
     if (!tiles.length) return;
     while (inflight < CONCURRENT) {
@@ -542,7 +607,9 @@
         const dd = distGaze(i);
         if (dd < bestD) { bestD = dd; best = i; }
       }
-      if (best < 0) return;
+      // nothing left within reach to ask for: if nothing is in flight either,
+      // the floor has finished filling in and the log says where it got to
+      if (best < 0) { sayFilled(); return; }
       const s = state[best];
       const dEye = distEye(best);
       const L = takeLayer(best, dEye);
@@ -1016,7 +1083,10 @@
     if (i < 0) { nameEl.innerHTML = ''; return; }
     nameEl.innerHTML = '';
     const t = tiles[state[i].film];
-    nameEl.append(el('b', '', t.date), el('span', '', t.title), el('i', '', t.series || ''));
+    // Title, then series, then date. The title is what somebody is looking for
+    // and it reads first; the date is the same shape on every tile and reads
+    // last, where a constant belongs. Asked for 2026-09-19.
+    nameEl.append(el('span', '', t.title), el('i', '', t.series || ''), el('b', '', t.date));
   }
 
   // ── the desktop camera ──────────────────────────────────────────────────
@@ -1108,7 +1178,7 @@
   }
 
   // ── the frame ───────────────────────────────────────────────────────────
-  let lastT = performance.now(), fpsAcc = 0, fpsN = 0, frames = 0;
+  let lastT = performance.now(), frames = 0;
   function step(dt) {
     // walking
     // ⚠️ ARROW KEYS, AND ONLY ARROW KEYS. W A S D is a convention you have to
@@ -1256,8 +1326,6 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     frames++;
-    if (dt > 0) { fpsAcc += 1 / dt; fpsN++; }
-    if (fpsN >= 30) { d.set('fps', Math.round(fpsAcc / fpsN)); fpsAcc = 0; fpsN = 0; }
     step(dt);
     const r = wrap.getBoundingClientRect();
     const W = Math.max(2, Math.round(r.width * devicePixelRatio));
@@ -1265,9 +1333,7 @@
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     projM = perspective(1.05, W / H, 0.05, 60);
     draw(mul(projM, viewM()), W, H);
-    d.set('loaded', usedLayers.size);
-    d.set('reach', reach.toFixed(1));
-      if (!xrSession) requestAnimationFrame(frame);
+    if (!xrSession) requestAnimationFrame(frame);
   }
 
   // ── VR ──────────────────────────────────────────────────────────────────
@@ -1275,29 +1341,35 @@
   navigator.xr?.isSessionSupported('immersive-vr').then((v) => { headsetKnown = v; },
     () => { headsetKnown = false; });
 
-  // ⚠️ ESCAPE LEAVES FULLSCREEN ON BOTH PATHS. The real API gives Escape for
-  // free; the `position: fixed` FALLBACK — which is what an iPhone gets, having
-  // no element Fullscreen API at all — has no browser behaviour behind it, so
-  // `watch()` wires the key and tells the page when it changed either way.
-  // Without this the fallback is a cover with no way out of it.
-  let outTimer = null;
-  function sayTheWayOut(text) {
-    outEl.textContent = text;
-    outEl.dataset.on = '1';
-    clearTimeout(outTimer);
-    // long enough to read twice, short enough not to sit on the picture
-    outTimer = setTimeout(() => { outEl.dataset.on = '0'; }, 4500);
+  // 🔴 THE WAY BACK IS A BUTTON INSIDE THE THING THAT WENT FULL. It is mounted
+  // in `wrap` rather than anywhere else on the page, because in real element
+  // fullscreen nothing outside that subtree is on screen at all, and the faux
+  // cover is laid over the control row. Either way, a way out that is not in
+  // here is a way out nobody can reach.
+  const fsx = createFullscreenExit(wrap, { onExit: () => fullChanged(false) });
+
+  // ⚠️ THREE THINGS CAN CHANGE IT AND ONLY ONE OF THEM RAISES AN EVENT. The
+  // real API fires `fullscreenchange`, which `watch()` hears; the faux cover is
+  // a class, which raises nothing at all, so the control that changed it says
+  // so by hand; and the button above knows because it just did it. All three
+  // come here, the way out is told, and the log says it once.
+  let inFull = false;
+  function fullChanged(on, how) {
+    fsx.sync();
+    if (on === inFull) return;
+    inFull = on;
+    d.log(on ? `filling the screen (${how})` : 'back to the page', 'hi');
   }
-  // ⚠️ `watch()` FIRES ON `fullscreenchange`, WHICH THE FALLBACK NEVER RAISES.
-  // MEASURED: entering by the `position: fixed` path left the hint's opacity at
-  // 0 — so the one path with NO browser chrome saying "press Esc" was also the
-  // one that said nothing itself. The hint is therefore raised where the page
-  // KNOWS it entered, from the control's own handler, and `watch()` is kept for
-  // the exit and for the real API's own changes.
-  watchFull(wrap, (on) => {
-    if (!on) outEl.dataset.on = '0';
-    d.log(on ? 'filling the screen · Escape to come back' : 'back to the page', 'hi');
-  });
+  // ⚠️ ESCAPE STILL LEAVES ON BOTH PATHS AND IS NO LONGER THE ONLY WAY OUT. The
+  // real API takes the key itself; `watch()` wires it for the faux cover, which
+  // has no browser behaviour behind it. A laptop keeps the key it expects and a
+  // phone, which has no such key, now has the button.
+  // ⚠️ AND IT REPORTS LEAVING ONLY, WHICH IS NOT TIDINESS. Only the ⛶ can put
+  // this page into full screen, and only IT knows which of the two paths ran.
+  // `fullscreenchange` may reach here before `toggle()` has returned that word,
+  // so letting this branch log an entry is a race whose prize is a line that
+  // does not say how it got there.
+  watchFull(wrap, (on) => { if (on) fsx.sync(); else fullChanged(false); });
 
   d.on('vr', async () => {
     if (!navigator.xr) { d.log('this browser has no WebXR at all', 'bad'); return; }
@@ -1309,11 +1381,29 @@
       const session = await navigator.xr.requestSession('immersive-vr',
         { requiredFeatures: ['local-floor'] });
       xrSession = session;
+      // 🔴 ONE WAY OUT, AND IT IS MOUNTED BEFORE ANYTHING THAT CAN THROW. Three
+      // awaits follow this line and any of them can fail with the SESSION
+      // ALREADY LIVE, which leaves somebody standing in a room with nothing
+      // drawing and nothing to press. Mounted here, the hold is already running
+      // before any of that can happen.
+      // ⚠️ AND THERE IS NO `update` FOR THIS PAGE TO FORGET. `mountXRQuit` puts
+      // its own callback on `session.requestAnimationFrame`, so the hold
+      // advances off the session's own frame loop even if the render loop below
+      // never starts. That is the repair for the failure CLAUDE.md records:
+      // `/blocks/` built the badge, drew it every frame and never advanced it,
+      // so there was no way out of that page at all.
+      // ⚠️ NO `onQuit` AND NO `session.end()`. The module ends the session
+      // itself, and everything this page puts away is already in the `end`
+      // listener below, which runs whatever ended the session.
+      // ⚠️ NO LABEL AND NO BUTTON PASSED. The defaults are the site's decision,
+      // any button held three seconds, and a page that retypes them is a page
+      // that can disagree with the module about how somebody leaves it.
+      xrQuit = mountXRQuit(gl, session, { log: (m, k) => d.log(m, k) });
       await gl.makeXRCompatible();
       session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
       xrRefSpace = await session.requestReferenceSpace('local-floor');
-      // ⚠️ ANY BUTTON LEAVES. "Press the Meta button" is not an answer a page
-      // gets to give about its own bug.
+      // The trigger going down takes hold of the floor. Whether that press was
+      // a drag or a click is decided when it comes back up, below.
       session.addEventListener('selectstart', onSelect);
       // 🔴 THE DECISION IS MADE WHEN YOU LET GO, AND NOTHING HAS TO BE HELD. A
     // press that did not move the floor was a click, and a click on a tile plays
@@ -1326,19 +1416,13 @@
       grab = null; dragSource = null; holdStill = false;
       if (wasClick && hover >= 0) playTile(hover);
     });
-      // 🔴 ONE WAY OUT: HOLD ANY BUTTON FOR THREE SECONDS. Nothing else on this
-      // page ends a session. The trigger drags the floor AND advances the hold,
-      // which is the one collision in this design and is written down in
-      // `xr-quit.mjs`: the ring fills in front of you from the first
-      // millisecond, so a drag about to become an exit says so, and letting go
-      // takes it back to zero.
-      xrQuit = createXRQuit(gl, {
-        onQuit: () => endVR('held a controller button for three seconds', session),
-      });
       session.addEventListener('end', () => {
         xrSession = null; d.log('left VR', 'hi'); requestAnimationFrame(frame);
       });
-      d.log('in VR: trigger drags the floor, rest your look to play, hold any button for three seconds to leave', 'hi');
+      // Two lines, and neither says "rest your look": the dwell is excluded in a
+      // session, because a head never stops moving and a trigger is a decision.
+      d.log('in VR: point with a controller, pull the trigger to drag the floor, click it on a film to play it', 'hi');
+      d.log('hold any controller button and a ring fills in front of you, three seconds and you are out');
       // 🔴 A DEAD-MAN'S SWITCH. If nothing has been drawn 6 s after the session
       // started, something threw where nothing was reporting and the wearer is
       // standing in a black room with no way out. MEASURED elsewhere in this
@@ -1363,21 +1447,24 @@
     // cover that needs no API, and SAYS which ran.
     if (fullSupport() === 'none') { d.log('this browser has no way to fill the screen', 'bad'); return; }
     const how = await toggleFull(wrap);
-    if (how === 'exit') outEl.dataset.on = '0'; else sayTheWayOut('Esc to leave');
-    d.log(how === 'exit' ? 'back to the page' : `filling the screen (${how})`, 'hi');
+    fullChanged(isFull(wrap), how);
   });
 
-  /** End the session and say which thing ended it. */
-  function endVR(why, session) {
-    d.log(`${why} · leaving VR`, 'hi');
-    session.end().catch(() => {});
-  }
-
-  // 🔴 "ANY BUTTON BUT THE TRIGGER LEAVES" IS GONE, AND IT WAS THE WRONG SHAPE.
-  // It made every other button a trap — you could not rest a thumb anywhere on
-  // this controller, on a page whose whole verb is a trigger you hold while you
-  // drag — and it never said which button had done it. One labelled button,
-  // held, with a ring that fills: `xr-quit.mjs`.
+  // 🔴 THE WAY OUT IS HELD, IT IS UNLABELLED, AND IT IS IN FRONT OF YOUR FACE.
+  // Three answers this page has had, in order. "Any button but the trigger
+  // leaves" made every other button a trap: you could not rest a thumb anywhere
+  // on a page whose whole verb is a trigger you hold while you drag, and it
+  // never said which button had done it. Then one named button held for three
+  // seconds with a ring that filled AT EACH HAND, which still asked somebody to
+  // find a particular button, and put the feedback on the hand you might not be
+  // pressing. Now: ANY button, held, and ONE ring dead centre about 1.6 m out,
+  // drawn with the depth test off so a tile cannot hide it.
+  // ⚠️ THE TRIGGER BOTH DRAGS THE FLOOR AND ADVANCES THE HOLD, which is the one
+  // collision in this design and is written down in `xr-quit.mjs`. The ring
+  // fills from the first millisecond of any press, so a drag about to become an
+  // exit says so while there is still time, and letting go takes it to zero.
+  // ⚠️ Nothing is drawn until something is held. There is no idle badge, and
+  // there is no word on it: the arc is the badge and the gesture says the rest.
   let xrQuit = null;
 
   let dragSource = null;
@@ -1459,7 +1546,6 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     xrFrames++;
-    xrQuit?.update(session.inputSources, dt);
     dragFloor(xframe);              // writes the target
     settleFloor(dt);                // and the floor moves toward it
     // ⚠️ THE POINTER IS TAKEN ONCE, HERE, AND NOT ONCE PER EYE. Asking the
@@ -1547,8 +1633,24 @@
         gl.clear(gl.DEPTH_BUFFER_BIT);
         gl.disable(gl.SCISSOR_TEST);
       }
+      // ⚠️ THE SHIFT GOES INTO THE VIEW, not into every tile's position — the
+      // instance data is rebuilt each frame and adding it there would be 298
+      // additions a frame to say what one translation says once. `inst.x/y`
+      // stay the floor's own coordinates, so picking and the gaze distance keep
+      // working in the same space the layout was authored in.
+      // 🔴 AND IT IS WORKED OUT BEFORE THE FLOOR IS DRAWN, WHICH IT WAS NOT.
+      // `upload()` answers 0 on a cold start, so the eye used to leave before
+      // this line existed, taking the way out with it on exactly the frames
+      // where there is nothing else on screen to look at. The hold advances
+      // either way now, off the session's own loop, but holding blind for three
+      // seconds is not the same as watching a ring fill.
+      const vm = new Float32Array(view.transform.inverse.matrix);
+      vm[12] += vm[0] * shift[0] + vm[8] * shift[1];
+      vm[13] += vm[1] * shift[0] + vm[9] * shift[1];
+      vm[14] += vm[2] * shift[0] + vm[10] * shift[1];
+      const viewVP = mul(view.projectionMatrix, vm);
       const drawn = upload();
-      if (!drawn) continue;
+      if (!drawn) { xrQuit?.draw(viewVP, vm); continue; }
       if (playing >= 0 && video.readyState >= 2 && video.videoWidth) {
         gl.bindTexture(gl.TEXTURE_2D, vidTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
@@ -1556,16 +1658,6 @@
         vidReady = true;
       }
       gl.useProgram(prog);
-      // ⚠️ THE SHIFT GOES INTO THE VIEW, not into every tile's position — the
-      // instance data is rebuilt each frame and adding it there would be 298
-      // additions a frame to say what one translation says once. `inst.x/y`
-      // stay the floor's own coordinates, so picking and the gaze distance keep
-      // working in the same space the layout was authored in.
-      const vm = new Float32Array(view.transform.inverse.matrix);
-      vm[12] += vm[0] * shift[0] + vm[8] * shift[1];
-      vm[13] += vm[1] * shift[0] + vm[9] * shift[1];
-      vm[14] += vm[2] * shift[0] + vm[10] * shift[1];
-      const viewVP = mul(view.projectionMatrix, vm);
       gl.uniformMatrix4fv(uVP, false, viewVP);
       gl.uniform2f(uTile, TILE_W, TILE_H);
       gl.uniform2f(uEye, eye[0], eye[2]);
@@ -1592,22 +1684,20 @@
       // floor had never moved — right at the start of a session and further out
       // with every drag, which is the worst way for it to be wrong.
       for (const h of hands) {
-        if (h.grip) {
-          const gf = new Float32Array(h.grip);
-          gf[12] -= shift[0]; gf[14] -= shift[1];
-          // 🔴 NO CONTROLLER IS DRAWN ANY MORE. 2026-09-17: *"rm controller
-          // geometry/tablet on all (only if i am ask on specific demo so keep
-          // that code ready to pop into scene)"*. `demo/shell/xr-controller.mjs`
-          // is untouched and `xrCons.want()` below still fetches and uploads the
-          // model, so putting the hands back is one line here:
-          //   xrCons.draw({ vp: viewVP, grip: gf, profile: h.profile, handedness: h.hand });
-          // ⚠️ THE WAY OUT STILL DRAWS AT THE GRIP. It is the one thing in here
-          // that must never depend on there being a model to hang it on.
-          // ⚠️ THE EYE COMES OUT OF `vm`, the matrix that is doing the
-          // projecting, so the badge faces the eye it is drawn for rather than
-          // one of them for both — see the disparity note by the ribbon below.
-          xrQuit?.draw(viewVP, [gf], eyeFromView(vm));
-        }
+        // 🔴 NO CONTROLLER IS DRAWN ANY MORE. 2026-09-17: *"rm controller
+        // geometry/tablet on all (only if i am ask on specific demo so keep
+        // that code ready to pop into scene)"*. `demo/shell/xr-controller.mjs`
+        // is untouched and `xrCons.want()` below still fetches and uploads the
+        // model, so putting the hands back is three lines here:
+        //   const gf = new Float32Array(h.grip);
+        //   gf[12] -= shift[0]; gf[14] -= shift[1];
+        //   xrCons.draw({ vp: viewVP, grip: gf, profile: h.profile, handedness: h.hand });
+        // 🔴 AND THE WAY OUT NO LONGER HANGS OFF A GRIP. It was drawn here, once
+        // per hand, inside this `h.grip` guard. A session driven by tracked
+        // HANDS reports no grip matrix at all, so on that input there was no
+        // ring to see; and one ring per hand put the feedback on a hand you may
+        // not be pressing. It is one ring in front of your face now, drawn at
+        // the end of the eye and owing nothing to what the runtime reports.
         if (!h.pose) continue;
         const pf = new Float32Array(h.pose);
         pf[12] -= shift[0]; pf[14] -= shift[1];
@@ -1617,10 +1707,17 @@
         // than making this a second place it has to be applied correctly.
         // ⚠️ NO COLOUR IS PASSED ANY MORE AND NONE CAN BE. The ray is grey on
         // every page since 2026-09-17 and lightens when something active
-        // happens, which is what `held` says — this page's own mono pair became
+        // happens, which is what `weight` says — this page's own mono pair became
         // the module's only pair. See the note by AIM_RGB in xr-ray.mjs.
         xrRay.draw({ vp: viewVP, view: vm, pose: pf, len: h.len, held: h.held });
       }
+      // 🔴 LAST IN THE EYE, AND ONE OF IT. The ring is head locked and takes its
+      // position, forward, right and up out of the very matrix that is doing the
+      // projecting, so it cannot be turned against a head pose this page worked
+      // out some other way. It draws with the depth test off, which is why it
+      // goes after everything: a wall of newsreels must not be able to hide the
+      // way out of the room.
+      xrQuit?.draw(viewVP, vm);
     }
   }
 
@@ -1659,10 +1756,83 @@
     }
   }
   rewrap();
-  d.set('tiles', tiles.length);
   requestAnimationFrame(frame);
 
+  // ── how it works ────────────────────────────────────────────────────────
+  //
+  // 🔴 THE ONE FACT THE PICTURE EXISTS TO CARRY: the stills and the films take
+  // DIFFERENT ROADS. A thumbnail comes through our own origin because the
+  // archive's image host sends no `access-control-allow-origin`, and a texture
+  // upload is only allowed to read bytes that are ours; the films need no such
+  // hop, because their host does send it. Nothing on the page shows that, and a
+  // paragraph describing it is the weaker of the two channels.
+  // ⚠️ `{ how: true, atEnd: true }` AND NO `title`. The heading lives in
+  // `diagram.mjs` and is never typed on a page, and `atEnd` puts the picture
+  // after the log, which is the actual bottom of the page.
+  const dg = createDiagram(d.el, {
+    caption: 'The pictures come through our own origin. The films come straight from the archive.',
+    nodes: [
+      // 🔴 `set: true`: THESE TWO ARE NOT A CHAIN. An undeclared gap between
+      // two boxes in one machine is drawn as an arrow, which would claim that
+      // the stills produce the films. They are two things the same archive
+      // holds, so the gap gets a bracket instead.
+      { id: 'err', label: 'ERR archive', sub: '1965 newsreels', kind: 'cloud', tech: 'archive',
+        set: true,
+        children: [
+          { id: 'stills', label: 'thumbnails', sub: 'JPEG, 256x192',
+            note: 'One still per film, served at whatever size is asked for. Their host '
+                + 'sends no access-control-allow-origin, so a browser may display these '
+                + 'bytes and WebGL may not read them.' },
+          { id: 'films', label: 'films', sub: 'HLS',
+            note: 'The newsreels themselves, as HLS playlists and segments. That host does '
+                + 'send access-control-allow-origin, so these reach the page with nothing '
+                + 'in front of them.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'image proxy', kind: 'cloud', tech: 'cloudflare',
+        note: 'Fetches each thumbnail once and keeps it in the edge cache, so the archive '
+            + 'is asked about one time per picture. It answers from our own origin, which '
+            + 'is what lets WebGL read the pixels.' },
+      { id: 'you', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'video', label: 'video', sub: 'one element',
+            note: 'One HTML video element, decoding whatever was pressed. There is one of '
+                + 'it and one texture behind it, so one film plays at a time.' },
+          { id: 'floor', label: 'floor', sub: 'WebGL2',
+            note: 'One instanced draw a frame, every tile sampling a layer of a single '
+                + 'texture array of 320. Only the tiles within 14 m are ever asked for, '
+                + 'eight at a time.' },
+        ] },
+    ],
+    links: [
+      { from: 'stills', to: 'cf', label: 'JPEG',
+        note: 'One request per picture, cached by the browser and twice inside Cloudflare. '
+            + 'The archive is asked roughly once per picture ever.' },
+      { from: 'cf', to: 'floor',
+        note: 'The same bytes, arriving from this origin rather than from the archive. '
+            + 'That is the whole reason for the hop: a cross-origin picture can be drawn '
+            + 'and cannot be read into a texture.' },
+      { from: 'films', to: 'video', label: 'HLS',
+        note: 'A press asks the archive for that film and gets back a playlist. hls.js '
+            + 'appends the segments, unless ManagedMediaSource means WebKit plays the '
+            + 'playlist itself.' },
+      // 🔴 NO LABEL, AND THAT IS THE RULE RATHER THAN AN OMISSION. Two stacked
+      // boxes in one machine share about sixteen pixels of gap, so a name in it
+      // runs under both of them. What travels is in the note.
+      { from: 'video', to: 'floor',
+        note: 'Every frame goes up as a WebGL texture and the tile that was pressed samples '
+            + 'it. Nothing moves to a player: the film runs in its own square on the floor.' },
+    ],
+  }, { how: true, atEnd: true });
+
   // ── the checks ──────────────────────────────────────────────────────────
+  // 🔴 GRADE THE PICTURE, BECAUSE NOTHING ELSE CAN SEE IT. `createDiagram`
+  // collects every name it had to shorten, every note over about forty words
+  // and every link it could not route, on `cuts`. A label that got cut or an
+  // arrow that was refused is invisible to a reader, who has no way to know
+  // that what they are looking at is not what was described.
+  d.assert('the diagram drew every name and every arrow whole',
+    dg.cuts.length === 0,
+    dg.cuts.map((c) => `${c.where} ${c.id}`).join(', ') || 'nothing cut, nothing refused');
   d.assert('the whole 1965 film catalogue is on the floor', tiles.length === 298,
     `${tiles.length} tiles`);
   d.assert('every tile has a picture to ask for', tiles.every((t) => t.photo),
@@ -1728,7 +1898,7 @@
   //  · and a film takes the rest of the floor the rest of the way.
   if (!SELFCHECK) {
     d.log('the checks that paint over a tile, run the floor forward and start a film '
-        + 'are for the harness · the rest ran');
+        + 'are for the harness. The rest ran');
   }
 
   // 🔴 BEHIND THE FLAG, BECAUSE THE FIRST THING IT DOES IS PAINT OVER A TILE
@@ -2130,11 +2300,13 @@
   // does not fire at all on mobile Safari. All of them mean the same thing here:
   // stop decoding a film for somebody who is no longer looking.
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { stopVideo(true); d.log('hidden · stopped', 'hi'); }
+    if (document.hidden) { stopVideo(true); d.log('hidden, so the film stopped', 'hi'); }
   });
   addEventListener('pagehide', () => stopVideo(true));
 
-  d.log(`${tiles.length} films on the floor · drag to look, arrows to walk, rest your look to play`, 'hi');
+  // Two lines, not one with glue in it: what is here, and what to do with it.
+  d.log(`${tiles.length} films on the floor`, 'hi');
+  d.log('drag to look, arrows to walk, rest your look on a film to play it');
   d.ready();
 </script>
 </html>

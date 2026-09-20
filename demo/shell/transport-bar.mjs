@@ -37,8 +37,8 @@ import { WAY_GLYPH, WAY_SAYS, LOOP_TURN, LOOP_WAYS } from './looper.mjs';
  */
 export function createTransportBar(host, deck, {
   absolute = false, scrub: wantScrub = true, extras = [], fmt = null, live = false, publish = true,
-  // 'play' (the default) or 'record': what the toggle's glyph says it does. See
-  // the note on the toggle itself.
+  // 'play' (the default), 'record', or TWO WORDS as an array: what the toggle
+  // says it does. See the note on the toggle itself.
   verb = 'play',
   // 🔴 `false` LEAVES THE LOOP BUTTON OFF, the way `scrub: false` already
   // leaves the slider off. A loop is a claim that hearing a passage twice is
@@ -274,9 +274,36 @@ export function createTransportBar(host, deck, {
    * untouched, so `demo/verify.mjs`'s play drill and every page holding the bar
    * keep working. Only the glyph and what a screen reader hears change.
    */
+  /**
+   * 🔴 `verb: ['start', 'stop']` MAKES THE TOGGLE TWO WORDS INSTEAD OF A GLYPH.
+   * Asked 2026-09-19 for `/stage/`: *"replace timeline-glued transport record
+   * button with start | stop text labels (same w)"*. A red dot says WRITING,
+   * and that bar's press also puts a show on air, so the dot described half of
+   * it. A word can say the whole thing.
+   *
+   * 🔴 BOTH WORDS ARE IN THE BUTTON AT ONCE AND THE HIDDEN ONE STILL TAKES ITS
+   * SPACE, which is what makes the two states the same width without anybody
+   * measuring anything. `shell.css` puts them in one grid cell and hides the
+   * inactive one with `visibility`, so the button is always as wide as the
+   * longer word, in any font. The alternative, swapping `textContent`, is a
+   * control that changes size under the pointer that just pressed it.
+   * ⚠️ REFUSED AT CONSTRUCTION, WHERE THE STACK STILL SAYS WHO ASKED. One word,
+   * three words, or a number would each fail in a different quiet way: one word
+   * gives a toggle that never changes, and three render on top of each other.
+   */
+  const WORDS = Array.isArray(verb) ? verb : null;
+  if (WORDS && (WORDS.length !== 2 || WORDS.some((w) => typeof w !== 'string' || !w.trim()))) {
+    throw new Error('createTransportBar: verb as words is exactly two non-empty strings'
+      + ` (got ${JSON.stringify(verb)})`);
+  }
   const RECORD = verb === 'record';
-  const toggle = el('button', `tbar-toggle${RECORD ? ' tbar-rec' : ''}`, '',
-    { type: 'button', 'aria-label': RECORD ? 'record/stop' : 'play/pause' });
+  const toggle = el('button', `tbar-toggle${RECORD ? ' tbar-rec' : ''}${WORDS ? ' tbar-word' : ''}`, '',
+    { type: 'button',
+      'aria-label': WORDS ? `${WORDS[0]}/${WORDS[1]}` : RECORD ? 'record/stop' : 'play/pause' });
+  // ⚠️ TWO SPANS, NOT ONE THAT GETS REWRITTEN. The stylesheet decides which one
+  // is visible from `data-state`, which the bar already maintains, so there is
+  // no second place that has to remember which word is showing.
+  if (WORDS) toggle.append(el('span', 'tbar-w0', WORDS[0]), el('span', 'tbar-w1', WORDS[1]));
   const scrub = el('div', 'tbar-scrub', '', { role: 'slider', tabindex: '0', 'aria-label': 'position' });
   const fill = el('div', 'tbar-fill');
   const headDot = el('div', 'tbar-head');
@@ -431,12 +458,42 @@ export function createTransportBar(host, deck, {
     throw new Error('createTransportBar: chip and live want the same position '
       + '(pass live: false, the chip can say LIVE itself if that is the fact)');
   }
+  // the loop's position: whatever was put in the slot, or the loop itself
+  const endSide = loopSlotEls.size ? [...loopSlotEls.values()]
+    : loopPair ? [loopPair] : [...(wantLoop ? [loopBtn] : []), ...loopExtraEls.values()];
+  /**
+   * 🔴 THE ROW HAS ONE BOUNDARY AND THE FREE SPACE OPENS AT IT: EVERYTHING FROM
+   * THE LOOP RIGHTWARDS SITS AT THE RIGHT END OF THE BAR. Asked 2026-09-19 as
+   * *"reel: move loop to the right of transport"*, and it is a rule about this
+   * row rather than a nudge on that page.
+   *
+   * The bar is two groups with a gap in the middle: the transport on the left
+   * (play, a page's own verbs, the slider) and the loop, the rates and the
+   * badge on the right. That was already true and was carried by whichever
+   * member happened to be in the middle: the scrub grows (`flex: 1 1 56px`),
+   * and `shell.css` gives the clock and the LIVE chip a `margin-right: auto`
+   * with no slider present. Three members, three copies of one intention, and
+   * a bar with NONE of them left had nobody holding the boundary: `/reel/`
+   * passes `scrub: false` (it has a strip) and `time: false` (its position is a
+   * date), so LOOP packed left against the ‹ › it used to sit a clock away
+   * from. MEASURED at 1280: LOOP's left edge at 57 px with 375 px of empty bar
+   * to the right of the rates.
+   *
+   * ⚠️ IT IS THE PROJECT'S EXISTING SPELLING FOR THIS, NOT A SECOND MECHANISM:
+   * `data-end="1"` is what `.pos-controls` stamps for `end: true` in
+   * `shell.mjs`, and it means the same thing here. `shell.css` says why the bar
+   * needs its own selector for it.
+   * ⚠️ AND IT IS UNCONDITIONAL, WHICH IS THE WHOLE POINT. Where something to the
+   * left is already flexible the margin gets nothing and nothing moves: a
+   * growing scrub eats the free space before auto margins are resolved, and the
+   * clock's `margin-right: auto` shares the SAME gap, so half each lands the
+   * group in exactly the same place. MEASURED both ways, unchanged to the
+   * tenth of a pixel at 1280 and at 390.
+   */
+  if (endSide[0]) endSide[0].dataset.end = '1';
   bar.append(...(wantToggle ? [toggle] : []), ...extraEls.values(), scrub,
     ...(chip ? [chip] : live ? [liveChip] : wantTime ? [time] : []),
-    // the loop's position: whatever was put in the slot, or the loop itself
-    ...(loopSlotEls.size ? [...loopSlotEls.values()]
-      : loopPair ? [loopPair] : [...(wantLoop ? [loopBtn] : []), ...loopExtraEls.values()]),
-    rates, badge);
+    ...endSide, rates, badge);
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────
@@ -1184,6 +1241,27 @@ export function createTransportBar(host, deck, {
   addEventListener('keydown', onKey);
 
   // ── published for CDP; the plan's whole point ───────────────────────────
+  /**
+   * 🔴 THIS OBJECT IS WHAT `window.__demo.transport` HOLDS. THE RETURN VALUE OF
+   * `createTransportBar` IS A DIFFERENT AND LARGER OBJECT, AND THE TWO ARE NOT
+   * INTERCHANGEABLE. The line at the bottom of this file publishes `api`
+   * itself; the thing handed back to the page is `{ el, api, extra, loopExtra,
+   * slot, note, destroy, … }`, which CARRIES `api` as a property rather than
+   * being it.
+   * ⚠️ SO A PAGE MUST NEVER ASSIGN THE RETURN VALUE TO `__demo.transport`. It
+   * cost another session real time today: doing that replaces a published
+   * object that has `position` with a wrapper that has none, and
+   * `demo/verify.mjs` dies on `t0.pos.toFixed` while the page itself looks
+   * perfectly well. The bar publishes itself and needs no help; a page with two
+   * bars says which one with `publish: false` on the other, and that option is
+   * the ONLY supported way to decide this.
+   * ⚠️ AND THE TWO DRIFT SILENTLY, because nothing type-checks either of them.
+   * `extra(id)` is on the return value and not here, which by the rule written
+   * on `loopExtra` below is a control a CDP check cannot reach on a page with
+   * more than one bar. Left as it is and written down rather than fixed
+   * quietly: adding a member changes what every harness can see, and that is a
+   * change somebody should ask for.
+   */
   const api = {
     /**
      * 🔴 THE BAR'S OWN ELEMENT, SO A CHECK CAN PRESS THIS BAR RATHER THAN THE
@@ -1272,6 +1350,9 @@ export function createTransportBar(host, deck, {
   drawLoop();
   paint({ pos: deck.position() });
 
+  // ⚠️ WHAT THE PAGE HOLDS, AND IT IS NOT WHAT THE HARNESS READS. See the note
+  // over `api` above: `__demo.transport` is `api`, this is a wrapper around it,
+  // and assigning this object there takes `position` away from every check.
   return {
     el: bar,
     api,

@@ -1599,7 +1599,11 @@ export function createStrip(canvas, deck, opts = {}) {
     // and is noise the moment the client has real numbers.
     const client = L.subLabel === undefined || L.subLabel === null ? []
       : [].concat(L.subLabel).filter(Boolean).map(String);
-    return client.length ? client : (sub.length ? [sub.join(' · ')] : []);
+    // ⚠️ `, ` AND NOT A MIDDOT, since 2026-09-19. A gutter is read by a visitor,
+    // and no middots is now a rule of this project: a separator lets a line
+    // bolt a third and a fourth fact on instead of ending, which is the habit
+    // the em dash rule is about wearing a different character.
+    return client.length ? client : (sub.length ? [sub.join(', ')] : []);
   }
 
   /** How wide the label column has to be to say what it is for. */
@@ -1720,7 +1724,10 @@ export function createStrip(canvas, deck, opts = {}) {
       // `64 ms worst` usually fit side by side — so the same numbers arrive in
       // a shorter lane. Measured against the real width, never assumed: where
       // they do not fit, they stay stacked.
-      if (all.length > 1 && ctx.measureText(all.join(' · ')).width <= gutRoom(TEXT_X)) all = [all.join(' · ')];
+      // ⚠️ `, ` rather than a middot, and it is measured with the same string it
+      // is joined with, or the fit test would be answering about a line nobody
+      // draws.
+      if (all.length > 1 && ctx.measureText(all.join(', ')).width <= gutRoom(TEXT_X)) all = [all.join(', ')];
       ctx.fillStyle = T.dim; ctx.globalAlpha = 0.8;
       // 🔴 WHAT DID NOT FIT IS RECORDED, because the break below is SILENT and
       // the line it drops is the last one — which is where a page puts its

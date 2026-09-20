@@ -56,7 +56,7 @@
 //
 // ── TWO THINGS THE ENGINE SOURCE GIVES US FOR FREE ─────────────────────────
 //
-// READ `rig/box/norns/Engine_Pappus.sc:849`:
+// READ `rig/board/norns/Engine_Pappus.sc:849`:
 //     SendReply.ar(vtrig * report, '/pgrain', [pos, dur, i, half]);
 // and `:682`:
 //     dur = Lag.kr(msize, lagt).clip(0.002, 8).min(winspansec);
