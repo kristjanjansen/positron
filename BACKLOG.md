@@ -1,5 +1,89 @@
 ## Open
 
+- 🔴 **`midi.mjs` NEVER CALLS `port.open()`, AND THAT IS THE BUG THAT MADE A
+  DESK OF FOUR LIVE INSTRUMENTS READ AS AN EMPTY ROOM.** Found 2026-09-20 on
+  `/dump/` and fixed there; `demo/shell/midi.mjs`'s `wire(port)` has the same
+  shape and reaches `/instrument/`.
+  🔴 **MEASURED**: with a Circuit, a Model 12, a Fast Track Pro and an MK-425C
+  all plugged in and transmitting, every CoreMIDI port read
+  **`connected/closed`** and fifteen seconds of moving a fader produced
+  **nothing**. One `await p.open()` per port took the same fifteen seconds to
+  **239 messages**.
+  ⚠️ **THE SPECIFICATION SAYS ASSIGNING `onmidimessage` OPENS THE PORT**, which
+  is why the line was never written, and why the failure is so quiet: no error,
+  no rejected promise, no console line. **A page with closed ports is pixel for
+  pixel a page watching a silent instrument.**
+  ⚠️ **AND IT HAD WORKED EARLIER IN THE SAME SESSION**, which is worse than
+  never working. The implicit open is real and it is not reliable across a
+  reload with another client holding the device, so this is an INTERMITTENT
+  silent failure, which is the worst shape a defect takes here.
+  ⚠️ **`port.connection` IS THE ONLY THING THAT CAN TELL THE TWO APART**, so it
+  belongs in a visible column rather than on a hover. `/dump/` shows it.
+
+- 🔴 **A DEAD GUARD IN `board.mjs`, AND IT IS THE FIFTH OF THIS PROJECT'S MOST
+  EXPENSIVE DEFECT CLASS.** Found 2026-09-20 while researching the Fast Track
+  Pro. `demo/shell/board.mjs:211` constructs the context as `new AudioContext({
+  sampleRate: rate })` and line 286 then asks `if (ctx.sampleRate !== rate)`.
+  **A context built with an explicit rate IS that rate**, so the comparison is a
+  value against itself and the branch cannot execute. The log line under it,
+  which warns that the pitch will be wrong and that you will hear clicks, has
+  never once been printed.
+  ⚠️ **AND THE COMMENT ABOVE IT ASSERTS THE VERY THING THE GUARD CANNOT
+  CHECK**: *"nothing in this chain resamples"*. Whether that is still true with
+  an explicit rate is the question to settle, because the browser may be
+  resampling underneath in exactly the case the guard was written to catch.
+  ⚠️ **MEASURE THE HARDWARE RATE, NOT THE ONE THE PAGE ASKED FOR.** That is the
+  same rule as `followsPlayhead` reporting the setting rather than the
+  behaviour, and as a counter beating a state.
+  ⚠️ **IT REACHES `/keys/` AND `/knobs/`**, both of which play a board in
+  another building.
+
+- 🔴 **`midi.mjs` ASKS `{ sysex: false }` AND THAT BLOCKS EVERY VERSION READ AND
+  EVERY MEMORY DUMP.** `demo/shell/midi.mjs:57`. A Device Inquiry, a GM SysEx
+  and the MK-425C's memory dump all need `{ sysex: true }`, which is a separate
+  browser permission.
+  ⚠️ **IT IS A SHARED KIT MODULE, SO IT IS DONE ONCE BY ONE AGENT BEFORE ANY
+  PAGE AGENT STARTS**, per the fan-out rule. `/dump/` asks for SysEx on its own
+  and does not go through this module, so the two must not drift into two
+  different answers about the same permission.
+
+- 🔴 **IN FLIGHT: `/held/`'s PICTURE AND ITS TRANSPORT READ AS ONE BLOCK.**
+  Asked 2026-09-20 with a screenshot: *"in bg: separate videopanel and
+  transport"*. The grey steps end, a tall dark band carries nothing but the
+  fullscreen button, and the transport bar begins against its edge with no air
+  between them.
+  ⚠️ **`shell.css` ALREADY SETS THE RHYTHM AND SOMETHING IS DEFEATING IT.**
+  `.pos-body > * + * { margin-top: 22px }` is on the gap between SIBLINGS, so
+  two things touching means they are not siblings of `.pos-body`: one is nested
+  inside the other or both are inside a wrapper. **Find which, rather than
+  adding a margin**, because a page-local margin is a second opinion about a
+  distance the stylesheet already owns.
+  ⚠️ **AND THE EMPTY BAND IS ITS OWN QUESTION.** About 110 px of panel holding
+  one button. A container with nothing in it must not paint its edges, which is
+  the rule an empty readout and an empty control row are both already covered
+  by.
+
+- ✅ **DONE: `/dump/`, A DUMPER THAT PUTS WHAT A DEVICE SENDS INTO COLUMNS.**
+  Asked 2026-09-20: *"should we do a dumper demo that gets out devices stuff in
+  columns?"*, then *"no diagram needed. i need dumper. can be full w below the
+  header / desc / feedback"*. **25/25.** Two tables, a ports list and the
+  traffic, raw bytes in their own column beside the reading of them.
+  ⚠️ **THE DECODER IS A MODULE AND IS GRADED WITH NO BROWSER**,
+  `demo/shell/midi-decode.mjs` and `midi-decode-test.mjs`, **36 asserts, five of
+  them negative controls**. Six sabotages take between 1 and 6 red.
+  ⚠️ **NO DIAGRAM AND FULL WIDTH ON INSTRUCTION.** `body { max-width:
+  none }` with `.pos-head` keeping 720px, asserted on the COMPUTED value rather
+  than on a pixel count, because the first attempt at that assert passed by four
+  pixels on a 756px harness window.
+
+- 🔴 **IN FLIGHT: M-AUDIO FAST TRACK PRO AND EVOLUTION MK-425C.** Asked
+  2026-09-20: *"also research some more devices: maudio fasttrack pro and
+  evolution mk425c"*.
+  ⚠️ **BOTH ARE OLD AND THE DRIVER STORY IS THE WHOLE QUESTION** for the Fast
+  Track Pro: whether its MIDI is class compliant and still works on Apple
+  Silicon even where its audio does not. Two separate questions with two
+  separate answers.
+
 - 🔴 **IN FLIGHT: VIRTUAL LAYOUTS FOR THE CIRCUIT AND THE MODEL 12, PLANNED AS
   CONTROL TYPES FIRST.** Asked 2026-09-20: *"Can we plan controls to compose
   virtual layouts for both devices? Do not have to be physically supersimilar,
