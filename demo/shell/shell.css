@@ -47,6 +47,55 @@
      which is the right diagnosis. A number a person has to remember is a number
      that will be typed differently somewhere. */
   --pos-gap: 40px;
+  /* 🔴 ONE COLUMN WIDTH FOR EVERY HARDWARE CONTROL, AND ONE GAP. Reported
+     2026-09-20 with a screenshot of a knob row, two pad rows and a fader row
+     that lined up with nothing: *"controls should line up vetically, make a
+     strip layut or smth"*. Each control had picked its own width (knob 62,
+     pad 40, fader 34) and its own row gap, so four rows of the same eight
+     channels drew four different column pitches. A channel strip is a GRID:
+     channel 3's knob, pad and fader are the same column or it is not a strip.
+     ⚠️ DECLARED HERE RATHER THAN PER COMPONENT, because a shared measurement
+     living in four files is a measurement that will disagree with itself. That
+     is the `--sld-col` lesson, which cost a row snapping back to the width of
+     one word three reports running. */
+  --ctl-w: 46px;
+  --ctl-gap: 8px;
+  /* ── THE CONTROL LAYOUT CONTRACT ──────────────────────────────────────
+
+     🔴 A HARDWARE CONTROL HAS A WORKING SURFACE AND SOME FURNITURE AROUND IT,
+     AND ONLY THE FURNITURE VARIES. A fader's working surface is its lane, a
+     pad's is its button, a knob's is its dial. Above and below each sits text
+     that belongs to the control and is invisible from outside it: a value
+     readout, a top label slot, a name underneath.
+
+     🔴 **SO A ROW OF DIFFERENT CONTROLS CANNOT BE ALIGNED WITH `flex-end`
+     UNLESS THEIR FURNITURE AGREES.** That is the whole rule, and it was
+     learned three times in one evening on /rack/, each time as a screenshot:
+     buttons sitting a label too low, two labels ending on different lines, and
+     a lane starting 30 px below the button beside it.
+
+     ✅ **THE ANSWER IS ONE HEAD AND ONE FOOT FOR EVERY CONTROL**, published
+     here rather than computed by each caller. A caller that has to know how a
+     component is built is a caller that breaks when it changes, and every one
+     of those three bugs was a caller doing exactly that.
+
+     --ctl-head  what sits ABOVE the working surface. A fader's value readout
+                 and a pad's reserved top label slot are both this tall, so a
+                 fader lane and a pad button start on the same line.
+     --ctl-foot  what sits BELOW it. A fader's label and a pad's bottom label
+                 are both this tall, so their names end on the same line.
+
+     ⚠️ **A SLOT IS RESERVED EVEN WHEN EMPTY.** A pad with no top label still
+     takes --ctl-head, or a grid whose downbeats are named would have those
+     pads sitting higher than the rest, which reads as a rendering fault rather
+     than a labelling choice.
+     ⚠️ **AND A CONTROL SPANNING A COLUMN OF OTHERS USES --ctl-step.** The
+     distance from one pad's button to the next is three things and not one:
+     this pad's foot, the gap, and the next pad's head. Counting two of the
+     three is what made a lane 115 px against the 145 it needed. */
+  --ctl-head: 15px;
+  --ctl-foot: 17px;
+  --ctl-step: calc(var(--ctl-foot) + var(--ctl-gap) + var(--ctl-head));
   --ok: #8fd6a8; --warn: #e0b060; --bad: #e0908a;
   --rec: #e5484d;        /* record: the one control that starts writing */
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -1016,6 +1065,11 @@ button.pos-pri[data-busy="1"] {
 .strip { height: 120px; }
 .strip-deep { height: min(58vh, 520px); }
 /* seed only — createStrip sets the real height from its lanes every frame */
+/* ⚠️ 44 px, AND IT IS NOT THE FLOOR. An `auto` strip writes
+   `canvas.style.height` on every layout and an inline style beats this rule, so
+   the real floor is `STRIP_AUTO_MIN` in `shell/strip.mjs`, which is 88. This
+   value only ever applies before the first layout. **Changing it here changes
+   nothing a reader will see**, which is why it says so. */
 .strip-auto { height: 44px; }
 
 /* ── what is under the pointer, under the strip (shell/strip.mjs) ─────────
@@ -1370,6 +1424,12 @@ video[hidden] { display: none; }
   font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); white-space: nowrap;
 }
+/* A primary and a secondary label, stacked, in the column the single label
+   already had. The pair is the same on a knob and on a fader: the primary names
+   what the control MOVES, the secondary names what it IS on the wire. */
+.sld-l-pair { display: inline-flex; flex-direction: column; gap: 3px; }
+.sld-l-p { color: var(--dim); }
+.sld-l-s { font-size: 9px; letter-spacing: .06em; color: var(--dim2); text-transform: none; }
 /* ⚠️ AN INSET SHADOW, NOT A BORDER, and it is the difference between the
    handle meeting the corner and missing it by a pixel. A border insets the
    PADDING BOX the handle is positioned in, so its travel is short by one pixel
@@ -3233,7 +3293,15 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   background: var(--card);
   border-top: 1px solid var(--line);
 }
-.pos-vp-slot { min-width: 0; display: flex; align-items: center; }
+/* 🔴 A SLOT HAS A GAP, BECAUSE A SLOT HOLDS MORE THAN ONE THING. Reported
+   2026-09-20 with a screenshot of two icon buttons in a panel footer sitting
+   flush against each other: *"add space between"*. The footer's own `gap: 12px`
+   is BETWEEN the three slots and never reaches inside one, so every page that
+   put two controls in a slot got them touching, and two buttons with no air
+   between them read as one segmented control with a line down it. 8 px rather
+   than 12, because these are siblings inside one slot rather than the three
+   regions of a footer. */
+.pos-vp-slot { min-width: 0; display: flex; align-items: center; gap: 8px; }
 .pos-vp-l { justify-content: flex-start; }
 .pos-vp-c { justify-content: center; }
 .pos-vp-r { justify-content: flex-end; }
@@ -3331,3 +3399,475 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 
 /* the two specimen blocks in the GLUE section: a surface needs something with
    a height in it, and a readout with one line is the smallest honest one */
+
+/* ── knob: a rotary control dragged VERTICALLY — shell/knob.mjs ─────────────
+   🔴 `cursor: ns-resize` IS NOT DECORATION, IT IS THE WHOLE ANSWER TO THIS
+   COMPONENT'S ONE KNOWN WEAKNESS. Vertical drag is what every professional
+   audio application uses, because angular drag breaks down near the centre
+   where two pixels swing the angle through most of its range. The cost is
+   discoverability: a control that LOOKS like a dial invites somebody to turn
+   it in a circle, and there is no signifier for "drag me up". This arrow is
+   the standard one and it is the cheapest honest signal there is. */
+.pos-knob {
+  display: flex; flex-direction: column; align-items: center;
+  width: var(--ctl-w); flex: 0 0 auto;
+  -webkit-touch-callout: none; user-select: none;
+}
+/* 🔴 A FIXED HEIGHT ON THE NUMBER. It changes sixty times a second under a
+   drag, and anything that redraws that often may not change how much room it
+   takes or the whole column jumps under the hand moving it. */
+.pos-knob-v {
+  font: 500 11px/14px var(--mono); font-variant-numeric: tabular-nums;
+  color: var(--fg); height: 14px; white-space: nowrap; overflow: hidden;
+}
+/* ⚠️ `height: auto`, BECAUSE THE VIEWBOX DECIDES THE SHAPE. `knob.mjs` crops the
+   viewBox to the arc's real extent, which depends on the sweep, so a height
+   typed here would be a second opinion about a shape the drawing already knows.
+   It was a square, and a 150 degree arc in a square box read as half a knob. */
+.pos-knob-dial {
+  width: var(--ctl-w); height: auto; display: block; margin: 3px 0 4px;
+  cursor: ns-resize;
+  /* or a drag on a phone scrolls the page instead of moving the knob */
+  touch-action: none;
+  border-radius: 50%; outline-offset: 2px;
+}
+.pos-knob-dial:focus-visible { outline: 2px solid var(--hi); }
+/* 🔴 ONE STROKE WIDTH, READ BY THE TRACK AND THE ARC. It was 7 in two places,
+   so changing it meant editing two numbers that have to stay equal or the
+   yellow sits inside a grey halo. One token, and the needle derives from it.
+   ⚠️ IT WENT 7 TO 10 AND BACK TO 4 IN TEN MINUTES, AND BOTH ASKS WERE RIGHT.
+   *"make rotary biiit thigker"* was about a 270 degree ring, where a thin line
+   most of the way round is faint. *"make it thin"* arrived with *"do not full
+   round rotary knob path, just a bit"*, and a short arc is a different object:
+   at 150 degrees the ring is a mark rather than a circle, and a heavy mark
+   reads as a blob. **The thickness belongs to the sweep**, which is why this
+   comment records both rather than only the last one. */
+.pos-knob { --knob-stroke: 4; }
+.pos-knob-track {
+  fill: none; stroke: var(--line2);
+  stroke-width: var(--knob-stroke); stroke-linecap: round;
+}
+.pos-knob-arc {
+  fill: none; stroke: var(--hi);
+  stroke-width: var(--knob-stroke); stroke-linecap: round;
+  transition: stroke .12s linear;
+}
+/* 🔴 THE SAME WIDTH AS THE ARC, NOT A FRACTION OF IT. Asked 2026-09-20: *"arc
+   and handle same thinness"*. It was `* 0.55` on the reasoning that a needle
+   reads against a ring, which is true of a THICK ring: at 10 the two needed
+   telling apart. At 4 they do not, and two hairlines at different weights read
+   as a drawing mistake rather than as a hierarchy. One token, used raw. */
+.pos-knob-ptr {
+  stroke: var(--fg); stroke-width: var(--knob-stroke);
+  stroke-linecap: round;
+}
+/* 🔴 THE SOURCE IS VISIBLE, WHICH IS THE POINT OF TRACKING IT. A knob last
+   moved by hardware is a knob whose binding is alive, and the one failure that
+   matters on a bound control is a binding that has quietly stopped arriving. */
+.pos-knob[data-from="hardware"] .pos-knob-arc { stroke: var(--ok); }
+/* 🔴 THE SAME PAIR AS A SLIDER'S, AND THE SAME TWO JOBS. The primary names what
+   the control MOVES and the secondary names what it IS on the wire. A knob and
+   a fader and a slider all carry it, so a strip made of all three reads as one
+   instrument. */
+.pos-knob-lab {
+  font: 600 9.5px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim); text-align: center; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pos-knob-sub {
+  font: 400 9px/1.3 var(--mono); color: var(--dim2); text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pos-knob-bank { min-width: 0; }
+.pos-knob-banklab {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); margin-bottom: 8px;
+}
+/* ⚠️ `min-width: 0` OR THE PAGE DRAGS SIDEWAYS INSTEAD OF THE ROW.
+   `overflow-x` cannot shrink a flex item below its content. MEASURED once at
+   390 px as 141 px of page overflow on a different component. */
+.pos-knob-row {
+  display: flex; gap: var(--ctl-gap); overflow-x: auto; min-width: 0;
+  padding-bottom: 2px;
+}
+
+/* ── pad: a square button that can be lit — shell/pad.mjs ───────────────────
+   ⚠️ THE TINT IS A CUSTOM PROPERTY WITH A FALLBACK, never a colour written by
+   the component onto the element. A component that sets the property itself
+   writes a rule nothing can override, including its own stylesheet, which is
+   the defect `video-panel.mjs` shipped with its `aspect` option. */
+.pos-pad {
+  --pad-tint: var(--dim);
+  width: var(--ctl-w); height: var(--ctl-w); min-width: 0; padding: 0;
+  /* 🔴 THE FACE SITS AT THE BOTTOM OF THE BUTTON. Asked 2026-09-21: *"alogn
+     labels on pad buttons to bottom"*. Centred, a name floats in the middle of
+     a square with nothing to sit on; against the bottom edge it reads as
+     printed on the panel, which is where hardware puts it.
+     ⚠️ **A CIRCLE IS EXEMPT AND STAYS CENTRED.** The bottom of a circle is its
+     narrowest point, so a word pushed there is cut by the curve on both sides
+     while the widest part of the button sits empty above it. */
+  display: grid; place-items: end center;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 4px; cursor: pointer;
+  -webkit-touch-callout: none; touch-action: manipulation;
+  transition: background .08s linear, border-color .08s linear;
+}
+/* 🔴 THE TINT STRIP ALONG THE BOTTOM IS GONE. Reported 2026-09-20 with a
+   screenshot: *"rm thicker bottom border on pads"*. It was there so an OFF pad
+   kept a trace of its lane colour, and it read as a thicker border on one side,
+   which is a rendering fault rather than a signal. **An off pad says nothing
+   about its colour now**, and the lane is carried by the pads that ARE on. If
+   that turns out not to be enough, the answer is a tinted BORDER on all four
+   sides, never a heavier edge on one.
+   ⚠️ `position: relative` IS KEPT, because the face label is positioned
+   against it. */
+.pos-pad { position: relative; overflow: hidden; }
+.pos-pad:hover { border-color: var(--line2); }
+.pos-pad[data-on] {
+  background: color-mix(in srgb, var(--pad-tint) 40%, var(--card));
+  border-color: var(--pad-tint);
+}
+/* The step head walking the grid, and a note arriving from a device. */
+.pos-pad[data-hit] { background: color-mix(in srgb, var(--pad-tint) 80%, #fff 10%); }
+.pos-pad:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+/* ⚠️ A FACE CUTS LIKE A LABEL DOES. It had no overflow handling at all, so a
+   word too long for a pad simply drew past its border. Same rule as the top and
+   bottom slots: the ellipsis is the signal that the word is in the wrong place,
+   not a way to fit it. */
+.pos-pad-face {
+  font: 500 10px/1 var(--mono); color: var(--fg);
+  font-variant-numeric: tabular-nums; pointer-events: none;
+  /* ⚠️ 5 px AT THE FOOT. It went 4, then 7 on *"add more bottom padding"*, then
+     back on *"to much.."*. 4 read as slipped, 7 read as floating well above the
+     edge, and the answer is between them. The side padding stays at 3 because
+     it only exists to stop a wide word touching the border before it
+     ellipsises. */
+  max-width: 100%; padding: 0 3px 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pos-pad[data-on] .pos-pad-face { color: var(--bg); }
+/* 🔴 A FIXED SQUARE, NOT A GRID TRACK THAT STRETCHES. Reported 2026-09-20
+   with a screenshot of eight pads filling a wide box: *"awful. bring back that
+   original pad button size square"*. The columns were `minmax(0, 1fr)`, so the
+   pad's SIZE was a function of how many of them there were and how wide the
+   page was: sixteen looked right and eight were enormous. A pad is a thing a
+   finger hits, so its size is a property of the pad.
+   ⚠️ IT WRAPS RATHER THAN SHRINKING. Sixteen at 40 px plus gaps is 700 px, and
+   a pad narrow enough to fit a phone is one nobody can hit. */
+/* A grid where no pad carries a label: the reserved slots are only air, so they
+   go and the gap is the same across and down. See createPadGrid. */
+.pos-padgrid-bare .pos-pad-top { display: none; }
+
+.pos-padgrid {
+  display: grid; gap: var(--ctl-gap); min-width: 0;
+  grid-template-columns: repeat(var(--pad-cols, 16), var(--ctl-w));
+  justify-content: start;
+}
+
+/* ── a half height button group — shell/button-group.mjs ────────────────────
+   A shorter button beside a full one says "this matters less", which is what a
+   row of secondary actions under a grid is. The label above it is the group's
+   own `label`, unchanged. */
+.pos-bgroup-half .pos-bgroup-row button { height: 22px; padding: 0 9px; font-size: 11px; }
+
+/* ── a pad's own label, above its own pad — shell/pad.mjs ───────────────────
+   🔴 EVERY PAD GETS THE SLOT EVEN WITH NOTHING IN IT. A grid where only the
+   downbeats are named would otherwise have four pads sitting lower than the
+   other twelve, and pads that do not line up read as a rendering fault rather
+   than as a labelling choice. `min-height` rather than `height`, so a label
+   that wraps pushes its own row rather than being cut. */
+/* 🔴 A PAD IS AS WIDE AS A PAD, SO A LONG LABEL ELLIPSISES RATHER THAN
+   STRETCHING IT. Asked 2026-09-21: *"actually, make long labels ..."*, after a
+   two word legend in a 46 px slot pushed its pad out over its neighbour. The
+   label rules already said `text-overflow: ellipsis`, and it never fired
+   because the WRAPPER had no width to overflow: it simply grew.
+   ⚠️ **AND THE ELLIPSIS IS A SIGNAL, NOT A FIX.** CLAUDE.md: anything that
+   truncates with an ellipsis is in the wrong place, and that is the point of
+   showing it. A cut label means the word is too long for a pad, and the answer
+   is a shorter word or a different home for it. */
+.pos-pad-wrap { display: flex; flex-direction: column; width: var(--ctl-w); min-width: 0; }
+/* Below the pad, where hardware prints a button's name. Unlike the top slot
+   this one is not reserved when empty: a bottom label is on every pad in a row
+   or on none, so an empty line would just be a gap. */
+/* 🔴 5 + 12 = 17, WHICH IS `--fdr-foot` EXACTLY. A fader puts 17 px under its
+   lane (5 px of lane margin plus a 12.35 px label line) and a pad now puts 17
+   under its button, so a row of both aligned with `flex-end` lines up TWICE
+   over: the lane bottom with the button bottom, and the two labels with each
+   other. Reported 2026-09-20 with a photograph: *"1 and solo label bottoms and
+   slider / button bottoms need to line up"*.
+   ⚠️ **THIS REPLACES A PER PAGE MARGIN AND THAT IS THE POINT.** `/rack/` was
+   lifting its button column by `--fdr-foot` to align to the lane, which worked
+   only while the pads had nothing under them. The moment they gained a label
+   the correction became the error. **Two controls that have to end on one line
+   should agree about their own feet, not have a caller reconcile them.** */
+.pos-pad-bot {
+  font: 500 9px/12px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--dim); margin-top: 5px;
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pos-pad-top {
+  font: 500 9px/12px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--dim2); min-height: 12px; margin-bottom: calc(var(--ctl-head) - 12px);
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── a button's own label, above its own button — shell/button-group.mjs ────
+   The join is dropped when these are in use: a segmented row claims "one thing
+   with several parts", which individual labels deny. See the component. */
+.pos-bgroup-cols { display: inline-flex; gap: 6px; align-items: flex-end; }
+.pos-bgroup-col { display: inline-flex; flex-direction: column; min-width: 0; }
+.pos-bgroup-top {
+  font: 500 9px/12px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--dim2); min-height: 12px; margin-bottom: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pos-bgroup-cols button { border-radius: 4px; }
+
+/* ── half height pads, and disabled states — shell/pad.mjs, knob.mjs ────────
+   🔴 HALF HEIGHT IS A PROP ON A PAD, NOT A SECOND COMPONENT. Asked for
+   2026-09-20: *"halfheigt buttons; they are just pads with half height (a
+   prop)"*, then said precisely: *"make an ption to have same w but half
+   height"*.
+   ⚠️ **SAME WIDTH, HALF THE HEIGHT.** It was `aspect-ratio: 2 / 1` for an hour,
+   which is the same thing only while the width is fixed, and the width was not:
+   the grid stretched it. Say the two dimensions rather than a ratio, and the
+   pad cannot be reshaped by how many of it there are. */
+.pos-pad-half {
+  width: var(--ctl-w); height: calc(var(--ctl-w) / 2);
+  /* 🔴 A HALF PAD CENTRES ITS FACE. Reported 2026-09-21: *"tune paddings so
+     label appear vert centerd"*. It is 23 px tall and its text is 10, so there
+     are 13 px to distribute and "against the bottom edge" spends 7 of them on
+     one side: the word reads as having fallen rather than as being placed.
+     ⚠️ **BOTTOM ALIGNMENT NEEDS ROOM TO BE A CHOICE.** On a 46 px square it is
+     one, and it reads as printed on the panel; on a half it is the only place
+     the word can nearly be anyway. Same reason a circle centres. */
+  place-items: center;
+}
+.pos-pad-half .pos-pad-face { padding: 0 3px; }
+/* 🔴 A CIRCLE, 10 PER CENT SMALLER, AND STILL THE SAME COMPONENT. All three
+   label slots, the tint, disabled and latch all work unchanged: it is a shape
+   prop, not a second button.
+   ⚠️ THE TINT STRIP THAT USED TO RUN ALONG A PAD'S BOTTOM WOULD BE A CHORD
+   ACROSS A CIRCLE, which is one more reason it was right to remove it. */
+.pos-pad-round {
+  width: calc(var(--ctl-w) * 0.9); height: calc(var(--ctl-w) * 0.9);
+  border-radius: 50%;
+  /* see the note on .pos-pad: a circle's bottom is its narrowest point */
+  place-items: center;
+}
+/* a round pad centres in a column sized for square ones */
+.pos-pad-wrap:has(.pos-pad-round) { align-items: center; }
+
+/* 🔴 A DISABLED CONTROL SAYS SO IN INK, NOT IN COLOUR ALONE, and it keeps its
+   shape. A control that shrinks or loses its border when switched off changes
+   the layout under whatever is beside it, and a row that reflows when one
+   button goes off reads as the page breaking. */
+.pos-pad:disabled {
+  opacity: .38; cursor: not-allowed;
+  background: var(--card); border-color: var(--line);
+}
+.pos-pad:disabled .pos-pad-face { color: var(--dim2); }
+/* The labels live OUTSIDE the button, so :disabled cannot reach them. The
+   wrapper carries the state for exactly this. */
+.pos-pad-wrap[data-off] .pos-pad-bot,
+.pos-pad-wrap[data-off] .pos-pad-top { color: var(--dim2); opacity: .55; }
+.pos-knob[data-off], .pos-fdr[data-off] { opacity: .38; }
+.pos-knob[data-off] .pos-knob-dial { cursor: not-allowed; }
+.pos-knob[data-off] .pos-knob-arc { stroke: var(--dim2); }
+.pos-fdr[data-off] .pos-fdr-lane { cursor: not-allowed; }
+.pos-fdr[data-off] .pos-fdr-cap { background: var(--dim2); }
+
+/* ── fader: THE SLIDER, TURNED 90 DEGREES — shell/fader.mjs ─────────────────
+   🔴 IT IS NOT A NEW LOOK AND IT MUST NEVER BECOME ONE. Instructed 2026-09-20:
+   *"vertical fades is same as out horiz sldier just turned 90c"*. The first
+   build was a rounded capsule with a coloured fill and a wide cap across it,
+   which is a fader off a mixer photograph rather than this project's slider,
+   and it read as a fifth control nobody had agreed to.
+   **Every value below is taken from `.sld-lane` and `.sld-knob` with the axes
+   swapped**, so the two cannot drift: 34 px across, `--card2`, an inset 1 px
+   shadow rather than a border, 4 px corners, and a SOLID BLOCK handle in
+   `--hi` rather than a fill and a cap.
+   ⚠️ THERE IS NO FILL. The slider has none: its handle is the reading. A fill
+   plus a handle says the value twice and the two can disagree by a pixel. */
+.pos-fdr {
+  /* 🔴 THE HEAD IS EXACTLY A HALF PAD TALL. Asked 2026-09-20: *"make slider
+     heads same h as halfbutton heights"*, and it is the right tie: a half pad
+     is `--ctl-w / 2` and so is this, so the two cannot drift apart and a strip
+     reads as one instrument rather than four components that happen to be
+     stacked. It was a typed 20 px, which agreed with nothing. */
+  --fdr-knob: calc(var(--ctl-w) / 2);
+  /* one number for the lane, so the head cannot be a different width */
+  --fdr-lane-w: 34px;
+  display: flex; flex-direction: column; align-items: center;
+  width: var(--ctl-w); flex: 0 0 auto;
+  -webkit-touch-callout: none; user-select: none;
+}
+/* fixed height: it changes under a drag, and nothing that redraws that often
+   may change how much room it takes */
+/* --ctl-head, so a fader lane and a pad button start on the same line. */
+.pos-fdr-v {
+  font: 500 11px/1 var(--mono); font-variant-numeric: tabular-nums;
+  color: var(--fg); height: var(--ctl-head);
+  display: flex; align-items: center;
+}
+/* 34 px is `.sld-lane`'s height, used here as its width. 120 is the travel. */
+/* ⚠️ 34 px INSIDE A 46 px COLUMN, CENTRED, NOT WIDENED. 34 is `.sld-lane`'s
+   height used here as its width, and the one rule this component has is that it
+   is the slider turned 90 degrees. Stretching the lane to fill the column would
+   break that to win an alignment the column already provides. */
+/* ⚠️ THE TRAVEL IS A VARIABLE SO A CALLER CAN MAKE IT SPAN SOMETHING. A fader
+   beside a column of pads has to reach from the first pad's top to the last
+   pad's bottom, and only the caller knows how many pads there are. Default
+   unchanged at 120. */
+.pos-fdr-lane {
+  position: relative; display: block;
+  width: var(--fdr-lane-w);
+  height: calc(var(--fdr-lane-h, 120px) - var(--fdr-lane-cut, 0px));
+  margin: 4px 0 5px;
+  background: var(--card2); box-shadow: inset 0 0 0 1px var(--line2);
+  border-radius: 4px;
+  /* 🔴 THE HEAD IS INSIDE THE BOX. Photographed 2026-09-20 hanging over both
+     edges of its lane: *"sloder head should be INSIDE its box"*. A handle wider
+     than the track it runs in reads as a rendering fault, and at the ends it
+     would also have escaped top and bottom. Clipping is the fix that cannot be
+     undone by a rounding error the way matching two widths by hand can. */
+  overflow: hidden;
+  cursor: ns-resize; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.pos-fdr-lane:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+/* `bottom` is set from script as a share of the TRAVEL, never of the height, so
+   the two ends land flush. Same arithmetic as the slider's `left`. */
+/* 🔴 THE HANDLE SITS INSIDE THE LANE BORDER, NOT ON IT. Reported 2026-09-21
+   with a screenshot: *"slider moving part should be smaller to fit with slider
+   lane borders"*. It was the lane full width, and the lane border is an INSET
+   SHADOW, so the handle covered it edge to edge and read as wider than the
+   track it runs in.
+   ⚠️ **INSET BY THE BORDER, NOT A SMALLER WIDTH.** left and right at 1 px with
+   no width means the handle is always exactly the track inner measure, so
+   changing --fdr-lane-w moves both together. A typed width would be a second
+   opinion about the same number.
+   ⚠️ AND THE RADIUS DROPS TO 3, because a 4 px corner inside a 4 px corner
+   leaves a sliver of track showing at each end of the handle. */
+.pos-fdr-cap {
+  position: absolute; left: 1px; right: 1px; bottom: 0;
+  height: var(--fdr-knob);
+  background: var(--hi); border-radius: 3px; pointer-events: none;
+}
+.pos-fdr[data-from="hardware"] .pos-fdr-cap { background: var(--ok); }
+.pos-fdr-lab {
+  font: 600 9.5px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim); text-align: center; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pos-fdr-sub {
+  font: 400 9px/1.3 var(--mono); color: var(--dim2); text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pos-fdr-bank { min-width: 0; }
+.pos-fdr-banklab {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); margin-bottom: 8px;
+}
+.pos-fdr-row { display: flex; gap: var(--ctl-gap); overflow-x: auto; min-width: 0; padding-bottom: 2px; }
+
+/* ── a row of controls whose working surfaces line up — the contract above ──
+   🔴 IT IS PLAIN `flex-end` AND THAT IS THE POINT. Because every control
+   publishes the same `--ctl-head` and `--ctl-foot`, the browser's own bottom
+   alignment lands the lanes, the buttons and the dials on one line with no
+   per page arithmetic. **A page doing its own margin correction here is a page
+   that will be wrong the moment a component gains a label**, which is exactly
+   how /rack/ broke: it lifted its button column by a foot's height, which was
+   right until the pads gained one of their own. */
+.pos-crow { display: flex; align-items: flex-end; gap: var(--ctl-gap); }
+/* A control that has to SPAN a column of n others: n surfaces plus n-1 steps. */
+.pos-crow [data-span] { --span-n: 3; }
+
+/* ── the invisible hand on a fader — shell/fader.mjs ────────────────────────
+   🔴 JOINED TO THE LANE, THE WAY `.sld-hand-row` JOINS THE HORIZONTAL ONE.
+   Corrected 2026-09-21: *"no, it has to be part of the slider as in
+   horizontal"*. It was absolutely positioned and out of flow, which kept every
+   alignment intact and made it a separate object floating under the fader.
+   **The slider already decided this**: its hand is a segment of the control,
+   1 px over, with the corners rounded only on the outside.
+   ⚠️ SO IT IS IN FLOW AND IT GROWS THE FADER, and a caller with pads beside it
+   has to account for that. --fdr-hand-h is published for exactly that, at
+   :root so a SIBLING can read it. A value on .pos-fdr would be invisible to
+   the button column next to it, which this kit has already got wrong once.
+   🔴 THE GLYPH IS ROTATED, NOT THE BUTTON. U+21C4 is a left and right pair
+   drawn for a horizontal lane. Turning the button would turn its border and
+   its focus ring; a bare text node cannot be transformed at all. */
+.pos-fdr { position: relative; }
+.pos-fdr-hand {
+  /* ⚠️ SQUARE: as tall as the lane is wide. A 22 px button on a 34 px lane read
+     as a lid rather than as a segment of the control. */
+  height: var(--fdr-lane-w, 34px); width: var(--fdr-lane-w, 34px); padding: 0;
+  /* 1 px over, so two borders make one seam */
+  /* ⚠️ 1 px OVER THE LANE, AND THE LANE'S OWN 5 px OF FOOT MOVES BELOW IT. The
+     button inherits the gap the lane used to leave above the label, or the
+     fader's foot below its last control is 12 px while a pad's is 17, and the
+     two end 5 px apart. MEASURED as exactly that before this line existed. */
+  margin-top: -1px; margin-bottom: 5px;
+  display: grid; place-items: center;
+  font-size: 13px; line-height: 1;
+  background: var(--card2); border: 1px solid var(--line2);
+  /* outer corners only, exactly as the slider does it */
+  border-radius: 0 0 4px 4px;
+  color: var(--dim); cursor: pointer;
+  -webkit-touch-callout: none; touch-action: manipulation;
+}
+/* 🔴 THE LANE GIVES UP THE ROOM, SO THE FADER'S BOTTOM DOES NOT MOVE. Said
+   plainly 2026-09-21: *"why need to account. its just sliders mode"*, *"the
+   bottom y stays"*, and that is the whole design. The first build grew the
+   fader downward by 22 px and made every control beside it compensate, which
+   is a component pushing its own problem onto its callers.
+   ⚠️ **A MODE CHANGES WHAT A CONTROL IS, NOT HOW MUCH ROOM IT TAKES.** With the
+   travel shortened instead, a fader with a hand and a fader without one are
+   the same size, so the pads beside them need no margin, the FX fader needs no
+   matching hand, and the head and foot contract is untouched.
+   ⚠️ THE SEAM IS WORTH 1 px BACK, because the button overlaps the lane by one. */
+/* 🔴 THE LANE GIVES UP ITS BOTTOM MARGIN, OR THE TWO DO NOT TOUCH. Reported
+   2026-09-21 with a screenshot: *"disconnectd from slider, to close to bototm
+   label"*. The lane carries `margin: 4px 0 5px`, so a button joined under it
+   sat 4 px away however negative its own top margin was, and the 5 px that had
+   been between the lane and the label ended up between the button and the
+   label instead of below the pair.
+   ⚠️ **A SEGMENTED JOIN IS TWO BORDERS OVERLAPPING BY ONE PIXEL AND NOTHING
+   ELSE BETWEEN THEM.** Any margin left in that gap is a hairline of card
+   showing through the seam. */
+.pos-fdr:has(.pos-fdr-hand) .pos-fdr-lane {
+  border-radius: 4px 4px 0 0;
+  margin-bottom: 0;
+}
+/* ⚠️ THE REDUCTION IS A VARIABLE, NOT A CONDITIONAL HEIGHT. Overriding the
+   height inside a `:has()` rule computed to ZERO, because the lane's own rule
+   is where `--fdr-lane-h` is read and a second declaration elsewhere resolved
+   it in a context that did not have it. One height declaration, one place, and
+   the CONDITION changes a number it reads. */
+.pos-fdr { --fdr-lane-cut: 0px; }
+/* ⚠️ THE CUT IS EVERYTHING THE BUTTON ADDS: its height, less the 1 px it
+   overlaps by, plus the 5 px of foot it now carries. Miss the 5 and the fader
+   grows by exactly that, which pushes the pad column down 5 px and takes the
+   TOP alignment red while the bottom one passes. **Both ends move together or
+   neither does.** */
+/* ⚠️ THE CUT IS WHAT THE BUTTON ADDS, NET. Its height, less the 1 px overlap,
+   less the 5 px of lane margin it replaces, plus the 5 px it now carries below
+   itself: the two fives cancel and the answer is the button's height minus the
+   seam. **Both ends move together or neither does**: miss a term and the fader
+   grows, which pushes the pad column down and takes the TOP alignment red while
+   the bottom one passes. */
+.pos-fdr:has(.pos-fdr-hand) {
+  --fdr-lane-cut: calc(var(--fdr-lane-w, 34px) - 1px);
+}
+.pos-fdr-hand-g { display: inline-block; transform: rotate(90deg); }
+/* 🔴 THE GLYPH LIGHTS, NOT THE BOX. Asked 2026-09-21: *"do not color its bg
+   when enabled but glyph"*. A filled yellow box beside a yellow fader handle is
+   two things claiming to be the value; the handle is the reading and the button
+   is a mode.
+   ⚠️ AND IT MATCHES WHAT EVERY OTHER CONTROL HERE DOES with an armed state: a
+   pad tints, a knob's arc turns, none of them floods a panel. */
+.pos-fdr-hand[aria-pressed="true"] { color: var(--hi); border-color: var(--line2); }
+.pos-fdr[data-off] .pos-fdr-hand { opacity: .4; cursor: not-allowed; }
+
+/* a centred face needs no bottom padding, or it sits above centre */
+.pos-pad-round .pos-pad-face { padding: 0 3px; }

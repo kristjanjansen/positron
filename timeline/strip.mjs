@@ -1575,7 +1575,28 @@ export function createStrip(canvas, deck, opts = {}) {
   // page adding a third line to a 44 px lane, drops a line in silence. That is
   // what `gutterFit()` is for: it reports `dropped` per lane, and 0 across all
   // sixteen is the measurement this rhythm was chosen against.
-  const GUT_NAME_Y = 11, GUT_SUB_Y = 22, GUT_SUB_STEP = 10;
+/**
+ * 🔴 `GUT_SUB_STEP` IS 13, NOT 10. Photographed 2026-09-20 on a lane carrying a
+ * name and two detail lines: *"not enougj line height for desc"*. The gutter
+ * text is 10 px, so a 10 px step is a line height of exactly 1.0 and the
+ * descenders of one line touch the ascenders of the next. One line looked fine
+ * and three read as a solid block.
+ * 🔴 **12 AND NOT 13, AND THE PAGE DECIDED THAT RATHER THAN A PREFERENCE.** The
+ * first attempt was 13 with the first line at 23, which is 1.3 and matches the
+ * rest of the project's small mono text. `/held/` went red immediately:
+ * **`maze dropped 1, transition dropped 1`**. Those lanes are 36 px, the second
+ * line would have landed at y+36 against a limit of y+34, and the drop is
+ * SILENT: a lane one pixel short loses its last line, which is where a page
+ * puts its count.
+ * ⚠️ **THE ALTERNATIVE WAS TO MAKE EVERY LANE TALLER AND THAT IS A WORSE
+ * TRADE.** Eight lanes on that page carry hand-set heights that decide what the
+ * whole piece looks like at a glance, and reshaping them to win three pixels of
+ * leading is a big change bought by a small one.
+ * ⚠️ AND THE ASSERT IS WHY THIS IS KNOWN RATHER THAN SHIPPED. `gutterFit()`
+ * publishes what was dropped and `/held/` reads it, so a leading change that
+ * quietly costs a page its numbers goes red in one run.
+ */
+  const GUT_NAME_Y = 11, GUT_SUB_Y = 22, GUT_SUB_STEP = 12;
 
   /** A lane's own lines under its name: the client's numbers when it has them,
    *  else the derived clock domain. ⚠️ Factored out because the gutter is now

@@ -136,6 +136,16 @@
      is silence, and a flex CHILD of a `flex-wrap` row is sized by its content
      no matter what width it asks for. */
   .kit-wide { display: block; }
+  /* Half of whatever the box gives it, for a specimen that does not need the
+     full width. A fraction rather than a pixel count, so the layout keeps
+     owning the width and this page has no second opinion about it to defend.
+     ⚠️ THE MEDIA BLOCK SITS AFTER THE PLAIN RULE, never before it. A media
+     query adds no specificity, so a later plain rule of the same weight wins at
+     every width — which is how `.pos-pick`'s entire phone layout sat in
+     shell.css for weeks and never once ran. Under 560 px half a box is narrower
+     than the transport bar's own controls, so the specimen takes it all back. */
+  .kit-half { max-width: 50%; }
+  @media (max-width: 560px) { .kit-half { max-width: 100%; } }
   /* the phone case. A fixed width so the one-column layout can be seen on a
      desktop, `max-width` so it is never wider than a real phone. */
   .kit-phone { width: 320px; max-width: 100%; }
@@ -179,6 +189,19 @@
      nothing. The caption takes the air and its specimen sits under it, so the
      pair is still one group with the shell's own 44 px above it. */
   .kit-box > * + .kit-cap { margin-top: 44px; }
+
+  /* A channel strip: four rows of controls, stacked the way a mixer stacks
+     them. The row headings came off 2026-09-20 and `.kit-hwlab` went with
+     them; every knob already carries its CC under it. */
+  .kit-hwrow { width: 100%; }
+  .kit-hwrow + .kit-hwrow { margin-top: 18px; }
+  .kit-hwitems { min-width: 0; }
+  /* The vertical twins, beside the horizontal ones they are meant to match. */
+  .kit-vrow { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
+
+  .kit-swatch { display: inline-flex; align-items: baseline; gap: 7px; margin-right: 20px; }
+  .kit-swatch-n { font: 600 12px/1.6 var(--mono); color: var(--fg); }
+  .kit-swatch-w { font: 400 12px/1.6 var(--mono); color: var(--dim); }
   .kit-cap + .pos-report { margin-top: 0; }
 </style>
 
@@ -195,7 +218,7 @@
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createField } from '/shell/field.mjs';
-  import { createStripView, STRIP_FOOTER_EMPTY } from '/shell/strip.mjs';
+  import { createStripView, createStripFooter, STRIP_FOOTER_EMPTY } from '/shell/strip.mjs';
   import { createFullscreenExit, EXIT_IDLE_MS, toggle as fsToggle, isFull as fsIsFull }
     from '/shell/fullscreen.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
@@ -209,6 +232,9 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createPad, createPadGrid } from '/shell/pad.mjs';
+  import { createFader, createFaderBank } from '/shell/fader.mjs';
   import { createXrProbe, xrCaps, onXrCaps, reasonFor, canEnter, answered, XR_STATES }
     from '/shell/xr-caps.mjs';
 
@@ -281,6 +307,12 @@
   // build read it in its dead zone, `section()` swallowed the throw into
   // `failed`, and the page died much later on an empty map. A block that moves
   // takes what it needs with it.
+  // ⚠️ DECLARED HERE, NOT INSIDE THE BLOCKS. A block that moved on this page
+  // once left its `const` behind, the build read it in its dead zone,
+  // `section()` swallowed the throw into `failed`, and the page died much
+  // later with a message about a different line.
+  const knobSpec = [];
+  let padSpec = null, halfSpec = null, fadeSpec = null, roundSpec = null, vertSpec = null;
   const presSpec = new Map();
   // ⚠️ DECLARED WITH THE OTHERS, NOT INSIDE THE BLOCK. A block that moved to the
   // top of this page once left its `const` behind, the build read it in its dead
@@ -345,7 +377,8 @@
   let glueSpec = null;        // { panel, bar, deck, mute }
   let fsxSpec = null;         // { host, exit, out }, a cover with a way back
   let footSpec = null;        // the strip whose footer says what is hovered
-  let vpUnder = null;         // the control group a panel lifts while full
+  let vpUnder = null;         // the control row a panel lifts while full
+  let vpStorey = null;        // the off-screen panel that row is graded against
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. Asked 2026-09-19 for
@@ -354,23 +387,34 @@
    * and *"replace timeline-glued transport record button with start | stop text
    * labels (same w)"*.
    *
-   * ⚠️ ONE BLOCK FOR TWO COMPONENTS, because the two changes are one
-   * arrangement: a film's transport belongs to the picture it drives, and the
-   * words are what that bar says. Shown apart they would be two specimens of
-   * nothing in particular.
+   * ⚠️ ONE BLOCK FOR TWO COMPONENTS, because they are one arrangement: a film's
+   * transport belongs to the picture it drives, and the words are what that bar
+   * says. Shown apart they would be specimens of nothing in particular.
+   * 🔴 THE WAY OUT OF FULL SCREEN WAS THE SECOND HALF OF THIS BLOCK AND ITS
+   * SPECIMEN IS GONE, 2026-09-20, asked for by quoting the page back: *"rm this
+   * part AND THE WAY BACK OUT OF FULL SCREEN / a picture / not filling the
+   * screen"*. The PIECE is still built, off screen, because two checks at the
+   * foot of this file press it and read its geometry. Deleting it as well as
+   * the specimen would have taken both with it while the page stayed green,
+   * which is this project's rule about a control you switch off.
    * ⚠️ AND NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the block
    * below gives: both harnesses press that row by position, so a new top block
    * with controls in it moves every other block's press.
    */
-  section('A TRANSPORT GLUED UNDER A PICTURE, AND A TOGGLE THAT SAYS TWO WORDS',
-    'A film\u2019s play and stop belong to the picture, so the bar is joined to the panel '
-    + 'rather than stacked under it: one edge round the pair, and the 1 px seam the footer '
-    + 'already has above it. The toggle carries two words instead of a glyph, and both of '
-    + 'them are in the button at once so it cannot change width when it changes state.',
+  section('GLUED TRANSPORT BAR',
+    'A panel and its transport bar wrapped in one edge with a 1 px seam. The toggle holds '
+    + 'both of its words at once, so it cannot change width when it changes state.',
     `panel.glue(bar.el)   // wraps in place, so the pair stays where the panel was
 createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
     (box) => {
       box.classList.add('kit-wide');
+      // 🔴 HALF THE WIDTH THE BOX GIVES IT, asked 2026-09-20: *"make it half
+      // w"*. `.kit-half` is `max-width: 50%` rather than a number of pixels,
+      // because the box already owns this width and a figure typed here would
+      // be a second opinion about it. MEASURED after the change: the seam, the
+      // edges and the toggle's two states are all unmoved.
+      const glued = el('div', 'kit-half');
+      box.append(glued);
       const c = document.createElement('canvas');
       c.width = FRAME_W; c.height = FRAME_H;
       const ctx = c.getContext('2d', { alpha: false });
@@ -402,12 +446,12 @@ createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
         mute.title = muted ? 'muted' : 'audible';
       };
       panel.slots.right.prepend(mute);
-      box.append(panel.el);
+      glued.append(panel.el);
 
       // A deck with no adapters offers no rates, so the bar draws no rate row:
       // what is on show here is the toggle, the clock and the seam.
       const deck = createDeck({ range: [0, 60_000] });
-      const bar = createTransportBar(box, deck, {
+      const bar = createTransportBar(glued, deck, {
         verb: ['start', 'stop'], live: false, loop: false, scrub: true, absolute: false,
         /**
          * 🔴 `publish: false`, AND ON THIS PAGE THAT IS NOT A TIE BREAK BETWEEN
@@ -422,36 +466,40 @@ createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
       // this is the realistic order and the one the method is for: a page has
       // its picture on screen before it has built the bar that belongs to it.
       panel.glue(bar.el);
-      glueSpec = { panel, bar, deck, mute };
+      glueSpec = { panel, bar, deck, mute, half: glued };
 
       let n = 0;
       const draw = () => { burn(ctx, FRAME_W, FRAME_H, n++, { hue: videoHue(1) }); requestAnimationFrame(draw); };
       requestAnimationFrame(draw);
-    });
 
-  /**
-   * 🔴 SECOND NEWEST, AND THE SAME RULE. Reported 2026-09-19
-   * from an iPhone: *"I can not leave fullscreen on mobile"*, and asked for as
-   * *"make permanett squaer button with fullscreen icon on bottom right when
-   * going to fullscreen in mobile. fade out it when no activity"*.
-   *
-   * ⚠️ NOTHING IN THIS BLOCK SITS IN A `.pos-controls` ROW, ON PURPOSE. Both
-   * harnesses press every button in that row, by position, so a block arriving
-   * at the top of this page with controls in it would move every other block's
-   * press and take the one check that depends on WHEN a press lands red for a
-   * reason nothing names. The way in is pressed by the checks at the bottom
-   * instead, which is also the only way to prove the way out by pressing it.
-   */
-  section('A WAY BACK FROM FULL SCREEN, ON A DEVICE WITH NO ESCAPE KEY',
-    'A square with the same glyph as the control that got you in, held off the corner by the '
-    + 'safe area, inside whatever went full so it survives real element fullscreen. It fades '
-    + 'when nothing has moved and is unpressable while faded, so the corner of a picture '
-    + 'cannot exit for somebody reaching past it.',
-    `const exit = createFullscreenExit(wrap);            // a bare canvas
-createFullscreenExit(panel.stage, { of: panel.el }); // inside a video panel`,
-    (box) => {
-      box.classList.add('kit-wide');
-
+      /**
+       * 🔴 THE WAY BACK OUT OF FULL SCREEN, BUILT AND NEVER SHOWN. Reported
+       * 2026-09-19 from an iPhone: *"I can not leave fullscreen on mobile"*,
+       * asked for as *"make permanett squaer button with fullscreen icon on
+       * bottom right when going to fullscreen in mobile. fade out it when no
+       * activity"*, and its specimen was taken off this page on 2026-09-20.
+       *
+       * 🔴 IT IS KEPT BECAUSE TWO CHECKS PRESS IT. `/blocks/` shipped a way out
+       * that was built, compiled and drawn every frame and never once updated,
+       * so there was no way out of that page at all while every line of it read
+       * correct. Reading that a control is wired is not the same claim as
+       * pressing it, and a piece deleted with its specimen is a check that stops
+       * running rather than one that fails.
+       * ⚠️ OFF SCREEN AND LAID OUT, the same shape as the video panel's second
+       * storey above and the faded probe at the foot of this file: the checks
+       * read `getBoundingClientRect`, so `display: none` is not available and
+       * `left: -9999px` is.
+       * ⚠️ AND THE HOLDER TAKES NO INLINE `position` THE COVER WOULD HAVE TO
+       * BEAT. `.pos-faux` is `position: fixed; inset: 0` from the stylesheet, a
+       * fixed ancestor is not a containing block for a fixed child, and an
+       * inline style on the host itself would have won against the class and
+       * left the cover parked off the left edge of the screen.
+       * ⚠️ NOTHING HERE SITS IN A `.pos-controls` ROW, ON PURPOSE. Both
+       * harnesses press every button in that row, by position, so an invisible
+       * button in one would be a press landing on nothing a visitor can see.
+       * The way in is pressed by the checks at the bottom instead, which is also
+       * the only way to prove the way out by pressing it.
+       */
       const o = out('not filling the screen');
       const host = el('div', 'kit-cover');
       host.append(el('div', 'kit-cover-p', 'a picture'));
@@ -471,42 +519,85 @@ createFullscreenExit(panel.stage, { of: panel.el }); // inside a video panel`,
       };
       fsxSpec = { host, exit, out: o, go };
 
-      const row = el('div', 'kit-row');
-      row.append(host, go, o);
-      box.append(row);
+      const probe = el('div', '');
+      probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:320px';
+      probe.append(host, go, o);
+      document.body.append(probe);
     });
 
   /**
-   * 🔴 THIRD NEWEST, AND THE SAME RULE. Asked 2026-09-19 with a photograph of
-   * `/reel/` on an iPhone: *"add feature to timeline: footer section, looks
-   * like glued that shows hovered info below timeline"*. The photograph shows
-   * the sticky tap tooltip covering the right half of the strip, four lines
-   * deep, over the marks it is describing.
+   * 🔴 ONE SECTION FOR ONE COMPONENT, MERGED 2026-09-20 on instruction: *"merge
+   * STRIP VIEW + footer"*. They were `STRIP VIEW` and `STRIP FOOTER`, twenty
+   * sections apart on the page, and the footer is an OPTION on the same call
+   * rather than a second component. A reader meeting `createStripView` twice
+   * has to work out that it is the same thing.
+   *
+   * The footer was asked for 2026-09-19 with a photograph of `/reel/` on an
+   * iPhone: *"add feature to timeline: footer section, looks like glued that
+   * shows hovered info below timeline"*. The photograph shows the sticky tap
+   * tooltip covering the right half of the strip, four lines deep, over the
+   * marks it is describing.
+   *
+   * ⚠️ THE STACK GOES INTO THE BOX BEFORE EITHER STRIP IS BUILT. `fit()`
+   * measures the width it has been given, and a strip built into an element
+   * that is not in the document yet measures nothing.
    */
-  section('WHAT YOU ARE POINTING AT, UNDER THE TIMELINE',
-    'A fixed box glued under the strip, written on every hover change, holding what the '
-    + 'tooltip used to draw on top of the marks it described. It keeps its height whether '
-    + 'it is saying four things or nothing, and a name too long for the width ellipsises '
-    + 'rather than wrapping the last line out of the box.',
-    `createStripView(host, deck, { lanes, footer: true })
+  section('STRIP VIEW',
+    'Marks on a lane over the deck\u2019s range. An optional box under it says what the '
+    + 'pointer is over, at one height whatever it is saying.',
+    `createStripView(host, deck, { lanes })
+createStripView(host, deck, { lanes, footer: true })
 createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen' } })`,
     (box) => {
       box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+      const bare = stack.titled('MARKS ON A LANE');
+      const footed = stack.titled('AND THE BOX THAT SAYS WHAT IS UNDER THE POINTER');
+      box.append(stack.el);
 
-      const t0 = 0, SPAN = 8000;
-      const items = [];
-      for (let i = 0; i < 9; i++) {
-        items.push({ id: `f${i}`, kind: 'mark', at: t0 + (i + 0.5) * (SPAN / 10),
-                     payload: { label: `${i + 1}` } });
-      }
       const { adapter } = markAdapter({ rates: [1] });
-      const deck = createDeck({ items, adapters: { mark: adapter }, range: [t0, t0 + SPAN] });
-      footSpec = createStripView(box, deck, {
+      const SPAN = 8000;
+      const marks = (n, tag) => {
+        const items = [];
+        for (let i = 0; i < n; i++) {
+          items.push({ id: `${tag}${i}`, kind: 'mark', at: (i + 0.5) * (SPAN / (n + 1)),
+                       payload: { label: `${i + 1}` } });
+        }
+        // ⚠️ A DECK NEEDS AN ADAPTER PER KIND, and without one the lane draws
+        // NOTHING: a tall empty box, no error, no warning. That is what this
+        // section was on its first attempt, and an empty component in a sandbox
+        // is worse than an absent one, because it reads as the component being
+        // broken.
+        return createDeck({ items, adapters: { mark: adapter }, range: [0, SPAN] });
+      };
+      // The swatch on the lane's left border AND the marks themselves take the
+      // page's primary colour. `L.color` is the one place it is set, and
+      // `styleFor` hands it to both.
+      const hi = getComputedStyle(document.documentElement)
+                   .getPropertyValue('--hi').trim() || '#ffd400';
+
+      // ⚠️ NO SUBLABEL ON THE BARE ONE. `14 marks · 8 s` still ellipsized, the
+      // gutter being narrower than fourteen characters at this width, and an
+      // ellipsis means the content is in the wrong place rather than that the
+      // box wants widening. A lane's own name is enough in a sandbox.
+      // 'auto' takes exactly the height its lanes need. 'default' left a band
+      // of empty canvas under a single lane.
+      const { strip } = createStripView(bare, marks(14, 'n'), {
         size: 'auto',
-        footer: true,
-        lanes: [{ id: 'mark', kind: 'mark', label: 'takes',
-                  color: getComputedStyle(document.documentElement)
-                           .getPropertyValue('--hi').trim() || '#ffd400' }],
+        lanes: [{ id: 'mark', kind: 'mark', color: hi }],
+      });
+      strip.fit?.();
+
+      footSpec = createStripView(footed, marks(9, 'f'), {
+        size: 'auto',
+        // 🔴 ONE LINE. Asked 2026-09-20 with a screenshot: *"1 line footer
+        // here"*. The default is three, which is right on a page whose marks
+        // carry a name, a time and a verdict; this specimen's marks carry a
+        // number, so two of the three rows were reserved air under a single
+        // sentence. **The specimen should show the component doing its job,
+        // not its widest possible job.**
+        footer: { lines: 1 },
+        lanes: [{ id: 'mark', kind: 'mark', label: 'takes', color: hi }],
       });
       footSpec.strip.fit?.();
     });
@@ -514,75 +605,76 @@ createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen'
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. Asked 2026-09-19:
    * *"global: make buttongroup component and convert all vr/ar buttons to it"*.
-   * The component and the probe that drives it are one block on purpose: a
-   * group whose buttons are always pressable is half of what was asked for, and
-   * the half that was reported was the other one, a `Run in VR` on an iPhone
-   * that accepts the press and answers with a line in the log.
+   *
+   * 🔴 THE HEADSET PAIR WAS THE SECOND HALF OF THIS BLOCK AND ITS SPECIMEN IS
+   * GONE, 2026-09-20, asked for by quoting the page back: *"rm save pressed /
+   * AND TWO THIS BROWSER MAY NOT BE ABLE TO / headset / vr no, ar no"*. The
+   * GROUP is still built and still wired to the real probe, off screen, because
+   * the check at the foot of this file grades that wiring and nothing else can
+   * see a call that is not there. `/held/` shipped the defect it catches: a
+   * `Run in VR` on an iPhone that accepts the press and answers with a line in
+   * the log.
+   * ⚠️ AND THE OFF-SCREEN ROW IS NOT `.pos-controls`. Both harnesses press
+   * every button in that row by position, so leaving it there would be two
+   * presses landing on buttons nobody can see.
    *
    * ⚠️ AND MOVING A BLOCK MOVES EVERY BUTTON AFTER IT. `verify.mjs` presses by
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder. This block is the first on the page with buttons in a
-   * `.pos-controls` row, so it now owns control 0.
+   * `.pos-controls` row, so it owns control 0.
    */
-  section('A ROW OF BUTTONS, AND ONE THIS BROWSER CANNOT USE',
+  section('BUTTON GROUP',
     'Buttons that each do something, sharing one row and one label, which is not a choice '
-    + 'of one thing out of three. The group owns which of them are off and the reason it '
-    + 'shows for one, so four pages say it one way instead of four.',
-    `const g = createButtonGroup({ label: 'headset', buttons: [
-  { id: 'vr', label: 'Run in VR', onPress: enterVr },
-  { id: 'ar', label: 'Run in AR', onPress: enterAr },
+    + 'of one thing out of three. `enable(id, false, why)` greys one and puts `why` in its '
+    + 'title, and it throws if `why` is missing.',
+    `const g = createButtonGroup({ label: 'log', buttons: [
+  { id: 'copy', label: 'Copy' },
+  { id: 'clear', label: 'Clear' },
+  { id: 'save', label: 'Save', aria: 'save the log to a file' },
 ] });
-onXrCaps((c) => g.enable('vr', canEnter(c.vr), reasonFor(c.vr, 'vr')));`,
+g.enable('clear', false, 'The log on this page is already empty.');`,
     (box) => {
       box.classList.add('kit-wide');
-      const stack = createStack(undefined, 'kit-col');
 
       // ⚠️ SHOWN IN A `.pos-controls` ROW, WHICH IS WHERE IT GOES. Both
       // harnesses press `.pos-controls button`, which is a DESCENDANT selector,
       // so a group inside that row is reachable and one outside it is not. The
       // check at the bottom grades exactly that, against this specimen.
-      const o1 = out('nothing pressed');
+      // ⚠️ AND NO HANDLER, which is what `CONTROL ROW` below already does with
+      // its six buttons: what is on show is the row, the join and the states,
+      // and an echo of the last press is a readout of the harness rather than
+      // of the component.
       bgRow = el('div', 'pos-controls');
       bgSpec = createButtonGroup({
-        label: 'take',
+        label: 'log',
         buttons: [
-          { id: 'play', label: 'Play' },
-          { id: 'keep', label: 'Keep' },
-          { id: 'drop', label: 'Drop', aria: 'drop this take' },
+          { id: 'copy', label: 'Copy' },
+          { id: 'clear', label: 'Clear' },
+          { id: 'save', label: 'Save', aria: 'save the log to a file' },
         ],
-        onPress: (id) => { o1.textContent = `${id} pressed`; },
       });
       bgRow.append(bgSpec.el);
-      const r1 = el('div', 'kit-row');
-      r1.append(bgRow, o1);
+      box.append(bgRow);
 
-      // The pair the component was built for, driven by the real probe, so this
-      // page shows what THIS browser says rather than a picture of what another
-      // one might. On a phone both go off before the first frame and say why on
-      // hover; in a headset both stay on.
-      const o2 = out('');
-      const xrRow = el('div', 'pos-controls');
+      // The pair the component was built for, driven by the real probe. Built
+      // and never shown, for the reason in the note above: the check at the
+      // foot of this file asks whether a page that subscribes agrees with what
+      // this browser answers, and it needs a group to ask it of.
+      const probe = el('div', '');
+      probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:320px';
       xrSpec = createButtonGroup({
         label: 'headset',
         buttons: [
-          { id: 'vr', label: 'Run in VR', onPress: () => { o2.textContent = 'a headset would open here'; } },
-          { id: 'ar', label: 'Run in AR', onPress: () => { o2.textContent = 'the room would show through here'; } },
+          { id: 'vr', label: 'Run in VR' },
+          { id: 'ar', label: 'Run in AR' },
         ],
       });
-      xrRow.append(xrSpec.el);
+      probe.append(xrSpec.el);
+      document.body.append(probe);
       onXrCaps((c) => {
         xrSpec.enable('vr', canEnter(c.vr), reasonFor(c.vr, 'vr'));
         xrSpec.enable('ar', canEnter(c.ar), reasonFor(c.ar, 'ar'));
-        // A value in a fixed box, not a sentence that rewrites itself: the two
-        // words change once each and the box does not move when they do.
-        o2.textContent = `vr ${c.vr} · ar ${c.ar}`;
       });
-      const r2 = el('div', 'kit-row');
-      r2.append(xrRow, o2);
-
-      stack.titled('THREE THINGS TO DO, IN ONE ROW', r1);
-      stack.titled('AND TWO THIS BROWSER MAY NOT BE ABLE TO', r2);
-      box.append(stack.el);
     });
 
 
@@ -601,11 +693,9 @@ onXrCaps((c) => g.enable('vr', canEnter(c.vr), reasonFor(c.vr, 'vr')));`,
    * after any reorder.
    */
   section('VIDEO PANEL',
-    'A picture, with a status, an empty middle and a fullscreen button under it, and a '
-    + 'second storey that carries the page’s own controls while it fills the screen.',
+    'A picture, with a status on the left, an empty middle and a fullscreen button under it.',
     `createVideoPanel({ media: canvas, of: 'the board' })
-createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode: 'footer' })
-panel.under(myControlRow)   // moved in while full in footer mode, and back out after`,
+createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode: 'footer' })`,
     (box) => {
       box.classList.add('kit-wide');
       const stack = createStack(undefined, 'kit-col');
@@ -660,43 +750,42 @@ panel.under(myControlRow)   // moved in while full in footer mode, and back out 
       }
 
       /**
-       * 🔴 THE SECOND STOREY, WHICH IS ONLY THERE WHILE FULL. Asked 2026-09-19
-       * with a photograph of `/mirror/` filling an iPhone: *"extend videopanel
-       * footer in fullscreen so it can have section below the footer bar
-       * (separaet with line). put controlgroup there"*.
+       * 🔴 THE SECOND STOREY IS STILL GRADED AND IS NO LONGER SHOWN. The
+       * specimen came off 2026-09-20 on instruction: *"rm a second storey under
+       * the footer"*. It was asked for on 2026-09-19 with a photograph of
+       * `/mirror/` filling an iPhone: *"extend videopanel footer in fullscreen
+       * so it can have section below the footer bar (separaet with line). put
+       * controlgroup there"*.
        *
-       * 🔴 IT IS THE SAME ELEMENT, MOVED. The group sits under the panel here,
-       * where a page keeps its controls, and the panel lifts it into a row of
-       * its own when it goes full. Two rows that can disagree about which option
-       * is chosen would be a readout living in two files, so the check below
-       * grades that there is exactly ONE of these buttons in the document.
-       * ⚠️ AND IT IS NOT IN A `.pos-controls` ROW, for the reason at the top of
-       * this file: a block with pressable controls moves every other block's
-       * press, and this one is about where a row LIVES rather than what it does.
+       * 🔴 THE MECHANISM IS LIVE AND THIS IS THE ONLY THING THAT GRADES IT.
+       * `/mirror/` calls `panel.under(knobRow)`, and in real element fullscreen
+       * nothing outside the full subtree is on screen, so on a phone that row is
+       * only reachable from inside the picture. Deleting the piece as well as the
+       * specimen would take the check with it, which is this project's own rule
+       * about a control you switch off. So it stays as an off-screen probe.
+       * ⚠️ OFF SCREEN AND LAID OUT, the same shape as the way-out probe at the
+       * foot of this file: the check reads `gridTemplateRows`, so `display:
+       * none` is not available and `left: -9999px` is.
+       * 🔴 IT IS THE SAME ELEMENT, MOVED. Two rows that can disagree about which
+       * option is chosen would be a readout living in two files, so the check
+       * grades that there is exactly ONE of them in the document.
        */
       {
+        const probe = el('div', '');
+        probe.style.cssText = 'position:fixed;left:-9999px;top:0;width:480px';
         const c = document.createElement('canvas');
         c.width = FRAME_W; c.height = FRAME_H;
         vpUnder = el('div', 'kit-row');
-        vpUnder.append(createButtonGroup({
-          label: 'take',
-          buttons: [{ id: 'keep', label: 'Keep' }, { id: 'drop', label: 'Drop' }],
-        }).el);
-        const p = createVideoPanel({
-          media: c, fullMode: 'footer',
-          left: createPresence({ of: '', mode: 'badge', state: 'online',
-                                 says: { online: 'live' } }).el,
-        });
-        const cell = el('div', 'kit-vp');
-        cell.append(el('p', 'kit-cap', 'a second storey under the footer'), p.el, vpUnder);
-        row.append(cell);
+        vpUnder.append(el('div', '', 'a control row'));
+        vpStorey = createVideoPanel({ media: c, fullMode: 'footer' });
+        probe.append(vpStorey.el, vpUnder);
+        document.body.append(probe);
         // ⚠️ HANDED OVER AFTER IT IS ON THE PAGE, which is the realistic order
         // and the one that matters: the panel records where the element lives
         // at the moment it is given it, so an element with no parent yet has no
         // home to be put back to. The constructor's `under` option is for a page
         // that builds its controls before it builds its panel.
-        p.under(vpUnder);
-        made.push({ ctx: c.getContext('2d', { alpha: false }), panel: p });
+        vpStorey.under(vpUnder);
       }
 
       vpSpec = made;
@@ -712,8 +801,8 @@ panel.under(myControlRow)   // moved in while full in footer mode, and back out 
       box.append(stack.el);
     });
 
-  section('ONLINE, OFFLINE, AND WHO ELSE HAS HOLD OF IT',
-    'Five states, and whether somebody else is holding it: a person, or a harness.',
+  section('PRESENCE',
+    'Five states, and whether a person or a harness is holding it.',
     `createPresence({ of: 'the board' }).set('online')
 createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } }).busy('tool')
 createPresence({ of: 'the board', mode: 'dot', state: 'online' })
@@ -776,7 +865,7 @@ presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
         c.append(key, val); inReadout.append(c);
       }
 
-      // A row of machines, which is the shape /knobs/, /grains/ and /rack/ all
+      // A row of machines, which is the shape /knobs/, /grains/ and /able/ all
       // want and all draw differently today.
       const machines = el('div', '');
       machines.style.cssText = 'display:grid;gap:6px;font:400 12px/1 var(--mono);color:var(--dim)';
@@ -825,7 +914,7 @@ presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
-  section('BLOCKS OF A PAGE, AND THE AIR BETWEEN THEM',
+  section('STACK',
     'The stack owns the air between blocks, so a block cannot change it.',
     `const page = createStack(d.el);          // mount() has already made this one
 page.add(bar.el, picks, keyboard.el);    // the order of the page, in one line
@@ -859,7 +948,7 @@ const row = page.stack();                // a block that is itself a column`,
       box.append(emptySpec.el);
     });
 
-  section('READOUT AND LOG, JOINED OR SPLIT',
+  section('READOUT AND LOG',
     'The numbers now and the record of what happened, split or joined into one surface.',
     `mount({ readout: { sent: '/s', lost: '' }, joined: true })   // one surface, at the foot
 mount({ readout: { sent: '/s', lost: '' } })                 // two surfaces, the default
@@ -946,20 +1035,37 @@ createReport({ readout, showLog: false, joined: true })      // the same pair, s
       box.append(el('p', 'kit-cap', 'the cells on their own, an even number of them'), cells);
     });
 
-  section('buttons', '',
+  section('CONTROL ROW', '',
     `el('button', '', 'Ordinary', { type: 'button' })
-el('button', 'pos-pri', 'Primary', { type: 'button' })`,
+el('button', 'pos-pri', 'Primary', { type: 'button' })
+b.disabled = true
+b.dataset.busy = '1'   // the working sweep, on either kind`,
     (box) => {
-      box.append(el('button', '', 'Ordinary', { type: 'button' }));
-      const p = el('button', 'pos-pri', 'Primary', { type: 'button' }); box.append(p);
-      const dis = el('button', '', 'Disabled', { type: 'button' }); dis.disabled = true; box.append(dis);
-      const busy = el('button', '', 'Working', { type: 'button' }); busy.dataset.busy = '1'; box.append(busy);
+      /**
+       * 🔴 BOTH KINDS IN ALL THREE STATES, WHICH IS SIX AND WAS FOUR. Reported
+       * 2026-09-20: *"primary working button missing"*.
+       * `button.pos-pri[data-busy="1"]` and `button.pos-pri:disabled` both have
+       * rules in `shell.css` and neither had a specimen, so a rule that stopped
+       * working would have looked exactly like a rule that works. A state with a
+       * rule and no specimen is the drift this page exists to catch.
+       */
+      for (const [cls, name] of [['', 'Ordinary'], ['pos-pri', 'Primary']]) {
+        box.append(el('button', cls, name, { type: 'button' }));
+        const off = el('button', cls, `${name}, off`, { type: 'button' });
+        off.disabled = true;
+        box.append(off);
+        const busy = el('button', cls, `${name}, working`, { type: 'button' });
+        busy.dataset.busy = '1';
+        box.append(busy);
+      }
     });
 
   // ── stepper ─────────────────────────────────────────────────────────────
-  section('stepper',
-    'Back and forward, with a middle that holds nothing, a jump, or the one you are on.',
-    `createStepper({ what: 'look', prev, next, random })
+  section('STEPPER',
+    'Back and forward, with a middle holding nothing, `random`, or the one you are on. '
+    + '`pick` replaces `random`, because the middle is one slot.',
+    `createStepper({ what: 'look', prev, next })
+createStepper({ what: 'look', prev, next, random })
 createStepper({ what: 'look', prev, next, pick: { options: names, at, onPick } })`,
     (box) => {
       box.classList.add('kit-wide');
@@ -968,7 +1074,7 @@ createStepper({ what: 'look', prev, next, pick: { options: names, at, onPick } }
 
       const o1 = out('nothing pressed');
       let a1 = 0;
-      const show1 = () => { o1.textContent = `${a1} · ${names[a1]}`; };
+      const show1 = () => { o1.textContent = `${names[a1]} (${a1})`; };
       const rolled = createStepper({
         what: 'look',
         prev: () => { a1 = (a1 + names.length - 1) % names.length; show1(); },
@@ -992,34 +1098,79 @@ createStepper({ what: 'look', prev, next, pick: { options: names, at, onPick } }
         next: () => { a2 = (a2 + 1) % names.length; sync2(); },
         pick: { options: names, at: 0, onPick: (i) => { a2 = i; sync2(); } },
       });
-      function sync2() { picked.show(names[a2], a2); o2.textContent = `${a2} · ${names[a2]}`; }
+      function sync2() { picked.show(names[a2], a2); o2.textContent = `${names[a2]} (${a2})`; }
       stepperPick = picked;
       const r2 = el('div', 'kit-row');
       r2.append(picked.el, o2);
 
-      stack.titled('A JUMP IN THE MIDDLE', r1);
+      // ⚠️ THE THIRD MIDDLE, WHICH IS NO MIDDLE. Reported 2026-09-20 as
+      // *"stepper misisng random butotn optopn"*, and the note above this block
+      // has always claimed three middles while the page showed two. The empty
+      // one is the case the component's own corner rounding has to survive, so
+      // it is the one that quietly stops being checked by looking.
+      const o3 = out('nothing pressed');
+      let a3 = 0;
+      const show3 = () => { o3.textContent = `${names[a3]} (${a3})`; };
+      const bare = createStepper({
+        what: 'look',
+        prev: () => { a3 = (a3 + names.length - 1) % names.length; show3(); },
+        next: () => { a3 = (a3 + 1) % names.length; show3(); },
+      });
+      const r3 = el('div', 'kit-row');
+      r3.append(bare.el, o3);
+
+      stack.titled('RANDOM IN THE MIDDLE', r1);
       stack.titled('OR THE ONE YOU ARE ON, WITH THE LIST BEHIND IT', r2);
+      stack.titled('OR NOTHING, WHICH IS TWO ARROWS', r3);
       box.append(stack.el);
     });
 
   // ── slider ──────────────────────────────────────────────────────────────
-  section('slider',
+  section('SLIDER',
     '',
-    `createSlider({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26 })
-createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
+    `createSlider({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26, hand: true })
+createFader({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26, hand: true })`,
     (box) => {
       const o = out('');
-      const a = createSlider({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26,
+      // ⚠️ `hand: true` ON THE TWO THAT MOVE, asked 2026-09-20: *"convert no
+      // hand slider to hand slider"*. The disabled one is left plain, because a
+      // hand on a lane nobody can drag is a control that cannot do the thing it
+      // names. What the button itself does is the INVISIBLE HAND block below.
+      const a = createSlider({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26, hand: true,
         onInput: (v) => { o.textContent = `mix ${v.toFixed(2)}`; } });
-      const b = createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, value: 6000, unit: 'Hz',
+      const b = createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, value: 6000,
+        unit: 'Hz', hand: true,
         onInput: (v) => { o.textContent = `damp ${v} Hz`; } });
       const c = createSlider({ label: 'off', min: 0, max: 1, step: 0.1, value: 0.5 });
       c.disabled(true);
-      box.append(el('button', '', 'Button, for height', { type: 'button' }), a.el, b.el, c.el, o);
+      box.append(a.el, b.el, c.el, o);
+
+      /**
+       * 🔴 THE SAME CONTROL STANDING UP, BESIDE THE ONE LYING DOWN. Asked
+       * 2026-09-21: *"add vert slider examples next to horiz"*, and next to is
+       * the whole point: a fader is `.sld-lane` and `.sld-knob` with the axes
+       * swapped, and the only way to catch the two drifting apart is to put
+       * them where one pair of eyes can see both.
+       * ⚠️ **THREE THINGS SHOULD MATCH AND ARE ASSERTED BELOW**: the track is
+       * 34 px across either way, the handle is a solid block rather than a
+       * fill, and the hand button is a segment of the lane with the corners
+       * rounded only on the outside.
+       */
+      const vRow = el('div', 'kit-vrow');
+      vertSpec = [
+        createFader({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26, hand: true,
+          onInput: (v) => { o.textContent = `mix ${v.toFixed(2)}`; } }),
+        createFader({ label: 'damp', min: 1000, max: 12000, step: 100, value: 6000,
+          unit: 'Hz', hand: true,
+          onInput: (v) => { o.textContent = `damp ${v} Hz`; } }),
+        createFader({ label: 'off', min: 0, max: 1, value: 0.5, disabled: true }),
+      ];
+      for (const f of vertSpec) vRow.append(f.el);
+      box.append(vRow);
     });
 
   // ── several sliders ─────────────────────────────────────────────────────
-  section('sliders stacked',
+  section('SLIDER GROUP',
     '',
     `createSliderGroup([rate, size, spray, swarm])`,
     (box) => {
@@ -1038,12 +1189,13 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
     });
 
   // ── two across, and a glide ─────────────────────────────────────────────
-  section('two across, and a patch that glides',
-    'Above 720 px they share six columns, and a new sound makes the handles travel.',
+  section('SLIDER GROUP, PAIRED',
+    'Above 720 px the pair shares six columns. Loading a patch with '
+    + '`set(v, { quiet: true, glideMs })` glides every handle without calling `onInput` back.',
     `createSliderGroup([...], { pair: true })
 s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     (box) => {
-      const o = out('press a sound');
+      const o = out('nothing loaded');
       const mk = (label, min, max, step, value, unit) =>
         createSlider({ label, min, max, step, value, unit,
           onInput: (v) => { o.textContent = `${label} ${v}${unit ? ' ' + unit : ''}`; } });
@@ -1054,32 +1206,38 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
         mk('spray', 0, 0.5, 0.01, 0.12, ''),
       ];
       const g = createSliderGroup(knobs, { pair: true });
-      const sounds = [
-        ['slow drift', [2.2, 0.30, 0.35, 0.12]],
-        ['glass rain', [14, 0.05, 0.50, 0.40]],
-        ['deep hum', [0.9, 0.38, 0.50, 0.08]],
+      // ⚠️ ONE BUTTON, NOT THREE NAMED SOUNDS. `slow drift`, `glass rain` and
+      // `deep hum` came off 2026-09-20 on instruction: *"rm slow drift etc
+      // butotns"*. The settings they loaded stayed, because the glide is the
+      // only thing this section has to show and a section that cannot be made
+      // to do its own trick is a picture of a component rather than a specimen.
+      const PATCHES = [
+        [2.2, 0.30, 0.35, 0.12],
+        [14, 0.05, 0.50, 0.40],
+        [0.9, 0.38, 0.50, 0.08],
       ];
+      let atPatch = 0;
       const row = el('div', 'pos-controls');
-      for (const [name, vals] of sounds) {
-        const b = el('button', '', name, { type: 'button' });
-        b.addEventListener('click', () => {
-          // ⚠️ QUIET AND GLIDING AT THE SAME TIME, which is the pair a patch
-          // wants: no callback storm back into whatever loaded the patch, and
-          // a handle you can watch move. They are separate options for exactly
-          // that reason.
-          knobs.forEach((k, i) => k.set(vals[i], { quiet: true, glideMs: GLIDE_MS }));
-          o.textContent = `${name} · four settings over ${GLIDE_MS} ms`;
-        });
-        row.append(b);
-      }
+      const load = el('button', '', 'Load a patch', { type: 'button' });
+      load.addEventListener('click', () => {
+        // ⚠️ QUIET AND GLIDING AT THE SAME TIME, which is the pair a patch
+        // wants: no callback storm back into whatever loaded the patch, and
+        // a handle you can watch move. They are separate options for exactly
+        // that reason.
+        atPatch = (atPatch + 1) % PATCHES.length;
+        const vals = PATCHES[atPatch];
+        knobs.forEach((k, i) => k.set(vals[i], { quiet: true, glideMs: GLIDE_MS }));
+        o.textContent = `four settings over ${GLIDE_MS} ms, and no callback came back`;
+      });
+      row.append(load);
       box.append(g.el, row, o);
     });
 
   // ── a slider that moves by itself ───────────────────────────────────────
-  section('A SLIDER THAT CAN MOVE ITSELF',
-    'Press ' + MOVE_GLYPH.sweep + ' and the handle sweeps by itself with a real reach and a pause at '
-    + 'each end rather than a triangle wave, drawn hollow while it runs because nobody is '
-    + 'holding it, and it hands over in one frame the moment you touch it.',
+  section('INVISIBLE HAND',
+    'Press ' + MOVE_GLYPH.sweep + ' and the handle sweeps on its own, with a real reach and a '
+    + 'pause at each end rather than a triangle wave. Touching the lane takes it back in one '
+    + 'frame, and the slider beside it has no hand for comparison.',
     `createSlider({ label: 'cutoff', min: 0, max: 127, step: 1, hand: true, onHand })`,
     (box) => {
       const o = out('not moved');
@@ -1097,7 +1255,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   // ── radio row ───────────────────────────────────────────────────────────
-  section('a choice of three',
+  section('CHOICE',
     '',
     `createChoice({ label: 'space', options: [['dry',0],['room',1],['hall',2]], at: 1, onPick })`,
     (box) => {
@@ -1113,8 +1271,8 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   // ── tabs ────────────────────────────────────────────────────────────────
-  section('the parts of one page',
-    'Places you go, not options you arm: colour and a bar mark the open one.',
+  section('TABS',
+    'Places you go rather than options you arm, with colour and a bar on the open one.',
     `createTabs({ tabs: [{id:'air',label:'On air'}, {id:'past',label:'Archive',disabled:true}, …] })`,
     (box) => {
       const o = out('air');
@@ -1133,7 +1291,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
       });
       for (const [id, text] of [['air', 'what is happening now'],
                                 ['write', 'the form you write in'],
-                                ['long', 'proof that the row scrolls rather than wrapping']]) {
+                                ['long', 'the row scrolls sideways rather than wrapping']]) {
         t.panel(id).append(el('div', 'kit-n', text));
       }
       box.append(t.el, o);
@@ -1156,7 +1314,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     const cut = t.split(/\s+[—–-]\s+|,\s+/)[0];
     return cut.length > 12 ? cut : t;
   };
-  const pick = ['weight', 'tapes', 'kurenniemi', 'rack', 'floor', 'radio', 'wire', 'strip'];
+  const pick = ['weight', 'tapes', 'kurenniemi', 'able', 'floor', 'radio', 'wire', 'strip'];
   const rows = pick.map((n) => DEMOS.find((x) => x.name === n)).filter(Boolean);
   const cardsFor = (extra = {}) => rows.map((r) => createCard({
     title: r.name,
@@ -1166,7 +1324,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     ...extra,
   }));
 
-  section('a link with room in it',
+  section('CARD',
     'A grey box, a name, one line about what is behind it, and tags along the bottom.',
     '',
     (box) => {
@@ -1176,7 +1334,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
       box.append(g.el);
     });
 
-  section('...and the same cards in a phone\u2019s width',
+  section('CARD GRID ON A PHONE',
     'Two columns at 375 px and up, one below, with the floor written min(100%, 170px).',
     '', (box) => {
       box.classList.add('kit-wide');
@@ -1191,7 +1349,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
       }
     });
 
-  section('a card that cannot be pressed, and a card with buttons',
+  section('CARD, REFUSED AND WITH BUTTONS',
     'A page this browser cannot run keeps its card, with the reason where the tags go.',
     '', (box) => {
       box.classList.add('kit-wide');
@@ -1210,15 +1368,15 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
         createCard({ title: 'weight', desc: 'big words standing in a room',
           tags: ['WebGL2'], href: '/weight/',
           actions: [
-            { label: 'Copy link', onPress: () => { o.textContent = 'copy link · held'; } },
-            { label: 'Open', onPress: () => { o.textContent = 'open · held'; } },
+            { label: 'Copy link', onPress: () => { o.textContent = 'copy link, weight'; } },
+            { label: 'Open', onPress: () => { o.textContent = 'open, weight'; } },
           ] }),
       ]);
       box.append(g.el, o);
     });
 
   // ── a choice that has not arrived yet ───────────────────────────────────
-  section('a choice whose effect is a second away',
+  section('CHOICE, PENDING',
     'Pending says the press landed while the thing it acts on catches up.',
     `c.pending(i)   // and c.pending(null) when it lands`,
     (box) => {
@@ -1242,7 +1400,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   // ── text field ──────────────────────────────────────────────────────────
-  section('a line of text, or four',
+  section('FIELD',
     'The label sits on top of the box, so a row of fields has one left edge.',
     `createField({ label: 'title', value: 'Rehearsal moved', grow: 'wide' })
 createField({ label: 'tags', placeholder: 'comma separated' })
@@ -1254,31 +1412,28 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
       const m = createField({ label: 'message', rows: 4, grow: 'wide',
         placeholder: 'what worked, what did not, what is missing' });
       /**
-       * ⚠️ A BUTTON FOR HEIGHT, AT THE BOTTOM AND ON THE RIGHT. Asked 2026-09-17:
-       * *"align to bottom (button, for height and move to right"*. It is here to
-       * be compared against, and a comparison needs the two things to share an
-       * edge: a button floating at the top of a row of fields lines up with
-       * nothing. The slider block carries one for the same reason.
+       * ⚠️ THE BUTTON FOR HEIGHT IS GONE, AND SO IS THE ALIGNMENT THAT SEATED
+       * IT. Asked for on 2026-09-17 as *"align to bottom (button, for height and
+       * move to right"* and unasked on 2026-09-20 as *"rm button for height"*.
+       * The slider block carried one for the same reason and lost it in the same
+       * pass.
        * ⚠️ AND THE `out` LINE IS GONE, with the disabled field. *"rm message · 1
        * lines, 8 characters"* and *"rm off button"*. A live count of what you
        * have typed says nothing about the component, and a field is the one
        * control on this page whose state you can read by looking at it.
        */
-      const height = el('button', '', 'Button, for height', { type: 'button' });
-      height.style.cssText = 'margin-left:auto;align-self:flex-end';
-      box.style.alignItems = 'flex-end';
-      box.append(a.el, b.el, m.el, height);
+      box.append(a.el, b.el, m.el);
     });
 
   // ── keyboard ────────────────────────────────────────────────────────────
   // ⚠️ THE NOTE IS WHERE THE GESTURES ARE WRITTEN DOWN FOR A READER, and it is
   // the only place. `/knobs/` and this page both carry a diagram, so both are
   // held to a one line `what` that is the index's own line; `/instrument/`,
-  // `/looper/` and `/rack/` have paragraphs about where their SOUND comes from
+  // `/looper/` and `/able/` have paragraphs about where their SOUND comes from
   // and are already at the length the house rule allows. A gallery of controls
   // is the right home for what a control does.
-  section('keyboard',
-    'An octave of piano keys: a swipe scrolls the row, a press then a slide plays.',
+  section('KEYBOARD',
+    'An octave of piano keys where a swipe scrolls the row and a press then a slide plays.',
     `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })
 createKeyboard(parent, { letters: false })   // a second one on the same page`,
     (box) => {
@@ -1291,7 +1446,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
         base: 60,
         onDown: (n) => { kb.lightNote(n, true); o.textContent = `note ${n} down`; },
         onUp: (n) => { kb.lightNote(n, false); o.textContent = `note ${n} up`; },
-        onOctave: (n) => { o.textContent = `octave moved · leftmost note is now ${n}`; },
+        onOctave: (n) => { o.textContent = `octave moved, leftmost note is now ${n}`; },
         // The keyboard has already released every key it was holding by the
         // time this runs. It is here for a page whose sound is made somewhere
         // the component cannot reach.
@@ -1328,7 +1483,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
     });
 
   // ── picker ──────────────────────────────────────────────────────────────
-  section('picker',
+  section('PICKER',
     '',
     `createPicker({ label: 'sound', what: 'patch', prev, next, random, onPick })`,
     (box) => {
@@ -1347,39 +1502,6 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
       }
       p.options(NAMES, 0); show(0);
       box.append(p.el, o);
-    });
-
-  // ── the strip ───────────────────────────────────────────────────────────
-  section('the timeline', '', '',
-    (box) => {
-      // ⚠️ A DECK NEEDS AN ADAPTER PER KIND, and without one the lane draws
-      // NOTHING — a tall empty box, no error, no warning. That is what this
-      // section was on its first attempt, and an empty component in a sandbox
-      // is worse than an absent one: it reads as the component being broken.
-      const t0 = 0, SPAN = 8000;
-      const items = [];
-      for (let i = 0; i < 14; i++) {
-        items.push({ id: `n${i}`, kind: 'mark', at: t0 + (i + 0.5) * (SPAN / 15),
-                     payload: { label: `${i + 1}` } });
-      }
-      const { adapter } = markAdapter({ rates: [1] });
-      const deck = createDeck({ items, adapters: { mark: adapter }, range: [t0, t0 + SPAN] });
-      const { strip } = createStripView(box, deck, {
-        // 'auto' takes exactly the height its lanes need — 'default' left a
-        // band of empty canvas under a single lane.
-        size: 'auto',
-        // ⚠️ NO SUBLABEL. `14 marks · 8 s` still ellipsized — the gutter is
-        // narrower than fourteen characters at this width — and an ellipsis
-        // means the content is in the wrong place, not that the box wants
-        // widening. A lane's own name is enough in a sandbox.
-        // The swatch on the lane's left border AND the marks themselves take
-        // the page's primary colour — `L.color` is the one place that is set,
-        // and `styleFor` hands it to both.
-        lanes: [{ id: 'mark', kind: 'mark',
-                  color: getComputedStyle(document.documentElement)
-                           .getPropertyValue('--hi').trim() || '#ffd400' }],
-      });
-      strip.fit?.();
     });
 
   // ── the flow diagram ────────────────────────────────────────────────────
@@ -1424,13 +1546,13 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
         const tag = id || spec.__id;
         if (tag) drawn.set(tag, i);
         report.textContent =
-          `${i.mode === 'row' ? 'left to right' : 'one column'} · ${i.width} px wide` +
-          ` · boxes ${i.boxW} by ${i.boxH} px · ` +
+          `${i.mode === 'row' ? 'left to right' : 'one column'}, ${i.width} px wide` +
+          `, boxes ${i.boxW} by ${i.boxH} px, ` +
           (i.measured ? 'type measured in the page' : 'TYPE ESTIMATED (nothing was measured)');
-        if (!i.cuts.length) { report.append(' · nothing cut'); return; }
-        report.append(el('b', '', ` · ${i.cuts.length} shortened to fit:`));
+        if (!i.cuts.length) { report.append(', nothing cut'); return; }
+        report.append(el('b', '', `, ${i.cuts.length} shortened to fit:`));
         for (const c of i.cuts) {
-          report.append(`\n    ${c.id} · its ${c.where} at ${Math.round(c.width)} px` +
+          report.append(`\n    ${c.id}, its ${c.where} at ${Math.round(c.width)} px` +
                         `\n      ${c.full}\n      became  ${c.shown}`);
         }
       },
@@ -1443,7 +1565,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
     return made;
   }
 
-  section('a flow diagram',
+  section('DIAGRAM',
     'Where the signal goes, laid out from a list of boxes and a list of arrows.',
     `createDiagram(host, {
   title: 'a key press, and what it costs',
@@ -1494,7 +1616,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
       ],
     }));
 
-  section('a label that does not fit',
+  section('DIAGRAM, A LABEL THAT DOES NOT FIT',
     'A word never runs past a border, and the line underneath names what was cut.',
     '',
     (box) => diagramCase(box, {
@@ -1524,7 +1646,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
   // SIDEWAYS and full DOWNWARDS. Left to right an arrow reaches the box it
   // names; stacked, the same arrow would cross the words `Raspberry Pi` on
   // the way in, so it stops at the machine.
-  section('a box inside a box',
+  section('DIAGRAM, CONTAINERS',
     'A machine and the programs on it are not one thing, so a box holds boxes.',
     `nodes: [{ id: 'pi', label: 'Raspberry Pi', kind: 'device', children: [
             { id: 'synth', label: 'synthesiser', sub: 'plays the note' },
@@ -1570,8 +1692,9 @@ links: [{ from: 'you', to: 'synth', label: 'note number' },   // into a box INSI
   // on top of it: one line down that gap, never two. The gap between the two
   // boxes nothing was declared between still has its tie, which is what makes
   // this a picture of the rule rather than of a special case.
-  section('an arrow between two boxes in one machine',
-    'It takes the tie\'s place rather than being drawn over it.',
+  section('DIAGRAM, INNER ARROWS',
+    'A declared arrow between two boxes in one machine takes the tie\'s place rather than '
+    + 'being drawn over it.',
     `children: [{ id: 'in',    label: 'capture' },
            { id: 'synth', label: 'synthesiser' },
            { id: 'rec',   label: 'recorder' }]
@@ -1621,7 +1744,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
       diagramCase(box, sibs, { phone: true, id: 'siblings-phone' });
     });
 
-  section('two return paths that must not overlap',
+  section('DIAGRAM, RETURN PATHS',
     'A return path runs under the row, and two of them go at different depths.',
     '',
     (box) => diagramCase(box, {
@@ -1653,7 +1776,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // path the page does not have, and the name that tells the two branches
   // apart was drawn at the midpoint, i.e. under that box. Seeing one width
   // could not have caught it, so the block shows both.
-  section('a branch, and the box it must not be drawn through',
+  section('DIAGRAM, ROUTING',
     'An arrow that reaches past a box is routed round it, never through it.',
     '',
     (box) => {
@@ -1696,7 +1819,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
       diagramCase(box, branch, { phone: true });
     });
 
-  section('the same picture at the width of a phone',
+  section('DIAGRAM ON A PHONE',
     'Below 560 px it becomes one column, in the order the signal takes.',
     '',
     (box) => diagramCase(box, {
@@ -1730,7 +1853,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // words. A component the sandbox does not show is a component nobody can
   // check against another page's copy of it, which is the one thing this page
   // exists to make possible.
-  section('rows in columns you declare',
+  section('TABLE',
     'Every column is named by the caller, and exactly one of them must grow.',
     `createTable({ columns: [
   { key: 'dir',  width: 52, hi: true },
@@ -1788,10 +1911,13 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // is watching. The specimens below are FOUR SEPARATE BADGES rather than one
   // pressed through four states, because the checks at the bottom measure them
   // and a check that drives a control is a check a visitor watches happen.
-  section('what the colours mean',
+  section('COLOURS',
     '',
-    `grey = not played · slate = played, unmeasurable
-green = inside what it promised · amber/red = later`,
+    // 🔴 NO SNIPPET. It read the whole table as two glued lines and the
+    // swatches under it then said the same six things again, which is a block
+    // telling a reader twice and neither time well. Reported 2026-09-20:
+    // *"doubled and unuseful labels"*.
+    '',
     (box) => {
       for (const [name, css, why] of [
         ['grey', 'var(--dim2)', 'not played'],
@@ -1803,12 +1929,138 @@ green = inside what it promised · amber/red = later`,
       ]) {
         const chip = el('span', '', null);
         chip.style.cssText = `display:inline-block;width:14px;height:14px;border-radius:3px;background:${css};vertical-align:-2px;margin-right:7px`;
-        const w = el('span', '', null);
-        w.style.cssText = 'font:400 12px/1.6 var(--mono);color:var(--dim);margin-right:18px';
-        w.append(chip, `${name} · ${why}`);
+        const w = el('span', 'kit-swatch', null);
+        // ⚠️ TWO CELLS, NOT ONE STRING WITH A MIDDOT IN IT. The name and what it
+        // means are two facts and the separator was glue holding them together
+        // in a sentence nobody wanted.
+        w.append(chip, el('b', 'kit-swatch-n', name), el('span', 'kit-swatch-w', why));
         box.append(w);
       }
     });
+
+
+  /**
+   * 🔴 AT THE BOTTOM, WHICH CONTRADICTS THIS PROJECT'S OWN RULE, DELIBERATELY.
+   * CLAUDE.md, instructed 2026-09-16: *"in kit move online stuff to topmost
+   * item (all new should land top, make rule)"*. Asked for the other way on
+   * 2026-09-20: *"add pieces to kit as well (bottom section). i want to verify
+   * ui first"*. The top is where a reader finds what ARRIVED since they last
+   * looked, which is what a SETTLED component wants. These are not settled.
+   * ⚠️ **WHEN THEY ARE ADOPTED THEY MOVE UP.** If this comment is still here and
+   * they are in a shipped page, the move was forgotten.
+   */
+  section('CHANNEL STRIP: KNOB, PAD, HALF PAD, FADER',
+    'The four shapes a hardware layout is built from, with the knobs on a Novation '
+    + 'Circuit’s measured macros, CC 80 to 87. A knob is dragged up and down rather than '
+    + 'turned, and the last control in every row is disabled.',
+    `createKnobBank([createKnob({ label: 'M1', sub: 'CC 80', min: 0, max: 127, value: 18 })])
+createPadGrid({ cols: 8, rows: 2, pad: (x, y) => ({ tint, top, on }) })
+createPadGrid({ cols: 8, pad: (x) => ({ half: true, label: String(x + 1) }) })
+createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
+    (box) => {
+      box.classList.add('kit-wide');
+      /**
+       * ⚠️ WHY A KNOB IS A VERTICAL DRAG, kept here because the note above lost
+       * it on 2026-09-20 and it is a measurement rather than a preference:
+       * angular drag dies near the centre, where two pixels swing the angle
+       * through most of its range.
+       * ⚠️ AND THE ROW HEADINGS ARE GONE, asked for the same day as *"headings"*
+       * with three of the four quoted back. Every knob carries its CC in its own
+       * `sub`, `half: true` is in the snippet above, and the fourth heading said
+       * *"which is the whole difference"*, which is the author explaining his own
+       * demonstration.
+       */
+      const row = () => {
+        const r = el('div', 'kit-hwrow');
+        const inner = el('div', 'kit-hwitems');
+        r.append(inner);
+        box.append(r);
+        return inner;
+      };
+
+      // ── knobs, carrying the Circuit's measured macro numbers ──────────
+      const kRow = row();
+      for (let i = 0; i < 5; i++) {
+        knobSpec.push(createKnob({
+          label: 'M' + (i + 1), sub: 'CC ' + (80 + i),
+          min: 0, max: 127, value: 18 + i * 22,
+          title: 'macro ' + (i + 1) + ', CC ' + (80 + i) + ' on channel 1',
+        }));
+      }
+      // ⚠️ ONE SHOWN AS MOVED BY HARDWARE, because that state is the reason the
+      // component tracks a source at all and it is invisible until something is
+      // in it. A live binding and one nobody ever bound look identical.
+      knobSpec[3].set(96, { from: 'hardware', quiet: true });
+      knobSpec.push(createKnob({
+        label: 'M6', sub: 'CC 85', value: 40, disabled: true,
+        title: 'disabled: nothing is bound to this one',
+      }));
+      kRow.append(createKnobBank(knobSpec, {}).el);
+
+      // ── square pads ───────────────────────────────────────────────────
+      const pRow = row();
+      const TINT = ['#7fb2ff', '#ff9f7f'];
+      padSpec = createPadGrid({
+        cols: 8, rows: 2,
+        pad: (x, y) => ({
+          tint: TINT[y],
+          top: x % 2 === 0 ? String(x / 2 + 1) : '',
+          on: y === 0 ? x % 2 === 0 : x % 4 === 1,
+          disabled: x === 7 && y === 1,
+          title: x === 7 && y === 1 ? 'disabled' : 'step ' + (x + 1) + ' of lane ' + (y + 1),
+        }),
+      });
+      pRow.append(padSpec.el);
+
+      // ── the same pads, half height, which is one prop ─────────────────
+      const hRow = row();
+      halfSpec = createPadGrid({
+        cols: 8,
+        pad: (x) => ({
+          half: true, tint: '#8fd6a8',
+          top: x % 2 === 0 ? String(x / 2 + 1) : '',
+          label: String(x + 1),
+          on: x % 3 === 0,
+          disabled: x === 7,
+          title: x === 7 ? 'disabled' : 'step ' + (x + 1),
+        }),
+      });
+      hRow.append(halfSpec.el);
+
+      // ── round pads, which are the same component with a shape prop ────
+      const rRow = row();
+      roundSpec = createPadGrid({
+        cols: 5,
+        pad: (x) => ({
+          round: true, tint: '#c9a0ff',
+          top: x === 0 ? 'top' : '',
+          label: String(x + 1),
+          bottom: ['play', 'stop', 'rec', '', 'off'][x],
+          on: x === 2,
+          disabled: x === 4,
+          title: x === 4 ? 'disabled' : 'round pad ' + (x + 1),
+        }),
+      });
+      rRow.append(roundSpec.el);
+
+      // ── vertical faders, the Model 12's measured shape ────────────────
+      const fRow = row();
+      const faders = [];
+      for (let i = 0; i < 5; i++) {
+        faders.push(createFader({
+          label: 'CH' + (i + 1),
+          value: 30 + i * 20,
+          title: 'channel ' + (i + 1) + ' fader, pitch bend on channel ' + (i + 1),
+        }));
+      }
+      faders[2].set(104, { from: 'hardware', quiet: true });
+      faders.push(createFader({ label: 'FX', value: 64, disabled: true,
+                                title: 'disabled: no master is bound' }));
+      fadeSpec = createFaderBank(faders, {});
+      fRow.append(fadeSpec.el);
+    });
+
+
 
   // ── what a machine can say about this page ──────────────────────────────
   //
@@ -1829,6 +2081,34 @@ green = inside what it promised · amber/red = later`,
   // once, and a number a reader trusts and nobody re-counts is worse than no
   // number. The order is the file.
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  /**
+   * 🔴 A FADER IS THE SLIDER TURNED 90 DEGREES, AND THAT IS A MEASUREMENT.
+   * Both read their look from `.sld-lane` and `.sld-knob` with the axes
+   * swapped, so the two can only drift if nobody compares them. **Putting them
+   * side by side on this page is half of it; this is the other half.**
+   */
+  if (vertSpec) {
+    const hLane = document.querySelector('.sld-lane');
+    const vLane = vertSpec[0].el.querySelector('.pos-fdr-lane');
+    const vHand = vertSpec[0].el.querySelector('.pos-fdr-hand');
+    if (hLane && vLane) {
+      const hr = hLane.getBoundingClientRect(), vr = vLane.getBoundingClientRect();
+      const hcs = getComputedStyle(hLane), vcs = getComputedStyle(vLane);
+      d.assert('a fader is the slider turned 90 degrees: the same track, across instead of along',
+        Math.abs(hr.height - vr.width) <= 1
+        && hcs.backgroundColor === vcs.backgroundColor
+        && hcs.borderTopWidth === '0px' && vcs.borderTopWidth === '0px',
+        `slider ${hr.height.toFixed(1)} px tall, fader ${vr.width.toFixed(1)} px wide, `
+        + `both ${vcs.backgroundColor} with no border`);
+    }
+    if (vHand) {
+      const hcs = getComputedStyle(vHand);
+      d.assert('and its hand button is a segment of the lane, rounded only on the outside',
+        hcs.borderTopLeftRadius === '0px' && hcs.borderBottomLeftRadius === '4px',
+        `corners ${hcs.borderTopLeftRadius} top, ${hcs.borderBottomLeftRadius} bottom`);
+    }
+  }
 
   // every block built. A component that throws takes the page with it when
   // the error escapes, which turns one broken control into a blank page.
@@ -1853,13 +2133,33 @@ green = inside what it promised · amber/red = later`,
     const pb = glueSpec.panel.el.getBoundingClientRect();
     const bb = glueSpec.bar.el.getBoundingClientRect();
     const seam = bb.top - pb.bottom;
-    d.assert('a transport glued under a picture is one surface with one edge',
+    /**
+     * 🔴 AND HALF THE WIDTH OF ITS BOX, MEASURED RATHER THAN READ OFF THE
+     * STYLESHEET. Asked 2026-09-20 as *"make it half w"*, and a rule that is
+     * present and inert reads exactly like one that works: this file already
+     * records three dead CSS rules found only by computing a value, and
+     * `.kit-half` sits on a child of a box whose `display` another class
+     * decides.
+     * ⚠️ AGAINST THE BOX'S OWN CONTENT WIDTH, NEVER A PIXEL COUNT TYPED HERE. A
+     * figure would be a second opinion about a width the layout owns, and it
+     * would have to be retyped every time the page's column changes.
+     * ⚠️ AND THE NEGATIVE HALF IS IN IT: a specimen still taking the whole box
+     * would satisfy every other clause in this check.
+     */
+    const half = glueSpec.half;
+    const hb = half.parentElement;
+    const hcs = getComputedStyle(hb);
+    const room = hb.clientWidth - parseFloat(hcs.paddingLeft) - parseFloat(hcs.paddingRight);
+    const took = half.getBoundingClientRect().width;
+    d.assert('a transport glued under a picture is one surface with one edge, at half its box',
       surf !== glueSpec.panel.el && surf.classList.contains('pos-glue')
       && surf.contains(glueSpec.panel.el) && surf.contains(glueSpec.bar.el)
       && Math.abs(seam - 1) <= 0.6 && edge(surf) === 1
-      && edge(glueSpec.panel.el) === 0 && edge(glueSpec.bar.el) === 0,
+      && edge(glueSpec.panel.el) === 0 && edge(glueSpec.bar.el) === 0
+      && took < room - 1 && Math.abs(took - room / 2) <= 1,
       `seam ${seam.toFixed(1)} px, one edge of ${edge(surf)} px round both, `
-      + `${edge(glueSpec.panel.el)} and ${edge(glueSpec.bar.el)} inside`);
+      + `${edge(glueSpec.panel.el)} and ${edge(glueSpec.bar.el)} inside, `
+      + `taking ${took.toFixed(1)} px of the ${room.toFixed(1)} px the box gives it`);
 
     /**
      * 🔴 THE TWO WORDS ARE THE SAME WIDTH, MEASURED IN BOTH STATES RATHER THAN
@@ -1930,8 +2230,10 @@ green = inside what it promised · amber/red = later`,
   // green. Graded with the harnesses' OWN selector string, against a specimen
   // mounted the way a page mounts one.
   // ⚠️ PROVED BY BREAKING IT, 2026-09-19: the same specimen in a `.kit-row`
-  // instead reads `0 of 3` and takes this red, and the page's pressable count
-  // drops from 8 to 5.
+  // instead reads `0 of 3` and takes this red. The pressable count beside it is
+  // 4 as of 2026-09-20, down from 6 when the headset pair went off screen, and
+  // it is a fact about how many blocks currently mount a control row rather
+  // than a number this check is graded against.
   const PRESSED = '.pos-controls button';
   const inRow = [...document.querySelectorAll(PRESSED)];
   const groupBtns = bgSpec ? bgSpec.buttons : [];
@@ -1990,12 +2292,12 @@ green = inside what it promised · amber/red = later`,
   // row under a pointer already on its way to it. `button[disabled]` is opacity
   // and a cursor, and this measures that it stayed that way.
   if (bgSpec) {
-    const b = bgSpec.button('keep');
+    const b = bgSpec.button('clear');
     const on = b.getBoundingClientRect();
-    bgSpec.enable('keep', false, 'There is nothing to keep on this page.');
+    bgSpec.enable('clear', false, 'The log on this page is already empty.');
     const off = b.getBoundingClientRect();
     const said = b.title;
-    bgSpec.enable('keep', true);
+    bgSpec.enable('clear', true);
     d.assert('a button switched off is the same size as it was on, and it says why',
       Math.abs(on.width - off.width) < 0.01 && Math.abs(on.height - off.height) < 0.01
       && said.length > 0 && b.title === '',
@@ -2008,10 +2310,10 @@ green = inside what it promised · amber/red = later`,
   // the thing, so the group refuses it the way `mount()` refuses an odd readout.
   if (bgSpec) {
     let refused = '';
-    try { bgSpec.enable('drop', false); }
+    try { bgSpec.enable('save', false); }
     catch (e) { refused = e.message; }
     d.assert('NEGATIVE CONTROL: a button disabled with no reason is refused rather than drawn',
-      refused.length > 0 && bgSpec.enabled('drop'),
+      refused.length > 0 && bgSpec.enabled('save'),
       refused || 'it was accepted, and the button is off with nothing to show for it');
   }
 
@@ -2063,9 +2365,13 @@ green = inside what it promised · amber/red = later`,
         : `${XR_STATES.length} answers over 2 modes, ${sentences} sentences, and nothing said when it works`);
   }
 
-  // The pair on this page is wired the way the four pages will wire theirs, so
+  // The pair this page builds is wired the way the four pages wire theirs, so
   // the wiring is graded once here rather than four times over there. Whatever
   // this browser answers, the control agrees with it.
+  // ⚠️ THE GROUP IS OFF SCREEN SINCE 2026-09-20, when the specimen was asked
+  // for removal. It is the same object wired the same way; what went is the row
+  // a visitor could see, and this check is why the group itself did not go with
+  // it.
   // ⚠️ PROVED BY BREAKING IT, 2026-09-19: with the two `enable` calls taken out
   // of the subscription this reads `vr no, pressable` and goes red, which is
   // the `/held/` defect exactly. A page that forgets to wire it is the failure
@@ -2618,7 +2924,25 @@ green = inside what it promised · amber/red = later`,
      * point would grade a path no pointer ever takes.
      */
     if (footSpec?.footer) {
-      const f = footSpec.footer;
+      /**
+       * 🔴 THE CHECK BUILDS ITS OWN FOOTER RATHER THAN GRADING THE SPECIMEN.
+       * The specimen was asked to be ONE line on 2026-09-20, *"1 line footer
+       * here"*, and both checks below read the SECOND row: one asserts six
+       * things are cut to `lines`, the other that a name too long for row 0
+       * does not push row 1 out of a box that is still the same height. Against
+       * a one line footer the second row is `undefined`, so the check did not
+       * fail, it THREW, and took the whole page down with a TypeError about
+       * `startsWith` that named no block.
+       * ⚠️ **A CHECK MUST NOT DECIDE WHAT A SPECIMEN LOOKS LIKE.** That is this
+       * project's rule about a check that mutates, arriving from the other
+       * side: there a check destroyed the thing it graded, here it would have
+       * dictated it. Three lines is what the BEHAVIOUR needs, so the check
+       * makes three lines and puts them back.
+       * ⚠️ IT IS APPENDED AND THEN REMOVED, because both asserts measure a
+       * height and a detached element has none.
+       */
+      const f = createStripFooter({ lines: 3 });
+      footSpec.el.parentElement.append(f.el);
       const h = () => f.el.getBoundingClientRect().height;
       const idle = h();
       f.set({ detail: ['takes  0:03.2'] });
@@ -2655,6 +2979,11 @@ green = inside what it promised · amber/red = later`,
         cut > 0 && Math.abs(tall - idle) < 0.5 && second.startsWith('the second line'),
         `${long.length} characters running ${cut} px past a ${row0.clientWidth} px line, still `
         + `${tall.toFixed(1)} px tall, and the line under it reads "${second}"`);
+      f.el.remove();
+
+      // And the specimen on the page really is the one line that was asked for.
+      d.assert('the footer on show is one line, which is what this specimen was asked to be',
+        footSpec.footer.lines === 1, `${footSpec.footer.lines} line(s)`);
     }
 
     /**
@@ -2668,8 +2997,8 @@ green = inside what it promised · amber/red = later`,
      * itself rather than a stand-in for it. Asking for real would put a cover
      * over the page in the middle of the checks that follow.
      */
-    if (vpSpec && vpUnder) {
-      const p = vpSpec[vpSpec.length - 1].panel;
+    if (vpStorey && vpUnder) {
+      const p = vpStorey;
       const home = vpUnder.parentNode;
       vpUnder.dataset.kit = 'storey';
       p.el.classList.add('pos-full');
