@@ -147,7 +147,7 @@ export const DEMOS = [
   // useful for writing the page and worthless as evidence about a device —
   // research/quest-xr calls that "the iPhone mistake in a new accent".
   { name: 'blocks', group: 'xr', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 6000,
-    one: 'square bricks on a grid. Pick one up and it snaps to whatever you set it on',
+    one: 'square bricks on a dotted floor you drag to look around, and in a headset a ray from your hand picks one up and snaps it to the grid where you let it go',
     tags: ['WebXR', 'WebGL2', 'relay', 'seeded'] },
 
   // Typography with a position rather than a place on a page. `gl: true` and
@@ -157,8 +157,8 @@ export const DEMOS = [
   // Six fields are computed in JavaScript at load, measured around 25 ms each
   // on this machine, and the asserts then draw every word off-screen twice to
   // read its size out of the pixels. The first assert sits behind all of it.
-  { name: 'held', group: 'xr', act: 0, created: '2026-09-15', built: true, gl: true, xr: true, settleMs: 8000,
-    one: 'one sentence broken across four walls, each word as big as it is short. Point at one and type your own over it',
+  { name: 'weight', group: 'xr', act: 0, created: '2026-09-15', built: true, gl: true, xr: true, settleMs: 8000,
+    one: 'one sentence broken across four walls, each word as big as it is short and none of them turning to face you, and any word retyped where it stands',
     tags: ['WebXR', 'WebGL2', 'fonts'] },
 
   // 🔴 THE ONE XR ROW WITH NO `gl: true`, AND THAT IS THE POINT OF IT. Its
@@ -316,6 +316,35 @@ export const DEMOS = [
   { name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true,
     one: 'every Kurenniemi recording that plays, laid end to end as one long tape',
     tags: ['timeline', 'uncertainty', 'archive'] },
+  // The other archive, and it is the opposite kind of thing from the two rows
+  // above. Those point at what fourteen institutions hold; this one points at
+  // files WE hold, because mimproject.org has been down long enough that two
+  // video sites were the last copies anybody could reach. Its corpus is a
+  // separate file for exactly that reason — see `build-mimproject.mjs`.
+  { name: 'making', group: 'mim', act: 5, created: '2026-09-19', built: true,
+    one: 'the recordings and the pictures that outlived MIMproject\'s own website, shown from the table under whichever one you are looking at',
+    tags: ['archive', 'provenance', 'R2'] },
+  // 🔴 THE FIRST ROW IN ACT 6, `composition`, AND IT SITS HERE IN THE ARRAY
+  // BECAUSE THE TWO QUESTIONS ARE DIFFERENT. The act is what the page teaches:
+  // a score is a composition rather than an archive, which is why it is not act
+  // 5 with the three rows above it. The POSITION is the story order, and the
+  // story wants it beside the other pages that read somebody else's documents
+  // and draw them. Acts have never run strictly down this array: there are act
+  // 4 rows below act 5 ones already.
+  // ⚠️ THE GROUP IS `timeline` BECAUSE THAT IS WHAT A VISITOR GETS: a picture
+  // of a piece on a line. The piece belongs to Liis Vares and Taavet Jansen and
+  // is elektron.art's; a section named after them would be a section of one,
+  // and the page is ours rather than theirs.
+  // ⚠️ THE SLUG WAS FREED ON 2026-09-19, when the headset text page that held it
+  // was renamed to `weight`. The deployed `/held/` is gone and no redirect was
+  // written, so this row is what answers that address now.
+  { name: 'held', group: 'xr', act: 6, created: '2026-09-19', built: true,
+    // sizes the wait for the page's first assert, which sits behind one local
+    // read of a 99 KB file. Nothing here has a control to press.
+    settleMs: 4000,
+    one: 'Held in Human, a mixed reality piece by Liis Vares and Taavet Jansen, drawn from its own score: '
+      + 'eight scenes, a voice that outlives them, and the one scene the score gives no length',
+    tags: ['timeline', 'uncertainty', 'canvas'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
   { name: 'deck', group: 'kurenniemi', act: 5, created: '2026-08-28', built: false, page: '/proto/deck/',
@@ -528,8 +557,9 @@ export const DEMOS = [
   // the count is unchanged for one 400 ms tick. 25 s measured against a drill
   // that takes about twelve.
   { name: 'stage', group: 'capture', act: 4, created: '2026-09-17', built: true, settleMs: 25000,
-    one: 'one press puts a live picture in front of an audience, asks them something, '
-      + 'and keeps every answer on the recording\u2019s own timeline',
+    one: 'two presses, one for the picture and one for the show, put a church scene from '
+      + 'a 2011 MIMproject performance in front of an audience, ask them something, and '
+      + 'keep every answer on the recording\u2019s own timeline',
     tags: ['WebRTC', 'canvas', 'tabs', 'R2'] },
 
   { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
@@ -619,9 +649,9 @@ export const DEMOS = [
    * `/knobs/`, and the deployed `/keys/` is gone with no redirect written — the
    * same as `radio1965` and `box` before it.
    *
-   * ⚠️ IT WAS `box` UNTIL 2026-09-16 and `rig/box/` keeps its name, because the
-   * BOARD is still the box: `box.mjs`, `box.hello`, `box.alive`. What left
-   * `rig/box/` is one HTML file; everything `push.sh` ships to the Raspberry Pi
+   * ⚠️ IT WAS `box` UNTIL 2026-09-16 and `rig/board/` keeps its name, because the
+   * BOARD is still the box: `board.mjs`, `board.hello`, `board.alive`. What left
+   * `rig/board/` is one HTML file; everything `push.sh` ships to the Raspberry Pi
    * is untouched.
    * ⚠️ AND IT NEVER HAD A HARNESS. `node demo/verify.mjs keys` answered `nothing
    * for this harness to verify` for its whole life, because it was not a built
@@ -772,7 +802,7 @@ export function shortDate(iso) {
  * answered one they cannot have yet ("where does this fit in the argument?").
  *
  * ⚠️ NEITHER AXIS REPLACES THE OTHER and neither is derived from the other.
- * `held` is act 0 because it teaches how a picture is drawn, and it is in the
+ * `weight` is act 0 because it teaches how a picture is drawn, and it is in the
  * headset group because that is where you would go looking for it.
  */
 /**
@@ -795,6 +825,7 @@ export const GROUPS = new Map([
   ['xr', 'in a headset'],
   ['vain', 'väin'],
   ['kurenniemi', 'kurenniemi'],
+  ['mim', 'mim'],
   ['instruments', 'instruments'],
   ['capture', 'capture'],
   ['timeline', 'timeline'],

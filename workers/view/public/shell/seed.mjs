@@ -45,8 +45,21 @@ export function mulberry32(seed) {
  * dozen of them on a plate read as scatter rather than as building. At 0.5 m a
  * brick is an object you move with your whole arm, which is the gesture this
  * page is for. Two and a half fit in a reach instead of ten.
+ *
+ * ⚠️ AND A WHOLE METRE SINCE 2026-09-19, WHICH IS THE SAME INSTINCT ONE STEP
+ * FURTHER: *"make blocks 2x bigger in each direction"*. The reasoning to check
+ * afterwards has not changed, and it is still what a brick feels like at arm's
+ * length. A metre cube is no longer an object you pick up, it is one you walk
+ * round and push, so a reach holds one of them where it used to hold two and a
+ * half, and eight of the floor's 12.5 cm dots fit across a face.
+ *
+ * 🔴 `PLATE` IN `demo/blocks/index.html` MOVES WITH THIS, ALWAYS. Every length
+ * in the document is a multiple of this constant, so they all double on their
+ * own. The plate is a distance in metres and does not, and leaving it where it
+ * was would have taken the buildable floor from 9.6 bricks across to 4.8, which
+ * is a doubling of the brick and a quartering of the room it goes in.
  */
-export const UNIT = 0.5;
+export const UNIT = 1.0;
 /**
  * 🔴 ONE SIZE, AND EVERY SIDE THE SAME. Three sizes were tried and they are the
  * wrong kind of variety here: mixed cubes on one grid make the grid hard to
@@ -76,8 +89,10 @@ export const PALETTE = [0.55, 0.62, 0.69, 0.76, 0.83, 0.90];
 
 export function world(seed) {
   const r = mulberry32(seed);
-  // ⚠️ FEWER, BECAUSE THEY ARE BIGGER. Twenty-seven half-metre cubes on a
-  // nine-cell plate is a wall, not a room to build in.
+  // ⚠️ FEWER, BECAUSE THEY ARE BIGGER. Twenty-seven cubes on a nine-cell plate
+  // is a wall, not a room to build in. The count is in CELLS rather than in
+  // metres, so it survived the brick doubling untouched: seven to thirteen
+  // things in eighty-one cells is the same room however big a cell is.
   const n = 7 + Math.floor(r() * 7);
   const hue = Math.round(r() * 1000) / 1000;
   const things = [];
@@ -145,7 +160,14 @@ export function validate(doc) {
   for (const t of doc.things) {
     if (![t.x, t.y, t.z, t.s].every(Number.isFinite)) return 'a thing with no place';
     if (t.s <= 0 || t.s > 2) return `a thing sized ${t.s}`;
-    if (Math.hypot(t.x, t.z) > 12) return 'a thing outside the room';
+    // ⚠️ IN METRES, SO IT DOUBLED WITH THE BRICK. It was 12 m against a 0.5 m
+    // unit, and the page's own ceiling on how far a thumbstick may push a held
+    // brick sat right under it: standing in a corner of the plate and pushing
+    // the full 8 m put a thing 11.4 m out, a shade inside this. Both numbers
+    // doubled together, so a push that used to be legal still is. Left at 12 it
+    // would have refused the move silently, and a brick that stops following
+    // your hand reads as a broken page rather than as a rule.
+    if (Math.hypot(t.x, t.z) > 24) return 'a thing outside the room';
     // 🔴 NOTHING GOES UNDER THE FLOOR, AND NOTHING STOPPED IT. This checked x
     // and z and never y, so the room had walls and no ground: a brick dragged
     // downward sank through the dots and out of reach, and the only way to get

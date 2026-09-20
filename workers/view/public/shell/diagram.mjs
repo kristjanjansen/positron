@@ -158,6 +158,17 @@ export const TECH_HUE = {
    * anybody can name.
    */
   raspberry: 343,          // #C51A4A, the crimson in their own logo
+  /**
+   * 🔴 THEIR OWN BLUE, FOR THE REASON `cloudflare` IS THEIR ORANGE AND A
+   * RASPBERRY PI IS THEIR CRIMSON. Asked 2026-09-19: *"make both outer boxes
+   * blue (meta color)"*, about a headset and its controllers.
+   * ⚠️ 213 IS READ OFF THE BRAND, not chosen: #0064E0 is hue 213 in HSL.
+   * ⚠️ AND IT IS NOT `device`. `device` is any machine in a room, a board, a
+   * phone, a speaker, and it stays 330 for all of them. This is for the one
+   * make of headset these pages are actually written against, which a reader
+   * can name on sight, the same argument the two entries above it make.
+   */
+  meta: 213,               // #0064E0, their blue
   archive: 250,            // ERR, archive.org, a corpus
   station: 205,            // a broadcaster
 };

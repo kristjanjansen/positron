@@ -76,7 +76,7 @@
    *
    * What is left is what survived being measured against its own floor with the
    * takes interleaved, which is the only honest design on a patch that drifts
-   * on its own (`node rig/box/wobble-test.mjs --ctrl 7,11,77,78 --reps 3`):
+   * on its own (`node rig/board/wobble-test.mjs --ctrl 7,11,77,78 --reps 3`):
    *   CC 7 volume        level 0.0000 -> 0.0375, spread inside one arm 0.0000
    *   CC 11 expression   level 0.0000 -> 0.0466, spread 0.0005 — the same thing
    *   CC 77, CC 78       resonance: nothing, 2 Hz of brightness against 4 of spread
@@ -94,7 +94,7 @@
    * controller measurement taken here HELD ONE NOTE for the whole run, which is
    * blind by construction to everything that acts when a note STARTS. With a
    * keyboard on the page that family is exactly where the interesting ones live,
-   * so `rig/box/note-test.mjs` plays short notes and measures the envelope
+   * so `rig/board/note-test.mjs` plays short notes and measures the envelope
    * instead. The two replacements are chosen from that and are not in yet: the
    * board went off the relay before the run.
    */
@@ -131,14 +131,14 @@
    * ⚠️ AND IT MOVES ON ITS OWN, which is a feature here and a trap for a
    * measurement: two takes at one value four seconds apart differ by 0.58
    * octaves of brightness. That is why it sounds alive and why
-   * `rig/box/wobble-test.mjs` has to interleave its takes on it.
+   * `rig/board/wobble-test.mjs` has to interleave its takes on it.
    */
   const BANK = 115, PROGRAM = 32, PATCH = 'AddSynth Morph';
   // One note, held. A repeating note would retrigger the patch's own filter
   // envelope and fight the slider, which would make the page about the wrong
   // thing.
   const NOTE = 40, VEL = 96;
-  // The board fixes 48000 Hz and 960-sample frames (rig/box/synth.mjs), and
+  // The board fixes 48000 Hz and 960-sample frames (rig/board/synth.mjs), and
   // NOTHING in this chain resamples.
   const RATE = 48000;
   // What the board publishes about its own stream. Checked against the frames
@@ -501,10 +501,10 @@
 
   // The network alone, with the relay's Durable Object never woken: the runtime
   // answers `ping` with `pong` for free out of its hibernation autoresponse.
-  // ⚠️ NOT `box.ping`, AND STILL NOT AFTER IT WAS REPAIRED. That verb replied
+  // ⚠️ NOT `board.ping`, AND STILL NOT AFTER IT WAS REPAIRED. That verb replied
   // with an `at` field, `at` is an envelope field, so the board's own formatter
-  // refused it and the handler answered `box.error` instead, for two sessions
-  // and to every caller. `rig/box/box.mjs` sends `pongAt` since 2026-09-18, which
+  // refused it and the handler answered `board.error` instead, for two sessions
+  // and to every caller. `rig/board/board.mjs` sends `pongAt` since 2026-09-18, which
   // is in the repo and NOT yet on the board. Either way this line stays: the
   // relay's runtime answers `ping` with `pong` out of its hibernation
   // autoresponse, so this measures the network with the Durable Object never
@@ -1524,19 +1524,35 @@
        * connector, other nothing, not good. its PCM slices?"*. It is: raw
        * samples, uncompressed, in 20 ms slices. One arrow said the format and
        * the next said nothing, which reads as two different journeys.
-       * The rate and the channel count moved into ffmpeg's own note, where
-       * there is room for them and where they describe the thing that chose
-       * them.
+       *
+       * 🔴 `PCM`, NOT `PCM slices`, SETTLED 2026-09-19: *"h.264 - unify label
+       * and longer desc on all diagrams where stream back pcm or mp4 video"*.
+       * Sound coming back is `PCM` on every diagram in this project and a
+       * picture coming back is `H.264` on `/mirror/`; `/kit/`'s specimens say
+       * `PCM` too, so an author copying one gets the settled word. The word
+       * `slices` went into the note, where there is room to say how long one
+       * is, and `20ms pieces` under ffmpeg was already saying it anyway.
+       *
+       * 🔴 AND THESE TWO NOTES REVERSE A REMOVAL, WHICH IS WHY IT IS WRITTEN
+       * DOWN. On 2026-09-16 this page was told *"rm descs in outer boxes and
+       * hover bottom descs"*, and fourteen notes came out of this picture,
+       * these two among them. The 2026-09-19 ask is later, is specific to a
+       * stream coming back, and names this page's own label; two notes on the
+       * return path is what it asks for and every other box here stays bare.
        */
       // 🔴 `back: true` ON BOTH RETURN LINKS, AND IT IS AN AUTHOR FLAG. Nothing
       // infers it: a link without it is laid out as a forward step, so a right
       // to left link gets drawn through whatever stands in the way and puts its
       // head somewhere nobody can account for. Flagged, they run in a lane under
       // the row and arrive at the bottom edge.
-      { from: 'ffmpeg', to: 'up', label: 'PCM slices', back: true,
-        },
-      { from: 'up', to: 'playout', label: 'PCM slices', back: true,
-        },
+      { from: 'ffmpeg', to: 'up', label: 'PCM', back: true,
+        note: 'Fifty slices a second, 960 samples each, 48 kHz and one channel, with nothing '
+            + 'compressed and nothing wrapped round them. A number in front of each one is '
+            + 'what makes a missing slice countable.' },
+      { from: 'up', to: 'playout', label: 'PCM', back: true,
+        note: 'A browser cannot dial a board behind a home router, so the sound comes back '
+            + 'the long way round. The relay drops a slice without saying so, and a gap in '
+            + 'those numbers is the only witness.' },
     ],
     // ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC. Put
     // inside it they are silently ignored, and the page shipped with no heading

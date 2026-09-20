@@ -60,11 +60,16 @@ export const touchOf = (isHeld, isAimed) => (isHeld ? TOUCH.held : isAimed ? TOU
 //      GL_INVALID_OPERATION (1282) for it and DREW CORRECTLY ANYWAY, because
 //      the linker happened to pick the same slot. So it is called before the
 //      link and `gl.getError()` is read on the first frame and published.
-//   5. THE WAY OUT BELONGS TO THE PAGE. A long hold on ANY controller button
-//      ends the session, with a ring at the controller filling while you hold
+//   5. THE WAY OUT COMES WITH THE SESSION. A long hold on ANY controller button
+//      ends it, with a ring filling in front of you while you hold
 //      (`xr-quit.mjs`) — plus a dead-man's switch that ends it if nothing has
 //      been drawn after 4 s. "Press the Meta button" is not an answer a page
 //      gets to give about its own bug.
+//      🔴 AND SINCE 2026-09-19 IT IS NOT A LINE ANYBODY REMEMBERS TO WRITE.
+//      `mountXRQuit(gl, session)` puts the hold on the session's own frame
+//      loop, so no file advances it and no file can fail to. `/blocks/` built
+//      the badge, drew it every frame and never advanced it, and there was no
+//      way out of that page at all.
 //      ⚠️ THE TWO ARE NOT THE SAME THING AND ONLY ONE IS AN EXIT. The hold is
 //      for a person who wants out; the dead-man's switch is for a page that has
 //      stopped being able to offer one. 2026-09-17 removed every OTHER exit
@@ -87,7 +92,7 @@ export const touchOf = (isHeld, isAimed) => (isHeld ? TOUCH.held : isAimed ? TOU
 
 import { createXRRoom, roomOf, ROOM_OPTIONAL_FEATURES, GRID, mul } from './xr-room.mjs';
 import { createXRHands, BUTTON, AXIS } from './xr-hands.mjs';
-import { createXRQuit } from './xr-quit.mjs';
+import { mountXRQuit } from './xr-quit.mjs';
 import { createXRTablet } from './xr-tablet.mjs';
 // ⚠️ READ, NEVER WRITTEN, AND THAT IS THE POINT. `xr-pick.mjs` is the ONE
 // ray-to-rectangle answer in this repo — `xr-hands.mjs` already asks it where
@@ -486,8 +491,11 @@ export function createXRPanels({
   // accident while reaching for something and it gave no warning. It then exited
   // on one NAMED button, held, which fixed the accident and asked somebody
   // wearing a headset to find a particular button by feel. Since 2026-09-17 it
-  // is ANY button, HELD, with a ring at the controller filling while you hold:
+  // is ANY button, HELD, with a ring in front of you filling while you hold:
   // nothing is reachable by accident and there is nothing to be told.
+  // ⚠️ THE RING CAME OFF THE CONTROLLERS ON 2026-09-19 and is head locked now,
+  // and the hold is advanced by the session rather than by this file. See the
+  // header of `xr-quit.mjs` for the argument that lost.
   let theQuit = null;
 
   /**
@@ -502,20 +510,38 @@ export function createXRPanels({
    * ⚠️ IT MUST NOT THROW INTO THE CALLER. A badge that will not compile is a
    * page with an uglier way out; a throw here is a page with none, because an
    * uncaught error in a frame callback deletes everything below it.
+   *
+   * 🔴 CALLED TWICE, WITH AND WITHOUT A SESSION, AND THE SECOND ONE IS THE REAL
+   * EXIT. 2026-09-19 moved the hold behind the session's own frame loop, so
+   * `mountXRQuit` wants the session and nothing else advances it. `build()`
+   * still asks for one with no session, which compiles the shader on a laptop
+   * and reports `driven: false`; the entry path asks again with the session and
+   * gets an exit that drives itself. The compile-only one is thrown away at
+   * that point, because two badges is two programs.
    */
-  function ensureQuit() {
-    if (theQuit !== null || quitFailed || !gl) return theQuit;
+  function ensureQuit(forSession = null) {
+    if (quitFailed || !gl) return theQuit;
+    // The one we have is right unless we now have a session and it is not on
+    // one. `driven` also goes false when a session ends, so re-entering builds
+    // a fresh mount rather than keeping a badge tied to a session that is gone.
+    if (theQuit && (!forSession || theQuit.driven)) return theQuit;
     try {
-      theQuit = createXRQuit(gl, {
-        // Guarded by `armed`: the press that opened this page's own button may
-        // still be down as the session starts, and an exit that fires on entry
-        // is a session nobody gets into. That guard matters more now that ANY
-        // button advances the hold, because the button still down IS one.
-        onQuit: () => {
-          if (!armed) return;
-          beacon('held the quit button · leaving');
-          session?.end().catch(() => {});
-        },
+      theQuit?.dispose();
+      theQuit = mountXRQuit(gl, forSession, {
+        // 🔴 NO `armed` GUARD HERE ANY MORE, AND IT DID NOT GO MISSING.
+        // The press that opened this page's own button may still be down as the
+        // session starts, and with every button live it IS one of the buttons
+        // the hold counts. That guard is now inside `xr-quit.mjs` for every
+        // page at once: the hold arms on the first frame with nothing pressed,
+        // or after three seconds regardless so a stuck button cannot trap
+        // somebody. This page's own `armed` flag still gates the trigger and
+        // the thumbstick, which is what it was also for.
+        // ⚠️ AND THIS DOES NOT END THE SESSION. The module does that itself,
+        // after this returns, which is the line that went missing from
+        // `/blocks/` and left a page with no way out.
+        onQuit: () => beacon('held a controller button, leaving'),
+        log,
+        say: beacon,
       });
       // ⚠️ COMPILED HERE, NOT ON THE FIRST DRAW. The object is lazy, so having
       // one proves nothing about its shader, and the check below would pass on
@@ -560,8 +586,9 @@ export function createXRPanels({
    * A page that draws its OWN ground has two floors: reported on
    * `/videoradio/`, whose sea is 46 wave fronts standing on a plane that the
    * room was also dotting. `room: null` is the wrong answer and CLAUDE.md says
-   * why: the tablet, the hands and therefore the quit badge's grips are built
-   * only when there is a room, so a page with none has no visible way out.
+   * why: the tablet and the hands are built only when there is a room, so a
+   * page with none loses the pointer and the slab. It no longer loses the way
+   * out, which is head locked and reads the session directly since 2026-09-19.
    * This takes the dots to zero alpha and leaves everything that gets you home.
    */
   const wantGrid = roomOpt.grid !== false;
@@ -573,11 +600,10 @@ export function createXRPanels({
    * water has a pair of plastic Touch controllers floating in it.
    *
    * ⚠️ IT STRIPS THE MODELS, NOT THE INPUT. `pointer`, `tabletM` and the hit
-   * test all still arrive, so the ray still points, the tablet still hangs and
-   * the quit badge still draws at the grip — that badge reads `theHands.hands`
-   * from this module rather than from the room, so it is untouched either way.
-   * Taking input away instead would be a session with no visible way out, which
-   * is the failure `room: null` already has a warning about.
+   * test all still arrive, so the ray still points and the tablet still hangs.
+   * The quit badge is not affected by any of this since 2026-09-19: it is head
+   * locked and it reads its own controllers off the session, so it draws and
+   * fires with nothing else in the picture.
    */
   // 🔴 AND THE DEFAULT IS NOW OFF. 2026-09-17: *"rm controller
   // geometry/tablet on all (only if i am ask on specific demo so keep that code
@@ -594,11 +620,11 @@ export function createXRPanels({
    * it hangs on a matrix that is input rather than a model: reported as
    * *"videoradio vr: still has left controller and tablet"* — the thing still
    * in the left hand WAS the tablet.
-   * ⚠️ THE WAY OUT SURVIVES. `xr-quit.mjs`'s badge reads grips from THIS module
-   * rather than from the room, and it is a hold on a face button, so it draws
-   * and fires with nothing else in the picture. A page that takes the tablet
-   * away has one visible exit instead of two, which is why this is a switch a
-   * page asks for rather than the default.
+   * ⚠️ THE WAY OUT SURVIVES. `xr-quit.mjs`'s ring is head locked and its hold
+   * is advanced by the session, so it draws and fires with nothing else in the
+   * picture at all. A page that takes the tablet away has one visible exit
+   * instead of two, which is why this is a switch a page asks for rather than
+   * the default.
    */
   // 🔴 OFF BY DEFAULT TOO, SAME INSTRUCTION, SAME DAY. The slab and its slider
   // are kept whole in `demo/shell/xr-tablet.mjs` and are one `tablet: true`
@@ -897,7 +923,11 @@ export function createXRPanels({
           // otherwise pass vacuously or fail for the wrong reason.
           made: roomDoc.things.length,
           things: drawnDoc.things.length,
-          scenery: `${wantSky ? 'walls' : 'no walls'} · ${wantThings ? 'objects' : 'no objects'} · a dotted floor`,
+          // Three facts about what is in the room, as a LIST rather than one
+          // string with joins in it. This reaches a page's assert details and
+          // so a visitor's log box, which is why it lost its middots on
+          // 2026-09-19 along with the rest of what a visitor reads.
+          scenery: `${wantSky ? 'walls' : 'no walls'}, ${wantThings ? 'objects' : 'no objects'} and a dotted floor`,
           // The floor's own numbers, so the one property that has broken here
           // before — dots still at strength where the quad stops — is gradeable
           // from a laptop.
@@ -938,10 +968,18 @@ export function createXRPanels({
       // replaced. `holdMs` is published beside it because with every button
       // live the hold length is the only thing between a resting thumb and the
       // session ending, which makes it the number worth asserting on.
+      // 🔴 `driven` AND `frames` ARE THE TWO THE OLD SHAPE COULD NOT REPORT.
+      // A badge that is built, compiled and drawn is what `/blocks/` had while
+      // there was no way out of it: what was missing was anything ADVANCING the
+      // hold. `driven` says a session is doing that and `frames` counts the
+      // frames it has done it for, so a headset run can assert the exit is
+      // live rather than that it exists.
       ? { built: true, button: theQuit.button, holdMs: theQuit.holdMs,
           label: theQuit.label, pressed: theQuit.pressed,
+          driven: theQuit.driven, frames: theQuit.frames, armed: theQuit.armed,
           holding: theQuit.holding, progress: theQuit.progress }
       : { built: false, button: null, holdMs: null, label: null, pressed: null,
+          driven: false, frames: 0, armed: false,
           holding: false, progress: 0,
           why: theQuit?.why || (quitFailed ? 'it threw on construction' : 'never built') }),
   });
@@ -1308,7 +1346,12 @@ export function createXRPanels({
         session.end().catch(() => {});
       }
     }, deadManMs);
-    ensureQuit();
+    // 🔴 THE WAY OUT JOINS THE SESSION HERE, AND THIS IS THE ONE LINE THAT
+    // MATTERS. `mountXRQuit` puts its own callback on the session's frame loop,
+    // so the hold advances from this moment whatever happens to the render loop
+    // below it. It is before `requestAnimationFrame(onXR)` on purpose: if the
+    // page's own loop throws on its first frame, the exit is already running.
+    ensureQuit(session);
     session.requestAnimationFrame(onXR);
     beacon('session running · requestAnimationFrame registered');
     return true;
@@ -1499,11 +1542,11 @@ export function createXRPanels({
     // way out you cannot see is the failure the module already has a dead-man's
     // switch for. Its own program binds what it needs and this one has finished
     // with the state.
-    const quit = ensureQuit();
-    if (quit) {
-      const grips = (theHands?.hands || []).map((h) => h.m).filter(Boolean);
-      if (grips.length) quit.draw(mul(proj, viewM), grips, [hp.x, hp.y, hp.z]);
-    }
+    // 🔴 THE VIEW MATRIX, NOT A LIST OF GRIPS. The ring is head locked since
+    // 2026-09-19, so where it goes comes out of the matrix this eye is already
+    // being projected with: no hand has to be reporting a pose for there to be
+    // a way out, which is what a session driven by tracked hands has.
+    ensureQuit(session)?.draw(mul(proj, viewM), viewM);
     gl.bindVertexArray(null);
   }
 
@@ -1512,22 +1555,25 @@ export function createXRPanels({
     session.requestAnimationFrame(onXR);
     const pose = frame.getViewerPose(space);
     if (!pose) return;
-    // How long this frame was, for anything that integrates. Capped, because a
-    // headset that stalled for a second must not advance a hold by a second:
-    // the whole point of the hold is that it measures a deliberate press, and a
-    // stall is not one.
-    const dtSec = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
+    // ⚠️ HOW LONG THIS FRAME WAS IS WORKED OUT WHERE IT IS USED. There was one
+    // here for the way out, capped at 0.1 s because a headset that stalled for
+    // a second must not advance a hold by a second. The way out measures its
+    // own frames now and caps them the same way, and the stick push below
+    // keeps its own.
     // 🔴 THE LAYER IS READ HERE, INSIDE THE CALLBACK, WHERE IT EXISTS.
     const layer = session.renderState.baseLayer;
     if (!layer) return;
     state.frames++;
 
-    // Arm the way out once every button is up — or after 3 s regardless, so a
-    // stuck button cannot be the reason somebody is trapped.
-    // ⚠️ THIS GUARD MATTERS MORE NOW THAT EVERY BUTTON IS LIVE. The press that
-    // opened this page's own button may still be down as the session starts,
-    // and it IS one of the buttons the hold counts, so without this the session
-    // would end about three seconds after it began.
+    // Arm the trigger and the thumbstick once every button is up, or after 3 s
+    // regardless, so a stuck button cannot be the reason nothing on this page
+    // works.
+    // ⚠️ THIS USED TO ARM THE WAY OUT TOO, AND THAT MOVED RATHER THAN WENT.
+    // The press that opened this page's own button may still be down as the
+    // session starts, and it IS one of the buttons the hold counts, so without
+    // that guard the session would end about three seconds after it began.
+    // `xr-quit.mjs` carries it for every page now: see ARM_MS in that file. The
+    // flag is kept here because the trigger and the stick want the same answer.
     if (!armed) {
       let anyDown = false;
       for (const src of session.inputSources) {
@@ -1535,17 +1581,14 @@ export function createXRPanels({
       }
       if (!anyDown || performance.now() - armAt > 3000) armed = true;
     } else {
-      // 🔴 THE WAY OUT IS A HOLD ON ONE NAMED BUTTON. It was a tap on ANY
-      // button, which is two separate faults. A page you leave by brushing a
-      // control while reaching for another one is a page that ends without
-      // being asked; and nothing on screen said which button did it, so the one
-      // gesture somebody needs most was the one they had to discover. The badge
-      // is drawn on the controller, it carries its own words, and its ring
-      // fills as the hold goes on, so a release cancels something visible.
-      //
-      // ⚠️ THE OTHER WAYS OUT ARE UNCHANGED. The grip still leaves through
-      // `squeezestart`, and the dead-man's switch still ends a session that has
-      // drawn nothing after 4 s. This is the deliberate one, not the only one.
+      // 🔴 THE WAY OUT IS NOT READ HERE ANY MORE, AND ITS ABSENCE IS THE POINT.
+      // There was an `ensureQuit()?.update(session.inputSources, dtSec)` on
+      // this line, which is the line `/blocks/` never wrote: it built the
+      // badge, drew it at both hands every frame and never advanced the hold,
+      // so there was no way out of that page at all and no shared code was
+      // wrong. The hold now runs on the session's own frame loop from inside
+      // `mountXRQuit`, so there is nothing here to forget and nothing here that
+      // can be deleted by accident.
       //
       // 🔴 THE THUMBSTICK IS THE A/B SWITCH AND IT IS NOT AN EXIT. The one
       // thing a headset run of this page has to do is compare the picture
@@ -1556,7 +1599,6 @@ export function createXRPanels({
       // ⚠️ It is the CLICK, and only while nothing is held: pushing the same
       // stick is how a held panel is pushed away and pulled back, so the two
       // gestures cannot collide.
-      ensureQuit()?.update(session.inputSources, dtSec);
       for (const src of session.inputSources) {
         const bs = src.gamepad?.buttons || [];
         const stick = !!bs[BUTTON.thumbstick]?.pressed;

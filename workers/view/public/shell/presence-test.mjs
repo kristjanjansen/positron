@@ -32,7 +32,7 @@ const ok = (name, cond, detail = '') => {
   else { fail++; console.log(`  FAIL ${name}${detail ? ' · ' + detail : ''}`); }
 };
 
-// The board's real numbers, read off `rig/box/box.mjs`: it sends `box.alive`
+// The board's real numbers, read off `rig/board/board.mjs`: it sends `board.alive`
 // on a 5000 ms interval. Everything below is expressed against that rather
 // than against a round number invented here.
 const BEAT = 5000;
@@ -205,10 +205,13 @@ ok('NEGATIVE CONTROL: a page with no socket reads unknown, not offline',
 
 // ── 19. the reason survives, because the reason is the useful part ──────────
 // `openWire` asks `/room/<name>/stats` when an upgrade fails and can say "the
-// room is full · 16 of 16". A badge that drops that is a badge that sends
+// room is full at 16 of 16". A badge that drops that is a badge that sends
 // somebody to debug a Pi over a relay that refused the socket.
+// ⚠️ THE FIXTURE IS `wire.mjs`'s OWN SENTENCE and was copied from it, so it
+// changed when that sentence lost its middot on 2026-09-19. A fixture that
+// drifts from the string it stands for is a test about nothing.
 {
-  const full = 'the room is full · 16 of 16 sockets';
+  const full = 'the room is full at 16 of 16 sockets';
   const r = wirePresence({ ready: 3, refusal: full });
   ok('a closed socket carries the relay\'s own reason',
     r.state === 'offline' && r.why === full, r.why);

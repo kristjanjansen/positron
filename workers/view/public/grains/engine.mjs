@@ -48,7 +48,7 @@
 // ── the two definitions, and where they come from ──────────────────────────
 //
 // 🔴 NEITHER IS BUILT HERE. Both are compiled by sclang ON THE BOARD by
-// `rig/box/norns/writedefs.scd`, because the page's whole claim is that the
+// `rig/board/norns/writedefs.scd`, because the page's whole claim is that the
 // browser runs the graph the Pi runs. `demo/grains/defs/PROVENANCE.json`
 // records the hash of the `.sc` each one came from, and `build.mjs` REFUSES the
 // build when a hash disagrees — a stale artefact is otherwise silent in the

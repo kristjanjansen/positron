@@ -201,7 +201,7 @@ const FILES = [
   // ── the two definitions `/grains/` loads into that engine ─────────────────
   //
   // 🔴 NOT VENDORED AND NOT BUILT HERE: these are compiled by sclang ON THE
-  // BOARD, by `rig/box/norns/writedefs.scd`, out of the same
+  // BOARD, by `rig/board/norns/writedefs.scd`, out of the same
   // `Engine_Pappus.sc` and `PosSource.sc` the Raspberry Pi's own service
   // compiles. `/grains/` claims the browser runs the graph the board runs, and
   // that claim is only true while these bytes came from there.
@@ -239,16 +239,16 @@ const FILES = [
   ['demo/shell/vendor/meta-quest-touch-plus-right.glb', 'shell/vendor/meta-quest-touch-plus-right.glb'],
   ['demo/shell/vendor/LICENSE-webxr-input-profiles', 'shell/vendor/LICENSE-webxr-input-profiles'],
 
-  // ── the typeface `/held/` is made of, vendored ────────────────────────────
+  // ── the typeface `/weight/` is made of, vendored ────────────────────────────
   //
   // ⚠️ LISTED BY NAME, and this one would have been missed by looking: a font
   // is not an `import`, so `checkImports()` cannot see it, AND `.woff2` is not
-  // in `demoFiles()`'s extension set, so even at the top of `demo/held/` it
+  // in `demoFiles()`'s extension set, so even at the top of `demo/weight/` it
   // would not have been copied. That is the `manifest.webmanifest` failure
   // exactly — `/items/` renamed one file and shipped a 404 to production
   // because an allowlist declined silently. `checkVendorUrls()` below is what
   // now refuses the build instead, which is why the page's `@font-face` writes
-  // its `src` as a QUOTED `/held/vendor/…` string.
+  // its `src` as a QUOTED `/weight/vendor/…` string.
   //
   // 🔴 TWO FILES, BECAUSE ESTONIAN IS SPLIT ACROSS TWO OF THEM. Ä Ö Ü Õ are in
   // `latin` (U+00xx) and Š Ž are in `latin-ext` (U+0160, U+017E). Dropping
@@ -257,17 +257,17 @@ const FILES = [
   // letter of one word in the wrong typeface. The page measures that rather
   // than trusting it (`text.mjs`, `ensureFont`).
   //
-  // ⚠️ THE PAGE DOES NOT NAME THE TYPEFACE — it asks for `held-display` and
-  // `held-text`, two aliases its stylesheet points at whatever is listed here.
+  // ⚠️ THE PAGE DOES NOT NAME THE TYPEFACE — it asks for `weight-display` and
+  // `weight-text`, two aliases its stylesheet points at whatever is listed here.
   // So a font change is these three lines, two files, and the `src` pair in the
   // page; nothing in `text.mjs` or in any assert moves. Keep it that way.
   //
   // LICENCE: SIL Open Font License 1.1 — Gabarito, via `google/fonts`
   // (`ofl/gabarito`). The two subsets are Google's own builds; the licence
   // ships beside them.
-  ['demo/held/vendor/gabarito-latin.woff2', 'held/vendor/gabarito-latin.woff2'],
-  ['demo/held/vendor/gabarito-latin-ext.woff2', 'held/vendor/gabarito-latin-ext.woff2'],
-  ['demo/held/vendor/LICENSE-gabarito', 'held/vendor/LICENSE-gabarito'],
+  ['demo/weight/vendor/gabarito-latin.woff2', 'weight/vendor/gabarito-latin.woff2'],
+  ['demo/weight/vendor/gabarito-latin-ext.woff2', 'weight/vendor/gabarito-latin-ext.woff2'],
+  ['demo/weight/vendor/LICENSE-gabarito', 'weight/vendor/LICENSE-gabarito'],
 
   ...extraPages(),
   ...demoFiles(),
@@ -816,7 +816,7 @@ function checkVendorUrls(copied) {
  * 🔴 AND REFUSE A COMPILED SynthDef THAT NO LONGER MATCHES ITS SOURCE.
  *
  * `demo/grains/defs/*.scsyndef` are built by sclang ON THE BOARD out of
- * `rig/box/norns/Engine_Pappus.sc` and `PosSource.sc`. `/grains/` loads them
+ * `rig/board/norns/Engine_Pappus.sc` and `PosSource.sc`. `/grains/` loads them
  * into wasm scsynth in the tab and claims, in its own first paragraph, that the
  * browser is running the graph the Raspberry Pi is running.
  *

@@ -1,0 +1,1090 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The table is the page below the picture, so it gets the room the picture
+     leaves rather than the component's default ceiling. `dvh` rather than `vh`
+     because a phone's address bar comes and goes and `vh` measures the taller
+     state, which puts the last rows under it. The floor keeps it a table rather
+     than a slot on a short window. `--tbl-h` is the component's own knob rather
+     than an override of its rule. */
+  .pos-tbl { --tbl-h: max(260px, calc(100dvh - 664px)); }
+  /* 🔴 THE BOX IS 16:9 AND THE PICTURE FILLS IT, CROPPING. Asked for as *"make
+     video win 16:9"*. The shell's default is `contain` and CLAUDE.md says why:
+     iOS hands back portrait from a camera, where `cover` shows 32% of the frame
+     and stretching squashes a face. That rule is about a SUBJECT SOMEBODY
+     FRAMED at a shape the page does not control. These are finished pieces,
+     and the arithmetic is the same one `/stage/` was given `fit: 'cover'` for:
+     4:3 into 16:9 keeps 75%, and it was laying a flat field down both sides of
+     every one of them.
+
+     🔴 THE PICTURE TAKES THE FULL WIDTH. INSTRUCTED 2026-09-19: *"make wideo
+     window full w"*, against a screenshot of the box sitting about two thirds
+     of the way across a wide window.
+     ⚠️ THE ARGUMENT IT OVERRULES IS KEPT, BECAUSE IT WAS MEASURED AND IT IS
+     STILL TRUE. The panel used to be WIDTH-CAPPED so the table stayed on
+     screen: `width: min(100%, calc(min(46vh, 380px) * 16 / 9))`, height
+     leading and width following the ratio. A 16:9 box at this page's full
+     width is 436 px tall, which MEASURED on an 872 px laptop put the first row
+     of the list at y=866, below the fold, and the list is this page's control
+     surface. That cost is real and is now paid on purpose: the picture is what
+     was asked for, and the empty state says `press a recording below`, which
+     points at something a short window now needs a scroll to reach.
+     ✅ WHAT SURVIVES IS THE PART THAT MATTERS: the width is still ONE
+     declaration, and the footer, the empty card and the video all take the
+     picture's own width from it rather than each carrying a copy. */
+  .pos-vp { width: 100%; }
+  .pos-vp-stage > video { object-fit: cover; }
+
+  /* 🔴 THE PICTURE BOX IS SQUARE AND A PICTURE FITS IT BY WIDTH OR BY HEIGHT.
+     Asked 2026-09-19: *"image preview box square and fit it by w or h"*.
+     ⚠️ IT IS THE SAME COMPONENT AS THE VIDEO ABOVE IT, NOT A SECOND BOX. The
+     panel already takes an `aspect`, and `shell.css` already contains an `img`
+     in its stage — so the square is `aspect: '1 / 1'` and the fit is the
+     stylesheet's own `object-fit: contain`, which this page must NOT override
+     the way it overrides the video's. `.pos-vp-stage > video` is the page's
+     cover rule and it names `video` for exactly that reason.
+     🔴 AND THIS ONE IS CAPPED WHERE THE VIDEO IS NOT. The video was made full
+     width on instruction (*"make wideo window full w"*) and a 16:9 box at this
+     page's width is 436 px tall. A SQUARE at that width is 1000 px tall on a
+     laptop, which puts the whole list under the fold and the list is how you
+     get to the next picture. The cap is the difference between the two shapes
+     rather than a disagreement about the instruction.
+     ⚠️ THE CORPUS RUNS 145x145 TO 3000x3000, which is why contain is right
+     here and cover is right for the films: a film is composed to fill its own
+     frame, and a recovered picture has whatever shape it was captured at. */
+  .mk-square { width: min(100%, 460px); margin-inline: auto; }
+  /* 🔴 THIS RULE SITS AFTER `.pos-vp`, AND IT HAS TO. Both are one class, so
+     the one written later wins at every width — and when this block was above
+     `.pos-vp { width: 100% }` the square rendered 775 px wide on a laptop and
+     the list vanished under the fold, exactly what the cap exists to prevent.
+     CLAUDE.md carries the same defect on `.pos-pick`, whose entire phone layout
+     had never run in its life because a later plain rule beat it.
+     ⚠️ THE FIX IS ORDER, NOT WEIGHT. Raising this to two classes to win an
+     argument with a rule eight lines up is how `.pos-faux` ended up needing
+     (0,2,0), and that one at least had somebody else's stylesheet to beat. */
+
+  /* 🔴 AN EMPTY PICTURE SAYS WHAT TO DO, AND `/stage/` BOUGHT THIS RULE: a
+     blank box with a transport under it is the shape of a thing that could be
+     played and cannot. Here it CAN be, the moment a row is pressed, so the box
+     says that rather than sitting there. It goes on the first press and does
+     not come back. */
+  .mk-hint {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    color: var(--dim); font-size: 13px; letter-spacing: .04em; text-align: center;
+    padding: 0 16px;
+  }
+
+  /* The element the panel shows. It is `display: block` inside the stage by the
+     stylesheet's own rule; this only keeps it out of the flow before the panel
+     has taken it, which happens one line after it is built. */
+  video { display: block; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createTabs } from '/shell/tabs.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+
+  /**
+   * The corpus, built by `demo/resources/build-mimproject.mjs` out of two
+   * measured inputs.
+   *
+   * 🔴 IT IS NOT `corpus.json` AND THE TWO MUST NOT BE MERGED. Every row of
+   * that one is a POINTER to something somebody else holds, and its rules
+   * follow from that: never copy, never re-probe, write down what was observed
+   * and when. Every row of this one points at a file WE hold, because
+   * mimproject.org has been down long enough that two video sites were the last
+   * copies anybody could reach. One file with both would put "never ask
+   * somebody else's server" and "this server is ours" under one set of rules,
+   * and the first would win by being written down.
+   */
+  const CORPUS = '/resources/mimproject.json';
+
+  /**
+   * The pictures, built by `demo/resources/build-mimproject-images.mjs`.
+   *
+   * 🔴 A THIRD CORPUS, AND IT IS A THIRD FOR THE REASON THE SECOND IS A
+   * SECOND. These are files we hold, like the recordings, but they were
+   * RECOVERED rather than pulled off a video site: every mimproject.org host
+   * stopped resolving, so the Wayback Machine was the only copy left. A row
+   * therefore carries where it was captured from and which archived page
+   * showed it, which is not a question a recording's row can be asked.
+   * ⚠️ THIRTY OF THEM ARE 145x145 THUMBNAILS whose originals were never
+   * captured, and they carry `thumbnail: true` so the list can say so. A
+   * thumbnail offered as a picture is the page making a claim the file cannot
+   * meet.
+   */
+  const PICTURES = '/resources/mimproject-images.json';
+
+  const d = mount({
+    name: 'making',
+    /**
+     * ⚠️ NO COUNT IN THIS SENTENCE, AND IT HAD ONE FOR AN HOUR. It read
+     * `Twenty-eight MIMproject videos` and went stale the first time a
+     * recording was taken out, which was the same day. A figure typed into
+     * prose is a second copy of something the corpus already knows, and
+     * CLAUDE.md's own opening paragraph carries the scar of a count nobody
+     * re-measured reading as a fact. The number is in the log line under the
+     * list, counted off the rows actually drawn.
+     */
+    what: 'The recordings and the pictures that outlived MIMproject\'s own website, shown '
+        + 'from the table under whichever one you are looking at.',
+    /**
+     * Six cells, and every one of them changes when a different row is
+     * pressed. A readout cell showing a structural constant reads as a
+     * measurement and teaches a reader to ignore the row.
+     *
+     * 🔴 `when` AND `uploaded` ARE TWO CELLS BECAUSE THEY ARE TWO FACTS, and
+     * putting them side by side is the clearest thing this page can say. `when`
+     * is the date of the WORK; `uploaded` is the day somebody got round to
+     * putting it on a video site, which for most of these is years later. The
+     * Karlsruhe clips are the extreme: made in 2008, uploaded in 2011.
+     * ⚠️ FIVE ROWS HAVE NO `when` AT ALL and that cell is EMPTY for them, while
+     * `uploaded` still reads. That is the honest pair: nothing states when they
+     * happened, an upload date is not an answer to that question, and the
+     * reader can see both of those at once.
+     * ⚠️ `via` IS HERE RATHER THAN IN THE TABLE because it is the third half of
+     * the same thought: which site the copy came off. It also keeps the count
+     * even, which `mount()` insists on.
+     */
+    /* 🔴 NO READOUT, AND THE TABLE IS WHY. Instructed 2026-09-19: *"rm when,
+       uploaded, via, length, picture, size from making and add these to
+       table"*. Every one of those six was a fact about ONE recording, shown
+       above a list of twenty-six, so the row you were reading and the row the
+       cells described were only the same row while you did not move. In a
+       column they are true of every row at once and comparable down the list,
+       which is what a table is for.
+       ⚠️ `null` RATHER THAN AN OMITTED FIELD, so both harnesses read the opt
+       out as deliberate rather than as somebody forgetting. */
+    readout: null,
+    /**
+     * 🔴 `joined` OUTLIVED THE READOUT IT WAS ABOUT, AND IT STILL EARNS ITS
+     * PLACE. It used to send the readout to the foot with the log, because the
+     * default arrangement put those cells between the paragraph and the
+     * picture and MEASURED on an 872 px laptop that pushed the first row of
+     * the list to y=866, below the fold. The list is this page's control
+     * surface, and a player on top of a table nobody can see without scrolling
+     * is a player on top of nothing.
+     * ⚠️ The cells are columns now, so the crowding argument is spent. What is
+     * left is the log, and `joined` is still what keeps it one surface at the
+     * foot rather than a second box.
+     */
+    joined: true,
+    // No control row. Every control this page could have is a row of the table,
+    // and a button that plays "the first one" is a second way to do the thing
+    // the list already does.
+    controls: [],
+  });
+  guard(d);
+
+  // ── the picture ───────────────────────────────────────────────────────────
+  //
+  // ⚠️ `preload="none"` IS THE WHOLE VISITOR RULE IN ONE ATTRIBUTE. CLAUDE.md:
+  // a visit must not open a file, make a sound, press a control or move the
+  // picture. `/tapes/` paid for this twice — once by loading a tape on every
+  // visit, once by asking archive.org for durations it already had written
+  // down — and the third report was *"omg you still do not get it"*. Every
+  // number this page shows before a press comes out of the corpus, so nothing
+  // here asks the bucket for anything until somebody chooses a recording.
+  /* ── two corpora, two tabs ──────────────────────────────────────────────────
+     🔴 ASKED FOR 2026-09-19: *"add a tab to making VIDEOS | IMAGES and make it
+     browsable"*. This is `tabs.mjs`'s FIRST use in a shipped page. It has been
+     in `/kit/` unused since it was written, because it was on `/items/` for one
+     commit and came off: three names over one list and one form is furniture.
+     Two names over two different corpora is the case it exists for.
+
+     ⚠️ A HASH, NEVER A SUBPAGE, which is the component's own rule and matters
+     more here than on most pages: a subpage is a NAVIGATION, and this page has
+     a `<video>` in it. Pressing IMAGES while a recording plays must not throw
+     the document away, and `#images` is still a real address that the back
+     button answers.
+
+     ⚠️ AND NEITHER TAB COSTS A VISITOR ANYTHING UNTIL A ROW IS PRESSED. Both
+     tables are text out of a corpus on this origin. The `<video>` is
+     `preload="none"` and the `<img>` has no `src` at all, so opening IMAGES
+     loads no picture — the same rule the rest of this page already keeps, and
+     the one `/tapes/` was reported for three times. */
+  const tabs = createTabs({
+    tabs: [{ id: 'videos', label: 'VIDEOS' }, { id: 'images', label: 'IMAGES' }],
+  });
+  d.stack.add(tabs.el);
+  const vPane = tabs.panel('videos');
+  const iPane = tabs.panel('images');
+
+  const video = el('video', '', null, { playsinline: '', preload: 'none' });
+  const panel = createVideoPanel({
+    media: video,
+    /**
+     * 🔴 NO PRESENCE DOT. `left: null` rather than letting the component put
+     * its default one there, asked for on sight as *"no need for dot"*.
+     *
+     * ⚠️ AND THE FACT IT CARRIED IS NOT LOST, WHICH IS THE HALF THAT MATTERS.
+     * Deleting a display without rehoming what it said is how a page quietly
+     * stops reporting something. A file that will not load says so in the log,
+     * by name, and that line is the better surface for it anyway: it appears
+     * when something happened rather than sitting there being green.
+     *
+     * ⚠️ AND THE `set` CALLS WENT WITH IT rather than being left to
+     * optional-chain into nothing. `panel.presence?.set('online')` against a
+     * panel with no presence is three lines that read as live and do nothing,
+     * which is this repo's named hazard in its smallest form.
+     */
+    left: null,
+    // 'hover' now that the footer holds only the ⛶: a square in the corner
+    // that comes up on movement and fades, rather than a footer bar kept on
+    // screen for one button.
+    fullMode: 'hover',
+  });
+  vPane.append(panel.el);
+  const hint = el('div', 'mk-hint', 'press a recording below');
+  panel.stage.append(hint);
+
+  /**
+   * 🔴 THE DECK IS A FOLLOWER AND THE ELEMENT IS THE MASTER. The element owns
+   * position once it is playing, so a control that writes to the deck alone is
+   * undone by the master's next tick, silently, within a few hundred
+   * milliseconds. Same arrangement as `/crate/`.
+   *
+   * The range opens at one millisecond and is corrected the moment a recording
+   * is chosen. A deck built with a real range before there is a file would be a
+   * slider describing a recording that is not in the element.
+   */
+  const deck = createDeck({ items: [], adapters: {}, range: [0, 1] });
+  const bar = createTransportBar(vPane, deck, {
+    command: {
+      play: () => { deck.play(); video.play().catch(() => {}); },
+      pause: () => { video.pause(); deck.pause(); },
+      // The playhead moves at once and the picture catches up: setting
+      // `currentTime` on a file coming off a bucket is a range request, and it
+      // arrives when the network says so. The deck may snap back a frame when
+      // the bytes land, which is the master re-anchoring rather than a fault.
+      seek: (pos) => { video.currentTime = Math.max(0, pos) / 1000; deck.seek(pos); },
+    },
+  });
+  const master = mediaMaster(deck, video, { anchorMs: 0 });
+  // `mediaMaster` does not run itself. Without this loop the object is built,
+  // holds a deck, and the playhead never moves.
+  (function frame() { master.tick(); requestAnimationFrame(frame); })();
+
+  // ── the list ──────────────────────────────────────────────────────────────
+
+  const mmss = (ms) => {
+    const s = Math.round(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  };
+  const MB = (b) => `${(b / 1e6).toFixed(1)} MB`;
+  /**
+   * 🔴 THE SAME NUMBER, IN A UNIT THAT CAN HOLD IT. `MB()` is right for the
+   * recordings, which run 2.9 MB to 148 MB. It is WRONG for the pictures: the
+   * thirty surviving thumbnails are 3 KB to 30 KB, and every one of them read
+   * `0.0 MB` — a cell showing a confident zero for a file that is really there.
+   * CLAUDE.md puts it the other way round and means the same thing: a page that
+   * pre-sets a counter to 0 is worse than an empty cell, because a zero reads
+   * as a very confident measurement of nothing.
+   * ⚠️ THE THRESHOLD IS WHERE THE FIRST FIGURE STOPS BEING A ZERO, not a round
+   * number picked for looking tidy.
+   */
+  const SIZE = (b) => (b < 1e5 ? `${Math.round(b / 1e3)} KB` : MB(b));
+
+  /**
+   * 🔴 THE FILE NAME IS THE COLUMN THAT GROWS, because it is what somebody
+   * scanning this list is reading down. The date, the length and the size are
+   * fixed tracks: they are all the same handful of characters wide, and a
+   * column that can reflow is a column that moves its neighbours.
+   *
+   * ⚠️ NO LINK COLUMN. `table.mjs` can make a cell a link to a field, and a
+   * link inside a row whose whole job is to be pressed is two different things
+   * to press an inch apart. Where the recording came from is on the row's
+   * hover, with the rest of what the corpus knows about it.
+   */
+  const table = createTable({
+    columns: [
+      { key: 'shown', label: 'when', width: 84 },
+      { key: 'file', label: 'file', grow: true, clip: true, hi: true },
+      // ⚠️ `picture`, `via` and `uploaded` CAME OFF THE READOUT on 2026-09-19
+      // and they sit to the right of the file on purpose: `when` and `file`
+      // are what somebody scans for, and these three are what they check once
+      // they have found it.
+      // ⚠️ `picture` ALIGNS LEFT, asked for 2026-09-19 as *"align picure to
+      // left in table"*, and it is the odd one out among the right-aligned
+      // four for a reason: `uploaded`, `length` and `size` are quantities that
+      // line up on their last digit, and `480x272` is a SHAPE, which has no
+      // last digit to line up on. Left puts every resolution's first figure in
+      // one place, next to the left-aligned `via` beside it.
+      { key: 'shot', label: 'picture', width: 92 },
+      { key: 'via', label: 'via', width: 68 },
+      { key: 'up', label: 'uploaded', width: 84, align: 'right' },
+      { key: 'len', label: 'length', width: 68, align: 'right' },
+      { key: 'size', label: 'size', width: 80, align: 'right' },
+    ],
+    cap: 200,
+    empty: '',
+    note: 'hover',
+    /**
+     * 🔴 PRESSING A ROW PLAYS IT. That is the page.
+     * ⚠️ A ROW WITH NO ADDRESS SAYS SO RATHER THAN DOING NOTHING. A control
+     * that looks live and is inert is this repo's named hazard, and a corpus
+     * row whose `file` never made it into the bucket would be exactly that.
+     */
+    onPick: (r) => {
+      if (!r.url) { d.log(`${r.file} has no address to play from`, 'warn'); return; }
+      pick(r, { play: true });
+    },
+  });
+  vPane.append(table.el);
+
+  // ── the pictures ──────────────────────────────────────────────────────────
+  //
+  /* 🔴 AN `<img>` WITH NO `src`, AND THAT IS THE WHOLE VISITOR RULE AGAIN. The
+     video beside it is `preload="none"`; an image element with no address is
+     the same statement in the one attribute an image has. Opening this tab asks
+     the bucket for nothing.
+     ⚠️ `decoding="async"` so a 3000x3000 sleeve does not decode on the main
+     thread while somebody is scrolling the list under it. */
+  const shot = el('img', '', null, { alt: '', decoding: 'async' });
+  /* 🔴 SQUARE, BY THE COMPONENT'S OWN `aspect`, NOT BY A BOX THIS PAGE DREW.
+     `video-panel.mjs` gained `aspect` for `/stage/`'s 4:3 film and it is the
+     same question here. Hand-rolling a second picture box would give this page
+     two surfaces that have to be kept looking alike by hand, which is the drift
+     `/kit/` exists to stop.
+     ⚠️ NO PRESENCE DOT, for the reason the video panel has none: there is
+     nothing on the far end of a picture to be online. */
+  const shotPanel = createVideoPanel({
+    media: shot, left: null, fullMode: 'hover', aspect: '1 / 1',
+  });
+  shotPanel.el.classList.add('mk-square');
+  iPane.append(shotPanel.el);
+  const shotHint = el('div', 'mk-hint', 'press a picture below');
+  shotPanel.stage.append(shotHint);
+
+  /**
+   * 🔴 THE FILE NAME GROWS AND EVERYTHING ELSE IS A FIXED TRACK, the same
+   * arrangement as the recordings, because it is the same act: reading down a
+   * list looking for one thing.
+   *
+   * ⚠️ `picture` ALIGNS LEFT HERE TOO. Asked for on the videos tab
+   * (*"align picure to left in table"*) and it is the same column answering the
+   * same question, so it gets the same answer: `3000x3000` is a SHAPE, with no
+   * last digit for a right edge to line up.
+   *
+   * ⚠️ `site` IS FIRST BECAUSE FOUR SITES LIVED ON ONE DOMAIN and which one a
+   * picture came off is the first thing that makes sense of it. The opera, the
+   * portfolio and the project site are different bodies of work.
+   *
+   * ⚠️ AND `captured` IS NOT A DATE OF WORK. It is the day the Wayback Machine
+   * took the copy we hold, which for the 2013 Drupal pictures is years after
+   * the thing in them. `uploaded` is the month the file went into the site and
+   * is empty wherever the path never said, which is most of the older ones.
+   */
+  const itable = createTable({
+    columns: [
+      { key: 'site', label: 'site', width: 104 },
+      { key: 'file', label: 'file', grow: true, clip: true, hi: true },
+      { key: 'px', label: 'picture', width: 92 },
+      { key: 'up', label: 'uploaded', width: 84 },
+      { key: 'got', label: 'captured', width: 92, align: 'right' },
+      { key: 'size', label: 'size', width: 80, align: 'right' },
+    ],
+    cap: 200,
+    empty: '',
+    note: 'hover',
+    /**
+     * 🔴 PRESSING A ROW SHOWS IT. That is this tab, exactly as pressing a row
+     * plays a recording is the other one.
+     * ⚠️ A ROW WITH NO ADDRESS SAYS SO rather than doing nothing, which is the
+     * same guard the recordings have and for the same reason: a control that
+     * looks live and is inert is this repo's named hazard.
+     */
+    onPick: (r) => {
+      if (!r.url) { d.log(`${r.file} has no address to show from`, 'warn'); return; }
+      show(r);
+    },
+  });
+  iPane.append(itable.el);
+
+  let seen = null;
+  const markSeen = () => itable.mark((row) => !!seen && row.url === seen.url);
+
+  /** Show one picture. The only thing on this tab that opens a file. */
+  function show(r) {
+    seen = r;
+    shotHint.remove();
+    markSeen();
+    shot.src = r.url;
+    /* ⚠️ THE LOG SAYS WHAT IT IS AND WHERE IT CAME FROM, because a file name
+       off a dead website is not self-explanatory and the row's hover is gone
+       the moment the pointer moves. A thumbnail says it is one HERE as well as
+       in its column: it is the fact most likely to disappoint somebody who has
+       just pressed it. */
+    d.log(`${r.file}, ${r.px}${r.thumb ? ', a thumbnail and the only size that survives' : ''}`, 'hi');
+  }
+
+  /**
+   * 🔴 A PICTURE THAT WILL NOT LOAD SAYS SO. Same reasoning as the video's
+   * error handler: without it the log says `showing …`, the element fails
+   * silently, and the only symptom is a box that stays empty.
+   */
+  shot.addEventListener('error', () => {
+    if (!seen) return;
+    d.log(`that picture would not load: ${seen.file}`, 'bad');
+  });
+
+  // ── choosing one ──────────────────────────────────────────────────────────
+
+  let chosen = null;
+  const markChosen = () => table.mark((row) => !!chosen && row.url === chosen.url);
+
+  /**
+   * Show a recording, and optionally start it.
+   *
+   * ⚠️ THE RANGE COMES FROM THE CORPUS FIRST AND THE ELEMENT SECOND. The length
+   * of every one of these was measured with ffprobe when the file was pulled
+   * and written down, so the transport has somewhere to go before a single byte
+   * has arrived. `loadedmetadata` then corrects it from the file itself, and
+   * the check below asserts the two agree — which is the one claim this page
+   * can make that the corpus cannot make about itself.
+   */
+  function pick(r, { play = false } = {}) {
+    chosen = r;
+    hint.remove();
+    markChosen();
+    // The six cells that used to be written here are columns now, true of
+    // every row at once rather than of whichever one was last pressed.
+
+    deck.pause();
+    deck.setRange([0, Math.max(1, r.durationMs)]);
+    deck.seek(0);
+    /**
+     * 🔴 `preload` IS LIFTED HERE AND NOWHERE ELSE, AND THAT IS THE WHOLE
+     * ARRANGEMENT. It starts at `none` so a visit costs nothing; a press is
+     * somebody asking for this recording, which is the moment loading stops
+     * being something done TO them.
+     * ⚠️ AND IT IS WHY THE FIRST BUILD OF THIS PAGE READ `file no answer`.
+     * With `preload="none"` a `load()` resets the element and fetches NOTHING,
+     * so `loadedmetadata` never fires, `video.duration` stays `NaN`, and the
+     * check comparing the corpus against the file had nothing to compare
+     * against. It looked like a bucket problem and was one attribute.
+     */
+    video.preload = 'metadata';
+    video.src = r.url;
+    video.load();
+    if (play) {
+      // Fired, never awaited: it settles when the decoder has started, which
+      // over somebody else's network is a wait with no deadline.
+      video.play().catch(() => {});
+      deck.play();
+    }
+    d.log(`${play ? 'playing' : 'loaded'} ${r.file}`, 'hi');
+  }
+
+  video.addEventListener('loadedmetadata', () => {
+    const ms = Math.round((video.duration || 0) * 1000);
+    if (ms > 0) deck.setRange([0, ms]);
+    measured = ms;
+  });
+  /**
+   * 🔴 A FILE THAT WILL NOT LOAD SAYS SO. Without this the page logs `playing
+   * …`, the element fails silently, the deck keeps whatever range the corpus
+   * gave it and the only symptom is a transport that never moves — a page
+   * reporting an action it did not manage to take.
+   */
+  video.addEventListener('error', () => {
+    if (!chosen) return;
+    d.log(`that file would not load: ${chosen.file}`, 'bad');
+  });
+
+  // ── what the corpus says, and then what is true ───────────────────────────
+
+  let measured = 0;
+  let corpus = null;
+
+  (async () => {
+    try {
+      corpus = await fetch(CORPUS).then((r) => r.json());
+    } catch (e) {
+      d.log(`the corpus would not load: ${e.message}`, 'bad');
+      return;
+    }
+    const rows = corpus.items.map((i) => ({
+      ...i,
+      file: i.file.split('/').pop(),
+      url: i.file,
+      // An undated row shows NOTHING rather than its upload date. The corpus is
+      // explicit that most of these went up years after the thing they show.
+      shown: i.when.edtf || '',
+      len: mmss(i.durationMs),
+      size: MB(i.bytes),
+      // ⚠️ THE UPLOAD DATE IS ITS OWN COLUMN AND NEVER FILLS THE EMPTY `when`.
+      // The corpus is explicit that most of these went up years after the
+      // thing they show, and five rows state no date at all, so a row with an
+      // empty `when` and a filled `uploaded` is the corpus being read
+      // correctly rather than a gap to patch.
+      up: i.uploaded || '',
+      via: i.via || '',
+      shot: i.picture ? `${i.picture.width}x${i.picture.height}` : '',
+      hover: `${i.title}\n\n${i.note}\n\nwhen: ${i.when.edtf || 'not stated'} (${i.when.how})`
+           + `\nuploaded to ${i.via}: ${i.uploaded}\nheld by: ${i.holder}`,
+    }));
+    table.set(rows);
+    markChosen();
+    d.log(`${rows.length} recordings, ${Math.round(corpus.counts.totalMs / 60000)} minutes, `
+        + `${corpus.counts.dated} of them dated`, 'hi');
+
+    d.assert('the corpus arrived and every row has an address',
+      rows.length > 0 && rows.every((r) => /^https?:\/\//.test(r.url)),
+      `${rows.length} rows, ${rows.filter((r) => /^https?:\/\//.test(r.url)).length} with an address`);
+
+    d.assert('the table drew every row the corpus holds',
+      table.count() === corpus.counts.items,
+      `${table.count()} drawn of ${corpus.counts.items}`);
+
+    /**
+     * 🔴 THE EDITORIAL CLAIM, ASSERTED RATHER THAN TRUSTED. Two of these
+     * recordings were filmed and uploaded by Kanuti Gildi SAAL: the
+     * productions are co-productions, the recordings are theirs. A corpus that
+     * let "MIMproject" stand over the whole file because most of the file is
+     * ours would be making a licence statement nobody checked.
+     */
+    /**
+     * ⚠️ THE FIRST VERSION OF THIS CHECK WAS BLIND AND A REAL DEFECT WALKED
+     * PAST IT. It compared `theirs.length` against `counts.theirs`, and both
+     * are derived from the same field, so when the opera interview silently
+     * flipped to being credited to us the pair still agreed perfectly. Only the
+     * DETAIL line moving from `2 of 28` to `1 of 26` gave it away, read by a
+     * human. CLAUDE.md's rule exactly: a statistic that is constant by
+     * construction over its subject is not a weak measurement, it is a blind
+     * one.
+     *
+     * So this compares two fields that are maintained SEPARATELY: the note,
+     * which is editorial prose written by hand, against `source`, which comes
+     * from a lookup table. For them to agree by accident, the same mistake has
+     * to be made twice in two places.
+     */
+    const CREDIT = /Filmed and uploaded by ([^,.]+)/;
+    const credited = corpus.items.filter((i) => CREDIT.test(i.note || ''));
+    const theirs = corpus.items.filter((i) => i.source !== 'MIMproject');
+    d.assert('a recording whose note credits somebody else has that somebody in its source',
+      credited.length > 0
+        && credited.length === theirs.length
+        && credited.every((i) => i.source === CREDIT.exec(i.note)[1]
+          && i.licenceBy.includes(i.source) && !i.holder.startsWith('MIMproject')),
+      `${credited.length} notes credit somebody else, ${theirs.length} rows do`);
+
+    /**
+     * ⚠️ THE NEGATIVE CONTROL FOR THE LINE ABOVE. A check that only counts the
+     * foreign rows would pass just as well on a corpus where every row was
+     * marked foreign. This one asserts the other side of the same split.
+     */
+    const ours = corpus.items.filter((i) => i.source === 'MIMproject');
+    d.assert('and the rest are ours and say that',
+      ours.length === corpus.counts.ours && ours.every((i) => i.holder.startsWith('MIMproject')),
+      `${ours.length} held by MIMproject`);
+
+    /**
+     * 🔴 AN UNDATED ROW IS UNDATED, NOT QUIETLY BACKFILLED. Five rows carry
+     * `precision: "none"` because nothing states when they happened. The trap
+     * this guards is a later change that reaches for `uploaded` to fill the
+     * gap, which would date five works to the day somebody got round to
+     * uploading them and would look completely fine.
+     */
+    const undated = corpus.items.filter((i) => i.when.precision === 'none');
+    d.assert('an undated recording shows no date at all',
+      undated.length > 0
+        && undated.every((i) => i.when.edtf === null && i.when.earliest === null)
+        && rows.filter((r) => r.when.precision === 'none').every((r) => r.shown === ''),
+      `${undated.length} of ${corpus.counts.items} state no date`);
+
+    /**
+     * 🔴 THE PICTURE FILLS THE BOX RATHER THAN SITTING INSIDE IT, ASSERTED
+     * BECAUSE THE FAILURE IS SILENT. This is one page-level rule overriding a
+     * shell default, and CLAUDE.md records what that costs when the selector
+     * stops matching: `/radio/` swapped a component, one of three rules that
+     * named the old class was updated, and the JavaScript and the comment
+     * beside it both read as correct while the row snapped back. Reported three
+     * times. A letterboxed picture would read as nothing at all.
+     */
+    const fit = getComputedStyle(video).objectFit;
+    d.assert('the picture fills its 16:9 box rather than sitting inside it',
+      fit === 'cover', `object-fit ${fit}`);
+
+    // ── the pictures, which cost a visitor nothing to list ──────────────────
+
+    let pics = null;
+    try {
+      pics = await fetch(PICTURES).then((r) => r.json());
+    } catch (e) {
+      d.log(`the pictures corpus would not load: ${e.message}`, 'bad');
+    }
+    if (pics) {
+      const irows = pics.items.map((i) => ({
+        ...i,
+        px: `${i.w}x${i.h}`,
+        size: SIZE(i.bytes),
+        // The Wayback capture date, which is the day this copy was taken and
+        // never the day the picture was made.
+        got: i.capturedAt || '',
+        // 🔴 EMPTY WHERE THE PATH NEVER SAID. WordPress writes
+        // `/uploads/2017/09/` and Drupal writes nothing, so an older picture
+        // honestly has no upload month. Filling it from `capturedAt` would date
+        // a 2013 photograph to 2013 by coincidence and to 2021 by accident.
+        up: i.uploadedPath || '',
+        thumb: !!i.thumbnail,
+        hover: `${i.file}\n\n${i.site}\ncaptured ${i.capturedAt} from ${i.source}`
+             + (i.shownOnTitles.length ? `\n\nshown on: ${i.shownOnTitles.join(', ')}` : '')
+             + (i.thumbnail ? '\n\nA THUMBNAIL. The original was never captured.' : ''),
+      }));
+      itable.set(irows);
+      d.log(`${irows.length} pictures out of the Wayback Machine, `
+          + `${pics.counts.thumbnailsOnly} of them thumbnails whose originals are gone, `
+          + `and ${pics.notRecovered.count} more that nothing ever captured`, 'hi');
+
+      d.assert('the pictures corpus arrived and every row has an address',
+        irows.length > 0 && irows.every((r) => /^https?:\/\//.test(r.url)),
+        `${irows.length} rows, ${irows.filter((r) => /^https?:\/\//.test(r.url)).length} with an address`);
+
+      d.assert('the images tab drew every picture the corpus holds',
+        itable.count() === pics.counts.items,
+        `${itable.count()} drawn of ${pics.counts.items}`);
+
+      /**
+       * 🔴 NO SIZE CELL READS A CONFIDENT ZERO. Found by looking at the page:
+       * a 41 KB rendition and every one of the thirty thumbnails printed
+       * `0.0 MB`, because the recordings' formatter shows one decimal of a
+       * megabyte and these files are three orders of magnitude smaller. Nothing
+       * about that is visible in a count, in a total, or in any check that
+       * compares the corpus against itself — the row was present, the number
+       * was derived from the real byte count, and it said nothing.
+       * ⚠️ THE CHECK IS ON THE RENDERED STRING, not on the formatter. Asserting
+       * `SIZE(1000) === '1 KB'` would be testing the function against the same
+       * arithmetic it implements, which CLAUDE.md records as the defect that
+       * kept `csound.mjs` green for months with two real bugs in it.
+       */
+      /**
+       * 🔴 ONE TAB STOP FOR THE WHOLE LIST, NOT ONE PER ROW. `table.mjs` gained
+       * a roving tabindex on 2026-09-19 (*"allow keyboard nav in tables"*), and
+       * the thing worth asserting is the ROVING part rather than the arrows:
+       * every row used to be `tabIndex = 0`, so tabbing past this table meant
+       * sixty-three presses. That is invisible in a screenshot and invisible in
+       * every other check, and it is free to read off the DOM.
+       * ⚠️ AND THE NEGATIVE HALF IS THE POINT: not just "one row is 0" but
+       * "every other row is -1". A table that left them all at 0 and added one
+       * more would pass the first half.
+       */
+      const picks = [...itable.el.querySelectorAll('.pos-tbl-row.pick')];
+      const stops = picks.filter((r) => r.tabIndex === 0);
+      d.assert('the whole list is one stop for the keyboard, not one stop per row',
+        picks.length === pics.counts.items && stops.length === 1
+          && picks.every((r) => r.tabIndex === 0 || r.tabIndex === -1),
+        `${picks.length} rows, ${stops.length} of them tabbable`);
+
+      const zeroish = irows.filter((r) => /^0(\.0)? /.test(r.size));
+      d.assert('every picture states a size a reader can use, and none of them reads zero',
+        zeroish.length === 0 && irows.every((r) => /^\d+(\.\d)? (KB|MB)$/.test(r.size)),
+        zeroish.length
+          ? `${zeroish.length} read zero, smallest is ${Math.min(...irows.map((r) => r.bytes))} bytes`
+          : `${irows.filter((r) => r.size.endsWith('KB')).length} in KB, `
+            + `${irows.filter((r) => r.size.endsWith('MB')).length} in MB`);
+
+      /**
+       * 🔴 THE BOX IS SQUARE AND FITS BY WIDTH OR HEIGHT, ASSERTED BECAUSE
+       * BOTH HALVES FAIL SILENTLY. This page overrides the shell's `contain`
+       * with `cover` for the video one line away in its own stylesheet, and a
+       * picture cropped instead of fitted looks like a composition choice
+       * rather than a bug.
+       * ⚠️ THIS COMMENT SAID WIDENING THAT RULE TO `.pos-vp-stage > *` WOULD
+       * CROP EVERY RECOVERED PICTURE, AND THE SABOTAGE THAT WAS MEANT TO PROVE
+       * IT REFUTED IT. `shell.css` has `.pos-vp-stage > img`, which is
+       * (0,1,1); `> *` is (0,1,0) and LOSES. What that widening actually does
+       * is break the VIDEO, because the page's own `> video` rule is gone and
+       * `> *` loses to the shell's `> video` too — measured, and the video's
+       * assert went red while this one stayed green and correct. The rule that
+       * WOULD crop these is one naming `img`, which is the thing to watch.
+       * ⚠️ AND THE RATIO IS READ OFF THE COMPUTED STYLE rather than off the
+       * option that was passed. `aspect: '1 / 1'` is what we asked for;
+       * `aspectRatio` is what the browser resolved, and a stylesheet rule
+       * landing later would beat the inline one without either being wrong to
+       * read.
+       */
+      const sBox = getComputedStyle(shotPanel.stage);
+      const sFit = getComputedStyle(shot).objectFit;
+      d.assert('the picture box is square and a picture fits it by width or by height',
+        sBox.aspectRatio.replace(/\s/g, '') === '1/1' && sFit === 'contain',
+        `aspect-ratio ${sBox.aspectRatio}, object-fit ${sFit}`);
+      /**
+       * 🔴 A THUMBNAIL SAYS IT IS ONE, AND THE NEGATIVE CONTROL IS THE HALF
+       * THAT MAKES IT WORTH ANYTHING. A check that only counted the flagged
+       * rows would pass on a corpus where every row was flagged. This asserts
+       * BOTH that every flagged row really is small AND that no unflagged row
+       * is, so the flag cannot drift away from the pixels it describes.
+       */
+      const small = pics.items.filter((i) => i.w <= 200 && i.h <= 200);
+      const flagged = pics.items.filter((i) => i.thumbnail);
+      d.assert('a picture that is only a thumbnail is marked as one, and nothing else is',
+        flagged.length === pics.counts.thumbnailsOnly
+          && flagged.length === small.length
+          && flagged.every((i) => small.includes(i)),
+        `${flagged.length} marked, ${small.length} are 200 px or under`);
+
+      /**
+       * 🔴 WHAT IS GONE IS PART OF THE RECORD. 196 pictures are referenced by
+       * an archived page and were never captured, and the bulk of them is the
+       * opera production photography. A list that showed only what survived
+       * would read as though that were everything there ever was, which is the
+       * one thing an archive page must not say.
+       */
+      d.assert('and the page says how many pictures did not survive, rather than showing only what did',
+        pics.notRecovered.count > 0
+          && d.logEl.textContent.includes(String(pics.notRecovered.count)),
+        `${pics.notRecovered.count} never captured, said in the log`);
+    }
+
+    // Nothing below this line runs for a visitor: each one opens a file.
+    if (!SELFCHECK) {
+      d.log('checks that open a file are off, so this page asks the bucket for nothing until you press a row', 'dim');
+      d.ready();
+      return;
+    }
+
+    /**
+     * 🔴 THE BOUNDARY THIS PAGE CANNOT WORK WITHOUT, ASSERTED RATHER THAN
+     * ASSUMED. Seeking inside a 250 MB recording is a Range request, and a
+     * `<video>` on a page at another origin needs the CORS header too. Both
+     * come from the station worker's `/media/` route; neither is visible in
+     * anything the page draws, so without this the day one of them stops the
+     * only symptom is a transport that will not scrub.
+     */
+    const probe = rows[0];
+    let ranged = null;
+    try {
+      const res = await fetch(probe.url, { headers: { Range: 'bytes=0-1' } });
+      /**
+       * ⚠️ `access-control-allow-origin` IS NOT READABLE FROM JAVASCRIPT AND
+       * THE FIRST BUILD OF THIS CHECK ASKED FOR IT. The browser consumes that
+       * header; it is not in the safelist and not exposed, so
+       * `headers.get(...)` answers `null` on a response that carried it. The
+       * check read `allow-origin none` against a bucket that sends `*`, which
+       * is a red assert about a page that is working.
+       *
+       * `res.type` is the readable form of the same fact. A cross-origin
+       * response that the browser let through reads `cors`; one it refused
+       * never resolves at all, and a same-origin one reads `basic`, which
+       * would mean this page had stopped asking the bucket.
+       */
+      ranged = {
+        status: res.status,
+        type: res.type,
+        len: res.headers.get('content-length'),
+      };
+    } catch (e) {
+      ranged = { status: 0, type: 'refused', len: null, why: e.message };
+    }
+    d.assert('the bucket serves a byte range, across origins, to a page that is not ours',
+      ranged.status === 206 && ranged.type === 'cors' && ranged.len === '2',
+      `HTTP ${ranged.status}, ${ranged.type}, ${ranged.len ?? '?'} bytes`);
+
+    /**
+     * 🔴 THE NEGATIVE CONTROL, AND IT IS A SECOND RANGE RATHER THAN A MISSING
+     * KEY. "It answered 206 with two bytes" proves nothing against a route that
+     * hands back the first two bytes of the file whatever was asked for, which
+     * is exactly what a naive implementation does. A SUFFIX range asks for the
+     * LAST two bytes: a server computing real ranges says so in
+     * `content-range`, and one that ignored the header cannot.
+     *
+     * ⚠️ IT WAS A 404 PROBE FIRST AND THAT COST A RED RUN. Fetching a key
+     * nothing wrote does answer 404, and Chrome files `Failed to load resource`
+     * in the console for it, which `demo/verify.mjs` counts — so the page was
+     * 21/22 with its own negative control as the one failure. A check that has
+     * to make the console look broken to prove something is the wrong check.
+     *
+     * ⚠️ `content-range` IS READABLE HERE ONLY BECAUSE THE WORKER EXPOSES IT.
+     * It is not CORS-safelisted; `workers/station/worker.mjs` sends
+     * `access-control-expose-headers: content-length, content-range,
+     * accept-ranges`. Drop that and this goes red on a bucket that is serving
+     * correctly, which is worth knowing before anybody edits those headers.
+     */
+    let tail = null;
+    try {
+      const res = await fetch(probe.url, { headers: { Range: 'bytes=-2' } });
+      tail = { status: res.status, cr: res.headers.get('content-range') };
+    } catch (e) {
+      tail = { status: 0, cr: null };
+    }
+    const lastTwo = /bytes (\d+)-(\d+)\/(\d+)$/.exec(tail.cr || '');
+    d.assert('and it is a real range, not the first bytes of the file every time',
+      tail.status === 206 && !!lastTwo
+        && Number(lastTwo[3]) === probe.bytes
+        && Number(lastTwo[1]) === probe.bytes - 2
+        && Number(lastTwo[2]) === probe.bytes - 1,
+      `content-range ${tail.cr ?? 'not exposed'}, file ${probe.bytes} bytes`);
+
+    /**
+     * 🔴 THE ONE CLAIM THIS PAGE CAN MAKE THAT THE CORPUS CANNOT MAKE ABOUT
+     * ITSELF. `durationMs` was measured with ffprobe on the file before it was
+     * uploaded; this reads the length the BROWSER finds in the bytes the bucket
+     * actually serves. A truncated upload, a swapped file or a mis-keyed row
+     * all show up here and nowhere else.
+     *
+     * ⚠️ The tolerance is a second and a half, not zero: a container's declared
+     * duration and a decoder's idea of it differ by the length of a frame or
+     * two, and a check that demanded equality would be measuring the container
+     * format rather than the file.
+     */
+    pick(probe, { play: false });
+    await new Promise((ok) => {
+      if (measured > 0) return ok();
+      video.addEventListener('loadedmetadata', ok, { once: true });
+      setTimeout(ok, 8000);
+    });
+    d.assert('the length the corpus wrote down is the length that came back',
+      measured > 0 && Math.abs(measured - probe.durationMs) < 1500,
+      `corpus ${mmss(probe.durationMs)}, file ${measured > 0 ? mmss(measured) : 'no answer'}`);
+
+    d.assert('choosing a recording gives the transport somewhere to go',
+      deck.range[1] > 1000 && table.count() > 0 && chosen === probe,
+      `range 0 to ${mmss(deck.range[1])}`);
+
+    /**
+     * 🔴 A PICTURE CAME OUT, AND `readyState` CANNOT SAY THAT. CLAUDE.md
+     * already records `/flipper/` reading 8/8 against a closed port because its
+     * check was satisfied by `!!c.hls` — true the instant the constructor
+     * returns — and records that the repair is not a better INSTANT, because
+     * `readyState` is an instant too. `totalVideoFrames` counts what this
+     * element has EVER decoded, and nothing resets it.
+     *
+     * ⚠️ IT IS WORTH ITS OWN CHECK BECAUSE THE FAILURE IS SILENT AND I HAVE
+     * SEEN IT: a `<video>` sitting at `readyState 0`, `networkState 2`, no
+     * error event, forever, while `fetch` on the same URL returns 206 in
+     * 169 ms. Metadata parsing and decoding are two different claims.
+     *
+     * ⚠️ MUTED, AND PUT BACK WHERE IT WAS FOUND. A harness has no speakers, and
+     * the play/pause drill that runs after this needs the transport parked at
+     * zero and not running: a bar that is already going is PAUSED by the
+     * drill's press, and it would read a playhead going nowhere on a page where
+     * nothing is wrong.
+     */
+    video.muted = true;
+    video.play().catch(() => {});
+    const frames = await new Promise((ok) => {
+      const t0 = performance.now();
+      (function look() {
+        const n = video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0;
+        if (n > 0 || performance.now() - t0 > 8000) return ok(n);
+        requestAnimationFrame(look);
+      })();
+    });
+    video.pause();
+    video.currentTime = 0;
+    deck.pause();
+    deck.seek(0);
+    d.assert('and pictures come out of it, rather than a file that only parsed',
+      frames > 0, `${frames} frames decoded`);
+
+    /**
+     * 🔴 THE IMAGES TAB IS DRIVEN HERE BECAUSE NOTHING ELSE CAN REACH IT.
+     * `demo/verify.mjs` works a page by clicking every button in
+     * `.pos-controls`, and a tab is not in that row — it is a place you go, not
+     * a setting. So without this the whole second half of the page would be
+     * graded by the asserts that run on its DATA and by nothing that touches
+     * its picture. CLAUDE.md records the same shape from the other side: a
+     * control the harness cannot press is a check that never runs, and the
+     * suite stays green either way because those asserts do not fail.
+     */
+    if (pics) {
+      tabs.go('images');
+
+      /**
+       * 🔴 THE BOX IS SQUARE IN LAID-OUT PIXELS, AND THIS CHECK CANNOT RUN
+       * UNTIL THE TAB IS OPEN. A hidden tab panel has NO layout, so the first
+       * build of this assert read `0.0x0.0 px` and went red on a page that was
+       * drawing correctly. That is why it sits here, behind the gate, one line
+       * after the tab is shown, rather than with the declared-value check
+       * above: opening a tab is a mutation and a visitor does not get one.
+       *
+       * 🔴 AND IT IS A DIFFERENT CLAIM FROM THE ONE ABOVE, WHICH IS THE WHOLE
+       * POINT. The computed `aspect-ratio` and `object-fit` were BOTH correct
+       * while this box rendered 775 px wide and pushed the list under the fold,
+       * because `.mk-square` sat above `.pos-vp { width: 100% }` in this page's
+       * own stylesheet and lost on source order at every width. CLAUDE.md's
+       * rule for a dead CSS rule is to read the COMPUTED value, and the value
+       * that was wrong is a width.
+       */
+      const box = shotPanel.stage.getBoundingClientRect();
+      d.assert('and the box is square on the page as well as in the stylesheet, and capped',
+        Math.abs(box.width - box.height) <= 1 && box.width > 0 && box.width <= 460,
+        `${box.width.toFixed(1)}x${box.height.toFixed(1)} px`);
+
+      /**
+       * 🔴 THE ARROWS MOVE THE KEYBOARD, AND THEY MOVE IT WITHOUT OPENING
+       * ANYTHING. Both halves matter. `onPick` here fetches a picture off the
+       * bucket, so an arrow that picked would spend a visitor's bandwidth on
+       * every row they stepped past — the load-on-visit defect arriving through
+       * the keyboard. This drives a real `ArrowDown` and asserts the focus
+       * moved AND that nothing was opened.
+       * ⚠️ BEHIND THE GATE BECAUSE IT MOVES FOCUS, which draws a ring on a row
+       * a visitor did not choose.
+       */
+      itable.focusRow(0);
+      const before = itable.focused();
+      const openedBefore = seen;
+      itable.el.querySelectorAll('.pos-tbl-row.pick')[0]
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      d.assert('the down arrow moves the keyboard one row and opens nothing',
+        before === 0 && itable.focused() === 1 && seen === openedBefore,
+        `focus ${before} to ${itable.focused()}, opened ${seen ? seen.file : 'nothing'}`);
+
+      /**
+       * 🔴 STEPPING KEEPS THE FOCUSED ROW INSIDE THE TABLE AND LEAVES THE PAGE
+       * WHERE IT IS. Reported 2026-09-20: *"do not make keyboard focused item
+       * move away from viewport of table when keep using keyboard"*.
+       *
+       * 🔴 THE PAGE HALF IS THE ONE THAT WAS BROKEN AND IS THE EASIEST TO
+       * FORGET TO CHECK. `focus()` and `scrollIntoView()` both scroll EVERY
+       * scrollable ancestor, the document included, so the old code moved the
+       * whole page under the table on every press. Asserting only "the row is
+       * visible" would pass on that, because scrolling the page is one of the
+       * ways to make a row visible.
+       *
+       * ⚠️ IT WALKS THE WHOLE LIST RATHER THAN PRESSING ONCE. A single press
+       * from row 0 moves nothing: the second row is already on screen. The
+       * failure only shows up once the list has scrolled, which is why this
+       * steps 62 times and checks after every one.
+       */
+      const scroller = itable.scroller();
+      const pageAt = window.scrollY;
+      let outside = 0, pageMoved = 0, worst = '';
+      itable.focusRow(0);
+      for (let i = 1; i < pics.counts.items; i += 1) {
+        itable.focusRow(i);
+        const r = itable.el.querySelectorAll('.pos-tbl-row.pick')[i].getBoundingClientRect();
+        const b = scroller.getBoundingClientRect();
+        if (r.top < b.top - 1 || r.bottom > b.bottom + 1) {
+          outside += 1;
+          if (!worst) worst = `row ${i} at ${Math.round(r.top - b.top)} of ${Math.round(b.height)}`;
+        }
+        if (window.scrollY !== pageAt) pageMoved += 1;
+      }
+      d.assert('stepping the whole list keeps every row inside the table and never scrolls the page',
+        outside === 0 && pageMoved === 0,
+        outside || pageMoved
+          ? `${outside} rows left the box (${worst}), page moved on ${pageMoved}`
+          : `${pics.counts.items} rows, all inside, page held at ${pageAt}`);
+
+      /**
+       * 🔴 AND THE ROW IS NOT FLUSH AGAINST THE EDGE, which is the difference
+       * between "technically visible" and "navigable". `scrollIntoView({ block:
+       * 'nearest' })` puts each new row exactly on the boundary, so somebody
+       * stepping down always reads the bottom-most row with nothing under it.
+       * ⚠️ THE ENDS ARE EXEMPT AND HAVE TO BE, because at row 0 and the last
+       * row there is nowhere to put the margin. Checking a middle row is the
+       * honest form of this claim.
+       */
+      const mid = Math.floor(pics.counts.items / 2);
+      itable.focusRow(mid);
+      const mr = itable.el.querySelectorAll('.pos-tbl-row.pick')[mid].getBoundingClientRect();
+      const mb = scroller.getBoundingClientRect();
+      d.assert('and a row in the middle of the list is kept off the edge of the box',
+        mr.top - mb.top >= mr.height - 1 && mb.bottom - mr.bottom >= mr.height - 1,
+        `${Math.round(mr.top - mb.top)} px above, ${Math.round(mb.bottom - mr.bottom)} px below, `
+        + `row ${Math.round(mr.height)} px`);
+      itable.focusRow(0);
+
+      /**
+       * 🔴 A FULL SCREEN PANEL DROPS ITS OWN SHAPE, WHICH IS WHAT CENTRES THE
+       * PICTURE. Asked as *"center fullscreen images"* and *"put back from
+       * fullscreen to sceen corner"*, which are one cause: the stage kept
+       * `aspect-ratio: 1 / 1` on a 16:9 screen, so the picture sat high and the
+       * exit button, which is `position: absolute` INSIDE that stage, went up
+       * there with it.
+       * ⚠️ THE HOOK IS DRIVEN RATHER THAN THE API, and that is not a dodge.
+       * `requestFullscreen` needs user activation the harness cannot always
+       * give, and `video-panel.mjs` sets `data-full` from `syncFull()` on BOTH
+       * routes precisely so the real API and the faux cover cannot diverge.
+       * Asserting the hook asserts both.
+       */
+      shotPanel.el.dataset.full = 'hover';
+      const fsStage = getComputedStyle(shotPanel.stage).aspectRatio;
+      const fsWide = shotPanel.el.getBoundingClientRect().width;
+      /* 🔴 DELETED, NOT EMPTIED, WHICH IS THE BUG THIS CHECK FOUND IN
+         `video-panel.mjs`. `[data-full]` matches an empty attribute, so
+         `dataset.full = ''` left every fullscreen rule applying to a panel that
+         had come back. The component deletes it now and so does this. */
+      delete shotPanel.el.dataset.full;
+      const backSquare = getComputedStyle(shotPanel.stage).aspectRatio.replace(/\s/g, '');
+      d.assert('a panel on the screen drops its own shape and its cap, and takes them back after',
+        fsStage === 'auto' && fsWide > 460 && backSquare === '1/1',
+        `full: ${fsStage} at ${fsWide.toFixed(0)} px, back: ${backSquare}`);
+
+      const first = pics.items.find((i) => !i.thumbnail) || pics.items[0];
+      show({ ...first, px: `${first.w}x${first.h}`, thumb: !!first.thumbnail });
+      const got = await new Promise((ok) => {
+        if (shot.complete && shot.naturalWidth > 0) return ok(true);
+        shot.addEventListener('load', () => ok(true), { once: true });
+        shot.addEventListener('error', () => ok(false), { once: true });
+        setTimeout(() => ok(false), 8000);
+      });
+      /**
+       * ⚠️ `naturalWidth` AGAINST THE CORPUS IS THE CLAIM WORTH MAKING, and it
+       * is the picture version of the length check above: the corpus says what
+       * was measured off the bytes before they were uploaded, and this reads
+       * what the browser found in the bytes the bucket actually served. A
+       * truncated upload, a swapped file or a mis-keyed row shows up here and
+       * nowhere else. `complete` alone would not: it is true for a failed load.
+       */
+      d.assert('a picture opens, and its size is the size the corpus wrote down',
+        got && shot.naturalWidth === first.w && shot.naturalHeight === first.h,
+        `${first.file}: corpus ${first.w}x${first.h}, file `
+        + `${shot.naturalWidth || 0}x${shot.naturalHeight || 0}`);
+
+      /**
+       * 🔴 PUT THE PAGE BACK. The harness's play drill presses
+       * `__demo.transport.el`'s own toggle, and that bar lives inside the
+       * VIDEOS panel — which `tabs.go('images')` has just set `hidden`. A check
+       * that leaves the page on another tab would break a drill that has
+       * nothing to do with it, on a page where nothing is wrong.
+       */
+      tabs.go('videos');
+      d.assert('and the page is back on the tab it opened on',
+        tabs.at() === 'videos' && !tabs.panel('videos').hidden && tabs.panel('images').hidden,
+        `on ${tabs.at()}`);
+    }
+
+    d.ready();
+  })();
+
+  /**
+   * ⚠️ NO `transport` KEY HERE, AND THE FIRST BUILD HAD ONE. `transport-bar.mjs`
+   * publishes `__demo.transport` ITSELF, and what it publishes is its `api` —
+   * the object carrying `position`, `playing`, `range` and `el`, which is what
+   * `demo/verify.mjs` reads. `createTransportBar` RETURNS a wrapper around that
+   * api, so assigning the return value here replaced the published object with
+   * one that has no `position`, and the harness read `pos undefined` and then
+   * threw on `t0.pos.toFixed`. A page that re-publishes what a component
+   * already published can only ever disagree with it.
+   */
+  window.__demo = Object.assign(window.__demo || {}, {
+    table,
+    panel,
+    corpus: () => corpus,
+    chosen: () => chosen,
+    pick,
+    // The second half of the page, published the same way, so a check can reach
+    // it by name rather than by DOM id.
+    tabs,
+    itable,
+    shotPanel,
+    seen: () => seen,
+    show,
+  });
+</script>
+</html>

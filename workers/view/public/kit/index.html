@@ -77,6 +77,15 @@
                border-radius: 4px; padding: 8px; }
   .kit-blk { border: 1px dashed var(--kit-edge); border-radius: 4px; color: var(--dim2);
              font: 400 11px/1 var(--mono); text-align: center; padding: 18px 0; }
+  /* The stand-in for a page that covers the screen with a bare canvas, which is
+     the shape `/weight/` and `/floor/` have and the shape the report came from.
+     ⚠️ NO `position` DECLARED HERE ON PURPOSE. `createFullscreenExit` gives a
+     static host `position: relative` itself, and a specimen that did it first
+     would be this page hiding the half of the component it is grading. */
+  .kit-cover { width: 260px; height: 146px; background: var(--card2);
+               border: 1px solid var(--line); border-radius: 4px;
+               display: flex; align-items: center; justify-content: center; }
+  .kit-cover-p { font: 400 11px/1 var(--mono); color: var(--dim2); }
   /* 🔴 THE DEFECT, KEPT ALIVE ON PURPOSE. `.kbd { margin: 0 0 10px }` in
      shell.css is what put a keyboard flush against a transport bar on `/keys/`:
      a `margin` shorthand's implied `margin-top: 0`, at (0,1,0), beating a
@@ -186,15 +195,22 @@
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createField } from '/shell/field.mjs';
-  import { createStripView } from '/shell/strip.mjs';
+  import { createStripView, STRIP_FOOTER_EMPTY } from '/shell/strip.mjs';
+  import { createFullscreenExit, EXIT_IDLE_MS, toggle as fsToggle, isFull as fsIsFull }
+    from '/shell/fullscreen.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createVideoPanel, FULL_MODES } from '/shell/video-panel.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createXrProbe, xrCaps, onXrCaps, reasonFor, canEnter, answered, XR_STATES }
+    from '/shell/xr-caps.mjs';
 
   /**
    * 🔴 IT MOUNTS THE SHELL NOW, AND THAT IS WHAT MAKES IT GRADEABLE. It used to
@@ -305,6 +321,271 @@
   // whichever came first and grade the wrong arrangement
   let joinedPage = null, splitPage = null;
 
+  // The button group specimens, held for the checks at the bottom: one row of
+  // ordinary actions, and one pair driven by what this browser actually says
+  // about a headset. ⚠️ DECLARED UP HERE WITH THE OTHERS, for the reason those
+  // lines give: this is the newest block and therefore the topmost one, and a
+  // `let` left where a block used to be is read in its dead zone.
+  let bgSpec = null, bgRow = null, xrSpec = null;
+  // The choice specimen, kept so the button group can be measured AGAINST it
+  // rather than against a number typed into a check. The claim being graded is
+  // that the two are different sizes of object, which is a comparison or it is
+  // nothing.
+  let choiceSpec = null;
+
+  // The way out of full screen, and the strip that says what is under the
+  // pointer. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
+  // comments above give: these two blocks are the newest and therefore the
+  // topmost, and a `let` left where a block used to be is read in its dead zone
+  // and swallowed by `section()` into `failed`.
+  // The panel with a transport glued under it, held for the two checks that
+  // measure it. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
+  // comments above give: this is the newest block and therefore the topmost,
+  // and a `let` left where a block used to be is read in its dead zone.
+  let glueSpec = null;        // { panel, bar, deck, mute }
+  let fsxSpec = null;         // { host, exit, out }, a cover with a way back
+  let footSpec = null;        // the strip whose footer says what is hovered
+  let vpUnder = null;         // the control group a panel lifts while full
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. Asked 2026-09-19 for
+   * `/stage/`, in one line with four other things: *"move video play / stop to
+   * videopanel footer"*, *"make transportbar glueable to videopanel footer"*
+   * and *"replace timeline-glued transport record button with start | stop text
+   * labels (same w)"*.
+   *
+   * ⚠️ ONE BLOCK FOR TWO COMPONENTS, because the two changes are one
+   * arrangement: a film's transport belongs to the picture it drives, and the
+   * words are what that bar says. Shown apart they would be two specimens of
+   * nothing in particular.
+   * ⚠️ AND NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the block
+   * below gives: both harnesses press that row by position, so a new top block
+   * with controls in it moves every other block's press.
+   */
+  section('A TRANSPORT GLUED UNDER A PICTURE, AND A TOGGLE THAT SAYS TWO WORDS',
+    'A film\u2019s play and stop belong to the picture, so the bar is joined to the panel '
+    + 'rather than stacked under it: one edge round the pair, and the 1 px seam the footer '
+    + 'already has above it. The toggle carries two words instead of a glyph, and both of '
+    + 'them are in the button at once so it cannot change width when it changes state.',
+    `panel.glue(bar.el)   // wraps in place, so the pair stays where the panel was
+createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const c = document.createElement('canvas');
+      c.width = FRAME_W; c.height = FRAME_H;
+      const ctx = c.getContext('2d', { alpha: false });
+      const panel = createVideoPanel({
+        media: c,
+        left: createPresence({ of: '', mode: 'badge', state: 'online',
+                               says: { online: 'live' } }).el,
+      });
+      /**
+       * 🔴 A SECOND GLYPH BESIDE THE ⛶, WHICH IS WHAT THE RIGHT SLOT LOOKS LIKE
+       * WITH TWO THINGS IN IT. `/stage/` puts the film's mute there. The
+       * glyphs are `♫` U+266B and `⊘` U+2298, chosen by looking: the text style
+       * speakers U+1F568 to U+1F56A are an empty tofu box in this font stack,
+       * and U+1F507 and U+1F50A are emoji presentation, 21 px of colour beside
+       * a ⛶ whose ink is 9.86 px of grey.
+       * ⚠️ `setSymbol`, NEVER `textContent`. The centring lives in a span that
+       * writing `textContent` throws away, which is the defect that module was
+       * written for and is invisible until somebody looks closely at a button
+       * whose glyph swaps.
+       */
+      let muted = true;
+      const mute = el('button', 'ico', '\u2298',
+        { type: 'button', 'aria-label': 'the sound', 'aria-pressed': 'false', title: 'muted' });
+      centreSymbol(mute);
+      mute.onclick = () => {
+        muted = !muted;
+        setSymbol(mute, muted ? '\u2298' : '\u266b');
+        mute.setAttribute('aria-pressed', String(!muted));
+        mute.title = muted ? 'muted' : 'audible';
+      };
+      panel.slots.right.prepend(mute);
+      box.append(panel.el);
+
+      // A deck with no adapters offers no rates, so the bar draws no rate row:
+      // what is on show here is the toggle, the clock and the seam.
+      const deck = createDeck({ range: [0, 60_000] });
+      const bar = createTransportBar(box, deck, {
+        verb: ['start', 'stop'], live: false, loop: false, scrub: true, absolute: false,
+        /**
+         * 🔴 `publish: false`, AND ON THIS PAGE THAT IS NOT A TIE BREAK BETWEEN
+         * TWO BARS. `/kit/` has no transport of its own and never had one, so a
+         * specimen claiming `__demo.transport` would hand the suite a playhead
+         * to drive on a page that is a gallery: `verify.mjs` would start
+         * pressing play and seeking on a bar that exists to be looked at.
+         */
+        publish: false,
+      });
+      // ⚠️ THE PANEL IS ALREADY IN THE BOX AND THE BAR IS APPENDED AFTER IT, so
+      // this is the realistic order and the one the method is for: a page has
+      // its picture on screen before it has built the bar that belongs to it.
+      panel.glue(bar.el);
+      glueSpec = { panel, bar, deck, mute };
+
+      let n = 0;
+      const draw = () => { burn(ctx, FRAME_W, FRAME_H, n++, { hue: videoHue(1) }); requestAnimationFrame(draw); };
+      requestAnimationFrame(draw);
+    });
+
+  /**
+   * 🔴 SECOND NEWEST, AND THE SAME RULE. Reported 2026-09-19
+   * from an iPhone: *"I can not leave fullscreen on mobile"*, and asked for as
+   * *"make permanett squaer button with fullscreen icon on bottom right when
+   * going to fullscreen in mobile. fade out it when no activity"*.
+   *
+   * ⚠️ NOTHING IN THIS BLOCK SITS IN A `.pos-controls` ROW, ON PURPOSE. Both
+   * harnesses press every button in that row, by position, so a block arriving
+   * at the top of this page with controls in it would move every other block's
+   * press and take the one check that depends on WHEN a press lands red for a
+   * reason nothing names. The way in is pressed by the checks at the bottom
+   * instead, which is also the only way to prove the way out by pressing it.
+   */
+  section('A WAY BACK FROM FULL SCREEN, ON A DEVICE WITH NO ESCAPE KEY',
+    'A square with the same glyph as the control that got you in, held off the corner by the '
+    + 'safe area, inside whatever went full so it survives real element fullscreen. It fades '
+    + 'when nothing has moved and is unpressable while faded, so the corner of a picture '
+    + 'cannot exit for somebody reaching past it.',
+    `const exit = createFullscreenExit(wrap);            // a bare canvas
+createFullscreenExit(panel.stage, { of: panel.el }); // inside a video panel`,
+    (box) => {
+      box.classList.add('kit-wide');
+
+      const o = out('not filling the screen');
+      const host = el('div', 'kit-cover');
+      host.append(el('div', 'kit-cover-p', 'a picture'));
+      // ⚠️ THE PIECE IS BUILT BEFORE THE HANDLER THAT READS IT. A `const`
+      // declared under the closure that closes over it is this page's most
+      // repeated defect, and it has already taken this file out once.
+      const exit = createFullscreenExit(host, {
+        onExit: () => { o.textContent = 'came back'; },
+      });
+      // ⚠️ AN ORDINARY BUTTON, NOT A SHELL CONTROL, for the reason in the note
+      // above. It is pressed from the checks rather than by the harness.
+      const go = el('button', '', 'Fill the screen', { type: 'button' });
+      go.onclick = async () => {
+        const how = await fsToggle(host);
+        exit.sync();
+        o.textContent = `filling the screen the ${how} way`;
+      };
+      fsxSpec = { host, exit, out: o, go };
+
+      const row = el('div', 'kit-row');
+      row.append(host, go, o);
+      box.append(row);
+    });
+
+  /**
+   * 🔴 THIRD NEWEST, AND THE SAME RULE. Asked 2026-09-19 with a photograph of
+   * `/reel/` on an iPhone: *"add feature to timeline: footer section, looks
+   * like glued that shows hovered info below timeline"*. The photograph shows
+   * the sticky tap tooltip covering the right half of the strip, four lines
+   * deep, over the marks it is describing.
+   */
+  section('WHAT YOU ARE POINTING AT, UNDER THE TIMELINE',
+    'A fixed box glued under the strip, written on every hover change, holding what the '
+    + 'tooltip used to draw on top of the marks it described. It keeps its height whether '
+    + 'it is saying four things or nothing, and a name too long for the width ellipsises '
+    + 'rather than wrapping the last line out of the box.',
+    `createStripView(host, deck, { lanes, footer: true })
+createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen' } })`,
+    (box) => {
+      box.classList.add('kit-wide');
+
+      const t0 = 0, SPAN = 8000;
+      const items = [];
+      for (let i = 0; i < 9; i++) {
+        items.push({ id: `f${i}`, kind: 'mark', at: t0 + (i + 0.5) * (SPAN / 10),
+                     payload: { label: `${i + 1}` } });
+      }
+      const { adapter } = markAdapter({ rates: [1] });
+      const deck = createDeck({ items, adapters: { mark: adapter }, range: [t0, t0 + SPAN] });
+      footSpec = createStripView(box, deck, {
+        size: 'auto',
+        footer: true,
+        lanes: [{ id: 'mark', kind: 'mark', label: 'takes',
+                  color: getComputedStyle(document.documentElement)
+                           .getPropertyValue('--hi').trim() || '#ffd400' }],
+      });
+      footSpec.strip.fit?.();
+    });
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. Asked 2026-09-19:
+   * *"global: make buttongroup component and convert all vr/ar buttons to it"*.
+   * The component and the probe that drives it are one block on purpose: a
+   * group whose buttons are always pressable is half of what was asked for, and
+   * the half that was reported was the other one, a `Run in VR` on an iPhone
+   * that accepts the press and answers with a line in the log.
+   *
+   * ⚠️ AND MOVING A BLOCK MOVES EVERY BUTTON AFTER IT. `verify.mjs` presses by
+   * position, so re-run `node demo/verify.mjs kit` and diff the assert count
+   * after any reorder. This block is the first on the page with buttons in a
+   * `.pos-controls` row, so it now owns control 0.
+   */
+  section('A ROW OF BUTTONS, AND ONE THIS BROWSER CANNOT USE',
+    'Buttons that each do something, sharing one row and one label, which is not a choice '
+    + 'of one thing out of three. The group owns which of them are off and the reason it '
+    + 'shows for one, so four pages say it one way instead of four.',
+    `const g = createButtonGroup({ label: 'headset', buttons: [
+  { id: 'vr', label: 'Run in VR', onPress: enterVr },
+  { id: 'ar', label: 'Run in AR', onPress: enterAr },
+] });
+onXrCaps((c) => g.enable('vr', canEnter(c.vr), reasonFor(c.vr, 'vr')));`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+
+      // ⚠️ SHOWN IN A `.pos-controls` ROW, WHICH IS WHERE IT GOES. Both
+      // harnesses press `.pos-controls button`, which is a DESCENDANT selector,
+      // so a group inside that row is reachable and one outside it is not. The
+      // check at the bottom grades exactly that, against this specimen.
+      const o1 = out('nothing pressed');
+      bgRow = el('div', 'pos-controls');
+      bgSpec = createButtonGroup({
+        label: 'take',
+        buttons: [
+          { id: 'play', label: 'Play' },
+          { id: 'keep', label: 'Keep' },
+          { id: 'drop', label: 'Drop', aria: 'drop this take' },
+        ],
+        onPress: (id) => { o1.textContent = `${id} pressed`; },
+      });
+      bgRow.append(bgSpec.el);
+      const r1 = el('div', 'kit-row');
+      r1.append(bgRow, o1);
+
+      // The pair the component was built for, driven by the real probe, so this
+      // page shows what THIS browser says rather than a picture of what another
+      // one might. On a phone both go off before the first frame and say why on
+      // hover; in a headset both stay on.
+      const o2 = out('');
+      const xrRow = el('div', 'pos-controls');
+      xrSpec = createButtonGroup({
+        label: 'headset',
+        buttons: [
+          { id: 'vr', label: 'Run in VR', onPress: () => { o2.textContent = 'a headset would open here'; } },
+          { id: 'ar', label: 'Run in AR', onPress: () => { o2.textContent = 'the room would show through here'; } },
+        ],
+      });
+      xrRow.append(xrSpec.el);
+      onXrCaps((c) => {
+        xrSpec.enable('vr', canEnter(c.vr), reasonFor(c.vr, 'vr'));
+        xrSpec.enable('ar', canEnter(c.ar), reasonFor(c.ar, 'ar'));
+        // A value in a fixed box, not a sentence that rewrites itself: the two
+        // words change once each and the box does not move when they do.
+        o2.textContent = `vr ${c.vr} · ar ${c.ar}`;
+      });
+      const r2 = el('div', 'kit-row');
+      r2.append(xrRow, o2);
+
+      stack.titled('THREE THINGS TO DO, IN ONE ROW', r1);
+      stack.titled('AND TWO THIS BROWSER MAY NOT BE ABLE TO', r2);
+      box.append(stack.el);
+    });
+
+
   /**
    * 🔴 NEWEST AT THE TOP, AND THE TWO PRESENCE BLOCKS ARE ONE. Asked 2026-09-17:
    * *"bring online offline up in kit and merge busy/test into it"*. They were
@@ -320,9 +601,11 @@
    * after any reorder.
    */
   section('VIDEO PANEL',
-    'A picture, with a status, an empty middle and a fullscreen button under it.',
+    'A picture, with a status, an empty middle and a fullscreen button under it, and a '
+    + 'second storey that carries the page’s own controls while it fills the screen.',
     `createVideoPanel({ media: canvas, of: 'the board' })
-createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode: 'footer' })`,
+createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode: 'footer' })
+panel.under(myControlRow)   // moved in while full in footer mode, and back out after`,
     (box) => {
       box.classList.add('kit-wide');
       const stack = createStack(undefined, 'kit-col');
@@ -374,6 +657,46 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
                                  says: { online: 'live' } }).el,
         });
         add(heading, p, c.getContext('2d', { alpha: false }));
+      }
+
+      /**
+       * 🔴 THE SECOND STOREY, WHICH IS ONLY THERE WHILE FULL. Asked 2026-09-19
+       * with a photograph of `/mirror/` filling an iPhone: *"extend videopanel
+       * footer in fullscreen so it can have section below the footer bar
+       * (separaet with line). put controlgroup there"*.
+       *
+       * 🔴 IT IS THE SAME ELEMENT, MOVED. The group sits under the panel here,
+       * where a page keeps its controls, and the panel lifts it into a row of
+       * its own when it goes full. Two rows that can disagree about which option
+       * is chosen would be a readout living in two files, so the check below
+       * grades that there is exactly ONE of these buttons in the document.
+       * ⚠️ AND IT IS NOT IN A `.pos-controls` ROW, for the reason at the top of
+       * this file: a block with pressable controls moves every other block's
+       * press, and this one is about where a row LIVES rather than what it does.
+       */
+      {
+        const c = document.createElement('canvas');
+        c.width = FRAME_W; c.height = FRAME_H;
+        vpUnder = el('div', 'kit-row');
+        vpUnder.append(createButtonGroup({
+          label: 'take',
+          buttons: [{ id: 'keep', label: 'Keep' }, { id: 'drop', label: 'Drop' }],
+        }).el);
+        const p = createVideoPanel({
+          media: c, fullMode: 'footer',
+          left: createPresence({ of: '', mode: 'badge', state: 'online',
+                                 says: { online: 'live' } }).el,
+        });
+        const cell = el('div', 'kit-vp');
+        cell.append(el('p', 'kit-cap', 'a second storey under the footer'), p.el, vpUnder);
+        row.append(cell);
+        // ⚠️ HANDED OVER AFTER IT IS ON THE PAGE, which is the realistic order
+        // and the one that matters: the panel records where the element lives
+        // at the moment it is given it, so an element with no parent yet has no
+        // home to be put back to. The constructor's `under` option is for a page
+        // that builds its controls before it builds its panel.
+        p.under(vpUnder);
+        made.push({ ctx: c.getContext('2d', { alpha: false }), panel: p });
       }
 
       vpSpec = made;
@@ -785,6 +1108,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
         at: 1,
         onPick: (_v, name) => { o.textContent = name; },
       });
+      choiceSpec = c;
       box.append(c.el, o);
     });
 
@@ -832,7 +1156,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     const cut = t.split(/\s+[—–-]\s+|,\s+/)[0];
     return cut.length > 12 ? cut : t;
   };
-  const pick = ['held', 'tapes', 'kurenniemi', 'rack', 'floor', 'radio', 'wire', 'strip'];
+  const pick = ['weight', 'tapes', 'kurenniemi', 'rack', 'floor', 'radio', 'wire', 'strip'];
   const rows = pick.map((n) => DEMOS.find((x) => x.name === n)).filter(Boolean);
   const cardsFor = (extra = {}) => rows.map((r) => createCard({
     title: r.name,
@@ -878,8 +1202,13 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
           why: 'this browser draws no 3-D' }),
         createCard({ title: 'instrument', desc: 'a keyboard you can play',
           why: 'no MIDI here, but the on-screen keys still sound' }),
-        createCard({ title: 'held', desc: 'big words standing in a room',
-          tags: ['WebGL2'], href: '/held/',
+        // ⚠️ `/held/` UNTIL 2026-09-19, AND THE NAME NOW BELONGS TO A DIFFERENT
+        // PAGE. A card is a LINK, so a stale one here does not 404, it opens
+        // something else and says nothing about it. That is the one failure a
+        // rename in this project has not produced before, because `/radio1965/`
+        // and `/box/` both just died.
+        createCard({ title: 'weight', desc: 'big words standing in a room',
+          tags: ['WebGL2'], href: '/weight/',
           actions: [
             { label: 'Copy link', onPress: () => { o.textContent = 'copy link · held'; } },
             { label: 'Open', onPress: () => { o.textContent = 'open · held'; } },
@@ -1122,7 +1451,8 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
   nodes: [{ id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
             note: 'What this box does here. **Two asterisks** is the only mark it takes.' }, …],
   links: [{ from: 'you', to: 'relay', label: 'note number' },
-          { from: 'relay', to: 'you', label: 'sound back', back: true }],
+          { from: 'relay', to: 'you', label: 'PCM', back: true,
+            note: 'What crosses this arrow, and what that costs.' }],
 })`,
     (box) => diagramCase(box, {
       title: 'a key press, and what it costs',
@@ -1144,8 +1474,23 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
       links: [
         { from: 'you', to: 'relay', label: 'note number' },
         { from: 'relay', to: 'box', label: 'note number' },
-        { from: 'box', to: 'relay', label: 'sound', back: true },
-        { from: 'relay', to: 'you', label: 'sound back', back: true },
+        /**
+         * 🔴 `PCM` IS THE PROJECT'S NAME FOR SOUND COMING BACK, AND A PICTURE
+         * COMING BACK IS `H.264`. Settled 2026-09-19: *"h.264 - unify label and
+         * longer desc on all diagrams where stream back pcm or mp4 video"*.
+         * This specimen said `sound` on one half and `sound back` on the other,
+         * which is two names for one journey, and the code sample above it is
+         * what an author copies, so the wrong word here spreads.
+         * ⚠️ AND THE RETURN CARRIES A NOTE, BECAUSE THAT IS THE OTHER HALF OF
+         * THE CONVENTION: a label is WHAT TRAVELS and the note is what that
+         * actually is. It says nothing that could be a measurement, because
+         * this picture is a made-up studio and a number invented here would be
+         * copied into a real page as though somebody had taken it.
+         */
+        { from: 'box', to: 'relay', label: 'PCM', back: true },
+        { from: 'relay', to: 'you', label: 'PCM', back: true,
+          note: 'Raw samples, uncompressed, in slices of a few milliseconds each. Nothing '
+              + 'is encoded on the way out, so nothing has to be decoded at this end.' },
       ],
     }));
 
@@ -1338,8 +1683,13 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
           // `the sound`, so the picture is the same size it was with two of
           // these five arrows unnamed.
           { from: 'cf', to: 'pi', label: 'four settings' },
-          { from: 'pi', to: 'cf', label: 'sound', back: true },
-          { from: 'cf', to: 'you', label: 'sound back', back: true },
+          // 🔴 `PCM` ON BOTH HALVES, the settled name for sound coming back.
+          // See the note on the first block in this page for why, and
+          // `/grains/`, which is the real page this picture is a sketch of.
+          { from: 'pi', to: 'cf', label: 'PCM', back: true },
+          { from: 'cf', to: 'you', label: 'PCM', back: true,
+            note: 'Raw samples, uncompressed, in slices of a few milliseconds each. The far '
+                + 'copy is heard the moment it arrives; the near one was never sent anywhere.' },
         ],
       };
       diagramCase(box, branch);
@@ -1366,8 +1716,12 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
       links: [
         { from: 'you', to: 'relay', label: 'note number' },
         { from: 'relay', to: 'box', label: 'note number' },
-        { from: 'box', to: 'relay', label: 'sound', back: true },
-        { from: 'relay', to: 'you', label: 'sound back', back: true },
+        // 🔴 THE SAME FOUR LINKS AS THE FIRST BLOCK, WHICH IS WHAT THE CAPTION
+        // CLAIMS, so the labels and the note track it exactly.
+        { from: 'box', to: 'relay', label: 'PCM', back: true },
+        { from: 'relay', to: 'you', label: 'PCM', back: true,
+          note: 'Raw samples, uncompressed, in slices of a few milliseconds each. Nothing '
+              + 'is encoded on the way out, so nothing has to be decoded at this end.' },
       ],
     }, { phone: true }));
 
@@ -1468,16 +1822,289 @@ green = inside what it promised · amber/red = later`,
   // ⚠️ THEY RUN AFTER A FRAME. Two of them measure laid-out geometry, and
   // `getBoundingClientRect` before the first paint answers about a page that
   // has not been arranged yet.
+  //
+  // ⚠️ AND THEY ARE NOT NUMBERED ANY MORE. Every check below used to open with
+  // a hand-typed index, which is a second copy of the order they already sit
+  // in: inserting six at the top on 2026-09-19 made seventeen of them wrong at
+  // once, and a number a reader trusts and nobody re-counts is worse than no
+  // number. The order is the file.
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  // 1 — every block built. A component that throws takes the page with it when
+  // every block built. A component that throws takes the page with it when
   // the error escapes, which turns one broken control into a blank page.
   d.assert('every block on this page built',
     built.length > 0 && failed.length === 0,
     failed.length ? `${failed.length} did not: ${failed.join(' · ')}`
                   : `${built.length} blocks, none threw`);
 
-  // 2 — 🔴 THE LEFT EDGES. Reported THREE TIMES on a real page and the third
+  /**
+   * 🔴 THE NEWEST BLOCK'S TWO CLAIMS, AND BOTH ARE MEASUREMENTS RATHER THAN
+   * LOOKS. A bar UNDER a panel and a bar GLUED to one are the same order of
+   * elements: what differs is whether there is one edge round the pair or two
+   * edges and a gap, which is three numbers.
+   * ⚠️ IT IS THE SAME SHAPE AS THE STRIP'S CHECK BELOW, on purpose. Two
+   * components reach `.pos-glue` and the rule that zeroes a child's border is
+   * double-classed precisely because a component can otherwise win the
+   * specificity fight, so both callers grade it the same way.
+   */
+  if (glueSpec) {
+    const surf = glueSpec.panel.surface;
+    const edge = (n) => Math.round(parseFloat(getComputedStyle(n).borderTopWidth) || 0);
+    const pb = glueSpec.panel.el.getBoundingClientRect();
+    const bb = glueSpec.bar.el.getBoundingClientRect();
+    const seam = bb.top - pb.bottom;
+    d.assert('a transport glued under a picture is one surface with one edge',
+      surf !== glueSpec.panel.el && surf.classList.contains('pos-glue')
+      && surf.contains(glueSpec.panel.el) && surf.contains(glueSpec.bar.el)
+      && Math.abs(seam - 1) <= 0.6 && edge(surf) === 1
+      && edge(glueSpec.panel.el) === 0 && edge(glueSpec.bar.el) === 0,
+      `seam ${seam.toFixed(1)} px, one edge of ${edge(surf)} px round both, `
+      + `${edge(glueSpec.panel.el)} and ${edge(glueSpec.bar.el)} inside`);
+
+    /**
+     * 🔴 THE TWO WORDS ARE THE SAME WIDTH, MEASURED IN BOTH STATES RATHER THAN
+     * ASSERTED FROM THE STYLESHEET. Asked as *"start | stop text labels (same
+     * w)"*, and the reason is the project's standing one about a control that
+     * resizes under the pointer that just pressed it.
+     * ⚠️ **AND THE WIDTH ALONE WOULD PASS ON A BUTTON SHOWING NEITHER WORD.**
+     * `visibility: hidden` on both is the same width as `visibility: hidden` on
+     * one, so the check reads which span is visible in each state as well. That
+     * is the half that would catch the `::before` glyph rule winning the
+     * specificity fight and a word never appearing at all.
+     * ⚠️ IT PRESSES THE TOGGLE AND WAITS FOR THE STATE TO LAND rather than
+     * setting `data-state` by hand, which would grade the stylesheet against
+     * itself and say nothing about the bar.
+     */
+    const t = glueSpec.bar.el.querySelector('.tbar-toggle');
+    const vis = (cls) => {
+      const n = t?.querySelector(`.${cls}`);
+      return n ? getComputedStyle(n).visibility : 'no span';
+    };
+    const w = () => (t ? +t.getBoundingClientRect().width.toFixed(2) : null);
+    const wIdle = w();
+    const seenIdle = [vis('tbar-w0'), vis('tbar-w1')];
+    t?.click();
+    for (let i = 0; i < 40 && t?.dataset.state !== 'playing'; i++) {
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    const wBusy = w();
+    const seenBusy = [vis('tbar-w0'), vis('tbar-w1')];
+    t?.click();
+    glueSpec.deck.pause();
+    d.assert('a toggle that says two words is the same width in both of its states',
+      wIdle != null && wBusy != null && Math.abs(wIdle - wBusy) < 0.01
+      && seenIdle[0] === 'visible' && seenIdle[1] === 'hidden'
+      && seenBusy[0] === 'hidden' && seenBusy[1] === 'visible',
+      `${wIdle} px showing "${t?.querySelector('.tbar-w0')?.textContent}" `
+      + `(${seenIdle.join('/')}), ${wBusy} px showing `
+      + `"${t?.querySelector('.tbar-w1')?.textContent}" (${seenBusy.join('/')})`);
+  }
+
+  // 🔴 GLUED, WHICH IS THE WORD THE ASK USED: *"footer section, looks like
+  // glued that shows hovered info below timeline"*. So it is not enough that
+  // the box is under the strip, it has to READ as the same surface, and that is
+  // three measurements rather than a look: one border round the pair, nothing
+  // between them but the 1 px seam `.pos-glue` shows through, and neither child
+  // painting an edge of its own. `.pos-strip` and `.pos-glue.pos-glue > *` both
+  // declare `border`, at (0,1,0) and (0,2,0), and which of them wins is the
+  // specificity trap this stylesheet already records three times.
+  if (footSpec) {
+    const box = footSpec.surface;
+    const cb = footSpec.el.getBoundingClientRect();
+    const fb = footSpec.footer.el.getBoundingClientRect();
+    const seam = fb.top - cb.bottom;
+    const edge = (n) => Math.round(parseFloat(getComputedStyle(n).borderTopWidth) || 0);
+    d.assert('the strip and the box saying what is under the pointer are one surface',
+      box.classList.contains('pos-glue') && Math.abs(seam - 1) <= 0.6
+      && edge(box) === 1 && edge(footSpec.el) === 0 && edge(footSpec.footer.el) === 0,
+      `seam ${seam.toFixed(1)} px, one edge of ${edge(box)} px round both, `
+      + `${edge(footSpec.el)} and ${edge(footSpec.footer.el)} inside`);
+  }
+
+  // 🔴 THE GROUP'S BUTTONS ARE WHERE THE HARNESSES LOOK, AND THAT IS THE ONE
+  // THING A ROW COMPONENT CAN QUIETLY BREAK. `verify.mjs` and `verify-gl.mjs`
+  // both press `.pos-controls button`, so a group that wraps its buttons in a
+  // row of its own is one refactor away from taking them out of that selector
+  // and out of the suite. `/mirror/` has already paid for this once: a stepper
+  // moved into the knob row and the press count went 9 to 7 while the page read
+  // green. Graded with the harnesses' OWN selector string, against a specimen
+  // mounted the way a page mounts one.
+  // ⚠️ PROVED BY BREAKING IT, 2026-09-19: the same specimen in a `.kit-row`
+  // instead reads `0 of 3` and takes this red, and the page's pressable count
+  // drops from 8 to 5.
+  const PRESSED = '.pos-controls button';
+  const inRow = [...document.querySelectorAll(PRESSED)];
+  const groupBtns = bgSpec ? bgSpec.buttons : [];
+  d.assert('every button in a group is found by the selector both harnesses press',
+    groupBtns.length === 3 && groupBtns.every((b) => inRow.includes(b)),
+    `${groupBtns.filter((b) => inRow.includes(b)).length} of ${groupBtns.length} under ${PRESSED}, `
+    + `${inRow.length} pressable on this page`);
+
+  // 🔴 THE GROUP IS ONE OBJECT, AND IT SHIPPED AS THREE. Reported 2026-09-19
+  // with a screenshot of `/mirror/`: *"i do not see buttongroup vr xr"*. The
+  // row had `gap: 8px`, which is what two unrelated controls look like. The
+  // join is `.pos-seg`'s `margin-left: -1px`, so what a reader sees is one
+  // line where two buttons meet rather than two edges with a gap: measured as
+  // the distance between the first button's right edge and the second's left,
+  // which is -1 when they are joined and +8 when they are not.
+  // ⚠️ AND THE CORNERS, because a join that overlaps borders while both
+  // buttons keep four round corners reads as a mistake rather than as a seam.
+  // Only the outer two are round.
+  if (bgSpec) {
+    const bs = bgSpec.buttons.map((b) => b.getBoundingClientRect());
+    const joins = bs.slice(1).map((r, i) => +(r.left - bs[i].right).toFixed(2));
+    const cs = bgSpec.buttons.map((b) => getComputedStyle(b));
+    const inner = cs[1].borderTopLeftRadius;
+    d.assert('a group is one object: its buttons share a border and only the outer corners are round',
+      joins.every((j) => Math.abs(j + 1) < 0.02)
+      && cs[0].borderTopLeftRadius !== '0px' && cs[cs.length - 1].borderTopRightRadius !== '0px'
+      && inner === '0px' && cs[1].borderTopRightRadius === '0px',
+      `${joins.length} join(s) at ${joins.join(', ')} px, ends rounded ${cs[0].borderTopLeftRadius}`
+      + ` and ${cs[cs.length - 1].borderTopRightRadius}, the middle one ${inner}`);
+  }
+
+  // 🔴 AND IT IS STILL NOT A CHOICE, WHICH IS THE HALF THE JOIN CANNOT CARRY.
+  // A segmented row with nothing armed is a legal choice state: `/stage/` ships
+  // one, with `at: -1`, because a question that arrives already answered is a
+  // question nobody was asked. So the difference has to live somewhere else and
+  // it lives in two places a reader can see. `aria-pressed` is the channel a
+  // choice arms, for a screen reader and for the `--hi` tint keyed on it, and a
+  // group never writes it. And a group's buttons are FULL SIZE, because they
+  // are things you press, where a choice's options are small because they are
+  // values being compared.
+  // ⚠️ MEASURED AS INK, NOT READ OFF THE STYLESHEET. A rule that is present and
+  // inert reads exactly like one that works, which is this page's own lesson.
+  if (bgSpec && choiceSpec) {
+    const armed = bgSpec.buttons.filter((b) => b.hasAttribute('aria-pressed'));
+    const gSize = parseFloat(getComputedStyle(bgSpec.buttons[0]).fontSize);
+    const cSize = parseFloat(getComputedStyle(choiceSpec.buttons[0]).fontSize);
+    d.assert('a joined group still cannot read as a choice: nothing is armed and the buttons are full size',
+      armed.length === 0 && gSize > cSize,
+      `${armed.length} of ${bgSpec.buttons.length} carry aria-pressed, and a group button is`
+      + ` ${gSize} px against a choice option's ${cSize} px`);
+  }
+
+  // 🔴 SWITCHING A BUTTON OFF MOVES NOTHING. The answer that switches these off
+  // arrives late by construction, because asking a browser about a headset is a
+  // promise, so a disabled look that changed the box would reflow the control
+  // row under a pointer already on its way to it. `button[disabled]` is opacity
+  // and a cursor, and this measures that it stayed that way.
+  if (bgSpec) {
+    const b = bgSpec.button('keep');
+    const on = b.getBoundingClientRect();
+    bgSpec.enable('keep', false, 'There is nothing to keep on this page.');
+    const off = b.getBoundingClientRect();
+    const said = b.title;
+    bgSpec.enable('keep', true);
+    d.assert('a button switched off is the same size as it was on, and it says why',
+      Math.abs(on.width - off.width) < 0.01 && Math.abs(on.height - off.height) < 0.01
+      && said.length > 0 && b.title === '',
+      `${on.width.toFixed(1)} by ${on.height.toFixed(1)} on, ${off.width.toFixed(1)} by ${off.height.toFixed(1)} off · `
+      + `"${said}" · nothing left over when it came back`);
+  }
+
+  // NEGATIVE CONTROL: the reason is not optional. A grey control with no
+  // explanation reads as a broken page rather than as a browser that cannot do
+  // the thing, so the group refuses it the way `mount()` refuses an odd readout.
+  if (bgSpec) {
+    let refused = '';
+    try { bgSpec.enable('drop', false); }
+    catch (e) { refused = e.message; }
+    d.assert('NEGATIVE CONTROL: a button disabled with no reason is refused rather than drawn',
+      refused.length > 0 && bgSpec.enabled('drop'),
+      refused || 'it was accepted, and the button is off with nothing to show for it');
+  }
+
+  // 🔴 THE IPHONE CASE, WHICH IS THE ONE THAT WAS BROKEN. Every XR page wrote
+  // `navigator.xr?.isSessionSupported(...).then(...)`, and on a browser with no
+  // `navigator.xr` the optional chain returns undefined, so neither handler runs
+  // and the variable stays null for ever. `/held/` then reported that to a
+  // visitor holding a phone as a check that had FAILED. `createXrProbe` takes
+  // the system object rather than reading `navigator`, so the case that cannot
+  // be reproduced in this browser can be built in one line.
+  // ⚠️ THREE PROBES, NOT ONE. A module that answered `absent` about everything
+  // would pass the first of these on its own, which is the whole reason the
+  // other two are here.
+  {
+    const nothing = createXrProbe(undefined).caps();
+    const says = await createXrProbe({ isSessionSupported: async () => true }).when(1000);
+    const refuses = await createXrProbe({ isSessionSupported: () => Promise.reject(new Error('no')) }).when(1000);
+    d.assert('a browser with nothing to ask is answered at once, and three browsers get three answers',
+      nothing.vr === 'absent' && nothing.ar === 'absent' && answered(nothing.vr)
+      && says.vr === 'yes' && says.ar === 'yes'
+      && refuses.vr === 'no' && refuses.ar === 'no',
+      `no headset support: ${nothing.vr} · a browser that says yes: ${says.vr} · `
+      + `one that refuses to answer: ${refuses.vr}`);
+  }
+
+  // Every answer that switches a control off has a sentence a visitor can read,
+  // and the answer that switches nothing off has nothing to say. A disabled
+  // button with no reason is worse than an enabled one; a tooltip on a working
+  // control restating its own label is furniture.
+  {
+    const wrong = [];
+    let sentences = 0;
+    for (const mode of ['vr', 'ar']) {
+      for (const st of XR_STATES) {
+        const says = reasonFor(st, mode);
+        if (says) sentences++;
+        if (!canEnter(st) && !says) wrong.push(`${mode} ${st} says nothing`);
+        if (st === 'yes' && says) wrong.push(`${mode} yes carries a tooltip it does not need`);
+        // The rules every visitor-facing sentence here obeys: no file path, no
+        // warning sign, and no dash bolting a second clause on.
+        if (says && (says.includes('/') || /[—⚠\u{1f534}]/u.test(says))) {
+          wrong.push(`${mode} ${st} is not plain words`);
+        }
+      }
+    }
+    d.assert('every answer that switches a headset button off says why, in plain words',
+      wrong.length === 0,
+      wrong.length ? wrong.join(' · ')
+        : `${XR_STATES.length} answers over 2 modes, ${sentences} sentences, and nothing said when it works`);
+  }
+
+  // The pair on this page is wired the way the four pages will wire theirs, so
+  // the wiring is graded once here rather than four times over there. Whatever
+  // this browser answers, the control agrees with it.
+  // ⚠️ PROVED BY BREAKING IT, 2026-09-19: with the two `enable` calls taken out
+  // of the subscription this reads `vr no, pressable` and goes red, which is
+  // the `/held/` defect exactly. A page that forgets to wire it is the failure
+  // this catches, because nothing else can see a call that is not there.
+  if (xrSpec) {
+    const c = xrCaps();
+    d.assert('a headset button is pressable exactly when this browser says it can be',
+      xrSpec.enabled('vr') === canEnter(c.vr) && xrSpec.enabled('ar') === canEnter(c.ar),
+      `vr ${c.vr}, ${xrSpec.enabled('vr') ? 'pressable' : 'off'} · `
+      + `ar ${c.ar}, ${xrSpec.enabled('ar') ? 'pressable' : 'off'}`);
+  }
+
+  // 🔴 NOTHING IN THE LOG IS WHITE. Asked 2026-09-19 with a photograph of a
+  // phone: *"do not color log items white, keep it gray or red or whatever you
+  // hae in palette"*. The emphasis on a `hi` line is carried by weight plus ONE
+  // step of ink now, so what is graded is that the step is real and that it
+  // stops short of the page's brightest colour.
+  // ⚠️ MEASURED AS INK, NEVER AS A RULE. shell.css already records what reading
+  // a stylesheet instead of a computed style costs: a rule that is present and
+  // inert reads exactly like one that works.
+  // ⚠️ AND THE SPECIMEN IS NEVER SEEN. `color` resolves on a `display: none`
+  // element, so it goes into the real log, is measured, and is gone inside one
+  // task.
+  {
+    const line = el('div', 'pos-line hi');
+    line.style.display = 'none';
+    const m = el('span', 'pos-m', 'probe');
+    line.append(m);
+    d.logEl.append(line);
+    const emph = getComputedStyle(m).color;
+    const brightest = getComputedStyle(document.body).color;
+    const body = getComputedStyle(d.logEl).color;
+    line.remove();
+    d.assert('the loudest line in the log is quieter than the page\u2019s brightest ink',
+      emph !== brightest && emph !== body,
+      `the log reads ${body}, its emphasis ${emph}, the page ${brightest}`);
+  }
+
+  // 🔴 THE LEFT EDGES. Reported THREE TIMES on a real page and the third
   // report was a different bug wearing the first one's clothes: a component
   // swap moved the class a rule was keyed on, the sharing call went on setting
   // a custom property nothing consumed, and the row snapped back to the width
@@ -1563,7 +2190,7 @@ green = inside what it promised · amber/red = later`,
         : 'the block did not build');
   }
 
-  // 3 — the readout specimen. An odd count leaves the last row short, and a
+  // the readout specimen. An odd count leaves the last row short, and a
   // cell with nothing in it must be EMPTY with its unit HIDDEN: an empty value
   // beside a standing `%` reads as a number that went missing, and a pre-set 0
   // reads as a very confident measurement of nothing.
@@ -1581,7 +2208,7 @@ green = inside what it promised · amber/red = later`,
     cells.length > 0 && cells.length % 2 === 0 && pending.length > 0 && !unitShown,
     `${cells.length} cells, ${pending.length} unmeasured, unit ${unitShown ? 'STILL SHOWING' : 'hidden'}`);
 
-  // 4 — 🔴 THE NEGATIVE CONTROL FOR IT, and it is the reason the rule holds at
+  // 🔴 THE NEGATIVE CONTROL FOR IT, and it is the reason the rule holds at
   // all: `mount()` REFUSES an odd count rather than trusting every page to
   // remember. A rule enforced by nothing is a rule that is already broken
   // somewhere. Called in a try, because passing is the throw.
@@ -1593,7 +2220,7 @@ green = inside what it promised · amber/red = later`,
   d.assert('NEGATIVE CONTROL: a readout with an odd number of cells is refused',
     odd !== 'it was accepted', odd);
 
-  // 5 — the diagram grades both directions. A cuts report that can only ever
+  // the diagram grades both directions. A cuts report that can only ever
   // say "nothing cut" is not a measurement of anything: the picture built out
   // of deliberately unwritable labels has to come back with cuts, and the one
   // written properly has to come back with none.
@@ -1608,7 +2235,7 @@ green = inside what it promised · amber/red = later`,
     tooLong ? `${tooLong.cuts.length} shortened: ${tooLong.cuts.map((c) => c.id).join(', ')}`
             : 'that picture never rendered');
 
-  // 6 — 🔴 A LINK ASKED FOR AND NOT DRAWN, WHICH IS THE ONE DEFECT A PICTURE
+  // 🔴 A LINK ASKED FOR AND NOT DRAWN, WHICH IS THE ONE DEFECT A PICTURE
   // CANNOT SHOW YOU. An arrow between two boxes in one container used to be
   // thrown away: the diagram still looked complete, because the plain tie
   // between those boxes stood exactly where the arrow should have been, and
@@ -1629,7 +2256,7 @@ green = inside what it promised · amber/red = later`,
     && narrow.arrows === 3 && narrow.ties === 1,
     `left to right: ${tally(wide)} · one column: ${tally(narrow)}`);
 
-  // 7 — 🔴 THE PRESENCE BADGE IS THE SAME WIDTH IN ALL FOUR STATES, which is
+  // 🔴 THE PRESENCE BADGE IS THE SAME WIDTH IN ALL FOUR STATES, which is
   // this project's standing rule about anything that redraws: a live sentence
   // under a picture reflowed between three and four lines and was reported as
   // "a horrible jump of content each time it updates". A badge whose word goes
@@ -1743,7 +2370,7 @@ green = inside what it promised · amber/red = later`,
       + `dot ${ink(idle, '.pos-pres-dot')} -> ${ink(person, '.pos-pres-dot')}`);
   }
 
-  // 8 — 🔴 AND THE ANIMATION CANNOT MOVE ANYTHING EITHER, which is a separate
+  // 🔴 AND THE ANIMATION CANNOT MOVE ANYTHING EITHER, which is a separate
   // claim from the one above: the reserve fixes the four states against each
   // other, this fixes every frame of the breathing dot against itself. Read off
   // the KEYFRAMES rather than off two measurements a moment apart, because a
@@ -1782,7 +2409,7 @@ green = inside what it promised · amber/red = later`,
       + `${props.size ? [...props].join(', ') : 'nothing this page can read'}`);
   }
 
-  // 9 — the four states are told apart by the DOT, not by the word beside it.
+  // the four states are told apart by the DOT, not by the word beside it.
   // Two states that differ only in their label are two states nobody reads,
   // which undoes the whole reason there are four. Measured ink: the ring's
   // colour, the fill's colour, the fill's opacity and whether it moves.
@@ -1799,7 +2426,7 @@ green = inside what it promised · amber/red = later`,
       PRESENCE_STATES.map((s, i) => `${s}: ${inks[i]}`).join(' · '));
   }
 
-  // 10 — 🔴 A DOT WHOSE MEANING IS ONLY A COLOUR IS A DOT A SCREEN READER
+  // 🔴 A DOT WHOSE MEANING IS ONLY A COLOUR IS A DOT A SCREEN READER
   // CANNOT READ. `display: none` on the word is how that happens by accident,
   // so the embedded mode CLIPS it instead: still in the accessibility tree,
   // still in the live region, and out of the flow so it costs the host nothing.
@@ -1815,7 +2442,7 @@ green = inside what it promised · amber/red = later`,
               : 'no embedded dot was found, so nothing was compared');
   }
 
-  // 11 — 🔴 NOTHING DRAGS THE PAGE SIDEWAYS. `min-width: 0` missing from a
+  // 🔴 NOTHING DRAGS THE PAGE SIDEWAYS. `min-width: 0` missing from a
   // scrolling row makes it push the whole document instead of scrolling inside
   // itself: MEASURED at 390 px, a tabs row produced 141 px of page overflow.
   // The document, not the element, is the thing to measure, because the element
@@ -1826,7 +2453,7 @@ green = inside what it promised · amber/red = later`,
     over <= 0 ? `${document.documentElement.clientWidth} px wide, nothing overflowing`
               : `${over} px of horizontal overflow`);
 
-  // 12 — 🔴 JOINED IS ONE SURFACE, AND IT TAKES TWO MEASUREMENTS TO SAY SO.
+  // 🔴 JOINED IS ONE SURFACE, AND IT TAKES TWO MEASUREMENTS TO SAY SO.
   // A border is the easiest thing in this arrangement to draw twice: the
   // readout and the log both carry `border: 1px solid var(--line)` of their
   // own on every other page, and the joined box has to take those off or the
@@ -1863,7 +2490,7 @@ green = inside what it promised · amber/red = later`,
       + `one edge of ${outer} px round both, ${inner.join(' and ')} inside`);
   }
 
-  // 13 — and the default is still two surfaces with the page between them. The
+  // and the default is still two surfaces with the page between them. The
   // readout is part of the flow above the body and takes the SMALL gap; the log
   // is the foot and takes the BIG one, which is the same gap a joined report
   // gets, so the two arrangements agree about where the page ends.
@@ -1887,7 +2514,7 @@ green = inside what it promised · amber/red = later`,
       `${above.toFixed(1)} px above the page and ${below.toFixed(1)} px below it, ${own ? 'two edges' : 'NOT two edges'}`);
   }
 
-  // 14 — 🔴 HALF A SURFACE IS NOT HALF A BOX. A page that declares no readout
+  // 🔴 HALF A SURFACE IS NOT HALF A BOX. A page that declares no readout
   // and joins anyway must get one bordered box holding a log, with no seam and
   // no empty strip where the cells would have been. A `display: none` child
   // takes no `gap` in a flex column, so the log starts exactly one border
@@ -1901,7 +2528,7 @@ green = inside what it promised · amber/red = later`,
       `the log starts ${drop.toFixed(1)} px inside the box, which is its edge and nothing else`);
   }
 
-  // 15 — 🔴 AND WITH NEITHER HALF, NO BOX. This is the `/typist/` defect in the
+  // 🔴 AND WITH NEITHER HALF, NO BOX. This is the `/typist/` defect in the
   // joined arrangement: an empty container painting its own two borders as a
   // full-width band nobody wrote. `createReport` returns no surface at all, so
   // there is nothing for a page to append and nothing to paint.
@@ -1912,7 +2539,7 @@ green = inside what it promised · amber/red = later`,
       ? 'no surface was returned, so there is no box to paint'
       : 'an empty surface was returned and would draw its own two edges');
 
-  // 16 — 🔴 THE GAP IS THE STACK'S, AND A BLOCK CANNOT ARGUE WITH IT. The third
+  // 🔴 THE GAP IS THE STACK'S, AND A BLOCK CANNOT ARGUE WITH IT. The third
   // specimen carries `margin: 0 0 10px` in this page's own stylesheet, which
   // loads AFTER shell.css — the exact shape that put a keyboard flush against a
   // transport bar on `/keys/` and measured 0.0 px. A shorthand's implied
@@ -1939,7 +2566,7 @@ green = inside what it promised · amber/red = later`,
       + `the block asking for margin-top 0 computes ${asked}`);
   }
 
-  // 17 — 🔴 AND A BLOCK WITH NOTHING IN IT TAKES NO GAP. This is the `/typist/`
+  // 🔴 AND A BLOCK WITH NOTHING IN IT TAKES NO GAP. This is the `/typist/`
   // band in a third costume: an empty container that draws nothing and still
   // spends a screenful of air, or paints its own two borders as a rule nobody
   // wrote. Two blocks with an unfilled one between them must sit ONE gap apart,
@@ -1958,7 +2585,7 @@ green = inside what it promised · amber/red = later`,
       + `the empty one computes display ${emptyBlock ? getComputedStyle(emptyBlock).display : '?'}`);
   }
 
-  // 18 — 🔴 THE KEYBOARD UNDER A FINGER, WHICH IS THE ONE THING ABOUT IT THIS
+  // 🔴 THE KEYBOARD UNDER A FINGER, WHICH IS THE ONE THING ABOUT IT THIS
   // MACHINE CANNOT SIT DOWN AT.
   //
   // ⚠️ EVERY CHECK BELOW IS BEHIND `?selfcheck=1`, because every one of them
@@ -1979,6 +2606,88 @@ green = inside what it promised · amber/red = later`,
       const step = () => (--n <= 0 ? r() : requestAnimationFrame(step));
       requestAnimationFrame(step);
     });
+    /**
+     * 🔴 THE FOOTER UNDER THE STRIP, WRITTEN AT IT AND MEASURED. Everything
+     * below this line puts words in a box a visitor is looking at, moves a row
+     * of buttons between two parents, or covers the screen, so it is behind
+     * `?selfcheck=1` with the rest. The claim is the one the ask is about: it is
+     * rewritten on every hover change, so it must not be able to change its own
+     * height while somebody reads it.
+     * ⚠️ IT IS FED THE STRIP'S OWN `hit` SHAPE, `{ detail: [...] }`, which is
+     * what `describe()` hands `onHover`. A check that called some other entry
+     * point would grade a path no pointer ever takes.
+     */
+    if (footSpec?.footer) {
+      const f = footSpec.footer;
+      const h = () => f.el.getBoundingClientRect().height;
+      const idle = h();
+      f.set({ detail: ['takes  0:03.2'] });
+      const one = h();
+      f.set({ detail: ['a', 'b', 'c', 'd', 'e', 'f'] });
+      const six = h();
+      const shown = f.says();
+      f.set(null);
+      const back = h();
+      const empty = f.says()[0];
+      d.assert('the box under the strip is one height saying six things, one thing, or nothing',
+        idle > 0 && Math.abs(one - idle) < 0.5 && Math.abs(six - idle) < 0.5
+        && Math.abs(back - idle) < 0.5 && shown.length === f.lines
+        && shown[0] === 'a' && shown[1] === 'b' && empty === STRIP_FOOTER_EMPTY,
+        `${idle.toFixed(1)} px empty, ${one.toFixed(1)} with one line, ${six.toFixed(1)} with six, `
+        + `${back.toFixed(1)} back to nothing, ${f.lines} lines kept of six, and it says "${empty}"`);
+
+      // 🔴 A NAME TOO LONG ELLIPSISES RATHER THAN WRAPPING, and that is the
+      // half a height check cannot see: a wrapped first line pushes the second
+      // one out of a box that is still exactly as tall as it was. Photographed
+      // on `/reel/`, where a title was cut mid word inside the tooltip.
+      // ⚠️ LONG ENOUGH ON ANY SCREEN, not long enough on this one. The real
+      // title that was photographed being cut is about seventy characters and
+      // FITS a laptop's box, so a check built on it would have passed here and
+      // failed nowhere while the defect it is about lives on a phone.
+      const long = `${'PÄEVAKAJA. Kaevanduse miiti ja muud, '.repeat(8)}lõpp`;
+      f.set({ detail: [long, 'the second line, which must survive it'] });
+      const row0 = f.el.firstElementChild;
+      const cut = row0.scrollWidth - row0.clientWidth;
+      const tall = h();
+      const second = f.says()[1];
+      f.set(null);
+      d.assert('a name too long for the box is cut off at the edge, not wrapped onto the line below',
+        cut > 0 && Math.abs(tall - idle) < 0.5 && second.startsWith('the second line'),
+        `${long.length} characters running ${cut} px past a ${row0.clientWidth} px line, still `
+        + `${tall.toFixed(1)} px tall, and the line under it reads "${second}"`);
+    }
+
+    /**
+     * 🔴 THE SECOND STOREY IS THE PAGE'S OWN ROW, MOVED, AND THERE IS ONE OF IT.
+     * Asked 2026-09-19: *"extend videopanel footer in fullscreen so it can have
+     * section below the footer bar (separaet with line). put controlgroup
+     * there"*, and the thing that would quietly go wrong is a second copy, which
+     * is two rows of buttons that can disagree about which option is chosen.
+     * ⚠️ IT GOES FULL BY THE CLASS, NOT BY ASKING THE BROWSER. `.pos-full` is
+     * what BOTH real paths set and what `isFull` reads, so this is the state
+     * itself rather than a stand-in for it. Asking for real would put a cover
+     * over the page in the middle of the checks that follow.
+     */
+    if (vpSpec && vpUnder) {
+      const p = vpSpec[vpSpec.length - 1].panel;
+      const home = vpUnder.parentNode;
+      vpUnder.dataset.kit = 'storey';
+      p.el.classList.add('pos-full');
+      p.mode('footer');                       // re-applies, which syncs the move
+      const lifted = vpUnder.parentNode;
+      const rows = getComputedStyle(p.el).gridTemplateRows.split(/\s+/).filter(Boolean).length;
+      const copies = document.querySelectorAll('[data-kit="storey"]').length;
+      p.el.classList.remove('pos-full');
+      p.mode('footer');
+      const returned = vpUnder.parentNode;
+      delete vpUnder.dataset.kit;
+      d.assert('the second storey holds the page’s own control row, moved, and puts it back',
+        lifted?.classList.contains('pos-vp-under') && p.el.contains(lifted)
+        && rows === 3 && copies === 1 && returned === home,
+        `${copies} of it in the document, ${rows} storeys while full, `
+        + `and it came back to the ${returned === home ? 'same' : 'wrong'} parent`);
+    }
+
     const probes = [];
     // On top of the page and out of the flow: it must be hit-testable, since
     // `document.elementFromPoint` is what decides which key a finger is on, and
@@ -2183,6 +2892,79 @@ green = inside what it promised · amber/red = later`,
     }
 
     for (const p of probes) p.kb.destroy();
+
+    /**
+     * 🔴 THE WAY BACK OUT, AND IT IS LAST ON PURPOSE. Two of the three checks
+     * below really cover the screen: the faux path puts `overflow: hidden` on
+     * the document and lays a fixed cover over everything, which is a state no
+     * geometry check above would be measuring a visitor's page in. So they run
+     * after every other check has had its answer.
+     *
+     * 🔴 AND THE EXIT IS PROVED BY PRESSING IT. `/blocks/` had a way out that
+     * was built, compiled and drawn every frame and never once updated, so
+     * there was no way out at all while every line of it read correct. Reading
+     * that a control is wired is not the same claim as pressing it.
+     */
+    {
+      /**
+       * 🔴 FADED MUST MEAN UNPRESSABLE, WHICH IS THE ONE THING `opacity: 0`
+       * DOES NOT SAY. Without `pointer-events: none` the bottom right corner of
+       * a picture exits full screen for somebody reaching past it, on a control
+       * they cannot see. MEASURED HERE RATHER THAN READ OUT OF THE STYLESHEET,
+       * because a rule that is present and inert reads exactly like one that
+       * works.
+       * ⚠️ PROVED BY BREAKING IT, 2026-09-19: with `pointer-events: none` taken
+       * off the faded rule in shell.css this reads `up auto, faded auto at
+       * opacity 0` and goes red, while everything else on the page stays green.
+       * ⚠️ AND IT IS A THROWAWAY PIECE WITH A SHORT IDLE, off screen, rather
+       * than the specimen. The shipped wait is EXIT_IDLE_MS, and a check that
+       * sat still for that long mid-block would fall off the end of the
+       * harness's collector, which stops 400 ms after the last assert.
+       * `.pos-full` is what both real paths set and what `isFull` reads, so the
+       * button is in the state it is graded in.
+       */
+      const probeHost = el('div', 'pos-full');
+      probeHost.style.cssText = 'position:fixed;left:-9999px;top:0;width:200px;height:120px';
+      document.body.append(probeHost);
+      const probe = createFullscreenExit(probeHost, { idleMs: 90 });
+      const upPE = getComputedStyle(probe.el).pointerEvents;
+      await nap(320);                       // the idle, then the 140 ms fade
+      const faded = getComputedStyle(probe.el);
+      const fadedPE = faded.pointerEvents, fadedOp = Number(faded.opacity);
+      document.dispatchEvent(new PointerEvent('pointermove'));
+      const backPE = getComputedStyle(probe.el).pointerEvents;
+      probe.destroy();
+      probeHost.remove();
+      d.assert('a faded way out cannot be pressed, and any movement brings it back',
+        upPE === 'auto' && fadedPE === 'none' && fadedOp === 0 && backPE === 'auto',
+        `up ${upPE}, faded ${fadedPE} at opacity ${fadedOp}, ${backPE} again after a pointer moved, `
+        + `on a 90 ms idle against the ${EXIT_IDLE_MS} ms a page gets`);
+    }
+
+    if (fsxSpec) {
+      const { host, exit, out } = fsxSpec;
+      await fsxSpec.go.onclick();
+      await nap(200);                       // the 140 ms fade, on its way up
+      const hb = host.getBoundingClientRect();
+      const bb = exit.el.getBoundingClientRect();
+      const cs = getComputedStyle(exit.el);
+      const gapR = hb.right - bb.right, gapB = hb.bottom - bb.bottom;
+      d.assert('the way out is inside the thing that went full, square, and off its bottom right corner',
+        host.contains(exit.el) && Math.abs(bb.width - bb.height) <= 0.6
+        && cs.opacity === '1' && cs.pointerEvents === 'auto'
+        && gapR >= 10 && gapR < hb.width / 2 && gapB >= 10 && gapB < hb.height / 2,
+        `${bb.width.toFixed(1)} by ${bb.height.toFixed(1)} px, ${gapR.toFixed(1)} px off the right edge `
+        + `and ${gapB.toFixed(1)} off the bottom, inside the cover`);
+
+      exit.el.click();
+      await nap(160);
+      const stillFull = fsIsFull(host);
+      const stillHost = document.documentElement.classList.contains('pos-faux-host');
+      d.assert('pressing it gives the screen back, which is the half that cannot be read off the source',
+        !stillFull && !stillHost && out.textContent === 'came back',
+        stillFull ? 'it was pressed and the cover is still there'
+          : `the cover is gone, the page scrolls again, and the specimen says "${out.textContent}"`);
+    }
   }
 
 
