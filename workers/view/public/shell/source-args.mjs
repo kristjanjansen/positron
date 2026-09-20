@@ -1,7 +1,7 @@
 // demo/shell/source-args.mjs — one spec, turned into the numbers `PosSource`
 // wants, in ONE place for the two machines that now run that definition.
 //
-// 🔴 WHY IT MOVED HERE. This was `sourceArgs()` in `rig/box/pappus.mjs`, where
+// 🔴 WHY IT MOVED HERE. This was `sourceArgs()` in `rig/board/pappus.mjs`, where
 // it was fine while the board was the only end running `PosSource.sc`. It is
 // not any more: `/grains/` loads the SAME compiled definition into wasm
 // scsynth in the tab, so the browser has to build the same amplitude table,

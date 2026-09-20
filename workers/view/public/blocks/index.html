@@ -7,47 +7,77 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .stage { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
-           background: #05070b; margin: 0 0 12px;
-           /* the window is dragged in now, so it says so and never scrolls the
-              page underneath while somebody is looking around */
-           touch-action: none; cursor: grab; }
-  .stage:active { cursor: grabbing; }
-  .stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9;
-                  transition: opacity 420ms ease; }
+  /* 🔴 `touch-action: none` IS THIS PAGE'S OWN ANSWER AND IT IS THE ONE THING
+     `shell.css` DELIBERATELY DOES NOT SET. A canvas you drag to look around
+     wants panning off and a canvas inside a page you scroll must not eat that
+     scroll, which are opposite answers to one question, so each page states its
+     own. This one is dragged to look, so it says so and never scrolls the page
+     underneath while somebody is looking around.
+     ⚠️ IT IS ON THE PANEL'S PICTURE BOX RATHER THAN ON THE CANVAS. A pointer's
+     allowed behaviours are the intersection down the ancestor chain, so a drag
+     that starts on the canvas is governed by this box as well, and the pointer
+     handlers are on this box too.
+     ⚠️ THE OTHER HALF IS GLOBAL AND IS NOT REPEATED HERE. `user-select: none`
+     and `-webkit-touch-callout: none` are on bare `canvas` in `shell.css` as of
+     2026-09-19, after this page was photographed on an iPhone wearing a blue
+     selection overlay with both drag handles. */
+  .pos-vp-stage { touch-action: none; cursor: grab; }
+  .pos-vp-stage:active { cursor: grabbing; }
   /* 🔴 THE ROOM APPEARS ONCE, RATHER THAN FOUR TIMES. The checks below roll
-     four rooms into this canvas before anything is pressed — an opening room,
-     a random one, a second random one and back — and each change cross-fades
-     over 900 ms, so a visitor arriving met three and a half seconds of bricks
-     sliding into different places. Reported as the boxes jumping position a
-     couple of times, which is exactly what it was. The frames are still drawn
-     and still timed; what waits is showing them. */
-  .stage.warming canvas { opacity: 0; }
-  /* ⚠️ `.stage.pos-full`, NEVER `.stage:fullscreen, .stage.pos-full` — a browser
-     that does not know that pseudo-class discards the WHOLE selector list, which
-     deletes the fallback on exactly the browsers that need it. (0,2,0) beats
-     `.stage` on specificity rather than on source order. */
-  .stage.pos-full { aspect-ratio: auto; width: 100%; height: 100%;
-                    border: 0; border-radius: 0; margin: 0; }
-  .stage.pos-full canvas { height: 100%; aspect-ratio: auto; }
+     four rooms into this canvas before anything is pressed: an opening room, a
+     random one, a second random one and back, each cross-fading over 900 ms, so
+     a visitor arriving met three and a half seconds of bricks sliding into
+     different places. Reported as the boxes jumping position a couple of times,
+     which is exactly what it was. The frames are still drawn and still timed;
+     what waits is showing them. */
+  .pos-vp-stage > canvas { transition: opacity 420ms ease; }
+  .pos-vp.warming > .pos-vp-stage > canvas { opacity: 0; }
+  /* 🔴 A NAMED VALUE IN A PANEL FOOTER, AND THIS IS THE THIRD COPY OF IT.
+     `/mirror/` has `.fact`, `.fact-k` and `.fact-v` and `/weight/` has `.hd-gpu`,
+     `.hd-gpu-k` and `.hd-gpu-v`, both for the same fact in the same kind of
+     cell. `/weight/`'s note says two is not yet a component and a third would be,
+     and this is the third: it belongs in the kit and is NOT being put there
+     here, because that would be a fourth hand in `shell.css` while somebody
+     else is holding it.
+     ⚠️ COPIED FROM `/weight/` RATHER THAN FROM `/mirror/`, AND DELIBERATELY. The
+     rule when two things merge here is to take the better half, never the
+     average: `/mirror/`'s wrapper is a horizontal SCROLLER because it holds a
+     row of four, and a scroller round one fact is machinery with nothing to do.
+     `/weight/`'s is the single-cell shape, with the ellipsis that keeps a long
+     chip name from pushing the ⛶ off the end of the row.
+     ⚠️ THE KEY STYLE IS `.pos-k`'s, copied rather than invented in all three
+     places, so a value named under a picture is named the way every readout in
+     the project names one. */
+  .bl-gpu { display: flex; align-items: baseline; gap: 5px; min-width: 0;
+            white-space: nowrap; overflow: hidden; }
+  .bl-gpu-k {
+    font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--dim2);
+  }
+  .bl-gpu-v {
+    font: 400 11px/1.4 var(--mono); color: var(--fg);
+    overflow: hidden; text-overflow: ellipsis;
+  }
 </style>
 
 <script type="module">
   import { mount, guard, el, createShipper, BUILD } from '/shell/shell.mjs';
-  import { toggle as toggleFull, watch as watchFull,
-    support as fullSupport } from '/shell/fullscreen.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
   import { docOf, validate as validate0, UNIT, PALETTE } from '/shell/seed.mjs';
   import { touchOf } from '/shell/xr-panel.mjs';
   import {
     createXRRoom, roomOf, spaced, clashes, radiusOf, halfOf, overlapOf, leastAxis, r4, holdM,
     GAP, DROP_PASSES, FADE_MS, ROOM_OPTIONAL_FEATURES,
-    perspective, lookAt,
+    perspective, lookAt, mul,
   } from '/shell/xr-room.mjs';
   import { createXRHands, BUTTON, AXIS } from '/shell/xr-hands.mjs';
   import { createXRTablet, valueFromU, TABLET } from '/shell/xr-tablet.mjs';
-  import { createXRQuit } from '/shell/xr-quit.mjs';
-  import { eyeFromView } from '/shell/xr-ray.mjs';
+  import { mountXRQuit, createQuitHold } from '/shell/xr-quit.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { XR_MODE, answered, canEnter, reasonFor, xrCaps, onXrCaps, whenXrCaps }
+    from '/shell/xr-caps.mjs';
 
   // ── the room is a module now ────────────────────────────────────────────
   // 🔴 THE PICTURE AND THE RULES ABOUT IT LIVE IN demo/shell/xr-room.mjs. The
@@ -157,43 +187,195 @@
     // and so is the controller geometry, so the sentence that named them had to
     // go with them: a description that has drifted is worse than a missing one
     // because a visitor believes it. What is left is what you do.
-    what: 'Square bricks on a dotted floor, all of them a whole number of units '
-      + 'across. Drag to look and the arrow keys to walk; in a headset a ray '
-      + 'from your hand picks a brick up with the trigger and the thumbstick '
-      + 'pushes it nearer or further, lighting it when it reaches a wall. Let '
-      + 'one go and it snaps to a grid squared up with the room, settles onto '
-      + 'whatever is under it, and comes to rest against the walls.',
-    // 🔴 FOUR CELLS, DOWN FROM EIGHT, AND FOUR OF THE OLD ONES COULD NOT MOVE.
-    // `seed`, `things` and `refused` were written once at load and then sat
-    // there; `round trip` only changed on a roll, and the roll is not a button
-    // any more. A row of constants teaches a reader to stop looking at the row.
-    // What is left all moves while somebody is watching: two frame timings, how
-    // many things you have picked up, and where you are looking from.
-    readout: { 'to frame': 'ms', worst: 'ms', moved: '', view: '' },
+    // 🔴 ONE SENTENCE SINCE 2026-09-19, WHICH IS THE RULE NOW. It was six,
+    // grown one clause at a time over four rounds of additions, and every round
+    // appended while none subtracted.
+    // 🔴 AND IT IS THE INDEX'S OWN LINE, WORD FOR WORD, because this page has a
+    // diagram now. A paragraph and a picture of the machinery are two
+    // explanations of one thing and the paragraph is the weaker of them, so
+    // what is left says what this is and what to press, and a visitor arriving
+    // from the index is not told the same thing twice in two wordings that can
+    // drift apart. `one` in `demo/manifest.mjs` carries the same sentence.
+    what: 'Square bricks on a dotted floor you drag to look around, and in a '
+      + 'headset a ray from your hand picks one up and snaps it to the grid '
+      + 'where you let it go.',
+    /**
+     * 🔴 NO READOUT, ASKED FOR TWICE: *"blocks: rm readout"*. There were four
+     * cells and every one of them was a number about the page rather than about
+     * the room: two frame timings, a count of what your own hands had done, and
+     * a word saying whether you were wearing a headset. A room you are standing
+     * in is its own readout, and a row of figures above it is a second thing to
+     * read that says less than the picture does.
+     * ⚠️ NOTHING THEY SAID WAS DROPPED, which is the rule when a display goes.
+     * `to frame` and `worst` are frame timing and go to the log when they
+     * change rather than sixty times a second; `view` is a state change and
+     * goes to the log at the moment it changes; `moved` is a count of what your
+     * hands did, which the room already shows, and it rides the line the drop
+     * already wrote. All four are still on `__demo` for a harness.
+     * ⚠️ `null` RATHER THAN AN OMITTED FIELD, so `readoutOptOut` reads it as
+     * deliberate and neither `verify.mjs` nor `verify-quest.mjs` can tell "no
+     * cells on purpose" apart from "none yet".
+     */
+    readout: null,
     // 🔴 THE SAME THREE AS EVERY OTHER HEADSET PAGE, IN THE SAME ORDER. `floor`
-    // and `held` offer VR, AR and fullscreen; this offered VR, AR and three
+    // and `weight` offer VR, AR and fullscreen; this offered VR, AR and three
     // buttons about rolling a room, so the two pages a visitor compares looked
     // like different kinds of thing. The rolling is not gone — it happens at
     // load and its checks run there, see `selfCheck()` — it is no longer
     // something to press.
-    controls: [
-      { id: 'enter', label: 'Run in VR' },
-      { id: 'ar', label: 'Run in AR' },
-      { id: 'full', label: '⛶', end: true },
-    ],
+    // 🔴 AND THE ROW IS EMPTY NOW, WHICH IS THE WHOLE OF WHAT IS LEFT HERE.
+    // `Run in VR` and `Run in AR` are a kit button group, prepended into this
+    // row below so both harnesses can still press them. The ⛶ was the last
+    // thing declared here and it went on 2026-09-19 with the video footer: the
+    // panel's right slot carries one already, and two full-screen buttons on
+    // one page is the duplication this stream has removed twice.
+    // ⚠️ CONTROL 0 DID NOT MOVE, WHICH IS THE THING TO CHECK. `settleMs` only
+    // ever lands on control 0 and the harness presses in document order, so
+    // removing a control can silently move where a six-second wait goes. The ⛶
+    // was LAST (`end: true`), and the order was `vr, ar, full` before and is
+    // `vr, ar` after, so control 0 is `vr` in both.
+    controls: [],
   });
   guard(d);
 
-  const stage = el('div', 'stage warming');
+  /**
+   * 🔴 THE TWO SESSION CONTROLS ARE ONE KIT COMPONENT, AND THEY USED TO BE
+   * THREE SPELLINGS OF ONE THING. Asked 2026-09-19: *"global: make buttongroup
+   * component and convert all vr/ar buttons to it"*. `/weight/` and `/floor/` say
+   * `vr`, `/mirror/` says `xr`, and this page said `enter`, so a check written
+   * against one page could not be read against another. The id here is `vr`.
+   *
+   * 🔴 IT GOES INSIDE `.pos-controls`, BEFORE THE ⛶. Both harnesses press
+   * `.pos-controls button`, which is a DESCENDANT selector, so a group in that
+   * row keeps every button pressable and a group anywhere else would silently
+   * stop being exercised. `prepend` rather than `append` because the ⛶ carries
+   * `end: true`, which is `margin-left: auto`, and a group appended after it
+   * would sit on the far side of that push.
+   *
+   * 🔴 AND THE GROUP OWNS DISABLED. Whether a session can be opened at all is
+   * an answer that arrives late and is `absent` on every phone, so the control
+   * is switched off with the reason in words rather than left to fail when it
+   * is pressed. `canEnter` treats `asking` as yes, so nothing is ever greyed
+   * out on a guess.
+   */
+  const xrGroup = createButtonGroup({
+    /**
+     * 🔴 NO LABEL, AND IT HAD ONE FOR AN HOUR. Asked 2026-09-19: *"blocks: rm
+     * 'headset' label and use buttongroup for vr xr"*. This page passed
+     * `label: 'headset'` while `/weight/`, `/floor/` and `/mirror/` passed none,
+     * so one page in four wore a word the others did not, which is the drift a
+     * component exists to remove appearing inside the component.
+     * ⚠️ AND THE GENERAL RULE IS WORTH SAYING, because it decides the next one
+     * of these: a CHOICE needs a label, because its options are answers and the
+     * label is the question. A row of ACTIONS does not, because each button
+     * already says what it does, and `Run in VR` needs no heading.
+     */
+    buttons: [
+      { id: 'vr', label: 'Run in VR' },
+      { id: 'ar', label: 'Run in AR' },
+    ],
+    // ⚠️ THROUGH `d.run`, SO THE HANDLERS STAY WHERE HANDLERS LIVE. `d.on('vr')`
+    // and `d.on('ar')` below are registered the same way every other control on
+    // every other page is, which is also what lets `selfCheck()` reach them by
+    // name if it ever has to.
+    onPress: (id) => d.run(id),
+  });
+  d.controls.prepend(xrGroup.el);
+  // 🔴 AND THE ROW HAS TO BE UN-HIDDEN, BECAUSE THE SHELL HID IT. `mount()`
+  // sets `hidden` on `.pos-controls` when a page declares no controls, so that
+  // a row with nothing in it does not leave a 14 px band of dead space. This
+  // page declares none and then puts two buttons in it, which is a case the
+  // shell cannot see: `hidden` is decided from the declaration and the group
+  // arrives afterwards. Without this line both session controls are in the DOM,
+  // reachable by `querySelectorAll`, disabled or enabled correctly, and
+  // invisible.
+  d.controls.hidden = false;
+  // Called at once with what is known, and again on every change.
+  onXrCaps((c) => {
+    xrGroup.enable('vr', canEnter(c.vr), reasonFor(c.vr, 'vr'));
+    xrGroup.enable('ar', canEnter(c.ar), reasonFor(c.ar, 'ar'));
+  });
+
   const canvas = el('canvas', null, null, { width: 960, height: 540 });
-  // ⚠️ NO LABEL OVER THE PICTURE. There was a badge in the top-left corner
-  // saying `window · <renderer>` and then `headset · you are in the room`, over
-  // the one thing on the page worth looking at. Where you are looking from is a
-  // fact, and a fact goes in a readout cell — `view`, below — which is a fixed
-  // box that cannot grow over the picture. The renderer string still goes to
-  // the log, where `verify-gl` reads it.
-  stage.append(canvas);
-  d.el.append(stage);
+  /**
+   * 🔴 THE ONE FACT UNDER THE PICTURE: WHAT DREW IT. Asked 2026-09-19:
+   * *"blocks: add videofooter with fullscreen control and info what renders
+   * it"*. It is FILLED from `rendererName` further down rather than typed, so
+   * the footer and `window.__demo.gl.renderer` cannot say two different things
+   * about one context, and a check below holds them to that.
+   * ⚠️ NOT A PRESENCE DOT, WHICH IS THE PANEL'S OWN DEFAULT LEFT SLOT. Nothing
+   * on this page answers from anywhere else that a visitor is waiting on, so a
+   * badge here could only ever read `online` about the browser it is drawn in,
+   * and a control with one honest state is the shape this project calls a lie.
+   * `/mirror/` gives a dot only to the pane fed by a Raspberry Pi, for the same
+   * reason and in as many words.
+   */
+  const gpuEl = el('span', 'bl-gpu');
+  gpuEl.append(el('span', 'bl-gpu-k', 'picture'), el('span', 'bl-gpu-v', ''));
+  const gpuVal = gpuEl.lastChild;
+
+  /**
+   * ⚠️ ONE PLACE SAYS IT, AND IT SAYS IT ONCE. Full screen can end three ways
+   * here (the footer's ⛶, Escape, a phone gesture) and more than one of them
+   * reaches this page, so a line written at each would print twice. Reporting
+   * on the CHANGE rather than on the event is the same rule this page applies
+   * to a brick crossing the wall: say it on the crossing, never per frame.
+   * ⚠️ DECLARED ABOVE THE PANEL THAT CALLS IT. `createVideoPanel` does not fire
+   * `onFull` while it is still building itself, and a page relying on that
+   * without saying so is a dead-zone read waiting to happen.
+   */
+  let fullSaid = null;
+  const sayFull = (on) => {
+    if (on === fullSaid) return;
+    fullSaid = on;
+    d.log(on
+      ? `filling the screen (${panel.support() || 'no way to'}). The ⛶ under the picture comes back out`
+      : 'back to the page', 'hi');
+  };
+
+  /**
+   * 🔴 THE PICTURE IS A KIT PANEL NOW, NOT A DIV THIS PAGE STYLED. Asked
+   * 2026-09-19 alongside `/weight/`. The ⛶ is the panel's own right slot, so this
+   * page stopped declaring a shell control for it and stopped mounting its own
+   * way back out of full screen: there was one of each an hour ago and two of
+   * anything is the duplication this stream keeps removing.
+   * 🔴 `fullMode` IS LEFT AT ITS DEFAULT, WHICH IS `hover`, AND `footer` WAS
+   * THE OTHER ANSWER. `footer` keeps the row on screen while full, so the name
+   * of what is drawing would survive going full screen; against that, `/weight/`
+   * is the same shape of page, was asked for in the same minute, and left the
+   * default, and two sibling pages a visitor compares should not be two kinds
+   * of thing. The renderer is a fact you read once rather than one you watch,
+   * so the default wins and the picture gets the whole screen.
+   * ⚠️ IT ALSO KEEPS THE WAY OUT INSIDE THE PICTURE. In `hover` the panel puts
+   * `createFullscreenExit` in its own stage; in `footer` with the standing
+   * right slot it does not, because that row's own ⛶ is still on screen. The
+   * check below reads whichever is there, so it grades the arrangement rather
+   * than assuming one.
+   * ⚠️ NO SECOND STOREY. `under` moves a page's own control row into the panel
+   * while full, which is right for `/mirror/`, whose controls are about the
+   * picture. Nothing was asked for here, and entering a headset is not a thing
+   * to do from inside a full-screen canvas.
+   * ⚠️ NO LABEL OVER THE PICTURE EITHER, which is older and still holds. A
+   * badge used to sit in the top-left corner over the one thing on the page
+   * worth looking at. Where you are looking from is a state change and goes in
+   * the log; what drew it is a fact and goes in the footer, which is a box that
+   * cannot grow over the picture.
+   */
+  const panel = createVideoPanel({
+    media: canvas,
+    left: gpuEl,
+    onFull: (full) => sayFull(full),
+  });
+  panel.el.classList.add('warming');
+  d.el.append(panel.el);
+  /**
+   * ⚠️ THE NAME IS KEPT, AND IT NAMES THE SAME THING IT ALWAYS DID: the box the
+   * picture is in, which is what you drag to look around and what fills the
+   * screen. It belongs to the panel now rather than to this page, so the
+   * pointer handlers and the keyboard's `isConnected` guard below are unchanged
+   * and the rename that would have touched eight lines did not happen.
+   */
+  const stage = panel.stage;
 
   // ── the picture ─────────────────────────────────────────────────────────
   // WebGL2 and nothing else. `OCULUS_multiview` is on by default on Quest and
@@ -212,69 +394,69 @@
   const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, xrCompatible: true });
   if (!gl) { d.log('no WebGL2 in this browser', 'bad'); }
 
-  const compile = (t, src) => {
-    const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
-    return s;
-  };
-  const link = (vs, fs) => {
-    const p = gl.createProgram();
-    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
-    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
-    // 🔴 BEFORE linkProgram, NOT AFTER. One VAO feeds every program here with
-    // position at 0 and normal at 1, so they all have to agree on that — and
-    // `bindAttribLocation` only takes effect at the NEXT link, so calling it
-    // after linking is a no-op that reads like a fix. It was called after, on
-    // one of the programs, and the Quest reported GL_INVALID_OPERATION (1282)
-    // on its first frame for it. It drew anyway, because the linker happened to
-    // pick the same slots — which is the worst kind of working.
-    gl.bindAttribLocation(p, 0, 'aPos');
-    gl.bindAttribLocation(p, 1, 'aNrm');
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-    return p;
-  };
-
-  const PANEL_VS = `#version 300 es
-    in vec3 aPos; in vec3 aNrm;
-    uniform mat4 uProj, uView, uModel; out vec2 vUv;
-    void main(){ vUv = vec2(aPos.x + 0.5, 0.5 - aPos.y);
-      gl_Position = uProj * uView * uModel * vec4(aPos, 1.0); }`;
-  const PANEL_FS = `#version 300 es
-    precision highp float;
-    in vec2 vUv; uniform sampler2D uTex; uniform float uFade; out vec4 o;
-    void main(){ vec4 t = texture(uTex, vUv); o = vec4(t.rgb, t.a * uFade); }`;
-
-  let progPanel = null, quad = null;
-  try { progPanel = link(PANEL_VS, PANEL_FS); }
-  catch (e) { d.log(`shader: ${e.message}`, 'bad'); }
-
-  function unitQuad() {
-    const P = [-0.5,-0.5,0, 0.5,-0.5,0, 0.5,0.5,0, -0.5,-0.5,0, 0.5,0.5,0, -0.5,0.5,0];
-    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
-    const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(P), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-    gl.bindVertexArray(null);
-    return { vao, count: 6 };
-  }
+  /**
+   * 🔴 THIS PAGE COMPILES NO SHADER OF ITS OWN ANY MORE, AND THAT IS WHAT THE
+   * POPUPS COST. There was a program here, a unit quad, a 768x192 canvas and a
+   * texture, and the only thing any of it ever drew was a card of text hung in
+   * front of your face. All eleven things that put one there are rehomed, so
+   * the apparatus went with them: a shader nothing draws through is a
+   * `getError` waiting to be blamed on something else.
+   * ⚠️ WHAT THE PICTURE IS MADE OF NOW: `xr-room.mjs` owns the room and its
+   * programs, `xr-tablet.mjs` owns the slab this page builds and does not show,
+   * and `xr-quit.mjs` owns the way out and its ring. None of the three is this
+   * page's to compile.
+   * ⚠️ AND THE `bindAttribLocation` LESSON DID NOT GO WITH IT. It has to be
+   * called BEFORE `linkProgram` or it is a no-op that reads like a fix, and a
+   * Quest reported GL_INVALID_OPERATION on its first frame for exactly that and
+   * DREW CORRECTLY ANYWAY. It is written down where the linking now happens,
+   * which is `xr-room.mjs` and `xr-quit.mjs`, and the assert that would catch
+   * it is still on this page as `no WebGL error is pending`.
+   */
   /**
    * 🔴 ONE WAY OUT OF A ROOM, AND ONE PLACE THAT SAYS WHAT FIRED.
    *
-   *   · a long hold on ANY controller button   — the only one a person uses
-   *   · a dead-man's switch at 4 s             — not an exit, a guard
+   *   a long hold on ANY controller button, which is the only one a person uses
+   *   a dead-man's switch at 4 s, which is not an exit but a guard
    *
    * 2026-09-17: *"make one general way to get out. hold down any controller
    * button for looooong enough then it quits. no other exit methods/ui's for
    * now."* The grip used to leave and so did a button on the tablet; both are
    * gone, and so is the tablet. What is left is `demo/shell/xr-quit.mjs`: hold
-   * anything for three seconds and a ring at the controller fills while you do.
+   * anything for three seconds and a ring fills in front of you while you do.
+   *
+   * 🔴 THE RING IS HEAD LOCKED AND IS NOT AT YOUR HANDS, 2026-09-19: *"Hold-to-
+   * quit: ui should not tied to controllers. it should be just front of me"*.
+   * One ring, dead centre, 1.6 m out, about five degrees across, drawn last
+   * with the depth test off so nothing in this room can hide the way out of it.
+   * ⚠️ AND IT SURVIVES THIS PAGE'S NEW BRICK SIZE, which is the one page where
+   * it could have failed, THOUGH NOT QUITE FOR THE REASON IT LOOKS LIKE. A
+   * brick is 1.0 m now and `MIN_HOLD` keeps a held one's centre 0.8 m or
+   * further away, so its near face is 0.3 m out and its far face 1.3 m: a clear
+   * 0.3 m short of the ring at 1.6. 🔴 THAT 1.3 IS MEASURED FROM YOUR HAND AND
+   * THE RING IS MEASURED FROM YOUR EYE, and the two are half a metre apart with
+   * an arm out, so a brick held at the minimum can reach PAST the ring's plane
+   * rather than stopping short of it. The margin is not what makes this work.
+   * What makes it work is that the ring is drawn last with `DEPTH_TEST` off and
+   * its depth writes masked, so no brick at any distance can be in front of it.
+   * Every push with the thumbstick goes further out, so the case is the same
+   * one at every distance.
+   *
+   * 🔴 AND THIS PAGE IS WHY THE MODULE MOUNTS ITSELF. It built the badge,
+   * compiled its shader, drew it at both hands every frame, and never once
+   * called `update`, so the hold could not advance and there was no way out of
+   * here at all. Reported from a device as *"i was not able to get out"*. There
+   * is no `update` to forget now: `mountXRQuit` takes the SESSION and puts its
+   * own callback on `session.requestAnimationFrame`.
    *
    * ⚠️ THE DEAD-MAN'S SWITCH IS NOT AN EXIT AND IT STAYS. It ends a session
    * that has drawn NOTHING after four seconds, which is the case where the page
    * threw and there is no ring, no badge and no render loop to draw one.
    * CLAUDE.md records what it prevents: a live session, nothing drawing, no way
    * out and no log line. Removing it would put that back.
+   * ⚠️ IT IS NOT MADE REDUNDANT BY THE MODULE DRIVING ITSELF EITHER. The hold
+   * survives a dead render loop, so somebody who knows the gesture can leave a
+   * page that threw; this is for somebody who does not, and it does not need
+   * three seconds of blind holding to find out.
    *
    * ⚠️ AND THE LOG HAS TO NAME WHICH. Two endings that both print "session
    * ended" make a page that cannot tell you why it ended, which is the same
@@ -318,7 +500,6 @@
 
   let room = null, tablet = null, xrHands = null, xrQuit = null;
   if (gl) {
-    quad = unitQuad();
     room = createXRRoom(gl, { log: (m, k) => d.log(m, k), say: shipNow });
     // ── the small screen on your left hand, and the controls on it ─────────
     // 🔴 THE CONTROLS ARE A LIST IN `xr-tablet.mjs`, NOT A THING THIS PAGE
@@ -362,39 +543,27 @@
     xrHands = createXRHands({ tablet, log: (m, k) => d.log(m, k), say: shipNow });
   }
 
-  // ── the status panel: text drawn to a canvas, uploaded as a texture ─────
-  // 🔴 THE 2D PAGE IS INVISIBLE INSIDE AN IMMERSIVE SESSION. `d.log` and the
-  // readout are behind your face, so anything you need to READ while wearing
-  // the headset has to be drawn in the scene. That is the whole reason this
-  // exists, and it is why the update story needed it first.
-  const panelCv = document.createElement('canvas');
-  panelCv.width = 768; panelCv.height = 192;
-  const pctx = panelCv.getContext('2d');
-  let panelTex = null, panelText = '', panelUntil = 0;
-
-  function setPanel(text, holdMs = 9000) {
-    panelText = text; panelUntil = performance.now() + holdMs;
-    pctx.clearRect(0, 0, 768, 192);
-    pctx.fillStyle = 'rgba(8,11,17,.88)';
-    pctx.roundRect?.(0, 0, 768, 192, 18); pctx.fill();
-    pctx.strokeStyle = '#ffd400'; pctx.lineWidth = 3;
-    pctx.beginPath(); pctx.moveTo(3, 18); pctx.lineTo(3, 174); pctx.stroke();
-    pctx.fillStyle = '#e8edf5';
-    pctx.font = '600 40px ui-monospace, SFMono-Regular, Menlo, monospace';
-    const lines = String(text).split('\n').slice(0, 3);
-    lines.forEach((l, i) => pctx.fillText(l.slice(0, 34), 34, 62 + i * 52));
-    if (!panelTex) {
-      panelTex = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, panelTex);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    }
-    gl.bindTexture(gl.TEXTURE_2D, panelTex);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, panelCv);
-  }
-
+  /**
+   * 🔴 NOTHING POPS UP IN A HEADSET ON THIS PAGE. A status card used to live
+   * here: 768x192 of canvas, a yellow rule down its edge, uploaded as a texture
+   * and hung head locked and low left, with eleven things allowed to raise it.
+   * Asked 2026-09-19, and this page is where it was noticed: *"also remove the
+   * notes/messagepopups from vrxr (noticed them in blocks)"*.
+   *
+   * ⚠️ THE ARGUMENT FOR IT WAS SOUND AND DID NOT COVER THIS. The 2-D page is
+   * genuinely invisible inside an immersive session, so anything you need to
+   * READ in there does have to be drawn in the scene. That argues for a surface
+   * you CHOOSE to look at. It does not argue for text that appears in front of
+   * you because something happened, which is what every one of the eleven was.
+   * ⚠️ AND THE SURFACE IT ARGUES FOR IS ALREADY BUILT. `xr-tablet.mjs` is whole
+   * and `SHOW_TABLET` is one flag from putting it back in your hand, which is a
+   * thing you look at when you want to rather than a thing that arrives.
+   *
+   * Where the eleven went: development traffic to this page's own log and to
+   * the beacon at pub.positron.studio, which are the two places a developer
+   * reads; notes about what your own hands just did are gone, because the thing
+   * MOVED and you were watching it, with the number kept in the log.
+   */
   // ⚠️ SAY WHICH RENDERER, ALWAYS. A visitor on a software rasteriser is a real
   // visitor, and a page that is quietly slow teaches nothing. demo/verify-gl.mjs
   // checks its own answer against this one, so a page that stays silent reads as
@@ -403,7 +572,28 @@
   if (gl) {
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     rendererName = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-
+    /**
+     * 🔴 NAME THE CHIP, NOT THE FIRST COMMA. Splitting
+     * "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)"
+     * on its first comma leaves the word "Apple", which says nothing at all.
+     * The part worth printing is what follows "Renderer:".
+     * ⚠️ THIRD COPY OF THIS LINE IN THE PROJECT: `/mirror/` has the first and
+     * `/weight/` the second, and all three read the same string out of the same
+     * extension and shorten it the same way. Taken from `/weight/` verbatim
+     * rather than written again, so the extraction that is owed here is a move
+     * rather than a reconciliation of three spellings.
+     * ⚠️ THE FULL STRING STAYS ON `__demo.gl.renderer`, which is what
+     * `verify-gl.mjs` compares its own answer against. The cell is for a
+     * reader, and the check below holds the two to the same context.
+     */
+    const short = String(rendererName).match(/Renderer:\s*([^,)]+)/)?.[1]
+      ?? String(rendererName).replace(/^ANGLE \(|\)$/g, '');
+    gpuVal.textContent = short.trim().slice(0, 32);
+  } else {
+    // ⚠️ AN EMPTY CELL WOULD READ AS A CELL STILL WAITING. There is no context
+    // and there never will be on this browser, which is a fact rather than a
+    // pending measurement.
+    gpuVal.textContent = 'no WebGL2';
   }
 
   // ── the room itself ─────────────────────────────────────────────────────
@@ -415,16 +605,6 @@
   let appliedAt = 0, shown = true, lastToFrame = null;
   let worst = 0, toFrame = [];
   const lastDocs = [];         // for the negative control
-  // Only the status panel's program belongs to this page now; the room's own
-  // uniforms are the room's business.
-  let PU = null;
-  const panelLocs = () => (PU ||= {
-    proj: gl.getUniformLocation(progPanel, 'uProj'),
-    view: gl.getUniformLocation(progPanel, 'uView'),
-    model: gl.getUniformLocation(progPanel, 'uModel'),
-    tex: gl.getUniformLocation(progPanel, 'uTex'),
-    fade: gl.getUniformLocation(progPanel, 'uFade'),
-  });
 
   /**
    * One view of the room, with this page's state handed across in one place.
@@ -442,7 +622,7 @@
    * symmetric noise, hue from the seed — and it was the loudest thing in the
    * picture on a page about the boxes inside it. Off, and what is left is the
    * dotted floor the module already draws: black, a ground reference, and the
-   * same surface `held` stands on, so the two 3-D rooms here read as one place.
+   * same surface `weight` stands on, so the two 3-D rooms here read as one place.
    * ⚠️ `sky: false` is a draw option the module already had for passthrough,
    * where the real room is behind you and a painted one would replace it. This
    * is the same argument indoors.
@@ -512,7 +692,7 @@
     appliedAt = performance.now(); shown = false;
     lastDocs.push(docOf(next));
     if (askedAt) roundTrip = Date.now() - askedAt;
-    d.log(`room ${next.seed} · ${next.things.length} things, ${docOf(next).length} bytes`);
+    d.log(`room ${next.seed} holds ${next.things.length} things in ${docOf(next).length} bytes`);
     return true;
   }
 
@@ -548,20 +728,28 @@
   }
 
   /**
-   * 🔴 THE PLATE — how far the room goes before there is a wall. The validator
-   * refuses anything past 12 m, which is a rule about a document rather than a
-   * place you can stand: a brick at 11 m is inside the room and nowhere near
-   * anything. 2.2 m is four paces across, which is a table you build on.
+   * 🔴 THE PLATE, WHICH IS HOW FAR THE ROOM GOES BEFORE THERE IS A WALL. The
+   * validator refuses anything past 24 m, which is a rule about a document
+   * rather than a place you can stand: a brick at 22 m is inside the room and
+   * nowhere near anything.
    * ⚠️ IT IS SMALLER THAN THE VALIDATOR'S LIMIT ON PURPOSE. The two are not the
-   * same rule — one says what a document may contain and this says where a
-   * brick may be put — and collapsing them would mean a generator change could
+   * same rule. One says what a document may contain and this says where a brick
+   * may be put, and collapsing them would mean a generator change could
    * silently move the walls.
    */
-  // ⚠️ THE PLATE FOLLOWS THE BRICK. It was 2.2 m against a 0.2 m unit, which is
-  // eleven bricks across; at 0.5 m the same number is 5.5 m of floor, which is
-  // further than you can walk in most rooms. Four and a half cells each way
-  // keeps everything inside a reach or two of where you are standing.
-  const PLATE = 2.4;
+  // ⚠️ THE PLATE FOLLOWS THE BRICK, AND THIS IS THE THIRD TIME THE PAIR HAS
+  // MOVED. It was 2.2 m against a 0.2 m unit, which is eleven bricks across; at
+  // 0.5 m eleven bricks would have been 5.5 m of floor, so it became 2.4, which
+  // is 9.6 bricks.
+  // 🔴 AND 4.8 SINCE 2026-09-19, BECAUSE THE UNIT WENT TO 1.0 m. The arithmetic
+  // is one division: a plate is measured in bricks as `2 * PLATE / UNIT`, so
+  // 2.4 against 0.5 m is 9.6 bricks across and 4.8 against 1.0 m is the same
+  // 9.6. Left at 2.4 the same floor would have been 4.8 bricks across, which is
+  // a brick twice the size in a room with a quarter of the places to put one.
+  // ⚠️ THE ROOM IS NOW 9.6 m ACROSS AND STILL REACHABLE. Its furthest corner is
+  // 6.8 m from the middle, under the 16 m ceiling on how far a held brick can
+  // be pushed, and well inside the 22 m of dotted floor the room module draws.
+  const PLATE = 4.8;
 
   /**
    * 🔴 WHICH WAY ROUND THE BRICK GRID IS, IN RADIANS. Zero until a headset
@@ -765,11 +953,21 @@
    * up and waits, because a session ending under somebody without warning is
    * the disruptive refresh this whole arrangement exists to avoid.
    */
+  /**
+   * 🔴 NONE OF THIS PUTS ANYTHING IN FRONT OF YOU ANY MORE. Every branch here
+   * used to hang a card in the scene, and this whole block is development
+   * traffic: somebody at a keyboard pushing a message down a socket at a person
+   * wearing a headset. Asked 2026-09-19: *"also remove the notes/messagepopups
+   * from vrxr (noticed them in blocks)"*. It goes to the two places a developer
+   * actually reads, which are this page's own log and the device log at
+   * pub.positron.studio, and to neither of them does anybody have to be wearing
+   * anything.
+   */
   let reloadOffered = null;
   async function onDev(m) {
     if (m.type === 'dev.status') {
-      setPanel(m.text || '', m.holdMs || 9000);
       d.log(`dev: ${m.text}`);
+      shipNow(`dev.status · ${m.text}`);
       return;
     }
     if (m.type === 'dev.shader') {
@@ -780,11 +978,11 @@
         // a browser pane. It throws if the body will not compile, and the
         // picture keeps its own.
         room.applyLook({ sky: m.sky, box: m.box });
-        setPanel('✓ new look\nfading in');
+        d.log('a new look arrived and is fading in', 'ok');
         shipNow('dev.shader compiled · fading in');
       } catch (e) {
         // A shader that will not compile must not take the picture with it.
-        setPanel(`✗ new look refused\n${String(e.message).slice(0, 30)}`);
+        d.log(`the new look would not compile, so the picture keeps its own. ${e.message}`, 'warn');
         shipNow(`FAIL dev.shader: ${e.message}`);
       }
       return;
@@ -795,19 +993,24 @@
         // second copy of one the browser has already evaluated.
         const mod = await import(`/shell/seed.mjs?v=${encodeURIComponent(m.v || Date.now())}`);
         world = (seed) => spaced(mod.world(seed)); validate = mod.validate;
-        setPanel('✓ new generator, applied\nroll to see it');
+        d.log('a new generator is in. The next room rolled will come out of it', 'ok');
         shipNow(`dev.module applied live · v${m.v}`);
       } catch (e) {
-        setPanel(`✗ new generator refused\n${String(e.message).slice(0, 30)}`);
+        d.log(`the new generator was refused, so the old one is still making rooms. ${e.message}`, 'warn');
         shipNow(`FAIL dev.module: ${e.message}`);
       }
       return;
     }
     if (m.type === 'dev.reload') {
       reloadOffered = m.build || 'a new build';
-      setPanel(`● update ready · ${reloadOffered}\npress A to take it`, 60000);
-      d.log(`an update is ready (${reloadOffered}). Reload when you want it`);
-      shipNow(`dev.reload offered · ${reloadOffered}`);
+      // ⚠️ THE `press A` INSTRUCTION IS REHOMED, NOT DROPPED. It was the one
+      // useful thing on a card that hung in somebody's view for a full minute,
+      // and the button still works: what changed is that the person told about
+      // it is the developer who pushed the update, in the log and the beacon,
+      // rather than whoever happened to be wearing the headset.
+      d.log(`an update is ready (${reloadOffered}). Reload when you want it, `
+        + 'or press A on a controller to take it without leaving the room');
+      shipNow(`dev.reload offered · ${reloadOffered} · A takes it`);
     }
   }
 
@@ -887,7 +1090,7 @@
     });
   }
 
-  // ── the window: you walk in it, the same way you walk in `held` ──────────
+  // ── the window: you walk in it, the same way you walk in `weight` ──────────
   //
   // 🔴 THE CAMERA USED TO ORBIT ON A TIMER — `eye = [cos(t*0.12)*6.5, 2.4,
   // sin(t*0.12)*6.5]` — which is the one thing a room you are meant to be IN
@@ -895,8 +1098,26 @@
   // nothing you can do about it. It also made this the only 3-D page here you
   // could not steer, beside two you can. Drag to look, arrows or WASD to walk,
   // 1.6 m off the floor — one idea of "a window into a room" across the project.
+  /**
+   * 🔴 THE ROOM SCALED AND THE PERSON LOOKING AT IT DID NOT, WHICH IS THE WHOLE
+   * OF HOW THIS PAIR MOVED ON 2026-09-19.
+   *
+   * `EYE_Y` is 1.6 m because that is how far a person's eyes are off the floor,
+   * and it stays at 1.6 whatever a brick measures. Doubling it would have
+   * turned a room of bigger bricks into the same room seen by a giant, which is
+   * the one thing "make the blocks twice as big" does not mean.
+   *
+   * Where you START is a different quantity: it is chosen so the room is in
+   * front of you rather than round you. The generator lays a nine-cell plate,
+   * so its nearest brick sat 2.25 m out at a 0.5 m unit and sits 4.5 m out at
+   * 1.0 m. Standing 6.0 m back left 3.75 m of clear floor in front of the first
+   * brick; 8.25 m leaves the same 3.75 m, so you are still outside the pile and
+   * the bricks arrive in the picture at twice the size, which is what was
+   * asked for. Left at 6.0 you would have opened the page standing against a
+   * metre cube.
+   */
   const EYE_Y = 1.6;
-  let camPos = [0, 6.0], camYaw = 0, camPitch = -0.12;
+  let camPos = [0, 8.25], camYaw = 0, camPitch = -0.12;
   const keys = new Set();
   addEventListener('keydown', (e) => {
     if (!stage.isConnected) return;
@@ -932,12 +1153,22 @@
     if (keys.has('ArrowLeft')) camYaw -= dt * 1.6;
     if (keys.has('ArrowRight')) camYaw += dt * 1.6;
     if (!fx && !fz) return;
+    // ⚠️ 3.2 m/s IS A PERSON WALKING BRISKLY AND DID NOT DOUBLE WITH THE BRICK,
+    // for the reason `EYE_Y` did not: it is a fact about whoever is looking
+    // rather than about what they are looking at. A 9.6 m room crosses in three
+    // seconds at this speed, and 6.4 m/s through a first-person camera is a
+    // sprint nobody asked for.
     const n = Math.hypot(fx, fz), amt = dt * 3.2;
     const c = Math.cos(camYaw), si = Math.sin(camYaw);
     camPos[0] += (fx * c + fz * si) * amt / n;
     camPos[1] += (fx * si - fz * c) * amt / n;
     // A soft wall: nothing stops you leaving, but a viewer forty metres out is
     // looking at nothing and has no way of knowing which way anything is.
+    // ⚠️ LEFT AT 22 WHEN THE BRICK DOUBLED, AND ON PURPOSE. It is not tuned
+    // against a brick, it is tuned against the DOTTED FLOOR, which `GRID` in
+    // `xr-room.mjs` fixes at 22 m across with its fade ending at 11. Doubling
+    // this would have let you walk to four times the floor's own half span and
+    // stand on nothing, and that file is not this page's to change.
     for (let i = 0; i < 2; i++) camPos[i] = Math.max(-22, Math.min(22, camPos[i]));
   }
 
@@ -977,12 +1208,22 @@
   if (gl) flat(performance.now());
 
   // ── the headset ─────────────────────────────────────────────────────────
+  // ⚠️ DECLARED UP HERE BECAUSE `publishXR` READS IT, and a `const` or a `let`
+  // left below its reader is this project's most repeated defect.
+  let view = 'window';
   let session = null, xrSpace = null, xrOk = false, xrFrames = 0, frameViews = 0;
   let rayNow = null, aimed = null, aimedDist = 0;
   // ⚠️ NOTHING GETS TO BE CLOSER THAN THIS. A cube 20 cm from your eyes is not
-  // a small cube, it is a wall — and you cannot aim at what you cannot back
-  // away from.
-  const MIN_HOLD = 0.4, BUBBLE = 0.45;
+  // a small cube, it is a wall, and you cannot aim at what you cannot back away
+  // from.
+  // 🔴 BOTH DOUBLED WITH THE BRICK, 2026-09-19, AND BOTH HAD TO. What fills
+  // your view is the angle a thing covers, so a 1.0 m cube held at 0.8 m looks
+  // exactly like a 0.5 m cube held at 0.4 m, and the near face is 0.30 m from
+  // your eye instead of 0.15. `BUBBLE` is compared against the distance to a
+  // thing's CENTRE, so it has to clear a brick's half-diagonal or a cube
+  // overlapping your head is not counted as being in it: that half-diagonal
+  // went 0.43 m to 0.87 m, which 0.45 no longer covered and 0.9 does.
+  const MIN_HOLD = 0.8, BUBBLE = 0.9;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   let lastShove = 0, aWas = false;
 
@@ -1004,10 +1245,27 @@
     });
     return best;
   }
-  // Taken once, at load, away from any gesture — see enter().
-  let headsetKnown = null, arKnown = null, arMode = false;
-  navigator.xr?.isSessionSupported('immersive-vr').then((v) => { headsetKnown = v; }, () => { headsetKnown = false; });
-  navigator.xr?.isSessionSupported('immersive-ar').then((v) => { arKnown = v; }, () => { arKnown = false; });
+  /**
+   * 🔴 THE TWO PROBES THAT USED TO LIVE HERE ARE `demo/shell/xr-caps.mjs` NOW,
+   * AND THEY WERE BROKEN IN ONE CHARACTER. They read
+   * `navigator.xr?.isSessionSupported('immersive-vr').then(v => …, () => …)`,
+   * and on a browser with no `navigator.xr` at all the optional chain returns
+   * `undefined`, so NEITHER handler ever ran and the variable stayed `null`
+   * forever. Photographed on an iPhone as a page reporting a failure where the
+   * honest answer is that there was never anything to ask. The module answers
+   * `absent` in the same turn instead.
+   *
+   * ⚠️ IT IS ONLY ABOUT WHETHER A SESSION CAN BE ASKED FOR. `nativeXR()` at the
+   * top of this file is a different question and both are needed: a desktop
+   * Chrome has a genuinely native `navigator.xr` and answers no, while the
+   * Immersive Web Emulator installs a JavaScript one that claims everything.
+   * Nothing here replaces that probe.
+   *
+   * ⚠️ AND IT IS READ SYNCHRONOUSLY IN `enter()`. `xrCaps()` is a snapshot, so
+   * the rule below about spending a transient user activation on an await is
+   * kept by construction rather than by remembering to take the answer early.
+   */
+  let arMode = false;
 
   /**
    * What demo/verify-quest.mjs reads to turn its compositor line from context
@@ -1050,18 +1308,48 @@
       // "nothing has ended this session", which is the true answer while one is
       // running and the honest one when the system menu ended it.
       leftBy,
+      /**
+       * 🔴 THE FOUR THE READOUT USED TO HOLD, KEPT ON THE MACHINE SURFACE. The
+       * row went on 2026-09-19 and CLAUDE.md's rule when a display goes is to
+       * rehome what it said rather than let the page quietly stop reporting it.
+       * Three of the four found a home in the log, where they belong because
+       * they change when something happens; all four are here as well, because
+       * a harness reads numbers and cannot read prose.
+       */
+      view, moved, toFrameMs: lastToFrame, worstGapMs: worst,
     };
   };
-  async function enter(mode = 'immersive-vr') {
-    arMode = mode === 'immersive-ar';
-    if (!navigator.xr) { d.log('this browser has no WebXR at all', 'warn'); return false; }
-    if (arMode && arKnown === false) { d.log('this headset will not composite over your room', 'warn'); return false; }
-    // 🔴 NO AWAIT BEFORE `requestSession`. It needs a TRANSIENT user activation,
-    // and awaiting anything first can spend it — so the support answer is the
-    // one already taken at load (`headsetKnown`), never a fresh await here.
-    // This is the whole reason the first attempt on a real Quest produced no
-    // asserts at all: the handler threw where nothing was reporting.
-    if (headsetKnown === false) { d.log('no headset here. The window above is the same room', 'warn'); return false; }
+
+  /**
+   * 🔴 WHERE YOU ARE LOOKING FROM, AND IT ONLY SPEAKS WHEN IT MOVES. This was a
+   * readout cell written from five places, which is a cell that can be rewritten
+   * with the value it already had. A state change belongs in the log at the
+   * MOMENT IT CHANGES, so the guard is the whole point rather than an
+   * optimisation: without it, entering a session would print the same line
+   * twice and nothing would have happened between them.
+   * ⚠️ IT SAYS NOTHING AT LOAD. `window` is where everybody starts, and a first
+   * log line announcing that you are looking at a page through a page is the
+   * kind of furniture a reader learns to scroll past.
+   */
+  const setView = (next) => {
+    if (next === view) return;
+    view = next;
+    d.log(next === 'window' ? 'back to the window' : `you are looking from ${next}`, 'hi');
+    publishXR();
+  };
+  async function enter(mode = XR_MODE.vr) {
+    arMode = mode === XR_MODE.ar;
+    // 🔴 NO AWAIT BEFORE `requestSession`. It needs a TRANSIENT user activation
+    // and awaiting anything first can spend it, so the answer is the snapshot
+    // the module already holds rather than a fresh question asked here. This is
+    // the whole reason the first attempt on a real Quest produced no asserts at
+    // all: the handler threw where nothing was reporting.
+    // ⚠️ ONE GUARD FOR THREE CASES, AND `asking` IS NOT ONE OF THEM. `canEnter`
+    // lets a question still out in the browser through, because a control that
+    // refuses on a guess is the other way of lying about what a browser can do.
+    const key = arMode ? 'ar' : 'vr';
+    const state = xrCaps()[key];
+    if (!canEnter(state)) { d.log(reasonFor(state, key), 'warn'); return false; }
     // ⚠️ A DEADLINE ON EVERY STEP. A rejected promise reports itself; one that
     // simply never settles does not, and that is what the first two headset
     // runs looked like from here — a session the user was standing in, with no
@@ -1159,7 +1447,7 @@
       xrSpace = await step('requestReferenceSpace local-floor',
         session.requestReferenceSpace('local-floor'));
     } catch (e) {
-      d.log(`the headset refused the session · ${e.name}: ${e.message}`, 'bad');
+      d.log(`the headset refused the session. ${e.name}: ${e.message}`, 'bad');
       shipNow(`FAIL session · ${e.name}: ${e.message}`);
       try { await session?.end(); } catch { /* it may never have started */ }
       session = null;
@@ -1195,20 +1483,41 @@
     shipNow(`session created · ${mode} · blend ${session.environmentBlendMode || 'not reported'} · refresh ${session.frameRate || 'not reported'}`);
     cancelAnimationFrame(raf);
 
-    d.set('view', arMode ? 'your room' : 'headset', 'ok');
+    /**
+     * 🔴 WHERE YOU ARE LOOKING FROM, SAID WHEN IT CHANGES. It was a readout
+     * cell and the cell is gone; a state change is exactly the thing a log
+     * carries well, because it moves when something happened rather than on a
+     * clock. `window`, `headset` and `your room` are the three it has, and this
+     * one call is why the page reports passthrough as the room you are in
+     * rather than as a session name.
+     */
+    setView(arMode ? 'your room' : 'headset');
     session.addEventListener('end', () => {
-      // 🔴 ONE LINE SAYS HOW THE SESSION ENDED, AND IT CAN NAME ALL FOUR CASES.
-      // Three exits belong to this page and the fourth belongs to nobody here —
-      // the system menu, the headset coming off, the runtime taking it. A log
-      // that printed "session ended" for all of them would leave every one of
-      // those to be guessed at from the outside, which is the shape of failure
-      // that has already cost this page three headset runs.
+      // 🔴 ONE LINE SAYS HOW THE SESSION ENDED, AND IT CAN NAME EVERY CASE.
+      // The long hold sets `leftBy` through this page's `onQuit`, the dead
+      // man's switch sets it directly, and the third case belongs to nobody
+      // here: the system menu, the headset coming off, the runtime taking it. A
+      // log that printed "session ended" for all of them would leave each one
+      // to be guessed at from outside, which is the shape of failure that has
+      // already cost this page three headset runs.
       const why = leftBy
         || 'something outside this page: the system menu, the headset coming off, or the runtime taking it';
       shipNow(`session ended · ${why} · ${xrFrames} frames drawn`);
-      d.log(`the headset session ended: ${why}`);
+      // ⚠️ THE WORST FRAME GAP IS SAID HERE AND NOWHERE ELSE. It was a readout
+      // cell rewritten on every frame, which is a number moving ninety times a
+      // second in front of somebody who cannot read it because they are wearing
+      // a headset. It is reset when a session starts, so the value at the end
+      // is that session's own worst gap rather than a maximum since page load,
+      // and this is the one moment it is finished and worth quoting.
+      d.log(`the headset session ended: ${why}. ${xrFrames} frames drawn, `
+        + `worst gap ${worst.toFixed(1)} ms`);
+      // ⚠️ AND THE WAY OUT GOES WITH THE SESSION IT WAS MOUNTED ON. It stops
+      // driving itself the moment the session ends, and re-entering mounts a
+      // fresh one, so holding the old object would only be something to draw
+      // through by accident.
+      xrQuit = null;
       xrOk = false; session = null; arMode = false; publishXR();
-      d.set('view', 'window'); raf = requestAnimationFrame(flat);
+      setView('window'); raf = requestAnimationFrame(flat);
     });
     // 🔴 ANY CONTROLLER BUTTON LEAVES. A page that puts someone in a room it
     // cannot draw, with no way out except the system menu, is worse than a page
@@ -1252,7 +1561,6 @@
     session.addEventListener('selectend', () => {
       if (held) {
         moved++;
-        d.set('moved', moved);
         // ⚠️ ONE MESSAGE ON DROP, NEVER ONE PER FRAME. At 90 fps a dragged
         // thing would be 90 msg/s into a relay whose measured ceiling is 60,
         // and the relay tells a sender NOTHING when that bites — it simply
@@ -1262,7 +1570,16 @@
         // will be — a corrected position arriving a message later would show
         // everyone else the thing jumping after it landed.
         const out = pushClear(held.i);
-        if (out) setPanel(`moved it clear of another thing\n${out.toFixed(2)} m`, 2500);
+        // ⚠️ NO CARD IN FRONT OF YOU FOR THIS. It is a note about what your own
+        // hands just did, and the brick MOVED, which you were watching: a
+        // sentence saying so is the page telling you what you can see. The
+        // distance is a fact worth keeping, so it goes to the log and to the
+        // beacon, both of which are read after the headset comes off.
+        // ⚠️ AND THE COUNT RIDES THIS LINE RATHER THAN A CELL OF ITS OWN. A
+        // running total of what your own hands have done is visible in the
+        // room, brick by brick; where it is worth having in words is beside the
+        // thing that happened.
+        if (out) d.log(`that one was moved ${out.toFixed(2)} m clear of another, ${moved} moved so far`);
         shipNow(`dropped thing ${held.i}${out ? ` · pushed ${out.toFixed(2)} m clear` : ''} · document now ${docOf(doc).length} bytes`);
         send({ type: 'scene.room', doc });
       }
@@ -1274,13 +1591,29 @@
     // was the only way to accept an update. The A/X button carries it now —
     // one hand, one press, and it exists on every Touch controller.
     // 🔴 THE ONE WAY OUT, AND NO LABEL OR BUTTON IS PASSED. The defaults are
-    // the site's decision — any button, held three seconds — and a page that
-    // retypes them is a page that can disagree with the module about how
+    // the site's decision, which is any button held three seconds, and a page
+    // that retypes them is a page that can disagree with the module about how
     // somebody leaves it.
+    // 🔴 MOUNTED ON THE SESSION, WHICH IS THE WHOLE REPAIR. It was built with
+    // the context alone and advanced by a line in the render loop, and the line
+    // was never written here: the badge drew at both hands every frame and the
+    // hold could not move. `mountXRQuit` is handed the SESSION and joins its
+    // frame loop itself, so there is no line left for this page to forget and
+    // the hold keeps advancing even if everything below throws.
+    // ⚠️ `onQuit` SAYS WHY AND DOES NOT END ANYTHING. The module ends the
+    // session whether this is passed or not and whether it throws or not, so
+    // `leaveNow` here would be a second `end()` on a session already going. All
+    // this page still owns is the reason, which the `end` handler reads back.
+    // ⚠️ AND THE ARMING GUARD WENT WITH IT. The module will not count a button
+    // that was already down when the session opened, which is the press that
+    // OPENED it, so a page holding its own guard would be a second opinion
+    // about one rule.
     // ⚠️ The dead-man's switch below is unchanged and is NOT this: it covers
     // the case where nothing ever drew, which is where no ring exists to hold.
-    xrQuit = createXRQuit(gl, {
-      onQuit: () => leaveNow('held a controller button for three seconds'),
+    xrQuit = mountXRQuit(gl, session, {
+      onQuit: () => leaving('held a controller button for three seconds'),
+      log: (m, k) => d.log(m, k),
+      say: shipNow,
     });
     // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
     // session started, the room is black and staying black; end it and say so
@@ -1290,7 +1623,7 @@
       if (session && xrFrames === 0) {
         shipNow('FAIL no frame drawn 4 s after the session started · leaving on my own');
         d.log('the headset session drew nothing. Ended it rather than leave you in the dark', 'bad');
-        leaveNow('this page\'s dead-man\'s switch · nothing had been drawn 4 s in');
+        leaveNow('nothing had been drawn 4 s in, so this page ended it on its own');
       }
     }, 4000);
     session.requestAnimationFrame(onXR);
@@ -1312,22 +1645,13 @@
     if (!pose) return;
     xrFrames++; publishXR();
     /**
-     * 🔴 ADVANCE THE WAY OUT. REPORTED 2026-09-19: *"i was not able to get
-     * out"*, and this one line is the whole reason. This page BUILT the quit
-     * badge and DREW it every frame and never once called `update`, so the hold
-     * could not advance, `onQuit` could not fire, and there was no way out of
-     * this page in a headset at all.
-     * ⚠️ **IT LOOKED COMPLETELY CORRECT FROM EVERY SIDE.** The object existed,
-     * the badge compiled, the ring was drawn at both hands every frame, and the
-     * page's own checks read a way out as present. `/held/`, `/floor/` and
-     * `xr-panel.mjs` all had the call; only this page was missing it, so no
-     * shared code was wrong and nothing could disagree with anything.
-     * ⚠️ `xr-quit-test.mjs` NOW REFUSES A PAGE THAT DRAWS A WAY OUT IT NEVER
-     * ADVANCES, because the defect is a MISSING line and nothing in a browser
-     * can see one of those.
+     * ⚠️ NOTHING ADVANCES THE WAY OUT HERE ANY MORE, AND THAT IS THE POINT.
+     * Two lines used to stand at this spot: a frame delta and an `update` that
+     * was never written, so the hold could not move and there was no way out of
+     * this page in a headset at all. `mountXRQuit` runs on the session's own
+     * frame loop now, so the hold advances whether this function is reached or
+     * not. Do not put an `update` back; there is none to call.
      */
-    const quitDt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0;
-    xrQuit?.update(session.inputSources, quitDt);
     if (ship && xrFrames % 120 === 0) ship(`${xrFrames} frames this session · worst gap in-session ${worst.toFixed(1)} ms`);
     if (frameViews === 0) frameViews = pose.views.length;
     const layer = session.renderState.baseLayer;
@@ -1475,7 +1799,14 @@
         // only one stick. See BUTTON/AXIS in xr-hands.mjs.
         const ax = src.gamepad?.axes || [];
         const push = (ax[AXIS.stickY] ?? ax[1] ?? 0);
-        if (Math.abs(push) > 0.15) held.dist = clamp(held.dist - push * 0.05, MIN_HOLD, 8);
+        // ⚠️ THE STEP AND THE CEILING BOTH DOUBLED WITH THE BRICK. 0.05 m a
+        // frame across a 4.8 m room took about a second to cross it, and 0.1
+        // across 9.6 m takes the same second; 8 m of reach covered the old
+        // plate's far corner from any corner of it, and 16 covers this one.
+        // ⚠️ THE VALIDATOR'S OWN BOUND MOVED WITH THIS ONE, in `seed.mjs`. Left
+        // at 12 m a push past it would be REFUSED rather than clamped, and a
+        // brick that stops following your hand reads as a broken page.
+        if (Math.abs(push) > 0.15) held.dist = clamp(held.dist - push * 0.1, MIN_HOLD, 16);
         moveThing(held.i, o[0] + dir[0] * held.dist, o[1] + dir[1] * held.dist, o[2] + dir[2] * held.dist);
         // 🔴 SAY SO WHEN THE PUSH HAS REACHED THE WALL. The thumbstick can shove
         // a brick out of the room and that is KEPT; what it lacked was any sign
@@ -1523,65 +1854,45 @@
         const t = doc.things[near];
         let dx = t.x - hp.x, dy = t.y - hp.y, dz = t.z - hp.z;
         const len = Math.hypot(dx, dy, dz) || 1;
-        // Straight out from your head, to arm's length.
-        if (moveThing(near, hp.x + (dx / len) * 0.9, hp.y + (dy / len) * 0.9, hp.z + (dz / len) * 0.9)) {
+        // Straight out from your head, to twice the bubble it was caught in.
+        // ⚠️ IT IS TWICE `BUBBLE` AND NOT A LENGTH OF ITS OWN. It used to read
+        // 0.9 m against a 0.45 m bubble and was described as arm's length,
+        // which was true of the number and not of the rule: put a thing back
+        // exactly ON the edge of the bubble and the next sweep can catch it
+        // again. Both doubled with the brick, so a metre cube ends up where you
+        // can see all of it rather than filling your view.
+        const OUT = BUBBLE * 2;
+        if (moveThing(near, hp.x + (dx / len) * OUT, hp.y + (dy / len) * OUT, hp.z + (dz / len) * OUT)) {
           lastShove = performance.now();
-          setPanel('moved a thing out of your face\nthumbstick pushes what you hold', 4000);
+          // ⚠️ AND NO CARD FOR THIS ONE EITHER. The brick visibly leaves your
+          // face, which is the whole feedback; the half that was worth saying
+          // was the tip about the thumbstick, and a tip is not something to put
+          // in front of somebody at the moment they are busy.
+          d.log('a thing was moved out of your face. The thumbstick pushes what you hold');
           shipNow(`shoved thing ${near} out of the bubble`);
         }
       }
     }
 
     /**
-     * The panel, head-locked and low-left, drawn after the room in EACH EYE so
-     * nothing occludes it. It fades out on its own — a status line that stays
-     * up forever is furniture in your field of view.
+     * ⚠️ THE STATUS CARD WAS DRAWN HERE AND THERE IS NOTHING TO DRAW NOW. Two
+     * things it taught are worth keeping where the next head-locked thing would
+     * go, and the second one has a live subject.
      *
-     * 🔴 INSIDE THE EYE LOOP, AND IT WAS NOT. This block used to sit after the
-     * loop and read `proj` and `view` — a parameter of `drawRoom` and the
+     * 🔴 A HEAD-LOCKED THING GOES INSIDE THE EYE LOOP. This block once sat
+     * AFTER it and read `proj` and `view`, a parameter of `drawRoom` and the
      * loop's own `const`, neither of which exists out there. MEASURED on a
-     * Quest 3, 2026-09-13: `Uncaught ReferenceError: proj is not defined @
-     * :970`, **385 times in one 49-second session**, so the panel has never
-     * once been drawn in a headset.
-     *
-     * ⚠️ AND IT IS WHY THE gl 1282 INSTRUMENTATION REPORTED NOTHING. The throw
-     * escapes the frame callback, and the `xrFrames === 1` check that ships
-     * the first frame's `getError()` runs AFTER this — so on every frame the
-     * panel was due, the check never ran. The log carries no `first headset
-     * frame` line at all. An uncaught error inside a render loop does not stop
-     * the loop; it silently removes everything below it.
-     *
-     * Per eye is also the only correct place for it: both eyes share one
-     * framebuffer, so a head-locked quad drawn once lands in whichever
-     * viewport happened to be current.
+     * Quest 3, 2026-09-13: `Uncaught ReferenceError: proj is not defined`, 385
+     * times in one 49-second session, so the card was never once drawn in a
+     * headset. The throw escapes the frame callback, so the `xrFrames === 1`
+     * check that ships the first frame's `getError()` never ran either: an
+     * uncaught error inside a render loop does not stop the loop, it silently
+     * removes everything below it.
+     * ⚠️ AND PER EYE IS THE ONLY CORRECT PLACE. Both eyes share one
+     * framebuffer, so a head-locked thing drawn once lands in whichever
+     * viewport happened to be current. The way out's ring is drawn that way,
+     * two lines below, for exactly this reason.
      */
-    function drawPanel(proj, viewMat) {
-      if (!pose || !panelTex || performance.now() >= panelUntil + 900) return;
-      const fade = Math.max(0, Math.min(1, (panelUntil + 900 - performance.now()) / 900));
-      const hm = pose.transform.matrix;
-      const M = new Float32Array([
-        hm[0] * 0.44, hm[1] * 0.44, hm[2] * 0.44, 0,
-        hm[4] * 0.11, hm[5] * 0.11, hm[6] * 0.11, 0,
-        hm[8], hm[9], hm[10], 0,
-        hm[12] - hm[8] * 1.25 - hm[4] * 0.30 - hm[0] * 0.16,
-        hm[13] - hm[9] * 1.25 - hm[5] * 0.30 - hm[1] * 0.16,
-        hm[14] - hm[10] * 1.25 - hm[6] * 0.30 - hm[2] * 0.16, 1]);
-      gl.useProgram(progPanel);
-      const PL = panelLocs();
-      gl.uniformMatrix4fv(PL.proj, false, proj);
-      gl.uniformMatrix4fv(PL.view, false, viewMat);
-      gl.uniformMatrix4fv(PL.model, false, M);
-      gl.uniform1f(PL.fade, fade);
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, panelTex);
-      gl.uniform1i(PL.tex, 0);
-      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      gl.disable(gl.DEPTH_TEST);
-      gl.bindVertexArray(quad.vao);
-      gl.drawArrays(gl.TRIANGLES, 0, quad.count);
-      gl.bindVertexArray(null);
-      gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
-    }
-
     // ── your real floor and walls, if this headset will say ────────────────
     // ⚠️ ONCE PER FRAME, BEFORE THE EYE LOOP — the answer is the same for both
     // eyes, and asking twice would be two reads of a set the runtime rebuilds.
@@ -1601,17 +1912,19 @@
       // inside their own scissor. See drawRoom.
       drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec, eye === 0,
                [hp0.x, hp0.y, hp0.z]);
-      drawPanel(view.projectionMatrix, view.transform.inverse.matrix);
-      // ⚠️ LAST IN THE EYE'S PASS, so it is in the room with everything else and
-      // shares the depth buffer this pass already has. The eye comes out of the
-      // view matrix doing the projecting — a badge oriented on one eye's answer
-      // for both reads as sitting at a depth it is not at.
-      if (xrQuit && xrHands) {
-        const grips = xrHands.hands.filter((h) => h.grip).map((h) => h.grip);
-        if (grips.length) {
-          xrQuit.draw(mul(view.projectionMatrix, new Float32Array(view.transform.inverse.matrix)),
-            grips, eyeFromView(new Float32Array(view.transform.inverse.matrix)));
-        }
+      // ⚠️ LAST IN THE EYE'S PASS, so it is in front of everything else in the
+      // room. The eye comes out of the view matrix doing the projecting, so a
+      // badge cannot end up oriented on one eye's answer for both, which reads
+      // as sitting at a depth it is not at.
+      // 🔴 NO GRIPS, AND NO GUARD ON HAVING ANY. The ring is head locked now,
+      // so `xrHands` has nothing to say about where it goes, and the old
+      // `grips.length` test meant a session driven by TRACKED HANDS, which
+      // report no grip matrices, could not draw the way out at all.
+      // ⚠️ IT DRAWS NOTHING UNTIL A BUTTON IS DOWN, so an idle frame costs one
+      // function call.
+      {
+        const eyeView = new Float32Array(view.transform.inverse.matrix);
+        xrQuit?.draw(mul(view.projectionMatrix, eyeView), eyeView);
       }
       eye++;
     }
@@ -1633,21 +1946,32 @@
       shipNow(`controller interface · ${xrHands ? xrHands.fingerprint() : 'NONE BUILT'}`
         + ` · its face ${room?.hasTablet ? 'compiled' : 'WOULD NOT COMPILE, so there is no tablet in here'}`
         + ` · this session is ${arMode ? 'immersive-ar' : 'immersive-vr'}, and nothing before this dot depends on that`);
-      // The grid's own line, on the panel, because the 2-D page is behind your
-      // face and this is the one thing in here that is a claim ABOUT your room.
-      if (room) setPanel(room.planes.short, 6000);
+      // 🔴 THE GRID'S OWN LINE, AND IT USED TO BE THE ONE CARD WITH A CASE FOR
+      // STAYING. It is a claim about YOUR room rather than about this page, and
+      // the 2-D page is behind your face. It still loses, for the reason the
+      // rest lost: it appeared because a session started rather than because
+      // anybody asked, which is what a popup is. It is on `__demo.xr` already,
+      // it is in the beacon line below, and it is in the log for whoever takes
+      // the headset off. A surface you CHOOSE to look at would be a different
+      // thing, and this page already has one built: see `SHOW_TABLET`.
+      // ⚠️ ON ONE LINE. `short` is written in two, because it was drawn on a
+      // card three lines tall; a log line is one line and wraps where it likes.
+      if (room) {
+        const said = room.planes.short.replace(/\n/g, ', ');
+        d.log(`your room, as this headset reports it: ${said}`);
+        shipNow(`your room · ${said}`);
+      }
     }
     markShown(now);
     // ⚠️ RETIRED HERE, NOT INSIDE drawRoom — that runs once PER EYE, so swapping
     // there would replace the programs between the left eye and the right and
     // show two different looks in one frame.
     if (room?.retire()) {
-      setPanel('✓ the new look is the look');
+      d.log('the new look is now the look', 'ok');
       shipNow('dev.shader live · the fade finished');
     }
     if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
     lastFrame = now;
-    d.set('worst', worst.toFixed(1));
   }
 
   /**
@@ -1662,7 +1986,16 @@
     shown = true;
     lastToFrame = now - appliedAt;
     toFrame.push(lastToFrame);
-    d.set('to frame', lastToFrame.toFixed(1), lastToFrame < TO_FRAME_CEIL_MS ? 'ok' : 'warn');
+    /**
+     * ⚠️ IN THE LOG, AND ONLY WHEN A ROOM ARRIVES. This was a readout cell
+     * rewritten on every accepted room, and a room arrives when somebody rolls
+     * one or when somebody else in the relay room moves a brick, which is a
+     * human pace. The ceiling is read from the same constant the sentence
+     * prints, never typed twice: it was typed twice once, the label said 120
+     * and the comparison said 1200, and the run still read green.
+     */
+    d.log(`the new room reached a drawn frame in ${lastToFrame.toFixed(1)} ms`,
+      lastToFrame < TO_FRAME_CEIL_MS ? 'ok' : 'warn');
   }
 
   // ── controls ────────────────────────────────────────────────────────────
@@ -1670,8 +2003,6 @@
     const seed = (Math.random() * 0xffffffff) >>> 0;
     const t = Date.now();
     await roll(seed);
-    d.set('worst', worst.toFixed(1));
-    d.set('view', xrOk ? 'headset' : 'window');
 
     d.assert('there is a real WebGL2 context', !!gl && !!gl.getParameter(gl.VERSION), gl?.getParameter(gl.VERSION));
     // ⚠️ ASSERT ON THE GL ERROR FLAG, because a WebGL page will happily draw a
@@ -1690,7 +2021,7 @@
                : `tightest pair ${cl.closest.toFixed(3)} m apart`);
     d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
     d.assert('the room changed only when the message came back', echoed || ws?.readyState !== 1,
-      echoed ? 'own message echoed' : 'no relay · drew locally and said so');
+      echoed ? 'own message echoed' : 'no relay, so it drew locally and said so');
     // The ceiling is read from the same constant the label prints. It was
     // typed twice once — the label said 120 and the comparison said 1200 — and
     // the run still read green, which is what a description that can disagree
@@ -1755,21 +2086,223 @@
     if (uiSeen === null) uiSeen = now;
     d.assert('the controller interface is the same whichever kind of session this is',
       now === uiSeen && !/\b(vr|ar|immersive|passthrough|opaque)\b/i.test(now),
-      `${where} · ${now}`);
+      `${where}: ${now}`);
   };
+
+  /**
+   * 🔴 WHAT THIS BROWSER SAID ABOUT HEADSETS, AND HAVING NONE IS AN ANSWER.
+   *
+   * This ran inside the two session handlers until 2026-09-19 and could not
+   * stay there, because the repair it grades is the one that SWITCHES THOSE
+   * HANDLERS' BUTTONS OFF. A check that only runs when a control can be pressed
+   * cannot say anything about a browser where it cannot, which is every phone.
+   * `selfCheck()` runs it instead, so it is answered on the machine the answer
+   * is about.
+   *
+   * 🔴 AND WHAT IT ASKS IS WHETHER THE QUESTION WAS ANSWERED, NOT WHETHER THE
+   * ANSWER WAS YES. `/weight/` asserted the second on an iPhone and reported
+   * `FAIL a headset was asked about, both ways` to somebody whose browser was
+   * behaving perfectly. `absent` is an answer and it passes.
+   */
+  /**
+   * 🔴 THE PICTURE OF THE MACHINERY, LAST ON THE PAGE. Asked 2026-09-19: *"add
+   * how it works to held and blocks: browser block and controllers"*. It is
+   * REFERENCE: read once, on purpose, by somebody who has already dragged the
+   * room about and now wants to know what is behind it, so it goes under the
+   * controls and the log rather than in front of the one thing a first visitor
+   * came for.
+   *
+   * 🔴 AND THE RELAY IS IN IT, WHICH THE ASK DID NOT EXPECT. The shape named
+   * was a browser and the controllers, on the argument that nothing else is
+   * involved, and that is true of `/weight/` and is NOT true here: this page
+   * opens a socket to a relay room, `apply()` is called from the message
+   * handler and from nowhere else, and one of its own checks says in as many
+   * words that the room changed only when the message came back. A drawing that
+   * left the relay out would contradict the page it is drawn on.
+   * ⚠️ WHAT THE ASK WAS REALLY AFTER SURVIVES ANYWAY, and it is the better
+   * story: there is no server holding a room and nothing is stored. Four bytes
+   * make every brick, the document is a few hundred more, and the relay repeats
+   * it rather than keeping it.
+   *
+   * ⚠️ `join: false` ON THE BROWSER, WHICH IS THE ONE DECISION IN THE LAYOUT.
+   * An undeclared gap between two boxes in one machine is drawn as an arrow,
+   * and an arrow from the generator to the room would claim a path that does
+   * not exist: the room only ever changes on the echo, never on the send, and
+   * that round trip is what the two outer arrows are. A bracket would say they
+   * are a set, which is true and adds nothing the container's own box does not
+   * already say.
+   */
+  const dg = createDiagram(d.el, {
+    caption: 'One number makes the room. Nothing about it is kept anywhere.',
+    nodes: [
+      { id: 'hands', label: 'controllers', sub: 'WebXR input', kind: 'device', tech: 'device',
+        note: 'Each controller reports where it is pointing and which buttons are down, as an '
+            + 'XRInputSource the runtime refreshes every frame. The trigger picks a brick up '
+            + 'and the thumbstick pushes it nearer or further.' },
+      { id: 'you', label: 'Browser', sub: 'laptop or headset', kind: 'here', tech: 'browser',
+        join: false,
+        children: [
+          { id: 'seed', label: 'generator', sub: '32-bit seed',
+            note: 'One number, run through mulberry32, places every brick on the grid. Nothing '
+                + 'about the room is stored, so four bytes are the whole of it.' },
+          { id: 'room', label: 'room', sub: 'WebGL2',
+            note: 'One program draws every brick and the dotted floor, one pass per eye. Both '
+                + 'eyes share a framebuffer in a headset, so only the first one clears it.' },
+        ] },
+      { id: 'relay', label: 'Relay object', sub: 'WebSocket', kind: 'cloud', tech: 'cloudflare',
+        note: 'A Cloudflare Durable Object that every browser in this room joins. It keeps '
+            + 'nothing: it repeats what arrives, and the copy that comes back is the one drawn.' },
+    ],
+    links: [
+      { from: 'seed', to: 'relay', label: 'room document',
+        note: 'The whole room as JSON, a few hundred bytes, sent before anything is drawn. Every '
+            + 'brick is already on the grid when it leaves, so nothing has to be tidied at the '
+            + 'other end.' },
+      // ⚠️ `back: true` IS AN AUTHOR FLAG AND NOTHING INFERS IT. Without it a
+      // right to left link is laid out as a forward step and drawn through
+      // whatever stands in the way.
+      { from: 'relay', to: 'room', back: true, label: 'same document',
+        note: 'The room changes on the echo and never on the send, so two headsets in one room '
+            + 'agree about what is in it. With no relay the page draws its own document and '
+            + 'says so.' },
+      { from: 'hands', to: 'room', label: 'pose, buttons',
+        note: 'Where each hand is and what is held down, every frame, in the floor-relative '
+            + 'space the room is measured in. Letting go sends the whole room back out once, so '
+            + 'nobody else watches a brick being dragged.' },
+    ],
+  }, { how: true, atEnd: true });
+
+  d.on('caps', async () => {
+    // Bounded: a browser whose promise never comes back gets the snapshot as it
+    // stands, still saying `asking`, rather than an invented answer.
+    const c = await whenXrCaps(3000);
+    d.assert('this browser has said whether it can open a headset, and having none is an answer',
+      answered(c.vr) && answered(c.ar),
+      `a headset of its own ${c.vr}, your room behind the page ${c.ar}`);
+
+    // 🔴 THE FAR SIDE OF THAT BOUNDARY. An answer nothing acts on is the inert
+    // control this repo keeps paying for, so this reads the BUTTONS rather than
+    // the states: every one that cannot be entered is off and carries a
+    // sentence, every one that can is live. The negative control is built in,
+    // because on a headset the same line passes with both of them live.
+    const both = [['vr', c.vr], ['ar', c.ar]];
+    const off = both.filter(([, s]) => !canEnter(s));
+    d.assert('a session this browser cannot open leaves a control that is off and says why',
+      both.every(([id, s]) => xrGroup.enabled(id) === canEnter(s))
+      && off.every(([id]) => xrGroup.button(id).title.trim().length > 0),
+      off.length
+        ? `${off.map(([id]) => id).join(' and ')} off, reading "${xrGroup.button(off[0][0]).title}"`
+        : 'both can be opened here, so both are live and neither carries a reason');
+
+    // 🔴 AND THEY ARE STILL IN THE ROW THE HARNESSES PRESS. `verify.mjs` and
+    // `verify-gl.mjs` both press `.pos-controls button` as a descendant, so a
+    // group moved out of that row would stop being exercised with nothing going
+    // red. The order is asserted with it, because the ⛶ is pushed to the far
+    // end and a group appended after it would land on the wrong side.
+    const ids = [...d.controls.querySelectorAll('button')].map((b) => b.dataset.id);
+    // ⚠️ `vr,ar` AND NOTHING ELSE SINCE THE VIDEO FOOTER LANDED. The ⛶ used to
+    // be a third, declared by the page and pushed to the far end of the row;
+    // the panel's own right slot carries it now. It was LAST, so control 0 is
+    // `vr` before and after and the page's six second settle did not move.
+    // ⚠️ AND THE ROW IS SHOWING. `mount()` hides `.pos-controls` when a page
+    // declares no controls, and this page declares none and then puts two in
+    // it, so without one line up there both buttons would be in the DOM, found
+    // by this very query, correctly enabled or disabled, and invisible. A check
+    // that only counted them would have passed through that.
+    d.assert('both session controls sit in the row the harness presses, and the row is showing',
+      d.controls.contains(xrGroup.el) && ids.join(',') === 'vr,ar' && !d.controls.hidden,
+      `${ids.join(' then ')}, in a row that is ${d.controls.hidden ? 'HIDDEN' : 'showing'}`);
+
+    /**
+     * 🔴 AND THE WAY BACK OUT OF FULL SCREEN IS INSIDE THE PICTURE, NOT IN THE
+     * ROW. This is the whole of the iPhone report: the faux cover is `fixed`
+     * over the viewport and real element fullscreen shows nothing outside the
+     * element, so a way out mounted anywhere else is a way out nobody on a
+     * phone can reach. The negative half is asserted with it, because a button
+     * that IS in the control row would also be pressed by the harness on every
+     * run and would leave full screen behind its own back.
+     * ⚠️ IT IS THE PANEL'S NOW AND IS FOUND RATHER THAN HELD. This page mounted
+     * its own `createFullscreenExit` for an hour; `video-panel.mjs` builds one
+     * inside its own picture box in `hover` mode, so keeping a handle would
+     * have been a second button. Querying for it grades what is really there,
+     * which is the point: a mode change that took the way out away would take
+     * this red rather than pass on a variable the page still held.
+     */
+    const wayOut = panel.stage.querySelector('.pos-fsx');
+    d.assert('the way back out of full screen is inside the picture that fills it',
+      !!wayOut && !d.controls.contains(wayOut) && !panel.foot.contains(wayOut),
+      wayOut ? `${wayOut.className} in the panel picture, and not among ${ids.length} controls`
+             : 'there is no way back out in the picture at all');
+
+    /**
+     * 🔴 THE FOOTER SAYS WHAT DREW THE PICTURE, AND IT IS THE SAME CONTEXT THE
+     * HARNESS ASKS ABOUT. Asked 2026-09-19 as *"info what renders it"*, and the
+     * thing worth grading is not that the cell has ink in it: a cell filled
+     * with a constant, or with a second read of a second context, would look
+     * exactly the same. So the short name has to be a piece of the long one
+     * this page publishes, which is what `verify-gl.mjs` compares its own
+     * answer against.
+     */
+    const said = gpuVal.textContent.trim();
+    d.assert('the footer names what drew the picture, out of the context the page reports',
+      said.length > 0 && (!gl || String(rendererName).includes(said)),
+      gl ? `"${said}" out of "${rendererName}"` : `no context, and it says "${said}"`);
+
+    /**
+     * 🔴 GRADE THE PICTURE, BECAUSE NOTHING ELSE CAN SEE IT. `createDiagram`
+     * collects every name it had to shorten, every note over about forty words
+     * and every link it could not route, on `cuts`. A label that got cut or an
+     * arrow that was refused is invisible to a reader, who has no way to know
+     * that what they are looking at is not what was described, and three real
+     * arrows once went missing from `/station/` behind a `console.warn` nobody
+     * was reading.
+     */
+    d.assert('the diagram drew every name and every arrow whole',
+      dg.cuts.length === 0,
+      dg.cuts.map((c) => `${c.where} ${c.id}: ${c.shown}`).join(', ') || 'nothing cut, nothing refused');
+    /**
+     * 🔴 AND NO LINE IN IT IS MISSING ITS ARROWHEAD. A headless line means a
+     * container drew a bracket between two of its children, which says they are
+     * a set rather than a chain. `Browser` passes `join: false`, so its two
+     * children get no line at all and there is nothing in this picture a reader
+     * could mistake for an arrow that lost its head.
+     */
+    d.assert('no line in the diagram is a bracket standing in for an arrow', dg.ties === 0,
+      `${dg.ties} line${dg.ties === 1 ? '' : 's'} with no head`);
+
+    /**
+     * 🔴 AND THE PAGE REFUSES IT TOO, NOT ONLY THE BUTTON. A switched-off
+     * control is the first fence and `enter()` carries the second, and the
+     * moment the first one started working the second stopped being run at all
+     * on any machine without a headset: a guard nothing fires is a guard nobody
+     * has seen work. There is one real case for it, which is a browser still
+     * `asking` when somebody presses, so the control was live and the answer
+     * came back no.
+     * ⚠️ ONLY WHERE THE ANSWER IS ALREADY NO, so this can never ask a headset
+     * for a session. `requestSession` needs a transient user activation and a
+     * check has none, so on a machine that could open one this would be a
+     * failure the page reported about itself for pressing its own button.
+     */
+    if (!canEnter(c.vr)) {
+      const opened = await enter(XR_MODE.vr);
+      d.assert('and the page turns the same session down itself, rather than leaving it to the button',
+        opened === false && !xrOk && !!doc,
+        `it answered ${opened} and the window is still drawing ${doc?.things.length} things`);
+    }
+
+    gradeUI('window');
+  });
 
   d.on('ar', async () => {
     let got = false;
-    try { got = await enter('immersive-ar'); }
+    try { got = await enter(XR_MODE.ar); }
     catch (e) {
       shipNow(`FAIL enter(ar) · ${e.name}: ${e.message}`);
-      d.log(`passthrough failed · ${e.name}: ${e.message}`, 'bad');
+      d.log(`passthrough failed. ${e.name}: ${e.message}`, 'bad');
       try { await session?.end(); } catch { /* may not exist */ }
       session = null; xrOk = false; arMode = false;
     }
     gradeUI('passthrough');
-    d.assert('it knows whether this headset can show your room',
-      arKnown === true || arKnown === false, `immersive-ar supported: ${arKnown}`);
     if (got) {
       d.assert('a passthrough session started', !!session && arMode);
       // ⚠️ ASSERT ON THE BLEND MODE, NOT ON THE SESSION NAME. A session can be
@@ -1780,23 +2313,24 @@
         session?.environmentBlendMode && session.environmentBlendMode !== 'opaque',
         `blend mode ${session?.environmentBlendMode}`);
     } else {
-      d.assert('with no passthrough it says so and stays in the window',
-        !xrOk, `immersive-ar supported: ${arKnown}`);
+      // ⚠️ REACHED ONLY WHERE THE CONTROL WAS PRESSABLE AND THE SESSION STILL
+      // DID NOT OPEN. Where this browser has already said it cannot, the button
+      // is off and the `caps` check above is what grades that.
+      d.assert('a passthrough that will not open leaves the page in the window',
+        !xrOk, `your room behind the page ${xrCaps().ar}`);
     }
   });
 
-  d.on('full', async () => {
-    // ⚠️ ASK, DO NOT OPTIONAL-CHAIN. `el.requestFullscreen?.()` on an iPhone is
-    // a control that looks live and is inert — no throw, no catch, no picture.
-    if (fullSupport() === 'none') { d.log('this browser has no way to fill the screen', 'bad'); return; }
-    const how = await toggleFull(stage);
-    d.log(how === 'exit' ? 'back to the page' : `filling the screen (${how})`, 'hi');
-  });
-  watchFull(stage, (on) => {
-    d.log(on ? 'filling the screen · Escape to come back' : 'back to the page', 'hi');
-  });
+  // ⚠️ NO `full` HANDLER AND NO `watch` CALL. The panel owns both: its ⛶ asks
+  // `fullscreen.mjs` itself, it follows the real events AND the faux path's
+  // class change, and it tells this page through `onFull`. What was here was a
+  // second copy of all of that.
 
-  d.on('enter', async () => {
+  // ⚠️ `vr`, NOT `enter`. `/weight/` and `/floor/` call this control `vr`,
+  // `/mirror/` calls it `xr`, and this page called it `enter`, so nothing
+  // written about one page could be read against another. Renamed 2026-09-19
+  // with the button group, and every reference moved with it.
+  d.on('vr', async () => {
     // ⚠️ A LAST NET. Every individual await inside enter() is guarded now, but
     // the bug that cost two runs was a plain synchronous statement BETWEEN the
     // guarded parts. A handler whose failure mode is silence is not one to
@@ -1805,7 +2339,7 @@
     try { got = await enter(); }
     catch (e) {
       shipNow(`FAIL enter() · ${e.name}: ${e.message}`);
-      d.log(`entering failed · ${e.name}: ${e.message}`, 'bad');
+      d.log(`entering failed. ${e.name}: ${e.message}`, 'bad');
       try { await session?.end(); } catch { /* may not exist */ }
       session = null; xrOk = false;
     }
@@ -1813,14 +2347,16 @@
     // the first two can pass, which is exactly why demo/verify.mjs cannot grade
     // this page and verify-quest.mjs has to exist.
     gradeUI('headset');
-    d.assert('it knows whether there is a headset here',
-      typeof navigator.xr === 'object' || navigator.xr === undefined,
-      navigator.xr ? 'WebXR present' : 'no WebXR in this browser');
     if (got) {
       d.assert('an immersive session started', !!session);
       d.assert('a floor-relative space resolved', !!xrSpace, 'local-floor');
     } else {
-      d.assert('with no headset it says so and keeps drawing the window',
+      // ⚠️ THE OTHER HALF IS IN THE `caps` CHECK AND NOT HERE ANY MORE. Where
+      // this browser has already said there is no headset, this button is off
+      // and cannot be pressed, so a check on this line would never run on the
+      // machine it is about. What it covers now is the case where the control
+      // WAS live and the session still did not open.
+      d.assert('a headset that will not open leaves the page drawing the window',
         !xrOk && !!doc, 'window path');
     }
   });
@@ -1962,10 +2498,14 @@
       // `moveThing` stores through `r4`, which rounds to 0.1 mm, and a position
       // that is exact in the grid's frame is not exact after being rotated into
       // the world, rounded, and rotated back: MEASURED, 19 micrometres, which
-      // is 3.8e-5 of a unit. The un-rotated check above can use 1e-6 because
-      // nothing rotates between the snap and the store. A tolerance of half a
-      // millimetre is two orders under the 0.5 m grid and an order over the
-      // rounding, so it can still catch a brick that missed by a whole unit.
+      // was 3.8e-5 of a 0.5 m unit and is 1.9e-5 of the metre unit now. The
+      // un-rotated check above can use 1e-6 because nothing rotates between the
+      // snap and the store.
+      // ⚠️ IT IS IN UNITS, NOT IN METRES, so it scaled with the brick on its
+      // own: 1e-3 of a unit was 0.5 mm and is 1 mm. Still three orders under
+      // the grid it is measuring and an order and a half over the rounding, so
+      // it can catch a brick that missed by a whole unit and cannot be tripped
+      // by the store.
       const GRID_EPS = 1e-3;
       const off = (v, t) => Math.abs(((v - t.s / 2) / UNIT) - Math.round((v - t.s / 2) / UNIT));
       const onGrid = (v, t) => off(v, t) < GRID_EPS;
@@ -1978,7 +2518,7 @@
         `in the room's own frame it sits at ${gx.toFixed(3)}, ${gz.toFixed(3)} on ${UNIT} m units`
         + ` (off the lattice by ${(off(gx, turned) * UNIT * 1000).toFixed(3)} and`
         + ` ${(off(gz, turned) * UNIT * 1000).toFixed(3)} mm, against a ${(GRID_EPS * UNIT * 1000).toFixed(1)} mm allowance)`
-        + ` · square to the headset the same drop lands ${moved.toFixed(3)} m away, so the turn is doing something`);
+        + `, and square to the headset the same drop lands ${moved.toFixed(3)} m away, so the turn is doing something`);
     }
 
     /**
@@ -2012,8 +2552,8 @@
       moveThing(i, keep.x, keep.y, keep.z);
       d.assert('a brick pushed against the wall is still pushed there, and lights up saying so',
         !inside && onIt && past && lit.lit > plain.lit,
-        `at the middle of the room ${inside} · at the wall ${onIt} · 1.5 m past it ${past} (it is not stopped)`
-        + ` · held reads ${plain.lit.toFixed(2)} bright, against the wall ${lit.lit.toFixed(2)}`);
+        `at the middle of the room ${inside}, at the wall ${onIt}, 1.5 m past it ${past} (it is not stopped). `
+        + `Held it reads ${plain.lit.toFixed(2)} bright, against the wall ${lit.lit.toFixed(2)}`);
       /**
        * 🔴 AND NOTHING CHANGES SIZE, IN ANY OF THE FOUR STATES. Instructed
        * 2026-09-19: *"do not make blcoks bigger on hilite, just lighen them
@@ -2029,8 +2569,8 @@
       held = wasHeld; atWall = wasWall;
       d.assert('a brick never changes size, whatever the ray is doing to it',
         sizes.every((t) => t.scale === 1),
-        `untouched ${sizes[0].scale} · aimed at ${sizes[1].scale} · held ${sizes[2].scale}`
-        + ` · against the wall ${sizes[3].scale}, and brightness carries all four`);
+        `untouched ${sizes[0].scale}, aimed at ${sizes[1].scale}, held ${sizes[2].scale}, `
+        + `against the wall ${sizes[3].scale}, and brightness carries all four`);
     }
 
     // ⚠️ THE THING ON YOUR HAND IS GRADED HERE TOO, AND IT IS ALL ARITHMETIC.
@@ -2059,8 +2599,8 @@
     d.assert('the tablet faces across the controller, back at you, not along it at the sky',
       Math.abs(dot3(nrm, axis)) < 0.5 && dot3(nrm, across) > 0.9 && det > 0,
       `${(Math.acos(Math.max(-1, Math.min(1, dot3(nrm, across)))) * 180 / Math.PI).toFixed(0)}° of lean back towards you`
-      + ` · along the controller it reads ${dot3(nrm, axis).toFixed(3)}, and the bug read 1.000`
-      + ` · its front face is the one you can see (${det.toExponential(2)})`);
+      + `, along the controller it reads ${dot3(nrm, axis).toFixed(3)} where the bug read 1.000, `
+      + `and its front face is the one you can see (${det.toExponential(2)})`);
 
     const c0 = TABLET.controls[0];
     d.assert('dragging the slider from end to end reaches both ends of the number it drives',
@@ -2114,8 +2654,8 @@
       const span = x1 >= 0 ? (x1 - x0 + 1) : 0;
       d.assert('this browser can draw the tablet, and the knob crosses its whole lane',
         room.hasTablet && ink > 2000 && moved > 1000 && span > laneW * 0.95,
-        `${room.hasTablet ? 'its face compiled' : 'ITS FACE WOULD NOT COMPILE'} · ${ink} lit pixels`
-        + ` · the knob sweeps ${span.toFixed(0)} px of a ${laneW.toFixed(0)} px lane`
+        `${room.hasTablet ? 'its face compiled' : 'ITS FACE WOULD NOT COMPILE'} with ${ink} lit pixels, `
+        + `and the knob sweeps ${span.toFixed(0)} px of a ${laneW.toFixed(0)} px lane`
         + ` between ${c0.min}${c0.unit} and ${c0.max}${c0.unit}`);
 
       // ⚠️ THE ONE PLACE A MONOSPACE ADVANCE IS ASSUMED, MEASURED AGAINST THE
@@ -2138,8 +2678,8 @@
         tctx.measureText(c.label).width + TABLET.kit.btnPadX * 2));
       d.assert('...and the real font fits the boxes the arithmetic reserved for it',
         drawn <= TABLET.headW && btnDrawn <= TABLET.btn.w,
-        `the head column: ${drawn.toFixed(1)} px drawn into ${TABLET.headW.toFixed(1)} reserved`
-        + ` · the button: ${btnDrawn.toFixed(1)} into ${TABLET.btn.w.toFixed(1)}`);
+        `the head column took ${drawn.toFixed(1)} px drawn into ${TABLET.headW.toFixed(1)} reserved, `
+        + `the button ${btnDrawn.toFixed(1)} into ${TABLET.btn.w.toFixed(1)}`);
 
       // 🔴 THE PRESS, THE DRAG AND THE LETTING GO — GRADED WITHOUT A HEADSET.
       // A controller ray needs hands; a hit is `{u, v}` and everything after it
@@ -2163,7 +2703,8 @@
       const afterLetGo = tablet.drag(hitAt(0.02));
       d.assert('a press takes hold of the slider, follows the ray, keeps its grip off the edge, and lets go',
         took && atLeft === c0.min && atRight === c0.max && kept === c0.max && afterLetGo === false,
-        `took ${took} · ${atLeft} then ${atRight}${c0.unit} · off the edge it stayed at ${kept} · after letting go a drag does nothing: ${afterLetGo === false}`);
+        `took ${took}, ${atLeft} then ${atRight}${c0.unit}, off the edge it stayed at ${kept}, `
+        + `and after letting go a drag does nothing: ${afterLetGo === false}`);
       // ⚠️ AND THE NUMBER HAS TO DO SOMETHING. A slider that moves a readout and
       // nothing else is a control that looks live and is inert — the same shape
       // as an optional-chained fullscreen call. This is the far side of that
@@ -2196,74 +2737,128 @@
       // threw on `find(x => x.leaves)` returning undefined and took everything
       // after it in the same handler.
       //
-      // What is graded now is the same BEHAVIOUR on the badge: a hold with a
-      // ring, on a real button index, cancelled by letting go. ⚠️ And it is
-      // graded through `update()` with supplied timestamps rather than by
-      // waiting — a real 900 ms pause here would push this handler past what
-      // the harness waits for and lose every assert after it.
+      // What is graded now is the same BEHAVIOUR: a hold with a ring, on a real
+      // button index, cancelled by letting go.
+      // 🔴 AND IT IS GRADED THROUGH `createQuitHold`, WHICH THE MODULE EXPORTS
+      // FOR EXACTLY THIS. The hold used to be an object a page built with a GL
+      // context and advanced itself, so a check could drive the shipped thing
+      // directly; it is mounted on a SESSION now and drives itself, and there
+      // is no session here. `createQuitHold` is the same arithmetic with no
+      // DOM, no GL and no session in it, so this still grades the gesture that
+      // ships rather than a copy of it.
+      // ⚠️ AND THE PICTURE IS GRADED SEPARATELY, through a mount with a `null`
+      // session. That is the other half: the arithmetic can be perfect and the
+      // ring still fail to compile, and an object existing says nothing about
+      // its shader.
       /**
-       * 🔴 DECLARED OUT HERE BECAUSE A LATER CHECK READS IT, AND IT WAS NOT.
-       * It was a `const` inside the block below, and the two-exits check
-       * further down reads `q?.label`. Optional chaining guards a value that is
-       * null; it does NOTHING for a name that was never declared in this scope,
-       * so the page threw `q is not defined`, the handler died where it stood,
-       * and everything after it — the remaining asserts and the picture — was
-       * gone. PHOTOGRAPHED: a black canvas with `q is not defined` as the last
-       * line of the log. That is CLAUDE.md's own rule about `?.` building a
-       * control that looks safe and is inert, in a new costume: here it made a
-       * REFERENCE look guarded.
+       * 🔴 DECLARED OUT HERE BECAUSE A LATER CHECK READS THEM, AND ONE WAS NOT.
+       * `q` was a `const` inside the block below and the one-exit check further
+       * down read `q?.label`. Optional chaining guards a value that is null; it
+       * does NOTHING for a name that was never declared in this scope, so the
+       * page threw `q is not defined`, the handler died where it stood, and
+       * everything after it was gone. PHOTOGRAPHED: a black canvas with that as
+       * the last line of the log.
        */
-      let q = null;
+      let q = null, quitBadge = null;
       {
         let fired = 0;
-        // ⚠️ NO LABEL AND NO BUTTON PASSED, so this grades the SHIPPED
-        // defaults. A check that names its own label and its own index passes
-        // whatever the module's defaults become, which is a check about the
-        // check.
-        q = createXRQuit(gl, { onQuit: () => { fired++; } });
+        // ⚠️ NO LABEL AND NO BUTTON PASSED to either, so this grades the
+        // SHIPPED defaults. A check that names its own label and its own index
+        // passes whatever the module's defaults become, which is a check about
+        // the check.
+        q = createQuitHold({ onQuit: () => { fired++; } });
+        quitBadge = mountXRQuit(gl, null);
+
+        /**
+         * 🔴 THE RING IS COMPILED HERE RATHER THAN ON SOMEBODY'S FIRST HEADSET
+         * FRAME, and `session: null` is what that argument is for. Everything
+         * in the badge is lazy until its first draw, so the object existing
+         * says nothing at all about whether its shader builds, and a page
+         * asserting "there is a way out" off the object alone stays green on a
+         * broken one. `prepare()` is the module answering for itself.
+         * ⚠️ `driven` IS THE NEGATIVE CONTROL. A compile-only mount must NOT be
+         * advancing a hold, because there is no session to advance it from, and
+         * a `true` here would mean this check had quietly started a second way
+         * out on a page that already has one.
+         */
+        const built = quitBadge.prepare();
+        d.assert('the way out compiles its ring on this machine, not on a headset first frame',
+          built && !quitBadge.why && quitBadge.driven === false,
+          built ? `it built, and nothing is driving it (driven ${quitBadge.driven})`
+                : `it would not build: ${quitBadge.why}`);
+
         // Six buttons, so the one pressed can be moved around. Index 4 is A/X
         // on a Touch controller; index 0 is the trigger.
         const pad = (down, i = 4) => [{ gamepad: {
           buttons: Array.from({ length: 6 }, (_, k) => ({ pressed: down && k === i })),
           axes: [0, 0, 0, 0] } }];
-        const HALF = q.holdMs / 2000;            // seconds to reach half the hold
+        /**
+         * ⚠️ THE HOLD BELIEVES AT MOST 0.1 s OF ANY ONE FRAME, so a check
+         * cannot jump half of it in a single call: a headset that stalled for a
+         * second must not advance a deliberate press by a second. Fed in frames
+         * the size the module will accept, which is still no time at all here
+         * because every one of them carries its own delta rather than waiting.
+         */
+        const feed = (ms, i = 4) => {
+          let p = 0;
+          for (let left = ms; left > 0; left -= 100) p = q.update(pad(true, i), Math.min(100, left) / 1000);
+          return p;
+        };
+        /** One frame with nothing pressed, which is what arms the hold. */
+        const armIt = () => q.update([], 0.016);
+        const HALF = q.holdMs / 2;
+
+        /**
+         * 🔴 THE PRESS THAT OPENED THE SESSION IS NOT A PRESS TO LEAVE IT. A
+         * headset session is entered from a controller button and that button
+         * is still down on the first frames inside, so without this the room
+         * would close about three seconds after it opened. It used to be a
+         * guard each page wrote for itself and it now belongs to the module, so
+         * it is graded here rather than assumed.
+         */
+        const born = feed(HALF);
+        const stillBorn = q.progress;
+        armIt();
+        d.assert('a button already down when the session opened does not advance the hold',
+          born === 0 && stillBorn === 0 && fired === 0 && q.armed,
+          `held through ${HALF} ms of an unarmed press and the ring read `
+          + `${(stillBorn * 100).toFixed(0)}%, fired ${fired} times, armed now ${q.armed}`);
+
         const onPress = q.update(pad(true), 0);
-        const halfWay = q.update(pad(true), HALF);
+        const halfWay = feed(HALF);
         const letGo = q.update(pad(false), 0.01);
         d.assert('the way out takes a hold: a press, or letting go part-way, does nothing',
           onPress === 0 && halfWay > 0.4 && halfWay < 0.6 && letGo === 0 && fired === 0,
-          `pressed ${(onPress * 100).toFixed(0)}% · half way ${(halfWay * 100).toFixed(0)}% · `
-          + `let go ${(letGo * 100).toFixed(0)}% · fired ${fired} times`);
+          `pressed ${(onPress * 100).toFixed(0)}%, half way ${(halfWay * 100).toFixed(0)}%, `
+          + `let go ${(letGo * 100).toFixed(0)}%, fired ${fired} times`);
 
         // 🔴 ANY BUTTON, AND THIS IS THE ASSERT THAT SAYS SO. Instructed
         // 2026-09-17: *"hold down any controller button for looooong enough
         // then it quits"*. The check that used to sit here named button 4, so
         // it would have passed unchanged on a module that still answered to
-        // that one button alone — which is the whole of what changed.
+        // that one button alone, which is the whole of what changed.
         // ⚠️ AND THE TRIGGER IS IN THE LIST ON PURPOSE. It is also what drags a
         // brick here, so if this ever has to be narrowed, index 0 is the one
         // that would go and this line is where that decision would show up.
         const each = [0, 1, 3, 4, 5].map((i) => {
-          q.reset();
-          q.update(pad(true, i), 0);
-          const p = q.update(pad(true, i), HALF);
+          q.reset(); armIt();
+          const p = feed(HALF, i);
           q.update(pad(false, i), 0.01);
           return { i, p };
         });
         d.assert('...and every button on the controller advances the same hold, not one named one',
           each.every((e) => e.p > 0.4 && e.p < 0.6) && q.button === 'any',
-          `${each.map((e) => `${e.i}:${(e.p * 100).toFixed(0)}%`).join(' · ')} · asked for "${q.button}"`);
-        q.reset();
+          `${each.map((e) => `${e.i} at ${(e.p * 100).toFixed(0)}%`).join(', ')}, asked for "${q.button}"`);
+        q.reset(); armIt();
         fired = 0;
-        q.update(pad(true), 0);
 
         // 🔴 AND THE RING HAS TO SAY HOW FAR THROUGH YOU ARE, or the hold is a
-        // button that does nothing for nine tenths of a second. The quantity is
-        // the progress the badge is DRAWN from, read back off the object rather
+        // button that does nothing for three seconds. The quantity is the
+        // progress the badge is DRAWN from, read back off the object rather
         // than off the number that was fed in.
-        q.update(pad(true), HALF);
+        feed(HALF);
         const mid = q.progress;
-        q.update(pad(true), HALF * 0.66);
+        feed(HALF * 0.66);
         const later = q.progress;
         d.assert('...and the ring fills as far as the hold has got, and no further',
           mid > 0.4 && mid < 0.6 && later > mid && later < 1,
@@ -2271,20 +2866,21 @@
 
         // ⚠️ AND IT FIRES ONCE. `session.end()` is async, so a ring that stayed
         // full for three more frames would ask three times.
-        q.update(pad(true), q.holdMs / 1000);
-        q.update(pad(true), q.holdMs / 1000);
+        feed(q.holdMs);
+        q.update(pad(true), 0.016);
+        q.update(pad(true), 0.016);
         d.assert('...and held the whole way it fires once, and only once',
           fired === 1 && q.progress === 1,
           `${fired} time(s) after the hold completed, and two frames more`);
 
         // 🔴 THE HOLD HAS TO BE LONG ENOUGH TO BE A DECISION. Every button on
         // the controller is live, so the only thing between a thumb resting
-        // somewhere and the session ending is this number — and the label has
-        // to say that holding is what does it, because there is no longer one
+        // somewhere and the session ending is this number, and the label has to
+        // say that holding is what does it, because there is no longer one
         // button to name.
         d.assert('the way out is a long hold on any button, and it says so',
-          q.button === 'any' && q.holdMs >= 2000 && /hold/i.test(q.label),
-          `hold any button for ${(q.holdMs / 1000).toFixed(1)} s, labelled "${q.label}"`);
+          q.button === 'any' && q.holdMs >= 2000 && /hold/i.test(quitBadge.label),
+          `hold any button for ${(q.holdMs / 1000).toFixed(1)} s, labelled "${quitBadge.label}"`);
       }
 
       /**
@@ -2306,9 +2902,9 @@
        */
       const exits = (tablet.controls || []).filter((c) => c.leaves);
       d.assert('there is exactly one way out, and it is the hold on the controller',
-        exits.length === 0 && !!q?.label,
+        exits.length === 0 && !!quitBadge?.label,
         exits.length === 0
-          ? `the tablet carries no exit · the only one is "${q?.label}"`
+          ? `the tablet carries no exit, so the only one is "${quitBadge?.label}"`
           : `the tablet still has ${exits.length}: ${exits.map((c) => c.label).join(', ')}`);
 
       tablet.set(c0.key, was); tablet.draw();
@@ -2328,7 +2924,7 @@
       d.assert('drawing a tablet with two controls on it left no WebGL error behind',
         tabErr === 0 && room.tabletUploadMs !== null,
         tabErr === 0
-          ? `clean · ${TABLET.px}x${TABLET.py} px uploaded in ${(room.tabletUploadMs ?? 0).toFixed(2)} ms`
+          ? `clean, ${TABLET.px}x${TABLET.py} px uploaded in ${(room.tabletUploadMs ?? 0).toFixed(2)} ms`
           : `gl.getError() ${tabErr}`);
     }
 
@@ -2394,7 +2990,11 @@
   publishXR();
   async function maybeReport() {
     if (REPORT_PARAM === '0') return;
-    const headset = await navigator.xr?.isSessionSupported('immersive-vr').catch(() => false);
+    // ⚠️ THE SAME ONE PROBE THE CONTROLS READ, not a second question put to this
+    // browser. `whenXrCaps` settles at once where there is no WebXR, so a phone
+    // reaches the `return` below in the same turn rather than waiting.
+    const caps = await whenXrCaps(3000);
+    const headset = caps.vr === 'yes';
     if (REPORT_PARAM !== '1' && !headset) return;
     ship = createShipper();
     const nx = nativeXR();
@@ -2408,14 +3008,15 @@
     ship(`window ${innerWidth}x${innerHeight} css · dpr ${devicePixelRatio}`);
     ship(`headset layout applied: ${document.documentElement.classList.contains('xr')}`);
     ship(`⚠️ SELF-REPORTED. This page cannot read its own hardware; only adb getprop can.`);
-    ship(`immersive-vr supported: ${headset}${REPORT_PARAM === '1' && !headset ? ' (forced on with ?report=1)' : ''}`);
+    ship(`immersive-vr ${caps.vr} · immersive-ar ${caps.ar}`
+      + `${REPORT_PARAM === '1' && !headset ? ' (forced on with ?report=1)' : ''}`);
     // ⚠️ WRAP `d.assert` RATHER THAN COPYING THE LIST. Every assert this page
     // makes ships, including ones added later by someone who never reads this
     // block — a second list of "things worth reporting" would go stale the
     // first time an assert was added, and go stale silently.
     const origAssert = d.assert;
     d.assert = (label, pass, detail) => { ship(`${pass ? 'ok  ' : 'FAIL'} ${label}${detail ? '  ' + detail : ''}`); return origAssert(label, pass, detail); };
-    d.log('reporting to pub.positron.studio · read it with /logs?format=text');
+    d.log('reporting to pub.positron.studio, read it with /logs?format=text');
   }
   maybeReport();
 
@@ -2430,18 +3031,24 @@
   // itself waiting on a timer that had stopped being generous.
   addEventListener('error', (e) => shipNow(`FAIL uncaught: ${e.message} @ ${(e.filename || '').split('/').pop()}:${e.lineno}`));
   addEventListener('unhandledrejection', (e) => shipNow(`FAIL unhandled rejection: ${e.reason?.message || e.reason}`));
-  for (const id of ['enter', 'ar', 'full']) {
+  // ⚠️ `d.button` FINDS THE GROUP'S TWO AS WELL AS THE SHELL'S ONE. It falls
+  // back to a `[data-id]` query inside `.pos-controls`, and the group sets that
+  // attribute on every button it makes, so a control moving into a component
+  // did not take it out of reach of this loop or of anything else that asks for
+  // one by name.
+  // ⚠️ NO `full` IN THIS LIST ANY MORE. The ⛶ belongs to the video panel and is
+  // not a shell control, so `d.button('full')` answers null and a press on it
+  // is not one of this page's own.
+  for (const id of ['vr', 'ar']) {
     const b = d.button(id);
     if (b) b.addEventListener('click', () => ship?.(`pressed "${b.textContent}"`), true);
   }
-  d.set('view', 'window');
-  d.set('moved', 0);
   try {
     if (sessionStorage.getItem('blocks-resume')) {
       sessionStorage.removeItem('blocks-resume');
-      d.log('updated · press "Run in AR" to go back in', 'ok');
-      const b = d.button('ar') || d.button('enter');
-      if (b) { b.classList.add('pos-pri'); b.textContent = '↩ Back in · update taken'; }
+      d.log('the update is in. Press Run in AR to go back in', 'ok');
+      const b = d.button('ar') || d.button('vr');
+      if (b) { b.classList.add('pos-pri'); b.textContent = '↩ Back in'; }
     }
   } catch { /* private mode */ }
   /**
@@ -2473,6 +3080,12 @@
     while (performance.now() - t0w < 4000 && (ws?.readyState !== 1 || !shown)) {
       await new Promise((r) => setTimeout(r, 50));
     }
+    // ⚠️ `caps` FIRST, AND IT IS THE ONE CHECK WITH NO BUTTON IT COULD LIVE ON.
+    // What it grades is that this browser's answer about headsets arrived and
+    // that the two controls were set from it, and on a browser that cannot open
+    // a session those controls are SWITCHED OFF, so a check inside their
+    // handlers would never run on the machines the claim is about.
+    await d.run('caps');
     await d.run('roll');
     await d.run('again');
     await d.run('bad');
@@ -2501,7 +3114,7 @@
   }
   // The checks are done and the room has stopped changing, so it can be looked
   // at. One appearance, faded rather than cut.
-  stage.classList.remove('warming');
+  panel.el.classList.remove('warming');
   d.ready();
 
   // ⚠️ ARRIVED FROM THE INDEX WITH `?xr=1` — put the one press that matters
@@ -2509,7 +3122,7 @@
   // activation, so the button still has to be pressed. This only means you do
   // not have to find it, which through a headset is most of the work.
   if (new URLSearchParams(location.search).has('xr')) {
-    const b = d.button('enter');
+    const b = d.button('vr');
     if (b) { b.scrollIntoView({ block: 'center' }); setTimeout(() => b.focus(), 60); }
   }
 </script>

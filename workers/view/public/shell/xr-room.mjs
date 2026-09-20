@@ -113,6 +113,17 @@ export function leastAxis(o) {
 // which 1 cm already fixes. 4 cm is for the eye: two things a rounding error
 // apart are one shape with a seam in it, and the rule is meant to make two
 // things look like two.
+//
+// 🔴 IT WAS LEFT AT 4 cm WHEN THE BRICK DOUBLED, 2026-09-19, AND THE REASON IS
+// THAT NOTHING READS IT. The brick went from 0.5 m to 1.0 m in `seed.mjs`, so
+// 4 cm is half the share of a brick it used to be, and the obvious move is to
+// double it. Checked before doing that: `spaced()` calls `overlapOf(a, b)` with
+// no gap at all, on purpose, for the measurement written a few lines above (a
+// brick set exactly on top of another was reported as still inside the rule),
+// and `/blocks/` imports this name and never uses it. So it governs nothing
+// today, and a constant with no consumer cannot be wrong for being small
+// against a brick. It is kept rather than deleted because a page imports it and
+// this file does not own that page.
 export const GAP = 0.04;
 // MEASURED over 400 seeds: 11 passes was the most any room needed, and 342 of
 // them settled in two. The cap is here so a pathological room cannot spin, not
@@ -786,6 +797,19 @@ const HOLD = {
 // front of you: exactly the cage the fade exists to avoid, drawn by the fade's
 // own constants disagreeing with the floor's. The span is DERIVED from the fade
 // now rather than typed beside it, so the two cannot drift again.
+// 🔴 AND IT STAYED AT 11 m WHEN THE BRICK DOUBLED, 2026-09-19. The floor is not
+// measured in bricks: this is how far a dot can still be seen, so it is set by
+// the DOT and the eye. At 4 mm radius a dot subtends 0.042 degrees at 11 m,
+// which on the measured Quest 3 framebuffer (1680 px an eye over about 110
+// degrees) is roughly two thirds of a pixel, so the fade already ends where
+// there is nothing left to draw. The dots got SMALLER in the same edit, which
+// argues for a shorter reach rather than a longer one, and the build area went
+// to 4.8 m across, whose corners still sit 8.6 m inside this edge.
+// ⚠️ AND A PAGE IS TUNED AGAINST THE NUMBER THIS DERIVES. `/blocks/` holds a
+// soft wall at 22 m, which is twice this half-span, and the reason it was not
+// doubled with the brick is that walking further would put somebody standing on
+// nothing. Moving `FADE_FAR` moves `GRID.span` and so moves what that wall is
+// measured against, which makes this a two-file change rather than a taste one.
 const FADE_NEAR = 4.5, FADE_FAR = 11;
 export const GRID = {
   span: FADE_FAR * 2,   // the floor square's side — half of it IS the fade's end
@@ -798,13 +822,19 @@ export const GRID = {
   // ONE quad, so the work is per pixel and not per dot, and the sub-pixel fade
   // two lines down is what keeps a denser grid from turning into haze.
   cell: 0.125,
-  // 🔴 5 mm, DOWN FROM 7. Asked 2026-09-16: *"make them smaller (global vr grid
-  // everywhere, same for xr)"*. At 7 mm on a 12.5 cm cell the dots were 11% of
-  // the gap between them and read as a stipple you look AT; at 5 they are 8%
-  // and read as a surface that happens to be marked. Both numbers are here so
-  // the ratio is visible, which is the quantity that matters rather than either
-  // one alone.
-  dot: 0.005,           // dot radius — ONE size, see the note in the shader
+  // 🔴 4 mm, DOWN FROM 5, DOWN FROM 7. Asked twice, the same way both times:
+  // *"make them smaller (global vr grid everywhere, same for xr)"* on
+  // 2026-09-16, and *"make floor grid dots a biiit smaller (global component)"*
+  // on 2026-09-19 with a screen shot of the flat page. On a 12.5 cm cell 7 mm
+  // is 11% of the gap between dots, 5 is 8% and 4 is 6.4%, so the surface goes
+  // on being marked without the marks being what you look at. Every number is
+  // here so the RATIO is visible, which is the quantity that matters rather
+  // than any one of them alone.
+  // ⚠️ A DOT SMALLER THAN A PIXEL FADES RATHER THAN ALIASES, which the note
+  // above GRID_FS explains: at a grazing angle one pixel covers many cells, and
+  // the shader answers with strength rather than with a hard edge. So going
+  // smaller costs distance rather than shimmer.
+  dot: 0.004,           // dot radius, ONE size, see the note in the shader
   /**
    * 🔴 HOW STRONG THE DOTS START, EXPORTED BECAUSE THE TABLET ALSO NEEDS IT.
    * `xr-tablet.mjs`'s `floor dots` slider had `value: 75` typed into it beside
@@ -1259,13 +1289,17 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     const own = `the page's own floor: a ${GRID.span} m square of dots at y=0, and no walls,`
       + ' because the floor is the one surface a headset standing on it can be sure of';
     if (planes.state === 'yours') {
-      const bits = Object.entries(planes.labels).map(([k, v]) => `${k} ${v}`).join(' · ');
+      const bits = Object.entries(planes.labels).map(([k, v]) => `${k} ${v}`).join(', ');
       const walls = planes.labels.wall || 0;
-      planes.note = `${planes.count} surface(s) from your room · ${bits}`
-        + ` · the dots are on ${planes.dotted} of them: every wall, the floor and the ceiling, and nothing standing on the floor`
-        + `, floor at y=${planes.floorY.toFixed(2)} m`
-        + (walls ? ` · ${walls} of them are walls, and those are the only walls this page draws`
-                 : ' · NO wall surfaces came back, so there are no dotted walls');
+      // Four facts, four sentences. This string reaches a page's log box, so it
+      // lost its middots on 2026-09-19 with the rest of what a visitor reads: a
+      // line that bolts a third and a fourth clause on with a separator is the
+      // habit the em dash rule is about, wearing a different character.
+      planes.note = `${planes.count} surface(s) from your room, ${bits}.`
+        + ` The dots are on ${planes.dotted} of them: every wall, the floor and the ceiling, and nothing standing on the floor,`
+        + ` floor at y=${planes.floorY.toFixed(2)} m.`
+        + (walls ? ` ${walls} of them are walls, and those are the only walls this page draws.`
+                 : ' NO wall surfaces came back, so there are no dotted walls.');
       planes.short = `floor: your room\n${planes.dotted} of ${planes.count} dotted`;
       planes.from = 'your room';
     } else if (planes.state === 'none') {

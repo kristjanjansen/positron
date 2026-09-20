@@ -1,4 +1,4 @@
-// demo/held/text.mjs — words turned into distance fields, so a letter stays a
+// demo/weight/text.mjs — words turned into distance fields, so a letter stays a
 // letter when you put your face against it.
 //
 // 🔴 WHY THIS IS NOT `texImage2D(canvas)`, WHICH IS THIS REPO'S ESTABLISHED
@@ -82,8 +82,8 @@
  * family by name. A face with no such axis makes the two identical, which
  * costs nothing.
  */
-export const DISPLAY = 'held-display';
-export const BODY = 'held-text';
+export const DISPLAY = 'weight-display';
+export const BODY = 'weight-text';
 
 /** The heaviest this family goes. Quoted rather than assumed: 900 is not a
  *  weight every variable font has, and asking for one it lacks silently gets
@@ -447,7 +447,7 @@ export async function ensureFont() {
   // for the second. Nothing was broken; the proxy was. A face that happened to
   // set S at the fallback's width would have reported as missing while
   // rendering perfectly. `check()` is decisive here because the family is an
-  // ALIAS — no system font is called `held-display`, so a match can only be
+  // ALIAS — no system font is called `weight-display`, so a match can only be
   // the vendored file.
   const loaded = document.fonts.check(`${DISPLAY_WEIGHT} 100px "${DISPLAY}"`, 'S');
   // ⚠️ THE WIDTH COMPARISON STILL EARNS ITS PLACE, for the OTHER question.

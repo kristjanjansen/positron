@@ -79,6 +79,14 @@ export const PROBES = {
    * ENTER a session, not to ask about one. A desktop Chrome carrying the WebXR
    * emulator answers true here, which is correct: it can present the layout
    * this flag turns on, and the flag is about layout.
+   *
+   * ⚠️ THIS IS NOT THE PROBE A CONTROL USES, AND THE DIFFERENCE IS WORTH ONE
+   * LINE SO THAT NOBODY ADDS A THIRD. What is decided here is a LAYOUT flag on
+   * the index, so `false` costs a reader nothing and un-links nothing.
+   * `demo/shell/xr-caps.mjs` answers the same question for a BUTTON, where a
+   * browser with no WebXR at all has to be told apart from one that answered
+   * no: it carries that third state, the reason in words, and the subscription
+   * a control needs when the answer lands after the page is drawn.
    */
   xr: async () => {
     if (!navigator.xr?.isSessionSupported) return false;

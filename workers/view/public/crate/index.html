@@ -997,7 +997,20 @@
             + 'broadcast cannot cross in one request.' },
       // The return path, under the row, because what comes back down it is
       // audio rather than a second request.
-      { from: 'store', to: 'play', label: 'audio bytes', back: true,
+      /**
+       * 🔴 `audio file`, AND DELIBERATELY NOT THE PROJECT'S RETURN-STREAM
+       * LABEL. Settled 2026-09-19: *"h.264 - unify label and longer desc on all
+       * diagrams where stream back pcm or mp4 video"*. A picture coming back is
+       * `H.264` and sound coming back is `PCM`, and this arrow is NEITHER. What
+       * comes down it is whatever file somebody dropped on the page, sitting in
+       * a bucket, read in ranges by an element that asks for them: a codec name
+       * here would be a guess, because `accept="audio/*"` takes mp3, wav, m4a
+       * or anything else the browser will play.
+       * ⚠️ IT SAID `audio bytes` AND THAT WAS THE PROBLEM THE UNIFICATION IS
+       * ABOUT. Beside `PCM` on another page, `audio bytes` reads as raw samples
+       * on a wire, which is exactly what this is not.
+       */
+      { from: 'store', to: 'play', label: 'audio file', back: true,
         note: 'The upload answers with an address and that address goes into the element, so '
             + 'nothing is played out of this browser\'s own copy. Seeking asks for a range '
             + 'rather than the file again: a **Range** header comes back as a **206**, '

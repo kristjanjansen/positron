@@ -38,6 +38,7 @@
   import { putWhole, proveReadable, fetchBack } from '/shell/ingest.mjs';
   import { resolveDuration, waitForFirstFrame } from '/shell/media.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { centreSymbol, setSymbol } from '/shell/symbol.mjs';
   import { armVideo, recorderMime } from '/shell/shell.mjs';
 
   /**
@@ -84,11 +85,15 @@
    * whose picture can be GRADED rather than merely looked at.
    *
    * ⚠️ AND SINCE *"rm video overlay"* ON 2026-09-18 IT IS THE FALLBACK RATHER
-   * THAN THE FEED. What a visit normally shows is the public domain film, alone
-   * and cropped to fill, with nothing drawn over it; the generated picture is
-   * what a visit gets when the film 404s, stalls or will not decode. Both are
-   * this project's own bytes off this project's own origin, so the paragraph
-   * above is unchanged in the only respect it was written about.
+   * THAN THE FEED. What a show puts out is the film alone, cropped to fill,
+   * with nothing drawn over it; the generated picture is what a visit gets when
+   * the film 404s, stalls or will not decode.
+   * ⚠️ **AND SINCE 2026-09-19 NEITHER IS ON SCREEN UNTIL SOMEBODY PRESSES
+   * RECORD.** The film is a 253 MB recording in our own R2 rather than 4 MB on
+   * this origin, so nothing is fetched on a visit and the stage is a flat field
+   * until a show starts. Both pictures are still this project's own bytes off
+   * this project's own servers, which is the only respect the paragraph above
+   * was written about.
    */
   const TABS = [
     { id: 'audience', label: 'Audience' },
@@ -107,8 +112,9 @@
     // explanations and the paragraph is the weaker one, and using the `one`
     // line verbatim stops a visitor arriving from the index being told the same
     // thing twice in two wordings that can drift apart.
-    what: 'One press puts a live picture in front of an audience, asks them '
-      + 'something, and keeps every answer on the recording\u2019s own timeline.',
+    what: 'Two presses, one for the picture and one for the show, put a church scene '
+      + 'from a 2011 MIMproject performance in front of an audience, ask them '
+      + 'something, and keep every answer on the recording\u2019s own timeline.',
     // ⚠️ NO CONTROLS ROW. The tabs are the navigation and the panels carry
     // their own, so a declared-empty row would paint a band of dead space.
     controls: [],
@@ -134,28 +140,22 @@
    * is one encode and three decodes for a picture nobody is sending anywhere.
    */
   /**
-   * 🔴 THE STAGE IS TALLER THAN THE FILM, NOT 16:9. Asked 2026-09-18 over three
-   * messages against a screenshot: *"add moer height (cut from sides)"*, a frame
-   * of the film with *"i need this cut"*, then *"make video 5% higher and crop
-   * left rihht sides a bit"*. 16:9 was showing **75%** of the film's height and
-   * throwing away the top of the cannon and the dancers' feet. The box shows all
-   * of it now and takes the crop off the sides instead.
+   * 🔴 THE STAGE IS 16:9, ASKED 2026-09-19: *"video win to 16:9"*, in the same
+   * message that replaced the film.
+   * ⚠️ **AND THE SHAPE BEFORE IT WAS RIGHT FOR THE FILM IT WAS ABOUT.** Three
+   * messages on 2026-09-18 bought a box 5% taller than 4:3 (*"add moer height
+   * (cut from sides)"*, a frame with *"i need this cut"*, *"make video 5% higher
+   * and crop left rihht sides a bit"*), because a 16:9 box was showing 75% of a
+   * 4:3 film's height and throwing away the top of the cannon and the dancers'
+   * feet. That argument retires with the film: the church scene is 1280x720,
+   * so 16:9 IS its own shape and a taller box would letterbox it. Settled, not
+   * to be re-argued from the old messages.
    * ⚠️ **IT IS ONE CONSTANT AND NOTHING ELSE IS TYPED TWICE.** The panel's box,
    * the empty-state card, the canvas and every check that reads a pixel derive
-   * from `STAGE_W` and `STAGE_H`, so moving the shape again is `STAGE_OVER`.
+   * from `STAGE_W` and `STAGE_H`, so moving the shape again is these two lines.
    */
   const STAGE_W = FRAME_W;
-  /**
-   * 🔴 5% TALLER THAN THE FILM'S OWN SHAPE, WHICH IS WHAT TAKES 5% OFF ITS
-   * SIDES. Asked 2026-09-18: *"make video 5% higher and crop left rihht sides a
-   * bit"*. The two halves are one number: at exactly 4:3 the film fits the box
-   * and nothing is cropped at all, so the only way to trim the sides is a box
-   * TALLER than the source. `cover` then scales by height, 360 to 1008 is
-   * **2.80x**, the film is drawn **1344** wide into 1280, and **32 px** comes
-   * off each side. Full height, 5% of the width gone.
-   */
-  const STAGE_OVER = 1.05;
-  const STAGE_H = Math.round(FRAME_W * 3 / 4 * STAGE_OVER);
+  const STAGE_H = Math.round(FRAME_W * 9 / 16);
   const master = document.createElement('canvas');
   master.width = STAGE_W; master.height = STAGE_H;
   const mctx = master.getContext('2d', { alpha: false });
@@ -366,9 +366,10 @@
    * `?bg=` is that person saying so. A suite run never passes it, so the
    * default picture stays the one this project generates itself.
    *
-   * ⚠️ IT IS A BACKGROUND, NOT THE FEED. The test pattern still draws on top,
-   * so the burned clock and the frozen row survive and the archive's seek check
-   * still has something to read.
+   * ⚠️ IT REPLACES THE PICTURE RATHER THAN SITTING BEHIND IT, AND THIS COMMENT
+   * SAID THE OPPOSITE FOR A DAY. The test pattern stopped drawing on top on
+   * 2026-09-18, at *"rm video overlay"*, so there is no burned clock over a
+   * `?bg=` clip and nothing downstream reads one.
    * ⚠️ AND RE-PUBLISHING AN ARCHIVE THROUGH OUR OWN FEED IS REDISTRIBUTION
    * RATHER THAN VIEWING. That is a rights question rather than a load one, it
    * belongs to whoever owns this project, and it is written here rather than
@@ -377,39 +378,57 @@
   /**
    * 🔴 AND THE DEFAULT BACKGROUND IS NOT ERR, SINCE 2026-09-18. Asked as
    * *"turn on the err feed in the bg"*, then settled with *"i just need some
-   * video there. look for suitable PD sources?"*. That second sentence
-   * dissolves the problem: the ask was never ERR, it was a picture, and a
-   * public domain film on our own origin costs a broadcaster nothing and raises
-   * no rights question to hand back to anybody.
+   * video there"*. That second sentence dissolves the problem: the ask was
+   * never ERR, it was a picture, and a picture we hold ourselves costs a
+   * broadcaster nothing and raises no rights question to hand back to anybody.
    *
-   * 🔴 IT IS `Le Voyage dans la Lune`, MELIES, 1902, AND IT HAS TWO INDEPENDENT
-   * PUBLIC DOMAIN GROUNDS RATHER THAN ONE: published 1902, so copyright has
-   * expired in every jurisdiction, AND the source item carries an explicit
-   * public domain mark. `demo/resources/moon-1902.json` records both, the
-   * source item, and the in and out points of the excerpt.
+   * 🔴 AND SINCE 2026-09-19 THE PICTURE IS OURS OUTRIGHT. Asked as *"rm going
+   * to the moon video in stage, video win to 16:9 and replace with mim
+   * sustsinable kirikutseen"*. It is the church scene from `MIM goes
+   * Sustainable`, staged in a temporary theatre container at the end of
+   * Kultuurikilomeeter in Tallinn's European Capital of Culture year, in a
+   * theatre built from construction warming boxes that the audience powered.
+   * 720p25, 22 minutes, and the recording is MIMproject's own.
+   * ⚠️ **IT REPLACES A PUBLIC DOMAIN FILM AND THE ARGUMENT FOR THAT ONE IS
+   * FINISHED, NOT OVERTURNED.** `Le Voyage dans la Lune` was chosen because a
+   * 1902 print raises no rights question. Material we made ourselves raises
+   * none either, and it is about the thing the page now asks the audience.
    *
-   * ⚠️ **THE AUDIO WAS REMOVED AND THAT IS A LICENCE DECISION, NOT A SIZE
-   * ONE.** The 1902 film is SILENT, so any sound on the upload is a modern
-   * score, and a modern score carries its own copyright on top of a public
-   * domain picture. Keeping it would have quietly reduced a two ground claim to
-   * one. It is the OPPOSITE call from the film this replaced: the Dickson
-   * Experimental Sound Film's audio was the 1894 artefact itself, and removing
-   * it there was the mistake.
-   *
-   * ⚠️ **TWO BETTER LOOKING CANDIDATES WERE REJECTED FOR HAVING ONE GROUND.**
-   * Mary Wigman's `Hexentanz` is the exact answer to the German Expressionist
-   * dance brief and survives only as an extract of a 1930 Bundesarchiv film, in
-   * copyright in Germany until 2044, published nowhere as a free file.
-   * `Metropolis` is US public domain by age and still in copyright in Germany,
-   * and every copy of it online is uploader-asserted or a rip of a restoration
-   * that carries fresh rights of its own.
-   *
-   * ⚠️ **AND IT IS SERVED FROM OUR OWN ORIGIN, FETCHED ONCE.** A public domain
-   * film on archive.org is still archive.org's server, which is the standing
-   * rule about external sources and the reason `/tapes/` needed a stand-in.
+   * 🔴 **THE ROW IS TAKEN BY `id`, NEVER BY FILE NAME, AND THAT IS NOT A
+   * PREFERENCE.** A re-encode changed a file name on 2026-09-19 and a lookup
+   * keyed by name re-credited one recording to another holder while every file
+   * was present and correct. An `id` is what the corpus promises to keep.
+   * ⚠️ **AND TWO ROWS IN THAT CORPUS ARE NOT OURS.** Kanuti Gildi SAAL filmed
+   * two co-productions and holds those recordings. This one is not one of
+   * them, and nothing below hard-codes that: the holder, the licence and the
+   * title are read off whichever row is named, so pointing this page at a
+   * different one credits that row rather than this one.
    */
-  const DEFAULT_BG = '/resources/moon-1902.mp4';
-  const BG = Q.get('bg') || DEFAULT_BG;
+  const FILM_ID = 'mim:mim-goes-sustainable-2011-kirikustseen';
+  const FILM_CORPUS = '/resources/mimproject.json';
+  /** The corpus row behind the stage, once it has been read. */
+  let film = null;
+
+  /**
+   * 🔴 THE LENGTH IS READ, NOT MEASURED. `durationMs` is in the corpus,
+   * ffprobed off the file when it was pulled, so this page knows how long the
+   * recording is before a byte of it arrives. Asking the element would mean
+   * loading enough of a 253 MB file to answer a question somebody has already
+   * answered.
+   */
+  async function readFilm() {
+    try {
+      const r = await fetch(FILM_CORPUS);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const c = await r.json();
+      const row = (c.items || []).find((it) => it.id === FILM_ID);
+      if (!row || !row.file) throw new Error(`no row ${FILM_ID}`);
+      return row;
+    } catch (e) {
+      d.log(`the film could not be looked up: ${e.message}`, 'bad');
+      return null;
+    }
+  }
   const secs = (t) => {
     if (!t) return null;
     const parts = String(t).split(':').map(Number);
@@ -426,63 +445,105 @@
 
   async function loadBackground(slug) {
     const v = document.createElement('video');
+    /**
+     * 🔴 MUTED, ASKED 2026-09-19: *"muted my default"*. It used to be moot: the
+     * film this replaced was a 1902 print with no sound at all. The church
+     * scene was recorded in a room with an audience in it, so there is
+     * something to hear and a visitor should not be made to hear it on arrival.
+     * ⚠️ **MUTED AND STOPPED ARE TWO DECISIONS, AND NOTHING HERE DEPENDS ON THE
+     * FIRST TO GET THE SECOND.** A muted element may autoplay where an unmuted
+     * one is refused, which is exactly the coupling that makes a later unmute
+     * break playback silently. This film plays only from `startShow`, which is
+     * a press, so the gesture is what allows it and mute is free to be turned
+     * off by the control under the picture.
+     */
     v.muted = true; v.playsInline = true; v.crossOrigin = 'anonymous';
     /**
-     * ⚠️ `preload = 'auto'` BECAUSE NOTHING ASKS THIS ELEMENT TO PLAY ANY MORE.
-     * A detached `<video>` fetches as little as it can get away with, and what
-     * used to force the data down was the `play()` that the stop-at-the-start
-     * ask removed. This is insurance rather than a measured fix: the film loads
-     * in the harness with or without it.
+     * 🔴 `preload = 'none'`, AND IT REPLACES AN `auto` THAT WAS RIGHT ABOUT A
+     * DIFFERENT FILE. The old comment here said the film loads in the harness
+     * with or without it, which was true of 4 MB on this origin and is not true
+     * of 253 MB from R2. Nothing is fetched until somebody presses play.
+     * ⚠️ `crossOrigin` IS NOT OPTIONAL NOW THE FILE IS ON ANOTHER HOST. The
+     * master canvas is read back by `getImageData` and captured by
+     * `captureStream`, and a canvas that has drawn a cross-origin video without
+     * CORS is TAINTED: both stop working with a security error rather than a
+     * blank picture. MEASURED on the file: `access-control-allow-origin: *` and
+     * `accept-ranges: bytes`.
      */
-    v.preload = 'auto';
+    v.preload = 'none';
     try {
       /**
        * ⚠️ THE FILE ROUTE IS FIVE LINES AND THE ERR ROUTE IS SIXTY, which is
        * the clearest argument for the default there is. No archive API, no
-       * HLS, no 618 KB of hls.js, no CORS question and no tainted canvas: a
-       * `<video>` with a `src` on the same origin as the page.
-       * ⚠️ IT LOOPS, because the film is 2 m 45 s and a show is longer.
+       * HLS, no 618 KB of hls.js and no tainted canvas: a `<video>` with a
+       * `src`, which R2 serves by the range that is being played.
+       * 🔴 IT NO LONGER LOOPS. It looped because the old film was 2 m 45 s and
+       * a show is longer than that. At 22 m 12 s the show is the shorter of the
+       * two, so a loop is a wrap nobody will ever reach, and a film that
+       * restarted mid-show would put the same minute out twice.
        */
       if (isFileSource(slug)) {
         v.src = slug;
-        v.loop = true;
-        // Ask for the bytes explicitly. `preload` is a hint a browser may ignore
-        // on a detached element; `load()` is the instruction.
-        v.load();
+        v.loop = false;
         /**
-         * 🔴 `loadeddata`, NOT `loadedmetadata`, AND NOT `play()`. Asked
-         * 2026-09-18: *"video sthould stop in control room in beginning"*. The
-         * film stands on its first frame until somebody starts the show, so the
-         * page needs a DECODED frame rather than a duration: `loadedmetadata`
-         * gives `readyState` 1, which has the size and no picture, and the
-         * drawing loop would have painted the test picture over a film that was
-         * loaded and had nothing to show yet.
-         * ⚠️ AND NOTHING HERE CALLS `play()` ANY MORE. `startShow` does, which
-         * is the only place that can honestly say a show has begun.
+         * 🔴 NO `load()`, NO `play()`, NO WAIT FOR A FRAME. The old shape here
+         * started the film and stopped it again to have one decoded frame to
+         * put on screen, which is a fine trick on a 4 MB file and a quarter of
+         * a gigabyte of somebody's bandwidth on this one. Nothing is asked for
+         * until `startShow` presses play.
+         * ⚠️ **SO A VISIT THAT PRESSES NOTHING SHOWS A FLAT FIELD, AND THAT IS
+         * THE TRADE.** The drawing loop already had that arm, from *"i get
+         * blinkig on-screen timecode etc stuff. rm it"*: what a visit gets
+         * before a press is one flat colour rather than a clock and a counter
+         * blinking at somebody who has not asked for anything.
+         * ⚠️ **AND A SEEK BEFORE METADATA IS NOT A FETCH.** Setting
+         * `currentTime` with `readyState` at 0 records a default playback start
+         * position and asks for nothing, so `?from=` still works without
+         * costing a visit who never presses.
          */
-        /**
-         * 🔴 PLAY ONE FRAME AND STOP ON IT, WHICH IS HOW A STILL IS MADE. The
-         * ask is that the control room shows a picture and does not advance it
-         * until a show begins, and the surest way to have a decoded frame to
-         * show is to start and immediately stop. The playhead ends within a
-         * frame of the in point; what it never does is run on to nobody.
-         * ⚠️ THE ASSERT IS THE GUARANTEE, NOT THIS LINE. `the film is in the
-         * stage picture, and it is stopped until a show starts` reads the
-         * playhead twice 600 ms apart and requires it not to have moved, so a
-         * `pause()` that lands late would take it red rather than pass quietly.
-         */
-        v.play().then(() => v.pause()).catch(() => {});
-        await new Promise((res) => {
-          v.addEventListener('loadeddata', res, { once: true });
-          setTimeout(res, 8000);
-        });
-        v.pause();
-        v.currentTime = BG_FROM ?? 0;
+        if (BG_FROM != null) v.currentTime = BG_FROM;
         bgVideo = v;
-        d.log(`background: ${slug.split('/').pop()}, ${v.videoWidth}x${v.videoHeight}, `
-          + 'stopped until the show starts', 'hi');
+        /**
+         * ⚠️ THE CONTROL IS THE STATE, NOT THIS ELEMENT. The lookup takes a
+         * moment and the mute button is on screen before it lands, so somebody
+         * who turns the sound on in that second would otherwise be overruled by
+         * an element created afterwards: the button would show a note and the
+         * film would be silent, which is a control that lies.
+         */
+        v.muted = muted;
+        /**
+         * ⚠️ AND THE FILM'S OWN TRANSPORT IS JOINED TO IT HERE, which is the
+         * first moment there is an element to join. `mediaMaster` makes the
+         * ELEMENT the master and the deck follow, so the bar's clock, its
+         * slider and its two words are all reading the film rather than a timer
+         * that agrees with it by luck.
+         */
+        filmMaster = mediaMaster(filmDeck, v, { stallPolicy: 'hold' });
+        const mins = film?.durationMs
+          ? `${Math.floor(film.durationMs / 60000)}:${String(Math.round(film.durationMs % 60000 / 1000)).padStart(2, '0')}`
+          : 'unknown length';
+        /**
+         * ⚠️ WHOSE RECORDING THIS IS, IN THE LOG, READ OFF THE ROW RATHER THAN
+         * TYPED HERE. A page showing somebody's work says whose it is, and two
+         * rows in this corpus belong to a different holder, so the credit is
+         * whatever the row says rather than a sentence that happens to be true
+         * of today's default.
+         */
+        d.log(film
+          ? `the stage picture is ${film.title}, ${film.source}, ${mins}, `
+            + `${(film.bytes / 1048576).toFixed(0)} MiB, ${film.licence}. Nothing of it is `
+            + 'fetched until somebody presses play under it'
+          : `background: ${slug.split('/').pop()}, nothing fetched until somebody presses play`, 'hi');
         return;
       }
+      /**
+       * ⚠️ THE ERR ROUTE KEEPS `auto`, AND THAT IS NOT AN INCONSISTENCY. It is
+       * reached only by a person who typed `?bg=` for a clip they want to
+       * watch, and it waits for a decoded frame below, which `none` would never
+       * deliver. The default route is the one every visit takes and the one
+       * that has to cost nothing.
+       */
+      v.preload = 'auto';
       const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(slug)}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
@@ -556,7 +617,7 @@
         setTimeout(res, 12000);
       });
       if (BG_FROM != null) v.currentTime = BG_FROM;
-      // Stopped until the show starts, the same as the file route. An HLS
+      // Stopped until somebody presses play, the same as the file route. An HLS
       // source has to be told the same thing or the two routes would disagree
       // about when a picture begins moving.
       v.pause();
@@ -568,6 +629,10 @@
         });
       }
       bgVideo = v;
+      // The control is the state here too, for the reason written on the file
+      // route: two paths that can disagree about mute is one of them lying.
+      v.muted = muted;
+      filmMaster = mediaMaster(filmDeck, v, { stallPolicy: 'hold' });
       d.log(`background: ERR ${slug}${BG_FROM != null ? ` from ${Q.get('from')}` : ''}`
         + `${BG_TO != null ? ` to ${Q.get('to')}` : ''}`, 'hi');
     } catch (e) {
@@ -576,13 +641,42 @@
     }
   }
   /**
-   * 🔴 THE GATE IS ABOUT WHOSE SERVER IT IS, NOT ABOUT WHETHER A CHECK IS
-   * RUNNING. The local film loads for everybody including a harness: it is this
-   * page's own picture now, it is 11 MB on the same origin, and gating it would
-   * leave the one thing a visitor always sees graded by nothing. The ERR route
-   * stays exactly as it was, opt-in and never reachable by a suite run.
+   * 🔴 THE GATE IS ABOUT WHOSE SERVER IT IS, AND THE FILM IS NOT GATED BECAUSE
+   * IT COSTS NOTHING TO SET UP. This used to say the film loads for everybody
+   * including a harness, ON PURPOSE, because it was 4 MB on this origin and
+   * gating it would leave the one thing a visitor always sees graded by
+   * nothing. The first half of that reasoning died with the file: 253 MB from
+   * R2 is not something to pull on a page load, for a visitor or for a suite
+   * run. **The second half is intact and is why nothing here is gated**: the
+   * element is prepared and asks for nothing, so a visit costs the corpus
+   * lookup and no more, and the checks still grade the real film by pressing
+   * the real control.
+   * ⚠️ THE ERR ROUTE STAYS EXACTLY AS IT WAS, opt-in and never reachable by a
+   * suite run, because that one is somebody else's server.
+   * ⚠️ AND THE LOOKUP IS SKIPPED ENTIRELY WHEN `?bg=` NAMES A SOURCE. A visitor
+   * who has said which picture they want should not pay for a table of the one
+   * they did not.
    */
-  if (BG && (isFileSource(BG) || !SELFCHECK)) loadBackground(BG);
+  const BG_ASKED = Q.get('bg');
+  (async () => {
+    if (BG_ASKED) {
+      if (isFileSource(BG_ASKED) || !SELFCHECK) await loadBackground(BG_ASKED);
+      return;
+    }
+    film = await readFilm();
+    if (!film) return;
+    /**
+     * 🔴 THE TRANSPORT LEARNS THE LENGTH HERE, FROM THE CORPUS, BEFORE A BYTE
+     * OF THE FILM IS ASKED FOR. `durationMs` was ffprobed off the file when it
+     * was pulled, so the bar can draw a real slider and a real clock over a
+     * file nothing has opened. Asking the element would mean loading a quarter
+     * of a gigabyte to answer a question that is written down.
+     * ⚠️ IT RUNS BEFORE `loadBackground`, not after, so there is no instant
+     * where a visitor sees a transport claiming a one second film.
+     */
+    filmDeck.setRange([0, film.durationMs]);
+    await loadBackground(film.file);
+  })();
 
   /**
    * 🔴 ONE ORIGIN FOR EVERY MARK ON THE STRIP, AND IT IS THE RECORDER'S FIRST
@@ -679,8 +773,8 @@
      * ⚠️ `atMs`, NEVER `at`. `at` is an ENVELOPE field: `wire.mjs` writes it
      * after the payload and throws rather than let a page lose its own value
      * silently. This is the SECOND time this exact collision has been paid for
-     * in this project, the first being `box.ping`, which replied with an `at`
-     * and so answered `box.error` to every caller for weeks. The throw is the
+     * in this project, the first being `board.ping`, which replied with an `at`
+     * and so answered `board.error` to every caller for weeks. The throw is the
      * fix working.
      */
     sendSoon({ type: 'show.state', phase, asked, atMs: sinceT0() });
@@ -1189,8 +1283,18 @@
      * claim the chip existed to avoid making.
      */
     live: false, time: false, scrub: false, loop: false, absolute: false,
-    // The press puts a show on air and writes it down. See `verb` in the kit.
-    verb: 'record',
+    /**
+     * 🔴 TWO WORDS, NOT A RED DOT. Asked 2026-09-19: *"replace timeline-glued
+     * transport record button with start | stop text labels (same w)"*. The dot
+     * is the convention for WRITING something and this press does two things at
+     * once, putting a show on air and recording it, so the dot was describing
+     * half of it. `start` and `stop` say the whole thing and need no convention.
+     * ⚠️ THE EQUAL WIDTH IS THE COMPONENT'S, NOT THIS PAGE'S. Both words sit in
+     * the button at once and the hidden one still claims its space, so the
+     * control cannot change size under the finger that pressed it. `/kit/`
+     * measures both states.
+     */
+    verb: ['start', 'stop'],
     /**
      * 🔴 `publish: false`, AND THIS IS THE LOAD-BEARING LINE. `__demo.transport`
      * is the only handle the suite has, and every bar used to claim it
@@ -1279,6 +1383,124 @@
    * two things.
    */
   room.append(createGlue(showBar.el, roomStrip.el));
+
+  /**
+   * 🔴 THE FILM HAS ITS OWN TRANSPORT, AND IT IS GLUED UNDER THE PICTURE IT
+   * DRIVES. Asked 2026-09-19: *"move video play / stop to videopanel footer"*
+   * and *"make transportbar glueable to videopanel footer"*. Play and stop
+   * belong to the picture, and the panel's footer is the row under the picture:
+   * glued, the two are one object with one edge, which is `createStripView`'s
+   * own arrangement for a strip and its footer.
+   *
+   * 🔴 AND THE FILM IS NOT THE SHOW. Asked in the same line: *"make video
+   * transport indepencent of when show starts"*. Until now the film played only
+   * from `startShow`, so there was no way to look at the picture without
+   * recording a show, and two different things were behind one press. They are
+   * two presses now: this one moves the picture, the one under the timeline puts
+   * it on air. Starting a show no longer touches the film, and stopping one no
+   * longer stops it.
+   * ⚠️ **SO A SHOW CAN GO OUT WITH A STILL IN IT**, which is a real state and
+   * the page says so in the log rather than quietly starting the film for you.
+   *
+   * 🔴 IT IS PLAY, STOP AND A CLOCK, AND IT GIVES UP THE SLIDER. That is the
+   * standing rule about one position surface per page, and this tab already has
+   * a strip: a 22 minute axis stacked 40 px above a 30 second one, at different
+   * scales with different origins, is the contradiction that rule is written
+   * about rather than a convenience. It is also exactly what was asked for,
+   * which was *"video play / stop"* and not a way to cue.
+   * ⚠️ **THE CLOCK IS NOT A SECOND AXIS.** `0:00.000 / 22:11.850` is a readout
+   * of one position and one length, in a fixed box, which is the shape this
+   * project puts changing numbers in. The length in it arrives from the corpus
+   * before a byte of the film does.
+   */
+  const filmDeck = createDeck({
+    // 0 until the corpus says otherwise, which is a moment later and still
+    // before a byte of the film is asked for. See `readFilm`.
+    range: [0, 1000],
+    // One item and one adapter, so the bar has a kind to read rates off, and
+    // ONE rate so it draws no rate row: a film has one speed.
+    items: [{ at: 0, kind: 'film', id: 'film', payload: {} }],
+    adapters: { film: { caps: { rates: [1] }, actuate: () => {} } },
+  });
+  let filmMaster = null;               // the mediaMaster, once there is a film
+
+  /**
+   * ⚠️ EVERY VERB GOES TO THE ELEMENT, AND THE DECK FOLLOWS IT. `mediaMaster`
+   * reads `currentTime` and bends the playhead onto it, so a seek written to
+   * the DECK is undone by the next tick. This is the same wiring the archive
+   * already has on this page, and the same reason.
+   */
+  const filmCommand = {
+    play: () => {
+      if (!bgVideo) { d.log('there is no film to play', 'warn'); return; }
+      bgVideo.play().catch((e) => d.log(`the film would not play: ${e.message}`, 'bad'));
+    },
+    pause: () => bgVideo?.pause(),
+    seek: (ms) => { if (bgVideo) bgVideo.currentTime = ms / 1000; else filmDeck.seek(ms); },
+  };
+
+  /**
+   * ⚠️ `publish: false`, LIKE THE SHOW'S BAR. There are three bars on this page
+   * now and `__demo.transport` is one name: the archive keeps it, because it is
+   * the one that can answer "where are we in the recording this page made".
+   * This one is a monitor control for the operator, and a harness that drove it
+   * would be pulling a quarter of a gigabyte to press play on somebody's film.
+   * ⚠️ AND IT CARRIES A CLOCK, which is the point of knowing the length before
+   * the file: `22:11.850` is on screen with nothing fetched.
+   */
+  const filmBar = createTransportBar(room, filmDeck, {
+    live: false, absolute: false, loop: false, time: true, scrub: false,
+    publish: false, command: filmCommand,
+  });
+  ctrl.panel.glue(filmBar.el);
+
+  /**
+   * 🔴 MUTE IS A GLYPH BESIDE THE FULLSCREEN BUTTON, NOT A ROW OF ITS OWN.
+   * Asked 2026-09-19: *"mute (find utf8 symobls) is next to fullscreen"*. It
+   * landed this morning as a `createChoice` reading `muted | on` under the
+   * timeline, which is a form control for a thing that belongs to the picture.
+   *
+   * 🔴 THE GLYPHS WERE CHOSEN BY LOOKING, AND THE OBVIOUS ONES DO NOT EXIST.
+   * The text style speakers U+1F568, U+1F569 and U+1F56A render as an EMPTY
+   * TOFU BOX here: measured, their ink box is 13.23 px, identical to
+   * U+10FFFD's, which is the codepoint nothing has a glyph for. The speakers
+   * that do exist, U+1F507 and U+1F50A, are emoji presentation: 21 px of ink in
+   * colour beside a ⛶ whose ink is 9.86 px and grey.
+   * ⚠️ SO IT IS `♫` U+266B AND `⊘` U+2298, both monochrome, both present, and
+   * both the weight of the ⛶ they sit next to. The note says there is sound and
+   * the circle says there is not, and each reads alone rather than by being
+   * compared with the state it is not in.
+   * ⚠️ IT IS CENTRED ON ITS INK with `setSymbol`, which is the module that
+   * exists because writing `textContent` silently undoes the centring. Two
+   * glyphs of different heights in one 34 px box is exactly the case it names.
+   * ⚠️ AND THE SOUND GOES NO FURTHER THAN THIS BROWSER. `captureStream` takes
+   * the canvas, which is a picture: there is no audio track on the feed, so
+   * this is monitoring for the person running the show rather than sound for
+   * the audience, and the log says so in words.
+   */
+  const MUTE_ON = '\u266b';
+  const MUTE_OFF = '\u2298';
+  let muted = true;
+  const muteBtn = el('button', 'ico', MUTE_OFF, { type: 'button', 'aria-label': 'the film\u2019s sound' });
+  centreSymbol(muteBtn);
+  function setMuted(next, say = false) {
+    muted = !!next;
+    if (bgVideo) bgVideo.muted = muted;
+    setSymbol(muteBtn, muted ? MUTE_OFF : MUTE_ON);
+    muteBtn.setAttribute('aria-pressed', String(!muted));
+    muteBtn.title = muted ? 'the film is muted' : 'the film is audible in this room';
+    if (say) {
+      d.log(muted
+        ? 'the film is muted'
+        : 'the film is audible in this room. The audience gets the picture and no sound');
+    }
+  }
+  muteBtn.onclick = () => setMuted(!muted, true);
+  // ⚠️ PREPENDED, SO THE ⛶ STAYS WHERE IT IS. Overriding the slot would take the
+  // default fullscreen button away, and the panel would then put its floating
+  // way out back over the picture to keep its own promise.
+  ctrl.panel.slots.right.prepend(muteBtn);
+  setMuted(true);
 
   /**
    * 🔴 THE DEFAULT IS AN IN-PAGE LOOPBACK AND IT IS A REAL WEBRTC HOP.
@@ -1474,17 +1696,22 @@
     starting = true;
     showDeck.play();
     /**
-     * 🔴 THE FILM STARTS HERE AND NOWHERE ELSE. Asked 2026-09-18: *"video
-     * sthould stop in control room in beginning"*. A control room before a show
-     * shows a still of what it is about to send, which is a true statement about
-     * a show that has not started; a film already running is a picture going out
-     * to nobody.
-     * ⚠️ IT IS NOT AWAITED. `play()` on a muted element resolves, but CLAUDE.md's
-     * rule is the general one: never let a picture or a sound gate the work. The
-     * show's own start has a recorder, a peer connection and a deadline behind
-     * it, and none of them may wait on a decoder.
+     * 🔴 THE FILM IS NOT STARTED HERE, SINCE 2026-09-19: *"make video transport
+     * indepencent of when show starts"*. This line used to be
+     * `bgVideo?.play()`, which made one press mean two things and left no way to
+     * look at the picture without recording a show. The film has its own
+     * transport under the panel now.
+     * ⚠️ **WHAT THE 2026-09-18 ASK BEHIND THE OLD LINE WANTED IS UNTOUCHED.**
+     * *"video sthould stop in control room in beginning"* is about a film that
+     * does not run to nobody before anybody asks, and it still does not: the
+     * film starts when somebody presses play and never on its own.
+     * ⚠️ **AND A SHOW WITH A STOPPED FILM IN IT IS A REAL STATE.** It is said in
+     * the log rather than quietly fixed, because starting somebody's film for
+     * them is the page deciding what they meant.
      */
-    bgVideo?.play().catch(() => {});
+    if (bgVideo && bgVideo.paused) {
+      d.log('the show is on air with the film stopped, so what is going out is a still', 'warn');
+    }
     // The window starts chasing the show now that there is one.
     roomStrip.strip.setFollow(true);
     try {
@@ -1571,9 +1798,10 @@
     if (phase !== 'live') return;
     showDeck.pause();
     phase = 'stopped';
-    // The show is over, so the picture stops where the audience last saw it.
-    // Not rewound: the frame it stopped on is the last frame that went out.
-    bgVideo?.pause();
+    // ⚠️ THE FILM IS NOT STOPPED HERE EITHER, and that is the other half of the
+    // same ask. A show ending is not a reason for the picture to stop: the
+    // operator may be cueing the next one, and the control they used to start it
+    // is the control that stops it.
     // And the control room's window stops chasing, so what is on screen is the
     // show that just happened rather than a window sliding past its end.
     roomStrip.strip.setFollow(false);
@@ -1722,28 +1950,39 @@
    * same stuff you haev in hints"*. A form whose fields are all placeholders is
    * a form nobody can press Send on without typing first, which on a page whose
    * whole point is watching a question arrive puts a chore in front of the
-   * demonstration. The third option stays empty, because a question with two
-   * answers and room for a third says more about the control than three filled
-   * ones would.
+   * demonstration.
+   * ⚠️ **ALL THREE ARE FILLED NOW, WHICH REVERSES A SMALLER DECISION.** The
+   * third used to stay empty on the argument that a question with two answers
+   * and room for a third says more about the control. The question that was
+   * asked for has three answers, and inventing a two-answer version of it to
+   * demonstrate an empty field would be the page arguing with the ask.
    */
   /**
-   * ⚠️ THE DEFAULT QUESTION IS ABOUT THE FILM BEHIND IT. Asked 2026-09-18:
-   * *"add meirelles-related q instead existin one"*, about the Méliès film that
-   * is now the picture, then *"use something else, perhaps less officoal"*.
-   * then *"Kas Kuul on nägu - comon"*, which was too silly to be worth pressing.
-   * `Kas see film vajab heli` is about what is on screen, has no right answer,
-   * and quietly touches the reason this print is silent: the 1902 film has no
-   * sound of its own, and every score anybody has laid over it since is somebody
-   * else's copyright.
+   * 🔴 THE DEFAULT QUESTION IS ABOUT THE FILM BEHIND IT, AND IT IS THE ONE
+   * THAT WAS ASKED FOR, WORD FOR WORD. Given 2026-09-19 as
+   * *"q is : Kas sa oled teinud ökopattu?: Veidi | Palju | Väga palju"*, with
+   * the film that replaced the Méliès print in the same session. The
+   * performance behind the picture is `MIM goes Sustainable`, in a theatre the
+   * audience generated the power for, so the question and the picture are about
+   * the same thing.
+   * ⚠️ **IT IS NOT TRANSLATED AND NOT CORRECTED.** It replaces
+   * `Kas see film vajab heli`, which was about a silent 1902 print and stopped
+   * being true of anything the moment the film changed.
+   * ⚠️ **AND THE PAGE STAYS ENGLISH AROUND IT ON PURPOSE.** It has been an
+   * Estonian question in an English page since 2026-09-18 and that is the right
+   * division rather than an accident: the labels, the buttons and the log are
+   * the instrument, which anybody reading this project reads, and the question
+   * is CONTENT, which belongs to whoever is running the show. Translating it
+   * would make the page tidier and the demonstration weaker, because a question
+   * with two diacritics and a question mark in it is exactly what proves the
+   * relay carries what was typed.
    */
+  const ASK_TITLE = 'Kas sa oled teinud ökopattu?';
+  const ASK_OPTIONS = ['Veidi', 'Palju', 'Väga palju'];
   const title = createField({
-    label: 'question', value: 'Kas see film vajab heli', grow: 'wide',
+    label: 'question', value: ASK_TITLE, grow: 'wide',
   });
-  const opts = [
-    createField({ label: 'option', value: 'Jah' }),
-    createField({ label: 'option', value: 'Ei' }),
-    createField({ label: 'option', placeholder: 'and a third, if you like' }),
-  ];
+  const opts = ASK_OPTIONS.map((v) => createField({ label: 'option', value: v }));
   /**
    * ⚠️ THE QUESTION ON ONE ROW, THE OPTIONS ON THE NEXT. Asked 2026-09-17:
    * *"options on its own row in contrrolroom"*. In one wrapping row the question
@@ -1821,6 +2060,13 @@
      * `fit: 'cover'` lets the film win the frame instead of gaining two black
      * pillars, and `burn` is not drawn over it at all, so there is no clock, no
      * counter and no frozen row on the picture.
+     * 🔴 **AND SINCE THE BOX WENT 16:9 ON 2026-09-19, `cover` AND `contain`
+     * AGREE TO THE PIXEL HERE.** The film is 1280x720 into a 1280x720 box, so
+     * neither crops anything and the setting changes no pixel on this page
+     * today. It stays `cover` for two reasons that are not taste: a film is
+     * composed to fill its own frame, which is the standing rule, and `?bg=`
+     * can point this page at a corpus row that is 4:3 or 480x272, where
+     * `contain` would lay flat field down the sides of it.
      * ⚠️ `scrim: 0` GOES WITH IT AND IS NOT A SEPARATE TASTE DECISION. The 55%
      * scrim exists to keep a burned clock readable on top of a picture; with
      * nothing on top it is a page dimming itself by more than half for the sake
@@ -1884,6 +2130,10 @@
      * of the join that worked.
      */
     archiveMaster?.tick();
+    // ⚠️ AND THE FILM'S, FOR THE REASON WRITTEN ABOVE: a `mediaMaster` that is
+    // built and never ticked is an object that does nothing, which this page has
+    // already paid for once on the archive.
+    filmMaster?.tick();
     frames++;
     requestAnimationFrame(tick);
   }
@@ -2132,93 +2382,115 @@
       + `${recordedMs == null ? ' (no recording yet, so the bound is the nominal show)' : ''}`);
 
     /**
-     * 🔴 IS THE FILM ACTUALLY IN THE PICTURE. It became the DEFAULT background
-     * on 2026-09-18, so every visitor sees it or fails to, and nothing graded
-     * it: `loadBackground` could have thrown, the file could have 404'd, the
-     * element could have stalled, and the page would have drawn its flat field
-     * and looked entirely correct. That is the shape this project keeps paying
-     * for, and the `.mp4` the build silently declined to copy earlier the same
-     * day is the same story one step upstream.
+     * 🔴 NOTHING OF THE FILM IS FETCHED UNTIL SOMEBODY PRESSES RECORD, AND
+     * THAT REPLACES A CHECK THAT READ THE PICTURE BEFORE A PRESS. Until
+     * 2026-09-19 the film was 4 MB on this origin, it was loaded on sight, and
+     * what this asserted was that a frame of it was on screen and stopped.
+     * The file is 253 MB from R2 now, so the thing worth grading before a press
+     * is the opposite one: that the page has asked for none of it.
      *
-     * 🔴 IT ASKS THE PICTURE THE RIGHT QUESTION, WHICH IS NOT "IS THERE A VIDEO
-     * ELEMENT". With no film the loop paints the generated picture, whose field
-     * is `FIELD`, one flat colour edge to edge between the things it draws. So
-     * the discriminator is whether a row of the frame is still flat, and that is
-     * a fact about the pixels rather than about the element.
-     * ⚠️ BOTH HALVES OR NEITHER, AND SINCE *"video sthould stop in control room
-     * in beginning"* THE SECOND HALF IS THE OPPOSITE ONE. A frame with spread in
-     * it proves something is in the picture; a `currentTime` that HELD STILL
-     * proves the page is not playing to an empty room before anybody pressed
-     * start. Spread alone would pass on a film that had run away on its own, and
-     * a still playhead alone would pass on a page showing nothing at all.
-     * ⚠️ AND THE OTHER DIRECTION IS ASSERTED AFTER THE SHOW STARTS, which is the
-     * negative control this pair needs: a check that only ever demanded a
-     * stopped film would be satisfied by a film that could not play.
+     * 🔴 IT IS ONE CLAIM IN TWO HALVES, PREPARED AND NOT FETCHED, AND NEITHER
+     * IS WORTH ANYTHING ALONE. A page that fetched nothing because it never
+     * resolved a source would pass the second half perfectly, so the element
+     * has to be pointed at the row named by `id` as well. That is the lookup
+     * this page must not get wrong: a re-encode changed a file name on the day
+     * this was written, and a table keyed by name re-credited a recording.
+     * ⚠️ AND WHAT THE PICTURE IS BEFORE A PRESS IS ASSERTED HERE TOO. With no
+     * decoded frame the loop paints `FIELD`, one flat colour edge to edge, so a
+     * frame with SPREAD in it before anybody has pressed anything would mean
+     * something had started on its own.
      */
-    let bgReadyAt = null;
-    for (let i = 0; i < 100 && !(bgVideo && bgVideo.readyState >= 2); i++) {
-      await new Promise((r) => setTimeout(r, 80));
+    for (let i = 0; i < 100 && !bgVideo; i++) {
+      await new Promise((r) => setTimeout(r, 40));
     }
-    const tA = bgVideo ? bgVideo.currentTime : null;
-    await new Promise((r) => setTimeout(r, 600));
-    const tB = bgVideo ? bgVideo.currentTime : null;
-    // A band below the middle, inside the pattern's own PAD, where the field
-    // would otherwise be one colour edge to edge.
-    let lo = 255, hi = 0;
-    if (bgVideo && bgVideo.readyState >= 2) {
-      const band = mctx.getImageData(PAD, Math.round(STAGE_H * 0.62), STAGE_W - PAD * 2, 1).data;
-      for (let i = 0; i < band.length; i += 4) {
-        const l = (band[i] * 0.299 + band[i + 1] * 0.587 + band[i + 2] * 0.114);
-        if (l < lo) lo = l; if (l > hi) hi = l;
-      }
-      bgReadyAt = Math.round(hi - lo);
-    }
-    A('the film is in the stage picture, and it is stopped until a show starts',
-      bgReadyAt != null && bgReadyAt > 25 && tA != null && tB === tA && bgVideo.paused,
-      bgVideo
-        ? `${bgVideo.videoWidth}x${bgVideo.videoHeight}, the playhead held at `
-          + `${tA.toFixed(2)}s for 600 ms (paused ${bgVideo.paused}), and one row of the `
-          + `frame spans ${bgReadyAt} of 255 in luminance where a flat field spans 0`
-        : 'no background element was ever created');
+    const bufBefore = bgVideo && bgVideo.buffered.length
+      ? bgVideo.buffered.end(bgVideo.buffered.length - 1) : 0;
+    const lumIdle = lumAtOf(mctx);
+    const idleSpread = Math.max(...lumIdle) - Math.min(...lumIdle);
+    /**
+     * ⚠️ ONE ASSERT IN BOTH MODES, WHICH IS THIS PAGE'S OWN RULE ABOUT `?r2=1`
+     * applied to the source: what changes with `?bg=` is what the label CLAIMS,
+     * never whether a claim is made. The default names the corpus row and the
+     * override names what the person typed.
+     */
+    const wantSrc = BG_ASKED
+      ? (isFileSource(BG_ASKED) ? new URL(BG_ASKED, location.href).href : null)
+      : (film ? film.file : null);
+    A(BG_ASKED
+      ? 'the film is the source ?bg= named, and none of it is fetched before a press'
+      : 'the film is the corpus row named by id, and none of it is fetched before a press',
+    !!bgVideo && !!wantSrc && bgVideo.src === wantSrc
+      && (BG_ASKED ? true : film.id === FILM_ID)
+      && bgVideo.preload === 'none' && bgVideo.readyState === 0
+      && bgVideo.networkState !== 2 && bufBefore === 0 && idleSpread <= 2,
+    bgVideo
+      ? `${BG_ASKED ? '?bg=' : (film ? film.id : 'no row')} -> `
+        + `${bgVideo.src.split('/').pop()}, preload ${bgVideo.preload}, readyState `
+        + `${bgVideo.readyState}, networkState ${bgVideo.networkState}, `
+        + `${bufBefore.toFixed(2)}s buffered, and the picture spans ${idleSpread} of 255 `
+        + 'where a flat field spans 0'
+      : 'no background element was ever created');
 
     /**
-     * 🔴 AND THE 4:3 FILM WINS THE 16:9 FRAME RATHER THAN SITTING IN PILLARS.
-     * Asked 2026-09-18: *"make 4:3 video win and crop"*. Deploying this without
-     * grading it is the exact shape last session paid for on the film itself,
-     * where forcing the flat fill over it left every counter healthy and the
-     * picture gone.
-     * ⚠️ **IT MEASURES THE EDGE COLUMN, WHICH IS WHERE THE TWO ARRANGEMENTS
-     * DIFFER AND THE ONLY PLACE THEY DO.** 480x360 contained in 1280x720 leaves
-     * a 160 px pillar of flat `FIELD` down each side and the middle of the frame
-     * looks identical either way, so a check that sampled the centre would pass
-     * under both and grade nothing.
-     * ⚠️ **A PICTURE CAN BE FLAT AND STILL BE A PICTURE, WHICH IS WHY THERE ARE
-     * TWO WAYS TO PASS.** A film frame that is dark at the edge reads as one
-     * value, the same shape as a pillar; what it cannot do is read as one value
-     * that is `FIELD` to within a point. So the column passes by VARYING, or by
-     * being flat at a luminance the field never has. A pillar is neither.
+     * 🔴 THE TRANSPORT KNOWS HOW LONG THE FILM IS BEFORE A BYTE OF IT ARRIVES,
+     * WHICH IS THE COROLLARY OF THE ASSERT ABOVE. Nothing is fetched, and the
+     * bar still draws a slider over 22 minutes and a clock that ends at
+     * 22:11.850, because `durationMs` was measured with ffprobe when the file
+     * was pulled and lives in the corpus.
+     * ⚠️ IT COMPARES THE DECK AGAINST THE ROW, NOT AGAINST A NUMBER TYPED HERE.
+     * A constant in this check would agree with a constant in the page and
+     * neither would be reading the file.
      */
-    let edgeSpread = null, edgeLum = null;
-    if (bgVideo && bgVideo.readyState >= 2) {
-      const col = mctx.getImageData(6, 0, 1, STAGE_H).data;
-      let clo = 255, chi = 0, sum = 0;
-      for (let i = 0; i < col.length; i += 4) {
-        const l = col[i] * 0.299 + col[i + 1] * 0.587 + col[i + 2] * 0.114;
-        if (l < clo) clo = l; if (l > chi) chi = l;
-        sum += l;
-      }
-      edgeSpread = Math.round(chi - clo);
-      edgeLum = Math.round(sum / (col.length / 4));
-    }
-    // `FIELD` is '#0d1017', which is luminance 16. A pillar is that value with
-    // no spread at all, read straight off the constant rather than typed twice.
-    const fieldLum = Math.round(13 * 0.299 + 16 * 0.587 + 23 * 0.114);
-    A('the film is cropped to fill the frame, so it reaches the left edge',
-      edgeSpread != null && (edgeSpread > 2 || Math.abs(edgeLum - fieldLum) > 6),
-      edgeSpread == null
-        ? 'there was no film to measure'
-        : `the column 6 px in spans ${edgeSpread} of 255 and averages ${edgeLum}, `
-          + `against a flat field at ${fieldLum}`);
+    // ⚠️ `durationMs` IS THE DECK'S GETTER, not a number read once: `setRange`
+    // moves it in place, and a captured copy would be the value from before the
+    // corpus landed, which is exactly what this is checking happened.
+    const filmSpan = filmDeck.durationMs;
+    A('the film\u2019s transport knows its length before a byte of it is fetched',
+      !!film && filmSpan === film.durationMs && bgVideo?.readyState === 0,
+      film
+        ? `the bar spans ${(filmSpan / 1000).toFixed(2)}s against ${(film.durationMs / 1000).toFixed(2)}s `
+          + `in the corpus, with the element at readyState ${bgVideo ? bgVideo.readyState : 'none'}`
+        : 'there is no corpus row to compare against');
+
+    /**
+     * 🔴 THE FILM'S BAR AND THE PICTURE ARE ONE SURFACE, AND THE PANEL GAVE UP
+     * ITS EDGE TO SAY SO. Asked as *"make transportbar glueable to videopanel
+     * footer"*. Two bordered boxes with the page rhythm between them state that
+     * they are two things, which is exactly what a film's transport is not.
+     * ⚠️ **IT MEASURES THE BORDER, WHICH IS THE ONLY PLACE A GLUE THAT DID NOT
+     * TAKE WOULD SHOW.** Both arrangements have the panel above the bar in the
+     * same order; what differs is whether there is one edge round the pair or
+     * two edges and a gap. `.pos-glue.pos-glue > *` is the rule that zeroes it,
+     * and it is double-classed precisely so a component cannot win against it,
+     * so this is the assert for that fight.
+     */
+    const surf = ctrl.panel.surface;
+    const panelBorder = parseFloat(getComputedStyle(ctrl.panel.el).borderTopWidth) || 0;
+    const surfBorder = parseFloat(getComputedStyle(surf).borderTopWidth) || 0;
+    A('the film\u2019s transport and the picture are one surface with one edge',
+      surf !== ctrl.panel.el && surf.classList.contains('pos-glue')
+      && surf.contains(filmBar.el) && surf.contains(ctrl.panel.el)
+      && panelBorder === 0 && surfBorder > 0,
+      `the surface is ${surf.className || 'the panel itself'}, holding `
+      + `${surf.children.length} block(s), with ${surfBorder}px of edge on the box and `
+      + `${panelBorder}px on the panel inside it`);
+
+    /**
+     * 🔴 WHICH BAR THE HARNESS DRIVES, ASSERTED RATHER THAN LEFT TO SOURCE
+     * ORDER. There are THREE on this page now: the film's, the show's and the
+     * archive's. `__demo.transport` is one name, and CLAUDE.md records this
+     * page handing it to whichever bar was built last, which is a fact about
+     * where a line sits in a file rather than a statement about the page.
+     * ⚠️ THE ARCHIVE KEEPS IT because it is the one that can answer "where are
+     * we in the recording this page made". The film's bar would have the
+     * harness pressing play on a quarter of a gigabyte of somebody's film.
+     */
+    A('the published transport is the archive\u2019s, not the film\u2019s or the show\u2019s',
+      window.__demo?.transport === bar.api
+      && window.__demo?.transport !== filmBar.api && window.__demo?.transport !== showBar.api,
+      window.__demo?.transport === bar.api ? 'the archive bar has the name'
+        : window.__demo?.transport === filmBar.api ? 'the FILM bar has it'
+          : window.__demo?.transport === showBar.api ? 'the SHOW bar has it' : 'nothing has it');
 
     const p1 = panels[1].panel;
     p1.full(true).then(() => {
@@ -2234,71 +2506,6 @@
       A('going full sets the state and gives the picture the whole box, by either route',
         false, `it threw: ${e.message}`);
     });
-
-    /**
-     * ⚠️ IT READS THE AUDIENCE, NOT THE ARCHIVE. The archive is a recording now:
-     * its frame is drawn for wherever the playhead is, so its burned clock is
-     * the show's time rather than the wall's, and asserting it against `now`
-     * measured the wrong thing. It went red at `nothing decoded` the moment the
-     * archive stopped following the live loop, which is the check noticing a
-     * change in meaning rather than a defect.
-     */
-    /**
-     * ⚠️ AND IT READS THE CONTROL ROOM, NOT THE AUDIENCE, SINCE 2026-09-18. The
-     * audience panel no longer holds a canvas at all before a show: it holds a
-     * card, and then the `<video>` that carries what came back. Its canvas is
-     * still blitted to and would still have answered, which is exactly the trap
-     * this project keeps meeting: a check that passes by reading something the
-     * page has stopped showing anybody.
-     */
-    /**
-     * 🔴 AND IT NO LONGER READS A BURNED CLOCK, SINCE *"rm video overlay"* ON
-     * 2026-09-18. This asserted `readBurned(panels[1].ctx)` against `now`, which
-     * grades the blit only while the thing being blitted is the generated
-     * pattern. With a film in the feed there is no clock in the picture at all,
-     * so that check would have gone red on a page that is working, which is the
-     * worst kind of red there is.
-     * ⚠️ **IT IS ONE CLAIM ACROSS BOTH ARMS RATHER THAN A BRANCH.** Whatever is
-     * being drawn, the same eight points must read the SAME in the panel as in
-     * the master, and the picture must MOVE. That is the blit and the loop,
-     * which is what the old check was really about: its own comment says *"the
-     * blit between them is exactly the step that could be missing"*.
-     * ⚠️ **BOTH HALVES OR NEITHER, AND EACH CATCHES WHAT THE OTHER CANNOT.** A
-     * match alone passes when the master is blank, because a blank panel
-     * matches a blank master perfectly. Movement alone passes when the panel is
-     * showing an old picture of its own. Neither is worth anything on its own.
-     * ⚠️ **AND IT SAMPLES LUMINANCE AT FIXED FRACTIONS, NOT A SUM.** A sum over
-     * the frame is the statistic CLAUDE.md records `/mirror/` being blinded by:
-     * three cosines 120 degrees apart sum to a constant. Eight points that each
-     * have to agree cannot be satisfied by a coincidence in the aggregate.
-     */
-    /**
-     * ⚠️ THE TWO READS ARE IN ONE TASK, WHICH IS WHAT MAKES THE MATCH EXACT.
-     * `tick` writes the master and blits it inside one animation frame, and no
-     * frame can run between two synchronous `getImageData` calls, so the panel
-     * is holding precisely the master frame being read. A tolerance here would
-     * be hiding a real difference rather than absorbing jitter.
-     */
-    const roomCtx = panels[1].ctx;
-    const roomA = lumAtOf(roomCtx);
-    const masterA = lumAtOf(mctx);
-    const blitted = roomA.every((v, i) => v === masterA[i]);
-    const worst = Math.max(...roomA.map((v, i) => Math.abs(v - masterA[i])));
-    const roomSpread = Math.max(...roomA) - Math.min(...roomA);
-    /**
-     * ⚠️ **AND THE MOVEMENT HALF MOVED TO AFTER THE SHOW STARTS, BECAUSE THE
-     * PICTURE IS A STILL BEFORE IT.** This read `changed by 0 of 255` the moment
-     * the film was made to wait for a start, and it was right: nothing moves in
-     * a control room before a show. What stands here is the blit and the proof
-     * the canvas is not blank, since a blank panel matches a blank master
-     * perfectly. The moving half is asserted where there is a reason for
-     * anything to move.
-     */
-    A('the control room shows what the loop drew, and the canvas is not blank',
-      blitted && roomSpread > 4,
-      `eight points read ${blitted ? 'identical' : `${worst} apart at worst`} in the panel and `
-      + `the master, spanning ${roomSpread} of 255 between them `
-      + `(${bgVideo && bgVideo.readyState >= 2 ? 'the film' : 'the generated picture'})`);
 
     /**
      * 🔴 NO BLACK RULE BETWEEN LANES, MEASURED IN PIXELS OFF THE STRIP ITSELF.
@@ -2347,11 +2554,47 @@
      * GOT. A bare `await` on a relay that is down is a hang, and this check has
      * already been caught once passing while its subject was absent.
      */
-    ask('a question the check asked', ['one', 'two']);
+    /**
+     * ⚠️ AND IT ASKS THE PAGE'S OWN DEFAULT QUESTION RATHER THAN AN INVENTED
+     * ONE. It used to send `a question the check asked`, which graded the lanes
+     * and nothing else; the default is Estonian, it has two diacritics and a
+     * question mark in it, and sending it here is what makes the round trip
+     * gradable at no extra cost.
+     */
+    ask(ASK_TITLE, ASK_OPTIONS);
     for (let i = 0; i < 60 && laneCount < 3; i++) {
       await new Promise((r) => setTimeout(r, 100));
     }
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    /**
+     * 🔴 THE QUESTION COMES BACK OFF THE RELAY WITH ITS DIACRITICS INTACT, AND
+     * THIS IS A REAL ROUND TRIP RATHER THAN A STRING COMPARED WITH ITSELF. The
+     * control room does not draw its own question: `ask()` sends it, the relay
+     * echoes it to the sender, and `render()` runs on the message ARRIVING. So
+     * what is read below is the text after `JSON.stringify`, a WebSocket frame,
+     * a Durable Object and `JSON.parse`, in both panels.
+     * ⚠️ IT COMPARES CODE POINTS, NOT A LOOK. `ö` is one character and can come
+     * back as two, as `o`, or as a replacement character, and all three read as
+     * a question in a log line. The detail prints the code points so a
+     * mangling can be named rather than squinted at.
+     */
+    const seenAt = (id) => {
+      const slot = byId.get(id).panel.slots.centre;
+      const lab = slot.querySelector('.pos-choice-l');
+      const btns = [...slot.querySelectorAll('button')].map((b) => b.textContent);
+      return { title: lab ? lab.textContent : null, options: btns };
+    };
+    const heard = SHOWN_ON.map((id) => [id, seenAt(id)]);
+    const intact = heard.every(([, h]) => h.title === ASK_TITLE
+      && h.options.length === ASK_OPTIONS.length
+      && h.options.every((o, i) => o === ASK_OPTIONS[i]));
+    const points = (t) => [...(t || '')].map((c) => (c.codePointAt(0) > 127
+      ? `U+${c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}` : c)).join('');
+    A('the question comes back off the relay with every character it was sent with',
+      intact,
+      heard.map(([id, h]) => `${id}: ${points(h.title)} [${h.options.map(points).join(' | ')}]`)
+        .join(', ') + `, against ${points(ASK_TITLE)} [${ASK_OPTIONS.map(points).join(' | ')}]`);
     const sc = strip.el;
     const sctx = sc.getContext('2d');
     // Down the middle of the plot, clear of the gutter and of the axis, in the
@@ -2438,11 +2681,45 @@
       await new Promise((r) => setTimeout(r, 50));
     }
     /**
-     * 🔴 AND THE FILM RUNS NOW, WHICH IS THE OTHER HALF OF *"video sthould stop
-     * in control room in beginning"*. Asserting only that it stops before a show
-     * is a claim a broken decoder satisfies perfectly, so the pair is: held
-     * still above, moving here, off one press.
+     * 🔴 STARTING A SHOW DOES NOT START THE FILM, WHICH IS THE WHOLE OF *"make
+     * video transport indepencent of when show starts"*. It did until
+     * 2026-09-19, and the assert here used to be the opposite one.
+     * ⚠️ **IT IS ONE HALF OF A PAIR AND WORTHLESS ALONE.** A film that cannot
+     * play at all passes this perfectly, which is why the next assert presses
+     * the film's own control and requires it to move. Held still by a show
+     * above, moving on its own press below.
+     * ⚠️ AND IT READS THE ELEMENT RATHER THAN THE DECK. The deck follows the
+     * element through `mediaMaster`, so the element is the side that would
+     * still be honest if the join were broken.
      */
+    const showLive = bgVideo ? { at: bgVideo.currentTime, paused: bgVideo.paused } : null;
+    A('starting a show does not start the film, which has its own transport',
+      !!showLive && showLive.paused === true && showLive.at === 0 && phase === 'live',
+      showLive
+        ? `the show is "${phase}" and the film is at ${showLive.at.toFixed(2)}s, paused ${showLive.paused}`
+        : 'there was no film to leave alone');
+
+    /**
+     * 🔴 NOW PRESS THE FILM'S OWN PLAY, WHICH IS A DIFFERENT BUTTON UNDER A
+     * DIFFERENT PICTURE. Pressing it rather than calling `filmCommand.play()`
+     * is the same rule the show's press already follows: a bar wired to the
+     * wrong command, or never glued into the panel, would leave every assert
+     * below it green.
+     * 🔴 AND THE FIRST FRAME IS WAITED FOR HERE, BECAUSE THIS PRESS IS WHAT
+     * STARTS THE FETCH. Nothing was loaded before it, so `currentTime` cannot
+     * advance until R2 has answered and a frame has decoded. A fixed 500 ms
+     * window would have graded the network rather than the page.
+     * ⚠️ IT IS BOUNDED AND THE WAIT IS PRINTED, so a slow one is attributable
+     * rather than mysterious, and a film that never arrives fails here rather
+     * than three asserts later.
+     */
+    const filmToggle = filmBar.el.querySelector('.tbar-toggle');
+    filmToggle?.click();
+    const pressedAt = performance.now();
+    for (let i = 0; i < 75 && !(bgVideo && bgVideo.readyState >= 2); i++) {
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    const firstFrameMs = Math.round(performance.now() - pressedAt);
     const runA = bgVideo ? bgVideo.currentTime : null;
     const panelA = lumAtOf(panels[1].ctx);
     await new Promise((r) => setTimeout(r, 500));
@@ -2456,12 +2733,159 @@
      * page has already paid for the difference once, in the archive caret, where
      * every assert sat on the side of the join that worked.
      */
-    A('starting the show starts the film, and the picture in the room follows it',
-      runA != null && runB > runA && !bgVideo.paused && panelMoved > 0,
+    A('the film plays from its own transport, and the picture in the room follows it',
+      !!filmToggle && runA != null && runB > runA && !bgVideo.paused && panelMoved > 0
+      && filmDeck.playing(),
       bgVideo
-        ? `the film went ${runA.toFixed(2)}s to ${runB.toFixed(2)}s once the show was live, `
-          + `and the panel changed by ${panelMoved} of 255 with it`
+        ? `one press on the bar under the picture, first frame ${firstFrameMs} ms later, `
+          + `then the film went ${runA.toFixed(2)}s to ${runB.toFixed(2)}s `
+          + `and the panel changed by ${panelMoved} of 255 with it `
+          + `(its deck ${filmDeck.playing() ? 'is running' : 'is stopped'})`
         : 'there was no film to start');
+
+    /**
+     * 🔴 THE FILM FILLS THE FRAME, AND THE BOX IS THE FILM'S OWN SHAPE. This
+     * used to read *"the 4:3 film wins the 16:9 frame rather than sitting in
+     * pillars"*, from *"make 4:3 video win and crop"*, and it ran before a
+     * press because the film was loaded on sight. Both halves moved: it runs
+     * after the press now, and the shape it grades is the one asked for on
+     * 2026-09-19, *"video win to 16:9"*.
+     * ⚠️ **IT MEASURES THE EDGE COLUMN, WHICH IS THE ONLY PLACE THE TWO
+     * ARRANGEMENTS DIFFER.** A source of the wrong shape contained in this box
+     * leaves a pillar of flat `FIELD` down each side and the middle of the
+     * frame looks identical either way, so a check that sampled the centre
+     * would pass under both and grade nothing.
+     * ⚠️ **A PICTURE CAN BE FLAT AND STILL BE A PICTURE, WHICH IS WHY THERE ARE
+     * TWO WAYS TO PASS.** A film frame that is dark at the edge reads as one
+     * value, the same shape as a pillar; what it cannot do is read as one value
+     * that is `FIELD` to within a point.
+     * ⚠️ **AND THE SHAPE IS COMPARED AGAINST THE FILE, NOT AGAINST ITSELF.**
+     * `cover` and `contain` agree to the pixel while the two shapes match, so
+     * the column alone would go on passing if the box drifted and the picture
+     * were quietly cropped. The aspect term is what notices that, and it reads
+     * the element rather than the corpus.
+     */
+    let edgeSpread = null, edgeLum = null;
+    if (bgVideo && bgVideo.readyState >= 2) {
+      const col = mctx.getImageData(6, 0, 1, STAGE_H).data;
+      let clo = 255, chi = 0, sum = 0;
+      for (let i = 0; i < col.length; i += 4) {
+        const l = col[i] * 0.299 + col[i + 1] * 0.587 + col[i + 2] * 0.114;
+        if (l < clo) clo = l; if (l > chi) chi = l;
+        sum += l;
+      }
+      edgeSpread = Math.round(chi - clo);
+      edgeLum = Math.round(sum / (col.length / 4));
+    }
+    // `FIELD` is '#0d1017', which is luminance 16. A pillar is that value with
+    // no spread at all, read straight off the constant rather than typed twice.
+    const fieldLum = Math.round(13 * 0.299 + 16 * 0.587 + 23 * 0.114);
+    const filmAspect = bgVideo && bgVideo.videoHeight
+      ? bgVideo.videoWidth / bgVideo.videoHeight : null;
+    A('the film fills the frame, and the frame is the film\u2019s own shape',
+      edgeSpread != null && (edgeSpread > 2 || Math.abs(edgeLum - fieldLum) > 6)
+      && filmAspect != null && Math.abs(filmAspect - STAGE_W / STAGE_H) < 0.01,
+      edgeSpread == null
+        ? 'there was no film to measure'
+        : `${bgVideo.videoWidth}x${bgVideo.videoHeight} into ${STAGE_W}x${STAGE_H}, `
+          + `${filmAspect.toFixed(3)} against ${(STAGE_W / STAGE_H).toFixed(3)}, and the `
+          + `column 6 px in spans ${edgeSpread} of 255 and averages ${edgeLum} against a `
+          + `flat field at ${fieldLum}`);
+
+    /**
+     * ⚠️ IT READS THE AUDIENCE, NOT THE ARCHIVE. The archive is a recording now:
+     * its frame is drawn for wherever the playhead is, so its burned clock is
+     * the show's time rather than the wall's, and asserting it against `now`
+     * measured the wrong thing. It went red at `nothing decoded` the moment the
+     * archive stopped following the live loop, which is the check noticing a
+     * change in meaning rather than a defect.
+     */
+    /**
+     * ⚠️ AND IT READS THE CONTROL ROOM, NOT THE AUDIENCE, SINCE 2026-09-18. The
+     * audience panel no longer holds a canvas at all before a show: it holds a
+     * card, and then the `<video>` that carries what came back. Its canvas is
+     * still blitted to and would still have answered, which is exactly the trap
+     * this project keeps meeting: a check that passes by reading something the
+     * page has stopped showing anybody.
+     */
+    /**
+     * 🔴 AND IT NO LONGER READS A BURNED CLOCK, SINCE *"rm video overlay"* ON
+     * 2026-09-18. This asserted `readBurned(panels[1].ctx)` against `now`, which
+     * grades the blit only while the thing being blitted is the generated
+     * pattern. With a film in the feed there is no clock in the picture at all,
+     * so that check would have gone red on a page that is working, which is the
+     * worst kind of red there is.
+     * ⚠️ **IT IS ONE CLAIM ACROSS BOTH ARMS RATHER THAN A BRANCH.** Whatever is
+     * being drawn, the same eight points must read the SAME in the panel as in
+     * the master, and the picture must MOVE. That is the blit and the loop,
+     * which is what the old check was really about: its own comment says *"the
+     * blit between them is exactly the step that could be missing"*.
+     * ⚠️ **BOTH HALVES OR NEITHER, AND EACH CATCHES WHAT THE OTHER CANNOT.** A
+     * match alone passes when the master is blank, because a blank panel
+     * matches a blank master perfectly. Movement alone passes when the panel is
+     * showing an old picture of its own. Neither is worth anything on its own.
+     * ⚠️ **AND IT SAMPLES LUMINANCE AT FIXED FRACTIONS, NOT A SUM.** A sum over
+     * the frame is the statistic CLAUDE.md records `/mirror/` being blinded by:
+     * three cosines 120 degrees apart sum to a constant. Eight points that each
+     * have to agree cannot be satisfied by a coincidence in the aggregate.
+     */
+    /**
+     * ⚠️ THE TWO READS ARE IN ONE TASK, WHICH IS WHAT MAKES THE MATCH EXACT.
+     * `tick` writes the master and blits it inside one animation frame, and no
+     * frame can run between two synchronous `getImageData` calls, so the panel
+     * is holding precisely the master frame being read. A tolerance here would
+     * be hiding a real difference rather than absorbing jitter.
+     * 🔴 **AND IT MOVED HERE FROM BEFORE THE PRESS ON 2026-09-19, BECAUSE
+     * THERE IS NOTHING IN THE PICTURE BEFORE ONE ANY MORE.** It used to run
+     * while the film stood on its first frame, and with the film no longer
+     * loaded on sight it read `spanning 0 of 255` and went red on a page that
+     * was working: a flat field is what a control room correctly shows before
+     * a show. MEASURED that way once rather than reasoned about.
+     * ⚠️ **AND THE MOVE IS WHAT KEEPS THE CHECK WORTH ANYTHING.** Its own note
+     * already said a match alone passes when the master is blank, because a
+     * blank panel matches a blank master perfectly. Before the press both
+     * halves were satisfiable by a page drawing nothing at all; here there is
+     * a film in the frame, so the match has something to be a match OF.
+     */
+    const roomCtx = panels[1].ctx;
+    const roomA = lumAtOf(roomCtx);
+    const masterA = lumAtOf(mctx);
+    const blitted = roomA.every((v, i) => v === masterA[i]);
+    const worst = Math.max(...roomA.map((v, i) => Math.abs(v - masterA[i])));
+    const roomSpread = Math.max(...roomA) - Math.min(...roomA);
+    A('the control room shows what the loop drew, and the canvas is not blank',
+      blitted && roomSpread > 4,
+      `eight points read ${blitted ? 'identical' : `${worst} apart at worst`} in the panel and `
+      + `the master, spanning ${roomSpread} of 255 between them `
+      + `(${bgVideo && bgVideo.readyState >= 2 ? 'the film' : 'the generated picture'})`);
+
+    /**
+     * 🔴 MUTED WHEN IT STARTS, AND THE GLYPH BESIDE THE ⛶ REALLY UNMUTES IT.
+     * Asked 2026-09-19 as *"muted my default"*, and a default is half a claim:
+     * a page that could never be unmuted would satisfy it perfectly. Both
+     * halves are one press apart, so both are here.
+     * ⚠️ IT PRESSES THE BUTTON RATHER THAN CALLING `setMuted()`. A control
+     * wired to nothing looks identical from the outside to one wired correctly,
+     * and this page has already paid for a setting that read as correct and did
+     * nothing.
+     * ⚠️ AND IT READS THE GLYPH, WHICH IS THE OTHER HALF OF THE SAME CONTROL.
+     * The element being unmuted while the button still shows a slashed circle
+     * is the exact failure `setSymbol` exists for: writing `textContent`
+     * throws away the span this module centres, so a check that only read
+     * `muted` would pass over a button that had stopped saying anything.
+     */
+    const glyphOf = () => (muteBtn.textContent || '').trim();
+    const mutedAtStart = bgVideo ? bgVideo.muted : null;
+    const glyphMuted = glyphOf();
+    muteBtn.click();
+    const mutedAfter = bgVideo ? bgVideo.muted : null;
+    const glyphLoud = glyphOf();
+    muteBtn.click();
+    A('the film starts muted, and the glyph beside the \u26f6 is what turns that off',
+      mutedAtStart === true && mutedAfter === false && bgVideo.muted === true
+      && glyphMuted === MUTE_OFF && glyphLoud === MUTE_ON,
+      `muted ${mutedAtStart} showing ${glyphMuted}, then ${mutedAfter} showing ${glyphLoud}, `
+      + `and ${bgVideo ? bgVideo.muted : 'no film'} showing ${glyphOf()} again`);
 
     A('the transport bar in the control room is what starts the show',
       !!showToggle && phase === 'live' && showDeck.playing(),
@@ -2872,6 +3296,11 @@
       // Put the page back where the drill found it rather than leaving a show
       // running behind every other check's back.
       await stopShow();
+      // ⚠️ AND THE FILM TOO, WHICH IS NEW AND IS THE COST OF INDEPENDENCE.
+      // `stopShow` used to stop the picture as a side effect; it does not any
+      // more, so a run that did not do this would leave a 22 minute film
+      // streaming from R2 behind every check after it.
+      filmCommand.pause();
     }
 
     /**
@@ -2949,14 +3378,14 @@
    * it are the operator's.
    */
   const DIAGRAM_SPEC = {
-    caption: 'One press sends a picture out and takes it back, and what came back is what is kept.',
+    caption: 'A picture goes out and comes back, and what came back is what is kept.',
     nodes: [
       { id: 'ctrl', label: 'Browser', sub: 'control room', kind: 'here', tech: 'browser',
         children: [
           { id: 'canvas', label: 'canvas', sub: '720p, 25fps',
             note: 'The picture the show is made of, drawn here and captured as a '
-                + '**MediaStream**. It carries a public domain film cropped to fill the '
-                + 'frame, and a visit that cannot load it gets a generated test picture.' },
+                + '**MediaStream**. It carries a MIMproject recording with its own play '
+                + 'and stop, fetched only once one of them is pressed.' },
           { id: 'recorder', label: 'MediaRecorder', sub: '700k, 2s',
             note: 'Records the track that came BACK, never the canvas. What the audience '
                 + 'saw is the returned track, and recording the source would make the '

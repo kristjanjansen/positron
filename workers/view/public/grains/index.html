@@ -183,13 +183,14 @@
   // inside a box says the same true thing at both widths and has no second
   // branch to route.
   //
-  // ⚠️ EVERY ARROW IS A THING THIS PAGE ASSERTS. `four settings` is the
+  // ⚠️ EVERY ARROW IS A THING THIS PAGE ASSERTS. `4 settings` is the
   // `params.set` pair `setKnob` sends, under "the page reached the relay";
-  // `sound and grains` is the PCM that `probeSound` measures with a key down
-  // AND the board's own `grain.marks`, under "the board's grains are reported
-  // by the engine that fired them". Nothing is drawn that no check covers —
-  // the notes and the material spec also go out, and they are left off rather
-  // than crowding the one arrow that carries the page's subject.
+  // `PCM` is what `probeSound` measures with the material turned down and up,
+  // and the board's own `grain.marks` ride the same socket, under "the board's
+  // grains are reported by the engine that fired them". Nothing is drawn that
+  // no check covers. The notes and the material spec also go out, and they are
+  // left off rather than crowding the one arrow that carries the page's
+  // subject.
   // 🔴 AT THE END, UNDER THE STANDING HEADING, LIKE EVERY OTHER DIAGRAM.
   // Instructed 2026-09-16: *"use same title on all diagrams"*. This page was
   // the last outlier and it was an outlier twice: it drew into `d.head`, so the
@@ -203,7 +204,18 @@
   // right rather than redundant, and it is what CLAUDE.md asks for anyway: a
   // diagram is REFERENCE, read once, on purpose, by somebody who has already
   // pressed the thing.
-  createDiagram(d.el, {
+  //
+  // 🔴 KEPT IN A CONST SO THE PICTURE CAN REPORT ITS OWN DAMAGE. The return
+  // value was thrown away here, so nothing graded this drawing:
+  // `createDiagram` collects every label it had to shorten, every note over
+  // about forty words and every arrow it could not route, and a page that never
+  // reads that list ships a cut label looking exactly like a picture that is
+  // fine. Asserted in `checkAll` now, in the same words `/crate/`, `/knobs/`
+  // and `/mirror/` use.
+  // ⚠️ AND IT IS NOT THE LAST ONE. MEASURED 2026-09-19 across every page that
+  // draws a diagram: `/items/` and `/radio/` still throw the return value away,
+  // so two pictures on this project are graded by nothing at all.
+  const dg = createDiagram(d.el, {
     // The paragraph that was in `what`, cut to the part the drawing cannot
     // say. Hovering a box replaces this line with what that box does, which is
     // why there is no tooltip anywhere on this page.
@@ -254,8 +266,29 @@
       // them, with four names in the picture instead of two.
       { from: 'you', to: 'cf', label: '4 settings' },
       { from: 'cf', to: 'pi', label: '4 settings' },
-      { from: 'pi', to: 'cf', label: 'sound and grains', back: true },
-      { from: 'cf', to: 'you', label: 'sound back', back: true },
+      /**
+       * 🔴 `PCM` ON BOTH HALVES, SETTLED 2026-09-19: *"h.264 - unify label and
+       * longer desc on all diagrams where stream back pcm or mp4 video"*. Sound
+       * coming back is `PCM` on every diagram in this project, `/mirror/` says
+       * `H.264` for a picture, and `/kit/`'s specimens say `PCM` so an author
+       * copying one gets the settled word.
+       *
+       * 🔴 IT SAID `sound and grains` AND `sound back`, WHICH IS TWO NAMES FOR
+       * ONE JOURNEY AND ONE OF THEM CARRYING TWO THINGS. The relay hands on
+       * exactly what it was given, so the second hop carries what the first
+       * did, and one arrow naming two payloads while the next named one read as
+       * the grains stopping at Cloudflare. They do not: the board's
+       * `grain.marks` ride the same socket the samples do, all the way here,
+       * and the note is where that is said.
+       */
+      { from: 'pi', to: 'cf', label: 'PCM', back: true,
+        note: 'Fifty slices a second, 960 samples each, 48 kHz and one channel, uncompressed. '
+            + 'The board’s report of every grain it fires rides the same socket, which is how '
+            + 'one card draws grains rather than guessing at them.' },
+      { from: 'cf', to: 'you', label: 'PCM', back: true,
+        note: 'The relay copies each slice on without changing it, so what plays here is the '
+            + 'board’s own sound. It arrives in uneven bursts, so 60 milliseconds of it are '
+            + 'held back before any is played.' },
     ],
   }, { how: true, atEnd: true });
 
@@ -275,7 +308,7 @@
    * failure there is.
    *
    * The board reports its own insert now — in `fx.pappus`, in `audio.started`
-   * and in the five-second `box.alive` — so a change made in another window
+   * and in the five-second `board.alive` — so a change made in another window
    * arrives here without this page asking for anything. ⚠️ This page does NOT
    * fight back: switching it on again automatically would be two tabs taking
    * turns for ever. It says what happened and leaves the button where it is.
@@ -1415,11 +1448,11 @@
   /**
    * The heartbeat, and the round trip, on one message.
    *
-   * ⚠️ NOT `box.ping`, AND STILL NOT AFTER IT WAS REPAIRED. The board's pong
-   * was `reply('box.pong', { at: … })`, `at` is an envelope field, so the
-   * envelope refused to format it and the handler answered `box.error`. The
+   * ⚠️ NOT `board.ping`, AND STILL NOT AFTER IT WAS REPAIRED. The board's pong
+   * was `reply('board.pong', { at: … })`, `at` is an envelope field, so the
+   * envelope refused to format it and the handler answered `board.error`. The
    * obvious round trip verb answered NOTHING for two sessions and a page timing
-   * it read an empty cell forever. `rig/box/box.mjs` sends `pongAt` since
+   * it read an empty cell forever. `rig/board/board.mjs` sends `pongAt` since
    * 2026-09-18, which is in the repo and NOT yet on the board. This page still
    * does not use it: `params.state` is the cheapest verb that always answers,
    * answers with no work behind it, and is worth asking anyway, so the round
@@ -1474,7 +1507,7 @@
   // 13 of them in the same minute the page reported `0 reported by the board`.
   // A filter whose job is to ignore other people's chatter will ignore an
   // announcement nobody told it about, silently and for ever.
-  const ANNOUNCED = new Set(['box.hello', 'box.alive', 'audio.stopped', 'video.stopped', 'grain.marks']);
+  const ANNOUNCED = new Set(['board.hello', 'board.alive', 'audio.stopped', 'video.stopped', 'grain.marks']);
   const fromBox = (m) => typeof m.re === 'string' || ANNOUNCED.has(m.type);
 
   function heard(m) {
@@ -1506,12 +1539,12 @@
     // the cheapest liveness there is — and it names what is sounding, so an
     // instrument somebody else starts shows up here without this page polling
     // for it. Only a CHANGE costs a question.
-    if (m.type === 'box.alive') {
+    if (m.type === 'board.alive') {
       if ((m.audio ?? null) !== playing) send({ type: 'audio.status' });
       if (!m.audio) playing = null;
     }
     if (m.type === 'audio.stopped') { playing = null; send({ type: 'audio.status' }); }
-    if (m.type === 'box.hello') { d.log(`${m.name || 'the board'} is here`, 'hi'); hello(); send({ type: 'audio.status' }); }
+    if (m.type === 'board.hello') { d.log(`${m.name || 'the board'} is here`, 'hi'); hello(); send({ type: 'audio.status' }); }
     if (m.type === 'audio.started') {
       const was = playing;
       if (m.ok) {
@@ -1705,7 +1738,7 @@
      * gates stayed armed for the rest of the visit.
      *
      * ⚠️ IT IS ALSO A NAME THE BOARD NO LONGER KNOWS. FluidSynth left
-     * `rig/box/jacksynth.mjs` on 2026-09-16 (`archive/box-fluidsynth-hexter/`),
+     * `rig/board/jacksynth.mjs` on 2026-09-16 (`archive/box-fluidsynth-hexter/`),
      * and an unrecognised source is refused by name rather than fallen through
      * to a microphone, so this line would now answer `unknown source
      * "fluidsynth"` and the page would granulate silence. One constant, used
@@ -1908,6 +1941,18 @@
   }
 
   function checkAll() {
+    /**
+     * 🔴 THE PICTURE REPORTS ITS OWN DAMAGE, AND UNTIL 2026-09-19 THIS PAGE
+     * WAS THE ONE THAT NEVER ASKED. It is the same assert `/crate/`, `/knobs/`
+     * and `/mirror/` carry, word for word, so a reader comparing two pages is
+     * not comparing two phrasings. It costs nothing, needs no board and no
+     * network, so it belongs at the top of the lane that always runs.
+     * ⚠️ IT MOVES THIS PAGE'S ASSERT COUNT BY ONE.
+     */
+    d.assert('nothing in the picture was cut, shortened or left undrawn',
+      (dg.cuts?.length ?? 0) === 0,
+      (dg.cuts?.length ?? 0) === 0 ? `${dg.ties ?? 0} tie(s), nothing reported`
+        : dg.cuts.map((c) => `${c.id}: ${c.shown}`).join(' · '));
     // ── the lane that is always reachable ─────────────────────────────────
     // 🔴 THESE RUN ON EVERY RUN, WITH NO BOARD AND NO NETWORK. That is the
     // whole reason this lane exists: `grains` used to assert nothing at all

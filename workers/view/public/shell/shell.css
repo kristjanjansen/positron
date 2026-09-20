@@ -4,6 +4,11 @@
   --bg: #0b0e14; --card: #11151d; --card2: #151b26;
   --line: #1f2937; --line2: #2b3546;
   --fg: #e6e6e6; --dim: #8b93a1; --dim2: #6a7280;
+  /* One step of ink between the page's brightest text and the log's body
+     colour, so a line can be emphasised without being the brightest thing on
+     the page. It exists for the log and has exactly one consumer: see
+     `.pos-line.hi` down the file, which carries the reason. */
+  --fg2: #b6bcc7;
   --hi: #ffd400;
   /* the gap between a slider's label column and its lane — see `.sld-group` */
   --sld-col: 12px;
@@ -206,6 +211,26 @@ button, .pos-btn {
   -webkit-touch-callout: none; touch-action: manipulation;
 }
 button:hover { border-color: var(--dim2); }
+
+/* 🔴 A CANVAS IS A PICTURE, AND NOBODY HAS EVER WANTED TO SELECT ONE.
+   Photographed on /blocks/ on an iPhone: the 3-D scene wearing a blue selection
+   overlay with both iOS drag handles, one at the top left of the picture and
+   one hanging below it into the log. The rule above already records the
+   measured half of this and it applies here unchanged: `user-select: none` does
+   NOT suppress the iOS loupe, and `-webkit-touch-callout: none` is the one that
+   does, so a picture you can hold your finger on needs both.
+   ⚠️ GLOBAL, MATCHED ON THE ELEMENT, so a canvas added to any future page gets
+   it without anybody remembering. Prose, readouts and the log keep their
+   selection, which is the rule already stated at `.pos-strip`: copying a number
+   out of those is a real thing to want, and copying a picture is not.
+   ⚠️ AND `touch-action` IS DELIBERATELY NOT HERE. A canvas you drag to look
+   around wants it off; a canvas inside a page you scroll must not eat the page
+   scroll. Those are opposite answers to one question, so each page states its
+   own and this file states neither. */
+canvas {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
 
 /* 🔴 DOUBLE-TAP ZOOM, ON A PAGE YOU PLAY WITH YOUR FINGERS. Photographed on
    /rack/ on an iPhone: the page sitting at about 3x, one button filling the
@@ -522,7 +547,20 @@ button.pos-pri[data-busy="1"] {
    long unbroken token (a URL, a base64 id). Both need the `pre-wrap` above to
    do anything at all. */
 .pos-m { min-width: 0; overflow-wrap: anywhere; }
-.pos-line.hi .pos-m, .pos-log b { color: var(--fg); font-weight: 500; }
+/* 🔴 NOTHING IN THE LOG IS WHITE. Asked 2026-09-19: *"do not color log items
+   white, keep it gray or red or whatever you hae in palette"*. This line was
+   `var(--fg)`, #e6e6e6, which is the page's brightest ink and reads as white on
+   a phone: an ordinary `ready · 45/45 checks` came out louder than the prose,
+   the readout and the picture above it, and a log is the quietest surface on
+   the page until something goes wrong.
+   The emphasis is still here and it is carried by WEIGHT plus one step of ink
+   (`--fg2`, #b6bcc7 against the body's #8b93a1), which is enough to pick a line
+   out of a column of them and not enough to compete with `ok`, `warn` and
+   `bad`. Those three keep their colours, because they are the lines that are
+   meant to be found from across the page.
+   ⚠️ `.pos-log b` SHARES THE SELECTOR, so any page writing `<b>` in a log line
+   moves with it, which is the intended reach: there is one emphasis in a log. */
+.pos-line.hi .pos-m, .pos-log b { color: var(--fg2); font-weight: 500; }
 .pos-line.bad .pos-m, .pos-log i { color: var(--bad); font-style: normal; }
 .pos-line.warn .pos-m { color: var(--warn); }
 .pos-line.ok .pos-m { color: var(--ok); }
@@ -697,6 +735,39 @@ button.pos-pri[data-busy="1"] {
 .tbar-toggle.tbar-rec[data-state="playing"]::before { content: "■"; color: #e5484d; font-size: 13px; }
 .tbar-toggle.tbar-rec[data-state="ended"]::before { content: "●"; color: #e5484d; font-size: 15px; }
 
+/* 🔴 A TOGGLE THAT SAYS ITS TWO STATES IN WORDS, AND BOTH WORDS ARE THE SAME
+   WIDTH. Asked 2026-09-19 for `/stage/`: *"replace timeline-glued transport
+   record button with start | stop text labels (same w)"*. A red dot is a
+   convention for WRITING something, and the bar it was on starts a show that
+   also goes out live, so the dot was describing half of what the press does.
+
+   🔴 THE EQUAL WIDTH IS STRUCTURAL, NOT MEASURED AND NOT HOPED FOR. Both words
+   are in the button, both in grid cell 1/1, and the hidden one is
+   `visibility: hidden` rather than `display: none`, so it is still laid out
+   and still claims its width. The button is therefore always as wide as the
+   WIDER of the two, in every font, at every size, with nothing to keep in
+   step. This is the readout's own rule about a cell reserving its widest value,
+   and the slider's, one control further down.
+   ⚠️ `visibility`, NEVER `display: none` or `hidden`: a removed child claims no
+   grid space, which is the whole trick, and the button would resize under the
+   pointer the moment it was pressed.
+   ⚠️ AND THE GLYPH HAS TO BE TURNED OFF EXPLICITLY. `.tbar-toggle::before`
+   carries ▶/❚❚/↺ for every state, and a state rule weighs the same (0,2,0) as
+   a plain `.tbar-word` one, so the `[data-state]` selector here is what makes
+   sure a word button never draws a triangle beside its word. */
+.tbar-toggle.tbar-word {
+  width: auto; min-width: 0; padding: 0 11px;
+  font: 500 11px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim);
+}
+.tbar-toggle.tbar-word::before,
+.tbar-toggle.tbar-word[data-state]::before { content: none; }
+.tbar-toggle.tbar-word > span { grid-area: 1 / 1; visibility: hidden; }
+.tbar-toggle.tbar-word > .tbar-w0 { visibility: visible; }
+.tbar-toggle.tbar-word[data-state="playing"] > .tbar-w0 { visibility: hidden; }
+.tbar-toggle.tbar-word[data-state="playing"] > .tbar-w1 { visibility: visible; }
+.tbar-toggle.tbar-word:hover { color: var(--fg); background: var(--card2); }
+
 /* a page button that belongs to the transport — sits with the toggle, and is
    the SAME SQUARE as it. These are transport verbs, so they are glyphs on a
    38 px square like ▶ and ❚❚, not words in a pill: a row that mixes the two
@@ -780,8 +851,28 @@ button.pos-pri[data-busy="1"] {
 }
 .tbar[data-seekable="0"] .tbar-scrub,
 .tbar[data-scrub="0"] .tbar-scrub { display: none; }
-/* with no slider the clock takes the slack, so the rates stay on the right */
+/* with no slider the clock takes the slack, so the rates stay on the right.
+   ⚠️ IT IS ONE HALF OF THE GAP, NOT THE WHOLE ANSWER. The rule that actually
+   holds the boundary is `.tbar > [data-end="1"]` further down, which pushes the
+   loop and everything after it right whatever is in the middle; this and the
+   LIVE chip's own `margin-right` are the middle member's side of the same gap,
+   and two auto margins in one gap share it, so the group lands in the same
+   place either way. Kept because a bar with no loop at all (`/station/`) has
+   nothing to carry `data-end` and still needs its rates on the right. */
 .tbar[data-scrub="0"] .tbar-time { margin-right: auto; }
+/* 🔴 THE ROW'S FREE SPACE OPENS AT THE LOOP, SO THE LOOP, THE RATES AND THE
+   BADGE SIT AT THE RIGHT END WHATEVER ELSE THE BAR IS CARRYING.
+   `transport-bar.mjs` stamps `data-end` on the first member of that group and
+   says why; this is the declaration. A page that turns off BOTH the slider and
+   the clock had nothing flexible left in the row, and the loop packed left
+   against the transport buttons. MEASURED on a bar of 688 px: LOOP's left edge
+   at 57 px, with 375 px of bar standing empty to its right.
+   ⚠️ SAME MECHANISM AND SAME SPELLING AS `end: true` IN `.pos-controls`, which
+   is `button[data-end="1"]` further up. It is repeated here because that
+   selector is `button` and this group can be a DIV (`.tbar-loopgrp`, the
+   segmented `[LOOP|→]` pair), and because scoping it to `.tbar` keeps a rule
+   about this row inside this row. */
+.tbar > [data-end="1"] { margin-left: auto; }
 
 .tbar-time {
   flex: none; display: grid; gap: 2px; justify-items: end;
@@ -870,6 +961,41 @@ button.pos-pri[data-busy="1"] {
 .strip-deep { height: min(58vh, 520px); }
 /* seed only — createStrip sets the real height from its lanes every frame */
 .strip-auto { height: 44px; }
+
+/* ── what is under the pointer, under the strip (shell/strip.mjs) ─────────
+   Asked 2026-09-19 with a photograph of `/reel/` on an iPhone: *"add feature to
+   timeline: footer section, looks like glued that shows hovered info below
+   timeline"*. The tooltip was covering the right half of the strip, four lines
+   deep, over the marks it was describing.
+
+   🔴 THE HEIGHT IS RESERVED AND THE OVERFLOW IS CLIPPED. It is rewritten on
+   every hover change, so a box that can grow a line as the finger moves pushes
+   the page while somebody is reading it, which is the measured `grain-scope`
+   defect. `--sf-lines` is set once from script, from the same number the module
+   used to build the rows, so nothing here can disagree with what is in the box.
+   ⚠️ `em` IN THE `calc` RESOLVES AGAINST THIS ELEMENT'S OWN `font-size`, which
+   is what makes the reservation follow the type rather than a number typed to
+   match it.
+
+   ⚠️ SELECTABLE, unlike the strip above it. `.pos-strip` turns selection off
+   because a picture is not text; this is a title and a date, and copying one
+   out is a real thing to want. */
+.pos-strip-foot {
+  display: block; width: 100%;
+  background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+  padding: 7px 10px;
+  height: calc(var(--sf-lines, 2) * 1.5em + 14px);
+  overflow: hidden;
+  font: 500 11.5px/1.5 var(--mono); color: var(--dim);
+}
+/* Each line clips to one line. A name that does not fit ellipsises rather than
+   wrapping into the line below it and pushing the last one out of the box. */
+.pos-strip-foot > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pos-strip-foot > div:first-child { color: var(--fg); }
+/* ⚠️ THE EMPTY LINE IS DIMMER THAN A READING. It says the box is waiting rather
+   than reporting, which is the same distinction the readout draws between a
+   cell with nothing in it and a cell showing a zero. */
+.pos-strip-foot:not([data-on="1"]) > div:first-child { color: var(--dim2); }
 
 /* ── index ────────────────────────────────────────────────────────────── */
 .pos-acts { list-style: none; margin: 0; padding: 0; }
@@ -1142,6 +1268,41 @@ video[hidden] { display: none; }
    and iOS will happily rubber-band it. */
 .pos-faux-host, .pos-faux-host body { overflow: hidden; overscroll-behavior: none; }
 
+
+/* ── the way back out of it (createFullscreenExit in fullscreen.mjs) ──────
+   🔴 REPORTED FROM AN IPHONE, 2026-09-19: *"I can not leave fullscreen on
+   mobile"*. The cover above is `inset: 0` over the control row that holds the
+   ⛶ which got you in, and the only exit wired anywhere was a keydown for a key
+   the device does not have. Asked for: *"make permanett squaer button with
+   fullscreen icon on bottom right when going to fullscreen in mobile. fade out
+   it when no activity"*.
+
+   🔴 HELD OFF THE CORNER BY THE SAFE AREA, OR ON AN IPHONE IT LANDS UNDER THE
+   HOME INDICATOR. The fallback in each `env()` is what a browser with no notch
+   and no `env()` support uses, so the 12 px is never lost.
+
+   🔴 AND FADED MEANS UNPRESSABLE. `opacity: 0` alone leaves a live 34 px target
+   in the bottom right of the picture, so the corner silently exits full screen
+   for somebody reaching for the picture. `/kit/` measures the faded button
+   rather than reading this rule, because a rule that is present and inert reads
+   exactly like one that works. */
+.pos-fsx {
+  position: absolute;
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+  width: 34px; height: 34px; padding: 0;
+  font-size: 15px; line-height: 1;
+  opacity: 0; pointer-events: none;
+  transition: opacity 140ms ease;
+  /* ⚠️ RESTATED, THOUGH `button` ABOVE ALREADY CARRIES BOTH. This is the one
+     control on the site that sits on top of a picture somebody holds a finger
+     on, so the measured loupe rule is written where it is being relied on. */
+  touch-action: manipulation; -webkit-touch-callout: none;
+}
+.pos-fsx[data-on="1"] { opacity: 1; pointer-events: auto; }
+.pos-fsx[data-on="1"][data-idle="1"] { opacity: 0; pointer-events: none; }
+
 /* ── slider (demo/shell/slider.mjs) ──────────────────────────────────────
    ⚠️ 34 px, the same as `button` above, because these share a flex row and a
    control of a different height makes the row grow and knocks everything else
@@ -1397,6 +1558,50 @@ video[hidden] { display: none; }
 .pos-choice button:focus-visible,
 .pos-pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
 
+/* ── button group (demo/shell/button-group.mjs) ───────────────────────────
+   🔴 IT IS SEGMENTED, AND IT SHIPPED WITH A GAP. The first build put 8 px
+   between the buttons on the argument that joining them would say they were
+   alternatives. REPORTED on the first page to use it, with a screenshot:
+   *"i do not see buttongroup vr xr"*. Both buttons were there and both were
+   correctly switched off; what was missing was the GROUP, because two boxes
+   with air between them are what two unrelated controls look like. The block
+   above had already settled the same argument for the choice row and the answer
+   was not carried over. So the row wears `step pos-seg` like every other
+   segmented row here: the borders overlap by a pixel so a join is one line, and
+   only the outer corners are round.
+
+   🔴 AND IT IS STILL NOT A CHOICE. The join cannot be what carries that,
+   because `/stage/` has a choice with nothing chosen and it is segmented too.
+   What carries it is the ARMED STATE, which a group never paints: nothing here
+   writes `aria-pressed`, so the `--hi` tint keyed on it below can never appear
+   and a screen reader can never announce one of these as pressed.
+
+   ⚠️ AND THE BUTTONS ARE FULL SIZE, which is the second channel. An option in
+   a choice is one of three VALUES being compared and is set at 11 px in an
+   11 px pad; `Run in VR` is a thing you PRESS and keeps the control row's own
+   13 px and 18 px. On `/mirror/` a group sits in the same row as three choices
+   and the two are visibly different sizes of object. `/kit/` measures both
+   channels rather than leaving them as a claim in a comment.
+
+   ⚠️ NO DISABLED LOOK HERE. `button[disabled]` up the file is already
+   `opacity: .4; cursor: default`, and the whole reason this group owns the
+   disabled state in script is so that four pages cannot invent four looks. */
+.pos-bgroup { display: inline-flex; align-items: center; gap: 8px; height: 34px; min-width: 0; }
+.pos-bgroup-l {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap;
+}
+/* `min-width: 0` on both, or the row cannot scroll and the PAGE goes sideways
+   instead. CLAUDE.md records the measurement: 390 px gave 141 px of document
+   overflow with this missing.
+   ⚠️ NO `gap`. The join is `.pos-seg`'s `margin-left: -1px`, and a gap here
+   would push the buttons apart again and leave the overlap doing nothing. */
+.pos-bgroup-row { display: flex; align-items: center; min-width: 0; }
+/* A label never wraps and neither does a button's name, for the reason written
+   at `.pos-choice button`: a folded name is a control twice the height of its
+   neighbours, so the row stops being a row. */
+.pos-bgroup-row button { white-space: nowrap; }
+
 /* ── the kit's controls on a phone ────────────────────────────────────────
    🔴 A LABEL BESIDE A GROUP IS A DESKTOP LUXURY. At 390 px the label eats the
    front of the row and the segment gets whatever is left, so `instrument` used
@@ -1432,16 +1637,30 @@ video[hidden] { display: none; }
   .pos-choice .step::-webkit-scrollbar { display: none; }
   .pos-choice .step button { flex: 1 0 auto; min-width: 0; padding: 0 8px; white-space: nowrap; }
 
-  /* The picker gets the same treatment, and the NAME is what stretches — the
-     arrows and the die are fixed targets and the name is the readout, so it is
-     the part with something to gain from the room. */
-  .pos-pick { display: grid; grid-template-columns: 1fr; gap: 4px; height: auto; width: 100%; }
-  .pos-pick-l { display: block; }
-  .pos-pick-seg { display: flex; width: 100%; }
-  .pos-pick-cell { width: auto; flex: 1 1 0; min-width: 0; }
-  /* ⚠️ The die stays OUT of the group and stays SQUARE. It is a different kind
-     of move from the arrows, and stretching it would say it was a third one. */
-  .pos-pick > .pos-pick-die { justify-self: start; }
+  /* 🔴 THE PICKER'S HALF OF THIS IS NOT HERE, AND THAT IS NOT TIDINESS.
+     It WAS here, and it never once ran: `.pos-pick`'s own block sits about five
+     hundred lines FURTHER DOWN this file, a media query adds no specificity,
+     and at equal specificity the later rule wins. So `display: grid` lost to
+     `display: inline-flex` at every width, on every page with a picker, for as
+     long as the rule existed. MEASURED on `/mirror/` at 390 px while the two
+     were side by side: the three choices collapsed to label-on-top and the
+     picker beside them did not, its segment starting 37 px in after an inline
+     label. The rules are unchanged; they are in a second media block after the
+     picker's own section, where they can reach it. */
+
+  /* The button group takes the same three decisions as the two above, for the
+     same measured reasons: the label goes ON TOP so the buttons get the whole
+     width, the buttons GROW to share the row, and the row SCROLLS rather than
+     shrinking a name below the word it has to say. `Run in VR` and `Run in AR`
+     side by side at 390 px are the case this was written for. */
+  .pos-bgroup { display: grid; grid-template-columns: 1fr; gap: 4px; height: auto; align-items: stretch; width: 100%; }
+  .pos-bgroup-l { display: block; }
+  .pos-bgroup-row {
+    width: 100%;
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .pos-bgroup-row::-webkit-scrollbar { display: none; }
+  .pos-bgroup-row button { flex: 1 0 auto; min-width: 0; padding: 0 12px; }
 }
 
 /* ── text field ───────────────────────────────────────────────────────────
@@ -1935,6 +2154,29 @@ video[hidden] { display: none; }
   display: inline-flex; align-items: center; justify-content: center;
 }
 .pos-pick-die svg { display: block; }
+
+/* ── the picker on a phone ────────────────────────────────────────────────
+   🔴 IT HAS TO BE AFTER THE BLOCK ABOVE, AND IT USED TO BE FIVE HUNDRED LINES
+   BEFORE IT. A media query adds nothing to specificity, so `@media (max-width:
+   560px) { .pos-pick { display: grid } }` written earlier in the file lost to
+   the plain `.pos-pick { display: inline-flex }` written later, and the phone
+   layout was dead on arrival. Nothing said so: a rule that is present and inert
+   reads exactly like one that works, which is this stylesheet's own recurring
+   lesson. Found 2026-09-19 by measuring a picker and a choice in one row at
+   390 px and seeing only one of them collapse.
+   The decision itself is unchanged and is the same one the choice row makes:
+   the label goes ON TOP so the control gets the whole width, and the NAME is
+   what stretches, because the arrows and the die are fixed targets and the name
+   is the readout. */
+@media (max-width: 560px) {
+  .pos-pick { display: grid; grid-template-columns: 1fr; gap: 4px; height: auto; width: 100%; }
+  .pos-pick-l { display: block; }
+  .pos-pick-seg { display: flex; width: 100%; }
+  .pos-pick-cell { width: auto; flex: 1 1 0; min-width: 0; }
+  /* ⚠️ The die stays OUT of the group and stays SQUARE. It is a different kind
+     of move from the arrows, and stretching it would say it was a third one. */
+  .pos-pick > .pos-pick-die { justify-self: start; }
+}
 
 /* ⚠️ THE JOIN ITSELF IS `.pos-seg`, WHICH EVERY `.step` CARRIES. The overlapped
    border, the outer-only corners and the hover raise used to be written out
@@ -2769,7 +3011,12 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   /* A picture with nothing in it yet is still a picture-shaped hole rather than
      a collapsed line, which is what `/kit/` shows and what a page looks like
      before its first frame. */
-  aspect-ratio: 16 / 9;
+  /* 🔴 THE SHAPE IS A PROPERTY SO THAT A RULE CAN STILL BEAT IT. `aspect` on
+     `createVideoPanel` used to be written straight onto `stage.style`, where no
+     selector could reach it — and the rule it was defeating is
+     `[data-full] .pos-vp-stage { aspect-ratio: auto }` a few lines down, which
+     is what lets a panel fill a screen. See the note in video-panel.mjs. */
+  aspect-ratio: var(--vp-aspect, 16 / 9);
 }
 .pos-vp-stage > video, .pos-vp-stage > canvas, .pos-vp-stage > img {
   width: 100%; height: 100%; display: block;
@@ -2785,9 +3032,23 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    bottom, which reads as a mark that has slipped rather than one that was
    placed. The log beside it uses 10 and 12, so this uses the same and the two
    boxes line their contents up with each other. */
+/* 🔴 THE SIDE SLOTS HAVE A FLOOR, AND WITHOUT ONE THE ROW OVERLAPS ITSELF.
+   This was `1fr auto 1fr`, and that is a trap rather than a typo: an `auto`
+   track's growth limit is its content's MAX-CONTENT, and flexible tracks are
+   only given what is left after it, so a centre slot with more in it than the
+   row can hold takes the whole row and BOTH `1fr` tracks resolve to zero. Their
+   contents then overflow their own zero-width boxes onto the neighbour.
+   MEASURED on `/mirror/` at 1280 px, with a four-cell centre: left slot 0 px
+   wide with its presence dot's right edge 2 px INSIDE the centre slot, drawn
+   over the first label; right slot 0 px wide with the ⛶ 2 px inside it, drawn
+   over the last value. Reported from a screenshot of exactly that.
+   `minmax(min-content, 1fr)` changes one thing: a side track may still share
+   the leftover equally, so a row with room to spare centres its middle slot as
+   before, but it can never shrink below what it is holding. What gives instead
+   is the centre, which is the slot a page fills and the one that can scroll. */
 .pos-vp-foot {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(min-content, 1fr) auto minmax(min-content, 1fr);
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
@@ -2799,22 +3060,28 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-vp-c { justify-content: center; }
 .pos-vp-r { justify-content: flex-end; }
 
-/* The close button lives ON the picture, top right, and only its opacity moves.
-   Adding and removing it on pointer movement would be layout work at the rate a
-   hand moves. */
-.pos-vp-close {
-  position: absolute; top: 10px; right: 10px;
-  opacity: 0; pointer-events: none;
-  transition: opacity 140ms ease;
-  z-index: 2;
-}
-.pos-vp[data-full="hover"] .pos-vp-close { opacity: 1; pointer-events: auto; }
-.pos-vp[data-full="hover"][data-idle="1"] .pos-vp-close { opacity: 0; pointer-events: none; }
+/* ⚠️ THE CLOSE BUTTON IS `.pos-fsx` NOW AND ITS RULES ARE WITH THE REST OF
+   FULL SCREEN, a thousand lines up. It used to be `.pos-vp-close`, a ✕ in the
+   top right of the picture, hand-rolled here with its own idle timer; that was
+   a second copy of a control `/held/` and `/floor/` each had a third and fourth
+   version of, and only the panel's copy could ever be reached by a page with a
+   video panel. One piece, mounted in the picture, bottom right, wearing the
+   same ⛶ as the button that got you in.
+*/
 
 /* Full, by either route. `/mirror/` solved this shape first: the PANE is what
    goes full, so the picture has to be told to fill it and the bar has to keep
    its row. */
-.pos-vp[data-full] { border: 0; border-radius: 0; background: #000; }
+/* 🔴 `width` AND `max-width` BECAUSE A PAGE MAY HAVE CAPPED ITS OWN PANEL, and
+   on the REAL fullscreen path nothing else takes the cap off. `.pos-faux`
+   already carries both and a browser with element fullscreen never gets that
+   class, so `/making/`'s 460 px square drew a small box in the middle of a
+   black screen. Two hooks, (0,2,0), so a page's own one-class cap loses on
+   specificity rather than on source order. */
+.pos-vp[data-full] {
+  border: 0; border-radius: 0; background: #000;
+  width: 100%; max-width: none;
+}
 /* ⚠️ FULL IS THE ONE PLACE IT IS BLACK. There is no page around it to belong to,
    and a picture filling a screen wants nothing bright at its edges. */
 .pos-vp[data-full] .pos-vp-stage { background: #000; }
@@ -2824,9 +3091,42 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 /* ⚠️ `footer` KEEPS THE ROW, which is the whole difference between it and the
    other two. A grid of `1fr auto` gives the picture everything left over and
    the row its own height, which is what `/mirror/` does. */
-.pos-vp[data-full="footer"] { display: grid; grid-template-rows: 1fr auto; height: 100%; }
+.pos-vp[data-full="footer"] { display: grid; grid-template-rows: 1fr auto auto; height: 100%; }
 .pos-vp[data-full="footer"] .pos-vp-stage { min-height: 0; }
 .pos-vp[data-full="footer"] .pos-vp-foot { padding: 10px 14px; }
+
+/* ── the second storey, under the footer bar, only while full ─────────────
+   Asked 2026-09-19 with a photograph of `/mirror/` filling an iPhone: *"extend
+   videopanel footer in fullscreen so it can have section below the footer bar
+   (separaet with line). put controlgroup there"*. The third `auto` row above is
+   this; off screen the row has no children and no box, so it costs nothing.
+
+   🔴 THE LINE IS A DELIBERATE EXCEPTION TO "SEPARATION IS SPACING, NOT LINES",
+   AND HERE IS THE REASON SO THE NEXT SWEEP DOES NOT DELETE IT. That rule works
+   because `.pos-body` puts 22 px between every pair of blocks, and air is what
+   says two things are different things. Full screen is the one place on this
+   site with no page rhythm available at all: the footer bar and the page's own
+   controls are stacked edge to edge inside one box that reaches every edge of
+   the screen, with no gap to spend. A hairline is what is left to say they are
+   two kinds of thing, and it is the same hairline the bar above it already
+   carries, so the panel reads as one surface in three storeys.
+
+   ⚠️ AND THE BOTTOM PADDING CARRIES THE SAFE AREA. This row is the lowest thing
+   on the screen in this mode, so on an iPhone its buttons land under the home
+   indicator without it. */
+.pos-vp-under { display: none; }
+.pos-vp[data-full="footer"] .pos-vp-under {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 10px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--card);
+  border-top: 1px solid var(--line);
+}
+/* A container with nothing in it must not paint its edges, which is this
+   project's own rule and the reason an empty readout is hidden. A page in
+   `footer` mode that never handed the panel a second storey would otherwise get
+   a 1 px band with 20 px of padding under its controls. */
+.pos-vp[data-full="footer"] .pos-vp-under:empty { display: none; }
 
 /* 🔴 SQUARE, AND `.ico` ALONE DOES NOT DO IT HERE. That class is scoped
    `.step button.ico`, so outside a segmented row it matches nothing and the
