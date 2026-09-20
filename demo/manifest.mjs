@@ -338,29 +338,20 @@ export const DEMOS = [
   // ⚠️ THE SLUG WAS FREED ON 2026-09-19, when the headset text page that held it
   // was renamed to `weight`. The deployed `/held/` is gone and no redirect was
   // written, so this row is what answers that address now.
+  // 🔴 AND `veil` IS GONE FROM THIS LIST, 2026-09-20, FOLDED INTO THE ROW
+  // BELOW. It was a second page off the same score file, sitting directly
+  // after this one, drawing what one visit LOOKS like against what the
+  // structure IS. Asked for as *"rm veil demo and integrate it into held
+  // begore timeljne"*, so the picture is now a 16:9 panel above `held`'s own
+  // line. ⚠️ THE DEPLOYED `/veil/` DIES WITH THE ROW and no redirect has been
+  // written, the same as `radio1965`, `box` and `keys` before it. It was live
+  // for less than a day.
   { name: 'held', group: 'xr', act: 6, created: '2026-09-19', built: true,
     // sizes the wait for the page's first assert, which sits behind one local
     // read of a 99 KB file. Nothing here has a control to press.
     settleMs: 4000,
-    one: 'Held in Human, a mixed reality piece by Liis Vares and Taavet Jansen, drawn from its own score: '
-      + 'eight scenes, a voice that outlives them, and the one scene the score gives no length',
-    tags: ['timeline', 'uncertainty', 'canvas'] },
-  // 🔴 THE SECOND PAGE OFF ONE FILE, AND IT SITS HERE BECAUSE IT PLAYS ON THE
-  // AXIS THE ROW ABOVE ESTABLISHES. `held` draws the score's STRUCTURE on a
-  // line, with the maze as a break in pixels; this draws what one visit LOOKS
-  // like, on the same clock with the maze taken out. The sentence about the
-  // maze only makes sense second, which is why the story order is this way
-  // round rather than newest first.
-  // ⚠️ THE GROUP IS `timeline` AND NOT `xr`, WHICH IS WHERE THE ROW ABOVE SITS.
-  // `xr` renders as `in a headset` on the front page, and the whole subject of
-  // this one is that a flat screen does something a headset cannot. Filing it
-  // under a headset would be the front page contradicting the page.
-  { name: 'veil', group: 'timeline', act: 6, created: '2026-09-20', built: true,
-    // sizes the wait for the page's first assert, which sits behind one local
-    // read of a 99 KB file and one canvas layout.
-    settleMs: 4000,
-    one: 'Held in Human drawn flat, with the room dimmed and coloured on the score\'s own clock '
-      + 'while the intro types itself',
+    one: 'Held in Human, a mixed reality piece by Liis Vares and Taavet Jansen, '
+      + 'played back from its own score',
     tags: ['timeline', 'uncertainty', 'canvas'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
