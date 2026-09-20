@@ -38,8 +38,24 @@ if [ -z "${ROOM:-}" ]; then
 fi
 
 echo "== packages"
+# 🔴 READ FROM `packages.txt`, NOT TYPED HERE. This line used to install
+# `alsa-utils curl git` and nothing else, so a board provisioned from this repo
+# came up with no jackd, no yoshimi, no SuperCollider, no csound and no ffmpeg:
+# **silent**, while `rig/audit.mjs` held the full list of twelve with reasons
+# and was a thing you ran by hand afterwards against a board you already had.
+# One list, read by the installer that needs it and by the audit that checks it.
+#
+# ⚠️ `awk` RATHER THAN node OR jq, because node is one of the things being
+# installed three lines down and jq is not on a fresh Pi. The file is tab
+# separated so that the `why` column can contain anything.
+#
+# ⚠️ `--no-install-recommends` ON EVERY ONE. csound's recommends pull tcl/tk
+# onto a headless board, and the same argument covers the rest.
+PKGS=$(awk -F'\t' '$0 !~ /^#/ && NF >= 3 && $3 == "apt" { printf "%s ", $1 }' "$SRC/packages.txt")
+[ -n "$PKGS" ] || { echo "packages.txt read as empty, refusing to provision a silent board" >&2; exit 4; }
+echo "   $PKGS"
 apt-get update -qq
-apt-get install -y -qq alsa-utils curl git
+apt-get install -y -qq --no-install-recommends $PKGS
 
 echo "== node"
 NEED=22

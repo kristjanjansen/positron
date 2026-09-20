@@ -1,0 +1,46 @@
+# rig/board/packages.txt — what a board needs installed, in ONE place.
+#
+# 🔴 WHY THIS FILE EXISTS. `rig/audit.mjs` held a careful list of twelve
+# packages with versions and reasons, and `setup.sh` installed four of them
+# (`alsa-utils curl git` and node). So a board provisioned from this repo came
+# up with no jackd, no yoshimi, no SuperCollider, no csound and no ffmpeg —
+# **silent** — while the audit that could have said so is a thing you run by
+# hand afterwards, against a board you already have. A list that describes a
+# machine nobody built from it is documentation, not provisioning.
+#
+# ⚠️ IT IS PLAIN TEXT AND TAB SEPARATED ON PURPOSE. `setup.sh` reads it with
+# `awk` on a fresh Pi where node does not exist yet, because node is one of the
+# things it is about to install. A .json or .mjs list could not be read by the
+# script that needs it first.
+#
+# ⚠️ EVERY INSTALL IS `--no-install-recommends`. The comment that bought this
+# was on csound, whose recommends pull tcl/tk onto a headless board, and the
+# same reasoning covers the rest: a board is not a desktop.
+#
+# Columns, tab separated:
+#   name   version seen on the working board, or `-` for unpinned
+#   via    `apt`, or `nodesource` for the one setup.sh installs its own way
+#   why    what breaks without it
+#
+# 🔴 FOUR PACKAGES LEFT THIS LIST ON 2026-09-16 AND ARE NAMED SO A REBUILT
+# BOARD DOES NOT QUIETLY GET THEM BACK: `fluidsynth`, `fluid-soundfont-gm`,
+# `dssi-host-jack` and `hexter`. Nothing spawns either instrument any more, so
+# installing them costs 141 MB of soundfont and a plugin host for something
+# that cannot be reached. `archive/box-fluidsynth-hexter/` has the code and the
+# reason.
+
+jackd2	1.9.22~dfsg-4	apt	the audio graph every instrument is patched into; the insert lives on it
+yoshimi	2.3.3.3-1	apt	911 instruments in 24 banks, as its own JACK client
+yoshimi-data	-	apt	those banks; without it yoshimi starts and has nothing to play
+supercollider	1:3.13.0+repack-3	apt	scsynth and sclang, what pappus the granular engine runs in
+sc3-plugins	-	apt	the extra UGens pappus uses; core SuperCollider is not enough for it
+csound	1:6.18.1+dfsg-4	apt	the reverb insert (rig/board/csd/space.csd)
+ffmpeg	8:7.1.5-0+deb13u1+rpt2	apt	encodes the camera and the rendered picture; h264_v4l2m2m is the hardware path
+alsa-utils	1.2.14-1+rpt1	apt	aconnect, which is how MIDI ports are read and patched
+v4l-utils	1.30.1-1	apt	v4l2-ctl, how the camera is asked what modes it has
+build-essential	-	apt	gcc, to build rig/vis on the board rather than cross-compiling
+libegl1	-	apt	rig/vis links against EGL; without it the renderer builds and will not run
+libgbm1	-	apt	rig/vis links against GBM, the headless surface it draws into
+git	-	apt	setup.sh wants it
+curl	-	apt	setup.sh fetches the NodeSource script with it
+nodejs	24.21.0-1nodesource1	nodesource	the service itself; from NodeSource, not Debian, which ships an older one
