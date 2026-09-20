@@ -7,7 +7,7 @@
 // delay and loss (which is how it is measured).
 //
 // ---------------------------------------------------------------------------
-// THE CLAIM THIS FILE EXISTS TO TEST (plan-looper.md §1)
+// THE CLAIM THIS FILE EXISTS TO TEST (plans/plan-looper.md §1)
 // ---------------------------------------------------------------------------
 // A committed loop is a VALUE. So the network is used ONCE PER LAYER, not once
 // per note, and how long delivery takes cannot change a single onset — it can

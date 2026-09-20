@@ -882,7 +882,7 @@ export function lockRate(seconds, { rate, elen = 1, name = 'this sound', subdivi
 
 /**
  * 🔴 LIFTED, NOT REWRITTEN, AND THE TWO GUARDS ARE WHY.
- * `plan-audio-shader.md §8 step 2` says it in as many words: `meterTick` is
+ * `plans/plan-audio-shader.md §8 step 2` says it in as many words: `meterTick` is
  * already written, already tuned, and already carries the two things a second
  * author would miss. An empty FFT bin reports `-Infinity`, and one NaN in the
  * sum poisons every follower at once; and the flux is POSITIVE ONLY, because a

@@ -1042,7 +1042,7 @@ function canonical(x) {
 export { canonical as canonicalJSON };
 
 // ---------------------------------------------------------------------------
-// 8. THE SCORE DOCUMENT — one container, several languages (plan-score.md).
+// 8. THE SCORE DOCUMENT — one container, several languages (plans/plan-score.md).
 //
 // NORMALIZE THE ENVELOPE, NEVER THE PAYLOAD.
 //

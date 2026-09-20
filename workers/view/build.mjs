@@ -121,7 +121,7 @@ const FILES = [
   ['proto/jam/moq/www/moq-synth.js', 'proto/jam/moq/www/moq-synth.js'],
   ['proto/jam/playout-worklet.js', 'proto/jam/playout-worklet.js'],
 
-  // ── the demo sequence (plan-demos.md) ─────────────────────────────────────
+  // ── the demo sequence (plans/plan-demos.md) ─────────────────────────────────────
   // strip.mjs is REQUIRED here: every Act 0 demo imports it, and
   // proto/megatimeline/index.html has imported /timeline/strip.mjs since
   // commit 3647696 without it ever being allowlisted — which is why
@@ -275,7 +275,7 @@ const FILES = [
 
 /**
  * Allowlist entries for every BUILT demo, generated from demo/manifest.mjs so
- * the list stops being hand-maintained (plan-demos.md, order of work step 8).
+ * the list stops being hand-maintained (plans/plan-demos.md, order of work step 8).
  *
  * This reads a directory, which the rule above forbids — but the rule exists
  * because the REPO ROOT holds .env. Enumeration here is confined to
@@ -592,7 +592,7 @@ await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 
 // the menu page — the only page this worker authors itself. Its list is
-// GENERATED from demo/manifest.mjs (plan-demos.md step 8) so there is no second
+// GENERATED from demo/manifest.mjs (plans/plan-demos.md step 8) so there is no second
 // place to forget. Number and name only; a row with no target renders greyed.
 {
   // 🔴 GROUPED BY SUBJECT on the front page, story order everywhere else.

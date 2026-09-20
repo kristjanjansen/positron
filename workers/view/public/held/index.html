@@ -12,7 +12,6 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createGlue } from '/shell/glue.mjs';
-  import { createDiagram } from '/shell/diagram.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
   import { createDeck } from '/timeline/transport.mjs';
 
@@ -52,8 +51,9 @@
        above the line. The old one named the line's own lanes with a colon and
        two commas, which is a description stretched to carry three facts, and it
        described only half of what is now on the page. */
-    what: 'Held in Human, a mixed reality piece by Liis Vares and Taavet Jansen, '
-      + 'played back from its own score.',
+    // ⚠️ THE SAME SENTENCE AS THE INDEX CARD, which is the rule for a page with
+    // a picture of its own machinery, so the two moved together.
+    what: 'Held in Human, played back from its own score.',
     /**
      * 🔴 STILL NO READOUT, AND `null` RATHER THAN AN OMITTED FIELD, so the
      * harness reads the opt out as deliberate. Instructed 2026-09-19: *"rm
@@ -228,7 +228,7 @@
      ⚠️ THE PAGE USED TO DRAW BOTH ARITHMETICS SIDE BY SIDE and it was cut on
      2026-09-20, on the reader's verdict rather than on a measurement: *"I sid
      not get two panels reasoning. Keep ot simple."* The comparison had to be
-     taught before it could be looked at. `plan-held-in-human-2d.md` §1 keeps
+     taught before it could be looked at. `plans/plan-held-in-human-2d.md` §1 keeps
      the whole argument, one log line at the foot of this file says the short of
      it, and the picture draws what the score says.
 
@@ -1149,7 +1149,7 @@
        whole second picture this page used to draw, and the instruction that
        took that picture out allowed the fact one line here if it could be said
        plainly. The reasoning is in the comment over `TABLES` and in
-       `plan-held-in-human-2d.md`, which is where somebody who wants it goes. */
+       `plans/plan-held-in-human-2d.md`, which is where somebody who wants it goes. */
     d.log('the picture over the line is one visit: the room dimmed and coloured on the score\'s own '
       + 'clock, with the intro typing itself over it. The room is a band of grey steps rather than '
       + 'the gallery, which is Mari Möldre\'s and is not in the score.');
@@ -1207,41 +1207,12 @@
        `Browser` box for the canvas above would be a third machine on a picture
        whose caption is that the score is the piece, and the arrow into it would
        be a lie: the page reads the score file, not Unity's passthrough. */
-    const dg = createDiagram(d.el, {
-      caption: 'The score is the piece: every length, every placement and every line is in the '
-        + 'file, so changing a number in it changes what the next visitor walks into.',
-      nodes: [
-        { id: 'score', label: 'score', sub: '667 lines', tech: 'file',
-          note: 'Every length, placement, fade and line count, as a name on one line and its value '
-            + 'on the next. Under them sit five small text formats: the maze words, the dialogue, '
-            + 'the questions, the river and the credits.' },
-        { id: 'order', label: 'running order', sub: 'Unity, 8 scenes', tech: 'graphics',
-          note: 'Runs the scenes in turn on their stated lengths, handing out both channel values '
-            + 'and a count of spoken lines as each one starts. The maze is the one that waits: it '
-            + 'ends when the visitor walks towards the stairs.' },
-        { id: 'chan', label: 'passthrough', sub: 'tint, opacity', tech: 'graphics',
-          note: 'Two independent channels with a value and a fade time per scene. One puts a colour '
-            + 'lookup table on the camera image, the other decides how much of the real room is '
-            + 'left.' },
-        { id: 'head', label: 'Headset', sub: 'a room, a visitor', tech: 'device',
-          note: 'The gallery seen through the headset cameras, held at 15% for the two and a half '
-            + 'minutes of the cylinder. One voice reads 24 lines over it, eight of them silence '
-            + 'with a stated length.' },
-      ],
-      links: [
-        { from: 'score', to: 'order', label: 'values',
-          note: 'Read once at start up. A scene takes its length, both channel values, both fade '
-            + 'times and its count of spoken lines from the file, so the running order holds no '
-            + 'numbers of its own.' },
-        { from: 'order', to: 'chan',
-          note: 'Each scene hands both channels their value and their fade the moment it starts. '
-            + 'The two run independently, which is why the colour can arrive a scene before the '
-            + 'room goes away.' },
-        { from: 'chan', to: 'head', label: 'picture',
-          note: 'A lookup table on the camera image and a level that dims it. The master dimmer is '
-            + 'left at 1.0, so the per scene numbers are the real ones.' },
-      ],
-    }, { how: true, atEnd: true });
+    // 🔴 NO DIAGRAM. Asked 2026-09-20: *"rm held diagram"*. The two asserts
+    // that graded it, `dg.cuts.length === 0` and `dg.ties === 0`, went with it
+    // rather than being left reading an object nothing builds.
+    // ⚠️ AND THE ONE SENTENCE RULE STILL APPLIES. `what` is one sentence here
+    // because a description is one sentence, not because a picture used to sit
+    // under it.
 
     // ── checks ──────────────────────────────────────────────────────────────
     //
@@ -1552,23 +1523,19 @@
     // ⚠️ `__demo.logs`, NOT `d.logs`. The mount return and the published api
     // are two different objects, which is the same distinction the transport
     // bar's own comment makes about `__demo.transport`.
-    const said = (window.__demo.logs || []).map((l) => l.msg).join('\n');
-    const sentence = document.querySelector('.pos-what')?.textContent || '';
-    const authors = roleOf('Authors');
-    A('the authors are in the page\'s own sentence, and the text\'s provenance is in the log',
-      // ⚠️ CASE FOLDED, because the score writes its credits in capitals and
-      // the page's own sentence does not. Comparing them as typed failed on
-      // `MIHKELSON` against `Mihkelson`, which is a check failing on the
-      // spelling of a name rather than on whether the name is there.
-      !!authors && /liis vares/i.test(sentence) && /taavet jansen/i.test(sentence)
-      && /mihkelson/i.test(said) && /mcilfarick-ksenofontov/i.test(said),
-      `${authors}, and the log names the text and its translator`);
-
-    // 8. the picture of the machinery, which grades itself
-    A('the diagram drew every name and every arrow whole', dg.cuts.length === 0,
-      dg.cuts.map((c) => `${c.where} ${c.id}`).join(', ') || 'nothing cut, nothing refused');
-    A('and no line in it is missing its arrowhead', dg.ties === 0,
-      `${dg.ties} line${dg.ties === 1 ? '' : 's'} with no head`);
+    /**
+     * 🔴 THE ATTRIBUTION CHECK IS GONE, AND THE PREMISE UNDER IT WAS WRONG.
+     * There was a check here requiring this page to name Liis Vares and Taavet
+     * Jansen, written on the belief that the piece is somebody else's work.
+     * Corrected 2026-09-20: *"they are in my team, attribution is ok"*, *"i
+     * mean no attribution"*, *"its a demo for them"*.
+     * ⚠️ SO IT IS NOT A CREDIT THAT WAS DROPPED, IT IS A CREDIT THAT WAS NEVER
+     * OWED. A page does not cite its own team, and a demo built FOR somebody
+     * does not open by telling them who they are.
+     * ⚠️ THE TEXT'S OWN PROVENANCE STAYS IN THE LOG, which is a different
+     * thing: this page renders a translated text rather than merely naming one,
+     * and the translator is not on the team.
+     */
 
     // 9. the strip's own gutters, which drop a line in silence when a lane is short
     const fit = strip.gutterFit();

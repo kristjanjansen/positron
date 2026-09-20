@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  import { mount, guard } from '/shell/shell.mjs';
+  import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
+  // The drill behind the button below holds two notes down on a studio Mac in
+  // another building for 2.2 seconds. A hidden button kept that away from a
+  // visitor by accident of layout; this keeps it away by construction.
+  import { ifSelfcheck } from '/shell/selfcheck.mjs';
+
+  // The studio Mac's room. `/keys/` is this same page pointed at a Raspberry Pi —
+  // which is the argument: what crosses the relay is a note NUMBER, so neither
+  // end knows what kind of machine the other one is.
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'm1-1';
+  // `?relay=ws://127.0.0.1:8899` points this page at a relay on the LAN, which
+  // is the only way to tell "the sound is bad" from "the PATH to the sound is
+  // bad" — the two have opposite fixes and look identical from here. /keys/ has
+  // had this override since it was written.
+  const RELAY = `${q.get('relay') || 'wss://ws.positron.studio'}/room/${ROOM}/ws`;
+  const ID = Math.random().toString(36).slice(2, 8);
+  const RATE = 48000;
+
+  const d = mount({
+    name: 'able',
+    what: 'A MacBook in a studio is running Ableton Live, and this page plays it. Press a key: the note number goes out over a socket, a small program on that machine hands it to Live over the Mac’s own MIDI bus, and a copy of what Live renders comes straight back as sound. Round trip is how long the far end took to answer, buffer is how much sound is held in hand before it is played, and a dropout is a moment that cushion ran out or had to be cut, one click each.',
+    // `buffer` and `dropouts` are here because "it sounds noisy" and "the stream
+    // is fine" were both true at once for an hour: the samples arriving over the
+    // relay measured bit-clean against the source — same pitch, same peak, zero
+    // discontinuities — while the page still sounded wrong. A cushion that
+    // keeps being trimmed or starved is the only part of this path that can do
+    // that, and it was the one part with no number on it.
+    //
+    // ⚠️ SEVEN CELLS, BECAUSE EIGHT DO NOT FIT. The row is
+    // `repeat(auto-fit, minmax(96px, 1fr))`, so at this page's ~740 px it takes
+    // SEVEN per line and a nine-cell row wrapped, leaving two cells and a hole.
+    // The two that went: `instrument` was a structural constant here (this page
+    // is the Ableton one; `/keys/` is the Pi), and a cell that cannot change
+    // teaches a reader to skip the row — and at 105 px it drew `Ablet…`, which
+    // is worse than absent. `frames` was an odometer; `rate` is the same
+    // quantity where it can still say something.
+    readout: { sound: '', 'round trip': 'ms',
+               bitrate: 'Mb/s', buffer: 'ms', dropouts: '', midi: '' },
+    // ⚠️ HIDDEN, NOT REMOVED — LESSONS #41. Pressing a key already starts the
+    // sound and the socket dials on load, so this button is dead weight for a
+    // human. But `verify.mjs` presses `.pos-controls button` and EVERY assert on
+    // this page hangs off this handler, so deleting it would silently stop the
+    // page being tested while looking tidier. `?checks=1` brings it back.
+    controls: [{ id: 'play', label: 'Start and connect', primary: true }],
+  });
+  guard(d);
+  if (!new URLSearchParams(location.search).has('checks')) d.button('play').hidden = true;
+
+  let ws = null, ctx = null, playout = null, seq = 0;
+  let frames = 0, bytes = 0, lastSeq = -1, missing = 0, pingAt = 0, started = false;
+  let answered = false, instrument = null, namedItself = false, rateWarned = false;
+  // 🔴 NOTHING HERE GUESSES HOW MANY CHANNELS ARE ARRIVING. 960 samples is a
+  // valid 20 ms mono frame and a valid 10 ms stereo one, so the payload cannot
+  // say — and guessing wrong plays an octave down, which sounds like a broken
+  // instrument rather than a broken header. The far end announces it, and the
+  // block below CHECKS the announcement against the frame length it also sent.
+  let told = null, chIn = 1, chChecked = false, chCorrected = 0;
+  // 🔴 A MEASUREMENT OUTRANKS A REPEATED CLAIM. Caught by deliberately shipping
+  // a stream that lied: the check corrected 1 -> 2, and then the NEXT status
+  // reply carried the same wrong 1 and put it straight back. So the page
+  // flip-flopped, and its own readout said "corrected to 1" about a correction
+  // TO 2. What re-opens the question is the sender changing its claim, which is
+  // a real event; saying the same wrong thing twice is not new information.
+  let claim = null, chProven = 0, breaks = -1, starved = 0, trimmed = 0, bufMs = 0;
+
+  const send = (m) => { if (ws?.readyState !== 1) return false; ws.send(JSON.stringify({ ...m, from: `page-${ID}`, at: Date.now(), seq: seq++ })); return true; };
+
+  async function startAudio() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: RATE, latencyHint: 'interactive' });
+    // ⚠️ Fire and move on. `resume()` waits on a gesture in a real browser and
+    // NEVER rejects, so awaiting it is a hang rather than an error.
+    ctx.resume().catch(() => {});
+    // 🔴 A SAMPLE RATE CANNOT BE INFERRED EITHER, AND NOBODY WAS CHECKING IT.
+    // The far end announces `rate` alongside `audioChannels` and `frameMs`, and
+    // this page ignored it while hard-coding 48000 — so a context that came back
+    // at another rate would play 48 kHz samples at 44.1 and fill the ring 8.8%
+    // faster than it drains: pitched down a tone and trimming every second or so,
+    // which is a noise complaint, not a pitch one. Chrome honours the request,
+    // which is exactly why nobody would ever see this fail by accident.
+    if (ctx.sampleRate !== RATE) {
+      d.log(`asked for ${RATE} Hz and got ${ctx.sampleRate}. Every sample arriving at ${RATE} will play ${(RATE / ctx.sampleRate).toFixed(3)}x wrong`, 'bad');
+    }
+    await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
+    // Two out, so a stereo instrument stays stereo. A mono sender is upmixed
+    // inside the worklet, so this is right either way.
+    playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+    playout.connect(ctx.destination);
+    playout.port.onmessage = (e) => {
+      const st = e.data?.stats; if (!st) return;
+      d.set('buffer', Math.round(st.bufferedMs));
+      // Both failure directions in one cell: a trim threw samples away, a
+      // starve ran out of them. Either one is a click.
+      const b = st.underruns + st.trimEvents;
+      starved = st.underruns; trimmed = st.trimEvents; bufMs = st.bufferedMs;
+      if (b !== breaks) {
+        // ⚠️ ONE CELL, TWO OPPOSITE FAULTS — so the LOG carries which. Running
+        // dry wants a bigger cushion and being trimmed wants a smaller one, and
+        // a reader who only ever sees the sum cannot tell which way to go. The
+        // cell counts clicks because that is what you HEARD; the line below says
+        // what they were.
+        const was = breaks; breaks = b;
+        d.set('dropouts', b, b ? 'warn' : 'ok');
+        if (was >= 0) d.log(`${starved} ran dry, ${trimmed} trimmed · cushion ${Math.round(bufMs)} ms`, 'warn');
+      }
+    };
+    applyChannels();
+    // The cushion is OURS, not the browser's — which is the whole reason to
+    // carry the samples rather than use WebRTC. And it is SIZED FROM THE PATH,
+    // not chosen: 2,242 frames measured off this relay on 2026-09-12 arrive
+    // p50 20.4 / p95 32.6 / p99 45.0 ms apart, with a worst gap of 108.6 ms —
+    // so the old 60 ms floor was under the worst single gap and the shipped
+    // logic broke 13.4 times a minute on it. Replaying that arrival train
+    // through this worklet's own rules: 60 ms -> 13.4/min, 100 -> 1.3,
+    // 150 -> 0. 100 ms is the playable end of that; every 20 ms here is 20 ms
+    // more between a key and the ear.
+    //
+    // 🔴 ADAPTIVE, BECAUSE A CUSHION HAS NO RESTORING FORCE. Frames arrive at
+    // the sender's rate and drain at the output's, and nothing pulls the
+    // occupancy back to the middle — measured, it random-walks 110 ms in 45 s
+    // and ONLY hitting a wall ever recentres it. So no fixed floor is safe
+    // forever; a floor that grows when it is proved too small is. It ratchets
+    // up and never down, which is why the cap is 250 and not higher.
+    playout.port.postMessage({ cmd: 'floor', ms: 100, adaptive: true, maxMs: 250 });
+  }
+
+  /** Whichever of the two arrives second — the announcement or the audio node. */
+  function applyChannels(n = chProven || told?.audioChannels) {
+    const want = n === 2 ? 2 : 1;
+    if (want === chIn && !playout) return;
+    chIn = want;
+    playout?.port.postMessage({ cmd: 'inChannels', n: want });
+    d.set('sound', want === 2 ? 'stereo' : 'mono', 'ok');
+  }
+
+  /**
+   * Prove the announcement rather than take it. `samples / channels / rate`
+   * must come out at the frame length the sender also declared; a mono stream
+   * called stereo lands at half of it, a stereo one called mono at double. This
+   * is the check that makes a wrong header VISIBLE instead of merely audible.
+   */
+  function checkChannels(samples) {
+    if (chChecked || !told?.frameMs) return;
+    chChecked = true;
+    const implied = (samples / chIn / RATE) * 1000;
+    if (Math.abs(implied - told.frameMs) <= told.frameMs * 0.02) return;
+    const real = Math.max(1, Math.min(2, Math.round(samples / ((told.frameMs / 1000) * RATE))));
+    d.log(`it announced ${chIn} channel${chIn > 1 ? 's' : ''}, but a frame works out at ` +
+          `${implied.toFixed(1)} ms against the ${told.frameMs} ms it declared · playing it as ${real}`, 'warn');
+    chCorrected++;
+    chProven = real;
+    applyChannels(real);
+  }
+
+  function connect() {
+    ws = new WebSocket(RELAY);
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => { d.log(`joined ${ROOM}`); send({ type: 'rack.status' }); pingAt = performance.now(); };
+    ws.onclose = () => { d.log('socket closed · reconnecting'); setTimeout(connect, 1200); };
+    ws.onmessage = (e) => {
+      if (typeof e.data !== 'string') { onPcm(e.data); return; }
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.from === `page-${ID}`) return;
+      if (m.type === 'rack.state' || m.type === 'rack.hello') {
+        if (pingAt) { d.set('round trip', Math.round(performance.now() - pingAt)); pingAt = 0; }
+        answered = true; instrument = m.instrument || 'an instrument';
+        told = m;
+        if (m.audioChannels !== claim) { claim = m.audioChannels; chProven = 0; chChecked = false; }
+      // The far end's rate against ours. Announced, so it can be checked.
+      if (m.rate && m.rate !== RATE && !rateWarned) {
+        rateWarned = true;
+        d.log(`the far end sends ${m.rate} Hz and this page plays at ${RATE}. Nothing in the chain resamples`, 'bad');
+      }
+        applyChannels();
+        // It named itself ONCE, in the log, where a long name fits and a repeat
+        // is not a new event. Every status reply carries it and nothing changed.
+        if (!namedItself) { namedItself = true; d.log(`${instrument} is answering in ${ROOM}`, 'hi'); }
+      }
+    };
+  }
+
+  function onPcm(buf) {
+    const s = new DataView(buf).getUint32(0, true);
+    // ⚠️ A COUNTER IS ONLY EVIDENCE ON THE FAR SIDE. `missing` counts gaps in the
+    // sender's own sequence, so it measures what the RELAY dropped rather than
+    // what this page asked for.
+    if (lastSeq >= 0 && s > lastSeq + 1) missing += s - lastSeq - 1;
+    lastSeq = s;
+    frames++; bytes += buf.byteLength;
+    const pcm = new Int16Array(buf, 12);
+    checkChannels(pcm.length);
+    if (playout) playout.port.postMessage({ pcm }, []);
+  }
+
+  const kb = createKeyboard(d.el, {
+    base: 60,
+    onDown: (n) => { kb.lightNote(n, true); startAudio().then(() => send({ type: 'note.on', note: n, vel: 100 })); },
+    onUp: (n) => { kb.lightNote(n, false); send({ type: 'note.off', note: n }); },
+  });
+  const midi = createMidi({
+    onDown: (n, vel) => { if (!kb.keyOf(n)) return; kb.lightNote(n, true); startAudio().then(() => send({ type: 'note.on', note: n, vel })); },
+    onUp: (n) => { kb.lightNote(n, false); send({ type: 'note.off', note: n }); },
+    log: (l, k) => d.log(l, k),
+    // ⚠️ NOT `midi?.state?.()` HERE. `createMidi` calls `onPorts` synchronously
+    // on the no-MIDI path, so the callback runs while `const midi` is still in
+    // its temporal dead zone — and optional chaining does NOT save you, because
+    // the throw is on reading the binding, before any `?.` applies. It printed
+    // `Cannot access 'midi' before initialization` on a phone, in red, under a
+    // page that otherwise worked.
+    onPorts: (n) => d.set('midi', n || 'none'),
+  });
+
+  let t0 = performance.now(), f0 = 0, b0 = 0;
+  setInterval(() => {
+    const now = performance.now(), dt = (now - t0) / 1000;
+    if (dt >= 1) {
+      // `frames` and the frame RATE are both still counted — the asserts below
+      // read them — they just have no cell any more. An odometer is not a
+      // measurement a reader can act on, and the rate sits at 50/s from the
+      // first second and never leaves it.
+      // ⚠️ ONE DECIMAL AND A SHORT UNIT, MEASURED. `1525` + `kbit/s` is 110 px of
+      // text in a 97 px cell, so it drew `1525kbit…` — and an ellipsis in a
+      // readout means the number is in the wrong shape, not that the cell is
+      // too narrow. `1.5` + `Mb/s` is 84 px.
+      d.set('bitrate', ((bytes - b0) * 8 / dt / 1e6).toFixed(1));
+      t0 = now; f0 = frames; b0 = bytes;
+    }
+  }, 1000);
+
+  d.on('play', async () => {
+    await startAudio();
+    started = true;
+    d.log('listening · press a key');
+    // 🔴 EVERYTHING BELOW SOUNDS A THIRD NOBODY ASKED FOR, IN A ROOM SOMEBODY
+    // ELSE MAY BE SITTING IN. The button is hidden from a visitor and `?checks=1`
+    // brings it back, so a person debugging this page used to get the drill as
+    // well as the connection; now they get the connection, and `?checks=1&selfcheck=1`
+    // gets both.
+    await ifSelfcheck(async () => {
+      const before = frames;
+      send({ type: 'note.on', note: 60, vel: 110 });
+      send({ type: 'note.on', note: 64, vel: 100 });
+      await new Promise((r) => setTimeout(r, 2200));
+      const during = frames - before;
+      send({ type: 'note.off', note: 60 }); send({ type: 'note.off', note: 64 });
+
+      d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
+      // Both branches, because a studio Mac that is off is the ordinary case and a
+      // page that only asserts the happy path has no coverage on those days.
+      // Both branches, and BOTH now read state rather than paint — the sentence
+      // this used to inspect was duplicating the paragraph above it and is gone.
+      d.assert('it says whether anything is at the far end', answered ? namedItself : d.logs.length > 0,
+        answered ? `${instrument} named itself` : 'nothing is answering, and the log says so');
+      if (answered) {
+        d.assert('an instrument named itself', !!instrument, String(instrument));
+        // Both halves: that it was TOLD, and that the telling survived a check.
+        d.assert('it was told how many channels, not left to guess', !!told?.audioChannels,
+          `announced ${told?.audioChannels} at ${told?.frameMs} ms a frame`);
+        // Three things the far end ANNOUNCES and this page CHECKS rather than
+        // trusts: how many channels, how long a frame is, and what rate it is at.
+        d.assert('the sample rate it sends is the one this page plays at',
+          !!told?.rate && told.rate === RATE && ctx?.sampleRate === RATE,
+          `sent ${told?.rate} Hz · context ${ctx?.sampleRate} Hz`);
+        d.assert('the frame length agrees with the channel count', chChecked && !chCorrected,
+          chCorrected ? `it said ${claim}, the frames say ${chIn} · playing ${chIn}`
+                      : `${chIn === 2 ? 'stereo' : 'mono'} checks out against ${told?.frameMs} ms`);
+        d.assert('sound came back while keys were held', during > 20, `${during} frames of audio in 2.2 s`);
+        d.assert('the relay dropped none of it', missing === 0, `${missing} missing of ${frames}`);
+        d.assert('this page makes no sound of its own', !!ctx && !!playout, 'every sample arrived over the socket');
+        // 🔴 THE ONE THE STREAM CANNOT ANSWER. The samples measured bit-clean off
+        // the relay while the page still sounded wrong, so the only place left
+        // for a click to come from is this cushion running dry or being trimmed.
+        d.assert('the cushion neither starved nor overflowed', breaks === 0,
+          breaks > 0 ? `${starved} ran dry, ${trimmed} trimmed, cushion now ${Math.round(bufMs)} ms` : 'no breaks');
+      } else {
+        d.assert('silence is reported as silence', !frames, `${frames} frames`);
+      }
+    }, { log: d.log, say: 'connected · press a key to hear the far end' });
+  });
+
+  connect();
+  d.ready();
+</script>
+</html>

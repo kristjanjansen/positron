@@ -42,7 +42,7 @@
   import { armVideo, recorderMime } from '/shell/shell.mjs';
 
   /**
-   * 🔴 THREE MODES, AND THE DEFAULT COSTS NOBODY ANYTHING. `plan-stage-live.md`
+   * 🔴 THREE MODES, AND THE DEFAULT COSTS NOBODY ANYTHING. `plans/plan-stage-live.md`
    * §7.1 is the argument and it is short: the harness presses every control on
    * every run, `/keep/` already publishes WHIP on every run, and a second
    * publishing page doubles that against a budget of **20 an hour**. From
@@ -207,7 +207,7 @@
       panel: createVideoPanel({
         /**
          * 🔴 THE AUDIENCE GETS NO `<video>` UNTIL THERE IS A SHOW, AND NO EMPTY
-         * ONE EITHER. `plan-stage-live.md` §2. A black 16:9 box with a
+         * ONE EITHER. `plans/plan-stage-live.md` §2. A black 16:9 box with a
          * transport under it is the shape of a thing that could be played and
          * cannot: this page already deleted a `live` badge from the archive
          * rather than re-word it, on exactly that argument. An element that
@@ -318,7 +318,7 @@
 
   // ══ the show ══════════════════════════════════════════════════════════════
   //
-  // 🔴 EVERYTHING BELOW IS `plan-stage-live.md` §7, THE FIRST STEP. What it
+  // 🔴 EVERYTHING BELOW IS `plans/plan-stage-live.md` §7, THE FIRST STEP. What it
   // proves is a list of things that could each be false: that the picture the
   // audience sees is the picture that was recorded (by object identity, not by
   // a name), that a question sent in one tab arrives in another, that when Stop
@@ -680,7 +680,7 @@
 
   /**
    * 🔴 ONE ORIGIN FOR EVERY MARK ON THE STRIP, AND IT IS THE RECORDER'S FIRST
-   * DATA. `plan-stage-live.md` §5.1. Not when the page loaded, not when the
+   * DATA. `plans/plan-stage-live.md` §5.1. Not when the page loaded, not when the
    * WHIP handshake finished. A mark is a position IN THE RECORDING, so anything
    * measured from another origin is on the wrong axis.
    * ⚠️ AND AN ANSWER ARRIVES WITH THE ANSWERING DEVICE'S CLOCK ON IT, WHICH IS
@@ -1538,7 +1538,7 @@
 
   /**
    * 🔴 THE RECORDER TAKES THE TRACK THAT CAME BACK, NEVER THE CANVAS.
-   * `plan-stage-live.md` §4.1. What the audience saw is the RETURNED track; a
+   * `plans/plan-stage-live.md` §4.1. What the audience saw is the RETURNED track; a
    * recording of the canvas is a recording of what we meant to send, and the
    * two differ by an encode, a network and a resolution ramp that Cloudflare
    * drives. Recording the source would make the archive a better picture than
@@ -1755,7 +1755,7 @@
        * a picture however correct the code is.
        *
        * ⚠️ THIS IS NOT A WORKAROUND DRESSED AS A FEATURE, AND THE DIFFERENCE IS
-       * THE LABEL. `plan-stage-live.md` §4.1 is right that recording the source
+       * THE LABEL. `plans/plan-stage-live.md` §4.1 is right that recording the source
        * is a lie in the flattering direction, and it is a lie only while nobody
        * is told. `recSource` carries which track was recorded, the log says it,
        * and the check below ASSERTS ON THE TRUTH OF THE LABEL rather than
@@ -1785,7 +1785,7 @@
 
   /**
    * 🔴 STOP RETURNS WHEN THE BYTES ARE IN R2 AND READABLE, WHICH A 200 ON THE
-   * PUT DOES NOT SAY. `plan-stage-live.md` §4.2. "Uploaded" and "readable" are
+   * PUT DOES NOT SAY. `plans/plan-stage-live.md` §4.2. "Uploaded" and "readable" are
    * two claims, and the gap between them is exactly where a recording goes
    * missing while every log line reads fine. `proveReadable` makes the second
    * claim with a HEAD, and compares the length, because a 200 with
@@ -3133,7 +3133,7 @@
      * THIS CHECK FOUND RATHER THAN A WEAKER CLAIM CHOSEN TO GO GREEN.
      *
      * It used to assert that the PICTURE moved, read off the burned clock, and
-     * `plan-stage-live.md` §10.6 asks for exactly that. MEASURED: seeking from
+     * `plans/plan-stage-live.md` §10.6 asks for exactly that. MEASURED: seeking from
      * 0.794s to 3.177s moves `currentTime` to both positions exactly, and
      * `readBurnedFrom` returns the IDENTICAL millisecond at both. The playhead
      * lands and the picture does not follow.

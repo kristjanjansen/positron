@@ -7,7 +7,7 @@
 // scsynth in the tab, so the browser has to build the same amplitude table,
 // the same semitone array and the same three scalars. Reimplementing that in
 // the page would be two authorities on one number — which is the mistake
-// `plan-twins.md` is about, one level down, and the reason `partialsOf` is
+// `plans/plan-twins.md` is about, one level down, and the reason `partialsOf` is
 // shared rather than copied.
 //
 // ⚠️ IT IS THE EXPANSION AND NOTHING ELSE. No engine, no wire, no OSC. The two

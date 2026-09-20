@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/shell/shell.css">
 
 <script type="module">
-  // demo/knobs/index.html, plan-controller.md step 3.
+  // demo/knobs/index.html, plans/plan-controller.md step 3.
   //
   // Two sliders, one filter, one Raspberry Pi. The subject is CONTINUOUS
   // CONTROL, not notes: every message is a complete statement of where a knob
@@ -1183,7 +1183,7 @@
     // Both branches. A board that is off is the ordinary case, and a page that
     // only asserts the happy path has no coverage on those days.
     // ⚠️ `d.api.logs`, NOT `d.logs`. The mount API does not carry the array;
-    // only `window.__demo` does, and `d.api` is that object. `/rack/` reads
+    // only `window.__demo` does, and `d.api` is that object. `/able/` reads
     // `d.logs.length` in exactly this position and throws a TypeError on the
     // branch where the far end is off, which is the branch that runs on the
     // ordinary day.

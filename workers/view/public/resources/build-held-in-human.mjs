@@ -12,13 +12,28 @@
 // holds no pointers and no files: it is ONE text document read and derived
 // from, so a picture of the piece can be drawn without re-reading the score.
 //
-// 🔴 THE PIECE IS SOMEBODY ELSE'S WORK. Held in Human is by Liis Vares and
-// Taavet Jansen, produced by elektron.art, 2024. The texts inside it are
-// quoted, never rewritten, and two of them are a published author's: the intro
-// and the outro are Ene Mihkelson, translated by Miriam Anne
-// McIlfarick-Ksenofontov. Nothing here may be published or used as a fixture
-// without the authors' word. The credits block carries the rest and this file
-// parses it rather than restating it.
+// ⚠️ THIS FILE OPENED WITH "THE PIECE IS SOMEBODY ELSE'S WORK" AND THAT WAS
+// WRONG. Corrected 2026-09-20: *"they are in my team, attribution is ok"*, *"i
+// mean no attribution"*, *"its a demo for them"*, and on what was asked for,
+// *"they asked for parser"*. Held in Human is by Liis Vares and Taavet Jansen,
+// produced by elektron.art, 2024, and they are on this team. **The page does
+// not credit them**, because a demo built FOR somebody does not open by telling
+// them who they are, and the attribution check that used to enforce it is gone.
+//
+// 🔴 WHAT IS STILL SOMEBODY ELSE'S: THE TEXT. The intro and the outro are Ene
+// Mihkelson, translated by Miriam Anne McIlfarick-Ksenofontov, and neither is
+// on the team. The texts are quoted and never rewritten, and the page names
+// them in its log because it RENDERS that text rather than merely referring to
+// it. That half of the old paragraph was right and it stays.
+//
+// 🔴 AND WHAT WAS ASKED FOR IS A PARSER, WHICH IS THIS FILE RATHER THAN THE
+// PAGE. The score is one text document, and everything downstream is derived
+// from it rather than typed: the scene order from its own three orderings, the
+// durations from its parameters or from summing its content, the events from
+// the names of its `time until ...` parameters, the credits from the credits
+// block. **The page is a way to see whether the parse is right.** If a choice
+// is ever between making the page nicer and making the parse more faithful,
+// the parse wins.
 //
 // WHAT IS DERIVED AND WHAT IS NOT. Nothing that can be read out of the score is
 // typed here. The scene order comes from the score's own three orderings, the
@@ -49,7 +64,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 const SRC = join(ROOT, 'research', 'held-in-human-score-2026-09-19.txt');
 const SRC_REL = 'research/held-in-human-score-2026-09-19.txt';
-const PLAN_REL = 'plan-held-in-human-score.md';
+const PLAN_REL = 'plans/plan-held-in-human-score.md';
 const OUT = join(HERE, 'held-in-human.json');
 
 const CHECK = process.argv.includes('--check');

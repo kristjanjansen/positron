@@ -31,6 +31,29 @@ export const SIZES = { mini: 'strip-mini', default: 'strip', deep: 'strip-deep',
  */
 export const STRIP_MIN_H = 150;
 
+/**
+ * The floor EVERY `auto` strip gets unless a page says otherwise.
+ *
+ * 🔴 DOUBLED FROM 44 ON 2026-09-20: *"timeline should be higher 2x even when no
+ * lanes nu default"*, then *"i still do not see higher default h for
+ * timeline"*, because the first attempt was made in the wrong place.
+ * ⚠️ **IT CANNOT BE DONE IN CSS AND THAT WAS THE FIRST MISTAKE.** An `auto`
+ * strip writes `canvas.style.height` from `S.contentH` on every layout, and an
+ * INLINE STYLE BEATS EVERY STYLESHEET RULE. A `.strip-auto { height: 88px }`
+ * was added, changed nothing, and read as correct in the source. That is this
+ * project's fourth-dead-rule pattern exactly, and the repair is the same one
+ * `video-panel.mjs` needed: go to where the value is COMPUTED, which is
+ * `S.contentH = Math.max(y, opts.minHeight || 0)`.
+ * ⚠️ IT IS A FLOOR RATHER THAN A HEIGHT, so it moves only the strips that were
+ * under it. Measured before it went in: kit 44, stage 50, draw 68, lanes 72,
+ * instrument 100, click 104, loops 116. Four move and three do not.
+ * ⚠️ AND IT IS SEPARATE FROM `STRIP_MIN_H` ABOVE, which is 150, opt-in, and was
+ * deliberately refused as a default because it would have reshaped seven pages
+ * nobody asked about. That refusal stands. This is a different number answering
+ * a different question, and it was asked for directly.
+ */
+export const STRIP_AUTO_MIN = 88;
+
 /** One token, read once, with the library's own fallback if there is no
  *  stylesheet. `grain-scope.mjs` reads the same `--dim2` for the same marks,
  *  which is what makes a loop on the wave and a loop on the line one picture
@@ -74,7 +97,20 @@ export const STRIP_FOOTER_LINES = 2;
 
 /** What it says with nothing under the pointer. A statement rather than an
  *  instruction: a gutter carries what it measured, never what to press. */
-export const STRIP_FOOTER_EMPTY = 'nothing under the pointer';
+/**
+ * 🔴 EMPTY, ASKED FOR 2026-09-20: *"rm 'nothing under the pointer'"*. It read
+ * `nothing under the pointer`, which is a box explaining that it is a box. The
+ * footer keeps its height whether it is saying four things or nothing, so the
+ * reserved space already says a reading will appear here, and a sentence
+ * repeating that is one more thing to read every time the pointer leaves.
+ * ⚠️ IT IS THE SAME RULE AS A READOUT CELL, which renders `''` rather than a
+ * placeholder, for the reason written there: a cell does not have to show that
+ * it is a cell, because the key above it and the box around it already say so.
+ * ⚠️ IT IS STILL AN EXPORTED CONSTANT rather than an inline `''`, because a
+ * page that wants to say something in the empty state passes its own `empty`,
+ * and `/kit/` asserts against this value.
+ */
+export const STRIP_FOOTER_EMPTY = '';
 
 /**
  * @param {object} [o]
@@ -143,6 +179,9 @@ export function createStripView(host, deck, { size = 'default', lanes = [], foot
     // 'auto' means the canvas takes exactly the height its lanes need, and
     // follows them when a lane is added or removed at runtime
     autoHeight: size === 'auto' || undefined,
+    // ⚠️ BEFORE THE SPREAD, so a page that passes its own `minHeight` still
+    // wins. `/stage/` passes STRIP_MIN_H and must keep it.
+    minHeight: size === 'auto' ? STRIP_AUTO_MIN : undefined,
     ...opts,
     // ⚠️ AFTER THE SPREAD, NEVER BEFORE IT. `...opts` carries the caller's own
     // `tooltip` and `onHover`, so these two would be overwritten by the values
