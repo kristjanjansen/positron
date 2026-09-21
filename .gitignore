@@ -73,15 +73,11 @@ positron-push-sa.json
 # ⚠️ `New Pack.circuitpack` in the root is DIFFERENT and is deliberately
 # tracked: it is the owner's own Circuit backup and CLAUDE.md records why it
 # must not be deleted. Ours to keep, theirs to sell.
-# 🔴 EVERYTHING IN `purchased/` IS IGNORED EXCEPT ITS README, which is tracked
-# ON PURPOSE so a fresh clone can see why the directory is empty. An ignored
-# directory with nothing in it does not exist in git at all, and the next person
-# would make a second place for the same thing.
-purchased/*
-!purchased/README.md
-# ⚠️ AND NOT A RULE PER PURCHASE. The first draft of this also listed
-# `Synth-Patches.com*`, `*.circuittrackspack` and `Soundbank*/`, which is a
-# filename rule that rots the moment the next thing arrives under a different
-# name, and which quietly teaches the next person that a download may sit in
-# the root as long as somebody remembers to add a line. One directory, one
-# rule, and the rule is about WHERE a thing lives rather than what it is called.
+# ⚠️ ONE RULE ABOUT WHERE A THING LIVES, NOT A RULE PER PURCHASE. An earlier
+# draft also listed `Synth-Patches.com*`, `*.circuittrackspack` and
+# `Soundbank*/`, and carried a tracked README inside the directory. Both were
+# cut on instruction (*"not oneff gitignore"*, *"just make a positron/something
+# dir and gignore it"*). A filename rule rots the moment the next thing arrives
+# under a different name; `LAYOUT.md` is where this project already records
+# where a file goes, so the directory needs no second explanation of itself.
+purchased/
