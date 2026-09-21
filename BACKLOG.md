@@ -1,6 +1,57 @@
 ## Open
 
-### /wish/ header, 2026-09-21
+### The incoming, 2026-09-21, late
+
+🔴 **FIVE OF THESE ARE RE-ASKS OF REQUESTS ALREADY IN THIS FILE FROM SESSION
+40**, which makes them dropped requests rather than new ones. The `/model/` to
+`/twelve/` rename, the nameplate, `Listen` becoming a connected button and the
+`connected` / `not connected` wording are all recorded further down under
+`### Issue queue, 2026-09-21, session 40, /model/` and
+`### Asked 2026-09-21, while session 39 was reading the handoff`. **The point of
+this file is that a request leaves it by being finished or refused in writing,
+and these did neither.**
+
+**Model:**
+- **`Rename to twelve`**. `/model/` becomes `/twelve/`, and it is the second
+  rename of that page.
+- **`Move model 12 to roght panel top right corner. No brand name`**. The
+  nameplate reads `MODEL 12` only, top right of the right panel. No `TASCAM`.
+- **`Rm disabled controls`**. A control that cannot do the thing it names is
+  the defect; `positron-verify` records that removing one also removes the
+  checks behind it, and that those go SILENT rather than red.
+- **`Convert liatwn to stayis button`** (listen to status). 
+- **`Use connected connecting not connected on all hw demos when
+  applicable`**. ⚠️ Three states, not two, and `connecting` is the one most
+  pages do not have. This reaches every hardware page, so it is a shared
+  decision made once rather than per page.
+
+**Wish:**
+- **`Realtime tranacription - can we do it?`** ⚠️ **ASKED BEFORE**, recorded
+  under `### Asked 2026-09-21, session 40, the /wish/ flow` as *"A LIVE
+  TRANSCRIPT WHILE THE BUTTON IS HELD"*, and asked again today as *"again: can
+  we have live transcript streaming?"*. **Three times.**
+- **`Do you have best kodels decided?`** Which model to use, per step.
+- **`Whwre store midi devices info when they are not connected at the
+  moment`**. Where a desk's port list lives when the instrument is unplugged.
+  ⚠️ `/wish/` carries `PORTS` as a typed constant and says so; `/bay/` reads the
+  browser's real ports and therefore sees nothing when nothing is plugged in.
+  The question is what remembers.
+- **`Whwere is drum machine?`** ✅ **ANSWERED: `/tom/`**, built and deployed
+  today, a 64 step grid whose rows are a pack's samples, which is what
+  `plans/plan-circuit-samples.md` asked for.
+
+### ✅ DONE 2026-09-21: /wish/ header, both blocks
+
+**Two glued headers, an action left and its model right, 50/50 up from 45.** The
+verdict became its OWN glue part after *"its a line in glue"*, so its divider is
+the component's 1 px seam rather than a border typed on the page, and it is away
+when it has nothing to say. Both pickers say `model`. `Interpret` is new and
+shares `askBox()` with Enter and with a finished transcription.
+🔴 **AND MOVING `Hold to talk` OUT OF `.pos-controls` TOOK 41 PAGE ASSERTS TO 2
+WITH THE RUN STILL GREEN.** They stopped running rather than failing. Third
+instance after `/mirror/` and `/blocks/`, and it happened inside the same edit
+that added a comment describing the trap. The page presses its own button under
+`SELFCHECK` now.
 
 - **`add interpret button to header and move model selection to right, label
   'model'`**. Said against a screenshot of the glued component whose top part is
@@ -44,7 +95,19 @@ only exists as a reason not to use something.
 accurate, and its worst step measured **1.6 to 11.8 ms late** across runs. That
 number is on the page as a readout cell rather than hidden.
 
-### /pack/, /shape/ and the kit, second stream, 2026-09-21
+### ✅ DONE 2026-09-21: /pack/, /shape/ and the kit, second stream
+
+**All of it.** The readout takes `rows` and `size: 'sm'` at 13 px, `/kit/`
+carries it inside the readout docs rather than as a section of its own, nothing
+is on screen on `/pack/` until a file lands, `/shape/` is grouped the way
+Novation group it and its paired sliders were a dead rule that had never run
+once, and the note research answered *"can we get note data out of regions?"*
+with 5,095 events.
+🔴 **AND `no empty table headers` TURNED OUT TO BE A DEFECT IN EVERY TABLE IN
+THE PROJECT.** `.pos-tbl-row` sets `display: grid`, which beats the UA's
+`[hidden]` rule, so `blank()` had always set an attribute and changed nothing,
+and the assert that exists to catch it read the PROPERTY and passed every run. A
+screenshot caught what the suite could not.
 
 - **`what a mess. why not 5x2 cells? have smaller readout values styling. put
   to kit too.`** Said against a screenshot of a ten cell readout wrapped 7 and
@@ -79,7 +142,14 @@ number is on the page as a readout cell rather than hidden.
   and `/kit/` has three blocks of them, so this is a component change and is
   done once rather than per page.
 
-### A new demo, 2026-09-21
+### ✅ DONE 2026-09-21: `/tom/`
+
+**Built, 26 asserts with four negative controls, deployed.** 8 rows by 64 steps,
+rows becoming the pack's samples, `createDrop` and `samplesIn` shared with
+`/pack/`, `createDeck` driving it. No sideways drag at 390, 756 or 1280, and
+4,096 cells built in 8 ms.
+⚠️ **THE `8x64` READING IS SAID ON THE PAGE RATHER THAN CHOSEN IN SILENCE**, and
+switching to the other one is `REST_ROWS` and `STEPS` changing places.
 
 - **`in bg make a tom demo, a 8x64 grid with transport on top. have circuitpack
   uploader on top (as many rows as there are samples)`**.
@@ -93,7 +163,12 @@ number is on the page as a readout cell rather than hidden.
   ⚠️ The uploader is `demo/shell/drop.mjs` and the decoder is
   `demo/shell/circuit-sample.mjs`, both landed today.
 
-### /pack/ and a rule, 2026-09-21
+### ✅ DONE 2026-09-21: /pack/ and the empty-header rule
+
+**Both.** The diagram is hidden until a file lands, heading and all, and the
+rule is in `positron-ui` carrying the trap that cost a red run: the heading IS a
+`.pos-tbl-row`, it is FIRST, so `table.el.querySelector('.pos-tbl-row')` returns
+it and `scroller()` is what you want.
 
 - **`do not show diargam when no file`**. The picture on the patches tab is
   drawn at rest carrying the reference's own default patch, and that was asked
@@ -180,7 +255,15 @@ number is on the page as a readout cell rather than hidden.
   asserts it; what was asked for is the RULE, so it goes in `positron-ui` where
   the table rules live, with the two places it can still be broken named.
 
-### /wish/, layout, 2026-09-21
+### ✅ DONE 2026-09-21: /wish/ layout
+
+**Three parts glued, picker over picture over dump, 47/47.** A negative control
+run with the order reversed and the grounds made transparent read 45/47, red on
+exactly the two new asserts.
+🔴 **THE PART WORTH CARRYING: a glue is `gap: 1px` over a `--line` ground, so a
+child that paints NO ground lets that colour through its whole area and the seam
+stops being a seam.** Neither of the kit's existing glued pairs says so out
+loud, and it has now caught three separate parts on two pages in one day.
 
 - **`make it a single component, 3 parts, glued. in top is patch list
   visualizer, below is diagram and dump is below`**. Said against a screenshot
@@ -267,7 +350,16 @@ third line carries a correction about a request that was already made once.
   `here:` port ids, carried in `HANDOFF.md` item 10 along with `/bay/` being
   unheard.
 
-### /pack/, nine requests in one stream, 2026-09-21
+### ✅ DONE 2026-09-21: /pack/, nine requests in one stream
+
+**All nine, then six more on top.** 55/55. The shortcut is gone, the drop block
+is titled with a glued footer that exists only when it speaks, counts lead the
+tab titles and a tab with nothing behind it switches off, the sample decoder and
+the waveform are kit modules, and six of the owner's own patches are published
+so the page has something to open.
+🔴 **AND `five synths??` WAS RIGHT.** Sixteen regions were labelled `synth` on
+an instrument with two synth parts, with no corroboration anywhere. Fourth
+label-read-as-content mistake in two days.
 
 Collected as they arrived, before any of them was worked on. All nine are about
 `demo/pack/index.html` unless a second file is named.
@@ -307,7 +399,18 @@ Collected as they arrived, before any of them was worked on. All nine are about
   the removal of a sentence from a screen, not a change to what is known about
   the two purchased packs.
 
-### ⚠️ A REVERTED UI REWRITE, AND A PATCH FILE THAT SHOULD NOT BE APPLIED BLIND
+### ✅ SETTLED 2026-09-21: the reverted UI rewrite, and the patch nobody should apply
+
+**Every point in it was decided by the owner directly, in their own words, over
+the following hours.** `open the pack here` is gone because it was ASKED for,
+which is not the same as the agent having been right; the counts lead the tab
+titles, which was the one detail nobody had decided; and the control still says
+`open` rather than `upload`, with `UPLOAD FILE` as the block's title, which is
+the owner's own arrangement rather than a drift back.
+⚠️ **THE PATCH FILE IS STALE AND SHOULD NOT BE APPLIED AT ALL NOW.** `/pack/`
+has moved several hundred lines since it was written.
+
+### ⚠️ THE ORIGINAL ENTRY, KEPT BECAUSE THE LESSON IN IT IS NOT ABOUT `/pack/`
 
 - 🔴 **A BACKGROUND AGENT REWROTE `/pack/`, `/kit/`, `drop.mjs` AND `shell.css`
   AGAINST TEN REQUESTS THAT WERE NEVER MADE, TWICE, AND IT WAS REVERTED TWICE.**
