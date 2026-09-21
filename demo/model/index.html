@@ -29,17 +29,35 @@
      measured it.
      ⚠️ AND IT SCROLLS RATHER THAN SHRINKING: a strip narrow enough to fit a
      phone is one nobody can work. */
-  /* 🔴 TWO CHILDREN: ONE SCROLLS, ONE DOES NOT. `min-width: 0` on the scroller
-     or `overflow-x` cannot shrink it below its content and the PAGE drags
-     sideways instead of the row. MEASURED once at 390 px as 141 px of page
-     overflow on a different component. */
+  /* 🔴 THE ARRANGEMENT IS A KIT COMPONENT SINCE 2026-09-21 AND IS NOT IN THIS
+     FILE ANY MORE. `demo/shell/panel-layout.mjs` and the `.panel-*` family in
+     `shell.css` own the two children, which one scrolls, that they are one
+     depth, and the border on the fixed one's facing edge. Asked as
+     *"generalize the evoltion layout to reusable components / use from others.
+     same patters"*; this page was one of the three hand-rolled copies.
+     ✅ **THIS PAGE IS THE ONE THAT MADE TWO PIECES OF THE CONTRACT OPTIONAL.**
+     It has NO outer card, so `cased: false` leaves `--panel-pad` at 0 and every
+     rule resolves to the right thing with no second stylesheet; and its fixed
+     column is on the RIGHT, which is why the side is an option and the border
+     moves with it. `/evo/` has the mirror of both.
+     ⚠️ **EVERY ELEMENT KEEPS ITS OWN `.rack-*` CLASS BESIDE THE SHARED ONE**,
+     which is what made this conversion move no selector. Nineteen rules in this
+     file name `.rack-row` or `.rack-lane`, FOUR of them inside a media query
+     this project's harness cannot reach, and renaming them would have been the
+     single largest risk in the extraction for no gain: what those rules say is
+     about a Model 12 and belongs here.
+     🔴 `--panel-gap: 0`, WHICH IS THE GLUE SAID ONCE. The shared rules put the
+     token between the column and the strip, and this mixer is glued: *"when
+     channels are next to each other, leave no gap, glue horizontally"* and
+     *"the panels are glued together, no gap, same h"*. Setting the token is the
+     honest way to say it, rather than overriding a margin the component set. */
   /* 🔴 THE LANE IS GLUED TO THE CHANNELS AND IS THE SAME HEIGHT. Reported
      2026-09-21 with a screenshot: *"the panels are glued together, no gap, same
      h"*. It sat apart with `--ctl-gap` between and stood taller than the rack,
      so the mixer read as two machines beside each other rather than one.
-     ⚠️ `align-items: stretch`, NOT `flex-end`. Bottom alignment makes two
-     children END together and says nothing about their heights; stretch makes
-     them the same height, which is what was asked for and what a mixer is. */
+     ⚠️ `align-items: stretch`, NOT `flex-end`. That is the component's now, on
+     `.panel-wrap`, with the reasoning kept there: bottom alignment makes two
+     children END together and says nothing about their heights. */
   /* 🔴 THE INSTRUMENT WEARS ITS MAKER AND ITS MODEL, IN UPPERCASE. Asked
      2026-09-21: *"replica names always in uppercase. add full name evolution
      mk-425c"*, which is a rule about every hardware replica rather than about
@@ -61,23 +79,31 @@
      under it. There is no border to do that here, so the distance is the only
      thing saying the nameplate belongs to the instrument rather than being a
      block of its own. */
-  .rack-unit { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-  .rack-brands { display: flex; justify-content: space-between; }
-  /* ⚠️ THE SAME TREATMENT AS `/circuit/`'s AND `/evo/`'s, to the declaration.
-     Three replicas whose nameplates are set three ways read as three pages
-     rather than as one shelf of instruments. */
-  .rack-brand {
-    font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--dim2);
-    text-transform: uppercase;
-  }
-  .rack-wrap { display: flex; align-items: stretch; gap: 0; min-width: 0; padding-bottom: 4px; }
+  /* The nameplate to instrument distance, which is the one thing this outer box
+     still decides. See the note above the wrap. */
+  .rack-unit { --panel-gap: 0px; gap: 10px; }
+  /* ⚠️ THE TWO NAMEPLATE RULES ARE GONE AND ARE NOT LOST. They were
+     `display: flex; justify-content: space-between` and the same four ink
+     declarations `/circuit/` and `/evo/` carried, to the letter, which is
+     exactly the drift the extraction was for: three replicas whose nameplates
+     are set three ways read as three pages rather than as one shelf of
+     instruments. They are `.panel-plate[data-place="ends"]` and
+     `.panel-plate-l` in `shell.css` now. */
+  /* ⚠️ THE FLEX GAP IS DEFENSIVE AND MEASURED INERT, kept rather than deleted
+     for the reason `/evo/` keeps its pair: `.panel-wrap` declares no gap today,
+     and a gap added tomorrow in another page's interest would unglue this
+     mixer. */
+  .rack-wrap { gap: 0; padding-bottom: 4px; }
   /* ⚠️ THE ROOM FOR THE SCROLLBAR IS ON THE WRAPPER, NOT ON THE SCROLLER.
      Reported 2026-09-21: *"bottom uneven"*. It was 4 px of `padding-bottom`
      here and nowhere on the lane, so the two boxes ended 4 px apart and every
      fader in the rack sat higher than the FX fader beside it. **A reservation
      that only one of two equal things makes is a reservation that breaks
      them.** */
-  .rack-row { display: flex; gap: 0; overflow-x: auto; min-width: 0; flex: 1 1 auto; }
+  /* The gap between two CHANNELS, which is the glue and is this page's. The
+     scroller's own `overflow-x`, `min-width: 0` and `flex: 1 1 auto` are
+     `.panel-strip`'s. */
+  .rack-row { gap: 0; }
   /* The lane keeps its width whatever the channels do. */
   /* 🔴 THE LANE IS ONE SURFACE, NOT THREE BOXES AND A FOURTH ONE ROUND THE FX
      FADER. Asked 2026-09-21: *"right panels should have same bg as channel
@@ -87,17 +113,26 @@
      ⚠️ ONE BOX, ONE BORDER, SAME `--card` AS A CHANNEL. The FX fader is part of
      the master column on the panel and is not a separate machine, so it must
      not be drawn as one. */
+  /* ⚠️ THE LANE'S CARD AND ITS LEFT BORDER ARE THE COMPONENT'S NOW.
+     `.panel-fixed` is the column that keeps its width, `.panel-fixed-r` puts
+     the 1 px border on the edge FACING the scroller, and `.panel-case` paints
+     the card. Asked 2026-09-21 as *"add left border to right panel"*, and the
+     reasoning is kept on `.panel-fixed-r` because it is the general one: the
+     channels SCROLL under this lane, so there is no fixed neighbour to stack
+     with, and the border is what tells a reader where the scrolling stops.
+     ⚠️ WHAT IS LEFT HERE IS WHAT A MODEL 12 SAYS. The lane centres its
+     controls, spaces them by the control row's own gap, insets them by 14 px
+     rather than the case's 20, and rounds only the outer edge, because the rack
+     it ends is square on the side it meets. */
+  /* ⚠️ THREE DECLARATIONS THAT OVERRIDE `.panel-case`, EACH A FACT ABOUT THIS
+     MIXER RATHER THAN A CORRECTION. The inset is 14 px and not the case's 20,
+     because a lane of controls is not a case wall. Only the OUTER edge is
+     round, because the rack this lane ends is square on the side it meets. And
+     the row gap is the control row's own, so a knob and a button column in here
+     sit on the same pitch as they do in a channel. */
   .rack-lane {
-    flex: 0 0 auto; display: flex; flex-direction: column; align-items: center;
-    gap: var(--ctl-gap);
-    padding: 14px; background: var(--card);
-    /* 🔴 IT KEEPS ITS LEFT BORDER. Asked 2026-09-21: *"add left border to right
-       panel"*. The usual reason to drop one is that it would stack with its
-       neighbour's, and that reasoning does not apply here: the channels SCROLL
-       under this lane, so there is no fixed neighbour to stack with. What sits
-       to its left is whichever strip happens to be scrolled there, and the
-       border is what tells a reader where the scrolling stops. */
-    border: 1px solid var(--line); border-radius: 0 4px 4px 0;
+    align-items: center; gap: var(--ctl-gap);
+    padding: 14px; border-radius: 0 4px 4px 0;
   }
   /* 🔴 THE BUTTON ROWS SIT AT THE TOP AND THE FADER FALLS TO THE BOTTOM. Asked
      2026-09-21: *"align right panel buttons to top"*. The lane is as tall as
@@ -194,7 +229,16 @@
      correct**, and the only reason it was caught in seconds is that the
      alignment is asserted rather than eyeballed. That is the fifth dead rule
      this project has measured and the first one caught by its own check. */
-  .pos-crow .pos-fdr {
+  /* 🔴 SCOPED TO A CHANNEL STRIP, AND IT WAS NOT. MEASURED 2026-09-21 while
+     extracting the panel: `.pos-crow .pos-fdr` matched **8 elements** and was
+     scoped by nothing but living in this page's `<style>` block, while
+     declaring a length that is a claim about a Model 12. On a page with two
+     panels it would have reached both, which is the same class of defect as
+     `--fdr-lane-h` falling back to its default when `.strip-body` went stale:
+     a rule that reads as correct and is aimed at the wrong elements. Now that
+     the arrangement around it is shared, a page-wide control selector is the
+     thing most likely to leak. */
+  .strip-one .pos-crow .pos-fdr {
     /* FOUR buttons beside the fader now, so four surfaces and three steps. */
     --fdr-lane-h: calc(4 * calc(var(--ctl-w) / 2) + 3 * var(--ctl-step));
   }
@@ -293,6 +337,7 @@
   import { createKnob } from '/shell/knob.mjs';
   import { createPad } from '/shell/pad.mjs';
   import { createFader } from '/shell/fader.mjs';
+  import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode, classifyEncoder, classifyBend } from '/shell/midi-decode.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
@@ -555,8 +600,44 @@ const PAN_SCALE = 2;
     ['f1', 'F1', null], ['f2', 'F2', 86], ['f3', 'F3', 46], ['f4', 'F4', 47],
   ];
 
+  /**
+   * 🔴 THE PANEL IS A KIT COMPONENT, AND THIS MIXER IS THE CALLER THAT MADE THE
+   * CASE OPTIONAL AND THE SIDE AN OPTION. `cased: false` because there is no
+   * outer card here at all: the eight strips and the master lane each paint
+   * their own, glued at the seams, so the box around them must add nothing.
+   * `side: 'right'` puts the fixed column and its 1 px border on the mirror
+   * side from `/evo/`'s.
+   * ⚠️ `flow: false`, BECAUSE THE SCROLLER'S OWN CHILDREN ARE THE CONTENT.
+   * `/evo/` needs a column inside its strip so that a row of controls can sit
+   * above a keyboard and one of them can absorb the slack. Here the eight
+   * channel strips ARE the strip's children and there is nothing to stack, so a
+   * flow would be a box that exists to be measured.
+   * ⚠️ AND THEREFORE NO ABSORBER, WHICH IS WHY THE COMPONENT REPORTS RATHER
+   * THAN THROWS. This panel's slack is 25.00 px, MEASURED, and it becomes AIR
+   * by `margin-top: auto` on each channel's `.pos-crow`: a claim about where a
+   * fader block sits on a Model 12 panel rather than a slack policy that
+   * happens to work. A component that refused a panel with no `.panel-grow`
+   * would refuse two of its three callers.
+   * ⚠️ **AND THE FOUR NAMES ARE THIS PAGE'S OWN, CARRIED BESIDE THE SHARED
+   * ONES.** Nineteen rules in this file name `.rack-row` or `.rack-lane` and
+   * four of them are inside a media query the harness cannot reach, so keeping
+   * both classes is what made this conversion move no selector at all.
+   */
+  const panel = createPanelLayout({
+    cased: false, side: 'right', flow: false,
+    /* ⚠️ `panel-case` ON THE FIXED COLUMN, WHICH IS THE ONE PLACE AN UNCASED
+       PANEL STILL NEEDS A CARD. With no case around the instrument the lane
+       would have no ground at all, so it is its own case: the class brings the
+       `--card` ground and the 1 px border, and the three declarations this
+       page makes on top of it are each a fact about a Model 12. See
+       `.rack-lane`. */
+    cls: { panel: 'rack-unit', wrap: 'rack-wrap', strip: 'rack-row',
+           fixed: 'panel-case rack-lane' },
+  });
+  const unit = panel.el, wrap = panel.wrap;
+
   const rack = STRIPS.map((_, i) => makeStrip(i));
-  const rackRow = el('div', 'rack-row');
+  const rackRow = panel.strip;
   for (const s of rack) rackRow.append(s.el);
 
   /**
@@ -604,7 +685,12 @@ const PAN_SCALE = 2;
     label, min: 0, max: 127, value: 100, disabled: true, title,
   }));
 
-  const lane = el('div', 'rack-lane');
+  /* The component's fixed column, which on this page IS the master lane. The
+     comment above the panel says why it is a sibling of the scroller rather
+     than `position: sticky` inside it, and that reasoning is now on
+     `.panel-fixed` in `shell.css` because both board pages reached it
+     independently. */
+  const lane = panel.fixed;
   const masterStrip = el('div', 'strip-one strip-master');
   /* ⚠️ ITS OWN CLASS, NOT `.pos-crow`. The phone rules turn every `.pos-crow`
      in this lane into a COLUMN, which is right for the jog above a transport
@@ -614,20 +700,20 @@ const PAN_SCALE = 2;
   masterFaders.append(master.el, ...outs.map((f) => f.el));
   masterStrip.append(masterFaders);
 
-  const wrap = el('div', 'rack-wrap');
-  wrap.append(rackRow, lane);
-
   /**
    * ⚠️ THE INSTRUMENT WEARS ITS OWN NAMES, AND BOTH HALVES OF IT. The maker at
    * the left end and the model at the right, exactly as `/circuit/` and `/evo/`
    * carry theirs. The stylesheet above says why it is above the boxes rather
    * than inside one, and why `model` on its own would not do.
+   * ⚠️ **`place: 'ends'` IS THE SAME PLACEMENT `/circuit/` USES AND THE TWO SIT
+   * IN DIFFERENT PARENTS**, which is the distinction the component deliberately
+   * does NOT carry: this plate goes above the panel's wrap and that one inside
+   * a card, and where a thing is appended is the caller's business. Two CSS
+   * placements and one append, rather than three placements.
    */
-  const brands = el('div', 'rack-brands');
-  brands.append(el('div', 'rack-brand', 'TASCAM'),
-                el('div', 'rack-brand', 'MODEL 12'));
-  const unit = el('div', 'rack-unit');
-  unit.append(brands, wrap);
+  const nameplate = createNameplate({ lines: ['TASCAM', 'MODEL 12'], place: 'ends' });
+  const brands = nameplate.el;
+  unit.insertBefore(brands, wrap);
   d.el.append(unit);
 
   /**
@@ -1148,13 +1234,13 @@ const PAN_SCALE = 2;
      * instrument nobody made.
      */
     {
-      const shown = (e) => {
-        const t = getComputedStyle(e).textTransform;
-        const s = (e.textContent || '').trim();
-        return t === 'uppercase' ? s.toUpperCase()
-             : t === 'lowercase' ? s.toLowerCase() : s;
-      };
-      const maker = shown(brands.firstChild), model = shown(brands.lastChild);
+      /* ⚠️ THE READER IS THE COMPONENT'S NOW, AND IT WAS COPIED INTO THREE PAGES
+         BEFORE IT LIVED ANYWHERE. `nameplate.shown()` reads what the browser
+         RENDERS rather than what is typed, which is the whole point of it: a
+         page leaning on `text-transform` renders `NOVATION` from a source that
+         says `novation`, and a check reading `textContent` grades the source
+         and stays green either way. Two pages had the same seven lines. */
+      const [maker, model] = nameplate.shown();
       d.assert('the panel prints the maker and the model, both in uppercase',
         maker === 'TASCAM' && model === 'MODEL 12', `${maker} ${model}`);
     }

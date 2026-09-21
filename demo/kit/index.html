@@ -208,6 +208,14 @@
      pair is still one group with the shell's own 44 px above it. */
   .kit-box > * + .kit-cap { margin-top: 44px; }
 
+  /* The PANEL specimen's fixed column and its row, which need a gap the shared
+     component deliberately does not have: `.panel-fixed` and `.panel-row` carry
+     no gap because what goes in them is an instrument's business, and every
+     caller declares its own (`/evo/` uses 12 and 20). A sandbox is a caller
+     like any other and says so rather than leaning on a default. */
+  .kit-panelcol { gap: 10px; }
+  .kit-panelrow { gap: 10px; }
+
   /* A channel strip: four rows of controls, stacked the way a mixer stacks
      them. The row headings came off 2026-09-20 and `.kit-hwlab` went with
      them; every knob already carries its CC under it. */
@@ -373,6 +381,7 @@
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader, createFaderBank } from '/shell/fader.mjs';
+  import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
   import { createXrProbe, xrCaps, onXrCaps, reasonFor, canEnter, answered, XR_STATES }
     from '/shell/xr-caps.mjs';
 
@@ -722,6 +731,17 @@
   // taken SEVEN asserts silent rather than failing one. A block whose specimens
   // all live in one bag is a block where adding a specimen is a coverage cut.
   let dispRefl = null;        // the field with no lamp behind it
+  // The three panel specimens, for the checks at the foot of this file: one
+  // with an absorber, one without as the negative control, and one at a phone's
+  // width. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
+  // lines above give: this is the newest block and therefore the topmost one,
+  // and a `let` left where a block used to be is read in its dead zone,
+  // swallowed by `section()` into `failed`, and reported much later with a
+  // message about a different line.
+  let panelWith = null;       // { panel, reading }  the absorber is on the block
+  let panelWithout = null;    // { panel, reading }  NEGATIVE CONTROL: no absorber
+  let panelPhone = null;      // { panel, holder }   a card at 320 px
+  let panelGrowBlk = null;    // the dashed block that absorbs the slack
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A segment display, as
@@ -741,6 +761,139 @@
    * block with a control in it moves every other block's press. A display is a
    * picture and has no control to add.
    */
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A hardware panel, as of
+   * 2026-09-21, asked for as *"generalize the evoltion layout to reusable
+   * components / use from others. same patters"* and then *"do it and add to
+   * kit"*. It had been hand-rolled THREE times: `/model/` called the parts
+   * `.rack-wrap` and `.rack-row`, `/circuit/` called them `.circ-panel` and
+   * `.circ-scroll`, and `/evo/` called them `.pan-wrap` and `.pan-strip` after
+   * having called them `.evo-wrap` and `.evo-strip`.
+   *
+   * 🔴 **TWO PANELS IN ONE BOX, AND THE SECOND ONE IS THE NEGATIVE CONTROL.**
+   * The thing this component is FOR is that the fixed column drives the depth
+   * and one child of the flow absorbs the slack, and a specimen that only ever
+   * shows the working arrangement proves nothing: a panel that looked right
+   * whatever it was given would pass *the absorber absorbed*. So the second
+   * panel is the same panel with the class left off, which is the sabotage that
+   * produced the 310.03 px measurement on `/evo/`, made permanent as a picture.
+   *
+   * 🔴 **AND THERE IS NO KEYBOARD IN IT, WHICH IS A REAL COST AND IS SAID OUT
+   * LOUD IN THE NOTE.** A keyboard is the honest demonstration of the slack: it
+   * is the only caller that has one, and it is where the 15:1 scale mismatch
+   * between a real key and a real keypad button lives. It is still the wrong
+   * thing to put here. This page already has a KEYBOARD block in the `input`
+   * part, and a panel with a two octave keyboard in it MEASURED 1018 px wide on
+   * `/evo/` against the 688 px column this page gets, so the specimen would be
+   * a scroller inside a scroller and the thing being shown would be lost in the
+   * thing showing it. A dashed block absorbing the slack shows the MECHANISM
+   * and not the instrument, which is what a sandbox is for.
+   *
+   * ⚠️ **NO `await` ANYWHERE IN THIS BLOCK.** The measuring window holds none on
+   * purpose, because JavaScript here is single threaded and no frame can be
+   * rendered between `measure()` and `settle()`, which is what makes an ungated
+   * window safe for somebody reading the page. Every call this block needs
+   * (`createPanelLayout`, `createNameplate`, `createKnob`, `createPad`,
+   * `createFader`, `createPadGrid`) is synchronous, and `paintedOpen` grades it.
+   * ⚠️ **AND NOTHING HERE IS IN A `.pos-controls` ROW.** Both harnesses press
+   * that row by position, so a new top block with a control in it moves every
+   * other block's press: MEASURED once on `/radio/` as a single press moving
+   * from t+1 s to t+31 s. A panel is a layout and has no control to add.
+   */
+  section('hardware', 'PANEL',
+    'A fixed column that does not scroll beside a strip of controls that does, in '
+    + 'a case, with the instrument’s name printed on it. The column drives the depth '
+    + 'and one child of the strip absorbs whatever is left, which the second panel '
+    + 'here shows by leaving that one class off. A dashed block stands in for the '
+    + 'control that grows, so what these two show is the mechanism rather than an '
+    + 'instrument: the real case is a keyboard, where a key is fifteen times a '
+    + 'keypad button on the object and only 1.6 times one here, and that is on '
+    + '/evo/.',
+    `const p = createPanelLayout({ side: 'left' })   // cased, column on the left
+p.fixed.append(knob.el, pad.el, fader.el)        // what stays put
+p.flow.append(row, block)                        // what scrolls
+p.grow(block)                                    // this child absorbs the slack
+p.check()                                        // -> { slack, growing, cuts }
+createNameplate({ lines: ['POSITRON', 'PANEL-1'], place: 'mid' })`,
+    (box) => {
+      box.classList.add('kit-wide');
+
+      /**
+       * One panel, built twice: identical apart from whether anything absorbs
+       * the slack. A specimen built from a shared function rather than typed
+       * twice is the only version where the two can be COMPARED, which is what
+       * the second one is for.
+       * ⚠️ THE CONTROLS ARE REAL ONES FROM THIS PAGE'S OWN KIT. A knob, a pad
+       * and a fader stacked make the column the taller child by a wide margin,
+       * which is the condition the whole component exists to handle, and a
+       * stand-in box of the right height would be the specimen arranging for
+       * its own demonstration to succeed.
+       */
+      const build = (absorb) => {
+        const p = createPanelLayout({
+          side: 'left', cls: { fixed: 'kit-panelcol' },
+          strip: { tabindex: 0, role: 'group', label: 'the panel’s strip, side scrolling' },
+        });
+        p.fixed.append(
+          createKnob({ label: 'M1', sub: 'CC 80', min: 0, max: 127, value: 40 }).el,
+          createPad({ half: true, label: 'TAP' }).el,
+          createFader({ label: 'CH1', min: 0, max: 127, value: 30 }).el,
+        );
+        /* 🔴 SIXTEEN PADS, AND THE COUNT IS THE POINT RATHER THAN DECORATION.
+           The first build of this specimen used four, and the check *there is
+           something to scroll behind the border* went RED at `0 px to scroll`:
+           the row fitted the page column, so `overflow-x: auto` was a
+           declaration about nothing and the panel was demonstrating its
+           arrangement without demonstrating the one thing that arrangement is
+           for. A strip that does not overflow is not a strip. */
+        const row = el('div', 'panel-row kit-panelrow');
+        row.append(createPadGrid({
+          cols: 16, pad: (x) => ({ top: String(x + 1) }),
+        }).el);
+        row.append(createNameplate({
+          lines: ['POSITRON', 'PANEL-1'], place: 'mid',
+        }).el);
+        const blk = el('div', 'kit-blk', absorb
+          ? 'this block carries .panel-grow' : 'this block carries nothing');
+        p.flow.append(row, blk);
+        // 🔴 THE ONE LINE THAT DIFFERS, AND IT IS AN ARGUMENT RATHER THAN A
+        // CLASS TYPED ON A PAGE. That is the whole reason `grow` exists: a
+        // required line a caller types is a line no browser check can see when
+        // it is MISSING, which is the `/blocks/` shape that shipped a headset
+        // page with no way out of it.
+        if (absorb) { p.grow(blk); panelGrowBlk = blk; }
+        box.append(p.el);
+        return { panel: p, blk, row };
+      };
+
+      box.append(el('p', 'kit-cap', 'with an absorber'));
+      panelWith = build(true);
+      box.append(el('p', 'kit-cap', 'no absorber, which is the negative control'));
+      panelWithout = build(false);
+
+      /**
+       * 🔴 THE THIRD SPECIMEN ANSWERS A QUESTION THE SUITE CANNOT ASK ANYWHERE
+       * ELSE. `demo/verify.mjs` runs at 756 px with no viewport override, so
+       * every assert on all three panel pages passes WITHOUT EVER ENTERING A
+       * MEDIA QUERY, and `/circuit/`'s own *the panel box starts and ends where
+       * the rest of the page does* is false at 390 px by 286.0 px with nothing
+       * red. A panel inside a 320 px holder is the cheapest thing that can see
+       * it, and it grades the COMPONENT rather than the three pages.
+       * ⚠️ 320 px IS NARROWER THAN ANY PHONE ANYBODY OWNS (iPhone SE 375, the
+       * commonest 390, Pixel 412), so what fits here fits on all of them.
+       */
+      box.append(el('p', 'kit-cap', 'a card in a 320 px holder'));
+      const holder = el('div', 'kit-phone');
+      const pp = createPanelLayout({ side: 'left', cls: { fixed: 'kit-panelcol' } });
+      pp.fixed.append(createPad({ half: true, label: 'TAP' }).el);
+      const prow = el('div', 'panel-row kit-panelrow');
+      prow.append(createPadGrid({ cols: 8, pad: () => ({}) }).el);
+      pp.flow.append(prow);
+      holder.append(pp.el);
+      box.append(holder);
+      panelPhone = { panel: pp, holder };
+    });
+
   section('hardware', 'SEGMENT DISPLAY',
     'A field of digits drawn from its own parts, with every unlit bar still '
     + 'faintly there, which is what makes it read as a display rather than as '
@@ -4596,6 +4749,100 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       // detail is the EVIDENCE for a claim, so it may not restate the claim.
       `one says "${said(namedPad)}" above it and the other says `
       + `"${said(barePad)}", and their buttons start ${off} px apart`);
+  }
+
+  /**
+   * 🔴 THE PANEL, AND THE FIVE CLAIMS ONLY THIS PAGE CAN MAKE ABOUT IT. Every
+   * one reads a real rect or a computed value, and every one has a way of going
+   * red that was tried on purpose.
+   */
+  if (panelWith && panelWithout && panelPhone) {
+    /* 1. The two children are ONE DEPTH, and the column is the taller one's
+       content. That is contract 3, and it is the claim `/model/` was reported
+       for with a screenshot: `align-items: flex-end` would make them END
+       together and say nothing about their heights, so a check reading only the
+       bottoms would pass the arrangement that was wrong. Both edges are read. */
+    const f = panelWith.panel.fixed.getBoundingClientRect();
+    const st = panelWith.panel.strip.getBoundingClientRect();
+    const topOff = +Math.abs(f.top - st.top).toFixed(2);
+    const botOff = +Math.abs(f.bottom - st.bottom).toFixed(2);
+    d.assert('the fixed column and the strip are one depth, at both ends',
+      f.height > 0 && topOff <= 1.5 && botOff <= 1.5
+      && +Math.abs(f.height - st.height).toFixed(2) <= 1.5,
+      `column ${f.height.toFixed(1)} px against strip ${st.height.toFixed(1)}, `
+      + `${topOff} px apart at the top and ${botOff} at the bottom`);
+
+    /* 2. 🔴 THE ABSORBER, WHICH IS THE COMPONENT'S CENTRAL PROMISE AND WAS
+       GRADED BY NOTHING ANYWHERE BEFORE THIS BLOCK. Three things together, and
+       no two of them are satisfiable by an accident: the flow's children fill
+       it, exactly ONE of them carries `.panel-grow`, and that one is taller
+       than the block in the panel beside it which has the same content and no
+       class. The third is what makes it a measurement of GROWTH rather than of
+       a number that happens to fit. */
+    const rWith = panelWith.panel.check();
+    const grown = panelGrowBlk.getBoundingClientRect().height;
+    const bare = panelWithout.blk.getBoundingClientRect().height;
+    d.assert('exactly one child of the flow absorbs the slack, and it is the one that grew',
+      rWith.measured && rWith.growing.length === 1
+      && rWith.growing[0] === panelGrowBlk
+      && Math.abs(rWith.slack) <= 1.5 && grown > bare + 40,
+      `flow ${rWith.flowH.toFixed(1)} px holding ${rWith.kidsH.toFixed(1)} of children, `
+      + `${rWith.slack.toFixed(1)} px unaccounted for · the absorbing block is `
+      + `${grown.toFixed(1)} px against ${bare.toFixed(1)} for the same block with no class`);
+
+    /* 3. ⚠️ THE NEGATIVE CONTROL, AND IT IS THE HALF THAT PROVES THE INSTRUMENT.
+       A panel that reported an absorber whatever it was shown would pass the
+       check above. The second panel is the SAME panel with one class left off,
+       so it must read the opposite: slack nobody took, no child growing, and
+       the component saying so on `cuts` rather than throwing, because
+       `/model/`'s 25.00 px of trailing air is legitimate. */
+    const rNone = panelWithout.panel.check();
+    d.assert('NEGATIVE CONTROL: with the class left off the slack is empty case, and it is reported',
+      rNone.measured && rNone.growing.length === 0 && rNone.slack > 40
+      && rNone.cuts.length === 1 && /panel-grow/.test(rNone.cuts[0]),
+      `${rNone.slack.toFixed(1)} px of the flow empty, ${rNone.growing.length} children growing, `
+      + `and it says "${(rNone.cuts[0] || 'nothing').slice(0, 64)}"`);
+
+    /* 4. THE SCROLL BOUNDARY, COMPUTED, PLUS THE BORDER THAT MARKS IT. The
+       border is the one line on a panel that survives the *separation is
+       spacing, not lines* rule, and it has to be on the edge FACING the
+       scroller: the left-hand column's RIGHT edge here, and `/model/`'s lane's
+       left. MEASURED rather than read, because a border stripped by a rule
+       nobody wrote is this project's fifth measured dead rule.
+       ⚠️ AND THERE HAS TO BE SOMETHING TO SCROLL, or `overflow-x: auto` is a
+       declaration about nothing. */
+    const cs = getComputedStyle(panelWith.panel.strip);
+    const cf = getComputedStyle(panelWith.panel.fixed);
+    const over = panelWith.panel.strip.scrollWidth - panelWith.panel.strip.clientWidth;
+    d.assert('the strip is the only scroller, with a floor of zero, and the border marks its edge',
+      cs.overflowX === 'auto' && cs.minWidth === '0px'
+      && parseFloat(cf.borderRightWidth) === 1 && parseFloat(cf.borderLeftWidth) === 0
+      && over > 0
+      && document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      `overflow-x ${cs.overflowX}, min-width ${cs.minWidth}, ${over} px to scroll · `
+      + `border right ${cf.borderRightWidth} and left ${cf.borderLeftWidth} · `
+      + `the page overflows by `
+      + `${document.documentElement.scrollWidth - document.documentElement.clientWidth} px`);
+
+    /* 5. 🔴 THE CARD'S EDGES AT A PHONE'S WIDTH, WHICH IS THE ONE THING NO
+       PANEL PAGE'S OWN ASSERT CAN REACH. `demo/verify.mjs` runs at 756 px, so
+       `/circuit/`'s *the panel box starts and ends where the rest of the page
+       does* is green while being false at 390 px by 286.0 px. In a 320 px
+       holder a card whose scroller is INSIDE it sits at its holder's own
+       insets, and the holder is what overflows. Both edges, because a card can
+       be right on the left and 286 px out on the right. */
+    const hb = panelPhone.holder.getBoundingClientRect();
+    const hs = getComputedStyle(panelPhone.holder);
+    const cb = panelPhone.panel.el.getBoundingClientRect();
+    const lOff = +(cb.left - (hb.left + parseFloat(hs.paddingLeft) + parseFloat(hs.borderLeftWidth))).toFixed(2);
+    const rOff = +((hb.right - parseFloat(hs.paddingRight) - parseFloat(hs.borderRightWidth)) - cb.right).toFixed(2);
+    d.assert('in a 320 px holder the card sits at the holder’s own edges, both of them',
+      hb.width <= 320 && Math.abs(lOff) <= 1 && Math.abs(rOff) <= 1
+      && document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      `holder ${hb.width.toFixed(0)} px · card ${cb.width.toFixed(1)} px, `
+      + `${lOff} px inside the left edge and ${rOff} px inside the right · `
+      + `the page overflows by `
+      + `${document.documentElement.scrollWidth - document.documentElement.clientWidth} px`);
   }
 
   // ── the parts, and whether a reader can still find what is new ──────────

@@ -4080,3 +4080,353 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    not a bad reading, and this project's colour rule says a colour reports how
    a thing LANDED. The class is here so a page that means something by it can
    say so; the display itself keeps its own ink and shows dashes. */
+
+/* ── a hardware panel: a fixed column beside a scrolling strip, in a case ────
+   — shell/panel-layout.mjs
+
+   🔴 THIS WAS HAND-ROLLED THREE TIMES BEFORE IT WAS A COMPONENT. Asked
+   2026-09-21: *"generalize the evoltion layout to reusable components / use
+   from others. same patters"*, then *"do it and add to kit"*. MEASURED across
+   the three live copies: `/model/` called them `.rack-wrap` and `.rack-row`,
+   `/circuit/` called them `.circ-panel` and `.circ-scroll`, and `/evo/` called
+   them `.pan-wrap` and `.pan-strip` after having called them `.evo-wrap` and
+   `.evo-strip`. Four names for one thing, which is the standing rule that a
+   control existing in one page and nowhere else is a component nobody has
+   spotted yet. This one existed in three.
+
+   🔴 THE PREFIX IS `.panel-`, NOT `.pan-`, AND THAT IS A REAL DECISION.
+   `/model/` draws `createKnob({ label: 'pan' })` on all eight channels and its
+   own comments discuss PAN at length (*"PAN is RELATIVE, not absolute"*), so a
+   page carrying `.pan-strip` beside a control called PAN is a page where
+   `grep -n pan` stops being a useful search. Four characters buy that back.
+
+   ── THE CONTRACT, WHICH IS THE UNION OF THE THREE CALLERS AND NOT THEIR
+      INTERSECTION ──────────────────────────────────────────────────────────
+   Written down because a caller doing arithmetic about a component's insides
+   is a page that breaks the moment the component gains a label, and this is
+   the same failure one level up.
+
+   1. **A panel has exactly one scrolling region and the PAGE never scrolls.**
+      `overflow-x: auto` plus `min-width: 0` on the same element, always both.
+      MEASURED on this project at 390 px once as 141 px of page overflow when
+      the second half was missing: `overflow-x` cannot shrink a flex item below
+      its content, so the scrolling happens in this box or it happens in the
+      document, and only one of those is a design.
+   2. **A panel MAY have a fixed column, on either side of the scroller.** It is
+      a SIBLING of the scroller and never `position: sticky` inside it, for the
+      reason both `/evo/` and `/model/` wrote down independently: a sticky child
+      needs a background to hide what passes under it, a shadow to say it is
+      over its neighbours, and it lands on top of the scrollbar. Two flex
+      children need none of that.
+   3. **Where there is a fixed column the wrap is `align-items: stretch` and the
+      two children are ONE DEPTH.** Not `flex-end`: bottom alignment makes them
+      END together and says nothing about their heights, which is what `/model/`
+      was reported for with a screenshot (*"the panels are glued together, no
+      gap, same h"*).
+   4. **The column's width is its widest child and nothing else.** MEASURED on
+      `/evo/`: 176 px of content, set by the keypad group, with the display and
+      the wheels stretching to it. A caller that wants a different width changes
+      what is IN the column.
+   5. **One 1 px border, on the fixed column's edge FACING the scroller, and it
+      is the edge of the scroll region.** It is the one line on a panel that
+      survives the *separation is spacing, not lines* rule, because it says
+      *the thing on this side stays put while the thing on that side moves
+      under it*, which spacing cannot carry and which a reader dragging the
+      strip needs to know. Both pages that have it say so independently.
+   6. **Two published measurements, `--panel-pad` and `--panel-gap`, declared on
+      the panel and NOT at `:root`.** On the panel because everything that reads
+      them is a DESCENDANT, so a page with two panels can give one different
+      proportions. The difference from `--disp-back` is the direction: that one
+      had to be at `:root` because a SIBLING of two displays needed it, and a
+      custom property inherits downward and never sideways.
+   7. **The nameplate is one ink rule and two placements.** See `.panel-plate`.
+   8. 🔴 **THE SCROLLING REGION IS INSIDE THE CARD, NOT AROUND IT**, and this is
+      the one place the contract CORRECTS a live page rather than describing it.
+      MEASURED 2026-09-21 at 390 px: `/circuit/` puts its scroller OUTSIDE its
+      card, so the card runs **286.0 px past the right edge of the page**, and
+      that page's own assert *the panel box starts and ends where the rest of
+      the page does* cannot see it, because `demo/verify.mjs` runs at 756 px
+      where the panel fits. Two of the three callers already have the boundary
+      in the right place and are correct at every width.
+   9. **Exactly one child of the flow absorbs the slack, and it says so.** See
+      `.panel-grow`.
+
+   ⚠️ **WHAT MUST NOT TRAVEL, BECAUSE A COMPONENT THAT CARRIES ONE
+   INSTRUMENT'S PROPORTIONS IS A COMPONENT WITH ONE CALLER.** `/evo/`'s keypad
+   padding and its eight keyboard overrides, `/circuit/`'s `repeat(8,
+   var(--ctl-w))` and its 34 px foot, `/model/`'s
+   `calc(4 * calc(var(--ctl-w) / 2) + 3 * var(--ctl-step))` and its whole phone
+   block. Those stay on their pages.
+   ⚠️ **AND `.panel-cap` IS NOT `.pos-cap`, WHICH IS A NEAR TWIN 700 LINES UP
+   THIS FILE.** That one is the house caption for a picture and brings
+   `margin-top: 3px` with it, which is the tell: a printed label on a panel is
+   positioned by the GROUP it names, and a caption that brings its own margin
+   would move it. Different things, and folding them together would move every
+   printed name on three pages.
+   ⚠️ **THE MODULE IS `panel-layout.mjs` AND NOT `panel.mjs`, WHICH IS TAKEN.**
+   See that module's own header.
+
+   🔴 ORDER IS LOAD BEARING IN EXACTLY ONE PLACE HERE: `.panel-case` sets
+   `--panel-pad` and must come AFTER `.panel`, which defaults it to 0. That is
+   the same additive-then-override shape `.pos-disp` and `.pos-disp-bare`
+   already use 50 lines up, and it is what makes an UNCASED panel resolve every
+   inset to 0 with no second rule. A media query adds no specificity and a
+   later plain rule of equal weight wins at every width, so nothing below is
+   allowed to depend on order beyond this one pair. */
+.panel {
+  /* 🔴 ZERO ON A BARE PANEL, AND THE CASE IS WHAT PAYS FOR AN INSET. `/model/`
+     has no outer card at all: its eight channel strips and its master lane each
+     paint their own, glued at the seams, so the panel around them must add
+     nothing. With the pad at 0 every rule below is already correct for it and
+     there is no second stylesheet for an uncased panel. */
+  --panel-pad: 0px;
+  /* The air between the fixed column and the strip, and between two rows of the
+     flow. It was the literal `16px` written on `/evo/`'s `.pan-fixed` right
+     padding AND on its `.pan-strip` left margin, which is one distance in two
+     places and this project's most repeated defect in its cheapest form.
+     ⚠️ TWO JOBS, ONE TOKEN, AND NOBODY HAS ASKED TO SPLIT THEM. The horizontal
+     gutter beside the border and the vertical air between rows measured 16 px
+     each on `/evo/`, and the second was raised on 2026-09-21 for a reason the
+     first does not share (*"more space on top of keyboard"*). Splitting them is
+     one line the day somebody wants two numbers. */
+  --panel-gap: 16px;
+  display: flex; flex-direction: column; min-width: 0;
+}
+/* 🔴 THE CARD IS ADDITIVE, AND IT IS `.panel-case` RATHER THAN A `.panel-bare`
+   THAT TAKES THINGS AWAY. A border stripped by a rule nobody wrote is the shape
+   this repository has measured five separate times, and `/evo/` already carries
+   an assert on its border's COMPUTED width for exactly that reason. A class
+   that only ever ADDS cannot produce that failure.
+   🔴 NO VERTICAL PADDING ON THE CARD, AND THAT IS WHAT LETS THE DIVIDER REACH
+   THE CARD'S EDGES. Asked 2026-09-21: *"evo border on right sticky panel should
+   extend to top and bottom of the panel"*.
+   🔴 **MEASURED BEFORE CHANGING ANYTHING, because there are four reasons a
+   border could stop short and they have different fixes.** At 1280 px the fixed
+   column measured top 339.30 and bottom 812.67 against a card INNER top of
+   339.30 and bottom of 812.67: **zero gap at both ends**. The border was
+   already the full height of the column, and the column was already the full
+   height of the card's CONTENT box. What stopped it was the card's own
+   `padding: 20px`, which put 20 px of card between the border's ends and the
+   card's visible edge at each end.
+   ✅ **SO THE CONTAINER GIVES UP THE VERTICAL INSET AND ITS TWO CHILDREN TAKE
+   IT**, which is the container stretching its children rather than a column
+   growing a margin to correct for its parent. A page that writes its own
+   correction here breaks the moment the component changes, which is exactly
+   what `/model/` did when it lifted a button column by a foot's height and the
+   pads later grew one.
+   ⚠️ THE PANEL DOES NOT GET TALLER. The 40 px left the card and arrived on the
+   column, so the card's border box measures what it did before. */
+.panel-case {
+  --panel-pad: 20px;
+  padding: 0 var(--panel-pad); background: var(--card);
+  border: 1px solid var(--line); border-radius: 4px;
+}
+.panel-wrap { display: flex; align-items: stretch; min-width: 0; }
+
+/* The column that does not scroll. Contract 2 and 4 above. */
+.panel-fixed {
+  flex: 0 0 auto; display: flex; flex-direction: column;
+  /* The card's vertical inset, handed down, so the border below can run the
+     card's full inner height. See `.panel-case`. */
+  padding-block: var(--panel-pad);
+}
+/* 🔴 THE GUTTER AND THE BORDER FACE THE SCROLLER, WHICH IS WHY THERE ARE TWO
+   CLASSES AND NOT ONE. `/evo/` has the column on the LEFT and `/model/` on the
+   RIGHT, so the side is an option and the border has to move with it. Asked on
+   both pages independently: *"add right border to the sticky left panel, like
+   model12"* and *"add left border to right panel"*.
+   ⚠️ TWO CLASSES RATHER THAN `.panel[data-side] .panel-fixed`, WHICH WOULD BE
+   (0,2,0) AND WOULD BEAT A PAGE'S OWN (0,1,0) RULE. `/model/`'s lane really
+   does want `padding: 14px` on all four sides, and a component scoped one level
+   deeper than its caller is a component the caller cannot correct. Raising
+   specificity to win a fight with a page is how `.pos-faux` ended up needing
+   (0,2,0), and that one at least had a rule to beat. */
+.panel-fixed-l { border-right: 1px solid var(--line); padding-right: var(--panel-gap); }
+.panel-fixed-r { border-left: 1px solid var(--line); padding-left: var(--panel-gap); }
+
+/* 🔴 THE INSET IS ON THE SCROLLER AND NOT ON `.panel-flow` INSIDE IT, so a
+   horizontal scrollbar sits inside the card's inset with the content rather
+   than against the card's bottom edge. `box-sizing: border-box` means
+   `.panel-flow`'s `height: 100%` still resolves against the content box. */
+/* 🔴 `display: flex`, AND LEAVING IT OUT COST A RUN. MEASURED 2026-09-21 on
+   the first conversion of `/model/`: the strip was a BLOCK, its eight
+   `display: inline-flex` channel strips flowed inline and WRAPPED at the
+   scroller's width, and the panel came out **1322.1 px tall against 465.7**,
+   which is exactly three rows of 440.7. The FX fader ended 882 px below the
+   channel faders and the page's own seam assert caught it.
+   ⚠️ **`/evo/` COULD NOT HAVE CAUGHT IT, WHICH IS THE POINT.** That page puts
+   ONE child in its strip, a `.panel-flow` at `width: max-content`, so a block
+   and a flex row lay it out identically and its rules never needed the
+   declaration. A component extracted from the caller that needed least is a
+   component with a hole in it, and only the second caller can find it.
+   ⚠️ MEASURED BOTH WAYS AFTERWARDS: `/evo/`'s panel is 503.03 by 688 with the
+   declaration and was 503.03 by 688 without it, identical to the digit at all
+   four widths. */
+.panel-strip {
+  display: flex; flex: 1 1 auto; min-width: 0; overflow-x: auto;
+  padding-block: var(--panel-pad);
+}
+.panel-strip-l { margin-left: var(--panel-gap); }   /* fixed column on the left */
+.panel-strip-r { margin-right: var(--panel-gap); }  /* fixed column on the right */
+
+/* 🔴 `width: max-content`, SO THE PANEL KEEPS ITS OWN WIDTH AT EVERY WINDOW
+   SIZE AND THE STRIP IS WHAT MOVES. `height: 100%` is the other half: it gives
+   the flow a DEFINITE height, which is the only thing that lets a child absorb
+   the slack. See `.panel-grow`. */
+.panel-flow {
+  width: max-content; height: 100%; display: flex; flex-direction: column;
+  align-items: stretch; gap: var(--panel-gap);
+  /* 🔴 THE FLOW DOES NOT SHRINK, AND `min-width: 0` HERE IS ACTIVELY WRONG.
+   ⚠️ **THIS IS THE ONE PLACE ON A PANEL WHERE THE `min-width: 0` RULE DOES NOT
+   APPLY, AND IT WAS NEARLY APPLIED BY ANALOGY.** That rule is about a
+   SCROLLER: `overflow-x` cannot shrink a flex item below its content, so
+   without it the page drags sideways. One element IN, on the scroller's own
+   content, it says the opposite thing. MEASURED 2026-09-21 by writing it and
+   diffing computed values: `min-width: 0` took this flow from **1018.47 px to
+   107 px** at 390, and to the strip's width at every other width, because a
+   flex item's default `flex-shrink: 1` then had nothing to stop it. The
+   keyboard and the back strip collapsed into the window instead of scrolling
+   inside it, and 28 rects moved.
+   ✅ **SO THE INTENT IS DECLARED RATHER THAN RESTING ON `min-width: auto`.**
+   `flex: 0 0 auto` says the flow keeps its own width, which is the whole
+   contract: the panel is as wide as the instrument and the strip is what moves.
+   Leaving it to the automatic minimum size worked and worked for a reason two
+   steps removed from what anybody reading this would think, and the next person
+   to write `min-width: 0` here would break it. */
+  flex: 0 0 auto;
+}
+/* 🔴 THE ONE CHILD THAT ABSORBS THE SLACK, AND IT IS THE COMPONENT'S CENTRAL
+   PROMISE. The fixed column DRIVES the depth (contract 3), so on any panel
+   whose column is taller than its strip's natural content there is slack, and
+   something has to take it.
+   🔴 **MEASURED BY SWITCHING IT OFF IN THE LIVE PAGE, WHICH IS THE ONLY WAY
+   THIS NUMBER EXISTS.** `/evo/`, 2026-09-21, `.evo-keys` from `flex: 1 1 auto`
+   to `flex: 0 0 auto`: the flow went **461.03 to 151** and the keyboard went
+   **334.03 to 24**. That is **310.03 px of absorbed slack, 67 per cent of the
+   flow's depth**, and the keyboard has NO INTRINSIC HEIGHT on that page at all,
+   because `.evo-keys .k { height: auto }` replaces the component's own key
+   height. So this is not a polish on top of a working keyboard: it is the only
+   thing giving the keyboard a size. Switch it off and the page draws a 24 px
+   keyboard with 310 px of empty card under it, which is the defect that page
+   was handed in the first place.
+   ⚠️ **`min-height: 0` IS NOT OPTIONAL AND IS THE HALF THAT GETS LEFT OUT.**
+   Without it a flex child will not shrink below its content. It is the vertical
+   twin of the `min-width: 0` rule already written down three times in this file
+   for a scrolling flex row.
+   🔴 **AND THE FACTORY APPLIES IT FROM AN ARGUMENT, so nothing is typed on a
+   page.** `createPanelLayout({ grow })` or `panel.grow(el)`. The alternative
+   was a documented requirement the caller types itself, and that is exactly the
+   `/blocks/` shape: a required call that no browser check can see when it is
+   MISSING, because in the broken state nothing throws and nothing looks wrong
+   until somebody opens the page. That page had no way out of it at all, every
+   other page had the line, so no shared code was wrong and nothing could
+   disagree with anything.
+   🔴 **AND A FLOW WITH SLACK AND NO ABSORBER IS REPORTED, NOT REFUSED.**
+   `panel.check()` pushes onto `panel.cuts`, the same channel `createDiagram`
+   uses for a label it had to shorten. A REPORT and not a throw, because
+   `/model/`'s 25.00 px of trailing air is legitimate (`margin-top: auto` inside
+   a channel strip, which is a claim about where a fader block sits on a Model
+   12 panel) and a panel with no fixed column has no slack at all, so refusing
+   the build would break two of the three callers.
+   ⚠️ **AND NOTHING HERE SETS A HEIGHT FROM JAVASCRIPT.** An inline style beats
+   every stylesheet, which is this project's fourth measured dead rule, and it
+   would have to re-run on every resize. A component that varies a property per
+   instance sets a custom property, never the property. */
+.panel-grow { flex: 1 1 auto; min-height: 0; }
+
+/* A row of control groups across the strip. */
+.panel-row { display: flex; align-items: flex-end; }
+/* A group of controls the panel prints a box around. */
+.panel-group {
+  background: var(--card2); border: 1px solid var(--line); border-radius: 5px;
+}
+
+/* 🔴 THE NAMEPLATE: ONE INK RULE AND TWO PLACEMENTS. All three callers already
+   shared the ink to the declaration (`font: 600 11px var(--mono)`,
+   `letter-spacing: .14em`, `color: var(--dim2)`, `text-transform: uppercase`),
+   and `line-height` was the one thing that differed, which is why it belongs to
+   the placement: `/evo/` stacks TWO lines and needs 1.5, the other two print one
+   line each and take 1.
+   ⚠️ **UPPERCASE, AS A RULE ABOUT EVERY REPLICA RATHER THAN ABOUT ONE PAGE.**
+   Asked 2026-09-21: *"replica names always in uppercase. add full name evolution
+   mk-425c"*. Three replicas whose nameplates are set three ways read as three
+   pages rather than as one shelf of instruments.
+   ⚠️ **THE TRANSFORM STAYS EVEN WHERE THE SOURCE IS TYPED UPPERCASE**, and the
+   pages' checks read what the browser RENDERS rather than what is typed, so
+   neither half can quietly go missing and leave the other looking right.
+   `/circuit/` rendered `NOVATION` correctly while its source typed `novation`.
+
+   🔴 **THE PLACEMENT IS A VALUE-MATCHED ATTRIBUTE, NEVER A BARE `[data-place]`.**
+   `[data-thing]` matches an EMPTY attribute, which is how a panel that had been
+   full once kept `border: 0` for the rest of a page's life. Matching the value
+   means an empty one matches neither branch, and `createNameplate` always writes
+   one.
+   ⚠️ **AND THERE IS A THIRD DISTINCTION THAT IS NOT A CSS PLACEMENT.** `/model/`
+   puts its plate ABOVE the boxes and `/circuit/` puts it INSIDE the card, and
+   both are `ends`: the difference is which parent the caller appends it to, not
+   how the row lays out. Two placements and one append, rather than three
+   placements. */
+.panel-plate-l {
+  font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--dim2);
+  text-transform: uppercase;
+}
+/* The maker at one end and the model at the other, across whatever the plate
+   spans: a card on `/circuit/`, the whole instrument on `/model/`. */
+.panel-plate[data-place="ends"] { display: flex; justify-content: space-between; }
+/* 🔴 A CENTRED BLOCK AT A FIXED POSITION IN THE FLOW, WHICH IS THE ONE
+   `/evo/` NEEDS AND IS NOT INTERCHANGEABLE WITH `ends`. MEASURED on that page
+   before the rebuild: `.evo-brands` was a `space-between` row stretched across
+   the panel's full 1575 px, so `evolution` landed at x 317 and `MK-425C` at
+   **x 1780**, 500 px off the right edge of the screen. Nobody had ever seen the
+   model name. A centred block between two known neighbours is reachable by
+   scrolling to it; a `space-between` far edge, positioned by a width the
+   KEYBOARD set, is not. */
+.panel-plate[data-place="mid"] { align-self: center; text-align: center; }
+.panel-plate[data-place="mid"] .panel-plate-l { line-height: 1.5; white-space: nowrap; }
+
+/* Two display fields sharing one window the panel draws. The page draws the
+   window because which fields go in it is an instrument's business. */
+.panel-win {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 7px 9px;
+  background: var(--disp-back); border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+/* 🔴 A PRINTED LABEL, AND WHAT GOES IN ONE IS THE PANEL'S OWN WORDS.
+   `.panel-cap` sits above a group, `.panel-sub` below a control or a pair of
+   them. Both are typed uppercase in the source even though the rule uppercases
+   them anyway, which is the house rule: `/circuit/` rendered `NOVATION`
+   correctly while its source typed `novation`, leaning on the stylesheet, and
+   the assert graded the ink and stayed green either way. */
+.panel-cap, .panel-sub {
+  font: 500 8px/11px var(--mono); letter-spacing: .1em;
+  text-transform: uppercase; pointer-events: none;
+}
+.panel-cap { color: var(--dim); letter-spacing: .16em; }
+.panel-sub { color: var(--dim2); text-align: center; }
+/* 🔴 A PRINTED LABEL NAMING A CONTROL THAT IS SWITCHED OFF DIMS WITH IT, AND
+   THAT HAS TO BE SAID OUT LOUD BECAUSE THE LABEL IS NOT INSIDE THE CONTROL.
+   Reported 2026-09-21 from a screenshot of `/evo/`: *"on dislable pad buttons
+   make labels way lighter"*.
+   🔴 **AND THE CAUSE WAS ONE LAYER UNDER WHAT WAS REPORTED, WHICH IS THE USUAL
+   PLACE.** The kit's own pad labels were never the problem: MEASURED at 1280 px,
+   a pad's `.pos-pad-top` reads **1.96:1** against its group, the faintest text
+   on the panel apart from a fader's slot number. The names a reader was actually
+   looking at are the ones a PAGE draws, absolutely positioned outside the pads
+   because they are wider than the buttons, and they were at full strength:
+   **5.91:1** for a single press name and **3.77:1** for a dual press one, over
+   buttons dimmed to .38. So the label really was the brightest thing in a dead
+   control, and making the kit's labels lighter would have hidden the faintest
+   text on the page while leaving every bright one exactly where it was.
+   ✅ **THE NUMBER IS `--ctl-off`**, for precisely this: a caller drawing its own
+   stand-in for a component's label slot has to be able to match the component,
+   and this one had nothing to match and was out by three times.
+   ⚠️ **A PANEL'S TWO TIERS SURVIVE.** `.panel-sub` is `--dim2` and `.panel-cap`
+   is `--dim`, which is a real instrument's own silkscreen hierarchy, so this
+   dims BOTH rather than flattening them to one ink. An opacity keeps a
+   relationship that a replacement colour would throw away.
+   ⚠️ **AND THE NAMEPLATE IS NOT ONE OF THESE.** `.panel-plate-l` names no
+   control: it is the make and the model, it is the one thing on the case that is
+   true whether or not anything is plugged in, and it stays where it is. */
+.panel-sub[data-off], .panel-cap[data-off] { opacity: var(--ctl-off); }

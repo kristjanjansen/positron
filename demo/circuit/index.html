@@ -33,6 +33,29 @@
      shrink a flex item below its content, and a row without it took 141 px of
      page overflow. The scrolling happens in this box or it happens in the
      document, and only one of those is a design. */
+  /* 🔴 AND THE SCROLL BOUNDARY IS ON THE WRONG SIDE OF THE CARD, WHICH IS
+     MEASURED AND IS DELIBERATELY NOT FIXED HERE. Found 2026-09-21 while
+     extracting `.panel-*` into the kit. At 390 px the card is 644 px wide
+     inside a 358 px page column, so **its right edge runs 286.0 px past the
+     right edge of the page** — and this page's own assert *the panel box starts
+     and ends where the rest of the page does* cannot see it, because
+     `demo/verify.mjs` runs at 756 px where the panel fits. Both the other two
+     panel pages put the scroller INSIDE the card and measure 0.0 px at both
+     edges at 390, 560, 756 and 1280.
+     🔴 **IT IS NOT FIXED IN THIS CHANGE BECAUSE IT REVERSES AN INSTRUCTION AND
+     CHANGES WHAT MOVES UNDER A FINGER.** *"make it overflow on mobile"* was
+     answered with a card that overflows, and *"these corners to line up with
+     the page content leftmost rightmost edges"* was answered with a card at
+     page width; those two asks are in conflict below the panel's own width, and
+     this code satisfies the second only above it. Moving the scroll inside the
+     card satisfies both, and it means `NOVATION` and `CIRCUIT` stop sliding off
+     while the controls scroll under them. That is worth a screenshot and a
+     decision rather than riding along with a rename.
+     ⚠️ **THE SCROLLER NEEDS `min-width: 0` OR IT DRAGS THE WHOLE PAGE
+     SIDEWAYS.** Already measured on this project at 390 px: `overflow-x` cannot
+     shrink a flex item below its content, and a row without it took 141 px of
+     page overflow. MEASURED here at all four widths: the document does not drag
+     sideways, so that half is right. */
   .circ-scroll { overflow-x: auto; min-width: 0; }
   /* 🔴 THE CARD IS NOT THE GRID, AND THAT SEPARATION IS THE WHOLE FIX.
      Photographed 2026-09-21 with `NOVATION` sitting about twice as far from the
@@ -72,10 +95,25 @@
      card's own 20 px; the panel sits in the middle of whatever is left. A
      reader sees one inset for the box and one for the instrument, and asking
      them to be the same number is asking a centred thing not to centre. */
+  /* 🔴 THE ARRANGEMENT IS A KIT COMPONENT SINCE 2026-09-21: `.panel` and
+     `.panel-case` in `shell.css`, from `demo/shell/panel-layout.mjs`. Asked as
+     *"generalize the evoltion layout to reusable components / use from others.
+     same patters"*; this page was one of the three hand-rolled copies, and it
+     is the one with NO fixed column, which is what made that piece of the
+     contract optional.
+     ⚠️ **WHAT THE COMPONENT BRINGS IS THE FLEX COLUMN, THE `min-width: 0`, THE
+     CARD AND THE 20 px INSET.** What stays here is everything a Circuit says:
+     the `max-content` floor that makes the phone case work, the 22 px gap, and
+     the deeper foot.
+     ⚠️ `width: 100%` AND `min-width: max-content` BOTH STAY. `.panel` carries
+     `min-width: 0`, which is right for a panel whose SCROLLER is inside it and
+     wrong for this one, where the card itself is the thing that overflows. This
+     is the page the extraction plan says should change that, in its own
+     reviewable change, and it has not changed here. See the note on
+     `.circ-scroll`. */
   .circ {
-    display: flex; flex-direction: column;
     width: 100%; min-width: max-content;
-    gap: 22px;
+    --panel-gap: 22px; gap: 22px;
     /* ⚠️ ONE NUMBER ON THREE SIDES, TAKEN FROM THE TOP AND REDUCED: *"use top
        one but reduce a bit"*. The foot keeps its own, because the bottom row of
        pads has no label under it to hold it off the edge. */
@@ -86,10 +124,16 @@
     /* ⚠️ THE FOOT IS DEEPER THAN THE SIDES, ASKED FOR TWICE. The bottom row of
        pads carries no label under it, so the inset that looks right beside a
        printed name looks tight under a pad. */
-    padding: 20px 20px 34px; background: var(--card);
-    border: 1px solid var(--line); border-radius: 4px;
+    /* ⚠️ THE CARD'S GROUND, BORDER AND RADIUS ARE `.panel-case`'s. What is
+       left here is the one asymmetric number: 34 px at the foot against 20 on
+       the other three sides. It stays a page rule with its reason rather than
+       growing the shared token an asymmetric form, because the reason is
+       instrument specific. */
+    padding: 20px 20px 34px;
   }
-  .circ-brands { display: flex; justify-content: space-between; }
+  /* ⚠️ THE NAMEPLATE ROW'S RULE IS GONE AND IS NOT LOST. It was
+     `display: flex; justify-content: space-between`, the same declaration
+     `/model/` carried, and it is `.panel-plate[data-place="ends"]` now. */
   /* 🔴 SENTENCE CASE ON EVERY LABEL AND EVERY BUTTON ON THIS PAGE. Asked
      2026-09-21: *"all sentence case labels and buttons"*. The kit uppercases a
      pad's legend, which is right on a page of readouts and section headings and
@@ -129,10 +173,11 @@
      new child can reorder**, and this one now has six children that must sit in
      known places.
      ⚠️ THE ASSERTS ARE WHY THIS TOOK ONE RUN RATHER THAN A SCREENSHOT. */
-  .circ-brand {
-    font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--dim2);
-    text-transform: uppercase; align-self: center;
-  }
+  /* ⚠️ THE FOUR INK DECLARATIONS ARE `.panel-plate-l`'s, and they were
+     identical on all three replicas to the letter, which is the drift the
+     extraction was for. `align-self: center` stays because it is placement
+     inside THIS row rather than ink. */
+  .circ-brand { align-self: center; }
   /* ⚠️ BOTH UPPERCASE. The panel prints `novation` in lower case and the page
      asked for neither: *"uppercalse all"*, and again as a rule about every
      replica a day later: *"replica names always in uppercase"*. At 11 px in a
@@ -151,8 +196,16 @@
   .circ-left    { grid-area: 2 / 1 / 3 / 2; }
   .circ-mid     { grid-area: 2 / 2 / 3 / 3; }
   .circ-right   { grid-area: 2 / 3 / 3 / 4; }
-  /* the knob row sits on the bottom of its own row, level with each other */
-  .circ > .pos-knob { align-self: end; }
+  /* 🔴 ONE MEASURED DEAD RULE DELETED HERE, WHICH WOULD HAVE BEEN THIS
+     PROJECT'S SEVENTH. `.circ > .pos-knob { align-self: end }` matched **0
+     elements**, MEASURED 2026-09-21: `.circ` has exactly two children, the
+     nameplate row and `.circ-panel`, so no knob was ever a direct child of it.
+     Its comment read *"the knob row sits on the bottom of its own row, level
+     with each other"*, which is done by `.circ-panel { align-items: start }`
+     plus the explicit grid areas below. It read as correct and did nothing.
+     ⚠️ `.circ .pos-pad-bot` MATCHES 0 TOO AND IS NOT THE SAME THING: the
+     `.pos-pad-top` half of that rule matches 60, so that half is forward
+     looking rather than defective and stays. */
   /* 🔴 THE TOP ROW USES THE BODY'S GAP, SO ITS ENDS SIT OVER THE COLUMNS.
      Asked 2026-09-21: *"center filter to right circle buttons"*. It carried
      `--ctl-gap` at 8 px while the body below it uses 14, so the volume knob and
@@ -298,6 +351,7 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createKnob } from '/shell/knob.mjs';
+  import { createNameplate } from '/shell/panel-layout.mjs';
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createPresenceButton } from '/shell/presence.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -381,17 +435,35 @@
    * says so above; this is the artwork, which is why the maker's name is on it
    * and why the two sit at opposite ends rather than in the middle.
    */
-  const circ = el('div', 'circ');
+  /* 🔴 THIS PAGE WEARS THE PANEL'S CLASSES AND DOES NOT CALL ITS FACTORY, AND
+     THAT IS THE EXTRACTION SAYING OUT LOUD WHERE IT STOPPED.
+     `createPanelLayout` ALWAYS builds a scrolling region, because contract 1 is
+     that a panel has exactly one and the page never scrolls, and it is the one
+     part of the contract that is not optional. On this page the scroller is
+     `.circ-scroll`, which is OUTSIDE the card, so calling the factory here
+     would give the panel a second one.
+     ✅ **SO THE CARD TAKES `.panel` AND `.panel-case` AND THE NAMEPLATE TAKES
+     ITS COMPONENT, AND THE FACTORY ARRIVES WITH THE SCROLL BOUNDARY.** That is
+     a visible behaviour change worth its own screenshot and its own review, and
+     the measurement that motivates it is on `.circ-scroll` below.
+     ⚠️ **A PAGE THAT USES HALF A COMPONENT HAS TO SAY WHICH HALF**, or the next
+     reader assumes the conversion was forgotten rather than staged. */
+  const circ = el('div', 'panel panel-case circ');
   const circScroll = el('div', 'circ-scroll');
   const panel = el('div', 'circ-panel');
-  const brands = el('div', 'circ-brands');
   /* ⚠️ TYPED UPPERCASE, NOT LEFT TO THE STYLESHEET. It read `novation` here and
      `NOVATION` on screen for a day, which is a source that does not say what
      the page says: the one reader who can be misled by that is the next person
      to grep for the word. The standing rule is `/kit/`'s, where `.kit-h` shouts
-     a heading whatever is typed and the heading is typed shouting anyway. */
-  brands.append(el('div', 'circ-brand circ-brand-l', 'NOVATION'),
-                el('div', 'circ-brand circ-brand-r', 'CIRCUIT'));
+     a heading whatever is typed and the heading is typed shouting anyway.
+     ⚠️ **`place: 'ends'` IS `/model/`'s PLACEMENT AND THIS PLATE SITS IN A
+     DIFFERENT PARENT.** That one goes above the instrument and this one inside
+     the card, and the component does not carry the difference: where a thing is
+     appended is the caller's business. */
+  const nameplate = createNameplate({
+    lines: ['NOVATION', 'CIRCUIT'], place: 'ends', cls: 'circ-brands',
+  });
+  const brands = nameplate.el;
   circ.append(brands, panel);
   const left = el('div', 'circ-side circ-left');
   const mid = el('div', 'circ-mid');
@@ -1022,13 +1094,10 @@
      * model is an instrument nobody made.
      */
     {
-      const shown = (e) => {
-        const t = getComputedStyle(e).textTransform;
-        const s = (e.textContent || '').trim();
-        return t === 'uppercase' ? s.toUpperCase()
-             : t === 'lowercase' ? s.toLowerCase() : s;
-      };
-      const maker = shown(brands.firstChild), model = shown(brands.lastChild);
+      /* ⚠️ THE READER IS THE COMPONENT'S NOW. `nameplate.shown()` applies the
+         transform the way the browser does, and it was the same seven lines in
+         this file and in `/model/` before it lived anywhere. */
+      const [maker, model] = nameplate.shown();
       d.assert('the panel prints the maker and the model, both in uppercase',
         maker === 'NOVATION' && model === 'CIRCUIT',
         `${maker} ${model}`);
