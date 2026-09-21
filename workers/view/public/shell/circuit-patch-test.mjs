@@ -20,8 +20,8 @@ import { readZip, entry } from './unzip.mjs';
 import * as C from './circuit-patch.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const PACK = path.join(HERE, '../../New Pack.circuitpack');
-const BOUGHT = path.join(HERE, '../../purchased/Synth-Patches.com - Soundbank for Novation Circuit and Tracks.zip');
+const PACK = path.join(HERE, '../../tmp/personal/New Pack.circuitpack');
+const BOUGHT = path.join(HERE, '../../tmp/purchages/Synth-Patches.com - Soundbank for Novation Circuit and Tracks.zip');
 
 let pass = 0, fail = 0, skip = 0;
 const ok = (name, cond, detail = '') => {

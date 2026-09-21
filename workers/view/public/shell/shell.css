@@ -70,7 +70,7 @@
 
      🔴 **SO A ROW OF DIFFERENT CONTROLS CANNOT BE ALIGNED WITH `flex-end`
      UNLESS THEIR FURNITURE AGREES.** That is the whole rule, and it was
-     learned three times in one evening on /model/, each time as a screenshot:
+     learned three times in one evening on /twelve/, each time as a screenshot:
      buttons sitting a label too low, two labels ending on different lines, and
      a lane starting 30 px below the button beside it.
 
@@ -443,7 +443,7 @@ canvas {
 }
 
 /* 🔴 DOUBLE-TAP ZOOM, ON A PAGE YOU PLAY WITH YOUR FINGERS. Photographed on
-   /model/ on an iPhone: the page sitting at about 3x, one button filling the
+   /twelve/ on an iPhone: the page sitting at about 3x, one button filling the
    screen, keys running off both edges — which reads as a broken layout and is
    not one. MEASURED at 390x844: `document.scrollWidth` 390 against a 390 px
    window and NOTHING wider than the viewport, so there is no overflow to fix.
@@ -931,6 +931,16 @@ button.pos-pri[data-busy="1"] {
 }
 .tbar-toggle::before { content: "▶"; }
 .tbar-toggle[data-state="playing"]::before { content: "❚❚"; font-size: 10px; }
+/* 🔴 `verb: 'stop'` SHOWS A SQUARE WHILE PLAYING, because on that bar the second
+   press stops and rewinds rather than pausing. A `❚❚` over a control that
+   returns the playhead to the top is a face describing a verb the button does
+   not perform.
+   ⚠️ `■` IS U+25A0 AND HAS NO EMOJI FORM, which is why it is not `⏹`: that one
+   defaults to emoji presentation and renders full colour at the wrong size and
+   baseline, and U+FE0E is honoured inconsistently across machines.
+   ⚠️ IT SITS AFTER THE `playing` RULE IT OVERRIDES, and carries one more class,
+   so neither source order nor a later edit can take it back. */
+.tbar-toggle.tbar-stop[data-state="playing"]::before { content: "■"; font-size: 12px; }
 .tbar-toggle[data-state="buffering"]::before { content: "◌"; }
 /* parked at the end: the button restarts, so it must not look like plain play */
 .tbar-toggle[data-state="ended"]::before { content: "↺"; font-size: 15px; }
@@ -3758,7 +3768,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    over: the lane bottom with the button bottom, and the two labels with each
    other. Reported 2026-09-20 with a photograph: *"1 and solo label bottoms and
    slider / button bottoms need to line up"*.
-   ⚠️ **THIS REPLACES A PER PAGE MARGIN AND THAT IS THE POINT.** `/model/` was
+   ⚠️ **THIS REPLACES A PER PAGE MARGIN AND THAT IS THE POINT.** `/twelve/` was
    lifting its button column by `--fdr-foot` to align to the lane, which worked
    only while the pads had nothing under them. The moment they gained a label
    the correction became the error. **Two controls that have to end on one line
@@ -3836,7 +3846,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    MEASURED 2026-09-21, all four pages that disable a pad, knob or fader:
    `/evo/` is a replica whose whole panel is switched off (20 pads of 20, 8
    knobs of 8, 2 faders of 2), `/circuit/`'s master volume is *"a pot. Whether
-   it sends anything has not been measured"*, `/model/`'s SUB and MAIN are the
+   it sends anything has not been measured"*, `/twelve/`'s SUB and MAIN are the
    analogue outputs with *"nothing on MIDI"*, and `/kit/`'s are specimens of
    this state. **Not one is a refusal**, so this is a change rather than an
    option. If a control ever genuinely does refuse a press, it needs its own
@@ -3969,7 +3979,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    alignment lands the lanes, the buttons and the dials on one line with no
    per page arithmetic. **A page doing its own margin correction here is a page
    that will be wrong the moment a component gains a label**, which is exactly
-   how /model/ broke: it lifted its button column by a foot's height, which was
+   how /twelve/ broke: it lifted its button column by a foot's height, which was
    right until the pads gained one of their own. */
 .pos-crow { display: flex; align-items: flex-end; gap: var(--ctl-gap); }
 /* A control that has to SPAN a column of n others: n surfaces plus n-1 steps. */
@@ -4152,7 +4162,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    🔴 THIS WAS HAND-ROLLED THREE TIMES BEFORE IT WAS A COMPONENT. Asked
    2026-09-21: *"generalize the evoltion layout to reusable components / use
    from others. same patters"*, then *"do it and add to kit"*. MEASURED across
-   the three live copies: `/model/` called them `.rack-wrap` and `.rack-row`,
+   the three live copies: `/twelve/` called them `.rack-wrap` and `.rack-row`,
    `/circuit/` called them `.circ-panel` and `.circ-scroll`, and `/evo/` called
    them `.pan-wrap` and `.pan-strip` after having called them `.evo-wrap` and
    `.evo-strip`. Four names for one thing, which is the standing rule that a
@@ -4160,7 +4170,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    spotted yet. This one existed in three.
 
    🔴 THE PREFIX IS `.panel-`, NOT `.pan-`, AND THAT IS A REAL DECISION.
-   `/model/` draws `createKnob({ label: 'pan' })` on all eight channels and its
+   `/twelve/` draws `createKnob({ label: 'pan' })` on all eight channels and its
    own comments discuss PAN at length (*"PAN is RELATIVE, not absolute"*), so a
    page carrying `.pan-strip` beside a control called PAN is a page where
    `grep -n pan` stops being a useful search. Four characters buy that back.
@@ -4179,13 +4189,13 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
       document, and only one of those is a design.
    2. **A panel MAY have a fixed column, on either side of the scroller.** It is
       a SIBLING of the scroller and never `position: sticky` inside it, for the
-      reason both `/evo/` and `/model/` wrote down independently: a sticky child
+      reason both `/evo/` and `/twelve/` wrote down independently: a sticky child
       needs a background to hide what passes under it, a shadow to say it is
       over its neighbours, and it lands on top of the scrollbar. Two flex
       children need none of that.
    3. **Where there is a fixed column the wrap is `align-items: stretch` and the
       two children are ONE DEPTH.** Not `flex-end`: bottom alignment makes them
-      END together and says nothing about their heights, which is what `/model/`
+      END together and says nothing about their heights, which is what `/twelve/`
       was reported for with a screenshot (*"the panels are glued together, no
       gap, same h"*).
    4. **The column's width is its widest child and nothing else.** MEASURED on
@@ -4219,7 +4229,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    ⚠️ **WHAT MUST NOT TRAVEL, BECAUSE A COMPONENT THAT CARRIES ONE
    INSTRUMENT'S PROPORTIONS IS A COMPONENT WITH ONE CALLER.** `/evo/`'s keypad
    padding and its eight keyboard overrides, `/circuit/`'s `repeat(8,
-   var(--ctl-w))` and its 34 px foot, `/model/`'s
+   var(--ctl-w))` and its 34 px foot, `/twelve/`'s
    `calc(4 * calc(var(--ctl-w) / 2) + 3 * var(--ctl-step))` and its whole phone
    block. Those stay on their pages.
    ⚠️ **AND `.panel-cap` IS NOT `.pos-cap`, WHICH IS A NEAR TWIN 700 LINES UP
@@ -4239,7 +4249,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    later plain rule of equal weight wins at every width, so nothing below is
    allowed to depend on order beyond this one pair. */
 .panel {
-  /* 🔴 ZERO ON A BARE PANEL, AND THE CASE IS WHAT PAYS FOR AN INSET. `/model/`
+  /* 🔴 ZERO ON A BARE PANEL, AND THE CASE IS WHAT PAYS FOR AN INSET. `/twelve/`
      has no outer card at all: its eight channel strips and its master lane each
      paint their own, glued at the seams, so the panel around them must add
      nothing. With the pad at 0 every rule below is already correct for it and
@@ -4277,7 +4287,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    IT**, which is the container stretching its children rather than a column
    growing a margin to correct for its parent. A page that writes its own
    correction here breaks the moment the component changes, which is exactly
-   what `/model/` did when it lifted a button column by a foot's height and the
+   what `/twelve/` did when it lifted a button column by a foot's height and the
    pads later grew one.
    ⚠️ THE PANEL DOES NOT GET TALLER. The 40 px left the card and arrived on the
    column, so the card's border box measures what it did before. */
@@ -4296,12 +4306,12 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   padding-block: var(--panel-pad);
 }
 /* 🔴 THE GUTTER AND THE BORDER FACE THE SCROLLER, WHICH IS WHY THERE ARE TWO
-   CLASSES AND NOT ONE. `/evo/` has the column on the LEFT and `/model/` on the
+   CLASSES AND NOT ONE. `/evo/` has the column on the LEFT and `/twelve/` on the
    RIGHT, so the side is an option and the border has to move with it. Asked on
    both pages independently: *"add right border to the sticky left panel, like
    model12"* and *"add left border to right panel"*.
    ⚠️ TWO CLASSES RATHER THAN `.panel[data-side] .panel-fixed`, WHICH WOULD BE
-   (0,2,0) AND WOULD BEAT A PAGE'S OWN (0,1,0) RULE. `/model/`'s lane really
+   (0,2,0) AND WOULD BEAT A PAGE'S OWN (0,1,0) RULE. `/twelve/`'s lane really
    does want `padding: 14px` on all four sides, and a component scoped one level
    deeper than its caller is a component the caller cannot correct. Raising
    specificity to win a fight with a page is how `.pos-faux` ended up needing
@@ -4314,7 +4324,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    than against the card's bottom edge. `box-sizing: border-box` means
    `.panel-flow`'s `height: 100%` still resolves against the content box. */
 /* 🔴 `display: flex`, AND LEAVING IT OUT COST A RUN. MEASURED 2026-09-21 on
-   the first conversion of `/model/`: the strip was a BLOCK, its eight
+   the first conversion of `/twelve/`: the strip was a BLOCK, its eight
    `display: inline-flex` channel strips flowed inline and WRAPPED at the
    scroller's width, and the panel came out **1322.1 px tall against 465.7**,
    which is exactly three rows of 440.7. The FX fader ended 882 px below the
@@ -4389,7 +4399,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    🔴 **AND A FLOW WITH SLACK AND NO ABSORBER IS REPORTED, NOT REFUSED.**
    `panel.check()` pushes onto `panel.cuts`, the same channel `createDiagram`
    uses for a label it had to shorten. A REPORT and not a throw, because
-   `/model/`'s 25.00 px of trailing air is legitimate (`margin-top: auto` inside
+   `/twelve/`'s 25.00 px of trailing air is legitimate (`margin-top: auto` inside
    a channel strip, which is a claim about where a fader block sits on a Model
    12 panel) and a panel with no fixed column has no slack at all, so refusing
    the build would break two of the three callers.
@@ -4426,7 +4436,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    full once kept `border: 0` for the rest of a page's life. Matching the value
    means an empty one matches neither branch, and `createNameplate` always writes
    one.
-   ⚠️ **AND THERE IS A THIRD DISTINCTION THAT IS NOT A CSS PLACEMENT.** `/model/`
+   ⚠️ **AND THERE IS A THIRD DISTINCTION THAT IS NOT A CSS PLACEMENT.** `/twelve/`
    puts its plate ABOVE the boxes and `/circuit/` puts it INSIDE the card, and
    both are `ends`: the difference is which parent the caller appends it to, not
    how the row lays out. Two placements and one append, rather than three
@@ -4436,7 +4446,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   text-transform: uppercase;
 }
 /* The maker at one end and the model at the other, across whatever the plate
-   spans: a card on `/circuit/`, the whole instrument on `/model/`. */
+   spans: a card on `/circuit/`, the whole instrument on `/twelve/`. */
 .panel-plate[data-place="ends"] { display: flex; justify-content: space-between; }
 /* 🔴 A CENTRED BLOCK AT A FIXED POSITION IN THE FLOW, WHICH IS THE ONE
    `/evo/` NEEDS AND IS NOT INTERCHANGEABLE WITH `ends`. MEASURED on that page
@@ -4448,6 +4458,24 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    KEYBOARD set, is not. */
 .panel-plate[data-place="mid"] { align-self: center; text-align: center; }
 .panel-plate[data-place="mid"] .panel-plate-l { line-height: 1.5; white-space: nowrap; }
+/* 🔴 ONE LINE IN THE TOP RIGHT CORNER OF A NARROW COLUMN, WHICH IS THE ONE
+   `/twelve/` NEEDS AND IS NOT REACHABLE WITH EITHER OF THE OTHER TWO. Asked
+   2026-09-21: *"Move model 12 to roght panel top right corner. No brand name"*.
+   A plate with a single line under `ends` is a `space-between` row with one
+   child, which parks it on the LEFT; under `mid` it centres. Both are wrong
+   corners rather than near misses.
+   🔴 **`margin-left: auto`, NOT `align-self: flex-end`.** An auto margin
+   absorbs free space and OUTRANKS the container's `align-items`, so it reaches
+   the right edge of a flex COLUMN whose items are centred, which is what
+   `/twelve/`'s master lane is (`.rack-lane { align-items: center }`).
+   `align-self` would have had to fight that rule, and it means BOTTOM rather
+   than right in a flex row, so the same placement would point two ways
+   depending on its parent.
+   ⚠️ `text-align: right` is for the non-flex parent, which no caller has today
+   and which would otherwise be the one arrangement this placement got wrong. */
+.panel-plate[data-place="end"] {
+  display: flex; justify-content: flex-end; text-align: right; margin-left: auto;
+}
 
 /* Two display fields sharing one window the panel draws. The page draws the
    window because which fields go in it is an instrument's business. */
@@ -4595,8 +4623,17 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    readout drew a 2 px band 24 px above the controls and was reported as old UI
    creeping in. */
 .pos-drop-note {
-  font: 400 12px/1.5 var(--mono); color: var(--dim2);
+  font: 400 12px/1.5 var(--mono);
+  /* 🔴 THE SAME GROUND AS THE BLOCK ABOVE IT, AND BRIGHTER INK. Asked
+     2026-09-21: *"upload footer bg same as top bg but text should be whitey"*.
+     It was `--card2` under `--dim2`, which is a lighter panel carrying quieter
+     text: two channels disagreeing about how much this line matters. It is the
+     NAME OF THE FILE SOMEBODY JUST OPENED, which is the one thing in that block
+     they did not already know, and it was the dimmest thing in it.
+     ⚠️ THE SEAM STAYS, because that is what makes it a footer rather than a
+     line of text at the bottom of a box. One edge, no second ground. */
+  color: var(--fg);
   border-top: 1px solid var(--line2);
-  padding: 8px 16px; background: var(--card2);
+  padding: 8px 16px;
 }
 .pos-drop-note[hidden] { display: none; }

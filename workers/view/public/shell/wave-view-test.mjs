@@ -45,7 +45,7 @@ import { readWave, toMono, content } from './circuit-sample.mjs';
 import * as V from './wave-view.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const PACK = path.join(HERE, '../../New Pack.circuitpack');
+const PACK = path.join(HERE, '../../tmp/personal/New Pack.circuitpack');
 
 let pass = 0, fail = 0, skip = 0;
 const ok = (name, cond, detail = '') => {
