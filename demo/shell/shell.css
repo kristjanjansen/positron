@@ -3901,8 +3901,25 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    inside a button is two edges saying one thing, which is the same rule
    `.pos-glue` already applies to a strip on a transport bar. */
 .pos-presence-btn { display: inline-flex; align-items: center; }
+/* 🔴 NO `color: inherit` HERE, AND IT WAS THERE FOR MONTHS KILLING EVERY STATE
+   COLOUR ON THE BADGE. MEASURED 2026-09-21 on `/circuit/`, reported as
+   *"chircuit checking should be gray"*: the badge's computed colour read
+   `rgb(230, 230, 230)`, which is `--fg`, in ALL FIVE states.
+   `.pos-presence-btn .pos-pres` is (0,2,0) and so is
+   `.pos-pres[data-state="checking"]`, and this rule sits 750 lines LATER in
+   this file, so it won on source order and the state rules never applied.
+   ⚠️ THE DAMAGE WAS WIDER THAN THE REPORT. `.pos-pres-dot::after` is
+   `background: currentColor`, so the DOT was `--fg` white in every state
+   including `online`, where it should be `--ok` green. `checking` looked almost
+   right only by accident, because its dot carries an explicit
+   `background: var(--dim2)`; the state WORD beside it was white. Every page
+   that mounts a presence BUTTON had this, which is every instrument page here.
+   ⚠️ AND THE RESET BELOW IS ABOUT A BOX, NOT ABOUT INK. Giving up a background,
+   a border, a padding and a margin is what stops a box inside a button being
+   two edges saying one thing. Colour was never part of that, and a badge whose
+   whole job is to carry a state colour must not be told to inherit one. */
 .pos-presence-btn .pos-pres {
-  background: none; border: 0; padding: 0; margin: 0; color: inherit;
+  background: none; border: 0; padding: 0; margin: 0;
 }
 
 /* ── a segment display: N digits drawn from parts — shell/segment.mjs ───────
