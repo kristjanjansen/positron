@@ -1034,6 +1034,56 @@
         `${maker} ${model}`);
     }
 
+    /**
+     * 🔴 THE PRESENCE BADGE'S STATE COLOUR, READ AS A COMPUTED VALUE, BECAUSE
+     * THE RULE THAT SETS IT WAS DEAD FOR MONTHS AND THE SOURCE READ AS CORRECT.
+     * Reported 2026-09-21 as *"chircuit checking should be gray"*. It was not:
+     * the badge computed `rgb(230, 230, 230)`, which is `--fg`, in ALL FIVE
+     * states, because `.pos-presence-btn .pos-pres { color: inherit }` is
+     * (0,2,0) exactly like `.pos-pres[data-state="checking"]` and sits 750
+     * lines later in `shell.css`, so it won on source order.
+     * ⚠️ AND THE DOT IS `background: currentColor`, so the damage was not the
+     * word alone: an ONLINE instrument had a WHITE dot rather than a green one,
+     * on every page here that mounts a presence button.
+     * 🔴 SO THIS IS ASSERTED AS INK RATHER THAN AS A SELECTOR. A grep for the
+     * rule would have found it present and correct every day it was broken.
+     * ⚠️ IT ALSO ASSERTS THE NEGATIVE HALF: that `online` is NOT the grey, so a
+     * stylesheet that greyed every state would fail rather than pass the first
+     * clause and look fixed.
+     * ⚠️ The attribute is set and put straight back inside one task, so nothing
+     * is painted and nobody watching the page sees a badge flicker. That is the
+     * mutating-check rule: ask whether a person would see it happen.
+     */
+    {
+      const badge = d.el.querySelector('.pos-pres') || document.querySelector('.pos-pres');
+      if (badge) {
+        const was = badge.dataset.state;
+        const inkOf = (st) => {
+          badge.dataset.state = st;
+          return getComputedStyle(badge).color;
+        };
+        const root = getComputedStyle(document.documentElement);
+        const asRgb = (v) => {
+          const h = v.trim().replace('#', '');
+          const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+          return `rgb(${r}, ${g}, ${b})`;
+        };
+        const grey = asRgb(root.getPropertyValue('--dim2'));
+        const good = asRgb(root.getPropertyValue('--ok'));
+        const checking = inkOf('checking');
+        const online = inkOf('online');
+        const unknown = inkOf('unknown');
+        badge.dataset.state = was;
+
+        d.assert('checking, unknown and offline all read as the dim grey, not as the foreground',
+          checking === grey && unknown === grey,
+          `checking ${checking}, unknown ${unknown}, wanted ${grey}`);
+        d.assert('and online reads as the good colour, which is the half a greyed stylesheet would fail',
+          online === good && online !== grey,
+          `online ${online}, wanted ${good}`);
+      }
+    }
+
     // 🔴 THE PRINTED NAMES SIT THE SAME DISTANCE FROM THREE EDGES, measured
     // rather than read off the stylesheet, because the defect that bought this
     // was a padding that was right in the source and wrong on the screen: a
