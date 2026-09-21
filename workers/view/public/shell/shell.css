@@ -2300,11 +2300,30 @@ video[hidden] { display: none; }
    passed: the same measurement, in one place, in the one language that can
    see it. It is also unconditional now: a table whose columns do not fit is
    not a phone, it is a table whose columns do not fit. */
+/* 🔴 A ROW'S HEIGHT, DECLARED ONCE, BECAUSE SOMETHING ELSE NOW NEEDS TO KNOW
+   IT. `createMidiLog({ reserve })` holds a box open for N rows before any have
+   arrived, and the only honest way to say "six rows tall" is in the same
+   numbers a row is built from. 9 + 7 of padding, 1.4 of line height on the
+   11px table face, and 1 of border.
+   ⚠️ IT IS ASSERTED AGAINST A REAL ROW rather than trusted: a page with traffic
+   measures one and compares, so a change to the padding above that forgets this
+   goes red instead of quietly making every reserved box the wrong size. */
+:root { --tbl-row-h: calc(9px + 7px + 1.4 * 11px + 1px); }
 .pos-tbl-row {
   display: grid; grid-template-columns: var(--tbl-cols); min-width: min-content;
   gap: 12px; padding: 9px 14px 7px; line-height: 1.4; align-items: baseline;
   border-bottom: 1px solid #ffffff08;
 }
+/* 🔴 ROOM FOR A TABLE THAT HAS NOTHING IN IT YET. Asked 2026-09-21 against the
+   sentence that used to fill it: *"press the status button, then play something
+   - rm just leave room for midi table"*. The sentence was doing two jobs, and
+   only one of them was worth keeping: it told a visitor what to press, which
+   the button beside it already says, and it held the box open, which is the
+   half that matters. A box that collapses when the words go rearranges the page
+   the moment somebody presses the button.
+   ⚠️ NO ROW, NO HEADING, NO TEXT. Just the space, so nothing moves when the
+   first message lands. */
+.pos-midilog[data-reserve] { min-height: calc(var(--reserve-rows) * var(--tbl-row-h)); }
 /* 🔴 A ROW THAT CAN BE PRESSED SAYS SO, AND SAYS IT QUIETLY. `/crate/` makes
    its files playable by pressing a row; nothing else in the table changes, on
    instruction (*"no table rework"*). So: a pointer, a face that lifts on hover,
@@ -3143,6 +3162,14 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    state it came from. */
 .tbar-loop[data-loop="armed"] { color: var(--fg); border-color: var(--dim2); }
 .tbar-loop[data-loop="on"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
+/* 🔴 A SLOT BUTTON THAT IS A TOGGLE READS AS ON THE SAME WAY THE LOOP DOES.
+   The bar's own LOOP wears `[data-loop="on"]`, which is its private state; a
+   page that puts its own toggle in that place has `aria-pressed`, which is the
+   standard the rest of this stylesheet already keys on. Without this, `/pack/`'s
+   loop toggle was a control whose state was legible only to a screen reader.
+   ⚠️ SAME INK AS THE LOOP IT REPLACES, because two toggles in one position
+   looking different would say they are different kinds of thing. */
+.tbar-slot[aria-pressed="true"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
 /* ⚠️ UNDER the fill and the head — it is the ground the playhead runs over, and
    a band drawn on top of the playhead hides the one thing that moves. Which is
    also why the band is grey and the head above it is not: they are stacked in
