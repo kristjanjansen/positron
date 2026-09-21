@@ -21,7 +21,24 @@ import * as X from './circuit-syx.mjs';
 import * as S from './circuit-session.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const PULL = '/private/tmp/claude-501/-Users-s32863-personal-positron/7ece5d66-afd6-4d4c-9d1b-db3bd7f3b538/scratchpad/pull';
+/** The two archive.org session streams, wherever they are kept. */
+const files = ['on_the_run.circuitpack', 'factory_16.syx'];
+
+// 🔴 THE FILES ARE LOOKED FOR IN `purchased/` FIRST AND A SCRATCHPAD SECOND,
+// AND THE ORDER IS THE POINT. A scratchpad path is session specific and gets
+// swept, so a test that only knows one is a test that silently stops measuring
+// anything the day the directory goes. `purchased/` is gitignored, durable, and
+// already the documented home for third party material that is not ours to
+// publish.
+// ⚠️ NOTHING IS COPIED THERE BY THIS FILE. It looks, it does not move, because
+// `on_the_run.circuitpack` writes flash on all 64 synth slots and deciding where
+// that file lives is not a test's decision to make.
+const CANDIDATES = [
+  path.join(HERE, '../../purchased'),
+  '/private/tmp/claude-501/-Users-s32863-personal-positron/7ece5d66-afd6-4d4c-9d1b-db3bd7f3b538/scratchpad/pull',
+];
+const PULL = CANDIDATES.find((d) => fs.existsSync(d) && files.some((f) => fs.existsSync(path.join(d, f))))
+  || CANDIDATES[0];
 
 let pass = 0, fail = 0, skip = 0;
 const ok = (name, cond, detail = '') => {
@@ -83,7 +100,6 @@ console.log('\n-- splitting a stream into messages --');
 
 // -------------------------------------------------------------- real files
 
-const files = ['on_the_run.circuitpack', 'factory_16.syx'];
 const have = files.filter((f) => fs.existsSync(path.join(PULL, f)));
 
 if (!have.length) {
