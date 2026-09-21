@@ -444,6 +444,52 @@
   did, the next step is different words for `offline`, not a rewritten
   `unknown`.
 
+### Asked 2026-09-21, session 40, the /wish/ flow
+
+- 🔴 **A GLIMMER ON TEXT INPUTS AND AREAS WHILE PROCESSING OR WAITING, MORE
+  SUBTLE.** Asked: *"make textinputs / areas have same glimmer fade when
+  processing, waiting for input. bit moer subtle"*. Same treatment the control
+  already gets from `data-busy`, applied to the text surfaces, dialled down.
+  ⚠️ **NOTHING THAT REDRAWS MAY CHANGE HOW MUCH ROOM IT TAKES**, so it is a
+  colour or an opacity and never a size, a border width or a shadow spread.
+
+- 🔴 **A LIVE TRANSCRIPT WHILE THE BUTTON IS HELD, A PROCESSING ANIMATION, AND
+  AN AUTO-ASK AFTER IT.** Asked: *"when i hold to talk, can you show live
+  transcript? show processing animation. then auto-ask after it and show glimmer
+  and then show json. can be single line."*
+  🔴 **AND THE LIVE TRANSCRIPT HAS A COST THAT IS NOT OURS TO PAY QUIETLY.** The
+  only way a browser does live interim text is `SpeechRecognition`
+  (`webkitSpeechRecognition` in Chrome), and **Chrome's implementation streams
+  the microphone to Google's servers**. This repository has a hard rule about
+  external services written in the strongest terms it has, and that rule is
+  explicitly *about whose server it is, not about which harm has been named
+  yet*. So it needs a decision in writing rather than an implementation.
+  ⚠️ **CHUNKED `/hear` CALLS ARE THE OTHER ROUTE AND ARE WORSE**: one Workers AI
+  call per second of speech, on a paid account, for text that is thrown away the
+  moment the real transcription lands.
+  ✅ **AND THE REST OF THE ASK NEEDS NO TRANSCRIPT AT ALL**: a processing
+  animation, an auto-ask when the hold ends, the glimmer, and then the JSON is
+  the whole flow and none of it is blocked. Build that; hold the transcript.
+
+- 🔴 **THE THINK CONTROLS GO ABOVE THE JSON.** Asked: *"but think controls
+  before json"*. Today the model pickers sit above the transcript and the JSON
+  is below both; the ask is that the picker for whichever model produces the
+  JSON sits immediately before it, so a reader sees what made a thing next to
+  the thing.
+
+- 🔴 **`THINK` IS RENAMED FOR THE TASK.** Asked: *"replace "think" with something
+  else, more related to task at hand"*.
+  ✅ **RECOMMEND `PATCH`.** It pairs with `HEAR` beside it, so the row reads
+  *HEAR ... PATCH ...*, which is exactly what the page does: it hears a sentence
+  and produces a patch. And `patch` is already this project's own word for the
+  output, in `printLink`, in the patch language, in `/bay/`, and in
+  `plans/plan-patchbay.md`. `WIRE` is taken by `demo/shell/wire.mjs` and by a
+  demo called `wire`, so it is out. `ROUTE` and `PLAN` are both defensible.
+  ⚠️ **AND `THINK` IS THE KIND OF WORD THE JARGON RULE IS ABOUT**: it describes
+  a mechanism in the private vocabulary of the people who built it, and a
+  visitor reading `THINK` beside `HEAR` learns nothing about what either one
+  produces.
+
 ### Asked 2026-09-21, session 40, /evo/ starting on C3
 
 - 🔴 **`/evo/` SHOULD START ON C3, AND THERE ARE TWO SEPARATE THINGS TO FIX.**
