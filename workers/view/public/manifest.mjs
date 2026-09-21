@@ -533,7 +533,7 @@ export const DEMOS = [
    * the harness.
    */
   { name: 'wish', group: 'hardware', act: 4, created: '2026-09-21', built: true,
-    one: 'say what you want the desk to do, and a Cloudflare model proposes the patch',
+    one: 'say which instrument should play which, and a language model proposes the connection',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
 
   /**
@@ -598,7 +598,7 @@ export const DEMOS = [
    * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
    */
   { name: 'pack', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
-    one: 'open a Circuit pack and look inside its patches, sessions and samples',
+    one: 'open a Circuit pack or a loose sample set and look inside its patches, sessions and samples',
     tags: ['zip', 'sysex', 'DecompressionStream'] },
   /**
    * 🔴 THE GRID, AND ITS ROWS ARE WHATEVER A READER OPENS. Asked 2026-09-21:
@@ -613,8 +613,8 @@ export const DEMOS = [
    * unzipped, all 64 samples decoded and every check run.
    */
   { name: 'tom', group: 'hardware', act: 4, created: '2026-09-21', built: true,
-    one: 'tap a grid of 64 steps whose rows become the samples in a Circuit pack you open here',
-    tags: ['WebAudio', 'timeline', 'zip'] },
+    one: 'tap a grid of 16 steps whose rows become the samples out of a Circuit pack or sample set you open here',
+    tags: ['WebAudio', 'timeline', 'zip', 'sysex'] },
 
   /**
    * 🔴 THE THIRD HARDWARE PANEL, AND ITS LAYOUT IS THE WEAKEST OF THE THREE.
@@ -632,7 +632,18 @@ export const DEMOS = [
     one: 'an Evolution MK-425C on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
-  { name: 'model', group: 'hardware', act: 4, created: '2026-09-20', built: true,
+  /**
+   * 🔴 THE SLUG IS `twelve` AND THIS IS THE PAGE'S SECOND RENAME IN TWO DAYS.
+   * Asked 2026-09-21: *"Rename to twelve"*, after *"rename rack to model"* the
+   * day before. So `/rack/` and `/model/` are both dead URLs for one page and
+   * neither has a redirect, which is the cost and is recorded rather than
+   * discovered later.
+   * ⚠️ THE SWEEP MATCHED THE URL FORM AND THE SLUG, NEVER THE WORD. `model` is
+   * ordinary English AND this repository's own word for a data layer, so
+   * `bay.mjs`'s prose, `xr-room.mjs`'s controller models and `/wish/`'s model
+   * pickers are all untouched.
+   */
+  { name: 'twelve', group: 'hardware', act: 4, created: '2026-09-20', built: true,
     one: 'a TASCAM Model 12 on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI', 'Mackie Control'] },
 

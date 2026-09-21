@@ -13,7 +13,7 @@
 // other side.
 
 import { createBay, apply, delivers, printLink, parseLink, printPatch, parsePatch,
-  classOf, checkTransforms, CLASSES, MEDIA, STALE_MS } from './bay.mjs';
+  classOf, checkTransforms, CLASSES, MEDIA, STALE_MS, OP_NAMES, OP_HELP } from './bay.mjs';
 import { decode } from './midi-decode.mjs';
 
 let pass = 0, fail = 0;
@@ -329,6 +329,195 @@ console.log('\n== the patch bay ==');
   ok('every class a port can name is in CLASSES',
     ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'sysex'].every((c) => CLASSES.includes(c)));
   ok('the media are the three the plan names', MEDIA.join(',') === 'midi,audio,clock');
+}
+
+// ── the three transforms added 2026-09-21, and the two traps in them ────────
+//
+// 🔴 A KEYBOARD SPLIT COULD NOT BE SAID IN THIS VOCABULARY AT ALL until `range`
+// existed. The owner asked for one in words and the model reached for `only`,
+// which filters by CLASS, because that was the nearest thing to a filter.
+{
+  const lower = [{ op: 'range', lo: 0, hi: 59 }, { op: 'channel', to: 1 }];
+  const upper = [{ op: 'range', lo: 60, hi: 127 }, { op: 'channel', to: 2 }];
+  const note = (d1, d2 = 100) => ({ cls: 'note', ch: 2, d1, d2 });
+  ok('a split sends a low note to one channel and not the other',
+    apply(lower, note(48))?.ch === 1 && apply(upper, note(48)) === null,
+    JSON.stringify(apply(lower, note(48))));
+  ok('and a high note the other way, which is the half that makes it a split',
+    apply(upper, note(72))?.ch === 2 && apply(lower, note(72)) === null,
+    JSON.stringify(apply(upper, note(72))));
+
+  // 🔴 THE TRAP: A NOTE OFF IS THE SAME NOTE NUMBER, so a note the filter let
+  // through is always told to stop, and one it refused never started. A filter
+  // keyed on anything that DIFFERS between the on and the off stops notes.
+  ok('a note off follows its own note through the split, so nothing can hang',
+    apply(lower, note(48, 0))?.d1 === 48 && apply(upper, note(48, 0)) === null,
+    'the off goes where the on went');
+
+  ok('a non-note passes a note range untouched, because a range is about pitch',
+    apply(lower, { cls: 'cc', ch: 2, d1: 74, d2: 10 })?.d1 === 74,
+    'cc survives');
+}
+{
+  const hard = [{ op: 'vrange', lo: 64, hi: 127 }];
+  const n = (d2) => ({ cls: 'note', ch: 1, d1: 60, d2 });
+  ok('a velocity layer keeps a hard hit and drops a soft one',
+    apply(hard, n(100))?.d2 === 100 && apply(hard, n(20)) === null,
+    'layered');
+  // 🔴 THE TRAP THAT WOULD HANG A SYNTH IN ANOTHER BUILDING: a note off carries
+  // velocity 0, so a naive window drops every release and leaves the note that
+  // a hard hit let through sounding forever.
+  ok('NEGATIVE CONTROL: a note off passes a velocity window it could never enter',
+    apply(hard, n(0))?.d2 === 0,
+    'velocity 0 is a release and always passes');
+}
+{
+  const fixed = [{ op: 'fixed', to: 96 }];
+  const n = (d2) => ({ cls: 'note', ch: 1, d1: 60, d2 });
+  ok('fixed gives every note one velocity, which is what this desk\'s drums do at 96',
+    apply(fixed, n(12))?.d2 === 96 && apply(fixed, n(127))?.d2 === 96,
+    'both 96');
+  ok('NEGATIVE CONTROL: and it leaves a note off alone, or a release becomes a second note on',
+    apply(fixed, n(0))?.d2 === 0,
+    'the release stays 0');
+}
+{
+  ok('a missing argument is refused by name',
+    /fixed takes "to"/.test(checkTransforms([{ op: 'fixed' }]))
+    && /channel takes "to"/.test(checkTransforms([{ op: 'channel' }])),
+    checkTransforms([{ op: 'fixed' }]));
+
+  /**
+   * 🔴 ONE BOUND IS A WHOLE INSTRUCTION, AND THIS ASSERT SAID THE OPPOSITE
+   * UNTIL 2026-09-21. It read *`range` refuses a missing `hi`*, which made
+   * *everything above middle C* unsayable: the only legal way to write it named
+   * 127 as a decision when it is the end of the scale. Both bounds still work
+   * and neither is required on its own.
+   */
+  ok('a range may be open at either end',
+    checkTransforms([{ op: 'range', lo: 60 }]) === ''
+    && checkTransforms([{ op: 'range', hi: 7 }]) === ''
+    && checkTransforms([{ op: 'vrange', lo: 64 }]) === '',
+    checkTransforms([{ op: 'range', lo: 60 }]));
+
+  const noteAt = (n) => ({ cls: 'note', ch: 1, d1: n, d2: 64 });
+  ok('an open top keeps everything above the bound and an open bottom everything below',
+    apply([{ op: 'range', lo: 60 }], noteAt(127)) !== null
+    && apply([{ op: 'range', lo: 60 }], noteAt(59)) === null
+    && apply([{ op: 'range', hi: 7 }], noteAt(0)) !== null
+    && apply([{ op: 'range', hi: 7 }], noteAt(8)) === null);
+
+  /* 🔴 NEGATIVE CONTROL, and it is the reason `oneOf` exists rather than two
+     optional arguments. A range with NO bound passes every note, which is a
+     filter that reads as working and does nothing at all. */
+  ok('NEGATIVE CONTROL: a range with neither bound is refused rather than passing everything',
+    /range takes "lo" or "hi"/.test(checkTransforms([{ op: 'range' }]))
+    && /vrange takes "lo" or "hi"/.test(checkTransforms([{ op: 'vrange' }])),
+    checkTransforms([{ op: 'range' }]));
+
+  /* 🔴 AND THE TEXT FORM HAS TO SURVIVE THE ABSENT BOUND, which is the defect
+     an open end would otherwise introduce quietly: `{ range, hi: 7 }` printed
+     as `range 7` reads back as `{ range, lo: 7 }`, the same words meaning the
+     opposite filter. */
+  for (const t of [{ op: 'range', hi: 7 }, { op: 'range', lo: 60 },
+                   { op: 'range', lo: 0, hi: 7 }, { op: 'vrange', hi: 63 }]) {
+    const line = printLink({ from: 'a', to: 'b', transforms: [t] });
+    const back = parseLink(line).transforms[0];
+    ok(`a one-sided ${t.op} round trips through the text form`,
+      JSON.stringify(back) === JSON.stringify(t), `${line} came back as ${JSON.stringify(back)}`);
+  }
+
+  /**
+   * 🔴 TWO RANGES OPEN AT THE SAME END IS ALWAYS ONE RANGE WRITTEN WRONG, and
+   * it is what a language model produces every time it is asked for a row of
+   * buttons: eleven runs on 2026-09-21, always `{"op":"range","to":A}` then
+   * `{"op":"range","to":B}`. Composed, the narrower bound wins and the other
+   * transform is dead, so the link is well formed, allowed, and passes one note
+   * of eight. The refusal carries the correction as JSON the person can read.
+   */
+  const two = checkTransforms([{ op: 'range', hi: 0 }, { op: 'range', hi: 7 }]);
+  ok('two ranges open at the same end are refused, and the message carries the right patch',
+    /both open at the same end/.test(two) && two.includes('"lo": 0, "hi": 7'), two);
+
+  /**
+   * 🔴 THE NEGATIVE CONTROL, AND IT IS THE HALF THAT STOPS THIS REFUSING REAL
+   * WORK. Two ranges open at OPPOSITE ends are a perfectly ordinary way to
+   * write a window, and a split is two ranges in two SEPARATE LINKS, which this
+   * check must never see as one list.
+   */
+  ok('NEGATIVE CONTROL: two ranges closing opposite ends are a window and are allowed',
+    checkTransforms([{ op: 'range', lo: 60 }, { op: 'range', hi: 72 }]) === ''
+    && checkTransforms([{ op: 'range', lo: 0, hi: 59 }]) === ''
+    && checkTransforms([{ op: 'range', lo: 60, hi: 127 }]) === '',
+    checkTransforms([{ op: 'range', lo: 60 }, { op: 'range', hi: 72 }]));
+
+  ok('a window written as two one-sided ranges keeps only what is inside it',
+    apply([{ op: 'range', lo: 60 }, { op: 'range', hi: 72 }], noteAt(64)) !== null
+    && apply([{ op: 'range', lo: 60 }, { op: 'range', hi: 72 }], noteAt(59)) === null
+    && apply([{ op: 'range', lo: 60 }, { op: 'range', hi: 72 }], noteAt(73)) === null);
+
+  /* A range that can never pass anything is a silent link, not a tight filter. */
+  ok('a low bound above the high one is refused rather than passing nothing',
+    /can never pass anything/.test(checkTransforms([{ op: 'range', lo: 60, hi: 7 }])),
+    checkTransforms([{ op: 'range', lo: 60, hi: 7 }]));
+
+  /* An optional argument that is present is still typed, which it was not while
+     the type check ran over the REQUIRED list only. */
+  ok('an optional bound that is present is still checked for being a number',
+    /range needs "hi" to be a number/.test(checkTransforms([{ op: 'range', lo: 36, hi: '47' }])),
+    checkTransforms([{ op: 'range', lo: 36, hi: '47' }]));
+}
+{
+  /**
+   * 🔴 A TRANSFORM WITH NOTHING TO SAY ABOUT ITSELF IS A TRANSFORM NOBODY WILL
+   * BE TOLD ABOUT. 2026-09-21: `range`, `vrange` and `fixed` were added here and
+   * the operator table a language model reads was left listing the other six,
+   * so the code accepted nine words and the model was offered six. It asked for
+   * a filter with the only filter it had been shown, `only`, eight times in one
+   * patch, and the page refused all eight. `workers/wish/src/wish-test.mjs`
+   * generates that table from `OP_HELP` and asserts it is complete; this is the
+   * half that stops a new op being declared with no sentence to generate FROM.
+   */
+  const mute = OP_HELP.filter((o) => typeof o.help !== 'string' || o.help.trim().length < 12);
+  ok('every transform carries a sentence a reader outside this file can use',
+    mute.length === 0 && OP_HELP.length === OP_NAMES.length,
+    `${mute.map((o) => o.op).join(', ') || 'none'} silent, ${OP_HELP.length} of ${OP_NAMES.length}`);
+
+  /* The signature is DERIVED from the argument list `checkTransforms` enforces,
+     so the two cannot part company. `cls` is the one argument that is not a
+     number and `scale` is the one that is not an integer. */
+  const sig = Object.fromEntries(OP_HELP.map((o) => [o.op, o.sig]));
+  ok('a signature names the arguments its own validator requires',
+    sig.only === 'only cls=C' && sig.range === 'range lo=N hi=N'
+    && sig.velocity === 'velocity scale=F' && sig.cc === 'cc from=N to=N ch=N',
+    JSON.stringify(sig));
+
+  /**
+   * 🔴 THE EXAMPLE EVERY TRANSFORM CARRIES IS GRADED BY THE VALIDATOR IT IS AN
+   * EXAMPLE OF. It is put in front of a language model on every call, and a
+   * model copies an example rather than reading a sentence, which is measured
+   * twice over in `workers/wish/src/wish.mjs`. So an example this code would
+   * refuse is a defect being TAUGHT, and it would read as documentation.
+   */
+  const refused = OP_HELP
+    .map((o) => [o.op, checkTransforms([{ op: o.op, ...o.eg }])])
+    .filter(([, why]) => why !== '');
+  ok('every transform example passes the validator it demonstrates',
+    refused.length === 0, refused.map(([op, why]) => `${op}: ${why}`).join(' | '));
+
+  /* And an example has to USE the op it names: `{"op":"range"}` with no
+     arguments passes nothing and would still be a line in the table. */
+  const thin = OP_HELP.filter((o) => o.need.some((a) => o.eg[a] === undefined));
+  ok('NEGATIVE CONTROL: no example leaves out an argument its op requires',
+    thin.length === 0, thin.map((o) => o.op).join(', '));
+
+  /* 🔴 NEGATIVE CONTROL: the thing the owner actually saw. `only` takes a
+     class, so a channel number under `to` is refused BY NAME, and the name in
+     the refusal is the word the prompt now puts next to it. */
+  ok('NEGATIVE CONTROL: `only` given a channel number is refused naming the argument it wanted',
+    /only takes "cls"/.test(checkTransforms([{ op: 'only', to: 1 }]))
+    && sig.only.includes('cls='),
+    checkTransforms([{ op: 'only', to: 1 }]));
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);

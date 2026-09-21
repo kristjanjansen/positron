@@ -65,7 +65,17 @@
     display: block; width: 100%; height: 64px; resize: none; overflow-y: auto;
     padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px;
     background-color: var(--card); color: var(--ink);
-    font-family: inherit; font-size: 15px; line-height: 1.45;
+    /* 🔴 MONOSPACED, ASKED FOR AGAINST THE SENTENCE ITSELF ON 2026-09-21. It
+       inherited the page's reading face, which is the right choice for prose
+       and the wrong one here: this box is not prose, it is the exact words that
+       go to a model, and it sits directly above a monospaced object built out
+       of them. A reader comparing what they SAID with what came BACK was
+       crossing a typeface to do it.
+       ⚠️ AND THE SIZE COMES DOWN WITH THE FACE. A monospaced 15 px is visibly
+       larger than the proportional 15 px it replaces, and this box is one line
+       tall by reservation. */
+    font-family: var(--mono, ui-monospace, monospace); font-size: 13.5px;
+    line-height: 1.5;
   }
   .wish-patch {
     /* `pre-wrap` and not `pre`: a long object wraps instead of running off the
@@ -134,7 +144,18 @@
      ⚠️ WHAT IT WAS FOR IS NOT LOST. `data-busy` is still set on both boxes, so
      a page rule could paint them again and the checks that read the attribute
      are unmoved; what is gone is the animation. */
-  .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); margin-top: 8px; }
+  /* ⚠️ NO MARGIN AND NO BORDER OF ITS OWN. It is a glue part now, so the seam
+     above it and the air around it come from `.pos-glue` and `.wish-part`, in
+     the same colour and the same measure as the picture and the object below
+     it. A divider typed here would be a second one. */
+  .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); }
+  /* 🔴 THE VERDICT PART KEEPS ONE LINE'S ROOM WHETHER OR NOT IT HAS WORDS.
+     Asked 2026-09-21: *"make this the minimal height even when no data"*. It
+     used to go away, which meant the picture and the object below it moved down
+     the instant an answer landed, under the eye of the person who pressed for
+     it. Every other box on this page already reserves its room from the first
+     paint and says so; this one now does too. */
+  .wish-verdict { min-height: 40px; display: flex; align-items: center; }
   .wish-why b { color: var(--bad, #e0908a); font-weight: 600; }
   .wish-why i { color: var(--ok, #8fd6a8); font-style: normal; }
   .wish-why-l { color: var(--ink); }
@@ -296,16 +317,96 @@
     { id: 'here:mk-425c-usb-midi-keyboard:out', dir: 'out', box: 'keys', label: 'MK-425C USB MIDI Keyboard' },
     { id: 'here:circuit:out', dir: 'out', box: 'circuit', label: 'Circuit' },
     { id: 'here:model-12-midi-in:out', dir: 'out', box: 'model12', label: 'Model 12 MIDI IN' },
+    /**
+     * 🔴 THE MODEL 12 OFFERS TWO PAIRS AND ONLY ONE WAS HERE, WHICH MADE A
+     * WRONG ANSWER THE ONLY ANSWER AVAILABLE. Asked 2026-09-21: *"I want to
+     * play notes with my model 12 REC buttons and play it to a circuit synth
+     * 1"*, and the model answered `Model 12 MIDI IN -> Circuit`, which is
+     * ALLOWED and would do nothing.
+     * ✅ MEASURED: the control surface is `Model 12 DAW Control IN`, **525
+     * messages**, while `Model 12 MIDI IN` **stayed silent throughout**,
+     * because that port is the DIN socket bridged to USB and nothing was
+     * patched into the jack.
+     * 🔴 AND THE PORT LIST IS AN `enum` ON PURPOSE, WHICH IS WHY THIS MATTERED
+     * SO MUCH. That enum is what stopped a Moog and a Prophet, neither on this
+     * desk, coming back as inventions. An enum missing a REAL port is the same
+     * mechanism refusing the truth, and the model has no way to say *the port I
+     * need is not on your list*.
+     * ⚠️ `instruments.mjs` HAD KNOWN ABOUT BOTH PAIRS SINCE THE TAXONOMY
+     * LANDED, and says in its own comment that they are two different things:
+     * the MIDI pair carries notes and controllers, the DAW Control pair speaks
+     * Mackie Control. The fact was in this repository and not in this list.
+     */
+    { id: 'here:model-12-daw-control-in:out', dir: 'out', box: 'model12',
+      label: 'Model 12 DAW Control IN' },
+    { id: 'here:model-12-daw-control-out:in', dir: 'in', box: 'model12',
+      label: 'Model 12 DAW Control OUT' },
     { id: 'here:circuit:in', dir: 'in', box: 'circuit', label: 'Circuit' },
     { id: 'here:model-12-midi-out:in', dir: 'in', box: 'model12', label: 'Model 12 MIDI OUT' },
     { id: 'here:mk-425c-usb-midi-keyboard:in', dir: 'in', box: 'keys', label: 'MK-425C USB MIDI Keyboard' },
   ];
   const PORT = new Map(PORTS.map((p) => [p.id, p]));
-  /** Measured facts, handed to the model because no manual carries them. */
+  /**
+   * Measured facts, handed to the model because no manual carries them.
+   *
+   * 🔴 THE ROTARIES ARE IN HERE SINCE 2026-09-21, AND THEIR ABSENCE WAS A REAL
+   * GAP RATHER THAN A MODEL FAILURE. Reported: *"'first' should be enogh. i see
+   * these rotaries!"*, after *"connect the first rotary knob of evolution to
+   * the first rotary knob of circuit"* came back as `{"op":"cc","to":1}` with
+   * no `from` at all and was refused. **The model had no way to know what a
+   * rotary sends.** It was told the channels and the semitone offset and
+   * nothing about controller numbers, so *the first rotary* named a thing it
+   * could not resolve, and it guessed a 1.
+   * ⚠️ AND THE PAGE COULD HAVE ANSWERED IT ALL ALONG. Both runs are measured on
+   * this desk and written down in `measured-devices-2026-09-20.md`: the
+   * keyboard's knobs at line 199 and the Circuit's macros at line 169. The
+   * facts existed in the repository and were never handed over.
+   * ⚖️ AND THE INFERRED HALF IS MARKED AS INFERRED, HERE, IN THE PROMPT. Macros
+   * 7 and 8 were never turned, so CC 86 and 87 come from the run of six rather
+   * than from a measurement, and a model told they are facts would state them
+   * as facts. Telling it which two are guesses is the same rule this project
+   * applies to its own prose.
+   */
   const FACTS = 'The MK-425C keyboard sends on MIDI channel 2 and its keys are one semitone '
-    + 'flat. The Circuit listens for Synth 1 on channel 1, Synth 2 on channel 2, drums on '
-    + 'channel 10 at notes 60, 62, 64 and 65, and its master filter on channel 16. The '
-    + 'Circuit has no factory reset, so it is never sent SysEx.';
+    + 'flat. Its six rotary knobs send, in the order they are printed on the panel, '
+    + 'CC 84, 72, 74, 71, 93 and 5, so its FIRST rotary knob is CC 84. '
+    + 'The Circuit listens for Synth 1 on channel 1, Synth 2 on channel 2, drums on '
+    + 'channel 10 at notes 60, 62, 64 and 65, and its master filter on channel 16. '
+    + 'The Circuit has eight macro knobs on channel 1 sending CC 80 to 87 in order, so its '
+    + 'FIRST macro knob is CC 80, and CC 86 and 87 are inferred rather than measured. The '
+    + 'Circuit has no factory reset, so it is never sent SysEx. '
+    // 🔴 THE MODEL 12'S BUTTONS, AND THE ONE THAT CANNOT SAFELY PLAY A SYNTH.
+    // ✅ MEASURED and recorded on `/twelve/`: REC is notes 0 to 7, SOLO 8 to 15,
+    // MUTE 16 to 23, and **REC SENDS NO RELEASE while SOLO and MUTE do**. Two
+    // buttons on one mixer, both momentary on the panel, disagreeing on the
+    // wire. A model asked to play a synth from REC would write a perfectly
+    // valid patch that leaves every note hanging on an instrument in another
+    // building, and nothing in the validator could catch it, because there is
+    // nothing invalid about it. So the model is told, in the same sentence.
+    + 'The TASCAM Model 12 has TWO port pairs and they carry different things. Its '
+    + 'buttons, knobs and faders all come out of Model 12 DAW Control IN, and they only '
+    + 'send anything when DAW control mode is switched on at the mixer. Model 12 MIDI IN '
+    + 'is the 5 pin DIN socket bridged to USB and carries only whatever is patched into '
+    + 'that socket, so it is the wrong port for the mixer own controls. '
+    + 'On DAW Control IN the REC buttons are notes 0 to 7, SOLO is notes 8 to 15 and MUTE '
+    + 'is notes 16 to 23, the PAN knobs are relative CC 16 upward and the faders are pitch '
+    + 'bend. REC SENDS NO NOTE OFF, so a link that plays a synth from REC leaves notes '
+    + 'hanging, and SOLO or MUTE should be used instead. Those notes are very low, 0 is '
+    + 'C-1, so playing a synth from them wants a transpose of about 60. '
+    // 🔴 THE LIST OF TRANSFORMS USED TO BE RETYPED HERE AND IT READ
+    // *"channel, transpose, velocity, only, drop, cc, and three more"*. It was
+    // the fourth copy of one vocabulary, it was written the day `range`,
+    // `vrange` and `fixed` were added, and the copy that actually defines the
+    // format for a model, the operator table in `systemFor()`, was the one
+    // nobody updated. The table is generated from `bay.mjs` now and lists all
+    // nine with their argument names, so a sentence here naming six would only
+    // ever be a chance to disagree with it.
+    // ⚠️ WHAT STAYS IS THE PART NO PER-OP LINE CAN CARRY: a split is a SHAPE
+    // made of two links, which is a fact about composing the language rather
+    // than about any one word in it.
+    + 'A split is two links between the same pair of ports with different ranges and '
+    + 'different channels, never one link. Sending one row of buttons somewhere wants a '
+    + 'range around just those note numbers, or everything else on that port rides along.';
 
   /** What each port consents to. The Circuit's line is the one that matters. */
   /**
@@ -361,7 +462,14 @@
 
   const d = mount({
     name: 'wish',
-    what: 'Say what you want the desk to do, and a Cloudflare model proposes the patch.',
+    /**
+     * ⚠️ MORE SPECIFIC, AND THE VENDOR IS OUT. Asked 2026-09-21: *"be more
+     * specific and its not importat its cf model"*. `what you want the desk to
+     * do` is a sentence that would fit any page here, and *Cloudflare* names
+     * whose computer it runs on, which is a fact about the bill rather than
+     * about what a visitor is looking at.
+     */
+    what: 'Say which instrument should play which, and a language model proposes the connection.',
     /**
      * 🔴 NO READOUT AT ALL. Asked 2026-09-21: *"rm links / 1 / refused / 1"*,
      * which is both remaining cells after the two timings came off earlier the
@@ -480,12 +588,11 @@
    * ⚠️ `Use the example` STAYS IN THE ROW, so the row is not empty and the
    * harness still reaches the asking path by itself.
    */
-  const header = (left, pick, under) => {
+  const header = (left, pick) => {
     const part = el('div', 'wish-part');
     const row = el('div', 'wish-head');
     row.append(left, pick.el);
     part.append(row);
-    if (under) part.append(under);
     return { part, row };
   };
 
@@ -500,11 +607,20 @@
    * those apart, and it needs a box somebody can retype.
    */
   const said = el('textarea', 'wish-said');
-  /* 🔴 THE PLACEHOLDER IS WHERE THE GESTURE IS WRITTEN DOWN, because there is
-     no `Ask` button left to carry it and a page does not get to hide its only
-     way to submit. Same rule as `Hold to talk` naming its own gesture: the
-     label is the documentation. */
-  said.placeholder = 'hold the button and say what you want, or type here and press Enter';
+  /**
+   * 🔴 NO PLACEHOLDER, AND THE REASON IT HAD ONE IS THE REASON IT CAN LOSE IT.
+   * Asked 2026-09-21: *"rm placholder text 'hold the button.."*. It read *hold
+   * the button and say what you want, or type here and press Enter*, and it was
+   * carrying the page's only written account of how to submit, because the `Ask`
+   * button had been removed and Enter is invisible.
+   * ✅ TWO BUTTONS CARRY IT NOW. `Hold to talk` heads this very block and names
+   * its own gesture, and `Interpret` heads the one below it. The label is the
+   * documentation, which is the rule this comment always cited, and the
+   * documentation is on a control rather than inside the box a reader is about
+   * to type over.
+   * ⚠️ ENTER STILL ASKS AND SHIFT+ENTER STILL MAKES A NEWLINE, and the check
+   * for that stays: what changed is where a reader is told, not what happens.
+   */
   said.spellcheck = false;
   const patch = el('pre', 'wish-patch');
   const whyBox = el('div', 'wish-rows');
@@ -564,11 +680,37 @@
    */
   said.classList.add('wish-part');
   const hear = header(speakBtn, hearPick);
-  const patchHead = header(d.button('interpret'), patchPick, whyBox);
+  const patchHead = header(d.button('interpret'), patchPick);
   const hearRow = hear.row;
   const patchRow = patchHead.row;
+  /**
+   * 🔴 THE VERDICT IS ITS OWN PART OF THE GLUE, NOT A LINE INSIDE THE HEADER.
+   * Reported 2026-09-21 against a screenshot: *"you are missing divider on top
+   * of allowerd and spacing"*, and then in four words that settle it, *"its a
+   * line in glue"*.
+   * ✅ AND THAT IS WHY IT IS THE RIGHT SHAPE RATHER THAN A STYLING FIX. Inside
+   * the header part the line needed a border and a margin TYPED ON THIS PAGE, a
+   * divider drawn by hand where the component beside it already draws one. As a
+   * part it gets the glue's own 1 px seam of `--line` and the part's own
+   * padding, which is the same edge the picture and the object already have, in
+   * the same colour, from the same rule.
+   * 🔴 AND IT STAYS AT ONE LINE RATHER THAN GOING AWAY, WHICH REVERSES WHAT I
+   * BUILT AN HOUR EARLIER. Asked 2026-09-21 against a screenshot of the filled
+   * component: *"make this the minimal height even when no data"*.
+   * ⚠️ THE ARGUMENT FOR HIDING IT WAS THE EMPTY-BOX RULE, and the argument
+   * against is the stronger one on this page: **nothing may change how much room
+   * it takes.** A part that appears when an answer lands moves the picture and
+   * the object down under the reader's eye, on a page whose every other box
+   * already reserves its room from the first paint for exactly that reason.
+   * ⚠️ AND THE EMPTY-BOX RULE IS NOT BEING BROKEN, IT IS BEING OUTRANKED. That
+   * rule is about a container drawing EDGES around nothing. The seams here are
+   * the glue's and exist for the parts either side of this one whatever it
+   * holds, so nothing new is painted; what is reserved is a line's height.
+   */
+  const whyPart = el('div', 'wish-part wish-verdict');
+  whyPart.append(whyBox);
   const heard = createGlue(hear.part, said);
-  const answer = createGlue(patchHead.part, dgHost, dump);
+  const answer = createGlue(patchHead.part, whyPart, dgHost, dump);
   d.el.append(heard, answer);
 
   /**
@@ -1585,6 +1727,30 @@
       && !whyBox.textContent.includes('here:'),
       whyBox.textContent.trim().slice(0, 110));
 
+    /**
+     * 🔴 AND WITH AN ANSWER ON SCREEN THE VERDICT IS A PART OF THE GLUE WITH A
+     * SEAM ABOVE IT, which is the only moment that can be measured: the part is
+     * away until something is proposed, so every check taken before one lands
+     * grades a three part component and says nothing about the fourth.
+     * ⚠️ THAT IS WHY THIS SITS HERE RATHER THAN BESIDE THE OTHER LAYOUT CHECKS.
+     * A check run at the wrong moment is a check that measures a state nothing
+     * has reached, which this page has already paid for once.
+     */
+    {
+      const seam = (a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().bottom;
+      const head = patchRow.parentElement;
+      const glueBg = getComputedStyle(answer).backgroundColor;
+      d.assert('with an answer up, the verdict is its own part with the glue\'s own seam over it',
+        whyPart.hidden === false && whyPart.parentElement === answer
+        && Math.abs(seam(head, whyPart) - 1) < 0.6
+        && Math.abs(seam(whyPart, dgHost) - 1) < 0.6
+        && getComputedStyle(whyPart).backgroundColor !== glueBg
+        && getComputedStyle(whyPart).borderTopWidth === '0px',
+        `${[...answer.children].filter((n) => !n.hidden).length} parts up, seams `
+        + `${seam(head, whyPart).toFixed(1)} above and ${seam(whyPart, dgHost).toFixed(1)} below, `
+        + `and it draws ${getComputedStyle(whyPart).borderTopWidth} of border of its own`);
+    }
+
     // ⚠️ THE NEGATIVE CONTROL: the same link, spelled right, is allowed. Without
     // it the line above would pass on a page that refused everything.
     const FIXED = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
@@ -1847,7 +2013,7 @@
      * 2026-09-21: *"make it a single component, 3 parts, glued. in top is patch
      * list visualizer, below is diagram and dump is below"*.
      * 🔴 APPENDING IN AN ORDER IS NOT LAYOUT, WHICH IS WHY THIS READS BOXES AND
-     * NOT `children`. `/model/` was corrected by screenshot twelve times in one
+     * NOT `children`. `/twelve/` was corrected by screenshot twelve times in one
      * evening and every one was plausible reasoning a rect would have refused.
      * The DOM answers *what did the author write*; the rect answers *what did
      * the browser do with it*, and a glue is a flex column whose order a single
@@ -1898,10 +2064,23 @@
      * read and one remembered.
      */
     const seamInk = getComputedStyle(answer).backgroundColor;
-    const grounds = [patchPart, dgHost, dump].map((n) => getComputedStyle(n).backgroundColor);
-    const edges = [patchPart, dgHost, dump]
+    // ⚠️ EVERY PART, READ OFF THE GLUE, rather than three named by hand. The
+    // verdict became a fourth part on 2026-09-21 and a list typed here would
+    // have gone on grading three of four without anything saying so.
+    const parts = [...answer.children].filter((n) => !n.hidden);
+    const grounds = parts.map((n) => getComputedStyle(n).backgroundColor);
+    const edges = parts
       .map((n) => parseFloat(getComputedStyle(n).borderTopWidth));
-    const seams = [drawn.top - picked.bottom, dumped.top - drawn.bottom];
+    /**
+     * ⚠️ EVERY SEAM, WALKED OFF THE GLUE, rather than two computed between three
+     * boxes named by hand. Those two were the header to the picture and the
+     * picture to the object, which measured a 42 px gap the moment the verdict
+     * became a part and stopped going away: a real distance between two real
+     * boxes, with a third part in between that the arithmetic did not know
+     * about. The layout was right and the ruler was counting the wrong pair.
+     */
+    const seams = parts.slice(1).map((n, i) =>
+      n.getBoundingClientRect().top - parts[i].getBoundingClientRect().bottom);
     d.assert('each part paints its own ground, so the 1 px seam between them is the only edge inside',
       seams.every((g) => Math.round(g) === 1)
       && edges.every((w) => w === 0)
@@ -1910,6 +2089,30 @@
       + `${edges.join()} px, ${grounds.filter((c) => c !== seamInk && c !== 'rgba(0, 0, 0, 0)').length} `
       + `of ${grounds.length} parts painting a ground of their own (${grounds[0]}) `
       + `against the glue's ${seamInk}`);
+
+    /**
+     * 🔴 THE VERDICT KEEPS ITS ROOM WITH NOTHING IN IT, which is what
+     * *"make this the minimal height even when no data"* asks for and the only
+     * part of it a check can see. The test is not that it is tall: it is that
+     * the component does not CHANGE HEIGHT when an answer lands, because that
+     * is the thing a reader would have seen move.
+     * ⚠️ IT EMPTIES AND REFILLS THE BOX IN ONE BLOCK WITH NO `await` IN IT, so
+     * no frame can be drawn between and nobody watching the page sees it
+     * flicker. Same argument `/kit/` makes about its own measuring window.
+     */
+    {
+      const full = answer.getBoundingClientRect().height;
+      const fullPart = whyPart.getBoundingClientRect().height;
+      const kept = [...whyBox.childNodes];
+      whyBox.replaceChildren();
+      const bare = answer.getBoundingClientRect().height;
+      const barePart = whyPart.getBoundingClientRect().height;
+      whyBox.replaceChildren(...kept);
+      d.assert('the verdict keeps a line of room with nothing in it, so nothing moves when an answer lands',
+        whyPart.hidden === false && barePart > 0 && Math.abs(full - bare) < 1,
+        `the part is ${fullPart.toFixed(1)} px with an answer and ${barePart.toFixed(1)} px `
+        + `without, and the component is ${full.toFixed(1)} against ${bare.toFixed(1)}`);
+    }
 
     d.assert('the desk it describes is the one the other pages build ids for',
       PORTS.some((p) => p.id === 'here:circuit:in') && PORTS.some((p) => p.id === 'here:mk-425c-usb-midi-keyboard:out'),
@@ -2138,8 +2341,20 @@
       const at = (m) => HEAR.findIndex(([, id]) => id === m);
       const runs = [];
       for (const [model, was, want] of [
+        /**
+         * 🔴 `taskham` WAS A REPAIR AND IS AN AMBIGUITY SINCE 2026-09-21, AND
+         * THE PAGE IS RIGHT TO REFUSE IT. Adding the Model 12's DAW Control
+         * pair to `PORTS` gave this desk TWO things a mangled `TASCAM` could
+         * mean, `TASCAM Model 12` and `TASCAM Model 12 DAW control`, and
+         * `reword()` never picks between two instruments on one span. So the
+         * expectation is the sentence UNCHANGED, and the log line saying why.
+         * ⚠️ THIS IS THE ASSERT DOING ITS JOB RATHER THAN BREAKING. It went red
+         * the moment the desk grew a fourth port, which is exactly when a check
+         * about naming things on this desk SHOULD go red, and the page's
+         * behaviour never changed.
+         */
         ['@cf/openai/whisper', 'taskham',
-          'The evolution plays the circuit and the TASCAM Model 12 records it.'],
+          'The evolution plays the circuit and the taskham records it.'],
         /* No leading space in the expectation, and `whisper-tiny-en` really
            does put one on everything: `finish()` trims before it repairs, so
            what the box gets is the sentence without the model's own margin. */
@@ -2151,8 +2366,9 @@
       }
       hearPick.buttons[0].click();          // put the picker back where it was
       const log = document.querySelector('.pos-log')?.textContent || '';
-      d.assert('a name the speech model mangled is repaired before the patch model reads it',
-        runs.every((r) => r.got === r.want) && runs.every((r) => log.includes(`"${r.was}"`)),
+      d.assert('a mangled name is repaired when it names one thing and left alone when it names two',
+        runs.every((r) => r.got === r.want) && runs.every((r) => log.includes(`"${r.was}"`))
+        && /names two things here/.test(log),
         runs.map((r) => `${JSON.stringify(r.was)} -> ${JSON.stringify(r.got.slice(0, 44))}`).join(' | '));
 
       /**
@@ -2195,10 +2411,16 @@
     d.assert('Enter asks what is in the box, and Shift+Enter leaves the key alone',
       plain.asked === true && plain.claimed === true
       && withShift.asked === false && withShift.claimed === false
-      && said.placeholder.includes('Enter'),
+      // ⚠️ AND THE BOX SAYS NOTHING, which is the other half of the same ask.
+      // A placeholder that explained the gesture was the page's only account of
+      // it until `Interpret` existed; now two buttons carry it and the box is
+      // empty. Asserted rather than assumed, because a stray placeholder is
+      // exactly the kind of string that survives a removal.
+      && said.placeholder === '',
       `Enter asked ${plain.asked} and claimed ${plain.claimed}, Shift+Enter asked `
       + `${withShift.asked} and claimed ${withShift.claimed}, the box says `
-      + `${JSON.stringify(said.placeholder)}`);
+      + `${JSON.stringify(said.placeholder)} and the gesture is on `
+      + `"${speakBtn.textContent}" and "${d.button('interpret').textContent}"`);
     await new Promise((r) => { setTimeout(r, 0); });   // let that proposal land
 
     /* 🔴 PAINT, NOT ROOM, AND BOTH HALVES ARE MEASURED. Nothing that redraws

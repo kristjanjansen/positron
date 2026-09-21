@@ -66,7 +66,8 @@ export const ON_AIR_CAN = ['online', 'coming', 'offline', 'unknown'];
  * degraded badge — and gives up the slider.
  */
 export function createTransportBar(host, deck, {
-  absolute = false, scrub: wantScrub = true, extras = [], fmt = null, live = false, publish = true,
+  absolute = false, scrub: wantScrub = true, extras = [], right = [],
+  fmt = null, live = false, publish = true,
   // 'play' (the default), 'record', or TWO WORDS as an array: what the toggle
   // says it does. See the note on the toggle itself.
   verb = 'play',
@@ -327,9 +328,28 @@ export function createTransportBar(host, deck, {
       + ` (got ${JSON.stringify(verb)})`);
   }
   const RECORD = verb === 'record';
-  const toggle = el('button', `tbar-toggle${RECORD ? ' tbar-rec' : ''}${WORDS ? ' tbar-word' : ''}`, '',
+  /**
+   * 🔴 `verb: 'stop'` IS THE THIRD FACE AND IT SAYS WHAT THE SECOND PRESS DOES.
+   * Asked for on `/tom/` 2026-09-21: *"replace pause icon with stop icon"*,
+   * after that page's second press was made to STOP and rewind rather than
+   * pause. A `❚❚` over a control that returns the playhead to the top is the
+   * shape this project calls a lie: a face describing a verb the button does
+   * not perform.
+   * ⚠️ IT IS A CLASS AND AN ARIA LABEL, NOTHING ELSE. The element, its
+   * `.tbar-toggle` class, its `data-state` and everything that presses it are
+   * untouched, so `verify.mjs`'s play drill and every page holding a bar keep
+   * working. That is the same argument `verb: 'record'` already makes above.
+   * ⚠️ AND THE GLYPH IS `■`, U+25A0, WHICH HAS NO EMOJI FORM. `positron-ui`
+   * records that `⏹` and its neighbours default to emoji presentation and
+   * render full colour at the wrong size and baseline, and that U+FE0E is
+   * honoured inconsistently across machines.
+   */
+  const STOPS = verb === 'stop';
+  const toggle = el('button',
+    `tbar-toggle${RECORD ? ' tbar-rec' : ''}${STOPS ? ' tbar-stop' : ''}${WORDS ? ' tbar-word' : ''}`, '',
     { type: 'button',
-      'aria-label': WORDS ? `${WORDS[0]}/${WORDS[1]}` : RECORD ? 'record/stop' : 'play/pause' });
+      'aria-label': WORDS ? `${WORDS[0]}/${WORDS[1]}`
+        : RECORD ? 'record/stop' : STOPS ? 'play/stop' : 'play/pause' });
   // ⚠️ TWO SPANS, NOT ONE THAT GETS REWRITTEN. The stylesheet decides which one
   // is visible from `data-state`, which the bar already maintains, so there is
   // no second place that has to remember which word is showing.
@@ -536,10 +556,29 @@ export function createTransportBar(host, deck, {
    * group in exactly the same place. MEASURED both ways, unchanged to the
    * tenth of a pixel at 1280 and at 390.
    */
+  /**
+   * 🔴 `right` IS A CALLER'S OWN CONTROL IN THE RIGHT GROUP, WHERE THE RATES
+   * SIT. Asked for on `/tom/` 2026-09-21: *"bpm in on the transport, right
+   * slot"*, after that page dropped the rate lattice for a `- bpm +` stepper.
+   * ⚠️ IT IS AN OPTION RATHER THAN A PAGE REACHING INTO `.tbar-rates`, which is
+   * what this project calls hand-rolling a control that exists: a page that
+   * queries a component's insides is a page that breaks the day the component
+   * renames a class, silently, with the source still reading as correct.
+   * ⚠️ AND `extras` IS NOT THE SAME SLOT. Those are a page's VERBS and sit by
+   * the play toggle on the left, because they are things you press to make
+   * something happen. The right group is what the transport IS doing: its loop,
+   * its rate, its badge. A tempo belongs with the rate it replaces.
+   * ⚠️ THE `data-end` MARKER FALLS THROUGH TO WHICHEVER MEMBER IS FIRST. It is
+   * what holds the gap in the middle of the bar, and a bar with no loop and no
+   * lattice would otherwise have nobody holding it and pack everything left,
+   * which is the `/reel/` measurement recorded above: LOOP at 57 px with 375 px
+   * of empty bar to its right.
+   */
   if (endSide[0]) endSide[0].dataset.end = '1';
+  else if (right[0]) right[0].dataset.end = '1';
   bar.append(...(wantToggle ? [toggle] : []), ...extraEls.values(), scrub,
     ...(chip ? [chip] : live ? [liveChip.el] : wantTime ? [time] : []),
-    ...endSide, rates, badge);
+    ...endSide, rates, ...right, badge);
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────

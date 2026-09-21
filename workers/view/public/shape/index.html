@@ -91,7 +91,7 @@
   import { createStack } from '/shell/stack.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
-  import { createPresenceButton } from '/shell/presence.mjs';
+  import { createPresenceButton, WIRED } from '/shell/presence.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
   import { decode } from '/shell/midi-decode.mjs';
   import { makeCcSend } from '/shell/cc-adapter.mjs';
@@ -629,7 +629,7 @@
          carry `p.name` as the reference guide prints it. */
       label: shown(p).label,
       /* ⚠️ THE CONTROLLER NUMBER IS IN THE HOVER AND NOT UNDER THE HANDLE.
-         `/circuit/` and `/model/` both took printed CC numbers off their faces
+         `/circuit/` and `/twelve/` both took printed CC numbers off their faces
          on 2026-09-21 (*"rm ccs, also from rack"*) and the argument carries
          here: a reader moving a filter wants to know which filter, and somebody
          debugging a binding is somebody who will point at the control. What left
@@ -988,8 +988,14 @@
     return !ports.length ? 'no outputs' : port ? 'sending' : 'no match';
   }
 
+  /* ⚠️ `says: WIRED`, NOT THIS PAGE'S OWN THREE WORDS. Asked 2026-09-21:
+     *"Use connected connecting not connected on all hw demos when applicable"*.
+     `online` and `offline` are network words and suit a board answering over a
+     relay from another building; an instrument on a USB cable on this desk is
+     connected or it is not. The map is one export in `presence.mjs` so that five
+     pages cannot end up with five vocabularies that agree today. */
   const pres = createPresenceButton({
-    of: 'Circuit', state: 'unknown',
+    of: 'Circuit', state: 'unknown', says: WIRED,
     can: ['unknown', 'checking', 'online', 'offline'],
     press: () => { presses++; return d.run('look'); },
   });

@@ -69,6 +69,8 @@ const OPS = {
    *  useful patch in this repository needs. */
   channel: {
     args: ['to'], need: ['to'],
+    help: 'put every message on MIDI channel N',
+    eg: { op: 'channel', to: 1 },
     classes: (set) => set,
     run: (ev, a) => (ev.ch === null ? ev : { ...ev, ch: a.to }),
   },
@@ -76,6 +78,8 @@ const OPS = {
    *  MK-425C was measured a semitone flat. */
   transpose: {
     args: ['by'], need: ['by'],
+    help: 'move notes by N semitones, N may be negative',
+    eg: { op: 'transpose', by: -12 },
     classes: (set) => set,
     run: (ev, a) => {
       if (ev.cls !== 'note') return ev;
@@ -89,6 +93,8 @@ const OPS = {
    *  release and scaling it makes a release that never reaches zero. */
   velocity: {
     args: ['scale'], need: ['scale'],
+    help: 'multiply note-on velocity',
+    eg: { op: 'velocity', scale: 0.5 },
     classes: (set) => set,
     run: (ev, a) => {
       if (ev.cls !== 'note' || ev.d2 === 0) return ev;
@@ -98,12 +104,16 @@ const OPS = {
   /** Keep one class and drop the rest. */
   only: {
     args: ['cls'], need: ['cls'],
+    help: 'keep only that class of message and drop every other class',
+    eg: { op: 'only', cls: 'note' },
     classes: (set, a) => new Set([...set].filter((c) => c === a.cls)),
     run: (ev, a) => (ev.cls === a.cls ? ev : null),
   },
   /** Drop one class and keep the rest. */
   drop: {
     args: ['cls'], need: ['cls'],
+    help: 'drop that class of message and keep every other class',
+    eg: { op: 'drop', cls: 'clock' },
     classes: (set, a) => new Set([...set].filter((c) => c !== a.cls)),
     run: (ev, a) => (ev.cls === a.cls ? null : ev),
   },
@@ -115,8 +125,87 @@ const OPS = {
    * instrument. A remap that only knew about controller numbers would send a
    * mod wheel to both.
    */
+  /**
+   * 🔴 A KEYBOARD SPLIT, WHICH COULD NOT BE SAID AT ALL UNTIL 2026-09-21. The
+   * owner asked for one in words: *"Split the keyboard into half. Lower part
+   * plays synth 1 in the circuit and upper part plays synth 2"*, and the model
+   * produced `{"op":"only","to":1}` twice, because `only` filters by CLASS and
+   * was the nearest thing in the whole vocabulary to a filter. **It was not
+   * wrong about the intent. There was no word for it.**
+   * ⚠️ A SPLIT IS TWO LINKS, NOT ONE OP. `link()` already allows two links
+   * between the same pair, so the lower half is one link with a range and a
+   * channel and the upper half is another. That is how a real one is built.
+   * 🔴 AND A NOTE OFF OUTSIDE THE RANGE IS DROPPED TOO, WHICH IS THE WHOLE
+   * SAFETY OF IT. The filter is on the NOTE NUMBER, which is the same for the
+   * on and the off, so a note that was never let through can never be left
+   * hanging. A filter keyed on anything that differs between them stops notes.
+   */
+  /**
+   * 🔴 ONE BOUND IS ENOUGH, AND THAT IS NOT A CONCESSION TO A MODEL. *Everything
+   * above middle C* is how a person says a split out loud, and it was
+   * unsayable here: `range lo=60 hi=127` names a top that is not a decision,
+   * and the half that matters is buried beside a constant. An open end is the
+   * honest form, and the closed one is still available.
+   * ⚠️ **SO `need` IS EMPTY AND `oneOf` REPLACES IT.** A `range` with neither
+   * bound passes every note and is a transform that does nothing, which reads
+   * as a filter that is working. It is refused.
+   */
+  range: {
+    args: ['lo', 'hi'], need: [], oneOf: ['lo', 'hi'],
+    help: 'keep only notes whose NOTE NUMBER is between lo and hi, which is how a keyboard split is made and how one row of buttons is picked out of a control surface. Either bound may be left out and that end is then open',
+    eg: { op: 'range', lo: 36, hi: 47 },
+    classes: (set) => set,
+    run: (ev, a) => {
+      if (ev.cls !== 'note') return ev;
+      const lo = a.lo === undefined ? 0 : a.lo;
+      const hi = a.hi === undefined ? 127 : a.hi;
+      return (ev.d1 < lo || ev.d1 > hi) ? null : ev;
+    },
+  },
+  /**
+   * 🔴 A VELOCITY LAYER: soft hits one instrument and hard hits another, which
+   * is how a real split-by-touch is built.
+   * 🔴 AND A NOTE OFF CARRIES VELOCITY 0, SO A NAIVE FILTER LEAVES EVERY NOTE
+   * HANGING. `d2 === 0` is the off and it passes ALWAYS, whatever the window
+   * is: dropping it would mean a note let through by a hard hit is never told
+   * to stop, and a stuck note on a synth in another building is the worst thing
+   * in this file. The test asserts the off passes a window it could not enter.
+   */
+  vrange: {
+    args: ['lo', 'hi'], need: [], oneOf: ['lo', 'hi'],
+    help: 'keep only notes whose VELOCITY is between lo and hi, which is how a soft layer and a hard layer are made. Either bound may be left out and that end is then open',
+    eg: { op: 'vrange', lo: 1, hi: 63 },
+    classes: (set) => set,
+    run: (ev, a) => {
+      if (ev.cls !== 'note' || ev.d2 === 0) return ev;
+      const lo = a.lo === undefined ? 1 : a.lo;
+      const hi = a.hi === undefined ? 127 : a.hi;
+      return (ev.d2 < lo || ev.d2 > hi) ? null : ev;
+    },
+  },
+  /**
+   * 🔴 ONE VELOCITY FOR EVERY NOTE, WHICH THIS DESK'S OWN DRUMS ALREADY DO.
+   * ✅ MEASURED and written in `measured-devices-2026-09-20.md`: the Circuit's
+   * drum pads send notes 60, 62 and 64 at **velocity 96, fixed**. So this is
+   * not an effect, it is how one instrument here behaves, and a link that wants
+   * to feed it from a touch sensitive keyboard needs to say so.
+   * ⚠️ AND IT LEAVES A NOTE OFF ALONE, for the reason above: rewriting a 0 to
+   * 96 turns every release into a second note on.
+   */
+  fixed: {
+    args: ['to'], need: ['to'],
+    help: 'give every note the same velocity N, which is what this desk\'s drums already do at 96',
+    eg: { op: 'fixed', to: 96 },
+    classes: (set) => set,
+    run: (ev, a) => {
+      if (ev.cls !== 'note' || ev.d2 === 0) return ev;
+      return { ...ev, d2: Math.max(1, Math.min(127, Math.round(a.to))) };
+    },
+  },
   cc: {
     args: ['from', 'to', 'ch'], need: ['from', 'to'],
+    help: 'move the controller numbered from onto the controller numbered to, optionally onto channel ch',
+    eg: { op: 'cc', from: 1, to: 74, ch: 10 },
     classes: (set) => set,
     run: (ev, a) => {
       if (ev.cls !== 'cc' || ev.d1 !== a.from) return ev;
@@ -126,6 +215,48 @@ const OPS = {
 };
 
 export const OP_NAMES = Object.keys(OPS);
+
+/**
+ * 🔴 THE VOCABULARY, IN THE ONE PLACE THE VOCABULARY IS DECLARED, BECAUSE IT
+ * HAS ALREADY BEEN WRITTEN DOWN IN FOUR PLACES AND THE ONE A MODEL READS WENT
+ * STALE. 2026-09-21: `range`, `vrange` and `fixed` were added here and to
+ * `schemaFor()`'s `enum` and to the page's prose, and NOT to the operator table
+ * in `systemFor()`, which is the part of the prompt that defines the format. So
+ * the model was choosing from six transforms while the code accepted nine, and
+ * it reported `{"op":"only","to":N}` for the third time, which is what a model
+ * says when it means *filter* and the only filter it has been shown is `only`.
+ * ⚠️ **THE SIGNATURE IS DERIVED FROM `args`, NEVER TYPED**, so it cannot
+ * disagree with what `checkTransforms` enforces. `cls` is the one argument that
+ * is not a number and `scale` is the one that is not an integer, which is the
+ * whole of the mapping.
+ * ⚠️ AND `help` IS REQUIRED OF EVERY OP, asserted in `bay-test.mjs`, because a
+ * new transform with no sentence beside it is exactly the defect above arriving
+ * again with nobody noticing.
+ */
+const PLACE = { cls: 'C', scale: 'F' };
+
+export const OP_HELP = OP_NAMES.map((op) => ({
+  op,
+  args: OPS[op].args.slice(),
+  need: OPS[op].need.slice(),
+  oneOf: (OPS[op].oneOf || []).slice(),
+  help: OPS[op].help,
+  eg: { ...OPS[op].eg },
+  sig: `${op} ${OPS[op].args.map((a) => `${a}=${PLACE[a] || 'N'}`).join(' ')}`,
+  /**
+   * 🔴 THE LINE A MODEL COPIES. MEASURED TWICE on 2026-09-21 against
+   * `llama-3.3-70b`: shown `range lo=N hi=N` in a table and one worked example
+   * carrying `"to"`, it wrote `{"op":"range","to":7}` on every run. It had the
+   * argument names in front of it and copied the JSON instead, which is what
+   * this file already records happening to `transpose`. **A sentence is read
+   * and an example is copied**, so every transform now has one rather than the
+   * two that happened to be spelled out.
+   * ⚠️ AND THE EXAMPLE IS GRADED BY OUR OWN VALIDATOR, asserted in
+   * `bay-test.mjs`: an example `checkTransforms` would refuse is a defect being
+   * taught to a model on every call, and it would read as documentation.
+   */
+  json: JSON.stringify({ op, ...OPS[op].eg }),
+}));
 
 /**
  * 🔴 A TRANSFORM WITH ITS ARGUMENT UNDER THE WRONG KEY IS THE DEFECT THIS
@@ -170,9 +301,67 @@ export function checkTransforms(transforms) {
       }
       if (k === 'cls') {
         if (!CLASSES.includes(t.cls)) return `${t.op} was given cls "${t.cls}", which is not one of ${CLASSES.join(', ')}`;
-      } else if (typeof t[k] !== 'number' || Number.isNaN(t[k])) {
+      }
+    }
+    /**
+     * 🔴 AT LEAST ONE OF A PAIR, WHICH `need` CANNOT SAY. `range` takes a low
+     * bound, a high bound or both, because *everything above middle C* is a
+     * real instruction and naming 127 as its top is noise. A `range` with
+     * NEITHER passes every note, which is a filter that silently does nothing,
+     * so it is refused by name here rather than allowed as a no-op.
+     */
+    if (op.oneOf && op.oneOf.every((k) => t[k] === undefined || t[k] === null)) {
+      return `${t.op} takes "${op.oneOf.join('" or "')}" and was given nothing`;
+    }
+    /**
+     * 🔴 EVERY ARGUMENT THAT IS PRESENT IS TYPE CHECKED, NOT ONLY THE REQUIRED
+     * ONES. This loop used to run over `need`, so the moment an argument became
+     * optional it also became untyped: `{ op: 'range', lo: 36, hi: '47' }` would
+     * have passed, and `ev.d1 > '47'` compares a number against a string, which
+     * is not a throw and not a drop. That is the same `NaN` shape this whole
+     * function exists for, one optional argument along.
+     */
+    for (const k of op.args) {
+      if (t[k] === undefined || t[k] === null || k === 'cls') continue;
+      if (typeof t[k] !== 'number' || Number.isNaN(t[k])) {
         return `${t.op} needs "${k}" to be a number, and it is ${JSON.stringify(t[k])}`;
       }
+    }
+    /**
+     * 🔴 A RANGE THAT CANNOT PASS ANYTHING IS A FILTER THAT READS AS WORKING.
+     * `lo` above `hi` drops every note on the link, the page draws the arrow,
+     * and the instrument is silent for a reason nothing on screen explains.
+     */
+    if (op.oneOf && t.lo !== undefined && t.hi !== undefined && t.lo > t.hi) {
+      return `${t.op} was given lo ${t.lo} above hi ${t.hi}, which can never pass anything`;
+    }
+  }
+  /**
+   * 🔴 TWO RANGES OPEN AT THE SAME END, WHICH IS ALWAYS ONE RANGE WRITTEN
+   * WRONG. MEASURED 2026-09-21, eleven runs of `llama-3.3-70b`: asked to play a
+   * row of buttons, it writes `{"op":"range","to":0}` then
+   * `{"op":"range","to":7}`, spelling *range 0 to 7* as two transforms because
+   * a link is `{"from": …, "to": …}` and that is the key in front of it.
+   * 🔴 **AND THE COMPOSED RESULT IS THE WORST KIND OF WRONG**: two high bounds
+   * in a row means the LOWER one wins, so the link passes notes up to 0 and the
+   * second range is dead. It is well formed, it is allowed, and one button of
+   * eight works. A refusal that names the correction is worth more than a patch
+   * that looks fine.
+   * ⚠️ **NOT MERGED, AND THAT IS DELIBERATE.** One run of the eleven produced
+   * the pair DESCENDING, 23 then 7, so reading the first as a low bound and the
+   * second as a high one is a guess that is sometimes backwards. A repair that
+   * is right most of the time is worse here than a refusal, because the thing
+   * on the far end is an instrument in another building.
+   */
+  for (const end of ['lo', 'hi']) {
+    const same = (transforms || []).filter((t) => OPS[t?.op]?.oneOf
+      && t[end] !== undefined && t[end === 'lo' ? 'hi' : 'lo'] === undefined);
+    if (same.length > 1) {
+      const op = same[0].op;
+      const [a, b] = [same[0][end], same[1][end]];
+      return `two ${op}s both open at the same end, ${end} ${a} and ${end} ${b}, so the `
+        + `narrower one wins and the other does nothing. One ${op} takes both bounds: `
+        + `{"op": "${op}", "lo": ${Math.min(a, b)}, "hi": ${Math.max(a, b)}}`;
     }
   }
   return '';
@@ -209,11 +398,27 @@ export function delivers(emits, transforms) {
 // and they will disagree, which is this project's most expensive defect class.
 
 /** One link as one line: `from -> to { op arg, op arg }` */
+/**
+ * 🔴 AN ABSENT OPTIONAL ARGUMENT PRINTS AS `*`, AND WITHOUT IT THE ROUND TRIP
+ * BREAKS SILENTLY. This used to drop every `undefined`, which was exact while
+ * every argument was required. `range` gained an open end on 2026-09-21, and
+ * `{ range, hi: 7 }` would have printed `range 7` and read back as
+ * `{ range, lo: 7 }`: the same words meaning the opposite filter, with nothing
+ * to catch it because both are well formed. `bay-test.mjs` round trips it.
+ * ⚠️ A TRAILING absent argument is still dropped, so `cc 1 74` is unchanged and
+ * so is every line anybody has written by hand.
+ */
 export function printLink(link) {
-  const t = (link.transforms || []).map((x) =>
-    [x.op, ...OPS[x.op].args.map((k) => x[k]).filter((v) => v !== undefined)]
-      .map((v) => (typeof v === 'number' && v > 0 && x.op === 'transpose' ? `+${v}` : `${v}`))
-      .join(' ')).join(', ');
+  const t = (link.transforms || []).map((x) => {
+    const args = OPS[x.op].args.map((k) => x[k]);
+    while (args.length && args[args.length - 1] === undefined) args.pop();
+    return [x.op, ...args]
+      .map((v) => {
+        if (v === undefined) return '*';
+        return (typeof v === 'number' && v > 0 && x.op === 'transpose') ? `+${v}` : `${v}`;
+      })
+      .join(' ');
+  }).join(', ');
   return `${link.from} -> ${link.to}${t ? ` { ${t} }` : ''}`;
 }
 
@@ -229,7 +434,7 @@ export function parseLink(line) {
     if (!OPS[op]) throw new Error(`bay: no transform called "${op}". There are ${OP_NAMES.join(', ')}`);
     const t = { op };
     OPS[op].args.forEach((k, i) => {
-      if (parts[i] === undefined) return;
+      if (parts[i] === undefined || parts[i] === '*') return;   // `*` is an open end
       const n = Number(parts[i]);
       t[k] = Number.isNaN(n) ? parts[i] : n;
     });

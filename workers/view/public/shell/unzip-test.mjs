@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readZip, entry } from './unzip.mjs';
 
-const PACK = path.join(path.dirname(new URL(import.meta.url).pathname), '../../New Pack.circuitpack');
+const PACK = path.join(path.dirname(new URL(import.meta.url).pathname), '../../tmp/personal/New Pack.circuitpack');
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {

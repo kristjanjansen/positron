@@ -18,7 +18,7 @@
 // of thing it is. Three different facts, none of them in the string, and every
 // page here had been guessing at all three separately: `/bay/` stripped a
 // trailing direction word, `/wish/` carried a hand-written `sub` per diagram
-// box, and `/circuit/`, `/model/` and `/evo/` each typed their own nameplate.
+// box, and `/circuit/`, `/twelve/` and `/evo/` each typed their own nameplate.
 //
 // ⚠️ IT IS DATA, NEVER A DERIVATION. No regular expression turns `MK-425C` into
 // `Evolution`: that happens to be right here and would be wrong on the next
@@ -91,7 +91,7 @@ export const DESK = [
    * point.
    * ⚠️ AND THEY REALLY ARE TWO DIFFERENT THINGS, so this is not a label patch.
    * The MIDI pair carries notes and controllers; the DAW Control pair speaks
-   * Mackie Control, which is a mixer protocol, and `/model/` records that it
+   * Mackie Control, which is a mixer protocol, and `/twelve/` records that it
    * sends nothing at all unless DAW control mode is switched on at the desk.
    */
   {

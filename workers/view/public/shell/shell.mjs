@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '586a220-155535-d773';
+export const BUILD = 'b7e45dc-182602-8f19';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -608,11 +608,106 @@ export function setCell(cells, k, value, state) {
  */
 export function addLine(logEl, msg, kind, t) {
   const row = el('span', `pos-line${kind && kind !== 'info' ? ' ' + kind : ''}`);
-  row.append(el('span', 'pos-t', ((t ?? performance.now()) / 1000).toFixed(2)));
+  const at = (t ?? performance.now()) / 1000;
+  row.append(el('span', 'pos-t', at.toFixed(2)));
   row.append(el('span', 'pos-m', String(msg)));
   logEl.append(row);
   logEl.scrollTop = logEl.scrollHeight;
+  tapLine(at, msg, kind);
   return row;
+}
+
+/**
+ * 🔴 EVERY LOG LINE GOES TO THE DEV SERVER AS WELL, SO A SESSION CAN READ WHAT
+ * A PAGE SAID. Asked for 2026-09-21: *"build a way to get the logs and debug
+ * (like you did with tap)"*, after an afternoon where every question about what
+ * a page was doing cost the person at the desk a screenshot.
+ *
+ * 🔴 IT CAN ONLY EVER RUN ON THIS MACHINE, AND THAT IS THE WHOLE SAFETY OF IT.
+ * The route is `demo/server.mjs` only and there is none in
+ * `workers/view/src/index.js`, so a deployed page has nowhere to post even if
+ * this fired. The hostname test is the second guard, in front of the first, so
+ * a visitor's browser never makes the request at all rather than making one
+ * that 404s.
+ *
+ * ⚠️ BATCHED AND `keepalive`, NEVER ONE FETCH A LINE. A page can put a dozen
+ * lines out in a frame, and `/reel/` is this project's standing lesson about
+ * what a page quietly does on its own behalf. Lines are collected and flushed
+ * on a timer, and the last flush survives the tab closing.
+ *
+ * ⚠️ AND A FAILURE HERE IS SILENT ON PURPOSE. If nothing is listening, the page
+ * must behave exactly as it does today: no console error, no log line about the
+ * logger, no retry. A debugging aid that changes what it is watching is worse
+ * than none.
+ */
+/**
+ * 🔴 AND THERE ARE TWO DESTINATIONS, BECAUSE THE SECOND ONE ALREADY EXISTED.
+ * Asked 2026-09-21, on being told the dev server had to be restarted to pick up
+ * the route: *"just make it worker?"* — and the worker is already built and has
+ * been since 2026-09-12. `createShipper()` below posts to
+ * `https://pub.positron.studio/log`, `CLAUDE.md` documents reading it back at
+ * `https://pub.positron.studio/logs?format=text`, and SIX pages wire it by hand
+ * for the headset and phone cases.
+ * ✅ SO THIS IS A UNIFICATION RATHER THAN A THIRD MECHANISM. One function, two
+ * destinations, and every page's log reaches whichever one can be read.
+ *   **local**, on `127.0.0.1`: the dev server's `/_log`, which appends to a
+ *   file. Free, private, on by default, and it is how a session reads a page
+ *   somebody is looking at on this desk.
+ *   **`?logs=1`**, anywhere including the deploy: the Worker, which is how a
+ *   page on a phone or a headset or on positron.studio can be read at all.
+ * 🔴 THE WORKER HALF IS BEHIND A FLAG AND MUST STAY THERE. A deployed page that
+ * shipped every visitor's log by default is a page opening something on load,
+ * which is this project's most expensive named defect and cost `/reel/` a
+ * newsreel on every visit. The flag is the person saying *watch this one*.
+ * ⚠️ AND THE RING BUFFER THIS POSTS INTO USED TO EVAPORATE IN UNDER A MINUTE.
+ * MEASURED 2026-09-12: posted at 02:07:46, read back fine, gone by 02:08:32,
+ * because it was an in-memory array on a Durable Object. It is persisted now.
+ * Any *the device reported nothing* conclusion drawn before that date is
+ * worthless.
+ */
+const TAP_LOCAL = typeof location !== 'undefined'
+  && /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(location.hostname);
+const TAP_FAR = typeof location !== 'undefined'
+  && new URLSearchParams(location.search).get('logs') === '1';
+let tapQueue = [];
+let tapTimer = null;
+let tapShip = null;
+
+function tapFlush() {
+  tapTimer = null;
+  if (!tapQueue.length) return;
+  const body = JSON.stringify({
+    page: (typeof document !== 'undefined' && document.title) || '',
+    url: location.pathname + location.search,
+    build: BUILD,
+    rows: tapQueue,
+  });
+  tapQueue = [];
+  try {
+    fetch('/_log', { method: 'POST', body, keepalive: true }).catch(() => {});
+  } catch { /* nothing is listening, and that is not this page's problem */ }
+}
+
+function tapLine(at, msg, kind) {
+  // ⚠️ THE WORKER FIRST, because it is the one a person asked for by adding a
+  // flag, and because `createShipper` does its own batching and its own repeat
+  // collapsing. Built on the first line rather than at module load, so a page
+  // nobody asked to watch never constructs it.
+  if (TAP_FAR) {
+    tapShip = tapShip || createShipper();
+    tapShip(`${kind && kind !== 'info' ? `[${kind}] ` : ''}${msg}`);
+  }
+  if (!TAP_LOCAL) return;
+  tapQueue.push({ at: +at.toFixed(3), msg: String(msg), kind: kind || 'info' });
+  if (tapQueue.length > 200) { tapFlush(); return; }
+  if (tapTimer === null) tapTimer = setTimeout(tapFlush, 250);
+}
+
+if ((TAP_LOCAL || TAP_FAR) && typeof addEventListener === 'function') {
+  // ⚠️ `pagehide` AND NOT `unload`. `unload` is not fired at all in some
+  // conditions and blocks the back/forward cache where it is; `pagehide` is the
+  // one that still runs, and `keepalive` is what lets the request outlive it.
+  addEventListener('pagehide', tapFlush);
 }
 
 /**
