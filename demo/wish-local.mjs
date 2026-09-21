@@ -64,12 +64,38 @@ const exec = promisify(execFile);
 // has no way to evict one, so a session of forty edits holds forty small
 // modules. That is the price of the thing above and it is worth it on a
 // development agent.
+//
+// 🔴 **AND THE RELOAD REACHES `wish.mjs` AND NOT WHAT `wish.mjs` IMPORTS,
+// WHICH COST A THIRD DIAGNOSIS ON 2026-09-21.** That file gained an import of
+// `demo/shell/bay.mjs` that day, so the vocabulary now arrives from outside its
+// own directory. Node caches a module by URL: a new `?v=` makes a fresh
+// `wish.mjs` and its static import of `bay.mjs` resolves to the copy already in
+// the registry, however old. Editing `bay.mjs` and asking again answered
+// **`Cannot read properties of undefined (reading 'length')`**, which names
+// neither file and reads as a bug in the request.
+// ✅ **SO BOTH FILES ARE STAMPED AND THE SECOND ONE IS REPORTED RATHER THAN
+// RELOADED**, because there is no way to evict it: the line says the vocabulary
+// on disk is newer than the one answering, and says to restart. A wrong answer
+// that explains itself is worth more than a clever reload that is subtly stale.
 const MODULE = new URL('../workers/wish/src/wish.mjs', import.meta.url);
 const MODULE_PATH = fileURLToPath(MODULE);
+const VOCAB_PATH = fileURLToPath(new URL('shell/bay.mjs', import.meta.url));
 
-function stampOf() {
-  const st = fs.statSync(MODULE_PATH);
+function stampOf(file = MODULE_PATH) {
+  const st = fs.statSync(file);
   return `${Math.round(st.mtimeMs)}-${st.size}`;
+}
+
+/** The vocabulary as it was when this process first imported it. */
+let vocabAtBoot = null;
+
+/** '' while the imported vocabulary is the one on disk, or what to do about it. */
+function vocabDrift() {
+  const now = stampOf(VOCAB_PATH);
+  if (vocabAtBoot === null) { vocabAtBoot = now; return ''; }
+  if (vocabAtBoot === now) return '';
+  return `demo/shell/bay.mjs changed since this process started (${vocabAtBoot} -> ${now}). `
+    + 'Node cannot evict an imported module, so restart this agent to pick it up.';
 }
 
 let loaded = { stamp: '', mod: null };
@@ -85,6 +111,10 @@ async function wish() {
   loaded = { stamp, mod };
   return mod;
 }
+
+/* Said once per reload rather than once per request: a warning on every call is
+   a warning nobody reads. */
+let saidDrift = '';
 
 const CONFIG = path.join(os.homedir(), 'Library/Preferences/.wrangler/config/default.toml');
 
@@ -272,6 +302,13 @@ http.createServer((req, res) => {
     let body;
     try {
       const mod = await wish();
+      /* 🔴 AN IMPORTED MODULE THAT WENT STALE SAYS SO ONCE. `wish.mjs` reloads
+         and `bay.mjs` underneath it cannot, so the only honest thing is to
+         name the file and the remedy in the log this session is already
+         reading. Measured on the day the import was added: without this the
+         symptom was a TypeError naming neither file. */
+      const drift = vocabDrift();
+      if (drift && drift !== saidDrift) { console.log(`  STALE  ${drift}`); saidDrift = drift; }
       cors = mod.corsFor(req.headers.origin || null);
       if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
       if (!mod.allowedOrigin(req.headers.origin || null)) {
@@ -297,6 +334,8 @@ http.createServer((req, res) => {
      report about this agent cannot be attributed to a version of the module it
      runs, which is the rule every device log in this project already follows. */
   await wish();
+  console.log(`  bay.mjs             ${stampOf(VOCAB_PATH)}   the transform vocabulary`);
+  vocabDrift();                    // the boot stamp everything after is compared against
   // ⚠️ THIS REPORTS AND DOES NOT REFUSE TO START, WHICH IS THE OTHER HALF OF
   // READING THE CREDENTIAL PER REQUEST. Somebody can run `npx wrangler login`
   // while this is up and the next call picks it up, so a missing session is a

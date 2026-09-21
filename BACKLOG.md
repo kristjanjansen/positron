@@ -90,6 +90,84 @@ PCM is **0**, not 65 per cent. It passes erased memory, which its own comment
 already documents.
 ⚠️ Also 17 pack-named files rather than 16, 6 zips rather than 5.
 
+#### THE MODEL WAS NEVER TOLD ABOUT THE THREE TRANSFORMS WE ADDED FOR IT, 2026-09-21
+
+🔴 **REPORTED VERBATIM:** *"got this refused `Model 12 DAW Control IN to Circuit
+{ only, only, only, only, only, only, only, only, transpose +60, channel 1 }` /
+`only takes "cls" and was given "to"`"*.
+🔴 **THAT IS THE THIRD TIME THE SAME MISTAKE HAS BEEN REPORTED AND THE FIRST
+TIME THE CAUSE WAS OURS.** `{"op":"only","to":N}` was the keyboard split
+(recorded below) and the answer was to invent `range`, `vrange` and `fixed`.
+They went into the schema `enum` and into the page's `FACTS` prose. **They were
+never added to the operator table in `systemFor()`, which is the part of the
+prompt that defines the format.** So the vocabulary grew from six to nine and
+the list the model reads stayed at six, with `only` still the only thing in it
+resembling a filter.
+✅ **AND THE PATCH WAS OTHERWISE RIGHT**, which is what makes it worth reading:
+`transpose +60` and `channel 1` are exactly correct for REC notes 0 to 7 landing
+on Circuit synth 1. The eight `only`s are the model trying to pick out eight
+buttons with a word that filters by CLASS, because nothing else was offered.
+🔴 **FOUR COPIES OF ONE VOCABULARY, AND THE ONE THE MODEL READS IS THE ONE THAT
+WENT STALE**: `OPS` in `bay.mjs`, the `enum` in `schemaFor()`, the table in
+`systemFor()`, and a sentence in the page's `FACTS` reading *"and three more"*.
+`CLASSES` is a fifth, declared in both `bay.mjs` and `wish.mjs`.
+⚠️ **THE RULE IS ALREADY IN THIS REPOSITORY**: a shared measurement in two files
+is a measurement that will disagree. This is that, with a model downstream of it.
+
+✅ **FIXED, AND THE FIX CHANGED WHAT THE MODEL SAYS WITHIN ONE CALL.** The table
+and the schema `enum` are generated from `bay.mjs` now, `CLASSES` is imported
+rather than retyped, and the page's prose copy is gone. First run after it, on
+the same sentence: `Model 12 DAW Control IN -> Circuit`, the RIGHT port, and
+`range` for the button rows with `transpose +60` and `channel 1`. It had never
+written `range` before because it had never been shown it.
+
+🔴 **AND A SECOND DEFECT WAS UNCOVERED UNDERNEATH, WHICH IS STILL OPEN.** The
+model will not write `lo` and `hi`. **ELEVEN RUNS, FOUR SHAPES OF THE PROMPT**,
+all producing `{"op":"range","to":A}` then `{"op":"range","to":B}`:
+- the argument names in a table as `range lo=N hi=N` — wrong on 3 of 3
+- every transform shown as copyable JSON, `{"op":"range","lo":36,"hi":47}` — wrong on 3 of 3
+- a two-link worked example carrying `"lo"` and `"hi"` — wrong on 3 of 3
+- a JSON COUNTER-EXAMPLE naming the exact wrong form — **measured WORSE**: 2 of
+  3 still wrong and **1 returning no links at all**, which is the one answer
+  worse than a refused patch. It is not in the prompt.
+🔴 **THE CAUSE IS STRUCTURAL AND IS THE ONE ALREADY RECORDED FOR `transpose`.** A
+link is `{"from": …, "to": …}` and the model has just written one, so `to` is
+the key in front of it. It is completing the JSON it is inside, not misreading
+the table, and four kinds of telling did not move it.
+✅ **WHAT WAS DONE ABOUT IT, SHORT OF GUESSING.**
+- `from` and `to` are read as the bounds and REPORTED, like `transpose`'s. `cc
+  from=A to=B` already uses that pair for a numeric pair, so it costs the
+  language nothing.
+- `range` and `vrange` are **open ended at either end**, which is worth having on
+  its own: *everything above middle C* was unsayable, because the only legal
+  form named 127 as a decision. `oneOf` refuses a range with NEITHER bound,
+  which would pass everything while reading as a filter.
+- **Two ranges open at the SAME end are refused by name**, and the message
+  carries the correct patch as JSON: *two ranges both open at the same end, hi 0
+  and hi 7, so the narrower one wins and the other does nothing. One range takes
+  both bounds: {"op": "range", "lo": 0, "hi": 7}*. Composed, that pair passes
+  notes up to 0, so it is well formed, allowed and plays one button of eight.
+⚠️ **AND THE PAIR IS NOT MERGED INTO ONE RANGE, DELIBERATELY.** One run of the
+eleven produced it DESCENDING, 23 then 7, so reading the first as a low bound is
+a guess that is sometimes backwards. A repair that is right most of the time is
+worse than a refusal when the far end is an instrument in another building.
+⚠️ **SO THE REPORTED SENTENCE STILL ENDS IN A REFUSAL**, and it is a refusal that
+names the patch to press instead rather than `only takes "cls"`.
+
+#### `demo/wish-local.mjs` reloads one file and not what that file imports, 2026-09-21
+
+🔴 **FOUND BY HITTING IT.** That agent re-imports `wish.mjs` with a fresh `?v=`
+on every request, which its own comment says cost two diagnoses. `wish.mjs`
+gained an import of `demo/shell/bay.mjs` today, and **Node caches a module by
+URL**: the fresh `wish.mjs` resolves its static import to whatever `bay.mjs` is
+already in the registry. Editing the vocabulary and asking again answered
+**`Cannot read properties of undefined (reading 'length')`**, which names
+neither file.
+✅ **REPORTED RATHER THAN RELOADED**, because there is no way to evict it: both
+files are stamped at boot and a changed `bay.mjs` prints one `STALE` line naming
+the file and saying to restart. Proved by touching it: one line across two
+requests.
+
 #### /wish/ cannot name the port the Model 12's buttons come out of, 2026-09-21
 
 🔴 **ASKED: *"I want to play notes with my model 12 REC buttons on channels and

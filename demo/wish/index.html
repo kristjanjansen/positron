@@ -393,12 +393,20 @@
     + 'bend. REC SENDS NO NOTE OFF, so a link that plays a synth from REC leaves notes '
     + 'hanging, and SOLO or MUTE should be used instead. Those notes are very low, 0 is '
     + 'C-1, so playing a synth from them wants a transpose of about 60. '
-    + 'Transforms available: channel, transpose, velocity, only, drop, cc, and three more. '
-    + 'range takes lo and hi and keeps only notes inside that note range, which is how a '
-    + 'keyboard split is built: two links from the same port with different ranges and '
-    + 'channels. vrange takes lo and hi and keeps only notes inside that VELOCITY range, '
-    + 'which is how a soft layer and a hard layer are built. fixed takes to and gives '
-    + 'every note that velocity, which is what the Circuit drums do at 96.';
+    // 🔴 THE LIST OF TRANSFORMS USED TO BE RETYPED HERE AND IT READ
+    // *"channel, transpose, velocity, only, drop, cc, and three more"*. It was
+    // the fourth copy of one vocabulary, it was written the day `range`,
+    // `vrange` and `fixed` were added, and the copy that actually defines the
+    // format for a model, the operator table in `systemFor()`, was the one
+    // nobody updated. The table is generated from `bay.mjs` now and lists all
+    // nine with their argument names, so a sentence here naming six would only
+    // ever be a chance to disagree with it.
+    // ⚠️ WHAT STAYS IS THE PART NO PER-OP LINE CAN CARRY: a split is a SHAPE
+    // made of two links, which is a fact about composing the language rather
+    // than about any one word in it.
+    + 'A split is two links between the same pair of ports with different ranges and '
+    + 'different channels, never one link. Sending one row of buttons somewhere wants a '
+    + 'range around just those note numbers, or everything else on that port rides along.';
 
   /** What each port consents to. The Circuit's line is the one that matters. */
   /**

@@ -15,6 +15,7 @@
 // costs nobody's account anything.
 
 import { handle, relabel, PATCH, HEAR, hearPayload, allowedOrigin, corsFor } from './wish.mjs';
+import { OP_NAMES, OP_HELP } from '../../../demo/shell/bay.mjs';
 
 let ok = 0;
 const bad = [];
@@ -90,6 +91,54 @@ is('the model chooses from real port ids and nothing else',
   choices.join() === 'here:mk-425c-usb-midi-keyboard:out,here:circuit:in,here:plain:in'
   && !choices.some((c) => c === 'Evolution' || c === 'the synth'),
   choices.join());
+
+/**
+ * 🔴 THE CHECK THIS FILE DID NOT HAVE, AND IT WOULD HAVE GONE RED THE HOUR
+ * `range` WAS ADDED. 2026-09-21 the vocabulary grew from six transforms to nine
+ * in `bay.mjs` and in the `enum` below, and the operator TABLE in the prompt
+ * kept listing six. Nothing anywhere compared the two, so the model spent half a
+ * day unable to say three words the code was waiting for, and what it said
+ * instead was `only` eight times in one patch.
+ * ⚠️ IT ASSERTS THE TABLE LINE, not merely that the word appears somewhere: the
+ * facts paragraph a page sends can mention a transform in prose, and prose after
+ * a worked example is not what a model copies.
+ */
+{
+  const head = (op) => `  {"op":"${op}"`;
+  const table = lines.filter((l) => OP_NAMES.some((op) => l.startsWith(head(op))));
+  const missing = OP_NAMES.filter((op) => !table.some((l) => l.startsWith(head(op))));
+  is('every transform the code accepts has its own line in the prompt',
+    missing.length === 0 && table.length === OP_NAMES.length,
+    `missing ${missing.join(', ') || 'none'}, ${table.length} lines for ${OP_NAMES.length} ops`);
+
+  /* And each line carries the ARGUMENT NAME, which is the half the model gets
+     wrong. `only cls=C` on its own page is what `{"op":"only","to":N}` was
+     missing. */
+  const unnamed = OP_HELP.filter((o) => !prompt.includes(o.json));
+  is('every transform is shown as the JSON object a model can copy',
+    unnamed.length === 0, unnamed.map((o) => o.json).join(' | '));
+
+  /* 🔴 NEGATIVE CONTROL. A check that only ever looks for what is there would
+     pass a table containing a transform nobody implemented, which is the same
+     drift pointing the other way: a model told about `quantize` would send one
+     and `checkTransforms` would refuse it. */
+  const named = lines
+    .map((l) => /^ {2}\{"op":"([a-z]+)"/.exec(l))
+    .filter(Boolean).map((m) => m[1]);
+  const invented = named.filter((n) => !OP_NAMES.includes(n));
+  is('NEGATIVE CONTROL: the prompt names no transform the code does not have',
+    invented.length === 0, invented.join(', '));
+
+  /* The schema and the table are two lists the model reads at once, and they
+     came from one declaration precisely so they cannot part company. */
+  const t = items.properties.transforms.items;
+  is('the schema offers exactly the transforms the prompt describes',
+    t.properties.op.enum.join() === OP_NAMES.join(), t.properties.op.enum.join());
+  const args = [...new Set(OP_HELP.flatMap((o) => o.args))];
+  const absent = args.filter((a) => t.properties[a] === undefined);
+  is('every argument any transform takes is a property the model may send',
+    absent.length === 0, absent.join(', '));
+}
 
 /**
  * The repair, both directions. `transpose` takes `by`; this model writes `to`
