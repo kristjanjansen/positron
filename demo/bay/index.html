@@ -155,7 +155,29 @@
   const why = el('div', 'bay-why');
   const clearPick = el('button', 'pos-btn', 'clear', { type: 'button' });
   const make = el('div', 'bay-make');
-  make.append(line, clearPick);
+  /**
+   * 🔴 PANIC, AND IT EXISTS BECAUSE MIDI IS NOW ACTUALLY FLOWING. Reported
+   * 2026-09-21, minutes after this page first carried a note to an instrument:
+   * *"got stuch notes. panic/noteoff?"* A stuck note is a held voice on
+   * somebody's synth with nothing on screen able to release it, and the only
+   * other way out is unplugging the instrument.
+   * 🔴 IT DOES NOT GO IN `.pos-controls`. `demo/verify.mjs` presses every button
+   * in that row on every run, dozens of times a day, and this one reaches every
+   * output on the desk. It sits beside `clear`, which is where this page already
+   * keeps the things that act.
+   * ⚠️ AND IT IS A SECOND WAY OUT OF THIS PAGE, WHICH IS THE THING WORTH
+   * DECLARING. `deliver` was the only exit and that made "this page has only
+   * ever sent notes, controllers and bend" an assert over a counter rather than
+   * a claim about a file. Panic must not route through a LINK, because a broken
+   * or removed link is exactly when it is needed, so it reaches the outputs
+   * directly. It therefore shares `toBytes` and bumps the same counter, and
+   * there is an assert that it can express nothing new.
+   */
+  const panic = el('button', 'pos-btn', 'panic', { type: 'button' });
+  panic.title = 'send all notes off and all sound off on every channel to every '
+    + 'instrument this page can reach, whatever is linked';
+  panic.onclick = () => allOff();
+  make.append(line, clearPick, panic);
 
   const linksT = createTable({
     columns: [
@@ -353,15 +375,75 @@
   const PLAY_WINDOW = 12000;
   let playAt = 0;
 
-  /** Is this message a deliberate press rather than traffic? */
+  /**
+   * Is this message a deliberate press rather than traffic?
+   *
+   * 🔴 A NOTE ON AND NOTHING ELSE, AND THE FIRST BUILD ALSO ACCEPTED A
+   * CONTROLLER AND A BEND, WHICH A LOOPBACK TURNED INTO A DEFECT WITHIN A
+   * MINUTE. MEASURED in a real browser on this desk: `IAC Driver Bus 1` is a
+   * loopback, so every byte this page sends to its output arrives back on its
+   * input. `panic` sends 32 control changes to every output, they came straight
+   * back, and the page read them as somebody playing the IAC bus and linked the
+   * keyboard to it. The log said `connected by playing them:
+   * mk-425c-usb-midi-keyboard:out -> iac-driver-bus-1:in`, which nobody asked
+   * for and which looks exactly like the feature working.
+   * ⚠️ A KNOB TURN PICKING AN INSTRUMENT WAS THE NICER BEHAVIOUR AND IT LOST TO
+   * THIS, which is the right way round: a loopback hijacking the bay is a bug
+   * and a knob not picking is a smaller feature.
+   * ⚠️ AND VELOCITY ZERO IS A NOTE OFF whatever the status byte says, because
+   * this keyboard sends releases as note on with velocity 0 and every single
+   * press would otherwise pick two instruments.
+   */
   function isGesture(m) {
-    const cls = classOf(m);
-    if (cls === 'note') return (m.d2 ?? 0) > 0;     // velocity 0 is a release
-    return cls === 'cc' || cls === 'bend';
+    return classOf(m) === 'note' && (m.d2 ?? 0) > 0;
   }
+
+  /**
+   * 🔴 AND NOTES ECHO TOO, WHICH THE FILTER ABOVE CANNOT CATCH. A link into a
+   * loopback sends notes to its output and they arrive back on its input, so
+   * the bay would read its own traffic as a gesture and pick the bus it had
+   * just been told to feed. So a port is deaf for a moment after this page
+   * sends to it: not to what it delivers, which is the whole job, but to what
+   * it READS BACK as a decision.
+   * ⚠️ IT IS PER PORT rather than one global gate, because a real hand on a
+   * second instrument during that moment is a real gesture and must not be
+   * swallowed.
+   * ⚠️ AND IT IS 250 ms, WHICH IS A GUESS WITH A REASON. CoreMIDI loopback is
+   * sub-millisecond, so this is two orders of magnitude of headroom; the cost
+   * of it being too long is that playing the same instrument you just patched
+   * INTO is ignored for a quarter of a second, and the cost of too short is the
+   * defect above.
+   */
+  const ECHO_MS = 250;
+  const echoUntil = new Map();            // port id -> when it may be believed again
+  const hush = (id) => echoUntil.set(id, performance.now() + ECHO_MS);
+  const hushed = (id) => (echoUntil.get(id) ?? 0) > performance.now();
+
+  /**
+   * 🔴 A LOOPBACK IS A DESTINATION, NOT SOMETHING YOU PLAY. Asked 2026-09-21
+   * after it hijacked the bay: *"can we ignore iac"*.
+   * `IAC Driver Bus 1` is a macOS virtual bus. Nobody presses a key on it, so
+   * it can never be the instrument somebody meant, and everything sent to it
+   * comes back on its input where it looks exactly like somebody playing.
+   * ✅ **IT KEEPS ITS ROW, WHICH IS THE HALF THAT MATTERS.** This page's own
+   * rule is that a port which vanished says it does not exist, and that is a
+   * different and false statement: routing to the IAC bus is how you reach
+   * another application on this machine, and it is a real thing to want. So it
+   * is reachable by PRESSING it and never by playing it, which is the honest
+   * split between *a thing you choose* and *a thing you play*.
+   * ⚠️ AND THE ECHO HUSH STAYS DESPITE THIS. It is not redundant: a link into
+   * the IAC bus still returns its own notes, other virtual buses exist under
+   * other names, and two instruments daisy-chained through a DIN socket echo
+   * the same way with nothing in their names to say so.
+   */
+  const NEVER_PLAYED = /\biac\b|loopback|virtual/i;
 
   function played(portIdOfSender, m) {
     if (!isGesture(m)) return;
+    /* This page just sent to the other half of this instrument, so what has
+       arrived is very likely its own bytes coming back. */
+    if (hushed(nodeOf(portIdOfSender))) return;
+    if (NEVER_PLAYED.test(rawName.get(portIdOfSender) || '')) return;
     const node = nodeOf(portIdOfSender);
     const g = instrument(node);
     if (!g) return;
@@ -484,6 +566,11 @@
          ROW. The Model 12 arrives as `Model 12 MIDI IN` and `Model 12 MIDI
          OUT`, so a reader who wants to know which port the grouping picked up
          should not have to take it on trust. */
+      /* A bus says what it is, on the row, because *why did nothing happen when
+         I played it* is a question asked at the row rather than in a comment. */
+      if (g.out && NEVER_PLAYED.test(rawName.get(g.out.id) || '')) {
+        lines.push('a virtual bus, so press it rather than playing it');
+      }
       const sentAs = g.out && rawName.get(g.out.id);
       const tookAs = g.in && rawName.get(g.in.id);
       if (sentAs && sentAs !== g.label) lines.push(`sends as ${sentAs}`);
@@ -587,7 +674,7 @@
         if (!bytes) return;
         /* ⚠️ A REAL SEND, AND THE ONLY ONE ON THIS PAGE. Everything upstream of
            here is arithmetic; this is the byte leaving the building. */
-        try { outs.get(id)?.send(bytes); heard++; d.set('heard', heard || ''); }
+        try { outs.get(id)?.send(bytes); hush(nodeOf(id)); heard++; d.set('heard', heard || ''); }
         catch (err) { d.log(`${p.name} refused a message: ${err.message}`, 'warn'); }
       } });
     outs.set(id, p);
@@ -600,6 +687,41 @@
    * and it is deliberately a second wall behind the `accepts` list: a list is a
    * declaration and this is arithmetic.
    */
+  /**
+   * 🔴 ALL NOTES OFF AND ALL SOUND OFF, ON EVERY CHANNEL, TO EVERY OUTPUT.
+   * CC 123 is All Notes Off and CC 120 is All Sound Off, and both are ordinary
+   * channel mode control changes, so this expresses NOTHING `toBytes` could not
+   * already build: no SysEx, no program change, no clock byte. The Circuit has
+   * no factory reset and neither of these touches flash.
+   * ⚠️ BOTH, AND IN THAT ORDER, BECAUSE THEY ARE DIFFERENT MESSAGES. All Notes
+   * Off releases held notes and lets their release envelopes finish, which is
+   * the musical answer. All Sound Off cuts the voices dead, which is the answer
+   * when a note is stuck because something never sent a release at all. Sending
+   * only the first leaves a hung voice on a synth with a long release; sending
+   * only the second makes a normal release sound broken.
+   * ⚠️ AND EVERY CHANNEL, NOT THE ONE THE LINK USED. A stuck note is by
+   * definition on a channel nobody is tracking any more, which is why the
+   * transform that moved it is no help here.
+   */
+  function allOff() {
+    let n = 0;
+    const reached = [];
+    for (const [id, port] of outs) {
+      let ok = 0;
+      for (let ch = 1; ch <= 16; ch++) {
+        for (const cc of [123, 120]) {
+          const bytes = toBytes({ cls: 'cc', ch, d1: cc, d2: 0 });
+          if (!bytes) continue;
+          try { port.send(bytes); hush(nodeOf(id)); ok++; n++; heard++; } catch { /* a port may have gone */ }
+        }
+      }
+      if (ok) reached.push(bay.port(id)?.label || id);
+    }
+    d.set('heard', heard || '');
+    if (!n) { d.log('nothing to send panic to, so press the status button first', 'warn'); return; }
+    d.log(`panic: all notes off and all sound off on 16 channels to ${reached.join(', ')}`, 'hi');
+  }
+
   function toBytes(ev) {
     const ch = Math.max(0, Math.min(15, (ev.ch ?? 1) - 1));
     if (ev.cls === 'note') return [(ev.d2 === 0 ? 0x80 : 0x90) | ch, ev.d1, ev.d2 ?? 0];
@@ -810,6 +932,30 @@
         && made?.from === 'test:model12:out' && made?.to === 'test:circuit:in',
         made ? printLink(made) : 'no link');
 
+      /**
+       * 🔴 THE LOOPBACK, WHICH IS THE DEFECT A REAL DESK FOUND AND A HARNESS
+       * NEVER WOULD. `IAC Driver Bus 1` sends back everything sent to it, so
+       * `panic`'s 32 control changes returned on its input and the page linked
+       * the keyboard to the bus. Both halves of the repair are asserted: a
+       * controller is no longer a gesture at all, and a note arriving from an
+       * instrument this page has just sent to is treated as its own echo.
+       */
+      pick = null;
+      const CC = { kind: 'control', ch: 1, d1: 74, d2: 64 };
+      played('test:circuit:out', CC);
+      d.assert('a controller is not a gesture, so a loopback echoing our own control changes picks nothing',
+        pick === null, `pick ${pick}`);
+
+      hush('test:circuit');
+      played('test:circuit:out', NOTE);
+      const duringHush = pick;
+      echoUntil.clear();
+      played('test:circuit:out', NOTE);
+      d.assert('and a note from an instrument we just sent to is our own echo, until the moment passes',
+        duringHush === null && pick === 'test:circuit',
+        `during the hush ${duringHush}, after it ${pick}`);
+      pick = null;
+
       /* The window, asserted by moving the clock rather than by waiting. */
       pick = null;
       played('test:model12:out', NOTE);
@@ -1000,6 +1146,39 @@
       d.assert('the page does not drag sideways at this width',
         document.documentElement.scrollWidth <= window.innerWidth + 1,
         `page ${document.documentElement.scrollWidth} against ${window.innerWidth}`);
+    }
+
+    /**
+     * 🔴 PANIC IS GRADED AS A SECOND EXIT, WHICH IS THE ONLY THING THAT MAKES
+     * IT SAFE TO HAVE. `deliver` used to be the one way out, and that is what
+     * turned "this page has only ever sent notes, controllers and bend" into a
+     * counter rather than a claim about a file. A second exit has to be held to
+     * the same wall.
+     */
+    {
+      /* Every byte panic can produce, built the same way it builds them. */
+      const made = [];
+      for (let ch = 1; ch <= 16; ch++) for (const cc of [123, 120]) {
+        made.push(toBytes({ cls: 'cc', ch, d1: cc, d2: 0 }));
+      }
+      const bad = made.filter((b) => !b || (b[0] & 0xf0) !== 0xb0);
+      d.assert('panic can only ever produce control changes, 32 of them, on all 16 channels',
+        made.length === 32 && bad.length === 0
+        && new Set(made.map((b) => b[0] & 0x0f)).size === 16,
+        `${made.length} messages, ${bad.length} that are not a control change`);
+
+      /* The negative half: the two it sends are the two that release a voice,
+         and nothing here can reach a note, a program change or SysEx. */
+      d.assert('and it sends all notes off and all sound off, and can express neither a note nor a program change',
+        new Set(made.map((b) => b[1])).size === 2
+        && made.some((b) => b[1] === 123) && made.some((b) => b[1] === 120)
+        && toBytes({ cls: 'program', d1: 3 }) === null
+        && toBytes({ cls: 'sysex' }) === null,
+        `controllers ${[...new Set(made.map((b) => b[1]))].join(' and ')}`);
+
+      d.assert('panic is not in the harness row, because a suite run must not reach the desk',
+        make.contains(panic) && !panic.closest('.pos-controls'),
+        panic.closest('.pos-controls') ? 'it is in .pos-controls' : 'beside clear, in the page');
     }
 
     d.assert('no secret in this page', !location.href.includes('token'));
