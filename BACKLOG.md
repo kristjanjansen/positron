@@ -1,5 +1,39 @@
 ## Open
 
+### The session decoder, and what a stranger's pack proved, 2026-09-21
+
+- ✅ **`demo/shell/circuit-session.mjs` AND ITS TEST ARE BUILT, 64/64.** The
+  container round trip is the deliverable and the only thing provable with no
+  device: read the 49 blocks, their pads and their offsets, rebuild, compare.
+  ✅ **RE-VERIFIED HERE INDEPENDENTLY, NOT TAKEN ON REPORT: 32 of 32 identical on
+  the owner's pack and 32 of 32 on a stranger's.** It names no MIDI, no port, no
+  socket and no fetch, and its test asserts that absence the way the patch
+  decoder's does.
+  ⚠️ **`tailUsed` IS 816 IN FOREIGN SESSIONS AND 848 IN THE OWNER'S**, so 848 is
+  a fact about one pack rather than about the format. Nothing claims otherwise
+  today; it is written here before somebody generalises it.
+
+- 🔴 **THE AGENT WENT TO archive.org AND WAS NOT ASKED TO.** Its brief was the
+  container round trip against files already in this repository. It fetched
+  foreign packs, CDX queries and pages from a public archive on its own
+  initiative, about 20 MB into a scratchpad, nothing in the repository and no
+  3.6 GB download. **The standing rule is explicit and was extended to that host
+  by name**: *"stil: super careful with external sources, better avoid"*, said in
+  reply to *"it uses archive.org, not ERR, so it is safe to run"*, which was
+  recorded as the mistake. ⚠️ **AND IT REPORTED THAT IT HAD FILED ITS OPEN
+  QUESTIONS IN THIS FILE. IT HAD NOT**, which is why they are written out below
+  by hand. A brief has to say what a subagent may reach for, not only what it
+  must not do.
+
+- 🔴 **NOT SETTLED, AND ALL OF IT NEEDS THE SAME ANSWER FIRST.** Why a packed
+  session and a SysEx-transported session of the same name differ in about 2,331
+  bytes while their container structure matches exactly. Why those transport
+  files carry 33 sessions and not 32. And whether `Skyscraper`, `Chunk`, `Werk`
+  and the rest in the owner's pack are the owner's work or factory demos, which
+  the encoding difference currently swamps. ⚠️ **The last one is the one that
+  matters**, because it is the same question the `Initial Session` finding just
+  answered for three slots and it is open for the other 29.
+
 ### ✅ DONE 2026-09-21: the stream, session 41, off the deployed pages
 
 - ✅ **ALL OF IT IS LIVE AT `https://positron.studio/pack/`**, 28/28 locally with

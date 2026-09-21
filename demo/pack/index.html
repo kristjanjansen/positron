@@ -46,7 +46,7 @@
   import {
     readPatch, summarise, sessionStats, patchFields, modSlots,
     categoryName, named, ADDRESSES,
-    PATCH_BYTES, PATCH_DATA, DATA_AT, SYSEX_HEAD, MOD_DESTINATIONS, LFO_WAVES,
+    PATCH_BYTES, PATCH_DATA, DATA_AT, SYSEX_HEAD, COMMANDS, MOD_DESTINATIONS,
   } from '/shell/circuit-patch.mjs';
 
   /**
@@ -384,11 +384,20 @@
   /** One loose patch message, which is what all 128 in this archive are. */
   async function openSyx(name, bytes) {
     if (bytes.length !== PATCH_BYTES) {
+      // ⚠️ A `.syx` LONGER THAN ONE MESSAGE IS A BANK, and a bank is 64 Replace
+      // Patch messages by the reference's own definition, which is the flash
+      // writing one. Scanning it is how that gets said rather than refused.
+      const scan = sysexScan(bytes);
+      if (scan.patches.length) {
+        fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), [], []);
+        sayScan(name, scan, `${name}, ${scan.patches.length} patches, read in this tab and sent nowhere`);
+        return;
+      }
       drop.say(`${name} is ${bytes.length} bytes and a Circuit patch is ${PATCH_BYTES}`, 'bad');
       return;
     }
     fill([{ name, bytes }], [], []);
-    drop.say(`${name}, one patch, read in this tab and sent nowhere`, 'good');
+    sayScan(name, sysexScan(bytes), `${name}, one patch, read in this tab and sent nowhere`);
   }
 
   /**
@@ -429,10 +438,75 @@
     drop.say(`${name} holds no Circuit pack and no patches`, 'bad');
   }
 
+  /**
+   * 🔴 A FILE THAT IS NOT A ZIP IS NOT NECESSARILY HARMLESS, AND THIS PAGE USED
+   * TO SAY `did not read as a pack` AND STOP. MEASURED 2026-09-21 on a file
+   * called `on_the_run.circuitpack` from a public archive: it is **not a zip at
+   * all**, it is a raw stream of **6,930 SysEx messages**, and 64 of those are
+   * Circuit patch messages carrying **command byte `01`, `Replace Patch`, the
+   * one that writes FLASH**, aimed at **every slot from 0 to 63**. The extension
+   * says pack, Novation Components would refuse it, and the next thing anybody
+   * reaches for is a SysEx tool, which is the one route with no safety rail.
+   * **So the most dangerous shape a file can have was the one this page had
+   * nothing to say about.**
+   * ⚠️ READING ONE IS STILL FREE and the patches in it are shown, because
+   * nothing here can send anything. What changes is that the page says out loud
+   * what the file would do in a tool that can.
+   */
+  function sysexScan(b) {
+    const out = { messages: 0, patches: [], flash: 0, slots: new Set() };
+    for (let i = 0; i < b.length; i++) {
+      if (b[i] !== 0xf0) continue;
+      let j = i + 1;
+      while (j < b.length && b[j] !== 0xf7) j++;
+      if (j >= b.length) break;
+      out.messages++;
+      if (j - i + 1 === PATCH_BYTES && SYSEX_HEAD.every((v, k) => b[i + k] === v)) {
+        out.patches.push(b.subarray(i, j + 1));
+        if (COMMANDS[b[i + 6]]?.flash) { out.flash++; out.slots.add(b[i + 7]); }
+      }
+      i = j;
+    }
+    return out;
+  }
+
+  let lastScan = null;
+
+  /**
+   * ⚠️ IT ALWAYS SAYS SOMETHING, AND THE FIRST VERSION RETURNED EARLY WHEN THERE
+   * WAS NOTHING TO WARN ABOUT. That left the PREVIOUS file's warning standing on
+   * screen while a harmless file was open, which is a stale alarm: the worst
+   * kind, because it is the one that teaches a reader to stop believing the
+   * alarms. Caught by the negative control rather than by looking.
+   */
+  function sayScan(name, scan, ok) {
+    lastScan = scan;
+    if (!scan.flash) { if (ok) drop.say(ok, 'good'); return; }
+    const slots = [...scan.slots].sort((a, b) => a - b);
+    const span = slots.length > 1 ? `${slots.length} slots, ${slots[0]} to ${slots[slots.length - 1]}` : `slot ${slots[0]}`;
+    drop.say(`${name} would overwrite ${span} in the flash of a Circuit if it were sent. `
+      + 'Nothing here can send it', 'bad');
+    d.log(`${name} carries ${scan.flash} Replace Patch message(s), which write flash on an `
+        + 'instrument with no factory reset', 'bad');
+  }
+
   async function openPack(name, bytes, from = '') {
     let list;
     try { list = readZip(bytes); }
-    catch (e) { drop.say(`${name} did not read as a pack: ${e.message}`, 'bad'); return; }
+    catch (e) {
+      // ⚠️ IT SAYS BOTH THINGS: that it is not a pack, and what it IS.
+      const scan = sysexScan(bytes);
+      if (scan.patches.length) {
+        d.log(`${name} is not a zip. It is a stream of ${scan.messages} sysex messages, `
+            + `${scan.patches.length} of them Circuit patches`, 'hi');
+        fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), [], []);
+        sayScan(name, scan, `${name}, ${scan.patches.length} patches out of a sysex stream, `
+          + 'read in this tab and sent nowhere');
+        return;
+      }
+      drop.say(`${name} did not read as a pack: ${e.message}`, 'bad');
+      return;
+    }
 
     const meta = entry(list, 'index.json');
     let names = [];
@@ -754,6 +828,45 @@
         && Math.min(...secs) < Math.max(...secs),
         `${Math.min(...secs).toFixed(2)} s to ${Math.max(...secs).toFixed(2)} s, `
         + `${secs.reduce((a, b) => a + b, 0).toFixed(1)} s in total`);
+
+      /**
+       * 🔴 THE FLASH WARNING, DRIVEN RATHER THAN READ. A file that would
+       * overwrite every patch slot on the instrument is the one thing this page
+       * exists to notice, and until today it was dismissed as `did not read as a
+       * pack`. The stream is built here from the pack's own 64 patches with byte
+       * 6 flipped to `01`, which is exactly the file measured in the wild.
+       */
+      // ⚠️ SNAPSHOT FIRST, AND THE NEGATIVE CONTROL CAUGHT THAT THIS WAS
+      // MISSING. `fill()` REPLACES `patches`, so building the safe stream out of
+      // `patches` after loading the flash one built it out of the flash one and
+      // the control went red reporting 64 of 64 writing flash. It was measuring
+      // the page correctly and my check was reading a variable that had moved.
+      const orig = patches.map((q) => q.bytes.slice());
+      const stream = new Uint8Array(PATCH_BYTES * 64);
+      for (let k = 0; k < 64; k++) {
+        const one = orig[k].slice();
+        one[6] = 0x01; one[7] = k;
+        stream.set(one, k * PATCH_BYTES);
+      }
+      await openPack('a bank that writes flash', stream);
+      d.assert('a file that would overwrite flash is named as one, with how many slots it reaches',
+        lastScan?.flash === 64 && lastScan.slots.size === 64
+        && /overwrite 64 slots, 0 to 63/.test(drop.note.textContent)
+        && patches.length === 64,
+        `"${drop.note.textContent.slice(0, 80)}"`);
+
+      // ⚠️ THE NEGATIVE CONTROL. A page that shouted at every file would pass
+      // the line above and be worthless. The same 64 messages with byte 6 left
+      // alone are the portable single patch format and must raise nothing.
+      const safe = new Uint8Array(PATCH_BYTES * 64);
+      for (let k = 0; k < 64; k++) safe.set(orig[k], k * PATCH_BYTES);
+      await openPack('a bank that lands in RAM', safe);
+      d.assert('NEGATIVE CONTROL: the same messages that land in RAM raise nothing',
+        lastScan?.flash === 0 && !/overwrite/.test(drop.note.textContent)
+        && patches.length === 64,
+        `${lastScan?.patches.length} patches, ${lastScan?.flash} of them writing flash`);
+
+      await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
       const before = fetched;
       showPatch(3);
