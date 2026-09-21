@@ -490,6 +490,33 @@
   visitor reading `THINK` beside `HEAR` learns nothing about what either one
   produces.
 
+- 🔴 **`/wish/` LOSES ITS READOUT ENTIRELY.** Asked: *"rm links / 1 / refused /
+  1"*, which is both remaining cells after the two timings went earlier today.
+  So `readout: null`.
+  ✅ **AND NOTHING IS LOST, WHICH WAS CHECKED RATHER THAN ASSUMED**: the log
+  already prints `thought for N ms: 1 link(s), 0 refused, N tokens` on every
+  proposal, so both numbers survive with their timings beside them.
+  ⚠️ **VERIFY THE EMPTY BOX IS NOT PAINTED**, measured rather than trusted. The
+  same removal on `/evo/` an hour ago was checked this way and read
+  `.pos-readout` present, **0 px tall, hidden true**. The shell hides an empty
+  readout, but `/typist/` proved what happens when it does not: a 2 px
+  full-width band nobody wrote, reported as *"old UI creeping in"*.
+  ⚠️ The harness assert `declares a readout` flips to *declares that it has no
+  readout, on purpose* and the count does not move.
+
+- 🔴 **`# no patch yet` GOES.** Asked: *"rm no patch yet"*.
+  ✅ **AND IT SHOULD BECOME THE SAME TREATMENT THE PICTURE JUST GOT**, which
+  keeps two surfaces consistent instead of inventing a third behaviour: the room
+  is reserved from the first paint so an answer landing after a two model round
+  trip cannot shove the log down the page, and the box shows nothing until there
+  is something to show. `.wish-patch` must then paint no border and no
+  background while empty, because **an empty box is a line**, which is the rule
+  `/typist/` bought.
+  ⚠️ **THE OTHER EMPTY STATE IS NOT A PLACEHOLDER AND MUST SURVIVE**: *the model
+  proposed nothing, which is the right answer to an instruction that names
+  nothing on this desk* is a REPORT, not furniture. Two empty states, and only
+  one of them is *nothing has happened yet*.
+
 ### Asked 2026-09-21, session 40, /evo/ starting on C3
 
 - 🔴 **`/evo/` SHOULD START ON C3, AND THERE ARE TWO SEPARATE THINGS TO FIX.**
