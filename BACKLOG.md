@@ -1,5 +1,68 @@
 ## Open
 
+### 🔴 OPEN AND WORKING FROM MEMORY IS WHY, 2026-09-21, session 42
+
+🔴 **I STOPPED WRITING REQUESTS DOWN AND THE OWNER HAD TO REPEAT THEMSELVES.**
+`no top padding on titles` was said FOUR times, `playing col hilite` THREE, and
+`permanent loop` THREE. CLAUDE.md says a request goes in this file BEFORE it is
+worked on and that working from memory *"fails silently for twenty"*. It was
+followed at the top of this session and abandoned around the `/pack/` stream.
+⚠️ **AND ONE OF THEM I HAD BACKWARDS FROM THE FIRST MESSAGE.** `no top padding
+on titles` meant the title HAS none and needs some; every repeat said so more
+plainly while I removed more padding. Written down, it would have been read
+once by somebody who was not mid-edit.
+
+#### /tom/, open
+
+- 🔴 **`i can not hear 1st col beat`**. The step at column 1 does not sound
+  after a wrap. ⚖️ **CANDIDATE CAUSE, NOT YET PROVED**: `timeline/transport.mjs`
+  resets an event with `ev.at > st.p0`, strictly greater, so an event scheduled
+  at exactly `0` is never re-armed after `deck.seek(0)`. The score puts step 0
+  at `at: 0`. A one millisecond offset on the whole score would move every event
+  off the range start and cost nothing audible, and that is the fix to TEST
+  rather than to assume.
+- **Sample accurate scheduling.** The lane is timer fired; the readout has been
+  seen at 22.6 ms and at 1.5 ms. `createAudioLane` became usable this evening
+  when its loop defect was fixed, and switching costs up to 100 ms before a cell
+  edit takes effect, which is `horizonMs`.
+
+#### Asked and answered in words, not built
+
+- **Realtime transcription**, asked THREE times. Whisper on Workers AI is batch,
+  961 ms for 3.68 s. The browser's own `SpeechRecognition` gives interim text
+  free, and in Chrome it sends audio to Google, which needs a decision rather
+  than a guess.
+- **`DESK - so use it`.** `instruments.mjs` holds what the things on this desk
+  are called; what has no home is a record of which PORTS a device had when it
+  was last seen, which is what the question was about.
+
+#### From the archive download, 2026-09-21
+
+- 🔴 **THE 3.0 GiB `Novation Circuit.zip` IS STILL THERE**, 87 per cent of the
+  item, left deliberately. It needs a decision rather than a default.
+- 🔴 **`stepGridLooksRight()` HAS A MEASURED FALSE POSITIVE RATE AND ITS CLAIM
+  IS TOO STRONG.** Sliced blindly, a sample set yields 108 blocks of 53,248
+  bytes that are PCM audio and **70 of 108 pass it**, because quiet audio is
+  mostly zeros and the published random-bytes control was the wrong shape. It
+  fails safe, those 70 yield zero notes, but the module says it tells a session
+  from a same-sized file and it does not. **Magic `dc bb` at offset 4 is 0 of
+  108 against 32 of 32 and is two bytes cheaper.**
+- ⚖️ **GATE REACHES 224 WHERE THE DOCUMENTED `0xFF` RANGE IS 1 TO 96.** 22 of
+  1,315 events, values 132, 200 and 224, and the sixths-of-a-step reading does
+  not explain them. Not settled without the instrument.
+- **`.ncs`, the Circuit Tracks project format**, shares the session header
+  convention (`USER` at 0, a 32 byte name at 16) with magic `0c 74` rather than
+  `dc bb`. No decoder. Whether the 28 byte step record survives into it is
+  unmeasured.
+
+#### Standing, and not new
+
+- **A build and a deploy.** `/twelve/` 404s on the edge until `node build.mjs`
+  runs and `/model/` keeps serving. Nothing since BUILD 586a220 is live.
+- **34 `/model/` references in THIS file**, left when the rename swept fourteen
+  others.
+- **`/bay/`'s five requests**, open since the revert, deferred on instruction.
+
 ### The incoming, 2026-09-21, late
 
 🔴 **FIVE OF THESE ARE RE-ASKS OF REQUESTS ALREADY IN THIS FILE FROM SESSION
