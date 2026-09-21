@@ -47,7 +47,7 @@
      sat 15 px from the top and **29** from the bottom, because the last child
      was a `.pos-controls` carrying its own `margin-bottom: 14px` which stacks
      on the padding. Moving the padding would have moved 14 px of a 29 px gap
-     and been reported again, which is exactly what `/model/` was corrected by
+     and been reported again, which is exactly what `/twelve/` was corrected by
      screenshot twelve times for: *"less h padding on strip"*, where the padding
      was already equal and a 146 px heading was leaving 50.2 px of air.
      🔴 AND IT IS `:not(.kit-out)` BECAUSE EIGHT BOXES DO THIS ON PURPOSE.
@@ -766,7 +766,7 @@
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A hardware panel, as of
    * 2026-09-21, asked for as *"generalize the evoltion layout to reusable
    * components / use from others. same patters"* and then *"do it and add to
-   * kit"*. It had been hand-rolled THREE times: `/model/` called the parts
+   * kit"*. It had been hand-rolled THREE times: `/twelve/` called the parts
    * `.rack-wrap` and `.rack-row`, `/circuit/` called them `.circ-panel` and
    * `.circ-scroll`, and `/evo/` called them `.pan-wrap` and `.pan-strip` after
    * having called them `.evo-wrap` and `.evo-strip`.
@@ -1617,9 +1617,17 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       box.append(stack.el);
     });
 
+  /* ⚠️ THE WORDS ARE AN OPTION AND THERE IS A NAMED MAP FOR INSTRUMENTS ON A
+     CABLE. `SAYS` is network language and suits a board answering over a relay;
+     `WIRED` says `connected`, `connecting` and `not connected`, and five pages
+     take it (`/circuit/`, `/twelve/`, `/shape/`, `/bay/`, `/evo/`). The
+     specimens below keep `SAYS`, because what they demonstrate is the five
+     STATES rather than one vocabulary, and because the width check at the
+     bottom is calibrated on the default phrases. */
   section('status', 'PRESENCE',
     'Five states, and whether a person or a harness is holding it.',
     `createPresence({ of: 'the board' }).set('online')
+createPresence({ of: 'the Circuit', says: WIRED })   // connected / connecting / not connected
 createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } }).busy('tool')
 createPresence({ of: 'the board', mode: 'dot', state: 'online' })
 presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
@@ -2880,7 +2888,7 @@ f.set(104, { from: 'hardware', quiet: true })`,
 
   /**
    * 🔴 THE CONTRACT BETWEEN ALL THREE, AND IT IS THE REASON THIS BLOCK EXISTS
-   * RATHER THAN THE PARTS ALONE. `/model/` was corrected by screenshot twelve
+   * RATHER THAN THE PARTS ALONE. `/twelve/` was corrected by screenshot twelve
    * times in one evening and **every single correction was the page doing
    * arithmetic about a component's insides**: a button column lifted by a
    * foot's height, which was right until the pads grew a label; a lane starting
@@ -4941,7 +4949,7 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
 
   /**
    * 🔴 THE DISTANCE BETWEEN TWO STACKED CONTROLS IS THREE THINGS, AND THIS IS
-   * THE FIRST CHECK IN THE REPOSITORY THAT SAYS SO. `/model/` was corrected by
+   * THE FIRST CHECK IN THE REPOSITORY THAT SAYS SO. `/twelve/` was corrected by
    * screenshot twelve times in one evening and every correction was a page
    * doing arithmetic about a component's insides: counting two of the three
    * made a lane 115 px against the 145 it needed, and **the error was exactly
@@ -5013,7 +5021,7 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
    */
   if (panelWith && panelWithout && panelPhone) {
     /* 1. The two children are ONE DEPTH, and the column is the taller one's
-       content. That is contract 3, and it is the claim `/model/` was reported
+       content. That is contract 3, and it is the claim `/twelve/` was reported
        for with a screenshot: `align-items: flex-end` would make them END
        together and say nothing about their heights, so a check reading only the
        bottoms would pass the arrangement that was wrong. Both edges are read. */
@@ -5050,7 +5058,7 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
        check above. The second panel is the SAME panel with one class left off,
        so it must read the opposite: slack nobody took, no child growing, and
        the component saying so on `cuts` rather than throwing, because
-       `/model/`'s 25.00 px of trailing air is legitimate. */
+       `/twelve/`'s 25.00 px of trailing air is legitimate. */
     const rNone = panelWithout.panel.check();
     d.assert('NEGATIVE CONTROL: with the class left off the slack is empty case, and it is reported',
       rNone.measured && rNone.growing.length === 0 && rNone.slack > 40
@@ -5061,7 +5069,7 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
     /* 4. THE SCROLL BOUNDARY, COMPUTED, PLUS THE BORDER THAT MARKS IT. The
        border is the one line on a panel that survives the *separation is
        spacing, not lines* rule, and it has to be on the edge FACING the
-       scroller: the left-hand column's RIGHT edge here, and `/model/`'s lane's
+       scroller: the left-hand column's RIGHT edge here, and `/twelve/`'s lane's
        left. MEASURED rather than read, because a border stripped by a rule
        nobody wrote is this project's fifth measured dead rule.
        ⚠️ AND THERE HAS TO BE SOMETHING TO SCROLL, or `overflow-x: auto` is a

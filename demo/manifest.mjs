@@ -632,7 +632,18 @@ export const DEMOS = [
     one: 'an Evolution MK-425C on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
-  { name: 'model', group: 'hardware', act: 4, created: '2026-09-20', built: true,
+  /**
+   * 🔴 THE SLUG IS `twelve` AND THIS IS THE PAGE'S SECOND RENAME IN TWO DAYS.
+   * Asked 2026-09-21: *"Rename to twelve"*, after *"rename rack to model"* the
+   * day before. So `/rack/` and `/model/` are both dead URLs for one page and
+   * neither has a redirect, which is the cost and is recorded rather than
+   * discovered later.
+   * ⚠️ THE SWEEP MATCHED THE URL FORM AND THE SLUG, NEVER THE WORD. `model` is
+   * ordinary English AND this repository's own word for a data layer, so
+   * `bay.mjs`'s prose, `xr-room.mjs`'s controller models and `/wish/`'s model
+   * pickers are all untouched.
+   */
+  { name: 'twelve', group: 'hardware', act: 4, created: '2026-09-20', built: true,
     one: 'a TASCAM Model 12 on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI', 'Mackie Control'] },
 

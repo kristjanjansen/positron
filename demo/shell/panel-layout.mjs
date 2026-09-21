@@ -22,7 +22,7 @@
 // ⚠️ `hardware.mjs` is taken too (`createHardware`, the one gesture that buys
 // audio and MIDI) and so is `xr-panel.mjs`. This name was what was left.
 //
-// 🔴 **AND THE CLASS PREFIX IS `.panel-`, NOT `.pan-`.** `/model/` draws
+// 🔴 **AND THE CLASS PREFIX IS `.panel-`, NOT `.pan-`.** `/twelve/` draws
 // `createKnob({ label: 'pan' })` on all eight channels, so a page carrying
 // `.pan-strip` beside a control called PAN is a page where `grep -n pan` stops
 // being a useful search.
@@ -37,7 +37,7 @@
 // ⚠️ **A COMPONENT THAT TRAVELS WITH ONE INSTRUMENT'S PROPORTIONS IS A COMPONENT
 // WITH ONE CALLER**, so none of these came along: `/evo/`'s keypad padding and
 // its eight keyboard overrides, `/circuit/`'s `repeat(8, var(--ctl-w))` and its
-// 34 px foot, `/model/`'s `calc(4 * calc(var(--ctl-w) / 2) + 3 *
+// 34 px foot, `/twelve/`'s `calc(4 * calc(var(--ctl-w) / 2) + 3 *
 // var(--ctl-step))` and its whole phone block.
 //
 // ── THE CONTRACT ────────────────────────────────────────────────────────────
@@ -45,9 +45,9 @@
 // `demo/shell/shell.css`. The three that a caller can get wrong from here:
 //
 //   1. **The fixed column is OPTIONAL and its side is an option.** `/evo/` has
-//      it on the left, `/model/` on the right, `/circuit/` has none. Pass
+//      it on the left, `/twelve/` on the right, `/circuit/` has none. Pass
 //      `side: null` for none, and the panel is one scroller with no wrap.
-//   2. **The case is OPTIONAL and defaults ON.** `/model/` has no outer card at
+//   2. **The case is OPTIONAL and defaults ON.** `/twelve/` has no outer card at
 //      all: its eight channel strips and its master lane each paint their own,
 //      glued at the seams. `cased: false` leaves `--panel-pad` at 0, and then
 //      every other rule is already correct for it with no second stylesheet.
@@ -60,7 +60,7 @@
 //      height on that page at all.
 //
 // 🔴 **A FLOW WITH SLACK AND NO ABSORBER IS REPORTED, NOT REFUSED.** `check()`
-// pushes onto `cuts`. A report and not a throw, because `/model/`'s 25.00 px of
+// pushes onto `cuts`. A report and not a throw, because `/twelve/`'s 25.00 px of
 // trailing air is legitimate and a panel with no fixed column has no slack at
 // all, so refusing the build would break two of the three callers.
 // ⚠️ **AND `check()` IS A MEASUREMENT, SO IT CANNOT RUN AT BUILD TIME.** Heights
@@ -103,12 +103,12 @@ const el = (tag, cls, txt) => {
  *
  * @param {object}  [o]
  * @param {boolean} [o.cased=true]   paint the card. `false` for a panel whose
- *                                   children paint their own, like `/model/`.
+ *                                   children paint their own, like `/twelve/`.
  * @param {?string} [o.side='left']  which side the fixed column is on, or
  *                                   `null` for a panel with no fixed column.
  * @param {boolean} [o.flow=true]    build a `.panel-flow` inside the scroller.
  *                                   `false` where the scroller's own children
- *                                   are the content, like `/model/`'s eight
+ *                                   are the content, like `/twelve/`'s eight
  *                                   channel strips.
  * @param {Element} [o.grow]         the flow child that absorbs the slack. May
  *                                   also be set later with `grow()`, which is
@@ -241,13 +241,26 @@ export function createPanelLayout(o = {}) {
  *                                    model at the other across whatever the
  *                                    plate spans. `'mid'` is a centred block at
  *                                    a fixed position, which is what a plate
- *                                    inside a SCROLLING flow needs.
+ *                                    inside a SCROLLING flow needs. `'end'` is
+ *                                    one line pushed to the right, which is
+ *                                    what a plate inside a narrow COLUMN needs.
  * @param {string}   [o.cls]          an extra class, for a page's own rules.
+ */
+/**
+ * 🔴 `'end'`, ADDED 2026-09-21 FOR `/twelve/`, AND IT IS A PLACEMENT RATHER
+ * THAN A PAGE'S RULE. Asked: *"Move model 12 to roght panel top right corner.
+ * No brand name"*. A plate carrying ONE line cannot use either of the other
+ * two: `ends` is `space-between`, which parks a lone child on the LEFT, and
+ * `mid` centres it. Neither is the corner that was asked for.
+ * ⚠️ **AND IT IS THE THIRD PLACEMENT, NOT A THIRD STYLESHEET.** The alternative
+ * was a `cls` and a rule in the page, which is how three replicas ended up
+ * setting their nameplates three ways and why this component exists. A
+ * placement is arrangement, and arrangement is what this file owns.
  */
 export function createNameplate(o = {}) {
   const { lines = [], place = 'ends', cls = '' } = o;
-  if (place !== 'ends' && place !== 'mid') {
-    throw new Error(`createNameplate: place is 'ends' or 'mid', not ${JSON.stringify(place)}`);
+  if (place !== 'ends' && place !== 'mid' && place !== 'end') {
+    throw new Error(`createNameplate: place is 'ends', 'mid' or 'end', not ${JSON.stringify(place)}`);
   }
   // 🔴 REFUSED RATHER THAN DRAWN EMPTY. A plate with nothing on it is a
   // container with nothing in it painting its own edges, which is the shape this

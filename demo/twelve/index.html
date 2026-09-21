@@ -58,37 +58,32 @@
      ⚠️ `align-items: stretch`, NOT `flex-end`. That is the component's now, on
      `.panel-wrap`, with the reasoning kept there: bottom alignment makes two
      children END together and says nothing about their heights. */
-  /* 🔴 THE INSTRUMENT WEARS ITS MAKER AND ITS MODEL, IN UPPERCASE. Asked
-     2026-09-21: *"replica names always in uppercase. add full name evolution
-     mk-425c"*, which is a rule about every hardware replica rather than about
-     one page. `/circuit/` and `/evo/` already carried theirs and this page
-     carried none at all.
-     ⚠️ IT IS NOT THE PAGE'S TITLE REPEATED. The page is called `model`, which
-     is its slug, and a slug is not what is printed on a mixer. This is the
-     artwork, which is why the maker's name is on it and why the two sit at
-     opposite ends rather than in the middle.
-     ⚠️ AND IT SITS ABOVE THE CARDS RATHER THAN INSIDE ONE, because this replica
-     has no single case: the eight strips and the master lane are each their own
-     box, glued at the seams. On the real panel `TASCAM` is printed across the
-     top of the screen operation section, in the master column, and where the
-     model wordmark sits is not recorded in `plans/plan-panel-layouts.md`. So
-     the nameplate spanning the whole object is a drawing choice on a replica
-     with no case, not a panel reading.
-     ⚠️ TEN PIXELS, WHICH IS A QUARTER OF THE PAGE'S OWN RHYTHM. On `/circuit/`
-     and `/evo/` the card's border is what ties a printed name to the panel
-     under it. There is no border to do that here, so the distance is the only
-     thing saying the nameplate belongs to the instrument rather than being a
-     block of its own. */
-  /* The nameplate to instrument distance, which is the one thing this outer box
-     still decides. See the note above the wrap. */
-  .rack-unit { --panel-gap: 0px; gap: 10px; }
-  /* ⚠️ THE TWO NAMEPLATE RULES ARE GONE AND ARE NOT LOST. They were
-     `display: flex; justify-content: space-between` and the same four ink
-     declarations `/circuit/` and `/evo/` carried, to the letter, which is
-     exactly the drift the extraction was for: three replicas whose nameplates
-     are set three ways read as three pages rather than as one shelf of
-     instruments. They are `.panel-plate[data-place="ends"]` and
-     `.panel-plate-l` in `shell.css` now. */
+  /* 🔴 THE INSTRUMENT WEARS ITS MODEL NAME AND NOT ITS MAKER'S, AND IT WEARS IT
+     IN THE MASTER COLUMN. Asked 2026-09-21: *"Move model 12 to roght panel top
+     right corner. No brand name"*.
+     ⚠️ IT NARROWS *"replica names always in uppercase. add full name evolution
+     mk-425c"* rather than contradicting it: that instruction is why this panel
+     has a name at all, and the name is still uppercase and still set by the
+     shared component. `/circuit/` and `/evo/` keep both halves.
+     ⚠️ IT IS NOT THE PAGE'S TITLE REPEATED. The page's slug is `twelve` and a
+     slug is not what is printed on a mixer. This is the artwork.
+     ⚠️ AND IT IS NO LONGER A PLATE SPANNING THE WHOLE OBJECT. It used to sit
+     above the cards, because a replica with no single case has nowhere else to
+     put a name belonging to the whole instrument. One name belongs to one part,
+     and on the real panel `TASCAM` is printed across the top of the screen
+     operation section, which is the master column this plate now sits in.
+     ⚠️ THE TEN PIXEL GAP WENT WITH IT. It tied a floating plate to the panel
+     under it, and a plate inside the lane's own card needs nothing to say it
+     belongs there. What spaces it from the function keys below is the lane's
+     own `--ctl-gap`, which is what spaces every other row in that column. */
+  .rack-unit { --panel-gap: 0px; }
+  /* ⚠️ THE NAMEPLATE'S INK AND ITS THREE PLACEMENTS ARE ALL IN `shell.css`,
+     which is what the panel extraction was for: three replicas whose
+     nameplates were set three ways read as three pages rather than as one
+     shelf of instruments. `.panel-plate-l` is the ink and
+     `.panel-plate[data-place="end"]` is this page's placement, added the same
+     day for the same request, because a plate with ONE line cannot use `ends`
+     (which parks a lone child left) or `mid` (which centres it). */
   /* ⚠️ THE FLEX GAP IS DEFENSIVE AND MEASURED INERT, kept rather than deleted
      for the reason `/evo/` keeps its pair: `.panel-wrap` declares no gap today,
      and a gap added tomorrow in another page's interest would unglue this
@@ -170,17 +165,27 @@
   .rack-lane .strip-master {
     background: none; border: 0; padding: 0; border-radius: 0;
   }
-  /* 🔴 THE FX FADER IS THE SAME LENGTH AS A CHANNEL FADER, AND IT IS THE SAME
-     EXPRESSION RATHER THAN THE SAME NUMBER. Asked 2026-09-21: *"fx slider same
-     height"*. A channel fader spans four buttons and three steps, so this one
-     takes that calculation rather than a pixel count copied from it, and the
-     two cannot drift when the button count or the control width changes.
-     ⚠️ IT IS THE SAME LENGTH DESPITE HAVING NOTHING BESIDE IT, which is the
-     point: on the panel the FX fader is the same 60 mm throw as the channels,
-     and a shorter one would read as a different kind of control. */
-  .rack-lane .pos-fdr {
-    --fdr-lane-h: calc(4 * calc(var(--ctl-w) / 2) + 3 * var(--ctl-step));
-  }
+  /* 🔴 ONE FADER LENGTH FOR THE WHOLE PANEL, DECLARED ONCE, AND IT STOPPED
+     BEING A BUTTON COUNT ON 2026-09-21. Asked 2026-09-21: *"fx slider same
+     height"*, and it was written twice as `four surfaces and three steps`
+     because four buttons stood beside every channel fader and the FX fader had
+     to match them.
+     🔴 **`Rm disabled controls` TOOK MAIN AND SUB OUT OF THAT COLUMN, AND A
+     LENGTH DERIVED FROM WHAT IS LEFT WOULD BE 86 px.** Two surfaces and one
+     step, on a mixer whose faders are all 60 mm and whose knobs are 46 px
+     across. That is not a shorter fader, it is a different kind of control.
+     ✅ **THE LENGTH WAS NEVER A FACT ABOUT THE BUTTONS. IT IS A FACT ABOUT THE
+     PANEL**, which has ONE fader throw and prints it on eight channels, the FX
+     fader and the two analogue outputs alike. So it is one declaration that two
+     kinds of fader read, and they cannot drift.
+     ⚠️ **THE EXPRESSION IS KEPT VERBATIM FROM WHEN IT MEANT FOUR BUTTONS, SO
+     NOTHING MOVED**: 212 px before and 212 px after, MEASURED. What changed is
+     what it claims. Re-deriving the same number from a different arithmetic
+     would have read as a length that had been recalculated.
+     ⚠️ AND MUTE AND SOLO NOW SIT AT THE FOOT OF THE FADER RATHER THAN SPANNING
+     IT, which is where they are on the object. */
+  .rack-unit { --rack-throw: calc(4 * calc(var(--ctl-w) / 2) + 3 * var(--ctl-step)); }
+  .rack-unit .pos-fdr { --fdr-lane-h: var(--rack-throw); }
   .transport-row { flex-wrap: wrap; justify-content: center; }
   .rack-row > .strip-one { border-radius: 0; }
   .rack-row > .strip-one + .strip-one { border-left: 0; }
@@ -223,28 +228,25 @@
    * ⚠️ WHAT IS LEFT HERE IS THE ONE THING ONLY THIS PAGE KNOWS: that the fader
    * spans THREE buttons. Three working surfaces plus two steps between them.
    */
-  /* ⚠️ `.pos-crow`, NOT `.strip-body`. This rule kept the old class name for one
-     run after the row was renamed, so `--fdr-lane-h` fell back to its 120 px
-     default and the lane was 29 px short again. **A dead selector reads as
-     correct**, and the only reason it was caught in seconds is that the
-     alignment is asserted rather than eyeballed. That is the fifth dead rule
-     this project has measured and the first one caught by its own check. */
-  /* 🔴 SCOPED TO A CHANNEL STRIP, AND IT WAS NOT. MEASURED 2026-09-21 while
-     extracting the panel: `.pos-crow .pos-fdr` matched **8 elements** and was
-     scoped by nothing but living in this page's `<style>` block, while
-     declaring a length that is a claim about a Model 12. On a page with two
-     panels it would have reached both, which is the same class of defect as
-     `--fdr-lane-h` falling back to its default when `.strip-body` went stale:
-     a rule that reads as correct and is aimed at the wrong elements. Now that
-     the arrangement around it is shared, a page-wide control selector is the
-     thing most likely to leak. */
-  .strip-one .pos-crow .pos-fdr {
-    /* FOUR buttons beside the fader now, so four surfaces and three steps. */
-    --fdr-lane-h: calc(4 * calc(var(--ctl-w) / 2) + 3 * var(--ctl-step));
-  }
-  /* ⚠️ NO COMPENSATION HERE, AND THERE WAS SOME FOR ONE RUN. A hand is a MODE
-     of the fader: the lane shortens and the fader's bottom does not move, so a
-     pad column beside it needs to know nothing about it. */
+  /* ⚠️ THE SECOND COPY OF THE LENGTH IS GONE AND THE TWO LESSONS IT CARRIED
+     ARE NOT. It was `.strip-one .pos-crow .pos-fdr`, and before that
+     `.strip-body .pos-fdr`, which kept the old class name for one run after the
+     row was renamed: `--fdr-lane-h` fell back to its 120 px default and the
+     lane was 29 px short. **A dead selector reads as correct**, and it was
+     caught in seconds only because the length is asserted rather than
+     eyeballed. That is the fifth dead rule this project has measured and the
+     first one caught by its own check.
+     ⚠️ AND IT WAS ONCE `.pos-crow .pos-fdr`, matching **8 elements** and scoped
+     by nothing but living in this page's `<style>` block, while declaring a
+     length that is a claim about a Model 12. `.rack-unit` scopes it to this
+     instrument, which is what both lessons were asking for.
+     ⚠️ THE CHECK THAT REPLACED THE ONE THOSE LESSONS BOUGHT reads the lane's
+     real height against `--rack-throw`, because `the lane starts level with the
+     first button in the column` was an alignment that only existed while four
+     buttons spanned the fader. */
+  /* ⚠️ NO COMPENSATION FOR THE INVISIBLE HAND, AND THERE WAS SOME FOR ONE RUN.
+     A hand is a MODE of the fader: the lane shortens and the fader's bottom
+     does not move, so a pad column beside it needs to know nothing about it. */
   .strip-btns { display: flex; flex-direction: column; gap: var(--ctl-gap); }
   /* ⚠️ REC IS THE SAME WIDTH AS THE REST. On the hardware it is a wide button
      spanning the strip, and it was drawn that way for one run: *"rec can be
@@ -341,6 +343,7 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode, classifyEncoder, classifyBend } from '/shell/midi-decode.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
+  import { createPresenceButton, WIRED } from '/shell/presence.mjs';
 
   /**
    * 🔴 WHAT THIS PAGE IS. One channel of a TASCAM Model 12, on screen, moving
@@ -413,10 +416,8 @@ const PAN_SCALE = 2;
 
 
   const d = mount({
-    name: 'model',
+    name: 'twelve',
     what: 'A TASCAM Model 12 on screen, moving when the real one moves.',
-    // SIX CELLS, all of which move. `steps` is the relative knob's whole story:
-    // it counts clicks, because a relative encoder has no position to report.
     /**
      * 🔴 NO READOUT, AND `null` RATHER THAN AN OMITTED FIELD so the shell knows
      * it was decided. Asked 2026-09-21: *"rm readouts from rack"*.
@@ -428,19 +429,23 @@ const PAN_SCALE = 2;
      * detent is magnitude 2, measured over ten slow clicks.
      */
     readout: null,
-    controls: [
-      // 🔴 CONTROL 0 TAKES `settleMs`, so nothing goes in front of `listen`.
-      { id: 'listen', label: 'Listen', primary: true },
-      /**
-       * ⚠️ NO RESET BUTTON, AND THE PROBLEM IT ANSWERED HAS NOT GONE AWAY. A
-       * relative encoder has no position to ask for, so turning the real pan
-       * while this page is shut leaves the two disagreeing forever with nothing
-       * here able to detect it. What makes its absence affordable is that a
-       * reload does the same thing, and that the knob no longer EATS the
-       * disagreement: the accumulator keeps its overshoot, so turning back
-       * retraces rather than drifting further every time.
-       */
-    ],
+    /**
+     * 🔴 NO DECLARED CONTROL. The primary one is a presence button built below
+     * and spliced into `.pos-controls`, which is where `demo/verify.mjs`
+     * presses. A status control outside that row is a control no harness
+     * drives, and every check behind it would go silent while the suite stayed
+     * green.
+     * ⚠️ **IT IS STILL CONTROL 0, WHICH IS THE ONE THAT TAKES `settleMs`.** The
+     * row holds exactly one button, so nothing can get in front of it.
+     * ⚠️ NO RESET BUTTON, AND THE PROBLEM IT ANSWERED HAS NOT GONE AWAY. A
+     * relative encoder has no position to ask for, so turning the real pan
+     * while this page is shut leaves the two disagreeing forever with nothing
+     * here able to detect it. What makes its absence affordable is that a
+     * reload does the same thing, and that the knob no longer EATS the
+     * disagreement: the accumulator keeps its overshoot, so turning back
+     * retraces rather than drifting further every time.
+     */
+    controls: [],
   });
   guard(d);
 
@@ -471,16 +476,23 @@ const PAN_SCALE = 2;
   const STRIPS = ['1', '2', '3', '4', '5', '6', '7/8', '9/10'];
 
   /**
-   * ⚠️ MAIN AND SUB ARE ON THE PANEL AND SEND NOTHING IN DAW CONTROL MODE.
-   * TASCAM's own enabled-controls diagram prints them white while MUTE and SOLO
-   * are blue. Drawn and disabled, because leaving them out would put MUTE next
-   * to SOLO, which is false about the panel.
+   * 🔴 TWO BUTTONS, AND MAIN AND SUB LEFT ON 2026-09-21. Asked: *"Rm disabled
+   * controls"*. They had been drawn and switched off for a reason this file
+   * argued at length: they are on the panel, TASCAM's own enabled-controls
+   * diagram prints them white while MUTE and SOLO are blue, and leaving them
+   * out puts MUTE next to SOLO, which is false about the panel.
+   * ⚠️ **AN INSTRUCTION SUPERSEDES IT, AND THE PANEL FACT IS NOT LOST**: it is
+   * read at 800 dpi in `plans/plan-panel-layouts.md`, which is where somebody
+   * asking what is printed on a Model 12 should be looking anyway. What this
+   * page draws now is what this page can move.
+   * ⚠️ **AND THE COST IS TWO CHECKS, WHICH IS WHY IT IS WRITTEN DOWN.** The
+   * pad count assert says two rather than four, and
+   * *the lane starts level with the first button in the column* described an
+   * alignment that only existed while four buttons spanned a fader.
    */
   const COLUMN = [
-    ['mute', 'MUTE', '#7fb2ff', false],
-    ['main', 'MAIN', '#6a7280', true],
-    ['sub', 'SUB', '#6a7280', true],
-    ['solo', 'SOLO', '#e0b060', false],
+    ['mute', 'MUTE', '#7fb2ff'],
+    ['solo', 'SOLO', '#e0b060'],
   ];
 
   /** One channel strip. Everything about it is its index. */
@@ -512,12 +524,11 @@ const PAN_SCALE = 2;
 
     const body = el('div', 'pos-crow');
     const btns = el('div', 'strip-btns');
-    for (const [id, label, tint, dead] of COLUMN) {
-      const note = id === 'solo' ? SOLO0 + i : id === 'mute' ? MUTE0 + i : null;
+    for (const [id, label, tint] of COLUMN) {
+      const note = id === 'solo' ? SOLO0 + i : MUTE0 + i;
       pads[id] = createPad({
-        half: true, bottom: label, tint, latch: true, disabled: dead,
-        title: dead ? `${label} is on the panel and sends nothing in DAW control mode`
-                    : `${label}, note ${note}`,
+        half: true, bottom: label, tint, latch: true,
+        title: `${label}, note ${note}`,
       });
       btns.append(pads[id].el);
     }
@@ -581,11 +592,14 @@ const PAN_SCALE = 2;
     ['stop', '■', 93, false], ['play', '►', 94, false], ['rec', '●', 95, false],
   ];
   /**
-   * ⚠️ FOUR FUNCTION KEYS, AND F1 IS NOT LIVE. TASCAM's enabled-controls
+   * 🔴 THREE FUNCTION KEYS, AND F1 LEFT ON 2026-09-21 WITH THE OTHER DISABLED
+   * CONTROLS. Asked: *"Rm disabled controls"*. TASCAM's enabled-controls
    * diagram prints F1 white while F2, F3 and F4 are blue, because F1 is the way
-   * OUT of DAW control mode.
-   * ✅ **AND THE OTHER THREE ARE MEASURED, ONE PRESS AT A TIME, 2026-09-21.**
-   * F2 is note **86**, F3 is **46**, F4 is **47**.
+   * OUT of DAW control mode, so it sends nothing this page could ever light.
+   * ⚠️ The panel fact stands and lives in `plans/plan-panel-layouts.md`. What
+   * is drawn here is what can move.
+   * ✅ **AND THE THREE THAT ARE LEFT ARE MEASURED, ONE PRESS AT A TIME,
+   * 2026-09-21.** F2 is note **86**, F3 is **46**, F4 is **47**.
    * 🔴 **THEY ARE NOT A CONTIGUOUS BLOCK, AND THAT IS THE INTERESTING PART.**
    * Everything else on this mixer runs in eights. **46 and 47 are Fader Bank
    * Left and Right in the Mackie map**, which is exactly what a desk with ten
@@ -597,7 +611,7 @@ const PAN_SCALE = 2;
    * the wrong thing.
    */
   const FKEYS = [
-    ['f1', 'F1', null], ['f2', 'F2', 86], ['f3', 'F3', 46], ['f4', 'F4', 47],
+    ['f2', 'F2', 86], ['f3', 'F3', 46], ['f4', 'F4', 47],
   ];
 
   /**
@@ -634,7 +648,9 @@ const PAN_SCALE = 2;
     cls: { panel: 'rack-unit', wrap: 'rack-wrap', strip: 'rack-row',
            fixed: 'panel-case rack-lane' },
   });
-  const unit = panel.el, wrap = panel.wrap;
+  /* ⚠️ NO `wrap` HERE ANY MORE. It was read for one thing, `unit.insertBefore(
+     brands, wrap)`, and the nameplate is inside the master lane now. */
+  const unit = panel.el;
 
   const rack = STRIPS.map((_, i) => makeStrip(i));
   const rackRow = panel.strip;
@@ -665,25 +681,24 @@ const PAN_SCALE = 2;
    * faders in the master column, not beside them.
    */
   /**
-   * 🔴 SUB AND MAIN STAND BESIDE THE FX FADER AND SEND NOTHING. Asked
-   * 2026-09-21: *"add sub and main sliders to right of fx but disabled"*.
-   * They are the two 60 mm faders on the right of the panel, and TASCAM's own
-   * enabled-controls diagram prints them WHITE while the FX fader is blue:
-   * in DAW control mode the FX fader is the master and these two move the
-   * analogue outputs only. Nothing of them reaches MIDI, which is why they are
-   * drawn and switched off rather than left out.
-   * ⚠️ **THIS IS THE SAME DECISION ALREADY MADE FOR MAIN AND SUB IN THE CHANNEL
-   * COLUMN**, and for the same reason: leaving them out would put the FX fader
-   * at the edge of the panel, which is false about the mixer.
-   * ⚠️ **AND A DISABLED CONTROL IS A CHECK THE HARNESS CANNOT REACH.** These
-   * two have nothing behind them to reach, which is the whole point of them,
-   * and the page asserts that rather than assuming it.
+   * 🔴 THE SUB AND MAIN FADERS LEFT ON 2026-09-21. Asked: *"Rm disabled
+   * controls"*. They had stood beside the FX fader since *"add sub and main
+   * sliders to right of fx but disabled"*, drawn and switched off because
+   * TASCAM's enabled-controls diagram prints them WHITE while the FX fader is
+   * blue: in DAW control mode the FX fader is the master and those two move the
+   * analogue outputs only, so nothing of them ever reaches MIDI.
+   * ⚠️ **THE ARGUMENT FOR KEEPING THEM WAS THAT THE FX FADER NOW SITS AT THE
+   * EDGE OF THE PANEL, WHICH IS FALSE ABOUT THE MIXER.** That is still true and
+   * an instruction supersedes it, exactly as it did for MAIN and SUB in the
+   * channel column. The panel is read at 800 dpi in
+   * `plans/plan-panel-layouts.md` and the drawing is not the record of it.
+   * ⚠️ **AND IT COSTS ONE ASSERT**, *sub and main stand beside the FX fader,
+   * disabled, ending on its line*, which had three claims in it: that there
+   * were two of them, that both were off, and that all three faders ended on
+   * one line. Nothing that assert measured survives its subjects, and the
+   * every-fader-ends-on-one-line claim is still made by the check that compares
+   * a channel fader against the FX fader.
    */
-  const OUTS = [['SUB', 'sub fader, the analogue sub output, nothing on MIDI'],
-                ['MAIN', 'main fader, the analogue main output, nothing on MIDI']];
-  const outs = OUTS.map(([label, title]) => createFader({
-    label, min: 0, max: 127, value: 100, disabled: true, title,
-  }));
 
   /* The component's fixed column, which on this page IS the master lane. The
      comment above the panel says why it is a sibling of the scroller rather
@@ -694,26 +709,40 @@ const PAN_SCALE = 2;
   const masterStrip = el('div', 'strip-one strip-master');
   /* ⚠️ ITS OWN CLASS, NOT `.pos-crow`. The phone rules turn every `.pos-crow`
      in this lane into a COLUMN, which is right for the jog above a transport
-     and wrong for three faders: stacked, they stop being a row of faders and
-     the lane grows three times its own height. */
+     and wrong for a row of faders: stacked, they stop being a row and the lane
+     grows by its own height each time. It holds one fader today and keeps the
+     class, because what the rule is about is the lane's shape rather than the
+     count. */
   const masterFaders = el('div', 'strip-outs');
-  masterFaders.append(master.el, ...outs.map((f) => f.el));
+  masterFaders.append(master.el);
   masterStrip.append(masterFaders);
 
   /**
-   * ⚠️ THE INSTRUMENT WEARS ITS OWN NAMES, AND BOTH HALVES OF IT. The maker at
-   * the left end and the model at the right, exactly as `/circuit/` and `/evo/`
-   * carry theirs. The stylesheet above says why it is above the boxes rather
-   * than inside one, and why `model` on its own would not do.
-   * ⚠️ **`place: 'ends'` IS THE SAME PLACEMENT `/circuit/` USES AND THE TWO SIT
-   * IN DIFFERENT PARENTS**, which is the distinction the component deliberately
-   * does NOT carry: this plate goes above the panel's wrap and that one inside
-   * a card, and where a thing is appended is the caller's business. Two CSS
-   * placements and one append, rather than three placements.
+   * 🔴 `MODEL 12`, IN THE TOP RIGHT CORNER OF THE MASTER LANE, AND `TASCAM` IS
+   * GONE. Asked 2026-09-21: *"Move model 12 to roght panel top right corner. No
+   * brand name"*, and before that *"put model 12 to right panel, no tascam,
+   * right aling"*.
+   * ⚠️ **IT NARROWS THE MORNING'S INSTRUCTION RATHER THAN CONTRADICTING IT.**
+   * *"replica names always in uppercase. add full name evolution mk-425c"* is
+   * why this panel got a name at all, and the name is still uppercase and still
+   * printed by the shared component. The MAKER is the half being dropped, on
+   * this page only. `/circuit/` and `/evo/` keep both halves and nothing here
+   * reaches them.
+   * 🔴 **AND IT MOVED OUT OF THE PAGE'S FLOW INTO THE INSTRUMENT.** It used to
+   * span the whole mixer above the boxes, which is where a replica with no case
+   * has to put a plate that belongs to the WHOLE object. One name belongs to
+   * one part, and the part is the master column: on the real panel `TASCAM` is
+   * printed across the top of the screen operation section, in that column.
+   * ⚠️ **SO THE ASSERT ABOUT SPANNING IS GONE AND ITS REPLACEMENT MEASURES A
+   * CORNER.** The old one read both far edges and the drop against the page's
+   * rhythm, which are claims about a plate that spans two boxes with air under
+   * it. Inside a column the claim is that it is at the top and flush right.
+   * ⚠️ AND EVERY RECT ON THIS PAGE MOVES UP BY THE NAMEPLATE AND ITS 10 px GAP,
+   * which is the same 21.0 px the morning's change moved them DOWN, arriving
+   * back. The lane gains the plate's own height instead.
    */
-  const nameplate = createNameplate({ lines: ['TASCAM', 'MODEL 12'], place: 'ends' });
+  const nameplate = createNameplate({ lines: ['MODEL 12'], place: 'end' });
   const brands = nameplate.el;
-  unit.insertBefore(brands, wrap);
   d.el.append(unit);
 
   /**
@@ -751,12 +780,10 @@ const PAN_SCALE = 2;
   const fRow = el('div', 'pos-crow');
   const fkeys = {};
   for (const [id, label, note] of FKEYS) {
-    const dead = note === null;
     fkeys[id] = createPad({
-      half: true, label, latch: true, disabled: dead, tint: '#6a7280', aria: id,
-      title: dead ? 'F1 leaves DAW control mode and sends nothing'
-                  : `${label}, note ${note}, measured`
-                    + (note === 46 || note === 47 ? ', Mackie fader bank' : ''),
+      half: true, label, latch: true, tint: '#6a7280', aria: id,
+      title: `${label}, note ${note}, measured`
+             + (note === 46 || note === 47 ? ', Mackie fader bank' : ''),
     });
     fRow.append(fkeys[id].el);
   }
@@ -770,7 +797,10 @@ const PAN_SCALE = 2;
   // The jog and the locate arrows are one row, as on the panel.
   jRow.append(jog.el);
   for (const spec of LOCATE) jRow.append(mkBtn(spec));
-  lane.append(fRow, jRow, tRow, masterStrip);
+  /* The nameplate is the lane's FIRST child, which is what "top right corner"
+     means once the column is `justify-content: flex-start` and the fader block
+     takes the slack at the bottom. */
+  lane.append(brands, fRow, jRow, tRow, masterStrip);
 
   // The first strip is the one every check reads, because it is the only one
   // measured byte by byte rather than inferred from a stride.
@@ -833,7 +863,7 @@ const PAN_SCALE = 2;
 
   function tap(b) {
     if (!LOCAL || tapDead || SELFCHECK) return;
-    pending.push({ from: 'model', bytes: b.map((n) => n.toString(16).toUpperCase().padStart(2, '0')).join(' ') });
+    pending.push({ from: 'twelve', bytes: b.map((n) => n.toString(16).toUpperCase().padStart(2, '0')).join(' ') });
     if (tapTimer) return;
     tapTimer = setTimeout(() => {
       const batch = pending; pending = []; tapTimer = 0;
@@ -848,7 +878,14 @@ const PAN_SCALE = 2;
    * one of these on the same day, and the rule about a clock byte being
    * counted rather than listed lives in there rather than in each of them.
    */
-  const traffic = createMidiLog({ empty: 'press Listen, then move something on the desk' });
+  /* ⚠️ THE EMPTY LINE NAMED A BUTTON THAT NO LONGER EXISTS, AND A SCREENSHOT
+     CAUGHT IT RATHER THAN THE SUITE. It read `press Listen, then move something
+     on the desk` for as long as it took to replace `Listen` with the status
+     button, which is this project's most repeated defect in its cheapest form:
+     nothing type-checks a sentence, so a control's name in prose goes stale
+     silently. It names the button by what it SAYS now, which is what somebody
+     looking at the page has to find. */
+  const traffic = createMidiLog({ empty: 'press the status button, then move something on the desk' });
   d.el.append(traffic.el);
 
   /**
@@ -1009,14 +1046,47 @@ const PAN_SCALE = 2;
     return opened;
   }
 
+  /**
+   * 🔴 THE BUTTON IS THE STATUS. Asked 2026-09-21: *"Convert liatwn to stayis
+   * button"*, and before that *"replace listen to connected button on model"*.
+   * `Listen` said what pressing would do and said nothing about whether
+   * anything answered, so a visitor who pressed it and saw no movement could
+   * not tell a silent mixer from an absent one. It logged a count and then went
+   * on saying the same word forever.
+   * ⚠️ **IT STAYS A PRESS.** A badge that opened MIDI on its own would be
+   * opening it on a VISIT, which is the rule four pages here have paid for.
+   * ⚠️ **AND THE WORDS ARE `WIRED`, NOT THIS PAGE'S OWN.** A Model 12 is on a
+   * USB cable on this desk, so it is connected or it is not; `online` is a
+   * network word and belongs to the board pages that reach a relay. The map is
+   * in `presence.mjs` and five pages share it.
+   */
+  const pres = createPresenceButton({
+    of: 'Model 12', state: 'unknown', says: WIRED,
+    can: ['unknown', 'checking', 'online', 'offline'],
+    press: () => d.run('listen'),
+  });
+  d.controls.hidden = false;
+  d.controls.append(pres.el);
+
   d.on('listen', async () => {
+    pres.set('checking');
     const got = await open();
     if (got) {
+      /* ⚠️ CONNECTED MEANS A PORT WITH THIS NAME ON IT, NOT THAT MIDI WAS
+         GRANTED. Permission is a fact about the browser; presence is a fact
+         about whether the mixer is plugged in, and reporting the first as the
+         second is how a page says `connected` about an empty desk. */
+      const seen = [...(access?.inputs?.values() ?? [])]
+        .filter((i) => /model\s*12/i.test(i.name || ''));
+      pres.set(seen.length ? 'online' : 'offline',
+        seen.length ? null : 'nothing with Model 12 in its name is plugged in');
       const n = countIn();
       d.log(n ? `${n} input${n === 1 ? '' : 's'} open` : 'no MIDI inputs', n ? 'hi' : '');
       d.log(`DAW control mode has to be ON for this channel to send anything: MENU, `
           + `DAW CONTROLLER, then any MCU preset. Its own MIDI IN port stays silent `
           + `unless something is plugged into the DIN socket.`);
+    } else {
+      pres.set('offline', 'this browser would not open MIDI');
     }
     if (SELFCHECK) await d.run('check');
   });
@@ -1070,6 +1140,38 @@ const PAN_SCALE = 2;
 
     d.assert('a visit opened nothing', SELFCHECK ? true : access === null,
       access ? `${countIn()} inputs, after a press` : 'no MIDI access taken');
+
+    /**
+     * 🔴 THE BUTTON IS THE STATUS, AND THE CHECK READS WHAT IT SAYS. Asked
+     * 2026-09-21: *"Convert liatwn to stayis button"*. `Listen` went on saying
+     * `Listen` whatever it found, so there was nothing on it to grade: the only
+     * evidence of a press was two log lines.
+     * ⚠️ **AND `state !== 'unknown'` IS THE HALF THAT CATCHES THE REAL TRAP.**
+     * `unknown` is where the badge is BORN, and only a press moves it. So this
+     * goes red if the button ever leaves `.pos-controls`, which is where
+     * `demo/verify.mjs` presses and where a status control that nothing drives
+     * would take every check behind it silent.
+     * ⚠️ **IT READS THE RENDERED WORD, NOT THE STATE NAME.** The state is
+     * `offline` and the word is `not connected`, and it is the word a visitor
+     * has. A check on the state alone would stay green with `says: WIRED`
+     * deleted and the badge back to network language.
+     */
+    {
+      /* 🔴 `pres.state()`, NOT `pres.state`. It is a FUNCTION on the presence
+         api (`state: () => now`) and `createPresenceButton` hands it through a
+         getter, so `pres.state` is the function itself. MEASURED on the first
+         run of this check: `pres.state !== 'unknown'` is true of a function
+         whatever the badge says, so the whole first clause passed vacuously and
+         the detail line read `state () => now`. **A comparison against a
+         function is a comparison that cannot fail**, which is the quietest way
+         to write a green check that measures nothing. */
+      const said = (pres.badge.textContent || '').trim();
+      const now = pres.state();
+      const words = Object.values(WIRED);
+      d.assert('the status button answers, in the words an instrument on a cable uses',
+        typeof now === 'string' && now !== 'unknown' && words.some((w) => said.endsWith(w)),
+        `${JSON.stringify(said)}, state ${now}`);
+    }
 
     // 🔴 THE THREE MEASURED FACTS, ASSERTED AS BEHAVIOUR RATHER THAN AS NUMBERS.
     const v = classifyEncoder(panValues);
@@ -1220,18 +1322,20 @@ const PAN_SCALE = 2;
     }
 
     /**
-     * 🔴 THE PANEL PRINTS THE MAKER AND THE MODEL, IN UPPERCASE. Asked
-     * 2026-09-21 as a rule about every hardware replica: *"replica names always
-     * in uppercase. add full name evolution mk-425c"*. This page carried no
-     * name at all, so `model` in the heading was the only thing on screen
-     * saying what the object is, and `model` is a slug.
+     * 🔴 THE PANEL PRINTS `MODEL 12` AND NOTHING ELSE, IN UPPERCASE. Asked
+     * 2026-09-21: *"Move model 12 to roght panel top right corner. No brand
+     * name"*, which narrows *"replica names always in uppercase"* rather than
+     * cancelling it.
      * ⚠️ **IT READS WHAT THE BROWSER RENDERS, NOT WHAT THE PAGE TYPED.** The
      * name shouts for two reasons, the string and `text-transform`, and only
      * one of them is in the JavaScript. A check on the string alone would stay
-     * green with the stylesheet rule deleted. The transform is applied below
+     * green with the stylesheet rule deleted. `shown()` applies the transform
      * the way the browser applies it.
-     * ⚠️ AND IT ASKS FOR BOTH HALVES. A replica carrying only its model is an
-     * instrument nobody made.
+     * ⚠️ **AND THE COUNT IS PART OF THE CLAIM.** This assert used to demand
+     * BOTH halves, on the reasoning that a replica carrying only its model is
+     * an instrument nobody made. It now demands exactly ONE line, because a
+     * `TASCAM` creeping back in is the thing that would be wrong, and a check
+     * that only reads the model name would not notice it.
      */
     {
       /* ⚠️ THE READER IS THE COMPONENT'S NOW, AND IT WAS COPIED INTO THREE PAGES
@@ -1240,58 +1344,70 @@ const PAN_SCALE = 2;
          page leaning on `text-transform` renders `NOVATION` from a source that
          says `novation`, and a check reading `textContent` grades the source
          and stays green either way. Two pages had the same seven lines. */
-      const [maker, model] = nameplate.shown();
-      d.assert('the panel prints the maker and the model, both in uppercase',
-        maker === 'TASCAM' && model === 'MODEL 12', `${maker} ${model}`);
+      const shown = nameplate.shown();
+      d.assert('the panel prints the model name alone, in uppercase',
+        shown.length === 1 && shown[0] === 'MODEL 12', shown.join(' ') || '(nothing)');
     }
 
     /**
-     * 🔴 AND THE NAMEPLATE BELONGS TO THE INSTRUMENT, WHICH IS A MEASUREMENT.
-     * It sits outside the cards, so nothing but the distance and the two edges
-     * says it is the mixer's name rather than a line of page furniture above
-     * it. Both ends are checked: a `space-between` row puts the maker at the
-     * rack's left edge and the model at the lane's right edge only while the
-     * row spans them both.
-     * ⚠️ AGAINST THE PAGE'S OWN RHYTHM RATHER THAN AGAINST A NUMBER. `--pos-gap`
-     * is what a block of its own would get, and the claim here is that this is
-     * closer than that, so the check reads the rhythm rather than repeating the
-     * 10 typed in the stylesheet. A measurement compared against a copy of the
-     * thing it measures cannot disagree with it.
+     * 🔴 AND IT IS IN THE MASTER LANE'S TOP RIGHT CORNER, WHICH IS A
+     * MEASUREMENT. Asked for in those words, and the two halves of the corner
+     * are two separate ways to be wrong: a plate that is flush right but
+     * floating in the middle of the column, and a plate at the top that is
+     * centred or left. Both are measured against the LANE's own box.
+     * ⚠️ **FLUSH RIGHT IS AGAINST THE LANE'S PADDING, NOT ITS BORDER.** The lane
+     * insets its contents by 14 px, so a plate at the lane's `right` would be
+     * sitting ON the card's edge. The function key row below it is the honest
+     * comparison, because whatever the inset is, both obey it.
+     * ⚠️ **AND `TOP` IS AGAINST THAT ROW TOO.** The plate is the lane's first
+     * child, so the only thing that can be above it is nothing, and the claim
+     * worth grading is that the row which used to be first is now BELOW it.
+     * 🔴 **THE OLD ASSERT MEASURED A PLATE SPANNING TWO BOXES WITH AIR UNDER
+     * IT**, reading both far edges and the drop against `--pos-gap`. Nothing it
+     * measured exists any more, so it is replaced rather than re-baselined.
      */
     {
-      const gap = parseFloat(getComputedStyle(document.documentElement)
-        .getPropertyValue('--pos-gap')) || 40;
       const b = brands.getBoundingClientRect();
-      const r = rackRow.getBoundingClientRect();
+      const f = fRow.getBoundingClientRect();
       const l = document.querySelector('.rack-lane').getBoundingClientRect();
-      const drop = r.top - b.bottom;
-      d.assert('the nameplate spans the mixer and sits closer to it than a block would',
-        Math.abs(b.left - r.left) <= 1 && Math.abs(b.right - l.right) <= 1
-        && drop > 0 && drop < gap / 2,
-        `left ${(b.left - r.left).toFixed(1)}, right ${(b.right - l.right).toFixed(1)}, `
-        + `${drop.toFixed(1)} px above the rack against a ${gap} px rhythm`);
+      d.assert('the nameplate is in the top right corner of the master lane',
+        b.top >= l.top && b.bottom <= f.top && Math.abs(b.right - f.right) <= 1,
+        `${(b.top - l.top).toFixed(1)} px below the lane's top, `
+        + `${(b.right - f.right).toFixed(1)} px off the controls' right edge, `
+        + `${(f.top - b.bottom).toFixed(1)} px above them`);
     }
 
-    // 🔴 SUB AND MAIN ARE DRAWN AND SEND NOTHING, asserted rather than assumed.
-    // A control that looks live and is inert is this project's named defect;
-    // one that looks inert and IS inert has to say so out loud, or the next
-    // person to read the page cannot tell which of the two it is.
+    /**
+     * 🔴 NOTHING ON THIS PANEL IS DISABLED, AND IT IS ASSERTED BECAUSE IT WAS
+     * ASKED FOR. *"Rm disabled controls"*, 2026-09-21. Four things went: MAIN
+     * and SUB in every channel column, F1, and the SUB and MAIN faders beside
+     * the FX fader.
+     * ⚠️ **IT IS A SWEEP OF THE PANEL RATHER THAN A LIST OF THE FOUR.** A check
+     * naming what was removed passes forever and says nothing about the next
+     * dead control somebody draws; a check that reads every `:disabled` under
+     * the instrument fails the moment one appears.
+     * ⚠️ **AND IT REPLACES AN ASSERT THAT MADE THE OPPOSITE CLAIM**, *sub and
+     * main stand beside the FX fader, disabled, ending on its line*, which
+     * measured that there were two of them, that both were off and that all
+     * three faders ended on one line. The last of those three is still made,
+     * by the check comparing a channel fader against the FX fader.
+     */
     {
-      const bottoms = [master, ...outs]
-        .map((f) => f.el.querySelector('.pos-fdr-lane').getBoundingClientRect().bottom);
-      const spread = Math.max(...bottoms) - Math.min(...bottoms);
-      d.assert('sub and main stand beside the FX fader, disabled, ending on its line',
-        outs.length === 2 && outs.every((f) => f.disabled()) && !master.disabled()
-        && spread <= 1,
-        `${outs.filter((f) => f.disabled()).length} of 2 off, `
-        + `ends spread ${spread.toFixed(1)} px`);
+      const off = unit.querySelectorAll('button:disabled, input:disabled');
+      d.assert('no control on the panel is drawn and switched off',
+        off.length === 0,
+        off.length ? `${off.length} disabled` : `${unit.querySelectorAll('button, input').length} controls, all live`);
     }
 
     d.assert('the rack is eight strips and one master',
       rack.length === 8 && !!master, `${rack.length} strips`);
-    d.assert('every strip carries a pan, a fader and four column buttons',
-      rack.every((s) => s.pan && s.fader && Object.keys(s.pads).length === 5),
-      `${rack.filter((s) => Object.keys(s.pads).length === 5).length} of ${rack.length} complete`);
+    /* ⚠️ THREE PADS, NOT FIVE. REC sits above the fader block and MUTE and SOLO
+       beside it; MAIN and SUB left on 2026-09-21 with the other disabled
+       controls. The number is in the assert's own words so the two cannot
+       disagree the way a count and a sentence usually do. */
+    d.assert('every strip carries a pan, a fader, REC and two column buttons',
+      rack.every((s) => s.pan && s.fader && Object.keys(s.pads).length === 3),
+      `${rack.filter((s) => Object.keys(s.pads).length === 3).length} of ${rack.length} complete`);
 
     // Nothing on this page may claim a source it has not had.
     d.assert('every control says the hardware moved it',
@@ -1322,23 +1438,50 @@ const PAN_SCALE = 2;
       const b = lastBtn.getBoundingClientRect().bottom;
       d.assert('the buttons end where the fader controls end, not at its label',
         Math.abs(a - b) <= 1.5, `lane ends at ${a.toFixed(1)}, buttons at ${b.toFixed(1)}`);
+      /**
+       * 🔴 THE FADER IS THE LENGTH THE PANEL DECLARES, WHICH IS THE CHECK THAT
+       * REPLACED `the lane starts level with the first button in the column`.
+       * That one read the fader's top against MUTE's, and it was only ever true
+       * because four buttons spanned the fader exactly. `Rm disabled controls`
+       * took two of them, so the column is 86 px at the foot of a 212 px lane
+       * and the old alignment describes nothing.
+       * 🔴 **WHAT IT WAS ACTUALLY WORTH WAS CATCHING A DEAD SELECTOR**, and it
+       * did: when the row was renamed and the rule kept the old class,
+       * `--fdr-lane-h` fell back to its 120 px default and the lane was 29 px
+       * short. This measures the same failure head on, and harder, because it
+       * names the number instead of a second element that happened to move
+       * with it.
+       * ⚠️ **TWO SOURCES, NOT A COPY OF ONE.** `--rack-throw` is declared on
+       * `.rack-unit` and the lane's height comes from `--fdr-lane-h` reading it
+       * through `.rack-unit .pos-fdr`. A stale selector breaks the second path
+       * and leaves the first intact, so the two can disagree, which is the only
+       * thing that makes a comparison evidence.
+       * 🔴 **AND THE TOKEN IS MEASURED THROUGH A BOX, NOT PARSED OUT OF
+       * `getComputedStyle`.** MEASURED on the first run of this check:
+       * `getPropertyValue('--rack-throw')` returns the `calc(...)` TEXT, because
+       * an unregistered custom property has no computed type, so `parseFloat`
+       * gave `NaN` and the assert went red on a page that was laying out
+       * perfectly. A hidden, out of flow probe asks the browser to resolve the
+       * same length the same way the fader does, and it is added and removed
+       * inside one task so nothing is painted.
+       */
+      {
+        const lanEl = fader.el.querySelector('.pos-fdr-lane');
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position:absolute;visibility:hidden;width:0;height:var(--rack-throw)';
+        unit.append(probe);
+        const want = probe.getBoundingClientRect().height;
+        probe.remove();
+        const got = lanEl.getBoundingClientRect().height;
+        d.assert('the fader is as long as the panel says a fader is',
+          want > 0 && Math.abs(got - want) <= 1,
+          `${got.toFixed(1)} px against a declared ${want.toFixed(1)} px`);
+      }
+
       // 🔴 AND THE LABELS UNDER THEM LINE UP TOO, which is a second claim and
       // needs a second measurement: the controls can end together while their
       // labels do not, which is exactly what happened when the pads gained a
       // bottom label and the page was still lifting the column by hand.
-      // 🔴 AND THE TOP LINES UP TOO, which is a third claim and a third
-      // measurement. The lane's height is calculated from tokens, so this is
-      // the check that the arithmetic matches the layout rather than merely
-      // looking plausible in a comment.
-      const recBtn = pads.mute.button;
-      if (recBtn) {
-        // the TOP is still the lane's: a hand under it does not move that
-        const lt = fader.el.querySelector('.pos-fdr-lane').getBoundingClientRect().top;
-        const rt = recBtn.getBoundingClientRect().top;
-        d.assert('the lane starts level with the first button in the column',
-          Math.abs(lt - rt) <= 1.5, `lane top ${lt.toFixed(1)}, mute top ${rt.toFixed(1)}`);
-      }
-
       const fLab = fader.el.querySelector('.pos-fdr-lab');
       const pLab = pads.solo.el.querySelector('.pos-pad-bot');
       if (fLab && pLab) {
