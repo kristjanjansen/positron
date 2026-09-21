@@ -153,6 +153,27 @@ in the bay's validator (a cycle walk that started at an input, an audio rule
 that refused every audio link, two refusals in the wrong order) and one in its
 model (`accepts` doing two jobs, which refused every real link on this desk).
 
+## The third half, done by two agents in parallel
+
+- **http://127.0.0.1:8890/shape/** edits a Circuit's voice **while it is
+  sounding**. **34/34**, 28 page asserts, ten of which run for every visitor.
+  🔴 **NOBODY HAS HEARD IT.** No Circuit was plugged in for any run, and
+  `portSends === 0` is asserted so a suite run can never be a hand on the
+  instrument. The real time claim rests on the reference guide and on the
+  existing `/dump/` measurements. **Plug the Circuit in and press something.**
+  ⚠️ Its opening handle positions are an invention: a control change is write
+  only, so the page cannot ask the device what its patch holds. `put back`
+  restores where this page found things, not the patch as saved.
+- `research/synth-editors-2026-09-21.md`: seven of fourteen editor UI elements
+  already exist here, four are genuinely missing, and **82 of the Circuit's 98
+  parameters are a plain knob the kit already has**.
+- `research/circuit-session-format-2026-09-21.md`: the session container is
+  mapped, and **a claim published this morning is corrected in it**.
+
+🔴 **TWO STALE LINES IN STANDING FILES WERE CAUGHT BY AGENTS READING THEM**, not
+by anybody looking: `tabs.mjs` described as used by no page when two pages use
+it, and the demo count, twice in one day. Both corrected.
+
 ## Two plans and two pieces of research landed
 
 - `plans/plan-patchbay.md`, the design. 414 lines.
@@ -169,8 +190,10 @@ model (`accepts` doing two jobs, which refused every real link on this desk).
    is the part of the backup that is missing.
 2. **`origin/main`**, above.
 3. **Commit this session's work**, above.
-4. 🔌 **Nobody has played the Circuit from a computer.** Every panel here
-   listens. It is the one measurement the whole patch bay demo rests on.
+4. 🔌 **NOBODY HAS PLAYED THE CIRCUIT FROM A COMPUTER, AND THERE ARE NOW TWO
+   PAGES WAITING ON IT.** `/bay/` can route a keyboard into it and `/shape/`
+   can move 98 of its parameters, and neither has been heard. It is one cable
+   already patched, one press, and it settles the whole chain.
 5. **`/circuit/`: how wide the card should be**, unchanged from last session.
 6. **`/model/`: three layout asks.** Channel strip content to the bottom, main
    and sub to the bottom, title to the right.
