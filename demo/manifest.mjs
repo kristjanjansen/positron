@@ -598,7 +598,7 @@ export const DEMOS = [
    * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
    */
   { name: 'pack', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
-    one: 'open a Circuit pack and see what its patches are made of',
+    one: 'open a Circuit pack and look inside its patches, sessions and samples',
     tags: ['zip', 'sysex', 'DecompressionStream'] },
 
   /**

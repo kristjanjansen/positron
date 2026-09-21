@@ -33,6 +33,12 @@
      the cut lands on a border. The scrollbar and the rows under the sticky
      heading are what say there is more. */
   .pk-tbl { --tbl-h: 194px; }
+  /* ⚠️ IT MOVES ON A PRESS AND NEVER ON A CLOCK, which is what makes a line of
+     prose allowed here at all. `positron-ui`'s rule is that nothing redrawing
+     every frame may change how much room it takes; text that changes when
+     somebody did something is fine, and this one changes when a session row is
+     opened. */
+  .pk-line { font: 400 12px/1.5 var(--mono); color: var(--dim); }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
@@ -44,6 +50,9 @@
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
   import { readSession, summarise as summariseSession, patchPayloads } from '/shell/circuit-session.mjs';
+  import {
+    readWave, toMono, summarise as summariseWave, summariseAll,
+  } from '/shell/circuit-sample.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import {
     readPatch, readPatchData, summarise, sessionStats, patchFields, modSlots,
@@ -87,7 +96,7 @@
     name: 'pack',
     // ⚠️ THE PAGE'S SENTENCE AND THE INDEX'S ARE ONE STRING, because a page with
     // a diagram carries the index's own line verbatim.
-    what: 'open a Circuit pack and see what its patches are made of',
+    what: 'open a Circuit pack and look inside its patches, sessions and samples',
     /**
      * 🔴 NO READOUT, AND `null` RATHER THAN AN OMITTED FIELD. Instructed
      * 2026-09-21: *"rm patches 64 / sessions 32 / different 32 of 32 / filled
@@ -102,7 +111,21 @@
      * so the verdict is now the only place either number appears.
      */
     readout: null,
-    controls: [{ id: 'here', label: 'open the pack here', primary: true }],
+    /**
+     * 🔴 NO CONTROLS EITHER, AND `open the pack here` WENT ON 2026-09-21 BECAUSE
+     * IT WAS ASKED FOR: *"rm 'open pack here'"*. It read the repository's own
+     * `New Pack.circuitpack`, which is published nowhere, so the control did
+     * something on this machine and answered a sentence everywhere else. The
+     * page has ONE way in now and it is the same one for everybody.
+     * ⚠️ A BACKGROUND AGENT DELETED THIS CONTROL ON ITS OWN AUTHORITY EARLIER
+     * THE SAME DAY AND WAS REVERTED FOR IT. It is gone now because the owner
+     * said so, not because that agent turned out to be right, and `BACKLOG.md`
+     * records the difference.
+     * ⚠️ AND `PACK` STAYS, FOR THE HARNESS ONLY. Every reading check on this
+     * page needs a real pack, and the one on this machine is the only one that
+     * is always there. It is read inside `SELFCHECK` and nowhere else, so a
+     * visitor still opens nothing.
+     */
   });
 
   const stack = createStack();
@@ -119,7 +142,19 @@
   // 1 `.circuittrackspack`, 128 `.syx`, an `.xlsx`, two `.txt` and 10 `.url`.
   const drop = createDrop({
     accept: ['.circuitpack', '.circuittrackspack', '.zip', '.syx', '.circuitsession'],
-    label: 'open a pack from this machine',
+    // ⚠️ THE WORDS WERE ASKED FOR ONE AT A TIME, 2026-09-21: a title reading
+    // *"upload file"*, a control reading *"[open file] or drag a file here"*,
+    // and the list of extensions *"under a button"*. `drop.mjs` gained `title`
+    // and `beside` for it and moved its hint below the button, so every caller
+    // gets the same order rather than this page arranging its own.
+    // 🔴 THE BUTTON STILL SAYS `open`, WHICH IS THE COMPONENT'S OWN RULE AND
+    // SURVIVED A REVERT. Nothing leaves the machine, and a control called
+    // *upload* invites somebody to build the thing `.gitignore` exists to
+    // prevent. The title is the reader's word for the block; the button is the
+    // promise about what pressing it does.
+    title: 'UPLOAD FILE',
+    label: 'open file',
+    beside: 'or drag a file here',
     hint: 'drop a pack or a session anywhere on this page',
     says: (m, kind) => d.log(m, kind),
     onOpen: (files) => openFiles(files),
@@ -162,11 +197,16 @@
    * with nothing in it keeps its bare word. A `0` next to a name reads as a very
    * confident measurement of nothing, which is the rule the readout already
    * states about a cell pre-set to zero.
+   * 🔴 AND THE COUNT LEADS, ASKED FOR 2026-09-21 AS *"put counts on front of tab
+   * titles"*. It read `PATCHES 64` and it reads `64 PATCHES` now. `BACKLOG.md`
+   * had this open as the one detail a reverted agent changed that nobody had
+   * actually decided, because the original ask said to add a count and never
+   * said which end. This is the answer to that.
    */
   function countTabs(n) {
     TABS.forEach((t, i) => {
       const c = n[t.id];
-      tabs.buttons[i].textContent = c ? `${t.label} ${c}` : t.label;
+      tabs.buttons[i].textContent = c ? `${c} ${t.label}` : t.label;
     });
   }
 
@@ -221,9 +261,56 @@
       { key: 'filled', label: 'filled', width: 62, align: 'right' },
     ],
     cap: 64, empty: '', note: 'hover',
+    onPick: (r) => showSession(r.i),
   });
+  sessionTable.el.classList.add('pk-tbl');
   const verdict = el('div', 'pk-verdict', 'no pack is open, so there is nothing to say about one yet');
-  panel('sessions').append(sessionTable.el, verdict);
+
+  /**
+   * 🔴 THE LIST OPENS, ASKED FOR 2026-09-21 AS *"make session list clicable and
+   * show data below what you extracted"*. The five columns in the list are what
+   * a reader SCANS; these two tables are what the decoder actually got out of
+   * the pressed file, and until today `circuit-session.mjs` read all of it and
+   * the page showed a hover.
+   * ⚠️ IT IS THE SAME ARRANGEMENT THE PATCHES TAB ALREADY HAS: a list, and one
+   * detail panel under it for the pressed row. A press changes the words in a
+   * panel that is already there rather than making one appear, because
+   * `fill()` opens the first row the moment a pack is read, exactly as it does
+   * for patches.
+   * ⚖️ AND WHAT A FIELD MEANS IS STILL NOT GUESSED. `circuit-session.mjs`
+   * decodes two things by name, the four byte head and the 32 byte name, and
+   * both are corroborated against `index.json`. Everything else here is a
+   * count, an offset or a byte total, which is what that module offers.
+   */
+  const sessionFacts = createTable({
+    columns: [
+      { key: 'field', label: 'field', width: 108 },
+      { key: 'value', label: 'value', grow: true, hi: true, clip: true },
+    ],
+    cap: 24, empty: '', note: 'hover',
+  });
+  const partsLine = el('div', 'pk-line', '');
+  /**
+   * 🔴 THE FIFTY REGIONS, WHICH ARE THE DECODER'S WHOLE MODEL OF THE FILE. A
+   * header, sixteen synth slots at 1,508 bytes, thirty two drum slots at 720 and
+   * a 6,004 byte tail, at the same offsets in all 32 of the owner's sessions and
+   * in all 64 of the two purchased packs.
+   * ⚠️ `used` AND `pad` ARE THE PAIR THAT MATTERS AND NEITHER MEANS ANYTHING
+   * ALONE. A session is four fifths erased flash, so a region's size says almost
+   * nothing and the bytes before the erasure starts say what is in it. That is
+   * the same denominator trap this project published once and corrected.
+   */
+  const partsTable = createTable({
+    columns: [
+      { key: 'part', label: 'part', grow: true },
+      { key: 'at', label: 'at', width: 76, align: 'right' },
+      { key: 'used', label: 'used', width: 72, align: 'right' },
+      { key: 'pad', label: 'pad', width: 76, align: 'right' },
+    ],
+    cap: 64, empty: '', note: 'hover',
+  });
+  partsTable.el.classList.add('pk-tbl');
+  panel('sessions').append(sessionTable.el, verdict, sessionFacts.el, partsLine, partsTable.el);
 
   /**
    * 🔴 THE SAMPLES TAB, ASKED FOR AS *"why there is no samples?"*. The plan
@@ -241,17 +328,26 @@
   const sampleTable = createTable({
     columns: [
       { key: 'name', label: 'name', grow: true, clip: true },
-      { key: 'len', label: 'length', width: 72, align: 'right' },
-      { key: 'size', label: 'size', width: 80, align: 'right' },
+      { key: 'len', label: 'length', width: 76, align: 'right' },
+      { key: 'peak', label: 'peak', width: 64, align: 'right' },
+      { key: 'sound', label: 'sound', width: 68, align: 'right' },
     ],
     cap: 128, empty: '', note: 'hover',
     onPick: (r) => playSample(r.i),
   });
-  panel('samples').append(sampleTable.el);
+  sampleTable.el.classList.add('pk-tbl');
+  /**
+   * ⚠️ THE TOTALS, AND `refused` IS THE NUMBER THAT MATTERS MOST IN THEM.
+   * `summariseAll` counts a file that would not parse rather than dropping it,
+   * because a total taken over the ones that worked hides the only thing worth
+   * seeing. The line is empty until something is open.
+   */
+  const samplesLine = el('div', 'pk-line', '');
+  panel('samples').append(samplesLine, sampleTable.el);
 
   // ── what is open ─────────────────────────────────────────────────────────
   let patches = [], rows = [], sessions = [], samples = [];
-  let picked = -1, played = 0, ac = null;
+  let picked = -1, pickedSession = -1, played = 0, ac = null, lastPlayed = null;
 
   const pct = (x) => `${(x * 100).toFixed(1)}`;
   const kb = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} kB` : `${(n / 1048576).toFixed(1)} MB`);
@@ -423,14 +519,14 @@
       const scan = sysexScan(bytes);
       if (scan.patches.length) {
         fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), [], []);
-        sayScan(name, scan, `${name}, ${scan.patches.length} patches, read in this tab and sent nowhere`);
+        sayScan(name, scan, name);
         return;
       }
       drop.say(`${name} is ${bytes.length} bytes and a Circuit patch is ${PATCH_BYTES}`, 'bad');
       return;
     }
     fill([{ name, bytes }], [], []);
-    sayScan(name, sysexScan(bytes), `${name}, one patch, read in this tab and sent nowhere`);
+    sayScan(name, sysexScan(bytes), name);
   }
 
   /**
@@ -457,7 +553,7 @@
     } catch { /* a session this module cannot partition still weighs */ }
     lastScan = null;
     fill(held, [one], []);
-    drop.say(`${name}, one session holding ${held.length} patches, read in this tab and sent nowhere`, 'good');
+    drop.say(name, 'good');
   }
 
   /**
@@ -492,7 +588,7 @@
       const got = [];
       for (const e of loose) got.push({ name: e.name.split('/').pop(), bytes: await e.read() });
       fill(got, [], []);
-      drop.say(`${name}, ${got.length} loose patches and no pack, read in this tab and sent nowhere`, 'good');
+      drop.say(name, 'good');
       return;
     }
     drop.say(`${name} holds no Circuit pack and no patches`, 'bad');
@@ -538,6 +634,20 @@
    * kind, because it is the one that teaches a reader to stop believing the
    * alarms. Caught by the negative control rather than by looking.
    */
+  /**
+   * 🔴 THE CONFIRMATION IS THE FILE'S NAME AND NOTHING ELSE SINCE 2026-09-21.
+   * It used to read *"Novation Circuit Bank Part 1.circuitpack inside
+   * Synth-Patches.com - Soundbank for Novation Circuit and Tracks.zip, 64
+   * patches, 32 sessions, 0 samples, read in this tab and sent nowhere"*, and
+   * the instruction was *"rm it"*. Every fact in it is now somewhere a reader
+   * can act on: the three counts LEAD the tab titles, and *sent nowhere* is in
+   * the picture's caption under every patch and asserted over a counter.
+   * ⚠️ IT STILL SAYS SOMETHING, WHICH IS THE PART THAT CANNOT GO. This line is
+   * where a refusal lands, and a note left holding the PREVIOUS file's words
+   * while a new one is open is a stale alarm, which is the one failure that
+   * teaches a reader to stop believing the alarms. The warnings below are
+   * untouched.
+   */
   function sayScan(name, scan, ok) {
     lastScan = scan;
     if (!scan.flash) { if (ok) drop.say(ok, 'good'); return; }
@@ -567,8 +677,7 @@
           st.push(await readOne(scan.sessions[k], `session ${k}`));
         }
         fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), st, []);
-        sayScan(name, scan, `${name}, ${scan.patches.length} patches and ${st.length} sessions `
-          + 'out of a sysex stream, read in this tab and sent nowhere');
+        sayScan(name, scan, name);
         return;
       }
       drop.say(`${name} did not read as a pack: ${e.message}`, 'bad');
@@ -605,19 +714,24 @@
       st.push(await readOne(b, names[i] || sess[i].name.split('/').pop()));
     }
 
-    // ⚠️ A SAMPLE'S LENGTH COMES OUT OF ITS OWN HEADER, WALKING THE CHUNKS.
-    // A WAV is not a fixed 44 byte header: `LIST` and `fact` chunks sit between
-    // `fmt ` and `data` in files from plenty of tools, and assuming the offset
-    // reads a length that is wrong rather than one that is missing.
+    // 🔴 A SAMPLE IS READ BY `circuit-sample.mjs` AND NOT BY A FUNCTION ON THIS
+    // PAGE. It had one, `wavShape`, which walked the chunks correctly and knew
+    // nothing about what was IN the audio, so the table could show a length and
+    // a file size and that was all it could ever show. The module answers 57
+    // asserts with seven sabotages behind it, refuses thirteen kinds of file by
+    // name rather than throwing, and decodes to plain floats.
+    // ⚠️ AND THE RAW BYTES ARE NOT KEPT. `readWave` copies the data chunk, so
+    // holding the file as well would be a second 5.1 MB of the same audio.
     const sm = [];
     for (const e of wav) {
       const b = await e.read();
-      sm.push({ name: e.name.split('/').pop(), size: e.size, bytes: b, ...wavShape(b) });
+      const name = e.name.split('/').pop();
+      const wave = readWave(b);
+      sm.push({ name, size: e.size, wave, row: summariseWave(wave, name) });
     }
 
     fill(got, st, sm);
-    drop.say(`${name}${from ? ` ${from}` : ''}, ${got.length} patches, ${st.length} sessions, `
-      + `${sm.length} samples, read in this tab and sent nowhere`, 'good');
+    drop.say(`${name}${from ? ` ${from}` : ''}`, 'good');
   }
 
   /**
@@ -627,17 +741,97 @@
    */
   async function readOne(bytes, fallbackName) {
     const stats = await sessionStats(bytes);
-    let deep = null;
-    try { deep = summariseSession(readSession(bytes)); }
-    catch { /* a file this module cannot partition is still weighable */ }
+    let deep = null, parts = [];
+    try {
+      const model = readSession(bytes);
+      deep = summariseSession(model);
+      // ⚠️ THE `data` COPY IS DROPPED AND THE COUNTS ARE KEPT. `readSession`
+      // hands back every region's leading bytes so `rebuild()` can put the file
+      // back together, and thirty two sessions of those is memory this page has
+      // no use for: the panel shows where a region is and how much of it is
+      // written, which is four numbers.
+      parts = model.slots.map((x) => ({
+        index: x.index, kind: x.kind, at: x.at, size: x.size, used: x.used, pad: x.pad,
+      }));
+    } catch { /* a file this module cannot partition is still weighable */ }
     return {
       ...stats,
       bytes,
       name: deep?.name || fallbackName,
+      tag: deep?.tag ?? null,
       used: deep?.used ?? null,
       magicOk: deep?.magicOk ?? null,
       patchNames: deep?.patchNames || [],
+      parts,
     };
+  }
+
+  /**
+   * One session opened out of the list. It logs, which is where a state change
+   * belongs, and it never touches the network or the audio context.
+   */
+  function showSession(i) {
+    const s = sessions[i];
+    if (!s) return;
+    pickedSession = i;
+    sessionTable.mark((r) => r.i === i);
+
+    const n = (x) => (x === null || x === undefined ? '' : x.toLocaleString());
+    const kinds = ['header', 'synth', 'drum', 'tail'];
+    const of = (k) => s.parts.filter((x) => x.kind === k);
+    const usedOf = (k) => of(k).reduce((a, x) => a + x.used, 0);
+
+    sessionFacts.set([
+      { field: 'name', value: s.name || '(no name)',
+        hover: 'thirty two bytes of space padded text at offset 16, and it agrees with '
+             + 'index.json in 32 of 32 here' },
+      { field: 'head', value: s.head,
+        hover: 'the first four bytes. It is NOT a backup test: the owner\'s own sessions '
+             + 'are USER 22, DEMO 7 and INIT 3, and all 64 purchased blanks say INIT too' },
+      { field: 'marker', value: s.magicOk === null ? '' : s.magicOk ? 'DC BB' : 'absent',
+        hover: 'two bytes at offset 4. DC BB in all 32 of the owner\'s sessions and 00 00 '
+             + 'in all 64 blanks, which is measured rather than a reading of what it means' },
+      { field: 'written', value: `${n(s.used)} B`,
+        hover: `the bytes before the erasure in all ${s.parts.length} regions, out of `
+             + `${n(s.bytes.length)} in the file` },
+      { field: 'not erasure', value: `${n(s.notErased)} B`,
+        hover: 'bytes that are not 0xFF, counted over the whole file' },
+      { field: 'payload', value: `${n(s.payload)} B`,
+        hover: 'bytes that are neither 0xFF nor 0x00. This is the denominator for any '
+             + 'statement about content, and using the file length instead measures the erasure' },
+      { field: 'filled', value: `${pct(s.nonZero)} per cent`,
+        hover: 'the share of the file that is not zero' },
+      { field: 'entropy', value: `${s.entropy.toFixed(2)} bits a byte`,
+        hover: 'a stock Initial Session has ordinary entropy, so this cannot tell a '
+             + 'template from somebody\'s work on its own' },
+      { field: 'nearest', value: s.nearest === null || s.nearest === Infinity ? ''
+          : `${n(s.nearest)} B away`,
+        hover: 'how far this file is from the closest other session in the same file, which '
+             + 'is the one measure that finds a repeated stock session' },
+      ...s.patchNames.map((nm, k) => ({
+        field: `synth ${k + 1}`, value: nm || '(no name)',
+        hover: 'a 340 byte payload in the last region, read without building a message round it',
+      })),
+    ]);
+
+    partsLine.textContent = `the ${s.parts.length} regions of "${s.name || '(no name)'}", `
+      + kinds.map((k) => `${of(k).length} ${k}`).join(', ');
+
+    partsTable.set(s.parts.map((x) => {
+      const nth = x.kind === 'synth' || x.kind === 'drum'
+        ? `${x.kind} ${s.parts.filter((y) => y.kind === x.kind && y.index <= x.index).length}`
+        : x.kind;
+      return {
+        part: nth,
+        at: n(x.at),
+        used: n(x.used),
+        pad: n(x.pad),
+        hover: `${n(x.size)} bytes at ${n(x.at)}, ${n(x.used)} written and ${n(x.pad)} erased`,
+      };
+    }));
+
+    d.log(`${s.name || '(no name)'}, head ${s.head}, ${n(s.used)} B written across `
+        + `${s.parts.length} regions, holding ${s.patchNames.join(' and ') || 'no readable patches'}`);
   }
 
   /**
@@ -660,20 +854,6 @@
       }
     }
     return out;
-  }
-
-  function wavShape(b) {
-    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
-    let off = 12, fmt = null, dataLen = 0;
-    while (off + 8 <= b.length) {
-      const id = String.fromCharCode(b[off], b[off + 1], b[off + 2], b[off + 3]);
-      const sz = dv.getUint32(off + 4, true);
-      if (id === 'fmt ') fmt = { ch: dv.getUint16(off + 10, true), rate: dv.getUint32(off + 12, true), bits: dv.getUint16(off + 22, true) };
-      if (id === 'data') dataLen = sz;
-      off += 8 + sz + (sz & 1);
-    }
-    if (!fmt || !dataLen) return { seconds: 0, rate: 0, bits: 0, ch: 0 };
-    return { seconds: dataLen / (fmt.rate * fmt.ch * fmt.bits / 8), ...fmt };
   }
 
   function fill(files, stats, wavs) {
@@ -717,7 +897,8 @@
     sessions = stats;
     const near = stats.length > 1 ? nearestEach(stats) : stats.map(() => null);
     stats.forEach((x, i) => { x.nearest = near[i]; });
-    sessionTable.set(stats.map((s) => ({
+    sessionTable.set(stats.map((s, i) => ({
+      i,
       name: s.name || '(no name)',
       head: s.head,
       used: s.used === null ? '' : `${s.used}`,
@@ -729,18 +910,50 @@
     })));
 
     samples = wavs;
-    sampleTable.set(wavs.map((w, i) => ({
-      i,
-      name: w.name,
-      len: `${w.seconds.toFixed(2)} s`,
-      size: kb(w.size),
-      hover: `${w.rate} Hz, ${w.bits} bit, ${w.ch === 1 ? 'mono' : `${w.ch} channels`}. Press to hear it`,
-    })));
+    /**
+     * ⚠️ A SAMPLE THAT WOULD NOT PARSE KEEPS ITS ROW AND SAYS WHY, which is the
+     * same rule the patch reader already follows: a reader that silently dropped
+     * one leaves a pack looking smaller than it is, and that is a wrong answer
+     * wearing an empty one's clothes.
+     */
+    sampleTable.set(wavs.map((w, i) => {
+      const r = w.row;
+      if (!r.ok) {
+        return { i, name: w.name, len: '', peak: '', sound: '',
+                 hover: `this one did not read: ${r.why}` };
+      }
+      return {
+        i,
+        name: w.name,
+        len: `${r.seconds.toFixed(2)} s`,
+        peak: r.peak.toFixed(2),
+        sound: `${r.sound.toFixed(0)}%`,
+        hover: `${r.rate} Hz, ${r.bits} bit, ${r.channels === 1 ? 'mono' : `${r.channels} channels`}`
+             + `, ${r.frames.toLocaleString()} frames in ${kb(w.size)}`
+             + `, ${r.lead} frame(s) of silence at the front and ${r.trail} at the back`
+             + `${r.silent ? ', and it is silent all through' : ''}. Press to hear it`,
+      };
+    }));
+
+    const all = summariseAll(wavs.map((w) => w.wave));
+    samplesLine.textContent = all.count
+      ? `${all.parsed} of ${all.count} read`
+        + (all.refused ? `, ${all.refused} refused` : '')
+        + `${all.rates.length === 1 ? `, all ${all.rates[0] / 1000} kHz ${all.depths[0]} bit `
+          + `${all.channels[0] === 1 ? 'mono' : `${all.channels[0]} channel`}` : ''}`
+        + `, ${all.shortest.toFixed(2)} s to ${all.longest.toFixed(2)} s`
+        + `, ${all.seconds.toFixed(1)} s in total`
+      : '';
 
     countTabs({ patches: patches.length, sessions: sessions.length, samples: samples.length });
     const distinct = new Set(stats.map((s) => s.fingerprint)).size;
     sayVerdict(stats, distinct);
     if (patches.length) showPatch(0);
+    // ⚠️ AND THE FIRST SESSION OPENS TOO, so the panel under the list is filled
+    // whenever anything is, and a press changes its words instead of adding a
+    // block and moving everything under it.
+    if (sessions.length) showSession(0);
+    else { sessionFacts.set([]); partsTable.set([]); partsLine.textContent = ''; pickedSession = -1; }
   }
 
   /**
@@ -763,11 +976,25 @@
     }
     const flat = stats.every((s) => s.entropy < 0.05);
     const empty = stats.every((s) => s.nonZero < 0.01);
+    /**
+     * 🔴 THE SENTENCE THIS BRANCH USED TO CARRY WAS REMOVED ON 2026-09-21, ASKED
+     * FOR VERBATIM: *"rm all 32 sessions in this pack are the same empty
+     * session. Sending it to a Circuit would replace whatever is on the
+     * instrument with blanks, and a Circuit has no factory reset"*. What is gone
+     * is the instruction half. What replaces it is the same counted facts the
+     * two branches below already report, in the same register, so this branch no
+     * longer tells a reader what would happen to their instrument and still
+     * tells them what is in the file.
+     * ⚠️ NOTHING MEASURED CHANGED AND `CLAUDE.md` IS UNTOUCHED. The two
+     * purchased packs are still one fingerprint across all 64 session files at
+     * 0.009 bits a byte and 0.07 per cent non-zero, and the owner's is still 32
+     * distinct at 0.83 to 1.46 bits. A screen is not where that lives.
+     */
     if (distinct === 1 && (flat || empty)) {
       verdict.dataset.state = 'bad';
-      verdict.textContent = `all ${stats.length} sessions in this pack are the same empty session. `
-        + 'Sending it to a Circuit would replace whatever is on the instrument with blanks, '
-        + 'and a Circuit has no factory reset';
+      verdict.textContent = `all ${stats.length} of these sessions are the same session, `
+        + `and it is ${pct(stats[0].nonZero)} per cent filled at `
+        + `${stats[0].entropy.toFixed(2)} bits a byte`;
       d.log('this pack carries blank sessions', 'bad');
       return;
     }
@@ -835,41 +1062,36 @@
     const w = samples[i];
     if (!w) return;
     sampleTable.mark((r) => r.i === i);
+    /**
+     * 🔴 THE AUDIO COMES OUT OF `circuit-sample.mjs` AND NOT OUT OF
+     * `decodeAudioData`, WHICH IS THE HALF OF *"make/use sample decoder"* THAT
+     * IS NOT THE TABLE. The browser's decoder is a promise, it accepts anything
+     * it feels like accepting, and it can say nothing about a file it refuses
+     * beyond an `EncodingError`. `toMono` answers in words, and because it is
+     * SYNCHRONOUS the page's own check can grade a press rather than racing a
+     * decode, which is what the old path could not do.
+     * ⚠️ AND SOUND NEVER GATES THE WORK. `AudioContext.resume()` waits on a
+     * gesture in a real browser and does not reject, so awaiting one is a hang
+     * rather than an error. It is fired and left.
+     */
+    const mono = toMono(w.wave);
+    if (!mono.ok) { d.log(`${w.name} did not decode: ${mono.why}`, 'bad'); return; }
     try {
       ac = ac || new (window.AudioContext || window.webkitAudioContext)();
       ac.resume();
-      const copy = w.bytes.slice().buffer;
-      ac.decodeAudioData(copy).then((buf) => {
-        const src = ac.createBufferSource();
-        src.buffer = buf;
-        src.connect(ac.destination);
-        src.start();
-        played++;
-        d.log(`${w.name}, ${buf.duration.toFixed(2)} s`);
-      }).catch((e) => d.log(`${w.name} did not decode (${e.message})`, 'bad'));
+      const buf = ac.createBuffer(1, mono.frames, mono.rate);
+      buf.copyToChannel(mono.samples, 0);
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.connect(ac.destination);
+      src.start();
+      played++;
+      lastPlayed = { name: w.name, frames: mono.frames, rate: mono.rate, seconds: buf.duration };
+      d.log(`${w.name}, ${buf.duration.toFixed(2)} s, ${mono.frames.toLocaleString()} frames at ${mono.rate} Hz`);
     } catch (e) {
       d.log(`no sound here (${e.message})`, 'bad');
     }
   }
-
-  // ── the button that reads the pack in this repository ────────────────────
-  const notPublished = 'the pack in this repository is not published here, '
-    + 'so open one from your own machine';
-
-  d.button('here')?.addEventListener('click', async () => {
-    // ⚠️ IT ANSWERS RATHER THAN DOING NOTHING. A control that looks live and is
-    // inert is this project's named hazard; a press that produces one sentence
-    // immediately is not that.
-    if (!PACK_HERE) { drop.say(notPublished, 'bad'); return; }
-    drop.say('reading the pack in this repository');
-    try {
-      const r = await realFetch(PACK);
-      if (!r.ok) throw new Error(`the server answered ${r.status}`);
-      await openPack('New Pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
-    } catch (e) {
-      drop.say(`${notPublished} (${e.message})`, 'bad');
-    }
-  });
 
   // ── what a visit is allowed to have done ─────────────────────────────────
   d.assert('a visit opens nothing, asks for nothing and makes no sound',
@@ -888,6 +1110,37 @@
       box.width > 200 && box.height > 40 && /\.zip/.test(drop.el.textContent)
       && !drop.el.dataset.over && drop.cover.isConnected === false,
       `${box.width.toFixed(0)} by ${box.height.toFixed(0)} px`);
+
+    /**
+     * 🔴 THE ORDER IS MEASURED OFF THE SCREEN AND NOT READ OFF THE SOURCE, which
+     * is `positron-ui`'s rule after `/model/` was corrected by screenshot twelve
+     * times in one evening. The ask was a title, then a button, then the
+     * extensions UNDER it, and `append` order is not layout: a stylesheet can
+     * reverse a column and the source still reads correctly.
+     */
+    const t = drop.el.querySelector('.pos-drop-title').getBoundingClientRect();
+    const b = drop.button.getBoundingClientRect();
+    const h = drop.el.querySelector('.pos-drop-hint').getBoundingClientRect();
+    d.assert('the title is over the button and the list of what it takes is under it',
+      t.bottom <= b.top + 1 && h.top >= b.bottom - 1
+      && drop.el.querySelector('.pos-drop-title').textContent === 'UPLOAD FILE'
+      && drop.button.textContent === 'open file'
+      && /or drag a file here/.test(drop.el.textContent),
+      `title ends at ${t.bottom.toFixed(0)}, the button runs ${b.top.toFixed(0)} to `
+      + `${b.bottom.toFixed(0)}, the list starts at ${h.top.toFixed(0)}`);
+
+    /**
+     * 🔴 ONE WAY IN, AND THIS ASSERT REPLACES THE ONE THAT WENT WITH THE BUTTON.
+     * `open the pack here` was removed on 2026-09-21 because it was asked for,
+     * and a control that disappears takes its checks with it silently:
+     * `positron-verify` records that those asserts do not fail, they stop
+     * running, and the suite stays green either way. So the removal itself is
+     * graded.
+     */
+    const bar = document.querySelector('.pos-controls');
+    d.assert('there is one way in and no control row at all, which is what the page promises',
+      bar?.hidden === true && bar.querySelectorAll('button').length === 0,
+      `${bar ? bar.querySelectorAll('button').length : 'no'} control(s), row ${bar?.hidden ? 'hidden' : 'shown'}`);
   }
 
   d.assert('the picture cut nothing and refused nothing',
@@ -921,11 +1174,18 @@
   if (SELFCHECK) {
     const r = PACK_HERE ? await realFetch(PACK).catch(() => null) : null;
     if (!r || !r.ok) {
+      /**
+       * ⚠️ THIS BRANCH USED TO PRESS `open the pack here` AND READ WHAT IT SAID.
+       * That control is gone, so what is left to grade is the only claim that
+       * ever mattered on a deploy: the page asked nobody for anything and the
+       * way in is the drop area, for everybody, with no branch on where it is
+       * being served from.
+       */
       d.log('the pack here is not published, so the reading checks did not run', 'bad');
-      d.button('here')?.click();
-      d.assert('where the pack is not published the button says so, and asks nobody for it',
-        drop.note.textContent === notPublished && !PACK_HERE && fetched === 0,
-        `at ${location.hostname} it says "${drop.note.textContent}" after ${fetched} request(s)`);
+      d.assert('where the pack is not published nothing is asked of anybody, and the way in is unchanged',
+        !PACK_HERE && fetched === 0 && drop.opens === 0 && patches.length === 0
+        && drop.el.classList.contains('pos-drop-area'),
+        `at ${location.hostname} after ${fetched} request(s) and ${drop.opens} file(s) opened`);
     } else {
       await openPack('New Pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
 
@@ -933,8 +1193,10 @@
         patches.length === 64 && sessions.length === 32 && samples.length === 64,
         `${patches.length} / ${sessions.length} / ${samples.length}`);
 
-      d.assert('and the counts are in the tab titles',
-        tabs.buttons.map((b) => b.textContent).join(' ') === 'PATCHES 64 SESSIONS 32 SAMPLES 64',
+      // ⚠️ THE COUNT LEADS, WHICH IS THE WHOLE OF THE CHANGE AND IS THE ONLY
+      // PART OF IT A CHECK CAN SEE. It read `PATCHES 64` until 2026-09-21.
+      d.assert('and the counts lead the tab titles',
+        tabs.buttons.map((b) => b.textContent).join(' ') === '64 PATCHES 32 SESSIONS 64 SAMPLES',
         tabs.buttons.map((b) => b.textContent).join(' '));
 
       d.assert('every patch in it lands in RAM rather than in flash',
@@ -963,9 +1225,19 @@
         bytes: 53248, notErased: 53248, payload: 0, fingerprint: 'same',
       }));
       sayVerdict(blank, 1);
-      d.assert('NEGATIVE CONTROL: a pack of blanks is called blanks, and it says what sending it costs',
-        verdict.dataset.state === 'bad' && /no factory reset/.test(verdict.textContent),
-        `"${verdict.textContent.slice(0, 70)}"`);
+      /**
+       * ⚠️ THE SECOND HALF OF THIS ASSERT IS THE REMOVAL ITSELF. The sentence
+       * this branch used to carry told a reader what sending the file would do
+       * to their instrument, and it was removed by name on 2026-09-21. An
+       * assert that only checked the words that stayed would go green again the
+       * moment somebody put the old ones back.
+       */
+      d.assert('NEGATIVE CONTROL: a pack of blanks is called one session repeated, with what it holds',
+        verdict.dataset.state === 'bad'
+        && /all 32 of these sessions are the same session/.test(verdict.textContent)
+        && /0\.1 per cent filled/.test(verdict.textContent)
+        && !/factory reset/.test(verdict.textContent),
+        `"${verdict.textContent}"`);
       sayVerdict(sessions, distinct);
 
       /**
@@ -995,6 +1267,51 @@
         && sessions.every((x) => x.patchNames.length === 2)
         && sessions[0].patchNames.join(' and ') === 'Frog Steps and Woo-z',
         `session 0 is "${nm[0]}" holding ${sessions[0].patchNames.join(' and ')}`);
+
+      /**
+       * 🔴 THE PANEL UNDER THE LIST, AND THE FIRST HALF IS THAT IT IS ALREADY
+       * FILLED. A detail panel that appears on the first press pushes everything
+       * under it down, which is the same reservation the picture on the patches
+       * tab was asked for. `fill()` opens session 0 for exactly that reason.
+       */
+      d.assert('opening a pack opens its first session too, so the panel under the list is never empty',
+        pickedSession === 0 && sessionFacts.count() === 11 && partsTable.count() === 50
+        && /50 regions of "User Session"/.test(partsLine.textContent)
+        && /16 synth/.test(partsLine.textContent) && /32 drum/.test(partsLine.textContent),
+        `${sessionFacts.count()} fields and ${partsTable.count()} regions · "${partsLine.textContent}"`);
+
+      /**
+       * 🔴 THE REGIONS ARE THE DECODER'S MODEL RATHER THAN A READING OF THE FILE
+       * LENGTH. Fifty regions covering 53,248 bytes with no gap and no overlap is
+       * the claim `circuit-session.mjs` makes, and because the page now SHOWS it
+       * the page can CHECK it: every region starts where the last one ended, and
+       * each one's written bytes plus its erasure come to its own size.
+       */
+      {
+        const parts = sessions[0].parts;
+        let at = 0, ok = true;
+        for (const x of parts) { if (x.at !== at || x.used + x.pad !== x.size) ok = false; at += x.size; }
+        d.assert('the fifty regions are contiguous, cover the whole file and each accounts for its own pad',
+          ok && at === 53248 && parts.length === 50,
+          `${parts.length} regions ending at ${at.toLocaleString()} of 53,248`);
+      }
+
+      /**
+       * 🔴 PRESSING A SECOND SESSION OPENS THAT ONE, and the negative control is
+       * the point: a panel that showed the first session whatever was pressed
+       * would pass any check that only counted rows.
+       */
+      const otherSession = sessions.findIndex((x, k) => k > 0 && x.name !== sessions[0].name
+        && x.used !== sessions[0].used);
+      showSession(otherSession);
+      d.assert('NEGATIVE CONTROL: pressing another session shows that one rather than the first',
+        pickedSession === otherSession && otherSession > 0
+        && partsLine.textContent.includes(`regions of "${sessions[otherSession].name}"`)
+        && sessionFacts.el.textContent.includes(sessions[otherSession].name)
+        && !sessionFacts.el.textContent.includes(sessions[0].patchNames[0]),
+        `session ${otherSession} is "${sessions[otherSession].name}" at ${sessions[otherSession].used} B `
+        + `against session 0's "${sessions[0].name}" at ${sessions[0].used} B`);
+      showSession(0);
 
       const stock = sessions.filter((x) => x.nearest < 16);
       d.assert('the three stock sessions are found by distance, which entropy cannot do',
@@ -1047,13 +1364,70 @@
         matches(patches[picked]) && dgBox.flt.sub !== summarise(patches[0]).filter,
         `patch ${picked} draws ${dgBox.flt.sub} against patch 0's ${summarise(patches[0]).filter}`);
 
-      // 🔴 THE SAMPLES, AND EVERY COLUMN IN THAT TABLE HAS TO BE ABLE TO MOVE.
-      const secs = samples.map((w) => w.seconds);
-      d.assert('the samples read as 48 kHz 16 bit mono, and their lengths differ',
-        samples.every((w) => w.rate === 48000 && w.bits === 16 && w.ch === 1)
-        && Math.min(...secs) < Math.max(...secs),
-        `${Math.min(...secs).toFixed(2)} s to ${Math.max(...secs).toFixed(2)} s, `
-        + `${secs.reduce((a, b) => a + b, 0).toFixed(1)} s in total`);
+      /**
+       * 🔴 THE SAMPLES, READ BY THE KIT MODULE AND NOT BY THIS PAGE. Every one
+       * of the 64 parses, none is refused, and every column in that table moves.
+       * The rate, the depth and the channel count are the same sixty four times,
+       * which is why they are in the totals line and the hover rather than in
+       * columns nobody would read twice.
+       */
+      const all = summariseAll(samples.map((w) => w.wave));
+      d.assert('all 64 samples read as 48 kHz 16 bit mono with none refused, and their lengths differ',
+        all.parsed === 64 && all.refused === 0 && all.truncated === 0
+        && all.rates.join() === '48000' && all.depths.join() === '16' && all.channels.join() === '1'
+        && all.shortest < all.longest,
+        `${all.parsed} of ${all.count} read, ${all.shortest.toFixed(2)} s to `
+        + `${all.longest.toFixed(2)} s, ${all.seconds.toFixed(1)} s in total`);
+
+      /**
+       * 🔴 PRESSING ONE REALLY DECODES IT HERE, AND THIS CHECK COULD NOT BE
+       * WRITTEN BEFORE TODAY. The old path handed the bytes to
+       * `decodeAudioData`, which is a promise, so a check could press the row
+       * and had nothing to read until a decoder somewhere else had finished.
+       * `toMono` is synchronous, so what the press produced is on the page by
+       * the time the next line runs.
+       * ⚠️ AND IT COMPARES AGAINST THE FILE'S OWN HEADER RATHER THAN AGAINST A
+       * NUMBER TYPED HERE, so a decoder that produced plausible audio of the
+       * wrong length goes red.
+       */
+      const playedWas = played;
+      playSample(0);
+      d.assert('pressing a sample decodes it in this page and makes a buffer of exactly its own length',
+        played === playedWas + 1 && lastPlayed?.frames === samples[0].row.frames
+        && lastPlayed.rate === samples[0].row.rate
+        && Math.abs(lastPlayed.seconds - samples[0].row.seconds) < 0.002,
+        `${samples[0].name} played ${lastPlayed?.frames.toLocaleString()} frames at `
+        + `${lastPlayed?.rate} Hz against ${samples[0].row.frames.toLocaleString()} in its header`);
+
+      /**
+       * 🔴 THE NEGATIVE CONTROL, AND IT IS THE ONE THE AGENT THAT BUILT THE
+       * MODULE ASKED FOR IN WORDS: a total taken over the files that worked
+       * hides the only thing worth seeing. A page that dropped a bad sample
+       * would show 63 rows and a tidy total and look perfect.
+       * ⚠️ IT ALSO PROVES THE PRESS REFUSES. A row that cannot decode must not
+       * increment the play counter, or the page reports having played something
+       * that made no sound.
+       */
+      const badWave = readWave(new Uint8Array([0x52, 0x58, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]));
+      fill([], [], [{ name: 'broken.wav', size: 12, wave: badWave, row: summariseWave(badWave, 'broken.wav') }]);
+      const beforeBad = played;
+      playSample(0);
+      d.assert('NEGATIVE CONTROL: a sample that will not read keeps its row, is counted as refused and does not play',
+        sampleTable.count() === 1 && played === beforeBad
+        && /1 refused/.test(samplesLine.textContent)
+        && /did not read/.test(sampleTable.scroller().querySelector('.pos-tbl-row')?.title || '')
+        && tabs.buttons[2].textContent === '1 SAMPLES',
+        `${sampleTable.count()} row saying `
+        + `"${sampleTable.scroller().querySelector('.pos-tbl-row')?.title}"`
+        + ` · the line reads "${samplesLine.textContent}"`);
+      // ⚠️ `scroller()` AND NOT `el`, AND THE FIRST TRY READ THE HEADING. The
+      // heading is `.pos-tbl-row pos-tbl-head` and it is FIRST in the element,
+      // so `el.querySelector('.pos-tbl-row')` returns a row with no title and
+      // the assert went red on a page doing exactly what it promises. That is
+      // this page's third assert measuring something next to the quantity in
+      // question, and the other two are in `HANDOFF.md`.
+
+      await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
       /**
        * 🔴 THE FLASH WARNING, DRIVEN RATHER THAN READ. A file that would

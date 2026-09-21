@@ -4487,6 +4487,24 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    than setting it empty. `video-panel.mjs` set `= ''` and kept a panel in its
    full screen state for the rest of the page's life. */
 .pos-drop-area[data-over] { border-color: var(--hi); background: var(--card2); }
+/* 🔴 THE TITLE, THE BUTTON ROW AND THE SMALL PRINT, IN THAT ORDER. Asked for
+   2026-09-21 as *"put title to the drop area 'upload file'"* and *"put this
+   under a button"*. The title is uppercase by the stylesheet and typed
+   uppercase in the caller, which is the rule `/kit/` states about its own
+   headings: the source should read like the page. */
+.pos-drop-title {
+  font: 600 12px/1.5 var(--mono); color: var(--fg);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+/* ⚠️ THE BUTTON AND THE WORDS BESIDE IT ARE ONE ROW THAT WRAPS, because at
+   390 px a button and a sentence on one line is a row that drags the page
+   sideways, and that is already this project's most repeated phone defect. */
+.pos-drop-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.pos-drop-beside {
+  font: 400 12px/1.5 var(--mono); color: var(--dim);
+}
 .pos-drop-hint {
   font: 500 12px/1.5 var(--mono); color: var(--dim);
 }
