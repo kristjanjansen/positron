@@ -34,6 +34,20 @@
      ⚠️ AND THE INSET MOVES OUT OF THE `<pre>` INTO THE PART, so the JSON and
      the verdict under it share one padding instead of each buying their own. */
   .wish-part { background: var(--card); padding: 10px 12px; }
+  /* 🔴 THE HEADER: AN ACTION ON THE LEFT, ITS MODEL ON THE RIGHT. Asked for one
+     block at a time on 2026-09-21, once for each of the two blocks.
+     `space-between` rather than a spacer element, and it WRAPS, because at
+     390 px a button and a five option picker on one line is a row that drags
+     the page sideways, which is already this project's most repeated phone
+     defect. */
+  .wish-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap;
+  }
+  /* ⚠️ THE PICKER DOES NOT GROW. Left to itself a choice in a flex row takes
+     whatever the button leaves, so the word `model` and its options would drift
+     apart as the button's label changed length. They stay one object. */
+  .wish-head > * { flex: 0 0 auto; }
 
   /* 🔴 THE BOTTOM PART IS THE OBJECT AND THE VERDICT ON IT, WHICH IS WHY THEY
      ARE ONE PART RATHER THAN A FOURTH. The request names three parts and the
@@ -59,7 +73,13 @@
        when an answer lands, which is a human-paced change rather than a clock,
        and is the case the no-twitch rule explicitly allows. */
     min-height: 62px; white-space: pre-wrap; overflow-wrap: anywhere;
-    font: 12px/1.6 var(--mono, ui-monospace, monospace); color: var(--ink);
+    /* 🔴 GREYER, ASKED FOR IN ONE WORD AGAINST THE OBJECT ITSELF. It was
+       `--ink`, the page's reading colour, which made a raw object the loudest
+       thing in the component while the picture and the verdict above it are
+       what a reader acts on. The object is EVIDENCE: it is there to be checked
+       against, not read first. Same argument `shell.css` already makes about
+       nothing in the log being white. */
+    font: 12px/1.6 var(--mono, ui-monospace, monospace); color: var(--dim);
     /* 🔴 NOTHING IS WRITTEN HERE UNTIL THERE IS SOMETHING TO WRITE, AND THE
        ROOM IS STILL TAKEN. Asked 2026-09-21: *"rm no patch yet"*. The box used
        to draw `# no patch yet`, which is furniture: it tells a reader that a
@@ -105,28 +125,16 @@
      size, no border width and no shadow spread, so nothing under a reader's
      hand moves while it runs. Asserted as a measured height rather than
      believed. */
-  .wish-said[data-busy], .wish-patch[data-busy] {
-    background-image: linear-gradient(100deg,
-      transparent 0%, transparent 35%,
-      color-mix(in oklab, var(--fg) 9%, transparent) 50%,
-      transparent 65%, transparent 100%);
-    background-size: 220% 100%;
-    background-repeat: no-repeat;
-    animation: pos-sweep 1.1s linear infinite;
-  }
-  /* A page that respects reduced motion still has to say the thing is working,
-     which is `shell.css`'s own reasoning about the button. A steady wash rather
-     than the dimming that block uses: the patch box is empty and unpainted
-     while it waits, so an opacity would have nothing to act on. */
-  @media (prefers-reduced-motion: reduce) {
-    .wish-said[data-busy], .wish-patch[data-busy] {
-      animation: none;
-      background-image: linear-gradient(
-        color-mix(in oklab, var(--fg) 6%, transparent),
-        color-mix(in oklab, var(--fg) 6%, transparent));
-    }
-  }
-  .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); }
+  /* 🔴 NO SHIMMER ON EITHER BOX, ASKED FOR AS *"rm shimmers from textareas"*.
+     A sweeping gradient across a box somebody is reading or typing into is
+     motion with no information in it: the busy state is already said by the
+     button's own sweep, which `shell.css` paints, and by the log line that
+     lands when the answer does. Two channels saying the same thing, and the one
+     removed was the one sitting under a cursor.
+     ⚠️ WHAT IT WAS FOR IS NOT LOST. `data-busy` is still set on both boxes, so
+     a page rule could paint them again and the checks that read the attribute
+     are unmoved; what is gone is the animation. */
+  .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); margin-top: 8px; }
   .wish-why b { color: var(--bad, #e0908a); font-weight: 600; }
   .wish-why i { color: var(--ok, #8fd6a8); font-style: normal; }
   .wish-why-l { color: var(--ink); }
@@ -247,9 +255,28 @@
    * visitor. `workers/wish/src/wish.mjs` allows that page's origin for exactly
    * this reason.
    */
-  const HERE = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(location.hostname);
+  /**
+   * 🔴 AND THE DEFAULT IS THE DEPLOYED WORKER EVERYWHERE SINCE 2026-09-21, WHICH
+   * REVERSES HALF OF THE PARAGRAPH ABOVE. Reported in one line: *"nothing
+   * answered at http://127.0.0.1:8799. Start the agent with `node
+   * demo/wish-local.mjs` - fix it. use worker"*.
+   * ⚠️ THE OLD REASONING WAS RIGHT ABOUT THE DEPLOY AND WRONG ABOUT THE DESK.
+   * It fixed a real defect, a page that answered 200 on a hostname where it
+   * could not possibly work, and it fixed it by following where the page came
+   * from. What it then did was make `http://127.0.0.1:8890/wish/` depend on a
+   * SECOND process that nobody starts, so the page this repository is developed
+   * on is the one page that does not work out of the box.
+   * ✅ AND NOTHING IS LOOSENED, WHICH IS WHY THIS IS SAFE RATHER THAN A
+   * CONCESSION. `workers/wish/src/wish.mjs`'s `NEAR` pattern already allows
+   * `http://localhost`, `http://127.0.0.1` and every private range, for the
+   * phone-on-the-wifi case, so a page on this laptop was always a caller the
+   * agent would answer. The only thing that changes is which URL it asks first.
+   * ⚠️ `?api=` STILL WINS, which is how somebody working on the agent itself
+   * points at `node demo/wish-local.mjs`, and it is what the local runner is
+   * for now.
+   */
   const API = new URLSearchParams(location.search).get('api')
-    || (HERE ? 'http://127.0.0.1:8799' : 'https://wish.positron.studio');
+    || 'https://wish.positron.studio';
 
   /**
    * 🔴 THE DESK, DESCRIBED RATHER THAN DISCOVERED, AND THAT IS DELIBERATE ON
@@ -383,6 +410,17 @@
          would have gone silent while the suite stayed green, which is what
          happened on `/mirror/` and `/blocks/`. */
       { id: 'example', label: 'Use the example' },
+      /* 🔴 `interpret` IS NEW, ASKED FOR 2026-09-21: *"add interpret button to
+         header"*. It asks the language model about whatever is in the box, which
+         is the same verb Enter already carries and the same one a release
+         carries after a transcription. It is a BUTTON for the reason the comment
+         above gives about `Use the example`: a harness cannot press a key in a
+         textarea, so a page whose only way to ask was Enter would be graded by
+         nothing while the suite stayed green.
+         ⚠️ IT SHARES `askBox()` RATHER THAN REPEATING IT. Three ways in and one
+         function, or the three drift and two of them stop matching what the page
+         says they do. */
+      { id: 'interpret', label: 'Interpret' },
     ],
   });
   guard(d);
@@ -411,14 +449,45 @@
    * about one relationship, and the claim would be that a picker is a caption,
    * which it is not: it is a control somebody presses.
    */
-  const hearPick = createChoice({ label: 'hear', options: HEAR, at: 0 });
-  const patchPick = createChoice({ label: 'patch', options: PATCH, at: 0 });
-  const hearRow = el('div', 'pos-crow');
-  hearRow.append(hearPick.el);
-  /* `wish-part` because this row is the top of the glue now, and a part paints
-     its own ground or the seam under it has nothing to show against. */
-  const patchRow = el('div', 'pos-crow wish-part');
-  patchRow.append(patchPick.el);
+  /**
+   * 🔴 BOTH PICKERS ARE LABELLED `model`, WHICH IS WHAT THEY ALWAYS WERE.
+   * Asked 2026-09-21 twice, once per block: *"move model selection to right,
+   * label 'model'"* and *"model selecton to right label: 'model'"*. They read
+   * `hear` and `patch`, which name the STEP rather than the thing the row
+   * chooses, and a row of five model names under the word `PATCH` is a label
+   * arguing with its own options.
+   * ⚠️ WHAT `hear` AND `patch` WERE CARRYING IS NOT LOST, it moved to the other
+   * side of the same header: the button on the left names the step, and it
+   * names it as a verb somebody presses rather than as a noun.
+   */
+  const hearPick = createChoice({ label: 'model', options: HEAR, at: 0 });
+  const patchPick = createChoice({ label: 'model', options: PATCH, at: 0 });
+
+  /**
+   * 🔴 A HEADER IS AN ACTION ON THE LEFT AND ITS MODEL ON THE RIGHT, AND BOTH
+   * BLOCKS WEAR THE SAME ONE. Asked for one block at a time: *"add interpret
+   * button to header and move model selection to right"*, then *"make similar
+   * glued header as in interpret, put hold to talk to left and model selecton
+   * to right"*.
+   * 🔴 THE BUTTONS ARE MOVED OUT OF `.pos-controls`, WHICH IS A DOCUMENTED
+   * PATTERN AND A REAL COST. `shell.mjs` says pages move controls on purpose and
+   * are told to, and `d.button(id)` finds one wherever the page put it, which is
+   * why that lookup stopped being a query on the row. The COST is that
+   * `demo/verify.mjs` presses `.pos-controls button` and nothing else, so a
+   * moved button is a button the harness no longer presses: `/mirror/` lost ten
+   * asserts that way and `/blocks/` six, and neither suite went red, they went
+   * quiet. **So the checks below press `speak` and `interpret` by name.**
+   * ⚠️ `Use the example` STAYS IN THE ROW, so the row is not empty and the
+   * harness still reaches the asking path by itself.
+   */
+  const header = (left, pick, under) => {
+    const part = el('div', 'wish-part');
+    const row = el('div', 'wish-head');
+    row.append(left, pick.el);
+    part.append(row);
+    if (under) part.append(under);
+    return { part, row };
+  };
 
   /**
    * 🔴 THE HEARD SENTENCE IS EDITABLE. Asked 2026-09-21, pointing at the
@@ -467,12 +536,40 @@
    * JSON inside the bottom one, because every row it prints is a reading of a
    * link in that object.
    */
+  /**
+   * 🔴 THE VERDICT MOVED OUT FROM UNDER THE JSON AND UNDER THE HEADER, asked
+   * for 2026-09-21: *"allowed MK-425C USB MIDI Keyboard to Circuit { transpose
+   * +1, channel 1 } move under header"*. It rode with the object because every
+   * row it prints is a reading of a link in that object, which is true and put
+   * it two parts away from the control that produced it, at the very bottom of
+   * the component. A reader pressing `Interpret` now gets the answer in words
+   * directly under the button they pressed, and the object stays where evidence
+   * belongs.
+   * ⚠️ THE ARGUMENT THAT PUT IT AT THE BOTTOM IS NOT WRONG, IT IS OUTWEIGHED.
+   * Both facts are true: it is a reading of the object, and it is the answer.
+   * What settles it is which one a reader acts on.
+   */
   const dump = el('div', 'wish-dump wish-part');
-  dump.append(patch, whyBox);
-  const answer = createGlue(patchRow, dgHost, dump);
-  d.el.append(hearRow, said, answer);
-
+  dump.append(patch);
   const speakBtn = d.button('speak');
+  /**
+   * 🔴 THE HEAR BLOCK IS GLUED TOO NOW, which is the whole of *"make similar
+   * glued header as in interpret"*. The picker and the transcript it fills were
+   * two blocks with the page's 40 px rhythm between them, so a reader had to
+   * join them by proximity; they are one surface with a 1 px seam now, exactly
+   * like the patch block under it.
+   * ⚠️ `said` CARRIES `wish-part` FOR THE REASON THE THREE PART GLUE ALREADY
+   * RECORDS: a child that paints no ground lets the glue's own line colour
+   * through its whole area and the seam stops being a seam.
+   */
+  said.classList.add('wish-part');
+  const hear = header(speakBtn, hearPick);
+  const patchHead = header(d.button('interpret'), patchPick, whyBox);
+  const hearRow = hear.row;
+  const patchRow = patchHead.row;
+  const heard = createGlue(hear.part, said);
+  const answer = createGlue(patchHead.part, dgHost, dump);
+  d.el.append(heard, answer);
 
   /**
    * 🔴 THE BOX AN ANSWER IS GOING TO LAND IN GLIMMERS WHILE ITS MODEL IS
@@ -629,22 +726,65 @@
    * the whole rig the desk, so an alias would resolve *connect the keyboard to
    * the desk* to one instrument on it.
    */
+  /**
+   * 🔴 A BOX'S NOTE IS BUILT FROM THE MAPPING, NOT TYPED. Asked 2026-09-21:
+   * *"are more detail to box desc based on the mapping data"*, and in the same
+   * breath, against the note that used to sit here, *"rm this slop text"*.
+   * 🔴 THE SENTENCE THAT WENT SAID: *"The Evolution keyboard. It sends on
+   * channel 2 and its keys are one semitone flat, which is why a transpose turns
+   * up in almost every proposal."* Two facts and a paragraph of colour, and the
+   * colour is a claim about what the model TENDS to do, which nothing on the
+   * page measures and which would read as true whatever it did.
+   * ✅ WHAT REPLACES IT IS WHAT THE MODEL IS ACTUALLY TOLD: this box's ports,
+   * their direction, and what each one carries, read off `PORTS`, `ACCEPTS`,
+   * `EMITS` and `NEVER` at build time. A reader hovering a box now sees the
+   * same table the proposal is validated against, so a refusal has a visible
+   * cause.
+   * ⚠️ AND ONE TYPED LINE STAYS PER BOX, because it carries what no port list
+   * can: which channel a device answers on. It is the same string handed to the
+   * model in `FACTS`, split per box rather than written twice, so the page and
+   * the prompt cannot disagree.
+   */
+  /**
+   * ⚠️ TERSE BECAUSE THE BOX IS A BOX. `createDiagram` reports what it had to
+   * cut, and the first version of these overran the Circuit's note by 40 px and
+   * took `the picture drew every name and every arrow whole` red. That is the
+   * component telling the AUTHOR, which is the one person who can do anything
+   * about it, and it is the same answer `table.mjs` gives about a heading too
+   * long for its column.
+   */
+  const CHANNELS = {
+    keys: 'Sends on channel 2, one semitone flat.',
+    circuit: 'Synth 1 ch 1, synth 2 ch 2, drums ch 10, master filter ch 16.',
+    model12: 'Nine faders sending pitch bend.',
+  };
   const INSTRUMENTS = [
     { id: 'keys', label: 'MK-425C', sub: 'MIDI keyboard', kind: 'device',
-      also: ['Evolution', 'Evolution MK-425C', 'MK-425C', 'the keyboard'],
-      note: 'The Evolution keyboard. It sends on channel 2 and its keys are one semitone '
-          + 'flat, which is why a transpose turns up in almost every proposal.' },
+      also: ['Evolution', 'Evolution MK-425C', 'MK-425C', 'the keyboard'] },
     { id: 'circuit', label: 'Circuit', sub: 'Novation synth', kind: 'device',
-      also: ['Novation', 'Novation Circuit', 'the synth'],
-      note: 'Two synth voices on channels 1 and 2, drums on channel 10, master filter on '
-          + 'channel 16. It has no factory reset, so a link that could carry SysEx is '
-          + 'refused outright.' },
+      also: ['Novation', 'Novation Circuit', 'the synth'] },
     { id: 'model12', label: 'Model 12', sub: 'TASCAM mixer', kind: 'device',
-      also: ['TASCAM', 'TASCAM Model 12', 'the mixer'],
-      note: 'Nine faders that send pitch bend, and a MIDI IN that takes notes and '
-          + 'controllers. Two well formed proposals measured here arrived at this box and '
-          + 'belonged to the Circuit.' },
+      also: ['TASCAM', 'TASCAM Model 12', 'the mixer'] },
   ];
+
+  /**
+   * What one box's ports carry, in words, straight off the tables the validator
+   * reads. `never` is named separately from what a port does not accept,
+   * because `bay.mjs` keeps those two lists apart on purpose: a class a
+   * destination does not handle is dropped and reported, and a class on `never`
+   * REFUSES the link. The difference is *I do not use that* against *that
+   * damages me*, and only the second is worth an error.
+   */
+  function portNote(boxId) {
+    const mine = PORTS.filter((p) => p.box === boxId);
+    const lines = mine.map((p) => {
+      if (p.dir === 'out') return `Out sends ${EMITS.join(', ')}.`;
+      const takes = ACCEPTS[p.id] ?? ['note', 'cc'];
+      return `In takes ${takes.length ? takes.join(', ') : 'nothing'}`
+        + `${NEVER.length ? `, never ${NEVER.join(', ')}` : ''}.`;
+    });
+    return [CHANNELS[boxId], ...lines].filter(Boolean).join(' ');
+  }
 
   /**
    * The ports as the model is told about them: the real id, the label CoreMIDI
@@ -735,7 +875,14 @@
      * said there was an answer.
      */
     const touched = new Set(links.flatMap((l) => [l.from, l.to]));
-    const nodes = INSTRUMENTS.filter((n) => touched.has(n.id));
+    /**
+     * ⚠️ THE NOTE IS ATTACHED HERE RATHER THAN HELD ON THE CONSTANT, because it
+     * is DERIVED: `portNote()` reads the same `PORTS`, `ACCEPTS`, `EMITS` and
+     * `NEVER` tables the validator reads, so the words under a box and the rule
+     * that refuses a link cannot drift apart. A typed note could, and did.
+     */
+    const nodes = INSTRUMENTS.filter((n) => touched.has(n.id))
+      .map((n) => ({ ...n, note: portNote(n.id) }));
     dg?.destroy();
     dg = null;
     /**
@@ -1101,6 +1248,13 @@
   const REPAIRED = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
     transforms: [{ op: 'transpose', by: 1 }] }];
   const FIXED = [{ op: 'transpose', said: 'to', read: 'by', value: 1 }];
+
+  /**
+   * ⚠️ ONE FUNCTION FOR THREE WAYS IN. Enter in the box, the `Interpret` button
+   * and a release after a transcription all ask the same question about the
+   * same text, and three copies of that would be three things to keep in step.
+   */
+  d.on('interpret', () => askBox());
 
   d.on('example', async () => {
     /* It writes into the same box the microphone fills, which is one
@@ -1621,18 +1775,44 @@
       said.value === EXAMPLE && reached === 0,
       `${said.value.length} characters in the box, ${reached} calls to the agent`);
 
-    /* 🔴 AND THE ROW READS *HEAR ... PATCH ...*, WHICH IS WHAT THE PAGE DOES.
-       The second one was labelled `think` until 2026-09-21, which named a
-       mechanism in this project's own vocabulary and told a visitor nothing
-       about what came out of it. The labels are read off the DOM rather than
-       off the constants, or the check would agree with itself. */
+    /* 🔴 BOTH PICKERS SAY `model`, AND THAT IS THE THIRD LABEL THIS ROW HAS
+       WORN. It was `think` until 2026-09-21, which named a mechanism in this
+       project's own vocabulary; then `hear` and `patch`, which name the STEP;
+       and now `model`, which names what the row actually chooses. Asked for one
+       block at a time. What `hear` and `patch` carried did not vanish, it moved
+       to the button on the left of the same header, where it is a verb somebody
+       presses rather than a noun over a list of model names.
+       ⚠️ READ OFF THE DOM RATHER THAN OFF THE CONSTANTS, or the check would
+       agree with itself. */
     const pickLabels = [...document.querySelectorAll('.pos-choice-l')].map((n) => n.textContent);
-    d.assert('both model pickers offer what the agent will run, under the names of their jobs',
+    d.assert('both model pickers offer what the agent will run, and both say model',
       hearPick.el.querySelectorAll('button').length === 3
       && patchPick.el.querySelectorAll('button').length === 5
-      && pickLabels.join() === 'hear,patch',
+      && pickLabels.join() === 'model,model',
       `${hearPick.el.querySelectorAll('button').length} and `
       + `${patchPick.el.querySelectorAll('button').length}, labelled ${pickLabels.join(' and ')}`);
+
+    /**
+     * 🔴 THE TWO HEADERS, MEASURED OFF REAL RECTS. An action on the left and its
+     * model on the right, in both blocks, which is what was asked for one block
+     * at a time. `append` order is not layout and a stylesheet can reverse a row.
+     * 🔴 AND THE MOVED BUTTONS ARE THE HALF THAT NEEDS SAYING OUT LOUD: they are
+     * no longer in `.pos-controls`, so the harness does not press them, and the
+     * checks on this page are driven from the page for exactly that reason. This
+     * asserts they are where the page put them.
+     */
+    for (const [name, row, btn, pick] of [['hear', hearRow, speakBtn, hearPick],
+                                          ['patch', patchRow, d.button('interpret'), patchPick]]) {
+      const b = btn.getBoundingClientRect();
+      const p = pick.el.getBoundingClientRect();
+      d.assert(`the ${name} header puts its action on the left and its model on the right`,
+        btn.parentElement === row && pick.el.parentElement === row
+        && b.left < p.left && b.right <= p.left + 1
+        && !btn.closest('.pos-controls'),
+        `${name}: the button runs ${b.left.toFixed(0)} to ${b.right.toFixed(0)}, `
+        + `the picker starts at ${p.left.toFixed(0)}, and the button is `
+        + `${btn.closest('.pos-controls') ? 'still in' : 'out of'} the control row`);
+    }
 
     /**
      * 🔴 THE HEAR PICKER IS DIRECTLY ABOVE THE BOX IT FILLS. Asked as *"but
@@ -1678,12 +1858,20 @@
      * the arrangement that was asked to go away, so the first clause is that one
      * element holds all three and that it is `.pos-glue`.
      */
+    /**
+     * ⚠️ THE PART, NOT THE HEADER ROW. Since the verdict moved under the header
+     * the top part is a `.wish-part` holding a `.wish-head` and the
+     * allowed/refused line, so a check reading the ROW measures a box that ends
+     * 11 px above where the part does and reports an 11 px seam on a component
+     * that is glued perfectly. MEASURED when exactly that happened.
+     */
     const rect = (n) => n.getBoundingClientRect();
-    const picked = rect(patchRow);
+    const patchPart = patchRow.parentElement;
+    const picked = rect(patchPart);
     const drawn = rect(dgHost);
     const dumped = rect(dump);
     const oneBox = answer.classList.contains('pos-glue')
-      && [patchRow, dgHost, dump].every((n) => n.parentElement === answer)
+      && [patchPart, dgHost, dump].every((n) => n.parentElement === answer)
       && answer.parentElement === d.el;
     d.assert('the patch picker, the picture and the JSON are one glued component, in that order',
       oneBox && picked.bottom <= drawn.top && drawn.bottom <= dumped.top,
@@ -1710,8 +1898,8 @@
      * read and one remembered.
      */
     const seamInk = getComputedStyle(answer).backgroundColor;
-    const grounds = [patchRow, dgHost, dump].map((n) => getComputedStyle(n).backgroundColor);
-    const edges = [patchRow, dgHost, dump]
+    const grounds = [patchPart, dgHost, dump].map((n) => getComputedStyle(n).backgroundColor);
+    const edges = [patchPart, dgHost, dump]
       .map((n) => parseFloat(getComputedStyle(n).borderTopWidth));
     const seams = [drawn.top - picked.bottom, dumped.top - drawn.bottom];
     d.assert('each part paints its own ground, so the 1 px seam between them is the only edge inside',
@@ -2029,8 +2217,19 @@
     const busyH = [said.getBoundingClientRect().height, patch.getBoundingClientRect().height];
     delete said.dataset.busy;
     delete patch.dataset.busy;
-    d.assert('the glimmer is paint that moves and takes no more room than the box already had',
-      moving.every((a) => a === (stillness ? 'none' : 'pos-sweep'))
+    /**
+     * 🔴 THIS ASSERT GRADED THE GLIMMER AND NOW GRADES ITS ABSENCE, which is the
+     * shape a removal has to take here. Asked 2026-09-21: *"rm shimmers from
+     * textareas"*. A check that simply vanished with the feature would leave the
+     * page one assert lighter and nothing saying why, and the next person to
+     * think a sweeping box looks lively would put it back.
+     * ⚠️ AND `data-busy` IS STILL ASSERTED TO LAND, because the state is not
+     * what was removed: only the animation went. The busy state is said by the
+     * button's own sweep, which `shell.css` paints, and by the log line.
+     */
+    d.assert('neither text box animates while it is working, and neither changes height',
+      moving.every((a) => a === 'none')
+      && said.dataset.busy === undefined && patch.dataset.busy === undefined
       && quietH[0] === busyH[0] && quietH[1] === busyH[1],
       `${moving.join(' and ')} under ${stillness ? 'reduced motion' : 'ordinary motion'}, `
       + `heights ${quietH.map((h) => h.toFixed(1)).join('/')} against `
@@ -2115,6 +2314,23 @@
 
     d.assert('no secret in this page', !location.href.includes('token'));
   });
+
+  /**
+   * 🔴 THE CHECKS ARE DRIVEN FROM HERE, BECAUSE THE BUTTON THAT USED TO REACH
+   * THEM IS NO LONGER IN THE ROW THE HARNESS SWEEPS. `demo/verify.mjs` presses
+   * `.pos-controls button` and nothing else; every check on this page hangs off
+   * `d.on('check')`, which is reached by pressing `speak` under `SELFCHECK`, and
+   * `speak` moved into the hear header when the two glued headers were built.
+   * 🔴 MEASURED THE MOMENT IT MOVED: 41 page asserts became **2**, and the run
+   * stayed GREEN. Not one assert failed. They stopped running, and only the
+   * COUNT said so. That is `/mirror/`'s ten and `/blocks/`'s six arriving a
+   * third time, in a page whose own comment two hundred lines up had just
+   * finished describing the trap.
+   * ⚠️ IT PRESSES THE REAL BUTTON RATHER THAN CALLING `d.run('check')`, so what
+   * is exercised is the same path a person's press takes, including the shell's
+   * busy paint and the handler's own `SELFCHECK` branch.
+   */
+  if (SELFCHECK) speakBtn.click();
 
   d.ready();
 </script>

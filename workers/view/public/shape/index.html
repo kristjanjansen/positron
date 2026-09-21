@@ -30,25 +30,61 @@
   .shape-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
   /* 🔴 ONE LABEL COLUMN ACROSS EVERY SECTION, AND THIS IS WHY IT IS HERE AND
-     NOT IN THE KIT. `.sld-group` is `max-content minmax(0, 1fr)`, so a group
-     sizes its first column from ITS OWN widest label. This page has seven
-     groups under seven headings, and their widest labels are `Polyphony Mode`,
-     `osc 1 virtual sync depth`, `pre FX level`, `env 2 to frequency`,
-     `env 1 sustain`, `distortion level` and `macro knob 1 position`. Left
-     alone, seven sections begin their lanes at seven different x and the rack
-     reads as seven unrelated tables.
+     NOT IN THE KIT. `.sld-group` sizes its label column `max-content`, so a
+     group sizes it from ITS OWN widest label. This page has NINE groups under
+     nine headings since the rack took Novation's grouping, and the longest
+     labels in them are 18 characters (`virtual sync depth` under OSC 1,
+     `env 2 to frequency` under FILTER) against five (`level` under DISTORTION
+     and under CHORUS). Left alone, nine sections begin their lanes at nine
+     different x and the rack reads as nine unrelated tables.
      ⚠️ IT IS `--lab`, WHICH `/radio/` ALREADY INVENTED for the same problem one
      component over, and the measurement is made in the script rather than
      guessed here. The assert below reads the real rects, because a rule that
      lost to another rule is this project's most expensive kind of defect and
-     the source always reads as correct. */
-  .shape-rack .sld-group { grid-template-columns: var(--lab, max-content) minmax(0, 1fr); }
+     the source always reads as correct.
 
-  /* 🔴 THE RACK IS A COLUMN AND IT IS ALLOWED TO BE TALL. Fifty two parameters
-     stacked is about two screens, which is what an editor for a synth with
-     fifty two parameters looks like. Two across would halve it and take the
-     shared column with it: side by side there is nothing to line up, and the
-     one claim this layout makes is that every lane starts in the same place. */
+     🔴 AND IT SETS A WIDTH ON THE HEAD RATHER THAN OVERRIDING THE GROUP'S
+     COLUMNS, WHICH IS THE ONLY REASON THE SECOND COLUMN BELOW WORKS AT ALL.
+     This rule was `.shape-rack .sld-group { grid-template-columns:
+     var(--lab, max-content) minmax(0, 1fr) }` until 2026-09-21, and the kit's
+     two column layout is `.sld-group.pos-pair { grid-template-columns:
+     repeat(2, max-content minmax(0, 1fr)) }` inside a `@media (min-width:
+     720px)`. A MEDIA QUERY ADDS NO SPECIFICITY, and this page's stylesheet
+     comes after `shell.css`, so the page's plain rule would have beaten the
+     kit's paired one at EVERY width and the second column would never have
+     appeared once in its life. That is the `.pos-pick` failure exactly, which
+     sat unnoticed for as long as it existed. Sizing the HEAD instead leaves the
+     kit's columns alone: a grid item with a definite width contributes that
+     width to a `max-content` track, so every label column in the rack resolves
+     to `--lab` whether the grid has two columns or four.
+     ⚠️ `content-box`, BECAUSE THE SEAM IS PADDING. `shell.css` puts
+     `padding-left: var(--sld-seam, 32px)` on the right hand slider's head so
+     the gap between two sliders is bigger than the gaps inside one. Under the
+     global `border-box` that padding would eat into `--lab` and squeeze the
+     label; under `content-box` it is added outside it, which is what makes it a
+     seam rather than a crop.
+     ⚠️ AND THE MEASUREMENT STILL READS THE LABEL AND THE VALUE, NEVER THE HEAD.
+     `shareLabelColumn` measures `.sld-l` and `.sld-v`, which are flex items in
+     a `flex-start` column and keep their natural widths however wide the head
+     around them is. Measuring the head would read back the answer instead of
+     the question and the number could only ever grow. */
+  .shape-rack .sld-head { box-sizing: content-box; width: var(--lab, auto); }
+
+  /* 🔴 TWO SLIDERS ACROSS ON A DESKTOP, AND THIS COMMENT USED TO ARGUE THE
+     OPPOSITE. Asked for 2026-09-21 as *"can we get 2 col sliders in desktop?"*.
+     What stood here said the rack is a column and is allowed to be tall, that
+     fifty two parameters stacked is what an editor for a synth with fifty two
+     parameters looks like, and that two across would take the shared column
+     with it. The last of those was the load bearing claim and it is wrong: the
+     kit's paired grid is `repeat(2, max-content minmax(0, 1fr))`, so BOTH label
+     columns are sized the same way and `--lab` fixes both of them. What is true
+     is that the claim gets one word longer, because a lane now lines up with
+     every other lane in its own column rather than with every lane on screen,
+     and the assert below says which of the two it just measured.
+     🔴 AND NOT ONE MEASUREMENT IS TYPED IN THIS FILE. The breakpoint, the seam
+     and the column gap are all `shell.css`'s, reached by passing `pair: true`
+     to `createSliderGroup`. A `720` typed here would be a shared measurement in
+     two files, which is the defect `--sld-col` exists to stop. */
 </style>
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
@@ -61,7 +97,7 @@
   import { makeCcSend } from '/shell/cc-adapter.mjs';
   import { MOVES, minSteps } from '/shell/hand.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { onChannel, sections, param, ccBytes } from '/shell/circuit-cc.mjs';
+  import { onChannel, param, ccBytes } from '/shell/circuit-cc.mjs';
 
   /**
    * 🔴 EDITING A NOVATION CIRCUIT WHILE IT PLAYS, AND THE ANSWER TO WHETHER
@@ -451,6 +487,101 @@
   const rowByKey = new Map();
 
   /**
+   * 🔴 NOVATION'S OWN GROUPING, AND EVERY ROW BELOW HAS A SOURCE. Asked for
+   * 2026-09-21 as *"compare shape and circuit patch editor resaetch. no full ui
+   * but can we at least use same grouping / labels what they have?"*, so this is
+   * the grouping and the labels and nothing else. There is no panel, no tab bar
+   * and no copy of their editor here, and `plans/plan-circuit-synth-editor.md`
+   * §5.4 refuses one in as many words.
+   *
+   * 📄 THE REFERENCE PUBLISHES A GROUPING AND IT IS IN THE PARAMETER NAMES.
+   * Every one of the 340 patch addresses in `demo/shell/circuit-patch.mjs` is
+   * named `Group_Parameter` by the Circuit Programmer's Reference Guide v1.1,
+   * and the groups a control change can reach are `Voice_`, `Osc1_`, `Osc2_`,
+   * `Mixer_`, `Filter_`, `Envelope1_`, `Distortion_`, `Chorus_` and
+   * `MacroKnob1_` through `MacroKnob8_`.
+   * 🌐 AND NOVATION'S OWN EDITOR DRAWS THE SAME SPLIT, read off the live DOM of
+   * components.novationmusic.com on 2026-09-21 and written down in
+   * `plans/plan-circuit-synth-editor.md` §1: its MAIN tab carries `Osc 1`,
+   * `Osc 2`, `Mixer`, `Filter`, `Envelope` and `LFO` as separate panels, and its
+   * EFFECTS tab carries `Chorus//Phaser`, `Equaliser`, `Distortion` and `Voice`.
+   * Two sources that cannot have copied each other, agreeing on the groups.
+   *
+   * 🔴 WHAT WAS HERE BEFORE CAME FROM A THIRD PLACE AND ONE OF ITS NAMES WAS
+   * WRONG. `circuit-cc.mjs` carries a `sec` column parsed out of the SAME guide's
+   * control change table, and that table groups more coarsely: all eighteen
+   * oscillator parameters under one `Oscillator`, the five envelope parameters
+   * under `Envelope`, and distortion and chorus under **`Effects and EQ`, a
+   * heading naming an EQ on a section that holds no EQ parameter**, because not
+   * one equaliser address on this instrument is reachable over a control change
+   * at all. That is a label promising a control that is not there, which is the
+   * reason this table exists rather than it being a tidy-up.
+   * ⚠️ AND `circuit-cc.mjs` IS LEFT ALONE, which is deliberate. Its `sec` values
+   * are asserted against this desk's own measurements in
+   * `demo/shell/circuit-cc-test.mjs` (`CC 74 is the master filter on channel 16
+   * and the synth filter on 1 and 2`), so that column is the wire's own record
+   * and this is a presentation decision sitting on top of it.
+   *
+   * ⚠️ A LABEL LOSES ONLY THE WORD ITS NEW HEADING CARRIES, AND NOTHING IS
+   * REWORDED. `osc 1 wave` under a heading reading OSC 1 says the group twice,
+   * so the label is `wave`; `virtual sync depth`, `Q normalize` and
+   * `env 2 to frequency` keep the reference's own spellings, because
+   * `plans/plan-circuit-synth-editor.md` §5.2 already priced churning them
+   * towards Novation's shorter house style and refused it. The full name stays
+   * in the hover, in the aria label and in every log line, which is the half
+   * that makes the short label safe.
+   */
+  const GROUPED = [
+    { sec: 'OSC 1', of: (p) => p.sec === 'Oscillator' && p.name.startsWith('osc 1 '), drop: 'osc 1 ' },
+    { sec: 'OSC 2', of: (p) => p.sec === 'Oscillator' && p.name.startsWith('osc 2 '), drop: 'osc 2 ' },
+    /* Five envelope parameters and all five are env 1, so the heading can say
+       which one. The reference has `Envelope2_` and `Envelope3_` as well and
+       neither is reachable over a control change. */
+    { sec: 'ENVELOPE 1', of: (p) => p.sec === 'Envelope', drop: 'env 1 ' },
+    { sec: 'DISTORTION', of: (p) => p.sec === 'Effects and EQ' && p.name.startsWith('distortion '), drop: 'distortion ' },
+    { sec: 'CHORUS', of: (p) => p.sec === 'Effects and EQ' && p.name.startsWith('chorus '), drop: 'chorus ' },
+    /* ⚠️ ONE HEADING OVER THE REFERENCE'S EIGHT `MacroKnob<n>_` GROUPS, WHICH IS
+       A ROLL-UP AND IS THEREFORE MINE RATHER THAN THEIRS. Novation draw the
+       eight macros as one row on all three of their tabs, so the shape is
+       borrowed even though the heading is not a name either source prints.
+       Only the word `macro` goes, because `knob 1` is what the group is. */
+    { sec: 'MACRO KNOBS', of: (p) => p.sec === 'Macro Knob', drop: 'macro ' },
+  ];
+
+  /**
+   * What a parameter is called on this page, and which heading it sits under.
+   *
+   * ⚠️ A PARAMETER WITH NO ROW ABOVE KEEPS BOTH, which is how `Voice`, `Mixer`
+   * and `Filter` stay exactly as the control change table has them: those three
+   * are already the reference's own patch group names. The four session
+   * headings keep theirs for a different reason, and it is worth saying rather
+   * than leaving implied. **Novation's patch editor edits a PATCH, and a
+   * session is not one**, so `Reverb`, `Delay`, `Master Filter` and `Mixer` on
+   * channel 16 have no counterpart in any of the research and there is nothing
+   * to adopt. They are the guide's control change table and nothing else.
+   */
+  function shown(p) {
+    const g = GROUPED.find((r) => r.of(p));
+    if (!g) return { sec: p.sec.toUpperCase(), label: p.name };
+    return { sec: g.sec, label: p.name.startsWith(g.drop) ? p.name.slice(g.drop.length) : p.name };
+  }
+
+  /**
+   * The headings for a part, in the order the reference's own table runs.
+   *
+   * ⚠️ THE ORDER IS READ, NOT DECLARED, so a heading cannot go missing and a
+   * parameter cannot land under one this page never draws. On the synths it
+   * comes out VOICE, OSC 1, OSC 2, MIXER, FILTER, ENVELOPE 1, DISTORTION,
+   * CHORUS, MACRO KNOBS, which is Novation's MAIN tab order with the panels
+   * they keep on their EFFECTS tab after it.
+   */
+  function shownSections(group) {
+    const out = [];
+    for (const p of onChannel(group)) { const s = shown(p).sec; if (!out.includes(s)) out.push(s); }
+    return out;
+  }
+
+  /**
    * ⚠️ FORTY HANDS SAY ONE LINE BETWEEN THEM. A line per slider was right while
    * at most one could be moving; `move everything` starts every lane on the
    * part that has room for one, and forty rows reading `osc 2 cents is moving
@@ -491,7 +622,12 @@
      */
     const wide = (p.hi - p.lo) >= HAND_STEPS;
     const sld = createSlider({
-      label: p.name,
+      /* ⚠️ THE SHORT NAME ON THE FACE AND THE FULL ONE EVERYWHERE ELSE. `wave`
+         under a heading reading OSC 1 is unambiguous on screen and is not
+         unambiguous in a log line that has no heading above it, so the hover,
+         the aria label, every `d.log` and the reading in the traffic log all
+         carry `p.name` as the reference guide prints it. */
+      label: shown(p).label,
       /* ⚠️ THE CONTROLLER NUMBER IS IN THE HOVER AND NOT UNDER THE HANDLE.
          `/circuit/` and `/model/` both took printed CC numbers off their faces
          on 2026-09-21 (*"rm ccs, also from rack"*) and the argument carries
@@ -517,15 +653,22 @@
   function buildRack(v) {
     const rows = [];
     const stack = createStack(undefined, 'shape-part');
-    for (const sec of sections(v.group)) {
+    for (const sec of shownSections(v.group)) {
+      /* 🔴 `pair: true` IS THE WHOLE OF THE TWO COLUMN LAYOUT, AND IT IS THE
+         KIT'S. `createSliderGroup` has carried it since `/draw/` needed it, it
+         is demonstrated on `/kit/` as SLIDER GROUP, PAIRED, and the breakpoint,
+         the seam and the column gap all live in `shell.css`. Hand-rolling a
+         second copy of a grid this project already ships is the defect
+         CLAUDE.md names most often. */
       const group = createSliderGroup(
-        onChannel(v.group).filter((p) => p.sec === sec).map((p) => makeSlider(v, p, rows)));
-      /* ⚠️ UPPERCASED HERE AS WELL AS IN THE STYLESHEET. `.pos-sec-h` renders a
-         heading uppercase whatever is typed, and the kit's rule is to type it
-         uppercase so the source reads like the page. These names come from the
-         reference guide in its own case, so the shout is applied where they
-         arrive rather than left for the stylesheet to do silently. */
-      stack.titled(sec.toUpperCase(), group.el);
+        onChannel(v.group).filter((p) => shown(p).sec === sec).map((p) => makeSlider(v, p, rows)),
+        { pair: true });
+      /* ⚠️ UPPERCASED WHERE THE NAME IS DECIDED, AS WELL AS IN THE STYLESHEET.
+         `.pos-sec-h` renders a heading uppercase whatever is typed, and the
+         kit's rule is to type it uppercase so the source reads like the page.
+         `shown` is where a heading gets its name, so the shout is applied there
+         rather than left for the stylesheet to do silently. */
+      stack.titled(sec, group.el);
     }
     return { el: stack.el, rows };
   }
@@ -902,6 +1045,15 @@
    * every one of the seven was traceable to one of the three. The layout one
    * reported `66.70 px apart`, which is the drift seven separately sized label
    * columns produce and the reason that rule exists.
+   * ⚠️ THAT LAYOUT ASSERT HAS CHANGED SHAPE SINCE, AND THE SABOTAGE WAS RE-RUN
+   * RATHER THAN ASSUMED TO STILL BITE. It counts left edges now instead of
+   * measuring a spread, because the rack is two columns wide on a desktop and
+   * two edges is the correct answer there. MEASURED 2026-09-21 with `--lab`
+   * cleared off every group in a live page at 756 px: **11 edges and 449.36 px
+   * of spread** against the 2 the assert requires, so the check that replaced it
+   * fails on the same defect the old one caught. ⚠️ Eleven rather than nine,
+   * because two columns give a short-labelled section two wrong edges instead of
+   * one.
    */
 
   /**
@@ -1022,19 +1174,46 @@
       `${withHand.length} of ${sliders.length} carry one, at ${HAND_STEPS} steps or more`);
 
     /**
-     * 🔴 A LAYOUT CLAIM IS A MEASUREMENT. Seven sections are seven separate
-     * grids, each of which would size its label column from its own widest name,
-     * so one left edge across all of them is the whole of what `--lab` is for
+     * 🔴 THE GROUPING IS A DECISION WITH A SOURCE, SO IT IS ASSERTED AND NOT
+     * DESCRIBED. Three claims in one, and the third is the negative control: the
+     * nine headings come out in the reference's own order, a parameter this page
+     * regroups loses exactly the word its heading gained, and a parameter this
+     * page does NOT regroup keeps both its heading and its full name. Without
+     * that last one the check would pass on a page that stripped every label
+     * down to nothing.
+     */
+    d.assert('the rack is grouped the way the reference and Novation both group it, and only the shared word is dropped',
+      shownSections('1/2').join(' ') === 'VOICE OSC 1 OSC 2 MIXER FILTER ENVELOPE 1 DISTORTION CHORUS MACRO KNOBS'
+      && shown(param('1/2', 22)).sec === 'OSC 1' && shown(param('1/2', 22)).label === 'virtual sync depth'
+      && shown(param('1/2', 33)).sec === 'OSC 2' && shown(param('1/2', 33)).label === 'virtual sync depth'
+      && shown(param('1/2', 70)).sec === 'ENVELOPE 1' && shown(param('1/2', 70)).label === 'sustain'
+      && shown(param('1/2', 3)).sec === 'VOICE' && shown(param('1/2', 3)).label === 'Polyphony Mode'
+      && shown(param('16', 74)).sec === 'MASTER FILTER' && shown(param('16', 74)).label === 'frequency',
+      `${shownSections('1/2').length} headings on a synth, ${shownSections('16').length} on the session`);
+
+    /**
+     * 🔴 A LAYOUT CLAIM IS A MEASUREMENT. Nine sections are nine separate grids,
+     * each of which would size its label column from its own widest name, so one
+     * left edge A COLUMN across all of them is the whole of what `--lab` is for
      * and it is exactly the kind of rule this project has watched lose silently
      * to another rule. Measured off real rects, after re-running the share, so
      * the measurement and the claim are in the same font state.
+     * 🔴 AND THE NUMBER OF EDGES IS READ OFF THE BREAKPOINT RATHER THAN ASSUMED,
+     * BECAUSE THE HARNESS ONLY EVER SEES ONE OF THE TWO CASES. `demo/verify.mjs`
+     * runs at 756 px with no viewport override, which is ABOVE the kit's 720 px
+     * pair breakpoint, so the case this green line measures is the two column
+     * one. The phone case is one column and one edge and nothing in this suite
+     * can reach it: it was measured with a throwaway probe at 390 px on
+     * 2026-09-21 and that measurement is not this assert.
      */
     shareLabelColumn();
     const lanes = [...rack.el.querySelectorAll('.sld-lane')].map((e) => e.getBoundingClientRect().left);
-    const spread = lanes.length ? Math.max(...lanes) - Math.min(...lanes) : -1;
-    d.assert('every lane in the rack starts at one left edge, across all seven sections',
-      lanes.length === sliders.length && spread <= 1.5,
-      `${lanes.length} lanes, ${spread.toFixed(2)} px apart`);
+    const edges = [];
+    for (const x of lanes) if (!edges.some((e) => Math.abs(e - x) <= 1.5)) edges.push(x);
+    const paired = matchMedia('(min-width: 720px)').matches;
+    d.assert('every lane in the rack starts at one left edge a column, across all nine sections',
+      lanes.length === sliders.length && edges.length === (paired ? 2 : 1),
+      `${lanes.length} lanes on ${edges.length} edge${edges.length === 1 ? '' : 's'} at ${Math.round(innerWidth)} px`);
 
     d.assert('the page does not drag sideways at this width',
       document.documentElement.scrollWidth <= window.innerWidth + 1,
