@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The part chooser and the one button beside it. */
+  .shape-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* 🔴 ONE LABEL COLUMN ACROSS EVERY SECTION, AND THIS IS WHY IT IS HERE AND
+     NOT IN THE KIT. `.sld-group` is `max-content minmax(0, 1fr)`, so a group
+     sizes its first column from ITS OWN widest label. This page has seven
+     groups under seven headings, and their widest labels are `Polyphony Mode`,
+     `osc 1 virtual sync depth`, `pre FX level`, `env 2 to frequency`,
+     `env 1 sustain`, `distortion level` and `macro knob 1 position`. Left
+     alone, seven sections begin their lanes at seven different x and the rack
+     reads as seven unrelated tables.
+     ⚠️ IT IS `--lab`, WHICH `/radio/` ALREADY INVENTED for the same problem one
+     component over, and the measurement is made in the script rather than
+     guessed here. The assert below reads the real rects, because a rule that
+     lost to another rule is this project's most expensive kind of defect and
+     the source always reads as correct. */
+  .shape-rack .sld-group { grid-template-columns: var(--lab, max-content) minmax(0, 1fr); }
+
+  /* 🔴 THE RACK IS A COLUMN AND IT IS ALLOWED TO BE TALL. Fifty two parameters
+     stacked is about two screens, which is what an editor for a synth with
+     fifty two parameters looks like. Two across would halve it and take the
+     shared column with it: side by side there is nothing to line up, and the
+     one claim this layout makes is that every lane starts in the same place. */
+</style>
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createStack } from '/shell/stack.mjs';
+  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createPresenceButton } from '/shell/presence.mjs';
+  import { createMidiLog } from '/shell/midi-log.mjs';
+  import { decode } from '/shell/midi-decode.mjs';
+  import { makeCcSend } from '/shell/cc-adapter.mjs';
+  import { MOVES, minSteps } from '/shell/hand.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { onChannel, sections, param, ccBytes } from '/shell/circuit-cc.mjs';
+
+  /**
+   * 🔴 EDITING A NOVATION CIRCUIT WHILE IT PLAYS, AND THE ANSWER TO WHETHER
+   * THAT IS POSSIBLE IS YES AND IT WAS ALREADY MEASURED.
+   * `demo/shell/circuit-cc.mjs` holds **98 control change parameters** parsed
+   * out of Novation's Circuit Programmer's Reference Guide v1.1: 52 for the two
+   * synths, 28 for the drums, 18 for the session. A control change moves a
+   * parameter on the LIVE voice, under a note that is already sounding, and the
+   * device answers it the same way it answers its own macro knobs.
+   *
+   * 🔴 NO SysEx. NOT ONE BYTE, AND THAT IS THE WHOLE SAFETY STORY.
+   * `plans/plan-circuit-editor.md` §1 records that `Replace Current Patch` and
+   * `Replace Patch` differ by ONE BYTE at offset 6, and the second overwrites a
+   * patch in flash on a device with **no factory reset**. `New Pack.circuitpack`
+   * in this repository is somebody's only copy of that flash. So this page has
+   * one function that turns an intention into bytes, it can express a control
+   * change and nothing else, and there is an assert that it returns null for a
+   * SysEx, for a program change and for a note.
+   *
+   * ⚠️ AND THE PAGE CANNOT READ THE INSTRUMENT. A control change is write only:
+   * there is no question this page may ask that the Circuit will answer with
+   * what its patch currently holds, because the only thing that would answer it
+   * is a SysEx dump. So a handle here says where THIS PAGE left a parameter and
+   * never what the patch holds, and the button is called `put back` rather than
+   * `reset` for that reason. The real undo is on the instrument: reloading the
+   * session brings the patch back off flash, which control changes never touch.
+   */
+
+  /**
+   * 🔴 THE CHANNEL IS HALF THE ADDRESS AND IS NEVER DROPPED. Synth 1 listens on
+   * MIDI channel 1, Synth 2 on channel 2, and the session on 16. **CC 74 is the
+   * synth filter on 1 and 2 AND the master filter on 16**, so a page keyed by
+   * controller number alone would merge two different parameters and move the
+   * wrong one. `circuit-cc.mjs` is keyed by the pair and so is everything here.
+   */
+  const VOICES = [
+    ['Synth 1', { group: '1/2', ch: 1 }],
+    ['Synth 2', { group: '1/2', ch: 2 }],
+    ['Session', { group: '16', ch: 16 }],
+  ];
+
+  /**
+   * 🔴 READ, NOT TYPED. A lane too coarse to show an invisible hand draws a
+   * staircase instead, because the ends of a sweep wander by `endJit` of the
+   * travel and under one step that wander rounds away. `minSteps()` is the
+   * arithmetic for it and lives beside the movement it describes, so the day
+   * somebody changes how far a hand wanders this page follows.
+   */
+  const HAND_STEPS = minSteps(MOVES[0][1]);
+
+  const d = mount({
+    name: 'shape',
+    what: "Edit a Novation Circuit's sound while it is playing, with sliders that can move themselves.",
+    /**
+     * Four cells and every one of them moves.
+     * `cc out` is what this page has produced, `rate` is what it is producing
+     * right now and is the cell that says the word real time in numbers,
+     * `merged` is how many moves went out inside somebody else's message, and
+     * `changed` is how far the instrument is from where this page opened.
+     */
+    readout: { 'cc out': '', rate: '/s', merged: '', changed: '' },
+    /**
+     * 🔴 NO DECLARED CONTROL. The one control in `.pos-controls` is the
+     * presence button built below and spliced in, which is where
+     * `demo/verify.mjs` presses, and it is control 0 so it is the one that gets
+     * `settleMs`. A status control outside that row is a control no harness
+     * drives, and every check behind it would go silent while the suite stayed
+     * green.
+     * 🔴 AND NOTHING THAT SENDS IS IN THAT ROW. The harness presses every button
+     * in `.pos-controls` on every run, dozens of times a day; a hand button or a
+     * `put back` in there would be the suite writing to an instrument on this
+     * desk. `slider.mjs` refuses a hand inside that row on its own, and there is
+     * an assert on it below.
+     */
+    controls: [],
+  });
+  guard(d);
+
+  // ── what may leave this page ──────────────────────────────────────────────
+
+  /**
+   * 🔴 AN INTENTION INTO BYTES, AND THE LIST IS SHORT BECAUSE THE LIST IS THE
+   * SAFETY. There is no branch here for SysEx, for a program change, for a note
+   * or for a clock byte, so **none of them can be expressed**, whatever anything
+   * upstream believes. This is `/bay/`'s `toBytes` with a second wall added: the
+   * pair has to be a parameter the reference guide documents for that channel
+   * group, so a controller number nobody has ever measured on this instrument
+   * cannot be sent either.
+   *
+   * ⚠️ IT IS ARITHMETIC RATHER THAN A DECLARATION. A list of allowed kinds can
+   * be edited by somebody who has not read this comment; a function with no
+   * branch for a thing cannot produce it by accident.
+   */
+  function toBytes(m) {
+    if (!m || m.kind !== 'cc') return null;
+    if (!Number.isInteger(m.ch) || m.ch < 1 || m.ch > 16) return null;
+    if (!Number.isFinite(m.value)) return null;
+    if (!param(m.group, m.cc)) return null;
+    return ccBytes(m.ch, m.cc, m.value);
+  }
+
+  /**
+   * 🔴 ONE PLACE A BYTE CAN LEAVE, SO THE AUDIT IS A COUNTER RATHER THAN A
+   * READING. `/reel/` is the page that bought this rule: nine ways out, six of
+   * them media source assignments a grep for `fetch` would have missed, and a
+   * page that opened somebody's stream on every visit for two sessions. Here
+   * every message goes through `emit` and every byte through `toBytes`, so "this
+   * page has only ever sent control changes" is an assert over what went rather
+   * than a claim about the file.
+   */
+  let out = 0, refused = 0, portSends = 0, notCc = 0;
+  /**
+   * The checks install one of these and nothing reaches a real port while it is
+   * there. `/knobs/` does the same with its send gate, for the reason written
+   * there: a suite run must not be a hand on somebody's instrument.
+   */
+  let sink = null;
+  let port = null;
+
+  function emit(m) {
+    const bytes = toBytes(m);
+    if (!bytes) { refused++; return false; }
+    /* The audit is a counter rather than a kept list, so it covers every
+       message this page has ever produced and costs no memory to do it. */
+    if ((bytes[0] & 0xf0) !== 0xb0) notCc++;
+    out++;
+    bump(1);
+    if (sink) sink.push({ ...m, bytes });
+    else if (port) { try { port.send(bytes); portSends++; } catch (e) { d.log(`the Circuit refused a message (${e.message})`, 'warn'); } }
+    const p = param(m.group, m.cc);
+    /* ⚠️ `cc out` COUNTS WHAT THIS PAGE PRODUCED, NOT WHAT AN INSTRUMENT HEARD,
+       and the two are separate on purpose. Whether anything was listening is the
+       presence badge's job, and a page with nothing plugged in still has to be
+       readable: the log below says what would have gone, byte for byte.
+       The hex is the fact and the reading is the opinion, which is
+       `midi-log.mjs`'s own rule. What this page can add to the reading is the
+       parameter's NAME, because it is the sender and therefore knows. */
+    traffic.add({ ...decode(bytes), reading: `${p ? p.name : 'unknown'}, ${m.value}` });
+    d.set('cc out', out);
+    return true;
+  }
+
+  // ── the coalescer ─────────────────────────────────────────────────────────
+
+  /**
+   * 🔴 ONE MESSAGE PER PARAMETER PER ANIMATION FRAME, AND THE CONSTRAINT IS THE
+   * DEVICE RATHER THAN A RELAY. `/knobs/` sizes its gate against a Cloudflare
+   * relay whose budget is 1000 messages a second with a 2000 burst, and against
+   * a Raspberry Pi in another building cutting audio into 20 ms frames. **The
+   * Circuit is on USB on this desk**, so neither number applies: there is no
+   * room, no token bucket and no network hop to spend. What is left is the
+   * instrument, and a parameter cannot be heard to change more often than the
+   * page can draw, so the frame is the right grain.
+   * ⚠️ WITHOUT IT A DRAG IS NOT A KNOB. A finger crossing a 127 step lane in a
+   * fifth of a second offers a value on every pointer move, and a browser
+   * coalesces pointer moves at the display rate only for `getCoalescedEvents`,
+   * not for the handler. One per frame is the ceiling this page promises and
+   * there is an assert that forty moves inside one frame leave as one message.
+   *
+   * ⚠️ A GATE PER CHANNEL, NOT ONE GATE. `makeCcSend` keys its pending map by
+   * CONTROLLER NUMBER, which is exactly the merge this instrument punishes: CC
+   * 74 on channel 1 and CC 74 on channel 16 are the synth filter and the master
+   * filter. A gate per channel cannot merge them by construction.
+   * ⚠️ AND `restateMs: Infinity`. The kit's gate restates the whole console
+   * every 500 ms so a lost last value repairs itself, which is right over a
+   * lossy relay and wrong over USB: here it would be a page sending to an
+   * instrument for as long as a tab is open with nobody touching anything.
+   * `gateMs: 0` for the same reason, since the frame is already the grain.
+   */
+  const gates = new Map();
+  const gateKey = (v) => `${v.group}|${v.ch}`;
+  function gateFor(v) {
+    const k = gateKey(v);
+    let g = gates.get(k);
+    if (!g) { g = { v, gate: makeCcSend({ gateMs: 0, restateMs: Infinity }) }; gates.set(k, g); }
+    return g;
+  }
+  const mergedTotal = () => [...gates.values()].reduce((s, g) => s + g.gate.stats.thinned, 0);
+
+  let pumping = 0;
+  function queue(v, p, value, end) {
+    gateFor(v).gate.put(p.cc, value, { end });
+    if (!pumping) pumping = requestAnimationFrame(flush);
+  }
+  function drain() {
+    const now = performance.now();
+    for (const g of gates.values()) {
+      const msg = g.gate.tick(now);
+      if (!msg) continue;
+      for (const [cc, value] of msg.set) emit({ kind: 'cc', group: g.v.group, ch: g.v.ch, cc, value });
+    }
+    d.set('merged', mergedTotal() || '');
+  }
+  const flush = () => { pumping = 0; drain(); };
+  /* For a caller that cannot wait for a frame: the checks, and the tab going to
+     the background, where no frame is coming and the last value of a gesture
+     would otherwise sit in the pending map until somebody came back. */
+  const flushNow = () => { if (pumping) cancelAnimationFrame(pumping); pumping = 0; drain(); };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flushNow(); });
+
+  /**
+   * How many control changes went out in the last second.
+   *
+   * ⚠️ A TIMER THAT STOPS ITSELF. It starts on the first message and clears when
+   * a whole second passes with nothing in it, so an idle page runs no clock and
+   * the cell is EMPTY rather than holding the last busy number, which would read
+   * as traffic that is not happening.
+   */
+  let ticker = 0, inWindow = 0;
+  function bump(n) {
+    inWindow += n;
+    if (ticker) return;
+    ticker = setInterval(() => {
+      const had = inWindow;
+      inWindow = 0;
+      d.set('rate', had || '');
+      if (!had) { clearInterval(ticker); ticker = 0; }
+    }, 1000);
+  }
+
+  // ── the parameters, and where this page left them ──────────────────────────
+
+  const keyOf = (v, p) => `${v.group}|${v.ch}|${p.cc}`;
+  /**
+   * 🔴 THE MIDPOINT OF THE WIRE RANGE, AND IT IS AN INVENTION RATHER THAN A
+   * READING. Several parameters are centred: the guide's `52 - 76` is minus
+   * twelve to plus twelve semitones with 64 in the middle, so the midpoint is
+   * the neutral one for those and an arbitrary one for the rest. Nothing is
+   * sent until somebody moves a handle, so an arbitrary opening position costs
+   * the instrument nothing. What it costs the READER is said in the log the
+   * first time this page is opened: a handle is where this page left it.
+   */
+  const homeOf = (p) => Math.round((p.lo + p.hi) / 2);
+  const values = new Map();       // key -> where this page has left the handle
+  /** The parameter a key names, or null for a key no table row answers. */
+  const paramOf = (key) => { const [g, , cc] = key.split('|'); return param(g, Number(cc)); };
+  const changed = () => [...values]
+    .filter(([k, x]) => { const p = paramOf(k); return p && x !== homeOf(p); }).length;
+
+  // ── the page ──────────────────────────────────────────────────────────────
+
+  let voice = VOICES[0][1], voiceName = VOICES[0][0];
+  let sliders = [];               // {p, sld, key} for the part on screen
+  let handStarts = 0;
+
+  const parts = createChoice({
+    label: 'sends to',
+    options: VOICES,
+    at: 0,
+    onPick: (v, name) => showVoice(v, name),
+  });
+  const back = el('button', 'pos-btn', 'put back', { type: 'button' });
+  back.title = 'put every parameter this page has moved back to where this page opened it';
+  back.onclick = () => putBack();
+  const bar = el('div', 'shape-bar');
+  bar.append(parts.el, back);
+
+  const rack = createStack(undefined, 'shape-rack');
+  const traffic = createMidiLog({ empty: 'move a slider and what it sends is listed here' });
+  d.stack.add(bar, rack.el, traffic.el);
+
+  /**
+   * ⚠️ A PART'S RACK IS BUILT ONCE AND KEPT. Rebuilding on every press would
+   * leave a detached slider's invisible hand holding an animation frame for the
+   * life of the tab, add a `visibilitychange` listener per slider per press, and
+   * throw away the positions somebody had set. Kept, a switch is a swap and
+   * coming back finds the handles where you left them.
+   * ⚠️ AND IT IS LAZY. A visit builds the 52 parameters of Synth 1 and nothing
+   * else, because the other two parts are a press away and 122 sliders is not a
+   * thing to make somebody's phone lay out before they have asked for it.
+   */
+  const built = new Map();
+  /** Every slider this page has built, across every part it has been shown. */
+  const everyRow = () => [...built.values()].flatMap((r) => r.rows);
+
+  const handSaid = (p) => (s) => {
+    if (s.why === 'in-controls') { d.log(s.says, 'warn'); return; }
+    if (s.why === 'coarse') return;            // a coarse lane is given no hand
+    if (s.on) { handStarts++; d.log(`${p.name} is moving by itself`); return; }
+    const why = s.why === 'ceiling' ? ', which is the ten minute ceiling'
+      : s.why === 'hidden' ? ', because this tab went to the background'
+      : s.why === 'put back' ? ', because everything went back' : '';
+    d.log(`${p.name} is yours again${why}`);
+  };
+
+  function makeSlider(v, p, into) {
+    const key = keyOf(v, p);
+    if (!values.has(key)) values.set(key, homeOf(p));
+    /**
+     * 🔴 A HAND WHERE A HAND CAN BE SEEN, AND NOWHERE ELSE. Twelve of the fifty
+     * two synth parameters are modes and switches with fewer steps than a sweep
+     * needs: `Polyphony Mode` has three, `filter type` has six, `osc 1 wave` has
+     * thirty. A hand on those draws a staircase and reads as a broken control,
+     * which `slider.mjs` already refuses to pretend about. The others get one.
+     */
+    const wide = (p.hi - p.lo) >= HAND_STEPS;
+    const sld = createSlider({
+      label: p.name,
+      /* ⚠️ THE CONTROLLER NUMBER IS IN THE HOVER AND NOT UNDER THE HANDLE.
+         `/circuit/` and `/model/` both took printed CC numbers off their faces
+         on 2026-09-21 (*"rm ccs, also from rack"*) and the argument carries
+         here: a reader moving a filter wants to know which filter, and somebody
+         debugging a binding is somebody who will point at the control. What left
+         is in the log underneath, in bytes, which is where this project puts a
+         wire fact. */
+      aria: `${p.name}, CC ${p.cc} on channel ${v.ch}`,
+      min: p.lo, max: p.hi, step: 1, value: values.get(key),
+      hand: wide,
+      onHand: wide ? handSaid(p) : undefined,
+      onInput: (x) => moved(v, p, x, false),
+      onChange: (x) => moved(v, p, x, true),
+    });
+    const title = `${p.name}, CC ${p.cc} on channel ${v.ch}, ${p.lo} to ${p.hi}`;
+    sld.el.title = title;
+    into.push({ p, sld, key, v });
+    return sld;
+  }
+
+  function buildRack(v) {
+    const rows = [];
+    const stack = createStack(undefined, 'shape-part');
+    for (const sec of sections(v.group)) {
+      const group = createSliderGroup(
+        onChannel(v.group).filter((p) => p.sec === sec).map((p) => makeSlider(v, p, rows)));
+      /* ⚠️ UPPERCASED HERE AS WELL AS IN THE STYLESHEET. `.pos-sec-h` renders a
+         heading uppercase whatever is typed, and the kit's rule is to type it
+         uppercase so the source reads like the page. These names come from the
+         reference guide in its own case, so the shout is applied where they
+         arrive rather than left for the stylesheet to do silently. */
+      stack.titled(sec.toUpperCase(), group.el);
+    }
+    return { el: stack.el, rows };
+  }
+
+  function showVoice(v, name) {
+    /* Anything still moving belongs to the part being left, and a hand on a
+       detached slider is a page sending for as long as the tab is open. */
+    for (const s of sliders) s.sld.hand?.stop('part');
+    flushNow();
+    voice = v; voiceName = name || voiceName;
+    const k = gateKey(v);
+    if (!built.has(k)) built.set(k, buildRack(v));
+    const r = built.get(k);
+    sliders = r.rows;
+    rack.el.replaceChildren(r.el);
+    shareLabelColumn();
+    d.set('changed', changed() || '');
+  }
+
+  /**
+   * One label column across every section on screen.
+   *
+   * ⚠️ IT MEASURES THE LABEL AND THE VALUE, NEVER THE HEAD THAT HOLDS THEM. A
+   * head sits in the very column being set, so reading its width after `--lab`
+   * is applied reads back the answer rather than the question and the number can
+   * only grow. This is `/radio/`'s note, one page over, and it cost that page
+   * three reports.
+   */
+  function shareLabelColumn() {
+    const groups = [...rack.el.querySelectorAll('.sld-group')];
+    if (!groups.length) return;
+    const wide = groups
+      .flatMap((g) => [...g.querySelectorAll('.sld-l, .sld-v')])
+      .reduce((m, e) => Math.max(m, e.getBoundingClientRect().width), 0);
+    if (!wide) return;
+    for (const g of groups) g.style.setProperty('--lab', `${Math.ceil(wide)}px`);
+  }
+
+  let saidNothingOpen = false, saidNoPort = false;
+  function moved(v, p, value, end) {
+    values.set(keyOf(v, p), value);
+    queue(v, p, value, end);
+    d.set('changed', changed() || '');
+    if (!access && !saidNothingOpen) {
+      saidNothingOpen = true;
+      d.log('nothing is open yet. Press the status button to look for a Circuit, and these handles will reach it.');
+    } else if (access && !port && !saidNoPort) {
+      saidNoPort = true;
+      d.log('no output with Circuit in its name, so these moves are going nowhere.', 'warn');
+    }
+  }
+
+  /**
+   * 🔴 `put back`, AND IT IS NOT CALLED `reset` BECAUSE IT IS NOT ONE. It
+   * re-sends, for every parameter this page has moved on every part, the value
+   * that parameter had when this page opened. That is where THIS PAGE started
+   * and it is not the patch as it was saved, because a control change is write
+   * only and nothing here has ever read the instrument.
+   * ✅ THE REAL UNDO IS ON THE INSTRUMENT AND COSTS NOTHING: a control change
+   * moves the live voice and never writes flash, so reloading the session brings
+   * the patch back exactly as it was. That is worth saying in the log rather
+   * than leaving somebody to hope.
+   */
+  function putBack() {
+    /* 🔴 EVERY PART, NOT THE ONE ON SCREEN. The first build stopped the hands
+       and moved the handles of the visible rack only, so a parameter moved on
+       Synth 2 was put back on the wire and left showing its old number the next
+       time somebody chose Synth 2. A handle that disagrees with what was sent is
+       the defect this page's whole `values` map exists to prevent. */
+    for (const s of everyRow()) s.sld.hand?.stop('put back');
+    let n = 0;
+    for (const [key, x] of values) {
+      const [, chs] = key.split('|');
+      const p = paramOf(key);
+      if (!p) continue;
+      const home = homeOf(p);
+      if (x === home) continue;
+      values.set(key, home);
+      gateFor({ group: key.split('|')[0], ch: Number(chs) }).gate.put(p.cc, home, { end: true });
+      n++;
+    }
+    flushNow();
+    /* ⚠️ `quiet`, BECAUSE THE VALUE HAS ALREADY GONE. Without it every handle
+       would queue its own arrival and the console would be sent twice. The glide
+       is the part a person sees: the handles travel home rather than the panel
+       redrawing as if nothing had happened. */
+    for (const s of everyRow()) s.sld.set(values.get(s.key), { quiet: true, glideMs: 600 });
+    d.set('changed', changed() || '');
+    if (!n) { d.log('nothing to put back'); return; }
+    d.log(`put ${n} parameter${n === 1 ? '' : 's'} back to where this page opened ${n === 1 ? 'it' : 'them'}. `
+        + 'That is not the patch as it was saved, because this page never reads the Circuit. '
+        + 'Reloading the session on the instrument does that, and nothing here has ever written to its flash.');
+  }
+
+  showVoice(voice, voiceName);
+  /* A late webfont changes every label width, and `document.fonts` is the event
+     for it rather than a guess at how long loading takes. */
+  document.fonts?.ready?.then(shareLabelColumn).catch(() => {});
+  new ResizeObserver(shareLabelColumn).observe(d.el);
+
+  // ── the instrument ────────────────────────────────────────────────────────
+
+  /**
+   * 🔴 A VISIT OPENS NOTHING, AND THE COUNTERS ARE HOW THAT IS GRADED RATHER
+   * THAN CLAIMED. `opensBeforePress` can only be raised by `open()` running
+   * without a press in front of it, so moving that call to the load path turns
+   * the assert red instead of leaving a green suite about a page that now asks
+   * a browser for MIDI on arrival.
+   */
+  let access = null, presses = 0, opens = 0, opensBeforePress = 0;
+
+  async function open() {
+    opens++;
+    if (!presses) opensBeforePress++;
+    if (!navigator.requestMIDIAccess) {
+      d.log('this browser has no Web MIDI, so nothing here can reach an instrument', 'warn');
+      return false;
+    }
+    try {
+      /**
+       * ⚠️ `sysex: false`, WHICH IS THE THIRD WALL AND THE ONLY ONE THE BROWSER
+       * ENFORCES. `toBytes` cannot build a SysEx and `emit` is the only way out,
+       * so this asks for a permission the page has no code to use. It costs
+       * nothing and it means a future edit that grew such a code path would be
+       * refused by Chrome rather than by a comment.
+       * ⚠️ OUTPUTS ONLY. This page sends and does not listen, so opening the
+       * inputs would be subscribing to a Circuit's continuous clock for nothing.
+       * `/circuit/` is the page that listens.
+       */
+      access = await navigator.requestMIDIAccess({ sysex: false });
+      const outs = [...access.outputs.values()].filter((o) => /circuit/i.test(o.name || ''));
+      for (const o of outs) { try { await o.open(); } catch { /* another client may hold it */ } }
+      port = outs[0] || null;
+      return true;
+    } catch (e) {
+      d.log(`MIDI was refused: ${e.message}`, 'warn');
+      return false;
+    }
+  }
+
+  const pres = createPresenceButton({
+    of: 'Circuit', state: 'unknown',
+    can: ['unknown', 'checking', 'online', 'offline'],
+    press: () => { presses++; return d.run('look'); },
+  });
+  d.controls.hidden = false;
+  d.controls.append(pres.el);
+
+  d.on('look', async () => {
+    pres.set('checking');
+    if (await open()) {
+      /* ⚠️ ONLINE MEANS A PORT WITH THIS NAME ON IT, NOT THAT MIDI WAS GRANTED.
+         Permission is a fact about the browser; presence is a fact about whether
+         the instrument is plugged in, and reporting the first as the second is
+         how a page says `online` about an empty desk. */
+      pres.set(port ? 'online' : 'offline',
+        port ? null : 'nothing with Circuit in its name is plugged in');
+      if (port) d.log(`sending to ${port.name}`, 'hi');
+      d.log('a handle here says where this page left a parameter and never what the patch holds, '
+          + 'because a control change is write only and nothing here reads the instrument.');
+      d.log('nothing on this page can send SysEx, a program change or a note, so the patches in '
+          + 'flash cannot be touched from here.');
+    } else {
+      pres.set('offline', 'this browser would not open MIDI');
+    }
+    if (SELFCHECK) await d.run('drive');
+  });
+
+  // ── checks ────────────────────────────────────────────────────────────────
+
+  const waitFor = (test, ms) => new Promise((done) => {
+    const t0 = performance.now();
+    const step = () => {
+      if (test() || performance.now() - t0 > ms) { done(!!test()); return; }
+      requestAnimationFrame(step);
+    };
+    step();
+  });
+
+  const find = (name) => sliders.find((s) => s.p.name === name);
+
+  /**
+   * 🔴 THE CHECKS WERE PROVED BY BREAKING THEM, 2026-09-21, WHICH IS THE ONLY
+   * THING THAT SEPARATES A CHECK FROM A DECORATION. Three sabotages in one run:
+   * the parameter membership test taken out of `toBytes`, the coalescer made to
+   * send on every move, and `--lab` left unset. **34/34 went to 27/34**, and
+   * every one of the seven was traceable to one of the three. The layout one
+   * reported `66.70 px apart`, which is the drift seven separately sized label
+   * columns produce and the reason that rule exists.
+   */
+
+  /**
+   * 🔴 THE FREE HALF, AND IT RUNS FOR EVERYBODY. Everything gradable from data
+   * this page already holds costs a visitor nothing, so it is not behind the
+   * self-check gate: what is behind that gate is the half that moves handles,
+   * starts a hand and puts bytes on a wire.
+   */
+  function grade() {
+    d.assert('a visit opened nothing',
+      opensBeforePress === 0, `${opens} opens after ${presses} presses`);
+
+    d.assert('there is one slider for every parameter the reference documents for this part',
+      sliders.length === onChannel(voice.group).length,
+      `${sliders.length} of ${onChannel(voice.group).length} for ${voiceName}`);
+
+    /* 🔴 THE ONE THAT MATTERS, AND IT IS THE REASON THIS PAGE MAY EXIST AT ALL.
+       A device with no factory reset is one byte away from losing a patch, and
+       that byte lives inside a SysEx message nothing here can build. */
+    d.assert('SysEx, a program change and a note cannot be expressed at all',
+      toBytes({ kind: 'sysex', ch: 1, cc: 74, value: 0 }) === null
+      && toBytes({ kind: 'program', ch: 1, cc: 0, value: 3 }) === null
+      && toBytes({ kind: 'note', ch: 1, cc: 60, value: 100 }) === null
+      && toBytes({ kind: 'clock' }) === null,
+      'all four came back null');
+
+    // ⚠️ THE NEGATIVE CONTROL. Without it the line above passes on a function
+    // that refuses everything, which is a page that cannot send at all.
+    d.assert('and a control change really is produced, which is the negative control',
+      JSON.stringify(toBytes({ kind: 'cc', group: '16', ch: 16, cc: 74, value: 100 })) === '[191,74,100]',
+      JSON.stringify(toBytes({ kind: 'cc', group: '16', ch: 16, cc: 74, value: 100 })));
+
+    // The second wall: a controller this instrument has never been documented
+    // to answer on this channel group is refused as well.
+    d.assert('a controller the reference does not document is refused too',
+      toBytes({ kind: 'cc', group: '1/2', ch: 1, cc: 126, value: 0 }) === null
+      && toBytes({ kind: 'cc', group: '16', ch: 16, cc: 1, value: 0 }) === null,
+      'CC 126 on a synth and CC 1 on the session');
+
+    /**
+     * 🔴 A HAND BUTTON IN `.pos-controls` WOULD BE THE SUITE PLAYING SOMEBODY'S
+     * INSTRUMENT. `slider.mjs` refuses to run one from inside that row and says
+     * so on its own face; this asserts the row is clean on this page, which is
+     * the half a component cannot check for a page it does not know about.
+     */
+    d.assert('no control in the harness row can send, and no hand lives in it',
+      document.querySelectorAll('.pos-controls .sld-hand').length === 0
+      && document.querySelectorAll('.pos-controls button').length === 1,
+      `${document.querySelectorAll('.pos-controls button').length} button in the row`);
+
+    /**
+     * 🔴 A HAND WHERE ONE CAN BE SEEN AND NOWHERE ELSE, BOTH HALVES. The first
+     * half alone would pass on a page that gave every slider a hand; the second
+     * would pass on a page that gave none.
+     */
+    const withHand = sliders.filter((s) => s.sld.hand);
+    d.assert('every slider with a hand has the steps to show one, and every slider without is too coarse',
+      withHand.every((s) => !s.sld.hand.coarse)
+      && sliders.filter((s) => !s.sld.hand).every((s) => (s.p.hi - s.p.lo) < HAND_STEPS)
+      && withHand.length > 0 && withHand.length < sliders.length,
+      `${withHand.length} of ${sliders.length} carry one, at ${HAND_STEPS} steps or more`);
+
+    /**
+     * 🔴 A LAYOUT CLAIM IS A MEASUREMENT. Seven sections are seven separate
+     * grids, each of which would size its label column from its own widest name,
+     * so one left edge across all of them is the whole of what `--lab` is for
+     * and it is exactly the kind of rule this project has watched lose silently
+     * to another rule. Measured off real rects, after re-running the share, so
+     * the measurement and the claim are in the same font state.
+     */
+    shareLabelColumn();
+    const lanes = [...rack.el.querySelectorAll('.sld-lane')].map((e) => e.getBoundingClientRect().left);
+    const spread = lanes.length ? Math.max(...lanes) - Math.min(...lanes) : -1;
+    d.assert('every lane in the rack starts at one left edge, across all seven sections',
+      lanes.length === sliders.length && spread <= 1.5,
+      `${lanes.length} lanes, ${spread.toFixed(2)} px apart`);
+
+    d.assert('the page does not drag sideways at this width',
+      document.documentElement.scrollWidth <= window.innerWidth + 1,
+      `page ${document.documentElement.scrollWidth} against ${window.innerWidth}`);
+
+    d.assert('no secret in this page', !location.href.includes('token'));
+  }
+
+  /**
+   * 🔴 THE HALF THAT COSTS SOMETHING, BEHIND THE GATE. It moves handles, runs an
+   * invisible hand and produces bytes, and a visitor would see all three happen
+   * in front of them.
+   * ⚠️ AND NOTHING REACHES AN INSTRUMENT WHILE IT RUNS. `sink` takes every
+   * message, so a suite run on the desk this Circuit is plugged into is not a
+   * hand on it. There is an assert on the counter at the end.
+   */
+  d.on('drive', async () => {
+    sink = [];
+
+    // ── the invisible hand, which is what this page is for ───────────────────
+    //
+    // 🔴 IT IS FIRST BECAUSE IT IS SLOW, AND SLOW IS MEASURED RATHER THAN
+    // GUESSED. A sweep is 7000 ms end to end with a Beta(3,4) speed profile, so
+    // the first STEP of a 127 step lane lands about half a second in: the curve
+    // is deliberately gentle at the start, which is the thing that makes it read
+    // as a hand rather than as a ramp. `settleMs` in the manifest covers it.
+    const filt = find('frequency');
+    const startedAt = filt.sld.get();
+    sink.length = 0;
+    filt.sld.hand.start(0, 'check');
+    /* 🔴 THREE STEPS, NOT ONE, AND THE NUMBER IS THE POINT. One step proves the
+       handle twitched and would be satisfied by a rounding error; three proves
+       it is travelling, and three is also what makes the assert below about a
+       SEQUENCE of messages rather than about a single one. MEASURED at about
+       800 ms on a 127 step lane, against a 2500 ms deadline. */
+    const STEPS = 3;
+    const moving = () => Math.abs(filt.sld.get() - startedAt) >= STEPS;
+    const movedByItself = await waitFor(moving, 2500);
+    d.assert('an invisible hand moves a handle with nobody touching it',
+      movedByItself && filt.sld.hand.running,
+      `${startedAt} to ${filt.sld.get()}, hand ${filt.sld.hand.running ? 'running' : 'stopped'}`);
+
+    flushNow();
+    const handMsgs = sink.filter((m) => m.cc === filt.p.cc);
+    /* 🔴 A HAND THAT MOVED A CONTROL WITHOUT THE SOUND CHANGING WOULD BE A LYING
+       CONTROL, which is this project's own phrase for the defect. So the claim
+       is not that the handle moved, it is that every position it passed through
+       went out, on this part's own channel and controller, as a sequence of
+       distinct values rather than as one message at the end. */
+    const handValues = new Set(handMsgs.map((m) => m.value));
+    d.assert('and every position it passes through goes out, on the channel and controller this part uses',
+      handMsgs.length >= 2 && handValues.size === handMsgs.length
+      && handMsgs.every((m) => m.bytes[0] === 0xb0 && m.bytes[1] === 74),
+      `${handMsgs.length} control changes at ${[...handValues].join(', ')}`);
+
+    sink.length = 0;
+    filt.sld.hand.stop('check');
+    flushNow();
+    /* ⚠️ THE LAST VALUE OF A GESTURE IS THE ONE THAT STAYS TRUE FOREVER. A hand
+       stopping is a gesture ending, so it has to land, or a filter sits at the
+       second to last position for as long as the instrument is on. */
+    d.assert('and when it stops, the position it stopped at is sent',
+      sink.length === 1 && sink[0].value === Math.round(filt.sld.get()),
+      `${sink.length} message for a handle at ${filt.sld.get()}`);
+    d.assert('the hand said so in the log rather than moving silently',
+      handStarts === 1, `${handStarts} starts`);
+
+    // ── one move, one message, one channel ───────────────────────────────────
+
+    sink.length = 0;
+    filt.sld.set(37);
+    flushNow();
+    d.assert('a slider move leaves as exactly one control change, with the right channel and controller',
+      sink.length === 1 && JSON.stringify(sink[0].bytes) === JSON.stringify([0xb0, 74, 37]),
+      `${sink.length} message${sink.length === 1 ? '' : 's'}, ${sink[0]?.bytes.map((b) => b.toString(16).toUpperCase()).join(' ')}`);
+
+    /* 🔴 THE SAME CONTROLLER ON THE WRONG CHANNEL IS THE ONE MISTAKE THIS
+       INSTRUMENT PUNISHES. CC 74 is the synth filter on 1 and the MASTER filter
+       on 16, and a page keyed by controller number alone would move whichever
+       one it happened to remember. */
+    d.assert('and the same controller on the session channel was not produced',
+      !sink.some((m) => m.bytes[0] === 0xbf),
+      `${sink.filter((m) => m.bytes[0] === 0xbf).length} on channel 16`);
+
+    // ── the coalescer ────────────────────────────────────────────────────────
+
+    sink.length = 0;
+    const mergedBefore = mergedTotal();
+    for (let i = 0; i < 40; i++) moved(voice, filt.p, 20 + i, false);
+    flushNow();
+    d.assert('forty moves inside one frame leave as one control change, carrying the last of them',
+      sink.length === 1 && sink[0].value === 59,
+      `${sink.length} message${sink.length === 1 ? '' : 's'} at ${sink[0]?.value}`);
+    d.assert('and the thirty nine that never left are counted rather than lost quietly',
+      mergedTotal() - mergedBefore === 39, `${mergedTotal() - mergedBefore} merged`);
+
+    // ── the parts ────────────────────────────────────────────────────────────
+    //
+    // 🔴 DRIVEN HERE BECAUSE THE HARNESS CANNOT REACH IT. The chooser is not in
+    // `.pos-controls` on purpose, and a check only a control can reach is a
+    // check nobody runs.
+    parts.set(2);                                  // Session, channel 16
+    d.assert('choosing the session gives the eighteen parameters it has',
+      sliders.length === 18 && voice.ch === 16, `${sliders.length} on channel ${voice.ch}`);
+
+    sink.length = 0;
+    find('frequency').sld.set(90);
+    flushNow();
+    d.assert('the master filter is the same controller number and goes out on channel 16',
+      sink.length === 1 && JSON.stringify(sink[0].bytes) === JSON.stringify([0xbf, 74, 90]),
+      sink[0]?.bytes.map((b) => b.toString(16).toUpperCase()).join(' ') || 'nothing');
+
+    parts.set(1);                                  // Synth 2, channel 2
+    sink.length = 0;
+    find('frequency').sld.set(51);
+    flushNow();
+    d.assert('Synth 2 is the same parameter on channel 2',
+      sink.length === 1 && JSON.stringify(sink[0].bytes) === JSON.stringify([0xb1, 74, 51]),
+      sink[0]?.bytes.map((b) => b.toString(16).toUpperCase()).join(' ') || 'nothing');
+
+    parts.set(0);
+
+    // ── putting it back ──────────────────────────────────────────────────────
+
+    d.assert('the page knows how far it has moved the instrument',
+      changed() > 0, `${changed()} parameters away from where this page opened`);
+    sink.length = 0;
+    putBack();
+    d.assert('put back re-sends every parameter this page moved, on all three parts',
+      changed() === 0 && sink.length > 0
+      && sink.every((m) => m.value === homeOf(param(m.group, m.cc))),
+      `${sink.length} control changes, ${changed()} left moved`);
+
+    // ── the audit ────────────────────────────────────────────────────────────
+
+    /* Over everything this page has ever produced, not over the last batch: the
+       counter is raised inside `emit`, which is the one door out. */
+    d.assert('every byte this page has put out is a control change',
+      out > 0 && notCc === 0 && refused === 0,
+      `${out} out, ${notCc} that were not a control change, ${refused} refused`);
+
+    /* 🔴 AND NONE OF IT REACHED AN INSTRUMENT. A suite run on the desk this
+       Circuit is plugged into must not be a hand on it, and this is the counter
+       that says so rather than a comment claiming it. */
+    d.assert('and no message reached a real instrument while the checks ran',
+      portSends === 0, `${portSends} sends to a port`);
+
+    d.assert('the log lists what left rather than staying empty',
+      traffic.count() > 0, `${traffic.count()} rows`);
+
+    sink = null;
+  });
+
+  grade();
+  d.ready();
+</script>
+</html>
