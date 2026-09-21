@@ -514,7 +514,7 @@ export const DEMOS = [
    * buttons have never sent a byte anybody has captured, so they are drawn and
    * marked rather than wired by guess.
    */
-  { name: 'circuit', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+  { name: 'circuit', group: 'hardware', act: 4, created: '2026-09-21', built: true,
     one: 'a Novation Circuit on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
@@ -532,7 +532,7 @@ export const DEMOS = [
    * hold a Cloudflare credential. Nothing reaches Cloudflare on a visit or under
    * the harness.
    */
-  { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+  { name: 'wish', group: 'hardware', act: 4, created: '2026-09-21', built: true,
     one: 'say what you want the desk to do, and a Cloudflare model proposes the patch',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
 
@@ -549,7 +549,7 @@ export const DEMOS = [
    * browser, most of them negative controls, because a validator passes a naive
    * suite by returning yes to everything.
    */
-  { name: 'bay', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+  { name: 'bay', group: 'hardware', act: 4, created: '2026-09-21', built: true,
     one: 'route one instrument to another, with the connections it refuses explained in words',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
@@ -576,7 +576,7 @@ export const DEMOS = [
    * curve, so the first step of a 127 step lane lands about half a second in,
    * and that measurement is the first thing the checks make.
    */
-  { name: 'shape', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 4000,
+  { name: 'shape', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 4000,
     one: "edit a Novation Circuit's sound while it is playing, with sliders that can move themselves",
     tags: ['WebMIDI', 'CoreMIDI'] },
 
@@ -592,11 +592,11 @@ export const DEMOS = [
    * flat), every release a note on at velocity 0, a seven bit pitch wheel in a
    * fourteen bit message, and six controller numbers for eight knobs.
    */
-  { name: 'evo', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+  { name: 'evo', group: 'hardware', act: 4, created: '2026-09-21', built: true,
     one: 'an Evolution MK-425C on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
-  { name: 'model', group: 'instruments', act: 4, created: '2026-09-20', built: true,
+  { name: 'model', group: 'hardware', act: 4, created: '2026-09-20', built: true,
     one: 'a TASCAM Model 12 on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI', 'Mackie Control'] },
 
@@ -703,7 +703,7 @@ export const DEMOS = [
    * a browser with no MIDI at all. It has a known stream written into it and
    * every check runs off that, so the page is worth opening on a phone.
    */
-  { name: 'dump', group: 'instruments', act: 4, created: '2026-09-20', built: true,
+  { name: 'dump', group: 'hardware', act: 4, created: '2026-09-20', built: true,
     one: 'every message a plugged-in instrument sends, as raw bytes beside a reading of them',
     tags: ['WebMIDI', 'CoreMIDI', 'SysEx'] },
 
@@ -963,7 +963,35 @@ export function shortDate(iso) {
  * some are phrases. Same rule as the diagram labels in CLAUDE.md.
  */
 export const GROUPS = new Map([
-  ['xr', 'in a headset'],
+  /**
+   * 🔴 `hardware` IS FIRST AND IS THE OBJECTS ON THE DESK. Asked 2026-09-21:
+   * *"make new group hardware on top if index, move all latest demos strting
+   * from dump there"*. Seven rows moved out of `instruments`: the three panel
+   * replicas, the patch bay, the editor, the speech front end and the dump.
+   * ⚠️ **WHAT SEPARATES THE TWO GROUPS IS WHETHER A REAL OBJECT IS IN THE
+   * ROOM**, not whether the page makes a sound. `instruments` keeps the pages
+   * that ARE an instrument in a browser (a looper, a granulator, a jam) plus
+   * the two that drive something over a relay. `hardware` is the pages about a
+   * thing you can put your hand on: a Novation Circuit, a TASCAM Model 12, an
+   * Evolution MK-425C, and the four pages that route, edit, describe or dump
+   * them.
+   * ⚠️ **THE CUT IS AT `dump` BECAUSE THAT IS WHERE IT WAS ASKED FOR.** `knobs`
+   * and `able` are arguable: one drives a Raspberry Pi in another building and
+   * the other plays Ableton Live on a Mac, so both have real hardware behind
+   * them. They stay where they are rather than being swept in on an inference.
+   */
+  ['hardware', 'hardware'],
+  /**
+   * ⚠️ `headset`, NOT `in a headset`, CHANGED 2026-09-21 ON INSTRUCTION
+   * (*"in a headset -> headset"*), AND IT FINISHES THE RULE WRITTEN BELOW.
+   * That rule took the articles out of these titles because a column reading
+   * `the timeline` over `instruments` over `capture` is a list where some
+   * members are names and some are phrases. `in a headset` was the last phrase
+   * standing: it carried both an article and a preposition, so it was the
+   * furthest from a name of any row here and it survived the sweep that was
+   * written about exactly that.
+   */
+  ['xr', 'headset'],
   ['vain', 'väin'],
   ['kurenniemi', 'kurenniemi'],
   ['mim', 'mim'],
