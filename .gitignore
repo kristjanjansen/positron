@@ -81,6 +81,15 @@ positron-push-sa.json
 # under a different name; `LAYOUT.md` is where this project already records
 # where a file goes, so the directory needs no second explanation of itself.
 purchased/
+# 🔴 AND `tmp/` SINCE 2026-09-21, WHICH IS WHERE BOTH OF THOSE TREES LIVE NOW.
+# Asked for by name: a non-git directory, `tmp/purchages` for the purchases and
+# `tmp/packs` for the archive download. 433 MB of other people's work, none of
+# it ours to publish, and the whole point of one ignored root is that a new
+# directory under it is covered the day it appears rather than the day somebody
+# remembers.
+# ⚠️ `purchased/` STAYS ABOVE, because a rule that stops matching is a rule that
+# silently starts tracking the day anything recreates that path.
+tmp/
 
 # 🔴 macOS writes this into any directory somebody opens in Finder, and this
 # repository has been bitten TWICE by `git add -A` sweeping in work that was not
