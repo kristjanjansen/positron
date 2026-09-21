@@ -220,15 +220,25 @@ names for multi presence and it will arrive here first.
 character name at offset 0x10, **87 per cent non zero**, and **44,071 of 53,248
 bytes are above 0x7F**.
 
-🔴 **THAT LAST NUMBER IS THE ONE THAT MATTERS: A SESSION IS NOT SEVEN BIT, SO IT
-IS NOT SysEx PAYLOAD.** A patch is 340 bytes that are all ≤ 0x7F and can travel
-over MIDI as they are. A session cannot, so whatever moves one is not the patch
-mechanism.
+🔴 **AND THAT LAST NUMBER WAS READ WRONG THE SAME DAY IT WAS WRITTEN. SEE
+`research/circuit-session-format-2026-09-21.md`.** This said *a session is not
+seven bit, so it is not SysEx payload*. **The 44,071 high bytes are 0xFF
+padding, not data.** Measured properly: the file's entropy is **0.91 bits per
+byte**, 0xFF appears **44,069** times, the real payload is **9,180 bytes**, and
+**two of them** are above 0x7F. So a session IS seven bit and could travel as
+SysEx. ⚠️ Whether Novation moves it that way is a different question and is
+still unanswered.
+⚠️ **THE MISTAKE IS THIS PROJECT'S OWN NAMED ONE**: a statistic measured over
+the whole file rather than over the part in question. Counting high bytes in a
+file that is four fifths erased flash measures the erasure.
 
 ⚠️ **AND NOTHING DOCUMENTS IT.** The Programmer's Reference covers patches,
-control changes and NRPN, and says nothing about the session container. 73 per
-cent of the bytes are identical across all 32 sessions, which is a lot of
-structure to reverse engineer for a format nobody has published.
+control changes and NRPN, and says nothing about the session container.
+✅ **THE CONTAINER IS MAPPED NOW THOUGH**: 49 data blocks, sizes 1 x 528,
+15 x 452, 32 x 32 and 1 x 848, on a 1508 byte stride. And **`ncstool` already
+reads AND writes the equivalent file for Circuit Tracks at 97.3 per cent**,
+which is a different device and a different format but the same shape of
+answer. `research/circuit-session-format-2026-09-21.md` has both.
 
 🔴 **THE STANDING INSTRUCTION IS STILL THE TOP OF `BACKLOG.md`**: get the 32
 sessions off the device, which is a Components operation nobody has run. **That
