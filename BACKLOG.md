@@ -1,5 +1,19 @@
 ## Open
 
+### A new demo, 2026-09-21
+
+- **`in bg make a tom demo, a 8x64 grid with transport on top. have circuitpack
+  uploader on top (as many rows as there are samples)`**.
+  ⚠️ **TWO READINGS OF `8x64` AND THE PARENTHESIS DECIDES IT.** Read as rows by
+  steps: 8 rows is what there is before a pack is open, and once one is, the
+  rows are the samples in it, which is 64 in the owner's pack. 64 is the step
+  count. The alternative reading, 8 steps and 64 rows, is not ruled out by the
+  words and is ruled out by the parenthesis only if `rows` means the first
+  number. **Flagged rather than decided in silence.**
+  ⚠️ `tom` is read as the SLUG, the way `pack`, `bay`, `wish` and `kit` are.
+  ⚠️ The uploader is `demo/shell/drop.mjs` and the decoder is
+  `demo/shell/circuit-sample.mjs`, both landed today.
+
 ### /pack/ and a rule, 2026-09-21
 
 - **`do not show diargam when no file`**. The picture on the patches tab is
