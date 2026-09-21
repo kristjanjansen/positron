@@ -66,6 +66,67 @@ and 🔴 **the stream end carries a CRC32 of the unpacked payload which verifies
 on 31 of 31**. That CRC is what makes the restoration exact rather than
 plausible, and a stream failing it is refused by name.
 
+#### Byte 0 shipped, and four more files open, 2026-09-21
+
+✅ **DONE.** `containerOf(buf)` reads two bytes: `50 4b` is a zip, `f0` is a raw
+SysEx stream, anything else is refused QUOTING THE BYTES IT FOUND. `/tom/` and
+`/pack/` route on it.
+✅ **THE RESTORATION IS EXACT RATHER THAN PLAUSIBLE, AND THAT IS THE CRC.**
+Every logical stream is split on `0x77`/`0x7a` BEFORE anything is unpacked,
+then checked against its declared unpacked length AND against the CRC32 in its
+end message. MEASURED on this disk: **36 of 36 streams verify**, 6,596,016
+payload bytes with **0 above 0x7F**, 293 to 256 on all 22,512 carriers, and the
+`80S` stream declares `0x57F000` and checksums `0xd79d1ca4` against a payload
+that computes `0xd79d1ca4`.
+✅ **`crc32()` WAS GRADED AGAINST AN ORACLE NOBODY HERE WROTE**: `node:zlib` on
+304 buffers including empty and 4 KB of noise, **0 disagreements**, plus the
+published `0xcbf43926` check digit. It is hand rolled because the module runs in
+a browser.
+
+| | before | after |
+| --- | --- | --- |
+| `/tom/` files it gets samples from | 2 of 29 | **6 of 29** |
+| `/pack/` files it shows anything from | 10 of 29 | **12 of 29** |
+| samples either page can reach | 64 | **320** |
+
+🔴 **AND ONE FILE CHANGED DIRECTION, WHICH IS A FIX RATHER THAN A LOSS.**
+`Future_Kawaii.rar` on `/pack/` used to announce **"134 of them Circuit
+patches"**. MEASURED: those 134 are 350 byte runs inside COMPRESSED ARCHIVE
+DATA, **43 distinct six byte heads, and 0 of 134 carry `f0 00 20 29 01 60`**.
+That is `patchesIn()` keying on length alone, showing its worst face. Byte 0
+refuses the file before the question is asked, and the page asserts it as a
+negative control without repairing `circuit-syx.mjs`.
+
+🔴 **STILL OPEN: `/pack/` NOW WITHHOLDS THE SESSION COUNT ON ANY FILE WITH A
+SAMPLE STREAM IN IT, AND THAT IS A DELIBERATE LOSS.** `sessionsIn()` crosses
+stream boundaries, so `payton_carter.circuitpack` answered **141** where the
+answer is 33, and `80S Drums_sampleset.syx` would have answered **108** where
+the answer is **0**. A newly opened file printing 108 fabricated sessions is
+worse than printing none, so the count is suppressed with a red line saying
+why. ✅ **THE CORRECT 33 ARE ONE STEP AWAY**: `streamsIn` already splits them
+and every session stream's payload is an exact multiple of 53,248.
+
+⚠️ **AND THREE FIGURES FROM YESTERDAY'S RESEARCH DID NOT REPRODUCE, ALL OF THEM
+DENOMINATORS RATHER THAN DISAGREEMENTS.** *31 of 31 streams* is **36 of 36** on
+disk, because 31 counts files after deduplicating the identical
+`With Patches`/`Without Patches` pairs. *19 files, 1,152 filled slots* is **24
+and 1,456**. And the median duration quoted for `80S Drums_sampleset.syx` as
+0.288 s is the upper of two middles; `summariseAll()` takes the mean and a page
+shows **0.276**.
+
+⚠️ **WHAT IS STILL UNSETTLED, AND EACH ONE IS MARKED ON THE PAGE:**
+- **The ten `.circuitpack` files inside `Future_Kawaii.rar` stay unreachable.**
+  `unzip.mjs` reads zips and that is a rar. So *eleven non-zip circuitpacks* is
+  one reachable and ten behind a container nothing here opens.
+- **`SLOT_CHANNELS = 1` IS A NAMED ASSUMPTION, NOT A MEASUREMENT.** The slot
+  header carries no channel field at all. If it is wrong every duration on the
+  page is out by a factor of two, and the only corroboration is the owner's own
+  64 WAVs.
+- **Byte 0 of the slot header is unexplained**, 35 distinct values and present
+  on empty slots too. Carried through as `flags` and named as unexplained.
+- **Whether a bulk sample transfer writes flash is still inference.** The only
+  candidate is the six nibble region field.
+
 #### Three defects found in our own code, 2026-09-21, reported not fixed
 
 - 🔴 **`patchesIn()` IDENTIFIES A PATCH BY LENGTH ALONE**, with no head check.

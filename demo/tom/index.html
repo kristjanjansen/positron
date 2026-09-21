@@ -314,7 +314,13 @@
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { readZip } from '/shell/unzip.mjs';
-  import { samplesIn, toMono, summariseAll } from '/shell/circuit-sample.mjs';
+  import {
+    samplesIn, toMono, summariseAll, containerOf, sampleSetIn, CONTAINER,
+  } from '/shell/circuit-sample.mjs';
+  // ⚠️ ONE CONSTANT AND NOT A LITERAL 350. A loose patch message is the one
+  // `.syx` in an archive that is NOT a bulk transfer, and the number that
+  // separates them already has a name in the module that reads patches.
+  import { PATCH_BYTES } from '/shell/circuit-patch.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   /**
@@ -400,7 +406,7 @@
 
   const d = mount({
     name: 'tom',
-    what: 'tap a grid of 16 steps whose rows become the samples in a Circuit pack you open here',
+    what: 'tap a grid of 16 steps whose rows become the samples out of a Circuit pack or sample set you open here',
     /**
      * Four cells, all of which move, and none of which is a structural
      * constant. `rows` is not among them because the number of rows is the
@@ -619,7 +625,11 @@
   // `drop.mjs` names no network API at all. The title is the reader's word for
   // the block and the button is the promise about what pressing it does.
   const drop = createDrop({
-    accept: ['.circuitpack', '.zip'],
+    // ⚠️ `.syx` SINCE 2026-09-21, BECAUSE THE PAGE OPENS ONE NOW. A bulk sample
+    // transfer is a `.syx` in the archive download and a `.circuitpack` that is
+    // not a zip in eleven more, and a list that named neither was a way in the
+    // page had stopped meaning.
+    accept: ['.circuitpack', '.zip', '.syx'],
     title: 'UPLOAD FILE',
     label: 'Open file',
     beside: 'or drag a file here',
@@ -1287,6 +1297,12 @@
         // racing a decode.
         const m = toMono(rows[r].wave);
         if (!m.ok) { silent++; d.log(`${rows[r].name} did not decode: ${m.why}`, 'bad'); return false; }
+        // 🔴 AN EMPTY SLOT IS A ROW, AND `createBuffer(1, 0, rate)` THROWS. A
+        // pack's 64 WAVs are all sound, so this case could not arise until a
+        // bulk transfer opened: `Roland Classics.syx` is 48 filled slots and 16
+        // empty, and an empty one must read as empty rather than as the page
+        // saying `no sound here` about a DOMException.
+        if (m.frames === 0) { silent++; d.log(`${rows[r].name} is an empty slot`); return false; }
         ac = ac || new (window.AudioContext || window.webkitAudioContext)();
         ac.resume();
         if (!master) {
@@ -1359,7 +1375,21 @@
    * reason. A reader that silently dropped one leaves a pack looking smaller
    * than it is, which is a wrong answer wearing an empty one's clothes.
    */
+  /**
+   * 🔴 ONE LINE READING BYTE 0, AND IT IS THE DIFFERENCE BETWEEN FOUR FILES IN
+   * THE ARCHIVE DOWNLOAD OPENING AND FOUR FILES BEING REFUSED. `50 4b` is a zip
+   * and `f0` is a bulk SysEx transfer, and this page used to hand both to
+   * `readZip()` and report *"did not read as a pack"* about the second.
+   * `research/dump-samples-2026-09-21.md` measured eleven `.circuitpack` files
+   * in that download that are not zips, carrying 64 samples each.
+   * ⚠️ AND THE THIRD ANSWER IS NOT A ZIP EITHER. One archive in that directory
+   * is a Windows executable and another a Nintendo DS ROM, and a router with two
+   * branches has to put them somewhere.
+   */
   async function openPack(name, bytes, from = '') {
+    const kind = containerOf(bytes);
+    if (kind.kind === CONTAINER.sysex) return openStream(name, bytes, from);
+    if (kind.kind !== CONTAINER.zip) { drop.say(`${name}: ${kind.why}`, 'bad'); return false; }
     let list;
     try { list = readZip(bytes); }
     catch (e) { drop.say(`${name} did not read as a pack: ${e.message}`, 'bad'); return false; }
@@ -1378,12 +1408,48 @@
   }
 
   /**
+   * 🔴 A BULK TRANSFER, WHICH IS THE OTHER SHAPE A CIRCUIT PACK COMES IN.
+   * 33 sessions and a 64 slot sample table travel seven bits to the byte in 300
+   * byte carriers, and the stream declares its own unpacked length and a CRC32
+   * of its own content. `sampleSetIn` refuses a stream that fails either, which
+   * is what makes the audio below exact rather than plausible.
+   * ⚠️ WHAT IS SHOWN IS THE STREAM'S OWN ARITHMETIC AND NOT A CLAIM ABOUT THE
+   * INSTRUMENT. Whether a transfer like this WRITES FLASH is unsettled and is
+   * recorded as unsettled. Nothing on this page can send one either way.
+   */
+  async function openStream(name, bytes, from = '') {
+    const set = sampleSetIn(bytes);
+    d.log(`${name} is not a zip. It is ${set.messages.toLocaleString()} sysex messages carrying `
+      + `${set.streams.length} stream(s), ${set.verified} of them verified against a checksum`
+      + (set.other ? `, and ${set.other} message(s) outside any stream` : ''), 'hi');
+    for (const s of set.streams) {
+      if (!s.ok) { d.log(`the stream at ${s.at} was refused: ${s.why}`, 'bad'); continue; }
+      d.log(`the stream at ${s.at} restores ${s.plainBytes.toLocaleString()} bytes from `
+        + `${s.carriers.toLocaleString()} carriers, crc 0x${s.crc.toString(16)}, and holds ${s.holds}`);
+    }
+    if (!set.ok) { drop.say(`${name}: ${set.why}`, 'bad'); return false; }
+    setRows(set.samples);
+    const all = summariseAll(set.samples.map((g) => g.wave));
+    const empty = set.samples.filter((g) => g.wave.frames === 0).length;
+    d.log(`${name}: ${all.parsed - empty} filled slot(s) of ${all.count}`
+      + (empty ? `, ${empty} empty` : '')
+      + `, ${all.seconds.toFixed(2)} s in total`);
+    drop.say(`${name}${from ? ` ${from}` : ''}`, 'good');
+    return true;
+  }
+
+  /**
    * A real download is a zip of packs rather than a pack. MEASURED on the
    * soundbank in `purchased/`: one archive holding 2 `.circuitpack`, 1
    * `.circuittrackspack`, 128 `.syx` and a spreadsheet. `unzip.mjs` reads a zip
    * inside a zip, which is how both of those were measured.
    * ⚠️ A `.circuittrackspack` IS FOR THE OTHER INSTRUMENT and is named rather
    * than opened.
+   * ⚠️ AND A ZIP HOLDING ONE BIG `.syx` IS THE OTHER HALF OF THE SAME ASK.
+   * `Roland_Classics.zip` and `drum_and_synth_samples.zip` each hold a single
+   * 6,753,638 byte sample transfer and no pack at all, and this page used to
+   * answer *"holds no Circuit pack"* about both. A loose 350 byte patch is not
+   * one of these and is left alone.
    */
   async function openZip(name, bytes) {
     let list;
@@ -1391,10 +1457,19 @@
     catch (e) { drop.say(`${name} did not read as a zip: ${e.message}`, 'bad'); return false; }
     const packs = list.filter((e) => e.name.endsWith('.circuitpack'));
     const others = list.filter((e) => e.name.endsWith('.circuittrackspack'));
+    const streams = list.filter((e) => /\.syx$/i.test(e.name) && e.size > PATCH_BYTES
+      && !e.name.startsWith('__MACOSX/'));
     if (others.length) {
       d.log(`${others.length} pack(s) in it are for a Circuit Tracks, not a Circuit, and were left alone`, 'bad');
     }
-    if (!packs.length) { drop.say(`${name} holds no Circuit pack`, 'bad'); return false; }
+    if (!packs.length && streams.length) {
+      if (streams.length > 1) {
+        d.log(`${streams.length} bulk transfers in ${name}: `
+            + `${streams.map((e) => e.name.split('/').pop()).join(', ')}. Opening the first`, 'hi');
+      }
+      return openStream(streams[0].name.split('/').pop(), await streams[0].read(), `inside ${name}`);
+    }
+    if (!packs.length) { drop.say(`${name} holds no Circuit pack and no bulk transfer`, 'bad'); return false; }
     if (packs.length > 1) {
       d.log(`${packs.length} packs in ${name}: ${packs.map((e) => e.name.split('/').pop()).join(', ')}. `
           + 'Opening the first', 'hi');
@@ -1435,7 +1510,7 @@
     for (let r = 0; r < rows.length; r++) {
       if (bufs.has(r) || !hasSound(r)) continue;
       const m = toMono(rows[r].wave);
-      if (!m.ok) continue;
+      if (!m.ok || m.frames === 0) continue;
       const b = ac.createBuffer(1, m.frames, m.rate);
       b.copyToChannel(m.samples, 0);
       bufs.set(r, b);
@@ -1471,7 +1546,7 @@
     midiAsked === 0 && navigator.requestMIDIAccess !== undefined,
     `requestMIDIAccess called ${midiAsked} time(s), and the counter is still in front of it`);
 
-  d.assert('the grid is 8 rows of 16 steps before a pack lands, which is a Circuit pattern\'s own length',
+  d.assert('the grid is 64 rows of 16 steps before a pack lands, one row for every sample slot',
     cells.length === REST_ROWS && cells.every((r) => r.length === STEPS)
     && rows.every((r) => r.wave === null),
     `${cells.length} rows of ${cells[0] ? cells[0].length : 0}, none of them a sample`);
@@ -1776,6 +1851,47 @@
       rove(0, 0, false);
     }
 
+    /**
+     * 🔴 THE ONE LINE THAT READS BYTE 0, GRADED WITH NO FILE AND NO CORPUS, SO
+     * IT RUNS ON THE DEPLOY TOO. Until 2026-09-21 every one of these went to
+     * `readZip()` and came back *"did not read as a pack"*, which is the right
+     * answer for one of the three and a refusal of 336 samples for another.
+     * ⚠️ THESE ARE REFUSALS BY DESIGN AND ALL THREE MUST LEAVE THE GRID ALONE.
+     * A router that reset the rows on a file it could not read would throw away
+     * whatever a reader had typed, which is the defect `setRows` exists to
+     * avoid, arriving by a different road.
+     */
+    {
+      const before = rows.length;
+      const zipish = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4]);
+      const streamish = new Uint8Array([0xf0, 0x00, 0x20, 0x29, 0x00, 0x77, 0xf7]);
+      const neither = new Uint8Array([0x4d, 0x5a, 0x90, 0x00]);
+
+      await openPack('a truncated zip', zipish);
+      const saidZip = drop.note.textContent;
+      await openPack('a stream that never ends', streamish);
+      const saidStream = drop.note.textContent;
+      await openPack('a Windows executable', neither);
+      const saidNeither = drop.note.textContent;
+
+      d.assert('byte 0 routes a file three ways, and a stream is refused as a stream rather than as "not a pack"',
+        /did not read as a pack/.test(saidZip)
+        && /never ends/.test(saidStream) && !/did not read as a pack/.test(saidStream)
+        && /a zip starts 50 4b/.test(saidNeither)
+        && rows.length === before,
+        `zip: "${saidZip}", stream: "${saidStream.slice(0, 60)}", `
+        + `neither: "${saidNeither.slice(0, 60)}"`);
+      // ⚠️ THE NEGATIVE CONTROL ON THE ROUTER. A router that answered `sysex`
+      // to everything would pass the middle line above, so the zip and the
+      // executable are asserted to take the other two branches by NAME.
+      d.assert('NEGATIVE CONTROL: the router reads the bytes rather than answering the same thing three times',
+        containerOf(zipish).kind === CONTAINER.zip
+        && containerOf(streamish).kind === CONTAINER.sysex
+        && containerOf(neither).kind === CONTAINER.unknown
+        && new Set([saidZip, saidStream, saidNeither]).size === 3,
+        `${containerOf(zipish).kind}, ${containerOf(streamish).kind}, ${containerOf(neither).kind}`);
+    }
+
     const r = PACK_HERE ? await realFetch(PACK).catch(() => null) : null;
     if (!r || !r.ok) {
       /**
@@ -1993,6 +2109,52 @@
           + `${deck.position().toFixed(0)} ms of transport, worst ${late} ms late`);
         setCell(0, 1, false); setCell(0, 2, false); setCell(0, 3, false);
         deck.seek(0);
+      }
+
+      /**
+       * 🔴 A REAL BULK TRANSFER, END TO END, WHEN THE ARCHIVE DOWNLOAD IS ON
+       * THIS MACHINE. `Roland_Classics.zip` holds one 6,753,638 byte `.syx` and
+       * no pack at all, so this page answered *"holds no Circuit pack"* about it
+       * until today. It is the best single file to drive because it is the one
+       * with EMPTY SLOTS in it: 48 filled and 16 empty, which is the case the
+       * owner's 64 WAVs could never produce and the case that threw a
+       * `DOMException` out of `createBuffer` before `fire()` learned to check.
+       * ⚠️ IT IS UNDER `tmp/`, WHICH IS GITIGNORED, so this never runs on the
+       * deploy or on a fresh clone and says so rather than going quiet.
+       */
+      {
+        const zip = await realFetch('/tmp/packs/Roland_Classics.zip').catch(() => null);
+        if (!zip || !zip.ok) {
+          d.log('the archive download is not on this machine, so no real bulk transfer was opened');
+        } else {
+          const kept = rows.slice();
+          const opened = await openZip('Roland_Classics.zip', new Uint8Array(await zip.arrayBuffer()));
+          const filled = rows.filter((x) => x.wave.frames > 0).length;
+          const empty = rows.filter((x) => x.wave.frames === 0).length;
+          const all = summariseAll(rows.map((x) => x.wave));
+          d.assert('a zip holding one bulk transfer and no pack opens to 64 slots, 48 of them filled',
+            opened === true && rows.length === 64 && filled === 48 && empty === 16
+            && all.refused === 0 && all.rates.length === 1 && all.rates[0] === 48000
+            && all.depths[0] === 16 && all.channels[0] === 1
+            && all.seconds.toFixed(2) === '17.31',
+            `${rows.length} rows, ${filled} filled and ${empty} empty, `
+            + `${all.seconds.toFixed(2)} s, all ${all.rates[0]} Hz ${all.depths[0]} bit mono`);
+
+          // 🔴 AND AN EMPTY SLOT IS SILENT RATHER THAN AN EXCEPTION. `fire()`
+          // reported `no sound here (Failed to execute 'createBuffer')` on one
+          // of these, which reads as a broken page rather than as an empty slot.
+          const emptyRow = rows.findIndex((x) => x.wave.frames === 0);
+          const fullRow = rows.findIndex((x) => x.wave.frames > 0);
+          const wasV = voices;
+          const rangEmpty = fire(emptyRow, 'the check', false);
+          const rangFull = fire(fullRow, 'the check', false);
+          d.assert('an empty slot starts no sound and is not an error, while a filled one still sounds',
+            rangEmpty === false && rangFull === true && voices === wasV + 1
+            && rows[emptyRow].row.seconds === 0 && rows[fullRow].row.seconds > 0,
+            `slot ${emptyRow} is empty and rang ${rangEmpty}, slot ${fullRow} is `
+            + `${rows[fullRow].row.seconds.toFixed(2)} s and rang ${rangFull}`);
+          setRows(kept);
+        }
       }
 
       d.log(`${voices} sound(s) started, worst step ${worstLate.toFixed(1)} ms late`);

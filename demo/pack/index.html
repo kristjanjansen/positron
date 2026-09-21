@@ -66,6 +66,7 @@
   } from '/shell/circuit-session.mjs';
   import {
     readWave, toMono, summarise as summariseWave, summariseAll,
+    containerOf, sampleSetIn, CONTAINER,
   } from '/shell/circuit-sample.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import {
@@ -110,7 +111,7 @@
     name: 'pack',
     // ⚠️ THE PAGE'S SENTENCE AND THE INDEX'S ARE ONE STRING, because a page with
     // a diagram carries the index's own line verbatim.
-    what: 'open a Circuit pack and look inside its patches, sessions and samples',
+    what: 'open a Circuit pack or a loose sample set and look inside its patches, sessions and samples',
     /**
      * 🔴 NO READOUT, AND `null` RATHER THAN AN OMITTED FIELD. Instructed
      * 2026-09-21: *"rm patches 64 / sessions 32 / different 32 of 32 / filled
@@ -708,13 +709,24 @@
       // ⚠️ A `.syx` LONGER THAN ONE MESSAGE IS A BANK, and a bank is 64 Replace
       // Patch messages by the reference's own definition, which is the flash
       // writing one. Scanning it is how that gets said rather than refused.
+      // 🔴 OR IT IS A BULK TRANSFER, WHICH IS WHAT THE BIG ONES IN THE ARCHIVE
+      // DOWNLOAD ARE. `80S Drums_sampleset.syx` is 6,753,638 bytes with not one
+      // patch message in it, and this page used to answer *"is 6753638 bytes and
+      // a Circuit patch is 350"*, which is true and useless about a file
+      // carrying 64 samples and 21 seconds of audio.
       const scan = sysexScan(bytes);
-      if (scan.patches.length) {
-        fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), [], []);
+      if (scan.patches.length || scan.samples.length || scan.sessions.length) {
+        sayStreams(name, scan);
+        const st = [];
+        for (let k = 0; k < scan.sessions.length; k++) {
+          st.push(await readOne(scan.sessions[k], `session ${k}`));
+        }
+        fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), st, scan.samples);
         sayScan(name, scan, name);
         return;
       }
-      drop.say(`${name} is ${bytes.length} bytes and a Circuit patch is ${PATCH_BYTES}`, 'bad');
+      drop.say(`${name} is ${bytes.length} bytes and a Circuit patch is ${PATCH_BYTES}`
+        + `${scan.set.why ? `. ${scan.set.why}` : ''}`, 'bad');
       return;
     }
     fill([{ name, bytes }], [], []);
@@ -779,6 +791,19 @@
     if (loose.length) {
       const got = [];
       for (const e of loose) got.push({ name: e.name.split('/').pop(), bytes: await e.read() });
+      // 🔴 A ZIP HOLDING ONE BIG `.syx` AND NO PATCHES IS A BULK TRANSFER IN A
+      // BAG, WHICH IS WHAT `Roland_Classics.zip` AND `drum_and_synth_samples.zip`
+      // ARE. Handing a 6,753,638 byte file to `readPatch` printed one line about
+      // a length and showed nothing.
+      // ⚠️ THE BIGGEST ONE, NOT THE FIRST. Both of those zips were made on a Mac
+      // and carry a `__MACOSX/._<name>.syx` resource fork of a few hundred bytes
+      // beside the real file, which is a `.syx` by its name and nothing at all
+      // by its content.
+      if (!got.some((f) => f.bytes.length === PATCH_BYTES)) {
+        const big = got.slice().sort((a, b) => b.bytes.length - a.bytes.length)[0];
+        await openSyx(big.name, big.bytes);
+        return;
+      }
       fill(got, [], []);
       drop.say(name, 'good');
       return;
@@ -806,15 +831,58 @@
   // place in the repository that knew how to walk a sysex stream. `circuit-syx.mjs`
   // is 23 asserts with sabotages behind it, it answers `writesFlash` FIRST, and
   // it reads the session payloads too, which the page's own version could not.
+  /**
+   * 🔴 AND SINCE 2026-09-21 IT READS THE SAMPLES OUT OF ONE TOO, WHICH IS THE
+   * half this page could not see. `sampleSetIn` splits the file on its stream
+   * starts and ends BEFORE it unpacks anything, checks each stream against the
+   * length it declares and the CRC32 it carries, and refuses one that fails.
+   * MEASURED: eleven `.circuitpack` files in the archive download carry 64
+   * samples each and this page called them `did not read as a pack`.
+   * ⚠️ `sessions` STILL COMES FROM `survey()` AND IT IS NOT TRUSTWORTHY ON A
+   * FILE WITH A SAMPLE TABLE IN IT. `sessionsIn()` concatenates every carrier in
+   * the file before slicing at 53,248, so a two stream `.circuitpack` answers
+   * 141 where the answer is 33, and a pure sample transfer answers 108 where the
+   * answer is 0. That defect is in `circuit-syx.mjs` and is REPORTED rather than
+   * repaired here. What this function does about it is refuse to pass the count
+   * on when a sample stream is present, which is `sampleSetIn`'s `sampleStreams`
+   * saying so rather than this page guessing.
+   */
   function sysexScan(b) {
     const v = survey(b);
+    const set = sampleSetIn(b);
     return {
       messages: v.messages,
       patches: patchesIn(b).map((m) => b.subarray(m.at, m.at + PATCH_BYTES)),
       flash: v.flashMessages,
       slots: new Set(v.flashLocations),
-      sessions: v.sessions || [],
+      sessions: set.sampleStreams ? [] : (v.sessions || []),
+      blindSessions: set.sampleStreams ? (v.sessions || []).length : 0,
+      samples: set.samples,
+      set,
     };
+  }
+
+  /**
+   * What a bulk transfer is, in the log, before anything is shown from it.
+   * ⚠️ IT ALWAYS SAYS WHY A STREAM WAS REFUSED. A file whose checksum fails is
+   * a file whose audio is wrong by at least one byte, and showing 64 rows of it
+   * with a quiet note somewhere is how a decoder produces confident noise.
+   */
+  function sayStreams(name, scan) {
+    const set = scan.set;
+    if (!set || !set.streams.length) return;
+    d.log(`${name} carries ${set.streams.length} bulk stream(s), `
+      + `${set.verified} verified against a declared length and a CRC32`
+      + (set.other ? `, and ${set.other} message(s) outside any stream` : ''), 'hi');
+    for (const s of set.streams) {
+      if (!s.ok) { d.log(`the stream at ${s.at} was refused: ${s.why}`, 'bad'); continue; }
+      d.log(`the stream at ${s.at} restores ${s.plainBytes.toLocaleString()} bytes from `
+        + `${s.carriers.toLocaleString()} carriers and holds ${s.holds}`);
+    }
+    if (scan.blindSessions) {
+      d.log(`the session count is withheld: slicing this file blind gives ${scan.blindSessions}, `
+        + 'which crosses a stream boundary and is not what is in it', 'bad');
+    }
   }
 
   let lastScan = null;
@@ -851,27 +919,42 @@
         + 'instrument with no factory reset', 'bad');
   }
 
+  /**
+   * 🔴 BYTE 0 DECIDES WHICH READER, AND IT USED TO BE A `try` ROUND `readZip`.
+   * `50 4b` is a zip and `f0` is a bulk SysEx transfer, and catching the zip
+   * failure to find out was a refusal wearing a reader's clothes: it answered
+   * `did not read as a pack` about a Windows executable and about a file
+   * carrying 64 samples in exactly the same words.
+   */
   async function openPack(name, bytes, from = '') {
-    let list;
-    try { list = readZip(bytes); }
-    catch (e) {
-      // ⚠️ IT SAYS BOTH THINGS: that it is not a pack, and what it IS.
-      const scan = sysexScan(bytes);
-      if (scan.patches.length) {
+    const kind = containerOf(bytes);
+    if (kind.kind !== CONTAINER.zip) {
+      // ⚠️ IT SAYS BOTH THINGS: that it is not a zip, and what it IS.
+      const scan = kind.kind === CONTAINER.sysex ? sysexScan(bytes) : null;
+      if (scan && (scan.patches.length || scan.samples.length || scan.sessions.length)) {
         d.log(`${name} is not a zip. It is a stream of ${scan.messages} sysex messages, `
             + `${scan.patches.length} of them Circuit patches`, 'hi');
-        // 🔴 AND A STREAM CARRIES SESSIONS TOO, WHICH THE PAGE'S OWN SCANNER
-        // COULD NOT SEE. They travel seven bits to the byte in 300 byte
-        // carriers, and `circuit-syx.mjs` unpacks them back to 53,248 bytes
-        // each, so the same three numbers that grade a pack grade one of these.
+        sayStreams(name, scan);
+        // 🔴 AND A STREAM CARRIES SESSIONS AND SAMPLES TOO, WHICH THE PAGE'S OWN
+        // SCANNER COULD NOT SEE. They travel seven bits to the byte in 300 byte
+        // carriers, and the same three numbers that grade a pack grade one of
+        // these.
         const st = [];
         for (let k = 0; k < scan.sessions.length; k++) {
           st.push(await readOne(scan.sessions[k], `session ${k}`));
         }
-        fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), st, []);
+        fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), st, scan.samples);
         sayScan(name, scan, name);
         return;
       }
+      drop.say(scan
+        ? `${name} is a sysex stream, and ${scan.set.why}`
+        : `${name} is not a pack: ${kind.why}`, 'bad');
+      return;
+    }
+    let list;
+    try { list = readZip(bytes); }
+    catch (e) {
       drop.say(`${name} did not read as a pack: ${e.message}`, 'bad');
       return;
     }
@@ -1274,6 +1357,12 @@
     if (!w) return;
     const mono = toMono(w.wave);
     if (!mono.ok) { d.log(`${w.name} did not decode: ${mono.why}`, 'bad'); return; }
+    // 🔴 AN EMPTY SLOT IS A ROW AND `createBuffer(1, 0, rate)` THROWS. Every
+    // sample in a `.circuitpack` is sound, so this could not arise until a bulk
+    // transfer opened: `Roland Classics.syx` is 48 filled slots and 16 empty,
+    // and an empty one has to read as empty rather than as `no sound here`
+    // about a DOMException.
+    if (mono.frames === 0) { d.log(`${w.name} is an empty slot`); return; }
     try {
       stopSample();
       ac = ac || new (window.AudioContext || window.webkitAudioContext)();
@@ -1460,6 +1549,67 @@
   }
 
   if (SELFCHECK) {
+    /**
+     * 🔴 THE ONE LINE THAT READS BYTE 0, GRADED WITH NO FILE AND NO CORPUS, SO
+     * IT RUNS ON THE DEPLOY TOO. This page caught the zip failure and asked the
+     * SysEx scanner afterwards, which worked for the one file it was built
+     * against and answered `did not read as a pack` about everything else in the
+     * same words. `50 4b` is a zip, `f0` is a stream, and anything else is
+     * neither: two archives in the download measured on 2026-09-21 are a Windows
+     * executable and a Nintendo DS ROM.
+     * ⚠️ ALL THREE ARE REFUSALS AND NONE OF THEM MAY OPEN ANYTHING, which is
+     * what keeps the page's own `with no file open there are no tabs` assert
+     * above true while this runs under it.
+     */
+    {
+      const zipish = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4]);
+      const streamish = new Uint8Array([0xf0, 0x00, 0x20, 0x29, 0x00, 0x77, 0xf7]);
+      const neither = new Uint8Array([0x4d, 0x5a, 0x90, 0x00]);
+      await openPack('a truncated zip', zipish);
+      const saidZip = drop.note.textContent;
+      await openPack('a stream that never ends', streamish);
+      const saidStream = drop.note.textContent;
+      await openPack('a Windows executable', neither);
+      const saidNeither = drop.note.textContent;
+      d.assert('byte 0 routes a file three ways, and a stream is refused as a stream rather than as "not a pack"',
+        /did not read as a pack/.test(saidZip)
+        && /is a sysex stream/.test(saidStream) && /never ends/.test(saidStream)
+        && /a zip starts 50 4b/.test(saidNeither)
+        && new Set([saidZip, saidStream, saidNeither]).size === 3
+        && patches.length === 0 && sessions.length === 0 && samples.length === 0,
+        `zip: "${saidZip}", stream: "${saidStream.slice(0, 50)}", `
+        + `neither: "${saidNeither.slice(0, 50)}"`);
+      d.assert('NEGATIVE CONTROL: the router reads the bytes rather than answering the same thing three times',
+        containerOf(zipish).kind === CONTAINER.zip
+        && containerOf(streamish).kind === CONTAINER.sysex
+        && containerOf(neither).kind === CONTAINER.unknown,
+        `${containerOf(zipish).kind}, ${containerOf(streamish).kind}, ${containerOf(neither).kind}`);
+
+      /**
+       * 🔴 AND THE THIRD BRANCH IS NOT TIDINESS, IT IS 134 ROWS OF NOISE THIS
+       * PAGE USED TO ANNOUNCE. MEASURED 2026-09-21 on `Future_Kawaii.rar`, 56
+       * MiB of compressed archive: catching the zip failure and scanning
+       * anyway found **134 messages of exactly 350 bytes** in it, **43 distinct
+       * six byte heads, and NOT ONE carrying the Circuit patch head
+       * `f0 00 20 29 01 60`**. The page said *"134 of them Circuit patches"*
+       * about compressed data, because `patchesIn()` identifies a patch by
+       * LENGTH ALONE. That defect is in `circuit-syx.mjs` and is not repaired
+       * here; what byte 0 does is refuse the file before the question is asked.
+       */
+      const rar = new Uint8Array([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00]);
+      const noise = new Uint8Array(PATCH_BYTES);
+      noise[0] = 0xf0;
+      noise[PATCH_BYTES - 1] = 0xf7;
+      for (let k = 1; k < PATCH_BYTES - 1; k++) noise[k] = (k * 37) & 0x7f;
+      d.assert('NEGATIVE CONTROL: any 350 byte run counts as a patch, so a rar has to be refused by its first two bytes',
+        patchesIn(noise).length === 1
+        && noise[4] !== SYSEX_HEAD[4]
+        && containerOf(rar).kind === CONTAINER.unknown,
+        `the patch reader counts ${patchesIn(noise).length} in 350 bytes of noise whose head is `
+        + `${[...noise.subarray(0, 6)].map((x) => x.toString(16).padStart(2, '0')).join(' ')}, `
+        + 'and a rar never reaches it');
+    }
+
     const r = PACK_HERE ? await realFetch(PACK).catch(() => null) : null;
     if (!r || !r.ok) {
       /**
@@ -1976,6 +2126,68 @@
         lastScan?.flash === 0 && !/overwrite/.test(drop.note.textContent)
         && patches.length === 64,
         `${lastScan?.patches.length} patches, ${lastScan?.flash} of them writing flash`);
+
+      /**
+       * 🔴 A REAL BULK TRANSFER, END TO END, WHEN THE ARCHIVE DOWNLOAD IS ON
+       * THIS MACHINE. `Roland_Classics.zip` holds one 6,753,638 byte `.syx` and
+       * no pack at all, and this page answered *"is 6753638 bytes and a Circuit
+       * patch is 350"* about its contents until today. It is the file with EMPTY
+       * SLOTS in it, 48 filled and 16 empty, which is the case the owner's 64
+       * WAVs can never produce.
+       * ⚠️ IT IS UNDER `tmp/`, WHICH IS GITIGNORED, so this never runs on the
+       * deploy or on a fresh clone and says so rather than going quiet.
+       */
+      {
+        const zip = await realFetch('/tmp/packs/Roland_Classics.zip').catch(() => null);
+        if (!zip || !zip.ok) {
+          d.log('the archive download is not on this machine, so no real bulk transfer was opened');
+        } else {
+          await openZip('Roland_Classics.zip', new Uint8Array(await zip.arrayBuffer()));
+          const all = summariseAll(samples.map((w) => w.wave));
+          const empty = samples.filter((w) => w.wave.frames === 0).length;
+          d.assert('a zip holding one bulk transfer opens to 64 sample slots, 48 filled and 16 empty, and no patches',
+            samples.length === 64 && empty === 16 && all.refused === 0
+            && patches.length === 0 && sessions.length === 0
+            && all.rates.length === 1 && all.rates[0] === 48000
+            && all.seconds.toFixed(2) === '17.31'
+            && tabs.buttons.map((b) => b.textContent).join(' ').includes('64 SAMPLES'),
+            `${samples.length} slots, ${empty} empty, ${all.seconds.toFixed(2)} s, `
+            + `tabs "${tabs.buttons.map((b) => b.textContent).join(' ')}"`);
+
+          // 🔴 THE CHECKSUM IS WHAT MAKES THAT AUDIO EXACT RATHER THAN
+          // PLAUSIBLE, AND THE PAGE SAYS SO. One verified stream, and the
+          // session count withheld because slicing this file blind gives 108
+          // blocks that are zero fill and sliced PCM rather than sessions.
+          const set = lastScan?.set;
+          d.assert('the stream verified against its own length and its own CRC32, and the blind session count is withheld',
+            set && set.streams.length === 1 && set.verified === 1
+            && set.streams[0].crcOk === true && set.streams[0].lengthOk === true
+            && set.streams[0].carriers === 22512 && set.streams[0].plainBytes === 5763072
+            && lastScan.blindSessions === 108 && sessions.length === 0,
+            `crc 0x${set?.streams[0].crc.toString(16)} over `
+            + `${set?.streams[0].plainBytes.toLocaleString()} bytes from `
+            + `${set?.streams[0].carriers.toLocaleString()} carriers, blind slicing would have said `
+            + `${lastScan?.blindSessions} sessions`);
+
+          // 🔴 AND AN EMPTY SLOT IS SILENT RATHER THAN AN EXCEPTION.
+          // `createBuffer(1, 0, rate)` throws, and `no sound here` about a
+          // DOMException reads as a broken page rather than as an empty slot.
+          const emptyAt = samples.findIndex((w) => w.wave.frames === 0);
+          const fullAt = samples.findIndex((w) => w.wave.frames > 0);
+          const wasPlayed = played;
+          openSample(emptyAt, true);
+          const afterEmpty = played;
+          openSample(fullAt, true);
+          d.assert('an empty slot opens, shows 0.00 s and starts nothing, while a filled one plays',
+            afterEmpty === wasPlayed && played === wasPlayed + 1
+            && samples[emptyAt].row.seconds === 0 && samples[fullAt].row.seconds > 0
+            && /0.00 s/.test(playerLine.textContent) === false,
+            `slot ${emptyAt} is empty and played ${afterEmpty - wasPlayed} time(s), `
+            + `slot ${fullAt} is ${samples[fullAt].row.seconds.toFixed(2)} s and played `
+            + `${played - afterEmpty} time(s)`);
+          stopSample();
+        }
+      }
 
       await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
