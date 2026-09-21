@@ -1865,9 +1865,12 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
   `clip`, `hover`); it THROWS unless exactly one column grows. `tabs.mjs` —
   uppercase, x-scrollable, no borders, `#links` rather than subpages (a subpage
   is a navigation: the audio stops, the service worker hands over, an installed
-  web app flashes white). ⚠️ `tabs.mjs` is in `/kit/` and in NO page — it was on
-  `/items/` for one commit and removed, because three names on a page holding
-  one list and one form is furniture. 🔴 **`min-width: 0` or a scrolling row
+  web app flashes white). ⚠️ **`tabs.mjs` WAS IN NO PAGE AND IS NOW IN TWO**: `/making/`, which says in
+  its own comment that it is the first shipped use, and `/stage/`. The line here
+  said *"in `/kit/` and in NO page"* long after that stopped being true, and a
+  research agent repeated it back on 2026-09-21 because this file said so. What
+  is still true is why it was removed from `/items/`: three names on a page
+  holding one list and one form is furniture. 🔴 **`min-width: 0` or a scrolling row
   drags the PAGE sideways instead of scrolling**: `overflow-x` cannot shrink a
   flex item below its content, and 390 px measured 141 px of page overflow.
 - 🔴 **A LAYOUT CLAIM IS A MEASUREMENT, AND `/model/` WAS CORRECTED BY
