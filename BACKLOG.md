@@ -423,6 +423,26 @@
   ⚠️ **AND THE BADGE WIDTH IS RESERVED OFF THE LONGEST THING IT CAN SAY**, so
   `not connected` is longer than `checking` and every state will measure wider.
   There is an assert on that reserve in `/kit/`; check it after.
+  🔴 **AND `unknown` READS `not connected` TOO.** Asked separately:
+  *"unknown: not connected"*. So `unknown` and `offline` would say the SAME
+  WORDS, and that is worth one sentence before it is built rather than after.
+  ⚠️ **THE TWO STATES MEAN DIFFERENT THINGS AND `presence.mjs` SAYS SO AT
+  LENGTH.** `unknown` is *we have not looked yet*; `offline` is *we looked and
+  nothing answered*. The file's own comment records the axes: **colour says what
+  is known, motion says something is happening**, and `unknown` is the one state
+  drawn as a HOLLOW ring precisely because nothing has been asked. Giving both
+  the same words leaves the dot carrying the whole distinction.
+  ✅ **AND THE INSTRUCTION IS STILL PROBABLY RIGHT, WHICH IS WHY IT IS RECORDED
+  RATHER THAN QUERIED.** From a visitor's side, before the button is pressed the
+  instrument IS not connected as far as this page knows, and `unknown` is the
+  page describing its own ignorance, which is the very thing the 2026-09-16
+  instruction (*"last is UNKNOWN"*) was fixing when it rejected `no word yet`
+  for describing the badge's situation rather than the thing's. `not connected`
+  describes the THING.
+  ⚠️ So build it, and **keep the ring hollow**, because that is now the only
+  channel telling the two apart. If that reads as a defect the way the tab mark
+  did, the next step is different words for `offline`, not a rewritten
+  `unknown`.
 
 ### Asked 2026-09-21, session 40, /evo/ starting on C3
 
