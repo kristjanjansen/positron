@@ -96,6 +96,29 @@
   --ctl-head: 15px;
   --ctl-foot: 17px;
   --ctl-step: calc(var(--ctl-foot) + var(--ctl-gap) + var(--ctl-head));
+  /* 🔴 A SEGMENT DISPLAY'S BACKLIGHT, DECLARED AT `:root` AND NOT ON THE
+     COMPONENT, FOR THE `--fdr-foot` REASON. A custom property inherits
+     DOWNWARD and never sideways, and the one arrangement `segment.mjs` was
+     written for is a three digit field beside a small two digit one inside ONE
+     window that the PAGE draws. That window is a SIBLING of both displays, so
+     a `--disp-back` declared on `.pos-disp` would be invisible to it, `var()`
+     would fall back to nothing, and the page would get a transparent box with
+     two bare fields floating in it. Declared here, both the component and
+     anything a page wraps round it read the same colour.
+     ⚠️ AND THESE ARE NOT THE SHELL'S OWN INK TOKENS, WHICH WAS CHECKED FIRST.
+     `--hi` is the one thing on a page that matters, so a panel of four
+     displays in it is four highlights, which is none; `--ok` means a reading
+     was good. A display's colour is its BACKLIGHT and carries no verdict. The
+     two figures below are the ones `/evo/` already had on screen, so the first
+     drawn display looks like the text box it replaces.
+     ⚠️ `--disp-ghost` IS THE WHOLE REASON THIS IS DRAWN RATHER THAN SET IN A
+     FONT: it is the opacity of every UNLIT bar, which is what makes a field
+     read as an LCD instead of as coloured text. One number, one set of
+     polygons. A font would need a dimmed 8 stacked behind every digit. */
+  --disp-h: 26px;
+  --disp-ink: #8fb6ff;
+  --disp-back: #0d1830;
+  --disp-ghost: 0.13;
   --ok: #8fd6a8; --warn: #e0b060; --bad: #e0908a;
   --rec: #e5484d;        /* record: the one control that starts writing */
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -3881,3 +3904,58 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-presence-btn .pos-pres {
   background: none; border: 0; padding: 0; margin: 0; color: inherit;
 }
+
+/* ── a segment display: N digits drawn from parts — shell/segment.mjs ───────
+   🔴 IT IS `.pos-disp` AND NOT `.pos-seg`, WHICH IS THE SEGMENTED ROW'S JOIN
+   400 LINES UP THIS FILE. `.pos-seg > * { border-radius: 0 }` and `.pos-seg >
+   * + * { margin-left: -1px }` are written for a row of buttons, and a display
+   under that name would have had its digits overlapped by a pixel each by
+   rules with nothing pointing at it. Caught by grepping the name first.
+   🔴 A PICTURE, NOT A CONTROL. Nothing here takes a pointer and nothing is
+   selectable, for the reason a canvas is not selectable anywhere on this site:
+   a long press on it raises the iOS loupe over a thing nobody has ever wanted
+   to copy, and `user-select: none` alone does not stop that. It is
+   `-webkit-touch-callout` that does.
+   ⚠️ `pointer-events: none` GOES ON THE PICTURE AND NOT ON THE BOX, so the
+   pointer lands on `.pos-disp` and its `title` still opens. That title is
+   where a value too wide for the field survives. */
+.pos-disp {
+  display: inline-flex; align-items: center; min-width: 0; max-width: 100%;
+  padding: 7px 10px;
+  color: var(--disp-ink);
+  background: var(--disp-back);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+/* Two fields in one window: the page draws the window, so each display gives
+   up its own box. Same rule `.pos-glue` applies to a strip on a transport bar
+   and `.pos-presence-btn` to a badge inside a button, because two edges saying
+   one thing is one edge too many. */
+.pos-disp-bare {
+  padding: 0; background: none; border: 0; border-radius: 0;
+}
+/* 🔴 `height` DECIDES AND `width` FOLLOWS, WHICH IS WHAT MAKES THE BOX FIXED.
+   A `viewBox` carries the field's aspect ratio, so one number sizes the whole
+   thing and the width cannot move when the value does. That is this project's
+   rule about anything that redraws live.
+   ⚠️ `max-width: 100%` IS THE ONE CONCESSION, and it is about a phone: a long
+   field in a narrow box letterboxes inside itself rather than dragging the
+   page sideways, which is the failure the tab row already shipped once.
+   ⚠️ THAT BEHAVIOUR IS READ, NOT MEASURED. `demo/verify.mjs` runs at 756 px
+   and never enters a phone width, so the claim above is the stylesheet's and
+   not a harness's. */
+.pos-disp-svg {
+  display: block; height: var(--disp-h); width: auto; max-width: 100%;
+  pointer-events: none;
+}
+/* 🔴 ONE OPACITY IS THE WHOLE GHOST. Every bar is drawn at `currentColor`, and
+   the unlit ones are the same ink turned down, which is exactly what an LCD
+   looks like with its backlight on and nothing to say. A lit bar is the same
+   colour at full strength, so the two can never disagree about hue. */
+.pos-disp-p { fill: currentColor; opacity: var(--disp-ghost); }
+.pos-disp-p.on { opacity: 1; }
+/* ⚠️ NOTHING COLOURS `.over`, ON PURPOSE. A field too narrow for a value is
+   not a bad reading, and this project's colour rule says a colour reports how
+   a thing LANDED. The class is here so a page that means something by it can
+   say so; the display itself keeps its own ink and shows dashes. */

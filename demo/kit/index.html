@@ -199,6 +199,26 @@
   /* The vertical twins, beside the horizontal ones they are meant to match. */
   .kit-vrow { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
 
+  /* A row of segment displays, each with its own caption above it. The caption
+     goes ABOVE for `.kit-cap`'s own reason, which is that a caption belongs to
+     the specimen under it, and the column's gap owns the air so no margin is
+     typed here. */
+  .kit-disp { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+  .kit-dispc { display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+               min-width: 0; }
+  .kit-dispc .kit-cap { margin: 0; }
+  /* 🔴 TWO FIELDS IN ONE WINDOW, DRAWN BY THE PAGE. `segment.mjs` refuses to
+     take a second field as an option and says why in its header; this is the
+     other half of that decision, and it is four declarations. Both displays
+     pass `frame: false`, so the pair has one edge rather than two inside a
+     third.
+     ⚠️ IT READS `--disp-back` OFF `:root`, which is exactly why that token is
+     declared there and not on `.pos-disp`: this box is a SIBLING of both
+     fields, and a custom property inherits downward and never sideways. */
+  .kit-disp-window {
+    display: inline-flex; align-items: flex-end; gap: 12px; padding: 7px 10px;
+    background: var(--disp-back); border: 1px solid var(--line); border-radius: 3px;
+  }
   .kit-swatch { display: inline-flex; align-items: baseline; gap: 7px; margin-right: 20px; }
   .kit-swatch-n { font: 600 12px/1.6 var(--mono); color: var(--fg); }
   .kit-swatch-w { font: 400 12px/1.6 var(--mono); color: var(--dim); }
@@ -228,6 +248,7 @@
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
+  import { createSegment, GLYPHS, SEGMENTS } from '/shell/segment.mjs';
   import { decode } from '/shell/midi-decode.mjs';
   import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -385,6 +406,111 @@
   let footSpec = null;        // the strip whose footer says what is hovered
   let vpUnder = null;         // the control row a panel lifts while full
   let vpStorey = null;        // the off-screen panel that row is graded against
+
+  // The segment displays, by what each one is showing, so the checks at the
+  // foot of this file can measure them against each other rather than against
+  // a number typed into a check. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER,
+  // for the reason the lines above give: this is the newest block and therefore
+  // the topmost one, and a `let` left where a block used to be is read in its
+  // dead zone, swallowed by `section()` into `failed`, and reported much later
+  // with a message about a different line.
+  const dispSpec = new Map();
+  let dispDot = null;         // the one field with a decimal point in it
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A segment display, as
+   * of 2026-09-21, asked for as *"do we have lcd font (made of parts/lines)?
+   * its 3 digits"*. There was none: this page had 25 sections and not one of
+   * them was a display.
+   *
+   * ⚠️ SIX FIELDS OF THE SAME SIZE, EACH SHOWING SOMETHING DIFFERENT, because
+   * the claims worth grading here are COMPARISONS: that a field is the same
+   * width holding `1` and `8`, that nothing measured is blank rather than
+   * `000`, and that a value too wide shows dashes rather than its low digits.
+   * One field driven through six values would have proved the same things and
+   * left whatever the last check set in front of a reader, which is the
+   * mutation this project already paid for on `/tapes/`.
+   * ⚠️ AND NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the two
+   * blocks below give: both harnesses press that row by position, so a new top
+   * block with a control in it moves every other block's press. A display is a
+   * picture and has no control to add.
+   */
+  section('SEGMENT DISPLAY',
+    'A field of digits drawn from its own parts, with every unlit bar still '
+    + 'faintly there, which is what makes it read as a display rather than as '
+    + 'coloured text. Nothing measured is blank and never a zero, and a value too '
+    + 'wide for the field shows dashes and keeps the number in its tooltip.',
+    `createSegment({ digits: 3 }).set(127)
+createSegment({ digits: 3, decimals: 1 }).set(12.5)     // the dot costs no cell
+createSegment({ digits: 2, frame: false, size: 16 })    // two fields, one window
+seg.set('')          // -> { blank: true },  nothing lit
+seg.set(1234)        // -> { over: true, asked: '1234' },  reads ---`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+
+      /** One field with its own caption above it, so six of them in a row each
+       *  say which of the six they are. */
+      const field = (cap, opts) => {
+        const col = el('div', 'kit-dispc');
+        col.append(el('div', 'kit-cap', cap));
+        const s = createSegment(opts);
+        col.append(s.el);
+        return { col, s };
+      };
+
+      // ── the same field, six readings ──────────────────────────────────
+      // All three digits, no decimal point, default ink: the width check below
+      // compares these against each other, so anything that changed the shape
+      // of the box would have to change all six.
+      const row = el('div', 'kit-disp');
+      for (const [cap, v] of [['reading', 127], ['narrowest', 111], ['every bar', 888],
+        ['measured zero', 0], ['nothing measured', ''], ['too wide', 1234]]) {
+        const { col, s } = field(cap, { digits: 3, value: v });
+        dispSpec.set(cap, s);
+        row.append(col);
+      }
+
+      // ── a decimal point, a word, and a second colour ──────────────────
+      const row2 = el('div', 'kit-disp');
+      const dot = field('one decimal', { digits: 3, decimals: 1, value: 12.5 });
+      dispDot = dot.s;
+      row2.append(dot.col);
+      // Seven bars draw a closed list of characters and no more. `rEC` is on
+      // that list; a K is not, and a field asked for one says so rather than
+      // drawing the nearest shape.
+      row2.append(field('a word it can spell', { digits: 3, value: 'rEC' }).col);
+      // The colour is a caller option and the default is the backlight `/evo/`
+      // already had. This one proves it moves.
+      row2.append(field('another ink', { digits: 3, value: 24, ink: 'var(--ok)' }).col);
+      row2.append(field('bigger', { digits: 2, value: 88, size: 44 }).col);
+
+      // ── two fields in one window, which is decision 1 ─────────────────
+      /**
+       * 🔴 A SECOND SMALLER FIELD IS TWO DISPLAYS AND NOT AN OPTION ON ONE, and
+       * this is the arrangement that makes that decision workable. The real
+       * MK-425C has a three digit field and a small two digit one in one
+       * window; here the PAGE draws the window and both displays pass
+       * `frame: false`, so there is one edge round the pair instead of two
+       * inside a third.
+       * ⚠️ THE WINDOW READS `--disp-back` OFF `:root`, which is why that token
+       * is declared there rather than on `.pos-disp`. A custom property
+       * inherits downward and never sideways, and this box is a SIBLING of both
+       * fields.
+       */
+      const panel = el('div', 'kit-disp-window');
+      panel.append(createSegment({ digits: 3, value: 127, frame: false }).el,
+        createSegment({ digits: 2, value: 12, frame: false, size: 15 }).el);
+      const panelCol = el('div', 'kit-dispc');
+      panelCol.append(el('div', 'kit-cap', 'two fields, one window'), panel);
+      const row3 = el('div', 'kit-disp');
+      row3.append(panelCol);
+
+      stack.titled('ONE FIELD, SIX THINGS TO SAY', row);
+      stack.titled('A POINT, A WORD, AND WHAT THE CALLER CAN CHANGE', row2);
+      stack.titled('AND A PANEL IS TWO OF THEM, NOT ONE WITH AN OPTION', row3);
+      box.append(stack.el);
+    });
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. Asked 2026-09-19 for
@@ -3355,6 +3481,145 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
     d.assert('a pitch bend is listed as its bytes and read as its value',
       text.includes('E0 00 40') && text.includes('8192'),
       'looked for E0 00 40 and 8192');
+  }
+
+  /**
+   * 🔴 THE SEGMENT DISPLAY, GRADED HERE BECAUSE EVERY CLAIM ABOUT IT IS A
+   * COMPARISON BETWEEN TWO FIELDS SIDE BY SIDE. `segment-test.mjs` already
+   * grades its arithmetic with no browser at all, so nothing below repeats a
+   * question that file can answer. What is left is the half that only a laid
+   * out page knows: how wide a box came out, what opacity a rule actually won
+   * with, and whether the picture takes a pointer.
+   */
+  if (dispSpec.size === 6) {
+    const svgOf = (k) => dispSpec.get(k).svg.getBoundingClientRect();
+    const keys = ['reading', 'narrowest', 'every bar', 'measured zero',
+      'nothing measured', 'too wide'];
+
+    /**
+     * 🔴 THE BOX IS THE SAME WIDTH WHATEVER IS IN IT, WHICH IS THIS PROJECT'S
+     * RULE ABOUT ANYTHING THAT REDRAWS LIVE. Six three digit fields showing
+     * `127`, `111`, `888`, `0`, nothing and an overflow, measured against each
+     * other rather than against a number typed here. A `1` is the narrowest
+     * glyph there is and an `8` the widest, so if a font or a text box had
+     * crept in anywhere this is where it would show.
+     */
+    {
+      const ws = keys.map((k) => svgOf(k).width);
+      const hs = keys.map((k) => svgOf(k).height);
+      const spread = Math.max(...ws) - Math.min(...ws);
+      d.assert('a field is the same box showing 111, 888, a zero, nothing and an overflow',
+        spread <= 0.05 && Math.max(...hs) - Math.min(...hs) <= 0.05,
+        `${ws.length} fields, ${ws[0].toFixed(2)} px wide, spread ${spread.toFixed(3)} px`);
+    }
+
+    /**
+     * 🔴 NOTHING MEASURED IS BLANK, AND A MEASURED ZERO IS NOT. Two fields the
+     * same size, one lit by nothing and one lit by a real `0`, which is the
+     * pair that makes the claim mean anything: a display that simply could not
+     * draw a zero would satisfy the first half on its own.
+     */
+    {
+      const none = dispSpec.get('nothing measured');
+      const zero = dispSpec.get('measured zero');
+      d.assert('nothing measured lights nothing, and a measured zero lights six bars',
+        none.lit() === 0 && !/[0-9]/.test(none.text()) && zero.lit() === 6,
+        `nothing lit ${none.lit()} parts and reads "${none.text()}", `
+        + `a zero lit ${zero.lit()}`);
+    }
+
+    /**
+     * 🔴 AND THE UNLIT BARS ARE STILL DRAWN, WHICH IS THE WHOLE REASON THIS IS
+     * DRAWN RATHER THAN SET IN A FONT. The blank field is the specimen for it:
+     * every part is off, and every part is still on screen at a faint opacity
+     * of the SAME ink as a lit one. Read off the COMPUTED style, because that
+     * is the only thing that knows which rule won.
+     */
+    {
+      const none = dispSpec.get('nothing measured');
+      const all = dispSpec.get('every bar');
+      const off = getComputedStyle(none.svg.querySelector('.pos-disp-p'));
+      const on = getComputedStyle(all.svg.querySelector('.pos-disp-p.on'));
+      const ghost = Number(off.opacity);
+      d.assert('an unlit bar is still drawn, faintly, in the same ink as a lit one',
+        ghost > 0.02 && ghost < 0.5 && Number(on.opacity) === 1 && off.fill === on.fill,
+        `unlit at opacity ${off.opacity} against lit at ${on.opacity}, both ${on.fill}`);
+    }
+
+    /**
+     * 🔴 NEGATIVE CONTROL, AND IT IS THE ONE A MAP RETURNING "ALL ON" WOULD
+     * FAIL. The parts lit in the picture are counted off the DOM; what they
+     * are compared against comes out of `GLYPHS`. Two independent sources, so
+     * the two can disagree, which is the whole repair from the MIM corpus
+     * where both halves of a check were derived from one field.
+     */
+    {
+      const ones = dispSpec.get('narrowest').lit();
+      const eights = dispSpec.get('every bar').lit();
+      d.assert('NEGATIVE CONTROL: three ones light six bars and three eights light all 21',
+        ones === 3 * GLYPHS[1].length && eights === 3 * SEGMENTS.length
+        && ones === 6 && eights === 21,
+        `111 lit ${ones} parts, 888 lit ${eights} of ${3 * SEGMENTS.length}`);
+    }
+
+    /**
+     * 🔴 A VALUE TOO WIDE SHOWS DASHES AND KEEPS THE NUMBER WHERE A READER CAN
+     * STILL GET AT IT. The defect this was decided against is an odometer
+     * printing `234` for 1234, so the check names the wrong answer as well as
+     * the right one, and it reads the TOOLTIP, which is the only place the
+     * value survives on screen.
+     */
+    {
+      const over = dispSpec.get('too wide');
+      const r = over.reading();
+      d.assert('a value too wide reads --- and its tooltip still carries the number',
+        r.over && over.text() === '---' && over.text() !== '234'
+        && over.el.title.includes('1234') && over.el.classList.contains('over')
+        && over.lit() === 3,
+        `reads "${over.text()}" with ${over.lit()} parts lit, tooltip "${over.el.title}"`);
+    }
+
+    /**
+     * A decimal point rides the digit to its left and costs no cell, so `12.5`
+     * really is on a three digit field. The pure side of that is in
+     * `segment-test.mjs`; what is graded here is that the part exists in the
+     * picture and that it is the one on the middle digit.
+     */
+    if (dispDot) {
+      const dots = [...dispDot.svg.querySelectorAll('[data-seg="dp"]')];
+      const litDots = dots.filter((n) => n.classList.contains('on'));
+      d.assert('a decimal point is a part of the middle digit, and the only dot lit',
+        dispDot.text() === '12.5' && dots.length === 3 && litDots.length === 1
+        && litDots[0] === dots[1],
+        `"${dispDot.text()}" on ${dispDot.digits} digits, ${litDots.length} of `
+        + `${dots.length} dots lit, on digit ${dots.indexOf(litDots[0])}`);
+    }
+
+    /**
+     * 🔴 IT IS A PICTURE AND NOT A CONTROL, AND THE TWO HALVES OF THAT ARE ONE
+     * ASSERT EACH. The picture takes no pointer while the box around it still
+     * does, which is what keeps the tooltip carrying an overflowed value
+     * reachable; and nothing in it is selectable, which is the rule a
+     * `<canvas>` already lives under here.
+     * ⚠️ THE iOS LOUPE HALF IS NOT MEASURED AND THIS CHECK SAYS SO.
+     * `-webkit-touch-callout` is a WebKit property, Blink drops it at parse
+     * time, and `getComputedStyle(...).webkitTouchCallout` came back
+     * **undefined** rather than false, which read as a real failure on a
+     * stylesheet that is correct. It is in `shell.css` beside `user-select` and
+     * only a WebKit browser can report it, so the claim graded here is the
+     * selection one and the callout is named as read.
+     */
+    {
+      const one = dispSpec.get('reading');
+      const svgCs = getComputedStyle(one.svg);
+      const boxCs = getComputedStyle(one.el);
+      const callout = boxCs.getPropertyValue('-webkit-touch-callout') || 'not reported here';
+      d.assert('the picture takes no pointer while its box still does, and nothing in it selects',
+        svgCs.pointerEvents === 'none' && boxCs.pointerEvents !== 'none'
+        && boxCs.getPropertyValue('user-select') === 'none',
+        `picture ${svgCs.pointerEvents}, box ${boxCs.pointerEvents}, `
+        + `select ${boxCs.getPropertyValue('user-select')}, callout ${callout}`);
+    }
   }
 
   d.ready();
