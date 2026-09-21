@@ -17,6 +17,7 @@
 //   NC1  an all-on table                  fails 2, 3, 5 and 7
 //   NC2  blank treated as zero            fails 10 and 11
 //   NC3  overflow printing the low digits fails 15
+//   NC4  the two schemes given the same palette fails 30 and 32
 //
 // All three were run before this file was committed and the counts are in the
 // report.
@@ -26,7 +27,7 @@
 // sweep changed costume into, and a file born after the rule starts without it.
 
 import { SEGMENTS, GLYPHS, DRAWABLE, COLLISIONS, BLANK_CHAR, OVER_CHAR,
-  segmentsFor, layout, GEO, advance, fieldW } from './segment.mjs';
+  segmentsFor, layout, GEO, advance, fieldW, SCHEMES, schemeFor } from './segment.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -321,6 +322,85 @@ ok('the drawable list is printable and holds every character in the table',
   DRAWABLE.length === Object.keys(GLYPHS).length && DRAWABLE.includes(OVER_CHAR)
   && DRAWABLE.includes(BLANK_CHAR),
   `${DRAWABLE.length} characters`);
+
+// ── the two kinds of display ──────────────────────────────────────────────
+//
+// 🔴 THE CLAIM IS NOT THAT THE PALETTES DIFFER, IT IS THAT ONE IS THE OTHER
+// INVERTED. Two tables of different hex would satisfy "they are not the same"
+// while both being light on dark, which is the defect worth catching: a
+// reflective display drawn light on dark is not a reflective display, it is a
+// backlit one in an odd colour. So the assert computes LUMINANCE and compares
+// the ink against its own field.
+
+/** Relative luminance of `#rrggbb`, 0 for black and 1 for white.
+ *  ⚠️ COMPUTED HERE RATHER THAN IMPORTED, so the test cannot agree with the
+ *  module by sharing its arithmetic. That is the two-independent-sources rule:
+ *  a check derived from the thing it is checking passes while being wrong. */
+const lum = (hex) => {
+  const h = hex.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  const f = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+};
+
+// 29. Both schemes are there and each carries all three of the things a
+//     display's look is made of, because a scheme missing one would silently
+//     inherit it from whichever scheme was set last.
+ok('both schemes carry an ink, a field and a ghost',
+  ['backlit', 'reflective'].every((k) => SCHEMES[k]
+    && typeof SCHEMES[k].ink === 'string' && typeof SCHEMES[k].back === 'string'
+    && typeof SCHEMES[k].ghost === 'number'),
+  `${Object.keys(SCHEMES).length} schemes`);
+
+// 30. THE ONE THAT MATTERS. Backlit glows, so its ink is lighter than its
+//     field. Reflective does not, so its ink is DARKER than its field. That is
+//     what the word inverse means here, stated as arithmetic.
+{
+  const bl = SCHEMES.backlit, rf = SCHEMES.reflective;
+  const blUp = lum(bl.ink) > lum(bl.back);
+  const rfDown = lum(rf.ink) < lum(rf.back);
+  ok('backlit is light on dark and reflective is dark on light, which is the inversion',
+    blUp && rfDown,
+    `backlit ink ${lum(bl.ink).toFixed(3)} on ${lum(bl.back).toFixed(3)}, `
+    + `reflective ink ${lum(rf.ink).toFixed(3)} on ${lum(rf.back).toFixed(3)}`);
+}
+
+// 31. And both are legible, which a pair of inverted palettes is not
+//     automatically: dark grey on slightly darker grey inverts correctly and
+//     cannot be read. WCAG calls 4.5 the floor for small text and these are
+//     large bars, so 3 is the bar being held here.
+{
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const rs = Object.entries(SCHEMES).map(([k, v]) => [k, ratio(v.ink, v.back)]);
+  ok('a lit bar stands off its own field in both schemes',
+    rs.every(([, r]) => r >= 3),
+    rs.map(([k, r]) => `${k} ${r.toFixed(1)}:1`).join(', '));
+}
+
+// 32. NEGATIVE CONTROL. The ghost moves with the scheme rather than being
+//     copied across. On a reflective display the undriven crystal is nearly
+//     the field's own colour, so a backlit ghost value there reads as a much
+//     cheaper display. If these are ever equal, somebody has pasted one.
+ok('NEGATIVE CONTROL: each scheme carries its own ghost rather than a shared one',
+  SCHEMES.backlit.ghost !== SCHEMES.reflective.ghost,
+  `backlit ${SCHEMES.backlit.ghost}, reflective ${SCHEMES.reflective.ghost}`);
+
+// 33. A ghost is visible and is not the lit bar. Zero would make this a font
+//     with extra steps, and one would make every field read `888`.
+ok('every ghost is visible and none of them is fully lit',
+  Object.values(SCHEMES).every((v) => v.ghost > 0.05 && v.ghost < 0.5),
+  Object.entries(SCHEMES).map(([k, v]) => `${k} ${v.ghost}`).join(', '));
+
+// 34. NEGATIVE CONTROL. A name nothing answers comes back null rather than the
+//     default, so a typo cannot survive as a design. Same rule as the glyph
+//     table refusing a character it cannot draw.
+ok('NEGATIVE CONTROL: a misspelled scheme name answers nothing, and no name does too',
+  schemeFor('reflctive') === null && schemeFor('') === null
+  && schemeFor(undefined) === null && schemeFor('reflective') === SCHEMES.reflective,
+  'refused three, answered one');
 
 console.log(`\n${pass} ok, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -344,6 +344,51 @@ function bars() {
 }
 
 /**
+ * 🔴 TWO KINDS OF LIQUID CRYSTAL DISPLAY, AND THEY ARE NOT EACH OTHER'S THEME.
+ * Asked 2026-09-21: *"have iption on segmentdisplay to inverse color:
+ * green-grayish"*.
+ *
+ * A **backlit** display glows: a lamp behind the glass, so a lit bar is bright
+ * and the field behind it is dark. That is the default here and it is what the
+ * Circuit and the MK-425C have.
+ *
+ * A **reflective** one does not glow at all. It has no lamp, it borrows the
+ * light in the room, and the crystal goes DARK where it is driven, so the
+ * picture is inverted: near black bars on a pale grey green field. That is a
+ * calculator, a multimeter, a Nokia, and almost every panel with a small
+ * readout made before about 2005.
+ *
+ * ⚠️ THEY ARE A PROPERTY OF THE OBJECT BEING DRAWN, NOT OF THE PAGE'S THEME.
+ * A page in a dark theme showing a reflective display is correct, because the
+ * real instrument on the desk is pale in a dark room. So this is a caller's
+ * choice about what it is a picture OF, and nothing here reads
+ * `prefers-color-scheme`.
+ *
+ * ⚠️ AND THE UNLIT BARS MOVE WITH IT, WHICH IS THE HALF THAT IS EASY TO MISS.
+ * On a backlit display an unlit bar is a bit of unlit glass and is nearly
+ * invisible. On a reflective one it is the SAME pale field as the background
+ * with only the faintest tint, and a reader sees it clearly, because the
+ * contrast between driven and undriven crystal is low. Copying the backlit
+ * ghost value across gives a reflective display that reads as a much cheaper
+ * one, so each scheme carries its own.
+ */
+export const SCHEMES = {
+  /** A lamp behind the glass. Light bars, dark field. */
+  backlit: { ink: '#8fb6ff', back: '#0d1830', ghost: 0.22 },
+  /** No lamp. Dark bars on the pale grey green of undriven crystal. */
+  reflective: { ink: '#1c2a1e', back: '#9fb094', ghost: 0.16 },
+};
+
+/** The scheme a name asks for, or null for a name nothing answers.
+ *  ⚠️ IT REFUSES RATHER THAN FALLING BACK, for the reason the glyph table
+ *  refuses a character it cannot draw: a display quietly showing the wrong
+ *  colours is a display lying about which instrument it is. */
+export function schemeFor(name) {
+  if (name == null) return null;
+  return Object.hasOwn(SCHEMES, name) ? SCHEMES[name] : null;
+}
+
+/**
  * A SEGMENT DISPLAY. A picture of a field of N digits, with every unlit bar
  * still faintly drawn.
  *
@@ -356,6 +401,10 @@ function bars() {
  * @param {string} [o.ink]          lit colour, as `--disp-ink`
  * @param {string} [o.back]         backlight, as `--disp-back`
  * @param {number} [o.ghost]        how visible an unlit bar is, as `--disp-ghost`
+ * @param {'backlit'|'reflective'} [o.scheme='backlit']  which kind of display
+ *   this is a picture of. `reflective` is the inverted grey green one with no
+ *   lamp behind it. `ink`, `back` and `ghost` each override whichever is chosen,
+ *   so a caller can take a scheme and change one thing about it.
  * @param {boolean} [o.frame=true]  false drops the box, so two can share one
  * @param {string} [o.title]        the standing tooltip
  * @param {string} [o.cls]
@@ -366,7 +415,7 @@ function bars() {
  *            lit:()=>number}}
  */
 export function createSegment({
-  digits = 3, decimals = 0, dot, value = '', size, ink, back, ghost,
+  digits = 3, decimals = 0, dot, value = '', size, ink, back, ghost, scheme,
   frame = true, title, cls = '',
 } = {}) {
   const n = Math.max(1, Math.trunc(digits));
@@ -382,6 +431,23 @@ export function createSegment({
   // A component that varies a property per instance sets a CUSTOM property,
   // never the property, so a stylesheet can still reach it.
   if (size != null) root.style.setProperty('--disp-h', typeof size === 'number' ? `${size}px` : size);
+
+  /* The scheme is written first and the three explicit options over the top of
+     it, so `{ scheme: 'reflective', ink: '#000' }` means what it reads like.
+     ⚠️ A NAME NOTHING ANSWERS IS A THROW RATHER THAN THE DEFAULT. Silently
+     drawing a backlit display for `scheme: 'reflctive'` is the typo surviving
+     as a design, which is this project's most repeated shape of defect. */
+  if (scheme != null) {
+    const sc = schemeFor(scheme);
+    if (!sc) {
+      throw new Error(`createSegment: no scheme called ${JSON.stringify(scheme)}. `
+        + `Known: ${Object.keys(SCHEMES).join(', ')}`);
+    }
+    root.style.setProperty('--disp-ink', sc.ink);
+    root.style.setProperty('--disp-back', sc.back);
+    root.style.setProperty('--disp-ghost', String(sc.ghost));
+    root.dataset.scheme = scheme;
+  }
   if (ink) root.style.setProperty('--disp-ink', ink);
   if (back) root.style.setProperty('--disp-back', back);
   if (ghost != null) root.style.setProperty('--disp-ghost', String(ghost));
