@@ -62,7 +62,32 @@
      different name: the title still had padding over it and the screenshot
      still showed it. Nothing above, and the air below is what separates it from
      the grid. */
-  .tom .panel-plate { padding: 0 0 10px; }
+  .tom .panel-plate { padding: 0; }
+  /* 🔴 AND THE 20 px UNDER THE TITLE WAS THE WRAP'S, NOT THE PLATE'S, WHICH IS
+     WHY TAKING IT OFF THE PLATE TWICE CHANGED NOTHING. Reported three times,
+     the last as *"can not nelive titles still have wrong padding"*, and each
+     time I took padding off something that was not carrying it.
+     ⚠️ MEASURED RATHER THAN GUESSED A FOURTH TIME. Plate bottom 542.5, first
+     row top 572.5, thirty pixels between them, and the breakdown is: 20 px of
+     `.panel-wrap` padding, then the 8 px ruler, then the 2 px row gap. Only the
+     first of those three is furniture. */
+  /* 🔴 AND IT IS THE TWO COLUMNS, NOT THE WRAP. Measured a fourth time after
+     the wrap rule changed nothing: `.panel-strip` and `.tom-fixed` each carry
+     `padding: 20px 0`, which is `--panel-pad` on the vertical, and that is the
+     twenty pixels.
+     ⚠️ BOTH TOGETHER OR NEITHER. The names and the steps line up because every
+     cell on both sides is one token tall; taking the top padding off one column
+     and not the other would offset them by 20 px, which is exactly the class of
+     bug this page already carries three asserts against.
+     ⚠️ THE FOOT STAYS, so the grid is not touching the card's bottom edge. What
+     was asked for is no padding over the TITLE, and the space under the last
+     row is not that. */
+  /* ⚠️ 10 px, NOT 0 AND NOT 20. At the component's own 20 the title sat 30 px
+     above the first row and was reported three times; at 0 the pads touch the
+     words, which was reported in two. Ten leaves 20 px between the plate's
+     bottom and the first row, which is the 8 px ruler, the 2 px row gap and
+     this. */
+  .tom .panel-strip, .tom .tom-fixed { padding-top: 10px; }
 
   /* 🔴 NO DIVIDER. `panel-layout.mjs` gives a left fixed column a `border-right`
      and a gutter, which is right when the two halves are different KINDS of
@@ -107,10 +132,35 @@
        at the same x. */
     height: var(--tom-cell); min-height: 0; border-radius: 3px;
     background: transparent; border: 0; color: var(--fg2);
-    text-align: left; cursor: pointer; display: block; width: 100%;
+    /* ⚠️ `right`, NOT `left`. The base `.tom-name` rule right aligns the
+       numbers, and `button.tom-name` at (0,1,1) was quietly overriding it: a
+       row WITH a sample is a button and a row without is a div, so opening a
+       pack would have left aligned exactly the rows that had something in them
+       and the straight edge asked for would have appeared only while the grid
+       was empty. */
+    text-align: right; cursor: pointer; display: block; width: 100%;
+    /* The colour is the only thing that moves, so it is the only thing with a
+       transition on it. */
+    transition: color .18s ease-out;
   }
-  button.tom-name:hover { background: var(--card2); color: var(--fg); }
-  .tom-name[data-pick] { color: var(--hi); }
+  /* 🔴 NO BACKGROUND ON A PREVIEW, ASKED FOR AS *"rm bg on sample preview, just
+     animate color to yellow"*. Hearing a row is not selecting it: a filled box
+     behind the number said *this one is chosen* and stayed saying it, while
+     what actually happened was a sound that has already finished. Colour can
+     say a moment; a box says a state.
+     ⚠️ AND IT IS THE SAME LANGUAGE AS THE REST OF THE GRID, where the pads
+     light rather than growing edges. This page has now had a box asked off it
+     four times: the playhead cursor, the highlight border, the pad hover and
+     this. */
+  button.tom-name:hover { color: var(--fg); }
+  .tom-name[data-pick] { color: var(--hi); animation: tom-heard .45s ease-out; }
+  @keyframes tom-heard {
+    0%   { color: #fff8dc; }
+    100% { color: var(--hi); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tom-name[data-pick] { animation: none; }
+  }
 
   /* The steps. `width: max-content` so the panel's own scroller is what moves,
      which is contract 1 of `panel-layout.mjs`: one scrolling region, and the
@@ -145,7 +195,16 @@
   .tom-cell {
     width: var(--tom-cell); height: var(--tom-cell); min-height: 0; flex: 0 0 auto;
     padding: 0; border-radius: 3px;
-    background: #171d29; border: 1px solid #1c2433;
+    /* 🔴 NO BORDER, ASKED FOR AS *"rm borders on pads"*. That is the fifth time
+       an edge has been asked off this grid: the playhead cursor, the highlight
+       border, the pad hover, the preview box and now the pads themselves. The
+       field IS the pad; an outline round it was a second way of saying where it
+       is, and sixteen of them across a row read as a wire grid rather than as
+       an instrument.
+       ⚠️ `border: 0` AND NOT A COLOUR CHANGE, because `box-sizing: border-box`
+       is global here: a 1 px border was taking 2 px out of every pad's inside,
+       and keeping it transparent would keep taking them. */
+    background: #171d29; border: 0;
   }
   /* Every fourth step is a beat and every sixteenth is a bar, so sixty four
      cells can be counted without reading the ruler. It is the field that
@@ -158,8 +217,12 @@
      changes on hover is the bordered cursor arriving a third time, one property
      at a time: this grid has now had an edge asked off it for the playhead, for
      the focus ring and for this. The pad is the thing; its outline is not. */
-  .tom-cell:hover { background: #222c3d; }
-  .tom-cell[data-on]:hover { background: #f0d089; }
+  /* ⚠️ HOVER LIFTS THE FIELD AND DOES NOTHING ELSE, asked for as *"hover on pad
+     only changes bg lighter a bit"*. `filter: brightness()` rather than a pair
+     of typed colours, so a pad that is off, on, muted or under the playhead all
+     lift by the same amount from whatever they already are, and none of them
+     needs its own hover rule. Four states, one line. */
+  .tom-cell:hover { filter: brightness(1.35); }
   /* 🔴 THE FOCUS RING SAT OUTSIDE THE PAD AND OVERLAPPED ITS NEIGHBOURS.
      Reported 2026-09-21 with a crop: *"outline looks bad"*, showing a 2 px
      yellow ring standing off a 16 px pad, wider than the 2 px gutter, so it
@@ -198,11 +261,11 @@
      colour, and copying the camera's cast is how a page ends up with one
      element nothing else on it agrees with.
      ✅ ONE TOKEN, so moving it is one line rather than a hunt. */
-  .tom-cell[data-on] { background: var(--tom-on); border-color: var(--tom-on); }
+  .tom-cell[data-on] { background: var(--tom-on); }
   /* A cell that is on but has no sample behind it stays grey, because
      brightness here says WHETHER THIS CAN MAKE A SOUND and nothing else can
      tell a reader that. */
-  .tom-cell[data-on][data-mute] { background: var(--dim2); border-color: var(--dim2); }
+  .tom-cell[data-on][data-mute] { background: var(--dim2); }
   /* 🔴 THE BAND MOVES WITH A TRANSFORM AND CHANGES NOTHING ABOUT LAYOUT. It is
      the only thing on this page that moves on its own, and `positron-ui`'s rule
      is that nothing redrawing may change how much room it takes. A transform on
