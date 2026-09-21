@@ -37,13 +37,14 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode } from '/shell/midi-decode.mjs';
   import { createBay, classOf, printLink } from '/shell/bay.mjs';
+  import { describe } from '/shell/instruments.mjs';
 
   /**
    * 🔴 A PATCH BAY: WHAT EXISTS, WHAT MAY REACH WHAT, AND THE ARITHMETIC THAT
    * REFUSES THE REST. `plans/plan-patchbay.md` is the design and this is its
    * first storey. The model, the validator and the text form are all in
    * `demo/shell/bay.mjs`, which is pure and is graded by
-   * `node demo/shell/bay-test.mjs` at **30 asserts with no browser**, most of
+   * `node demo/shell/bay-test.mjs` at **36 asserts with no browser**, most of
    * them negative controls, because a validator is the one kind of code that
    * passes a naive test suite by returning `{ok: true}` to everything.
    *
@@ -52,6 +53,10 @@
    * `accepts` list below is not decoration, and the one line that matters is
    * that the Circuit's input does not accept SysEx: that device has no factory
    * reset, and one byte inside a SysEx message overwrites a patch.
+   *
+   * 🔴 **THE TABLE IS ONE ROW PER INSTRUMENT, AND THIS IS THE THIRD BUILD
+   * BECAUSE THE FIRST TWO WERE ONE ROW PER PORT.** See `instruments()`, which
+   * is where that grouping and its failure modes are written out.
    */
 
   /**
@@ -91,43 +96,89 @@
     /* Four cells and every one of them moves. `heard` is deliberately beside
        `sent`, because they are counted at OPPOSITE ENDS of the link and a page
        that showed only the first would be this project's oldest defect: a
-       counter on the sending side is not evidence the far end did anything. */
-    readout: { ports: '', links: '', sent: '', heard: '' },
+       counter on the sending side is not evidence the far end did anything.
+       ⚠️ THE FIRST CELL COUNTS INSTRUMENTS RATHER THAN PORTS, so it is the
+       number of rows in the table underneath it. It counted ports until
+       2026-09-21, when the table stopped having one row per port, and a figure
+       nobody can check against the page it sits on is a figure nobody reads.
+       The port count is in the log line the status button prints. */
+    readout: { instruments: '', links: '', sent: '', heard: '' },
     controls: [],
   });
   guard(d);
 
   const bay = createBay();
   const outs = new Map();              // port id -> the Web MIDI output behind it
+  const rawName = new Map();           // port id -> the name CoreMIDI gave that port
   let access = null, sent = 0, heard = 0;
-  let pickFrom = null, pickTo = null;
+  /* THE INVARIANT: one instrument is held, or none is. There is no state in
+     which a complete pair is sitting around waiting, because the press that
+     completes a pair also tries it. */
+  let pick = null;                     // the held instrument, by its node key
 
   // ── the registry ────────────────────────────────────────────────────────
 
   const ports = createTable({
     columns: [
-      { key: 'label', label: 'port', grow: true, clip: true, hi: true },
-      { key: 'way', label: 'way', width: 44 },
-      { key: 'med', label: 'kind', width: 54 },
-      { key: 'list', label: 'takes', width: 150, clip: true },
+      { key: 'label', label: 'instrument', grow: true, clip: true, hi: true },
+      /* 🔴 WHAT IT SENDS AND WHAT IT TAKES, IN ONE ROW, because the two halves
+         of a MIDI wire are not two instruments. That split used to be the
+         table's first column and it was reported three times.
+         ⚠️ ON A REAL DESK EVERY `sends` CELL READS THE SAME, and that is a fact
+         about what this page can know rather than a column nobody needs: a Web
+         MIDI port cannot be asked what it emits, so every source is credited
+         with `EMITS`. `takes` is the cell that varies, and it is where the
+         MK-425C's empty list and the Circuit's refusal of SysEx live.
+         ⚠️ AND THE `kind` COLUMN IS GONE. It read `midi` on every row, because
+         this page only ever adopts Web MIDI ports, and one cell cannot answer
+         for an instrument whose two ports could one day be two media. The
+         medium is in the refusal sentence, which names both when they differ. */
+      { key: 'sends', label: 'sends', width: 104, clip: true },
+      { key: 'takes', label: 'takes', width: 104, clip: true },
+      /* 🔴 THE REFUSAL HAS TO BE READABLE BEFORE THE PRESS, AND WITH THE
+         `connect` BUTTON GONE THE SECOND PRESS BOTH ASKS AND ANSWERS. So every
+         row says, while one instrument is held, whether IT can be the other
+         end: `ready` or `refused`, with the validator's own sentence on the
+         row's hover. Empty while nothing is held, because there is no question
+         yet. The keyboard that accepts nothing is the row this matters most
+         for, and it says `nothing` under `takes` as well. */
+      { key: 'join', label: 'join', width: 62, hi: true },
     ],
     cap: 64,
     empty: 'press the status button to look for instruments',
     note: 'hover',
-    /* Pressing a row picks it: the first press is the source, the second is the
-       destination. ⚠️ IT DOES NOT CONNECT. Opening is a decision and gets its
-       own button, which is the same rule `table.mjs` already has about an arrow
-       moving rather than opening. */
+    /* Pressing a row picks one end. Pressing another row MAKES THE LINK. See
+       the rule above `choose()`, which is where the whole interaction lives. */
     onPick: (row) => choose(row.id),
   });
 
-  const line = el('div', 'bay-line', 'press a port, then another');
+  const line = el('div', 'bay-line', 'press an instrument, then another');
   const why = el('div', 'bay-why');
-  const connect = el('button', 'pos-btn', 'connect', { type: 'button' });
-  connect.disabled = true;
   const clearPick = el('button', 'pos-btn', 'clear', { type: 'button' });
   const make = el('div', 'bay-make');
-  make.append(line, connect, clearPick);
+  /**
+   * 🔴 PANIC, AND IT EXISTS BECAUSE MIDI IS NOW ACTUALLY FLOWING. Reported
+   * 2026-09-21, minutes after this page first carried a note to an instrument:
+   * *"got stuch notes. panic/noteoff?"* A stuck note is a held voice on
+   * somebody's synth with nothing on screen able to release it, and the only
+   * other way out is unplugging the instrument.
+   * 🔴 IT DOES NOT GO IN `.pos-controls`. `demo/verify.mjs` presses every button
+   * in that row on every run, dozens of times a day, and this one reaches every
+   * output on the desk. It sits beside `clear`, which is where this page already
+   * keeps the things that act.
+   * ⚠️ AND IT IS A SECOND WAY OUT OF THIS PAGE, WHICH IS THE THING WORTH
+   * DECLARING. `deliver` was the only exit and that made "this page has only
+   * ever sent notes, controllers and bend" an assert over a counter rather than
+   * a claim about a file. Panic must not route through a LINK, because a broken
+   * or removed link is exactly when it is needed, so it reaches the outputs
+   * directly. It therefore shares `toBytes` and bumps the same counter, and
+   * there is an assert that it can express nothing new.
+   */
+  const panic = el('button', 'pos-btn', 'panic', { type: 'button' });
+  panic.title = 'send all notes off and all sound off on every channel to every '
+    + 'instrument this page can reach, whatever is linked';
+  panic.onclick = () => allOff();
+  make.append(line, clearPick, panic);
 
   const linksT = createTable({
     columns: [
@@ -145,18 +196,368 @@
 
   d.el.append(ports.el, make, why, linksT.el, patch, traffic.el);
 
+  // ── instruments, which are a grouping this page makes over ports ─────────
+
+  /**
+   * 🔴 ONE ROW PER INSTRUMENT, AND THIS IS THE PAGE'S THIRD BUILD BECAUSE THE
+   * FIRST TWO SHOWED ONE ROW PER PORT. Reported three times, the last as *"do
+   * press 1st intrument then another linking"*, and every report said **device**
+   * or **instrument** where the page said **port**. A MIDI wire has two halves
+   * and a desk does not: the Circuit appeared twice, once to send and once to
+   * receive, so somebody looking for it found two Circuits and had to know
+   * which of them takes notes. Worse, one of every keyboard's two rows is a
+   * DEAD END: the MK-425C accepts nothing, so its receiving row existed only to
+   * be refused, and "press the first instrument" had a better than even chance
+   * of landing on a row that can never be half of a link.
+   *
+   * 🔴 NOTHING ABOUT THE MODEL CHANGED, AND THAT IS DELIBERATE.
+   * `demo/shell/bay.mjs` is ports and links, it is pure, and
+   * `node demo/shell/bay-test.mjs` grades it at 36 asserts with no browser. An
+   * instrument is a grouping THE PAGE makes, recomputed from `bay.ports()` on
+   * every paint, so there is no second store that can drift from the first.
+   *
+   * 🔴 THE GROUPING KEY IS THE NODE SEGMENT OF THE PORT ID, WHICH IS THE SLUG
+   * OF THE INSTRUMENT'S NAME WITH ITS DIRECTION WORD REMOVED. `bay.mjs` already
+   * walks nodes rather than ports to find a loop, so `site:node` is the model's
+   * own word for one machine and this page is not inventing a unit.
+   * ⚠️ A NAME IS A FRAGILE KEY AND THE DIRECTION WORD IS WHY. MEASURED on this
+   * desk and written down in `plans/plan-fasttrack-mk425c.md` section 8.1:
+   * CoreMIDI offers the Model 12 as a source called `Model 12 MIDI IN` and a
+   * destination called `Model 12 MIDI OUT`. One instrument, spelled differently
+   * on its two sides, so a raw name would have split it in two and rebuilt the
+   * exact defect this change removes.
+   * ⚠️ IT FAILS BY SPLITTING RATHER THAN BY MERGING, WHICH IS THE SAFE
+   * DIRECTION. A pair of names it cannot match leaves two rows, each saying in
+   * its own cells what it can and cannot do, and nothing is hidden. A wrong
+   * MERGE would be worse than a wrong split, because it would send notes at a
+   * different physical instrument from the one whose name was pressed.
+   * ⚠️ TWO INSTRUMENTS WITH ONE NAME GET A NUMBERED NODE and stay two rows. The
+   * port id used to collide outright, so the second one silently replaced the
+   * first in the port map: two keyboards, one row, one of them unreachable.
+   * ⚠️ AND A PORT BELONGING TO NO RECOGNISABLE INSTRUMENT IS STILL A ROW. An
+   * IAC bus and a virtual port each become their own instrument, named whatever
+   * they are called. A row that vanished would say the port does not exist,
+   * which is a different and false statement.
+   */
+  const DIR_WORD = /[\s_-]+(?:in|out|input|output)$/i;
+  /**
+   * 🔴 THE NAME COMES FROM THE TAXONOMY, NOT FROM THE CABLE. Asked 2026-09-21
+   * as *"can you not enrich the names with brands etc"* and *"have a
+   * taxononomy"*, after `/wish/` was told *"connect evolution to circuit"* and
+   * correctly answered that nothing on this desk is called evolution. CoreMIDI
+   * calls that port `MK-425C USB MIDI Keyboard`; the instrument is an
+   * **Evolution** MK-425C, and the maker was in none of the strings this page
+   * had. `demo/shell/instruments.mjs` is the one place that knows, graded at 14
+   * asserts with no browser.
+   * ⚠️ AND THE RAW NAME IS STILL KEPT AND STILL PRINTED. `rawName` holds it and
+   * a row shows it whenever it differs from the label, because it is the only
+   * thing tying a row back to a cable and the thing a reader needs when two
+   * devices are named alike.
+   */
+  const instrumentName = (raw) => describe(raw).label;
+  const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
+
+  /** Every instrument on the desk, in the order its first port was adopted. */
+  function instruments() {
+    const by = new Map();
+    for (const p of bay.ports()) {
+      const node = nodeOf(p.id);
+      let g = by.get(node);
+      if (!g) { g = { node, label: p.label, out: null, in: null }; by.set(node, g); }
+      if (p.dir === 'out' && !g.out) g.out = p;
+      if (p.dir === 'in' && !g.in) g.in = p;
+    }
+    return [...by.values()];
+  }
+  const instrument = (node) => instruments().find((g) => g.node === node);
+
+  /**
+   * 🔴 EVERY INSTRUMENT BY NAME, AND WHICH HALVES IT HAS. Reported 2026-09-21
+   * as *"bay does not connect by i get midi events"*, and this page could not
+   * answer it: it logged a COUNT. A count cannot tell a reader whether the
+   * grouping split one instrument into two rows, whether the thing they
+   * expected is absent, or whether the half they need is missing, and those are
+   * three different faults with one symptom. That is the gap `/shape/` had, and
+   * it is fixed here for the same reason.
+   * ⚠️ IT IS A FUNCTION RATHER THAN A LOOP INSIDE THE STATUS HANDLER SO THE
+   * CHECKS GRADE THE REAL THING. Inline, the assert below could only ever have
+   * read a log written before its own fixtures existed, which is how a check
+   * ends up measuring the moment instead of the code.
+   * ⚠️ AND THE RAW NAME IS PRINTED ONLY WHEN IT DIFFERS from the row's label,
+   * because `Model 12 MIDI IN` and `Model 12 MIDI OUT` are the two halves of
+   * one instrument and a reader should not have to take the grouping on trust.
+   */
+  function sayInstruments() {
+    /**
+     * 🔴 NO LEADING SPACES, AND THE REASON IS THE LOG'S OWN LAYOUT. Reported
+     * 2026-09-21 with a crop: *"can we avind this uglu wrapping / indent?"*
+     * `.pos-log` is a GRID, `auto 1fr`, with `.pos-line { display: contents }`,
+     * so the timestamp has its own column and a wrapped message already aligns
+     * under where the message began. Two literal spaces indented the FIRST line
+     * only, and `white-space: pre-wrap` keeps them, so every continuation
+     * appeared to hang backwards. The nesting was doing a job the grid already
+     * does.
+     * ⚠️ AND THE TAXONOMY MADE THE WRAPPING WORSE, WHICH IS MY DOING. Enriching
+     * `Model 12 DAW Control` to `TASCAM Model 12 DAW control` lengthened every
+     * label, and the old line then repeated the raw port name after it, so one
+     * instrument took three lines to say two facts. The raw name is only worth
+     * printing when the enrichment did not already contain it.
+     */
+    for (const g of instruments()) {
+      const halves = g.out && g.in ? 'sends and takes'
+        : g.out ? 'sends only' : g.in ? 'takes only' : 'neither';
+      const raw = [g.out, g.in].filter(Boolean)
+        .map((x) => rawName.get(x.id))
+        .filter((x, i, a) => x && a.indexOf(x) === i
+          /* Redundant once the label carries the same words. `Model 12 DAW
+             Control OUT` adds nothing beside `TASCAM Model 12 DAW control`. */
+          && !x.toLowerCase().startsWith(g.label.toLowerCase().split(' ').slice(1).join(' ')));
+      d.log(`${g.label}, ${halves}${raw.length ? ` (${raw.join(', ')})` : ''}`);
+    }
+  }
+
+  /**
+   * One candidate link: this instrument's output into that one's input, asked
+   * of the validator.
+   * 🔴 THE ROW AND THE PRESS COME FROM THIS ONE CALL. `paint()` asks it to fill
+   * the `join` cell and `choose()` asks it to make the link, so a row reading
+   * `ready` cannot be a row whose press is refused, and the sentence on a
+   * refused row's hover is the same sentence the press would have printed.
+   */
+  function candidate(src, dst) {
+    if (!src.out) return { ok: false, why: `${src.label} has no output, so nothing leaves it` };
+    if (!dst.in) return { ok: false, why: `${dst.label} has no input, so nothing can reach it` };
+    const transforms = suggest(src.out.id, dst.in.id);
+    return { from: src.out.id, to: dst.in.id, transforms,
+      ...bay.validate(src.out.id, dst.in.id, transforms) };
+  }
+
+  /**
+   * 🔴 THE DIRECTION IS DECIDED BY THE ORDER OF PRESSING AND IS NEVER
+   * DISCOVERED. Two instruments that can each both send and receive give two
+   * possible links, and the only signal a page has is which one was pressed
+   * first, so **THE FIRST PRESS SENDS**. The pending line says so the moment
+   * that press lands, before there is anything to be surprised by, and every
+   * other row's `join` cell is computed for that one direction.
+   * ⚠️ AN INSTRUMENT THAT CAN ONLY RECEIVE IS NOT AMBIGUOUS AND DOES NOT NEED
+   * THE RULE. There is one possible link, so it is used, and the pending line
+   * reads the other way round.
+   * ⚠️ AND A REFUSED PAIR IS NOT QUIETLY TURNED ROUND. Sending the other way
+   * because this way was refused would make the `join` cell a guess about what
+   * a press will do, and that cell is the only thing on the page that answers
+   * before the press. A pair that only works one way round reads `refused` in
+   * the direction that does not work, which is the truth about the press being
+   * offered.
+   */
+  function plan(held, other) {
+    return held.out ? candidate(held, other) : candidate(other, held);
+  }
+
   // ── picking and connecting ──────────────────────────────────────────────
 
-  function choose(id) {
-    const p = bay.port(id);
-    if (!p) return;
-    if (!pickFrom && p.dir === 'out') pickFrom = id;
-    else if (pickFrom && !pickTo && p.dir === 'in') pickTo = id;
-    else if (p.dir === 'out') { pickFrom = id; pickTo = null; }
-    else pickTo = id;
+  /**
+   * 🔴 TWO PRESSES MAKE A LINK, AND THE RULE IS WRITTEN OUT HERE BECAUSE IT IS
+   * THE PAGE. It used to be four presses: grant MIDI, a source row, a
+   * destination row, then a `connect` button. Reported as *"can not get the bay
+   * work. make it simple, enable devices, i press first edevice, then next and
+   * they are connected"*. The fourth press is gone.
+   *
+   * WHAT EACH PRESS DOES:
+   *  - nothing held: this instrument is held, and it SENDS if it can. The line
+   *    and the `why` sentence both say which way round it is going to go.
+   *  - the SAME instrument again: it is put down, and the line says so. This is
+   *    why no press can ever appear to do nothing.
+   *  - another instrument: the link is attempted at once.
+   *      - allowed, so it is made, the pick clears and the log prints the line.
+   *      - refused, so NOTHING is made, the `why` line carries the validator's
+   *        sentence, and **THE FIRST PICK STAYS** so the next press can try a
+   *        different partner. Clearing it would make a refusal cost two presses
+   *        to recover from, and the refusal is not that row's fault.
+   */
+  /**
+   * 🔴 PLAY ONE INSTRUMENT, PLAY THE NEXT, AND THEY ARE LINKED. Asked four
+   * times before it was understood: *"can not get the bay work"*, *"do press
+   * 1st intrument then another linking"*, *"bay does not connect ... when
+   * playing instruments"*, and finally *"i want connection from pressing
+   * cntroller keys on 1rst and second instrument"*. Every earlier answer made
+   * the SCREEN easier to press. The ask was never about the screen: a patch bay
+   * is patched with your hands on the instruments.
+   *
+   * 🔴 IT IS A NOTE ON AND NOTHING ELSE, AND THAT IS NOT FUSSINESS. CLAUDE.md
+   * records that the Circuit on this desk **sends its own clock continuously at
+   * about 122 bpm**, which makes it the master. A rule that picked *the last
+   * instrument that sent anything* would therefore pick the Circuit forever,
+   * within a millisecond of the page opening, and nothing a person did could
+   * ever change it. Clock, active sensing, aftertouch and program changes are
+   * traffic; a note on with velocity is a decision.
+   * ⚠️ AND VELOCITY ZERO IS A NOTE OFF, whatever the status byte says. Releasing
+   * a key must not count as a second gesture, or every single press would pick
+   * two instruments.
+   *
+   * ⚠️ THE PICK EXPIRES, because a patch bay that remembers a note from four
+   * minutes ago links two things nobody meant to join. `PLAY_WINDOW` is the
+   * whole of the promise: the two gestures are one gesture in two places.
+   * ⚠️ AND PRESSING THE SAME INSTRUMENT AGAIN ONLY REFRESHES IT rather than
+   * closing a loop on itself, so holding a chord and thinking about it is free.
+   * ⚠️ IT SHARES `pick` WITH THE ROW PRESSES, so a hand and a pointer cannot
+   * disagree about what is held, and either may finish what the other started.
+   */
+  const PLAY_WINDOW = 12000;
+  let playAt = 0;
+
+  /**
+   * Is this message a deliberate press rather than traffic?
+   *
+   * 🔴 A NOTE ON AND NOTHING ELSE, AND THE FIRST BUILD ALSO ACCEPTED A
+   * CONTROLLER AND A BEND, WHICH A LOOPBACK TURNED INTO A DEFECT WITHIN A
+   * MINUTE. MEASURED in a real browser on this desk: `IAC Driver Bus 1` is a
+   * loopback, so every byte this page sends to its output arrives back on its
+   * input. `panic` sends 32 control changes to every output, they came straight
+   * back, and the page read them as somebody playing the IAC bus and linked the
+   * keyboard to it. The log said `connected by playing them:
+   * mk-425c-usb-midi-keyboard:out -> iac-driver-bus-1:in`, which nobody asked
+   * for and which looks exactly like the feature working.
+   * ⚠️ A KNOB TURN PICKING AN INSTRUMENT WAS THE NICER BEHAVIOUR AND IT LOST TO
+   * THIS, which is the right way round: a loopback hijacking the bay is a bug
+   * and a knob not picking is a smaller feature.
+   * ⚠️ AND VELOCITY ZERO IS A NOTE OFF whatever the status byte says, because
+   * this keyboard sends releases as note on with velocity 0 and every single
+   * press would otherwise pick two instruments.
+   */
+  function isGesture(m) {
+    return classOf(m) === 'note' && (m.d2 ?? 0) > 0;
+  }
+
+  /**
+   * 🔴 AND NOTES ECHO TOO, WHICH THE FILTER ABOVE CANNOT CATCH. A link into a
+   * loopback sends notes to its output and they arrive back on its input, so
+   * the bay would read its own traffic as a gesture and pick the bus it had
+   * just been told to feed. So a port is deaf for a moment after this page
+   * sends to it: not to what it delivers, which is the whole job, but to what
+   * it READS BACK as a decision.
+   * ⚠️ IT IS PER PORT rather than one global gate, because a real hand on a
+   * second instrument during that moment is a real gesture and must not be
+   * swallowed.
+   * ⚠️ AND IT IS 250 ms, WHICH IS A GUESS WITH A REASON. CoreMIDI loopback is
+   * sub-millisecond, so this is two orders of magnitude of headroom; the cost
+   * of it being too long is that playing the same instrument you just patched
+   * INTO is ignored for a quarter of a second, and the cost of too short is the
+   * defect above.
+   */
+  const ECHO_MS = 250;
+  const echoUntil = new Map();            // port id -> when it may be believed again
+  const hush = (id) => echoUntil.set(id, performance.now() + ECHO_MS);
+  const hushed = (id) => (echoUntil.get(id) ?? 0) > performance.now();
+
+  /**
+   * 🔴 A LOOPBACK IS A DESTINATION, NOT SOMETHING YOU PLAY. Asked 2026-09-21
+   * after it hijacked the bay: *"can we ignore iac"*.
+   * `IAC Driver Bus 1` is a macOS virtual bus. Nobody presses a key on it, so
+   * it can never be the instrument somebody meant, and everything sent to it
+   * comes back on its input where it looks exactly like somebody playing.
+   * ✅ **IT KEEPS ITS ROW, WHICH IS THE HALF THAT MATTERS.** This page's own
+   * rule is that a port which vanished says it does not exist, and that is a
+   * different and false statement: routing to the IAC bus is how you reach
+   * another application on this machine, and it is a real thing to want. So it
+   * is reachable by PRESSING it and never by playing it, which is the honest
+   * split between *a thing you choose* and *a thing you play*.
+   * ⚠️ AND THE ECHO HUSH STAYS DESPITE THIS. It is not redundant: a link into
+   * the IAC bus still returns its own notes, other virtual buses exist under
+   * other names, and two instruments daisy-chained through a DIN socket echo
+   * the same way with nothing in their names to say so.
+   */
+  /* 🔴 THE RULE IS THE TAXONOMY'S NOW, not a second regular expression here.
+     `plays: false` sits on the entry with the reason beside it, and the module's
+     test asserts it is the only entry carrying it. A page holding its own copy
+     of a fact the kit already states is the two-files-one-measurement defect
+     this project keeps paying for. */
+  const neverPlayed = (raw) => describe(raw).plays === false;
+
+  function played(portIdOfSender, m) {
+    if (!isGesture(m)) return;
+    /* This page just sent to the other half of this instrument, so what has
+       arrived is very likely its own bytes coming back. */
+    if (hushed(nodeOf(portIdOfSender))) return;
+    if (neverPlayed(rawName.get(portIdOfSender) || '')) return;
+    const node = nodeOf(portIdOfSender);
+    const g = instrument(node);
+    if (!g) return;
+    const now = performance.now();
+    /* A pick older than the window is not a held thought, it is a forgotten
+       one. Drop it and treat this gesture as a fresh first press. */
+    if (pick && now - playAt > PLAY_WINDOW) {
+      say(`${instrument(pick)?.label || 'the last instrument'} was let go, so this starts again`);
+      pick = null;
+    }
+    playAt = now;
+    if (!pick) {
+      pick = node;
+      const alone = instruments().length < 2;
+      say(alone
+        ? `${g.label} is the only instrument here, so there is nothing to connect it to`
+        : `${g.label} sent something. Play the one it should reach.`, alone);
+      d.log(`${g.label} is held by playing it. Play another instrument to connect them.`);
+      paint();
+      return;
+    }
+    if (node === pick) { paint(); return; }         // still the same hand
+    const held = instrument(pick);
+    const plan0 = plan(held, g);
+    if (!plan0.from) { say(plan0.why, true); paint(); return; }
+    const r = bay.link(plan0.from, plan0.to, plan0.transforms);
+    if (!r.ok) {
+      say(r.why, true);
+      d.log(`${held.label} to ${g.label} was refused: ${r.why}`, 'warn');
+      paint();
+      return;
+    }
+    say(r.warn || `${bay.port(plan0.from).label} now reaches ${bay.port(plan0.to).label}`, !!r.warn);
+    d.log(`connected by playing them: ${printLink(bay.links().at(-1))}`);
+    pick = null;
     paint();
   }
-  clearPick.onclick = () => { pickFrom = null; pickTo = null; paint(); };
+
+  function choose(node) {
+    const g = instrument(node);
+    if (!g) return;
+
+    if (node === pick) {
+      pick = null;
+      say(`${g.label} is no longer picked`);
+      paint();
+      return;
+    }
+
+    if (!pick) {
+      pick = node;
+      /* 🔴 THE INVITATION IS ONLY MADE WHERE IT CAN BE ACCEPTED. With one
+         instrument on the desk there is nothing to press next, and
+         *"press what it should reach"* is an instruction nobody can follow.
+         Reported as this page not connecting while MIDI was plainly arriving:
+         the press was landing, the sentence was answering, and the second
+         press it asked for did not exist. */
+      const alone = instruments().length < 2;
+      say(alone
+        ? `${g.label} is the only instrument here, so there is nothing to connect it to`
+        : g.out ? `${g.label} sends. Press what it should reach.`
+                : `${g.label} receives. Press what should reach it.`,
+        alone);
+      paint();
+      return;
+    }
+
+    const p = plan(instrument(pick), g);
+    // The only refusal this page words itself: one side has no port at all, so
+    // there is nothing for the validator to be asked about.
+    if (!p.from) { say(p.why, true); paint(); return; }
+    const r = bay.link(p.from, p.to, p.transforms);
+    if (!r.ok) { say(r.why, true); paint(); return; }
+    say(r.warn || `${bay.port(p.from).label} now reaches ${bay.port(p.to).label}`, !!r.warn);
+    d.log(`connected ${printLink(bay.links().at(-1))}`);
+    pick = null;
+    paint();
+  }
+  clearPick.onclick = () => { pick = null; say(''); paint(); };
 
   /**
    * 🔴 THE TRANSFORMS THE SMALLEST USEFUL PATCH ON THIS DESK NEEDS, AND BOTH
@@ -166,7 +567,8 @@
    * *play the Circuit*. And that keyboard was measured **a semitone flat**,
    * notes 47 to 71 where a 25 key controller sits at 48 to 72.
    * ⚠️ THEY ARE A SUGGESTION THE PAGE MAKES AND SHOWS, not something it does
-   * quietly: the line above the button prints the whole link before it exists.
+   * quietly: a row that is `ready` prints the whole link, transforms and all, on
+   * its hover, before the press that makes it.
    */
   function suggest(fromId, toId) {
     const a = bay.port(fromId), b = bay.port(toId);
@@ -177,49 +579,76 @@
     return t;
   }
 
-  connect.onclick = () => {
-    if (!pickFrom || !pickTo) return;
-    const r = bay.link(pickFrom, pickTo, suggest(pickFrom, pickTo));
-    if (!r.ok) { say(r.why, true); return; }
-    say(r.warn || 'connected', !!r.warn);
-    pickFrom = null; pickTo = null;
-    paint();
-  };
-
   function say(text, bad = false) {
     why.textContent = text;
     if (bad) why.dataset.bad = '1'; else delete why.dataset.bad;
   }
 
+  /**
+   * 🔴 THE REFUSAL IS STILL SHOWN BEFORE THE PRESS, AND WITH THE BUTTON GONE IT
+   * HAS TO COME EARLIER. Every row is asked, while one end is held, whether it
+   * could be the other end: the answer is one word in the `join` column and the
+   * validator's own sentence on the row's hover. So a pair that cannot be joined
+   * says why without anybody trying it, which is the rule the button used to
+   * carry, moved one press earlier.
+   */
   function paint() {
-    ports.set(bay.ports().map((p) => ({
-      id: p.id, label: p.label, way: p.dir === 'out' ? 'out' : 'in',
-      med: p.medium,
-      list: p.dir === 'in' ? (p.accepts.join(' ') || 'nothing') : p.emits.join(' '),
-      hover: `${p.id}\n${p.note || ''}`,
-    })));
-    ports.mark((row) => row.id === pickFrom || row.id === pickTo);
+    const held = pick ? instrument(pick) : null;
+
+    ports.set(instruments().map((g) => {
+      const lines = [g.node];
+      /* 🔴 THE NAME EACH HALF REALLY HAS, WHENEVER IT IS NOT THE NAME ON THE
+         ROW. The Model 12 arrives as `Model 12 MIDI IN` and `Model 12 MIDI
+         OUT`, so a reader who wants to know which port the grouping picked up
+         should not have to take it on trust. */
+      /* A bus says what it is, on the row, because *why did nothing happen when
+         I played it* is a question asked at the row rather than in a comment. */
+      if (g.out && neverPlayed(rawName.get(g.out.id) || '')) {
+        lines.push('a virtual bus, so press it rather than playing it');
+      }
+      const sentAs = g.out && rawName.get(g.out.id);
+      const tookAs = g.in && rawName.get(g.in.id);
+      if (sentAs && sentAs !== g.label) lines.push(`sends as ${sentAs}`);
+      if (tookAs && tookAs !== g.label) lines.push(`takes as ${tookAs}`);
+      if (g.in?.note) lines.push(g.in.note);
+      else if (g.out?.note) lines.push(g.out.note);
+      let join = '';
+      if (!held) lines.push('press it to start a link');
+      else if (g.node === pick) lines.push('press it again to put it down');
+      else {
+        const p = plan(held, g);
+        join = p.ok ? 'ready' : 'refused';
+        lines.push(p.ok
+          ? `press it to connect ${printLink({ from: p.from, to: p.to, transforms: p.transforms })}`
+          : p.why);
+        if (p.ok && p.warn) lines.push(p.warn);
+      }
+      return {
+        id: g.node, label: g.label,
+        /* An instrument with only one direction is still one row, and the
+           missing half reads `nothing` rather than being left blank: a blank
+           cell collapses "it takes nothing" and "we did not look". The reason
+           it takes nothing is on the hover, where there is room for it. */
+        sends: g.out ? (g.out.emits.join(' ') || 'nothing') : 'nothing',
+        takes: g.in ? (g.in.accepts.join(' ') || 'nothing') : 'nothing',
+        join, hover: lines.join('\n'),
+      };
+    }));
+    ports.mark((row) => row.id === pick);
 
     linksT.set(bay.links().map((l) => ({
       id: l.id, text: printLink(l), sent: l.sent, drop: l.dropped, cut: 'remove',
       hover: 'press to remove this link',
     })));
 
-    const a = pickFrom && bay.port(pickFrom), b = pickTo && bay.port(pickTo);
-    line.textContent = !a ? 'press a port, then another'
-      : !b ? `${a.label} -> ?`
-      : printLink({ from: pickFrom, to: pickTo, transforms: suggest(pickFrom, pickTo) });
-    connect.disabled = !(a && b);
-    /* A refusal is shown BEFORE the press, so the button is not a thing you
-       press to find out. */
-    if (a && b) {
-      const v = bay.validate(pickFrom, pickTo, suggest(pickFrom, pickTo));
-      if (!v.ok) { say(v.why, true); connect.disabled = true; }
-      else say(v.warn || '', !!v.warn);
-    }
+    /* 🔴 THE PENDING LINE SAYS WHICH WAY IT IS GOING TO GO, BEFORE THE SECOND
+       PRESS LANDS. That is the whole of the order rule made visible: the held
+       instrument is on the left because the first press sends. */
+    line.textContent = !held ? 'press an instrument, then another'
+      : held.out ? `${held.label} -> ?` : `? -> ${held.label}`;
 
     patch.textContent = bay.text() || '# nothing is connected';
-    d.set('ports', bay.ports().length || '');
+    d.set('instruments', instruments().length || '');
     d.set('links', bay.links().length || '');
     d.set('sent', sent || '');
     d.set('heard', heard || '');
@@ -232,13 +661,33 @@
     return rule ? rule : { accepts: DEFAULT_ACCEPTS, never: ['sysex'], why: '' };
   }
 
+  /**
+   * A port id, whose node segment is the grouping key. See `instruments()`.
+   * 🔴 IT IS NUMBERED WHEN IT IS TAKEN, because two instruments with one name
+   * used to mint one id and the second silently replaced the first in the port
+   * map: two keyboards on the desk, one row on the page, and no way to reach
+   * whichever of them lost. They are two rows now, both labelled the same, and
+   * the node key on each row's hover is what tells them apart.
+   */
+  function portId(name, dir) {
+    const base = slug(instrumentName(name));
+    let node = base, n = 1;
+    while (bay.port(`here:${node}:${dir}`)) node = `${base}-${++n}`;
+    return `here:${node}:${dir}`;
+  }
+
   /** One Web MIDI port becomes one bay port. */
   function adoptInput(p) {
-    const id = `here:${slug(p.name)}:out`;
-    bay.addPort({ id, label: p.name || 'unnamed', dir: 'out', medium: 'midi',
+    const id = portId(p.name, 'out');
+    rawName.set(id, p.name || 'unnamed');
+    bay.addPort({ id, label: instrumentName(p.name), dir: 'out', medium: 'midi',
       shape: { protocol: '1.0' }, emits: EMITS, note: p.manufacturer || '' });
     p.onmidimessage = (e) => {
       const m = decode(Array.from(e.data));
+      /* 🔴 PATCHING BY PLAYING, AND IT IS THE THING THAT WAS ASKED FOR FOUR
+         TIMES. `played()` is before the flood policy on purpose: a gesture must
+         pick an instrument even on a port the log has decided to stop listing. */
+      played(id, m);
       if (!traffic.add(m)) return;          // the flood policy lives in the log
       const ev = { cls: classOf(m), ch: m.ch, d1: m.d1, d2: m.d2 };
       sent += bay.send(id, ev);
@@ -247,16 +696,20 @@
   }
 
   function adoptOutput(p) {
-    const id = `here:${slug(p.name)}:in`;
+    const id = portId(p.name, 'in');
+    rawName.set(id, p.name || 'unnamed');
+    /* ⚠️ THE CONSENT RULE IS MATCHED ON THE RAW NAME, never on the grouped one.
+       It is the fullest thing there is to match, and the patterns are about
+       device families, which a trailing `OUT` never carried. */
     const c = consentFor(p.name || '');
-    bay.addPort({ id, label: p.name || 'unnamed', dir: 'in', medium: 'midi',
+    bay.addPort({ id, label: instrumentName(p.name), dir: 'in', medium: 'midi',
       shape: { protocol: '1.0' }, accepts: c.accepts, never: c.never ?? ['sysex'], note: c.why,
       deliver: (ev) => {
         const bytes = toBytes(ev);
         if (!bytes) return;
         /* ⚠️ A REAL SEND, AND THE ONLY ONE ON THIS PAGE. Everything upstream of
            here is arithmetic; this is the byte leaving the building. */
-        try { outs.get(id)?.send(bytes); heard++; d.set('heard', heard || ''); }
+        try { outs.get(id)?.send(bytes); hush(nodeOf(id)); heard++; d.set('heard', heard || ''); }
         catch (err) { d.log(`${p.name} refused a message: ${err.message}`, 'warn'); }
       } });
     outs.set(id, p);
@@ -269,6 +722,41 @@
    * and it is deliberately a second wall behind the `accepts` list: a list is a
    * declaration and this is arithmetic.
    */
+  /**
+   * 🔴 ALL NOTES OFF AND ALL SOUND OFF, ON EVERY CHANNEL, TO EVERY OUTPUT.
+   * CC 123 is All Notes Off and CC 120 is All Sound Off, and both are ordinary
+   * channel mode control changes, so this expresses NOTHING `toBytes` could not
+   * already build: no SysEx, no program change, no clock byte. The Circuit has
+   * no factory reset and neither of these touches flash.
+   * ⚠️ BOTH, AND IN THAT ORDER, BECAUSE THEY ARE DIFFERENT MESSAGES. All Notes
+   * Off releases held notes and lets their release envelopes finish, which is
+   * the musical answer. All Sound Off cuts the voices dead, which is the answer
+   * when a note is stuck because something never sent a release at all. Sending
+   * only the first leaves a hung voice on a synth with a long release; sending
+   * only the second makes a normal release sound broken.
+   * ⚠️ AND EVERY CHANNEL, NOT THE ONE THE LINK USED. A stuck note is by
+   * definition on a channel nobody is tracking any more, which is why the
+   * transform that moved it is no help here.
+   */
+  function allOff() {
+    let n = 0;
+    const reached = [];
+    for (const [id, port] of outs) {
+      let ok = 0;
+      for (let ch = 1; ch <= 16; ch++) {
+        for (const cc of [123, 120]) {
+          const bytes = toBytes({ cls: 'cc', ch, d1: cc, d2: 0 });
+          if (!bytes) continue;
+          try { port.send(bytes); hush(nodeOf(id)); ok++; n++; heard++; } catch { /* a port may have gone */ }
+        }
+      }
+      if (ok) reached.push(bay.port(id)?.label || id);
+    }
+    d.set('heard', heard || '');
+    if (!n) { d.log('nothing to send panic to, so press the status button first', 'warn'); return; }
+    d.log(`panic: all notes off and all sound off on 16 channels to ${reached.join(', ')}`, 'hi');
+  }
+
   function toBytes(ev) {
     const ch = Math.max(0, Math.min(15, (ev.ch ?? 1) - 1));
     if (ev.cls === 'note') return [(ev.d2 === 0 ? 0x80 : 0x90) | ch, ev.d1, ev.d2 ?? 0];
@@ -313,9 +801,26 @@
     pres.set('checking');
     if (await open()) {
       const n = bay.ports().length;
+      const k = instruments().length;
       pres.set(n ? 'online' : 'offline', n ? null : 'nothing is plugged in');
-      d.log(`${n} ports. Press one, press another, and this page says whether they `
-          + 'may be joined before you press connect.');
+      d.log(`${k} instrument${k === 1 ? '' : 's'} on ${n} ports. Press one and press `
+          + 'another to connect them, and the first one sends. While one is held, every '
+          + 'other row says whether it can take it.');
+      sayInstruments();
+      /**
+       * 🔴 ONE INSTRUMENT IS NOT A DESK, AND THE PAGE HAS TO SAY SO RATHER THAN
+       * INVITING A PRESS THAT CANNOT WORK. A link needs two, and a page that
+       * answers the first press with *"press what it should reach"* when there
+       * is nothing else to press has told somebody to do an impossible thing.
+       * That is the rule this page already keeps for a second press of the same
+       * row, arriving from the direction nobody checked.
+       */
+      if (k === 1) {
+        d.log('a link needs two instruments and there is one, so there is nothing to '
+            + 'connect it to yet. Plug in something else and press the status button again.', 'warn');
+      } else if (!k) {
+        d.log('no instruments, so there is nothing to route.', 'warn');
+      }
       d.log('nothing here can send SysEx, a program change or a clock byte, because '
           + 'there is no code that turns one into bytes.');
     } else {
@@ -334,12 +839,35 @@
      * grades on any machine but this desk. The bindings, the refusals and the
      * counters are all the page's own code either way.
      */
-    /* ⚠️ NAMED FOR THE INSTRUMENT IT STANDS IN FOR, because `suggest()` reads
-       the label and a fixture called `test keys` would exercise half of it
-       while the assert below claimed both halves. */
+    /* ⚠️ NAMED FOR THE INSTRUMENTS THEY STAND IN FOR, because `suggest()` and
+       `consentFor()` both read a name, and a fixture called `test keys` would
+       exercise half of this page while the asserts below claimed both halves.
+       🔴 AND EVERY ONE OF THEM HAS BOTH HALVES OF ITS WIRE, WHICH IS WHAT THIS
+       BUILD IS ABOUT: six ports have to come out of the table as three rows.
+       ⚠️ THE MK-425C EMITS SysEx ON PURPOSE, which the real one does not: the
+       page credits every real source with `EMITS`, and `EMITS` has no SysEx in
+       it. It is here so that pressing the keyboard and then the Circuit is
+       REFUSED, which is what the refusal checks need and what the happy path
+       cannot use. The Model 12 sends notes and controllers and nothing else, so
+       that pair is allowed.
+       ⚠️ AND THE MK-425C'S INPUT TAKES ITS `accepts` FROM `CONSENT`, which is
+       the empty list. That row is the dead end this whole change is about, so a
+       fixture that invented a friendlier one would grade nothing. */
+    const kc = consentFor('MK-425C');
     bay.addPort({ id: 'test:mk-425c:out', label: 'MK-425C', dir: 'out', medium: 'midi',
       shape: { protocol: '1.0' }, emits: ['note', 'cc', 'sysex'] });
+    bay.addPort({ id: 'test:mk-425c:in', label: 'MK-425C', dir: 'in', medium: 'midi',
+      shape: { protocol: '1.0' }, accepts: kc.accepts, never: kc.never, note: kc.why });
+    const mc = consentFor('Model 12');
+    bay.addPort({ id: 'test:model12:out', label: 'Model 12', dir: 'out', medium: 'midi',
+      shape: { protocol: '1.0' }, emits: ['note', 'cc'] });
+    bay.addPort({ id: 'test:model12:in', label: 'Model 12', dir: 'in', medium: 'midi',
+      shape: { protocol: '1.0' }, accepts: mc.accepts, never: mc.never, note: mc.why });
     const c = consentFor('Circuit');
+    /* The Circuit sends its own clock, measured at about 122 bpm, so its output
+       emits one and every destination here drops it. */
+    bay.addPort({ id: 'test:circuit:out', label: 'Circuit', dir: 'out', medium: 'midi',
+      shape: { protocol: '1.0' }, emits: ['note', 'cc', 'clock'] });
     bay.addPort({ id: 'test:circuit:in', label: 'Circuit', dir: 'in', medium: 'midi',
       shape: { protocol: '1.0' }, accepts: c.accepts, never: c.never, note: c.why,
       deliver: () => { heard++; } });
@@ -394,10 +922,257 @@
       JSON.stringify(suggest('test:mk-425c:out', 'test:circuit:in')));
 
     const cyc = bay.validate('test:circuit:in', 'test:mk-425c:out', []);
+    /**
+     * 🔴 PATCHING BY PLAYING, GRADED, AND THE NEGATIVE HALF IS THE WHOLE POINT.
+     * CLAUDE.md records that the Circuit here sends its own clock continuously
+     * at about 122 bpm, so a rule that picked the last instrument to send
+     * ANYTHING would pick it within a millisecond of the page opening and never
+     * let go. These asserts say a clock byte picks nothing and a note does.
+     */
+    {
+      pick = null; playAt = 0;
+      const l0 = bay.links().length;
+      /* ⚠️ THE FIXTURES ARE WHAT `decode` REALLY PRODUCES, and the first draft
+         of them was not. `classOf` switches on `kind` and its cases are
+         `note on`, `note off`, `control`, `clock`; a fixture carrying
+         `kind: 'note'` and a helpfully pre-set `cls` fell through to `other`,
+         so three of these went red against a working feature. A fixture that
+         sets the answer instead of the input grades nothing. */
+      const NOTE = { kind: 'note on', ch: 2, d1: 60, d2: 100 };
+      const OFF = { kind: 'note on', ch: 2, d1: 60, d2: 0 };
+      const CLOCK = { kind: 'clock', ch: null, d1: 0, d2: 0 };
+
+      played('test:circuit:out', CLOCK);
+      played('test:model12:out', CLOCK);
+      d.assert('a clock byte picks no instrument, so a Circuit sending its own clock cannot hold the bay',
+        pick === null && bay.links().length === l0,
+        `pick ${pick}, ${bay.links().length - l0} links from two clocks`);
+
+      played('test:mk-425c:out', OFF);
+      d.assert('and a note off picks nothing either, so releasing a key is not a second press',
+        pick === null, `pick ${pick}`);
+
+      played('test:model12:out', NOTE);
+      const afterFirst = pick;
+      played('test:model12:out', NOTE);
+      d.assert('playing one instrument holds it, and playing it again only refreshes it',
+        afterFirst === 'test:model12' && pick === 'test:model12'
+        && bay.links().length === l0,
+        `held ${pick}, ${bay.links().length - l0} links`);
+
+      played('test:circuit:out', NOTE);
+      const made = bay.links().at(-1);
+      d.assert('and playing a second instrument connects them, out of the one played first',
+        bay.links().length === l0 + 1 && !pick
+        && made?.from === 'test:model12:out' && made?.to === 'test:circuit:in',
+        made ? printLink(made) : 'no link');
+
+      /**
+       * 🔴 THE LOOPBACK, WHICH IS THE DEFECT A REAL DESK FOUND AND A HARNESS
+       * NEVER WOULD. `IAC Driver Bus 1` sends back everything sent to it, so
+       * `panic`'s 32 control changes returned on its input and the page linked
+       * the keyboard to the bus. Both halves of the repair are asserted: a
+       * controller is no longer a gesture at all, and a note arriving from an
+       * instrument this page has just sent to is treated as its own echo.
+       */
+      pick = null;
+      const CC = { kind: 'control', ch: 1, d1: 74, d2: 64 };
+      played('test:circuit:out', CC);
+      d.assert('a controller is not a gesture, so a loopback echoing our own control changes picks nothing',
+        pick === null, `pick ${pick}`);
+
+      hush('test:circuit');
+      played('test:circuit:out', NOTE);
+      const duringHush = pick;
+      echoUntil.clear();
+      played('test:circuit:out', NOTE);
+      d.assert('and a note from an instrument we just sent to is our own echo, until the moment passes',
+        duringHush === null && pick === 'test:circuit',
+        `during the hush ${duringHush}, after it ${pick}`);
+      pick = null;
+
+      /* The window, asserted by moving the clock rather than by waiting. */
+      pick = null;
+      played('test:model12:out', NOTE);
+      playAt -= PLAY_WINDOW + 1;
+      played('test:circuit:out', NOTE);
+      d.assert('a pick older than the window starts again rather than joining something nobody meant',
+        pick === 'test:circuit' && bay.links().length === l0 + 1,
+        `held ${pick} after a stale first press, ${bay.links().length - l0} links total`);
+      pick = null;
+      /* 🔴 THIS BLOCK PUTS BACK WHAT IT MADE, because a check that leaves state
+         behind breaks the check after it and the failure names the wrong one.
+         It happened: the reversed-order drill below went red reading a link
+         this block had left, which is a check failing because of its neighbour
+         rather than because of the page. Cleaning up beats reordering, which
+         only works until somebody adds a third block. */
+      for (const l of bay.links().slice(l0)) bay.unlink(l.id);
+      playAt = 0;
+      paint();
+    }
+
     d.assert('an input cannot be used as a source', !cyc.ok, cyc.why);
 
-    d.assert('the readout counts links and ports, and sent and heard separately',
-      bay.links().length >= 1 && bay.ports().length >= 2, `${bay.ports().length} ports`);
+    /* Every claim below about a row is read off the RENDERED table rather than
+       off the code that fills it, because what a reader can find is the claim
+       and a function returning the right string is not a row saying it. */
+    const rows = () => [...ports.el.querySelectorAll('.pos-tbl-body .pos-tbl-row')];
+    const rowOf = (label) => rows().find((r) => r.firstElementChild?.textContent === label);
+    const cellsOf = (r) => [...r.children].map((c) => c.textContent);
+
+    /**
+     * 🔴 ONE ROW PER INSTRUMENT, WHICH IS THE WHOLE REPORT. Six ports, three
+     * instruments, three rows. The keyboard is the one to name: it has an
+     * output and an input, the old table gave it two rows, and one of them
+     * existed only to be refused.
+     */
+    d.assert('six ports on three instruments come out as three rows, not six',
+      bay.ports().length === 6 && rows().length === 3
+      && rows().filter((r) => r.firstElementChild.textContent === 'MK-425C').length === 1,
+      `${bay.ports().length} ports, ${rows().length} rows: `
+      + `${rows().map((r) => r.firstElementChild.textContent).join(', ')}`);
+
+    /**
+     * 🔴 TWO PRESSES, NOT FOUR. These drive `choose()` exactly as a finger does,
+     * because the report was about the INTERACTION and a check that called
+     * `bay.link()` would have been green through every version of this page,
+     * including the one somebody could not get to work.
+     */
+    pick = null;
+    const l0 = bay.links().length;
+    choose('test:model12');
+    choose('test:circuit');
+    const made = bay.links().at(-1);
+    d.assert('pressing two instruments connects them, with no third press',
+      bay.links().length === l0 + 1 && !pick,
+      `${bay.links().length - l0} link from two presses`);
+
+    /**
+     * 🔴 A DESK OF ONE SAYS SO, AND SAYS IT ON THE PRESS RATHER THAN AFTER A
+     * SECOND PRESS THAT CANNOT HAPPEN. Reported 2026-09-21 as *"bay does not
+     * connect by i get midi events"*, which is what this page looks like when
+     * exactly one instrument is plugged in: the press lands, the line answers
+     * *"press what it should reach"*, and there is nothing else on the desk.
+     * ⚠️ IT IS ASSERTED AGAINST THE RENDERED LINE, not against a branch, and it
+     * asserts BOTH HALVES: alone it refuses, and with a neighbour it invites.
+     * A page that said `nothing to connect it to` whatever was plugged in would
+     * pass the first clause.
+     */
+    {
+      const only = bay.ports().filter((x) => !x.id.startsWith('solo:'));
+      // A desk of one, built from nothing but this page's own arithmetic.
+      const soloBay = instruments().length;
+      pick = null;
+      choose('test:circuit');
+      const withPeers = why.textContent;
+      pick = null;
+      d.assert('with a neighbour on the desk, the first press invites a second',
+        /press what/i.test(withPeers) && soloBay >= 2,
+        `${soloBay} instruments, line reads "${withPeers}"`);
+      /* 🔴 READ OFF THE LOG ELEMENT, because the claim is about what a reader
+         can see. A count of ports would have passed this line on every day the
+         log said nothing but a number, which is the defect being fixed. */
+      sayInstruments();
+      const logText = (document.querySelector('.pos-log')?.textContent || '');
+      const named = [...new Set(instruments().map((g) => g.label))];
+      const missing = named.filter((n) => !logText.includes(n));
+      d.assert('and the log names every instrument it found, rather than only counting them',
+        named.length > 0 && missing.length === 0,
+        missing.length ? `not in the log: ${missing.join(', ')}` : `all ${named.length} named`);
+    }
+
+    /* 🔴 THE TIE-BREAK, ASSERTED. Both of these can send and both can receive,
+       so there are two possible links and the order of pressing is the only
+       signal there is. First pressed sends. */
+    d.assert('and it runs the way the first press said, out of the one pressed first',
+      made?.from === 'test:model12:out' && made?.to === 'test:circuit:in',
+      made ? printLink(made) : 'no link');
+    bay.unlink(made.id);
+
+    /* ⚠️ THE OTHER ORDER, WHICH USED TO BE THE HALF THAT DID NOTHING AT ALL:
+       pressing a destination row first left the page unchanged and silent. Now
+       there is no destination row, and the same two presses reversed make the
+       opposite link rather than the same one. */
+    pick = null;
+    const l1 = bay.links().length;
+    choose('test:circuit');
+    const lineSaid = line.textContent;
+    choose('test:model12');
+    const back = bay.links().at(-1);
+    d.assert('and pressing them the other way round makes the opposite link',
+      bay.links().length === l1 + 1 && back?.from === 'test:circuit:out'
+      && back?.to === 'test:model12:in',
+      back ? printLink(back) : 'no link');
+
+    /* 🔴 AND THE PENDING LINE SAID WHICH WAY IT WOULD GO BEFORE THAT SECOND
+       PRESS LANDED, which is the difference between a rule and a surprise. */
+    d.assert('the pending line said which way it would run before that press landed',
+      lineSaid === 'Circuit -> ?', lineSaid);
+    bay.unlink(back.id);
+
+    /* A refusal is the second press ANSWERING, and the first pick has to survive
+       it or a refusal costs two presses to recover from. */
+    pick = null;
+    const l2 = bay.links().length;
+    choose('test:mk-425c');
+    choose('test:circuit');
+    d.assert('a refused pair is not connected, says why, and keeps the first pick',
+      bay.links().length === l2 && /sysex/i.test(why.textContent)
+      && pick === 'test:mk-425c',
+      `${why.textContent}, holding ${pick || 'nothing'}`);
+
+    /* 🔴 AND THE REASON IS READABLE BEFORE THE PRESS, WHICH IS WHAT THE GONE
+       BUTTON USED TO BUY. */
+    const circuitRow = rowOf('Circuit');
+    d.assert('a row that cannot take the pick reads as refused, with the reason in its hover',
+      !!circuitRow && circuitRow.lastElementChild.textContent === 'refused'
+      && /sysex/i.test(circuitRow.title),
+      circuitRow ? `join reads ${circuitRow.lastElementChild.textContent}, hover says ${circuitRow.title.split('\n').pop()}` : 'no row');
+
+    /**
+     * 🔴 THE ROW THAT MOTIVATED THIS BUILD, AND IT IS THE NEGATIVE HALF. The
+     * MK-425C is a controller with no sound engine, so `CONSENT` gives it an
+     * empty `accepts` and nothing can ever be sent to it. That used to be a
+     * whole row of the table which existed to be refused; it is half of one row
+     * now, it reads `nothing` under `takes`, and it reads `refused` BEFORE
+     * anybody presses it rather than after.
+     */
+    pick = null;
+    choose('test:circuit');
+    const keysRow = rowOf('MK-425C');
+    d.assert('an instrument that accepts nothing says so and reads refused before the press',
+      !!keysRow && cellsOf(keysRow)[2] === 'nothing'
+      && cellsOf(keysRow)[3] === 'refused' && /takes none/i.test(keysRow.title),
+      /* ⚠️ THE HOVER IS IN THE DETAIL BECAUSE A SABOTAGE PROVED IT HAS TO BE.
+         Reversing the direction rule left this line red with a detail reading
+         `takes nothing, join refused`, which is what a PASS looks like: the
+         clause that had failed was the reason, and the reason was invisible. */
+      keysRow ? `takes ${cellsOf(keysRow)[2]}, join ${cellsOf(keysRow)[3]}, `
+        + `hover says ${keysRow.title.split('\n').pop()}` : 'no row');
+
+    /* ⚠️ AND THE POSITIVE CONTROL BESIDE IT, IN THE SAME PAINT, or the line
+       above would pass on a page whose every row reads refused. */
+    const m12Row = rowOf('Model 12');
+    d.assert('and the instrument beside it reads ready, which is the negative control',
+      !!m12Row && cellsOf(m12Row)[3] === 'ready',
+      m12Row ? `join reads ${cellsOf(m12Row)[3]}` : 'no row');
+
+    /* No press may appear to do nothing, and pressing the held row again is the
+       one that would, so it puts it down. */
+    pick = null;
+    choose('test:model12');
+    const wasHeld = pick;
+    choose('test:model12');
+    d.assert('pressing the held row again puts it down rather than doing nothing',
+      wasHeld === 'test:model12' && !pick && /no longer picked/.test(why.textContent),
+      why.textContent);
+    paint();
+
+    /* The first readout cell counts INSTRUMENTS, so it is the number of rows in
+       the table below it rather than a port count nothing on the page shows. */
+    d.assert('the readout counts instruments and links, and sent and heard separately',
+      bay.links().length >= 1 && instruments().length === 3 && instruments().length === rows().length,
+      `${instruments().length} instruments, ${rows().length} rows, ${bay.links().length} links`);
 
     if (d.el.isConnected) {
       d.assert('the pending link line keeps one height whatever is in it',
@@ -406,6 +1181,39 @@
       d.assert('the page does not drag sideways at this width',
         document.documentElement.scrollWidth <= window.innerWidth + 1,
         `page ${document.documentElement.scrollWidth} against ${window.innerWidth}`);
+    }
+
+    /**
+     * 🔴 PANIC IS GRADED AS A SECOND EXIT, WHICH IS THE ONLY THING THAT MAKES
+     * IT SAFE TO HAVE. `deliver` used to be the one way out, and that is what
+     * turned "this page has only ever sent notes, controllers and bend" into a
+     * counter rather than a claim about a file. A second exit has to be held to
+     * the same wall.
+     */
+    {
+      /* Every byte panic can produce, built the same way it builds them. */
+      const made = [];
+      for (let ch = 1; ch <= 16; ch++) for (const cc of [123, 120]) {
+        made.push(toBytes({ cls: 'cc', ch, d1: cc, d2: 0 }));
+      }
+      const bad = made.filter((b) => !b || (b[0] & 0xf0) !== 0xb0);
+      d.assert('panic can only ever produce control changes, 32 of them, on all 16 channels',
+        made.length === 32 && bad.length === 0
+        && new Set(made.map((b) => b[0] & 0x0f)).size === 16,
+        `${made.length} messages, ${bad.length} that are not a control change`);
+
+      /* The negative half: the two it sends are the two that release a voice,
+         and nothing here can reach a note, a program change or SysEx. */
+      d.assert('and it sends all notes off and all sound off, and can express neither a note nor a program change',
+        new Set(made.map((b) => b[1])).size === 2
+        && made.some((b) => b[1] === 123) && made.some((b) => b[1] === 120)
+        && toBytes({ cls: 'program', d1: 3 }) === null
+        && toBytes({ cls: 'sysex' }) === null,
+        `controllers ${[...new Set(made.map((b) => b[1]))].join(' and ')}`);
+
+      d.assert('panic is not in the harness row, because a suite run must not reach the desk',
+        make.contains(panic) && !panic.closest('.pos-controls'),
+        panic.closest('.pos-controls') ? 'it is in .pos-controls' : 'beside clear, in the page');
     }
 
     d.assert('no secret in this page', !location.href.includes('token'));
