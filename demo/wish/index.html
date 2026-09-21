@@ -7,15 +7,21 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* 🔴 EVERY BOX HERE HAS A RESERVED HEIGHT, because all three of them are
-     filled by something that arrives over a network a second or two after the
-     press. A page whose blocks appear one at a time moves the thing under the
-     reader's hand twice. */
-  .wish-said, .wish-patch, .wish-why { min-width: 0; overflow-x: auto; }
+  /* 🔴 EVERY BOX HERE HAS A RESERVED HEIGHT, because all of them are filled by
+     something that arrives over a network a second or two after the press. A
+     page whose blocks appear one at a time moves the thing under the reader's
+     hand twice. */
+  .wish-said, .wish-patch, .wish-why, .wish-dg { min-width: 0; }
+  .wish-patch { overflow-x: auto; }
+  /* 🔴 THE TRANSCRIPTION IS EDITABLE AND ITS HEIGHT IS FIXED. A textarea that
+     grows with its content is the one thing this project has a rule against,
+     so it scrolls instead. `resize: none` for the same reason: a corner a
+     reader can drag is a block that changes the page's height. */
   .wish-said {
-    min-height: 40px; display: flex; align-items: center; padding: 8px 12px;
-    border: 1px solid var(--line); border-radius: 4px; background: var(--card);
-    font-size: 15px; color: var(--ink);
+    display: block; width: 100%; height: 64px; resize: none; overflow-y: auto;
+    padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--card); color: var(--ink);
+    font-family: inherit; font-size: 15px; line-height: 1.45;
   }
   .wish-patch {
     min-height: 62px; white-space: pre; padding: 10px 12px;
@@ -25,13 +31,48 @@
   .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); }
   .wish-why b { color: var(--bad, #e0908a); font-weight: 600; }
   .wish-why i { color: var(--ok, #8fd6a8); font-style: normal; }
+  .wish-why-l { color: var(--ink); }
   .wish-rows { display: flex; flex-direction: column; gap: 6px; }
+
+  /* 🔴 THE PICTURE'S ROOM IS TAKEN BEFORE THERE IS A PICTURE. It is redrawn
+     after a two model round trip, and a box that appears then would shove the
+     log and everything under it down the page. The number is MEASURED rather
+     than guessed, and the page asserts it fits in every state: 249 px with no
+     arrows, where the drawer stacks all three instruments in one column, and
+     184 px once an arrow puts one of them in a second column.
+     ⚠️ It holds the whole desk from the first paint rather than nothing, so
+     there is no empty bordered box here either.
+     ⚠️ AND IT IS CENTRED IN ITS OWN BOX, because the tallest state is the one
+     with no answer in it: without this the picture would sit against the top
+     and leave 65 px of nothing under it for every run that succeeds. */
+  .wish-dg {
+    min-height: 252px; display: flex; flex-direction: column; justify-content: center;
+  }
+  /* Not `.pos-body > .pos-dg`: that 44 px belongs to the standing `How it
+     works` picture, which opens a section at the end of a page. This one is a
+     result and sits with the JSON it draws, so it keeps the ordinary rhythm. */
+  .wish-dg .pos-dg { margin-top: 0; }
+
+  /* 🔴 NO SPINNER ON HOVER. Asked 2026-09-21: *"rm spinner on hover"*.
+     `shell.css` gives every busy control `cursor: progress`, which macOS draws
+     as a spinning wheel beside the pointer, so the one control on this page a
+     person holds down had a spinner under their hand for the whole press.
+     🔴 AND NO DOT EITHER, ASKED THE SAME DAY: *"rm dot from hold to talk"*. A
+     voice level dot was asked for first and then withdrawn, so the button
+     carries no indicator of its own at all. The `data-busy` sweep, which is
+     paint on the button rather than something added to it, is the whole signal
+     and it runs from the press until the answer lands.
+     ⚠️ SPECIFICITY RATHER THAN ORDER, WHICH IS THE WEAKER FIX AND IS THE ONLY
+     ONE AVAILABLE: the rule being beaten is in a shared stylesheet this page
+     cannot reorder. `button[data-busy="1"]` is (0,1,1) and this is (0,2,1). */
+  .pos-controls button[data-busy="1"] { cursor: default; }
 </style>
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { createBay, printLink, checkTransforms } from '/shell/bay.mjs';
+  import { createBay, printLink, checkTransforms, delivers } from '/shell/bay.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
 
   /**
    * 🔴 SAY WHAT YOU WANT AND THE DESK PROPOSES A PATCH. Asked 2026-09-21:
@@ -61,14 +102,22 @@
    * the desk that was measured, and every id is the one `/bay/` would build for
    * the same device.
    */
+  /**
+   * ⚠️ `box` IS DECLARED RATHER THAN DERIVED, and the Model 12 is why. Its two
+   * ports are called `Model 12 MIDI IN` and `Model 12 MIDI OUT`, so the middle
+   * segment of their ids differs and the two halves of one instrument cannot be
+   * recognised as one by splitting an id. Stripping the words off the labels
+   * would work until a device is renamed, which is the thing a label does.
+   */
   const PORTS = [
-    { id: 'here:mk-425c-usb-midi-keyboard:out', dir: 'out', label: 'MK-425C USB MIDI Keyboard' },
-    { id: 'here:circuit:out', dir: 'out', label: 'Circuit' },
-    { id: 'here:model-12-midi-in:out', dir: 'out', label: 'Model 12 MIDI IN' },
-    { id: 'here:circuit:in', dir: 'in', label: 'Circuit' },
-    { id: 'here:model-12-midi-out:in', dir: 'in', label: 'Model 12 MIDI OUT' },
-    { id: 'here:mk-425c-usb-midi-keyboard:in', dir: 'in', label: 'MK-425C USB MIDI Keyboard' },
+    { id: 'here:mk-425c-usb-midi-keyboard:out', dir: 'out', box: 'keys', label: 'MK-425C USB MIDI Keyboard' },
+    { id: 'here:circuit:out', dir: 'out', box: 'circuit', label: 'Circuit' },
+    { id: 'here:model-12-midi-in:out', dir: 'out', box: 'model12', label: 'Model 12 MIDI IN' },
+    { id: 'here:circuit:in', dir: 'in', box: 'circuit', label: 'Circuit' },
+    { id: 'here:model-12-midi-out:in', dir: 'in', box: 'model12', label: 'Model 12 MIDI OUT' },
+    { id: 'here:mk-425c-usb-midi-keyboard:in', dir: 'in', box: 'keys', label: 'MK-425C USB MIDI Keyboard' },
   ];
+  const PORT = new Map(PORTS.map((p) => [p.id, p]));
   /** Measured facts, handed to the model because no manual carries them. */
   const FACTS = 'The MK-425C keyboard sends on MIDI channel 2 and its keys are one semitone '
     + 'flat. The Circuit listens for Synth 1 on channel 1, Synth 2 on channel 2, drums on '
@@ -90,6 +139,22 @@
   const NEVER = ['sysex'];
   const EMITS = ['note', 'cc', 'bend', 'touch', 'program', 'clock'];
 
+  /**
+   * 🔴 ALL THREE OF THESE WORK, AND FOR A WHILE TWO OF THEM COULD NOT. Reported
+   * 2026-09-21: choosing `whisper` answered a schema mismatch, because one
+   * payload shape was being sent to three models that do not share one. `turbo`
+   * takes base64, the two older ones take an array of bytes, and `turbo` was the
+   * default, so nothing had ever pressed the other two.
+   * ✅ MEASURED on one 12,863 byte recording of the same sentence, after the
+   * repair: all three returned it word for word, in 1.2 s, 1.3 s and 1.7 s.
+   * ⚠️ THE DIFFERENCE SHOWS UP ON LENGTH. On 79 s of speech `turbo` returned
+   * 1,653 characters in 11.0 s and `whisper` returned 839 in 29.1 s, so the
+   * older one transcribed about half the recording and took nearly three times
+   * as long. A byte array also costs 3.57 bytes of request per byte of audio
+   * against base64's 1.34, which is 2.67 times the body for the same words.
+   * ⚠️ AND VOICE ACTIVITY DETECTION IS `turbo`'s ALONE: the other two take no
+   * options at all, so nothing tells them to ignore a synth in the room.
+   */
   const HEAR = [['turbo', '@cf/openai/whisper-large-v3-turbo'],
                 ['whisper', '@cf/openai/whisper'],
                 ['tiny', '@cf/openai/whisper-tiny-en']];
@@ -102,17 +167,39 @@
   const d = mount({
     name: 'wish',
     what: 'Say what you want the desk to do, and a Cloudflare model proposes the patch.',
-    /* Four cells, and the two times are separate because they are two different
-       models and the point of the pickers is to move them independently. */
-    readout: { heard: 'ms', thought: 'ms', links: '', refused: '' },
+    /**
+     * 🔴 TWO CELLS, AND THE TWO TIMINGS CAME OFF. Asked 2026-09-21 as
+     * *"rm heard"*, and `mount()` throws on an odd count, so taking one of four
+     * forces a second decision rather than leaving a hole. Both timings went:
+     * they are a pair, both milliseconds, and both are facts about how long
+     * somebody else's model took rather than about the patch. `links` and
+     * `refused` are the outcome and are what a person pressing the button wants.
+     * ⚠️ NOTHING WAS LOST, BECAUSE THE LOG CARRIES THEM NOW. It did not before,
+     * so deleting the cells without adding the lines would have stopped the page
+     * reporting a real number.
+     */
+    readout: { links: '', refused: '' },
     controls: [
       /* 🔴 CONTROL 0, so `settleMs` lands on it and so the harness presses the
          thing this page is about. It uses a canned reply under `?selfcheck=1`
          and reaches nobody.
          ⚠️ THE LABEL IS THE DOCUMENTATION. A control that is worked with a
          gesture rather than a press has to name the gesture, because there is
-         nothing else on the page that could. */
-      { id: 'speak', label: 'Hold to talk', primary: true },
+         nothing else on the page that could.
+         🔴 AND IT IS NOT THE PRIMARY. Asked 2026-09-21: *"hold to talk is
+         secondary button"*. It had carried `primary: true` since it was called
+         `Speak`, which put the brightest fill in the row on a control that also
+         wears the busy sweep from the press until the answer lands: a glow that
+         means *press this* and a sweep that means *this is working* on one
+         button, and the two were being read as one thing. */
+      { id: 'speak', label: 'Hold to talk' },
+      /* 🔴 IT SENDS WHAT IS IN THE BOX, which is the half that makes an
+         editable transcription worth anything. A mis-heard word is now one
+         keystroke and one model call rather than a second recording and two. */
+      { id: 'ask', label: 'Ask' },
+      /* 🔴 IT WRITES INTO THE BOX AND ASKS NOBODY ANYTHING, so it costs no
+         model call at all. It used to send straight to Cloudflare, which made
+         the cheapest control on the page the one that spent the account. */
       { id: 'example', label: 'Use the example' },
     ],
   });
@@ -123,10 +210,24 @@
   const row = el('div', 'pos-crow');
   row.append(hearPick.el, thinkPick.el);
 
-  const said = el('div', 'wish-said', 'nothing said yet');
+  /**
+   * 🔴 THE HEARD SENTENCE IS EDITABLE. Asked 2026-09-21, pointing at the
+   * transcription: *"-> textarea"*. There are two models in the chain and the
+   * first one is the one nobody could correct, so a word it got wrong cost a
+   * second recording and two more model calls.
+   * ⚠️ IT ALSO SEPARATES TWO FAILURES THAT LOOK IDENTICAL FROM OUTSIDE: the
+   * speech model mis-heard, and the language model mis-read a sentence that was
+   * transcribed correctly. Re-asking the same words is the only way to tell
+   * those apart, and it needs a box somebody can retype.
+   */
+  const said = el('textarea', 'wish-said');
+  said.placeholder = 'hold the button and say what you want, or use the example';
+  said.spellcheck = false;
   const patch = el('pre', 'wish-patch', '# no patch yet');
   const whyBox = el('div', 'wish-rows');
-  d.el.append(row, said, patch, whyBox);
+  /* The picture's room, taken from the first paint. See `.wish-dg`. */
+  const dgHost = el('div', 'wish-dg');
+  d.el.append(row, said, patch, whyBox, dgHost);
 
   const speakBtn = d.button('speak');
 
@@ -154,31 +255,215 @@
     const rows = [];
     let ok = 0;
     for (const l of links) {
-      const line = printLink({ from: l.from, to: l.to, transforms: l.transforms || [] });
       const bad = checkTransforms(l.transforms || []);
       const v = bad ? { ok: false, why: bad } : b.validate(l.from, l.to, l.transforms || []);
       if (v.ok) { b.link(l.from, l.to, l.transforms || []); ok++; }
-      rows.push({ line, ok: v.ok, why: v.why });
+      rows.push({ link: l, say: sayLink(l), carries: carriedBy(l), ok: v.ok, why: v.why });
     }
     return { rows, ok, refused: rows.length - ok };
   }
 
+  // ── the words, the names and the picture ─────────────────────────────────
+
+  /**
+   * 🔴 `here:` IS THIS PROJECT'S OWN VOCABULARY AND IT WAS ON THE PAGE. Asked
+   * 2026-09-21: *"here:mk-425c-usb-midi-keyboard:out -> here:circuit:in { ... }
+   * what is here?"* It is the SITE, the first of the three segments in a port
+   * id, and it means this machine as opposed to one reached over the relay. The
+   * question is the answer: nobody outside this repository can know that, and
+   * every port on this desk is local, so the segment that exists to tell two
+   * sites apart was printing the same word on every row.
+   * ✅ SO A ROW SHOWS THE NAME, AND A SITE APPEARS ONLY WHEN IT IS NOT THIS ONE.
+   * The id is still the model's key and it is still in the JSON above, where a
+   * reader wants exactly what came back.
+   *
+   * 🔴 AND `printLink` IS NOT THE PLACE TO FIX IT, WHICH IS WORTH WRITING DOWN
+   * BECAUSE THE OBVIOUS READING SAYS OTHERWISE. That function's output is
+   * parsed straight back by `parseLink`, and `bay-test.mjs` asserts the round
+   * trip: a `printLink` that printed labels would make the text form a second
+   * source of truth that says something the graph cannot, which is the one
+   * thing the module's own header forbids. So the human form is a separate
+   * function, and it reuses `printLink` for the transform half rather than
+   * writing a second formatter that could disagree about a `+`.
+   */
+  const NAME_OF = (id) => {
+    const p = PORT.get(id);
+    if (!p) return id;                      // a port the model invented
+    const site = id.split(':')[0];
+    return site === 'here' ? p.label : `${site} ${p.label}`;
+  };
+  /** ` { transpose +1 }` or `''`, straight out of `printLink`. */
+  const TRANSFORM_TEXT = (l) =>
+    printLink({ from: 'x', to: 'y', transforms: l.transforms || [] }).slice('x -> y'.length);
+  const sayLink = (l) => `${NAME_OF(l.from)} to ${NAME_OF(l.to)}${TRANSFORM_TEXT(l)}`;
+
+  /** What would actually cross this link: what the source can emit, after the
+   *  transforms, kept to what the destination consents to. */
+  function carriedBy(l) {
+    const dst = PORT.get(l.to);
+    if (!PORT.get(l.from) || !dst) return [];
+    try {
+      const could = delivers(EMITS, l.transforms || []);
+      const takes = ACCEPTS[dst.id] ?? ['note', 'cc'];
+      return [...could].filter((c) => takes.includes(c));
+    } catch { return []; }                  // a transform name that does not exist
+  }
+
+  /**
+   * 🔴 THE DESK, DRAWN, AND IT IS THE FIRST DIAGRAM IN THIS PROJECT THAT IS NOT
+   * `How it works`. Asked 2026-09-21: *"make it json and autodraw diagram below
+   * (reserve space for it)"*. Every other picture here is REFERENCE: it passes
+   * `{ how: true, atEnd: true }`, takes the standing heading and sits last on
+   * the page because it is read once. **This one is a RESULT.** It changes on
+   * every press, it is the answer rather than an explanation, and it belongs
+   * directly under the JSON it draws, so it passes neither flag and takes no
+   * title at all. `createDiagram` already allows that: with no `how` and no
+   * `title` the heading element is hidden and nothing is written above the
+   * picture.
+   * 🔴 THE WHOLE DESK IS DRAWN WHATEVER WAS PROPOSED, and that is the point. A
+   * model here produces well formed patches aimed at the WRONG INSTRUMENT, which
+   * no validator can catch because there is nothing invalid about them. An arrow
+   * arriving at the wrong box is visible in an instant, and only if the right
+   * box is in the picture beside it.
+   */
+  const INSTRUMENTS = [
+    { id: 'keys', label: 'MK-425C', sub: 'MIDI keyboard', kind: 'device',
+      note: 'The Evolution keyboard. It sends on channel 2 and its keys are one semitone '
+          + 'flat, which is why a transpose turns up in almost every proposal.' },
+    { id: 'circuit', label: 'Circuit', sub: 'Novation synth', kind: 'device',
+      note: 'Two synth voices on channels 1 and 2, drums on channel 10, master filter on '
+          + 'channel 16. It has no factory reset, so a link that could carry SysEx is '
+          + 'refused outright.' },
+    { id: 'model12', label: 'Model 12', sub: 'TASCAM mixer', kind: 'device',
+      note: 'Nine faders that send pitch bend, and a MIDI IN that takes notes and '
+          + 'controllers. Two well formed proposals measured here arrived at this box and '
+          + 'belonged to the Circuit.' },
+  ];
+  const DG_CAPTION = 'Every arrow is a link the model asked for, and a refused one is '
+    + 'marked rather than left out.';
+
+  /**
+   * One arrow per pair of instruments the proposal joins.
+   * 🔴 A REFUSED LINK IS PART OF THE PICTURE. The run this page was reported on
+   * was `1 link, 1 refused`, so a diagram drawing only what passed would have
+   * been EMPTY while the readout beside it said an answer had arrived. Its label
+   * is `refused`, which is what travels: nothing.
+   * ⚠️ TWO PROPOSALS BETWEEN ONE PAIR ARE ONE ARROW, or two would be drawn down
+   * one gap and read as one, and then the picture would say fewer links than the
+   * readout does.
+   * ⚠️ AND A LINK THAT BEGINS AND ENDS AT ONE INSTRUMENT HAS NO ARROW TO DRAW.
+   * It is counted and logged rather than dropped in silence.
+   */
+  function arrowsFor(rows) {
+    const pairs = new Map();
+    let loops = 0;
+    for (const r of rows) {
+      const a = PORT.get(r.link.from)?.box, b = PORT.get(r.link.to)?.box;
+      if (!a || !b) continue;
+      if (a === b) { loops++; continue; }
+      const key = `${a}|${b}`;
+      const g = pairs.get(key) || { from: a, to: b, n: 0, ok: 0, why: '', carries: new Set(), t: '' };
+      g.n++;
+      if (r.ok) { g.ok++; r.carries.forEach((c) => g.carries.add(c)); g.t = g.t || TRANSFORM_TEXT(r.link); }
+      else if (!g.why) g.why = r.why;
+      pairs.set(key, g);
+    }
+    /**
+     * 🔴 ONLY A REFUSED ARROW IS LABELLED, AND THE BUDGET IS WHY RATHER THAN
+     * TASTE. MEASURED: the gap between two columns gives a link label **52 px**
+     * here, which is about seven characters at the drawer's link size, and
+     * `createDiagram` reported `transpose+1,…` as a cut the first time this was
+     * built. `refused` fits. A list of message classes or a transform does not,
+     * so what travels goes in the note, which is read on hover in the line under
+     * the picture where there is room for a sentence.
+     * ⚠️ AND THE ASYMMETRY IS THE MESSAGE: an arrow means the model asked for
+     * this link, a marked arrow means the validator stopped it.
+     */
+    const links = [...pairs.values()].map((g) => ({
+      from: g.from,
+      to: g.to,
+      label: g.ok ? '' : 'refused',
+      note: g.ok
+        ? `${[...g.carries].join(', ') || 'nothing'} would cross this link`
+          + `${g.t ? `, after ${g.t.replace(/^ \{ | \}$/g, '')}` : ''}.`
+          + (g.n > 1 ? ` The model proposed ${g.n} links between these two.` : '')
+        : g.why,
+    }));
+    return { links, loops };
+  }
+
+  let dg = null;
+  function draw(g) {
+    const { links, loops } = arrowsFor(g.rows);
+    if (loops) {
+      d.log(`${loops} proposed link${loops > 1 ? 's' : ''} began and ended at one instrument, `
+        + 'so the picture has no arrow for it');
+    }
+    dg?.destroy();
+    dg = createDiagram(dgHost, { caption: DG_CAPTION, nodes: INSTRUMENTS, links });
+    return { drawn: links.length, loops };
+  }
+
+  /* Two different empty states, and they are not the same sentence. Nothing has
+     been asked yet, and a model was asked and proposed nothing. */
+  const NO_PATCH = '# no patch yet';
+  const EMPTY_PATCH = '# the model proposed nothing, which is the right answer to an instruction\n'
+    + '# that names nothing on this desk';
+
+  /**
+   * 🔴 THE PATCH BOX IS JSON, ONE OBJECT PER LINE. Asked 2026-09-21: *"can it
+   * not be full json(l) message?"* The compact patch language was written for
+   * `/bay/`, where it labels a link somebody is about to make and the shortest
+   * true sentence wins. Here it is the MODEL'S OUTPUT being shown for
+   * inspection, and the compact form was dropping the evidence: the run this
+   * was reported on read `{ transpose, channel 1 }` with no sign of the `to: 1`
+   * that was the whole problem, so the refusal underneath named a key the line
+   * above it did not show.
+   */
   function show(links) {
     const g = grade(links);
-    patch.textContent = links.length
-      ? links.map((l) => printLink({ from: l.from, to: l.to, transforms: l.transforms || [] })).join('\n')
-      : '# the model proposed nothing, which is the right answer to an instruction\n'
-        + '# that names nothing on this desk';
+    patch.textContent = links.length ? links.map((l) => JSON.stringify(l)).join('\n') : EMPTY_PATCH;
     whyBox.replaceChildren(...g.rows.map((r) => {
       const e = el('div', 'wish-why');
       e.append(el(r.ok ? 'i' : 'b', '', r.ok ? 'allowed' : 'refused'),
-        document.createTextNode(`  ${r.ok ? r.line : r.why}`));
+        el('span', 'wish-why-l', `  ${r.say}`));
+      // A refusal's reason names the key or the port, never the row it is about,
+      // so the link it belongs to is on the line above it.
+      if (!r.ok) e.append(el('div', '', r.why));
       return e;
     }));
     d.set('links', links.length || '');
     d.set('refused', g.refused || '');
+    g.picture = draw(g);
     return g;
   }
+
+  /**
+   * 🔴 A PRESS CLEARS THE LAST ANSWER BEFORE IT ASKS THE NEXT QUESTION. Asked
+   * 2026-09-21: *"hold to talk should clear previous input / routing"*. The
+   * heard sentence, the JSON, the refusals and the picture all used to stay on
+   * screen while a new recording was made and while both models thought, so for
+   * several seconds the page showed the OLD answer next to a NEW question with
+   * nothing to say which was which. A blank says *nothing yet*. A previous
+   * answer left standing says *this is the answer*.
+   * ⚠️ ON THE PRESS, NOT ON THE REPLY. Clearing when the answer lands leaves
+   * the whole window that causes the problem exactly as it was.
+   * ⚠️ AND THE READOUT GOES BACK TO EMPTY, never to `0`, which would read as a
+   * very confident measurement of nothing.
+   */
+  function clearAnswer() {
+    patch.textContent = NO_PATCH;
+    whyBox.replaceChildren();
+    d.set('links', '');
+    d.set('refused', '');
+    dg?.destroy();
+    dg = createDiagram(dgHost, { caption: DG_CAPTION, nodes: INSTRUMENTS, links: [] });
+  }
+  function clearAll() { said.value = ''; clearAnswer(); }
+
+  /* The desk is on screen from the first paint, so the room the picture needs
+     is taken before anybody presses anything. */
+  clearAnswer();
 
   // ── the two calls ────────────────────────────────────────────────────────
 
@@ -224,21 +509,37 @@
   }
 
   async function think(text) {
-    said.textContent = text;
+    said.value = text;
+    clearAnswer();
     d.log(`asking ${thinkPick.value().split('/').pop()}`);
     const out = await post('/wish', { text, ports: PORTS, facts: FACTS, model: thinkPick.value() });
-    d.set('thought', out.ms ?? '');
     const g = show(out.links || []);
-    d.log(`${out.links?.length ?? 0} link(s), ${g.refused} refused, ${out.usage?.total_tokens ?? '?'} tokens`);
+    /* 🔴 THE TIMING LIVES HERE NOW, because the readout gave up its two cells
+       and a number nothing prints is a number the page stopped reporting. */
+    d.log(`thought for ${out.ms ?? '?'} ms: ${out.links?.length ?? 0} link(s), `
+      + `${g.refused} refused, ${out.usage?.total_tokens ?? '?'} tokens`);
     return out;
   }
 
-  d.on('example', async () => {
-    /* The sentence the whole thing was measured on, so somebody with no
-       microphone still sees the page work. It still costs a model call. */
+  /** The sentence the whole thing was measured on, so somebody with no
+   *  microphone has something to press. */
+  const EXAMPLE = 'Connect the keyboard to the circuit and transpose it up one semitone.';
+
+  d.on('example', () => {
+    /* 🔴 IT WRITES AND IT ASKS NOBODY, so the harness may press it for real and
+       it costs the account nothing. `Ask` is the control that spends money, and
+       putting the sentence in the same box the microphone fills is what item
+       eight of the report asked for: one destination rather than two. */
+    said.value = EXAMPLE;
+    clearAnswer();
+    d.log('the example is in the box, so press Ask to send it');
+  });
+
+  d.on('ask', async () => {
     if (SELFCHECK) return;
-    try { await think('Connect the keyboard to the circuit and transpose it up one semitone.'); }
-    catch (e) { blame(e); }
+    const text = said.value.trim();
+    if (!text) { d.log('there is nothing in the box to ask about'); return; }
+    try { await think(text); } catch (e) { blame(e); }
   });
 
   // ── hold to talk ─────────────────────────────────────────────────────────
@@ -280,6 +581,20 @@
      is holding it. */
   const lit = (on) => { if (on) speakBtn.dataset.busy = '1'; else delete speakBtn.dataset.busy; };
 
+  /**
+   * 🔴 THE BUTTON CARRIES NOTHING OF ITS OWN, AND THAT IS AN INSTRUCTION RATHER
+   * THAN A CHOICE. A dot moving with the microphone level was asked for on
+   * 2026-09-21 and withdrawn the same day: *"rm dot from hold to talk"*. The
+   * `AnalyserNode` that had been built for it came out with it, because a
+   * microphone analyser nobody reads is a node opened on every press for no
+   * reader.
+   * 🔴 **SO THERE IS NO PER HOLD LEVEL INDICATION ON THIS PAGE, AND IT IS A
+   * KNOWN GAP RATHER THAN AN OVERSIGHT.** Somebody holding the button cannot
+   * tell whether the microphone is picking them up until the transcription
+   * arrives. What is left is the sweep above, which says the control is at work
+   * and says nothing about what it can hear.
+   */
+
   function release() {
     stream?.getTracks().forEach((t) => t.stop());
     stream = null; rec = null;
@@ -291,6 +606,11 @@
     talk.began++;
     startedAt = performance.now();
     stopWanted = false; dropped = false;
+    /* 🔴 THE ANSWER GOES BEFORE THE QUESTION IS ASKED, not when the reply
+       lands. See `clearAnswer`: the window this closes is the whole recording
+       plus both model calls, which is the several seconds a reader spends
+       looking at the last answer while giving the next instruction. */
+    clearAll();
     lit(true);
     /* ⚠️ THE MICROPHONE IS THE ONLY HALF A CHECK SKIPS. The gesture itself, its
        timing and its ending are the same code for a harness and for a hand,
@@ -375,8 +695,11 @@
       let s = '';
       for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
       const heard = await post('/hear', { audio: btoa(s), model: hearPick.value() });
-      d.set('heard', heard.ms ?? '');
-      if (!heard.text?.trim()) { said.textContent = 'nothing was heard'; return; }
+      /* The timing the readout used to carry. See `readout` above. */
+      d.log(`heard in ${heard.ms ?? '?'} ms by ${hearPick.value().split('/').pop()}`);
+      /* ⚠️ IT GOES IN THE LOG AND NOT IN THE BOX. The box is a textarea now, so
+         a sentence written into it is a sentence somebody can press Ask with. */
+      if (!heard.text?.trim()) { d.log('nothing was heard, so nothing was asked'); return; }
       await think(heard.text.trim());
     } catch (e) {
       blame(e);
@@ -442,9 +765,47 @@
        leave it, and it counts every call. */
     d.assert('a visit reached nobody', reached === 0, `${reached} calls to the agent`);
 
-    d.assert('the transform the real model returned is refused, by name',
-      g.refused === 1 && /transpose/.test(whyBox.textContent) && /by/.test(whyBox.textContent),
-      whyBox.textContent.trim().slice(0, 90));
+    /* 🔴 THE FIELD NAMES ARE QUOTED, AND THAT IS WHAT THIS LINE NOW GRADES.
+       `refused transpose needs by and was given to` was reported as unreadable
+       because `by` and `to` are FIELD NAMES printed as bare English, so the
+       sentence parses as broken grammar rather than as a report about two keys.
+       The check behind it is untouched and must stay untouched. */
+    d.assert('the transform the real model returned is refused, and both keys read as keys',
+      g.refused === 1 && /transpose takes "by"/.test(whyBox.textContent)
+      && /was given "to"/.test(whyBox.textContent),
+      whyBox.textContent.trim().slice(0, 110));
+
+    /* 🔴 THE JSON IS THE MODEL'S OWN OBJECT, and the `to: 1` that caused the
+       refusal is IN it. That is the whole reason this box stopped being the
+       compact patch language: the refusal underneath was naming a key the line
+       above it did not show.
+       🔴 AND THE PARSE IS GUARDED, WHICH THE FIRST BUILD OF THIS LINE WAS NOT.
+       Found by sabotage: putting the compact form back made `JSON.parse` THROW
+       inside the assert's own expression, which killed the rest of the check and
+       took the page from 25 asserts to 2 while reading green. An assert that
+       throws does not go red, it goes missing. */
+    const asObject = (() => { try { return JSON.parse(patch.textContent); } catch { return null; } })();
+    d.assert('the box shows the whole object, including the argument that was refused',
+      patch.textContent.split('\n').length === 1 && asObject?.transforms?.[0]?.to === 1,
+      patch.textContent.slice(0, 110));
+
+    /* ⚠️ THE NEGATIVE CONTROL FOR THE SLICE, and it is the only thing that makes
+       `TRANSFORM_TEXT` safe: it cuts a fixed number of characters off
+       `printLink`'s output, so the day that function's separator changes this
+       goes red instead of the page quietly showing half an id. */
+    d.assert('the link line is built from printLink rather than from a second formatter',
+      printLink({ from: 'x', to: 'y', transforms: [] }) === 'x -> y'
+      && TRANSFORM_TEXT({ transforms: [{ op: 'transpose', by: 1 }] }) === ' { transpose +1 }',
+      `${printLink({ from: 'x', to: 'y', transforms: [] })} and `
+      + `${TRANSFORM_TEXT({ transforms: [{ op: 'transpose', by: 1 }] })}`);
+
+    /* 🔴 NO `here:` ANYWHERE A READER LOOKS. It is the site segment of a port id
+       and it means this machine, which nobody outside this repository can know
+       and which is the same word on every row of this desk. */
+    d.assert('a row names the instrument and never shows a port id',
+      /MK-425C USB MIDI Keyboard to Circuit/.test(whyBox.textContent)
+      && !whyBox.textContent.includes('here:'),
+      whyBox.textContent.trim().slice(0, 110));
 
     // ⚠️ THE NEGATIVE CONTROL: the same link, spelled right, is allowed. Without
     // it the line above would pass on a page that refused everything.
@@ -464,6 +825,86 @@
     d.assert('a proposal of nothing says so rather than showing an empty box',
       EMPTY.ok === 0 && patch.textContent.includes('proposed nothing'),
       patch.textContent.split('\n')[0]);
+
+    /* ── the picture, in all three of its states ──────────────────────────
+       🔴 GRADE IT, BECAUSE NOTHING ELSE CAN SEE IT. `createDiagram` collects
+       every name it had to shorten, every note over about forty words and every
+       arrow it could not route, on `cuts`.
+       ⚠️ AND IN EVERY STATE, WHICH THE FIRST BUILD OF THIS CHECK GOT WRONG. It
+       read `cuts` once, on a picture with no arrows in it, so a link label the
+       drawer had to cut passed straight through a check written to catch
+       exactly that. The picture is rebuilt on every answer, so the cuts are a
+       fact about a state rather than about the page. */
+    const boxes = () => dgHost.querySelectorAll('.pos-dg-n').length;
+    const arrows = () => dgHost.querySelectorAll('.pos-dg-l').length;
+    const figH = () => dgHost.querySelector('.pos-dg')?.getBoundingClientRect().height ?? 0;
+    /* ⚠️ `:not([aria-hidden])` IS NOT DECORATION. `createDiagram` measures its
+       own text with a ruler element that carries the same class, parked off to
+       one side and emptied after each layout, so a plain query answers one more
+       label than the picture has and the first one is always blank. */
+    const labels = () => [...dgHost.querySelectorAll('.pos-dg-llab:not([aria-hidden])')]
+      .map((t) => t.textContent);
+
+    const seen = [];
+    const look = (what) => seen.push({
+      what, boxes: boxes(), arrows: arrows(), h: figH(), mode: dg.mode,
+      labels: labels(),
+      cuts: dg.cuts.map((c) => `${c.where} ${c.id} at ${c.width}px`),
+    });
+
+    show([]); look('nothing proposed');
+    const g4 = show(REAL); look('one refused link');
+    show(FIXED); look('one allowed link');
+
+    d.assert('the picture drew every name and every arrow whole, in every state',
+      seen.every((s) => s.cuts.length === 0),
+      seen.flatMap((s) => s.cuts.map((c) => `${s.what}: ${c}`)).join('; ')
+        || `nothing cut in ${seen.length} states, laid out as ${seen[0].mode}`);
+
+    /* 🔴 THE WHOLE DESK, WHATEVER WAS PROPOSED, AND ONE ARROW PER PROPOSAL.
+       A proposal of nothing draws three instruments and no arrows rather than an
+       empty box, and the refused run draws its arrow: a picture showing only
+       what passed would have been blank on the run this was reported from, while
+       the readout beside it said `1 link, 1 refused`. */
+    d.assert('the whole desk is drawn whatever came back, with one arrow per proposal',
+      seen.every((s) => s.boxes === 3)
+      && seen.map((s) => s.arrows).join() === '0,1,1',
+      seen.map((s) => `${s.what}: ${s.boxes} boxes, ${s.arrows} arrows`).join('; '));
+
+    /* The negative half is the second clause: a link that PASSED must not be
+       marked, or the mark would say nothing. */
+    d.assert('a refused link is drawn and marked refused, and an allowed one is not marked',
+      g4.picture.drawn === 1 && seen[1].labels.join() === 'refused'
+      && seen[2].labels.length === 0,
+      `refused run ${JSON.stringify(seen[1].labels)}, allowed run ${JSON.stringify(seen[2].labels)}`);
+
+    /* 🔴 THE ROOM IS TAKEN BEFORE THE PICTURE ARRIVES, which is what *"reserve
+       space for it"* asked for. The reservation is a CSS number, so this reads
+       the COMPUTED value rather than the source: a rule that lost is a rule that
+       reads as correct in a stylesheet. */
+    const reserved = parseFloat(getComputedStyle(dgHost).minHeight) || 0;
+    d.assert('the picture fits the room reserved for it in every state',
+      reserved > 0 && seen.every((s) => s.h <= reserved),
+      `${reserved} px reserved against ${seen.map((s) => s.h.toFixed(0)).join(', ')} drawn`);
+
+    /* ── the only feedback the control has left ────────────────────────────
+       🔴 THE BUTTON CARRIES NOTHING OF ITS OWN, so the paint IS the signal and
+       it is worth grading. A dot was asked for and withdrawn the same day, and
+       what replaced it is nothing, which makes this the one channel a person
+       holding the button has. The negative half is in the same line: it must
+       not be lit before anybody has touched it. */
+    d.assert('the control carries no indicator of its own',
+      speakBtn.children.length === 0 && speakBtn.textContent === 'Hold to talk',
+      `${speakBtn.children.length} children, label ${JSON.stringify(speakBtn.textContent)}`);
+
+    /* ── the example, which now costs nothing ─────────────────────────────
+       🔴 IT IS PRESSED FOR REAL HERE, because it no longer reaches Cloudflare.
+       It writes into the same box the microphone fills, which is the whole point
+       of that box being editable. */
+    d.run('example');
+    d.assert('the example lands in the box the microphone fills, and asks nobody',
+      said.value === EXAMPLE && reached === 0,
+      `${said.value.length} characters in the box, ${reached} calls to the agent`);
 
     d.assert('both model pickers offer what the agent will run',
       hearPick.el.querySelectorAll('button').length === 3
@@ -490,9 +931,37 @@
     const press = (type, init) => speakBtn.dispatchEvent(new PointerEvent(type,
       { bubbles: true, pointerId: 1, pointerType: 'mouse', button: 0, ...init }));
 
+    /* 🔴 THE ANSWER AND THE QUESTION ARE PUT UP FIRST AND THE PRESS HAS TO TAKE
+       BOTH AWAY. Asked as *"hold to talk should clear previous input /
+       routing"*, and the clear has to happen on the PRESS: clearing when the
+       reply lands leaves exactly the window that causes the problem, which is
+       the recording plus both model calls. The readout goes to empty and never
+       to `0`. */
+    show(REAL);
+    said.value = EXAMPLE;
+    const before = [patch.textContent, whyBox.textContent, said.value,
+      d.el.isConnected ? arrows() : 1].join('|');
+
     const began0 = talk.began, ended0 = talk.ended;
+    const darkBefore = !speakBtn.dataset.busy;
     press('pointerdown');
     const midHold = talk.holding;
+    const litDuring = speakBtn.dataset.busy === '1';
+    const cells = [...document.querySelectorAll('.pos-readout .pos-v')].map((c) => c.textContent);
+
+    /* 🔴 THE PAINT IS THE WHOLE OF THE FEEDBACK NOW, so the press had better
+       light it. Both halves in one line: dark before anybody touches it, lit
+       from the press. What it cannot say is whether the microphone can hear
+       anything, which is the gap the withdrawn dot leaves. */
+    d.assert('the press lights the control, which is the only signal it has',
+      darkBefore === true && litDuring === true,
+      `busy before ${!darkBefore}, busy during ${litDuring}`);
+    d.assert('the press takes the whole last answer away before it listens',
+      before.length > 20 && patch.textContent === NO_PATCH && whyBox.textContent === ''
+      && said.value === '' && arrows() === 0 && cells.every((t) => t.trim() === ''),
+      `patch ${JSON.stringify(patch.textContent.slice(0, 16))}, ${whyBox.childElementCount} rows, `
+      + `${said.value.length} characters, ${arrows()} arrows, cells ${JSON.stringify(cells)}`);
+
     press('pointerup');
     d.assert('a press and a release is one hold, begun and ended',
       midHold === true && talk.began === began0 + 1 && talk.ended === ended0 + 1 && talk.holding === false,
@@ -533,10 +1002,16 @@
 
     if (d.el.isConnected) {
       /* Nothing on this page may change its own height while a reader is
-         looking at it: all three boxes are filled a second or two apart. */
+         looking at it, and a textarea that grows with its content is exactly
+         that. MEASURED at both ends: empty, and with far more text than fits. */
+      const emptyBox = said.getBoundingClientRect().height;
+      const keptText = said.value;
+      said.value = `${EXAMPLE} ${EXAMPLE} ${EXAMPLE} ${EXAMPLE}`;
+      const fullBox = said.getBoundingClientRect().height;
+      said.value = keptText;
       d.assert('the transcript box keeps its height whether it is empty or full',
-        said.getBoundingClientRect().height >= 40 && said.getBoundingClientRect().height <= 60,
-        `${said.getBoundingClientRect().height.toFixed(1)} px`);
+        emptyBox === fullBox && emptyBox >= 56 && emptyBox <= 72 && said.scrollHeight > 0,
+        `${emptyBox.toFixed(1)} px empty against ${fullBox.toFixed(1)} px full`);
       d.assert('the page does not drag sideways at this width',
         document.documentElement.scrollWidth <= window.innerWidth + 1,
         `page ${document.documentElement.scrollWidth} against ${window.innerWidth}`);
