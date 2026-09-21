@@ -37,6 +37,34 @@ or checking it tells you nothing about what is running. Compare `md5sum` against
 
 ## The instruments
 
+- 🔴 **THE CIRCUIT SHIPS WITH `Save` DISABLED, AND THAT IS A PROTECTION RATHER
+  THAN A FAULT. 📄 DOCUMENTED, NOT MEASURED ON THIS DESK.** Circuit User Guide
+  v1.6 page 18, verified verbatim 2026-09-21 against the copy at
+  `~/Downloads/Files/2025-01/circuit-ug-en-03-v1-6.pdf`: *"The Save function is
+  deliberately disabled before shipping from the factory to prevent accidental
+  erasure of the demo Sessions. The Save button will initially be unlit, and
+  before you can save any Sessions of your own, you will need to unlock the Save
+  function. To do this, hold down the Shift and Save buttons together while
+  powering Circuit on."*
+  ⚠️ **WHETHER THIS DESK'S UNIT HAS IT LOCKED OR UNLOCKED IS UNKNOWN HERE.**
+  Nobody has looked at whether that button is lit, and this entry is a fact about
+  the model rather than about the instrument in the room. The check costs nothing
+  and needs no computer: **is the Save button lit blue**.
+  🔴 **SO THE SYMPTOM TO RECOGNISE IS A SAVE THAT SILENTLY SELECTS.** 📄 The
+  guide says a working save *blinks green rapidly*; with Save inert a pad press
+  in Sessions View is an ordinary session SELECT, which loads the stored session
+  over whatever is being worked on. **It looks like the instrument throwing work
+  away and it is the instrument refusing to write.**
+  🔴 **AND UNLOCKING IT COSTS A POWER CYCLE, WHICH DISCARDS THE UNSAVED WORK
+  THAT PROMPTED THE UNLOCKING.** 📄 The same page says `Clear Session` is
+  disabled alongside it, so both come back together on a box with no factory
+  reset holding **29 sessions of real work**. ⚖️ **Whether Novation Components
+  can export the LIVE session out of RAM or only what is in flash is UNMEASURED
+  and worth knowing before anybody power cycles anything.** Take a fresh pack
+  first either way: reading is free, `New Pack.circuitpack` is dated 2026-09-20,
+  and a diff against it says which sessions have moved since.
+
+
 - **`rack` plays Ableton Live from a browser and it is LIVE (2026-09-12).**
   <https://positron.studio/able/>, 15/15. A note number crosses the relay,
   `rig/m1/live-agent.mjs` hands it to Live over CoreMIDI, and a **Core Audio
