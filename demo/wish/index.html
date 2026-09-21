@@ -247,9 +247,28 @@
    * visitor. `workers/wish/src/wish.mjs` allows that page's origin for exactly
    * this reason.
    */
-  const HERE = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(location.hostname);
+  /**
+   * 🔴 AND THE DEFAULT IS THE DEPLOYED WORKER EVERYWHERE SINCE 2026-09-21, WHICH
+   * REVERSES HALF OF THE PARAGRAPH ABOVE. Reported in one line: *"nothing
+   * answered at http://127.0.0.1:8799. Start the agent with `node
+   * demo/wish-local.mjs` - fix it. use worker"*.
+   * ⚠️ THE OLD REASONING WAS RIGHT ABOUT THE DEPLOY AND WRONG ABOUT THE DESK.
+   * It fixed a real defect, a page that answered 200 on a hostname where it
+   * could not possibly work, and it fixed it by following where the page came
+   * from. What it then did was make `http://127.0.0.1:8890/wish/` depend on a
+   * SECOND process that nobody starts, so the page this repository is developed
+   * on is the one page that does not work out of the box.
+   * ✅ AND NOTHING IS LOOSENED, WHICH IS WHY THIS IS SAFE RATHER THAN A
+   * CONCESSION. `workers/wish/src/wish.mjs`'s `NEAR` pattern already allows
+   * `http://localhost`, `http://127.0.0.1` and every private range, for the
+   * phone-on-the-wifi case, so a page on this laptop was always a caller the
+   * agent would answer. The only thing that changes is which URL it asks first.
+   * ⚠️ `?api=` STILL WINS, which is how somebody working on the agent itself
+   * points at `node demo/wish-local.mjs`, and it is what the local runner is
+   * for now.
+   */
   const API = new URLSearchParams(location.search).get('api')
-    || (HERE ? 'http://127.0.0.1:8799' : 'https://wish.positron.studio');
+    || 'https://wish.positron.studio';
 
   /**
    * 🔴 THE DESK, DESCRIBED RATHER THAN DISCOVERED, AND THAT IS DELIBERATE ON

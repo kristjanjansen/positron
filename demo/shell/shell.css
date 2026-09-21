@@ -328,9 +328,16 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    ⚠️ THE KEY DOES NOT SHRINK WITH IT. It is already 9.5 px and is the half a
    reader scans; shrinking both would make the panel smaller rather than
    quieter. */
-.pos-readout-sm .pos-cell { padding: 8px 10px; }
-.pos-readout-sm .pos-v { font-size: 15px; }
-.pos-readout-sm .pos-u { font-size: 9.5px; }
+/* ⚠️ 13 px AND NOT 15, ASKED FOR AS *"make smaller readout values even more
+   smaller"*. It was 19 by default, then 15, and it is 13 here. That is BELOW
+   the key's 9.5 px by only 3.5, which is close to the floor: the value has to
+   stay the louder of the two or the pair reads upside down, and `tabular-nums`
+   needs enough size to keep a column of figures aligned by eye. Anything
+   smaller than this wants the key shrinking with it, which is a different
+   request. */
+.pos-readout-sm .pos-cell { padding: 7px 10px; }
+.pos-readout-sm .pos-v { font-size: 13px; }
+.pos-readout-sm .pos-u { font-size: 9px; }
 /* 🔴 FIVE COLUMNS IS 78 px A CELL ON A PHONE, WHICH IS NOT A CELL. The grid is
    asked for at the width a laptop has and has to give way below it.
    ⚠️ AND THIS BLOCK SITS AFTER THE RULE IT OVERRIDES, WHICH IS NOT A STYLE

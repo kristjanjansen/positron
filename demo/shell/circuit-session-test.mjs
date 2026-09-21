@@ -587,5 +587,93 @@ console.log('\n-- what this module must not be able to do --');
     src.includes('NOTHING HERE SENDS ANYTHING ANYWHERE'));
 }
 
+
+// ── the note data, which is the first thing this module can say a region HOLDS
+//
+// 🔴 EVERY FIGURE HERE IS REPRODUCED FROM A SECOND IMPLEMENTATION. The
+// derivation is in `research/circuit-session-notes-2026-09-21.md`; this file
+// grades the decoder that shipped from it, against the real pack and against
+// the blanks, which is the only pairing that means anything.
+if (fs.existsSync(PACK)) {
+  const notes = all.map((b) => S.notesIn(b));
+  const total = notes.reduce((n, x) => n + x.length, 0);
+  ok('5,095 note events come out of the owner\'s 32 sessions',
+    total === 5095, `${total} events`);
+
+  // 🔴 THE CONTROL, AND IT IS THE ROW THAT SEPARATES THE TWO PACKS. The blanks
+  // pass the shape tests trivially because they are zero filled; the yield is
+  // the one number that cannot be faked by emptiness.
+  ok('and ZERO come out of all 64 purchased blanks, which is what the shape tests cannot tell you',
+    blanks.length === 64 && blanks.every((b) => S.notesIn(b).length === 0),
+    `${blanks.length} blank sessions, ${blanks.reduce((n, b) => n + S.notesIn(b).length, 0)} events`);
+
+  const zero = notes.map((x, i) => (x.length ? null : i)).filter((i) => i !== null);
+  ok('the three sessions with no notes are 10, 16 and 22, which is a THIRD road to the same three files',
+    zero.join(',') === '10,16,22',
+    `${zero.join(', ')} · CLAUDE.md reached them by distance from a template and index.json names all three Initial Session`);
+
+  const first = notes[0][0];
+  ok('session_0\'s first event is note 55 at gate 2 and velocity 41, in region 0 step 0 slot 0',
+    first.note === 55 && first.gate === 2 && first.velocity === 41
+    && first.region === 0 && first.step === 0 && first.slot === 0 && first.at === 80,
+    JSON.stringify(first));
+
+  const flat = notes.flat();
+  ok('no velocity is above 127, in 5,095 of 5,095',
+    flat.every((e) => e.velocity <= 127),
+    `${flat.filter((e) => e.velocity > 127).length} above it`);
+  // ⚠️ AND 105 NOTE BYTES ARE ABOVE THE MIDI RANGE AND ARE NOT EXPLAINED. Said
+  // out loud rather than filtered away: a decoder that clamped them would hide
+  // the one thing about this format nobody understands.
+  ok('105 note bytes ARE above 127, all in one session, and that is unexplained rather than hidden',
+    flat.filter((e) => e.note > 127).length === 105
+    && new Set(flat.filter((e) => e.note > 127).map((e, i) => notes.findIndex((x) => x.includes(flat.filter((y) => y.note > 127)[0])))).size === 1,
+    `${flat.filter((e) => e.note > 127).length} of ${flat.length}`);
+
+  ok('every step record has its two zero bytes and no high bit in its mask, in all 32',
+    all.every((b) => S.stepGridLooksRight(b).share === 1),
+    `${all.filter((b) => S.stepGridLooksRight(b).share === 1).length} of ${all.length} sessions at 256 of 256 records`);
+
+  // 🔴 THE VELOCITY MODE, AND THE SECOND SOURCE IS A FILE ON THIS DISK.
+  const heads = new Map();
+  for (const b of all) { const k = b[S.VELOCITY_AT]; heads.set(k, (heads.get(k) || 0) + 1); }
+  ok('header byte 8 is a THIRD byte separating the two packs: FF 24 and 07 8 here, 00 on all 64 blanks',
+    heads.get(0xff) === 24 && heads.get(0x07) === 8 && heads.size === 2
+    && blanks.every((b) => b[S.VELOCITY_AT] === 0x00),
+    [...heads].map(([k, v]) => `0x${k.toString(16)} x${v}`).join(', '));
+
+  // ⚠️ THE SABOTAGES. A decoder that found notes in anything would pass every
+  // line above, so each of these has to move exactly what it should.
+  const cut = all[0].slice();
+  cut[80] = (cut[80] + 7) & 0x7f;
+  ok('SABOTAGE: moving one note byte moves exactly that one event and nothing else',
+    S.notesIn(cut).length === notes[0].length
+    && S.notesIn(cut)[0].note === ((first.note + 7) & 0x7f)
+    && S.notesIn(cut).slice(1).every((e, i) => e.note === notes[0][i + 1].note),
+    `${S.notesIn(cut)[0].note} against ${first.note}, with ${S.notesIn(cut).length} events either way`);
+
+  const masked = all[0].slice();
+  for (let st = 0; st < S.STEPS; st++) masked[S.HEADER_LEN + st * S.STEP_LEN] = 0;
+  ok('SABOTAGE: zeroing one region\'s sixteen masks removes only that region\'s events',
+    S.notesIn(masked).length < notes[0].length
+    && S.notesIn(masked).every((e) => e.region !== 0)
+    && notes[0].filter((e) => e.region !== 0).length === S.notesIn(masked).length,
+    `${notes[0].length} down to ${S.notesIn(masked).length}`);
+
+  // 🔴 THE NEGATIVE CONTROL THAT MATTERS MOST: a blank with one hand written
+  // record in it must read back exactly what was written, or the decoder is
+  // finding structure that is not there.
+  const planted = blanks[0].slice();
+  const at = S.HEADER_LEN;
+  planted[at] = 0b11;
+  planted[at + 4] = 60; planted[at + 5] = 3; planted[at + 7] = 100;
+  planted[at + 8] = 64; planted[at + 9] = 3; planted[at + 11] = 90;
+  const got = S.notesIn(planted);
+  ok('NEGATIVE CONTROL: one planted record in a blank reads back the two notes written into it',
+    got.length === 2 && got[0].note === 60 && got[1].note === 64
+    && got[0].gate === 3 && got[0].velocity === 100 && got[1].velocity === 90,
+    got.map((e) => `${e.note}@${e.velocity}`).join(' '));
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}${skip ? `  ${skip} skipped` : ''}\n`);
 process.exit(fail ? 1 : 0);
