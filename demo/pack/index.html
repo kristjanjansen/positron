@@ -43,6 +43,7 @@
   import { createStack } from '/shell/stack.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
+  import { readSession, summarise as summariseSession } from '/shell/circuit-session.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import {
     readPatch, summarise, sessionStats, patchFields, modSlots,
@@ -200,12 +201,24 @@
   patchTable.el.classList.add('pk-tbl');
   panel('patches').append(patchTable.el);
 
+  /**
+   * 🔴 `nearest` IS THE COLUMN THAT ANSWERS THE QUESTION THE OTHERS CANNOT, and
+   * it exists because entropy was measured failing at it today. A stock
+   * `Initial Session` is not blank: it has ordinary entropy and an ordinary
+   * non-zero share, so every number this page had said it was somebody's work.
+   * MEASURED on the owner's pack: the three stock slots sit **one byte** from
+   * each other, and the closest pair among the other 29 is **415 bytes** apart.
+   * ⚠️ AND IT IS SHOWN AS A NUMBER RATHER THAN CLASSIFIED, so there is no
+   * threshold in this page to argue with. A reader seeing `1, 1, 1` against
+   * `262` and up does not need to be told which ones are copies.
+   */
   const sessionTable = createTable({
     columns: [
       { key: 'name', label: 'name', grow: true, clip: true },
-      { key: 'head', label: 'head', width: 62 },
-      { key: 'bits', label: 'bits', width: 58, align: 'right' },
-      { key: 'filled', label: 'filled', width: 66, align: 'right' },
+      { key: 'head', label: 'head', width: 58 },
+      { key: 'used', label: 'used', width: 72, align: 'right' },
+      { key: 'nearest', label: 'nearest', width: 76, align: 'right' },
+      { key: 'filled', label: 'filled', width: 62, align: 'right' },
     ],
     cap: 64, empty: '', note: 'hover',
   });
@@ -523,7 +536,7 @@
         // each, so the same three numbers that grade a pack grade one of these.
         const st = [];
         for (let k = 0; k < scan.sessions.length; k++) {
-          st.push({ ...(await sessionStats(scan.sessions[k])), name: `session ${k}` });
+          st.push(await readOne(scan.sessions[k], `session ${k}`));
         }
         fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), st, []);
         sayScan(name, scan, `${name}, ${scan.patches.length} patches and ${st.length} sessions `
@@ -553,10 +566,15 @@
     const got = [];
     for (const e of syx) got.push({ name: e.name.split('/').pop(), bytes: await e.read() });
 
+    // ⚠️ THE SESSION IS DECODED NOW RATHER THAN WEIGHED. `sessionStats` treats
+    // the file as opaque bytes, which is what this page had, and
+    // `circuit-session.mjs` was built, tested at 68 asserts and imported by
+    // nothing, which is the pattern this repository complained about in the
+    // morning and then committed in the afternoon.
     const st = [];
     for (let i = 0; i < sess.length; i++) {
-      const s = await sessionStats(await sess[i].read());
-      st.push({ ...s, name: names[i] || sess[i].name.split('/').pop() });
+      const b = await sess[i].read();
+      st.push(await readOne(b, names[i] || sess[i].name.split('/').pop()));
     }
 
     // ⚠️ A SAMPLE'S LENGTH COMES OUT OF ITS OWN HEADER, WALKING THE CHUNKS.
@@ -572,6 +590,48 @@
     fill(got, st, sm);
     drop.say(`${name}${from ? ` ${from}` : ''}, ${got.length} patches, ${st.length} sessions, `
       + `${sm.length} samples, read in this tab and sent nowhere`, 'good');
+  }
+
+  /**
+   * One session, weighed AND decoded. The name the file carries is preferred
+   * over the one `index.json` carries, and they agree in 32 of 32 here, so the
+   * fallback is for a stream that has no index at all.
+   */
+  async function readOne(bytes, fallbackName) {
+    const stats = await sessionStats(bytes);
+    let deep = null;
+    try { deep = summariseSession(readSession(bytes)); }
+    catch { /* a file this module cannot partition is still weighable */ }
+    return {
+      ...stats,
+      bytes,
+      name: deep?.name || fallbackName,
+      used: deep?.used ?? null,
+      magicOk: deep?.magicOk ?? null,
+      patchNames: deep?.patchNames || [],
+    };
+  }
+
+  /**
+   * How far each session is from its nearest neighbour in the same file, in
+   * bytes. 🔴 THIS IS THE ONE MEASURE THAT SEPARATES A STOCK SESSION FROM WORK,
+   * and nothing else on this page can: a template has ordinary entropy, an
+   * ordinary non-zero share and a distinct fingerprint, because one byte of
+   * difference is enough for all three.
+   */
+  function nearestEach(list) {
+    const out = new Array(list.length).fill(Infinity);
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i].bytes, b = list[j].bytes;
+        let n = 0;
+        const len = Math.max(a.length, b.length);
+        for (let k = 0; k < len; k++) if (a[k] !== b[k]) n++;
+        if (n < out[i]) out[i] = n;
+        if (n < out[j]) out[j] = n;
+      }
+    }
+    return out;
   }
 
   function wavShape(b) {
@@ -622,13 +682,17 @@
     patchTable.set(rows);
 
     sessions = stats;
+    const near = stats.length > 1 ? nearestEach(stats) : stats.map(() => null);
+    stats.forEach((x, i) => { x.nearest = near[i]; });
     sessionTable.set(stats.map((s) => ({
       name: s.name || '(no name)',
       head: s.head,
-      bits: s.entropy.toFixed(2),
+      used: s.used === null ? '' : `${s.used}`,
+      nearest: s.nearest === null || s.nearest === Infinity ? '' : `${s.nearest}`,
       filled: `${pct(s.nonZero)}%`,
-      hover: `${s.bytes} bytes, ${s.notErased} of them not erasure and ${s.payload} `
-           + `neither erasure nor zero, ${s.fingerprint.slice(0, 12)}`,
+      hover: `${s.entropy.toFixed(2)} bits a byte, ${s.notErased} bytes not erasure`
+           + `${s.patchNames.length ? `, synths ${s.patchNames.join(' and ')}` : ''}`
+           + `${s.magicOk === false ? ', and it carries no Circuit session marker' : ''}`,
     })));
 
     samples = wavs;
@@ -698,11 +762,32 @@
       d.log(`${distinct} of ${stats.length} sessions are distinct, so ${stats.length - distinct} are copies`, 'hi');
       return;
     }
+    /**
+     * 🔴 AND A SESSION CAN BE DISTINCT, FULL, HIGH ENTROPY AND STILL NOT BE
+     * WORK. A stock `Initial Session` differs from another copy of itself by ONE
+     * byte, which is enough to give it its own fingerprint, its own entropy and
+     * its own non-zero share. Every number this page had said it was somebody's
+     * work. MEASURED on the owner's pack: the three stock slots are 1 byte from
+     * each other and the closest pair among the other 29 is **415** apart.
+     * ⚠️ `TEMPLATE_GAP` IS NOT A TUNED THRESHOLD, IT IS A NUMBER SITTING IN A
+     * MEASURED GAP TWO ORDERS OF MAGNITUDE WIDE. Anything from 2 to 261 gives
+     * the same answer on this pack, and the table shows the real distance beside
+     * every row so a reader never has to take this line's word for it.
+     */
+    const TEMPLATE_GAP = 16;
+    const copies = stats.filter((x) => x.nearest !== null && x.nearest < TEMPLATE_GAP);
+    const real = stats.length - copies.length;
     verdict.dataset.state = 'good';
-    verdict.textContent = `all ${stats.length} sessions are different from each other and `
-      + `the emptiest is ${pct(Math.min(...stats.map((s) => s.nonZero)))} per cent filled, `
-      + 'so this is somebody\'s work rather than a pack of blanks';
-    d.log(`${distinct} of ${stats.length} sessions are distinct`, 'good');
+    verdict.textContent = `all ${stats.length} sessions differ from each other, and `
+      + (copies.length
+        ? `${copies.length} of them sit within ${Math.max(...copies.map((x) => x.nearest))} `
+          + `byte(s) of another, so those are one stock session repeated. `
+          + `That leaves ${real} of real work`
+        : `the emptiest is ${pct(Math.min(...stats.map((x) => x.nonZero)))} per cent filled, `
+          + 'so this is somebody\'s work rather than a pack of blanks');
+    d.log(copies.length
+      ? `${distinct} of ${stats.length} distinct, but ${copies.length} are one stock session repeated, so ${real} are work`
+      : `${distinct} of ${stats.length} sessions are distinct`, 'good');
   }
 
   /**
@@ -864,6 +949,32 @@
         && !/somebody's work/.test(verdict.textContent),
         `"${verdict.textContent.slice(0, 80)}"`);
       sayVerdict(sessions, new Set(sessions.map((x) => x.fingerprint)).size);
+
+      /**
+       * 🔴 THE SESSION IS DECODED, NOT ONLY WEIGHED, AND THE THREE STOCK SLOTS
+       * ARE FOUND BY A MEASURE THAT ENTROPY CANNOT MAKE. This is the assert that
+       * would have been red all morning: every number the page had said those
+       * three were somebody's work.
+       */
+      const nm = sessions.map((x) => x.name);
+      d.assert('each session gives up its own name and its two synth patch names',
+        nm[0] === 'User Session' && sessions.every((x) => x.magicOk === true)
+        && sessions.every((x) => x.patchNames.length === 2)
+        && sessions[0].patchNames.join(' and ') === 'Frog Steps and Woo-z',
+        `session 0 is "${nm[0]}" holding ${sessions[0].patchNames.join(' and ')}`);
+
+      const stock = sessions.filter((x) => x.nearest < 16);
+      d.assert('the three stock sessions are found by distance, which entropy cannot do',
+        stock.length === 3 && stock.every((x) => x.nearest === 1)
+        && stock.every((x) => x.name === 'Initial Session')
+        && stock.every((x) => x.entropy > 0.8)
+        && Math.min(...sessions.filter((x) => x.nearest >= 16).map((x) => x.nearest)) === 262,
+        `${stock.length} sit 1 byte apart at entropy ${stock.map((x) => x.entropy.toFixed(2)).join(', ')}, `
+        + `against ${Math.min(...sessions.filter((x) => x.nearest >= 16).map((x) => x.nearest))} for the nearest of the rest`);
+
+      d.assert('and the page says 29 of real work rather than 32',
+        /29 of real work/.test(verdict.textContent) && verdict.dataset.state === 'good',
+        `"${verdict.textContent.slice(-40)}"`);
 
       const heads = new Set(sessions.map((s) => s.head));
       d.assert('and the first four bytes are not what decided it, because INIT is on both sides',
