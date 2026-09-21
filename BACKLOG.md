@@ -52,6 +52,30 @@ once by somebody who was not mid-edit.
   are called; what has no home is a record of which PORTS a device had when it
   was last seen, which is what the question was about.
 
+#### From the Pi research, 2026-09-21
+
+- 🔴 **THE BOARD HAS NO SOUNDCARD IN ITS AUDIO PATH AND NO STANDING FILE SAYS
+  SO.** `rig/board/jacksynth.mjs:631` starts `jackd -r -d dummy -r 48000 -p
+  1024`. **The dummy backend.** The instrument plays into a graph with no
+  hardware behind it, `ffmpeg -f jack` captures it, and the bytes leave over the
+  relay. **The Pi is not the thing making sound in any sense a person standing
+  next to it could hear**: it is a renderer whose only output is a WebSocket.
+- ⚖️ **`-p 1024` IS 21.33 ms A BLOCK AND NOTHING ARGUES FOR IT.** A dummy driver
+  cannot xrun against hardware. Lowering it to 256 cuts 16 ms off every path,
+  costs one line, and costs everybody in the room about thirteen seconds of
+  silence while it restarts. **Not done, because it is somebody else's room.**
+- 🔴 **PRESS TO SOUND THROUGH THE BOARD HAS NEVER BEEN MEASURED.** `/knobs/`'s
+  `round trip` cell is a browser-to-EDGE echo with the Durable Object never
+  woken and the board not in the room. The page that measured it properly was
+  `/keys/`, which was retired 2026-09-17. Putting its `lag` cell on `/knobs/`
+  and pressing one key would settle it.
+- ⚠️ **`demo/keys/` DOES NOT EXIST** and two files still talk as though it does.
+  Exactly one page imports `shell/board.mjs` and it is `/knobs/`; `/grains/`
+  hand-rolls its own socket and its own playout and never moved onto the kit
+  module.
+- 🔌 **THE BOARD'S MODEL IS INFERRED, NOT READ.** Pi 4 from three traces, never
+  off `/proc/device-tree/model`. One command settles it.
+
 #### From the archive download, 2026-09-21
 
 - ✅ **THE 3.0 GiB `Novation Circuit.zip` IS REFUSED, 2026-09-21: *"no"*.** 87
