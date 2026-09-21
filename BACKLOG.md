@@ -52,6 +52,44 @@ once by somebody who was not mid-edit.
   are called; what has no home is a record of which PORTS a device had when it
   was last seen, which is what the question was about.
 
+#### A pack that is not a zip, being built 2026-09-21
+
+🔴 **ASKED IN THREE WORDS: *"one line reading byte 0 - do it"*.** `50 4b` is a
+zip and `f0` is a SysEx stream, and today's measurement is that eleven files in
+`tmp/packs/` call themselves a pack, are NOT zips, and hold **336 samples and
+363 sessions** that `/tom/` and `/pack/` refuse outright.
+✅ **THE FORMAT IS MEASURED, NOT GUESSED**, in
+`research/dump-samples-2026-09-21.md`: the payload is seven bit packed exactly
+like session data, **0 bytes above 0x7F in 6,596,016**, so `unpack7()` applies
+unchanged; the stream start carries the unpacked length and **31 of 31 match**;
+and 🔴 **the stream end carries a CRC32 of the unpacked payload which verifies
+on 31 of 31**. That CRC is what makes the restoration exact rather than
+plausible, and a stream failing it is refused by name.
+
+#### Three defects found in our own code, 2026-09-21, reported not fixed
+
+- 🔴 **`patchesIn()` IDENTIFIES A PATCH BY LENGTH ALONE**, with no head check.
+  112 of 1,201 counted are Circuit **Tracks** rather than OG Circuit, and worse
+  in the other direction: **128 Tracks messages carry byte 6 = `0x01` and
+  `survey()` never sees them**, because they are 12 and 352 bytes. So
+  `writesFlash: false` on a `.circuittrackspack` carries NO information.
+  ⚠️ The 768 flash verdict is unaffected: all of those are product `0x60`.
+- 🔴 **`readWave()` FLAGS 19 COMPLETE FILES AS `truncated`**, all of them with a
+  zero RIFF size field, 0 with a chunk past EOF and 0 with a partial frame. The
+  page tells a visitor audio is missing when all of it is there.
+- 🔴 **`sessionsIn()` CONCATENATES ACROSS STREAM BOUNDARIES**: `survey()` on a
+  non-zip `.circuitpack` answers **141 sessions** where the real answer is 33.
+
+#### A correction to yesterday's own research, 2026-09-21
+
+✅ **THE `stepGridLooksRight()` FALSE POSITIVE STORY WAS WRONG AND IS WITHDRAWN.**
+It was written up as 70 of 108 blocks of PCM audio passing. Re-measured: **70 of
+those 108 blocks contain not one non-zero byte**, and the test passes 70 of 70
+zero blocks and **0 of 38 audio blocks**. Its false positive rate against real
+PCM is **0**, not 65 per cent. It passes erased memory, which its own comment
+already documents.
+⚠️ Also 17 pack-named files rather than 16, 6 zips rather than 5.
+
 #### /wish/ cannot name the port the Model 12's buttons come out of, 2026-09-21
 
 🔴 **ASKED: *"I want to play notes with my model 12 REC buttons on channels and
