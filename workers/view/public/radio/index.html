@@ -2786,7 +2786,9 @@
             + `the next press left the row reading ${H.offRow}, `
             + `${H.lit.inControls} hand buttons are in the control row, and `
             + `${Math.round(H.lit.leftMs / 1000)} s were left of the ten minute ceiling`);
+
     }
+
 
     // 🔴 AND THE STATION BUTTONS, WHICH NOTHING ELSE CAN REACH. `verify.mjs`
     // presses `.pos-controls button, .tbar-x` and this row is neither, so
@@ -5709,6 +5711,34 @@
               + `${heardLooping.toFixed(4)} with the live path at ${dryWhileLooping.toFixed(3)}`);
       }
     }
+  }
+
+  /* ⚠️ HERE RATHER THAN IN THE CHECK BLOCK, BECAUSE THAT BLOCK DOES NOT RUN.
+     `/radio/`'s deep checks sit behind `if (!eng) return`, so a harness run
+     with nobody pressing play reaches THREE page asserts. This one is about
+     the stylesheet and needs no station, no engine and no press, so it belongs
+     where a visit already is. MEASURED: the first placement read 14 asserts,
+     the same number as before it existed. */
+  /**
+   * 🔴 ONE BORDER ROUND THE PICTURE, NOT TWO. Reported 2026-09-21 with a
+   * screenshot: *"rm thick borders round waveform and 'the radio as it
+   * arrives'"*. MEASURED at the time: the canvas computed `1px` and its
+   * `.pos-glue` parent computed `1px` in the same colour with nothing
+   * between them, and two 1 px lines touching read as one 2 px line.
+   * ⚠️ IT IS READ AS A COMPUTED VALUE, which is the only thing that knows
+   * which rule won, and it reads BOTH elements, because asserting the canvas
+   * alone would pass a page that had lost the outer edge instead.
+   */
+  {
+    const c = scope.canvas;
+    const glued = c.closest('.pos-glue');
+    const cw = parseFloat(getComputedStyle(c).borderTopWidth);
+    const gw = glued ? parseFloat(getComputedStyle(glued).borderTopWidth) : 0;
+    const wrap = getComputedStyle(c.parentElement);
+    d.assert('the waveform is inside one border rather than two, and its caption sits on a ground',
+      !!glued && cw === 0 && gw > 0 && wrap.backgroundColor !== 'rgba(0, 0, 0, 0)',
+      `canvas ${cw} px, the glue round it ${gw} px, and the wrap paints `
+      + `${wrap.backgroundColor}`);
   }
 
   d.ready();
