@@ -519,6 +519,24 @@ export const DEMOS = [
     tags: ['WebMIDI', 'CoreMIDI'] },
 
   /**
+   * 🔴 SAY WHAT YOU WANT AND THE DESK PROPOSES A PATCH. Asked 2026-09-21:
+   * *"Can we have a demo called Wish? Where I can input voice uh, commands and
+   * you are translating them to a batch pay via the models from Cloudflare,
+   * maybe even try out different models."*
+   * 🔴 **IT PROPOSES AND NEVER CONNECTS, AND THAT IS A MEASUREMENT RATHER THAN
+   * CAUTION.** Run against the real models on the day it was built: asked to put
+   * the mod wheel on the master filter, the 70B returned a perfectly valid patch
+   * pointed at the WRONG INSTRUMENT. No validator can catch that. A person
+   * reading one line can.
+   * ⚠️ IT NEEDS `node demo/wish-local.mjs` RUNNING, because a browser cannot
+   * hold a Cloudflare credential. Nothing reaches Cloudflare on a visit or under
+   * the harness.
+   */
+  { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+    one: 'say what you want the desk to do, and a Cloudflare model proposes the patch',
+    tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
+
+  /**
    * 🔴 THE PATCH BAY, AND IT IS THE FIRST PAGE HERE THAT SENDS TO AN
    * INSTRUMENT. Asked 2026-09-21: *"Can you do patchbay deno called bay"*,
    * straight after `plans/plan-patchbay.md`. The three panels before it all

@@ -49,6 +49,42 @@
   Every panel so far listens. So the `accepts` list is not decoration: notes,
   control changes and bend go, and SysEx, program change and clock do not.
 
+- 🔴 **THE CIRCUIT PACK IN THE BROWSER, AND A DRUM MACHINE OUT OF IT.** Asked
+  2026-09-21: *"plan and research the circuit patch or package file parsing
+  download and upload... can we do locally patch uploading and parsing in
+  browser and extracting samples out of it and making a small drum machine...
+  we need to move towards playing around with drum machines, sample based
+  stuff, distributed drum machines, different grids, so that can be a good
+  intro and sample material to build some demos"*.
+  ✅ **HALF OF IT IS ALREADY MEASURED**: `plans/plan-circuit-editor.md` has the
+  patch format byte for byte, 64 patches of 350 bytes each.
+  🔴 **WHAT IS NOT**: the `samples/` half of the pack, the 32
+  `.circuitsession` files, and whether a browser can open a zip with no
+  vendored library at all.
+  ⚠️ **AND `New Pack.circuitpack` IS SOMEBODY'S ONLY COPY.** Reading it is free
+  and writing anything back to the device is not.
+
+- ✅ **DONE 2026-09-21. `/wish/` IS LIVE LOCALLY, 18/18, AND THE MODELS WERE
+  RUN AGAINST THE REAL DESK.** Speech in at **961 ms** for webm/opus, a patch
+  out at **1.6 s** on the 70B. `workers/wish/` is the deployable half and
+  `demo/wish-local.mjs` runs the same module here, because `wrangler dev` with
+  an `ai` binding dies with `write EPIPE` when it is not holding a terminal.
+  🔴 **AND THE MEASUREMENT IS WHY THE PAGE NEVER CONNECTS**: the 70B aimed the
+  mod wheel and the drums at the Model 12 when both belong to the Circuit.
+  Well formed patches to the wrong instrument, which no validator can catch.
+  Asked 2026-09-21: *"Can we have a demo called
+  Wish? Where I can input voice uh, commands and you are translating them to a
+  batch pay via the models from Cloudflare, maybe even try out different
+  models."* Voice in, a patch out, with a model picker.
+  🔴 **WHAT THE MEASUREMENT ALREADY SAYS IT MUST SHOW.** On 2026-09-21 the real
+  models were run against the real desk: the 70B gets the INTENT right and the
+  IDENTITY wrong often enough to matter (it sent the mod wheel to the Model 12
+  when the master filter is on the Circuit), and it puts arguments under the
+  wrong key. So the page shows the proposal, the validator's refusals and a
+  person's press, and never connects on its own.
+  ⚠️ **NOTHING MAY REACH CLOUDFLARE ON A VISIT OR UNDER THE HARNESS.** It is
+  somebody's account and a run of the suite is dozens of Chromes.
+
 - ✅ **RESEARCHED 2026-09-21, `research/cf-models-speech-to-patch-2026-09-21.md`.**
   `@cf/openai/whisper-large-v3-turbo` at **$0.000513 an audio minute** with
   `vad_filter` and word timings, then

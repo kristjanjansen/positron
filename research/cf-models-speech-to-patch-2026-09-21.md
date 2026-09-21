@@ -4,11 +4,10 @@
 > conversion"*. This is level 3 of `plans/plan-patchbay.md` §4: somebody says
 > what they want and a patch comes out.
 >
-> 🔴 **NOTHING HERE HAS BEEN RUN.** Every number is read off Cloudflare's own
-> documentation on 2026-09-21 through their docs search, with the page named.
-> No model was called, no latency was measured, and no token was spent. A plan
-> written from documentation says so, and §6 names what would have to be
-> switched on to turn any of it into a measurement.
+> ⚠️ **THIS OPENED BY SAYING NOTHING HAD BEEN RUN. IT HAS NOW.** §1 to §5 were
+> written from Cloudflare's documentation, and then the models were called
+> against the real desk the same day. **§7 is the measurement and it outranks
+> everything above it wherever they disagree**, which they do in two places.
 
 ---
 
@@ -180,3 +179,99 @@ Read 2026-09-21 through Cloudflare's documentation search:
   changelog entry of 2025-02-25 that introduced it.
 - <https://developers.cloudflare.com/workers-ai/platform/pricing/> for the token
   prices quoted in §3.
+
+
+---
+
+## 7. 🔴 MEASURED, 2026-09-21, against the real desk
+
+Run through `demo/wish-local.mjs`, which calls the Workers AI REST API with the
+OAuth session wrangler already holds on this machine.
+
+⚠️ **FIRST, THE CREDENTIAL, BECAUSE IT COST THE FIRST TWENTY MINUTES.** The
+repository's own `.env` carries `CF_API_TOKEN`, and against Workers AI it
+answers **401**: a Cloudflare API token is permission scoped and that one is not
+scoped for AI. The wrangler OAuth session carries **`ai (write)`** and works.
+⚠️ **AND `wrangler dev` WILL NOT RUN DETACHED HERE.** With an `ai` binding it
+must open a remote session, and backgrounded without a terminal it dies with
+`write EPIPE`, every time. That is why the page talks to a node agent rather
+than to `wrangler dev`.
+
+### 7.1 Hearing, and it is better than the plan assumed
+
+Synthesised with `say -v Daniel`, 3.68 s of speech, *"connect the keyboard to
+the circuit and transpose it up one semitone"*.
+
+| format | bytes | latency | transcript |
+|---|---|---|---|
+| mp3, 3 calls | 30,572 | **1338, 811, 1089 ms** | correct, word for word, all three |
+| **webm/opus** | 16,060 | **961 ms** | correct |
+
+🟢 **WEBM/OPUS GOES STRAIGHT IN, WHICH DECIDES HOW A PAGE RECORDS.**
+`MediaRecorder` produces exactly that, so no encoder is needed in the browser.
+⚠️ **SYNTHETIC SPEECH IS NOT A VOICE IN A ROOM.** This says the pipeline works
+and says nothing about a person talking over a synth.
+🔴 **AND ESTONIAN IS STILL UNMEASURED**: there is no Estonian voice installed on
+this machine, so it needs a person saying a patch instruction out loud.
+
+### 7.2 Thinking, and the two places the documentation was optimistic
+
+`@cf/meta/llama-3.3-70b-instruct-fp8-fast`, the loose schema, three calls:
+**1607, 1659, 1724 ms**, 464 prompt tokens and 52 completion tokens each.
+
+🟢 **THE ENUM WORKS AS HOPED, AND THE TWO ADVERSARIAL CASES ARE THE PROOF.**
+*"Connect the Moog to the Prophet"*, neither of which is on this desk, returned
+**`{"links": []}` in 496 ms**. *"Send a sysex patch dump from the dumper to the
+circuit"* returned **`{"links": []}` in 422 ms**. It did not invent a port and it
+did not reach for the one message that damages the instrument.
+
+🔴 **BUT A SCHEMA CONSTRAINS SHAPE AND NOT MEANING, AND THAT IS THE FINDING.**
+Every run returned `{"op": "transpose", "to": 1}`. **`transpose` takes `by`.**
+The object is valid against the schema, because the schema lists every argument
+any transform can take and requires only `op`. `bay.mjs`'s `apply` would have
+computed `note + undefined`, which is `NaN`: not a throw, not a drop, a note
+number that does not exist arriving at an instrument from a link the page called
+connected. **`checkTransforms` now refuses it by name** and is graded by four
+asserts, one of them the negative control.
+
+🔴 **AND A TIGHTER SCHEMA IS MUCH WORSE, WHICH IS THE OPPOSITE OF WHAT I
+EXPECTED.** Replacing the loose object with an `anyOf` of one branch per
+transform, each with its own required argument:
+
+| schema | latency | result |
+|---|---|---|
+| loose | **1.6 s** | right ports, wrong argument name |
+| `anyOf` per op | **10.2 to 11.6 s** | the same transform repeated until the tokens ran out, three times out of three |
+
+⚖️ Constrained decoding through a union appears to be expensive on this stack.
+**The loose schema plus an ordinary validator beats the clever schema**, which is
+this project's usual answer in a new place.
+
+### 7.3 The model comparison, and the honest verdict
+
+| model | latency | what it did with the same sentence |
+|---|---|---|
+| llama-3.3-70b, loose | 1.6 s | the right two ports |
+| llama-3.1-8b, loose | 1.2 to 2.2 s | invented a **multi hop chain through the IAC bus** and pointed at the Model 12 |
+
+🔴 **AND THE 70B IS RIGHT ABOUT INTENT AND UNRELIABLE ABOUT IDENTITY.** Two
+harder instructions, same desk, same prompt:
+
+- *"Put the mod wheel on the master filter."* It produced `cc` and `channel 16`,
+  which is the right idea, **aimed at the Model 12**. The master filter is on the
+  Circuit.
+- *"Play the drums from the keyboard."* `channel 10`, correct, **aimed at the
+  Model 12** again.
+
+🔴 **NO VALIDATOR CAN CATCH EITHER, BECAUSE THERE IS NOTHING INVALID ABOUT
+THEM.** They are well formed patches to the wrong instrument. **That is the
+measured argument for `plans/plan-patchbay.md` §5's rule**, which was written
+before any of this was run: a model proposes, a person presses. The rule was a
+principle in the morning and is a measurement now.
+
+### 7.4 What the numbers do to §4's arithmetic
+
+The estimate was about $0.00047 a command. Measured token counts: **324 to 464
+prompt tokens and 52 completion tokens**, which is **$0.00021**, plus
+$0.0000316 for 3.7 s of audio. So **about a quarter of a cent per ten commands**,
+and the estimate was pessimistic by roughly half.
