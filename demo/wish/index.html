@@ -317,6 +317,30 @@
     { id: 'here:mk-425c-usb-midi-keyboard:out', dir: 'out', box: 'keys', label: 'MK-425C USB MIDI Keyboard' },
     { id: 'here:circuit:out', dir: 'out', box: 'circuit', label: 'Circuit' },
     { id: 'here:model-12-midi-in:out', dir: 'out', box: 'model12', label: 'Model 12 MIDI IN' },
+    /**
+     * 🔴 THE MODEL 12 OFFERS TWO PAIRS AND ONLY ONE WAS HERE, WHICH MADE A
+     * WRONG ANSWER THE ONLY ANSWER AVAILABLE. Asked 2026-09-21: *"I want to
+     * play notes with my model 12 REC buttons and play it to a circuit synth
+     * 1"*, and the model answered `Model 12 MIDI IN -> Circuit`, which is
+     * ALLOWED and would do nothing.
+     * ✅ MEASURED: the control surface is `Model 12 DAW Control IN`, **525
+     * messages**, while `Model 12 MIDI IN` **stayed silent throughout**,
+     * because that port is the DIN socket bridged to USB and nothing was
+     * patched into the jack.
+     * 🔴 AND THE PORT LIST IS AN `enum` ON PURPOSE, WHICH IS WHY THIS MATTERED
+     * SO MUCH. That enum is what stopped a Moog and a Prophet, neither on this
+     * desk, coming back as inventions. An enum missing a REAL port is the same
+     * mechanism refusing the truth, and the model has no way to say *the port I
+     * need is not on your list*.
+     * ⚠️ `instruments.mjs` HAD KNOWN ABOUT BOTH PAIRS SINCE THE TAXONOMY
+     * LANDED, and says in its own comment that they are two different things:
+     * the MIDI pair carries notes and controllers, the DAW Control pair speaks
+     * Mackie Control. The fact was in this repository and not in this list.
+     */
+    { id: 'here:model-12-daw-control-in:out', dir: 'out', box: 'model12',
+      label: 'Model 12 DAW Control IN' },
+    { id: 'here:model-12-daw-control-out:in', dir: 'in', box: 'model12',
+      label: 'Model 12 DAW Control OUT' },
     { id: 'here:circuit:in', dir: 'in', box: 'circuit', label: 'Circuit' },
     { id: 'here:model-12-midi-out:in', dir: 'in', box: 'model12', label: 'Model 12 MIDI OUT' },
     { id: 'here:mk-425c-usb-midi-keyboard:in', dir: 'in', box: 'keys', label: 'MK-425C USB MIDI Keyboard' },
@@ -359,10 +383,16 @@
     // valid patch that leaves every note hanging on an instrument in another
     // building, and nothing in the validator could catch it, because there is
     // nothing invalid about it. So the model is told, in the same sentence.
-    + 'The TASCAM Model 12 sends its REC buttons as notes 0 to 7, SOLO as notes 8 to 15 '
-    + 'and MUTE as notes 16 to 23, its PAN knobs as relative CC 16 upward, and its faders '
-    + 'as pitch bend. REC SENDS NO NOTE OFF, so a link that plays a synth from REC leaves '
-    + 'notes hanging, and SOLO or MUTE should be used instead. '
+    + 'The TASCAM Model 12 has TWO port pairs and they carry different things. Its '
+    + 'buttons, knobs and faders all come out of Model 12 DAW Control IN, and they only '
+    + 'send anything when DAW control mode is switched on at the mixer. Model 12 MIDI IN '
+    + 'is the 5 pin DIN socket bridged to USB and carries only whatever is patched into '
+    + 'that socket, so it is the wrong port for the mixer own controls. '
+    + 'On DAW Control IN the REC buttons are notes 0 to 7, SOLO is notes 8 to 15 and MUTE '
+    + 'is notes 16 to 23, the PAN knobs are relative CC 16 upward and the faders are pitch '
+    + 'bend. REC SENDS NO NOTE OFF, so a link that plays a synth from REC leaves notes '
+    + 'hanging, and SOLO or MUTE should be used instead. Those notes are very low, 0 is '
+    + 'C-1, so playing a synth from them wants a transpose of about 60. '
     + 'Transforms available: channel, transpose, velocity, only, drop, cc, and three more. '
     + 'range takes lo and hi and keeps only notes inside that note range, which is how a '
     + 'keyboard split is built: two links from the same port with different ranges and '
@@ -2303,8 +2333,20 @@
       const at = (m) => HEAR.findIndex(([, id]) => id === m);
       const runs = [];
       for (const [model, was, want] of [
+        /**
+         * 🔴 `taskham` WAS A REPAIR AND IS AN AMBIGUITY SINCE 2026-09-21, AND
+         * THE PAGE IS RIGHT TO REFUSE IT. Adding the Model 12's DAW Control
+         * pair to `PORTS` gave this desk TWO things a mangled `TASCAM` could
+         * mean, `TASCAM Model 12` and `TASCAM Model 12 DAW control`, and
+         * `reword()` never picks between two instruments on one span. So the
+         * expectation is the sentence UNCHANGED, and the log line saying why.
+         * ⚠️ THIS IS THE ASSERT DOING ITS JOB RATHER THAN BREAKING. It went red
+         * the moment the desk grew a fourth port, which is exactly when a check
+         * about naming things on this desk SHOULD go red, and the page's
+         * behaviour never changed.
+         */
         ['@cf/openai/whisper', 'taskham',
-          'The evolution plays the circuit and the TASCAM Model 12 records it.'],
+          'The evolution plays the circuit and the taskham records it.'],
         /* No leading space in the expectation, and `whisper-tiny-en` really
            does put one on everything: `finish()` trims before it repairs, so
            what the box gets is the sentence without the model's own margin. */
@@ -2316,8 +2358,9 @@
       }
       hearPick.buttons[0].click();          // put the picker back where it was
       const log = document.querySelector('.pos-log')?.textContent || '';
-      d.assert('a name the speech model mangled is repaired before the patch model reads it',
-        runs.every((r) => r.got === r.want) && runs.every((r) => log.includes(`"${r.was}"`)),
+      d.assert('a mangled name is repaired when it names one thing and left alone when it names two',
+        runs.every((r) => r.got === r.want) && runs.every((r) => log.includes(`"${r.was}"`))
+        && /names two things here/.test(log),
         runs.map((r) => `${JSON.stringify(r.was)} -> ${JSON.stringify(r.got.slice(0, 44))}`).join(' | '));
 
       /**
