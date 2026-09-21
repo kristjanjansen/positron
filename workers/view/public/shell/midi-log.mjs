@@ -35,10 +35,27 @@ export const MAX_ROWS = 200;
  * @param {string} [o.empty]  what the box says before anything has arrived.
  *                            A page whose traffic sits behind a press should
  *                            name that press here.
+ * @param {number} [o.reserve] rows of height to hold open while it is empty.
  * @returns {{el, add:(m:object)=>boolean, count:()=>number, clear:Function,
  *            table:object}}
  */
-export function createMidiLog({ cap = MAX_ROWS, empty = 'nothing has arrived yet' } = {}) {
+/**
+ * 🔴 `reserve` HOLDS THE BOX OPEN WITH NOTHING IN IT, AND IT REPLACES A
+ * SENTENCE THAT WAS DOING TWO JOBS. Asked 2026-09-21: *"`press the status
+ * button, then play something` - rm just leave room for midi table"*. That
+ * string told a visitor what to press, which the button beside it already says
+ * on its face, and it held the table's height, which is the half worth keeping.
+ * ⚠️ **AND THE TWO ARE INDEPENDENT ON PURPOSE.** `empty: ''` with no `reserve`
+ * collapses the box, which is right for a table that appears when a file lands;
+ * `reserve` with no `empty` keeps both. A page asking for room is not asking
+ * for a caption and had to say so in one option before.
+ * ⚠️ IT IS ROWS RATHER THAN PIXELS, because a table's row height is `shell.css`'s
+ * business and a page that typed `min-height: 186px` would be a second opinion
+ * about it. `--tbl-row-h` is declared beside `.pos-tbl-row` and asserted against
+ * a real measured row.
+ */
+export function createMidiLog({ cap = MAX_ROWS, empty = 'nothing has arrived yet',
+                                reserve = 0 } = {}) {
   const t0 = performance.now();
   const table = createTable({
     columns: [
@@ -60,6 +77,10 @@ export function createMidiLog({ cap = MAX_ROWS, empty = 'nothing has arrived yet
     note: 'hover',
   });
   table.el.classList.add('pos-midilog');
+  if (reserve > 0) {
+    table.el.dataset.reserve = String(reserve);
+    table.el.style.setProperty('--reserve-rows', String(reserve));
+  }
 
   return {
     el: table.el,

@@ -153,7 +153,8 @@ export function createTransportBar(host, deck, {
    * keeps in that position. `/videoradio/`'s ⛶ is not a loop control that
    * happens to be visible, it is the only thing in that slot.
    *
-   * Same declaration shape as `extras`: `{ id, label, aria, title, onPress }`.
+   * Same declaration shape as `extras`: `{ id, label, aria, title, word, onPress }`.
+   * `word: true` for a label rather than a glyph, exactly as `extras` takes it.
    * Reachable afterwards as `bar.slot(id)`, so a check can press the real
    * control and a page can relabel one.
    */
@@ -413,7 +414,18 @@ export function createTransportBar(host, deck, {
      * ⚠️ IT LOOKS IDENTICAL. `shell.css` gives `.tbar-slot` the same rule as
      * `.tbar-x`; what differs is who presses it, not what it is.
      */
-    const b = el('button', 'tbar-slot', x.label,
+    /**
+     * 🔴 `word: true` MAKES IT A LABEL RATHER THAN A GLYPH, AND IT WAS MISSING
+     * WHILE `extras` HAD IT. MEASURED 2026-09-21 on `/pack/`: a slot button
+     * carrying the word `loop` drew a 30 px square with the text spilling out
+     * of it and over the bar's own right edge. `.tbar-slot` is a GLYPH box,
+     * `--tbar-btn` wide, and the only thing that has ever gone in one is
+     * `/videoradio/`'s ⛶, which is why nobody met this.
+     * ⚠️ AND THE SLOT'S WHOLE PURPOSE IS TO TAKE THE LOOP BUTTON'S PLACE, which
+     * is `tbar-loop tbar-word` reading `LOOP`. A slot that could not wear a
+     * word could not replace the thing it is named after.
+     */
+    const b = el('button', `tbar-slot${x.word ? ' tbar-word' : ''}`, x.label,
       { type: 'button', 'aria-label': x.aria || x.id });
     b.dataset.id = x.id;
     if (x.title) b.title = x.title;
