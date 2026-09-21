@@ -7,7 +7,7 @@
 // check that only asks whether something came back, so the asserts below name
 // the exact maker, and the ones marked NEGATIVE CONTROL are written so that a
 // specific wrong implementation fails them.
-import { DESK, KINDS, describe, alias } from './instruments.mjs';
+import { DESK, KINDS, describe, alias, normalise, sounds, resolve } from './instruments.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -142,6 +142,76 @@ ok('NEGATIVE CONTROL: an unrecognised port adds no alias line',
 ok('every note is one short sentence',
   DESK.every((e) => !e.note || (e.note.split(/\s+/).length <= 20 && !/\.\s/.test(e.note))),
   DESK.map((e) => e.note.split(/\s+/).length).join(', ') + ' words');
+
+// ── hearing a name wrong ──────────────────────────────────────────────────
+//
+// 🔴 EVERY NEGATIVE CONTROL BELOW IS A REAL FALSE MATCH FROM THE FIRST BUILD,
+// not an invented worry. `connect` matched Novation Circuit at one edit,
+// `machine from` matched the Model 12's DAW control, and `keyboard` matched the
+// M-Audio Fast Track Pro. Reported from the other side in the same minute:
+// *"circuit gets mistaken for secury"*. A matcher like this fails by being too
+// helpful, so the asserts that matter are the ones about silence.
+
+// 16. Spoken digits become a model number, which is what a person says out loud.
+ok('a spoken model number normalises to digits',
+  normalise('mk four twenty five c') === 'mk 425 c'
+  && normalise('Model  12!') === 'model 12',
+  `"${normalise('mk four twenty five c')}"`);
+
+// 17. The sound key brings together what a microphone confuses, and it is the
+//     two-tokens-into-one case that a token by token comparison cannot reach.
+ok('tascam and task am reduce to the same sound',
+  sounds('tascam') === sounds('task am') && sounds('tascam').length >= 4,
+  `${sounds('tascam')} for both`);
+
+// 18. The cases this was asked for.
+{
+  const a = resolve('connect evolution to circuit').map((h) => h.full);
+  const b = resolve('connect the task am to the circus').map((h) => h.full);
+  ok('a sentence naming the instruments properly resolves both, exactly',
+    a.includes('Evolution MK-425C') && a.includes('Novation Circuit')
+    && resolve('connect evolution to circuit').every((h) => h.how === 'exact'),
+    a.join(', '));
+  ok('and a mis-heard sentence still resolves them, by sound',
+    b.includes('Novation Circuit') && b.some((f) => f.startsWith('TASCAM')),
+    b.join(', '));
+}
+
+// 19. NEGATIVE CONTROL. An instruction that names no instrument resolves to
+//     NOTHING. Three sentences, all of them things somebody would really say.
+{
+  const quiet = ['can you make it a bit louder please',
+    'put the mod wheel on the master filter',
+    'connect it to the thing and then route it'];
+  const noisy = quiet.filter((q) => resolve(q).length);
+  ok('NEGATIVE CONTROL: an instruction naming no instrument resolves to nothing',
+    noisy.length === 0,
+    noisy.length ? `matched in: ${noisy.join(' | ')}` : `${quiet.length} sentences, all silent`);
+}
+
+// 20. NEGATIVE CONTROL, AND THE SHARPEST ONE. `connect` is one edit from
+//     `circuit` by sound and shares its first letter, so no threshold separates
+//     them. The stop list does, and this is the assert that says so.
+ok('NEGATIVE CONTROL: the verb "connect" never resolves to the Circuit',
+  !resolve('connect').length && !resolve('connect connect').length
+  && resolve('circuit').some((h) => h.full === 'Novation Circuit'),
+  'the verb is silent and the noun is not');
+
+// 21. NEGATIVE CONTROL. The instrument that is not plugged in is never offered,
+//     however many aliases it shares with one that is.
+ok('NEGATIVE CONTROL: an instrument that is not on the desk is never resolved',
+  DESK.some((e) => e.present === false)
+  && !resolve('connect the novation drum machine').some((h) => /Tracks/.test(h.full)),
+  resolve('connect the novation drum machine').map((h) => h.full).join(', ') || 'nothing');
+
+// 22. An exact hit always beats a sound-alike for the same instrument, or a
+//     sentence that named a thing properly could be "corrected" to something
+//     else, which is the worst thing this could do.
+{
+  const h = resolve('circuit').find((x) => x.full === 'Novation Circuit');
+  ok('an exact hit wins, so a properly named instrument is never re-interpreted',
+    h && h.how === 'exact' && h.cost === 0, h ? `${h.how} ${h.cost}` : 'no hit');
+}
 
 console.log(`\n${pass} ok, ${fail} failed`);
 process.exit(fail ? 1 : 0);
