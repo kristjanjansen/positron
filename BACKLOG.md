@@ -49,7 +49,15 @@
   Every panel so far listens. So the `accepts` list is not decoration: notes,
   control changes and bend go, and SysEx, program change and clock do not.
 
-- 🔴 **A SOUND EDITING DEMO FOR THE CIRCUIT, WITH THE INVISIBLE HAND.** Asked
+- ✅ **DONE 2026-09-21. `/shape/`, 34/34, 28 PAGE ASSERTS, TEN OF THEM FOR
+  EVERY VISITOR.** 52 handed sliders for a synth and 18 for the session, one
+  message per parameter per animation frame, **one gate per channel** because
+  the gate keys on controller number alone and CC 74 exists on three.
+  🔴 **THREE WALLS**: `toBytes` refuses anything that is not a control change
+  on a documented `(group, cc)` pair, `ccBytes` can only make `0xB0`, and the
+  browser is asked for `sysex: false`. One exit, so the audit is a counter.
+  ⚠️ **NOBODY HAS HEARD IT**, and `portSends === 0` is asserted so a suite run
+  can never be a hand on the instrument. Asked
   2026-09-21: *"can you build a demo for sound editing using our invisible hand
   sliders and experience what we had so far. Propose also a name for it. I'm
   running out of ideas. Can it play back real time on circuit?"*
@@ -60,7 +68,14 @@
   nothing an editor does this way can touch flash.
   ⚠️ **THE NAME PROPOSED IS `shape`**, with `carve` and `tone` behind it.
 
-- 🔴 **SAMPLE PACKS WORTH HAVING, AND THE CIRCUIT'S OWN LIMITS.** Asked
+- ✅ **RESEARCHED 2026-09-21, `plans/plan-circuit-samples.md` §3 AND §5.**
+  MEASURED: 64 samples, **all 48 kHz 16 bit mono**, 0.12 s to 2.00 s, **53.4 s
+  in total**. ⚠️ **AND THE WRITING DISAGREES ABOUT THE RATE**: the quoted
+  limit is 60 s of 44.1 kHz. The reading that fits both is a budget counted in
+  SAMPLES, and one experiment settles it.
+  🔴 **THE RECOMMENDATION IS TO RECORD OUR OWN**, off the Model 12 through the
+  Fast Track Pro, because it removes the licence question instead of
+  researching it. Asked
   2026-09-21: *"research good quality sample packs for good drum sound,
   especially this more alternative and non-club music, more atmospheric, or
   just interesting warm stuff"*, and *"look up what is the circuit limits of
@@ -69,7 +84,31 @@
   ⚠️ **A LICENCE IS PART OF THE ANSWER, NOT A FOOTNOTE.** A pack that cannot be
   redistributed cannot go in this repository or into a demo somebody opens.
 
-- 🔴 **THE CIRCUIT PACK IN THE BROWSER, AND A DRUM MACHINE OUT OF IT.** Asked
+- ✅ **RESEARCHED 2026-09-21, `research/synth-editors-2026-09-21.md`.** Asked:
+  *"see existing a bunch of editors maybe something to learn from what UI
+  elements we need"*. Seven of fourteen elements already exist here, three in a
+  different form, **four genuinely missing**: an envelope editor, a search box
+  over a list, A/B compare and undo. 🔴 **AND 82 OF THE CIRCUIT'S 98 PARAMETERS
+  ARE A PLAIN KNOB THE KIT ALREADY HAS**, so the next three are a filter on
+  `table.mjs`, a compare snapshot, and a picker that draws its options.
+  ⚠️ It argues AGAINST MIDI learn and against skinning, with reasons.
+
+- ✅ **RESEARCHED 2026-09-21, `research/circuit-session-format-2026-09-21.md`.**
+  Asked: *"Look for session parsing and writing"*. **It exists and it is for a
+  different device**: `ncstool` reads and writes Circuit **Tracks** `.ncs` at
+  97.3 per cent of 160,780 bytes. Ours is the 2015 Circuit's 53,248 byte
+  `.circuitsession` and **nothing was found that reads one**.
+  🔴 **AND IT CORRECTED A CLAIM PUBLISHED THE SAME DAY**: a session is seven
+  bit after all, because the 44,071 high bytes are 0xFF padding. Entropy 0.91
+  bits a byte, 9,180 real bytes of 53,248, container mapped into 49 blocks.
+
+- ✅ **HALF DONE 2026-09-21: THE PARSING IS BUILT, THE DRUM MACHINE IS NOT.**
+  `demo/shell/unzip.mjs` reads a `.circuitpack` with **nothing vendored**,
+  13/13 against the real file. `plans/plan-circuit-samples.md` has the pack
+  contents, the limits, the pipeline and the drum machine's shape, and
+  `research/circuit-session-format-2026-09-21.md` maps the session container.
+  🔴 **WHAT IS LEFT IS THE PAGES**: a pack reader, then the machine with per
+  lane lengths, then a writer. Asked
   2026-09-21: *"plan and research the circuit patch or package file parsing
   download and upload... can we do locally patch uploading and parsing in
   browser and extracting samples out of it and making a small drum machine...

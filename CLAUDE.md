@@ -473,6 +473,58 @@ it all"*. So the rule above has a second half now, and it is about WHEN.
   already say what an external red means.
 
 
+🔴 **A STATISTIC MEASURED OVER A WHOLE ARTEFACT MEASURES ITS PADDING.
+2026-09-21, AND IT WAS PUBLISHED BEFORE IT WAS CAUGHT.** A Circuit session file
+was written up as *"not seven bit, so it is not SysEx payload"* on the evidence
+that **44,071 of its 53,248 bytes are above 0x7F**. The number is correct. The
+bytes are **0xFF erasure**: the file's entropy is **0.91 bits a byte**, its real
+payload is **9,180 bytes**, and **two** of those are above 0x7F. Counting high
+bytes in a file that is four fifths erased flash measures the erasure.
+⚠️ **THE TELL WAS AVAILABLE AND FREE**: entropy, a byte histogram and a run
+length map all say *this is mostly one value* in one command each. **Ask what
+the denominator is before dividing by it.**
+
+🔴 **A JSON SCHEMA CONSTRAINS SHAPE AND CANNOT CONSTRAIN MEANING. MEASURED
+2026-09-21 AGAINST WORKERS AI.** Asked for a patch, `llama-3.3-70b` returned
+`{"op": "transpose", "to": 1}` on every run. **`transpose` takes `by`.** The
+object was valid against the schema it was generated under, because that schema
+listed every argument any transform could take and required only `op`, and the
+code would have computed `note + undefined`, which is `NaN`: not a throw, not a
+drop, a note number that does not exist arriving at an instrument from a link
+the page called connected. **Validate the MEANING in ordinary code
+(`checkTransforms`), never in the schema.**
+⚠️ **AND A TIGHTER SCHEMA WAS MUCH WORSE, WHICH IS THE OPPOSITE OF THE OBVIOUS
+FIX.** An `anyOf` with one branch per operation took the same model from
+**1.6 s to 10.2 s** and made it repeat one transform until the tokens ran out,
+three runs of three. **The loose schema plus an ordinary validator wins.**
+✅ What a schema CAN do is identity: the list of real ports as an `enum` meant a
+Moog and a Prophet, neither on the desk, came back as **no links at all in
+496 ms** rather than as an invention.
+
+🔴 **A MODEL PROPOSES AND A PERSON PRESSES, AND THE REASON IS MEASURED RATHER
+THAN CAUTIOUS.** Asked to put the mod wheel on the master filter, and separately
+to play the drums from the keyboard, that model produced **well formed patches
+aimed at the wrong instrument**. Nothing in a validator can catch that, because
+there is nothing invalid about them. A person reading one line can. **Anything
+that turns words into actions here shows the action as text first.**
+
+🔴 **`UNSUPPORTED` AND `FORBIDDEN` ARE TWO LISTS AND MERGING THEM BREAKS
+EVERYTHING OR PROTECTS NOTHING.** `bay.mjs` had one `accepts` list, so a MIDI
+source emitting six classes could never reach a synth that takes three: **every
+real link on the desk was refused**. Split: a class a destination does not
+handle is **dropped at the boundary and reported**, a class on `never` **refuses
+the link outright**. The difference is between *I do not use that* and *that
+damages me*, and only the second is worth an error.
+
+🔴 **A STANDING FILE GOES STALE IN HOURS ON A BUSY DAY, AND A BACKGROUND AGENT
+READING IT INHERITS THE ERROR AS A FINDING.** Both of this session's stale lines
+were caught by agents, not by anybody looking: `tabs.mjs` reported as used by no
+page while two pages use it, and the demo count at the top of this file wrong
+**twice in one day**, `47 of 49` in the morning and `51 of 53` by the afternoon,
+both true when written. ⚠️ **SO A CLAIM AN AGENT IS GOING TO BUILD ON IS WORTH
+ONE COMMAND OF CHECKING BEFORE IT IS HANDED OVER**, and a brief should say which
+claims in it were verified today.
+
 **Measure the quantity in question, not one adjacent to it.** An A/B where both
 arms share the bug returns "identical", which reads as "fine". Before running a
 comparison, ask what defect it could NOT detect.
