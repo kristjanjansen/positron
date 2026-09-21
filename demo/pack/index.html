@@ -203,6 +203,21 @@
     { id: 'samples', label: 'SAMPLES' },
   ];
   const tabs = createTabs({ tabs: TABS });
+  /**
+   * 🔴 NOTHING BUT THE WAY IN UNTIL A FILE LANDS, REPORTED BY SCREENSHOT
+   * 2026-09-21 AS *"no files, no tabs no content"*. Three tab names, three
+   * column headings and a ten cell readout, all of them naming things that are
+   * not there, is a page describing a file nobody has opened.
+   * ⚠️ IT IS ONE ELEMENT RATHER THAN SIX. Hiding each table, each heading and
+   * the readout separately is six things to keep in step and one of them will
+   * be forgotten; the tabs component holds every one of them.
+   * ⚠️ AND `hidden` WORKS HERE BECAUSE `.pos-tabs` SETS NO `display`. Three
+   * other components on this page needed an explicit `[hidden] { display:
+   * none }` to make the attribute mean anything, and the table heading needed
+   * one TODAY. Checked rather than assumed, and the check reads the computed
+   * style rather than the property.
+   */
+  tabs.el.hidden = true;
   stack.add(tabs.el);
   const panel = (id) => tabs.panel(id);
 
@@ -315,6 +330,13 @@
       head: '', marker: '', written: 'B', 'not erasure': 'B', payload: 'B',
       filled: '%', entropy: '', nearest: 'B', 'synth 1': '', 'synth 2': '',
     },
+    // 🔴 FIVE ACROSS AND TWO DOWN, ASKED FOR AS *"why not 5x2 cells?"* against a
+    // panel that had wrapped 7 and 3 and cut `10,620` to `10,62…` in its own
+    // cell. Ten cells and five columns is the only arrangement that puts
+    // `written` beside `not erasure` and `payload` beside `filled`, which are
+    // the two pairs a reader compares.
+    cols: 5,
+    size: 'sm',
     showLog: false,
   });
   const partsLine = el('div', 'pk-line', '');
@@ -1053,6 +1075,7 @@
      * zero. `hidden` IS `display: none`.
      */
     dgHost.hidden = !patches.length;
+    tabs.el.hidden = !(patches.length || stats.length || wavs.length);
     if (patches.length) showPatch(0);
     // ⚠️ AND THE FIRST SESSION OPENS TOO, so the panel under the list is filled
     // whenever anything is, and a press changes its words instead of adding a
@@ -1305,10 +1328,35 @@
     tabs.buttons.map((b) => b.textContent).join(' ') === 'PATCHES SESSIONS SAMPLES',
     tabs.buttons.map((b) => b.textContent).join(' '));
 
-  d.assert('an empty table draws no heading, because a column name over nothing labels air',
-    patchTable.count() === 0 && sampleTable.count() === 0
-    && patchTable.el.querySelector('.pos-tbl-head')?.hidden === true,
-    `${patchTable.count()} patch rows, ${sampleTable.count()} sample rows`);
+  /**
+   * 🔴 THIS ASSERT PASSED EVERY RUN WHILE THE HEADINGS WERE ON SCREEN, AND A
+   * SCREENSHOT IS WHAT CAUGHT IT. It read `head.hidden === true`, which is a
+   * fact about an ATTRIBUTE, and `.pos-tbl-row` sets `display: grid`, which
+   * beats the UA's `[hidden] { display: none }`. So `blank()` set the attribute,
+   * changed nothing, and the check agreed with it.
+   * ⚠️ SO IT READS THE COMPUTED STYLE NOW, WHICH IS THE ONLY THING THAT KNOWS
+   * WHAT IS BEING DRAWN, and it covers all four tables rather than two.
+   * `shell.css` gained `.pos-tbl-row[hidden]`, so this was a defect in every
+   * empty table in the project and not only in these.
+   */
+  {
+    const heads = [patchTable, sessionTable, partsTable, sampleTable]
+      .map((t) => t.el.querySelector('.pos-tbl-head'))
+      .filter(Boolean);
+    const drawn = heads.filter((h) => getComputedStyle(h).display !== 'none');
+    d.assert('an empty table draws no heading, because a column name over nothing labels air',
+      patchTable.count() === 0 && sampleTable.count() === 0 && partsTable.count() === 0
+      && heads.length === 4 && drawn.length === 0,
+      `${drawn.length} of ${heads.length} headings are still being drawn over `
+      + `${patchTable.count()} patch, ${sessionTable.count()} session and ${sampleTable.count()} sample rows`);
+
+    // 🔴 AND THE WHOLE BLOCK IS AWAY, which is the request itself.
+    d.assert('with no file open there are no tabs and nothing under them',
+      tabs.el.hidden === true && getComputedStyle(tabs.el).display === 'none'
+      && tabs.el.getBoundingClientRect().height === 0,
+      `the tabs are ${getComputedStyle(tabs.el).display} at `
+      + `${tabs.el.getBoundingClientRect().height} px`);
+  }
 
   if (SELFCHECK) {
     const r = PACK_HERE ? await realFetch(PACK).catch(() => null) : null;

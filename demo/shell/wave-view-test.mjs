@@ -506,6 +506,184 @@ if (!fs.existsSync(PACK)) {
   }
 }
 
+/* ── the component, against a stub document ───────────────────────────────
+   🔴 THIS SECTION EXISTS BECAUSE A REAL DEFECT LIVED EXACTLY WHERE NOTHING WAS
+   LOOKING. `clear()` hid the wrapper and left the bitmap alone, so the canvas
+   kept the last sample and `ink()` went on reporting it. REPORTED from `/pack/`
+   on 2026-09-21: draw a sample, read `ink()`, `clear()`, read `ink()` again,
+   and the answer was **the same 63,264 pixels both times**. A page check built
+   on that difference was measuring nothing, which is the shape this file's own
+   header warns about for `facts()`.
+
+   ⚠️ WHAT IT GRADES AND WHAT IT DOES NOT. The canvas below is a stub that
+   rasterises axis aligned rectangles into a byte array and nothing else, so
+   what is being graded is WHICH CALLS the component makes into a canvas and
+   what state they leave behind. A browser is still the only thing that can say
+   the picture is antialiased correctly, that the stylesheet loses to
+   `shell.css` on source order, that the three greys read as three greys, or
+   that a real `ResizeObserver` fires. Those stay in the list at the top.
+   ⚠️ AND A STUB GRADES THE STUB AS MUCH AS THE COMPONENT, which is why the two
+   claims taken from it are the coarsest ones available: is any byte of the
+   bitmap set, and does the frame counter stop. Neither depends on the stub
+   being faithful about anything a browser would do differently. */
+
+console.log('\n-- the component, driven against a stub document --');
+
+function stubCtx(canvas) {
+  let sx = 1, sy = 1, fill = [0, 0, 0];
+  const hex = (v) => {
+    const m = /^#([0-9a-f]{6})$/i.exec(String(v).trim());
+    return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : [255, 255, 255];
+  };
+  const rect = (x, y, w, h, on) => {
+    const x0 = Math.max(0, Math.round(x * sx)), y0 = Math.max(0, Math.round(y * sy));
+    const x1 = Math.min(canvas.width, Math.round((x + w) * sx));
+    const y1 = Math.min(canvas.height, Math.round((y + h) * sy));
+    for (let py = y0; py < y1; py++) {
+      for (let px = x0; px < x1; px++) {
+        const i = (py * canvas.width + px) * 4;
+        canvas.bits[i] = on ? fill[0] : 0;
+        canvas.bits[i + 1] = on ? fill[1] : 0;
+        canvas.bits[i + 2] = on ? fill[2] : 0;
+        canvas.bits[i + 3] = on ? 255 : 0;
+      }
+    }
+  };
+  return {
+    setTransform(a, b, c, d) { sx = a; sy = d; },
+    scale(x, y) { sx *= x; sy *= y; },
+    set fillStyle(v) { fill = hex(v); },
+    get fillStyle() { return fill; },
+    fillRect(x, y, w, h) { rect(x, y, w, h, true); },
+    clearRect(x, y, w, h) { rect(x, y, w, h, false); },
+    getImageData(x, y, w, h) { return { data: canvas.bits }; },
+  };
+}
+
+function stubEl(tag) {
+  const e = {
+    tag, className: '', textContent: '', hidden: false, id: '', children: [], removed: false,
+    style: { setProperty(k, v) { e.style[k] = v; } },
+    clientWidth: 0, clientHeight: 0, width: 0, height: 0, bits: new Uint8ClampedArray(4),
+    setAttribute() {},
+    append(...k) { e.children.push(...k); },
+    remove() { e.removed = true; },
+    getContext() { return (e.ctx = e.ctx || stubCtx(e)); },
+  };
+  // A canvas loses its bitmap when either dimension is assigned, exactly as a
+  // real one does. That is load bearing here: it is the thing that would have
+  // wiped the stale picture EVENTUALLY, and the whole point of the defect is
+  // that `clear()` must not wait for it.
+  let w = 0, h = 0;
+  Object.defineProperty(e, 'width', {
+    get: () => w, set: (v) => { w = v; e.bits = new Uint8ClampedArray(Math.max(1, w * h) * 4); },
+  });
+  Object.defineProperty(e, 'height', {
+    get: () => h, set: (v) => { h = v; e.bits = new Uint8ClampedArray(Math.max(1, w * h) * 4); },
+  });
+  return e;
+}
+
+const styles = [];
+let rafQ = [];
+globalThis.document = {
+  createElement: stubEl,
+  getElementById: (id) => styles.find((s) => s.id === id) || null,
+  head: { prepend(s) { styles.push(s); } },
+  documentElement: {},
+};
+globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
+globalThis.window = { devicePixelRatio: 2 };
+globalThis.requestAnimationFrame = (fn) => rafQ.push(fn);
+globalThis.cancelAnimationFrame = () => { rafQ = []; };
+globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+
+{
+  const host = stubEl('div');
+  const view = V.createWaveView(host, { height: 120, label: 'a sample' });
+  const wrap = host.children[0];
+  const cv = wrap.children[0];
+  const anyInk = () => { for (let i = 3; i < cv.bits.length; i += 4) if (cv.bits[i]) return true; return false; };
+  // A layout the component can measure. It reads `clientWidth` off the wrapper
+  // and `clientHeight` off the canvas, which is the content box either way.
+  wrap.clientWidth = 700; cv.clientHeight = 120;
+
+  const s = new Float32Array(48000);
+  for (let i = 0; i < s.length; i++) s[i] = Math.sin(i / 40) * 0.8;
+  s[1234] = 0.99;
+
+  // 22. It puts nothing on the page before there is anything to show.
+  ok('a view with no sample is hidden and has painted nothing',
+    wrap.hidden === true && !anyInk() && view.facts().drawn === false
+    && styles.length === 1,
+    `${styles.length} stylesheet injected, hidden ${wrap.hidden}`);
+
+  // 23. A sample goes in, the box comes back, and the BITMAP has ink in it.
+  const put = view.set(s, 48000, { name: 'sample_0' });
+  const drew = view.ink();
+  ok('a sample unhides the box and really does reach the bitmap',
+    put.ok && wrap.hidden === false && drew.measured === true && drew.ink > 0
+    && drew.ink < drew.total && cv.width === 1400 && cv.height === 240,
+    `${drew.ink.toLocaleString('en-US')} of ${drew.total.toLocaleString('en-US')} pixels, backing store ${cv.width}x${cv.height}`);
+
+  // 24. 🔴 THE REPORTED DEFECT. `clear()` wipes the canvas, synchronously, and
+  //     it is asserted against the BYTES rather than against what `ink()` says
+  //     about them. Two independent readings of one fact: the bitmap is the
+  //     fact, `ink()` is the component's report of it, and the bug was that the
+  //     report could not disagree with anything.
+  const was = drew.ink;
+  view.clear();
+  const after = view.ink();
+  ok('clear() empties the bitmap rather than only hiding the box',
+    !anyInk() && after.ink === 0 && wrap.hidden === true && view.facts().drawn === false,
+    `${was.toLocaleString('en-US')} pixels before, ${after.ink} after, and every byte of the bitmap is zero`);
+
+  // 25. And `ink()` says it had nothing to measure, rather than returning a
+  //     share about a bitmap with no field colour in it.
+  ok('and ink() reports that it measured nothing, instead of a number that cannot move',
+    after.measured === false && after.share === 0 && after.why.includes('empty'),
+    after.why);
+
+  // 26. The frame loop runs while something plays and STOPS when it does not.
+  //     Read off the counter, never off the boolean: a state read one line
+  //     after an event is an instant, and a counter is what has happened.
+  {
+    view.set(s, 48000, { name: 'again' });
+    let t = 0;
+    view.follow(() => t);
+    const step = () => { const q = rafQ; rafQ = []; for (const fn of q) fn(); };
+    t = 0.1; step(); t = 0.2; step();
+    const running = view.facts();
+    t = null; step();                       // the page says the sound stopped
+    const stopped = view.facts().paints;
+    step(); step();
+    ok('the head moves while something plays and the loop stops dead when it does not',
+      running.moving === true && running.ticks === 2 && running.position === 0.2
+      && view.facts().moving === false && view.facts().paints === stopped
+      && rafQ.length === 0,
+      `${running.paints} paints while following, then ${stopped} and no more`);
+  }
+
+  // 27. NEGATIVE CONTROL ON THE STUB ITSELF. Everything above is worthless if
+  //     the stub canvas records nothing, so one rectangle is drawn by hand and
+  //     read back.
+  {
+    const probe = stubEl('canvas');
+    probe.width = 4; probe.height = 4;
+    const c = probe.getContext();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.fillStyle = '#ffffff';
+    c.fillRect(1, 1, 2, 2);
+    let on = 0;
+    for (let i = 3; i < probe.bits.length; i += 4) if (probe.bits[i]) on++;
+    c.clearRect(0, 0, 4, 4);
+    let left = 0;
+    for (let i = 3; i < probe.bits.length; i += 4) if (probe.bits[i]) left++;
+    ok('the stub canvas can tell a drawn pixel from an empty one, or none of the five above mean anything',
+      on === 4 && left === 0, `${on} of 16 pixels filled, ${left} left after a clear`);
+  }
+}
+
 /* ── the absence ──────────────────────────────────────────────────────────── */
 
 console.log('\n-- what this module must not be able to do --');
