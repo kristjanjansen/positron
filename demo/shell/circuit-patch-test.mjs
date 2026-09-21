@@ -198,8 +198,19 @@ ok('session_0 has 9,179 bytes that are not erasure and 2,238 that are neither er
 const heads = tally(stats.map((s) => s.head));
 ok('the owner\'s own sessions are USER 22, DEMO 7 and INIT 3',
   heads.USER === 22 && heads.DEMO === 7 && heads.INIT === 3, JSON.stringify(heads));
+// 🔴 THIS ASSERT'S CONDITION WAS RIGHT AND ITS SENTENCE WAS WRONG, WHICH IS THE
+// WORST COMBINATION THERE IS: it read `the three that say INIT are ordinary work
+// rather than blanks` and passed every time. They are not blanks, and they are
+// not work either. MEASURED 2026-09-21 against a stranger's pack off the public
+// archive: `session_16` is BYTE IDENTICAL to a stock template that appears ten
+// times in that pack, and `session_10` and `session_22` differ from it at
+// exactly one byte, 0xBBAC. The owner's other 29 differ from it by 262 to 5,412
+// bytes, a median of 1,524. `index.json` names all three `Initial Session`.
+// ⚠️ SO THE CLAIM IS NARROWED TO WHAT WAS ACTUALLY MEASURED HERE: they are not
+// empty. Whether a session is WORK is a comparison against the stock template
+// and this file cannot make it, because the template is not in this repository.
 const initOnes = stats.filter((s) => s.head === 'INIT');
-ok('and the three that say INIT are ordinary work rather than blanks',
+ok('the three that say INIT are not blanks, whatever else they turn out to be',
   initOnes.every((s) => s.entropy > 0.8 && s.nonZero > 0.8)
   && new Set(initOnes.map((s) => s.fingerprint)).size === 3,
   `entropy ${initOnes.map((s) => s.entropy.toFixed(2)).join(', ')}`);

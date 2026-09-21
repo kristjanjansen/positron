@@ -107,6 +107,22 @@ distinct fingerprints of 32**, not one a copy of another, **zero sessions
 entirely empty**, every one 84 to 89 per cent non-zero bytes, and the `User
 Session` rows sitting HIGHER than most of the named ones. **A name is a label
 somebody did not change. Content is the fact.**
+🔴 **AND IT IS 29 OF 32, NOT 32. THE SENTENCE ABOVE IS TRUE AND CARRIES WEIGHT IT
+CANNOT HOLD.** MEASURED 2026-09-21 against a stranger's Circuit pack:
+`session_16` is **byte identical** to a stock `Initial Session` template that
+appears ten times in that pack, and `session_10` and `session_22` differ from it
+at **exactly one byte, 0xBBAC**. The owner's other 29 differ from it by **262 to
+5,412 bytes, median 1,524**, so there is no middle ground to argue about, and
+`index.json` names all three of them `Initial Session`.
+🔴 **THE LESSON IS THE THIRD IN A ROW AND IT IS THE SAME ONE: A UNIQUE HASH IS
+NOT EVIDENCE OF CONTENT.** A one byte delta makes a distinct fingerprint, so
+distinctness can only ever say *these files are not identical*, which is a much
+smaller claim than *this is somebody's work*. First a name was not evidence, then
+a four byte head was not evidence, and now a hash is not either. **The measure
+that works is distance from the stock template.**
+⚠️ **AND THE CONCLUSION DOES NOT FLIP.** The pack holds **29 sessions of real
+work**, it is still the only backup, and nothing about not sending a pack to the
+Circuit changes. This is 32 becoming 29, not any of it becoming disposable.
 ⚠️ **VERIFYING A BACKUP NEEDS NO DEVICE**: `unzip -l`, read `index.json`, check
 the session count, check one patch is 350 bytes. Fewer WAVs than sample rows is
 normal rather than damage. `plans/plan-circuit-patches.md` has the whole
@@ -138,9 +154,22 @@ name and the displayed name are both `New Pack` and neither tells them apart.
 ⚠️ Whether that transfer really writes session slots is INFERENCE and is marked
 as such in `research/circuit-soundbank-2026-09-21.md`. The only way to confirm
 it costs the sessions if the answer is yes.
-✅ **THE 128 LOOSE `.syx` FILES ARE SAFE**: byte 6 is `00` on every one, which is
-`Replace Current Patch` and lands in RAM. Not one flash-writing `Replace Patch`
-exists in the archive.
+✅ **THE 128 LOOSE `.syx` FILES IN `purchased/` ARE SAFE**: byte 6 is `00` on
+every one, re-measured 2026-09-21, which is `Replace Current Patch` and lands in
+RAM.
+🔴 **AND THAT SENTENCE HAD NO SCOPE ON IT UNTIL 2026-09-21, WHEN IT READ `NOT ONE
+FLASH-WRITING Replace Patch EXISTS IN THE ARCHIVE`. IT IS TRUE OF `purchased/`
+AND FALSE OF THE WIDER WORLD.** MEASURED on a file called
+`on_the_run.circuitpack` fetched from a public archive: **it is not a zip at
+all**, it is a raw SysEx stream of 6,930 messages, and 64 of them are Circuit
+patch messages carrying **command byte `01`, which is `Replace Patch`, the one
+that writes FLASH**, aimed at **all 64 slots, 0 through 63**. One file, every
+synth patch on the instrument, and the extension says `circuitpack`.
+🔴 **SO AN EXTENSION IS NOT EVIDENCE EITHER.** A `.circuitpack` that is not a zip
+is the shape to be afraid of: Components would not open it, so anybody handling
+it reaches for a SysEx tool, which is the one route with no safety rail on it.
+**Read byte 6 of every 350 byte message before touching any file that did not
+come from this repository.**
 
 ## Run and check
 
