@@ -636,18 +636,9 @@ export function readPatch(buf) {
   const command = u8[6];
   const spec = COMMANDS[command];
   if (!spec) throw new Error(`byte 6 is ${hex(command)} and no Circuit command is that`);
-  const data = u8.slice(DATA_AT, DATA_AT + PATCH_DATA);
-
-  let highBytes = 0;
-  for (const b of data) if (b > 0x7f) highBytes++;
-
-  const rawName = String.fromCharCode(...data.subarray(0, NAME_LEN));
-  const at = (a) => data[a];
-  const value = (name) => data[addressOf(name)];
-
   return {
+    ...readPatchData(u8.slice(DATA_AT, DATA_AT + PATCH_DATA)),
     bytes: u8,
-    data,
     command,
     commandName: spec.name,
     // 🔴 The one fact worth reading before anything else about a `.syx`.
@@ -655,6 +646,43 @@ export function readPatch(buf) {
     slot: u8[7],
     slotName: spec.slot === 'patch' ? `patch ${u8[7]}` : `synth ${u8[7] + 1}`,
     reserved: u8[8],
+  };
+}
+
+/**
+ * The 340 address payload on its own, with no message wrapped round it.
+ *
+ * 🔴 THIS EXISTS BECAUSE A SESSION CARRIES TWO PATCHES AND THEY ARE NOT
+ * MESSAGES. `demo/shell/circuit-session.mjs` finds them at offsets 47,300 and
+ * 47,640 of a `.circuitsession`, as bare 340 byte payloads, and MEASURED, 10 of
+ * 64 are byte identical to a `patch_*.syx` payload in the same pack. Before
+ * this, the only way to decode one was to build a SysEx frame around it, and
+ * **building a message is the first half of sending one**, so that function
+ * deliberately does not exist anywhere in this repository.
+ * ⚠️ IT READS, IT DOES NOT MAKE. Everything `summarise`, `patchFields` and
+ * `modSlots` need is `data`, so they all work on a payload unchanged.
+ * ⚠️ AND THE MESSAGE FIELDS ARE NOT GUESSED, THEY ARE REPORTED ABSENT. A
+ * payload has no command byte and no destination, so `commandName` is empty and
+ * `writesFlash` is false because a payload cannot write anything: it is not a
+ * message. That is different from a message that happens to be safe.
+ */
+export function readPatchData(buf) {
+  const data = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  if (data.length !== PATCH_DATA) {
+    throw new Error(`a patch payload is ${PATCH_DATA} bytes and this is ${data.length}`);
+  }
+  let highBytes = 0;
+  for (const b of data) if (b > 0x7f) highBytes++;
+  const rawName = String.fromCharCode(...data.subarray(0, NAME_LEN));
+  const at = (a) => data[a];
+  const value = (name) => data[addressOf(name)];
+  return {
+    data,
+    command: null,
+    commandName: '',
+    writesFlash: false,
+    slot: null,
+    slotName: '',
     rawName,
     name: rawName.replace(/\0/g, ' ').trimEnd(),
     category: at(addressOf('Patch_Category')),
