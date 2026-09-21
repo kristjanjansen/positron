@@ -92,6 +92,88 @@ absent one.** It reads the caption element now.
 `container stn, container cf`. Re-run with today's `shell.css` reverted: the
 same failure, identically. So it is `/radio/`'s picture and not the stylesheet.
 
+#### The session line goes, and the notes want a picture, 2026-09-21
+
+🔴 **ASKED, QUOTING THE WHOLE LINE:** *"rm `"User Session", 50 regions: 1 of 76
+bytes, 16 of 1,508 bytes, 32 of 720 bytes, 1 of 6,004 bytes. The 16 of 1,508
+hold 177 note event(s), 60 to 104, with velocity per note. What the rest hold is
+not known`"*. Same shape as the sample player's sentence an hour earlier: a row
+of facts glued into prose above a table that has a row per region.
+⚠️ **AND THE STRIDE IS THE ONE FACT THE TABLE CANNOT ALREADY SHOW.** `part`,
+`at`, `used` and `notes` are columns; the region SIZE, which is what makes
+`1 / 16 / 32 / 1` visible, is only in the hover.
+
+🔴 **AND THEN: *"can we see actual notes on timeline in
+https://positron.studio/pack/#sessions"*.** The events are decoded already:
+`notesIn()` and `notesPerRegion()` in `circuit-session.mjs`, 177 events with
+pitch and velocity, and the page counts them and draws nothing.
+
+🔴 **AND THE READOUT GOES INTO THE TABLE TOO.** Quoted in full: *"head USER /
+marker DC BB / written 15,046B / not erasure 13,276B / payload 2,132B / filled
+79.1% / entropy 1.07 / nearest 220B / synth 1 ASMR Desert / synth 2
+ASMRHealingFlute - put this to table"*. Ten cells about ONE session, above a
+table with a row per session.
+⚠️ **AND THAT IS THE SAME MOVE A THIRD TIME TODAY**, after the sample player's
+sentence and the region line. The pattern the owner is correcting is a SELECTED
+row's facts being restated above the list instead of living in it: a readout
+answers *what is this one* and a column answers *which of these is different*,
+and with 32 sessions the second question is the one worth a surface.
+
+#### 105 of 5,095 decoded notes cannot be notes, 2026-09-21
+
+🔴 **FOUND BY TRYING TO DRAW THE DECODER'S OUTPUT**, which is the whole argument
+for drawing it. The page has printed a COUNT of note events since this morning
+and the count was never wrong; a picture has to put each one somewhere, and
+**105 of 5,095 have a note number above 127**, which is impossible in MIDI.
+✅ **MEASURED:** the values are 128 (12), 129 (48), 130 (9), 131 (30) and 132
+(6), **clustered rather than scattered**, and their velocities and gates are
+ordinary: 117, 105, 114, 60, 126 and gates 1 to 5.
+🔴 **AND MASKING BIT 7 DOES NOT RESCUE THEM.** It would turn them into notes 0,
+1, 2, 3 and 4, five octaves below everything else in the file. So the byte
+`notesIn()` reads as a pitch is carrying something else as well, and what that
+is is not known.
+⚠️ **THEY ARE DRAWN AND COUNTED SEPARATELY, NEVER CLAMPED.** A clamp would pile
+all 105 on the top line and draw a chord that is not in the file.
+⚠️ **THE COUNT ITSELF IS UNAFFECTED**, and so is the 29-of-32 conclusion:
+`notesIn` finding 5,095 events in 29 sessions and 0 in the 3 stock ones stands.
+This is about what ONE FIELD of an event means, not about whether the events
+are there.
+
+#### The drop area's edge is too heavy and the wrong colour, 2026-09-21
+
+🔴 **ASKED: *"drop area: thiner border and gray not yeloow"***. `createDrop`'s
+resting edge is the site yellow, which is the colour this project spends on the
+thing that is RUNNING. A way in is not a thing that is running.
+
+#### /pack/ draws two borders round one thing, 2026-09-21
+
+🔴 **ASKED WITH A SCREENSHOT: *"rm double bordering"***, pointing at the samples
+tab. Each glued part paints its own ground and the component inside it paints
+its own border, so the waveform sits in a bordered box inside a bordered box and
+so does the transport bar.
+⚠️ **IT IS A CONSEQUENCE OF THE GLUE FIX FROM EARLIER THE SAME DAY.** Each part
+was given a background so the 1 px seam would read as a seam; what was not
+noticed is that the thing inside it already had an edge of its own.
+
+🔴 **AND IT IS NOT ONE PAGE. SECOND SCREENSHOT, `/radio/`:** *"rm thick borders
+round waveform and 'the radio as it arrives'"*. That is `grain-scope.mjs`, a
+different component from `/pack/`'s `wave-view.mjs`, carrying the same heavy
+edge round a picture and its caption.
+⚠️ **SO THIS IS A DECISION ABOUT PICTURES, NOT A PATCH TO ONE PAGE.** Both
+components box a drawing that already has its own shape, and a border round a
+waveform is furniture competing with the thing it frames.
+
+🔴 **AND THE THIRD MESSAGE SETTLES WHAT THE FIRST ONE MEANT: *"use same
+component in pack"*.** So *"use standard wave visualizer (what we had in radio
+wtc...)"* was never about `wave-view.mjs` at all. **The standard waveform on
+this site is `grain-scope.mjs`**, which `/radio/`, `/tapes/` and `/grains/` all
+use, and `wave-view.mjs` has exactly one caller, `/pack/`, which is the page
+being complained about.
+⚠️ **AND THE TWO DRAW DIFFERENT THINGS TODAY.** `grain-scope` is fed a LIVE ring
+and draws what has arrived; `/pack/` holds a whole `AudioBuffer` and draws all
+of it at once. Whether that component can show a static buffer is the question
+to answer before anything is swapped, and it is not answered yet.
+
 #### /pack/'s sample player hand-rolls its transport, 2026-09-21
 
 🔴 **ASKED WITH A SCREENSHOT:** *"use standard wave visualizer (what we had in
