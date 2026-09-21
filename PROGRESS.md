@@ -1,4 +1,4 @@
-# Session 39: a third panel, a log the three of them share, and a signal chain measured end to end (2026-09-21)
+# Session 39: three panels, a patch bay, a spoken patch, and four bugs found by measuring (2026-09-21)
 
 **A STREAM OF SEVEN REQUESTS ARRIVED WHILE THE HANDOFF WAS BEING READ, AND
 EVERY ONE WENT INTO `BACKLOG.md` BEFORE IT WAS WORKED ON.** That is the rule and
@@ -78,7 +78,57 @@ against a real **51 of 53**, in the paragraph that warns about exactly that
 drift. `LAYOUT.md` was three facts stale as well: it still described `plans/` as
 23 files at the repository root.
 
-**NOTHING WAS COMMITTED AND NOTHING WAS DEPLOYED.**
+**AND THEN THE SESSION KEPT GOING, WHICH IS WHY THIS ENTRY HAS TWO HALVES.**
+
+**`/bay/` IS A PATCH BAY AND ITS VALIDATOR IS GRADED WITHOUT A BROWSER.**
+`demo/shell/bay.mjs` holds three nouns and the arithmetic that refuses things;
+`node demo/shell/bay-test.mjs` is 36 asserts, most of them negative controls.
+🔴 **THE TEST FOUND THREE REAL BUGS, TWO BEFORE ANY PAGE EXISTED.** The cycle
+check walked PORTS and started from the proposed destination, which is an
+input, so no link ever started there and every loop was allowed. The rule
+refusing a link that drops everything fired on AUDIO links, which carry no
+message classes at all. And the two refusals were in the wrong ORDER, so a link
+that carried nothing was reported as a destination that took none of it.
+🔴 **AND A FOURTH CAME FROM POINTING A REAL MODEL AT IT.** `accepts` was doing
+two jobs, so a MIDI source emitting six classes could never reach a synth that
+takes three: **every real link on this desk was refused.** It is two lists now.
+A class a port does not handle is dropped at the boundary and the link says so;
+a class on `never` refuses the link outright. The difference is between *I do
+not use that* and *that damages me*.
+
+**`/wish/` SPEAKS A PATCH, AND THE MEASUREMENT IS WHY IT NEVER CONNECTS.**
+whisper-large-v3-turbo hears in **961 ms** for webm/opus, which is what
+`MediaRecorder` makes, so the page needs no encoder.
+llama-3.3-70b-instruct-fp8-fast proposes in **1.6 s**.
+🟢 **THE ENUM TRICK WORKS**: a Moog and a Prophet, neither on this desk,
+returned no links in 496 ms, and a SysEx dump request returned none in 422 ms.
+🔴 **A SCHEMA CONSTRAINS SHAPE AND NOT MEANING.** Every run returned
+`{"op":"transpose","to":1}`, and `transpose` takes `by`. Valid, meaningless, and
+`apply()` would have computed `note + undefined`. `checkTransforms` refuses it
+by name now.
+🔴 **AND A TIGHTER SCHEMA IS MUCH WORSE, WHICH IS THE OPPOSITE OF WHAT WAS
+EXPECTED.** An `anyOf` with one branch per transform took the 70B from 1.6 s to
+**10.2 s** and made it repeat one transform until the tokens ran out, three runs
+of three.
+🔴 **THE ONE THAT DECIDES THE DESIGN**: asked to put the mod wheel on the master
+filter, and to play the drums from the keyboard, the 70B produced **well formed
+patches aimed at the wrong instrument**. No validator can catch that. A person
+reading one line can. `plans/plan-patchbay.md` §5 was a principle in the morning
+and is a measurement now.
+
+**A PACK IS A ZIP AND A BROWSER OPENS IT WITH NOTHING VENDORED.**
+`demo/shell/unzip.mjs`, `DecompressionStream('deflate-raw')` plus a hundred
+lines of container, **13/13 against the real pack**. Measured first, so the
+cases were known before the code: 164 entries, 161 deflated, 3 stored, no
+zip64. The samples are **64 files, all 48 kHz 16 bit mono, 53.4 s in total**.
+⚠️ **AND THE WRITING DISAGREES WITH THE MEASUREMENT ABOUT THE RATE**: the quoted
+limit is 60 s of 44.1 kHz and every file in this pack is 48000 Hz. The reading
+that fits both is a budget counted in samples, and it is one experiment nobody
+has run.
+
+**THE CIRCUIT'S 98 LIVE PARAMETERS ARE A KIT MODULE**, parsed out of the
+Programmer's Reference rather than typed, and graded **16/16 against this
+desk's own measurements** rather than against the document they came from.
 
 ---
 
