@@ -331,6 +331,34 @@ is checkable in one command, so check it before repeating it.
   off the DOM, so assert it, including the negative half: one row at 0 AND
   every other at -1.
 
+- 🔴 **NO EMPTY TABLE HEADERS. A COLUMN NAME OVER NO ROWS LABELS AIR.**
+  Instructed 2026-09-21: *"no empty table headers (add rule)"*. A heading is a
+  promise that there is something under it to scan, and a heading over nothing
+  is furniture that reads as a table which failed to load.
+  ✅ **`table.mjs` ALREADY DOES IT AND THE RULE IS ABOUT EVERYTHING ELSE.**
+  `blank()` sets `head.hidden = true` and `add()` clears it on the first row, so
+  no caller has to remember. **The rule exists for the two ways round it**: a
+  page that hand-rolls a grid instead of using the component, and a page that
+  passes a non-empty `empty:` string, which puts a message under a hidden
+  heading rather than a heading over nothing. Both are fine; neither is the
+  default you get for free.
+  ⚠️ **AND IT IS THE SAME RULE AS `AN EMPTY BOX IS A LINE`, ONE ELEMENT ALONG.**
+  `/typist/` drew a 2 px band nobody wrote out of a childless `.pos-readout`,
+  `.pos-controls[hidden]` exists because an empty control row left a 14 px band,
+  and `drop.mjs`'s footer is `hidden` rather than empty for exactly this. **A
+  container with nothing in it must not paint its edges, and a label with
+  nothing under it must not paint its name.**
+  ⚠️ **ASSERT IT WHERE YOU BUILD IT.** `/pack/` carries
+  `an empty table draws no heading, because a column name over nothing labels
+  air`, reading `.pos-tbl-head?.hidden === true`, and that assert is free.
+  🔴 **AND READ THE BODY, NOT THE ELEMENT, WHEN YOU CHECK A ROW.** The heading
+  IS a `.pos-tbl-row` — it is `pos-tbl-row pos-tbl-head` — and it comes first,
+  so `table.el.querySelector('.pos-tbl-row')` returns the HEADING. MEASURED
+  2026-09-21 on `/pack/`: an assert reading a row's `title` that way came back
+  `""` and went red on a page doing exactly what it promises. `scroller()` is
+  the body and is the thing to query. That is the third assert on that one page
+  measuring something next to the quantity in question.
+
 - 🔴 **A TABLE HEADING IS ONE LINE AND IT IS SHORT. IT NEVER WRAPS.**
   Instructed 2026-09-20: *"Tablw headings aingle line, make rule to keep it
   short"*, photographed on `/making/` with the `FILE` header rendered **one

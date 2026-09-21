@@ -58,7 +58,10 @@ import { el } from './shell.mjs';
  *                                and what the cover says while a drag is in
  *                                flight. The extensions are appended to the
  *                                first and left off the second.
- * @param {string} [o.empty]      the area's own line before anything is opened
+ * @param {string} [o.empty]      the footer's words before anything is opened.
+ *                                `''` means NO FOOTER until there is something
+ *                                to say, which is what a caller wants when an
+ *                                empty strip would paint a rule nobody wrote.
  * @param {boolean} [o.area]      false for a bare button with no resting area.
  *                                The default is the area, because a component
  *                                whose only visible part appears mid-drag is the
@@ -117,7 +120,20 @@ export function createDrop({
    * every answer for hours while the source read as correct. A box with words in
    * it cannot lose that fight.
    */
+  /**
+   * 🔴 THE NOTE IS A FOOTER ON THE BLOCK, ASKED FOR 2026-09-21 AS *"should be
+   * file uplaod block footer, glued"*. It sat inside the area's padding and it
+   * spans the block now, under a seam, the way a glued pair's second part does.
+   * 🔴 AND IT EXISTS ONLY WHEN IT HAS WORDS, which is the other half of the same
+   * instruction: *"rm nothing has been opened"*. A footer with a border and
+   * nothing in it is `positron-ui`'s named defect exactly, **an empty box is a
+   * line**, and a page that opts out of a surface has to opt out of its BOX too.
+   * So the two requests are one mechanism rather than two changes that fight.
+   * ⚠️ `hidden` RATHER THAN AN EMPTY STRING, because `.pos-drop-note` carries a
+   * `min-height` and an emptied one would reserve a strip and paint its seam.
+   */
   const note = el('div', 'pos-drop-note', empty);
+  note.hidden = !empty;
   const root = el('div', area ? 'pos-drop pos-drop-area' : 'pos-drop');
   if (area) {
     /**
@@ -130,14 +146,19 @@ export function createDrop({
      * because `/kit/` and `/pack/` both assert that a reader is told what this
      * takes BEFORE a refusal has to tell them.
      */
-    if (title) root.append(el('div', 'pos-drop-title', title));
+    // ⚠️ THE BODY IS A WRAPPER SO THE FOOTER CAN SPAN THE BLOCK. The area used
+    // to carry the padding and every child sat inside it; a footer inside that
+    // padding is a line with a gap each side of it, which is not a footer.
+    const body = el('div', 'pos-drop-body');
+    if (title) body.append(el('div', 'pos-drop-title', title));
     const row = el('div', 'pos-drop-row');
     row.append(button);
     if (beside) row.append(el('span', 'pos-drop-beside', beside));
     const words = exts.length
       ? `${hint} (${exts.join(', ')})`
       : hint;
-    root.append(row, el('div', 'pos-drop-hint', words), note);
+    body.append(row, el('div', 'pos-drop-hint', words));
+    root.append(body, note);
   } else {
     root.append(button, note);
   }
@@ -162,7 +183,13 @@ export function createDrop({
 
   // Everything the component has to say goes through here, so its own line and
   // the page's log can never disagree about what happened.
-  const tell = (msg, kind) => { note.textContent = msg; says(msg, kind); };
+  // ⚠️ AND THE FOOTER COMES AND GOES WITH ITS WORDS. Nothing else in here has
+  // to remember that, which is the point of one function saying everything.
+  const tell = (msg, kind) => {
+    note.textContent = msg;
+    note.hidden = !msg;
+    says(msg, kind);
+  };
 
   const okName = (name) => !exts.length || exts.some((e) => name.toLowerCase().endsWith(e));
 

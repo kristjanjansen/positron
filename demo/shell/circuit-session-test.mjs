@@ -67,14 +67,14 @@ ok('fifty regions, contiguous, covering exactly 53,248 bytes',
   `${S.SLOTS.length} regions, ${S.SLOTS.reduce((n, s) => n + s.size, 0)} bytes`);
 ok('a 76 byte header, 16 slots of 1508, 32 of 720 and a final 6004',
   JSON.stringify(tally(S.SLOTS.map((s) => `${s.kind}:${s.size}`)))
-  === JSON.stringify({ 'header:76': 1, 'synth:1508': 16, 'drum:720': 32, 'tail:6004': 1 }),
+  === JSON.stringify({ 'header:76': 1, 'wide:1508': 16, 'narrow:720': 32, 'tail:6004': 1 }),
   JSON.stringify(tally(S.SLOTS.map((s) => s.kind))));
 // 🔴 THE TWO ARITHMETIC FACTS THE 76 RESTS ON. 528 less 452 is 76, and 76 plus
 // sixteen strides of 1508 lands exactly on the offset where the 720 stride
 // begins. If either were off by one the grid would not close on 53,248.
 ok('76 plus 16 x 1508 is 24,204 and that is where the 720 stride starts',
-  S.DRUM_AT === 24204 && S.TAIL_AT === 47244 && S.TAIL_AT + S.TAIL_LEN === S.SESSION_BYTES,
-  `${S.DRUM_AT} then ${S.TAIL_AT}`);
+  S.NARROW_AT === 24204 && S.TAIL_AT === 47244 && S.TAIL_AT + S.TAIL_LEN === S.SESSION_BYTES,
+  `${S.NARROW_AT} then ${S.TAIL_AT}`);
 ok('and 528 less 452 is 76, which is the only split making the first record the same as the rest',
   528 - 452 === S.HEADER_LEN);
 

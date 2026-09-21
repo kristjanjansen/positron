@@ -8,20 +8,6 @@
 <title>POSITRON · pack</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* 🔴 THE VERDICT IS THE LOUDEST THING ON THIS PAGE AND IT IS NOT A READOUT
-     CELL. Three numbers tell a backup from a pack of blanks, and a reader who
-     has to compare three figures against three they do not have has been handed
-     the evidence and not the answer. This is one sentence saying which of the
-     two this pack is.
-     ⚠️ IT IS NEVER EMPTY, which is structural rather than polite. `/wish/`
-     reserved a picture's room with `min-height` and MEASURED the host at 0 px
-     and `display: none`, beaten by `.pos-stack > div:empty { display: none }` at
-     (0,2,1). A box with words in it cannot lose that fight. */
-  .pk-verdict { font: 500 13px/1.5 var(--mono); color: var(--dim);
-                border-left: 2px solid var(--line2); padding: 2px 0 2px 12px;
-                min-height: 1.5em; margin-top: 14px; }
-  .pk-verdict[data-state="good"] { color: var(--fg); border-left-color: #3fb950; }
-  .pk-verdict[data-state="bad"] { color: var(--fg); border-left-color: var(--hi); }
   /* 🔴 HALF THE HEIGHT, ASKED FOR AS *"patched table 1/2 less high"*. The
      component's own default is 420 px and it is a custom property for exactly
      this, so a page sets the number rather than reaching into the component.
@@ -41,7 +27,7 @@
   .pk-line { font: 400 12px/1.5 var(--mono); color: var(--dim); }
 </style>
 <script type="module">
-  import { mount, el } from '/shell/shell.mjs';
+  import { mount, el, createReport } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
@@ -106,9 +92,9 @@
      * that opts out of a surface and keeps its box paints a 2 px band nobody
      * wrote.
      * ⚠️ AND WHAT IT SAID IS REHOMED, WHICH IS THE HALF THAT GETS FORGOTTEN.
-     * `patches` and `sessions` are in the tab titles. `different` and `filled`
-     * are both in the verdict sentence under the sessions table, word for word,
-     * so the verdict is now the only place either number appears.
+     * `patches` and `sessions` lead the tab titles. `different` and `filled`
+     * are in the `nearest` and `filled` columns of the sessions table and in
+     * the readout under it, which is where they were always checkable.
      */
     readout: null,
     /**
@@ -153,8 +139,12 @@
     // prevent. The title is the reader's word for the block; the button is the
     // promise about what pressing it does.
     title: 'UPLOAD FILE',
-    label: 'open file',
+    label: 'Open file',
     beside: 'or drag a file here',
+    // ⚠️ NO RESTING LINE, ASKED FOR AS *"rm nothing has been opened"*. The
+    // footer comes into existence when it has something to say and goes away
+    // again, which is `drop.mjs`'s own answer to an empty box painting a line.
+    empty: '',
     hint: 'drop a pack or a session anywhere on this page',
     says: (m, kind) => d.log(m, kind),
     onOpen: (files) => openFiles(files),
@@ -264,7 +254,6 @@
     onPick: (r) => showSession(r.i),
   });
   sessionTable.el.classList.add('pk-tbl');
-  const verdict = el('div', 'pk-verdict', 'no pack is open, so there is nothing to say about one yet');
 
   /**
    * 🔴 THE LIST OPENS, ASKED FOR 2026-09-21 AS *"make session list clicable and
@@ -282,12 +271,27 @@
    * both are corroborated against `index.json`. Everything else here is a
    * count, an offset or a byte total, which is what that module offers.
    */
-  const sessionFacts = createTable({
-    columns: [
-      { key: 'field', label: 'field', width: 108 },
-      { key: 'value', label: 'value', grow: true, hi: true, clip: true },
-    ],
-    cap: 24, empty: '', note: 'hover',
+  /**
+   * 🔴 A READOUT AND NOT A TWO COLUMN TABLE, ASKED FOR 2026-09-21 AS *"convert
+   * to readout"*. A `field` / `value` table is a readout with a heading over it
+   * and one fact per row, which is the shape the kit already owns and does
+   * better: cells side by side, `tabular-nums`, a reserved width so a changing
+   * number cannot move its neighbours.
+   * 🔴 TEN CELLS, BECAUSE `createReport` THROWS ON AN ODD COUNT and the facts
+   * were eleven. The one that went is `name`, and it went UP rather than out:
+   * it is in the line under this readout, where a 32 byte name has a whole line
+   * to sit on instead of a cell with a reserved width.
+   * ⚠️ AND EVERY CELL HERE CAN CHANGE. `head` is USER, DEMO or INIT, `marker`
+   * is present or absent, and the eight numbers all move between sessions. A
+   * cell showing a structural constant reads as a measurement and teaches a
+   * reader to ignore the row.
+   */
+  const facts = createReport({
+    readout: {
+      head: '', marker: '', written: 'B', 'not erasure': 'B', payload: 'B',
+      filled: '%', entropy: '', nearest: 'B', 'synth 1': '', 'synth 2': '',
+    },
+    showLog: false,
   });
   const partsLine = el('div', 'pk-line', '');
   /**
@@ -310,7 +314,7 @@
     cap: 64, empty: '', note: 'hover',
   });
   partsTable.el.classList.add('pk-tbl');
-  panel('sessions').append(sessionTable.el, verdict, sessionFacts.el, partsLine, partsTable.el);
+  panel('sessions').append(sessionTable.el, facts.readoutEl, partsLine, partsTable.el);
 
   /**
    * 🔴 THE SAMPLES TAB, ASKED FOR AS *"why there is no samples?"*. The plan
@@ -442,7 +446,16 @@
           + 'have neither LFO reaching anything at all.' },
     ],
   };
-  const dg = createDiagram(panel('patches'), dgSpec, { how: true, atEnd: false });
+  /**
+   * 🔴 THE PICTURE LIVES IN A HOST OF ITS OWN SO IT CAN BE PUT AWAY WHOLE.
+   * `createDiagram` appends TWO things to whatever it is given, the standing
+   * `How it works` heading and the figure, and hiding the figure alone would
+   * leave a heading standing over nothing. One wrapper hides both.
+   */
+  const dgHost = el('div', 'pk-dg');
+  dgHost.hidden = true;
+  panel('patches').append(dgHost);
+  const dg = createDiagram(dgHost, dgSpec, { how: true, atEnd: false });
 
   /**
    * The reference's own default patch, built from the address table rather than
@@ -484,10 +497,16 @@
     dg.render();
   }
 
-  paint(defaultPatch(),
-    'No pack is open, so every part is showing the reference\'s own default, which is what '
-    + 'an unedited patch holds. Press a row once a pack is open and this becomes that patch.');
-
+  /**
+   * 🔴 NOTHING IS PAINTED AT REST, AND `defaultPatch()` IS STILL HERE FOR THE
+   * CHECK RATHER THAN FOR THE PAGE. The picture used to be drawn on load
+   * carrying the reference's own default, which reserved its room; the
+   * instruction on 2026-09-21 was *"do not show diargam when no file"*, so
+   * there is nothing to reserve room for until something is open.
+   * ⚠️ THE DEFAULT IS STILL WORTH KEEPING because it is the only patch this
+   * page can build without a file, and the check uses it to prove the picture
+   * really is absent rather than merely empty.
+   */
   function showPatch(i) {
     const p = patches[i];
     if (!p) return;
@@ -771,67 +790,55 @@
    * belongs, and it never touches the network or the audio context.
    */
   function showSession(i) {
-    const s = sessions[i];
-    if (!s) return;
+    const x = sessions[i];
+    if (!x) return;
     pickedSession = i;
     sessionTable.mark((r) => r.i === i);
 
-    const n = (x) => (x === null || x === undefined ? '' : x.toLocaleString());
-    const kinds = ['header', 'synth', 'drum', 'tail'];
-    const of = (k) => s.parts.filter((x) => x.kind === k);
-    const usedOf = (k) => of(k).reduce((a, x) => a + x.used, 0);
+    const n = (v) => (v === null || v === undefined ? '' : v.toLocaleString());
+    facts.set('head', x.head);
+    facts.set('marker', x.magicOk === null ? '' : x.magicOk ? 'DC BB' : 'absent');
+    facts.set('written', n(x.used));
+    facts.set('not erasure', n(x.notErased));
+    facts.set('payload', n(x.payload));
+    facts.set('filled', (x.nonZero * 100).toFixed(1));
+    facts.set('entropy', x.entropy.toFixed(2));
+    facts.set('nearest', x.nearest === null || x.nearest === Infinity ? '' : n(x.nearest));
+    facts.set('synth 1', x.patchNames[0] || '');
+    facts.set('synth 2', x.patchNames[1] || '');
 
-    sessionFacts.set([
-      { field: 'name', value: s.name || '(no name)',
-        hover: 'thirty two bytes of space padded text at offset 16, and it agrees with '
-             + 'index.json in 32 of 32 here' },
-      { field: 'head', value: s.head,
-        hover: 'the first four bytes. It is NOT a backup test: the owner\'s own sessions '
-             + 'are USER 22, DEMO 7 and INIT 3, and all 64 purchased blanks say INIT too' },
-      { field: 'marker', value: s.magicOk === null ? '' : s.magicOk ? 'DC BB' : 'absent',
-        hover: 'two bytes at offset 4. DC BB in all 32 of the owner\'s sessions and 00 00 '
-             + 'in all 64 blanks, which is measured rather than a reading of what it means' },
-      { field: 'written', value: `${n(s.used)} B`,
-        hover: `the bytes before the erasure in all ${s.parts.length} regions, out of `
-             + `${n(s.bytes.length)} in the file` },
-      { field: 'not erasure', value: `${n(s.notErased)} B`,
-        hover: 'bytes that are not 0xFF, counted over the whole file' },
-      { field: 'payload', value: `${n(s.payload)} B`,
-        hover: 'bytes that are neither 0xFF nor 0x00. This is the denominator for any '
-             + 'statement about content, and using the file length instead measures the erasure' },
-      { field: 'filled', value: `${pct(s.nonZero)} per cent`,
-        hover: 'the share of the file that is not zero' },
-      { field: 'entropy', value: `${s.entropy.toFixed(2)} bits a byte`,
-        hover: 'a stock Initial Session has ordinary entropy, so this cannot tell a '
-             + 'template from somebody\'s work on its own' },
-      { field: 'nearest', value: s.nearest === null || s.nearest === Infinity ? ''
-          : `${n(s.nearest)} B away`,
-        hover: 'how far this file is from the closest other session in the same file, which '
-             + 'is the one measure that finds a repeated stock session' },
-      ...s.patchNames.map((nm, k) => ({
-        field: `synth ${k + 1}`, value: nm || '(no name)',
-        hover: 'a 340 byte payload in the last region, read without building a message round it',
-      })),
-    ]);
+    /**
+     * 🔴 THE REGIONS ARE NUMBERED AND NOT NAMED, CORRECTED 2026-09-21 AFTER
+     * **"five synths??"**. They read `synth 1` through `synth 16` and a Circuit
+     * has TWO synth parts, so the page was printing a name this project typed
+     * itself as though it had been read off the file. What is measured is the
+     * offset and the stride, so that is what a row says, and the line above
+     * counts the two strides without claiming what either holds.
+     * ⚠️ The two patches that ARE corroborated are in the readout above, out of
+     * the TAIL region, which is the one place a patch really was found.
+     */
+    const strides = [];
+    for (const r of x.parts) {
+      const last = strides[strides.length - 1];
+      if (last && last.size === r.size) last.n++;
+      else strides.push({ size: r.size, n: 1 });
+    }
+    partsLine.textContent = x.parts.length
+      ? `"${x.name || '(no name)'}", ${x.parts.length} regions: `
+        + strides.map((g) => `${g.n} of ${n(g.size)} bytes`).join(', ')
+        + '. What they hold is not known'
+      : '';
 
-    partsLine.textContent = `the ${s.parts.length} regions of "${s.name || '(no name)'}", `
-      + kinds.map((k) => `${of(k).length} ${k}`).join(', ');
+    partsTable.set(x.parts.map((r, k) => ({
+      part: `region ${k + 1}`,
+      at: n(r.at),
+      used: n(r.used),
+      pad: n(r.pad),
+      hover: `${n(r.size)} bytes at ${n(r.at)}, ${n(r.used)} written and ${n(r.pad)} erased`,
+    })));
 
-    partsTable.set(s.parts.map((x) => {
-      const nth = x.kind === 'synth' || x.kind === 'drum'
-        ? `${x.kind} ${s.parts.filter((y) => y.kind === x.kind && y.index <= x.index).length}`
-        : x.kind;
-      return {
-        part: nth,
-        at: n(x.at),
-        used: n(x.used),
-        pad: n(x.pad),
-        hover: `${n(x.size)} bytes at ${n(x.at)}, ${n(x.used)} written and ${n(x.pad)} erased`,
-      };
-    }));
-
-    d.log(`${s.name || '(no name)'}, head ${s.head}, ${n(s.used)} B written across `
-        + `${s.parts.length} regions, holding ${s.patchNames.join(' and ') || 'no readable patches'}`);
+    d.log(`${x.name || '(no name)'}, head ${x.head}, ${n(x.used)} B written across `
+        + `${x.parts.length} regions, holding ${x.patchNames.join(' and ') || 'no readable patches'}`);
   }
 
   /**
@@ -946,108 +953,60 @@
       : '';
 
     countTabs({ patches: patches.length, sessions: sessions.length, samples: samples.length });
-    const distinct = new Set(stats.map((s) => s.fingerprint)).size;
-    sayVerdict(stats, distinct);
+    sayCounts(stats);
+    /**
+     * 🔴 NO PICTURE UNTIL A FILE LANDS, ASKED FOR AS *"do not show diargam when
+     * no file"*. This reverses the reservation asked for the day before, and
+     * the two are genuinely in tension: a picture drawn at rest cannot move
+     * later, and a picture drawn at rest is a picture of nothing.
+     * 🔴 THE HOST IS UNHIDDEN BEFORE `showPatch` RATHER THAN AFTER, AND THAT
+     * ORDER IS LOAD BEARING. `diagram.mjs`'s own header says a `display: none`
+     * ancestor is exactly what makes `getComputedTextLength` answer 0, so a
+     * render inside a hidden box lays every label out against a ruler reading
+     * zero. `hidden` IS `display: none`.
+     */
+    dgHost.hidden = !patches.length;
     if (patches.length) showPatch(0);
     // ⚠️ AND THE FIRST SESSION OPENS TOO, so the panel under the list is filled
     // whenever anything is, and a press changes its words instead of adding a
     // block and moving everything under it.
     if (sessions.length) showSession(0);
-    else { sessionFacts.set([]); partsTable.set([]); partsLine.textContent = ''; pickedSession = -1; }
+    else {
+      // ⚠️ EVERY CELL BACK TO EMPTY RATHER THAN TO 0. Nothing unmeasured prints
+      // as a zero here: a `0` in a readout reads as a very confident
+      // measurement of nothing, and `setCell` hides the unit with it.
+      for (const k of facts.cells.keys()) facts.set(k, '');
+      partsTable.set([]); partsLine.textContent = ''; pickedSession = -1;
+    }
   }
 
   /**
-   * 🔴 THE THREE NUMBERS TURNED INTO THE ONE SENTENCE THEY ARE FOR.
-   * MEASURED on both sides: the owner's pack is 32 distinct fingerprints of 32
-   * at 0.83 to 1.46 bits a byte and 84.6 to 89.6 per cent non-zero; the two
-   * purchased packs are ONE fingerprint across all 64 of their session files at
-   * 0.009 bits and 0.07 per cent. Two orders of magnitude, so it is not delicate.
-   * 🔴 AND THE FIRST FOUR BYTES ARE NOT PART OF IT, WHICH CORRECTS THREE FILES.
-   * `INIT` was published as the blank signature. The owner's 32 sessions are
-   * USER 22, DEMO 7 and INIT 3, and those three are ordinary work. Deciding on
-   * the head would have condemned them. It is still SHOWN, in its own column,
-   * because a reader should see for themselves that it is the same on both sides.
+   * 🔴 THE VERDICT BLOCK IS GONE, REMOVED 2026-09-21 AT THE OWNER'S WORD:
+   * *"rm all 1 sessions differ from each other, and the emptiest is 84.7 per
+   * cent filled, so this is somebody's work rather than a pack of blanks etc
+   * texts"*. Every branch of it, not one sentence.
+   * ✅ **THE EVIDENCE SURVIVES BECAUSE IT WAS NEVER IN THE SENTENCE.** The
+   * `nearest` column carries the byte distance on every row and the readout
+   * carries it again for the open one, and this page's own comment already said
+   * that column is there so a reader never has to take a verdict's word for it.
+   * What went is the CONCLUSION, not the measurement.
+   * 🔴 **AND IT TOOK THREE ASSERTS AND TWO NEGATIVE CONTROLS WITH IT**, which
+   * is a real loss and is written down rather than glossed: the blanks control,
+   * the mostly copies middle ground and the `29 of real work` line all graded
+   * that function. `positron-verify`'s rule is that a removed thing takes its
+   * checks with it SILENTLY, so they are accounted for here.
+   * ⚠️ One log line stays, and it is a count with no conclusion in it. The log
+   * is where a state change belongs, and `3 sessions sit within 16 bytes of
+   * another` is a measurement a reader can check against the column.
    */
-  function sayVerdict(stats, distinct) {
-    if (!stats.length) {
-      verdict.textContent = 'this file carries no sessions, so there is nothing here to overwrite';
-      delete verdict.dataset.state;
-      return;
-    }
-    const flat = stats.every((s) => s.entropy < 0.05);
-    const empty = stats.every((s) => s.nonZero < 0.01);
-    /**
-     * 🔴 THE SENTENCE THIS BRANCH USED TO CARRY WAS REMOVED ON 2026-09-21, ASKED
-     * FOR VERBATIM: *"rm all 32 sessions in this pack are the same empty
-     * session. Sending it to a Circuit would replace whatever is on the
-     * instrument with blanks, and a Circuit has no factory reset"*. What is gone
-     * is the instruction half. What replaces it is the same counted facts the
-     * two branches below already report, in the same register, so this branch no
-     * longer tells a reader what would happen to their instrument and still
-     * tells them what is in the file.
-     * ⚠️ NOTHING MEASURED CHANGED AND `CLAUDE.md` IS UNTOUCHED. The two
-     * purchased packs are still one fingerprint across all 64 session files at
-     * 0.009 bits a byte and 0.07 per cent non-zero, and the owner's is still 32
-     * distinct at 0.83 to 1.46 bits. A screen is not where that lives.
-     */
-    if (distinct === 1 && (flat || empty)) {
-      verdict.dataset.state = 'bad';
-      verdict.textContent = `all ${stats.length} of these sessions are the same session, `
-        + `and it is ${pct(stats[0].nonZero)} per cent filled at `
-        + `${stats[0].entropy.toFixed(2)} bits a byte`;
-      d.log('this pack carries blank sessions', 'bad');
-      return;
-    }
-    /**
-     * 🔴 THE MIDDLE GROUND, AND THE FIRST VERSION HAD NONE. It said `blanks` only
-     * when every session was identical AND flat, and called everything else
-     * somebody's work. MEASURED on a real file 2026-09-21: a stream carrying 33
-     * sessions of which only **2 are distinct** produced the sentence *"2 of 33
-     * sessions are different from each other ... so this is somebody's work
-     * rather than a pack of blanks"*, which reports a number and then draws the
-     * opposite conclusion from it in the same breath. A reader who believed the
-     * words would have been told the wrong thing by a page whose only job is to
-     * tell them the right one.
-     * ⚠️ AND THE REPAIR IS NOT A THRESHOLD. Inventing a ratio at which copies
-     * become blanks would be a number with no measurement behind it. It states
-     * what it counted and declines to conclude, which is the honest reading of a
-     * file that is neither: no state class, so it is neither green nor amber.
-     */
-    if (distinct < stats.length) {
-      delete verdict.dataset.state;
-      verdict.textContent = `only ${distinct} of these ${stats.length} sessions differ from each `
-        + `other, so ${stats.length - distinct} are copies of another session in the same file. `
-        + 'That is neither a backup nor a pack of blanks, and what it would replace on an '
-        + 'instrument is whatever those copies are';
-      d.log(`${distinct} of ${stats.length} sessions are distinct, so ${stats.length - distinct} are copies`, 'hi');
-      return;
-    }
-    /**
-     * 🔴 AND A SESSION CAN BE DISTINCT, FULL, HIGH ENTROPY AND STILL NOT BE
-     * WORK. A stock `Initial Session` differs from another copy of itself by ONE
-     * byte, which is enough to give it its own fingerprint, its own entropy and
-     * its own non-zero share. Every number this page had said it was somebody's
-     * work. MEASURED on the owner's pack: the three stock slots are 1 byte from
-     * each other and the closest pair among the other 29 is **415** apart.
-     * ⚠️ `TEMPLATE_GAP` IS NOT A TUNED THRESHOLD, IT IS A NUMBER SITTING IN A
-     * MEASURED GAP TWO ORDERS OF MAGNITUDE WIDE. Anything from 2 to 261 gives
-     * the same answer on this pack, and the table shows the real distance beside
-     * every row so a reader never has to take this line's word for it.
-     */
-    const TEMPLATE_GAP = 16;
-    const copies = stats.filter((x) => x.nearest !== null && x.nearest < TEMPLATE_GAP);
-    const real = stats.length - copies.length;
-    verdict.dataset.state = 'good';
-    verdict.textContent = `all ${stats.length} sessions differ from each other, and `
-      + (copies.length
-        ? `${copies.length} of them sit within ${Math.max(...copies.map((x) => x.nearest))} `
-          + `byte(s) of another, so those are one stock session repeated. `
-          + `That leaves ${real} of real work`
-        : `the emptiest is ${pct(Math.min(...stats.map((x) => x.nonZero)))} per cent filled, `
-          + 'so this is somebody\'s work rather than a pack of blanks');
-    d.log(copies.length
-      ? `${distinct} of ${stats.length} distinct, but ${copies.length} are one stock session repeated, so ${real} are work`
-      : `${distinct} of ${stats.length} sessions are distinct`, 'good');
+  const TEMPLATE_GAP = 16;
+  function sayCounts(stats) {
+    if (!stats.length) return;
+    const distinct = new Set(stats.map((x) => x.fingerprint)).size;
+    const copies = stats.filter((x) => x.nearest !== null && x.nearest !== Infinity
+      && x.nearest < TEMPLATE_GAP).length;
+    d.log(`${stats.length} sessions, ${distinct} distinct`
+      + (copies ? `, ${copies} within ${TEMPLATE_GAP} bytes of another` : ''));
   }
 
   /**
@@ -1118,13 +1077,25 @@
      * extensions UNDER it, and `append` order is not layout: a stylesheet can
      * reverse a column and the source still reads correctly.
      */
+    /**
+     * 🔴 THE FOOTER IS NOT THERE WHEN IT HAS NOTHING TO SAY, and this is the
+     * assert for *"rm nothing has been opened"* plus *"should be file uplaod
+     * block footer, glued"* at once. A footer with a border and no words is an
+     * empty box painting a line nobody wrote.
+     */
+    d.assert('the block has no footer until something has been opened',
+      drop.note.hidden === true && drop.note.textContent === ''
+      && drop.note.getBoundingClientRect().height === 0,
+      `the footer is ${drop.note.hidden ? 'away' : 'up'} at `
+      + `${drop.note.getBoundingClientRect().height} px`);
+
     const t = drop.el.querySelector('.pos-drop-title').getBoundingClientRect();
     const b = drop.button.getBoundingClientRect();
     const h = drop.el.querySelector('.pos-drop-hint').getBoundingClientRect();
     d.assert('the title is over the button and the list of what it takes is under it',
       t.bottom <= b.top + 1 && h.top >= b.bottom - 1
       && drop.el.querySelector('.pos-drop-title').textContent === 'UPLOAD FILE'
-      && drop.button.textContent === 'open file'
+      && drop.button.textContent === 'Open file'
       && /or drag a file here/.test(drop.el.textContent),
       `title ends at ${t.bottom.toFixed(0)}, the button runs ${b.top.toFixed(0)} to `
       + `${b.bottom.toFixed(0)}, the list starts at ${h.top.toFixed(0)}`);
@@ -1149,17 +1120,23 @@
     dg.ties === 0, `${dg.ties} headless tie(s)`);
 
   /**
-   * 🔴 THE PICTURE HAS ITS FULL SIZE BEFORE ANYTHING IS OPENED, which is the
-   * half of *"reserver space when no active one"* that can go red. Every box
-   * carries the reference default, so pressing a row changes the words and not
-   * the height, and nothing under the picture moves.
+   * 🔴 THE PICTURE IS NOT THERE AT ALL BEFORE A FILE IS, AND THIS REPLACES THE
+   * TWO RESERVATION ASSERTS THAT USED TO SIT HERE. They measured that the
+   * picture had its full height at rest and did not move when a pack opened,
+   * which was the right check for the behaviour asked for on 2026-09-20 and is
+   * the wrong check for the behaviour asked for on 2026-09-21.
+   * ⚠️ AND IT GRADES THE HEADING TOO. Hiding a figure and leaving `How it
+   * works` standing over nothing is the failure that is easy to ship here,
+   * because the heading is not the diagram's own element.
    */
-  let restHeight = 0;
   {
-    restHeight = +dg.el.getBoundingClientRect().height.toFixed(1);
-    d.assert('the picture is drawn at its full size before any pack is open, so nothing moves later',
-      restHeight > 60 && dgSpec.nodes.every((n) => n.sub && n.sub.length > 0),
-      `${restHeight} px tall with all ${dgSpec.nodes.length} boxes carrying a default`);
+    const box = dgHost.getBoundingClientRect();
+    d.assert('with no file open there is no picture and no heading over one',
+      dgHost.hidden === true && box.height === 0
+      && dgHost.querySelector('.pos-how') !== null
+      && dgHost.querySelector('.pos-dg') !== null,
+      `the host is ${box.height} px tall holding `
+      + `${dgHost.querySelectorAll('.pos-how, .pos-dg').length} parts`);
   }
 
   d.assert('every tab keeps its bare word until it has something to count',
@@ -1189,6 +1166,28 @@
     } else {
       await openPack('New Pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
 
+      /**
+       * 🔴 THE FOOTER ARRIVES WITH THE FILE AND SPANS THE BLOCK. `glued` is
+       * three measurements, not a look: it is as wide as the block's inside, it
+       * sits at the bottom of it, and there is no gap between the body above and
+       * it. `positron-ui` records `/model/` being corrected by screenshot twelve
+       * times in one evening because layout was reasoned about instead of
+       * measured.
+       */
+      {
+        const area = drop.el.getBoundingClientRect();
+        const foot = drop.note.getBoundingClientRect();
+        const body = drop.el.querySelector('.pos-drop-body').getBoundingClientRect();
+        d.assert('opening a file raises a footer that spans the block and is glued to the body above it',
+          drop.note.hidden === false && drop.note.textContent.includes('.circuitpack')
+          && Math.abs(foot.width - (area.width - 2)) < 2
+          && Math.abs(foot.bottom - (area.bottom - 1)) < 2
+          && Math.abs(foot.top - body.bottom) < 2,
+          `the footer is ${foot.width.toFixed(0)} px of the block's ${area.width.toFixed(0)}, `
+          + `${(foot.top - body.bottom).toFixed(1)} px under the body, saying `
+          + `"${drop.note.textContent}"`);
+      }
+
       d.assert('the pack reads as 64 patches, 32 sessions and 64 samples',
         patches.length === 64 && sessions.length === 32 && samples.length === 64,
         `${patches.length} / ${sessions.length} / ${samples.length}`);
@@ -1203,70 +1202,21 @@
         patches.every((p) => !p.writesFlash),
         `${patches.filter((p) => p.writesFlash).length} of ${patches.length} would write flash`);
 
-      // 🔴 THE PICTURE DID NOT CHANGE HEIGHT WHEN IT FILLED, which is the whole
-      // of the reservation and the only part of it a check can see.
-      d.assert('opening a pack did not move the picture, because its room was already reserved',
-        Math.abs(dg.el.getBoundingClientRect().height - restHeight) < 1,
-        `${dg.el.getBoundingClientRect().height.toFixed(1)} px against ${restHeight} at rest`);
+      /**
+       * 🔴 AND OPENING ONE BRINGS IT BACK, WITH REAL LAYOUT. The height is the
+       * half that matters: `diagram.mjs` measures its own text with
+       * `getComputedTextLength`, which answers 0 inside a `display: none`
+       * ancestor, so a picture rendered while its host was hidden would come
+       * back on screen laid out against a ruler reading zero.
+       */
+      d.assert('opening a pack brings the picture back, laid out rather than collapsed',
+        dgHost.hidden === false && dg.el.getBoundingClientRect().height > 60
+        && dg.cuts.length === 0,
+        `${dg.el.getBoundingClientRect().height.toFixed(1)} px tall, ${dg.cuts.length} cut`);
 
       const distinct = new Set(sessions.map((s) => s.fingerprint)).size;
       d.assert('the sessions are all different from each other, so this is a backup',
-        distinct === 32 && verdict.dataset.state === 'good',
-        `${distinct} distinct of ${sessions.length}`);
-
-      /**
-       * 🔴 THE NEGATIVE CONTROL, AND WITHOUT IT THE VERDICT IS DECORATION. A
-       * page that said `this is a backup` whatever it was shown would pass every
-       * assert above. Four pages here were fully green against stand-ins whose
-       * refusals had been switched off.
-       */
-      const blank = Array.from({ length: 32 }, () => ({
-        name: '', head: 'INIT', entropy: 0.009, nonZero: 0.0007,
-        bytes: 53248, notErased: 53248, payload: 0, fingerprint: 'same',
-      }));
-      sayVerdict(blank, 1);
-      /**
-       * ⚠️ THE SECOND HALF OF THIS ASSERT IS THE REMOVAL ITSELF. The sentence
-       * this branch used to carry told a reader what sending the file would do
-       * to their instrument, and it was removed by name on 2026-09-21. An
-       * assert that only checked the words that stayed would go green again the
-       * moment somebody put the old ones back.
-       */
-      d.assert('NEGATIVE CONTROL: a pack of blanks is called one session repeated, with what it holds',
-        verdict.dataset.state === 'bad'
-        && /all 32 of these sessions are the same session/.test(verdict.textContent)
-        && /0\.1 per cent filled/.test(verdict.textContent)
-        && !/factory reset/.test(verdict.textContent),
-        `"${verdict.textContent}"`);
-      sayVerdict(sessions, distinct);
-
-      /**
-       * 🔴 THE MIDDLE GROUND, DRIVEN. A file that is mostly copies is neither of
-       * the two things this page had words for, and it took a real file to find
-       * that out. The set here is the owner's own 32 with all but two replaced by
-       * a copy of the first, which is the shape `on_the_run.circuitpack` has.
-       */
-      const mostly = sessions.map((x, k) => (k < 2 ? x : { ...sessions[0] }));
-      sayVerdict(mostly, 2);
-      d.assert('a file that is mostly copies is called neither a backup nor blanks',
-        !verdict.dataset.state && /only 2 of these 32/.test(verdict.textContent)
-        && /30 are copies/.test(verdict.textContent)
-        && !/somebody's work/.test(verdict.textContent),
-        `"${verdict.textContent.slice(0, 80)}"`);
-      sayVerdict(sessions, new Set(sessions.map((x) => x.fingerprint)).size);
-
-      /**
-       * 🔴 THE SESSION IS DECODED, NOT ONLY WEIGHED, AND THE THREE STOCK SLOTS
-       * ARE FOUND BY A MEASURE THAT ENTROPY CANNOT MAKE. This is the assert that
-       * would have been red all morning: every number the page had said those
-       * three were somebody's work.
-       */
-      const nm = sessions.map((x) => x.name);
-      d.assert('each session gives up its own name and its two synth patch names',
-        nm[0] === 'User Session' && sessions.every((x) => x.magicOk === true)
-        && sessions.every((x) => x.patchNames.length === 2)
-        && sessions[0].patchNames.join(' and ') === 'Frog Steps and Woo-z',
-        `session 0 is "${nm[0]}" holding ${sessions[0].patchNames.join(' and ')}`);
+        distinct === 32, `${distinct} distinct of ${sessions.length}`);
 
       /**
        * 🔴 THE PANEL UNDER THE LIST, AND THE FIRST HALF IS THAT IT IS ALREADY
@@ -1275,10 +1225,28 @@
        * tab was asked for. `fill()` opens session 0 for exactly that reason.
        */
       d.assert('opening a pack opens its first session too, so the panel under the list is never empty',
-        pickedSession === 0 && sessionFacts.count() === 11 && partsTable.count() === 50
-        && /50 regions of "User Session"/.test(partsLine.textContent)
-        && /16 synth/.test(partsLine.textContent) && /32 drum/.test(partsLine.textContent),
-        `${sessionFacts.count()} fields and ${partsTable.count()} regions · "${partsLine.textContent}"`);
+        pickedSession === 0 && partsTable.count() === 50
+        && facts.cells.get('head').textContent === 'USER'
+        && facts.cells.get('synth 1').textContent === 'Frog Steps'
+        && /"User Session", 50 regions/.test(partsLine.textContent)
+        && /16 of 1,508 bytes/.test(partsLine.textContent)
+        && /32 of 720 bytes/.test(partsLine.textContent)
+        && /What they hold is not known/.test(partsLine.textContent),
+        `${facts.cells.size} cells and ${partsTable.count()} regions · "${partsLine.textContent}"`);
+
+      /**
+       * 🔴 AND NO ROW CLAIMS TO BE A SYNTH, WHICH IS THE CORRECTION ITSELF.
+       * The owner asked **"five synths??"** against rows reading `synth 1` to
+       * `synth 5`, and a Circuit has TWO synth parts. An assert that only
+       * checked the new words would go green again the moment somebody put the
+       * old ones back, so this one checks the absence.
+       */
+      d.assert('no region calls itself a synth or a drum, because nothing measured says it is one',
+        !/synth|drum/i.test(partsTable.scroller().textContent)
+        && !/synth|drum/i.test(partsLine.textContent)
+        && partsTable.scroller().textContent.includes('region 1'),
+        `${partsTable.count()} rows, the first reading `
+        + `"${partsTable.scroller().querySelector('.pos-tbl-row')?.textContent.slice(0, 20)}"`);
 
       /**
        * 🔴 THE REGIONS ARE THE DECODER'S MODEL RATHER THAN A READING OF THE FILE
@@ -1306,9 +1274,9 @@
       showSession(otherSession);
       d.assert('NEGATIVE CONTROL: pressing another session shows that one rather than the first',
         pickedSession === otherSession && otherSession > 0
-        && partsLine.textContent.includes(`regions of "${sessions[otherSession].name}"`)
-        && sessionFacts.el.textContent.includes(sessions[otherSession].name)
-        && !sessionFacts.el.textContent.includes(sessions[0].patchNames[0]),
+        && partsLine.textContent.includes(`"${sessions[otherSession].name}"`)
+        && facts.cells.get('synth 1').textContent === sessions[otherSession].patchNames[0]
+        && facts.cells.get('synth 1').textContent !== sessions[0].patchNames[0],
         `session ${otherSession} is "${sessions[otherSession].name}" at ${sessions[otherSession].used} B `
         + `against session 0's "${sessions[0].name}" at ${sessions[0].used} B`);
       showSession(0);
@@ -1322,9 +1290,17 @@
         `${stock.length} sit 1 byte apart at entropy ${stock.map((x) => x.entropy.toFixed(2)).join(', ')}, `
         + `against ${Math.min(...sessions.filter((x) => x.nearest >= 16).map((x) => x.nearest))} for the nearest of the rest`);
 
-      d.assert('and the page says 29 of real work rather than 32',
-        /29 of real work/.test(verdict.textContent) && verdict.dataset.state === 'good',
-        `"${verdict.textContent.slice(-40)}"`);
+      /**
+       * ⚠️ THE PAGE NO LONGER CONCLUDES, SO THIS IS AN ASSERT ABOUT THE COLUMN
+       * A READER LOOKS AT RATHER THAN ABOUT A SENTENCE. `29 of real work` was
+       * the verdict's words; the same fact is 32 rows of which 3 read a
+       * single-digit distance and 29 read 262 or more.
+       */
+      d.assert('the numbers a reader sees separate the three stock sessions from the other 29',
+        sessions.filter((x) => x.nearest < 16).length === 3
+        && sessions.filter((x) => x.nearest >= 16).length === 29,
+        `${sessions.filter((x) => x.nearest < 16).length} within 16 bytes, `
+        + `${sessions.filter((x) => x.nearest >= 16).length} beyond it`);
 
       /**
        * 🔴 THE LOOSE SESSION PATH, DRIVEN. It was advertised on the drop area
@@ -1345,7 +1321,7 @@
 
       const heads = new Set(sessions.map((s) => s.head));
       d.assert('and the first four bytes are not what decided it, because INIT is on both sides',
-        heads.has('INIT') && verdict.dataset.state === 'good',
+        heads.has('INIT') && new Set(sessions.map((x) => x.fingerprint)).size === 32,
         `the owner's own sessions say ${[...heads].join(', ')}`);
 
       showPatch(0);

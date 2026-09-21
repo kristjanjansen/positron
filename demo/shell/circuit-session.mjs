@@ -47,12 +47,36 @@ export const SESSION_BYTES = 53248;
 /** Erased flash. The owner's sessions pad with it and the purchased blanks do not. */
 export const ERASED = 0xff;
 
-/** The fixed grid, measured across all 32 of the owner's sessions. */
+/**
+ * The fixed grid, measured across all 32 of the owner's sessions.
+ *
+ * 🔴 THE NAMES `SYNTH` AND `DRUM` ARE A READING AND THEY WERE PUBLISHED AS A
+ * FACT, CORRECTED 2026-09-21. A page showed the sixteen 1,508 byte regions as
+ * `synth 1` through `synth 16` and the owner asked **"five synths??"**, which is
+ * the right question: **a Circuit has TWO synth parts.** Nothing in this module
+ * corroborates the names. What IS corroborated is the opposite: the two real
+ * synth patches are decoded out of the TAIL region by `patchPayloads`, and even
+ * those are marked as a reading at `PATCH_AT`.
+ * ⚠️ **IT IS THE FOURTH TIME IN TWO DAYS THAT A LABEL WAS READ AS CONTENT.**
+ * First a name in an index (`User Session`), then a four byte head (`INIT`),
+ * then a unique hash, and now a name this module typed itself. The pattern is
+ * the same each time and the repair is the same each time: say what was
+ * measured, and let the thing that was not measured be visibly absent.
+ * ⚖️ **A CANDIDATE READING, MARKED AS ONE.** The counts fit `2 synth parts x 8
+ * patterns` and `4 drum parts x 8 patterns`, which is probably where the names
+ * came from. That is arithmetic that happens to land, not evidence. The
+ * experiment that would settle it is one change on the instrument, one export
+ * and a diff, and it needs a person at the Circuit.
+ * ✅ **SO THE KINDS ARE NAMED FOR THEIR STRIDE AND FOR NOTHING ELSE.** `wide`
+ * is the 1,508 byte stride and `narrow` is the 720 byte one. Both names are
+ * true by construction and neither can be mistaken for a part of an
+ * instrument.
+ */
 export const HEADER_LEN = 76;
-export const SYNTH_SLOTS = 16;
-export const SYNTH_SLOT_LEN = 1508;
-export const DRUM_SLOTS = 32;
-export const DRUM_SLOT_LEN = 720;
+export const WIDE_SLOTS = 16;
+export const WIDE_SLOT_LEN = 1508;
+export const NARROW_SLOTS = 32;
+export const NARROW_SLOT_LEN = 720;
 export const TAIL_LEN = 6004;
 
 // ⚖️ THE 76 IS DERIVED, NOT CHOSEN. The first data block of a clean session is
@@ -63,20 +87,20 @@ export const TAIL_LEN = 6004;
 // The same bytes partition identically if you call the first region 1584 long
 // and have fifteen records after it. Nothing here depends on which reading is
 // right, because the bytes are the same either way.
-export const DRUM_AT = HEADER_LEN + SYNTH_SLOTS * SYNTH_SLOT_LEN;   // 24204
-export const TAIL_AT = DRUM_AT + DRUM_SLOTS * DRUM_SLOT_LEN;        // 47244
+export const NARROW_AT = HEADER_LEN + WIDE_SLOTS * WIDE_SLOT_LEN;   // 24204
+export const TAIL_AT = NARROW_AT + NARROW_SLOTS * NARROW_SLOT_LEN;  // 47244
 
 /**
  * The fifty regions, in file order, contiguous and covering every byte.
- * @type {{index:number, kind:'header'|'synth'|'drum'|'tail', at:number, size:number}[]}
+ * @type {{index:number, kind:'header'|'wide'|'narrow'|'tail', at:number, size:number}[]}
  */
 export const SLOTS = (() => {
   const out = [{ kind: 'header', at: 0, size: HEADER_LEN }];
-  for (let i = 0; i < SYNTH_SLOTS; i++) {
-    out.push({ kind: 'synth', at: HEADER_LEN + i * SYNTH_SLOT_LEN, size: SYNTH_SLOT_LEN });
+  for (let i = 0; i < WIDE_SLOTS; i++) {
+    out.push({ kind: 'wide', at: HEADER_LEN + i * WIDE_SLOT_LEN, size: WIDE_SLOT_LEN });
   }
-  for (let k = 0; k < DRUM_SLOTS; k++) {
-    out.push({ kind: 'drum', at: DRUM_AT + k * DRUM_SLOT_LEN, size: DRUM_SLOT_LEN });
+  for (let k = 0; k < NARROW_SLOTS; k++) {
+    out.push({ kind: 'narrow', at: NARROW_AT + k * NARROW_SLOT_LEN, size: NARROW_SLOT_LEN });
   }
   out.push({ kind: 'tail', at: TAIL_AT, size: TAIL_LEN });
   return out.map((s, index) => ({ index, ...s }));
@@ -361,10 +385,13 @@ export function summarise(session) {
     magicOk: session.header.magicOk,
     length: session.length,
     used: sum(session.slots),
-    synthSlots: kind('synth').length,
-    synthUsed: sum(kind('synth')),
-    drumSlots: kind('drum').length,
-    drumUsed: sum(kind('drum')),
+    // ⚠️ NAMED FOR THE STRIDE, NOT FOR A PART OF AN INSTRUMENT. See the note on
+    // the grid above: these were `synthSlots` and `drumSlots` and a page printed
+    // sixteen synths on a machine that has two.
+    wideSlots: kind('wide').length,
+    wideUsed: sum(kind('wide')),
+    narrowSlots: kind('narrow').length,
+    narrowUsed: sum(kind('narrow')),
     tailUsed: kind('tail')[0].used,
     patchNames: patches.map((p) => p.name),
   };
