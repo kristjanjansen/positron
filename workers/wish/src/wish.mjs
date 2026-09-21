@@ -31,6 +31,59 @@ export const HEAR = [
   '@cf/openai/whisper',
   '@cf/openai/whisper-tiny-en',
 ];
+
+/**
+ * 🔴 THREE LISTENING MODELS DO NOT SHARE ONE PAYLOAD, AND ONE SHAPE WAS SENT
+ * TO ALL THREE. Reported 2026-09-21: choosing `whisper` answered *"oneOf at '/'
+ * not met, 0 matches: Type mismatch of '/', 'string' not in 'object', Type
+ * mismatch of '/audio', 'array' not in 'string'"*, which is that model's schema
+ * listing both of its branches and refusing a base64 string under `audio` on
+ * each of them. `turbo` was the default, `turbo` takes base64, so nothing ever
+ * pressed the other two.
+ * - `base64`: `turbo`. It also understands `task`, `language` and `vad_filter`.
+ * - `bytes`: the original `whisper` and `whisper-tiny-en`. `audio` is an array
+ *   of byte values and there are no options at all, so voice activity
+ *   detection goes with them.
+ * ⚠️ **AND A BYTE ARRAY IS NOT A FREE SUBSTITUTION.** MEASURED on a 12,863 byte
+ * recording of one spoken sentence: the base64 body is **17,202 bytes** (1.34x
+ * the audio) and the array body is **45,895** (3.57x), so the older two spend
+ * **2.67 times** as many bytes for the same utterance and meet any request
+ * ceiling at well under half the length `turbo` can carry.
+ */
+export const HEAR_SHAPE = {
+  '@cf/openai/whisper-large-v3-turbo': 'base64',
+  '@cf/openai/whisper': 'bytes',
+  '@cf/openai/whisper-tiny-en': 'bytes',
+};
+
+/**
+ * The payload for one listening model, shaped for that model.
+ * 🔴 IT IS ONE FUNCTION BECAUSE TWO WOULD DRIFT. The Worker and
+ * `demo/wish-local.mjs` both reach a model through `handle()`, so the shaping
+ * has to be inside it rather than at either caller.
+ * @param {string} model     one of HEAR
+ * @param {string} audio     base64, which is what a browser can cheaply make
+ * @param {string} [language]
+ */
+export function hearPayload(model, audio, language) {
+  if (HEAR_SHAPE[model] === 'bytes') {
+    // `atob` is in both runtimes. The intermediate string is the only way
+    // across without a Buffer, which a Worker does not have.
+    const bin = atob(audio);
+    const bytes = new Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { audio: bytes };
+  }
+  return {
+    audio,
+    task: 'transcribe',
+    ...(language ? { language } : {}),
+    // Voice activity detection, because a studio microphone is open in a room
+    // with a synth in it. ⚠️ `turbo` ONLY: the two older models take no
+    // options, so they transcribe the room along with the voice.
+    vad_filter: true,
+  };
+}
 export const THINK = [
   '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
   '@cf/meta/llama-3.1-8b-instruct-fp8-fast',
@@ -115,14 +168,7 @@ export async function handle(path, body, run) {
     if (!HEAR.includes(model)) return bad(`not a listening model: ${model}`);
     if (!body.audio) return bad('audio is base64');
     const t0 = Date.now();
-    const r = await run(model, {
-      audio: body.audio,
-      task: 'transcribe',
-      ...(body.language ? { language: body.language } : {}),
-      // Voice activity detection, because a studio microphone is open in a room
-      // with a synth in it.
-      vad_filter: true,
-    });
+    const r = await run(model, hearPayload(model, body.audio, body.language));
     return { status: 200, body: { text: r.text ?? '', words: r.word_count ?? null, ms: Date.now() - t0, model } };
   }
 

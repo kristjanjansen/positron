@@ -151,12 +151,27 @@ export function checkTransforms(transforms) {
     if (!op) return `no transform called "${t.op}". There are ${OP_NAMES.join(', ')}`;
     for (const k of op.need) {
       if (t[k] === undefined || t[k] === null) {
-        return `${t.op} needs ${k} and was given ${Object.keys(t).filter((x) => x !== 'op').join(', ') || 'nothing'}`;
+        /**
+         * 🔴 A FIELD NAME IS QUOTED, OR THE SENTENCE READS AS BROKEN GRAMMAR.
+         * This said `${t.op} needs ${k} and was given ${keys}`, which on the one
+         * failure it is written for came out as **`transpose needs by and was
+         * given to`** and was reported 2026-09-21 with the words *"what is
+         * it?"*. Both `by` and `to` are FIELD NAMES, and printed bare they are
+         * read as English, so a reader looks for the noun that is missing.
+         * ⚠️ THE CHECK ITSELF IS UNCHANGED AND MUST STAY UNCHANGED. That object
+         * is valid against the schema it was generated under, and without this
+         * the code computes `note + undefined`, which is `NaN`: a note number
+         * that does not exist arriving at an instrument down a link the page
+         * called connected.
+         */
+        const given = Object.keys(t).filter((x) => x !== 'op');
+        return `${t.op} takes "${k}" and was given `
+          + (given.length ? given.map((x) => `"${x}"`).join(', ') : 'nothing');
       }
       if (k === 'cls') {
         if (!CLASSES.includes(t.cls)) return `${t.op} was given cls "${t.cls}", which is not one of ${CLASSES.join(', ')}`;
       } else if (typeof t[k] !== 'number' || Number.isNaN(t[k])) {
-        return `${t.op} needs ${k} to be a number, and it is ${JSON.stringify(t[k])}`;
+        return `${t.op} needs "${k}" to be a number, and it is ${JSON.stringify(t[k])}`;
       }
     }
   }
