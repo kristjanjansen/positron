@@ -393,6 +393,9 @@
    * same quantity from a different direction is two numbers that can disagree.
    */
   const STEP_MS = 125;
+  /** One millisecond, so no event sits exactly on the range start. See the
+   *  schedule below: an event at 0 is never re-armed by a backward seek. */
+  const SCORE_EPS = 1;
   const SPAN = STEPS * STEP_MS;
 
   const d = mount({
@@ -521,7 +524,24 @@
     onPosition: (pos) => { showAt(pos); wrapAt(pos); },
   });
   for (let i = 0; i < STEPS; i++) {
-    deck.schedule({ at: i * STEP_MS, kind: 'step', id: `s${i}`, payload: { step: i, at: i * STEP_MS } });
+    /**
+     * 🔴 EVERY STEP IS ONE MILLISECOND OFF THE RANGE START, AND THAT IS WHY THE
+     * FIRST COLUMN CAN BE HEARD. Reported twice: *"i can not hear 1st col
+     * beat"*. `timeline/transport.mjs` re-arms an event with `ev.at > st.p0`,
+     * STRICTLY greater, so an event scheduled at exactly `0` is never re-armed
+     * after `deck.seek(0)`: on the first lap it fires, and on every lap after
+     * the wrap it is silent while all fifteen others sound.
+     * ⚠️ THE OFFSET IS ON THE SCORE, NOT ON THE COMPARISON. Changing the
+     * strictness in `transport.mjs` would reach every deck in this project
+     * including two offline render paths, to fix one page's zero. One
+     * millisecond at 120 bpm is 0.008 of a step and is under any threshold
+     * anybody can hear.
+     * ⚠️ AND `stepAt()` IS UNTOUCHED, because it divides a POSITION by the step
+     * length and the positions did not move: the score moved by 1 ms inside a
+     * 125 ms step, so every event still lands in the step it names.
+     */
+    deck.schedule({ at: i * STEP_MS + SCORE_EPS, kind: 'step', id: `s${i}`,
+                    payload: { step: i, at: i * STEP_MS } });
   }
 
 
@@ -679,6 +699,8 @@
   }
   setBpm(BPM_AT_1);
 
+
+
   /**
    * 🔴 NO LOOP, ASKED FOR AS *"rm loop for now"*. It was the bar's own LOOP
    * arming a window over the whole grid, which is a transport's idea of a loop
@@ -701,6 +723,36 @@
    */
   const bar = createTransportBar(d.el, deck,
     { scrub: false, loop: false, right: [tempo.el] });
+
+  /**
+   * 🔴 THE SECOND PRESS STOPS RATHER THAN PAUSING. Asked 2026-09-21: *"replace
+   * pause with stop. when i pess space 2 timess its plays, stops (resets to
+   * first col and restarts)"*, then *"3 times"*, which names the whole cycle:
+   * play, stop back to the first column, play from the top again.
+   * ⚠️ A DRUM MACHINE HAS NO PAUSE, and that is the argument rather than a
+   * preference. Resuming half way through a sixteen step bar is a thing a tape
+   * does; an instrument that repeats a bar either runs or is at the top of it.
+   * 🔴 IT HANGS OFF THE PRESS AND NOT OFF `onState`, BECAUSE THAT CALLBACK
+   * FIRES ONCE AT LOAD AND NEVER ON PLAY. Measured today with this page's own
+   * log, and it is what made three attempts at looping fail before that was
+   * known. Anything here that needed to know *the transport just stopped* has
+   * to read it rather than be told.
+   * ⚠️ AND IT RUNS AFTER THE BAR'S OWN HANDLER, which is what the timeout is
+   * for: a listener added later on the same element fires later, but the bar's
+   * work is not necessarily finished when it returns. It asks the transport
+   * what state it ended up in rather than assuming the press toggled it.
+   * ⚠️ SPACE GETS THIS FOR FREE. The bar owns space as its play key on every
+   * page here, so it presses this same button: one behaviour, not two.
+   */
+  // ⚠️ `bar.el`, NOT `bar.api.el`. `createTransportBar` returns a WRAPPER and
+  // `api` is what it publishes; reaching through the wrong one threw on load
+  // and the page died with `__demo` never published, which the probe saw as
+  // every reading coming back `undefined`.
+  bar.el.querySelector('.tbar-toggle')?.addEventListener('click', () => {
+    setTimeout(() => {
+      if (!deck.transport.playing && deck.position() > 0) deck.seek(0);
+    }, 0);
+  });
   setBpm(BPM_AT_1);
 
   // ⚠️ THE PAGE NEVER RE-PUBLISHES `__demo.transport`. `createTransportBar`
@@ -1056,16 +1108,62 @@
     return true;
   }
 
-  rowsEl.addEventListener('click', (e) => {
-    const c = e.target.closest('.tom-cell');
-    if (!c) return;
+  /**
+   * 🔴 HOLD AND DRAW, ASKED FOR 2026-09-21: *"when i hold pointer down enabling
+   * pads, i should be able to draw otjher pads before i do poiunterup"*. A
+   * sixteen step pattern is built in runs, and clicking sixteen times to make
+   * one is the kind of thing an instrument is supposed to save you.
+   *
+   * 🔴 THE VALUE IS DECIDED BY THE FIRST PAD AND CARRIED, NOT TOGGLED PER PAD.
+   * Toggling each one under the finger means dragging across a run of lit pads
+   * ERASES them while dragging across dark ones lights them, so one gesture
+   * does two opposite things depending on what it crosses. The first press says
+   * `on` or `off` and the whole stroke means that.
+   *
+   * ⚠️ NO `setPointerCapture`, WHICH IS THE OBVIOUS THING AND IS WRONG HERE.
+   * Capturing retargets every later pointer event to the element that captured,
+   * so `pointerover` would never fire on the pads being dragged across: the
+   * stroke would paint exactly one pad, which is what it does today. The
+   * listeners sit on the CONTAINER instead.
+   *
+   * ⚠️ AND `click` IS GONE, because a press that painted on `pointerdown` and
+   * again on `click` toggles twice and lands back where it started. The
+   * keyboard path is unaffected: Enter has its own branch in the keydown
+   * handler and does not come through here.
+   */
+  let drawing = null;                 // the value this stroke is painting, or null
+
+  function paint(c, first) {
     const r = +c.dataset.row, s = +c.dataset.step;
-    setCell(r, s, !on[r][s]);
-    rove(r, s, false);
+    if (Number.isNaN(r) || Number.isNaN(s)) return;
+    if (on[r][s] === (drawing ? 1 : 0)) return;   // already what the stroke wants
+    setCell(r, s, drawing);
+    if (first) rove(r, s, false);
     // Hearing what you just switched on is how a pattern gets built. It is a
     // press, so it is allowed to make a sound.
-    if (on[r][s]) fire(r, 'a cell');
+    if (drawing) fire(r, 'a cell');
+  }
+
+  rowsEl.addEventListener('pointerdown', (e) => {
+    const c = e.target.closest('.tom-cell');
+    if (!c || e.button !== 0) return;
+    e.preventDefault();
+    drawing = !on[+c.dataset.row][+c.dataset.step];
+    paint(c, true);
   });
+
+  rowsEl.addEventListener('pointerover', (e) => {
+    if (drawing === null) return;
+    const c = e.target.closest('.tom-cell');
+    if (c) paint(c, false);
+  });
+
+  // ⚠️ ON THE WINDOW, because a stroke that ends off the grid still has to end.
+  // A `pointerup` on the page background never reaches the container, and a
+  // stroke left armed would paint on the next hover with nothing held down.
+  for (const ev of ['pointerup', 'pointercancel']) {
+    addEventListener(ev, () => { drawing = null; });
+  }
 
   fixedEl.addEventListener('click', (e) => {
     const b = e.target.closest('button.tom-name');
@@ -1486,6 +1584,47 @@
         + `after a backward seek`);
       toggle(onFirst, 0);
     }
+  }
+
+  /**
+   * 🔴 A STROKE PAINTS EVERY PAD IT CROSSES, AND ONE VALUE FOR THE WHOLE
+   * STROKE. Asked for as *"when i hold pointer down enabling pads, i should be
+   * able to draw otjher pads"*. The thing that can go wrong and look right is
+   * the stroke TOGGLING each pad: dragging across a run of lit pads would erase
+   * them while dragging across dark ones lights them, so one gesture does two
+   * opposite things depending on what it crosses.
+   * ⚠️ SO THE NEGATIVE HALF IS THE HALF THAT MATTERS: the stroke starts on a
+   * pad that is already ON, and every pad it crosses must end up OFF, including
+   * the ones that were already off.
+   * ⚠️ AND IT RELEASES, because a stroke left armed paints on the next hover
+   * with nothing held down, which is a page that changes under a moving mouse.
+   */
+  if (SELFCHECK) {
+    const row = cells[0];
+    const down = (c) => c.dispatchEvent(new PointerEvent('pointerdown',
+      { bubbles: true, button: 0, pointerId: 1 }));
+    const over = (c) => c.dispatchEvent(new PointerEvent('pointerover',
+      { bubbles: true, pointerId: 1 }));
+    for (let s = 0; s < 4; s++) setCell(0, s, false);
+
+    down(row[0]); over(row[1]); over(row[2]);
+    const drew = [0, 1, 2, 3].map((s) => on[0][s]);
+    dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+    over(row[3]);
+    const afterUp = on[0][3];
+
+    // Now the other way: start on a lit pad and rub a run of them out.
+    for (let s = 0; s < 4; s++) setCell(0, s, s !== 2);
+    down(row[0]); over(row[1]); over(row[2]); over(row[3]);
+    const erased = [0, 1, 2, 3].map((s) => on[0][s]);
+    dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+    for (let s = 0; s < 4; s++) setCell(0, s, false);
+
+    d.assert('holding and dragging paints every pad it crosses, one value for the whole stroke',
+      drew.join() === '1,1,1,0' && afterUp === 0
+      && erased.join() === '0,0,0,0',
+      `drew ${drew.join('')} then ${afterUp} after the release, `
+      + `and a stroke starting on a lit pad left ${erased.join('')}`);
   }
 
   d.assert('the strip is what scrolls when the steps do not fit, and the page never drags sideways',

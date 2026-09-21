@@ -14,6 +14,18 @@ once by somebody who was not mid-edit.
 
 #### /tom/, open
 
+- **`when i hold pointer down enabling pads, i should be able to "draw" otjher
+  pads before i do poiunterup`**. Drag across the grid with the button held and
+  paint every pad passed over.
+
+- **`replace pause with stop. when i pess space 2 timess its plays, stops
+  (resets to first col and restarts)`**. The transport's second press STOPS
+  rather than pausing: the playhead returns to the first column, so a third
+  press starts the pattern from the top.
+  ⚠️ `onState` CANNOT CARRY THIS. Measured today: it fires once at load and
+  never on play, which is what made three attempts at looping fail. So the stop
+  has to hang off the press itself.
+
 - 🔴 **`i can not hear 1st col beat`**. The step at column 1 does not sound
   after a wrap. ⚖️ **CANDIDATE CAUSE, NOT YET PROVED**: `timeline/transport.mjs`
   resets an event with `ev.at > st.p0`, strictly greater, so an event scheduled
@@ -38,8 +50,10 @@ once by somebody who was not mid-edit.
 
 #### From the archive download, 2026-09-21
 
-- 🔴 **THE 3.0 GiB `Novation Circuit.zip` IS STILL THERE**, 87 per cent of the
-  item, left deliberately. It needs a decision rather than a default.
+- ✅ **THE 3.0 GiB `Novation Circuit.zip` IS REFUSED, 2026-09-21: *"no"*.** 87
+  per cent of that item stays where it is. Recorded rather than left silent,
+  because a line leaves this file by being finished OR by being refused in
+  writing.
 - 🔴 **`stepGridLooksRight()` HAS A MEASURED FALSE POSITIVE RATE AND ITS CLAIM
   IS TOO STRONG.** Sliced blindly, a sample set yields 108 blocks of 53,248
   bytes that are PCM audio and **70 of 108 pass it**, because quiet audio is
