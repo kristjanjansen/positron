@@ -7,7 +7,7 @@
 // check that only asks whether something came back, so the asserts below name
 // the exact maker, and the ones marked NEGATIVE CONTROL are written so that a
 // specific wrong implementation fails them.
-import { DESK, KINDS, describe, alias, normalise, sounds, resolve } from './instruments.mjs';
+import { DESK, KINDS, describe, alias, normalise, sounds, resolve, tokenise, reword } from './instruments.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -404,6 +404,187 @@ const HEARD = [
     found.length === 0,
     found.length ? found.map(([s]) => `${JSON.stringify(s)} -> ${resolve(s).map((h) => h.full)}`).join(' | ')
       : gone.map(([s]) => JSON.stringify(s)).join(' and ') + ' both silent');
+}
+
+// ── where a name sits in the sentence, and what a page may do about it ──────
+//
+// 🔴 `tokenise()` AND `normalise()` MUST AGREE, AND THE WAY TO BE SURE IS NOT
+// TO READ THEM. A correction that lands in a textarea is placed by a character
+// offset, and an offset that is one token out rewrites the wrong word while
+// looking entirely plausible on screen. `normalise()` is written in terms of
+// `tokenise()` for that reason, so this asserts the property rather than the
+// two implementations: every token's own slice of the RAW string has to reduce
+// back to that token.
+{
+  const strings = [
+    '', ' ', '...', 'Play the MK425C into the circuit.', ' Play the MK425 C into the circuit.',
+    'mk four twenty five c', 'The tascam model twelve daw control does nothing at all.',
+    'put the groove a box through the audio interface.', 'Set the tempo to 120.',
+    'Connect the keyboard to the circuit and transpose it up one semitone.',
+    'MK-425C', 'Twenty-five!', 'a1 b2', 'one two three four', '  leading and trailing  ',
+  ];
+  const bad = [];
+  for (const s of strings) {
+    const tok = tokenise(s);
+    if (tok.map((t) => t.word).join(' ') !== normalise(s)) bad.push(`${JSON.stringify(s)} does not rebuild`);
+    for (const t of tok) {
+      if (normalise(s.slice(t.at, t.to)) !== t.word) {
+        bad.push(`${JSON.stringify(s)} token ${JSON.stringify(t.word)} points at ${JSON.stringify(s.slice(t.at, t.to))}`);
+      }
+    }
+  }
+  ok('every token knows where it came from, and its own words reduce back to it',
+    bad.length === 0, bad.length ? bad.join(' | ') : `${strings.length} strings, offsets intact`);
+}
+
+// 🔴 THE SPANS ARE WHAT MAKES A CORRECTION PLACEABLE, so a hit has to point at
+// the words that matched and not merely report that something matched.
+{
+  const s = 'Play the MK425C into the circuit.';
+  const hits = resolve(s);
+  const slice = (f) => { const h = hits.find((x) => x.full === f); return h ? s.slice(h.at, h.to) : null; };
+  ok('a hit points at the words in the raw sentence, capitals and all',
+    slice('Evolution MK-425C') === 'MK425C' && slice('Novation Circuit') === 'circuit',
+    `${JSON.stringify(slice('Evolution MK-425C'))} and ${JSON.stringify(slice('Novation Circuit'))}`);
+}
+
+/** The three instruments `/wish/` actually has. Everything else on DESK is in
+ *  this room and not on that page, which is the whole point of `has`. */
+const WISH = new Set(['Evolution MK-425C', 'Novation Circuit', 'TASCAM Model 12']);
+const onWish = { has: (f) => WISH.has(f) };
+
+// A mis-heard name is repaired in the words a reader is looking at, and the
+// repair says what it replaced. Three real transcripts, three models.
+{
+  const cases = [
+    ['put the groove a box through the audio interface.', 'put the Novation Circuit through the audio interface.', 'groove a box'],
+    ['Play the MK425C into the circuit.', 'Play the Evolution MK-425C into the circuit.', 'MK425C'],
+    ['The evolution plays the circuit and the taskham records it.',
+      'The evolution plays the circuit and the TASCAM Model 12 records it.', 'taskham'],
+  ];
+  const bad = [];
+  for (const [said, want, was] of cases) {
+    const r = reword(said, onWish);
+    if (r.text !== want) bad.push(`${JSON.stringify(said)} -> ${JSON.stringify(r.text)}`);
+    if (!r.fixed.some((f) => f.was === was)) bad.push(`${JSON.stringify(said)} did not report ${JSON.stringify(was)}`);
+  }
+  ok('a mis-heard name is corrected in the raw words, and the correction says what it replaced',
+    bad.length === 0, bad.length ? bad.join(' | ') : `${cases.length} real transcripts repaired and reported`);
+}
+
+// 🔴 NEGATIVE CONTROL: AN EXACT HEARING IS NEVER REWRITTEN. This is the assert
+// that fails an implementation which simply replaces every hit with its full
+// name: `circuit` and `keyboard` are correct English for those instruments and
+// `Novation Circuit` is not an improvement on them, it is a page editing
+// somebody's sentence for nothing.
+{
+  const same = ['Connect the keyboard to the circuit and transpose it up one semitone.',
+    'The desk needs DOM mode switched on.', 'Send the circuit to the model 12.'];
+  const moved = same.filter((s) => reword(s, onWish).text !== s);
+  ok('NEGATIVE CONTROL: a sentence that named the instruments properly comes back untouched',
+    moved.length === 0, moved.length ? moved.map((s) => JSON.stringify(reword(s, onWish).text)).join(' | ')
+      : `${same.length} sentences unchanged`);
+}
+
+// 🔴 NEGATIVE CONTROL: NOTHING NAMED, NOTHING CHANGED. The twenty transcripts
+// above that resolve to nothing must also come back character for character,
+// because `reword` is the half a page hands to a person.
+{
+  const quiet = ['Make it louder.', 'Stop everything.', 'Put the mod wheel on the filter',
+    'Turn the reverb down a little.', 'Play a chord and hold it down.', 'Set the tempo to 120.',
+    'Give me a bit more bass in the monitors.', 'Root it to the thing and then send it back.'];
+  const moved = quiet.filter((s) => reword(s, onWish).text !== s);
+  ok('NEGATIVE CONTROL: an instruction naming nothing is returned exactly as it arrived',
+    moved.length === 0, moved.length ? moved.join(' | ') : `${quiet.length} instructions unchanged`);
+}
+
+// 🔴 NEGATIVE CONTROL: AN INSTRUMENT THE CALLER DOES NOT HAVE IS REPORTED AND
+// NEVER SUBSTITUTED. `/wish/` has no Fast Track Pro and no IAC Driver, so a
+// sentence naming one is a fact worth saying and never a word worth changing.
+// An implementation that rewrote on `resolve()` alone would fail this, and the
+// page would then answer *nothing on this desk* about a name it wrote itself.
+{
+  const away = [['The fast track row is the recording input.', 'M-Audio Fast Track Pro'],
+    ['Apple Boss is echoing everything back.', 'Apple IAC Driver'],
+    ['The tascam model twelve daw control does nothing at all.', 'TASCAM Model 12 DAW control']];
+  const bad = [];
+  for (const [s, name] of away) {
+    const r = reword(s, onWish);
+    if (r.text !== s) bad.push(`${JSON.stringify(s)} was rewritten to ${JSON.stringify(r.text)}`);
+    if (!r.absent.some((a) => a.names.includes(name))) bad.push(`${JSON.stringify(s)} did not report ${name}`);
+    if (r.fixed.length) bad.push(`${JSON.stringify(s)} claimed a repair`);
+  }
+  ok('NEGATIVE CONTROL: a name this desk does not have is reported and never substituted',
+    bad.length === 0, bad.length ? bad.join(' | ')
+      : away.map(([, n]) => n).join(', ') + ' each named and each left alone');
+}
+
+// 🔴 THE DECISION THAT WAS OPEN, AND IT IS GRADED HERE BECAUSE `/wish/` CANNOT
+// REACH IT. `HANDOFF.md` asked what a page does with two hits for one
+// instruction. Two shapes look alike and only one is an ambiguity.
+//
+// **A name inside a longer name is not two instruments.** `tascam model twelve
+// daw control` contains `tascam model twelve`, and somebody who said the long
+// one said the long one.
+{
+  const s = 'The tascam model twelve daw control does nothing at all.';
+  const names = reword(s).hits.map((h) => h.full);
+  ok('a more specific name beats the name inside it, so one span names one instrument',
+    names.length === 1 && names[0] === 'TASCAM Model 12 DAW control', names.join(', ') || 'nothing');
+}
+
+// 🔴 NEGATIVE CONTROL: TWO INSTRUMENTS THE CALLER REALLY HAS, ON ONE SPAN, IS
+// NEVER REPAIRED. `audio interface` is an alias of the TASCAM Model 12 AND of
+// the M-Audio Fast Track Pro, both exact, both at distance 0, and no threshold
+// and no cleverer phonetic key can separate them. A page that picked one would
+// be printing a coin toss as a fact. Both names are reported, the words stand,
+// and a person fixes it by typing one of them.
+// ⚠️ IT IS GRADED WITH A DESK THAT HAS BOTH, on purpose: `/wish/` carries three
+// instruments and the ambiguity cannot arise there, so a check written against
+// that page would pass while measuring nothing.
+{
+  const both = { has: (f) => f === 'TASCAM Model 12' || f === 'M-Audio Fast Track Pro' };
+  const s = 'Send it through the audio interface.';
+  const r = reword(s, both);
+  const u = r.unsure[0];
+  ok('NEGATIVE CONTROL: one span naming two instruments on the desk is reported and never picked',
+    r.text === s && r.fixed.length === 0 && !!u && u.names.length === 2
+      && u.names.includes('TASCAM Model 12') && u.names.includes('M-Audio Fast Track Pro'),
+    u ? `${JSON.stringify(u.was)} -> ${u.names.join(' or ')}, nothing rewritten` : 'no ambiguity reported');
+}
+
+// 🔴 AND THE SAME REFUSAL ON A MIS-HEARD SPAN, WHICH IS THE ONLY VERSION OF IT
+// THAT CAN BE GOT WRONG. FOUND BY SABOTAGE: dropping the `continue` after an
+// ambiguity is reported left the check above FULLY GREEN, because
+// `audio interface` is an exact hearing and nothing was ever going to be
+// rewritten there. The branch that matters is a span that WOULD have been
+// repaired had it named one thing, and there is a real transcript of it:
+// `whisper` returned *"Send the Novation to the taskam."*, and `taskam` reaches
+// the TASCAM Model 12 and its DAW control surface at the same distance.
+{
+  const both = { has: (f) => f.startsWith('TASCAM') };
+  const s = 'Send the Novation to the taskam.';
+  const r = reword(s, both);
+  const u = r.unsure[0];
+  ok('NEGATIVE CONTROL: a mis-heard span naming two instruments is refused rather than guessed',
+    r.text === s && r.fixed.length === 0 && !!u && u.was === 'taskam' && u.names.length === 2,
+    u ? `${JSON.stringify(u.was)} -> ${u.names.join(' or ')}, ${r.fixed.length} repaired`
+      : `no ambiguity reported, ${r.fixed.length} repaired`);
+}
+
+// 🔴 AND A REPAIR MUST NOT BE ABLE TO PRODUCE A NAME NOTHING DOWNSTREAM KNOWS.
+// Whatever `reword` writes into the box is read next by a language model whose
+// vocabulary is the caller's own alias list, so the two lists have to hold the
+// same strings. This is the two-derivations-of-one-fact rule: the check is that
+// a name `reword` can write is a name `describe()` gives for a port on the
+// desk, which is where the page builds its aliases from.
+{
+  const ports = ['MK-425C USB MIDI Keyboard', 'Circuit', 'Model 12 MIDI IN'];
+  const known = new Set(ports.map((p) => describe(p).full));
+  const writes = ['put the groove a box through it', 'Play the MK425C', 'the taskham records it']
+    .flatMap((s) => reword(s, { has: (f) => known.has(f) }).fixed.map((f) => f.full));
+  ok('every name a repair can write is a name the desk already answers to',
+    writes.length === 3 && writes.every((w) => known.has(w)), writes.join(', ') || 'nothing written');
 }
 
 console.log(`\n${pass} ok, ${fail} failed`);

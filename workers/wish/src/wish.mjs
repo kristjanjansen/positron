@@ -18,11 +18,56 @@
 // `by`. `demo/shell/bay.mjs`'s `checkTransforms` is the wall for that, and it is
 // on the PAGE rather than here, where a caller could skip it.
 
-export const CORS = {
-  'access-control-allow-origin': '*',
-  'access-control-allow-headers': 'content-type',
-  'access-control-allow-methods': 'POST, OPTIONS',
-};
+/**
+ * 🔴 WHO MAY CALL THIS, AND IT WAS `*` UNTIL IT HAD A HOSTNAME. While the only
+ * way to reach this code was `demo/wish-local.mjs` on a laptop, an open
+ * `access-control-allow-origin` cost nothing. On `wish.positron.studio` it is
+ * an invitation, because every call spends a paid Workers AI account.
+ *
+ * ⚠️ **AN ORIGIN HEADER IS A FACT ABOUT A BROWSER AND NOTHING ELSE.** A page
+ * cannot forge it, which is the whole of what this buys: another site's tab
+ * cannot spend this account, and a crawler that sends no origin at all is
+ * refused. **Anything that is not a browser sends whatever it likes.** So this
+ * stops the accidents and stops nobody who is trying, and the thing that bounds
+ * the bill in that case is the rate limit in `index.js`.
+ *
+ * ⚠️ THREE KINDS OF CALLER ARE ALLOWED AND EACH ONE IS A PAGE THIS PROJECT
+ * SERVES.
+ * - **The site**, which is the point of deploying this at all.
+ * - **A page this account deployed**, because `workers_dev` stays true across
+ *   this repository so every old link keeps resolving, and `/wish/` on that
+ *   mirror is the same page.
+ * - **A page on this machine or this network**, which is `node
+ *   demo/server.mjs` and a phone on the same wifi looking at it. A stray page
+ *   on the internet is not on a private address, so this loosens nothing the
+ *   paragraph above did not already concede, and without it a phone cannot be
+ *   used to try the page at all: it can reach the deployed agent and it can
+ *   never reach a laptop's `127.0.0.1`.
+ */
+const SITE = ['https://positron.studio', 'https://www.positron.studio'];
+const OURS = /^https:\/\/[a-z0-9-]+\.kristjan-jansen\.workers\.dev$/;
+const NEAR = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+
+/** @param {string|null} origin the request's `Origin` header, or null */
+export function allowedOrigin(origin) {
+  if (!origin) return false;              // not a browser, or a crawler
+  return SITE.includes(origin) || OURS.test(origin) || NEAR.test(origin);
+}
+
+/**
+ * The reply headers for one caller.
+ * ⚠️ IT ECHOES THE ORIGIN RATHER THAN ANSWERING `*`, and it says `vary: origin`
+ * so a cache cannot hand one caller's permission to another.
+ */
+export function corsFor(origin) {
+  return {
+    'access-control-allow-origin': allowedOrigin(origin) ? origin : 'https://positron.studio',
+    'access-control-allow-headers': 'content-type',
+    'access-control-allow-methods': 'POST, OPTIONS',
+    'access-control-max-age': '86400',
+    vary: 'origin',
+  };
+}
 
 /** What this will run, by job. An allowlist, because the name arrives from a
  *  browser and somebody's account is being spent. */

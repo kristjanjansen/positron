@@ -176,6 +176,7 @@
   import { createChoice } from '/shell/choice.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, printLink, checkTransforms, delivers } from '/shell/bay.mjs';
+  import { describe, reword } from '/shell/instruments.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
   /**
@@ -196,8 +197,27 @@
    * dozens of Chromes. The checks below run on a canned reply.
    */
 
-  /** Where the agent is. `node demo/wish-local.mjs` puts it here. */
-  const API = new URLSearchParams(location.search).get('api') || 'http://127.0.0.1:8799';
+  /**
+   * 🔴 WHERE THE AGENT IS, AND THIS PAGE USED TO ANSWER 200 ON A HOSTNAME WHERE
+   * IT COULD NOT POSSIBLY WORK. The default was `http://127.0.0.1:8799`
+   * whatever served the page, so `https://positron.studio/wish/` loaded
+   * perfectly, painted every control, and then asked a port on the VISITOR's
+   * own machine, which is nobody's wish agent. That is the shape this project
+   * calls a lie: a page that looks like it is working.
+   * ✅ **THE DEFAULT FOLLOWS WHERE THE PAGE CAME FROM.** Served off this laptop
+   * it talks to `node demo/wish-local.mjs`; served off anything else it talks
+   * to the deployed Worker, which is where the credential is.
+   * ⚠️ `?api=` STILL WINS OVER BOTH, which is how the deployed page is pointed
+   * at a local agent and the other way round.
+   * ⚠️ AND THE TEST IS *IS THIS MACHINE*, NOT *IS THIS THE SITE*. A phone on
+   * the same wifi is looking at `http://192.168.x.x:8890` and can never reach a
+   * laptop's loopback, so it belongs on the deployed agent like any other
+   * visitor. `workers/wish/src/wish.mjs` allows that page's origin for exactly
+   * this reason.
+   */
+  const HERE = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(location.hostname);
+  const API = new URLSearchParams(location.search).get('api')
+    || (HERE ? 'http://127.0.0.1:8799' : 'https://wish.positron.studio');
 
   /**
    * 🔴 THE DESK, DESCRIBED RATHER THAN DISCOVERED, AND THAT IS DELIBERATE ON
@@ -805,7 +825,12 @@
      * distinguishable from `EXAMPLE` in a check.
      */
     if (SELFCHECK && path === '/hear') {
-      return { text: CANNED_HEARD, words: null, ms: 0, model: 'canned' };
+      /* 🔴 THE STAND-IN ANSWERS PER MODEL, BECAUSE THE REAL ONES DO. One canned
+         sentence for three models would have graded the repair with a
+         transcript that needs no repairing, which is a check that runs and
+         measures nothing. Every string in `HEARD_BY` is a real reply from that
+         model to the same spoken sentence. */
+      return { text: HEARD_BY[body.model] ?? CANNED_HEARD, words: null, ms: 0, model: 'canned' };
     }
     if (SELFCHECK && path === '/wish') {
       /* ⚠️ THE GATE RETURNS WHAT THE SERVER NOW RETURNS, not the raw model
@@ -824,7 +849,13 @@
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
       });
     } catch {
-      const e = new Error(`nothing answered at ${API}. Start the agent with \`node demo/wish-local.mjs\``);
+      /* ⚠️ AND THE ADVICE FOLLOWS THE ADDRESS. Telling a visitor on
+         positron.studio to start a node process on their own laptop is the
+         `Authentication error` defect again: a message that sends a reader to
+         look at the one thing that was never theirs. */
+      const e = new Error(HERE
+        ? `nothing answered at ${API}. Start the agent with \`node demo/wish-local.mjs\``
+        : `nothing answered at ${API}`);
       e.answered = false;
       throw e;
     }
@@ -840,6 +871,58 @@
   /** What went wrong, in the words of whichever end has a right to them. */
   function blame(e) {
     d.log(e.answered === false ? e.message : `the agent said: ${e.message}`, 'warn');
+  }
+
+  /**
+   * 🔴 THE INSTRUMENTS THIS PAGE CAN ACTUALLY PATCH, DERIVED FROM ITS OWN PORT
+   * LIST AND NEVER TYPED AGAIN. `demo/shell/instruments.mjs` describes the
+   * whole room: a Fast Track Pro, an IAC bus and the Model 12's DAW control
+   * surface are all real and none of them is on this page. A correction that
+   * wrote one of those names into the box would put a word in somebody's mouth
+   * AND still come back *nothing on this desk*, which is both failures in one
+   * press. `describe()` turns a port's own label into the taxonomy's name, so
+   * this list cannot drift from `PORTS`.
+   */
+  const ONDESK = new Set(PORTS.map((p) => describe(p.label).full));
+
+  /**
+   * 🔴 THE SPEECH MODEL'S HEARING, REPAIRED BEFORE THE LANGUAGE MODEL READS IT,
+   * AND SAID OUT LOUD EVERY TIME. Asked 2026-09-21: *"can you patch wish thinkg
+   * or transcding with simular-sounding lookups"*, and this is where the lookup
+   * finally gets called: it had 32 asserts and 144 measured transcripts behind
+   * it and NO page using it.
+   *
+   * 🔴 IT IS THE TRANSCRIPTION AND NEVER THE TYPING. A machine produced these
+   * words and a machine may be corrected; what a person typed into that box is
+   * what they meant, and a page that rewrites it while they press Enter is
+   * arguing with them. So `think()` is left alone and this sits on the one path
+   * a model's output takes.
+   *
+   * ⚠️ NOTHING IS REWRITTEN SILENTLY, which is the whole condition on doing it
+   * at all. The line below names the words that were there before, the box
+   * shows the result, and the box is editable, so the repair costs one
+   * keystroke to undo. It is the same arrangement as `relabel()` at the other
+   * end of the chain, which repairs the one key this model always gets wrong
+   * and RETURNS the repair so the page can print it.
+   *
+   * ⚠️ AND TWO INSTRUMENTS ON ONE SPAN IS NEVER PICKED BETWEEN. See `reword()`:
+   * the words stand, both names are printed, and the person chooses by typing
+   * one of them. This page's desk has three instruments and the ambiguity
+   * cannot arise on it, so that branch is graded in
+   * `demo/shell/instruments-test.mjs` with a desk that has both.
+   */
+  function hearWords(text) {
+    const r = reword(text, { has: (full) => ONDESK.has(full) });
+    for (const f of r.fixed) {
+      d.log(`the words "${f.was}" are how this desk's ${f.full} came back, so the box says ${f.full}`);
+    }
+    for (const u of r.unsure) {
+      d.log(`"${u.was}" names two things here, ${u.names.join(' and ')}, so it was left as it was`);
+    }
+    for (const a of r.absent) {
+      d.log(`"${a.was}" sounds like ${a.names[0]}, which is not on this desk`);
+    }
+    return r.text;
   }
 
   /**
@@ -890,6 +973,28 @@
    * chain from a constant a button had written a moment earlier.
    */
   const CANNED_HEARD = 'connect the keyboard to the circuit and transpose it up one semitone';
+
+  /**
+   * 🔴 WHAT EACH LISTENING MODEL REALLY RETURNED, SO THE REPAIR IS GRADED
+   * THROUGH THE PATH IT LIVES ON RATHER THAN BESIDE IT. All three rows are
+   * quoted from `research/name-lookups-2026-09-21.md`, including the leading
+   * space `whisper-tiny-en` puts on everything.
+   * - `turbo` gets the sentence above, which names both instruments properly
+   *   and is therefore the negative control: a correct hearing must come back
+   *   untouched.
+   * - `whisper` mangled `tascam` into `taskham` (row 647). On the WHOLE desk
+   *   that reaches the Model 12 and its DAW control surface at the same
+   *   distance; this page has no DAW control port, so exactly one instrument
+   *   survives and the words are corrected.
+   * - `tiny-en` split `MK425C` into two tokens (row 582), which is the case the
+   *   span arithmetic exists for.
+   * ⚠️ THE PICKER IS AN ORDINARY CONTROL AND THE CHECK USES IT AS ONE. Nothing
+   * here is a second switch only a harness knows about.
+   */
+  const HEARD_BY = {
+    '@cf/openai/whisper': 'The evolution plays the circuit and the taskham records it.',
+    '@cf/openai/whisper-tiny-en': ' Play the MK425 C into the circuit.',
+  };
 
   /**
    * 🔴 THE REPLY THE REAL MODEL GAVE, AND IT IS THE GATE FOR A SUITE RUN.
@@ -1146,7 +1251,7 @@
        * at a sentence the speech model got wrong, which is the only reason that
        * box is a textarea.
        */
-      await think(heard.text.trim());
+      await think(hearWords(heard.text.trim()));
     } catch (e) {
       blame(e);
     } finally {
@@ -1661,6 +1766,60 @@
         'proposing: patch',
         'answered: nothing'].join(' | '),
       span.join(' | '));
+
+    /**
+     * 🔴 A NAME THE SPEECH MODEL MANGLED IS REPAIRED BEFORE THE PATCH MODEL
+     * READS IT, AND THIS IS THE FIRST PAGE TO CALL THAT LOOKUP AT ALL. It had
+     * 32 asserts and 144 measured transcripts behind it and no caller, which
+     * `HANDOFF.md` recorded as open. The two transcripts below are real replies
+     * from those two models, and the picker is pressed the way a person would
+     * press it rather than reached around.
+     * ⚠️ **THE NEGATIVE CONTROL IS THE ASSERT ABOVE**, which drove `turbo` and
+     * found `CANNED_HEARD` in the box unchanged. A repair that fired on a
+     * correct hearing would take it red, so the two halves are graded and
+     * neither can pass alone.
+     * ⚠️ AND THE SECOND ONE IS THE HALF THAT KEEPS THIS FROM BEING A SILENT
+     * REWRITE. The words that were there before are read back off the LOG, not
+     * off the constant, because what has to exist is the sentence a person
+     * reads.
+     */
+    {
+      const at = (m) => HEAR.findIndex(([, id]) => id === m);
+      const runs = [];
+      for (const [model, was, want] of [
+        ['@cf/openai/whisper', 'taskham',
+          'The evolution plays the circuit and the TASCAM Model 12 records it.'],
+        /* No leading space in the expectation, and `whisper-tiny-en` really
+           does put one on everything: `finish()` trims before it repairs, so
+           what the box gets is the sentence without the model's own margin. */
+        ['@cf/openai/whisper-tiny-en', 'MK425 C', 'Play the Evolution MK-425C into the circuit.'],
+      ]) {
+        hearPick.buttons[at(model)].click();
+        await finish();
+        runs.push({ was, want, got: said.value });
+      }
+      hearPick.buttons[0].click();          // put the picker back where it was
+      const log = document.querySelector('.pos-log')?.textContent || '';
+      d.assert('a name the speech model mangled is repaired before the patch model reads it',
+        runs.every((r) => r.got === r.want) && runs.every((r) => log.includes(`"${r.was}"`)),
+        runs.map((r) => `${JSON.stringify(r.was)} -> ${JSON.stringify(r.got.slice(0, 44))}`).join(' | '));
+
+      /**
+       * 🔴 AND A NAME THIS DESK DOES NOT HAVE IS REPORTED, NEVER SUBSTITUTED.
+       * `demo/shell/instruments.mjs` describes the whole room and this page
+       * carries three instruments of it, so *"The fast track row is the
+       * recording input."* names something real that is not here. Writing
+       * `M-Audio Fast Track Pro` into the box would put a word in somebody's
+       * mouth and still come back *nothing on this desk*.
+       */
+      const away = 'The fast track row is the recording input.';
+      const back = hearWords(away);
+      const line = (document.querySelector('.pos-log')?.textContent || '')
+        .split('\n').find((l) => l.includes('not on this desk')) || '';
+      d.assert('a name this desk does not have is said out loud and never written into the box',
+        back === away && line.includes('Fast Track'),
+        `${JSON.stringify(back.slice(0, 32))}, log says ${JSON.stringify(line.trim().slice(-58))}`);
+    }
 
     /**
      * 🔴 ENTER IS THE ONLY WAY TO SUBMIT AN EDITED SENTENCE NOW, AND A HARNESS

@@ -185,13 +185,20 @@ export function serve(port = PORT) {
     });
     s.listen(port, '127.0.0.1', () => {
       const got = s.address().port;
-      if (got !== port) console.error(`(port ${port} was busy — serving on ${got})`);
+      if (got !== port) console.error(`(port ${port} was busy, so this is on ${got})`);
       ok(s);
     });
   });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  await serve();
-  console.log(`demo server  http://127.0.0.1:${PORT}/demo/`);
+  /* 🔴 THE LINE A READER CLICKS HAS TO BE THE PORT IT GOT, NOT THE PORT IT
+     ASKED FOR. MEASURED 2026-09-21: with 8890 already held, this printed
+     `(port 8890 was busy, so this is on 8893)` on stderr and then
+     `demo server http://127.0.0.1:8890/demo/` on stdout, so the two lines
+     disagreed and the one that looks like the answer was the wrong one. The
+     harnesses already read `server.address().port` back for exactly this
+     reason, and the boot line was the one place still trusting the constant. */
+  const s = await serve();
+  console.log(`demo server  http://127.0.0.1:${s.address().port}/demo/`);
 }
