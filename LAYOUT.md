@@ -199,3 +199,44 @@ left alone.
 the rest is captured data, renders and logs, ignored. A large directory here is
 not mess; it is a working machine's output. `auto.crt` / `auto.key` are at the
 root and are in `.gitignore`.
+
+---
+
+## `.claude/skills/` and the rule that keeps `CLAUDE.md` small
+
+**Seven skills, added 2026-09-21 on instruction** (*"organize claude.md its too
+big. should we start doing skills?"*). MEASURED before the split: `CLAUDE.md`
+was **2245 lines and 157,181 bytes**, about **39,000 tokens, paid on every turn
+of every session and every background agent this project spawns**. It is
+**444 lines and 27,576 bytes** now, an **82 per cent cut** to the always loaded
+part, and **not one of its 2146 non-blank lines was summarised away**: they are
+in `.claude/skills/<name>/SKILL.md`, verbatim, proved line by line.
+
+🔴 **A RULE STAYS IN `CLAUDE.md` ONLY IF IT IS TRUE ON EVERY TASK.** The
+workflow, what costs money, what leaves this machine, how work is handed over.
+Everything else is a skill.
+
+🔴 **A SKILL IS NAMED FOR THE WORK, NEVER FOR THE CODE.** Somebody about to
+change a control has to recognise `positron-ui` from what they are about to do,
+not from which directory they will end up in. The `description` in the
+frontmatter is the only part that is always loaded, so it is written as a
+trigger (*"load before…"*) rather than as a summary of contents.
+
+🔴 **AND WHEN A RULE MOVES, ITS TRIGGER STAYS BEHIND**, as a row in the table in
+`CLAUDE.md`. A rule nobody knows to load is a rule that is gone, which is a
+worse outcome than a file that is too long.
+
+⚠️ **MOVE A RULE VERBATIM. DO NOT SUMMARISE IT.** The measurements, the dates,
+the quoted reports and the wrong first answers are what make a rule survive
+being argued with; condensed, it reads as an opinion and gets overruled by the
+next plausible argument.
+
+| skill | holds |
+| --- | --- |
+| `positron-ui` | the kit, controls, readouts, tables, transport bars, CSS, spacing, phone layout, visitor prose |
+| `positron-verify` | harnesses, asserts, self-checks, stand-ins, the traps that make a working page read as broken |
+| `positron-diagram` | `diagram.mjs`, boxes, labels, subs, notes, arrows |
+| `positron-streaming` | HLS, MoQ, WHEP, Cloudflare Stream, the relay, ERR, Durable Objects |
+| `positron-xr` | WebXR, the Quest measurements, passthrough, the way out, full screen |
+| `positron-hardware` | the board, the rig, Yoshimi, the Circuit, capture |
+| `positron-history` | every rename and every retired page |

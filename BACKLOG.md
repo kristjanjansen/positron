@@ -1,5 +1,99 @@
 ## Open
 
+### Asked 2026-09-21, session 40, the three pages that were shipped and not played
+
+- 🔴 **`/wish/` ANSWERS `Authentication error` AND THE CAUSE IS MEASURED, NOT
+  GUESSED.** Reported: *"i can not get wish to work, the agent did not answer:
+  Authentication error. Is `node demo/wish-local.mjs` running?"* It WAS running,
+  on :8799, and it answered every request. MEASURED 2026-09-21 05:39 UTC: the
+  wrangler OAuth access token in
+  `~/Library/Preferences/.wrangler/config/default.toml` carried
+  `expiration_time = "2026-09-21T01:30:11.612Z"`, **four hours in the past**, and
+  `demo/wish-local.mjs` reads it ONCE at module load (`const TOK = token()`) and
+  never again. A Cloudflare OAuth access token lasts an hour, so that server is
+  authenticated for its first hour of life and dead for every hour after it.
+  ✅ **AND THE REFRESH IS FREE**: `npx wrangler whoami` re-mints it and rewrites
+  the config, MEASURED, `expiration_time` moving from `01:30:11Z` to
+  `06:39:45Z` and the file's md5 changing. So the fix is to read the token per
+  request, notice the expiry, and let wrangler refresh its own credential.
+  ⚠️ **AND THE MESSAGE THE PAGE PRINTS IS THE SECOND HALF OF THE DEFECT.**
+  `Authentication error` is Cloudflare's words for an expired token and the page
+  bolts `Is node demo/wish-local.mjs running?` onto it, which sends a reader to
+  look at the one thing that was never wrong. A 500 that is an expired session
+  says so.
+
+- 🔴 **`/bay/` IS TOO MANY PRESSES AND THE ASK IS TO CUT THEM.** Reported:
+  *"can not get the bay work. make it simple, enable devices, i press first
+  edevice, then next and they are connected"*. Today it is: press the status
+  button, press a source row, press a destination row, **then press connect**.
+  The fourth press is the one to remove. `demo/bay/index.html`.
+  ⚠️ **THE REFUSAL MUST SURVIVE THE CUT.** `CLAUDE.md` records that a refusal is
+  shown BEFORE the press so the button is not a thing you press to find out;
+  with the button gone the refusal has to be visible on the FIRST press, on the
+  rows themselves, and a pair that cannot be joined must say so without being
+  tried.
+  ⚠️ **AND THE ORDER RULE IS PART OF WHY IT READS AS BROKEN**: `choose()`
+  refuses to start from an input, so pressing a destination first does nothing
+  at all and the page says nothing about why.
+
+- 🔴 **`/shape/` DOES NOT CHANGE THE SOUND, AND NOBODY HAS EVER HEARD IT.**
+  Reported: *"shape: i can not get the sound changing in circuit, when i press
+  notes in synth1/2 no sound changes"*. That page has never been heard by
+  anybody: `HANDOFF.md` says so and `portSends === 0` is asserted so a suite run
+  can never be a hand on the instrument. So this is the first real attempt and
+  the first question is which of the three walls is holding: the browser never
+  granted MIDI, no output matched `/circuit/i`, the Circuit's own MIDI receive
+  is off, or the bytes are right and something else is.
+  ⚠️ **THE PAGE CANNOT SAY WHICH, WHICH IS ITSELF THE DEFECT.** It names one
+  port by a regular expression over its name and reports `offline` for every
+  other reason there could be. It should list what it found.
+
+- 🔴 **AND `/shape/` GETS ONE GLOBAL INVISIBLE HANDS BUTTON.** Asked:
+  *"have a global invisible hands button that sets all sliders to random
+  position and enables their hands"*. One press: every slider on the part in
+  front of you goes to a random position and its hand starts moving.
+  ⚠️ **IT MAY NOT GO IN `.pos-controls`.** `demo/verify.mjs` presses every button
+  in that row on every run, so a button that sends to an instrument living there
+  is the suite putting a hand on somebody's synth. It goes beside `put back`,
+  which is where the page already keeps the things that send.
+
+- 🔴 **`/wish/`'s `Speak` BUTTON BECOMES HOLD TO TALK.** Asked:
+  *"replace speak button with a hold to alk button"*. Today it is a toggle in
+  `.pos-controls`: press to start recording, press again to stop. Held, the
+  recording lasts exactly as long as the hand does and there is no state to get
+  stuck in.
+  🔴 **AND IT LEAVES `.pos-controls` IF IT STOPS BEING PRESSABLE BY THE
+  HARNESS.** `demo/verify.mjs` CLICKS control 0, and a click is not a hold, so a
+  hold-only control in that row is a check the suite can no longer reach, which
+  is the `/mirror/` and `/blocks/` lesson in a new costume. Either the button
+  answers a plain click as well as a hold, or the checks behind it are reachable
+  another way and the moved assert count is accounted for.
+
+- ✅ **DONE 2026-09-21. `CLAUDE.md` IS 436 LINES AND 27,586 BYTES, AN 82 PER
+  CENT CUT, AND NOT ONE OF ITS 2146 NON-BLANK LINES WAS SUMMARISED AWAY.**
+  Asked: *"organize claude.md its too big. should we start doing skills?"*
+  MEASURED before: **2245 lines, 157,181 bytes, about 39,000 tokens paid on
+  every turn of every session and every background agent**. Seven skills now
+  hold the rest, verbatim, in `.claude/skills/<name>/SKILL.md`:
+  `positron-ui`, `positron-verify`, `positron-diagram`, `positron-streaming`,
+  `positron-xr`, `positron-hardware`, `positron-history`.
+  ✅ **NOTHING LOST, AND IT WAS PROVED LINE BY LINE RATHER THAN CLAIMED**: every
+  one of the 2146 non-blank lines of the old file was matched verbatim against
+  the new `CLAUDE.md` plus the seven skills, and the only four that did not
+  match are section headings the restructure replaced. The partition itself
+  refuses to claim a line twice, so no rule was duplicated either.
+  🔴 **THE RULE THAT CAME OUT OF IT IS IN `LAYOUT.md`**: a rule stays in
+  `CLAUDE.md` only if it is true on every task, a skill is named for the WORK
+  rather than for the code, a rule moves VERBATIM because the measurements and
+  the wrong first answers are what make it survive being argued with, and when
+  a rule moves its TRIGGER stays behind as a row in the table. A rule nobody
+  knows to load is a rule that is gone, which is worse than a file that is too
+  long.
+  ⚠️ **ONE THING WAS DELIBERATELY NOT FIXED**: 21 em dashes survive in carried
+  over text, including the one quoted inside the no-em-dashes rule as its own
+  bad example. Rewording a recorded rule to tidy its punctuation changes what
+  somebody wrote down.
+
 ### Asked 2026-09-21, while session 39 was reading the handoff
 
 - ✅ **DONE AND MEASURED 2026-09-21, `research/fasttrack-capture-2026-09-21.md`.**
