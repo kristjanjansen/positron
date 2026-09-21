@@ -16,15 +16,27 @@ git push --force-with-lease=main:4add3238cd812195db75fddfe405786fe5359a8b origin
 gh auth switch --user Kristjan-Jansen_enefit
 ```
 
-⚠️ **ONE AGENT WAS STILL RUNNING WHEN THIS WAS WRITTEN**, rig-testing the
-similar-sounding name lookups in `demo/shell/instruments.mjs` against what the
-REAL speech models return, with several `say` voices and about forty
-instructions including a dozen that name no instrument. It writes
-`research/name-lookups-2026-09-21.md` and may tune `instruments.mjs` and its
-test. **If that file is dirty or that research file exists, its work landed and
-was not committed by session 40.** Read its document before touching the
-matcher, because its whole job was to replace invented test cases with measured
-ones.
+✅ **THE NAME LOOKUPS ARE RIG TESTED AND IT LANDED.**
+`research/name-lookups-2026-09-21.md`, 711 lines, 144 real transcripts. 48
+instructions across six `say` voices through all three speech models. Pooled
+**recall 133/144 to 141/144 and precision 162/175 with thirteen false positives
+to 168/168 with none**, and the sixteen sentences naming no instrument go 46/48
+to 48/48.
+🔴 **THE NUMBER THAT SAYS THE MATCHER EARNS ITS PLACE: between 14 and 22 per cent
+of every instrument found arrived through a mis-hearing.**
+🔴 **AND TWO LOOSENINGS WERE REFUSED ON EVIDENCE, WHICH IS THE PART TO READ
+BEFORE TOUCHING IT.** A prefix exemption reads as FREE on the corpus and puts an
+instrument into **18 of 95 ordinary phrases**: `grab the fader` becomes the
+Novation Circuit, and that is a sentence somebody says at this desk. Dropping
+stop words before comparing resolves `crack the gate open` to the Circuit at
+distance 0. **The thresholds in that module are calibrated against measurements,
+not taste. Do not loosen one without a new negative control.**
+⚠️ **AND THE RESIDUAL ERROR IS IN THE DESK'S OWN VOCABULARY RATHER THAN IN THE
+THRESHOLDS**: `the cricket outside` resolves to the Circuit at distance 0
+because both reduce to `krkt`, unfixable without a dictionary.
+⚠️ **EVERY TRANSCRIPT IS CLEAN SYNTHETIC SPEECH, SO THOSE FIGURES ARE THE FLOOR
+OF THE DIFFICULTY AND NOT THE CEILING.** Nobody has measured a voice in a room
+with a synth playing, which is the condition this desk is actually in.
 
 ✅ **EVERYTHING ELSE IS COMMITTED AND THE TREE WAS CLEAN.** Every commit was
 path limited, because up to five agents were writing in this checkout at once.
@@ -220,11 +232,23 @@ shared lands before the page that wants it, which is the standing rule.
 
 1. **`origin/main`**, above. The only thing here needing a person rather than a
    decision.
-2. ⚠️ **THE NAME-LOOKUP RIG TEST WAS STILL RUNNING.** See the note at the top:
-   if `demo/shell/instruments.mjs` is dirty or
-   `research/name-lookups-2026-09-21.md` exists, read that document first. Its
-   job was to replace invented test cases with what the real speech models
-   actually return, so anything it says outranks the calibration in the module.
+2. **`resolve()` IS BUILT, TESTED AND USED BY NOTHING.** `/bay/` imports the
+   taxonomy but only calls `describe()`. The similar-sounding lookup has 32
+   asserts and 144 measured transcripts behind it and **no page calls it yet**.
+   `/wish/` is where it belongs: correct the transcript before the language
+   model reads it, show the correction in the editable box, and never rewrite
+   silently.
+   ⚠️ **AND IT HAS ONE UNRESOLVED DESIGN QUESTION WAITING**: all three speech
+   models mangled `daw` four different ways (`DOM`, `download`, `door`, `dock`),
+   so the Model 12 and its DAW control surface both come back, and **what a page
+   does with two hits for one instruction is a `/wish/` decision nobody has
+   taken.**
+3. ⚠️ **ESTONIAN IS A BACKLOG LINE AND IS DELIBERATELY NOT SCHEDULED**
+   (*"estonina can wait"*). The top of `BACKLOG.md` has why it is not an alias
+   problem: `STOP` is a closed set of ENGLISH verbs and it is the only thing
+   carrying the matcher's precision, so an Estonian sentence collapses it. There
+   is no `et_` voice on this machine, measured, so the cheap half needs a real
+   person and a microphone rather than a synthesiser.
 3. 🔴 **`purchased/` IS GITIGNORED WHOLE AND MUST STAY THAT WAY.** *"i purchased
    them. do not git them"*. `New Pack.circuitpack` in the root is the opposite
    case and stays tracked: the owner's own backup, somebody's only copy, and
