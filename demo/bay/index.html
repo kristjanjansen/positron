@@ -288,12 +288,31 @@
    * one instrument and a reader should not have to take the grouping on trust.
    */
   function sayInstruments() {
+    /**
+     * 🔴 NO LEADING SPACES, AND THE REASON IS THE LOG'S OWN LAYOUT. Reported
+     * 2026-09-21 with a crop: *"can we avind this uglu wrapping / indent?"*
+     * `.pos-log` is a GRID, `auto 1fr`, with `.pos-line { display: contents }`,
+     * so the timestamp has its own column and a wrapped message already aligns
+     * under where the message began. Two literal spaces indented the FIRST line
+     * only, and `white-space: pre-wrap` keeps them, so every continuation
+     * appeared to hang backwards. The nesting was doing a job the grid already
+     * does.
+     * ⚠️ AND THE TAXONOMY MADE THE WRAPPING WORSE, WHICH IS MY DOING. Enriching
+     * `Model 12 DAW Control` to `TASCAM Model 12 DAW control` lengthened every
+     * label, and the old line then repeated the raw port name after it, so one
+     * instrument took three lines to say two facts. The raw name is only worth
+     * printing when the enrichment did not already contain it.
+     */
     for (const g of instruments()) {
-      const halves = [g.out ? 'sends' : null, g.in ? 'takes' : null].filter(Boolean).join(' and ')
-        || 'neither sends nor takes';
-      const raw = [g.out, g.in].filter(Boolean).map((x) => rawName.get(x.id))
-        .filter((x, i, a) => x && x !== g.label && a.indexOf(x) === i);
-      d.log(`  ${g.label}: ${halves}${raw.length ? `, as ${raw.join(' and ')}` : ''}`);
+      const halves = g.out && g.in ? 'sends and takes'
+        : g.out ? 'sends only' : g.in ? 'takes only' : 'neither';
+      const raw = [g.out, g.in].filter(Boolean)
+        .map((x) => rawName.get(x.id))
+        .filter((x, i, a) => x && a.indexOf(x) === i
+          /* Redundant once the label carries the same words. `Model 12 DAW
+             Control OUT` adds nothing beside `TASCAM Model 12 DAW control`. */
+          && !x.toLowerCase().startsWith(g.label.toLowerCase().split(' ').slice(1).join(' ')));
+      d.log(`${g.label}, ${halves}${raw.length ? ` (${raw.join(', ')})` : ''}`);
     }
   }
 
