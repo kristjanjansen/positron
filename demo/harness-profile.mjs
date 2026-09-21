@@ -80,5 +80,30 @@ export function claimProfile(prefix) {
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     process.on(sig, () => { clean(); process.exit(130); });
   }
-  return { dir, clean, swept: removed };
+  /**
+   * 🔴 IT STRINGIFIES TO THE PATH, AND WITHOUT THIS IT STRINGIFIED TO
+   * `[object Object]` AND CHROME MADE A DIRECTORY CALLED THAT. MEASURED four
+   * times on 2026-09-21: three background agents and this session all wrote
+   * `--user-data-dir=${claimProfile('probe')}` in a throwaway CDP script, and a
+   * 156 MB Chrome profile appeared in the REPOSITORY ROOT under the literal
+   * name `[object Object]`. Two agents reported it as a mystery and one deleted
+   * it and it came back.
+   * 🔴 THE FAILURE MODE IS THE BAD KIND: `[object Object]` IS A VALID RELATIVE
+   * PATH, so nothing throws, nothing warns, Chrome starts perfectly and the
+   * profile lands wherever the caller's cwd happens to be. A name that was
+   * invalid would have failed in one second.
+   * 🔴 AND `sweepStale()` CAN NEVER RECOVER IT, which is the half that makes it
+   * worth fixing here rather than in each caller: the sweep finds directories
+   * whose PID is dead by reading the pid out of the NAME, and that name has no
+   * pid in it. So it is a leak this module is structurally blind to, in a
+   * project that has already had a run out of disk at 229 leftover profiles and
+   * about 20 GB.
+   * ⚠️ THE DESTRUCTURING CALLERS ARE UNAFFECTED. `const { dir } = claimProfile()`
+   * reads the same field it always did; this only gives the object an answer
+   * for the question every caller was already asking it.
+   */
+  const out = { dir, clean, swept: removed };
+  Object.defineProperty(out, 'toString', { value: () => dir, enumerable: false });
+  Object.defineProperty(out, Symbol.toPrimitive, { value: () => dir, enumerable: false });
+  return out;
 }

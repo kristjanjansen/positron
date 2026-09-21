@@ -418,6 +418,23 @@ just those three gave 57/57. So **before calling a red run a regression, run the
 failing demos ALONE** — it costs a minute and it separates "my change broke it"
 from "I was competing with myself", which look identical in the output.
 
+🔴 **`claimProfile()` RETURNS AN OBJECT, AND FOUR SEPARATE THROWAWAY PROBES PUT
+IT STRAIGHT INTO A TEMPLATE STRING ON ONE DAY.** `--user-data-dir=${claimProfile('probe')}`
+stringifies to `[object Object]`, **which is a valid relative path**, so nothing
+throws, nothing warns, Chrome starts perfectly, and a **156 MB profile appears in
+the repository root in a directory literally called `[object Object]`**. MEASURED
+2026-09-21: three background agents and the session all did it, two reported it
+as a mystery, and one deleted it and it came back within the hour.
+🔴 **AND `sweepStale()` IS STRUCTURALLY BLIND TO IT**, which is what makes it a
+leak rather than a mess: the sweep decides a directory is stale by reading a PID
+out of its NAME, and that name has no pid in it. In a project that has already
+had a volume run out at 229 leftover profiles and about 20 GB.
+✅ **THE OBJECT STRINGIFIES TO ITS OWN PATH NOW**, via `toString` and
+`Symbol.toPrimitive`, so `${profile}` and `const { dir } =` both do the right
+thing. **The lesson is the shape rather than the patch: a helper that returns an
+object where every caller wants a string will be interpolated, and a wrong value
+that happens to be a legal path is worse than one that throws.**
+
 🔴 **A HARNESS THAT DOES NOT DELETE ITS OWN PROFILE FILLS THE DISK, AND THE
 DISK FAILING LOOKS LIKE EVERYTHING FAILING.** Every harness here launches Chrome
 with a per-run `--user-data-dir`, for reasons that are correct and written down

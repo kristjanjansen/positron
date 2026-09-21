@@ -56,6 +56,7 @@
   import { createDrop } from '/shell/drop.mjs';
   import { createStack } from '/shell/stack.mjs';
   import { createGlue } from '/shell/glue.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createWaveView } from '/shell/wave-view.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
@@ -187,6 +188,48 @@
    * `__demo.transport`.
    */
   window.__demo.drop = drop;
+
+  /**
+   * 🔴 SIX PATCHES THE PAGE CAN OPEN WITH NO FILE AT ALL, ASKED FOR AS *"can we
+   * get some sample patches in to choose from?"* and then *"at least one"*.
+   * The pack in this repository is not published and never will be, so until
+   * today a visitor met an upload box and an empty page, which got worse the
+   * moment the tabs learned to stay away until something lands.
+   * 🔴 THEY ARE THE OWNER'S OWN PATCHES AND PUBLISHING THEM WAS ASKED FOR IN
+   * WORDS RATHER THAN ASSUMED. A patch is not a pack: `New Pack.circuitpack`
+   * holds 32 of somebody's SESSIONS and stays unpublished, and these are six
+   * 350 byte synth patches with no session data in them.
+   * ✅ EVERY ONE CARRIES `00` AT OFFSET 6, WHICH IS `Replace Current Patch` AND
+   * LANDS IN RAM. The extractor refused to write a file that was not 350 bytes,
+   * that had any other command byte, or that `readPatch` called `writesFlash`.
+   * ⚠️ AND NOTHING IS FETCHED UNTIL ONE IS PRESSED. `/reel/` asked a
+   * broadcaster for a newsreel on every visit for a first frame nobody had
+   * asked to see, and this page asserts `fetched === 0` for a visit.
+   * ⚠️ IT IS NOT IN `.pos-controls`, because this page has no control row and
+   * asserts that it has none. Both harnesses press that row by position, so the
+   * checks here drive these buttons by name instead.
+   */
+  const READY = [
+    ['aciiid', 'Aciiid'], ['flamed', 'Flamed'], ['aggie', 'Aggie'],
+    ['frosted-glass', 'Frosted Glass'], ['smooth-pad', 'Smooth Pad'], ['twins', 'Twins'],
+  ];
+  const ready = createButtonGroup({
+    label: 'or open one of these',
+    buttons: READY.map(([id, label]) => ({ id, label })),
+    onPress: (id) => openReady(id),
+  });
+  stack.add(ready.el);
+
+  async function openReady(id) {
+    const name = `${READY.find(([k]) => k === id)[1]}.syx`;
+    try {
+      const r = await fetch(`/resources/patches/${id}.syx`);
+      if (!r.ok) throw new Error(`the server answered ${r.status}`);
+      await openSyx(name, new Uint8Array(await r.arrayBuffer()));
+    } catch (e) {
+      drop.say(`${name} did not open (${e.message})`, 'bad');
+    }
+  }
 
   // ── the three lists ──────────────────────────────────────────────────────
   //
@@ -330,12 +373,12 @@
       head: '', marker: '', written: 'B', 'not erasure': 'B', payload: 'B',
       filled: '%', entropy: '', nearest: 'B', 'synth 1': '', 'synth 2': '',
     },
-    // 🔴 FIVE ACROSS AND TWO DOWN, ASKED FOR AS *"why not 5x2 cells?"* against a
-    // panel that had wrapped 7 and 3 and cut `10,620` to `10,62…` in its own
-    // cell. Ten cells and five columns is the only arrangement that puts
-    // `written` beside `not erasure` and `payload` beside `filled`, which are
-    // the two pairs a reader compares.
-    cols: 5,
+    // 🔴 TWO ROWS, ASKED FOR AS *"why not 5x2 cells?"* and then as
+    // *"1xsomehting / 2xsomehing etc"*, against a panel that had wrapped 7 and 3
+    // and cut `10,620` to `10,62…` in its own cell. The caller names the shape
+    // and the ten cells make the columns, which is why the even rule earns its
+    // keep twice: an even count divides by two exactly.
+    rows: 2,
     size: 'sm',
     showLog: false,
   });
@@ -1397,6 +1440,53 @@
           + `${(foot.top - body.bottom).toFixed(1)} px under the body, saying `
           + `"${drop.note.textContent}"`);
       }
+
+      /**
+       * 🔴 THE SIX PUBLISHED PATCHES, DRIVEN. They are the only thing a visitor
+       * to the deploy can open, so a broken one there is a page with nothing on
+       * it, and that is exactly the state this check exists to notice. It
+       * presses a button by NAME rather than by position, because this page has
+       * no control row for a harness to sweep.
+       * ⚠️ EVERY ONE MUST LAND IN RAM. `00` at offset 6 is `Replace Current
+       * Patch`; `01` is `Replace Patch`, which writes flash on an instrument
+       * with no factory reset. The extractor refused to write anything else and
+       * this is the second reading of the same fact, off the deployed bytes.
+       */
+      {
+        const before = fetched;
+        await openReady('frosted-glass');
+        d.assert('a published patch opens by name and lands in RAM rather than in flash',
+          patches.length === 1 && patches[0].name === 'Frosted Glass'
+          && patches[0].writesFlash === false && patches[0].bytes.length === PATCH_BYTES
+          && patches[0].bytes[6] === 0x00
+          && fetched === before + 1,
+          `${patches[0]?.name} is ${patches[0]?.bytes.length} bytes with command `
+          + `${patches[0]?.bytes[6]}, after ${fetched - before} request(s)`);
+
+        // ⚠️ AND ALL SIX, because one working says nothing about the other five
+        // and the five are what makes it a choice. They are fetched one at a
+        // time rather than at once: a visitor presses one.
+        const seen = [];
+        for (const [id, label] of READY) {
+          await openReady(id);
+          seen.push({ id, label, got: patches[0]?.name, flash: patches[0]?.writesFlash });
+        }
+        d.assert('all six open, every one lands in RAM, and no two of them are the same patch',
+          seen.length === 6 && seen.every((x) => x.got === x.label && x.flash === false)
+          && new Set(seen.map((x) => x.got)).size === 6,
+          seen.map((x) => `${x.label}${x.got === x.label ? '' : ` -> ${x.got}`}`).join(', '));
+
+        // 🔴 AND THE BUTTONS ARE NOT IN THE CONTROL ROW, which is what keeps the
+        // page's own `no control row at all` assert true while it has six more
+        // ways in than it had this morning.
+        d.assert('the six sit outside the control row, so the page still has no control row to sweep',
+          ready.buttons.length === 6
+          && !ready.el.closest('.pos-controls')
+          && document.querySelectorAll('.pos-controls button').length === 0,
+          `${ready.buttons.length} buttons, ${document.querySelectorAll('.pos-controls button').length} in the control row`);
+      }
+
+      await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
       d.assert('the pack reads as 64 patches, 32 sessions and 64 samples',
         patches.length === 64 && sessions.length === 32 && samples.length === 64,

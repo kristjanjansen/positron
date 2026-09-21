@@ -1,5 +1,22 @@
 ## Open
 
+### `createAudioLane` cannot loop, read rather than measured, 2026-09-21
+
+🔴 **FOUND WHILE BUILDING `/tom/` AND IT IS A CLAIM ABOUT `timeline/transport.mjs`
+RATHER THAN ABOUT THAT PAGE.** A committed node's `onended` sets
+`ev.status = 'rendered'`; `cancelCommitted()` resets only `committed`, and the
+`onState` seek handler resets only `passed`. **`rendered` is terminal**, so
+every event that actually SOUNDED is silent on lap two, and a step grid loops or
+it is not a step grid.
+⚠️ **IT IS READ OFF THE SOURCE AND HAS NOT BEEN RUN.** Grading it needs a real
+`AudioContext` and two laps of wall time. It is written here rather than in a
+comment because if it is WRONG then `/tom/` should be using that lane and
+getting sample accuracy for free, and nobody will go back and check a claim that
+only exists as a reason not to use something.
+⚠️ **WHAT IT COSTS TODAY**: `/tom/`'s lane is timer fired rather than sample
+accurate, and its worst step measured **1.6 to 11.8 ms late** across runs. That
+number is on the page as a readout cell rather than hidden.
+
 ### /pack/, /shape/ and the kit, second stream, 2026-09-21
 
 - **`what a mess. why not 5x2 cells? have smaller readout values styling. put
