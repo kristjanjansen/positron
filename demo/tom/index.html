@@ -44,6 +44,23 @@
      */
     --tom-name: 22px;
   }
+  /* 🔴 NO TOP PADDING OVER THE TITLE, ASKED FOR TWICE: *"no top padding on
+     titles"*, and then *"still no padding on top of titles"* after I had
+     acknowledged it and gone on to something else. It was dropped, not
+     refused.
+     ⚠️ MEASURED BEFORE CHANGING IT, because there are several reasons a gap
+     could be there and they have different fixes. At 1280 px the plate sat in a
+     648 px content box with `padding: 20px` on all four sides of
+     `.panel-case`, so the 20 px over the title was the CARD's, not the plate's
+     and not a margin. Only the top is taken off: the sides still hold the
+     content off the border, and the foot still does.
+     ⚠️ (0,2,0) AGAINST `.panel-case`'s (0,1,0), so it cannot come down to
+     source order the day somebody moves this block. */
+  .tom.panel-case { padding-top: 0; }
+  /* The plate keeps one line of its own room, so the words are not touching the
+     border: that is the title's line box rather than padding over it. */
+  .tom .panel-plate { padding: 6px 0 2px; }
+
   /* 🔴 NO DIVIDER. `panel-layout.mjs` gives a left fixed column a `border-right`
      and a gutter, which is right when the two halves are different KINDS of
      thing. Here they are one grid with its row labels: a rule down the middle
@@ -445,7 +462,7 @@
     items: [],
     adapters: { step: stepAdapter },
     range: [0, SPAN],
-    onPosition: (pos) => { showAt(pos); wrapAt(pos); },
+    onPosition: (pos) => showAt(pos),
   });
   for (let i = 0; i < STEPS; i++) {
     deck.schedule({ at: i * STEP_MS, kind: 'step', id: `s${i}`, payload: { step: i, at: i * STEP_MS } });
@@ -453,39 +470,22 @@
 
 
 
-  /**
-   * 🔴 IT LOOPS BY ITSELF, ASKED FOR AS *"make it autoloop"* after *"rm loop for
-   * now"*, and the two are the same instruction seen from both ends: a sixteen
-   * step pattern repeating is what the instrument DOES, not a mode you put it
-   * in. So there is no LOOP button and there is no way to switch this off.
-   *
-   * 🔴 AND IT ONLY BECAME AUDIBLE THIS EVENING. `createAudioLane` set a
-   * committed node's status to `rendered` on its `onended`, and nothing reset
-   * it, so every step that had actually SOUNDED was silent on lap two.
-   * MEASURED on the audio thread with the ear `/lanes/` uses: 4 heard on lap
-   * one, **0 on lap two**. It is one condition in `timeline/transport.mjs` now
-   * and lap two is 4 again. Without that fix this function would have produced
-   * a playhead going round and round in silence, which is the worst possible
-   * shape: a page that looks like it is working.
-   *
-   * ⚠️ A BACKWARD `seek`, WHICH IS THE SAME THING THE TRANSPORT BAR'S OWN LOOP
-   * DOES. One path, so a wrap here and a wrap there cannot behave differently.
-   * ⚠️ AND IT WRAPS ON THE LAST STEP RATHER THAN AT THE END OF TIME. The score
-   * runs to `SPAN`, and a step is `STEP_MS` long, so the sixteenth step's own
-   * length is part of the bar: seeking at `SPAN` would hold the last step for
-   * one extra frame every lap and the pattern would drift against a metronome.
-   */
   /** Bright while it runs, barely there while it is parked. */
   function setLive(on) {
     if (on) rowsEl.dataset.live = '1';
     else delete rowsEl.dataset.live;
   }
 
-  function wrapAt(pos) {
-    if (!deck.playing?.()) return;
-    if (pos < SPAN - 1) return;
-    deck.seek(0);
-  }
+  /**
+   * ⚠️ NO AUTOLOOP, ASKED FOR AS *"no autoloop"* an hour after *"make it
+   * autoloop"*. The wrap is gone and nothing replaces it: the grid plays once
+   * and stops at the end, the way the deck does by itself.
+   * ⚠️ WHAT THE AUTOLOOP FOUND IS KEPT ANYWAY, and it is the more valuable
+   * half: `createAudioLane` left a step that had sounded terminally `rendered`,
+   * so lap two was silent. That is fixed in `timeline/transport.mjs` and
+   * measured on the audio thread, and it would still be undiscovered if this
+   * page had not briefly looped.
+   */
 
   // ── the way in ──────────────────────────────────────────────────────────
   //
@@ -1031,6 +1031,10 @@
         buf = ac.createBuffer(1, m.frames, m.rate);
         buf.copyToChannel(m.samples, 0);
         bufs.set(r, buf);
+        // ⚠️ THE FIRST SOUND IS THE ONLY ONE THAT CAN PAY THIS, because it is
+        // the press that builds the context. Every other row is decoded here
+        // and out of the firing path for good.
+        warmRows();
       }
       const src = ac.createBufferSource();
       src.buffer = buf;
@@ -1137,6 +1141,39 @@
    * the reader has done. Rows that still exist keep their steps; rows that
    * arrive start empty.
    */
+  /**
+   * 🔴 EVERY SAMPLE IS DECODED WHEN THE PACK OPENS, NOT WHEN A STEP FIRES.
+   * Reported 2026-09-21 with the readout showing **22.6 ms late**: *"lot of
+   * late. when i put pads in and then get samples, not good timing"*, and the
+   * second half of that sentence is the diagnosis. `fire()` decoded a row's
+   * WAV the first time that row sounded, so the FIRST hit of every sample paid
+   * `toMono` plus a `createBuffer` plus a `copyToChannel` on the firing path,
+   * inside the window the readout measures. A pattern with eight rows in it
+   * paid it eight times, once each, exactly while somebody was listening to
+   * whether the timing was any good.
+   * ⚠️ IT IS ON THE OPEN, WHICH IS A PRESS, NOT ON A VISIT. Decoding 64 WAVs
+   * because somebody loaded the page is the load-on-a-visit defect this project
+   * has paid for three times. Opening a pack is a person asking for this.
+   * ⚠️ AND IT DOES NOT MAKE THE CONTEXT. `AudioContext` is still built on the
+   * first sound, so a visit still makes none and the page's own check still
+   * asserts that.
+   * ⚖️ THIS IS THE CHEAP HALF OF THE TIMING AND NOT ALL OF IT. The lane here is
+   * TIMER fired rather than sample accurate, which is worth single digit
+   * milliseconds and is a separate change: `createAudioLane` became usable only
+   * this evening, when its loop defect was fixed.
+   */
+  function warmRows() {
+    if (!ac) return;
+    for (let r = 0; r < rows.length; r++) {
+      if (bufs.has(r) || !hasSound(r)) continue;
+      const m = toMono(rows[r].wave);
+      if (!m.ok) continue;
+      const b = ac.createBuffer(1, m.frames, m.rate);
+      b.copyToChannel(m.samples, 0);
+      bufs.set(r, b);
+    }
+  }
+
   function setRows(got) {
     const was = on;
     rows = got;
@@ -1144,7 +1181,14 @@
     bufs.clear();
     picked = -1;
     drawGrid();
-    d.log(`${rows.length} rows, ${STEPS} steps, drawn in ${built.toFixed(0)} ms`);
+    // ⚠️ AFTER THE GRID, so the picture is on screen before the decoding
+    // starts, and only if a context already exists: making one here would be
+    // the page opening an audio device nobody asked it to.
+    const t1 = performance.now();
+    warmRows();
+    const warmed = performance.now() - t1;
+    d.log(`${rows.length} rows, ${STEPS} steps, drawn in ${built.toFixed(0)} ms`
+      + (bufs.size ? `, ${bufs.size} decoded in ${warmed.toFixed(0)} ms` : ''));
   }
 
   drawGrid();
