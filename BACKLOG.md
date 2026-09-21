@@ -1,6 +1,22 @@
 ## Open
 
-### Stream, 2026-09-21, session 41, off the deployed pages
+### ✅ DONE 2026-09-21: the stream, session 41, off the deployed pages
+
+- ✅ **ALL OF IT IS LIVE AT `https://positron.studio/pack/`**, 28/28 locally with
+  22 page asserts and 17/17 against the deploy. `/kit/` is 113/113. Eight
+  requests, collected first and worked second.
+  ✅ **DONE**: the visible drop area, `.zip` including a zip of packs, the demo
+  renamed `patches` to `pack`, three tabs with their counts in the titles, the
+  readout removed with what it said rehomed, the patches table cut to six whole
+  rows, the picture moved under the table with its room reserved before anything
+  is open, six more synth boxes, and the samples tab with press to hear.
+  ⚠️ **STILL OPEN, AND BOTH WERE NAMED WHEN THEY WERE LOGGED**: the parameter
+  panel `plans/plan-pack-page.md` §2 asked for, and what a zip of SEVERAL packs
+  should do. It opens the first and says how many it found, which is a stand-in
+  for a decision nobody has taken.
+  🔴 **AND `https://positron.studio/patches/` IS GONE WITH NO REDIRECT.** That
+  URL was live for about an hour and was handed over in a report before the
+  rename. The project's precedent is no redirect: `/held/` went the same way.
 
 - 🔴 **`/pack/`: MORE OF THE SYNTH IN THE PICTURE.** Asked with a screenshot
   of the five box signal path: *"add more boxes with syhtn elements"*.
