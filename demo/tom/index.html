@@ -26,13 +26,31 @@
   .tom {
     --tom-gap: 2px;
     --tom-cell: 16px;
-    --tom-ruler: 14px;
+    /* ⚠️ THE RULER CARRIES NO TEXT SINCE 2026-09-21, so it is a press target and
+       a measuring stick rather than a row of labels. 8 px is enough to press
+       and small enough not to read as a band. */
+    --tom-ruler: 8px;
     /* ⚠️ MEASURED RATHER THAN CHOSEN. `sample_10.wav` is thirteen characters of
        10 px mono, about 78 px, and the column has to hold that plus its own
        4 px each side or every row past nine reads `sample_10.wa`. It did, in
        the first screenshot. */
-    --tom-name: 108px;
+    /**
+     * 🔴 A NUMBER, NOT A NAME, SO THE COLUMN IS 28 px RATHER THAN 108. Asked
+     * 2026-09-21: *"rm divider vert line next to pads, just numbers 0..64 on
+     * left"*. It was 108 px because `sample_10.wav` is thirteen characters of
+     * 10 px mono, and every row in a pack differs only in the digits: 64 rows
+     * of the same eight characters, in a column sized to hold a word none of
+     * them differ in.
+     */
+    --tom-name: 22px;
   }
+  /* 🔴 NO DIVIDER. `panel-layout.mjs` gives a left fixed column a `border-right`
+     and a gutter, which is right when the two halves are different KINDS of
+     thing. Here they are one grid with its row labels: a rule down the middle
+     is `positron-ui`'s separation rule broken in the smallest way, a line
+     saying what the gap already says. (0,1,0) against the component's own
+     (0,1,0), and this block is after `shell.css`, so it wins on order. */
+  .tom-fixed { border-right: 0; padding-right: 0; }
   /* The column of names. `panel-fixed` already stacks; it has no gap of its own
      because the panel's flow is what normally carries one, and this page does
      not use the flow. */
@@ -49,9 +67,13 @@
      Centring by line height leaves the text in an inline box, where the
      property applies. */
   .tom-name {
-    height: var(--tom-cell); flex: 0 0 auto; padding: 0 4px;
-    font: 500 10px/var(--tom-cell) var(--mono); color: var(--dim);
-    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    height: var(--tom-cell); flex: 0 0 auto; padding: 0 6px 0 0;
+    font: 500 10px/var(--tom-cell) var(--mono); color: var(--dim2);
+    /* ⚠️ RIGHT ALIGNED AND `tabular-nums`, so 0 to 63 make one straight edge
+       against the pads rather than a ragged one. It is the same reason the
+       readout reserves its widest value. */
+    text-align: right; font-variant-numeric: tabular-nums;
+    overflow: hidden; white-space: nowrap;
   }
   /* A row whose sample can be heard is a button; a row with nothing behind it
      is a div. 🔴 NOT A DISABLED BUTTON: at rest every row is empty, and eight
@@ -82,8 +104,9 @@
     cursor: pointer;
   }
   .tom-tick {
-    width: var(--tom-cell); flex: 0 0 auto;
+    width: var(--tom-cell); flex: 0 0 auto; height: var(--tom-ruler);
     font: 500 9px/var(--tom-ruler) var(--mono); color: var(--dim2);
+    text-align: center;
     text-align: left; letter-spacing: 0;
   }
   .tom-tick[data-bar] { color: var(--dim); }
@@ -92,9 +115,16 @@
   .tom-row { display: flex; gap: var(--tom-gap); height: var(--tom-cell); }
   /* 🔴 THE CELL OVERRIDES SIX THINGS THE GLOBAL `button` RULE SETS, and every
      one of them is a number that belongs to a pill rather than to a grid. */
+  /* 🔴 THE PADS FILL THE WIDTH AND ARE SQUARE, ASKED FOR AS *"make tom pads fit
+     the space"* and *"the rest of w are sqare pads"*. `--tom-cell` is measured
+     from the strip in JavaScript rather than typed, because the name column and
+     the steps live in separate flex children of `panel-layout.mjs` and nothing
+     in the browser makes them agree: they agree because both sides are one
+     token tall. Making the pads flex in CSS alone would have let the two halves
+     drift the moment the window moved. */
   .tom-cell {
     width: var(--tom-cell); height: var(--tom-cell); min-height: 0; flex: 0 0 auto;
-    padding: 0; border-radius: 2px;
+    padding: 0; border-radius: 3px;
     background: #171d29; border: 1px solid #1c2433;
   }
   /* Every fourth step is a beat and every sixteenth is a bar, so sixty four
@@ -103,24 +133,84 @@
      for the opposite reason. */
   .tom-cell[data-beat] { background: #1c2331; }
   .tom-cell[data-bar] { background: #222b3c; }
-  .tom-cell:hover { border-color: var(--dim2); }
+  /* ⚠️ HOVER BRIGHTENS THE PAD AND LEAVES ITS EDGE ALONE, asked for as *"no
+     border hover effect on pad, just make pad brigher on hover"*. A border that
+     changes on hover is the bordered cursor arriving a third time, one property
+     at a time: this grid has now had an edge asked off it for the playhead, for
+     the focus ring and for this. The pad is the thing; its outline is not. */
+  .tom-cell:hover { background: #222c3d; }
+  .tom-cell[data-on]:hover { background: #f0d089; }
+  /* 🔴 THE FOCUS RING SAT OUTSIDE THE PAD AND OVERLAPPED ITS NEIGHBOURS.
+     Reported 2026-09-21 with a crop: *"outline looks bad"*, showing a 2 px
+     yellow ring standing off a 16 px pad, wider than the 2 px gutter, so it
+     drew over the two cells either side and read as a rendering fault.
+     ✅ `outline-offset: -1px` PUTS IT INSIDE THE PAD, where it cannot reach a
+     neighbour at any gap, and one pixel is enough on a shape this small. The
+     ring is still the accent colour, because focus is the one thing on this
+     grid that is about the person rather than about the music. */
+  .tom-cell:focus-visible {
+    outline: 2px solid var(--hi); outline-offset: -1px; border-radius: 3px;
+  }
   /* 🔴 BRIGHTNESS SAYS WHETHER THIS CELL CAN MAKE A SOUND, WHICH IS THE ONE
      THING A READER CANNOT SEE ANY OTHER WAY. A cell on a row with no sample is
      switched on and silent, and colouring it like a cell that will sound would
      be the page asserting something nothing measured. Three greys and no hue,
      which is `grain-scope.mjs`'s settled answer reused: material is grey here,
      and the one thing that moves keeps the bright ink. */
-  .tom-cell[data-on] { background: var(--fg2); border-color: var(--fg2); }
+  /* 🔴 CIRCUIT COLOURS, ASKED FOR AS *"use circuilt colors"* WITH A PHOTOGRAPH
+     OF THE INSTRUMENT. A lit step on that machine is warm amber; the pad under
+     the playhead is a cold near-white. So a lit cell is amber here and the
+     column being played is white, which is the same two-colour language the
+     hardware uses and the reason a reader can tell them apart at a glance.
+     🔴 AND THE ROWS ARE NOT COLOURED BY DRUM TRACK, WHICH IS THE OBVIOUS THING
+     TO DO AND WOULD BE A LIE. The photograph shows four drum tracks in two
+     colours, orange and green, and it is tempting to paint rows 0 to 15 orange
+     and so on. **Which of the Circuit's drum pads plays slot 37 is not known**:
+     it is a property of a SESSION, it is in no WAV header, and
+     `research/circuit-session-notes-2026-09-21.md` says so in as many words.
+     Painting that mapping would be this project's label-as-content mistake for
+     the fifth time in three days, in colour.
+     ✅ SO COLOUR SAYS STATE, WHICH IS MEASURED: lit, silent, or playing. */
+  /* ⚠️ LESS ORANGE, REPORTED AS *"still wrong hues on pads (orangey)"*. It was
+     `#f0a030`, which is a red-leaning orange and the loudest hue on a page
+     whose every other surface is a blue grey. The Circuit's lit pads photograph
+     warm, but a photograph of a backlit silicone pad in a room is not a screen
+     colour, and copying the camera's cast is how a page ends up with one
+     element nothing else on it agrees with.
+     ✅ ONE TOKEN, so moving it is one line rather than a hunt. */
+  .tom-cell[data-on] { background: var(--tom-on); border-color: var(--tom-on); }
+  /* A cell that is on but has no sample behind it stays grey, because
+     brightness here says WHETHER THIS CAN MAKE A SOUND and nothing else can
+     tell a reader that. */
   .tom-cell[data-on][data-mute] { background: var(--dim2); border-color: var(--dim2); }
   /* 🔴 THE BAND MOVES WITH A TRANSFORM AND CHANGES NOTHING ABOUT LAYOUT. It is
      the only thing on this page that moves on its own, and `positron-ui`'s rule
      is that nothing redrawing may change how much room it takes. A transform on
      an absolutely positioned element takes no room at all. */
-  .tom-head {
-    position: absolute; top: 0; bottom: 0; left: 0; width: var(--tom-cell);
-    pointer-events: none; border-radius: 2px;
-    background: rgba(255, 212, 0, .08);
-    box-shadow: inset 1px 0 0 var(--hi), inset -1px 0 0 var(--hi);
+  /* 🔴 THE PLAYING COLUMN IS THE PADS THEMSELVES, WHITE, AND THEY BREATHE.
+     Asked for as *"just hilite current col whit whitey (some anim)"*, then
+     reported again as *"still no playing col hilite.."*, and finally, against a
+     bordered column standing over the grid, *"just hilite the pads, no extra
+     bordered cursor"*. The instrument in the photograph lights its pads; a band
+     drawn on top was a second object with its own edge and its own alignment to
+     get wrong.
+     ⚠️ TWO TOKENS SO THE GENERATED `nth-child` RULES HAVE SOMETHING TO NAME.
+     A colour written into sixteen generated rules would be sixteen places one
+     decision lives. */
+  .tom {
+    /* ⚠️ OPAQUE RATHER THAN TRANSLUCENT. At .78 over a dark card the fill came
+       out closer to the field than to white, so the only thing a reader could
+       see was the edge, which is why the edge was asked for twice and then
+       removed. The light is the fill now and there is nothing else. */
+    --tom-now: #dfe6ef;
+    --tom-on: #e3c168;
+  }
+  @keyframes tom-breathe {
+    0%, 100% { opacity: .78; }
+    50%      { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tom-rows .tom-cell { animation: none !important; }
   }
   /* ⚠️ IT MOVES ON A PRESS AND NEVER ON A CLOCK, which is what makes a line of
      prose allowed here at all. It says which sample was last heard and why, and
@@ -136,7 +226,8 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createDrop } from '/shell/drop.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
-  import { createPanelLayout } from '/shell/panel-layout.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { readZip } from '/shell/unzip.mjs';
   import { samplesIn, toMono, summariseAll } from '/shell/circuit-sample.mjs';
@@ -199,7 +290,16 @@
    * true statements about the grid rather than decoration that happens to land.
    */
   const STEPS = 16;
-  const REST_ROWS = 8;
+  /**
+   * 🔴 SIXTY FOUR ROWS AT REST SINCE 2026-09-21, ASKED FOR AS *"make 64 rows"*.
+   * That is the Circuit's own sample slot count, so an empty grid is now the
+   * shape of the instrument rather than a placeholder eight, and opening a pack
+   * fills rows that were already there instead of growing the page by 56.
+   * ⚠️ IT IS A TALL PAGE AND THAT IS THE TRADE. 64 rows is about 1,300 px, so
+   * the transport scrolls off the top. A nested vertical scroller would push
+   * the horizontal one below the fold and is the worse of the two.
+   */
+  const REST_ROWS = 64;
   /**
    * How long a step is, in milliseconds. 125 ms is a sixteenth note at 120
    * beats a minute, so the whole grid is eight seconds and four bars of four.
@@ -302,7 +402,18 @@
    *  silent. A count on the far side of the boundary from `voices`. */
   let actuated = 0;
   const stepAdapter = {
-    caps: { rates: [0.5, 1, 2], continuous: false, assertOnSeek: true },
+    /**
+     * 🔴 NO RATE LATTICE, ASKED FOR 2026-09-21: *"rm rate, replace with - bpm
+     * +"*. `caps.rates` is what the bar renders its 0.5x / 1x / 2x from, so
+     * declaring none is how a page says it has no lattice; the bar then shows
+     * nothing rather than a row of one.
+     * ✅ AND THE QUANTITY DID NOT CHANGE, ONLY ITS UNITS. The page's own comment
+     * used to argue that a second tempo control would be two numbers that can
+     * disagree, and it was right: so the `- bpm +` below sets the SAME thing the
+     * lattice set, the deck's rate, printed in the units a drum machine uses.
+     * 120 bpm is rate 1 by construction, because a step is 125 ms.
+     */
+    caps: { continuous: false, assertOnSeek: true },
     actuate(p) {
       actuated++;
       fireStep(p.step);
@@ -323,10 +434,38 @@
     items: [],
     adapters: { step: stepAdapter },
     range: [0, SPAN],
-    onPosition: (pos) => showAt(pos),
+    onPosition: (pos) => { showAt(pos); wrapAt(pos); },
   });
   for (let i = 0; i < STEPS; i++) {
     deck.schedule({ at: i * STEP_MS, kind: 'step', id: `s${i}`, payload: { step: i, at: i * STEP_MS } });
+  }
+
+  /**
+   * 🔴 IT LOOPS BY ITSELF, ASKED FOR AS *"make it autoloop"* after *"rm loop for
+   * now"*, and the two are the same instruction seen from both ends: a sixteen
+   * step pattern repeating is what the instrument DOES, not a mode you put it
+   * in. So there is no LOOP button and there is no way to switch this off.
+   *
+   * 🔴 AND IT ONLY BECAME AUDIBLE THIS EVENING. `createAudioLane` set a
+   * committed node's status to `rendered` on its `onended`, and nothing reset
+   * it, so every step that had actually SOUNDED was silent on lap two.
+   * MEASURED on the audio thread with the ear `/lanes/` uses: 4 heard on lap
+   * one, **0 on lap two**. It is one condition in `timeline/transport.mjs` now
+   * and lap two is 4 again. Without that fix this function would have produced
+   * a playhead going round and round in silence, which is the worst possible
+   * shape: a page that looks like it is working.
+   *
+   * ⚠️ A BACKWARD `seek`, WHICH IS THE SAME THING THE TRANSPORT BAR'S OWN LOOP
+   * DOES. One path, so a wrap here and a wrap there cannot behave differently.
+   * ⚠️ AND IT WRAPS ON THE LAST STEP RATHER THAN AT THE END OF TIME. The score
+   * runs to `SPAN`, and a step is `STEP_MS` long, so the sixteenth step's own
+   * length is part of the bar: seeking at `SPAN` would hold the last step for
+   * one extra frame every lap and the pattern would drift against a metronome.
+   */
+  function wrapAt(pos) {
+    if (!deck.playing?.()) return;
+    if (pos < SPAN - 1) return;
+    deck.seek(0);
   }
 
   // ── the way in ──────────────────────────────────────────────────────────
@@ -369,7 +508,77 @@
   // ⚠️ AND THE BAR KEEPS WHAT ONLY IT HAS: play, the clock, the rate lattice,
   // LOOP and the degraded badge. One press of LOOP at the start arms the window
   // and it closes at the end of the grid, which is how four bars repeat.
-  const bar = createTransportBar(d.el, deck, { scrub: false });
+  /**
+   * 🔴 `- bpm +`, WHICH IS THE RATE IN THE UNITS THIS INSTRUMENT USES. Asked
+   * 2026-09-21: *"rm rate, replace with - bpm +"*.
+   * ✅ IT SETS THE DECK'S RATE AND NOTHING ELSE, which is why the page's old
+   * argument against a second tempo control still holds: there is still ONE
+   * quantity. A step is 125 ms, so 120 bpm is rate 1 exactly, and the score is
+   * never rescheduled.
+   * ⚠️ AND IT IS `createStepper`, NOT THREE BUTTONS. The kit owns that shape,
+   * including the middle slot and the square arrows, and hand rolling a control
+   * that exists is this project's most repeated defect.
+   * ⚠️ THE RANGE IS THE LATTICE IT REPLACES, WIDENED: 60 to 240 bpm is rate 0.5
+   * to 2, the three values the lattice offered, and every step between them.
+   */
+  const BPM_AT_1 = 60000 / (STEP_MS * 4);      // 120, and derived rather than typed
+  const BPM_MIN = 60, BPM_MAX = 240, BPM_STEP = 5;
+  let bpm = BPM_AT_1;
+  const BPMS = [];
+  for (let v = BPM_MIN; v <= BPM_MAX; v += BPM_STEP) BPMS.push(v);
+  /**
+   * ⚠️ THE MIDDLE IS A `pick` RATHER THAN A PLAIN READOUT, which is the shape
+   * the component already has: the current value named, with the whole list
+   * behind it. So `-` and `+` walk in fives and the cell jumps straight to a
+   * tempo, and the cell's width comes from the widest member so the arrows do
+   * not move as the number changes. A readout slot would have been a fourth
+   * thing for that component to grow.
+   */
+  const tempo = createStepper({
+    what: 'tempo',
+    prev: () => setBpm(bpm - BPM_STEP),
+    next: () => setBpm(bpm + BPM_STEP),
+    pick: {
+      options: BPMS.map((v) => `${v} bpm`),
+      at: BPMS.indexOf(BPM_AT_1),
+      onPick: (i) => setBpm(BPMS[i]),
+    },
+  });
+  function setBpm(v) {
+    bpm = Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(v)));
+    const i = BPMS.indexOf(bpm);
+    tempo.show(`${bpm} bpm`, i >= 0 ? i : undefined);
+    // ⚠️ `setRate` DOES NOT START PLAYBACK, which is the seam that module's own
+    // header records: it used to double as `play()` and no longer does. So
+    // changing the tempo while stopped leaves it stopped.
+    deck.setRate(bpm / BPM_AT_1);
+  }
+  setBpm(BPM_AT_1);
+
+  /**
+   * 🔴 NO LOOP, ASKED FOR AS *"rm loop for now"*. It was the bar's own LOOP
+   * arming a window over the whole grid, which is a transport's idea of a loop
+   * rather than a drum machine's: a sixteen step pattern repeating is what the
+   * instrument DOES, not a mode you put it in, and the two readings were
+   * competing on one button.
+   * ⚠️ `for now` IS THE OWNER'S WORD AND IS KEPT. Nothing about the deck
+   * changes, so turning it back on is `loop: true`.
+   */
+  /**
+   * ⚠️ THE TEMPO GOES IN THE BAR'S RIGHT SLOT, WHERE THE RATE LATTICE SAT.
+   * Asked 2026-09-21: *"bpm in on the transport, right slot"*. `right` is an
+   * option `transport-bar.mjs` grew for it rather than this page querying
+   * `.tbar-rates`, which would be a page reaching into a component's insides
+   * and breaking silently the day it renames a class.
+   * ⚠️ AND IT IS NOT IN `.pos-controls`, which this page declares empty on
+   * purpose. Both harnesses press that row and nothing else, so a control
+   * outside it is a control nothing presses: the checks below drive it by name,
+   * which is the cost this session has now paid twice over.
+   */
+  const bar = createTransportBar(d.el, deck,
+    { scrub: false, loop: false, right: [tempo.el] });
+  setBpm(BPM_AT_1);
+
   // ⚠️ THE PAGE NEVER RE-PUBLISHES `__demo.transport`. `createTransportBar`
   // returns a WRAPPER and `publish: true` has already written its internal
   // `api`; assigning the return value over the top hands the harness an object
@@ -408,8 +617,21 @@
     'aria-valuemin': '1', 'aria-valuemax': String(STEPS), 'aria-valuenow': '1',
   });
   const rowsEl = el('div', 'tom-rows');
-  const headEl = el('div', 'tom-head');
-  gridEl.append(rulerEl, rowsEl, headEl);
+
+  gridEl.append(rulerEl, rowsEl);
+  {
+    // The sixteen column rules, generated from the one constant that knows.
+    const sheet = document.createElement('style');
+    sheet.textContent = Array.from({ length: STEPS }, (_, i) =>
+      `.tom-rows[data-now="${i}"] .tom-cell:nth-child(${i + 1}){`
+      // ⚠️ THE FILL AND NOTHING ELSE, asked for as *"lose hilite borders"*
+      // against a crop showing a bright edge round a dark pad. A lit pad on the
+      // instrument is a lit pad: the light IS the fill, and an edge drawn round
+      // it is the bordered cursor coming back one property at a time.
+      + 'background:var(--tom-now);'
+      + 'animation:tom-breathe 1.4s ease-in-out infinite}').join('\n');
+    document.head.append(sheet);
+  }
   panel.strip.append(gridEl);
   /**
    * ⚠️ EMPTY AT REST AND RESERVED, NOT AN INSTRUCTION. A gutter carries what it
@@ -443,7 +665,19 @@
       // Every fourth step carries its own number, which is sixteen numbers
       // across four bars. Every cell carries a tick so the ruler and the rows
       // share one geometry and the head can read it off either.
-      const t = el('div', 'tom-tick', s % 4 === 0 ? String(s + 1) : '');
+      /**
+       * 🔴 NO NUMBERS OVER THE PADS, ASKED FOR AS *"no 1 5 labels above the top
+       * pad row"*. It printed 1, 5, 9 and 13 every fourth step, which is a
+       * second way of saying what the cells already say: every fourth pad is a
+       * beat and every sixteenth a bar, in the FIELD, which is the channel
+       * `pattern.mjs` settled on for the same reason. Two channels carrying one
+       * fact, and the one removed was the one made of words.
+       * ⚠️ THE TICK ELEMENT STAYS AND ONLY ITS TEXT GOES, which is deliberate:
+       * it is the ruler a press seeks on, and `geometry()` reads the first two
+       * ticks' `offsetLeft` so the band and the cells cannot disagree. Deleting
+       * the row would have taken both with it to remove some digits.
+       */
+      const t = el('div', 'tom-tick', '');
       if (s % 4 === 0) t.dataset.beat = '1';
       if (s % 16 === 0) t.dataset.bar = '1';
       t.dataset.step = String(s);
@@ -453,10 +687,25 @@
 
     for (let r = 0; r < rows.length; r++) {
       const sound = hasSound(r);
-      const nm = el(sound ? 'button' : 'div', 'tom-name', rows[r].name);
+      /**
+       * 🔴 A ROW IS ITS SLOT NUMBER, ASKED FOR AS *"relpace sammple names with
+       * 0 1 2 etc numbers in tom"*. Every name in a pack is `sample_N.wav`, so
+       * a column of them was 64 rows of the same eight characters with the only
+       * varying part at the end, and the column had to be 108 px wide to hold
+       * a word none of them differ in.
+       * ✅ AND THE NUMBER IS THE SLOT RATHER THAN A ROW INDEX, which is the same
+       * thing here and would stop being so the day a pack arrives with a gap in
+       * it. `samplesIn()` returns them in the pack's own numeric order and its
+       * test asserts exactly that, with a negative control that hands the
+       * entries in backwards.
+       * ⚠️ THE FULL NAME IS STILL ON THE HOVER, so nothing was lost: it is one
+       * of the three facts that title already carries.
+       */
+      const nm = el(sound ? 'button' : 'div', 'tom-name', String(r));
       if (sound) {
         nm.type = 'button';
-        nm.title = `${rows[r].row.seconds.toFixed(2)} s, peak ${rows[r].row.peak.toFixed(2)}. Press to hear it`;
+        nm.title = `${rows[r].name}, ${rows[r].row.seconds.toFixed(2)} s, `
+          + `peak ${rows[r].row.peak.toFixed(2)}. Press to hear it`;
         nm.dataset.row = String(r);
       } else {
         nm.title = rows[r].row && !rows[r].row.ok
@@ -493,9 +742,65 @@
     built = performance.now() - t0;
     geom = null;
     nowStep = -1;
+    // ⚠️ SIZED AFTER THE ROWS EXIST, because the strip's width is what it is
+    // once its content is in it, and a measurement taken before that is a
+    // measurement of an empty box.
+    sizeCells();
     showAt(deck.position());
     d.set('on', onCount());
   }
+
+  /**
+   * 🔴 THE PAD SIZE IS MEASURED FROM THE STRIP AND WRITTEN TO ONE TOKEN, which
+   * is what makes the pads square AND keeps the two halves of the grid in step.
+   * Asked 2026-09-21: *"make tom pads fit the space"* and *"the rest of w are
+   * sqare pads"*.
+   * ⚠️ IT CANNOT BE DONE IN CSS ALONE HERE, AND THAT IS THE WHOLE REASON THIS
+   * FUNCTION EXISTS. `panel-layout.mjs` puts the names and the steps in separate
+   * flex children, so nothing in the browser relates a pad's height to a name
+   * row's height: they agree because both are `--tom-cell`. A pad that flexed
+   * in CSS would size itself and leave the names behind, and the misalignment
+   * would grow with the window. One token, measured once, read by both.
+   * ⚠️ AND IT IS A CUSTOM PROPERTY, NEVER A WRITTEN `width`. A component that
+   * varies a property per instance sets a custom property or no stylesheet can
+   * take it back, which is the `video-panel.mjs` lesson this project already
+   * paid for once.
+   * ⚠️ THE FLOOR IS 10 px. At 390 px the strip has about 360 to give, which is
+   * 20 px a pad over sixteen steps; the floor is there so a narrower box makes
+   * the strip scroll rather than making the pads vanish.
+   */
+  const CELL_MIN = 10;
+  function sizeCells() {
+    const box = panel.strip?.clientWidth || 0;
+    if (!box) return;
+    const gap = 2;                     // `--tom-gap`, and the only place it is read
+    const w = Math.max(CELL_MIN, Math.floor((box - (STEPS - 1) * gap) / STEPS));
+    panel.el.style.setProperty('--tom-cell', `${w}px`);
+    geom = null;
+    nowStep = -1;
+    showAt(deck.position());
+  }
+  // ⚠️ A `ResizeObserver` RATHER THAN A `resize` LISTENER. The strip changes
+  // width when the window does AND when the log grows, and only one of those
+  // fires `resize`.
+  /**
+   * 🔴 THE CASE IS PRINTED, ASKED FOR AS *"add titles to tom area: left:
+   * positron right: tom"*. `place: 'ends'` is exactly that: the maker at one
+   * end of the plate and the model at the other, which is how every other
+   * instrument on this desk wears its name and is why the component has that
+   * placement at all.
+   * ⚠️ AND IT IS A REAL NAMEPLATE RATHER THAN TWO SPANS. `panel-layout.mjs`
+   * owns it because three replicas once set their names three ways, and it
+   * REFUSES a plate with no lines on it, which is the empty-box rule one
+   * component along.
+   * ⚠️ TYPED UPPERCASE THOUGH THE RULE UPPERCASES IT ANYWAY, so the source
+   * reads like the page. Same rule `/kit/` states about its own headings.
+   */
+  const plate = createNameplate({ lines: ['POSITRON', 'TOM'], place: 'ends' });
+  panel.el.prepend(plate.el);
+
+  const ro = new ResizeObserver(() => sizeCells());
+  ro.observe(panel.strip);
 
   /** Where the steps actually are, read off the laid out ruler rather than
    *  computed from the token, so the band and the cells cannot disagree. */
@@ -517,17 +822,31 @@
    * transform and two attributes, none of which can change how much room
    * anything takes.
    */
+  /**
+   * 🔴 THE PADS THEMSELVES LIGHT UP, AND THERE IS NO CURSOR. Reported
+   * 2026-09-21 with a crop of a bordered column standing over the grid: *"just
+   * hilite the pads, no extra bordered cursor"*. That is what the instrument in
+   * the photograph does, and it is what a band over the top could never be: the
+   * band was a second object drawn on top of the pads, with its own edge, its
+   * own corners and its own alignment to get wrong.
+   *
+   * ✅ AND IT IS ONE DOM WRITE PER STEP RATHER THAN SIXTY FOUR. Setting
+   * `data-now` on each cell of a column would be 64 removals and 64 additions
+   * eight times a second; one attribute on the CONTAINER, with sixteen
+   * generated `nth-child` rules behind it, is one write. `positron-ui`'s rule
+   * is that a live picture may not change how much room it takes, and a
+   * background colour cannot.
+   * ⚠️ THE RULES ARE GENERATED ONCE FROM `STEPS`, not typed sixteen times. A
+   * hand-written list would be a second place the step count lives.
+   */
   function showAt(pos) {
     const s = stepAt(pos);
     if (s === nowStep) return;
-    const g = geometry();
-    if (!g) return;
     if (tickEls[nowStep]) delete tickEls[nowStep].dataset.now;
     nowStep = s;
     if (tickEls[s]) tickEls[s].dataset.now = '1';
     rulerEl.setAttribute('aria-valuenow', String(s + 1));
-    headEl.style.width = `${g.w}px`;
-    headEl.style.transform = `translateX(${g.x0 + s * g.pitch}px)`;
+    rowsEl.dataset.now = String(s);
     d.set('step', s + 1);
   }
 
@@ -877,7 +1196,48 @@
   {
     const cs = getComputedStyle(panel.strip);
     const over = panel.strip.scrollWidth - panel.strip.clientWidth;
-    d.assert('the strip is what scrolls when the steps do not fit, and the page never drags sideways',
+    /**
+   * 🔴 THE PATTERN WRAPS AND SOUNDS AGAIN, WHICH IS THE ONE THING THIS PAGE
+   * COULD NOT DO UNTIL `timeline/transport.mjs` WAS FIXED THIS EVENING. A
+   * committed node's `onended` set its status to `rendered`, nothing reset it,
+   * and every step that had SOUNDED was silent on lap two. MEASURED on the
+   * audio thread: 4 heard on lap one, 0 on lap two.
+   * ⚠️ SO THIS ASSERT GRADES THAT FIX FROM THE PAGE SIDE, and it counts what
+   * the lane ACTUATED rather than what the deck queued. A count on the wrong
+   * side of that boundary is this project's standing lesson: `createMidiLane`'s
+   * `scheduled()` read identically to delivery while every note was being
+   * scheduled fifty six years out.
+   * ⚠️ IT SEEKS RATHER THAN WAITING TWO SECONDS OF WALL TIME. A check that sat
+   * through two real laps would be eight seconds of a harness run, and the wrap
+   * it is grading is a backward seek either way.
+   */
+  if (SELFCHECK) {
+    const onFirst = (() => {
+      // One step lit on a row that can sound, so there is something to count.
+      const r = rows.findIndex((_, i) => hasSound(i));
+      if (r < 0) return null;
+      toggle(r, 0);
+      return r;
+    })();
+    if (onFirst !== null) {
+      deck.seek(0);
+      const before = actuated;
+      fireStep(0);
+      const lap1 = actuated - before;
+      // The wrap, down the same path `wrapAt` takes.
+      deck.seek(0);
+      const mid = actuated;
+      fireStep(0);
+      const lap2 = actuated - mid;
+      d.assert('a step that has already sounded sounds again on the next lap',
+        lap1 > 0 && lap2 === lap1,
+        `${lap1} actuation(s) on the first pass and ${lap2} on the second, `
+        + `after a backward seek`);
+      toggle(onFirst, 0);
+    }
+  }
+
+  d.assert('the strip is what scrolls when the steps do not fit, and the page never drags sideways',
       /auto|scroll/.test(cs.overflowX) && parseFloat(cs.minWidth) === 0
       && document.documentElement.scrollWidth <= window.innerWidth + 1,
       `overflow-x ${cs.overflowX} at min-width ${cs.minWidth}, `
@@ -1059,16 +1419,29 @@
        * doing exactly what it promises.
        */
       {
-        deck.seek(32 * STEP_MS);
+        /**
+         * ⚠️ THIS MEASURED A BAND'S `translateX` UNTIL 2026-09-21 AND THERE IS
+         * NO BAND. The cursor was replaced by lighting the pads themselves, so
+         * the quantity to read is which COLUMN is lit, and the only honest way
+         * to read that is off the computed style of a real cell: the rules are
+         * generated `nth-child` selectors, so an attribute on the container is
+         * the page's intent and the cell's background is the result.
+         * 🔴 AND IT READS TWO CELLS, NOT ONE. A check that the right cell is lit
+         * passes on a grid where EVERY cell is lit, which is the loudest way to
+         * be wrong and the hardest to tell from working.
+         */
+        deck.seek(7 * STEP_MS);
         await raf2();
-        const g = geometry();
         const want = stepAt(deck.position());
-        const x = Number((headEl.style.transform.match(/-?[\d.]+/) || [NaN])[0]);
-        d.assert('the band sits on the step the position is in, measured off the ruler rather than a constant',
-          Math.abs(x - (g.x0 + want * g.pitch)) < 0.5
+        const row0 = cells[0] || [];
+        const lit = getComputedStyle(row0[want]).backgroundColor;
+        const dark = getComputedStyle(row0[(want + 1) % STEPS]).backgroundColor;
+        d.assert('the pads of the playing column light up, and the ones beside them do not',
+          rowsEl.dataset.now === String(want)
+          && lit !== dark
           && tickEls[want].dataset.now === '1'
           && window.__demo.readout.step === want + 1,
-          `band at ${x} px for step ${want + 1} of ${STEPS}, pitch ${g.pitch} px, `
+          `step ${want + 1} of ${STEPS}: its pads are ${lit} against ${dark} next door, `
           + `readout says ${window.__demo.readout.step}`);
       }
 
