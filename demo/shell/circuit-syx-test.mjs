@@ -34,7 +34,11 @@ const files = ['on_the_run.circuitpack', 'factory_16.syx'];
 // `on_the_run.circuitpack` writes flash on all 64 synth slots and deciding where
 // that file lives is not a test's decision to make.
 const CANDIDATES = [
-  path.join(HERE, '../../purchased'),
+  // ⚠️ `tmp/purchages` SINCE 2026-09-21, asked for by name. `tmp/` is ignored
+  // as a whole, so the durability argument this file makes is unchanged: a
+  // directory git never sees cannot be swept by a clean.
+  path.join(HERE, '../../tmp/purchages'),
+  path.join(HERE, '../../tmp/packs'),
   '/private/tmp/claude-501/-Users-s32863-personal-positron/7ece5d66-afd6-4d4c-9d1b-db3bd7f3b538/scratchpad/pull',
 ];
 const PULL = CANDIDATES.find((d) => fs.existsSync(d) && files.some((f) => fs.existsSync(path.join(d, f))))

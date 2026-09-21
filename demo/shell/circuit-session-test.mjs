@@ -28,8 +28,8 @@ import * as S from './circuit-session.mjs';
 import * as C from './circuit-patch.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const PACK = path.join(HERE, '../../New Pack.circuitpack');
-const BOUGHT = path.join(HERE, '../../purchased/Synth-Patches.com - Soundbank for Novation Circuit and Tracks.zip');
+const PACK = path.join(HERE, '../../tmp/personal/New Pack.circuitpack');
+const BOUGHT = path.join(HERE, '../../tmp/purchages/Synth-Patches.com - Soundbank for Novation Circuit and Tracks.zip');
 
 let pass = 0, fail = 0, skip = 0;
 const ok = (name, cond, detail = '') => {
@@ -663,7 +663,13 @@ if (fs.existsSync(PACK)) {
   // 🔴 THE NEGATIVE CONTROL THAT MATTERS MOST: a blank with one hand written
   // record in it must read back exactly what was written, or the decoder is
   // finding structure that is not there.
-  const planted = blanks[0].slice();
+  // ⚠️ GUARDED, BECAUSE EVERY OTHER USE OF `blanks` IN THIS FILE ALREADY WAS.
+  // The soundbank is optional and this file says so in three places and then
+  // indexed `blanks[0]` unconditionally here: moving that directory turned a
+  // clean skip into `Cannot read properties of undefined`, which reads as a
+  // broken decoder rather than as an absent file.
+  if (!blanks.length) note('the purchased soundbank is not here, so the planted record is unmeasured');
+  const planted = blanks.length ? blanks[0].slice() : new Uint8Array(S.SESSION_BYTES);
   const at = S.HEADER_LEN;
   planted[at] = 0b11;
   planted[at + 4] = 60; planted[at + 5] = 3; planted[at + 7] = 100;

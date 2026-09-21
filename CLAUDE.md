@@ -87,10 +87,20 @@ that, because attribution is not a thing to alter without being asked.
 
 ## `New Pack.circuitpack` IS SOMEBODY'S ONLY COPY. DO NOT DELETE IT
 
-🔴 **A 3.3 MiB FILE IN THE REPOSITORY ROOT THAT IS NOT BUILD OUTPUT AND IS NOT
-A MISTAKE.** A complete backup of the Novation Circuit on this desk, taken
-2026-09-20 through Novation Components, and asked to live here: *"put
-.circuitpack to project root"*.
+🔴 **IT LIVES AT `tmp/personal/New Pack.circuitpack` SINCE 2026-09-21 AND `tmp/`
+IS GITIGNORED, SO GIT IS NO LONGER ITS BACKUP.** It was in the repository root,
+tracked, from *"put .circuitpack to project root"*, and it was moved on
+instruction: *"move to ~/personal/positron/tmp/personal"*.
+🔴 **WHICH MEANS THE ONLY COPY IS NOW ONE DIRECTORY ON ONE DISK.** While it was
+tracked, every clone carried it. That is over: a fresh clone of this repository
+has no pack in it, and a `git clean` cannot touch `tmp/` but nothing else is
+holding a second copy either.
+✅ **THE OLD BLOB IS STILL IN HISTORY AND IS RECOVERABLE**, verified at the
+move: commit `419ec5c`, **3,506,555 bytes**, the same size as the file on disk.
+`git show 419ec5c:'New Pack.circuitpack' > recovered.circuitpack` brings it
+back. ⚠️ That is a 2026-09-20 export, so it is only as fresh as that day.
+🔴 **A COMPLETE BACKUP OF THE NOVATION CIRCUIT ON THIS DESK**, taken 2026-09-20
+through Novation Components.
 🔴 **THE CIRCUIT HAS NO FACTORY RESET AND THEREFORE NO UNDO.** Three things
 replace its contents and all three are one press from the safe one: `Send to
 Circuit`, loading the Circuit Factory Pack, and a `Replace Patch` SysEx. If any
