@@ -229,7 +229,9 @@ console.log('\n-- what it refuses, by name, as a value rather than a throw --');
 
 if (!fs.existsSync(PACK)) {
   console.log('\n  New Pack.circuitpack is not here, so the corpus is unmeasured.');
-  console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
+
+
+console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
   process.exit(fail ? 1 : 0);
 }
 
@@ -606,6 +608,58 @@ console.log('\n-- what this module must not be able to do --');
     heard.length === 0, heard.join() || `${audio.length} patterns, none present`);
   ok('the file does say so in its own header, so the next reader is told rather than left to notice',
     src.includes('NOTHING HERE SENDS ANYTHING ANYWHERE') && src.includes('OPENS NO AUDIO DEVICE'));
+}
+
+// ── the samples out of a pack, which is the half two pages share ──────────
+//
+// 🔴 `samplesIn` EXISTS BECAUSE A SECOND PAGE WAS ABOUT TO GROW A COPY OF IT.
+// Instructed 2026-09-21: *"use shared code to get samples"*. What it has to get
+// right beyond parsing is the ORDER, and that is the part a reader could never
+// catch by looking: `sample_10.wav` sorts before `sample_2.wav` as text, and the
+// pack's own `index.json` names `Sample1` to `Sample64` against `sample_0.wav`
+// to `sample_63.wav` in order, 64 of 64. A page showing slot 10 where slot 2
+// lives would be silently wrong on every row after the ninth.
+{
+  const got = await W.samplesIn(list);
+  ok('it finds all 64 samples in a real pack and every one of them parses',
+    got.length === 64 && got.every((x) => x.wave.ok && x.row.ok),
+    `${got.length} found, ${got.filter((x) => x.wave.ok).length} parsed`);
+
+  ok('and they come back in the pack\'s own numeric order, not in the order the names sort',
+    got.every((x, i) => x.name === `sample_${i}.wav`),
+    `${got[0].name}, ${got[1].name}, ${got[2].name} ... ${got[63].name}`);
+
+  // 🔴 THE NEGATIVE CONTROL FOR THAT ORDER, AND WITHOUT IT THE ASSERT ABOVE IS
+  // SATISFIED BY THE ARCHIVE HAPPENING TO BE IN ORDER ALREADY. The entries are
+  // handed over shuffled here, so a function that returned them as it found
+  // them goes red.
+  const shuffled = list.slice().reverse();
+  const back = await W.samplesIn(shuffled);
+  ok('NEGATIVE CONTROL: handed the entries backwards it still returns them in the pack\'s order',
+    back.length === 64 && back.every((x, i) => x.name === `sample_${i}.wav`),
+    `${back[0].name} then ${back[1].name}`);
+
+  // ⚠️ AN ARCHIVE WITH NO WAVS IS NOT AN ERROR, IT IS AN ANSWER, and it is the
+  // real shape of both packs in `purchased/`, whose index promises 128 samples
+  // that are not in either file.
+  ok('an archive with no samples in it comes back empty rather than throwing',
+    (await W.samplesIn(list.filter((e) => !/\.wav$/i.test(e.name)))).length === 0
+    && (await W.samplesIn([])).length === 0
+    && (await W.samplesIn(null)).length === 0,
+    'no wavs, an empty list and nothing at all all come back as no samples');
+
+  // 🔴 A FILE THAT WILL NOT PARSE KEEPS ITS PLACE AND CARRIES ITS REASON, which
+  // is what stops a pack looking smaller than it is.
+  const broken = [{
+    name: 'samples/sample_0.wav', size: 12,
+    read: async () => new Uint8Array([0x52, 0x58, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]),
+  }];
+  const bad = await W.samplesIn(broken);
+  ok('a sample that will not read keeps its row and says why rather than being dropped',
+    bad.length === 1 && bad[0].wave.ok === false && bad[0].row.ok === false
+    && /RIFF/.test(bad[0].row.why)
+    && W.summariseAll(bad.map((x) => x.wave)).refused === 1,
+    `1 row saying "${bad[0].row.why}"`);
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}${skip ? `  ${skip} skipped` : ''}\n`);

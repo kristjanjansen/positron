@@ -29,6 +29,12 @@
      `--line` ground, so a child with no background lets that colour through its
      whole area and the 1 px seam stops being a seam. MEASURED on `/wish/` the
      same day; neither of the kit's existing glued pairs says it out loud. */
+  /* ⚠️ THE PICTURE'S HOST PAINTS A GROUND TOO, AND IT WENT RED WITHOUT ONE.
+     The component styles its own `.pos-wave` and this is the wrapper the page
+     puts it in, so it had no background and the glue's line colour came
+     straight through its whole area. Third part, same trap, measured the same
+     day on `/wish/`. */
+  .pk-wave { background: var(--card); padding: 10px 12px; }
   .pk-player { background: var(--card); padding: 10px 12px;
                display: flex; flex-direction: column; gap: 8px; }
   .pk-prow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -50,6 +56,7 @@
   import { createDrop } from '/shell/drop.mjs';
   import { createStack } from '/shell/stack.mjs';
   import { createGlue } from '/shell/glue.mjs';
+  import { createWaveView } from '/shell/wave-view.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
   import { readSession, summarise as summariseSession, patchPayloads } from '/shell/circuit-session.mjs';
@@ -409,7 +416,24 @@
   const player = el('div', 'pk-player');
   player.append(playRow, playerLine);
 
-  panel('samples').append(samplesLine, createGlue(sampleTable.el, player));
+  /**
+   * 🔴 THE WAVEFORM SITS DIRECTLY ON TOP OF THE TRANSPORT, ASKED FOR
+   * 2026-09-21 as *"add waveform visualiser to pack"* and then *"its glued to
+   * top of transport"*. So the component is three parts: the list, the picture
+   * of the open sample, and the transport under it.
+   * ⚠️ IT DRAWS AND IT DOES NOT PLAY. This page owns the `AudioContext` and
+   * already builds an `AudioBuffer` out of `toMono`, so the view is handed a
+   * position and never a sound. Two audio paths in one page is the shape
+   * `positron-ui` records three pages paying for.
+   * ⚠️ AND IT IS NOT ON SCREEN UNTIL THERE IS SOMETHING TO DRAW. The component
+   * hides itself until `set()`, which is the same rule as the drop footer and
+   * the empty table heading: a container with nothing in it must not paint its
+   * edges.
+   */
+  const waveHost = el('div', 'pk-wave');
+  const wave = createWaveView(waveHost, { height: 96, label: 'the open sample' });
+
+  panel('samples').append(samplesLine, createGlue(sampleTable.el, waveHost, player));
 
   // ── what is open ─────────────────────────────────────────────────────────
   let patches = [], rows = [], sessions = [], samples = [];
@@ -1099,6 +1123,14 @@
         + `${r.rate} Hz, peak ${r.peak.toFixed(2)}`
       : `${w.name} did not read: ${r.why}`;
     playBtn.disabled = !r.ok;
+
+    // ⚠️ THE PICTURE IS DRAWN FROM THE SAME FLOATS THE SOUND IS MADE OF, out of
+    // `toMono`, so what is on screen and what comes out of the speaker cannot
+    // be two readings of one file that disagree.
+    const mono = r.ok ? toMono(w.wave) : { ok: false };
+    if (mono.ok) wave.set(mono.samples, mono.rate, { name: w.name });
+    else wave.clear();
+
     if (andPlay && r.ok) playSample(i);
   }
 
@@ -1136,6 +1168,19 @@
       src.start();
       voice = src;
       played++;
+      /**
+       * 🔴 THE HEAD FOLLOWS THE CONTEXT CLOCK AND NOT A TIMER, and it stops
+       * when the sound does. `AudioContext.currentTime` is the only clock that
+       * agrees with what is being heard; a `setInterval` drifts against it and
+       * a `requestAnimationFrame` loop that never stops is a phone's battery
+       * spent drawing a still picture.
+       */
+      const began = ac.currentTime;
+      wave.follow(() => {
+        if (!voice) return null;
+        const t = ac.currentTime - began;
+        return looping && buf.duration > 0 ? t % buf.duration : t;
+      });
       lastPlayed = { name: w.name, frames: mono.frames, rate: mono.rate, seconds: buf.duration };
       d.log(`${w.name}, ${buf.duration.toFixed(2)} s, ${mono.frames.toLocaleString()} frames at `
           + `${mono.rate} Hz${looping ? ', looping' : ''}`);
@@ -1148,6 +1193,10 @@
     if (!voice) return;
     try { voice.stop(); } catch { /* a voice that already ended cannot be stopped twice */ }
     voice = null;
+    // ⚠️ THE HEAD GOES BACK TO THE TOP RATHER THAN STANDING WHERE THE SOUND
+    // STOPPED. A line left in the middle of a picture with nothing playing
+    // reads as a sound that is paused, and nothing here can resume.
+    wave.rest(0);
   }
 
   playBtn.addEventListener('click', () => { if (picked2 >= 0) playSample(picked2); });
@@ -1190,6 +1239,12 @@
      * block footer, glued"* at once. A footer with a border and no words is an
      * empty box painting a line nobody wrote.
      */
+    d.assert('with nothing open there is no waveform, so no empty box paints an edge',
+      wave.el.hidden === true && wave.el.getBoundingClientRect().height === 0
+      && wave.facts().frames === 0,
+      `the picture is ${wave.el.hidden ? 'away' : 'up'} at `
+      + `${wave.el.getBoundingClientRect().height} px`);
+
     d.assert('the block has no footer until something has been opened',
       drop.note.hidden === true && drop.note.textContent === ''
       && drop.note.getBoundingClientRect().height === 0,
@@ -1505,18 +1560,78 @@
          */
         const was = tabs.at();
         tabs.go('samples');
+        // ⚠️ A SAMPLE IS OPENED FIRST, WITHOUT PLAYING ONE. The picture hides
+        // itself until it has something to draw, so measuring the three parts
+        // before anything is open measures two of them and a box that is not
+        // there. `openSample(i, false)` is the half of the press that opens
+        // rather than the half that sounds, which is the split this page made
+        // for the player and is useful here for the same reason.
+        openSample(0, false);
         const glue = player.parentElement;
         const t = sampleTable.el.getBoundingClientRect();
         const pl = player.getBoundingClientRect();
         const ground = (x) => getComputedStyle(x).backgroundColor;
-        d.assert('the player is below the table and glued to it, with one 1 px seam between them',
-          glue.classList.contains('pos-glue')
-          && pl.top > t.top && Math.abs(pl.top - t.bottom - 1) < 0.6
+        const wv = waveHost.getBoundingClientRect();
+        d.assert('the list, the picture and the transport are one box, in that order, with 1 px seams',
+          glue.classList.contains('pos-glue') && glue.children.length === 3
+          && Math.abs(wv.top - t.bottom - 1) < 0.6
+          && Math.abs(pl.top - wv.bottom - 1) < 0.6
           && ground(player) !== 'rgba(0, 0, 0, 0)'
           && ground(sampleTable.el) !== 'rgba(0, 0, 0, 0)'
+          && ground(waveHost) !== 'rgba(0, 0, 0, 0)'
           && ground(player) !== ground(glue),
-          `the seam is ${(pl.top - t.bottom).toFixed(1)} px with the tab open, the parts paint `
-          + `${ground(sampleTable.el)} and ${ground(player)} against the glue's ${ground(glue)}`);
+          `seams ${(wv.top - t.bottom).toFixed(1)} and ${(pl.top - wv.bottom).toFixed(1)} px `
+          + `with the tab open, the parts paint ${ground(sampleTable.el)}, ${ground(waveHost)} `
+          + `and ${ground(player)} against the glue's ${ground(glue)}`);
+
+        /**
+         * 🔴 THE PICTURE IS ASKED FOR INK RATHER THAN FOR A COLUMN COUNT, which
+         * is the check the component's own header demands: every number in
+         * `facts()` would read the same if the fill colour were the field
+         * colour, if the scale were zero or if `paint()` returned early.
+         * `/radio/` already records that a check a wave was drawn has to ask
+         * the canvas.
+         */
+        /**
+         * ⚠️ AND AN INK SHARE ON ITS OWN IS NOT EVIDENCE, WHICH THE FIRST RUN
+         * SHOWED BY ANSWERING 99.9 PER CENT. `ink()` counts pixels differing
+         * from the one at the top left corner, so a canvas painted edge to edge
+         * in a field colour while the corner stayed transparent would answer
+         * almost 100 and mean nothing. The number that carries weight is the
+         * DIFFERENCE between a picture with a sample in it and the same canvas
+         * with none, which is why this clears it and puts it back.
+         */
+        /**
+         * ⚠️ AN INK SHARE ON ITS OWN IS NOT EVIDENCE, WHICH THE FIRST RUN
+         * SHOWED BY ANSWERING 99.9 PER CENT. `ink()` counts pixels differing
+         * from the one at the top left corner, so a canvas painted edge to edge
+         * while its corner stayed clear would answer almost 100 and mean
+         * nothing.
+         * 🔴 AND CLEARING IT IS NOT THE DIFFERENTIAL EITHER, WHICH THE SECOND
+         * RUN SHOWED: `clear()` hides the wrapper and leaves the BITMAP where it
+         * was, so the same 63,264 pixels were counted before and after. That is
+         * a real gap in the component rather than in this check, and it is
+         * reported rather than worked around here.
+         * ✅ SO THE DIFFERENTIAL IS TWO DIFFERENT SAMPLES. The shortest in the
+         * pack is 5,999 frames and the longest is 95,947, and a picture that
+         * followed nothing would draw them identically.
+         */
+        const f = wave.facts();
+        const drawn = wave.ink();
+        const byLen = samples.map((w, k) => ({ k, n: w.row.frames })).sort((a, b) => a.n - b.n);
+        const other = byLen[0].k === 0 ? byLen[byLen.length - 1].k : byLen[0].k;
+        openSample(other, false);
+        const g = wave.facts();
+        const second = wave.ink();
+        openSample(0, false);
+        d.assert('the picture really follows the open sample, because two different ones draw differently',
+          f.frames === samples[0].row.frames
+          && Math.abs(f.seconds - samples[0].row.seconds) < 0.002
+          && f.cols > 64 && drawn.ink > 0
+          && g.frames === samples[other].row.frames && g.frames !== f.frames
+          && second.ink !== drawn.ink,
+          `${samples[0].name} is ${f.frames.toLocaleString()} frames and ${drawn.ink} lit pixels, `
+          + `${samples[other].name} is ${g.frames.toLocaleString()} and ${second.ink}`);
         tabs.go(was);
       }
 
@@ -1541,8 +1656,9 @@
 
       stopBtn.click();
       d.assert('and stop really lets go of it, so a looping sample can be got out of',
-        voice === null && looping === true,
-        `the voice is ${voice === null ? 'gone' : 'still held'} and the toggle is still on`);
+        voice === null && looping === true && wave.facts().position === 0,
+        `the voice is ${voice === null ? 'gone' : 'still held'}, the toggle is still on, `
+        + `and the head is parked at ${wave.facts().position}`);
       loopBtn.click();
 
       d.assert('pressing a row opens that sample into the player under the table',

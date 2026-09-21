@@ -358,3 +358,59 @@ export function summariseAll(waves) {
     truncated: good.filter((w) => w.truncated).length,
   };
 }
+
+/**
+ * 🔴 THE SAMPLES OUT OF AN OPEN PACK, IN ONE PLACE, BECAUSE TWO PAGES WANT
+ * THEM. Instructed 2026-09-21: *"use shared code to get samples"*, while a
+ * second page that opens a `.circuitpack` was being started. `/pack/` had this
+ * loop inline and the new page would have had a second copy of it, which is
+ * exactly the shape CLAUDE.md names: a control that exists in one page and
+ * nowhere else is a component nobody has noticed yet, and the version that
+ * arrives second is always subtly different.
+ *
+ * ⚠️ IT TAKES THE ENTRY LIST `unzip.mjs` RETURNS, NOT THE PACK'S BYTES. A page
+ * opening a pack wants its patches and its sessions out of the same list, so
+ * reading the zip twice to get two halves of one file would be the waste that
+ * is easy not to notice. The caller unzips once and hands the list round.
+ *
+ * ⚠️ AND THE ORDER IS THE PACK'S OWN, BY NUMBER RATHER THAN BY NAME.
+ * `sample_10.wav` sorts before `sample_2.wav` as text, and the owner's
+ * `index.json` names them `Sample1` to `Sample64` against `sample_0.wav` to
+ * `sample_63.wav` IN ORDER, 64 of 64. A page showing slot 10 where slot 2 lives
+ * would be wrong in a way nobody would spot by looking.
+ *
+ * 🔴 A FILE THAT WILL NOT PARSE KEEPS ITS PLACE AND CARRIES ITS REASON. It is
+ * the rule the patch reader already follows: a reader that silently drops one
+ * leaves a pack looking smaller than it is, which is a wrong answer wearing an
+ * empty one's clothes. `summariseAll` counts them as `refused` for the same
+ * reason.
+ * ⚠️ AND A MANIFEST IS A PROMISE WHILE THE ARCHIVE IS THE INVENTORY, which was
+ * MEASURED 2026-09-21 on the two packs in `purchased/`: their `index.json`
+ * lists 128 samples between them, every one with an empty name, pointing at
+ * `samples/sample_0.wav` onward, and **neither zip holds a single `.wav`**. A
+ * page building its table from the index would show sixty four rows of audio
+ * that is not in the file. So this reads the ENTRIES and never the index.
+ *
+ * @param {{name:string,size:number,read:()=>Promise<Uint8Array>}[]} entries
+ *   whatever `readZip()` returned
+ * @returns {Promise<{name:string,size:number,wave:object,row:object}[]>}
+ */
+export async function samplesIn(entries) {
+  const wav = (entries || [])
+    .filter((e) => /\.wav$/i.test(e.name))
+    .sort((a, b) => num(a.name) - num(b.name));
+  const out = [];
+  for (const e of wav) {
+    const name = e.name.split('/').pop();
+    const bytes = await e.read();
+    const wave = readWave(bytes);
+    out.push({ name, size: e.size, wave, row: summarise(wave, name) });
+  }
+  return out;
+}
+
+/** The first run of digits in a name, or -1 when there is none to sort on. */
+function num(name) {
+  const m = String(name).match(/(\d+)(?!.*\d)/);
+  return m ? +m[1] : -1;
+}
