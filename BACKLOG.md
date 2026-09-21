@@ -342,6 +342,688 @@
   guard is asserted on purpose.
 
 
+- 🔴 **`/evo/`'s NUMPAD BUTTONS ARE HALF HEIGHT.** Asked: *"evo: half height
+  buttons in numpad"*, about the 3 wide by 4 tall keypad in the sticky left
+  column. Squat rather than square.
+  ⚠️ **AND MOST OF THAT HEIGHT IS PROBABLY NOT THE BUTTON.** A pad reserves
+  `--ctl-head` and `--ctl-foot` even when empty, so twelve unlabelled pads still
+  take twelve head slots and twelve foot slots. Shrinking the working surface
+  when the furniture is what makes the block tall makes the control look wrong
+  and does not answer the report. Measure the rects before choosing what to cut.
+  ⚠️ **AND `--ctl-step` IS THREE THINGS**, this pad's foot, the gap and the next
+  pad's head, which a four row grid has three of. Counting two of them made a
+  lane 115 px against the 145 it needed on `/model/`, and the error was exactly
+  one reserved slot.
+  ⚠️ **THE BRACKETED LABEL HAS TO SURVIVE IT.** The bottom row is `-`, `0`, `+`
+  and the `-`/`+` pair carries `SNAP SHOT` bracketed underneath, drawn the same
+  way the octave pair's `TRANSPOSE` and the function buttons' five dual-press
+  labels are.
+
+- 🔴 **`/evo/`: NO CONNECTOR LINES, NO BLACK BARS, AND THE PATTERN BEHIND ALL
+  THREE.** Asked in a run: *"no need to snapshot and funciton button separator
+  lines"*, *"assignable buttons can be just title"*, and the half height keypad
+  above.
+  🔴 **THE REPLICA IS A DRAWING IN THIS PROJECT'S IDIOM, NOT A FACSIMILE OF A
+  SILKSCREEN.** What has to be faithful is what the controls ARE, where they SIT
+  relative to each other, and what they are CALLED. The printed graphics that
+  group them, the bars and brackets and rules, are a panel's way of saying
+  *these belong together* on a surface with no other way to say it. A page has
+  spacing and headings, which say it better and are already standardised here.
+  ✅ **AND IT AGREES WITH A STANDING RULE RATHER THAN FIGHTING ONE: separation
+  is spacing, not lines.** `shell.css` sets one rhythm precisely so a divider is
+  a second channel saying what the spacing already says, and it is the diagram
+  lesson from the other direction, where `join: false` exists for a container
+  whose own box already carries the relationship and a line *"just gives the eye
+  something to follow that leads nowhere"*.
+  ⚠️ **THE WORDS SURVIVE, THE GRAPHICS DO NOT.** `ASSIGNABLE BUTTONS`,
+  `FUNCTION BUTTONS`, `SNAP SHOT`, `TRANSPOSE` and the five dual-press labels
+  are what those groups and presses are called, and on a panel of blank keys the
+  word `ASSIGNABLE` is the only thing saying they are assignable rather than
+  broken. The reading taken is that the LINES go and the LABELS stay; if the ask
+  was to drop `SNAP SHOT` itself, that is a fact about the instrument going
+  missing and needs saying rather than doing.
+  ⚠️ **AND A LABEL THAT SERVED A PAIR HAS TO BE RE-CENTRED**, or it reads as
+  belonging to the left button alone now that nothing ties it to both.
+
+- 🔴 **`/evo/`: THE PITCH AND MOD WHEELS ARE CENTRED.** Asked: *"align pitch /
+  mod to centr"*.
+  ⚠️ **SAY WHICH CENTRE, BECAUSE THERE ARE TWO AND THIS PAGE HAS BOTH.** The
+  wheels sit at the foot of the sticky left column, so centring them in that
+  column is one reading and centring them under the keypad above them is
+  another, and the column is about a sixth of the panel while the keypad is three
+  buttons wide.
+  🔴 **AND `/model/` IS THE RECORDED WARNING HERE: A LAYOUT CLAIM IS A
+  MEASUREMENT.** That page was corrected by screenshot twelve times in one
+  evening and every correction was plausible reasoning a rect would have
+  refused, including *"less h padding on strip"* where the padding was already
+  equal at 14 px both ways and the real cause was a 146 px heading leaving
+  50.2 px of air each side. Measure the wheels' box, the column's box and the
+  keypad's box, and assert the one that was asked for.
+
+- 🔴 **INSTRUMENT PAGES SAY `connected` AND `not connected`, NOT `online` AND
+  `offline`.** Asked: *"synts: not connected / connected"*, alongside
+  *"replace listen to connected button on model"*.
+  ✅ **AND THE KIT ALREADY TAKES IT PER PAGE, SO NOTHING SHARED HAS TO MOVE.**
+  `demo/shell/presence.mjs` exports `SAYS` and its own header says a page may
+  shorten the words with `says: { coming: 'starting' }`, which also shortens the
+  badge, because the reserved width is measured off whatever it can say. So an
+  instrument page passes `says: { online: 'connected', offline: 'not
+  connected' }` and no other page changes.
+  ✅ **THE VOCABULARY IS RIGHT AND IT IS THE SAME ARGUMENT THE FILE ALREADY
+  MAKES ABOUT `checking`.** `online` and `offline` are network words: they suit
+  a Raspberry Pi over a relay in another building, which is what that badge was
+  built for. A synth on a USB cable on this desk is CONNECTED or it is not, and
+  a page saying a plugged-in Circuit is `online` is describing the wrong kind of
+  presence.
+  ⚠️ **WHICH PAGES, AND IT IS NOT ALL OF THEM.** `/circuit/`, `/model/`,
+  `/shape/`, `/bay/` and `/evo/` are USB on this desk and take the new words.
+  `/keys/` and `/knobs/` reach a board over a relay and `online` is exactly
+  right for those, so they keep it. That split is the reason this is a per page
+  option rather than an edit to `SAYS`.
+  ⚠️ **AND THE BADGE WIDTH IS RESERVED OFF THE LONGEST THING IT CAN SAY**, so
+  `not connected` is longer than `checking` and every state will measure wider.
+  There is an assert on that reserve in `/kit/`; check it after.
+
+### Issue queue, 2026-09-21, session 40, /model/
+
+- 🔴 **`/model/` BECOMES `/twelve/`, AND IT IS THE SECOND RENAME OF THIS PAGE IN
+  TWO DAYS.** Asked: *"rename model to twelve"*. `/rack/` became `/model/`
+  yesterday, so a kept link to `/rack/` already 404s and now `/model/` will too.
+  Two dead URLs for one page. An instruction supersedes the rule, the same way
+  `radio1965`, `box` and `rig/box/` superseded theirs, but the cost is recorded
+  rather than discovered later.
+  🔴 **THE SWEEP MATCHES THE URL FORM AND THE SLUG, NEVER THE WORD, AND THIS IS
+  THE WORST CASE THIS PROJECT HAS HAD FOR THAT.** `held` was dangerous because
+  it is ordinary English. **`model` is ordinary English AND it is this
+  repository's own word for a data layer**: `demo/shell/bay.mjs` is *the model*
+  in every comment about it, `xr-room.mjs` has model matrices, and
+  `plans/plan-patchbay.md` uses it throughout. A careless sweep would rewrite
+  the patch bay's prose and `/blocks/`'s 3-D code.
+  ✅ **SO MATCH ONLY**: `/model/` in a URL, `demo/model/` as a path,
+  `name: 'model'` in `manifest.mjs`, and a harness invocation like
+  `verify.mjs model`. Nothing else.
+  ⚠️ **AND `archive/` IS LEFT ALONE**, because an archive records what was
+  there, which is why `box` and `radio1965` are still spelled the old way in it.
+
+- 🔴 **THE NAMEPLATE: `MODEL 12` ONLY, IN THE RIGHT PANEL, RIGHT ALIGNED, AND
+  `TASCAM` GOES.** Asked with a screenshot: *"put model 12 to right panel, no
+  tascam, right aling"*.
+  ⚠️ **IT NARROWS THIS MORNING'S INSTRUCTION RATHER THAN CONTRADICTING IT.**
+  *"replica names always in uppercase. add full name evolution mk-425c"* got
+  `TASCAM` at the left end and `MODEL 12` at the right, added today because that
+  panel had no name on it at all. The maker is the half being dropped, on this
+  page, and the model name moves into the right hand panel where the master lane
+  is. Do not sweep that decision onto `/circuit/` or `/evo/` without being told.
+  ⚠️ **THE GEOMETRY ASSERTS WILL MOVE.** This morning's change shifted every
+  one of `/model/`'s rects exactly 21.0 px down, being an 11 px nameplate plus a
+  10 px gap. Taking the nameplate out of the flow above the mixer moves them
+  back, and every one has to be accounted for rather than re-baselined.
+
+- 🔴 **`Listen` BECOMES A CONNECTED BUTTON.** Asked: *"replace listen to
+  connected button on model"*. Today control 0 is
+  `{ id: 'listen', label: 'Listen', primary: true }`, and its handler opens the
+  MIDI inputs, counts them and logs two lines.
+  ✅ **THE KIT ALREADY HAS THE RIGHT THING AND THREE PAGES USE IT**:
+  `createPresenceButton`, which is what `/circuit/`, `/bay/`, `/shape/` and
+  `/evo/` all carry. It reports `unknown`, `checking`, `online` or `offline`
+  about a named subject, which is the same job `Listen` is doing badly by
+  logging a count and leaving the button saying the same word forever.
+  🔴 **AND CONTROL 0 IS THE ONE THAT GETS `settleMs`**, which the page's own
+  comment at line 387 says in so many words, so whatever replaces `Listen` has
+  to stay first in `.pos-controls` or every check behind it loses its budget.
+  ⚠️ **THE BADGE'S STATE COLOURS ONLY STARTED WORKING AN HOUR AGO**, so this
+  page will be the fifth caller of a component whose ink was dead until today.
+
+### Issue queue, 2026-09-21, session 40, /kit/ once the tabs landed
+
+- 🔴 **THE BAR ABOVE A TAB READS AS A DEFECT, WHICH IS THE VERDICT ON IT.**
+  Reported with a screenshot: *"what happeend to tabs?"*, pointing at `READOUT`
+  wearing a yellow rule ACROSS ITS TOP while `INPUT` wears the selected
+  underline BELOW.
+  ✅ **IT IS NOT A BUG, IT IS A DELIBERATE MARK**: `demo/kit/index.html:242`,
+  `.kit-tabs .pos-tabs-t[data-kit-new] { box-shadow: inset 0 2px 0 0 var(--hi) }`,
+  the agent's answer to the collision I asked it to solve. **The newest
+  component goes at the top of `/kit/` and that is an instruction**, because
+  what a reader does not know about is what arrived since they last looked, and
+  tabs hide four fifths of the page. So it marks the tab holding the newest
+  section, which today is `READOUT` holding `SEGMENT DISPLAY`.
+  🔴 **AND IT IS STILL WRONG, FOR THE REASON THIS PROJECT ALREADY REVERSED A
+  DIAGRAM RULE OVER: A CONVENTION ONLY WORKS IF IT IS LEGIBLE.** The headless
+  ties between inner boxes were correct by argument and were REPORTED TWICE as
+  a head that had fallen off, and they lost. This is the same shape: a rule
+  above one tab and a rule below another, in the same colour, two pixels tall,
+  reads as a marker that slipped rather than as a different kind of statement.
+  ⚠️ **THE PROBLEM IT SOLVES IS REAL AND MUST NOT BE DROPPED.** The claim *a
+  reader can see what is new* has to stay true of the tabbed page. What has to
+  change is the channel: a mark that is not a rule of the same weight in the
+  same colour as the selection. A word, a dot, a count, anything that cannot be
+  mistaken for the selected underline.
+
+- 🔴 **MORE ROOM ABOVE AND BELOW THE TAB ROW.** Asked: *"add more space below
+  and top of tabs"*. In the screenshot the row sits close under the paragraph
+  above it and the first section heading follows immediately below, so the tabs
+  read as part of the prose rather than as the thing that switches the page.
+  ⚠️ **IT IS A KIT DECISION, NOT A PAGE ONE, AND IT IS THE SECOND TIME THIS
+  EXACT MISTAKE WOULD BE EASY TO MAKE.** Vertical spacing here is one rhythm
+  declared once (`--pos-gap: 40px`, `shell.css:49`, applied by `.pos-stack`),
+  and a page that writes its own margin correction is a page that breaks the
+  moment the component changes. If a tab row genuinely wants a different gap
+  from the body rhythm, that belongs on the component in `shell.css` with a
+  comment saying what claim it is making, and then every page with tabs gets it
+  rather than `/kit/` alone. `/making/` and `/stage/` both use `tabs.mjs`.
+
+- 🔴 **`COLOURS` MOVES OUT OF `LAYOUT` INTO A `BASICS` TAB, AND `BASICS` IS
+  LAST.** Asked: *"move color to basics (last tab)"*. The tab row becomes
+  **INPUT, READOUT, TIME, LAYOUT, DIAGRAM, BASICS**, so `DIAGRAM` is no longer
+  the last one.
+  ✅ **AND IT IS THE RIGHT CORRECTION TO MY OWN TAB SET.** I put `COLOURS` in
+  `LAYOUT` and that was the weakest placement of the twenty six, for the reason
+  the tab names were chosen in the first place: every other tab answers *what do
+  I have for X*, and a reader never goes looking for a colour the way they go
+  looking for a slider. A palette is not a component, it is the material every
+  component is made of, so it reads as the thing `LAYOUT` could not find a home
+  for. `BASICS` names that honestly and putting it last says it is the reference
+  you drop to rather than the shelf you shop from.
+  ❓ **WHAT ELSE BELONGS IN `BASICS` IS OPEN AND WORTH DECIDING ONCE**, because
+  a tab holding one section is a tab that invites the same question again.
+  Candidates already on the page: the vertical rhythm (`--pos-gap`), the control
+  head and foot contract (`--ctl-head` / `--ctl-foot`), and the glyph rule about
+  characters with no emoji form. All three are decisions every component obeys
+  and none of them is a component.
+  ⚠️ **AND A SIX TAB ROW IS THE WIDTH QUESTION AGAIN.** `overflow-x` cannot
+  shrink a flex item below its content, and 390 px has already been MEASURED at
+  141 px of page overflow on a tab row once. Re-measure `scrollWidth` against
+  `innerWidth` at 390, 560, 756 and 1280 with six tabs rather than five.
+
+- 🔴 **THE `TIME` TAB NEEDS TRANSPORT EXAMPLES, AND TODAY IT HAS EXACTLY ONE.**
+  Asked: *"time: add transport examples"*. `demo/kit/index.html:775` is
+  `GLUED TRANSPORT BAR` and it is the only transport section on the page, which
+  means the most configurable component in the kit is demonstrated in one of its
+  shapes.
+  🔴 **AND EVERY VARIANT WORTH SHOWING EXISTS BECAUSE A RULE WAS PAID FOR**, so
+  each specimen is a rule made visible rather than a permutation:
+  - **`scrub: false`**, which a page with a strip must pass. Two horizontal time
+    axes at different scales stacked is not redundancy, it is a contradiction,
+    and the strip already seeks on press AND on drag where the bar's slider did
+    not.
+  - **`toggle: false`**, a bar with NO PLAY BUTTON. Play, pause and seek are all
+    claims about a position inside a sound, and `/keys/` has none: a note sounds
+    while a key is held. It disarms everything that depended on playing rather
+    than letting it read false by luck, and `api.toggles` says so in one boolean
+    which `demo/verify.mjs` reads before its play drill.
+  - **a `chip`**, which is what such a bar carries instead, and on both board
+    pages it is the presence badge, because the fact worth having about an
+    instrument in another building is whether it is answering.
+  - **`publish: false`**, for the second bar on a page. `__demo.transport` is
+    the only handle a CDP check has and every bar claimed it unconditionally, so
+    it was whichever bar was BUILT LAST, which is a fact about source order
+    rather than a statement about the page.
+  - **`chip` with `live`**, which THROWS, because they want the same position.
+    A specimen that shows a refusal is worth as much as one that shows a shape.
+  ⚠️ **THE PAGE ALREADY HAS ONE TRANSPORT BAR PUBLISHING ITSELF.** Adding four
+  more makes `/kit/` the page with the most bars in the repository, so exactly
+  one of them may publish and the rest pass `publish: false`, or the harness
+  grades whichever happened to be built last. That is the rule above,
+  demonstrated by the page that documents it.
+  ⚠️ **AND A BAR NEEDS A DECK TO SAY ANYTHING.** Check what the existing section
+  feeds its bar before writing four more, because four decks running on a
+  reference page is four things moving while somebody reads.
+
+- 🔴 **THE `READOUT` TAB IS RENAMED `STATUS`.** Asked: *"readout -> status"*.
+  ✅ **AND IT REMOVES A COLLISION I BUILT IN.** A tab called `READOUT` holds a
+  section called `READOUT AND LOG`, so the name means two different sizes of
+  thing one line apart: the whole family of reporting surfaces, and one specific
+  component. `STATUS` is what the tab actually answers, it is ordinary English
+  rather than this project's word for a row of cells, and it fits the four
+  or five characters a heading here is budgeted.
+  ⚠️ The row becomes **INPUT, STATUS, TIME, LAYOUT, DIAGRAM, BASICS**, and
+  `#links` change with it, so anything pointing at the old fragment stops
+  resolving. Nothing outside the page links to those yet.
+
+- 🔴 **A `HARDWARE` TAB AFTER ALL, HOLDING THE CHANNEL STRIP AND THE SEGMENT
+  DISPLAY, AND THE STRIP IS BROKEN DOWN INTO ITS PARTS WITH THE WHOLE ONE KEPT
+  LAST.** Asked: *"move channel strip and secmented to 'hardware' tab. breaks
+  strp elements down and keep final example."*
+  ✅ **THIS OVERRULES MY OWN REASONING AND THE OWNER IS RIGHT.** I dissolved
+  `HARDWARE` on the argument that everything in it was a reporting surface, so a
+  segment display belonged under `STATUS` with the logs and the tables. What
+  that missed is that these two are not components a page composes, they are
+  **parts of a picture of an object**. A channel strip and a seven segment
+  display are things you find on a panel; a table and a log are things you find
+  on a web page. The tab now answers *what do I have for drawing an instrument*,
+  which is a real question three pages here have already had to answer alone.
+  ⚠️ **SO THE SEGMENT DISPLAY MOVES OUT OF `STATUS`**, which also means the
+  newest component's tab changes and whatever marks it has to follow.
+  🔴 **BREAKING THE STRIP DOWN IS THE MORE VALUABLE HALF.** A finished strip
+  shows that the kit can draw one; the PARTS show what a caller actually
+  assembles and, more to the point, **where the alignment contract lives**.
+  `/model/` was corrected by screenshot twelve times in one evening and every
+  correction was the page doing arithmetic about a component's insides. The
+  specimens should make `--ctl-head`, `--ctl-foot` and `--ctl-step` visible as
+  the three distances they are, because *"the distance between two stacked
+  controls is three things, not one"* is a sentence nobody believes until they
+  see it.
+  ⚠️ **AND THE FINAL EXAMPLE STAYS**, which the ask says: the parts prove the
+  contract, the whole one proves the parts compose.
+
+- ❓ **ANSWERED: DO WE HAVE HARDWARE LAYOUT COMPONENTS? NO, AND THERE ARE
+  ALREADY THREE HAND-ROLLED COPIES, ABOUT TO BE FOUR.** Asked: *"do we have hw
+  layoout components?"* MEASURED 2026-09-21.
+  ✅ **WHAT THE KIT DOES PUBLISH IS THE CONTROL CONTRACT AND NOTHING ELSE**:
+  `--ctl-head: 15px`, `--ctl-foot: 17px`, `--ctl-step`, and `.pos-crow` for a
+  row. That is about aligning controls WITHIN a row, and it exists because a
+  caller doing that arithmetic itself is a page that breaks the moment a
+  component gains a label.
+  🔴 **WHAT IT DOES NOT PUBLISH IS THE PANEL, AND EVERY INSTRUMENT PAGE HAS
+  WRITTEN ITS OWN**: `/model/` has `.rack-wrap`, `.rack-row`, `.transport-row`;
+  `/circuit/` has `.circ-panel`, `.circ-row`, `.circ-scroll`; `/evo/` has
+  `.evo-panel`, `.evo-strip`, `.evo-wrap`. **Three copies of one idea**, and the
+  `/evo/` rebuild in flight is writing a **fourth**, because the sticky column
+  plus scrolling strip it was asked for is the shape `/model/` already has.
+  🔴 **THE STANDING RULE SAYS WHAT THAT MEANS**: a control that exists in one
+  page and nowhere else is a component that has not been noticed yet. This one
+  exists in three and still has not been noticed, which is how three pages ended
+  up with three radio rows and two slider stacks.
+  ✅ **AND THE SHARED SHAPE IS NOW LEGIBLE RATHER THAN GUESSED**, which is the
+  thing that was missing before: **a panel is a nameplate, a fixed column that
+  does not scroll, and a scrolling row of controls beside it.** `/model/` is a
+  master lane and eight strips, `/evo/` is a display column and a back strip,
+  `/circuit/` is a scroller already.
+  ⚠️ **DECIDE IT AFTER `/evo/` LANDS, NOT DURING.** Two agents writing one panel
+  component in one checkout is the hand-rolled-control rule arriving by a
+  different road, and the fourth copy is the evidence that makes the component
+  worth designing. Extract from three working panels rather than predicting one.
+
+### Issue queue, 2026-09-21, session 40, opened on /wish/
+
+- 🔴 **`refused transpose needs by and was given to` IS UNREADABLE, AND THE
+  VALIDATOR BEHIND IT IS WORKING PERFECTLY.** Reported with a screenshot:
+  *"refused transpose needs by and was given to - what is it?"*
+  The sentence is built at `demo/shell/bay.mjs:154`:
+  `` `${t.op} needs ${k} and was given ${keys}` ``. `by` and `to` are FIELD
+  NAMES rendered as bare English words, so the line parses as broken grammar
+  rather than as a report about two keys. Somebody reading it looks for a
+  missing noun.
+  ✅ **WHAT IT MEANS**: the model returned `{"op": "transpose", "to": 1}` and
+  `transpose` takes `by`. This is the exact failure `CLAUDE.md` already records
+  as measured, and the whole reason `checkTransforms` exists in ordinary code
+  rather than in the schema: that object is VALID against the schema it was
+  generated under, and the code would have computed `note + undefined`, which
+  is `NaN`, a note number that does not exist arriving at an instrument down a
+  link the page called connected.
+  ⚠️ **SO THE FIX IS THE WORDING, NEVER THE CHECK.** Mark a field name as a
+  field name. `transpose takes "by" and was given "to"` already reads, and the
+  page has a code face it could use.
+  ❓ **AND THERE IS A SECOND, LARGER QUESTION WORTH DECIDING RATHER THAN
+  DRIFTING INTO**: this model gets this exact key wrong on nearly every run.
+  A page that showed the repair as text and let a person press it would fit the
+  standing rule (*a model proposes and a person presses*) while removing the
+  most common refusal there is. Silently rewriting `to` into `by` would NOT,
+  because then nothing on screen says the model was wrong.
+
+- 🔴 **THE LINK LINE SHOULD BE FULL JSON, NOT THE COMPACT PATCH LANGUAGE.**
+  Asked: *"here:mk-425c-usb-midi-keyboard:out -> here:circuit:in { transpose,
+  channel 1 } - can it not be full json(l) message?"*
+  That line is `printLink()` from `demo/shell/bay.mjs`, the patch language's
+  text form, and on this page it is doing a job it was not written for: on
+  `/bay/` it labels a link a person is about to make, where the shortest true
+  sentence wins. **On `/wish/` it is the MODEL'S OUTPUT being shown for
+  inspection before anybody presses anything**, and there the reader needs to
+  see exactly what came back, including the argument that was refused. The
+  compact form drops it: the screenshot reads `{ transpose, channel 1 }` with
+  **no sign of the `to: 1` that was the whole problem**.
+  ⚠️ **WHICH IS WHY THIS ONE MATTERS MORE THAN IT LOOKS.** The refusal underneath
+  names a key the line above does not show, so the two halves of the page cannot
+  be read against each other.
+  ⚠️ `jsonl`, one object per line, is the right shape for several links.
+
+- 🔴 **THE HEARD SENTENCE IS A TEXTAREA, NOT A READOUT.** Asked:
+  *"Connect the keyboard to the circuit and transpose it up one semitone. ->
+  textarea"*. Today the transcription is shown as text a reader cannot touch,
+  so a word the speech model got wrong can only be fixed by holding the button
+  and saying the whole thing again.
+  ✅ **AND IT IS THE CHEAPEST FIX ON THIS PAGE.** There are two models in the
+  chain and the first one is the one nobody can correct. Making that box
+  editable means a mis-heard word costs one keystroke instead of a second
+  recording, a second `/hear` call and a second `/wish` call.
+  ⚠️ **IT ALSO SEPARATES TWO FAILURES THAT CURRENTLY LOOK IDENTICAL**: the
+  speech model mis-heard, and the language model mis-read a sentence that was
+  transcribed correctly. With an editable box a person can re-ask the same
+  words and see whether the answer changes, which is the only way to tell those
+  apart from outside.
+  ⚠️ **NOTHING THAT REDRAWS LIVE MAY CHANGE HOW MUCH ROOM IT TAKES**, and a
+  textarea that grows with its content is exactly that. Give it a fixed height
+  and let it scroll, or reserve the room it will need.
+  ⚠️ And `Use the example` writes into it, so that button and the microphone
+  now have the same destination rather than two.
+
+- 🔴 **TWO OF THE THREE LISTENING MODELS ON `/wish/` CANNOT WORK, AND THE ERROR
+  SAYS EXACTLY WHY ONCE IT IS DECODED.** Reported: choosing `whisper` gives
+  `AiError: Bad input: Error: oneOf at '/' not met, 0 matches: Type mismatch of
+  '/', 'string' not in 'object', Type mismatch of '/audio', 'array' not in
+  'string'` after 849 ms.
+  🔴 **THE CAUSE: ONE PAYLOAD SHAPE IS SENT TO THREE MODELS THAT DO NOT SHARE
+  ONE.** `workers/wish/src/wish.mjs:119` sends `{ audio: <base64 string>, task,
+  language?, vad_filter }` whatever `model` is.
+  - `@cf/openai/whisper-large-v3-turbo` takes `audio` as a **base64 string** and
+    understands `task` and `vad_filter`. That is why `turbo` works and is the
+    default, and is why nobody noticed.
+  - `@cf/openai/whisper` is the ORIGINAL and its schema is a `oneOf`: either the
+    whole input is a bare string, or it is an object whose `audio` is an
+    **array of bytes**. **Both branches refuse a base64 string under `audio`**,
+    which is the two mismatches in the message, in order. It is not a transient
+    failure and no retry will help.
+  - `@cf/openai/whisper-tiny-en` is almost certainly the same old shape.
+    ⚠️ **ASSUME NOTHING: `tiny` HAS NEVER BEEN PRESSED EITHER**, so it is
+    untested rather than working, and it should be checked in the same change
+    rather than fixed on the strength of resembling its sibling.
+  ✅ **THE FIX IS PER MODEL PAYLOAD SHAPING IN ONE PLACE**, which is the one
+  function both the Worker and `demo/wish-local.mjs` share, so the two cannot
+  drift into two answers.
+  🔴 **AND A BYTE ARRAY IS NOT A FREE SUBSTITUTION, WHICH IS WORTH MEASURING
+  BEFORE COMMITTING TO IT.** Base64 costs about 1.33 bytes per byte; a JSON
+  array of decimal integers costs about **4**, so the 18.2 KB recording in the
+  screenshot becomes roughly 70 KB of request body rather than 24. There is a
+  request size ceiling on Workers AI, so the older models may have a much
+  shorter maximum utterance than `turbo` for reasons that have nothing to do
+  with the models.
+  ⚠️ **AND `task` AND `vad_filter` PROBABLY GO AWAY WITH IT.** They are
+  `turbo`'s options. `vad_filter` is not decoration here: the comment beside it
+  says it exists because a studio microphone is open in a room with a synth in
+  it. So the older models may transcribe the room as well as the voice, which is
+  a REASON TO PREFER `turbo` rather than a thing to fix.
+  ❓ **SO THE REAL QUESTION IS WHETHER THOSE TWO ROWS SHOULD EXIST.** A picker
+  offering three models of which one works is worse than a picker offering one.
+  Either they are made to work and measured against each other, or they come
+  off the page. A control that cannot do the thing it names is the defect, which
+  is already a standing rule here.
+
+- 🔴 **`Hold to talk` CLEARS THE LAST ANSWER BEFORE IT RECORDS THE NEXT ONE.**
+  Asked: *"hold to talk should clear previous input / routing"*. Today the
+  heard sentence, the link line and the refusal all stay on screen while a new
+  recording is being made and while both models are thinking, so for several
+  seconds the page shows the OLD answer next to a NEW question.
+  🔴 **THAT IS THE SAME SHAPE AS A STALE LINK BEING WORSE THAN A DEAD ONE**,
+  which this repository already has a rule about. A blank says *nothing yet*. A
+  previous answer left standing says *this is the answer*, and there is nothing
+  on screen to say otherwise. Anybody holding the button twice in a row is
+  reading the first answer while giving the second instruction.
+  ⚠️ **CLEAR ON PRESS, NOT ON ANSWER.** The clear belongs at `pointerdown`, so
+  the page is empty for the whole time it is listening and thinking. Clearing
+  when the reply lands leaves the window that causes the problem exactly as it
+  is.
+  ⚠️ **AND THE READOUT IS PART OF THE ANSWER.** Whatever cells survive the line
+  below must go back to empty too, never to `0`, which reads as a very
+  confident measurement of nothing.
+
+- 🔴 **`/wish/`'s READOUT LOSES `heard`, AND THAT FORCES A SECOND DECISION.**
+  Asked: *"rm heard"*, quoted with the whole row: `heard 3165ms`,
+  `thought 1856ms`, `links 1`, `refused 1`.
+  🔴 **FOUR CELLS MINUS ONE IS THREE, AND `mount()` THROWS ON AN ODD COUNT.**
+  That is not a lint, it is a deliberate throw, and the reason is editorial: an
+  odd readout always has a weakest cell and being made to find it is the point.
+  So `rm heard` cannot be done alone.
+  ✅ **THE READING THAT NEEDS NO GUESSWORK IS THAT BOTH TIMINGS GO**, leaving
+  `links` and `refused`. `heard` and `thought` are a pair, both milliseconds,
+  both facts about how long somebody else's model took rather than about the
+  patch; `links` and `refused` are the outcome and are the two numbers a person
+  pressing that button actually wants. **Confirm this before building it**,
+  because the alternative reading is that one timing survives and a new cell
+  joins it.
+  ⚠️ And the log already carries both timings per call, so nothing is lost by
+  taking them off the readout.
+
+- ❓ **`here:` IN A PORT ID IS THIS PROJECT'S OWN VOCABULARY LEAKING ONTO THE
+  PAGE.** Asked: *"here:mk-425c-usb-midi-keyboard:out -> here:circuit:in
+  { channel 1, transpose } - what is here?"*
+  It is the **site**, the first of the three segments in a port id
+  (`site:node:direction`), and it means *this machine*, as opposed to a port
+  reached over the relay on the Raspberry Pi or the Mac. `demo/bay/index.html`
+  mints it in `adoptInput` and `adoptOutput` as `here:${slug(name)}:out`.
+  🔴 **AND THE QUESTION IS THE ANSWER: NOBODY OUTSIDE THIS REPOSITORY CAN KNOW
+  THAT, AND THE STANDING RULE FORBIDS IT.** No jargon in anything a visitor
+  reads, and the banned list is exactly this project's private vocabulary. A
+  reader seeing `here:` either ignores it, which makes it noise in the one line
+  they are being asked to check, or wonders what it is, which is what happened.
+  ⚠️ **IT IS ALSO REDUNDANT ON BOTH PAGES THAT SHOW IT TODAY**, because every
+  port on both is local, so the segment that exists to tell two sites apart is
+  printing the same word on every row.
+  ✅ **SO `printLink` SHOWS THE LABEL AND NOT THE ID**, and a site appears only
+  when it is not this one. The id stays the id: it is the model's key, it is
+  what `/wish/` must send and receive, and it belongs in the JSON the item
+  above asks for. What must not happen is a reader being shown a key where a
+  name belongs.
+
+- 🔴 **`/wish/` DRAWS THE PROPOSED ROUTING AS A DIAGRAM, UNDER THE JSON, IN
+  SPACE THAT IS ALREADY RESERVED.** Asked: *"make it json and autodraw diagram
+  below (reserve space for it)"*, which folds together the JSON item above and a
+  new one.
+  ✅ **IT IS THE RIGHT MOVE FOR THIS PAGE SPECIFICALLY.** The standing rule is
+  that a model proposes and a person presses, and that anything turning words
+  into actions shows the action as text first. A picture is the fastest way for
+  a person to see that a patch is **aimed at the wrong instrument**, which is
+  the exact failure measured here and the one no validator can catch: two well
+  formed patches aimed at the Model 12 when both belonged to the Circuit. A
+  reader spots a line going to the wrong box in an instant and has to parse JSON
+  to spot the same thing.
+  🔴 **AND IT IS THE FIRST DIAGRAM IN THIS REPOSITORY THAT IS NOT `How it
+  works`, SO TWO STANDING RULES DO NOT APPLY TO IT AND MUST NOT BE COPIED IN.**
+  Every diagram here is REFERENCE: it passes `{ how: true, atEnd: true }`, takes
+  no `title`, gets the heading `How it works` out of `diagram.mjs`, and sits
+  last on the page because it is read once by somebody who has already pressed
+  the thing. **This one is a RESULT.** It changes on every press, it is the
+  answer rather than an explanation of the page, and it belongs directly under
+  the JSON it draws. So it passes neither flag, and `createDiagram` should be
+  checked for whether it can be asked for a picture with no heading at all.
+  ⚠️ **RESERVE THE SPACE, WHICH THE ASK ALREADY SAYS.** A picture appearing
+  after a two model round trip would shove the log and everything under it down
+  the page, and this project has been reported for content jumping once already.
+  The box exists from the first paint and is empty until there is something to
+  draw.
+  ⚠️ **AND A REFUSED LINK IS PART OF THE PICTURE, NOT AN ABSENCE FROM IT.** The
+  run in the screenshot was `1 link, 1 refused`, so a diagram drawing only what
+  passed would have been EMPTY while the page reported an answer. Draw the
+  refused link and mark it refused, or the picture disagrees with the readout
+  beside it.
+  ⚠️ **THE BOX LABELS ARE THE INSTRUMENT NAMES, NEVER THE PORT IDS**, which is
+  the `here:` item above arriving in a second place. A diagram label is a NAME
+  and takes no article, and it has about fourteen characters, so
+  `here:mk-425c-usb-midi-keyboard:out` is not a candidate.
+
+### Asked 2026-09-21, session 40, the /wish/ button and a kit assert
+
+- 🔴 **`/wish/`'s `Hold to talk` IS A SECONDARY BUTTON.** Asked: *"hold to talk
+  is secondary button"*. It is declared `primary: true` in the page's `controls`
+  and has been since it was `Speak`.
+  ⚠️ **AND CHECK WHAT `primary` ACTUALLY DOES BEFORE MOVING IT**, because a
+  press-and-hold control on this page also carries the `data-busy` paint from
+  the press until the answer lands, and those are two different visual channels
+  that could be reading as one.
+
+- 🔴 **`/wish/`: NO SPINNER ON HOVER, AND NO DOT EITHER.** Asked first as
+  *"rm spinner on hover, do some dot animation (voice level?)"*, then reversed
+  within the hour as *"rm dot from hold to talk"*. **Only the first half
+  stands**: the spinner goes and nothing replaces it. The voice level was never
+  built, and the agent was told mid-task so it did not build one.
+  🔴 **WHAT THE REVERSAL LEAVES IS AN OPEN QUESTION RATHER THAN A CLOSED ITEM.**
+  Somebody holding that button still has no way to know the microphone is
+  picking them up, which is the whole thing a level would have answered. The
+  `data-busy` paint from press until the answer lands is the only signal, and it
+  says *something is happening* rather than *I can hear you*. Recorded as a
+  known gap, not an oversight, so nobody re-derives it as a bug.
+  ⚠️ **AND THE REASON THE LEVEL WAS ATTRACTIVE IS STILL TRUE**: the page already
+  opens a real microphone stream, so an `AnalyserNode` costs one node and no
+  permission that has not been granted. If it ever comes back, it must not fake
+  it: a dot moving on a timer while the microphone hears nothing is this
+  project's gate-feedback defect, a broken page that looks like it is working.
+  ⚠️ The superseded text follows, for the reasoning it carries.
+  ⚠️ **THE VOICE LEVEL IS THE INTERESTING HALF AND IT IS FREE HERE**: the page
+  already opens a real microphone stream for its recording, so an `AnalyserNode`
+  on that stream costs one node and no permission that has not already been
+  granted. A dot that moves with what the microphone is actually hearing is the
+  one piece of feedback that tells somebody holding the button whether it is
+  picking them up.
+  🔴 **AND IT MUST NOT FAKE IT.** A dot animating on a timer while the
+  microphone hears nothing is this project's gate-feedback defect: a broken page
+  that looks like it is working. If the level cannot be read, the dot must not
+  move.
+  ⚠️ **NOTHING THAT REDRAWS EVERY FRAME MAY CHANGE HOW MUCH ROOM IT TAKES.** A
+  level dot is inside a control in the harness row, so it has a fixed box and a
+  fixed footprint at every level, the way the presence dot already does.
+
+- 🔴 **`/kit/`'s PRESENCE SECTION SHOULD ASSERT THE BADGE'S INK PER STATE.**
+  Fixed today on `/circuit/` where it was reported, and the defect was a dead
+  rule that made **every state colour on every instrument page** read as the
+  foreground. `/kit/` is the page whose whole job is to make component drift
+  visible, so it is the right long-term home for that check. It was held by
+  another agent when the fix landed, which is the only reason this is a line
+  here rather than part of that commit.
+
+### Asked 2026-09-21, session 40, after /shape/ was first heard
+
+- ✅ **THE CIRCUIT HAS BEEN PLAYED FROM A COMPUTER. 2026-09-21, REPORTED AS
+  *"shape works"*.** The oldest open item in `HANDOFF.md` and the one thing this
+  repository could never grade by itself. Until this morning **nobody had ever
+  heard `/shape/`**, its own comments said so, and its real time claim rested on
+  the Circuit Programmer's Reference Guide plus the existing `/dump/`
+  measurements. A hand on a slider now changes the sound of the instrument, so
+  that claim is a measurement.
+  ⚠️ **`portSends === 0` IS STILL ASSERTED AND STAYS.** What changed is that a
+  PERSON pressed it. A suite run may never be a hand on somebody's instrument.
+  ⚠️ **AND `/bay/` IS STILL UNHEARD**, which is a different path: routing the
+  MK-425C INTO the Circuit through the patch bay. Nobody has played that.
+  🔴 **WHICH OF THE FIVE BADGE WORDS IT TURNED OUT TO BE IS NOT YET RECORDED**,
+  and it is the fact worth having: `refused` would mean the MIDI permission
+  prompt was the whole story, `no match` would mean the port name was, and
+  `sending` all along would mean something else entirely. Ask before this goes
+  stale.
+
+- 🔴 **`/shape/`'s OUTPUT PICKER COMES OFF.** Asked: *"rm output"*, straight
+  after the page was confirmed working. It was added this morning as a
+  DIAGNOSTIC, because the page could not say which of four failures it was in,
+  and the page working means the name match found the instrument on its own and
+  the control is a step nobody needs.
+  🔴 **WHAT MUST NOT COME OFF WITH IT IS THE DIAGNOSIS**: every output logged by
+  name, the five distinct failure words that replaced the single word `offline`,
+  `access.onstatechange` rescanning, the line printed when the first byte
+  actually reaches a port, and above all **the safety that replaced `outs[0]`:
+  with no name match this page chooses NOTHING**. The first output on this desk
+  is a TASCAM or an Evolution and CC 74 arriving at either moves something real.
+  ⚠️ **AND THE COST IS WRITTEN DOWN RATHER THAN DESIGNED AROUND**: two Circuits
+  on one desk, or a Circuit exposing more than one endpoint, becomes a case with
+  no way out from the interface. A comment says so, so the next person does not
+  rediscover it as a bug.
+
+### Asked 2026-09-21, session 40, /bay/ again: an instrument is not a port
+
+- 🔴 **`/bay/` LISTS PORTS AND THE ASK IS TO PRESS INSTRUMENTS, AND THOSE ARE
+  NOT THE SAME THING.** Asked: *"bay: do press 1st intrument then another
+  linking"*, which is the third time this page has been reported, after
+  *"enough, make it simple, enable devices, i press first edevice, then next and
+  they are connected"*. Both reports say **device** and **instrument**. The page
+  says **port**: its first column is literally headed `port`.
+  ✅ **THE TWO PRESS FIX IS LIVE AND IS NOT THE PROBLEM.** Verified on the
+  deploy 2026-09-21: `https://positron.studio/bay/` carries the `join` column,
+  the `replaces` wording and the `no longer picked` wording, so it is the fixed
+  build. Pressing two rows does link them, in either order, with no third press.
+  🔴 **WHAT IS WRONG IS THE ROW.** `adoptInput` makes `here:<slug>:out` and
+  `adoptOutput` makes `here:<slug>:in`, so **every instrument on the desk is TWO
+  rows**, one per direction. A person looking for the Circuit finds two Circuits
+  and has to know which of them is the one that receives. That is the in/out
+  split of the MIDI wire showing through the interface, and it is exactly the
+  kind of internal vocabulary this project has a rule against putting in front
+  of a visitor.
+  🔴 **AND ONE OF THE TWO ROWS IS ALWAYS A DEAD END.** `CONSENT` gives the
+  MK-425C `accepts: []`, with the note *"a controller with no sound engine, so
+  nothing is worth sending to it"*. So the keyboard's `in` row exists only to be
+  refused. Pressing *the first instrument* has a better than even chance of
+  landing on a row that can never be half of a link.
+  ✅ **THE FIX IS ONE ROW PER INSTRUMENT**, with the page working out the
+  direction: press A, press B, and A's output goes to B's input. What each
+  instrument can send and can take belongs in that one row.
+  ⚠️ **AND THE AMBIGUOUS CASE HAS TO BE DECIDED RATHER THAN DISCOVERED**: two
+  instruments that can each both send and receive have two possible links, and
+  the order of pressing is the only signal available. First pressed sends.
+  ⚠️ **NOTHING ABOUT THE MODEL CHANGES.** `demo/shell/bay.mjs` is ports and
+  links and is graded at 36/36 with no browser; an instrument is a grouping the
+  PAGE makes over ports. Do not push device identity into the model to fix a
+  presentation problem.
+
+### Asked 2026-09-21, session 40, the /evo/ panel rebuild
+
+🔴 **COLLECTED, NOT WORKED.** The stream was still arriving when these were
+written down.
+
+- 🔴 **`/evo/` IS REDRAWN AGAINST A PICTURE OF THE REAL CONTROLLER.** Asked:
+  *"evo: look up controller image and make it similar"*. Today's panel is laid
+  out from the MIDI spec rather than from the instrument's face, which is why
+  the next three lines exist. Find a reference photograph of the Evolution
+  MK-425C first and work from it.
+
+- 🔴 **THE EIGHT ROTARIES ARE LABELLED `C1` TO `C8`, AND THEIR ORDER IS WRONG.**
+  Asked: *"rotators: labels c1 to c8. they are not same order as phsyical
+  buttons"*. They currently read `1` to `8` with `unbound` under each. Two
+  separate faults in one line: the NAME is wrong, and the ORDER on screen does
+  not match the order on the box.
+
+- 🔴 **THE FUNCTION BUTTONS, THE MINUS AND PLUS, AND THE ROTARIES GO TO THE
+  TOP, IN AN OVERFLOW PANEL WITH THE KEYBOARD.** Asked: *"put funciton buttons,
+  -+ and rotaty to the top. its a overflow panel along withy stn keyboard
+  component"*.
+  ⚠️ **AND THE OVERFLOW IS ALREADY THERE AND IS ALREADY A PROBLEM.** MEASURED
+  2026-09-21: `.evo-scroll` is **688 px of client width holding 1575 px of
+  content**, so **8 of the 25 keys are on screen** and the rest need a sideways
+  drag with no affordance saying so. The page itself does not drag sideways
+  (`scrollWidth` 1280 against a 1280 window), so the rule about scrolling a row
+  rather than the page is being kept. Widening does not help: at 1800 px the cut
+  is identical, because the body has a max width.
+
+- 🔴 **THE LEFT IS A STICKY AREA, THE WAY `/model/`'s RIGHT SIDE IS: LED ON
+  TOP, 3x4 DIGITS UNDER IT, WHEELS BELOW THAT.** Asked: *"left is sticky area a
+  la model12 rigth area. led on top, below 3x4 digits and wheels below"*. So the
+  panel is two regions: a fixed column on the left that does not scroll, and the
+  scrolling row of controls and keys to the right of it.
+
+- 🔴 **`unbound` AND EVERY PRINTED CC NUMBER COME OFF EVERY HARDWARE REPLICA,
+  NOT JUST `/evo/`.** Asked: *"evolution: rm unbound labels and cc labels on hw
+  replicas in general"*. `/evo/` prints `unbound` under all eight rotaries and
+  the panels carry controller numbers on their faces.
+  ✅ **THE SAME CUT WAS ALREADY MADE ONCE AND THE REASONING IS RECORDED**:
+  `/circuit/` and `/model/` took printed CC numbers off their faces on
+  2026-09-21 (*"rm ccs, also from rack"*), and `/shape/` puts the controller
+  number in the HOVER instead, because a reader moving a filter wants to know
+  which filter and somebody debugging a binding is somebody who will point at
+  the control. So this is that rule reaching the pages it had not reached yet,
+  and the destination for the number is the hover and the MIDI log, never the
+  face. ⚠️ **`unbound` IS DIFFERENT AND IS WORSE**: it is not a fact about the
+  instrument at all, it is this page admitting it does not know what a knob is
+  wired to, printed eight times under eight knobs.
+
+- 🔴 **A REPLICA'S NAME IS UPPERCASE AND IS THE FULL NAME.** Asked:
+  *"replica names always in uppercase. add full name evolution mk-425c"*.
+  `/evo/`'s panel reads `evolution` in lower case. It becomes
+  **`EVOLUTION MK-425C`**.
+  🔴 **AND THE MODEL NAME IS ALREADY THERE AND HAS NEVER BEEN SEEN BY ANYBODY.
+  MEASURED 2026-09-21.** `demo/evo/index.html:149` appends two `.evo-brand`
+  nodes, `evolution` and `MK-425C`. In a 1280 px window the first lands at
+  **x 317** and the second at **x 1780**, which is **500 px off the right edge
+  of the screen**. The cause is that `.evo-brands` is a child of `.evo`, which
+  is **1575 px wide** because the keyboard sizes it, inside an `.evo-scroll`
+  whose client width is **688 px**. So a `space-between` row puts the model name
+  at the far end of content nobody scrolls to.
+  ⚠️ **THIS IS WHY THE PAGE LOOKS LIKE IT HAS NO MODEL NAME AND THE SOURCE
+  LOOKS CORRECT**, which is this project's most expensive shape of defect. It
+  was found by measuring the rendered rect, not by reading the file. A nameplate
+  belongs to the FIXED part of the panel, not to the part that scrolls, which is
+  the same conclusion the sticky-left-column request arrives at from the other
+  direction.
+  ⚠️ **AND IT IS GENERAL, LIKE THE LINE ABOVE IT**: `/model/`, `/circuit/` and
+  `/evo/` are all replicas of a named object, so all three carry the maker and
+  the model in full, in uppercase. Check what each one says today before
+  changing one.
+  ⚠️ The kit already renders section headings uppercase whatever is typed, and
+  the standing rule is to TYPE it uppercase so the source reads like the page.
+
 ### The instruments, 2026-09-21
 
 - 🔴 **`/circuit/`: HOW WIDE THE CARD SHOULD BE IS UNANSWERED, AND IT WAS ASKED

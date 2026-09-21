@@ -1,15 +1,14 @@
-# Handoff, 2026-09-21, session 39
+# Handoff, 2026-09-21, session 40
 
-**Twelve commits, a clean tree, five new demos, four new kit modules, three
-plans and four pieces of research. Nothing is deployed.** Five of the six new
-standing rules at the top of `CLAUDE.md` came out of a defect this session
-shipped and then caught.
+**Nineteen commits, deployed twice, and `CLAUDE.md` is a fifth of the size it
+was this morning.** The day was one long stream of reports off the deployed
+pages, collected in `BACKLOG.md` as they arrived and worked in fanned-out
+batches, which is the arrangement the standing rule asks for and it held.
 
-🔴 **READ THIS FIRST, AND IT IS THE SAME LINE AS LAST SESSION: `origin/main`
-STILL NEEDS ONE COMMAND FROM A PERSON.** It points at **`4add323`**, a commit
-whose message is about a Circuit pack and whose content is **57 plan renames, 0
-insertions, 0 deletions**, verified again today. `6a8befc` is an ancestor of the
-current head, so nothing is lost either way. The force push is blocked here.
+🔴 **READ THIS FIRST, AND IT IS THE THIRD SESSION RUNNING: `origin/main` STILL
+NEEDS ONE COMMAND FROM A PERSON.** It points at **`4add323`**, a commit whose
+message is about a Circuit pack and whose content is 57 plan renames with zero
+insertions and zero deletions. The force push is blocked from here.
 
 ```sh
 gh auth switch --user kristjanjansen
@@ -17,212 +16,127 @@ git push --force-with-lease=main:4add3238cd812195db75fddfe405786fe5359a8b origin
 gh auth switch --user Kristjan-Jansen_enefit
 ```
 
-✅ **EVERYTHING BELOW IS COMMITTED AND THE TREE IS CLEAN.** This paragraph said
-the opposite for most of the session, which was true when written and stopped
-being true at `f373cac`. Twelve commits, all on
-`session-28-station-videoradio`, none pushed.
-⚠️ **EVERY ONE WAS PATH LIMITED**, because two agents were writing in this
-checkout for part of it. A hook in `.claude/hooks/` refuses `git add -A` here
-now, and it refused one of mine, correctly.
+✅ **THE TREE IS CLEAN AND EVERYTHING BELOW IS COMMITTED**, on
+`session-28-station-videoradio`, none pushed. Every commit was path limited,
+because up to five agents were writing in this checkout at once.
 
-## What is new, and where to open it
+## Deployed, and what to open
 
-The dev server is RUNNING as this is written, on **8890** and **8892**, and all
-four pages answer 200 on both:
+**BUILD `598a558-080052-7533`.** Both deploys today were built from a
+**throwaway `git worktree` at `HEAD`** rather than from the working tree,
+because agents were mid-edit and a build here would have shipped half-finished
+pages. That is worth repeating as a technique: `git worktree add --detach`, build
+and deploy from there, remove it. The tree has no `.env`, so wrangler uses the
+machine OAuth session and the `.env` trap does not arise.
 
-- **http://127.0.0.1:8890/bay/** is the patch bay. **22/22.** It is the first
-  page here that SENDS to an instrument.
+- **https://positron.studio/** the front page, with a new `hardware` group first
+- **https://positron.studio/evo/** the Evolution MK-425C, rebuilt from photographs
+- **https://positron.studio/bay/** the patch bay, one row per instrument
+- **https://positron.studio/shape/** the Circuit editor, and **it has been heard**
+- **https://positron.studio/kit/** six tabs
+- **https://positron.studio/circuit/** and **/model/** with their nameplates
+- ⚠️ **https://positron.studio/wish/** answers 200 and **cannot work deployed**:
+  its agent is `node demo/wish-local.mjs` on this laptop. Locally it is
+  **http://127.0.0.1:8890/wish/?api=http://127.0.0.1:8799**.
 
-- **http://127.0.0.1:8890/evo/** is the Evolution MK-425C, the third hardware
-  panel. **24/24.** 25 keys, 8 knobs, 10 buttons, both wheels, a drawn LCD.
-- **http://127.0.0.1:8890/model/** is the TASCAM Model 12, **renamed from
-  `/rack/` today**. **35/35.**
-- **http://127.0.0.1:8890/circuit/** is the Novation Circuit. **30/30.**
-- **http://127.0.0.1:8890/kit/** carries `MIDI LOG` as its new top section.
-  **70/70.**
+## The one thing that changes what this project is
 
-🔴 **`/bay/` IS THE ONE TO LOOK AT AND IT NEEDS A PERSON.** Press the status
-button, grant MIDI, press a source port then a destination, and the line above
-the button prints the whole link before it exists, with the refusal under it if
-there is one. **Nobody has yet played the MK-425C into the Circuit through it**,
-because a harness cannot grant Web MIDI and cannot hear a synth.
+🔴 **THE CIRCUIT HAS BEEN PLAYED FROM A COMPUTER. `/shape/` WORKS.** Reported as
+*"shape works"*. That was `HANDOFF.md`'s priority 3 for two sessions and the one
+claim this repository could never grade by itself. `portSends === 0` is still
+asserted, because what changed is that a PERSON pressed it and a suite run still
+may never be a hand on somebody's instrument.
+⚠️ **`/bay/` IS STILL UNHEARD**: routing the MK-425C INTO the Circuit through the
+patch bay is a different path and nobody has played it.
+❓ **AND WHICH OF THE FIVE BADGE WORDS IT TURNED OUT TO BE IS NOT RECORDED.**
+`refused` would mean the MIDI permission prompt was the whole story, `no match`
+the port name, `sending` all along something else. Worth asking before it goes
+stale.
 
-⚠️ **`/rack/` NO LONGER EXISTS AND THAT IS THE INTENDED OUTCOME.** For one day a
-kept link to it opened a DIFFERENT page, which is the `/held/` situation and the
-one failure worse than a dead link. After the next deploy it 404s. The build
-output was checked: `public/rack/` is gone, `public/model/` and `public/evo/`
-are there.
+## `CLAUDE.md` is 436 lines and seven skills
 
-**Nothing is deployed.** Build stamp made here is `b06cf25-234409-b07d`.
+2245 lines and 157 KB became 436 and 27.6 KB, **an 82 per cent cut to what every
+session and every agent pays on every turn**, roughly 39,000 tokens down to
+6,900. Seven skills in `.claude/skills/`: `positron-ui`, `positron-verify`,
+`positron-diagram`, `positron-streaming`, `positron-xr`, `positron-hardware`,
+`positron-history`.
 
-## The three instruments now have one MIDI log, and it is a kit module
+✅ **NOTHING WAS SUMMARISED AWAY AND IT WAS PROVED RATHER THAN CLAIMED**: all
+2146 non-blank lines matched verbatim against the new file plus the seven skills,
+with only four restructured headings unmatched. The partition refuses to claim a
+line twice, so no rule was duplicated either.
+🔴 **THE RULE THAT CAME OUT OF IT IS IN `LAYOUT.md`**: a rule stays in
+`CLAUDE.md` only if it is true on every task, a skill is named for the WORK
+rather than the code, a rule moves VERBATIM because the measurements and the
+wrong first answers are what make it survive being argued with, and **when a
+rule moves its trigger stays behind** as a row in the table. A rule nobody knows
+to load is a rule that is gone.
 
-`demo/shell/midi-log.mjs`. Asked as *"add midi event logs to circuit and rack
-demos"*, and `/evo/` was written the same hour, which made three callers on one
-day and therefore a component rather than three copies.
+## The defects worth carrying forward
 
-🔴 **THE ROW IS ADDED BEFORE THE ROUTING, ON EVERY PAGE.** A log fed after the
-routing lists only what the panel already understands, which is the opposite of
-what a log is for. Asserted on both existing pages by feeding a CC on channel 5
-that neither page routes anywhere, and checking it is listed all the same.
+🔴 **EVERY STATE COLOUR ON THE PRESENCE BADGE WAS DEAD, ON EVERY INSTRUMENT
+PAGE.** Reported as *"chircuit checking should be gray"*. It was not, and the
+badge computed `--fg` in **all five states**, because
+`.pos-presence-btn .pos-pres { color: inherit }` is (0,2,0) exactly like
+`.pos-pres[data-state="checking"]` and sat 750 lines later in the file. The dot
+is `background: currentColor`, so an ONLINE instrument had a **white** dot rather
+than a green one. Asserted as ink now, because a grep for that rule would have
+found it present and correct on every day it was broken.
 
-**Assert counts, all accounted for**: `/circuit/` 19 to 22 page asserts,
-`/model/` 24 to 27, `/kit/` plus 4, `/evo/` 16 from new. Plus 8 harness asserts
-each, which is where 30, 35, 24 and 70 come from.
+🔴 **A DELETED `const` TOOK SEVENTEEN ASSERTS SILENT AND THE SUITE READ GREEN AT
+16/16.** Mine, on `/wish/`. Two surviving references to a hoisted constant made
+the check handler throw partway through; the asserts did not fail, they stopped
+running, and the only thing that said so was `page asserted something · 10`
+where it had been 27. **The count is the rule.**
 
-## What was measured on the desk, and it answers two open questions at once
+🔴 **`/evo/`'S KEYBOARD HAD 25 WHITE KEYS AND NO BLACK ONES, AND MY OWN BRIEF WAS
+PROTECTING THE BUG.** I told the agent not to touch the key pattern because
+`createKeyboard` decides colour from the offset from base. **It does not**: it
+tests `sharps.has(k)` against a set of computer key letters, and that page passes
+synthetic names in no set.
 
-**Capturing the Circuit through the Fast Track Pro.**
-`research/fasttrack-capture-2026-09-21.md`.
+🔴 **`.evo-keys .kbd .pad` WAS A DEAD SELECTOR** because the class is `.kpad`, so
+the kit's own octave pair and a `Notes off` button had been rendering on that
+replica all along. Sixth measured dead rule here.
 
-- The Circuit's **left** output is on the interface's **input 1**, which is
-  **capture channel 1**. 48 kHz, 16 bit.
-- **With the Circuit's output and the interface gain both at maximum: peak
-  -1.69 dBFS over 9.46 s, and ZERO clipped samples of 454,144.**
-- Channel 2 is unused and is **its own noise, not crosstalk**: correlation
-  between the two captured channels is **+0.030**.
-- One command does it, and it resolves the device **by name** because an
-  avfoundation index is a shared mutable global this project has already been
-  bitten by.
+🔴 **TWO ASSERTS WERE GREEN WHILE BROKEN AND ONLY SABOTAGE SAID SO.** `the eight
+rotaries read C1 to C8` passed with the constant REVERSED, because it compared
+the DOM against the thing that built it. `the wheels are centred` passed with
+centring OFF, because it measured the full-width wrapper, which cannot move.
 
-🔴 **AND THE CAPTURE WAS PROVED ALIVE BEFORE ANY SILENCE WAS INTERPRETED.** A
-denied microphone permission delivers exact zeros; a real converter has a floor.
-`-52 dBFS` is therefore the reading that says the permission is granted, the ADC
-is running, and nothing is playing.
+## What is open
 
-## The Circuit synth editor, researched and not built
-
-`plans/plan-circuit-editor.md`. Reported in full in the session reply.
-
-- 🟢 **An editor needs no SysEx to EDIT**: 374 parameters are addressable live,
-  **98 by CC and 276 by NRPN**, on channels 1, 2 and 16.
-- 🔴 **`Replace Current Patch` and `Replace Patch` differ by ONE BYTE at offset
-  6**, and the second writes flash on a device with no factory reset. An editor
-  here must be unable to express it, the way `/circuit/` cannot express a record.
-- 🔴 **The 64 pack files were measured byte for byte and match the published
-  format exactly.** They are `Replace Current Patch` messages for Synth 1, which
-  is the documented portable single patch format.
-- 🔴 **A sentence in this repository was wrong and is fixed.** The channel 16
-  master filter **is** documented, in the Programmer's Reference, and
-  `plans/plan-circuit-model12.md` §3.5 had already tabulated that section. The
-  claim that no manual says it came from reading the USER GUIDE and generalising.
-
-## The universal patch bay
-
-`plans/plan-patchbay.md`, 414 lines, reported in full in the session reply.
-Nothing built. The headline is that the patch bay is a **control plane**: it
-carries MIDI, it **brokers** audio, and it never sits in the middle of a stream.
-
-## The patch bay, built
-
-`demo/shell/bay.mjs` is the model, the validator and the text form, all pure.
-`node demo/shell/bay-test.mjs` is **30 asserts with no browser**, most of them
-negative controls, because a validator is the one kind of code that passes a
-naive suite by returning yes to everything.
-
-🔴 **THE TEST FOUND TWO REAL BUGS BEFORE ANY PAGE EXISTED.** The cycle check
-walked PORTS and started from the proposed destination, which is an input, so no
-link ever started there, the walk ended at once and every loop was allowed. And
-the rule refusing a link whose transforms drop everything fired on AUDIO links,
-which carry no message classes at all, so it would have refused every audio link
-in the building.
-
-🔴 **THE PAGE SENDS, WHICH NO PAGE HERE HAS DONE BEFORE**, so there are two
-walls rather than one: each port declares what it `accepts`, and separately
-there is no code on the page that turns a SysEx, a program change or a clock
-byte into bytes. The Circuit has no factory reset.
-
-## The second half of the session
-
-- **http://127.0.0.1:8890/bay/** the patch bay. **22/22**, model at **36/36**
-  with no browser.
-- **http://127.0.0.1:8890/wish/** speak a patch. **18/18**. Needs
-  `node demo/wish-local.mjs` running, which is ALSO running now on **:8799**.
-- `demo/shell/unzip.mjs` reads `New Pack.circuitpack` with nothing vendored,
-  **13/13**.
-- `demo/shell/circuit-cc.mjs` is the Circuit's 98 live parameters, **16/16**
-  graded against this desk's own measurements rather than the document they
-  were parsed from.
-
-🔴 **THE MEASUREMENT THAT DECIDES THE WHOLE PATCH BAY DESIGN.** Asked to put
-the mod wheel on the master filter, and separately to play the drums from the
-keyboard, `llama-3.3-70b-instruct-fp8-fast` produced **well formed patches
-aimed at the Model 12** when both belong to the Circuit. Nothing in a validator
-can catch that. A person reading one line can, which is why `/wish/` proposes
-and never connects.
-
-🔴 **AND FOUR REAL BUGS WERE FOUND BY MEASURING RATHER THAN BY READING**: three
-in the bay's validator (a cycle walk that started at an input, an audio rule
-that refused every audio link, two refusals in the wrong order) and one in its
-model (`accepts` doing two jobs, which refused every real link on this desk).
-
-## The third half, done by two agents in parallel
-
-- **http://127.0.0.1:8890/shape/** edits a Circuit's voice **while it is
-  sounding**. **34/34**, 28 page asserts, ten of which run for every visitor.
-  🔴 **NOBODY HAS HEARD IT.** No Circuit was plugged in for any run, and
-  `portSends === 0` is asserted so a suite run can never be a hand on the
-  instrument. The real time claim rests on the reference guide and on the
-  existing `/dump/` measurements. **Plug the Circuit in and press something.**
-  ⚠️ Its opening handle positions are an invention: a control change is write
-  only, so the page cannot ask the device what its patch holds. `put back`
-  restores where this page found things, not the patch as saved.
-- `research/synth-editors-2026-09-21.md`: seven of fourteen editor UI elements
-  already exist here, four are genuinely missing, and **82 of the Circuit's 98
-  parameters are a plain knob the kit already has**.
-- `research/circuit-session-format-2026-09-21.md`: the session container is
-  mapped, and **a claim published this morning is corrected in it**.
-
-🔴 **TWO STALE LINES IN STANDING FILES WERE CAUGHT BY AGENTS READING THEM**, not
-by anybody looking: `tabs.mjs` described as used by no page when two pages use
-it, and the demo count, twice in one day. Both corrected.
-
-## Two plans and two pieces of research landed
-
-- `plans/plan-patchbay.md`, the design. 414 lines.
-- `plans/plan-circuit-editor.md`, the patch format, measured against the
-  published one byte for byte.
-- `plans/plan-circuit-samples.md`, the pack in a browser and the drum machine
-  after it.
-- `research/fasttrack-capture-2026-09-21.md` and
-  `research/cf-models-speech-to-patch-2026-09-21.md`, both measured.
-
-## The rules this session added to `CLAUDE.md`
-
-Each one cost something before it was written down.
-
-1. **A statistic over a whole artefact measures its padding.** 44,071 high
-   bytes in a session file turned out to be erasure, and the wrong conclusion
-   was published before it was caught.
-2. **A JSON schema constrains shape and cannot constrain meaning.** A model
-   returned a transform whose argument was under the wrong key, valid against
-   its schema, and the code would have computed `NaN` silently.
-3. **A tighter schema was measurably worse**, 1.6 s to 10.2 s, and degenerate.
-4. **A model proposes and a person presses**, because the failure is a well
-   formed patch aimed at the wrong instrument and no validator can see it.
-5. **`unsupported` and `forbidden` are two lists.** Merging them refused every
-   real link on this desk.
-6. **A standing file goes stale in hours and an agent reading it inherits the
-   error as a finding.** Both of today's stale lines were caught that way.
-
-## Open, in priority order
-
-1. **The 32 user sessions off the Circuit.** Asked for, still not done, and it
-   is the part of the backup that is missing.
-2. **`origin/main`**, above. It is the only thing here that needs a person
-   rather than a decision.
-3. 🔌 **NOBODY HAS PLAYED THE CIRCUIT FROM A COMPUTER, AND THERE ARE NOW TWO
-   PAGES WAITING ON IT.** `/bay/` can route a keyboard into it and `/shape/`
-   can move 98 of its parameters, and neither has been heard. It is one cable
-   already patched, one press, and it settles the whole chain.
-4. **The pack reader and the drum machine.** `demo/shell/unzip.mjs` already
-   opens a `.circuitpack` with nothing vendored;
-   `plans/plan-circuit-samples.md` §8 has the order.
-5. **`/circuit/`: how wide the card should be**, unchanged from last session.
-6. **`/model/`: three layout asks.** Channel strip content to the bottom, main
-   and sub to the bottom, title to the right.
-7. **No page is graded on a phone**, and that now includes five new ones. The
-   harness runs at 756 px and never enters a media query.
-8. **Nothing is deployed.** The last build stamp made here is in the tree; a
-   deploy would put `/evo/`, `/model/`, `/bay/`, `/wish/` and `/shape/` up and
-   would 404 `/rack/`, which is the intended outcome.
+1. **`origin/main`**, above. The only thing here needing a person rather than a
+   decision.
+2. **Two agents were still running when this was written**: eight `/evo/`
+   items (space above the keyboard, `PITCHBEND` as one word, disabled labels
+   much lighter, display back to backlit, plain cursor on disabled controls,
+   much less blue in the display, the sticky column's border full height, and
+   the readout removed), and an analysis of a purchased Circuit soundbank in
+   `purchased/`.
+3. 🔴 **`purchased/` IS GITIGNORED WHOLE AND MUST STAY THAT WAY.** *"i purchased
+   them. do not git them"*. `New Pack.circuitpack` in the root is the opposite
+   case and stays tracked: the owner's own backup, somebody's only copy.
+4. **THE PANEL LAYOUT IS THE NEXT REAL PIECE OF WORK, AND IT IS READY.**
+   `/evo/` was written FOR extraction and not extracted, on purpose: eleven
+   role-named `.pan-*` classes with the contract in five numbered points, and
+   everything `.evo-*` left behind. There are now FOUR hand-rolled panels
+   (`/model/`, `/circuit/`, `/evo/`, and `/keys/`-adjacent), which is the
+   standing rule about a component nobody has noticed yet, three times over.
+   ⚠️ The one forced decision: `.pan-flow`'s `height: 100%` with a growing
+   child, because a kit key is 74 px and a kit pad 46 px while the real ratio is
+   15:1, a mismatch neither `/circuit/` nor `/model/` hit because neither has a
+   keyboard. Any component has to say which child absorbs the slack.
+5. **`/bay/` still shows `here:` port ids.** The shared `printLink` fix is
+   unavailable: `bay-test.mjs` asserts its round trip, so a version printing
+   labels would make the text form say what the graph cannot.
+6. **The `use "by"` repair press on `/wish/`**, recommended and deliberately
+   deferred: it means dynamic controls outside `.pos-controls`, which the harness
+   does not press and which therefore need their own reachable checks.
+7. **`vad_filter` is unmeasured.** There is no recording of a studio microphone
+   with a synth running, so *"the older two may transcribe the room"* is an
+   argument from the API surface rather than a measurement.
+8. **No page is graded on a phone.** `verify.mjs` runs at 756 px only. Every
+   width number in today's reports came from a throwaway script, not the suite.
+9. **The 32 user sessions off the Circuit**, asked for two sessions ago and
+   still the missing part of the backup.
