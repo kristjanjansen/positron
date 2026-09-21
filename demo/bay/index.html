@@ -322,6 +322,84 @@
    *        different partner. Clearing it would make a refusal cost two presses
    *        to recover from, and the refusal is not that row's fault.
    */
+  /**
+   * 🔴 PLAY ONE INSTRUMENT, PLAY THE NEXT, AND THEY ARE LINKED. Asked four
+   * times before it was understood: *"can not get the bay work"*, *"do press
+   * 1st intrument then another linking"*, *"bay does not connect ... when
+   * playing instruments"*, and finally *"i want connection from pressing
+   * cntroller keys on 1rst and second instrument"*. Every earlier answer made
+   * the SCREEN easier to press. The ask was never about the screen: a patch bay
+   * is patched with your hands on the instruments.
+   *
+   * 🔴 IT IS A NOTE ON AND NOTHING ELSE, AND THAT IS NOT FUSSINESS. CLAUDE.md
+   * records that the Circuit on this desk **sends its own clock continuously at
+   * about 122 bpm**, which makes it the master. A rule that picked *the last
+   * instrument that sent anything* would therefore pick the Circuit forever,
+   * within a millisecond of the page opening, and nothing a person did could
+   * ever change it. Clock, active sensing, aftertouch and program changes are
+   * traffic; a note on with velocity is a decision.
+   * ⚠️ AND VELOCITY ZERO IS A NOTE OFF, whatever the status byte says. Releasing
+   * a key must not count as a second gesture, or every single press would pick
+   * two instruments.
+   *
+   * ⚠️ THE PICK EXPIRES, because a patch bay that remembers a note from four
+   * minutes ago links two things nobody meant to join. `PLAY_WINDOW` is the
+   * whole of the promise: the two gestures are one gesture in two places.
+   * ⚠️ AND PRESSING THE SAME INSTRUMENT AGAIN ONLY REFRESHES IT rather than
+   * closing a loop on itself, so holding a chord and thinking about it is free.
+   * ⚠️ IT SHARES `pick` WITH THE ROW PRESSES, so a hand and a pointer cannot
+   * disagree about what is held, and either may finish what the other started.
+   */
+  const PLAY_WINDOW = 12000;
+  let playAt = 0;
+
+  /** Is this message a deliberate press rather than traffic? */
+  function isGesture(m) {
+    const cls = classOf(m);
+    if (cls === 'note') return (m.d2 ?? 0) > 0;     // velocity 0 is a release
+    return cls === 'cc' || cls === 'bend';
+  }
+
+  function played(portIdOfSender, m) {
+    if (!isGesture(m)) return;
+    const node = nodeOf(portIdOfSender);
+    const g = instrument(node);
+    if (!g) return;
+    const now = performance.now();
+    /* A pick older than the window is not a held thought, it is a forgotten
+       one. Drop it and treat this gesture as a fresh first press. */
+    if (pick && now - playAt > PLAY_WINDOW) {
+      say(`${instrument(pick)?.label || 'the last instrument'} was let go, so this starts again`);
+      pick = null;
+    }
+    playAt = now;
+    if (!pick) {
+      pick = node;
+      const alone = instruments().length < 2;
+      say(alone
+        ? `${g.label} is the only instrument here, so there is nothing to connect it to`
+        : `${g.label} sent something. Play the one it should reach.`, alone);
+      d.log(`${g.label} is held by playing it. Play another instrument to connect them.`);
+      paint();
+      return;
+    }
+    if (node === pick) { paint(); return; }         // still the same hand
+    const held = instrument(pick);
+    const plan0 = plan(held, g);
+    if (!plan0.from) { say(plan0.why, true); paint(); return; }
+    const r = bay.link(plan0.from, plan0.to, plan0.transforms);
+    if (!r.ok) {
+      say(r.why, true);
+      d.log(`${held.label} to ${g.label} was refused: ${r.why}`, 'warn');
+      paint();
+      return;
+    }
+    say(r.warn || `${bay.port(plan0.from).label} now reaches ${bay.port(plan0.to).label}`, !!r.warn);
+    d.log(`connected by playing them: ${printLink(bay.links().at(-1))}`);
+    pick = null;
+    paint();
+  }
+
   function choose(node) {
     const g = instrument(node);
     if (!g) return;
@@ -484,6 +562,10 @@
       shape: { protocol: '1.0' }, emits: EMITS, note: p.manufacturer || '' });
     p.onmidimessage = (e) => {
       const m = decode(Array.from(e.data));
+      /* 🔴 PATCHING BY PLAYING, AND IT IS THE THING THAT WAS ASKED FOR FOUR
+         TIMES. `played()` is before the flood policy on purpose: a gesture must
+         pick an instrument even on a port the log has decided to stop listing. */
+      played(id, m);
       if (!traffic.add(m)) return;          // the flood policy lives in the log
       const ev = { cls: classOf(m), ch: m.ch, d1: m.d1, d2: m.d2 };
       sent += bay.send(id, ev);
@@ -683,6 +765,71 @@
       JSON.stringify(suggest('test:mk-425c:out', 'test:circuit:in')));
 
     const cyc = bay.validate('test:circuit:in', 'test:mk-425c:out', []);
+    /**
+     * 🔴 PATCHING BY PLAYING, GRADED, AND THE NEGATIVE HALF IS THE WHOLE POINT.
+     * CLAUDE.md records that the Circuit here sends its own clock continuously
+     * at about 122 bpm, so a rule that picked the last instrument to send
+     * ANYTHING would pick it within a millisecond of the page opening and never
+     * let go. These asserts say a clock byte picks nothing and a note does.
+     */
+    {
+      pick = null; playAt = 0;
+      const l0 = bay.links().length;
+      /* ⚠️ THE FIXTURES ARE WHAT `decode` REALLY PRODUCES, and the first draft
+         of them was not. `classOf` switches on `kind` and its cases are
+         `note on`, `note off`, `control`, `clock`; a fixture carrying
+         `kind: 'note'` and a helpfully pre-set `cls` fell through to `other`,
+         so three of these went red against a working feature. A fixture that
+         sets the answer instead of the input grades nothing. */
+      const NOTE = { kind: 'note on', ch: 2, d1: 60, d2: 100 };
+      const OFF = { kind: 'note on', ch: 2, d1: 60, d2: 0 };
+      const CLOCK = { kind: 'clock', ch: null, d1: 0, d2: 0 };
+
+      played('test:circuit:out', CLOCK);
+      played('test:model12:out', CLOCK);
+      d.assert('a clock byte picks no instrument, so a Circuit sending its own clock cannot hold the bay',
+        pick === null && bay.links().length === l0,
+        `pick ${pick}, ${bay.links().length - l0} links from two clocks`);
+
+      played('test:mk-425c:out', OFF);
+      d.assert('and a note off picks nothing either, so releasing a key is not a second press',
+        pick === null, `pick ${pick}`);
+
+      played('test:model12:out', NOTE);
+      const afterFirst = pick;
+      played('test:model12:out', NOTE);
+      d.assert('playing one instrument holds it, and playing it again only refreshes it',
+        afterFirst === 'test:model12' && pick === 'test:model12'
+        && bay.links().length === l0,
+        `held ${pick}, ${bay.links().length - l0} links`);
+
+      played('test:circuit:out', NOTE);
+      const made = bay.links().at(-1);
+      d.assert('and playing a second instrument connects them, out of the one played first',
+        bay.links().length === l0 + 1 && !pick
+        && made?.from === 'test:model12:out' && made?.to === 'test:circuit:in',
+        made ? printLink(made) : 'no link');
+
+      /* The window, asserted by moving the clock rather than by waiting. */
+      pick = null;
+      played('test:model12:out', NOTE);
+      playAt -= PLAY_WINDOW + 1;
+      played('test:circuit:out', NOTE);
+      d.assert('a pick older than the window starts again rather than joining something nobody meant',
+        pick === 'test:circuit' && bay.links().length === l0 + 1,
+        `held ${pick} after a stale first press, ${bay.links().length - l0} links total`);
+      pick = null;
+      /* 🔴 THIS BLOCK PUTS BACK WHAT IT MADE, because a check that leaves state
+         behind breaks the check after it and the failure names the wrong one.
+         It happened: the reversed-order drill below went red reading a link
+         this block had left, which is a check failing because of its neighbour
+         rather than because of the page. Cleaning up beats reordering, which
+         only works until somebody adds a third block. */
+      for (const l of bay.links().slice(l0)) bay.unlink(l.id);
+      playAt = 0;
+      paint();
+    }
+
     d.assert('an input cannot be used as a source', !cyc.ok, cyc.why);
 
     /* Every claim below about a row is read off the RENDERED table rather than
