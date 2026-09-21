@@ -25,6 +25,22 @@
      somebody did something is fine, and this one changes when a session row is
      opened. */
   .pk-line { font: 400 12px/1.5 var(--mono); color: var(--dim); }
+  /* ⚠️ EVERY GLUED PART PAINTS ITS OWN GROUND. `.pos-glue` is `gap: 1px` over a
+     `--line` ground, so a child with no background lets that colour through its
+     whole area and the 1 px seam stops being a seam. MEASURED on `/wish/` the
+     same day; neither of the kit's existing glued pairs says it out loud. */
+  .pk-player { background: var(--card); padding: 10px 12px;
+               display: flex; flex-direction: column; gap: 8px; }
+  .pk-prow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  /* 🔴 A FIXED WIDTH ON THE TWO GLYPH BUTTONS, so the row does not resize when a
+     face changes. Nothing that can redraw may change how much room it takes. */
+  .pk-pbtn { min-width: 34px; height: 30px; }
+  .pk-loop { min-width: 52px; }
+  .pk-loop[aria-pressed="true"] { border-color: var(--hi); color: var(--hi); }
+  /* ⚠️ THE OPEN SAMPLE'S LINE IS A FIXED BOX. It changes on a press rather than
+     on a clock, so prose is allowed, but a wrapping line would move the whole
+     tab under it and `min-height` is one line's worth either way. */
+  .pk-player-line { min-height: 1.5em; }
 </style>
 <script type="module">
   import { mount, el, createReport } from '/shell/shell.mjs';
@@ -33,6 +49,7 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { createDrop } from '/shell/drop.mjs';
   import { createStack } from '/shell/stack.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
   import { readSession, summarise as summariseSession, patchPayloads } from '/shell/circuit-session.mjs';
@@ -337,7 +354,7 @@
       { key: 'sound', label: 'sound', width: 68, align: 'right' },
     ],
     cap: 128, empty: '', note: 'hover',
-    onPick: (r) => playSample(r.i),
+    onPick: (r) => openSample(r.i, true),
   });
   sampleTable.el.classList.add('pk-tbl');
   /**
@@ -347,11 +364,57 @@
    * seeing. The line is empty until something is open.
    */
   const samplesLine = el('div', 'pk-line', '');
-  panel('samples').append(samplesLine, sampleTable.el);
+
+  /**
+   * 🔴 THE PLAYER IS UNDER THE TABLE AND GLUED TO IT, ASKED FOR 2026-09-21 AS
+   * *"move sample player below table, add loop"*. It was asked for at the TOP
+   * an hour earlier and the second instruction supersedes the first; what did
+   * not change is that the two are ONE component rather than two blocks with
+   * the page's rhythm between them.
+   * ⚠️ EACH PART PAINTS ITS OWN GROUND, which `/wish/` measured the same day and
+   * which neither of the kit's existing glued pairs says out loud: `.pos-glue`
+   * is `gap: 1px` over a `--line` ground, so a child with no background of its
+   * own lets that colour through its whole area and the seam stops being a seam.
+   *
+   * 🔴 THE LOOP IS `AudioBufferSourceNode.loop` AND NOT `looper.mjs`, AND THAT
+   * IS A DECISION RATHER THAN AN OVERSIGHT. CLAUDE.md's rule is to build from
+   * the kit and the kit HAS a looper, so this needs a reason. That module owns
+   * a RING fed by a tap on a live graph: `keep()` opens a window, `close()`
+   * makes a buffer out of what arrived, and it refuses anything under a quarter
+   * of a second. A sample is already a whole buffer sitting in memory, so using
+   * it would mean playing the sample into a tap and capturing it back in real
+   * time to get something we are holding already, and a 0.12 s sample would be
+   * refused by its own minimum.
+   * ⚠️ WHAT THAT MODULE WOULD REALLY BRING IS ITS FIVE WAYS, `round back half
+   * chop pingpong`, which would be worth having on a drum sample. That is a
+   * component change rather than a page change and nobody has asked for it.
+   */
+  const playerLine = el('div', 'pk-line pk-player-line', 'press a sample to open it here');
+  const playBtn = el('button', 'pk-pbtn', '\u25BA');
+  playBtn.type = 'button';
+  playBtn.title = 'play the open sample';
+  const stopBtn = el('button', 'pk-pbtn', '\u25A0');
+  stopBtn.type = 'button';
+  stopBtn.title = 'stop it';
+  // ⚠️ `►` AND `■`, NEVER `▶` AND `⏹`. `positron-ui`: the ones that look right
+  // in an editor have an emoji presentation and render full colour at the wrong
+  // size and baseline, and U+FE0E is honoured inconsistently. These two have no
+  // emoji form at all.
+  const loopBtn = el('button', 'pk-pbtn pk-loop', 'loop');
+  loopBtn.type = 'button';
+  loopBtn.setAttribute('aria-pressed', 'false');
+  loopBtn.title = 'keep it running until you stop it';
+  const playRow = el('div', 'pk-prow');
+  playRow.append(playBtn, stopBtn, loopBtn);
+  const player = el('div', 'pk-player');
+  player.append(playRow, playerLine);
+
+  panel('samples').append(samplesLine, createGlue(sampleTable.el, player));
 
   // ── what is open ─────────────────────────────────────────────────────────
   let patches = [], rows = [], sessions = [], samples = [];
-  let picked = -1, pickedSession = -1, played = 0, ac = null, lastPlayed = null;
+  let picked = -1, pickedSession = -1, picked2 = -1, played = 0;
+  let ac = null, lastPlayed = null, voice = null, looping = false;
 
   const pct = (x) => `${(x * 100).toFixed(1)}`;
   const kb = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} kB` : `${(n / 1048576).toFixed(1)} MB`);
@@ -1017,40 +1080,84 @@
    * gesture in a real browser and does not reject, so awaiting one is a hang
    * rather than an error. It is fired and left.
    */
+  /**
+   * 🔴 PRESSING A ROW OPENS A SAMPLE AND PLAYS IT, AND THE TWO ARE SEPARATE
+   * VERBS. `/reel/` fetched a newsreel and a day's radio on every visit for a
+   * first frame nobody had asked to see, and the repair there was exactly this
+   * split: `select()` moves and opens nothing, `play()` is the only half that
+   * costs anything. Here nothing leaves the machine either way, but the player
+   * under the table needs a sample to be OPEN without one being in the air.
+   */
+  function openSample(i, andPlay) {
+    const w = samples[i];
+    if (!w) return;
+    picked2 = i;
+    sampleTable.mark((r) => r.i === i);
+    const r = w.row;
+    playerLine.textContent = r.ok
+      ? `${w.name}, ${r.seconds.toFixed(2)} s, ${r.frames.toLocaleString()} frames at `
+        + `${r.rate} Hz, peak ${r.peak.toFixed(2)}`
+      : `${w.name} did not read: ${r.why}`;
+    playBtn.disabled = !r.ok;
+    if (andPlay && r.ok) playSample(i);
+  }
+
+  /**
+   * 🔴 THE AUDIO COMES OUT OF `circuit-sample.mjs` AND NOT OUT OF
+   * `decodeAudioData`, WHICH IS THE HALF OF *"make/use sample decoder"* THAT IS
+   * NOT THE TABLE. The browser's decoder is a promise, it accepts what it feels
+   * like accepting, and it can say nothing about a file it refuses beyond an
+   * `EncodingError`. `toMono` answers in words, and because it is SYNCHRONOUS
+   * the page's own check can grade a press rather than racing a decode.
+   * ⚠️ AND SOUND NEVER GATES THE WORK. `AudioContext.resume()` waits on a
+   * gesture in a real browser and does not reject, so awaiting one is a hang
+   * rather than an error. It is fired and left.
+   */
   function playSample(i) {
     const w = samples[i];
     if (!w) return;
-    sampleTable.mark((r) => r.i === i);
-    /**
-     * 🔴 THE AUDIO COMES OUT OF `circuit-sample.mjs` AND NOT OUT OF
-     * `decodeAudioData`, WHICH IS THE HALF OF *"make/use sample decoder"* THAT
-     * IS NOT THE TABLE. The browser's decoder is a promise, it accepts anything
-     * it feels like accepting, and it can say nothing about a file it refuses
-     * beyond an `EncodingError`. `toMono` answers in words, and because it is
-     * SYNCHRONOUS the page's own check can grade a press rather than racing a
-     * decode, which is what the old path could not do.
-     * ⚠️ AND SOUND NEVER GATES THE WORK. `AudioContext.resume()` waits on a
-     * gesture in a real browser and does not reject, so awaiting one is a hang
-     * rather than an error. It is fired and left.
-     */
     const mono = toMono(w.wave);
     if (!mono.ok) { d.log(`${w.name} did not decode: ${mono.why}`, 'bad'); return; }
     try {
+      stopSample();
       ac = ac || new (window.AudioContext || window.webkitAudioContext)();
       ac.resume();
       const buf = ac.createBuffer(1, mono.frames, mono.rate);
       buf.copyToChannel(mono.samples, 0);
       const src = ac.createBufferSource();
       src.buffer = buf;
+      src.loop = looping;
       src.connect(ac.destination);
+      // ⚠️ THE HANDLE IS KEPT SO THE LOOP TOGGLE CAN REACH A SOUND THAT IS
+      // ALREADY RUNNING. A toggle that only took effect on the NEXT press is a
+      // control that looks live and does nothing for as long as you are
+      // listening, which is this project's named hazard.
+      src.onended = () => { if (voice === src) voice = null; };
       src.start();
+      voice = src;
       played++;
       lastPlayed = { name: w.name, frames: mono.frames, rate: mono.rate, seconds: buf.duration };
-      d.log(`${w.name}, ${buf.duration.toFixed(2)} s, ${mono.frames.toLocaleString()} frames at ${mono.rate} Hz`);
+      d.log(`${w.name}, ${buf.duration.toFixed(2)} s, ${mono.frames.toLocaleString()} frames at `
+          + `${mono.rate} Hz${looping ? ', looping' : ''}`);
     } catch (e) {
       d.log(`no sound here (${e.message})`, 'bad');
     }
   }
+
+  function stopSample() {
+    if (!voice) return;
+    try { voice.stop(); } catch { /* a voice that already ended cannot be stopped twice */ }
+    voice = null;
+  }
+
+  playBtn.addEventListener('click', () => { if (picked2 >= 0) playSample(picked2); });
+  stopBtn.addEventListener('click', () => stopSample());
+  loopBtn.addEventListener('click', () => {
+    looping = !looping;
+    loopBtn.setAttribute('aria-pressed', String(looping));
+    // The running voice, not only the next one. See the note above.
+    if (voice) voice.loop = looping;
+  });
 
   // ── what a visit is allowed to have done ─────────────────────────────────
   d.assert('a visit opens nothing, asks for nothing and makes no sound',
@@ -1376,6 +1483,75 @@
         + `${lastPlayed?.rate} Hz against ${samples[0].row.frames.toLocaleString()} in its header`);
 
       /**
+       * 🔴 THE PLAYER IS UNDER THE TABLE AND THE TWO ARE ONE BOX, MEASURED OFF
+       * REAL RECTS. `glued` is three numbers rather than a look: the player
+       * starts where the table ends, the seam between them is 1 px, and both
+       * paint a ground of their own, because a transparent child lets the
+       * glue's own colour through and the seam stops being a seam.
+       */
+      {
+        /**
+         * 🔴 THE TAB IS OPENED FIRST, AND THE FIRST RUN OF THIS CHECK MEASURED A
+         * HIDDEN PANEL AND REPORTED A 0.0 px SEAM ON A LAYOUT THAT WAS PERFECT.
+         * An inactive tab panel has no layout at all, so every rect in it reads
+         * zero while `getComputedStyle` goes on answering real colours, which is
+         * the worst possible mixture: half the assert is true and half of it is
+         * measuring nothing. `table.mjs`'s own `cuts()` answers `measured:
+         * false` for exactly this case and says so in its header.
+         * ⚠️ IT SWITCHES BACK IN THE SAME BLOCK WITH NO `await` IN IT, so no
+         * frame can be drawn between and nobody watching the page sees a tab
+         * move. That is the same argument `/kit/` makes about its own measuring
+         * window, and an `await` here would break it.
+         */
+        const was = tabs.at();
+        tabs.go('samples');
+        const glue = player.parentElement;
+        const t = sampleTable.el.getBoundingClientRect();
+        const pl = player.getBoundingClientRect();
+        const ground = (x) => getComputedStyle(x).backgroundColor;
+        d.assert('the player is below the table and glued to it, with one 1 px seam between them',
+          glue.classList.contains('pos-glue')
+          && pl.top > t.top && Math.abs(pl.top - t.bottom - 1) < 0.6
+          && ground(player) !== 'rgba(0, 0, 0, 0)'
+          && ground(sampleTable.el) !== 'rgba(0, 0, 0, 0)'
+          && ground(player) !== ground(glue),
+          `the seam is ${(pl.top - t.bottom).toFixed(1)} px with the tab open, the parts paint `
+          + `${ground(sampleTable.el)} and ${ground(player)} against the glue's ${ground(glue)}`);
+        tabs.go(was);
+      }
+
+      /**
+       * 🔴 THE LOOP REACHES A SOUND THAT IS ALREADY RUNNING, which is the whole
+       * of *"add loop"* that can go wrong. A toggle taking effect only on the
+       * NEXT press is a control that looks live and does nothing for as long as
+       * anybody is listening, and that is this project's named hazard. So the
+       * check presses loop WHILE a voice is playing and reads the voice.
+       * ⚠️ AND IT PUTS IT BACK, because every check after this one would
+       * otherwise be running against a page left looping.
+       */
+      openSample(0, true);
+      const wasLooping = voice?.loop;
+      loopBtn.click();
+      const nowLooping = voice?.loop;
+      d.assert('pressing loop changes the sound that is already playing, not only the next one',
+        wasLooping === false && nowLooping === true
+        && loopBtn.getAttribute('aria-pressed') === 'true' && looping === true,
+        `the running voice went loop ${wasLooping} to ${nowLooping}, `
+        + `the button says ${loopBtn.getAttribute('aria-pressed')}`);
+
+      stopBtn.click();
+      d.assert('and stop really lets go of it, so a looping sample can be got out of',
+        voice === null && looping === true,
+        `the voice is ${voice === null ? 'gone' : 'still held'} and the toggle is still on`);
+      loopBtn.click();
+
+      d.assert('pressing a row opens that sample into the player under the table',
+        picked2 === 0 && playerLine.textContent.includes(samples[0].name)
+        && playerLine.textContent.includes('frames')
+        && playBtn.disabled === false,
+        `"${playerLine.textContent}"`);
+
+      /**
        * 🔴 THE NEGATIVE CONTROL, AND IT IS THE ONE THE AGENT THAT BUILT THE
        * MODULE ASKED FOR IN WORDS: a total taken over the files that worked
        * hides the only thing worth seeing. A page that dropped a bad sample
@@ -1387,9 +1563,9 @@
       const badWave = readWave(new Uint8Array([0x52, 0x58, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]));
       fill([], [], [{ name: 'broken.wav', size: 12, wave: badWave, row: summariseWave(badWave, 'broken.wav') }]);
       const beforeBad = played;
-      playSample(0);
+      openSample(0, true);
       d.assert('NEGATIVE CONTROL: a sample that will not read keeps its row, is counted as refused and does not play',
-        sampleTable.count() === 1 && played === beforeBad
+        sampleTable.count() === 1 && played === beforeBad && playBtn.disabled === true
         && /1 refused/.test(samplesLine.textContent)
         && /did not read/.test(sampleTable.scroller().querySelector('.pos-tbl-row')?.title || '')
         && tabs.buttons[2].textContent === '1 SAMPLES',
