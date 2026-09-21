@@ -403,9 +403,28 @@
       d.log(`${loops} proposed link${loops > 1 ? 's' : ''} began and ended at one instrument, `
         + 'so the picture has no arrow for it');
     }
+    /**
+     * 🔴 ONLY THE INSTRUMENTS THE PROPOSAL TOUCHES, NOT THE WHOLE DESK.
+     * Reported 2026-09-21 with a crop: *"why 2 boxes when only 2 are
+     * connected"*, pointing at a Model 12 drawn with nothing attached to it
+     * beside a keyboard reaching a Circuit.
+     * ⚠️ IT WAS DELIBERATE AND IT WAS WRONG. The whole desk was drawn so that a
+     * proposal of nothing had something to show rather than a blank box, and
+     * that reason died when the picture was made to wait for a mapping: there
+     * is no empty state left for it to serve. What survived was three boxes
+     * where two were asked for, and an unattached box is not neutral, it is the
+     * picture saying *this instrument was considered and left out*, which is a
+     * claim the model never made.
+     * ⚠️ BOTH ENDS OF A REFUSED LINK STAY, because a refusal is part of the
+     * answer: the run that prompted all of this was one link, refused, and a
+     * picture showing only what passed would have been empty while the readout
+     * said there was an answer.
+     */
+    const touched = new Set(links.flatMap((l) => [l.from, l.to]));
+    const nodes = INSTRUMENTS.filter((n) => touched.has(n.id));
     dg?.destroy();
-    dg = createDiagram(dgHost, { caption: DG_CAPTION, nodes: INSTRUMENTS, links });
-    return { drawn: links.length, loops };
+    dg = createDiagram(dgHost, { caption: DG_CAPTION, nodes, links });
+    return { drawn: links.length, loops, boxes: nodes.length };
   }
 
   /* Two different empty states, and they are not the same sentence. Nothing has
@@ -517,7 +536,14 @@
        visit opened anything, so counting a call that never left the tab would
        make the one assert about it read false. */
     if (SELFCHECK && path === '/wish') {
-      return { links: CANNED, ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+      /* ⚠️ THE GATE RETURNS WHAT THE SERVER NOW RETURNS, not the raw model
+         output. `relabel` in `workers/wish/src/wish.mjs` repairs the one key
+         this model always gets wrong and reports the repair, so a stand-in
+         handing back the raw form would grade a path that no longer exists.
+         The raw form is still used directly below, where the validator is being
+         asked about it. */
+      return { links: REPAIRED, fixed: FIXED, ms: 0, model: 'canned',
+        usage: { total_tokens: 0 } };
     }
     reached++;
     let r;
@@ -550,6 +576,13 @@
     d.log(`asking ${thinkPick.value().split('/').pop()}`);
     const out = await post('/wish', { text, ports: PORTS, facts: FACTS, model: thinkPick.value() });
     const g = show(out.links || []);
+    /* 🔴 A REPAIR NOBODY IS TOLD ABOUT IS A REWRITE, and *a model proposes and a
+       person presses* survives only if the person can see what the model
+       actually said. */
+    for (const f of out.fixed || []) {
+      d.log(`the model wrote "${f.said}" on ${f.op} where this desk uses `
+        + `"${f.read}", so it was read as ${f.op} ${f.read} ${f.value}`);
+    }
     /* 🔴 THE TIMING LIVES HERE NOW, because the readout gave up its two cells
        and a number nothing prints is a number the page stopped reporting. */
     d.log(`thought for ${out.ms ?? '?'} ms: ${out.links?.length ?? 0} link(s), `
@@ -579,6 +612,23 @@
    */
   const CANNED = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
     transforms: [{ op: 'transpose', to: 1 }] }];
+  /**
+   * 🔴 THE SAME REPLY AFTER THE BOUNDARY REPAIRED IT, which is what a real call
+   * returns now. Reported 2026-09-21 as *"can we please kill it"* after the
+   * refusal was seen a fourth time. `to` is an ABSOLUTE target and `by` is a
+   * RELATIVE shift, so the language keeps `by` and `to` is accepted as a known
+   * synonym: `transpose to 1` would mean transpose to note number 1, which is
+   * meaningless, and standardising on `to` would make the patch language wrong
+   * in order to agree with a model.
+   * ⚠️ THE PROMPT WAS NEVER THE PROBLEM. It already said *"transpose takes by,
+   * not to"* in those words and the model did it anyway on every run, because
+   * a link's own destination field is `to` and `channel to=N` is the first
+   * transform listed, so `to` sits beside `transpose` twice in the most
+   * prominent places there are. Pattern matching, not misreading.
+   */
+  const REPAIRED = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+    transforms: [{ op: 'transpose', by: 1 }] }];
+  const FIXED = [{ op: 'transpose', said: 'to', read: 'by', value: 1 }];
 
   d.on('example', async () => {
     /* It writes into the same box the microphone fills, which is one
@@ -914,12 +964,19 @@
         || `nothing cut in ${seen.length} states, laid out as ${seen[0].mode}`);
 
     /* 🔴 THE WHOLE DESK, WHATEVER WAS PROPOSED, AND ONE ARROW PER PROPOSAL.
-       A proposal of nothing draws three instruments and no arrows rather than an
-       empty box, and the refused run draws its arrow: a picture showing only
-       what passed would have been blank on the run this was reported from, while
-       the readout beside it said `1 link, 1 refused`. */
-    d.assert('the whole desk is drawn whatever came back, with one arrow per proposal',
-      seen.every((s) => s.boxes === 3)
+       🔴 THE CLAIM CHANGED 2026-09-21 AND THIS ASSERT WENT RED, CORRECTLY. It
+       used to require THREE boxes on every run, because the whole desk was
+       drawn so a proposal of nothing had something to show. That reason died
+       when the picture was made to wait for a mapping, and what was left was
+       reported: *"why 2 boxes when only 2 are connected"*. An unattached box is
+       not neutral, it is the picture saying *this instrument was considered and
+       left out*, which the model never said.
+       ⚠️ THE OTHER HALF IS UNCHANGED AND IS THE ONE THAT MATTERS: the refused
+       run still draws its arrow, and BOTH ITS ENDS. A picture showing only what
+       passed would have been blank on the run this was reported from, while the
+       readout beside it said `1 link, 1 refused`. */
+    d.assert('only the instruments a proposal touches are drawn, with one arrow per proposal',
+      seen.map((s) => s.boxes).join() === '0,2,2'
       && seen.map((s) => s.arrows).join() === '0,1,1',
       seen.map((s) => `${s.what}: ${s.boxes} boxes, ${s.arrows} arrows`).join('; '));
 
@@ -1067,6 +1124,36 @@
       d.assert('the page does not drag sideways at this width',
         document.documentElement.scrollWidth <= window.innerWidth + 1,
         `page ${document.documentElement.scrollWidth} against ${window.innerWidth}`);
+    }
+
+    /**
+     * 🔴 THE REPAIR IS GRADED, IN BOTH DIRECTIONS, AND THIS BLOCK IS LAST ON
+     * PURPOSE. Placed earlier, its `await think()` left the control lit and
+     * the press drill below then read `busy before true`, which is a check
+     * failing because of the check above it rather than because of the page. What the boundary sends back
+     * has to be a patch the validator ACCEPTS, and the raw thing it repaired
+     * has to still be refused, or the two halves could drift into agreeing.
+     */
+    {
+      const repaired = show(REPAIRED);
+      const raw = show(CANNED);
+      d.assert('the repaired reply is allowed and the raw one it came from is still refused',
+        repaired.ok === 1 && repaired.refused === 0
+        && raw.ok === 0 && raw.refused === 1,
+        `repaired ${repaired.ok} allowed, raw ${raw.refused} refused`);
+      /* And the page SAYS it, which is the half that keeps this from being a
+         silent rewrite. Read off the log rather than off the constant.
+         ⚠️ THE PROPOSAL IS DRIVEN HERE RATHER THAN LEFT TO A PRESS. A first
+         draft read the log and found nothing, because the line is only written
+         when a proposal runs and nothing guarantees a control was pressed
+         before this check. Depending on press order is how a check ends up
+         measuring the moment instead of the code. It costs nothing: `post` is
+         gated under `?selfcheck=1` and reaches no model. */
+      await think(EXAMPLE);
+      const logText = document.querySelector('.pos-log')?.textContent || '';
+      d.assert('and the page says in words which key the model wrote and which it was read as',
+        /wrote "to"/.test(logText) && /"by"/.test(logText),
+        logText.split('\n').find((l) => l.includes('wrote')) || 'no such line in the log');
     }
 
     d.assert('no secret in this page', !location.href.includes('token'));

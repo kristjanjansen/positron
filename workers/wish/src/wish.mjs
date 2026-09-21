@@ -134,7 +134,64 @@ function schemaFor(outs, ins) {
   };
 }
 
+/**
+ * 🔴 THE ONE MISTAKE THIS MODEL MAKES EVERY TIME, REPAIRED AT THE BOUNDARY AND
+ * REPORTED RATHER THAN HIDDEN. Asked 2026-09-21 after seeing it a fourth time:
+ * *"can we please kill it"*, then *"to and by"*, then *"keep it to?"*
+ *
+ * **The language keeps `by` and that is the answer to the question.** `to` is
+ * an ABSOLUTE target and `by` is a RELATIVE shift: `channel to 1` means put it
+ * on channel 1, `transpose by 1` means move it up a semitone, and
+ * `transpose to 1` would mean transpose to note number 1, which is meaningless.
+ * Standardising on `to` would make the patch language wrong in order to agree
+ * with a model.
+ *
+ * 🔴 AND THE PROMPT WAS NEVER THE PROBLEM. It already said, in those words,
+ * *"Use the argument name given above. transpose takes by, not to."* The model
+ * did it anyway on every run. The cause is the SCHEMA's own shape: a link's
+ * destination field is called `to`, and `channel to=N` is the first transform
+ * listed, so `to` sits beside `transpose` twice in the most prominent places
+ * there are. It is pattern matching, not misreading, and no amount of telling
+ * it fixes that.
+ * ⚠️ AND A TIGHTER SCHEMA IS MEASURABLY WORSE, ALREADY PAID FOR HERE: an
+ * `anyOf` with one branch per operation took this model from 1.6 s to 10.2 s
+ * and made it repeat one transform until the tokens ran out, three runs of
+ * three. The loose schema plus an ordinary validator wins.
+ *
+ * ✅ SO: a known synonym is relabelled in ordinary code, which is where MEANING
+ * belongs, and the repair is RETURNED so the page can say it happened. Nothing
+ * is silently rewritten: *a model proposes and a person presses* survives only
+ * if the person can see what the model actually said.
+ * ⚠️ IT REPAIRS ONLY WHERE THE RIGHT KEY IS ABSENT, so a model that sends both
+ * is left alone and refused by the validator, which is the honest answer to an
+ * ambiguous patch.
+ */
+const SYNONYM = { transpose: { to: 'by' } };
+
+export function relabel(links) {
+  const fixed = [];
+  const out = (Array.isArray(links) ? links : []).map((l) => {
+    const transforms = (Array.isArray(l?.transforms) ? l.transforms : []).map((t) => {
+      const map = SYNONYM[t?.op];
+      if (!map) return t;
+      const next = { ...t };
+      for (const [wrong, right] of Object.entries(map)) {
+        if (next[wrong] !== undefined && next[right] === undefined) {
+          next[right] = next[wrong];
+          delete next[wrong];
+          fixed.push({ op: t.op, said: wrong, read: right, value: next[right] });
+        }
+      }
+      return next;
+    });
+    return { ...l, transforms };
+  });
+  return { links: out, fixed };
+}
+
 function systemFor(ports, facts) {
+  const outs = ports.filter((p) => p.dir === 'out').map((p) => p.id);
+  const ins = ports.filter((p) => p.dir === 'in').map((p) => p.id);
   const line = (p) => `  ${p.id} : ${p.label}${p.dir === 'in' ? ' (receives)' : ' (sends)'}`;
   return [
     'You turn a spoken studio instruction into patch bay links. Output only links.',
@@ -147,7 +204,15 @@ function systemFor(ports, facts) {
     '  only cls=C          keep only that class',
     '  drop cls=C          drop that class',
     '  cc from=A to=B ch=N move controller A to controller B, optionally onto channel N',
-    'Use the argument name given above. transpose takes by, not to.',
+    /* ⚠️ A WORKED EXAMPLE RATHER THAN A FOURTH SENTENCE TELLING IT. The line
+       that used to sit here said *"transpose takes by, not to"* in those words
+       and the model still sent `to` on every run. `relabel` is what actually
+       fixes it; this is here because an example costs nine tokens and a
+       repaired patch costs a line of explanation on the page. */
+    'One link up a semitone onto channel 1 looks exactly like this:',
+    `  {"from": "${outs[0]}", "to": "${ins[0]}", `
+      + '"transforms": [{"op": "transpose", "by": 1}, {"op": "channel", "to": 1}]}',
+    'Note "by" for transpose and "to" for channel. They are different words.',
     facts || '',
     'If the instruction names nothing on this desk, return an empty list of links.',
   ].join('\n');
@@ -194,8 +259,12 @@ export async function handle(path, body, run) {
     // why this is two lines rather than one.
     let out = r.response;
     if (typeof out === 'string') { try { out = JSON.parse(out); } catch { out = null; } }
+    const { links, fixed } = relabel(out?.links ?? []);
     return { status: 200, body: {
-      links: out?.links ?? [],
+      links,
+      /* What the model actually said, where this repaired it. The page prints
+         it, because a repair nobody is told about is a rewrite. */
+      fixed,
       raw: typeof r.response === 'string' ? r.response : null,
       usage: r.usage ?? null, ms: Date.now() - t0, model,
     } };
