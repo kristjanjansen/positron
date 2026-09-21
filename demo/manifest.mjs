@@ -598,7 +598,7 @@ export const DEMOS = [
    * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
    */
   { name: 'pack', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
-    one: 'open a Circuit pack and look inside its patches, sessions and samples',
+    one: 'open a Circuit pack or a loose sample set and look inside its patches, sessions and samples',
     tags: ['zip', 'sysex', 'DecompressionStream'] },
   /**
    * 🔴 THE GRID, AND ITS ROWS ARE WHATEVER A READER OPENS. Asked 2026-09-21:
@@ -613,8 +613,8 @@ export const DEMOS = [
    * unzipped, all 64 samples decoded and every check run.
    */
   { name: 'tom', group: 'hardware', act: 4, created: '2026-09-21', built: true,
-    one: 'tap a grid of 16 steps whose rows become the samples in a Circuit pack you open here',
-    tags: ['WebAudio', 'timeline', 'zip'] },
+    one: 'tap a grid of 16 steps whose rows become the samples out of a Circuit pack or sample set you open here',
+    tags: ['WebAudio', 'timeline', 'zip', 'sysex'] },
 
   /**
    * 🔴 THE THIRD HARDWARE PANEL, AND ITS LAYOUT IS THE WEAKEST OF THE THREE.
