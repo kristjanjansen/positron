@@ -104,6 +104,59 @@ rotaries read C1 to C8` passed with the constant REVERSED, because it compared
 the DOM against the thing that built it. `the wheels are centred` passed with
 centring OFF, because it measured the full-width wrapper, which cannot move.
 
+## Planned and not built: `/patches/` and a drop target
+
+`plans/plan-patches-page.md`, 128 lines, written 2026-09-21 on instruction
+(*"do lightweight planning on patch demo (inclu global dragdroppable upload)"*).
+Lightweight on purpose: everything hard is already measured and named, so what
+is missing is one page and one kit module.
+
+**Asked for after the question "where is patch analuzer / unpacker?", and the
+honest answer was: the unpacker exists, the analysis exists as research, and
+there is no page.** `demo/shell/unzip.mjs` reads a `.circuitpack` in a browser
+with nothing vendored at 13 asserts; `research/circuit-soundbank-2026-09-21.md`
+is the 514-line analysis; `plans/plan-circuit-editor.md` has the format byte
+for byte. Nothing puts any of it on screen.
+
+🔴 **THE DECODER IS THE ONE THING THAT EXISTED AND WAS NOT KEPT.** The soundbank
+analysis built one, graded it against the published `patch_0` at 246 varying
+fields of 324 exactly, and it lived in a scratchpad that is gone. Step one is
+`demo/shell/circuit-patch.mjs` with its own no-browser test, or the page becomes
+the third place that knows the format.
+
+🔴 **AND THE FEATURE THAT EARNS THE PAGE IS A SAFETY CHECK.** It prints, per
+session, the distinct fingerprints, the entropy, the non-zero share and the
+first four bytes. Those four cheap numbers separate a backup from a wipe: the
+purchased pack's 32 sessions measured **1 distinct fingerprint of 32, entropy
+0.01, 0.1 per cent non-zero, first bytes `INIT`** against the owner's **32 of
+32, 0.83 to 1.46, 84.6 to 89.6 per cent, `DEMO`**. All three packs display as
+`*New Pack` in Components, so the only backup of the instrument and the two that
+would erase it are three identical rows, and this page is what tells them apart
+before anybody presses `Send to Circuit`.
+
+🔴 **THE DROP TARGET IS `open`, NEVER `upload`.** `demo/shell/drop.mjs`, a kit
+module. Nothing leaves the machine: `FileReader` to an `ArrayBuffer` in the tab,
+no `fetch`. A purchased soundbank lives in `purchased/` precisely because it is
+not ours to publish, and a control called *upload* invites somebody to build the
+thing the gitignore exists to prevent.
+⚠️ Four of its five traps are already measured elsewhere here: `dragleave` fires
+on every child so a boolean flickers; `preventDefault` is needed on BOTH
+`dragover` and `drop` or the browser navigates to the file and the page is gone;
+a fixed full-page cover sits over the controls, which is the `/weight/` and
+`/floor/` lesson; and a drop target that is the only way in is a page somebody
+cannot use, so there is an `<input type="file">` behind a button on the same
+handler.
+
+⚠️ **AND `/patches/` SENDS NOTHING. NOT ONE BYTE.** No Web MIDI at all, asserted,
+because a page that could send a pack is one press from destroying flash on an
+instrument with no factory reset, and `New Pack.circuitpack` is the only backup
+of that flash. `/shape/`'s wall is the model, except that here the function that
+turns an intention into bytes does not exist.
+
+⚠️ Order matters and the page is third: the decoder, then the shared drop module
+with its `/kit/` block, then the page, then the fingerprint panel. Anything
+shared lands before the page that wants it, which is the standing rule.
+
 ## What is open
 
 1. **`origin/main`**, above. The only thing here needing a person rather than a
