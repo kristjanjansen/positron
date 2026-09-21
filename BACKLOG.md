@@ -133,6 +133,28 @@
 Collected as it arrived, before any of it was worked on. Verbatim, because the
 third line carries a correction about a request that was already made once.
 
+✅ **ALL FIVE DONE 2026-09-21. `/bay/` IS 49/49 LOCALLY, UP FROM 44/44, AND THE
+MODEL IS UNTOUCHED AT 36/36.** The tables are gone, the readout is `readout:
+null` declared rather than omitted, the status button latches and says
+`wait for instrument`, the picture sits above it, and the `from` and `to` cells
+sit under it carrying the two counters at the two ends of one link.
+🔴 **THE FIRST ASK WAS FOUND AND IT IS ONE LINE: *"So the patcbay visualiser
+table plus fiagram"*, said the same day while specifying `/pack/`** and recorded
+in this file under that page. So the visualiser was defined as a table beside a
+picture, and *"do not use tables"* in the same breath as the second ask settles
+which half survives on `/bay/`. **One `createDiagram` does both jobs**: at rest
+it is the bay, with a link it is the connection, and the JSON appears beside it
+only when something is connected.
+⚠️ **AND PATCHING IS NOW ONLY BY PLAYING.** With the rows gone there is no way
+to pick an instrument with a pointer, which is what *"i want connection from
+pressing cntroller keys on 1rst and second instrument"* asked for four times and
+what `wait for instrument` means. **The cost is that a visitor with no MIDI
+instrument can read this page and cannot work it**, and that is a real change
+worth confirming rather than assuming.
+⚠️ **`/bay/` IS STILL UNHEARD** and one new path is unheard twice over: an
+instrument plugged in while the button is latched is adopted without a second
+press, which is written and has never been measured against a real socket.
+
 - **`rm instruments` / `links` / `sent` / `heard`**. Four readout cells named
   one per line.
 - **`online status button: 'wait for instrument' (like push to talk but does

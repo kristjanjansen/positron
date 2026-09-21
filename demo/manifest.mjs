@@ -550,7 +550,7 @@ export const DEMOS = [
    * suite by returning yes to everything.
    */
   { name: 'bay', group: 'hardware', act: 4, created: '2026-09-21', built: true,
-    one: 'route one instrument to another, with the connections it refuses explained in words',
+    one: 'play one instrument and then another to connect them',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
   /**
