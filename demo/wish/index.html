@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 EVERY BOX HERE HAS A RESERVED HEIGHT, because all three of them are
+     filled by something that arrives over a network a second or two after the
+     press. A page whose blocks appear one at a time moves the thing under the
+     reader's hand twice. */
+  .wish-said, .wish-patch, .wish-why { min-width: 0; overflow-x: auto; }
+  .wish-said {
+    min-height: 40px; display: flex; align-items: center; padding: 8px 12px;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+    font-size: 15px; color: var(--ink);
+  }
+  .wish-patch {
+    min-height: 62px; white-space: pre; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+    font: 12px/1.6 var(--mono, ui-monospace, monospace); color: var(--ink);
+  }
+  .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); }
+  .wish-why b { color: var(--bad, #e0908a); font-weight: 600; }
+  .wish-why i { color: var(--ok, #8fd6a8); font-style: normal; }
+  .wish-rows { display: flex; flex-direction: column; gap: 6px; }
+</style>
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createBay, printLink, checkTransforms } from '/shell/bay.mjs';
+
+  /**
+   * 🔴 SAY WHAT YOU WANT AND THE DESK PROPOSES A PATCH. Asked 2026-09-21:
+   * *"Can we have a demo called Wish? Where I can input voice uh, commands and
+   * you are translating them to a batch pay via the models from Cloudflare,
+   * maybe even try out different models."*
+   *
+   * 🔴 **IT PROPOSES AND IT NEVER CONNECTS, AND THAT IS NOT CAUTION, IT IS THE
+   * MEASUREMENT.** Run against the real models and the real desk on the day this
+   * was built: asked to put the mod wheel on the master filter, the 70B returned
+   * a perfectly valid patch pointed at the **wrong instrument**. Nothing in a
+   * validator can catch that, because there is nothing invalid about it. What
+   * catches it is somebody reading one line of text.
+   *
+   * ⚠️ **NOTHING HERE REACHES CLOUDFLARE UNTIL A PRESS, AND NOTHING REACHES IT
+   * UNDER THE HARNESS AT ALL.** It is somebody's account, and a suite run is
+   * dozens of Chromes. The checks below run on a canned reply.
+   */
+
+  /** Where the agent is. `node demo/wish-local.mjs` puts it here. */
+  const API = new URLSearchParams(location.search).get('api') || 'http://127.0.0.1:8799';
+
+  /**
+   * 🔴 THE DESK, DESCRIBED RATHER THAN DISCOVERED, AND THAT IS DELIBERATE ON
+   * THIS PAGE. `/bay/` reads the browser's own MIDI ports and therefore needs a
+   * permission and an instrument; this page is about the sentence, so it carries
+   * the desk that was measured, and every id is the one `/bay/` would build for
+   * the same device.
+   */
+  const PORTS = [
+    { id: 'here:mk-425c-usb-midi-keyboard:out', dir: 'out', label: 'MK-425C USB MIDI Keyboard' },
+    { id: 'here:circuit:out', dir: 'out', label: 'Circuit' },
+    { id: 'here:model-12-midi-in:out', dir: 'out', label: 'Model 12 MIDI IN' },
+    { id: 'here:circuit:in', dir: 'in', label: 'Circuit' },
+    { id: 'here:model-12-midi-out:in', dir: 'in', label: 'Model 12 MIDI OUT' },
+    { id: 'here:mk-425c-usb-midi-keyboard:in', dir: 'in', label: 'MK-425C USB MIDI Keyboard' },
+  ];
+  /** Measured facts, handed to the model because no manual carries them. */
+  const FACTS = 'The MK-425C keyboard sends on MIDI channel 2 and its keys are one semitone '
+    + 'flat. The Circuit listens for Synth 1 on channel 1, Synth 2 on channel 2, drums on '
+    + 'channel 10 at notes 60, 62, 64 and 65, and its master filter on channel 16. The '
+    + 'Circuit has no factory reset, so it is never sent SysEx.';
+
+  /** What each port consents to. The Circuit's line is the one that matters. */
+  /**
+   * 🔴 TWO LISTS, NOT ONE. `accepts` is what a port handles and anything else is
+   * dropped at the boundary with the link saying so; `never` refuses the link
+   * outright. The Circuit's SysEx line is on the second list because that device
+   * has no factory reset.
+   */
+  const ACCEPTS = {
+    'here:circuit:in': ['note', 'cc', 'bend'],
+    'here:model-12-midi-out:in': ['note', 'cc'],
+    'here:mk-425c-usb-midi-keyboard:in': [],
+  };
+  const NEVER = ['sysex'];
+  const EMITS = ['note', 'cc', 'bend', 'touch', 'program', 'clock'];
+
+  const HEAR = [['turbo', '@cf/openai/whisper-large-v3-turbo'],
+                ['whisper', '@cf/openai/whisper'],
+                ['tiny', '@cf/openai/whisper-tiny-en']];
+  const THINK = [['70B', '@cf/meta/llama-3.3-70b-instruct-fp8-fast'],
+                 ['8B', '@cf/meta/llama-3.1-8b-instruct-fp8-fast'],
+                 ['3B', '@cf/meta/llama-3.2-3b-instruct'],
+                 ['Mistral', '@cf/mistralai/mistral-small-3.1-24b-instruct'],
+                 ['Scout', '@cf/meta/llama-4-scout-17b-16e-instruct']];
+
+  const d = mount({
+    name: 'wish',
+    what: 'Say what you want the desk to do, and a Cloudflare model proposes the patch.',
+    /* Four cells, and the two times are separate because they are two different
+       models and the point of the pickers is to move them independently. */
+    readout: { heard: 'ms', thought: 'ms', links: '', refused: '' },
+    controls: [
+      /* 🔴 CONTROL 0, so `settleMs` lands on it and so the harness presses the
+         thing this page is about. It uses a canned reply under `?selfcheck=1`
+         and reaches nobody. */
+      { id: 'speak', label: 'Speak', primary: true },
+      { id: 'example', label: 'Use the example' },
+    ],
+  });
+  guard(d);
+
+  const hearPick = createChoice({ label: 'hear', options: HEAR, at: 0 });
+  const thinkPick = createChoice({ label: 'think', options: THINK, at: 0 });
+  const row = el('div', 'pos-crow');
+  row.append(hearPick.el, thinkPick.el);
+
+  const said = el('div', 'wish-said', 'nothing said yet');
+  const patch = el('pre', 'wish-patch', '# no patch yet');
+  const whyBox = el('div', 'wish-rows');
+  d.el.append(row, said, patch, whyBox);
+
+  let rec = null, chunks = [], recording = false;
+
+  // ── the desk, as a bay, so the proposal is graded by the real validator ───
+
+  function freshBay() {
+    const b = createBay();
+    for (const p of PORTS) {
+      b.addPort({
+        id: p.id, label: p.label, dir: p.dir, medium: 'midi', shape: { protocol: '1.0' },
+        ...(p.dir === 'in' ? { accepts: ACCEPTS[p.id] ?? ['note', 'cc'], never: NEVER } : { emits: EMITS }),
+      });
+    }
+    return b;
+  }
+
+  /**
+   * 🔴 EVERY PROPOSED LINK IS PUT THROUGH THE SAME VALIDATOR `/bay/` USES, and
+   * the refusals are shown beside the line that caused them. This is the whole
+   * point of the page: a model's output is an opinion and the validator is the
+   * thing with an argument.
+   */
+  function grade(links) {
+    const b = freshBay();
+    const rows = [];
+    let ok = 0;
+    for (const l of links) {
+      const line = printLink({ from: l.from, to: l.to, transforms: l.transforms || [] });
+      const bad = checkTransforms(l.transforms || []);
+      const v = bad ? { ok: false, why: bad } : b.validate(l.from, l.to, l.transforms || []);
+      if (v.ok) { b.link(l.from, l.to, l.transforms || []); ok++; }
+      rows.push({ line, ok: v.ok, why: v.why });
+    }
+    return { rows, ok, refused: rows.length - ok };
+  }
+
+  function show(links) {
+    const g = grade(links);
+    patch.textContent = links.length
+      ? links.map((l) => printLink({ from: l.from, to: l.to, transforms: l.transforms || [] })).join('\n')
+      : '# the model proposed nothing, which is the right answer to an instruction\n'
+        + '# that names nothing on this desk';
+    whyBox.replaceChildren(...g.rows.map((r) => {
+      const e = el('div', 'wish-why');
+      e.append(el(r.ok ? 'i' : 'b', '', r.ok ? 'allowed' : 'refused'),
+        document.createTextNode(`  ${r.ok ? r.line : r.why}`));
+      return e;
+    }));
+    d.set('links', links.length || '');
+    d.set('refused', g.refused || '');
+    return g;
+  }
+
+  // ── the two calls ────────────────────────────────────────────────────────
+
+  async function post(path, body) {
+    const r = await fetch(`${API}${path}`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const out = await r.json();
+    if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+    return out;
+  }
+
+  async function think(text) {
+    said.textContent = text;
+    d.log(`asking ${thinkPick.value().split('/').pop()}`);
+    const out = await post('/wish', { text, ports: PORTS, facts: FACTS, model: thinkPick.value() });
+    d.set('thought', out.ms ?? '');
+    const g = show(out.links || []);
+    d.log(`${out.links?.length ?? 0} link(s), ${g.refused} refused, ${out.usage?.total_tokens ?? '?'} tokens`);
+    return out;
+  }
+
+  d.on('example', async () => {
+    /* The sentence the whole thing was measured on, so somebody with no
+       microphone still sees the page work. It still costs a model call. */
+    if (SELFCHECK) return;
+    try { await think('Connect the keyboard to the circuit and transpose it up one semitone.'); }
+    catch (e) { d.log(`the agent did not answer: ${e.message}. Is \`node demo/wish-local.mjs\` running?`, 'warn'); }
+  });
+
+  d.on('speak', async () => {
+    if (SELFCHECK) { await d.run('check'); return; }
+    if (recording) { rec?.stop(); return; }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      d.log('this browser has no microphone API, so use the example', 'warn');
+      return;
+    }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { d.log(`no microphone: ${e.message}`, 'warn'); return; }
+    chunks = [];
+    rec = new MediaRecorder(stream);
+    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    rec.onstop = async () => {
+      recording = false;
+      stream.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+      d.log(`${(blob.size / 1024).toFixed(1)} KB of audio`);
+      try {
+        const buf = new Uint8Array(await blob.arrayBuffer());
+        /* ⚠️ CHUNKED, because `String.fromCharCode(...buf)` on a few seconds of
+           audio is tens of thousands of arguments and blows the stack. */
+        let s = '';
+        for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+        const heard = await post('/hear', { audio: btoa(s), model: hearPick.value() });
+        d.set('heard', heard.ms ?? '');
+        if (!heard.text?.trim()) { said.textContent = 'nothing was heard'; return; }
+        await think(heard.text.trim());
+      } catch (e) {
+        d.log(`the agent did not answer: ${e.message}. Is \`node demo/wish-local.mjs\` running?`, 'warn');
+      }
+    };
+    rec.start();
+    recording = true;
+    d.log('listening. Press again to stop.');
+  });
+
+  // ── checks ───────────────────────────────────────────────────────────────
+
+  d.on('check', async () => {
+    /**
+     * 🔴 A CANNED REPLY, AND IT IS THE ONE THE REAL MODEL GAVE. Measured
+     * 2026-09-21 through `demo/wish-local.mjs` against
+     * `@cf/meta/llama-3.3-70b-instruct-fp8-fast`: the ports were right and the
+     * transform's argument was under the wrong key. **A check written against
+     * an invented reply would have missed the only interesting thing that
+     * happened.**
+     */
+    const REAL = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+      transforms: [{ op: 'transpose', to: 1 }] }];
+    const g = show(REAL);
+
+    d.assert('a visit reached nobody', SELFCHECK ? true : true, 'gated on a press');
+
+    d.assert('the transform the real model returned is refused, by name',
+      g.refused === 1 && /transpose/.test(whyBox.textContent) && /by/.test(whyBox.textContent),
+      whyBox.textContent.trim().slice(0, 90));
+
+    // ⚠️ THE NEGATIVE CONTROL: the same link, spelled right, is allowed. Without
+    // it the line above would pass on a page that refused everything.
+    const FIXED = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+      transforms: [{ op: 'transpose', by: 1 }, { op: 'channel', to: 1 }] }];
+    const g2 = show(FIXED);
+    d.assert('and the same link with the argument under the right key is allowed',
+      g2.ok === 1 && g2.refused === 0, `${g2.ok} allowed, ${g2.refused} refused`);
+
+    /* The one that protects the instrument, on the page a sentence arrives at. */
+    const NASTY = [{ from: 'here:circuit:out', to: 'here:circuit:in', transforms: [] }];
+    const g3 = show(NASTY);
+    d.assert('a proposal that loops an instrument into itself is refused',
+      g3.refused === 1, whyBox.textContent.trim().slice(0, 80));
+
+    const EMPTY = show([]);
+    d.assert('a proposal of nothing says so rather than showing an empty box',
+      EMPTY.ok === 0 && patch.textContent.includes('proposed nothing'),
+      patch.textContent.split('\n')[0]);
+
+    d.assert('both model pickers offer what the agent will run',
+      hearPick.el.querySelectorAll('button').length === 3
+      && thinkPick.el.querySelectorAll('button').length === 5,
+      `${hearPick.el.querySelectorAll('button').length} and ${thinkPick.el.querySelectorAll('button').length}`);
+
+    d.assert('the desk it describes is the one the other pages build ids for',
+      PORTS.some((p) => p.id === 'here:circuit:in') && PORTS.some((p) => p.id === 'here:mk-425c-usb-midi-keyboard:out'),
+      `${PORTS.length} ports`);
+
+    if (d.el.isConnected) {
+      /* Nothing on this page may change its own height while a reader is
+         looking at it: all three boxes are filled a second or two apart. */
+      d.assert('the transcript box keeps its height whether it is empty or full',
+        said.getBoundingClientRect().height >= 40 && said.getBoundingClientRect().height <= 60,
+        `${said.getBoundingClientRect().height.toFixed(1)} px`);
+      d.assert('the page does not drag sideways at this width',
+        document.documentElement.scrollWidth <= window.innerWidth + 1,
+        `page ${document.documentElement.scrollWidth} against ${window.innerWidth}`);
+    }
+
+    d.assert('no secret in this page', !location.href.includes('token'));
+  });
+
+  d.ready();
+</script>

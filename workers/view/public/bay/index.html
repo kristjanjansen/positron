@@ -63,12 +63,21 @@
    * continuously at about 122 bpm, which makes it the master. Sending it one is
    * an argument between two clocks.
    */
+  /**
+   * 🔴 `accepts` AND `never` ARE TWO DIFFERENT LISTS AND THE SECOND ONE IS THE
+   * INSTRUMENT'S SAFETY. A class a port merely does not handle is dropped at
+   * the boundary and the link says so; a class on `never` refuses the link
+   * outright. The difference is between *I do not use that* and *that damages
+   * me*, and the first build had only one list, which refused every real link
+   * on this desk because a MIDI source emits six classes and a synth takes
+   * three.
+   */
   const CONSENT = [
-    { match: /circuit/i, accepts: ['note', 'cc', 'bend'],
+    { match: /circuit/i, accepts: ['note', 'cc', 'bend'], never: ['sysex'],
       why: 'no SysEx, because one byte inside one overwrites a patch and this device has no factory reset' },
-    { match: /model 12/i, accepts: ['note', 'cc'],
+    { match: /model 12/i, accepts: ['note', 'cc'], never: ['sysex'],
       why: 'a desk, so notes and controllers only' },
-    { match: /mk-?4\d\dc|evolution/i, accepts: [],
+    { match: /mk-?4\d\dc|evolution/i, accepts: [], never: ['sysex'],
       why: 'a controller with no sound engine, so nothing is worth sending to it' },
   ];
   const DEFAULT_ACCEPTS = ['note', 'cc', 'bend'];
@@ -220,7 +229,7 @@
 
   function consentFor(name) {
     const rule = CONSENT.find((c) => c.match.test(name));
-    return rule ? rule : { accepts: DEFAULT_ACCEPTS, why: '' };
+    return rule ? rule : { accepts: DEFAULT_ACCEPTS, never: ['sysex'], why: '' };
   }
 
   /** One Web MIDI port becomes one bay port. */
@@ -241,7 +250,7 @@
     const id = `here:${slug(p.name)}:in`;
     const c = consentFor(p.name || '');
     bay.addPort({ id, label: p.name || 'unnamed', dir: 'in', medium: 'midi',
-      shape: { protocol: '1.0' }, accepts: c.accepts, note: c.why,
+      shape: { protocol: '1.0' }, accepts: c.accepts, never: c.never ?? ['sysex'], note: c.why,
       deliver: (ev) => {
         const bytes = toBytes(ev);
         if (!bytes) return;
@@ -332,7 +341,7 @@
       shape: { protocol: '1.0' }, emits: ['note', 'cc', 'sysex'] });
     const c = consentFor('Circuit');
     bay.addPort({ id: 'test:circuit:in', label: 'Circuit', dir: 'in', medium: 'midi',
-      shape: { protocol: '1.0' }, accepts: c.accepts, note: c.why,
+      shape: { protocol: '1.0' }, accepts: c.accepts, never: c.never, note: c.why,
       deliver: () => { heard++; } });
     paint();
 

@@ -13,7 +13,7 @@
 // other side.
 
 import { createBay, apply, delivers, printLink, parseLink, printPatch, parsePatch,
-  classOf, CLASSES, MEDIA, STALE_MS } from './bay.mjs';
+  classOf, checkTransforms, CLASSES, MEDIA, STALE_MS } from './bay.mjs';
 import { decode } from './midi-decode.mjs';
 
 let pass = 0, fail = 0;
@@ -28,7 +28,7 @@ function desk({ accepts = ['note', 'cc', 'bend'] } = {}) {
   b.addPort({ id: 'here:mk425c:out', label: 'MK-425C', dir: 'out', medium: 'midi',
     shape: { protocol: '1.0' }, emits: ['note', 'cc', 'bend'] });
   b.addPort({ id: 'here:circuit:in', label: 'Circuit', dir: 'in', medium: 'midi',
-    shape: { protocol: '1.0' }, accepts, deliver: (e) => heard.push(e) });
+    shape: { protocol: '1.0' }, accepts, never: ['sysex'], deliver: (e) => heard.push(e) });
   b.addPort({ id: 'here:circuit:out', label: 'Circuit out', dir: 'out', medium: 'midi',
     shape: { protocol: '1.0' }, emits: ['note', 'cc', 'clock'] });
   b.addPort({ id: 'here:mk425c:in', label: 'MK-425C in', dir: 'in', medium: 'midi',
@@ -179,11 +179,15 @@ console.log('\n== the patch bay ==');
 }
 
 {
-  // 11. Transforms that drop everything would make a link that looks connected
-  //     and carries nothing, which is this project's definition of a lie.
+  // 11. Transforms that leave NO class at all would make a link that looks
+  //     connected and carries nothing, which is this project's definition of a
+  //     lie. `mk425c:out` emits note, cc and bend, so keeping only sysex keeps
+  //     nothing. ⚠️ A DIFFERENT REFUSAL FROM 11c BELOW: here the SOURCE is left
+  //     with nothing, there the DESTINATION takes none of what arrives.
   const b = desk();
-  const r = b.link('here:mk425c:out', 'here:circuit:in', [{ op: 'only', cls: 'program' }]);
-  ok('a link whose transforms drop everything is refused', !r.ok && /nothing/.test(r.why), r.why);
+  const r = b.link('here:mk425c:out', 'here:circuit:in', [{ op: 'only', cls: 'sysex' }]);
+  ok('a link whose transforms leave no class at all is refused',
+    !r.ok && /nothing/.test(r.why), r.why);
 }
 
 // ── transforms ─────────────────────────────────────────────────────────────
@@ -214,6 +218,43 @@ console.log('\n== the patch bay ==');
   const other = apply([{ op: 'cc', from: 1, to: 74, ch: 16 }], { cls: 'cc', ch: 2, d1: 7, d2: 64 });
   ok('and it leaves a different controller entirely alone',
     other.d1 === 7 && other.ch === 2, `CC ${other.d1} on channel ${other.ch}`);
+}
+
+// ── a transform that is not well formed ────────────────────────────────────
+//
+// 🔴 THESE ARE NOT HYPOTHETICAL. MEASURED 2026-09-21: asked to turn *"connect
+// the keyboard to the circuit and transpose it up one semitone"* into a patch,
+// Workers AI returned `{ op: 'transpose', to: 1 }`, which is valid against the
+// JSON Schema it was generated under and is meaningless. `transpose` takes
+// `by`, and `ev.d1 + undefined` is `NaN`, which is neither a throw nor a drop.
+
+{
+  const b = desk();
+  const r = b.link('here:mk425c:out', 'here:circuit:in', [{ op: 'transpose', to: 1 }]);
+  ok('a transform with its argument under the wrong key is refused, by name',
+    !r.ok && r.why.includes('transpose') && r.why.includes('by'), r.why);
+}
+
+{
+  // NEGATIVE CONTROL: the same transform, spelled right, connects.
+  const b = desk();
+  const r = b.link('here:mk425c:out', 'here:circuit:in', [{ op: 'transpose', by: 1 }]);
+  ok('and the same transform spelled correctly is allowed', r.ok, r.why);
+}
+
+{
+  ok('a class nobody has heard of is named in the refusal',
+    checkTransforms([{ op: 'only', cls: 'banana' }]).includes('banana'),
+    checkTransforms([{ op: 'only', cls: 'banana' }]));
+  ok('a half given cc remap says which half is missing',
+    checkTransforms([{ op: 'cc', from: 1 }]).includes('to'),
+    checkTransforms([{ op: 'cc', from: 1 }]));
+  ok('a number given as a string is refused rather than coerced',
+    checkTransforms([{ op: 'channel', to: '1' }]).includes('number'),
+    checkTransforms([{ op: 'channel', to: '1' }]));
+  ok('and a well formed list says nothing at all',
+    checkTransforms([{ op: 'channel', to: 1 }, { op: 'drop', cls: 'sysex' }]) === '',
+    'empty string');
 }
 
 // ── the text form ──────────────────────────────────────────────────────────

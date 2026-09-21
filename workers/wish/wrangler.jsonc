@@ -1,0 +1,16 @@
+{
+  "name": "positron-wish",
+  // The speech half of the patch bay. It exists because a browser cannot hold a
+  // Cloudflare credential, so the two model calls have to happen somewhere with
+  // a binding, and this is the smallest somewhere.
+  //
+  // 🔴 NO CUSTOM DOMAIN AND NO ROUTE, DELIBERATELY. This spends somebody's
+  // account every time it is called, so it is not on a hostname that a crawler
+  // or a stray page can find. Run it with `npx wrangler dev` and point the page
+  // at it, and decide about deploying separately.
+  "workers_dev": false,
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "ai": { "binding": "AI" },
+  "observability": { "enabled": true }
+}

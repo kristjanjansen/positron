@@ -68,14 +68,14 @@ const OPS = {
    *  Circuit's first synth listens on 1, so this is the transform the smallest
    *  useful patch in this repository needs. */
   channel: {
-    args: ['to'],
+    args: ['to'], need: ['to'],
     classes: (set) => set,
     run: (ev, a) => (ev.ch === null ? ev : { ...ev, ch: a.to }),
   },
   /** Move notes. `+1` is a real thing somebody wants on day one here: the
    *  MK-425C was measured a semitone flat. */
   transpose: {
-    args: ['by'],
+    args: ['by'], need: ['by'],
     classes: (set) => set,
     run: (ev, a) => {
       if (ev.cls !== 'note') return ev;
@@ -88,7 +88,7 @@ const OPS = {
   /** Scale note-on velocity. A note off is left alone: its velocity is a
    *  release and scaling it makes a release that never reaches zero. */
   velocity: {
-    args: ['scale'],
+    args: ['scale'], need: ['scale'],
     classes: (set) => set,
     run: (ev, a) => {
       if (ev.cls !== 'note' || ev.d2 === 0) return ev;
@@ -97,13 +97,13 @@ const OPS = {
   },
   /** Keep one class and drop the rest. */
   only: {
-    args: ['cls'],
+    args: ['cls'], need: ['cls'],
     classes: (set, a) => new Set([...set].filter((c) => c === a.cls)),
     run: (ev, a) => (ev.cls === a.cls ? ev : null),
   },
   /** Drop one class and keep the rest. */
   drop: {
-    args: ['cls'],
+    args: ['cls'], need: ['cls'],
     classes: (set, a) => new Set([...set].filter((c) => c !== a.cls)),
     run: (ev, a) => (ev.cls === a.cls ? null : ev),
   },
@@ -116,7 +116,7 @@ const OPS = {
    * mod wheel to both.
    */
   cc: {
-    args: ['from', 'to', 'ch'],
+    args: ['from', 'to', 'ch'], need: ['from', 'to'],
     classes: (set) => set,
     run: (ev, a) => {
       if (ev.cls !== 'cc' || ev.d1 !== a.from) return ev;
@@ -126,6 +126,42 @@ const OPS = {
 };
 
 export const OP_NAMES = Object.keys(OPS);
+
+/**
+ * 🔴 A TRANSFORM WITH ITS ARGUMENT UNDER THE WRONG KEY IS THE DEFECT THIS
+ * FUNCTION EXISTS FOR, AND IT WAS FOUND BY MEASUREMENT RATHER THAN BY READING.
+ * 2026-09-21, asking Workers AI to turn a spoken sentence into a patch, the
+ * model returned `{ op: 'transpose', to: 1 }`. **`transpose` takes `by`.** The
+ * object was perfectly valid against the JSON Schema it was generated under,
+ * because that schema listed every argument any op could take and required only
+ * `op`, so `to` was allowed on a transform that has no `to`.
+ * ⚠️ **AND `apply()` WOULD HAVE SAID NOTHING.** `ev.d1 + undefined` is `NaN`,
+ * which is not a throw and not a drop: it is a note number that no longer exists
+ * arriving at an instrument, from a page that reported the link as connected.
+ * 🔴 **SO THE CHECK LIVES HERE RATHER THAN IN THE SCHEMA.** A schema constrains
+ * the SHAPE of what a model may say and it cannot constrain the MEANING. That is
+ * the same rule this project already has about a shape being declared rather
+ * than inferred, arriving from the direction of a language model.
+ * @returns {string} '' when every transform is well formed, or the reason.
+ */
+export function checkTransforms(transforms) {
+  for (const t of transforms || []) {
+    if (!t || typeof t !== 'object') return 'a transform must be an object with an op';
+    const op = OPS[t.op];
+    if (!op) return `no transform called "${t.op}". There are ${OP_NAMES.join(', ')}`;
+    for (const k of op.need) {
+      if (t[k] === undefined || t[k] === null) {
+        return `${t.op} needs ${k} and was given ${Object.keys(t).filter((x) => x !== 'op').join(', ') || 'nothing'}`;
+      }
+      if (k === 'cls') {
+        if (!CLASSES.includes(t.cls)) return `${t.op} was given cls "${t.cls}", which is not one of ${CLASSES.join(', ')}`;
+      } else if (typeof t[k] !== 'number' || Number.isNaN(t[k])) {
+        return `${t.op} needs ${k} to be a number, and it is ${JSON.stringify(t[k])}`;
+      }
+    }
+  }
+  return '';
+}
 
 /** Run an ordered list. Returns the event, or null if something dropped it. */
 export function apply(transforms, ev) {
@@ -214,6 +250,8 @@ export function createBay({ now = () => Date.now() } = {}) {
    * @param {string} p.medium  one of MEDIA
    * @param {object} p.shape   what the data IS
    * @param {string[]} [p.accepts] in-ports: the classes it consents to
+   * @param {string[]} [p.never]   in-ports: classes that make a link a HARD
+   *                               REFUSAL rather than a quiet drop. See below.
    * @param {string[]} [p.emits]   out-ports: the classes it can produce
    * @param {Function} [p.deliver] in-ports: where a delivered event goes
    */
@@ -221,7 +259,7 @@ export function createBay({ now = () => Date.now() } = {}) {
     if (!p.id) throw new Error('bay: a port needs an id');
     if (!MEDIA.includes(p.medium)) throw new Error(`bay: medium is one of ${MEDIA.join(', ')}, not ${p.medium}`);
     if (p.dir !== 'in' && p.dir !== 'out') throw new Error('bay: dir is "in" or "out"');
-    ports.set(p.id, { accepts: [], emits: [], shape: {}, seenAt: now(), heard: 0, ...p });
+    ports.set(p.id, { accepts: [], never: [], emits: [], shape: {}, seenAt: now(), heard: 0, ...p });
     return ports.get(p.id);
   }
   function seen(id) { const p = ports.get(id); if (p) p.seenAt = now(); }
@@ -245,6 +283,12 @@ export function createBay({ now = () => Date.now() } = {}) {
     }
     if (a.id === b.id) return { ok: false, why: 'a port cannot feed itself' };
 
+    /* Before anything about the ports: is the list of transforms even well
+       formed. See `checkTransforms`, which exists because a model produced a
+       schema valid transform with its argument under the wrong key. */
+    const badT = checkTransforms(transforms);
+    if (badT) return { ok: false, why: badT };
+
     // Shape. ⚠️ THE FIELD THAT DISAGREES IS NAMED. "incompatible" is a refusal
     // somebody has to debug; "48000 against 44100" is one they can fix.
     for (const k of Object.keys(b.shape || {})) {
@@ -254,31 +298,55 @@ export function createBay({ now = () => Date.now() } = {}) {
       }
     }
 
-    // Consent.
+    /**
+     * 🔴 CONSENT, AND IT IS TWO DIFFERENT QUESTIONS THAT THE FIRST BUILD
+     * ANSWERED AS ONE. It refused any link that could deliver a class the
+     * destination did not accept, and **that refused every real link on this
+     * desk**: a MIDI source emits six classes, the Circuit takes three, so a
+     * keyboard could never reach a synth at all. Found by `/wish/`, which put a
+     * real model's real proposal through it and got `Circuit does not accept
+     * touch` for a patch that was otherwise perfect.
+     * ✅ **A CLASS A PORT SIMPLY DOES NOT HANDLE IS DROPPED AND REPORTED.** The
+     * drop already happens at the destination in `send`, so nothing is sent
+     * either way; what changes is that the link exists and the reader is told
+     * what will not cross it.
+     * 🔴 **A CLASS A PORT `never` TAKES IS STILL A HARD REFUSAL**, and that is
+     * the list the Circuit's SysEx line lives on. The difference is between *I
+     * do not use that* and *that damages me*.
+     */
     let could;
     try { could = delivers(a.emits, transforms); }
     catch (e) { return { ok: false, why: e.message }; }
     for (const c of could) {
-      if (!b.accepts.includes(c)) {
+      if (b.never.includes(c)) {
         return { ok: false, why: `${b.label} does not accept ${c}, and this link could deliver it` };
       }
     }
-    /* ⚠️ ONLY FOR MIDI. An AUDIO link carries no message classes at all, so an
-       empty set is the normal case there and this rule would refuse every
-       audio link in the building. Found by the test, which is what a negative
-       control on the other medium is for. */
+    /* ⚠️ THE SOURCE BEING LEFT WITH NOTHING IS CHECKED BEFORE THE DESTINATION
+       TAKING NONE OF IT, because they are two different faults and the second
+       message is wrong about the first. Order matters here and a test caught
+       it reading `Circuit takes none of what this link carries` about a link
+       that carried nothing in the first place. */
     if (a.medium === 'midi' && could.size === 0) {
       return { ok: false, why: 'these transforms drop everything, so the link would carry nothing' };
+    }
+    const dropped = [...could].filter((c) => !b.accepts.includes(c));
+    const carried = [...could].filter((c) => b.accepts.includes(c));
+    if (a.medium === 'midi' && !carried.length) {
+      return { ok: false, why: `${b.label} takes none of what this link carries` };
     }
 
     // Cycles, at node level, because hardware THRU can close one outside our view.
     if (reachesNode(nodeOf(b.id), nodeOf(a.id))) {
       return { ok: false, why: `that closes a loop: ${b.label} already reaches ${a.label}` };
     }
-    const warn = stale(a) || stale(b)
-      ? `${stale(a) ? a.label : b.label} has not been heard from for ${Math.round((now() - (stale(a) ? a.seenAt : b.seenAt)) / 1000)}s`
-      : undefined;
-    return { ok: true, why: '', ...(warn ? { warn } : {}) };
+    const warns = [];
+    if (stale(a) || stale(b)) {
+      const p = stale(a) ? a : b;
+      warns.push(`${p.label} has not been heard from for ${Math.round((now() - (p.seenAt ?? 0)) / 1000)}s`);
+    }
+    if (dropped.length) warns.push(`${b.label} will drop ${dropped.join(', ')}`);
+    return { ok: true, why: '', ...(warns.length ? { warn: warns.join('. ') } : {}) };
   }
 
   /**
