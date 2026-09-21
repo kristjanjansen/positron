@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 ONE PITCH, DECLARED ONCE, AND THE JAVASCRIPT NEVER TYPES IT AGAIN.
+     A step's width decides where the playhead band sits, how wide the ruler
+     tick under it is, and how far an arrow key moves. Three numbers that have
+     to agree, and `--sld-col` is already this project's record of what happens
+     when a shared measurement is typed in two files: `/radio/`'s label column
+     snapped back to the width of one word and was reported three times.
+     ⚠️ THE PAGE READS IT OFF THE LAID OUT ELEMENTS rather than off this
+     declaration, so even this token cannot disagree with the picture: the head
+     takes the ruler tick's own `offsetLeft` and `offsetWidth`.
+     ⚠️ AND THE ROW PITCH IS THE SAME ONE, which is what makes the fixed name
+     column line up with the steps beside it. `panel-layout.mjs`'s contract puts
+     the two in separate flex children, so nothing in the browser makes them
+     agree: they agree because every cell on both sides is `--tom-cell` tall
+     with `--tom-gap` between. There is an assert on the top and bottom edges,
+     because `/model/` records three alignments that looked like one and two of
+     them lining up while the third was 30 px out. */
+  .tom {
+    --tom-gap: 2px;
+    --tom-cell: 16px;
+    --tom-ruler: 14px;
+    /* ⚠️ MEASURED RATHER THAN CHOSEN. `sample_10.wav` is thirteen characters of
+       10 px mono, about 78 px, and the column has to hold that plus its own
+       4 px each side or every row past nine reads `sample_10.wa`. It did, in
+       the first screenshot. */
+    --tom-name: 108px;
+  }
+  /* The column of names. `panel-fixed` already stacks; it has no gap of its own
+     because the panel's flow is what normally carries one, and this page does
+     not use the flow. */
+  .tom-fixed { gap: var(--tom-gap); width: var(--tom-name); }
+  /* ⚠️ THE SPACER IS THE RULER'S HEIGHT AND NOT A GUESS. It is the one child of
+     the fixed column with no counterpart to measure against, so it is declared
+     from the same token the ruler is. */
+  .tom-spacer { height: var(--tom-ruler); flex: 0 0 auto; }
+  /* 🔴 `line-height`, NOT `display: flex`, AND THAT IS WHY THE ELLIPSIS WORKS.
+     A flex container's text is an anonymous flex item, and `text-overflow` does
+     not reach it: the first build centred the name with `align-items` and every
+     name past `sample_9.wav` was HARD CLIPPED mid word with no ellipsis, which
+     photographs as a rendering fault rather than as a name that does not fit.
+     Centring by line height leaves the text in an inline box, where the
+     property applies. */
+  .tom-name {
+    height: var(--tom-cell); flex: 0 0 auto; padding: 0 4px;
+    font: 500 10px/var(--tom-cell) var(--mono); color: var(--dim);
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  /* A row whose sample can be heard is a button; a row with nothing behind it
+     is a div. 🔴 NOT A DISABLED BUTTON: at rest every row is empty, and eight
+     dimmed controls read as a page that failed rather than as a page waiting
+     for a file. A control that cannot do what it names is this project's named
+     lie, and the repair is to not draw the control. */
+  button.tom-name {
+    /* the global button rule is a 34 px pill with 18 px of padding; a cell in a
+       grid is none of those things. The padding stays the one `.tom-name`
+       already sets, so a row with a sample and a row without start their names
+       at the same x. */
+    height: var(--tom-cell); min-height: 0; border-radius: 3px;
+    background: transparent; border: 0; color: var(--fg2);
+    text-align: left; cursor: pointer; display: block; width: 100%;
+  }
+  button.tom-name:hover { background: var(--card2); color: var(--fg); }
+  .tom-name[data-pick] { color: var(--hi); }
+
+  /* The steps. `width: max-content` so the panel's own scroller is what moves,
+     which is contract 1 of `panel-layout.mjs`: one scrolling region, and the
+     page never drags sideways. */
+  .tom-grid {
+    position: relative; width: max-content;
+    display: flex; flex-direction: column; gap: var(--tom-gap);
+  }
+  .tom-ruler {
+    display: flex; gap: var(--tom-gap); height: var(--tom-ruler);
+    cursor: pointer;
+  }
+  .tom-tick {
+    width: var(--tom-cell); flex: 0 0 auto;
+    font: 500 9px/var(--tom-ruler) var(--mono); color: var(--dim2);
+    text-align: left; letter-spacing: 0;
+  }
+  .tom-tick[data-bar] { color: var(--dim); }
+  .tom-tick[data-now] { color: var(--hi); }
+  .tom-rows { display: flex; flex-direction: column; gap: var(--tom-gap); }
+  .tom-row { display: flex; gap: var(--tom-gap); height: var(--tom-cell); }
+  /* 🔴 THE CELL OVERRIDES SIX THINGS THE GLOBAL `button` RULE SETS, and every
+     one of them is a number that belongs to a pill rather than to a grid. */
+  .tom-cell {
+    width: var(--tom-cell); height: var(--tom-cell); min-height: 0; flex: 0 0 auto;
+    padding: 0; border-radius: 2px;
+    background: #171d29; border: 1px solid #1c2433;
+  }
+  /* Every fourth step is a beat and every sixteenth is a bar, so sixty four
+     cells can be counted without reading the ruler. It is the field that
+     changes and never the ink, which is the same decision `pattern.mjs` made
+     for the opposite reason. */
+  .tom-cell[data-beat] { background: #1c2331; }
+  .tom-cell[data-bar] { background: #222b3c; }
+  .tom-cell:hover { border-color: var(--dim2); }
+  /* 🔴 BRIGHTNESS SAYS WHETHER THIS CELL CAN MAKE A SOUND, WHICH IS THE ONE
+     THING A READER CANNOT SEE ANY OTHER WAY. A cell on a row with no sample is
+     switched on and silent, and colouring it like a cell that will sound would
+     be the page asserting something nothing measured. Three greys and no hue,
+     which is `grain-scope.mjs`'s settled answer reused: material is grey here,
+     and the one thing that moves keeps the bright ink. */
+  .tom-cell[data-on] { background: var(--fg2); border-color: var(--fg2); }
+  .tom-cell[data-on][data-mute] { background: var(--dim2); border-color: var(--dim2); }
+  /* 🔴 THE BAND MOVES WITH A TRANSFORM AND CHANGES NOTHING ABOUT LAYOUT. It is
+     the only thing on this page that moves on its own, and `positron-ui`'s rule
+     is that nothing redrawing may change how much room it takes. A transform on
+     an absolutely positioned element takes no room at all. */
+  .tom-head {
+    position: absolute; top: 0; bottom: 0; left: 0; width: var(--tom-cell);
+    pointer-events: none; border-radius: 2px;
+    background: rgba(255, 212, 0, .08);
+    box-shadow: inset 1px 0 0 var(--hi), inset -1px 0 0 var(--hi);
+  }
+  /* ⚠️ IT MOVES ON A PRESS AND NEVER ON A CLOCK, which is what makes a line of
+     prose allowed here at all. It says which sample was last heard and why, and
+     it is a fixed box either way so a longer name cannot move the grid under
+     it. */
+  .tom-line {
+    font: 400 12px/1.5 var(--mono); color: var(--dim); min-height: 1.5em;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createDrop } from '/shell/drop.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createPanelLayout } from '/shell/panel-layout.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { readZip } from '/shell/unzip.mjs';
+  import { samplesIn, toMono, summariseAll } from '/shell/circuit-sample.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+
+  /**
+   * 🔴 THIS PAGE SENDS NOTHING AND ASKS NOBODY FOR ANYTHING, AND BOTH ARE
+   * ASSERTED OVER COUNTERS RATHER THAN OVER A READING OF THE SOURCE. A grep for
+   * `requestMIDIAccess` finds it absent on every day it is absent and says
+   * nothing about the day somebody adds it behind a helper. The reason it
+   * matters here is the same one `/pack/` writes down: a Circuit has no factory
+   * reset, one byte separates `Replace Current Patch` from `Replace Patch`, and
+   * the file this page opens is somebody's only backup of that flash. Nothing
+   * on this page can reach an instrument.
+   */
+  let midiAsked = 0;
+  if (navigator.requestMIDIAccess) {
+    const real = navigator.requestMIDIAccess.bind(navigator);
+    navigator.requestMIDIAccess = (...a) => { midiAsked++; return real(...a); };
+  }
+  let fetched = 0;
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (...a) => { fetched++; return realFetch(...a); };
+
+  // 🔴 THE PACK IN THIS REPOSITORY IS NOT PUBLISHED AND MUST NOT BE.
+  // `workers/view/build.mjs` copies an explicit allowlist and this file is not
+  // on it, deliberately: it holds 32 of somebody's sessions. Whether it is here
+  // is decided from the ORIGIN rather than discovered by fetching, because a
+  // build that discovers it with a 404 takes the deploy run red on `no console
+  // errors`, and a red that is expected is a red everybody skips. Copied from
+  // `/pack/` on purpose: two pages deciding this two ways is one page deciding
+  // it wrong.
+  const PACK = '/New%20Pack.circuitpack';
+  const PACK_HERE = location.protocol === 'file:'
+    || /^(localhost|127\.|0\.0\.0\.0|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/
+      .test(location.hostname);
+
+  /**
+   * 🔴 SIXTY FOUR STEPS ACROSS AND EIGHT ROWS DOWN UNTIL A PACK LANDS, WHICH IS
+   * ONE OF TWO READINGS OF THE ASK AND IS SAID OUT LOUD RATHER THAN CHOSEN IN
+   * SILENCE. The request was *"a 8x64 grid with transport on top. have
+   * circuitpack uploader on top (as many rows as there are samples)"*. Read as
+   * ROWS by STEPS: 8 rows is what there is before a file is open, the
+   * parenthesis says the rows become the samples once one is, and 64 is the
+   * step count. The other reading, 8 steps and 64 rows, is not ruled out by the
+   * words, and it is ruled out by the parenthesis only if `rows` means the
+   * first number. `BACKLOG.md` carries both.
+   * ⚠️ SWAPPING THEM IS `REST_ROWS` AND `STEPS` CHANGING PLACES AND NOTHING
+   * ELSE. Nothing below counts either of them twice.
+   */
+  const STEPS = 64;
+  const REST_ROWS = 8;
+  /**
+   * How long a step is, in milliseconds. 125 ms is a sixteenth note at 120
+   * beats a minute, so the whole grid is eight seconds and four bars of four.
+   * ⚠️ THERE IS NO TEMPO CONTROL AND THAT IS NOT AN OMISSION. The transport bar
+   * renders a rate lattice off `caps.rates`, so the bar's own 0.5x / 1x / 2x IS
+   * the tempo: 60, 120 and 240 beats a minute. A second control setting the
+   * same quantity from a different direction is two numbers that can disagree.
+   */
+  const STEP_MS = 125;
+  const SPAN = STEPS * STEP_MS;
+
+  const d = mount({
+    name: 'tom',
+    what: 'tap a grid of 64 steps whose rows become the samples in a Circuit pack you open here',
+    /**
+     * Four cells, all of which move, and none of which is a structural
+     * constant. `rows` is not among them because the number of rows is the
+     * thing you are looking at; a cell counting what is on screen teaches a
+     * reader to read the cell instead of the page.
+     * ⚠️ `on` IS SET AT LOAD AND THE OTHER THREE ARE NOT. A census of a grid
+     * that is visibly empty is a real reading of zero. A counter of sounds that
+     * have not happened is not, and `0` there would read as a very confident
+     * measurement of nothing.
+     */
+    readout: { on: '', step: '', voices: '', late: 'ms' },
+    /**
+     * 🔴 NO CONTROL ROW AT ALL, AND THE MISSING CONTROL IS `clear`. `verify.mjs`
+     * presses every button in `.pos-controls` in order on every run, so a
+     * control that empties the pattern is a control that empties the pattern
+     * underneath this page's own reading checks, and the two race. The cells
+     * are the controls here, the transport bar carries the transport, and a
+     * reader who wants a cell off presses it again. If `clear` is wanted it
+     * wants a way for the harness to press it safely first.
+     */
+    controls: [],
+  });
+  guard(d);
+
+  // ── where the playhead is, as a step ────────────────────────────────────
+  /**
+   * 🔴 PURE, SO IT CAN BE GRADED WITHOUT A BROWSER OR A SOUND. Every bug a
+   * grid like this has ever had lives in exactly this arithmetic: a step index
+   * one past the end at the last millisecond, a negative position from a range
+   * that does not start at zero, a floor that turns into a round.
+   */
+  function stepAt(pos) {
+    const i = Math.floor((pos - 0) / STEP_MS);
+    return Math.min(STEPS - 1, Math.max(0, i));
+  }
+
+  // ── what is open ────────────────────────────────────────────────────────
+  /** `[{ name, wave, row }]`. `wave` is null on a resting row, and `row.ok` is
+   *  false on a sample that would not read: both keep their place in the grid,
+   *  because a reader that silently dropped one leaves a pack looking smaller
+   *  than it is. */
+  let rows = restRows();
+  /** One `Uint8Array(STEPS)` per row. */
+  let on = rows.map(() => new Uint8Array(STEPS));
+  let cells = [];                 // cells[r][s]
+  let nameEls = [];
+  let tickEls = [];
+  let focusR = 0, focusS = 0;     // the roving tab stop
+  let ac = null, master = null;
+  const bufs = new Map();         // row index -> AudioBuffer
+  let voices = 0, silent = 0, worstLate = 0, lastFired = null;
+  let nowStep = -1, picked = -1, built = 0;
+  let audioSaid = false;
+
+  function restRows() {
+    return Array.from({ length: REST_ROWS }, (_, i) => (
+      { name: `row ${i + 1}`, wave: null, row: null }
+    ));
+  }
+
+  const hasSound = (r) => !!(rows[r] && rows[r].wave && rows[r].wave.ok);
+  const onCount = () => on.reduce((n, r) => n + r.reduce((m, v) => m + v, 0), 0);
+
+  // ── the deck ────────────────────────────────────────────────────────────
+  /**
+   * 🔴 THE TIMELINE'S OWN DECK, NOT A `setInterval`. Asked for as *"use
+   * webauudito transport code we have"*. `createDeck` brings the worker tick
+   * host, the lookahead, the rate lattice, the drift log and a seek that
+   * re-folds state, and `transport-bar.mjs` is the one control that drives one.
+   *
+   * 🔴 AND `createAudioLane` IS DELIBERATELY NOT USED, WHICH NEEDS A REASON
+   * BECAUSE IT IS THE WEB AUDIO HALF OF THAT SAME FILE. That lane commits an
+   * event as a node started at an exact audio time, which is a thousand times
+   * closer to the instant than a timer. It CANNOT LOOP, and that is read in
+   * `timeline/transport.mjs`: a node's `onended` moves an event to `rendered`,
+   * `cancelCommitted()` only resets `committed`, and the seek handler only
+   * resets `passed`, so `rendered` is terminal and a second lap is silent. A
+   * step grid loops or it is not a step grid.
+   * ⚠️ THIS IS READ OFF THE SOURCE RATHER THAN MEASURED, and it is a claim
+   * about that module rather than about this page. The bill for the timer lane
+   * is in the `late` cell, which is the honest number and is this project's
+   * own way of reporting it: `/lanes/` exists to show the difference.
+   */
+  /** How many times the SCHEDULER called this, which is a different number
+   *  from how many sounds started: a step with no cell on it actuates and is
+   *  silent. A count on the far side of the boundary from `voices`. */
+  let actuated = 0;
+  const stepAdapter = {
+    caps: { rates: [0.5, 1, 2], continuous: false, assertOnSeek: true },
+    actuate(p) {
+      actuated++;
+      fireStep(p.step);
+      // 🔴 AGAINST THE MILLISECOND THE SCORE ASKS FOR, not against the previous
+      // step, which would only measure the timer against itself. Read on the
+      // page's side of the boundary, which is the side that can be wrong.
+      worstLate = Math.max(worstLate, Math.abs(deck.position() - p.at));
+      d.set('late', worstLate.toFixed(1));
+    },
+    // ⚠️ COUNT ONLY. The rows a reducer is handed are not the items that were
+    // scheduled, and assuming they are took a whole page down from inside a
+    // seek once already.
+    reduce: (r) => ({ count: r.length }),
+    assertState: (s) => s,
+  };
+
+  const deck = createDeck({
+    items: [],
+    adapters: { step: stepAdapter },
+    range: [0, SPAN],
+    onPosition: (pos) => showAt(pos),
+  });
+  for (let i = 0; i < STEPS; i++) {
+    deck.schedule({ at: i * STEP_MS, kind: 'step', id: `s${i}`, payload: { step: i, at: i * STEP_MS } });
+  }
+
+  // ── the way in ──────────────────────────────────────────────────────────
+  //
+  // 🔴 IT IS `open`, NOT `upload`, AND NOTHING LEAVES THE MACHINE. The file is
+  // read into an `ArrayBuffer` in this tab and handed to the code below;
+  // `drop.mjs` names no network API at all. The title is the reader's word for
+  // the block and the button is the promise about what pressing it does.
+  const drop = createDrop({
+    accept: ['.circuitpack', '.zip'],
+    title: 'UPLOAD FILE',
+    label: 'Open file',
+    beside: 'or drag a file here',
+    // ⚠️ NO RESTING LINE. The footer comes into existence when it has something
+    // to say and goes away again, which is the component's own answer to an
+    // empty box painting a line nobody wrote.
+    empty: '',
+    hint: 'drop a pack anywhere on this page',
+    says: (m, kind) => d.log(m, kind),
+    onOpen: (files) => openFiles(files),
+  });
+  d.stack.add(drop.el);
+  /**
+   * 🔴 PUBLISHED ON `__demo`, BECAUSE A DRAG CANNOT BE SYNTHESISED AND THE
+   * BUTTON OPENS AN OPERATING SYSTEM DIALOG. Those are the only two ways in for
+   * a person and neither is drivable, so without this the one path that matters
+   * is reachable by nothing outside the page. It goes on `window.__demo` and
+   * NOT on `mount()`'s return value: they are different objects, and the
+   * wrapper is somewhere no harness looks.
+   */
+  window.__demo.drop = drop;
+
+  // ── the transport ───────────────────────────────────────────────────────
+  //
+  // 🔴 `scrub: false`: ONE POSITION SURFACE PER PAGE, AND THE GRID IS IT. The
+  // ruler over the steps is a horizontal time axis carrying the content as well
+  // as the position, which is exactly the argument that takes the slider off a
+  // page with a strip. Two axes at different scales, stacked, is a
+  // contradiction rather than a redundancy.
+  // ⚠️ AND THE BAR KEEPS WHAT ONLY IT HAS: play, the clock, the rate lattice,
+  // LOOP and the degraded badge. One press of LOOP at the start arms the window
+  // and it closes at the end of the grid, which is how four bars repeat.
+  const bar = createTransportBar(d.el, deck, { scrub: false });
+  // ⚠️ THE PAGE NEVER RE-PUBLISHES `__demo.transport`. `createTransportBar`
+  // returns a WRAPPER and `publish: true` has already written its internal
+  // `api`; assigning the return value over the top hands the harness an object
+  // with no `position` and `verify.mjs` dies inside its own drill while the
+  // page looks perfect.
+
+  // ── the grid ────────────────────────────────────────────────────────────
+  //
+  // 🔴 A FIXED COLUMN BESIDE ONE SCROLLER, WHICH IS `panel-layout.mjs`'S WHOLE
+  // CONTRACT AND NOT THIS PAGE'S ARITHMETIC. Sixty four steps is about 1,150 px
+  // and a phone is 390: the steps scroll inside their own box or the PAGE drags
+  // sideways, and `overflow-x` cannot shrink a flex item below its content, so
+  // it takes `min-width: 0` on the same element. That pair was measured on this
+  // project once as 141 px of page overflow.
+  // ⚠️ `flow: false`: the scroller's own child is the content. The flow carries
+  // `gap: var(--panel-gap)` at 16 px, and this grid's vertical rhythm is 2 px,
+  // which has to match the name column beside it exactly.
+  const panel = createPanelLayout({
+    side: 'left', flow: false,
+    cls: { panel: 'tom', fixed: 'tom-fixed' },
+    /**
+     * ⚠️ THE SCROLLER TAKES NO TAB STOP, WHICH IS A DEPARTURE FROM WHAT THE
+     * COMPONENT OFFERS AND HAS A REASON. `transport-bar.mjs` binds the project's
+     * one keyboard table on `window` and the arrows SEEK there, with a
+     * `preventDefault` on them, so a focusable scroll container here would
+     * answer an arrow by moving the playhead instead of scrolling, which is a
+     * control that looks live and does something else. The ruler carries the
+     * tab stop, where an arrow seeking is exactly right.
+     */
+    strip: { role: 'group', label: 'steps' },
+  });
+  const fixedEl = panel.fixed;
+  const gridEl = el('div', 'tom-grid');
+  const rulerEl = el('div', 'tom-ruler', '', {
+    role: 'slider', tabindex: '0', 'aria-label': 'position',
+    'aria-valuemin': '1', 'aria-valuemax': String(STEPS), 'aria-valuenow': '1',
+  });
+  const rowsEl = el('div', 'tom-rows');
+  const headEl = el('div', 'tom-head');
+  gridEl.append(rulerEl, rowsEl, headEl);
+  panel.strip.append(gridEl);
+  /**
+   * ⚠️ EMPTY AT REST AND RESERVED, NOT AN INSTRUCTION. A gutter carries what it
+   * MEASURED and never what to press; what to press is the control's own label.
+   * `min-height` keeps the room so the block below does not move when the first
+   * sound names itself here, and the element paints no border, so an empty one
+   * is space rather than a rule nobody wrote.
+   */
+  const line = el('div', 'tom-line', '');
+  d.stack.add(panel.el, line);
+
+  /**
+   * Draw the whole grid: one name per row, one cell per step.
+   *
+   * 🔴 THE ROVING TAB STOP IS SET WHILE THE CELLS ARE MADE, NOT AFTERWARDS.
+   * `table.mjs` records why there is one at all: every row at `tabIndex = 0`
+   * made tabbing past a 63 row table take sixty three presses, and a grid is
+   * that failure squared: 4,096 tab stops for one block on the page.
+   */
+  function drawGrid() {
+    const t0 = performance.now();
+    fixedEl.textContent = '';
+    rowsEl.textContent = '';
+    rulerEl.textContent = '';
+    cells = []; nameEls = []; tickEls = [];
+    focusR = Math.min(focusR, rows.length - 1);
+    focusS = Math.min(focusS, STEPS - 1);
+
+    fixedEl.append(el('div', 'tom-spacer'));
+    for (let s = 0; s < STEPS; s++) {
+      // Every fourth step carries its own number, which is sixteen numbers
+      // across four bars. Every cell carries a tick so the ruler and the rows
+      // share one geometry and the head can read it off either.
+      const t = el('div', 'tom-tick', s % 4 === 0 ? String(s + 1) : '');
+      if (s % 4 === 0) t.dataset.beat = '1';
+      if (s % 16 === 0) t.dataset.bar = '1';
+      t.dataset.step = String(s);
+      tickEls.push(t);
+      rulerEl.append(t);
+    }
+
+    for (let r = 0; r < rows.length; r++) {
+      const sound = hasSound(r);
+      const nm = el(sound ? 'button' : 'div', 'tom-name', rows[r].name);
+      if (sound) {
+        nm.type = 'button';
+        nm.title = `${rows[r].row.seconds.toFixed(2)} s, peak ${rows[r].row.peak.toFixed(2)}. Press to hear it`;
+        nm.dataset.row = String(r);
+      } else {
+        nm.title = rows[r].row && !rows[r].row.ok
+          ? `this one did not read: ${rows[r].row.why}`
+          : 'this row has no sample yet, so its steps are silent';
+      }
+      nameEls.push(nm);
+      fixedEl.append(nm);
+
+      const rowEl = el('div', 'tom-row');
+      // ⚠️ `rowCells`, NOT `line`. A `const line` here would shadow the page's
+      // own `.tom-line` element from the top of this block, which is the exact
+      // shape `positron-ui` records as seven asserts going silent on a temporal
+      // dead zone while the page read green.
+      const rowCells = [];
+      for (let s = 0; s < STEPS; s++) {
+        const c = el('button', 'tom-cell', '', {
+          type: 'button',
+          'aria-label': `${rows[r].name}, step ${s + 1}`,
+          'aria-pressed': on[r][s] ? 'true' : 'false',
+        });
+        if (s % 4 === 0) c.dataset.beat = '1';
+        if (s % 16 === 0) c.dataset.bar = '1';
+        c.dataset.row = String(r); c.dataset.step = String(s);
+        if (on[r][s]) c.dataset.on = '1';
+        if (on[r][s] && !sound) c.dataset.mute = '1';
+        c.tabIndex = (r === focusR && s === focusS) ? 0 : -1;
+        rowCells.push(c);
+        rowEl.append(c);
+      }
+      cells.push(rowCells);
+      rowsEl.append(rowEl);
+    }
+    built = performance.now() - t0;
+    geom = null;
+    nowStep = -1;
+    showAt(deck.position());
+    d.set('on', onCount());
+  }
+
+  /** Where the steps actually are, read off the laid out ruler rather than
+   *  computed from the token, so the band and the cells cannot disagree. */
+  let geom = null;
+  function geometry() {
+    if (geom && geom.w) return geom;
+    const a = tickEls[0], b = tickEls[1];
+    if (!a) return null;
+    const w = a.offsetWidth;
+    geom = { x0: a.offsetLeft, pitch: b ? b.offsetLeft - a.offsetLeft : w, w };
+    return geom.w ? geom : null;
+  }
+
+  /**
+   * Put the band on the step the position is in.
+   *
+   * ⚠️ IT TOUCHES THE DOM ONLY WHEN THE STEP CHANGES, which at 120 beats a
+   * minute is eight times a second rather than sixty. And what it touches is a
+   * transform and two attributes, none of which can change how much room
+   * anything takes.
+   */
+  function showAt(pos) {
+    const s = stepAt(pos);
+    if (s === nowStep) return;
+    const g = geometry();
+    if (!g) return;
+    if (tickEls[nowStep]) delete tickEls[nowStep].dataset.now;
+    nowStep = s;
+    if (tickEls[s]) tickEls[s].dataset.now = '1';
+    rulerEl.setAttribute('aria-valuenow', String(s + 1));
+    headEl.style.width = `${g.w}px`;
+    headEl.style.transform = `translateX(${g.x0 + s * g.pitch}px)`;
+    d.set('step', s + 1);
+  }
+
+  // ── pressing things ─────────────────────────────────────────────────────
+  function setCell(r, s, v) {
+    if (!on[r] || s < 0 || s >= STEPS) return false;
+    on[r][s] = v ? 1 : 0;
+    const c = cells[r] && cells[r][s];
+    if (c) {
+      if (v) c.dataset.on = '1'; else delete c.dataset.on;
+      if (v && !hasSound(r)) c.dataset.mute = '1'; else delete c.dataset.mute;
+      c.setAttribute('aria-pressed', v ? 'true' : 'false');
+    }
+    d.set('on', onCount());
+    return true;
+  }
+
+  rowsEl.addEventListener('click', (e) => {
+    const c = e.target.closest('.tom-cell');
+    if (!c) return;
+    const r = +c.dataset.row, s = +c.dataset.step;
+    setCell(r, s, !on[r][s]);
+    rove(r, s, false);
+    // Hearing what you just switched on is how a pattern gets built. It is a
+    // press, so it is allowed to make a sound.
+    if (on[r][s]) fire(r, 'a cell');
+  });
+
+  fixedEl.addEventListener('click', (e) => {
+    const b = e.target.closest('button.tom-name');
+    if (!b) return;
+    audition(+b.dataset.row);
+  });
+
+  /**
+   * 🔴 THE RULER SEEKS, WHICH IS WHAT MAKES THIS PAGE'S ONE POSITION SURFACE A
+   * POSITION SURFACE. Without it `scrub: false` would take seeking off the page
+   * rather than moving it.
+   * ⚠️ ON A PRESS AND NOT ON A DRAG, AND THAT IS A TRADE RATHER THAN AN
+   * OVERSIGHT. The ruler sits inside the panel's horizontal scroller, so a
+   * `touch-action: none` that captured a drag would also stop a finger
+   * scrolling the steps, which is the gesture a reader makes far more often. A
+   * tap seeks, a swipe scrolls, and the keyboard table the bar owns still moves
+   * the playhead with the arrows.
+   */
+  rulerEl.addEventListener('click', (e) => {
+    const t = e.target.closest('.tom-tick');
+    if (!t) return;
+    deck.seek(+t.dataset.step * STEP_MS);
+  });
+
+  // ── the keyboard ────────────────────────────────────────────────────────
+  /**
+   * 🔴 AN ARROW MOVES AND DOES NOT OPEN, AND IT MUST NOT REACH THE TRANSPORT.
+   * `transport-bar.mjs` binds ONE keyboard table for the whole project on
+   * `window`: space toggles play, the arrows seek, a digit jumps to a tenth. A
+   * grid that moved focus with the arrows and let the event through would seek
+   * two per cent of the piece on every press, so this stops the event at the
+   * grid. There is an assert on exactly that, and it is a negative control: the
+   * playhead must not move.
+   * ⚠️ SPACE IS STOPPED TOO AND NOT HANDLED. A `<button>` activates on keyup,
+   * so the cell still toggles; what is prevented is the same press also
+   * starting the transport.
+   */
+  function rove(r, s, focus = true) {
+    const old = cells[focusR] && cells[focusR][focusS];
+    if (old) old.tabIndex = -1;
+    focusR = Math.max(0, Math.min(rows.length - 1, r));
+    focusS = Math.max(0, Math.min(STEPS - 1, s));
+    const next = cells[focusR] && cells[focusR][focusS];
+    if (next) { next.tabIndex = 0; if (focus) next.focus(); }
+    return next;
+  }
+
+  rowsEl.addEventListener('keydown', (e) => {
+    const c = e.target.closest('.tom-cell');
+    if (!c) return;
+    const r = +c.dataset.row, s = +c.dataset.step;
+    const k = e.key;
+    if (k === ' ') { e.stopPropagation(); return; }
+    let to = null;
+    if (k === 'ArrowLeft') to = [r, s - 1];
+    else if (k === 'ArrowRight') to = [r, s + 1];
+    else if (k === 'ArrowUp') to = [r - 1, s];
+    else if (k === 'ArrowDown') to = [r + 1, s];
+    else if (k === 'Home') to = [r, 0];
+    else if (k === 'End') to = [r, STEPS - 1];
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+    rove(to[0], to[1]);
+  });
+
+  // ── the sound ───────────────────────────────────────────────────────────
+  /**
+   * 🔴 ON A PRESS OR ON A STEP, AND NEVER ON A VISIT. Sixty four WAVs through an
+   * `AudioContext` at load is the load-on-a-visit defect this project has paid
+   * for three times. Nothing is decoded until the row it belongs to is about to
+   * be heard, and the buffer is kept afterwards.
+   * ⚠️ AND SOUND NEVER GATES THE WORK. `AudioContext.resume()` waits on a
+   * gesture in a real browser and does NOT reject, so awaiting one is a hang
+   * rather than an error. It is fired and left.
+   */
+  function fire(r, why, tell = true) {
+    if (!hasSound(r)) { silent++; return false; }
+    let buf = bufs.get(r);
+    try {
+      if (!buf) {
+        // 🔴 THE AUDIO COMES OUT OF `circuit-sample.mjs` AND NOT OUT OF
+        // `decodeAudioData`. The browser's decoder is a promise, it accepts what
+        // it feels like accepting, and it can say nothing about a file it
+        // refuses beyond an `EncodingError`. `toMono` answers in words, and
+        // because it is SYNCHRONOUS a check can grade a press rather than
+        // racing a decode.
+        const m = toMono(rows[r].wave);
+        if (!m.ok) { silent++; d.log(`${rows[r].name} did not decode: ${m.why}`, 'bad'); return false; }
+        ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+        ac.resume();
+        if (!master) {
+          master = ac.createGain();
+          // Sixty four rows can land on one step. Half scale leaves room for
+          // that without the page deciding a mix nobody asked for.
+          master.gain.value = 0.5;
+          master.connect(ac.destination);
+        }
+        buf = ac.createBuffer(1, m.frames, m.rate);
+        buf.copyToChannel(m.samples, 0);
+        bufs.set(r, buf);
+      }
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.connect(master);
+      src.start();
+      voices++;
+      lastFired = { row: r, name: rows[r].name, seconds: buf.duration, frames: buf.length, rate: buf.sampleRate, why };
+      d.set('voices', voices);
+      // ⚠️ ON A PRESS AND NEVER ON A STEP. Eight lines of prose a second is the
+      // live caption `grain-scope` was reported for, and a fixed box only stops
+      // it moving the page: it does not make it readable.
+      if (tell) line.textContent = `${rows[r].name}, ${buf.duration.toFixed(2)} s, ${why}`;
+      return true;
+    } catch (e) {
+      if (!audioSaid) { d.log(`no sound here (${e.message})`, 'bad'); audioSaid = true; }
+      return false;
+    }
+  }
+
+  /** Every row switched on at this step, in row order. Returns how many really
+   *  sounded, which is not the same as how many cells were on. */
+  function fireStep(s) {
+    let n = 0;
+    for (let r = 0; r < rows.length; r++) if (on[r][s] && fire(r, `step ${s + 1}`, false)) n++;
+    return n;
+  }
+
+  /** Hear one row on its own. A grid of sixty four rows named `sample_0.wav` to
+   *  `sample_63.wav` cannot be worked without this. */
+  function audition(r) {
+    if (nameEls[picked]) delete nameEls[picked].dataset.pick;
+    picked = r;
+    if (nameEls[r]) nameEls[r].dataset.pick = '1';
+    fire(r, 'its name');
+  }
+
+  // ── opening a file ──────────────────────────────────────────────────────
+  async function openFiles(files) {
+    for (const f of files) {
+      if (f.name.toLowerCase().endsWith('.zip')) { await openZip(f.name, f.bytes); continue; }
+      await openPack(f.name, f.bytes);
+    }
+  }
+
+  /**
+   * 🔴 THE SAMPLES COME OUT OF `circuit-sample.mjs` AND NOT OUT OF A LOOP ON
+   * THIS PAGE. Asked for as *"use shared code to get samples"*. `samplesIn`
+   * takes the entry list `readZip` returns rather than the bytes, so a page
+   * wanting patches out of the same file does not unzip it twice, and it sorts
+   * by the NUMBER in a name rather than by the name as text, because
+   * `sample_10.wav` sorts before `sample_2.wav` and the pack's own index names
+   * `Sample1` to `Sample64` against `sample_0.wav` to `sample_63.wav` in order.
+   * ⚠️ A FILE THAT WILL NOT PARSE KEEPS ITS ROW, with `row.ok === false` and a
+   * reason. A reader that silently dropped one leaves a pack looking smaller
+   * than it is, which is a wrong answer wearing an empty one's clothes.
+   */
+  async function openPack(name, bytes, from = '') {
+    let list;
+    try { list = readZip(bytes); }
+    catch (e) { drop.say(`${name} did not read as a pack: ${e.message}`, 'bad'); return false; }
+    const got = await samplesIn(list);
+    if (!got.length) { drop.say(`${name} holds no samples`, 'bad'); return false; }
+    setRows(got);
+    const all = summariseAll(got.map((g) => g.wave));
+    d.log(`${name}: ${all.parsed} of ${all.count} samples read`
+      + (all.refused ? `, ${all.refused} refused` : '')
+      // ⚠️ ONLY WHERE SOMETHING PARSED. `shortest` is 0 over an empty set, and a
+      // pack of sixty four refusals reported as `0.00 s to 0.00 s` is a
+      // measurement of nothing wearing a measurement's clothes.
+      + (all.parsed ? `, ${all.shortest.toFixed(2)} s to ${all.longest.toFixed(2)} s` : ''));
+    drop.say(`${name}${from ? ` ${from}` : ''}`, 'good');
+    return true;
+  }
+
+  /**
+   * A real download is a zip of packs rather than a pack. MEASURED on the
+   * soundbank in `purchased/`: one archive holding 2 `.circuitpack`, 1
+   * `.circuittrackspack`, 128 `.syx` and a spreadsheet. `unzip.mjs` reads a zip
+   * inside a zip, which is how both of those were measured.
+   * ⚠️ A `.circuittrackspack` IS FOR THE OTHER INSTRUMENT and is named rather
+   * than opened.
+   */
+  async function openZip(name, bytes) {
+    let list;
+    try { list = readZip(bytes); }
+    catch (e) { drop.say(`${name} did not read as a zip: ${e.message}`, 'bad'); return false; }
+    const packs = list.filter((e) => e.name.endsWith('.circuitpack'));
+    const others = list.filter((e) => e.name.endsWith('.circuittrackspack'));
+    if (others.length) {
+      d.log(`${others.length} pack(s) in it are for a Circuit Tracks, not a Circuit, and were left alone`, 'bad');
+    }
+    if (!packs.length) { drop.say(`${name} holds no Circuit pack`, 'bad'); return false; }
+    if (packs.length > 1) {
+      d.log(`${packs.length} packs in ${name}: ${packs.map((e) => e.name.split('/').pop()).join(', ')}. `
+          + 'Opening the first', 'hi');
+    }
+    return openPack(packs[0].name.split('/').pop(), await packs[0].read(), `inside ${name}`);
+  }
+
+  /**
+   * 🔴 THE PATTERN SURVIVES THE PACK. A reader can tap eight rows of steps
+   * before anything is open and then give them sounds, and throwing that away
+   * because the row count changed would be the page discarding the only work
+   * the reader has done. Rows that still exist keep their steps; rows that
+   * arrive start empty.
+   */
+  function setRows(got) {
+    const was = on;
+    rows = got;
+    on = rows.map((_, i) => (was[i] ? was[i].slice() : new Uint8Array(STEPS)));
+    bufs.clear();
+    picked = -1;
+    drawGrid();
+    d.log(`${rows.length} rows, ${STEPS} steps, drawn in ${built.toFixed(0)} ms`);
+  }
+
+  drawGrid();
+
+  // ── what a visit is allowed to have done ────────────────────────────────
+  d.assert('a visit opens nothing, asks for nothing and makes no sound',
+    drop.opens === 0 && fetched === 0 && voices === 0 && ac === null && onCount() === 0,
+    `${drop.opens} file(s) opened, ${fetched} request(s), ${voices} sound(s), `
+    + `${onCount()} cell(s) on, audio context ${ac === null ? 'never made' : 'made'}`);
+
+  d.assert('nothing here asks for MIDI, so nothing here can write to an instrument',
+    midiAsked === 0 && navigator.requestMIDIAccess !== undefined,
+    `requestMIDIAccess called ${midiAsked} time(s), and the counter is still in front of it`);
+
+  d.assert('the grid is 8 rows of 64 steps before a pack lands, which is one of the two readings of 8x64',
+    cells.length === REST_ROWS && cells.every((r) => r.length === STEPS)
+    && rows.every((r) => r.wave === null),
+    `${cells.length} rows of ${cells[0] ? cells[0].length : 0}, none of them a sample`);
+
+  d.assert('the way in is visible at rest and says what it takes',
+    drop.el.classList.contains('pos-drop-area')
+    && /\.circuitpack/.test(drop.el.querySelector('.pos-drop-hint')?.textContent || ''),
+    `"${drop.el.querySelector('.pos-drop-hint')?.textContent || ''}"`);
+
+  d.assert('the block has no footer until something has been opened',
+    drop.note.hidden === true && drop.note.textContent === '',
+    `hidden ${drop.note.hidden}, saying "${drop.note.textContent}"`);
+
+  /**
+   * 🔴 THE HARNESS'S ONLY HANDLE, AND THE TRAP IS THAT THE TWO OBJECTS LOOK
+   * ALIKE. `createTransportBar` publishes its internal `api` and RETURNS a
+   * wrapper; a page that assigns the return value over the top hands
+   * `verify.mjs` an object with no `position`, and the harness then dies inside
+   * its own drill while the page looks perfect.
+   */
+  d.assert('the transport the harness reads is the bar\'s own api and not the wrapper around it',
+    window.__demo.transport === bar.api && window.__demo.transport !== bar
+    && typeof window.__demo.transport.position === 'number',
+    `position ${window.__demo.transport.position}, range ${JSON.stringify(bar.api.range)}`);
+
+  /**
+   * 🔴 THE COMPUTED VALUE, BECAUSE THE ELEMENT IS THERE EITHER WAY. This assert
+   * read `!bar.el.querySelector('.tbar-scrub')` first and went red on a page
+   * doing exactly what it promises: `transport-bar.mjs` appends its slider
+   * UNCONDITIONALLY at line 540 and `scrub: false` sets `data-scrub="0"`, which
+   * `shell.css` turns into `display: none`. Asking whether the node exists is
+   * asking a question next to the one in question, which is the measurement
+   * mistake this project has now made on three separate pages.
+   */
+  {
+    const scrubEl = bar.el.querySelector('.tbar-scrub');
+    d.assert('the grid is the one position surface, so the bar draws no slider',
+      bar.el.dataset.scrub === '0' && getComputedStyle(scrubEl).display === 'none'
+      && rulerEl.getAttribute('role') === 'slider' && tickEls.length === STEPS,
+      `the bar says data-scrub="${bar.el.dataset.scrub}" and its slider computes `
+      + `display: ${getComputedStyle(scrubEl).display}, against ${tickEls.length} `
+      + 'ticks on the ruler that do seek');
+  }
+
+  /**
+   * 🔴 THREE ALIGNMENTS THAT LOOK LIKE ONE ARE THREE ASSERTS. `/model/` was
+   * corrected by screenshot twelve times in one evening and the pattern is that
+   * two of three line up while the third is 30 px out. The name column and the
+   * steps are separate flex children of the panel, so nothing in the browser
+   * makes them agree: they agree because both sides are built from one token.
+   */
+  {
+    const n0 = nameEls[0].getBoundingClientRect();
+    const r0 = rowsEl.children[0].getBoundingClientRect();
+    const nz = nameEls[nameEls.length - 1].getBoundingClientRect();
+    const rz = rowsEl.children[rowsEl.children.length - 1].getBoundingClientRect();
+    d.assert('the first name sits on the first row of steps',
+      Math.abs(n0.top - r0.top) < 1 && Math.abs(n0.bottom - r0.bottom) < 1,
+      `top ${(n0.top - r0.top).toFixed(2)} px apart, bottom ${(n0.bottom - r0.bottom).toFixed(2)} px apart`);
+    d.assert('and the last one still does, so the two columns share one pitch',
+      Math.abs(nz.top - rz.top) < 1 && Math.abs(nz.bottom - rz.bottom) < 1,
+      `top ${(nz.top - rz.top).toFixed(2)} px apart over ${nameEls.length} rows`);
+  }
+
+  /**
+   * 🔴 THE STEPS SCROLL AND THE PAGE DOES NOT. `overflow-x` cannot shrink a flex
+   * item below its content, so this is true only because the scroller also
+   * carries `min-width: 0`, which is a pair `panel-layout.mjs` states as
+   * contract 1 and which this project once measured as 141 px of page overflow
+   * when half of it was missing.
+   * ⚠️ AT WHATEVER WIDTH THE READER IS. `demo/verify.mjs` runs at 756 px with no
+   * viewport override, so this assert alone says nothing about a phone. The
+   * 390 px reading is in the report that shipped with the page.
+   */
+  d.assert('the steps scroll inside their own box and the page does not drag sideways',
+    panel.strip.scrollWidth > panel.strip.clientWidth
+    && document.documentElement.scrollWidth <= window.innerWidth + 1,
+    `strip ${panel.strip.scrollWidth} px of content in ${panel.strip.clientWidth}, `
+    + `document ${document.documentElement.scrollWidth} px in a ${window.innerWidth} px window`);
+
+  /**
+   * 🔴 ONE TAB STOP FOR THE WHOLE GRID, AND THE NEGATIVE HALF IS THE ONE THAT
+   * MATTERS. `table.mjs` records sixty three presses to tab past a table; a
+   * grid is 4,096. Asserting only that one cell is reachable would pass on a
+   * grid where every cell is.
+   */
+  {
+    const all = cells.flat();
+    const zero = all.filter((c) => c.tabIndex === 0).length;
+    const minus = all.filter((c) => c.tabIndex === -1).length;
+    d.assert('the grid is one tab stop, not one per cell',
+      zero === 1 && minus === all.length - 1,
+      `${zero} cell(s) at 0 and ${minus} at -1, of ${all.length}`);
+  }
+
+  /**
+   * The arithmetic, graded at both edges and past both of them. A step index
+   * one past the end at the last millisecond is the bug this kind of grid
+   * always has.
+   */
+  d.assert('a position lands on the step that holds it, and never off either end',
+    stepAt(0) === 0 && stepAt(STEP_MS - 1) === 0 && stepAt(STEP_MS) === 1
+    && stepAt(SPAN - 1) === STEPS - 1 && stepAt(SPAN) === STEPS - 1
+    && stepAt(-1000) === 0 && stepAt(SPAN * 4) === STEPS - 1,
+    `0 -> ${stepAt(0)}, ${STEP_MS} -> ${stepAt(STEP_MS)}, ${SPAN - 1} -> ${stepAt(SPAN - 1)}, `
+    + `-1000 -> ${stepAt(-1000)}, ${SPAN * 4} -> ${stepAt(SPAN * 4)}`);
+
+  // ── the checks that press things, which a visitor never sees ────────────
+  if (SELFCHECK) {
+    const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    /**
+     * 🔴 NEGATIVE CONTROL: A ROW WITH NO SAMPLE LIGHTS UP AND STAYS SILENT.
+     * The whole page is a grid of lit squares, so "a cell is on" is the easiest
+     * thing in the world to see and says nothing about whether anything was
+     * heard. This is the assert that separates them, and it goes red the moment
+     * `fire()` stops checking whether a row has a sample at all.
+     */
+    {
+      const was = voices;
+      setCell(0, 0, true);
+      const rang = fireStep(0);
+      d.assert('NEGATIVE CONTROL: a step on a row with no sample lights its cell and starts no sound',
+        cells[0][0].dataset.on === '1' && cells[0][0].dataset.mute === '1'
+        && rang === 0 && voices === was && ac === null,
+        `${rang} sound(s) from a lit cell, ${voices - was} new voice(s), `
+        + `audio context ${ac === null ? 'never made' : 'made'}`);
+    }
+
+    /**
+     * 🔴 NEGATIVE CONTROL: AN ARROW INSIDE THE GRID MOVES FOCUS AND NOT THE
+     * PLAYHEAD. `transport-bar.mjs` binds one keyboard table on `window` and
+     * the arrows seek two per cent of the piece; a grid that let the event
+     * through would drag the transport on every press. With the
+     * `stopPropagation` removed this goes red on the position, which is what
+     * makes it a measurement rather than a decoration.
+     */
+    {
+      const before = deck.position();
+      cells[0][0].focus();
+      cells[0][0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      const moved = document.activeElement === cells[0][1];
+      d.assert('NEGATIVE CONTROL: an arrow inside the grid moves focus and leaves the playhead alone',
+        moved && cells[0][1].tabIndex === 0 && cells[0][0].tabIndex === -1
+        && Math.abs(deck.position() - before) < 1,
+        `focus ${moved ? 'moved one step' : 'did not move'}, position `
+        + `${before.toFixed(1)} -> ${deck.position().toFixed(1)}`);
+      rove(0, 0, false);
+    }
+
+    const r = PACK_HERE ? await realFetch(PACK).catch(() => null) : null;
+    if (!r || !r.ok) {
+      /**
+       * On a deploy the pack is not published and must not be, so what is left
+       * to grade is the only claim that ever mattered out there: the page asked
+       * nobody for anything and the way in is the same for everybody, with no
+       * branch on where it is being served from.
+       */
+      d.log('the pack here is not published, so the reading checks did not run', 'bad');
+      d.assert('where the pack is not published nothing is asked of anybody, and the way in is unchanged',
+        !PACK_HERE && fetched === 0 && drop.opens === 0
+        && rows.length === REST_ROWS && drop.el.classList.contains('pos-drop-area'),
+        `at ${location.hostname} after ${fetched} request(s) and ${drop.opens} file(s) opened`);
+    } else {
+      const bytes = new Uint8Array(await r.arrayBuffer());
+      await openPack('New Pack.circuitpack', bytes);
+
+      d.assert('the pack gives the grid one row for every sample in it, and the steps do not move',
+        rows.length === 64 && cells.length === 64
+        && cells.every((row) => row.length === STEPS)
+        && nameEls.length === 64 && nameEls.every((n) => n.textContent),
+        `${rows.length} rows of ${cells[0].length}, first "${rows[0].name}", last "${rows[63].name}"`);
+
+      /**
+       * 🔴 THE WORK A READER DID BEFORE THE FILE ARRIVED IS STILL THERE. The
+       * cell switched on in the negative control above was on row 0 of an eight
+       * row grid; the grid is 64 rows now and row 0 is `sample_0.wav`. This is
+       * the one assert that could only pass if `setRows` copied the pattern
+       * across, and it is free because the earlier check already put it there.
+       */
+      d.assert('the pattern typed before the pack survives the pack arriving',
+        on[0][0] === 1 && cells[0][0].dataset.on === '1'
+        && cells[0][0].dataset.mute === undefined,
+        `step 1 of row 1 is ${on[0][0] ? 'still on' : 'gone'} and is `
+        + `${cells[0][0].dataset.mute ? 'still silent' : 'no longer silent'}`);
+
+      const all = summariseAll(rows.map((x) => x.wave));
+      d.assert('all 64 read as 48 kHz 16 bit mono with none refused, and their lengths differ',
+        all.parsed === 64 && all.refused === 0 && all.rates.length === 1
+        && all.rates[0] === 48000 && all.depths[0] === 16 && all.channels[0] === 1
+        && all.longest > all.shortest,
+        `${all.parsed} of ${all.count}, ${all.rates.join('/')} Hz, ${all.depths.join('/')} bit, `
+        + `${all.shortest.toFixed(6)} s to ${all.longest.toFixed(6)} s`);
+
+      /**
+       * 🔴 A STEP PLAYS EXACTLY THE ROWS THAT ARE ON AT IT, AND THE SOUND IS THE
+       * SAMPLE'S OWN LENGTH. A buffer of the wrong length is the failure that
+       * looks right: something is heard, the counter goes up, and the page reads
+       * as working while the decode is off.
+       */
+      {
+        setCell(0, 0, false);
+        setCell(3, 8, true);
+        setCell(9, 8, true);
+        const was = voices;
+        const rang = fireStep(8);
+        const want = rows[9].row.seconds;
+        d.assert('a step starts one sound for each row that is on at it, each its own sample\'s length',
+          rang === 2 && voices === was + 2
+          && lastFired.name === rows[9].name
+          && Math.abs(lastFired.seconds - want) < 0.002
+          && lastFired.rate === rows[9].row.rate,
+          `${rang} sound(s), last "${lastFired.name}" at ${lastFired.seconds.toFixed(6)} s `
+          + `against ${want.toFixed(6)} s in its header, ${lastFired.rate} Hz`);
+
+        /**
+         * 🔴 NEGATIVE CONTROL: A STEP WITH NOTHING ON IT STARTS NOTHING. Without
+         * this the assert above would pass on a page that played every row at
+         * every step, which is the loudest possible way to be wrong and the
+         * hardest to tell from working.
+         */
+        const was2 = voices;
+        const none = fireStep(9);
+        d.assert('NEGATIVE CONTROL: a step with no cell on it starts no sound at all',
+          none === 0 && voices === was2,
+          `${none} sound(s) and ${voices - was2} new voice(s) from an empty step`);
+        setCell(3, 8, false);
+        setCell(9, 8, false);
+      }
+
+      /**
+       * Pressing a row's name hears that one sample. A grid of sixty four rows
+       * named `sample_0.wav` to `sample_63.wav` cannot be worked without it, and
+       * it is an audition rather than a transport move: nothing about the
+       * playhead may change.
+       */
+      {
+        const was = voices, where = deck.position();
+        nameEls[7].click();
+        d.assert('pressing a row\'s name hears that sample and does not move the transport',
+          voices === was + 1 && lastFired.name === rows[7].name
+          && nameEls[7].dataset.pick === '1'
+          && Math.abs(deck.position() - where) < 1 && deck.playing() === false,
+          `"${lastFired.name}" after pressing row 8, position `
+          + `${where.toFixed(1)} -> ${deck.position().toFixed(1)}`);
+      }
+
+      /**
+       * 🔴 THE BAND IS WHERE THE POSITION SAYS, AND THE EXPECTED VALUE IS
+       * RE-DERIVED AT READ TIME RATHER THAN REMEMBERED FROM THE SEEK. A harness
+       * that seeks in the middle of this would otherwise take it red on a page
+       * doing exactly what it promises.
+       */
+      {
+        deck.seek(32 * STEP_MS);
+        await raf2();
+        const g = geometry();
+        const want = stepAt(deck.position());
+        const x = Number((headEl.style.transform.match(/-?[\d.]+/) || [NaN])[0]);
+        d.assert('the band sits on the step the position is in, measured off the ruler rather than a constant',
+          Math.abs(x - (g.x0 + want * g.pitch)) < 0.5
+          && tickEls[want].dataset.now === '1'
+          && window.__demo.readout.step === want + 1,
+          `band at ${x} px for step ${want + 1} of ${STEPS}, pitch ${g.pitch} px, `
+          + `readout says ${window.__demo.readout.step}`);
+      }
+
+      /**
+       * 🔴 NEGATIVE CONTROL: A SAMPLE THAT WILL NOT READ KEEPS ITS ROW AND
+       * CANNOT BE PLAYED. Every one of the 64 in this pack parses, so the only
+       * way to grade the refusal path is to hand the real module a file that
+       * cannot. `samplesIn` is asked for it rather than the row being faked
+       * here, because a fake row grades this page's idea of a refusal and not
+       * the module's.
+       */
+      {
+        const bad = await samplesIn([{
+          name: 'sample_999.wav', size: 8,
+          read: async () => new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0]),
+        }]);
+        const good = rows.slice();
+        setRows([...good, ...bad]);
+        const r64 = rows.length - 1;
+        setCell(r64, 0, true);
+        const was = voices;
+        const rang = fireStep(0);
+        d.assert('NEGATIVE CONTROL: a sample that will not read keeps its row, says why, and starts nothing',
+          rows.length === 65 && bad.length === 1 && bad[0].row.ok === false
+          && nameEls[r64].tagName === 'DIV'
+          && /did not read/.test(nameEls[r64].title)
+          && rang === 0 && voices === was,
+          `${rows.length} rows, the last one "${bad[0].name}" refused because `
+          + `"${bad[0].row.why}", ${rang} sound(s) from it`);
+        setRows(good);
+      }
+
+      d.assert('the file that was opened is named in the block\'s footer, which exists only now',
+        drop.note.hidden === false && /\.circuitpack/.test(drop.note.textContent),
+        `"${drop.note.textContent}"`);
+
+      /**
+       * 🔴 THE ONE LINK NOTHING ELSE HERE REACHES: THE SCHEDULER REALLY WALKING
+       * THE GRID. Every check above drives `fireStep` by hand, which grades the
+       * grid and the sound and says nothing at all about whether the deck ever
+       * calls it. `verify.mjs`'s own drill grades that the position advances,
+       * which is the other half of the same sentence and not this one.
+       * ⚠️ IT IS THE ONLY CHECK ON THIS PAGE THAT COSTS WALL TIME, and 420 ms
+       * is three steps: the fewest that can tell a scheduler firing repeatedly
+       * from one that fired once on a seek. It is safe to run here because
+       * `verify.mjs` waits for `__demo.ready` before it touches the transport,
+       * so this window closes before the harness presses anything.
+       * ⚠️ AND IT ASSERTS THE LATENESS IS A NUMBER RATHER THAN A BOUND. A
+       * threshold on a timer lane under a loaded headless Chrome is a check
+       * that goes red for reasons that are nothing to do with this page; the
+       * value is in the detail, which is where a reader can act on it.
+       */
+      {
+        setCell(0, 1, true); setCell(0, 2, true); setCell(0, 3, true);
+        deck.seek(0);
+        const wasV = voices, wasA = actuated;
+        deck.play();
+        await new Promise((r) => setTimeout(r, 420));
+        deck.pause();
+        const late = Number(window.__demo.readout.late);
+        d.assert('playing walks the grid and fires the cells it passes over',
+          actuated >= wasA + 3 && voices >= wasV + 3
+          && deck.position() > 3 * STEP_MS && Number.isFinite(late),
+          `${actuated - wasA} step(s) actuated and ${voices - wasV} sound(s) started over `
+          + `${deck.position().toFixed(0)} ms of transport, worst ${late} ms late`);
+        setCell(0, 1, false); setCell(0, 2, false); setCell(0, 3, false);
+        deck.seek(0);
+      }
+
+      d.log(`${voices} sound(s) started, worst step ${worstLate.toFixed(1)} ms late`);
+    }
+  }
+
+  d.ready();
+</script>

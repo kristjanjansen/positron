@@ -304,8 +304,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   border-radius: 4px; margin: 0 0 14px; overflow: hidden;
 }
 .pos-readout > * { flex: 1 1 96px; min-width: 0; }
-/* 🔴 A FIXED NUMBER OF COLUMNS, ASKED FOR 2026-09-21 AS *"why not 5x2 cells?"*
-   AGAINST A TEN CELL READOUT THAT HAD WRAPPED 7 AND 3. The flex row fills every
+/* 🔴 A FIXED NUMBER OF ROWS, ASKED FOR 2026-09-21 AS *"why not 5x2 cells?"* and
+   then as *"1xsomehting / 2xsomehing etc"*, AGAINST A TEN CELL READOUT THAT HAD
+   WRAPPED 7 AND 3. The caller names the SHAPE and the columns fall out of the
+   cell count, which is why an EVEN number of cells earns its rule twice: an
+   even count divides by two exactly, so `rows: 2` is always a full rectangle. The flex row fills every
    line, which is right when a page does not care where the break falls and
    wrong when the cells are pairs: `written` and `not erasure` belong beside each
    other and ended up in different rows at whatever width the browser chose.
@@ -315,7 +318,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    ⚠️ AND `minmax(0, 1fr)` RATHER THAN `1fr`: a grid track's `min-width` is
    `auto`, so a long value would push its own column wider and the five would
    stop being equal. */
-.pos-readout[data-cols] {
+.pos-readout[data-rows] {
   display: grid; grid-template-columns: repeat(var(--ro-cols, 5), minmax(0, 1fr));
 }
 /* 🔴 A QUIETER VALUE, ASKED FOR IN THE SAME BREATH AS *"have smaller readout
@@ -335,14 +338,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    every width: `.pos-pick`'s entire phone layout sat above the plain rule that
    beat it and had never run in its life. MEASURED 2026-09-19. */
 @media (max-width: 560px) {
-  .pos-readout[data-cols] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pos-readout[data-rows] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
    nothing until this existed — the row stayed on screen while the page said it
    was hidden */
 
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
-   nothing until this existed. ⚠️ IT SITS AFTER `[data-cols]` ON PURPOSE: both
+   nothing until this existed. ⚠️ IT SITS AFTER `[data-rows]` ON PURPOSE: both
    selectors weigh (0,2,0), so the later one wins, and a readout that was both
    hidden and gridded would otherwise come back on screen. */
 .pos-readout[hidden] { display: none; }

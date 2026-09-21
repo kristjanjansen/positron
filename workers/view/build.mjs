@@ -135,6 +135,40 @@ const FILES = [
   ...shellFiles(),
   // 06 imports the v6 player UNCHANGED rather than reimplementing it
   ['src/low-latency-player.js', 'src/low-latency-player.js'],
+
+  // ── six Circuit patches, so `/pack/` has something to open ────────────────
+  //
+  // 🔴 THESE ARE THE OWNER'S OWN PATCHES AND PUBLISHING THEM WAS ASKED FOR IN
+  // WORDS. `/pack/` shows nothing until a file lands and `New Pack.circuitpack`
+  // is NOT published, so a visitor met an upload box and an empty page. The
+  // request was *"can we get some sample patches in to choose from?"*, then
+  // *"at least one"*, and the publishing question was put to the owner rather
+  // than assumed: *"that is your sound design going onto a public URL, so I am
+  // not doing it unless you say"*, answered *"do it"*.
+  //
+  // 🔴 A PATCH IS NOT A PACK, AND THAT DISTINCTION IS THE WHOLE SAFETY OF THIS
+  // BLOCK. `New Pack.circuitpack` holds 32 of somebody's SESSIONS and stays off
+  // this list for good. These are six 350 byte synth patches with no session
+  // data in them at all.
+  //
+  // ✅ AND EVERY ONE WAS CHECKED BEFORE IT WAS WRITTEN, not after. Each is
+  // exactly 350 bytes and each carries `00` at offset 6, which is
+  // `Replace Current Patch` and lands in RAM. The extractor THROWS on a length
+  // that is not 350, on a byte 6 that is not `00`, and on anything `readPatch`
+  // calls `writesFlash`, because `01` at that offset is `Replace Patch` and
+  // writes flash on an instrument with no factory reset.
+  //
+  // ⚠️ SIX AND NOT ONE, AND NOT SIXTY FOUR. The ask was `at least one`; six is
+  // what it takes to make the page's picture move. Between them they cover six
+  // waveforms, three filter types, all three voice modes and 0 to 4 mod slots
+  // in use, so pressing through them changes every box in the diagram. Sixty
+  // four would be publishing the bank.
+  ['demo/resources/patches/aciiid.syx', 'resources/patches/aciiid.syx'],
+  ['demo/resources/patches/flamed.syx', 'resources/patches/flamed.syx'],
+  ['demo/resources/patches/aggie.syx', 'resources/patches/aggie.syx'],
+  ['demo/resources/patches/frosted-glass.syx', 'resources/patches/frosted-glass.syx'],
+  ['demo/resources/patches/smooth-pad.syx', 'resources/patches/smooth-pad.syx'],
+  ['demo/resources/patches/twins.syx', 'resources/patches/twins.syx'],
   // 🔴 `/notes/` IS NOT SHIPPED. It rendered two essays on the front page, and
   // those have moved to `research/`, which is where writing that argues or
   // reports lives and which is not deployed. A viewer page with nothing left to

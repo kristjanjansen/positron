@@ -600,6 +600,21 @@ export const DEMOS = [
   { name: 'pack', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
     one: 'open a Circuit pack and look inside its patches, sessions and samples',
     tags: ['zip', 'sysex', 'DecompressionStream'] },
+  /**
+   * 🔴 THE GRID, AND ITS ROWS ARE WHATEVER A READER OPENS. Asked 2026-09-21:
+   * *"in bg make a tom demo, a 8x64 grid with transport on top. have
+   * circuitpack uploader on top (as many rows as there are samples)"*, then
+   * *"use webauudito transport code we have"* and *"use shared code to get
+   * samples"*. It is `/pack/`'s file read for its audio rather than its bytes.
+   * ⚠️ `8x64` IS READ AS ROWS BY STEPS, WHICH IS ONE OF TWO READINGS AND IS
+   * SAID ON THE PAGE RATHER THAN CHOSEN IN SILENCE. `BACKLOG.md` carries both.
+   * ⚠️ NO `settleMs`. `verify.mjs` waits for `__demo.ready` before it touches
+   * the transport, and this page is ready 770 ms after load with the whole pack
+   * unzipped, all 64 samples decoded and every check run.
+   */
+  { name: 'tom', group: 'hardware', act: 4, created: '2026-09-21', built: true,
+    one: 'tap a grid of 64 steps whose rows become the samples in a Circuit pack you open here',
+    tags: ['WebAudio', 'timeline', 'zip'] },
 
   /**
    * 🔴 THE THIRD HARDWARE PANEL, AND ITS LAYOUT IS THE WEAKEST OF THE THREE.

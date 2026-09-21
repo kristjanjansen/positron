@@ -839,46 +839,6 @@
    * block with a control in it moves every other block's press. These two
    * buttons are in the box, which nothing presses by position.
    */
-  /**
-   * 🔴 THE NEWEST BLOCK, AT THE TOP, WHICH IS THIS PAGE'S OWN RULE. Asked for
-   * 2026-09-21 in the same breath as the options themselves: *"have smaller
-   * readout values styling. put to kit too"*.
-   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the blocks
-   * below give: both harnesses press that row by position, so a new top block
-   * with a control in it moves every other block's press.
-   */
-  section('status', 'READOUT, FIXED COLUMNS',
-    'The readout row fills every line it takes, which is right when a page does not care '
-    + 'where the break falls and wrong when the cells are pairs. Ten cells wrapped seven and '
-    + 'three on /pack/ and split two numbers a reader compares. A caller can ask for a number '
-    + 'of columns instead, and for a quieter value when the panel is reference rather than the '
-    + 'thing you look at.',
-    `createReport({ readout, cols: 5, size: 'sm', showLog: false })
-// cols  a grid of that many equal columns, 2 below 560px. Omit it for the flex row
-// size  'sm' is a 15px value instead of 19. The KEY does not shrink with it`,
-    (box) => {
-      const ten = () => ({
-        head: '', marker: '', written: 'B', 'not erasure': 'B', payload: 'B',
-        filled: '%', entropy: '', nearest: 'B', 'synth 1': '', 'synth 2': '',
-      });
-      const fill = (r) => {
-        r.set('head', 'USER'); r.set('marker', 'DC BB'); r.set('written', '10,620');
-        r.set('not erasure', '9,206'); r.set('payload', '1,054'); r.set('filled', '84.7');
-        r.set('entropy', '0.83'); r.set('nearest', '262');
-        r.set('synth 1', 'SpaceRadio'); r.set('synth 2', 'SpooKey');
-        return r;
-      };
-      // ⚠️ THE SAME TEN CELLS AND THE SAME TEN VALUES IN BOTH, so what is on
-      // screen is the ARRANGEMENT and nothing else. Two specimens differing in
-      // their content would demonstrate the content.
-      kitRoFlex = fill(createReport({ readout: ten(), showLog: false }));
-      kitRoGrid = fill(createReport({ readout: ten(), cols: 5, size: 'sm', showLog: false }));
-      box.append(
-        el('div', 'kit-cap', 'the flex row, which is the default'), kitRoFlex.readoutEl,
-        el('div', 'kit-cap', 'five columns and a quieter value'), kitRoGrid.readoutEl,
-      );
-    });
-
   section('input', 'DROP TARGET',
     'A visible area that says what it takes, a button for somebody who does not drag, '
     + 'and one line that reports what happened. A file opens in the tab and nothing '
@@ -1808,7 +1768,9 @@ const row = page.stack();                // a block that is itself a column`,
     'The numbers now and the record of what happened, split or joined into one surface.',
     `mount({ readout: { sent: '/s', lost: '' }, joined: true })   // one surface, at the foot
 mount({ readout: { sent: '/s', lost: '' } })                 // two surfaces, the default
-createReport({ readout, showLog: false, joined: true })      // the same pair, standalone`,
+createReport({ readout, showLog: false, joined: true })      // the same pair, standalone
+createReport({ readout, rows: 2, size: 'sm' })               // 1 x n, 2 x n. The count must be even
+// size: 'sm' is a 15px value instead of 19. The KEY does not shrink with it`,
     (box) => {
       box.classList.add('kit-wide');
 
@@ -1889,6 +1851,44 @@ createReport({ readout, showLog: false, joined: true })      // the same pair, s
         c.append(val); cells.append(c);
       }
       box.append(el('p', 'kit-cap', 'the cells on their own, an even number of them'), cells);
+
+      /**
+       * 🔴 THE SHAPE, FOLDED IN HERE RATHER THAN GIVEN A SECTION, ASKED FOR
+       * 2026-09-21 AS *"READOUT, FIXED COLUMNS - inegrate into readout docs"*.
+       * It HAD a section of its own at the top of this page for about twenty
+       * minutes, which is the same defect the block above records being fixed in
+       * 2026-09-17: a reader met the readout twice and had to work out they were
+       * the same component. The newest thing goes at the top of this page; a new
+       * OPTION on an old component goes where that component already is.
+       *
+       * 🔴 AND IT IS WHY THE EVEN RULE EARNS ITS KEEP TWICE. The rule above was
+       * demoted to EDITORIAL when the row became flex and the hole it described
+       * stopped existing. `rows: 2` brings it back as structural: an even count
+       * divides by two exactly, so a shape is always a full rectangle and never
+       * a gap in the last row.
+       */
+      const ten = () => ({
+        head: '', marker: '', written: 'B', 'not erasure': 'B', payload: 'B',
+        filled: '%', entropy: '', nearest: 'B', 'synth 1': '', 'synth 2': '',
+      });
+      const fillTen = (r) => {
+        r.set('head', 'USER'); r.set('marker', 'DC BB'); r.set('written', '10,620');
+        r.set('not erasure', '9,206'); r.set('payload', '1,054'); r.set('filled', '84.7');
+        r.set('entropy', '0.83'); r.set('nearest', '262');
+        r.set('synth 1', 'SpaceRadio'); r.set('synth 2', 'SpooKey');
+        return r;
+      };
+      // ⚠️ THE SAME TEN CELLS AND THE SAME TEN VALUES IN BOTH, so the only thing
+      // that can differ on screen is the arrangement. Two specimens differing in
+      // their content would be demonstrating the content.
+      kitRoFlex = fillTen(createReport({ readout: ten(), showLog: false }));
+      kitRoGrid = fillTen(createReport({ readout: ten(), rows: 2, size: 'sm', showLog: false }));
+      box.append(
+        el('p', 'kit-cap', 'ten cells with no shape asked for, which is the default'),
+        kitRoFlex.readoutEl,
+        el('p', 'kit-cap', 'the same ten as two rows, with a quieter value'),
+        kitRoGrid.readoutEl,
+      );
     });
 
   section('input', 'CONTROL ROW', '',
@@ -3331,8 +3331,41 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       .map((c) => Math.round(c.getBoundingClientRect().top)));
     const rowOf = (r, k) => Math.round([...r.readoutEl.children][k].getBoundingClientRect().top);
     const gridRows = tops(kitRoGrid);
+    // ⚠️ AND IT IS FULL WIDTH, WHICH IT WAS NOT. MEASURED 2026-09-21 with a
+    // throwaway probe at 1280 px: 557.6 px inside a 660 px content box, short by
+    // 102.4. `.kit-box` is a flex row, so a readout in it is a flex ITEM and
+    // takes its content width rather than the line. This section already carries
+    // `kit-wide`, which makes the box `display: block`, and that is the fix the
+    // page had already found for the same component once.
+    const roBox = kitRoGrid.readoutEl.getBoundingClientRect();
+    const host = kitRoGrid.readoutEl.parentElement;
+    /**
+     * ⚠️ `clientWidth` AND NOT A RECT MINUS PADDING, AND THE FIRST TRY WAS THE
+     * SECOND. It read `rect.width - paddingLeft - paddingRight` and answered
+     * `658.0 px of a 660.0 px content box`, so the assert went red by exactly
+     * 2 px on a layout that was perfect: the box has a 1 px border each side and
+     * the arithmetic forgot it. EVERY sibling in that box measured 658, which is
+     * what said the layout was right and the ruler was wrong.
+     * ⚠️ AND `clientWidth` ALONE WAS THE SECOND WRONG RULER, WHICH IS WORTH
+     * WRITING DOWN BECAUSE IT SOUNDS LIKE THE RIGHT ONE. It is content PLUS
+     * PADDING, with only the border and the scrollbar taken off, so it answered
+     * 686 and the assert went red again by 28 px. The content box is
+     * `clientWidth` minus the padding: 688 less 2 of border is 686, less 28 of
+     * padding is 658, which is what every child in that box measures.
+     * 🔴 THREE RULERS FOR ONE DISTANCE AND TWO OF THEM WERE WRONG. The thing
+     * that told me the LAYOUT was fine both times was that every sibling
+     * measured the same 658, which is a fact about the page rather than about
+     * my arithmetic.
+     */
+    const hp = getComputedStyle(host);
+    const content = host.clientWidth - parseFloat(hp.paddingLeft) - parseFloat(hp.paddingRight);
+    const sibs = [...host.children].map((c) => Math.round(c.getBoundingClientRect().width));
+    d.assert('a readout fills the width it is given rather than shrinking to its cells',
+      Math.abs(roBox.width - content) < 1 && new Set(sibs).size === 1,
+      `${roBox.width.toFixed(1)} px of a ${content.toFixed(1)} px content box, `
+      + `and all ${sibs.length} children of that box measure ${[...new Set(sibs)].join(', ')}`);
     const vSize = (r) => parseFloat(getComputedStyle(r.readoutEl.querySelector('.pos-v')).fontSize);
-    d.assert('asked for five columns it lays ten cells out five and five, whatever the flex row does',
+    d.assert('asked for two rows it lays ten cells out five and five, whatever the flex row does',
       gridRows.size === 2
       && rowOf(kitRoGrid, 0) === rowOf(kitRoGrid, 4)
       && rowOf(kitRoGrid, 5) === rowOf(kitRoGrid, 9)
