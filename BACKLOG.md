@@ -424,6 +424,43 @@
   `not connected` is longer than `checking` and every state will measure wider.
   There is an assert on that reserve in `/kit/`; check it after.
 
+### Asked 2026-09-21, session 40, /evo/ starting on C3
+
+- 🔴 **`/evo/` SHOULD START ON C3, AND THERE ARE TWO SEPARATE THINGS TO FIX.**
+  Asked: *"make evo key start from c3. what i need to do?"*
+  **The instrument** is sending notes **47 to 71**, measured, where a 25 key
+  controller sits at 48 to 72. **The page** hard-codes that measurement:
+  `demo/evo/index.html:608` is `const KEY_LO = 47`, and it is passed as `base`
+  with `minBase: KEY_LO, maxBase: KEY_LO`, so the drawing cannot shift.
+  ✅ **THE INSTRUMENT HALF IS DOCUMENTED AND FREE**, from
+  `research/evo-mk425c-face-2026-09-21.md` §5, quoting the manual: transpose is
+  *"Press 'TRANSPOSE' (OCTAVE + and OCTAVE together) (8). Press the Octave + or
+  - key (8) for every semi tone you want to transpose up or down."* One press up.
+  🔴 **BUT DO THE POWER CYCLE FIRST, BECAUSE IT MIGHT BE THE WHOLE ANSWER AND
+  COSTS NOTHING.** The manual's non-volatile list is verbatim: *"Also stored is
+  Draw Bar mode (on/off), DATA LSB and DATA MSB data, global channel setting and
+  last used memory preset."* **Octave and transpose are absent from it.** So off
+  and on, play the bottom key: back at 48 means somebody had left a live
+  transpose set and the instrument is ordinary; back at 47 means transpose
+  survives a power cycle and the manual's list is incomplete. Either answer is
+  worth having.
+  🔴 **AND THE PAGE FIX IS NOT `48`, IT IS TO STOP ASSUMING.** Transpose is a
+  MUTABLE instrument setting with a documented control on the front panel, so a
+  page that hard-codes one measurement of it is a page that is wrong the moment
+  somebody presses that control, in both directions. It should report the lowest
+  note it has actually SEEN.
+  ⚠️ **THE CATCH IS THE FIRST PAINT**: nothing has been seen before a key is
+  pressed, so a default is still needed. 48 is the right default, because it is
+  what the instrument does from the factory, and the page should say in its log
+  when what arrives disagrees with what it drew, which is the observation
+  against expectation pattern the `channel` line already uses on that page.
+  ⚠️ **AND THE KEY PATTERN MUST NOT BE TOUCHED WHILE DOING IT.**
+  `createKeyboard` decides black from white by `sharps.has(k)` against the
+  LETTER a key is played from, not from the offset, which is why this page had
+  **25 white keys and 0 black** until the rebuild. The base moves the NAMES; the
+  shape comes from the `sharps` set the page now passes.
+  🔴 Queued behind the panel extraction, which holds this file.
+
 ### Asked 2026-09-21, session 40, a smaller round pad
 
 - 🔴 **A SMALLER ROUND PAD, AND `/evo/`'s OCTAVE `-`/`+` USES IT.** Asked:
