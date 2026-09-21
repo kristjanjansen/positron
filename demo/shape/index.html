@@ -7,8 +7,20 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The part chooser and the one button beside it. */
+  /* 🔴 EVERYTHING THAT CAN REACH THE INSTRUMENT, AND NOTHING ELSE. The part
+     chooser, the output chooser and the two buttons live here rather than in
+     `.pos-controls`, because `demo/verify.mjs` clicks every button in that row
+     on every run: a `move everything` in there would be the suite putting a
+     random patch on somebody's synth dozens of times a day. It wraps, because
+     four controls do not fit a phone in one line.
+     🔴 AND IT WRAPS IN TWO GROUPS RATHER THAN AS FOUR LOOSE CONTROLS. MEASURED
+     2026-09-21 at 1280 px, where the body column is 688: the four come to 784
+     with their gaps, so they were ALWAYS going to wrap, and loose they broke
+     3 and 1 with `put back` alone on a line under the output chooser. What you
+     are pointing at and what to do with it are two questions, so they are two
+     groups and the break lands between them at every width. */
   .shape-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .shape-bar-g { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
   /* 🔴 ONE LABEL COLUMN ACROSS EVERY SECTION, AND THIS IS WHY IT IS HERE AND
      NOT IN THE KIT. `.sld-group` is `max-content minmax(0, 1fr)`, so a group
@@ -36,6 +48,7 @@
   import { createStack } from '/shell/stack.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
+  import { createPicker } from '/shell/picker.mjs';
   import { createPresenceButton } from '/shell/presence.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
   import { decode } from '/shell/midi-decode.mjs';
@@ -100,7 +113,9 @@
      * Four cells and every one of them moves.
      * `cc out` is what this page has produced, `rate` is what it is producing
      * right now and is the cell that says the word real time in numbers,
-     * `merged` is how many moves went out inside somebody else's message, and
+     * `merged` is how many positions never left on their own because a newer
+     * one was already coming, whether the coalescer folded them together or the
+     * pacing held one back, and
      * `changed` is how far the instrument is from where this page opened.
      */
     readout: { 'cc out': '', rate: '/s', merged: '', changed: '' },
@@ -171,7 +186,17 @@
     out++;
     bump(1);
     if (sink) sink.push({ ...m, bytes });
-    else if (port) { try { port.send(bytes); portSends++; } catch (e) { d.log(`the Circuit refused a message (${e.message})`, 'warn'); } }
+    else if (port) {
+      try {
+        port.send(bytes);
+        portSends++;
+        /* ⚠️ A STATE CHANGE, SAID ONCE. `cc out` counts what this page PRODUCED
+           and climbs just as fast with nothing plugged in, which is exactly the
+           reading somebody had while the instrument stayed silent. This is the
+           one line that says a byte left the browser. */
+        if (!saidReached) { saidReached = true; d.log(`the first control change has gone to ${portName(port)}`, 'hi'); }
+      } catch (e) { d.log(`${portName(port)} refused a message (${e.message})`, 'warn'); }
+    }
     const p = param(m.group, m.cc);
     /* ⚠️ `cc out` COUNTS WHAT THIS PAGE PRODUCED, NOT WHAT AN INSTRUMENT HEARD,
        and the two are separate on purpose. Whether anything was listening is the
@@ -220,10 +245,52 @@
     if (!g) { g = { v, gate: makeCcSend({ gateMs: 0, restateMs: Infinity }) }; gates.set(k, g); }
     return g;
   }
-  const mergedTotal = () => [...gates.values()].reduce((s, g) => s + g.gate.stats.thinned, 0);
+
+  /**
+   * 🔴 FORTY HANDS ARE NOT ONE HAND FORTY TIMES, AND THE COALESCER ABOVE CANNOT
+   * HELP WITH IT. MEASURED 2026-09-21, in a real Chrome, with `move everything`
+   * pressed and nothing plugged in: **322, then 1076, then 1289 control changes
+   * a second**, and the `merged` cell EMPTY for the whole run. That empty cell
+   * is the finding. The gate merges by controller number, and forty hands move
+   * forty DIFFERENT controllers, so there is nothing for it to merge: its
+   * promise is one message per parameter per frame, which at sixty frames and
+   * forty lanes is two thousand four hundred a second and is working exactly as
+   * written.
+   * ⚠️ THE ARITHMETIC, SO THE NUMBER IS NOT A TASTE. A 127 step lane swept in
+   * 7000 ms passes through about 18 distinct values a second on average, and
+   * more than twice that through the fast middle of the curve. Forty of those
+   * at once is the measurement above. A ceiling of 600 gives each of forty
+   * lanes a value every 67 ms, which is 15 a second: under the natural average,
+   * so what it takes is the peak rather than the gesture.
+   * ⚠️ ONE HAND IS UNTOUCHED, AND SO IS EVERY FINGER. The gap is zero below two
+   * hands, and it is applied ONLY to a value a hand produced. A pointer drag is
+   * one parameter at pointer rate and is already the thing the frame gate was
+   * written for, so a person dragging a filter still gets a value every frame
+   * however many other lanes are moving.
+   */
+  const HAND_CEILING = 600;                    // control changes a second, everything in
+  const handGap = (n) => (n <= 1 ? 0 : Math.ceil(1000 * n / HAND_CEILING));
+  let handsRunning = 0, paced = 0;
+  const lastOffer = new Map();                 // parameter key -> when it was last offered
+
+  /**
+   * Every position this page decided not to send because a newer one was
+   * coming, whichever side of the gate it was dropped on.
+   */
+  const mergedTotal = () => paced + [...gates.values()].reduce((s, g) => s + g.gate.stats.thinned, 0);
 
   let pumping = 0;
-  function queue(v, p, value, end) {
+  function queue(v, p, value, end, byHand = false) {
+    /* ⚠️ THE LAST VALUE OF A GESTURE IS NEVER PACED. `end` is a hand stopping or
+       a pointer lifting, and that value is the one that stays true until
+       somebody moves the control again. */
+    const gap = byHand && !end ? handGap(handsRunning) : 0;
+    if (gap) {
+      const k = `${gateKey(v)}|${p.cc}`;
+      const now = performance.now();
+      if (now - (lastOffer.get(k) ?? -Infinity) < gap) { paced++; d.set('merged', mergedTotal() || ''); return; }
+      lastOffer.set(k, now);
+    }
     gateFor(v).gate.put(p.cc, value, { end });
     if (!pumping) pumping = requestAnimationFrame(flush);
   }
@@ -286,7 +353,9 @@
 
   let voice = VOICES[0][1], voiceName = VOICES[0][0];
   let sliders = [];               // {p, sld, key} for the part on screen
-  let handStarts = 0;
+  let handStarts = 0, handLines = 0;
+  /* One line rather than forty. See `handSaid`. */
+  let quietHands = false;
 
   const parts = createChoice({
     label: 'sends to',
@@ -294,11 +363,58 @@
     at: 0,
     onPick: (v, name) => showVoice(v, name),
   });
+
+  /**
+   * 🔴 THE PERSON CHOOSES THE OUTPUT. A NAME IS A GUESS AND IT WAS THE ONLY
+   * THING THIS PAGE HAD. The first build filtered the browser's outputs with
+   * `/circuit/i` and took the first survivor, so **four different failures all
+   * came out as the word `offline`**: no Web MIDI at all, a browser that
+   * refused, a granted browser with no outputs, and a desk full of outputs
+   * none of which happened to spell the name this page was looking for. A
+   * reader could not tell which of the four they had, and the one report this
+   * page has ever had was that nothing changed on the instrument.
+   * ⚠️ `none` IS THE FIRST ENTRY AND IT IS NOT DECORATION. It is how a person
+   * takes the page off the wire without unplugging anything, and it is what
+   * this page opens on, because a visit must not choose an instrument.
+   */
+  const NONE = 'none';
+  const outs = createPicker({
+    label: 'output',
+    what: 'MIDI output',
+    prev: () => setPick(pick - 1),
+    next: () => setPick(pick + 1),
+    onPick: (i) => setPick(i),
+  });
+  outs.el.title = 'which MIDI output these sliders send to. Press the status button to fill this list.';
+  /* A visit asks the browser for nothing, so the list is `none` and the control
+     is dead until somebody has pressed the status button. */
+  outs.options([NONE], 0);
+  outs.disabled(true);
+
   const back = el('button', 'pos-btn', 'put back', { type: 'button' });
   back.title = 'put every parameter this page has moved back to where this page opened it';
   back.onclick = () => putBack();
+
+  /**
+   * 🔴 IT IS HERE AND NOT IN `.pos-controls`, WHICH IS THE WHOLE REASON THIS
+   * ROW EXISTS. `demo/verify.mjs` clicks every button in the harness row on
+   * every run, dozens of times a day, so this button in there would be the
+   * suite putting a random patch on somebody's synth and leaving forty sliders
+   * moving by themselves afterwards. `slider.mjs` refuses a HAND inside that
+   * row on its own; nothing in the kit can refuse a BUTTON that starts forty of
+   * them, so the page answers for it and asserts the placement below.
+   */
+  const all = el('button', 'pos-btn', 'move everything', { type: 'button' });
+  all.title = 'put every slider on this part somewhere new, and let the ones with room to show it '
+    + 'go on moving by themselves';
+  all.onclick = () => moveEverything();
+
   const bar = el('div', 'shape-bar');
-  bar.append(parts.el, back);
+  const choosers = el('div', 'shape-bar-g');
+  const doers = el('div', 'shape-bar-g');
+  choosers.append(parts.el, outs.el);
+  doers.append(all, back);
+  bar.append(choosers, doers);
 
   const rack = createStack(undefined, 'shape-rack');
   const traffic = createMidiLog({ empty: 'move a slider and what it sends is listed here' });
@@ -317,14 +433,35 @@
   const built = new Map();
   /** Every slider this page has built, across every part it has been shown. */
   const everyRow = () => [...built.values()].flatMap((r) => r.rows);
+  /** The same rows, by parameter key, so `moved` can ask a slider about itself. */
+  const rowByKey = new Map();
 
+  /**
+   * ⚠️ FORTY HANDS SAY ONE LINE BETWEEN THEM. A line per slider was right while
+   * at most one could be moving; `move everything` starts every lane on the
+   * part that has room for one, and forty rows reading `osc 2 cents is moving
+   * by itself` push everything a reader might act on off the top of the log.
+   * The caller that started them says how many, once. `handLines` counts what
+   * actually reached the log, so the page can assert that rather than claim it.
+   */
   const handSaid = (p) => (s) => {
-    if (s.why === 'in-controls') { d.log(s.says, 'warn'); return; }
+    if (s.why === 'in-controls') { d.log(s.says, 'warn'); handLines++; return; }
     if (s.why === 'coarse') return;            // a coarse lane is given no hand
-    if (s.on) { handStarts++; d.log(`${p.name} is moving by itself`); return; }
+    /* ⚠️ HOW MANY ARE MOVING, COUNTED HERE BECAUSE THIS IS THE ONE PLACE BOTH
+       EDGES ARRIVE. `start` always raises this and `stop` returns early when
+       there is nothing to stop, so the pair is exact and the pacing above has a
+       number rather than a scan of every row on every offer. */
+    if (s.on) {
+      handsRunning++; handStarts++;
+      if (!quietHands) { handLines++; d.log(`${p.name} is moving by itself`); }
+      return;
+    }
+    handsRunning = Math.max(0, handsRunning - 1);
+    if (quietHands) return;
     const why = s.why === 'ceiling' ? ', which is the ten minute ceiling'
       : s.why === 'hidden' ? ', because this tab went to the background'
       : s.why === 'put back' ? ', because everything went back' : '';
+    handLines++;
     d.log(`${p.name} is yours again${why}`);
   };
 
@@ -357,7 +494,9 @@
     });
     const title = `${p.name}, CC ${p.cc} on channel ${v.ch}, ${p.lo} to ${p.hi}`;
     sld.el.title = title;
-    into.push({ p, sld, key, v });
+    const row = { p, sld, key, v };
+    into.push(row);
+    rowByKey.set(key, row);
     return sld;
   }
 
@@ -380,7 +519,7 @@
   function showVoice(v, name) {
     /* Anything still moving belongs to the part being left, and a hand on a
        detached slider is a page sending for as long as the tab is open. */
-    for (const s of sliders) s.sld.hand?.stop('part');
+    stopEveryHand('part');
     flushNow();
     voice = v; voiceName = name || voiceName;
     const k = gateKey(v);
@@ -413,15 +552,34 @@
 
   let saidNothingOpen = false, saidNoPort = false;
   function moved(v, p, value, end) {
-    values.set(keyOf(v, p), value);
-    queue(v, p, value, end);
+    const key = keyOf(v, p);
+    values.set(key, value);
+    /* 🔴 WHETHER A HAND PRODUCED THIS, READ OFF THE COMPONENT RATHER THAN
+       GUESSED. `pointerdown` makes a hand YIELD, so `running && !held` is true
+       exactly while the invisible hand is the thing moving the handle and false
+       for every finger, arrow key and `set()` from this page. That is the line
+       the pacing above needs and there is no other way to draw it: `onInput` is
+       one callback and both paths go through it. */
+    const h = rowByKey.get(key)?.sld.hand;
+    queue(v, p, value, end, !!(h?.running && !h.held));
     d.set('changed', changed() || '');
+    /**
+     * 🔴 WHICH LINK IS BROKEN, IN THE PLACE SOMEBODY IS LOOKING WHEN THEY
+     * NOTICE. Moving a handle and hearing nothing is the whole of the report
+     * this page has ever had, and until now the page answered it with a badge
+     * reading `offline` that meant four different things.
+     */
     if (!access && !saidNothingOpen) {
       saidNothingOpen = true;
-      d.log('nothing is open yet. Press the status button to look for a Circuit, and these handles will reach it.');
+      d.log('nothing is open yet, so these moves are going nowhere. Press the status button '
+          + 'beside the title and this page will list what is plugged in.');
     } else if (access && !port && !saidNoPort) {
       saidNoPort = true;
-      d.log('no output with Circuit in its name, so these moves are going nowhere.', 'warn');
+      d.log(ports.length
+        ? `no output is chosen, so these moves are going nowhere. There ${ports.length === 1
+            ? 'is one to choose from' : `are ${ports.length} to choose from`} above.`
+        : 'this browser opened MIDI and found no outputs at all, so these moves are going nowhere.',
+        'warn');
     }
   }
 
@@ -436,13 +594,30 @@
    * the patch back exactly as it was. That is worth saying in the log rather
    * than leaving somebody to hope.
    */
+  /**
+   * Stop every hand that is running, anywhere, and say how many in one line
+   * when there is more than one of them.
+   *
+   * ⚠️ IT COUNTS BEFORE IT STOPS, because `stop()` is what raises the line and
+   * a count taken afterwards is always zero.
+   */
+  function stopEveryHand(why) {
+    const rows = everyRow();
+    const n = rows.filter((s) => s.sld.hand?.running).length;
+    quietHands = n > 1;
+    for (const s of rows) s.sld.hand?.stop(why);
+    quietHands = false;
+    if (n > 1) { handLines++; d.log(`${n} sliders stopped moving by themselves`); }
+    return n;
+  }
+
   function putBack() {
     /* 🔴 EVERY PART, NOT THE ONE ON SCREEN. The first build stopped the hands
        and moved the handles of the visible rack only, so a parameter moved on
        Synth 2 was put back on the wire and left showing its old number the next
        time somebody chose Synth 2. A handle that disagrees with what was sent is
        the defect this page's whole `values` map exists to prevent. */
-    for (const s of everyRow()) s.sld.hand?.stop('put back');
+    stopEveryHand('put back');
     let n = 0;
     for (const [key, x] of values) {
       const [, chs] = key.split('|');
@@ -467,6 +642,54 @@
         + 'Reloading the session on the instrument does that, and nothing here has ever written to its flash.');
   }
 
+  /**
+   * 🔴 `move everything`, ASKED FOR 2026-09-21 AS *"a global invisible hands
+   * button that sets all sliders to random position and enables their hands"*.
+   * One press puts every slider on the part in front of you somewhere new and
+   * leaves the ones with room to show it moving by themselves.
+   *
+   * 🔴 THE TWELVE COARSE LANES ARE MOVED AND ARE GIVEN NO HAND, AND BOTH HALVES
+   * ARE DELIBERATE. `Polyphony Mode` has three steps, `filter type` has six and
+   * `osc 1 wave` has thirty, which is fewer than a sweep's own wander, so a hand
+   * on one draws a staircase and `slider.mjs` already refuses to pretend
+   * otherwise. That is a statement about the ANIMATION and not about the value:
+   * a wave and a filter type are among the biggest changes this instrument can
+   * be asked for, and a button called `move everything` that left a quarter of
+   * the rack at its opening position would be a control that names one thing and
+   * does another.
+   *
+   * ⚠️ THE VALUE GOES OUT THROUGH `moved`, AND THE HANDLE IS MOVED QUIETLY. This
+   * is `put back`'s shape read the other way: one road to the coalescer, so
+   * fifty two positions leave as fifty two control changes in one frame rather
+   * than as a hundred and four.
+   * ⚠️ AND THE POSITION IS SET BEFORE THE HAND IS STARTED. `set()` makes a hand
+   * yield for over a second, so starting first and placing second would leave
+   * forty lanes standing still with their buttons lit.
+   */
+  let allPresses = 0;
+  function moveEverything() {
+    allPresses++;
+    const rows = sliders;
+    const handed = rows.filter((s) => s.sld.hand);
+    quietHands = handed.length > 1;
+    for (const s of rows) {
+      const { p, sld } = s;
+      const x = p.lo + Math.floor(Math.random() * (p.hi - p.lo + 1));
+      moved(s.v, p, x, true);
+      /* A lane about to be taken over by a hand is given no glide: the hand
+         starts from wherever the handle is on the next frame, so the travel
+         would be thrown away half way through and read as a stutter. */
+      sld.set(x, { quiet: true, glideMs: sld.hand ? 0 : 600 });
+      sld.hand?.start(0, 'everything');
+    }
+    quietHands = false;
+    flushNow();
+    d.log(`moved ${rows.length} parameters on ${voiceName} and left ${handed.length} of them `
+        + `moving by themselves. ${rows.length - handed.length} lanes are too coarse to show a hand `
+        + 'and were only moved. Press put back to stop all of it.');
+    handLines++;
+  }
+
   showVoice(voice, voiceName);
   /* A late webfont changes every label width, and `document.fonts` is the event
      for it rather than a guess at how long loading takes. */
@@ -484,13 +707,104 @@
    */
   let access = null, presses = 0, opens = 0, opensBeforePress = 0;
 
+  /**
+   * Every MIDI output this browser reported, in its order, and which one of them
+   * is chosen. `pick` indexes the PICKER, where 0 is `none`, so `ports[pick - 1]`
+   * is the output and `pick === 0` means this page is sending nowhere.
+   */
+  let ports = [], pick = 0;
+  const portName = (o) => o.name || o.id || 'unnamed output';
+  const optionNames = () => [NONE, ...ports.map(portName)];
+
+  /**
+   * 🔴 THE INDEX OF THE FIRST OUTPUT THAT LOOKS LIKE A CIRCUIT, OR -1, AND -1
+   * MEANS NOTHING IS CHOSEN RATHER THAN TAKE THE FIRST ONE. An output nobody
+   * picked is somebody's DAW, or the TASCAM Model 12 and the Evolution keyboard
+   * that are on this same desk and in this same list: CC 74 arriving at one of
+   * those moves something real that is not this instrument. A page that guesses
+   * wrong in silence is worse than a page that sends nowhere and says so.
+   * ⚠️ IT IS PURE AND IT IS GRADED. The whole of the name guessing is this one
+   * line, so the check below can hand it three lists and read the answers
+   * without a browser, a permission or a device.
+   */
+  const defaultPort = (names) => names.findIndex((n) => /circuit/i.test(n));
+
+  let saidFacts = false, saidReached = false;
+
+  /**
+   * Choose an output by its position in the picker, open it, and say so.
+   *
+   * ⚠️ `port.open()` IS REPEATED WITHOUT HARM. An already open port resolves at
+   * once, which is what `/dump/` relies on for the same reason: another client
+   * may have held the device when the page first looked.
+   */
+  function setPick(at, from = 'press') {
+    const was = port;
+    pick = Math.max(0, Math.min(ports.length, Math.round(at) || 0));
+    port = pick > 0 ? ports[pick - 1] : null;
+    outs.show(optionNames()[pick], pick);
+    if (port && port !== was) {
+      port.open?.()?.catch?.((e) => d.log(`${portName(port)} would not open (${e.message})`, 'warn'));
+    }
+    /* 🔴 ONLINE MEANS BYTES HAVE SOMEWHERE TO GO, NOT THAT MIDI WAS GRANTED.
+       Permission is a fact about the browser and presence is a fact about the
+       desk, and reporting the first as the second is how a page says `online`
+       about nothing at all. */
+    pres.set(port ? 'online' : 'offline',
+      port ? null
+        : ports.length ? 'an output is there and none is chosen'
+        : access ? 'this browser found no MIDI outputs'
+        : 'nothing has been opened yet');
+    if (port !== was || from === 'press') {
+      d.log(port ? `sending to ${portName(port)}` : 'sending nowhere', port ? 'hi' : '');
+    }
+    if (port && !saidFacts) {
+      saidFacts = true;
+      d.log('a handle here says where this page left a parameter and never what the patch holds, '
+          + 'because a control change is write only and nothing here reads the instrument.');
+      d.log('nothing on this page can send SysEx, a program change or a note, so the patches in '
+          + 'flash cannot be touched from here.');
+    }
+  }
+
+  /**
+   * 🔴 EVERY OUTPUT, BY NAME, INCLUDING THE ONES THAT DO NOT MATCH. An empty
+   * list and a list of three names that are not this instrument are two
+   * different facts and they read identically as the word `offline`.
+   */
+  function listOutputs(from) {
+    const was = optionNames().join('|');
+    ports = access ? [...access.outputs.values()] : [];
+    const names = optionNames();
+    /* Plugging something in fires this repeatedly and most of the time nothing
+       about the list has changed, so an unchanged list says nothing. */
+    if (from === 'changed' && names.join('|') === was) return;
+    const held = port ? ports.indexOf(port) : -1;
+    outs.options(names, 0);
+    outs.disabled(ports.length < 1);
+    const real = names.slice(1);
+    d.log(real.length
+      ? `${real.length} MIDI output${real.length === 1 ? '' : 's'}: ${real.join(', ')}`
+      : 'this browser opened MIDI and found no outputs at all', real.length ? '' : 'warn');
+    /* Keep the output somebody chose if it is still there; otherwise the name
+       match, and where there is none, nothing. */
+    const guess = defaultPort(real);
+    setPick(held >= 0 ? held + 1 : guess + 1, from);
+    if (real.length && guess < 0) {
+      d.log('nothing in that list has Circuit in its name, so no output was chosen for you. '
+          + 'Pick one above and these handles will reach it.', 'warn');
+    }
+  }
+
+  /**
+   * @returns {'no web midi'|'refused'|'no outputs'|'no match'|'sending'} which
+   * link in the chain is the one that is broken, as a word per DIFFERENT
+   * failure.
+   */
   async function open() {
     opens++;
     if (!presses) opensBeforePress++;
-    if (!navigator.requestMIDIAccess) {
-      d.log('this browser has no Web MIDI, so nothing here can reach an instrument', 'warn');
-      return false;
-    }
+    if (!navigator.requestMIDIAccess) return 'no web midi';
     try {
       /**
        * ⚠️ `sysex: false`, WHICH IS THE THIRD WALL AND THE ONLY ONE THE BROWSER
@@ -503,14 +817,16 @@
        * `/circuit/` is the page that listens.
        */
       access = await navigator.requestMIDIAccess({ sysex: false });
-      const outs = [...access.outputs.values()].filter((o) => /circuit/i.test(o.name || ''));
-      for (const o of outs) { try { await o.open(); } catch { /* another client may hold it */ } }
-      port = outs[0] || null;
-      return true;
     } catch (e) {
       d.log(`MIDI was refused: ${e.message}`, 'warn');
-      return false;
+      return 'refused';
     }
+    /* Plugging an instrument in after the page loaded is the ordinary case, not
+       an edge one. A page that only ever looks once is a page you have to
+       reload, and reloading is how somebody concludes the page is broken. */
+    access.onstatechange = () => listOutputs('changed');
+    listOutputs('press');
+    return !ports.length ? 'no outputs' : port ? 'sending' : 'no match';
   }
 
   const pres = createPresenceButton({
@@ -523,20 +839,28 @@
 
   d.on('look', async () => {
     pres.set('checking');
-    if (await open()) {
-      /* ⚠️ ONLINE MEANS A PORT WITH THIS NAME ON IT, NOT THAT MIDI WAS GRANTED.
-         Permission is a fact about the browser; presence is a fact about whether
-         the instrument is plugged in, and reporting the first as the second is
-         how a page says `online` about an empty desk. */
-      pres.set(port ? 'online' : 'offline',
-        port ? null : 'nothing with Circuit in its name is plugged in');
-      if (port) d.log(`sending to ${port.name}`, 'hi');
-      d.log('a handle here says where this page left a parameter and never what the patch holds, '
-          + 'because a control change is write only and nothing here reads the instrument.');
-      d.log('nothing on this page can send SysEx, a program change or a note, so the patches in '
-          + 'flash cannot be touched from here.');
-    } else {
-      pres.set('offline', 'this browser would not open MIDI');
+    const link = await open();
+    if (link === 'no web midi') {
+      pres.set('offline', 'this browser has no Web MIDI');
+      d.log('this browser has no Web MIDI, so nothing here can reach an instrument. '
+          + 'Chrome and Edge have it and Safari has none at all.', 'warn');
+    } else if (link === 'refused') {
+      pres.set('offline', 'this browser refused MIDI');
+    }
+    /**
+     * 🔴 THE INSTRUMENT IS THE LAST LINK AND THE PAGE CANNOT SEE IT, SO IT SAYS
+     * WHERE TO LOOK. A control change is write only, so an open port, correct
+     * bytes and a silent synth is a state this page cannot tell apart from a
+     * working one. Two things on the Circuit itself produce exactly that:
+     * `MIDI CC Rx` can be switched off in the Settings View, and since firmware
+     * 1.8 each track's MIDI channel can be moved off the one this page uses.
+     */
+    if (link === 'sending') {
+      d.log('if a handle moves and the sound does not, the next thing to look at is the Circuit. '
+          + 'Hold Shift while turning it on for the Settings View: the orange pads are MIDI CC '
+          + 'receive and send, and both are on from the factory. The same view sets which MIDI '
+          + 'channel each track listens on, and this page uses 1 for Synth 1, 2 for Synth 2 and '
+          + '16 for the session.');
     }
     if (SELFCHECK) await d.run('drive');
   });
@@ -611,6 +935,48 @@
       document.querySelectorAll('.pos-controls .sld-hand').length === 0
       && document.querySelectorAll('.pos-controls button').length === 1,
       `${document.querySelectorAll('.pos-controls button').length} button in the row`);
+
+    /**
+     * 🔴 AND THE THREE CONTROLS THAT CAN REACH AN INSTRUMENT ARE NAMED, NOT
+     * COUNTED. The assert above would still pass if `move everything` were in
+     * the harness row and the presence button were not, and that arrangement is
+     * the suite starting forty hands on somebody's synth on every run. Counting
+     * buttons cannot see which button; this names all three.
+     */
+    d.assert('the output chooser, move everything and put back all sit in the page row',
+      [outs.el, all, back].every((e) => bar.contains(e) && !e.closest('.pos-controls')),
+      `${[outs.el, all, back].filter((e) => bar.contains(e)).length} of 3 in .shape-bar`);
+
+    /**
+     * 🔴 A NAME IS A GUESS AND THIS IS THE WHOLE OF IT. Three lists and the
+     * answers read back with no browser, no permission and no device: a match
+     * anywhere in the list wins, the FIRST match wins where there are several,
+     * and a list with no match chooses NOTHING rather than the first output,
+     * which on this desk is a TASCAM Model 12 and an Evolution keyboard.
+     */
+    d.assert('the output is chosen by name where a name matches, and nothing is chosen where none does',
+      defaultPort(['IAC Driver Bus 1', 'Circuit', 'Model 12']) === 1
+      && defaultPort(['Circuit MIDI 1', 'Circuit MIDI 2']) === 0
+      && defaultPort(['IAC Driver Bus 1', 'Model 12', 'MK-425C USB MIDI Keyboard']) === -1
+      && defaultPort([]) === -1,
+      'four lists answered');
+
+    d.assert('a visit chooses no output and opens no port',
+      pick === 0 && port === null && ports.length === 0,
+      `picker at ${pick}, ${ports.length} outputs known`);
+
+    /**
+     * 🔴 ONE HAND IS A FRAME AND FORTY ARE A CEILING, AND BOTH HALVES ARE HERE.
+     * The first two cases are the negative control: a page that paced one hand
+     * would have made the sweep this page exists for worse in order to solve a
+     * problem it does not have. The last is the arithmetic that keeps forty of
+     * them under the ceiling, which was measured at 1289 a second before it
+     * existed.
+     */
+    d.assert('one hand is paced not at all, and forty are held under the ceiling',
+      handGap(0) === 0 && handGap(1) === 0
+      && handGap(40) === 67 && 40 * (1000 / handGap(40)) <= HAND_CEILING,
+      `${handGap(40)} ms apart for forty lanes, ${Math.round(40 * (1000 / handGap(40)))} a second`);
 
     /**
      * 🔴 A HAND WHERE ONE CAN BE SEEN AND NOWHERE ELSE, BOTH HALVES. The first
@@ -770,6 +1136,77 @@
       changed() === 0 && sink.length > 0
       && sink.every((m) => m.value === homeOf(param(m.group, m.cc))),
       `${sink.length} control changes, ${changed()} left moved`);
+
+    // ── move everything ──────────────────────────────────────────────────────
+    //
+    // 🔴 DRIVEN BY PRESSING THE REAL BUTTON, NOT BY CALLING THE FUNCTION. The
+    // button is in `.shape-bar` precisely so the harness never presses it, and a
+    // check that called `moveEverything()` instead would grade the arithmetic
+    // while leaving the control itself untested. `element.click()` is what
+    // `verify.mjs` does to every other button on every other page.
+
+    const wide = sliders.filter((s) => s.sld.hand);
+    const coarse = sliders.filter((s) => !s.sld.hand);
+    const startsBefore = handStarts, linesBefore = handLines;
+    sink.length = 0;
+    all.click();
+    flushNow();
+
+    d.assert('one press leaves every lane with room for a hand moving by itself, and the coarse ones alone',
+      wide.every((s) => s.sld.hand.running) && coarse.every((s) => !s.sld.hand)
+      && handStarts - startsBefore === wide.length
+      && wide.length > 0 && coarse.length > 0,
+      `${wide.filter((s) => s.sld.hand.running).length} of ${wide.length} moving, `
+      + `${coarse.length} too coarse for one`);
+
+    /* 🔴 FORTY HANDS, ONE LINE. A line per slider is the log this page reports
+       real faults in, filled with forty rows nobody needs, and the one thing
+       worth reading gets pushed off the top of it. */
+    d.assert('and it says so once rather than once per slider',
+      handLines - linesBefore === 1, `${handLines - linesBefore} lines for ${wide.length} hands`);
+
+    /* 🔴 THE COARSE LANES REALLY DO MOVE, AND THIS IS WHERE THAT IS GRADED.
+       Twelve of the fifty two are modes and switches that a hand cannot animate,
+       which is a statement about the ANIMATION: a filter type and an oscillator
+       wave are two of the biggest changes this instrument takes, and a button
+       called `move everything` that skipped a quarter of the rack would be
+       naming one thing and doing another. */
+    const ccs = new Set(sink.map((m) => m.cc));
+    d.assert('every parameter on the part went out, the twelve coarse ones included, one message each',
+      sink.length === sliders.length && ccs.size === sink.length
+      && coarse.every((s) => ccs.has(s.p.cc)),
+      `${sink.length} control changes for ${sliders.length} parameters, ${ccs.size} distinct`);
+
+    /**
+     * 🔴 AND THE PACING IS CONSULTED ON THE REAL PATH, WHICH IS A DIFFERENT
+     * CLAIM FROM THE ARITHMETIC ABOVE. A formula nothing calls is this
+     * project's most expensive kind of defect, and it reads as correct. Two
+     * offers per lane inside one frame, with forty hands running: the first
+     * sets each lane's clock and the second is inside the 67 ms gap, so forty
+     * positions are held back rather than put on the wire.
+     * ⚠️ THE FIRST ROUND IS NOT A CONTROL, IT IS THE SETUP. Each lane's clock
+     * is empty until something offers, so a single round would pass on a page
+     * with no pacing at all.
+     */
+    const pacedBefore = paced;
+    sink.length = 0;
+    for (const s of wide) moved(s.v, s.p, s.p.lo + 3, false);
+    const pacedAfterFirst = paced;
+    for (const s of wide) moved(s.v, s.p, s.p.lo + 4, false);
+    flushNow();
+    d.assert('with forty hands running, a second position inside the gap is held back rather than sent',
+      pacedAfterFirst === pacedBefore && paced - pacedBefore === wide.length
+      && sink.length === wide.length,
+      `${paced - pacedBefore} held back, ${sink.length} sent for ${wide.length} lanes`);
+
+    /* 🔴 AND PUT BACK IS THE WAY OUT OF IT. A button that starts forty hands and
+       no button that stops them is a page somebody has to reload, and a reload
+       is how this project's `/weight/` full screen bug was reported. */
+    sink.length = 0;
+    back.click();
+    d.assert('put back stops every hand the press started, on every part',
+      everyRow().every((s) => !s.sld.hand?.running) && changed() === 0,
+      `${everyRow().filter((s) => s.sld.hand?.running).length} still moving, ${changed()} left moved`);
 
     // ── the audit ────────────────────────────────────────────────────────────
 
