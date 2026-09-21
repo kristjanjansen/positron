@@ -108,8 +108,11 @@
     controls: [
       /* 🔴 CONTROL 0, so `settleMs` lands on it and so the harness presses the
          thing this page is about. It uses a canned reply under `?selfcheck=1`
-         and reaches nobody. */
-      { id: 'speak', label: 'Speak', primary: true },
+         and reaches nobody.
+         ⚠️ THE LABEL IS THE DOCUMENTATION. A control that is worked with a
+         gesture rather than a press has to name the gesture, because there is
+         nothing else on the page that could. */
+      { id: 'speak', label: 'Hold to talk', primary: true },
       { id: 'example', label: 'Use the example' },
     ],
   });
@@ -125,7 +128,7 @@
   const whyBox = el('div', 'wish-rows');
   d.el.append(row, said, patch, whyBox);
 
-  let rec = null, chunks = [], recording = false;
+  const speakBtn = d.button('speak');
 
   // ── the desk, as a bay, so the proposal is graded by the real validator ───
 
@@ -179,13 +182,45 @@
 
   // ── the two calls ────────────────────────────────────────────────────────
 
+  /**
+   * 🔴 ONE COUNTED FUNCTION, AND IT IS THE ONLY THING ON THIS PAGE THAT CAN
+   * LEAVE IT. `reached` is what the assert below reads, so "a visit reached
+   * nobody" is a number rather than a claim about a file.
+   */
+  let reached = 0;
+
+  /**
+   * 🔴 A FETCH THAT NEVER CONNECTED AND A FETCH THAT CAME BACK WITH AN ERROR
+   * ARE TWO DIFFERENT REPORTS, AND THIS PAGE USED TO GIVE ONE. Both ends bolted
+   * *"Is `node demo/wish-local.mjs` running?"* onto whatever went wrong, so an
+   * expired Cloudflare credential was reported as a process that might not be
+   * up. It sent a reader to look at the one thing that was never wrong, and it
+   * cost an hour. The agent's own message is the agent's message.
+   */
   async function post(path, body) {
-    const r = await fetch(`${API}${path}`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-    });
-    const out = await r.json();
-    if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+    reached++;
+    let r;
+    try {
+      r = await fetch(`${API}${path}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+      });
+    } catch {
+      const e = new Error(`nothing answered at ${API}. Start the agent with \`node demo/wish-local.mjs\``);
+      e.answered = false;
+      throw e;
+    }
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const e = new Error(out.error || `HTTP ${r.status}`);
+      e.answered = true;
+      throw e;
+    }
     return out;
+  }
+
+  /** What went wrong, in the words of whichever end has a right to them. */
+  function blame(e) {
+    d.log(e.answered === false ? e.message : `the agent said: ${e.message}`, 'warn');
   }
 
   async function think(text) {
@@ -203,44 +238,187 @@
        microphone still sees the page work. It still costs a model call. */
     if (SELFCHECK) return;
     try { await think('Connect the keyboard to the circuit and transpose it up one semitone.'); }
-    catch (e) { d.log(`the agent did not answer: ${e.message}. Is \`node demo/wish-local.mjs\` running?`, 'warn'); }
+    catch (e) { blame(e); }
   });
 
-  d.on('speak', async () => {
-    if (SELFCHECK) { await d.run('check'); return; }
-    if (recording) { rec?.stop(); return; }
+  // ── hold to talk ─────────────────────────────────────────────────────────
+
+  /**
+   * 🔴 HELD RATHER THAN TOGGLED, ASKED FOR 2026-09-21: *"replace speak button
+   * with a hold to alk button"*. A toggle carries a state that can get stuck:
+   * a second press that is missed, a hand that leaves the page, a phone that
+   * takes the gesture away to scroll, and the microphone is open with nobody in
+   * front of it. A hold lasts exactly as long as the hand does.
+   *
+   * 🔴 **AND IT ANSWERS A PLAIN CLICK AS WELL, WHICH IS NOT POLITENESS.**
+   * `demo/verify.mjs` drives every page by calling `.click()` on each button in
+   * `.pos-controls`, and `element.click()` fires NO pointer events at all. A
+   * hold-only control in that row is a check the harness can no longer reach,
+   * and those asserts do not go red, they stop running while the suite stays
+   * green: this repository has paid for exactly that twice, on `/mirror/` and
+   * on `/blocks/`. So a press with no pointer behind it, which is the harness,
+   * the Enter key and an assistive click, records a fixed short window instead.
+   * **A click is a tap with no finger**, and it is the same code path.
+   */
+  const MIN_HOLD = 450;     // below this a press is a tap rather than a hold
+  const TAP_MS = 2500;      // what a tap, or a click with no pointer, records
+
+  const talk = {
+    holding: false, began: 0, ended: 0, last: null,
+    classify: (ms) => (ms >= MIN_HOLD ? 'hold' : 'tap'),
+  };
+
+  let rec = null, stream = null, chunks = [];
+  let startedAt = 0, tapTimer = 0, lastGesture = -1e9;
+  let stopWanted = false, dropped = false, busy = false;
+
+  /* 🔴 THE PICTURE IS THE ONE EVERY OTHER CONTROL IN THIS PROJECT USES.
+     `data-busy` is paint only, it is reduced-motion aware, and it says "this
+     control is at work" from the moment of the press until the answer lands,
+     which is true of the recording and of the thinking after it. A label change
+     or a spinner would resize the button and reflow the row under the hand that
+     is holding it. */
+  const lit = (on) => { if (on) speakBtn.dataset.busy = '1'; else delete speakBtn.dataset.busy; };
+
+  function release() {
+    stream?.getTracks().forEach((t) => t.stop());
+    stream = null; rec = null;
+  }
+
+  function begin() {
+    if (talk.holding || busy) return;
+    talk.holding = true;
+    talk.began++;
+    startedAt = performance.now();
+    stopWanted = false; dropped = false;
+    lit(true);
+    /* ⚠️ THE MICROPHONE IS THE ONLY HALF A CHECK SKIPS. The gesture itself, its
+       timing and its ending are the same code for a harness and for a hand,
+       because a gesture that behaves one way under `?selfcheck=1` is a gesture
+       nothing grades. */
+    if (SELFCHECK) return;
+    open();
+  }
+
+  async function open() {
     if (!navigator.mediaDevices?.getUserMedia) {
-      d.log('this browser has no microphone API, so use the example', 'warn');
+      d.log('this browser has no microphone, so use the example', 'warn');
+      talk.holding = false; lit(false);
       return;
     }
-    let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (e) { d.log(`no microphone: ${e.message}`, 'warn'); return; }
+    let s;
+    try { s = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { d.log(`no microphone: ${e.message}`, 'warn'); talk.holding = false; lit(false); return; }
+    /* ⚠️ A PERMISSION PROMPT TAKES LONGER THAN A PRESS. The hand can be off the
+       button before the microphone opens, so the release is checked here rather
+       than assumed. */
+    if (stopWanted) { s.getTracks().forEach((t) => t.stop()); lit(false); return; }
+    stream = s;
     chunks = [];
-    rec = new MediaRecorder(stream);
+    rec = new MediaRecorder(s);
     rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-    rec.onstop = async () => {
-      recording = false;
-      stream.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-      d.log(`${(blob.size / 1024).toFixed(1)} KB of audio`);
-      try {
-        const buf = new Uint8Array(await blob.arrayBuffer());
-        /* ⚠️ CHUNKED, because `String.fromCharCode(...buf)` on a few seconds of
-           audio is tens of thousands of arguments and blows the stack. */
-        let s = '';
-        for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-        const heard = await post('/hear', { audio: btoa(s), model: hearPick.value() });
-        d.set('heard', heard.ms ?? '');
-        if (!heard.text?.trim()) { said.textContent = 'nothing was heard'; return; }
-        await think(heard.text.trim());
-      } catch (e) {
-        d.log(`the agent did not answer: ${e.message}. Is \`node demo/wish-local.mjs\` running?`, 'warn');
-      }
-    };
+    rec.onstop = finish;
     rec.start();
-    recording = true;
-    d.log('listening. Press again to stop.');
+    /* ⚠️ A TAP CAN LET GO BEFORE THE MICROPHONE OPENS, so this reads the state
+       rather than describing the gesture it assumed. */
+    d.log(talk.holding ? 'listening while the button is held' : 'listening');
+  }
+
+  /** @param {'up'|'cancel'|'click'} why */
+  function end(why) {
+    if (!talk.holding) return;          // idempotent: pointerup and lostpointercapture both land here
+    talk.holding = false;
+    talk.ended++;
+    if (why !== 'click') lastGesture = performance.now();
+    const ms = Math.round(performance.now() - startedAt);
+    const kind = why === 'cancel' ? 'cancel' : talk.classify(ms);
+    talk.last = { ms, kind, why };
+    if (kind === 'cancel') {
+      /* 🔴 THE PHONE CASE, AND IT ENDS THE RECORDING RATHER THAN SENDING IT.
+         The browser takes a gesture away to scroll and no `pointerup` ever
+         arrives, so half a word would be uploaded on behalf of somebody who was
+         scrolling the page. */
+      d.log('the press was taken away, so nothing was sent');
+      dropped = true;
+      stop();
+      return;
+    }
+    if (kind === 'hold') { stop(); return; }
+    d.log(`that was ${ms} ms, too short to be a hold, so ${(TAP_MS / 1000).toFixed(1)} s is recorded instead`);
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(stop, Math.max(0, TAP_MS - ms));
+  }
+
+  /* ⚠️ THE LIGHT STAYS ON UNTIL `finish()` IS DONE. Turning it off at the
+     release and on again at the upload blinks the control for the one or two
+     frames `onstop` takes to arrive, and a control that flickers reads as one
+     that lost the press. */
+  function stop() {
+    clearTimeout(tapTimer);
+    stopWanted = true;
+    if (!rec) { lit(false); release(); return; }
+    if (rec.state !== 'inactive') rec.stop(); else finish();
+  }
+
+  async function finish() {
+    const type = rec?.mimeType || 'audio/webm';
+    release();
+    if (dropped) { dropped = false; chunks = []; lit(false); return; }
+    const blob = new Blob(chunks, { type });
+    d.log(`${(blob.size / 1024).toFixed(1)} KB of audio`);
+    busy = true;
+    lit(true);
+    try {
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      /* ⚠️ CHUNKED, because `String.fromCharCode(...buf)` on a few seconds of
+         audio is tens of thousands of arguments and blows the stack. */
+      let s = '';
+      for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      const heard = await post('/hear', { audio: btoa(s), model: hearPick.value() });
+      d.set('heard', heard.ms ?? '');
+      if (!heard.text?.trim()) { said.textContent = 'nothing was heard'; return; }
+      await think(heard.text.trim());
+    } catch (e) {
+      blame(e);
+    } finally {
+      busy = false;
+      lit(false);
+    }
+  }
+
+  speakBtn.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;   // a right click is not a press
+    /* 🔴 CAPTURE, OR A PHONE GETS STUCK RECORDING. With the pointer captured
+       this button is guaranteed its `pointerup` even when the finger has slid
+       off it, so the pointer leaving cannot strand a hold. `pointercancel` is
+       the other half: the browser takes the gesture away for a scroll and
+       nothing else ever arrives. */
+    try { speakBtn.setPointerCapture(e.pointerId); } catch { /* a synthetic pointer has no id to capture */ }
+    lastGesture = performance.now();
+    begin();
+  });
+  speakBtn.addEventListener('pointerup', () => end('up'));
+  speakBtn.addEventListener('pointercancel', () => end('cancel'));
+  /* The catch-all for a capture lost some other way. `end` is idempotent, so a
+     `pointerup` that already ran leaves this a no-op. */
+  speakBtn.addEventListener('lostpointercapture', () => end('up'));
+
+  /* ⚠️ NOT `async`, ON PURPOSE. The shell paints `data-busy` and DISABLES a
+     control whose handler returns a promise, and it clears both when the
+     promise settles, which would wipe the recording's own paint one tick after
+     a tap set it. The selfcheck branch does return one, because there the
+     control really is working for as long as the checks run. */
+  d.on('speak', () => {
+    if (SELFCHECK) return d.run('check');
+    /* 🔴 A CLICK THAT TRAILS A REAL HOLD IS THE SAME PRESS ARRIVING TWICE. A
+       trusted `pointerup` is followed by a `click` on the same button, so
+       without this a hand's press would also start the no-pointer path. A
+       synthetic click carries no pointer events at all and never trips it. */
+    if (performance.now() - lastGesture < 600) return undefined;
+    if (busy || talk.holding) return undefined;
+    begin();
+    end('click');
+    return undefined;
   });
 
   // ── checks ───────────────────────────────────────────────────────────────
@@ -258,7 +436,11 @@
       transforms: [{ op: 'transpose', to: 1 }] }];
     const g = show(REAL);
 
-    d.assert('a visit reached nobody', SELFCHECK ? true : true, 'gated on a press');
+    /* 🔴 A COUNTER, NOT A CLAIM. This read `SELFCHECK ? true : true` and could
+       not go red whatever the page did, which is an assert that reports the
+       author's intention. `post()` is the one function on this page that can
+       leave it, and it counts every call. */
+    d.assert('a visit reached nobody', reached === 0, `${reached} calls to the agent`);
 
     d.assert('the transform the real model returned is refused, by name',
       g.refused === 1 && /transpose/.test(whyBox.textContent) && /by/.test(whyBox.textContent),
@@ -291,6 +473,63 @@
     d.assert('the desk it describes is the one the other pages build ids for',
       PORTS.some((p) => p.id === 'here:circuit:in') && PORTS.some((p) => p.id === 'here:mk-425c-usb-midi-keyboard:out'),
       `${PORTS.length} ports`);
+
+    /* ── the hold ──────────────────────────────────────────────────────────
+       🔴 DRIVEN WITH REAL POINTER EVENTS, which is the half a `.click()`
+       cannot reach and the half that gets a phone stuck. No microphone is
+       opened by any of it: `begin()` does the gesture's own bookkeeping and
+       stops at its `SELFCHECK` line, so what is graded here is the wiring and
+       the arithmetic rather than a recording. */
+
+    /* ⚠️ THE SHELL DISABLES A CONTROL WHILE ITS HANDLER IS PENDING, AND THIS
+       CHECK IS THAT HANDLER. A disabled button receives no pointer events at
+       all, so the presses below would land on nothing and three asserts would
+       quietly measure a page nobody had touched. */
+    const wasOff = speakBtn.disabled;
+    speakBtn.disabled = false;
+    const press = (type, init) => speakBtn.dispatchEvent(new PointerEvent(type,
+      { bubbles: true, pointerId: 1, pointerType: 'mouse', button: 0, ...init }));
+
+    const began0 = talk.began, ended0 = talk.ended;
+    press('pointerdown');
+    const midHold = talk.holding;
+    press('pointerup');
+    d.assert('a press and a release is one hold, begun and ended',
+      midHold === true && talk.began === began0 + 1 && talk.ended === ended0 + 1 && talk.holding === false,
+      `holding ${midHold} during, ${talk.began - began0} begun, ${talk.ended - ended0} ended, holding ${talk.holding} after`);
+
+    press('pointerdown');
+    press('pointercancel');
+    d.assert('a press the browser takes away ends the hold rather than leaving it recording',
+      talk.holding === false && talk.last?.kind === 'cancel' && talk.ended === ended0 + 2,
+      `holding ${talk.holding}, last ${talk.last?.kind}`);
+
+    /* The negative control is in the same line: a long press must NOT be read
+       as a tap, or every hold would quietly become a fixed window. */
+    d.assert('a press too short to be a hold is a tap, and a long one is not',
+      talk.classify(10) === 'tap' && talk.classify(MIN_HOLD - 1) === 'tap'
+      && talk.classify(MIN_HOLD) === 'hold' && talk.classify(4000) === 'hold',
+      `the line is ${MIN_HOLD} ms`);
+
+    /* Holding a button on an iPhone raises the text loupe and drops selection
+       handles over the page, and this is the one control here that is held.
+       The COMPUTED value, because a rule that lost is a rule that reads as
+       correct in the source.
+       ⚠️ **AND ONE THIRD OF IT CANNOT BE MEASURED IN THE BROWSER THAT RUNS THIS
+       CHECK.** MEASURED 2026-09-21: desktop Chrome computes
+       `-webkit-touch-callout` as the empty string, so grading it there took
+       this assert red about a page where nothing is wrong. A probe that could
+       not answer reads as `unknown` and never blocks, the same rule
+       `caps.mjs` works to, and the detail line says which of the three were
+       actually read. */
+    const cs = getComputedStyle(speakBtn);
+    const callout = cs.getPropertyValue('-webkit-touch-callout');
+    d.assert('a long press on this control is a mis-press, never a selection',
+      cs.touchAction === 'manipulation' && cs.userSelect === 'none'
+      && (callout === '' || callout === 'none'),
+      `touch-action ${cs.touchAction}, user-select ${cs.userSelect}, `
+      + `callout ${callout || 'not computed by this browser'}`);
+    speakBtn.disabled = wasOff;
 
     if (d.el.isConnected) {
       /* Nothing on this page may change its own height while a reader is
