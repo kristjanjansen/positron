@@ -7,7 +7,7 @@
 // lives in `purchased/` precisely because it is not ours to publish, and a
 // control called *upload* invites somebody to build the thing that gitignore
 // exists to prevent. The label a visitor reads says **open**.
-// ⚠️ `plans/plan-patches-page.md` §3 specifies `FileReader`. `file.arrayBuffer()`
+// ⚠️ `plans/plan-pack-page.md` §3 specifies `FileReader`. `file.arrayBuffer()`
 // is the same locality with fewer moving parts and it returns a promise, so a
 // read that fails propagates instead of landing in an `onerror` nobody wrote.
 //

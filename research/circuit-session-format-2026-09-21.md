@@ -143,10 +143,20 @@ against the same session before the change. That is the only honest method, and
 it costs one Components export per field. It also means putting sessions back on
 the Circuit, which is the operation CLAUDE.md warns about in capitals.
 
-⚠️ **AND THE 32 SESSIONS ARE STILL NOT BACKED UP.** `New Pack.circuitpack`
-contains the PACK's session slots. The 32 live on the device are the thing the
-owner called *"very important"* and nobody has exported them. **Decoding a
-format is a poor reason to be the first person to write to that device.**
+🔴 **THIS SAID THE 32 SESSIONS ARE STILL NOT BACKED UP AND THAT IS WRONG.
+CORRECTED 2026-09-21 BY THE OWNER:** *"its in kristjanjansen git"*. The
+distinction this paragraph drew, between the PACK's session slots and the 32
+live on the device, is not a distinction the files support: the pack holds **32
+distinct fingerprints of 32**, none empty, 84.57 to 89.58 per cent non-zero,
+under the owner's own session names. **`New Pack.circuitpack` IS the backup and
+it is tracked.**
+⚠️ **THE NARROW VERSION SURVIVES.** The pack is dated 2026-09-20, so work done
+on the Circuit since then exists in one place. That argues for a fresh export
+before anything risky, not for there being no backup.
+⚠️ **AND THE CONCLUSION OF THIS SECTION DOES NOT CHANGE.** Decoding a format is
+still a poor reason to be the first person to WRITE to that device, because the
+instrument has no factory reset and recovery means sending a pack back, which is
+itself one of the three operations that replace its contents.
 
 ---
 

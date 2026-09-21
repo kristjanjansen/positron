@@ -190,9 +190,28 @@ control beside it so a guard that refused everything could not pass.
 has not saved, that work is gone. ⚖️ Treat it as a write, ask before it, and
 keep it out of step 2 entirely.
 
-⚠️ **`New Pack.circuitpack` IS THE ONLY BACKUP AND IT IS NOT A FULL ONE.**
-CLAUDE.md: the 32 user sessions are not in it. Until they are off the device,
-the cost of a mistake includes work that exists nowhere else.
+🔴 **THIS SAID `New Pack.circuitpack` IS NOT A FULL BACKUP AND THAT THE 32 USER
+SESSIONS ARE NOT IN IT. IT IS WRONG, IT WAS WRONG WHEN IT WAS WRITTEN, AND IT
+SURVIVED BEING FLAGGED ONCE.** `research/circuit-soundbank-2026-09-21.md` §9
+measured the opposite and named this sentence as the contradiction; nobody came
+back and changed it. The owner settled it on 2026-09-21: *"its in kristjanjansen
+git"*.
+✅ **MEASURED, TWICE, ON DIFFERENT DAYS:** the pack's `index.json` declares 32
+sessions, 32 `.circuitsession` files are present, **32 distinct fingerprints of
+32**, none empty, 84.57 to 89.58 per cent non-zero, and the names in the index
+are the owner's own work (`Skyscraper`, `Insert Point`, `Chunk`, `Ghostly
+Intro`, `Dub Circulation`, `Werk`, `Off Timed`, `Back To Earth`, and the ones
+still called `User Session`, which measurement puts HIGHER than most of the
+named ones). **The backup exists and it is tracked in the repository.**
+⚠️ **WHAT IS STILL TRUE IS MUCH NARROWER AND IS WORTH KEEPING.** The pack was
+taken on 2026-09-20 through Novation Components, so it is the device as it was
+THAT DAY. Anything made on the Circuit since is in one place. That is an
+argument for taking a fresh pack before a risky operation, not an argument that
+there is no backup.
+🔴 **AND THE COST OF A MISTAKE IS STILL REAL.** A `Replace Patch` overwrites
+flash on an instrument with no factory reset, and recovering from the pack means
+sending it back, which is itself one of the three operations that replace the
+instrument's contents.
 
 ---
 

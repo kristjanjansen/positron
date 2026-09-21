@@ -121,7 +121,7 @@ non-zero**, and an empty `name` in all 32. The owner's own pack is 32 distinct
 of 32 with none empty.
 🔴 **AND THE FIRST FOUR BYTES ARE NOT A FOURTH TEST. THIS LINE SAID `INIT`
 AGAINST THE OWNER'S `DEMO` UNTIL 2026-09-21, AND THE PACK SAYS OTHERWISE.**
-MEASURED on both sides that day while building `/patches/`: the owner's 32
+MEASURED on both sides that day while building `/pack/`: the owner's 32
 sessions are **`USER` 22, `DEMO` 7 and `INIT` 3**. Three of somebody's real
 sessions carry the exact head published here as the blank signature, and all
 three are ordinary work at entropy 0.87 and 86.5 per cent non-zero with distinct

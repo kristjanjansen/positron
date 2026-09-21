@@ -56,7 +56,7 @@ Circuit's contents on a device with no factory reset.
 
 🔴 **THE HEAD ROW ABOVE READ `DEMO` AGAINST `INIT` UNTIL 2026-09-21 AND THAT
 WAS WRONG, WHICH MATTERS BECAUSE IT WAS BEING USED AS A TEST.** Re-measured over
-all 32 while building `/patches/`: the owner's pack is `USER` 22, `DEMO` 7 and
+all 32 while building `/pack/`: the owner's pack is `USER` 22, `DEMO` 7 and
 `INIT` 3. The three that say `INIT` are named `Initial Session` in `index.json`
 and are ordinary work, entropy 0.87 and 86.5 per cent non-zero with distinct
 fingerprints, so a check keyed on the head would have called three real sessions

@@ -4,7 +4,7 @@
 // 🔴 THIS EXISTED ONCE AND WAS NOT KEPT, WHICH IS WHY IT IS HERE.
 // `research/circuit-soundbank-2026-09-21.md` built a decoder, graded it against
 // the published `patch_0` at 246 varying fields of 324 exactly, and it lived in
-// a scratchpad that is gone. `plans/plan-patches-page.md` §4 makes rebuilding it
+// a scratchpad that is gone. `plans/plan-pack-page.md` §4 makes rebuilding it
 // step one, because a page that decodes inline is the third place in this
 // repository that knows the format and the first one nothing grades.
 //
@@ -696,7 +696,7 @@ export function summarise(patch) {
 // factory reset.
 //
 // 🔴 AND THE FIRST FOUR BYTES ARE NOT THE FOURTH DISCRIMINATOR. THEY WERE
-// PUBLISHED AS ONE AND THE PACK DISAGREES. `CLAUDE.md`, `plans/plan-patches-page.md`
+// PUBLISHED AS ONE AND THE PACK DISAGREES. `CLAUDE.md`, `plans/plan-pack-page.md`
 // §2.1 and `research/circuit-soundbank-2026-09-21.md` all said `INIT` against the
 // owner's `DEMO`. The owner's 32 sessions are **`USER` 22, `DEMO` 7 and `INIT`
 // 3**, so three of somebody's real sessions carry the exact head published as the
