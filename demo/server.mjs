@@ -97,6 +97,38 @@ export function serve(port = PORT) {
      * happened once and cannot be repeated by asking again, which is exactly
      * the property that made the round trips expensive.
      */
+    /**
+     * ── /_log — what a page SAID, written where a session can read it ────────
+     *
+     * 🔴 IT IS `/_tap` ONE STEP ALONG AND IT EXISTS FOR THE SAME REASON. Asked
+     * for 2026-09-21: *"build a way to get the logs and debug (like you did with
+     * tap)"*, after an afternoon in which every question about what a page was
+     * doing was answered by the owner taking a screenshot and me reading it.
+     * A log line is on somebody's screen; this puts it in a file.
+     * ⚠️ DEV SERVER ONLY, EXACTLY LIKE `/_tap`. There is no such route in
+     * `workers/view/src/index.js` and there must never be one, so a deployed
+     * page posts nowhere and nobody's log is written to anybody's disk. The
+     * page behaves identically with nothing listening, which is what keeps
+     * LOCAL == DEPLOYED true where it matters.
+     * ⚠️ AND IT IS PER PAGE, because two pages open at once is the normal state
+     * of this project and one interleaved file would be unreadable.
+     */
+    if (rel === '_log' && req.method === 'POST') {
+      const chunks = [];
+      let n = 0;
+      for await (const c of req) {
+        n += c.length;
+        if (n > 4_000_000) { res.writeHead(413).end('too much'); return; }
+        chunks.push(c);
+      }
+      const { appendFileSync, mkdirSync } = await import('node:fs');
+      const dir = new URL('../.tap/', import.meta.url);
+      try { mkdirSync(dir, { recursive: true }); } catch { /* already there */ }
+      appendFileSync(new URL('log.jsonl', dir), Buffer.concat(chunks) + '\n');
+      res.writeHead(204, { 'access-control-allow-origin': '*' }).end();
+      return;
+    }
+
     if (rel === '_tap' && req.method === 'POST') {
       const chunks = [];
       // A cap, because a keyboard can put 733 messages on the wire in eight

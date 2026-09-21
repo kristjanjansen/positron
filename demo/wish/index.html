@@ -65,7 +65,17 @@
     display: block; width: 100%; height: 64px; resize: none; overflow-y: auto;
     padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px;
     background-color: var(--card); color: var(--ink);
-    font-family: inherit; font-size: 15px; line-height: 1.45;
+    /* 🔴 MONOSPACED, ASKED FOR AGAINST THE SENTENCE ITSELF ON 2026-09-21. It
+       inherited the page's reading face, which is the right choice for prose
+       and the wrong one here: this box is not prose, it is the exact words that
+       go to a model, and it sits directly above a monospaced object built out
+       of them. A reader comparing what they SAID with what came BACK was
+       crossing a typeface to do it.
+       ⚠️ AND THE SIZE COMES DOWN WITH THE FACE. A monospaced 15 px is visibly
+       larger than the proportional 15 px it replaces, and this box is one line
+       tall by reservation. */
+    font-family: var(--mono, ui-monospace, monospace); font-size: 13.5px;
+    line-height: 1.5;
   }
   .wish-patch {
     /* `pre-wrap` and not `pre`: a long object wraps instead of running off the
@@ -139,6 +149,13 @@
      the same colour and the same measure as the picture and the object below
      it. A divider typed here would be a second one. */
   .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); }
+  /* 🔴 THE VERDICT PART KEEPS ONE LINE'S ROOM WHETHER OR NOT IT HAS WORDS.
+     Asked 2026-09-21: *"make this the minimal height even when no data"*. It
+     used to go away, which meant the picture and the object below it moved down
+     the instant an answer landed, under the eye of the person who pressed for
+     it. Every other box on this page already reserves its room from the first
+     paint and says so; this one now does too. */
+  .wish-verdict { min-height: 40px; display: flex; align-items: center; }
   .wish-why b { color: var(--bad, #e0908a); font-weight: 600; }
   .wish-why i { color: var(--ok, #8fd6a8); font-style: normal; }
   .wish-why-l { color: var(--ink); }
@@ -590,14 +607,21 @@
    * part it gets the glue's own 1 px seam of `--line` and the part's own
    * padding, which is the same edge the picture and the object already have, in
    * the same colour, from the same rule.
-   * ⚠️ AND IT GOES AWAY WHEN IT HAS NOTHING TO SAY. A part with a seam above it
-   * and nothing in it is an empty box painting a line nobody wrote, which is
-   * this project's named defect and is exactly what the drop footer and the
-   * empty table heading already answer.
+   * 🔴 AND IT STAYS AT ONE LINE RATHER THAN GOING AWAY, WHICH REVERSES WHAT I
+   * BUILT AN HOUR EARLIER. Asked 2026-09-21 against a screenshot of the filled
+   * component: *"make this the minimal height even when no data"*.
+   * ⚠️ THE ARGUMENT FOR HIDING IT WAS THE EMPTY-BOX RULE, and the argument
+   * against is the stronger one on this page: **nothing may change how much room
+   * it takes.** A part that appears when an answer lands moves the picture and
+   * the object down under the reader's eye, on a page whose every other box
+   * already reserves its room from the first paint for exactly that reason.
+   * ⚠️ AND THE EMPTY-BOX RULE IS NOT BEING BROKEN, IT IS BEING OUTRANKED. That
+   * rule is about a container drawing EDGES around nothing. The seams here are
+   * the glue's and exist for the parts either side of this one whatever it
+   * holds, so nothing new is painted; what is reserved is a line's height.
    */
   const whyPart = el('div', 'wish-part wish-verdict');
   whyPart.append(whyBox);
-  whyPart.hidden = true;
   const heard = createGlue(hear.part, said);
   const answer = createGlue(patchHead.part, whyPart, dgHost, dump);
   d.el.append(heard, answer);
@@ -974,7 +998,6 @@
     /* Both of these are things to show, the object and the report that there is
        no object, so both get the box's edges. See `.wish-patch`. */
     patch.dataset.shown = '1';
-    whyPart.hidden = !g.rows.length;
     whyBox.replaceChildren(...g.rows.map((r) => {
       const e = el('div', 'wish-why');
       e.append(el(r.ok ? 'i' : 'b', '', r.ok ? 'allowed' : 'refused'),
@@ -1027,7 +1050,6 @@
        rest of the page's life. */
     delete patch.dataset.shown;
     whyBox.replaceChildren();
-    whyPart.hidden = true;
     dg?.destroy();
     dg = null;
     dgHost.replaceChildren();
@@ -1962,7 +1984,16 @@
     const grounds = parts.map((n) => getComputedStyle(n).backgroundColor);
     const edges = parts
       .map((n) => parseFloat(getComputedStyle(n).borderTopWidth));
-    const seams = [drawn.top - picked.bottom, dumped.top - drawn.bottom];
+    /**
+     * ⚠️ EVERY SEAM, WALKED OFF THE GLUE, rather than two computed between three
+     * boxes named by hand. Those two were the header to the picture and the
+     * picture to the object, which measured a 42 px gap the moment the verdict
+     * became a part and stopped going away: a real distance between two real
+     * boxes, with a third part in between that the arithmetic did not know
+     * about. The layout was right and the ruler was counting the wrong pair.
+     */
+    const seams = parts.slice(1).map((n, i) =>
+      n.getBoundingClientRect().top - parts[i].getBoundingClientRect().bottom);
     d.assert('each part paints its own ground, so the 1 px seam between them is the only edge inside',
       seams.every((g) => Math.round(g) === 1)
       && edges.every((w) => w === 0)
@@ -1971,6 +2002,30 @@
       + `${edges.join()} px, ${grounds.filter((c) => c !== seamInk && c !== 'rgba(0, 0, 0, 0)').length} `
       + `of ${grounds.length} parts painting a ground of their own (${grounds[0]}) `
       + `against the glue's ${seamInk}`);
+
+    /**
+     * 🔴 THE VERDICT KEEPS ITS ROOM WITH NOTHING IN IT, which is what
+     * *"make this the minimal height even when no data"* asks for and the only
+     * part of it a check can see. The test is not that it is tall: it is that
+     * the component does not CHANGE HEIGHT when an answer lands, because that
+     * is the thing a reader would have seen move.
+     * ⚠️ IT EMPTIES AND REFILLS THE BOX IN ONE BLOCK WITH NO `await` IN IT, so
+     * no frame can be drawn between and nobody watching the page sees it
+     * flicker. Same argument `/kit/` makes about its own measuring window.
+     */
+    {
+      const full = answer.getBoundingClientRect().height;
+      const fullPart = whyPart.getBoundingClientRect().height;
+      const kept = [...whyBox.childNodes];
+      whyBox.replaceChildren();
+      const bare = answer.getBoundingClientRect().height;
+      const barePart = whyPart.getBoundingClientRect().height;
+      whyBox.replaceChildren(...kept);
+      d.assert('the verdict keeps a line of room with nothing in it, so nothing moves when an answer lands',
+        whyPart.hidden === false && barePart > 0 && Math.abs(full - bare) < 1,
+        `the part is ${fullPart.toFixed(1)} px with an answer and ${barePart.toFixed(1)} px `
+        + `without, and the component is ${full.toFixed(1)} against ${bare.toFixed(1)}`);
+    }
 
     d.assert('the desk it describes is the one the other pages build ids for',
       PORTS.some((p) => p.id === 'here:circuit:in') && PORTS.some((p) => p.id === 'here:mk-425c-usb-midi-keyboard:out'),
