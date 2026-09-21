@@ -117,8 +117,18 @@ AS `*New Pack`, AND TWO OF THEM WOULD ERASE THE SESSIONS.** A purchased
 soundbank in `purchased/` carries two `.circuitpack` files whose 32 session
 files are **blanks**, measured rather than inferred from their names: **1
 distinct fingerprint of 32**, entropy **0.01 bits a byte**, **0.1 per cent
-non-zero**, first four bytes `INIT` against the owner's `DEMO`, and an empty
-`name` in all 32. The owner's own pack is 32 distinct of 32 with none empty.
+non-zero**, and an empty `name` in all 32. The owner's own pack is 32 distinct
+of 32 with none empty.
+🔴 **AND THE FIRST FOUR BYTES ARE NOT A FOURTH TEST. THIS LINE SAID `INIT`
+AGAINST THE OWNER'S `DEMO` UNTIL 2026-09-21, AND THE PACK SAYS OTHERWISE.**
+MEASURED on both sides that day while building `/patches/`: the owner's 32
+sessions are **`USER` 22, `DEMO` 7 and `INIT` 3**. Three of somebody's real
+sessions carry the exact head published here as the blank signature, and all
+three are ordinary work at entropy 0.87 and 86.5 per cent non-zero with distinct
+fingerprints. **Deciding on the head would have condemned them.** The three
+numbers above separate the two packs by two orders of magnitude and are what the
+check rests on. ⚠️ It is the `User Session` mistake one layer down, in a field
+that looks like content rather than like a label.
 🔴 **THE VENDOR'S INSTALL NOTE SAYS TO PRESS `Send to Circuit`**, which is one
 of the three operations listed above that replace the instrument's contents on a
 box with no factory reset. So the safe pack and the two that would wipe 32
