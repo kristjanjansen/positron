@@ -186,8 +186,19 @@
    * first number. `BACKLOG.md` carries both.
    * ⚠️ SWAPPING THEM IS `REST_ROWS` AND `STEPS` CHANGING PLACES AND NOTHING
    * ELSE. Nothing below counts either of them twice.
+   *
+   * 🔴 AND IT IS SIXTEEN STEPS SINCE 2026-09-21, SETTLED IN THREE WORDS:
+   * *"tom: 16 col"*. That is a Circuit pattern's own length, which is the
+   * instrument this grid's rows come out of, so the page and the machine now
+   * count the same way. It also puts the whole pattern on a phone: sixty four
+   * columns meant about ten of them were on screen at 390 px and the other
+   * fifty four had to be dragged to.
+   * ⚠️ THE RULER'S MARKS SURVIVE THE CHANGE, which is the thing that would
+   * quietly have stopped meaning anything. A beat mark every 4 steps and a bar
+   * mark every 16 describe 4 bars over 64 and ONE bar over 16, and both are
+   * true statements about the grid rather than decoration that happens to land.
    */
-  const STEPS = 64;
+  const STEPS = 16;
   const REST_ROWS = 8;
   /**
    * How long a step is, in milliseconds. 125 ms is a sixteenth note at 120
@@ -202,7 +213,7 @@
 
   const d = mount({
     name: 'tom',
-    what: 'tap a grid of 64 steps whose rows become the samples in a Circuit pack you open here',
+    what: 'tap a grid of 16 steps whose rows become the samples in a Circuit pack you open here',
     /**
      * Four cells, all of which move, and none of which is a structural
      * constant. `rows` is not among them because the number of rows is the
@@ -773,7 +784,7 @@
     midiAsked === 0 && navigator.requestMIDIAccess !== undefined,
     `requestMIDIAccess called ${midiAsked} time(s), and the counter is still in front of it`);
 
-  d.assert('the grid is 8 rows of 64 steps before a pack lands, which is one of the two readings of 8x64',
+  d.assert('the grid is 8 rows of 16 steps before a pack lands, which is a Circuit pattern\'s own length',
     cells.length === REST_ROWS && cells.every((r) => r.length === STEPS)
     && rows.every((r) => r.wave === null),
     `${cells.length} rows of ${cells[0] ? cells[0].length : 0}, none of them a sample`);
@@ -848,11 +859,31 @@
    * viewport override, so this assert alone says nothing about a phone. The
    * 390 px reading is in the report that shipped with the page.
    */
-  d.assert('the steps scroll inside their own box and the page does not drag sideways',
-    panel.strip.scrollWidth > panel.strip.clientWidth
-    && document.documentElement.scrollWidth <= window.innerWidth + 1,
-    `strip ${panel.strip.scrollWidth} px of content in ${panel.strip.clientWidth}, `
-    + `document ${document.documentElement.scrollWidth} px in a ${window.innerWidth} px window`);
+  /**
+   * 🔴 THIS ASSERT REQUIRED THE CONTENT TO OVERFLOW AND WENT RED WHEN IT
+   * STOPPED. At sixty four steps the strip held about 1,150 px of content in
+   * 522 and the check read `scrollWidth > clientWidth`; at sixteen it holds 522
+   * in 522, and the assert failed on a layout that had just got BETTER.
+   * ⚠️ IT WAS MEASURING THE CORPUS RATHER THAN THE PAGE. Whether the steps
+   * happen to overflow today is a fact about the step count; what the page
+   * promises is that when they DO overflow the strip takes it and the document
+   * does not, and that promise is in the computed style and in `min-width`,
+   * both of which are true at any count.
+   * ⚠️ AND THE HALF THAT ALWAYS MATTERED IS UNCHANGED: the page must never drag
+   * sideways. `overflow-x` cannot shrink a flex item below its content, so it
+   * needs `min-width: 0` on the same element, and that pair was measured on
+   * this project once as 141 px of page overflow.
+   */
+  {
+    const cs = getComputedStyle(panel.strip);
+    const over = panel.strip.scrollWidth - panel.strip.clientWidth;
+    d.assert('the strip is what scrolls when the steps do not fit, and the page never drags sideways',
+      /auto|scroll/.test(cs.overflowX) && parseFloat(cs.minWidth) === 0
+      && document.documentElement.scrollWidth <= window.innerWidth + 1,
+      `overflow-x ${cs.overflowX} at min-width ${cs.minWidth}, `
+      + `${over > 0 ? `${over} px of steps past the box` : 'all steps fit today'}, `
+      + `document ${document.documentElement.scrollWidth} px in a ${window.innerWidth} px window`);
+  }
 
   /**
    * 🔴 ONE TAB STOP FOR THE WHOLE GRID, AND THE NEGATIVE HALF IS THE ONE THAT
