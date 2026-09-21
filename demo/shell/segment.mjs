@@ -372,9 +372,21 @@ function bars() {
  * ghost value across gives a reflective display that reads as a much cheaper
  * one, so each scheme carries its own.
  */
+/* 🔴 AND THE BACKLIT ONE IS NEARLY NEUTRAL, WHICH IT WAS NOT UNTIL
+   2026-09-21. Asked: *"reduce blue hue a lot in segm control"*. It was
+   `#8fb6ff` on `#0d1830`, which is a **fully saturated** blue ink (HSL
+   saturation 100 per cent) on a 57 per cent field, and at that strength the
+   colour was the loudest thing about any panel carrying one.
+   MEASURED, before and after: ink saturation **100 -> 14 per cent**, field
+   **57 -> 23**, and the blue-minus-red spread **112 -> 22** on the ink and
+   **35 -> 12** on the field. What did NOT move is the legibility: contrast
+   **8.65:1 -> 8.28:1**, so the readout is as readable as it was.
+   ⚠️ A TRACE OF BLUE IS KEPT ON PURPOSE. Taken to a true neutral this stops
+   reading as a lamp behind glass and starts reading as an LED, and the two
+   kinds of display are the distinction this whole table exists to draw. */
 export const SCHEMES = {
   /** A lamp behind the glass. Light bars, dark field. */
-  backlit: { ink: '#8fb6ff', back: '#0d1830', ghost: 0.32 },
+  backlit: { ink: '#a8b2be', back: '#141820', ghost: 0.32 },
   /** No lamp. Dark bars on the pale grey green of undriven crystal. */
   reflective: { ink: '#1c2a1e', back: '#9fb094', ghost: 0.24 },
 };

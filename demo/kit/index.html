@@ -4380,6 +4380,20 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
      * ⚠️ TWO INDEPENDENT SOURCES IS THE WHOLE CHECK, which is the repair this
      * project took from the MIM corpus: one side comes out of the stylesheet
      * and the other out of the module, so the two CAN disagree and say so.
+     *
+     * 🔴 AND IT COVERS ALL THREE NOW, NOT JUST THE GHOST. Extended 2026-09-21,
+     * the day the blue came down: `--disp-ink` and `--disp-back` are the same
+     * pair as `SCHEMES.backlit.ink` and `.back`, written down twice in exactly
+     * the way the ghost was, and the check that existed watched the one of the
+     * three that had already been caught. **A check aimed at the defect that
+     * happened is not aimed at the defect that is coming**, and these two moved
+     * from `#8fb6ff` on `#0d1830` to a near-neutral pair in one edit. Two of
+     * three agreeing is the MIM corpus failure precisely: the halves that were
+     * compared moved together while the third sat wrong and silent.
+     * ⚠️ COMPARED AS RESOLVED COLOUR, NOT AS TYPED TEXT. A token reads back
+     * from `getComputedStyle` however the author spelled it, so `#a8b2be` and
+     * `#A8B2BE` are one colour and two strings. The browser is the thing that
+     * knows: paint each into an element and read the `color` back.
      */
     {
       const token = Number(getComputedStyle(document.documentElement)
@@ -4387,6 +4401,26 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       d.assert('the stylesheet’s ghost and the backlit scheme’s are one measurement',
         Math.abs(token - SCHEMES.backlit.ghost) < 0.001,
         `--disp-ghost ${token} against SCHEMES.backlit.ghost ${SCHEMES.backlit.ghost}`);
+
+      /* Resolve a colour the way only a browser can, so a comparison is about
+         the colour rather than about how it was spelled. */
+      const asColour = (v) => {
+        const probe = el('span');
+        probe.style.color = v;
+        document.body.append(probe);
+        const out = getComputedStyle(probe).color;
+        probe.remove();
+        return out;
+      };
+      const root = getComputedStyle(document.documentElement);
+      const pairs = [['ink', '--disp-ink'], ['back', '--disp-back']].map(([k, tok]) => {
+        const fromCss = asColour(root.getPropertyValue(tok).trim());
+        const fromJs = asColour(SCHEMES.backlit[k]);
+        return { k, tok, fromCss, fromJs, same: fromCss === fromJs };
+      });
+      d.assert('the stylesheet’s ink and field and the backlit scheme’s are one measurement',
+        pairs.every((p) => p.same),
+        pairs.map((p) => `${p.tok} ${p.fromCss} against SCHEMES.backlit.${p.k} ${p.fromJs}`).join(' · '));
     }
 
     /**

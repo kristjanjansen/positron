@@ -96,6 +96,24 @@
   --ctl-head: 15px;
   --ctl-foot: 17px;
   --ctl-step: calc(var(--ctl-foot) + var(--ctl-gap) + var(--ctl-head));
+  /* 🔴 HOW FAR A SWITCHED-OFF CONTROL'S FURNITURE DIMS, AND IT IS PUBLISHED
+     FOR THE SAME REASON THE HEAD AND FOOT ARE: a caller that has to guess a
+     component's own number is a caller that guesses it wrong.
+     MEASURED 2026-09-21 on `/evo/`, whose whole panel is switched off. Its
+     function button names are wider than the buttons, so the page draws them
+     itself rather than using the pad's own label slots, and it had no number to
+     match: they rendered at FULL strength, **5.91:1** against the card, over
+     buttons dimmed to .38 and beside the pad's own top labels at **1.96:1**.
+     The label was the brightest thing in a dead control, which is what got
+     reported, and the cause was three times the intended value.
+     ⚠️ IT IS AN OPACITY AND NOT A COLOUR, so it composites over whatever the
+     control is standing on. `--dim2` on `--card` and `--dim2` on `--card2` are
+     two different readings and a caller should not have to know which.
+     ⚠️ AND IT IS NOT THE BUTTON'S OWN .38. Text at .38 of `--dim2` measures
+     1.56:1, which stops being a label; the working surface can go fainter than
+     the words naming it, because a reader who cannot make out a dimmed button
+     can still see its shape, and a name they cannot read tells them nothing. */
+  --ctl-off: 0.55;
   /* 🔴 A SEGMENT DISPLAY'S BACKLIGHT, DECLARED AT `:root` AND NOT ON THE
      COMPONENT, FOR THE `--fdr-foot` REASON. A custom property inherits
      DOWNWARD and never sideways, and the one arrangement `segment.mjs` was
@@ -130,8 +148,15 @@
      below. Changing the air round every tab row on the site is this line. */
   --pos-tabs-air: 28px;
   --disp-h: 26px;
-  --disp-ink: #8fb6ff;
-  --disp-back: #0d1830;
+  /* 🔴 NEARLY NEUTRAL SINCE 2026-09-21, and the pair in `SCHEMES.backlit` moved
+     with them by the rule three paragraphs up. Asked: *"reduce blue hue a lot in
+     segm control"*. They were `#8fb6ff` on `#0d1830`, a fully saturated blue
+     ink on a 57 per cent field. MEASURED across the change: ink saturation
+     100 -> 14 per cent, field 57 -> 23, and contrast 8.65:1 -> 8.28:1, so the
+     colour came down and the legibility did not. `segment.mjs` carries the
+     whole reasoning beside the table. */
+  --disp-ink: #a8b2be;
+  --disp-back: #141820;
   /* 🔴 0.32, RAISED TWICE ON REPORT: 0.13, then 0.22, then this. Asked as
      *"ligher noacive segments"* and then again as *"nonactive segement in
      segment display: lighter"*, which is the measurement that matters more than
@@ -3734,20 +3759,49 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 /* 🔴 A DISABLED CONTROL SAYS SO IN INK, NOT IN COLOUR ALONE, and it keeps its
    shape. A control that shrinks or loses its border when switched off changes
    the layout under whatever is beside it, and a row that reflows when one
-   button goes off reads as the page breaking. */
+   button goes off reads as the page breaking.
+
+   🔴 AND IT SHOWS THE ORDINARY CURSOR, NOT `not-allowed`. Asked 2026-09-21:
+   *"rm disable cursor o ndisabled knobs/padbuttins, just use regular.
+   noniteractive cursor"*. `not-allowed` says *you tried to use this and were
+   refused*, and nothing in this kit's disabled controls is refusing anybody:
+   every one of them is a picture of a control that is bound to nothing.
+   ⚠️ CHECKED BEFORE SWEEPING, because a rule on `:disabled` reaches every page
+   and one of them might have had a control that really was refusing a press.
+   MEASURED 2026-09-21, all four pages that disable a pad, knob or fader:
+   `/evo/` is a replica whose whole panel is switched off (20 pads of 20, 8
+   knobs of 8, 2 faders of 2), `/circuit/`'s master volume is *"a pot. Whether
+   it sends anything has not been measured"*, `/model/`'s SUB and MAIN are the
+   analogue outputs with *"nothing on MIDI"*, and `/kit/`'s are specimens of
+   this state. **Not one is a refusal**, so this is a change rather than an
+   option. If a control ever genuinely does refuse a press, it needs its own
+   class and its own cursor rather than this one back.
+   ⚠️ `default`, NOT `auto`. Over a `<button>` the initial value already
+   resolves to the arrow, but `auto` on text-bearing furniture resolves to the
+   I-beam, and the pad's labels are text. */
 .pos-pad:disabled {
-  opacity: .38; cursor: not-allowed;
+  opacity: .38; cursor: default;
   background: var(--card); border-color: var(--line);
 }
 .pos-pad:disabled .pos-pad-face { color: var(--dim2); }
 /* The labels live OUTSIDE the button, so :disabled cannot reach them. The
-   wrapper carries the state for exactly this. */
+   wrapper carries the state for exactly this.
+   🔴 AND THE AMOUNT IS `--ctl-off`, PUBLISHED AT `:root`, BECAUSE A CALLER
+   DRAWING ITS OWN STAND-IN LABEL HAS TO BE ABLE TO MATCH IT. That is the
+   published-reservations rule, and `/evo/` is the caller that proved it:
+   its function button names are wider than the buttons, so the page draws
+   them itself instead of using these slots, and they sat at FULL strength
+   over buttons dimmed to .38. MEASURED 2026-09-21 on that panel: a
+   page-drawn name at **5.91:1** against its card while the pad's own top
+   label beside it was at **1.96:1**, which is the label being the brightest
+   thing in a dead control. A number a caller has to guess is a number a
+   caller guesses wrong, and this one was wrong by three times. */
 .pos-pad-wrap[data-off] .pos-pad-bot,
-.pos-pad-wrap[data-off] .pos-pad-top { color: var(--dim2); opacity: .55; }
+.pos-pad-wrap[data-off] .pos-pad-top { color: var(--dim2); opacity: var(--ctl-off); }
 .pos-knob[data-off], .pos-fdr[data-off] { opacity: .38; }
-.pos-knob[data-off] .pos-knob-dial { cursor: not-allowed; }
+.pos-knob[data-off] .pos-knob-dial { cursor: default; }
 .pos-knob[data-off] .pos-knob-arc { stroke: var(--dim2); }
-.pos-fdr[data-off] .pos-fdr-lane { cursor: not-allowed; }
+.pos-fdr[data-off] .pos-fdr-lane { cursor: default; }
 .pos-fdr[data-off] .pos-fdr-cap { background: var(--dim2); }
 
 /* ── fader: THE SLIDER, TURNED 90 DEGREES — shell/fader.mjs ─────────────────
@@ -3940,7 +3994,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    ⚠️ AND IT MATCHES WHAT EVERY OTHER CONTROL HERE DOES with an armed state: a
    pad tints, a knob's arc turns, none of them floods a panel. */
 .pos-fdr-hand[aria-pressed="true"] { color: var(--hi); border-color: var(--line2); }
-.pos-fdr[data-off] .pos-fdr-hand { opacity: .4; cursor: not-allowed; }
+.pos-fdr[data-off] .pos-fdr-hand { opacity: .4; cursor: default; }
 
 /* a centred face needs no bottom padding, or it sits above centre */
 .pos-pad-round .pos-pad-face { padding: 0 3px; }
