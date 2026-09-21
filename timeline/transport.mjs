@@ -2803,7 +2803,36 @@ export function createAudioLane(transport, ctx, {
 
   const unsub = transport.onState((st) => {
     cancelCommitted();
-    if (st.reason === 'seek') for (const ev of events) if (ev.at > st.p0 && ev.status === 'passed') ev.status = 'pending';
+    /**
+     * 🔴 'rendered' IS RESET HERE TOO, AND LEAVING IT OUT MEANT THIS LANE COULD
+     * NOT LOOP. A node's `onended` is the only thing that writes 'rendered',
+     * so what stayed silent on a second lap was exactly the set of events that
+     * had SOUNDED on the first one.
+     *
+     * MEASURED 2026-09-21 in a real AudioContext with the audio thread doing
+     * the counting (demo/shell/impulse-worklet.js, the ear /lanes/ uses): four
+     * events at 300, 900, 1500 and 2100 over a 2400 ms lap, played out, then
+     * seek(0). Lap one 4 impulses heard, LAP TWO 0, stats {rendered: 4}.
+     * THE CONTROL, in the same run and the same lane: cut the lap at 1200
+     * instead, and the two events that had not sounded yet DID sound after the
+     * seek, at 1496 and 2097 ms. The anchor, the commit path and the ear are
+     * all fine across a seek; only the terminal status was wrong.
+     *
+     * ⚠️ IT IS WHAT THE OTHER TWO LANES IN THIS FILE ALREADY DO. The wall
+     * scheduler's reconcile() resets ANY event ahead of the playhead ('re-fire
+     * after a backward seek is correct replay'), and createMidiLane has no
+     * terminal status at all, so both of them loop. This was the odd one out.
+     * ⚠️ AND THE OFFLINE RENDER LAB COULD NOT HAVE CAUGHT IT: offline nothing
+     * sounds until startRendering(), so `onended` never fires while the
+     * commits are being made and 'rendered' never happens there. Two loop
+     * defects on one lane, and the arm that found the other one is blind to
+     * this one.
+     */
+    if (st.reason === 'seek') {
+      for (const ev of events) {
+        if (ev.at > st.p0 && (ev.status === 'passed' || ev.status === 'rendered')) ev.status = 'pending';
+      }
+    }
   });
 
   return {
