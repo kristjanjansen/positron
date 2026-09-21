@@ -554,6 +554,33 @@ export const DEMOS = [
     tags: ['WebMIDI', 'CoreMIDI'] },
 
   /**
+   * 🔴 THE FIRST EDITOR, AND THE ANSWER TO *"can it play back real time on
+   * circuit?"* IS YES AND WAS ALREADY MEASURED. Asked 2026-09-21: *"based on
+   * your research what you've done in sound editing in circuit can you build a
+   * demo for sound editing using our invisible hand sliders and experience what
+   * we had so far."*. `demo/shell/circuit-cc.mjs` holds **98 control change
+   * parameters** read out of Novation's Circuit Programmer's Reference Guide
+   * v1.1, and a control change moves a parameter on the LIVE voice under a note
+   * that is already sounding.
+   * 🔴 **NO SysEx, WHICH IS THE WHOLE SAFETY STORY.**
+   * `plans/plan-circuit-editor.md` §1 records that `Replace Current Patch` and
+   * `Replace Patch` differ by ONE BYTE, and the second overwrites a patch on a
+   * device with no factory reset whose only backup is `New Pack.circuitpack` in
+   * this repository. One function turns an intention into bytes here, it can
+   * express a control change and nothing else, and it is asserted both ways.
+   * ⚠️ IT CANNOT READ THE INSTRUMENT, so a handle says where this page left a
+   * parameter and never what the patch holds. The button is `put back` rather
+   * than `reset` for that reason, and the real undo is reloading the session on
+   * the Circuit, which control changes never touch.
+   * ⚠️ `settleMs` IS FOR THE HAND. A sweep is 7000 ms end to end on a gentle
+   * curve, so the first step of a 127 step lane lands about half a second in,
+   * and that measurement is the first thing the checks make.
+   */
+  { name: 'shape', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 4000,
+    one: "edit a Novation Circuit's sound while it is playing, with sliders that can move themselves",
+    tags: ['WebMIDI', 'CoreMIDI'] },
+
+  /**
    * 🔴 THE THIRD HARDWARE PANEL, AND ITS LAYOUT IS THE WEAKEST OF THE THREE.
    * Asked 2026-09-21: *"do evolution mk425c demo named evo"*, *"demo: hw
    * layout"*. `/circuit/` was drawn from Novation's own artwork at 800 dpi and

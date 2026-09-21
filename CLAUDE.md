@@ -1,11 +1,13 @@
 # positron
 
-Live at **https://positron.studio**. 51 shelled demos of 53 rows
-(2026-09-21, counted from `DEMOS` rather than remembered). `evo` is the newest,
-2026-09-21, and it is the third hardware panel after `circuit` and `model`.
-⚠️ **THIS READ `47 of 49` AND NAMED A DEMO FROM TWO DAYS EARLIER**, which is
-the same drift the warning below is about, arriving again in the same file that
-warns about it. The count is one command and it is written out below. `making` is the MIMproject archive: the
+Live at **https://positron.studio**. 54 shelled demos of 56 rows
+(2026-09-21, counted from `DEMOS` rather than remembered). **Five arrived on
+2026-09-21**: `evo`, `bay`, `wish`, `shape` and `circuit`.
+⚠️ **THIS READ `47 of 49` IN THE MORNING AND `51 of 53` BY THE AFTERNOON, AND
+BOTH WERE TRUE WHEN WRITTEN.** The second one was corrected three demos before
+this one, which is the point: on a day when pages are being added this line goes
+stale in hours, and it was a background agent reading it that caught it the
+second time. The count is one command and it is written out below. `making` is the MIMproject archive: the
 recordings and the pictures that outlived the project's own website, on two
 tabs. ⚠️ THE FIGURES HERE READ `43 of 46` AND `tapes is the newest` FOR FOUR
 DAYS AND THREE DEMOS, which is the drift this file's own rule is about, and the
