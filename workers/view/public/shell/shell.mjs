@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = 'b345ee3-011055-1ca9';
+export const BUILD = '55f4efd-145405-d7c3';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -462,6 +462,7 @@ export function mount({
  */
 export function createReport({
   readout = {}, showReadout = true, showLog = true, joined = false,
+  rows = 0, size = '',
 } = {}) {
   // 🔴 AN EVEN NUMBER OF CELLS, AND WHEN IT IS ODD THE ANSWER IS TO CUT ONE.
   // The row was `repeat(auto-fit, minmax(96px, 1fr))` when this rule was
@@ -488,6 +489,37 @@ export function createReport({
 
   const cells = new Map();
   const readoutEl = el('div', 'pos-readout');
+  /**
+   * 🔴 A FIXED NUMBER OF ROWS, ASKED FOR 2026-09-21 AS *"why not 5x2 cells?"*
+   * and then as *"1xsomehting / 2xsomehing etc"*. The flex row fills every line,
+   * which is right when a page does not care where the break falls and wrong
+   * when the cells are PAIRS: `written` and `not erasure` belong beside each
+   * other and landed in different rows at whatever width the browser chose.
+   * 🔴 IT IS ROWS AND NOT COLUMNS, AND THAT IS THE OWNER'S CORRECTION RATHER
+   * THAN A PREFERENCE. This took a `cols` for about an hour. A caller who says
+   * `cols: 5` has done the division themselves and can get it wrong; a caller
+   * who says `rows: 2` is naming the SHAPE, and the columns fall out of the cell
+   * count. `1 x something` and `2 x something` is how the owner said it.
+   * ✅ AND IT LEANS ON THE EVEN RULE ABOVE, WHICH IS WHY THAT RULE EARNS ITS
+   * KEEP TWICE. An even count divides by 2 exactly, so `rows: 2` is always a
+   * full rectangle and never a hole in the last row. The rule that used to be
+   * editorial is structural again the moment a caller asks for a shape.
+   * ⚠️ IT IS OPT IN AND THE FLEX ROW IS STILL THE DEFAULT, because that row was
+   * measured filling at thirteen widths and both counts, and nothing about the
+   * pages using it has changed.
+   * ⚠️ A CUSTOM PROPERTY AND NOT `style.gridTemplateColumns`. A component that
+   * varies a property per instance sets a custom property, never the property,
+   * or no stylesheet can ever take it back: `video-panel.mjs` wrote
+   * `style.aspectRatio` from an option and left one page's picture square on a
+   * 16:9 screen with the way out of full screen off the top of it.
+   */
+  if (rows > 0) {
+    readoutEl.dataset.rows = String(rows);
+    readoutEl.style.setProperty('--ro-cols', String(Math.ceil(keys.length / rows)));
+  }
+  // ⚠️ `sm` IS A QUIETER VALUE AND NOT A SMALLER PANEL. The key stays 9.5 px
+  // because it is the half a reader scans down.
+  if (size === 'sm') readoutEl.classList.add('pos-readout-sm');
   // hidden, not absent: `/crate/` and `/videoradio/` both reach for this
   // element, and shell.css gives `.pos-readout[hidden]` an explicit
   // `display: none` because `display: flex` beats the UA's own `[hidden]` rule.
