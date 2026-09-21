@@ -171,8 +171,17 @@ function schemaFor(outs, ins) {
               items: {
                 type: 'object',
                 properties: {
-                  op: { type: 'string', enum: ['channel', 'transpose', 'velocity', 'only', 'drop', 'cc'] },
+                  op: { type: 'string',
+                        enum: ['channel', 'transpose', 'velocity', 'only', 'drop',
+                               'range', 'vrange', 'fixed', 'cc'] },
                   to: { type: 'number' }, by: { type: 'number' }, scale: { type: 'number' },
+                  // ⚠️ `lo` AND `hi` ADDED 2026-09-21 WITH `range` AND `vrange`. A
+                  // schema that lists every argument any op can take and requires
+                  // only `op` is deliberate and is argued above: the tight `anyOf`
+                  // was measured at 10.2 s against 1.6 and repeated itself three
+                  // runs of three. So a new op is two lines here and a row in
+                  // `checkTransforms`, which is where MEANING is checked.
+                  lo: { type: 'number' }, hi: { type: 'number' },
                   cls: { type: 'string', enum: CLASSES }, from: { type: 'number' }, ch: { type: 'number' },
                 },
                 required: ['op'],

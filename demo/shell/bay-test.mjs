@@ -331,5 +331,63 @@ console.log('\n== the patch bay ==');
   ok('the media are the three the plan names', MEDIA.join(',') === 'midi,audio,clock');
 }
 
+// ── the three transforms added 2026-09-21, and the two traps in them ────────
+//
+// 🔴 A KEYBOARD SPLIT COULD NOT BE SAID IN THIS VOCABULARY AT ALL until `range`
+// existed. The owner asked for one in words and the model reached for `only`,
+// which filters by CLASS, because that was the nearest thing to a filter.
+{
+  const lower = [{ op: 'range', lo: 0, hi: 59 }, { op: 'channel', to: 1 }];
+  const upper = [{ op: 'range', lo: 60, hi: 127 }, { op: 'channel', to: 2 }];
+  const note = (d1, d2 = 100) => ({ cls: 'note', ch: 2, d1, d2 });
+  ok('a split sends a low note to one channel and not the other',
+    apply(lower, note(48))?.ch === 1 && apply(upper, note(48)) === null,
+    JSON.stringify(apply(lower, note(48))));
+  ok('and a high note the other way, which is the half that makes it a split',
+    apply(upper, note(72))?.ch === 2 && apply(lower, note(72)) === null,
+    JSON.stringify(apply(upper, note(72))));
+
+  // 🔴 THE TRAP: A NOTE OFF IS THE SAME NOTE NUMBER, so a note the filter let
+  // through is always told to stop, and one it refused never started. A filter
+  // keyed on anything that DIFFERS between the on and the off stops notes.
+  ok('a note off follows its own note through the split, so nothing can hang',
+    apply(lower, note(48, 0))?.d1 === 48 && apply(upper, note(48, 0)) === null,
+    'the off goes where the on went');
+
+  ok('a non-note passes a note range untouched, because a range is about pitch',
+    apply(lower, { cls: 'cc', ch: 2, d1: 74, d2: 10 })?.d1 === 74,
+    'cc survives');
+}
+{
+  const hard = [{ op: 'vrange', lo: 64, hi: 127 }];
+  const n = (d2) => ({ cls: 'note', ch: 1, d1: 60, d2 });
+  ok('a velocity layer keeps a hard hit and drops a soft one',
+    apply(hard, n(100))?.d2 === 100 && apply(hard, n(20)) === null,
+    'layered');
+  // 🔴 THE TRAP THAT WOULD HANG A SYNTH IN ANOTHER BUILDING: a note off carries
+  // velocity 0, so a naive window drops every release and leaves the note that
+  // a hard hit let through sounding forever.
+  ok('NEGATIVE CONTROL: a note off passes a velocity window it could never enter',
+    apply(hard, n(0))?.d2 === 0,
+    'velocity 0 is a release and always passes');
+}
+{
+  const fixed = [{ op: 'fixed', to: 96 }];
+  const n = (d2) => ({ cls: 'note', ch: 1, d1: 60, d2 });
+  ok('fixed gives every note one velocity, which is what this desk\'s drums do at 96',
+    apply(fixed, n(12))?.d2 === 96 && apply(fixed, n(127))?.d2 === 96,
+    'both 96');
+  ok('NEGATIVE CONTROL: and it leaves a note off alone, or a release becomes a second note on',
+    apply(fixed, n(0))?.d2 === 0,
+    'the release stays 0');
+}
+{
+  ok('all three refuse a missing argument by name',
+    /range takes "hi"/.test(checkTransforms([{ op: 'range', lo: 0 }]))
+    && /vrange takes "lo"/.test(checkTransforms([{ op: 'vrange', hi: 9 }]))
+    && /fixed takes "to"/.test(checkTransforms([{ op: 'fixed' }])),
+    checkTransforms([{ op: 'range', lo: 0 }]));
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);
