@@ -21,7 +21,7 @@
      the two in separate flex children, so nothing in the browser makes them
      agree: they agree because every cell on both sides is `--tom-cell` tall
      with `--tom-gap` between. There is an assert on the top and bottom edges,
-     because `/model/` records three alignments that looked like one and two of
+     because `/twelve/` records three alignments that looked like one and two of
      them lining up while the third was 30 px out. */
   .tom {
     --tom-gap: 2px;
@@ -57,9 +57,12 @@
      ⚠️ (0,2,0) AGAINST `.panel-case`'s (0,1,0), so it cannot come down to
      source order the day somebody moves this block. */
   .tom.panel-case { padding-top: 0; }
-  /* The plate keeps one line of its own room, so the words are not touching the
-     border: that is the title's line box rather than padding over it. */
-  .tom .panel-plate { padding: 6px 0 2px; }
+  /* ⚠️ ZERO OVER IT, ASKED FOR A THIRD TIME. I took the CARD's top padding off
+     and then gave the plate 6 px of its own, which is the same gap wearing a
+     different name: the title still had padding over it and the screenshot
+     still showed it. Nothing above, and the air below is what separates it from
+     the grid. */
+  .tom .panel-plate { padding: 0 0 10px; }
 
   /* 🔴 NO DIVIDER. `panel-layout.mjs` gives a left fixed column a `border-right`
      and a gutter, which is right when the two halves are different KINDS of
@@ -462,7 +465,7 @@
     items: [],
     adapters: { step: stepAdapter },
     range: [0, SPAN],
-    onPosition: (pos) => showAt(pos),
+    onPosition: (pos) => { showAt(pos); wrapAt(pos); },
   });
   for (let i = 0; i < STEPS; i++) {
     deck.schedule({ at: i * STEP_MS, kind: 'step', id: `s${i}`, payload: { step: i, at: i * STEP_MS } });
@@ -477,15 +480,30 @@
   }
 
   /**
-   * ⚠️ NO AUTOLOOP, ASKED FOR AS *"no autoloop"* an hour after *"make it
-   * autoloop"*. The wrap is gone and nothing replaces it: the grid plays once
-   * and stops at the end, the way the deck does by itself.
-   * ⚠️ WHAT THE AUTOLOOP FOUND IS KEPT ANYWAY, and it is the more valuable
-   * half: `createAudioLane` left a step that had sounded terminally `rendered`,
-   * so lap two was silent. That is fixed in `timeline/transport.mjs` and
-   * measured on the audio thread, and it would still be undiscovered if this
-   * page had not briefly looped.
+   * 🔴 PERMANENT LOOP MODE. Asked for three times in one evening and the third
+   * settles it: *"make it autoloop"*, then *"no autoloop"*, then *"permanend
+   * loop mode"*. A sixteen step pattern repeating is what the instrument DOES,
+   * so it is not a mode you put it in and there is no control for it.
+   * 🔴 AND IT IS ONLY AUDIBLE BECAUSE OF THIS EVENING'S FIX.
+   * `createAudioLane` left a step that had already sounded terminally
+   * `rendered`, so lap two was silent: MEASURED on the audio thread as 4 heard
+   * on lap one and 0 on lap two. Without that one condition in
+   * `timeline/transport.mjs` this would be a playhead going round and round in
+   * silence, which is a page that LOOKS like it is working.
+   * ⚠️ A BACKWARD `seek`, THE SAME PATH THE TRANSPORT BAR'S OWN LOOP TAKES, so
+   * a wrap here and a wrap there cannot behave differently.
+   * ⚠️ AND IT WRAPS AT THE END OF THE LAST STEP RATHER THAN AT THE END OF TIME.
+   * The score runs to `SPAN` and a step is `STEP_MS` long, so the sixteenth
+   * step's own length is part of the bar: seeking at `SPAN` exactly would hold
+   * that step one extra frame every lap and the pattern would drift against a
+   * metronome.
    */
+  function wrapAt(pos) {
+    if (!deck.transport.playing) return;
+    if (pos < SPAN - 1) return;
+    deck.seek(0);
+  }
+
 
   // ── the way in ──────────────────────────────────────────────────────────
   //
@@ -1249,7 +1267,7 @@
   }
 
   /**
-   * 🔴 THREE ALIGNMENTS THAT LOOK LIKE ONE ARE THREE ASSERTS. `/model/` was
+   * 🔴 THREE ALIGNMENTS THAT LOOK LIKE ONE ARE THREE ASSERTS. `/twelve/` was
    * corrected by screenshot twelve times in one evening and the pattern is that
    * two of three line up while the third is 30 px out. The name column and the
    * steps are separate flex children of the panel, so nothing in the browser
