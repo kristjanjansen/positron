@@ -57,7 +57,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { createStack } from '/shell/stack.mjs';
   import { createGlue } from '/shell/glue.mjs';
-  import { createWaveView } from '/shell/wave-view.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
   import {
@@ -578,8 +578,50 @@
    * the empty table heading: a container with nothing in it must not paint its
    * edges.
    */
+  /**
+   * 🔴 IT IS `grain-scope.mjs`, WHICH IS THIS SITE'S WAVEFORM, AND IT WAS
+   * `wave-view.mjs`, WHICH WAS THIS PAGE'S. Asked 2026-09-21 as *"use standard
+   * wave visualizer (what we had in radio wtc...)"* and then settled three
+   * messages later as *"use same component in pack"*. `/radio/`, `/tapes/` and
+   * `/grains/` all draw with the scope; `wave-view` had exactly one caller,
+   * which was this page, so "the standard one" was the one this page was not
+   * using.
+   * ⚠️ THE SCOPE DRAWS A HELD BUFFER AS WELL AS A LIVE ONE, which is what made
+   * the swap possible rather than a rewrite: `buffer(peaks)` is its own comment's
+   * *"the held sound itself, as peaks. This is what makes the rest legible"*,
+   * and `/grains/` already inspects a fixed buffer through it.
+   * ⚠️ AND NO `fullScale`, DELIBERATELY. That option locks the vertical scale so
+   * a live stream stops heaving as loud passages scroll off; a sample sitting
+   * still has nothing to scroll and its relative shape is the subject, which is
+   * the same reasoning `/grains/` is given in that file.
+   */
   const waveHost = el('div', 'pk-wave');
-  const wave = createWaveView(waveHost, { height: 96, label: 'the open sample' });
+  const wave = createGrainScope(waveHost, { seconds: 1, height: 96 });
+  /**
+   * 🔴 THE PAGE HIDES ITS OWN PART, BECAUSE THE SCOPE DOES NOT HIDE ITSELF AND
+   * SHOULD NOT. `/radio/` draws a scrolling picture from `feed()` before any
+   * peaks exist, so a component that vanished without a buffer would blank the
+   * page it was built for. `wave-view` hid itself and this page relied on it;
+   * with the swap the rule moves to where it is true, which is here.
+   * ⚠️ AND IT IS `hidden` ON THE GLUED PART, not on the canvas, or the glue
+   * keeps a 1 px seam round nothing.
+   */
+  waveHost.hidden = true;
+  /** How many lit pixels the scope has drawn. The differential a check needs. */
+  function waveInk() {
+    const c = wave.canvas;
+    const g = c?.getContext?.('2d');
+    if (!g || !c.width) return 0;
+    const px = g.getImageData(0, 0, c.width, c.height).data;
+    /* ⚠️ AGAINST THE FIELD, NOT AGAINST TRANSPARENT. This canvas paints its own
+       background, so every pixel is opaque and an alpha test counts the whole
+       box. `--card` is what an empty scope is, so anything else is a wave. */
+    let n = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i] > 40 || px[i + 1] > 45 || px[i + 2] > 55) n++;
+    }
+    return n;
+  }
 
   panel('samples').append(samplesLine, createGlue(sampleTable.el, waveHost, player));
 
@@ -593,6 +635,33 @@
      sessions TABLE formats the same numbers now, so a helper that only one
      function could see was a second copy waiting to be typed. */
   const n = (v) => (v === null || v === undefined ? '' : v.toLocaleString());
+  /**
+   * 🔴 THE SCOPE TAKES PEAKS, NOT SAMPLES, and that is the whole of the adapter
+   * between a held `AudioBuffer` and a component built for a live ring. One
+   * amplitude per column, taken as the largest magnitude in that column, which
+   * is what a waveform is: `grain-scope` mirrors it around the centre itself.
+   * ⚠️ 480 COLUMNS RATHER THAN ONE PER PIXEL. The picture is redrawn on resize
+   * and on every frame while a sample plays, and rebuilding an envelope from
+   * 72,000 frames at 60 Hz is work nobody asked for. 480 is finer than the
+   * widest this box gets and is computed once per sample.
+   */
+  const PEAK_COLS = 480;
+  function peaksOf(samples) {
+    const n = samples?.length || 0;
+    const out = new Float32Array(PEAK_COLS);
+    if (!n) return out;
+    for (let i = 0; i < PEAK_COLS; i++) {
+      const from = Math.floor((i * n) / PEAK_COLS);
+      const to = Math.max(from + 1, Math.floor(((i + 1) * n) / PEAK_COLS));
+      let mx = 0;
+      for (let j = from; j < to && j < n; j++) {
+        const v = samples[j] < 0 ? -samples[j] : samples[j];
+        if (v > mx) mx = v;
+      }
+      out[i] = mx;
+    }
+    return out;
+  }
   const pct = (x) => `${(x * 100).toFixed(1)}`;
   const kb = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} kB` : `${(n / 1048576).toFixed(1)} MB`);
 
@@ -1392,8 +1461,12 @@
     // `toMono`, so what is on screen and what comes out of the speaker cannot
     // be two readings of one file that disagree.
     const mono = r.ok ? toMono(w.wave) : { ok: false };
-    if (mono.ok) wave.set(mono.samples, mono.rate, { name: w.name });
-    else wave.clear();
+    if (mono.ok) {
+      waveHost.hidden = false;
+      wave.buffer(peaksOf(mono.samples));
+      wave.source(w.name);
+      wave.playhead(0);
+    } else { wave.clear(); waveHost.hidden = true; }
 
     if (andPlay && r.ok) playSample(i);
   }
@@ -1467,13 +1540,19 @@
        * be two readings of one sound, which is the thing this page already
        * refuses to do with its picture and its audio.
        */
-      wave.follow(() => {
-        if (!voice) return null;
+      /* ⚠️ THE SCOPE HAS NO `follow`, SO THE PAGE OWNS THE LOOP. `wave-view`
+         took a function and ran its own frame loop; `grain-scope` is pushed a
+         fraction. The clock is unchanged and is still the one that agrees with
+         what is being heard, and it still stops when the sound does. */
+      const tick = () => {
+        if (voice !== src) return;
         const t = ac.currentTime - began;
         const at = looping && buf.duration > 0 ? t % buf.duration : t;
         deck.seek(Math.round(at * 1000));
-        return at;
-      });
+        wave.playhead(buf.duration > 0 ? at / buf.duration : 0);
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
       deck.play();
       lastPlayed = { name: w.name, frames: mono.frames, rate: mono.rate, seconds: buf.duration };
       d.log(`${w.name}, ${buf.duration.toFixed(2)} s, ${mono.frames.toLocaleString()} frames at `
@@ -1490,7 +1569,7 @@
     // ⚠️ THE HEAD GOES BACK TO THE TOP RATHER THAN STANDING WHERE THE SOUND
     // STOPPED. A line left in the middle of a picture with nothing playing
     // reads as a sound that is paused, and nothing here can resume.
-    wave.rest(0);
+    wave.playhead(0);
     deck.pause();
     deck.seek(0);
   }
@@ -1531,10 +1610,10 @@
      * empty box painting a line nobody wrote.
      */
     d.assert('with nothing open there is no waveform, so no empty box paints an edge',
-      wave.el.hidden === true && wave.el.getBoundingClientRect().height === 0
-      && wave.facts().frames === 0,
-      `the picture is ${wave.el.hidden ? 'away' : 'up'} at `
-      + `${wave.el.getBoundingClientRect().height} px`);
+      waveHost.hidden === true && waveHost.getBoundingClientRect().height === 0
+      && wave.showing() === 'scrolling',
+      `the picture is ${waveHost.hidden ? 'away' : 'up'} at `
+      + `${waveHost.getBoundingClientRect().height} px, showing ${wave.showing()}`);
 
     d.assert('the block has no footer until something has been opened',
       drop.note.hidden === true && drop.note.textContent === ''
@@ -2077,8 +2156,14 @@
         const pl = player.getBoundingClientRect();
         const ground = (x) => getComputedStyle(x).backgroundColor;
         const wv = waveHost.getBoundingClientRect();
+        /* ⚠️ AND NOTHING INSIDE DRAWS A SECOND EDGE, which is the reported
+           fault rather than an extra: *"rm double bordering"*. MEASURED at the
+           time on `/radio/`: a component's 1 px against the glue's 1 px in the
+           same colour reads as one 2 px line. */
+        const inner = (x) => parseFloat(getComputedStyle(x).borderTopWidth);
         d.assert('the list, the picture and the transport are one box, in that order, with 1 px seams',
           glue.classList.contains('pos-glue') && glue.children.length === 3
+          && inner(glue) > 0 && inner(wave.canvas) === 0 && inner(bar.api.el) === 0
           && Math.abs(wv.top - t.bottom - 1) < 0.6
           && Math.abs(pl.top - wv.bottom - 1) < 0.6
           && ground(player) !== 'rgba(0, 0, 0, 0)'
@@ -2087,7 +2172,8 @@
           && ground(player) !== ground(glue),
           `seams ${(wv.top - t.bottom).toFixed(1)} and ${(pl.top - wv.bottom).toFixed(1)} px `
           + `with the tab open, the parts paint ${ground(sampleTable.el)}, ${ground(waveHost)} `
-          + `and ${ground(player)} against the glue's ${ground(glue)}`);
+          + `and ${ground(player)} against the glue's ${ground(glue)}, and inside it the `
+          + `picture draws ${inner(wave.canvas)} px and the transport ${inner(bar.api.el)} px`);
 
         /**
          * 🔴 THE PICTURE IS ASKED FOR INK RATHER THAN FOR A COLUMN COUNT, which
@@ -2121,22 +2207,32 @@
          * pack is 5,999 frames and the longest is 95,947, and a picture that
          * followed nothing would draw them identically.
          */
-        const f = wave.facts();
-        const drawn = wave.ink();
+        /* ⚠️ THE FACTS MOVED OFF THE COMPONENT AND ONTO THE PIXELS. The scope
+           is handed peaks and holds no opinion about frames or seconds, which
+           `wave-view` did; what it can still answer is whether it is drawing
+           MATERIAL or a scrolling stream, and the rest is the canvas itself. */
+        /* ⚠️ A FRAME IS WAITED FOR, AND WITHOUT IT THIS READ 0 LIT PIXELS ON A
+           PERFECTLY GOOD PICTURE. `wave-view` painted inside `set()`, so a
+           check could read the canvas on the next line; `grain-scope` paints on
+           its own `requestAnimationFrame` loop, the way a component drawing a
+           live stream has to. The difference is invisible in the source and
+           takes the ink assert red. */
+        const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await frame();
+        const drawn = waveInk();
         const byLen = samples.map((w, k) => ({ k, n: w.row.frames })).sort((a, b) => a.n - b.n);
         const other = byLen[0].k === 0 ? byLen[byLen.length - 1].k : byLen[0].k;
         openSample(other, false);
-        const g = wave.facts();
-        const second = wave.ink();
+        await frame();
+        const second = waveInk();
         openSample(0, false);
+        await frame();
         d.assert('the picture really follows the open sample, because two different ones draw differently',
-          f.frames === samples[0].row.frames
-          && Math.abs(f.seconds - samples[0].row.seconds) < 0.002
-          && f.cols > 64 && drawn.ink > 0
-          && g.frames === samples[other].row.frames && g.frames !== f.frames
-          && second.ink !== drawn.ink,
-          `${samples[0].name} is ${f.frames.toLocaleString()} frames and ${drawn.ink} lit pixels, `
-          + `${samples[other].name} is ${g.frames.toLocaleString()} and ${second.ink}`);
+          wave.showing() === 'material' && drawn > 0 && second > 0 && second !== drawn
+          && samples[other].row.frames !== samples[0].row.frames,
+          `${samples[0].name} is ${samples[0].row.frames.toLocaleString()} frames and `
+          + `${drawn} lit pixels, ${samples[other].name} is `
+          + `${samples[other].row.frames.toLocaleString()} and ${second}`);
         tabs.go(was);
       }
 
@@ -2197,10 +2293,10 @@
          suite behind it. */
       playBtn.click();
       d.assert('and the transport really lets go of it, so a looping sample can be got out of',
-        voice === null && looping === true && wave.facts().position === 0
+        voice === null && looping === true && deck.position() === 0
         && deck.transport.playing === false,
         `the voice is ${voice === null ? 'gone' : 'still held'}, the toggle is still on, `
-        + `the head is parked at ${wave.facts().position} and the deck is `
+        + `the head is parked at ${deck.position()} and the deck is `
         + `${deck.transport.playing ? 'still playing' : 'stopped'}`);
       loopBtn.click();
 

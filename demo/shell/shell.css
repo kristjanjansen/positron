@@ -2137,8 +2137,23 @@ video[hidden] { display: none; }
    ground, so a part with no background of its own lets that colour through its
    whole area and the caption would sit on the seam. A margin inside a glue is
    the seam becoming a gap. */
-.pos-glue > .pos-scope { margin: 0; background: var(--card); padding: 10px 12px; }
-.pos-glue > .pos-scope > .pos-scope-c { border: 0; }
+/* ⚠️ ONE LEVEL DEEP AS WELL AS DIRECT. `/radio/` glues the scope straight in
+   and `/pack/` wraps it in the element that paints its part's ground, which is
+   what `.pos-glue` requires of every child, so a direct-child selector fixed
+   one page and left the other exactly as reported. MEASURED: the canvas read
+   1 px on `/pack/` and 0 on `/radio/` from the same rule. */
+.pos-glue > .pos-scope, .pos-glue > * > .pos-scope { margin: 0; }
+.pos-glue > .pos-scope { background: var(--card); padding: 10px 12px; }
+.pos-glue > .pos-scope > .pos-scope-c,
+.pos-glue > * > .pos-scope > .pos-scope-c { border: 0; }
+/* 🔴 AND THE SAME FOR A TRANSPORT INSIDE A GLUED PART, which is the other half
+   of *"rm double bordering"*. A bar on a page draws its own edge and should;
+   a bar that is one part of a glued block has the glue drawing it, and the two
+   touch exactly as the scope's did.
+   ⚠️ ONE LEVEL DEEP AS WELL AS DIRECT, because a page wraps the bar in the
+   element that paints the part's ground, which is what `.pos-glue`'s own rule
+   requires of every child. */
+.pos-glue > .tbar, .pos-glue > * > .tbar { border: 0; }
 
 /* ── note grid ────────────────────────────────────────────────────────────
    demo/shell/note-grid.mjs. One row per pattern, sixteen steps across, pitch up
