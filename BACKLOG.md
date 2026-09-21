@@ -1,5 +1,97 @@
 ## Open
 
+### /wish/, layout, 2026-09-21
+
+- **`make it a single component, 3 parts, glued. in top is patch list
+  visualizer, below is diagram and dump is below`**. Said against a screenshot
+  of the page showing, top to bottom, the `PATCH` picker row (`70B`, `8B`,
+  `3B`, `Mistral`, `Scout`), the JSON dump, the allowed/refused line and then
+  the diagram. The order asked for is **picker, then diagram, then dump**, all
+  three in ONE glued component rather than three blocks with rhythm between
+  them.
+  ⚠️ **`createGlue` IS DOCUMENTED AS BEING FOR ONE PAIR AND THIS IS THREE.**
+  `positron-ui`: *"createGlue IS FOR THE ONE PAIR IT WAS WRITTEN FOR, a strip
+  sitting on the transport bar that drives it, and its own header says so"*, and
+  *"inside a glue the children give up their border and radius, so a picture in
+  one has nothing to say where its box ends"*. The ask is explicit, so it gets
+  built; what has to be decided is how a diagram and a JSON dump say where they
+  end once their own edges are gone.
+  ⚠️ `patch list visualizer` is read here as the `PATCH` picker row, which is
+  the list of patches one per model. Nothing else on that page is a list.
+
+- **`why refused`**, asked against a second screenshot where `70B` produced
+  `{"op": "cc", "to": 16}` and the page said *refused* with
+  `cc takes "from" and was given "to"`. ✅ **ANSWERED IN THE REPLY, AND IT IS
+  NOT A FAULT ON THE PAGE.** `demo/shell/bay.mjs:119` declares `cc` as
+  `need: ['from', 'to']`, the model supplied only the destination, and
+  `checkTransforms` refused it. Left here because it is worth knowing that the
+  answer cost a code read rather than being on screen.
+
+### /bay/, one stream, 2026-09-21
+
+Collected as it arrived, before any of it was worked on. Verbatim, because the
+third line carries a correction about a request that was already made once.
+
+- **`rm instruments` / `links` / `sent` / `heard`**. Four readout cells named
+  one per line.
+- **`online status button: 'wait for instrument' (like push to talk but does
+  not lose state on mouseup'`**. A latching control rather than a momentary one.
+- **`do not use tables. use the pathbay visualizer (i asked to do it) above it
+  below status button is a panel with 2 cols (like 2 readings) from to what
+  describe in and out. when connected show connection visualiser (json +
+  diagram). when 2nd is conneted, stop waiting`**.
+  🔴 **`(i asked to do it)` IS THE PART TO READ FIRST.** A patchbay visualiser
+  was asked for before and is not on the page, so this is a second ask for the
+  same thing, and that makes it a dropped request rather than a new one. Find
+  the first ask in this file or in the plans before rebuilding from scratch.
+  ⚠️ The layout named is: the visualiser ABOVE, the status button, then a two
+  column panel reading `from` and `to` with a description of in and out. A
+  connection draws itself as JSON and a diagram. The second connection ends the
+  wait.
+  ⚠️ **AND `do not use tables` IS ABOUT `/bay/`**, whose link line still shows
+  `here:` port ids, carried in `HANDOFF.md` item 10 along with `/bay/` being
+  unheard.
+
+### /pack/, nine requests in one stream, 2026-09-21
+
+Collected as they arrived, before any of them was worked on. All nine are about
+`demo/pack/index.html` unless a second file is named.
+
+- **`rm 'open pack here'`**. The repo-pack shortcut goes. ⚠️ **THIS IS THE OWNER
+  DECIDING WHAT THE REVERTED AGENT DECIDED FOR ITSELF**, and the entry above
+  says so: an agent deleted this control on its own authority and was reverted
+  for it. Deleting it now is right BECAUSE it was asked for, not because the
+  agent turned out to be correct.
+- **`rename file upload section to [open file] or drag a file here`**. The
+  control line inside the drop area.
+- **`drop a pack or a session anywhere on this page (.circuitpack,
+  .circuittrackspack, .zip, .syx, .circuitsession) - put this under a button`**.
+  The extension list moves below the control instead of standing above it.
+- **`Novation Circuit Bank Part 1.circuitpack inside Synth-Patches.com -
+  Soundbank for Novation Circuit and Tracks.zip, 64 patches, 32 sessions, 0
+  samples, read in this tab and sent nowhere - rm it`**. The long provenance
+  line under the opened file goes.
+- **`put title to the drop area 'upload file'`**. So the area is titled
+  `upload file` and the control inside it reads `open file`. ⚠️ Both words in
+  one block on purpose, and that is the owner's arrangement rather than a
+  drift back to the relabel that was reverted.
+- **`but counts on front of tab titles`** (put). `64 PATCHES`, not
+  `PATCHES 64`. ✅ **THIS SETTLES THE ONE OPEN DETAIL IN THE ENTRY ABOVE**,
+  which said the end was never specified and was worth one word from the owner.
+- **`make/use sample decoder, put them into table and make playable`**. A pack
+  carries 64 WAVs, 48 kHz 16 bit mono, 0.12 to 2.00 s. Needs a new kit module
+  beside `circuit-session.mjs` and `circuit-patch.mjs`, a table, and audio.
+  `plans/plan-circuit-samples.md` owns the wider idea.
+- **`make session list clicable and show data below what you extracted`**.
+  `circuit-session.mjs` already reads the 50 region grid, the tag, the name and
+  the two patch payloads, and the page uses almost none of it.
+- **`rm all 32 sessions in this pack are the same empty session. Sending it to a
+  Circuit would replace whatever is on the instrument with blanks, and a Circuit
+  has no factory reset`**. The blank-pack warning sentence goes from the page.
+  ⚠️ **THE MEASUREMENT STAYS AND SO DOES `CLAUDE.md`.** What was asked for is
+  the removal of a sentence from a screen, not a change to what is known about
+  the two purchased packs.
+
 ### ⚠️ A REVERTED UI REWRITE, AND A PATCH FILE THAT SHOULD NOT BE APPLIED BLIND
 
 - 🔴 **A BACKGROUND AGENT REWROTE `/pack/`, `/kit/`, `drop.mjs` AND `shell.css`

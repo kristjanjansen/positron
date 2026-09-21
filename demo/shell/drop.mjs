@@ -50,9 +50,14 @@ import { el } from './shell.mjs';
  * @param {string[]} [o.accept]   extensions, lowercase with the dot. Empty takes anything.
  * @param {(files:{name:string,size:number,bytes:Uint8Array}[])=>any} o.onOpen
  * @param {(msg:string, kind?:string)=>void} [o.says]   words for the page's log
+ * @param {string} [o.title]      a heading over the area. Empty means none.
  * @param {string} [o.label]      the button's own words. It says `open`.
- * @param {string} [o.hint]       what the area says at rest and what the cover
- *                                says while a drag is in flight
+ * @param {string} [o.beside]     words on the same line as the button, for the
+ *                                other way in. `or drag a file here`.
+ * @param {string} [o.hint]       what the area says UNDER the button at rest,
+ *                                and what the cover says while a drag is in
+ *                                flight. The extensions are appended to the
+ *                                first and left off the second.
  * @param {string} [o.empty]      the area's own line before anything is opened
  * @param {boolean} [o.area]      false for a bare button with no resting area.
  *                                The default is the area, because a component
@@ -66,7 +71,9 @@ export function createDrop({
   accept = [],
   onOpen,
   says = () => {},
+  title = '',
   label = 'open a file',
+  beside = '',
   hint = 'drop it anywhere on this page',
   empty = 'nothing has been opened',
   area = true,
@@ -113,10 +120,24 @@ export function createDrop({
   const note = el('div', 'pos-drop-note', empty);
   const root = el('div', area ? 'pos-drop pos-drop-area' : 'pos-drop');
   if (area) {
+    /**
+     * 🔴 THE HINT SITS UNDER THE BUTTON AND NOT OVER IT, ASKED FOR 2026-09-21 AS
+     * *"put this under a button"*. The order a reader meets is the title, then
+     * the thing to press, then the small print about what may be dropped. It was
+     * the other way round and the extension list was the first thing on the
+     * area, which is the least useful sentence in the block reading first.
+     * ⚠️ THE EXTENSIONS STAY IN THE AREA'S OWN TEXT wherever the line lands,
+     * because `/kit/` and `/pack/` both assert that a reader is told what this
+     * takes BEFORE a refusal has to tell them.
+     */
+    if (title) root.append(el('div', 'pos-drop-title', title));
+    const row = el('div', 'pos-drop-row');
+    row.append(button);
+    if (beside) row.append(el('span', 'pos-drop-beside', beside));
     const words = exts.length
       ? `${hint} (${exts.join(', ')})`
       : hint;
-    root.append(el('div', 'pos-drop-hint', words), button, note);
+    root.append(row, el('div', 'pos-drop-hint', words), note);
   } else {
     root.append(button, note);
   }
