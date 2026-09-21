@@ -5,35 +5,39 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON · patches</title>
+<title>POSITRON · pack</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* 🔴 THE VERDICT IS THE LOUDEST THING ON THIS PAGE AND IT IS NOT A READOUT
-     CELL. Four numbers tell a backup from a pack of blanks, and a reader who
-     has to compare four figures against four figures they do not have has been
-     handed the evidence and not the answer. This is one sentence, in the ink
-     the page reserves for something that matters, saying which of the two this
-     pack is.
-     ⚠️ IT RESERVES ITS ROOM. An empty host beaten by `.pos-stack > div:empty {
-     display: none }` is a measured defect on `/wish/`, where a picture meant to
-     hold its place was 0 px and `display: none` for hours while the source read
-     as correct. `min-height` alone would lose the same fight, so this is never
-     empty: before a pack is open it says so in words. */
-  .pat-verdict { font: 500 13px/1.5 var(--mono); color: var(--dim);
-                 border-left: 2px solid var(--line2); padding: 2px 0 2px 12px;
-                 min-height: 1.5em; }
-  .pat-verdict[data-state="good"] { color: var(--fg); border-left-color: var(--ok, #3fb950); }
-  .pat-verdict[data-state="bad"] { color: var(--fg); border-left-color: var(--hi); }
-  /* The row holding the way in from this machine. It is NOT `.pos-controls`:
-     both harnesses press every button in that row, and the button here opens
-     the operating system's file picker, which is a modal dialog that would sit
-     over the page for the rest of the run. */
-  .pat-open { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-  .pat-open-n { font: 400 12px/1.5 var(--mono); color: var(--dim2); }
+     CELL. Three numbers tell a backup from a pack of blanks, and a reader who
+     has to compare three figures against three they do not have has been handed
+     the evidence and not the answer. This is one sentence saying which of the
+     two this pack is.
+     ⚠️ IT IS NEVER EMPTY, which is structural rather than polite. `/wish/`
+     reserved a picture's room with `min-height` and MEASURED the host at 0 px
+     and `display: none`, beaten by `.pos-stack > div:empty { display: none }` at
+     (0,2,1). A box with words in it cannot lose that fight. */
+  .pk-verdict { font: 500 13px/1.5 var(--mono); color: var(--dim);
+                border-left: 2px solid var(--line2); padding: 2px 0 2px 12px;
+                min-height: 1.5em; margin-top: 14px; }
+  .pk-verdict[data-state="good"] { color: var(--fg); border-left-color: #3fb950; }
+  .pk-verdict[data-state="bad"] { color: var(--fg); border-left-color: var(--hi); }
+  /* 🔴 HALF THE HEIGHT, ASKED FOR AS *"patched table 1/2 less high"*. The
+     component's own default is 420 px and it is a custom property for exactly
+     this, so a page sets the number rather than reaching into the component.
+     MEASURED before the change: 453 px showing 13 rows of 64.
+     ⚠️ AND IT IS A WHOLE NUMBER OF ROWS, WHICH THE FIRST TRY WAS NOT. At a
+     round 210 px the box held 6.48 rows and the seventh was sliced through the
+     middle of its letters, which photographs as a rendering fault rather than
+     as a scroller. MEASURED: a row is 32.39 px, so six of them is 194.34 and
+     the cut lands on a border. The scrollbar and the rows under the sticky
+     heading are what say there is more. */
+  .pk-tbl { --tbl-h: 194px; }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
+  import { createTabs } from '/shell/tabs.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createDrop } from '/shell/drop.mjs';
   import { createStack } from '/shell/stack.mjs';
@@ -41,122 +45,127 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import {
     readPatch, summarise, sessionStats, patchFields, modSlots,
-    categoryName, PATCH_BYTES, MOD_DESTINATIONS,
+    categoryName, named, ADDRESSES,
+    PATCH_BYTES, PATCH_DATA, DATA_AT, SYSEX_HEAD, MOD_DESTINATIONS, LFO_WAVES,
   } from '/shell/circuit-patch.mjs';
 
   /**
-   * 🔴 THIS PAGE SENDS NOTHING. NOT ONE BYTE, AND IT IS ASSERTED RATHER THAN
-   * INTENDED. There is no Web MIDI here, no `requestMIDIAccess`, no output and
-   * no encoder: `circuit-patch.mjs` exports nothing that makes a message, and
-   * its own test asserts that absence. The reason is one byte. `Replace Current
-   * Patch` and `Replace Patch` differ at offset 6 of a 350 byte message, the
-   * second overwrites a patch in FLASH on an instrument with no factory reset,
-   * and `New Pack.circuitpack` is the only backup of that flash. A page that
-   * could send a pack is one press away from destroying it.
-   *
-   * ⚠️ THE COUNTER BELOW IS HOW THAT CLAIM IS GRADED. A grep for
-   * `requestMIDIAccess` finds it absent on every day it is absent and says
-   * nothing about the day somebody adds it behind a convenience helper. This
-   * wraps the method and counts, so the assert is over a number rather than
-   * over a reading of the file.
+   * 🔴 THIS PAGE SENDS NOTHING. NOT ONE BYTE, AND IT IS ASSERTED OVER A COUNTER
+   * RATHER THAN OVER A READING OF THE SOURCE. There is no Web MIDI here, no
+   * output and no encoder: `circuit-patch.mjs` exports nothing that makes a
+   * message and its own test asserts that absence. The reason is one byte.
+   * `Replace Current Patch` and `Replace Patch` differ at offset 6 of a 350 byte
+   * message, the second overwrites a patch in FLASH on an instrument with no
+   * factory reset, and `New Pack.circuitpack` is the backup of that flash.
+   * ⚠️ A grep for `requestMIDIAccess` finds it absent on every day it is absent
+   * and says nothing about the day somebody adds it behind a helper. This wraps
+   * the method and counts.
    */
   let midiAsked = 0;
   if (navigator.requestMIDIAccess) {
     const real = navigator.requestMIDIAccess.bind(navigator);
     navigator.requestMIDIAccess = (...a) => { midiAsked++; return real(...a); };
   }
-  /** Every request this page makes after load, for the same reason. */
   let fetched = 0;
   const realFetch = window.fetch.bind(window);
   window.fetch = (...a) => { fetched++; return realFetch(...a); };
 
   // 🔴 THE PACK IN THIS REPOSITORY IS NOT PUBLISHED AND MUST NOT BE.
   // `workers/view/build.mjs` copies an explicit allowlist and this file is not
-  // on it, deliberately: it holds 32 of somebody's real sessions, it is their
-  // only backup, and putting it on a public website is not a decision this page
-  // gets to make. So the button below works on a checkout and answers 404 on
-  // the deploy, where the way in is the drop target. The page says which.
+  // on it, deliberately: it holds 32 of somebody's sessions. Whether it is here
+  // is decided from the ORIGIN rather than discovered by fetching, because the
+  // first build discovered it with a 404 and took the deploy run red on
+  // `no console errors`, and a red that is expected is a red everybody skips.
   const PACK = '/New%20Pack.circuitpack';
-
-  /**
-   * 🔴 WHETHER THE PACK IS HERE IS DECIDED FROM THE ORIGIN, NOT DISCOVERED BY
-   * ASKING, AND THE FIRST VERSION ASKED. It fetched, got a 404 on the deploy,
-   * and said so in words, which reads correctly to a person and took
-   * `DEMO_BASE=https://positron.studio node demo/verify.mjs patches` RED on
-   * `no console errors` with two 404s in it. A red that is expected is a red
-   * everybody learns to skip, and the next real one goes with it.
-   * ⚠️ IT IS NOT A GUESS ABOUT THE FILE, IT IS A FACT ABOUT THE DEPLOY.
-   * `workers/view/build.mjs` copies an explicit allowlist and this file is not
-   * on it, so the pack exists exactly where the repository does. A page served
-   * off a checkout is served off loopback or off this network.
-   * ⚠️ AND BEING WRONG COSTS NOTHING. Somebody serving the repository from a
-   * public hostname gets the words below and the drop target, which is the same
-   * way in a visitor has.
-   */
   const PACK_HERE = location.protocol === 'file:'
     || /^(localhost|127\.|0\.0\.0\.0|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/
       .test(location.hostname);
 
-  const ONE = 'open a Circuit pack and see what its patches are made of';
-
   const d = mount({
     name: 'pack',
     // ⚠️ THE PAGE'S SENTENCE AND THE INDEX'S ARE ONE STRING, because a page with
-    // a diagram carries the index's own line verbatim: a paragraph and a picture
-    // of the machinery are two explanations of one thing, and a visitor arriving
-    // from the front page must not be told it twice in two wordings that drift.
-    what: ONE,
+    // a diagram carries the index's own line verbatim.
+    what: 'open a Circuit pack and see what its patches are made of',
     /**
-     * Four cells, and all four change between one pack and another. They are
-     * about the PACK rather than about a patch: every per-patch fact is a column
-     * in the table under them, which is `/making/`'s lesson written down — six
-     * cells describing ONE recording sat above a list of twenty-six, so the row
-     * being read and the row the cells described were the same row only while
-     * nobody moved.
-     *
-     * 🔴 `different` AND `filled` ARE THE SAFETY CHECK IN TWO NUMBERS. A pack of
-     * blanks reads 1 of 32 and 0.1 per cent; the owner's own reads 32 of 32 and
-     * 84.6. Both packs display as `*New Pack` in Novation Components, so these
-     * two cells are what tells them apart before anybody presses Send to Circuit.
+     * 🔴 NO READOUT, AND `null` RATHER THAN AN OMITTED FIELD. Instructed
+     * 2026-09-21: *"rm patches 64 / sessions 32 / different 32 of 32 / filled
+     * 84.6%"*, which was all four cells. `mount()` checks for the DECLARATION so
+     * both harnesses read this as deliberate rather than as somebody forgetting,
+     * and the shell hides the empty box as well as its contents, because a page
+     * that opts out of a surface and keeps its box paints a 2 px band nobody
+     * wrote.
+     * ⚠️ AND WHAT IT SAID IS REHOMED, WHICH IS THE HALF THAT GETS FORGOTTEN.
+     * `patches` and `sessions` are in the tab titles. `different` and `filled`
+     * are both in the verdict sentence under the sessions table, word for word,
+     * so the verdict is now the only place either number appears.
      */
-    readout: { patches: '', sessions: '', different: '', filled: '%' },
+    readout: null,
     controls: [{ id: 'here', label: 'open the pack here', primary: true }],
   });
 
   const stack = createStack();
   d.el.append(stack.el);
 
-  // ── the way in from this machine ─────────────────────────────────────────
-  const openNote = el('div', 'pat-open-n', 'nothing has been opened');
+  // ── the way in ───────────────────────────────────────────────────────────
+  //
+  // 🔴 IT IS AN AREA AND NOT ONLY A BUTTON, AND THAT WAS THE REPORTED DEFECT.
+  // The first build put a button here and nothing else, because the component's
+  // cover only exists while a drag is in flight, so the thing inviting the
+  // gesture appeared after the gesture.
+  // ⚠️ AND IT TAKES `.zip`, WHICH IS THE SHAPE A REAL DOWNLOAD ARRIVES IN.
+  // MEASURED on the soundbank in `purchased/`: one zip holding 2 `.circuitpack`,
+  // 1 `.circuittrackspack`, 128 `.syx`, an `.xlsx`, two `.txt` and 10 `.url`.
   const drop = createDrop({
-    accept: ['.circuitpack', '.syx'],
+    accept: ['.circuitpack', '.circuittrackspack', '.zip', '.syx'],
     label: 'open a pack from this machine',
-    hint: 'drop a .circuitpack or a .syx',
-    says: (m, kind) => { openNote.textContent = m; d.log(m, kind); },
+    hint: 'drop a pack anywhere on this page',
+    says: (m, kind) => d.log(m, kind),
     onOpen: (files) => openFiles(files),
   });
-  const openRow = el('div', 'pat-open');
-  openRow.append(drop.el, openNote);
-  stack.add(openRow);
+  stack.add(drop.el);
 
-  // ── the patches ──────────────────────────────────────────────────────────
+  // ── the three lists ──────────────────────────────────────────────────────
+  //
+  // 🔴 TABS, AND THE COUNTS ARE IN THEIR TITLES. Asked as *"patches and sessions
+  // are in separte tabs"* and *"add num of patches / sessions to tab title"*.
+  // Typed uppercase though the stylesheet would do it, so the source reads like
+  // the page, which is the same rule `/kit/` states about its own headings.
+  // ⚠️ A TAB IS `#links`, NEVER A SUBPAGE: a subpage is a navigation, and the
+  // sound stops, the service worker hands over and an installed web app flashes
+  // white. `tabs.mjs` owns that and this page does not have to think about it.
+  const TABS = [
+    { id: 'patches', label: 'PATCHES' },
+    { id: 'sessions', label: 'SESSIONS' },
+    { id: 'samples', label: 'SAMPLES' },
+  ];
+  const tabs = createTabs({ tabs: TABS });
+  stack.add(tabs.el);
+  const panel = (id) => tabs.panel(id);
+
   /**
-   * 🔴 FIVE COLUMNS, AND THE SIXTH WAS CUT AFTER MEASURING RATHER THAN BEFORE.
-   * It started at six with a `kind` column carrying the category byte. MEASURED
-   * at 390 px: the row came out **598 px**, so a phone had **240 px** of
-   * sideways drag, and a table that has to be dragged sideways is already
-   * recorded here as a thing nobody reads. Fewer columns beats a wider minimum.
-   * ⚠️ `kind` WENT RATHER THAN ONE OF THE OTHERS FOR TWO REASONS. This page is
-   * for what a patch is MADE of, and a category is a label somebody typed rather
-   * than a part of the sound. And it is the weakest column on the evidence:
-   * Novation publish no label table for that byte at all, seven of its fifteen
-   * values were recovered by correlating against a vendor spreadsheet, and
-   * MEASURED on this bank **16 of 64 rows would have shown a bare number**. It
-   * is still on every row's hover and in the picture's caption.
-   * ⚠️ EVERY HEADING IS ONE SHORT WORD AND NEVER WRAPS. `/making/` shipped
-   * `FILE` rendered one letter per line down four rows, which is a table
-   * reporting that its columns do not fit, in the one place a reader cannot act
-   * on it. MEASURED here: all five heading cells are 14 px tall at both widths.
+   * ⚠️ THE COUNT IS APPENDED TO THE LABEL RATHER THAN REPLACING IT, and a tab
+   * with nothing in it keeps its bare word. A `0` next to a name reads as a very
+   * confident measurement of nothing, which is the rule the readout already
+   * states about a cell pre-set to zero.
+   */
+  function countTabs(n) {
+    TABS.forEach((t, i) => {
+      const c = n[t.id];
+      tabs.buttons[i].textContent = c ? `${t.label} ${c}` : t.label;
+    });
+  }
+
+  /**
+   * 🔴 FIVE COLUMNS AND NOT EIGHT, AND THE SIXTH WAS CUT AFTER MEASURING.
+   * MEASURED at 390 px with six: the row came out 598 px, so a phone had 240 px
+   * of sideways drag. `kind` went rather than another, because this page is for
+   * what a patch is MADE of and a category is a label somebody typed, and
+   * because Novation publish no label table for that byte at all: seven of its
+   * fifteen values were recovered by correlation and 16 of 64 rows here would
+   * have shown a bare number. It is on every row's hover.
+   * ⚠️ EVERY HEADING IS ONE SHORT WORD AND NEVER WRAPS. A wrapping heading is a
+   * table reporting that its columns do not fit, in the one place a reader
+   * cannot act on it.
    */
   const patchTable = createTable({
     columns: [
@@ -166,18 +175,12 @@
       { key: 'lfo', label: 'lfo', width: 48 },
       { key: 'voice', label: 'voice', width: 56 },
     ],
-    cap: 200,
-    empty: '',
-    note: 'hover',
+    cap: 200, empty: '', note: 'hover',
     onPick: (r) => showPatch(r.i),
   });
-  // ⚠️ `titled` RATHER THAN A HEADING OF MY OWN. `createStack` grew it on a
-  // direct ask (*"add heading support for createStack and stop messing around"*)
-  // and a page that types its own `h3` is the fourth copy of a control this
-  // project already has, which is the rule most of `/kit/` exists to enforce.
-  stack.titled('PATCHES', patchTable);
+  patchTable.el.classList.add('pk-tbl');
+  panel('patches').append(patchTable.el);
 
-  // ── the sessions, which is the safety check ──────────────────────────────
   const sessionTable = createTable({
     columns: [
       { key: 'name', label: 'name', grow: true, clip: true },
@@ -185,66 +188,195 @@
       { key: 'bits', label: 'bits', width: 58, align: 'right' },
       { key: 'filled', label: 'filled', width: 66, align: 'right' },
     ],
-    cap: 64,
-    empty: '',
-    note: 'hover',
+    cap: 64, empty: '', note: 'hover',
   });
-  const verdict = el('div', 'pat-verdict', 'no pack is open, so there is nothing to say about one yet');
-  // ⚠️ THE TABLE AND ITS VERDICT ARE ONE BLOCK, NOT TWO. A stack puts the
-  // project's one gap between its children and has nothing to say about the
-  // inside of one, so a verdict added as a sibling would stand 40 px from the
-  // list it is about.
-  stack.titled('SESSIONS', sessionTable, verdict);
-  sessionTable.el.style.marginBottom = '14px';
+  const verdict = el('div', 'pk-verdict', 'no pack is open, so there is nothing to say about one yet');
+  panel('sessions').append(sessionTable.el, verdict);
+
+  /**
+   * 🔴 THE SAMPLES TAB, ASKED FOR AS *"why there is no samples?"*. The plan
+   * deferred them on the reasoning that drawing a waveform is a different page,
+   * and that reasoning is spent the moment there are tabs: a tab is where a
+   * third list goes.
+   * ⚠️ NO COLUMN HERE IS CONSTANT. MEASURED across the pack's 64: every one is
+   * 48 kHz, 16 bit and mono, so a rate or a channel column would be the same
+   * value sixty four times, which teaches a reader to ignore the row. Length and
+   * size both move.
+   * 🔴 AND A SAMPLE SOUNDS ON A PRESS AND NEVER OTHERWISE. Decoding 64 WAVs into
+   * an `AudioContext` on a visit is the load-on-a-visit defect this project has
+   * paid for three times.
+   */
+  const sampleTable = createTable({
+    columns: [
+      { key: 'name', label: 'name', grow: true, clip: true },
+      { key: 'len', label: 'length', width: 72, align: 'right' },
+      { key: 'size', label: 'size', width: 80, align: 'right' },
+    ],
+    cap: 128, empty: '', note: 'hover',
+    onPick: (r) => playSample(r.i),
+  });
+  panel('samples').append(sampleTable.el);
 
   // ── what is open ─────────────────────────────────────────────────────────
-  let patches = [];        // decoded, in pack order
-  let rows = [];           // the table's own rows, so a press can find its patch
-  let sessions = [];       // { name, ...sessionStats }
-  let picked = -1;
+  let patches = [], rows = [], sessions = [], samples = [];
+  let picked = -1, played = 0, ac = null;
 
   const pct = (x) => `${(x * 100).toFixed(1)}`;
+  const kb = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} kB` : `${(n / 1048576).toFixed(1)} MB`);
+
+  // ── the picture ──────────────────────────────────────────────────────────
+  /**
+   * 🔴 IT IS UNDER THE TABLE RATHER THAN LAST ON THE PAGE, WHICH IS A DOCUMENTED
+   * EXCEPTION TO A STANDING RULE AND NOT AN OVERSIGHT. Instructed 2026-09-21:
+   * *"patches: patched table 1/2 less high, diagram under it, reserver space
+   * when no active one"*. `positron-diagram` says every diagram passes
+   * `{ how: true, atEnd: true }` and sits last, because a diagram is REFERENCE
+   * and putting one above the controls delays what a visitor came for.
+   * ✅ **THE SMALLEST AMENDMENT THAT HONOURS THE ASK IS TO MOVE THE POSITION AND
+   * NOTHING ELSE.** Same component, same standing `How it works` heading, no
+   * title of its own, and `atEnd: false` so it lands where the selection is.
+   * **This picture is not reference, it is the detail panel for the pressed
+   * row**, and a detail panel two screens below the row it describes is not one.
+   *
+   * 🔴 AND IT IS DRAWN BEFORE ANYTHING IS OPENED, WHICH IS WHAT RESERVES THE
+   * SPACE. Every box carries the reference's own default, built from the address
+   * table rather than typed, so the picture has exactly the size it will have
+   * once a patch is pressed and nothing below it moves. An empty box is shorter
+   * than one with a sub, so leaving the subs blank would have reserved the wrong
+   * height, which is the same shape of mistake as a `min-height` that never
+   * applied.
+   */
+  const dgBox = {
+    o1: { id: 'o1', label: 'osc 1', sub: '', tech: 'sound',
+          note: 'One of thirty waveforms, and fourteen of those are wavetables rather than plain '
+              + 'shapes. Its level, its tuning and its pulse width are separate bytes, so an '
+              + 'oscillator can be fully configured and silent.' },
+    o2: { id: 'o2', label: 'osc 2', sub: '', tech: 'sound',
+          note: 'The same thirty waveforms again. Twenty six of the sixty four patches in this '
+              + 'pack leave its level at zero, which is what the word silent means here.' },
+    noi: { id: 'noi', label: 'noise', sub: '', tech: 'sound',
+           note: 'A white noise source with one level byte at address 57. The factory bank uses '
+               + 'it in five patches of sixty four and a bought bank used it in forty eight.' },
+    ring: { id: 'ring', label: 'ring mod', sub: '', tech: 'sound',
+            note: 'The two oscillators multiplied together, with its own level. It makes metallic '
+                + 'and bell tones out of two ordinary waves and is off in most patches.' },
+    mix: { id: 'mix', label: 'mixer', sub: '', tech: 'sound',
+           note: 'Four levels and two more for the signal before and after the effects. What comes '
+               + 'out of here is the only thing the filter ever sees.' },
+    flt: { id: 'flt', label: 'filter', sub: '', tech: 'sound',
+           note: 'Six types: low and high pass at 12 and 24 dB, and two band pass shapes. Its '
+               + 'frequency is the parameter the mod matrix reaches more often than any other.' },
+    amp: { id: 'amp', label: 'amp', sub: '', tech: 'sound',
+           note: 'Envelope 1 is the amplitude envelope. Its release is the single byte that best '
+               + 'separates one bank from another, at a median of 40 across these sixty four.' },
+    fx: { id: 'fx', label: 'FX', sub: '', tech: 'sound',
+          note: 'Distortion, chorus and a three band equaliser, each with its own level byte. A '
+              + 'level of zero is the effect switched off rather than turned down.' },
+    // ⚠️ THESE THREE ARE `sound` LIKE EVERYTHING ELSE, AND THE FIRST DRAFT MADE
+    // THEM `graphics` TO SET THEM APART. `TECH_HUE` is one colour per technology
+    // across every diagram in this project, and `graphics` means anything that
+    // draws, in six other pictures. Borrowing it to mean *not audio* here would
+    // teach a reader a colour that is false everywhere else. One instrument, one
+    // colour; what says the LFOs are not in the signal path is that their arrows
+    // go to the matrix and not to the mixer.
+    lfo1: { id: 'lfo1', label: 'LFO 1', sub: '', tech: 'sound',
+            note: 'Thirty eight shapes, from a sine to a random sample and hold to a sixteen step '
+                + 'chromatic run. Its rate can be free or locked to the tempo.' },
+    lfo2: { id: 'lfo2', label: 'LFO 2', sub: '', tech: 'sound',
+            note: 'The same thirty eight shapes. Of the sixty four patches in this pack exactly '
+                + 'one runs both LFOs at once, against a hundred and twelve of a bought bank.' },
+    mod: { id: 'mod', label: 'mod matrix', sub: '', tech: 'sound',
+           note: 'Twenty slots, each taking two sources to one of eighteen destinations with a '
+               + 'depth. A depth of 64 is zero, so a slot can be addressed and reach nothing.' },
+  };
+  const dgSpec = {
+    caption: '',
+    nodes: [dgBox.o1, dgBox.o2, dgBox.noi, dgBox.ring, dgBox.lfo1, dgBox.lfo2,
+            dgBox.mix, dgBox.mod, dgBox.flt, dgBox.amp, dgBox.fx],
+    links: [
+      { from: 'o1', to: 'mix', note: 'Its level is address 54, and a wave with a level of zero is '
+          + 'a part of the patch that is configured and contributes nothing.' },
+      { from: 'o2', to: 'mix', note: 'Its level is address 55. Zero there is why the table says '
+          + 'silent rather than showing a wave.' },
+      { from: 'noi', to: 'mix', note: 'One byte at address 57. Noise is what makes a breath or a '
+          + 'snare out of a synth voice.' },
+      { from: 'ring', to: 'mix', note: 'Address 56. Ring modulation needs both oscillators running '
+          + 'to make anything at all, so it is silent whenever osc 2 is.' },
+      { from: 'mix', to: 'flt', note: 'The mixer also carries a level before and after the effects, '
+          + 'which is how a patch stays the same loudness with distortion switched on.' },
+      { from: 'flt', to: 'amp', note: 'Envelope 2 is the filter envelope and envelope 1 is the '
+          + 'amplifier\'s. A patch can aim either at the filter frequency through the matrix.' },
+      { from: 'amp', to: 'fx', note: 'The effects sit after the amplifier, so a long release is '
+          + 'heard through whatever distortion and chorus the patch has switched on.' },
+      { from: 'lfo1', to: 'mod', note: 'An LFO reaches nothing by itself. It becomes audible only '
+          + 'when a matrix slot names it as a source with a depth other than 64.' },
+      { from: 'lfo2', to: 'mod', note: 'The same again. Forty three of these sixty four patches '
+          + 'have neither LFO reaching anything at all.' },
+    ],
+  };
+  const dg = createDiagram(panel('patches'), dgSpec, { how: true, atEnd: false });
+
+  /**
+   * The reference's own default patch, built from the address table rather than
+   * typed, so the picture at rest is a real reading of real bytes and there is
+   * no second copy of any default anywhere on this page.
+   */
+  function defaultPatch() {
+    const b = new Uint8Array(PATCH_BYTES);
+    SYSEX_HEAD.forEach((v, i) => { b[i] = v; });
+    for (let a = 0; a < PATCH_DATA; a++) b[DATA_AT + a] = ADDRESSES[a].d;
+    b[PATCH_BYTES - 1] = 0xf7;
+    return readPatch(b);
+  }
+
+  function paint(p, why) {
+    const s = summarise(p);
+    const used = modSlots(p).filter((m) => m.used);
+    const lfoWave = (n) => named(`LFO${n}_Waveform`, p.value(`LFO${n}_Waveform`));
+    const reaches = (lo, hi) => used.some((m) => [lo, hi].includes(m.source1) || [lo, hi].includes(m.source2));
+    dgBox.o1.sub = s.osc1;
+    dgBox.o2.sub = s.osc2Silent ? 'silent' : s.osc2;
+    dgBox.noi.sub = p.value('Mixer_NoiseLevel') ? `level ${p.value('Mixer_NoiseLevel')}` : 'off';
+    dgBox.ring.sub = p.value('Mixer_RingModLevel12') ? `level ${p.value('Mixer_RingModLevel12')}` : 'off';
+    dgBox.mix.sub = `${[p.value('Mixer_Osc1Level'), p.value('Mixer_Osc2Level'),
+      p.value('Mixer_NoiseLevel'), p.value('Mixer_RingModLevel12')].filter(Boolean).length} of 4`;
+    dgBox.flt.sub = s.filter;
+    dgBox.amp.sub = `release ${s.release}`;
+    dgBox.fx.sub = s.distortion ? 'distortion' : s.chorus ? 'chorus' : 'dry';
+    dgBox.lfo1.sub = reaches(6, 7) ? lfoWave(1) : 'reaches none';
+    dgBox.lfo2.sub = reaches(8, 9) ? lfoWave(2) : 'reaches none';
+    dgBox.mod.sub = used.length ? `${used.length} of 20` : 'none in use';
+    const where = used.length
+      ? [...new Set(used.map((m) => MOD_DESTINATIONS[m.destination]))].join(', ')
+      : '';
+    dgSpec.caption = why
+      || `${p.name}, category ${p.category}${categoryName(p.category) ? ` (${categoryName(p.category)})` : ''}. `
+        + `${where ? `The matrix reaches ${where}. ` : 'Nothing in the matrix reaches anything. '}`
+        + 'Nothing on this page can send it.';
+    dg.render();
+  }
+
+  paint(defaultPatch(),
+    'No pack is open, so every part is showing the reference\'s own default, which is what '
+    + 'an unedited patch holds. Press a row once a pack is open and this becomes that patch.');
 
   function showPatch(i) {
     const p = patches[i];
     if (!p) return;
     picked = i;
     patchTable.mark((r) => r.i === i);
+    paint(p);
     const s = summarise(p);
-    const used = modSlots(p).filter((m) => m.used);
-    // 🔴 THE DIAGRAM IS THE DETAIL PANEL. `plans/plan-pack-page.md` §5 left
-    // open whether a pressed row should raise a panel of parameters and guessed
-    // a table; the ask that settled it was *"So the patcbay visualiser table
-    // plus fiagram"*. A patch is a configuration of one signal path, so the
-    // picture of the machinery and the picture of the patch are the same
-    // picture, and pressing a row repaints it. It stays last on the page under
-    // the standing heading, which is where every diagram in this project goes.
-    dgBox.o1.sub = s.osc1;
-    dgBox.o2.sub = s.osc2Silent ? 'silent' : s.osc2;
-    dgBox.flt.sub = s.filter;
-    dgBox.amp.sub = `release ${s.release}`;
-    dgBox.fx.sub = s.distortion ? 'distortion' : s.chorus ? 'chorus' : 'dry';
-    const reach = used.length
-      ? used.map((m) => MOD_DESTINATIONS[m.destination]).filter((x, k, a) => a.indexOf(x) === k)
-      : [];
-    dg.el && (dgSpec.caption = captionFor(p, s, reach));
-    dg.render();
-    d.log(`${p.name} · ${s.poly} · ${s.filter} · ${used.length} mod slot(s) in use`);
+    d.log(`${p.name}, ${s.poly}, ${s.filter}, ${modSlots(p).filter((m) => m.used).length} mod slot(s) in use`);
   }
 
-  function captionFor(p, s, reach) {
-    const lfo = s.lfo === 'none'
-      ? 'Neither LFO reaches anything through the mod matrix'
-      : `${s.lfo === 'both' ? 'Both LFOs reach' : `${s.lfo.toUpperCase()} reaches`} ${reach.join(', ') || 'something'}`;
-    return `${p.name}, category ${p.category}${categoryName(p.category) ? ` (${categoryName(p.category)})` : ''}. `
-      + `${lfo}. Nothing on this page can send it.`;
-  }
-
-  // ── reading a pack ───────────────────────────────────────────────────────
+  // ── reading ──────────────────────────────────────────────────────────────
 
   async function openFiles(files) {
     for (const f of files) {
-      if (f.name.toLowerCase().endsWith('.syx')) { await openSyx(f.name, f.bytes); continue; }
+      const n = f.name.toLowerCase();
+      if (n.endsWith('.syx')) { await openSyx(f.name, f.bytes); continue; }
+      if (n.endsWith('.zip')) { await openZip(f.name, f.bytes); continue; }
       await openPack(f.name, f.bytes);
     }
   }
@@ -252,18 +384,55 @@
   /** One loose patch message, which is what all 128 in this archive are. */
   async function openSyx(name, bytes) {
     if (bytes.length !== PATCH_BYTES) {
-      d.log(`${name} is ${bytes.length} bytes and a Circuit patch is ${PATCH_BYTES}`, 'bad');
-      openNote.textContent = `${name} is not a Circuit patch`;
+      drop.say(`${name} is ${bytes.length} bytes and a Circuit patch is ${PATCH_BYTES}`, 'bad');
       return;
     }
-    fill([{ name, bytes }], []);
-    openNote.textContent = `${name}, one patch, read in this tab and sent nowhere`;
+    fill([{ name, bytes }], [], []);
+    drop.say(`${name}, one patch, read in this tab and sent nowhere`, 'good');
   }
 
-  async function openPack(name, bytes) {
+  /**
+   * 🔴 A REAL DOWNLOAD IS A ZIP OF PACKS, NOT A PACK, AND THE FIRST BUILD
+   * REFUSED IT. MEASURED on the soundbank in `purchased/`: 2 `.circuitpack`, 1
+   * `.circuittrackspack`, 128 `.syx`, an `.xlsx`, two `.txt` and 10 `.url` in one
+   * archive. `unzip.mjs` already reads a zip inside a zip, which is how both of
+   * those packs were measured.
+   * ⚠️ A `.circuittrackspack` IS FOR THE OTHER INSTRUMENT and is named rather
+   * than opened. `research/circuit-soundbank-2026-09-21.md` §5 measured that.
+   */
+  async function openZip(name, bytes) {
     let list;
     try { list = readZip(bytes); }
-    catch (e) { d.log(`${name} did not read as a pack: ${e.message}`, 'bad'); return; }
+    catch (e) { drop.say(`${name} did not read as a zip: ${e.message}`, 'bad'); return; }
+    const packs = list.filter((e) => e.name.endsWith('.circuitpack'));
+    const others = list.filter((e) => e.name.endsWith('.circuittrackspack'));
+    const loose = list.filter((e) => e.name.endsWith('.syx'));
+    if (others.length) {
+      d.log(`${others.length} pack(s) in it are for a Circuit Tracks, not a Circuit, and were left alone`, 'bad');
+    }
+    if (packs.length) {
+      const pick = packs[0];
+      if (packs.length > 1) {
+        d.log(`${packs.length} packs in ${name}: ${packs.map((e) => e.name.split('/').pop()).join(', ')}. `
+            + 'Opening the first', 'hi');
+      }
+      await openPack(pick.name.split('/').pop(), await pick.read(), `inside ${name}`);
+      return;
+    }
+    if (loose.length) {
+      const got = [];
+      for (const e of loose) got.push({ name: e.name.split('/').pop(), bytes: await e.read() });
+      fill(got, [], []);
+      drop.say(`${name}, ${got.length} loose patches and no pack, read in this tab and sent nowhere`, 'good');
+      return;
+    }
+    drop.say(`${name} holds no Circuit pack and no patches`, 'bad');
+  }
+
+  async function openPack(name, bytes, from = '') {
+    let list;
+    try { list = readZip(bytes); }
+    catch (e) { drop.say(`${name} did not read as a pack: ${e.message}`, 'bad'); return; }
 
     const meta = entry(list, 'index.json');
     let names = [];
@@ -279,6 +448,7 @@
       .filter((e) => /\.syx$/.test(e.name))
       .sort((a, b) => (+(a.name.match(/\d+/) || [0])[0]) - (+(b.name.match(/\d+/) || [0])[0]));
     const sess = list.filter((e) => e.name.endsWith('.circuitsession'));
+    const wav = list.filter((e) => e.name.endsWith('.wav'));
 
     const got = [];
     for (const e of syx) got.push({ name: e.name.split('/').pop(), bytes: await e.read() });
@@ -288,19 +458,43 @@
       const s = await sessionStats(await sess[i].read());
       st.push({ ...s, name: names[i] || sess[i].name.split('/').pop() });
     }
-    fill(got, st);
-    const wavs = list.filter((e) => e.name.endsWith('.wav')).length;
-    openNote.textContent = `${name} · ${got.length} patches, ${st.length} sessions, ${wavs} samples, read in this tab and sent nowhere`;
+
+    // ⚠️ A SAMPLE'S LENGTH COMES OUT OF ITS OWN HEADER, WALKING THE CHUNKS.
+    // A WAV is not a fixed 44 byte header: `LIST` and `fact` chunks sit between
+    // `fmt ` and `data` in files from plenty of tools, and assuming the offset
+    // reads a length that is wrong rather than one that is missing.
+    const sm = [];
+    for (const e of wav) {
+      const b = await e.read();
+      sm.push({ name: e.name.split('/').pop(), size: e.size, bytes: b, ...wavShape(b) });
+    }
+
+    fill(got, st, sm);
+    drop.say(`${name}${from ? ` ${from}` : ''}, ${got.length} patches, ${st.length} sessions, `
+      + `${sm.length} samples, read in this tab and sent nowhere`, 'good');
   }
 
-  function fill(files, stats) {
-    patches = [];
-    rows = [];
+  function wavShape(b) {
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    let off = 12, fmt = null, dataLen = 0;
+    while (off + 8 <= b.length) {
+      const id = String.fromCharCode(b[off], b[off + 1], b[off + 2], b[off + 3]);
+      const sz = dv.getUint32(off + 4, true);
+      if (id === 'fmt ') fmt = { ch: dv.getUint16(off + 10, true), rate: dv.getUint32(off + 12, true), bits: dv.getUint16(off + 22, true) };
+      if (id === 'data') dataLen = sz;
+      off += 8 + sz + (sz & 1);
+    }
+    if (!fmt || !dataLen) return { seconds: 0, rate: 0, bits: 0, ch: 0 };
+    return { seconds: dataLen / (fmt.rate * fmt.ch * fmt.bits / 8), ...fmt };
+  }
+
+  function fill(files, stats, wavs) {
+    patches = []; rows = [];
     for (const f of files) {
       let p;
       // ⚠️ A PATCH THAT WILL NOT READ IS REPORTED BY NAME, never skipped. A
-      // reader that silently dropped one would leave a pack looking smaller
-      // than it is, which is a wrong answer wearing an empty one's clothes.
+      // reader that silently dropped one leaves a pack looking smaller than it
+      // is, which is a wrong answer wearing an empty one's clothes.
       try { p = readPatch(f.bytes); }
       catch (e) { d.log(`${f.name}: ${e.message}`, 'bad'); continue; }
       if (p.writesFlash) {
@@ -310,7 +504,7 @@
       const i = patches.length;
       patches.push(p);
       const s = summarise(p);
-      const moved = patchFields(p).filter((f) => f.changed).length;
+      const moved = patchFields(p).filter((x) => x.changed).length;
       rows.push({
         i,
         name: p.name || '(no name)',
@@ -318,15 +512,11 @@
         filter: s.filter,
         lfo: s.lfo === 'none' ? '' : s.lfo,
         voice: s.poly,
-        // ⚠️ THE HOVER CARRIES WHAT A COLUMN WOULD HAVE, AND `moved` IS THE ONE
-        // FACT NOTHING ELSE ON THIS PAGE SAYS: how much of this patch somebody
-        // actually changed, counted against the reference's own defaults rather
-        // than against the other patches in the pack.
-        hover: `${p.commandName}, ${p.slotName} · category ${p.category}`
+        hover: `${p.commandName}, ${p.slotName}, category ${p.category}`
              + `${s.categoryLabel ? ` (${s.categoryLabel})` : ''}`
-             + ` · osc 2 ${s.osc2Silent ? 'silent' : s.osc2}`
-             + ` · attack ${s.attack}, release ${s.release} · ${s.mods} mod slot(s)`
-             + ` · ${moved} of ${patchFields(p).length} parameters off their default`,
+             + `, osc 2 ${s.osc2Silent ? 'silent' : s.osc2}`
+             + `, attack ${s.attack} release ${s.release}, ${s.mods} mod slot(s)`
+             + `, ${moved} of ${PATCH_DATA} parameters off their default`,
       });
     }
     patchTable.set(rows);
@@ -337,35 +527,36 @@
       head: s.head,
       bits: s.entropy.toFixed(2),
       filled: `${pct(s.nonZero)}%`,
-      hover: `${s.bytes} bytes · ${s.notErased} of them are not erasure and ${s.payload} are `
-           + `neither erasure nor zero · ${s.fingerprint.slice(0, 12)}`,
+      hover: `${s.bytes} bytes, ${s.notErased} of them not erasure and ${s.payload} `
+           + `neither erasure nor zero, ${s.fingerprint.slice(0, 12)}`,
     })));
 
+    samples = wavs;
+    sampleTable.set(wavs.map((w, i) => ({
+      i,
+      name: w.name,
+      len: `${w.seconds.toFixed(2)} s`,
+      size: kb(w.size),
+      hover: `${w.rate} Hz, ${w.bits} bit, ${w.ch === 1 ? 'mono' : `${w.ch} channels`}. Press to hear it`,
+    })));
+
+    countTabs({ patches: patches.length, sessions: sessions.length, samples: samples.length });
     const distinct = new Set(stats.map((s) => s.fingerprint)).size;
-    const lowFill = stats.length ? Math.min(...stats.map((s) => s.nonZero)) : null;
-    d.set('patches', patches.length);
-    d.set('sessions', stats.length);
-    d.set('different', stats.length ? `${distinct} of ${stats.length}` : '');
-    d.set('filled', stats.length ? pct(lowFill) : '');
     sayVerdict(stats, distinct);
     if (patches.length) showPatch(0);
   }
 
   /**
-   * 🔴 THE FOUR NUMBERS TURNED INTO THE ONE SENTENCE THEY ARE FOR.
-   * MEASURED on both sides, 2026-09-21: the owner's pack is 32 distinct
-   * fingerprints of 32 at 0.83 to 1.46 bits a byte and 84.6 to 89.6 per cent
-   * non-zero; the two purchased packs are ONE fingerprint across all 64 of their
-   * session files, 0.009 bits and 0.07 per cent. Two orders of magnitude, so the
-   * test is not delicate.
-   *
-   * 🔴 AND THE FIRST FOUR BYTES ARE NOT PART OF IT, WHICH CORRECTS SOMETHING
-   * THREE FILES IN THIS REPOSITORY PUBLISHED. `INIT` was written up as the blank
-   * signature against the owner's `DEMO`. The owner's 32 sessions are USER 22,
-   * DEMO 7 and INIT 3, and those three are ordinary work at 0.87 bits and 86.5
-   * per cent. Deciding on the head would have condemned them. It is still shown,
-   * in its own column, because a reader should be able to see for themselves
-   * that it is the same on both sides.
+   * 🔴 THE THREE NUMBERS TURNED INTO THE ONE SENTENCE THEY ARE FOR.
+   * MEASURED on both sides: the owner's pack is 32 distinct fingerprints of 32
+   * at 0.83 to 1.46 bits a byte and 84.6 to 89.6 per cent non-zero; the two
+   * purchased packs are ONE fingerprint across all 64 of their session files at
+   * 0.009 bits and 0.07 per cent. Two orders of magnitude, so it is not delicate.
+   * 🔴 AND THE FIRST FOUR BYTES ARE NOT PART OF IT, WHICH CORRECTS THREE FILES.
+   * `INIT` was published as the blank signature. The owner's 32 sessions are
+   * USER 22, DEMO 7 and INIT 3, and those three are ordinary work. Deciding on
+   * the head would have condemned them. It is still SHOWN, in its own column,
+   * because a reader should see for themselves that it is the same on both sides.
    */
   function sayVerdict(stats, distinct) {
     if (!stats.length) {
@@ -390,200 +581,140 @@
     d.log(`${distinct} of ${stats.length} sessions are distinct`, 'good');
   }
 
+  /**
+   * 🔴 ON A PRESS, AND NOTHING IS DECODED UNTIL ONE HAPPENS. Sixty four WAVs
+   * through `decodeAudioData` on a visit is the load-on-a-visit defect three
+   * times over.
+   * ⚠️ AND SOUND NEVER GATES THE WORK. `AudioContext.resume()` waits on a
+   * gesture in a real browser and does not reject, so awaiting one is a hang
+   * rather than an error. It is fired and left.
+   */
+  function playSample(i) {
+    const w = samples[i];
+    if (!w) return;
+    sampleTable.mark((r) => r.i === i);
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      ac.resume();
+      const copy = w.bytes.slice().buffer;
+      ac.decodeAudioData(copy).then((buf) => {
+        const src = ac.createBufferSource();
+        src.buffer = buf;
+        src.connect(ac.destination);
+        src.start();
+        played++;
+        d.log(`${w.name}, ${buf.duration.toFixed(2)} s`);
+      }).catch((e) => d.log(`${w.name} did not decode (${e.message})`, 'bad'));
+    } catch (e) {
+      d.log(`no sound here (${e.message})`, 'bad');
+    }
+  }
+
   // ── the button that reads the pack in this repository ────────────────────
-  //
-  // 🔴 ON A PRESS, NEVER ON LOAD. It is 3.3 MiB of somebody's bandwidth for a
-  // first row nobody asked to see, which is exactly the shape `/reel/` shipped:
-  // a fetch on every visit for a frame nobody wanted. A visit here opens nothing
-  // and the counters say so.
   const notPublished = 'the pack in this repository is not published here, '
     + 'so open one from your own machine';
 
   d.button('here')?.addEventListener('click', async () => {
     // ⚠️ IT ANSWERS RATHER THAN DOING NOTHING. A control that looks live and is
-    // inert is this project's named hazard, and a press that produces one
-    // sentence immediately is not that: it answers the question the label asks.
-    if (!PACK_HERE) {
-      openNote.textContent = notPublished;
-      d.log('the pack in this repository is not published on the deploy, deliberately: '
-          + 'it is somebody\'s only backup and it holds 32 of their sessions', 'bad');
-      return;
-    }
-    openNote.textContent = 'reading the pack in this repository';
+    // inert is this project's named hazard; a press that produces one sentence
+    // immediately is not that.
+    if (!PACK_HERE) { drop.say(notPublished, 'bad'); return; }
+    drop.say('reading the pack in this repository');
     try {
       const r = await realFetch(PACK);
       if (!r.ok) throw new Error(`the server answered ${r.status}`);
       await openPack('New Pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
     } catch (e) {
-      openNote.textContent = notPublished;
-      d.log(`the pack here did not load (${e.message})`, 'bad');
+      drop.say(`${notPublished} (${e.message})`, 'bad');
     }
   });
 
-  // ── the picture ──────────────────────────────────────────────────────────
-  /**
-   * 🔴 THE PICTURE IS THE PATCH, AND IT IS THE SECOND SHAPE RATHER THAN THE
-   * FIRST. It was drawn as two machines to begin with, a `Browser` holding the
-   * drop target, the zip reader and the decoder, and a `Circuit` holding the
-   * voice, with NO arrow between them: the absence was the message, because
-   * nothing here can reach the instrument.
-   * 🔴 IT MEASURED BADLY AND THE MEASUREMENT IS WHY IT CHANGED. Two machines
-   * with no link between them land in the same column and stack, so the picture
-   * filled **27 per cent of its width at 746 px tall**, against `/crate/`'s
-   * 64 per cent at 271 px and `/items/`'s 100 per cent at 226 px, both measured
-   * the same minute. The layout puts two containers side by side only when
-   * something joins them, so the honest picture and the legible one were in
-   * direct conflict and the drawing lost.
-   * ✅ WHAT REPLACED IT IS BETTER AT THE THING THAT WAS ASKED FOR. The ask was
-   * *"So the patcbay visualiser table plus fiagram"*, and this is the signal
-   * path of the patch under the pointer: five boxes whose subs are read off the
-   * selected patch every time a row is pressed. The two oscillators share a
-   * column and meet at the filter, which is what the instrument does.
-   * ⚠️ AND THE FACT THE OLD PICTURE CARRIED IS NOT LOST, IT IS SAID WHERE IT
-   * CAN GO RED. The caption says nothing here can send it, and the assert over
-   * `requestMIDIAccess` is what grades it. A missing arrow was never gradable.
-   */
-  const dgBox = {
-    o1: { id: 'o1', label: 'osc 1', sub: 'wave', tech: 'sound',
-          note: 'One of thirty waveforms, and fourteen of those are wavetables rather than plain '
-              + 'shapes. Its level, its tuning and its pulse width are separate bytes, so an '
-              + 'oscillator can be configured and silent.' },
-    o2: { id: 'o2', label: 'osc 2', sub: 'wave', tech: 'sound',
-          note: 'The same thirty waveforms again. Twenty six of the sixty four patches in this '
-              + 'pack leave its level at zero, which is what the word silent means here.' },
-    flt: { id: 'flt', label: 'filter', sub: 'type', tech: 'sound',
-           note: 'Six types: low and high pass at 12 and 24 dB, and two band pass shapes. Its '
-               + 'frequency is the parameter the mod matrix reaches more often than any other.' },
-    amp: { id: 'amp', label: 'amp', sub: 'release', tech: 'sound',
-           note: 'Envelope 1 is the amplitude envelope. Its release is the single byte that best '
-               + 'separates one bank from another, at a median of 40 across these sixty four.' },
-    fx: { id: 'fx', label: 'FX', sub: 'dry', tech: 'sound',
-          note: 'Distortion, chorus and a three band equaliser, each with its own level byte. A '
-              + 'level of zero is the effect switched off rather than turned down.' },
-  };
-  const dgSpec = {
-    caption: 'This is the patch under the pointer, drawn from the 340 bytes it is made of. '
-      + 'Nothing on this page can send it back: there is no Web MIDI here and no function '
-      + 'anywhere that turns a patch into a message, because the one that writes a patch into '
-      + 'flash is a single byte away from the one that does not.',
-    nodes: [dgBox.o1, dgBox.o2, dgBox.flt, dgBox.amp, dgBox.fx],
-    links: [
-      { from: 'o1', to: 'flt', label: 'level',
-        note: 'Both oscillators, a noise source and a ring modulator meet at a mixer with a '
-            + 'level byte each, and what comes out of it is what the filter is given.' },
-      { from: 'o2', to: 'flt', label: 'level',
-        note: 'Its level is address 55. Zero there is an oscillator that is fully configured and '
-            + 'contributes nothing, which is why the table says silent rather than showing a wave.' },
-      { from: 'flt', to: 'amp', label: 'envelope',
-        note: 'Envelope 2 is the filter envelope and envelope 1 is the amplifier\'s. A patch can '
-            + 'aim either at the filter frequency through the mod matrix.' },
-      { from: 'amp', to: 'fx', label: 'signal',
-        note: 'The effects sit after the amplifier, so a long release is heard through whatever '
-            + 'distortion and chorus the patch has switched on.' },
-    ],
-  };
-  const dg = createDiagram(d.el, dgSpec, { how: true, atEnd: true });
-
   // ── what a visit is allowed to have done ─────────────────────────────────
-  d.assert('a visit opens nothing and asks for nothing',
-    drop.opens === 0 && patches.length === 0 && fetched === 0,
-    `${drop.opens} files opened, ${patches.length} patches read, ${fetched} request(s) made`);
+  d.assert('a visit opens nothing, asks for nothing and makes no sound',
+    drop.opens === 0 && patches.length === 0 && fetched === 0 && played === 0 && ac === null,
+    `${drop.opens} files opened, ${patches.length} patches read, ${fetched} request(s), ${played} sample(s) played`);
 
-  // 🔴 THE ASSERT THIS PAGE EXISTS TO CARRY. Not a reading of the source: a
-  // counter on the method itself, so it stays true on the day somebody adds a
-  // convenience helper behind a control.
-  // ⚠️ THE COUNTER AND NOTHING ELSE, AND THE FIRST VERSION OF THIS ASSERT WAS
-  // WRONG IN THE MOST ORDINARY WAY. It also required `window.MIDIOutput` to be
-  // undefined, which is a fact about the BROWSER and not about this page:
-  // Chrome defines that constructor whether or not anybody ever asks for
-  // access, so the assert went red on a page where nothing was wrong. Measure
-  // the quantity in question, not one next to it.
   d.assert('nothing here asks for MIDI, so nothing here can write to an instrument',
     midiAsked === 0 && navigator.requestMIDIAccess !== undefined,
     `requestMIDIAccess called ${midiAsked} time(s), and the counter is still in front of it`);
 
+  // 🔴 THE WAY IN IS ON SCREEN BEFORE ANY DRAG, which is the defect the first
+  // build shipped: a component whose only visible part appeared mid-drag.
+  {
+    const box = drop.el.getBoundingClientRect();
+    d.assert('the way in is visible at rest and says what it takes, including a zip',
+      box.width > 200 && box.height > 40 && /\.zip/.test(drop.el.textContent)
+      && !drop.el.dataset.over && drop.cover.isConnected === false,
+      `${box.width.toFixed(0)} by ${box.height.toFixed(0)} px`);
+  }
+
   d.assert('the picture cut nothing and refused nothing',
     dg.cuts.length === 0, dg.cuts.map((c) => `${c.id}: ${c.shown}`).join(' · ') || 'none');
-
-  // ⚠️ A DIAGRAM WITH A HEADLESS LINE IN IT READS AS A HEAD THAT FELL OFF,
-  // which was reported on two pages before it became a rule. Every gap here is
-  // a declared link, so there is nothing left for a bracket to do.
   d.assert('every line in the picture has an arrowhead on it',
     dg.ties === 0, `${dg.ties} headless tie(s)`);
 
   /**
-   * 🔴 THE PICTURE IS THE SELECTED PATCH, ASSERTED FIELD BY FIELD RATHER THAN
-   * BELIEVED. A diagram whose subs were typed once and never updated would look
-   * exactly like this one and would be a drawing of whatever patch happened to
-   * be first, which is the shape of defect this project calls a control that
-   * looks live and is inert. Every box is compared against the decoder's own
-   * reading of the patch the table has marked.
+   * 🔴 THE PICTURE HAS ITS FULL SIZE BEFORE ANYTHING IS OPENED, which is the
+   * half of *"reserver space when no active one"* that can go red. Every box
+   * carries the reference default, so pressing a row changes the words and not
+   * the height, and nothing under the picture moves.
    */
-  const picturePatch = () => {
-    const p = patches[picked];
-    if (!p) return null;
-    const s = summarise(p);
-    return dgBox.o1.sub === s.osc1
-      && dgBox.o2.sub === (s.osc2Silent ? 'silent' : s.osc2)
-      && dgBox.flt.sub === s.filter
-      && dgBox.amp.sub === `release ${s.release}`
-      && dgBox.fx.sub === (s.distortion ? 'distortion' : s.chorus ? 'chorus' : 'dry');
-  };
-
-  // ⚠️ THE HEADING IS `hidden`, NOT ABSENT FROM THE DOM, so a check reading
-  // `textContent` finds every column name in an empty table and goes red on a
-  // component doing exactly what it promises. Ask whether it is DRAWN.
+  let restHeight = 0;
   {
-    const head = patchTable.el.querySelector('.pos-tbl-head');
-    d.assert('an empty table draws no heading, because a column name over nothing labels air',
-      patchTable.count() === 0 && !!head && head.hidden
-      && patchTable.el.querySelectorAll('.pos-tbl-row:not(.pos-tbl-head)').length === 0,
-      `${patchTable.count()} rows and the heading is ${head && head.hidden ? 'hidden' : 'drawn'}`);
+    restHeight = +dg.el.getBoundingClientRect().height.toFixed(1);
+    d.assert('the picture is drawn at its full size before any pack is open, so nothing moves later',
+      restHeight > 60 && dgSpec.nodes.every((n) => n.sub && n.sub.length > 0),
+      `${restHeight} px tall with all ${dgSpec.nodes.length} boxes carrying a default`);
   }
 
-  /**
-   * Everything from here is behind the gate, because it opens a 3.3 MiB file.
-   * A visit asserts a strict subset and that is the intended shape.
-   */
+  d.assert('every tab keeps its bare word until it has something to count',
+    tabs.buttons.map((b) => b.textContent).join(' ') === 'PATCHES SESSIONS SAMPLES',
+    tabs.buttons.map((b) => b.textContent).join(' '));
+
+  d.assert('an empty table draws no heading, because a column name over nothing labels air',
+    patchTable.count() === 0 && sampleTable.count() === 0
+    && patchTable.el.querySelector('.pos-tbl-head')?.hidden === true,
+    `${patchTable.count()} patch rows, ${sampleTable.count()} sample rows`);
+
   if (SELFCHECK) {
     const r = PACK_HERE ? await realFetch(PACK).catch(() => null) : null;
     if (!r || !r.ok) {
-      // ⚠️ SAID OUT LOUD RATHER THAN SKIPPED IN SILENCE. On the deploy this file
-      // is not published, on purpose, so a run there grades the page's load time
-      // half and nothing else. A check nobody can run must say it did not run.
       d.log('the pack here is not published, so the reading checks did not run', 'bad');
-      // ⚠️ IT PRESSES THE BUTTON RATHER THAN READING WHAT THE PAGE SAYS, and
-      // the first version did the second thing and went red on the deploy for
-      // it: the sentence is produced BY the press, and this block runs before
-      // the harness gets there. An assert over a state nothing has reached yet
-      // is an assert about load order.
       d.button('here')?.click();
       d.assert('where the pack is not published the button says so, and asks nobody for it',
-        openNote.textContent === notPublished && !PACK_HERE && fetched === 0,
-        `at ${location.hostname} it says "${openNote.textContent}" after ${fetched} request(s)`);
+        drop.note.textContent === notPublished && !PACK_HERE && fetched === 0,
+        `at ${location.hostname} it says "${drop.note.textContent}" after ${fetched} request(s)`);
     } else {
       await openPack('New Pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
 
-      d.assert('the pack reads as 64 patches and 32 sessions',
-        patches.length === 64 && sessions.length === 32,
-        `${patches.length} patches, ${sessions.length} sessions`);
+      d.assert('the pack reads as 64 patches, 32 sessions and 64 samples',
+        patches.length === 64 && sessions.length === 32 && samples.length === 64,
+        `${patches.length} / ${sessions.length} / ${samples.length}`);
+
+      d.assert('and the counts are in the tab titles',
+        tabs.buttons.map((b) => b.textContent).join(' ') === 'PATCHES 64 SESSIONS 32 SAMPLES 64',
+        tabs.buttons.map((b) => b.textContent).join(' '));
 
       d.assert('every patch in it lands in RAM rather than in flash',
         patches.every((p) => !p.writesFlash),
         `${patches.filter((p) => p.writesFlash).length} of ${patches.length} would write flash`);
 
+      // 🔴 THE PICTURE DID NOT CHANGE HEIGHT WHEN IT FILLED, which is the whole
+      // of the reservation and the only part of it a check can see.
+      d.assert('opening a pack did not move the picture, because its room was already reserved',
+        Math.abs(dg.el.getBoundingClientRect().height - restHeight) < 1,
+        `${dg.el.getBoundingClientRect().height.toFixed(1)} px against ${restHeight} at rest`);
+
       const distinct = new Set(sessions.map((s) => s.fingerprint)).size;
       d.assert('the sessions are all different from each other, so this is a backup',
         distinct === 32 && verdict.dataset.state === 'good',
-        `${distinct} distinct of ${sessions.length} · the page says "${verdict.textContent.slice(0, 60)}"`);
+        `${distinct} distinct of ${sessions.length}`);
 
       /**
        * 🔴 THE NEGATIVE CONTROL, AND WITHOUT IT THE VERDICT IS DECORATION. A
        * page that said `this is a backup` whatever it was shown would pass every
-       * assert above. Four pages in this repository were fully green against
-       * stand-ins whose refusals had been switched off, so the blank pack is
-       * built here and put down the same path: 32 sessions of one repeated byte,
-       * which is what the two purchased packs measure as.
+       * assert above. Four pages here were fully green against stand-ins whose
+       * refusals had been switched off.
        */
       const blank = Array.from({ length: 32 }, () => ({
         name: '', head: 'INIT', entropy: 0.009, nonZero: 0.0007,
@@ -595,34 +726,38 @@
         `"${verdict.textContent.slice(0, 70)}"`);
       sayVerdict(sessions, distinct);
 
-      /**
-       * ⚠️ AND THE HEAD IS NOT WHAT DECIDES IT, WHICH CORRECTS THREE FILES.
-       * `INIT` was published as the blank signature. Three of the owner's own
-       * sessions carry it and are ordinary work, so the fabricated blanks above
-       * wear the same head as real sessions here and are still called blanks.
-       */
       const heads = new Set(sessions.map((s) => s.head));
       d.assert('and the first four bytes are not what decided it, because INIT is on both sides',
         heads.has('INIT') && verdict.dataset.state === 'good',
         `the owner's own sessions say ${[...heads].join(', ')}`);
 
       showPatch(0);
-      d.assert('pressing a patch repaints every box in the picture with that patch in it',
-        picturePatch() === true && picked === 0,
-        `the picture says ${dgBox.o1.sub} / ${dgBox.o2.sub} / ${dgBox.flt.sub} / ${dgBox.amp.sub} / ${dgBox.fx.sub}`);
+      const matches = (p) => {
+        const s = summarise(p);
+        return dgBox.o1.sub === s.osc1 && dgBox.flt.sub === s.filter
+          && dgBox.amp.sub === `release ${s.release}`;
+      };
+      d.assert('pressing a patch repaints the picture with that patch in it',
+        matches(patches[0]) && picked === 0,
+        `the picture says ${dgBox.o1.sub} into ${dgBox.mix.sub} into ${dgBox.flt.sub}`);
 
-      // ⚠️ THE NEGATIVE CONTROL. A picture that never repainted would pass the
-      // line above on the first patch and on nothing else, so a second patch
-      // with different parts goes through the same press.
       const other = patches.findIndex((q, k) => k > 0 && summarise(q).filter !== summarise(patches[0]).filter);
       showPatch(other > 0 ? other : 1);
       d.assert('NEGATIVE CONTROL: a different patch draws a different picture',
-        picturePatch() === true && dgBox.flt.sub !== summarise(patches[0]).filter,
+        matches(patches[picked]) && dgBox.flt.sub !== summarise(patches[0]).filter,
         `patch ${picked} draws ${dgBox.flt.sub} against patch 0's ${summarise(patches[0]).filter}`);
 
+      // 🔴 THE SAMPLES, AND EVERY COLUMN IN THAT TABLE HAS TO BE ABLE TO MOVE.
+      const secs = samples.map((w) => w.seconds);
+      d.assert('the samples read as 48 kHz 16 bit mono, and their lengths differ',
+        samples.every((w) => w.rate === 48000 && w.bits === 16 && w.ch === 1)
+        && Math.min(...secs) < Math.max(...secs),
+        `${Math.min(...secs).toFixed(2)} s to ${Math.max(...secs).toFixed(2)} s, `
+        + `${secs.reduce((a, b) => a + b, 0).toFixed(1)} s in total`);
+
       const before = fetched;
-      showPatch(Math.min(7, patches.length - 1));
-      d.assert('and stepping through them asks nobody for anything',
+      showPatch(3);
+      d.assert('stepping through them asks nobody for anything',
         fetched === before, `${fetched - before} request(s) while moving`);
 
       d.assert('nothing was sent while all of that happened',

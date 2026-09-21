@@ -814,6 +814,12 @@
    * global dragdroppable upload)"* and built because `/pack/` needs a way in
    * for a pack that is not the one in this repository.
    *
+   * 🔴 THE AREA IS THE POINT AND THE FIRST VERSION OF THIS BLOCK HAD NONE.
+   * It showed a button, because that was all the component drew: its cover is
+   * `position: fixed` and is inserted only while a drag is in flight, so the
+   * thing inviting the gesture appeared after the gesture. Reported as *"i just
+   * do not get funcionality why there is no upload aread / button"*.
+   *
    * 🔴 IT IS `open`, NOT `upload`, AND THE SPECIMEN'S LABEL IS THE POINT.
    * Nothing leaves the machine and this module names no network API at all. A
    * purchased soundbank lives in `purchased/` precisely because it is not ours
@@ -833,35 +839,35 @@
    * buttons are in the box, which nothing presses by position.
    */
   section('input', 'DROP TARGET',
-    'Drop a file anywhere on the page and it opens in the tab, with nothing leaving the '
-    + 'machine. The button is the same handler for somebody who does not drag, and the '
-    + 'second one drops a JPEG on purpose so the refusal has something to say out loud.',
+    'A visible area that says what it takes, a button for somebody who does not drag, '
+    + 'and one line that reports what happened. A file opens in the tab and nothing '
+    + 'leaves the machine, so the second button drops a JPEG on purpose to give the '
+    + 'refusal something to say out loud.',
     `const drop = createDrop({
-  accept: ['.circuitpack', '.syx'],
+  accept: ['.circuitpack', '.zip', '.syx'],  // named in the area, before a refusal
   label: 'open a pack',
-  says: (m, kind) => d.log(m, kind),      // a refusal says so in words
-  onOpen: (files) => read(files[0].bytes), // a Uint8Array, in this tab
+  says: (m, kind) => d.log(m, kind),         // the area says it too
+  onOpen: (files) => read(files[0].bytes),   // a Uint8Array, in this tab
 })
-box.append(drop.el)                        // the cover is the whole page`,
+box.append(drop.el)     // the area is the resting state, the cover is the drag`,
     (box) => {
-      kitDropLine = el('div', 'kit-out', 'nothing has been opened');
       kitDrop = createDrop({
-        accept: ['.circuitpack', '.syx'],
+        accept: ['.circuitpack', '.zip', '.syx'],
         label: 'open a pack',
-        hint: 'drop a .circuitpack or a .syx',
-        says: (m, kind) => { kitDropLine.textContent = m; d.log(m, kind); },
+        hint: 'drop a pack anywhere on this page',
+        says: (m, kind) => d.log(m, kind),
         onOpen: (files) => {
           const f = files[0];
-          kitDropLine.textContent = `${f.name} · ${f.bytes.length} bytes, read in this tab and sent nowhere`;
-          d.log(`opened ${f.name}`, 'good');
+          kitDrop.say(`${f.name}, ${f.bytes.length} bytes, read in this tab and sent nowhere`, 'good');
         },
       });
+      kitDropLine = kitDrop.note;
       const jpeg = el('button', '', 'drop a JPEG on purpose');
       jpeg.type = 'button';
       jpeg.addEventListener('click', () => {
         kitDrop.open([new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'photo.jpg')]);
       });
-      box.append(kitDrop.el, jpeg, kitDropLine);
+      box.append(kitDrop.el, jpeg);
     });
 
   section('hardware', 'PANEL',
@@ -3212,6 +3218,15 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
     const box = kitDrop.cover.getBoundingClientRect();
     kitDropTall = document.documentElement.scrollHeight;
     kitDrop.cover.remove();
+    // 🔴 THE AREA IS ON SCREEN BEFORE ANYBODY DRAGS ANYTHING, which is the whole
+    // repair and is exactly what the first version could not have passed.
+    const areaBox = kitDrop.el.getBoundingClientRect();
+    d.assert('the way in is on screen before any drag, with words saying what it takes',
+      areaBox.width > 100 && areaBox.height > 40
+      && kitDrop.el.classList.contains('pos-drop-area')
+      && /\.circuitpack/.test(kitDrop.el.textContent) && !kitDrop.el.dataset.over,
+      `${areaBox.width.toFixed(0)} by ${areaBox.height.toFixed(0)} px, saying `
+      + `"${kitDrop.el.querySelector('.pos-drop-hint')?.textContent}"`);
     d.assert('a visit opens nothing, and the cover is not in the page until something is dragged over it',
       kitDrop.opens === 0 && !kitDrop.cover.isConnected,
       `${kitDrop.opens} files opened and the cover is ${kitDrop.cover.isConnected ? 'in' : 'out of'} the document`);

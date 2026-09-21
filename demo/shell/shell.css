@@ -4467,3 +4467,35 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    It exists as a class only so a harness can press the keyboard path by name,
    which is the half of this component a drag cannot reach. */
 .pos-drop { display: inline-flex; align-items: center; gap: 10px; }
+
+/* 🔴 THE RESTING AREA, WHICH IS THE PART THAT WAS MISSING AND IS THE WHOLE
+   POINT OF THE COMPONENT. Reported 2026-09-21: *"i just do not get funcionality
+   why there is no upload aread / button"*. A drop cover that only exists during
+   a drag advertises nothing, so this is the visible target a reader sees before
+   they touch anything.
+   ⚠️ THE DASHED EDGE IS THE SAME LANGUAGE AS THE COVER'S, at a lower strength.
+   The cover is `--hi` at 2 px because the page is being dragged over; this is
+   `--line2` at 1 px because it is at rest. One idea, two intensities, so the
+   thing that lights up is recognisably the thing that was waiting. */
+.pos-drop-area {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  border: 1px dashed var(--line2); border-radius: 4px;
+  background: var(--card); padding: 16px; width: 100%;
+  transition: border-color .12s ease, background .12s ease;
+}
+/* ⚠️ `[data-over]` MATCHES ON PRESENCE, which is why drop.mjs DELETES it rather
+   than setting it empty. `video-panel.mjs` set `= ''` and kept a panel in its
+   full screen state for the rest of the page's life. */
+.pos-drop-area[data-over] { border-color: var(--hi); background: var(--card2); }
+.pos-drop-hint {
+  font: 500 12px/1.5 var(--mono); color: var(--dim);
+}
+/* 🔴 NEVER EMPTY, AND THAT IS STRUCTURAL RATHER THAN POLITE. `/wish/` reserved a
+   picture's room with `min-height` and MEASURED the host at 0 px and
+   `display: none`, because `.pos-stack > div:empty { display: none }` is (0,2,1)
+   and won. A line with words in it cannot lose that fight, so this one always
+   says something, starting with `nothing has been opened`. */
+.pos-drop-note {
+  font: 400 12px/1.5 var(--mono); color: var(--dim2);
+  min-height: 1.5em;
+}
