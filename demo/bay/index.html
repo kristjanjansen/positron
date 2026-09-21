@@ -43,7 +43,7 @@
    * REFUSES THE REST. `plans/plan-patchbay.md` is the design and this is its
    * first storey. The model, the validator and the text form are all in
    * `demo/shell/bay.mjs`, which is pure and is graded by
-   * `node demo/shell/bay-test.mjs` at **30 asserts with no browser**, most of
+   * `node demo/shell/bay-test.mjs` at **36 asserts with no browser**, most of
    * them negative controls, because a validator is the one kind of code that
    * passes a naive test suite by returning `{ok: true}` to everything.
    *
@@ -109,25 +109,31 @@
       { key: 'label', label: 'port', grow: true, clip: true, hi: true },
       { key: 'way', label: 'way', width: 44 },
       { key: 'med', label: 'kind', width: 54 },
-      { key: 'list', label: 'takes', width: 150, clip: true },
+      { key: 'list', label: 'takes', width: 120, clip: true },
+      /* 🔴 THE REFUSAL HAS TO BE READABLE BEFORE THE PRESS, AND WITH THE
+         `connect` BUTTON GONE THE SECOND PRESS BOTH ASKS AND ANSWERS. So every
+         row says, while one end is picked, whether IT can be the other end:
+         `ready` or `refused`, with the validator's own sentence on the row's
+         hover. Empty while nothing is picked, because there is no question yet.
+         ⚠️ `takes` LOST 30 px TO PAY FOR THIS COLUMN rather than the row
+         gaining 62, because a row wider than a phone scrolls sideways and
+         CLAUDE.md already records that a row nobody can read is worse than a
+         column nobody needs. The full class list is still one hover away. */
+      { key: 'join', label: 'join', width: 62, hi: true },
     ],
     cap: 64,
     empty: 'press the status button to look for instruments',
     note: 'hover',
-    /* Pressing a row picks it: the first press is the source, the second is the
-       destination. ⚠️ IT DOES NOT CONNECT. Opening is a decision and gets its
-       own button, which is the same rule `table.mjs` already has about an arrow
-       moving rather than opening. */
+    /* Pressing a row picks one end. Pressing another row MAKES THE LINK. See
+       the rule above `choose()`, which is where the whole interaction lives. */
     onPick: (row) => choose(row.id),
   });
 
   const line = el('div', 'bay-line', 'press a port, then another');
   const why = el('div', 'bay-why');
-  const connect = el('button', 'pos-btn', 'connect', { type: 'button' });
-  connect.disabled = true;
   const clearPick = el('button', 'pos-btn', 'clear', { type: 'button' });
   const make = el('div', 'bay-make');
-  make.append(line, connect, clearPick);
+  make.append(line, clearPick);
 
   const linksT = createTable({
     columns: [
@@ -147,16 +153,76 @@
 
   // ── picking and connecting ──────────────────────────────────────────────
 
+  /**
+   * 🔴 TWO PRESSES MAKE A LINK, AND THE RULE IS WRITTEN OUT HERE BECAUSE IT IS
+   * THE PAGE. It used to be four presses: grant MIDI, a source row, a
+   * destination row, then a `connect` button. Reported as *"can not get the bay
+   * work. make it simple, enable devices, i press first edevice, then next and
+   * they are connected"*. The fourth press is gone.
+   *
+   * 🔴 AND THE ORDER RULE WAS HALF OF WHY IT READ AS BROKEN. The old `choose()`
+   * refused to start from an input, so a person who pressed a destination first
+   * got **nothing at all and no sentence about it**, which is the one state this
+   * page may never be in. Either end may be pressed first now, and the
+   * direction of the row decides which end it is.
+   *
+   * THE INVARIANT: at most one of `pickFrom` and `pickTo` is ever set. There is
+   * no state in which a complete pair is sitting around waiting, because the
+   * press that completes a pair also tries it.
+   *
+   * WHAT EACH PRESS DOES:
+   *  - nothing picked: this row becomes the source if it sends and the
+   *    destination if it receives.
+   *  - the SAME row again: it is put down, and the line says so. This is why no
+   *    press can ever appear to do nothing.
+   *  - another row pointing the SAME way (two sources, two destinations): it
+   *    REPLACES the pick, because two of one end can never be a link and
+   *    *"I meant this one"* is the only thing it can mean. The line names both.
+   *  - a row pointing the OTHER way: the link is attempted at once.
+   *      - allowed, so it is made, the pick clears and the log prints the line.
+   *      - refused, so NOTHING is made, the `why` line carries the validator's
+   *        sentence, and **THE FIRST PICK STAYS** so the next press can try a
+   *        different partner. Clearing it would make a refusal cost two presses
+   *        to recover from, and the refusal is not that row's fault.
+   */
   function choose(id) {
     const p = bay.port(id);
     if (!p) return;
-    if (!pickFrom && p.dir === 'out') pickFrom = id;
-    else if (pickFrom && !pickTo && p.dir === 'in') pickTo = id;
-    else if (p.dir === 'out') { pickFrom = id; pickTo = null; }
-    else pickTo = id;
+
+    if (id === pickFrom || id === pickTo) {
+      pickFrom = null; pickTo = null;
+      say(`${p.label} is no longer picked`);
+      paint();
+      return;
+    }
+
+    const held = pickFrom || pickTo;
+    if (!held) {
+      if (p.dir === 'out') { pickFrom = id; say(`${p.label} sends. Press what it should reach.`); }
+      else { pickTo = id; say(`${p.label} receives. Press what should reach it.`); }
+      paint();
+      return;
+    }
+
+    const other = bay.port(held);
+    if (p.dir === other.dir) {
+      if (p.dir === 'out') { pickFrom = id; pickTo = null; }
+      else { pickTo = id; pickFrom = null; }
+      say(`${p.label} replaces ${other.label}`);
+      paint();
+      return;
+    }
+
+    const from = p.dir === 'out' ? id : pickFrom;
+    const to = p.dir === 'in' ? id : pickTo;
+    const r = bay.link(from, to, suggest(from, to));
+    if (!r.ok) { say(r.why, true); paint(); return; }
+    say(r.warn || `${bay.port(from).label} now reaches ${bay.port(to).label}`, !!r.warn);
+    d.log(`connected ${printLink(bay.links().at(-1))}`);
+    pickFrom = null; pickTo = null;
     paint();
   }
-  clearPick.onclick = () => { pickFrom = null; pickTo = null; paint(); };
+  clearPick.onclick = () => { pickFrom = null; pickTo = null; say(''); paint(); };
 
   /**
    * 🔴 THE TRANSFORMS THE SMALLEST USEFUL PATCH ON THIS DESK NEEDS, AND BOTH
@@ -166,7 +232,8 @@
    * *play the Circuit*. And that keyboard was measured **a semitone flat**,
    * notes 47 to 71 where a 25 key controller sits at 48 to 72.
    * ⚠️ THEY ARE A SUGGESTION THE PAGE MAKES AND SHOWS, not something it does
-   * quietly: the line above the button prints the whole link before it exists.
+   * quietly: a row that is `ready` prints the whole link, transforms and all, on
+   * its hover, before the press that makes it.
    */
   function suggest(fromId, toId) {
     const a = bay.port(fromId), b = bay.port(toId);
@@ -177,46 +244,55 @@
     return t;
   }
 
-  connect.onclick = () => {
-    if (!pickFrom || !pickTo) return;
-    const r = bay.link(pickFrom, pickTo, suggest(pickFrom, pickTo));
-    if (!r.ok) { say(r.why, true); return; }
-    say(r.warn || 'connected', !!r.warn);
-    pickFrom = null; pickTo = null;
-    paint();
-  };
-
   function say(text, bad = false) {
     why.textContent = text;
     if (bad) why.dataset.bad = '1'; else delete why.dataset.bad;
   }
 
+  /**
+   * 🔴 THE REFUSAL IS STILL SHOWN BEFORE THE PRESS, AND WITH THE BUTTON GONE IT
+   * HAS TO COME EARLIER. Every row is asked, while one end is held, whether it
+   * could be the other end: the answer is one word in the `join` column and the
+   * validator's own sentence on the row's hover. So a pair that cannot be joined
+   * says why without anybody trying it, which is the rule the button used to
+   * carry, moved one press earlier.
+   */
   function paint() {
-    ports.set(bay.ports().map((p) => ({
-      id: p.id, label: p.label, way: p.dir === 'out' ? 'out' : 'in',
-      med: p.medium,
-      list: p.dir === 'in' ? (p.accepts.join(' ') || 'nothing') : p.emits.join(' '),
-      hover: `${p.id}\n${p.note || ''}`,
-    })));
-    ports.mark((row) => row.id === pickFrom || row.id === pickTo);
+    const held = pickFrom || pickTo;
+    const pick = held ? bay.port(held) : null;
+
+    ports.set(bay.ports().map((p) => {
+      const lines = [p.id];
+      if (p.note) lines.push(p.note);
+      let join = '';
+      if (!pick) lines.push('press it to start a link');
+      else if (p.id === held) lines.push('press it again to put it down');
+      else if (p.dir === pick.dir) lines.push(`press it to pick this instead of ${pick.label}`);
+      else {
+        const from = p.dir === 'out' ? p.id : held;
+        const to = p.dir === 'in' ? p.id : held;
+        const t = suggest(from, to);
+        const v = bay.validate(from, to, t);
+        join = v.ok ? 'ready' : 'refused';
+        lines.push(v.ok ? `press it to connect ${printLink({ from, to, transforms: t })}` : v.why);
+        if (v.ok && v.warn) lines.push(v.warn);
+      }
+      return {
+        id: p.id, label: p.label, way: p.dir === 'out' ? 'out' : 'in',
+        med: p.medium,
+        list: p.dir === 'in' ? (p.accepts.join(' ') || 'nothing') : p.emits.join(' '),
+        join, hover: lines.join('\n'),
+      };
+    }));
+    ports.mark((row) => row.id === held);
 
     linksT.set(bay.links().map((l) => ({
       id: l.id, text: printLink(l), sent: l.sent, drop: l.dropped, cut: 'remove',
       hover: 'press to remove this link',
     })));
 
-    const a = pickFrom && bay.port(pickFrom), b = pickTo && bay.port(pickTo);
-    line.textContent = !a ? 'press a port, then another'
-      : !b ? `${a.label} -> ?`
-      : printLink({ from: pickFrom, to: pickTo, transforms: suggest(pickFrom, pickTo) });
-    connect.disabled = !(a && b);
-    /* A refusal is shown BEFORE the press, so the button is not a thing you
-       press to find out. */
-    if (a && b) {
-      const v = bay.validate(pickFrom, pickTo, suggest(pickFrom, pickTo));
-      if (!v.ok) { say(v.why, true); connect.disabled = true; }
-      else say(v.warn || '', !!v.warn);
-    }
+    line.textContent = !pick ? 'press a port, then another'
+      : pick.dir === 'out' ? `${pick.label} -> ?` : `? -> ${pick.label}`;
 
     patch.textContent = bay.text() || '# nothing is connected';
     d.set('ports', bay.ports().length || '');
@@ -314,8 +390,8 @@
     if (await open()) {
       const n = bay.ports().length;
       pres.set(n ? 'online' : 'offline', n ? null : 'nothing is plugged in');
-      d.log(`${n} ports. Press one, press another, and this page says whether they `
-          + 'may be joined before you press connect.');
+      d.log(`${n} ports. Press one and press another to connect them, in either `
+          + 'order. While one is held, every other row says whether it can take it.');
       d.log('nothing here can send SysEx, a program change or a clock byte, because '
           + 'there is no code that turns one into bytes.');
     } else {
@@ -339,6 +415,13 @@
        while the assert below claimed both halves. */
     bay.addPort({ id: 'test:mk-425c:out', label: 'MK-425C', dir: 'out', medium: 'midi',
       shape: { protocol: '1.0' }, emits: ['note', 'cc', 'sysex'] });
+    /* ⚠️ A SECOND SOURCE, AND IT IS THE ONE THE TWO PRESS CHECKS NEED. The
+       MK-425C above emits SysEx on purpose, so pressing it and then the Circuit
+       is REFUSED, which is exactly what the refusal checks want and exactly
+       what the happy path cannot use. The Model 12 sends notes and controllers
+       and nothing else, so that pair is allowed. */
+    bay.addPort({ id: 'test:model12:out', label: 'Model 12', dir: 'out', medium: 'midi',
+      shape: { protocol: '1.0' }, emits: ['note', 'cc'] });
     const c = consentFor('Circuit');
     bay.addPort({ id: 'test:circuit:in', label: 'Circuit', dir: 'in', medium: 'midi',
       shape: { protocol: '1.0' }, accepts: c.accepts, never: c.never, note: c.why,
@@ -395,6 +478,64 @@
 
     const cyc = bay.validate('test:circuit:in', 'test:mk-425c:out', []);
     d.assert('an input cannot be used as a source', !cyc.ok, cyc.why);
+
+    /**
+     * 🔴 TWO PRESSES, NOT FOUR. These drive `choose()` exactly as a finger does,
+     * because the report was about the INTERACTION and a check that called
+     * `bay.link()` would have been green through every version of this page,
+     * including the one somebody could not get to work.
+     */
+    pickFrom = null; pickTo = null;
+    const l0 = bay.links().length;
+    choose('test:model12:out');
+    choose('test:circuit:in');
+    d.assert('pressing two rows connects them, with no third press',
+      bay.links().length === l0 + 1 && !pickFrom && !pickTo,
+      `${bay.links().length - l0} link from two presses`);
+
+    // ⚠️ THE ORDER RULE, WHICH IS THE HALF THAT USED TO DO NOTHING AT ALL: a
+    // destination pressed first used to leave the page unchanged and silent.
+    const l1 = bay.links().length;
+    choose('test:circuit:in');
+    const heldFirst = pickTo;
+    choose('test:model12:out');
+    d.assert('and either order works, so a destination may be pressed first',
+      heldFirst === 'test:circuit:in' && bay.links().length === l1 + 1,
+      `held ${heldFirst || 'nothing'} first`);
+    bay.unlink(bay.links().at(-1).id);      // the duplicate this check just made
+
+    /* A refusal is the second press ANSWERING, and the first pick has to survive
+       it or a refusal costs two presses to recover from. */
+    pickFrom = null; pickTo = null;
+    const l2 = bay.links().length;
+    choose('test:mk-425c:out');
+    choose('test:circuit:in');
+    d.assert('a refused pair is not connected, says why, and keeps the first pick',
+      bay.links().length === l2 && /sysex/i.test(why.textContent)
+      && pickFrom === 'test:mk-425c:out' && !pickTo,
+      `${why.textContent}, holding ${pickFrom || 'nothing'}`);
+
+    /* 🔴 AND THE REASON IS READABLE BEFORE THE PRESS, WHICH IS WHAT THE GONE
+       BUTTON USED TO BUY. Read off the rendered row rather than off the code
+       that fills it, because what a reader can find is the claim. */
+    const rowOf = (label) => [...ports.el.querySelectorAll('.pos-tbl-body .pos-tbl-row')]
+      .find((r) => r.firstElementChild?.textContent === label);
+    const circuitRow = rowOf('Circuit');
+    d.assert('a row that cannot take the pick reads as refused, with the reason in its hover',
+      !!circuitRow && circuitRow.lastElementChild.textContent === 'refused'
+      && /sysex/i.test(circuitRow.title),
+      circuitRow ? `join reads ${circuitRow.lastElementChild.textContent}, hover says ${circuitRow.title.split('\n').pop()}` : 'no row');
+
+    /* No press may appear to do nothing, and pressing the held row again is the
+       one that would, so it puts it down. */
+    pickFrom = null; pickTo = null;
+    choose('test:model12:out');
+    const wasHeld = pickFrom;
+    choose('test:model12:out');
+    d.assert('pressing the held row again puts it down rather than doing nothing',
+      wasHeld === 'test:model12:out' && !pickFrom && !pickTo && /no longer picked/.test(why.textContent),
+      why.textContent);
+    paint();
 
     d.assert('the readout counts links and ports, and sent and heard separately',
       bay.links().length >= 1 && bay.ports().length >= 2, `${bay.ports().length} ports`);
