@@ -52,6 +52,30 @@ once by somebody who was not mid-edit.
   are called; what has no home is a record of which PORTS a device had when it
   was last seen, which is what the question was about.
 
+#### A Fast Track Pro on the board, 2026-09-21
+
+- 🔴 **PLANNED BY THE OWNER: *"i am plannig to connect fastrack pro to pi and
+  stream sound to browser fo testing"*.** This is the single change that moves
+  the board from a renderer to an instrument, and most of the Pi research's
+  conclusions are conditional on it.
+- ✅ **THE DEVICE IS ALREADY IN THE DESK REGISTRY**, `demo/shell/instruments.mjs:111`,
+  `M-Audio Fast Track Pro`, `kind: 'soundcard'`, put there on evidence from
+  three speech models. So `/wish/` and `/bay/` will name it correctly the day it
+  appears, and the line saying it is *not on this desk* is the thing to change.
+- **The change on the board is ONE LINE**, `rig/board/jacksynth.mjs:631`:
+  `jackd -r -d dummy -r 48000 -p 1024` becomes `-d alsa -d hw:N`.
+- 🔴 **AND `-p 1024` STOPS BEING FREE.** On a dummy driver 21.33 ms a block
+  costs nothing and buys nothing. On a real converter it is the floor of every
+  press, and it is the first thing to bring down once xruns can happen at all.
+- ⚖️ **WHAT NOBODY HERE HAS CHECKED**: whether that interface enumerates
+  cleanly on this kernel, at what rates, and whether it needs a
+  `snd-usb-audio` quirk. Three commands settle it on the board and none of them
+  is guessing: `cat /proc/asound/cards`, `arecord -l && aplay -l`, and
+  `jackd -d alsa -d hw:N -r 48000 -p 256` watched for xruns.
+- 🔴 **AND PRESS TO SOUND BECOMES MEASURABLE FOR THE FIRST TIME.** The page that
+  measured it properly was `/keys/`, retired 2026-09-17. Its `lag` cell on
+  `/knobs/` plus one key press is the whole experiment.
+
 #### From the Pi research, 2026-09-21
 
 - 🔴 **THE BOARD HAS NO SOUNDCARD IN ITS AUDIO PATH AND NO STANDING FILE SAYS
