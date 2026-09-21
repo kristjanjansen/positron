@@ -114,11 +114,25 @@
      ⚠️ `--disp-ghost` IS THE WHOLE REASON THIS IS DRAWN RATHER THAN SET IN A
      FONT: it is the opacity of every UNLIT bar, which is what makes a field
      read as an LCD instead of as coloured text. One number, one set of
-     polygons. A font would need a dimmed 8 stacked behind every digit. */
+     polygons. A font would need a dimmed 8 stacked behind every digit.
+     🔴 AND THESE THREE ARE THE SAME MEASUREMENT AS `SCHEMES.backlit` IN
+     `demo/shell/segment.mjs`, SO THEY MOVE TOGETHER. Asked 2026-09-21 as
+     *"ligher noacive segments"*, and the ghost was raised to 0.22 there and
+     left at 0.13 here, so a display drawn with no `scheme` option got one
+     number and the same display drawn with `scheme: 'backlit'` got another.
+     A shared measurement in two files is a measurement that will disagree, and
+     this one already had. `/kit/` asserts the two agree, so a future edit to
+     one of them goes red rather than quiet. */
+  /* 🔴 THE AIR ABOVE AND BELOW A TAB ROW, DECLARED ONCE HERE FOR THE SAME
+     REASON `--pos-gap` IS. A tab row is the control that switches the page and
+     wants more room than the 18 px it had; the reasoning, the measurement and
+     why it sits on the BAR rather than the wrapper are all on `.pos-tabs-bar`
+     below. Changing the air round every tab row on the site is this line. */
+  --pos-tabs-air: 28px;
   --disp-h: 26px;
   --disp-ink: #8fb6ff;
   --disp-back: #0d1830;
-  --disp-ghost: 0.13;
+  --disp-ghost: 0.22;
   --ok: #8fd6a8; --warn: #e0b060; --bad: #e0908a;
   --rec: #e5484d;        /* record: the one control that starts writing */
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -2060,10 +2074,39 @@ video[hidden] { display: none; }
    put 13 px of nothing between the letters and their own mark and 0 px between
    that mark and the panel, so the underline read as a rule across the top of
    the content rather than as part of the tab. */
+/* 🔴 AND THERE IS MORE OF IT ON BOTH SIDES SINCE 2026-09-21, ASKED FOR AS *"add
+   more space below and top of tabs"* FROM A SCREENSHOT OF `/kit/`. A tab row is
+   the control that switches the page, and MEASURED on all three pages that have
+   one it had **0 px above it and 18 px below**: tight under the paragraph above
+   and immediately over the first heading below, so it read as part of the prose
+   rather than as the thing that changes what the prose is about.
+   🔴 AND THE ZERO ABOVE WAS NOT THIS RULE'S FAULT, WHICH TOOK MEASURING TWICE.
+   `.pos-body` is a `.pos-stack` and owns the gap BETWEEN siblings, and on
+   `/kit/`, `/making/` and `/stage/` alike the tab wrapper is the body's ONLY
+   child — MEASURED, `siblings: 1` on all three — so the rhythm had nothing to
+   act on. What sits above it is `.pos-head`, and the stack EXCLUDES that from
+   its own bottom margin by name, so there was no gap anywhere to inherit. Two
+   elements touching usually means they are not siblings at all.
+   ⚠️ THE AIR GOES ON THE BAR RATHER THAN ON THE WRAPPER, AND MARGIN COLLAPSING
+   IS WHAT MAKES THAT WORK. `.pos-tabs` has no padding and no border, so the
+   bar's top margin collapses up through it and out through the body and lands
+   against whatever is really above the row. MEASURED on all three pages, from
+   the bottom of `.pos-head` to the top of the bar: **0 px before, 28 px after**.
+   ⚠️ AND A `padding-top` ON THE WRAPPER WOULD HAVE BEEN WRONG RATHER THAN
+   EQUIVALENT. Padding does not collapse, so on a page that one day does put a
+   block above its tabs it would ADD to the stack's 40 and that page would sit
+   at 68 for a reason nobody wrote down. A margin collapses with it instead and
+   the larger of the two wins.
+   ⚠️ ONE NUMBER, BOTH SIDES. 28 px is more than the 18 it replaces and less than
+   the project's 40 px block gap, because a tab row and the panel under it are
+   closer kin than two blocks: the row is a label for what follows it.
+   ⚠️ IT REACHES `/making/` AND `/stage/` TOO, which is the point of deciding it
+   on the component. MEASURED on both: 28 above and 28 below, the same as
+   `/kit/`, and neither page reads its own tab spacing anywhere. */
 .pos-tabs-bar {
   display: flex; gap: 28px; overflow-x: auto;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
-  margin-bottom: 18px;
+  margin-top: var(--pos-tabs-air); margin-bottom: var(--pos-tabs-air);
 }
 .pos-tabs-bar::-webkit-scrollbar { display: none; }
 /* ⚠️ `margin-right: -.1em` IS NOT A NUDGE, IT IS THE LETTER-SPACE COMING BACK.
