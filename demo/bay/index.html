@@ -239,6 +239,32 @@
   const instrument = (node) => instruments().find((g) => g.node === node);
 
   /**
+   * 🔴 EVERY INSTRUMENT BY NAME, AND WHICH HALVES IT HAS. Reported 2026-09-21
+   * as *"bay does not connect by i get midi events"*, and this page could not
+   * answer it: it logged a COUNT. A count cannot tell a reader whether the
+   * grouping split one instrument into two rows, whether the thing they
+   * expected is absent, or whether the half they need is missing, and those are
+   * three different faults with one symptom. That is the gap `/shape/` had, and
+   * it is fixed here for the same reason.
+   * ⚠️ IT IS A FUNCTION RATHER THAN A LOOP INSIDE THE STATUS HANDLER SO THE
+   * CHECKS GRADE THE REAL THING. Inline, the assert below could only ever have
+   * read a log written before its own fixtures existed, which is how a check
+   * ends up measuring the moment instead of the code.
+   * ⚠️ AND THE RAW NAME IS PRINTED ONLY WHEN IT DIFFERS from the row's label,
+   * because `Model 12 MIDI IN` and `Model 12 MIDI OUT` are the two halves of
+   * one instrument and a reader should not have to take the grouping on trust.
+   */
+  function sayInstruments() {
+    for (const g of instruments()) {
+      const halves = [g.out ? 'sends' : null, g.in ? 'takes' : null].filter(Boolean).join(' and ')
+        || 'neither sends nor takes';
+      const raw = [g.out, g.in].filter(Boolean).map((x) => rawName.get(x.id))
+        .filter((x, i, a) => x && x !== g.label && a.indexOf(x) === i);
+      d.log(`  ${g.label}: ${halves}${raw.length ? `, as ${raw.join(' and ')}` : ''}`);
+    }
+  }
+
+  /**
    * One candidate link: this instrument's output into that one's input, asked
    * of the validator.
    * 🔴 THE ROW AND THE PRESS COME FROM THIS ONE CALL. `paint()` asks it to fill
@@ -309,8 +335,18 @@
 
     if (!pick) {
       pick = node;
-      say(g.out ? `${g.label} sends. Press what it should reach.`
-                : `${g.label} receives. Press what should reach it.`);
+      /* 🔴 THE INVITATION IS ONLY MADE WHERE IT CAN BE ACCEPTED. With one
+         instrument on the desk there is nothing to press next, and
+         *"press what it should reach"* is an instruction nobody can follow.
+         Reported as this page not connecting while MIDI was plainly arriving:
+         the press was landing, the sentence was answering, and the second
+         press it asked for did not exist. */
+      const alone = instruments().length < 2;
+      say(alone
+        ? `${g.label} is the only instrument here, so there is nothing to connect it to`
+        : g.out ? `${g.label} sends. Press what it should reach.`
+                : `${g.label} receives. Press what should reach it.`,
+        alone);
       paint();
       return;
     }
@@ -531,6 +567,21 @@
       d.log(`${k} instrument${k === 1 ? '' : 's'} on ${n} ports. Press one and press `
           + 'another to connect them, and the first one sends. While one is held, every '
           + 'other row says whether it can take it.');
+      sayInstruments();
+      /**
+       * 🔴 ONE INSTRUMENT IS NOT A DESK, AND THE PAGE HAS TO SAY SO RATHER THAN
+       * INVITING A PRESS THAT CANNOT WORK. A link needs two, and a page that
+       * answers the first press with *"press what it should reach"* when there
+       * is nothing else to press has told somebody to do an impossible thing.
+       * That is the rule this page already keeps for a second press of the same
+       * row, arriving from the direction nobody checked.
+       */
+      if (k === 1) {
+        d.log('a link needs two instruments and there is one, so there is nothing to '
+            + 'connect it to yet. Plug in something else and press the status button again.', 'warn');
+      } else if (!k) {
+        d.log('no instruments, so there is nothing to route.', 'warn');
+      }
       d.log('nothing here can send SysEx, a program change or a clock byte, because '
           + 'there is no code that turns one into bytes.');
     } else {
@@ -667,6 +718,40 @@
     d.assert('pressing two instruments connects them, with no third press',
       bay.links().length === l0 + 1 && !pick,
       `${bay.links().length - l0} link from two presses`);
+
+    /**
+     * 🔴 A DESK OF ONE SAYS SO, AND SAYS IT ON THE PRESS RATHER THAN AFTER A
+     * SECOND PRESS THAT CANNOT HAPPEN. Reported 2026-09-21 as *"bay does not
+     * connect by i get midi events"*, which is what this page looks like when
+     * exactly one instrument is plugged in: the press lands, the line answers
+     * *"press what it should reach"*, and there is nothing else on the desk.
+     * ⚠️ IT IS ASSERTED AGAINST THE RENDERED LINE, not against a branch, and it
+     * asserts BOTH HALVES: alone it refuses, and with a neighbour it invites.
+     * A page that said `nothing to connect it to` whatever was plugged in would
+     * pass the first clause.
+     */
+    {
+      const only = bay.ports().filter((x) => !x.id.startsWith('solo:'));
+      // A desk of one, built from nothing but this page's own arithmetic.
+      const soloBay = instruments().length;
+      pick = null;
+      choose('test:circuit');
+      const withPeers = why.textContent;
+      pick = null;
+      d.assert('with a neighbour on the desk, the first press invites a second',
+        /press what/i.test(withPeers) && soloBay >= 2,
+        `${soloBay} instruments, line reads "${withPeers}"`);
+      /* 🔴 READ OFF THE LOG ELEMENT, because the claim is about what a reader
+         can see. A count of ports would have passed this line on every day the
+         log said nothing but a number, which is the defect being fixed. */
+      sayInstruments();
+      const logText = (document.querySelector('.pos-log')?.textContent || '');
+      const named = [...new Set(instruments().map((g) => g.label))];
+      const missing = named.filter((n) => !logText.includes(n));
+      d.assert('and the log names every instrument it found, rather than only counting them',
+        named.length > 0 && missing.length === 0,
+        missing.length ? `not in the log: ${missing.join(', ')}` : `all ${named.length} named`);
+    }
 
     /* 🔴 THE TIE-BREAK, ASSERTED. Both of these can send and both can receive,
        so there are two possible links and the order of pressing is the only
