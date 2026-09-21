@@ -52,6 +52,37 @@ once by somebody who was not mid-edit.
   are called; what has no home is a record of which PORTS a device had when it
   was last seen, which is what the question was about.
 
+#### /wish/ cannot name the port the Model 12's buttons come out of, 2026-09-21
+
+🔴 **ASKED: *"I want to play notes with my model 12 REC buttons on channels and
+play it to a circuit synth 1"*, and the 70B answered
+`Model 12 MIDI IN -> Circuit { channel 1 }`, ALLOWED. It would not work, for
+four reasons, and only one of them is the model's.**
+
+1. 🔴 **THE PORT IS WRONG AND THE RIGHT ONE IS NOT IN THE LIST.** ✅ MEASURED:
+   the control surface is `Model 12 DAW Control IN`, **525 messages**, and
+   `Model 12 MIDI IN` **stayed silent throughout** because that port is the DIN
+   socket bridged to USB and nothing was patched into the jack.
+   `demo/wish/index.html`'s `PORTS` carries only the MIDI pair, so the model was
+   choosing from a list with the right answer missing. `instruments.mjs`
+   already knows both pairs and already says they are two different things.
+   ⚠️ **AND THE PORT LIST IS AN `enum` ON PURPOSE**, which is what stopped a
+   Moog and a Prophet being invented. An enum missing a real port is that same
+   mechanism refusing the truth.
+2. 🔴 **REC SENDS NO NOTE OFF** while SOLO and MUTE do. Every note would hang on
+   an instrument in another building, and nothing in the validator can catch it
+   because there is nothing invalid about the patch.
+3. **Notes 0 to 7 are C-1 to G-1**, so it needs a `transpose` to reach a
+   playable octave. Asked directly: *"does it not need transform to actual
+   keyboard cdef...?"* Yes, and even then it is eight chromatic semitones.
+4. **Nothing filters the rest.** SOLO, MUTE, the PAN encoders and the faders'
+   pitch bend all ride the same link, so pressing MUTE plays a note and moving
+   a fader bends. `range` exists now and would do it.
+
+⚠️ **AND THE DAW CONTROL PAIR SENDS NOTHING UNLESS DAW CONTROL MODE IS SWITCHED
+ON AT THE DESK**, which `/twelve/` records. So even the right port is silent
+until somebody presses something on the mixer.
+
 #### A keyboard split cannot be said at all, 2026-09-21
 
 🔴 **FOUND BY THE OWNER ASKING FOR ONE.** *"Split the keyboard into half. Lower
