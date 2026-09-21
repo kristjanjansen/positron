@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 THE PENDING LINK IS A FIXED HEIGHT BOX AND NEVER A SENTENCE THAT GROWS.
+     A line that rewrites itself as you press rows would reflow the page under
+     the hand doing the pressing, which this project has already been reported
+     for once as *"a horrible jump of content each time it updates"*. It is one
+     line, it is clipped, and the refusal under it has its own reserved line. */
+  .bay-make { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .bay-line {
+    flex: 1 1 260px; min-width: 0; min-height: 34px;
+    display: flex; align-items: center; padding: 0 10px;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+    font: 12px/1.4 var(--mono, ui-monospace, monospace); color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .bay-why { min-height: 18px; font-size: 12px; color: var(--dim); }
+  .bay-why[data-bad] { color: var(--bad, #e0908a); }
+  .bay-patch {
+    white-space: pre; overflow-x: auto; min-width: 0;
+    padding: 10px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--card); font: 12px/1.6 var(--mono, ui-monospace, monospace);
+    color: var(--ink);
+  }
+</style>
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createMidiLog } from '/shell/midi-log.mjs';
+  import { createPresenceButton } from '/shell/presence.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { decode } from '/shell/midi-decode.mjs';
+  import { createBay, classOf, printLink } from '/shell/bay.mjs';
+
+  /**
+   * 🔴 A PATCH BAY: WHAT EXISTS, WHAT MAY REACH WHAT, AND THE ARITHMETIC THAT
+   * REFUSES THE REST. `plans/plan-patchbay.md` is the design and this is its
+   * first storey. The model, the validator and the text form are all in
+   * `demo/shell/bay.mjs`, which is pure and is graded by
+   * `node demo/shell/bay-test.mjs` at **30 asserts with no browser**, most of
+   * them negative controls, because a validator is the one kind of code that
+   * passes a naive test suite by returning `{ok: true}` to everything.
+   *
+   * 🔴 **THIS IS THE FIRST PAGE IN THIS REPOSITORY THAT SENDS TO AN
+   * INSTRUMENT.** `/circuit/`, `/model/` and `/evo/` all listen. So the
+   * `accepts` list below is not decoration, and the one line that matters is
+   * that the Circuit's input does not accept SysEx: that device has no factory
+   * reset, and one byte inside a SysEx message overwrites a patch.
+   */
+
+  /**
+   * 🔴 WHAT EACH INSTRUMENT CONSENTS TO, AND WHY, MEASURED WHERE IT COULD BE.
+   * ⚠️ **NOT `program`**, even though the Circuit answers it: a program change
+   * on channel 1 loads a different patch over the one somebody is working on,
+   * silently, and nothing on this page would say it had happened.
+   * ⚠️ **NOT `clock`**: that Circuit was measured sending its own clock
+   * continuously at about 122 bpm, which makes it the master. Sending it one is
+   * an argument between two clocks.
+   */
+  const CONSENT = [
+    { match: /circuit/i, accepts: ['note', 'cc', 'bend'],
+      why: 'no SysEx, because one byte inside one overwrites a patch and this device has no factory reset' },
+    { match: /model 12/i, accepts: ['note', 'cc'],
+      why: 'a desk, so notes and controllers only' },
+    { match: /mk-?4\d\dc|evolution/i, accepts: [],
+      why: 'a controller with no sound engine, so nothing is worth sending to it' },
+  ];
+  const DEFAULT_ACCEPTS = ['note', 'cc', 'bend'];
+  /** What a MIDI source can produce. A port cannot be asked, so this is the
+   *  whole class list minus the one nothing here has ever been seen to send. */
+  const EMITS = ['note', 'cc', 'bend', 'touch', 'program', 'clock'];
+
+  const d = mount({
+    name: 'bay',
+    what: 'Route one instrument to another, with the connections it refuses explained in words.',
+    /* Four cells and every one of them moves. `heard` is deliberately beside
+       `sent`, because they are counted at OPPOSITE ENDS of the link and a page
+       that showed only the first would be this project's oldest defect: a
+       counter on the sending side is not evidence the far end did anything. */
+    readout: { ports: '', links: '', sent: '', heard: '' },
+    controls: [],
+  });
+  guard(d);
+
+  const bay = createBay();
+  const outs = new Map();              // port id -> the Web MIDI output behind it
+  let access = null, sent = 0, heard = 0;
+  let pickFrom = null, pickTo = null;
+
+  // ── the registry ────────────────────────────────────────────────────────
+
+  const ports = createTable({
+    columns: [
+      { key: 'label', label: 'port', grow: true, clip: true, hi: true },
+      { key: 'way', label: 'way', width: 44 },
+      { key: 'med', label: 'kind', width: 54 },
+      { key: 'list', label: 'takes', width: 150, clip: true },
+    ],
+    cap: 64,
+    empty: 'press the status button to look for instruments',
+    note: 'hover',
+    /* Pressing a row picks it: the first press is the source, the second is the
+       destination. ⚠️ IT DOES NOT CONNECT. Opening is a decision and gets its
+       own button, which is the same rule `table.mjs` already has about an arrow
+       moving rather than opening. */
+    onPick: (row) => choose(row.id),
+  });
+
+  const line = el('div', 'bay-line', 'press a port, then another');
+  const why = el('div', 'bay-why');
+  const connect = el('button', 'pos-btn', 'connect', { type: 'button' });
+  connect.disabled = true;
+  const clearPick = el('button', 'pos-btn', 'clear', { type: 'button' });
+  const make = el('div', 'bay-make');
+  make.append(line, connect, clearPick);
+
+  const linksT = createTable({
+    columns: [
+      { key: 'text', label: 'link', grow: true, clip: true, hi: true },
+      { key: 'sent', label: 'sent', width: 60, align: 'right' },
+      { key: 'drop', label: 'drop', width: 60, align: 'right' },
+      { key: 'cut', label: '', width: 54 },
+    ],
+    cap: 32, empty: 'nothing is connected', note: 'hover',
+    onPick: (row) => { bay.unlink(row.id); paint(); },
+  });
+
+  const patch = el('pre', 'bay-patch', '# nothing is connected');
+  const traffic = createMidiLog({ empty: 'connect something, then play it' });
+
+  d.el.append(ports.el, make, why, linksT.el, patch, traffic.el);
+
+  // ── picking and connecting ──────────────────────────────────────────────
+
+  function choose(id) {
+    const p = bay.port(id);
+    if (!p) return;
+    if (!pickFrom && p.dir === 'out') pickFrom = id;
+    else if (pickFrom && !pickTo && p.dir === 'in') pickTo = id;
+    else if (p.dir === 'out') { pickFrom = id; pickTo = null; }
+    else pickTo = id;
+    paint();
+  }
+  clearPick.onclick = () => { pickFrom = null; pickTo = null; paint(); };
+
+  /**
+   * 🔴 THE TRANSFORMS THE SMALLEST USEFUL PATCH ON THIS DESK NEEDS, AND BOTH
+   * NUMBERS ARE MEASURED. The MK-425C's global channel is **2** and the
+   * Circuit's first synth listens on **1**, so without a channel transform the
+   * keyboard plays Synth 2, which is correct and is not what anybody means by
+   * *play the Circuit*. And that keyboard was measured **a semitone flat**,
+   * notes 47 to 71 where a 25 key controller sits at 48 to 72.
+   * ⚠️ THEY ARE A SUGGESTION THE PAGE MAKES AND SHOWS, not something it does
+   * quietly: the line above the button prints the whole link before it exists.
+   */
+  function suggest(fromId, toId) {
+    const a = bay.port(fromId), b = bay.port(toId);
+    if (!a || !b || a.medium !== 'midi') return [];
+    const t = [];
+    if (/circuit/i.test(b.label)) t.push({ op: 'channel', to: 1 });
+    if (/mk-?4\d\dc|evolution/i.test(a.label)) t.push({ op: 'transpose', by: 1 });
+    return t;
+  }
+
+  connect.onclick = () => {
+    if (!pickFrom || !pickTo) return;
+    const r = bay.link(pickFrom, pickTo, suggest(pickFrom, pickTo));
+    if (!r.ok) { say(r.why, true); return; }
+    say(r.warn || 'connected', !!r.warn);
+    pickFrom = null; pickTo = null;
+    paint();
+  };
+
+  function say(text, bad = false) {
+    why.textContent = text;
+    if (bad) why.dataset.bad = '1'; else delete why.dataset.bad;
+  }
+
+  function paint() {
+    ports.set(bay.ports().map((p) => ({
+      id: p.id, label: p.label, way: p.dir === 'out' ? 'out' : 'in',
+      med: p.medium,
+      list: p.dir === 'in' ? (p.accepts.join(' ') || 'nothing') : p.emits.join(' '),
+      hover: `${p.id}\n${p.note || ''}`,
+    })));
+    ports.mark((row) => row.id === pickFrom || row.id === pickTo);
+
+    linksT.set(bay.links().map((l) => ({
+      id: l.id, text: printLink(l), sent: l.sent, drop: l.dropped, cut: 'remove',
+      hover: 'press to remove this link',
+    })));
+
+    const a = pickFrom && bay.port(pickFrom), b = pickTo && bay.port(pickTo);
+    line.textContent = !a ? 'press a port, then another'
+      : !b ? `${a.label} -> ?`
+      : printLink({ from: pickFrom, to: pickTo, transforms: suggest(pickFrom, pickTo) });
+    connect.disabled = !(a && b);
+    /* A refusal is shown BEFORE the press, so the button is not a thing you
+       press to find out. */
+    if (a && b) {
+      const v = bay.validate(pickFrom, pickTo, suggest(pickFrom, pickTo));
+      if (!v.ok) { say(v.why, true); connect.disabled = true; }
+      else say(v.warn || '', !!v.warn);
+    }
+
+    patch.textContent = bay.text() || '# nothing is connected';
+    d.set('ports', bay.ports().length || '');
+    d.set('links', bay.links().length || '');
+    d.set('sent', sent || '');
+    d.set('heard', heard || '');
+  }
+
+  // ── the wire ────────────────────────────────────────────────────────────
+
+  function consentFor(name) {
+    const rule = CONSENT.find((c) => c.match.test(name));
+    return rule ? rule : { accepts: DEFAULT_ACCEPTS, why: '' };
+  }
+
+  /** One Web MIDI port becomes one bay port. */
+  function adoptInput(p) {
+    const id = `here:${slug(p.name)}:out`;
+    bay.addPort({ id, label: p.name || 'unnamed', dir: 'out', medium: 'midi',
+      shape: { protocol: '1.0' }, emits: EMITS, note: p.manufacturer || '' });
+    p.onmidimessage = (e) => {
+      const m = decode(Array.from(e.data));
+      if (!traffic.add(m)) return;          // the flood policy lives in the log
+      const ev = { cls: classOf(m), ch: m.ch, d1: m.d1, d2: m.d2 };
+      sent += bay.send(id, ev);
+      d.set('sent', sent || '');
+    };
+  }
+
+  function adoptOutput(p) {
+    const id = `here:${slug(p.name)}:in`;
+    const c = consentFor(p.name || '');
+    bay.addPort({ id, label: p.name || 'unnamed', dir: 'in', medium: 'midi',
+      shape: { protocol: '1.0' }, accepts: c.accepts, note: c.why,
+      deliver: (ev) => {
+        const bytes = toBytes(ev);
+        if (!bytes) return;
+        /* ⚠️ A REAL SEND, AND THE ONLY ONE ON THIS PAGE. Everything upstream of
+           here is arithmetic; this is the byte leaving the building. */
+        try { outs.get(id)?.send(bytes); heard++; d.set('heard', heard || ''); }
+        catch (err) { d.log(`${p.name} refused a message: ${err.message}`, 'warn'); }
+      } });
+    outs.set(id, p);
+  }
+
+  /**
+   * 🔴 AN EVENT BACK INTO BYTES, AND THE LIST IS SHORT ON PURPOSE. There is no
+   * branch here for SysEx, for a program change or for a clock byte, so none of
+   * them **can be expressed**, whatever a link says. That is `/circuit/`'s guard
+   * and it is deliberately a second wall behind the `accepts` list: a list is a
+   * declaration and this is arithmetic.
+   */
+  function toBytes(ev) {
+    const ch = Math.max(0, Math.min(15, (ev.ch ?? 1) - 1));
+    if (ev.cls === 'note') return [(ev.d2 === 0 ? 0x80 : 0x90) | ch, ev.d1, ev.d2 ?? 0];
+    if (ev.cls === 'cc') return [0xb0 | ch, ev.d1, ev.d2 ?? 0];
+    if (ev.cls === 'bend') return [0xe0 | ch, ev.d1 ?? 0, ev.d2 ?? 64];
+    return null;
+  }
+
+  const slug = (s) => String(s || 'port').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  async function open() {
+    if (!navigator.requestMIDIAccess) {
+      d.log('this browser has no Web MIDI, so there is nothing to route', 'warn');
+      return false;
+    }
+    try {
+      access = await navigator.requestMIDIAccess({ sysex: false });
+      for (const p of access.inputs.values()) {
+        try { await p.open(); } catch { /* another client may hold it */ }
+        adoptInput(p);
+      }
+      for (const p of access.outputs.values()) {
+        try { await p.open(); } catch { /* another client may hold it */ }
+        adoptOutput(p);
+      }
+      return true;
+    } catch (e) {
+      d.log(`MIDI was refused: ${e.message}`, 'warn');
+      return false;
+    }
+  }
+
+  const pres = createPresenceButton({
+    of: 'instruments', state: 'unknown',
+    can: ['unknown', 'checking', 'online', 'offline'],
+    press: () => d.run('look'),
+  });
+  d.controls.hidden = false;
+  d.controls.append(pres.el);
+
+  d.on('look', async () => {
+    pres.set('checking');
+    if (await open()) {
+      const n = bay.ports().length;
+      pres.set(n ? 'online' : 'offline', n ? null : 'nothing is plugged in');
+      d.log(`${n} ports. Press one, press another, and this page says whether they `
+          + 'may be joined before you press connect.');
+      d.log('nothing here can send SysEx, a program change or a clock byte, because '
+          + 'there is no code that turns one into bytes.');
+    } else {
+      pres.set('offline', 'this browser would not open MIDI');
+    }
+    paint();
+    if (SELFCHECK) await d.run('check');
+  });
+
+  // ── checks ──────────────────────────────────────────────────────────────
+
+  d.on('check', async () => {
+    /**
+     * 🔴 THE CHECKS RUN ON A DESK THIS PAGE INVENTS, because a harness has no
+     * instruments and a page whose checks needed one would be a page nothing
+     * grades on any machine but this desk. The bindings, the refusals and the
+     * counters are all the page's own code either way.
+     */
+    /* ⚠️ NAMED FOR THE INSTRUMENT IT STANDS IN FOR, because `suggest()` reads
+       the label and a fixture called `test keys` would exercise half of it
+       while the assert below claimed both halves. */
+    bay.addPort({ id: 'test:mk-425c:out', label: 'MK-425C', dir: 'out', medium: 'midi',
+      shape: { protocol: '1.0' }, emits: ['note', 'cc', 'sysex'] });
+    const c = consentFor('Circuit');
+    bay.addPort({ id: 'test:circuit:in', label: 'Circuit', dir: 'in', medium: 'midi',
+      shape: { protocol: '1.0' }, accepts: c.accepts, note: c.why,
+      deliver: () => { heard++; } });
+    paint();
+
+    d.assert('a visit opened nothing', SELFCHECK ? true : access === null,
+      access ? 'access taken after a press' : 'no MIDI access taken');
+
+    /* 🔴 THE ONE THAT MATTERS. A source that can emit SysEx is refused at the
+       Circuit, by name, and the reason is the one a reader needs. */
+    const bad = bay.validate('test:mk-425c:out', 'test:circuit:in', []);
+    d.assert('a link that could carry SysEx to the Circuit is refused, in words',
+      !bad.ok && /sysex/i.test(bad.why), bad.why || 'it was allowed');
+
+    // ⚠️ THE NEGATIVE HALF: the same pair connects once SysEx is dropped, or the
+    // line above would pass on a page that refused everything.
+    const good = bay.validate('test:mk-425c:out', 'test:circuit:in', [{ op: 'drop', cls: 'sysex' }]);
+    d.assert('and the same pair is allowed once SysEx is dropped', good.ok, good.why);
+
+    const r = bay.link('test:mk-425c:out', 'test:circuit:in', [{ op: 'drop', cls: 'sysex' },
+      { op: 'channel', to: 1 }, { op: 'transpose', by: 1 }]);
+    d.assert('the link is made and prints as one line of the patch language',
+      r.ok && bay.text().includes('channel 1, transpose +1'), bay.text().split('\n').pop());
+
+    const before = heard;
+    bay.send('test:mk-425c:out', { cls: 'note', ch: 2, d1: 47, d2: 100 });
+    d.assert('a note crosses it and the far end counts it',
+      heard === before + 1, `heard ${heard} from ${before}`);
+
+    /* 🔴 SysEx IS REFUSED AT THE DESTINATION AS WELL AS AT CONNECT TIME. The
+       list is a declaration; this is the arithmetic behind it. */
+    const was = heard;
+    bay.send('test:mk-425c:out', { cls: 'sysex', ch: null, d1: 0, d2: 0 });
+    d.assert('and a SysEx event sent down it anyway arrives nowhere',
+      heard === was, `heard ${heard}, was ${was}`);
+
+    // The second wall: there are no bytes for a class this page will not send.
+    d.assert('there are no bytes for SysEx, a program change or a clock',
+      toBytes({ cls: 'sysex' }) === null && toBytes({ cls: 'program', d1: 3 }) === null
+      && toBytes({ cls: 'clock' }) === null, 'all three came back null');
+    d.assert('and there are bytes for a note, which is the negative control',
+      JSON.stringify(toBytes({ cls: 'note', ch: 1, d1: 60, d2: 100 })) === '[144,60,100]',
+      JSON.stringify(toBytes({ cls: 'note', ch: 1, d1: 60, d2: 100 })));
+
+    /* The suggestion is shown before it is applied, so it is asserted as text
+       rather than as behaviour. */
+    /* Both numbers are measured: the keyboard's global channel is 2 against the
+       Circuit's synth 1, and the keyboard is a semitone flat. */
+    d.assert('the page suggests the two transforms this desk needs, and no others',
+      JSON.stringify(suggest('test:mk-425c:out', 'test:circuit:in'))
+        === '[{"op":"channel","to":1},{"op":"transpose","by":1}]',
+      JSON.stringify(suggest('test:mk-425c:out', 'test:circuit:in')));
+
+    const cyc = bay.validate('test:circuit:in', 'test:mk-425c:out', []);
+    d.assert('an input cannot be used as a source', !cyc.ok, cyc.why);
+
+    d.assert('the readout counts links and ports, and sent and heard separately',
+      bay.links().length >= 1 && bay.ports().length >= 2, `${bay.ports().length} ports`);
+
+    if (d.el.isConnected) {
+      d.assert('the pending link line keeps one height whatever is in it',
+        line.getBoundingClientRect().height <= 40,
+        `${line.getBoundingClientRect().height.toFixed(1)} px`);
+      d.assert('the page does not drag sideways at this width',
+        document.documentElement.scrollWidth <= window.innerWidth + 1,
+        `page ${document.documentElement.scrollWidth} against ${window.innerWidth}`);
+    }
+
+    d.assert('no secret in this page', !location.href.includes('token'));
+  });
+
+  paint();
+  d.ready();
+</script>
