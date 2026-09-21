@@ -130,6 +130,46 @@ has run.
 Programmer's Reference rather than typed, and graded **16/16 against this
 desk's own measurements** rather than against the document they came from.
 
+**AND A THIRD STAGE, RUN BY TWO AGENTS IN PARALLEL ON INSTRUCTION.**
+
+**`/shape/` EDITS A CIRCUIT'S VOICE WHILE IT IS SOUNDING, 34/34**, ten of its
+asserts running for every visitor rather than only under the harness. Three
+walls and only the first is a list: `toBytes` refuses anything that is not a
+control change on a **documented** `(channel group, controller)` pair,
+`ccBytes` can only ever produce `0xB0`, and the browser is asked for
+`sysex: false`. One exit point, so *this page has only ever sent control
+changes* is a counter over what went rather than a claim about the file.
+🔴 **NOBODY HAS HEARD IT**, and that is asserted rather than admitted:
+`portSends === 0` means a suite run can never become a hand on the instrument.
+⚠️ **AND ITS OPENING POSITIONS ARE AN INVENTION.** A control change is write
+only, so the page cannot ask the device what its patch holds. `put back` has
+that name because it restores where this page found things and not the patch as
+saved.
+
+**THE SESSION FILE IS FOUR FIFTHS EMPTY AND THIS SESSION READ THAT WRONG
+FIRST.** `plans/plan-circuit-samples.md` said a session is not seven bit and so
+not SysEx payload, from **44,071 of 53,248 bytes above 0x7F**. Those bytes are
+**0xFF padding**. Measured properly: entropy **0.91 bits a byte**, real payload
+**9,180 bytes**, **two** of them above 0x7F.
+🔴 **THE MISTAKE IS THIS PROJECT'S OWN NAMED ONE ARRIVING FROM A NEW
+DIRECTION**: a statistic measured over the whole artefact rather than over the
+part in question. **Counting high bytes in a file that is four fifths erased
+flash measures the erasure.**
+✅ The container is mapped into **49 blocks**, and `ncstool` already reads AND
+WRITES the equivalent file for Circuit **Tracks** at 97.3 per cent. Different
+device, different format, same shape of answer.
+
+**THE EDITOR SURVEY SAYS THE KIT IS MOSTLY DONE.** Seven of fourteen elements
+exist, four are genuinely missing, and the number that decides the ranking came
+off our own table rather than off the survey: **82 of the Circuit's 98
+parameters are a plain knob `demo/shell/` already has.**
+
+🔴 **AND TWO STALE LINES IN STANDING FILES WERE CAUGHT BY AGENTS READING THEM,
+NOT BY ANYBODY LOOKING.** `tabs.mjs` was described as used by no page while two
+pages use it, and the demo count went stale **twice in one day**: `47 of 49` in
+the morning, `51 of 53` by the afternoon, both true when written. On a day when
+five demos are added, that line goes stale in hours.
+
 ---
 
 # Session 38: four instruments stopped being documentation (2026-09-20 to 21)

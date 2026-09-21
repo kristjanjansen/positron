@@ -1,5 +1,10 @@
 # Handoff, 2026-09-21, session 39
 
+**Eleven commits, a clean tree, five new demos, four new kit modules, three
+plans and four pieces of research. Nothing is deployed.** Five of the six new
+standing rules at the top of `CLAUDE.md` came out of a defect this session
+shipped and then caught.
+
 🔴 **READ THIS FIRST, AND IT IS THE SAME LINE AS LAST SESSION: `origin/main`
 STILL NEEDS ONE COMMAND FROM A PERSON.** It points at **`4add323`**, a commit
 whose message is about a Circuit pack and whose content is **57 plan renames, 0
@@ -183,6 +188,24 @@ it, and the demo count, twice in one day. Both corrected.
   after it.
 - `research/fasttrack-capture-2026-09-21.md` and
   `research/cf-models-speech-to-patch-2026-09-21.md`, both measured.
+
+## The rules this session added to `CLAUDE.md`
+
+Each one cost something before it was written down.
+
+1. **A statistic over a whole artefact measures its padding.** 44,071 high
+   bytes in a session file turned out to be erasure, and the wrong conclusion
+   was published before it was caught.
+2. **A JSON schema constrains shape and cannot constrain meaning.** A model
+   returned a transform whose argument was under the wrong key, valid against
+   its schema, and the code would have computed `NaN` silently.
+3. **A tighter schema was measurably worse**, 1.6 s to 10.2 s, and degenerate.
+4. **A model proposes and a person presses**, because the failure is a well
+   formed patch aimed at the wrong instrument and no validator can see it.
+5. **`unsupported` and `forbidden` are two lists.** Merging them refused every
+   real link on this desk.
+6. **A standing file goes stale in hours and an agent reading it inherits the
+   error as a finding.** Both of today's stale lines were caught that way.
 
 ## Open, in priority order
 
