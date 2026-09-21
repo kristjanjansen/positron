@@ -740,7 +740,7 @@
    * because three pages grew one on the same day; the policy that a clock byte
    * is counted and never listed lives in there with it.
    */
-  const traffic = createMidiLog({ empty: 'press the status button, then play something' });
+  const traffic = createMidiLog({ empty: '', reserve: 6 });
   d.el.append(traffic.el);
 
   // ── what arrives ────────────────────────────────────────────────────────
@@ -939,6 +939,25 @@
   // ── checks ──────────────────────────────────────────────────────────────
 
   d.on('check', async () => {
+    /**
+     * 🔴 MEASURED BEFORE ANY MESSAGE LANDS, WHICH IS THE ONLY MOMENT IT CAN BE.
+     * Asked 2026-09-21: *"rm just leave room for midi table"*. The sentence
+     * that used to fill this box was holding it open, so taking it away without
+     * `reserve` would collapse the panel and then push it back down the instant
+     * somebody pressed the button. This reads the EMPTY box, and the assert
+     * below compares it against a row measured after eleven have arrived.
+     */
+    const emptyBox = traffic.el.getBoundingClientRect().height;
+    /**
+     * ⚠️ THE CAPTION ELEMENT, NOT `textContent`, AND THE FIRST BUILD OF THIS
+     * ASSERT READ THE WRONG ONE. An empty table HIDES its heading rather than
+     * removing it, so `textContent` on the box came back `"atchwhatbytesreading"`
+     * and the check went red on a page where the height was right to a tenth of
+     * a pixel. This is the third time in this project that a hidden element has
+     * been read as an absent one.
+     */
+    const emptySays = traffic.el.querySelector('.pos-tbl-empty');
+
     for (let i = 0; i < 8; i++) take([0xb0, MACRO_CC0 + i, 20 + i * 12]);
     take([0xbf, FILTER_CC, 100]);          // channel 16
     take([0x99, 60, 0x60]);                // drums, channel 10
@@ -1225,6 +1244,25 @@
 
     d.assert('the clock bytes took no row at all',
       !traffic.el.textContent.includes('F8'), `${traffic.count()} rows`);
+
+    /**
+     * 🔴 THE ROOM IS REAL AND IT IS MEASURED AGAINST A ROW RATHER THAN AGAINST A
+     * NUMBER TYPED HERE. `--tbl-row-h` in `shell.css` is built out of the same
+     * padding and line height `.pos-tbl-row` is, and two constants that are
+     * meant to agree will disagree unless something compares them. A row exists
+     * now, so it is the second source.
+     * ⚠️ AND THE EMPTY BOX SAID NOTHING, which is the half that was asked for.
+     * A reserved box with a caption in it is the sentence back again.
+     */
+    {
+      const row = traffic.el.querySelector('.pos-tbl-row:not(.pos-tbl-head)');
+      const rowH = row ? row.getBoundingClientRect().height : 0;
+      d.assert('the empty log held room for six rows and said nothing in it',
+        emptySays === null && rowH > 0 && emptyBox >= rowH * 6 - 2 && emptyBox <= rowH * 6 + 4,
+        `${emptyBox.toFixed(1)} px of room against ${rowH.toFixed(1)} px a row, `
+        + `six of which is ${(rowH * 6).toFixed(1)}, and the caption element is `
+        + `${emptySays === null ? 'not there' : JSON.stringify(emptySays.textContent)}`);
+    }
 
     d.assert('no secret in this page', !location.href.includes('token'));
   });

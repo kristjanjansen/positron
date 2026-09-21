@@ -35,18 +35,16 @@
      straight through its whole area. Third part, same trap, measured the same
      day on `/wish/`. */
   .pk-wave { background: var(--card); padding: 10px 12px; }
-  .pk-player { background: var(--card); padding: 10px 12px;
-               display: flex; flex-direction: column; gap: 8px; }
-  .pk-prow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  /* 🔴 A FIXED WIDTH ON THE TWO GLYPH BUTTONS, so the row does not resize when a
-     face changes. Nothing that can redraw may change how much room it takes. */
-  .pk-pbtn { min-width: 34px; height: 30px; }
-  .pk-loop { min-width: 52px; }
-  .pk-loop[aria-pressed="true"] { border-color: var(--hi); color: var(--hi); }
-  /* ⚠️ THE OPEN SAMPLE'S LINE IS A FIXED BOX. It changes on a press rather than
-     on a clock, so prose is allowed, but a wrapping line would move the whole
-     tab under it and `min-height` is one line's worth either way. */
-  .pk-player-line { min-height: 1.5em; }
+  /* 🔴 THREE HAND-ROLLED BUTTONS AND A LINE OF PROSE STOOD HERE UNTIL
+     2026-09-21, ASKED FOR AS *"use standard wave visualizer (what we had in
+     radio wtc and standard transport)"*. The wave was already the standard one;
+     the transport was `►`, `■` and a `loop` toggle typed into this page while
+     `createTransportBar` is what thirty other pages use, which is exactly the
+     hand-rolled control `positron-ui` exists to stop.
+     ⚠️ THE HOST KEEPS ITS GROUND AND ITS PADDING, because it is still one part
+     of a glued three and a child with no background lets the seam colour
+     through its whole area. */
+  .pk-player { background: var(--card); padding: 10px 12px; }
 </style>
 <script type="module">
   import { mount, el, createReport } from '/shell/shell.mjs';
@@ -54,9 +52,10 @@
   import { createTabs } from '/shell/tabs.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createDrop } from '/shell/drop.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
   import { createStack } from '/shell/stack.mjs';
   import { createGlue } from '/shell/glue.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createWaveView } from '/shell/wave-view.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
@@ -194,49 +193,21 @@
   window.__demo.drop = drop;
 
   /**
-   * 🔴 SIX PATCHES THE PAGE CAN OPEN WITH NO FILE AT ALL, ASKED FOR AS *"can we
-   * get some sample patches in to choose from?"* and then *"at least one"*.
-   * The pack in this repository is not published and never will be, so until
-   * today a visitor met an upload box and an empty page, which got worse the
-   * moment the tabs learned to stay away until something lands.
-   * 🔴 THEY ARE THE OWNER'S OWN PATCHES AND PUBLISHING THEM WAS ASKED FOR IN
-   * WORDS RATHER THAN ASSUMED. A patch is not a pack: `New Pack.circuitpack`
-   * holds 32 of somebody's SESSIONS and stays unpublished, and these are six
-   * 350 byte synth patches with no session data in them.
-   * ✅ EVERY ONE CARRIES `00` AT OFFSET 6, WHICH IS `Replace Current Patch` AND
-   * LANDS IN RAM. The extractor refused to write a file that was not 350 bytes,
-   * that had any other command byte, or that `readPatch` called `writesFlash`.
-   * ⚠️ AND NOTHING IS FETCHED UNTIL ONE IS PRESSED. `/reel/` asked a
-   * broadcaster for a newsreel on every visit for a first frame nobody had
-   * asked to see, and this page asserts `fetched === 0` for a visit.
-   * ⚠️ IT IS NOT IN `.pos-controls`, because this page has no control row and
-   * asserts that it has none. Both harnesses press that row by position, so the
-   * checks here drive these buttons by name instead.
+   * 🔴 SIX PATCH BUTTONS STOOD HERE AND CAME OFF 2026-09-21, ASKED FOR AS
+   * *"rm aciiiid ...twinds from pack"*, which names the first and the last of
+   * them. They were `Aciiid Flamed Aggie Frosted Glass Smooth Pad Twins`, the
+   * owner's own patches, published earlier the same day so that a visitor met
+   * something other than an upload box and an empty page.
+   * ⚠️ **THE SIX FILES ARE STILL PUBLISHED AND NOTHING POINTS AT THEM NOW.**
+   * `/resources/patches/*.syx`, allowlisted in `workers/view/build.mjs`.
+   * Taking them down was not asked for and they are somebody's work, so they
+   * stay until somebody says otherwise rather than being swept as a tidy-up.
+   * ⚠️ AND THREE ASSERTS WENT WITH THE ROW, which is the honest arithmetic:
+   * *a published patch opens by name and lands in RAM*, *all six open*, and
+   * *the six sit outside the control row*. The last of those was a second
+   * reading of something this page already asserts on its own at *there is one
+   * way in and no control row at all*, so that one is not a loss.
    */
-  const READY = [
-    ['aciiid', 'Aciiid'], ['flamed', 'Flamed'], ['aggie', 'Aggie'],
-    ['frosted-glass', 'Frosted Glass'], ['smooth-pad', 'Smooth Pad'], ['twins', 'Twins'],
-  ];
-  const ready = createButtonGroup({
-    // ⚠️ NO LABEL, ASKED FOR AS *"rm or open one of these from pack"*. The row
-    // sits directly under a block titled UPLOAD FILE whose own hint names every
-    // extension it takes, so a second sentence introducing six buttons is the
-    // caption the button faces already are.
-    buttons: READY.map(([id, label]) => ({ id, label })),
-    onPress: (id) => openReady(id),
-  });
-  stack.add(ready.el);
-
-  async function openReady(id) {
-    const name = `${READY.find(([k]) => k === id)[1]}.syx`;
-    try {
-      const r = await fetch(`/resources/patches/${id}.syx`);
-      if (!r.ok) throw new Error(`the server answered ${r.status}`);
-      await openSyx(name, new Uint8Array(await r.arrayBuffer()));
-    } catch (e) {
-      drop.say(`${name} did not open (${e.message})`, 'bad');
-    }
-  }
 
   // ── the three lists ──────────────────────────────────────────────────────
   //
@@ -443,6 +414,20 @@
     columns: [
       { key: 'name', label: 'name', grow: true, clip: true },
       { key: 'len', label: 'length', width: 76, align: 'right' },
+      /**
+       * 🔴 `frames` AND `rate` ARE HERE BECAUSE A SENTENCE UNDER THE PLAYER WAS
+       * CARRYING THEM. Asked 2026-09-21, quoting it: *"`slot 55, 0.25 s, 12,143
+       * frames at 48000 Hz, peak 0.86` - this goes to the table, rm from here"*.
+       * Every one of those five facts is a CELL, and four of them already had a
+       * column; the line was gluing them into prose, which is the middot rule
+       * wearing different punctuation.
+       * ⚠️ AND THEY WERE IN THE `hover` ALREADY, which is not the same thing: a
+       * hover is one row at a time and answers *what is this one*, a column
+       * answers *which of these is different*. The rate is the fact a bulk
+       * transfer makes worth scanning, because a pack can mix them.
+       */
+      { key: 'frames', label: 'frames', width: 84, align: 'right' },
+      { key: 'rate', label: 'rate', width: 76, align: 'right' },
       { key: 'peak', label: 'peak', width: 64, align: 'right' },
       { key: 'sound', label: 'sound', width: 68, align: 'right' },
     ],
@@ -482,25 +467,72 @@
    * chop pingpong`, which would be worth having on a drum sample. That is a
    * component change rather than a page change and nobody has asked for it.
    */
-  const playerLine = el('div', 'pk-line pk-player-line', 'press a sample to open it here');
-  const playBtn = el('button', 'pk-pbtn', '\u25BA');
-  playBtn.type = 'button';
-  playBtn.title = 'play the open sample';
-  const stopBtn = el('button', 'pk-pbtn', '\u25A0');
-  stopBtn.type = 'button';
-  stopBtn.title = 'stop it';
-  // ⚠️ `►` AND `■`, NEVER `▶` AND `⏹`. `positron-ui`: the ones that look right
-  // in an editor have an emoji presentation and render full colour at the wrong
-  // size and baseline, and U+FE0E is honoured inconsistently. These two have no
-  // emoji form at all.
-  const loopBtn = el('button', 'pk-pbtn pk-loop', 'loop');
-  loopBtn.type = 'button';
-  loopBtn.setAttribute('aria-pressed', 'false');
-  loopBtn.title = 'keep it running until you stop it';
-  const playRow = el('div', 'pk-prow');
-  playRow.append(playBtn, stopBtn, loopBtn);
+  /**
+   * 🔴 THE TRANSPORT IS `createTransportBar` AND NOT THREE BUTTONS TYPED HERE.
+   * Asked 2026-09-21 with a screenshot: *"use standard wave visualizer (what we
+   * had in radio wtc and standard transport)"*. The wave was already the
+   * standard component; what was hand-rolled was `►`, `■` and a `loop` toggle,
+   * on a page that sits one tab away from the thirty pages using the real one.
+   *
+   * 🔴 THE DECK IS A FOLLOWER AND THE PAGE OWNS THE SOUND, which is `/crate/`'s
+   * arrangement and for the same reason: an `AudioBufferSourceNode` cannot be
+   * seeked, paused or resumed, so anything that claimed to be driving one from
+   * a deck would be a control writing to a clock nobody is listening to. The
+   * page starts a voice, the voice's own position is pushed into the deck each
+   * frame, and the bar draws what it is given.
+   * ⚠️ ONE CLOCK, NOT TWO. `AudioContext.currentTime` is the only clock that
+   * agrees with what is being heard, and it already drove the waveform. The
+   * deck is fed from that same function rather than running free, so the bar's
+   * playhead and the wave's cannot be two readings of one sound that disagree.
+   *
+   * 🔴 `publish: false`, AND THAT IS NOT DODGING THE HARNESS. `demo/verify.mjs`
+   * presses `__demo.transport`'s toggle and asserts the position advanced. On
+   * this page nothing can advance until a file has been opened and a row
+   * pressed, so publishing would take a drill red on a page where nothing is
+   * wrong. The bar is graded by this page's own checks, which open a pack first.
+   *
+   * 🔴 LOOP TAKES THE `loopSlot`, BECAUSE THE BAR'S OWN LOOP IS A DIFFERENT
+   * THING. That one marks an A and a B on a deck and plays the passage between
+   * them. What this page means by loop is `AudioBufferSourceNode.loop`, the
+   * whole sample again, which is one boolean on a running voice. Putting it in
+   * the slot keeps it exactly where the old button was, on the standard bar,
+   * without two controls called LOOP meaning two things.
+   */
   const player = el('div', 'pk-player');
-  player.append(playRow, playerLine);
+  // ONE DECK FOR THE PAGE'S LIFE: the bar binds its deck when it is built, so a
+  // deck made later leaves the bar pointing at something nobody is playing.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, 1] });
+  const bar = createTransportBar(player, deck, {
+    publish: false,
+    loop: false,
+    loopSlot: [{
+      id: 'loop', label: 'LOOP', word: true, aria: 'loop the open sample',
+      title: 'keep it running until you stop it',
+      onPress: (btn) => {
+        looping = !looping;
+        btn.setAttribute('aria-pressed', String(looping));
+        // The running voice, not only the next one: a toggle that took effect
+        // on the NEXT press is a control that does nothing for as long as you
+        // are listening, which is this project's named hazard.
+        if (voice) voice.loop = looping;
+      },
+    }],
+    command: {
+      play: () => { if (picked2 >= 0) playSample(picked2); },
+      pause: () => stopSample(),
+      // A buffer source has no seek. Starting a new one at an offset is the
+      // only honest answer, and it is what a person pressing the slider means.
+      seek: (pos) => { if (picked2 >= 0) playSample(picked2, Math.max(0, pos) / 1000); },
+    },
+  });
+  const loopBtn = bar.slot('loop');
+  loopBtn.setAttribute('aria-pressed', 'false');
+  /* ⚠️ REACHED THROUGH `bar.api.el`, NOT THROUGH `document`. A page that finds
+     its own control with a document-wide selector finds whichever one is first
+     in the DOM, which is a fact about source order rather than about this bar.
+     `transport-bar.mjs` records a harness pressing one bar while grading
+     another for exactly that reason. */
+  const playBtn = bar.api.el.querySelector('.tbar-toggle');
 
   /**
    * 🔴 THE WAVEFORM SITS DIRECTLY ON TOP OF THE TRANSPORT, ASKED FOR
@@ -1219,13 +1251,15 @@
     sampleTable.set(wavs.map((w, i) => {
       const r = w.row;
       if (!r.ok) {
-        return { i, name: w.name, len: '', peak: '', sound: '',
+        return { i, name: w.name, len: '', frames: '', rate: '', peak: '', sound: '',
                  hover: `this one did not read: ${r.why}` };
       }
       return {
         i,
         name: w.name,
         len: `${r.seconds.toFixed(2)} s`,
+        frames: r.frames.toLocaleString(),
+        rate: `${(r.rate / 1000).toFixed(r.rate % 1000 ? 1 : 0)} kHz`,
         peak: r.peak.toFixed(2),
         sound: `${r.sound.toFixed(0)}%`,
         hover: `${r.rate} Hz, ${r.bits} bit, ${r.channels === 1 ? 'mono' : `${r.channels} channels`}`
@@ -1325,11 +1359,19 @@
     picked2 = i;
     sampleTable.mark((r) => r.i === i);
     const r = w.row;
-    playerLine.textContent = r.ok
-      ? `${w.name}, ${r.seconds.toFixed(2)} s, ${r.frames.toLocaleString()} frames at `
-        + `${r.rate} Hz, peak ${r.peak.toFixed(2)}`
-      : `${w.name} did not read: ${r.why}`;
+    /**
+     * 🔴 THE SENTENCE THAT USED TO BE WRITTEN HERE IS GONE AND ITS FACTS ARE
+     * COLUMNS. Asked 2026-09-21, quoting it: *"`slot 55, 0.25 s, 12,143 frames
+     * at 48000 Hz, peak 0.86` - this goes to the table, rm from here"*. The
+     * marked row above carries all five, and the one that could not be a column
+     * is the refusal, which is the row's own hover and its blank cells.
+     */
     playBtn.disabled = !r.ok;
+    /* The bar's clock and slider need a length before they mean anything, and a
+       slot that did not read has none. */
+    deck.pause();
+    deck.setRange([0, r.ok && r.seconds > 0 ? Math.round(r.seconds * 1000) : 1]);
+    deck.seek(0);
 
     // ⚠️ THE PICTURE IS DRAWN FROM THE SAME FLOATS THE SOUND IS MADE OF, out of
     // `toMono`, so what is on screen and what comes out of the speaker cannot
@@ -1352,7 +1394,13 @@
    * gesture in a real browser and does not reject, so awaiting one is a hang
    * rather than an error. It is fired and left.
    */
-  function playSample(i) {
+  /**
+   * @param {number} i      which slot
+   * @param {number} [from] seconds into the sample to start at, which is what a
+   *   press on the transport's slider means. A buffer source has no seek, so
+   *   the only honest answer to one is a new voice started at an offset.
+   */
+  function playSample(i, from = 0) {
     const w = samples[i];
     if (!w) return;
     const mono = toMono(w.wave);
@@ -1377,8 +1425,15 @@
       // ALREADY RUNNING. A toggle that only took effect on the NEXT press is a
       // control that looks live and does nothing for as long as you are
       // listening, which is this project's named hazard.
-      src.onended = () => { if (voice === src) voice = null; };
-      src.start();
+      src.onended = () => {
+        if (voice !== src) return;
+        voice = null;
+        /* ⚠️ THE BAR HAS TO BE TOLD, or its toggle stays saying PAUSE over a
+           page making no sound. A one-shot ending is a state change nothing
+           else on this page would notice. */
+        deck.pause();
+      };
+      src.start(0, Math.max(0, Math.min(from, buf.duration)));
       voice = src;
       played++;
       /**
@@ -1388,12 +1443,23 @@
        * a `requestAnimationFrame` loop that never stops is a phone's battery
        * spent drawing a still picture.
        */
-      const began = ac.currentTime;
+      const began = ac.currentTime - from;
+      /**
+       * 🔴 ONE CLOCK FEEDS BOTH SURFACES. This used to move the waveform's head
+       * alone; the transport bar's playhead now comes off the same function, by
+       * pushing the position into the deck each frame the way `mediaMaster`
+       * does for a media element. Two clocks started at the same instant would
+       * be two readings of one sound, which is the thing this page already
+       * refuses to do with its picture and its audio.
+       */
       wave.follow(() => {
         if (!voice) return null;
         const t = ac.currentTime - began;
-        return looping && buf.duration > 0 ? t % buf.duration : t;
+        const at = looping && buf.duration > 0 ? t % buf.duration : t;
+        deck.seek(Math.round(at * 1000));
+        return at;
       });
+      deck.play();
       lastPlayed = { name: w.name, frames: mono.frames, rate: mono.rate, seconds: buf.duration };
       d.log(`${w.name}, ${buf.duration.toFixed(2)} s, ${mono.frames.toLocaleString()} frames at `
           + `${mono.rate} Hz${looping ? ', looping' : ''}`);
@@ -1410,16 +1476,13 @@
     // STOPPED. A line left in the middle of a picture with nothing playing
     // reads as a sound that is paused, and nothing here can resume.
     wave.rest(0);
+    deck.pause();
+    deck.seek(0);
   }
 
-  playBtn.addEventListener('click', () => { if (picked2 >= 0) playSample(picked2); });
-  stopBtn.addEventListener('click', () => stopSample());
-  loopBtn.addEventListener('click', () => {
-    looping = !looping;
-    loopBtn.setAttribute('aria-pressed', String(looping));
-    // The running voice, not only the next one. See the note above.
-    if (voice) voice.loop = looping;
-  });
+  /* ⚠️ NO LISTENERS HERE ANY MORE. The bar's `command` object is what calls
+     `playSample` and `stopSample`, and its `loopSlot` owns the loop toggle, so
+     a press and a programmatic call go down one path instead of two. */
 
   // ── what a visit is allowed to have done ─────────────────────────────────
   d.assert('a visit opens nothing, asks for nothing and makes no sound',
@@ -1660,39 +1723,6 @@
        * with no factory reset. The extractor refused to write anything else and
        * this is the second reading of the same fact, off the deployed bytes.
        */
-      {
-        const before = fetched;
-        await openReady('frosted-glass');
-        d.assert('a published patch opens by name and lands in RAM rather than in flash',
-          patches.length === 1 && patches[0].name === 'Frosted Glass'
-          && patches[0].writesFlash === false && patches[0].bytes.length === PATCH_BYTES
-          && patches[0].bytes[6] === 0x00
-          && fetched === before + 1,
-          `${patches[0]?.name} is ${patches[0]?.bytes.length} bytes with command `
-          + `${patches[0]?.bytes[6]}, after ${fetched - before} request(s)`);
-
-        // ⚠️ AND ALL SIX, because one working says nothing about the other five
-        // and the five are what makes it a choice. They are fetched one at a
-        // time rather than at once: a visitor presses one.
-        const seen = [];
-        for (const [id, label] of READY) {
-          await openReady(id);
-          seen.push({ id, label, got: patches[0]?.name, flash: patches[0]?.writesFlash });
-        }
-        d.assert('all six open, every one lands in RAM, and no two of them are the same patch',
-          seen.length === 6 && seen.every((x) => x.got === x.label && x.flash === false)
-          && new Set(seen.map((x) => x.got)).size === 6,
-          seen.map((x) => `${x.label}${x.got === x.label ? '' : ` -> ${x.got}`}`).join(', '));
-
-        // 🔴 AND THE BUTTONS ARE NOT IN THE CONTROL ROW, which is what keeps the
-        // page's own `no control row at all` assert true while it has six more
-        // ways in than it had this morning.
-        d.assert('the six sit outside the control row, so the page still has no control row to sweep',
-          ready.buttons.length === 6
-          && !ready.el.closest('.pos-controls')
-          && document.querySelectorAll('.pos-controls button').length === 0,
-          `${ready.buttons.length} buttons, ${document.querySelectorAll('.pos-controls button').length} in the control row`);
-      }
 
       await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
@@ -2039,24 +2069,78 @@
       const wasLooping = voice?.loop;
       loopBtn.click();
       const nowLooping = voice?.loop;
+      /**
+       * 🔴 THE TOGGLE'S STATE HAS TO BE VISIBLE, NOT ONLY ANNOUNCED. MEASURED
+       * 2026-09-21: a `loopSlot` button is styled as a GLYPH box and had no
+       * pressed state at all, so this control said `aria-pressed="true"` to a
+       * screen reader and looked identical to a reader with eyes. Both halves
+       * are asserted here, and the colour is read as a COMPUTED value because
+       * that is the only thing that knows which rule won.
+       */
+      {
+        /* ⚠️ THE SAMPLES TAB HAS TO BE THE OPEN ONE OR THE BAR IS NOT LAID OUT.
+           The first build of this read 0 px wide with the picture check's tab
+           still selected, which is a measurement of a hidden element rather
+           than a fault in the button. */
+        const wasTab = tabs.at();
+        tabs.go('samples');
+        const was = loopBtn.getAttribute('aria-pressed') === 'true';
+        if (was) loopBtn.click();                       // start from off, whatever ran before
+        const off = getComputedStyle(loopBtn).backgroundColor;
+        loopBtn.click();
+        const on = getComputedStyle(loopBtn).backgroundColor;
+        const box = loopBtn.getBoundingClientRect();
+        const barBox = bar.api.el.getBoundingClientRect();
+        d.assert('the loop toggle looks pressed as well as reading pressed, and fits the bar',
+          off !== on && loopBtn.getAttribute('aria-pressed') === 'true'
+          && box.width > 34 && box.right <= barBox.right + 1,
+          `${off} off to ${on} on, ${box.width.toFixed(0)} px wide ending `
+          + `${(barBox.right - box.right).toFixed(1)} px inside the bar`);
+        loopBtn.click();
+        if (was) loopBtn.click();                       // and leave it as it was found
+        tabs.go(wasTab);
+      }
+
       d.assert('pressing loop changes the sound that is already playing, not only the next one',
         wasLooping === false && nowLooping === true
         && loopBtn.getAttribute('aria-pressed') === 'true' && looping === true,
         `the running voice went loop ${wasLooping} to ${nowLooping}, `
         + `the button says ${loopBtn.getAttribute('aria-pressed')}`);
 
-      stopBtn.click();
-      d.assert('and stop really lets go of it, so a looping sample can be got out of',
-        voice === null && looping === true && wave.facts().position === 0,
+      /* ⚠️ THE BAR'S OWN TOGGLE, NOT A `stopSample()` CALL. A check that calls
+         the function the button calls grades the function and says nothing
+         about the button, which is how a control ends up inert with a green
+         suite behind it. */
+      playBtn.click();
+      d.assert('and the transport really lets go of it, so a looping sample can be got out of',
+        voice === null && looping === true && wave.facts().position === 0
+        && deck.transport.playing === false,
         `the voice is ${voice === null ? 'gone' : 'still held'}, the toggle is still on, `
-        + `and the head is parked at ${wave.facts().position}`);
+        + `the head is parked at ${wave.facts().position} and the deck is `
+        + `${deck.transport.playing ? 'still playing' : 'stopped'}`);
       loopBtn.click();
 
-      d.assert('pressing a row opens that sample into the player under the table',
-        picked2 === 0 && playerLine.textContent.includes(samples[0].name)
-        && playerLine.textContent.includes('frames')
-        && playBtn.disabled === false,
-        `"${playerLine.textContent}"`);
+      /**
+       * 🔴 THE ROW IS WHAT SAYS WHICH SAMPLE IS OPEN NOW, and this assert used
+       * to read a sentence under the player that no longer exists. The five
+       * facts it carried are cells on the marked row, which is where they were
+       * asked to go.
+       */
+      {
+        /* ⚠️ `.on` IS WHAT `table.mark()` SETS, and reading the scroller rather
+           than the table keeps the hidden heading out of it, which this project
+           has now paid for four times. */
+        const mark = sampleTable.scroller().querySelector('.pos-tbl-row.on');
+        const cells = [...(mark?.querySelectorAll('.pos-tbl-c') || [])].map((c) => c.textContent);
+        d.assert('the marked row carries every fact the sentence under the player used to',
+          picked2 === 0 && cells.length === 6
+          && cells[0] === samples[0].name
+          && cells[1] === `${samples[0].row.seconds.toFixed(2)} s`
+          && cells[2] === samples[0].row.frames.toLocaleString()
+          && /kHz$/.test(cells[3]) && cells[4] === samples[0].row.peak.toFixed(2)
+          && playBtn.disabled === false,
+          `the marked row reads ${JSON.stringify(cells)}`);
+      }
 
       /**
        * 🔴 THE NEGATIVE CONTROL, AND IT IS THE ONE THE AGENT THAT BUILT THE
@@ -2181,7 +2265,7 @@
           d.assert('an empty slot opens, shows 0.00 s and starts nothing, while a filled one plays',
             afterEmpty === wasPlayed && played === wasPlayed + 1
             && samples[emptyAt].row.seconds === 0 && samples[fullAt].row.seconds > 0
-            && /0.00 s/.test(playerLine.textContent) === false,
+            && deck.range[1] > 1,
             `slot ${emptyAt} is empty and played ${afterEmpty - wasPlayed} time(s), `
             + `slot ${fullAt} is ${samples[fullAt].row.seconds.toFixed(2)} s and played `
             + `${played - afterEmpty} time(s)`);

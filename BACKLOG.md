@@ -66,6 +66,83 @@ and 🔴 **the stream end carries a CRC32 of the unpacked payload which verifies
 on 31 of 31**. That CRC is what makes the restoration exact rather than
 plausible, and a stream failing it is refused by name.
 
+#### The MIDI log's empty sentence comes off three pages, 2026-09-21
+
+🔴 **ASKED, QUOTING IT:** *"`press the status button, then play something` - rm
+just leave room for midi table"*. It is `createMidiLog`'s `empty` on `/evo/` and
+`/circuit/`, and `/twelve/` carries the same sentence ending *"then move
+something on the desk"*.
+⚠️ **THE ROOM IS THE POINT, NOT THE REMOVAL.** A table that collapses to nothing
+when the sentence goes is the page rearranging itself the moment a visitor
+presses the button, which is the opposite of what was asked for.
+✅ **DONE AS `createMidiLog({ empty: '', reserve: 6 })`**, and `reserve` is in
+ROWS rather than pixels because a row's height is `shell.css`'s business.
+`--tbl-row-h` is declared once beside `.pos-tbl-row` out of the same padding and
+line height a row is built from, and **asserted against a real measured row** on
+`/circuit/`: **194.4 px of room against 32.4 px a row, six of which is 194.3**.
+⚠️ AND THE FIRST BUILD OF THAT ASSERT READ `textContent` ON THE BOX AND GOT
+`"atchwhatbytesreading"`, because an empty table HIDES its heading rather than
+removing it. **Third time in this project a hidden element has been read as an
+absent one.** It reads the caption element now.
+
+#### /radio/'s diagram is cutting two container names, 2026-09-21, not mine
+
+⚠️ **FOUND WHILE CHECKING SOMETHING ELSE AND VERIFIED AS PRE-EXISTING.**
+`the diagram drew every name and every arrow whole` reads
+`container stn, container cf`. Re-run with today's `shell.css` reverted: the
+same failure, identically. So it is `/radio/`'s picture and not the stylesheet.
+
+#### /pack/'s sample player hand-rolls its transport, 2026-09-21
+
+🔴 **ASKED WITH A SCREENSHOT:** *"use standard wave visualizer (what we had in
+radio wtc and standard transport)"*, pointing at the `►` `■` `loop` row under
+the open sample.
+✅ **THE WAVE IS ALREADY STANDARD.** `createWaveView` from
+`demo/shell/wave-view.mjs`, and `/pack/` is its only caller.
+🔴 **THE TRANSPORT IS NOT.** Three `pk-pbtn` buttons, an `aria-pressed` loop
+toggle and a sentence of facts under them, all typed into that page.
+`createTransportBar` is what **30 pages** use, and `positron-ui` says transport
+UI is that module and nothing else.
+⚠️ AND THE PAGE ALREADY PUBLISHES A TRANSPORT FOR THE HARNESS, so whichever bar
+is built has to say which one it is.
+✅ **DONE, AND IT FOUND TWO HOLES IN THE COMPONENT ON THE WAY.**
+- 🔴 **A `loopSlot` BUTTON COULD NOT WEAR A WORD**, though the slot's whole
+  purpose is to take the place of `LOOP`, which is one. `.tbar-slot` is a GLYPH
+  box, `--tbar-btn` wide, and `loop` spilled out of it and over the bar's own
+  right edge. `extras` has taken `word: true` all along; `loopSlot` never did.
+  Nobody met it because the only thing ever put in that slot is
+  `/videoradio/`'s ⛶.
+- 🔴 **AND A TOGGLE IN THAT SLOT HAD NO PRESSED STATE AT ALL.** The bar's own
+  LOOP lights on `[data-loop="on"]`, which is its private state; a page's toggle
+  has `aria-pressed`, which nothing styled. **The control said it was on to a
+  screen reader and looked identical to a reader with eyes.** Now asserted on
+  computed colour, `rgb(21, 27, 38)` off to `rgb(230, 230, 230)` on, 59 px wide,
+  ending 9.0 px inside the bar.
+⚠️ **`publish: false`, AND THAT IS NOT DODGING THE HARNESS.** `demo/verify.mjs`
+presses `__demo.transport`'s toggle and asserts the position advanced; on this
+page nothing can advance until a file is open and a row pressed, so publishing
+would take a drill red on a page where nothing is wrong.
+⚠️ **AND THE DECK IS A FOLLOWER**, `/crate/`'s arrangement: an
+`AudioBufferSourceNode` cannot be seeked, paused or resumed, so the page starts
+a voice and pushes the voice's own `AudioContext.currentTime` into the deck each
+frame. **One clock feeds the wave and the bar**, out of the function that
+already drove the waveform.
+
+🔴 **AND THE SIX PATCH BUTTONS COME OFF THE PAGE.** Asked 2026-09-21:
+*"rm aciiiid ...twinds from pack"*, which names the first and last of the
+`READY` row, `Aciiid Flamed Aggie Frosted Glass Smooth Pad Twins`. They are the
+owner's own patches, published earlier the same day so a visitor met something
+other than an empty page.
+⚠️ **AND THE SIX FILES STAY PUBLISHED UNLESS SOMEBODY SAYS OTHERWISE**, under
+`/resources/patches/`, allowlisted in `workers/view/build.mjs`. Nothing will
+point at them.
+
+🔴 **AND THE FACTS LINE UNDER IT BELONGS IN THE TABLE.** Asked in the same
+breath, quoting it: *"`slot 55, 0.25 s, 12,143 frames at 48000 Hz, peak 0.86` -
+this goes to the table, rm from here"*. It is a row of cells glued into one
+sentence, which is the middot rule wearing different punctuation, and the table
+above it already has a row per slot.
+
 #### Byte 0 shipped, and four more files open, 2026-09-21
 
 ✅ **DONE.** `containerOf(buf)` reads two bytes: `50 4b` is a zip, `f0` is a raw
