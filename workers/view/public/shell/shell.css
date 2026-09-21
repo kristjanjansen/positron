@@ -2119,6 +2119,57 @@ video[hidden] { display: none; }
   background: var(--card);
 }
 .pos-scope-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0; }
+/* 🔴 A GLUED SCOPE DRAWS ONE BORDER, NOT TWO. Reported 2026-09-21 with two
+   screenshots, *"rm double bordering"* against `/pack/` and *"rm thick borders
+   round waveform and 'the radio as it arrives'"* against `/radio/`, which are
+   the same fault described from two pages.
+   ✅ MEASURED rather than guessed: the canvas computes `1px solid rgb(31, 41,
+   55)` and its `.pos-glue` parent computes the same 1 px in the same colour,
+   with nothing between them. Two 1 px lines touching is a 2 px line, which is
+   why it reads as THICK rather than as double.
+   ⚠️ THE BORDER STAYS WHERE THERE IS NO GLUE. A scope bare on a page has
+   nothing else drawing its edge, and `/grains/` puts one inside a card whose
+   ground is `--card` too, so removing it everywhere would dissolve the picture
+   into whatever is behind it. This is scoped to the one arrangement that
+   doubles.
+   ⚠️ AND THE WRAP TAKES THE GROUND AND LOSES THE MARGIN, which is the rule
+   `/wish/` measured the same day: `.pos-glue` is `gap: 1px` over a `--line`
+   ground, so a part with no background of its own lets that colour through its
+   whole area and the caption would sit on the seam. A margin inside a glue is
+   the seam becoming a gap. */
+/* ⚠️ ONE LEVEL DEEP AS WELL AS DIRECT. `/radio/` glues the scope straight in
+   and `/pack/` wraps it in the element that paints its part's ground, which is
+   what `.pos-glue` requires of every child, so a direct-child selector fixed
+   one page and left the other exactly as reported. MEASURED: the canvas read
+   1 px on `/pack/` and 0 on `/radio/` from the same rule. */
+.pos-glue > .pos-scope, .pos-glue > * > .pos-scope { margin: 0; }
+.pos-glue > .pos-scope { background: var(--card); padding: 10px 12px; }
+.pos-glue > .pos-scope > .pos-scope-c,
+.pos-glue > * > .pos-scope > .pos-scope-c { border: 0; }
+/* 🔴 AND THE SAME FOR A TRANSPORT INSIDE A GLUED PART, which is the other half
+   of *"rm double bordering"*. A bar on a page draws its own edge and should;
+   a bar that is one part of a glued block has the glue drawing it, and the two
+   touch exactly as the scope's did.
+   ⚠️ ONE LEVEL DEEP AS WELL AS DIRECT, because a page wraps the bar in the
+   element that paints the part's ground, which is what `.pos-glue`'s own rule
+   requires of every child. */
+.pos-glue > .tbar, .pos-glue > * > .tbar { border: 0; }
+
+/* ── note grid ────────────────────────────────────────────────────────────
+   demo/shell/note-grid.mjs. One row per pattern, sixteen steps across, pitch up
+   the row on one scale for the whole picture. Velocity is alpha and never
+   colour: colour on this site says how a thing LANDED, and a note in a file has
+   not landed anywhere.
+   ⚠️ SAME ARRANGEMENT AS `.pos-scope`, deliberately. A picture with a caption
+   under it is a shape this project already has, and a second one that behaved
+   differently inside a glue would be two answers to one question. */
+.pos-ngrid { margin: 0; }
+.pos-ngrid-c { display: block; width: 100%; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--card); }
+.pos-ngrid-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0;
+  min-height: 1.5em; }
+.pos-glue > .pos-ngrid { margin: 0; background: var(--card); padding: 10px 12px; }
+.pos-glue > .pos-ngrid > .pos-ngrid-c { border: 0; }
 
 /* ── message list ─────────────────────────────────────────────────────────
    demo/shell/messages.mjs. One renderer for live traffic and for a history of
@@ -4574,10 +4625,18 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 }
 /* The dashed edge is the page saying *inside here*, which is the whole message.
    It is inset rather than on the frame so it reads as a target rather than as a
-   window that has gone modal. */
+   window that has gone modal.
+   🔴 1 PX AND GREY SINCE 2026-09-21, ASKED FOR AS *"drop area: thiner border and
+   gray not yeloow"*. It was 2 px of `--hi`, and this site spends yellow on the
+   thing that is RUNNING. A target waiting for a file is not running: it is the
+   same claim the rest of the stylesheet makes when it keeps LOOP quiet so the
+   playhead can be the loud thing.
+   ⚠️ THE MESSAGE STAYS YELLOW AND THAT IS THE POINT OF THE CHANGE. One bright
+   thing in the middle of a dimmed page reads as an instruction; a bright frame
+   AND a bright instruction is two, and neither wins. */
 .pos-drop-cover::before {
   content: ''; position: absolute; inset: 14px;
-  border: 2px dashed var(--hi); border-radius: 6px;
+  border: 1px dashed var(--line2); border-radius: 6px;
 }
 .pos-drop-say {
   font: 600 13px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase;

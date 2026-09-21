@@ -53,10 +53,11 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { createDrop } from '/shell/drop.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createNoteGrid } from '/shell/note-grid.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createStack } from '/shell/stack.mjs';
   import { createGlue } from '/shell/glue.mjs';
-  import { createWaveView } from '/shell/wave-view.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
   import {
@@ -320,9 +321,29 @@
     columns: [
       { key: 'name', label: 'name', grow: true, clip: true },
       { key: 'head', label: 'head', width: 58 },
+      /**
+       * 🔴 TEN READOUT CELLS BECAME COLUMNS ON 2026-09-21, ASKED FOR BY QUOTING
+       * THE WHOLE READOUT AND SAYING *"put this to table"*, then *"...and rm
+       * readout"*. It is the third time in one day the same correction has been
+       * made on this page, after the sample player's sentence and the region
+       * line, and the pattern is worth naming: **a readout answers *what is
+       * this one* and a column answers *which of these is different***. With
+       * 32 sessions in front of you the second question is the one worth a
+       * surface, and the first is what the marked row already is.
+       * ⚠️ `written` DID NOT GET A COLUMN, because it was `used` under another
+       * name. Two columns of one number is the disagreement this project keeps
+       * paying for, arriving by way of a rename.
+       */
+      { key: 'marker', label: 'marker', width: 66 },
+      { key: 'synth1', label: 'synth 1', width: 124, clip: true },
+      { key: 'synth2', label: 'synth 2', width: 124, clip: true },
+      { key: 'notes', label: 'notes', width: 62, align: 'right', hi: true },
       { key: 'used', label: 'used', width: 72, align: 'right' },
-      { key: 'nearest', label: 'nearest', width: 76, align: 'right' },
+      { key: 'notErased', label: 'not erasure', width: 84, align: 'right' },
+      { key: 'payload', label: 'payload', width: 76, align: 'right' },
       { key: 'filled', label: 'filled', width: 62, align: 'right' },
+      { key: 'entropy', label: 'entropy', width: 68, align: 'right' },
+      { key: 'nearest', label: 'nearest', width: 76, align: 'right' },
     ],
     cap: 64, empty: '', note: 'hover',
     onPick: (r) => showSession(r.i),
@@ -360,21 +381,22 @@
    * cell showing a structural constant reads as a measurement and teaches a
    * reader to ignore the row.
    */
-  const facts = createReport({
-    readout: {
-      head: '', marker: '', written: 'B', 'not erasure': 'B', payload: 'B',
-      filled: '%', entropy: '', nearest: 'B', 'synth 1': '', 'synth 2': '',
-    },
-    // 🔴 TWO ROWS, ASKED FOR AS *"why not 5x2 cells?"* and then as
-    // *"1xsomehting / 2xsomehing etc"*, against a panel that had wrapped 7 and 3
-    // and cut `10,620` to `10,62…` in its own cell. The caller names the shape
-    // and the ten cells make the columns, which is why the even rule earns its
-    // keep twice: an even count divides by two exactly.
-    rows: 2,
-    size: 'sm',
-    showLog: false,
+  /**
+   * 🔴 A TEN CELL READOUT AND A LINE OF PROSE STOOD HERE UNTIL 2026-09-21.
+   * The readout went on being asked for in one message, *"head USER / marker DC
+   * BB / written 15,046B ... - put this to table"*, then *"...and rm readout"*,
+   * and the line in another, quoted in full and ending *"rm"*. Both were the
+   * SELECTED session's facts restated above the list they came out of.
+   * ✅ **THE CELLS ARE COLUMNS NOW AND THE LINE IS GONE.** What replaces them is
+   * the thing neither could ever be: a picture of the notes.
+   * ⚠️ AND ONE FACT FROM THE LINE HAD NOWHERE TO GO, so it got a column of its
+   * own on the regions table below: the region SIZE, which is what made
+   * `1 of 76, 16 of 1,508, 32 of 720, 1 of 6,004` legible. It was in a hover.
+   */
+  const notesHost = el('div', 'pk-notes');
+  const grid = createNoteGrid(notesHost, {
+    label: 'pattern down the side, sixteen steps across, pitch up the row',
   });
-  const partsLine = el('div', 'pk-line', '');
   /**
    * 🔴 THE FIFTY REGIONS, WHICH ARE THE DECODER'S WHOLE MODEL OF THE FILE. A
    * header, sixteen synth slots at 1,508 bytes, thirty two drum slots at 720 and
@@ -388,6 +410,11 @@
   const partsTable = createTable({
     columns: [
       { key: 'part', label: 'part', grow: true },
+      /* 🔴 THE STRIDE, WHICH WAS THE ONE FACT THE REMOVED LINE CARRIED THAT NO
+         COLUMN HAD. `1 of 76, 16 of 1,508, 32 of 720, 1 of 6,004` is the
+         decoder's whole model of the file, and it was readable only by hovering
+         fifty rows one at a time. */
+      { key: 'size', label: 'size', width: 76, align: 'right' },
       { key: 'at', label: 'at', width: 76, align: 'right' },
       { key: 'used', label: 'used', width: 72, align: 'right' },
       { key: 'notes', label: 'notes', width: 64, align: 'right', hi: true },
@@ -395,7 +422,10 @@
     cap: 64, empty: '', note: 'hover',
   });
   partsTable.el.classList.add('pk-tbl');
-  panel('sessions').append(sessionTable.el, facts.readoutEl, partsLine, partsTable.el);
+  /* ⚠️ GLUED, WHICH IS THE ARRANGEMENT THE SAMPLES TAB ALREADY HAS: the list,
+     the picture of the pressed row, and the detail under it. Three parts of one
+     component rather than three blocks with the page's rhythm between them. */
+  panel('sessions').append(createGlue(sessionTable.el, notesHost, partsTable.el));
 
   /**
    * 🔴 THE SAMPLES TAB, ASKED FOR AS *"why there is no samples?"*. The plan
@@ -548,8 +578,50 @@
    * the empty table heading: a container with nothing in it must not paint its
    * edges.
    */
+  /**
+   * 🔴 IT IS `grain-scope.mjs`, WHICH IS THIS SITE'S WAVEFORM, AND IT WAS
+   * `wave-view.mjs`, WHICH WAS THIS PAGE'S. Asked 2026-09-21 as *"use standard
+   * wave visualizer (what we had in radio wtc...)"* and then settled three
+   * messages later as *"use same component in pack"*. `/radio/`, `/tapes/` and
+   * `/grains/` all draw with the scope; `wave-view` had exactly one caller,
+   * which was this page, so "the standard one" was the one this page was not
+   * using.
+   * ⚠️ THE SCOPE DRAWS A HELD BUFFER AS WELL AS A LIVE ONE, which is what made
+   * the swap possible rather than a rewrite: `buffer(peaks)` is its own comment's
+   * *"the held sound itself, as peaks. This is what makes the rest legible"*,
+   * and `/grains/` already inspects a fixed buffer through it.
+   * ⚠️ AND NO `fullScale`, DELIBERATELY. That option locks the vertical scale so
+   * a live stream stops heaving as loud passages scroll off; a sample sitting
+   * still has nothing to scroll and its relative shape is the subject, which is
+   * the same reasoning `/grains/` is given in that file.
+   */
   const waveHost = el('div', 'pk-wave');
-  const wave = createWaveView(waveHost, { height: 96, label: 'the open sample' });
+  const wave = createGrainScope(waveHost, { seconds: 1, height: 96 });
+  /**
+   * 🔴 THE PAGE HIDES ITS OWN PART, BECAUSE THE SCOPE DOES NOT HIDE ITSELF AND
+   * SHOULD NOT. `/radio/` draws a scrolling picture from `feed()` before any
+   * peaks exist, so a component that vanished without a buffer would blank the
+   * page it was built for. `wave-view` hid itself and this page relied on it;
+   * with the swap the rule moves to where it is true, which is here.
+   * ⚠️ AND IT IS `hidden` ON THE GLUED PART, not on the canvas, or the glue
+   * keeps a 1 px seam round nothing.
+   */
+  waveHost.hidden = true;
+  /** How many lit pixels the scope has drawn. The differential a check needs. */
+  function waveInk() {
+    const c = wave.canvas;
+    const g = c?.getContext?.('2d');
+    if (!g || !c.width) return 0;
+    const px = g.getImageData(0, 0, c.width, c.height).data;
+    /* ⚠️ AGAINST THE FIELD, NOT AGAINST TRANSPARENT. This canvas paints its own
+       background, so every pixel is opaque and an alpha test counts the whole
+       box. `--card` is what an empty scope is, so anything else is a wave. */
+    let n = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i] > 40 || px[i + 1] > 45 || px[i + 2] > 55) n++;
+    }
+    return n;
+  }
 
   panel('samples').append(samplesLine, createGlue(sampleTable.el, waveHost, player));
 
@@ -559,6 +631,37 @@
   let ac = null, lastPlayed = null, voice = null, looping = false;
 
   const WIDE_BYTES = 1508;
+  /* ⚠️ MODULE SCOPE SINCE 2026-09-21, and it was local to `showSession`. The
+     sessions TABLE formats the same numbers now, so a helper that only one
+     function could see was a second copy waiting to be typed. */
+  const n = (v) => (v === null || v === undefined ? '' : v.toLocaleString());
+  /**
+   * 🔴 THE SCOPE TAKES PEAKS, NOT SAMPLES, and that is the whole of the adapter
+   * between a held `AudioBuffer` and a component built for a live ring. One
+   * amplitude per column, taken as the largest magnitude in that column, which
+   * is what a waveform is: `grain-scope` mirrors it around the centre itself.
+   * ⚠️ 480 COLUMNS RATHER THAN ONE PER PIXEL. The picture is redrawn on resize
+   * and on every frame while a sample plays, and rebuilding an envelope from
+   * 72,000 frames at 60 Hz is work nobody asked for. 480 is finer than the
+   * widest this box gets and is computed once per sample.
+   */
+  const PEAK_COLS = 480;
+  function peaksOf(samples) {
+    const n = samples?.length || 0;
+    const out = new Float32Array(PEAK_COLS);
+    if (!n) return out;
+    for (let i = 0; i < PEAK_COLS; i++) {
+      const from = Math.floor((i * n) / PEAK_COLS);
+      const to = Math.max(from + 1, Math.floor(((i + 1) * n) / PEAK_COLS));
+      let mx = 0;
+      for (let j = from; j < to && j < n; j++) {
+        const v = samples[j] < 0 ? -samples[j] : samples[j];
+        if (v > mx) mx = v;
+      }
+      out[i] = mx;
+    }
+    return out;
+  }
   const pct = (x) => `${(x * 100).toFixed(1)}`;
   const kb = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} kB` : `${(n / 1048576).toFixed(1)} MB`);
 
@@ -1080,6 +1183,11 @@
       patchNames: deep?.patchNames || [],
       parts,
       notes: events.length,
+      // 🔴 THE EVENTS, NOT ONLY HOW MANY. This carried a COUNT until 2026-09-21
+      // and a count is the one thing about music with no music in it. Asked
+      // twice: *"can we see actual notes on timeline"*, then *"so can you show
+      // notes in timeline in pack?"*.
+      events,
       velocityPerStep: bytes[VELOCITY_AT] === VELOCITY_PER_STEP,
       pitches: events.length
         ? [Math.min(...events.map((e) => e.note)), Math.max(...events.map((e) => e.note))]
@@ -1097,58 +1205,25 @@
     pickedSession = i;
     sessionTable.mark((r) => r.i === i);
 
-    const n = (v) => (v === null || v === undefined ? '' : v.toLocaleString());
-    facts.set('head', x.head);
-    facts.set('marker', x.magicOk === null ? '' : x.magicOk ? 'DC BB' : 'absent');
-    facts.set('written', n(x.used));
-    facts.set('not erasure', n(x.notErased));
-    facts.set('payload', n(x.payload));
-    facts.set('filled', (x.nonZero * 100).toFixed(1));
-    facts.set('entropy', x.entropy.toFixed(2));
-    facts.set('nearest', x.nearest === null || x.nearest === Infinity ? '' : n(x.nearest));
-    facts.set('synth 1', x.patchNames[0] || '');
-    facts.set('synth 2', x.patchNames[1] || '');
+    /* Every one of these is a column on the list above now. What opening a
+       session changes is the picture and the region table. */
+    grid.set(x.events || []);
 
     /**
      * 🔴 THE REGIONS ARE NUMBERED AND NOT NAMED, CORRECTED 2026-09-21 AFTER
      * **"five synths??"**. They read `synth 1` through `synth 16` and a Circuit
      * has TWO synth parts, so the page was printing a name this project typed
      * itself as though it had been read off the file. What is measured is the
-     * offset and the stride, so that is what a row says, and the line above
-     * counts the two strides without claiming what either holds.
-     * ⚠️ The two patches that ARE corroborated are in the readout above, out of
-     * the TAIL region, which is the one place a patch really was found.
+     * offset and the stride, so that is what a row says, and the `size` column
+     * carries the four strides without claiming what any of them holds.
+     * ⚠️ The two patches that ARE corroborated are `synth 1` and `synth 2` on
+     * the list above, out of the TAIL region, which is the one place a patch
+     * really was found.
      */
-    const strides = [];
-    for (const r of x.parts) {
-      const last = strides[strides.length - 1];
-      if (last && last.size === r.size) last.n++;
-      else strides.push({ size: r.size, n: 1 });
-    }
-    /**
-     * 🔴 THIS LINE SAID `What they hold is not known` UNTIL 18:04 TODAY, AND IT
-     * WAS TRUE WHEN IT WAS WRITTEN. The owner read it back at me with *"where
-     * is note data?"*, which is the right question the moment the research
-     * landed. What is known now is exactly one of the four strides, so the
-     * sentence says which one and goes on refusing to guess about the rest.
-     * ⚠️ AND IT IS SAID AS A COUNT RATHER THAN AS A NAME. Sixteen regions
-     * holding note data is measured; calling them two synth parts of eight
-     * patterns is still a reading, and it is still not published here.
-     */
-    partsLine.textContent = x.parts.length
-      ? `"${x.name || '(no name)'}", ${x.parts.length} regions: `
-        + strides.map((g) => `${g.n} of ${n(g.size)} bytes`).join(', ')
-        + `. The ${x.parts.filter((r) => r.kind === 'wide').length} of `
-        + `${n(WIDE_BYTES)} hold ${n(x.notes)} note event(s)`
-        + (x.notes
-          ? `, ${x.pitches[0]} to ${x.pitches[1]}, with velocity `
-            + `${x.velocityPerStep ? 'per step' : 'per note'}`
-          : '')
-        + '. What the rest hold is not known'
-      : '';
 
     partsTable.set(x.parts.map((r, k) => ({
       part: `region ${k + 1}`,
+      size: n(r.size),
       at: n(r.at),
       used: n(r.used),
       // ⚠️ EMPTY AND NOT `0` ON A REGION THAT CANNOT HOLD NOTES. A zero there
@@ -1233,12 +1308,22 @@
       i,
       name: s.name || '(no name)',
       head: s.head,
-      used: s.used === null ? '' : `${s.used}`,
-      nearest: s.nearest === null || s.nearest === Infinity ? '' : `${s.nearest}`,
+      // ⚠️ EMPTY, NOT `absent`, WHEN NOTHING LOOKED. `magicOk === null` means the
+      // file could not be partitioned at all, and a word there would read as a
+      // measurement that came back negative.
+      marker: s.magicOk === null ? '' : s.magicOk ? 'DC BB' : 'absent',
+      synth1: s.patchNames[0] || '',
+      synth2: s.patchNames[1] || '',
+      notes: n(s.notes),
+      used: s.used === null ? '' : n(s.used),
+      notErased: n(s.notErased),
+      payload: n(s.payload),
       filled: `${pct(s.nonZero)}%`,
-      hover: `${s.entropy.toFixed(2)} bits a byte, ${s.notErased} bytes not erasure`
-           + `${s.patchNames.length ? `, synths ${s.patchNames.join(' and ')}` : ''}`
-           + `${s.magicOk === false ? ', and it carries no Circuit session marker' : ''}`,
+      entropy: s.entropy.toFixed(2),
+      nearest: s.nearest === null || s.nearest === Infinity ? '' : n(s.nearest),
+      hover: `${s.notes} note event(s)`
+           + `${s.magicOk === false ? ', and it carries no Circuit session marker' : ''}`
+           + '. Press to open it',
     })));
 
     samples = wavs;
@@ -1303,8 +1388,7 @@
       // ⚠️ EVERY CELL BACK TO EMPTY RATHER THAN TO 0. Nothing unmeasured prints
       // as a zero here: a `0` in a readout reads as a very confident
       // measurement of nothing, and `setCell` hides the unit with it.
-      for (const k of facts.cells.keys()) facts.set(k, '');
-      partsTable.set([]); partsLine.textContent = ''; pickedSession = -1;
+      partsTable.set([]); grid.clear(); pickedSession = -1;
     }
   }
 
@@ -1377,8 +1461,12 @@
     // `toMono`, so what is on screen and what comes out of the speaker cannot
     // be two readings of one file that disagree.
     const mono = r.ok ? toMono(w.wave) : { ok: false };
-    if (mono.ok) wave.set(mono.samples, mono.rate, { name: w.name });
-    else wave.clear();
+    if (mono.ok) {
+      waveHost.hidden = false;
+      wave.buffer(peaksOf(mono.samples));
+      wave.source(w.name);
+      wave.playhead(0);
+    } else { wave.clear(); waveHost.hidden = true; }
 
     if (andPlay && r.ok) playSample(i);
   }
@@ -1452,13 +1540,19 @@
        * be two readings of one sound, which is the thing this page already
        * refuses to do with its picture and its audio.
        */
-      wave.follow(() => {
-        if (!voice) return null;
+      /* ⚠️ THE SCOPE HAS NO `follow`, SO THE PAGE OWNS THE LOOP. `wave-view`
+         took a function and ran its own frame loop; `grain-scope` is pushed a
+         fraction. The clock is unchanged and is still the one that agrees with
+         what is being heard, and it still stops when the sound does. */
+      const tick = () => {
+        if (voice !== src) return;
         const t = ac.currentTime - began;
         const at = looping && buf.duration > 0 ? t % buf.duration : t;
         deck.seek(Math.round(at * 1000));
-        return at;
-      });
+        wave.playhead(buf.duration > 0 ? at / buf.duration : 0);
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
       deck.play();
       lastPlayed = { name: w.name, frames: mono.frames, rate: mono.rate, seconds: buf.duration };
       d.log(`${w.name}, ${buf.duration.toFixed(2)} s, ${mono.frames.toLocaleString()} frames at `
@@ -1475,7 +1569,7 @@
     // ⚠️ THE HEAD GOES BACK TO THE TOP RATHER THAN STANDING WHERE THE SOUND
     // STOPPED. A line left in the middle of a picture with nothing playing
     // reads as a sound that is paused, and nothing here can resume.
-    wave.rest(0);
+    wave.playhead(0);
     deck.pause();
     deck.seek(0);
   }
@@ -1516,10 +1610,10 @@
      * empty box painting a line nobody wrote.
      */
     d.assert('with nothing open there is no waveform, so no empty box paints an edge',
-      wave.el.hidden === true && wave.el.getBoundingClientRect().height === 0
-      && wave.facts().frames === 0,
-      `the picture is ${wave.el.hidden ? 'away' : 'up'} at `
-      + `${wave.el.getBoundingClientRect().height} px`);
+      waveHost.hidden === true && waveHost.getBoundingClientRect().height === 0
+      && wave.showing() === 'scrolling',
+      `the picture is ${waveHost.hidden ? 'away' : 'up'} at `
+      + `${waveHost.getBoundingClientRect().height} px, showing ${wave.showing()}`);
 
     d.assert('the block has no footer until something has been opened',
       drop.note.hidden === true && drop.note.textContent === ''
@@ -1762,15 +1856,36 @@
        * under it down, which is the same reservation the picture on the patches
        * tab was asked for. `fill()` opens session 0 for exactly that reason.
        */
-      d.assert('opening a pack opens its first session too, so the panel under the list is never empty',
-        pickedSession === 0 && partsTable.count() === 50
-        && facts.cells.get('head').textContent === 'USER'
-        && facts.cells.get('synth 1').textContent === 'Frog Steps'
-        && /"User Session", 50 regions/.test(partsLine.textContent)
-        && /16 of 1,508 bytes/.test(partsLine.textContent)
-        && /32 of 720 bytes/.test(partsLine.textContent)
-        && /What the rest hold is not known/.test(partsLine.textContent),
-        `${facts.cells.size} cells and ${partsTable.count()} regions · "${partsLine.textContent}"`);
+      {
+        /* The ten facts that used to be a readout are cells on the marked row.
+           Read off the row rather than off `sessions[0]`, because the point is
+           that the TABLE carries them. */
+        const mark = sessionTable.scroller().querySelector('.pos-tbl-row.on');
+        const by = (k) => mark?.children[sessionTable.columns.findIndex((c) => c.key === k)]
+          ?.textContent.trim();
+        d.assert('opening a pack opens its first session too, and the row carries what the readout did',
+          pickedSession === 0 && partsTable.count() === 50 && !!mark
+          && by('name') === 'User Session' && by('head') === 'USER' && by('marker') === 'DC BB'
+          && by('synth1') === 'Frog Steps' && by('payload') && by('entropy') && by('notErased'),
+          `the marked row reads name ${by('name')}, head ${by('head')}, marker ${by('marker')}, `
+          + `synth 1 ${by('synth1')}, payload ${by('payload')}, entropy ${by('entropy')}`);
+
+        /* And the stride, which the removed line was the only way to see. */
+        /* ⚠️ NO SLICE. `scroller()` is the body and the heading is not in it,
+           which this project has now got wrong in both directions. */
+        const sizes = [...partsTable.scroller().querySelectorAll('.pos-tbl-row')]
+          .map((r) => r.children[1].textContent.trim());
+        const runs = [];
+        for (const v of sizes) {
+          const last = runs[runs.length - 1];
+          if (last && last.v === v) last.n++; else runs.push({ v, n: 1 });
+        }
+        d.assert('the region sizes are a column, so the four strides can be read off the table',
+          runs.length === 4
+          && runs.map((r) => `${r.n} of ${r.v}`).join(', ')
+             === '1 of 76, 16 of 1,508, 32 of 720, 1 of 6,004',
+          runs.map((r) => `${r.n} of ${r.v}`).join(', '));
+      }
 
       /**
        * 🔴 THE NOTE DATA, ON THE PAGE. The owner read `What they hold is not
@@ -1784,7 +1899,12 @@
        */
       {
         const rows = [...partsTable.scroller().querySelectorAll('.pos-tbl-row')];
-        const cell = (r) => r.children[3].textContent.trim();
+        /* ⚠️ BY NAME, NOT BY INDEX. This read `children[3]` and a `size` column
+           was inserted in front of it on 2026-09-21, which moved `notes` to 4.
+           A positional read of a table is a check that breaks when a column is
+           added, silently and in the wrong direction. */
+        const notesAt = partsTable.columns.findIndex((c) => c.key === 'notes');
+        const cell = (r) => r.children[notesAt].textContent.trim();
         const wide = rows.slice(1, 17);
         const rest = [...rows.slice(0, 1), ...rows.slice(17)];
         const shown = wide.reduce((n, r) => n + (+cell(r) || 0), 0);
@@ -1794,12 +1914,50 @@
           `${shown} note events across 16 regions, and ${rest.filter((r) => cell(r) === '').length} `
           + 'of the other 34 are blank rather than zero');
 
-        d.assert('and the line says where the notes are rather than that nothing is known',
-          /hold [\d,]+ note event\(s\)/.test(partsLine.textContent)
-          && /velocity per (step|note)/.test(partsLine.textContent)
-          && !/What they hold is not known/.test(partsLine.textContent)
-          && /What the rest hold is not known/.test(partsLine.textContent),
-          `"${partsLine.textContent.slice(-95)}"`);
+        /**
+         * 🔴 THE NOTES ARE DRAWN, WHICH IS WHAT WAS ASKED FOR TWICE. A count in
+         * a cell says how many; this asserts that each one is somewhere, that
+         * the rows are the patterns that hold anything, and that PITCH moves a
+         * note rather than only the step.
+         * ⚠️ AND IT ASSERTS THE INK, because a picture that laid out perfectly
+         * and painted nothing would pass everything above it.
+         */
+        /* ⚠️ THE SESSIONS TAB HAS TO BE OPEN OR THE CANVAS HAS NO WIDTH AND
+           PAINTS NOTHING. Measured at 0 lit pixels on a picture that was
+           perfectly correct, which is the same hidden-element reading that
+           cost the loop toggle its first assert an hour earlier. */
+        const wasTab = tabs.at();
+        tabs.go('sessions');
+        grid.repaint();
+        const f = grid.facts();
+        const hi = sessions[0].events.reduce((a, b) => (b.note > a.note ? b : a));
+        const lo = sessions[0].events.reduce((a, b) => (b.note < a.note ? b : a));
+        d.assert('the notes are drawn, one row per pattern that holds any, with pitch up the row',
+          f.count === sessions[0].notes && f.regions === 12 && f.steps === 16
+          && grid.ink() > 40
+          && grid.place(hi).y < grid.place(lo).y + (f.rows.indexOf(lo.region)
+             - f.rows.indexOf(hi.region)) * f.rowH + f.rowH,
+          `${f.count} notes across ${f.regions} of 16 patterns, ${f.lo} to ${f.hi}, `
+          + `${grid.ink()} lit pixels`);
+
+        /* 🔴 NEGATIVE CONTROL: a picture that drew the same thing whatever it
+           was given would pass the line above. An empty session hides it. */
+        const before = grid.ink();
+        grid.set([]);
+        d.assert('NEGATIVE CONTROL: a session with no notes draws nothing and hides its box',
+          grid.ink() === 0 && grid.el.hidden === true && grid.says() === '',
+          `${before} lit pixels became ${grid.ink()} and the box is `
+          + `${grid.el.hidden ? 'hidden' : 'still shown'}`);
+        grid.set(sessions[0].events);
+        tabs.go(wasTab);
+
+        /* ⚠️ AND THE 105 THAT CANNOT BE NOTES ARE SAID RATHER THAN DRAWN AS
+           MUSIC. MEASURED over the owner's pack: 105 of 5,095 events carry a
+           note number above 127, which is impossible in MIDI. */
+        const over = sessions.reduce((k, x) => k + x.events.filter((e) => e.note > 127).length, 0);
+        d.assert('the events our decoder cannot read as notes are counted rather than clamped',
+          over === 105 && sessions.reduce((k, x) => k + x.notes, 0) === 5095,
+          `${over} of 5,095 events carry a note number above 127`);
 
         /**
          * 🔴 THE NEGATIVE CONTROL THE RESEARCH INSISTS ON: a decoder that found
@@ -1826,7 +1984,6 @@
        */
       d.assert('no region calls itself a synth or a drum, because nothing measured says it is one',
         !/synth|drum/i.test(partsTable.scroller().textContent)
-        && !/synth|drum/i.test(partsLine.textContent)
         && partsTable.scroller().textContent.includes('region 1'),
         `${partsTable.count()} rows, the first reading `
         + `"${partsTable.scroller().querySelector('.pos-tbl-row')?.textContent.slice(0, 20)}"`);
@@ -1854,14 +2011,20 @@
        */
       const otherSession = sessions.findIndex((x, k) => k > 0 && x.name !== sessions[0].name
         && x.used !== sessions[0].used);
+      showSession(0);
+      const g0 = grid.facts();
+      /* ⚠️ THE PICTURE IS WHAT PROVES IT NOW. The readout that used to answer
+         this is gone, so the differential is the drawing: two sessions with
+         different note counts cannot draw the same thing, and a picture that
+         ignored the press would keep the first one's numbers. */
       showSession(otherSession);
-      d.assert('NEGATIVE CONTROL: pressing another session shows that one rather than the first',
+      const g1 = grid.facts();
+      d.assert('NEGATIVE CONTROL: pressing another session draws that one rather than the first',
         pickedSession === otherSession && otherSession > 0
-        && partsLine.textContent.includes(`"${sessions[otherSession].name}"`)
-        && facts.cells.get('synth 1').textContent === sessions[otherSession].patchNames[0]
-        && facts.cells.get('synth 1').textContent !== sessions[0].patchNames[0],
-        `session ${otherSession} is "${sessions[otherSession].name}" at ${sessions[otherSession].used} B `
-        + `against session 0's "${sessions[0].name}" at ${sessions[0].used} B`);
+        && g1.count === sessions[otherSession].notes
+        && g1.count !== g0.count && g1.count > 0,
+        `session ${otherSession} is "${sessions[otherSession].name}" with ${g1.count} notes `
+        + `against session 0's "${sessions[0].name}" with ${g0.count}`);
       showSession(0);
 
       const stock = sessions.filter((x) => x.nearest < 16);
@@ -1993,8 +2156,14 @@
         const pl = player.getBoundingClientRect();
         const ground = (x) => getComputedStyle(x).backgroundColor;
         const wv = waveHost.getBoundingClientRect();
+        /* ⚠️ AND NOTHING INSIDE DRAWS A SECOND EDGE, which is the reported
+           fault rather than an extra: *"rm double bordering"*. MEASURED at the
+           time on `/radio/`: a component's 1 px against the glue's 1 px in the
+           same colour reads as one 2 px line. */
+        const inner = (x) => parseFloat(getComputedStyle(x).borderTopWidth);
         d.assert('the list, the picture and the transport are one box, in that order, with 1 px seams',
           glue.classList.contains('pos-glue') && glue.children.length === 3
+          && inner(glue) > 0 && inner(wave.canvas) === 0 && inner(bar.api.el) === 0
           && Math.abs(wv.top - t.bottom - 1) < 0.6
           && Math.abs(pl.top - wv.bottom - 1) < 0.6
           && ground(player) !== 'rgba(0, 0, 0, 0)'
@@ -2003,7 +2172,8 @@
           && ground(player) !== ground(glue),
           `seams ${(wv.top - t.bottom).toFixed(1)} and ${(pl.top - wv.bottom).toFixed(1)} px `
           + `with the tab open, the parts paint ${ground(sampleTable.el)}, ${ground(waveHost)} `
-          + `and ${ground(player)} against the glue's ${ground(glue)}`);
+          + `and ${ground(player)} against the glue's ${ground(glue)}, and inside it the `
+          + `picture draws ${inner(wave.canvas)} px and the transport ${inner(bar.api.el)} px`);
 
         /**
          * 🔴 THE PICTURE IS ASKED FOR INK RATHER THAN FOR A COLUMN COUNT, which
@@ -2037,22 +2207,32 @@
          * pack is 5,999 frames and the longest is 95,947, and a picture that
          * followed nothing would draw them identically.
          */
-        const f = wave.facts();
-        const drawn = wave.ink();
+        /* ⚠️ THE FACTS MOVED OFF THE COMPONENT AND ONTO THE PIXELS. The scope
+           is handed peaks and holds no opinion about frames or seconds, which
+           `wave-view` did; what it can still answer is whether it is drawing
+           MATERIAL or a scrolling stream, and the rest is the canvas itself. */
+        /* ⚠️ A FRAME IS WAITED FOR, AND WITHOUT IT THIS READ 0 LIT PIXELS ON A
+           PERFECTLY GOOD PICTURE. `wave-view` painted inside `set()`, so a
+           check could read the canvas on the next line; `grain-scope` paints on
+           its own `requestAnimationFrame` loop, the way a component drawing a
+           live stream has to. The difference is invisible in the source and
+           takes the ink assert red. */
+        const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await frame();
+        const drawn = waveInk();
         const byLen = samples.map((w, k) => ({ k, n: w.row.frames })).sort((a, b) => a.n - b.n);
         const other = byLen[0].k === 0 ? byLen[byLen.length - 1].k : byLen[0].k;
         openSample(other, false);
-        const g = wave.facts();
-        const second = wave.ink();
+        await frame();
+        const second = waveInk();
         openSample(0, false);
+        await frame();
         d.assert('the picture really follows the open sample, because two different ones draw differently',
-          f.frames === samples[0].row.frames
-          && Math.abs(f.seconds - samples[0].row.seconds) < 0.002
-          && f.cols > 64 && drawn.ink > 0
-          && g.frames === samples[other].row.frames && g.frames !== f.frames
-          && second.ink !== drawn.ink,
-          `${samples[0].name} is ${f.frames.toLocaleString()} frames and ${drawn.ink} lit pixels, `
-          + `${samples[other].name} is ${g.frames.toLocaleString()} and ${second.ink}`);
+          wave.showing() === 'material' && drawn > 0 && second > 0 && second !== drawn
+          && samples[other].row.frames !== samples[0].row.frames,
+          `${samples[0].name} is ${samples[0].row.frames.toLocaleString()} frames and `
+          + `${drawn} lit pixels, ${samples[other].name} is `
+          + `${samples[other].row.frames.toLocaleString()} and ${second}`);
         tabs.go(was);
       }
 
@@ -2113,10 +2293,10 @@
          suite behind it. */
       playBtn.click();
       d.assert('and the transport really lets go of it, so a looping sample can be got out of',
-        voice === null && looping === true && wave.facts().position === 0
+        voice === null && looping === true && deck.position() === 0
         && deck.transport.playing === false,
         `the voice is ${voice === null ? 'gone' : 'still held'}, the toggle is still on, `
-        + `the head is parked at ${wave.facts().position} and the deck is `
+        + `the head is parked at ${deck.position()} and the deck is `
         + `${deck.transport.playing ? 'still playing' : 'stopped'}`);
       loopBtn.click();
 

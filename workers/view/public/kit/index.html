@@ -222,6 +222,16 @@
   .kit-hwrow { width: 100%; }
   .kit-hwrow + .kit-hwrow { margin-top: 18px; }
   .kit-hwitems { min-width: 0; }
+  /* 🔴 THE FOUR SHAPES SIDE BY SIDE, ASKED FOR AS *"align channel strips
+     horiztlly"*. They were four full width rows stacked, which is a picture of
+     four separate demonstrations; a channel strip is the four TOGETHER, and
+     nothing about that reads off a column of them.
+     ⚠️ IT WRAPS RATHER THAN SCROLLING. Four groups do not fit a phone and a
+     horizontal scroll inside a page that also scrolls is the thing `shell.css`
+     already refuses everywhere else. */
+  .kit-hwstrips { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px 30px; }
+  .kit-hwstrips > .kit-hwrow { width: auto; }
+  .kit-hwstrips > .kit-hwrow + .kit-hwrow { margin-top: 0; }
   /* The vertical twins, beside the horizontal ones they are meant to match. */
   .kit-vrow { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
 
@@ -355,6 +365,7 @@
   import { MOVE_GLYPH, MOVE_OFF, MOVE_SAYS } from '/shell/hand.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createTabs } from '/shell/tabs.mjs';
+  import { createNoteGrid } from '/shell/note-grid.mjs';
   import { createCard, createCardGrid } from '/shell/card.mjs';
   import { DEMOS } from '/manifest.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
@@ -1126,6 +1137,46 @@ log.add(decode(bytes))     // false if it was a flood and was not listed`,
    * passes `publish: false`. Asserted both ways, because a page where nothing
    * claimed it and a page where two did would look the same from the count.
    */
+  /**
+   * 🔴 THE NEWEST COMPONENT, AT THE TOP OF ITS GROUP, WHICH IS THIS PAGE'S OWN
+   * RULE. Built 2026-09-21 after `/pack/` was asked twice for it: *"can we see
+   * actual notes on timeline"*, then *"so can you show notes in timeline in
+   * pack?"*.
+   * 🔴 AND IT IS DELIBERATELY NOT `strip.mjs`, which is the component directly
+   * below it and the reason this specimen sits here rather than anywhere else.
+   * A strip draws marks against a DECK, in milliseconds, and its mark colour is
+   * reserved for HOW A MARK LANDED. A Circuit pattern has no milliseconds in it
+   * and the thing worth seeing is PITCH, which a strip has no axis for.
+   */
+  section('timeline', 'NOTE GRID',
+    'Note events where they fall in a pattern: one row per pattern, sixteen steps '
+    + 'across, pitch up the row on one scale for the whole picture and velocity as alpha.',
+    `const grid = createNoteGrid(host)
+grid.set(notesIn(sessionBytes))   // [{ region, step, note, velocity }]`,
+    (box) => {
+      /* Two patterns a reader can check by eye: a rising line and a falling
+         one, at the same steps, so the axis is provable from the picture
+         rather than only from the caption. */
+      const ev = [];
+      for (let i = 0; i < 8; i++) {
+        ev.push({ region: 0, step: i * 2, note: 52 + i * 3, velocity: 20 + i * 15 });
+        ev.push({ region: 4, step: i * 2 + 1, note: 73 - i * 3, velocity: 127 - i * 14 });
+      }
+      const grid = createNoteGrid(box, { label: 'one rising pattern and one falling' });
+      grid.set(ev);
+      /* 🔴 THE AXIS IS ASSERTED RATHER THAN DESCRIBED, which is what this page
+         is for: a specimen nothing grades is a picture of a component that may
+         already have stopped working. A higher note must sit higher, and two
+         patterns must be two rows. */
+      const f = grid.facts();
+      const first = grid.place(ev[0]), last = grid.place(ev[14]);
+      d.assert('a higher note sits higher, and two patterns are two rows',
+        f.regions === 2 && f.count === 16 && last.y < first.y && last.row === first.row,
+        `${f.count} notes in ${f.regions} rows, ${f.lo} to ${f.hi}, `
+        + `note ${ev[14].note} at y ${last.y.toFixed(1)} above note ${ev[0].note} at `
+        + `y ${first.y.toFixed(1)}`);
+    });
+
   section('timeline', 'TRANSPORT BAR',
     'The whole row, the two things a page can take off it, and the one pair it refuses.',
     `createTransportBar(host, deck)                       // everything
@@ -3016,7 +3067,12 @@ f.set(104, { from: 'hardware', quiet: true })`,
    * ⚠️ **WHEN THEY ARE ADOPTED THEY MOVE UP.** If this comment is still here and
    * they are in a shipped page, the move was forgotten.
    */
-  section('hardware', 'CHANNEL STRIP: KNOB, PAD, HALF PAD, FADER',
+  /* 🔴 THE FOUR NAMES CAME OFF THE HEADING 2026-09-21, ASKED FOR AS *"rm :
+     KNOB, PAD, HALF PAD, FADER"*. Each of the four has its own section on this
+     page already, the snippet below names all four constructors, and a heading
+     that lists its own contents is the caption the contents already are. It is
+     the same cut the row headings inside this block took the day before. */
+  section('hardware', 'CHANNEL STRIP',
     'The four shapes a hardware layout is built from, with the knobs on a Novation '
     + 'Circuit’s measured macros, CC 80 to 87. A knob is dragged up and down rather than '
     + 'turned, and the last control in every row is disabled.',
@@ -3037,11 +3093,13 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
        * *"which is the whole difference"*, which is the author explaining his own
        * demonstration.
        */
+      const strips = el('div', 'kit-hwstrips');
+      box.append(strips);
       const row = () => {
         const r = el('div', 'kit-hwrow');
         const inner = el('div', 'kit-hwitems');
         r.append(inner);
-        box.append(r);
+        strips.append(r);
         return inner;
       };
 
