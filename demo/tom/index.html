@@ -748,11 +748,30 @@
   // `api` is what it publishes; reaching through the wrong one threw on load
   // and the page died with `__demo` never published, which the probe saw as
   // every reading coming back `undefined`.
-  bar.el.querySelector('.tbar-toggle')?.addEventListener('click', () => {
+  /**
+   * 🔴 BOTH WAYS IN, AND I ONLY WIRED ONE. Reported: *"i can not get the stop
+   * working. when i press space white playing it does not reset"*, and the bar
+   * is why: `transport-bar.mjs`'s key table calls `cmd.pause()` DIRECTLY rather
+   * than pressing its own button, so a listener on the button never sees the
+   * space bar at all.
+   * 🔴 AND MY CHECK AGREED WITH THE BUG BECAUSE IT CLICKED. It drove the toggle
+   * with `.click()`, which is the path that worked, and never pressed the key,
+   * which is the path a person uses. `positron-verify`'s rule is to measure the
+   * quantity in question; this measured one next to it.
+   * ⚠️ ONE FUNCTION, TWO LISTENERS. The alternative was a second copy of the
+   * rewind behind the key, and two copies of one decision is how they come to
+   * disagree.
+   * ⚠️ AND THE KEY LISTENER IS ADDED AFTER THE BAR'S, so it runs after the bar
+   * has decided what the press meant, and it asks the transport what state it
+   * ended in rather than assuming the press toggled it.
+   */
+  function rewindIfStopped() {
     setTimeout(() => {
       if (!deck.transport.playing && deck.position() > 0) deck.seek(0);
     }, 0);
-  });
+  }
+  bar.el.querySelector('.tbar-toggle')?.addEventListener('click', rewindIfStopped);
+  addEventListener('keydown', (e) => { if (e.key === ' ') rewindIfStopped(); });
   setBpm(BPM_AT_1);
 
   // ⚠️ THE PAGE NEVER RE-PUBLISHES `__demo.transport`. `createTransportBar`
@@ -1625,6 +1644,34 @@
       && erased.join() === '0,0,0,0',
       `drew ${drew.join('')} then ${afterUp} after the release, `
       + `and a stroke starting on a lit pad left ${erased.join('')}`);
+  }
+
+  /**
+   * 🔴 THE STOP IS DRIVEN BY THE KEY AND NOT BY A CLICK, BECAUSE THAT IS THE
+   * DIFFERENCE THAT HID THE BUG. `transport-bar.mjs`'s key table calls
+   * `cmd.pause()` directly rather than pressing its own button, so the stop
+   * worked under `.click()` and did nothing under the space bar, and the check
+   * that only clicked reported green while the owner could not stop the page.
+   * ⚠️ A REAL `keydown` ON THE WINDOW, which is where the bar listens, rather
+   * than calling the page's own handler. Calling the handler would grade the
+   * handler; dispatching the key grades the wiring, and the wiring was what was
+   * missing.
+   */
+  if (SELFCHECK) {
+    const key = () => dispatchEvent(new KeyboardEvent('keydown',
+      { key: ' ', bubbles: true, cancelable: true }));
+    const tick = () => new Promise((r) => { setTimeout(r, 0); });
+    deck.seek(7 * STEP_MS);
+    key();                                  // plays
+    const started = deck.transport.playing;
+    key();                                  // stops, and the page rewinds
+    await tick();
+    const after = Math.round(deck.position());
+    const stopped = !deck.transport.playing;
+    d.assert('space plays, and pressing it again stops and returns to the first column',
+      started === true && stopped === true && after === 0,
+      `space started it (${started}), stopped it (${stopped}) and left the playhead `
+      + `at ${after} ms`);
   }
 
   /**
