@@ -202,9 +202,20 @@
        out closer to the field than to white, so the only thing a reader could
        see was the edge, which is why the edge was asked for twice and then
        removed. The light is the fill now and there is nothing else. */
+    /* 🔴 TWO BRIGHTNESSES, AND THE DIM ONE IS THE DEFAULT. Asked 2026-09-21:
+       *"nonplaying hilited col should be way less bright"*. A full white column
+       on a stopped page is the loudest thing on screen saying nothing is
+       happening, and it competes with the lit steps a reader is actually
+       editing. Playing, it is white; stopped, it is barely more than the field,
+       which is enough to say where the playhead is parked and no more. */
     --tom-now: #dfe6ef;
     --tom-on: #e3c168;
   }
+  /* ⚠️ THE BRIGHT VALUE AND THE BREATHING BOTH HANG OFF ONE ATTRIBUTE, set from
+     the deck's own state rather than guessed from whether positions are
+     arriving. A stopped grid does not animate at all, which is the rule about
+     not running a frame loop to draw a still picture, one property along. */
+  .tom-rows:not([data-live]) .tom-cell { animation: none !important; }
   @keyframes tom-breathe {
     0%, 100% { opacity: .78; }
     50%      { opacity: 1; }
@@ -440,6 +451,8 @@
     deck.schedule({ at: i * STEP_MS, kind: 'step', id: `s${i}`, payload: { step: i, at: i * STEP_MS } });
   }
 
+
+
   /**
    * 🔴 IT LOOPS BY ITSELF, ASKED FOR AS *"make it autoloop"* after *"rm loop for
    * now"*, and the two are the same instruction seen from both ends: a sixteen
@@ -462,6 +475,12 @@
    * length is part of the bar: seeking at `SPAN` would hold the last step for
    * one extra frame every lap and the pattern would drift against a metronome.
    */
+  /** Bright while it runs, barely there while it is parked. */
+  function setLive(on) {
+    if (on) rowsEl.dataset.live = '1';
+    else delete rowsEl.dataset.live;
+  }
+
   function wrapAt(pos) {
     if (!deck.playing?.()) return;
     if (pos < SPAN - 1) return;
@@ -622,14 +641,30 @@
   {
     // The sixteen column rules, generated from the one constant that knows.
     const sheet = document.createElement('style');
-    sheet.textContent = Array.from({ length: STEPS }, (_, i) =>
-      `.tom-rows[data-now="${i}"] .tom-cell:nth-child(${i + 1}){`
-      // ⚠️ THE FILL AND NOTHING ELSE, asked for as *"lose hilite borders"*
-      // against a crop showing a bright edge round a dark pad. A lit pad on the
-      // instrument is a lit pad: the light IS the fill, and an edge drawn round
-      // it is the bordered cursor coming back one property at a time.
-      + 'background:var(--tom-now);'
-      + 'animation:tom-breathe 1.4s ease-in-out infinite}').join('\n');
+    /**
+     * 🔴 TWO RULES A STEP, AND THE PARKED ONE CHANGES NO COLOUR AT ALL.
+     * Reported 2026-09-21 against a crop: *"hilite should not kill my 1st col
+     * beat bg color"*. A parked playhead was REPLACING the background, so
+     * column 1, which is a bar and therefore the lightest field on the grid,
+     * lost the one thing that said so. Every fourth pad is a beat and every
+     * sixteenth a bar, in the field, and a highlight that overwrites the field
+     * deletes that for whichever column it is on.
+     * ✅ `filter: brightness()` LIFTS WHATEVER IS THERE rather than replacing
+     * it, so a bar column parked under the playhead is still visibly a bar, and
+     * a lit step under it is still visibly lit.
+     * ⚠️ PLAYING IS THE OTHER RULE AND IT DOES REPLACE, deliberately: a running
+     * playhead is the loudest thing on the grid and has nothing to share with.
+     * ⚠️ THE FILL AND NOTHING ELSE, asked for as *"lose hilite borders"*. A lit
+     * pad on the instrument is a lit pad: the light IS the fill, and an edge
+     * round it is the bordered cursor coming back one property at a time.
+     */
+    sheet.textContent = Array.from({ length: STEPS }, (_, i) => {
+      const at = `.tom-cell:nth-child(${i + 1})`;
+      return `.tom-rows[data-now="${i}"] ${at}{filter:brightness(1.85)}\n`
+        + `.tom-rows[data-live][data-now="${i}"] ${at}{`
+        + 'filter:none;background:var(--tom-now);'
+        + 'animation:tom-breathe 1.4s ease-in-out infinite}';
+    }).join('\n');
     document.head.append(sheet);
   }
   panel.strip.append(gridEl);
@@ -798,6 +833,27 @@
    */
   const plate = createNameplate({ lines: ['POSITRON', 'TOM'], place: 'ends' });
   panel.el.prepend(plate.el);
+
+  /**
+   * 🔴 THE PLAY STATE COMES OFF THE TRANSPORT'S OWN LISTENER, AND MY FIRST TRY
+   * WAS A DEAD OPTION. I passed `onState` to `createDeck`, which takes no such
+   * option, so it was accepted, ignored and never called: the column stayed dim
+   * forever and the source read as correct. That is this project's most
+   * expensive shape, a guard that does nothing while looking like it does, and
+   * the only reason it was caught is that the assert below reads the COMPUTED
+   * colour in both states rather than trusting the attribute.
+   * ⚠️ `deck.transport.onState` IS THE REAL HOOK and it hands back an
+   * unsubscribe. A page that inferred playing from positions arriving would
+   * call a paused deck playing for one more frame and a seeking one playing
+   * forever, which is reading the event next to the state instead of the state.
+   * 🔴 AND IT SUBSCRIBES HERE RATHER THAN BESIDE THE DECK, BECAUSE IT FIRES
+   * IMMEDIATELY. Placed next to `createDeck` it ran while `rowsEl` and
+   * `rulerEl` were still in their temporal dead zone, and the page said so:
+   * `Cannot access 'rowsEl' before initialization`, twice, in its own log. A
+   * `const` shadows its whole block from the top, which this project has
+   * already paid for once when seven asserts went silent on it.
+   */
+  deck.transport.onState((st) => setLive(!!st?.playing));
 
   const ro = new ResizeObserver(() => sizeCells());
   ro.observe(panel.strip);
@@ -1434,15 +1490,38 @@
         await raf2();
         const want = stepAt(deck.position());
         const row0 = cells[0] || [];
-        const lit = getComputedStyle(row0[want]).backgroundColor;
-        const dark = getComputedStyle(row0[(want + 1) % STEPS]).backgroundColor;
-        d.assert('the pads of the playing column light up, and the ones beside them do not',
+        /**
+         * 🔴 THREE CLAIMS, AND THE FIRST TRY MEASURED A QUANTITY THAT CANNOT
+         * MOVE. It compared `backgroundColor` across the two states and read
+         * `field 35, parked 29, playing 229`: parked came out DARKER than the
+         * field, because a parked playhead changes no colour at all. It lifts
+         * what is there with `filter: brightness()`, which `getComputedStyle`
+         * reports under `filter` and never under `backgroundColor`. That is
+         * this project's measure-the-adjacent-quantity mistake again, and the
+         * page was behaving exactly as asked while the check said otherwise.
+         * ✅ SO: parked LIFTS AND REPLACES NOTHING, which is what keeps a bar
+         * column's own field colour; playing REPLACES and stops lifting.
+         */
+        const at = row0[want];
+        const parkedBg = getComputedStyle(at).backgroundColor;
+        const parkedFx = getComputedStyle(at).filter;
+        // The same cell with the playhead elsewhere, which is the only honest
+        // reference for "its own colour survived".
+        rowsEl.dataset.now = String((want + 1) % STEPS);
+        const ownBg = getComputedStyle(at).backgroundColor;
+        rowsEl.dataset.now = String(want);
+        setLive(true);
+        const liveBg = getComputedStyle(at).backgroundColor;
+        const liveFx = getComputedStyle(at).filter;
+        setLive(!!deck.transport.playing);
+        d.assert('a parked playhead lifts the pad without replacing its field, and a playing one replaces it',
           rowsEl.dataset.now === String(want)
-          && lit !== dark
           && tickEls[want].dataset.now === '1'
-          && window.__demo.readout.step === want + 1,
-          `step ${want + 1} of ${STEPS}: its pads are ${lit} against ${dark} next door, `
-          + `readout says ${window.__demo.readout.step}`);
+          && window.__demo.readout.step === want + 1
+          && parkedBg === ownBg && /brightness/.test(parkedFx)
+          && liveFx === 'none' && liveBg !== ownBg,
+          `parked keeps ${parkedBg} under ${parkedFx}, playing paints ${liveBg} `
+          + `with filter ${liveFx}`);
       }
 
       /**
