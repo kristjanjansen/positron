@@ -1,5 +1,85 @@
 ## Open
 
+### /pack/ and a rule, 2026-09-21
+
+- **`do not show diargam when no file`**. The picture on the patches tab is
+  drawn at rest carrying the reference's own default patch, and that was asked
+  for on the same day as *"reserver space when no active one"*. This reverses
+  that half: nothing on screen until a file lands.
+  ⚠️ **IT TAKES THE `reserve` ASSERTS WITH IT.** Two of `/pack/`'s checks are
+  about the picture having its full height before a pack is open and not moving
+  when one does. A hidden picture cannot be measured, so what replaces them is
+  the absence itself: the diagram is NOT in the document at rest and IS after a
+  file opens.
+  ⚠️ And the standing `How it works` heading is part of the diagram block, so it
+  goes with it rather than standing over nothing.
+
+- **`open file -> Open file`**. The drop button's label takes a capital.
+
+- **`rm nothing has been opened`**. The drop note's resting line.
+  ⚠️ `drop.mjs`'s header argues that line is STRUCTURAL rather than polite: a
+  box with words in it cannot lose to `.pos-stack > div:empty { display: none }`,
+  which is how `/wish/` measured a host at 0 px. That argument does not reach
+  here, because the note is inside `.pos-drop-area` rather than a direct stack
+  child, and `.pos-drop-note` carries `min-height: 1.5em` of its own.
+
+- **`Novation Circuit Bank Part 1.circuitpack inside Synth-Patches.com -
+  Soundbank for Novation Circuit and Tracks.zip - should be file uplaod block
+  footer, glued`**. The line naming what was opened becomes a FOOTER of the
+  upload block, sharing its edge rather than sitting inside its padding.
+  ⚠️ **IT RECONCILES WITH THE LINE ABOVE RATHER THAN FIGHTING IT.** A footer
+  with a border and nothing in it is an empty box painting a rule nobody wrote,
+  which `positron-ui` already forbids in those words. So the footer EXISTS only
+  when it has something to say, which is also what `rm nothing has been opened`
+  asks for, and the two requests are one mechanism.
+
+- 🔴 **`five synths??`**, asked against a screenshot of the regions table
+  reading `synth 1` through `synth 5`. **THE OWNER IS RIGHT AND THE PAGE WAS
+  PUBLISHING A READING AS A FACT.** A Circuit has TWO synth parts. The sixteen
+  1,508 byte regions are called `synth` by `circuit-session.mjs` with **no
+  corroboration anywhere in the module**, while the two patches it really does
+  find are decoded out of the TAIL region and line 122 marks even those as a
+  reading. So the file's own measured content contradicts the label sitting on
+  sixteen other regions.
+  ⚠️ **THIS IS THE FOURTH TIME IN TWO DAYS**, after `User Session`, the four
+  byte head and the unique hash. Each one was a LABEL being read as CONTENT.
+  ⚖️ The counts fit `2 synths x 8 patterns` and `4 drums x 8 patterns`, which is
+  probably where the names came from. That is inference and is marked as such.
+  ✅ The page names regions by their measured offset and stride now and claims
+  nothing about what they hold.
+
+- **`field / value ... - convert to readout`**, said against the session facts
+  table. The field and value pairs become readout cells instead of a two column
+  table. ⚠️ `mount()` THROWS on an odd cell count and the facts are eleven, so
+  one has to go or two have to merge, and `positron-ui` says the odd one is
+  always the weakest cell rather than something to pad.
+
+- **`still no sample viewer / player`**. The samples tab has a table that
+  sounds on a press and no PICTURE of a sample and no transport. A waveform view
+  and a player are what was asked for.
+
+- 🔴 **`rm all 1 sessions differ from each other, and the emptiest is 84.7 per
+  cent filled, so this is somebody's work rather than a pack of blanks etc
+  texts`**. The whole verdict block under the sessions table goes, every branch
+  of it, not one sentence.
+  ⚠️ **IT TAKES THREE ASSERTS AND TWO NEGATIVE CONTROLS WITH IT**, which is a
+  real loss and is recorded rather than glossed: the blanks control, the mostly
+  copies middle ground and the `29 of real work` line all grade `sayVerdict`.
+  ✅ **THE EVIDENCE SURVIVES BECAUSE IT WAS NEVER IN THE SENTENCE.** The
+  `nearest` column shows the byte distance on every row, and the page's own
+  comment already said that is there so a reader never has to take the verdict's
+  word for it. What is gone is the conclusion, not the measurement.
+
+- **`ok sampler pack is there. glue the trasport to top of table`**. A transport
+  bar glued to the TOP of the samples table, one component rather than two
+  blocks. `createGlue` takes a rest parameter and `/wish/` proved three parts
+  work, so the shape exists.
+
+- **`no empty table headers (add rule)`**. A column name over no rows labels
+  air. `table.mjs` already hides its heading when it blanks and `/pack/` already
+  asserts it; what was asked for is the RULE, so it goes in `positron-ui` where
+  the table rules live, with the two places it can still be broken named.
+
 ### /wish/, layout, 2026-09-21
 
 - **`make it a single component, 3 parts, glued. in top is patch list

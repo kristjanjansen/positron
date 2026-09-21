@@ -4478,10 +4478,17 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    `--line2` at 1 px because it is at rest. One idea, two intensities, so the
    thing that lights up is recognisably the thing that was waiting. */
 .pos-drop-area {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0;
   border: 1px dashed var(--line2); border-radius: 4px;
-  background: var(--card); padding: 16px; width: 100%;
+  background: var(--card); padding: 0; width: 100%; overflow: hidden;
   transition: border-color .12s ease, background .12s ease;
+}
+/* ⚠️ THE PADDING MOVED OFF THE AREA AND ONTO THIS, so the footer below can span
+   the block edge to edge. A footer sitting inside the block's padding is a line
+   with a gap each side of it, which reads as a stray rule rather than a foot. */
+.pos-drop-body {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  padding: 16px;
 }
 /* ⚠️ `[data-over]` MATCHES ON PRESENCE, which is why drop.mjs DELETES it rather
    than setting it empty. `video-panel.mjs` set `= ''` and kept a panel in its
@@ -4513,7 +4520,18 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    `display: none`, because `.pos-stack > div:empty { display: none }` is (0,2,1)
    and won. A line with words in it cannot lose that fight, so this one always
    says something, starting with `nothing has been opened`. */
+/* 🔴 THE FOOTER, GLUED TO THE BLOCK IT BELONGS TO. Asked for 2026-09-21 as
+   *"should be file uplaod block footer, glued"*. It is the same idea as
+   `.pos-glue`'s 1 px seam: one box, and a hairline saying where the answer
+   starts.
+   🔴 AND IT IS `hidden` WHEN IT HAS NOTHING TO SAY, which `drop.mjs` does,
+   because a strip with a border and no words is an empty box painting a line
+   nobody wrote. That is the `/typist/` defect exactly, where a childless
+   readout drew a 2 px band 24 px above the controls and was reported as old UI
+   creeping in. */
 .pos-drop-note {
   font: 400 12px/1.5 var(--mono); color: var(--dim2);
-  min-height: 1.5em;
+  border-top: 1px solid var(--line2);
+  padding: 8px 16px; background: var(--card2);
 }
+.pos-drop-note[hidden] { display: none; }
