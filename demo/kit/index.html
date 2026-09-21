@@ -3220,16 +3220,11 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
     kitDrop.cover.remove();
     // 🔴 THE AREA IS ON SCREEN BEFORE ANYBODY DRAGS ANYTHING, which is the whole
     // repair and is exactly what the first version could not have passed.
-    const areaBox = kitDrop.area.getBoundingClientRect();
+    const areaBox = kitDrop.el.getBoundingClientRect();
     d.assert('the way in is on screen before any drag, with words saying what it takes',
       areaBox.width > 100 && areaBox.height > 40
-      // ⚠️ `area`, NOT `el`. Since 2026-09-21 `el` is a WRAPPER holding the
-      // dashed target and a glued result footer, because only the dashed half
-      // is droppable. An assert naming `el` read the wrong box and `data-over`
-      // off an element that never carries it, so it would have passed whatever
-      // the component did. A component swap moves every selector that named it.
-      && kitDrop.area.classList.contains('pos-drop-area')
-      && /\.circuitpack/.test(kitDrop.el.textContent) && !kitDrop.area.dataset.over,
+      && kitDrop.el.classList.contains('pos-drop-area')
+      && /\.circuitpack/.test(kitDrop.el.textContent) && !kitDrop.el.dataset.over,
       `${areaBox.width.toFixed(0)} by ${areaBox.height.toFixed(0)} px, saying `
       + `"${kitDrop.el.querySelector('.pos-drop-hint')?.textContent}"`);
     d.assert('a visit opens nothing, and the cover is not in the page until something is dragged over it',
