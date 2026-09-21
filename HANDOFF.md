@@ -1,6 +1,6 @@
 # Handoff, 2026-09-21, session 39
 
-**Eleven commits, a clean tree, five new demos, four new kit modules, three
+**Twelve commits, a clean tree, five new demos, four new kit modules, three
 plans and four pieces of research. Nothing is deployed.** Five of the six new
 standing rules at the top of `CLAUDE.md` came out of a defect this session
 shipped and then caught.
@@ -17,15 +17,13 @@ git push --force-with-lease=main:4add3238cd812195db75fddfe405786fe5359a8b origin
 gh auth switch --user Kristjan-Jansen_enefit
 ```
 
-🔴 **AND EVERYTHING BELOW IS UNCOMMITTED.** This session did not commit, because
-committing was not asked for. In a shared checkout that is a real hazard: a peer
-session running `git add -A`, or a `git commit` with no path list, sweeps all of
-it into a commit about something else. The path limited form:
-
-```sh
-git commit -F msg.txt -- demo/evo demo/model demo/circuit demo/kit demo/manifest.mjs \
-  demo/shell/midi-log.mjs demo/shell/shell.css plans/ research/ CLAUDE.md LAYOUT.md BACKLOG.md
-```
+✅ **EVERYTHING BELOW IS COMMITTED AND THE TREE IS CLEAN.** This paragraph said
+the opposite for most of the session, which was true when written and stopped
+being true at `f373cac`. Twelve commits, all on
+`session-28-station-videoradio`, none pushed.
+⚠️ **EVERY ONE WAS PATH LIMITED**, because two agents were writing in this
+checkout for part of it. A hook in `.claude/hooks/` refuses `git add -A` here
+now, and it refused one of mine, correctly.
 
 ## What is new, and where to open it
 
@@ -211,13 +209,20 @@ Each one cost something before it was written down.
 
 1. **The 32 user sessions off the Circuit.** Asked for, still not done, and it
    is the part of the backup that is missing.
-2. **`origin/main`**, above.
-3. **Commit this session's work**, above.
-4. 🔌 **NOBODY HAS PLAYED THE CIRCUIT FROM A COMPUTER, AND THERE ARE NOW TWO
+2. **`origin/main`**, above. It is the only thing here that needs a person
+   rather than a decision.
+3. 🔌 **NOBODY HAS PLAYED THE CIRCUIT FROM A COMPUTER, AND THERE ARE NOW TWO
    PAGES WAITING ON IT.** `/bay/` can route a keyboard into it and `/shape/`
    can move 98 of its parameters, and neither has been heard. It is one cable
    already patched, one press, and it settles the whole chain.
+4. **The pack reader and the drum machine.** `demo/shell/unzip.mjs` already
+   opens a `.circuitpack` with nothing vendored;
+   `plans/plan-circuit-samples.md` §8 has the order.
 5. **`/circuit/`: how wide the card should be**, unchanged from last session.
 6. **`/model/`: three layout asks.** Channel strip content to the bottom, main
    and sub to the bottom, title to the right.
-7. **No page is graded on a phone.** The harness runs at 756 px.
+7. **No page is graded on a phone**, and that now includes five new ones. The
+   harness runs at 756 px and never enters a media query.
+8. **Nothing is deployed.** The last build stamp made here is in the tree; a
+   deploy would put `/evo/`, `/model/`, `/bay/`, `/wish/` and `/shape/` up and
+   would 404 `/rack/`, which is the intended outcome.
