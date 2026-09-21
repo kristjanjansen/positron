@@ -552,9 +552,15 @@
       // is not published, on purpose, so a run there grades the page's load time
       // half and nothing else. A check nobody can run must say it did not run.
       d.log('the pack here is not published, so the reading checks did not run', 'bad');
-      d.assert('the pack in this repository is readable, or the page says it is not',
-        openNote.textContent === notPublished && !PACK_HERE,
-        `not published at ${location.hostname}, and the page says so`);
+      // ⚠️ IT PRESSES THE BUTTON RATHER THAN READING WHAT THE PAGE SAYS, and
+      // the first version did the second thing and went red on the deploy for
+      // it: the sentence is produced BY the press, and this block runs before
+      // the harness gets there. An assert over a state nothing has reached yet
+      // is an assert about load order.
+      d.button('here')?.click();
+      d.assert('where the pack is not published the button says so, and asks nobody for it',
+        openNote.textContent === notPublished && !PACK_HERE && fetched === 0,
+        `at ${location.hostname} it says "${openNote.textContent}" after ${fetched} request(s)`);
     } else {
       await openPack('New Pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
 
