@@ -7,48 +7,342 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* 🔴 THE CARD HUGS THE PANEL AND THE PANEL SCROLLS SIDEWAYS ON A PHONE.
-     Both decisions are `/circuit/`'s and both were paid for there over an
-     evening of screenshots, so they are copied deliberately rather than
-     re-derived: a keyboard is 25 keys wide and there is no phone width at
-     which that becomes a column of something else.
-     ⚠️ THE SCROLLER NEEDS `min-width: 0` OR IT DRAGS THE WHOLE PAGE SIDEWAYS.
-     Measured on this project at 390 px: `overflow-x` cannot shrink a flex item
-     below its content. The scrolling happens in this box or in the document,
-     and only one of those is a design. */
-  .evo-scroll { overflow-x: auto; min-width: 0; }
-  .evo {
-    display: flex; flex-direction: column;
-    width: 100%; min-width: max-content;
-    gap: 22px;
-    /* The foot is deeper than the sides, as on `/circuit/`: the bottom row is
-       keys, and a key carries no label under it to hold it off the edge. */
-    padding: 20px 20px 34px; background: var(--card);
+  /* ════════════════════════════════════════════════════════════════════════
+     PART ONE: WHAT TRAVELS.
+
+     🔴 A HARDWARE PANEL ON THIS SITE IS A FIXED COLUMN BESIDE A SCROLLING
+     STRIP, AND THIS IS THE FOURTH COPY OF THAT IDEA. Asked 2026-09-21:
+     *"generalize the evoltion layout to reusable components / use from others.
+     same patters"*. MEASURED across the three that already exist: `/model/`
+     calls them `.rack-wrap` and `.rack-row`, `/circuit/` calls them
+     `.circ-panel` and `.circ-scroll`, and this page called them `.evo-wrap`
+     and `.evo-strip`. Three names for one thing, which is exactly the standing
+     rule that a control existing in one page and nowhere else is a component
+     nobody has spotted yet. This one exists in three.
+     🔴 **THE EXTRACTION IS NOT DONE HERE AND MUST NOT BE.** Two other agents
+     are writing in this checkout, one of them inside `demo/shell/shell.css`,
+     and three agents writing one shared component is the hand-rolled control
+     rule arriving by a different road. What this block does instead is make the
+     extraction cheap: every class in it is named for its ROLE rather than for
+     this instrument, and everything below the second banner is about the
+     MK-425C in particular and should stay behind.
+
+     ── THE CONTRACT THIS PANEL ACTUALLY RELIES ON ────────────────────────────
+     Written down because a caller doing arithmetic about a component's insides
+     is a page that breaks the moment the component gains a label, and this is
+     the same thing one level up.
+
+     1. `.pan-fixed`'s WIDTH is its widest child and nothing else. Here that is
+        the keypad group, at three control columns plus its own padding, so the
+        column comes out 176 px and the display and the wheels stretch to it.
+        A caller that wants a different width changes what is IN the column.
+     2. `.pan-strip` SCROLLS and `.pan-flow` inside it is `width: max-content`,
+        so the panel keeps its own width at every window size and the strip is
+        what moves. The strip needs `min-width: 0` or `overflow-x` cannot shrink
+        it below its content and the PAGE drags sideways instead: measured on
+        this project at 390 px as 141 px of page overflow.
+     3. The two are `align-items: stretch`, so the column is the full DEPTH of
+        the panel whatever is in the strip, and `.pan-flow` takes `height: 100%`
+        so its own tallest-growing child can absorb the slack. Bottom alignment
+        would make them END together and say nothing about their heights.
+     4. THE BORDER BETWEEN THEM IS THE EDGE OF THE SCROLL REGION and lives on
+        the fixed column's right edge. See its own note.
+     5. `.pan-plate` sits at a FIXED POSITION IN THE FLOW between two known
+        neighbours. It must never be a `space-between` row across the panel:
+        that is the measured bug this rebuild was handed, and it put the model
+        name 500 px off the right edge of the screen.
+     ════════════════════════════════════════════════════════════════════════ */
+
+  .pan {
+    display: flex; flex-direction: column; min-width: 0;
+    padding: 20px; background: var(--card);
     border: 1px solid var(--line); border-radius: 4px;
   }
-  .evo-brands { display: flex; justify-content: space-between; }
-  .evo-brand { font-size: 13px; letter-spacing: 0.14em; color: var(--dim); }
-  /* Sentence case on every label, for `/circuit/`'s reason: the kit shouts a
-     pad's legend, which is right on a page of headings and wrong on a picture
-     of a panel. The two printed names are artwork and keep their case. */
-  .evo .pos-pad-top, .evo .pos-pad-bot { text-transform: none; }
-  .evo-panel { display: grid; justify-content: center; gap: 22px; }
-  .evo-top { display: flex; gap: 22px; align-items: flex-start; }
-  .evo-knobs { display: flex; gap: 10px; }
-  .evo-btns { display: flex; gap: 10px; }
-  /* 🔴 THE DISPLAY IS DRAWN AND IS NOT A CONTROL. A blue backlit LCD with a
-     three digit field and a small two digit one, per the manual. Nothing on
-     the wire reports what it is showing, so it shows what this page knows and
-     says so on hover rather than inventing a reading. */
-  .evo-lcd {
-    min-width: 92px; padding: 6px 10px; border: 1px solid var(--line);
-    border-radius: 3px; background: #0d1830; color: #8fb6ff;
-    font: 600 18px/1.1 var(--mono, ui-monospace, monospace);
-    display: flex; align-items: baseline; gap: 6px; justify-content: space-between;
+  .pan-wrap { display: flex; align-items: stretch; min-width: 0; }
+
+  /* 🔴 THE COLUMN THAT DOES NOT SCROLL, AND IT IS A SIBLING OF THE SCROLLER
+     RATHER THAN `position: sticky` INSIDE IT. `/model/`'s reasoning, with the
+     fixed side swapped from right to left: sticky would work and would cost
+     more, because a sticky child needs a background to hide what passes under
+     it, a shadow to say it is over its neighbours, and it lands on top of the
+     scrollbar. Two flex children need none of that. */
+  .pan-fixed { flex: 0 0 auto; display: flex; flex-direction: column; }
+
+  /* 🔴 THE RIGHT BORDER IS THE EDGE OF THE SCROLL REGION, AND IT IS THE ONE
+     LINE ON THIS PANEL THAT IS RIGHT. Asked 2026-09-21: *"add right border to
+     the sticky left panel, like model12"*, and `/model/` keeps the mirror of it
+     for the mirror of the reason: *"the channels SCROLL under this lane, so
+     there is no fixed neighbour to stack with. What sits to its left is
+     whichever strip happens to be scrolled there, and the border is what tells
+     a reader where the scrolling stops."*
+     ⚠️ **IT DOES NOT CONTRADICT `separation is spacing, not lines`, AND THE
+     DIFFERENCE IS WORTH STATING BECAUSE THREE OTHER LINES CAME OFF THIS PANEL
+     TODAY.** A connector between two adjacent buttons says *these belong
+     together*, which position already says, so it is a second channel repeating
+     the first. This border says *the thing to the left stays put while the
+     thing to the right moves under it*, which spacing cannot carry and which a
+     reader dragging the strip needs to know.
+     ✅ **AND IT IS THE AFFORDANCE.** It replaces the edge shade that came off
+     on instruction, in a channel that does not read as a rendering fault.
+     ⚠️ MEASURE THE COMPUTED VALUE, NEVER THE DECLARATION. `.pos-glue` exists
+     for children giving up their border and radius, and a border stripped by a
+     rule nobody wrote is this project's fifth measured dead rule. The page
+     asserts the computed width. */
+  .pan-fixed { border-right: 1px solid var(--line); padding-right: 16px; }
+  .pan-strip { flex: 1 1 auto; min-width: 0; overflow-x: auto; margin-left: 16px; }
+  .pan-flow {
+    width: max-content; height: 100%; display: flex; flex-direction: column;
+    align-items: stretch;
   }
-  .evo-lcd small { font-size: 11px; opacity: 0.75; }
-  .evo-lower { display: flex; gap: 22px; align-items: flex-end; }
-  .evo-wheels { display: flex; gap: 10px; }
+  /* A row of control groups across the strip. */
+  .pan-row { display: flex; align-items: flex-end; }
+  /* A group of controls the panel prints a box around. */
+  .pan-group {
+    background: var(--card2); border: 1px solid var(--line); border-radius: 5px;
+  }
+
+  /* 🔴 THE NAMEPLATE, AT A FIXED POSITION IN THE FLOW. Asked 2026-09-21:
+     *"evolution title + model nr goes to the right of transpose, centered,
+     scrolls with overflow"*, which is where the real instrument has it: the
+     back strip runs display, function buttons, the octave pair bracketed to
+     `TRANSPOSE`, then the logo with `MK-425C` under it, then the rotaries.
+     🔴 **AND IT IS NOT THE BUG THIS REBUILD WAS HANDED, WHICH WAS NOT ABOUT
+     SCROLLING.** MEASURED on the old page at 1280 px: `.evo-brands` was a
+     `space-between` row stretched across the panel's full 1575 px, so
+     `evolution` landed at x 317 and `MK-425C` at **x 1780**, 500 px off the
+     right edge of the screen. Nobody had ever seen the model name. A centred
+     block between two known neighbours is reachable by scrolling to it; a
+     `space-between` far edge, positioned by a width the KEYBOARD set, is not.
+     ⚠️ **`EVOLUTION` IS ON THE REAR-FACING LIP OF THE REAL CASE, NOT THE TOP**,
+     where a top-down photograph reads it mirrored. So this is not a facsimile
+     of where the silkscreen is. It is the nameplate a player sees, which is the
+     logo plus the model number in the middle of the strip.
+     ⚠️ UPPERCASE, AND THE SAME THREE DECLARATIONS `/circuit/` AND `/model/`
+     GOT TODAY. Three replicas whose nameplates are set three ways read as three
+     pages rather than as one shelf of instruments. */
+  .pan-plate { align-self: center; text-align: center; }
+  .pan-plate-l {
+    font: 600 11px/1.5 var(--mono); letter-spacing: .14em; color: var(--dim2);
+    text-transform: uppercase; white-space: nowrap;
+  }
+
+  /* Two display fields sharing one window the panel draws. See the note on the
+     display below for why that is a page's job and not the component's. */
+  .pan-win {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 7px 9px;
+    background: var(--disp-back); border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+
+  /* 🔴 A PRINTED LABEL, AND WHAT GOES IN ONE IS THE PANEL'S OWN WORDS. `.pan-cap`
+     sits above a group, `.pan-sub` below a control or a pair of them. Both are
+     typed uppercase in the source even though the rule uppercases them anyway,
+     which is the house rule: `/circuit/` rendered `NOVATION` correctly while its
+     source typed `novation`, leaning on the stylesheet, and the assert graded
+     the ink and stayed green either way. */
+  .pan-cap, .pan-sub {
+    font: 500 8px/11px var(--mono); letter-spacing: .1em;
+    text-transform: uppercase; pointer-events: none;
+  }
+  .pan-cap { color: var(--dim); letter-spacing: .16em; }
+  .pan-sub { color: var(--dim2); text-align: center; }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     PART TWO: WHAT STAYS. THE MK-425C'S OWN PARTS.
+
+     🔴 THE PANEL IS ONE STRIP ALONG THE BACK AND ONE COLUMN AT THE LEFT END,
+     AND THE KEYS FILL EVERYTHING ELSE. That is the whole layout of a real
+     MK-425C, read off three photographs of two privately owned units plus the
+     manufacturer's own in `research/evo-mk425c-face-2026-09-21.md`, and it is
+     also exactly how the owner described it, so there was no design decision to
+     take: *"left is sticky area a la model12 rigth area. led on top, below 3x4
+     digits and wheels below"* and *"put funciton buttons, -+ and rotaty to the
+     top. its a overflow panel along withy stn keyboard component"*.
+
+     🔴 **AND IT IS A DRAWING IN THIS PROJECT'S IDIOM, NOT A FACSIMILE OF THE
+     SILKSCREEN.** Four instructions in one afternoon point the same way: half
+     height keypad buttons, no connector lines, and both black header bars gone.
+     What has to be faithful is what the controls ARE, where they SIT relative
+     to each other, and what they are CALLED. The printed graphics that group
+     them, the bars and the brackets and the rules, are a surface's only way of
+     saying *these belong together*; a web page has spacing and position, which
+     say it better and are already standardised here.
+     ✅ **AND THAT AGREES WITH A STANDING RULE RATHER THAN FIGHTING ONE:
+     SEPARATION IS SPACING, NOT LINES.** `shell.css` sets one vertical rhythm
+     precisely so a divider is a second channel saying what the spacing already
+     says, and `.pos-head` carries a note saying exactly that. It is the diagram
+     rule from the other end too: `join: false` exists for a container whose own
+     box already carries the relationship, because a line there *"just gives the
+     eye something to follow that leads nowhere"*.
+     ════════════════════════════════════════════════════════════════════════ */
+
+  .pan.evo { gap: 0; }
+  .evo-wrap { gap: 0; }
+  .evo-fixed { gap: 12px; }
+  .evo-row { gap: 20px; }
+  /* The wheels are the FRONTMOST thing on the case, at the very edge nearest
+     the player, so they go to the foot of the column whatever room is left. */
+  /* 🔴 AND THEY ARE CENTRED. Asked 2026-09-21: *"align pitch / mod to centr"*.
+     ⚠️ **THERE ARE TWO CENTRES HERE AND THIS PANEL HAS BOTH, so which one is
+     measured matters.** The column's own centre is one reading and the centre of
+     the keypad above them is the other. MEASURED: the keypad group is the widest
+     thing in the column, so the column's content width IS the keypad's width and
+     the two centres coincide to within the group's own 1 px borders. The page
+     asserts BOTH rather than picking, which is the `/model/` lesson: that page
+     was corrected by screenshot twelve times in one evening and every correction
+     was plausible reasoning a rect would have refused. */
+  .evo-wheels { margin-top: auto; display: flex; justify-content: center; }
+
+  /* ── the display ───────────────────────────────────────────────────────── */
+  /* 🔴 THE SMALL FIELD IS AT THE BOTTOM LEFT AND THE THREE DIGITS FILL THE
+     RIGHT TWO THIRDS, which is the order both of the manual's own LCD
+     illustrations draw and is the reverse of what this box shipped with on the
+     first run of this rebuild.
+     🔴 AND THERE IS NO LED ANYWHERE ON THIS INSTRUMENT. *"led on top"* names
+     the display, which is topmost because it sits in the top-left CORNER of the
+     case. Reading it as a separate indicator would put a part on the replica
+     that the object does not have. */
+  .evo-win { gap: 10px; }
+
+  /* ── the keypad: twelve buttons, and both counts are true ──────────────── */
+  /* 🔴 `10 assignable buttons` AND `a 3x4 grid` ARE ONE OBJECT COUNTED TWICE.
+     The ten are `0` to `9`; the other two are `-` and `+`, documented
+     separately as *"+/- buttons. Dual press function sends out Snap Shot
+     command."* So the marketing copy and the owner's sketch never disagreed.
+     🔴 IT IS A TELEPHONE KEYPAD, NOT A CALCULATOR ONE: `1 2 3` on the TOP row
+     and `- 0 +` on the bottom, with `0` between the two. Getting that backwards
+     is the easiest mistake available here, and the old page made a different
+     one, drawing `0` to `9` in source order so `0` came first.
+     🔴 **AND THE BUTTONS ARE HALF HEIGHT.** Asked 2026-09-21: *"evo: half
+     height buttons in numpad"*.
+     ⚠️ **MEASURED BEFORE SHRINKING ANYTHING, BECAUSE A PAD RESERVES SLOTS EVEN
+     WHEN EMPTY AND THAT RESERVATION CAN BE MOST OF A BLOCK'S HEIGHT.** Here it
+     is not: the grid was **268 px = 4 buttons at 184 + 4 digit slots at 48 + 3
+     gaps at 24**, and **zero foot slots were reserved**, because `.pos-pad-bot`
+     is only created when a bottom label is given. So 69 per cent of the height
+     was the working surface and the furniture was 18 per cent, which is what
+     makes `half` the right lever rather than a change that would look wrong and
+     not answer the report. It takes the grid to 176 and the column to 472.
+     ⚠️ AND IT IS CLOSER TO THE PANEL, NOT FURTHER FROM IT: the real buttons are
+     about 1.45 times wider than they are tall, so squat is the right direction
+     and square never was. */
+  .evo-keypad { display: flex; flex-direction: column; padding: 10px; }
+  /* The digit is printed ABOVE each button on the panel rather than on its
+     face, which is what `--ctl-head` already reserves. */
+  .evo-keypad .pos-pad-top { color: var(--dim); }
+  .evo-snapbox { margin-top: 6px; }
+
+  /* ── the wheels ────────────────────────────────────────────────────────── */
+  .evo-wheelrow { display: flex; align-items: flex-start; gap: 6px; }
+  /* 🔴 `MAX` AND `MIN` ARE PRINTED ONCE IN THE GAP AND SERVE BOTH WHEELS, so
+     they belong to the row rather than to either fader, and they mark the ENDS
+     OF THE TRAVEL rather than the top and bottom of a column.
+     🔴 **AND THEY ARE PLACED FROM PUBLISHED TOKENS, WHICH IS THE WHOLE TRICK.**
+     The first run of this rebuild used `space-between` over the row's full
+     height precisely to avoid arithmetic about a fader's insides, and
+     PHOTOGRAPHED it read as `max` captioning the value readout beside it and
+     `min` captioning the slot number: both labels correct, both attached to the
+     wrong thing. `--fdr-lane-h` is the lane's own height and `--ctl-head` is
+     what the control layout contract reserves above a working surface.
+     ⚠️ AND THE `4px` IS A RESERVATION THE KIT DOES NOT PUBLISH. MEASURED:
+     `.pos-fdr-lane` carries `margin: 4px 0 5px`, so a fader's top edge to its
+     lane's top edge is `--ctl-head` plus four, and the contract has no token for
+     the four. The first build of this row was out by exactly that and the assert
+     named the number. It is typed here, once, beside the thing it governs. */
+  .evo-wheelmid {
+    display: flex; flex-direction: column; justify-content: space-between;
+    height: var(--fdr-lane-h, 120px);
+    margin-top: calc(var(--ctl-head) + 4px);
+  }
+  /* 🔴 `PITCH …` AND `MODULA…`, PHOTOGRAPHED ON THE FIRST RUN. A fader's label
+     is `nowrap` with an ellipsis at the control's own width, which is the right
+     rule for a row of faders and wrong for two wheels whose printed names are
+     wider than they are. This project's own rule is that an ellipsis is the
+     SIGNAL that a word is in the wrong place, so the answer is not a shorter
+     word: the panel prints `PITCH BEND` under a wheel narrower than the phrase,
+     and it wraps. */
+  .evo-wheels .pos-fdr-lab {
+    white-space: normal; overflow: visible; text-overflow: clip;
+  }
+
+  /* ── the six function buttons ──────────────────────────────────────────── */
+  /* 🔴 SIX, NOT EIGHT, AND FIVE DUAL PRESS LABELS RATHER THAN EIGHT. Eight is
+     the MK-449C. The manual's own footnote gives six single press functions and
+     five dual press ones for this model and then adds *"Additional unlabelled
+     dual press functions: Velocity Curve, Device ID, Memory Dump"*, so three
+     real abilities are NOT printed on a 425C's face, because six buttons leave
+     five gaps. A replica of the face draws five.
+     🔴 **AND NO GROUP LABEL, WHICH IS THE SECOND BAR TO COME OFF.** Asked
+     2026-09-21: *"rm funciton buttons / assignable buttons labels"*. Each of
+     these six already has its own name printed above it, so a heading saying
+     *these are buttons with functions* is furniture you read once and look
+     past: the diagram rule that a container takes no note, arriving on a panel.
+     🔴 THE LABELS ARE DRAWN BY THE PAGE RATHER THAN IN THE PAD'S OWN SLOTS,
+     because on this panel they are WIDER THAN THE BUTTONS and very nearly touch
+     each other. `.pos-pad-top` is `nowrap` with an ellipsis at the pad's own
+     width, which is the right rule for a control in a row and would have cut
+     `CHANNEL` to `CHANNE…` on every one of these six. Absolutely positioned
+     they overlap exactly as the printing does, and the row stays as narrow as
+     its buttons.
+     ⚠️ EVERY POSITION IS DERIVED FROM `--i` AND THE SHARED PITCH, never typed.
+     A label placed by hand is a label that moves when `--ctl-w` does. */
+  .evo-fn-row {
+    --fn-gap: 10px; --fn-top: 26px; --fn-bot: 24px;
+    position: relative; display: flex; gap: var(--fn-gap);
+    padding: var(--fn-top) 0 var(--fn-bot);
+  }
+  .evo-fn-lab, .evo-fn-pair {
+    position: absolute; width: 82px; margin-left: -41px;
+    white-space: pre-line;
+  }
+  /* the single press name, above its own button, sitting on the lower of the
+     two printed lines so a one word name lines up with a two word one */
+  .evo-fn-lab {
+    top: 0; height: var(--fn-top); display: flex; align-items: flex-end;
+    justify-content: center; color: var(--dim);
+    left: calc(var(--i) * (var(--ctl-w) + var(--fn-gap)) + var(--ctl-w) / 2);
+  }
+  /* 🔴 THE DUAL PRESS NAME, ON THE MIDPOINT OF THE PAIR IT BELONGS TO. With the
+     connector gone the centring is the only thing saying it belongs to BOTH
+     buttons rather than to the left one, so it is no longer decoration and the
+     page asserts it against real rects. */
+  .evo-fn-pair {
+    bottom: 0; height: var(--fn-bot);
+    left: calc(var(--i) * (var(--ctl-w) + var(--fn-gap)) + var(--ctl-w) + var(--fn-gap) / 2);
+  }
+
+  /* ── the octave pair ───────────────────────────────────────────────────── */
+  /* 🔴 TWO ROUND BLUE BUTTONS, IN THE BACK STRIP, NOWHERE NEAR THE WHEELS. The
+     old page grouped them WITH the wheels, which is a count without a layout.
+     They are the only round buttons and the only coloured ones on the panel. */
+  .evo-oct { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .evo-oct-row { position: relative; display: flex; gap: 12px; padding-bottom: 16px; }
+  .evo-oct .pos-pad { --pad-tint: #7fb2ff; }
+  /* Coloured at rest, which is a fact about the object rather than a state this
+     page is claiming: `--pad-tint` is the component's own published knob, so
+     this is not a page writing a colour the component cannot override. */
+  .evo-oct .pos-pad:not([data-on]) {
+    background: color-mix(in srgb, var(--pad-tint) 16%, var(--card));
+    border-color: color-mix(in srgb, var(--pad-tint) 45%, var(--line));
+  }
+  .evo-oct-lab { position: absolute; left: -20px; right: -20px; bottom: 0; }
+
+  /* ── the eight rotaries ────────────────────────────────────────────────── */
+  /* 🔴 ONE ROW OF EIGHT, `C1` TO `C8`, LEFT TO RIGHT, WITH A PRINTED DIVIDER
+     BETWEEN `C4` AND `C5`. The divider is the one thing that could mislead
+     somebody into calling this two rows of four; all three photographs agree
+     there is one row.
+     ⚠️ **AND IT IS THE ONE PRINTED LINE KEPT ON THIS PANEL.** It does not tie
+     two controls together, which is what every connector that came off today
+     did: it marks a 4 and 4 split inside ONE row, which the research names as
+     the feature most likely to be misread as two rows. Removing it would lose a
+     fact rather than a graphic. Reversible in one declaration. */
+  .evo-rot { display: flex; align-items: flex-end; gap: var(--ctl-gap); padding: 8px 10px; }
+  .evo-rot-div { align-self: stretch; width: 0; border-left: 1px solid var(--line2); }
+  .evo-rot .pos-knob-lab { color: var(--dim); }
+
+  /* ── the keys ──────────────────────────────────────────────────────────── */
   /* 🔴 THE KEYS ARE A PICTURE, NOT A CONTROL SURFACE, AND THAT IS WHY THEY DO
      NOT TAKE A POINTER. This keyboard has no sound engine in it: it is a
      controller, so a key that lit when you pressed it on screen would be
@@ -56,18 +350,61 @@
      light when the real ones are played and at no other time.
      ⚠️ A DISABLED BUTTON WOULD BE THE WRONG TOOL. `disabled` is a `return` in
      front of a handler and this project has already lost sixteen asserts to
-     one, twice in a day; these keys have no handler to guard. What is wanted
-     is a surface that never offered a press in the first place. */
+     one, twice in a day; these keys have no handler to guard. What is wanted is
+     a surface that never offered a press in the first place. */
   .evo-keys { pointer-events: none; }
-  .evo-keys .kbd .pad { display: none; }
+  /* 🔴 `.kpad`, AND THE OLD RULE SAID `.pad`, WHICH MATCHED NOTHING. A dead
+     selector reads as correct, and this one had never hidden anything: the
+     keyboard's own control row was on this page all along, so a replica of a
+     controller with no octave buttons on its keys carried an octave pair and a
+     `Notes off` button underneath them. PHOTOGRAPHED on the first screenshot of
+     this rebuild, which is the fifth dead rule this project has measured.
+     ⚠️ THEY ARE HIDDEN RATHER THAN DISABLED because they are the KIT's octave
+     controls, for a keyboard somebody plays from a computer. This one is a
+     picture of somebody else's instrument and the octave pair it really has is
+     in the back strip, drawn separately and lit by nothing. */
+  .evo-keys .kbd .kpad { display: none; }
+  /* 🔴 THE KEYS GROW TO THE DEPTH OF THE CASE, AND THAT IS FOUR OVERRIDES INTO
+     A COMPONENT, SO HERE IS WHY. MEASURED on the first run of this rebuild: the
+     left column came out 552 px deep, because a display over a four row pad
+     grid over two faders is that tall, and the back strip plus a 74 px key came
+     to 224. That left 328 px of empty card under the keyboard, and the keys read
+     as floating at the back of a deep case.
+     🔴 **IT IS A SCALE MISMATCH BETWEEN TWO KIT COMPONENTS AND NEITHER IS
+     WRONG.** A kit key is 74 px because that is a playable target; a kit pad is
+     46 px for the same reason. On the real instrument a key is 15 cm and a
+     keypad button is about 1 cm, so the ratio the object has is 15:1 and the
+     ratio the kit has is 1.6:1. `/circuit/` and `/model/` never met this because
+     neither has a keyboard. The keys are 28 to 98 per cent of the case's depth,
+     so growing them is the faithful direction and shrinking the panel is not.
+     ⚠️ A PERCENTAGE FOR THE SHARP, NOT THE COMPONENT'S 46 px. That absolute is
+     62 per cent of 74, and left as it is a grown white key would carry a stubby
+     black one. The ratio is what the component means. */
+  .evo-keys, .evo-keys .kbd { display: flex; flex-direction: column; margin: 0; }
+  .evo-keys, .evo-keys .kbd, .evo-keys .keys { flex: 1 1 auto; min-height: 0; }
+  .evo-keys .keys { margin-bottom: 0; }
+  .evo-keys .k { height: auto; }
+  .evo-keys .k.sharp { height: 62%; }
+  /* 🔴 A KEY ON THIS KEYBOARD DOES NOT GROW SIDEWAYS, BECAUSE IT IS A DRAWING AT
+     A FIXED SCALE. `.keys` sizes its columns `minmax(--k-min, 1fr)`, which is
+     right for a keyboard somebody plays: a key fills whatever room it is given.
+     Inside a `max-content` box that `1fr` resolves to the KEY's own max-content,
+     which measured 86 px a white key and drew a two octave keyboard 1297 px wide
+     against a 925 px panel. Pinned to `--k-min` the keys are 49 px, the keyboard
+     is 777 px, and it sits at about three quarters of the panel's width, which is
+     what the photographs show.
+     ⚠️ IT ALSO MEANS THE KEYBOARD NEVER SCROLLS INSIDE THE STRIP, so there is
+     one scroller on this page and not two. The page asserts that. */
+  .evo-keys .keys { grid-template-columns: repeat(var(--k-cols, 8), var(--k-min, 49px)); }
   .evo-log { margin-top: 0; }
 </style>
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createKnob } from '/shell/knob.mjs';
-  import { createPad } from '/shell/pad.mjs';
+  import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader } from '/shell/fader.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createSegment, SCHEMES } from '/shell/segment.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
   import { createPresenceButton } from '/shell/presence.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -79,18 +416,27 @@
    * fail differently:
    *   - **WHAT IT SENDS** is measured, off this desk through `/dump/` on
    *     2026-09-20, and is in `measured-devices-2026-09-20.md`.
-   *   - **WHERE THE CONTROLS ARE** is READ, out of a 2006 Getting Started
-   *     guide, and is the weakest claim on this page.
-   * 🔴 **AND THAT SECOND HALF IS WEAKER HERE THAN ON EITHER OTHER PANEL.**
-   * `/circuit/` was laid out from Novation's own artwork at 800 dpi. Evolution
-   * Electronics no longer exists, there is no artwork to read, and the manual
-   * gives a NUMBERED LIST of controls rather than a picture of them. So the
-   * counts below are documented and the ARRANGEMENT is this page's arithmetic:
-   * eight knobs over ten buttons, wheels at the left of the keys, which is
-   * where every 25 key controller of that decade put them.
-   * ⚠️ **A COUNT IS NOT A LAYOUT**, which is the mistake the Model 12 page made
-   * and was corrected for twice by somebody looking at the object. Anybody with
-   * this keyboard in front of them should correct what is below.
+   *   - **WHERE THE CONTROLS ARE** is READ, and it is now read off
+   *     photographs rather than off a numbered list.
+   * 🔴 **AND THAT SECOND HALF USED TO BE THE WEAKEST CLAIM ON THIS PAGE AND NO
+   * LONGER IS.** It was eight knobs over ten buttons with the wheels at the left
+   * of the keys, which is where every 25 key controller of that decade put them,
+   * and the note here said so and asked anybody with the instrument in front of
+   * them to correct it. Somebody did, and
+   * `research/evo-mk425c-face-2026-09-21.md` then settled every part of it off
+   * three manual PDFs and three photographs of two privately owned units.
+   * ⚠️ **A COUNT IS NOT A LAYOUT**, which is what the old arrangement was, and
+   * it was wrong in six separate ways: the rotaries were named `1` to `8`, the
+   * keypad was ten buttons in source order rather than twelve in a telephone
+   * grid, the octave pair sat with the wheels, there were no function buttons at
+   * all, the keyboard was twenty five white keys with no black ones, and the
+   * nameplate was 500 px off the edge of the screen.
+   * ⚠️ **THE ONE THING IN THAT RESEARCH THAT IS A TRAP**: the Advanced User
+   * Guide PDF titled `MK-425C / MK-449C / MK-461C` has a photograph of a
+   * DIFFERENT KEYBOARD on its cover, with a red seven segment LED, a master
+   * volume slider where the keypad goes, and no rotaries. It is the highest
+   * resolution "MK-425C" picture on the open web. Anything drawn from it would
+   * look deliberate and would be a different instrument.
    */
 
   /**
@@ -99,9 +445,12 @@
    * ⚠️ AND IT IS NOT A CONSTANT OF THE INSTRUMENT. Every controller on it can
    * carry its own channel, set from the keypad, held in non volatile memory,
    * and written down nowhere. One program button was measured sending on
-   * channel 1 while the other nine sent on 2. So this page listens on ALL
-   * channels and reports the channel it heard, rather than filtering on a
-   * number that is a setting somebody can change without a record.
+   * channel 1 while the other nine sent on 2, and the manual explains the
+   * mechanism: a controller assigned to channel `00` transmits on the global
+   * one, so a button explicitly set to 1 is somebody's per control assignment.
+   * So this page listens on ALL channels and reports the channel it heard,
+   * rather than filtering on a number that is a setting somebody can change
+   * without a record.
    */
   const GLOBAL_CH = 2;
 
@@ -114,20 +463,124 @@
    * ⚠️ **SO THE KEYS ARE DRAWN WHERE THE WIRE SAYS THEY ARE**, and the page
    * says what the range means rather than quietly correcting it. Drawing 48 to
    * 72 and shifting what arrives would hide the one thing worth reporting.
+   * 🔴 **AND THE KEY PATTERN WAS DRAWN WRONG UNTIL THIS REBUILD, WHICH IS A
+   * MEASUREMENT AND NOT A READING.** The note handed to this page said not to
+   * touch the pattern, on the grounds that `createKeyboard` decides black or
+   * white from the OFFSET from the base note, so `base: 47` would draw a
+   * correctly C to C shaped picture while printing `B2` on the leftmost key.
+   * **It does not.** It decides from `sharps.has(k)`, which tests the LETTER
+   * this keyboard is played from against a set of computer keys, and this page
+   * passes twenty five synthetic names `k0` to `k24` that are in no set.
+   * MEASURED at 756 px: **25 white keys, 0 black, `--k-cols: 25`**, so a two
+   * octave keyboard was a chromatic row of twenty five identical white slivers
+   * 1297 px wide. That is the arrangement `shell.css`'s own comment calls *"a
+   * chromatic row rather than a keyboard, and nobody can find C on one"*.
+   * ✅ SO THE PATTERN IS DECLARED BELOW AND HANDED OVER, and the page asserts
+   * the picture rather than the count. What the old assert checked was
+   * `kbd.notes()`, which was 25 notes from 47 and perfectly true, and blind to
+   * there being no black keys in the drawing at all.
+   * ⚠️ **WHAT THE NOTE WAS RIGHT ABOUT IS THE NAMES**, and that half is kept:
+   * the shape is a C to C keyboard because the instrument is one, and the
+   * leftmost key still prints `B2` because that is the note the wire carries.
+   * Correcting the base to make the names read `C3` would hide the transpose;
+   * correcting the shape to start on B would draw an instrument that does not
+   * exist.
+   * ⚠️ **IT IS ALSO TESTABLE FOR FREE AND HAS NOT BEEN TESTED.** The manual's
+   * non volatile memory list names the controller assignments, the draw bar
+   * mode, the two data bytes, the global channel and the last used preset, and
+   * it does NOT name transpose or octave. So switching the keyboard off and on
+   * and playing the bottom key says whether this minus one is a live transpose
+   * somebody left set or the instrument's own base.
    */
   const KEY_LO = 47, KEYS = 25;
 
   /**
-   * 🔴 SIX CONTROLLER NUMBERS FOR EIGHT KNOBS, AND WHICH KNOB IS WHICH IS NOT
-   * KNOWN. Measured: CC 84, 72, 74, 71, 93 and CC 5 all arrived from the knob
-   * row, and neither manual prints a default for any knob of any preset.
+   * 🔴 THE KEYBOARD IS 15 WHITE AND 10 BLACK, THE BLACKS IN GROUPS OF 2, 3, 2,
+   * 3, WITH A WHITE AT EACH END. Counted off the manufacturer photograph and
+   * both user photographs: the leftmost key is a white one with no black to its
+   * left, and the rightmost is a white one with no black to its right and a
+   * white immediately before it. That is C up to C, two octaves.
+   * ⚠️ TYPED OFF THE PHOTOGRAPH RATHER THAN DERIVED FROM A PITCH CLASS TEST, so
+   * the drawing and the check against it come from two places and can disagree.
+   * A set built by one expression and asserted against the same expression
+   * agrees perfectly while being wrong, which is the trap that re-credited a
+   * recording in the MIM corpus.
+   */
+  const KEY_PATTERN = 'WBWBWWBWBWBWWBWBWWBWBWBWW';
+
+  /**
+   * 🔴 THE EIGHT ROTARIES ARE NAMED `C1` TO `C8`, LEFT TO RIGHT, AND THAT IS
+   * NOW A MAP RATHER THAN A DISCOVERY ORDER. Reported 2026-09-21: *"rotators:
+   * labels c1 to c8. they are not same order as phsyical buttons"*, and read
+   * against the photographs that is two faults and neither of them is a left to
+   * right reversal. The old page called them `1` to `8`, and it had no order at
+   * all: it bound a controller number to a knob in the sequence the numbers
+   * first arrived on the wire, so the knob a reader turned and the knob that
+   * moved on screen were related only by which they happened to turn first.
+   * ✅ **THE INSTRUMENT PRINTS ITS OWN CONTROL NUMBER ON EVERY ASSIGNABLE
+   * CONTROL IT HAS**, so there is nothing left to discover about position: the
+   * rotaries are `C1` to `C8`, the pitch bend wheel is `C9`, the modulation
+   * wheel is `C10`, the ten keypad digits are 11 to 20, and the sustain socket
+   * on the back is printed `SUSTAIN - C21`. That is one flat numbering across
+   * the whole instrument and it closes with no remainder against the manual's
+   * documented total of 21 controls.
+   * ⚠️ **`C1` IS NOT `CC 1`.** These are the instrument's own control slots,
+   * and a reader who sees `C1` and thinks `CC 1` has been misled. Which MIDI
+   * controller number a given slot sends is a per preset, per unit setting held
+   * in non volatile memory and printed in none of the three manuals, which is
+   * the reason the number belongs in the hover and not on the face.
+   */
+  const ROTARIES = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'];
+  /** Where the printed divider line falls inside that one row. */
+  const ROTARY_SPLIT = 4;
+  /** The wheels' own printed slots, and both are on the panel under the wheel. */
+  const BEND_SLOT = 9, MOD_SLOT = 10;
+
+  /**
+   * 🔴 SIX FUNCTION BUTTONS, AND THE MANUAL'S OWN FOOTNOTE IS WHAT CONFIRMS
+   * SIX RATHER THAN EIGHT: *"There are also 8 function buttons (6 on the
+   * MK-425C)"*. Printed above each button is its single press function.
+   * ⚠️ TWO LINES WHERE THE PANEL PRINTS TWO LINES, which is why these are
+   * newline separated strings rather than words: `GLOBAL` sits over `CHANNEL`
+   * and `PROGRAM` sits on the lower of those two lines beside it.
+   */
+  const FN_ONE = ['GLOBAL\nCHANNEL', 'CONTROL\nASSIGN', 'PROGRAM',
+                  'DATA\nLSB', 'DATA\nMSB', 'RECALL'];
+  /**
+   * 🔴 FIVE DUAL PRESS LABELS, EACH BELONGING TO A PAIR OF ADJACENT BUTTONS,
+   * printed BELOW and centred on the midpoint of the pair. Six buttons leave
+   * five gaps, so the three further dual presses the manual lists (velocity
+   * curve, device ID, memory dump) are printed nowhere on a 425C. The 449C
+   * prints them, which is a fact about that face and not this one.
+   */
+  const FN_PAIR = ['CONTROL\nMUTE', 'CHANNEL\nASSIGN', 'CONTROL\nSELECT',
+                   'MIDI OUT\nFROM USB', 'STORE'];
+
+  /* ⚠️ U+2212 MINUS, NOT A HYPHEN, AND IT IS THE SAME CHARACTER THE OCTAVE PAIR
+     USES. Written two ways for one glyph on the first run of this rebuild, and
+     the keypad assert below caught it: the page rendered a hyphen and the check
+     was comparing against a minus. One mark on the panel is one character in
+     the source. */
+  const MINUS = '−';
+  /** The keypad, as the panel lays it out: `1 2 3` on top, `0` between `-` and `+`. */
+  const KEYPAD = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], [MINUS, '0', '+']];
+
+  /**
+   * 🔴 SIX CONTROLLER NUMBERS FOR EIGHT KNOBS, AND WHICH SLOT SENDS WHICH IS
+   * STILL NOT KNOWN. Measured: CC 84, 72, 74, 71, 93 and CC 5 all arrived from
+   * the knob row, and none of the three manuals prints a default for any knob
+   * of any preset. Appendix B lists what a control CAN be assigned to and never
+   * what it IS assigned to.
    * ⚠️ **CC 74 IS `cutoff` AND CC 5 IS `portamento time` BY CONVENTION, AND
    * THAT SAYS NOTHING ABOUT WHAT EITHER KNOB DOES.** This is the Yoshimi
    * lesson, measured on real hardware here: the standard meaning of a
    * controller number is a convention, never a fact about a device.
+   * ✅ **AND THE INSTRUMENT WILL ANSWER IT ONE KNOB AT A TIME, FOR FREE.** Turn
+   * a knob and its own display shows that knob's slot in the two digit field
+   * and the controller number assigned to it in the three digit field. Nobody
+   * has sat down and read all eight off.
    */
   const KNOB_CC_SEEN = [84, 72, 74, 71, 93, 5];
-  const KNOBS = 8, BUTTONS = 10;
 
   const d = mount({
     name: 'evo',
@@ -142,60 +595,101 @@
   });
   guard(d);
 
-  const root = el('div', 'evo');
-  const scroll = el('div', 'evo-scroll');
-  const panel = el('div', 'evo-panel');
-  const brands = el('div', 'evo-brands');
-  brands.append(el('div', 'evo-brand', 'evolution'), el('div', 'evo-brand', 'MK-425C'));
-  root.append(brands, panel);
-  scroll.append(root);
-  d.el.append(scroll);
+  const card = el('div', 'pan evo');
+  const wrap = el('div', 'pan-wrap evo-wrap');
+  const fixed = el('div', 'pan-fixed evo-fixed');
+  /* 🔴 THE SCROLLER TAKES FOCUS AND SAYS WHICH WAY IT GOES. That is the second
+     channel beside the fixed column's right border, it costs no pixels, and it
+     is the only one a reader who cannot see the border gets. */
+  const strip = el('div', 'pan-strip evo-strip', '', {
+    tabindex: '0', role: 'group',
+    'aria-label': 'the panel’s back strip and its keys, side scrolling',
+  });
+  const flow = el('div', 'pan-flow evo-flow');
+  strip.append(flow);
+  wrap.append(fixed, strip);
+  card.append(wrap);
+  d.el.append(card);
 
-  // ── the top row: a display, then eight knobs ────────────────────────────
-
-  const top = el('div', 'evo-top');
-  const lcd = el('div', 'evo-lcd');
-  lcd.append(el('span', '', '---'), el('small', '', '--'));
-  lcd.title = 'a blue backlit LCD, three digits and a small two digit field. '
-    + 'Nothing it shows is on the wire, so this one shows nothing';
-  top.append(lcd);
+  // ── the display, topmost in the left column ─────────────────────────────
 
   /**
-   * 🔴 A KNOB CLAIMS A CONTROLLER NUMBER ONLY ONCE IT HAS HEARD ONE, AND THE
-   * POSITION IS STILL A GUESS. Eight knobs are drawn because the manual counts
-   * eight. Six controller numbers have ever been seen. Nothing on the wire says
-   * which physical knob sent which number, so this page binds them in the order
-   * they first arrive and LABELS each one with the number it took.
-   * ⚠️ **IT IS A DISCOVERY ORDER, NOT A MAP**, and that distinction is the
-   * `/circuit/` drum grid mistake in a new costume: that page coloured a pad by
-   * a note's position in a discovery map and so reported the instrument while
-   * looking like it was reporting the beat. Here the CC number under the knob
-   * is the fact and the knob it sits under is the guess, which is why the
-   * number is printed where a reader can see it disagree with their hand.
+   * 🔴 A FIXED SEGMENT LCD WITH TWO NUMERIC FIELDS: A LARGE THREE DIGIT ONE AND
+   * A SMALL TWO DIGIT ONE, BOTH SEVEN SEGMENT. The manual's Default mode
+   * paragraph is the single best sentence about it: *"In Default mode, the LCD
+   * will show the controller symbol, and the 2 digit display will show the last
+   * selected controller. The 3 digits display the currently assigned MIDI CC
+   * number."*
+   * 🔴 **SO THE THREE DIGITS CARRY THE VALUE AND THE TWO CARRY WHICH CONTROL
+   * THE VALUE IS ABOUT**, and that pattern holds across every reading in the
+   * manual: a program change puts the program in the three and the channel it
+   * went on in the two, and `CONTROL ASSIGN` puts the controller number in the
+   * three and the selected control in the two.
+   * ⚠️ **THE TWO DIGIT FIELD IS BLANK FOR A ROTARY AND FILLED FOR A WHEEL, AND
+   * THAT IS THE HONEST DIFFERENCE RATHER THAN A GAP.** A wheel's slot is
+   * printed on the panel under it, so CC 1 arriving is known to be `C10`. A
+   * rotary sends a controller number and nothing on the wire says which of the
+   * eight slots sent it, so the field shows nothing. It is not a zero: a zero
+   * reads as a very confident measurement of nothing.
+   * ⚠️ AND IT WAS A MONOSPACE TEXT BOX UNTIL NOW, which read as an LCD because
+   * of its two colours and nothing else. `createSegment` draws every unlit bar
+   * faintly, which is the thing that actually makes a panel read as liquid
+   * crystal: you can see the `8` behind the `1`.
+   *
+   * 🔴 **THE REFLECTIVE SCHEME, AND IT IS THE MORE HONEST OF THE TWO CLAIMS.**
+   * Asked 2026-09-21: *"evo: inverse segmented one"*. A reflective display has
+   * no lamp behind it: it borrows the light in the room and the crystal goes
+   * DARK where it is driven, so it is near black bars on pale grey green.
+   * ⚠️ **AND IT MATCHES WHAT ANYBODY HERE HAS ACTUALLY LOOKED AT.** The manual
+   * says the backlight is blue, and the research could only report that as READ
+   * RATHER THAN SEEN: every photograph of an MK-425C it found was of a
+   * powered-down unit, and a powered-down LCD is exactly this, dark segments on
+   * pale grey green. So the backlit draw would be a picture of a sentence in a
+   * manual and this one is a picture of three photographs. Neither is a
+   * measurement of a lit panel, and nobody has switched this keyboard on and
+   * looked.
+   * ⚠️ THE SCHEME CARRIES ITS OWN GHOST VALUE AND NOTHING HERE HARD-CODES ONE.
+   * Both ghosts were raised twice today on report, so a number copied out of
+   * that module would already be two versions stale.
    */
-  const knobs = [];
-  const knobCC = new Array(KNOBS).fill(null);
-  const knobRow = el('div', 'evo-knobs');
-  for (let i = 0; i < KNOBS; i++) {
-    const k = createKnob({
-      label: `${i + 1}`, sub: 'unbound', min: 0, max: 127, value: 0,
-      title: 'a fully assignable rotary. Which controller number this one sends '
-           + 'has never been measured, so it takes the next one heard',
-      disabled: true,
-    });
-    knobs.push(k);
-    knobRow.append(k.el);
-  }
-  top.append(knobRow);
-  panel.append(top);
+  const win = el('div', 'pan-win evo-win');
+  const disp3 = createSegment({
+    digits: 3, frame: false, size: 38, scheme: 'reflective',
+    title: 'the three digit field. On this instrument it carries the value: a '
+         + 'controller number, a program number, or a velocity',
+  });
+  const disp2 = createSegment({
+    digits: 2, frame: false, size: 20, scheme: 'reflective',
+    title: 'the two digit field. It says which control the value is about, and '
+         + 'it is blank when nothing on the wire says which',
+  });
+  /* 🔴 THE WINDOW'S OWN GLASS COMES OUT OF THE SAME SCHEME THE FIELDS DO, and
+     that is why it is set from the module rather than declared in the
+     stylesheet. `:root`'s `--disp-back` is the BACKLIT colour, so a window
+     painted from the token would have been a dark blue pane behind grey green
+     digits: the page and the component disagreeing about which instrument this
+     is. One source, and the page asserts they still agree. */
+  win.style.setProperty('--disp-back', SCHEMES.reflective.back);
+  /* The small field FIRST, because it is at the bottom left of the real window
+     and the three large digits fill the right two thirds of it. */
+  win.append(disp2.el, disp3.el);
+  fixed.append(win);
 
-  // ── ten buttons, which are also the numeric keypad ──────────────────────
+  /** Both fields at once, so a reading can never be half replaced. */
+  function show(value, about) {
+    disp3.set(value);
+    disp2.set(about);
+  }
+
+  // ── twelve half height buttons, in a 3 wide by 4 tall grid ──────────────
 
   /**
    * 🔴 EACH PRESS SENDS THREE MESSAGES, NOT ONE. Measured: a bank select LSB, a
    * bank select MSB and then a program change. Nine buttons gave programs 1 to
    * 9 on channel 2, which is the documented `Program / Bank preset` assignment
-   * behaving as written.
+   * behaving as written, and the manual corroborates it: *"Try for instance
+   * preset 01 which has been setup to send program messages 01 to 10 on the 10
+   * assignable buttons."*
    * ⚠️ **AND THE TENTH SENT PROGRAM 0 ON CHANNEL 1.** One button carries an
    * explicit channel while the rest inherit the global one. It is unresolved,
    * and it is why the program number rather than the channel decides which
@@ -203,23 +697,52 @@
    * ⚠️ IN EDIT MODE THESE TEN ARE THE KEYPAD, which is why the manual says you
    * cannot select one by pressing it. They are controllers 11 to 20.
    */
-  const buttons = [];
-  const btnRow = el('div', 'evo-btns');
-  for (let i = 0; i < BUTTONS; i++) {
-    const p = createPad({
-      label: `${i}`, tint: '#7fb2ff', latch: false, disabled: true,
-      title: `program ${i}, sent with a bank select pair in front of it. `
-           + 'In edit mode this is the keypad digit ' + i,
-    });
-    buttons.push(p);
-    btnRow.append(p.el);
-  }
-  panel.append(btnRow);
+  const keypadBox = el('div', 'pan-group evo-keypad');
+  /**
+   * 🔴 THE WORD `ASSIGNABLE` LIVES IN THE HOVER, WHICH IS THE ONE THING KEPT
+   * WHEN THE PRINTED BAR CAME OFF. Asked 2026-09-21: *"rm funciton buttons /
+   * assignable buttons labels"*. The fact behind that bar is real and is not on
+   * the face any more: twelve keys with no name on them read as broken rather
+   * than as blank on purpose, and `ASSIGNABLE BUTTONS` is the only thing the
+   * real panel prints that says otherwise. So it goes where this page already
+   * keeps a fact a reader may want and does not need on the panel, which is
+   * exactly where the printed controller numbers went.
+   */
+  keypadBox.title = 'the ten assignable buttons, which the panel prints '
+    + 'ASSIGNABLE BUTTONS under. They are blank on purpose: each one sends '
+    + 'whatever it has been assigned, and in edit mode the ten are a keypad';
+  const keypad = createPadGrid({
+    cols: 3, rows: 4,
+    pad: (x, y) => {
+      const face = KEYPAD[y][x];
+      const digit = /\d/.test(face);
+      return {
+        /* The digit is printed above the button on the panel, not on it. */
+        top: face, half: true,
+        aria: digit ? `assignable button ${face}` : `${face} button`,
+        tint: '#7fb2ff', latch: false, disabled: true,
+        title: digit
+          ? `program ${face}, sent with a bank select pair in front of it. `
+            + `In edit mode this is the keypad digit ${face}`
+          : `${face}. Pressed together with the other one it sends a snap shot, `
+            + 'which is every controller’s current value at once',
+      };
+    },
+  });
+  /** Program number to the button that carries it, so a flash needs no arithmetic. */
+  const padByDigit = new Map();
+  KEYPAD.forEach((row, y) => row.forEach((face, x) => {
+    if (/\d/.test(face)) padByDigit.set(face, keypad.at(x, y));
+  }));
 
-  // ── the wheels and the keys ─────────────────────────────────────────────
+  /* `SNAP SHOT` is what the `-` and `+` pressed together do, printed under the
+     bottom row. The bracket that used to tie it to them is gone; the label is
+     centred across the row those two buttons end. */
+  const snap = el('div', 'pan-sub evo-snapbox', 'SNAP SHOT');
+  keypadBox.append(keypad.el, snap);
+  fixed.append(keypadBox);
 
-  const lower = el('div', 'evo-lower');
-  const wheels = el('div', 'evo-wheels');
+  // ── the two wheels, frontmost on the case ───────────────────────────────
 
   /**
    * 🔴 THE PITCH BEND WHEEL IS SEVEN BIT INSIDE A FOURTEEN BIT MESSAGE.
@@ -232,17 +755,59 @@
    * this instrument does not do.
    */
   const bend = createFader({
-    label: 'pitch', min: 0, max: 16383, value: 8192,
-    title: 'pitch bend. Seven bit in a fourteen bit message, and it was measured '
-         + 'reaching 13952 rather than 16383',
+    label: 'pitch bend', sub: `C${BEND_SLOT}`, min: 0, max: 16383, value: 8192,
+    title: 'pitch bend, printed C9 on the panel. Seven bit in a fourteen bit '
+         + 'message, and it was measured reaching 13952 rather than 16383',
     disabled: true,
   });
   /** Measured: CC 1, values 57 to 127 seen, which is the documented default. */
   const mod = createFader({
-    label: 'mod', min: 0, max: 127, value: 0,
-    title: 'the modulation wheel, CC 1', disabled: true,
+    label: 'modulation', sub: `C${MOD_SLOT}`, min: 0, max: 127, value: 0,
+    title: 'the modulation wheel, printed C10 on the panel, sending CC 1',
+    disabled: true,
   });
-  wheels.append(bend.el, mod.el);
+  const wheels = el('div', 'evo-wheels');
+  const wheelRow = el('div', 'evo-wheelrow');
+  const wheelMid = el('div', 'pan-sub evo-wheelmid');
+  /* Typed uppercase rather than left to a `text-transform`, which is the house
+     rule: the source should read like the page. */
+  wheelMid.append(el('div', '', 'MAX'), el('div', '', 'MIN'));
+  wheelRow.append(bend.el, wheelMid, mod.el);
+  wheels.append(wheelRow);
+  fixed.append(wheels);
+
+  // ── the back strip: function buttons, octave pair, nameplate, rotaries ──
+
+  const row = el('div', 'pan-row evo-row');
+
+  const fnRow = el('div', 'evo-fn-row');
+  const fnPads = [];
+  for (let i = 0; i < FN_ONE.length; i++) {
+    const p = createPad({
+      latch: false, disabled: true,
+      aria: FN_ONE[i].replace('\n', ' ').toLowerCase(),
+      title: `${FN_ONE[i].replace('\n', ' ')} on a single press. Nothing this `
+           + 'sends has ever been captured, and the manual says no data leaves '
+           + 'the keyboard in edit mode except program and bank changes',
+    });
+    fnPads.push(p);
+    fnRow.append(p.el);
+    const lab = el('div', 'pan-sub evo-fn-lab', FN_ONE[i]);
+    lab.style.setProperty('--i', String(i));
+    fnRow.append(lab);
+  }
+  for (let i = 0; i < FN_PAIR.length; i++) {
+    const lab = el('div', 'pan-sub evo-fn-pair', FN_PAIR[i]);
+    lab.style.setProperty('--i', String(i));
+    fnRow.append(lab);
+  }
+  /* 🔴 NO WRAPPER AND NO GROUP HEADING. The six buttons go straight into the
+     row now that the `FUNCTION BUTTONS` bar is gone, because a wrapper holding
+     one child has a `gap` with nothing to act on: this project measured a page
+     whose `.pos-body` had exactly one child getting no vertical rhythm at all,
+     the rule working perfectly with nothing to act on. Count the siblings
+     before hunting for a rule that lost. */
+  row.append(fnRow);
 
   /**
    * ⚠️ OCTAVE AND TRANSPOSE ARE DRAWN AND ARE LIT BY NOTHING. The manual gives
@@ -252,12 +817,51 @@
    * step is unmeasured**, and a button that moved this drawing on a guess would
    * be a page inventing a fact about an instrument.
    */
-  const octDown = createPad({ label: '-', bottom: 'octave', latch: false, disabled: true,
-    title: 'octave down. Nothing this sends has ever been captured' });
-  const octUp = createPad({ label: '+', bottom: 'octave', latch: false, disabled: true,
-    title: 'octave up. Nothing this sends has ever been captured' });
-  wheels.append(octDown.el, octUp.el);
-  lower.append(wheels);
+  const oct = el('div', 'evo-oct');
+  const octRow = el('div', 'evo-oct-row');
+  const octDown = createPad({
+    top: MINUS, round: true, latch: false, disabled: true, aria: 'octave down',
+    title: 'octave down. Nothing this sends has ever been captured',
+  });
+  const octUp = createPad({
+    top: '+', round: true, latch: false, disabled: true, aria: 'octave up',
+    title: 'octave up. Nothing this sends has ever been captured',
+  });
+  octRow.append(octDown.el, octUp.el,
+    el('div', 'pan-sub evo-oct-lab', 'TRANSPOSE'));
+  oct.append(el('div', 'pan-cap', 'OCTAVE'), octRow);
+  row.append(oct);
+
+  /* The nameplate, in the middle of the back strip where the logo sits, between
+     the octave pair and the rotaries. See the note on `.pan-plate`. */
+  const plate = el('div', 'pan-plate evo-plate');
+  plate.append(el('div', 'pan-plate-l', 'EVOLUTION'),
+    el('div', 'pan-plate-l', 'MK-425C'));
+  row.append(plate);
+
+  const rot = el('div', 'pan-group evo-rot');
+  const knobs = [];
+  for (let i = 0; i < ROTARIES.length; i++) {
+    if (i === ROTARY_SPLIT) rot.append(el('div', 'evo-rot-div'));
+    const k = createKnob({
+      label: ROTARIES[i], min: 0, max: 127, value: 0,
+      /* 🔴 NO `sub`, WHICH IS WHERE THE WORD `unbound` USED TO BE, EIGHT TIMES
+         OVER. Asked 2026-09-21: *"evolution: rm unbound labels and cc labels on
+         hw replicas in general"*. It was never a fact about the instrument, it
+         was the page admitting it did not know what a knob was wired to, and
+         printing that admission under every dial. The controller number's home
+         is the hover and the MIDI table, which is where `/circuit/`, `/model/`
+         and `/shape/` already keep theirs. */
+      title: `${ROTARIES[i]}, a fully assignable rotary. Which controller `
+           + 'number this slot sends is held in the keyboard and printed in no '
+           + 'manual, so nothing here claims one until one is heard',
+      disabled: true,
+    });
+    knobs.push(k);
+    rot.append(k.el);
+  }
+  row.append(rot);
+  flow.append(row);
 
   /**
    * 🔴 THE KIT'S KEYBOARD, NOT A FOURTH COPY OF ONE. `createKeyboard` already
@@ -266,6 +870,11 @@
    * ⚠️ IT TAKES A LETTER MAP because its other callers are played from a
    * computer keyboard. This one is a picture of somebody else's instrument, so
    * the letters are off and the map is 25 slots of nothing but a note offset.
+   * 🔴 **AND IT TAKES `sharps` SEPARATELY, WHICH IS THE THING THIS PAGE HAD
+   * NEVER PASSED.** The set holds the LETTER names of the black keys, not their
+   * notes and not their offsets, so a caller inventing its own key names has to
+   * say which of them are black or it gets none. See `KEY_PATTERN` above, and
+   * the note on `KEY_LO` for what that cost.
    */
   const keyMap = {};
   const keyNames = [];
@@ -273,10 +882,10 @@
   const keysBox = el('div', 'evo-keys');
   const kbd = createKeyboard(keysBox, {
     base: KEY_LO, map: keyMap, keys: keyNames, letters: false,
+    sharps: new Set(keyNames.filter((_, i) => KEY_PATTERN[i] === 'B')),
     minBase: KEY_LO, maxBase: KEY_LO,
   });
-  lower.append(keysBox);
-  panel.append(lower);
+  flow.append(keysBox);
 
   // ── the MIDI event log ──────────────────────────────────────────────────
 
@@ -300,6 +909,8 @@
   let access = null;
   let notes = 0, vLo = null, vHi = null, bendRaw = null;
   const chSeen = new Set(), ccSeen = new Set(), offGrid = new Set();
+  /** Controller number to the rotary now following it. See `take` below. */
+  const knobCC = new Array(ROTARIES.length).fill(null);
   let flatSaid = false;
 
   function paint() {
@@ -338,6 +949,11 @@
         vLo = vLo === null ? m.d2 : Math.min(vLo, m.d2);
         vHi = vHi === null ? m.d2 : Math.max(vHi, m.d2);
         kbd.lightNote(m.note, true);
+        /* The instrument shows a velocity briefly when a button in note mode is
+           pressed, and a key is the same fact. Nothing on the wire says which
+           slot a KEY is, and a key is not an assignable control, so the small
+           field has nothing to say about it. */
+        show(m.d2, '');
         if (!flatSaid && m.note < 48) {
           flatSaid = true;
           d.log('this keyboard is playing a semitone below where a 25 key '
@@ -354,37 +970,70 @@
     if (m.kind === 'pitch bend') {
       bendRaw = (m.d2 << 7) | m.d1;
       bend.set(bendRaw, { from: 'hardware' });
+      /* ⚠️ AND THE DISPLAY SAYS NOTHING ABOUT IT, because the real one does
+         not: there is no bend row in any reading the manuals print. A 14 bit
+         value would also overflow a three digit field and show dashes, which
+         would read as a fault rather than as a page declining to invent a
+         reading. */
       paint();
       return;
     }
 
     if (m.kind === 'control' && m.cc === 1) {
       mod.set(m.d2, { from: 'hardware' });
+      /* 🔴 THE ONE CONTROL WHOSE SLOT AND CONTROLLER NUMBER ARE BOTH KNOWN, so
+         it is the one reading where both fields of the display are filled: the
+         panel prints `C10` under this wheel and the wire says CC 1. */
+      show(m.cc, MOD_SLOT);
       return;
     }
 
     if (m.kind === 'control' && (m.cc === 0 || m.cc === 32)) return;   // the bank pair
 
     if (m.kind === 'program') {
-      const p = buttons[m.d1];
+      const p = padByDigit.get(String(m.d1));
       if (p) p.flash(160);
-      else d.log(`program ${m.d1} arrived and this panel draws ten buttons`, 'warn');
+      else d.log(`program ${m.d1} arrived and this panel draws ten of them`, 'warn');
+      /* The manual's own reading for a program change: the number in the three
+         digits and the channel it went on in the two. */
+      show(m.d1, m.ch === null ? '' : m.ch);
       return;
     }
 
     if (m.kind === 'control') {
       ccSeen.add(m.cc);
+      /**
+       * 🔴 THE POSITIONS ARE A MAP NOW AND THE BINDING IS STILL NOT. Knob `n`
+       * on screen is the knob printed `Cn`, full stop, which is what the report
+       * about the order was about and is fixed above by `ROTARIES`. What is
+       * still unknown, and is unknown in the instrument rather than in this
+       * page, is which of the eight slots sends a given controller number: it
+       * is a per preset, per unit setting in non volatile memory and no manual
+       * prints it.
+       * ⚠️ **SO A CONTROLLER NUMBER FOLLOWS THE FIRST FREE ROTARY AND THE LOG
+       * SAYS THAT IN THOSE WORDS.** It is an association this page made, never
+       * a reading of the panel, and the difference is the `/circuit/` drum grid
+       * mistake: that page coloured a pad by a note's position in a discovery
+       * map and so reported the instrument while looking like it was reporting
+       * the beat.
+       * ⚠️ AND THE NUMBER GOES IN THE HOVER RATHER THAN UNDER THE DIAL, because
+       * the face carries what the instrument prints on itself.
+       */
       let slot = knobCC.indexOf(m.cc);
       if (slot < 0) {
         slot = knobCC.indexOf(null);
         if (slot < 0) return;             // nine controller numbers, eight knobs
         knobCC[slot] = m.cc;
-        const subEl = knobs[slot].el.querySelector('.pos-knob-sub');
-        if (subEl) subEl.textContent = `CC ${m.cc}`;
-        d.log(`CC ${m.cc} took knob ${slot + 1}, which is the order it arrived in `
-            + 'rather than where it is on the panel');
+        knobs[slot].el.title = `${ROTARIES[slot]}, a fully assignable rotary. `
+          + `CC ${m.cc} is following it, which is the order that number arrived `
+          + 'in rather than a reading of the panel';
+        d.log(`CC ${m.cc} is following ${ROTARIES[slot]}. Nothing on the wire says `
+            + 'which of the eight sent it, so that is an order of arrival');
       }
       knobs[slot].set(m.d2, { from: 'hardware' });
+      /* The instrument's default reading: the controller number in the three
+         digits. The two digits stay blank because the slot is the unknown. */
+      show(m.cc, '');
     }
   }
 
@@ -449,7 +1098,28 @@
     take([0x90 | ch, 71, 0]);                        // a release, as this keyboard sends one
     take([0xe0 | ch, 0x00, 0x40]);                   // bend, LSB 0 as measured
     take([0xb0 | ch, 1, 100]);                       // mod wheel
+
+    /**
+     * 🔴 THE DISPLAY'S OWN RULE, ASSERTED AT THE ONE MOMENT BOTH FIELDS CAN BE
+     * FILLED. The mod wheel is the only control on this instrument whose slot
+     * AND controller number are both known, so it is the only reading where the
+     * small field has anything to say. Asserted here rather than at the end,
+     * because the next few messages replace it.
+     */
+    d.assert('the mod wheel fills both fields, because its slot is printed on the panel',
+      disp3.text().trim() === '1' && disp2.text().trim() === String(MOD_SLOT),
+      `three digits "${disp3.text()}", two digits "${disp2.text()}"`);
+
     for (const cc of KNOB_CC_SEEN) take([0xb0 | ch, cc, 64]);
+
+    // ⚠️ THE NEGATIVE HALF, and it is the whole point of the field: a rotary's
+    // slot is NOT on the wire, so the small field must go back to saying
+    // nothing rather than keeping the wheel's answer or printing a zero.
+    d.assert('and a rotary fills only the value, because nothing says which slot sent it',
+      disp3.text().trim() === String(KNOB_CC_SEEN[KNOB_CC_SEEN.length - 1])
+        && disp2.text().trim() === '',
+      `three digits "${disp3.text()}", two digits "${disp2.text()}"`);
+
     take([0xb0 | ch, 32, 0]); take([0xb0 | ch, 0, 0]); take([0xc0 | ch, 3]);   // a button
     take([0xf8]); take([0xfe]);                      // floods
 
@@ -488,17 +1158,18 @@
     d.assert('the modulation wheel is CC 1 and moved',
       mod.hardwareMoves() > 0, `${mod.hardwareMoves()} moves`);
 
-    d.assert('six measured controller numbers took six of the eight knobs',
-      knobCC.filter((c) => c !== null).length === KNOB_CC_SEEN.length,
-      `${knobCC.filter((c) => c !== null).length} bound`);
+    /* ⚠️ OFF THE KNOBS' OWN COUNTERS RATHER THAN OFF THIS PAGE'S BOOKKEEPING,
+       so the claim is about what moved rather than about what was recorded. */
+    const moved = knobs.filter((k) => k.hardwareMoves() > 0).length;
+    d.assert('six measured controller numbers moved six of the eight rotaries',
+      moved === KNOB_CC_SEEN.length, `${moved} of ${knobs.length} moved`);
 
-    d.assert('and two knobs stay unbound rather than being given a number',
-      knobCC.filter((c) => c === null).length === KNOBS - KNOB_CC_SEEN.length,
-      `${knobCC.filter((c) => c === null).length} unbound`);
+    d.assert('and two rotaries were never moved, and say nothing about it',
+      knobs.length - moved === 2, `${knobs.length - moved} still at rest`);
 
-    d.assert('a program change lit a button and the bank pair in front of it did not',
-      buttons[3] && !knobCC.includes(0) && !knobCC.includes(32),
-      `knob numbers ${knobCC.filter(Boolean).join(',')}`);
+    d.assert('a program change lit a keypad button and the bank pair in front of it did not',
+      !!padByDigit.get('3') && !knobCC.includes(0) && !knobCC.includes(32),
+      `rotary numbers ${knobCC.filter((c) => c !== null).join(',')}`);
 
     d.assert('the channel heard is reported rather than assumed',
       [...chSeen].includes(GLOBAL_CH), `channels ${[...chSeen].join(',')}`);
@@ -511,13 +1182,402 @@
       Array.from(traffic.el.querySelectorAll('.pos-tbl-row:not(.pos-tbl-head)'))
         .every((t) => /[0-9A-F]{2}/.test(t.textContent)), `${traffic.count()} rows`);
 
+    /**
+     * 🔴 THE PANEL'S COUNTS, WHICH ARE WHERE A REPLICA GOES WRONG FIRST. Six
+     * function buttons and five dual press labels is a 425C; eight and eight is
+     * a 449C, and a cover photograph in one of this instrument's own manuals is
+     * a third keyboard entirely.
+     */
+    d.assert('six function buttons, and five dual press labels one to a pair',
+      fnPads.length === 6 && fnRow.querySelectorAll('.evo-fn-pair').length === 5
+        && fnRow.querySelectorAll('.evo-fn-lab').length === 6,
+      `${fnPads.length} buttons, ${fnRow.querySelectorAll('.evo-fn-lab').length} names, `
+      + `${fnRow.querySelectorAll('.evo-fn-pair').length} pairs`);
+
+    /**
+     * 🔴 THE DISPLAY IS TWO FIELDS, READ OFF THE PICTURE RATHER THAN OFF THE
+     * OPTIONS IT WAS BUILT WITH. Seven bars a digit, so three digits is 21
+     * polygons and two is 14, and a field that quietly came back with a
+     * different number of cells could not pass this while `digits` still said
+     * the right thing.
+     */
+    const bars3 = disp3.svg.querySelectorAll('.pos-disp-p').length;
+    const bars2 = disp2.svg.querySelectorAll('.pos-disp-p').length;
+    d.assert('the display is a three digit field and a two digit one in one window',
+      bars3 === 21 && bars2 === 14
+        && disp3.el.parentElement === win && disp2.el.parentElement === win
+        && disp3.el.classList.contains('pos-disp-bare')
+        && disp2.el.classList.contains('pos-disp-bare'),
+      `${bars3} bars and ${bars2} bars, both bare inside one window`);
+
     if (d.el.isConnected) {
-      const keys = keysBox.getBoundingClientRect();
-      const wheelR = wheels.getBoundingClientRect();
-      d.assert('the wheels stand to the left of the keys and end on their line',
-        wheelR.right <= keys.left + 1 && Math.abs(wheelR.bottom - keys.bottom) < 24,
-        `${(keys.left - wheelR.right).toFixed(1)} px apart, `
-        + `${(wheelR.bottom - keys.bottom).toFixed(1)} px of foot`);
+      /**
+       * 🔴 BOTH FIELDS ARE THE REFLECTIVE KIND AND THE WINDOW THEY SIT IN
+       * AGREES. The failure this catches is a page and a component disagreeing
+       * about which instrument they are drawing: `:root`'s `--disp-back` is the
+       * BACKLIT dark blue, so a window painted from the token would be a blue
+       * pane behind grey green digits.
+       * ⚠️ THE COMPUTED BACKGROUND, AND THE EXPECTATION OUT OF `SCHEMES` RATHER
+       * THAN A HEX TYPED HERE. A check that names a colour is a second copy of
+       * the stylesheet and the two will disagree, which is why `/kit/`'s
+       * equivalent assert was rewritten today. Both ghost values moved twice in
+       * one afternoon.
+       */
+      const toRgb = (h) => {
+        const n = parseInt(h.slice(1), 16);
+        return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+      };
+      const glass = getComputedStyle(win).backgroundColor;
+      d.assert('the display is the reflective kind, and its window agrees',
+        disp3.el.dataset.scheme === 'reflective'
+          && disp2.el.dataset.scheme === 'reflective'
+          && glass === toRgb(SCHEMES.reflective.back),
+        `${disp3.el.dataset.scheme}, glass ${glass} against `
+        + `${toRgb(SCHEMES.reflective.back)}`);
+
+      /* 🔴 EVERY LAYOUT CLAIM BELOW IS READ OFF A RENDERED RECT AND NOT OFF THE
+         CODE THAT FILLED IT, because the defect this rebuild was handed was
+         invisible in the source and obvious in a rect: a nameplate at x 1780 on
+         a 1280 px screen, written by a `space-between` row that read as
+         perfectly ordinary. */
+
+      /**
+       * 🔴 THE EIGHT ROTARIES READ `C1` TO `C8` IN LEFT TO RIGHT SCREEN ORDER.
+       * Sorted by rect rather than by DOM order, so the printed divider that
+       * sits between `C4` and `C5` cannot put them out of sequence and neither
+       * can a `flex-direction` somebody changes later.
+       */
+      const rotNames = knobs
+        .map((k) => ({ x: k.el.getBoundingClientRect().left,
+                       t: k.el.querySelector('.pos-knob-lab')?.textContent.trim() }))
+        .sort((a, b) => a.x - b.x).map((o) => o.t);
+      /* 🔴 AGAINST THE NUMBERING SCHEME, NOT AGAINST `ROTARIES`, AND SABOTAGE
+         IS WHAT FOUND THAT. The first version of this line compared the
+         rendered labels against the same constant that had built them, so
+         reversing that constant to `C8` first left it GREEN: two numbers
+         derived from one field, which is the trap that re-credited a recording
+         in the MIM corpus. The expectation is generated from the instrument's
+         own flat one based numbering instead, which the research closes with no
+         remainder across two models, so the printed list and the scheme are two
+         sources and can disagree. */
+      const scheme = Array.from({ length: 8 }, (_, i) => `C${i + 1}`);
+      d.assert('the eight rotaries read C1 to C8 in left to right screen order',
+        rotNames.join(' ') === scheme.join(' '), rotNames.join(' '));
+
+      /**
+       * 🔴 NOTHING ON THE PANEL PRINTS A CONTROLLER NUMBER OR THE WORD
+       * `unbound`. Asked 2026-09-21: *"evolution: rm unbound labels and cc
+       * labels on hw replicas in general"*. Scanned over what the panel
+       * RENDERS, so a `sub` re-added anywhere on it fails this wherever it is
+       * put, rather than only where somebody remembered to look.
+       * ⚠️ THE DISPLAY IS EXEMPT BY CONSTRUCTION AND NOT BY AN EXCEPTION: it is
+       * an SVG of polygons with no text nodes in it, and showing a controller
+       * number is what the real display does.
+       * ⚠️ THE DETAIL NAMES WHICH HALF FAILED, because the first version
+       * reported "none of them a CC" while going red on the word `unbound`, and
+       * a failure line that describes the passing half is one nobody can act on.
+       */
+      const printed = card.textContent.replace(/\s+/g, ' ');
+      const badCC = printed.match(/cc\s*\d+/i);
+      const badWord = printed.match(/unbound/i);
+      d.assert('nothing on the panel prints a controller number or the word unbound',
+        !badCC && !badWord,
+        badCC || badWord
+          ? `found "${(badCC || badWord)[0]}" in the printing`
+          : `${printed.length} characters of printing, no CC and no unbound`);
+
+      /* ⚠️ AND THE OTHER HALF, because deleting the display without rehoming
+         the fact is how a page quietly stops reporting something. */
+      const inHover = knobs.filter((k) => /CC \d+/.test(k.el.title || '')).length;
+      d.assert('and the controller number survives in the rotary’s hover',
+        inHover === KNOB_CC_SEEN.length, `${inHover} hovers name a CC`);
+
+      /**
+       * 🔴 NEITHER GROUP CARRIES A PRINTED LABEL, AND THAT IS TWO BARS AND THREE
+       * CONNECTORS GONE. Asked 2026-09-21: *"rm funciton buttons / assignable
+       * buttons labels"* and *"no need to snapshot and funciton button separator
+       * lines"*. Checked over the panel's rendered text so the words cannot come
+       * back anywhere on it, and over the elements so a removed one cannot leave
+       * this assert green against nothing.
+       */
+      const noBars = !/FUNCTION BUTTONS|ASSIGNABLE BUTTONS/i.test(printed)
+        && card.querySelectorAll('.evo-bar, .pos-sec-h, .evo-join, .evo-snap-brk,'
+          + ' .evo-oct-brk').length === 0;
+      d.assert('neither group carries a printed label, and no connector survives',
+        noBars, noBars ? 'no bars, no headings, no connectors'
+          : 'a bar, a heading or a connector is still drawn');
+
+      /* ⚠️ AND THE FACT THE `ASSIGNABLE` BAR CARRIED IS REHOMED RATHER THAN
+         DELETED. Twelve blank keys with no name anywhere read as broken rather
+         than as blank on purpose, so the word is in the group's hover. */
+      /* ⚠️ THE DETAIL QUOTES THE HOVER RATHER THAN DESCRIBING IT, because the
+         first version printed "the keypad group says so on hover" while going
+         red, which is a failure line describing the thing that did not happen. */
+      d.assert('and the word assignable survives in the keypad’s hover',
+        /assignable/i.test(keypadBox.title || ''),
+        keypadBox.title ? `hover reads "${keypadBox.title.slice(0, 44)}…"` : 'no hover at all');
+
+      /**
+       * 🔴 THE KEYPAD IS THREE ACROSS AND FOUR DOWN, counted off distinct rect
+       * columns and rows rather than off the `cols` and `rows` handed to the
+       * grid, which is the same two-numbers-from-one-field trap the corpus
+       * build shipped once.
+       */
+      const cells = [...keypad.el.querySelectorAll('.pos-pad')]
+        .map((b) => { const r = b.getBoundingClientRect();
+                      return { x: Math.round(r.left), y: Math.round(r.top),
+                               w: r.width, h: r.height,
+                               t: b.parentElement.querySelector('.pos-pad-top').textContent }; });
+      const cols = new Set(cells.map((c) => c.x)), rows = new Set(cells.map((c) => c.y));
+      d.assert('the keypad is three across and four down',
+        cells.length === 12 && cols.size === 3 && rows.size === 4,
+        `${cells.length} buttons in ${cols.size} columns and ${rows.size} rows`);
+
+      /**
+       * 🔴 AND ITS BUTTONS ARE HALF HEIGHT, MEASURED OFF THE BUTTON AND NOT OFF
+       * THE WRAPPER. Asked 2026-09-21: *"evo: half height buttons in numpad"*.
+       * `.pos-pad-half` is *"same width, half the height"*, and its own comment
+       * records that it was `aspect-ratio: 2 / 1` for an hour, which is the same
+       * thing only while the width is fixed. So the WIDTH is asserted too: this
+       * has to be a height change and not a scale-down.
+       */
+      const halves = cells.filter((c) => Math.abs(c.h - c.w / 2) < 1).length;
+      const fullWidth = cells.filter((c) => Math.abs(c.w - 46) < 1).length;
+      d.assert('the keypad buttons are half height, and only their height changed',
+        halves === 12 && fullWidth === 12,
+        `${cells[0].w.toFixed(0)} by ${cells[0].h.toFixed(0)} px, ${halves} of 12 half`);
+
+      /**
+       * 🔴 AND 0 SITS IN THE BOTTOM ROW BETWEEN `-` AND `+`. The old page drew
+       * `0` to `9` in source order, so `0` came first, and `1 2 3` on the bottom
+       * row is the easiest mistake available here.
+       */
+      const lastY = Math.max(...rows);
+      const bottom = cells.filter((c) => c.y === lastY).sort((a, b) => a.x - b.x)
+        .map((c) => c.t);
+      const topRow = cells.filter((c) => c.y === Math.min(...rows))
+        .sort((a, b) => a.x - b.x).map((c) => c.t);
+      d.assert('and 0 sits in the bottom row between - and +, with 1 2 3 on top',
+        bottom.join('') === `${MINUS}0+` && topRow.join('') === '123',
+        `top "${topRow.join(' ')}", bottom "${bottom.join(' ')}"`);
+
+      /**
+       * 🔴 EACH DUAL PRESS NAME IS CENTRED ON THE MIDPOINT OF ITS PAIR, AND
+       * THIS ASSERT EXISTS BECAUSE THE CONNECTOR WENT. With a rule and a tick
+       * drawn from the label to both buttons, centring was decoration. With them
+       * gone it is the only thing saying the name belongs to both rather than to
+       * the left one, so it is now load-bearing and is measured.
+       */
+      const pairLabs = [...fnRow.querySelectorAll('.evo-fn-pair')];
+      const offBy = pairLabs.map((lab, i) => {
+        const a = fnPads[i].button.getBoundingClientRect();
+        const b = fnPads[i + 1].button.getBoundingClientRect();
+        const l = lab.getBoundingClientRect();
+        return Math.abs((l.left + l.width / 2) - (a.left + a.width / 2
+          + (b.left + b.width / 2 - (a.left + a.width / 2)) / 2));
+      });
+      d.assert('each dual press name is centred across the pair it belongs to',
+        pairLabs.length === 5 && Math.max(...offBy) < 1,
+        `worst ${Math.max(...offBy).toFixed(2)} px off its pair's midpoint`);
+
+      /**
+       * 🔴 THE NAMEPLATE SITS BETWEEN THE OCTAVE PAIR AND THE ROTARIES, INSIDE
+       * THE STRIP'S OWN CONTENT. Asked 2026-09-21: *"evolution title + model nr
+       * goes to the right of transpose, centered, scrolls with overflow"*, so it
+       * is no longer asserted to be on screen at load: it legitimately may not
+       * be, and scrolling reaches it.
+       * ⚠️ **THIS IS STILL THE ASSERT THAT WOULD HAVE CAUGHT THE ORIGINAL BUG.**
+       * That was not *a nameplate inside a scroller*: it was a `space-between`
+       * row stretched across the panel, which put `MK-425C` at x 1780 in a
+       * 1280 px window, past the end of everything. A block between two known
+       * neighbours whose centre falls inside the strip's own content cannot land
+       * there.
+       */
+      const pr = plate.getBoundingClientRect();
+      const or = oct.getBoundingClientRect();
+      const rr = rot.getBoundingClientRect();
+      const fr = flow.getBoundingClientRect();
+      const mid = pr.left + pr.width / 2;
+      d.assert('the nameplate sits between the octave pair and the rotaries, inside the strip',
+        pr.width > 0 && or.right <= pr.left + 1 && pr.right <= rr.left + 1
+          && mid > fr.left && mid < fr.right,
+        `${(pr.left - or.right).toFixed(0)} px after TRANSPOSE, `
+        + `${(rr.left - pr.right).toFixed(0)} px before C1, centre `
+        + `${(mid - fr.left).toFixed(0)} of ${fr.width.toFixed(0)} px of panel`);
+
+      /**
+       * 🔴 THE LEFT COLUMN HOLDS STILL WHILE THE STRIP SCROLLS, which is the
+       * whole of what *"left is sticky area"* asked for and is the one claim a
+       * screenshot cannot make.
+       * ⚠️ IT PUTS THE SCROLL BACK. A check that leaves a page moved is the test
+       * rather than a check, and this project has already destroyed a
+       * self-moving zoom with one.
+       */
+      const range = strip.scrollWidth - strip.clientWidth;
+      const by = Math.min(180, range);
+      const fixed0 = fixed.getBoundingClientRect().left;
+      const keys0 = keysBox.getBoundingClientRect().left;
+      strip.scrollLeft = by;
+      const fixed1 = fixed.getBoundingClientRect().left;
+      const keys1 = keysBox.getBoundingClientRect().left;
+      strip.scrollLeft = 0;
+
+      d.assert('the left column holds still while the strip scrolls',
+        by > 20 && Math.abs(fixed1 - fixed0) < 0.5 && keys0 - keys1 > by - 2,
+        `column moved ${(fixed1 - fixed0).toFixed(1)} px, keys moved `
+        + `${(keys0 - keys1).toFixed(1)} of ${by}`);
+
+      /**
+       * 🔴 AND ITS RIGHT BORDER IS WHERE THE SCROLLING STARTS, WHICH IS THE
+       * AFFORDANCE. Asked 2026-09-21: *"rm shade on evolution overflow"*, and
+       * the edge gradient that used to say this came off. A border does the same
+       * job in a channel that does not read as a rendering fault: this project
+       * has measured that a scroller with nothing marking it reads as a clipped
+       * picture, which is how this page was reported in the first place.
+       * ⚠️ **THE COMPUTED VALUE, NEVER THE DECLARATION.** `.pos-glue` exists for
+       * children giving up their border and radius, and a border stripped by a
+       * rule nobody wrote is this project's fifth measured dead rule.
+       * ⚠️ AND THE OVERFLOW IS ASSERTED WITH IT, because a border marking the
+       * edge of a scroll region that has nothing behind it is decoration.
+       */
+      const bw = parseFloat(getComputedStyle(fixed).borderRightWidth);
+      d.assert('the left column’s right border is where the scrolling starts',
+        bw >= 1 && range > 40,
+        `${bw} px of border, ${range.toFixed(0)} px of panel off screen`);
+
+      /**
+       * 🔴 THE LEFT COLUMN IS THE FULL DEPTH OF THE PANEL. `align-items:
+       * stretch` rather than `flex-end`, and the difference is invisible until
+       * somebody changes it: bottom alignment makes two children END together
+       * and says nothing about their heights, which is what `/model/` was
+       * reported for with a screenshot.
+       */
+      const fh = fixed.getBoundingClientRect().height;
+      const sh = strip.getBoundingClientRect().height;
+      d.assert('the left column is the full depth of the panel',
+        Math.abs(fh - sh) < 1.5, `${fh.toFixed(1)} px against ${sh.toFixed(1)}`);
+
+      /**
+       * 🔴 ONE SCROLLER ON THIS PAGE AND NOT TWO. `.keys` brings its own
+       * `overflow-x: auto`, so a keyboard squeezed narrower than its keys
+       * scrolls INSIDE the strip that is supposed to be scrolling it, and a
+       * reader dragging the outer one gets the inner one.
+       */
+      const inner = keysBox.querySelector('.keys');
+      d.assert('the keyboard does not scroll inside the strip',
+        inner.scrollWidth <= inner.clientWidth + 1,
+        `${inner.scrollWidth} of key in ${inner.clientWidth} px of room`);
+
+      /**
+       * 🔴 THE ASSERT THAT WOULD HAVE CAUGHT TWENTY FIVE WHITE KEYS, AND THE
+       * REASON IT IS READ OFF THE RENDERED PICTURE. The old page asserted
+       * `kbd.notes()`, which said 25 notes from 47, was perfectly true, and was
+       * blind to the drawing having no black keys in it at all. MEASURED before
+       * this rebuild: 25 white, 0 black, `--k-cols: 25`.
+       * ⚠️ SORTED BY CENTRE, NOT BY DOM ORDER OR BY LEFT EDGE. A black key
+       * straddles the join between its two whites and is pulled back by half its
+       * own width, so its LEFT edge is left of the white it comes after. Its
+       * centre is between the two, which is what a reader sees.
+       */
+      const drawn = [...keysBox.querySelectorAll('.k')]
+        .map((k) => { const r = k.getBoundingClientRect();
+                      return { c: r.left + r.width / 2,
+                               t: k.classList.contains('sharp') ? 'B' : 'W' }; })
+        .sort((a, b) => a.c - b.c).map((o) => o.t).join('');
+      d.assert('the keys are 15 white and 10 black, in groups of two and three',
+        drawn === KEY_PATTERN,
+        `${drawn.split('W').length - 1} white and ${drawn.split('B').length - 1} black, `
+        + `${drawn === KEY_PATTERN ? 'in the pattern the photographs show' : drawn}`);
+
+      /**
+       * 🔴 THE WHEELS ARE LEFT OF THE KEYS AND ARE THE FRONTMOST THING ON THE
+       * PANEL, WHICH IS THE CLAIM THIS ASSERT USED TO GET HALF RIGHT. It said
+       * they *"end on their line"*, and they do not: on the instrument they sit
+       * at the very edge of the case nearest the player, lower than the keys'
+       * back edge, with nothing in front of them. So the test is that nothing in
+       * their own column is below them.
+       */
+      /* 🔴 THE ROW, NEVER `.evo-wheels`, AND SABOTAGE IS WHAT FOUND THAT.
+         `.evo-wheels` is the full-width container that CENTRES the row, so its
+         own rect is the column's rect whatever is inside it: switching the
+         centring off left the assert below fully green, because the box it was
+         measuring had not moved and never could. That is this project's rule
+         about measuring the working surface rather than the wrapper, which it
+         already paid for once reading a pad's `el` instead of its `button`. */
+      const keysR = keysBox.getBoundingClientRect();
+      const wheelR = wheelRow.getBoundingClientRect();
+      const colFoot = fixed.getBoundingClientRect().bottom;
+      d.assert('the wheels are left of the keys and nothing in their column is in front of them',
+        wheelR.right <= keysR.left + 1 && colFoot - wheelR.bottom < 2,
+        `${(keysR.left - wheelR.right).toFixed(1)} px left of the keys, `
+        + `${(colFoot - wheelR.bottom).toFixed(1)} px behind the column's foot`);
+
+      /**
+       * 🔴 AND THEY ARE CENTRED, WHICH IS TWO CENTRES ON THIS PANEL AND BOTH ARE
+       * MEASURED. Asked 2026-09-21: *"align pitch / mod to centr"*. The column's
+       * own centre is one reading of that and the keypad above them is the other,
+       * and they coincide here only because the keypad is the widest thing in the
+       * column. Asserting both rather than picking is the `/model/` lesson: that
+       * page was corrected by screenshot twelve times in one evening and every
+       * correction was plausible reasoning a rect would have refused.
+       */
+      const wc = wheelR.left + wheelR.width / 2;
+      const kpr = keypadBox.getBoundingClientRect();
+      const fixr = fixed.getBoundingClientRect();
+      const offCol = Math.abs(wc - (fixr.left + (fixr.width - bw - 16) / 2));
+      const offPad = Math.abs(wc - (kpr.left + kpr.width / 2));
+      d.assert('the wheels are centred in the column and under the keypad',
+        offCol < 1.5 && offPad < 1.5,
+        `${offCol.toFixed(1)} px off the column's centre, `
+        + `${offPad.toFixed(1)} px off the keypad's`);
+
+      /**
+       * 🔴 `MAX` AND `MIN` MARK THE ENDS OF THE TRAVEL, ON BOTH LANES AT ONCE,
+       * AND THAT IS TWO ALIGNMENTS RATHER THAN ONE. Photographed on the first
+       * run of this rebuild sitting level with the value readout and the slot
+       * number instead, which is what `space-between` over a whole column gets
+       * you: two correct labels attached to the wrong things.
+       * ⚠️ AND THE RENDERED TEXT IS GRADED, NOT THE SOURCE, because several kit
+       * components uppercase a label in CSS whatever is typed and a
+       * `toUpperCase()` on top of one is a no-op that reads as a fix.
+       */
+      const lanes = [...wheels.querySelectorAll('.pos-fdr-lane')]
+        .map((l) => l.getBoundingClientRect());
+      const maxEl = wheelMid.firstElementChild, minEl = wheelMid.lastElementChild;
+      const maxR = maxEl.getBoundingClientRect(), minR = minEl.getBoundingClientRect();
+      const topGap = Math.max(...lanes.map((l) => Math.abs(l.top - maxR.top)));
+      const botGap = Math.max(...lanes.map((l) => Math.abs(l.bottom - minR.bottom)));
+      const ink = (e) => {
+        const t = getComputedStyle(e).textTransform;
+        const s = (e.textContent || '').trim();
+        return t === 'uppercase' ? s.toUpperCase() : t === 'lowercase' ? s.toLowerCase() : s;
+      };
+      d.assert('MAX and MIN sit at the ends of both wheels’ travel, in uppercase',
+        lanes.length === 2 && topGap < 2 && botGap < 2
+          && ink(maxEl) === 'MAX' && ink(minEl) === 'MIN',
+        `"${ink(maxEl)}" is ${topGap.toFixed(1)} px off both lane tops, `
+        + `"${ink(minEl)}" ${botGap.toFixed(1)} px off both bottoms`);
+
+      /**
+       * ⚠️ AND NOTHING ON THE PANEL IS CUT WITH AN ELLIPSIS, which this project
+       * treats as the signal that a word is in the wrong place rather than as a
+       * way of fitting it. `PITCH …` and `MODULA…` were both photographed on the
+       * first run of this rebuild.
+       * 🔴 **CUT IS NOT THE SAME AS WIDER THAN ITS CONTROL, AND THE FIRST
+       * VERSION OF THIS CHECK CONFLATED THEM.** It read `scrollWidth >
+       * clientWidth` alone and failed on `MODULATION`, which is one unbreakable
+       * word 66 px long over a 46 px wheel and is drawn IN FULL, because the box
+       * does not clip. That is what the panel does: every printed name on this
+       * instrument is wider than the control under it. A name is cut when it
+       * overflows a box that CLIPS, so the test asks the computed overflow too.
+       */
+      const cut = [...card.querySelectorAll('.pos-fdr-lab, .pos-fdr-sub, .pos-pad-top, '
+        + '.pos-pad-bot, .pos-pad-face, .pos-knob-lab')]
+        .filter((e) => e.scrollWidth > e.clientWidth + 1
+                    && getComputedStyle(e).overflowX !== 'visible')
+        .map((e) => e.textContent.trim());
+      d.assert('no name on the panel is cut short',
+        cut.length === 0, cut.length ? `cut: ${cut.join(', ')}` : 'nothing truncated');
 
       /* The panel scrolls in its own box, never the document. Measured on this
          project at 390 px as 141 px of page overflow when it does not. */
