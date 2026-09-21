@@ -128,7 +128,42 @@
   `checkTransforms` refused it. Left here because it is worth knowing that the
   answer cost a code read rather than being on screen.
 
-### /bay/, one stream, 2026-09-21
+### /bay/, one stream, 2026-09-21 — BUILT, REVERTED, STILL OPEN
+
+🔴 **A REBUILD OF THIS PAGE WAS COMMITTED AND REVERTED THE SAME HOUR**, asked
+for in one line: *"revert bay its a total mess"*. Commit `5203a9f`, reverted by
+`74574ee`. **The five requests below are OPEN, not answered and not refused.**
+⚠️ **THE PAGE IS BACK IN THE STATE `HANDOFF.md` ITEM 10 ALREADY COMPLAINS
+ABOUT**: unheard, and still showing `here:` port ids in its link line. So the
+revert restores a known bad state rather than a good one, and 44/44 against the
+reverted 49/49 is not the thing that was wrong.
+🔴 **WHAT WAS PROBABLY THE MESS, NAMED BEFORE ANYBODY REBUILDS IT**: with the
+tables gone, patching was possible ONLY BY PLAYING, so a visitor with no MIDI
+instrument could read the page and could not work it. The agent flagged exactly
+that in its own report and shipped it anyway. **`do not use tables` is not `do
+not have a way in for somebody with no instrument on the desk`**, and the next
+attempt has to answer both.
+✅ **FOUR THINGS WORTH KEEPING OUT OF THE REVERTED WORK**, so they are not
+re-derived:
+- **The first ask was found and it is one line**: *"So the patcbay visualiser
+  table plus fiagram"*, said the same day while specifying `/pack/`. That is
+  still the specification after the revert.
+- **`join: false` on a container.** A container joins its neighbours by
+  default, so three instruments are otherwise drawn as a CHAIN, which is a
+  picture of a patch nobody made on the page whose subject is which things are
+  patched.
+- **A note reserves height for the longest string it can ever hold.** MEASURED:
+  272.0 px at rest against 252.4 px held, so the picture shrank under the hand
+  that made a link. Subs change, notes are fixed.
+- **A child inherits its container's `kind`**, so `[data-kind="device"]` selects
+  nothing inside one.
+⚠️ **AND IT IS THE THIRD REVERTED UI REWRITE IN TWO DAYS**, after the two
+recorded further down this file. The other two were reverted for building
+against requests nobody made; this one was built against five requests that were
+made, which is a different fault and worth not confusing with the first.
+
+### The five, verbatim
+
 
 Collected as it arrived, before any of it was worked on. Verbatim, because the
 third line carries a correction about a request that was already made once.
