@@ -374,9 +374,9 @@ function bars() {
  */
 export const SCHEMES = {
   /** A lamp behind the glass. Light bars, dark field. */
-  backlit: { ink: '#8fb6ff', back: '#0d1830', ghost: 0.22 },
+  backlit: { ink: '#8fb6ff', back: '#0d1830', ghost: 0.32 },
   /** No lamp. Dark bars on the pale grey green of undriven crystal. */
-  reflective: { ink: '#1c2a1e', back: '#9fb094', ghost: 0.16 },
+  reflective: { ink: '#1c2a1e', back: '#9fb094', ghost: 0.24 },
 };
 
 /** The scheme a name asks for, or null for a name nothing answers.

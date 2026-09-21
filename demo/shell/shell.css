@@ -132,7 +132,14 @@
   --disp-h: 26px;
   --disp-ink: #8fb6ff;
   --disp-back: #0d1830;
-  --disp-ghost: 0.22;
+  /* 🔴 0.32, RAISED TWICE ON REPORT: 0.13, then 0.22, then this. Asked as
+     *"ligher noacive segments"* and then again as *"nonactive segement in
+     segment display: lighter"*, which is the measurement that matters more than
+     any argument about what a datasheet says an LCD looks like.
+     ⚠️ IT MUST MOVE IN STEP WITH `SCHEMES.backlit.ghost` IN `segment.mjs`, and
+     there is an assert on /kit/ that the two agree, because a shared
+     measurement living in two files is a measurement that will disagree. */
+  --disp-ghost: 0.32;
   --ok: #8fd6a8; --warn: #e0b060; --bad: #e0908a;
   --rec: #e5484d;        /* record: the one control that starts writing */
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;

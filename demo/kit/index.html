@@ -40,6 +40,24 @@
   .kit-box { border: 1px solid var(--line); border-radius: 4px; background: var(--card);
              padding: 14px; margin: 14px 0 0; display: flex; flex-wrap: wrap;
              gap: 10px; align-items: center; }
+  /* 🔴 THE LAST CHILD GIVES UP ITS BOTTOM MARGIN, AND THE PADDING WAS NEVER THE
+     PROBLEM. Reported 2026-09-21 with a crop of the `BUTTON GROUP` box as
+     *"bottom pading same as top"*. MEASURED before changing anything: the
+     padding was **already 14 px top and bottom on all 39 boxes**, and the ink
+     sat 15 px from the top and **29** from the bottom, because the last child
+     was a `.pos-controls` carrying its own `margin-bottom: 14px` which stacks
+     on the padding. Moving the padding would have moved 14 px of a 29 px gap
+     and been reported again, which is exactly what `/model/` was corrected by
+     screenshot twelve times for: *"less h padding on strip"*, where the padding
+     was already equal and a 146 px heading was leaving 50.2 px of air.
+     🔴 AND IT IS `:not(.kit-out)` BECAUSE EIGHT BOXES DO THIS ON PURPOSE.
+     `.kit-out` carries `margin-bottom: -14px`, deliberately cancelling the
+     padding so a readout strip sits flush to the box's bottom edge, and it is
+     the last child in eight of these. A blanket `:last-child { margin-bottom:
+     0 }` would have read as a tidy-up and silently unstuck all eight. The
+     survey is the only reason that is known: 11 of 39 boxes measured uneven,
+     and only ONE of the eleven was the reported defect. */
+  .kit-box > :last-child:not(.kit-out) { margin-bottom: 0; }
   /* The three blocks in the layout specimen, so a gap has something to be
      measured between. They are deliberately plain: what is being shown is the
      air, not the boxes. */
@@ -282,6 +300,25 @@
      off the gap to compensate would put the component's own number in a second
      file, which is the thing this project has a rule about. */
   .kit-tabs .pos-tabs-t { position: relative; padding-right: 11px; }
+  /* 🔴 THE SELECTED RULE STOPS AT THE LABEL, NOT AT THE DOT'S SLOT. Reported
+     2026-09-21 as *"underline under tab too long"*, and MEASURED: every tab
+     overhung its own text by exactly **11.00 px on the right and 0 on the
+     left**, which is this page's reserved dot slot to the digit. The component
+     draws the selection as `box-shadow: inset 0 -2px 0 0`, an inset shadow
+     spans the whole padding box, and the slot was added an hour earlier to fix
+     the new-block mark. So one repair lengthened the other's underline.
+     ⚠️ THE FIX BELONGS HERE AND NOT IN `shell.css`, because the slot belongs
+     here: `/making/` and `/stage/` use the same component, reserve nothing, and
+     have nothing to compensate for. Putting the correction in the component
+     would be this page's private arithmetic charged to two innocent callers.
+     ⚠️ AND IT IS `::before` BECAUSE `::after` IS THE DOT. Both on one element,
+     one for the mark and one for the selection, which is the whole point of
+     the two being different channels. */
+  .kit-tabs .pos-tabs-t[aria-selected="true"] { box-shadow: none; }
+  .kit-tabs .pos-tabs-t[aria-selected="true"]::before {
+    content: ''; position: absolute; left: 0; right: 11px; bottom: 0; height: 2px;
+    background: var(--hi);
+  }
   .kit-tabs .pos-tabs-t[data-kit-new]::after {
     content: ''; position: absolute; right: 0; top: 50%; margin-top: -6px;
     width: 5px; height: 5px; border-radius: 50%; background: var(--hi);
@@ -752,7 +789,6 @@ seg.set(1234)        // -> { over: true, asked: '1234' },  reads ---`,
       // The colour is a caller option and the default is the backlight `/evo/`
       // already had. This one proves it moves.
       row2.append(field('another ink', { digits: 3, value: 24, ink: 'var(--ok)' }).col);
-      row2.append(field('bigger', { digits: 2, value: 88, size: 44 }).col);
       /**
        * 🔴 THE SECOND SCHEME, AND IT IS THE POINT OF THE WHOLE OPTION. Asked
        * 2026-09-21: *"have iption on segmentdisplay to inverse color:
@@ -2467,34 +2503,6 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // is watching. The specimens below are FOUR SEPARATE BADGES rather than one
   // pressed through four states, because the checks at the bottom measure them
   // and a check that drives a control is a check a visitor watches happen.
-  section('layout', 'COLOURS',
-    '',
-    // 🔴 NO SNIPPET. It read the whole table as two glued lines and the
-    // swatches under it then said the same six things again, which is a block
-    // telling a reader twice and neither time well. Reported 2026-09-20:
-    // *"doubled and unuseful labels"*.
-    '',
-    (box) => {
-      for (const [name, css, why] of [
-        ['grey', 'var(--dim2)', 'not played'],
-        ['slate', 'var(--dim)', 'played, unmeasurable'],
-        ['green', 'var(--ok)', 'inside what it promised'],
-        ['amber', 'var(--warn)', 'later than promised'],
-        ['red', 'var(--bad)', 'later still, or wrong'],
-        ['yellow', 'var(--hi)', 'the one thing this page is about'],
-      ]) {
-        const chip = el('span', '', null);
-        chip.style.cssText = `display:inline-block;width:14px;height:14px;border-radius:3px;background:${css};vertical-align:-2px;margin-right:7px`;
-        const w = el('span', 'kit-swatch', null);
-        // ⚠️ TWO CELLS, NOT ONE STRING WITH A MIDDOT IN IT. The name and what it
-        // means are two facts and the separator was glue holding them together
-        // in a sentence nobody wanted.
-        w.append(chip, el('b', 'kit-swatch-n', name), el('span', 'kit-swatch-w', why));
-        box.append(w);
-      }
-    });
-
-
   /**
    * 🔴 THE STRIP BROKEN INTO ITS PARTS, AND THE PARTS COME FIRST BECAUSE THEY
    * ARE WHAT A CALLER ASSEMBLES. Asked 2026-09-21: *"breaks strp elements down
@@ -4716,19 +4724,74 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
      */
     const peek = (id) => kitTabs.go(id, { push: false });
     peek(GROUPS.map(([id]) => id).find((id) => id !== markedId));
-    const shut = getComputedStyle(marked).boxShadow;
-    const dShut = dot();
+    /* ⚠️ THE SELECTION IS A `::before` BAR AND NO LONGER A BOX SHADOW, CHANGED
+       2026-09-21 when the underline was reported as too long. This assert used
+       to read `boxShadow` and went red on that change, correctly: the CLAIM it
+       makes is unaltered, that the two marks are told apart by something other
+       than where they sit, but the mechanism carrying one of them moved and a
+       check naming the old one was grading a thing that had gone. */
+    const barOf = () => {
+      const cs = getComputedStyle(marked, '::before');
+      return { w: cs.width, h: cs.height, drawn: cs.content !== 'none' };
+    };
+    const dShut = dot(); const bShut = barOf();
     peek(markedId);
-    const open = getComputedStyle(marked).boxShadow;
-    const dOpen = dot();
+    const dOpen = dot(); const bOpen = barOf();
     peek(was);
-    d.assert('the mark is a dot with a box of its own and the open tab\u2019s bar is a shadow with none',
-      dShut.drawn && dOpen.drawn
-      && dShut.w === dShut.h && dShut.w > 0 && dShut.round
-      && dOpen.w === dShut.w && dOpen.h === dShut.h
-      && shut === 'none' && /-2px/.test(open),
+    /* 🔴 AND THE UNDERLINE STOPS SHORT OF THE DOT'S SLOT BY THE SLOT'S OWN
+       WIDTH. Reported as *"underline under tab too long"* and MEASURED at
+       exactly 11.00 px of overhang on every tab, which was this page's reserved
+       slot to the digit. Asserted as a RECT against the label's own ink rather
+       than against the 11 typed in the stylesheet, so the check cannot agree
+       with a copy of itself. */
+    const r = document.createRange(); r.selectNodeContents(marked);
+    const ink = r.getBoundingClientRect();
+    const box = marked.getBoundingClientRect();
+    /* The BAR's own width against the BUTTON's, which is the quantity in
+       question. An earlier draft of this measured the button against the label
+       and would have passed while the bar still ran the full width, because the
+       button overhangs the label by the slot either way. */
+    const barW = parseFloat(bOpen.w);
+    const slot = box.width - barW;
+    const labelGap = box.right - ink.right;
+
+    d.assert('the mark is a round dot and the selection is a flat bar, so neither can be read as the other',
+      dShut.drawn && dOpen.drawn && dShut.w === dShut.h && dShut.w > 0 && dShut.round
+      && dOpen.w === dShut.w && bOpen.drawn && !bShut.drawn && bOpen.h === '2px',
       `the dot is ${dShut.w} by ${dShut.h} px and round in both states · `
-      + `the marked tab's shadow is "${shut}" shut and "${open}" open`);
+      + `the bar is ${bOpen.h} tall open and ${bShut.drawn ? 'drawn' : 'absent'} shut`);
+
+    /**
+     * 🔴 NO BOX ADDS ITS LAST CHILD'S MARGIN TO ITS OWN PADDING, AND IT IS
+     * ASSERTED ON THE MARGIN RATHER THAN ON THE GAP. Reported as *"bottom
+     * pading same as top"*, where the padding was already 14 px both ways on
+     * all 39 boxes and the ink sat 15 above and 29 below, because a
+     * `.pos-controls` carried its own 14 px underneath.
+     * ⚠️ `.kit-out` IS EXCLUDED BECAUSE EIGHT BOXES CANCEL THE PADDING ON
+     * PURPOSE with `margin-bottom: -14px`, so a readout strip sits flush to the
+     * bottom edge. An assert over the GAP would have demanded they be changed;
+     * an assert over the MARGIN says what the rule actually promises.
+     */
+    {
+      const boxes = [...d.el.querySelectorAll('.kit-box')];
+      const bad = boxes.map((b) => {
+        const last = [...b.children].reverse()
+          .find((k) => k.getBoundingClientRect().height > 0);
+        if (!last || last.classList.contains('kit-out')) return null;
+        const mb = parseFloat(getComputedStyle(last).marginBottom) || 0;
+        return mb !== 0 ? `${last.className || last.tagName} ${mb}px` : null;
+      }).filter(Boolean);
+      d.assert('no box pays for its last child\u2019s bottom margin on top of its own padding',
+        boxes.length > 20 && bad.length === 0,
+        bad.length ? `${bad.length} of ${boxes.length}: ${bad.slice(0, 3).join(', ')}`
+          : `${boxes.length} boxes, none adding a margin`);
+    }
+
+    d.assert('and the selected bar is shorter than its button by the dot\u2019s slot',
+      Number.isFinite(barW) && barW > 0 && slot > 6 && slot < 16
+      && Math.abs(slot - labelGap) < 2,
+      `bar ${barW.toFixed(2)} px in a ${box.width.toFixed(2)} px button, `
+      + `so ${slot.toFixed(2)} px short against ${labelGap.toFixed(2)} px of slot`);
   }
 
   /**
