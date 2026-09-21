@@ -350,7 +350,25 @@
     + 'channel 10 at notes 60, 62, 64 and 65, and its master filter on channel 16. '
     + 'The Circuit has eight macro knobs on channel 1 sending CC 80 to 87 in order, so its '
     + 'FIRST macro knob is CC 80, and CC 86 and 87 are inferred rather than measured. The '
-    + 'Circuit has no factory reset, so it is never sent SysEx.';
+    + 'Circuit has no factory reset, so it is never sent SysEx. '
+    // 🔴 THE MODEL 12'S BUTTONS, AND THE ONE THAT CANNOT SAFELY PLAY A SYNTH.
+    // ✅ MEASURED and recorded on `/twelve/`: REC is notes 0 to 7, SOLO 8 to 15,
+    // MUTE 16 to 23, and **REC SENDS NO RELEASE while SOLO and MUTE do**. Two
+    // buttons on one mixer, both momentary on the panel, disagreeing on the
+    // wire. A model asked to play a synth from REC would write a perfectly
+    // valid patch that leaves every note hanging on an instrument in another
+    // building, and nothing in the validator could catch it, because there is
+    // nothing invalid about it. So the model is told, in the same sentence.
+    + 'The TASCAM Model 12 sends its REC buttons as notes 0 to 7, SOLO as notes 8 to 15 '
+    + 'and MUTE as notes 16 to 23, its PAN knobs as relative CC 16 upward, and its faders '
+    + 'as pitch bend. REC SENDS NO NOTE OFF, so a link that plays a synth from REC leaves '
+    + 'notes hanging, and SOLO or MUTE should be used instead. '
+    + 'Transforms available: channel, transpose, velocity, only, drop, cc, and three more. '
+    + 'range takes lo and hi and keeps only notes inside that note range, which is how a '
+    + 'keyboard split is built: two links from the same port with different ranges and '
+    + 'channels. vrange takes lo and hi and keeps only notes inside that VELOCITY range, '
+    + 'which is how a soft layer and a hard layer are built. fixed takes to and gives '
+    + 'every note that velocity, which is what the Circuit drums do at 96.';
 
   /** What each port consents to. The Circuit's line is the one that matters. */
   /**

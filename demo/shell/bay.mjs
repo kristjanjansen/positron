@@ -115,6 +115,63 @@ const OPS = {
    * instrument. A remap that only knew about controller numbers would send a
    * mod wheel to both.
    */
+  /**
+   * 🔴 A KEYBOARD SPLIT, WHICH COULD NOT BE SAID AT ALL UNTIL 2026-09-21. The
+   * owner asked for one in words: *"Split the keyboard into half. Lower part
+   * plays synth 1 in the circuit and upper part plays synth 2"*, and the model
+   * produced `{"op":"only","to":1}` twice, because `only` filters by CLASS and
+   * was the nearest thing in the whole vocabulary to a filter. **It was not
+   * wrong about the intent. There was no word for it.**
+   * ⚠️ A SPLIT IS TWO LINKS, NOT ONE OP. `link()` already allows two links
+   * between the same pair, so the lower half is one link with a range and a
+   * channel and the upper half is another. That is how a real one is built.
+   * 🔴 AND A NOTE OFF OUTSIDE THE RANGE IS DROPPED TOO, WHICH IS THE WHOLE
+   * SAFETY OF IT. The filter is on the NOTE NUMBER, which is the same for the
+   * on and the off, so a note that was never let through can never be left
+   * hanging. A filter keyed on anything that differs between them stops notes.
+   */
+  range: {
+    args: ['lo', 'hi'], need: ['lo', 'hi'],
+    classes: (set) => set,
+    run: (ev, a) => {
+      if (ev.cls !== 'note') return ev;
+      return (ev.d1 < a.lo || ev.d1 > a.hi) ? null : ev;
+    },
+  },
+  /**
+   * 🔴 A VELOCITY LAYER: soft hits one instrument and hard hits another, which
+   * is how a real split-by-touch is built.
+   * 🔴 AND A NOTE OFF CARRIES VELOCITY 0, SO A NAIVE FILTER LEAVES EVERY NOTE
+   * HANGING. `d2 === 0` is the off and it passes ALWAYS, whatever the window
+   * is: dropping it would mean a note let through by a hard hit is never told
+   * to stop, and a stuck note on a synth in another building is the worst thing
+   * in this file. The test asserts the off passes a window it could not enter.
+   */
+  vrange: {
+    args: ['lo', 'hi'], need: ['lo', 'hi'],
+    classes: (set) => set,
+    run: (ev, a) => {
+      if (ev.cls !== 'note' || ev.d2 === 0) return ev;
+      return (ev.d2 < a.lo || ev.d2 > a.hi) ? null : ev;
+    },
+  },
+  /**
+   * 🔴 ONE VELOCITY FOR EVERY NOTE, WHICH THIS DESK'S OWN DRUMS ALREADY DO.
+   * ✅ MEASURED and written in `measured-devices-2026-09-20.md`: the Circuit's
+   * drum pads send notes 60, 62 and 64 at **velocity 96, fixed**. So this is
+   * not an effect, it is how one instrument here behaves, and a link that wants
+   * to feed it from a touch sensitive keyboard needs to say so.
+   * ⚠️ AND IT LEAVES A NOTE OFF ALONE, for the reason above: rewriting a 0 to
+   * 96 turns every release into a second note on.
+   */
+  fixed: {
+    args: ['to'], need: ['to'],
+    classes: (set) => set,
+    run: (ev, a) => {
+      if (ev.cls !== 'note' || ev.d2 === 0) return ev;
+      return { ...ev, d2: Math.max(1, Math.min(127, Math.round(a.to))) };
+    },
+  },
   cc: {
     args: ['from', 'to', 'ch'], need: ['from', 'to'],
     classes: (set) => set,
