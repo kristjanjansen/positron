@@ -382,6 +382,7 @@
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader, createFaderBank } from '/shell/fader.mjs';
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
+  import { createDrop } from '/shell/drop.mjs';
   import { createXrProbe, xrCaps, onXrCaps, reasonFor, canEnter, answered, XR_STATES }
     from '/shell/xr-caps.mjs';
 
@@ -800,6 +801,69 @@
    * other block's press: MEASURED once on `/radio/` as a single press moving
    * from t+1 s to t+31 s. A panel is a layout and has no control to add.
    */
+  // The drop specimen's own state, declared out here rather than inside the
+  // block, for the reason this page has written down three times: a block that
+  // moves to the top leaves its `const` behind, the build reads it in its dead
+  // zone, `section()` swallows the throw into `failed`, and the page dies much
+  // later with a message about a different line.
+  let kitDrop = null, kitDropLine = null, kitDropTall = 0;
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A drop target, as of
+   * 2026-09-21, asked for as *"do lightweight planning on patch demo (inclu
+   * global dragdroppable upload)"* and built because `/patches/` needs a way in
+   * for a pack that is not the one in this repository.
+   *
+   * 🔴 IT IS `open`, NOT `upload`, AND THE SPECIMEN'S LABEL IS THE POINT.
+   * Nothing leaves the machine and this module names no network API at all. A
+   * purchased soundbank lives in `purchased/` precisely because it is not ours
+   * to publish, and a control called *upload* invites somebody to build the
+   * thing that gitignore exists to prevent.
+   *
+   * 🔴 AND THE REFUSAL HAS A BUTTON, BECAUSE A DRAG CANNOT BE SYNTHESISED AND
+   * THE HALF NOBODY TESTS IS THE HALF THAT REFUSES. `/tapes/`, `/now/` and
+   * `/flipper/` were all fully green against stand-ins whose refusals had been
+   * switched off, four instances of one pattern, and the fix was the same every
+   * time: break it on purpose and see what stays green. Dropping a JPEG here is
+   * that press, and it is the same code path a real drop takes.
+   *
+   * ⚠️ AND NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the two
+   * blocks below give: both harnesses press that row by position, so a new top
+   * block with a control in it moves every other block's press. These two
+   * buttons are in the box, which nothing presses by position.
+   */
+  section('input', 'DROP TARGET',
+    'Drop a file anywhere on the page and it opens in the tab, with nothing leaving the '
+    + 'machine. The button is the same handler for somebody who does not drag, and the '
+    + 'second one drops a JPEG on purpose so the refusal has something to say out loud.',
+    `const drop = createDrop({
+  accept: ['.circuitpack', '.syx'],
+  label: 'open a pack',
+  says: (m, kind) => d.log(m, kind),      // a refusal says so in words
+  onOpen: (files) => read(files[0].bytes), // a Uint8Array, in this tab
+})
+box.append(drop.el)                        // the cover is the whole page`,
+    (box) => {
+      kitDropLine = el('div', 'kit-out', 'nothing has been opened');
+      kitDrop = createDrop({
+        accept: ['.circuitpack', '.syx'],
+        label: 'open a pack',
+        hint: 'drop a .circuitpack or a .syx',
+        says: (m, kind) => { kitDropLine.textContent = m; d.log(m, kind); },
+        onOpen: (files) => {
+          const f = files[0];
+          kitDropLine.textContent = `${f.name} · ${f.bytes.length} bytes, read in this tab and sent nowhere`;
+          d.log(`opened ${f.name}`, 'good');
+        },
+      });
+      const jpeg = el('button', '', 'drop a JPEG on purpose');
+      jpeg.type = 'button';
+      jpeg.addEventListener('click', () => {
+        kitDrop.open([new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'photo.jpg')]);
+      });
+      box.append(kitDrop.el, jpeg, kitDropLine);
+    });
+
   section('hardware', 'PANEL',
     'A fixed column that does not scroll beside a strip of controls that does, in '
     + 'a case, with the instrument’s name printed on it. The column drives the depth '
@@ -3125,6 +3189,77 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
 
   // every block built. A component that throws takes the page with it when
   // the error escapes, which turns one broken control into a blank page.
+  /**
+   * 🔴 THE DROP TARGET, AND THE FIRST TWO OF THESE ARE ABOUT A COVER NOBODY
+   * SHOULD EVER BE TRAPPED UNDER. `/weight/` and `/floor/` both shipped a
+   * `position: fixed; inset: 0` cover that sat over the row holding the button
+   * that got you out, so this one has two independent guards and both are
+   * measured: it is in the document only while a drag is in flight, and it is
+   * `pointer-events: none` for its whole life. Either one alone would be enough
+   * and neither one alone is checked.
+   *
+   * ⚠️ THE MEASUREMENT APPENDS THE COVER AND TAKES IT AWAY WITHOUT AWAITING,
+   * which is the same argument the panel block's window makes: JavaScript here
+   * is single threaded, no frame can be rendered between these statements, and
+   * so a person reading this page never sees it. An `await` anywhere in this
+   * block would break that and would be a check that mutates the page in front
+   * of a reader, which is what `/tapes/`'s zoom check was doing.
+   */
+  {
+    const tallWas = document.documentElement.scrollHeight;
+    document.body.append(kitDrop.cover);
+    const pe = getComputedStyle(kitDrop.cover).pointerEvents;
+    const box = kitDrop.cover.getBoundingClientRect();
+    kitDropTall = document.documentElement.scrollHeight;
+    kitDrop.cover.remove();
+    d.assert('a visit opens nothing, and the cover is not in the page until something is dragged over it',
+      kitDrop.opens === 0 && !kitDrop.cover.isConnected,
+      `${kitDrop.opens} files opened and the cover is ${kitDrop.cover.isConnected ? 'in' : 'out of'} the document`);
+    d.assert('the cover cannot be pressed and cannot move anything, even while it is up',
+      pe === 'none' && kitDropTall === tallWas && box.width > 0 && box.height > 0,
+      `pointer-events ${pe} · the page is ${kitDropTall} px tall with it up and ${tallWas} px without `
+      + `· the cover itself is ${box.width.toFixed(0)} by ${box.height.toFixed(0)}`);
+  }
+
+  /**
+   * 🔴 THE REFUSAL, AND IT IS BEHIND THE GATE BECAUSE IT PRESSES A CONTROL.
+   * A drop target that took everything would pass every check that counts what
+   * it opened, which is the shape this project measured four times: `/tapes/`,
+   * `/now/` and `/flipper/` were all fully green against stand-ins whose
+   * refusals had been switched off. So the JPEG is dropped on purpose, down the
+   * same code path a real drag takes, and the words it produces are asserted
+   * rather than the counter alone: a refusal that increments a number and says
+   * nothing to the reader is the failure this is guarding against.
+   */
+  if (SELFCHECK) {
+    // 🔴 THE WINDOW IS SHUT ACROSS THE WAIT AND OPENED AGAIN AFTER, WHICH IS
+    // THE RULE THIS PAGE ALREADY WROTE DOWN AND WHICH I BROKE ON THE FIRST RUN.
+    // Reading a file is a promise, so an `await` here sits inside the measuring
+    // window, a `requestAnimationFrame` callback finds it open, and a frame is
+    // drawn with all five parts laid out at once. It went red immediately and
+    // named the count, which is what that counter is for: no reading of the
+    // source can see an await, and three other places on this page do exactly
+    // this dance for the same reason.
+    settle();
+    const openedWas = kitDrop.opens, refusedWas = kitDrop.refused;
+    await kitDrop.open([new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'photo.jpg')]);
+    const said = kitDropLine.textContent;
+    d.assert('a file it does not take is refused in words that name it, and it opens nothing',
+      kitDrop.refused === refusedWas + 1 && kitDrop.opens === openedWas
+      && said.includes('photo.jpg') && /not \.circuitpack/.test(said),
+      `refused ${refusedWas} then ${kitDrop.refused}, opened ${openedWas} then ${kitDrop.opens} · it said "${said}"`);
+
+    // ⚠️ THE NEGATIVE CONTROL. A target that refused EVERYTHING would pass the
+    // assert above perfectly, so one file it does take goes down the same path.
+    const before = kitDrop.opens;
+    await kitDrop.open([new File([new Uint8Array([0xf0, 0x00, 0x20, 0x29])], 'one.syx')]);
+    d.assert('NEGATIVE CONTROL: a file it does take is opened rather than refused, down the same path',
+      kitDrop.opens === before + 1 && kitDrop.refused === refusedWas + 1
+      && kitDropLine.textContent.includes('one.syx'),
+      `opened ${before} then ${kitDrop.opens} · "${kitDropLine.textContent}"`);
+    measure();
+  }
+
   d.assert('every block on this page built',
     built.length > 0 && failed.length === 0,
     failed.length ? `${failed.length} did not: ${failed.join(' · ')}`
