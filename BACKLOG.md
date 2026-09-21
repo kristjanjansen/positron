@@ -52,6 +52,39 @@ once by somebody who was not mid-edit.
   are called; what has no home is a record of which PORTS a device had when it
   was last seen, which is what the question was about.
 
+#### The drum twin: one score, two renderers, compared, 2026-09-21
+
+🔴 **ASKED FOR DIRECTLY: *"same idea as in shadrs / sc pathces: compare in
+browser and pi rendering, share assets to render (in drum pachnine wavs and
+patterns)"*, then *"you did hw reseach already"*, which is the instruction to
+stop surveying and build it.**
+
+**The shape, which this project has already built twice.** `/grains/` runs a
+granulator in the tab and Pappus on the board from ONE description and asserts
+*72 sine partials here, 72 on the board*. `/mirror/` does it for a picture. The
+drum version is the same three parts:
+
+1. **One set of assets.** The 64 WAVs of a `.circuitpack`, read by
+   `circuit-sample.mjs` in the tab and by `Buffer.read` in scsynth. ⚠️ The pack
+   ships with the checkout through `push.sh` rather than over the relay: 3.5 MB
+   is four messages under the 1000 KiB cap but needs a chunk protocol that does
+   not exist, and the file is already in this repository.
+2. **One score.** 16 steps by 64 rows of booleans, sent as step events rather
+   than audio. 8 messages a second at 120 bpm against a relay measured at 1000.
+3. 🔴 **A COMPARISON THAT CAN GO RED, WHICH IS THE ONLY PART THAT MATTERS.**
+   Not *both sound similar*. Both ends report what they FIRED and the numbers
+   are put beside each other: *this page fired 16, the board fired 16*.
+   ⚠️ **AND THE BOARD'S COUNT MUST COME FROM SCSYNTH STARTING A SYNTH, NOT FROM
+   THE BOARD RECEIVING A MESSAGE.** `createMidiLane`'s `scheduled()` counted
+   what the page QUEUED and read identically to delivery while every note was
+   being scheduled fifty six years out. `source.set` already shows the right
+   shape: it asks scsynth `/s_get` and refuses to claim success until the engine
+   answers.
+
+⚠️ **AND THE BOARD CANNOT BE HEARD IN ITS OWN ROOM UNTIL THE FAST TRACK PRO
+ARRIVES**, so until then the comparison is browser audio against a stream, and
+the value of it is the COUNTS rather than the sound.
+
 #### A Fast Track Pro on the board, 2026-09-21
 
 - 🔴 **PLANNED BY THE OWNER: *"i am plannig to connect fastrack pro to pi and
