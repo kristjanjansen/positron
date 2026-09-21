@@ -424,6 +424,36 @@
   `not connected` is longer than `checking` and every state will measure wider.
   There is an assert on that reserve in `/kit/`; check it after.
 
+### Asked 2026-09-21, session 40, a smaller round pad
+
+- 🔴 **A SMALLER ROUND PAD, AND `/evo/`'s OCTAVE `-`/`+` USES IT.** Asked:
+  *"make smaller version of rounded button"*, then *"use it in evo +-"*.
+  ✅ **THE COMPONENT ALREADY HAS BOTH NEIGHBOURING OPTIONS, SO THIS IS A THIRD
+  AND NOT A NEW CONTROL.** `demo/shell/pad.mjs` documents `round` (*"A CIRCLE,
+  10 per cent smaller than a square pad"*) and `half` (*"HALF HEIGHT"*, asked
+  for 2026-09-20). So the shape of the answer is settled: another size flag on
+  the same factory, `.pos-pad-round` plus a modifier, never a second component.
+  ⚠️ **AND THE REAL INSTRUMENT IS THE ARGUMENT FOR IT.** The MK-425C's octave
+  pair is *"the only round and only coloured buttons on the panel"*
+  (`research/evo-mk425c-face-2026-09-21.md`), and on the object they are small
+  next to everything else. A replica drawing them at full pad size is drawing
+  the wrong instrument.
+  🔴 **IT IS QUEUED BEHIND THE PANEL EXTRACTION RATHER THAN DONE, AND
+  DELIBERATELY.** That change holds `demo/shell/shell.css`, `demo/evo/index.html`,
+  `demo/kit/index.html`, `demo/model/index.html` and `demo/circuit/index.html`
+  at once, renames 12 classes, and has **19 rules at risk on `/model/` alone**
+  with four of them inside a media query this project cannot grade. Adding a
+  component change to it mid-flight is how an assert count stops being
+  accountable, which is the one thing that change cannot afford.
+  ⚠️ **THREE THINGS TO GET RIGHT WHEN IT IS DONE**, all of them recorded
+  elsewhere. A pad reserves `--ctl-head` and `--ctl-foot` **even when empty**, so
+  a smaller pad in a row of bigger ones still has to sit on the shared baseline
+  or `/model/`'s twelve screenshots happen again. `/kit/` asserts a badge
+  measures the same width in five states and a pad's working surface is its
+  BUTTON rather than its wrapper, so measure the button. And the octave pair
+  carries a bracketed `TRANSPOSE` beneath it, so whatever height it becomes has
+  to leave that legible.
+
 ### Issue queue, 2026-09-21, session 40, /model/
 
 - 🔴 **`/model/` BECOMES `/twelve/`, AND IT IS THE SECOND RENAME OF THIS PAGE IN
