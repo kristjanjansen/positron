@@ -14,7 +14,7 @@
 // was delivered. The runner is a stub that captures instead of calling, so this
 // costs nobody's account anything.
 
-import { handle, relabel, PATCH, HEAR, hearPayload } from './wish.mjs';
+import { handle, relabel, PATCH, HEAR, hearPayload, allowedOrigin, corsFor } from './wish.mjs';
 
 let ok = 0;
 const bad = [];
@@ -136,6 +136,53 @@ const refused = await handle('/wish', { model: '@cf/somebody/else', ports: DESK 
 is('a model that is not on the list is refused before it is run',
   refused.status === 400 && /not a patch model/.test(refused.body.error),
   JSON.stringify(refused.body));
+
+// ── who may spend the account ───────────────────────────────────────────────
+//
+// 🔴 THE ALLOWLIST IS GRADED BOTH WAYS OR IT IS NOT GRADED. A rule that
+// answered `true` to everything passes any check that only asks whether the
+// site gets in, and this one guards a paid account on a public hostname.
+// ⚠️ AND THE HONEST CLAIM IS NARROW: an `Origin` header is a fact about a
+// BROWSER. Anything that is not one sends whatever it likes, so what these
+// asserts grade is that a stray page and a crawler are refused, never that
+// somebody trying is.
+is('the site is allowed, with and without www',
+  allowedOrigin('https://positron.studio') && allowedOrigin('https://www.positron.studio'));
+is('a page served off this machine is allowed, on any port',
+  allowedOrigin('http://127.0.0.1:8890') && allowedOrigin('http://localhost:3000')
+  && allowedOrigin('http://192.168.1.14:8890'));
+is('a page this account deployed is allowed',
+  allowedOrigin('https://elektron-view.kristjan-jansen.workers.dev'));
+
+{
+  /* 🔴 NEGATIVE CONTROL, AND THE LAST TWO ARE THE ONES A NAIVE RULE LETS
+     THROUGH. A `startsWith` on the site would pass `positron.studio.evil.com`;
+     an `includes` would pass `https://evil.com/?x=positron.studio`; and a
+     subdomain rule written without an anchor would pass a workers.dev name
+     under somebody else's account. */
+  const no = [null, '', 'null', 'https://evil.example',
+    'https://positron.studio.evil.example', 'http://positron.studio',
+    'https://evil.example/?x=https://positron.studio',
+    'https://evil.kristjan-jansen.workers.dev.evil.example',
+    'https://wish.someone-else.workers.dev',
+    'http://8.8.8.8:8890', 'http://172.32.0.1:8890'];
+  const through = no.filter((o) => allowedOrigin(o));
+  is('NEGATIVE CONTROL: a stray page, a crawler and a lookalike hostname are all refused',
+    through.length === 0, through.join(', '));
+}
+
+{
+  /* A reply may not hand one caller's permission to another, and a cache is the
+     thing that would do it. */
+  const h = corsFor('http://127.0.0.1:8890');
+  is('the reply echoes the caller rather than answering star, and varies on it',
+    h['access-control-allow-origin'] === 'http://127.0.0.1:8890' && h.vary === 'origin',
+    JSON.stringify(h));
+  const r = corsFor('https://evil.example');
+  is('NEGATIVE CONTROL: a refused caller is never named in the allow header',
+    r['access-control-allow-origin'] === 'https://positron.studio',
+    r['access-control-allow-origin']);
+}
 
 for (const line of bad) console.log(`FAIL  ${line}`);
 console.log(`${ok}/${ok + bad.length} ok`);

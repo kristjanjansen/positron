@@ -216,13 +216,55 @@ const SPOKEN = { zero: '0', oh: '0', one: '1', two: '2', three: '3', four: '4', 
  * this is for `MK-425C`, never for a quantity.
  */
 export function normalise(s) {
-  return String(s ?? '').toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .split(' ')
-    .map((w) => SPOKEN[w] ?? w)
-    .join(' ')
-    .replace(/(?<=\d) (?=\d)/g, '')
-    .trim();
+  return tokenise(s).map((t) => t.word).join(' ');
+}
+
+/**
+ * The same words `normalise()` produces, each one still knowing where in the
+ * raw string it came from.
+ *
+ * 🔴 IT EXISTS BECAUSE A CORRECTION HAS TO LAND IN THE BOX A PERSON READS, AND
+ * `normalise()` THROWS AWAY EVERYTHING NEEDED TO PUT IT THERE. `resolve()`
+ * matches against lowercased, punctuation-free, digit-joined words; the
+ * transcript on `/wish/` is a textarea holding what the speech model actually
+ * returned, capital letters, full stops and all. Without an offset there is no
+ * way back from *"the span `groove a box` matched"* to *"characters 8 to 20 of
+ * what you are looking at"*, and a page that cannot say WHERE it changed
+ * something is a page that changed it silently.
+ *
+ * ⚠️ **IT MUST PRODUCE EXACTLY WHAT `normalise()` PRODUCED, WHICH IS WHY
+ * `normalise()` IS NOW WRITTEN IN TERMS OF IT RATHER THAN BESIDE IT.** Two
+ * functions doing one string transform is this repository's most repeated
+ * defect: `bay.mjs` derived one port list twice and the two could disagree with
+ * nothing to catch it. One implementation cannot drift from itself.
+ *
+ * ⚠️ A JOINED DIGIT RUN KEEPS THE WHOLE SPAN. `four twenty five` is three words
+ * in the raw text and one token here, so its range runs from the `f` to the
+ * last `e`, separators included. That is what has to be replaced to replace the
+ * number.
+ *
+ * @param {string} s
+ * @returns {{word:string, at:number, to:number}[]} `at` and `to` index the RAW
+ *   string, so `s.slice(at, to)` is the words as they were said.
+ */
+export function tokenise(s) {
+  const raw = String(s ?? '');
+  const out = [];
+  for (const m of raw.matchAll(/[a-z0-9]+/gi)) {
+    const w = m[0].toLowerCase();
+    const word = SPOKEN[w] ?? w;
+    const prev = out[out.length - 1];
+    /* The digit join, which `normalise()` used to do with a lookbehind over the
+       whole string. Same rule, one token at a time: a run of digits said out
+       loud is one number. */
+    if (prev && /^\d+$/.test(prev.word) && /^\d+$/.test(word)) {
+      prev.word += word;
+      prev.to = m.index + m[0].length;
+      continue;
+    }
+    out.push({ word, at: m.index, to: m.index + m[0].length });
+  }
+  return out;
 }
 
 /**
@@ -349,21 +391,48 @@ const hasStop = (span) => span.split(' ').some((t) => STOP.has(t));
 /**
  * Which instruments does this sentence name, including badly?
  *
+ * ⚠️ **A HIT CARRIES WHERE IT WAS FOUND, `at` AND `to`, AND THEY INDEX THE RAW
+ * STRING RATHER THAN THE NORMALISED ONE.** `text.slice(at, to)` is the words as
+ * the speech model wrote them, which is what a reader is looking at and the
+ * only thing a correction can replace. `said` is still the normalised span, so
+ * every assert written before this stands.
+ *
  * @param {string} text what was heard
  * @returns {{said:string, word:string, full:string, kind:string|null,
- *            how:'exact'|'sound', entry:object}[]} one hit per instrument,
+ *            how:'exact'|'sound', at:number, to:number, i:number, n:number,
+ *            entry:object}[]} one hit per instrument,
  *   best first, never two hits for one instrument.
  */
 export function resolve(text) {
-  const flat = normalise(text);
-  const tokens = flat ? flat.split(' ') : [];
+  const raw = String(text ?? '');
+  const tok = tokenise(raw);
+  const tokens = tok.map((t) => t.word);
   const best = new Map();                 // full name -> hit
 
-  const offer = (entry, word, said, how, cost) => {
+  const offer = (entry, word, said, how, cost, i, n) => {
     const key = `${entry.maker} ${entry.model}`;
     const prev = best.get(key);
     if (prev && (prev.how === 'exact' || prev.cost <= cost)) return;
-    best.set(key, { said, word, full: key, kind: entry.kind, how, cost, entry });
+    best.set(key, { said, word, full: key, kind: entry.kind, how, cost,
+      i, n, at: tok[i].at, to: tok[i + n - 1].to, entry });
+  };
+
+  /**
+   * Where a whole alias sits in the sentence, as a token index, or -1.
+   * 🔴 IT REPLACES FOUR STRING TESTS THAT SAID THE SAME THING AND COULD NOT SAY
+   * WHERE. `flat === w || flat.includes(' w ') || flat.startsWith('w ') ||
+   * flat.endsWith(' w')` is exactly *"w appears as a whole run of tokens"*, and
+   * a token scan answers the same question while knowing the index. Measured
+   * identical over the whole corpus rather than argued.
+   */
+  const findWhole = (w) => {
+    const want = w.split(' ');
+    for (let i = 0; i + want.length <= tokens.length; i++) {
+      let hit = true;
+      for (let j = 0; j < want.length; j++) if (tokens[i + j] !== want[j]) { hit = false; break; }
+      if (hit) return i;
+    }
+    return -1;
   };
 
   for (const entry of DESK) {
@@ -383,8 +452,8 @@ export function resolve(text) {
       if (!w.includes(' ') && STOP.has(w)) continue;
       /* Exact first and it wins outright: a sentence that named the thing
          properly must never be "corrected" to something else. */
-      if (flat === w || flat.includes(` ${w} `) || flat.startsWith(`${w} `)
-        || flat.endsWith(` ${w}`)) { offer(entry, word, w, 'exact', 0); continue; }
+      const whole = findWhole(w);
+      if (whole >= 0) { offer(entry, word, w, 'exact', 0, whole, w.split(' ').length); continue; }
 
       const wk = sounds(word);
       if (wk.length < MIN_SOUND_LEN) continue;
@@ -444,10 +513,105 @@ export function resolve(text) {
           if (sk[0] !== wk[0]) continue;
           if (Math.abs(sk.length - wk.length) > 1) continue;
           const d = dist(sk, wk);
-          if (d <= allowed(wk.length)) offer(entry, word, said, 'sound', d);
+          if (d <= allowed(wk.length)) offer(entry, word, said, 'sound', d, i, n);
         }
       }
     }
   }
   return [...best.values()].sort((a, b) => a.cost - b.cost);
+}
+
+/**
+ * 🔴 WHAT A PAGE DOES WITH WHAT `resolve()` FOUND, AND THE PART THAT WAS OPEN
+ * IS THE PART WHERE IT FOUND TWO THINGS.
+ *
+ * `HANDOFF.md` carried this as an unanswered design question: all three speech
+ * models mangle `daw` four different ways, so *"the desk needs daw mode
+ * switched on"* comes back naming the **TASCAM Model 12** and its **DAW control
+ * surface** at once, and *"what a page does with two hits for one instruction
+ * is a `/wish/` decision nobody has taken"*. Taken here, and taken as three
+ * rules rather than one, because the measured corpus has three different shapes
+ * in it and only one of them is really an ambiguity.
+ *
+ * 🔴 **1. A MORE SPECIFIC NAME BEATS A NAME INSIDE IT.** MEASURED: *"The tascam
+ * model twelve daw control does nothing at all."* matches `tascam model 12 daw
+ * control` over five tokens AND `tascam model 12` over three, and the second
+ * span sits entirely inside the first. That is not two instruments being named,
+ * it is one name containing another, and the longer one is the one somebody
+ * said. A hit whose span is strictly inside another hit's span goes.
+ *
+ * 🔴 **2. AN INSTRUMENT THE CALLER DOES NOT HAVE IS REPORTED AND NEVER
+ * SUBSTITUTED.** `DESK` describes this room; a page describes what is plugged
+ * into it, and they are not the same list. MEASURED: *"Send the Novation to the
+ * taskam."* names `TASCAM Model 12` and `TASCAM Model 12 DAW control` on one
+ * span at the same cost, and `/wish/` has only the first, so for that page the
+ * span is not ambiguous at all. Rewriting a name the caller cannot patch would
+ * put a word in somebody's mouth AND still answer *nothing on this desk*, which
+ * is both failures at once.
+ *
+ * 🔴 **3. TWO INSTRUMENTS THE CALLER REALLY HAS, ON ONE SPAN, IS NOT REPAIRED.
+ * EVER.** MEASURED: `audio interface` is an alias of the TASCAM Model 12 and of
+ * the M-Audio Fast Track Pro, at exact strength and distance 0, where no
+ * threshold and no cleverer phonetic key can separate them. Picking one is a
+ * coin toss printed as a fact. Both names are reported and the words are left
+ * exactly as they were, and the person fixes it by typing one word, which is
+ * the cheapest correction on the page and the reason the box is editable.
+ *
+ * ⚠️ **AND AN EXACT HEARING IS NEVER REWRITTEN**, which is `resolve()`'s own
+ * rule arriving one layer up. A sentence that named the thing properly has
+ * nothing to correct, so only `how: 'sound'` produces a replacement.
+ *
+ * ⚠️ **NOTHING HERE IS SILENT.** Every replacement comes back in `fixed` with
+ * the words that were there before it, and the caller is expected to say so:
+ * this is the same shape as `relabel()` in `workers/wish/src/wish.mjs`, which
+ * repairs the one key a model always gets wrong and RETURNS the repair so the
+ * page can print it. *A model proposes and a person presses* survives only if
+ * the person can see what was actually said.
+ *
+ * @param {string} text what was heard
+ * @param {{has?: (full:string) => boolean}} [opts] `has` answers whether an
+ *   instrument is one the caller can actually patch. The default is that
+ *   everything on `DESK` counts, which is the right answer for a caller with no
+ *   opinion and the wrong one for a page with a port list.
+ * @returns {{text:string, fixed:{was:string, full:string, at:number, to:number}[],
+ *            unsure:{was:string, names:string[]}[],
+ *            absent:{was:string, names:string[]}[], hits:object[]}}
+ */
+export function reword(text, opts = {}) {
+  const raw = String(text ?? '');
+  const has = opts.has || (() => true);
+  const all = resolve(raw);
+
+  /* Rule 1, before anything else looks at a group: a span strictly inside
+     another span was never a second instrument. */
+  const hits = all.filter((h) => !all.some((o) => o !== h
+    && o.at <= h.at && o.to >= h.to && (o.to - o.at) > (h.to - h.at)));
+
+  /* What is left, grouped by overlapping text. Sorted by position, because a
+     group is built by walking left to right and a replacement is applied right
+     to left. */
+  const groups = [];
+  for (const h of [...hits].sort((a, b) => a.at - b.at || a.to - b.to)) {
+    const g = groups[groups.length - 1];
+    if (g && h.at < g.to) { g.hits.push(h); g.to = Math.max(g.to, h.to); }
+    else groups.push({ at: h.at, to: h.to, hits: [h] });
+  }
+
+  const fixed = [], unsure = [], absent = [];
+  for (const g of groups) {
+    const here = g.hits.filter((h) => has(h.full));
+    const was = raw.slice(g.at, g.to);
+    if (!here.length) { absent.push({ was, names: g.hits.map((h) => h.full) }); continue; }
+    if (here.length > 1) { unsure.push({ was, names: here.map((h) => h.full) }); continue; }
+    const h = here[0];
+    if (h.how === 'sound') fixed.push({ was: raw.slice(h.at, h.to), full: h.full, at: h.at, to: h.to });
+  }
+
+  /* Right to left, so an earlier offset is still an offset into the string it
+     was measured against. */
+  let out = raw;
+  for (const f of [...fixed].sort((a, b) => b.at - a.at)) {
+    out = out.slice(0, f.at) + f.full + out.slice(f.to);
+  }
+  return { text: out, fixed, unsure, absent, hits };
 }

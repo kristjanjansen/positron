@@ -4,13 +4,43 @@
   // Cloudflare credential, so the two model calls have to happen somewhere with
   // a binding, and this is the smallest somewhere.
   //
-  // 🔴 NO CUSTOM DOMAIN AND NO ROUTE, DELIBERATELY. This spends somebody's
-  // account every time it is called, so it is not on a hostname that a crawler
-  // or a stray page can find. Run it with `npx wrangler dev` and point the page
-  // at it, and decide about deploying separately.
+  // 🔴 THIS FILE SAID `NO CUSTOM DOMAIN AND NO ROUTE, DELIBERATELY` UNTIL
+  // 2026-09-21, and the reason it gave is still true: *this spends somebody's
+  // account every time it is called*. What changed is that the owner of the
+  // account asked for it in production, twice, after correcting himself once.
+  // So it has a hostname and it has a guard, and `src/index.js` carries the
+  // three layers and an honest account of what each one does not stop.
+  //
+  // 🔴 A SUBDOMAIN RATHER THAN A PATH UNDER `positron.studio`, AND THAT IS NOT
+  // A PREFERENCE. `positron.studio` is elektron-view's CUSTOM DOMAIN and a
+  // custom domain owns every path on its hostname. `workers/store` already
+  // priced this exact question and wrote the answer down: *the plan's "same
+  // hostname" wish is not worth a path-route fight with a custom domain*.
+  // Sixteen workers in this repository are `<name>.positron.studio`, so this is
+  // the shape, and the cost is that the page's call is cross-origin and needs
+  // the CORS headers in `src/wish.mjs`.
+  "routes": [{ "pattern": "wish.positron.studio", "custom_domain": true }],
+  // 🔴 AND `workers_dev` STAYS FALSE, WHICH IS THE ONE HALF OF THE OLD COMMENT
+  // THAT SURVIVES INTACT. A `*.workers.dev` name is a second public address
+  // with no reason to exist: everything that calls this calls the hostname
+  // above, and an address nothing uses is an address only a crawler finds.
   "workers_dev": false,
   "main": "src/index.js",
   "compatibility_date": "2026-08-01",
   "ai": { "binding": "AI" },
+  // 🔴 THE BRAKE, AND IT IS THE ONLY LAYER WORTH ANYTHING AGAINST SOMEBODY
+  // TRYING. 30 requests a minute per address: a person holding the button makes
+  // two calls an utterance, so this is about fifteen utterances a minute, which
+  // nobody speaks and which leaves room for several people behind one office
+  // address.
+  // ⚠️ **IT IS PER CLOUDFLARE LOCATION AND CLOUDFLARE SAYS SO**: *"permissive,
+  // eventually consistent, and intentionally designed to not be used as an
+  // accurate accounting system"*. The real ceiling for one caller is 30 times
+  // the number of data centres they can reach. It bounds a runaway page and a
+  // simple script; it does not bound a distributed one.
+  // ⚠️ `period` TAKES ONLY 10 OR 60. It is not a free parameter.
+  "ratelimits": [
+    { "name": "WISH_RATE", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } }
+  ],
   "observability": { "enabled": true }
 }

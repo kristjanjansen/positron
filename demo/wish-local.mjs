@@ -39,9 +39,52 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { handle } from '../workers/wish/src/wish.mjs';
+import { fileURLToPath } from 'node:url';
 
 const exec = promisify(execFile);
+
+// ── which build is answering ────────────────────────────────────────────────
+//
+// 🔴 **THIS PROCESS USED TO IMPORT `wish.mjs` ONCE AND SERVE THAT COPY
+// FOREVER, AND IT COST TWO SEPARATE DIAGNOSES IN ONE DAY.** A static
+// `import { handle }` is read when the process starts, so every edit to the
+// prompt, the schema, the payload shaping or the relabeller was invisible until
+// somebody remembered to restart, and **"still broken" and "the fix never
+// loaded" are the same observation**. That is the failure `CLAUDE.md` names as
+// the worst shape there is: the thing that changed is not in the code anybody
+// is looking at.
+//
+// ✅ **SO IT IS STAMPED AND IT RELOADS.** The boot line says which build is
+// answering, every request checks the file's modification time and size, and a
+// changed module is re-imported before it is used, with a line saying so. The
+// stamp is `<mtime>-<size>` rather than a git sha, because the thing being
+// attributed is a file on this disk that is usually uncommitted while it is
+// being worked on.
+// ⚠️ A RE-IMPORT WITH A NEW QUERY LEAVES THE OLD MODULE IN THE REGISTRY. Node
+// has no way to evict one, so a session of forty edits holds forty small
+// modules. That is the price of the thing above and it is worth it on a
+// development agent.
+const MODULE = new URL('../workers/wish/src/wish.mjs', import.meta.url);
+const MODULE_PATH = fileURLToPath(MODULE);
+
+function stampOf() {
+  const st = fs.statSync(MODULE_PATH);
+  return `${Math.round(st.mtimeMs)}-${st.size}`;
+}
+
+let loaded = { stamp: '', mod: null };
+
+/** The module as it is on disk RIGHT NOW, re-read only when it has changed. */
+async function wish() {
+  const stamp = stampOf();
+  if (loaded.stamp === stamp) return loaded.mod;
+  const mod = await import(`${MODULE.href}?v=${encodeURIComponent(stamp)}`);
+  console.log(loaded.stamp
+    ? `  wish.mjs reloaded   ${stamp}   was ${loaded.stamp}`
+    : `  wish.mjs            ${stamp}`);
+  loaded = { stamp, mod };
+  return mod;
+}
 
 const CONFIG = path.join(os.homedir(), 'Library/Preferences/.wrangler/config/default.toml');
 
@@ -211,27 +254,32 @@ async function run(model, payload) {
 }
 
 const PORT = Number(process.env.PORT || 8799);
-const CORS = {
-  'access-control-allow-origin': '*',
-  'access-control-allow-headers': 'content-type',
-  'access-control-allow-methods': 'POST, OPTIONS',
-};
 
+/* ⚠️ THE ORIGIN RULE IS THE DEPLOYED WORKER'S, READ OUT OF THE ONE MODULE
+   RATHER THAN TYPED AGAIN HERE. It allows every localhost port, so nothing
+   about working on this machine changes, and it means a page that works here
+   cannot be refused out there for a reason this file never knew about. */
 http.createServer((req, res) => {
+  let cors = { 'access-control-allow-origin': 'https://positron.studio', vary: 'origin' };
   const send = (status, body) => {
-    res.writeHead(status, { 'content-type': 'application/json', ...CORS });
+    res.writeHead(status, { 'content-type': 'application/json', ...cors });
     res.end(JSON.stringify(body));
   };
-  if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return; }
-  if (req.method !== 'POST') return send(405, { error: 'post to /hear or /wish' });
 
   let raw = '';
   req.on('data', (c) => { raw += c; });
   req.on('end', async () => {
     let body;
-    try { body = JSON.parse(raw || '{}'); } catch { return send(400, { error: 'body is JSON' }); }
     try {
-      const out = await handle(new URL(req.url, 'http://x').pathname, body, run);
+      const mod = await wish();
+      cors = mod.corsFor(req.headers.origin || null);
+      if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
+      if (!mod.allowedOrigin(req.headers.origin || null)) {
+        return send(403, { error: 'this agent answers pages on positron.studio' });
+      }
+      if (req.method !== 'POST') return send(405, { error: 'post to /hear or /wish' });
+      try { body = JSON.parse(raw || '{}'); } catch { return send(400, { error: 'body is JSON' }); }
+      const out = await mod.handle(new URL(req.url, 'http://x').pathname, body, run);
       // One line per call, so a session can be read afterwards. Never the audio
       // and never the token.
       const what = out.body.text !== undefined ? JSON.stringify(out.body.text)
@@ -243,8 +291,12 @@ http.createServer((req, res) => {
       send(500, { error: e.message });
     }
   });
-}).listen(PORT, () => {
+}).listen(PORT, async () => {
   console.log(`wish agent   http://127.0.0.1:${PORT}   account ${ACC.slice(0, 6)}…`);
+  /* 🔴 THE BUILD STAMP, PRINTED BEFORE ANYTHING IS ASKED OF IT. Without it a
+     report about this agent cannot be attributed to a version of the module it
+     runs, which is the rule every device log in this project already follows. */
+  await wish();
   // ⚠️ THIS REPORTS AND DOES NOT REFUSE TO START, WHICH IS THE OTHER HALF OF
   // READING THE CREDENTIAL PER REQUEST. Somebody can run `npx wrangler login`
   // while this is up and the next call picks it up, so a missing session is a
