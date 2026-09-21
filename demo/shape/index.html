@@ -8,19 +8,26 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* 🔴 EVERYTHING THAT CAN REACH THE INSTRUMENT, AND NOTHING ELSE. The part
-     chooser, the output chooser and the two buttons live here rather than in
-     `.pos-controls`, because `demo/verify.mjs` clicks every button in that row
-     on every run: a `move everything` in there would be the suite putting a
-     random patch on somebody's synth dozens of times a day. It wraps, because
-     four controls do not fit a phone in one line.
-     🔴 AND IT WRAPS IN TWO GROUPS RATHER THAN AS FOUR LOOSE CONTROLS. MEASURED
-     2026-09-21 at 1280 px, where the body column is 688: the four come to 784
-     with their gaps, so they were ALWAYS going to wrap, and loose they broke
-     3 and 1 with `put back` alone on a line under the output chooser. What you
-     are pointing at and what to do with it are two questions, so they are two
-     groups and the break lands between them at every width. */
+     chooser and the two buttons live here rather than in `.pos-controls`,
+     because `demo/verify.mjs` clicks every button in that row on every run: a
+     `move everything` in there would be the suite putting a random patch on
+     somebody's synth dozens of times a day.
+     🔴 THREE LOOSE CONTROLS, AND THE TWO GROUPS THAT USED TO HOLD THEM ARE
+     GONE. This row had four controls until the output chooser was removed on
+     2026-09-21, and four were MEASURED at 784 px of controls in a 688 px column:
+     they were always going to wrap, loose they broke 3 and 1 with `put back`
+     alone on a line, and the repair was two groups with the break between them.
+     RE-MEASURED with three at 390, 560, 756 and 1280 px, off real rects: the row
+     is 564.5 px in a 688 px column at 756 and at 1280, and 491.1 px in a 528 px
+     column at 560, so it is ONE LINE at all three. At 390 the column is 358 and
+     the same 491.1 px cannot fit however it is wrapped, so it breaks 1 and 2:
+     the part chooser on its own line in its phone layout, then `move everything`
+     and `put back` together at 266.0 px. That is the break the two groups
+     existed to force, and a flat row lands it in the same place for nothing.
+     ⚠️ NO SIDEWAYS DRAG AT ANY OF THE FOUR, measured as
+     `scrollWidth - innerWidth` and 0 every time. The assert below re-checks it
+     at the one width the harness runs. */
   .shape-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .shape-bar-g { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
   /* 🔴 ONE LABEL COLUMN ACROSS EVERY SECTION, AND THIS IS WHY IT IS HERE AND
      NOT IN THE KIT. `.sld-group` is `max-content minmax(0, 1fr)`, so a group
@@ -48,7 +55,6 @@
   import { createStack } from '/shell/stack.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
-  import { createPicker } from '/shell/picker.mjs';
   import { createPresenceButton } from '/shell/presence.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
   import { decode } from '/shell/midi-decode.mjs';
@@ -59,12 +65,21 @@
 
   /**
    * 🔴 EDITING A NOVATION CIRCUIT WHILE IT PLAYS, AND THE ANSWER TO WHETHER
-   * THAT IS POSSIBLE IS YES AND IT WAS ALREADY MEASURED.
+   * THAT WORKS IS NOW A FACT RATHER THAN A READING. **A person played the
+   * Circuit from this page on 2026-09-21 and reported *"shape works"*.** Until
+   * that morning nobody had ever heard this page, and this comment claimed the
+   * real time behaviour *"was already measured"* on the strength of Novation's
+   * documentation, which is a different kind of claim and a weaker one.
    * `demo/shell/circuit-cc.mjs` holds **98 control change parameters** parsed
    * out of Novation's Circuit Programmer's Reference Guide v1.1: 52 for the two
-   * synths, 28 for the drums, 18 for the session. A control change moves a
-   * parameter on the LIVE voice, under a note that is already sounding, and the
-   * device answers it the same way it answers its own macro knobs.
+   * synths, 28 for the drums, 18 for the session. That the device answers a
+   * control change on the LIVE voice, under a note that is already sounding, the
+   * same way it answers its own macro knobs, is what the guide says AND what the
+   * instrument on this desk did.
+   * ⚠️ WHAT IS STILL ONLY DOCUMENTED IS THE OTHER 46. One person moved sliders
+   * on a synth part and heard the sound change; the drum parameters and the
+   * session parameters are still the reference guide's word, and so is every
+   * individual controller number in the table.
    *
    * 🔴 NO SysEx. NOT ONE BYTE, AND THAT IS THE WHOLE SAFETY STORY.
    * `plans/plan-circuit-editor.md` §1 records that `Replace Current Patch` and
@@ -365,31 +380,34 @@
   });
 
   /**
-   * 🔴 THE PERSON CHOOSES THE OUTPUT. A NAME IS A GUESS AND IT WAS THE ONLY
-   * THING THIS PAGE HAD. The first build filtered the browser's outputs with
-   * `/circuit/i` and took the first survivor, so **four different failures all
-   * came out as the word `offline`**: no Web MIDI at all, a browser that
-   * refused, a granted browser with no outputs, and a desk full of outputs
-   * none of which happened to spell the name this page was looking for. A
-   * reader could not tell which of the four they had, and the one report this
-   * page has ever had was that nothing changed on the instrument.
-   * ⚠️ `none` IS THE FIRST ENTRY AND IT IS NOT DECORATION. It is how a person
-   * takes the page off the wire without unplugging anything, and it is what
-   * this page opens on, because a visit must not choose an instrument.
+   * 🔴 THERE IS NO OUTPUT CHOOSER, AND THERE WAS ONE FOR HALF A DAY. Removed
+   * 2026-09-21 on instruction (*"rm output"*), after a person played the Circuit
+   * from this page and reported *"shape works"*: the name match found the
+   * instrument on its own, so the control was a step between a visitor and a
+   * working page that nobody needed to take.
+   *
+   * 🔴 WHAT THE PICKER WAS FOR IS STILL HERE, WHICH IS THE HALF WORTH KEEPING.
+   * It was added as a diagnostic, because the first build reported **four
+   * different failures as the single word `offline`**: no Web MIDI at all, a
+   * browser that refused, a granted browser with no outputs, and a desk full of
+   * outputs none of which spelled the name this page was looking for. The words
+   * are still distinct, every output is still logged by name, `onstatechange`
+   * still rescans, and one log line still says when a byte first reaches a port.
+   * The chooser was never what made the fault findable. The REPORTING was.
+   *
+   * 🔴 AND WHAT IT COSTS, SO THE NEXT PERSON DOES NOT REDISCOVER IT AS A BUG.
+   * The name match takes the FIRST output whose name has Circuit in it, and
+   * nothing in the interface can say otherwise. **Two Circuits on one desk, or
+   * one Circuit exposing more than one endpoint, therefore has no way out from
+   * this page**: the assert below fixes `Circuit MIDI 1` as the winner over
+   * `Circuit MIDI 2`, and if the parameters have to reach the second one, they
+   * cannot from here. That is a real case and it is unhandled on purpose,
+   * because there is one Circuit on this desk and a control nobody needs is a
+   * control that gets pressed by accident.
+   * ⚠️ IT IS NOT A CASE THE PAGE FAILS QUIETLY. The log names every output it
+   * found, so somebody with two of them can at least see both and know which
+   * one this page took.
    */
-  const NONE = 'none';
-  const outs = createPicker({
-    label: 'output',
-    what: 'MIDI output',
-    prev: () => setPick(pick - 1),
-    next: () => setPick(pick + 1),
-    onPick: (i) => setPick(i),
-  });
-  outs.el.title = 'which MIDI output these sliders send to. Press the status button to fill this list.';
-  /* A visit asks the browser for nothing, so the list is `none` and the control
-     is dead until somebody has pressed the status button. */
-  outs.options([NONE], 0);
-  outs.disabled(true);
 
   const back = el('button', 'pos-btn', 'put back', { type: 'button' });
   back.title = 'put every parameter this page has moved back to where this page opened it';
@@ -410,11 +428,7 @@
   all.onclick = () => moveEverything();
 
   const bar = el('div', 'shape-bar');
-  const choosers = el('div', 'shape-bar-g');
-  const doers = el('div', 'shape-bar-g');
-  choosers.append(parts.el, outs.el);
-  doers.append(all, back);
-  bar.append(choosers, doers);
+  bar.append(parts.el, all, back);
 
   const rack = createStack(undefined, 'shape-rack');
   const traffic = createMidiLog({ empty: 'move a slider and what it sends is listed here' });
@@ -565,9 +579,10 @@
     d.set('changed', changed() || '');
     /**
      * 🔴 WHICH LINK IS BROKEN, IN THE PLACE SOMEBODY IS LOOKING WHEN THEY
-     * NOTICE. Moving a handle and hearing nothing is the whole of the report
-     * this page has ever had, and until now the page answered it with a badge
-     * reading `offline` that meant four different things.
+     * NOTICE. Moving a handle and hearing nothing was the first report this page
+     * had, and the page answered it with a badge reading `offline` that meant
+     * four different things. A word per failure is what replaced that, and it is
+     * what the page kept when the output chooser went.
      */
     if (!access && !saidNothingOpen) {
       saidNothingOpen = true;
@@ -576,8 +591,9 @@
     } else if (access && !port && !saidNoPort) {
       saidNoPort = true;
       d.log(ports.length
-        ? `no output is chosen, so these moves are going nowhere. There ${ports.length === 1
-            ? 'is one to choose from' : `are ${ports.length} to choose from`} above.`
+        ? `no output here is named Circuit, so these moves are going nowhere. This browser `
+          + `reported ${ports.length === 1 ? 'one output' : `${ports.length} outputs`} and the `
+          + 'log above names them.'
         : 'this browser opened MIDI and found no outputs at all, so these moves are going nowhere.',
         'warn');
     }
@@ -707,42 +723,40 @@
    */
   let access = null, presses = 0, opens = 0, opensBeforePress = 0;
 
-  /**
-   * Every MIDI output this browser reported, in its order, and which one of them
-   * is chosen. `pick` indexes the PICKER, where 0 is `none`, so `ports[pick - 1]`
-   * is the output and `pick === 0` means this page is sending nowhere.
-   */
-  let ports = [], pick = 0;
+  /** Every MIDI output this browser reported, in its order. */
+  let ports = [];
   const portName = (o) => o.name || o.id || 'unnamed output';
-  const optionNames = () => [NONE, ...ports.map(portName)];
 
   /**
-   * 🔴 THE INDEX OF THE FIRST OUTPUT THAT LOOKS LIKE A CIRCUIT, OR -1, AND -1
-   * MEANS NOTHING IS CHOSEN RATHER THAN TAKE THE FIRST ONE. An output nobody
-   * picked is somebody's DAW, or the TASCAM Model 12 and the Evolution keyboard
-   * that are on this same desk and in this same list: CC 74 arriving at one of
-   * those moves something real that is not this instrument. A page that guesses
-   * wrong in silence is worse than a page that sends nowhere and says so.
-   * ⚠️ IT IS PURE AND IT IS GRADED. The whole of the name guessing is this one
-   * line, so the check below can hand it three lists and read the answers
-   * without a browser, a permission or a device.
+   * 🔴 THE FIRST OUTPUT THAT LOOKS LIKE A CIRCUIT, OR NULL, AND NULL MEANS
+   * NOTHING IS CHOSEN RATHER THAN TAKE THE FIRST ONE. An output nobody named is
+   * somebody's DAW, or the TASCAM Model 12 and the Evolution keyboard that are
+   * on this same desk and in this same list: CC 74 arriving at one of those
+   * moves something real that is not this instrument. A page that guesses wrong
+   * in silence is worse than a page that sends nowhere and says so, and with the
+   * chooser gone there is nobody to correct the guess.
+   * ⚠️ IT RETURNS THE OUTPUT AND NOT AN INDEX, which is the whole of what the
+   * picker's removal changed here. An index needed translating (`-1` into
+   * `nothing`, `n` into `n + 1` past the `none` row), and the translation was a
+   * second place the fall-back-to-the-first-output mistake could be made.
+   * ⚠️ AND IT IS PURE AND IT IS GRADED. The whole of the name guessing is this
+   * one line, so the two checks below hand it five lists between them and read
+   * the answers with no browser, no permission and no device.
    */
-  const defaultPort = (names) => names.findIndex((n) => /circuit/i.test(n));
+  const chosenOut = (list) => list.find((o) => /circuit/i.test(portName(o))) ?? null;
 
   let saidFacts = false, saidReached = false;
 
   /**
-   * Choose an output by its position in the picker, open it, and say so.
+   * Take an output, open it, and say so.
    *
    * ⚠️ `port.open()` IS REPEATED WITHOUT HARM. An already open port resolves at
    * once, which is what `/dump/` relies on for the same reason: another client
    * may have held the device when the page first looked.
    */
-  function setPick(at, from = 'press') {
+  function use(next, from = 'press') {
     const was = port;
-    pick = Math.max(0, Math.min(ports.length, Math.round(at) || 0));
-    port = pick > 0 ? ports[pick - 1] : null;
-    outs.show(optionNames()[pick], pick);
+    port = next || null;
     if (port && port !== was) {
       port.open?.()?.catch?.((e) => d.log(`${portName(port)} would not open (${e.message})`, 'warn'));
     }
@@ -752,7 +766,7 @@
        about nothing at all. */
     pres.set(port ? 'online' : 'offline',
       port ? null
-        : ports.length ? 'an output is there and none is chosen'
+        : ports.length ? 'no output here is named Circuit'
         : access ? 'this browser found no MIDI outputs'
         : 'nothing has been opened yet');
     if (port !== was || from === 'press') {
@@ -770,29 +784,31 @@
   /**
    * 🔴 EVERY OUTPUT, BY NAME, INCLUDING THE ONES THAT DO NOT MATCH. An empty
    * list and a list of three names that are not this instrument are two
-   * different facts and they read identically as the word `offline`.
+   * different facts and they read identically as the word `offline`. This is the
+   * half of the diagnostic that survived the chooser, and it is the half that
+   * found the fault: a reader can see what the browser reported and what this
+   * page made of it, which is what the picker's list was really showing.
    */
   function listOutputs(from) {
-    const was = optionNames().join('|');
+    const was = ports.map(portName).join('|');
     ports = access ? [...access.outputs.values()] : [];
-    const names = optionNames();
+    const names = ports.map(portName);
     /* Plugging something in fires this repeatedly and most of the time nothing
        about the list has changed, so an unchanged list says nothing. */
     if (from === 'changed' && names.join('|') === was) return;
-    const held = port ? ports.indexOf(port) : -1;
-    outs.options(names, 0);
-    outs.disabled(ports.length < 1);
-    const real = names.slice(1);
-    d.log(real.length
-      ? `${real.length} MIDI output${real.length === 1 ? '' : 's'}: ${real.join(', ')}`
-      : 'this browser opened MIDI and found no outputs at all', real.length ? '' : 'warn');
-    /* Keep the output somebody chose if it is still there; otherwise the name
+    d.log(names.length
+      ? `${names.length} MIDI output${names.length === 1 ? '' : 's'}: ${names.join(', ')}`
+      : 'this browser opened MIDI and found no outputs at all', names.length ? '' : 'warn');
+    /* Keep the output already in use if it is still there; otherwise the name
        match, and where there is none, nothing. */
-    const guess = defaultPort(real);
-    setPick(held >= 0 ? held + 1 : guess + 1, from);
-    if (real.length && guess < 0) {
-      d.log('nothing in that list has Circuit in its name, so no output was chosen for you. '
-          + 'Pick one above and these handles will reach it.', 'warn');
+    const held = port && ports.includes(port) ? port : null;
+    const guess = chosenOut(ports);
+    use(held || guess, from);
+    if (names.length && !port) {
+      d.log('nothing in that list has Circuit in its name, so no output was chosen and these '
+          + 'handles are going nowhere. This page picks its output by name and has no control to '
+          + 'override that, so the thing to check is that the Circuit is plugged in and awake.',
+        'warn');
     }
   }
 
@@ -937,33 +953,48 @@
       `${document.querySelectorAll('.pos-controls button').length} button in the row`);
 
     /**
-     * 🔴 AND THE THREE CONTROLS THAT CAN REACH AN INSTRUMENT ARE NAMED, NOT
-     * COUNTED. The assert above would still pass if `move everything` were in
-     * the harness row and the presence button were not, and that arrangement is
-     * the suite starting forty hands on somebody's synth on every run. Counting
-     * buttons cannot see which button; this names all three.
+     * 🔴 AND THE CONTROLS THAT CAN REACH AN INSTRUMENT ARE NAMED, NOT COUNTED.
+     * The assert above would still pass if `move everything` were in the harness
+     * row and the presence button were not, and that arrangement is the suite
+     * starting forty hands on somebody's synth on every run. Counting buttons
+     * cannot see which button; this names both of them.
+     * ⚠️ IT NAMED THREE UNTIL THE OUTPUT CHOOSER WAS REMOVED. The rule it
+     * protects is unchanged and is the one that matters: nothing that can send
+     * sits in the row `demo/verify.mjs` clicks.
      */
-    d.assert('the output chooser, move everything and put back all sit in the page row',
-      [outs.el, all, back].every((e) => bar.contains(e) && !e.closest('.pos-controls')),
-      `${[outs.el, all, back].filter((e) => bar.contains(e)).length} of 3 in .shape-bar`);
+    d.assert('move everything and put back both sit in the page row and neither is in the harness row',
+      [all, back].every((e) => bar.contains(e) && !e.closest('.pos-controls')),
+      `${[all, back].filter((e) => bar.contains(e)).length} of 2 in .shape-bar`);
 
     /**
-     * 🔴 A NAME IS A GUESS AND THIS IS THE WHOLE OF IT. Three lists and the
+     * 🔴 A NAME IS A GUESS AND THIS IS THE WHOLE OF IT. Two lists and the
      * answers read back with no browser, no permission and no device: a match
-     * anywhere in the list wins, the FIRST match wins where there are several,
-     * and a list with no match chooses NOTHING rather than the first output,
-     * which on this desk is a TASCAM Model 12 and an Evolution keyboard.
+     * anywhere in the list wins, and the FIRST match wins where there are
+     * several, which is the case that has no way out from the interface now that
+     * there is no chooser.
      */
-    d.assert('the output is chosen by name where a name matches, and nothing is chosen where none does',
-      defaultPort(['IAC Driver Bus 1', 'Circuit', 'Model 12']) === 1
-      && defaultPort(['Circuit MIDI 1', 'Circuit MIDI 2']) === 0
-      && defaultPort(['IAC Driver Bus 1', 'Model 12', 'MK-425C USB MIDI Keyboard']) === -1
-      && defaultPort([]) === -1,
-      'four lists answered');
+    d.assert('the output is chosen by name, and the first match wins where there are several',
+      chosenOut([{ name: 'IAC Driver Bus 1' }, { name: 'Circuit' }, { name: 'Model 12' }])?.name === 'Circuit'
+      && chosenOut([{ name: 'Circuit MIDI 1' }, { name: 'Circuit MIDI 2' }])?.name === 'Circuit MIDI 1',
+      'two lists answered');
+
+    /**
+     * 🔴 AND THIS IS THE ONE STANDING BETWEEN THIS PAGE AND A STRAY CC 74 ON THE
+     * TASCAM. It is the negative half and it is a separate assert on purpose: a
+     * page that took the first output would pass the line above unharmed, and
+     * the first output on this desk is a Model 12 or an Evolution keyboard, both
+     * of which move something real when CC 74 arrives. With no chooser left,
+     * this is the only thing choosing, so it is the only thing refusing.
+     */
+    d.assert('and where no name matches, nothing is chosen rather than the first output',
+      chosenOut([{ name: 'IAC Driver Bus 1' }, { name: 'Model 12' }, { name: 'MK-425C USB MIDI Keyboard' }]) === null
+      && chosenOut([{ name: 'Model 12' }]) === null
+      && chosenOut([]) === null,
+      'three lists chose nothing');
 
     d.assert('a visit chooses no output and opens no port',
-      pick === 0 && port === null && ports.length === 0,
-      `picker at ${pick}, ${ports.length} outputs known`);
+      port === null && ports.length === 0,
+      `${ports.length} outputs known, sending to ${port ? portName(port) : 'nothing'}`);
 
     /**
      * 🔴 ONE HAND IS A FRAME AND FORTY ARE A CEILING, AND BOTH HALVES ARE HERE.
