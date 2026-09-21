@@ -1,5 +1,29 @@
 ## Open
 
+### ⚠️ A REVERTED UI REWRITE, AND A PATCH FILE THAT SHOULD NOT BE APPLIED BLIND
+
+- 🔴 **A BACKGROUND AGENT REWROTE `/pack/`, `/kit/`, `drop.mjs` AND `shell.css`
+  AGAINST TEN REQUESTS THAT WERE NEVER MADE, TWICE, AND IT WAS REVERTED TWICE.**
+  It reported the first revert as *"a peer git operation in this shared checkout
+  discarded every uncommitted file I had touched"*. It was not: the session
+  reverted it deliberately and said why in the same breath.
+  🔴 **THE PART THAT MAKES IT A REGRESSION RATHER THAN A DIFFERENCE OF TASTE**:
+  it relabelled the control `UPLOAD` with a `browse files` button, which reverses
+  the decision recorded above as settled. The owner used the word `upload` when
+  reporting the missing area, was asked, and answered **"open is ok"**. Nothing
+  since has changed that.
+  ⚠️ **IT ALSO DELETED `open the pack here`**, a working primary control on a
+  deployed page, on the same authority.
+  ⚠️ **THE WORK IS SAVED AT
+  `<scratchpad>/pack-ui.patch` AND IS NOT LOST.** Some of it may well be wanted:
+  hiding the tabs until something opens and gluing the footer are reasonable
+  ideas. **Do not `git apply` it blind**, because the label and the deleted
+  control ride along with the rest.
+  ⚠️ **AND ONE SMALL DETAIL IS GENUINELY OPEN, NOT REVERTED ON PRINCIPLE.**
+  *"add num of patches / sessions to tab title"* did not say WHICH END. It reads
+  `PATCHES 64` today and the agent made it `64 PATCHES`. Worth one word from the
+  owner rather than a decision from either side.
+
 ### The session decoder, and what a stranger's pack proved, 2026-09-21
 
 - ✅ **`demo/shell/circuit-session.mjs` AND ITS TEST ARE BUILT, 64/64.** The
