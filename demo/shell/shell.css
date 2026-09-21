@@ -4613,8 +4613,17 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    readout drew a 2 px band 24 px above the controls and was reported as old UI
    creeping in. */
 .pos-drop-note {
-  font: 400 12px/1.5 var(--mono); color: var(--dim2);
+  font: 400 12px/1.5 var(--mono);
+  /* 🔴 THE SAME GROUND AS THE BLOCK ABOVE IT, AND BRIGHTER INK. Asked
+     2026-09-21: *"upload footer bg same as top bg but text should be whitey"*.
+     It was `--card2` under `--dim2`, which is a lighter panel carrying quieter
+     text: two channels disagreeing about how much this line matters. It is the
+     NAME OF THE FILE SOMEBODY JUST OPENED, which is the one thing in that block
+     they did not already know, and it was the dimmest thing in it.
+     ⚠️ THE SEAM STAYS, because that is what makes it a footer rather than a
+     line of text at the bottom of a box. One edge, no second ground. */
+  color: var(--fg);
   border-top: 1px solid var(--line2);
-  padding: 8px 16px; background: var(--card2);
+  padding: 8px 16px;
 }
 .pos-drop-note[hidden] { display: none; }

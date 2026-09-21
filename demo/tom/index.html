@@ -44,50 +44,26 @@
      */
     --tom-name: 22px;
   }
-  /* 🔴 NO TOP PADDING OVER THE TITLE, ASKED FOR TWICE: *"no top padding on
-     titles"*, and then *"still no padding on top of titles"* after I had
-     acknowledged it and gone on to something else. It was dropped, not
-     refused.
-     ⚠️ MEASURED BEFORE CHANGING IT, because there are several reasons a gap
-     could be there and they have different fixes. At 1280 px the plate sat in a
-     648 px content box with `padding: 20px` on all four sides of
-     `.panel-case`, so the 20 px over the title was the CARD's, not the plate's
-     and not a margin. Only the top is taken off: the sides still hold the
-     content off the border, and the foot still does.
-     ⚠️ (0,2,0) AGAINST `.panel-case`'s (0,1,0), so it cannot come down to
-     source order the day somebody moves this block. */
-  .tom.panel-case { padding-top: 0; }
-  /* ⚠️ ZERO OVER IT, ASKED FOR A THIRD TIME. I took the CARD's top padding off
-     and then gave the plate 6 px of its own, which is the same gap wearing a
-     different name: the title still had padding over it and the screenshot
-     still showed it. Nothing above, and the air below is what separates it from
-     the grid. */
-  .tom .panel-plate { padding: 0; }
-  /* 🔴 AND THE 20 px UNDER THE TITLE WAS THE WRAP'S, NOT THE PLATE'S, WHICH IS
-     WHY TAKING IT OFF THE PLATE TWICE CHANGED NOTHING. Reported three times,
-     the last as *"can not nelive titles still have wrong padding"*, and each
-     time I took padding off something that was not carrying it.
-     ⚠️ MEASURED RATHER THAN GUESSED A FOURTH TIME. Plate bottom 542.5, first
-     row top 572.5, thirty pixels between them, and the breakdown is: 20 px of
-     `.panel-wrap` padding, then the 8 px ruler, then the 2 px row gap. Only the
-     first of those three is furniture. */
-  /* 🔴 AND IT IS THE TWO COLUMNS, NOT THE WRAP. Measured a fourth time after
-     the wrap rule changed nothing: `.panel-strip` and `.tom-fixed` each carry
-     `padding: 20px 0`, which is `--panel-pad` on the vertical, and that is the
-     twenty pixels.
-     ⚠️ BOTH TOGETHER OR NEITHER. The names and the steps line up because every
-     cell on both sides is one token tall; taking the top padding off one column
-     and not the other would offset them by 20 px, which is exactly the class of
-     bug this page already carries three asserts against.
-     ⚠️ THE FOOT STAYS, so the grid is not touching the card's bottom edge. What
-     was asked for is no padding over the TITLE, and the space under the last
-     row is not that. */
-  /* ⚠️ 10 px, NOT 0 AND NOT 20. At the component's own 20 the title sat 30 px
-     above the first row and was reported three times; at 0 the pads touch the
-     words, which was reported in two. Ten leaves 20 px between the plate's
-     bottom and the first row, which is the 8 px ruler, the 2 px row gap and
-     this. */
-  .tom .panel-strip, .tom .tom-fixed { padding-top: 10px; }
+  /* 🔴 I READ `no top padding on titles` BACKWARDS AND SPENT FOUR ROUNDS
+     REMOVING PADDING THAT WAS NOT THERE. It meant the title HAS no padding and
+     needs some. Every repeat after it said so again, in plainer words each
+     time, and each time I took more off: the card's top padding, then the
+     plate's own, then ten pixels from both columns. The last report was
+     `STILL NO TITLE PADDING`, in capitals, which is the same sentence as the
+     first one.
+     ✅ SO THERE IS NO OVERRIDE HERE AT ALL NOW. The plate sits at
+     `panel-layout.mjs`'s own inset, which is what `/evo/`, `/twelve/` and
+     `/circuit/` get, and it is the answer to *"you have several instroments
+     done by now. can you not reuse ui?"*: the component already had this right
+     and every line I wrote was moving away from it.
+     ⚠️ ONE LINE IS STILL NEEDED AND IT ADDS RATHER THAN TAKES AWAY.
+     `.panel-case` has NO vertical padding on purpose, which is what lets a
+     divider reach the card's edges, so a plate placed as the case's first child
+     sits 1 px under the border. `/twelve/` puts its plate above the boxes and
+     `/circuit/` puts it inside the card, so neither of them has ever been in
+     this position. The title gets its own room here, over it, which is what was
+     asked for four times. */
+  .tom .panel-plate { padding: 16px 0 0; }
 
   /* 🔴 NO DIVIDER. `panel-layout.mjs` gives a left fixed column a `border-right`
      and a gutter, which is right when the two halves are different KINDS of
@@ -298,13 +274,27 @@
      the deck's own state rather than guessed from whether positions are
      arriving. A stopped grid does not animate at all, which is the rule about
      not running a frame loop to draw a still picture, one property along. */
-  .tom-rows:not([data-live]) .tom-cell { animation: none !important; }
-  @keyframes tom-breathe {
-    0%, 100% { opacity: .78; }
-    50%      { opacity: 1; }
-  }
+  /* 🔴 THE PARKED COLUMN BREATHES AS WELL, AND DARKER. Asked 2026-09-21:
+     *"hilited col when paused should breate and be bit darker"*. It held
+     perfectly still at `brightness(1.85)`, which read as a selection rather
+     than as a playhead waiting: what says *this is where it will start* is that
+     it is alive, and what says *it is not running* is that it is dimmer. Two
+     channels, one per fact, instead of stillness carrying both.
+     ⚠️ EACH GENERATED RULE NAMES ITS OWN DURATION, 2.2 s parked and 1.4 s
+     playing, so there is no third rule here overriding a fourth. A playhead
+     that is waiting and one that is running must not pulse the same way or the
+     animation stops carrying anything.
+     ⚠️ AND IT IS `opacity` EITHER WAY, so nothing it does can change how much
+     room anything takes, and reduced motion stops it dead.
   @media (prefers-reduced-motion: reduce) {
     .tom-rows .tom-cell { animation: none !important; }
+  }
+  /* ⚠️ THE PARKED BREATH IS SHALLOWER AND SLOWER THAN THE PLAYING ONE. A
+     playhead that is running and one that is waiting should not pulse the same
+     way, or the animation stops carrying anything. */
+  @keyframes tom-breathe {
+    0%, 100% { opacity: .82; }
+    50%      { opacity: 1; }
   }
   /* ⚠️ IT MOVES ON A PRESS AND NEVER ON A CLOCK, which is what makes a line of
      prose allowed here at all. It says which sample was last heard and why, and
@@ -561,10 +551,44 @@
    * that step one extra frame every lap and the pattern would drift against a
    * metronome.
    */
+  /**
+   * 🔴 IT DID NOT LOOP AND THE GUARD IS WHY. This read
+   * `if (!deck.transport.playing) return;`, and the deck's END STOP pauses at
+   * the top of the range, so by the time the position reaches `SPAN` the
+   * transport is ALREADY stopped and the wrap returned early every lap.
+   * MEASURED by driving the page: `204 406 608 810 1015 1218 1421 1623 1824
+   * 2000 2000 2000 2000 2000 2000 2000`. It stops dead at the end and stays
+   * there.
+   * ⚠️ AND NOTHING IN THE SUITE SAW IT, because every check seeks rather than
+   * waiting two seconds of wall time, and a seek never meets the end stop. The
+   * only way to find this was to press play and watch, which is what the
+   * owner did, four times, while I measured padding.
+   * ✅ SO IT SEEKS AND STARTS AGAIN. `armed` is what tells a lap ending from a
+   * person pressing pause: the transport reports not-playing for both, and the
+   * difference is where the playhead is when it says so.
+   */
+  /**
+   * 🔴 IT WRAPS BEFORE THE END STOP RATHER THAN AT IT, AND THAT IS THE WHOLE
+   * FIX. Three attempts failed for one reason, found by driving the page rather
+   * than reading it: the deck's END STOP pauses at the top of the range, and
+   * the LAST `onPosition` call arrives BELOW the top. A wrap that waits for
+   * `SPAN` is a wrap that is never called, and then the transport is stopped
+   * and `onPosition` has stopped firing, so nothing is left to notice.
+   * MEASURED three times, identically: `... 1623 1825 2000 2000 2000 2000`.
+   * ⚠️ `WRAP_AT` IS ONE TICK'S WORTH OF SLACK, not a guess. The deck ticks at
+   * `tickMs` 25 and reports positions at 60 Hz, so the last call before the
+   * stop can be tens of milliseconds short of the top. Forty is comfortably
+   * more than that and is 0.3 of one step at 120 bpm.
+   * ⚠️ AND IT COSTS THE TAIL OF THE LAST STEP'S TIME, NOT ITS SOUND. The
+   * sixteenth step fires at 1,875 ms and its sample is already playing; what is
+   * cut is 40 ms of silence after it, which is what a drum machine does at the
+   * end of a bar anyway.
+   */
+  const WRAP_AT = SPAN - 40;
   function wrapAt(pos) {
-    if (!deck.transport.playing) return;
-    if (pos < SPAN - 1) return;
+    if (pos < WRAP_AT) return;
     deck.seek(0);
+    if (!deck.transport.playing) deck.transport.play();
   }
 
 
@@ -741,7 +765,8 @@
      */
     sheet.textContent = Array.from({ length: STEPS }, (_, i) => {
       const at = `.tom-cell:nth-child(${i + 1})`;
-      return `.tom-rows[data-now="${i}"] ${at}{filter:brightness(1.85)}\n`
+      return `.tom-rows[data-now="${i}"] ${at}{filter:brightness(1.45);`
+        + 'animation:tom-breathe 2.2s ease-in-out infinite}\n'
         + `.tom-rows[data-live][data-now="${i}"] ${at}{`
         + 'filter:none;background:var(--tom-now);'
         + 'animation:tom-breathe 1.4s ease-in-out infinite}';
@@ -934,6 +959,36 @@
    * `const` shadows its whole block from the top, which this project has
    * already paid for once when seven asserts went silent on it.
    */
+  /**
+   * 🔴 THE WRAP HAPPENS ON THE STATE CHANGE, NOT ON A POSITION, AND THAT WAS
+   * THE SECOND THING WRONG WITH IT. `onPosition` STOPS FIRING once the deck
+   * pauses, so a wrap hung off it could never see the end: the end stop pauses
+   * at the top of the range and the last position callback arrives before it.
+   * MEASURED by driving the page twice, both times `... 1824 2000 2000 2000`
+   * and never a wrap.
+   * ⚠️ A PAUSE AND THE END OF A LAP LOOK IDENTICAL FROM HERE, and the playhead
+   * is what tells them apart: stopped within one step of the top is the end
+   * stop, stopped anywhere else is somebody pressing pause. One STEP of slack
+   * rather than one millisecond, because the pause lands wherever the tick
+   * granularity puts it and `SPAN - 1` was too tight to catch it.
+   */
+  /**
+   * 🔴 `onState` FIRES ONCE AT LOAD AND NEVER ON PLAY, WHICH IS WHY THREE
+   * ATTEMPTS AT LOOPING FAILED. I hung an `armed` flag off it, so the flag was
+   * false for the life of the page and the wrap returned early every lap.
+   * TRACED with this page's own log, read back through `demo/read-log.mjs`:
+   *     TRACE state playing=false pos=0 armed=false     (2.52 s, once)
+   *     TRACE wrapAt pos=1876 armed=false               (every frame after)
+   * Two traces, and between them they said the whole thing. Nothing about the
+   * transport was wrong; my flag was never set.
+   * ✅ AND THE FLAG WAS NEVER NEEDED. `onPosition` fires ONLY WHILE PLAYING, so
+   * any call to `wrapAt` is already proof that it is playing. The simplest
+   * thing that could work was there the whole time, behind a guard I added for
+   * a case that cannot happen.
+   * ⚠️ THE STATE LISTENER STAYS FOR THE ONE THING IT DOES DO: the parked column
+   * is dim and the playing one is bright, and that is a paint rather than a
+   * decision.
+   */
   deck.transport.onState((st) => setLive(!!st?.playing));
 
   const ro = new ResizeObserver(() => sizeCells());
@@ -1063,7 +1118,22 @@
     if (!c) return;
     const r = +c.dataset.row, s = +c.dataset.step;
     const k = e.key;
-    if (k === ' ') { e.stopPropagation(); return; }
+    /**
+     * 🔴 SPACE PLAYS AND STOPS, ENTER TURNS A PAD ON AND OFF. Asked 2026-09-21:
+     * *"space should play and stop. enter turns pad on and off"*.
+     * ⚠️ SPACE WAS BEING SWALLOWED HERE, on purpose and wrongly. A pad is a
+     * `<button>`, so the browser's own default for space is to PRESS it, which
+     * would have toggled a step; `stopPropagation` stopped the transport bar
+     * seeing it and the default still fired. So space toggled a pad and did not
+     * play, which is the two keys the other way round.
+     * ✅ `preventDefault` KILLS THE BUTTON DEFAULT and the event is left to
+     * bubble to the bar's own keyboard table, which already owns space as the
+     * play key on every page here. One binding for play, not a second copy.
+     * ⚠️ AND ENTER GETS `preventDefault` TOO, or a button fires its click as
+     * well and the pad toggles twice, landing back where it started.
+     */
+    if (k === ' ') { e.preventDefault(); return; }
+    if (k === 'Enter') { e.preventDefault(); e.stopPropagation(); setCell(r, s, !on[r][s]); return; }
     let to = null;
     if (k === 'ArrowLeft') to = [r, s - 1];
     else if (k === 'ArrowRight') to = [r, s + 1];
