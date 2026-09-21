@@ -931,6 +931,16 @@ button.pos-pri[data-busy="1"] {
 }
 .tbar-toggle::before { content: "▶"; }
 .tbar-toggle[data-state="playing"]::before { content: "❚❚"; font-size: 10px; }
+/* 🔴 `verb: 'stop'` SHOWS A SQUARE WHILE PLAYING, because on that bar the second
+   press stops and rewinds rather than pausing. A `❚❚` over a control that
+   returns the playhead to the top is a face describing a verb the button does
+   not perform.
+   ⚠️ `■` IS U+25A0 AND HAS NO EMOJI FORM, which is why it is not `⏹`: that one
+   defaults to emoji presentation and renders full colour at the wrong size and
+   baseline, and U+FE0E is honoured inconsistently across machines.
+   ⚠️ IT SITS AFTER THE `playing` RULE IT OVERRIDES, and carries one more class,
+   so neither source order nor a later edit can take it back. */
+.tbar-toggle.tbar-stop[data-state="playing"]::before { content: "■"; font-size: 12px; }
 .tbar-toggle[data-state="buffering"]::before { content: "◌"; }
 /* parked at the end: the button restarts, so it must not look like plain play */
 .tbar-toggle[data-state="ended"]::before { content: "↺"; font-size: 15px; }

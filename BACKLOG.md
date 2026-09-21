@@ -14,6 +14,10 @@ once by somebody who was not mid-edit.
 
 #### /tom/, open
 
+- **`replace pause icon with stop icon`**. The transport toggle shows a pause
+  glyph while playing and the second press STOPS, so the face and the behaviour
+  disagree.
+
 - **`when i hold pointer down enabling pads, i should be able to "draw" otjher
   pads before i do poiunterup`**. Drag across the grid with the button held and
   paint every pad passed over.
