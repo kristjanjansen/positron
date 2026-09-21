@@ -307,30 +307,29 @@
      tracked caps do not run together, which more air cannot cause. Taking 11 px
      off the gap to compensate would put the component's own number in a second
      file, which is the thing this project has a rule about. */
-  .kit-tabs .pos-tabs-t { position: relative; padding-right: 11px; }
-  /* 🔴 THE SELECTED RULE STOPS AT THE LABEL, NOT AT THE DOT'S SLOT. Reported
-     2026-09-21 as *"underline under tab too long"*, and MEASURED: every tab
-     overhung its own text by exactly **11.00 px on the right and 0 on the
-     left**, which is this page's reserved dot slot to the digit. The component
-     draws the selection as `box-shadow: inset 0 -2px 0 0`, an inset shadow
-     spans the whole padding box, and the slot was added an hour earlier to fix
-     the new-block mark. So one repair lengthened the other's underline.
-     ⚠️ THE FIX BELONGS HERE AND NOT IN `shell.css`, because the slot belongs
-     here: `/making/` and `/stage/` use the same component, reserve nothing, and
-     have nothing to compensate for. Putting the correction in the component
-     would be this page's private arithmetic charged to two innocent callers.
-     ⚠️ AND IT IS `::before` BECAUSE `::after` IS THE DOT. Both on one element,
-     one for the mark and one for the selection, which is the whole point of
-     the two being different channels. */
-  .kit-tabs .pos-tabs-t[aria-selected="true"] { box-shadow: none; }
-  .kit-tabs .pos-tabs-t[aria-selected="true"]::before {
-    content: ''; position: absolute; left: 0; right: 11px; bottom: 0; height: 2px;
-    background: var(--hi);
-  }
-  .kit-tabs .pos-tabs-t[data-kit-new]::after {
-    content: ''; position: absolute; right: 0; top: 50%; margin-top: -6px;
-    width: 5px; height: 5px; border-radius: 50%; background: var(--hi);
-  }
+  /* ⚠️ `position: relative` STAYS because the panel below is positioned against
+     it; the 11 px of padding went with the dot it was reserving. */
+  .kit-tabs .pos-tabs-t { position: relative; }
+  /* 🔴 THE NEW-BLOCK DOT IS GONE, 2026-09-21: *"what is this dot? i never askd"*.
+     It was added in session 40 by a background agent that had spotted a real
+     problem and solved it unasked: this page's rule is that the newest block
+     goes at the TOP, and a tab row hides five sixths of the page, so the rule
+     stops working the moment the sections are tabbed. The mark named the part
+     holding the newest block.
+     🔴 THE PROBLEM WAS REAL AND THE DECISION WAS NOT THE AGENT'S TO MAKE. This
+     repository reverted a whole `/pack/` rewrite the same week for the same
+     reason, and the entry recording it says the part that makes it a regression
+     rather than a difference of taste is that it changed something nobody had
+     asked about.
+     ⚠️ AND IT TOOK A SECOND RULE WITH IT. The dot needed an 11 px slot on the
+     right of every tab, which lengthened the component's own selection
+     underline by exactly that much, reported as *"underline under tab too
+     long"* and repaired HERE with a `::before` standing in for the underline.
+     Both are gone: `.pos-tabs-t` draws its own selection again and nothing on
+     this page compensates for anything.
+     ⚠️ WHAT IS LOST IS STATED RATHER THAN QUIETLY DROPPED: nothing now tells a
+     reader which part holds the newest block. The rule that the newest block is
+     the first `section()` call in the file is unchanged and still true. */
 
   /* 🔴 A RECT INSIDE A CLOSED TAB IS ZERO, AND TWO ZEROS COMPARE EQUAL, SO A
      CHECK THAT MEASURES ONE PASSES WHILE MEASURING NOTHING. About forty of the
@@ -3159,17 +3158,11 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
    * time somebody lands a block somewhere else. A mark costs nothing and says
    * more: it names the part rather than replacing where you were.
    */
+  // ⚠️ `newestSection` STAYS: the hash router below uses it, and so does the
+  // assert that the newest block is the first one in its part. What went is the
+  // MARK on the tab, not the knowledge of which block is newest.
   const newestSection = built[0] ? idFor(built[0]) : null;
   const newestPart = newestSection ? sectionTab.get(newestSection) : null;
-  for (const [i, [id]] of GROUPS.entries()) {
-    if (id !== newestPart) continue;
-    // ⚠️ THE ATTRIBUTE CARRIES THE BLOCK'S NAME RATHER THAN BEING EMPTY, so the
-    // mark can be read off the DOM and the hover says which block it means. An
-    // empty attribute would still MATCH, which is the other half of this
-    // project's rule about `[data-thing]`, and it would tell a reader nothing.
-    kitTabs.buttons[i].dataset.kitNew = built[0];
-    kitTabs.buttons[i].title = `newest here: ${built[0]}`;
-  }
 
   /**
    * 🔴 A HASH NAMING A BLOCK OPENS THE PART HOLDING IT. `/kit/#slider` has
@@ -5146,197 +5139,35 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       + `${built.length} built` + (empty.length ? ` · EMPTY: ${empty.join(', ')}` : ''));
   }
 
-  /**
-   * 🔴 A READER CAN STILL SEE WHAT IS NEW, WHICH IS THE ONE RULE A TAB ROW
-   * BREAKS BY ITSELF. Two facts make the claim, and neither is typed anywhere:
-   * the newest block is the FIRST block in the part that holds it, and that
-   * part is the only one marked. Without the second, the new block sits at the
-   * top of a part nobody opens.
-   * ⚠️ THE NEGATIVE HALF IS THAT NO OTHER TAB CARRIES IT. A page that marked
-   * all five would satisfy "the newest part is marked" and say nothing.
+   /**
+   * 🔴 THE HALF OF THIS THAT SURVIVES THE DOT'S REMOVAL, AND IT IS THE HALF
+   * THAT WAS ALWAYS THIS PAGE'S OWN RULE: the newest block is FIRST in the part
+   * that holds it. The mark that named that part went on 2026-09-21 because
+   * nobody asked for it; the ordering rule predates it and is untouched.
+   * ⚠️ AND IT IS WORTH SAYING WHAT IS NO LONGER CHECKED: nothing now asserts
+   * that a reader can FIND the newest block, only that it is first where it
+   * lives. A tab row still hides five sixths of this page, and that is a real
+   * gap rather than a solved problem.
    */
   {
-    const marked = kitTabs.buttons.filter((b) => b.dataset.kitNew !== undefined);
-    const tab = marked.length === 1
-      ? GROUPS[kitTabs.buttons.indexOf(marked[0])] : null;
     const firstIn = newestPart
       ? panels.get(newestPart).el.querySelector(':scope > .kit-sec')?.id : null;
-    d.assert('the part holding the newest block is the only one marked, and the block is first in it',
-      marked.length === 1 && !!tab && tab[0] === newestPart
-      && firstIn === newestSection && marked[0].dataset.kitNew === built[0],
-      `${built[0]} is the newest block, ${newestPart} holds it, ${marked.length} tab(s) marked`
-      + `${tab ? ` (${tab[1]})` : ''}, and the first block in that part is ${firstIn}`);
+    d.assert('the newest block is the first one in the part that holds it',
+      !!newestPart && firstIn === newestSection,
+      `${built[0]} is the newest block, ${newestPart} holds it, `
+      + `and the first block in that part is ${firstIn}`);
   }
+
+
 
   /**
-   * 🔴 THE MARK CANNOT MOVE THE ROW, WHEREVER IT IS. Measuring the row once
-   * says nothing: what has to be true is that it is the SAME WIDTH with the
-   * mark on any tab, which is a comparison or it is nothing. The mark is moved
-   * to another tab and put back synchronously, so nothing is rendered in
-   * between.
-   * ⚠️ AND THE MARK IS ABSOLUTE FOR THIS REASON. A dot beside the label in the
-   * flow would widen its own tab, so the row would shift whenever a new block
-   * landed in a different part, and it would be the LAST tab's dot that made a
-   * row which fits look scrollable.
+   * ⚠️ THE CHECK THAT LIVED HERE GRADED THE NEW-BLOCK MARK AGAINST THE OPEN
+   * TAB'S UNDERLINE, because the two had once been one channel: a 2 px bar in
+   * `--hi` saying both *this part is open* and *the newest block is in here*.
+   * The mark is gone on instruction, so the collision it guarded cannot happen
+   * and the check has no subject. Removed rather than left passing vacuously.
    */
-  {
-    const marked = kitTabs.buttons.find((b) => b.dataset.kitNew !== undefined);
-    const other = kitTabs.buttons.find((b) => b !== marked);
-    const last = kitTabs.buttons[kitTabs.buttons.length - 1];
-    /**
-     * 🔴 THE INK, NOT `scrollWidth`, AND THE FIRST VERSION OF THIS MEASURED THE
-     * WRONG QUANTITY AND SAID SO PERFECTLY. `scrollWidth` on a scroll container
-     * that is NOT overflowing returns the container's own client width, so on
-     * any screen where the six tabs fit it is pinned to the width of the bar
-     * and cannot move whatever the tabs do. MEASURED: with the dot put back
-     * into the flow, taking 11 px of its own, all four readings stayed
-     * identical and the check read green. The quantity in question is how far
-     * the row of tabs REACHES, which is the last tab's right edge against the
-     * first tab's left.
-     */
-    const wide = () => +(kitTabs.buttons[kitTabs.buttons.length - 1].getBoundingClientRect().right
-      - kitTabs.buttons[0].getBoundingClientRect().left).toFixed(2);
-    const here = wide();
-    const name = marked.dataset.kitNew;
-    delete marked.dataset.kitNew;
-    /**
-     * 🔴 THE ROW WITH NO MARK ANYWHERE, AND THIS IS THE READING THAT MAKES THE
-     * CHECK MEAN ANYTHING. Moving the mark between tabs was the only comparison
-     * at first and a SABOTAGE PROVED IT VACUOUS: with the dot put back into the
-     * flow, taking 11 px of its own, the row stayed exactly the same width when
-     * the mark moved, because every tab reserves the slot and so every tab
-     * grows by the same amount. The claim on the label is that the mark costs
-     * the row NO width, and the only way to measure a cost is against not
-     * paying it.
-     */
-    const none = wide();
-    other.dataset.kitNew = name;
-    const there = wide();
-    delete other.dataset.kitNew;
-    // the last tab, because a mark at the end of a scrolling row is the case
-    // that would make a row which fits look scrollable
-    last.dataset.kitNew = name;
-    const atEnd = wide();
-    if (last !== marked) delete last.dataset.kitNew;
-    marked.dataset.kitNew = name;
-    const back = wide();
-    d.assert('the mark costs the row no width, wherever in the row it sits',
-      here === none && here === there && here === atEnd && here === back,
-      `${here} px with the mark on ${name}, ${none} px with no mark at all, ${there} px moved `
-      + `along, ${atEnd} px on the last tab, ${back} px back`);
-  }
 
-  /**
-   * 🔴 THE MARK AND THE OPEN TAB'S UNDERLINE ARE TWO CHANNELS, AND THIS CHECK
-   * EXISTS BECAUSE THEY WERE ONE. The mark was a 2 px bar in `--hi` across the
-   * tab's top, the selection is a 2 px bar in `--hi` under the word, and the
-   * report was *"what happeend to tabs?"*: a reader saw an underline that had
-   * slipped. Position alone is not a channel, which is what that report
-   * measured, so what is graded here is that the two differ in something else.
-   * The mark has a BOX of its own, 5 px square and round; the selection has no
-   * box at all, because it is a shadow. Neither can be read as the other and
-   * neither can be turned into the other by a stylesheet edit that keeps this
-   * check green.
-   * ⚠️ AND THE MARKED TAB CARRIES NO SHADOW WHILE IT IS SHUT, which is the half
-   * that says the mark is not quietly drawing a selection. It goes somewhere
-   * else first rather than assuming where it started: `go` returns early on the
-   * part that is already open, so reading the shut state first would have
-   * measured the open one twice on any arrival that opened the marked part,
-   * which a `#segment-display` link does.
-   */
-  {
-    const was = kitTabs.at();
-    const marked = kitTabs.buttons.find((b) => b.dataset.kitNew !== undefined);
-    const markedId = GROUPS[kitTabs.buttons.indexOf(marked)][0];
-    const dot = () => {
-      const a = getComputedStyle(marked, '::after');
-      return { w: Number.parseFloat(a.width), h: Number.parseFloat(a.height),
-               round: Number.parseFloat(a.borderTopLeftRadius) >= Number.parseFloat(a.width) / 2,
-               drawn: a.content !== 'none' };
-    };
-    /**
-     * 🔴 `push: false`, OR THIS CHECK REWRITES THE READER'S ADDRESS. FOUND BY
-     * MEASURING IT: `/kit/#segment-display` opened HARDWARE and scrolled to the
-     * block correctly, and then came to rest at `#hardware`, because `go`
-     * writes the part's id over the hash on every press and this check presses
-     * three times. The block's own address, put back four hundred lines above
-     * precisely so a reader can copy it, was destroyed by the thing grading the
-     * page. `push: false` walks the tabs and leaves the history alone, which is
-     * this project's rule about a check that mutates: if a person were watching
-     * this page, would they see it happen? They would have seen it in the
-     * address bar.
-     */
-    const peek = (id) => kitTabs.go(id, { push: false });
-    peek(GROUPS.map(([id]) => id).find((id) => id !== markedId));
-    /* ⚠️ THE SELECTION IS A `::before` BAR AND NO LONGER A BOX SHADOW, CHANGED
-       2026-09-21 when the underline was reported as too long. This assert used
-       to read `boxShadow` and went red on that change, correctly: the CLAIM it
-       makes is unaltered, that the two marks are told apart by something other
-       than where they sit, but the mechanism carrying one of them moved and a
-       check naming the old one was grading a thing that had gone. */
-    const barOf = () => {
-      const cs = getComputedStyle(marked, '::before');
-      return { w: cs.width, h: cs.height, drawn: cs.content !== 'none' };
-    };
-    const dShut = dot(); const bShut = barOf();
-    peek(markedId);
-    const dOpen = dot(); const bOpen = barOf();
-    peek(was);
-    /* 🔴 AND THE UNDERLINE STOPS SHORT OF THE DOT'S SLOT BY THE SLOT'S OWN
-       WIDTH. Reported as *"underline under tab too long"* and MEASURED at
-       exactly 11.00 px of overhang on every tab, which was this page's reserved
-       slot to the digit. Asserted as a RECT against the label's own ink rather
-       than against the 11 typed in the stylesheet, so the check cannot agree
-       with a copy of itself. */
-    const r = document.createRange(); r.selectNodeContents(marked);
-    const ink = r.getBoundingClientRect();
-    const box = marked.getBoundingClientRect();
-    /* The BAR's own width against the BUTTON's, which is the quantity in
-       question. An earlier draft of this measured the button against the label
-       and would have passed while the bar still ran the full width, because the
-       button overhangs the label by the slot either way. */
-    const barW = parseFloat(bOpen.w);
-    const slot = box.width - barW;
-    const labelGap = box.right - ink.right;
-
-    d.assert('the mark is a round dot and the selection is a flat bar, so neither can be read as the other',
-      dShut.drawn && dOpen.drawn && dShut.w === dShut.h && dShut.w > 0 && dShut.round
-      && dOpen.w === dShut.w && bOpen.drawn && !bShut.drawn && bOpen.h === '2px',
-      `the dot is ${dShut.w} by ${dShut.h} px and round in both states · `
-      + `the bar is ${bOpen.h} tall open and ${bShut.drawn ? 'drawn' : 'absent'} shut`);
-
-    /**
-     * 🔴 NO BOX ADDS ITS LAST CHILD'S MARGIN TO ITS OWN PADDING, AND IT IS
-     * ASSERTED ON THE MARGIN RATHER THAN ON THE GAP. Reported as *"bottom
-     * pading same as top"*, where the padding was already 14 px both ways on
-     * all 39 boxes and the ink sat 15 above and 29 below, because a
-     * `.pos-controls` carried its own 14 px underneath.
-     * ⚠️ `.kit-out` IS EXCLUDED BECAUSE EIGHT BOXES CANCEL THE PADDING ON
-     * PURPOSE with `margin-bottom: -14px`, so a readout strip sits flush to the
-     * bottom edge. An assert over the GAP would have demanded they be changed;
-     * an assert over the MARGIN says what the rule actually promises.
-     */
-    {
-      const boxes = [...d.el.querySelectorAll('.kit-box')];
-      const bad = boxes.map((b) => {
-        const last = [...b.children].reverse()
-          .find((k) => k.getBoundingClientRect().height > 0);
-        if (!last || last.classList.contains('kit-out')) return null;
-        const mb = parseFloat(getComputedStyle(last).marginBottom) || 0;
-        return mb !== 0 ? `${last.className || last.tagName} ${mb}px` : null;
-      }).filter(Boolean);
-      d.assert('no box pays for its last child\u2019s bottom margin on top of its own padding',
-        boxes.length > 20 && bad.length === 0,
-        bad.length ? `${bad.length} of ${boxes.length}: ${bad.slice(0, 3).join(', ')}`
-          : `${boxes.length} boxes, none adding a margin`);
-    }
-
-    d.assert('and the selected bar is shorter than its button by the dot\u2019s slot',
-      Number.isFinite(barW) && barW > 0 && slot > 6 && slot < 16
-      && Math.abs(slot - labelGap) < 2,
-      `bar ${barW.toFixed(2)} px in a ${box.width.toFixed(2)} px button, `
-      + `so ${slot.toFixed(2)} px short against ${labelGap.toFixed(2)} px of slot`);
-  }
 
   /**
    * 🔴 GRADING THE TABS DID NOT MOVE THE READER'S ADDRESS, AND THIS IS HERE

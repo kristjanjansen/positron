@@ -533,7 +533,7 @@ export const DEMOS = [
    * the harness.
    */
   { name: 'wish', group: 'hardware', act: 4, created: '2026-09-21', built: true,
-    one: 'say what you want the desk to do, and a Cloudflare model proposes the patch',
+    one: 'say which instrument should play which, and a language model proposes the connection',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
 
   /**

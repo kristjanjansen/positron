@@ -322,10 +322,34 @@
     { id: 'here:mk-425c-usb-midi-keyboard:in', dir: 'in', box: 'keys', label: 'MK-425C USB MIDI Keyboard' },
   ];
   const PORT = new Map(PORTS.map((p) => [p.id, p]));
-  /** Measured facts, handed to the model because no manual carries them. */
+  /**
+   * Measured facts, handed to the model because no manual carries them.
+   *
+   * 🔴 THE ROTARIES ARE IN HERE SINCE 2026-09-21, AND THEIR ABSENCE WAS A REAL
+   * GAP RATHER THAN A MODEL FAILURE. Reported: *"'first' should be enogh. i see
+   * these rotaries!"*, after *"connect the first rotary knob of evolution to
+   * the first rotary knob of circuit"* came back as `{"op":"cc","to":1}` with
+   * no `from` at all and was refused. **The model had no way to know what a
+   * rotary sends.** It was told the channels and the semitone offset and
+   * nothing about controller numbers, so *the first rotary* named a thing it
+   * could not resolve, and it guessed a 1.
+   * ⚠️ AND THE PAGE COULD HAVE ANSWERED IT ALL ALONG. Both runs are measured on
+   * this desk and written down in `measured-devices-2026-09-20.md`: the
+   * keyboard's knobs at line 199 and the Circuit's macros at line 169. The
+   * facts existed in the repository and were never handed over.
+   * ⚖️ AND THE INFERRED HALF IS MARKED AS INFERRED, HERE, IN THE PROMPT. Macros
+   * 7 and 8 were never turned, so CC 86 and 87 come from the run of six rather
+   * than from a measurement, and a model told they are facts would state them
+   * as facts. Telling it which two are guesses is the same rule this project
+   * applies to its own prose.
+   */
   const FACTS = 'The MK-425C keyboard sends on MIDI channel 2 and its keys are one semitone '
-    + 'flat. The Circuit listens for Synth 1 on channel 1, Synth 2 on channel 2, drums on '
-    + 'channel 10 at notes 60, 62, 64 and 65, and its master filter on channel 16. The '
+    + 'flat. Its six rotary knobs send, in the order they are printed on the panel, '
+    + 'CC 84, 72, 74, 71, 93 and 5, so its FIRST rotary knob is CC 84. '
+    + 'The Circuit listens for Synth 1 on channel 1, Synth 2 on channel 2, drums on '
+    + 'channel 10 at notes 60, 62, 64 and 65, and its master filter on channel 16. '
+    + 'The Circuit has eight macro knobs on channel 1 sending CC 80 to 87 in order, so its '
+    + 'FIRST macro knob is CC 80, and CC 86 and 87 are inferred rather than measured. The '
     + 'Circuit has no factory reset, so it is never sent SysEx.';
 
   /** What each port consents to. The Circuit's line is the one that matters. */
@@ -382,7 +406,14 @@
 
   const d = mount({
     name: 'wish',
-    what: 'Say what you want the desk to do, and a Cloudflare model proposes the patch.',
+    /**
+     * ⚠️ MORE SPECIFIC, AND THE VENDOR IS OUT. Asked 2026-09-21: *"be more
+     * specific and its not importat its cf model"*. `what you want the desk to
+     * do` is a sentence that would fit any page here, and *Cloudflare* names
+     * whose computer it runs on, which is a fact about the bill rather than
+     * about what a visitor is looking at.
+     */
+    what: 'Say which instrument should play which, and a language model proposes the connection.',
     /**
      * 🔴 NO READOUT AT ALL. Asked 2026-09-21: *"rm links / 1 / refused / 1"*,
      * which is both remaining cells after the two timings came off earlier the
