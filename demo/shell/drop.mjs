@@ -11,6 +11,18 @@
 // is the same locality with fewer moving parts and it returns a promise, so a
 // read that fails propagates instead of landing in an `onerror` nobody wrote.
 //
+// 🔴 IT HAS A VISIBLE AREA, AND THE FIRST VERSION DID NOT. THAT WAS THE DEFECT.
+// It shipped with a button and a cover, and the cover is `position: fixed` and is
+// inserted into the document ONLY while a drag is already in flight. So a reader
+// who had not started dragging had nothing on screen telling them they could:
+// **the affordance appeared after the gesture it exists to invite.** Reported
+// 2026-09-21 as *"i just do not get funcionality why there is no upload aread /
+// button, global component i am asking"*, which is exactly right.
+// ⚠️ THE PLAN SPECIFIED THE DRAG, THE REFUSAL, THE KEYBOARD PATH AND THE COVER,
+// AND SPECIFIED NO RESTING STATE. Every one of those is about what happens after
+// somebody has decided to drop something. Nothing said what the page looks like
+// before that, so nothing was built, and each piece was correct on its own.
+//
 // 🔴 FIVE THINGS TO GET RIGHT AND FOUR WERE ALREADY MEASURED ELSEWHERE HERE.
 //
 // 1. `dragleave` FIRES ON EVERY CHILD, so a boolean flickers: the pointer
@@ -39,7 +51,13 @@ import { el } from './shell.mjs';
  * @param {(files:{name:string,size:number,bytes:Uint8Array}[])=>any} o.onOpen
  * @param {(msg:string, kind?:string)=>void} [o.says]   words for the page's log
  * @param {string} [o.label]      the button's own words. It says `open`.
- * @param {string} [o.hint]       what the cover says while a drag is in flight
+ * @param {string} [o.hint]       what the area says at rest and what the cover
+ *                                says while a drag is in flight
+ * @param {string} [o.empty]      the area's own line before anything is opened
+ * @param {boolean} [o.area]      false for a bare button with no resting area.
+ *                                The default is the area, because a component
+ *                                whose only visible part appears mid-drag is the
+ *                                defect this one was reported for.
  * @param {Document|HTMLElement} [o.on]  what listens. The document by default,
  *                                       because the ask was a page-wide target.
  * @param {number} [o.maxBytes]
@@ -50,6 +68,8 @@ export function createDrop({
   says = () => {},
   label = 'open a file',
   hint = 'drop it anywhere on this page',
+  empty = 'nothing has been opened',
+  area = true,
   on = document,
   maxBytes = 64 * 1024 * 1024,
 } = {}) {
@@ -77,19 +97,51 @@ export function createDrop({
     input.value = '';
   });
 
-  const root = el('div', 'pos-drop');
-  root.append(button, input);
+  /**
+   * 🔴 THE AREA IS THE COMPONENT'S RESTING STATE AND IT SAYS WHAT MAY BE DROPPED
+   * ON IT. A dashed edge is a target; the words inside name the extensions, so a
+   * refusal is never the first time a reader learns what this takes.
+   * ⚠️ THE NOTE LINE IS PART OF IT RATHER THAN THE PAGE'S, so every caller gets
+   * the refusal and the confirmation in the same place with nothing to remember.
+   * It is NEVER EMPTY: it says `nothing has been opened` before anything is, and
+   * that is not politeness. `/wish/` reserved a picture's room with `min-height`
+   * and MEASURED the host at 0 px and `display: none`, beaten by
+   * `.pos-stack > div:empty { display: none }` at (0,2,1), so the log moved on
+   * every answer for hours while the source read as correct. A box with words in
+   * it cannot lose that fight.
+   */
+  const note = el('div', 'pos-drop-note', empty);
+  const root = el('div', area ? 'pos-drop pos-drop-area' : 'pos-drop');
+  if (area) {
+    const words = exts.length
+      ? `${hint} (${exts.join(', ')})`
+      : hint;
+    root.append(el('div', 'pos-drop-hint', words), button, note);
+  } else {
+    root.append(button, note);
+  }
+  root.append(input);
 
   const cover = el('div', 'pos-drop-cover');
   cover.append(el('div', 'pos-drop-say', hint));
 
+  // ⚠️ THE AREA AND THE COVER LIGHT UP TOGETHER, so a drag that starts far from
+  // the area still points at it. `data-over` is DELETED rather than set empty:
+  // `[data-over]` matches on PRESENCE, and `= ''` is how `video-panel.mjs` kept
+  // a panel in full screen state for the rest of a page's life.
   function show() {
     if (!cover.isConnected) document.body.append(cover);
+    root.dataset.over = '1';
   }
   function hide() {
     depth = 0;
     cover.remove();
+    delete root.dataset.over;
   }
+
+  // Everything the component has to say goes through here, so its own line and
+  // the page's log can never disagree about what happened.
+  const tell = (msg, kind) => { note.textContent = msg; says(msg, kind); };
 
   const okName = (name) => !exts.length || exts.some((e) => name.toLowerCase().endsWith(e));
 
@@ -99,12 +151,12 @@ export function createDrop({
     for (const f of files) {
       if (!okName(f.name)) {
         refused++;
-        says(`${f.name} is not ${exts.join(' or ')}, so it was not opened`, 'bad');
+        tell(`${f.name} is not ${exts.join(' or ')}, so it was not opened`, 'bad');
         continue;
       }
       if (f.size > maxBytes) {
         refused++;
-        says(`${f.name} is ${(f.size / 1048576).toFixed(1)} MB and the limit here is ${(maxBytes / 1048576) | 0} MB`, 'bad');
+        tell(`${f.name} is ${(f.size / 1048576).toFixed(1)} MB and the limit here is ${(maxBytes / 1048576) | 0} MB`, 'bad');
         continue;
       }
       good.push({ name: f.name, size: f.size, bytes: new Uint8Array(await f.arrayBuffer()) });
@@ -139,6 +191,10 @@ export function createDrop({
     button,
     input,
     cover,
+    /** The component's own line, so a page can assert what a reader was told. */
+    note,
+    /** Words into the area and the caller's log at once. */
+    say: tell,
     /** Live, so a page can assert that a visit opened nothing. */
     get opens() { return opens; },
     /** Live. A stand-in that refused everything would otherwise read as working. */

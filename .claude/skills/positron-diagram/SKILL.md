@@ -65,6 +65,33 @@ description: How a diagram on a demo page is written: what goes in a box, a labe
     every `what` paragraph uses it that way. `this` pointed at something
     position already makes unambiguous: the picture is last on the page it
     belongs to.
+    🔴 **ONE EXCEPTION EXISTS AND IT IS `atEnd: false`, NOT A SECOND TREATMENT.
+    ADDED 2026-09-21 ON INSTRUCTION**: *"patches: patched table 1/2 less high,
+    diagram under it, reserver space when no active one"*. `/pack/`'s picture is
+    the DETAIL PANEL for the pressed table row, not reference: it repaints with
+    that patch's own waves, filter, envelope and matrix. **A detail panel two
+    screens below the row it describes is not a detail panel.** So it sits inside
+    the tab under the table.
+    ⚠️ **AND THE AMENDMENT IS THE SMALLEST ONE THAT HONOURS THE ASK.** Same
+    component, same standing `How it works` heading, still no `title`, still one
+    per page. **Only `atEnd` changes**, and the host is the element the selection
+    lives in. Everything the original rule was protecting survives: the picture
+    is still below the controls, there is still exactly one treatment, and a page
+    still cannot type its own heading.
+    ⚠️ **THE TEST FOR THIS EXCEPTION IS WHETHER THE PICTURE CHANGES WHEN THE
+    READER PRESSES SOMETHING.** A picture that is the same on every visit is
+    reference and goes last. A picture that is a reading of the thing under the
+    pointer belongs beside it. If you are moving one for any other reason, you
+    are moving it for the reason this rule already refused.
+    🔴 **AND A LIVE PICTURE MUST RESERVE ITS ROOM BEFORE ANYTHING IS SELECTED**,
+    or it grows into the page the first time somebody presses a row. `/pack/`
+    draws the reference's own DEFAULT patch at load, built out of the address
+    table rather than typed, so every box carries a sub and the figure has
+    exactly the height it will keep. **An empty box is shorter than one with a
+    sub**, so blank subs reserve the wrong height, which is the `min-height` that
+    never applied wearing different clothes. MEASURED: 444.1 px at rest and
+    444.0 px with 64 patches loaded, asserted on the page.
+
     ⚠️ **AND THE DRIFT THIS PREVENTS WAS REAL AND MEASURED, NOT HYPOTHETICAL.**
     On the day the rule was written there were THREE treatments across six
     pages: four passed `how: true`, `/crate/` typed its own lowercase title, and
