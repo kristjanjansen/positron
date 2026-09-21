@@ -129,6 +129,40 @@ walls rather than one: each port declares what it `accepts`, and separately
 there is no code on the page that turns a SysEx, a program change or a clock
 byte into bytes. The Circuit has no factory reset.
 
+## The second half of the session
+
+- **http://127.0.0.1:8890/bay/** the patch bay. **22/22**, model at **36/36**
+  with no browser.
+- **http://127.0.0.1:8890/wish/** speak a patch. **18/18**. Needs
+  `node demo/wish-local.mjs` running, which is ALSO running now on **:8799**.
+- `demo/shell/unzip.mjs` reads `New Pack.circuitpack` with nothing vendored,
+  **13/13**.
+- `demo/shell/circuit-cc.mjs` is the Circuit's 98 live parameters, **16/16**
+  graded against this desk's own measurements rather than the document they
+  were parsed from.
+
+🔴 **THE MEASUREMENT THAT DECIDES THE WHOLE PATCH BAY DESIGN.** Asked to put
+the mod wheel on the master filter, and separately to play the drums from the
+keyboard, `llama-3.3-70b-instruct-fp8-fast` produced **well formed patches
+aimed at the Model 12** when both belong to the Circuit. Nothing in a validator
+can catch that. A person reading one line can, which is why `/wish/` proposes
+and never connects.
+
+🔴 **AND FOUR REAL BUGS WERE FOUND BY MEASURING RATHER THAN BY READING**: three
+in the bay's validator (a cycle walk that started at an input, an audio rule
+that refused every audio link, two refusals in the wrong order) and one in its
+model (`accepts` doing two jobs, which refused every real link on this desk).
+
+## Two plans and two pieces of research landed
+
+- `plans/plan-patchbay.md`, the design. 414 lines.
+- `plans/plan-circuit-editor.md`, the patch format, measured against the
+  published one byte for byte.
+- `plans/plan-circuit-samples.md`, the pack in a browser and the drum machine
+  after it.
+- `research/fasttrack-capture-2026-09-21.md` and
+  `research/cf-models-speech-to-patch-2026-09-21.md`, both measured.
+
 ## Open, in priority order
 
 1. **The 32 user sessions off the Circuit.** Asked for, still not done, and it
