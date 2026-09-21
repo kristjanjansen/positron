@@ -69,6 +69,21 @@ drum version is the same three parts:
    ships with the checkout through `push.sh` rather than over the relay: 3.5 MB
    is four messages under the 1000 KiB cap but needs a chunk protocol that does
    not exist, and the file is already in this repository.
+   🔴 **THAT SENTENCE IS WRONG AND THE OWNER CAUGHT IT: *"we aready split pcm.
+   reuse?"*.** `rig/board/board.mjs` ships binary in framed chunks TWICE OVER,
+   with the sequence number in the PAYLOAD because a binary frame carries no
+   envelope: `sendFrame()` at line 288 with an 8 byte header, and `sendPcm()`
+   at 449 with a 12 byte one. AND IT WAS BUILT FOR EXACTLY THIS HAZARD: its own
+   comment records that the relay's caps drop frames with no error at all, and
+   ✅ MEASURED **at 8 Mbit/s the relay lost 101 of 361 frames and nothing else
+   on the path reported it**.
+   ⚠️ **SO WHAT IS MISSING IS MUCH SMALLER**: a discriminator, because
+   `demo/shell/board.mjs:244` says every page treats an incoming binary frame as
+   PCM; knowing when a transfer is WHOLE, which a sequence number does not give
+   you; and a rate, which that 101-of-361 figure is the argument for.
+   ⚠️ **AND THE RECOMMENDATION HAS TO BE RE-DERIVED RATHER THAN KEPT.** `push.sh`
+   needs a restart that takes the sound away from whoever is listening, and a
+   pack somebody drops in a browser can never reach the board through it at all.
 2. **One score.** 16 steps by 64 rows of booleans, sent as step events rather
    than audio. 8 messages a second at 120 bpm against a relay measured at 1000.
 3. 🔴 **A COMPARISON THAT CAN GO RED, WHICH IS THE ONLY PART THAT MATTERS.**
