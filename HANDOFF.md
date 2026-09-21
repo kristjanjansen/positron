@@ -24,7 +24,11 @@ git commit -F msg.txt -- demo/evo demo/model demo/circuit demo/kit demo/manifest
 
 ## What is new, and where to open it
 
-`node demo/server.mjs` first, then:
+The dev server is RUNNING as this is written, on **8890** and **8892**, and all
+four pages answer 200 on both:
+
+- **http://127.0.0.1:8890/bay/** is the patch bay. **22/22.** It is the first
+  page here that SENDS to an instrument.
 
 - **http://127.0.0.1:8890/evo/** is the Evolution MK-425C, the third hardware
   panel. **24/24.** 25 keys, 8 knobs, 10 buttons, both wheels, a drawn LCD.
@@ -33,6 +37,12 @@ git commit -F msg.txt -- demo/evo demo/model demo/circuit demo/kit demo/manifest
 - **http://127.0.0.1:8890/circuit/** is the Novation Circuit. **30/30.**
 - **http://127.0.0.1:8890/kit/** carries `MIDI LOG` as its new top section.
   **70/70.**
+
+🔴 **`/bay/` IS THE ONE TO LOOK AT AND IT NEEDS A PERSON.** Press the status
+button, grant MIDI, press a source port then a destination, and the line above
+the button prints the whole link before it exists, with the refusal under it if
+there is one. **Nobody has yet played the MK-425C into the Circuit through it**,
+because a harness cannot grant Web MIDI and cannot hear a synth.
 
 ⚠️ **`/rack/` NO LONGER EXISTS AND THAT IS THE INTENDED OUTCOME.** For one day a
 kept link to it opened a DIFFERENT page, which is the `/held/` situation and the
@@ -99,6 +109,25 @@ is running, and nothing is playing.
 `plans/plan-patchbay.md`, 414 lines, reported in full in the session reply.
 Nothing built. The headline is that the patch bay is a **control plane**: it
 carries MIDI, it **brokers** audio, and it never sits in the middle of a stream.
+
+## The patch bay, built
+
+`demo/shell/bay.mjs` is the model, the validator and the text form, all pure.
+`node demo/shell/bay-test.mjs` is **30 asserts with no browser**, most of them
+negative controls, because a validator is the one kind of code that passes a
+naive suite by returning yes to everything.
+
+🔴 **THE TEST FOUND TWO REAL BUGS BEFORE ANY PAGE EXISTED.** The cycle check
+walked PORTS and started from the proposed destination, which is an input, so no
+link ever started there, the walk ended at once and every loop was allowed. And
+the rule refusing a link whose transforms drop everything fired on AUDIO links,
+which carry no message classes at all, so it would have refused every audio link
+in the building.
+
+🔴 **THE PAGE SENDS, WHICH NO PAGE HERE HAS DONE BEFORE**, so there are two
+walls rather than one: each port declares what it `accepts`, and separately
+there is no code on the page that turns a SysEx, a program change or a clock
+byte into bytes. The Circuit has no factory reset.
 
 ## Open, in priority order
 

@@ -32,6 +32,38 @@
   manual*. The measurement was always right; only the sentence about what is
   documented was wrong. ✅ Corrected in the page 2026-09-21.
 
+- ✅ **DONE 2026-09-21. `/bay/` IS LIVE LOCALLY, 22/22, AND ITS MODEL IS A KIT
+  MODULE GRADED AT 30 WITH NO BROWSER.** `demo/shell/bay.mjs` plus
+  `demo/shell/bay-test.mjs`. **The test found a real bug**: the cycle check
+  walked PORTS and started from the proposed destination, which is an input, so
+  no link ever started there, the walk ended immediately and every loop was
+  allowed. It walks nodes now.
+  ⚠️ **AND THE AUDIO MEDIUM FOUND A SECOND ONE**: the rule refusing a link whose
+  transforms drop everything fired on audio links, which carry no message
+  classes at all, so it would have refused every audio link in the building.
+  Asked 2026-09-21: *"Can you do
+  patchbay deno called bay"*, straight after `plans/plan-patchbay.md` was
+  written. Slug `bay`, `demo/bay/index.html`, and the model as a kit module so
+  the validator can be graded with no browser.
+  🔴 **IT IS THE FIRST PAGE IN THIS REPOSITORY THAT SENDS TO THE CIRCUIT.**
+  Every panel so far listens. So the `accepts` list is not decoration: notes,
+  control changes and bend go, and SysEx, program change and clock do not.
+
+- ✅ **RESEARCHED 2026-09-21, `research/cf-models-speech-to-patch-2026-09-21.md`.**
+  `@cf/openai/whisper-large-v3-turbo` at **$0.000513 an audio minute** with
+  `vad_filter` and word timings, then
+  `@cf/meta/llama-3.3-70b-instruct-fp8-fast` in **JSON mode**, which Workers AI
+  has had since 2025-02-25. **About $0.00047 a spoken command**, so cost is not
+  a reason to choose anything and latency is the number nobody has.
+  🔴 **THE FINDING IS THAT THE REGISTRY BECOMES AN `enum` IN THE SCHEMA**, so a
+  model cannot name a port that does not exist: the constraint is structural
+  rather than a hope in a prompt. Nothing was run. Asked 2026-09-21: *"In bg
+  investigate cf models to do sound-to-patcbay conversion"*. This is level 3 of
+  `plans/plan-patchbay.md` §4: speech, transcribed, interpreted into the link
+  language. ⚠️ **THE RULE FROM THAT PLAN HOLDS WHATEVER THE MODEL IS**: a model
+  PROPOSES a patch as text and a person confirms it. Nothing a microphone says
+  connects anything on its own.
+
 - 🔴 **THE UNIVERSAL PATCH BAY, ASKED 2026-09-21 AS A DESIGN QUESTION.** *"I
   want to start bringing these pieces together... a system where you can freely
   map one signal to another"*, scoped to **MIDI and audio for now** and designed

@@ -519,6 +519,23 @@ export const DEMOS = [
     tags: ['WebMIDI', 'CoreMIDI'] },
 
   /**
+   * 🔴 THE PATCH BAY, AND IT IS THE FIRST PAGE HERE THAT SENDS TO AN
+   * INSTRUMENT. Asked 2026-09-21: *"Can you do patchbay deno called bay"*,
+   * straight after `plans/plan-patchbay.md`. The three panels before it all
+   * listen; this one routes one instrument into another and can therefore do
+   * damage, which is why the model carries an `accepts` list per port and why
+   * there is no code on the page that turns a SysEx, a program change or a
+   * clock byte into bytes.
+   * ⚠️ THE MODEL AND THE VALIDATOR ARE NOT IN THE PAGE. `demo/shell/bay.mjs` is
+   * pure and `node demo/shell/bay-test.mjs` grades it at 30 asserts with no
+   * browser, most of them negative controls, because a validator passes a naive
+   * suite by returning yes to everything.
+   */
+  { name: 'bay', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+    one: 'route one instrument to another, with the connections it refuses explained in words',
+    tags: ['WebMIDI', 'CoreMIDI'] },
+
+  /**
    * 🔴 THE THIRD HARDWARE PANEL, AND ITS LAYOUT IS THE WEAKEST OF THE THREE.
    * Asked 2026-09-21: *"do evolution mk425c demo named evo"*, *"demo: hw
    * layout"*. `/circuit/` was drawn from Novation's own artwork at 800 dpi and
