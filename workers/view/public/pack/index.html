@@ -56,10 +56,14 @@
   import { createDrop } from '/shell/drop.mjs';
   import { createStack } from '/shell/stack.mjs';
   import { createGlue } from '/shell/glue.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createWaveView } from '/shell/wave-view.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
-  import { readSession, summarise as summariseSession, patchPayloads } from '/shell/circuit-session.mjs';
+  import {
+    readSession, summarise as summariseSession, patchPayloads,
+    notesPerRegion, notesIn, VELOCITY_AT, VELOCITY_PER_STEP,
+  } from '/shell/circuit-session.mjs';
   import {
     readWave, toMono, summarise as summariseWave, summariseAll,
   } from '/shell/circuit-sample.mjs';
@@ -188,6 +192,51 @@
    */
   window.__demo.drop = drop;
 
+  /**
+   * 🔴 SIX PATCHES THE PAGE CAN OPEN WITH NO FILE AT ALL, ASKED FOR AS *"can we
+   * get some sample patches in to choose from?"* and then *"at least one"*.
+   * The pack in this repository is not published and never will be, so until
+   * today a visitor met an upload box and an empty page, which got worse the
+   * moment the tabs learned to stay away until something lands.
+   * 🔴 THEY ARE THE OWNER'S OWN PATCHES AND PUBLISHING THEM WAS ASKED FOR IN
+   * WORDS RATHER THAN ASSUMED. A patch is not a pack: `New Pack.circuitpack`
+   * holds 32 of somebody's SESSIONS and stays unpublished, and these are six
+   * 350 byte synth patches with no session data in them.
+   * ✅ EVERY ONE CARRIES `00` AT OFFSET 6, WHICH IS `Replace Current Patch` AND
+   * LANDS IN RAM. The extractor refused to write a file that was not 350 bytes,
+   * that had any other command byte, or that `readPatch` called `writesFlash`.
+   * ⚠️ AND NOTHING IS FETCHED UNTIL ONE IS PRESSED. `/reel/` asked a
+   * broadcaster for a newsreel on every visit for a first frame nobody had
+   * asked to see, and this page asserts `fetched === 0` for a visit.
+   * ⚠️ IT IS NOT IN `.pos-controls`, because this page has no control row and
+   * asserts that it has none. Both harnesses press that row by position, so the
+   * checks here drive these buttons by name instead.
+   */
+  const READY = [
+    ['aciiid', 'Aciiid'], ['flamed', 'Flamed'], ['aggie', 'Aggie'],
+    ['frosted-glass', 'Frosted Glass'], ['smooth-pad', 'Smooth Pad'], ['twins', 'Twins'],
+  ];
+  const ready = createButtonGroup({
+    // ⚠️ NO LABEL, ASKED FOR AS *"rm or open one of these from pack"*. The row
+    // sits directly under a block titled UPLOAD FILE whose own hint names every
+    // extension it takes, so a second sentence introducing six buttons is the
+    // caption the button faces already are.
+    buttons: READY.map(([id, label]) => ({ id, label })),
+    onPress: (id) => openReady(id),
+  });
+  stack.add(ready.el);
+
+  async function openReady(id) {
+    const name = `${READY.find(([k]) => k === id)[1]}.syx`;
+    try {
+      const r = await fetch(`/resources/patches/${id}.syx`);
+      if (!r.ok) throw new Error(`the server answered ${r.status}`);
+      await openSyx(name, new Uint8Array(await r.arrayBuffer()));
+    } catch (e) {
+      drop.say(`${name} did not open (${e.message})`, 'bad');
+    }
+  }
+
   // ── the three lists ──────────────────────────────────────────────────────
   //
   // 🔴 TABS, AND THE COUNTS ARE IN THEIR TITLES. Asked as *"patches and sessions
@@ -198,9 +247,9 @@
   // sound stops, the service worker hands over and an installed web app flashes
   // white. `tabs.mjs` owns that and this page does not have to think about it.
   const TABS = [
-    { id: 'patches', label: 'PATCHES' },
-    { id: 'sessions', label: 'SESSIONS' },
-    { id: 'samples', label: 'SAMPLES' },
+    { id: 'patches', label: 'PATCHES', one: 'PATCH' },
+    { id: 'sessions', label: 'SESSIONS', one: 'SESSION' },
+    { id: 'samples', label: 'SAMPLES', one: 'SAMPLE' },
   ];
   const tabs = createTabs({ tabs: TABS });
   /**
@@ -235,7 +284,21 @@
   function countTabs(n) {
     TABS.forEach((t, i) => {
       const c = n[t.id];
-      tabs.buttons[i].textContent = c ? `${c} ${t.label}` : t.label;
+      // ⚠️ ONE OF A THING LOSES THE `s`, ASKED FOR AS *"1 sessions <- lose s
+      // when single"* and then *"same for patches / samples"*. `1 SESSIONS` is
+      // a count arguing with its own noun.
+      tabs.buttons[i].textContent = c ? `${c} ${c === 1 ? t.one : t.label}` : t.label;
+      /**
+       * 🔴 AND A TAB WITH NOTHING BEHIND IT IS SWITCHED OFF, asked for against a
+       * screenshot of an empty SAMPLES tab holding a player and the words
+       * `press a sample to open it here` with no samples in it. A tab is a
+       * promise that there is something under it. It is the same rule as a
+       * column heading over no rows and an empty box painting a line.
+       * ⚠️ NOT BEFORE A FILE IS OPEN, THOUGH: with nothing open the whole tab
+       * strip is away, and three greyed words would be a worse answer than no
+       * words. This only runs once something has landed.
+       */
+      tabs.enable(t.id, c > 0, `this file carries no ${t.label.toLowerCase()}`);
     });
   }
 
@@ -355,7 +418,7 @@
       { key: 'part', label: 'part', grow: true },
       { key: 'at', label: 'at', width: 76, align: 'right' },
       { key: 'used', label: 'used', width: 72, align: 'right' },
-      { key: 'pad', label: 'pad', width: 76, align: 'right' },
+      { key: 'notes', label: 'notes', width: 64, align: 'right', hi: true },
     ],
     cap: 64, empty: '', note: 'hover',
   });
@@ -462,6 +525,7 @@
   let picked = -1, pickedSession = -1, picked2 = -1, played = 0;
   let ac = null, lastPlayed = null, voice = null, looping = false;
 
+  const WIDE_BYTES = 1508;
   const pct = (x) => `${(x * 100).toFixed(1)}`;
   const kb = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} kB` : `${(n / 1048576).toFixed(1)} MB`);
 
@@ -869,7 +933,7 @@
    */
   async function readOne(bytes, fallbackName) {
     const stats = await sessionStats(bytes);
-    let deep = null, parts = [];
+    let deep = null, parts = [], events = [];
     try {
       const model = readSession(bytes);
       deep = summariseSession(model);
@@ -878,9 +942,18 @@
       // back together, and thirty two sessions of those is memory this page has
       // no use for: the panel shows where a region is and how much of it is
       // written, which is four numbers.
+      // 🔴 THE NOTE COUNT PER REGION, WHICH IS THE FIRST THING THIS PAGE HAS
+      // EVER BEEN ABLE TO SAY ABOUT WHAT A REGION HOLDS. The owner asked *"where
+      // is note data?"* against a line still reading `what they hold is not
+      // known`, which was true in the morning and stopped being true at
+      // 18:04.
+      const per = notesPerRegion(bytes);
+      let wide = 0;
       parts = model.slots.map((x) => ({
         index: x.index, kind: x.kind, at: x.at, size: x.size, used: x.used, pad: x.pad,
+        notes: x.kind === 'wide' ? per[wide++] : null,
       }));
+      events = notesIn(bytes);
     } catch { /* a file this module cannot partition is still weighable */ }
     return {
       ...stats,
@@ -891,6 +964,11 @@
       magicOk: deep?.magicOk ?? null,
       patchNames: deep?.patchNames || [],
       parts,
+      notes: events.length,
+      velocityPerStep: bytes[VELOCITY_AT] === VELOCITY_PER_STEP,
+      pitches: events.length
+        ? [Math.min(...events.map((e) => e.note)), Math.max(...events.map((e) => e.note))]
+        : null,
     };
   }
 
@@ -932,18 +1010,41 @@
       if (last && last.size === r.size) last.n++;
       else strides.push({ size: r.size, n: 1 });
     }
+    /**
+     * 🔴 THIS LINE SAID `What they hold is not known` UNTIL 18:04 TODAY, AND IT
+     * WAS TRUE WHEN IT WAS WRITTEN. The owner read it back at me with *"where
+     * is note data?"*, which is the right question the moment the research
+     * landed. What is known now is exactly one of the four strides, so the
+     * sentence says which one and goes on refusing to guess about the rest.
+     * ⚠️ AND IT IS SAID AS A COUNT RATHER THAN AS A NAME. Sixteen regions
+     * holding note data is measured; calling them two synth parts of eight
+     * patterns is still a reading, and it is still not published here.
+     */
     partsLine.textContent = x.parts.length
       ? `"${x.name || '(no name)'}", ${x.parts.length} regions: `
         + strides.map((g) => `${g.n} of ${n(g.size)} bytes`).join(', ')
-        + '. What they hold is not known'
+        + `. The ${x.parts.filter((r) => r.kind === 'wide').length} of `
+        + `${n(WIDE_BYTES)} hold ${n(x.notes)} note event(s)`
+        + (x.notes
+          ? `, ${x.pitches[0]} to ${x.pitches[1]}, with velocity `
+            + `${x.velocityPerStep ? 'per step' : 'per note'}`
+          : '')
+        + '. What the rest hold is not known'
       : '';
 
     partsTable.set(x.parts.map((r, k) => ({
       part: `region ${k + 1}`,
       at: n(r.at),
       used: n(r.used),
-      pad: n(r.pad),
-      hover: `${n(r.size)} bytes at ${n(r.at)}, ${n(r.used)} written and ${n(r.pad)} erased`,
+      // ⚠️ EMPTY AND NOT `0` ON A REGION THAT CANNOT HOLD NOTES. A zero there
+      // would read as a measurement of a region that was looked at and found
+      // empty, and the thirty four that are not 1,508 bytes long were never
+      // looked at for notes at all.
+      notes: r.notes === null ? '' : n(r.notes),
+      hover: `${n(r.size)} bytes at ${n(r.at)}, ${n(r.used)} written and ${n(r.pad)} erased`
+           + (r.notes === null
+             ? '. Nothing is known about what this one holds'
+             : `. ${n(r.notes)} note event(s) in its sixteen step records`),
     })));
 
     d.log(`${x.name || '(no name)'}, head ${x.head}, ${n(x.used)} B written across `
@@ -1398,6 +1499,53 @@
           + `"${drop.note.textContent}"`);
       }
 
+      /**
+       * 🔴 THE SIX PUBLISHED PATCHES, DRIVEN. They are the only thing a visitor
+       * to the deploy can open, so a broken one there is a page with nothing on
+       * it, and that is exactly the state this check exists to notice. It
+       * presses a button by NAME rather than by position, because this page has
+       * no control row for a harness to sweep.
+       * ⚠️ EVERY ONE MUST LAND IN RAM. `00` at offset 6 is `Replace Current
+       * Patch`; `01` is `Replace Patch`, which writes flash on an instrument
+       * with no factory reset. The extractor refused to write anything else and
+       * this is the second reading of the same fact, off the deployed bytes.
+       */
+      {
+        const before = fetched;
+        await openReady('frosted-glass');
+        d.assert('a published patch opens by name and lands in RAM rather than in flash',
+          patches.length === 1 && patches[0].name === 'Frosted Glass'
+          && patches[0].writesFlash === false && patches[0].bytes.length === PATCH_BYTES
+          && patches[0].bytes[6] === 0x00
+          && fetched === before + 1,
+          `${patches[0]?.name} is ${patches[0]?.bytes.length} bytes with command `
+          + `${patches[0]?.bytes[6]}, after ${fetched - before} request(s)`);
+
+        // ⚠️ AND ALL SIX, because one working says nothing about the other five
+        // and the five are what makes it a choice. They are fetched one at a
+        // time rather than at once: a visitor presses one.
+        const seen = [];
+        for (const [id, label] of READY) {
+          await openReady(id);
+          seen.push({ id, label, got: patches[0]?.name, flash: patches[0]?.writesFlash });
+        }
+        d.assert('all six open, every one lands in RAM, and no two of them are the same patch',
+          seen.length === 6 && seen.every((x) => x.got === x.label && x.flash === false)
+          && new Set(seen.map((x) => x.got)).size === 6,
+          seen.map((x) => `${x.label}${x.got === x.label ? '' : ` -> ${x.got}`}`).join(', '));
+
+        // 🔴 AND THE BUTTONS ARE NOT IN THE CONTROL ROW, which is what keeps the
+        // page's own `no control row at all` assert true while it has six more
+        // ways in than it had this morning.
+        d.assert('the six sit outside the control row, so the page still has no control row to sweep',
+          ready.buttons.length === 6
+          && !ready.el.closest('.pos-controls')
+          && document.querySelectorAll('.pos-controls button').length === 0,
+          `${ready.buttons.length} buttons, ${document.querySelectorAll('.pos-controls button').length} in the control row`);
+      }
+
+      await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
+
       d.assert('the pack reads as 64 patches, 32 sessions and 64 samples',
         patches.length === 64 && sessions.length === 32 && samples.length === 64,
         `${patches.length} / ${sessions.length} / ${samples.length}`);
@@ -1441,8 +1589,53 @@
         && /"User Session", 50 regions/.test(partsLine.textContent)
         && /16 of 1,508 bytes/.test(partsLine.textContent)
         && /32 of 720 bytes/.test(partsLine.textContent)
-        && /What they hold is not known/.test(partsLine.textContent),
+        && /What the rest hold is not known/.test(partsLine.textContent),
         `${facts.cells.size} cells and ${partsTable.count()} regions · "${partsLine.textContent}"`);
+
+      /**
+       * 🔴 THE NOTE DATA, ON THE PAGE. The owner read `What they hold is not
+       * known` back at me with *"where is note data?"*, which was the right
+       * question the moment the research landed. `notesIn` is graded in
+       * `circuit-session-test.mjs` at 5,095 events against 0 in all 64 blanks;
+       * what THIS asserts is that the page shows it, and shows it per region.
+       * ⚠️ AND THE COLUMN IS EMPTY ON THE OTHER 34 RATHER THAN `0`. A zero would
+       * read as a region that was looked at and found empty, and nothing looks
+       * for notes outside the sixteen 1,508 byte regions.
+       */
+      {
+        const rows = [...partsTable.scroller().querySelectorAll('.pos-tbl-row')];
+        const cell = (r) => r.children[3].textContent.trim();
+        const wide = rows.slice(1, 17);
+        const rest = [...rows.slice(0, 1), ...rows.slice(17)];
+        const shown = wide.reduce((n, r) => n + (+cell(r) || 0), 0);
+        d.assert('the sixteen 1,508 byte regions carry a note count and the other 34 carry nothing',
+          rows.length === 50 && shown === sessions[0].notes && shown > 0
+          && rest.every((r) => cell(r) === ''),
+          `${shown} note events across 16 regions, and ${rest.filter((r) => cell(r) === '').length} `
+          + 'of the other 34 are blank rather than zero');
+
+        d.assert('and the line says where the notes are rather than that nothing is known',
+          /hold [\d,]+ note event\(s\)/.test(partsLine.textContent)
+          && /velocity per (step|note)/.test(partsLine.textContent)
+          && !/What they hold is not known/.test(partsLine.textContent)
+          && /What the rest hold is not known/.test(partsLine.textContent),
+          `"${partsLine.textContent.slice(-95)}"`);
+
+        /**
+         * 🔴 THE NEGATIVE CONTROL THE RESEARCH INSISTS ON: a decoder that found
+         * notes in anything would pass every line above. The three stock
+         * sessions in this very pack hold ZERO, and they are the same three that
+         * distance from a template finds, which is a third independent road to
+         * the same files.
+         */
+        const stock = sessions.filter((x) => x.nearest < 16);
+        d.assert('NEGATIVE CONTROL: the three stock sessions hold no notes at all, found a third way',
+          stock.length === 3 && stock.every((x) => x.notes === 0)
+          && sessions.filter((x) => x.notes === 0).length === 3
+          && sessions.reduce((n, x) => n + x.notes, 0) === 5095,
+          `${sessions.filter((x) => x.notes === 0).length} of 32 hold none, `
+          + `${sessions.reduce((n, x) => n + x.notes, 0)} events in the pack`);
+      }
 
       /**
        * 🔴 AND NO ROW CLAIMS TO BE A SYNTH, WHICH IS THE CORRECTION ITSELF.
@@ -1732,7 +1925,9 @@
         sampleTable.count() === 1 && played === beforeBad && playBtn.disabled === true
         && /1 refused/.test(samplesLine.textContent)
         && /did not read/.test(sampleTable.scroller().querySelector('.pos-tbl-row')?.title || '')
-        && tabs.buttons[2].textContent === '1 SAMPLES',
+        && tabs.buttons[2].textContent === '1 SAMPLE'
+        && tabs.enabled('samples') === true
+        && tabs.enabled('patches') === false && tabs.enabled('sessions') === false,
         `${sampleTable.count()} row saying `
         + `"${sampleTable.scroller().querySelector('.pos-tbl-row')?.title}"`
         + ` · the line reads "${samplesLine.textContent}"`);
