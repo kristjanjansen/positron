@@ -206,9 +206,17 @@ ok('the owner\'s own sessions are USER 22, DEMO 7 and INIT 3',
 // times in that pack, and `session_10` and `session_22` differ from it at
 // exactly one byte, 0xBBAC. The owner's other 29 differ from it by 262 to 5,412
 // bytes, a median of 1,524. `index.json` names all three `Initial Session`.
-// ⚠️ SO THE CLAIM IS NARROWED TO WHAT WAS ACTUALLY MEASURED HERE: they are not
-// empty. Whether a session is WORK is a comparison against the stock template
-// and this file cannot make it, because the template is not in this repository.
+// ⚠️ SO THE CLAIM HERE IS NARROWED TO WHAT THIS FILE MEASURES: they are not
+// empty. Which one they are is graded in `circuit-session-test.mjs`.
+// 🔴 AND THE SENTENCE THAT USED TO SIT HERE WAS WRONG IN AN INSTRUCTIVE WAY. It
+// said the comparison needs the stock template and so could not be made from
+// this repository. **It needs no template.** MEASURED from the pack alone: the
+// three `Initial Session` slots differ FROM EACH OTHER by exactly one byte, all
+// three pairs; the closest pair among the other 29 is **415 bytes** apart; and
+// no INIT comes within **262 bytes** of any non-INIT. One against a floor of 262
+// is not ambiguous, and **the floor is the half that makes the one byte mean
+// anything**. Reaching for an outside source was the expensive answer to a
+// question the file in hand could settle.
 const initOnes = stats.filter((s) => s.head === 'INIT');
 ok('the three that say INIT are not blanks, whatever else they turn out to be',
   initOnes.every((s) => s.entropy > 0.8 && s.nonZero > 0.8)
