@@ -40,6 +40,36 @@
      ⚠️ `align-items: stretch`, NOT `flex-end`. Bottom alignment makes two
      children END together and says nothing about their heights; stretch makes
      them the same height, which is what was asked for and what a mixer is. */
+  /* 🔴 THE INSTRUMENT WEARS ITS MAKER AND ITS MODEL, IN UPPERCASE. Asked
+     2026-09-21: *"replica names always in uppercase. add full name evolution
+     mk-425c"*, which is a rule about every hardware replica rather than about
+     one page. `/circuit/` and `/evo/` already carried theirs and this page
+     carried none at all.
+     ⚠️ IT IS NOT THE PAGE'S TITLE REPEATED. The page is called `model`, which
+     is its slug, and a slug is not what is printed on a mixer. This is the
+     artwork, which is why the maker's name is on it and why the two sit at
+     opposite ends rather than in the middle.
+     ⚠️ AND IT SITS ABOVE THE CARDS RATHER THAN INSIDE ONE, because this replica
+     has no single case: the eight strips and the master lane are each their own
+     box, glued at the seams. On the real panel `TASCAM` is printed across the
+     top of the screen operation section, in the master column, and where the
+     model wordmark sits is not recorded in `plans/plan-panel-layouts.md`. So
+     the nameplate spanning the whole object is a drawing choice on a replica
+     with no case, not a panel reading.
+     ⚠️ TEN PIXELS, WHICH IS A QUARTER OF THE PAGE'S OWN RHYTHM. On `/circuit/`
+     and `/evo/` the card's border is what ties a printed name to the panel
+     under it. There is no border to do that here, so the distance is the only
+     thing saying the nameplate belongs to the instrument rather than being a
+     block of its own. */
+  .rack-unit { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .rack-brands { display: flex; justify-content: space-between; }
+  /* ⚠️ THE SAME TREATMENT AS `/circuit/`'s AND `/evo/`'s, to the declaration.
+     Three replicas whose nameplates are set three ways read as three pages
+     rather than as one shelf of instruments. */
+  .rack-brand {
+    font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--dim2);
+    text-transform: uppercase;
+  }
   .rack-wrap { display: flex; align-items: stretch; gap: 0; min-width: 0; padding-bottom: 4px; }
   /* ⚠️ THE ROOM FOR THE SCROLLBAR IS ON THE WRAPPER, NOT ON THE SCROLLER.
      Reported 2026-09-21: *"bottom uneven"*. It was 4 px of `padding-bottom`
@@ -586,7 +616,19 @@ const PAN_SCALE = 2;
 
   const wrap = el('div', 'rack-wrap');
   wrap.append(rackRow, lane);
-  d.el.append(wrap);
+
+  /**
+   * ⚠️ THE INSTRUMENT WEARS ITS OWN NAMES, AND BOTH HALVES OF IT. The maker at
+   * the left end and the model at the right, exactly as `/circuit/` and `/evo/`
+   * carry theirs. The stylesheet above says why it is above the boxes rather
+   * than inside one, and why `model` on its own would not do.
+   */
+  const brands = el('div', 'rack-brands');
+  brands.append(el('div', 'rack-brand', 'TASCAM'),
+                el('div', 'rack-brand', 'MODEL 12'));
+  const unit = el('div', 'rack-unit');
+  unit.append(brands, wrap);
+  d.el.append(unit);
 
   /**
    * 🔴 MULTI JOG IS CC 60 AND IT IS THE CLEANEST CONTROL ON THE MIXER.
@@ -1089,6 +1131,59 @@ const PAN_SCALE = 2;
       d.assert('every fader in the rack ends on the same line as the FX fader',
         Math.abs(chL.bottom - fxL.bottom) <= 1,
         `channel ends at ${chL.bottom.toFixed(1)}, FX at ${fxL.bottom.toFixed(1)}`);
+    }
+
+    /**
+     * 🔴 THE PANEL PRINTS THE MAKER AND THE MODEL, IN UPPERCASE. Asked
+     * 2026-09-21 as a rule about every hardware replica: *"replica names always
+     * in uppercase. add full name evolution mk-425c"*. This page carried no
+     * name at all, so `model` in the heading was the only thing on screen
+     * saying what the object is, and `model` is a slug.
+     * ⚠️ **IT READS WHAT THE BROWSER RENDERS, NOT WHAT THE PAGE TYPED.** The
+     * name shouts for two reasons, the string and `text-transform`, and only
+     * one of them is in the JavaScript. A check on the string alone would stay
+     * green with the stylesheet rule deleted. The transform is applied below
+     * the way the browser applies it.
+     * ⚠️ AND IT ASKS FOR BOTH HALVES. A replica carrying only its model is an
+     * instrument nobody made.
+     */
+    {
+      const shown = (e) => {
+        const t = getComputedStyle(e).textTransform;
+        const s = (e.textContent || '').trim();
+        return t === 'uppercase' ? s.toUpperCase()
+             : t === 'lowercase' ? s.toLowerCase() : s;
+      };
+      const maker = shown(brands.firstChild), model = shown(brands.lastChild);
+      d.assert('the panel prints the maker and the model, both in uppercase',
+        maker === 'TASCAM' && model === 'MODEL 12', `${maker} ${model}`);
+    }
+
+    /**
+     * 🔴 AND THE NAMEPLATE BELONGS TO THE INSTRUMENT, WHICH IS A MEASUREMENT.
+     * It sits outside the cards, so nothing but the distance and the two edges
+     * says it is the mixer's name rather than a line of page furniture above
+     * it. Both ends are checked: a `space-between` row puts the maker at the
+     * rack's left edge and the model at the lane's right edge only while the
+     * row spans them both.
+     * ⚠️ AGAINST THE PAGE'S OWN RHYTHM RATHER THAN AGAINST A NUMBER. `--pos-gap`
+     * is what a block of its own would get, and the claim here is that this is
+     * closer than that, so the check reads the rhythm rather than repeating the
+     * 10 typed in the stylesheet. A measurement compared against a copy of the
+     * thing it measures cannot disagree with it.
+     */
+    {
+      const gap = parseFloat(getComputedStyle(document.documentElement)
+        .getPropertyValue('--pos-gap')) || 40;
+      const b = brands.getBoundingClientRect();
+      const r = rackRow.getBoundingClientRect();
+      const l = document.querySelector('.rack-lane').getBoundingClientRect();
+      const drop = r.top - b.bottom;
+      d.assert('the nameplate spans the mixer and sits closer to it than a block would',
+        Math.abs(b.left - r.left) <= 1 && Math.abs(b.right - l.right) <= 1
+        && drop > 0 && drop < gap / 2,
+        `left ${(b.left - r.left).toFixed(1)}, right ${(b.right - l.right).toFixed(1)}, `
+        + `${drop.toFixed(1)} px above the rack against a ${gap} px rhythm`);
     }
 
     // 🔴 SUB AND MAIN ARE DRAWN AND SEND NOTHING, asserted rather than assumed.

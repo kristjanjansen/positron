@@ -134,9 +134,13 @@
     text-transform: uppercase; align-self: center;
   }
   /* ⚠️ BOTH UPPERCASE. The panel prints `novation` in lower case and the page
-     asked for neither: *"uppercalse all"*. At 11 px in a mono face beside a
-     row of uppercase control labels, a lower case word reads as a different
-     kind of thing rather than as branding. */
+     asked for neither: *"uppercalse all"*, and again as a rule about every
+     replica a day later: *"replica names always in uppercase"*. At 11 px in a
+     mono face beside a row of uppercase control labels, a lower case word reads
+     as a different kind of thing rather than as branding.
+     ⚠️ THE TRANSFORM STAYS EVEN THOUGH BOTH NAMES ARE NOW TYPED UPPERCASE, and
+     the check below reads what the browser RENDERS rather than what is typed,
+     so neither half can quietly go missing and leave the other looking right. */
   .circ-vol     { grid-area: 1 / 1 / 2 / 2; }
   .circ-macros  { grid-area: 1 / 2 / 2 / 3; }
   .circ-filt    { grid-area: 1 / 3 / 2 / 4; }
@@ -381,7 +385,12 @@
   const circScroll = el('div', 'circ-scroll');
   const panel = el('div', 'circ-panel');
   const brands = el('div', 'circ-brands');
-  brands.append(el('div', 'circ-brand circ-brand-l', 'novation'),
+  /* ⚠️ TYPED UPPERCASE, NOT LEFT TO THE STYLESHEET. It read `novation` here and
+     `NOVATION` on screen for a day, which is a source that does not say what
+     the page says: the one reader who can be misled by that is the next person
+     to grep for the word. The standing rule is `/kit/`'s, where `.kit-h` shouts
+     a heading whatever is typed and the heading is typed shouting anyway. */
+  brands.append(el('div', 'circ-brand circ-brand-l', 'NOVATION'),
                 el('div', 'circ-brand circ-brand-r', 'CIRCUIT'));
   circ.append(brands, panel);
   const left = el('div', 'circ-side circ-left');
@@ -997,6 +1006,32 @@
       d.assert('every top button stands over its own pad column',
         top.length === 8 && below.length === 8 && worst <= 1,
         `worst ${worst.toFixed(1)} px across eight columns`);
+    }
+
+    /**
+     * 🔴 THE PRINTED NAMES ARE THE MAKER AND THE MODEL, IN UPPERCASE. Asked
+     * 2026-09-21 as a rule about every hardware replica: *"replica names always
+     * in uppercase"*.
+     * ⚠️ **IT READS WHAT THE BROWSER RENDERS, NOT WHAT THE PAGE TYPED.** Two
+     * things make a name shout here and only one of them is in the JavaScript,
+     * so a check on the string alone would pass a page whose stylesheet had
+     * lost `text-transform` and would have failed this page for the whole day
+     * its source read `novation` while its screen read `NOVATION`. The
+     * transform is applied below the way the browser applies it.
+     * ⚠️ AND IT ASKS FOR BOTH HALVES OF THE NAME. A replica carrying only its
+     * model is an instrument nobody made.
+     */
+    {
+      const shown = (e) => {
+        const t = getComputedStyle(e).textTransform;
+        const s = (e.textContent || '').trim();
+        return t === 'uppercase' ? s.toUpperCase()
+             : t === 'lowercase' ? s.toLowerCase() : s;
+      };
+      const maker = shown(brands.firstChild), model = shown(brands.lastChild);
+      d.assert('the panel prints the maker and the model, both in uppercase',
+        maker === 'NOVATION' && model === 'CIRCUIT',
+        `${maker} ${model}`);
     }
 
     // 🔴 THE PRINTED NAMES SIT THE SAME DISTANCE FROM THREE EDGES, measured
