@@ -145,7 +145,24 @@ export const PATCH = [
   '@cf/meta/llama-4-scout-17b-16e-instruct',
 ];
 
-const CLASSES = ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'sysex'];
+/**
+ * 🔴 THE VOCABULARY IS IMPORTED, AND IT WAS TYPED OUT HERE THREE TIMES.
+ * 2026-09-21, reported by the owner: a patch came back as eight `only`s and was
+ * refused with `only takes "cls" and was given "to"`. **That is what a model
+ * says when it means *filter* and the only filter it has been shown is `only`.**
+ * `range`, `vrange` and `fixed` had been added to `bay.mjs` and to the `enum`
+ * below that same day and NOT to the operator table in `systemFor()`, which is
+ * the part of this prompt that defines the format. So the code accepted nine
+ * transforms and the model was choosing from six, silently, and the page
+ * refused a patch that was otherwise correct.
+ * ⚠️ **`CLASSES` WAS A FOURTH COPY** and was identical, which is the state every
+ * duplicated list is in right up until it is not.
+ * ⚠️ AND THE IMPORT REACHES OUT OF THE WORKER ON PURPOSE. `demo/shell/bay.mjs`
+ * is pure logic with no DOM in it, wrangler bundles it, and `demo/wish-local.mjs`
+ * resolves the same path from node. The alternative is this file holding a
+ * second opinion about what a transform is, which is the defect being repaired.
+ */
+import { OP_NAMES, OP_HELP, CLASSES } from '../../../demo/shell/bay.mjs';
 
 /**
  * 🔴 THE LOOSE SCHEMA IS THE ONE THAT WORKS, AND THAT IS A MEASUREMENT RATHER
@@ -155,6 +172,19 @@ const CLASSES = ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'sysex'];
  * decoding through a union is apparently expensive and it is not worth what it
  * buys, because `checkTransforms` catches the same faults for nothing.
  */
+/**
+ * Every argument any transform takes, typed once. `cls` is the only one that is
+ * not a number, which `bay.mjs` already encodes in the same place it declares
+ * the argument, so adding an op adds its arguments here with nobody typing them.
+ */
+const ARG_PROPS = Object.fromEntries(
+  [...new Set(OP_HELP.flatMap((o) => o.args))]
+    .map((a) => [a, a === 'cls' ? { type: 'string', enum: CLASSES } : { type: 'number' }]),
+);
+
+/** Width of the widest signature, so the table lines up without a magic number. */
+const PAD = Math.max(...OP_HELP.map((o) => o.json.length));
+
 function schemaFor(outs, ins) {
   return {
     type: 'object',
@@ -171,18 +201,14 @@ function schemaFor(outs, ins) {
               items: {
                 type: 'object',
                 properties: {
-                  op: { type: 'string',
-                        enum: ['channel', 'transpose', 'velocity', 'only', 'drop',
-                               'range', 'vrange', 'fixed', 'cc'] },
-                  to: { type: 'number' }, by: { type: 'number' }, scale: { type: 'number' },
-                  // ⚠️ `lo` AND `hi` ADDED 2026-09-21 WITH `range` AND `vrange`. A
-                  // schema that lists every argument any op can take and requires
-                  // only `op` is deliberate and is argued above: the tight `anyOf`
-                  // was measured at 10.2 s against 1.6 and repeated itself three
-                  // runs of three. So a new op is two lines here and a row in
-                  // `checkTransforms`, which is where MEANING is checked.
-                  lo: { type: 'number' }, hi: { type: 'number' },
-                  cls: { type: 'string', enum: CLASSES }, from: { type: 'number' }, ch: { type: 'number' },
+                  // ⚠️ A SCHEMA THAT LISTS EVERY ARGUMENT ANY OP CAN TAKE AND
+                  // REQUIRES ONLY `op` IS DELIBERATE and is argued above: the
+                  // tight `anyOf` was measured at 10.2 s against 1.6 and
+                  // repeated itself three runs of three. What is NOT deliberate
+                  // is typing the list, which is how `range`, `vrange` and
+                  // `fixed` reached this enum and never reached the prompt.
+                  op: { type: 'string', enum: OP_NAMES },
+                  ...ARG_PROPS,
                 },
                 required: ['op'],
               },
@@ -228,7 +254,34 @@ function schemaFor(outs, ins) {
  * is left alone and refused by the validator, which is the honest answer to an
  * ambiguous patch.
  */
-const SYNONYM = { transpose: { to: 'by' } };
+/**
+ * 🔴 AND `range` JOINED IT ON THE DAY IT BECAME REACHABLE, WHICH IS THE SAME
+ * DEFECT ARRIVING ON A NEW WORD WITHIN THE HOUR. MEASURED 2026-09-21, eight
+ * runs across four shapes of this prompt: told the argument names in a table,
+ * shown `{"op":"range","lo":36,"hi":47}` beside them, given a two-link worked
+ * example carrying `"lo"` and `"hi"` in JSON, and finally shown the wrong form
+ * as a counter-example, `llama-3.3-70b` wrote `{"op":"range","to":N}` **every
+ * single run**. The counter-example measured WORSE: three runs, two still
+ * wrong and one returning no links at all.
+ * 🔴 **THE CAUSE IS THE SAME ONE THIS FILE ALREADY NAMES AND IT IS STRUCTURAL.**
+ * A link is `{"from": …, "to": …}` and the model has just written one, so `to`
+ * is the key in front of it. It is not misreading the table. It is completing
+ * the JSON it is already inside.
+ * ✅ **SO `from` AND `to` ARE READ AS THE BOUNDS, WHICH COSTS THE LANGUAGE
+ * NOTHING**: `cc from=A to=B` already uses that exact pair for a numeric pair
+ * in this same vocabulary, so *range from 0 to 7* is consistent with what is
+ * here rather than a concession. `range` is open ended at either end since the
+ * same day, so a lone `{"op":"range","to":7}` reads as **notes 0 to 7**, which
+ * is what was asked for.
+ * ⚠️ AND IT IS REPORTED IN WORDS LIKE EVERY OTHER REPAIR. A patch that arrives
+ * saying something different from what the model wrote is a rewrite, and the
+ * person pressing the button has to be able to see it happened.
+ */
+const SYNONYM = {
+  transpose: { to: 'by' },
+  range: { from: 'lo', to: 'hi' },
+  vrange: { from: 'lo', to: 'hi' },
+};
 
 export function relabel(links) {
   const fixed = [];
@@ -296,13 +349,18 @@ function systemFor(ports, facts, outs, ins) {
     ...(anyAlso ? ['An "also called" line lists other names people in this room use for that '
       + 'instrument. Match an instruction against those as well as the label, and answer '
       + 'with the id.'] : []),
-    'Transforms, each an object with "op" and its own argument:',
-    '  channel to=N        put every message on MIDI channel N',
-    '  transpose by=N      move notes by N semitones, N may be negative',
-    '  velocity scale=F    multiply note-on velocity',
-    '  only cls=C          keep only that class',
-    '  drop cls=C          drop that class',
-    '  cc from=A to=B ch=N move controller A to controller B, optionally onto channel N',
+    /* 🔴 GENERATED FROM `bay.mjs`, BECAUSE THE TYPED VERSION OF THIS TABLE
+       LISTED SIX OF NINE FOR HALF A DAY AND A REFUSED PATCH IS WHAT IT COST.
+       A transform the code accepts and the prompt omits is a word the model
+       cannot say, and what it does instead is reach for the nearest thing it
+       WAS shown, which was `only` eight times over. */
+    /* ⚠️ THE LEFT COLUMN IS THE JSON ITSELF, NOT A SIGNATURE. Measured twice
+       the same day: `range lo=N hi=N` in this column and one worked example
+       carrying `"to"` produced `{"op":"range","to":7}` on every run. The
+       argument names were in front of it and it copied the example. */
+    'Transforms. Each one is an object, written exactly like the example beside it:',
+    ...OP_HELP.map((o) => `  ${o.json.padEnd(PAD)} ${o.help}`),
+    `A class C is one of: ${CLASSES.join(', ')}.`,
     /* ⚠️ A WORKED EXAMPLE RATHER THAN A FOURTH SENTENCE TELLING IT. The line
        that used to sit here said *"transpose takes by, not to"* in those words
        and the model still sent `to` on every run. `relabel` is what actually
@@ -312,6 +370,32 @@ function systemFor(ports, facts, outs, ins) {
     `  {"from": "${outs[0]}", "to": "${ins[0]}", `
       + '"transforms": [{"op": "transpose", "by": 1}, {"op": "channel", "to": 1}]}',
     'Note "by" for transpose and "to" for channel. They are different words.',
+    /* 🔴 A SECOND WORKED EXAMPLE, AND IT IS HERE BECAUSE OF A MEASUREMENT
+       RATHER THAN A HUNCH. 2026-09-21, the hour the operator table stopped
+       listing six of nine: the 70B immediately started reaching for `range`,
+       chose the right port, the right note rows and the right channel, and
+       wrote `{"op":"range","to":23}` then `{"op":"range","to":7}` because the
+       only transform JSON it had ever been shown carried `"to"`. It is the same
+       pattern match this file already documents for `transpose`, arriving on
+       the new word within minutes, and the same answer applies: the note above
+       saying which word goes where had been in the prompt for hours and the
+       model wrote `to` on every run anyway. **An example is copied. A sentence
+       is not.** So the two-argument shape gets its own line of JSON.
+       ⚠️ AND IT IS A SPLIT RATHER THAN A ROW OF BUTTONS, because a split is the
+       general shape and the row of buttons is one desk's instance of it. An
+       example built from the thing that was just reported teaches the report. */
+    /* ⚠️ A JSON COUNTER-EXAMPLE WAS TRIED HERE AND MEASURED WORSE, SO IT IS
+       NOT IN THE PROMPT. It read *`{"op":"range","to":0}` then
+       `{"op":"range","to":7}` is WRONG*, naming the exact form eight runs had
+       produced. Three runs after it: still wrong twice, and once **no links at
+       all**, which is the one answer worse than a refused patch. Showing a
+       model the mistake is showing it the mistake. */
+    'A split is TWO links '
+      + 'between the same pair of ports rather than one link with two ranges:',
+    `  {"from": "${outs[0]}", "to": "${ins[0]}", `
+      + '"transforms": [{"op": "range", "lo": 0, "hi": 59}, {"op": "channel", "to": 1}]}',
+    `  {"from": "${outs[0]}", "to": "${ins[0]}", `
+      + '"transforms": [{"op": "range", "lo": 60, "hi": 127}, {"op": "channel", "to": 2}]}',
     facts || '',
     'If the instruction names nothing on this desk, return an empty list of links.',
   ].join('\n');
