@@ -53,9 +53,44 @@
         name 500 px off the right edge of the screen.
      ════════════════════════════════════════════════════════════════════════ */
 
+  /* 🔴 TWO MEASUREMENTS, DECLARED ONCE, BECAUSE BOTH OF THEM WERE TYPED TWICE.
+     `--pan-pad` is how far the panel's contents sit inside its card, and
+     `--pan-gap` is the air between two groups in it. The gap was the literal
+     `16px` written on `.pan-fixed`'s right padding AND on `.pan-strip`'s left
+     margin, which is one distance in two places and this project's most
+     repeated defect in its cheapest form.
+     ⚠️ ON `.pan` RATHER THAN AT `:root`, and the difference from `--disp-back`
+     is the direction. That one had to be at `:root` because a SIBLING of two
+     displays needed it and a custom property inherits downward and never
+     sideways. Everything that reads these two is a DESCENDANT of the card, so
+     the component is the right home, and a page with two panels can give one of
+     them different proportions. */
   .pan {
+    --pan-pad: 20px;
+    --pan-gap: 16px;
     display: flex; flex-direction: column; min-width: 0;
-    padding: 20px; background: var(--card);
+    /* 🔴 NO VERTICAL PADDING HERE, AND THAT IS WHAT MAKES THE DIVIDER REACH THE
+       CARD'S EDGES. Asked 2026-09-21: *"evo border on right sticky panel should
+       extend to top and bottom of the panel"*.
+       🔴 **MEASURED BEFORE CHANGING ANYTHING, because there are four reasons a
+       border could stop short and they have different fixes.** At 1280 px the
+       fixed column measured top 339.30 and bottom 812.67 against a card INNER
+       top of 339.30 and bottom of 812.67: **zero gap at both ends**. The border
+       was already the full height of the column, and the column was already the
+       full height of the card's CONTENT box. What stopped it was the card's own
+       `padding: 20px`, which put 20 px of card between the border's ends and the
+       card's visible edge at each end.
+       ✅ **SO THE CONTAINER GIVES UP THE VERTICAL INSET AND ITS TWO CHILDREN
+       TAKE IT**, which is the container stretching its children rather than the
+       column growing a margin to correct for its parent. A page that writes its
+       own correction here breaks the moment the component changes, which is
+       exactly what `/model/` did when it lifted a button column by a foot's
+       height and the pads later grew one.
+       ⚠️ THE PANEL DOES NOT GET TALLER. The 40 px left the card and arrived on
+       the column, so the card's border box measures the same as before. Both
+       ends are asserted as rects, separately, because two alignments that look
+       like one are two asserts. */
+    padding: 0 var(--pan-pad); background: var(--card);
     border: 1px solid var(--line); border-radius: 4px;
   }
   .pan-wrap { display: flex; align-items: stretch; min-width: 0; }
@@ -88,11 +123,44 @@
      for children giving up their border and radius, and a border stripped by a
      rule nobody wrote is this project's fifth measured dead rule. The page
      asserts the computed width. */
-  .pan-fixed { border-right: 1px solid var(--line); padding-right: 16px; }
-  .pan-strip { flex: 1 1 auto; min-width: 0; overflow-x: auto; margin-left: 16px; }
+  /* The vertical half of this padding is the card's, handed down so the border
+     on this column can run the card's full inner height. See `.pan`. */
+  .pan-fixed {
+    border-right: 1px solid var(--line);
+    padding: var(--pan-pad) var(--pan-gap) var(--pan-pad) 0;
+  }
+  /* 🔴 THE INSET IS ON THE SCROLLER AND NOT ON `.pan-flow` INSIDE IT, so the
+     horizontal scrollbar sits inside the card's inset with the content rather
+     than against the card's bottom edge. `box-sizing: border-box` means
+     `.pan-flow`'s `height: 100%` still resolves against the content box. */
+  .pan-strip {
+    flex: 1 1 auto; min-width: 0; overflow-x: auto;
+    margin-left: var(--pan-gap); padding-block: var(--pan-pad);
+  }
+  /* 🔴 THE GAP BETWEEN TWO ROWS OF THE PANEL, AND IT IS THE CONTAINER'S TO OWN.
+     Asked 2026-09-21: *"more space on top of keyboard"*, because the white keys
+     started immediately under the dual press labels and those labels read as
+     belonging to the keys rather than to the six buttons above them.
+     🔴 **THE DISTANCE BETWEEN TWO STACKED THINGS IS THREE QUANTITIES AND ALL
+     THREE WERE MEASURED FIRST**: this row's foot, the gap, and the keyboard's
+     head. At 1280 px they were **0, 0 and 0**. The foot is `--fn-bot`, a 24 px
+     band that the dual press names FILL (two lines of 12.35 px is 24.7, so they
+     finish 0.7 px past it and there is no air in it at all); the gap was
+     nothing, because this was a flex column with no `gap`, no margin below the
+     row and none above the keys; and the head was nothing, because the kit's
+     `.kbd` margins are overridden to zero further down this file.
+     ✅ **THE GAP IS THE ONE THAT MOVED, AND IT IS THE ONLY ONE THAT COULD BE.**
+     Raising `--fn-bot` adds air between the BUTTONS and their names, because
+     the names are anchored `bottom: 0` and ride down with it. A margin on
+     `.evo-keys` is the page correcting for its container, which is the shape
+     this project keeps paying for. A container that owns both sides of a
+     distance leaves nothing for a page to disagree with.
+     ⚠️ AND IT COSTS THE PANEL NO DEPTH. The keys are `flex: 1 1 auto` with
+     `min-height: 0`, so they absorb the gap out of their own growth and the
+     card measures what it did before. */
   .pan-flow {
     width: max-content; height: 100%; display: flex; flex-direction: column;
-    align-items: stretch;
+    align-items: stretch; gap: var(--pan-gap);
   }
   /* A row of control groups across the strip. */
   .pan-row { display: flex; align-items: flex-end; }
@@ -100,6 +168,34 @@
   .pan-group {
     background: var(--card2); border: 1px solid var(--line); border-radius: 5px;
   }
+
+  /* 🔴 A PRINTED LABEL NAMING A CONTROL THAT IS SWITCHED OFF DIMS WITH IT, AND
+     THAT HAS TO BE SAID OUT LOUD BECAUSE THE LABEL IS NOT INSIDE THE CONTROL.
+     Reported 2026-09-21 from a screenshot of this panel: *"on dislable pad
+     buttons make labels way lighter"*.
+     🔴 **AND THE CAUSE WAS ONE LAYER UNDER WHAT WAS REPORTED, WHICH IS THE
+     USUAL PLACE.** The kit's own pad labels were never the problem: MEASURED at
+     1280 px, a pad's `.pos-pad-top` reads **1.96:1** against its group, the
+     faintest text on the panel apart from a fader's slot number. The names a
+     reader was actually looking at are the ones THIS FILE draws, absolutely
+     positioned outside the pads because they are wider than the buttons, and
+     they were at full strength: **5.91:1** for a single press name and
+     **3.77:1** for a dual press one, over buttons dimmed to .38. So the label
+     really was the brightest thing in a dead control, and making the kit's
+     labels lighter would have hidden the faintest text on the page while
+     leaving every bright one exactly where it was.
+     ✅ **THE NUMBER IS `--ctl-off`, WHICH THE KIT NOW PUBLISHES** for precisely
+     this: a caller drawing its own stand-in for a component's label slot has to
+     be able to match the component, and this one had nothing to match and was
+     out by three times. See the note on `--ctl-off` in `shell.css`.
+     ⚠️ **THE PANEL'S TWO TIERS SURVIVE.** A single press name is `--dim` and a
+     dual press one is `--dim2`, which is the real instrument's own silkscreen
+     hierarchy, so this dims BOTH rather than flattening them to one ink. An
+     opacity keeps a relationship that a replacement colour would throw away.
+     ⚠️ **AND THE NAMEPLATE IS NOT ONE OF THESE.** `.pan-plate-l` names no
+     control: it is the make and the model, it is the one thing on the case that
+     is true whether or not anything is plugged in, and it stays where it is. */
+  .pan-sub[data-off], .pan-cap[data-off] { opacity: var(--ctl-off); }
 
   /* 🔴 THE NAMEPLATE, AT A FIXED POSITION IN THE FLOW. Asked 2026-09-21:
      *"evolution title + model nr goes to the right of transpose, centered,
@@ -260,10 +356,27 @@
      rule for a row of faders and wrong for two wheels whose printed names are
      wider than they are. This project's own rule is that an ellipsis is the
      SIGNAL that a word is in the wrong place, so the answer is not a shorter
-     word: the panel prints `PITCH BEND` under a wheel narrower than the phrase,
-     and it wraps. */
+     word.
+     🔴 **AND WRAPPING WAS THE WRONG ANSWER TOO, WHICH TOOK A SECOND REPORT.**
+     Asked 2026-09-21: *"pichbend single word"*. `PITCH BEND` broke at its space
+     and `MODULATION` could not, so one label was 24.69 px tall and the other
+     12.34, and the two slot numbers underneath them, `C9` and `C10`, ended up
+     **12.34 px apart** on a pair of controls that are otherwise identical. A
+     wrapping label is the control reporting that its name does not fit, and it
+     reports it in the one place a reader cannot act on.
+     ✅ **SO THE NAME IS ONE TOKEN AND THE WIDTH IS A DECISION.** `nowrap` with
+     `overflow: visible` says out loud what this panel is doing: both names are
+     wider than their wheels and are ALLOWED to be, because the two wheels sit
+     28.86 px apart and the names still do not touch. MEASURED after: `pitchbend`
+     57 px and `modulation` 67 px in 46 px boxes, one line each, 11 px of clear
+     air between them, and both slot numbers on one line. The page asserts the
+     gap rather than trusting it, because that clearance is the whole reason
+     this is allowed to overflow.
+     ⚠️ NOT `text-overflow: ellipsis`. An ellipsis here would cut a name the
+     panel really does print, which is the opposite of the signal it exists to
+     give. */
   .evo-wheels .pos-fdr-lab {
-    white-space: normal; overflow: visible; text-overflow: clip;
+    white-space: nowrap; overflow: visible; text-overflow: clip;
   }
 
   /* ── the six function buttons ──────────────────────────────────────────── */
@@ -585,10 +698,23 @@
   const d = mount({
     name: 'evo',
     what: 'An Evolution MK-425C on screen, moving when the real one moves.',
-    /* Four cells, and every one of them moves. `channel` is here rather than
-       as a constant in the prose precisely BECAUSE it is not a constant: one
-       button on this keyboard was measured answering on a different one. */
-    readout: { keys: '', velocity: '', bend: '', channel: '' },
+    /* 🔴 NO READOUT, ON PURPOSE. Asked 2026-09-21: *"rm keys / velocity / bend /
+       channel in evo"*, which is all four cells, so the row goes rather than
+       shrinking to an odd two.
+       ✅ **AND THE FACTS DID NOT GO WITH IT.** Three of the four were already on
+       screen twice: the MIDI log lists every message with its channel, its raw
+       bytes and a reading, so `keys` and `velocity` are in it row by row, and
+       `bend` is the number printed under the wheel that moved. The fourth is
+       rehomed to a log line, and `sayChannel` below carries the reason.
+       ⚠️ `readout: null` IS THE DECLARATION AND NOT AN OMISSION. The shell turns
+       it into `readoutOptOut`, so `demo/verify.mjs` asserts *declares that it
+       has no readout, on purpose* rather than failing a page that forgot one:
+       an absent field is still a failure, and this one is a choice.
+       ⚠️ AND A PAGE THAT OPTS OUT OF A SURFACE MUST OPT OUT OF ITS BOX. An
+       empty `.pos-readout` still painted its own 1 px edges on `/typist/` and
+       rendered as a full width rule nobody wrote. The shell hides it now, and
+       this page asserts that rather than trusting it. */
+    readout: null,
     /* 🔴 NO DECLARED CONTROL. The primary one is a presence button spliced
        into `.pos-controls` below, which is where `demo/verify.mjs` presses. */
     controls: [],
@@ -636,40 +762,47 @@
    * faintly, which is the thing that actually makes a panel read as liquid
    * crystal: you can see the `8` behind the `1`.
    *
-   * 🔴 **THE REFLECTIVE SCHEME, AND IT IS THE MORE HONEST OF THE TWO CLAIMS.**
-   * Asked 2026-09-21: *"evo: inverse segmented one"*. A reflective display has
-   * no lamp behind it: it borrows the light in the room and the crystal goes
-   * DARK where it is driven, so it is near black bars on pale grey green.
-   * ⚠️ **AND IT MATCHES WHAT ANYBODY HERE HAS ACTUALLY LOOKED AT.** The manual
-   * says the backlight is blue, and the research could only report that as READ
-   * RATHER THAN SEEN: every photograph of an MK-425C it found was of a
-   * powered-down unit, and a powered-down LCD is exactly this, dark segments on
-   * pale grey green. So the backlit draw would be a picture of a sentence in a
-   * manual and this one is a picture of three photographs. Neither is a
-   * measurement of a lit panel, and nobody has switched this keyboard on and
-   * looked.
+   * 🔴 **THE BACKLIT SCHEME, ON INSTRUCTION.** Asked 2026-09-21 as *"reverse
+   * secmented display"*, which reverses *"evo: inverse segmented one"* from two
+   * hours earlier. A backlit display has a lamp behind the glass, so a lit bar
+   * is bright and the field behind it is dark.
+   * ⚠️ **WHAT IS KNOWN ABOUT THE REAL PANEL IS UNCHANGED, AND IT IS WORTH
+   * KEEPING BECAUSE IT IS THE PART A LATER READER WOULD OTHERWISE RE-DERIVE.**
+   * The manual says the backlight is blue, and the research could only report
+   * that as READ RATHER THAN SEEN: every photograph of an MK-425C it found was
+   * of a powered-down unit, and a powered-down LCD looks like the reflective
+   * draw, dark segments on pale grey green. **Nobody here has switched this
+   * keyboard on and looked**, so neither scheme is a measurement of a lit
+   * panel. The reflective draw used to be argued for on exactly that ground,
+   * and an instruction outranks the argument the same way it did for two slug
+   * renames today. The measurement stays; the conclusion goes.
    * ⚠️ THE SCHEME CARRIES ITS OWN GHOST VALUE AND NOTHING HERE HARD-CODES ONE.
    * Both ghosts were raised twice today on report, so a number copied out of
    * that module would already be two versions stale.
+   * ⚠️ AND `reflective` IS UNTOUCHED IN THE KIT. It is drawn by `/kit/`'s own
+   * specimen and graded by `demo/shell/segment-test.mjs`, including the
+   * luminance check proving one scheme is the other inverted. This page's
+   * choice says nothing about whether that scheme should exist.
    */
   const win = el('div', 'pan-win evo-win');
   const disp3 = createSegment({
-    digits: 3, frame: false, size: 38, scheme: 'reflective',
+    digits: 3, frame: false, size: 38, scheme: 'backlit',
     title: 'the three digit field. On this instrument it carries the value: a '
          + 'controller number, a program number, or a velocity',
   });
   const disp2 = createSegment({
-    digits: 2, frame: false, size: 20, scheme: 'reflective',
+    digits: 2, frame: false, size: 20, scheme: 'backlit',
     title: 'the two digit field. It says which control the value is about, and '
          + 'it is blank when nothing on the wire says which',
   });
   /* 🔴 THE WINDOW'S OWN GLASS COMES OUT OF THE SAME SCHEME THE FIELDS DO, and
      that is why it is set from the module rather than declared in the
-     stylesheet. `:root`'s `--disp-back` is the BACKLIT colour, so a window
-     painted from the token would have been a dark blue pane behind grey green
-     digits: the page and the component disagreeing about which instrument this
-     is. One source, and the page asserts they still agree. */
-  win.style.setProperty('--disp-back', SCHEMES.reflective.back);
+     stylesheet. The two are the same colour again now that this page is back on
+     `backlit`, which is exactly when a second source stops being able to
+     disagree and starts looking correct by luck. It is still read from the
+     module, because the day this page changes scheme again is the day a token
+     would be wrong, and the page asserts the window and the fields match. */
+  win.style.setProperty('--disp-back', SCHEMES.backlit.back);
   /* The small field FIRST, because it is at the bottom left of the real window
      and the three large digits fill the right two thirds of it. */
   win.append(disp2.el, disp3.el);
@@ -754,8 +887,15 @@
    * layout that assumes a released wheel reports centre is asserting something
    * this instrument does not do.
    */
+  /* 🔴 `pitchbend`, ONE WORD. Asked 2026-09-21: *"pichbend single word"*, because
+     `PITCH BEND` wrapped to two lines under a 46 px wheel while `MODULATION`
+     beside it sat on one, so the pair read as two different kinds of label and
+     the two slot numbers under them ended up 12.34 px apart. One token cannot
+     be broken, so both labels are now one line and `C9` and `C10` land level.
+     See the label rule in the styles above for the width decision that goes
+     with it. */
   const bend = createFader({
-    label: 'pitch bend', sub: `C${BEND_SLOT}`, min: 0, max: 16383, value: 8192,
+    label: 'pitchbend', sub: `C${BEND_SLOT}`, min: 0, max: 16383, value: 8192,
     title: 'pitch bend, printed C9 on the panel. Seven bit in a fourteen bit '
          + 'message, and it was measured reaching 13952 rather than 16383',
     disabled: true,
@@ -887,6 +1027,23 @@
   });
   flow.append(keysBox);
 
+  /**
+   * 🔴 EVERY PRINTED LABEL ON THIS PANEL NAMES SOMETHING SWITCHED OFF, SO EVERY
+   * ONE OF THEM DIMS. Reported 2026-09-21: *"on dislable pad buttons make labels
+   * way lighter"*. The rule and the measurements are on `.pan-sub[data-off]`
+   * near the top of this file; this is the line that applies it.
+   * 🔴 **IT IS A SWEEP RATHER THAN SIX SEPARATE FLAGS BECAUSE THE PREMISE IS
+   * TRUE OF THE WHOLE PANEL, AND THE PREMISE IS ASSERTED.** MEASURED: 20 pads
+   * of 20, 8 rotaries of 8 and 2 wheels of 2 are disabled, because this page is
+   * a picture of somebody else's instrument and nothing on it is bound to
+   * anything. A page where some controls were live would have to mark only the
+   * labels naming the dead ones, so the check below refuses the day that
+   * becomes true here rather than letting these labels quietly start lying.
+   * ⚠️ THE NAMEPLATE IS NOT SWEPT and cannot be: `.pan-plate-l` is neither
+   * `.pan-sub` nor `.pan-cap`, because the make and the model name no control.
+   */
+  for (const lab of card.querySelectorAll('.pan-sub, .pan-cap')) lab.dataset.off = '1';
+
   // ── the MIDI event log ──────────────────────────────────────────────────
 
   /**
@@ -913,11 +1070,40 @@
   const knobCC = new Array(ROTARIES.length).fill(null);
   let flatSaid = false;
 
-  function paint() {
-    d.set('keys', notes || '');
-    d.set('velocity', vLo === null ? '' : vLo === vHi ? String(vLo) : `${vLo}-${vHi}`);
-    d.set('bend', bendRaw === null ? '' : bendRaw);
-    d.set('channel', chSeen.size ? [...chSeen].sort((a, b) => a - b).join(',') : '');
+  /**
+   * 🔴 THE CHANNEL, SAID ONCE, IN WORDS. This is where the readout's `channel`
+   * cell went when the row was removed on 2026-09-21 (*"rm keys / velocity /
+   * bend / channel in evo"*), and it had to go SOMEWHERE: deleting a display
+   * without rehoming what it said is how a page quietly stops reporting
+   * something, which is worse than reporting it badly.
+   * 🔴 **AND OF THE FOUR IT WAS THE ONLY ONE THAT NEEDED A NEW HOME.** The
+   * other three are already on screen twice over: the log lists every message
+   * with its channel, its raw bytes and a reading, so `keys` and `velocity` are
+   * in it row by row, and `bend` is the number under the wheel that just moved.
+   * The channel was the odd one out because the cell showed the SET of channels
+   * heard across the whole session, which is a fact about the instrument rather
+   * than about any one message, and no row can carry it.
+   * ⚠️ **IT IS WORTH A LINE BECAUSE THE ANSWER IS SURPRISING.** This keyboard's
+   * global channel was measured as 2 rather than 1, which is the kind of thing
+   * somebody rediscovers the hard way; `/bay/` carries a transform to
+   * compensate for it. A log line fires when something happened rather than on
+   * a clock, so it is the right surface for a fact that arrives once.
+   * 🔴 **AND IT IS THE OBSERVATION, NOT THE EXPECTATION, WHICH IS WHY IT IS NOT
+   * A SECOND COPY OF THE LINE THE PRESS ALREADY WRITES.** That one states what
+   * was MEASURED, out of `GLOBAL_CH`. This one states what is ARRIVING, out of
+   * the byte. Two independent sources, so they can disagree and say so, which
+   * is the repair this project took from the MIM corpus: two numbers derived
+   * from one field move together while being wrong.
+   */
+  const chSaid = new Set();
+  function sayChannel(ch) {
+    if (chSaid.has(ch)) return;
+    chSaid.add(ch);
+    const n = ch + 1;
+    d.log(n === GLOBAL_CH
+      ? `this keyboard is answering on channel ${n}, which is where it was measured`
+      : `this keyboard is answering on channel ${n}, and it was measured on `
+        + `${GLOBAL_CH}`, n === GLOBAL_CH ? undefined : 'warn');
   }
 
   function take(b) {
@@ -925,7 +1111,7 @@
     /* The log refuses a flood itself and says so by returning false, which
        is the one place that policy lives. */
     if (!traffic.add(m)) return;
-    if (m.ch !== null) chSeen.add(m.ch);
+    if (m.ch !== null) { chSeen.add(m.ch); sayChannel(m.ch); }
 
     if (m.kind === 'note on' || m.kind === 'note off') {
       /**
@@ -963,7 +1149,6 @@
       } else {
         kbd.lightNote(m.note, false);
       }
-      paint();
       return;
     }
 
@@ -975,7 +1160,6 @@
          value would also overflow a three digit field and show dashes, which
          would read as a fault rather than as a page declining to invent a
          reading. */
-      paint();
       return;
     }
 
@@ -1212,28 +1396,49 @@
 
     if (d.el.isConnected) {
       /**
-       * 🔴 BOTH FIELDS ARE THE REFLECTIVE KIND AND THE WINDOW THEY SIT IN
-       * AGREES. The failure this catches is a page and a component disagreeing
-       * about which instrument they are drawing: `:root`'s `--disp-back` is the
-       * BACKLIT dark blue, so a window painted from the token would be a blue
-       * pane behind grey green digits.
-       * ⚠️ THE COMPUTED BACKGROUND, AND THE EXPECTATION OUT OF `SCHEMES` RATHER
-       * THAN A HEX TYPED HERE. A check that names a colour is a second copy of
-       * the stylesheet and the two will disagree, which is why `/kit/`'s
-       * equivalent assert was rewritten today. Both ghost values moved twice in
-       * one afternoon.
+       * 🔴 BOTH FIELDS ARE THE BACKLIT KIND AND THE WINDOW THEY SIT IN AGREES.
+       * The failure this catches is a page and a component disagreeing about
+       * which instrument they are drawing, which is visible as a pane in one
+       * scheme's colour behind digits in the other's.
+       * ⚠️ IT SAID `reflective` UNTIL 2026-09-21 AND WAS RE-POINTED RATHER THAN
+       * DELETED, when the panel was put back on `backlit` on instruction. The
+       * claim worth keeping is that the page draws the display it says it draws;
+       * which of the two it is is a decision above this check.
+       * 🔴 **READ AS COMPUTED COLOUR AND AS A DIRECTION, NEVER AS A HEX.** A
+       * check that names a colour is a second copy of the stylesheet and the two
+       * will disagree: both ghost values moved twice in one afternoon and the
+       * blue came a long way down in the same day. So the ink and the glass are
+       * read off the rendered elements, the expectation is resolved from
+       * `SCHEMES` through the browser so a comparison is about colour rather
+       * than spelling, and the LAST clause is what makes it a display rather
+       * than two matching strings: a backlit panel's ink is lighter than its
+       * field, which is what the word means.
        */
-      const toRgb = (h) => {
-        const n = parseInt(h.slice(1), 16);
-        return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+      const resolve = (v) => {
+        const probe = el('span');
+        probe.style.color = v;
+        d.el.append(probe);
+        const out = getComputedStyle(probe).color;
+        probe.remove();
+        return out;
+      };
+      const lumOf = (css) => {
+        const [r, g, b] = css.match(/\d+/g).map(Number).map((c) => c / 255);
+        const f = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
       };
       const glass = getComputedStyle(win).backgroundColor;
-      d.assert('the display is the reflective kind, and its window agrees',
-        disp3.el.dataset.scheme === 'reflective'
-          && disp2.el.dataset.scheme === 'reflective'
-          && glass === toRgb(SCHEMES.reflective.back),
-        `${disp3.el.dataset.scheme}, glass ${glass} against `
-        + `${toRgb(SCHEMES.reflective.back)}`);
+      const inkSeen = getComputedStyle(disp3.el).color;
+      const wantInk = resolve(SCHEMES.backlit.ink);
+      const wantBack = resolve(SCHEMES.backlit.back);
+      const glows = lumOf(inkSeen) > lumOf(glass);
+      d.assert('the display is the backlit kind, its window agrees, and the ink is the lit half',
+        disp3.el.dataset.scheme === 'backlit'
+          && disp2.el.dataset.scheme === 'backlit'
+          && inkSeen === wantInk && resolve(glass) === wantBack && glows,
+        `${disp3.el.dataset.scheme} · ink ${inkSeen} against ${wantInk} · `
+        + `glass ${glass} against ${wantBack} · ink lum `
+        + `${lumOf(inkSeen).toFixed(3)} over field ${lumOf(glass).toFixed(3)}`);
 
       /* 🔴 EVERY LAYOUT CLAIM BELOW IS READ OFF A RENDERED RECT AND NOT OFF THE
          CODE THAT FILLED IT, because the defect this rebuild was handed was
@@ -1458,6 +1663,67 @@
         Math.abs(fh - sh) < 1.5, `${fh.toFixed(1)} px against ${sh.toFixed(1)}`);
 
       /**
+       * 🔴 AND THE DIVIDER REACHES THE CARD'S OWN EDGES, WHICH IS A DIFFERENT
+       * CLAIM FROM THE ONE ABOVE AND WAS FALSE WHILE THAT ONE PASSED. Asked
+       * 2026-09-21: *"evo border on right sticky panel should extend to top and
+       * bottom of the panel"*. The column was already the full height of the
+       * card's CONTENT box, which is what the assert above measures, and the
+       * card's own `padding: 20px` still sat between each end of the border and
+       * the card's visible edge. `column depth == strip depth` is exactly the
+       * kind of agreement that reads as done: both halves were right and both
+       * were inside the padding.
+       * 🔴 **BOTH ENDS, SEPARATELY.** Two alignments that look like one are two
+       * asserts: this project has measured a case where two of three lined up
+       * while the third was 30 px out, and another where two boxes matched
+       * perfectly while the faders inside them were 17 px apart. One assert on
+       * one end would pass while the other end was wrong, and a border short at
+       * the bottom only is exactly what a `padding-bottom` nobody cancelled
+       * looks like.
+       * ⚠️ AGAINST THE CARD'S INNER EDGE, meaning just inside its own 1 px
+       * border, because that is the line a reader sees as the edge of the panel.
+       */
+      const cardBox = card.getBoundingClientRect();
+      const cardCs = getComputedStyle(card);
+      const cardTopIn = cardBox.top + parseFloat(cardCs.borderTopWidth);
+      const cardBotIn = cardBox.bottom - parseFloat(cardCs.borderBottomWidth);
+      const colBox = fixed.getBoundingClientRect();
+      const overTop = colBox.top - cardTopIn;
+      const underBot = cardBotIn - colBox.bottom;
+      d.assert('the divider starts at the panel’s top edge',
+        Math.abs(overTop) < 1.5,
+        `${overTop.toFixed(2)} px of card between the two, card padding-top `
+        + `${cardCs.paddingTop}`);
+      d.assert('and it finishes at the panel’s bottom edge',
+        Math.abs(underBot) < 1.5,
+        `${underBot.toFixed(2)} px of card between the two, card padding-bottom `
+        + `${cardCs.paddingBottom}`);
+
+      /**
+       * 🔴 THE AIR ABOVE THE KEYBOARD, AND THAT IT IS THE CONTAINER'S. Asked
+       * 2026-09-21: *"more space on top of keyboard"*. All three of the
+       * quantities that make up this distance measured ZERO before the change:
+       * the row's foot (a 24 px label band its two-line names fill completely),
+       * the gap (a flex column with no `gap`), and the keyboard's head (the
+       * kit's `.kbd` margins are overridden to nothing in this file).
+       * ⚠️ **THE NEGATIVE HALF IS WHICH ONE MOVED**, and it is the point of the
+       * assert rather than a flourish. A margin on the keyboard would satisfy
+       * "there is air above the keys" and would be the page correcting for its
+       * container, which breaks the moment the container changes. So this
+       * requires the distance to equal the container's own `row-gap` AND both
+       * children to contribute no margin of their own.
+       */
+      const rowBox = row.getBoundingClientRect();
+      const keysBoxR = keysBox.getBoundingClientRect();
+      const air = keysBoxR.top - rowBox.bottom;
+      const flowGap = parseFloat(getComputedStyle(flow).rowGap);
+      const rowFoot = parseFloat(getComputedStyle(row).marginBottom);
+      const keysHead = parseFloat(getComputedStyle(keysBox).marginTop);
+      d.assert('the keys sit clear of the back strip, on the container’s own gap',
+        air > 8 && Math.abs(air - flowGap) < 1.5 && rowFoot === 0 && keysHead === 0,
+        `${air.toFixed(2)} px of air against a row-gap of ${flowGap} px · `
+        + `row margin-bottom ${rowFoot}, keys margin-top ${keysHead}`);
+
+      /**
        * 🔴 ONE SCROLLER ON THIS PAGE AND NOT TWO. `.keys` brings its own
        * `overflow-x: auto`, so a keyboard squeezed narrower than its keys
        * scrolls INSIDE the strip that is supposed to be scrolling it, and a
@@ -1506,11 +1772,23 @@
          already paid for once reading a pad's `el` instead of its `button`. */
       const keysR = keysBox.getBoundingClientRect();
       const wheelR = wheelRow.getBoundingClientRect();
-      const colFoot = fixed.getBoundingClientRect().bottom;
+      /* 🔴 THE COLUMN'S CONTENT BOTTOM, NOT ITS BOX BOTTOM, AND THIS ASSERT WENT
+         RED TEACHING THE DIFFERENCE. It read the box bottom, which was the same
+         line until the column took over the card's vertical inset so its right
+         border could reach the card's edges: after that the box ended 20 px
+         below the last control in it and this failed at `20.0 px behind the
+         column's foot` with nothing in the column changed. That is the standing
+         rule about measuring the working surface rather than the wrapper,
+         arriving one level up from the pad it was written about. The claim here
+         is that nothing is drawn BELOW the wheels, so the line to compare with
+         is where the column's content stops. */
+      const fixedCs = getComputedStyle(fixed);
+      const colFoot = fixed.getBoundingClientRect().bottom
+        - parseFloat(fixedCs.paddingBottom) - parseFloat(fixedCs.borderBottomWidth);
       d.assert('the wheels are left of the keys and nothing in their column is in front of them',
         wheelR.right <= keysR.left + 1 && colFoot - wheelR.bottom < 2,
         `${(keysR.left - wheelR.right).toFixed(1)} px left of the keys, `
-        + `${(colFoot - wheelR.bottom).toFixed(1)} px behind the column's foot`);
+        + `${(colFoot - wheelR.bottom).toFixed(1)} px behind the column's content foot`);
 
       /**
        * 🔴 AND THEY ARE CENTRED, WHICH IS TWO CENTRES ON THIS PANEL AND BOTH ARE
@@ -1524,7 +1802,13 @@
       const wc = wheelR.left + wheelR.width / 2;
       const kpr = keypadBox.getBoundingClientRect();
       const fixr = fixed.getBoundingClientRect();
-      const offCol = Math.abs(wc - (fixr.left + (fixr.width - bw - 16) / 2));
+      /* ⚠️ THE COLUMN'S RIGHT PADDING IS READ, NOT TYPED. It was a literal `16`
+         here, which is the same distance as `--pan-gap` in this page's styles:
+         one measurement in two places, which is the defect that cost this
+         project a row snapping back to the width of one word three reports
+         running. The computed value cannot disagree with the stylesheet. */
+      const colPadR = parseFloat(getComputedStyle(fixed).paddingRight);
+      const offCol = Math.abs(wc - (fixr.left + (fixr.width - bw - colPadR) / 2));
       const offPad = Math.abs(wc - (kpr.left + kpr.width / 2));
       d.assert('the wheels are centred in the column and under the keypad',
         offCol < 1.5 && offPad < 1.5,
@@ -1559,6 +1843,51 @@
         + `"${ink(minEl)}" ${botGap.toFixed(1)} px off both bottoms`);
 
       /**
+       * 🔴 BOTH WHEEL NAMES ARE ONE LINE, SO THEIR SLOT NUMBERS LAND LEVEL.
+       * Asked 2026-09-21: *"pichbend single word"*. `PITCH BEND` had a space to
+       * break at and `MODULATION` did not, so one name was two lines and the
+       * other one, and `C9` ended up **12.34 px below `C10`** on a pair of
+       * controls that are identical in every other respect.
+       * ⚠️ **THE SLOT NUMBERS ARE THE HALF WORTH ASSERTING**, because they are
+       * the visible consequence and they are downstream of the cause. A check
+       * that only counted lines would pass a future label that wraps somewhere
+       * this page does not look, and a check that only compared the two numbers
+       * would pass two names that both wrapped.
+       */
+      const wlabs = [...wheels.querySelectorAll('.pos-fdr-lab')];
+      const wsubs = [...wheels.querySelectorAll('.pos-fdr-sub')];
+      const lineOf = (e) => e.getBoundingClientRect().height
+        / parseFloat(getComputedStyle(e).lineHeight);
+      const lines = wlabs.map(lineOf);
+      const subSkew = Math.abs(wsubs[0].getBoundingClientRect().top
+        - wsubs[1].getBoundingClientRect().top);
+      d.assert('neither wheel’s name wraps, so both slot numbers sit on one line',
+        wlabs.length === 2 && wsubs.length === 2
+          && lines.every((n) => n < 1.5) && subSkew < 1.5,
+        `${wlabs.map((e, i) => `"${e.textContent.trim()}" ${lines[i].toFixed(2)} line(s)`).join(', ')}`
+        + ` · slot numbers ${subSkew.toFixed(2)} px apart`);
+
+      /**
+       * 🔴 AND THE WIDTH DECISION IS ASSERTED RATHER THAN ASSUMED, because the
+       * names are deliberately allowed to overflow their wheels and that is only
+       * safe while they do not touch. Both are wider than the 46 px control
+       * under them, which is what the real panel prints; the clearance between
+       * them is the whole reason `overflow: visible` is the right answer here
+       * rather than a cut.
+       */
+      const lr = wlabs.map((e) => {
+        const r = e.getBoundingClientRect();
+        const w = e.scrollWidth;
+        const mid = r.left + r.width / 2;
+        return { lo: mid - w / 2, hi: mid + w / 2, w, box: r.width };
+      }).sort((a, b) => a.lo - b.lo);
+      const clear = lr[1].lo - lr[0].hi;
+      d.assert('both names are wider than their wheels and still do not touch',
+        lr.every((x) => x.w > x.box) && clear > 4,
+        `${lr.map((x) => `${x.w} px of name in a ${x.box} px box`).join(', ')} · `
+        + `${clear.toFixed(1)} px of clear air between them`);
+
+      /**
        * ⚠️ AND NOTHING ON THE PANEL IS CUT WITH AN ELLIPSIS, which this project
        * treats as the signal that a word is in the wrong place rather than as a
        * way of fitting it. `PITCH …` and `MODULA…` were both photographed on the
@@ -1579,6 +1908,125 @@
       d.assert('no name on the panel is cut short',
         cut.length === 0, cut.length ? `cut: ${cut.join(', ')}` : 'nothing truncated');
 
+      /**
+       * 🔴 EVERY PRINTED NAME ON THIS DEAD PANEL IS DIM, MEASURED AS CONTRAST
+       * AND NOT AS A CLASS NAME. Reported 2026-09-21: *"on dislable pad buttons
+       * make labels way lighter"*, because the names were the brightest thing in
+       * a set of controls nobody can press.
+       * 🔴 **READ AS EFFECTIVE INK, WHICH IS THE ONLY HONEST READING.** A
+       * label's own `color` says nothing about what a reader sees: the opacity
+       * of every ancestor multiplies down onto it, and these names sit inside a
+       * card, sometimes inside a group with a different background. So this
+       * walks the tree for the accumulated alpha, composites over the real
+       * ground, and computes a ratio. A check reading `color` would have passed
+       * the whole time.
+       * 🔴 **A CEILING AND A FLOOR, BECAUSE ONLY ONE OF THEM IS THE BUG THAT WAS
+       * REPORTED AND BOTH ARE FAILURES.** The ceiling catches the dimming being
+       * removed: before the change these ran **3.56 to 5.91:1** and the lowest
+       * of them would fail a 3.0 ceiling, so the bound discriminates rather than
+       * merely passing. The floor catches over-correcting, which the ask itself
+       * warns about: text at the BUTTON's own .38 of `--dim2` measures 1.56:1
+       * and has stopped being a label. Something a reader cannot read at all no
+       * longer says what it is.
+       * ⚠️ AND THE NAMEPLATE IS THE NEGATIVE CONTROL, ASSERTED SEPARATELY BELOW.
+       * A check that pushed everything down would pass "the labels are dim" and
+       * would have taken the make and model down with them.
+       */
+      const alphaOf = (e) => {
+        let a = 1, n = e;
+        while (n && n !== document.documentElement) {
+          a *= parseFloat(getComputedStyle(n).opacity) || 0;
+          n = n.parentElement;
+        }
+        return a;
+      };
+      const groundOf = (e) => {
+        let n = e;
+        while (n) {
+          const c = getComputedStyle(n).backgroundColor.match(/[\d.]+/g);
+          if (c && (c.length < 4 || Number(c[3]) > 0.9)) return c.slice(0, 3).map(Number);
+          n = n.parentElement;
+        }
+        return [11, 14, 20];
+      };
+      const relLum = ([r, g, b]) => {
+        const f = (c) => (c / 255 <= 0.03928 ? c / 255 / 12.92 : ((c / 255 + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      const seenRatio = (e) => {
+        const fg = getComputedStyle(e).color.match(/[\d.]+/g).slice(0, 3).map(Number);
+        const bg = groundOf(e);
+        const a = alphaOf(e);
+        const mix = fg.map((v, i) => v * a + bg[i] * (1 - a));
+        const [hi, lo] = [relLum(mix), relLum(bg)].sort((m, n) => n - m);
+        return (hi + 0.05) / (lo + 0.05);
+      };
+      const dimmedNames = [...card.querySelectorAll('.pan-sub, .pan-cap')]
+        .filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
+        .map((e) => ({ t: e.textContent.replace(/\s+/g, ' ').trim().slice(0, 16),
+                       r: seenRatio(e) }));
+      const loudest = dimmedNames.reduce((a, b) => (b.r > a.r ? b : a), dimmedNames[0]);
+      const faintest = dimmedNames.reduce((a, b) => (b.r < a.r ? b : a), dimmedNames[0]);
+      d.assert('every printed name on the panel is dimmed with the controls it names',
+        dimmedNames.length >= 6 && loudest.r < 3 && faintest.r > 1.5,
+        `${dimmedNames.length} names, "${loudest.t}" loudest at ${loudest.r.toFixed(2)}:1, `
+        + `"${faintest.t}" faintest at ${faintest.r.toFixed(2)}:1`);
+
+      /* ⚠️ THE NEGATIVE CONTROL. The make and the model name no control, they are
+         true whether or not anything is plugged in, and a sweep that dimmed
+         every word on the card would have taken them too. */
+      const plateEl = card.querySelector('.pan-plate-l');
+      const plateR = seenRatio(plateEl);
+      d.assert('NEGATIVE CONTROL: the nameplate names no control and is not dimmed',
+        plateR > 3 && !plateEl.hasAttribute('data-off'),
+        `"${plateEl.textContent.trim()}" at ${plateR.toFixed(2)}:1, `
+        + `against ${loudest.r.toFixed(2)}:1 for the loudest printed name`);
+
+      /**
+       * 🔴 AND NOTHING ON THIS PANEL SHOWS THE REFUSAL CURSOR. Asked 2026-09-21:
+       * *"rm disable cursor o ndisabled knobs/padbuttins, just use regular.
+       * noniteractive cursor"*. `not-allowed` says *you tried to use this and
+       * were refused*, and nothing here is refusing anybody: the page's own
+       * header says the keys are a picture rather than a control surface,
+       * because a key that lit when you pressed it would be claiming something
+       * happened somewhere. A refusal cursor on a picture is the interface
+       * apologising for a press that was never on offer.
+       * ⚠️ ALL THREE KINDS, because the rule lives in three separate
+       * declarations in `shell.css` and a sweep that missed one would leave the
+       * fader lane refusing while the pads did not.
+       */
+      const cursors = {
+        pad: getComputedStyle(card.querySelector('.pos-pad:disabled')).cursor,
+        dial: getComputedStyle(card.querySelector('.pos-knob[data-off] .pos-knob-dial')).cursor,
+        lane: getComputedStyle(card.querySelector('.pos-fdr[data-off] .pos-fdr-lane')).cursor,
+      };
+      d.assert('no control on this panel wears the refusal cursor',
+        Object.values(cursors).every((c) => c === 'default'),
+        Object.entries(cursors).map(([k, v]) => `${k} ${v}`).join(', '));
+
+      /**
+       * 🔴 THIS PAGE DECLARES NO READOUT AND DRAWS NO EMPTY BOX WHERE ONE WOULD
+       * HAVE BEEN. Asked 2026-09-21: *"rm keys / velocity / bend / channel in
+       * evo"*, which is all four cells.
+       * 🔴 **MEASURED RATHER THAN TRUSTED, BECAUSE THE FAILURE IS RECORDED.**
+       * `/typist/` declared `readout: null` and still got a `.pos-readout` div
+       * with no children, whose own 1 px top and bottom borders rendered as a
+       * **2 px full width band 24 px above the controls**: a horizontal rule
+       * nobody wrote, reported as *"old UI creeping in"*. The shell hides an
+       * empty readout now, and *"the shell handles it"* is exactly the kind of
+       * sentence this project keeps finding has outlived its own truth.
+       * ⚠️ IT ACCEPTS EITHER SHAPE. Whether the shell omits the element or hides
+       * it is the shell's business; what this page needs is that nothing paints
+       * an edge where the row used to be, so the test is on the rendered height.
+       */
+      const ro = d.el.parentElement.querySelector('.pos-readout')
+        || document.querySelector('.pos-readout');
+      const roH = ro ? ro.getBoundingClientRect().height : 0;
+      d.assert('no readout, and no empty box painting an edge where it was',
+        __demo.readoutOptOut === true && roH === 0,
+        ro ? `a .pos-readout is present and ${roH} px tall, hidden ${ro.hasAttribute('hidden')}`
+           : 'no .pos-readout element at all');
+
       /* The panel scrolls in its own box, never the document. Measured on this
          project at 390 px as 141 px of page overflow when it does not. */
       d.assert('the panel scrolls sideways inside its own box, not the page',
@@ -1589,6 +2037,5 @@
     d.assert('no secret in this page', !location.href.includes('token'));
   });
 
-  paint();
   d.ready();
 </script>
