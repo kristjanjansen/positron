@@ -112,6 +112,26 @@ the session count, check one patch is 350 bytes. Fewer WAVs than sample rows is
 normal rather than damage. `plans/plan-circuit-patches.md` has the whole
 procedure and the list of what destroys patches.
 
+🔴 **AND SINCE 2026-09-21 THERE ARE THREE PACKS ON THIS MACHINE THAT ALL DISPLAY
+AS `*New Pack`, AND TWO OF THEM WOULD ERASE THE SESSIONS.** A purchased
+soundbank in `purchased/` carries two `.circuitpack` files whose 32 session
+files are **blanks**, measured rather than inferred from their names: **1
+distinct fingerprint of 32**, entropy **0.01 bits a byte**, **0.1 per cent
+non-zero**, first four bytes `INIT` against the owner's `DEMO`, and an empty
+`name` in all 32. The owner's own pack is 32 distinct of 32 with none empty.
+🔴 **THE VENDOR'S INSTALL NOTE SAYS TO PRESS `Send to Circuit`**, which is one
+of the three operations listed above that replace the instrument's contents on a
+box with no factory reset. So the safe pack and the two that would wipe 32
+real sessions are three identically labelled rows in Components.
+⚠️ **READ THE `name` IN `index.json` BEFORE SENDING ANYTHING**, because the file
+name and the displayed name are both `New Pack` and neither tells them apart.
+⚠️ Whether that transfer really writes session slots is INFERENCE and is marked
+as such in `research/circuit-soundbank-2026-09-21.md`. The only way to confirm
+it costs the sessions if the answer is yes.
+✅ **THE 128 LOOSE `.syx` FILES ARE SAFE**: byte 6 is `00` on every one, which is
+`Replace Current Patch` and lands in RAM. Not one flash-writing `Replace Patch`
+exists in the archive.
+
 ## Run and check
 
 ```sh
