@@ -70,7 +70,14 @@
   comment already said that is there so a reader never has to take the verdict's
   word for it. What is gone is the conclusion, not the measurement.
 
-- **`ok sampler pack is there. glue the trasport to top of table`**. A transport
+- **`move sample player below table, add loop`**. ⚠️ **THIS SUPERSEDES THE LINE
+  BELOW**, which asked for the transport glued to the TOP of the table. Below,
+  and with a loop.
+
+- ~~**`ok sampler pack is there. glue the trasport to top of table`**~~
+  Superseded by the line above before it was built. Kept because the glue half
+  still stands: the player and the table are one component, the ask that changed
+  is which end. A transport
   bar glued to the TOP of the samples table, one component rather than two
   blocks. `createGlue` takes a rest parameter and `/wish/` proved three parts
   work, so the shape exists.
