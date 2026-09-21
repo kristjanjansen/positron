@@ -68,6 +68,48 @@ ok('they split 52 synth, 28 drum, 18 session',
   ok('all four drums have a level on channel 10', drums);
 }
 
+// ── the section column, after 28 rows of it were a heading off page 9 ──────
+
+{
+  /* 🔴 ALL 28 DRUM ROWS READ `song select` UNTIL 2026-09-21. `circuit-cc.mjs`'s
+     header carries the measurement; the short version is that the Drum Control
+     table on page 10 has no `Section` column, so a parse carrying the last
+     section forward was still holding the foot of page 9.
+     ⚠️ AND THIS ASSERT IS A DOCUMENT CLAIM RATHER THAN A MEASUREMENT, which is
+     unlike every assert above it and is worth saying out loud. This desk has
+     never measured a drum control change at all: `measured-devices-2026-09-20.md`
+     has channel 10 as notes 60, 62 and 64 at a fixed velocity of 96 and nothing
+     more, so there is no second source to hold the drums' section against. */
+  const secs = sections('10');
+  ok('the 28 drum parameters sit under one section, and it is the table they came out of',
+    secs.length === 1 && secs[0] === 'Drum Control'
+      && onChannel('10').every((p) => p.sec === 'Drum Control'),
+    secs.join(', '));
+}
+
+{
+  /* 🔴 A NEGATIVE CONTROL FOR THE WHOLE COLUMN RATHER THAN FOR THE DRUMS. What
+     failed was a heading from a NEIGHBOURING table leaking in, so the guard is
+     the things that sit beside the parameter tables and are not sections: the
+     reference's Supported Realtime and Supported System Common message names.
+     Put `song select` back on any one row and this goes red. */
+  const NOT_SECTIONS = ['song select', 'song position pointer', 'start', 'stop',
+    'continue', 'timing clock'];
+  const leaked = CIRCUIT_CC.filter((p) => NOT_SECTIONS.includes(p.sec.toLowerCase()));
+  ok('no section is a MIDI message name off a neighbouring table',
+    leaked.length === 0,
+    leaked.length ? leaked.map((p) => `${p.ch}: ${p.sec}`).join(', ') : `none of ${NOT_SECTIONS.length} checked`);
+
+  /* ⚠️ AND THE CHEAPER TELL, WHICH WAS ON SCREEN FOR A DAY BEFORE ANYBODY
+     OPENED THE PDF. The reference sets every `Section` cell in Title Case and
+     every message name in lower case, so a lower case section is a value that
+     came from somewhere other than the Section column. */
+  const lower = CIRCUIT_CC.filter((p) => p.sec[0] !== p.sec[0].toUpperCase());
+  ok('every section is Title Case, the way the reference prints that column',
+    lower.length === 0,
+    lower.length ? lower[0].sec : `${new Set(CIRCUIT_CC.map((p) => p.sec)).size} distinct sections`);
+}
+
 // ── the bytes ──────────────────────────────────────────────────────────────
 
 {
