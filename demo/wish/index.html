@@ -24,7 +24,11 @@
     font-family: inherit; font-size: 15px; line-height: 1.45;
   }
   .wish-patch {
-    min-height: 62px; white-space: pre; padding: 10px 12px;
+    /* `pre-wrap` and not `pre`: a long object wraps instead of running off the
+       right edge, and what was off the edge was the evidence. It changes height
+       when an answer lands, which is a human-paced change rather than a clock,
+       and is the case the no-twitch rule explicitly allows. */
+    min-height: 62px; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px 12px;
     border: 1px solid var(--line); border-radius: 4px; background: var(--card);
     font: 12px/1.6 var(--mono, ui-monospace, monospace); color: var(--ink);
   }
@@ -422,7 +426,13 @@
    */
   function show(links) {
     const g = grade(links);
-    patch.textContent = links.length ? links.map((l) => JSON.stringify(l)).join('\n') : EMPTY_PATCH;
+    /* 🔴 INDENTED, AND WRAPPED RATHER THAN CLIPPED. Asked as *"indent json"*,
+       and the clipping was the more serious half: a screenshot showed the line
+       cut at `"op":"trans` , which is one character before the `"to": 1` that
+       the whole JSON exists to reveal. The compact form hid that argument by
+       omitting it; the one-line form hid it by running off the edge. */
+    patch.textContent = links.length
+      ? links.map((l) => JSON.stringify(l, null, 2)).join('\n') : EMPTY_PATCH;
     whyBox.replaceChildren(...g.rows.map((r) => {
       const e = el('div', 'wish-why');
       e.append(el(r.ok ? 'i' : 'b', '', r.ok ? 'allowed' : 'refused'),
@@ -451,18 +461,37 @@
    * ⚠️ AND THE READOUT GOES BACK TO EMPTY, never to `0`, which would read as a
    * very confident measurement of nothing.
    */
+  /**
+   * 🔴 NOTHING IS DRAWN UNTIL THERE IS A MAPPING, AND THE ROOM IS STILL
+   * RESERVED. Asked 2026-09-21: *"do not show diagram until we have mapping"*,
+   * after *"make it json and autodraw diagram below (reserve space for it)"*.
+   * Those two pull in opposite directions only if *show* and *reserve* are
+   * treated as one thing. They are not: the height is held from the first paint
+   * so an answer landing after a two model round trip cannot shove the log down
+   * the page, and the picture itself appears when there is something to draw.
+   * ⚠️ AND AN EMPTY BOX MUST NOT PAINT ITS EDGES, which is a standing rule here
+   * ("separation is spacing, not lines, AND AN EMPTY BOX IS A LINE"), measured
+   * once on `/typist/` where a page declaring `readout: null` still got a div
+   * whose own borders rendered as a 2 px band nobody had written. `.wish-dg`
+   * carries no border and no background, so the reserved room is invisible
+   * until it holds a picture.
+   * ⚠️ A DESK WITH NO ARROWS IS NOT A MAPPING. The old behaviour drew all three
+   * instruments from the first paint, which reads as an answer: three boxes and
+   * nothing joining them is a picture saying *these do not connect*, which is a
+   * claim nobody made.
+   */
   function clearAnswer() {
     patch.textContent = NO_PATCH;
     whyBox.replaceChildren();
     d.set('links', '');
     d.set('refused', '');
     dg?.destroy();
-    dg = createDiagram(dgHost, { caption: DG_CAPTION, nodes: INSTRUMENTS, links: [] });
+    dg = null;
+    dgHost.replaceChildren();
   }
   function clearAll() { said.value = ''; clearAnswer(); }
 
-  /* The desk is on screen from the first paint, so the room the picture needs
-     is taken before anybody presses anything. */
+  /* The room is taken before anybody presses anything; the picture is not. */
   clearAnswer();
 
   // ── the two calls ────────────────────────────────────────────────────────
@@ -483,6 +512,13 @@
    * cost an hour. The agent's own message is the agent's message.
    */
   async function post(path, body) {
+    /* 🔴 A SUITE RUN ASKS NOBODY AND SPENDS NOTHING, AND `reached` IS NOT BUMPED
+       BECAUSE NOTHING WAS REACHED. The counter is the page's audit of whether a
+       visit opened anything, so counting a call that never left the tab would
+       make the one assert about it read false. */
+    if (SELFCHECK && path === '/wish') {
+      return { links: CANNED, ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+    }
     reached++;
     let r;
     try {
@@ -525,18 +561,35 @@
    *  microphone has something to press. */
   const EXAMPLE = 'Connect the keyboard to the circuit and transpose it up one semitone.';
 
-  d.on('example', () => {
-    /* 🔴 IT WRITES AND IT ASKS NOBODY, so the harness may press it for real and
-       it costs the account nothing. `Ask` is the control that spends money, and
-       putting the sentence in the same box the microphone fills is what item
-       eight of the report asked for: one destination rather than two. */
+  /**
+   * 🔴 THE REPLY THE REAL MODEL GAVE, AND IT IS THE GATE FOR A SUITE RUN.
+   * MEASURED 2026-09-21 through `demo/wish-local.mjs` against
+   * `@cf/meta/llama-3.3-70b-instruct-fp8-fast`: the ports were right and the
+   * transform's argument was under the wrong key. A check written against an
+   * invented reply would have missed the only interesting thing that happened.
+   * 🔴 AND IT IS WHY `Use the example` MAY ASK. Reported 2026-09-21: *"i do not
+   * get why you own example does not work. use example shoyld ask"*. The button
+   * used to write into the box and ask nobody, so the harness could press it
+   * for nothing; but a button called *use the example* that does not use it is
+   * the shape of control this project calls a lie. **THE GATE BELONGS ON THE
+   * NETWORK, NOT ON THE BUTTON**, which is `/shape/`'s `sink` exactly: a suite
+   * run must not be a hand on somebody's paid account, and the way to arrange
+   * that is for the call to reach a stand-in rather than for the control to do
+   * nothing.
+   */
+  const CANNED = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+    transforms: [{ op: 'transpose', to: 1 }] }];
+
+  d.on('example', async () => {
+    /* It writes into the same box the microphone fills, which is one
+       destination rather than two, AND THEN IT ASKS. See `CANNED` for why that
+       is free under a suite run. */
     said.value = EXAMPLE;
     clearAnswer();
-    d.log('the example is in the box, so press Ask to send it');
+    try { await think(EXAMPLE); } catch (e) { blame(e); }
   });
 
   d.on('ask', async () => {
-    if (SELFCHECK) return;
     const text = said.value.trim();
     if (!text) { d.log('there is nothing in the box to ask about'); return; }
     try { await think(text); } catch (e) { blame(e); }
@@ -755,9 +808,7 @@
      * an invented reply would have missed the only interesting thing that
      * happened.**
      */
-    const REAL = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
-      transforms: [{ op: 'transpose', to: 1 }] }];
-    const g = show(REAL);
+    const g = show(CANNED);
 
     /* 🔴 A COUNTER, NOT A CLAIM. This read `SELFCHECK ? true : true` and could
        not go red whatever the page did, which is an assert that reports the
@@ -786,7 +837,8 @@
        throws does not go red, it goes missing. */
     const asObject = (() => { try { return JSON.parse(patch.textContent); } catch { return null; } })();
     d.assert('the box shows the whole object, including the argument that was refused',
-      patch.textContent.split('\n').length === 1 && asObject?.transforms?.[0]?.to === 1,
+      patch.textContent.split('\n').length > 1 && /\n  "/.test(patch.textContent)
+      && asObject?.transforms?.[0]?.to === 1,
       patch.textContent.slice(0, 110));
 
     /* ⚠️ THE NEGATIVE CONTROL FOR THE SLICE, and it is the only thing that makes
@@ -853,7 +905,7 @@
     });
 
     show([]); look('nothing proposed');
-    const g4 = show(REAL); look('one refused link');
+    const g4 = show(CANNED); look('one refused link');
     show(FIXED); look('one allowed link');
 
     d.assert('the picture drew every name and every arrow whole, in every state',
@@ -937,7 +989,7 @@
        reply lands leaves exactly the window that causes the problem, which is
        the recording plus both model calls. The readout goes to empty and never
        to `0`. */
-    show(REAL);
+    show(CANNED);
     said.value = EXAMPLE;
     const before = [patch.textContent, whyBox.textContent, said.value,
       d.el.isConnected ? arrows() : 1].join('|');
