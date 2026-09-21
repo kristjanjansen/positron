@@ -17,10 +17,6 @@
      reserved a picture's room with `min-height` and MEASURED the host at 0 px
      and `display: none`, beaten by `.pos-stack > div:empty { display: none }` at
      (0,2,1). A box with words in it cannot lose that fight. */
-  /* 🔴 RESERVED, NOT COLLAPSED, so opening a file fills room that was already
-     there instead of shoving the drop area up the page. */
-  .pk-hold { min-height: 460px; }
-  .pk-hold[data-empty] > * { display: none; }
   .pk-verdict { font: 500 13px/1.5 var(--mono); color: var(--dim);
                 border-left: 2px solid var(--line2); padding: 2px 0 2px 12px;
                 min-height: 1.5em; margin-top: 14px; }
@@ -106,13 +102,7 @@
      * so the verdict is now the only place either number appears.
      */
     readout: null,
-    /**
-     * 🔴 NO CONTROLS. Asked 2026-09-21 as *"rm 'open the pack here' only dashed
-     * area is file drop target"*. Two ways in saying the same thing is the
-     * `"diffetence"` report this page already answered once by making the area
-     * visible; with a real area on the page, the second control is the one to go.
-     */
-    controls: [],
+    controls: [{ id: 'here', label: 'open the pack here', primary: true }],
   });
 
   const stack = createStack();
@@ -129,8 +119,7 @@
   // 1 `.circuittrackspack`, 128 `.syx`, an `.xlsx`, two `.txt` and 10 `.url`.
   const drop = createDrop({
     accept: ['.circuitpack', '.circuittrackspack', '.zip', '.syx', '.circuitsession'],
-    title: 'UPLOAD',
-    label: 'browse files',
+    label: 'open a pack from this machine',
     hint: 'drop a pack or a session anywhere on this page',
     says: (m, kind) => d.log(m, kind),
     onOpen: (files) => openFiles(files),
@@ -165,19 +154,7 @@
     { id: 'samples', label: 'SAMPLES' },
   ];
   const tabs = createTabs({ tabs: TABS });
-  /**
-   * 🔴 NOTHING BUT THE WAY IN UNTIL SOMETHING IS OPEN. Asked 2026-09-21 as *"rm
-   * tabs and contents when no patches yet"* and *"rm how it works when no
-   * patches"*. Three empty tables, a verdict about no pack and a diagram
-   * explaining a file nobody has opened are five things that say nothing.
-   * ⚠️ AND THE ROOM IS RESERVED RATHER THAN COLLAPSED, asked as *"reserve empty
-   * space"*: a page that grows 460 px the instant a file lands throws the drop
-   * area up under the reader's own cursor.
-   */
-  const hold = el('div', 'pk-hold');
-  hold.dataset.empty = '1';
-  hold.append(tabs.el);
-  stack.add(hold);
+  stack.add(tabs.el);
   const panel = (id) => tabs.panel(id);
 
   /**
@@ -189,7 +166,7 @@
   function countTabs(n) {
     TABS.forEach((t, i) => {
       const c = n[t.id];
-      tabs.buttons[i].textContent = c ? `${c} ${t.label}` : t.label;
+      tabs.buttons[i].textContent = c ? `${t.label} ${c}` : t.label;
     });
   }
 
@@ -760,10 +737,6 @@
       hover: `${w.rate} Hz, ${w.bits} bit, ${w.ch === 1 ? 'mono' : `${w.ch} channels`}. Press to hear it`,
     })));
 
-    // 🔴 THE MOMENT THERE IS SOMETHING TO READ, AND NOT BEFORE. A file that
-    // opened and yielded nothing leaves the page as it was.
-    if (patches.length || sessions.length || samples.length) delete hold.dataset.empty;
-    else hold.dataset.empty = '1';
     countTabs({ patches: patches.length, sessions: sessions.length, samples: samples.length });
     const distinct = new Set(stats.map((s) => s.fingerprint)).size;
     sayVerdict(stats, distinct);
@@ -913,9 +886,7 @@
     const box = drop.el.getBoundingClientRect();
     d.assert('the way in is visible at rest and says what it takes, including a zip',
       box.width > 200 && box.height > 40 && /\.zip/.test(drop.el.textContent)
-      // ⚠️ `area`, NOT `el`: `el` is the wrapper now and never carries
-      // `data-over`, so reading it here would pass whatever the component did.
-      && !drop.area.dataset.over && drop.cover.isConnected === false,
+      && !drop.el.dataset.over && drop.cover.isConnected === false,
       `${box.width.toFixed(0)} by ${box.height.toFixed(0)} px`);
   }
 
@@ -930,24 +901,12 @@
    * carries the reference default, so pressing a row changes the words and not
    * the height, and nothing under the picture moves.
    */
-  /**
-   * 🔴 THIS ASSERT GUARANTEED THE OPPOSITE AND WAS RIGHT TO GO RED. It read
-   * *"the picture is drawn at its full size before any pack is open"*, which was
-   * the old promise: show everything at rest so nothing moves later. The promise
-   * changed on 2026-09-21 to *"rm tabs and contents when no patches yet"* plus
-   * *"reserve empty space"*, so what is guaranteed now is that NOTHING is shown
-   * and the ROOM is held anyway.
-   * ⚠️ REWRITTEN RATHER THAN DELETED, because both promises exist to prevent the
-   * same thing: the page changing height under somebody's cursor.
-   */
   let restHeight = 0;
   {
-    restHeight = +hold.getBoundingClientRect().height.toFixed(1);
-    const shown = tabs.el.getBoundingClientRect().height;
-    d.assert('nothing is shown before a pack is open, and the room for it is reserved anyway',
-      hold.dataset.empty === '1' && shown === 0 && restHeight >= 460
-      && dgSpec.nodes.every((n) => n.sub && n.sub.length > 0),
-      `${restHeight} px reserved, ${shown} px shown, all ${dgSpec.nodes.length} boxes carrying a default`);
+    restHeight = +dg.el.getBoundingClientRect().height.toFixed(1);
+    d.assert('the picture is drawn at its full size before any pack is open, so nothing moves later',
+      restHeight > 60 && dgSpec.nodes.every((n) => n.sub && n.sub.length > 0),
+      `${restHeight} px tall with all ${dgSpec.nodes.length} boxes carrying a default`);
   }
 
   d.assert('every tab keeps its bare word until it has something to count',
@@ -974,28 +933,19 @@
         patches.length === 64 && sessions.length === 32 && samples.length === 64,
         `${patches.length} / ${sessions.length} / ${samples.length}`);
 
-      d.assert('and the counts lead the tab titles',
-        tabs.buttons.map((b) => b.textContent).join(' ') === '64 PATCHES 32 SESSIONS 64 SAMPLES',
+      d.assert('and the counts are in the tab titles',
+        tabs.buttons.map((b) => b.textContent).join(' ') === 'PATCHES 64 SESSIONS 32 SAMPLES 64',
         tabs.buttons.map((b) => b.textContent).join(' '));
 
       d.assert('every patch in it lands in RAM rather than in flash',
         patches.every((p) => !p.writesFlash),
         `${patches.filter((p) => p.writesFlash).length} of ${patches.length} would write flash`);
 
-      /**
-       * 🔴 THE EXPLANATION FITS THE ROOM THAT WAS ALREADY THERE, which is what
-       * the reservation buys and the only part a check can see. A reservation
-       * smaller than the thing it reserves for is not a reservation, it is a
-       * smaller jump.
-       * ⚠️ IT CANNOT PROMISE THE TABLES FIT TOO. Three tables of a real pack are
-       * taller than any fixed box, so the page does grow below this point, and
-       * saying otherwise would be a claim nothing measured.
-       */
-      const grown = +dg.el.getBoundingClientRect().height.toFixed(1);
-      d.assert('the picture that appeared fits inside the room reserved for it',
-        grown > 60 && grown <= restHeight, `${grown} px into ${restHeight} px reserved`);
-      d.assert('and the tabs are showing now that there is something in them',
-        !hold.dataset.empty && tabs.el.getBoundingClientRect().height > 0);
+      // 🔴 THE PICTURE DID NOT CHANGE HEIGHT WHEN IT FILLED, which is the whole
+      // of the reservation and the only part of it a check can see.
+      d.assert('opening a pack did not move the picture, because its room was already reserved',
+        Math.abs(dg.el.getBoundingClientRect().height - restHeight) < 1,
+        `${dg.el.getBoundingClientRect().height.toFixed(1)} px against ${restHeight} at rest`);
 
       const distinct = new Set(sessions.map((s) => s.fingerprint)).size;
       d.assert('the sessions are all different from each other, so this is a backup',
