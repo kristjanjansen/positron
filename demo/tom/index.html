@@ -722,7 +722,7 @@
    * which is the cost this session has now paid twice over.
    */
   const bar = createTransportBar(d.el, deck,
-    { scrub: false, loop: false, right: [tempo.el] });
+    { scrub: false, loop: false, right: [tempo.el], verb: 'stop' });
 
   /**
    * 🔴 THE SECOND PRESS STOPS RATHER THAN PAUSING. Asked 2026-09-21: *"replace
@@ -1625,6 +1625,30 @@
       && erased.join() === '0,0,0,0',
       `drew ${drew.join('')} then ${afterUp} after the release, `
       + `and a stroke starting on a lit pad left ${erased.join('')}`);
+  }
+
+  /**
+   * 🔴 THE FACE SAYS WHAT THE SECOND PRESS DOES, which is the whole of
+   * *"replace pause icon with stop icon"* and is the half that can go quietly
+   * wrong: the behaviour changed this evening and a `❚❚` over it would have
+   * been a control describing a verb it does not perform.
+   * ⚠️ READ OFF THE COMPUTED `content` OF THE PSEUDO ELEMENT, not off a class.
+   * A class is the page's intent; the glyph is what a reader sees, and the two
+   * part company the day a stylesheet rule loses to another one. This project
+   * has measured five dead CSS rules that read as correct.
+   */
+  if (SELFCHECK) {
+    const tog = bar.el.querySelector('.tbar-toggle');
+    const face = () => getComputedStyle(tog, '::before').content;
+    const resting = face();
+    tog.dataset.state = 'playing';
+    const running = face();
+    delete tog.dataset.state;
+    d.assert('the transport shows play at rest and a STOP square while it runs, never a pause',
+      /\u25B6|\u25BA/.test(resting) && running.includes('\u25A0')
+      && !running.includes('\u275A') && tog.getAttribute('aria-label') === 'play/stop',
+      `${resting} at rest, ${running} while playing, announced as `
+      + `"${tog.getAttribute('aria-label')}"`);
   }
 
   d.assert('the strip is what scrolls when the steps do not fit, and the page never drags sideways',

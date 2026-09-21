@@ -328,9 +328,28 @@ export function createTransportBar(host, deck, {
       + ` (got ${JSON.stringify(verb)})`);
   }
   const RECORD = verb === 'record';
-  const toggle = el('button', `tbar-toggle${RECORD ? ' tbar-rec' : ''}${WORDS ? ' tbar-word' : ''}`, '',
+  /**
+   * 🔴 `verb: 'stop'` IS THE THIRD FACE AND IT SAYS WHAT THE SECOND PRESS DOES.
+   * Asked for on `/tom/` 2026-09-21: *"replace pause icon with stop icon"*,
+   * after that page's second press was made to STOP and rewind rather than
+   * pause. A `❚❚` over a control that returns the playhead to the top is the
+   * shape this project calls a lie: a face describing a verb the button does
+   * not perform.
+   * ⚠️ IT IS A CLASS AND AN ARIA LABEL, NOTHING ELSE. The element, its
+   * `.tbar-toggle` class, its `data-state` and everything that presses it are
+   * untouched, so `verify.mjs`'s play drill and every page holding a bar keep
+   * working. That is the same argument `verb: 'record'` already makes above.
+   * ⚠️ AND THE GLYPH IS `■`, U+25A0, WHICH HAS NO EMOJI FORM. `positron-ui`
+   * records that `⏹` and its neighbours default to emoji presentation and
+   * render full colour at the wrong size and baseline, and that U+FE0E is
+   * honoured inconsistently across machines.
+   */
+  const STOPS = verb === 'stop';
+  const toggle = el('button',
+    `tbar-toggle${RECORD ? ' tbar-rec' : ''}${STOPS ? ' tbar-stop' : ''}${WORDS ? ' tbar-word' : ''}`, '',
     { type: 'button',
-      'aria-label': WORDS ? `${WORDS[0]}/${WORDS[1]}` : RECORD ? 'record/stop' : 'play/pause' });
+      'aria-label': WORDS ? `${WORDS[0]}/${WORDS[1]}`
+        : RECORD ? 'record/stop' : STOPS ? 'play/stop' : 'play/pause' });
   // ⚠️ TWO SPANS, NOT ONE THAT GETS REWRITTEN. The stylesheet decides which one
   // is visible from `data-state`, which the bar already maintains, so there is
   // no second place that has to remember which word is showing.
