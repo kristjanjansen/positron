@@ -243,31 +243,20 @@ next plausible argument.
 
 ---
 
-## `purchased/` is for things somebody paid for
+## `purchased/` is for things somebody paid for, and it is ignored whole
 
-**Made 2026-09-21 on instruction**: *"i purchased them. do not git them"*, then
-*"make a dir for such things"*, then *"not oneff gitignore"*.
+**Made 2026-09-21**: *"i purchased them. do not git them"*, *"make a dir for
+such things"*, *"just make a positron/something dir and gignore it"*.
 
 🔴 **A PAID SOUNDBANK ARRIVED IN THE REPOSITORY ROOT, UNTRACKED AND UNIGNORED**,
-which means one careless `git add -A` would have published a commercial patch
-library from a repository that gets pushed to GitHub. The hook in
-`.claude/hooks/` refuses `git add -A` here, and a hook is the second line.
+so one careless `git add -A` would have published a commercial patch library
+from a repository that gets pushed. The hook in `.claude/hooks/` refuses
+`git add -A` here; that is the second line and this is the first.
 
-- **`purchased/*` is ignored and `!purchased/README.md` is not.** That one
-  tracked file is the whole point: an ignored directory with nothing tracked in
-  it **does not exist in git at all**, so a fresh clone would show nothing and
-  the next person would invent a second place for the same thing.
-- 🔴 **AND IT IS ONE RULE ABOUT WHERE A THING LIVES, NOT A RULE PER PURCHASE.**
-  The first draft also listed `Synth-Patches.com*`, `*.circuittrackspack` and
-  `Soundbank*/`, and it was cut on instruction. A filename rule rots the moment
-  the next thing arrives under a different name, and worse, it teaches the next
-  person that a download may sit in the root as long as somebody remembers to
-  add a line.
-- ⚠️ **`New Pack.circuitpack` IN THE ROOT IS THE OPPOSITE CASE AND STAYS
-  TRACKED.** It is the owner's own Circuit backup, it is somebody's only copy,
-  and `CLAUDE.md` records why it must never be deleted. **Ours to keep, theirs
-  to sell**, and `git check-ignore` was run against it to prove the new rule
-  does not reach it.
-- ⚠️ Material this project holds rights to is **addressed, not stored**: the
-  MIMproject recordings and pictures live in R2 with
-  `demo/resources/mimproject.json` as the manifest.
+Anything bought or licensed goes in `purchased/` and nothing in it is committed.
+⚠️ **It is one rule about WHERE a thing lives.** A rule per filename rots the
+moment the next thing arrives under a different name, and teaches the next
+person that a download may sit in the root as long as somebody adds a line.
+⚠️ **`New Pack.circuitpack` in the root is the opposite case and stays
+tracked**: the owner's own Circuit backup, somebody's only copy, and `CLAUDE.md`
+says why it must never be deleted. **Ours to keep, theirs to sell.**
