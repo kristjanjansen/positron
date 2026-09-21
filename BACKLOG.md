@@ -1,5 +1,16 @@
 ## Open
 
+### `circuit-cc.mjs` puts 28 drum parameters under `song select`, 2026-09-21
+
+⚖️ **ALMOST CERTAINLY A `pdftotext` ARTEFACT**, a neighbouring heading picked up
+while the section column was generated. All 28 channel 10 parameters carry it.
+⚠️ **NOTHING DISPLAYS IT TODAY**, because `/shape/` does not offer the drums.
+**Any page that adds channel 10 inherits it**, which is why it is written down
+rather than left for whoever does.
+⚠️ Found while regrouping `/shape/`. That file's `sec` column is graded against
+this desk's own measurements in `circuit-cc-test.mjs`, so it stays the wire's
+record and a fix has to keep those asserts green.
+
 ### `createAudioLane` cannot loop, read rather than measured, 2026-09-21
 
 🔴 **FOUND WHILE BUILDING `/tom/` AND IT IS A CLAIM ABOUT `timeline/transport.mjs`
