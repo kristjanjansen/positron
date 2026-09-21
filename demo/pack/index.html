@@ -42,6 +42,7 @@
   import { createDrop } from '/shell/drop.mjs';
   import { createStack } from '/shell/stack.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
+  import { survey, patchesIn } from '/shell/circuit-syx.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import {
     readPatch, summarise, sessionStats, patchFields, modSlots,
@@ -123,6 +124,19 @@
     onOpen: (files) => openFiles(files),
   });
   stack.add(drop.el);
+  /**
+   * 🔴 PUBLISHED ON `__demo`, BECAUSE A DRAG CANNOT BE SYNTHESISED AND THE
+   * BUTTON OPENS AN OPERATING SYSTEM DIALOG. Those are the only two ways in for
+   * a person, and neither is drivable, so without this the one path that matters
+   * on this page is reachable by nothing outside it. `drop.open(files)` is the
+   * same code a real drop runs.
+   * ⚠️ AND IT GOES ON `window.__demo`, NOT ON `mount()`'s RETURN VALUE. They are
+   * different objects: `mount` publishes its internal `api` and hands back a
+   * wrapper. Setting it on the wrapper put it somewhere no harness looks, which
+   * is the same trap `transport-bar.mjs` records about a page re-publishing
+   * `__demo.transport`.
+   */
+  window.__demo.drop = drop;
 
   // ── the three lists ──────────────────────────────────────────────────────
   //
@@ -453,21 +467,20 @@
    * nothing here can send anything. What changes is that the page says out loud
    * what the file would do in a tool that can.
    */
+  // ⚠️ AND THE SCANNING IS A KIT MODULE RATHER THAN A FUNCTION ON THIS PAGE.
+  // It WAS a function on this page for about an hour, which made this the second
+  // place in the repository that knew how to walk a sysex stream. `circuit-syx.mjs`
+  // is 23 asserts with sabotages behind it, it answers `writesFlash` FIRST, and
+  // it reads the session payloads too, which the page's own version could not.
   function sysexScan(b) {
-    const out = { messages: 0, patches: [], flash: 0, slots: new Set() };
-    for (let i = 0; i < b.length; i++) {
-      if (b[i] !== 0xf0) continue;
-      let j = i + 1;
-      while (j < b.length && b[j] !== 0xf7) j++;
-      if (j >= b.length) break;
-      out.messages++;
-      if (j - i + 1 === PATCH_BYTES && SYSEX_HEAD.every((v, k) => b[i + k] === v)) {
-        out.patches.push(b.subarray(i, j + 1));
-        if (COMMANDS[b[i + 6]]?.flash) { out.flash++; out.slots.add(b[i + 7]); }
-      }
-      i = j;
-    }
-    return out;
+    const v = survey(b);
+    return {
+      messages: v.messages,
+      patches: patchesIn(b).map((m) => b.subarray(m.at, m.at + PATCH_BYTES)),
+      flash: v.flashMessages,
+      slots: new Set(v.flashLocations),
+      sessions: v.sessions || [],
+    };
   }
 
   let lastScan = null;
@@ -499,9 +512,17 @@
       if (scan.patches.length) {
         d.log(`${name} is not a zip. It is a stream of ${scan.messages} sysex messages, `
             + `${scan.patches.length} of them Circuit patches`, 'hi');
-        fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), [], []);
-        sayScan(name, scan, `${name}, ${scan.patches.length} patches out of a sysex stream, `
-          + 'read in this tab and sent nowhere');
+        // 🔴 AND A STREAM CARRIES SESSIONS TOO, WHICH THE PAGE'S OWN SCANNER
+        // COULD NOT SEE. They travel seven bits to the byte in 300 byte
+        // carriers, and `circuit-syx.mjs` unpacks them back to 53,248 bytes
+        // each, so the same three numbers that grade a pack grade one of these.
+        const st = [];
+        for (let k = 0; k < scan.sessions.length; k++) {
+          st.push({ ...(await sessionStats(scan.sessions[k])), name: `session ${k}` });
+        }
+        fill(scan.patches.map((b, i) => ({ name: `${name} #${i}`, bytes: b })), st, []);
+        sayScan(name, scan, `${name}, ${scan.patches.length} patches and ${st.length} sessions `
+          + 'out of a sysex stream, read in this tab and sent nowhere');
         return;
       }
       drop.say(`${name} did not read as a pack: ${e.message}`, 'bad');
@@ -648,8 +669,32 @@
       d.log('this pack carries blank sessions', 'bad');
       return;
     }
+    /**
+     * 🔴 THE MIDDLE GROUND, AND THE FIRST VERSION HAD NONE. It said `blanks` only
+     * when every session was identical AND flat, and called everything else
+     * somebody's work. MEASURED on a real file 2026-09-21: a stream carrying 33
+     * sessions of which only **2 are distinct** produced the sentence *"2 of 33
+     * sessions are different from each other ... so this is somebody's work
+     * rather than a pack of blanks"*, which reports a number and then draws the
+     * opposite conclusion from it in the same breath. A reader who believed the
+     * words would have been told the wrong thing by a page whose only job is to
+     * tell them the right one.
+     * ⚠️ AND THE REPAIR IS NOT A THRESHOLD. Inventing a ratio at which copies
+     * become blanks would be a number with no measurement behind it. It states
+     * what it counted and declines to conclude, which is the honest reading of a
+     * file that is neither: no state class, so it is neither green nor amber.
+     */
+    if (distinct < stats.length) {
+      delete verdict.dataset.state;
+      verdict.textContent = `only ${distinct} of these ${stats.length} sessions differ from each `
+        + `other, so ${stats.length - distinct} are copies of another session in the same file. `
+        + 'That is neither a backup nor a pack of blanks, and what it would replace on an '
+        + 'instrument is whatever those copies are';
+      d.log(`${distinct} of ${stats.length} sessions are distinct, so ${stats.length - distinct} are copies`, 'hi');
+      return;
+    }
     verdict.dataset.state = 'good';
-    verdict.textContent = `${distinct} of ${stats.length} sessions are different from each other and `
+    verdict.textContent = `all ${stats.length} sessions are different from each other and `
       + `the emptiest is ${pct(Math.min(...stats.map((s) => s.nonZero)))} per cent filled, `
       + 'so this is somebody\'s work rather than a pack of blanks';
     d.log(`${distinct} of ${stats.length} sessions are distinct`, 'good');
@@ -800,6 +845,21 @@
         `"${verdict.textContent.slice(0, 70)}"`);
       sayVerdict(sessions, distinct);
 
+      /**
+       * 🔴 THE MIDDLE GROUND, DRIVEN. A file that is mostly copies is neither of
+       * the two things this page had words for, and it took a real file to find
+       * that out. The set here is the owner's own 32 with all but two replaced by
+       * a copy of the first, which is the shape `on_the_run.circuitpack` has.
+       */
+      const mostly = sessions.map((x, k) => (k < 2 ? x : { ...sessions[0] }));
+      sayVerdict(mostly, 2);
+      d.assert('a file that is mostly copies is called neither a backup nor blanks',
+        !verdict.dataset.state && /only 2 of these 32/.test(verdict.textContent)
+        && /30 are copies/.test(verdict.textContent)
+        && !/somebody's work/.test(verdict.textContent),
+        `"${verdict.textContent.slice(0, 80)}"`);
+      sayVerdict(sessions, new Set(sessions.map((x) => x.fingerprint)).size);
+
       const heads = new Set(sessions.map((s) => s.head));
       d.assert('and the first four bytes are not what decided it, because INIT is on both sides',
         heads.has('INIT') && verdict.dataset.state === 'good',
@@ -850,7 +910,7 @@
       }
       await openPack('a bank that writes flash', stream);
       d.assert('a file that would overwrite flash is named as one, with how many slots it reaches',
-        lastScan?.flash === 64 && lastScan.slots.size === 64
+        lastScan?.flash === 64 && lastScan.slots.size === 64 && lastScan.messages === 64
         && /overwrite 64 slots, 0 to 63/.test(drop.note.textContent)
         && patches.length === 64,
         `"${drop.note.textContent.slice(0, 80)}"`);
