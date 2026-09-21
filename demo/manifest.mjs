@@ -613,7 +613,7 @@ export const DEMOS = [
    * unzipped, all 64 samples decoded and every check run.
    */
   { name: 'tom', group: 'hardware', act: 4, created: '2026-09-21', built: true,
-    one: 'tap a grid of 64 steps whose rows become the samples in a Circuit pack you open here',
+    one: 'tap a grid of 16 steps whose rows become the samples in a Circuit pack you open here',
     tags: ['WebAudio', 'timeline', 'zip'] },
 
   /**
