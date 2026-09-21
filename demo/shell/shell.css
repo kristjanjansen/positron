@@ -4430,3 +4430,40 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    control: it is the make and the model, it is the one thing on the case that is
    true whether or not anything is plugged in, and it stays where it is. */
 .panel-sub[data-off], .panel-cap[data-off] { opacity: var(--ctl-off); }
+
+/* -- the drop target -------------------------------------------------------
+   demo/shell/drop.mjs. A file dropped anywhere on the page OPENS, in the tab,
+   and nothing leaves the machine.
+
+   🔴 THE COVER IS `pointer-events: none` FOR ITS WHOLE LIFE, AND IT IS IN THE
+   DOCUMENT ONLY WHILE A DRAG IS IN FLIGHT. That is two separate guards for one
+   failure, and the failure is written down twice already in this project:
+   `/weight/` and `/floor/` both shipped a `position: fixed; inset: 0` cover
+   that sat over the row holding the button that got you out, and a cover cannot
+   be argued with by a reader who cannot reach the control under it. A drag is
+   the one moment a full page surface is honestly what the page is doing.
+   ⚠️ AND IT TAKES NO LAYOUT ROOM AT ANY MOMENT, fixed and out of flow, so
+   nothing on the page moves when it appears. `grain-scope`'s live caption is
+   the rule that says why: anything that can change its own height while
+   somebody is looking at it moves everything under it. */
+.pos-drop-cover {
+  position: fixed; inset: 0; z-index: 80;
+  pointer-events: none;
+  display: grid; place-items: center;
+  background: rgba(11, 14, 20, .82);
+}
+/* The dashed edge is the page saying *inside here*, which is the whole message.
+   It is inset rather than on the frame so it reads as a target rather than as a
+   window that has gone modal. */
+.pos-drop-cover::before {
+  content: ''; position: absolute; inset: 14px;
+  border: 2px dashed var(--hi); border-radius: 6px;
+}
+.pos-drop-say {
+  font: 600 13px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--hi); text-align: center; padding: 0 20px;
+}
+/* The button is an ordinary button and says so by taking no rules of its own.
+   It exists as a class only so a harness can press the keyboard path by name,
+   which is the half of this component a drag cannot reach. */
+.pos-drop { display: inline-flex; align-items: center; gap: 10px; }

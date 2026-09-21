@@ -1,5 +1,41 @@
 ## Open
 
+### `/wish/` in production, asked 2026-09-21, session 41
+
+- 🔴 **ASKED AS `"In bg can you take wish testing gindings, do fixes and do
+  worker and make it working in prod"`**, then *"I meqn work in local dev"*, then
+  *"No actuall in prod"*. **PROD is the answer**, and it is the last word on it.
+  🔴 **AND `workers/wish/wrangler.jsonc` REFUSES A PUBLIC HOSTNAME ON PURPOSE**:
+  `workers_dev: false`, no route, and a comment saying *"this spends somebody's
+  account every time it is called, so it is not on a hostname that a crawler or a
+  stray page can find"*. Making it work in production is exactly the change that
+  comment was written against, so the deploy carries a guard rather than going
+  out bare, and the exposure gets reported in words.
+  ⚠️ **THE SITE DEPLOY IS NOT THE AGENT'S TO MAKE.** `/patches/` is in flight in
+  this same checkout, so `workers/view` is built and deployed by the session
+  after that lands. The agent deploys `workers/wish` only.
+
+### `/patches/`, asked 2026-09-21, session 41
+
+- 🔴 **ASKED AS `"Patch demo: make it"`**, which is `plans/plan-patches-page.md`
+  taken off the shelf. The plan's order is the order, and the page is THIRD:
+  `demo/shell/circuit-patch.mjs` with a no-browser test first, then
+  `demo/shell/drop.mjs` with its `/kit/` block, then `/patches/`, then the
+  session fingerprint panel, then `manifest.mjs`.
+  🔴 **THE DECODER IS THE ONE THING THAT EXISTED AND WAS NOT KEPT.** It lived in
+  a scratchpad, graded 246 varying fields of 324 against the published `patch_0`,
+  and it is gone. Rebuilding it is step one or the page becomes the third place
+  that knows the format.
+  🔴 **AND THE PAGE SENDS NOTHING. NOT ONE BYTE.** No Web MIDI, asserted, because
+  `New Pack.circuitpack` is the only backup of flash on an instrument with no
+  factory reset.
+  🔴 **AND THE VISUALISER IS A TABLE PLUS A DIAGRAM.** Asked 2026-09-21: *"So the
+  patcbay visualiser table plus fiagram"*. `plans/plan-patches-page.md` §5 left
+  *"whether the detail panel should use the segment display"* open and guessed a
+  table; the answer is both. A Circuit patch is a signal path, so the picture is
+  `demo/shell/diagram.mjs` showing what the selected patch actually has switched
+  on, and the table is the 64 rows beside it. Load `positron-diagram` first.
+
 ### Followup, 2026-09-21, session 40: Estonian and the lookups
 
 - 🔴 **THE NAME MATCHER WAS NEVER TESTED IN ESTONIAN, AND THE THING CARRYING ALL
