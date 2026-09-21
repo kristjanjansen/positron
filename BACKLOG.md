@@ -1,5 +1,51 @@
 ## Open
 
+### Followup, 2026-09-21, session 40: Estonian and the lookups
+
+- 🔴 **THE NAME MATCHER WAS NEVER TESTED IN ESTONIAN, AND THE THING CARRYING ALL
+  ITS PRECISION IS A LIST OF ENGLISH VERBS.** Asked: *"did you tried estonian
+  too? leave it to followup if not"*. It was not in the rig-test brief: the
+  corpus and the `say` voices were English throughout.
+  🔴 **AND THIS IS NOT AN ALIAS PROBLEM, WHICH IS WHY IT NEEDS ITS OWN WORK.**
+  `resolve()` in `demo/shell/instruments.mjs` is safe only because of `STOP`, a
+  closed set of the verbs and prepositions an English instruction is made of.
+  It exists because `connect` reduces to `knkt` and `circuit` to `krkt`, one
+  edit apart with the same first letter, so **no threshold separates them and
+  only knowing that one of them is a verb does**. An Estonian instruction
+  contains no English verbs at all, so `STOP` catches nothing, every guard falls
+  back to the distance, and precision collapses to what the first build
+  measured: `connect` matching the Circuit, `keyboard` matching the Fast Track
+  Pro. **Adding Estonian words to the taxonomy would make that worse rather than
+  better**, because it adds keys to match against while removing nothing.
+  ⚠️ **AND `sounds()` IS ENGLISH PHONOLOGY.** It drops vowels after the first and
+  folds the consonant pairs a microphone confuses in English. Estonian
+  distinguishes short, long and overlong vowels as MEANING, so a reduction that
+  throws vowels away is throwing away the wrong thing. That is a different
+  function, not a tuned threshold.
+  ✅ **TWO SEPARABLE QUESTIONS, AND THE FIRST IS THE CHEAP ONE.**
+  1. **Estonian-accented English**, which is what will actually be spoken at
+     this desk most of the time. Nothing about the matcher changes; what changes
+     is the CORPUS, and it cannot be synthesised: `say -v ?` has no Estonian
+     voice on this machine, so this needs recordings of a real person saying the
+     forty instructions. That is an afternoon with a microphone and it would
+     measure the thing that matters.
+  2. **Estonian-language instructions** (*"ühenda klaver circuitiga"*), which
+     needs an Estonian `STOP` set, Estonian aliases per instrument, a
+     phonological reduction that keeps vowel length, and `language: 'et'` on the
+     `/hear` call. Whisper supports Estonian; how well on this desk is
+     unmeasured.
+  ⚠️ **AND THE HONEST INTERIM BEHAVIOUR IS SILENCE RATHER THAN A GUESS.** Until
+  it is calibrated, an Estonian sentence should resolve to NOTHING, which is what
+  it does today by accident and should do on purpose. A false negative makes the
+  model answer *nothing on this desk* and a person edits one word; a false
+  positive routes an instrument they never named. Those costs are not the same
+  size and that is written into the module.
+  ⚠️ **ONE MEASUREMENT WOULD DECIDE THE ORDER OF ALL OF THIS**: hand the three
+  speech models one Estonian-accented English sentence naming two instruments.
+  If `turbo` transcribes it cleanly, question 1 is nearly free and question 2 is
+  a want rather than a need.
+
+
 ### Asked 2026-09-21, session 40, the three pages that were shipped and not played
 
 - 🔴 **`/wish/` ANSWERS `Authentication error` AND THE CAUSE IS MEASURED, NOT
