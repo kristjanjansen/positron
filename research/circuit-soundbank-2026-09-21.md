@@ -51,8 +51,18 @@ Circuit's contents on a device with no factory reset.
 | **distinct fingerprints** | **32 of 32** | **1 of 32** |
 | entropy | 0.83 to 1.46 bits a byte | **0.01 bits a byte** |
 | non-zero share | 84.6% to 89.6% | **0.1%** |
-| first four bytes | `DEMO` | `INIT` |
+| first four bytes | `USER` 22, `DEMO` 7, `INIT` 3 | `INIT`, all 32 |
 | name in `index.json` | real names and `User Session` | **empty string, all 32** |
+
+🔴 **THE HEAD ROW ABOVE READ `DEMO` AGAINST `INIT` UNTIL 2026-09-21 AND THAT
+WAS WRONG, WHICH MATTERS BECAUSE IT WAS BEING USED AS A TEST.** Re-measured over
+all 32 while building `/patches/`: the owner's pack is `USER` 22, `DEMO` 7 and
+`INIT` 3. The three that say `INIT` are named `Initial Session` in `index.json`
+and are ordinary work, entropy 0.87 and 86.5 per cent non-zero with distinct
+fingerprints, so a check keyed on the head would have called three real sessions
+blanks. **The three rows above it separate the packs by two orders of magnitude
+and are the whole test.** ⚠️ This is §4.3's own warning arriving one layer down:
+a name is not evidence, and neither is a four byte marker that looks like one.
 
 🔴 **A PURCHASED SESSION FILE IS 53,212 ZEROS AND 36 OTHER BYTES.** The 36 are
 `INIT` at offset 0 and thirty-two `0x20` spaces in the name field. That is an

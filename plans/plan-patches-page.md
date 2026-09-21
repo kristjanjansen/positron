@@ -7,6 +7,47 @@ that opens a file without sending it anywhere.** Asked 2026-09-21:
 Lightweight on purpose. Everything hard has already been measured and lives in
 files named below; what is missing is a page and one kit module.
 
+## ✅ BUILT 2026-09-21, and three things came out differently
+
+Asked for as *"Patch demo: make it"*, then *"So the patcbay visualiser table plus
+fiagram"*. Live at **https://positron.studio/patches/**.
+
+- `demo/shell/circuit-patch.mjs` and `circuit-patch-test.mjs`, **48/48**. The 340
+  address table is GENERATED out of the Programmer's Reference with
+  `pdftotext -layout` rather than typed, and checked to be 340 contiguous
+  addresses with no duplicates before it was written out.
+- `demo/shell/drop.mjs` and its `/kit/` block, four asserts, two of them negative
+  controls. `/kit/` went to **112/112**, and its own frame counter caught an
+  `await` put inside its measuring window on the first run.
+- `/patches/`, **22/22 locally and 14/14 against the deploy**.
+
+**What came out differently from this plan:**
+
+1. 🔴 **THE DETAIL PANEL IS THE DIAGRAM.** §2 asked for a panel of parameters
+   grouped by `circuit-cc.mjs`'s sections and §5 guessed a table. The ask that
+   settled it was *"table plus diagram"*, so pressing a row repaints the signal
+   path under `How it works` with that patch's own waves, filter and envelope.
+   What a panel would have carried is on the row's hover, including how many of
+   the 340 parameters are off their default. **A parameter panel is still
+   unbuilt and is worth having.**
+2. 🔴 **THE PICTURE WAS DRAWN TWICE AND THE MEASUREMENT DECIDED IT.** The first
+   was two machines, a `Browser` and a `Circuit`, with NO arrow between them
+   because nothing here can reach the instrument. Two containers with no link
+   between them land in the same column and stack: it filled **27 per cent of its
+   width at 746 px tall**, against `/crate/`'s 64 per cent at 271 px and
+   `/items/`'s 100 per cent at 226 px. The signal path fills 100 per cent at
+   118 px. **The fact the old picture carried is not lost, it moved to where it
+   can go red**: the caption, and an assert over a counter on
+   `requestMIDIAccess`. A missing arrow was never gradable.
+3. 🔴 **THE PACK IS NOT PUBLISHED AND THE PAGE DECIDES THAT FROM THE ORIGIN.**
+   §2 says the page opens `New Pack.circuitpack` on a press, which it does on a
+   checkout. `workers/view/build.mjs` copies an allowlist and that file is not on
+   it, deliberately: it holds 32 of somebody's real sessions. The first build
+   discovered the absence by fetching and took the deploy run RED on
+   `no console errors` with two 404s, which is a red everybody learns to skip.
+
+⚠️ **AND §2.1's FOURTH NUMBER WAS WRONG**, which is written into that section.
+
 ## 1. What already exists, so nothing here is rebuilt
 
 | piece | where | state |
@@ -49,14 +90,22 @@ the Csound lesson, which was 22/22 green for months with two real defects.
 `research/circuit-soundbank-2026-09-21.md` measured a purchased pack whose 32
 sessions were **empty**: 1 distinct fingerprint of 32 against the owner's 32 of
 32, entropy 0.01 bits a byte against 0.83 to 1.46, 0.1 per cent non-zero against
-84.6 to 89.6, first four bytes `INIT` against `DEMO`. **And all three packs on
+84.6 to 89.6. **And all three packs on
 this machine display as `*New Pack` in Novation Components**, so the only backup
 and the two that would erase it are three identical rows.
 
-So the page prints, per session: **distinct fingerprints, entropy, non-zero
-share, and the first four bytes.** That is four cheap numbers that separate a
-backup from a wipe, and it is the check that would have caught the purchased
-pack before anybody pressed `Send to Circuit`.
+So the page prints, per session: **distinct fingerprints, entropy and non-zero
+share.** That is three cheap numbers that separate a backup from a wipe, and it
+is the check that would have caught the purchased pack before anybody pressed
+`Send to Circuit`.
+
+🔴 **THIS SAID FOUR NUMBERS AND THE FOURTH WAS THE FIRST FOUR BYTES, AND IT IS
+WRONG. CORRECTED 2026-09-21 BY MEASURING BOTH SIDES.** The owner's 32 sessions
+are **`USER` 22, `DEMO` 7 and `INIT` 3**, so three real sessions carry the head
+this plan published as the blank signature, at entropy 0.87 and 86.5 per cent
+non-zero with distinct fingerprints. The head is still SHOWN on the page, in its
+own column, because a reader should be able to see for themselves that it is the
+same on both sides. It decides nothing.
 ⚠️ **A NAME IS NOT EVIDENCE**, which this project got wrong once already about
 these very sessions: the ones called `User Session` were implied to be blanks and
 measurement said 32 distinct of 32, none empty. Fingerprint content.

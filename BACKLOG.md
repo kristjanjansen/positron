@@ -1,9 +1,14 @@
 ## Open
 
-### `/wish/` in production, asked 2026-09-21, session 41
+### ✅ DONE 2026-09-21: `/wish/` in production
 
-- 🔴 **ASKED AS `"In bg can you take wish testing gindings, do fixes and do
-  worker and make it working in prod"`**, then *"I meqn work in local dev"*, then
+- ✅ **LIVE AT `https://wish.positron.studio`**, one real call measured through it
+  at 2,475 ms on the 70B. `resolve()` is called by a page now. Three guards and a
+  written account of what each does NOT stop; one press is about $0.00034 and the
+  free daily allowance covers roughly 320. The page half waits on nothing: the
+  site was deployed. ⚠️ The `use "by"` repair press was REFUSED in writing.
+  Asked as *"In bg can you take wish testing gindings, do fixes and do
+  worker and make it working in prod"*, then *"I meqn work in local dev"*, then
   *"No actuall in prod"*. **PROD is the answer**, and it is the last word on it.
   🔴 **AND `workers/wish/wrangler.jsonc` REFUSES A PUBLIC HOSTNAME ON PURPOSE**:
   `workers_dev: false`, no route, and a comment saying *"this spends somebody's
@@ -15,9 +20,12 @@
   this same checkout, so `workers/view` is built and deployed by the session
   after that lands. The agent deploys `workers/wish` only.
 
-### `/patches/`, asked 2026-09-21, session 41
+### ✅ DONE 2026-09-21: `/patches/`
 
-- 🔴 **ASKED AS `"Patch demo: make it"`**, which is `plans/plan-patches-page.md`
+- ✅ **LIVE AT `https://positron.studio/patches/`**, 22/22 locally and 14/14
+  against the deploy. The decoder is 48/48, `drop.mjs` is in `/kit/` at 112/112.
+  ⚠️ **STILL OPEN: the parameter panel** `plans/plan-patches-page.md` §2 asked
+  for, and the samples half. Asked as *"Patch demo: make it"*, which is `plans/plan-patches-page.md`
   taken off the shelf. The plan's order is the order, and the page is THIRD:
   `demo/shell/circuit-patch.mjs` with a no-browser test first, then
   `demo/shell/drop.mjs` with its `/kit/` block, then `/patches/`, then the
