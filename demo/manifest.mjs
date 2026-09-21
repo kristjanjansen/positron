@@ -581,6 +581,27 @@ export const DEMOS = [
     tags: ['WebMIDI', 'CoreMIDI'] },
 
   /**
+   * 🔴 THE OTHER HALF OF THE CIRCUIT, AND THE TWO PAGES ARE DELIBERATELY NOT
+   * ONE. `/shape/` sends and cannot read; this one reads and cannot send. Merging
+   * them would put a send path on the page that opens somebody's only backup,
+   * and `plans/plan-patches-page.md` §5 refuses it for exactly that reason.
+   * ⚠️ IT SENDS NOTHING AND THE PAGE ASSERTS IT over a counter on
+   * `requestMIDIAccess` rather than over a reading of its own source. `Replace
+   * Current Patch` and `Replace Patch` differ by one byte at offset 6, the
+   * second writes flash on an instrument with no factory reset, and nothing here
+   * can build either message: `circuit-patch.mjs` exports no encoder at all.
+   * ⚠️ `New Pack.circuitpack` IS NOT PUBLISHED AND THIS ROW DOES NOT CHANGE
+   * THAT. It holds 32 of somebody's real sessions and is their only backup, so
+   * the button that reads it works on a checkout and says so plainly on the
+   * deploy, where the way in is a file from the reader's own machine.
+   * ⚠️ `settleMs` IS FOR THE READING. 3.3 MiB unzipped, 64 patches decoded and
+   * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
+   */
+  { name: 'patches', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
+    one: 'open a Circuit pack and see what its patches are made of',
+    tags: ['zip', 'sysex', 'DecompressionStream'] },
+
+  /**
    * 🔴 THE THIRD HARDWARE PANEL, AND ITS LAYOUT IS THE WEAKEST OF THE THREE.
    * Asked 2026-09-21: *"do evolution mk425c demo named evo"*, *"demo: hw
    * layout"*. `/circuit/` was drawn from Novation's own artwork at 800 dpi and
