@@ -62,3 +62,26 @@ workers/pub/node_modules/
 *-sa.*.json
 positron-push-sa.json
 .tap/
+
+# ── purchased content, which is not ours to publish ────────────────────────
+# 🔴 A PAID SOUNDBANK LIVES HERE AND MUST NEVER BE COMMITTED. Said plainly
+# 2026-09-21: *"i purchased them. do not git them"*. The zip arrived untracked
+# and UNIGNORED, so a single careless `git add -A` would have published
+# somebody's commercial patch library from a repository that is pushed to
+# GitHub. The hook in `.claude/hooks/` refuses `git add -A` here, but a hook is
+# a second line and this is the first.
+# ⚠️ `New Pack.circuitpack` in the root is DIFFERENT and is deliberately
+# tracked: it is the owner's own Circuit backup and CLAUDE.md records why it
+# must not be deleted. Ours to keep, theirs to sell.
+# 🔴 EVERYTHING IN `purchased/` IS IGNORED EXCEPT ITS README, which is tracked
+# ON PURPOSE so a fresh clone can see why the directory is empty. An ignored
+# directory with nothing in it does not exist in git at all, and the next person
+# would make a second place for the same thing.
+purchased/*
+!purchased/README.md
+# ⚠️ AND NOT A RULE PER PURCHASE. The first draft of this also listed
+# `Synth-Patches.com*`, `*.circuittrackspack` and `Soundbank*/`, which is a
+# filename rule that rots the moment the next thing arrives under a different
+# name, and which quietly teaches the next person that a download may sit in
+# the root as long as somebody remembers to add a line. One directory, one
+# rule, and the rule is about WHERE a thing lives rather than what it is called.

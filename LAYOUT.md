@@ -240,3 +240,34 @@ next plausible argument.
 | `positron-xr` | WebXR, the Quest measurements, passthrough, the way out, full screen |
 | `positron-hardware` | the board, the rig, Yoshimi, the Circuit, capture |
 | `positron-history` | every rename and every retired page |
+
+---
+
+## `purchased/` is for things somebody paid for
+
+**Made 2026-09-21 on instruction**: *"i purchased them. do not git them"*, then
+*"make a dir for such things"*, then *"not oneff gitignore"*.
+
+🔴 **A PAID SOUNDBANK ARRIVED IN THE REPOSITORY ROOT, UNTRACKED AND UNIGNORED**,
+which means one careless `git add -A` would have published a commercial patch
+library from a repository that gets pushed to GitHub. The hook in
+`.claude/hooks/` refuses `git add -A` here, and a hook is the second line.
+
+- **`purchased/*` is ignored and `!purchased/README.md` is not.** That one
+  tracked file is the whole point: an ignored directory with nothing tracked in
+  it **does not exist in git at all**, so a fresh clone would show nothing and
+  the next person would invent a second place for the same thing.
+- 🔴 **AND IT IS ONE RULE ABOUT WHERE A THING LIVES, NOT A RULE PER PURCHASE.**
+  The first draft also listed `Synth-Patches.com*`, `*.circuittrackspack` and
+  `Soundbank*/`, and it was cut on instruction. A filename rule rots the moment
+  the next thing arrives under a different name, and worse, it teaches the next
+  person that a download may sit in the root as long as somebody remembers to
+  add a line.
+- ⚠️ **`New Pack.circuitpack` IN THE ROOT IS THE OPPOSITE CASE AND STAYS
+  TRACKED.** It is the owner's own Circuit backup, it is somebody's only copy,
+  and `CLAUDE.md` records why it must never be deleted. **Ours to keep, theirs
+  to sell**, and `git check-ignore` was run against it to prove the new rule
+  does not reach it.
+- ⚠️ Material this project holds rights to is **addressed, not stored**: the
+  MIMproject recordings and pictures live in R2 with
+  `demo/resources/mimproject.json` as the manifest.
