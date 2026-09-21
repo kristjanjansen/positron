@@ -52,6 +52,33 @@ once by somebody who was not mid-edit.
   are called; what has no home is a record of which PORTS a device had when it
   was last seen, which is what the question was about.
 
+#### A keyboard split cannot be said at all, 2026-09-21
+
+🔴 **FOUND BY THE OWNER ASKING FOR ONE.** *"Split the keyboard into half. Lower
+part plays synth 1 in the circuit and upper part plays synth 2 in the circuit."*
+The 70B produced `{"op":"only","to":1}` twice and both were refused with
+`only takes "cls" and was given "to"`, which is true and is not the story.
+🔴 **THE STORY IS THAT `bay.mjs` HAS SIX TRANSFORMS AND NONE OF THEM FILTERS BY
+PITCH**: `channel, transpose, velocity, only, drop, cc`. `only` filters by
+CLASS, note against cc against bend, so the nearest thing to *the lower half of
+the keyboard* in this whole vocabulary is a verb about message types. **The
+model was not wrong about the intent. The desk has no word for it.**
+⚠️ **AND IT IS THE SCHEMA LESSON ONE LAYER OUT.** This project already records
+that a JSON Schema constrains SHAPE and cannot constrain MEANING, so the
+validator moved into ordinary code. This is the same failure one step further
+out: the VOCABULARY has a hole, so a model asked for something reasonable
+produces the nearest valid-looking thing and a validator refuses it by name
+without anybody learning why.
+✅ **WHAT IT WOULD TAKE, AND IT IS SMALL**: one `range` op taking `lo` and `hi`,
+dropping a note outside it, plus its row in `checkTransforms` and its own
+asserts. `link()` already allows two links between the same pair, so a split is
+two links from one port with different ranges and channels, which is how a real
+one is built anyway.
+⚠️ **AND THE PROMPT WOULD HAVE TO SAY SO.** `FACTS` gained the rotary CC
+numbers today for exactly this reason: a model that is not told a thing exists
+cannot use it, and the failure looks like a bad model rather than a missing
+sentence.
+
 #### The drum twin: one score, two renderers, compared, 2026-09-21
 
 🔴 **ASKED FOR DIRECTLY: *"same idea as in shadrs / sc pathces: compare in
