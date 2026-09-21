@@ -66,9 +66,10 @@ export function createDrop({
   accept = [],
   onOpen,
   says = () => {},
+  title = '',
   label = 'open a file',
   hint = 'drop it anywhere on this page',
-  empty = 'nothing has been opened',
+  empty = '',
   area = true,
   on = document,
   maxBytes = 64 * 1024 * 1024,
@@ -112,15 +113,33 @@ export function createDrop({
    */
   const note = el('div', 'pos-drop-note', empty);
   const root = el('div', area ? 'pos-drop pos-drop-area' : 'pos-drop');
+  /**
+   * 🔴 ONLY THE DASHED AREA IS A TARGET, AND THE RESULT IS A FOOTER GLUED UNDER
+   * IT. Asked 2026-09-21 as *"only dashed area is file drop target"* and *"if
+   * file dropped, it will be glued footer to upload component"*. A result
+   * sitting inside the invitation reads as part of the invitation.
+   * 🔴 AND THERE IS NO FOOTER AT ALL UNTIL SOMETHING IS SAID, asked as *"rm
+   * nothing has been opened and footer when no files"*. It used to open reading
+   * `nothing has been opened`, because `/wish/` lost a reserved box to
+   * `.pos-stack > div:empty { display: none }`. ⚠️ THAT LESSON IS ABOUT A BOX
+   * THAT MUST BE VISIBLE AND GOT COLLAPSED, which is not this: here the element
+   * is not in the document at all, so no selector decides anything.
+   */
+  const wrap = el('div', 'pos-drop-wrap');
   if (area) {
-    const words = exts.length
-      ? `${hint} (${exts.join(', ')})`
-      : hint;
-    root.append(el('div', 'pos-drop-hint', words), button, note);
+    const words = exts.length ? `${hint} (${exts.join(', ')})` : hint;
+    // ⚠️ THE BUTTON AND THE WORDS BESIDE IT ARE ONE ROW, because `[browse
+    // files] or drag a file here` is one sentence with a control in it.
+    const row = el('div', 'pos-drop-row');
+    row.append(button, el('span', 'pos-drop-or', 'or drag a file here'));
+    if (title) root.append(el('div', 'pos-drop-title', title));
+    root.append(el('div', 'pos-drop-hint', words), row);
   } else {
-    root.append(button, note);
+    root.append(button);
   }
   root.append(input);
+  wrap.append(root);
+  if (empty) wrap.append(note);
 
   const cover = el('div', 'pos-drop-cover');
   cover.append(el('div', 'pos-drop-say', hint));
@@ -141,7 +160,13 @@ export function createDrop({
 
   // Everything the component has to say goes through here, so its own line and
   // the page's log can never disagree about what happened.
-  const tell = (msg, kind) => { note.textContent = msg; says(msg, kind); };
+  // ⚠️ THE FOOTER JOINS THE DOCUMENT ON ITS FIRST WORD, not at build time, so a
+  // component nobody has used has no footer to read.
+  const tell = (msg, kind) => {
+    note.textContent = msg;
+    if (!note.isConnected) wrap.append(note);
+    says(msg, kind);
+  };
 
   const okName = (name) => !exts.length || exts.some((e) => name.toLowerCase().endsWith(e));
 
@@ -187,7 +212,8 @@ export function createDrop({
   window.addEventListener('blur', onEnd);
 
   return {
-    el: root,
+    el: wrap,
+    area: root,
     button,
     input,
     cover,
