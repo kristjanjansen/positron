@@ -78,6 +78,25 @@
   // the deploy, where the way in is the drop target. The page says which.
   const PACK = '/New%20Pack.circuitpack';
 
+  /**
+   * 🔴 WHETHER THE PACK IS HERE IS DECIDED FROM THE ORIGIN, NOT DISCOVERED BY
+   * ASKING, AND THE FIRST VERSION ASKED. It fetched, got a 404 on the deploy,
+   * and said so in words, which reads correctly to a person and took
+   * `DEMO_BASE=https://positron.studio node demo/verify.mjs patches` RED on
+   * `no console errors` with two 404s in it. A red that is expected is a red
+   * everybody learns to skip, and the next real one goes with it.
+   * ⚠️ IT IS NOT A GUESS ABOUT THE FILE, IT IS A FACT ABOUT THE DEPLOY.
+   * `workers/view/build.mjs` copies an explicit allowlist and this file is not
+   * on it, so the pack exists exactly where the repository does. A page served
+   * off a checkout is served off loopback or off this network.
+   * ⚠️ AND BEING WRONG COSTS NOTHING. Somebody serving the repository from a
+   * public hostname gets the words below and the drop target, which is the same
+   * way in a visitor has.
+   */
+  const PACK_HERE = location.protocol === 'file:'
+    || /^(localhost|127\.|0\.0\.0\.0|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/
+      .test(location.hostname);
+
   const ONE = 'open a Circuit pack and see what its patches are made of';
 
   const d = mount({
@@ -377,20 +396,27 @@
   // first row nobody asked to see, which is exactly the shape `/reel/` shipped:
   // a fetch on every visit for a frame nobody wanted. A visit here opens nothing
   // and the counters say so.
+  const notPublished = 'the pack in this repository is not published here, '
+    + 'so open one from your own machine';
+
   d.button('here')?.addEventListener('click', async () => {
+    // ⚠️ IT ANSWERS RATHER THAN DOING NOTHING. A control that looks live and is
+    // inert is this project's named hazard, and a press that produces one
+    // sentence immediately is not that: it answers the question the label asks.
+    if (!PACK_HERE) {
+      openNote.textContent = notPublished;
+      d.log('the pack in this repository is not published on the deploy, deliberately: '
+          + 'it is somebody\'s only backup and it holds 32 of their sessions', 'bad');
+      return;
+    }
     openNote.textContent = 'reading the pack in this repository';
     try {
       const r = await realFetch(PACK);
       if (!r.ok) throw new Error(`the server answered ${r.status}`);
       await openPack('New Pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
     } catch (e) {
-      // ⚠️ AND IT SAYS WHICH OF THE TWO THIS IS. On a checkout the pack is
-      // there; on the deploy it is not published, on purpose, because it holds
-      // 32 of somebody's real sessions and is their only backup.
-      openNote.textContent = 'the pack in this repository is not published here, '
-        + 'so open one from your own machine';
-      d.log(`the pack here did not load (${e.message}). It is not published on the deploy, `
-          + 'deliberately: it is somebody\'s only backup and it holds their sessions', 'bad');
+      openNote.textContent = notPublished;
+      d.log(`the pack here did not load (${e.message})`, 'bad');
     }
   });
 
@@ -520,14 +546,15 @@
    * A visit asserts a strict subset and that is the intended shape.
    */
   if (SELFCHECK) {
-    const r = await realFetch(PACK).catch(() => null);
+    const r = PACK_HERE ? await realFetch(PACK).catch(() => null) : null;
     if (!r || !r.ok) {
       // ⚠️ SAID OUT LOUD RATHER THAN SKIPPED IN SILENCE. On the deploy this file
       // is not published, on purpose, so a run there grades the page's load time
       // half and nothing else. A check nobody can run must say it did not run.
       d.log('the pack here is not published, so the reading checks did not run', 'bad');
       d.assert('the pack in this repository is readable, or the page says it is not',
-        openNote.textContent.length > 0, 'not published at this origin');
+        openNote.textContent === notPublished && !PACK_HERE,
+        `not published at ${location.hostname}, and the page says so`);
     } else {
       await openPack('New Pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
 
