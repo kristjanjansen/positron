@@ -11,8 +11,38 @@
      something that arrives over a network a second or two after the press. A
      page whose blocks appear one at a time moves the thing under the reader's
      hand twice. */
-  .wish-said, .wish-patch, .wish-why, .wish-dg { min-width: 0; }
+  .wish-said, .wish-patch, .wish-why, .wish-dg, .wish-dump { min-width: 0; }
   .wish-patch { overflow-x: auto; }
+
+  /* 🔴 THE ANSWER IS ONE COMPONENT OF THREE PARTS. Asked 2026-09-21: *"make it
+     a single component, 3 parts, glued. in top is patch list visualizer, below
+     is diagram and dump is below"*. `createGlue` builds it, the picker row is
+     the top part, the picture is the middle one and the JSON is the bottom one.
+     🔴 A GLUE TAKES A CHILD'S BORDER AND RADIUS AWAY, SO EVERY PART HAS TO
+     PAINT ITS OWN GROUND. `.pos-glue` is `gap: 1px` over `background:
+     var(--line)`, so what says where one part ends is a 1 px seam of `--line`
+     showing between them. A part that paints nothing lets that colour through
+     its whole area and the seam disappears into it, which is the question a
+     three part glue asks and a two part one does not: the middle part touches
+     the component's own border on neither side and is bounded by seams alone.
+     The kit's own glued pairs already answer it, and neither of them says so
+     out loud: `.pos-cell` and `.pos-log` both carry `background: var(--card)`.
+     ⚠️ SO THE RULE SITS ON THIS PAGE'S OWN ELEMENTS AND NEVER ON `.pos-glue`.
+     A page reaching into a component's insides is a named defect here, and
+     nothing about this needs it: a part that paints itself is a part wherever
+     it is put, and `createGlue` already takes as many blocks as it is given.
+     ⚠️ AND THE INSET MOVES OUT OF THE `<pre>` INTO THE PART, so the JSON and
+     the verdict under it share one padding instead of each buying their own. */
+  .wish-part { background: var(--card); padding: 10px 12px; }
+
+  /* 🔴 THE BOTTOM PART IS THE OBJECT AND THE VERDICT ON IT, WHICH IS WHY THEY
+     ARE ONE PART RATHER THAN A FOURTH. The request names three parts and the
+     allowed/refused line is not one of them, and it is not furniture either:
+     every row is a reading of a link in the JSON an inch above it, printed by
+     `printLink` off the same object. A seam between them would say they are two
+     answers. Under it, with no seam, they are the answer and what this desk
+     makes of it. */
+  .wish-dump { display: flex; flex-direction: column; gap: 8px; }
   /* 🔴 THE TRANSCRIPTION IS EDITABLE AND ITS HEIGHT IS FIXED. A textarea that
      grows with its content is the one thing this project has a rule against,
      so it scrolls instead. `resize: none` for the same reason: a corner a
@@ -28,29 +58,35 @@
        right edge, and what was off the edge was the evidence. It changes height
        when an answer lands, which is a human-paced change rather than a clock,
        and is the case the no-twitch rule explicitly allows. */
-    min-height: 62px; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px 12px;
-    border-radius: 4px;
+    min-height: 62px; white-space: pre-wrap; overflow-wrap: anywhere;
     font: 12px/1.6 var(--mono, ui-monospace, monospace); color: var(--ink);
     /* 🔴 NOTHING IS WRITTEN HERE UNTIL THERE IS SOMETHING TO WRITE, AND THE
        ROOM IS STILL TAKEN. Asked 2026-09-21: *"rm no patch yet"*. The box used
        to draw `# no patch yet`, which is furniture: it tells a reader that a
        box is a box, which the box already said, and it is the same mistake as
        an em dash standing in for a number nobody measured.
-       🔴 AND AN EMPTY BOX IS A LINE, which is the rule `/typist/` bought: a
-       bordered rectangle with nothing in it renders as a horizontal rule
-       nobody wrote. So the edge and the card colour arrive with the content and
-       leave with it.
-       ⚠️ THE BORDER IS TRANSPARENT RATHER THAN ABSENT. `border: 0` while empty
-       and `1px` once filled would move everything below this box by two pixels
-       the moment an answer lands, which is the one thing this page is built not
-       to do. A transparent edge takes exactly the room a visible one does.
-       ⚠️ AND `background-color` ON THE STATE RULE, NEVER THE `background`
-       SHORTHAND: the shorthand resets `background-image`, which is where the
-       glimmer below lives, so a filled box would stop being able to say it is
-       waiting for the next answer. */
-    border: 1px solid transparent;
+       🔴 AND IT PAINTS NO EDGE AND NO GROUND OF ITS OWN SINCE 2026-09-21,
+       because it is inside a glue now and the glue draws the one edge round the
+       whole component. This box used to carry `border: 1px solid transparent`
+       that became `--line` on `[data-shown]`, so an empty box painted nothing
+       and a filled one painted a card with edges, which is how it answered the
+       rule `/typist/` bought: an empty bordered rectangle renders as a
+       horizontal rule nobody wrote. Both halves of that belong to the part
+       now. `.wish-dump` paints the ground whatever is in the box, the glue
+       paints the edge, and an empty box can no longer draw a line because it
+       has nothing to draw one with.
+       ⚠️ THE ROOM IS STILL RESERVED ON THIS ELEMENT AND NOT ON THE PART, so the
+       floor is the JSON's own and the check reads it where it is declared.
+       ⚠️ AND `[data-shown]` HAS NO RULE LEFT, WHICH IS DELIBERATE. A rule
+       painting an edge the glue already paints would be a second border over
+       the one the child gave up, which is the doubled edge `.pos-glue` exists
+       to avoid, and it would read as correct in the stylesheet. The attribute
+       itself stays: `show()` and `clearAnswer()` are the page's own record of
+       whether an answer is on screen, and the checks read it.
+       ⚠️ THE GLIMMER IS UNAFFECTED. It was always `background-image`, and the
+       warning that bought that wording was about a `background` shorthand
+       resetting it. There is no shorthand on this element any more. */
   }
-  .wish-patch[data-shown] { border-color: var(--line); background-color: var(--card); }
 
   /* 🔴 A TEXT SURFACE THAT IS WAITING FOR SOMETHING SAYS SO, WITH THE SAME
      SWEEP EVERY CONTROL IN THIS PROJECT USES. Asked 2026-09-21: *"make
@@ -96,25 +132,19 @@
   .wish-why-l { color: var(--ink); }
   .wish-rows { display: flex; flex-direction: column; gap: 6px; }
 
-  /* 🔴 THE PICTURE'S ROOM, AND THIS COMMENT CLAIMED MORE THAN THE PAGE DOES.
-     It used to say the room is taken before there is a picture, so an answer
-     landing after a two model round trip cannot shove the log down the page.
-     🔴 MEASURED 2026-09-21 AND IT IS NOT TRUE: with nothing proposed this host
-     stands at **0 px, `display: none`**, while `min-height` still reads
-     **252 px**. `shell.css` carries `.pos-stack > div:empty { display: none }`
-     at (0,2,1), which is a deliberate rule (an empty wrapper must not paint a
-     band, which is the `/typist/` lesson) and it beats `.wish-dg`'s (0,1,0)
-     whatever the source order. This host is an empty div on the first paint and
-     after every press, so the log DOES move when a picture arrives.
-     ⚠️ THE ASSERT BELOW COULD NOT SEE IT, because it reads `min-height`, which
-     is the author's intention rather than the rendered box. The measurement is
-     in its detail line now, and the number to look at is the third one.
-     ⚠️ AND IT IS LEFT ALONE ON PURPOSE. Making it hold would put 252 px of
-     blank page under the JSON on every visit, and 252 was measured when the
-     WHOLE DESK was drawn in one column. The states that exist now measure 47,
-     119 and 119, so the honest repair is a smaller floor plus a rule that beats
-     the shared one, which is a change to what the page looks like on load and
-     has not been asked for.
+  /* 🔴 THE PICTURE'S ROOM, AND IT STANDS NOW BECAUSE THE HOST MOVED. This
+     comment recorded a measured failure until 2026-09-21: with nothing proposed
+     the host was **0 px, `display: none`**, because `shell.css` carries
+     `.pos-stack > div:empty { display: none }` at (0,2,1) and this host is an
+     empty div on the first paint and after every press. A page-local
+     `div.wish-dg:empty { display: flex }` at the same weight and later in the
+     cascade was what held it up.
+     🔴 THAT RULE IS GONE, because the host is a child of the glue now and not
+     of the page stack, so the shared rule cannot reach it at all. A rule that
+     matches nothing is this project's second most expensive kind of defect,
+     and it reads as the thing keeping the room open. The room is `min-height`
+     and `display: flex` on this element, which is all it ever needed to be once
+     nothing was fighting it.
      ⚠️ IT IS CENTRED IN ITS OWN BOX, because the tallest state is the one with
      the least in it: without this the picture would sit against the top and
      leave nothing but air under it for every run that succeeds. */
@@ -124,28 +154,29 @@
        thinking"*. The two states that exist both lay out at **119 px** at this
        page's width, so 120 is the default and the box grows past it where a
        narrower screen makes the drawer stack.
-       ⚠️ IT READ 252 px UNTIL NOW, measured when the WHOLE DESK was drawn in
+       ⚠️ IT READ 252 px BEFORE THAT, measured when the WHOLE DESK was drawn in
        one column. Only the instruments a proposal touches are drawn since, so
-       that number reserved 133 px of air that nothing could ever fill. */
-    min-height: 120px; display: flex; flex-direction: column; justify-content: center;
+       that number reserved 133 px of air that nothing could ever fill.
+       🔴 AND IT READS 140 RATHER THAN 120 SINCE THIS BECAME A PART OF THE GLUE,
+       which is the same 120 with the part's own padding added back. `*
+       { box-sizing: border-box }` is project-wide, so a `min-height` on a
+       padded box reserves the padding OUT of it, and 120 here would have left
+       100 px for a 119 px picture. The check subtracts the padding off again
+       and compares the FIGURE against 120, so the number that is graded is
+       still the number that was measured. */
+    min-height: 140px; display: flex; flex-direction: column; justify-content: center;
   }
-  /* 🔴 AND THE ROOM HAS TO ACTUALLY STAND, WHICH IT DID NOT. MEASURED
-     2026-09-21: with nothing proposed this host was **0 px, `display: none`**
-     while `min-height` still read 252, so the log moved every time a picture
-     arrived and the assert on it could not see that, because `min-height` is
-     the author's intention rather than the rendered box.
-     `shell.css` carries `.pos-stack > div:empty { display: none }` at (0,2,1),
-     which is a deliberate rule (an empty wrapper must not paint a band, the
-     `/typist/` lesson) and it beat `.wish-dg`'s (0,1,0) whatever the order.
-     This host is the one case it is wrong about: it is empty ON PURPOSE and for
-     a measured reason, so it says so at the same weight and later in the
-     cascade. It still paints no border and no background, so the room is
-     invisible until it holds a picture. */
-  div.wish-dg:empty { display: flex; }
-  /* Not `.pos-body > .pos-dg`: that 44 px belongs to the standing `How it
-     works` picture, which opens a section at the end of a page. This one is a
-     result and sits with the JSON it draws, so it keeps the ordinary rhythm. */
-  .wish-dg .pos-dg { margin-top: 0; }
+  /* 🔴 NO MARGIN AT ALL, AND IT USED TO BE `margin-top` ONLY. Not
+     `.pos-body > .pos-dg`: that 44 px belongs to the standing `How it works`
+     picture, which opens a section at the end of a page. This one is a result
+     and sits with the JSON it draws.
+     🔴 THE BOTTOM HALF IS WHAT MADE THE ROOM A FICTION. `.pos-dg` carries
+     `margin: 0 0 14px`, and `.pos-glue` takes a margin off its DIRECT children
+     only, so the figure kept 14 px under it inside this part: a 119 px picture
+     asked for 133 px of room against a 120 px floor, and the part grew when an
+     answer landed. The assert could not see it either, because it reads the
+     figure's own rect and a margin is outside that. */
+  .wish-dg .pos-dg { margin: 0; }
 
   /* 🔴 NO SPINNER ON HOVER. Asked 2026-09-21: *"rm spinner on hover"*.
      `shell.css` gives every busy control `cursor: progress`, which macOS draws
@@ -174,6 +205,7 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createChoice } from '/shell/choice.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, printLink, checkTransforms, delivers } from '/shell/bay.mjs';
   import { describe, reword } from '/shell/instruments.mjs';
@@ -356,17 +388,24 @@
   guard(d);
 
   /**
-   * 🔴 EACH PICKER SITS DIRECTLY ABOVE THE THING IT MAKES, AND THEY USED TO
-   * SHARE ONE ROW AT THE TOP. Asked 2026-09-21: *"but think controls before
-   * json"*. Two models run in sequence here and each one fills a different box,
-   * so a reader looking at a transcription and asking *which one heard this?*
-   * had to go back up past the JSON to find out, and a reader looking at the
-   * JSON had the same walk. `hear` labels the transcript under it and `patch`
-   * labels the object under that.
-   * ⚠️ THEY ARE TWO ROWS RATHER THAN TWO LOOSE PICKERS, because `.pos-choice`
-   * is an inline element and `.pos-stack` owns the gap between BLOCKS: an
-   * inline child takes no margin, so a bare picker would sit flush against the
-   * box under it. `.pos-crow` is the row the kit already has for this.
+   * 🔴 EACH PICKER SITS WITH THE THING IT MAKES, AND THEY USED TO SHARE ONE ROW
+   * AT THE TOP. Asked 2026-09-21: *"but think controls before json"*. Two models
+   * run in sequence here and each one fills a different box, so a reader looking
+   * at a transcription and asking *which one heard this?* had to go back up past
+   * the JSON to find out, and a reader looking at the JSON had the same walk.
+   * `hear` labels the transcript directly under it.
+   * 🔴 `patch` NO LONGER SITS DIRECTLY ON THE JSON, AND THAT IS THE LATER ASK
+   * RATHER THAN A DRIFT BACK. *"make it a single component, 3 parts, glued. in
+   * top is patch list visualizer, below is diagram and dump is below"*, so the
+   * picker heads the component the patch model fills and the picture stands
+   * between it and the object. What the earlier ask was about survives: the
+   * picker that chooses the patch model is inside the thing that model
+   * produces, rather than in a row at the top of the page beside a picker for a
+   * different model.
+   * ⚠️ THEY ARE ROWS RATHER THAN LOOSE PICKERS, because `.pos-choice` is an
+   * inline element and `.pos-stack` owns the gap between BLOCKS: an inline child
+   * takes no margin, so a bare picker would sit flush against the box under it.
+   * `.pos-crow` is the row the kit already has for this.
    * ⚠️ AND THE GAP IS THE PROJECT'S ONE RHYTHM, not a smaller one bought for
    * the pair. A page that writes its own gap here is a page making a claim
    * about one relationship, and the claim would be that a picker is a caption,
@@ -376,7 +415,9 @@
   const patchPick = createChoice({ label: 'patch', options: PATCH, at: 0 });
   const hearRow = el('div', 'pos-crow');
   hearRow.append(hearPick.el);
-  const patchRow = el('div', 'pos-crow');
+  /* `wish-part` because this row is the top of the glue now, and a part paints
+     its own ground or the seam under it has nothing to show against. */
+  const patchRow = el('div', 'pos-crow wish-part');
   patchRow.append(patchPick.el);
 
   /**
@@ -399,8 +440,37 @@
   const patch = el('pre', 'wish-patch');
   const whyBox = el('div', 'wish-rows');
   /* The picture's room, taken from the first paint. See `.wish-dg`. */
-  const dgHost = el('div', 'wish-dg');
-  d.el.append(hearRow, said, patchRow, patch, whyBox, dgHost);
+  const dgHost = el('div', 'wish-dg wish-part');
+
+  /**
+   * 🔴 ONE COMPONENT, THREE PARTS, GLUED. Asked 2026-09-21: *"make it a single
+   * component, 3 parts, glued. in top is patch list visualizer, below is
+   * diagram and dump is below"*. The page used to lay four blocks down its own
+   * stack with the project's 40 px rhythm between them, so the picker, the
+   * JSON, the verdict and the picture read as four things that happen to be
+   * near each other rather than as one answer.
+   * 🔴 `createGlue` IS DOCUMENTED AS BEING FOR ONE PAIR AND THIS IS THREE. Its
+   * header says so, and so does CLAUDE.md's spacing rule: *"createGlue IS FOR
+   * THE ONE PAIR IT WAS WRITTEN FOR, a strip sitting on the transport bar that
+   * drives it"*. The ask is explicit, and the function already takes
+   * `...blocks` and has since it was written, so nothing about the component
+   * changes here.
+   * ⚠️ WHAT A THIRD PART COSTS IS AN EDGE. Inside a glue every child gives up
+   * its border and its radius, and with two parts each one still has the
+   * component's own border along its outer side. The MIDDLE part has neither:
+   * the picture is bounded by a 1 px seam above and a 1 px seam below and by
+   * nothing else, so a part that paints no ground would let the seam colour
+   * through its whole area and the two seams would stop being seams. Every part
+   * carries `wish-part` for exactly that, and the rule is on this page's own
+   * elements rather than on `.pos-glue`. See the stylesheet.
+   * ⚠️ AND THE ALLOWED/REFUSED LINE IS NOT A FOURTH PART. It rides with the
+   * JSON inside the bottom one, because every row it prints is a reading of a
+   * link in that object.
+   */
+  const dump = el('div', 'wish-dump wish-part');
+  dump.append(patch, whyBox);
+  const answer = createGlue(patchRow, dgHost, dump);
+  d.el.append(hearRow, said, answer);
 
   const speakBtn = d.button('speak');
 
@@ -1378,26 +1448,36 @@
     /* 🔴 A MODEL THAT PROPOSED NOTHING IS A REPORT AND IS SHOWN LIKE ANY OTHER
        ANSWER, which is the second clause here and is the negative control for
        the assert below it: two empty states, and this is the one with something
-       to say. If the box stopped painting its edges around a sentence it would
-       be saying nothing had happened. */
+       to say.
+       🔴 THE EDGE CLAUSE LEFT THIS LINE 2026-09-21 AND WAS REHOMED RATHER THAN
+       DROPPED. It read `borderTopColor !== rgba(0, 0, 0, 0)` on the `<pre>`,
+       which was the page's way of saying *this box is showing something*. Inside
+       a glue no child has an edge of its own, so the fact moved to the assert on
+       the component's seams and edges, where it is now measured for all three
+       parts at once instead of for this one. */
     const EMPTY = show([]);
-    const reportEdge = getComputedStyle(patch).borderTopColor;
     d.assert('a proposal of nothing says so rather than showing an empty box',
       EMPTY.ok === 0 && patch.textContent.includes('proposed nothing')
-      && patch.dataset.shown === '1' && reportEdge !== 'rgba(0, 0, 0, 0)',
-      `${patch.textContent.split('\n')[0]}, edge ${reportEdge}`);
+      && patch.dataset.shown === '1',
+      `${patch.textContent.split('\n')[0]}, shown ${patch.dataset.shown === '1'}`);
 
     /**
      * 🔴 AND THE OTHER EMPTY STATE IS THE ONE THAT SAYS NOTHING, WHICH IS WHAT
      * *"rm no patch yet"* ASKED FOR ON 2026-09-21. Four things at once, because
      * they only work together: the box is blank, it does not claim to be
-     * showing anything, it paints NO edge and no card colour (an empty box is a
-     * line, which is the rule `/typist/` bought), and the room is still taken
-     * so an answer landing after a two model round trip cannot shove the log
-     * down the page.
+     * showing anything, it draws no edge and no ground of its own, and the room
+     * is still taken so an answer landing after a two model round trip cannot
+     * shove what is under it down the page.
+     * 🔴 THE EDGE CLAUSE IS A WIDTH NOW AND IT USED TO BE A COLOUR, which is a
+     * change in the instrument rather than in the claim. `border-top-color`
+     * computes to `currentColor` when nothing sets it, so on a box with no
+     * border at all it answers the ink colour and never `rgba(0, 0, 0, 0)`: the
+     * old test could only work while the page was painting a transparent 1 px
+     * edge on purpose. A width of 0 is the same question asked of a box that
+     * has given its border to the glue.
      * ⚠️ THE COMPUTED VALUES, NEVER THE SOURCE. A rule that lost reads as
      * correct in a stylesheet, which this project has measured five times, and
-     * `.wish-patch` is fighting nothing here but could be tomorrow.
+     * `.wish-patch` is fighting `.pos-glue`'s (0,2,0) child rule now.
      */
     clearAnswer();
     const blank = getComputedStyle(patch);
@@ -1405,10 +1485,10 @@
     const blankFloor = parseFloat(blank.minHeight) || 0;
     d.assert('with nothing asked yet the box is blank, paints no edge, and still holds the room',
       patch.textContent === '' && !patch.dataset.shown
-      && blank.borderTopColor === 'rgba(0, 0, 0, 0)'
+      && parseFloat(blank.borderTopWidth) === 0
       && blank.backgroundColor === 'rgba(0, 0, 0, 0)'
       && blankFloor > 0 && blankH >= blankFloor,
-      `${JSON.stringify(patch.textContent)}, edge ${blank.borderTopColor}, `
+      `${JSON.stringify(patch.textContent)}, edge ${blank.borderTopWidth}, `
       + `ground ${blank.backgroundColor}, ${blankH.toFixed(0)} px standing on a `
       + `${blankFloor} px floor`);
 
@@ -1438,6 +1518,10 @@
        after it with it. */
     const look = (what) => seen.push({
       what, boxes: boxes(), arrows: arrows(), h: figH(), mode: dg?.mode ?? 'not drawn',
+      /* The PART's own height, which is a different question from the figure's:
+         a picture that fits can still grow the part it sits in, and the part is
+         what a reader sees move. See the room assert below. */
+      hostH: dgHost.getBoundingClientRect().height,
       labels: labels(), inHost: dgHost.childElementCount,
       cuts: (dg?.cuts ?? []).map((c) => `${c.where} ${c.id} at ${c.width}px`),
     });
@@ -1496,15 +1580,27 @@
        it. MEASURED 2026-09-21: the empty host was **0 px, `display: none`**,
        beaten by `.pos-stack > div:empty` in `shell.css` at (0,2,1), so the log
        moved on every answer while this line read green. The empty height is a
-       clause now, not a remark. */
-    const reserved = parseFloat(getComputedStyle(dgHost).minHeight) || 0;
+       clause now, not a remark.
+       🔴 AND THE ROOM IS THE CONTENT BOX, NOT THE `min-height`, SINCE THE HOST
+       BECAME A PART OF THE GLUE. `box-sizing` is `border-box` project-wide, so
+       a padded part's `min-height` includes its own padding and comparing a
+       figure against it would grade the picture against a number that is
+       partly air. The padding comes off before the comparison and the detail
+       line prints both, so nobody has to re-derive which is which. */
+    const dgBox = getComputedStyle(dgHost);
+    const dgPad = parseFloat(dgBox.paddingTop) + parseFloat(dgBox.paddingBottom);
+    const reserved = (parseFloat(dgBox.minHeight) || 0) - dgPad;
     clearAnswer();
     const roomWhenEmpty = dgHost.getBoundingClientRect().height;
     const showsWhenEmpty = getComputedStyle(dgHost).display;
-    d.assert('the picture fits the room kept for it, and the room is there before the picture is',
-      reserved > 0 && seen.every((s) => s.h <= reserved) && roomWhenEmpty >= reserved,
+    d.assert('the picture fits the room kept for it, and the part never changes height',
+      reserved > 0 && seen.every((s) => s.h <= reserved)
+      && roomWhenEmpty >= reserved + dgPad
+      && seen.every((s) => Math.round(s.hostH) === Math.round(roomWhenEmpty)),
       `${reserved} px is the default height, against ${seen.map((s) => s.h.toFixed(0)).join(', ')} `
-      + `drawn, and ${roomWhenEmpty.toFixed(0)} px standing as ${showsWhenEmpty} with nothing in it`);
+      + `drawn, and ${roomWhenEmpty.toFixed(0)} px standing as ${showsWhenEmpty} with nothing in it, `
+      + `${dgPad} px of it the part's own padding; the part measured `
+      + `${seen.map((s) => s.hostH.toFixed(0)).join(', ')} px through those states`);
 
     /* ── the only feedback the control has left ────────────────────────────
        🔴 THE BUTTON CARRIES NOTHING OF ITS OWN, so the paint IS the signal and
@@ -1539,26 +1635,93 @@
       + `${patchPick.el.querySelectorAll('button').length}, labelled ${pickLabels.join(' and ')}`);
 
     /**
-     * 🔴 EACH PICKER IS DIRECTLY ABOVE THE BOX IT FILLS. Asked as *"but think
-     * controls before json"*, and the whole of it is document order, so it is
-     * read as document order rather than as a pair of coordinates: nothing on
-     * this page is positioned, so the DOM answers the question a rect would
-     * only imply.
+     * 🔴 THE HEAR PICKER IS DIRECTLY ABOVE THE BOX IT FILLS. Asked as *"but
+     * think controls before json"*, and the whole of it is document order, so it
+     * is read as document order rather than as a pair of coordinates: nothing on
+     * this page is positioned, so the DOM answers the question a rect would only
+     * imply.
      * 🔴 AND IT ASKS ABOUT THE PICKER, NOT ABOUT THE ROW AROUND IT, WHICH THE
      * FIRST BUILD OF THIS LINE GOT WRONG. It compared the two `.pos-crow`
      * wrappers' indices, and putting both pickers back in the top row left the
      * second wrapper standing empty in the same slot, so the sabotage that
      * undoes exactly what was asked for read **green**. A check on the
      * container of a thing is not a check on the thing.
+     * 🔴 THE PATCH HALF LEFT THIS LINE 2026-09-21 AND IS ASSERTED BELOW OFF REAL
+     * RECTS. It read `holds(patch, patchPick)`, which is false now and correctly
+     * so: *"in top is patch list visualizer, below is diagram and dump is
+     * below"* puts the picture between that picker and the JSON. The negative
+     * clause stays here, because *the patch picker is not the thing labelling
+     * the transcript* is still the confusion this line exists to catch.
      */
     const above = (box) => box.previousElementSibling;
     const nameOf = (n) => (n ? n.className || n.tagName.toLowerCase() : 'nothing');
     const holds = (box, pick) => above(box)?.contains(pick.el) === true;
-    d.assert('the picker for a box sits directly above that box',
-      holds(said, hearPick) && holds(patch, patchPick) && !holds(said, patchPick),
+    d.assert('the hear picker sits directly above the transcript it fills',
+      holds(said, hearPick) && !holds(said, patchPick),
       `hear ${holds(said, hearPick) ? 'is' : 'is not'} in the row above the transcript, `
-      + `patch ${holds(patch, patchPick) ? 'is' : 'is not'} in the row above the JSON, `
+      + `patch ${holds(said, patchPick) ? 'is' : 'is not'}, `
       + `page reads ${[...d.el.children].map(nameOf).join(' then ')}`);
+
+    /**
+     * 🔴 ONE COMPONENT, THREE PARTS, IN THAT ORDER, MEASURED OFF RECTS. Asked
+     * 2026-09-21: *"make it a single component, 3 parts, glued. in top is patch
+     * list visualizer, below is diagram and dump is below"*.
+     * 🔴 APPENDING IN AN ORDER IS NOT LAYOUT, WHICH IS WHY THIS READS BOXES AND
+     * NOT `children`. `/model/` was corrected by screenshot twelve times in one
+     * evening and every one was plausible reasoning a rect would have refused.
+     * The DOM answers *what did the author write*; the rect answers *what did
+     * the browser do with it*, and a glue is a flex column whose order a single
+     * `order` or `flex-direction` could reverse without moving a line of this
+     * page.
+     * ⚠️ AND THE GLUE ITSELF IS A CLAUSE. Three parts in document order inside
+     * three separate blocks would satisfy every inequality below and be exactly
+     * the arrangement that was asked to go away, so the first clause is that one
+     * element holds all three and that it is `.pos-glue`.
+     */
+    const rect = (n) => n.getBoundingClientRect();
+    const picked = rect(patchRow);
+    const drawn = rect(dgHost);
+    const dumped = rect(dump);
+    const oneBox = answer.classList.contains('pos-glue')
+      && [patchRow, dgHost, dump].every((n) => n.parentElement === answer)
+      && answer.parentElement === d.el;
+    d.assert('the patch picker, the picture and the JSON are one glued component, in that order',
+      oneBox && picked.bottom <= drawn.top && drawn.bottom <= dumped.top,
+      `${oneBox ? 'one .pos-glue holds all three' : 'NOT one box'}, picker ends at `
+      + `${picked.bottom.toFixed(0)}, picture runs ${drawn.top.toFixed(0)} to `
+      + `${drawn.bottom.toFixed(0)}, JSON starts at ${dumped.top.toFixed(0)}`);
+
+    /**
+     * 🔴 AND WHAT SAYS WHERE A PART ENDS IS THE SEAM, WHICH IS THE WHOLE
+     * QUESTION A THIRD PART ASKS. Inside a glue every child gives up its border
+     * and its radius, so the picture is bounded above and below by 1 px of
+     * `--line` and by nothing else. That only works while each part paints a
+     * ground of its own: a transparent part lets the seam colour through its
+     * whole area, and then there is no seam, there is a block of `--line` with
+     * text on it.
+     * ⚠️ THREE THINGS AT ONCE BECAUSE THEY ONLY WORK TOGETHER: the gaps between
+     * the parts are 1 px rather than the page's 40 px rhythm, no part draws a
+     * border of its own, and every part's ground is something other than the
+     * seam colour. Drop any one and the other two are still true of a picture
+     * nobody can read the edges of.
+     * ⚠️ THE GROUND IS COMPARED AGAINST THE GLUE'S OWN BACKGROUND rather than
+     * against a colour typed here, so the day `--line` or `--card` moves this
+     * still asks the right question. Two values read from the page, never one
+     * read and one remembered.
+     */
+    const seamInk = getComputedStyle(answer).backgroundColor;
+    const grounds = [patchRow, dgHost, dump].map((n) => getComputedStyle(n).backgroundColor);
+    const edges = [patchRow, dgHost, dump]
+      .map((n) => parseFloat(getComputedStyle(n).borderTopWidth));
+    const seams = [drawn.top - picked.bottom, dumped.top - drawn.bottom];
+    d.assert('each part paints its own ground, so the 1 px seam between them is the only edge inside',
+      seams.every((g) => Math.round(g) === 1)
+      && edges.every((w) => w === 0)
+      && grounds.every((c) => c !== seamInk && c !== 'rgba(0, 0, 0, 0)'),
+      `seams ${seams.map((g) => g.toFixed(1)).join(' and ')} px, borders `
+      + `${edges.join()} px, ${grounds.filter((c) => c !== seamInk && c !== 'rgba(0, 0, 0, 0)').length} `
+      + `of ${grounds.length} parts painting a ground of their own (${grounds[0]}) `
+      + `against the glue's ${seamInk}`);
 
     d.assert('the desk it describes is the one the other pages build ids for',
       PORTS.some((p) => p.id === 'here:circuit:in') && PORTS.some((p) => p.id === 'here:mk-425c-usb-midi-keyboard:out'),
