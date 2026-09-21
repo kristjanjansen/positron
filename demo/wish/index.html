@@ -20,7 +20,7 @@
   .wish-said {
     display: block; width: 100%; height: 64px; resize: none; overflow-y: auto;
     padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px;
-    background: var(--card); color: var(--ink);
+    background-color: var(--card); color: var(--ink);
     font-family: inherit; font-size: 15px; line-height: 1.45;
   }
   .wish-patch {
@@ -29,8 +29,66 @@
        when an answer lands, which is a human-paced change rather than a clock,
        and is the case the no-twitch rule explicitly allows. */
     min-height: 62px; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px 12px;
-    border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+    border-radius: 4px;
     font: 12px/1.6 var(--mono, ui-monospace, monospace); color: var(--ink);
+    /* 🔴 NOTHING IS WRITTEN HERE UNTIL THERE IS SOMETHING TO WRITE, AND THE
+       ROOM IS STILL TAKEN. Asked 2026-09-21: *"rm no patch yet"*. The box used
+       to draw `# no patch yet`, which is furniture: it tells a reader that a
+       box is a box, which the box already said, and it is the same mistake as
+       an em dash standing in for a number nobody measured.
+       🔴 AND AN EMPTY BOX IS A LINE, which is the rule `/typist/` bought: a
+       bordered rectangle with nothing in it renders as a horizontal rule
+       nobody wrote. So the edge and the card colour arrive with the content and
+       leave with it.
+       ⚠️ THE BORDER IS TRANSPARENT RATHER THAN ABSENT. `border: 0` while empty
+       and `1px` once filled would move everything below this box by two pixels
+       the moment an answer lands, which is the one thing this page is built not
+       to do. A transparent edge takes exactly the room a visible one does.
+       ⚠️ AND `background-color` ON THE STATE RULE, NEVER THE `background`
+       SHORTHAND: the shorthand resets `background-image`, which is where the
+       glimmer below lives, so a filled box would stop being able to say it is
+       waiting for the next answer. */
+    border: 1px solid transparent;
+  }
+  .wish-patch[data-shown] { border-color: var(--line); background-color: var(--card); }
+
+  /* 🔴 A TEXT SURFACE THAT IS WAITING FOR SOMETHING SAYS SO, WITH THE SAME
+     SWEEP EVERY CONTROL IN THIS PROJECT USES. Asked 2026-09-21: *"make
+     textinputs / areas have same glimmer fade when processing, waiting for
+     input. bit moer subtle"*.
+     ⚠️ SUBTLER IS ONE NUMBER AND NOT A SECOND ANIMATION. The button's sweep is
+     `var(--fg)` at 22 per cent; this is 9, because a button is a small bright
+     object and these two are the largest surfaces on the page. The PERIOD is
+     deliberately the same 1.1 s: two sweeps side by side at different rates
+     beat against each other, which is a second thing to look at rather than a
+     quieter version of the first.
+     ⚠️ `@keyframes pos-sweep` IS `shell.css`'s OWN, reused rather than copied.
+     One idea, one picture, which is the argument `choice.mjs` already makes
+     about its own pending state.
+     ⚠️ PAINT ONLY, WHICH IS THE STANDING RULE: `background-image` changes no
+     size, no border width and no shadow spread, so nothing under a reader's
+     hand moves while it runs. Asserted as a measured height rather than
+     believed. */
+  .wish-said[data-busy], .wish-patch[data-busy] {
+    background-image: linear-gradient(100deg,
+      transparent 0%, transparent 35%,
+      color-mix(in oklab, var(--fg) 9%, transparent) 50%,
+      transparent 65%, transparent 100%);
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    animation: pos-sweep 1.1s linear infinite;
+  }
+  /* A page that respects reduced motion still has to say the thing is working,
+     which is `shell.css`'s own reasoning about the button. A steady wash rather
+     than the dimming that block uses: the patch box is empty and unpainted
+     while it waits, so an opacity would have nothing to act on. */
+  @media (prefers-reduced-motion: reduce) {
+    .wish-said[data-busy], .wish-patch[data-busy] {
+      animation: none;
+      background-image: linear-gradient(
+        color-mix(in oklab, var(--fg) 6%, transparent),
+        color-mix(in oklab, var(--fg) 6%, transparent));
+    }
   }
   .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); }
   .wish-why b { color: var(--bad, #e0908a); font-weight: 600; }
@@ -38,20 +96,52 @@
   .wish-why-l { color: var(--ink); }
   .wish-rows { display: flex; flex-direction: column; gap: 6px; }
 
-  /* 🔴 THE PICTURE'S ROOM IS TAKEN BEFORE THERE IS A PICTURE. It is redrawn
-     after a two model round trip, and a box that appears then would shove the
-     log and everything under it down the page. The number is MEASURED rather
-     than guessed, and the page asserts it fits in every state: 249 px with no
-     arrows, where the drawer stacks all three instruments in one column, and
-     184 px once an arrow puts one of them in a second column.
-     ⚠️ It holds the whole desk from the first paint rather than nothing, so
-     there is no empty bordered box here either.
-     ⚠️ AND IT IS CENTRED IN ITS OWN BOX, because the tallest state is the one
-     with no answer in it: without this the picture would sit against the top
-     and leave 65 px of nothing under it for every run that succeeds. */
+  /* 🔴 THE PICTURE'S ROOM, AND THIS COMMENT CLAIMED MORE THAN THE PAGE DOES.
+     It used to say the room is taken before there is a picture, so an answer
+     landing after a two model round trip cannot shove the log down the page.
+     🔴 MEASURED 2026-09-21 AND IT IS NOT TRUE: with nothing proposed this host
+     stands at **0 px, `display: none`**, while `min-height` still reads
+     **252 px**. `shell.css` carries `.pos-stack > div:empty { display: none }`
+     at (0,2,1), which is a deliberate rule (an empty wrapper must not paint a
+     band, which is the `/typist/` lesson) and it beats `.wish-dg`'s (0,1,0)
+     whatever the source order. This host is an empty div on the first paint and
+     after every press, so the log DOES move when a picture arrives.
+     ⚠️ THE ASSERT BELOW COULD NOT SEE IT, because it reads `min-height`, which
+     is the author's intention rather than the rendered box. The measurement is
+     in its detail line now, and the number to look at is the third one.
+     ⚠️ AND IT IS LEFT ALONE ON PURPOSE. Making it hold would put 252 px of
+     blank page under the JSON on every visit, and 252 was measured when the
+     WHOLE DESK was drawn in one column. The states that exist now measure 47,
+     119 and 119, so the honest repair is a smaller floor plus a rule that beats
+     the shared one, which is a change to what the page looks like on load and
+     has not been asked for.
+     ⚠️ IT IS CENTRED IN ITS OWN BOX, because the tallest state is the one with
+     the least in it: without this the picture would sit against the top and
+     leave nothing but air under it for every run that succeeds. */
   .wish-dg {
-    min-height: 252px; display: flex; flex-direction: column; justify-content: center;
+    /* 🔴 A DEFAULT HEIGHT, AND IT IS MEASURED. Asked 2026-09-21: *"use the
+       patcher visualizer with a default height and a shimmer only while
+       thinking"*. The two states that exist both lay out at **119 px** at this
+       page's width, so 120 is the default and the box grows past it where a
+       narrower screen makes the drawer stack.
+       ⚠️ IT READ 252 px UNTIL NOW, measured when the WHOLE DESK was drawn in
+       one column. Only the instruments a proposal touches are drawn since, so
+       that number reserved 133 px of air that nothing could ever fill. */
+    min-height: 120px; display: flex; flex-direction: column; justify-content: center;
   }
+  /* 🔴 AND THE ROOM HAS TO ACTUALLY STAND, WHICH IT DID NOT. MEASURED
+     2026-09-21: with nothing proposed this host was **0 px, `display: none`**
+     while `min-height` still read 252, so the log moved every time a picture
+     arrived and the assert on it could not see that, because `min-height` is
+     the author's intention rather than the rendered box.
+     `shell.css` carries `.pos-stack > div:empty { display: none }` at (0,2,1),
+     which is a deliberate rule (an empty wrapper must not paint a band, the
+     `/typist/` lesson) and it beat `.wish-dg`'s (0,1,0) whatever the order.
+     This host is the one case it is wrong about: it is empty ON PURPOSE and for
+     a measured reason, so it says so at the same weight and later in the
+     cascade. It still paints no border and no background, so the room is
+     invisible until it holds a picture. */
+  div.wish-dg:empty { display: flex; }
   /* Not `.pos-body > .pos-dg`: that 44 px belongs to the standing `How it
      works` picture, which opens a section at the end of a page. This one is a
      result and sits with the JSON it draws, so it keeps the ordinary rhythm. */
@@ -70,6 +160,16 @@
      ONE AVAILABLE: the rule being beaten is in a shared stylesheet this page
      cannot reorder. `button[data-busy="1"]` is (0,1,1) and this is (0,2,1). */
   .pos-controls button[data-busy="1"] { cursor: default; }
+  /* 🔴 AND NOTHING PAINTS THE MODEL PICKERS AT ALL. Asked 2026-09-21: *"don't
+     animate the model radios"*. They were briefly given `choice.mjs`'s own
+     pending sweep so the row could say which of the two models was at work, and
+     that is the wrong thing to say on them: a picker holds a choice a person
+     made, and animating it reads as the page doing something TO that choice.
+     What is at work is said by the box the answer is going to land in.
+     ⚠️ SO THERE IS NO RULE HERE, AND THAT IS DELIBERATE. A rule guarding the
+     spinner on an animating picker would be a dead rule, which this project
+     counts as its second most expensive kind of defect. The check reads the
+     pickers at every moment of the span and expects to find nothing. */
 </style>
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
@@ -162,7 +262,19 @@
   const HEAR = [['turbo', '@cf/openai/whisper-large-v3-turbo'],
                 ['whisper', '@cf/openai/whisper'],
                 ['tiny', '@cf/openai/whisper-tiny-en']];
-  const THINK = [['70B', '@cf/meta/llama-3.3-70b-instruct-fp8-fast'],
+  /**
+   * 🔴 THE ROW IS CALLED `PATCH` AND IT WAS CALLED `THINK`. Asked 2026-09-21:
+   * *"replace "think" with something else, more related to task at hand"*.
+   * `think` describes a mechanism in the private vocabulary of the people who
+   * built the page, which is exactly what the no-jargon rule is about: a
+   * visitor reading `THINK` beside `HEAR` learns nothing about what either one
+   * produces. `patch` is already this project's word for the output, in
+   * `printLink`, in the patch language and in `/bay/`, so the row reads
+   * *HEAR ... PATCH ...*, which is what the page does.
+   * ⚠️ `WIRE` WAS THE OTHER CANDIDATE AND IS TAKEN, by `demo/shell/wire.mjs`
+   * and by a demo of that name.
+   */
+  const PATCH = [['70B', '@cf/meta/llama-3.3-70b-instruct-fp8-fast'],
                  ['8B', '@cf/meta/llama-3.1-8b-instruct-fp8-fast'],
                  ['3B', '@cf/meta/llama-3.2-3b-instruct'],
                  ['Mistral', '@cf/mistralai/mistral-small-3.1-24b-instruct'],
@@ -172,17 +284,25 @@
     name: 'wish',
     what: 'Say what you want the desk to do, and a Cloudflare model proposes the patch.',
     /**
-     * 🔴 TWO CELLS, AND THE TWO TIMINGS CAME OFF. Asked 2026-09-21 as
-     * *"rm heard"*, and `mount()` throws on an odd count, so taking one of four
-     * forces a second decision rather than leaving a hole. Both timings went:
-     * they are a pair, both milliseconds, and both are facts about how long
-     * somebody else's model took rather than about the patch. `links` and
-     * `refused` are the outcome and are what a person pressing the button wants.
-     * ⚠️ NOTHING WAS LOST, BECAUSE THE LOG CARRIES THEM NOW. It did not before,
-     * so deleting the cells without adding the lines would have stopped the page
-     * reporting a real number.
+     * 🔴 NO READOUT AT ALL. Asked 2026-09-21: *"rm links / 1 / refused / 1"*,
+     * which is both remaining cells after the two timings came off earlier the
+     * same day. The cells went one pair at a time for the same reason: a count
+     * of links and a count of refusals are the OUTCOME, and the outcome already
+     * has a better home on a page where every answer is an event rather than a
+     * running measurement.
+     * ✅ NOTHING IS LOST, AND THAT WAS CHECKED RATHER THAN ASSUMED. Every
+     * proposal logs one line carrying the time, the link count, the refusals
+     * and the tokens together, which is more than two boxes could hold and it
+     * is dated, so two answers can be compared.
+     * ⚠️ `readout: null` IS A DECLARATION AND NOT AN OMISSION. The shell turns
+     * it into `readoutOptOut`, so `demo/verify.mjs` asserts *declares that it
+     * has no readout, on purpose* rather than failing a page that forgot one.
+     * ⚠️ AND THE BOX IT WOULD HAVE DRAWN IS MEASURED RATHER THAN TRUSTED,
+     * below: an empty `.pos-readout` painted its own two 1 px edges as a
+     * full-width band nobody wrote on `/typist/`, reported as *"old UI creeping
+     * in"*.
      */
-    readout: { links: '', refused: '' },
+    readout: null,
     controls: [
       /* 🔴 CONTROL 0, so `settleMs` lands on it and so the harness presses the
          thing this page is about. It uses a canned reply under `?selfcheck=1`
@@ -197,22 +317,47 @@
          means *press this* and a sweep that means *this is working* on one
          button, and the two were being read as one thing. */
       { id: 'speak', label: 'Hold to talk' },
-      /* 🔴 IT SENDS WHAT IS IN THE BOX, which is the half that makes an
-         editable transcription worth anything. A mis-heard word is now one
-         keystroke and one model call rather than a second recording and two. */
-      { id: 'ask', label: 'Ask' },
-      /* 🔴 IT WRITES INTO THE BOX AND ASKS NOBODY ANYTHING, so it costs no
-         model call at all. It used to send straight to Cloudflare, which made
-         the cheapest control on the page the one that spent the account. */
+      /* 🔴 THERE IS NO `Ask` BUTTON, ASKED FOR 2026-09-21: *"remove the Ask
+         button, auto-ask after transcription"*. A release already transcribed
+         and then proposed by itself, so the button was a second way to do the
+         thing that had just finished happening.
+         🔴 AND THE BOX STILL HAS A WAY TO SUBMIT, BECAUSE AN EDITABLE BOX WITH
+         NONE IS A LYING CONTROL. It is Enter, with Shift+Enter for a newline.
+         See the `keydown` handler for why that key and where the gesture is
+         written down.
+         ⚠️ IT ALSO MEANS THIS ROW IS TWO CONTROLS RATHER THAN THREE, and the
+         harness presses each one, so the proposal path is still reached by a
+         BUTTON: `Use the example` asks. Without that, the checks behind asking
+         would have gone silent while the suite stayed green, which is what
+         happened on `/mirror/` and `/blocks/`. */
       { id: 'example', label: 'Use the example' },
     ],
   });
   guard(d);
 
+  /**
+   * 🔴 EACH PICKER SITS DIRECTLY ABOVE THE THING IT MAKES, AND THEY USED TO
+   * SHARE ONE ROW AT THE TOP. Asked 2026-09-21: *"but think controls before
+   * json"*. Two models run in sequence here and each one fills a different box,
+   * so a reader looking at a transcription and asking *which one heard this?*
+   * had to go back up past the JSON to find out, and a reader looking at the
+   * JSON had the same walk. `hear` labels the transcript under it and `patch`
+   * labels the object under that.
+   * ⚠️ THEY ARE TWO ROWS RATHER THAN TWO LOOSE PICKERS, because `.pos-choice`
+   * is an inline element and `.pos-stack` owns the gap between BLOCKS: an
+   * inline child takes no margin, so a bare picker would sit flush against the
+   * box under it. `.pos-crow` is the row the kit already has for this.
+   * ⚠️ AND THE GAP IS THE PROJECT'S ONE RHYTHM, not a smaller one bought for
+   * the pair. A page that writes its own gap here is a page making a claim
+   * about one relationship, and the claim would be that a picker is a caption,
+   * which it is not: it is a control somebody presses.
+   */
   const hearPick = createChoice({ label: 'hear', options: HEAR, at: 0 });
-  const thinkPick = createChoice({ label: 'think', options: THINK, at: 0 });
-  const row = el('div', 'pos-crow');
-  row.append(hearPick.el, thinkPick.el);
+  const patchPick = createChoice({ label: 'patch', options: PATCH, at: 0 });
+  const hearRow = el('div', 'pos-crow');
+  hearRow.append(hearPick.el);
+  const patchRow = el('div', 'pos-crow');
+  patchRow.append(patchPick.el);
 
   /**
    * 🔴 THE HEARD SENTENCE IS EDITABLE. Asked 2026-09-21, pointing at the
@@ -225,15 +370,57 @@
    * those apart, and it needs a box somebody can retype.
    */
   const said = el('textarea', 'wish-said');
-  said.placeholder = 'hold the button and say what you want, or use the example';
+  /* 🔴 THE PLACEHOLDER IS WHERE THE GESTURE IS WRITTEN DOWN, because there is
+     no `Ask` button left to carry it and a page does not get to hide its only
+     way to submit. Same rule as `Hold to talk` naming its own gesture: the
+     label is the documentation. */
+  said.placeholder = 'hold the button and say what you want, or type here and press Enter';
   said.spellcheck = false;
-  const patch = el('pre', 'wish-patch', '# no patch yet');
+  const patch = el('pre', 'wish-patch');
   const whyBox = el('div', 'wish-rows');
   /* The picture's room, taken from the first paint. See `.wish-dg`. */
   const dgHost = el('div', 'wish-dg');
-  d.el.append(row, said, patch, whyBox, dgHost);
+  d.el.append(hearRow, said, patchRow, patch, whyBox, dgHost);
 
   const speakBtn = d.button('speak');
+
+  /**
+   * 🔴 THE BOX AN ANSWER IS GOING TO LAND IN GLIMMERS WHILE ITS MODEL IS
+   * WORKING. Asked 2026-09-21: *"make textinputs / areas have same glimmer fade
+   * when processing"*, *"show processing animation"*, and then narrowed the
+   * same day to *"a shimmer only while thinking"*. The sweep IS the processing
+   * animation rather than a second picture beside it, and it is the one every
+   * control in this project already wears.
+   *
+   * 🔴 ONLY WHILE A MODEL IS ACTUALLY WORKING, WHICH IS THE NARROWING AND IT
+   * TOOK ONE STATE OFF. The first build painted from the press, so an open
+   * microphone with somebody still talking into it read as work in progress.
+   * Nothing is being computed then: the page is waiting for a person, and a
+   * page that looks busy while nothing is happening is this project's
+   * gate-feedback defect in a new costume. The button's own sweep says the
+   * CONTROL is at work, which is true from the press, and that is a different
+   * claim from *a model is thinking*.
+   * 🔴 ONE BOX AT A TIME, AND WHICH ONE IS THE MESSAGE. The listening model
+   * fills the transcript, so that box glimmers while `/hear` is out; the patch
+   * model fills the JSON, so that box glimmers while `/wish` is out. Painting
+   * both would say two models were working when one is, and it is the arrow
+   * telling a reader where to look next.
+   * ⚠️ AND NEVER THE PICKERS: *"don't animate the model radios"*. See the
+   * stylesheet.
+   * ⚠️ IT IS PAINT, EXACTLY LIKE THE BUTTON'S. No size, no border width, no
+   * shadow spread, because nothing on this page may change how much room it
+   * takes while somebody is looking at it.
+   * @param {'hear'|'patch'|null} [stage] which model is at work, or neither
+   */
+  function waitFor(stage = null) {
+    /* Set and DELETED, never set to `''`: every rule here is written
+       `[data-busy]`, and an attribute selector matches on presence, so a
+       surface that had waited once would glimmer for the rest of the page's
+       life. Measured on `video-panel.mjs` and it is a standing rule. */
+    const paint = (node, on) => { if (on) node.dataset.busy = '1'; else delete node.dataset.busy; };
+    paint(said, stage === 'hear');
+    paint(patch, stage === 'patch');
+  }
 
   // ── the desk, as a bay, so the proposal is graded by the real validator ───
 
@@ -330,19 +517,56 @@
    * arriving at the wrong box is visible in an instant, and only if the right
    * box is in the picture beside it.
    */
+  /**
+   * 🔴 `also` IS THE WORDS A PERSON ACTUALLY SAYS, AND THE PAGE WAS MISSING
+   * THEM. Reported 2026-09-21 with a screenshot: *"connect evolution to
+   * circuit"* answered *the model proposed nothing*. **The model was right and
+   * the desk's vocabulary was wrong.** CoreMIDI calls that port `MK-425C USB
+   * MIDI Keyboard`; the instrument is an **Evolution MK-425C**, the maker's
+   * name is on the box and in every sentence anybody says about it, and it was
+   * in none of the strings the model was given. The last line of the prompt
+   * fired exactly as written.
+   * 🔴 THEY ARE DATA AND ARE NEVER DERIVED FROM THE LABEL. A pattern turning
+   * `MK-425C` into `Evolution` is an invention that happens to be right in this
+   * room and would be wrong on the next device. A maker is a fact somebody
+   * knows, so it is typed here, and an instrument with nothing to add gets no
+   * line in the prompt at all.
+   * ⚠️ AND AN ALIAS NEVER BECOMES A PORT ID. `from` and `to` in the schema stay
+   * an `enum` of the real ids, which is what stopped a Moog and a Prophet
+   * neither of which is on this desk coming back as inventions. Aliases go in
+   * the prose the model READS, never in the list it must choose from.
+   * ⚠️ `the desk` IS DELIBERATELY NOT ON THE MIXER. This page's own prose calls
+   * the whole rig the desk, so an alias would resolve *connect the keyboard to
+   * the desk* to one instrument on it.
+   */
   const INSTRUMENTS = [
     { id: 'keys', label: 'MK-425C', sub: 'MIDI keyboard', kind: 'device',
+      also: ['Evolution', 'Evolution MK-425C', 'MK-425C', 'the keyboard'],
       note: 'The Evolution keyboard. It sends on channel 2 and its keys are one semitone '
           + 'flat, which is why a transpose turns up in almost every proposal.' },
     { id: 'circuit', label: 'Circuit', sub: 'Novation synth', kind: 'device',
+      also: ['Novation', 'Novation Circuit', 'the synth'],
       note: 'Two synth voices on channels 1 and 2, drums on channel 10, master filter on '
           + 'channel 16. It has no factory reset, so a link that could carry SysEx is '
           + 'refused outright.' },
     { id: 'model12', label: 'Model 12', sub: 'TASCAM mixer', kind: 'device',
+      also: ['TASCAM', 'TASCAM Model 12', 'the mixer'],
       note: 'Nine faders that send pitch bend, and a MIDI IN that takes notes and '
           + 'controllers. Two well formed proposals measured here arrived at this box and '
           + 'belonged to the Circuit.' },
   ];
+
+  /**
+   * The ports as the model is told about them: the real id, the label CoreMIDI
+   * gives it, and whatever else this room calls the instrument it belongs to.
+   * ⚠️ IT IS BUILT AT CALL TIME rather than folded into `PORTS`, because `PORTS`
+   * is also what `freshBay()` and the picture read and neither has any business
+   * with a nickname.
+   */
+  const portsForModel = () => PORTS.map((p) => {
+    const also = INSTRUMENTS.find((n) => n.id === p.box)?.also;
+    return also?.length ? { ...p, also } : { ...p };
+  });
   const DG_CAPTION = 'Every arrow is a link the model asked for, and a refused one is '
     + 'marked rather than left out.';
 
@@ -423,13 +647,40 @@
     const touched = new Set(links.flatMap((l) => [l.from, l.to]));
     const nodes = INSTRUMENTS.filter((n) => touched.has(n.id));
     dg?.destroy();
+    dg = null;
+    /**
+     * 🔴 NO LINKS, NO PICTURE AT ALL, AND THIS WAS A REAL DEFECT. Reported
+     * 2026-09-21: *"Every arrow is a link the model asked for, and a refused
+     * one is marked rather than left out. - on empty diagram"*. Filtering the
+     * nodes down to the ones a proposal touches left `createDiagram` being
+     * called unconditionally, so a proposal of nothing rendered **a caption
+     * with nothing above it**: furniture explaining a picture that is not
+     * there.
+     * ⚠️ THERE ARE TWO ROUTES TO AN EMPTY PICTURE AND ONLY ONE WAS HANDLED.
+     * `clearAnswer()` empties the host, which is why this survived every run:
+     * the only way to see it is the *model proposed nothing* path.
+     * ⚠️ AND THE REPORT IS NOT THE CAPTION. *The model proposed nothing* lives
+     * in the patch box and stays; this caption goes. One is an answer, the
+     * other explains a drawing.
+     * ⚠️ THE ROOM STAYS EITHER WAY. See `.wish-dg`.
+     */
+    if (!links.length) { dgHost.replaceChildren(); return { drawn: 0, loops, boxes: 0 }; }
     dg = createDiagram(dgHost, { caption: DG_CAPTION, nodes, links });
     return { drawn: links.length, loops, boxes: nodes.length };
   }
 
-  /* Two different empty states, and they are not the same sentence. Nothing has
-     been asked yet, and a model was asked and proposed nothing. */
-  const NO_PATCH = '# no patch yet';
+  /**
+   * 🔴 TWO DIFFERENT EMPTY STATES, AND ONLY ONE OF THEM IS A SENTENCE. Nothing
+   * has been asked yet, and a model was asked and proposed nothing.
+   * ⚠️ THE FIRST ONE LOST ITS WORDS ON 2026-09-21: *"rm no patch yet"*. It said
+   * `# no patch yet`, which tells a reader that an empty box is empty. The box
+   * shows nothing and paints no edge now, and `.wish-patch` holds the floor so
+   * the log below cannot be shoved down the page when an answer lands.
+   * 🔴 THE SECOND ONE SURVIVES AND IS NOT FURNITURE. *The model proposed
+   * nothing* is a REPORT, and the right answer to an instruction that names
+   * nothing on this desk, so it is shown in a box that paints its edges like
+   * any other answer. There is an assert on it.
+   */
   const EMPTY_PATCH = '# the model proposed nothing, which is the right answer to an instruction\n'
     + '# that names nothing on this desk';
 
@@ -452,6 +703,9 @@
        omitting it; the one-line form hid it by running off the edge. */
     patch.textContent = links.length
       ? links.map((l) => JSON.stringify(l, null, 2)).join('\n') : EMPTY_PATCH;
+    /* Both of these are things to show, the object and the report that there is
+       no object, so both get the box's edges. See `.wish-patch`. */
+    patch.dataset.shown = '1';
     whyBox.replaceChildren(...g.rows.map((r) => {
       const e = el('div', 'wish-why');
       e.append(el(r.ok ? 'i' : 'b', '', r.ok ? 'allowed' : 'refused'),
@@ -461,8 +715,6 @@
       if (!r.ok) e.append(el('div', '', r.why));
       return e;
     }));
-    d.set('links', links.length || '');
-    d.set('refused', g.refused || '');
     g.picture = draw(g);
     return g;
   }
@@ -477,40 +729,44 @@
    * answer left standing says *this is the answer*.
    * ⚠️ ON THE PRESS, NOT ON THE REPLY. Clearing when the answer lands leaves
    * the whole window that causes the problem exactly as it was.
-   * ⚠️ AND THE READOUT GOES BACK TO EMPTY, never to `0`, which would read as a
-   * very confident measurement of nothing.
+   * ⚠️ AND THE BOX GOES BACK TO BLANK, never to a placeholder. There used to be
+   * a `# no patch yet` line here, which said only that a box is a box.
    */
   /**
-   * 🔴 NOTHING IS DRAWN UNTIL THERE IS A MAPPING, AND THE ROOM IS STILL
-   * RESERVED. Asked 2026-09-21: *"do not show diagram until we have mapping"*,
-   * after *"make it json and autodraw diagram below (reserve space for it)"*.
-   * Those two pull in opposite directions only if *show* and *reserve* are
-   * treated as one thing. They are not: the height is held from the first paint
-   * so an answer landing after a two model round trip cannot shove the log down
-   * the page, and the picture itself appears when there is something to draw.
+   * 🔴 NOTHING IS DRAWN UNTIL THERE IS A MAPPING. Asked 2026-09-21: *"do not
+   * show diagram until we have mapping"*, after *"make it json and autodraw
+   * diagram below (reserve space for it)"*.
+   * ⚠️ THE SECOND HALF OF THAT PAIR IS THE ONE THIS DOES NOT DELIVER, AND IT IS
+   * MEASURED RATHER THAN ARGUED. See `.wish-dg`: an empty host is
+   * `display: none` and 0 px, so the room is not held and the log moves when a
+   * picture lands. The patch box above it DOES hold its floor, because a `<pre>`
+   * is not on the list of wrappers `shell.css` collapses.
    * ⚠️ AND AN EMPTY BOX MUST NOT PAINT ITS EDGES, which is a standing rule here
    * ("separation is spacing, not lines, AND AN EMPTY BOX IS A LINE"), measured
    * once on `/typist/` where a page declaring `readout: null` still got a div
    * whose own borders rendered as a 2 px band nobody had written. `.wish-dg`
-   * carries no border and no background, so the reserved room is invisible
-   * until it holds a picture.
+   * carries no border and no background either way.
    * ⚠️ A DESK WITH NO ARROWS IS NOT A MAPPING. The old behaviour drew all three
    * instruments from the first paint, which reads as an answer: three boxes and
    * nothing joining them is a picture saying *these do not connect*, which is a
    * claim nobody made.
    */
   function clearAnswer() {
-    patch.textContent = NO_PATCH;
+    patch.textContent = '';
+    /* DELETED rather than emptied, because `.wish-patch[data-shown]` matches on
+       presence: a box that had held one answer would keep its edges for the
+       rest of the page's life. */
+    delete patch.dataset.shown;
     whyBox.replaceChildren();
-    d.set('links', '');
-    d.set('refused', '');
     dg?.destroy();
     dg = null;
     dgHost.replaceChildren();
   }
   function clearAll() { said.value = ''; clearAnswer(); }
 
-  /* The room is taken before anybody presses anything; the picture is not. */
+  /* Nothing is shown before anybody presses anything. The patch box holds its
+     own floor from here; the picture's host does not, which is measured and
+     written up on `.wish-dg`. */
   clearAnswer();
 
   // ── the two calls ────────────────────────────────────────────────────────
@@ -535,6 +791,22 @@
        BECAUSE NOTHING WAS REACHED. The counter is the page's audit of whether a
        visit opened anything, so counting a call that never left the tab would
        make the one assert about it read false. */
+    /**
+     * 🔴 AND THE LISTENING CALL IS GATED TOO, SO THE WHOLE RELEASE IS GRADED.
+     * Until this line `/hear` was unreachable in a harness run by construction
+     * rather than by a gate: `begin()` stops before it opens a microphone, so
+     * `finish()` never ran and the auto-ask nobody could reach was graded by
+     * nothing at all. With a canned transcription a check can drive `finish()`
+     * and watch a release transcribe and then propose, for nothing.
+     * ✅ THE SENTENCE IS THE ONE THAT WAS MEASURED, from
+     * `research/cf-models-speech-to-patch-2026-09-21.md` §7.1: 3.68 s of
+     * webm/opus, returned word for word in 961 ms. Its case and its missing
+     * full stop are the model's, not a typo, and they are what makes it
+     * distinguishable from `EXAMPLE` in a check.
+     */
+    if (SELFCHECK && path === '/hear') {
+      return { text: CANNED_HEARD, words: null, ms: 0, model: 'canned' };
+    }
     if (SELFCHECK && path === '/wish') {
       /* ⚠️ THE GATE RETURNS WHAT THE SERVER NOW RETURNS, not the raw model
          output. `relabel` in `workers/wish/src/wish.mjs` repairs the one key
@@ -570,29 +842,54 @@
     d.log(e.answered === false ? e.message : `the agent said: ${e.message}`, 'warn');
   }
 
+  /**
+   * The patch half of the flow: a sentence in, an object out.
+   * ⚠️ THE FUNCTION KEEPS ITS NAME AND THE PAGE DOES NOT USE THE WORD. `think`
+   * is fine in code and is jargon on screen, which is the whole of the rule: a
+   * visitor never reads a function name.
+   */
   async function think(text) {
     said.value = text;
     clearAnswer();
-    d.log(`asking ${thinkPick.value().split('/').pop()}`);
-    const out = await post('/wish', { text, ports: PORTS, facts: FACTS, model: thinkPick.value() });
-    const g = show(out.links || []);
-    /* 🔴 A REPAIR NOBODY IS TOLD ABOUT IS A REWRITE, and *a model proposes and a
-       person presses* survives only if the person can see what the model
-       actually said. */
-    for (const f of out.fixed || []) {
-      d.log(`the model wrote "${f.said}" on ${f.op} where this desk uses `
-        + `"${f.read}", so it was read as ${f.op} ${f.read} ${f.value}`);
+    /* The box under the picker is what is being waited for from here until the
+       object lands, however the sentence got into the transcript. */
+    waitFor('patch');
+    d.log(`asking ${patchPick.value().split('/').pop()}`);
+    try {
+      const out = await post('/wish', { text, ports: portsForModel(), facts: FACTS, model: patchPick.value() });
+      const g = show(out.links || []);
+      /* 🔴 A REPAIR NOBODY IS TOLD ABOUT IS A REWRITE, and *a model proposes and
+         a person presses* survives only if the person can see what the model
+         actually said. */
+      for (const f of out.fixed || []) {
+        d.log(`the model wrote "${f.said}" on ${f.op} where this desk uses `
+          + `"${f.read}", so it was read as ${f.op} ${f.read} ${f.value}`);
+      }
+      /* 🔴 THE WHOLE OUTCOME LIVES HERE NOW, because the readout gave up its
+         cells and a number nothing prints is a number the page stopped
+         reporting. Four facts on one line, dated by the log, so two answers can
+         be compared. */
+      d.log(`the patch came back in ${out.ms ?? '?'} ms: ${out.links?.length ?? 0} link(s), `
+        + `${g.refused} refused, ${out.usage?.total_tokens ?? '?'} tokens`);
+      return out;
+    } finally {
+      /* ⚠️ IN A `finally`, or a model that answers with an error leaves both
+         surfaces glimmering at somebody who is never going to get an answer. */
+      waitFor();
     }
-    /* 🔴 THE TIMING LIVES HERE NOW, because the readout gave up its two cells
-       and a number nothing prints is a number the page stopped reporting. */
-    d.log(`thought for ${out.ms ?? '?'} ms: ${out.links?.length ?? 0} link(s), `
-      + `${g.refused} refused, ${out.usage?.total_tokens ?? '?'} tokens`);
-    return out;
   }
 
   /** The sentence the whole thing was measured on, so somebody with no
    *  microphone has something to press. */
   const EXAMPLE = 'Connect the keyboard to the circuit and transpose it up one semitone.';
+  /**
+   * What a listening model really returned for that sentence, word for word,
+   * measured in `research/cf-models-speech-to-patch-2026-09-21.md` §7.1. It is
+   * the gate's reply for `/hear`, and it is NOT `EXAMPLE`: a check that saw the
+   * example in the box could not tell a transcription that flowed through the
+   * chain from a constant a button had written a moment earlier.
+   */
+  const CANNED_HEARD = 'connect the keyboard to the circuit and transpose it up one semitone';
 
   /**
    * 🔴 THE REPLY THE REAL MODEL GAVE, AND IT IS THE GATE FOR A SUITE RUN.
@@ -639,10 +936,31 @@
     try { await think(EXAMPLE); } catch (e) { blame(e); }
   });
 
-  d.on('ask', async () => {
+  /** Ask about whatever is in the box, which is the only thing Enter does. */
+  async function askBox() {
     const text = said.value.trim();
     if (!text) { d.log('there is nothing in the box to ask about'); return; }
     try { await think(text); } catch (e) { blame(e); }
+  }
+
+  /**
+   * 🔴 ENTER ASKS, SHIFT+ENTER MAKES A NEWLINE, AND THAT REPLACES A BUTTON.
+   * Asked 2026-09-21: *"remove the Ask button, auto-ask after transcription"*.
+   * An instruction here is one sentence, so a newline is very nearly never
+   * wanted, which is what lets Enter carry the primary meaning: it is the
+   * settled convention for a composer and it needs no furniture on the page.
+   * ⚠️ `preventDefault` ON THE ASKING BRANCH ONLY, or Enter would both ask and
+   * leave a blank line in the box it just sent.
+   * 🔴 AND A HARNESS CANNOT PRESS A KEY IN A TEXTAREA. `demo/verify.mjs` clicks
+   * every button in the control row and does nothing else, so an ask that only
+   * a key could reach would be graded by nothing while the suite stayed green.
+   * Two things keep it reachable: `Use the example` is a button and it asks,
+   * and the check below dispatches the real `keydown` for both halves.
+   */
+  said.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    e.preventDefault();
+    askBox();
   });
 
   // ── hold to talk ─────────────────────────────────────────────────────────
@@ -679,7 +997,7 @@
   /* 🔴 THE PICTURE IS THE ONE EVERY OTHER CONTROL IN THIS PROJECT USES.
      `data-busy` is paint only, it is reduced-motion aware, and it says "this
      control is at work" from the moment of the press until the answer lands,
-     which is true of the recording and of the thinking after it. A label change
+     which is true of the recording and of the proposal after it. A label change
      or a spinner would resize the button and reflow the row under the hand that
      is holding it. */
   const lit = (on) => { if (on) speakBtn.dataset.busy = '1'; else delete speakBtn.dataset.busy; };
@@ -715,6 +1033,10 @@
        looking at the last answer while giving the next instruction. */
     clearAll();
     lit(true);
+    /* ⚠️ AND NOTHING SHIMMERS YET. A microphone that is open with somebody
+       still talking into it is the page waiting for a PERSON, and no model is
+       working: *"a shimmer only while thinking"*. The button's own sweep says
+       the control is at work, which is a different and true claim. */
     /* ⚠️ THE MICROPHONE IS THE ONLY HALF A CHECK SKIPS. The gesture itself, its
        timing and its ending are the same code for a harness and for a hand,
        because a gesture that behaves one way under `?selfcheck=1` is a gesture
@@ -731,7 +1053,11 @@
     }
     let s;
     try { s = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (e) { d.log(`no microphone: ${e.message}`, 'warn'); talk.holding = false; lit(false); return; }
+    catch (e) {
+      d.log(`no microphone: ${e.message}`, 'warn');
+      talk.holding = false; lit(false);
+      return;
+    }
     /* ⚠️ A PERMISSION PROMPT TAKES LONGER THAN A PRESS. The hand can be off the
        button before the microphone opens, so the release is checked here rather
        than assumed. */
@@ -791,6 +1117,14 @@
     d.log(`${(blob.size / 1024).toFixed(1)} KB of audio`);
     busy = true;
     lit(true);
+    /* 🔴 THE SHIMMER STARTS HERE, which is the moment the recording has stopped
+       and the listening model's work begins. Before this line the page is
+       waiting for a person; after it, it is waiting for a model.
+       ⚠️ AND IT IS SET BEFORE THE FIRST `await` RATHER THAN BESIDE THE `post`,
+       so there is no tick in which the box is blank and nothing says why. It
+       also makes the moment observable by a check, which cannot sample a state
+       that only exists between two awaits. */
+    waitFor('hear');
     try {
       const buf = new Uint8Array(await blob.arrayBuffer());
       /* ⚠️ CHUNKED, because `String.fromCharCode(...buf)` on a few seconds of
@@ -798,17 +1132,30 @@
       let s = '';
       for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
       const heard = await post('/hear', { audio: btoa(s), model: hearPick.value() });
-      /* The timing the readout used to carry. See `readout` above. */
+      /* One of the two timings the readout used to carry. See `readout` above:
+         there is no readout on this page at all now, so a number nothing logs
+         is a number the page stopped reporting. */
       d.log(`heard in ${heard.ms ?? '?'} ms by ${hearPick.value().split('/').pop()}`);
-      /* ⚠️ IT GOES IN THE LOG AND NOT IN THE BOX. The box is a textarea now, so
-         a sentence written into it is a sentence somebody can press Ask with. */
       if (!heard.text?.trim()) { d.log('nothing was heard, so nothing was asked'); return; }
+      /**
+       * 🔴 THE RELEASE ASKS BY ITSELF, AND IT HAS SINCE THE HOLD WAS BUILT.
+       * Asked again 2026-09-21: *"then auto-ask after it and show glimmer and
+       * then show json"*. `think()` writes the transcription into the box on
+       * its way past, so the words land somewhere a reader can correct them and
+       * the proposal starts in the same breath. `Ask` is for the second attempt
+       * at a sentence the speech model got wrong, which is the only reason that
+       * box is a textarea.
+       */
       await think(heard.text.trim());
     } catch (e) {
       blame(e);
     } finally {
       busy = false;
       lit(false);
+      /* `think()` already did this on its own way out. Here for the paths that
+         never reached it: a refused upload, an empty transcription, a model
+         that answered with an error. */
+      waitFor();
     }
   }
 
@@ -923,10 +1270,42 @@
     d.assert('a proposal that loops an instrument into itself is refused',
       g3.refused === 1, whyBox.textContent.trim().slice(0, 80));
 
+    /* 🔴 A MODEL THAT PROPOSED NOTHING IS A REPORT AND IS SHOWN LIKE ANY OTHER
+       ANSWER, which is the second clause here and is the negative control for
+       the assert below it: two empty states, and this is the one with something
+       to say. If the box stopped painting its edges around a sentence it would
+       be saying nothing had happened. */
     const EMPTY = show([]);
+    const reportEdge = getComputedStyle(patch).borderTopColor;
     d.assert('a proposal of nothing says so rather than showing an empty box',
-      EMPTY.ok === 0 && patch.textContent.includes('proposed nothing'),
-      patch.textContent.split('\n')[0]);
+      EMPTY.ok === 0 && patch.textContent.includes('proposed nothing')
+      && patch.dataset.shown === '1' && reportEdge !== 'rgba(0, 0, 0, 0)',
+      `${patch.textContent.split('\n')[0]}, edge ${reportEdge}`);
+
+    /**
+     * 🔴 AND THE OTHER EMPTY STATE IS THE ONE THAT SAYS NOTHING, WHICH IS WHAT
+     * *"rm no patch yet"* ASKED FOR ON 2026-09-21. Four things at once, because
+     * they only work together: the box is blank, it does not claim to be
+     * showing anything, it paints NO edge and no card colour (an empty box is a
+     * line, which is the rule `/typist/` bought), and the room is still taken
+     * so an answer landing after a two model round trip cannot shove the log
+     * down the page.
+     * ⚠️ THE COMPUTED VALUES, NEVER THE SOURCE. A rule that lost reads as
+     * correct in a stylesheet, which this project has measured five times, and
+     * `.wish-patch` is fighting nothing here but could be tomorrow.
+     */
+    clearAnswer();
+    const blank = getComputedStyle(patch);
+    const blankH = patch.getBoundingClientRect().height;
+    const blankFloor = parseFloat(blank.minHeight) || 0;
+    d.assert('with nothing asked yet the box is blank, paints no edge, and still holds the room',
+      patch.textContent === '' && !patch.dataset.shown
+      && blank.borderTopColor === 'rgba(0, 0, 0, 0)'
+      && blank.backgroundColor === 'rgba(0, 0, 0, 0)'
+      && blankFloor > 0 && blankH >= blankFloor,
+      `${JSON.stringify(patch.textContent)}, edge ${blank.borderTopColor}, `
+      + `ground ${blank.backgroundColor}, ${blankH.toFixed(0)} px standing on a `
+      + `${blankFloor} px floor`);
 
     /* ── the picture, in all three of its states ──────────────────────────
        🔴 GRADE IT, BECAUSE NOTHING ELSE CAN SEE IT. `createDiagram` collects
@@ -948,10 +1327,14 @@
       .map((t) => t.textContent);
 
     const seen = [];
+    /* ⚠️ `dg` IS NULL IN THE STATE WHERE NOTHING WAS PROPOSED, since a picture
+       with no arrows is not drawn at all. Reading `dg.mode` there is a
+       TypeError inside the check, which does not go red, it takes every assert
+       after it with it. */
     const look = (what) => seen.push({
-      what, boxes: boxes(), arrows: arrows(), h: figH(), mode: dg.mode,
-      labels: labels(),
-      cuts: dg.cuts.map((c) => `${c.where} ${c.id} at ${c.width}px`),
+      what, boxes: boxes(), arrows: arrows(), h: figH(), mode: dg?.mode ?? 'not drawn',
+      labels: labels(), inHost: dgHost.childElementCount,
+      cuts: (dg?.cuts ?? []).map((c) => `${c.where} ${c.id} at ${c.width}px`),
     });
 
     show([]); look('nothing proposed');
@@ -961,7 +1344,8 @@
     d.assert('the picture drew every name and every arrow whole, in every state',
       seen.every((s) => s.cuts.length === 0),
       seen.flatMap((s) => s.cuts.map((c) => `${s.what}: ${c}`)).join('; ')
-        || `nothing cut in ${seen.length} states, laid out as ${seen[0].mode}`);
+        || `nothing cut in ${seen.length} states, laid out as `
+        + `${seen.find((x) => x.mode !== 'not drawn')?.mode ?? 'nothing'}`);
 
     /* 🔴 THE WHOLE DESK, WHATEVER WAS PROPOSED, AND ONE ARROW PER PROPOSAL.
        🔴 THE CLAIM CHANGED 2026-09-21 AND THIS ASSERT WENT RED, CORRECTLY. It
@@ -975,10 +1359,20 @@
        run still draws its arrow, and BOTH ITS ENDS. A picture showing only what
        passed would have been blank on the run this was reported from, while the
        readout beside it said `1 link, 1 refused`. */
+    /* 🔴 AND NOTHING AT ALL IS RENDERED ON THE EMPTY PATH, WHICH THIS LINE
+       COULD NOT SEE AND A READER COULD. Reported 2026-09-21: *"Every arrow is a
+       link the model asked for, and a refused one is marked rather than left
+       out. - on empty diagram"*. `createDiagram` was still being called with no
+       nodes and no links, so it drew a caption with nothing above it, and this
+       assert read `0 boxes, 0 arrows` and passed, because **a count of the
+       things you expected cannot see a thing you did not expect.** The third
+       clause counts everything in the host instead. */
     d.assert('only the instruments a proposal touches are drawn, with one arrow per proposal',
       seen.map((s) => s.boxes).join() === '0,2,2'
-      && seen.map((s) => s.arrows).join() === '0,1,1',
-      seen.map((s) => `${s.what}: ${s.boxes} boxes, ${s.arrows} arrows`).join('; '));
+      && seen.map((s) => s.arrows).join() === '0,1,1'
+      && seen[0].inHost === 0,
+      seen.map((s) => `${s.what}: ${s.boxes} boxes, ${s.arrows} arrows, `
+        + `${s.inHost} things in the host`).join('; '));
 
     /* The negative half is the second clause: a link that PASSED must not be
        marked, or the mark would say nothing. */
@@ -990,11 +1384,22 @@
     /* 🔴 THE ROOM IS TAKEN BEFORE THE PICTURE ARRIVES, which is what *"reserve
        space for it"* asked for. The reservation is a CSS number, so this reads
        the COMPUTED value rather than the source: a rule that lost is a rule that
-       reads as correct in a stylesheet. */
+       reads as correct in a stylesheet.
+       🔴 AND THE ROOM HAS TO ACTUALLY STAND, WHICH IS A SECOND QUESTION AND THE
+       ONE THIS ASSERT USED TO MISS. `min-height` reads its number whatever the
+       box is doing, so a reserved room and a collapsed one look identical to
+       it. MEASURED 2026-09-21: the empty host was **0 px, `display: none`**,
+       beaten by `.pos-stack > div:empty` in `shell.css` at (0,2,1), so the log
+       moved on every answer while this line read green. The empty height is a
+       clause now, not a remark. */
     const reserved = parseFloat(getComputedStyle(dgHost).minHeight) || 0;
-    d.assert('the picture fits the room reserved for it in every state',
-      reserved > 0 && seen.every((s) => s.h <= reserved),
-      `${reserved} px reserved against ${seen.map((s) => s.h.toFixed(0)).join(', ')} drawn`);
+    clearAnswer();
+    const roomWhenEmpty = dgHost.getBoundingClientRect().height;
+    const showsWhenEmpty = getComputedStyle(dgHost).display;
+    d.assert('the picture fits the room kept for it, and the room is there before the picture is',
+      reserved > 0 && seen.every((s) => s.h <= reserved) && roomWhenEmpty >= reserved,
+      `${reserved} px is the default height, against ${seen.map((s) => s.h.toFixed(0)).join(', ')} `
+      + `drawn, and ${roomWhenEmpty.toFixed(0)} px standing as ${showsWhenEmpty} with nothing in it`);
 
     /* ── the only feedback the control has left ────────────────────────────
        🔴 THE BUTTON CARRIES NOTHING OF ITS OWN, so the paint IS the signal and
@@ -1015,14 +1420,65 @@
       said.value === EXAMPLE && reached === 0,
       `${said.value.length} characters in the box, ${reached} calls to the agent`);
 
-    d.assert('both model pickers offer what the agent will run',
+    /* 🔴 AND THE ROW READS *HEAR ... PATCH ...*, WHICH IS WHAT THE PAGE DOES.
+       The second one was labelled `think` until 2026-09-21, which named a
+       mechanism in this project's own vocabulary and told a visitor nothing
+       about what came out of it. The labels are read off the DOM rather than
+       off the constants, or the check would agree with itself. */
+    const pickLabels = [...document.querySelectorAll('.pos-choice-l')].map((n) => n.textContent);
+    d.assert('both model pickers offer what the agent will run, under the names of their jobs',
       hearPick.el.querySelectorAll('button').length === 3
-      && thinkPick.el.querySelectorAll('button').length === 5,
-      `${hearPick.el.querySelectorAll('button').length} and ${thinkPick.el.querySelectorAll('button').length}`);
+      && patchPick.el.querySelectorAll('button').length === 5
+      && pickLabels.join() === 'hear,patch',
+      `${hearPick.el.querySelectorAll('button').length} and `
+      + `${patchPick.el.querySelectorAll('button').length}, labelled ${pickLabels.join(' and ')}`);
+
+    /**
+     * 🔴 EACH PICKER IS DIRECTLY ABOVE THE BOX IT FILLS. Asked as *"but think
+     * controls before json"*, and the whole of it is document order, so it is
+     * read as document order rather than as a pair of coordinates: nothing on
+     * this page is positioned, so the DOM answers the question a rect would
+     * only imply.
+     * 🔴 AND IT ASKS ABOUT THE PICKER, NOT ABOUT THE ROW AROUND IT, WHICH THE
+     * FIRST BUILD OF THIS LINE GOT WRONG. It compared the two `.pos-crow`
+     * wrappers' indices, and putting both pickers back in the top row left the
+     * second wrapper standing empty in the same slot, so the sabotage that
+     * undoes exactly what was asked for read **green**. A check on the
+     * container of a thing is not a check on the thing.
+     */
+    const above = (box) => box.previousElementSibling;
+    const nameOf = (n) => (n ? n.className || n.tagName.toLowerCase() : 'nothing');
+    const holds = (box, pick) => above(box)?.contains(pick.el) === true;
+    d.assert('the picker for a box sits directly above that box',
+      holds(said, hearPick) && holds(patch, patchPick) && !holds(said, patchPick),
+      `hear ${holds(said, hearPick) ? 'is' : 'is not'} in the row above the transcript, `
+      + `patch ${holds(patch, patchPick) ? 'is' : 'is not'} in the row above the JSON, `
+      + `page reads ${[...d.el.children].map(nameOf).join(' then ')}`);
 
     d.assert('the desk it describes is the one the other pages build ids for',
       PORTS.some((p) => p.id === 'here:circuit:in') && PORTS.some((p) => p.id === 'here:mk-425c-usb-midi-keyboard:out'),
       `${PORTS.length} ports`);
+
+    /**
+     * 🔴 THE MODEL IS TOLD WHAT THIS ROOM CALLS EACH INSTRUMENT, AND THAT IS
+     * THIS PAGE'S HALF OF IT. Reported 2026-09-21 with a screenshot: *"connect
+     * evolution to circuit"* answered *the model proposed nothing*, which was
+     * the right answer to a prompt that had never heard the word. The rendering
+     * is the Worker's job and `node workers/wish/src/wish-test.mjs` grades it;
+     * what a browser can see is that the words leave here at all.
+     * ⚠️ AND THE IDS ARE UNTOUCHED, which is the second clause. `from` and `to`
+     * are an `enum` of exactly these, so a nickname leaking into the list the
+     * model must choose from would be an invention arriving by invitation.
+     */
+    const told = portsForModel();
+    const names = told.flatMap((p) => p.also ?? []);
+    d.assert('the model is told the other names this room uses, and never a new port id',
+      told.length === PORTS.length
+      && told.map((p) => p.id).join() === PORTS.map((p) => p.id).join()
+      && names.includes('Evolution') && names.includes('TASCAM')
+      && told.every((p) => p.also?.length > 0),
+      `${new Set(names).size} names across ${told.length} ports, `
+      + `ids ${told.map((p) => p.id).join() === PORTS.map((p) => p.id).join() ? 'unchanged' : 'MOVED'}`);
 
     /* ── the hold ──────────────────────────────────────────────────────────
        🔴 DRIVEN WITH REAL POINTER EVENTS, which is the half a `.click()`
@@ -1044,8 +1500,7 @@
        BOTH AWAY. Asked as *"hold to talk should clear previous input /
        routing"*, and the clear has to happen on the PRESS: clearing when the
        reply lands leaves exactly the window that causes the problem, which is
-       the recording plus both model calls. The readout goes to empty and never
-       to `0`. */
+       the recording plus both model calls. */
     show(CANNED);
     said.value = EXAMPLE;
     const before = [patch.textContent, whyBox.textContent, said.value,
@@ -1056,20 +1511,19 @@
     press('pointerdown');
     const midHold = talk.holding;
     const litDuring = speakBtn.dataset.busy === '1';
-    const cells = [...document.querySelectorAll('.pos-readout .pos-v')].map((c) => c.textContent);
 
-    /* 🔴 THE PAINT IS THE WHOLE OF THE FEEDBACK NOW, so the press had better
-       light it. Both halves in one line: dark before anybody touches it, lit
-       from the press. What it cannot say is whether the microphone can hear
+    /* 🔴 THE PAINT IS THE WHOLE OF THIS CONTROL'S OWN FEEDBACK, so the press had
+       better light it. Both halves in one line: dark before anybody touches it,
+       lit from the press. What it cannot say is whether the microphone can hear
        anything, which is the gap the withdrawn dot leaves. */
-    d.assert('the press lights the control, which is the only signal it has',
+    d.assert('the press lights the control it was aimed at',
       darkBefore === true && litDuring === true,
       `busy before ${!darkBefore}, busy during ${litDuring}`);
     d.assert('the press takes the whole last answer away before it listens',
-      before.length > 20 && patch.textContent === NO_PATCH && whyBox.textContent === ''
-      && said.value === '' && arrows() === 0 && cells.every((t) => t.trim() === ''),
-      `patch ${JSON.stringify(patch.textContent.slice(0, 16))}, ${whyBox.childElementCount} rows, `
-      + `${said.value.length} characters, ${arrows()} arrows, cells ${JSON.stringify(cells)}`);
+      before.length > 20 && patch.textContent === '' && !patch.dataset.shown
+      && whyBox.textContent === '' && said.value === '' && arrows() === 0,
+      `patch ${JSON.stringify(patch.textContent)}, shown ${!!patch.dataset.shown}, `
+      + `${whyBox.childElementCount} rows, ${said.value.length} characters, ${arrows()} arrows`);
 
     press('pointerup');
     d.assert('a press and a release is one hold, begun and ended',
@@ -1107,6 +1561,158 @@
       && (callout === '' || callout === 'none'),
       `touch-action ${cs.touchAction}, user-select ${cs.userSelect}, `
       + `callout ${callout || 'not computed by this browser'}`);
+
+    /* ── the shimmer, at every moment of the flow it belongs to ────────────
+       🔴 IT SITS HERE AND NOT HIGHER UP, FOR THE REASON THE LAST BLOCK OF THIS
+       CHECK ALREADY CARRIES: the check runs synchronously inside the `speak`
+       handler, so the shell has not yet painted `data-busy` on that button, and
+       the FIRST `await` in this function is the moment it does. An await above
+       the press drill takes `busy before true`, which is a check failing
+       because of the check above it. Every press below therefore happens before
+       the await, while the button is still enabled.
+       🔴 AND IT IS SIX MOMENTS OF ONE BEHAVIOUR RATHER THAN SIX CLAIMS. *"a
+       shimmer only while thinking"* has a negative half in every one of them: a
+       check that looked only at a model working would pass a page that also
+       shimmered while a microphone was open, which is the state that was asked
+       to stop. */
+    /**
+     * Which surfaces say they are waiting, in words, so one string can be
+     * compared against a whole flow rather than booleans against moments.
+     * ⚠️ IT READS THE DOM AND NEVER `waitFor`'s OWN ARGUMENT. A check that read
+     * the stage back would agree with itself whatever the paint was doing,
+     * which is the two-numbers-derived-from-one-field trap this project has
+     * already paid for on the MIM corpus.
+     * ⚠️ AND IT KEEPS READING THE PICKERS, WHICH ARE EXPECTED NEVER TO APPEAR.
+     * *"don't animate the model radios"*: the guard for a thing that was
+     * removed is to go on looking for it, and `choice.mjs` still has the
+     * `pending()` that would put it back.
+     */
+    const waiting = () => [
+      said.dataset.busy ? 'transcript' : '',
+      patch.dataset.busy ? 'patch' : '',
+      hearPick.buttons[hearPick.get()].dataset.busy ? 'hear model' : '',
+      patchPick.buttons[patchPick.get()].dataset.busy ? 'patch model' : '',
+    ].filter(Boolean).join(' + ') || 'nothing';
+
+    /* 🔴 EVERYTHING ALREADY IN FLIGHT HAS TO LAND BEFORE THIS DRILL STARTS, AND
+       FINDING THAT OUT IS THE FIRST MOMENT OF THE DRILL RATHER THAN A SETUP
+       LINE. `d.run('example')` above is deliberately not awaited, so its
+       proposal is still pending at this point in a synchronous check and its
+       paint would be read as this drill's own. A `setTimeout` rather than a
+       microtask, because a proposal is several ticks deep and one
+       `Promise.resolve()` only buys one of them. What it then measures is that
+       a finished proposal leaves NOTHING shimmering. */
+    await new Promise((r) => { setTimeout(r, 0); });
+    speakBtn.disabled = false;              // the shell disabled it across that await
+    const span = [`at rest: ${waiting()}`];
+    press('pointerdown');
+    /* 🔴 THE NEGATIVE MOMENT, AND IT IS THE WHOLE OF THE NARROWING. An open
+       microphone is the page waiting for a PERSON, so nothing shimmers. The
+       first build of this feature painted from here and it was asked to stop. */
+    span.push(`held: ${waiting()}`);
+    press('pointerup');                     // a tap, which opens no microphone
+    span.push(`let go: ${waiting()}`);
+    /**
+     * 🔴 THE WHOLE RELEASE, DRIVEN THROUGH THE REAL FUNCTION AND COSTING
+     * NOTHING. `finish()` is what a stopped recording calls, and until `/hear`
+     * was gated it could not be reached under a harness at all: `begin()` opens
+     * no microphone, so nothing ever called this and the auto-ask was graded by
+     * nothing. `chunks` is empty, so the blob is 0 bytes and the log says so,
+     * which is honest for a check.
+     * ⚠️ IT IS SAMPLED BEFORE THE AWAIT because `waitFor('hear')` is the last
+     * thing `finish()` does synchronously. A state that only exists between two
+     * awaits cannot be sampled at all, which is why that line sits where it
+     * does rather than beside the `post`.
+     */
+    const f = finish();
+    span.push(`listening: ${waiting()}`);
+    await f;
+    span.push(`landed: ${waiting()}`);
+
+    /**
+     * 🔴 THE RELEASE ASKED BY ITSELF, AND NOTHING GRADED THAT UNTIL NOW. Asked
+     * 2026-09-21: *"then auto-ask after it and show json"*, and again as
+     * *"remove the Ask button, auto-ask after transcription"*. One call, and
+     * both models ran: the transcription is in the box a person can correct and
+     * the object is in the box under the patch picker, with no second press.
+     * ⚠️ THE TRANSCRIPTION IS NOT THE EXAMPLE SENTENCE, on purpose, so this
+     * cannot pass on a constant a button wrote a moment earlier. `begin()`
+     * emptied the box on the press above.
+     * ⚠️ AND THE PARSE IS GUARDED. An assert that throws does not go red, it
+     * goes missing, and it takes the rest of this check with it.
+     */
+    const proposed = (() => { try { return JSON.parse(patch.textContent); } catch { return null; } })();
+    d.assert('a release transcribes and then proposes, with no second press and nobody reached',
+      said.value === CANNED_HEARD && patch.dataset.shown === '1'
+      && proposed?.transforms?.[0]?.by === 1 && reached === 0,
+      `box reads ${JSON.stringify(said.value.slice(0, 32))}, patch `
+      + `${JSON.stringify(proposed?.transforms ?? null)}, ${reached} calls to the agent`);
+
+    const p = think(EXAMPLE);               // free: `post` is gated, see CANNED
+    span.push(`proposing: ${waiting()}`);
+    await p;
+    span.push(`answered: ${waiting()}`);
+    d.assert('a box shimmers while its own model is working, and at no other time',
+      span.join(' | ') === ['at rest: nothing',
+        'held: nothing',
+        'let go: nothing',
+        'listening: transcript',
+        'landed: nothing',
+        'proposing: patch',
+        'answered: nothing'].join(' | '),
+      span.join(' | '));
+
+    /**
+     * 🔴 ENTER IS THE ONLY WAY TO SUBMIT AN EDITED SENTENCE NOW, AND A HARNESS
+     * CANNOT PRESS A KEY, SO IT IS PRESSED HERE. Both halves in one line:
+     * Enter asks and claims the key, and Shift+Enter does neither, or a
+     * sentence could never be given a second line and every newline would
+     * spend a model call.
+     * ⚠️ IT IS SAMPLED ON THE SHIMMER, because `waitFor('patch')` is the first
+     * thing a proposal does synchronously and *did a model call start* has no
+     * other observable answer inside one tick.
+     */
+    clearAnswer();
+    said.value = EXAMPLE;
+    const key = (init) => {
+      const e = new KeyboardEvent('keydown',
+        { key: 'Enter', bubbles: true, cancelable: true, ...init });
+      said.dispatchEvent(e);
+      return { asked: patch.dataset.busy === '1', claimed: e.defaultPrevented };
+    };
+    const withShift = key({ shiftKey: true });
+    const plain = key({});
+    d.assert('Enter asks what is in the box, and Shift+Enter leaves the key alone',
+      plain.asked === true && plain.claimed === true
+      && withShift.asked === false && withShift.claimed === false
+      && said.placeholder.includes('Enter'),
+      `Enter asked ${plain.asked} and claimed ${plain.claimed}, Shift+Enter asked `
+      + `${withShift.asked} and claimed ${withShift.claimed}, the box says `
+      + `${JSON.stringify(said.placeholder)}`);
+    await new Promise((r) => { setTimeout(r, 0); });   // let that proposal land
+
+    /* 🔴 PAINT, NOT ROOM, AND BOTH HALVES ARE MEASURED. Nothing that redraws
+       may change how much space it takes, so the height is read with the
+       glimmer on and off; and a CSS rule that lost reads as correct in the
+       source, so the ANIMATION is read as a computed value rather than trusted.
+       ⚠️ THE REDUCED MOTION BRANCH IS NOT A GET OUT. `shell.css` turns every
+       animation off under that setting, so the honest answer there is `none`
+       and the page says which branch was measured. It is the `caps.mjs` rule:
+       a probe that could not answer must not read as a failure. */
+    const stillness = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const quietH = [said.getBoundingClientRect().height, patch.getBoundingClientRect().height];
+    said.dataset.busy = '1';
+    patch.dataset.busy = '1';
+    const moving = [getComputedStyle(said).animationName, getComputedStyle(patch).animationName];
+    const busyH = [said.getBoundingClientRect().height, patch.getBoundingClientRect().height];
+    delete said.dataset.busy;
+    delete patch.dataset.busy;
+    d.assert('the glimmer is paint that moves and takes no more room than the box already had',
+      moving.every((a) => a === (stillness ? 'none' : 'pos-sweep'))
+      && quietH[0] === busyH[0] && quietH[1] === busyH[1],
+      `${moving.join(' and ')} under ${stillness ? 'reduced motion' : 'ordinary motion'}, `
+      + `heights ${quietH.map((h) => h.toFixed(1)).join('/')} against `
+      + `${busyH.map((h) => h.toFixed(1)).join('/')}`);
     speakBtn.disabled = wasOff;
 
     if (d.el.isConnected) {
@@ -1124,13 +1730,42 @@
       d.assert('the page does not drag sideways at this width',
         document.documentElement.scrollWidth <= window.innerWidth + 1,
         `page ${document.documentElement.scrollWidth} against ${window.innerWidth}`);
+
+      /**
+       * 🔴 NO READOUT, AND NO EMPTY BOX PAINTING AN EDGE WHERE ONE WOULD HAVE
+       * BEEN. Asked 2026-09-21: *"rm links / 1 / refused / 1"*, which is both
+       * remaining cells.
+       * 🔴 MEASURED RATHER THAN TRUSTED, BECAUSE THE FAILURE IS RECORDED.
+       * `/typist/` declared `readout: null` and still got a `.pos-readout` div
+       * with no children, whose own 1 px top and bottom borders rendered as a
+       * 2 px full-width band nobody wrote, reported as *"old UI creeping in"*.
+       * The shell hides an empty readout now, and *"the shell handles it"* is
+       * exactly the kind of sentence this project keeps finding has outlived
+       * its own truth.
+       * ⚠️ IT ACCEPTS EITHER SHAPE. Whether the shell omits the element or
+       * hides it is the shell's business; what this page needs is that nothing
+       * paints an edge where the row used to be, so the test is on the
+       * rendered height.
+       */
+      const ro = d.el.parentElement.querySelector('.pos-readout')
+        || document.querySelector('.pos-readout');
+      const roH = ro ? ro.getBoundingClientRect().height : 0;
+      d.assert('no readout, and no empty box painting an edge where it was',
+        __demo.readoutOptOut === true && roH === 0,
+        ro ? `a .pos-readout is present and ${roH} px tall, hidden ${ro.hasAttribute('hidden')}`
+           : 'no .pos-readout element at all');
     }
 
     /**
      * 🔴 THE REPAIR IS GRADED, IN BOTH DIRECTIONS, AND THIS BLOCK IS LAST ON
      * PURPOSE. Placed earlier, its `await think()` left the control lit and
      * the press drill below then read `busy before true`, which is a check
-     * failing because of the check above it rather than because of the page. What the boundary sends back
+     * failing because of the check above it rather than because of the page.
+     * ⚠️ THE GLIMMER DRILL ABOVE SHARES THAT CONSTRAINT AND SITS AFTER THE
+     * PRESS DRILL FOR THE SAME REASON. Every await in this check has to be
+     * below the line that reads `speakBtn.dataset.busy`, because the shell
+     * paints it the moment this function first yields.
+     * What the boundary sends back
      * has to be a patch the validator ACCEPTS, and the raw thing it repaired
      * has to still be refused, or the two halves could drift into agreeing.
      */

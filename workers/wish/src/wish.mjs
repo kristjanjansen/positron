@@ -84,7 +84,15 @@ export function hearPayload(model, audio, language) {
     vad_filter: true,
   };
 }
-export const THINK = [
+/**
+ * What turns a sentence into a patch.
+ * 🔴 IT WAS CALLED `THINK` UNTIL 2026-09-21: *"replace "think" with something
+ * else, more related to task at hand"*. The label a visitor reads is the reason
+ * for the rename, and this name moves with it so the allowlist, the row and the
+ * refusal below all say one word. `PATCH` is already this project's own word
+ * for the output, in `printLink` and in `/bay/`.
+ */
+export const PATCH = [
   '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
   '@cf/meta/llama-3.1-8b-instruct-fp8-fast',
   '@cf/meta/llama-3.2-3b-instruct',
@@ -189,14 +197,51 @@ export function relabel(links) {
   return { links: out, fixed };
 }
 
-function systemFor(ports, facts) {
-  const outs = ports.filter((p) => p.dir === 'out').map((p) => p.id);
-  const ins = ports.filter((p) => p.dir === 'in').map((p) => p.id);
-  const line = (p) => `  ${p.id} : ${p.label}${p.dir === 'in' ? ' (receives)' : ' (sends)'}`;
+/**
+ * 🔴 A PORT MAY CARRY THE OTHER NAMES ITS ROOM USES FOR IT, AND WITHOUT THEM A
+ * CORRECT INSTRUCTION GETS NOTHING. Reported 2026-09-21 with a screenshot:
+ * *"connect evolution to circuit"* answered with an empty list. The model was
+ * right and the vocabulary was wrong: CoreMIDI calls that port `MK-425C USB
+ * MIDI Keyboard`, the instrument is an **Evolution MK-425C**, and the maker's
+ * name was in none of the strings this prompt was built from. The last line
+ * below fired exactly as written.
+ * ⚠️ THE NAMES ARRIVE FROM THE CALLER AND ARE NEVER INVENTED HERE. A page knows
+ * what is plugged in; this file is deployed and must not hold a fact about one
+ * room. A port with no `also` gets no extra line, which is why the sabotage
+ * that proves this is a desk with no aliases at all.
+ * ⚠️ AND AN ALIAS NEVER REACHES THE `enum`. `outs` and `ins` are built from
+ * `p.id` and nothing else, so what the model must CHOOSE from is still the real
+ * ids. That is measured: a Moog and a Prophet neither of which is on the desk
+ * came back as no links in 496 ms rather than as inventions, and an alias in
+ * that list would be the invention arriving by invitation.
+ */
+/**
+ * 🔴 `outs` AND `ins` ARE DERIVED ONCE AND HANDED IN, BECAUSE THEY WERE DERIVED
+ * TWICE. This function computed its own pair for the worked example while
+ * `handle()` computed another for the `enum`, from the same field, so the list
+ * the model is SHOWN and the list it may CHOOSE FROM could disagree with
+ * nothing to catch it. Found by sabotage: leaking an alias into this copy left
+ * `node workers/wish/src/wish-test.mjs` fully green, because the enum it reads
+ * came from the other one.
+ */
+function systemFor(ports, facts, outs, ins) {
+  const alsoOf = (p) => (Array.isArray(p.also) ? p.also : [])
+    .filter((a) => typeof a === 'string' && a.trim());
+  const line = (p) => {
+    const head = `  ${p.id} : ${p.label}${p.dir === 'in' ? ' (receives)' : ' (sends)'}`;
+    const also = alsoOf(p);
+    return also.length ? `${head}\n      also called: ${also.join(', ')}` : head;
+  };
+  const anyAlso = ports.some((p) => alsoOf(p).length > 0);
   return [
     'You turn a spoken studio instruction into patch bay links. Output only links.',
     'The ports on this desk:',
     ...ports.map(line),
+    /* Said once and only where it applies: a desk whose ports carry no other
+       names must not be told to match against a list that is not there. */
+    ...(anyAlso ? ['An "also called" line lists other names people in this room use for that '
+      + 'instrument. Match an instruction against those as well as the label, and answer '
+      + 'with the id.'] : []),
     'Transforms, each an object with "op" and its own argument:',
     '  channel to=N        put every message on MIDI channel N',
     '  transpose by=N      move notes by N semitones, N may be negative',
@@ -238,17 +283,22 @@ export async function handle(path, body, run) {
   }
 
   if (path === '/wish') {
-    const model = body.model || THINK[0];
-    if (!THINK.includes(model)) return bad(`not a thinking model: ${model}`);
+    const model = body.model || PATCH[0];
+    /* ⚠️ THIS MESSAGE REACHES A READER. `blame()` on the page prints whatever
+       this end says, so the refusal names the job the row is labelled with
+       rather than the word that row used to carry. */
+    if (!PATCH.includes(model)) return bad(`not a patch model: ${model}`);
     const ports = Array.isArray(body.ports) ? body.ports : [];
     if (!ports.length) return bad('send the ports, or there is nothing to name');
+    /* The one derivation. Both the worked example in the prompt and the `enum`
+       the model must choose from read these, so they cannot drift apart. */
     const outs = ports.filter((p) => p.dir === 'out').map((p) => p.id);
     const ins = ports.filter((p) => p.dir === 'in').map((p) => p.id);
     if (!outs.length || !ins.length) return bad('a desk needs something that sends and something that receives');
     const t0 = Date.now();
     const r = await run(model, {
       messages: [
-        { role: 'system', content: systemFor(ports, body.facts) },
+        { role: 'system', content: systemFor(ports, body.facts, outs, ins) },
         { role: 'user', content: String(body.text || '') },
       ],
       response_format: { type: 'json_schema', json_schema: schemaFor(outs, ins) },
