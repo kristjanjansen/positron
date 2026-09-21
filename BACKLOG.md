@@ -9,6 +9,13 @@
   `PATCH`.
   ⚠️ `PATCH` was always the wrong word for that row: it labels a list of MODELS.
 
+- **`make similar glued header as in interpret, put hold to talk to left and
+  model selecton to right label: 'model'`**. The same shape on the HEAR block:
+  a glued header with the hold-to-talk control on the left and the speech model
+  picker on the right, labelled `model`. ⚠️ So BOTH blocks get one header
+  pattern: the action left, the model right, and `HEAR` and `PATCH` both stop
+  labelling a list of models.
+
 ### `circuit-cc.mjs` puts 28 drum parameters under `song select`, 2026-09-21
 
 ⚖️ **ALMOST CERTAINLY A `pdftotext` ARTEFACT**, a neighbouring heading picked up
