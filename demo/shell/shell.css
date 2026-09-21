@@ -4483,6 +4483,20 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   background: var(--card); padding: 16px; width: 100%;
   transition: border-color .12s ease, background .12s ease;
 }
+/* 🔴 ONLY THE DASHED HALF IS THE TARGET. The wrapper carries no border of its
+   own, so the dashed edge stays on the part a reader may drop on and the result
+   sits under it in a box that is plainly not one. */
+.pos-drop-wrap { display: flex; flex-direction: column; width: 100%; }
+/* ⚠️ THE AREA IS A WHOLE ROUNDED BOX UNTIL A FOOTER JOINS IT. The footer only
+   enters the document on its first word, and an area squared off at the bottom
+   for a footer that is not there is a join to nothing. */
+.pos-drop-wrap > .pos-drop-area:not(:last-child) { border-radius: 4px 4px 0 0; }
+.pos-drop-title {
+  font: 600 11px/1.4 var(--mono); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink);
+}
+.pos-drop-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pos-drop-or { font: 400 12px/1.5 var(--mono); color: var(--dim); }
 /* ⚠️ `[data-over]` MATCHES ON PRESENCE, which is why drop.mjs DELETES it rather
    than setting it empty. `video-panel.mjs` set `= ''` and kept a panel in its
    full screen state for the rest of the page's life. */
@@ -4498,4 +4512,6 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-drop-note {
   font: 400 12px/1.5 var(--mono); color: var(--dim2);
   min-height: 1.5em;
+  border: 1px solid var(--line2); border-top: 0; border-radius: 0 0 4px 4px;
+  background: var(--card2); padding: 10px 16px; width: 100%;
 }
