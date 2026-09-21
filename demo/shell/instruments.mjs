@@ -109,7 +109,15 @@ export const DESK = [
   {
     match: /fast\s*track/i,
     maker: 'M-Audio', model: 'Fast Track Pro', kind: 'soundcard',
-    also: ['audio interface', 'converter'],
+    /* 🔴 `Fast Track` IS IN THIS LIST ON EVIDENCE AND IT IS A FACT RATHER THAN A
+       CONVENIENCE. MEASURED 2026-09-21: the word `Pro` is the one a speech model
+       drops or replaces. *"fast track"* came back as itself from two models and
+       as *"Fast-trap"* from the third, and *"the fast track pro is the recording
+       input"* came back as *"The fast track row is the recording input."* Four
+       misses across three models, all of them the same syllable. `Fast Track` is
+       also what M-Audio calls the line, and there is exactly one of them on this
+       desk, so somebody saying it means this box. */
+    also: ['Fast Track', 'audio interface', 'converter'],
     /* MEASURED in `research/fasttrack-capture-2026-09-21.md`: the Circuit's
        left output is on capture channel 1 at 48 kHz 16 bit. */
     note: 'two in and two out, and it carries the Circuit into a recording',
@@ -267,6 +275,16 @@ function dist(a, b) {
  * and `pad` are ordinary English that appears in ordinary instructions, and the
  * whole failure mode being guarded against is a page hearing an instrument in a
  * sentence that did not name one.
+ * 🔴 AND THE FLOOR APPLIES TO WHAT WAS SAID AS WELL AS TO THE KEY, WHICH IT DID
+ * NOT UNTIL 2026-09-21 AND WHICH COST FOUR OF THE THIRTEEN FALSE POSITIVES
+ * MEASURED AGAINST REAL WHISPER TRANSCRIPTS. `card` and `chord` both reduce to
+ * `krt`, three characters, which is one edit from `kprt` (**keyboard**) and one
+ * from `krkt` (**Novation Circuit**). So *"The sound card is on channel 1."*
+ * found the keyboard and the Circuit, and *"Play a chord and hold it down."*,
+ * which names nothing at all, found both of them too. The key was already
+ * floored and the span was not, and a three character key is too little
+ * information for one edit to mean anything whichever side of the comparison it
+ * sits on. `research/name-lookups-2026-09-21.md` has all thirteen.
  */
 const MIN_SOUND_LEN = 4;
 const allowed = (len) => (len <= 5 ? 1 : len <= 9 ? 1 : 2);
@@ -288,6 +306,17 @@ const allowed = (len) => (len <= 5 ? 1 : len <= 9 ? 1 : 2);
  * 🔴 AND A SPAN CONTAINING ONE IS REFUSED WHOLE, not just a token equal to one,
  * because the window slides: `machine from` is two tokens and only the second
  * is a verb.
+ * 🔴 `control` JOINED THE LIST ON EVIDENCE, 2026-09-21, AND IT IS NOT A VERB.
+ * It was the last false positive standing against real Whisper transcripts and
+ * it stood on all three models: *"the tascam model twelve daw control does
+ * nothing at all"* found the **Evolution MK-425C**, because `control` reduces to
+ * `kntrl` and the keyboard's own alias `controller` reduces to `kntrlr`, one
+ * edit apart. So a sentence about the mixer's control surface named the
+ * keyboard. ⚠️ THE WORD IS IN THE DESK'S OWN VOCABULARY TWICE, which is what
+ * makes it dangerous rather than merely common: it is the tail of one
+ * instrument's name and the head of another's alias. Stopping it costs nothing,
+ * because `controller` said properly is found by the EXACT branch, which never
+ * consults this list.
  * ⚠️ The cost of a false NEGATIVE is that the model answers *nothing on this
  * desk*, which is honest and which a person fixes by editing one word in a box.
  * The cost of a false POSITIVE is a page putting words in somebody's mouth and
@@ -299,7 +328,21 @@ const STOP = new Set(['connect', 'connects', 'connected', 'route', 'routes', 'se
   'from', 'into', 'onto', 'with', 'and', 'the', 'a', 'an', 'to', 'on', 'off', 'up',
   'down', 'all', 'every', 'please', 'can', 'you', 'it', 'its', 'my', 'this', 'that',
   'then', 'now', 'also', 'again', 'but', 'for', 'of', 'in', 'out', 'at', 'by', 'as',
-  'so', 'if', 'do', 'does', 'is', 'are', 'be', 'let', 'want', 'need', 'give']);
+  'so', 'if', 'do', 'does', 'is', 'are', 'be', 'let', 'want', 'need', 'give',
+  /* 🔴 ALL FOUR INFLECTIONS, BECAUSE TWO OF THEM WERE NOT ENOUGH AND A SWEEP
+     SAID SO. `control` and `controls` went in first, and *"a controlled
+     sound"* still found the keyboard. That is this project's substring lesson
+     from the other end: a list of forms is as wrong as a substring test until
+     somebody enumerates it. */
+  'control', 'controls', 'controlled', 'controlling',
+  /* 🔴 `bus` IS HERE FOR THE EXACT BRANCH, NOT FOR THE SOUND ONE, AND IT IS
+     THE ONLY WORD ON THIS LIST THAT IS ALSO A REAL ALIAS ON THE DESK. The
+     `sounds()` floor already refused it (`ps`, two characters), so no
+     mis-hearing could ever reach the IAC Driver through it. An exact hearing
+     could and did: **`the master bus`** and **`a bus compressor`** both
+     resolved to the **Apple IAC Driver**, and both are ordinary mixing, not
+     MIDI. `virtual bus` and `loopback` still reach it, and so does `Apple`. */
+  'bus']);
 
 const hasStop = (span) => span.split(' ').some((t) => STOP.has(t));
 
@@ -330,6 +373,14 @@ export function resolve(text) {
     for (const word of words) {
       const w = normalise(word);
       if (!w) continue;
+      /* 🔴 AN ALIAS THAT IS ONE STOP WORD NAMES NOTHING ON EITHER BRANCH, AND
+         UNTIL 2026-09-21 THE STOP LIST GOVERNED ONLY THE SOUND ONE. MEASURED
+         over ordinary studio vocabulary: `the master bus` and `a bus
+         compressor` both resolved to the **Apple IAC Driver** at exact
+         strength, where no threshold and no phonetic key can reach them. The
+         test is the WHOLE alias rather than a token inside it, so `virtual
+         bus` and `mackie control` are untouched and only the bare word goes. */
+      if (!w.includes(' ') && STOP.has(w)) continue;
       /* Exact first and it wins outright: a sentence that named the thing
          properly must never be "corrected" to something else. */
       if (flat === w || flat.includes(` ${w} `) || flat.startsWith(`${w} `)
@@ -338,20 +389,59 @@ export function resolve(text) {
       const wk = sounds(word);
       if (wk.length < MIN_SOUND_LEN) continue;
       const span = w.split(' ').length;
-      /* Compared over a window of the SAME number of spoken words, because
-         `task am` is two tokens where `tascam` is one and a token by token
-         comparison can never bring them together. */
-      for (const n of new Set([span, span + 1])) {
+      /* 🔴 THE WINDOW IS NOT THE KEY'S OWN WIDTH, AND WRITING IT AS `span` AND
+         `span + 1` LOST TWO REAL INSTRUMENTS. MEASURED 2026-09-21 against real
+         Whisper transcripts: a speech model JOINS tokens and SPLITS them, in
+         both directions and by more than one.
+         - `m k four twenty five c`, six spoken tokens, came back as **`MK425C`**,
+           one token, from all three models. The key `mk 425 c` is three, so no
+           window of three or four could ever contain it and the keyboard was
+           missed on every model.
+         - `groovebox`, one token, came back as **`groove a box`**, three. The
+           key is one, so the same arithmetic missed it from the other side.
+         So the range runs from one token to two past the key, and what keeps it
+         safe is the three guards below rather than the width. */
+      for (let n = 1; n <= span + 2; n++) {
         for (let i = 0; i + n <= tokens.length; i++) {
           const said = tokens.slice(i, i + n).join(' ');
-          if (hasStop(said)) continue;
           const sk = sounds(said);
+          /**
+           * 🔴 A STOP WORD VETOES A SPAN UNLESS IT PROVABLY DID NOT CONTRIBUTE
+           * TO THE SOUND, AND THAT IS A TEST RATHER THAN A FEELING. Take the
+           * stop words out: if the key is the SAME string, they added nothing
+           * to it and cannot be what matched, so the veto has nothing to
+           * protect. If the key CHANGES, they were part of it and the span goes.
+           * MEASURED 2026-09-21, and the two halves are both real:
+           * - *"put the groovebox through the audio interface"* came back from
+           *   `@cf/openai/whisper` as **"put the groove a box through the audio
+           *   interface."** The model split one word into three by inserting an
+           *   article. `groove a box` and `groove box` both reduce to `jrpx`,
+           *   because `sounds()` deletes a vowel anywhere but the first
+           *   character, so the `a` is not in the key at all. The whole span
+           *   veto was refusing a perfect match on the strength of a letter
+           *   that was not being compared.
+           * - *"crack the gate open"* is the negative control and it is not
+           *   hypothetical: the OBVIOUS form of this repair, dropping stop
+           *   words and comparing what is left, resolves it to the **Novation
+           *   Circuit at distance 0**, because `crack gate` reduces to `krkt`
+           *   and so does `circuit`. With the `the` left in, the span reduces
+           *   to `krktkt`, which is a different string, so this test refuses it
+           *   and the looser one does not.
+           * ⚠️ MEASURED BOTH WAYS: this recovers one instrument across the
+           * corpus and changes the answer on NONE of 132 ordinary studio
+           * phrases. The looser form changes one of them, and changes it wrong.
+           */
+          if (hasStop(said)) {
+            const kept = said.split(' ').filter((t) => !STOP.has(t)).join(' ');
+            if (!kept || sounds(kept) !== sk) continue;
+          }
           /* 🔴 THREE GUARDS, AND EACH ONE WAS BOUGHT BY A MEASURED FALSE MATCH.
              The first sound has to agree, because a speech model mishears a
              vowel far more readily than the consonant a word opens on. The
              lengths have to be close, or a short word matches inside a long
              key. And only then does the distance get a say. */
-          if (!sk || sk[0] !== wk[0]) continue;
+          if (!sk || sk.length < MIN_SOUND_LEN) continue;
+          if (sk[0] !== wk[0]) continue;
           if (Math.abs(sk.length - wk.length) > 1) continue;
           const d = dist(sk, wk);
           if (d <= allowed(wk.length)) offer(entry, word, said, 'sound', d);
