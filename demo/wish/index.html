@@ -134,7 +134,11 @@
      ⚠️ WHAT IT WAS FOR IS NOT LOST. `data-busy` is still set on both boxes, so
      a page rule could paint them again and the checks that read the attribute
      are unmoved; what is gone is the animation. */
-  .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); margin-top: 8px; }
+  /* ⚠️ NO MARGIN AND NO BORDER OF ITS OWN. It is a glue part now, so the seam
+     above it and the air around it come from `.pos-glue` and `.wish-part`, in
+     the same colour and the same measure as the picture and the object below
+     it. A divider typed here would be a second one. */
+  .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); }
   .wish-why b { color: var(--bad, #e0908a); font-weight: 600; }
   .wish-why i { color: var(--ok, #8fd6a8); font-style: normal; }
   .wish-why-l { color: var(--ink); }
@@ -480,12 +484,11 @@
    * ⚠️ `Use the example` STAYS IN THE ROW, so the row is not empty and the
    * harness still reaches the asking path by itself.
    */
-  const header = (left, pick, under) => {
+  const header = (left, pick) => {
     const part = el('div', 'wish-part');
     const row = el('div', 'wish-head');
     row.append(left, pick.el);
     part.append(row);
-    if (under) part.append(under);
     return { part, row };
   };
 
@@ -500,11 +503,20 @@
    * those apart, and it needs a box somebody can retype.
    */
   const said = el('textarea', 'wish-said');
-  /* 🔴 THE PLACEHOLDER IS WHERE THE GESTURE IS WRITTEN DOWN, because there is
-     no `Ask` button left to carry it and a page does not get to hide its only
-     way to submit. Same rule as `Hold to talk` naming its own gesture: the
-     label is the documentation. */
-  said.placeholder = 'hold the button and say what you want, or type here and press Enter';
+  /**
+   * 🔴 NO PLACEHOLDER, AND THE REASON IT HAD ONE IS THE REASON IT CAN LOSE IT.
+   * Asked 2026-09-21: *"rm placholder text 'hold the button.."*. It read *hold
+   * the button and say what you want, or type here and press Enter*, and it was
+   * carrying the page's only written account of how to submit, because the `Ask`
+   * button had been removed and Enter is invisible.
+   * ✅ TWO BUTTONS CARRY IT NOW. `Hold to talk` heads this very block and names
+   * its own gesture, and `Interpret` heads the one below it. The label is the
+   * documentation, which is the rule this comment always cited, and the
+   * documentation is on a control rather than inside the box a reader is about
+   * to type over.
+   * ⚠️ ENTER STILL ASKS AND SHIFT+ENTER STILL MAKES A NEWLINE, and the check
+   * for that stays: what changed is where a reader is told, not what happens.
+   */
   said.spellcheck = false;
   const patch = el('pre', 'wish-patch');
   const whyBox = el('div', 'wish-rows');
@@ -564,11 +576,30 @@
    */
   said.classList.add('wish-part');
   const hear = header(speakBtn, hearPick);
-  const patchHead = header(d.button('interpret'), patchPick, whyBox);
+  const patchHead = header(d.button('interpret'), patchPick);
   const hearRow = hear.row;
   const patchRow = patchHead.row;
+  /**
+   * 🔴 THE VERDICT IS ITS OWN PART OF THE GLUE, NOT A LINE INSIDE THE HEADER.
+   * Reported 2026-09-21 against a screenshot: *"you are missing divider on top
+   * of allowerd and spacing"*, and then in four words that settle it, *"its a
+   * line in glue"*.
+   * ✅ AND THAT IS WHY IT IS THE RIGHT SHAPE RATHER THAN A STYLING FIX. Inside
+   * the header part the line needed a border and a margin TYPED ON THIS PAGE, a
+   * divider drawn by hand where the component beside it already draws one. As a
+   * part it gets the glue's own 1 px seam of `--line` and the part's own
+   * padding, which is the same edge the picture and the object already have, in
+   * the same colour, from the same rule.
+   * ⚠️ AND IT GOES AWAY WHEN IT HAS NOTHING TO SAY. A part with a seam above it
+   * and nothing in it is an empty box painting a line nobody wrote, which is
+   * this project's named defect and is exactly what the drop footer and the
+   * empty table heading already answer.
+   */
+  const whyPart = el('div', 'wish-part wish-verdict');
+  whyPart.append(whyBox);
+  whyPart.hidden = true;
   const heard = createGlue(hear.part, said);
-  const answer = createGlue(patchHead.part, dgHost, dump);
+  const answer = createGlue(patchHead.part, whyPart, dgHost, dump);
   d.el.append(heard, answer);
 
   /**
@@ -943,6 +974,7 @@
     /* Both of these are things to show, the object and the report that there is
        no object, so both get the box's edges. See `.wish-patch`. */
     patch.dataset.shown = '1';
+    whyPart.hidden = !g.rows.length;
     whyBox.replaceChildren(...g.rows.map((r) => {
       const e = el('div', 'wish-why');
       e.append(el(r.ok ? 'i' : 'b', '', r.ok ? 'allowed' : 'refused'),
@@ -995,6 +1027,7 @@
        rest of the page's life. */
     delete patch.dataset.shown;
     whyBox.replaceChildren();
+    whyPart.hidden = true;
     dg?.destroy();
     dg = null;
     dgHost.replaceChildren();
@@ -1585,6 +1618,30 @@
       && !whyBox.textContent.includes('here:'),
       whyBox.textContent.trim().slice(0, 110));
 
+    /**
+     * 🔴 AND WITH AN ANSWER ON SCREEN THE VERDICT IS A PART OF THE GLUE WITH A
+     * SEAM ABOVE IT, which is the only moment that can be measured: the part is
+     * away until something is proposed, so every check taken before one lands
+     * grades a three part component and says nothing about the fourth.
+     * ⚠️ THAT IS WHY THIS SITS HERE RATHER THAN BESIDE THE OTHER LAYOUT CHECKS.
+     * A check run at the wrong moment is a check that measures a state nothing
+     * has reached, which this page has already paid for once.
+     */
+    {
+      const seam = (a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().bottom;
+      const head = patchRow.parentElement;
+      const glueBg = getComputedStyle(answer).backgroundColor;
+      d.assert('with an answer up, the verdict is its own part with the glue\'s own seam over it',
+        whyPart.hidden === false && whyPart.parentElement === answer
+        && Math.abs(seam(head, whyPart) - 1) < 0.6
+        && Math.abs(seam(whyPart, dgHost) - 1) < 0.6
+        && getComputedStyle(whyPart).backgroundColor !== glueBg
+        && getComputedStyle(whyPart).borderTopWidth === '0px',
+        `${[...answer.children].filter((n) => !n.hidden).length} parts up, seams `
+        + `${seam(head, whyPart).toFixed(1)} above and ${seam(whyPart, dgHost).toFixed(1)} below, `
+        + `and it draws ${getComputedStyle(whyPart).borderTopWidth} of border of its own`);
+    }
+
     // ⚠️ THE NEGATIVE CONTROL: the same link, spelled right, is allowed. Without
     // it the line above would pass on a page that refused everything.
     const FIXED = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
@@ -1898,8 +1955,12 @@
      * read and one remembered.
      */
     const seamInk = getComputedStyle(answer).backgroundColor;
-    const grounds = [patchPart, dgHost, dump].map((n) => getComputedStyle(n).backgroundColor);
-    const edges = [patchPart, dgHost, dump]
+    // ⚠️ EVERY PART, READ OFF THE GLUE, rather than three named by hand. The
+    // verdict became a fourth part on 2026-09-21 and a list typed here would
+    // have gone on grading three of four without anything saying so.
+    const parts = [...answer.children].filter((n) => !n.hidden);
+    const grounds = parts.map((n) => getComputedStyle(n).backgroundColor);
+    const edges = parts
       .map((n) => parseFloat(getComputedStyle(n).borderTopWidth));
     const seams = [drawn.top - picked.bottom, dumped.top - drawn.bottom];
     d.assert('each part paints its own ground, so the 1 px seam between them is the only edge inside',
@@ -2195,10 +2256,16 @@
     d.assert('Enter asks what is in the box, and Shift+Enter leaves the key alone',
       plain.asked === true && plain.claimed === true
       && withShift.asked === false && withShift.claimed === false
-      && said.placeholder.includes('Enter'),
+      // ⚠️ AND THE BOX SAYS NOTHING, which is the other half of the same ask.
+      // A placeholder that explained the gesture was the page's only account of
+      // it until `Interpret` existed; now two buttons carry it and the box is
+      // empty. Asserted rather than assumed, because a stray placeholder is
+      // exactly the kind of string that survives a removal.
+      && said.placeholder === '',
       `Enter asked ${plain.asked} and claimed ${plain.claimed}, Shift+Enter asked `
       + `${withShift.asked} and claimed ${withShift.claimed}, the box says `
-      + `${JSON.stringify(said.placeholder)}`);
+      + `${JSON.stringify(said.placeholder)} and the gesture is on `
+      + `"${speakBtn.textContent}" and "${d.button('interpret').textContent}"`);
     await new Promise((r) => { setTimeout(r, 0); });   // let that proposal land
 
     /* 🔴 PAINT, NOT ROOM, AND BOTH HALVES ARE MEASURED. Nothing that redraws
