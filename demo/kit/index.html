@@ -807,6 +807,7 @@
   // zone, `section()` swallows the throw into `failed`, and the page dies much
   // later with a message about a different line.
   let kitDrop = null, kitDropLine = null, kitDropTall = 0;
+  let kitRoFlex = null, kitRoGrid = null;
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A drop target, as of
@@ -838,6 +839,46 @@
    * block with a control in it moves every other block's press. These two
    * buttons are in the box, which nothing presses by position.
    */
+  /**
+   * 🔴 THE NEWEST BLOCK, AT THE TOP, WHICH IS THIS PAGE'S OWN RULE. Asked for
+   * 2026-09-21 in the same breath as the options themselves: *"have smaller
+   * readout values styling. put to kit too"*.
+   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the blocks
+   * below give: both harnesses press that row by position, so a new top block
+   * with a control in it moves every other block's press.
+   */
+  section('status', 'READOUT, FIXED COLUMNS',
+    'The readout row fills every line it takes, which is right when a page does not care '
+    + 'where the break falls and wrong when the cells are pairs. Ten cells wrapped seven and '
+    + 'three on /pack/ and split two numbers a reader compares. A caller can ask for a number '
+    + 'of columns instead, and for a quieter value when the panel is reference rather than the '
+    + 'thing you look at.',
+    `createReport({ readout, cols: 5, size: 'sm', showLog: false })
+// cols  a grid of that many equal columns, 2 below 560px. Omit it for the flex row
+// size  'sm' is a 15px value instead of 19. The KEY does not shrink with it`,
+    (box) => {
+      const ten = () => ({
+        head: '', marker: '', written: 'B', 'not erasure': 'B', payload: 'B',
+        filled: '%', entropy: '', nearest: 'B', 'synth 1': '', 'synth 2': '',
+      });
+      const fill = (r) => {
+        r.set('head', 'USER'); r.set('marker', 'DC BB'); r.set('written', '10,620');
+        r.set('not erasure', '9,206'); r.set('payload', '1,054'); r.set('filled', '84.7');
+        r.set('entropy', '0.83'); r.set('nearest', '262');
+        r.set('synth 1', 'SpaceRadio'); r.set('synth 2', 'SpooKey');
+        return r;
+      };
+      // ⚠️ THE SAME TEN CELLS AND THE SAME TEN VALUES IN BOTH, so what is on
+      // screen is the ARRANGEMENT and nothing else. Two specimens differing in
+      // their content would demonstrate the content.
+      kitRoFlex = fill(createReport({ readout: ten(), showLog: false }));
+      kitRoGrid = fill(createReport({ readout: ten(), cols: 5, size: 'sm', showLog: false }));
+      box.append(
+        el('div', 'kit-cap', 'the flex row, which is the default'), kitRoFlex.readoutEl,
+        el('div', 'kit-cap', 'five columns and a quieter value'), kitRoGrid.readoutEl,
+      );
+    });
+
   section('input', 'DROP TARGET',
     'A visible area that says what it takes, a button for somebody who does not drag, '
     + 'and one line that reports what happened. A file opens in the tab and nothing '
@@ -3273,6 +3314,37 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       && kitDropLine.textContent.includes('one.syx'),
       `opened ${before} then ${kitDrop.opens} · "${kitDropLine.textContent}"`);
     measure();
+  }
+
+  /**
+   * 🔴 THE NEW BLOCK'S ONE CLAIM, AND IT IS A MEASUREMENT RATHER THAN A LOOK.
+   * Two readouts with the SAME ten cells and the SAME ten values, so the only
+   * thing that can differ between them is the arrangement. The flex row wraps
+   * wherever the width lets it; the grid puts five in a row whatever happens,
+   * which is the whole of what was asked for.
+   * ⚠️ IT COMPARES ROW TOPS, NOT COLUMN COUNTS. A cell's column is not a thing
+   * the DOM knows; how many distinct tops the ten cells have is, and it is the
+   * same fact a reader sees.
+   */
+  {
+    const tops = (r) => new Set([...r.readoutEl.children]
+      .map((c) => Math.round(c.getBoundingClientRect().top)));
+    const rowOf = (r, k) => Math.round([...r.readoutEl.children][k].getBoundingClientRect().top);
+    const gridRows = tops(kitRoGrid);
+    const vSize = (r) => parseFloat(getComputedStyle(r.readoutEl.querySelector('.pos-v')).fontSize);
+    d.assert('asked for five columns it lays ten cells out five and five, whatever the flex row does',
+      gridRows.size === 2
+      && rowOf(kitRoGrid, 0) === rowOf(kitRoGrid, 4)
+      && rowOf(kitRoGrid, 5) === rowOf(kitRoGrid, 9)
+      && rowOf(kitRoGrid, 0) !== rowOf(kitRoGrid, 5),
+      `${gridRows.size} row(s) of cells in the grid against ${tops(kitRoFlex).size} in the flex row`);
+
+    d.assert('and the quieter value is smaller while the key it sits under is not',
+      vSize(kitRoGrid) < vSize(kitRoFlex)
+      && parseFloat(getComputedStyle(kitRoGrid.readoutEl.querySelector('.pos-k')).fontSize)
+         === parseFloat(getComputedStyle(kitRoFlex.readoutEl.querySelector('.pos-k')).fontSize),
+      `${vSize(kitRoGrid)} px against ${vSize(kitRoFlex)} px, with both keys at `
+      + `${getComputedStyle(kitRoGrid.readoutEl.querySelector('.pos-k')).fontSize}`);
   }
 
   d.assert('every block on this page built',

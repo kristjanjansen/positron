@@ -304,9 +304,47 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   border-radius: 4px; margin: 0 0 14px; overflow: hidden;
 }
 .pos-readout > * { flex: 1 1 96px; min-width: 0; }
+/* 🔴 A FIXED NUMBER OF COLUMNS, ASKED FOR 2026-09-21 AS *"why not 5x2 cells?"*
+   AGAINST A TEN CELL READOUT THAT HAD WRAPPED 7 AND 3. The flex row fills every
+   line, which is right when a page does not care where the break falls and
+   wrong when the cells are pairs: `written` and `not erasure` belong beside each
+   other and ended up in different rows at whatever width the browser chose.
+   ⚠️ IT IS A GRID ONLY WHEN A CALLER ASKS. The flex row is still the default
+   and is still what every other page gets, because it is the arrangement that
+   was measured filling at thirteen widths and both counts.
+   ⚠️ AND `minmax(0, 1fr)` RATHER THAN `1fr`: a grid track's `min-width` is
+   `auto`, so a long value would push its own column wider and the five would
+   stop being equal. */
+.pos-readout[data-cols] {
+  display: grid; grid-template-columns: repeat(var(--ro-cols, 5), minmax(0, 1fr));
+}
+/* 🔴 A QUIETER VALUE, ASKED FOR IN THE SAME BREATH AS *"have smaller readout
+   values styling"*. The default 19 px is for a page whose readout is the thing
+   you look at; a ten cell panel inside a tab is reference, and at 19 px
+   `10,620` was being cut to `10,62…` in its own cell.
+   ⚠️ THE KEY DOES NOT SHRINK WITH IT. It is already 9.5 px and is the half a
+   reader scans; shrinking both would make the panel smaller rather than
+   quieter. */
+.pos-readout-sm .pos-cell { padding: 8px 10px; }
+.pos-readout-sm .pos-v { font-size: 15px; }
+.pos-readout-sm .pos-u { font-size: 9.5px; }
+/* 🔴 FIVE COLUMNS IS 78 px A CELL ON A PHONE, WHICH IS NOT A CELL. The grid is
+   asked for at the width a laptop has and has to give way below it.
+   ⚠️ AND THIS BLOCK SITS AFTER THE RULE IT OVERRIDES, WHICH IS NOT A STYLE
+   CHOICE. A media query adds NO specificity, so a later plain rule beats it at
+   every width: `.pos-pick`'s entire phone layout sat above the plain rule that
+   beat it and had never run in its life. MEASURED 2026-09-19. */
+@media (max-width: 560px) {
+  .pos-readout[data-cols] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
    nothing until this existed — the row stayed on screen while the page said it
    was hidden */
+
+/* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
+   nothing until this existed. ⚠️ IT SITS AFTER `[data-cols]` ON PURPOSE: both
+   selectors weigh (0,2,0), so the later one wins, and a readout that was both
+   hidden and gridded would otherwise come back on screen. */
 .pos-readout[hidden] { display: none; }
 .pos-cell { background: var(--card); padding: 10px 12px; min-width: 0; }
 .pos-k {
@@ -2254,6 +2292,23 @@ video[hidden] { display: none; }
    ⚠️ `text-align: inherit` and `font: inherit` because a `role="button"` row is
    still a div here, but a page could hand this a real button and the cells must
    not suddenly centre themselves. */
+/* 🔴 `display: grid` ABOVE BEATS THE UA'S `[hidden] { display: none }`, AND
+   WITHOUT THIS LINE `head.hidden = true` SET AN ATTRIBUTE AND CHANGED NOTHING.
+   MEASURED 2026-09-21 by screenshot: `/pack/` with no file open showed three
+   column headings over three empty tables, on the page that carries the assert
+   `an empty table draws no heading, because a column name over nothing labels
+   air`. That assert read `head.hidden === true`, which is the PROPERTY, so it
+   passed every run while the heading was on screen.
+   ⚠️ SO EVERY EMPTY TABLE IN THIS PROJECT HAS BEEN DRAWING ITS HEADING FOR AS
+   LONG AS `table.mjs` HAS EXISTED. `blank()` has always set the attribute.
+   ⚠️ AND IT IS THE FOURTH COMPONENT TO NEED THIS EXACT PATCH: the readout, the
+   control row, the log and the glue all carry it with a comment saying why, and
+   the one whose whole job is to disappear did not. **A component that sets
+   `display` must say what `[hidden]` means, every time.**
+   🔴 AND THE LESSON IS ABOUT THE ASSERT, NOT THE RULE: `el.hidden` is a fact
+   about an attribute and `getComputedStyle(el).display` is a fact about the
+   screen. Only the second one can tell you a thing is not being drawn. */
+.pos-tbl-row[hidden] { display: none; }
 .pos-tbl-row.pick { cursor: pointer; }
 .pos-tbl-row.pick:hover { background: var(--card2); }
 .pos-tbl-row.pick:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }

@@ -1,5 +1,40 @@
 ## Open
 
+### /pack/, /shape/ and the kit, second stream, 2026-09-21
+
+- **`what a mess. why not 5x2 cells? have smaller readout values styling. put
+  to kit too.`** Said against a screenshot of a ten cell readout wrapped 7 and
+  3, with `10,620` cut to `10,62…` in its own cell.
+
+- 🔴 **`no files, no tabs no content`**, said against a screenshot of `/pack/`
+  with nothing open showing three tab names, three column headings and ten
+  readout keys, every one of them naming something that is not there.
+  🔴 **AND THE HEADINGS WERE A REAL DEFECT REACHING EVERY TABLE IN THE
+  PROJECT.** `.pos-tbl-row` sets `display: grid`, which beats the UA's
+  `[hidden] { display: none }`, so `blank()` has always set an attribute and
+  changed nothing. `/pack/`'s own assert `an empty table draws no heading` read
+  `head.hidden === true`, the PROPERTY, and passed every run while the heading
+  was on screen. **A screenshot caught what the suite could not.** Fourth
+  component to need that patch, after the readout, the control row and the log.
+
+- **`can we get note data out of regions?`** Whether the fifty regions of a
+  session carry sequencer note data that can be read out. ⚖️ Nothing in
+  `circuit-session.mjs` claims to know what a region holds, and the names it
+  once used were removed today for exactly that reason. This is a research
+  question and it is worth one: 32 regions of 720 bytes and 16 of 1,508 in a
+  file whose instrument has 8 patterns of 16 steps.
+
+- **`compare shape and circuit patch editor resaetch. no full ui but can we at
+  least use same grouping / labels what they have?`** `/shape/` against
+  whatever the Circuit patch editor research settled about how Novation group
+  and name their parameters. **Not a full editor**, just the grouping and the
+  labels.
+
+- **`can we get 2 col sliders in desktop?`** A slider group in two columns at
+  desktop width. ⚠️ `demo/shell/slider.mjs` and the slider GROUP already exist
+  and `/kit/` has three blocks of them, so this is a component change and is
+  done once rather than per page.
+
 ### A new demo, 2026-09-21
 
 - **`in bg make a tom demo, a 8x64 grid with transport on top. have circuitpack

@@ -60,6 +60,13 @@
 // component that only looks right next to one page's stylesheet is the
 // `choice.mjs` bug in a new costume.
 //
+// ⚠️ AND THE WRAPPER PAINTS ITS OWN GROUND, WHICH MATTERS BECAUSE THIS GETS PUT
+// INSIDE THINGS. `createGlue` lays its children out with a 1 px gap over a
+// `--line` ground, so a transparent child does not show a hairline between two
+// panes, it shows that colour across its whole area. `.pos-wave` sets
+// `background: var(--card)`, so the component is safe in a glue. A caller that
+// wraps it in a box of its own has to paint that box.
+//
 // 🔴 THE BORDER IS ON THE WRAPPER AND NOT ON THE CANVAS, WHICH IS ARITHMETIC
 // RATHER THAN TASTE. `box-sizing: border-box` is global here, so a canvas with
 // a 1 px border whose CSS width is set from its container's width renders 2 px
@@ -345,13 +352,30 @@ export function createWaveView(host, { height = 120, label = '', normalise = fal
     paints++;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
+
+    // 🔴 NOTHING TO DRAW IS AN EMPTY BITMAP, NOT AN EMPTY PICTURE, AND THIS
+    // LINE SHIPPED PAINTING A FIELD AND A MIDLINE INSTEAD. `clear()` did not
+    // repaint at all, so the canvas kept the LAST SAMPLE and only the wrapper
+    // being hidden made it look gone. REPORTED 2026-09-21 while `/pack/` was
+    // being wired up: a page drew a sample, read `ink()`, called `clear()`, read
+    // `ink()` again, and got **the same 63,264 pixels both times**, so a check
+    // built on the difference was measuring nothing. Two ways it bites. A page
+    // that unhides the wrapper again for any reason flashes the previous
+    // sample, and every number a check could ask for reads exactly the same
+    // whether the clear worked or not.
+    // ⚠️ AND IT IS CLEARED RATHER THAN FILLED WITH A FIELD AND A MIDLINE. A
+    // midline on an empty picture is a drawing of silence, which is a different
+    // claim from there being nothing here. The wrapper paints `--card`, so an
+    // empty canvas shows an empty box either way, and a transparent bitmap is
+    // the one state `ink()` can tell apart from a picture.
+    if (!env || env.empty) { ctx.clearRect(0, 0, W, H); return; }
+
     ctx.fillStyle = C.field;
     ctx.fillRect(0, 0, W, H);
 
     const mid = H / 2;
     ctx.fillStyle = C.line;
     ctx.fillRect(0, mid - 0.5, W, 1);
-    if (!env || env.empty) return;
 
     // Full scale by default: 1.0 reaches PAD_Y from the edge. `normalise`
     // divides by this sample's own peak instead, which is opt in for the reason
@@ -434,11 +458,21 @@ export function createWaveView(host, { height = 120, label = '', normalise = fal
       return { ok: true, frames: len, seconds, cols: env.cols, peak: env.peak, lit: env.lit };
     },
 
-    /** Nothing drawn, no head, no loop, and the box goes away with it. */
+    /**
+     * Nothing drawn, no head, no loop, and the box goes away with it.
+     *
+     * 🔴 IT WIPES THE BITMAP, SYNCHRONOUSLY, AND THE FIRST VERSION DID NOT.
+     * Hiding the wrapper is not clearing the picture: the canvas kept every
+     * pixel of the last sample, `ink()` went on reporting them, and the only
+     * thing that would eventually have wiped it is a resize observation
+     * arriving later and setting `canvas.width`. A cleanup that depends on
+     * something else happening afterwards is not a cleanup.
+     */
     clear() {
       stopLoop();
       pos = null;
       samples = null; env = null; rate = 0; seconds = 0; name = '';
+      paint();
       wrap.hidden = true;
     },
 
@@ -522,18 +556,36 @@ export function createWaveView(host, { height = 120, label = '', normalise = fal
      * token, because the corner is field by construction: the wave is inset by
      * `PAD_Y` and can never reach row zero.
      *
+     * 🔴 SO IT HAS TO SAY WHEN THE CORNER IS NOT A FIELD COLOUR AT ALL, AND
+     * THIS RETURNED A BARE SHARE UNTIL 2026-09-21. On a bitmap that has never
+     * been painted, or one this component has just wiped, the corner is
+     * TRANSPARENT: every pixel then matches it, or every pixel differs from it
+     * depending on which channels are compared, and the number that comes out
+     * is about nothing. Reported from `/pack/` as a `share` near 0.999 passing
+     * a `share > 0` assert while meaning nothing. `measured` is the field that
+     * says whether there was anything to measure, and it is the one to read
+     * FIRST, the way `table.mjs` reports a table that has not been laid out.
+     * A check that reads `share` without reading `measured` is back to
+     * believing a number that cannot move.
+     *
      * ⚠️ IT IS A READBACK AND IT IS FOR A CHECK. Do not call it in a frame.
+     *
+     * @returns {{ink:number, total:number, share:number, measured:boolean, why:string}}
      */
     ink() {
-      if (!W || !H || !canvas.width) return { ink: 0, total: 0, share: 0 };
+      const none = (why) => ({ ink: 0, total: 0, share: 0, measured: false, why });
+      if (!W || !H || !canvas.width) return none('the picture has no size yet, so nothing has been drawn into it');
       const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      // The corner carries the field colour on any painted bitmap, and an alpha
+      // of zero is how an unpainted or wiped one says so.
+      if (d[3] === 0) return none('the bitmap is empty, so there is no field colour to compare against');
       const r0 = d[0], g0 = d[1], b0 = d[2];
       let ink = 0;
       const total = canvas.width * canvas.height;
       for (let p = 0; p < d.length; p += 4) {
         if (Math.abs(d[p] - r0) > 8 || Math.abs(d[p + 1] - g0) > 8 || Math.abs(d[p + 2] - b0) > 8) ink++;
       }
-      return { ink, total, share: total ? ink / total : 0 };
+      return { ink, total, share: total ? ink / total : 0, measured: true, why: '' };
     },
 
     /** Put it away: the loop, the observer and the element. */

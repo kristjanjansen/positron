@@ -462,6 +462,7 @@ export function mount({
  */
 export function createReport({
   readout = {}, showReadout = true, showLog = true, joined = false,
+  cols = 0, size = '',
 } = {}) {
   // 🔴 AN EVEN NUMBER OF CELLS, AND WHEN IT IS ODD THE ANSWER IS TO CUT ONE.
   // The row was `repeat(auto-fit, minmax(96px, 1fr))` when this rule was
@@ -488,6 +489,29 @@ export function createReport({
 
   const cells = new Map();
   const readoutEl = el('div', 'pos-readout');
+  /**
+   * 🔴 A FIXED NUMBER OF COLUMNS, ASKED FOR 2026-09-21 AS *"why not 5x2
+   * cells?"* against a ten cell readout that had wrapped 7 and 3. The flex row
+   * fills every line, which is right when a page does not care where the break
+   * falls and wrong when the cells are PAIRS: `written` and `not erasure`
+   * belong beside each other and landed in different rows at whatever width the
+   * browser chose.
+   * ⚠️ IT IS OPT IN AND THE FLEX ROW IS STILL THE DEFAULT, because that row was
+   * measured filling at thirteen widths and both counts, and nothing about the
+   * pages using it has changed.
+   * ⚠️ A CUSTOM PROPERTY AND NOT `style.gridTemplateColumns`. A component that
+   * varies a property per instance sets a custom property, never the property,
+   * or no stylesheet can ever take it back: `video-panel.mjs` wrote
+   * `style.aspectRatio` from an option and left one page's picture square on a
+   * 16:9 screen with the way out of full screen off the top of it.
+   */
+  if (cols > 0) {
+    readoutEl.dataset.cols = String(cols);
+    readoutEl.style.setProperty('--ro-cols', String(cols));
+  }
+  // ⚠️ `sm` IS A QUIETER VALUE AND NOT A SMALLER PANEL. The key stays 9.5 px
+  // because it is the half a reader scans down.
+  if (size === 'sm') readoutEl.classList.add('pos-readout-sm');
   // hidden, not absent: `/crate/` and `/videoradio/` both reach for this
   // element, and shell.css gives `.pos-readout[hidden]` an explicit
   // `display: none` because `display: flex` beats the UA's own `[hidden]` rule.
