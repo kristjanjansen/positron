@@ -37,6 +37,7 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode } from '/shell/midi-decode.mjs';
   import { createBay, classOf, printLink } from '/shell/bay.mjs';
+  import { describe } from '/shell/instruments.mjs';
 
   /**
    * 🔴 A PATCH BAY: WHAT EXISTS, WHAT MAY REACH WHAT, AND THE ARITHMETIC THAT
@@ -239,11 +240,21 @@
    * which is a different and false statement.
    */
   const DIR_WORD = /[\s_-]+(?:in|out|input|output)$/i;
-  const instrumentName = (raw) => {
-    const s = String(raw || '').trim();
-    // A port called nothing but `OUT` keeps its name rather than losing it.
-    return s.replace(DIR_WORD, '').trim() || s || 'unnamed';
-  };
+  /**
+   * 🔴 THE NAME COMES FROM THE TAXONOMY, NOT FROM THE CABLE. Asked 2026-09-21
+   * as *"can you not enrich the names with brands etc"* and *"have a
+   * taxononomy"*, after `/wish/` was told *"connect evolution to circuit"* and
+   * correctly answered that nothing on this desk is called evolution. CoreMIDI
+   * calls that port `MK-425C USB MIDI Keyboard`; the instrument is an
+   * **Evolution** MK-425C, and the maker was in none of the strings this page
+   * had. `demo/shell/instruments.mjs` is the one place that knows, graded at 14
+   * asserts with no browser.
+   * ⚠️ AND THE RAW NAME IS STILL KEPT AND STILL PRINTED. `rawName` holds it and
+   * a row shows it whenever it differs from the label, because it is the only
+   * thing tying a row back to a cable and the thing a reader needs when two
+   * devices are named alike.
+   */
+  const instrumentName = (raw) => describe(raw).label;
   const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
 
   /** Every instrument on the desk, in the order its first port was adopted. */
@@ -436,14 +447,19 @@
    * other names, and two instruments daisy-chained through a DIN socket echo
    * the same way with nothing in their names to say so.
    */
-  const NEVER_PLAYED = /\biac\b|loopback|virtual/i;
+  /* 🔴 THE RULE IS THE TAXONOMY'S NOW, not a second regular expression here.
+     `plays: false` sits on the entry with the reason beside it, and the module's
+     test asserts it is the only entry carrying it. A page holding its own copy
+     of a fact the kit already states is the two-files-one-measurement defect
+     this project keeps paying for. */
+  const neverPlayed = (raw) => describe(raw).plays === false;
 
   function played(portIdOfSender, m) {
     if (!isGesture(m)) return;
     /* This page just sent to the other half of this instrument, so what has
        arrived is very likely its own bytes coming back. */
     if (hushed(nodeOf(portIdOfSender))) return;
-    if (NEVER_PLAYED.test(rawName.get(portIdOfSender) || '')) return;
+    if (neverPlayed(rawName.get(portIdOfSender) || '')) return;
     const node = nodeOf(portIdOfSender);
     const g = instrument(node);
     if (!g) return;
@@ -568,7 +584,7 @@
          should not have to take it on trust. */
       /* A bus says what it is, on the row, because *why did nothing happen when
          I played it* is a question asked at the row rather than in a comment. */
-      if (g.out && NEVER_PLAYED.test(rawName.get(g.out.id) || '')) {
+      if (g.out && neverPlayed(rawName.get(g.out.id) || '')) {
         lines.push('a virtual bus, so press it rather than playing it');
       }
       const sentAs = g.out && rawName.get(g.out.id);
