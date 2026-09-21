@@ -478,7 +478,7 @@ that had been built on reasoning for two days, and **neither was visible in the
 MIDI**:
 
 🔴 **REC IS NOT IN THE BUTTON COLUMN.** It is a WIDE button above the fader,
-spanning the strip, with its own round indicator. `/model/` had it as the first
+spanning the strip, with its own round indicator. `/twelve/` had it as the first
 of three squares beside the fader.
 🔴 **THERE ARE FOUR BUTTONS BESIDE THE FADER, NOT THREE**: MUTE, MAIN, SUB,
 SOLO, top to bottom, at fixed heights on the fader scale. **MAIN and SUB send

@@ -36,9 +36,9 @@
 
 🔴 **THREE PAGES, NOT FOUR, AND THE FOURTH IS `/evo/` COUNTED TWICE.**
 `/evo/`'s own banner says *"THIS IS THE FOURTH COPY OF THAT IDEA"* and then
-names three: `/model/`, `/circuit/` and *"this page called them `.evo-wrap` and
+names three: `/twelve/`, `/circuit/` and *"this page called them `.evo-wrap` and
 `.evo-strip`"*, which is the predecessor of the rebuild that is now in the file.
-So the live callers are **`/model/`, `/circuit/` and `/evo/`**, and the fourth
+So the live callers are **`/twelve/`, `/circuit/` and `/evo/`**, and the fourth
 copy is the one the rebuild replaced.
 
 ⚠️ **`/keys/` IS NOT A FIFTH CASE BECAUSE IT NO LONGER EXISTS.** MEASURED:
@@ -87,7 +87,7 @@ All three at 1280 px, `?selfcheck=1`, `.pos-body` 688 px wide.
 - Nameplate **inside the flow**, `.pan-plate` at x 996, 73.5 by 33 px, two
   stacked lines.
 
-### 2.2 `/model/` (TASCAM Model 12): no case, fixed column on the RIGHT, nameplate above everything
+### 2.2 `/twelve/` (TASCAM Model 12): no case, fixed column on the RIGHT, nameplate above everything
 
 | element | x | y | w | h | scrollW | clientW |
 |---|---|---|---|---|---|---|
@@ -163,7 +163,7 @@ scroll, and a scrolling strip of controls beside it, inside a card*. **Measured
 against all three, that is the union of the three pages rather than their
 intersection, and it has to be stated as four independent pieces.**
 
-| piece | `/evo/` | `/model/` | `/circuit/` | verdict |
+| piece | `/evo/` | `/twelve/` | `/circuit/` | verdict |
 |---|---|---|---|---|
 | a nameplate | inside the flow, stacked, centred | above the boxes, `space-between` | inside the card, `space-between` | **every panel has one. Its PLACEMENT is optional and is one of three.** |
 | a scrolling region with `min-width: 0` | the strip | the row | the whole card | **every panel has one. WHAT scrolls is optional.** |
@@ -180,12 +180,12 @@ So the contract, restated:
    page overflow when the second half was missing.
 2. **A panel may have a fixed column, on either side of the scroller.** It is a
    SIBLING of the scroller, never `position: sticky` inside it, for the reason
-   both `/evo/` and `/model/` write down: a sticky child needs a background to
+   both `/evo/` and `/twelve/` write down: a sticky child needs a background to
    hide what passes under it, a shadow to say it is over its neighbours, and it
    lands on top of the scrollbar, while two flex children need none of that.
 3. **Where there is a fixed column, the wrap is `align-items: stretch` and the
    two children are one depth.** Not `flex-end`: bottom alignment makes them END
-   together and says nothing about their heights, which is what `/model/` was
+   together and says nothing about their heights, which is what `/twelve/` was
    reported for with a screenshot.
 4. **The column's width is its widest child and nothing else.** MEASURED on
    `/evo/`: 176 px of content, set by the keypad group, with the display and the
@@ -201,14 +201,14 @@ So the contract, restated:
    a DESCENDANT, so a page with two panels can give one different proportions;
    the `--fdr-foot` lesson is about a SIBLING needing a value and does not apply.
    ⚠️ **On an uncased panel `--pan-pad` resolves to 0 and every other rule is
-   unchanged**, which is what makes `/model/` fit the same stylesheet.
+   unchanged**, which is what makes `/twelve/` fit the same stylesheet.
 7. **The nameplate is one ink rule and three layouts.** The ink is
    `font: 600 11px var(--mono); letter-spacing: .14em; color: var(--dim2);
    text-transform: uppercase`, which all three pages already share to the
    declaration. What is NOT shared, read off the three stylesheets: `/evo/` adds
    `line-height: 1.5` and `white-space: nowrap` because it stacks two lines
    (MEASURED 33 px tall), `/circuit/` adds `align-self: center` because it is a
-   grid child, `/model/` adds nothing (MEASURED 11 px tall). So `line-height`
+   grid child, `/twelve/` adds nothing (MEASURED 11 px tall). So `line-height`
    belongs to the placement and not to the ink.
 8. 🔴 **THE SCROLLING REGION IS INSIDE THE CARD, NOT AROUND IT.** This is the
    one place the contract CORRECTS a live page rather than describing it, and
@@ -245,7 +245,7 @@ of a working keyboard: it is the only thing giving the keyboard a size. Switch i
 off and the page draws a 24 px keyboard with 310 px of empty card under it, which
 is the defect the rebuild was handed in the first place.
 
-**`/model/`, measured by switching `align-items: stretch` to `flex-start`:**
+**`/twelve/`, measured by switching `align-items: stretch` to `flex-start`:**
 
 | | natural | as it ships |
 |---|---|---|
@@ -269,7 +269,7 @@ filter and master pots at one size (*"single size knobs weverywhre"*). So on a
 panel with a keyboard the keys are the part allowed to grow into the depth of the
 case, and shrinking the panel to match a 74 px key is the wrong direction:
 MEASURED, the keys are 28 to 98 per cent of the case's depth on the real object.
-`/circuit/` and `/model/` never meet this because neither has a keyboard.
+`/circuit/` and `/twelve/` never meet this because neither has a keyboard.
 
 ### 4.3 The five options, and what each costs
 
@@ -293,7 +293,7 @@ at the author rather than discovered by a reader.
 anywhere. Cost, measured: `/evo/` ships a 24 px keyboard and 310 px of empty
 card. **Refused on the measurement.**
 
-**D. The slack always becomes growth on the last child.** Cost: on `/model/` the
+**D. The slack always becomes growth on the last child.** Cost: on `/twelve/` the
 last thing in a channel strip is its fader block, so 25 px would stretch a fader
 lane whose length is a deliberate expression (`4 * --ctl-w/2 + 3 * --ctl-step`,
 the length of four buttons and three steps) and which is asserted to end on one
@@ -302,7 +302,7 @@ a statement about the panel, which is the argument the transport bar's
 `publish: false` already rests on. **Refused.**
 
 **E. The fixed column stops driving the depth.** `align-items: flex-start`.
-Cost: `/model/` was reported by screenshot for precisely this, *"the panels are
+Cost: `/twelve/` was reported by screenshot for precisely this, *"the panels are
 glued together, no gap, same h"*, and `/evo/` asserts `the left column is the
 full depth of the panel` on purpose. **Refused on two pages' reports.**
 
@@ -327,7 +327,7 @@ scrolling flex row.
 **And the component REPORTS a flow with slack and no absorber**, on the same
 `cuts` channel `createDiagram` already uses for a label it had to cut: a list the
 page can assert on and a visible line under the specimen. **A report and not a
-throw**, because `/model/`'s 25 px of trailing air is legitimate and a panel with
+throw**, because `/twelve/`'s 25 px of trailing air is legitimate and a panel with
 no fixed column has no slack at all, so refusing the build would break two of the
 three callers. The condition is checkable from the DOM at build time: the flow
 has a definite height, its children's heights sum to less than it, and no child
@@ -340,7 +340,7 @@ rule (`stage.style.aspectRatio` against
 re-run on every resize. A component that varies a property per instance sets a
 custom property, never the property.
 
-**What `/model/` does under this contract:** nothing changes. It has no flow, its
+**What `/twelve/` does under this contract:** nothing changes. It has no flow, its
 slack is 25 px, and `margin-top: auto` inside a channel strip stays exactly where
 it is, because it is a claim about where a fader block sits on a Model 12 panel
 (*"Knobs and REC at the top, the fader and its buttons in the lower block, and
@@ -365,7 +365,7 @@ reason. A class that only ever adds cannot produce that failure.
 
 On an uncased panel `--pan-pad: 0`, and then `.pan-fixed`'s
 `padding: var(--pan-pad) var(--pan-gap) var(--pan-pad) 0` and `.pan-strip`'s
-`padding-block: var(--pan-pad)` are already correct for `/model/` with no second
+`padding-block: var(--pan-pad)` are already correct for `/twelve/` with no second
 rule. ⚠️ **That is only true since the edit that landed today**, which moved the
 vertical inset off the card onto its two children so the divider could reach the
 card's edges. Before it, the inset was on `.pan` and an uncased panel would have
@@ -390,13 +390,13 @@ a screenshot and a decision, not a bundle.
 **So: the rename and the furniture convert now; `/circuit/`'s scroll boundary is
 a second, separately reviewable change**, and this plan recommends making it.
 
-### 5.3 🔴 The class prefix is a real decision, because `/model/` has a PAN knob
+### 5.3 🔴 The class prefix is a real decision, because `/twelve/` has a PAN knob
 
-MEASURED: `demo/model/index.html` builds `createKnob({ label: 'pan' })` on all
+MEASURED: `demo/twelve/index.html` builds `createKnob({ label: 'pan' })` on all
 eight channels, and the page's own comments discuss PAN at length (*"PAN is
 RELATIVE, not absolute"*, *"the panel legend reads PAN C BAL"*). After the
 conversion that page would carry `.pan-strip` and `.pan-fixed` beside a control
-called PAN, so `grep -n pan demo/model/index.html` stops being a useful search.
+called PAN, so `grep -n pan demo/twelve/index.html` stops being a useful search.
 
 - **Option 1, keep `.pan-*`.** Cheapest: the names are already written in
   `/evo/` and the prefix is consistent with the kit's existing unprefixed
@@ -475,7 +475,7 @@ stylesheet with comments stripped.
 **Visible change on `/evo/`: none.** Every rule keeps its declarations and its
 selector's shape.
 
-### 6.2 `/model/`: the hard one, and the contract has to grow for it in exactly two places
+### 6.2 `/twelve/`: the hard one, and the contract has to grow for it in exactly two places
 
 **It fits, with two additions:** the card becomes optional (§5.1) and the
 nameplate's placement becomes an option (§3.7). Nothing else about it is
@@ -526,13 +526,13 @@ flatten, controls on top. align all to bottom"*) rather than a reflow.
 - ⚠️ **`.strip-*` IS `shell.css`'s OWN PREFIX.** `.strip`, `.strip-mini`,
   `.strip-deep` and `.strip-auto` are the timeline strip view's height classes,
   set by `demo/shell/strip.mjs`. MEASURED: `.strip` matches **0** elements on
-  `/model/` today and `.strip-body` matches 0, so the collision is latent rather
+  `/twelve/` today and `.strip-body` matches 0, so the collision is latent rather
   than live, and `.strip-body` was already this project's fifth measured dead
   rule. A `.strip-one` added to `shell.css` tomorrow would silently reach eight
-  channel strips. Renaming `/model/`'s five `.strip-*` classes is not required by
+  channel strips. Renaming `/twelve/`'s five `.strip-*` classes is not required by
   this extraction and is worth doing in the same pass.
 
-**Visible change on `/model/`: none intended.** The one thing that could move is
+**Visible change on `/twelve/`: none intended.** The one thing that could move is
 the scrollbar reservation, see §11.
 
 ### 6.3 `/circuit/`: furniture now, scroll boundary second
@@ -579,7 +579,7 @@ be deleted on the same reasoning.
 ### 7.1 🔴 THE BASELINE, MEASURED ONCE
 
 ```
-node demo/verify.mjs model circuit evo kit
+node demo/verify.mjs twelve circuit evo kit
 ```
 
 **219/219 green, 0 failures**, run 2026-09-21 at the start of this survey:
@@ -609,8 +609,8 @@ this run.
 
 | page | what | line at survey time |
 |---|---|---|
-| `/model/` | `document.querySelector('.rack-lane')` in *the master lane is glued to the channels and is the same height* | ~1120 |
-| `/model/` | `document.querySelector('.rack-lane')` in *the nameplate spans the mixer and sits closer to it than a block would* | ~1180 |
+| `/twelve/` | `document.querySelector('.rack-lane')` in *the master lane is glued to the channels and is the same height* | ~1120 |
+| `/twelve/` | `document.querySelector('.rack-lane')` in *the nameplate spans the mixer and sits closer to it than a block would* | ~1180 |
 | `/evo/` | `card.querySelectorAll('.pan-sub, .pan-cap')`, which stamps `data-off` on all 15 printed labels | ~1032 |
 
 MEASURED: `.pan-sub` matches **14** elements and `.pan-cap` **1**, and
@@ -640,7 +640,7 @@ name of a thing that was deliberately removed.
 VARIABLE rather than a selector**, so a class rename leaves them running against
 the right elements. That is the difference between this rename and the
 `.strip-body` one. On `/evo/` those are `fixed`, `strip`, `keysBox`, `flow`,
-`plate`, `oct`, `rot`, `wheelRow`, `keypadBox`, `win`, `card`; on `/model/`,
+`plate`, `oct`, `rot`, `wheelRow`, `keypadBox`, `win`, `card`; on `/twelve/`,
 `rackRow`, `brands`, `rack[i]`, `master`, `outs`; on `/circuit/`, `circScroll`,
 `circ`, `brands`, `grid`.
 
@@ -653,7 +653,7 @@ agent watches them:**
    (reads the COMPUTED `borderRightWidth`, plus `scrollWidth - clientWidth > 40`).
 3. `/evo/`: *the left column is the full depth of the panel* (the `stretch`
    claim, within 1.5 px).
-4. `/model/`: *the master lane is glued to the channels and is the same height*
+4. `/twelve/`: *the master lane is glued to the channels and is the same height*
    (seam within 1 px AND heights within 1 px).
 
 **Two asserts that SHOULD be added by this change, because nothing grades them
@@ -794,10 +794,10 @@ with one instrument's proportions is a component with one caller.**
   derived from `--i` and the shared pitch.
 - `/circuit/`'s `repeat(8, var(--ctl-w))`, its zig zag offset, its `18px` seams
   and its `34px` foot.
-- `/model/`'s `--fdr-lane-h: calc(4 * calc(var(--ctl-w) / 2) + 3 *
+- `/twelve/`'s `--fdr-lane-h: calc(4 * calc(var(--ctl-w) / 2) + 3 *
   var(--ctl-step))`, twice, which is the claim that a fader spans four buttons
   and three steps on a Model 12.
-- `/model/`'s entire phone block.
+- `/twelve/`'s entire phone block.
 
 ### 9.3 The shared legend, and it needs its own measurement first
 
@@ -835,7 +835,7 @@ two clear ones and one that is not a defect.
 | `/evo/` | `.evo-log { margin-top: 0 }` | **0** | 🔴 dead. No element carries the class. |
 | `/circuit/` | `.circ .pos-pad-bot` | **0** | not a defect: the `.pos-pad-top` half of the same rule matches 60, and this half is forward looking. |
 | `/evo/` | `.pan.evo { gap: 0 }`, `.evo-wrap { gap: 0 }` | 1 each | inert, MEASURED: removing both leaves the panel 503.03 by 646 to the digit. Defensive, not dead. Decide in writing. |
-| `/model/` | `.strip`, `.strip-body` | **0** | latent collision with `shell.css`'s timeline strip, not live today. |
+| `/twelve/` | `.strip`, `.strip-body` | **0** | latent collision with `shell.css`'s timeline strip, not live today. |
 | `/evo/` | `.evo-keys .kbd .pad` | **0**, against `.kpad` at 1 | the sixth dead rule, confirmed repaired. |
 
 ⚠️ **Fixing `.circ > .pos-knob` and `.evo-log` is a deletion of two rules that do
@@ -849,7 +849,7 @@ because this change is the one reading every rule on those pages.
 🔴 **Written as its own section because a plan that hides its uncertainty is the
 kind this project keeps paying for.**
 
-1. **Whether the scrollbar reservation is needed at all.** `/model/` reserves
+1. **Whether the scrollbar reservation is needed at all.** `/twelve/` reserves
    `padding-bottom: 4px` on the wrap and `/evo/` relies on the case's own
    `padding-block: 20px`. MEASURED: `.pan-strip`'s client height equals its
    content height (473 and 473 at survey time), so **the overlay scrollbar on
@@ -871,7 +871,7 @@ kind this project keeps paying for.**
    stays at 193 px of the 316 available, 61 per cent, leaving a **107 px window on
    a 1018 px panel**. The page does not drag sideways and nothing is red. Whether
    that is a usable phone layout or the next screenshot report is a question for
-   somebody holding a phone, and no rule in this repository answers it. `/model/`
+   somebody holding a phone, and no rule in this repository answers it. `/twelve/`
    answered the same question with a redesign rather than a reflow.
 4. **Whether `/circuit/` should keep its scroll boundary.** §5.2 recommends
    moving it and says why it is a separate change. The recommendation rests on a
@@ -888,7 +888,7 @@ kind this project keeps paying for.**
    judgement, not a measurement.
 7. **The nameplate's `shown()` helper is copied three times** and the survey did
    not settle where it should live. MEASURED: the same seven line
-   `textTransform`-aware reader appears in `/model/`, `/circuit/` and `/evo/`, and
+   `textTransform`-aware reader appears in `/twelve/`, `/circuit/` and `/evo/`, and
    two of the three use it for the identical assert *the panel prints the maker and
    the model, both in uppercase*. It reads what the browser RENDERS rather than what
    is typed, which is the whole point of it, so it belongs beside `createNameplate`.
@@ -898,7 +898,7 @@ kind this project keeps paying for.**
 
 ## 12. The order of work, for one agent in one change
 
-1. `node demo/verify.mjs model circuit evo kit`. **Record the four numbers
+1. `node demo/verify.mjs twelve circuit evo kit`. **Record the four numbers
    first**, because §7.1's are already stale.
 2. Re-read `/evo/`'s PART ONE block in the file as it stands. It is still being
    edited.
@@ -911,13 +911,13 @@ kind this project keeps paying for.**
    collision.
 5. `/evo/`: rename, delete the two dead rules, decide the two inert ones in
    writing. Re-read the five names in the negative assert by hand.
-6. `/model/`: the 19 rules, the 2 asserts, the unprefixed `.pos-crow .pos-fdr`.
+6. `/twelve/`: the 19 rules, the 2 asserts, the unprefixed `.pos-crow .pos-fdr`.
 7. `/circuit/`: nameplate and card only. Delete `.circ > .pos-knob`. Leave
    `.circ-scroll` for the second change.
 8. `/kit/`: the `PANEL` block as the first `section()` call, `hardware` tab, two
    captioned specimens, four asserts, holders declared with the others at the top.
 9. `node demo/check-html.mjs` on each of the four pages, then
-   `node demo/verify.mjs model circuit evo kit` ONCE, and **account for every
+   `node demo/verify.mjs twelve circuit evo kit` ONCE, and **account for every
    assert that moved**. A count that went up by less than the four new `/kit/`
    asserts means something stopped running, and asserts do not fail when they stop
    running.

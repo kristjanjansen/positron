@@ -15,7 +15,7 @@
      *"generalize the evoltion layout to reusable components / use from others.
      same patters"*, then *"do it and add to kit"*. It is now
      `demo/shell/panel-layout.mjs` and the `.panel-*` family in `shell.css`,
-     used by this page, by `/model/` and by `/circuit/`, with a specimen in
+     used by this page, by `/twelve/` and by `/circuit/`, with a specimen in
      `/kit/`.
 
      🔴 **EVERY RULE THAT USED TO BE HERE IS IN `shell.css` WITH ITS
@@ -24,7 +24,7 @@
      edges, the 5.91:1 that bought `--ctl-off`, the `x 1780` nameplate: all of
      it moved rather than being summarised, because the measurements and the
      wrong first answers are the reason a rule survives being argued with.
-     ⚠️ **THE PREFIX CHANGED FROM `.pan-` TO `.panel-`**, because `/model/`
+     ⚠️ **THE PREFIX CHANGED FROM `.pan-` TO `.panel-`**, because `/twelve/`
      draws a knob labelled `pan` on all eight channels and a shared prefix that
      collides with a control's name is a prefix that makes `grep` useless.
 
@@ -94,7 +94,7 @@
      the keypad above them is the other. MEASURED: the keypad group is the widest
      thing in the column, so the column's content width IS the keypad's width and
      the two centres coincide to within the group's own 1 px borders. The page
-     asserts BOTH rather than picking, which is the `/model/` lesson: that page
+     asserts BOTH rather than picking, which is the `/twelve/` lesson: that page
      was corrected by screenshot twelve times in one evening and every correction
      was plausible reasoning a rect would have refused. */
   .evo-wheels { margin-top: auto; display: flex; justify-content: center; }
@@ -296,7 +296,7 @@
      WRONG.** A kit key is 74 px because that is a playable target; a kit pad is
      46 px for the same reason. On the real instrument a key is 15 cm and a
      keypad button is about 1 cm, so the ratio the object has is 15:1 and the
-     ratio the kit has is 1.6:1. `/circuit/` and `/model/` never met this because
+     ratio the kit has is 1.6:1. `/circuit/` and `/twelve/` never met this because
      neither has a keyboard. The keys are 28 to 98 per cent of the case's depth,
      so growing them is the faithful direction and shrinking the panel is not.
      ⚠️ A PERCENTAGE FOR THE SHARP, NOT THE COMPONENT'S 46 px. That absolute is
@@ -332,7 +332,7 @@
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
   import { createSegment, SCHEMES } from '/shell/segment.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
-  import { createPresenceButton } from '/shell/presence.mjs';
+  import { createPresenceButton, WIRED } from '/shell/presence.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { decode, noteName } from '/shell/midi-decode.mjs';
 
@@ -813,7 +813,7 @@
          hw replicas in general"*. It was never a fact about the instrument, it
          was the page admitting it did not know what a knob was wired to, and
          printing that admission under every dial. The controller number's home
-         is the hover and the MIDI table, which is where `/circuit/`, `/model/`
+         is the hover and the MIDI table, which is where `/circuit/`, `/twelve/`
          and `/shape/` already keep theirs. */
       title: `${ROTARIES[i]}, a fully assignable rotary. Which controller `
            + 'number this slot sends is held in the keyboard and printed in no '
@@ -1078,8 +1078,14 @@
     }
   }
 
+  /* ⚠️ `says: WIRED`, NOT THIS PAGE'S OWN THREE WORDS. Asked 2026-09-21:
+     *"Use connected connecting not connected on all hw demos when applicable"*.
+     `online` and `offline` are network words and suit a board answering over a
+     relay from another building; an instrument on a USB cable on this desk is
+     connected or it is not. The map is one export in `presence.mjs` so that five
+     pages cannot end up with five vocabularies that agree today. */
   const pres = createPresenceButton({
-    of: 'MK-425C', state: 'unknown',
+    of: 'MK-425C', state: 'unknown', says: WIRED,
     can: ['unknown', 'checking', 'online', 'offline'],
     press: () => d.run('listen'),
   });
@@ -1489,7 +1495,7 @@
        * 🔴 THE LEFT COLUMN IS THE FULL DEPTH OF THE PANEL. `align-items:
        * stretch` rather than `flex-end`, and the difference is invisible until
        * somebody changes it: bottom alignment makes two children END together
-       * and says nothing about their heights, which is what `/model/` was
+       * and says nothing about their heights, which is what `/twelve/` was
        * reported for with a screenshot.
        */
       const fh = fixed.getBoundingClientRect().height;
@@ -1630,7 +1636,7 @@
        * MEASURED. Asked 2026-09-21: *"align pitch / mod to centr"*. The column's
        * own centre is one reading of that and the keypad above them is the other,
        * and they coincide here only because the keypad is the widest thing in the
-       * column. Asserting both rather than picking is the `/model/` lesson: that
+       * column. Asserting both rather than picking is the `/twelve/` lesson: that
        * page was corrected by screenshot twelve times in one evening and every
        * correction was plausible reasoning a rect would have refused.
        */

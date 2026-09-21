@@ -24,7 +24,7 @@ knob sent which number. Two knobs stay `unbound`, which is asserted, because
 filling them would be the `/circuit/` drum grid mistake again: reporting the
 instrument while looking like it was reporting the position.
 
-**`/rack/` IS `/model/`, AND THIS RENAME ENDS A STALE LINK RATHER THAN MAKING
+**`/rack/` IS `/twelve/`, AND THIS RENAME ENDS A STALE LINK RATHER THAN MAKING
 ONE.** For one day a kept link to `/rack/` opened the Model 12 instead of the
 Ableton demo it used to be, which is the `/held/` situation and the one failure
 worse than a dead link. After the next deploy it 404s.
@@ -34,7 +34,7 @@ rack. So did every mention of the Ableton demo that used to own the slug.
 
 **THE MIDI LOG IS A KIT MODULE BECAUSE THREE PAGES GREW ONE ON THE SAME DAY.**
 `demo/shell/midi-log.mjs`. The raw bytes are a column of their own and are never
-replaced by the reading beside them, which matters most on `/model/`, where a
+replaced by the reading beside them, which matters most on `/twelve/`, where a
 pan click's `0x44` is four counter clockwise and reads as sixty eight to anybody
 given only a number.
 🔴 **THE ROW IS ADDED BEFORE THE ROUTING.** A log fed afterwards lists only what

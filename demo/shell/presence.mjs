@@ -72,6 +72,59 @@ export const SAYS = {
   unknown: 'unknown',
 };
 
+/**
+ * 🔴 WHAT AN INSTRUMENT ON A CABLE SAYS, WHICH IS NOT WHAT A THING ON A RELAY
+ * SAYS. Asked 2026-09-21: *"synts: not connected / connected"*, and again the
+ * same day as *"Use connected connecting not connected on all hw demos when
+ * applicable"*.
+ *
+ * `online` and `offline` are NETWORK words. They suit a Raspberry Pi answering
+ * over a relay from another building, which is what this badge was built for.
+ * A synth on a USB cable on this desk is CONNECTED or it is not, and a page
+ * saying a plugged-in Circuit is `online` is describing the wrong kind of
+ * presence.
+ *
+ * 🔴 **IT IS ONE MAP HERE, NOT THREE WORDS TYPED INTO FIVE PAGES.** That is the
+ * whole reason it is an export rather than an object literal per caller: five
+ * pages writing their own `says` is five vocabularies that agree today, and the
+ * hand-rolled control rule arriving by a different road. A page passes
+ * `says: WIRED` and nothing else.
+ *
+ * 🔴 **THREE WORDS FOR FIVE STATES, AND THE TWO COLLISIONS ARE DELIBERATE.**
+ *   - `checking` and `coming` both read **connecting**. A cable has no
+ *     difference between *we are asking* and *it is starting up*: there is
+ *     nothing to start. What both mean to somebody holding a plug is that the
+ *     answer has not arrived yet.
+ *   - `unknown` and `offline` both read **not connected**. Asked for directly
+ *     (*"unknown: not connected"*). The two states still MEAN different things
+ *     and `presenceOf` still tells them apart: `unknown` is *we have not looked
+ *     yet* and `offline` is *we looked and nothing answered*.
+ * ⚠️ **SO THE DOT IS NOW THE ONLY THING SEPARATING THEM AND IT MUST STAY
+ * HOLLOW.** `unknown` is drawn as a hollow ring precisely because nothing has
+ * been asked, and that ring is carrying the whole distinction once both states
+ * say the same words. If that ever reads as a defect, the repair is different
+ * words for `offline`, never a rewritten `unknown`.
+ *
+ * ⚠️ **AND THE BADGE GETS WIDER, WHICH IS ARITHMETIC RATHER THAN A SURPRISE.**
+ * The reserve is measured off the longest phrase an instance can say, so
+ * `not connected` (13) replacing `checking` (8) as the longest widens every
+ * state of every badge that takes this map. `/kit/`'s specimens use `SAYS` and
+ * do not move.
+ *
+ * ⚠️ **WHICH PAGES, AND IT IS NOT ALL OF THEM.** `/circuit/`, `/twelve/`,
+ * `/shape/`, `/bay/` and `/evo/` are USB on this desk and take these words.
+ * `/knobs/` reaches a board over a relay through `board.mjs`, and `/stage/`
+ * asks whether a show is on air, so both keep their own. That split is why
+ * this is a named map a caller opts into rather than an edit to `SAYS`.
+ */
+export const WIRED = {
+  online: 'connected',
+  checking: 'connecting',
+  coming: 'connecting',
+  offline: 'not connected',
+  unknown: 'not connected',
+};
+
 /** How many expected beats may be missed before it is called gone. */
 export const MISSES = 2;
 

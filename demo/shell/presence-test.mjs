@@ -24,7 +24,7 @@
 //      MEASURED 28/28 -> 25/28, and the third failure is the good one: the
 //      walk at the bottom stops reaching all four states at all.
 
-import { presenceOf, wirePresence, PRESENCE_STATES, SAYS, MISSES } from './presence.mjs';
+import { presenceOf, wirePresence, PRESENCE_STATES, SAYS, WIRED, MISSES } from './presence.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -264,8 +264,30 @@ console.log('\n== the words ==');
 // `looper-test.mjs` checks it: a formatter can put one back on every string at
 // once and a sweep cannot see that coming.
 ok('no em dash in anything the badge says',
-  Object.values(SAYS).every((s) => !s.includes('—')),
-  `${Object.values(SAYS).length} words`);
+  [...Object.values(SAYS), ...Object.values(WIRED)].every((s) => !s.includes('—')),
+  `${Object.values(SAYS).length + Object.values(WIRED).length} words`);
+
+// ── 23b. `WIRED` covers every state, and collides on purpose ────────────────
+// 🔴 IT BREAKS THE RULE CHECK 22 MAKES, AND THAT IS THE POINT OF WRITING IT
+// DOWN. Five states map onto THREE words: `checking` and `coming` both read
+// `connecting`, because a cable has no difference between *we are asking* and
+// *it is starting up*; `unknown` and `offline` both read `not connected`, which
+// was asked for directly (*"unknown: not connected"*, 2026-09-21).
+// ⚠️ SO THE DOT CARRIES THE WHOLE DISTINCTION between the collided pairs, and
+// `unknown` is drawn as a hollow ring for exactly that reason. A future reader
+// who "fixes" this to satisfy check 22 has undone an instruction, which is why
+// the collision is asserted rather than merely tolerated.
+{
+  const missing = PRESENCE_STATES.filter((s) => typeof WIRED[s] !== 'string' || !WIRED[s]);
+  ok('WIRED has a word for every state, and it is three words for five',
+    missing.length === 0 && new Set(Object.values(WIRED)).size === 3,
+    missing.length ? `no word for ${missing.join(', ')}`
+      : `${new Set(Object.values(WIRED)).size} words: ${[...new Set(Object.values(WIRED))].join(' · ')}`);
+  ok('and the two collisions are the ones that were asked for',
+    WIRED.checking === WIRED.coming && WIRED.unknown === WIRED.offline
+    && WIRED.online !== WIRED.offline,
+    `checking/coming "${WIRED.checking}", unknown/offline "${WIRED.unknown}", online "${WIRED.online}"`);
+}
 
 // ── 24. NEGATIVE CONTROL: none of them is jargon dressed as a state ─────────
 // The banned list in CLAUDE.md is this project's private vocabulary. A badge is
@@ -273,9 +295,10 @@ ok('no em dash in anything the badge says',
 {
   const banned = ['lookahead', 'horizon', 'tick', 'host', 'commit', 'actuate',
     'lattice', 'deck', 'lane', 'fold', 'adapter', 'heartbeat', 'socket', 'stale'];
-  const bad = Object.values(SAYS).filter((s) => banned.some((b) => s.toLowerCase().includes(b)));
+  const words = [...Object.values(SAYS), ...Object.values(WIRED)];
+  const bad = words.filter((s) => banned.some((b) => s.toLowerCase().includes(b)));
   ok('NEGATIVE CONTROL: no word a visitor reads is this project\'s own vocabulary',
-    bad.length === 0, bad.length ? bad.join(', ') : Object.values(SAYS).join(' · '));
+    bad.length === 0, bad.length ? bad.join(', ') : [...new Set(words)].join(' · '));
 }
 
 // ── NEGATIVE CONTROL: a heartbeat never invents `checking` ────────────────

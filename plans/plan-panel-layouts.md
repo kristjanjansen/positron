@@ -7,7 +7,7 @@
 >
 > 🔴 **AND IT IS THE HALF THAT `plans/plan-circuit-model12.md` AND
 > `plans/plan-fasttrack-mk425c.md` DO NOT HAVE.** Those two answer *what does
-> this control send*. Neither answers *where is it*. `demo/model/index.html`
+> this control send*. Neither answers *where is it*. `demo/twelve/index.html`
 > already draws one TASCAM Model 12 channel strip, every MIDI number in it
 > measured, and its ARRANGEMENT was reasoning plus two corrections shouted from
 > in front of the hardware. This file settles the arrangement.
@@ -282,7 +282,7 @@ still affecting what goes to the computer, and two monitoring MUTE switches in
 separate things are true of one strip: five controls drive the DAW, three are
 physically dead, and the input half still works on the audio.
 
-## 1.6 What this settles for `demo/model/index.html`
+## 1.6 What this settles for `demo/twelve/index.html`
 
 📁 REPO. That page draws PAN at the top, then a row of the fader with a column
 of REC, MUTE, SOLO to its right aligned to the fader's foot. Against the

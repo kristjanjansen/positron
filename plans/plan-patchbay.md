@@ -51,7 +51,7 @@ given in words.
 | `rig/m1/live-agent.mjs` | CoreMIDI out plus a Core Audio process tap on the Mac | Live captured at **-5.3 dBFS**, 0 dropped of 801 |
 | `rig/board/` | the Pi: jackd, one instrument, capture | one room, one jackd, one capture |
 | `demo/dump/` | every message a device sends, bytes beside a reading | the instrument that produced every number below |
-| `/circuit/`, `/model/`, `/evo/` | three hardware panels that listen | 22, 27 and 16 page asserts |
+| `/circuit/`, `/twelve/`, `/evo/` | three hardware panels that listen | 22, 27 and 16 page asserts |
 
 🔴 **SO THE TRANSPORTS ARE DONE.** What nobody can do today is say *"the
 keyboard plays the Circuit"* without writing a page that hard codes both ends.
