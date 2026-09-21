@@ -885,7 +885,7 @@ const PAN_SCALE = 2;
      nothing type-checks a sentence, so a control's name in prose goes stale
      silently. It names the button by what it SAYS now, which is what somebody
      looking at the page has to find. */
-  const traffic = createMidiLog({ empty: 'press the status button, then move something on the desk' });
+  const traffic = createMidiLog({ empty: '', reserve: 6 });
   d.el.append(traffic.el);
 
   /**

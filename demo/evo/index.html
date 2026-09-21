@@ -893,7 +893,7 @@
    * flags them as a flood. A table that printed them would be a table nobody
    * can read a second after the button is pressed.
    */
-  const traffic = createMidiLog({ empty: 'press the status button, then play something' });
+  const traffic = createMidiLog({ empty: '', reserve: 6 });
   d.el.append(traffic.el);
 
   // ── what arrives ────────────────────────────────────────────────────────
