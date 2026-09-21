@@ -43,10 +43,10 @@
   import { createStack } from '/shell/stack.mjs';
   import { readZip, entry } from '/shell/unzip.mjs';
   import { survey, patchesIn } from '/shell/circuit-syx.mjs';
-  import { readSession, summarise as summariseSession } from '/shell/circuit-session.mjs';
+  import { readSession, summarise as summariseSession, patchPayloads } from '/shell/circuit-session.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import {
-    readPatch, summarise, sessionStats, patchFields, modSlots,
+    readPatch, readPatchData, summarise, sessionStats, patchFields, modSlots,
     categoryName, named, ADDRESSES,
     PATCH_BYTES, PATCH_DATA, DATA_AT, SYSEX_HEAD, COMMANDS, MOD_DESTINATIONS,
   } from '/shell/circuit-patch.mjs';
@@ -118,9 +118,9 @@
   // MEASURED on the soundbank in `purchased/`: one zip holding 2 `.circuitpack`,
   // 1 `.circuittrackspack`, 128 `.syx`, an `.xlsx`, two `.txt` and 10 `.url`.
   const drop = createDrop({
-    accept: ['.circuitpack', '.circuittrackspack', '.zip', '.syx'],
+    accept: ['.circuitpack', '.circuittrackspack', '.zip', '.syx', '.circuitsession'],
     label: 'open a pack from this machine',
-    hint: 'drop a pack anywhere on this page',
+    hint: 'drop a pack or a session anywhere on this page',
     says: (m, kind) => d.log(m, kind),
     onOpen: (files) => openFiles(files),
   });
@@ -407,6 +407,7 @@
   async function openFiles(files) {
     for (const f of files) {
       const n = f.name.toLowerCase();
+      if (n.endsWith('.circuitsession')) { await openSession(f.name, f.bytes); continue; }
       if (n.endsWith('.syx')) { await openSyx(f.name, f.bytes); continue; }
       if (n.endsWith('.zip')) { await openZip(f.name, f.bytes); continue; }
       await openPack(f.name, f.bytes);
@@ -430,6 +431,33 @@
     }
     fill([{ name, bytes }], [], []);
     sayScan(name, sysexScan(bytes), `${name}, one patch, read in this tab and sent nowhere`);
+  }
+
+  /**
+   * One loose `.circuitsession`, which is a thing that exists on its own.
+   *
+   * 🔴 ITS TWO PATCHES ARE PAYLOADS, NOT MESSAGES, which is the whole reason
+   * `readPatchData` exists. A session carries them as bare 340 byte runs with no
+   * command byte and no frame, so reading them through `readPatch` would mean
+   * BUILDING a SysEx message round them, and building a message is the first
+   * half of sending one. That function does not exist here and this path is why
+   * it does not have to.
+   * ⚠️ AND A SESSION IS THE ONE FILE ON THIS PAGE THAT CANNOT WRITE FLASH BY
+   * ITSELF, because it is not a message at all. It still says nothing about what
+   * Components would do with it.
+   */
+  async function openSession(name, bytes) {
+    let one;
+    try { one = await readOne(bytes, name.replace(/\.circuitsession$/i, '')); }
+    catch (e) { drop.say(`${name} did not read as a session: ${e.message}`, 'bad'); return; }
+    let held = [];
+    try {
+      held = patchPayloads(readSession(bytes))
+        .map((x, i) => ({ name: `${one.name} synth ${i + 1}`, data: x.data }));
+    } catch { /* a session this module cannot partition still weighs */ }
+    lastScan = null;
+    fill(held, [one], []);
+    drop.say(`${name}, one session holding ${held.length} patches, read in this tab and sent nowhere`, 'good');
   }
 
   /**
@@ -655,7 +683,12 @@
       // ⚠️ A PATCH THAT WILL NOT READ IS REPORTED BY NAME, never skipped. A
       // reader that silently dropped one leaves a pack looking smaller than it
       // is, which is a wrong answer wearing an empty one's clothes.
-      try { p = readPatch(f.bytes); }
+      // ⚠️ A SESSION'S PATCHES ARE PAYLOADS, NOT MESSAGES. `f.data` is 340
+      // bytes lifted out of a session and has no command byte around it;
+      // `f.bytes` is a whole 350 byte `.syx`. Reading the first as the second
+      // would need a SysEx frame built round it, and building a message is the
+      // first half of sending one.
+      try { p = f.data ? readPatchData(f.data) : readPatch(f.bytes); }
       catch (e) { d.log(`${f.name}: ${e.message}`, 'bad'); continue; }
       if (p.writesFlash) {
         d.log(`${f.name} is a Replace Patch, which writes ${p.slotName} in flash. `
@@ -975,6 +1008,23 @@
       d.assert('and the page says 29 of real work rather than 32',
         /29 of real work/.test(verdict.textContent) && verdict.dataset.state === 'good',
         `"${verdict.textContent.slice(-40)}"`);
+
+      /**
+       * 🔴 THE LOOSE SESSION PATH, DRIVEN. It was advertised on the drop area
+       * before it existed: the accept list named `.circuitsession` while the
+       * handler called a function that was not there, so the page read green and
+       * would have thrown the moment anybody dropped one. A capability a control
+       * announces and cannot perform is this project's named hazard.
+       */
+      const oneSession = sessions[0].bytes.slice();
+      await drop.open([new File([oneSession], 'User Session.circuitsession')]);
+      d.assert('a loose session opens, and its two patches come out as payloads rather than messages',
+        sessions.length === 1 && patches.length === 2
+        && sessions[0].name === 'User Session'
+        && patches[0].name === 'Frog Steps' && patches[1].name === 'Woo-z',
+        `${sessions.length} session holding ${patches.map((x) => x.name).join(' and ')}`);
+
+      await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
       const heads = new Set(sessions.map((s) => s.head));
       d.assert('and the first four bytes are not what decided it, because INIT is on both sides',
