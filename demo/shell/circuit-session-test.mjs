@@ -292,6 +292,56 @@ ok('and not one byte of the 21,760 is above 0x7F',
 
 // ------------------------------------- two implementations of the same census
 
+// ------------------------------------------- what the pack actually holds
+
+console.log('\n-- 29 sessions of work and 3 stock slots, from this pack alone --');
+
+// 🔴 `CLAUDE.md` SAYS `32 DISTINCT FINGERPRINTS OF 32, NOT ONE A COPY OF
+// ANOTHER` AND USES THAT TO SAY ALL 32 ARE REAL WORK. The count is true and the
+// conclusion does not follow, because a ONE BYTE delta produces a distinct
+// fingerprint. It is the third time this lesson has arrived: a name was not
+// evidence, then a four byte head was not evidence, and now a unique hash is not
+// evidence either.
+// ✅ AND `circuit-patch-test.mjs` SAYS THIS CANNOT BE SETTLED WITHOUT THE STOCK
+// TEMPLATE, WHICH IS NOT IN THIS REPOSITORY. IT CAN. Comparing the three INIT
+// slots against EACH OTHER needs no template at all, and the separation is
+// enormous: one byte between them, 415 bytes between the closest pair of the
+// other 29.
+{
+  const apart = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
+  const init = all.map((u, i) => ({ i, u })).filter(({ i }) => SESS[i].header.tag === 'INIT');
+  const rest = all.map((u, i) => ({ i, u })).filter(({ i }) => SESS[i].header.tag !== 'INIT');
+
+  ok('the three INIT slots are 10, 16 and 22, and index.json names all three Initial Session',
+    init.map(({ i }) => i).join() === '10,16,22'
+    && init.every(({ i }) => meta.sessions[i].name === 'Initial Session'),
+    init.map(({ i }) => i).join());
+
+  const pairs = [];
+  for (let x = 0; x < init.length; x++) for (let y = x + 1; y < init.length; y++) {
+    pairs.push(apart(init[x].u, init[y].u));
+  }
+  ok('and all three pairs differ in exactly one byte, so they are one stock image',
+    pairs.length === 3 && pairs.every((n) => n === 1), `${pairs.join(', ')} bytes apart`);
+
+  // 🔴 THE FLOOR, WHICH IS THE HALF THAT MAKES ONE BYTE MEAN ANYTHING. Without
+  // it, "one byte apart" is a number with nothing to be small compared to.
+  let closest = Infinity;
+  for (let x = 0; x < rest.length; x++) for (let y = x + 1; y < rest.length; y++) {
+    closest = Math.min(closest, apart(rest[x].u, rest[y].u));
+  }
+  let reach = Infinity;
+  for (const a of init) for (const b of rest) reach = Math.min(reach, apart(a.u, b.u));
+  ok('while the closest pair among the other 29 is 415 bytes apart, and no INIT comes within 262 of one',
+    closest === 415 && reach === 262, `${closest} and ${reach}`);
+
+  // 🔴 AND THE CONCLUSION THAT MUST TRAVEL WITH IT. The correction is 32 to 29.
+  // It is not `some of these are disposable`. The owner said `user sessions are
+  // mine. very important` and this pack is still the only backup of 29 of them.
+  ok('so the pack holds 29 sessions of work and 3 stock slots, and is still the only backup',
+    rest.length === 29 && init.length === 3, `${rest.length} and ${init.length}`);
+}
+
 console.log('\n-- against circuit-patch.mjs, written on the same day by another hand --');
 {
   let agree = 0;

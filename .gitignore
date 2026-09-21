@@ -81,3 +81,9 @@ positron-push-sa.json
 # under a different name; `LAYOUT.md` is where this project already records
 # where a file goes, so the directory needs no second explanation of itself.
 purchased/
+
+# 🔴 macOS writes this into any directory somebody opens in Finder, and this
+# repository has been bitten TWICE by `git add -A` sweeping in work that was not
+# the commit's. An untracked file nobody put there is exactly the shape that
+# rides along. Ignored so it cannot.
+.DS_Store
