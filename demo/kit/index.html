@@ -223,6 +223,84 @@
   .kit-swatch-n { font: 600 12px/1.6 var(--mono); color: var(--fg); }
   .kit-swatch-w { font: 400 12px/1.6 var(--mono); color: var(--dim); }
   .kit-cap + .pos-report { margin-top: 0; }
+
+  /* The three distances a stacked control keeps, drawn at the heights the
+     stylesheet states rather than at heights this page chose: every band's
+     `height` is `var(--ctl-*)`, set in the block that builds it. A figure typed
+     here would be a second copy of a measurement.
+     ⚠️ THE BANDS ARE TOLD APART BY INK RATHER THAN BY HUE, the same way the
+     readout's states are: two reserved slots and one real gap, where the gap is
+     the one that is not a slot. */
+  .kit-step { display: flex; gap: 10px; align-items: flex-start; }
+  .kit-step-c { width: 130px; }
+  .kit-step-b { display: flex; align-items: center; padding-left: 8px;
+                border: 1px dashed var(--kit-edge); border-bottom: 0;
+                background: var(--card2); overflow: hidden; }
+  /* the gap is the one band that is not a reserved slot, so it is the one band
+     with nothing painted in it */
+  .kit-step-c > .kit-step-b:nth-child(2) { background: none; }
+  .kit-step-c > .kit-step-b:last-child { border-bottom: 1px dashed var(--kit-edge); }
+  .kit-step-n { font: 400 10px/1 var(--mono); color: var(--dim2); white-space: nowrap; }
+  /* Two columns of the same height is the whole claim, so the step band keeps
+     all four of its edges and nothing else does. */
+  .kit-step-s { border: 1px dashed var(--kit-edge); background: var(--card2); }
+
+  /* 🔴 A TAB THAT HOLDS SOMETHING NEW CARRIES A DOT. Tabs hide five sixths of
+     this page, so the standing rule that the newest block goes at the top needs
+     a second half: a reader has to be able to tell WHICH part the new thing is
+     in without opening all six. The mark says that, and the block being first
+     inside the part says the rest.
+     🔴 IT WAS A 2 px BAR ACROSS THE TAB'S TOP AND THAT WAS WRONG, REPORTED
+     2026-09-21 AS *"what happeend to tabs?"*. The bar was in `--hi` and the
+     OPEN tab's own marker is a 2 px bar in `--hi` under the word, so the row
+     carried two statements in one channel and a reader resolved the ambiguity
+     the only way anybody would: as an underline that had slipped. Every part of
+     the argument for it was true — it took no room, it could not be clipped, it
+     used the mechanism the component already used — and it lost anyway, for the
+     reason this project reversed its own rule about headless ties between inner
+     boxes on a diagram: those were correct by argument and were reported TWICE
+     as a head that had fallen off. **A convention only works if it is legible.**
+     ⚠️ SO THE MARK IS A DIFFERENT CHANNEL, NOT A DIFFERENT POSITION. A round
+     dot beside the word cannot be read as a rule under it whatever it is
+     coloured, and the check at the foot of this file grades exactly that: the
+     dot has a box of its own and the selection has none, so the two are told
+     apart by something other than where they sit.
+     🔴 AND EVERY TAB RESERVES THE SLOT, WHICH IS THE HOUSE PATTERN RATHER
+     THAN A COST. The first version of this hung the dot in the 28 px the row
+     already puts between two tabs, on the reasoning that reserving a slot on
+     six tabs to use one was waste. It is the opposite: `--ctl-head` reserves a
+     label's slot on every control that has no label, for exactly this reason,
+     and the standing rule is that **a slot is reserved even when empty**.
+     Reserving it buys two things a gap cannot. The row is the same width
+     wherever the mark is, so a new block landing in a different part never
+     shifts it. And the dot belongs to ITS OWN TAB: in the gap it sat 13 px from
+     one tab and 12 px from the next, which is a mark a reader cannot attribute,
+     the legibility failure the bar had in a second costume.
+     ⚠️ THE ROW'S 28 px GAP IS LEFT ALONE. Ink to ink it becomes 39 on this page,
+     and the measurement the component states 28 for is a FLOOR: it exists so
+     tracked caps do not run together, which more air cannot cause. Taking 11 px
+     off the gap to compensate would put the component's own number in a second
+     file, which is the thing this project has a rule about. */
+  .kit-tabs .pos-tabs-t { position: relative; padding-right: 11px; }
+  .kit-tabs .pos-tabs-t[data-kit-new]::after {
+    content: ''; position: absolute; right: 0; top: 50%; margin-top: -6px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--hi);
+  }
+
+  /* 🔴 A RECT INSIDE A CLOSED TAB IS ZERO, AND TWO ZEROS COMPARE EQUAL, SO A
+     CHECK THAT MEASURES ONE PASSES WHILE MEASURING NOTHING. About forty of the
+     checks at the foot of this file read real geometry — a badge the same width
+     in five states, two greys told apart by ink, six display fields at 55.63 px
+     with a spread of 0.000 — and a tab row would have handed four fifths of
+     them a box with no size. That is the shape this project has already paid
+     for four times: a stand-in makes a page runnable without making it graded.
+     So every panel is laid out for the length of the measuring window and put
+     back, and the window holds no `await`, so no frame is ever rendered while
+     it is open and a reader sees nothing. A counter grades that, and sabotage
+     of it is in the report.
+     ⚠️ SPECIFICITY IS THE WHOLE MECHANISM: `[hidden]` is `display: none` from
+     the browser's own stylesheet at (0,1,0), and this is (0,2,1). */
+  .kit-measuring .pos-tabs-p[hidden] { display: block; }
 </style>
 
 <script type="module">
@@ -248,7 +326,7 @@
   import { burn, readBurned, FRAME_W, FRAME_H, videoHue } from '/shell/pattern.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createMidiLog } from '/shell/midi-log.mjs';
-  import { createSegment, GLYPHS, SEGMENTS } from '/shell/segment.mjs';
+  import { createSegment, GLYPHS, SEGMENTS, SCHEMES } from '/shell/segment.mjs';
   import { decode } from '/shell/midi-decode.mjs';
   import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -295,22 +373,196 @@
   // What every section reports about itself, for the checks at the bottom.
   const built = [];
   const failed = [];
+
+  /**
+   * 🔴 FIVE PARTS, NAMED ACROSS THE TOP, AND THE PAGE IS NOW THE LARGEST
+   * CALLER OF ITS OWN TAB COMPONENT. Asked 2026-09-21: *"in bg reogranize kit
+   * into tabs. recommend. my ideas: input layout hardware diagram"*. Thirty
+   * four blocks on one scroll is a page nobody reaches the bottom of, and the
+   * two things it is read for are *what do I have for X* and *what arrived
+   * since I last looked*.
+   *
+   * 🔴 `hardware` HOLDS WHAT YOU DRAW AN OBJECT WITH, AND THE FIRST CUT PUT IT
+   * SOMEWHERE ELSE. The reasoning that dissolved it was that a segment display
+   * and a presence badge only LOOK like equipment while what they do is answer
+   * a question about a machine, which is what a readout does. That is true of a
+   * badge and it is not what these two are: a channel strip and a seven segment
+   * field are **parts of a picture of an object**, where a table and a log are
+   * parts of a web page. So the part answers *what do I have for drawing an
+   * instrument*, which is a real question three pages here have each answered
+   * alone. A presence badge stayed in `status`, because a badge is a sentence
+   * about whether something is answering and it sits in a transport bar, not on
+   * a panel.
+   *
+   * ⚠️ `timeline` IS THE PART THE FOUR PROPOSED NAMES HAD NO ROOM FOR: a
+   * transport bar, a strip, the two glued together and the panel they are glued
+   * to are the biggest pieces in this kit and they are all about watching
+   * something happen. Folding them into `layout` would make `layout` mean
+   * *everything left over*. It is the front page's own word for the same
+   * family, so a reader meets one name in both places rather than two.
+   *
+   * ⚠️ `status` RATHER THAN `readout`, ASKED FOR AS *"readout -> status"*. A
+   * part called READOUT held a block called READOUT AND LOG, so one word meant
+   * two different sizes of thing one line apart: the whole family of reporting
+   * surfaces, and one component inside it.
+   *
+   * 🔴 THERE WAS A SEVENTH PART CALLED `basics` AND IT LASTED AN HOUR. DO NOT
+   * RE-PROPOSE IT. Asked for as *"move color to basics (last tab)"* and then
+   * *"BASICS. -> rm"*, and the reason it failed is worth keeping because it is
+   * an argument about tabs rather than about colour. `COLOURS` really is the
+   * weakest placement on this page: every other part answers *what do I have
+   * for X*, and nobody goes looking for a colour the way they go looking for a
+   * slider, so in `layout` it reads as the block that part could not find a
+   * home for. But a part holding ONE block is worse than a block sitting in the
+   * wrong part, because a tab is a promise that there is something behind it.
+   * Three candidates were considered for joining it and all three stayed put:
+   * `STACK` is the vertical rhythm and is material by the same argument, but it
+   * is `createStack` with a constructor a page calls and it is the whole of
+   * `layout`'s answer to *how is a page arranged*; `CONTROL ROW` is the three
+   * states every button obeys rather than a component, and a reader looking for
+   * a button looks where the things you press are; and the head and foot
+   * contract and the glyph rule have no block on this page at all.
+   *
+   * ⚠️ AND THE LABELS ARE TYPED UPPERCASE THOUGH THE STYLESHEET WOULD DO IT.
+   * Same reason as `.kit-h`: the source should read like the page.
+   */
+  const GROUPS = [
+    ['input', 'INPUT'],
+    ['status', 'STATUS'],
+    ['timeline', 'TIMELINE'],
+    ['layout', 'LAYOUT'],
+    ['hardware', 'HARDWARE'],
+    ['diagram', 'DIAGRAM'],
+  ];
+
+  /**
+   * 🔴 A LINK TO A BLOCK, NOT ONLY TO A PART, AND IT DID NOT EXIST BEFORE THE
+   * TABS. Nothing on this page carried an `id`, so `/kit/#slider` has never
+   * worked; a tab row makes that worse rather than better, because the block a
+   * reader wants to point somebody at is now behind a press. Every section gets
+   * an id off its title, and a hash naming one opens the part holding it and
+   * scrolls to it.
+   * ⚠️ THE TABS OWN THE ADDRESS AFTERWARDS. `createTabs` writes the part's id
+   * over the hash on its first `go`, so the section hash is put BACK once the
+   * scroll has happened and survives until the reader presses a tab, which is
+   * the moment it stops being true.
+   */
+  const idFor = (title) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const sectionTab = new Map();       // section id -> the part holding it
+  const wanted = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+
+  const kitTabs = createTabs({ tabs: GROUPS.map(([id, label]) => ({ id, label })) });
+  kitTabs.el.classList.add('kit-tabs');
+  body.append(kitTabs.el);
+
+  /**
+   * 🔴 EVERY PANEL IS A STACK, OR THE PAGE LOSES ITS OWN RHYTHM THE MOMENT THE
+   * BLOCKS MOVE INSIDE ONE. `.pos-body` is a stack and gave every pair of
+   * sections the project's one 40 px gap; a section inside a tab panel is not a
+   * child of `.pos-body` any more, and `.pos-tabs-p > * + *` would have handed
+   * it 22 px instead. Nothing would have failed and the whole page would have
+   * quietly tightened. Asserted at the bottom against `--pos-gap` rather than
+   * against a number typed here.
+   */
+  const panels = new Map(GROUPS.map(([id]) => [id, createStack(kitTabs.panel(id))]));
+
+  /**
+   * 🔴 EVERY PART IS LAID OUT WHILE THE BLOCKS ARE BUILT AND WHILE THE CHECKS
+   * MEASURE, AND NOT FOR ONE FRAME LONGER. A closed tab panel is `hidden`,
+   * which is `display: none`, which gives everything inside it a rect of zero.
+   * That breaks this page in TWO different ways and only one of them is about
+   * the checks.
+   *
+   * 🔴 THE ONE THAT IS NOT ABOUT THE CHECKS IS THE EXPENSIVE ONE, AND IT WAS
+   * FOUND BY RUNNING THIS. `createDiagram` measures its own text at BUILD time
+   * and falls back to an estimate when it cannot, so seven pictures built
+   * inside a closed panel came out laid out for **320 px inside a 658 px
+   * panel**, reporting `type ESTIMATED`. That is not a harness artefact: a
+   * reader pressing DIAGRAM would have found seven pictures drawn for a page a
+   * third of the width, and the only thing that noticed was one assert that
+   * happens to report how the width was arrived at. **A component that measures
+   * itself when it is made cannot be made inside a closed tab.**
+   *
+   * 🔴 THE ONE THAT IS ABOUT THE CHECKS IS THAT TWO ZEROS COMPARE EQUAL, SO A
+   * CHECK THAT MEASURES ONE PASSES WHILE MEASURING NOTHING. About forty of the
+   * checks below read real geometry — a badge the same width in five states,
+   * two greys told apart by ink, six display fields at 55.63 px with a spread
+   * of 0.000 — and a tab row would have taken four fifths of this page's
+   * coverage away while leaving the count and the colour exactly where they
+   * were. That is the failure this project has recorded four times, and the
+   * cure is the same one: make the instrument able to see, then break it and
+   * check that it stops. The negative control is at the foot of this file.
+   *
+   * ⚠️ AND IT IS NOT GATED ON `?selfcheck=1`, WHICH IS DELIBERATE AND IS THE
+   * HARDER OF THE TWO CHOICES. A window only the harness opened would leave a
+   * visitor's run measuring zeros in silence and a visitor's diagrams drawn at
+   * 320 px, and a page that measures one thing for a harness and another for a
+   * person is a page nothing grades. What makes it safe for somebody reading
+   * the page instead is that **the window holds no `await`**: JavaScript here
+   * is single threaded, so no frame can be rendered between `measure()` and
+   * `settle()` and there is nothing to see. The three places that do have to
+   * wait for something — the first paint, a toggle reaching its playing state,
+   * and three headset probes that are promises — settle the window first and
+   * open it again after.
+   *
+   * ⚠️ THE COUNTER IS THE HALF THAT MAKES THAT A MEASUREMENT RATHER THAN A
+   * CLAIM ABOUT THIS FILE. A `requestAnimationFrame` callback runs immediately
+   * before a frame is rendered, so a callback that finds the window open is a
+   * frame about to show every part at once. It can only happen if somebody adds
+   * an `await` inside the window, which is exactly the edit that would put the
+   * flash back, and no reading of the source can see one.
+   */
+  let measuring = false, paintedOpen = 0, watching = true;
+  const measure = () => { measuring = true; document.body.classList.add('kit-measuring'); };
+  const settle = () => {
+    measuring = false;
+    // ⚠️ REMOVED, NOT SET EMPTY. `.kit-measuring` is a class rather than a data
+    // attribute, so this one is honest either way, and the note is here because
+    // the attribute beside it is not: `[data-kit-new]` matches on PRESENCE.
+    document.body.classList.remove('kit-measuring');
+  };
+  const watch = () => {
+    if (!watching) return;
+    if (measuring) paintedOpen++;
+    requestAnimationFrame(watch);
+  };
+  requestAnimationFrame(watch);
+  measure();
+
   /**
    * 🔴 A SECTION THAT THROWS IS THE DEFECT THIS PAGE EXISTS TO FIND, so it is
    * caught and RECORDED rather than allowed to stop the page. A component that
    * will not build takes every block below it with it when the error escapes,
    * which turns one broken control into a blank page and hides which one it
    * was. Both lists are asserted at the bottom.
+   *
+   * 🔴 `tab` IS THE FIRST ARGUMENT AND THE BLOCKS ARE STILL IN FILE ORDER, AND
+   * THAT IS THE WHOLE REASON NOTHING MOVED. The standing rule is that the
+   * newest component goes at the TOP of this page, and this file has already
+   * been taken out once by a block that moved and left its `const` behind: the
+   * build read it in its dead zone, this function swallowed the throw into
+   * `failed`, and the page died much later on an empty map with a message about
+   * a different line. Grouping thirty four blocks into five contiguous runs
+   * would have moved thirty of them. Naming the part instead moves none: the
+   * order in the file is still newest first, the order inside a part is the
+   * order in the file, and **the newest block on the page is the first call to
+   * this function**, which is what marks its tab. A block added tomorrow goes
+   * at the top of the file with a part name and the mark follows it with
+   * nothing to remember.
    */
-  function section(title, note, src, build) {
-    // 🔴 ONE ELEMENT PER SECTION, WHICH IS WHAT `.pos-body` BEING A STACK ASKS
-    // FOR. These four used to be four children of the page, and a stack puts
-    // the project's one gap between every pair of its children — so a title
-    // would have stood 40 px away from the sentence explaining it. A heading,
-    // its note, its snippet and its specimen are one block; the air belongs
-    // BETWEEN blocks. See demo/shell/stack.mjs.
+  function section(tab, title, note, src, build) {
+    const into = panels.get(tab);
+    if (!into) throw new Error(`section ${title}: no part called ${tab}`);
+    // 🔴 ONE ELEMENT PER SECTION, WHICH IS WHAT A STACK ASKS FOR. These four
+    // used to be four children of the page, and a stack puts the project's one
+    // gap between every pair of its children — so a title would have stood
+    // 40 px away from the sentence explaining it. A heading, its note, its
+    // snippet and its specimen are one block; the air belongs BETWEEN blocks.
+    // See demo/shell/stack.mjs.
     const sec = el('section', 'kit-sec');
-    body.append(sec);
+    sec.id = idFor(title);
+    sectionTab.set(sec.id, tab);
+    into.add(sec);
     sec.append(el('h2', 'kit-h', title));
     if (note) sec.append(el('p', 'kit-n', note));
     if (src) sec.append(el('pre', 'kit-src', src));
@@ -401,6 +653,10 @@
   // measure it. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the
   // comments above give: this is the newest block and therefore the topmost,
   // and a `let` left where a block used to be is read in its dead zone.
+  // The four shapes a transport bar takes, and the message it refuses one pair
+  // with. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the lines
+  // above give: a `let` left beside a block that moves is read in its dead zone.
+  let tbarSpec = null;        // { whole, noScrub, noToggle, refused, deck }
   let glueSpec = null;        // { panel, bar, deck, mute }
   let fsxSpec = null;         // { host, exit, out }, a cover with a way back
   let footSpec = null;        // the strip whose footer says what is hovered
@@ -414,8 +670,21 @@
   // the topmost one, and a `let` left where a block used to be is read in its
   // dead zone, swallowed by `section()` into `failed`, and reported much later
   // with a message about a different line.
+  // The strip's parts, broken out of the assembled specimen so the contract
+  // between them can be measured. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER,
+  // for the reason the lines above give.
+  let padPair = null;         // the two-lane grid in the PAD block
+  let stepPads = null;        // two fully labelled pads, stacked
+  let stepBand = null;        // the band drawn at `--ctl-step`, which is how it is read
+  let namedPad = null, barePad = null;   // one with a top label and one without
   const dispSpec = new Map();
   let dispDot = null;         // the one field with a decimal point in it
+  // 🔴 HELD ON ITS OWN AND DELIBERATELY NOT IN `dispSpec`. That map is the six
+  // fields the width check compares against each other, and the check is
+  // guarded on `dispSpec.size === 6` — so putting a seventh in it would have
+  // taken SEVEN asserts silent rather than failing one. A block whose specimens
+  // all live in one bag is a block where adding a specimen is a coverage cut.
+  let dispRefl = null;        // the field with no lamp behind it
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A segment display, as
@@ -435,7 +704,7 @@
    * block with a control in it moves every other block's press. A display is a
    * picture and has no control to add.
    */
-  section('SEGMENT DISPLAY',
+  section('hardware', 'SEGMENT DISPLAY',
     'A field of digits drawn from its own parts, with every unlit bar still '
     + 'faintly there, which is what makes it read as a display rather than as '
     + 'coloured text. Nothing measured is blank and never a zero, and a value too '
@@ -484,6 +753,23 @@ seg.set(1234)        // -> { over: true, asked: '1234' },  reads ---`,
       // already had. This one proves it moves.
       row2.append(field('another ink', { digits: 3, value: 24, ink: 'var(--ok)' }).col);
       row2.append(field('bigger', { digits: 2, value: 88, size: 44 }).col);
+      /**
+       * 🔴 THE SECOND SCHEME, AND IT IS THE POINT OF THE WHOLE OPTION. Asked
+       * 2026-09-21: *"have iption on segmentdisplay to inverse color:
+       * green-grayish"*. `backlit` is a lamp behind the glass, so the driven
+       * bars are the bright ones; `reflective` has no lamp, so the crystal goes
+       * DARK where it is driven and the field is the pale grey green of a
+       * calculator. It is one option rather than three colours passed by hand,
+       * because a scheme is a set of three numbers that only make sense
+       * together, and its ghost is its own: 0.16 against the backlight's 0.22,
+       * because dark bars on a pale field read heavier at the same opacity.
+       * ⚠️ THIS PAGE IS THE ONLY PLACE ANYBODY SEES IT, which is the argument
+       * for the block existing at all.
+       */
+      const refl = field('reflective, no lamp behind it',
+        { digits: 3, value: 127, scheme: 'reflective' });
+      dispRefl = refl.s;
+      row2.append(refl.col);
 
       // ── two fields in one window, which is decision 1 ─────────────────
       /**
@@ -540,7 +826,7 @@ seg.set(1234)        // -> { over: true, asked: '1234' },  reads ---`,
    * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason the block below
    * gives: both harnesses press that row by position.
    */
-  section('MIDI LOG',
+  section('status', 'MIDI LOG',
     'What arrived on the wire, in columns, under the panel it moved. The raw bytes are a '
     + 'column of their own and are never replaced by the reading beside them, because a '
     + 'relative encoder reads as a position if all you have is an interpretation. A clock '
@@ -561,7 +847,115 @@ log.add(decode(bytes))     // false if it was a flood and was not listed`,
       kitMidiLog = log;
     });
 
-  section('GLUED TRANSPORT BAR',
+  /**
+   * 🔴 THE SHAPES A TRANSPORT BAR TAKES, AND EVERY ONE OF THEM IS A RULE THAT
+   * WAS PAID FOR. Asked 2026-09-21 as *"time: add transport examples"*, because
+   * the most configurable component in the kit was demonstrated in exactly one
+   * of its shapes on the page whose job is to make drift visible.
+   *
+   * ⚠️ FOUR VIEWS OF ONE DECK, NOT FOUR DECKS. Nothing on this page may move
+   * unless a reader asked it to, and four decks would be four clocks running
+   * behind a gallery. One idle deck with no adapters offers no rates, so the
+   * bars draw no rate row and what is on show is the shape of the row itself.
+   *
+   * 🔴 AND EXACTLY ONE OF THEM PUBLISHES. `__demo.transport` is the only handle
+   * a CDP check has, and every bar used to claim it unconditionally, so which
+   * bar the harness graded was decided by SOURCE ORDER rather than by the page:
+   * `/stage/` grew a second bar and the wrong one won by being further down the
+   * file. This page now holds four, which makes it the worst case in the
+   * repository, so the whole row claims the handle and every other specimen
+   * passes `publish: false`. Asserted both ways, because a page where nothing
+   * claimed it and a page where two did would look the same from the count.
+   */
+  section('timeline', 'TRANSPORT BAR',
+    'The whole row, the two things a page can take off it, and the one pair it refuses.',
+    `createTransportBar(host, deck)                       // everything
+createTransportBar(host, deck, { scrub: false })      // a page with a strip
+createTransportBar(host, deck, { toggle: false, chip: badge.el })
+createTransportBar(host, deck, { chip, live: true })  // throws: one position, two claims`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+      // ⚠️ ONE DECK. See the note above: four would be four clocks.
+      const deck = createDeck({ range: [0, 60_000] });
+      tbarSpec = {};
+
+      const at = (cap, opts) => {
+        const host = el('div', 'kit-half');
+        const bar = createTransportBar(host, deck, { publish: false, ...opts });
+        stack.titled(cap, host);
+        return bar;
+      };
+
+      /**
+       * 🔴 THE WHOLE ROW, AND IT IS THE ONE BAR ON THIS PAGE THAT PUBLISHES.
+       * `publish` defaults to true, so this passes nothing, and that is the
+       * point: shown in only one of its two states the option is a rule with no
+       * specimen, which is the drift this page exists to catch and is exactly
+       * what `CONTROL ROW` records about a primary button that is working.
+       * ⚠️ AND IT GIVES THE HARNESS A DEFINED PLAYHEAD INSTEAD OF AN ACCIDENTAL
+       * ONE. `__demo.transport` is the only handle a CDP check has; with four
+       * other bars on the page the winner would otherwise be whichever was
+       * built LAST, which is a fact about source order rather than a statement
+       * about the page, and is how `/stage/` handed the suite the wrong bar.
+       * `verify.mjs` will press this toggle and seek this deck, on a deck with
+       * no adapters whose only job is to have a position.
+       */
+      tbarSpec.whole = at('EVERYTHING, AND THE ONE BAR HERE THAT PUBLISHES',
+        { verb: ['start', 'stop'], publish: true });
+
+      /**
+       * 🔴 ONE POSITION SURFACE PER PAGE. A page with a strip passes this,
+       * because two horizontal time axes at different scales stacked is not a
+       * redundancy, it is a contradiction: the strip already seeks on press AND
+       * on drag, which the bar's slider never did.
+       */
+      tbarSpec.noScrub = at('SCRUB: FALSE, WHICH IS WHAT A PAGE WITH A STRIP PASSES',
+        { scrub: false, verb: ['start', 'stop'] });
+
+      /**
+       * 🔴 A BAR WITH NO PLAY BUTTON AT ALL, AND WHAT IT CARRIES INSTEAD. Play,
+       * pause and seek are all claims about a POSITION INSIDE A SOUND, and
+       * `/knobs/` has none: a note sounds while a key is held, so there is
+       * nothing to start or resume and a toggle whose only honest behaviour is
+       * to do nothing is the shape of control this project calls a lie. What
+       * such a bar keeps is the chip, and on both board pages that is the
+       * presence badge, because the fact worth having about an instrument in
+       * another building is whether it is answering.
+       * ⚠️ IT DISARMS WHAT DEPENDED ON PLAYING rather than leaving it to read
+       * false by luck: `api.playing` is forced false, the space bar stops being
+       * a play key, the end stop never arms, and `api.toggles` says so in one
+       * boolean that `demo/verify.mjs` reads before its play drill.
+       */
+      tbarSpec.noToggle = at('TOGGLE: FALSE, WITH A PRESENCE BADGE IN THE CHIP\u2019S PLACE', {
+        toggle: false, scrub: false, loop: false,
+        chip: createPresence({ of: 'Raspberry Pi', mode: 'badge', state: 'online' }).el,
+      });
+
+      /**
+       * 🔴 AND THE ONE PAIR IT REFUSES, SHOWN AS THE REFUSAL. A chip and a live
+       * badge want the same position in the row, so asking for both is asking
+       * the bar to draw two things in one place; it throws rather than picking.
+       * A specimen showing a refusal is worth as much as one showing a shape,
+       * which this page already does for a readout with an odd number of cells
+       * and for a table with two growing columns.
+       */
+      let refused = 'IT WAS ACCEPTED';
+      try {
+        createTransportBar(el('div', ''), deck, {
+          publish: false, live: true,
+          chip: createPresence({ of: '', mode: 'badge', state: 'online' }).el,
+        });
+      } catch (e) { refused = e.message; }
+      tbarSpec.refused = refused;
+      const say = el('div', 'kit-cut', `a chip and a live badge: ${refused}`);
+      stack.add(say);
+
+      tbarSpec.deck = deck;
+      box.append(stack.el);
+    });
+
+  section('timeline', 'GLUED TRANSPORT BAR',
     'A panel and its transport bar wrapped in one edge with a 1 px seam. The toggle holds '
     + 'both of its words at once, so it cannot change width when it changes state.',
     `panel.glue(bar.el)   // wraps in place, so the pair stays where the panel was
@@ -614,11 +1008,13 @@ createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
       const bar = createTransportBar(glued, deck, {
         verb: ['start', 'stop'], live: false, loop: false, scrub: true, absolute: false,
         /**
-         * 🔴 `publish: false`, AND ON THIS PAGE THAT IS NOT A TIE BREAK BETWEEN
-         * TWO BARS. `/kit/` has no transport of its own and never had one, so a
-         * specimen claiming `__demo.transport` would hand the suite a playhead
-         * to drive on a page that is a gallery: `verify.mjs` would start
-         * pressing play and seeking on a bar that exists to be looked at.
+         * 🔴 `publish: false`, AND SINCE 2026-09-21 THAT REALLY IS A TIE BREAK
+         * BETWEEN BARS. This comment used to say `/kit/` had no transport of
+         * its own and never had one, which stopped being true the moment the
+         * block above it landed: there are four bars on this page now and the
+         * whole row is the one that claims `__demo.transport`. Whichever bar
+         * claims it has to be a decision, because the alternative is source
+         * order deciding, and this one is further down the file than that one.
          */
         publish: false,
       });
@@ -702,7 +1098,7 @@ createTransportBar(host, deck, { verb: ['start', 'stop'] })`,
    * measures the width it has been given, and a strip built into an element
    * that is not in the document yet measures nothing.
    */
-  section('STRIP VIEW',
+  section('timeline', 'STRIP VIEW',
     'Marks on a lane over the deck\u2019s range. An optional box under it says what the '
     + 'pointer is over, at one height whatever it is saying.',
     `createStripView(host, deck, { lanes })
@@ -783,7 +1179,7 @@ createStripView(host, deck, { lanes, footer: { lines: 3, empty: 'nothing chosen'
    * after any reorder. This block is the first on the page with buttons in a
    * `.pos-controls` row, so it owns control 0.
    */
-  section('BUTTON GROUP',
+  section('input', 'BUTTON GROUP',
     'Buttons that each do something, sharing one row and one label, which is not a choice '
     + 'of one thing out of three. `enable(id, false, why)` greys one and puts `why` in its '
     + 'title, and it throws if `why` is missing.',
@@ -852,7 +1248,7 @@ g.enable('clear', false, 'The log on this page is already empty.');`,
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
-  section('VIDEO PANEL',
+  section('timeline', 'VIDEO PANEL',
     'A picture, with a status on the left, an empty middle and a fullscreen button under it.',
     `createVideoPanel({ media: canvas, of: 'the board' })
 createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode: 'footer' })`,
@@ -961,7 +1357,7 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       box.append(stack.el);
     });
 
-  section('PRESENCE',
+  section('status', 'PRESENCE',
     'Five states, and whether a person or a harness is holding it.',
     `createPresence({ of: 'the board' }).set('online')
 createPresence({ of: 'Raspberry Pi', busyWords: { page: 'in use', tool: 'under test' } }).busy('tool')
@@ -1074,7 +1470,7 @@ presenceOf({ now, lastSeenAt, everyMs: 5000 })   // -> one of the five`,
    * position, so re-run `node demo/verify.mjs kit` and diff the assert count
    * after any reorder.
    */
-  section('STACK',
+  section('layout', 'STACK',
     'The stack owns the air between blocks, so a block cannot change it.',
     `const page = createStack(d.el);          // mount() has already made this one
 page.add(bar.el, picks, keyboard.el);    // the order of the page, in one line
@@ -1108,7 +1504,7 @@ const row = page.stack();                // a block that is itself a column`,
       box.append(emptySpec.el);
     });
 
-  section('READOUT AND LOG',
+  section('status', 'READOUT AND LOG',
     'The numbers now and the record of what happened, split or joined into one surface.',
     `mount({ readout: { sent: '/s', lost: '' }, joined: true })   // one surface, at the foot
 mount({ readout: { sent: '/s', lost: '' } })                 // two surfaces, the default
@@ -1195,7 +1591,7 @@ createReport({ readout, showLog: false, joined: true })      // the same pair, s
       box.append(el('p', 'kit-cap', 'the cells on their own, an even number of them'), cells);
     });
 
-  section('CONTROL ROW', '',
+  section('input', 'CONTROL ROW', '',
     `el('button', '', 'Ordinary', { type: 'button' })
 el('button', 'pos-pri', 'Primary', { type: 'button' })
 b.disabled = true
@@ -1221,7 +1617,7 @@ b.dataset.busy = '1'   // the working sweep, on either kind`,
     });
 
   // ── stepper ─────────────────────────────────────────────────────────────
-  section('STEPPER',
+  section('input', 'STEPPER',
     'Back and forward, with a middle holding nothing, `random`, or the one you are on. '
     + '`pick` replaces `random`, because the middle is one slot.',
     `createStepper({ what: 'look', prev, next })
@@ -1286,7 +1682,7 @@ createStepper({ what: 'look', prev, next, pick: { options: names, at, onPick } }
     });
 
   // ── slider ──────────────────────────────────────────────────────────────
-  section('SLIDER',
+  section('input', 'SLIDER',
     '',
     `createSlider({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26, hand: true })
 createFader({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26, hand: true })`,
@@ -1330,7 +1726,7 @@ createFader({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26, hand: true 
     });
 
   // ── several sliders ─────────────────────────────────────────────────────
-  section('SLIDER GROUP',
+  section('input', 'SLIDER GROUP',
     '',
     `createSliderGroup([rate, size, spray, swarm])`,
     (box) => {
@@ -1349,7 +1745,7 @@ createFader({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26, hand: true 
     });
 
   // ── two across, and a glide ─────────────────────────────────────────────
-  section('SLIDER GROUP, PAIRED',
+  section('input', 'SLIDER GROUP, PAIRED',
     'Above 720 px the pair shares six columns. Loading a patch with '
     + '`set(v, { quiet: true, glideMs })` glides every handle without calling `onInput` back.',
     `createSliderGroup([...], { pair: true })
@@ -1394,7 +1790,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   // ── a slider that moves by itself ───────────────────────────────────────
-  section('INVISIBLE HAND',
+  section('input', 'INVISIBLE HAND',
     'Press ' + MOVE_GLYPH.sweep + ' and the handle sweeps on its own, with a real reach and a '
     + 'pause at each end rather than a triangle wave. Touching the lane takes it back in one '
     + 'frame, and the slider beside it has no hand for comparison.',
@@ -1415,7 +1811,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   // ── radio row ───────────────────────────────────────────────────────────
-  section('CHOICE',
+  section('input', 'CHOICE',
     '',
     `createChoice({ label: 'space', options: [['dry',0],['room',1],['hall',2]], at: 1, onPick })`,
     (box) => {
@@ -1431,7 +1827,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   // ── tabs ────────────────────────────────────────────────────────────────
-  section('TABS',
+  section('layout', 'TABS',
     'Places you go rather than options you arm, with colour and a bar on the open one.',
     `createTabs({ tabs: [{id:'air',label:'On air'}, {id:'past',label:'Archive',disabled:true}, …] })`,
     (box) => {
@@ -1484,7 +1880,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     ...extra,
   }));
 
-  section('CARD',
+  section('layout', 'CARD',
     'A grey box, a name, one line about what is behind it, and tags along the bottom.',
     '',
     (box) => {
@@ -1494,7 +1890,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
       box.append(g.el);
     });
 
-  section('CARD GRID ON A PHONE',
+  section('layout', 'CARD GRID ON A PHONE',
     'Two columns at 375 px and up, one below, with the floor written min(100%, 170px).',
     '', (box) => {
       box.classList.add('kit-wide');
@@ -1509,7 +1905,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
       }
     });
 
-  section('CARD, REFUSED AND WITH BUTTONS',
+  section('layout', 'CARD, REFUSED AND WITH BUTTONS',
     'A page this browser cannot run keeps its card, with the reason where the tags go.',
     '', (box) => {
       box.classList.add('kit-wide');
@@ -1536,7 +1932,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   // ── a choice that has not arrived yet ───────────────────────────────────
-  section('CHOICE, PENDING',
+  section('input', 'CHOICE, PENDING',
     'Pending says the press landed while the thing it acts on catches up.',
     `c.pending(i)   // and c.pending(null) when it lands`,
     (box) => {
@@ -1560,7 +1956,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     });
 
   // ── text field ──────────────────────────────────────────────────────────
-  section('FIELD',
+  section('input', 'FIELD',
     'The label sits on top of the box, so a row of fields has one left edge.',
     `createField({ label: 'title', value: 'Rehearsal moved', grow: 'wide' })
 createField({ label: 'tags', placeholder: 'comma separated' })
@@ -1592,7 +1988,7 @@ createField({ label: 'message', rows: 4, grow: 'wide' })`,
   // `/looper/` and `/able/` have paragraphs about where their SOUND comes from
   // and are already at the length the house rule allows. A gallery of controls
   // is the right home for what a control does.
-  section('KEYBOARD',
+  section('input', 'KEYBOARD',
     'An octave of piano keys where a swipe scrolls the row and a press then a slide plays.',
     `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })
 createKeyboard(parent, { letters: false })   // a second one on the same page`,
@@ -1643,7 +2039,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
     });
 
   // ── picker ──────────────────────────────────────────────────────────────
-  section('PICKER',
+  section('input', 'PICKER',
     '',
     `createPicker({ label: 'sound', what: 'patch', prev, next, random, onPick })`,
     (box) => {
@@ -1725,7 +2121,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
     return made;
   }
 
-  section('DIAGRAM',
+  section('diagram', 'DIAGRAM',
     'Where the signal goes, laid out from a list of boxes and a list of arrows.',
     `createDiagram(host, {
   title: 'a key press, and what it costs',
@@ -1776,7 +2172,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
       ],
     }));
 
-  section('DIAGRAM, A LABEL THAT DOES NOT FIT',
+  section('diagram', 'DIAGRAM, A LABEL THAT DOES NOT FIT',
     'A word never runs past a border, and the line underneath names what was cut.',
     '',
     (box) => diagramCase(box, {
@@ -1806,7 +2202,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
   // SIDEWAYS and full DOWNWARDS. Left to right an arrow reaches the box it
   // names; stacked, the same arrow would cross the words `Raspberry Pi` on
   // the way in, so it stops at the machine.
-  section('DIAGRAM, CONTAINERS',
+  section('diagram', 'DIAGRAM, CONTAINERS',
     'A machine and the programs on it are not one thing, so a box holds boxes.',
     `nodes: [{ id: 'pi', label: 'Raspberry Pi', kind: 'device', children: [
             { id: 'synth', label: 'synthesiser', sub: 'plays the note' },
@@ -1852,7 +2248,7 @@ links: [{ from: 'you', to: 'synth', label: 'note number' },   // into a box INSI
   // on top of it: one line down that gap, never two. The gap between the two
   // boxes nothing was declared between still has its tie, which is what makes
   // this a picture of the rule rather than of a special case.
-  section('DIAGRAM, INNER ARROWS',
+  section('diagram', 'DIAGRAM, INNER ARROWS',
     'A declared arrow between two boxes in one machine takes the tie\'s place rather than '
     + 'being drawn over it.',
     `children: [{ id: 'in',    label: 'capture' },
@@ -1904,7 +2300,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
       diagramCase(box, sibs, { phone: true, id: 'siblings-phone' });
     });
 
-  section('DIAGRAM, RETURN PATHS',
+  section('diagram', 'DIAGRAM, RETURN PATHS',
     'A return path runs under the row, and two of them go at different depths.',
     '',
     (box) => diagramCase(box, {
@@ -1936,7 +2332,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // path the page does not have, and the name that tells the two branches
   // apart was drawn at the midpoint, i.e. under that box. Seeing one width
   // could not have caught it, so the block shows both.
-  section('DIAGRAM, ROUTING',
+  section('diagram', 'DIAGRAM, ROUTING',
     'An arrow that reaches past a box is routed round it, never through it.',
     '',
     (box) => {
@@ -1979,7 +2375,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
       diagramCase(box, branch, { phone: true });
     });
 
-  section('DIAGRAM ON A PHONE',
+  section('diagram', 'DIAGRAM ON A PHONE',
     'Below 560 px it becomes one column, in the order the signal takes.',
     '',
     (box) => diagramCase(box, {
@@ -2013,7 +2409,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // words. A component the sandbox does not show is a component nobody can
   // check against another page's copy of it, which is the one thing this page
   // exists to make possible.
-  section('TABLE',
+  section('status', 'TABLE',
     'Every column is named by the caller, and exactly one of them must grow.',
     `createTable({ columns: [
   { key: 'dir',  width: 52, hi: true },
@@ -2071,7 +2467,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   // is watching. The specimens below are FOUR SEPARATE BADGES rather than one
   // pressed through four states, because the checks at the bottom measure them
   // and a check that drives a control is a check a visitor watches happen.
-  section('COLOURS',
+  section('layout', 'COLOURS',
     '',
     // 🔴 NO SNIPPET. It read the whole table as two glued lines and the
     // swatches under it then said the same six things again, which is a block
@@ -2100,6 +2496,238 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
 
 
   /**
+   * 🔴 THE STRIP BROKEN INTO ITS PARTS, AND THE PARTS COME FIRST BECAUSE THEY
+   * ARE WHAT A CALLER ASSEMBLES. Asked 2026-09-21: *"breaks strp elements down
+   * and keep final example"*. A finished strip shows the kit can draw one; it
+   * does not show what you write to get there, and it hides the thing that
+   * actually goes wrong.
+   * ⚠️ NEWEST FIRST YIELDS TO READING ORDER INSIDE THIS PART, which is the same
+   * exception the assembled block below already declares for itself. These four
+   * are the newest blocks on the page and they sit at the bottom of `hardware`,
+   * because parts then whole is one argument read in one direction and breaking
+   * it to satisfy an ordering rule would leave the conclusion above its premise.
+   */
+  section('hardware', 'KNOB',
+    'Dragged up and down rather than turned, with its controller under it.',
+    `createKnob({ label: 'M1', sub: 'CC 80', min: 0, max: 127, value: 18 })
+createKnobBank([k1, k2, k3])
+k.set(96, { from: 'hardware', quiet: true })   // moved at the desk, not here`,
+    (box) => {
+      box.classList.add('kit-wide');
+      /**
+       * ⚠️ WHY A VERTICAL DRAG, WHICH IS A MEASUREMENT RATHER THAN A PREFERENCE:
+       * an angular drag dies near the centre, where two pixels swing the angle
+       * through most of its range.
+       * ⚠️ AND ONE OF THEM IS SHOWN AS MOVED BY HARDWARE, because that state is
+       * the reason the component tracks a source at all and it is invisible
+       * until something is in it. A live binding and one nobody ever bound look
+       * identical.
+       */
+      const ks = [
+        createKnob({ label: 'M1', sub: 'CC 80', min: 0, max: 127, value: 18,
+                     title: 'macro 1, CC 80 on channel 1' }),
+        createKnob({ label: 'M2', sub: 'CC 81', min: 0, max: 127, value: 96,
+                     title: 'macro 2, CC 81 on channel 1' }),
+        createKnob({ label: 'M3', sub: 'CC 82', min: 0, max: 127, value: 64,
+                     disabled: true, title: 'disabled: nothing is bound to this one' }),
+      ];
+      ks[1].set(96, { from: 'hardware', quiet: true });
+      box.append(createKnobBank(ks, {}).el);
+    });
+
+  section('hardware', 'PAD',
+    'Square, half height or round, and the shape is one property rather than three components.',
+    `createPadGrid({ cols: 8, rows: 2, pad: (x, y) => ({ tint, top, on }) })
+createPadGrid({ cols: 8, pad: (x) => ({ half: true, label: String(x + 1) }) })
+createPadGrid({ cols: 5, pad: (x) => ({ round: true, bottom: 'play' }) })`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const stack = createStack(undefined, 'kit-col');
+      const TINT = ['#7fb2ff', '#ff9f7f'];
+      /**
+       * 🔴 TWO ROWS, WHICH IS ALSO THE SPECIMEN THE BLOCK BELOW MEASURES. The
+       * distance between two STACKED pads is the thing `--ctl-step` names, and
+       * it needs two rows to exist at all.
+       * ⚠️ AND ONLY EVERY OTHER PAD IS NAMED, which is what makes the reserved
+       * slot visible: a pad with no top label still takes `--ctl-head`, or the
+       * named ones would sit lower than the rest and it would read as a
+       * rendering fault rather than a labelling choice.
+       */
+      padPair = createPadGrid({
+        cols: 8, rows: 2,
+        pad: (x, y) => ({
+          tint: TINT[y],
+          top: x % 2 === 0 ? String(x / 2 + 1) : '',
+          on: y === 0 ? x % 2 === 0 : x % 4 === 1,
+          disabled: x === 7 && y === 1,
+          title: x === 7 && y === 1 ? 'disabled' : `step ${x + 1} of lane ${y + 1}`,
+        }),
+      });
+      stack.titled('SQUARE, TWO LANES, AND ONLY EVERY OTHER ONE NAMED', padPair.el);
+
+      stack.titled('HALF HEIGHT, WHICH IS ONE PROPERTY', createPadGrid({
+        cols: 8,
+        pad: (x) => ({
+          half: true, tint: '#8fd6a8',
+          top: x % 2 === 0 ? String(x / 2 + 1) : '',
+          label: String(x + 1), on: x % 3 === 0, disabled: x === 7,
+          title: x === 7 ? 'disabled' : `step ${x + 1}`,
+        }),
+      }).el);
+
+      stack.titled('ROUND, WHICH IS ANOTHER', createPadGrid({
+        cols: 5,
+        pad: (x) => ({
+          round: true, tint: '#c9a0ff',
+          top: x === 0 ? 'top' : '', label: String(x + 1),
+          bottom: ['play', 'stop', 'rec', '', 'off'][x],
+          on: x === 2, disabled: x === 4,
+          title: x === 4 ? 'disabled' : `round pad ${x + 1}`,
+        }),
+      }).el);
+      box.append(stack.el);
+    });
+
+  section('hardware', 'FADER',
+    'The slider turned ninety degrees, with its value above the lane and its name under it.',
+    `createFader({ label: 'CH1', value: 30 })
+createFaderBank([f1, f2, f3])
+f.set(104, { from: 'hardware', quiet: true })`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const fs = [];
+      for (let i = 0; i < 4; i++) {
+        fs.push(createFader({ label: `CH${i + 1}`, value: 30 + i * 20,
+          title: `channel ${i + 1} fader, pitch bend on channel ${i + 1}` }));
+      }
+      fs[2].set(104, { from: 'hardware', quiet: true });
+      fs.push(createFader({ label: 'FX', value: 64, disabled: true,
+                            title: 'disabled: no master is bound' }));
+      box.append(createFaderBank(fs, {}).el);
+    });
+
+  /**
+   * 🔴 THE CONTRACT BETWEEN ALL THREE, AND IT IS THE REASON THIS BLOCK EXISTS
+   * RATHER THAN THE PARTS ALONE. `/model/` was corrected by screenshot twelve
+   * times in one evening and **every single correction was the page doing
+   * arithmetic about a component's insides**: a button column lifted by a
+   * foot's height, which was right until the pads grew a label; a lane starting
+   * 30 px below the button beside it; two labels ending on different lines.
+   * The sentence the kit publishes is *the distance between two stacked
+   * controls is three things, not one*, and nobody believes a sentence like
+   * that until they see the three.
+   * ⚠️ EVERY FIGURE IS READ OFF THE DOCUMENT, never typed. `--ctl-head`,
+   * `--ctl-foot` and `--ctl-gap` are stated once in `shell.css` and
+   * `--ctl-step` is declared as the sum of them there, so this block asks for
+   * all four and draws what it was told. A number typed here would be a second
+   * copy of a measurement and this project's rule is that two copies disagree.
+   */
+  section('hardware', 'HEAD, GAP AND FOOT',
+    'The distance between two stacked controls is three things, and only the middle one is a gap.',
+    `--ctl-head   the slot above the working surface, reserved even when empty
+--ctl-foot   the slot below it
+--ctl-gap    the only part of it that is actually a gap
+--ctl-step   declared as the sum of the three, so a caller never adds them up`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const root = getComputedStyle(document.documentElement);
+      const px = (n) => root.getPropertyValue(n).trim();
+      const stack = createStack(undefined, 'kit-col');
+
+      /**
+       * 🔴 THE BANDS ARE DRAWN AT THE HEIGHTS THE STYLESHEET STATES, so the
+       * picture cannot disagree with the contract: each one is `height:
+       * var(--ctl-*)` rather than a figure this block chose.
+       * 🔴 AND `--ctl-step` IS DRAWN AS A FOURTH BAND BESIDE THE THREE RATHER
+       * THAN PRINTED AS A NUMBER, WHICH IS ALSO THE ONLY WAY TO READ IT. A
+       * custom property is SUBSTITUTED, not computed, so
+       * `getPropertyValue('--ctl-step')` hands back the literal text
+       * `calc(var(--ctl-foot) + var(--ctl-gap) + var(--ctl-head))` and
+       * `parseFloat` of that is **NaN**. This block read NaN for one run. The
+       * value only exists once a browser has resolved it against a real
+       * property, so the band IS the measurement, and the two columns being the
+       * same height is the whole claim in one look.
+       */
+      const ladder = el('div', 'kit-step');
+      const col = el('div', 'kit-step-c');
+      for (const [name, prop] of [['head', '--ctl-head'], ['gap', '--ctl-gap'],
+                                  ['foot', '--ctl-foot']]) {
+        const band = el('div', 'kit-step-b', null);
+        band.style.height = `var(${prop})`;
+        band.append(el('span', 'kit-step-n', `${name} ${px(prop)}`));
+        col.append(band);
+      }
+      stepBand = el('div', 'kit-step-b kit-step-s', null);
+      stepBand.style.height = 'var(--ctl-step)';
+      stepBand.append(el('span', 'kit-step-n', 'step'));
+      const right = el('div', 'kit-step-c');
+      right.append(stepBand);
+      ladder.append(col, right);
+      stack.titled('THREE DISTANCES, AND ONE NAME FOR ALL THREE', ladder);
+
+      /**
+       * 🔴 AND THE PAIR THE FIGURES ARE ABOUT, STACKED, WITH BOTH LABELS ON
+       * BOTH. The check below measures the distance between the two BUTTONS,
+       * which is where `--ctl-step` is supposed to land, and it needs a pad
+       * that has something under it as well as over it or there is no foot in
+       * the measurement.
+       * 🔴 MEASURED WHILE WRITING THIS: TWO STACKED PADS WITH NO BOTTOM LABEL
+       * SIT 23 px APART, NOT 40. That is `gap` plus `head` exactly, so the foot
+       * slot is NOT reserved on a pad with nothing under it, while the head
+       * slot IS reserved on a pad with nothing over it. The kit's own rule is
+       * written about the head, so this is an asymmetry rather than a
+       * contradiction, and it is left alone here and reported rather than
+       * patched from a gallery. What it means for a caller is that `--ctl-step`
+       * is the distance between two FULLY LABELLED controls and an upper bound
+       * on any other pair.
+       * ⚠️ THE SPECIMEN IS THIS BLOCK'S OWN. The two-lane grid in `PAD` is that
+       * block's specimen and a check does not get to decide what a specimen
+       * looks like, which is this project's rule about a check that mutates
+       * arriving from the other side.
+       */
+      /**
+       * ⚠️ AND THE COLUMN IS A REAL `createPadGrid`, NOT A FLEX COLUMN OF MY
+       * OWN, WHICH IS ALSO A MEASUREMENT. A hand-rolled column read **32 px**
+       * between the two buttons, which is `foot` plus `head` and no gap: the
+       * `--ctl-gap` in the middle of the step belongs to the CONTAINER, and
+       * `.pos-pad-grid` and `.pos-crow` are the two things in the kit that
+       * declare it. So a specimen assembled by hand cannot demonstrate the
+       * step, for the same reason the split readout block below had to be put
+       * in a stack before its gaps existed at all.
+       */
+      const stepGrid = createPadGrid({
+        cols: 1, rows: 2,
+        pad: (x, y) => ({
+          top: String(y + 1), label: y === 0 ? 'A' : 'B',
+          bottom: y === 0 ? 'kick' : 'snare',
+          tint: y === 0 ? '#7fb2ff' : '#ff9f7f', on: y === 0,
+          title: 'labelled above and below',
+        }),
+      });
+      stepPads = [stepGrid.at(0, 0), stepGrid.at(0, 1)];
+      stack.titled('TWO OF THEM STACKED, WHICH IS WHERE THE STEP LANDS', stepGrid.el);
+
+      /**
+       * 🔴 AND A SLOT IS RESERVED EVEN WHEN IT IS EMPTY. One pad named above,
+       * one with nothing there, and both buttons start on the same line; a grid
+       * whose downbeats alone are named would otherwise have those pads sitting
+       * higher than the rest, which reads as a rendering fault rather than as a
+       * labelling choice.
+       * ⚠️ MEASURE THE BUTTON, NEVER THE WRAPPER. A pad returns its wrapper as
+       * `el` and exposes `button` separately; an assert reading the wrapper
+       * once reported a button 17 px low while the button was exactly right.
+       */
+      const pair = el('div', 'pos-crow');
+      namedPad = createPad({ top: '1', label: 'A', tint: '#7fb2ff', on: true,
+                             title: 'named above' });
+      barePad = createPad({ label: 'B', tint: '#7fb2ff',
+                            title: 'nothing above it, and the slot is still reserved' });
+      pair.append(namedPad.el, barePad.el);
+      stack.titled('ONE NAMED ABOVE AND ONE NOT, STARTING ON ONE LINE', pair);
+      box.append(stack.el);
+    });
+
+  /**
    * 🔴 AT THE BOTTOM, WHICH CONTRADICTS THIS PROJECT'S OWN RULE, DELIBERATELY.
    * CLAUDE.md, instructed 2026-09-16: *"in kit move online stuff to topmost
    * item (all new should land top, make rule)"*. Asked for the other way on
@@ -2109,7 +2737,7 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
    * ⚠️ **WHEN THEY ARE ADOPTED THEY MOVE UP.** If this comment is still here and
    * they are in a shipped page, the move was forgotten.
    */
-  section('CHANNEL STRIP: KNOB, PAD, HALF PAD, FADER',
+  section('hardware', 'CHANNEL STRIP: KNOB, PAD, HALF PAD, FADER',
     'The four shapes a hardware layout is built from, with the knobs on a Novation '
     + 'Circuit’s measured macros, CC 80 to 87. A knob is dragged up and down rather than '
     + 'turned, and the last control in every row is disabled.',
@@ -2220,7 +2848,64 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       fRow.append(fadeSpec.el);
     });
 
+  // 🔴 EVERY BLOCK IS BUILT, SO THE PARTS CLOSE. The window was open for the
+  // build because a diagram measures its own text when it is made and came out
+  // laid out for 320 px inside a 658 px panel without it. Nothing above this
+  // line waited for anything, so no frame was ever rendered with all five parts
+  // open, and the scroll below lands where a reader will actually find it.
+  settle();
 
+  /**
+   * 🔴 THE MARK THAT SAYS WHICH PART HOLDS SOMETHING NEW, AND IT IS THE RULE
+   * THIS REORGANISATION WOULD OTHERWISE HAVE BROKEN IN SILENCE. The standing
+   * instruction is *"in kit move online stuff to topmost item (all new should
+   * land top, make rule)"*, and the reason is written down: this page is read
+   * by somebody checking what the kit has, and what they do not know about is
+   * what arrived since they last looked. **A tab row hides four fifths of the
+   * page**, so the newest block can be at the top of a part nobody opens, and a
+   * reader who never presses that tab is never told. A quiet break is the worst
+   * kind.
+   *
+   * ✅ SO IT IS TWO FACTS AND NEITHER IS TYPED. The newest block is the FIRST
+   * call to `section()`, which is the order of the file; the part holding it is
+   * the part named on that call; and the mark goes on whichever tab that turns
+   * out to be. Nothing here names a block or a part, so a block added at the
+   * top of the file tomorrow moves the mark by itself and there is no second
+   * copy to go stale. Both facts are asserted at the bottom, including the
+   * negative half, that no other tab carries it.
+   *
+   * ⚠️ AND THE DEFAULT PART DOES NOT MOVE. Opening on whichever part is newest
+   * would answer the same question and cost a reader their muscle memory every
+   * time somebody lands a block somewhere else. A mark costs nothing and says
+   * more: it names the part rather than replacing where you were.
+   */
+  const newestSection = built[0] ? idFor(built[0]) : null;
+  const newestPart = newestSection ? sectionTab.get(newestSection) : null;
+  for (const [i, [id]] of GROUPS.entries()) {
+    if (id !== newestPart) continue;
+    // ⚠️ THE ATTRIBUTE CARRIES THE BLOCK'S NAME RATHER THAN BEING EMPTY, so the
+    // mark can be read off the DOM and the hover says which block it means. An
+    // empty attribute would still MATCH, which is the other half of this
+    // project's rule about `[data-thing]`, and it would tell a reader nothing.
+    kitTabs.buttons[i].dataset.kitNew = built[0];
+    kitTabs.buttons[i].title = `newest here: ${built[0]}`;
+  }
+
+  /**
+   * 🔴 A HASH NAMING A BLOCK OPENS THE PART HOLDING IT. `/kit/#slider` has
+   * never worked on this page, because nothing on it carried an `id`; behind a
+   * tab row it would be worse than not working, because the block exists, is
+   * addressed, and is in a panel that is `hidden`.
+   * ⚠️ THE HASH IS PUT BACK AFTER THE TAB TOOK IT. `createTabs` writes the
+   * part's own id over the address on its first `go`, which is right for a tab
+   * press and wrong for an arrival, so the block's id goes back once it has
+   * been scrolled to and survives until the reader presses a tab.
+   */
+  if (wanted && sectionTab.has(wanted)) {
+    kitTabs.go(sectionTab.get(wanted));
+    try { history.replaceState(null, '', `#${encodeURIComponent(wanted)}`); } catch { /* file:// */ }
+    document.getElementById(wanted)?.scrollIntoView({ block: 'start' });
+  }
 
   // ── what a machine can say about this page ──────────────────────────────
   //
@@ -2240,7 +2925,14 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
   // in: inserting six at the top on 2026-09-19 made seventeen of them wrong at
   // once, and a number a reader trusts and nobody re-counts is worse than no
   // number. The order is the file.
+  // ⚠️ AND THE MEASURING WINDOW IS SHUT ACROSS THIS WAIT, which is the first of
+  // the three places it has to be. It has been open since before the blocks
+  // were built, because a diagram measures its own text when it is made; this
+  // is the first frame anybody could see, so it closes for that frame and opens
+  // again underneath the checks. See `measure()` above.
+  settle();
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  measure();
 
   /**
    * 🔴 A FADER IS THE SLIDER TURNED 90 DEGREES, AND THAT IS A MEASUREMENT.
@@ -2344,9 +3036,16 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
     const wIdle = w();
     const seenIdle = [vis('tbar-w0'), vis('tbar-w1')];
     t?.click();
+    // ⚠️ THE MEASURING WINDOW SHUTS ACROSS THIS WAIT AND OPENS AGAIN AFTER IT.
+    // Both widths are read with every part laid out, which is the only state
+    // either of them is a real number in; what may not happen is a frame being
+    // rendered with all five parts open, and this loop is one of the two places
+    // on the page that gives the browser the chance. See `measure()` above.
+    settle();
     for (let i = 0; i < 40 && t?.dataset.state !== 'playing'; i++) {
       await new Promise((r) => requestAnimationFrame(r));
     }
+    measure();
     const wBusy = w();
     const seenBusy = [vis('tbar-w0'), vis('tbar-w1')];
     t?.click();
@@ -2358,6 +3057,98 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       `${wIdle} px showing "${t?.querySelector('.tbar-w0')?.textContent}" `
       + `(${seenIdle.join('/')}), ${wBusy} px showing `
       + `"${t?.querySelector('.tbar-w1')?.textContent}" (${seenBusy.join('/')})`);
+  }
+
+  /**
+   * 🔴 A BAR WITH NO PLAY BUTTON HAS NO PLAY BUTTON, AND SAYS SO IN A BOOLEAN A
+   * HARNESS CAN READ. Two independent sources, which is the whole check: the
+   * DOM says whether `.tbar-toggle` was ever appended, and `api.toggles` says
+   * what the page asked for, so the two can disagree. Without the boolean
+   * `demo/verify.mjs` clicks `.tbar-toggle` and asserts the position advanced,
+   * which takes a `toggle: false` page red for a reason that is not its fault.
+   * ⚠️ AND THE COMPARISON IS AGAINST THE WHOLE ROW BESIDE IT, never against a
+   * count typed here. A page that had lost its toggle everywhere would satisfy
+   * "this one has none".
+   */
+  if (tbarSpec) {
+    const has = (b) => !!b.api.el.querySelector('.tbar-toggle');
+    d.assert('a bar told to leave the play button off has none, and says so in one boolean',
+      has(tbarSpec.whole) && tbarSpec.whole.api.toggles !== false
+      && !has(tbarSpec.noToggle) && tbarSpec.noToggle.api.toggles === false
+      && tbarSpec.noToggle.api.playing === false,
+      `the whole row: toggle ${has(tbarSpec.whole) ? 'drawn' : 'MISSING'}, `
+      + `toggles ${tbarSpec.whole.api.toggles} · with it off: `
+      + `${has(tbarSpec.noToggle) ? 'STILL DRAWN' : 'no toggle'}, `
+      + `toggles ${tbarSpec.noToggle.api.toggles}, playing ${tbarSpec.noToggle.api.playing}`);
+
+    /**
+     * 🔴 ONE POSITION SURFACE PER PAGE, WHICH IS WHAT `scrub: false` IS FOR.
+     * ⚠️ AND IT IS NOT AN ELEMENT THAT GOES MISSING, WHICH IS WHAT THIS CHECK
+     * FIRST ASSUMED AND WHY IT WENT RED ON A BAR THAT WAS RIGHT. The slider is
+     * always built; `scrub: false` sets `data-scrub="0"` on the bar and
+     * `shell.css` hides it from there. So the question is which rule won, and
+     * the only thing that knows that is the COMPUTED style. A presence test
+     * read `STILL HAS ONE` about a bar with no visible slider at all.
+     * ⚠️ BOTH SIDES, because `data-scrub` is `seekable && wantScrub`: a deck
+     * that could not be seeked would hide the slider on every bar here and a
+     * one-sided check would have called that a success.
+     */
+    const shows = (b) => getComputedStyle(b.api.el.querySelector('.tbar-scrub')).display;
+    const flag = (b) => b.api.el.dataset.scrub;
+    d.assert('and a bar told to leave the slider off draws no second time axis',
+      shows(tbarSpec.whole) !== 'none' && flag(tbarSpec.whole) === '1'
+      && shows(tbarSpec.noScrub) === 'none' && flag(tbarSpec.noScrub) === '0',
+      `the whole row is data-scrub=${flag(tbarSpec.whole)} showing `
+      + `${shows(tbarSpec.whole)}, the one with scrub off is `
+      + `data-scrub=${flag(tbarSpec.noScrub)} showing ${shows(tbarSpec.noScrub)}`);
+
+    /**
+     * 🔴 WHAT SUCH A BAR CARRIES INSTEAD, AND IT IS A BADGE RATHER THAN A WORD.
+     * The chip's position held `LIVE` once: a word drawn because a page passed
+     * `live: true` at BUILD time, so it said LIVE whether or not a byte had
+     * arrived. On both board pages the chip is the presence badge, because the
+     * fact worth having about an instrument in another building is whether it
+     * is answering, which is a thing that can change.
+     */
+    const chip = tbarSpec.noToggle.api.el.querySelector('.pos-pres');
+    d.assert('the chip on a bar with no toggle is a badge that can change, not a word',
+      !!chip && chip.querySelector('.pos-pres-dot')
+      && chip.querySelector('.pos-pres-w').textContent.trim().length > 0,
+      chip ? `it says "${chip.querySelector('.pos-pres-w').textContent.trim()}" beside a dot`
+           : 'there is nothing in the chip position');
+
+    /**
+     * 🔴 NEGATIVE CONTROL: A CHIP AND A LIVE BADGE WANT THE SAME POSITION AND
+     * THE BAR REFUSES RATHER THAN PICKING. A specimen showing a refusal is
+     * worth as much as one showing a shape, and this page already does it for a
+     * readout with an odd number of cells and a table with two growing columns.
+     */
+    d.assert('NEGATIVE CONTROL: a chip and a live badge are refused rather than drawn over each other',
+      typeof tbarSpec.refused === 'string' && tbarSpec.refused !== 'IT WAS ACCEPTED'
+      && tbarSpec.refused.includes('same position'),
+      tbarSpec.refused);
+
+    /**
+     * 🔴 EXACTLY ONE BAR ON THIS PAGE CLAIMS THE PAGE'S PLAYHEAD, AND THE COUNT
+     * ALONE CANNOT SEE IT. `__demo.transport` is the only handle a CDP check
+     * has; with four bars here, a page where NOTHING claimed it and a page
+     * where two did would both read green, because the handle is not something
+     * an assert count knows about. So both halves are graded: the handle is
+     * filled, and it is filled by the bar this page chose rather than by
+     * whichever was built last.
+     * ⚠️ IDENTITY, NOT A SELECTOR. `document.querySelector('.tbar')` is the
+     * first bar in DOM order, which is the same object only while a page has
+     * one; `/stage/` has already paid for that confusion. This compares the
+     * published object against the specimen itself.
+     */
+    const bars = [...document.querySelectorAll('.tbar')];
+    const published = d.api.transport || window.__demo?.transport;
+    d.assert('of the four bars here exactly one claims the page\u2019s playhead, and it is the whole row',
+      bars.length === 4 && !!published && published === tbarSpec.whole.api
+      && published.el === tbarSpec.whole.api.el
+      && bars.filter((b) => b === published.el).length === 1,
+      `${bars.length} bars on the page · the handle holds ${published ? 'one of them' : 'NOTHING'}`
+      + `${published && published === tbarSpec.whole.api ? ', the whole row' : ''}`);
   }
 
   // 🔴 GLUED, WHICH IS THE WORD THE ASK USED: *"footer section, looks like
@@ -2488,9 +3279,14 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
   // would pass the first of these on its own, which is the whole reason the
   // other two are here.
   {
+    // ⚠️ THE SECOND OF THE TWO WAITS, AND THIS ONE MEASURES NO GEOMETRY AT ALL,
+    // so the window simply shuts across it. Three promises resolving is three
+    // frames a browser could render with every part open. See `measure()`.
+    settle();
     const nothing = createXrProbe(undefined).caps();
     const says = await createXrProbe({ isSessionSupported: async () => true }).when(1000);
     const refuses = await createXrProbe({ isSessionSupported: () => Promise.reject(new Error('no')) }).when(1000);
+    measure();
     d.assert('a browser with nothing to ask is answered at once, and three browsers get three answers',
       nothing.vr === 'absent' && nothing.ar === 'absent' && answered(nothing.vr)
       && says.vr === 'yes' && says.ar === 'yes'
@@ -3066,6 +3862,13 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
   // ⚠️ THE FLAG IS `shell/selfcheck.mjs`'s NOW, read the same way on every page
   // rather than re-derived here. Same value, same moment, one place to grep.
   if (SELFCHECK) {
+    // ⚠️ THE MEASURING WINDOW STAYS OPEN ACROSS THIS BLOCK AND THE WATCHDOG
+    // STANDS DOWN FOR IT. Everything in here waits — for a fade, for a
+    // keyboard's verdict, for a cover to come up — so frames WILL be rendered
+    // with every part laid out, and none of them is rendered for a visitor,
+    // because a visitor never enters this block at all. The counter comes back
+    // on at the end so it still covers the run to `ready()`.
+    watching = false;
     const { createKeyboard, KEY_MIN_PX, BLACK_RATIO, SWIPE_PX } = await import('/shell/keyboard.mjs');
     const nap = (ms) => new Promise((r) => setTimeout(r, ms));
     const frames = (n) => new Promise((r) => {
@@ -3454,6 +4257,7 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
         stillFull ? 'it was pressed and the cover is still there'
           : `the cover is gone, the page scrolls again, and the specimen says "${out.textContent}"`);
     }
+    watching = true;
   }
 
   /**
@@ -3534,6 +4338,13 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
      * every part is off, and every part is still on screen at a faint opacity
      * of the SAME ink as a lit one. Read off the COMPUTED style, because that
      * is the only thing that knows which rule won.
+     * ⚠️ THE EXPECTED FIGURE IS READ OFF `--disp-ghost`, NOT TYPED HERE, AND
+     * THAT IS A REPAIR RATHER THAN A TIDY-UP. This check named 0.13 until
+     * 2026-09-21, when the ghost was raised on instruction (*"ligher noacive
+     * segments"*) and the check went red on a stylesheet that was right. A
+     * number typed into a check is a second copy of a measurement, and this
+     * project's rule is that two copies will disagree. The claim is unchanged:
+     * an unlit bar is drawn, it is faint, and it is not the lit one.
      */
     {
       const none = dispSpec.get('nothing measured');
@@ -3541,9 +4352,65 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       const off = getComputedStyle(none.svg.querySelector('.pos-disp-p'));
       const on = getComputedStyle(all.svg.querySelector('.pos-disp-p.on'));
       const ghost = Number(off.opacity);
+      const token = Number(getComputedStyle(document.documentElement)
+        .getPropertyValue('--disp-ghost'));
       d.assert('an unlit bar is still drawn, faintly, in the same ink as a lit one',
-        ghost > 0.02 && ghost < 0.5 && Number(on.opacity) === 1 && off.fill === on.fill,
-        `unlit at opacity ${off.opacity} against lit at ${on.opacity}, both ${on.fill}`);
+        ghost > 0.02 && ghost < 0.5 && Math.abs(ghost - token) < 0.001
+        && Number(on.opacity) === 1 && off.fill === on.fill,
+        `unlit at opacity ${off.opacity} against lit at ${on.opacity}, both ${on.fill} · `
+        + `--disp-ghost says ${token}`);
+    }
+
+    /**
+     * 🔴 THE STYLESHEET AND THE MODULE AGREE ABOUT THE GHOST, AND THEY DID NOT.
+     * `--disp-ghost` in shell.css and `SCHEMES.backlit.ghost` in segment.mjs
+     * are the same measurement written down twice, and on 2026-09-21 one of
+     * them was raised and the other was not: a field drawn with no `scheme`
+     * option got 0.13 and the same field drawn with `scheme: 'backlit'` got
+     * 0.22, which is one component looking two different ways depending on
+     * which of its own defaults a caller happened to name. Nothing could fail.
+     * ⚠️ TWO INDEPENDENT SOURCES IS THE WHOLE CHECK, which is the repair this
+     * project took from the MIM corpus: one side comes out of the stylesheet
+     * and the other out of the module, so the two CAN disagree and say so.
+     */
+    {
+      const token = Number(getComputedStyle(document.documentElement)
+        .getPropertyValue('--disp-ghost'));
+      d.assert('the stylesheet’s ghost and the backlit scheme’s are one measurement',
+        Math.abs(token - SCHEMES.backlit.ghost) < 0.001,
+        `--disp-ghost ${token} against SCHEMES.backlit.ghost ${SCHEMES.backlit.ghost}`);
+    }
+
+    /**
+     * 🔴 A SCHEME REALLY IS A DIFFERENT DISPLAY, MEASURED AS INK. An option
+     * that did nothing would leave two fields side by side looking identical,
+     * and nothing else on this page could tell. The three numbers a scheme
+     * carries only make sense together, so all three are compared: a reflective
+     * field's driven bars are DARKER than its own field rather than brighter,
+     * which is the whole difference between a lamp behind the glass and no lamp
+     * at all, and its ghost is its own rather than the backlight's.
+     * ⚠️ THE DIRECTION IS THE CLAIM, NOT MERELY THE DIFFERENCE. Two schemes
+     * that simply disagreed about a colour would pass a check that only asked
+     * whether they differ.
+     */
+    if (dispRefl) {
+      const lum = (c) => {
+        const [r, g, b] = (c.match(/[\d.]+/g) || [0, 0, 0]).map(Number);
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const back = getComputedStyle(dispRefl.el).backgroundColor;
+      const bar = getComputedStyle(dispRefl.svg.querySelector('.pos-disp-p.on')).fill;
+      const lit = getComputedStyle(dispSpec.get('reading').svg
+        .querySelector('.pos-disp-p.on')).fill;
+      const litBack = getComputedStyle(dispSpec.get('reading').el).backgroundColor;
+      const ghost = Number(getComputedStyle(dispRefl.el).getPropertyValue('--disp-ghost'));
+      d.assert('a reflective field goes dark where it is driven, while a backlit one goes bright',
+        lum(bar) < lum(back) && lum(lit) > lum(litBack)
+        && Math.abs(ghost - SCHEMES.reflective.ghost) < 0.001
+        && dispRefl.text() === '127',
+        `reflective: bar ${lum(bar).toFixed(0)} on a field of ${lum(back).toFixed(0)} · `
+        + `backlit: bar ${lum(lit).toFixed(0)} on ${lum(litBack).toFixed(0)} · `
+        + `ghosts ${ghost} and ${SCHEMES.backlit.ghost}`);
     }
 
     /**
@@ -3620,6 +4487,377 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
         `picture ${svgCs.pointerEvents}, box ${boxCs.pointerEvents}, `
         + `select ${boxCs.getPropertyValue('user-select')}, callout ${callout}`);
     }
+  }
+
+  /**
+   * 🔴 THE DISTANCE BETWEEN TWO STACKED CONTROLS IS THREE THINGS, AND THIS IS
+   * THE FIRST CHECK IN THE REPOSITORY THAT SAYS SO. `/model/` was corrected by
+   * screenshot twelve times in one evening and every correction was a page
+   * doing arithmetic about a component's insides: counting two of the three
+   * made a lane 115 px against the 145 it needed, and **the error was exactly
+   * one reserved slot**. The kit publishes `--ctl-step` as the sum precisely so
+   * nobody adds them up, and until now nothing checked that the sum is what a
+   * real pair of pads actually measures.
+   * ⚠️ TWO INDEPENDENT SOURCES. One side is the four custom properties read off
+   * the document; the other is the rect between two stacked pad BUTTONS in a
+   * real grid. They are linked by the stylesheet and not by arithmetic here, so
+   * a grid that stopped using the tokens would disagree with them.
+   * ⚠️ AND THE BUTTON, NEVER THE WRAPPER. A pad returns its wrapper as `el` and
+   * exposes `button` separately; an assert reading the wrapper reported a
+   * button 17 px low while the button was exactly right.
+   */
+  if (stepPads && stepBand) {
+    const root = getComputedStyle(document.documentElement);
+    const n = (prop) => Number.parseFloat(root.getPropertyValue(prop));
+    const head = n('--ctl-head'), foot = n('--ctl-foot'), gap = n('--ctl-gap');
+    /**
+     * ⚠️ `--ctl-step` IS READ OFF THE BAND DRAWN AT IT, NOT OFF `:root`. It is
+     * declared as `calc(var(--ctl-foot) + var(--ctl-gap) + var(--ctl-head))`,
+     * and a custom property is SUBSTITUTED rather than computed, so
+     * `getPropertyValue` hands back that text and `parseFloat` of it is NaN.
+     * This check read NaN for one run. A resolved length only exists once a
+     * browser has put the property against something real.
+     */
+    const step = +Number.parseFloat(getComputedStyle(stepBand).height).toFixed(2);
+    const top = stepPads[0].button, below = stepPads[1].button;
+    const apart = +(below.getBoundingClientRect().top
+      - top.getBoundingClientRect().bottom).toFixed(1);
+    d.assert('the distance between two stacked controls is head plus gap plus foot, and --ctl-step is the sum',
+      step > 0 && Math.abs(step - (head + gap + foot)) < 0.01
+      && apart > 0 && Math.abs(apart - step) <= 0.6,
+      `head ${head} + gap ${gap} + foot ${foot} = ${head + gap + foot} px, the band drawn at `
+      + `--ctl-step measures ${step}, and two fully labelled pads stack ${apart} px apart`);
+  }
+
+  /**
+   * 🔴 A SLOT IS RESERVED EVEN WHEN IT IS EMPTY, WHICH IS THE OTHER HALF OF THE
+   * CONTRACT AND THE ONE A CALLER BREAKS. A pad with no top label still takes
+   * `--ctl-head`, or a grid whose downbeats are named has those pads sitting
+   * higher than the rest and it reads as a rendering fault rather than as a
+   * labelling choice. Measured as two buttons starting on one line while only
+   * one of the two wrappers has anything above it.
+   * ⚠️ THE NEGATIVE HALF IS THAT THE TWO WRAPPERS REALLY DIFFER. Two pads that
+   * both had a top label, or both had none, would start on the same line for a
+   * reason that says nothing about the reservation.
+   */
+  if (namedPad && barePad) {
+    const said = (pd) => (pd.el.querySelector('.pos-pad-top')?.textContent || '').trim();
+    const tops = [namedPad.button.getBoundingClientRect().top,
+                  barePad.button.getBoundingClientRect().top];
+    const off = +Math.abs(tops[0] - tops[1]).toFixed(2);
+    d.assert('a pad with nothing above it still reserves the slot, so both buttons start on one line',
+      said(namedPad).length > 0 && said(barePad).length === 0
+      && tops[0] > 0 && off <= 0.5,
+      // ⚠️ THE DETAIL READS BOTH PADS. It said "and the other says nothing" as
+      // hardcoded prose, and a sabotage that gave the bare pad a top label took
+      // the assert red with a detail still claiming the pad said nothing. A
+      // detail is the EVIDENCE for a claim, so it may not restate the claim.
+      `one says "${said(namedPad)}" above it and the other says `
+      + `"${said(barePad)}", and their buttons start ${off} px apart`);
+  }
+
+  // ── the parts, and whether a reader can still find what is new ──────────
+  //
+  // 🔴 EVERY CHECK ABOVE THIS LINE MEASURED THE PAGE WITH ALL FIVE PARTS LAID
+  // OUT. Everything below measures the parts themselves, so the window shuts
+  // here and the page is in the state a reader has it in.
+  settle();
+  // 🔴 WHAT THE ADDRESS SAYS BEFORE ANY CHECK TOUCHES A TAB. Two of the checks
+  // below press tabs to grade them, and pressing a tab writes the part's id
+  // over the hash. See the assert at the end of this run.
+  const addressWas = location.hash;
+
+  /**
+   * 🔴 THE FIVE PARTS HOLD EVERY BLOCK, AND NOTHING IS ORPHANED. The tab row is
+   * this page's whole index now: a block in no part is a block that cannot be
+   * reached, and it would look exactly like a block that was never written.
+   * `section()` throws on a part that does not exist, so the failure this
+   * catches is the other one, a part named in `GROUPS` that nothing was ever
+   * put into, which draws a tab onto an empty panel.
+   * ⚠️ COUNTED OFF THE DOM AND COMPARED AGAINST `built`, WHICH ARE TWO
+   * INDEPENDENT SOURCES. One is what is on the page, the other is what the
+   * builder said it made, so the two can disagree.
+   */
+  {
+    const per = GROUPS.map(([id, label]) =>
+      [label, panels.get(id).el.querySelectorAll(':scope > .kit-sec').length]);
+    const total = per.reduce((n, [, c]) => n + c, 0);
+    const empty = per.filter(([, c]) => c === 0).map(([l]) => l);
+    // ⚠️ NO TOTAL TYPED HERE. This read `built.length === 34` for one run and
+    // was wrong within the hour, because five blocks were added the same day:
+    // a count nobody re-measures is this page's own lesson about the file at
+    // the top of the repository. What is graded is that the two sources AGREE,
+    // which is the half that can catch a block going somewhere unreachable.
+    d.assert('every part of this page holds blocks, and between them they hold all of them',
+      total === built.length && built.length > 0 && empty.length === 0,
+      `${per.map(([l, c]) => `${l} ${c}`).join(', ')} · ${total} blocks on the page of `
+      + `${built.length} built` + (empty.length ? ` · EMPTY: ${empty.join(', ')}` : ''));
+  }
+
+  /**
+   * 🔴 A READER CAN STILL SEE WHAT IS NEW, WHICH IS THE ONE RULE A TAB ROW
+   * BREAKS BY ITSELF. Two facts make the claim, and neither is typed anywhere:
+   * the newest block is the FIRST block in the part that holds it, and that
+   * part is the only one marked. Without the second, the new block sits at the
+   * top of a part nobody opens.
+   * ⚠️ THE NEGATIVE HALF IS THAT NO OTHER TAB CARRIES IT. A page that marked
+   * all five would satisfy "the newest part is marked" and say nothing.
+   */
+  {
+    const marked = kitTabs.buttons.filter((b) => b.dataset.kitNew !== undefined);
+    const tab = marked.length === 1
+      ? GROUPS[kitTabs.buttons.indexOf(marked[0])] : null;
+    const firstIn = newestPart
+      ? panels.get(newestPart).el.querySelector(':scope > .kit-sec')?.id : null;
+    d.assert('the part holding the newest block is the only one marked, and the block is first in it',
+      marked.length === 1 && !!tab && tab[0] === newestPart
+      && firstIn === newestSection && marked[0].dataset.kitNew === built[0],
+      `${built[0]} is the newest block, ${newestPart} holds it, ${marked.length} tab(s) marked`
+      + `${tab ? ` (${tab[1]})` : ''}, and the first block in that part is ${firstIn}`);
+  }
+
+  /**
+   * 🔴 THE MARK CANNOT MOVE THE ROW, WHEREVER IT IS. Measuring the row once
+   * says nothing: what has to be true is that it is the SAME WIDTH with the
+   * mark on any tab, which is a comparison or it is nothing. The mark is moved
+   * to another tab and put back synchronously, so nothing is rendered in
+   * between.
+   * ⚠️ AND THE MARK IS ABSOLUTE FOR THIS REASON. A dot beside the label in the
+   * flow would widen its own tab, so the row would shift whenever a new block
+   * landed in a different part, and it would be the LAST tab's dot that made a
+   * row which fits look scrollable.
+   */
+  {
+    const marked = kitTabs.buttons.find((b) => b.dataset.kitNew !== undefined);
+    const other = kitTabs.buttons.find((b) => b !== marked);
+    const last = kitTabs.buttons[kitTabs.buttons.length - 1];
+    /**
+     * 🔴 THE INK, NOT `scrollWidth`, AND THE FIRST VERSION OF THIS MEASURED THE
+     * WRONG QUANTITY AND SAID SO PERFECTLY. `scrollWidth` on a scroll container
+     * that is NOT overflowing returns the container's own client width, so on
+     * any screen where the six tabs fit it is pinned to the width of the bar
+     * and cannot move whatever the tabs do. MEASURED: with the dot put back
+     * into the flow, taking 11 px of its own, all four readings stayed
+     * identical and the check read green. The quantity in question is how far
+     * the row of tabs REACHES, which is the last tab's right edge against the
+     * first tab's left.
+     */
+    const wide = () => +(kitTabs.buttons[kitTabs.buttons.length - 1].getBoundingClientRect().right
+      - kitTabs.buttons[0].getBoundingClientRect().left).toFixed(2);
+    const here = wide();
+    const name = marked.dataset.kitNew;
+    delete marked.dataset.kitNew;
+    /**
+     * 🔴 THE ROW WITH NO MARK ANYWHERE, AND THIS IS THE READING THAT MAKES THE
+     * CHECK MEAN ANYTHING. Moving the mark between tabs was the only comparison
+     * at first and a SABOTAGE PROVED IT VACUOUS: with the dot put back into the
+     * flow, taking 11 px of its own, the row stayed exactly the same width when
+     * the mark moved, because every tab reserves the slot and so every tab
+     * grows by the same amount. The claim on the label is that the mark costs
+     * the row NO width, and the only way to measure a cost is against not
+     * paying it.
+     */
+    const none = wide();
+    other.dataset.kitNew = name;
+    const there = wide();
+    delete other.dataset.kitNew;
+    // the last tab, because a mark at the end of a scrolling row is the case
+    // that would make a row which fits look scrollable
+    last.dataset.kitNew = name;
+    const atEnd = wide();
+    if (last !== marked) delete last.dataset.kitNew;
+    marked.dataset.kitNew = name;
+    const back = wide();
+    d.assert('the mark costs the row no width, wherever in the row it sits',
+      here === none && here === there && here === atEnd && here === back,
+      `${here} px with the mark on ${name}, ${none} px with no mark at all, ${there} px moved `
+      + `along, ${atEnd} px on the last tab, ${back} px back`);
+  }
+
+  /**
+   * 🔴 THE MARK AND THE OPEN TAB'S UNDERLINE ARE TWO CHANNELS, AND THIS CHECK
+   * EXISTS BECAUSE THEY WERE ONE. The mark was a 2 px bar in `--hi` across the
+   * tab's top, the selection is a 2 px bar in `--hi` under the word, and the
+   * report was *"what happeend to tabs?"*: a reader saw an underline that had
+   * slipped. Position alone is not a channel, which is what that report
+   * measured, so what is graded here is that the two differ in something else.
+   * The mark has a BOX of its own, 5 px square and round; the selection has no
+   * box at all, because it is a shadow. Neither can be read as the other and
+   * neither can be turned into the other by a stylesheet edit that keeps this
+   * check green.
+   * ⚠️ AND THE MARKED TAB CARRIES NO SHADOW WHILE IT IS SHUT, which is the half
+   * that says the mark is not quietly drawing a selection. It goes somewhere
+   * else first rather than assuming where it started: `go` returns early on the
+   * part that is already open, so reading the shut state first would have
+   * measured the open one twice on any arrival that opened the marked part,
+   * which a `#segment-display` link does.
+   */
+  {
+    const was = kitTabs.at();
+    const marked = kitTabs.buttons.find((b) => b.dataset.kitNew !== undefined);
+    const markedId = GROUPS[kitTabs.buttons.indexOf(marked)][0];
+    const dot = () => {
+      const a = getComputedStyle(marked, '::after');
+      return { w: Number.parseFloat(a.width), h: Number.parseFloat(a.height),
+               round: Number.parseFloat(a.borderTopLeftRadius) >= Number.parseFloat(a.width) / 2,
+               drawn: a.content !== 'none' };
+    };
+    /**
+     * 🔴 `push: false`, OR THIS CHECK REWRITES THE READER'S ADDRESS. FOUND BY
+     * MEASURING IT: `/kit/#segment-display` opened HARDWARE and scrolled to the
+     * block correctly, and then came to rest at `#hardware`, because `go`
+     * writes the part's id over the hash on every press and this check presses
+     * three times. The block's own address, put back four hundred lines above
+     * precisely so a reader can copy it, was destroyed by the thing grading the
+     * page. `push: false` walks the tabs and leaves the history alone, which is
+     * this project's rule about a check that mutates: if a person were watching
+     * this page, would they see it happen? They would have seen it in the
+     * address bar.
+     */
+    const peek = (id) => kitTabs.go(id, { push: false });
+    peek(GROUPS.map(([id]) => id).find((id) => id !== markedId));
+    const shut = getComputedStyle(marked).boxShadow;
+    const dShut = dot();
+    peek(markedId);
+    const open = getComputedStyle(marked).boxShadow;
+    const dOpen = dot();
+    peek(was);
+    d.assert('the mark is a dot with a box of its own and the open tab\u2019s bar is a shadow with none',
+      dShut.drawn && dOpen.drawn
+      && dShut.w === dShut.h && dShut.w > 0 && dShut.round
+      && dOpen.w === dShut.w && dOpen.h === dShut.h
+      && shut === 'none' && /-2px/.test(open),
+      `the dot is ${dShut.w} by ${dShut.h} px and round in both states · `
+      + `the marked tab's shadow is "${shut}" shut and "${open}" open`);
+  }
+
+  /**
+   * 🔴 GRADING THE TABS DID NOT MOVE THE READER'S ADDRESS, AND THIS IS HERE
+   * BECAUSE IT DID. Two checks above press tabs to read them in both states,
+   * and `go` writes the part's id over the hash on every press, so a visitor
+   * arriving at `/kit/#segment-display` came to rest at `#hardware`: the right
+   * part was open and the block's own address, put back on purpose so it could
+   * be copied, had been destroyed by the thing grading the page. MEASURED
+   * before and after, rather than read off the two `push: false` arguments,
+   * because an argument is a claim and a comparison is a measurement.
+   */
+  {
+    /**
+     * ⚠️ IT PUTS A BLOCK'S ADDRESS IN THE BAR AND WALKS THE TABS UNDER IT,
+     * BECAUSE COMPARING BEFORE AND AFTER IS VACUOUS ON THE HARNESS. The harness
+     * arrives with no fragment, so `createTabs` writes the opening part's id and
+     * a tab walk that ends where it started writes the SAME id back: sabotaging
+     * `push: false` left the two readings identical and the check green. The
+     * case that broke is an address naming a BLOCK, which only a person
+     * following a link ever has, so the check gives itself one.
+     * ⚠️ AND IT PUTS THE ADDRESS BACK. A check does not get to leave a reader
+     * somewhere they did not ask to be, which is the whole defect it grades.
+     */
+    const link = `#${newestSection}`;
+    let moved = 'no history here';
+    try {
+      history.replaceState(null, '', link);
+      const home = kitTabs.at();
+      kitTabs.go(GROUPS.map(([id]) => id).find((id) => id !== home), { push: false });
+      kitTabs.go(home, { push: false });
+      moved = location.hash;
+      history.replaceState(null, '', addressWas || location.pathname);
+    } catch { /* file:// has no history to write */ }
+    d.assert('pressing tabs to grade them leaves a link to a block exactly as the reader had it',
+      moved === link && location.hash === addressWas,
+      `a link reading "${link}" came out of the tab walk as "${moved}", and the address is `
+      + `back at "${location.hash || '(nothing)'}" from "${addressWas || '(nothing)'}"`);
+  }
+
+  /**
+   * 🔴 ONE PART IS OPEN AND THE OTHER FOUR ARE NOT LAID OUT, WHICH IS BOTH THE
+   * COMPONENT'S CLAIM AND THE NEGATIVE CONTROL FOR THE MEASURING WINDOW ABOVE.
+   * A closed panel has to have no size, or the tabs are doing nothing; and the
+   * same panel has to HAVE a size while `.kit-measuring` is on, or the window
+   * every geometry check on this page depends on was decoration. The second
+   * reading is the one that would have caught a tab row taking four fifths of
+   * this page's coverage away in silence, and it is here rather than in a note
+   * because a note cannot go red.
+   */
+  {
+    const shutPart = GROUPS.map(([id]) => id).find((id) => id !== kitTabs.at());
+    const shutSec = panels.get(shutPart).el.querySelector(':scope > .kit-sec');
+    const openSec = panels.get(kitTabs.at()).el.querySelector(':scope > .kit-sec');
+    const h = (n) => +n.getBoundingClientRect().height.toFixed(1);
+    const closed = h(shutSec);
+    const seen = h(openSec);
+    measure();
+    const opened = h(shutSec);
+    settle();
+    const hiddenCount = GROUPS.filter(([id]) => panels.get(id).el.hidden).length;
+    d.assert('a closed part is laid out by nothing until the checks ask, which is what makes them measurements',
+      hiddenCount === GROUPS.length - 1 && closed === 0 && seen > 0 && opened > 0,
+      `${hiddenCount} of ${GROUPS.length} parts closed · the first block in ${shutPart} is `
+      + `${closed} px tall closed and ${opened} px with the window open, against ${seen} px `
+      + `for the open part's own first block`);
+  }
+
+  /**
+   * 🔴 NO FRAME WAS EVER RENDERED WITH EVERY PART OPEN. This is what makes the
+   * measuring window safe for somebody reading the page rather than only for
+   * the harness: a `requestAnimationFrame` callback runs immediately before a
+   * frame is drawn, so a callback that finds the window open is a frame that
+   * would have shown all five parts at once. It can only happen if an `await`
+   * lands inside the window, and no reading of the source can see one.
+   * ⚠️ PROVED BY BREAKING IT: taking the `settle()` out of the toggle check's
+   * wait reads `3 frames` here and goes red, with everything else on the page
+   * still green.
+   */
+  d.assert('nothing was ever drawn with every part open at once',
+    paintedOpen === 0,
+    paintedOpen === 0 ? 'the window held no wait, so no frame fell inside it'
+                      : `${paintedOpen} frame(s) were drawn with all five parts laid out`);
+
+  /**
+   * 🔴 THE BLOCKS INSIDE A PART KEEP THE PROJECT'S ONE GAP, WHICH IS THE RULE
+   * THIS REORGANISATION WOULD HAVE LOST QUIETLY. `.pos-body` is a stack and was
+   * giving every pair of sections 40 px; a section inside a tab panel is not its
+   * child any more, and `.pos-tabs-p > * + *` would have handed it 22 instead.
+   * Nothing would have failed. Every panel is a stack for exactly this, and the
+   * number is read off `--pos-gap` rather than typed here.
+   */
+  {
+    const want = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--pos-gap'));
+    const open = panels.get(kitTabs.at()).el;
+    const secs = [...open.querySelectorAll(':scope > .kit-sec')];
+    const gaps = secs.slice(1).map((s, i) => +(s.getBoundingClientRect().top
+      - secs[i].getBoundingClientRect().bottom).toFixed(1));
+    const worst = gaps.length ? Math.max(...gaps.map((g) => Math.abs(g - want))) : -1;
+    d.assert('two blocks in one part sit the project’s one gap apart, not the panel’s own',
+      open.classList.contains('pos-stack') && gaps.length > 1 && worst <= 0.5,
+      `${gaps.length} gap(s) in ${kitTabs.at()} against --pos-gap ${want} px, worst ${worst} px out`);
+  }
+
+  /**
+   * 🔴 A LINK TO A BLOCK LANDS ON THE BLOCK, WHICH IS A THING THIS PAGE COULD
+   * NOT DO BEFORE IT HAD TABS. Nothing on it carried an `id`, so `/kit/#slider`
+   * has never worked; behind a tab row the same link is worse than broken,
+   * because the block exists, is addressed, and sits in a panel that is
+   * `hidden`. Graded by resolving every block's id to a part WITHOUT
+   * navigating, because a check that changed the address would leave a reader
+   * somewhere they did not ask to be.
+   * ⚠️ AND THE NEGATIVE HALF: a name no block has resolves to nothing, so the
+   * table is a lookup rather than something that answers whatever it is asked.
+   */
+  {
+    const ids = [...sectionTab.keys()];
+    const unresolved = ids.filter((id) => !document.getElementById(id));
+    const wrong = ids.filter((id) => {
+      const part = sectionTab.get(id);
+      return document.getElementById(id)?.closest('.pos-tabs-p') !== panels.get(part).el;
+    });
+    d.assert('every block has an address, and the address names the part holding it',
+      ids.length === built.length && unresolved.length === 0 && wrong.length === 0
+      && !sectionTab.has('no-such-block'),
+      unresolved.length || wrong.length
+        ? `${unresolved.length} with no element, ${wrong.length} in the wrong part`
+        : `${ids.length} addresses, ${idFor('SLIDER')} is in ${sectionTab.get(idFor('SLIDER'))}`);
   }
 
   d.ready();
