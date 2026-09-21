@@ -124,10 +124,122 @@ export const MACRO_KNOBS = 8;
 // what those five mean.
 // ⚠️ SO AN UNKNOWN CATEGORY GETS NO INVENTED WORD. `categoryName` returns `''`,
 // which is `instruments.mjs`'s rule about an unrecognised port arriving here.
+export const CATEGORIES = [
+  'None',
+  'Arp',
+  'Bass',
+  'Bell',
+  'Classic',
+  'Drum',
+  'Keyboard',
+  'Lead',
+  'Motion',
+  'Pad',
+  'Poly',
+  'SFX',
+  'String',
+  'User 1',
+  'User 2',
+];
+
+/**
+ * The seven values that were recovered by correlation before Novation's own
+ * list was read, kept because they are the evidence that the list is right.
+ * All seven agree with  exactly.
+ */
 export const CATEGORY_DERIVED = {
   1: 'arp', 2: 'bass', 3: 'bell', 6: 'keyboard', 7: 'lead', 8: 'motion',
   9: 'pad',
 };
+
+/**
+ * 📄 The 71 macro knob destinations. The Programmer's Reference gives this
+ * parameter a range of 0..70 and NO table at all, and
+ * `research/circuit-soundbank-2026-09-21.md` §8 lists these names as
+ * unobtainable from this machine. They were read off the live DOM of Novation's
+ * own Circuit editor on 2026-09-21.
+ * ✅ THE STRUCTURAL FIT IS WHAT MAKES THEM CREDIBLE RATHER THAN PLAUSIBLE:
+ * values 51 to 70 are `Mod Matrix 1` to `Mod Matrix 20`, twenty consecutive
+ * entries landing exactly on the twenty slots this format has, and ending
+ * precisely at the documented maximum of 70.
+ * 🔴 AND HOW THEY WERE OBTAINED WAS NOT AUTHORISED. The instrument was
+ * CONNECTED while that page was driven by a script, with `Send to Circuit` in
+ * the header. `plans/plan-circuit-synth-editor.md` opens with the whole account.
+ * The data was re-verified here index by index; the reading was not the problem.
+ */
+export const MACRO_DESTINATIONS = [
+  'No Destination',
+  'Portamento Rate',
+  'Post FX Volume',
+  'O1 Wave Interpolate',
+  'O1 Pulse Width Index',
+  'O1 VSync Depth',
+  'O1 Density',
+  'O1 Density Detune',
+  'O1 Semitones Tune',
+  'O1 Cents Tune',
+  'O2 Wave Interpolate',
+  'O2 Pulse Width Index',
+  'O2 VSync Depth',
+  'O2 Density',
+  'O2 Density Detune',
+  'O2 Semitones Tune',
+  'O2 Cents Tune',
+  'OSC 1 Volume',
+  'OSC 2 Volume',
+  'Ring Volume',
+  'Noise Volume',
+  'Cutoff Frequency',
+  'Resonance',
+  'Drive',
+  'Key Track',
+  'Env2 Mod',
+  'Env 1 Attack',
+  'Env 1 Decay',
+  'Env 1 Sustain',
+  'Env 1 Release',
+  'Env 2 Attack',
+  'Env 2 Decay',
+  'Env 2 Sustain',
+  'Env 2 Release',
+  'Env 3 Delay',
+  'Env 3 Attack',
+  'Env 3 Decay',
+  'Env 3 Sustain',
+  'Env 3 Release',
+  'LFO 1 Rate',
+  'LFO 1 Sync',
+  'LFO 1 Slew',
+  'LFO 2 Rate',
+  'LFO 2 Sync',
+  'LFO 2 Slew',
+  'Distortion Level',
+  'Chorus Level',
+  'Chorus Rate',
+  'Chorus Feedback',
+  'Chorus Depth',
+  'Chorus Delay',
+  'Mod Matrix 1',
+  'Mod Matrix 2',
+  'Mod Matrix 3',
+  'Mod Matrix 4',
+  'Mod Matrix 5',
+  'Mod Matrix 6',
+  'Mod Matrix 7',
+  'Mod Matrix 8',
+  'Mod Matrix 9',
+  'Mod Matrix 10',
+  'Mod Matrix 11',
+  'Mod Matrix 12',
+  'Mod Matrix 13',
+  'Mod Matrix 14',
+  'Mod Matrix 15',
+  'Mod Matrix 16',
+  'Mod Matrix 17',
+  'Mod Matrix 18',
+  'Mod Matrix 19',
+  'Mod Matrix 20',
+];
 
 /**
  * Every address the patch has, 0..339.
@@ -555,7 +667,10 @@ export function readPatch(buf) {
 
 /** The derived word for a category byte, or `''` when nobody here knows. */
 export function categoryName(n) {
-  return CATEGORY_DERIVED[n] || '';
+  // ⚠️ LOWERCASED, because every other word this module returns is a value read
+  // off a table and reads in running prose.  is a category the instrument
+  // offers and is not the same as "we do not know", which is still .
+  return CATEGORIES[n] ? CATEGORIES[n].toLowerCase() : '';
 }
 
 /** A named value from a table, or the bare number when it is out of range. */
@@ -597,6 +712,7 @@ export function named(p, v) {
   if (p === 'Distortion_Type') return label(DISTORTION_TYPES, v);
   if (p === 'LFO1_Waveform' || p === 'LFO2_Waveform') return label(LFO_WAVES, v);
   if (p === 'Patch_Category') return categoryName(v);
+  if (/^MacroKnob\d+_Destination[A-D]$/.test(p)) return label(MACRO_DESTINATIONS, v);
   if (/^ModMatrix\d+_Source[12]$/.test(p)) return label(MOD_SOURCES, v);
   if (/^ModMatrix\d+_Destination$/.test(p)) return label(MOD_DESTINATIONS, v);
   return '';
