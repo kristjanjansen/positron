@@ -49,6 +49,26 @@
   Every panel so far listens. So the `accepts` list is not decoration: notes,
   control changes and bend go, and SysEx, program change and clock do not.
 
+- 🔴 **A SOUND EDITING DEMO FOR THE CIRCUIT, WITH THE INVISIBLE HAND.** Asked
+  2026-09-21: *"can you build a demo for sound editing using our invisible hand
+  sliders and experience what we had so far. Propose also a name for it. I'm
+  running out of ideas. Can it play back real time on circuit?"*
+  🟢 **THE REAL TIME QUESTION IS ALREADY ANSWERED AND THE ANSWER IS YES.**
+  `plans/plan-circuit-editor.md`: **374 parameters are addressable live, 98 by
+  CC and 276 by NRPN**, on channels 1, 2 and 16. A slider moving sends a control
+  change and the synth changes under your hand. **No SysEx is involved**, so
+  nothing an editor does this way can touch flash.
+  ⚠️ **THE NAME PROPOSED IS `shape`**, with `carve` and `tone` behind it.
+
+- 🔴 **SAMPLE PACKS WORTH HAVING, AND THE CIRCUIT'S OWN LIMITS.** Asked
+  2026-09-21: *"research good quality sample packs for good drum sound,
+  especially this more alternative and non-club music, more atmospheric, or
+  just interesting warm stuff"*, and *"look up what is the circuit limits of
+  samples, the length, the quality, can we downsample, what this pipeline would
+  look like"*.
+  ⚠️ **A LICENCE IS PART OF THE ANSWER, NOT A FOOTNOTE.** A pack that cannot be
+  redistributed cannot go in this repository or into a demo somebody opens.
+
 - 🔴 **THE CIRCUIT PACK IN THE BROWSER, AND A DRUM MACHINE OUT OF IT.** Asked
   2026-09-21: *"plan and research the circuit patch or package file parsing
   download and upload... can we do locally patch uploading and parsing in
