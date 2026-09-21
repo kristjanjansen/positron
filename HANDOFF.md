@@ -26,10 +26,10 @@ writing in this checkout for most of the session.
 
 ## Deployed, and what to open
 
-- **https://positron.studio/patches/** a Circuit pack opened and read. **The
+- **https://positron.studio/pack/** a Circuit pack opened and read. **The
   pack in this repository is NOT published**, deliberately, so the way in on the
   deploy is your own file through the drop target.
-  Locally, with the pack: **http://127.0.0.1:8890/patches/** and press
+  Locally, with the pack: **http://127.0.0.1:8890/pack/** and press
   `open the pack here`. ⚠️ `node demo/server.mjs` must be running.
 - **https://positron.studio/wish/** now points at a deployed agent and needs no
   local process. **https://wish.positron.studio** is that agent.
@@ -38,7 +38,7 @@ writing in this checkout for most of the session.
 ## The one thing to carry forward above everything else
 
 🔴 **THE FIRST FOUR BYTES OF A SESSION FILE ARE NOT A BACKUP TEST, AND THREE
-FILES SAID THEY WERE.** `CLAUDE.md`, `plans/plan-patches-page.md` §2.1 and
+FILES SAID THEY WERE.** `CLAUDE.md`, `plans/plan-pack-page.md` §2.1 and
 `research/circuit-soundbank-2026-09-21.md` all published `INIT` as the blank
 signature against the owner's `DEMO`. MEASURED on both sides while building the
 page: the owner's 32 sessions are **`USER` 22, `DEMO` 7 and `INIT` 3**. Three of
@@ -78,7 +78,7 @@ and is still a label. All three files are corrected.
   `dragover` and `drop`, a cover that is in the document only during a drag and
   `pointer-events: none` for its whole life, a refusal that says so in words, and
   a file input behind a button. `/kit/` is **112/112**.
-- **`/patches/`**, 22/22 locally and 14/14 against the deploy.
+- **`/pack/`**, 22/22 locally and 14/14 against the deploy.
 
 ## The defects worth carrying forward
 
@@ -90,7 +90,7 @@ the source can see an await**, and three other places on that page already do th
 `settle()` / `measure()` dance for the same reason. It worked exactly as written.
 
 🔴 **A PICTURE THAT WAS HONEST AND UNREADABLE, AND THE MEASUREMENT DECIDED IT.**
-`/patches/`'s diagram was two machines, a `Browser` and a `Circuit`, with NO arrow
+`/pack/`'s diagram was two machines, a `Browser` and a `Circuit`, with NO arrow
 between them, because nothing on the page can reach the instrument. The absence
 was the message. Two containers with no link between them land in the same column
 and stack, so it filled **27 per cent of its width at 746 px tall**, against
@@ -112,7 +112,7 @@ so it went red on a component doing exactly what it promises.
 a sentence that the button press produces, while the check block runs before the
 harness presses anything. Red on the deploy, green locally, page correct in both.
 
-🔴 **A RED THAT IS EXPECTED IS A RED EVERYBODY LEARNS TO SKIP.** `/patches/` first
+🔴 **A RED THAT IS EXPECTED IS A RED EVERYBODY LEARNS TO SKIP.** `/pack/` first
 discovered that the pack is unpublished by fetching it and reading the 404. That
 reads correctly to a person and took the deploy run red on `no console errors`.
 It decides from the origin now, which is a fact about `build.mjs`'s allowlist
@@ -128,8 +128,8 @@ a bare number**.
 
 1. **`origin/main`**, above, and the command in the last handoff was wrong. This
    is the only thing here needing a person rather than a decision.
-2. 🔴 **THE PARAMETER PANEL ON `/patches/` IS NOT BUILT.**
-   `plans/plan-patches-page.md` §2 asked for a panel showing a pressed patch's
+2. 🔴 **THE PARAMETER PANEL ON `/pack/` IS NOT BUILT.**
+   `plans/plan-pack-page.md` §2 asked for a panel showing a pressed patch's
    parameters grouped by `circuit-cc.mjs`'s sections, and what shipped instead is
    the diagram, because the ask that arrived was *"table plus diagram"*.
    `patchFields()` and `macroLegs()` are built and tested and the page uses the
@@ -153,12 +153,21 @@ a bare number**.
    the matcher's precision.
 7. **`vad_filter` is unmeasured**, unchanged from the last two sessions.
 8. 🔴 **NO PAGE IS GRADED ON A PHONE AND `verify.mjs` STILL RUNS AT 756 px ONLY.**
-   `/patches/` was measured at 390 with a throwaway probe, which is the same
+   `/pack/` was measured at 390 with a throwaway probe, which is the same
    arrangement the last session flagged as the largest blind spot. Three unpriced
    options are in `plans/plan-panel-component.md`.
-9. **The 32 user sessions off the Circuit**, asked for four sessions ago.
-   `/patches/` now makes it cheap to CHECK such a backup and does nothing to make
-   one.
+9. ✅ **THE 32 SESSIONS ARE BACKED UP AND THIS ITEM WAS WRONG FOR FOUR
+   SESSIONS.** It read *"the 32 user sessions off the Circuit, still the missing
+   part of the backup"*. Corrected by the owner 2026-09-21: *"its in
+   kristjanjansen git"*. `New Pack.circuitpack` holds 32 distinct fingerprints of
+   32, none empty, under their own names. 🔴 **THE WRONG SENTENCE ORIGINATED IN
+   `plans/plan-circuit-editor.md` §5, WAS MEASURED AS WRONG BY
+   `research/circuit-soundbank-2026-09-21.md` §9 THE SAME DAY, AND STILL
+   PROPAGATED INTO TWO MORE FILES AND INTO THIS ONE**, because the research named
+   the contradiction and nobody went back and edited the source. **Flagging a
+   wrong claim is not correcting it.** All three are corrected now.
+   ⚠️ What survives is narrow: the pack is dated 2026-09-20, so take a fresh one
+   before anything risky.
 10. 🔴 **`/bay/` IS STILL UNHEARD** and still shows `here:` port ids in its link
     line. Both carried over unchanged.
 11. **The remaining `/evo/` and `/shape/` asks in `BACKLOG.md`**, collected and

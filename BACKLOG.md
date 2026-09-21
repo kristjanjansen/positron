@@ -1,5 +1,171 @@
 ## Open
 
+### Stream, 2026-09-21, session 41, off the deployed pages
+
+- 🔴 **`/pack/`: MORE OF THE SYNTH IN THE PICTURE.** Asked with a screenshot
+  of the five box signal path: *"add more boxes with syhtn elements"*.
+  ✅ **THE DECODER ALREADY READS EVERY ONE OF THESE**, so nothing has to be
+  learned first, only drawn: `noise` and `ring mod` (mixer levels at 56 and 57),
+  `mixer` itself with its pre and post FX levels, `env 1` amp, `env 2` filter and
+  `env 3` aux (env 3 has a delay the other two do not), `LFO 1` and `LFO 2` with
+  waveform, rate, slew and their five packed flag bits, the `mod matrix` at 20
+  slots, and the FX box splitting into `distortion`, `chorus` and a three band
+  `EQ`.
+  🔴 **THE LAYOUT HAS A HARD CEILING AND IT IS FIVE COLUMNS AT THIS WIDTH, READ
+  OFF `diagram.mjs`'s OWN CONSTANTS.** `boxW = (avail - (cols - 1) * gapX) / cols`
+  with `GAP_X_MAX 58`, `GAP_X_MIN 34` and `BOX_MIN_W 92`, and a figure 688 px
+  wide: 4 columns gives a 128 px box, 5 gives 110 at the minimum gap, **6 gives
+  86 and the whole picture flips to one column top to bottom**. So DEPTH is the
+  budget, not box count: boxes sharing a column stack vertically and cost only
+  height.
+  ✅ **SO THE SHAPE THAT FITS IS WIDE AT THE FRONT**: `osc 1`, `osc 2`, `noise`
+  and `ring mod` all in column 0, then `mixer`, `filter`, `amp`, `FX`. That is
+  five columns and four more boxes for free.
+  ⚠️ **WHERE THE MODULATORS GO IS THE OPEN QUESTION.** `LFO 1`, `LFO 2`, the
+  three envelopes and the mod matrix have no incoming signal, so they land in
+  column 0 as well and would make it nine boxes tall. Options nobody has priced:
+  a second picture, a container, or links that give them a column of their own.
+  ⚠️ **AND BELOW 560 px IT IS ONE COLUMN WHATEVER THIS SAYS** (`COL_BREAK`), so
+  every box added is a screen of phone height. MEASURED today: the five box
+  version is 118 px tall at 1280 and 369 at 390.
+
+- 🔴 **`/pack/`: A THIRD TAB, SAMPLES.** Asked as *"why there is no
+  samples?"*. The answer was that `plans/plan-pack-page.md` §5 deferred them
+  to `plans/plan-circuit-samples.md` on the reasoning that drawing a waveform is
+  a different page, and with tabs arriving that reasoning is spent: a tab is
+  exactly where a third list goes, and the page already COUNTS them in its own
+  open line.
+  ✅ **MEASURED OFF THE PACK TODAY, so the tab has real columns to show:** 64
+  WAVs, **48 kHz, 16 bit, mono, every one**, 0.12 s to 2.00 s, **53.4 s in
+  total**, 4.89 MiB of the pack's 3.3 MiB compressed.
+  🔴 **PLAYING ONE IS A DECISION AND NOT A FREEBIE.** A list with a length, a
+  rate and a size costs nothing. Decoding 64 WAVs into an `AudioContext` on a
+  visit is the load-on-a-visit defect this project has paid for three times, so
+  a sample sounds on a PRESS and never otherwise, and a visit decodes nothing.
+  ⚠️ **AND A WAVEFORM IS STILL A DIFFERENT PAGE.** `plans/plan-circuit-samples.md`
+  owns the drum machine and the grid. This tab is the pack's contents, not an
+  instrument.
+
+- 🔴 **`/pack/`: TABS, AND THE COUNTS MOVE INTO THEIR TITLES.** Asked as
+  *"patches and sessions are in separte tabs"*, then *"add num of patches /
+  sessions to tab title"*. `demo/shell/tabs.mjs` is the component and it is in
+  two pages already. Labels are typed UPPERCASE so the source reads like the
+  page, so `PATCHES 64` and `SESSIONS 32`.
+  ⚠️ **A COUNT IN A TAB LABEL CHANGES THE ROW'S WIDTH WHEN A PACK IS OPENED**,
+  and `/kit/` already asserts that the tab row costs no width wherever the mark
+  sits. A label that grows from `PATCHES` to `PATCHES 64` is a different claim
+  and needs looking at, not assuming.
+  ⚠️ **AND A TAB IS `#links`, NEVER A SUBPAGE**, which `tabs.mjs` states: a
+  subpage is a navigation, and the audio stops, the service worker hands over and
+  an installed web app flashes white.
+
+- 🔴 **`/pack/`: THE READOUT GOES ENTIRELY.** Asked as *"rm patches 64 /
+  sessions 32 / different 32 of 32 / filled 84.6%"*, which is all four cells.
+  ✅ **THE OPT OUT IS `readout: null`, NOT `{}`**, because `mount()` checks for
+  the DECLARATION rather than accepting an empty one, and a page that opts out of
+  a surface must opt out of its BOX too or it paints a 2 px band nobody wrote.
+  ⚠️ **AND REHOME WHAT IT SAID, WHICH IS THE HALF THAT GETS FORGOTTEN.** Two of
+  the four cells were the safety check. `patches` and `sessions` go to the tab
+  titles by the line above. `different` and `filled` are ALREADY both in the
+  verdict sentence under the sessions table, word for word, so nothing is lost
+  here, but that has to stay true: the verdict is now the only place either
+  number appears.
+
+- 🔴 **`/pack/`: THE TABLE IS HALF AS HIGH, THE DIAGRAM MOVES UNDER IT, AND
+  THE SPACE IS RESERVED WHEN NOTHING IS SELECTED.** Asked as *"patches: patched
+  table 1/2 less high, diagram under it, reserver space when no active one"*.
+  🔴 **`diagram under it` CONTRADICTS A STANDING RULE AND THE RULE IS NOT MINE TO
+  WAIVE.** `positron-diagram`: *every* diagram passes `{ how: true, atEnd: true }`
+  and no title, goes last on the page under the standing `How it works` heading,
+  and a page that passes its own title gets it refused. The drift that rule
+  prevents was measured: three treatments across six pages on the day it was
+  written. **This page's picture is not reference, it is the detail panel for the
+  pressed row**, which is a genuinely different thing and is the first case that
+  has come up. **Put it to the owner as an amendment rather than quietly moving
+  one page.**
+  ✅ **RESERVING THE SPACE IS ALREADY A MEASURED LESSON AND HAS A KNOWN TRAP.**
+  `/wish/` reserved a picture's room with `min-height` and it never applied: the
+  empty host measured **0 px and `display: none`**, beaten by
+  `.pos-stack > div:empty { display: none }` at (0,2,1), so the log moved on every
+  answer for hours while the source read as correct. **Point a browser at it and
+  measure the computed value.** The `/pack/` verdict line already dodges this
+  by never being empty.
+  ⚠️ **`1/2 less high` IS AMBIGUOUS AND IS RECORDED RATHER THAN RESOLVED**: half
+  the height, or a third of it. MEASURED today at 1280 px the patches table is
+  453 px tall showing 13 rows of 64.
+
+- 🔴 **A SESSION DECODER AND WRITER, LAUNCHED IN THE BACKGROUND 2026-09-21.**
+  Asked as *"lauch session decoder/writer in bg"*, after *"do you have session
+  decoder?"* and the honest answer that there is none: `sessionStats()` treats a
+  `.circuitsession` as opaque bytes, and `research/circuit-session-format-2026-09-21.md`
+  maps the CONTAINER without knowing what one field means.
+  ✅ **THE ONE THING PROVABLE WITH NO DEVICE IS THE ROUND TRIP**: read all 32
+  sessions out of the pack, map the 49 blocks, write them back, and compare byte
+  for byte. That is free and it is the whole first deliverable.
+  🔴 **AND THE SEMANTICS ARE NOT KNOWABLE FROM THIS MACHINE.** Deciding what a
+  field means needs one export, one change on the Circuit, a second export and a
+  diff. Anything short of that is inference and is marked as such or left out.
+  🔴 **NOTHING IT BUILDS MAY SEND.** No Web MIDI anywhere near it.
+
+- 🔴 **THERE IS NO VISIBLE DROP AREA, AND THAT IS THE REAL ANSWER TO THE
+  `"diffetence"` QUESTION ABOVE.** Asked: *"i just do not get funcionality why
+  there is no upload aread / button, global component i am asking. it should
+  support zip"*.
+  🔴 **THE COMPLAINT IS CORRECT AND IT IS A DESIGN MISS, NOT A BUG.**
+  `demo/shell/drop.mjs` exists and works, but the ONLY thing it puts on a page is
+  a button. Its cover is `position: fixed` and is inserted into the document ONLY
+  while a drag is already in flight, so **a reader who has not started dragging
+  has nothing on screen telling them they may drag at all**. The affordance is
+  invisible until after the gesture it is meant to invite.
+  🔴 **WHAT IS WANTED IS A GLOBAL COMPONENT WITH A VISIBLE AREA**, which is the
+  original ask this all came from: *"do lightweight planning on patch demo (inclu
+  global dragdroppable upload)"*. `plans/plan-pack-page.md` §3 specified the
+  drag behaviour, the refusal, the keyboard path and the cover, and specified NO
+  resting state. That is the gap.
+  ✅ **THE WORD IS SETTLED AND IT IS `open`.** Asked 2026-09-21 as *"upload
+  aread / button"* twice, put back as a decision rather than settled from the
+  plan, and answered: *"open is ok"*. So `plans/plan-pack-page.md` §3 stands
+  and the reasoning stands with it: nothing leaves the machine, and a control
+  called *upload* invites somebody to build the thing `purchased/`'s gitignore
+  exists to prevent. **Do not re-litigate this.** The word a visitor reads is
+  `open`, on the button and on the area.
+
+- 🔴 **AND IT MUST TAKE A `.zip`, WHICH TODAY IT REFUSES. MEASURED.**
+  `accept: ['.circuitpack', '.syx']`, so a `.zip` is refused by name. **The
+  purchased soundbank on this machine IS a `.zip`**, and reading it just now it
+  holds **2 `.circuitpack`, 1 `.circuittrackspack`, 128 `.syx`, an `.xlsx`, two
+  `.txt` and 10 `.url`**. So the one real archive anybody would drop on this page
+  is the one shape it will not take.
+  ✅ **NOTHING NEW HAS TO BE BUILT TO READ IT.** `demo/shell/unzip.mjs` already
+  reads a zip inside a zip: that is exactly how both purchased packs were
+  measured for the session fingerprint work, `readZip` on the outer file and
+  `readZip` again on each `.circuitpack` entry.
+  ⚠️ **WHAT NEEDS DECIDING IS WHAT A ZIP OF MANY THINGS MEANS.** One pack is
+  obvious. A zip holding two packs, a Tracks pack for a different instrument, and
+  128 loose patches is a LIST, and the page currently shows one pack at a time.
+  ⚠️ **AND A `.circuittrackspack` IS FOR THE OTHER INSTRUMENT.** That is already
+  measured in `research/circuit-soundbank-2026-09-21.md` §5. It must be named as
+  such rather than opened as if it were a Circuit pack.
+
+- 🔴 **`/pack/`: THE TWO WAYS IN. Asked with a screenshot cropped to exactly
+  those two buttons and the word `"diffetence"`.** What is on screen is
+  `open the pack here` as the primary, then a 40 px gap, then
+  `open a pack from this machine` with `nothing has been opened` beside it.
+  ⚠️ **THE WORD IS AMBIGUOUS AND IS RECORDED RATHER THAN RESOLVED.** It could be
+  *make the difference between these two clearer*, or *what IS the difference*,
+  or *the two are styled too differently for two things that both open a pack*.
+  Both labels start with `open` and both take a pack, so a reader has to parse
+  `here` against `from this machine` to tell them apart, and on the deploy the
+  first one cannot work at all.
+  ⚠️ **AND THE GAP BETWEEN THEM IS THE STACK'S 40 px**, because one is in
+  `.pos-controls` and the other is a page block, so two controls that answer the
+  same question sit a full rhythm apart. That is a layout consequence of where
+  they live rather than a decision anybody made.
+  Files: `demo/pack/index.html`. ⚠️ The control row is pressed by position by
+  both harnesses, and the drop button must NOT go in it: pressing it opens the
+  operating system's file picker, which is a modal that would sit over the page
+  for the rest of a run.
+
 ### ✅ DONE 2026-09-21: `/wish/` in production
 
 - ✅ **LIVE AT `https://wish.positron.studio`**, one real call measured through it
@@ -16,19 +182,19 @@
   stray page can find"*. Making it work in production is exactly the change that
   comment was written against, so the deploy carries a guard rather than going
   out bare, and the exposure gets reported in words.
-  ⚠️ **THE SITE DEPLOY IS NOT THE AGENT'S TO MAKE.** `/patches/` is in flight in
+  ⚠️ **THE SITE DEPLOY IS NOT THE AGENT'S TO MAKE.** `/pack/` is in flight in
   this same checkout, so `workers/view` is built and deployed by the session
   after that lands. The agent deploys `workers/wish` only.
 
-### ✅ DONE 2026-09-21: `/patches/`
+### ✅ DONE 2026-09-21: `/pack/`
 
-- ✅ **LIVE AT `https://positron.studio/patches/`**, 22/22 locally and 14/14
+- ✅ **LIVE AT `https://positron.studio/pack/`**, 22/22 locally and 14/14
   against the deploy. The decoder is 48/48, `drop.mjs` is in `/kit/` at 112/112.
-  ⚠️ **STILL OPEN: the parameter panel** `plans/plan-patches-page.md` §2 asked
-  for, and the samples half. Asked as *"Patch demo: make it"*, which is `plans/plan-patches-page.md`
+  ⚠️ **STILL OPEN: the parameter panel** `plans/plan-pack-page.md` §2 asked
+  for, and the samples half. Asked as *"Patch demo: make it"*, which is `plans/plan-pack-page.md`
   taken off the shelf. The plan's order is the order, and the page is THIRD:
   `demo/shell/circuit-patch.mjs` with a no-browser test first, then
-  `demo/shell/drop.mjs` with its `/kit/` block, then `/patches/`, then the
+  `demo/shell/drop.mjs` with its `/kit/` block, then `/pack/`, then the
   session fingerprint panel, then `manifest.mjs`.
   🔴 **THE DECODER IS THE ONE THING THAT EXISTED AND WAS NOT KEPT.** It lived in
   a scratchpad, graded 246 varying fields of 324 against the published `patch_0`,
@@ -38,7 +204,7 @@
   `New Pack.circuitpack` is the only backup of flash on an instrument with no
   factory reset.
   🔴 **AND THE VISUALISER IS A TABLE PLUS A DIAGRAM.** Asked 2026-09-21: *"So the
-  patcbay visualiser table plus fiagram"*. `plans/plan-patches-page.md` §5 left
+  patcbay visualiser table plus fiagram"*. `plans/plan-pack-page.md` §5 left
   *"whether the detail panel should use the segment display"* open and guessed a
   table; the answer is both. A Circuit patch is a signal path, so the picture is
   `demo/shell/diagram.mjs` showing what the selected patch actually has switched

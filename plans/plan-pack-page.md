@@ -1,4 +1,4 @@
-# plan-patches-page
+# plan-pack-page
 
 **A page that opens a Circuit pack and says what is in it, and a drop target
 that opens a file without sending it anywhere.** Asked 2026-09-21:
@@ -10,7 +10,7 @@ files named below; what is missing is a page and one kit module.
 ## ✅ BUILT 2026-09-21, and three things came out differently
 
 Asked for as *"Patch demo: make it"*, then *"So the patcbay visualiser table plus
-fiagram"*. Live at **https://positron.studio/patches/**.
+fiagram"*. Live at **https://positron.studio/pack/**.
 
 - `demo/shell/circuit-patch.mjs` and `circuit-patch-test.mjs`, **48/48**. The 340
   address table is GENERATED out of the Programmer's Reference with
@@ -19,7 +19,7 @@ fiagram"*. Live at **https://positron.studio/patches/**.
 - `demo/shell/drop.mjs` and its `/kit/` block, four asserts, two of them negative
   controls. `/kit/` went to **112/112**, and its own frame counter caught an
   `await` put inside its measuring window on the first run.
-- `/patches/`, **22/22 locally and 14/14 against the deploy**.
+- `/pack/`, **22/22 locally and 14/14 against the deploy**.
 
 **What came out differently from this plan:**
 
@@ -69,7 +69,7 @@ the third place that knows the format.
 against a number derived from the same formula the decoder implements. That is
 the Csound lesson, which was 22/22 green for months with two real defects.
 
-## 2. The page: `/patches/`
+## 2. The page: `/pack/`
 
 **One sentence:** *Open a Circuit pack and see what its patches are made of.*
 
@@ -156,7 +156,7 @@ with nothing typed, so the mark follows by itself.
    `patch_0` from the owner's own pack.
 2. `demo/shell/drop.mjs` plus a `/kit/` block. **Shared, so it lands before the
    page**, which is the standing rule about anything shared going first and once.
-3. `/patches/` reading `New Pack.circuitpack` on a press.
+3. `/pack/` reading `New Pack.circuitpack` on a press.
 4. The session fingerprint panel from §2.1.
 5. `manifest.mjs`: `hardware` group, `built: true`, a one-sentence `one` line
    that is the same string as the page's `what`.
@@ -169,7 +169,7 @@ with nothing typed, so the mark follows by itself.
 - **Whether the detail panel should use the segment display.** It would look
   right and it is a picture of a number, but 52 parameters is not a readout and
   the honest answer is probably a table.
-- **Whether `/patches/` and `/shape/` should be one page.** They are opposite
+- **Whether `/pack/` and `/shape/` should be one page.** They are opposite
   halves of the same object: one reads flash and cannot send, the other sends
   and cannot read. Merging them puts a send path on a page that opens somebody's
   only backup, which is an argument for leaving them apart.

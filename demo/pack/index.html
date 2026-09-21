@@ -100,7 +100,7 @@
   const ONE = 'open a Circuit pack and see what its patches are made of';
 
   const d = mount({
-    name: 'patches',
+    name: 'pack',
     // ⚠️ THE PAGE'S SENTENCE AND THE INDEX'S ARE ONE STRING, because a page with
     // a diagram carries the index's own line verbatim: a paragraph and a picture
     // of the machinery are two explanations of one thing, and a visitor arriving
@@ -212,7 +212,7 @@
     patchTable.mark((r) => r.i === i);
     const s = summarise(p);
     const used = modSlots(p).filter((m) => m.used);
-    // 🔴 THE DIAGRAM IS THE DETAIL PANEL. `plans/plan-patches-page.md` §5 left
+    // 🔴 THE DIAGRAM IS THE DETAIL PANEL. `plans/plan-pack-page.md` §5 left
     // open whether a pressed row should raise a panel of parameters and guessed
     // a table; the ask that settled it was *"So the patcbay visualiser table
     // plus fiagram"*. A patch is a configuration of one signal path, so the

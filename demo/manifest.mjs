@@ -584,7 +584,7 @@ export const DEMOS = [
    * 🔴 THE OTHER HALF OF THE CIRCUIT, AND THE TWO PAGES ARE DELIBERATELY NOT
    * ONE. `/shape/` sends and cannot read; this one reads and cannot send. Merging
    * them would put a send path on the page that opens somebody's only backup,
-   * and `plans/plan-patches-page.md` §5 refuses it for exactly that reason.
+   * and `plans/plan-pack-page.md` §5 refuses it for exactly that reason.
    * ⚠️ IT SENDS NOTHING AND THE PAGE ASSERTS IT over a counter on
    * `requestMIDIAccess` rather than over a reading of its own source. `Replace
    * Current Patch` and `Replace Patch` differ by one byte at offset 6, the
@@ -597,7 +597,7 @@ export const DEMOS = [
    * ⚠️ `settleMs` IS FOR THE READING. 3.3 MiB unzipped, 64 patches decoded and
    * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
    */
-  { name: 'patches', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
+  { name: 'pack', group: 'hardware', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
     one: 'open a Circuit pack and see what its patches are made of',
     tags: ['zip', 'sysex', 'DecompressionStream'] },
 

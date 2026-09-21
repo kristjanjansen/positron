@@ -191,7 +191,7 @@ ok('session_0 has 9,179 bytes that are not erasure and 2,238 that are neither er
   stats[0].notErased === 9179 && stats[0].payload === 2238,
   `${stats[0].notErased} / ${stats[0].payload}`);
 
-// 🔴 THE CORRECTION. `CLAUDE.md`, `plans/plan-patches-page.md` §2.1 and
+// 🔴 THE CORRECTION. `CLAUDE.md`, `plans/plan-pack-page.md` §2.1 and
 // `research/circuit-soundbank-2026-09-21.md` all published the first four bytes
 // as a discriminator: `INIT` for a blank against the owner's `DEMO`. This file
 // says otherwise and it is the file.
@@ -273,7 +273,7 @@ ok('a command byte the reference does not define is refused',
     `${p.commandName}, ${p.slotName}`);
 }
 
-// 🔴 AND THE ABSENCE IS ASSERTED RATHER THAN INTENDED. `plans/plan-patches-page.md`
+// 🔴 AND THE ABSENCE IS ASSERTED RATHER THAN INTENDED. `plans/plan-pack-page.md`
 // §2: the function that turns an intention into bytes does not exist at all, so
 // it cannot be called by mistake. This is the assert that keeps it that way when
 // somebody adds a convenience helper six months from now.
