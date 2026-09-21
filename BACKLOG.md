@@ -171,8 +171,22 @@ use, and `wave-view.mjs` has exactly one caller, `/pack/`, which is the page
 being complained about.
 ⚠️ **AND THE TWO DRAW DIFFERENT THINGS TODAY.** `grain-scope` is fed a LIVE ring
 and draws what has arrived; `/pack/` holds a whole `AudioBuffer` and draws all
-of it at once. Whether that component can show a static buffer is the question
-to answer before anything is swapped, and it is not answered yet.
+of it at once.
+✅ **ANSWERED AND DONE: THE SCOPE DRAWS A HELD BUFFER TOO**, which is what made
+this a swap rather than a rewrite. `buffer(peaks)` is its own comment's *"the
+held sound itself, as peaks. This is what makes the rest legible"*, and
+`/grains/` already inspects a fixed buffer through it. The adapter is one
+function, `peaksOf`, largest magnitude per column over 480 columns.
+⚠️ **AND `wave-view.mjs` NOW HAS NO CALLERS.** It is not deleted: nothing asked
+for that, its test still passes, and a module with a test and no caller is a
+smaller problem than a deletion nobody reviewed. Worth a decision, not a sweep.
+⚠️ **THREE DIFFERENCES COST AN ASSERT EACH AND ARE WORTH KNOWING.** The scope
+paints on its OWN `requestAnimationFrame` loop where `wave-view` painted inside
+`set()`, so a check reading the canvas on the next line measured **0 lit pixels
+on a perfectly good picture**. It holds no opinion about frames or seconds, so
+those facts moved onto the page and onto the pixels. And it does not hide itself
+with nothing to draw, correctly, because `/radio/` draws a scrolling stream
+before any buffer exists, so the page hides its own glued part instead.
 
 #### /pack/'s sample player hand-rolls its transport, 2026-09-21
 
