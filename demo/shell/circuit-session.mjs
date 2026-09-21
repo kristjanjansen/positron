@@ -396,3 +396,129 @@ export function summarise(session) {
     patchNames: patches.map((p) => p.name),
   };
 }
+
+// ------------------------------------------------------- the note data
+
+/**
+ * 🔴 A `wide` REGION HOLDS SEQUENCER NOTE DATA, AND THIS IS THE FIRST THING
+ * THIS MODULE HAS EVER BEEN ABLE TO SAY ABOUT WHAT A REGION HOLDS. Asked
+ * 2026-09-21: *"can we get note data out of regions?"*, and then, against a
+ * page still printing *"what they hold is not known"*, *"where is note data?"*.
+ *
+ * ✅ TWO INDEPENDENT IMPLEMENTATIONS AGREE TO THE EVENT: **5,095 note events**
+ * across the owner's 32 sessions, **0** across all 64 purchased blanks, and
+ * `session_0`'s first event is note 55 with gate 2 and velocity 41 in both.
+ * `research/circuit-session-notes-2026-09-21.md` has the whole derivation.
+ *
+ * ⚠️ THE 28 WAS FOUND BLIND, BEFORE ANY RECORD WAS READ. Matching byte `i`
+ * against byte `i + L` over all 512 of the owner's wide regions puts the top
+ * four lags at 56, 112, 84 and 28, which are the four multiples of 28, against
+ * a 68.03 per cent baseline over all 128 lags.
+ *
+ * 🔴 AND A CONSISTENCY SCORE ON ITS OWN IS A LIAR, WHICH IS WHY NOTHING HERE
+ * RESTS ON ONE. Strides 56, 112, 224 and 448 all BEAT 28 and are multiples of
+ * it that read one record in two, four, eight or sixteen: **they score better
+ * by finding less.** Four origins at stride 28 score a perfect 100 per cent
+ * with zero events, because they land on bytes that are always zero. What
+ * carries the claim is the YIELD against the controls: random bytes score
+ * 11.08 per cent on the mask test, and the owner's own sessions with every
+ * non-erasure byte SHUFFLED score 18.99, against 99.62.
+ */
+export const STEPS = 16;
+export const STEP_LEN = 28;
+export const STEP_SLOTS = 6;
+export const SLOT_LEN = 4;
+/** 16 x 28 is 448, then 4 bytes, then 11 blocks of 96 is 1,056. 1,508 exactly. */
+export const STEP_GRID_LEN = STEPS * STEP_LEN;
+
+/**
+ * ⚖️ WHERE VELOCITY LIVES, SELECTED BY HEADER BYTE 8, AND THE SECOND SOURCE IS
+ * A GENUINE ROSETTA STONE THAT WAS SITTING ON THIS DISK.
+ * `purchased/Ghostly Intro.circuitsession` is **byte identical** to the owner's
+ * `session_17`, and `Ghostly Intro (2)` is a different file with the same name.
+ * Byte 8 is `0x07` in the first and `0xFF` in the second, and **the two decode
+ * to the same music**: 31 note events each, note number and velocity agreeing
+ * on 31 of 31, read out of different bytes.
+ * ⚠️ MEASURED ACROSS BOTH PACKS: the owner's 32 are `0xFF` 24 and `0x07` 8, and
+ * all 64 blanks are `0x00`. So it is a third byte that separates the two packs,
+ * after the marker and the yield.
+ * ⚠️ AND IT IS A READING OF WHAT THE BYTE SELECTS, not of what it MEANS. No
+ * firmware was consulted and no instrument was in the loop.
+ */
+export const VELOCITY_AT = 8;
+export const VELOCITY_PER_STEP = 0x07;
+export const VELOCITY_PER_NOTE = 0xff;
+
+/**
+ * Every note event in a session, in region then step then slot order.
+ *
+ * 🔴 IT READS THE MASK AND NEVER THE NOTE BYTES, AND THAT IS NOT A STYLE
+ * CHOICE. 31 records of 8,192 carry a popcount ONE BELOW their filled slot
+ * count, and the popcount is never greater, 8,192 of 8,192. The reading is a
+ * stale note byte left in a freed slot, and a decoder that counted non-zero
+ * note bytes instead would invent those 31 events.
+ *
+ * ⚠️ IT DECODES AND IT CANNOT WRITE. Like everything else in this file: no
+ * message is built, nothing is sent, and a writer is deliberately absent,
+ * because one that emitted only what it understands would destroy everything
+ * else in the file.
+ *
+ * @param {ArrayBuffer|Uint8Array} buf  a whole session
+ * @returns {{region:number, step:number, slot:number, at:number,
+ *            note:number, gate:number, velocity:number}[]}
+ */
+export function notesIn(buf) {
+  const u8 = bytesOf(buf);
+  const perNote = u8[VELOCITY_AT] !== VELOCITY_PER_STEP;
+  const out = [];
+  for (let w = 0; w < WIDE_SLOTS; w++) {
+    const base = HEADER_LEN + w * WIDE_SLOT_LEN;
+    for (let st = 0; st < STEPS; st++) {
+      const r = base + st * STEP_LEN;
+      const mask = u8[r];
+      if (!mask) continue;
+      for (let k = 0; k < STEP_SLOTS; k++) {
+        if (!(mask & (1 << k))) continue;
+        const at = r + 4 + k * SLOT_LEN;
+        out.push({
+          region: w,
+          step: st,
+          slot: k,
+          at,
+          note: u8[at],
+          gate: u8[at + 1],
+          velocity: perNote ? u8[at + 3] : u8[r + 1],
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/** How many note events each of the sixteen wide regions holds. */
+export function notesPerRegion(buf) {
+  const n = new Array(WIDE_SLOTS).fill(0);
+  for (const e of notesIn(buf)) n[e.region]++;
+  return n;
+}
+
+/**
+ * ⚠️ THE SHAPE CLAIM, SO A CALLER CAN REFUSE A FILE RATHER THAN READ NOISE OUT
+ * OF IT. Bytes 2 and 3 of every step record are zero in 8,192 of 8,192 of the
+ * owner's records and in 16,384 of 16,384 blanks, and in **0 of 2,048** records
+ * of random bytes. It is the cheapest thing that tells a session from a file
+ * that merely happens to be 53,248 bytes long.
+ */
+export function stepGridLooksRight(buf) {
+  const u8 = bytesOf(buf);
+  let ok = 0, seen = 0;
+  for (let w = 0; w < WIDE_SLOTS; w++) {
+    const base = HEADER_LEN + w * WIDE_SLOT_LEN;
+    for (let st = 0; st < STEPS; st++) {
+      const r = base + st * STEP_LEN;
+      seen++;
+      if (u8[r + 2] === 0 && u8[r + 3] === 0 && !(u8[r] & 0xc0)) ok++;
+    }
+  }
+  return { records: seen, ok, share: seen ? ok / seen : 0 };
+}

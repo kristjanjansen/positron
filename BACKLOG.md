@@ -1,5 +1,14 @@
 ## Open
 
+### /wish/ header, 2026-09-21
+
+- **`add interpret button to header and move model selection to right, label
+  'model'`**. Said against a screenshot of the glued component whose top part is
+  the `PATCH` picker row alone. So the header carries an `interpret` action on
+  the left and the model choice on the right, labelled `model` rather than
+  `PATCH`.
+  ⚠️ `PATCH` was always the wrong word for that row: it labels a list of MODELS.
+
 ### `circuit-cc.mjs` puts 28 drum parameters under `song select`, 2026-09-21
 
 ⚖️ **ALMOST CERTAINLY A `pdftotext` ARTEFACT**, a neighbouring heading picked up
