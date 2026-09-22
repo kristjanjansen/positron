@@ -1,5 +1,261 @@
 ## Open
 
+### `/muta/`, the panel layout, 2026-09-22, arrived mid-task
+
+Asked from a photo of the real Plaits panel: *"can we organize 4 rotaries like
+in hw and label them so. how to map others"*. Arrived while the polyphony work
+on the same page was in flight, and is to be done AFTER that is green.
+
+- **Four big knobs in a 2 by 2 block**, labelled as the panel does: FREQUENCY
+  top left, HARMONICS top right, TIMBRE bottom left, MORPH bottom right.
+- **Three small attenuverters in a row under them**, TIMBRE left, FM middle,
+  MORPH right, in the panel's own order. Bipolar, `range 2.0, offset -1.0` in
+  `plaits/ui.cc`, so a knob from -1 to 1 homed at 0.
+- `createKnob` and `createKnobBank` from `demo/shell/knob.mjs`, never a
+  hand-rolled rotary.
+- 🔴 **THE DECISION IT FORCES: `decay` and `lpg_colour` have no knob of their
+  own on the hardware.** `plaits/ui.cc:70-84` binds them as the ALTERNATE
+  functions of MORPH and TIMBRE. Keeping them as their own controls is more
+  usable and less faithful. Pick one and write down what was refused.
+- ⚠️ `octave_` and `transposition_` are two firmware fields and ONE shim field.
+  `ui.cc` combines them into `patch.note`. Do not split pitch into coarse and
+  fine, which would be copying the panel rather than the instrument.
+- The engine is 8 plus 8, measured off the LED code rather than assumed:
+  `engine & 7` picks the lamp and `engine & 8` picks its colour.
+
+**THE LAYOUT WAS SETTLED IN A SECOND MESSAGE** and the decision above is made:
+*"so lets do 2 row knobs layout, () () | () .. / () () | () .. first 2 col are
+hw ones, next come exra ones."*
+
+```
+FREQUENCY  HARMONICS  |  TIMBRE±  FM±  MORPH±
+TIMBRE     MORPH      |  DECAY    LPG COLOUR
+```
+
+Two rows, first two columns the panel's own four rotaries in the panel's own
+positions, then the extras. **The hidden pair gets visible controls**, and the
+page says in two words that the hardware reaches them through a held button.
+The attenuverter order is the PANEL's, which `plaits/drivers/pots_adc.h`
+enumerates as `TIMBRE_ATTENUVERTER, FM_ATTENUVERTER, MORPH_ATTENUVERTER`.
+
+#### ✅ DONE 2026-09-22, and one hole left open
+
+Built and green at 26/26 with 20 page asserts. **What is NOT measured is the
+phone.** `demo/verify.mjs` runs at 756 px with no viewport override, so the
+nine knob columns of `/muta/` have never been drawn below 560 px. Row one is
+five knobs at `--ctl-w` 46 px with four 8 px gaps and one 24 px one, which is
+286 px of content, and `.pos-knob-row` carries `overflow-x: auto` with
+`min-width: 0` so it should scroll inside itself rather than drag the page.
+**That is an argument about a stylesheet, not a reading**, and this project has
+measured four dead CSS rules that read as correct. Somebody with a browser at
+390 px settles it in one look.
+
+### The /pack/ stream, 2026-09-22, session 43, COLLECTING
+
+⚠️ **WRITTEN AS IT ARRIVES AND NOT WORKED YET.** `work in bg` was said in the
+first message, so the fan-out happens when the stream stops.
+
+#### ✅ DONE 2026-09-22: `/pack/`, both tabs
+
+✅ **62/62 to 67/67, page asserts 56 to 61, and nothing went silent**, proved by
+sabotage rather than asserted: forcing `showRegion` to ignore its region and
+`gateSteps` to return the raw byte took 3 red.
+
+#### the sessions tab, as asked
+
+Verbatim, one message: *"rm current notes visualization, restore session and
+region tables as they where. when clicked on region on regions table, make that
+line active and below it use out transport + timeline glued together with the
+note events, x being time. if there is no time info, use pad grid? when not
+selected region, show empty trans/timeline/padgrid. work in bg"*
+
+- **`rm current notes visualization`**. `demo/pack/index.html:396` builds
+  `notesHost` + `createNoteGrid`, and `:428` glues it BETWEEN the two tables:
+  `createGlue(sessionTable.el, notesHost, partsTable.el)`.
+- **`restore session and region tables as they where`**. The two tables glued
+  with nothing between them.
+- **`when clicked on region on regions table, make that line active`**.
+  ⚠️ `partsTable` HAS NO `onPick` TODAY (`:411`), only `note: 'hover'`. The
+  sessions table above it has one. So this is a new control, and
+  `positron-verify` says adding one moves every later harness press on the page.
+- **`below it use out transport + timeline glued together with the note events,
+  x being time`**. `createTransportBar` + `createStripView` under the regions
+  table, one `createGlue`. The samples tab is the precedent on this same page
+  (`:626`), and `/replay/:256`, `/reel/:569`, `/stage/:1148` glue a bar to a
+  strip.
+- 🔴 **`if there is no time info, use pad grid?` AND THERE IS NO TIME INFO.**
+  MEASURED in `demo/shell/circuit-session.mjs:470`: `notesIn()` returns
+  `{ region, step, slot, at, note, gate, velocity }`. `step` is **0 to 15**, an
+  index into a sixteen step grid, and `gate` is a byte. **There is no
+  millisecond and no tempo anywhere in what this decoder reads.** So `x being
+  time` can only be steps unless a step duration is invented, and inventing one
+  is the thing this project keeps paying for.
+  ⚠️ **AND IT IS PER REGION, WHICH SPLITS THE FIFTY ROWS IN TWO.** The regions
+  table lists 50: one header, **sixteen wide slots that carry notes**, thirty
+  two narrow slots and one tail. `notesPerRegion` only fills the sixteen. So the
+  other 34 rows have no events at all, which is a third state beyond "time" and
+  "no time".
+- **`when not selected region, show empty trans/timeline/padgrid`**. Present and
+  empty rather than absent. ⚠️ Against `/pack/`'s own rule from yesterday, which
+  is that a container with nothing in it must not paint its edges
+  (`:578`, the wave host, and the empty table heading fix). **These two asks
+  point opposite ways and the newer one wins**, but the edge treatment has to be
+  decided rather than defaulted.
+
+#### ✅ DONE 2026-09-22: `/wish/`, five requests
+
+✅ **ALL FIVE ARE BUILT AND GREEN, 51/51 to 58/58, page asserts 45 to 52.**
+🔴 **AND THE PAGE'S OWN TWICE-RECORDED CLAIM ABOUT `Use the example` WAS
+MEASURED FALSE BEFORE THE BUTTON WAS DELETED.** Moving it out of the control
+row and running the page gave **51/51 with 45 page asserts, identical**. Every
+check hangs off `d.on('check')`, reached by `speakBtn.click()` at the foot of
+the file, so the harness press was driving a path the checks already drove and
+carried no assert of its own. **The trap is real and this page was not in it.**
+
+⚠️ **THE FIRST TWO WERE WORKED BEFORE THEY WERE WRITTEN DOWN, WHICH IS THE
+THING THIS FILE EXISTS TO STOP.** They are recorded here after the edit rather
+than before it. Both are small and both are done; the third is not.
+
+- ✅ **DONE: the diagram caption, `rm`**, sent as a screenshot of the sentence
+  and the word *"rm"*. It read *"Every arrow is a link the model asked for, and
+  a refused one is marked rather than left out."*, was `DG_CAPTION` at
+  `demo/wish/index.html:942`, and reached `createDiagram` at `:1047`.
+  ⚠️ **SECOND REPORT OF THE SAME SENTENCE IN TWO DAYS.** On 2026-09-21 it was
+  reported for being drawn over an EMPTY picture, and the fix then was to stop
+  calling `createDiagram` with no links. That guard stays and is not spent: an
+  empty call still draws a reserved caption line and a room round it.
+  ✅ No assert read the caption text. The `only the instruments a proposal
+  touches are drawn` check counts boxes, arrows and things in the host, so it is
+  unaffected.
+
+- ✅ **DONE: `i takes nothing is unclear language`.** `portNote()` at
+  `demo/wish/index.html:920` built a box's hover note ending
+  `In takes nothing, never sysex.` for the MK-425C, whose `ACCEPTS` entry is
+  `[]`.
+  🔴 **IT WAS TWO UNCLEAR THINGS IN ONE LINE.** *takes nothing* does not say
+  whether the port accepts no message class or merely has nothing patched into
+  it, and those are a fact about the DEVICE and a fact about the ROOM. And
+  *never sysex* directly after it reads as a contradiction, which buries the one
+  thing that clause is for: `accepts` and `never` are different lists, a class
+  off the first is DROPPED and reported, a class on the second REFUSES the link.
+  It now reads `In accepts no messages at all. A sysex link is refused.` and
+  `In accepts note, cc, bend. A sysex link is refused.`
+  ⚠️ **UNVERIFIED: THE WIDTH.** `createDiagram` reports what it had to cut and
+  there is an assert on nothing being cut. The new line is longer. It has been
+  parse checked and NOT measured in a browser.
+
+- 🔴 **OPEN: `add 5 varied examples into a table, some failable instead of "Use
+  the example" in wish`.** One button becomes a table of five, and some of them
+  are meant to FAIL.
+  🔴 **THE BUTTON IS LEAD BALLAST FOR THE WHOLE PAGE'S GRADING AND THE PAGE SAYS
+  SO TWICE**, at `:515` and `:588`. `demo/verify.mjs` presses
+  `.pos-controls button` and nothing else, so the asking path is reached by the
+  harness ONLY because `Use the example` is a button in that row. `/mirror/`
+  lost ten asserts to a moved button and `/blocks/` six, and **neither suite
+  went red, both went quiet**. A table row press is not a `.pos-controls
+  button`.
+  🔴 **AND `Use the example` ASKS, WHICH COSTS MONEY UNLESS THE STAND-IN
+  CATCHES IT.** `CANNED` at `:1409` is the reply the real model gave, and the
+  gate is on the NETWORK rather than on the button, deliberately: *"a suite run
+  must not be a hand on somebody's paid account"*. Five examples need five
+  stand-in answers or the gate stops covering them.
+  ⚠️ **`EXAMPLE` IS READ BY AT LEAST FIVE CHECKS**, `:1977`, `:2200`, `:2346`
+  and `:2438`, and one of them turns on the transcription NOT being the example
+  sentence.
+  ⚠️ **WHAT `some failable` CAN MEAN IS NOT ONE THING.** The page already has
+  three different failures worth showing: a link the validator REFUSES (sysex to
+  the Circuit, which has no factory reset), a proposal naming an instrument that
+  is not on this desk, and a request the patch language cannot express at all
+  (a keyboard split, recorded in this file under `#### A keyboard split cannot
+  be said at all`). Which of those five examples carry is a decision.
+
+- 🔴 **OPEN: `give me full names of models with prices as model (browser std
+  tooltip) on hover`.** The two pickers show short names only: `turbo`,
+  `whisper`, `tiny` and `70B`, `8B`, `3B`, `Mistral`, `Scout`. The full name is
+  already the second element of each pair in `HEAR` and `PATCH`, so half of this
+  is already in the file. The PRICE is not in the file anywhere.
+  ⚠️ **`choice.mjs` HAS NO TITLE SUPPORT AND IT IS A SHARED KIT MODULE.**
+  `createChoice({ options: [[name, value]] })` builds a button from `name` and
+  nothing else. So this is either a kit change that reaches every page using a
+  picker, or the page setting `title` on the buttons after the group is built.
+  A kit change is done ONCE by ONE hand, per the rule in `CLAUDE.md`.
+  🔴 **AND A PRICE IS A NUMBER THAT MUST COME FROM CLOUDFLARE'S PUBLISHED
+  PRICING AND NOT FROM A MODEL'S MEMORY.** Eight models, eight prices, and a
+  plausible wrong one is this project's most expensive habit. The only figure
+  this repository holds today is from the last handoff: one `/wish/` press is
+  about **$0.00034** and the free daily allowance covers roughly **320**, which
+  is a figure for the PAIR of calls rather than per model.
+  ⚠️ Workers AI is billed in NEURONS, so a per model price is a neurons figure
+  and a dollar conversion, and quoting one without the other is half a fact.
+
+  ✅ **THE PRICES ARE FETCHED AND VERIFIED, 2026-09-22**, off
+  `developers.cloudflare.com/workers-ai/platform/pricing/`, whose own page
+  stamp reads **last updated Sep 17, 2026**. Rate: **$0.011 per 1,000 neurons**.
+  Free allocation: **10,000 neurons a day**, reset at 00:00 UTC.
+
+  | picker | full name | published price |
+  | --- | --- | --- |
+  | `turbo` | `@cf/openai/whisper-large-v3-turbo` | $0.0005 per audio minute, 46.63 neurons |
+  | `whisper` | `@cf/openai/whisper` | $0.0005 per audio minute, 41.14 neurons |
+  | `tiny` | `@cf/openai/whisper-tiny-en` | 🔴 **NONE PUBLISHED** |
+  | `70B` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | $0.293 in, $2.253 out, per M tokens |
+  | `8B` | `@cf/meta/llama-3.1-8b-instruct-fp8-fast` | $0.045 in, $0.384 out |
+  | `3B` | `@cf/meta/llama-3.2-3b-instruct` | $0.051 in, $0.335 out |
+  | `Mistral` | `@cf/mistralai/mistral-small-3.1-24b-instruct` | $0.351 in, $0.555 out |
+  | `Scout` | `@cf/meta/llama-4-scout-17b-16e-instruct` | $0.270 in, $0.850 out |
+
+  Neuron figures per M tokens, input then output: 70B 26,668 / 204,805, 8B
+  4,119 / 34,868, 3B 4,625 / 30,475, Mistral 31,876 / 50,488, Scout 24,545 /
+  77,273.
+  🔴 **`whisper-tiny-en` IS IN NO PRICING TABLE AND ITS OWN MODEL PAGE CARRIES
+  NO UNIT PRICING ROW.** Both were checked. The audio table lists whisper,
+  whisper-large-v3-turbo, melotts, four Deepgram models and smart-turn-v2, and
+  tiny-en is not among them. **Its tooltip says there is no published price.
+  It does not get a guessed one.**
+  🔴 **AND TWO CLOUDFLARE PAGES DISAGREE ABOUT `@cf/openai/whisper`.** The
+  pricing table says **$0.0005 per audio minute** and the model's own page says
+  **$0.000453 per audio minute**. Both were read today. The pricing table is the
+  one to quote, and the disagreement is recorded rather than averaged.
+  ⚠️ **AND THE ORDER IS NOT WHAT A READER WOULD GUESS: `3B` COSTS MORE PER INPUT
+  TOKEN THAN `8B`**, $0.051 against $0.045. A tooltip carrying real prices is
+  worth having partly because of that.
+
+- 🔴 **OPEN: `show all actual details of connection on the diagram not slop`**,
+  sent with a screenshot of `MK-425C -> Circuit` joined by a **bare unlabelled
+  arrow**. Everything the page knows about that link is in the hover `note`
+  built by `arrowsFor()`, and the picture itself says only that a link exists.
+  🔴 **THE REASON IT IS BARE IS MEASURED, AND IT IS THE CONSTRAINT THIS HAS TO
+  BEAT.** The comment in `arrowsFor()` records it: the gap between two columns
+  gives a link label **52 px**, which is about **seven characters** at the
+  drawer's link size, and `createDiagram` reported `transpose+1,...` as a CUT
+  the first time this was built. `refused` fits. A transform does not.
+  ✅ **AND ONE THING CHANGED TODAY THAT MAKES ROOM.** The caption under the
+  picture was removed this morning, so the line that used to hold *"Every arrow
+  is a link the model asked for"* is now empty when nothing is hovered, and
+  `captionTexts` still reserves its height. **That slot is free.**
+  ⚠️ **AND `here:` PORT IDS ARE NOT THE DETAILS BEING ASKED FOR.** The handoff
+  carries `/bay/` still showing `here:` ids in its link line as an open defect.
+  What a reader wants is the port's LABEL, the channel, the transform and what
+  crosses, in words.
+
+#### ✅ DONE: `/pack/#samples`, three removals
+
+- **`pack#samples 64 of 64 read, all 48 kHz 16 bit mono, 0.12 s to 2.00 s, 53.4 s
+  in total -- rm`**. That is `samplesLine`, built at `:474`, written at `:1358`,
+  appended at `:626`. ⚠️ **TWO ASSERTS READ IT**, `:2340` and `:2347`, including
+  the `1 refused` case, so removing the line takes those checks with it unless
+  they move to where the fact still lives.
+- **`rm double padding around transport. its just glued transport to table`**,
+  with a screenshot of the sample player sitting inside a second box. The
+  `.pk-player` wrapper is `el('div', 'pk-player')` at `:531` and the glue
+  already owns the border and the radius.
+- **`rm padding and its border around waveform canvas. rm sample name from
+  corner of the canvas`**, with a screenshot. The canvas is `createGrainScope`
+  in `waveHost` at `:591`. The name in the corner is drawn by the SCOPE, not by
+  this page, so it is a `grain-scope.mjs` option or a component change, and
+  `/radio/`, `/tapes/` and `/grains/` draw with the same module.
+
+
 ### 🔴 OPEN AND WORKING FROM MEMORY IS WHY, 2026-09-21, session 42
 
 🔴 **I STOPPED WRITING REQUESTS DOWN AND THE OWNER HAD TO REPEAT THEMSELVES.**
@@ -11,6 +267,570 @@ followed at the top of this session and abandoned around the `/pack/` stream.
 on titles` meant the title HAS none and needs some; every repeat said so more
 plainly while I removed more padding. Written down, it would have been read
 once by somebody who was not mid-edit.
+
+#### `/wish/`, the second stream, 2026-09-22
+
+✅ **ALL FIVE DONE, 58/58 to 59/59 green.**
+
+- ✅ **`move above hold-to-talk and rm about col and gray the ask content`.**
+  The table sat between the box a sentence goes into and the answer it
+  produces, which put five worked examples in the middle of the thing they are
+  examples OF. It is first now, so the page reads as its own order of
+  operations. `about` is still CARRIED on every row and still reported per
+  example by the check drill, it is just not a 150 px column restating in three
+  words a sentence already read. `hi` went with it: `.pos-tbl-c` is `--dim` and
+  `.pos-tbl-c.hi` is `--fg`, so the examples were the brightest block on a page
+  whose subject is the answer.
+- ✅ **`when refused, paint recused conector/label red`.** `diagram.mjs` gained
+  `bad: true`, an AUTHOR flag like `back: true`, painting the line, the label
+  and the arrowhead in `--bad`.
+  🔴 **FOUR ARROWHEADS RATHER THAN ONE CSS RULE, BECAUSE AN SVG MARKER DOES NOT
+  INHERIT ITS LINE'S STROKE.** A marker is painted from its own fill, so one
+  rule on the path would have sent a red line to a grey head, and the picture
+  would have contradicted itself at the end a reader looks at.
+  🔴 **AND THE FIRST VERSION OF THE ASSERT WENT RED ON THE ALLOWED CASE, FOR
+  THE RIGHT REASON.** It searched for `.pos-dg-head-bad` in the host. All four
+  heads are declared in `<defs>` on EVERY picture, so the red one is always
+  present and finding it says nothing about whether a line uses it. **A count
+  of a thing that is always there cannot see a thing that is sometimes used.**
+  It reads the link's own `marker-end` now.
+  ⚠️ **COLOUR IS A SECOND CHANNEL AND NEVER THE ONLY ONE.** The label still
+  reads `refused` in words, so the picture survives greyscale, a screenshot and
+  a reader who cannot separate those two hues.
+- ✅ **`limit height of this box. display as json array`** and **`(event when
+  one)`**. The box printed one object per link with nothing between them, which
+  is **not JSON at all**: it cannot be pasted anywhere and a reader counting
+  connections has to count braces. One array now, and an array for one link as
+  well, because a shape that is an object for one and an array for two is a
+  shape every reader and every parser has to branch on. The ceiling is 18 lines
+  and it SCROLLS rather than clips, because the argument a refusal names can be
+  on any line and a clip would hide exactly the evidence a reader came for.
+  ⚠️ **TWO ASSERTS MOVED WITH THE SHAPE AND BOTH WENT RED FIRST**, which is
+  what they are for: one read `asObject.transforms` and one tested for `\n  "`,
+  an indent that went from two spaces to four.
+
+- ✅ **DONE: `do not get this error. explain desc or fix`**, against
+  `cc takes "from" and was given "to"` on the knob example.
+  🔴 **THE MESSAGE NAMED SOMETHING THAT WAS NOT WRONG.** `cc` needs BOTH keys,
+  it moves the controller numbered `from` onto the controller numbered `to`,
+  and **`to: 80` was exactly right**: 80 is the Circuit's first macro knob. The
+  only fault was that `from` was absent. The sentence read as *cc takes from,
+  NOT to*, so it sent a reader to delete a correct argument.
+  ✅ **THE MODEL HAD EVERYTHING IT NEEDED.** `FACTS` says *"its six rotary
+  knobs send, in the order they are printed on the panel, CC 84, 72, 74, 71, 93
+  and 5, so its FIRST rotary knob is CC 84"*, so the answer was
+  `{ op: 'cc', from: 84, to: 80 }` and the 70B dropped one key.
+  ✅ **THE FIX SPLITS ONE SENTENCE INTO THREE CASES.** A key the op does not
+  have is a SWAP and names both sides, which is what makes `transpose takes
+  "by" and was given "to"` useful, and it is unchanged. Keys that all belong
+  with a required one missing is an OMISSION and says what is needed and which
+  part did not arrive. Nothing given at all keeps `and was given nothing`.
+  🔴 **THE THIRD CASE WAS FOUND BY `bay-test.mjs` GOING RED IN ONE LINE**, on
+  `fixed needs "to", and "to" is missing`, a sentence tying itself in a knot to
+  say what `and was given nothing` says plainly. **62/62 and /wish/ 59/59.**
+  ⚠️ **AND IT IS THIS PROJECT'S MOST REPEATED LESSON ARRIVING IN PROSE RATHER
+  THAN IN AN ASSERT**: a message that measures something NEXT TO the quantity
+  in question sends a reader to the wrong place.
+
+#### The two questions asked 2026-09-22, answered in chat
+
+- **`when refused how come we generate connection json?`** The box is the
+  MODEL'S OUTPUT shown for inspection, not a connection that was made, and the
+  verdicts sit ABOVE it in the glue so a reader meets `refused` before the
+  object it is about. It is deliberate and was bought by a defect: the compact
+  form once read `{ transpose, channel 1 }` with no sign of the `to: 1` that
+  was the whole problem, so the refusal named a key the line above it did not
+  show. ⚠️ **THE FAIR HALF OF THE CRITICISM** is that nothing on the block says
+  *proposed* rather than *applied*, and the page has no other cue.
+- 🔴 **`how to visualize 2 connections? boxes inside boxes? or just two
+  diagrams?`** OPEN, recommendation given in chat: **boxes inside boxes, keyed
+  on CHANNEL, drawing only the children a proposal touches.** A Circuit's
+  channel 1 and channel 2 ARE two synths inside one instrument, and
+  `CHANNELS.circuit` already says so in the prompt. Two diagrams is refused:
+  `positron-diagram` allows one picture per page with one treatment.
+  ⚠️ **AND IT DOES NOT GENERALISE TO EVERY PAIR.** Two proposals differing only
+  by RANGE on one channel land on the same box and stay one arrow. The honest
+  rule is one arrow per distinct destination, where a destination is a port and
+  a channel.
+
+#### ✅ DONE 2026-09-22: /muta/, two instruments chained
+
+✅ **BUILT AND GREEN AT 38/38 WITH 32 PAGE ASSERTS**, against `/plai/`'s
+26/26 with 20. `demo/plai/` is `demo/muta/`, the row in `demo/manifest.mjs` is
+`muta`, and `workers/view/build.mjs` deploys four vendor files where it used to
+deploy two. **The page opens nothing outside the deploy.**
+✅ **THE CLAIM THE PAGE EXISTS TO MAKE IS THE ONE THAT IS ASSERTED**: both
+artefacts compile with **0 wasm imports each**, they are **195.0 KB and
+76.4 KB** against `scsynth.wasm`'s 1740.8 KB, the first quantum came **195 ms**
+after the fetch began, and one build script gives them **two different
+digests**, `ece3f3c55e5ab63a` and `1a0619e5a94767ee`, over the same pinned
+commits.
+✅ **AND THE CHAIN IS GRADED AS A CHAIN, NOT AS TWO PAGES SHARING A TAB.**
+The effect really combines two signals: ring modulation reads **0.8872** with
+both inputs and **0.0000** with the modulator silenced. The whole chain is
+silent with nothing played and **0.056** with a pluck, out of an oscillator at
+0.107. The oscillator costs **26 µs** for eight voices and the effect
+**17 µs** on top, **44 µs** of the 2667 µs those 128 frames last.
+🔴 **THE OCTAVE IS PRINTED RATHER THAN HIDDEN, WHICH IS WHAT THE PLAN
+RECOMMENDED AND IS NOW MEASURED ON THE PAGE**: 20 bands at **43.7 to 3520 Hz**,
+which the page reports as **-1.00 octaves** under the 96,000 Hz the tables were
+computed at. ⚠️ **AND THE CELL ONLY SAYS IT WHILE THE VOCODER IS THE
+PATH RUNNING**, which is its own assert, because a shift reported under the six
+cross modulation algorithms would be a true number about the wrong signal.
+⚠️ **WHAT IS STILL NOT MEASURED IS THE BOARD.** Two ends of a digest
+and nothing built on the Pi, exactly as it was for the oscillator alone.
+
+🔴 **ASKED: `rename plai demo to muta and implement warps in there`, then
+`call it warp`, then settled as `no muta is slug. it contains 2 istriments
+chained, plai and warp`.** So `/plai/` becomes `/muta/`, and it holds TWO
+`createInstrument` cases whose plates read `PLAI` and `WARP`, the first feeding
+the second.
+
+✅ **MEASURED TODAY OUT OF THE PINNED SOURCE, so none of it needs re-deriving:**
+
+| | value | where |
+| --- | --- | --- |
+| Warps licence scope | `FAMILY = f4xx`, an STM32F4, so MIT | `warps/makefile:29` |
+| its rate | **96,000** | `warps/warps.cc:97` |
+| its block ceiling | `kMaxBlockSize = 96`, and loops use `size` | `warps/dsp/` |
+| the trap | **filter bank coefficients baked at 96 kHz** | `lookup_tables.py:103`, `filter_bank.py:63` |
+
+🔴 **AT 48 kHz THE TWENTY VOCODER BANDS SIT AN OCTAVE LOW AND THE SIX CROSS
+MODULATION ALGORITHMS ARE UNAFFECTED.** `Modulator::Init` takes the rate and
+gets the oscillators and follower times right; the biquad coefficients are fixed
+numbers whose table names carry the rate. **Half the knob is exactly right and
+half is an octave down.** `plans/plan-two-more-modules.md` recommends shipping
+at 48 and printing the error in a readout cell rather than running the context
+at 96, because `plai_init` refuses any rate but 48000 and a 96 kHz context would
+silently make the two firmwares incompatible.
+✅ **AND THE `kBlockSize` TRAP IS NOT IN WARPS**, checked by name in the plan:
+every `kMaxBlockSize` is an array dimension and every loop uses the `size`
+argument. A 128 frame quantum is two calls of 64 with no carry.
+✅ **WARPS RENDERS ITS OWN CARRIER** when `carrier_shape` is non-zero
+(`modulator.cc:225-240`), so the chain needs ONE external signal and `/plai/`
+is it.
+
+#### Two more VCV modules, proposed not built, 2026-09-22
+
+🔴 **ASKED: `in bg propose 2 more vcv modules. some effects perhaps? and
+something else`.** A PROPOSAL, landing in `plans/`. Nothing built.
+
+✅ **THE PIPELINE EXISTS AND ITS COST IS MEASURED**, so this is a choosing
+problem rather than a feasibility one: `demo/plai/build/build.sh` is
+containerised, the artefact is **199,678 bytes with ZERO wasm imports** booting
+in **171 to 192 ms**, and one voice costs **2.1 to 15.7 µs per 128 frames**.
+⚠️ **AN EFFECT NEEDS A SOURCE AND `/plai/` GENERATES ONE**, which is the design
+question a proposal has to answer rather than skip.
+⚠️ **AND `/grains/` ALREADY GRANULATES**, so Clouds would be a second
+implementation of something this site has, which `LESSONS.md` §81 has a whole
+entry about.
+
+#### The /kit/ instrument stream, 2026-09-22, WORKING
+
+- ✅ **`wrap it into insrtument wrapper with title suppoer |positron  plai|`**
+  and **`add global component (takes instument panels into it) to kit`**.
+  `demo/shell/instrument.mjs` + `instrument-test.mjs` (8 ok), and an INSTRUMENT
+  block at the top of `/kit/`. **147/147 green.**
+  🔴 **IT IS A COMPOSITION AND FIVE PAGES HAD WRITTEN IT THEMSELVES**: `/tom/`,
+  `/circuit/`, `/evo/`, `/twelve/` and two more inside `/kit/`'s own PANEL
+  specimen. The module builds no case and no plate of its own and the test
+  asserts that ABSENCE, because a second implementation would pass every check
+  on the page and drift from `panel-layout.mjs` the first time a panel changed.
+  ⚠️ **TWO OF MY OWN ASSERTS WENT RED FIRST, BOTH FOR GUESSING AT STRUCTURE.**
+  One read rects to tell `ends` from `end`, and a `.panel-plate-l` is a full
+  width flex child so both offsets came back `0.0 px`; it reads the computed
+  `justify-content` now. The other assumed the strip is a child of the case and
+  it is inside `panel-wrap`; it uses `compareDocumentPosition` now.
+- ✅ **`no nameplate exaple`** and **`rm a card in a 320 px holder`**.
+  🔴 **THE SECOND ONE TOOK THE PROJECT'S ONLY PHONE WIDTH ASSERT WITH IT, AND
+  NOTHING REPLACES IT.** `verify.mjs` runs at 756 px with no viewport
+  override, so every remaining panel assert passes without ever meeting a media
+  query, and `/circuit/`'s own *the panel box starts and ends where the rest of
+  the page does* is green while being FALSE at 390 px by 286.0 px. The `mid`
+  placement is also no longer demonstrated anywhere.
+- ✅ **`more space under eq labels, same as left right`**: the filter's foot was
+  4 px against `PAD`'s 10. It is `H - PAD` now, and the plot floor gives up the
+  same 6 px so the curve cannot land on the label.
+- ✅ **`add same bg to waveform as to filter`**: `--card2`. Safe because `ink()`
+  reads the field back out of the canvas. ⚠️ The envelope stays on `--card`,
+  which is what was asked rather than an oversight.
+- 🔴 **REFUSED BY THE OWNER, NOT BY ME: `make instrument examples overflow
+  scroll not to break column` and `adjust their content to be less wide`.**
+  Withdrawn as *"ignore hw exmaple content reorg for w, its fine"*. ✅ MEASURED
+  before it was withdrawn: **no direct child of any `.kit-box` is wider than
+  its box at 390 px**, on any tab, so there was nothing to scroll.
+  ⚠️ And the pad count was load-bearing: `/kit/`'s PANEL comment records that
+  four pads took *there is something to scroll behind the border* RED at `0 px
+  to scroll`, so cutting 16 to 8 would have taken it red at the harness width.
+- ✅ **`by stroke` -> `by draw`.** `stroke` is `step-grid.mjs`'s private word
+  for the gesture and it was appearing in a readout a visitor reads. The ask
+  that built the gesture called it drawing. `/tom/` accepts both names for one
+  release, because a page that stops firing on a drag goes SILENT rather than
+  red.
+- ✅ **`make stepgrid distance from glue line same as left padding`.**
+  ⚠️ **THE WORDS COULD NOT BE TAKEN LITERALLY AND THE MEASUREMENT IS WHY.**
+  MEASURED inside the glue at 900 px: left 1.0, right 1.0, bottom 1.0, all three
+  the glue's own seam. There is no left padding to match: what reads as a left
+  inset is the LABEL COLUMN's width. Bottom only, 10 px, because a symmetric
+  inset would be the double padding `/pack/` was reported for the same day.
+- ✅ **`step grid current beat hilite rough ... make it appear smooth like
+  analog lamp lights up and turns out and preseve original button hue a bit`.**
+  🔴 **IT IS THE SAME REPORT `/tom/` MADE ABOUT THE PARKED HEAD, ONE STATE
+  ALONG.** *"hilite should not kill my 1st col beat bg color"* was fixed by
+  moving the parked head to a filter, and the RUNNING head was left setting
+  `background:var(--pg-now)`, so a lit pad, a silent pad and a bar pad all
+  became one colour the moment the head reached them. **Colour there says
+  STATE, and the head overwriting three other states is the head saying all
+  four.** It is an inset `box-shadow` at 58 per cent now, layered over
+  `background-color` so every other state shows through.
+  ✅ **AND THE LAMP IS AN ASYMMETRY BETWEEN TWO RULES.** The head's own rule
+  carries 90 ms, the base `.pos-pg-pad` carries 320 ms, so a pad lights fast
+  and decays slowly, which is what a filament does. Both go with reduced
+  motion.
+  ⚠️ **TWO ASSERTS SAID `a playing one replaces it` AND HAD TO BE REWRITTEN**,
+  on `/kit/` and `/tom/`. They now claim the opposite and grade the wash: the
+  pad's colour survives both states and only the running head carries an inset.
+- ✅ **`support starte end labels -1 1`**: `createKnob` takes `ends`, either
+  `true` for `min` and `max` or a pair for the panel's own marks. It costs NO
+  height, sitting in the dial's own dead space by a negative margin, so
+  `--ctl-head` and `--ctl-foot` are untouched and a row mixing labelled and
+  unlabelled knobs still lines up. **275/275 across `kit`, `circuit`, `evo` and
+  `twelve`**, none of which renders differently.
+- ✅ **`make rule of max 6 in a row or go full 2 x 4. no odd nrs`**, against
+  `/plai/`'s eight cell readout laid out as **SEVEN AND ONE**.
+  🔴 **THE OPT IN WAS THE DEFECT.** `rows` was added 2026-09-21 for a ten cell
+  readout that wrapped 7 and 3, it fixed that page, and it left every page
+  written afterwards free to make the same shape again. Above six cells the
+  shape is now automatic: `ceil(n / 6)` rows, columns falling out of that, so
+  eight is 4 and 4. Nothing changes at six or fewer. A caller's own `rows`
+  still wins, because a page that named its shape has a reason the cell count
+  cannot see.
+- ⏳ **`CHANNEL STRIP example, make real channels with dividers (see panels) and
+  line things up`.**
+- ✅ **`add more space around plai rotaties`**, and **`use instrument panels,
+  nameplate and wrapper`**, on the page that is `/muta/` since the rename.
+  MEASURED in the run that landed it: both rows start their added rotaries at
+  **227.0 px** with **64 px** of gap against the **16 px** between neighbours,
+  the case insets them **21.0 px** left and below and **52.0 px** above, which
+  is that plus a **31.0 px** plate, and the plate reads `PLAI` at the far end.
+  ⚠️ **THE CASE IS `instrument.mjs` AND THE PAGE BUILDS NO PLATE OF ITS OWN**,
+  which is the whole reason that component exists.
+
+#### /muta/ laid out like the panel, 2026-09-22
+
+🔴 **ASKED WITH A PHOTO OF THE MODULE: `can we organize 4 rotaries like in hw
+and label them so. how to map others`.**
+
+✅ **THE FIRMWARE ANSWERS IT AND EVERY ONE OF OUR 14 PARAMS IS ACCOUNTED FOR.**
+Read today off `plaits/ui.cc:70-84` in the pinned source. **Each big pot carries
+a PRIMARY and a SECONDARY parameter**, the secondary reached in the alternate
+parameters mode:
+
+| panel control | primary | secondary | our id |
+| --- | --- | --- | --- |
+| FREQUENCY | `transposition_`, bipolar | none | 1 `note` |
+| HARMONICS | `harmonics` | `octave_` | 2 |
+| TIMBRE | `timbre` | **`lpg_colour`** | 3, and 6 |
+| MORPH | `morph` | **`decay`** | 4, and 5 |
+| FM attenuverter | `frequency_modulation_amount`, bipolar | none | 11 |
+| TIMBRE attenuverter | `timbre_modulation_amount`, bipolar | none | 12 |
+| MORPH attenuverter | `morph_modulation_amount`, bipolar | none | 13 |
+| two buttons | `engine` | none | 0 |
+| TRIG jack | `trigger` and `trigger_patched` | | 7, 9 |
+| LEVEL jack | `level` and `level_patched` | | 8, 10 |
+| V/OCT jack | adds to pitch | | into 1 |
+
+🔴 **SO `decay` AND `lpg_colour` HAVE NO KNOB OF THEIR OWN, AND THAT IS THE
+ANSWER TO *how to map others*.** They are the alternate functions of MORPH and
+TIMBRE. `/plai/` currently gives them their own sliders, which is a LARGER
+control surface than the hardware has, and that is a choice to make rather than
+a gap to fill.
+✅ **THE THREE ATTENUVERTERS ARE BIPOLAR**, `range 2.0, offset -1.0` in the
+firmware, so their span is -1 to +1 with a centre detent. `knob.mjs` takes
+`min`, `max` and `home`, so a centre-homed knob from -1 to 1 is the component
+saying the same thing.
+✅ **AND THE ENGINE IS 8 PLUS 8, MEASURED FROM THE LED CODE**: `engine & 7`
+picks the lamp and `engine & 8` picks its colour, which is the two banks the two
+buttons switch between.
+⚠️ **`octave_` AND `transposition_` ARE TWO FIELDS IN THE FIRMWARE AND ONE IN
+OUR SHIM.** `ui.cc` combines them into `patch.note`, so a single pitch control
+is honest, and splitting it into a coarse and a fine one would be copying the
+panel rather than the instrument.
+✅ **THE LAYOUT IS SPECIFIED, 2026-09-22**: *"lets do 2 row knobs layout, () ()
+| () .. / () () | () .. first 2 col are hw ones, next come exra ones."*
+
+```
+FREQUENCY  HARMONICS  |  FM±  TIMBRE±  MORPH±
+TIMBRE     MORPH      |  DECAY  LPG COLOUR
+```
+
+The first two columns are the panel's four big rotaries in their own positions.
+The extras group by kind rather than by leftover: row one carries the three
+ATTENUVERTERS, which are a row on the hardware too, and row two carries the two
+parameters the hardware HIDES behind its alternate mode.
+✅ **BUILT 2026-09-22, AND GRADED RATHER THAN EYEBALLED.** Three asserts on
+`/muta/` read real rects: frequency and timbre at **55.0 px**, harmonics and
+morph at **117.0 px**, the second row **109 px** lower, and the model picker and
+both rows of rotaries all starting on the same line at 756 px wide.
+⚠️ **AND THE DECISION `decay` AND `lpg_colour` FORCED WAS MADE THE USABLE
+WAY**: both keep a control of their own, which is a larger surface than the
+hardware has, and row two is where the two parameters the hardware hides behind
+its alternate mode live.
+
+#### ✅ DONE 2026-09-22: /kit/ dragged the page sideways on a phone
+
+🔴 **REPORTED FROM A PHONE AGAINST THE DEPLOY AS `It breaks layout`**, with a
+screenshot of the PAD block's pads running past their box. MEASURED at 390 px
+in a browser afterwards, which is the only reason the real cause was found.
+
+- 🔴 **THE FIRST MEASUREMENT SAID ZERO AND WAS WRONG ABOUT THE PAGE.** A probe
+  that loads `/kit/` and reads `scrollWidth` sees the DEFAULT tab only, and
+  every other panel is hidden and has no layout at all. `boxW` came back **0**
+  for the PAD block for the same reason. **A tabbed page has to have its tab
+  activated before anything on it can be measured**, and a probe that does not
+  reports a clean bill of health for nine tabs it never looked at.
+- 🔴 **TWO RULES CLAIMED BEHAVIOUR THEY DID NOT HAVE, AND BOTH COMMENTS WERE
+  THE EVIDENCE.** `.pos-padgrid` said *"it wraps rather than shrinking"* over a
+  `repeat(var(--pad-cols), …)` which is a FIXED track count and cannot wrap: it
+  spilled **27 px** out of its own box. `.kit-hwstrips` said a horizontal
+  scroll is *"the thing shell.css already refuses everywhere else"*, which is
+  false. `.pos-tbl-row` scrolls, `tabs.mjs` is an x-scrollable bar by design,
+  and `step-grid.mjs` scrolls its strip. What is refused is the PAGE dragging.
+- 🔴 **AND THE 65 px WAS NOT THE BLOCK THAT WAS REPORTED.** The pads were the
+  visible symptom; the document's own overflow came from **CHANNEL STRIP**,
+  where `flex-wrap` wraps BETWEEN items and **a single item wider than the
+  container cannot wrap**. One strip at 424 px in a 358 px box.
+- ✅ **MEASURED AFTER: page overflow 0 at 390 px on ALL TEN TABS**, with nothing
+  leaking out of a parent whose overflow is visible. `verify.mjs kit circuit
+  evo` is **235/235**, which covers the two other pages using `pad.mjs`.
+- ✅ **GRADED, WITH ITS LIMIT STATED.** A new assert reads the COMPUTED
+  `overflow-x` and `min-width` on both elements, because a scroller without
+  `min-width: 0` beside it drags the page and this repository has 141 px of
+  measured overflow from that pair being half written. ⚠️ **It is not a phone
+  check**: `verify.mjs` runs at 756 px with no viewport override, so no media
+  query was entered. The 390 px sweep was by hand and nothing in the suite can
+  repeat it.
+- ⏳ **STILL OPEN AND NOW MEASURED TWICE: NO PAGE IS GRADED ON A PHONE.** The
+  throwaway probe used here activates each tab, emulates 390 px and reports the
+  outermost element past the viewport. It is in a scratchpad and will be swept.
+  `plans/plan-panel-component.md` has three unpriced options.
+
+#### ✅ DONE 2026-09-22: the /kit/ stream, nine requests
+
+- ✅ **`use std transport glued on top, rm other examples`** on STEP GRID. The
+  `Play` button was HAND ROLLED, on the one page whose job is to catch that.
+  `createTransportBar` above the grid, glued, `publish: false`. The read only
+  and 320 px examples went, and what stopped being graded is named in the file:
+  the computed cursor, opacity and rendered tab stops of a read only grid, and
+  a real strip scrolling. Both structural halves survive in
+  `step-grid-test.mjs`.
+  ⚠️ **`createGlue` WAS NEVER IMPORTED INTO `/kit/`** and the page died on
+  `__demo.ready` with a null `classList`, because the throw landed in the CHECK
+  rather than in `section()`'s try block.
+- ✅ **`add more space on top of tese env 1, CC 73 75 70 72`**, the ENVELOPE
+  block.
+- ✅ **`put same bit lighter gray behind eq viz`**.
+- ✅ **`dashed to dotted in eq`**. A zero length dash with a round cap is a
+  real dot. The envelope's sustain line keeps its dashes, because nobody asked
+  and two marks meaning two things are worth keeping apart.
+- ✅ **`a name it cannot read / align texts to bottom of the eq`** and
+  **`..betwen texts and align to bottom`**, so space between the two lines and
+  the pair sitting on the bottom.
+- ✅ **THE LIGHTER GROUND IS SAFE ONLY BECAUSE `ink()` READS THE FIELD BACK OUT
+  OF THE CANVAS.** It samples pixel 0,0 after the fill, so moving the filter to
+  `--card2` recalibrates the counter by itself. Painting a lighter rectangle
+  inside `draw()` instead would have made every pixel of the plot read as ink,
+  which is the exact defect that had four envelope asserts green while none of
+  them could see a picture.
+🔴 **AND FOUR CHECKS STOPPED BEING MADE, WHICH IS WRITTEN INTO THE FILE RATHER
+THAN LEFT AS A GAP IN A COUNT**: a read only grid's computed cursor, opacity
+and rendered tab stops; a real strip scrolling at 320 px; that a wavetable and
+a blend are refused for DIFFERENT stated reasons; and that one component turns
+its picture off at wave 14 and on again at wave 0. Every structural half
+survives in `step-grid-test.mjs` and `synth-view-test.mjs` without a browser.
+- ✅ **`rm line`**, with a screenshot of the rule under `saw 7:3 PW`.
+- ✅ **`rm this exampoel a wavetable, refused`**.
+- ✅ **`rm osc 1 wave example`**, with **`align waveform names to left`**.
+
+#### VCV next steps, and where a wasm compile can happen, 2026-09-22
+
+🔴 **ASKED: `i assume we can not do wasm compilint in this machine?
+(threatlocker)`** and **`i want somehting to run both in browser and in pi,
+streaming (lke we did for sc, shaders,...)`**
+
+✅ **BOTH SECURITY AGENTS ARE RUNNING, CONFIRMED BY `ps` 2026-09-22**: Microsoft
+Defender AND **ThreatLocker**, the latter with a system extension. `LESSONS.md`
+§80 says *"Defender-managed"* and that is incomplete: ThreatLocker is the
+application allowlister and is the one that would block an unapproved binary.
+
+🔴 **ON THE HOST: NO, AND DO NOT TEST IT.** §80 records that the last attempt
+produced **security prompts on the owner's screen in the middle of something
+else**, not a failed build. The blocked thing is the TOOLCHAIN: `emsdk` pulls
+down unsigned native `clang`, `wasm-ld` and friends, which is exactly what an
+allowlister stops.
+✅ **BUT THE OUTPUT WAS NEVER THE PROBLEM. A `.wasm` IS NOT A NATIVE
+EXECUTABLE.** It is data, run by node or a browser, both already approved here.
+🔴 **AND THE ROUTE ROUND IT IS ALREADY INSTALLED AND ALREADY USED FOR THIS EXACT
+JOB.** MEASURED today: `/usr/local/bin/docker` pointing at **OrbStack**,
+recorded in `rig/obs-docker/NOTES.md` as **28.5.2, 12 CPU, 16 GB VM**, and
+`rig/board/README.md:112` already runs
+`docker run --platform linux/arm64 -v "$PWD:/repo:ro"` to build FOR THE BOARD.
+So a container toolchain is not a new capability to ask for, it is the one this
+repository reaches for when it needs a compiler. ⚠️ The daemon is not running
+right now.
+
+#### The two ends, and why VCV beats SuperCollider at this one thing
+
+🔴 **ONE C++ SOURCE COMPILES TO BOTH TARGETS, WHICH IS THE CLAIM `/grains/`
+COULD NEVER MAKE.** `LESSONS.md` §81 is explicit: the page ran a Web Audio
+worklet that was a REIMPLEMENTATION, *"a different sentence"*, and *"no amount
+of A/B can promote similar to same"*. A lifted Mutable or Airwindows core is
+one file compiled twice, to wasm and to aarch64. **Same definition, two
+renderers, and this time the word same is literally true.**
+✅ **AND THE SCARIEST NUMBER IN `plans/plan-vcv-modules.md` DOES NOT APPLY.**
+§10 measures 48,000 barrier pairs a second and a full cable walk per sample.
+That is Rack's ENGINE. A lifted core has no barriers, no cable walk and no
+expander sweep, so the per-sample cost that makes the Pi question frightening is
+a cost of the runtime we are not using.
+⚠️ **AND THE PI STILL HAS NO SOUNDCARD**, which is why streaming is the right
+shape rather than a workaround: the board is a renderer, `snd-aloop` is already
+loaded by `rig/board/setup.sh`, and the relay already carries frames.
+
+#### A universal pad grid, lifted out of /tom/, 2026-09-22
+
+- ✅ **DONE: `have space betwen tables`**, reported with a screenshot of
+  `/pack/#sessions` running the sessions list straight into the regions
+  heading. All four parts were in ONE `createGlue`, so the panel had exactly one
+  child. ⚠️ **THE GAP WAS NOT MISSING, THERE WAS NOTHING FOR IT TO ACT ON.**
+  `.pos-tabs-p > * + *` carries 22 px and was working perfectly against a list
+  of one. Same shape `positron-ui` records on `/held/`. **Before hunting for a
+  rule that lost, count the siblings.** The sessions list is a block now and the
+  regions table, transport and step grid stay one surface. **67/67 green**, and
+  the glue assert that read `children.length === 4` was re-pointed and now
+  grades the 22 px gap as well.
+  ⚠️ **AND THIS PROJECT HAS TWO VERTICAL RHYTHMS, WHICH IS WORTH KNOWING BEFORE
+  SOMEBODY TRIPS ON IT.** `.pos-stack` is `--pos-gap: 40px` and
+  `.pos-tabs-p > * + *` is **22 px**, the old pre-2026-09-20 rhythm, still
+  live on every tabbed page. Not changed today, because it reaches `/making/`
+  and `/stage/` too.
+
+- 🔴 **OPEN: `use a standard pad grid component from tom, make it universal and
+  add to kit`.** `/tom/` is a 64 row by 16 step pad grid that lights and loops
+  by itself, and `/pack/` grew a second 16 by 6 one yesterday for a session's
+  note events. **Two hand-rolled grids in two pages is a component that has not
+  been noticed yet**, which `positron-ui` names in as many words.
+  ⚠️ `/tom/` has had **five separate edges asked off** that grid already: the
+  playhead cursor, the highlight border, the pad hover, the focus ring and the
+  pads' own outline. Those decisions are the component, and a lift that loses
+  them re-opens five settled arguments.
+
+- 🔴 **OPEN: `just add std play / stop of the grid pad, no prev next`.**
+  `/pack/`'s transport is currently `toggle: false, scrub: false, loop: false`
+  with `‹` and `›` walk buttons, built yesterday on the measurement that
+  **nothing in a session names a tempo**, so play would claim a rate the file
+  does not carry.
+  ⚠️ **THE ASK OVERRIDES THAT AND THE CONCERN IS RECORDED RATHER THAN ARGUED.**
+  ✅ **AND `/tom/` ALREADY SOLVED IT**, because a 16 step grid that plays itself
+  needs a rate and that page names one. So the two requests above are one job:
+  the rate comes with the component, and it is the PAGE's rate rather than a
+  number claimed to be the file's.
+
+#### ✅ DONE 2026-09-22: the missing synth UI elements, six of them
+
+✅ **`/kit/` 113/113 to 147/147, 48 blocks of 48. `/tom/` 44/44 to 44/44.**
+Four new tests with no browser: `range-slider` 28, `check` 14, `synth-view` 49,
+`step-grid` 32, all re-run by the session and all green. `verify.mjs kit tom`
+is **191/191**.
+🔴 **`createPadGrid` WAS ALREADY TAKEN.** `demo/shell/pad.mjs` exports it for a
+grid of the hardware PAD control and `/circuit/` and `/evo/` both use it. The
+new one is **`createStepGrid` in `demo/shell/step-grid.mjs`**, and the collision
+was found by node refusing the import rather than by anybody reading.
+🔴 **A RATE NOW NEEDS A `whose` AND THE CONSTRUCTOR THROWS WITHOUT ONE**, with
+the message *"a tempo nobody owns is a number presented as the file's"*. The
+`/pack/` concern is a refusal the suite runs.
+🔴 **TWO INSTRUMENTS WERE LYING AND BOTH WERE CAUGHT BY NUMBERS BEING TOO
+TIDY.** `ink()` reported **exactly 10032** for three different envelopes:
+`--card` is `#11151d` and `/\d+/g` on it returns the single number `11151`, so
+green and blue were compared against `undefined` and every painted pixel
+counted. It was measuring the box's area. And `nearestHandle` had an exact
+float tie, `|0.5-0.2|` being `0.3` against `|0.5-0.8|` being
+`0.30000000000000004`, so a press halfway between two handles picked a
+different handle depending on where they sat.
+⚠️ **THE FILTER CURVE IS PAINTED WITH THE WORD `schematic` INSIDE THE CANVAS**,
+not in a caption beside it, so the disclaimer travels with the picture. No
+hertz on x, no decibel figure on y.
+⚠️ **THE WAVEFORM DRAWS 4 OF 30 AND REFUSES 26 IN WORDS**, by exact name only,
+so `saw 9:1 PW` is refused despite sharing a word with `sawtooth`. The refusal
+count is asserted as exactly 4, so the day somebody derives the blends it goes
+red and they read why.
+⚠️ **THE ENVELOPE REFUSES A TIME AXIS**: attack is 0..127 with no published
+mapping to seconds, so the canvas paints `proportions, not seconds` into
+itself. Env 1 is driven by CC 73/75/70/72; Env 2 and 3 stand still and say
+`patch only`, because neither is on any controller number.
+⚠️ **OPEN: the segmented choice is still `button`, not `role="radio"`.** That
+is eleven call sites and a change to what every page announces, and it is
+nothing to do with orientation. Recorded in `choice.mjs`.
+
+#### The original ask, kept for the measurements in it
+
+🔴 **`In bg implement missing synth ui elemement and show in kit`**, after the
+list was settled in conversation. The asked-for set, in the owner's words:
+*"waveform display / evelope editor / display (can start with noninteracive) /
+filter editor / display (can start with nonimteractive) / plus checboxes and
+radios (horiz and vert) / 2-head slider (range)"*.
+
+🔴 **THE FACT THAT DECIDES WHICH OF THESE CAN EVER BE INTERACTIVE.** MEASURED
+2026-09-22 out of `circuit-cc.mjs` and `circuit-patch.mjs`: what the Circuit
+exposes over control change and what its patch format holds are two different
+instruments.
+
+| | over CC | in the patch |
+| --- | --- | --- |
+| synth, ch 1 and 2 | **52 params** | part of 340 addresses |
+| drums, ch 10 | **28 params** | |
+| session, ch 16 | **18 params** | |
+| LFO | 🔴 **zero, not one** | **28 addresses** |
+| Envelope | Env 1 only, 5 params | **17 addresses**, Env 1, 2 and 3 |
+| Equaliser | 🔴 **zero on the synth** | **6 addresses** |
+
+So a live control is honest only for the 52, 28 and 18. **Non-interactive is
+what the hardware permits, not a phase one compromise.**
+
+- **EQ, asked directly.** The synth equaliser is `Equaliser_BassFrequency`
+  through `Equaliser_TrebleLevel`, six addresses, SysEx only. ✅ **The drums
+  each have one that IS reachable**: cc 17, 43, 49 and 76 on channel 10.
+  ⚠️ And `/shape/` has no channel 10 at all, so 28 drum parameters including
+  the only movable EQ on the instrument are absent from that page.
+- ⚠️ **`waveform display` IS TWO ASKS AND ONE IS DONE.** Drawing a recorded
+  buffer is `grain-scope.mjs`, on four pages. Drawing *what wave 17 looks like*
+  is not, and **the data does not exist here**: 30 names, no shapes, and **16 of
+  the 30 are wavetables** which have no single shape to draw.
+  🔴 **THIS SAID 14 UNTIL 2026-09-22 AND IT WAS THE OTHER HALF OF THE SPLIT.**
+  `FIRST_WAVETABLE` is 14, which is the count of PLAIN waveforms and the INDEX
+  the tables begin at, and `OSC_WAVES.slice(14)` is **16** rows long. One
+  constant, two meanings. The wrong half reached `/pack/`'s own diagram note, a
+  briefing and this file, and was caught by the agent building the waveform
+  view measuring it rather than reading it. **The conclusion does not move: 26
+  of 30 have no shape that can honestly be drawn and 4 do.**
+- ⚠️ **RADIOS EXIST AND A CHECKBOX DOES NOT.** `choice.mjs` is a segmented row,
+  horizontal only. Searched the whole kit 2026-09-22: **no checkbox anywhere**,
+  and no vertical orientation for either.
+- ✅ **THE RANGE SLIDER HAS A NAMED JOB.** A macro leg is `Destination, Start,
+  End, Depth`, and 8 macros by 4 legs is **32 start and end pairs**.
+- 🔴 **AND THE CHEAPEST IMPROVEMENT IS NOT A NEW ELEMENT AT ALL.** `/shape/`
+  draws enumerations as SLIDERS: `osc 1 wave` is `0..29` across thirty named
+  waveforms, `filter type` `0..5`, `drive type` `0..6`. `createPicker` already
+  exists, is a real `<select>` under a drawn cell, and four pages use it.
+
+#### Does Chrome have in-browser LLMs now, 2026-09-22
+
+- 🔴 **`does chrome has in-browser llm-based models now? investigate in bg`.**
+  Research, not a build. ⚠️ **IT HAS A LIVE DEPENDENT**: `BACKLOG.md` already
+  records realtime transcription asked THREE times and answered in words, and
+  the standing answer is *"the browser's own `SpeechRecognition` gives interim
+  text free, and in Chrome it sends audio to Google, which needs a decision
+  rather than a guess"*. A model that runs ON the device changes that answer and
+  changes `/wish/`'s bill, so the question is not idle.
 
 #### /tom/, open
 
