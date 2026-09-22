@@ -2561,3 +2561,108 @@ project already requires diffing after any change.
 ⚠️ Third time in one session that an edit looked applied and was not: twice a
 script threw before `writeFileSync`, once an API name was wrong. **The count is
 the instrument. Read it every run, not just when something looks wrong.**
+
+## 107. A comment that states an intention the rule cannot implement (session 43)
+
+Two of them in one stylesheet, found by one phone screenshot.
+
+`.pos-padgrid` carried `⚠️ IT WRAPS RATHER THAN SHRINKING` directly above
+`grid-template-columns: repeat(var(--pad-cols, 16), var(--ctl-w))`. A fixed
+track count cannot wrap. It spilled **27 px** out of its own box and had done
+since it was written. `.kit-hwstrips` carried `⚠️ IT WRAPS RATHER THAN
+SCROLLING`, and its `flex-wrap` does wrap, but **only between items**: one strip
+whose content was 424 px in a 358 px box dragged the document **65 px
+sideways**. That comment also asserted a horizontal scroll is *"the thing
+shell.css already refuses everywhere else"*, which is false. `.pos-tbl-row`
+scrolls against its own minimum, `tabs.mjs` is an x-scrollable bar by design,
+and `step-grid.mjs` scrolls its strip.
+
+**A comment describing intent reads as a description of behaviour**, and the
+next person to look does not re-derive the CSS. Both rules had `min-width: 0`
+and neither had the `overflow-x` that needs it, which is the pair this file
+already records 141 px of page overflow for.
+
+⚠️ **AND THE BLOCK THAT WAS REPORTED WAS NOT THE BLOCK THAT CAUSED IT.** The
+pads were the visible symptom. The 65 px came from a different section entirely.
+When somebody reports what they SEE, measure the document, not the thing they
+pointed at.
+
+## 108. A tabbed page measures as perfect until its tab is activated (session 43)
+
+The first probe of `/kit/` loaded it at 390 px, read
+`documentElement.scrollWidth` and reported **zero overflow**. The `.kit-box` of
+the reported section measured **0 px wide**. Both readings were correct and both
+were worthless: nine of ten panels were hidden and had no layout at all.
+
+**A probe that does not click the tab gives every hidden tab a clean bill of
+health it never looked at**, and reports it in the same words it would use for a
+page that is genuinely fine. Activating each tab in turn found the real
+offender in one run.
+
+It is #56's shape in a different costume: a measurement taken in a state the
+subject was never in.
+
+## 109. Three subjects agreeing to the digit is a broken collector (session 43)
+
+`ink()` counted pixels that differed from the field, and read the field with
+`C.field.match(/\d+/g)`. `--card` is `#11151d`, so that regex returns the single
+number `11151`: the green and blue comparisons were both against `undefined`,
+every painted pixel counted, and **the function was measuring the area of the
+box**. Four asserts were green and none of them could see a picture.
+
+The tell was free and was nearly missed. **Three different envelopes, with three
+different shapes in them, all reported exactly `10032`.** A real collector
+measuring three different subjects does not return one number.
+
+✅ The repair is to read the field back OUT of the canvas after the fill, which
+needs no parser at all and is exact for any format a token can hold.
+
+## 110. An exact equality on an animating property is a race (session 43)
+
+`cs.opacity === '1'`, sampled 200 ms into a 140 ms fade, passed for weeks and
+then went red at **0.998744** once a busier page pushed the transition a frame
+later. The claim was that the control is VISIBLE, and 0.998744 is visible.
+Nothing ever wanted the difference between that and 1.
+
+⚠️ **AND THE DETAIL COULD NOT NAME ITS OWN FAILING CLAUSE.** It printed the
+button's size and both insets, which were every clause that passed, so the fault
+was in one of the two it did not print. That cost a whole extra run. **An assert
+with six clauses prints six facts.**
+
+## 111. An opt in fixes one page and licenses every page after it (session 43)
+
+A `rows` option was added to the readout on 2026-09-21, for a ten cell readout
+that had wrapped 7 and 3. It fixed that page. It was opt in, the flex row stayed
+the default, and the reasoning written beside it was sound: that row had been
+measured filling at thirteen widths.
+
+The next page with more than six cells laid eight of them out as **seven and
+one** and was reported the same way. Nobody had done anything wrong; the rule
+simply was not on by default, and **a rule you have to remember is a rule that
+holds until the next author**.
+
+The same shape, one file along: `/tom/` reported a PARKED playhead replacing a
+pad's colour, it was moved to a filter, and the RUNNING playhead was left
+replacing it. Reported again a day later. **When a fix is applied to one state
+of a thing, ask which other states have the same shape.**
+
+## 112. A message that names the wrong half sends a reader to the wrong place (session 43)
+
+`checkTransforms` refused `{ op: 'cc', to: 80 }` with **`cc takes "from" and was
+given "to"`**, which reads as *cc takes from, NOT to*. It is false: `cc` moves
+the controller numbered `from` onto the controller numbered `to`, needs both,
+and **`to: 80` was exactly right**, 80 being the Circuit's first macro knob. The
+only fault was that `from` was absent. The sentence sent a reader to delete a
+correct argument.
+
+The template was written for a genuine SWAP, `transpose takes "by" and was given
+"to"`, where naming both sides is the whole help. It had been reused for an
+OMISSION, where the given keys are all valid and one required key is missing.
+Three cases, three sentences now.
+
+⚠️ **AND THE THIRD CASE WAS FOUND BY A TEST GOING RED IN ONE LINE**, on
+`fixed needs "to", and "to" is missing`, a sentence tying itself in a knot to say
+what `and was given nothing` says plainly.
+
+It is #82 in prose: a message that measures something NEXT TO the quantity in
+question.
