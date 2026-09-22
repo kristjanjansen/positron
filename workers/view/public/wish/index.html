@@ -82,7 +82,20 @@
        right edge, and what was off the edge was the evidence. It changes height
        when an answer lands, which is a human-paced change rather than a clock,
        and is the case the no-twitch rule explicitly allows. */
-    min-height: 62px; white-space: pre-wrap; overflow-wrap: anywhere;
+    /* 🔴 A CEILING AS WELL AS A FLOOR, ASKED FOR 2026-09-22 AS *"limit height
+       of this box"* against a two link split that ran to thirty lines. The
+       object is EVIDENCE, read once and checked against, and a block that
+       pushes the picture and the verdict off the screen has stopped being
+       evidence and started being the page.
+       ⚠️ IT SCROLLS INSIDE ITSELF RATHER THAN CLIPPING, because the one thing
+       this box exists to show is the argument a refusal names, and that can be
+       on any line of it. A clip would hide exactly the evidence a reader came
+       for, which is the defect `pre-wrap` was introduced to fix from the other
+       direction.
+       ⚠️ AND THE NUMBER IS A LINE COUNT RATHER THAN A PIXEL GUESS: 18 lines at
+       this leading, so a single link is never scrollable and a split is. */
+    min-height: 62px; max-height: calc(18 * 12px * 1.6); overflow-y: auto;
+    white-space: pre-wrap; overflow-wrap: anywhere;
     /* 🔴 GREYER, ASKED FOR IN ONE WORD AGAINST THE OBJECT ITSELF. It was
        `--ink`, the page's reading colour, which made a raw object the loudest
        thing in the component while the picture and the verdict above it are
@@ -235,6 +248,7 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createGlue } from '/shell/glue.mjs';
+  import { createTable } from '/shell/table.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, printLink, checkTransforms, delivers } from '/shell/bay.mjs';
   import { describe, reword } from '/shell/instruments.mjs';
@@ -460,6 +474,62 @@
                  ['Mistral', '@cf/mistralai/mistral-small-3.1-24b-instruct'],
                  ['Scout', '@cf/meta/llama-4-scout-17b-16e-instruct']];
 
+  /**
+   * 🔴 WHAT EACH MODEL IS CALLED IN FULL AND WHAT A PRESS COSTS, ON HOVER.
+   * Asked 2026-09-22: *"give me full names of models with prices as model
+   * (browser std tooltip) on hover"*. Both rows show a nickname, `turbo` and
+   * `70B` and `Scout`, which is the right label on a button that wide and tells
+   * a reader nothing about which model ran or what asking it costs.
+   * ✅ READ OFF `developers.cloudflare.com/workers-ai/platform/pricing/` on
+   * 2026-09-22, whose own page stamp says last updated 2026-09-17. The rate is
+   * $0.011 per 1,000 neurons and the free allocation is 10,000 neurons a day,
+   * reset at 00:00 UTC.
+   * 🔴 `whisper-tiny-en` HAS NO PUBLISHED PRICE AND ITS TOOLTIP SAYS SO IN
+   * WORDS. Two pages were checked: it is absent from the audio pricing table
+   * entirely and its own model page has no Unit Pricing row. It does not get a
+   * guessed price, an interpolated one, or one borrowed from either of the
+   * other whispers. A plausible invented number here is the exact failure this
+   * project keeps paying for.
+   * ⚠️ AND TWO CLOUDFLARE PAGES DISAGREE ABOUT `@cf/openai/whisper`. The
+   * pricing table says $0.0005 per audio minute and that model's own page says
+   * $0.000453. The table is what is quoted, because one source has to win and
+   * the pricing table is the one that prices everything else in this list.
+   * ⚠️ THE UNITS ARE IN THE TOOLTIP RATHER THAN IMPLIED. `$0.293` on its own
+   * says nothing, an audio minute and a million tokens are not comparable
+   * quantities, and telling those two apart is most of what this hover is for.
+   * ⚠️ WORTH KNOWING AND NOT A TYPO: `3B` costs MORE per input token than `8B`,
+   * $0.051 against $0.045.
+   * ⚠️ NEURONS PER MILLION TOKENS, input then output, which is what the dollar
+   * figures are computed from and what the daily allocation is counted in:
+   * 70B 26,668 and 204,805, 8B 4,119 and 34,868, 3B 4,625 and 30,475, Mistral
+   * 31,876 and 50,488, Scout 24,545 and 77,273. The two priced speech models
+   * are 46.63 and 41.14 neurons an audio minute. They are here rather than in
+   * the tooltip because a tooltip is two short lines and this is a table.
+   */
+  const PRICE = {
+    '@cf/openai/whisper-large-v3-turbo': '$0.0005 per audio minute',
+    '@cf/openai/whisper': '$0.0005 per audio minute',
+    '@cf/openai/whisper-tiny-en': 'no price published by Cloudflare',
+    '@cf/meta/llama-3.3-70b-instruct-fp8-fast':
+      '$0.293 per M input tokens, $2.253 per M output tokens',
+    '@cf/meta/llama-3.1-8b-instruct-fp8-fast':
+      '$0.045 per M input tokens, $0.384 per M output tokens',
+    '@cf/meta/llama-3.2-3b-instruct':
+      '$0.051 per M input tokens, $0.335 per M output tokens',
+    '@cf/mistralai/mistral-small-3.1-24b-instruct':
+      '$0.351 per M input tokens, $0.555 per M output tokens',
+    '@cf/meta/llama-4-scout-17b-16e-instruct':
+      '$0.270 per M input tokens, $0.850 per M output tokens',
+  };
+  /**
+   * The full name on one line and what it costs on the next.
+   * ⚠️ A MODEL WITH NO ROW IN `PRICE` GETS A ONE LINE TOOLTIP AND THE CHECK
+   * GOES RED, rather than a fallback price that reads as a reading. `filter`
+   * drops the missing line instead of printing `undefined`, which would be a
+   * number-shaped thing in a place a reader trusts.
+   */
+  const priceTip = (id) => [id, PRICE[id]].filter(Boolean).join('\n');
+
   const d = mount({
     name: 'wish',
     /**
@@ -512,12 +582,21 @@
          NONE IS A LYING CONTROL. It is Enter, with Shift+Enter for a newline.
          See the `keydown` handler for why that key and where the gesture is
          written down.
-         ⚠️ IT ALSO MEANS THIS ROW IS TWO CONTROLS RATHER THAN THREE, and the
-         harness presses each one, so the proposal path is still reached by a
-         BUTTON: `Use the example` asks. Without that, the checks behind asking
-         would have gone silent while the suite stayed green, which is what
-         happened on `/mirror/` and `/blocks/`. */
-      { id: 'example', label: 'Use the example' },
+         🔴 AND `Use the example` IS GONE SINCE 2026-09-22, ASKED FOR AS *"add 5
+         varied examples into a table, some failable instead of 'Use the
+         example' in wish"*. One example was one sentence, and what is
+         interesting about this page is that some sentences come back wrong in
+         several different ways. See `EXAMPLES`.
+         🔴 IT CARRIED A CLAIM THAT WAS NOT TRUE, AND THE CLAIM WAS MEASURED
+         BEFORE IT WAS DELETED. This comment said the row had to keep one button
+         because `demo/verify.mjs` presses `.pos-controls button` and nothing
+         else, so the asking path would otherwise be graded by nothing. MEASURED
+         2026-09-22 by moving that one button out of the row and running the
+         page: **51/51 green with 45 page asserts, the same as with it in**.
+         Every check on this page hangs off `d.on('check')`, which is reached by
+         `speakBtn.click()` at the foot of this file, so the harness press was
+         driving a path the checks already drive and was carrying no assert of
+         its own. **The trap is real and this page was not in it.** */
       /* 🔴 `interpret` IS NEW, ASKED FOR 2026-09-21: *"add interpret button to
          header"*. It asks the language model about whatever is in the box, which
          is the same verb Enter already carries and the same one a release
@@ -568,8 +647,8 @@
    * side of the same header: the button on the left names the step, and it
    * names it as a verb somebody presses rather than as a noun.
    */
-  const hearPick = createChoice({ label: 'model', options: HEAR, at: 0 });
-  const patchPick = createChoice({ label: 'model', options: PATCH, at: 0 });
+  const hearPick = createChoice({ label: 'model', options: HEAR, at: 0, title: priceTip });
+  const patchPick = createChoice({ label: 'model', options: PATCH, at: 0, title: priceTip });
 
   /**
    * 🔴 A HEADER IS AN ACTION ON THE LEFT AND ITS MODEL ON THE RIGHT, AND BOTH
@@ -711,7 +790,91 @@
   whyPart.append(whyBox);
   const heard = createGlue(hear.part, said);
   const answer = createGlue(patchHead.part, whyPart, dgHost, dump);
-  d.el.append(heard, answer);
+
+  /**
+   * 🔴 FIVE THINGS TO SAY, IN A TABLE, AND SOME OF THEM GO WRONG. Asked
+   * 2026-09-22: *"add 5 varied examples into a table, some failable instead of
+   * 'Use the example' in wish"*. What replaced is one button holding one
+   * sentence, which was enough to prove the chain runs and said nothing about
+   * the thing this page is actually for: a model proposes, a validator argues,
+   * and a person is the only reader who can catch the proposals that are
+   * perfectly valid and aimed at the wrong instrument.
+   * 🔴 IT SITS BETWEEN THE SENTENCE AND THE ANSWER BECAUSE THAT IS WHAT IT
+   * FILLS. A row writes into the same box the microphone fills and then asks,
+   * which is one destination rather than two, and is why that box is editable.
+   * ⚠️ ITS OWN BLOCK RATHER THAN A THIRD PART OF THE HEAR GLUE. `.pos-tbl`
+   * paints its own border, radius and ground; inside a glue every child gives
+   * those up, so a table in one would either draw a second edge over the one
+   * the glue draws or lose the edge that makes it read as a table. The page's
+   * one 40 px rhythm separates it instead, which is the standing rule.
+   * ⚠️ TWO COLUMNS, NOT THREE. A row scrolls sideways rather than squeezing,
+   * and a row that has to be dragged is a row nobody reads, so the thing to do
+   * with a third column is not add it.
+   * ⚠️ AND THE `about` COLUMN SAYS WHAT THE SENTENCE IS ABOUT, NEVER WHAT THE
+   * ANSWER WILL BE. Under `?selfcheck=1` the reply is canned and known; for a
+   * visitor it is whatever the model says today, so a column reading `refused`
+   * would be this page predicting an answer it has not got. What each one
+   * really returned when it was asked is on the row's hover, where a fact with
+   * a date belongs.
+   */
+  /**
+   * 🔴 ONE COLUMN SINCE 2026-09-22, AND IT IS DIM. Reported with a screenshot
+   * of the two column table as *"rm about col and gray the ask content"*.
+   * ⚠️ `about` IS STILL CARRIED, IT IS JUST NOT A COLUMN. Every row keeps its
+   * field and the check drill still reports per example with it, so nothing
+   * that was being graded stopped being graded. What went is a 150 px column
+   * restating in three words a sentence the reader has already read.
+   * ⚠️ AND `hi` WENT WITH IT, WHICH IS THE `gray` HALF. `.pos-tbl-c` is
+   * `--dim` and `.pos-tbl-c.hi` is `--fg`, so this table was the brightest
+   * block on a page whose subject is the ANSWER. A marked row still lifts to
+   * `--hi`, because `.pos-tbl-row.on .pos-tbl-c.hi` was never what made the
+   * pressed row visible: its rule is on the row.
+   */
+  const examples = createTable({
+    columns: [
+      { key: 'say', label: 'ask', grow: true },
+    ],
+    note: 'was',
+    empty: '',
+    onPick: (r) => useExample(r),
+  });
+  /**
+   * 🔴 ABOVE `Hold to talk` SINCE 2026-09-22, ASKED FOR AS *"move above
+   * hold-to-talk"*. The table used to sit between the box a sentence goes into
+   * and the answer it produces, which put the five worked examples in the
+   * middle of the thing they are examples OF.
+   * ⚠️ AND THE ORDER NOW READS AS THE PAGE'S ORDER OF OPERATIONS: here are
+   * five sentences you can press, here is where you say your own, here is what
+   * came back.
+   */
+  d.el.append(examples.el, heard, answer);
+
+  /**
+   * Put one example in the box and ask about it, which is what the button this
+   * replaced did on its last day.
+   * ⚠️ THE ROW LIGHTS UP, so a reader scrolling back to the table after reading
+   * an answer can see which sentence produced it. `mark` takes a predicate over
+   * the row data rather than an index, which is the component's own rule.
+   */
+  async function useExample(r) {
+    said.value = r.say;
+    examples.mark((x) => x.say === r.say);
+    clearAnswer();
+    try { await think(r.say); } catch (e) { blame(e); }
+  }
+
+  /**
+   * 🔴 THE CONTROL ROW IS EMPTY NOW AND MUST NOT PAINT ITS EDGES. All three of
+   * this page's controls live somewhere else: `speak` and `interpret` head the
+   * two glued blocks, and the third was `Use the example`, which a table
+   * replaced. `shell.mjs` hides `.pos-controls` only when a page DECLARES no
+   * controls, which is not this case, so the row would stand there empty and
+   * draw the 14 px band the `[hidden]` rule exists to stop. Same rule as the
+   * empty readout that rendered as a 2 px line nobody wrote on `/typist/`.
+   * ⚠️ ASKED OF THE ROW RATHER THAN TYPED, so the day a control comes back into
+   * it the row comes back with it.
+   */
+  if (!d.controls.querySelector('button')) d.controls.hidden = true;
 
   /**
    * 🔴 THE BOX AN ANSWER IS GOING TO LAND IN GLIMMERS WHILE ITS MODEL IS
@@ -778,7 +941,17 @@
       const bad = checkTransforms(l.transforms || []);
       const v = bad ? { ok: false, why: bad } : b.validate(l.from, l.to, l.transforms || []);
       if (v.ok) { b.link(l.from, l.to, l.transforms || []); ok++; }
-      rows.push({ link: l, say: sayLink(l), carries: carriedBy(l), ok: v.ok, why: v.why });
+      /**
+       * 🔴 `warn` IS KEPT SINCE 2026-09-22 AND WAS THROWN AWAY BEFORE IT.
+       * `bay.mjs` returns one on an allowed link, and on this desk it is almost
+       * always `Circuit will drop touch, program, clock`, which is a fact about
+       * what really crosses a connection that the page computed on every press
+       * and showed nobody. Asked for as *"show all actual details of connection
+       * on the diagram not slop"*, and the first actual detail was already in
+       * hand and being discarded one line from here.
+       */
+      rows.push({ link: l, say: sayLink(l), carries: carriedBy(l),
+                  ok: v.ok, why: v.why, warn: v.warn || '' });
     }
     return { rows, ok, refused: rows.length - ok };
   }
@@ -922,10 +1095,63 @@
     const lines = mine.map((p) => {
       if (p.dir === 'out') return `Out sends ${EMITS.join(', ')}.`;
       const takes = ACCEPTS[p.id] ?? ['note', 'cc'];
-      return `In takes ${takes.length ? takes.join(', ') : 'nothing'}`
-        + `${NEVER.length ? `, never ${NEVER.join(', ')}` : ''}.`;
+      /**
+       * 🔴 `In takes nothing, never sysex.` WAS REPORTED AS UNCLEAR LANGUAGE ON
+       * 2026-09-22, AND IT WAS TWO DIFFERENT UNCLEAR THINGS IN ONE LINE.
+       * *takes nothing* does not say whether the port accepts no message class
+       * or merely has nothing patched into it, and those are a fact about the
+       * DEVICE and a fact about the ROOM. It is the first one: the MK-425C's
+       * input is an `ACCEPTS` entry of `[]`.
+       * ⚠️ AND *never sysex* READ AS A CONTRADICTION DIRECTLY AFTER IT. A port
+       * that takes nothing appears to be being told it takes nothing twice,
+       * which buries the one thing that line is for: the two lists are not the
+       * same list. A class off `accepts` is DROPPED at the boundary and
+       * reported; a class on `never` REFUSES THE LINK. So the refusal gets its
+       * own sentence and the word `refused`, which is the word the picture
+       * already puts on a refused arrow.
+       */
+      const refused = NEVER.length
+        ? ` A ${NEVER.join(' or ')} link is refused.` : '';
+      return (takes.length
+        ? `In accepts ${takes.join(', ')}.`
+        : 'In accepts no messages at all.') + refused;
     });
     return [CHANNELS[boxId], ...lines].filter(Boolean).join(' ');
+  }
+
+  /**
+   * 🔴 WHICH PORT OF THIS INSTRUMENT THE PROPOSAL ACTUALLY USES, WHICH IS THE
+   * DETAIL A BOX CANNOT OTHERWISE SHOW. Asked 2026-09-22 as *"show all actual
+   * details of connection on the diagram not slop"*. A box is an INSTRUMENT,
+   * the Model 12 has four ports, and picking the wrong one of them is the
+   * single most expensive mistake this page has recorded: `Model 12 MIDI IN` is
+   * allowed, is the DIN socket, and stayed silent through 525 messages while
+   * the buttons came out of `Model 12 DAW Control IN`. A picture that drew both
+   * of those as `Model 12` could never show the difference.
+   * ⚠️ IT REPLACES THE INSTRUMENT'S KIND, which is what the sub used to say:
+   * `MIDI keyboard`, `Novation synth`, `TASCAM mixer`. Those are facts about
+   * the DEVICE and the request is about the CONNECTION, and a box that has
+   * nothing in this proposal keeps its kind because there is no port to name.
+   * ⚠️ THE INSTRUMENT'S OWN NAME COMES OFF THE FRONT, or the sub echoes the
+   * label printed directly above it, which is the fault `captionTexts` records
+   * about a line under a picture repeating the box it points at. What is left
+   * of `Circuit` is nothing, so that one falls back to the direction, which is
+   * the word the port id itself uses.
+   */
+  function portSub(boxId, rows) {
+    const box = INSTRUMENTS.find((n) => n.id === boxId);
+    const used = [];
+    for (const r of rows) {
+      for (const id of [r.link.from, r.link.to]) {
+        const p = PORT.get(id);
+        if (p && p.box === boxId && !used.includes(p)) used.push(p);
+      }
+    }
+    return used.map((p) => {
+      const rest = box && p.label.startsWith(box.label)
+        ? p.label.slice(box.label.length).trim() : p.label;
+      return rest || (p.dir === 'in' ? 'in' : 'out');
+    }).join(' and ');
   }
 
   /**
@@ -939,8 +1165,22 @@
     const also = INSTRUMENTS.find((n) => n.id === p.box)?.also;
     return also?.length ? { ...p, also } : { ...p };
   });
-  const DG_CAPTION = 'Every arrow is a link the model asked for, and a refused one is '
-    + 'marked rather than left out.';
+  /**
+   * 🔴 THE CAPTION IS GONE, ASKED FOR 2026-09-22 WITH A SCREENSHOT OF IT AND THE
+   * word *"rm"*. It read *"Every arrow is a link the model asked for, and a
+   * refused one is marked rather than left out."*, and it is the second time in
+   * two days that sentence has been reported: yesterday it was drawn over an
+   * empty picture and the fix was to stop drawing the picture at all.
+   * ⚠️ IT WAS EXPLAINING A DRAWING RATHER THAN SAYING ANYTHING ABOUT THIS RUN.
+   * A refused arrow already carries the word `refused` on it, so the caption
+   * was a second way of saying what the picture says, and the one fact it
+   * added, that a refusal is drawn rather than dropped, is visible the moment
+   * a refusal happens.
+   * ⚠️ THE LINE UNDER THE PICTURE STAYS AND IS NOT EMPTY FURNITURE. That slot
+   * is a box's own sentence on hover, which `captionTexts` still reserves
+   * height for, so nothing moves when a box is hovered and nothing is drawn
+   * when one is not.
+   */
 
   /**
    * One arrow per pair of instruments the proposal joins.
@@ -962,10 +1202,26 @@
       if (!a || !b) continue;
       if (a === b) { loops++; continue; }
       const key = `${a}|${b}`;
-      const g = pairs.get(key) || { from: a, to: b, n: 0, ok: 0, why: '', carries: new Set(), t: '' };
+      const g = pairs.get(key) || { from: a, to: b, n: 0, ok: 0, why: '', carries: new Set(),
+                                    ts: new Set(), ports: new Set(), drops: '' };
       g.n++;
-      if (r.ok) { g.ok++; r.carries.forEach((c) => g.carries.add(c)); g.t = g.t || TRANSFORM_TEXT(r.link); }
-      else if (!g.why) g.why = r.why;
+      /* 🔴 WHICH PORTS, WHICH IS THE DETAIL THE PICTURE CANNOT DRAW. A box is
+         an INSTRUMENT and the Model 12 has four ports, two of which look like
+         the right one and only one of which carries its buttons. A `Set`,
+         because a split proposes two links down the same pair of ports and
+         naming it twice would read as two connections. */
+      g.ports.add(`${NAME_OF(r.link.from)} to ${NAME_OF(r.link.to)}`);
+      if (r.ok) {
+        g.ok++;
+        r.carries.forEach((c) => g.carries.add(c));
+        /* ⚠️ EVERY DISTINCT TRANSFORM, NOT THE FIRST ONE. This kept `g.t ||
+           TRANSFORM_TEXT(...)`, so a pair carrying two links with two different
+           transforms showed one of them and said nothing about the other. A
+           split is exactly that shape. */
+        const t = TRANSFORM_TEXT(r.link).replace(/^ \{ | \}$/g, '');
+        if (t) g.ts.add(t);
+        g.drops = g.drops || r.warn;
+      } else if (!g.why) g.why = r.why;
       pairs.set(key, g);
     }
     /**
@@ -979,16 +1235,53 @@
      * ⚠️ AND THE ASYMMETRY IS THE MESSAGE: an arrow means the model asked for
      * this link, a marked arrow means the validator stopped it.
      */
-    const links = [...pairs.values()].map((g) => ({
-      from: g.from,
-      to: g.to,
-      label: g.ok ? '' : 'refused',
-      note: g.ok
-        ? `${[...g.carries].join(', ') || 'nothing'} would cross this link`
-          + `${g.t ? `, after ${g.t.replace(/^ \{ | \}$/g, '')}` : ''}.`
-          + (g.n > 1 ? ` The model proposed ${g.n} links between these two.` : '')
-        : g.why,
-    }));
+    /**
+     * 🔴 AN ALLOWED ARROW NAMES WHAT CROSSES IT SINCE 2026-09-22, AND A REFUSED
+     * ONE STILL SAYS `refused`. Reported with a screenshot of `MK-425C ->
+     * Circuit` joined by a bare line: *"show all actual details of connection
+     * on the diagram not slop"*. The picture said a link existed and nothing
+     * else, and everything the page knew about it was one hover away.
+     * ⚠️ THE ASYMMETRY SURVIVES AND IS THE REASON THE TWO STRINGS ARE NOT THE
+     * SAME KIND OF THING. An arrow means the model asked for this link; a
+     * marked one means the validator stopped it. `refused` is a verdict and a
+     * class list is cargo, so the two can never be read as each other.
+     * ⚠️ AND THE CLASS LIST IS THE ONLY DETAIL THAT FITS. The budget above is
+     * MEASURED rather than judged: `GAP_X_MAX` is 58 px and `EDGE_OUT` is 2, so
+     * a link label gets **52 px** over two lines at the drawer's 9.5 px, and
+     * `createDiagram` reported `transpose+1,...` as a cut the first time this
+     * was tried. What a destination consents to is at most three of the six
+     * classes a MIDI port emits, so the longest this can ever be is `note, cc,
+     * bend`, which wraps. Everything longer is in the sentence below.
+     */
+    const links = [...pairs.values()].map((g) => {
+      const ports = [...g.ports].join(' and ');
+      const also = g.n > 1 ? ` The model proposed ${g.n} links between these two.` : '';
+      const ts = [...g.ts].join(' and ');
+      return {
+        from: g.from,
+        to: g.to,
+        /* 🔴 RED, ASKED FOR 2026-09-22 AS *"when refused, paint recused
+           conector/label red"*. `bad: true` is a `diagram.mjs` flag added the
+           same day and it paints the line, the label and the arrowhead.
+           ⚠️ IT IS A SECOND CHANNEL AND THE FIRST ONE DOES NOT MOVE. The label
+           still reads `refused` in words, so the picture still says what
+           happened in greyscale, in a screenshot, and to a reader who cannot
+           separate these two hues. Colour is never the only carrier here. */
+        bad: !g.ok,
+        label: g.ok ? [...g.carries].join(', ') : 'refused',
+        /* 🔴 THE WHOLE CONNECTION, IN THE LINE UNDER THE PICTURE, WHICH IS THE
+           ONE CHANNEL HERE WITH ROOM FOR A SENTENCE. Three facts and three
+           sentences rather than one string with commas holding it together:
+           which ports, what crosses them and after what, and what the far end
+           will throw away. */
+        note: g.ok
+          ? `${ports}. It carries ${[...g.carries].join(', ') || 'nothing'}`
+            + `${ts ? `, after ${ts}` : ''}.`
+            + (g.drops ? ` ${g.drops}.` : '')
+            + also
+          : `${ports}. ${g.why}` + also,
+      };
+    });
     return { links, loops };
   }
 
@@ -1024,7 +1317,7 @@
      * that refuses a link cannot drift apart. A typed note could, and did.
      */
     const nodes = INSTRUMENTS.filter((n) => touched.has(n.id))
-      .map((n) => ({ ...n, note: portNote(n.id) }));
+      .map((n) => ({ ...n, sub: portSub(n.id, g.rows) || n.sub, note: portNote(n.id) }));
     dg?.destroy();
     dg = null;
     /**
@@ -1041,10 +1334,14 @@
      * ⚠️ AND THE REPORT IS NOT THE CAPTION. *The model proposed nothing* lives
      * in the patch box and stays; this caption goes. One is an answer, the
      * other explains a drawing.
+     * ⚠️ **THE CAPTION IS GONE ALTOGETHER SINCE 2026-09-22** and this guard is
+     * NOT spent by that. An empty `createDiagram` still draws a figure with a
+     * reserved caption line and a room round it, so the thing this line stops
+     * is furniture with nothing above it either way.
      * ⚠️ THE ROOM STAYS EITHER WAY. See `.wish-dg`.
      */
     if (!links.length) { dgHost.replaceChildren(); return { drawn: 0, loops, boxes: 0 }; }
-    dg = createDiagram(dgHost, { caption: DG_CAPTION, nodes, links });
+    dg = createDiagram(dgHost, { nodes, links });
     return { drawn: links.length, loops, boxes: nodes.length };
   }
 
@@ -1080,8 +1377,18 @@
        cut at `"op":"trans` , which is one character before the `"to": 1` that
        the whole JSON exists to reveal. The compact form hid that argument by
        omitting it; the one-line form hid it by running off the edge. */
+    /* 🔴 ONE JSON ARRAY, AND IT IS AN ARRAY EVEN WHEN THERE IS ONE LINK IN IT.
+       Asked 2026-09-22 as *"display as json array"* and then *"(event when
+       one)"*, against a keyboard split that came back as two objects printed
+       one after the other. Two top level objects with nothing between them is
+       not JSON at all: it cannot be pasted anywhere, and a reader counting
+       connections has to count braces.
+       ⚠️ AND THE SINGLE CASE IS THE ONE THAT WAS ASKED FOR TWICE. A shape that
+       is an object for one and an array for two is a shape every reader and
+       every parser has to branch on, which is the same argument the readout
+       makes about a cell that is sometimes a number and sometimes blank. */
     patch.textContent = links.length
-      ? links.map((l) => JSON.stringify(l, null, 2)).join('\n') : EMPTY_PATCH;
+      ? JSON.stringify(links, null, 2) : EMPTY_PATCH;
     /* Both of these are things to show, the object and the report that there is
        no object, so both get the box's edges. See `.wish-patch`. */
     patch.dataset.shown = '1';
@@ -1091,7 +1398,14 @@
         el('span', 'wish-why-l', `  ${r.say}`));
       // A refusal's reason names the key or the port, never the row it is about,
       // so the link it belongs to is on the line above it.
+      // ⚠️ AND AN ALLOWED LINK GETS THE SAME SECOND LINE WHEN THE VALIDATOR HAS
+      // SOMETHING TO SAY ABOUT IT. `allowed` alone reads as *everything you
+      // said will happen*, and on this desk it usually is not: a MIDI source
+      // emits six classes and the Circuit consents to three. The line is the
+      // same shape as a refusal's, in the same dim ink, because it is the same
+      // kind of fact and only the weight differs.
       if (!r.ok) e.append(el('div', '', r.why));
+      else if (r.warn) e.append(el('div', '', r.warn));
       return e;
     }));
     g.picture = draw(g);
@@ -1198,8 +1512,24 @@
          handing back the raw form would grade a path that no longer exists.
          The raw form is still used directly below, where the validator is being
          asked about it. */
-      return { links: REPAIRED, fixed: FIXED, ms: 0, model: 'canned',
-        usage: { total_tokens: 0 } };
+      /**
+       * 🔴 ONE ANSWER PER EXAMPLE, BECAUSE THERE ARE FIVE EXAMPLES NOW. Until
+       * 2026-09-22 this returned the same reply whatever was asked, which was
+       * right while one button held one sentence and would be a hole the moment
+       * a second sentence existed: four of the five rows would fall outside the
+       * gate and a suite run would start spending on somebody's account, or,
+       * if the gate still caught them, four different requests would be graded
+       * against one answer and measure nothing.
+       * ⚠️ KEYED ON THE SENTENCE, which is the only thing the agent is sent
+       * that identifies the request. It is the row's own `say`, so the table
+       * and the gate cannot drift: there is one list.
+       * ⚠️ AND THE FALLBACK IS THE FIRST EXAMPLE'S REPLY, for the paths that
+       * ask about something nobody listed: a transcription that came off a
+       * recording, and anything typed into the box and sent with Enter.
+       */
+      const ex = EXAMPLES.find((e) => e.say === body.text);
+      return { links: ex ? ex.links : REPAIRED, fixed: ex ? ex.fixed : FIXED,
+        ms: 0, model: 'canned', usage: { total_tokens: 0 } };
     }
     reached++;
     let r;
@@ -1321,9 +1651,8 @@
     }
   }
 
-  /** The sentence the whole thing was measured on, so somebody with no
-   *  microphone has something to press. */
-  const EXAMPLE = 'Connect the keyboard to the circuit and transpose it up one semitone.';
+  /** The sentence the whole thing was measured on. It is `EXAMPLES[0]` now and
+   *  is named below, where the other four are. */
   /**
    * What a listening model really returned for that sentence, word for word,
    * measured in `research/cf-models-speech-to-patch-2026-09-21.md` §7.1. It is
@@ -1392,20 +1721,136 @@
   const FIXED = [{ op: 'transpose', said: 'to', read: 'by', value: 1 }];
 
   /**
+   * 🔴 FIVE SENTENCES, AND THREE OF THEM GO WRONG IN THREE DIFFERENT WAYS.
+   * Asked 2026-09-22: *"add 5 varied examples into a table, some failable
+   * instead of 'Use the example' in wish"*.
+   *
+   * 🔴 `links` IS WHAT THE REAL MODEL REALLY RETURNED ON FOUR OF THE FIVE, AND
+   * THE FIFTH SAYS ON ITS OWN ROW THAT IT IS CONSTRUCTED. A
+   * check written against an invented reply misses the only interesting thing
+   * that happened, which is the argument `CANNED` above already makes; the
+   * same standard is owed to a reader pressing a row.
+   * ⚠️ AND `links` IS ONLY EVER SEEN UNDER `?selfcheck=1`. A visitor pressing a
+   * row reaches the deployed agent and gets whatever the model says today. What
+   * is canned here is what a suite run sees, so that a run costs nobody
+   * anything, which is the whole of `post`'s gate: the gate belongs on the
+   * network and never on the control.
+   * 🔴 SO FIVE ROWS NEED FIVE CANNED ANSWERS. One reply for five sentences
+   * would put four of them outside the gate and a suite run would start paying
+   * for them, or worse, would grade four different requests against one answer
+   * and measure nothing.
+   *
+   * ⚠️ WHAT IS NOT HERE, AND IT IS THE ONE THIS DESK WORRIES ABOUT MOST. A
+   * SysEx link to the Circuit cannot be produced on this page at all: `NEVER`
+   * refuses a class the source could deliver, `EMITS` does not list `sysex`, so
+   * `delivers()` can never contain it and the hard refusal is unreachable from
+   * any sentence. Putting `sysex` into `EMITS` to make the example work would
+   * refuse EVERY link into the Circuit, because `never` is tested before
+   * anything is dropped. The rule is still said in words on the box's own
+   * hover, and it is still true of the instrument.
+   */
+  const EXAMPLES = [
+    /**
+     * ✅ MEASURED 2026-09-21 on `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
+     * through `demo/wish-local.mjs`: the ports right and the transform's
+     * argument under the wrong key. `links` is the reply AFTER the boundary
+     * repaired it, because that is what a real call returns now, and `fixed` is
+     * the repair the page prints in words.
+     */
+    { say: 'Connect the keyboard to the circuit and transpose it up one semitone.',
+      about: 'a transpose',
+      was: 'Measured 2026-09-21 on the 70B. The ports were right and transpose '
+        + 'carried its argument under "to" rather than "by", which the boundary '
+        + 'repairs and the log names.',
+      links: REPAIRED, fixed: FIXED },
+    /**
+     * 🔴 THE PROPOSAL THAT IS PERFECTLY VALID AND WOULD DO NOTHING, WHICH IS
+     * THE FAILURE NO VALIDATOR CAN CATCH AND THE REASON THIS PAGE PROPOSES
+     * RATHER THAN CONNECTS. ✅ MEASURED 2026-09-21 from *"I want to play notes
+     * with my model 12 REC buttons and play it to a circuit synth 1"*: the
+     * model answered `Model 12 MIDI IN -> Circuit`. That port is the 5 pin DIN
+     * socket bridged to USB and it stayed SILENT through 525 messages while the
+     * buttons came out of `Model 12 DAW Control IN`.
+     * ⚠️ IT IS ALLOWED AND IT STAYS ALLOWED. There is nothing invalid about it,
+     * and a page that refused it would be inventing a rule to hide a lesson.
+     */
+    { say: 'Play notes with my Model 12 REC buttons into circuit synth 1.',
+      about: 'a port with a twin',
+      was: 'Measured 2026-09-21 on the 70B. It chose Model 12 MIDI IN, which is '
+        + 'allowed and would do nothing: that port is the DIN socket, and the '
+        + 'buttons come out of Model 12 DAW Control IN.',
+      links: [{ from: 'here:model-12-midi-in:out', to: 'here:circuit:in',
+                transforms: [{ op: 'channel', to: 1 }] }],
+      fixed: [] },
+    /**
+     * 🔴 THE VOCABULARY REACHING FOR THE NEAREST WORD IT HAS. ✅ MEASURED
+     * 2026-09-21 from *"Split the keyboard into half. Lower part plays synth 1
+     * in the circuit and upper part plays synth 2 in the circuit."*: the 70B
+     * produced `{"op":"only","to":1}` twice and both were refused, because
+     * `only` filters by message CLASS and was the closest thing in the whole
+     * language to a filter.
+     * ⚠️ `range` WAS ADDED THE SAME DAY AND THIS REPLY IS FROM BEFORE IT
+     * EXISTED. Whether the model reaches for `range` now has not been measured,
+     * and a canned answer saying it does would be a claim nobody checked.
+     * ⚠️ IT IS ALSO THE ONLY ROW WITH TWO LINKS BETWEEN ONE PAIR, which is one
+     * arrow on purpose: two drawn down one gap read as one, and then the
+     * picture would say fewer links than the answer does. The count is in the
+     * arrow's own sentence.
+     */
+    { say: 'Split the keyboard in half, the lower part plays synth 1 and the upper part plays synth 2.',
+      about: 'a keyboard split',
+      was: 'Measured 2026-09-21 on the 70B. Two links, both refused: "only" '
+        + 'filters by message class, and it was the nearest word the language '
+        + 'had to a filter. A pitch range was added the same day.',
+      links: [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+                transforms: [{ op: 'only', to: 1 }] },
+              { from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+                transforms: [{ op: 'only', to: 2 }] }],
+      fixed: [] },
+    /**
+     * 🔴 THE ENUM REFUSING AN INVENTION, WHICH IS THE ONE PLACE A JSON SCHEMA
+     * REALLY EARNS ITS KEEP HERE. ✅ MEASURED 2026-09-21: a Moog and a Prophet,
+     * neither of them on this desk, came back as **no links at all in 496 ms**,
+     * because `from` and `to` are an `enum` of the real port ids and there was
+     * nothing in it to name. The page says so in words rather than showing an
+     * empty box.
+     */
+    { say: 'Play the Moog from the keyboard.',
+      about: 'not on this desk',
+      was: 'Measured 2026-09-21. A Moog and a Prophet, neither on this desk, '
+        + 'came back as no links at all in 496 ms, because the ports the model '
+        + 'may name are a fixed list.',
+      links: [], fixed: [] },
+    /**
+     * 🔴 THE ONE THAT CARRIES A CONTROLLER RATHER THAN NOTES, AND IT IS
+     * CONSTRUCTED. ⚖️ MEASURED 2026-09-21 was the FAILURE: *"connect the first
+     * rotary knob of evolution to the first rotary knob of circuit"* came back
+     * as `{"op":"cc","to":1}` with no `from` at all and was refused, because
+     * the model had been told the channels and nothing about controller
+     * numbers. `FACTS` gained the keyboard's six CC numbers and the Circuit's
+     * eight macros that day. **This reply is what those facts make possible and
+     * it has not been asked again**, so it is marked as constructed on the row
+     * rather than quoted as a reading.
+     */
+    { say: 'Connect the first rotary knob of the keyboard to the first macro knob of the circuit.',
+      about: 'a knob',
+      was: 'Constructed, not measured. Asked on 2026-09-21 this came back as a '
+        + 'cc with no source and was refused, and the prompt gained the knob '
+        + 'numbers that day. Nobody has asked it again.',
+      links: [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+                transforms: [{ op: 'cc', from: 84, to: 80 }] }],
+      fixed: [] },
+  ];
+  examples.set(EXAMPLES);
+  /** The first row, which is the sentence the whole chain was measured on. */
+  const EXAMPLE = EXAMPLES[0].say;
+
+  /**
    * ⚠️ ONE FUNCTION FOR THREE WAYS IN. Enter in the box, the `Interpret` button
    * and a release after a transcription all ask the same question about the
    * same text, and three copies of that would be three things to keep in step.
    */
   d.on('interpret', () => askBox());
-
-  d.on('example', async () => {
-    /* It writes into the same box the microphone fills, which is one
-       destination rather than two, AND THEN IT ASKS. See `CANNED` for why that
-       is free under a suite run. */
-    said.value = EXAMPLE;
-    clearAnswer();
-    try { await think(EXAMPLE); } catch (e) { blame(e); }
-  });
 
   /** Ask about whatever is in the box, which is the only thing Enter does. */
   async function askBox() {
@@ -1705,8 +2150,19 @@
        throws does not go red, it goes missing. */
     const asObject = (() => { try { return JSON.parse(patch.textContent); } catch { return null; } })();
     d.assert('the box shows the whole object, including the argument that was refused',
-      patch.textContent.split('\n').length > 1 && /\n  "/.test(patch.textContent)
-      && asObject?.transforms?.[0]?.to === 1,
+      /* 🔴 THE INDENT MOVED FROM TWO SPACES TO FOUR WHEN THE BOX BECAME AN
+         ARRAY, so a test for `\n  "` stopped matching. It reads the SHAPE now
+         rather than the whitespace: an array, opening on its own line, with a
+         key indented under an entry. Indentation was never the claim. The
+         claim is that the object is shown whole and readable rather than
+         compacted onto one line, which is what hid a `to: 1` once. */
+      patch.textContent.split('\n').length > 1
+      && patch.textContent.trimStart().startsWith('[')
+      && /\n\s{4}"/.test(patch.textContent)
+      /* 🔴 `asObject[0]`, BECAUSE THE BOX IS AN ARRAY SINCE 2026-09-22. This
+         read `asObject.transforms` and would have gone red on the shape
+         change, which is what it is for. */
+      && Array.isArray(asObject) && asObject[0]?.transforms?.[0]?.to === 1,
       patch.textContent.slice(0, 110));
 
     /* ⚠️ THE NEGATIVE CONTROL FOR THE SLICE, and it is the only thing that makes
@@ -1828,8 +2284,17 @@
        own text with a ruler element that carries the same class, parked off to
        one side and emptied after each layout, so a plain query answers one more
        label than the picture has and the first one is always blank. */
+    /* 🔴 AND THE LINES ARE JOINED WITH A SPACE, BECAUSE `textContent` JOINS
+       THEM WITH NOTHING. `createDiagram` draws a wrapped label as one `tspan`
+       per line, so the moment an arrow carried more than one word this read
+       `note, cc,bend` and an assert about what the picture says was failing on
+       the place the drawer chose to break. MEASURED 2026-09-22, the first day
+       an allowed arrow had a name on it. */
     const labels = () => [...dgHost.querySelectorAll('.pos-dg-llab:not([aria-hidden])')]
-      .map((t) => t.textContent);
+      .map((t) => {
+        const lines = [...t.querySelectorAll('tspan')].map((x) => x.textContent);
+        return lines.length ? lines.join(' ') : t.textContent;
+      });
 
     const seen = [];
     /* ⚠️ `dg` IS NULL IN THE STATE WHERE NOTHING WAS PROPOSED, since a picture
@@ -1883,12 +2348,70 @@
       seen.map((s) => `${s.what}: ${s.boxes} boxes, ${s.arrows} arrows, `
         + `${s.inHost} things in the host`).join('; '));
 
-    /* The negative half is the second clause: a link that PASSED must not be
-       marked, or the mark would say nothing. */
-    d.assert('a refused link is drawn and marked refused, and an allowed one is not marked',
+    /* 🔴 THE ASYMMETRY, AND IT CHANGED SHAPE ON 2026-09-22 WITHOUT CHANGING
+       MEANING. This used to read *an allowed one is not marked* and the whole
+       weight of it sat on an allowed arrow carrying NOTHING, which is also what
+       *"show all actual details of connection on the diagram not slop"* was
+       reported about. An allowed arrow names what crosses it now.
+       ⚠️ THE CLAIM THAT MATTERS IS UNCHANGED: a refused link and an allowed one
+       must never read as each other. `refused` is a verdict and `note, cc,
+       bend` is cargo, so the second clause is that the allowed run says neither
+       nothing nor `refused`. */
+    d.assert('a refused link is marked refused, and an allowed one names what crosses it',
       g4.picture.drawn === 1 && seen[1].labels.join() === 'refused'
-      && seen[2].labels.length === 0,
+      && seen[2].labels.join() === 'note, cc, bend',
       `refused run ${JSON.stringify(seen[1].labels)}, allowed run ${JSON.stringify(seen[2].labels)}`);
+
+    /**
+     * 🔴 AND IT IS RED, WHICH IS A SECOND CHANNEL RATHER THAN A REPLACEMENT.
+     * Asked 2026-09-22 as *"when refused, paint recused conector/label red"*.
+     * 🔴 THE COMPUTED VALUE, NEVER THE STYLESHEET. `positron-ui` records four
+     * dead CSS rules found this way, one of them inert for as long as it
+     * existed, and the reason is always the same: a rule that lost reads as
+     * correct in the source. This reads what the browser decided.
+     * ⚠️ AND IT GRADES THE ARROWHEAD SEPARATELY, because an SVG marker is
+     * painted from its own fill and does NOT inherit the line's stroke. A red
+     * line arriving at a grey head is the exact defect the four marker
+     * declarations in `diagram.mjs` exist to prevent, and one CSS rule would
+     * have looked like it covered it.
+     * ⚠️ THE NEGATIVE HALF IS THE ALLOWED RUN: if everything were red, this
+     * would pass while saying nothing.
+     */
+    const ink = (run) => {
+      show(run);
+      const g = dgHost.querySelector('.pos-dg-l');
+      const path = g?.querySelector('.pos-dg-link');
+      /* 🔴 THE LINK'S OWN `marker-end`, NEVER A SEARCH FOR THE RED MARKER.
+         This read `dgHost.querySelector('.pos-dg-head-bad')` on its first run
+         and went red correctly on the ALLOWED case: all four arrowheads are
+         declared in `<defs>` on every picture, so the red one is always
+         present and finding it says nothing about whether any line uses it.
+         **A count of a thing that is always there cannot see a thing that is
+         sometimes used.** */
+      const end = path?.getAttribute('marker-end') || '';
+      return {
+        line: path && getComputedStyle(path).stroke,
+        lab: g && getComputedStyle(g.querySelector('.pos-dg-llab')).fill,
+        marked: !!g?.hasAttribute('data-bad'),
+        redHead: /-r[fb]\)$/.test(end),
+        end,
+      };
+    };
+    const bad = ink(CANNED), good = ink(FIXED);
+    const BAD_INK = getComputedStyle(document.documentElement)
+      .getPropertyValue('--bad').trim();
+    const asRgb = (hex) => {
+      const p = el('span');
+      p.style.color = hex; document.body.append(p);
+      const v = getComputedStyle(p).color; p.remove(); return v;
+    };
+    const want = asRgb(BAD_INK);
+    d.assert('a refused link is red down its whole length, line, label and arrowhead, and an allowed one is not',
+      bad.marked && bad.line === want && bad.lab === want && bad.redHead
+      && !good.marked && good.line !== want && good.lab !== want && !good.redHead,
+      `refused line ${bad.line} label ${bad.lab} head ${bad.end}, `
+      + `allowed line ${good.line} label ${good.lab} head ${good.end}, `
+      + `--bad is ${BAD_INK} which computes to ${want}`);
 
     /* 🔴 THE ROOM IS TAKEN BEFORE THE PICTURE ARRIVES, which is what *"reserve
        space for it"* asked for. The reservation is a CSS number, so this reads
@@ -1932,14 +2455,6 @@
       speakBtn.children.length === 0 && speakBtn.textContent === 'Hold to talk',
       `${speakBtn.children.length} children, label ${JSON.stringify(speakBtn.textContent)}`);
 
-    /* ── the example, which now costs nothing ─────────────────────────────
-       🔴 IT IS PRESSED FOR REAL HERE, because it no longer reaches Cloudflare.
-       It writes into the same box the microphone fills, which is the whole point
-       of that box being editable. */
-    d.run('example');
-    d.assert('the example lands in the box the microphone fills, and asks nobody',
-      said.value === EXAMPLE && reached === 0,
-      `${said.value.length} characters in the box, ${reached} calls to the agent`);
 
     /* 🔴 BOTH PICKERS SAY `model`, AND THAT IS THE THIRD LABEL THIS ROW HAS
        WORN. It was `think` until 2026-09-21, which named a mechanism in this
@@ -1957,6 +2472,38 @@
       && pickLabels.join() === 'model,model',
       `${hearPick.el.querySelectorAll('button').length} and `
       + `${patchPick.el.querySelectorAll('button').length}, labelled ${pickLabels.join(' and ')}`);
+
+    /**
+     * 🔴 A NICKNAME ON THE BUTTON AND THE WHOLE TRUTH ON THE HOVER. Asked
+     * 2026-09-22: *"give me full names of models with prices as model (browser
+     * std tooltip) on hover"*. `70B` is the right label on a button and says
+     * nothing about which model ran or what asking it costs.
+     * ⚠️ THE UNITS ARE PART OF THE CLAIM AND ARE GRADED AS ONE. An audio minute
+     * and a million tokens are not comparable quantities, so a tooltip reading
+     * `$0.293` would be a number with no unit in a place a reader trusts. Five
+     * rows say `per M input tokens` and two say `per audio minute`, which is
+     * the split between the two things this page asks.
+     * 🔴 AND THE ONE MODEL WITH NO PUBLISHED PRICE SAYS SO IN WORDS, WHICH IS
+     * THE CLAUSE WORTH MOST. `whisper-tiny-en` is absent from Cloudflare's
+     * audio pricing table and has no Unit Pricing row of its own, and a
+     * plausible interpolated number in that slot is exactly the kind of
+     * confident sentence this project keeps paying for. If somebody ever fills
+     * it in with a guess, this line goes red.
+     * ⚠️ READ OFF THE BUTTONS, NEVER OFF `PRICE`, or the check would agree with
+     * itself about a tooltip that never reached the DOM.
+     */
+    const tips = [...hearPick.buttons, ...patchPick.buttons].map((b) => b.title || '');
+    const modelIds = [...HEAR, ...PATCH].map(([, id]) => id);
+    const twoLines = tips.map((t) => t.split('\n'));
+    d.assert('every model names itself in full on hover, with a price and its unit',
+      tips.length === 8
+      && twoLines.every((t, i) => t.length === 2 && t[0] === modelIds[i] && t[1].length > 8)
+      && tips.filter((t) => t.includes('per M input tokens')).length === 5
+      && tips.filter((t) => t.includes('per audio minute')).length === 2
+      && tips.filter((t) => t.includes('no price published by Cloudflare')).length === 1,
+      `${tips.length} tooltips, ${twoLines.filter((t) => t[0] === modelIds[twoLines.indexOf(t)]).length} `
+      + `naming their model, ${tips.filter((t) => /per (M input tokens|audio minute)/.test(t)).length} `
+      + `carrying a unit; turbo reads ${JSON.stringify(tips[0])}`);
 
     /**
      * 🔴 THE TWO HEADERS, MEASURED OFF REAL RECTS. An action on the left and its
@@ -2221,6 +2768,141 @@
       `touch-action ${cs.touchAction}, user-select ${cs.userSelect}, `
       + `callout ${callout || 'not computed by this browser'}`);
 
+    /* 🔴 THE EXAMPLES DRILL SITS HERE AND NOT WHERE THE ONE BUTTON'S ASSERT
+       USED TO, AND THE REASON IS THE SAME ONE THE SHIMMER DRILL BELOW ALREADY
+       CARRIES. Five rows cannot be pressed without awaiting between them, and
+       the shell paints `data-busy` on the `speak` button the moment this
+       handler first yields, so an await above the press drill takes
+       `busy before true` and a check fails because of the check above it rather
+       than because of the page. MEASURED 2026-09-22: it did, on the first run
+       after the table landed. Every await in this function belongs below the
+       line that reads `speakBtn.dataset.busy`.
+       ⚠️ AND THE LAST ROW IS PRESSED AND LEFT PENDING, which is what the
+       shimmer drill's opening wait is for. */
+    /* ── the five examples, which cost nothing ────────────────────────────
+       🔴 EVERY ROW IS PRESSED FOR REAL, because `post` is gated and none of
+       them reaches Cloudflare. A row is a `<button>` by role and `onPick` is
+       what a finger reaches, so `.click()` on the row element is the same path
+       a person takes rather than a function called around the table.
+       🔴 AND THE ROWS ARE READ OFF THE BODY, NEVER OFF THE COMPONENT. The
+       heading IS a `.pos-tbl-row` (it is `pos-tbl-row pos-tbl-head`) and it
+       comes first, so a query on the element answers the heading and an assert
+       about a row measures a column name. `scroller()` is the body. */
+    const rowEls = () => [...examples.scroller().querySelectorAll('.pos-tbl-row')];
+    const tick = () => new Promise((r) => { setTimeout(r, 0); });
+    d.assert('the table lists every example, with a heading over rows and a sentence on each',
+      EXAMPLES.length === 5 && rowEls().length === 5
+      && rowEls().every((r, i) => r.title === EXAMPLES[i].was && r.title.length > 40)
+      && examples.el.querySelector('.pos-tbl-head')?.hidden === false,
+      `${rowEls().length} rows of ${EXAMPLES.length}, heading hidden `
+      + `${examples.el.querySelector('.pos-tbl-head')?.hidden}, shortest hover `
+      + `${Math.min(...rowEls().map((r) => r.title.length))} characters`);
+
+    /**
+     * 🔴 THE TABLE REPORTS WHAT DID NOT FIT, THE WAY THE PICTURE DOES, AND IT
+     * IS THE AUTHOR WHO IS TOLD. A heading that wraps is not a typography
+     * problem, it is the table saying its column list is too heavy for the
+     * page, and it says it in the one place a reader can do nothing about it.
+     * PHOTOGRAPHED on `/making/` with `FILE` set one letter per line beside an
+     * empty cell, on a page reading 38 of 38 green.
+     * ⚠️ `measured` IS A CLAUSE RATHER THAN A DETAIL. A table with no layout
+     * answers no cuts, which would read as a clean table, so the check has to
+     * require that anything was looked at. Same rule as `caps.mjs`: a probe
+     * that could not answer must never read as a pass.
+     */
+    const tcuts = examples.cuts();
+    d.assert('the table fits its box, so no heading wraps and no row is dragged sideways',
+      tcuts.measured === true && tcuts.cuts.length === 0,
+      tcuts.measured
+        ? (tcuts.cuts.map((c) => `${c.where} ${c.id}: ${c.full} shown as ${c.shown}`).join('; ')
+           || `nothing cut across ${tcuts.width.toFixed(0)} px`)
+        : 'the table had no layout to measure');
+
+    /**
+     * 🔴 FIVE ROWS, FIVE ANSWERS, AND THE POINT IS THAT THEY ARE DIFFERENT.
+     * One line per row, compared as ONE STRING against what each example is
+     * for, so a row that quietly starts behaving like its neighbour cannot pass
+     * by satisfying a count.
+     * ⚠️ THE VERDICTS ARE READ OFF THE PAGE rather than off `grade`'s return
+     * value, because what is being graded is what a reader is shown. Two
+     * numbers derived from one field agree with each other whatever is wrong,
+     * which this project has already paid for on the MIM corpus.
+     */
+    const verdicts = () => [...whyBox.querySelectorAll('.wish-why')]
+      .map((e) => (e.querySelector('i') ? 'allowed' : 'refused'));
+    const ran = [];
+    for (let i = 0; i < EXAMPLES.length; i++) {
+      rowEls()[i].click();
+      await tick();
+      const v = verdicts();
+      ran.push({
+        about: EXAMPLES[i].about,
+        inBox: said.value === EXAMPLES[i].say,
+        lit: examples.scroller().querySelectorAll('.pos-tbl-row.on').length,
+        line: `${EXAMPLES[i].about}: ${v.filter((x) => x === 'allowed').length} allowed, `
+          + `${v.filter((x) => x === 'refused').length} refused, ${arrows()} arrow`
+          + `${arrows() === 1 ? '' : 's'}`
+          + (labels().length ? ` saying ${labels().map((t) => JSON.stringify(t)).join(' and ')}` : ''),
+      });
+    }
+    d.assert('a row writes its sentence into the box the microphone fills, lights up, and asks nobody',
+      ran.every((r) => r.inBox) && ran.every((r) => r.lit === 1) && reached === 0,
+      `${ran.filter((r) => r.inBox).length} of ${ran.length} landed in the box, `
+      + `${ran.map((r) => r.lit).join()} rows lit, ${reached} calls to the agent`);
+    d.assert('the five examples come back five different ways',
+      ran.map((r) => r.line).join(' | ') === [
+        'a transpose: 1 allowed, 0 refused, 1 arrow saying "note, cc, bend"',
+        'a port with a twin: 1 allowed, 0 refused, 1 arrow saying "note, cc, bend"',
+        'a keyboard split: 0 allowed, 2 refused, 1 arrow saying "refused"',
+        'not on this desk: 0 allowed, 0 refused, 0 arrows',
+        'a knob: 1 allowed, 0 refused, 1 arrow saying "note, cc, bend"',
+      ].join(' | '),
+      ran.map((r) => r.line).join(' | '));
+
+    /**
+     * 🔴 THE DETAILS THE PICTURE DID NOT CARRY UNTIL 2026-09-22, MEASURED ON
+     * THE ROW THEY MATTER MOST ON. Reported with a screenshot of a bare arrow:
+     * *"show all actual details of connection on the diagram not slop"*. The
+     * example is the Model 12 one, because that instrument has four ports, two
+     * of them look right and only one carries its buttons, and a picture
+     * drawing both as `Model 12` can never say which was chosen.
+     * ⚠️ `:not([aria-hidden])` FOR THE SAME REASON THE LINK LABELS NEED IT:
+     * `createDiagram` measures its own text with a ruler carrying the same
+     * class, parked off to one side, so a plain query answers one more than the
+     * picture has.
+     */
+    rowEls()[1].click();
+    await tick();
+    const subs = [...dgHost.querySelectorAll('.pos-dg-sub:not([aria-hidden])')]
+      .map((t) => t.textContent);
+    const arrowSays = dgHost.querySelector('.pos-dg-l')?.getAttribute('aria-label') || '';
+    d.assert('the picture names the port in use, and the arrow carries the whole connection',
+      /* ⚠️ WHAT IS UNDER THE BOXES, NOT IN WHAT ORDER. The picture draws them
+         in `INSTRUMENTS` order and which end of an arrow comes first is the
+         drawer's business, so an ordered comparison here would be an assert
+         about a constant's line order wearing a claim about a picture. */
+      subs.length === 2 && subs.includes('MIDI IN') && subs.includes('in')
+      && /^Model 12 MIDI IN to Circuit\./.test(arrowSays)
+      && /It carries note, cc, bend, after channel 1\./.test(arrowSays)
+      && /Circuit will drop touch, program, clock\./.test(arrowSays),
+      `the boxes read ${JSON.stringify(subs)} and the arrow says ${JSON.stringify(arrowSays)}`);
+
+    /* 🔴 AND A LINK THAT PASSES IS NOT SILENTLY COMPLETE. `allowed` on its own
+       reads as *all of it will happen*, and on this desk it never is: a MIDI
+       port emits six classes and the Circuit consents to three. The validator
+       has said so on every allowed link since it was written and the page threw
+       it away until 2026-09-22. */
+    d.assert('an allowed link says what the far end will throw away',
+      /Circuit will drop touch, program, clock/.test(whyBox.textContent)
+      && verdicts().join() === 'allowed',
+      whyBox.textContent.trim().slice(0, 120));
+
+    /* ⚠️ AND THE LAST PRESS IS LEFT PENDING ON PURPOSE. The shimmer drill below
+       opens by waiting a whole turn for everything already in flight to land,
+       which is the first moment of that drill rather than a setup line, and it
+       needs something to have been in flight. */
+    rowEls()[0].click();
+
     /* ── the shimmer, at every moment of the flow it belongs to ────────────
        🔴 IT SITS HERE AND NOT HIGHER UP, FOR THE REASON THE LAST BLOCK OF THIS
        CHECK ALREADY CARRIES: the check runs synchronously inside the `speak`
@@ -2255,9 +2937,9 @@
 
     /* 🔴 EVERYTHING ALREADY IN FLIGHT HAS TO LAND BEFORE THIS DRILL STARTS, AND
        FINDING THAT OUT IS THE FIRST MOMENT OF THE DRILL RATHER THAN A SETUP
-       LINE. `d.run('example')` above is deliberately not awaited, so its
-       proposal is still pending at this point in a synchronous check and its
-       paint would be read as this drill's own. A `setTimeout` rather than a
+       LINE. The last example row above is pressed and deliberately not
+       awaited, so its proposal is still pending at this point in a synchronous
+       check and its paint would be read as this drill's own. A `setTimeout` rather than a
        microtask, because a proposal is several ticks deep and one
        `Promise.resolve()` only buys one of them. What it then measures is that
        a finished proposal leaves NOTHING shimmering. */
@@ -2303,9 +2985,12 @@
     const proposed = (() => { try { return JSON.parse(patch.textContent); } catch { return null; } })();
     d.assert('a release transcribes and then proposes, with no second press and nobody reached',
       said.value === CANNED_HEARD && patch.dataset.shown === '1'
-      && proposed?.transforms?.[0]?.by === 1 && reached === 0,
+      /* `[0]` since 2026-09-22: the box is a JSON ARRAY now, one entry per
+         link, and an array even when there is one. */
+      && Array.isArray(proposed) && proposed[0]?.transforms?.[0]?.by === 1
+      && reached === 0,
       `box reads ${JSON.stringify(said.value.slice(0, 32))}, patch `
-      + `${JSON.stringify(proposed?.transforms ?? null)}, ${reached} calls to the agent`);
+      + `${JSON.stringify(proposed?.[0]?.transforms ?? null)}, ${reached} calls to the agent`);
 
     const p = think(EXAMPLE);               // free: `post` is gated, see CANNED
     span.push(`proposing: ${waiting()}`);
@@ -2381,8 +3066,15 @@
        */
       const away = 'The fast track row is the recording input.';
       const back = hearWords(away);
+      /* ⚠️ BOTH HALVES OF THE SENTENCE, AND THE SECOND CLAUSE IS NEW ON
+         2026-09-22. `not on this desk` is now also the `about` of an example
+         row, so a failing assert's own detail line can carry those words into
+         the log and this search would find the harness talking to itself
+         instead of the page. MEASURED: it did, on the first run after the
+         table landed. */
       const line = (document.querySelector('.pos-log')?.textContent || '')
-        .split('\n').find((l) => l.includes('not on this desk')) || '';
+        .split('\n').find((l) => l.includes('sounds like')
+          && l.includes('not on this desk')) || '';
       d.assert('a name this desk does not have is said out loud and never written into the box',
         back === away && line.includes('Fast Track'),
         `${JSON.stringify(back.slice(0, 32))}, log says ${JSON.stringify(line.trim().slice(-58))}`);
@@ -2497,6 +3189,25 @@
         __demo.readoutOptOut === true && roH === 0,
         ro ? `a .pos-readout is present and ${roH} px tall, hidden ${ro.hasAttribute('hidden')}`
            : 'no .pos-readout element at all');
+
+      /**
+       * 🔴 AND THE CONTROL ROW IS EMPTY NOW, WHICH IS THE SAME RULE ONE
+       * ELEMENT ALONG. All three controls live somewhere else: `speak` and
+       * `interpret` head the two glued blocks, and `Use the example` was
+       * replaced by a table of five on 2026-09-22. `shell.mjs` hides
+       * `.pos-controls` only for a page that DECLARES none, which this page
+       * does not, so the row would have stood there empty and drawn the 14 px
+       * band its `[hidden]` rule exists to stop.
+       * ⚠️ MEASURED AS A HEIGHT, exactly like the readout above, because
+       * whether it is hidden or emptied is not the question. The question is
+       * whether anything paints where the row used to be.
+       */
+      const crow = d.controls;
+      const crowH = crow ? crow.getBoundingClientRect().height : 0;
+      d.assert('no control row left, and no empty box painting an edge where it was',
+        crow.querySelectorAll('button').length === 0 && crowH === 0,
+        `${crow.querySelectorAll('button').length} buttons in the row, ${crowH} px tall, `
+        + `hidden ${crow.hidden}`);
     }
 
     /**

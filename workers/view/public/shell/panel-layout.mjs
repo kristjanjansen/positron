@@ -124,7 +124,7 @@ const el = (tag, cls, txt) => {
 export function createPanelLayout(o = {}) {
   const {
     cased = true, side = 'left', flow: wantFlow = true, grow: growEl = null,
-    cls = {}, strip: stripOpts = {},
+    cls = {}, strip: stripOpts = {}, plate: plateOpts = null,
   } = o;
   if (side !== null && side !== 'left' && side !== 'right') {
     throw new Error(`createPanelLayout: side is 'left', 'right' or null, not ${JSON.stringify(side)}`);
@@ -132,6 +132,34 @@ export function createPanelLayout(o = {}) {
 
   const add = (base, extra) => (extra ? `${base} ${extra}` : base);
   const root = el('div', add(`panel${cased ? ' panel-case' : ''}`, cls.panel));
+
+  /**
+   * 🔴 THE PANEL PLACES ITS OWN NAMEPLATE SINCE 2026-09-22, AND EVERY PAGE THAT
+   * PREPENDED ONE WAS PAYING FOR THE SPACING ITSELF. Reported against `/plai/`
+   * as *"you failed afain on nameplate padding. after hrs work yesterday. why
+   * not panel can have just nameplate support via nameplate component"*, and
+   * the answer is that it can and now does.
+   * 🔴 THE EVIDENCE WAS ONE LINE IN A PAGE: `demo/tom/index.html` carried
+   * `.tom .panel-plate { padding: 16px 0 0 }`. `.panel-case` is
+   * `padding: 0 var(--panel-pad)`, horizontal only, because `.panel-fixed` and
+   * `.panel-strip` each supply their own `padding-block`. A plate prepended
+   * from outside supplies none, so it sits on the top border, and the ONE page
+   * that noticed fixed it in its own stylesheet. Every page after it inherited
+   * the defect and not the fix.
+   * ⚠️ **AND A WRAPPER DID NOT SOLVE IT, WHICH IS THE PART WORTH REMEMBERING.**
+   * `instrument.mjs` was written the same day to stop five pages hand-rolling
+   * this assembly, and it centralised the `prepend` while leaving the spacing
+   * exactly where it was. **Centralising an assembly that does not own its own
+   * layout moves the duplication rather than removing it.**
+   * ⚠️ IT TAKES OPTIONS OR A BUILT PLATE. A caller with its own `createNameplate`
+   * hands the object over; a caller with nothing hands over `{ lines, place }`
+   * and never imports the component at all.
+   */
+  let plate = null;
+  if (plateOpts) {
+    plate = plateOpts.el && plateOpts.lines ? plateOpts : createNameplate(plateOpts);
+    root.append(plate.el);
+  }
 
   let wrap = null, fixed = null;
   // 🔴 THE SCROLLER IS BUILT WHATEVER ELSE IS TRUE, because contract 1 says a
@@ -225,7 +253,7 @@ export function createPanelLayout(o = {}) {
     return { flowH, kidsH, gap, slack, growing, cuts, measured };
   }
 
-  return { el: root, wrap, fixed, strip, flow: flowEl, cased, side, grow, check, cuts };
+  return { el: root, wrap, fixed, strip, flow: flowEl, plate, cased, side, grow, check, cuts };
 }
 
 /**

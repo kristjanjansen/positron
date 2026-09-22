@@ -1,0 +1,1595 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<style>
+  /* 🔴 ONE PITCH FOR THE WHOLE PANEL, WHICH IS THE PROPORTIONS OF A REAL
+     OBJECT AND THEREFORE THIS PAGE'S TO SET. `panel-layout.mjs` splits it in
+     those words: the component owns the ARRANGEMENT and a page owns its own
+     instrument's proportions. `/circuit/` already declares its own `14px` for
+     the same reason and its comment says why one pitch beats three.
+     🔴 MEASURED BEFORE IT WAS CHANGED, because *"more space around the
+     rotaries"* can mean the dial, the column, the gap or the group's own
+     surroundings, and those have four different fixes. At
+     1280 px: every dial is `--ctl-w` 46 px wide, `.pos-knob-dial` is the full
+     46 as well, and the gap between two neighbours was the site default of
+     **8 px**. So a row of rotaries was 46 px of drawing, 8 px of air, 46 px of
+     drawing, and the dial had NO margin of its own inside its column at all.
+     The air between two knobs was the only air there was.
+     ⚠️ SO IT IS THE GAP AND NOT THE COLUMN. Widening `--ctl-w` would move the
+     working surface of every control on the site; widening the gap moves only
+     the space complained about. 16 px, which doubles it, and the divider below
+     stays three of them so the two groups keep the 4 to 1 ratio they had.
+     ⚠️ AND IT IS DECLARED ON THE CASE, NOT AT `:root`, so it reaches the two
+     knob rows and nothing above them. A custom property inherits downward and
+     never sideways, which is what makes this safe to say once. */
+  /* ⚠️ ONE DECLARATION FOR BOTH CASES, AND EACH ONE STILL CARRIES ITS OWN NAME.
+     `.muta-panel` is the pitch, which is a claim about how a rotary is spaced
+     and is the same claim on both instruments. `.plai-panel` and `.warp-panel`
+     exist so an assert can say WHICH case it measured, because a page with two
+     of them cannot query `.panel` and mean anything. */
+  .muta-panel { --ctl-gap: 16px; }
+
+  /* The picker sits above the knobs: choosing the model comes first, moving
+     it comes second. One row, one class, no layout arithmetic. */
+  .plai-pick { display: flex; align-items: center; }
+
+  /* TWO ROWS THAT READ AS ONE BLOCK, AND ONE CHILD OF THE PANEL'S FLOW. The
+     flow puts `--panel-gap` between its children, which is right between the
+     model picker and the rotaries and too much between the two halves of a
+     2 by 2 arrangement. One container, one control gap, and the flow sees a
+     single child. */
+  /* ⚠️ `min-width: 0` OR THE PAGE DRAGS SIDEWAYS INSTEAD OF THE ROW. It is the
+     same guard `.pos-knob-row` carries and for the same reason: `overflow-x`
+     cannot shrink a flex item below its content, and this container sits
+     between the row and the panel's flow. */
+  .plai-knobs {
+    display: flex; flex-direction: column; gap: var(--ctl-gap); min-width: 0;
+  }
+
+  /* The effect has one row and one carrier picker above it, which is the same
+     arrangement as the oscillator above with one row fewer. */
+  .warp-pick { display: flex; align-items: center; }
+
+  /* 🔴 THE DIVIDER IS A GAP, NEVER A RULE. `positron-ui`: separation is
+     spacing, and an empty box is a line. This widens ONE existing gap in a
+     flex row rather than inserting anything, so there is no element to paint
+     its own edges and nothing for a phone to scroll past. It is the same
+     `--ctl-gap` the row already uses, three of them, so the two groups are
+     separated by four gaps where neighbours get one. */
+  .plai-extra { margin-left: calc(var(--ctl-gap) * 3); }
+
+  /* 🔴 THE WIDER PITCH IS A DESKTOP AFFORDANCE AND A PHONE HAS NOWHERE TO PUT
+     IT. MEASURED at 390 px with the 16 px pitch: the top row comes to 342 px
+     inside a 316 px scroller, so the strip scrolled 26 px, and what was under
+     the case's right edge was the third attenuverter AND the model picker's
+     die. The strip scrolling is the panel's own contract and the page never
+     drags, so nothing was broken. It still puts a control a visitor needs
+     behind a sideways drag inside a card, which this project already records
+     as a thing nobody finds.
+     ⚠️ THE ARITHMETIC, SO THE NEXT NUMBER CAN BE CHOSEN RATHER THAN GUESSED:
+     the row is `5 * 46 + 7 * gap`, because the divider is three more gaps on
+     top of the four between neighbours, and the scroller is the window less
+     32 px of page padding and 42 px of case. At 16 px that needs a 416 px
+     window. Back at the site default of 8 it is 286 px in 316, with 30 px to
+     spare, which is the margin this wants rather than the 2 px that a pitch of
+     12 would have left.
+     🔴 AND IT IS LAST IN THIS BLOCK BECAUSE A MEDIA QUERY ADDS NO SPECIFICITY.
+     `.muta-panel` above is the same weight, so a media block written before it
+     would lose at every width and never run once, which is exactly what
+     happened to `.pos-pick`'s entire phone layout.
+     ⚠️ NOTHING IN THE SUITE CAN SEE THIS. `demo/verify.mjs` runs at 756 px with
+     no viewport override, so the asserts on this page grade the 16 px pitch
+     only. The 390 px reading above was taken by hand. */
+  @media (max-width: 560px) { .muta-panel { --ctl-gap: 8px; } }
+</style>
+
+<script type="module">
+  // 🔴 THIS PAGE RUNS SOMEBODY ELSE'S FIRMWARE, UNMODIFIED, AND THAT IS THE
+  // CLAIM IT EXISTS TO MAKE. `LESSONS.md` #81: `/grains/` said *"the same
+  // granulator in this page and on a Raspberry Pi"* and it was false, because
+  // the page ran a REIMPLEMENTATION and *"no amount of A/B can promote similar
+  // to same"*. What is under this page is `plaits/dsp/voice.cc` compiled by
+  // emscripten from a pinned commit, with no line of it rewritten. The build
+  // stamps its own source digest into the wasm, so a second build of the same
+  // sources on the board can be compared to this one by something other than
+  // listening. That comparison has NOT been made yet and the page says so.
+  //
+  // 🔴 AND IT IS NOT A `ScriptProcessorNode`. `plans/plan-vcv-modules.md` §9.2
+  // measured the only shipped browser build in this ecosystem, Cardinal's, and
+  // it runs the whole engine in `createScriptProcessor(2048, …)` on the main
+  // thread: 42.7 ms of buffer, competing with layout and paint, on a node the
+  // Web Audio specification deprecated years ago. This is 128 frames on the
+  // audio thread.
+  //
+  // ── EIGHT VOICES, AND THE POLYPHONY IS THE HOST'S ───────────────────────
+  //
+  // 🔴 PLAITS IN HARDWARE IS ONE MODULE WITH ONE VOICE IN IT. Rack gets chords
+  // out of the same DSP by instantiating `plaits::Voice voice[16]` against ONE
+  // `Patch`, and the shim does the same with eight. Nothing in `plaits/` was
+  // changed to make that possible, which is the point: polyphony is an
+  // arrangement of copies rather than an edit to somebody's firmware.
+  //
+  // 🔴 AND A STOLEN VOICE IS INVISIBLE FROM THE SPEAKERS. The note that went
+  // away sounds exactly like a note that was never played, so the page prints
+  // which voice took each note and says out loud when one was taken from
+  // something still ringing.
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createInstrument } from '/shell/instrument.mjs';
+
+  // TWO ARTEFACTS, TWO SHIMS, ONE PINNED COMMIT. Neither module knows the
+  // other exists: what chains them is a WebAudio connection made in `boot()`.
+  const PLAI_URL = '/muta/vendor/plai.wasm';
+  const WARP_URL = '/muta/vendor/warp.wasm';
+
+  // The sixteen models, in the order `plaits/dsp/voice.cc:38` registers them.
+  // THE ORDER IS THE SOURCE'S, NOT A CHOICE MADE HERE: `plai_active_engine()`
+  // returns the index the DSP is actually sounding, and a list in any other
+  // order would label the wrong sound with a straight face.
+  const MODELS = [
+    'virtual analog', 'waveshaping', 'two operator FM', 'granular formant',
+    'harmonic', 'wavetable', 'chord', 'speech',
+    'swarm', 'filtered noise', 'particle noise', 'string',
+    'modal', 'bass drum', 'snare drum', 'hi-hat',
+  ];
+
+  // The parameter ids, the third and last copy of this list. The other two are
+  // demo/muta/build/plai_shim.cc and demo/muta/muta-worklet.js, and all three
+  // spell the names out because a mismatch moves the wrong control instead of
+  // throwing.
+  // ⚠️ 7 (trigger) AND 9 (trigger_patched) ARE GONE and are not listed. A gate
+  // belongs to one voice, so it is `plai_note_on` and `plai_set_drone` now.
+  const P = {
+    engine: 0, note: 1, harmonics: 2, timbre: 3, morph: 4,
+    decay: 5, lpgColour: 6, level: 8, levelPatched: 10,
+    fmAmount: 11, timbreModAmount: 12, morphModAmount: 13,
+  };
+
+  // HOW MANY VOICES THE SLIDER OFFERS. The wasm is the authority and reports
+  // `plai_max_voices()`, but the control is built before anything is fetched,
+  // so this number has to be typed once. The check below grades it against
+  // what the wasm says rather than trusting that they agree.
+  const SLIDER_MAX_VOICES = 8;
+
+  // The effect's parameter ids, the third copy. The others are
+  // demo/muta/build/warp_shim.cc and demo/muta/muta-worklet.js.
+  const W = {
+    algorithm: 0, amount: 1, drive1: 2, drive2: 3, note: 4, carrier: 5,
+  };
+
+  // THE SEVEN THINGS THE ALGORITHM KNOB CAN BE, IN THE ORDER
+  // `warps/dsp/modulator.h:117` REGISTERS THEM. Six waveshapers and then a
+  // vocoder, and the knob crossfades between adjacent ones rather than
+  // stepping, so `warp_algorithm()` reports which pair is sounding and
+  // `warp_algorithm_blend()` says how far between them the knob sits.
+  // ⚠️ THE UPSTREAM SPELLING OF THE SECOND ONE IS ONE WORD THIS SITE DOES NOT
+  // PRINT: `positron-ui` bans it as private vocabulary, which it is not here,
+  // but a reader cannot tell those apart. `wavefolder` is what the circuit is.
+  const ALGORITHMS = [
+    'crossfade', 'wavefolder', 'analog ring', 'digital ring',
+    'bitwise xor', 'comparator', 'vocoder',
+  ];
+
+  // WHAT THE SECOND INPUT IS. 0 takes the oscillator's aux jack, which is the
+  // chain; 1 to 3 render an internal carrier instead and turn the first input
+  // into a phase modulation input. `warps/ui.cc:231` is `(shape + 1) & 3`, so
+  // four positions is the instrument's own count rather than a choice here.
+  const CARRIERS = ['from PLAI', 'sine', 'triangle', 'saw'];
+
+  // WHERE THE VOCODER LIVES ON THE KNOB, AND IT IS NOT AT THE TOP.
+  // `modulator.cc:206` puts the vocoder above 0.725, and `:312` reads
+  // `release_time > 0.995` as FREEZE, which above about 0.982 holds the last
+  // spectrum forever. 0.85 is the middle of the band that sounds.
+  const VOCODER_AT = 0.85;
+  const SHAPER_AT = 0.25;
+
+  // The chord four notes make, as intervals off the pitch control. Four rather
+  // than eight so a press at the default setting never has to steal, and a
+  // press at a setting below four always does.
+  const CHORD = [0, 4, 7, 11];
+
+  const ONE = 'Two of Emilie Gillet’s firmwares, an oscillator and an effect, compiled '
+            + 'from their own C++ to WebAssembly and chained in one audio graph.';
+
+  const d = mount({
+    name: 'muta',
+    what: ONE,
+    // EIGHT CELLS, AND EVERY ONE MOVES. The two wasm SIZES are the headline
+    // numbers of this experiment and they are deliberately NOT here: they are
+    // constants, and a constant in a readout teaches a reader to stop looking
+    // at the row. They are in the log, once, beside the yardsticks worth
+    // comparing to.
+    // 🔴 `bands` IS THE CELL THIS PAGE EXISTS TO PRINT. Warps' filter bank
+    // coefficients were computed at 96 kHz and this page runs at 48, so the
+    // twenty vocoder bands sit an octave below where the hardware puts them.
+    // It reads the shift in octaves while the vocoder is the path running and
+    // is EMPTY while it is not, because the six waveshapers are unaffected and
+    // a figure that applied to nothing would be worse than no figure.
+    readout: {
+      boot: 'ms', rate: 'Hz', render: 'µs', load: '%',
+      peak: '', sounding: '', algorithm: '', bands: 'oct',
+    },
+    controls: [
+      { id: 'boot', label: 'Start audio', primary: true },
+      { id: 'pluck', label: 'Pluck' },
+      { id: 'chord', label: 'Chord' },
+      { id: 'model', label: 'Next model' },
+      { id: 'drone', label: 'Drone' },
+      { id: 'vocoder', label: 'Vocoder' },
+    ],
+  });
+  guard(d);
+
+  let ctx = null, node = null, ready = null, wasmBytes = 0, wasmImports = -1;
+  let bootMs = null, quiet = null, loud = null, entered = null, costPerQuantumMs = null;
+  let oneVoiceMs = null, manyVoiceMs = null;
+  let model = 0, droning = false, meters = 0, bench = null;
+  let voiceCount = SLIDER_MAX_VOICES, trim = 1;
+  let lastNote = null, chord = null, blockRule = null;
+  let last = { peak: 0, blocks: 0, renders: 0, held: 0, poly: 0,
+               blocksPerQuantum: 0, engine: -1, frames: 0 };
+
+  // ── the effect's own state, kept apart from the oscillator's ──────────────
+  let warpNode = null, warpReady = null, warpBytes = 0, warpImports = -1;
+  let warpEntered = null, warpBench = null, warpCostMs = null, warpMeters = 0;
+  let vocoding = false, carrier = 0;
+  let warpLast = { peak: 0, inPeak: 0, blocks: 0, frames: 0, blocksPerQuantum: 0,
+                   carry: -1, algorithm: -1, blend: 0, vocoding: false,
+                   vocoderAmount: 0, carrier: 0, quantum: 0 };
+  let carrySeen = new Set();
+  let chainOff = null, chainOn = null;
+
+  // ⚠️ DECLARED HERE, ABOVE EVERYTHING THAT CLOSES OVER THEM. `boot()` and
+  // `onWorklet()` both reach these, and `positron-ui` records a page where a
+  // `const` declared later in the same block silently took seven asserts out
+  // of a run through its temporal dead zone.
+  let onReady = () => {};
+  let onFirst = () => {};
+  let onWarpReady = () => {};
+
+  // ── the controls ────────────────────────────────────────────────────────
+  // Built before boot, because a page whose controls appear only after a press
+  // is a page that looks broken until you press the one button it shows.
+  //
+  // ⚠️ THE VOICE COUNT IS NOT A PANEL CONTROL AND SITS APART FROM THE ONES
+  // THAT ARE. Plaits has six knobs and one voice; this row is the host's
+  // arrangement of copies and says so in its second label.
+  const voicesSlider = createSlider({
+    label: 'voices', sub: 'host, not panel',
+    min: 1, max: SLIDER_MAX_VOICES, step: 1, value: SLIDER_MAX_VOICES,
+    onInput: (v) => setVoices(v),
+  });
+  const voicesRow = createSliderGroup([voicesSlider]);
+  voicesRow.el.classList.add('plai-voices');
+
+  const pick = createPicker({
+    label: 'model',
+    what: 'model',
+    prev: () => setModel(model - 1),
+    next: () => setModel(model + 1),
+    random: () => setModel(Math.floor(Math.random() * MODELS.length)),
+    onPick: (i) => setModel(i),
+  });
+  pick.options(MODELS, 0);
+  const pickRow = el('div', 'plai-pick');
+  pickRow.append(pick.el);
+
+  // ── the panel, arranged the way the panel is ────────────────────────────
+  //
+  // 🔴 READ OFF `plaits/ui.cc:70-84` IN THE PINNED SOURCE, NOT OFF A
+  // PHOTOGRAPH. Every pot there is bound with a primary parameter and, for
+  // three of them, a SECONDARY reached by holding a button:
+  //
+  //   FREQUENCY   transposition_, bipolar       no secondary
+  //   HARMONICS   harmonics                     octave_
+  //   TIMBRE      timbre                        lpg_colour
+  //   MORPH       morph                         decay
+  //   three attenuverters, each `2.0f, -1.0f`, which is -1 to +1 centred at 0
+  //
+  // 🔴 SO THE INSTRUMENT HAS FOUR BIG ROTARIES AND THIS PAGE HAS NINE, AND
+  // THAT IS A CHOICE RATHER THAN A GAP. `decay` and `lpg_colour` have no knob
+  // of their own out there: they are what TIMBRE and MORPH become while a
+  // button is held. Folding them into a held gesture here would be faithful
+  // and would hide two controls behind something a visitor has to discover, so
+  // they are visible and their second label says where the hardware keeps
+  // them. WHAT WAS REFUSED is the alternate mode, and the reason is that a
+  // page nobody can work is worse than a page that differs from a panel.
+  //
+  // ⚠️ `octave_` AND `transposition_` ARE TWO FIELDS IN THE FIRMWARE AND ONE
+  // HERE. `ui.cc` combines them into `patch.note` before the DSP sees either,
+  // so one pitch control is the instrument. Splitting it into coarse and fine
+  // would be copying the panel rather than the instrument.
+  //
+  // ⚠️ AND THE ATTENUVERTERS ARE IN THE PANEL'S ORDER, TIMBRE THEN FM THEN
+  // MORPH, which `plaits/drivers/pots_adc.h` enumerates in exactly that order.
+  // Putting FM first would have grouped it with the row it modulates, which is
+  // a better argument about meaning and a worse one about fidelity, and
+  // fidelity is what was asked for.
+  //
+  // ⚠️ NO MARGIN ARITHMETIC. Every column is one `createKnob`, every row is one
+  // `createKnobBank`, and the only geometry this page writes is one widened
+  // gap. `positron-ui` records `/twelve/` being corrected by screenshot twelve
+  // times in one evening, every time for a page doing arithmetic about a
+  // component's insides.
+  const knobs = new Map();
+  const knob = (key, id, o) => {
+    // ON EVERY MOVE. There is no wire here and no relay to overrun: the
+    // message crosses one thread boundary and is audible in the next render
+    // quantum, which is 2.67 ms away.
+    const k = createKnob({ ...o, onInput: (v) => send({ t: 'param', id, value: v }) });
+    knobs.set(key, k);
+    return k;
+  };
+
+  // ⚠️ EVERY KNOB CARRIES A SECOND LABEL, INCLUDING THE ONES THAT DO NOT NEED
+  // IT. `knob.mjs` appends the sub only when there is one, so a row mixing the
+  // two would have columns of two different heights. It also earns its place:
+  // TIMBRE and MORPH each appear twice on this page, and the range under them
+  // is the only thing telling the big rotary from its attenuverter.
+  //
+  // 🔴 AND THE THREE ATTENUVERTERS PRINT THE PANEL'S OWN MARKS, WHICH IS WHAT
+  // `ends` IS FOR. `createKnob` takes either `true`, which prints `min` and
+  // `max`, or a pair. The pair is right here for two reasons and the first is
+  // this page's own settled rule: when meaning and fidelity disagree on a
+  // panel here, fidelity wins, which is already written a few lines up about the
+  // attenuverters' ORDER. Mutable print `-` and `+` beside these three pots and
+  // nothing beside the four big ones.
+  // ⚠️ THE SECOND REASON IS THAT `ends: true` WOULD SAY THE SAME THING TWICE.
+  // These three already carry `-1 to 1` as their second label, so numbers in
+  // the dial's gap would be the same two figures 12 px above themselves inside
+  // one 46 px column, and the live value is printed above the dial as well.
+  // `-` and `+` add the one thing neither of those carries: WHICH HALF OF THE
+  // TRAVEL is negative, said by position rather than by text.
+  const MARKS = ['-', '+'];
+  const rowTop = createKnobBank([
+    knob('pitch', P.note,
+      { label: 'frequency', sub: '24 to 96', min: 24, max: 96, value: 60, home: 60 }),
+    knob('harmonics', P.harmonics,
+      { label: 'harmonics', sub: '0 to 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
+    knob('timbreMod', P.timbreModAmount,
+      { label: 'timbre', sub: '-1 to 1', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
+    knob('fmMod', P.fmAmount,
+      { label: 'fm', sub: '-1 to 1', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
+    knob('morphMod', P.morphModAmount,
+      { label: 'morph', sub: '-1 to 1', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
+  ]);
+  const rowBottom = createKnobBank([
+    knob('timbre', P.timbre,
+      { label: 'timbre', sub: '0 to 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
+    knob('morph', P.morph,
+      { label: 'morph', sub: '0 to 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
+    knob('decay', P.decay,
+      { label: 'decay', sub: 'held button', min: 0, max: 1, value: 0.5, home: 0.5 }),
+    knob('colour', P.lpgColour,
+      { label: 'colour', sub: 'held button', min: 0, max: 1, value: 0.5, home: 0.5 }),
+  ]);
+  // The first knob after the instrument's own pair, on each row, carries the
+  // gap. One class, one declaration, and the two rows line up because every
+  // knob is `--ctl-w` wide and the browser does the rest.
+  knobs.get('timbreMod').el.classList.add('plai-extra');
+  knobs.get('decay').el.classList.add('plai-extra');
+  const knobGrid = el('div', 'plai-knobs');
+  knobGrid.append(rowTop.el, rowBottom.el);
+
+  // ── the case ────────────────────────────────────────────────────────────
+  //
+  // 🔴 `createInstrument`, WHICH IS THE COMPOSITION AND NOT A CASE THIS PAGE
+  // DRAWS. It calls `createPanelLayout` and `createNameplate` and builds
+  // neither itself, and five pages had written that assembly by hand before it
+  // existed. The maker comes from `MAKER` in that module, so the word is typed
+  // in one place on the site rather than on every panel.
+  //
+  // 🔴 `side: null`, WHICH IS A PANEL WITH NO FIXED COLUMN, AND `/circuit/`
+  // IS THE OTHER ONE. A fixed column has to hold something that must stay put
+  // while the rest scrolls, and nothing here qualifies: the two knob rows come
+  // to 342 px, so at every width this page is read at there is nothing to
+  // scroll. The one candidate was the model picker, and a `--pick-w` of 22ch
+  // makes it about 250 px wide, which at 390 px would leave the rotaries about
+  // 100 px of strip and force a sideways drag on a phone to reach the fourth
+  // knob.
+  //
+  // ⚠️ THE VOICE SLIDER STAYS OUTSIDE THE CASE, WHICH IS THE SAME CLAIM ITS
+  // OWN SECOND LABEL MAKES. Plaits is one module with one voice in it; eight
+  // of them is this page's arrangement of copies. Putting that control on the
+  // instrument's plate would have the case claiming a knob the instrument does
+  // not have, which is the one thing a replica may not do.
+  /* 🔴 NO MAKER, ASKED FOR 2026-09-22 AS *"rm positron from plai and tom
+     nameplates"*. `plateSpec` turns an empty maker into ONE line at `end`
+     rather than `ends`, because `ends` is `space-between` and parks a lone
+     child on the left, which `/twelve/` was reported for. The page does not
+     choose that placement and cannot get it wrong. */
+  const inst = createInstrument({
+    name: 'PLAI', maker: '',
+    panel: { side: null, cls: { panel: 'muta-panel plai-panel' } },
+  });
+  inst.add(pickRow, knobGrid);
+
+  // ── the second case, which is an effect and not an oscillator ────────────
+  //
+  // 🔴 TWO INSTRUMENTS ON ONE PAGE, AND THE ORDER ON THE PAGE IS THE ORDER OF
+  // THE SIGNAL. PLAI makes the sound and WARP changes it, so PLAI is above.
+  // Nothing about a WebAudio connection makes that visible, and a reader who
+  // has to work out which way round two cases are wired has been handed a
+  // puzzle rather than a panel.
+  //
+  // 🔴 READ OFF `warps/ui.cc` AND `warps/cv_scaler.cc` IN THE PINNED SOURCE.
+  // The module has one big ALGORITHM pot, one PARAMETER pot, two LEVEL pots
+  // that are the channel drives, and a button that cycles the carrier shape
+  // through four positions (`ui.cc:231`, `(carrier_shape_ + 1) & 3`). The
+  // LEVEL 1 pot doubles as the internal carrier's pitch when a shape is
+  // chosen: `cv_scaler.cc:159` is `60 * pot + 12`, which is the range the NOTE
+  // rotary below carries.
+  //
+  // ⚠️ THE ALGORITHM CONTROL IS ONE CONTINUOUS ROTARY AND NOT A LIST OF SEVEN.
+  // `modulator.cc:302` crossfades between two adjacent algorithms on the
+  // fractional part of the knob, so a picker would be a different instrument
+  // wearing this one's name. What is sounding is in a readout cell instead,
+  // which is where a number that moves belongs.
+  const wknobs = new Map();
+  const wknob = (key, id, o) => {
+    const k = createKnob({ ...o, onInput: (v) => sendWarp({ t: 'param', id, value: v }) });
+    wknobs.set(key, k);
+    return k;
+  };
+
+  const wpick = createPicker({
+    label: 'carrier',
+    what: 'carrier',
+    prev: () => setCarrier(carrier - 1),
+    next: () => setCarrier(carrier + 1),
+    random: () => setCarrier(Math.floor(Math.random() * CARRIERS.length)),
+    onPick: (i) => setCarrier(i),
+  });
+  wpick.options(CARRIERS, 0);
+  const wpickRow = el('div', 'warp-pick');
+  wpickRow.append(wpick.el);
+
+  const warpRow = createKnobBank([
+    wknob('algorithm', W.algorithm,
+      { label: 'algorithm', sub: '0 to 1', min: 0, max: 1, value: 0, home: 0 }),
+    wknob('amount', W.amount,
+      { label: 'amount', sub: '0 to 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
+    wknob('drive1', W.drive1,
+      { label: 'level 1', sub: 'carrier', min: 0, max: 1, value: 0.5, home: 0.5 }),
+    wknob('drive2', W.drive2,
+      { label: 'level 2', sub: 'modulator', min: 0, max: 1, value: 0.5, home: 0.5 }),
+    wknob('note', W.note,
+      { label: 'note', sub: '12 to 72', min: 12, max: 72, value: 48, home: 48 }),
+  ]);
+
+  const warpInst = createInstrument({
+    name: 'WARP', maker: '',
+    panel: { side: null, cls: { panel: 'muta-panel warp-panel' } },
+  });
+  warpInst.add(wpickRow, warpRow.el);
+
+  d.stack.add(voicesRow.el, inst.el, warpInst.el);
+
+  function send(m) { if (node) node.port.postMessage(m); }
+  function sendWarp(m) { if (warpNode) warpNode.port.postMessage(m); }
+
+  /** Move the algorithm rotary and tell the effect, so the control and the DSP
+   *  never disagree about where the knob is. */
+  function setAlgorithm(v) {
+    wknobs.get('algorithm').set(v);
+    sendWarp({ t: 'param', id: W.algorithm, value: v });
+  }
+
+  function setCarrier(i) {
+    carrier = ((i % CARRIERS.length) + CARRIERS.length) % CARRIERS.length;
+    wpick.show(CARRIERS[carrier], carrier);
+    sendWarp({ t: 'param', id: W.carrier, value: carrier });
+    d.log(carrier === 0
+      ? 'the second input comes from PLAI, so the whole sound is the chain'
+      : `the carrier is WARP's own ${CARRIERS[carrier]} and PLAI's first output `
+        + 'becomes a phase modulation input');
+  }
+
+  function setModel(i) {
+    model = ((i % MODELS.length) + MODELS.length) % MODELS.length;
+    pick.show(MODELS[model], model);
+    send({ t: 'param', id: P.engine, value: model });
+    d.log(`model ${model}, ${MODELS[model]}`);
+    measureCost(model, voiceCount);
+  }
+
+  function setVoices(n) {
+    voiceCount = Math.max(1, Math.round(n));
+    send({ t: 'voices', n: voiceCount });
+    measureCost(model, voiceCount);
+  }
+
+  /** One note, at the pitch the control is showing. `holdMs` of 0 sustains. */
+  function noteOn(note, holdMs) { send({ t: 'noteOn', note, holdMs }); }
+
+  /**
+   * ⚠️ NOT ROUNDED TO A SEMITONE, AND THE ROUNDING IS WHAT WAS REMOVED. The
+   * panel's FREQUENCY pot is continuous and `NoteToFrequency` takes a float, so
+   * a knob reading 60.37 plays 60.37. Rounding it would leave the control
+   * showing one number and the instrument playing another, which is the
+   * smallest version of a control that lies. The chord adds whole semitones to
+   * whatever this is, exactly as turning the knob on the module does.
+   */
+  function pitch() { return knobs.get('pitch').value(); }
+
+  // ── boot ────────────────────────────────────────────────────────────────
+  // 🔴 NOTHING HERE HAPPENS ON A VISIT. No fetch, no AudioContext, no decode.
+  // A visit, a slider drag and a model change all open nothing; the wasm is
+  // asked for by the press of Start audio and never before it.
+  async function boot() {
+    if (ctx) return;
+    const t0 = performance.now();
+
+    // 48000 ASKED FOR BY NAME, because Plaits is compiled against
+    // `kSampleRate = 48000` and its resource tables are built at that rate.
+    // Rack answers the same problem with a sample rate converter on the
+    // output; this page asks the browser instead and REPORTS WHAT IT GOT, so a
+    // machine that hands back 44100 says so rather than playing flat in
+    // silence about it.
+    ctx = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 48000, latencyHint: 'interactive',
+    });
+    await ctx.resume();
+    d.set('rate', Math.round(ctx.sampleRate), ctx.sampleRate === 48000 ? 'ok' : 'bad');
+
+    await ctx.audioWorklet.addModule('/muta/muta-worklet.js');
+
+    // THE MAIN THREAD FETCHES, THE AUDIO THREAD COMPILES. There is no `fetch`
+    // inside an AudioWorkletGlobalScope, so the bytes have to cross the port.
+    //
+    // 🔴 BYTES, NOT A COMPILED `WebAssembly.Module`. MEASURED 2026-09-22 in
+    // headless Chrome 141: posting a Module to an AudioWorklet's port throws
+    // nothing here and arrives nowhere. The page read `wasm not yet` on the
+    // first render and then timed out, which looks exactly like a broken
+    // instrument and is a dropped message. The worklet's header has the whole
+    // account.
+    const [bytes, warpBytesBuf] = await Promise.all([grab(PLAI_URL), grab(WARP_URL)]);
+    wasmBytes = bytes.byteLength;               // read BEFORE the transfer empties it
+    warpBytes = warpBytesBuf.byteLength;
+
+    node = new AudioWorkletNode(ctx, 'plai-voice', { outputChannelCount: [2] });
+    node.port.onmessage = (e) => onWorklet(e.data);
+    // A processor that throws is dropped by the audio thread for the rest of
+    // the page's life, silently. Without this the symptom is an instrument
+    // that simply does not sound, which is the least informative face a fault
+    // can wear.
+    node.onprocessorerror = () => d.log('the audio thread dropped the oscillator', 'bad');
+    node.port.onmessageerror = () => d.log('a message from the audio thread could not be read', 'bad');
+
+    // 🔴 THE CHAIN, AND IT IS ONE LINE OF WEBAUDIO RATHER THAN ANYTHING INSIDE
+    // EITHER FIRMWARE. `channelCountMode: 'explicit'` with
+    // `channelInterpretation: 'discrete'` is what keeps PLAI's two jacks as two
+    // jacks: the default would treat a two channel input as a stereo pair and
+    // mix it, which would hand WARP the same signal on both inputs and quietly
+    // turn a cross-modulator into a squarer.
+    warpNode = new AudioWorkletNode(ctx, 'warp-mod', {
+      numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+      channelCount: 2, channelCountMode: 'explicit', channelInterpretation: 'discrete',
+    });
+    warpNode.port.onmessage = (e) => onWarp(e.data);
+    warpNode.onprocessorerror = () => d.log('the audio thread dropped the effect', 'bad');
+    warpNode.port.onmessageerror = () => d.log('a message from the effect could not be read', 'bad');
+
+    // ⚠️ THE OSCILLATOR NEVER REACHES THE DESTINATION. Everything audible on
+    // this page has been through both firmwares, which is what makes the second
+    // one gradable at all: a page that mixed the dry oscillator in would sound
+    // fine with the effect doing nothing.
+    node.connect(warpNode);
+    warpNode.connect(ctx.destination);
+    d.log(`audio context ${ctx.state} at ${Math.round(ctx.sampleRate)} Hz`);
+
+    const waitReady = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('the worklet never answered')), 5000);
+      onReady = (m) => { clearTimeout(timer); resolve(m); };
+    });
+    // 🔴 THE THING WORTH TIMING IS THE FIRST SAMPLE, NOT THE HANDSHAKE.
+    // "Instantiated" is a fact about the wasm; "rendered" is a fact about the
+    // instrument, and the gap between them is a render quantum plus whatever
+    // the audio thread was doing. The worklet announces the first one from
+    // inside `process()`.
+    const waitFirst = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no audio was ever rendered')), 5000);
+      onFirst = () => { clearTimeout(timer); resolve(performance.now()); };
+    });
+    const waitWarp = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('the effect never answered')), 5000);
+      onWarpReady = (m) => { clearTimeout(timer); resolve(m); };
+    });
+    // NOT TRANSFERRED. The port copies it either way, and this side keeps the
+    // bytes for the cost measurement below, which needs a second instance of
+    // exactly the same module rather than a second download of it.
+    node.port.postMessage({ t: 'wasm', bytes, rate: ctx.sampleRate });
+    warpNode.port.postMessage({ t: 'wasm', bytes: warpBytesBuf, rate: ctx.sampleRate });
+    warpReady = await waitWarp;
+    warpImports = warpReady.imports;
+    ready = await waitReady;
+    wasmImports = ready.imports;
+    trim = ready.trim;
+    // ⚠️ A FAILED BOOT STILL REPORTS. Letting this throw would take the whole
+    // check block with it, and a page that stops before it grades itself is a
+    // page whose one red line is a stack trace. The assert below says the same
+    // thing with the numbers beside it.
+    try {
+      bootMs = (await waitFirst) - t0;
+      d.set('boot', bootMs.toFixed(0), 'ok');
+    } catch (e) {
+      d.log(String(e.message || e), 'bad');
+    }
+
+    d.log(`${(wasmBytes / 1024).toFixed(1)} KB of WebAssembly, ${wasmImports} imports, `
+        + `first sample ${bootMs.toFixed(0)} ms after the fetch began`, 'hi');
+    d.log(ready.build);
+    // ⚠️ THE 210.1 MB IS A PUBLISHED ZIP, NOT A PAGE WEIGHT, AND
+    // plans/plan-vcv-modules.md §9.3 marks it as unmeasured for exactly that
+    // reason. It is quoted as what somebody downloads, which is what it is.
+    d.log(`this repository's own yardsticks: scsynth.wasm is 1740.8 KB booting in 747 ms, `
+        + `and the only shipped whole-Rack web build publishes a 210.1 MB zip`);
+    // Everything the DSP says about itself, read out of the wasm rather than
+    // typed here a second time.
+    d.log(`${ready.engines} models, ${ready.blockSize} frames a block, `
+        + `${Math.round(ready.dspRate)} Hz`);
+    // WHAT EIGHT VOICES COST IN MEMORY, read off the types in the shim rather
+    // than estimated. The allocator buffer cannot be shared: `voice.cc:56`
+    // frees it before every engine so that sixteen engines can share one
+    // voice's RAM, which means two voices sharing one would be two live
+    // engines writing the same bytes.
+    d.log(`${ready.maxVoices} voices at ${ready.voiceBytes} bytes each, with `
+        + `${(ready.allocBytes / 1024).toFixed(0)} KB of engine workspace apiece`);
+    if (!ready.rateOk) {
+      d.log(`this browser gave ${Math.round(ready.hostRate)} Hz and Plaits is compiled for `
+          + `${Math.round(ready.dspRate)} Hz, so the pitch is wrong by that ratio`, 'bad');
+    }
+
+    // ── what the second firmware says about itself ───────────────────────────
+    d.log(`${(warpBytes / 1024).toFixed(1)} KB of WebAssembly for the effect, `
+        + `${warpImports} imports, ${warpReady.bands} bands, blocks of `
+        + `${warpReady.blockSize} against a ceiling of ${warpReady.maxBlock}`, 'hi');
+    d.log(warpReady.build);
+    // 🔴 THE DEFECT THIS PAGE REPORTS RATHER THAN HIDES, SAID IN FULL ONCE AND
+    // KEPT IN A READOUT CELL AFTERWARDS. The band figures are the wasm's own,
+    // computed from the rate it was handed, so this cannot drift from what the
+    // filter bank is doing.
+    d.log(`the effect's twenty vocoder bands were computed at `
+        + `${Math.round(warpReady.tableRate)} Hz and this page runs at `
+        + `${Math.round(warpReady.dspRate)} Hz, so they sit at `
+        + `${warpReady.bandLo.toFixed(1)} to ${warpReady.bandHi.toFixed(0)} Hz instead of `
+        + `${(warpReady.bandLo * 2).toFixed(1)} to ${(warpReady.bandHi * 2).toFixed(0)} Hz, `
+        + `which is ${warpReady.bandShift.toFixed(2)} octaves low`, 'bad');
+    d.log('the six waveshaping algorithms are unaffected by that, because they hold no '
+        + 'filter. Half the algorithm rotary is exactly right and half of it is an '
+        + 'octave down, and the bands cell says so whenever the vocoder is the path '
+        + 'running');
+    d.log('running the whole page at 96000 Hz would fix it and break the other half: '
+        + 'the oscillator refuses any rate but 48000, so the two firmwares would stop '
+        + 'agreeing about pitch. Oversampling the effect alone is the real answer and '
+        + 'is not built');
+
+    setVoices(voicesSlider.get());
+    setCarrier(0);
+
+    bench = makeBench(bytes);
+    warpBench = makeWarpBench(warpBytesBuf);
+    // TWO PRICES, NOT ONE, because the readout cell can only show the setting
+    // in front of you and the interesting fact is what the eighth voice costs.
+    oneVoiceMs = costOf(model, 1);
+    warpCostMs = warpCost();
+    measureCost(model, voiceCount);
+    manyVoiceMs = costPerQuantumMs - warpCostMs;
+    d.log(`one voice ${(oneVoiceMs * 1000).toFixed(0)} µs and ${voiceCount} voices `
+        + `${(manyVoiceMs * 1000).toFixed(0)} µs, against the 2667 µs those 128 frames last`);
+    d.log(`the effect on top of that is ${(warpCostMs * 1000).toFixed(0)} µs, which is `
+        + `${(warpCostMs / oneVoiceMs).toFixed(1)} times one oscillator voice`);
+    d.log('render and load are how long the whole chain takes to produce 128 frames at '
+        + 'the voice count set above, and what share that is of the 2.67 ms those frames '
+        + 'last. Measured on the main thread against a second copy of each wasm, '
+        + 'because an AudioWorklet has no clock in it');
+    d.log(`the mix is trimmed to ${trim.toFixed(3)} at ${voiceCount} voices, so eight of `
+        + 'them never sum past the end of the graph');
+
+    // ⚠️ A SILENCE CONTROL FIRST, AND IT IS THE HALF THAT MAKES THE NEXT
+    // NUMBER MEAN ANYTHING. A page that only ever measures the loud case
+    // passes "there was sound" with a broken gate wide open. 600 ms of a
+    // running, untriggered voice is the reading that has to be near zero.
+    // ⚠️ THE COUNTER, NOT THE VALUE. `last.peak` starts at 0, so reading it
+    // before any meter has arrived records a very confident measurement of
+    // nothing and the silence assert below would pass having measured no
+    // audio at all.
+    const before = meters;
+    const wbefore = warpMeters;
+    await sleep(600);
+    quiet = meters > before ? last.peak : null;
+    // 🔴 THE SAME CONTROL ONE MODULE ALONG, AND IT IS A DIFFERENT CLAIM. The
+    // oscillator being quiet says nothing about the effect: a cross-modulator
+    // handed silence can still ring, can still put out its own carrier, and
+    // can still have a stuck buffer in it. Both ends of the chain are measured
+    // with nothing played, and both have to be near zero.
+    chainOff = warpMeters > wbefore ? warpLast.peak : null;
+    d.log(quiet == null ? 'the audio thread reported nothing in 600 ms'
+                        : `untriggered peak ${quiet.toFixed(6)} out of PLAI and `
+                          + `${chainOff == null ? 'nothing' : chainOff.toFixed(6)} out of WARP`,
+          quiet == null ? 'bad' : '');
+
+    const mid = meters;
+    const wmid = warpMeters;
+    pluck();
+    await sleep(600);
+    loud = meters > mid ? last.peak : null;
+    chainOn = warpMeters > wmid ? warpLast.peak : null;
+
+    await measureChord();
+
+    await d.run('check');
+  }
+
+  /** Fetch one artefact and say which URL failed rather than which fetch did. */
+  async function grab(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${url} answered ${res.status}`);
+    return res.arrayBuffer();
+  }
+
+  /**
+   * FOUR NOTES AT ONCE, HELD, AND THE TWO THINGS THAT CAN ONLY BE MEASURED
+   * WHILE THEY ARE.
+   *
+   * 🔴 THE GATES ARE NEVER RELEASED, which is what makes the second measurement
+   * possible at all. A plucked voice frees itself when it falls quiet, so the
+   * count of sounding voices drifts down through the window and
+   * `renders / blocks` stops dividing for a reason that is not a fault. The
+   * shim only frees a voice whose trigger has fallen, so four gates left up
+   * hold four voices for the whole window.
+   * ⚠️ HELD, NOT LOUD. `voice.cc:90` triggers the lowpass gate on a RISING EDGE
+   * alone, so these four decay like any pluck while staying held. The peak
+   * below is therefore a chord's peak and not a sustained one, and comparing it
+   * with the single note above is fair for that reason.
+   *
+   * ⚠️ EVERYTHING BEFORE IT IS STOPPED FIRST. The single pluck above rings for
+   * about a second at the default decay, so without this the chord is five
+   * voices and the arithmetic below is graded against the wrong number.
+   */
+  async function measureChord() {
+    send({ t: 'allOff' });
+    await sleep(150);
+    const root = pitch();
+    for (const i of CHORD) noteOn(root + i, 0);
+    await sleep(320);
+
+    const a = { ...last, n: meters };
+    await sleep(420);
+    const b = { ...last, n: meters };
+
+    chord = { held: b.held, peak: b.peak, poly: b.poly };
+    // 🔴 A DELTA OF ZERO SATISFIES `renders === held * blocks` AND MEASURES
+    // NOTHING. `positron-verify` calls this the count that is only evidence on
+    // the far side of a boundary: both halves of the equation have to have
+    // moved, and two different meter reports have to have arrived, before the
+    // equality says anything at all.
+    blockRule = {
+      dBlocks: b.blocks - a.blocks,
+      dRenders: b.renders - a.renders,
+      held: a.held,
+      steady: a.held === b.held,
+      reports: b.n - a.n,
+    };
+    d.log(`a chord of ${CHORD.length} on ${b.held} voices, peak ${b.peak.toFixed(3)}`);
+    send({ t: 'allOff' });
+    await sleep(80);
+  }
+
+  /**
+   * WHAT N VOICES COST, AND WHERE THE NUMBER COMES FROM.
+   *
+   * 🔴 ON THE MAIN THREAD, BECAUSE AN AUDIOWORKLET HAS NO CLOCK. `performance`
+   * is not exposed to an `AudioWorkletGlobalScope`, measured on this machine
+   * before this function existed, so timing the real render inside the real
+   * callback is not available. This is the SAME wasm and the SAME shim, a
+   * second instance of it, rendering as fast as the machine will go.
+   *
+   * ⚠️ SO IT IS THE COST OF THE DSP, NOT THE COST OF THE AUDIO CALLBACK. It
+   * excludes whatever the browser spends around `process()`, and it is a main
+   * thread reading of work that really happens on another thread. Both of
+   * those make it a floor rather than a load figure, and the page says so
+   * rather than calling it latency.
+   *
+   * ⚠️ IT DRONES RATHER THAN RESTS. An untriggered voice still runs its engine,
+   * but the lowpass gate is shut, and measuring the quiet case would price the
+   * instrument at its cheapest moment. A FREE voice is worse than that: the
+   * shim does not render one at all, so a bench that never played a note would
+   * price eight voices at the cost of nothing.
+   *
+   * ⚠️ AND IT IS RE-MEASURED PER MODEL AND PER VOICE COUNT, WHICH IS WHY THE
+   * CELL MOVES. The sixteen models are not one price: measured here, the
+   * cheapest and the dearest are a factor of seven apart.
+   */
+  function makeBench(bytes) {
+    const ex = new WebAssembly.Instance(new WebAssembly.Module(bytes), {}).exports;
+    if (typeof ex._initialize === 'function') ex._initialize();
+    ex.plai_init(48000);
+    return { ex, op: ex.plai_out_ptr(), ap: ex.plai_aux_ptr() };
+  }
+
+  /**
+   * THE EFFECT'S OWN BENCH, AND IT NEEDS SOMETHING TO CHEW ON.
+   *
+   * ⚠️ AN EFFECT PRICED ON SILENCE IS PRICED AT ITS CHEAPEST MOMENT, which is
+   * the same mistake the oscillator's bench already records about a resting
+   * voice. Warps has a noise gate in `SaturatingAmplifier::Process` that pulls
+   * a quiet input down, so a bench fed zeros measures the gate. This one feeds
+   * two sine waves at full level.
+   * ⚠️ AND IT IS PRICED ON THE VOCODER, which is the dearer of the two paths by
+   * a filter bank and twenty envelope followers. A number that only ever
+   * measured the waveshapers would understate the worst case the page can put
+   * in front of somebody.
+   */
+  function makeWarpBench(bytes) {
+    const ex = new WebAssembly.Instance(new WebAssembly.Module(bytes), {}).exports;
+    if (typeof ex._initialize === 'function') ex._initialize();
+    ex.warp_init(48000);
+    const il = ex.warp_in_l_ptr(), ir = ex.warp_in_r_ptr();
+    const inL = new Float32Array(ex.memory.buffer, il, 128);
+    const inR = new Float32Array(ex.memory.buffer, ir, 128);
+    for (let i = 0; i < 128; i++) {
+      inL[i] = Math.sin((2 * Math.PI * 220 * i) / 48000) * 0.6;
+      inR[i] = Math.sin((2 * Math.PI * 331 * i) / 48000) * 0.6;
+    }
+    return { ex, il, ir, op: ex.warp_out_ptr(), ap: ex.warp_aux_ptr() };
+  }
+
+  function warpCost() {
+    if (!warpBench) return null;
+    const { ex, il, ir, op, ap } = warpBench;
+    ex.warp_set_param(W.algorithm, VOCODER_AT);
+    ex.warp_set_param(W.carrier, 0);
+    for (let i = 0; i < 200; i++) ex.warp_render(il, ir, op, ap, 128);
+    const N = 1000;
+    const t0 = performance.now();
+    for (let i = 0; i < N; i++) ex.warp_render(il, ir, op, ap, 128);
+    return (performance.now() - t0) / N;
+  }
+
+  /**
+   * DOES THE EFFECT REALLY PROCESS TWO SIGNALS, OR ONLY PASS ONE THROUGH?
+   *
+   * 🔴 A CROSS-MODULATOR HANDED THE SAME SIGNAL TWICE PASSES EVERY "THERE WAS
+   * SOUND" CHECK THERE IS, and the channel wiring is exactly what a
+   * `channelInterpretation` default would break. So this runs the same wasm
+   * twice: once with two different inputs and once with the second input
+   * silenced, and requires the two to differ. A module ignoring its modulator
+   * returns the same samples both times.
+   * ⚠️ ON THE BENCH RATHER THAN THE INSTRUMENT, because it needs the ring
+   * modulator rather than whatever the knob is set to, and it must not be
+   * audible.
+   */
+  function twoInputs() {
+    if (!warpBench) return null;
+    const { ex, il, ir, op, ap } = warpBench;
+    const inR = new Float32Array(ex.memory.buffer, ir, 128);
+    const kept = Float32Array.from(inR);
+    const out = new Float32Array(ex.memory.buffer, op, 128);
+
+    // ANALOG RING MODULATION, index 2 of six, which is a knob at 2.5/8.
+    ex.warp_set_param(W.algorithm, 2.5 / 8);
+    ex.warp_set_param(W.carrier, 0);
+    ex.warp_set_param(W.drive1, 0.8);
+    ex.warp_set_param(W.drive2, 0.8);
+    const run = () => {
+      for (let i = 0; i < 40; i++) ex.warp_render(il, ir, op, ap, 128);
+      let rms = 0;
+      for (let i = 0; i < 128; i++) rms += out[i] * out[i];
+      return Math.sqrt(rms / 128);
+    };
+    const both = run();
+    inR.fill(0);
+    const one = run();
+    inR.set(kept);
+    return { both, one, algorithm: ex.warp_algorithm() };
+  }
+
+  function costOf(engine, n) {
+    const { ex, op, ap } = bench;
+    ex.plai_all_off();
+    ex.plai_set_polyphony(n);
+    ex.plai_set_param(P.engine, engine);
+    // Spread, so no two voices are rendering the same note and the engines
+    // cannot share a cached anything.
+    for (let i = 0; i < n; i++) ex.plai_note_on(40 + i * 5, 0);
+    ex.plai_set_drone(1);                          // gate out of the way
+    // WARM UP FIRST, and it is not politeness. The first few hundred calls
+    // are tiering up through the engine's compilers, and timing those measures
+    // the compiler. It also lets the model actually change: the DSP runs the
+    // request through a hysteresis quantizer before it swaps.
+    for (let i = 0; i < 200; i++) ex.plai_render(op, ap, 128);
+    const N = 1000;                                // 2.7 s of audio
+    const t0 = performance.now();
+    for (let i = 0; i < N; i++) ex.plai_render(op, ap, 128);
+    return (performance.now() - t0) / N;
+  }
+
+  /**
+   * DOES IT REALLY TAKE THE QUIETEST, OR ONLY THE OLDEST?
+   *
+   * 🔴 THE CHECK ON THE AUDIO THREAD CANNOT ANSWER THAT, AND SAYING SO IS THE
+   * POINT OF THIS ONE. Three notes played 200 ms apart leave the OLDEST voice
+   * and the QUIETEST voice as the same voice, because a plucked note only ever
+   * gets quieter. An assert that passes there would pass just as happily
+   * against an oldest-first rule, which is `positron-verify`'s A/B where both
+   * arms share the bug: the answer comes back identical and reads as fine.
+   *
+   * ✅ SO THIS BUILDS THE CASE WHERE THE TWO RULES DISAGREE: an older voice
+   * that is LOUDER than a newer one. Oldest-first would take the note still
+   * sounding out from under a listener; quietest takes the one that has faded.
+   *
+   * 🔴 AND THE FIRST ATTEMPT AT IT WAS WRONG, WHICH IS WHY IT IS WRITTEN DOWN.
+   * It held the older voice's gate up forever on the assumption that a held
+   * gate sustains. IT DOES NOT. `voice.cc:90-97` fires `lpg_envelope_.Trigger()`
+   * on the RISING EDGE alone, so Plaits' trigger is a one shot and a gate that
+   * stays high only stops the voice re-arming. Both voices decayed together,
+   * the newer one was louder by 0.0052, and the check went red against a shim
+   * that was doing exactly the right thing. The drone is the real bypass: with
+   * nothing patched into the trigger the lowpass gate is out of the way and the
+   * engine simply runs.
+   * ⚠️ A HELD GATE STILL KEEPS A VOICE **ACTIVE**, which is a different claim
+   * and is the one the chord above rests on.
+   *
+   * ⚠️ ON THE BENCH RATHER THAN THE INSTRUMENT, because it needs half a second
+   * of rendering with no gaps in it and it must not be audible. Same wasm,
+   * same shim, a second instance of it.
+   */
+  function stealRule() {
+    if (!bench) return null;
+    const { ex, op, ap } = bench;
+    ex.plai_all_off();
+    ex.plai_set_polyphony(2);
+    ex.plai_set_param(P.engine, 0);
+    const loud = ex.plai_note_on(60, 24);
+    // ONE VOICE IS SOUNDING, SO THIS DRONES THAT ONE AND NOTHING ELSE. The next
+    // note-on patches its own voice's trigger back in and leaves this one
+    // alone, which is what makes an older-and-louder voice possible at all.
+    ex.plai_set_drone(1);
+    for (let i = 0; i < 8; i++) ex.plai_render(op, ap, 128);
+    const faded = ex.plai_note_on(67, 24);            // 6 ms of gate, then decay
+    for (let i = 0; i < 150; i++) ex.plai_render(op, ap, 128);   // 0.4 s
+    const levels = [ex.plai_voice_level(0), ex.plai_voice_level(1)];
+    const took = ex.plai_note_on(72, 24);
+    const stolen = ex.plai_last_stolen();
+    ex.plai_all_off();
+    return { held: loud, faded, levels, took, stolen };
+  }
+
+  /**
+   * ⚠️ THE CELL IS THE WHOLE CHAIN, NOT THE OSCILLATOR. Two firmwares run in
+   * one quantum and only their sum has to fit it, so a `render` figure for one
+   * of them would be a number that cannot go over budget however bad things
+   * get. The effect's own share is measured once and printed in the log, and
+   * `manyVoiceMs` keeps the oscillator's half so the per-voice assert still
+   * grades what it always graded.
+   */
+  function measureCost(engine, n) {
+    if (!bench) return;
+    try {
+      const per = costOf(engine, n) + (warpCostMs || 0);
+      const budget = (128 / 48000) * 1000;          // 2.667 ms of wall clock
+      costPerQuantumMs = per;
+      d.set('render', (per * 1000).toFixed(0));
+      d.set('load', ((per / budget) * 100).toFixed(2));
+    } catch (e) {
+      d.log(`the cost could not be measured: ${e.message || e}`, 'bad');
+    }
+  }
+
+  function onWorklet(m) {
+    if (!m) return;
+    if (m.t === 'ready') { onReady(m); return; }
+    if (m.t === 'fail') { d.log(m.why, 'bad'); return; }
+    if (m.t === 'entered') {
+      entered = m;
+      d.log(`the audio thread ran the processor, ${m.chans} channels of ${m.frames} frames, `
+          + `wasm ${m.ready ? 'in place' : 'not yet'}`);
+      return;
+    }
+    if (m.t === 'first') { onFirst(); return; }
+    if (m.t === 'voices') {
+      trim = m.trim;
+      if (m.got !== m.asked) {
+        d.log(`asked for ${m.asked} voices and got ${m.got}, which is all there are`, 'bad');
+      }
+      return;
+    }
+    if (m.t === 'note') {
+      lastNote = m;
+      d.set('sounding', m.held);
+      // 🔴 THE ONE THING A LISTENER CANNOT HEAR. A stolen voice stops making
+      // the note it was making, which sounds exactly like a note that was
+      // never played, so it is said in words the moment it happens.
+      if (m.stolen >= 0) {
+        d.log(`voice ${m.voice} took note ${m.note} from note ${Math.round(m.stolenNote)}, `
+            + `which was the quietest at ${m.stolenLevel.toFixed(4)}`, 'hi');
+      }
+      return;
+    }
+    if (m.t === 'meter') {
+      last = m;
+      meters++;
+      d.set('sounding', m.held);
+    }
+  }
+
+  /**
+   * THE EFFECT'S SIDE OF THE PORT.
+   *
+   * ⚠️ THE `peak` CELL IS THIS ONE AND NOT THE OSCILLATOR'S, because what comes
+   * out of the page is what comes out of the chain. The oscillator's peak is
+   * still measured, and still graded, and is in the log rather than the
+   * readout: two peaks in one row would be one number nobody can attribute.
+   */
+  function onWarp(m) {
+    if (!m) return;
+    if (m.t === 'ready') { onWarpReady(m); return; }
+    if (m.t === 'fail') { d.log(`the effect: ${m.why}`, 'bad'); return; }
+    if (m.t === 'entered') {
+      warpEntered = m;
+      d.log(`the audio thread ran the effect, ${m.inChans} channels in and ${m.chans} out `
+          + `of ${m.frames} frames, wasm ${m.ready ? 'in place' : 'not yet'}`);
+      return;
+    }
+    if (m.t === 'meter') {
+      warpLast = m;
+      warpMeters++;
+      vocoding = m.vocoding;
+      // 🔴 THE CARRY IS THE ONE READING THAT PROVES THE BLOCK ARITHMETIC RAN.
+      // 128 frames against blocks of 60 leaves 8, then 16, then 24, so a page
+      // that saw ONE value here would be looking at a chopper that rounds.
+      carrySeen.add(m.carry);
+      d.set('peak', m.peak ? m.peak.toFixed(3) : '');
+      d.set('algorithm', ALGORITHMS[m.algorithm] ?? '');
+      // EMPTY WHILE THE WAVESHAPERS ARE RUNNING, because the shift is a fact
+      // about the filter bank and the filter bank is not in that path. A
+      // number printed there would be a defect claimed where there is none.
+      d.set('bands', m.vocoding ? warpReady.bandShift.toFixed(2) : '',
+            m.vocoding ? 'bad' : '');
+    }
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function pluck() {
+    if (!node) { d.log('press Start audio first', 'bad'); return; }
+    // Six milliseconds of gate. `voice.cc` reads the trigger through a delay
+    // line five blocks long and only re-arms once it falls under 0.1, so
+    // anything shorter can be written and read back as nothing.
+    noteOn(pitch(), 6);
+  }
+
+  d.on('boot', () => boot().catch((e) => d.fail(e)));
+  d.on('pluck', pluck);
+  d.on('chord', () => {
+    if (!node) { d.log('press Start audio first', 'bad'); return; }
+    const root = pitch();
+    // A HELD CHORD RATHER THAN A PLUCKED ONE, because a chord is the thing
+    // this page gained and a 6 ms gate on four voices is four plucks that
+    // happen to land together.
+    for (const i of CHORD) noteOn(root + i, 900);
+  });
+  d.on('model', () => { setModel(model + 1); pluck(); });
+  d.on('drone', () => {
+    if (!node) { d.log('press Start audio first', 'bad'); return; }
+    droning = !droning;
+    // `trigger_patched` is the whole difference between a note and a drone in
+    // Plaits: with nothing patched into the trigger the lowpass gate is
+    // bypassed and the engine simply runs. It acts on whatever is already
+    // sounding, so a chord pressed first and droned second sustains as a
+    // chord.
+    send({ t: 'drone', on: droning });
+    // THE LABEL SAYS WHAT THE NEXT PRESS DOES. There is no toggled-button
+    // style in `shell.css`, and inventing one here would be the fourth copy of
+    // a control that already exists somewhere.
+    const b = d.button('drone');
+    if (b) b.textContent = droning ? 'Notes' : 'Drone';
+    d.log(droning ? 'droning, the lowpass gate is out of the way'
+                  : 'back to notes, the lowpass gate shapes each pluck');
+  });
+
+  /**
+   * THE ONE PRESS THAT REACHES THE HALF OF THE ALGORITHM ROTARY THAT IS AN
+   * OCTAVE LOW.
+   *
+   * ⚠️ IT MOVES THE ROTARY RATHER THAN SENDING PAST IT. A control showing one
+   * value while the DSP holds another is the smallest version of a control that
+   * lies, and this page already refuses that about the pitch knob.
+   * ⚠️ AND IT LANDS AT 0.85 RATHER THAN AT 1. `modulator.cc:312` reads a
+   * release time above 0.995 as FREEZE, which above about 0.982 on this rotary
+   * holds the last spectrum forever, so the top of the travel is a hold and not
+   * a vocoder. The instrument is faithful and the preset is chosen.
+   */
+  // ⚠️ THE BUTTON'S OWN STATE, NOT THE METER'S. `vocoding` arrives with a meter
+  // report every 250 ms, so two presses inside one report would both read the
+  // same value and the label would stop matching the knob. What the button
+  // remembers is what the button last did.
+  let wantVocoder = false;
+  d.on('vocoder', () => {
+    if (!warpNode) { d.log('press Start audio first', 'bad'); return; }
+    const toVocoder = !wantVocoder;
+    wantVocoder = toVocoder;
+    setAlgorithm(toVocoder ? VOCODER_AT : SHAPER_AT);
+    const b = d.button('vocoder');
+    if (b) b.textContent = toVocoder ? 'Waveshaper' : 'Vocoder';
+    d.log(toVocoder
+      ? 'the vocoder path, twenty bands an octave below where the hardware puts them'
+      : 'back to the waveshapers, which hold no filter and are exactly right at this rate');
+    // SOMETHING TO HEAR IT ON. A vocoder with nothing going through it is
+    // silence, and silence after a press reads as a broken button.
+    const root = pitch();
+    for (const i of CHORD) noteOn(root + i, 900);
+  });
+
+  // ── the checks ──────────────────────────────────────────────────────────
+  // Everything gradable from numbers already in hand runs for everybody, which
+  // is the shell's rule. The two checks that PRESS something and change what
+  // you hear are behind the gate.
+  d.on('check', async () => {
+    // ⚠️ BOTH ARTEFACTS IN ONE CLAIM, because "the wasm" stopped being a
+    // singular noun on this page and an assert naming one of two would leave
+    // the other ungraded while reading as coverage.
+    d.assert('both wasm modules compiled and need nothing from the host',
+      wasmImports === 0 && warpImports === 0,
+      `the oscillator ${wasmImports < 0 ? 'never compiled' : `${wasmImports} imports`}, `
+      + `the effect ${warpImports < 0 ? 'never compiled' : `${warpImports} imports`}`);
+
+    // AGAINST THIS REPOSITORY'S OWN YARDSTICK, which is the comparison
+    // plan-vcv-modules.md §9.3 asks for. 1.70 MB is scsynth.wasm, measured
+    // here on 2026-09-12.
+    d.assert('both of them together are smaller than this project’s other sound engine',
+      wasmBytes > 0 && warpBytes > 0 && wasmBytes + warpBytes < 1740800,
+      `${(wasmBytes / 1024).toFixed(1)} KB and ${(warpBytes / 1024).toFixed(1)} KB against `
+      + `scsynth.wasm at 1740.8 KB`);
+
+    // ⚠️ THE TWO SILENCES SEPARATED. A processor nobody calls and a processor
+    // that returns early look identical from the speakers, and the second one
+    // is a bug in this file while the first is a bug in the graph around it.
+    d.assert('the audio thread ran both processors and gave each 128 frames',
+      !!entered && entered.chans === 2 && entered.frames === 128
+        && !!warpEntered && warpEntered.chans === 2 && warpEntered.frames === 128,
+      entered && warpEntered
+        ? `the oscillator got ${entered.chans} channels of ${entered.frames} frames and the `
+          + `effect ${warpEntered.chans} of ${warpEntered.frames}`
+        : `${entered ? '' : 'the oscillator’s '}${warpEntered ? '' : 'the effect’s '}`
+          + 'process() was never called');
+
+    d.assert('the first quantum of audio was rendered',
+      bootMs != null && bootMs > 0,
+      bootMs == null ? 'nothing was ever rendered' : `${bootMs.toFixed(0)} ms after the fetch began`);
+
+    d.assert('the audio thread runs at the rate the DSP was compiled for',
+      !!ready && ready.rateOk && Math.round(ready.hostRate) === 48000,
+      ready ? `host ${Math.round(ready.hostRate)} Hz, DSP ${Math.round(ready.dspRate)} Hz`
+            : 'never started');
+
+    // ⚠️ BOTH HALVES, AND THE QUIET ONE IS THE HARDER CLAIM. A gate stuck open
+    // passes "there was sound" every time.
+    d.assert('a press makes a sound and an untriggered voice does not',
+      quiet != null && loud != null && quiet < 0.01 && loud > 0.02,
+      quiet == null || loud == null ? 'the audio thread reported nothing'
+        : `untriggered ${quiet.toFixed(6)}, plucked ${loud.toFixed(3)}, at a trim of `
+          + `${trim.toFixed(3)}`);
+
+    // 🔴 AND THE SAME TWO HALVES AT THE FAR END OF THE CHAIN, WHICH IS A
+    // DIFFERENT CLAIM AND NOT A RESTATEMENT. Everything audible on this page
+    // leaves the effect, so the oscillator being right says nothing about what
+    // a listener gets. An effect that dropped every sample would leave the
+    // assert above perfectly green.
+    d.assert('the whole chain is silent when nothing is played and sounds when it is',
+      chainOff != null && chainOn != null && chainOff < 0.01 && chainOn > 0.01,
+      chainOff == null || chainOn == null ? 'the effect reported nothing'
+        : `${chainOff.toFixed(6)} with nothing played and ${chainOn.toFixed(3)} with a pluck, `
+          + `out of an oscillator at ${loud == null ? '?' : loud.toFixed(3)}`);
+
+    // ONE WORKLET CALL IS 128 FRAMES AND PLAITS' OWN BLOCK IS 12, so a quantum
+    // is ten or eleven Render calls with the remainder carried. Rack's adapter
+    // is the other shape: 128 calls of `process()` buffered into blocks of 12
+    // through a ring buffer and a sample rate converter.
+    const bpq = last.blocksPerQuantum;
+    d.assert('one worklet call is 128 frames and ten or eleven blocks of twelve',
+      last.frames === 128 && (bpq === 10 || bpq === 11),
+      `${last.frames} frames, ${bpq} blocks of ${ready?.blockSize ?? '?'}`);
+
+    // 🔴 THE INVARIANT THE WHOLE ARRANGEMENT RESTS ON, ASSERTED RATHER THAN
+    // COMMENTED. `voice.cc` sets three envelope rates from the `kBlockSize`
+    // CONSTANT rather than from the `size` argument it was handed (lines 135,
+    // 207 and 213), so a Render call of any other length advances the audio at
+    // one rate and the envelopes at another and the instrument becomes a
+    // different instrument. Every voice therefore has to sit on the same block
+    // boundary, and `plai_voice_renders()` is what makes that checkable: with
+    // N voices sounding for a whole window it has to advance by exactly N
+    // times `plai_blocks_rendered()`.
+    const br = blockRule;
+    d.assert('every voice rendered the same blocks of twelve as every other',
+      !!br && br.steady && br.held > 1 && br.reports > 0 && br.dBlocks > 0
+        && br.dRenders === br.held * br.dBlocks,
+      br ? `${br.dRenders} voice renders against ${br.held} voices times ${br.dBlocks} blocks, `
+         + `over ${br.reports} reports from the audio thread`
+         : 'the chord was never measured');
+
+    // ⚠️ FOUR VOICES, READ OFF THE DSP'S OWN COUNT RATHER THAN OFF WHAT THIS
+    // PAGE SENT. A note that never crossed the port, or four notes that all
+    // landed on one voice, both leave this at 1.
+    d.assert('four notes at once are four voices and not one voice retriggered',
+      !!chord && chord.held === CHORD.length && chord.peak > 0.02,
+      chord ? `${chord.held} of ${chord.poly} voices sounding at peak `
+            + `${chord.peak.toFixed(3)}, against one note at ${loud == null ? '?' : loud.toFixed(3)}`
+            : 'the chord was never measured');
+
+    // ⚠️ A NUMBER TYPED ON THIS PAGE, GRADED AGAINST THE WASM THAT OWNS IT.
+    // The slider has to exist before anything is fetched, so its top end is a
+    // constant here and `kMaxVoices` is a constant in the shim. This is the
+    // one line that can notice them disagreeing.
+    d.assert('the voice control reaches exactly as far as the wasm does',
+      !!ready && ready.maxVoices === SLIDER_MAX_VOICES,
+      ready ? `slider to ${SLIDER_MAX_VOICES}, wasm reports ${ready.maxVoices}` : 'never started');
+
+    // THE STAMP IS THE WHOLE POINT OF THE EXERCISE AND IT IS NOT YET A PROOF.
+    // It names both upstream commits and a digest over the exact source set,
+    // so a native build of the same sources on the board can be compared to
+    // this one by something other than two people agreeing it sounds right.
+    // Nothing has been built on the board. This asserts the stamp is WELL
+    // FORMED and says out loud that the comparison is unmade.
+    const stamp = ready?.build ?? '';
+    const sha = ready?.sourceSha ?? '';
+    const wstamp = warpReady?.build ?? '';
+    const wsha = warpReady?.sourceSha ?? '';
+    const wellFormed = (s, h, name) =>
+      new RegExp(`^${name} [0-9a-f]{7} stmlib [0-9a-f]{7} src [0-9a-f]{16} emcc \\S+$`).test(s)
+      && /^[0-9a-f]{16}$/.test(h) && s.includes(h);
+    d.assert('each wasm carries the commits and the source digest it was built from',
+      wellFormed(stamp, sha, 'plaits') && wellFormed(wstamp, wsha, 'warps'),
+      `${stamp || 'no stamp'} and ${wstamp || 'no stamp'}`);
+
+    // 🔴 AND THE TWO DIGESTS ARE DIFFERENT, WHICH IS WHAT ONE BUILD SCRIPT
+    // BUYING TWO MODULES HAS TO PROVE. `build.sh` is shared now, and a shared
+    // script that handed both artefacts one identity would make the digest
+    // mechanism worthless in the exact way it was written to prevent. The
+    // digest is computed over the SHIM'S BYTES and the SOURCE LIST, both of
+    // which differ, so this is a check that the parameterisation reached the
+    // part that matters rather than only the part that compiles.
+    d.assert('one build script gives the two modules two different digests',
+      /^[0-9a-f]{16}$/.test(sha) && /^[0-9a-f]{16}$/.test(wsha) && sha !== wsha,
+      `the oscillator ${sha || 'none'}, the effect ${wsha || 'none'}`);
+
+    // ⚠️ AN UPPER BOUND AND A SHAPE, NOT JUST A LOWER ONE. "Greater than zero"
+    // passes on a loop that was optimised away, and a voice count that costs
+    // the same whatever it is set to would mean seven of the eight are not
+    // being rendered at all. The ratio is the half that says the voices are
+    // real.
+    const ratio = oneVoiceMs ? manyVoiceMs / oneVoiceMs : 0;
+    d.assert('every voice costs, and all of them together still fit a render quantum',
+      oneVoiceMs != null && manyVoiceMs != null && oneVoiceMs > 0.001
+        && ratio > voiceCount / 2 && manyVoiceMs < 2.667,
+      oneVoiceMs == null ? 'never measured'
+        : `one voice ${(oneVoiceMs * 1000).toFixed(0)} µs, ${voiceCount} voices `
+          + `${(manyVoiceMs * 1000).toFixed(0)} µs, a factor of ${ratio.toFixed(1)}, `
+          + 'of the 2667 µs those 128 frames last');
+
+    // 🔴 THE STEALING RULE IS **THE QUIETEST VOICE**, AND THIS IS THE ONLY
+    // CHECK THAT CAN TELL IT FROM AN OLDEST-FIRST RULE. A Plaits note is a
+    // pluck through a lowpass gate that rings for about a second, so taking the
+    // oldest cuts whichever note a listener is still holding on to while a
+    // voice that faded three notes ago sits unused. WHAT WAS REFUSED is
+    // oldest-first, same-pitch-first and refusing the note outright: the first
+    // for that reason, the second because this instrument has no reason to
+    // expect a repeated pitch, and the third because a note that does nothing
+    // is the shape of control this project calls a lie.
+    const sr = stealRule();
+    d.assert('a note takes the quietest voice and not merely the oldest one',
+      !!sr && sr.stolen === sr.faded && sr.stolen !== sr.held
+        && sr.levels[sr.held] > sr.levels[sr.faded] * 2,
+      sr ? `voice ${sr.held} was older and still at ${sr.levels[sr.held].toFixed(4)}, voice `
+         + `${sr.faded} was newer and down to ${sr.levels[sr.faded].toFixed(4)}, and voice `
+         + `${sr.stolen} was taken`
+         : 'the bench was never built');
+
+    // ── the effect ─────────────────────────────────────────────────────────
+
+    // 🔴 THE BLOCK LENGTH IS THE ONE THING THE PLAN GOT WRONG, SO IT IS THE
+    // FIRST THING GRADED. `plans/plan-two-more-modules.md` §3.4 says 128 frames
+    // are "two calls of 64 with no carry" on the evidence that every
+    // `kMaxBlockSize` is an array dimension. Both floors in `filter_bank.cc`
+    // and the silent `return` in `sample_rate_converter.h:220` need a multiple
+    // of TWELVE, and 64 is not one. 60 is, and it is what the firmware itself
+    // hands its codec.
+    d.assert('the effect runs the block length the firmware runs, and it divides by twelve',
+      !!warpReady && warpReady.blockSize === 60 && warpReady.blockSize % 12 === 0
+        && warpReady.blockSize <= warpReady.maxBlock,
+      warpReady ? `blocks of ${warpReady.blockSize} against a ceiling of ${warpReady.maxBlock}`
+                : 'the effect never started');
+
+    // 🔴 AND THE REMAINDER IS CARRIED RATHER THAN ROUNDED, WHICH ONLY A MOVING
+    // READING CAN SHOW. 128 frames against blocks of 60 leaves 8 over, then 16,
+    // then 24, so a chopper that rounded a quantum to two blocks would report
+    // the same carry for ever. Requiring MORE THAN ONE distinct value is what
+    // separates this from a constant.
+    const carries = [...carrySeen];
+    d.assert('the frames a quantum cannot fill are carried into the next block',
+      carries.length > 1 && carries.every((c) => c >= 0 && c < 60)
+        && warpLast.frames > 0 && warpLast.blocks > 0,
+      carries.length
+        ? `${carries.length} different carries seen (${carries.slice(0, 6).join(', ')}), over `
+          + `${warpLast.blocks} blocks and ${warpLast.frames} frames`
+        : 'the effect reported no carry at all');
+
+    // 🔴 THE CLAIM THE PAGE IS FOR, AND IT IS A DEFECT REPORTED RATHER THAN
+    // HIDDEN. Warps' filter bank coefficients are fixed numbers computed at
+    // 96 kHz by `filter_bank.py`, so at 48 kHz every band sits an octave low.
+    // The numbers come out of the wasm rather than off this page, which is the
+    // only way the check can disagree with the code.
+    d.assert('the vocoder’s bands are an octave below the hardware’s, and the page says so',
+      !!warpReady && warpReady.bands === 20
+        && Math.abs(warpReady.bandShift + 1) < 0.001
+        && Math.abs(warpReady.bandLo * 2 - 87.3) < 0.5
+        && Math.abs(warpReady.bandHi * 2 - 7040) < 5,
+      warpReady ? `${warpReady.bands} bands at ${warpReady.bandLo.toFixed(1)} to `
+                + `${warpReady.bandHi.toFixed(0)} Hz, which is `
+                + `${warpReady.bandShift.toFixed(2)} octaves under the `
+                + `${Math.round(warpReady.tableRate)} Hz the tables were computed at`
+                : 'the effect never started');
+
+    // ⚠️ AND THE CELL IS EMPTY ON THE HALF OF THE ROTARY THAT IS UNAFFECTED,
+    // WHICH IS THE NEGATIVE HALF OF THE SAME CLAIM. A page that printed the
+    // shift all the time would be claiming a defect in the six waveshapers,
+    // which hold no filter and are exactly right at this rate.
+    const bandCell = document.querySelector('.pos-readout [data-k="bands"] .pos-cell-v')
+      ?? [...document.querySelectorAll('.pos-readout .pos-cell')]
+          .find((c) => c.textContent.trim().startsWith('bands'));
+    d.assert('the bands cell reports the shift only while the vocoder is the path running',
+      !!bandCell && (warpLast.vocoding
+        ? bandCell.textContent.includes('-1.00')
+        : !bandCell.textContent.includes('-1.00')),
+      bandCell ? `the ${warpLast.vocoding ? 'vocoder' : ALGORITHMS[warpLast.algorithm] ?? '?'} `
+               + `is running and the cell reads "${bandCell.textContent.trim()}"`
+               : 'there is no bands cell on the page');
+
+    // 🔴 TWO SIGNALS IN, AND A CROSS-MODULATOR HANDED ONE SIGNAL TWICE PASSES
+    // EVERY OTHER CHECK ON THIS PAGE. This is the one that can catch a
+    // `channelInterpretation` default mixing the oscillator's two jacks into
+    // one, which would look and sound like a working page.
+    const ti = twoInputs();
+    d.assert('the effect really combines two signals and not one of them twice',
+      !!ti && ti.both > 0.001 && ti.one >= 0 && Math.abs(ti.both - ti.one) > ti.both * 0.2,
+      ti ? `ring modulation at ${ti.both.toFixed(4)} with both inputs and `
+         + `${ti.one.toFixed(4)} with the modulator silenced`
+         : 'the bench was never built');
+
+    // ⚠️ THE EFFECT'S SHARE OF THE QUANTUM, AND THE CHAIN'S TOTAL. An effect
+    // that cost nothing would be an effect the compiler removed, and a chain
+    // that does not fit 2.667 ms is not real time however good each half is.
+    d.assert('the effect costs something and the whole chain still fits a render quantum',
+      warpCostMs != null && warpCostMs > 0.001 && costPerQuantumMs != null
+        && costPerQuantumMs < 2.667,
+      warpCostMs == null ? 'never measured'
+        : `the effect ${(warpCostMs * 1000).toFixed(0)} µs on top of the oscillator's `
+          + `${(manyVoiceMs * 1000).toFixed(0)} µs, ${(costPerQuantumMs * 1000).toFixed(0)} µs `
+          + 'of the 2667 µs those 128 frames last');
+
+    // ⚠️ A LAYOUT CLAIM IS A MEASUREMENT, AND THREE ALIGNMENTS THAT LOOK LIKE
+    // ONE ARE THREE ASSERTS. `positron-ui` records two of three lining up while
+    // the third was 30 px out, and arithmetic in a comment being no evidence at
+    // all.
+    // 🔴 AND THEY GRADE THE DESKTOP PATH ONLY, WHICH IS A HOLE AND NOT A
+    // FOOTNOTE. `demo/verify.mjs` runs at 756 px with no viewport override, so
+    // nothing below 560 px is ever entered and NOTHING HERE HAS BEEN MEASURED
+    // ON A PHONE. What is known is structural rather than measured: every knob
+    // is `--ctl-w` wide, every gap is `--ctl-gap`, and `.pos-knob-row` carries
+    // `overflow-x: auto` with `min-width: 0`, so a row too wide for the screen
+    // scrolls inside itself instead of dragging the page. That is an argument
+    // about the stylesheet and a browser is the only thing that can settle it.
+    const box = (key) => knobs.get(key)?.el.getBoundingClientRect() ?? null;
+    const near = (a, b) => a != null && b != null && Math.abs(a - b) < 1;
+
+    // 🔴 THE THING THAT WAS ASKED FOR: the instrument's four rotaries in the
+    // instrument's own two by two, FREQUENCY over TIMBRE and HARMONICS over
+    // MORPH. Both columns AND the row order, because a block with its columns
+    // right and its rows swapped is a different panel.
+    const bFreq = box('pitch'), bHarm = box('harmonics');
+    const bTimb = box('timbre'), bMorph = box('morph');
+    d.assert('the instrument’s four rotaries sit two by two, in its own positions',
+      near(bFreq?.x, bTimb?.x) && near(bHarm?.x, bMorph?.x) && bTimb?.y > bFreq?.y,
+      bFreq && bTimb && bHarm && bMorph
+        ? `frequency and timbre at ${bFreq.x.toFixed(1)} px, harmonics and morph at `
+          + `${bHarm.x.toFixed(1)} px, second row ${(bTimb.y - bFreq.y).toFixed(0)} px lower`
+        : 'one of the four is not on the page');
+
+    // 🔴 AND THE SEPARATION IS A GAP THAT IS REALLY WIDER, NOT A CLASS THAT
+    // EXISTS. A dead CSS rule reads as correct, and this project has measured
+    // four of them. This compares the gap between the two groups against the
+    // gap between two neighbours in the same row, so a rule that never applied
+    // takes it red.
+    const bTmod = box('timbreMod'), bDecay = box('decay');
+    const wide = bTmod && bHarm ? bTmod.x - bHarm.right : NaN;
+    const narrow = bHarm && bFreq ? bHarm.x - bFreq.right : NaN;
+    d.assert('the added rotaries start in one column on both rows, after a wider gap',
+      near(bTmod?.x, bDecay?.x) && wide > narrow + 8,
+      Number.isFinite(wide)
+        ? `both rows start theirs at ${bTmod.x.toFixed(1)} px, with ${wide.toFixed(0)} px `
+          + `of gap against ${narrow.toFixed(0)} px between neighbours`
+        : 'the two rows could not both be measured');
+
+    // ⚠️ AND THE STACKED COMPONENTS STILL SHARE A LEFT EDGE. `/radio/` had
+    // exactly this go wrong when a `createChoice` row became a `createPicker`
+    // one and the rules keyed on the old class stopped matching, and it was
+    // reported three times before anybody measured it.
+    // ⚠️ THE VOICE ROW LEFT THIS CLAIM WHEN THE CASE ARRIVED, AND THAT IS THE
+    // ARRANGEMENT RATHER THAN A HOLE. It sits OUTSIDE the case on purpose, so
+    // it starts where the case's border does and the controls inside start one
+    // `--panel-pad` further in. Two different edges, and the assert below
+    // grades the outer one.
+    const rows = [
+      ['model', document.querySelector('.pos-pick-l')],
+      ['row 1', document.querySelectorAll('.plai-knobs .pos-knob-row')[0]],
+      ['row 2', document.querySelectorAll('.plai-knobs .pos-knob-row')[1]],
+    ].map(([name, node2]) => [name, node2 ? node2.getBoundingClientRect().x : NaN]);
+    const found = rows.every(([, x]) => Number.isFinite(x));
+    const spread = found
+      ? Math.max(...rows.map(([, x]) => x)) - Math.min(...rows.map(([, x]) => x))
+      : NaN;
+    d.assert('the model picker and both rows of rotaries start on the same line',
+      found && spread < 1,
+      found ? `${rows.map(([n, x]) => `${n} ${x.toFixed(1)} px`).join(', ')}, at `
+            + `${Math.round(innerWidth)} px wide`
+            : 'one of the three is not on the page');
+
+    // 🔴 THE CASE STARTS AND ENDS WHERE THE REST OF THE PAGE DOES, WHICH IS
+    // `/circuit/`'s OWN CLAIM AND THE ONE IT FAILS. `shell.css` contract 8
+    // records that page putting its scroller OUTSIDE its card, so at 390 px
+    // the card runs 286.0 px past the right edge while its assert stays green
+    // at the harness width. Here the scroller is inside the card, which is the
+    // component's own arrangement, so this is a check that the page did not
+    // undo it.
+    // ⚠️ GRADED AGAINST THE READOUT, AND THE VOICE ROW WAS THE WRONG RULER.
+    // MEASURED 2026-09-22, red on the first try: the case spans 34.0 to 722.0
+    // px and the slider group above it spans 34.0 to 594.0, because a
+    // `createSliderGroup` is as wide as its sliders and not as wide as the
+    // page. The readout is the page's own full width furniture and is in a
+    // different subtree from the case, so the two agreeing is a real reading
+    // rather than a child measuring its own parent.
+    const bPanel = document.querySelector('.plai-panel')?.getBoundingClientRect();
+    const bRead = document.querySelector('.pos-readout')?.getBoundingClientRect();
+    d.assert('the case starts and ends where the rest of the page does',
+      !!bPanel && !!bRead && near(bPanel.x, bRead.x) && near(bPanel.right, bRead.right)
+        && document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      bPanel && bRead
+        ? `the case spans ${bPanel.x.toFixed(1)} to ${bPanel.right.toFixed(1)} px `
+          + `against the readout's ${bRead.x.toFixed(1)} to ${bRead.right.toFixed(1)} px, `
+          + `and the page is ${document.documentElement.scrollWidth} px wide in a `
+          + `${document.documentElement.clientWidth} px window`
+        : 'the case or the readout is not on the page');
+
+    // 🔴 THE SPACE THAT WAS ASKED FOR, MEASURED RATHER THAN DESCRIBED. Asked
+    // 2026-09-22 as *"add more space around plai rotaties"*, and the answer is
+    // the case's own inset rather than a margin this page writes: one
+    // `--panel-pad` on every side, and the page never types the number.
+    // 🔴 AND THE FIRST VERSION OF THIS ASSERT CLAIMED ALL THREE INSETS WERE
+    // EQUAL AND WENT RED SAYING `32.0 px above, 21.0 px left, 21.0 px below`.
+    // It was right and the claim was wrong: the NAMEPLATE lives in the top
+    // inset, so the air above the rotaries is the pad plus the plate. An
+    // arrangement that reads as symmetrical is not the same as three equal
+    // numbers, and only a rect knows which.
+    // ⚠️ A BORDER IS A PIXEL AND IT COUNTS. These are measured from the panel's
+    // BORDER box, so 20 px of padding reads as 21.
+    const bFlow = document.querySelector('.panel-flow')?.getBoundingClientRect();
+    const bPlate = document.querySelector('.panel-plate')?.getBoundingClientRect();
+    const air = bPanel && bFlow && bPlate
+      ? { top: bFlow.top - bPanel.top, left: bFlow.left - bPanel.left,
+          bottom: bPanel.bottom - bFlow.bottom, plate: bPlate.height }
+      : null;
+    d.assert('the case insets the rotaries equally, with the plate in the top one',
+      !!air && air.left > 16 && Math.abs(air.left - air.bottom) < 1
+        && Math.abs(air.top - air.bottom - air.plate) < 1,
+      air ? `${air.left.toFixed(1)} px left, ${air.bottom.toFixed(1)} px below, and `
+          + `${air.top.toFixed(1)} px above, which is that plus an ${air.plate.toFixed(1)} px plate`
+          : 'the case, its flow or its plate is not on the page');
+
+    // 🔴 THE MARKS ARE ON EXACTLY THE THREE ATTENUVERTERS AND NOWHERE ELSE,
+    // WHICH IS BOTH HALVES OF ONE CLAIM. `ends` costs no height, so a knob that
+    // wrongly grew a pair would look right and a knob that wrongly lost one
+    // would look right too; only the count says so. The negative half is the
+    // half that catches a later `ends: true` sprayed across the bank.
+    const marked = [...knobs.entries()]
+      .map(([key, k]) => [key, [...k.el.querySelectorAll('.pos-knob-end')].map((e) => e.textContent)])
+      .filter(([, m]) => m.length);
+    const wantMarked = ['timbreMod', 'fmMod', 'morphMod'];
+    d.assert('only the three attenuverters print the marks at the ends of their travel',
+      marked.length === wantMarked.length
+        && wantMarked.every((key) => marked.some(([k2]) => k2 === key))
+        && marked.every(([, m]) => m.join('') === '-+'),
+      marked.length
+        ? `${marked.map(([k2, m]) => `${k2} ${m.join(' to ')}`).join(', ')}, and `
+          + `${knobs.size - marked.length} of ${knobs.size} carry none`
+        : 'no knob on the page prints its ends');
+
+    // ⚠️ THE PLATE IS READ AS RENDERED, NOT AS TYPED. `createNameplate` leans on
+    // `text-transform`, so a check on `textContent` would grade the source and
+    // stay green whichever case the page typed. `shown()` reads the computed
+    // transform, which is why it exists.
+    const plate = inst.shown();
+    /* 🔴 ONE LINE SINCE 2026-09-22, ASKED FOR AS *"rm positron from plai and
+       tom nameplates"*, and this read two. The placement moves with the count
+       and is the half a caller can get wrong: `ends` is `space-between` and
+       parks a lone child on the LEFT, so a single line has to be `end`.
+       `plateSpec` decides it, and this grades the decision rather than the
+       page's typing. */
+    d.assert('the case is named by its model alone, pushed to the far end',
+      plate.length === 1 && plate[0] === 'PLAI'
+      && inst.plate.place === 'end'
+      && getComputedStyle(inst.plate.el).justifyContent === 'flex-end',
+      `the plate reads ${plate.join(' then ')} at ${inst.plate.place}`);
+
+    // ⚠️ BEHIND THE GATE: these press nothing a visitor pressed, change the
+    // sound and move the controls in front of them. What they grade is the
+    // whole chain, because every number in them is the DSP's own answer rather
+    // than what this page last sent.
+    await ifSelfcheck(async () => {
+      const want = 13;                    // bass drum, a model nothing defaults to
+      setModel(want);
+      pluck();
+      await sleep(400);
+      d.assert('a model picked here is the model the DSP reports sounding',
+        last.engine === want, `asked ${want}, sounding ${last.engine}`);
+      setModel(0);
+
+      // 🔴 THE STEALING RULE, GRADED AGAINST THE NUMBERS THE RULE SAW. The
+      // worklet reads every voice's level in the line before it asks for the
+      // note, so this compares the shim's choice against the levels at the
+      // moment of the choice rather than against a meter up to 250 ms stale.
+      // ⚠️ AND IT IS CHECKED AT TWO VOICES rather than at eight, because a
+      // third note is the smallest thing that has to steal. Two hundred
+      // milliseconds apart puts both of them far past the eight millisecond
+      // window in which a voice's level is not yet a measurement.
+      send({ t: 'allOff' });
+      send({ t: 'voices', n: 2 });
+      await sleep(150);
+      noteOn(60, 40);
+      await sleep(200);
+      noteOn(67, 40);
+      await sleep(200);
+      const steals0 = lastNote ? lastNote.steals : 0;
+      noteOn(72, 40);
+      await sleep(200);
+
+      const n = lastNote;
+      const lv = n?.before ?? [];
+      const quietest = lv.length ? lv.indexOf(Math.min(...lv)) : -1;
+      // ⚠️ AND IT REFUSES TO GRADE ON TWO NUMBERS THAT ARE THE SAME. With a
+      // `before` array of zeros, or of two equal readings, `indexOf(min)`
+      // answers 0 and so does the shim, and the assert would pass having
+      // compared nothing. The levels have to be far enough apart that the
+      // choice between them was a real one.
+      const spread2 = lv.length > 1 ? Math.max(...lv) / Math.max(1e-9, Math.min(...lv)) : 0;
+      d.assert('a note with no free voice takes the quietest one and says which',
+        !!n && n.stolen >= 0 && n.steals === steals0 + 1 && n.stolen === quietest
+          && n.voice === n.stolen && spread2 > 1.2,
+        n ? `voice ${n.stolen} was taken at level ${n.stolenLevel.toFixed(4)}, and the `
+          + `levels when it was decided were ${lv.map((x) => x.toFixed(4)).join(', ')}, `
+          + `a factor of ${spread2.toFixed(2)} apart`
+          : 'no note was ever reported');
+
+      send({ t: 'allOff' });
+      send({ t: 'voices', n: voiceCount });
+    }, { log: d.log, say: 'the model switch and the voice stealing are checked only under a harness, because both change the sound' });
+  });
+
+  d.log('press Start audio, then Pluck or Chord. The voices slider is this page’s own '
+      + 'and the instrument has no such control');
+  d.log('the two rotaries on the left of each row are Plaits’ front panel, in its own '
+      + 'positions. After the gap come its three attenuverters, then decay and colour, '
+      + 'which the panel reaches by holding a button rather than with knobs of their own');
+  d.log('nothing is fetched until Start audio is pressed');
+  d.ready();
+</script>
+</html>

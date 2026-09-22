@@ -1896,7 +1896,21 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
   // arrowhead by its line's stroke width, so a heavier line would grow a
   // heavier head — and stroke weight is one of the two channels carrying
   // `kind` in greyscale, which must stay a statement about BOXES only.
-  for (const [name, cls] of [['f', 'pos-dg-head'], ['b', 'pos-dg-head pos-dg-head-b']]) {
+  /**
+   * 🔴 FOUR HEADS, NOT TWO, SINCE 2026-09-22. Asked on `/wish/` as *"when
+   * refused, paint recused conector/label red"*.
+   * ⚠️ **A MARKER DOES NOT INHERIT THE LINE'S STROKE**, which is the whole
+   * reason this is four entries rather than one CSS rule. An SVG marker is
+   * painted from its own fill, so a red line would have arrived at a grey
+   * arrowhead and the picture would have contradicted itself at the one end a
+   * reader looks at. `fill: context-stroke` would say it in one place and is
+   * not safe to rely on here, so the refused pair is declared instead.
+   */
+  for (const [name, cls] of [
+    ['f', 'pos-dg-head'], ['b', 'pos-dg-head pos-dg-head-b'],
+    ['rf', 'pos-dg-head pos-dg-head-bad'],
+    ['rb', 'pos-dg-head pos-dg-head-b pos-dg-head-bad'],
+  ]) {
     const mk = s('marker', {
       id: `${uid}-${name}`, viewBox: '0 0 8 8', refX: 7.2, refY: 4,
       markerWidth: 7, markerHeight: 7, markerUnits: 'userSpaceOnUse', orient: 'auto',
@@ -2161,11 +2175,21 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       // sentence in the picture ("what actually travels here") was the one thing
       // a pointer could not reach. The fat transparent copy underneath is the
       // standard repair: same geometry, twelve pixels wide, invisible.
+      /* 🔴 `bad: true` PAINTS THE WHOLE LINK, LINE, LABEL AND HEAD, IN `--bad`.
+         A page declares it; nothing here infers it, the same way `back: true`
+         is an author flag. It is for a link the picture is REPORTING rather
+         than describing: `/wish/` draws what a model asked for, and a refusal
+         is the most important thing on that picture.
+         ⚠️ IT IS A SECOND CHANNEL, NEVER THE ONLY ONE. The label still says
+         `refused` in words, because colour alone fails a reader who cannot
+         separate these two hues and fails a screenshot in greyscale. */
       const lg = s('g', { class: 'pos-dg-l', tabindex: '0', role: 'img' });
+      if (l.bad) lg.setAttribute('data-bad', '');
       lg.append(s('path', { class: 'pos-dg-hit', d: l.d }));
       lg.append(s('path', {
         class: l.back ? 'pos-dg-link pos-dg-back' : 'pos-dg-link',
-        d: l.d, 'marker-end': `url(#${uid}-${l.back ? 'b' : 'f'})`,
+        d: l.d,
+        'marker-end': `url(#${uid}-${l.bad ? 'r' : ''}${l.back ? 'b' : 'f'})`,
       }));
       if (l.lab.lines.length) {
         const first = l.stack === 'up' ? l.ly - (l.lab.lines.length - 1) * m.linkLh : l.ly;
