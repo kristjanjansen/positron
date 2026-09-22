@@ -217,6 +217,113 @@ const OPS = {
 export const OP_NAMES = Object.keys(OPS);
 
 /**
+ * 🔴 THE WORDS A PERSON READS, AND UNTIL 2026-09-22 THERE WERE NONE, SO THE
+ * REFUSALS WERE WRITTEN IN FIELD NAMES. REPORTED against a real reply:
+ * *"MK-425C USB MIDI Keyboard to Circuit { only } / only takes "cls" and was
+ * given "to" - its not for humans, i do not know what to do"*. `cls` and `to`
+ * are keys in this file's own schema, and a sentence made of two of them tells
+ * a reader which keys the validator compared and nothing about what to do.
+ * ⚠️ **AND THAT LINE HAD ALREADY BEEN REPAIRED ONCE THE SAME DAY**, for a
+ * different fault: it read `cc takes "from" and was given "to"` and accused a
+ * correct argument of being wrong. That repair made it TRUE. True and
+ * unreadable are different problems and only the first one was fixed.
+ * 🔴 **`help` COULD NOT BE REUSED AND THAT IS THE REASON THIS TABLE EXISTS.**
+ * `help` is what a language model reads in `workers/wish/src/wish.mjs`, and
+ * `cc`'s reads *move the controller numbered from onto the controller numbered
+ * to*, which carries two field names on purpose because the model is choosing
+ * keys. A visitor is not.
+ * 🔴 **IT IS ONE TABLE RATHER THAN THREE FIELDS PER OP SO THAT IT CAN BE
+ * GRADED WHOLE.** `bay-test.mjs` asserts that every operator has a `does` and
+ * that every argument of every operator has both a `part` and an `ask`, which
+ * is the same guard `help` already has and for the same reason: a new
+ * transform with no words beside it is this defect arriving again with nobody
+ * noticing.
+ *   - `does` finishes the sentence `<op> ...`, so it is a verb phrase.
+ *   - `part` names an argument as a thing rather than as a key. It is the
+ *     half that replaces `"cls"` and `"to"`.
+ *   - `ask` is the SOLUTION line: one imperative naming real values. It is
+ *     never the problem with *do not* in front of it.
+ */
+const SAYS = {
+  channel: {
+    does: 'puts every message on one MIDI channel',
+    part: { to: 'the channel number' },
+    ask: { to: 'Name a channel from 1 to 16, and the Circuit\'s first synth answers on 1.' },
+  },
+  transpose: {
+    does: 'moves notes up or down the keyboard',
+    part: { by: 'the number of semitones' },
+    ask: { by: 'Name how many semitones to move, such as 1 up or -12 down.' },
+  },
+  velocity: {
+    does: 'scales how hard every note was played',
+    part: { scale: 'the amount to multiply by' },
+    ask: { scale: 'Name what to multiply by, such as 0.5 for half as hard.' },
+  },
+  only: {
+    does: 'keeps one kind of message and drops the rest',
+    part: { cls: 'a kind of message' },
+    ask: { cls: '' },                       // filled from CLASSES below
+  },
+  drop: {
+    /* ⚠️ NOT `drops one kind of message`, or the sentence opens `drop drops`.
+       An operator's name is the first word of its own problem line. */
+    does: 'throws away one kind of message and keeps the rest',
+    part: { cls: 'a kind of message' },
+    ask: { cls: '' },
+  },
+  range: {
+    does: 'keeps only the notes inside a stretch of the keyboard',
+    part: { lo: 'the lowest note', hi: 'the highest note' },
+    ask: {
+      lo: 'Name the lowest note to keep, or the highest, or both, from 0 to 127.',
+      hi: 'Name the lowest note to keep, or the highest, or both, from 0 to 127.',
+    },
+  },
+  vrange: {
+    does: 'keeps only the notes played inside a band of loudness',
+    part: { lo: 'the softest hit', hi: 'the hardest hit' },
+    ask: {
+      lo: 'Name the softest hit to keep, or the hardest, or both, from 1 to 127.',
+      hi: 'Name the softest hit to keep, or the hardest, or both, from 1 to 127.',
+    },
+  },
+  fixed: {
+    does: 'gives every note the same loudness',
+    part: { to: 'the loudness to give them' },
+    ask: { to: 'Name one loudness from 1 to 127, and this desk\'s drums send 96.' },
+  },
+  cc: {
+    does: 'moves one controller onto another',
+    part: { from: 'the controller it comes from', to: 'the controller it goes to',
+            ch: 'the channel to send it on' },
+    ask: {
+      from: 'Name the controller it comes from, from 0 to 127, which is the number that knob sends.',
+      to: 'Name the controller it goes to, from 0 to 127.',
+      ch: 'Name the channel to send it on, from 1 to 16.',
+    },
+  },
+};
+/* ⚠️ DERIVED, NEVER TYPED. The list of kinds a link can carry is `CLASSES` and
+   it is the one place it is declared, so a class added there arrives in the
+   sentence that offers it without anybody remembering to come here. The
+   brief's own example of a readable solution is this string. */
+SAYS.only.ask.cls = `Name one of ${CLASSES.join(', ')}.`;
+SAYS.drop.ask.cls = SAYS.only.ask.cls;
+
+/** `transpose moves notes up or down the keyboard`, with no field name in it. */
+const head = (op) => `${op} ${SAYS[op].does}`;
+/** What an argument IS, in words. Falls back to nothing rather than to its key:
+ *  a key printed as English is the whole of the defect this exists for. */
+const part = (op, k) => SAYS[op]?.part?.[k] || 'what it needs';
+const ask = (op, k) => SAYS[op]?.ask?.[k] || '';
+/** The operators, offered as a list somebody can choose from. */
+const PICK_AN_OP = () => `Name one of ${OP_NAMES.join(', ')}.`;
+
+/** The visitor's vocabulary, exported so a test can grade it whole. */
+export const OP_SAYS = SAYS;
+
+/**
  * 🔴 THE VOCABULARY, IN THE ONE PLACE THE VOCABULARY IS DECLARED, BECAUSE IT
  * HAS ALREADY BEEN WRITTEN DOWN IN FOUR PLACES AND THE ONE A MODEL READS WENT
  * STALE. 2026-09-21: `range`, `vrange` and `fixed` were added here and to
@@ -273,13 +380,26 @@ export const OP_HELP = OP_NAMES.map((op) => ({
  * the SHAPE of what a model may say and it cannot constrain the MEANING. That is
  * the same rule this project already has about a shape being declared rather
  * than inferred, arriving from the direction of a language model.
- * @returns {string} '' when every transform is well formed, or the reason.
+ *
+ * 🔴 IT ANSWERS IN TWO SENTENCES SINCE 2026-09-22, ASKED FOR AS *"can we have
+ * cooncrete problem -> soluton texts?"*. `why` is what is wrong, in words;
+ * `fix` is the thing a person can do, naming real values. Neither one is ever
+ * the other with *do not* in front of it, which is the failure mode of every
+ * problem-and-solution pair ever written.
+ * ⚠️ AND A REFUSAL'S SOLUTION IS SOMETIMES THAT THERE IS NONE, WHICH IS THE
+ * TEXT RATHER THAN A MISSING ONE. A blank second line reads as a sentence that
+ * failed to load, so *this link cannot be made* is written out.
+ * @returns {''|{why: string, fix: string}} '' when every transform is well
+ *          formed, or the problem and what to do about it.
  */
 export function checkTransforms(transforms) {
   for (const t of transforms || []) {
-    if (!t || typeof t !== 'object') return 'a transform must be an object with an op';
+    if (!t || typeof t !== 'object') {
+      return { why: 'one of the transforms is not an object with a transform name in it.',
+               fix: 'There is nothing here to repair, so the instruction has to be asked again.' };
+    }
     const op = OPS[t.op];
-    if (!op) return `no transform called "${t.op}". There are ${OP_NAMES.join(', ')}`;
+    if (!op) return { why: `there is no transform called "${t.op}".`, fix: PICK_AN_OP() };
     for (const k of op.need) {
       if (t[k] === undefined || t[k] === null) {
         /**
@@ -316,23 +436,56 @@ export function checkTransforms(transforms) {
          * NEXT TO the quantity in question sends a reader to the wrong place.
          * Here it sent one to delete an argument that was correct.
          */
+        /**
+         * 🔴 AND THE THREE CASES SURVIVE THE REWRITE, BECAUSE THEY ARE THREE
+         * DIFFERENT THINGS A READER HAS TO DO. What changed on 2026-09-22 is
+         * the words, not the split: a swap, a partial omission and an empty
+         * object stay tellable apart, which `bay-test.mjs` grades directly.
+         */
         const given = Object.keys(t).filter((x) => x !== 'op');
         const strange = given.filter((x) => !op.args.includes(x));
-        const q = (x) => `"${x}"`;
         /* ⚠️ THREE CASES, NOT TWO, AND THE THIRD WAS FOUND BY `bay-test.mjs`
            GOING RED IN ONE LINE. An empty object is neither a swap nor a
-           partial omission: nothing arrived, so there is no other key to name
-           and no half of the requirement to point at. `fixed needs "to", and
-           "to" is missing` is a sentence tying itself in a knot to say what
-           `and was given nothing` says plainly. */
-        if (!given.length) return `${t.op} takes ${q(k)} and was given nothing`;
-        if (strange.length) {
-          return `${t.op} takes ${q(k)} and was given ${strange.map(q).join(', ')}`;
+           partial omission: nothing arrived, so there is no other argument to
+           point at and no half of the requirement to name. */
+        if (!given.length) {
+          return { why: `${head(t.op)}, and it was given nothing at all.`, fix: ask(t.op, k) };
         }
-        return `${t.op} needs ${op.need.map(q).join(' and ')}, and ${q(k)} is missing`;
+        if (strange.length) {
+          /**
+           * 🔴 THE SOLUTION IS THE REPAIRED OBJECT, WHICH IS THE ONE FORM THAT
+           * NEEDS NO FIELD NAME IN PROSE. The JSON is already on the page
+           * directly above this sentence, asked for as *"can it not be full
+           * json(l) message?"*, so a corrected object beside it is read by
+           * comparison rather than by parsing an English claim about two keys.
+           * ⚠️ THE VALUE THAT ARRIVED IS CARRIED OVER, AND THE OBJECT IS ONLY
+           * OFFERED WHEN IT CAN BE. The measured case is
+           * `{ op: 'transpose', to: 1 }`, where the **1 was never wrong** and
+           * only its name was, so `{"op":"transpose","by":1}` is a repair a
+           * reader can check against the JSON above it. `{ op: 'only', to: 1 }`
+           * is not: `1` is not a kind of message, so any object written here
+           * would carry a value this file INVENTED and print it as if somebody
+           * had asked for it. That one gets the list of real kinds instead,
+           * which is the offer the report itself suggested.
+           */
+          const gaps = op.need.filter((n) => t[n] === undefined || t[n] === null);
+          const spare = strange.map((x) => t[x]).find((v) => v !== undefined);
+          const fits = gaps.length === 1 && (gaps[0] === 'cls'
+            ? CLASSES.includes(spare)
+            : typeof spare === 'number' && !Number.isNaN(spare));
+          const mend = { op: t.op };
+          for (const a of op.args) if (t[a] !== undefined && t[a] !== null) mend[a] = t[a];
+          if (fits) mend[gaps[0]] = spare;
+          return { why: `${head(t.op)}, and nothing it was given is ${part(t.op, k)}.`,
+                   fix: fits ? `Write it as ${JSON.stringify(mend)}.` : ask(t.op, k) };
+        }
+        return { why: `${head(t.op)}, and ${part(t.op, k)} is missing.`, fix: ask(t.op, k) };
       }
       if (k === 'cls') {
-        if (!CLASSES.includes(t.cls)) return `${t.op} was given cls "${t.cls}", which is not one of ${CLASSES.join(', ')}`;
+        if (!CLASSES.includes(t.cls)) {
+          return { why: `${head(t.op)}, and ${JSON.stringify(t.cls)} is not a kind of message.`,
+                   fix: ask(t.op, 'cls') };
+        }
       }
     }
     /**
@@ -343,7 +496,20 @@ export function checkTransforms(transforms) {
      * so it is refused by name here rather than allowed as a no-op.
      */
     if (op.oneOf && op.oneOf.every((k) => t[k] === undefined || t[k] === null)) {
-      return `${t.op} takes "${op.oneOf.join('" or "')}" and was given nothing`;
+      /* ⚠️ AND THE TWO WAYS IN ARE TOLD APART SINCE 2026-09-22. `{ op: 'range' }`
+         was given nothing; `{ op: 'range', to: 7 }` was given something that is
+         not a bound, and that second one is MEASURED rather than imagined: it
+         is what `llama-3.3-70b` wrote eleven runs out of eleven. One sentence
+         for both of them said `was given nothing` about an object that plainly
+         had a number in it. */
+      const stray = Object.keys(t).some((x) => x !== 'op' && !op.args.includes(x));
+      const [lo, hi] = op.oneOf;
+      return {
+        why: stray
+          ? `${head(t.op)}, and nothing it was given is ${part(t.op, lo)} or ${part(t.op, hi)}.`
+          : `${head(t.op)}, and neither ${part(t.op, lo)} nor ${part(t.op, hi)} was given.`,
+        fix: ask(t.op, lo),
+      };
     }
     /**
      * 🔴 EVERY ARGUMENT THAT IS PRESENT IS TYPE CHECKED, NOT ONLY THE REQUIRED
@@ -356,7 +522,9 @@ export function checkTransforms(transforms) {
     for (const k of op.args) {
       if (t[k] === undefined || t[k] === null || k === 'cls') continue;
       if (typeof t[k] !== 'number' || Number.isNaN(t[k])) {
-        return `${t.op} needs "${k}" to be a number, and it is ${JSON.stringify(t[k])}`;
+        return { why: `${head(t.op)}, and ${part(t.op, k)} came as ${JSON.stringify(t[k])} `
+                      + 'rather than as a number.',
+                 fix: ask(t.op, k) };
       }
     }
     /**
@@ -365,7 +533,14 @@ export function checkTransforms(transforms) {
      * and the instrument is silent for a reason nothing on screen explains.
      */
     if (op.oneOf && t.lo !== undefined && t.hi !== undefined && t.lo > t.hi) {
-      return `${t.op} was given lo ${t.lo} above hi ${t.hi}, which can never pass anything`;
+      /* ⚠️ THE OFFER IS MADE TO A PERSON AND IS NEVER TAKEN BY THE CODE, which
+         is the same line the two-bounds refusal below draws and for the same
+         reason: the far end is an instrument in another building. Showing the
+         swapped object is what lets somebody decide in one glance; swapping it
+         here would be a guess nobody was told about. */
+      return { why: `${head(t.op)}, and ${part(t.op, 'lo')} ${t.lo} is above `
+                    + `${part(t.op, 'hi')} ${t.hi}, so nothing can ever pass.`,
+               fix: `Turn them round: ${JSON.stringify({ op: t.op, lo: t.hi, hi: t.lo })}.` };
     }
   }
   /**
@@ -391,9 +566,12 @@ export function checkTransforms(transforms) {
     if (same.length > 1) {
       const op = same[0].op;
       const [a, b] = [same[0][end], same[1][end]];
-      return `two ${op}s both open at the same end, ${end} ${a} and ${end} ${b}, so the `
-        + `narrower one wins and the other does nothing. One ${op} takes both bounds: `
-        + `{"op": "${op}", "lo": ${Math.min(a, b)}, "hi": ${Math.max(a, b)}}`;
+      return {
+        why: `two ${op}s each name only ${part(op, end)}, ${a} and ${b}, so the narrower `
+             + 'one wins and the other does nothing.',
+        fix: `One ${op} takes both ends: `
+             + `${JSON.stringify({ op, lo: Math.min(a, b), hi: Math.max(a, b) })}.`,
+      };
     }
   }
   return '';
@@ -522,31 +700,49 @@ export function createBay({ now = () => Date.now() } = {}) {
    * carries a sentence, because a patch bay that answers "no" is a patch bay
    * nobody can use. It is also the half that stays useful if every language
    * model in §5 of the plan were deleted.
-   * @returns {{ok:boolean, why:string, warn?:string}}
+   *
+   * 🔴 AND EVERY REFUSAL CARRIES A SECOND SENTENCE SINCE 2026-09-22: `fix` is
+   * the thing a person can do about it. Several of these have no repair, and
+   * saying so in words is what tells a reader to stop trying. A blank line
+   * would read as a sentence that failed to load.
+   * @returns {{ok:boolean, why:string, fix?:string, warn?:string}}
    */
   function validate(fromId, toId, transforms = []) {
     const a = ports.get(fromId), b = ports.get(toId);
-    if (!a) return { ok: false, why: `there is no port called ${fromId}` };
-    if (!b) return { ok: false, why: `there is no port called ${toId}` };
-    if (a.dir !== 'out') return { ok: false, why: `${a.label} is an input, so nothing leaves it` };
-    if (b.dir !== 'in') return { ok: false, why: `${b.label} is an output, so nothing arrives at it` };
-    if (a.medium !== b.medium) {
-      return { ok: false, why: `${a.label} carries ${a.medium} and ${b.label} takes ${b.medium}` };
+    const NO_PORT = 'Nothing on this desk answers to that name, so this link cannot be made.';
+    if (!a) return { ok: false, why: `there is no port called ${fromId}.`, fix: NO_PORT };
+    if (!b) return { ok: false, why: `there is no port called ${toId}.`, fix: NO_PORT };
+    if (a.dir !== 'out') {
+      return { ok: false, why: `${a.label} is an input, so nothing leaves it.`,
+               fix: `A link starts at something that sends, so name what should reach ${a.label} instead.` };
     }
-    if (a.id === b.id) return { ok: false, why: 'a port cannot feed itself' };
+    if (b.dir !== 'in') {
+      return { ok: false, why: `${b.label} is an output, so nothing arrives at it.`,
+               fix: `A link ends at something that receives, so name what ${b.label} should reach instead.` };
+    }
+    if (a.medium !== b.medium) {
+      return { ok: false, why: `${a.label} carries ${a.medium} and ${b.label} takes ${b.medium}.`,
+               fix: `Nothing here turns ${a.medium} into ${b.medium}, so this link cannot be made.` };
+    }
+    if (a.id === b.id) {
+      return { ok: false, why: 'a port cannot feed itself.',
+               fix: 'Name a different instrument at one end of the link.' };
+    }
 
     /* Before anything about the ports: is the list of transforms even well
        formed. See `checkTransforms`, which exists because a model produced a
        schema valid transform with its argument under the wrong key. */
     const badT = checkTransforms(transforms);
-    if (badT) return { ok: false, why: badT };
+    if (badT) return { ok: false, ...badT };
 
     // Shape. ⚠️ THE FIELD THAT DISAGREES IS NAMED. "incompatible" is a refusal
     // somebody has to debug; "48000 against 44100" is one they can fix.
     for (const k of Object.keys(b.shape || {})) {
       if (a.shape?.[k] === undefined) continue;
       if (a.shape[k] !== b.shape[k]) {
-        return { ok: false, why: `${k} does not match: ${a.label} is ${a.shape[k]} and ${b.label} wants ${b.shape[k]}` };
+        return { ok: false,
+                 why: `${k} does not match: ${a.label} is ${a.shape[k]} and ${b.label} wants ${b.shape[k]}.`,
+                 fix: 'Nothing here can change what either end speaks, so this link cannot be made.' };
       }
     }
 
@@ -568,10 +764,22 @@ export function createBay({ now = () => Date.now() } = {}) {
      */
     let could;
     try { could = delivers(a.emits, transforms); }
-    catch (e) { return { ok: false, why: e.message }; }
+    catch (e) { return { ok: false, why: e.message, fix: PICK_AN_OP() }; }
     for (const c of could) {
       if (b.never.includes(c)) {
-        return { ok: false, why: `${b.label} does not accept ${c}, and this link could deliver it` };
+        /**
+         * 🔴 THIS ONE HAS A REPAIR AND IT IS THE PAGE'S OWN NEGATIVE CONTROL.
+         * `/bay/` already asserts *and the same pair is allowed once SysEx is
+         * dropped*, so the honest solution here is the transform that does it
+         * rather than *there is no fix*: the Circuit's refusal is about what
+         * reaches it, not about whether a keyboard may play it at all.
+         * ⚠️ WHAT HAS NO REPAIR IS THE RULE ITSELF, and nothing here offers to
+         * bend it. `never` is the list that carries an instrument's safety, and
+         * the only thing on offer is not sending it that class.
+         */
+        return { ok: false,
+                 why: `${b.label} does not accept ${c}, and this link could deliver it.`,
+                 fix: `Stop the link carrying ${c}: ${JSON.stringify({ op: 'drop', cls: c })}.` };
       }
     }
     /* ⚠️ THE SOURCE BEING LEFT WITH NOTHING IS CHECKED BEFORE THE DESTINATION
@@ -580,17 +788,26 @@ export function createBay({ now = () => Date.now() } = {}) {
        it reading `Circuit takes none of what this link carries` about a link
        that carried nothing in the first place. */
     if (a.medium === 'midi' && could.size === 0) {
-      return { ok: false, why: 'these transforms drop everything, so the link would carry nothing' };
+      const names = (transforms || []).map((t) => t.op);
+      return { ok: false,
+               why: 'these transforms drop everything, so the link would carry nothing.',
+               fix: names.length
+                 ? `The link runs ${names.join(', then ')}. Take one of them off.`
+                 : `${a.label} sends nothing at all, so this link cannot be made.` };
     }
     const dropped = [...could].filter((c) => !b.accepts.includes(c));
     const carried = [...could].filter((c) => b.accepts.includes(c));
     if (a.medium === 'midi' && !carried.length) {
-      return { ok: false, why: `${b.label} takes none of what this link carries` };
+      return { ok: false, why: `${b.label} takes none of what this link carries.`,
+               fix: b.accepts.length
+                 ? `${b.label} takes ${b.accepts.join(', ')}, so send it one of those.`
+                 : `${b.label} takes nothing at all, so nothing can ever reach it.` };
     }
 
     // Cycles, at node level, because hardware THRU can close one outside our view.
     if (reachesNode(nodeOf(b.id), nodeOf(a.id))) {
-      return { ok: false, why: `that closes a loop: ${b.label} already reaches ${a.label}` };
+      return { ok: false, why: `that closes a loop: ${b.label} already reaches ${a.label}.`,
+               fix: `Remove the link that already joins them, and then this one can be made.` };
     }
     const warns = [];
     if (stale(a) || stale(b)) {
@@ -629,7 +846,7 @@ export function createBay({ now = () => Date.now() } = {}) {
 
   function link(fromId, toId, transforms = []) {
     const v = validate(fromId, toId, transforms);
-    if (!v.ok) return { ok: false, why: v.why };
+    if (!v.ok) return { ok: false, why: v.why, fix: v.fix || '' };
     const id = `L${nextLink++}`;
     links.set(id, { id, from: fromId, to: toId, transforms, enabled: true, sent: 0, dropped: 0 });
     return { ok: true, id, why: '', warn: v.warn };
@@ -674,7 +891,7 @@ export function createBay({ now = () => Date.now() } = {}) {
       const bad = [];
       for (const l of parsePatch(text)) {
         const r = link(l.from, l.to, l.transforms);
-        if (!r.ok) bad.push({ line: printLink(l), why: r.why });
+        if (!r.ok) bad.push({ line: printLink(l), why: r.why, fix: r.fix || '' });
       }
       return bad;
     },

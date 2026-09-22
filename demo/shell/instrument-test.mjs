@@ -108,9 +108,14 @@ const is = (what, cond, detail) => {
      word to revert. What this grades is unchanged in substance: the bar is
      GLUED to the case rather than placed inside it, and the case keeps placing
      its own plate whenever the bar is not carrying one. */
+  /* ⚠️ THE MATCH ALLOWS A CALLER'S OWN PARTS BETWEEN THE TWO, which is the
+     `parts` option added 2026-09-22 for a picture that sits between a case and
+     its bar. This read the two arguments as literally adjacent and went red on
+     a spread appearing between them, which is a change in the call's shape
+     rather than in what it claims. */
   is('the bar is glued to the case at either end, and never placed inside it',
-    /createGlue\(panel\.el, head\.head\)/.test(code)
-    && /createGlue\(head\.head, panel\.el\)/.test(code)
+    /createGlue\(panel\.el,[^)]*head\.head\)/.test(code)
+    && /createGlue\(head\.head, panel\.el[^)]*\)/.test(code)
     && /plate: barHasPlate \? null : spec/.test(code),
     'glued above or below, and the panel keeps placing the plate when the bar has none');
 

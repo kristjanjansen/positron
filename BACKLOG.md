@@ -22,23 +22,23 @@ because two writers in one checkout is this project's most expensive mistake.
 | 3 | `make knobs 10% bigger` | ✅ done, deployed | session |
 | 4 | `rm four faders, a different shape on the same rule` | ✅ done, 156 to 155 | session |
 | 5 | `add inivisible hands to muta's` | ✅ built, not verified | session |
-| 6 | `invisible m4 knob: show value without floating or make it stop wiggling` | ⏳ | kit agent |
-| 7 | `still not aligned to vertical separated lanes`, CHANNEL STRIP | ⏳ | kit agent |
-| 8 | `one line, which cannot use the same placement / rm example` | ⏳ | kit agent |
-| 9 | `rm wrapper and info footer`, STEP GRID | ⏳ | kit agent |
-| 10 | `make sure right padding is same as bottom` | ⏳ | kit agent |
-| 11 | `show example with both axies labels and one withouth ones` | ⏳ | kit agent |
-| 12 | `make 2nd and 3nd fade fade faster` | ⏳ | kit agent |
-| 13 | `put all to controls grid`, FILTER RESPONSE | ⏳ | kit agent |
-| 14 | `alitng title and desc to bottm (leave nice padding)` | ⏳ | kit agent |
-| 15 | `no "not drawn"` | ⏳ | kit agent |
-| 16 | `create instrumet header/glue...` | ⏳ | kit agent |
-| 17 | `i mobile: header in 2 levels` then `3 levels, sorry` | ⏳ ungradable here | kit agent |
-| 18 | `move voices to knobs, bottom right, stepped knob` | ⏳ needs `step` first | kit agent, then session |
+| 6 | `invisible m4 knob: show value without floating or make it stop wiggling` | ✅ done | done |
+| 7 | `still not aligned to vertical separated lanes`, CHANNEL STRIP | ✅ done | done |
+| 8 | `one line, which cannot use the same placement / rm example` | ✅ done | done |
+| 9 | `rm wrapper and info footer`, STEP GRID | ✅ done | done |
+| 10 | `make sure right padding is same as bottom` | ✅ done | done |
+| 11 | `show example with both axies labels and one withouth ones` | ✅ done | done |
+| 12 | `make 2nd and 3nd fade fade faster` | ✅ done | done |
+| 13 | `put all to controls grid`, FILTER RESPONSE | ✅ done, with a refusal recorded | done |
+| 14 | `alitng title and desc to bottm (leave nice padding)` | ✅ done | done |
+| 15 | `no "not drawn"` | ✅ done, kept in the aria-label | done |
+| 16 | `create instrumet header/glue...` | ✅ done, then glued and moved to the foot | done |
+| 17 | `i mobile: header in 2 levels` then `3 levels, sorry` | ⚠️ shipped on a reading | done |
+| 18 | `move voices to knobs, bottom right, stepped knob` | ✅ done | done |
 | 19 | `redeisgn it` + `reserve right side...`, `/wish/` Interpret | ✅ 69/69, left align blocked | done |
 | 20 | `when i click to prepared ask, interpret button should disable and shimmer` | ✅ done | done |
-| 21 | `apply to muta's`, the instrument header | ⏳ blocked on 16 | session |
-| 22 | `can you have wave / osilocope visualizer to top of muta...` | ⏳ blocked on a kit answer | session |
+| 21 | `apply to muta's`, the instrument header | ✅ done | done |
+| 22 | `can you have wave / osilocope visualizer to top of muta...` | ✅ done, one per instrument | done |
 | 23 | `match createKnobBank and createControlGrid or unifu?` | ✅ answered, recommendation recorded | session |
 | 24 | `do not unserstand why it fails`, `/wish/` | ✅ answered, and it found a stale claim | session |
 
@@ -124,6 +124,51 @@ the hand-over and the `.pos-controls` refusal, all of which lived inside
 `createSlider` where a knob could not reach them. `slider.mjs` lost about 150
 lines and kept its exports, because `/radio/`, `/kit/` and `/knobs/` import
 `HAND_YIELD_MS` from it.
+
+#### /muta/'s header, and the knob grid it never used, 2026-09-22
+
+🔴 **ASKED WITH A CROP OF THE PLAI HEADER:** *"make top secion a glued section
+with line under it. online labels: 'turn on' 'turn off' (rm start audio, those
+turnots enable it. move patch selector the right and nameplate to center"*, and
+in the next breath *"use knob grid"*.
+
+- ⏳ **THE HEADER BECOMES A GLUED SECTION WITH A SEAM UNDER IT.**
+- ⏳ **THE ORDER CHANGES: status left, NAMEPLATE CENTRE, patch selector RIGHT.**
+  ⚠️ **THE CENTRING ASSERT MOVES WITH IT AND DOES NOT RELAX.** What was graded
+  is that the middle cell is centred on the CASE rather than balanced between
+  two unequal neighbours, measured at 0.0 px off on both cases. That claim is
+  about the middle cell, so it now grades the plate.
+- ⏳ **THE STATUS BECOMES A REAL BUTTON THAT STARTS THE AUDIO**, labelled by
+  what a press DOES rather than by what the state is: `turn on` and `turn off`.
+  The dot keeps the state, the word takes the action.
+  ✅ **THIS SETTLES A QUESTION THE COMPONENT LEFT OPEN THIS MORNING.**
+  `instrument.mjs` was built so a caller supplying `press` gets a real button and
+  one supplying none gets a badge, and `/muta/` chose the badge because nothing
+  could be switched off. Something can now.
+- 🔴 **AND REMOVING `Start audio` IS THE DANGEROUS HALF, FOR A MEASURED
+  REASON.** `demo/verify.mjs` drives a page by pressing the buttons in
+  `.pos-controls`, and the header button is not in that row. So deleting the
+  control the harness presses would leave the audio never started and **every
+  assert behind it silently not running**, which `positron-verify` records twice
+  in one day on `/mirror/` and `/blocks/`: ten and six asserts that do not fail,
+  they disappear.
+  ⚠️ **AND `settleMs` ONLY EVER LANDS ON CONTROL 0**, which `Start audio` is
+  today. Removing it moves every other control's press.
+  ✅ **SO THE PAGE HAS TO DRIVE THE HEADER BUTTON ITSELF, BEHIND `SELFCHECK`**,
+  which is exactly what `/mirror/` does for the headset buttons it can no longer
+  reach, with a map so a real press is never doubled.
+- ⏳ **`use knob grid`, AND IT IS THE COMPONENT'S OWN ORIGIN STORY.**
+  `control-grid.mjs` was built FROM this page: its header quotes the ask *"make
+  component for know etc grid where centers of 2x2 knobs make square etc"* and
+  records that on `/plai/` the pitch was **46 px across and about 100 down, so
+  four knobs made a tall rectangle and were reported as one**. The page it was
+  extracted from is the one page that never used it.
+  🔴 **THE TRAP IS THE WIDER GAP, WHICH WAS ALSO ASKED FOR AND IS ASSERTED.**
+  *"add more space around plai rotaties"* put **64 px** between the panel's own
+  rotaries and the added ones, against **16 px** between neighbours, and a
+  single uniform grid has one gap. ✅ **TWO GRIDS SIDE BY SIDE ANSWER BOTH**: a
+  2 by 2 of the four panel rotaries, which is literally the shape the component
+  was asked for, and a 3 by 2 of the extras, with the wider gap between them.
 
 #### /wish/ rows, the second round of reports, 2026-09-22
 

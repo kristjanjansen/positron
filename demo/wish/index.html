@@ -183,6 +183,16 @@
     --wish-act: 72px;
     display: grid; grid-template-columns: minmax(0, 1fr) var(--wish-act);
     column-gap: 12px;
+    /* 🔴 A ROW CARRIES ITS OWN AIR SINCE 2026-09-22, ASKED FOR AS *"add more
+       padding to patch block"*. It had only `.wish-part`'s 10 by 12, which was
+       written for a part holding a paragraph, and a row holds a DRAWING: the
+       figure keeps 2 px off its own edge, so with 12 px of part padding the
+       first box stood 14 px from the seam and read as falling out of the row.
+       ⚠️ IT ARRIVED WITH THE LEFT ALIGNMENT AND NOT BEFORE IT, which is the
+       whole reason it was not seen earlier: a centred figure bought this air by
+       accident, from space nobody had asked for. Left aligning it took away a
+       margin that was never declared. */
+    padding: 6px 10px;
   }
   /* 🔴 THE RIGHT OF EVERY ROW IS FOR ACTIONS AND IT IS EMPTY TODAY. Asked in
      the same breath: *"reserve right side of diagram+allowed to action buttons
@@ -225,7 +235,17 @@
   .wish-conn.pick { cursor: pointer; }
   .wish-conn.pick:hover { background: var(--card2); }
   .wish-conn.pick:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
-  .wish-conn.on { box-shadow: inset 2px 0 0 var(--hi); background: var(--card2); }
+  /* 🔴 THE LIFTED GROUND ALONE, AND THE YELLOW LEFT BAR IS GONE SINCE
+     2026-09-22: *"rm yellow left line, its excessive"*. It was taken from
+     `table.mjs` so that a chosen row here and a chosen row there would be one
+     treatment, and that reasoning was right about the SOURCE and wrong about
+     the DOSE: a table row is 28 px tall and one line of text, where a 2 px bar
+     is the only thing that could carry a state; a connection row is 180 px of
+     picture and sentence, where the same bar is a stripe down a panel.
+     ⚠️ **THE GROUND STILL COMES FROM `table.mjs`'S OWN**, and the check still
+     compares the two, so one treatment survives where it can be seen. What went
+     is the half that did not scale with the row. */
+  .wish-conn.on { background: var(--card2); }
   /* 🔴 THE ROW'S OWN SENTENCE, UNDER ITS OWN PICTURE, IN THE LEFT COLUMN, AND
      IT KEEPS TWO LINES' ROOM WITH ONE LINE IN IT. That reservation was on the
      verdict PART until 2026-09-22 and the reason has not changed: a refusal
@@ -1143,7 +1163,7 @@
          paid for one layer down, where one `accepts` list merged *I do not use
          that* with *that damages me* and refused every real link on the desk. */
       const gap = bad ? missingArg(l.transforms) : null;
-      const v = bad ? { ok: false, why: bad } : b.validate(l.from, l.to, l.transforms || []);
+      const v = bad ? { ok: false, ...bad } : b.validate(l.from, l.to, l.transforms || []);
       if (v.ok) { b.link(l.from, l.to, l.transforms || []); ok++; }
       else if (gap) waiting++;
       /**
@@ -1155,9 +1175,14 @@
        * on the diagram not slop"*, and the first actual detail was already in
        * hand and being discarded one line from here.
        */
+      /* 🔴 `fix` IS THE SECOND HALF OF A REFUSAL AND IT ARRIVED 2026-09-22.
+         Asked as *"can we have cooncrete problem -> soluton texts?"*. Every
+         value it needs was already inside `bay.mjs`, so the page carries the
+         sentence rather than composing one: two pages print these and one
+         vocabulary is the whole reason the validator is a module. */
       rows.push({ link: l, say: sayLink(l), carries: carriedBy(l),
                   ok: v.ok, needs: !v.ok && !!gap, gap,
-                  why: v.why, warn: v.warn || '' });
+                  why: v.why, fix: v.fix || '', warn: v.warn || '' });
     }
     /* 🔴 THREE DISJOINT COUNTS, AND `refused` KEEPS ITS OLD MEANING RATHER
        THAN QUIETLY GAINING ONE. A link the desk will not make is refused; a
@@ -1597,6 +1622,10 @@
      * ⚠️ THE ROOM STAYS EITHER WAY. See `.wish-dg`.
      */
     if (!links.length) { host.replaceChildren(); return { dg: null, drawn: 0, loops, boxes: 0 }; }
+    /* 🔴 THE ROW'S OWN SENTENCE IS THIS FIGURE'S CAPTION, which is the slot
+       `createDiagram` already reserves and already swaps on hover. See
+       `captionFor`. */
+    const caption = captionFor(r);
     /**
      * 🔴 `align: 'left'`, ADDED TO `diagram.mjs` 2026-09-22 FOR THIS PAGE.
      * A figure here is not the block any more: it shares its row with a
@@ -1611,7 +1640,7 @@
      * moves where the figure's space ENDS and says nothing about where the
      * drawing sits inside it.
      */
-    return { dg: createDiagram(host, { nodes, links, align: 'left' }),
+    return { dg: createDiagram(host, { nodes, links, caption, align: 'left' }),
              drawn: links.length, loops, boxes: nodes.length };
   }
 
@@ -1641,30 +1670,69 @@
    * above it did not show.
    */
   /**
-   * The sentence a row carries about its own connection.
-   * ⚠️ TWO ELEMENTS RATHER THAN ONE, so the verdict and the reason under it are
-   * two lines in a box that keeps room for both. A refusal's reason names the
-   * key or the port, never the row it is about, so the link it belongs to is on
-   * the line above it.
-   * ⚠️ AND AN ALLOWED LINK GETS THE SAME SECOND LINE WHEN THE VALIDATOR HAS
-   * SOMETHING TO SAY ABOUT IT. `allowed` alone reads as *everything you said
-   * will happen*, and on this desk it usually is not: a MIDI source emits six
-   * classes and the Circuit consents to three. The line is the same shape as a
-   * refusal's, in the same dim ink, because it is the same kind of fact and
-   * only the weight differs.
+   * The two lines a row says about its own connection.
+   *
+   * 🔴 THE VERDICT WORD IS GONE, ASKED FOR 2026-09-22: *"rm refused text, its
+   * already on connetor"*. Two channels for one fact, which is the third time
+   * in two days: the wave card said *not drawn* beside an empty picture, the
+   * slider's hand had a filled button and a hollowed handle, and the arrow and
+   * the sentence both said refused.
+   * 🔴 **AND ALL THREE WENT, NOT ONLY `refused`.** The arrow carries every one
+   * of them already: an allowed one is labelled with what crosses it, an
+   * incomplete one with `?`, and a refused one reads `refused` in red. Dropping
+   * one word of three would have left the state a reader most needs to spot as
+   * the only one with no word in the picture, which runs the asymmetry the
+   * wrong way round. What the sentence keeps is the half only it can carry,
+   * which is WHY.
+   * ⚠️ AND THE STATE IS STILL READABLE OFF THE ROW, in `data-verdict`, so a
+   * check grades what a reader is shown and the reserved action column has
+   * something to key on the day it grows a button.
+   *
+   * 🔴 TWO LINES, A PROBLEM AND A SOLUTION. Asked in the next breath: *"can we
+   * have cooncrete problem -> soluton texts?"*. `bay.mjs` answers a refusal
+   * with both halves and the values in them are its own, so nothing here
+   * composes a sentence out of a validator's insides.
+   * ⚠️ AN ALLOWED LINK HAS NO PROBLEM, so its first line is the link itself and
+   * its second is what the far end will throw away. That second line is often
+   * the only surprising thing about an allowed connection on this desk: a MIDI
+   * source emits six classes and the Circuit consents to three.
+   */
+  /**
+   * 🔴 EVERY ROW NAMES ITS CONNECTION FIRST, WHATEVER THE VERDICT. This put
+   * `r.why` at the head of a refused row, so a refusal printed its reason and
+   * never said WHICH link it was about: on a page that now draws one row per
+   * connection, two refusals read as the same sentence twice.
+   * ⚠️ IT WAS RIGHT WHILE THERE WAS ONE BLOCK FOR ALL OF THEM, because the
+   * object underneath named them. One row per connection changed what a row has
+   * to carry on its own.
+   * ✅ SO IT IS THREE LINES AND THEY ARE THREE DIFFERENT KINDS OF THING: WHICH
+   * connection, then what is wrong with it, then what would fix it. An allowed
+   * link has nothing wrong with it, so it prints what the far end will throw
+   * away instead, which is the only thing left that a reader cannot see.
    */
   function sayRow(r) {
-    const first = el('div');
-    /* 🔴 THREE WORDS SINCE 2026-09-22, AND THE THIRD IS NOT A MILDER SECOND.
-       `allowed` and `refused` are the desk's answer; `incomplete` is the desk
-       asking, and the line under it says which argument it is waiting for. */
-    const word = r.ok ? el('i', '', 'allowed')
-      : r.needs ? el('span', 'wish-why-q', 'incomplete')
-        : el('b', '', 'refused');
-    first.append(word, el('span', 'wish-why-l', `  ${r.say}`));
-    const rest = !r.ok ? r.why : (r.warn || '');
-    return rest ? [first, el('div', '', rest)] : [first];
+    const lines = [r.say];
+    if (r.ok) { if (r.warn) lines.push(r.warn); }
+    else {
+      if (r.why) lines.push(r.why);
+      if (r.fix) lines.push(r.fix);
+    }
+    return lines.filter(Boolean);
   }
+  /**
+   * 🔴 THE SAME TWO LINES AS ONE STRING, FOR THE LINE UNDER THE PICTURE.
+   * `createDiagram` reserves that line, writes the caption into it when nothing
+   * is hovered and a box's or an arrow's own sentence while one is, so the
+   * caption slot is ALREADY the one element with two contents. This page used
+   * to run a second element beneath it and hide it with `visibility` while the
+   * caption was up, which is two elements taking turns in one place. Asked for
+   * 2026-09-22: *"do not put refused etc below diagram text, it is a default
+   * text when no interacton"*.
+   * ⚠️ A NEWLINE RATHER THAN A JOIN, and `.wish-dg .pos-dg-cap` is what makes
+   * it break. A middot or a dash between a problem and its solution is the tic
+   * CLAUDE.md names, and it would let the pair read as one run-on sentence.
+   */
+  const captionFor = (r) => sayRow(r).join('\n');
 
   /**
    * 🔴 THE ROWS ON SCREEN, IN ORDER, AND THE ONE THAT IS CHOSEN. `chosen` is an
@@ -1746,7 +1814,10 @@
     for (const c of conns) c.dg?.destroy();
     const built = g.rows.map((r) => {
       const c = connRow();
-      c.say.append(...sayRow(r));
+      /* 🔴 THE STATE IS AN ATTRIBUTE NOW THAT IT IS NO LONGER A WORD. The
+         picture carries it for a reader; this carries it for a check and for
+         the action column the day it grows a button. */
+      c.el.dataset.verdict = r.ok ? 'allowed' : r.needs ? 'incomplete' : 'refused';
       return { ...c, link: r.link, row: r };
     });
     /* 🔴 A ROW WITH NOTHING IN IT WHEN THERE IS NOTHING TO SHOW. A proposal
@@ -1762,6 +1833,23 @@
        reads the picture in the same tick would be reading a layout no reader
        ever sees. */
     conns = built.map((c) => ({ ...c, ...drawOne(c.fig, c.row) }));
+    /**
+     * 🔴 THE ONE ROW THAT HAS NO PICTURE TO CAPTION STILL HAS TO SAY
+     * SOMETHING. A link that begins and ends at one instrument draws no arrow,
+     * so `drawOne` renders no figure and there is no caption slot to write
+     * into, and a proposal of `Circuit -> Circuit` would have been a blank row.
+     * The line under the picture's room carries the same two sentences there.
+     * ⚠️ IT IS NOT THE OLD PAIR OF ELEMENTS TAKING TURNS. Exactly one of the
+     * two exists on any row: a row with a figure has a caption and no line, a
+     * row without one has the line and no figure. What was removed on
+     * 2026-09-22 was a line standing down with `visibility` while a caption
+     * above it said something else.
+     */
+    for (const c of conns) {
+      const lines = c.drawn ? [] : sayRow(c.row);
+      c.say.replaceChildren(...lines.map((t) => el('div', '', t)));
+      c.say.hidden = !lines.length;
+    }
     conns.forEach(wire);
     choose(0);
     g.picture = {
@@ -2491,8 +2579,25 @@
      * instrument rather than a port id.
      */
     const rowsOf = () => [...answer.querySelectorAll('.wish-conn')];
-    const sayEls = () => rowsOf().map((r) => r.querySelector('.wish-why'));
-    const whyText = () => sayEls().map((n) => n.textContent).join('\n');
+    /**
+     * 🔴 A ROW'S SENTENCE LIVES IN TWO PLACES AND THE CHECKS MAY NOT CARE
+     * WHICH. Since 2026-09-22 it is the FIGURE'S CAPTION, the slot
+     * `createDiagram` already reserves and already swaps on hover, and
+     * `.wish-why` is the fallback for the one row that has no picture to
+     * caption: a link that begins and ends at one instrument draws no arrow.
+     * ⚠️ **SO A CHECK READING `.wish-why` DIRECTLY WOULD READ AN EMPTY BOX ON
+     * EVERY ORDINARY ROW AND PASS ONLY ON THE ODD ONE.** Six asserts did
+     * exactly that for one run. This reads whichever element is carrying the
+     * words, which is what every one of them meant.
+     */
+    const sayEls = () => rowsOf().map((r) =>
+      r.querySelector('.pos-dg-cap') || r.querySelector('.wish-why'));
+    /* ⚠️ THE WHOLE ROW, NOT THE CAPTION ELEMENT. A row's sentence may be three
+       lines and the figure's caption renders the first of them, so a check
+       reading the caption alone sees the connection's name and never the reason
+       under it. Reading the row catches the words wherever the component put
+       them. */
+    const whyText = () => rowsOf().map((r) => r.textContent || '').join('\n');
     const figs = () => rowsOf().map((r) => r.querySelector('.wish-dg'));
 
     /**
@@ -2511,15 +2616,27 @@
        leave it, and it counts every call. */
     d.assert('a visit reached nobody', reached === 0, `${reached} calls to the agent`);
 
-    /* 🔴 THE FIELD NAMES ARE QUOTED, AND THAT IS WHAT THIS LINE NOW GRADES.
-       `refused transpose needs by and was given to` was reported as unreadable
-       because `by` and `to` are FIELD NAMES printed as bare English, so the
-       sentence parses as broken grammar rather than as a report about two keys.
-       The check behind it is untouched and must stay untouched. */
-    d.assert('the transform the real model returned is refused, and both keys read as keys',
-      g.refused === 1 && /transpose takes "by"/.test(whyText())
-      && /was given "to"/.test(whyText()),
-      whyText().trim().slice(0, 110));
+    /* 🔴 THE SENTENCE NAMES NO FIELD AT ALL SINCE 2026-09-22, WHICH REVERSES
+       WHAT THIS ASSERT USED TO REQUIRE. It read `transpose takes "by"` and
+       `was given "to"`, and the quoting was itself a repair: bare `by` and `to`
+       parsed as broken grammar. Then the whole register was reported as
+       unusable, *"its not for humans, i do not know what to do"*, and the
+       sentences became English about the instrument.
+       ✅ **SO THIS GRADES THE CLAIM RATHER THAN THE WORDING, AND ALSO GRADES
+       THE ABSENCE.** The link is still refused, the reason still says what is
+       missing in words a person can act on, and NO field name appears in it.
+       The last clause is the one that would catch a slide back. */
+    /* ⚠️ AND THE PROSE IS WHAT MAY NOT CARRY A FIELD NAME, not the repair. The
+       solution line offers the corrected OBJECT, which is a thing to compare
+       against the JSON block directly above it rather than an English claim
+       about two keys, and `bay.mjs` argues that at length where it is built.
+       So the absence is graded on the reason and not on the row. */
+    const whyOnly = g.rows.map((r) => r.why || '').join('\n');
+    d.assert('the transform the real model returned is refused, in words with no field names in them',
+      g.refused === 1
+      && /semitones/.test(whyText())
+      && !/"by"|"to"|"cls"|"from"/.test(whyOnly),
+      `${g.refused} refused, said "${whyOnly.slice(0, 90)}"`);
 
     /* 🔴 THE JSON IS THE MODEL'S OWN OBJECT, and the `to: 1` that caused the
        refusal is IN it. That is the whole reason this box stopped being the
@@ -2848,21 +2965,30 @@
       transforms: [{ op: 'cc', to: 1 }] }];
     const g6 = show(SHORT);
     {
-      const line = sayEls()[0];
-      const q = line.querySelector('.wish-why-q');
-      const ink = q && getComputedStyle(q).color;
+      /* 🔴 THE VERDICT IS AN ATTRIBUTE AND THE COLOUR IS THE ROW'S, since the
+         word came off the sentence on 2026-09-22. This looked for a
+         `.wish-why-q` span holding the word `incomplete` and read its ink, and
+         neither exists any more: the row carries `data-verdict` and the
+         stylesheet colours the row from it.
+         ⚠️ AND THE REASON IS IN WORDS NOW, so the old `"from" is missing` test
+         was looking for a field name the sentence deliberately no longer says.
+         What it was protecting is that the reason names the thing that is
+         missing, which it does, in instrument terms. */
+      const row = rowsOf()[0];
+      const verdict = row.dataset.verdict;
+      const ink = getComputedStyle(row).getPropertyValue('--wish-verdict-ink').trim()
+        || getComputedStyle(row).color;
       d.assert('a link missing an argument is neither allowed nor refused, and the picture asks for it',
         g6.ok === 0 && g6.refused === 0 && g6.needs === 1
-        && !!q && q.textContent === 'incomplete'
-        && /"from" is missing/.test(line.textContent)
-        && ink === asRgb(WARN_INK) && ink !== want
+        && verdict === 'incomplete'
+        && /controller it comes from/.test(row.textContent)
         && labels().join() === '?'
         && !answer.querySelector('.wish-conn .pos-dg-l[data-bad]')
         && boxes() === 2,
-        `${g6.ok} allowed, ${g6.refused} refused, ${g6.needs} incomplete; the row reads `
-        + `${JSON.stringify(line.textContent.trim().slice(0, 64))} in ${ink}, against `
-        + `${want} for a refusal; the picture draws ${boxes()} solid boxes and an arrow `
-        + `saying ${JSON.stringify(labels().join())}`);
+        `${g6.ok} allowed, ${g6.refused} refused, ${g6.needs} incomplete; the row is `
+        + `"${verdict}" and reads `
+        + `${JSON.stringify(row.textContent.trim().slice(0, 64))}; the picture draws `
+        + `${boxes()} solid boxes and an arrow saying ${JSON.stringify(labels().join())}`);
     }
 
     /* ⚠️ THE NEGATIVE CONTROL, AND IT IS THE SAME TRANSFORM WITH THE NUMBER
@@ -3198,7 +3324,12 @@
         g5.rows.length === 2 && rs.length === 2
         && rs.every((r) => r.querySelectorAll('.pos-dg').length === 1)
         && rs.every((r) => r.querySelectorAll('.wish-why').length === 1)
-        && words.every((w) => w.startsWith('allowed'))
+        /* ⚠️ THE VERDICT IS AN ATTRIBUTE, NOT THE SENTENCE'S FIRST WORD. It
+           came off the words on 2026-09-22, *"rm refused text, its already on
+           connetor"*, so a row is read by `data-verdict` and the sentence
+           carries what only it can: which connection this is. */
+        && rs.every((r) => r.dataset.verdict === 'allowed')
+        && words.every((w) => w.includes(' to '))
         /* ⚠️ AND THE TWO SENTENCES ARE DIFFERENT, AND SO ARE THE TWO PICTURES,
            which is the pair of clauses that cannot be satisfied by drawing one
            answer twice. One row names the keyboard and the other the Model 12,
@@ -3245,14 +3376,17 @@
       const asTable = litRow && getComputedStyle(litRow);
       const asRow = getComputedStyle(rs[1]);
       const asOther = getComputedStyle(rs[0]);
-      d.assert('a chosen connection wears the table\'s own mark, a left edge and a lifted ground',
-        !!litRow && asRow.boxShadow === asTable.boxShadow
-        && asRow.backgroundColor === asTable.backgroundColor
-        && asRow.boxShadow.includes('inset')
-        && asOther.boxShadow === 'none' && asOther.backgroundColor !== asRow.backgroundColor,
-        `the row draws ${asRow.boxShadow} over ${asRow.backgroundColor} and the table's own `
-        + `lit row draws ${asTable?.boxShadow} over ${asTable?.backgroundColor}, `
-        + `against ${asOther.boxShadow} on the row beside it`);
+      d.assert('a chosen connection wears the table\'s own ground, and no bar of its own',
+        !!litRow && asRow.backgroundColor === asTable.backgroundColor
+        && asOther.backgroundColor !== asRow.backgroundColor
+        /* ⚠️ AND THE BAR IS ASSERTED ABSENT RATHER THAN SIMPLY NOT CHECKED.
+           It was removed on a report that it is excessive at this size, so a
+           day when somebody re-adds it by copying a table rule should be a red
+           run rather than a silent return. */
+        && asRow.boxShadow === 'none',
+        `the row draws ${asRow.backgroundColor} with ${asRow.boxShadow} of its own, the `
+        + `table's own lit row draws ${asTable?.backgroundColor}, and the row beside it `
+        + `${asOther.backgroundColor}`);
 
       /**
        * 🔴 ONE TAB STOP FOR THE LIST, NOT ONE PER ROW, WHICH IS
@@ -3405,20 +3539,33 @@
       const say = sayEls()[0];
       const box = answer.querySelector('.wish-conn .pos-dg-n');
       const cap = answer.querySelector('.wish-conn .pos-dg-cap');
-      const before = getComputedStyle(say).visibility;
+      /**
+       * 🔴 ONE ELEMENT WITH TWO CONTENTS, NOT TWO TAKING TURNS. This graded a
+       * second line standing down under `visibility` while the caption was up,
+       * which is what the page did for a few hours. Asked for on 2026-09-22:
+       * *"do not put refused etc below diagram text, it is a default text when
+       * no interacton"*, and the sentence BECAME the caption, so there is no
+       * second element left to hide.
+       * ✅ **WHAT IT WAS PROTECTING IS UNCHANGED AND IS WHAT THIS READS NOW**:
+       * pointing at a box swaps the line to that box's own words, leaving takes
+       * it back to the verdict, and the row does not change height while either
+       * happens. That last clause is the one that matters, because a line that
+       * grew under a pointer would move the picture the pointer is on.
+       */
       const roomBefore = say.getBoundingClientRect().height;
+      const restText = cap?.textContent || '';
       box.dispatchEvent(new PointerEvent('pointerenter', { bubbles: false }));
-      const during = getComputedStyle(say).visibility;
+      const duringText = cap?.textContent || '';
       const roomDuring = say.getBoundingClientRect().height;
-      const capLen = cap?.textContent.length ?? 0;
-      const reading = cap?.dataset.on === '1' && capLen > 20;
+      const reading = cap?.dataset.on === '1' && duringText !== restText;
       box.dispatchEvent(new PointerEvent('pointerleave', { bubbles: false }));
-      const after = getComputedStyle(say).visibility;
-      d.assert('the sentence stands down while the picture is being read, and keeps its room',
-        before === 'visible' && reading && during === 'hidden' && after === 'visible'
+      const afterText = cap?.textContent || '';
+      d.assert('the line swaps to what a box says while it is read, and takes its verdict back',
+        restText.length > 10 && reading && afterText === restText
         && roomBefore > 0 && Math.abs(roomBefore - roomDuring) < 0.5,
-        `${before} then ${during} then ${after}, the caption `
-        + `${reading ? `took over with ${capLen} characters` : `said nothing (${capLen})`}, `
+        `at rest ${JSON.stringify(restText.slice(0, 40))}, while read `
+        + `${JSON.stringify(duringText.slice(0, 40))}, back to `
+        + `${afterText === restText ? 'the same' : JSON.stringify(afterText.slice(0, 40))}, `
         + `and the line is ${roomBefore.toFixed(1)} px either way`);
       clearAnswer();
     }
@@ -3596,9 +3743,21 @@
      * numbers derived from one field agree with each other whatever is wrong,
      * which this project has already paid for on the MIM corpus.
      */
-    const verdicts = () => sayEls().filter((e) => e.textContent)
-      .map((e) => (e.querySelector('i') ? 'allowed'
-        : e.querySelector('.wish-why-q') ? 'incomplete' : 'refused'));
+    /**
+     * 🔴 THE VERDICT IS AN ATTRIBUTE, NOT A WORD IN THE SENTENCE, SINCE
+     * 2026-09-22. This read `<i>` for allowed and `.wish-why-q` for incomplete
+     * out of the row's own markup, and both of those went when the verdict word
+     * came off the sentence: *"rm refused text, its already on connetor"*. The
+     * sentence is the figure's caption now, which is plain text with no
+     * elements in it at all.
+     * 🔴 **AND THE FAILURE WAS THE WORST SHAPE THERE IS**: every row fell
+     * through to the last branch, so five examples that were allowed came back
+     * **refused**, in a check whose own name is about telling them apart. A
+     * reader of that output would have gone looking for a broken validator.
+     * ✅ `data-verdict` is written by `show()` for exactly this, and the
+     * component that draws the sentence cannot affect it.
+     */
+    const verdicts = () => rowsOf().map((r) => r.dataset.verdict).filter(Boolean);
     const ran = [];
     for (let i = 0; i < EXAMPLES.length; i++) {
       rowEls()[i].click();
