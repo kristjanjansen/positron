@@ -174,7 +174,7 @@ export function knobPlaces({ min, max, step = 0, sweep = SWEEP } = {}) {
 export function createKnob({
   label, sub = '', min = 0, max = 127, value, home, unit = '', title = '',
   onInput = () => {}, onChange = () => {}, disabled = false,
-  stroke, ends, step, hand: wantHand = false,
+  stroke, ends, step, hand: wantHand = false, format = null,
 } = {}) {
   if (!label) throw new Error('a knob needs a label: it is the only thing naming what it moves');
   const span = max - min;
@@ -374,6 +374,19 @@ export function createKnob({
    * character along.
    */
   function show(n) {
+    /**
+     * 🔴 A KNOB WHOSE VALUE HAS A NAME PRINTS THE NAME, ADDED 2026-09-22 FOR
+     * `/muta/`'s WARPS ALGORITHM, ASKED FOR AS *"should show names instead"*
+     * and *"fraction num is not that helpful"*. That dial sweeps a continuous
+     * crossfade through six shapers, so `0.31` is a true number that says
+     * nothing about which two a reader is between, and the panel itself prints
+     * a ring of eight icons rather than a scale.
+     * ⚠️ IT IS THE CALLER'S FUNCTION AND NOT A TABLE HERE, because what a value
+     * is CALLED is a fact about an instrument and this component knows nothing
+     * about instruments.
+     * ⚠️ AND `unit` IS NOT APPENDED TO IT. A name is not a quantity.
+     */
+    if (format) return String(format(n));
     let t = n.toFixed(dp);
     if (t === `-${(0).toFixed(dp)}`) t = (0).toFixed(dp);
     return unit ? `${t} ${unit}` : t;
@@ -394,8 +407,27 @@ export function createKnob({
    * `tabular-nums`, so a digit, a minus and a point are all one advance. The
    * two ends are the widest strings a value between them can make.
    */
-  root.style.setProperty('--knob-num-w',
-    `${Math.max(...[min, max].map((n) => show(n).length))}ch`);
+  /**
+   * 🔴 **AND THE TWO ENDS STOP BEING ENOUGH THE MOMENT A KNOB PRINTS NAMES.**
+   * For a number, the widest string a value between two ends can make is at one
+   * of them, which is why this read `min` and `max` alone. A NAME has no such
+   * order: on Plaits' own list `chord` sits between `harmonic` and `speech` and
+   * is shorter than both, so the longest name on a dial is usually in the
+   * middle. A reservation taken from the ends would be too narrow and the cell
+   * would slide again, which is the entire defect this line exists to stop.
+   * ⚠️ SO A FORMATTED KNOB IS SAMPLED ACROSS ITS TRAVEL: every step where it
+   * has steps, and one sweep of points where it is continuous. Measured rather
+   * than declared, because a caller asked to hand over its longest string will
+   * eventually hand over its second longest.
+   */
+  const widestValue = () => {
+    if (!format) return Math.max(...[min, max].map((n) => show(n).length));
+    const n = stp > 0 ? Math.round(span / stp) : SWEEP;
+    let w = 0;
+    for (let i = 0; i <= n; i++) w = Math.max(w, show(min + (span * i) / n).length);
+    return w;
+  };
+  root.style.setProperty('--knob-num-w', `${widestValue()}ch`);
 
   function paint() {
     const frac = (v - min) / span;

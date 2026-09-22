@@ -5128,13 +5128,34 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    ⚠️ **THE PADDING MOVES WITH IT.** The header used to sit in the case's top
    inset with nothing under it; a line needs air on both sides or it reads as
    the header's underline rather than as the edge of a section. */
-/* ⚠️ NO `margin-bottom`. The case already puts its own inset between the header
-   and what follows, so a margin here is that inset counted twice: MEASURED at
-   40 px under the line against 21 px left and below, on a panel whose whole
-   claim is that the three agree. */
-.panel-case > .panel-head {
-  padding-block: var(--panel-pad);
-  border-bottom: 1px solid var(--line);
+/* 🔴 NO BORDER AND NO MARGIN. The header is a GLUED part since 2026-09-22, so
+   the line under it is `.pos-glue`'s own 1 px seam, drawn at the full width of
+   the surface. A `border-bottom` here was inside the case's padding and could
+   never reach the sides, which is exactly how it was reported.
+   🔴 **AND IT DECLARES `--panel-pad` RATHER THAN READING IT, WHICH COST A ROUND
+   TRIP.** That token is declared on `.panel`, and the header was a CHILD of the
+   case until this change, so it inherited it. As a SIBLING it inherits nothing,
+   `var(--panel-pad)` resolved to nothing, and the padding shorthand fell to
+   zero: reported one minute later as *"where is padding. good god.."*, with the
+   status button against the edge.
+   ⚠️ **A CUSTOM PROPERTY INHERITS DOWNWARD, NEVER SIDEWAYS**, which `shell.css`
+   already records about `--fdr-foot` being declared on `.pos-fdr` and invisible
+   to the button column beside it. Same mistake, same file, one component
+   along. */
+/* 🔴 **THE TRANSPORT BAR'S OWN NUMBERS, BECAUSE THAT IS WHAT WAS ASKED FOR:**
+   *"this does not look like glued transport or smt"*, and then, pointing at a
+   screenshot of the bar itself, *"just look at transport"*. `.tbar` is a flat
+   `padding: 8px` with a 1 px border, which its own comment records as MEASURED
+   after a report of *"unify paddings and button sizes"*, and a `gap: 14px`.
+   ⚠️ **`--panel-pad` WAS THE WRONG MEASURE AND IT WAS 20.** It is the inset a
+   CASE keeps around its controls, which is a different quantity from the air a
+   glued BAR keeps around its buttons, and using it made a header two and a half
+   times the thing it is glued to. A number being available is not a reason to
+   read it. */
+.pos-glue > .panel-head {
+  padding: 8px;
+  column-gap: 14px;
+  background: var(--card);
 }
 .panel-head {
   display: grid;
