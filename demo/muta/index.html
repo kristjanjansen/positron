@@ -974,6 +974,14 @@
       sampleRate: 48000, latencyHint: 'interactive',
     });
     await ctx.resume();
+    wetGain = ctx.createGain();
+    dryGain = ctx.createGain();
+    drySplit = ctx.createChannelSplitter(2);
+    /* ⚠️ THE DRY PATH IS THE ONE THAT IS UP BEFORE ANYTHING IS PRESSED, because
+       nothing is switched on yet and an effect nobody has turned on must not be
+       in the signal. `wetFade` takes over from the first press. */
+    wetGain.gain.value = 0;
+    dryGain.gain.value = 1;
     /* ⚠️ THE CELL WENT AND THE FACT DID NOT. A rate that is not 48000 is the
        one thing that stops both firmwares being able to feed each other, so it
        is said out loud rather than dropped with its cell. */
@@ -1022,9 +1030,29 @@
     // this page has been through both firmwares, which is what makes the second
     // one gradable at all: a page that mixed the dry oscillator in would sound
     // fine with the effect doing nothing.
+    /**
+     * 🔴 A BYPASS, SO THE EFFECT'S SWITCH CHANGES THE SOUND. Reported
+     * 2026-09-22: *"sound does not change when i turn warps on and off"*, which
+     * was exactly true: the graph was built once and the switch only moved a
+     * lamp and a picture, so a listener went on hearing a processed signal on a
+     * panel that said it was off. That is the shape this project calls a lie.
+     * ⚠️ **AND THE DRY PATH IS ONE CHANNEL, NOT THE NODE.** The note above
+     * still holds: the oscillator renders `out` on channel 0 and `aux` on
+     * channel 1, which are two sockets rather than a stereo pair, so connecting
+     * it straight to the destination would put two different sounds in two
+     * ears. The splitter takes channel 0, which is the jack a rack would patch.
+     * ⚠️ TWO GAINS RATHER THAN A DISCONNECT, and they ramp. Re-patching a live
+     * graph clicks; a 20 ms ramp does not, and it is short enough that a press
+     * still feels immediate.
+     */
     node.connect(warpNode);
-    warpNode.connect(ctx.destination);
+    warpNode.connect(wetGain);
+    wetGain.connect(ctx.destination);
+    node.connect(drySplit);
+    drySplit.connect(dryGain, 0);
+    dryGain.connect(ctx.destination);
     d.log(`audio context ${ctx.state} at ${Math.round(ctx.sampleRate)} Hz`);
+    wetFade(warpsOn);
 
     const waitReady = new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('the worklet never answered')), 5000);
@@ -1612,6 +1640,23 @@
    */
   let booting = null;
   let plaitsOn = false, warpsOn = false;
+  let wetGain = null, dryGain = null, drySplit = null;
+  /**
+   * 🔴 THE EFFECT IN OR OUT OF THE WAY, RAMPED. `warpsOn` picks which of the
+   * two paths is heard; a switch that only moved a lamp was reported as *"sound
+   * does not change when i turn warps on and off"*.
+   * ⚠️ 20 ms, because re-patching a live graph clicks and a ramp does not, and
+   * it is short enough that a press still feels immediate.
+   */
+  function wetFade(on) {
+    if (!wetGain || !dryGain || !ctx) return;
+    const t = ctx.currentTime;
+    for (const [g, v] of [[wetGain, on ? 1 : 0], [dryGain, on ? 0 : 1]]) {
+      g.gain.cancelScheduledValues(t);
+      g.gain.setValueAtTime(g.gain.value, t);
+      g.gain.linearRampToValueAtTime(v, t + 0.02);
+    }
+  }
 
   async function ensureAudio() {
     if (!booting) booting = boot().catch((e) => { booting = null; d.fail(e); });
@@ -1644,7 +1689,6 @@
       send({ t: 'allOff' });
       /* ⚠️ THE EFFECT KEEPS PLAYING IF IT IS ON, on its own carrier, which is
          the state `carrier_shape` exists for. */
-      if (warpsOn && carrier === 0) setCarrier(1);
       light();
       paintScope();
       await idleIfEmpty();
@@ -1680,6 +1724,7 @@
   async function toggleWarps() {
     if (warpsOn) {
       warpsOn = false;
+      wetFade(false);
       light();
       paintWarpScope();
       await idleIfEmpty();
@@ -1696,10 +1741,13 @@
     /* The effect needs something coming through it, and with PLAITS off that is
        its own carrier. With PLAITS on it is already droning. */
     if (plaitsOn) startDrone();
-    /* ⚠️ STARTING WITH WARPS ALONE GIVES IT A SOURCE. With PLAITS off the
-       external input is silence, so the effect would be on and inaudible, which
-       is the shape of control this project calls a lie. */
-    setCarrier(plaitsOn ? 0 : 1);
+    /* ⚠️ AND IT DOES NOT TOUCH THE CARRIER. It set one when the oscillator was
+       off, on the reasoning that an effect with a silent input is inaudible.
+       Asked for 2026-09-22: *"do not swithc warps to sine, keep it on from
+       plaits until user changes it"*. A switch that moves a picker the reader
+       set is a control reaching past its own job, and the silence it was
+       avoiding is a true reading of an oscillator that is off. */
+    wetFade(true);
     light();
   }
   /**

@@ -306,6 +306,12 @@
      ⚠️ IT IS CENTRED IN ITS OWN BOX, because the tallest state is the one with
      the least in it: without this the picture would sit against the top and
      leave nothing but air under it for every run that succeeds. */
+  /* ⚠️ **120 STAYS, AND I CUT IT TO 100 FOR A FEW MINUTES ON A MISREADING.**
+     `.pos-dg` measures 100 and the HOST measures 119 with a picture in it,
+     because the figure carries its own caption line. Reserving 100 would make
+     the row grow by 19 px the moment an answer landed, which is the jump this
+     reservation exists to stop, and the page's own check caught it in one run:
+     `100 px is the default height, against 0, 119, 100 drawn`. */
   .wish-dg {
     /* 🔴 A DEFAULT HEIGHT, AND IT IS MEASURED. Asked 2026-09-21: *"use the
        patcher visualizer with a default height and a shimmer only while
@@ -935,7 +941,19 @@
    * into it is drawn with the same 1 px seam as the parts that were there at
    * build time and nothing has to be told about it.
    */
-  const answer = createGlue(patchHead.part, connRow().el, dump);
+  /**
+   * 🔴 THE OBJECT BLOCK IS ITS OWN SURFACE SINCE 2026-09-22, NOT THE GLUE'S
+   * LAST PART. Asked against a screenshot of the two touching: *"disconnect
+   * these 2 panels"*, and in the same breath *"clickig on it shoul should show
+   * dump in a separate panel"*.
+   * ⚠️ **IT WAS RIGHT WHILE THE BLOCK HELD ONE ANSWER AND IS WRONG NOW.**
+   * `createGlue`'s own rule is that gluing CLAIMS two things are one object,
+   * which was true of a header, a picture and the object behind it. The rows
+   * are the answer now, and the object is a reading OF the row a person
+   * pressed: one surface per thing, with the page's own rhythm between them,
+   * says that where a shared border says the opposite.
+   */
+  const answer = createGlue(patchHead.part, connRow().el);
 
   /**
    * 🔴 FIVE THINGS TO SAY, IN A TABLE, AND SOME OF THEM GO WRONG. Asked
@@ -993,7 +1011,9 @@
    * five sentences you can press, here is where you say your own, here is what
    * came back.
    */
-  d.el.append(examples.el, heard, answer);
+  /* ⚠️ THE OBJECT BLOCK IS A SIBLING OF THE ANSWER, not a child of it, so the
+     page's own vertical rhythm sits between them. See the note on `answer`. */
+  d.el.append(examples.el, heard, answer, dump);
 
   /**
    * Put one example in the box and ask about it, which is what the button this
@@ -1744,11 +1764,15 @@
   let chosen = -1;
 
   /** Put a fresh set of rows into the glue, between the header and the object. */
+  /* ⚠️ THE ROWS GO AT THE END OF THE GLUE NOW, because the object block left it
+     on 2026-09-22 and `insertBefore(row, dump)` was inserting before a node that
+     is no longer a child. It threw on the first answer and took the whole page
+     with it, which is why `__demo.ready` failed rather than one assert. */
   function layRows(rows) {
     for (const old of [...answer.children]) {
       if (old.classList.contains('wish-conn')) old.remove();
     }
-    for (const row of rows) answer.insertBefore(row, dump);
+    for (const row of rows) answer.append(row);
   }
 
   /**
@@ -2632,10 +2656,17 @@
        about two keys, and `bay.mjs` argues that at length where it is built.
        So the absence is graded on the reason and not on the row. */
     const whyOnly = g.rows.map((r) => r.why || '').join('\n');
+    /* ⚠️ A LIST RATHER THAN A REGEX LITERAL, and the reason is the build rather
+       than taste: `build.mjs` scans modules for imports, and a pattern holding
+       a quoted `from` reads as one. It refused the build with
+       `wish/index.html imports /.test(whyOnly)`, which is the scanner quoting
+       my own check back at me. */
+    const FIELD_WORDS = ['by', 'to', 'cls', 'from'];
+    const namesAField = (t) => FIELD_WORDS.some((w) => t.includes(`"${w}"`));
     d.assert('the transform the real model returned is refused, in words with no field names in them',
       g.refused === 1
       && /semitones/.test(whyText())
-      && !/"by"|"to"|"cls"|"from"/.test(whyOnly),
+      && !namesAField(whyOnly),
       `${g.refused} refused, said "${whyOnly.slice(0, 90)}"`);
 
     /* 🔴 THE JSON IS THE MODEL'S OWN OBJECT, and the `to: 1` that caused the
@@ -2699,15 +2730,19 @@
       const head = patchRow.parentElement;
       const glueBg = getComputedStyle(answer).backgroundColor;
       const row = rowsOf()[0];
+      /* ⚠️ THE SEAM BELOW WENT WITH THE OBJECT BLOCK, 2026-09-22. A row is the
+         LAST part of the glue now, so what is under it is the component's own
+         edge rather than a seam, and asking for 1 px there was asking the glue
+         to have a part it no longer has. The claim that survives is the one
+         this was always about: a row is a PART, with the glue's seam above it,
+         painting its own ground and drawing no border of its own. */
       d.assert('with an answer up, the connection is its own part with the glue\'s own seam over it',
         rowsOf().length === g.rows.length && row.parentElement === answer
         && Math.abs(seam(head, row) - 1) < 0.6
-        && Math.abs(seam(row, dump) - 1) < 0.6
         && getComputedStyle(row).backgroundColor !== glueBg
         && getComputedStyle(row).borderTopWidth === '0px',
         `${[...answer.children].filter((n) => !n.hidden).length} parts up for `
-        + `${g.rows.length} connection(s), seams ${seam(head, row).toFixed(1)} above and `
-        + `${seam(row, dump).toFixed(1)} below, `
+        + `${g.rows.length} connection(s), a ${seam(head, row).toFixed(1)} px seam above it, `
         + `and it draws ${getComputedStyle(row).borderTopWidth} of border of its own`);
     }
 
@@ -3192,18 +3227,28 @@
     const picked = rect(patchPart);
     const laid = rowsOf().map(rect);
     const dumped = rect(dump);
+    /* 🔴 THE OBJECT BLOCK IS NO LONGER IN THE GLUE, SINCE 2026-09-22:
+       *"disconnect these 2 panels"*. So this grades two claims that used to be
+       one: the picker and the rows are ONE glued component in order, and the
+       object is a SEPARATE surface under it with the page's own air between
+       them rather than a shared border. The second half is the ask, and reading
+       the gap is what tells a disconnected panel from one that merely lost its
+       seam. */
     const oneBox = answer.classList.contains('pos-glue')
-      && [patchPart, ...rowsOf(), dump].every((n) => n.parentElement === answer)
-      && answer.parentElement === d.el;
-    d.assert('the patch picker, every connection and the JSON are one glued component, in that order',
+      && [patchPart, ...rowsOf()].every((n) => n.parentElement === answer)
+      && answer.parentElement === d.el
+      && dump.parentElement === d.el;
+    const apart = dumped.top - laid[laid.length - 1].bottom;
+    d.assert('the picker and the connections are one glued component, and the JSON is its own',
       oneBox && laid.length > 0
       && picked.bottom <= laid[0].top
       && laid.every((r, i) => (i === 0 || laid[i - 1].bottom <= r.top))
-      && laid[laid.length - 1].bottom <= dumped.top,
-      `${oneBox ? `one .pos-glue holds the header, ${laid.length} row(s) and the JSON`
-        : 'NOT one box'}, picker ends at `
+      && apart > 8,
+      `${oneBox ? `one .pos-glue holds the header and ${laid.length} row(s), with the JSON outside it`
+        : 'NOT the right two boxes'}, picker ends at `
       + `${picked.bottom.toFixed(0)}, rows run ${laid.map((r) => `${r.top.toFixed(0)} to `
-        + `${r.bottom.toFixed(0)}`).join(' and ')}, JSON starts at ${dumped.top.toFixed(0)}`);
+        + `${r.bottom.toFixed(0)}`).join(' and ')}, and the JSON starts `
+      + `${apart.toFixed(0)} px below them`);
 
     /**
      * 🔴 AND WHAT SAYS WHERE A PART ENDS IS THE SEAM, WHICH IS THE WHOLE
