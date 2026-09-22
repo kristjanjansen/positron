@@ -19,12 +19,11 @@
      the cut lands on a border. The scrollbar and the rows under the sticky
      heading are what say there is more. */
   .pk-tbl { --tbl-h: 194px; }
-  /* ⚠️ IT MOVES ON A PRESS AND NEVER ON A CLOCK, which is what makes a line of
-     prose allowed here at all. `positron-ui`'s rule is that nothing redrawing
-     every frame may change how much room it takes; text that changes when
-     somebody did something is fine, and this one changes when a session row is
-     opened. */
-  .pk-line { font: 400 12px/1.5 var(--mono); color: var(--dim); }
+  /* 🔴 `.pk-line` STOOD HERE AND WENT WITH ITS LAST CALLER ON 2026-09-22. It
+     styled the samples tab's totals sentence, which was removed that day, and a
+     rule with nothing matching it is a rule that reads as correct forever. This
+     project has measured four dead CSS rules and every one of them survived by
+     looking like it was doing something. */
   /* ⚠️ EVERY GLUED PART PAINTS ITS OWN GROUND. `.pos-glue` is `gap: 1px` over a
      `--line` ground, so a child with no background lets that colour through its
      whole area and the 1 px seam stops being a seam. MEASURED on `/wish/` the
@@ -33,18 +32,93 @@
      The component styles its own `.pos-wave` and this is the wrapper the page
      puts it in, so it had no background and the glue's line colour came
      straight through its whole area. Third part, same trap, measured the same
-     day on `/wish/`. */
-  .pk-wave { background: var(--card); padding: 10px 12px; }
+     day on `/wish/`.
+     🔴 AND THE GROUND IS ALL IT CARRIES NOW. It was `background` plus
+     `padding: 10px 12px` until 2026-09-22, removed on a screenshot reading
+     *"rm padding and its border around waveform canvas"*: an inset picture
+     inside a glued part reads as a box drawn inside a box, and the seam is the
+     only edge this surface is meant to have. The GROUND stays, because taking
+     it would let the glue's line colour through the whole part, which is the
+     trap the paragraph above records. */
+  .pk-wave { background: var(--card); }
   /* 🔴 THREE HAND-ROLLED BUTTONS AND A LINE OF PROSE STOOD HERE UNTIL
      2026-09-21, ASKED FOR AS *"use standard wave visualizer (what we had in
      radio wtc and standard transport)"*. The wave was already the standard one;
      the transport was `►`, `■` and a `loop` toggle typed into this page while
      `createTransportBar` is what thirty other pages use, which is exactly the
      hand-rolled control `positron-ui` exists to stop.
-     ⚠️ THE HOST KEEPS ITS GROUND AND ITS PADDING, because it is still one part
-     of a glued three and a child with no background lets the seam colour
-     through its whole area. */
-  .pk-player { background: var(--card); padding: 10px 12px; }
+     🔴 AND THE PADDING CAME OFF 2026-09-22: *"rm double padding around
+     transport. its just glued transport to table"*. `.tbar` already carries its
+     own `padding: 8px` and its own `min-height: 52px`, so a wrapper adding ten
+     more pixels was a second inset round a control that had already reserved
+     its room. ⚠️ THE GROUND STAYS, for the reason above it. */
+  .pk-player { background: var(--card); }
+  /* The sessions tab's transport sits in the same kind of wrapper, for the same
+     reason and with the same absence of padding. */
+  .pk-bar { background: var(--card); }
+  /* 🔴 THE SIXTEEN STEP PICTURE OF THE PRESSED REGION. The pads carry the
+     ground, and the host's padding is exactly the grid's own gap, so the outer
+     margin and the inner gaps are one measurement and the block reads as a grid
+     rather than as a grid inside a box. */
+  .pk-steps { --pk-gap: 3px; background: var(--card); padding: var(--pk-gap); }
+  .pk-grid {
+    display: grid; grid-template-columns: 54px repeat(16, minmax(0, 1fr));
+    gap: var(--pk-gap);
+  }
+  /* The row names and the step numbers. `tabular-nums` so a two digit step is
+     the same width as a one digit one and the ruler cannot shuffle. */
+  .pk-g-lab, .pk-g-step {
+    font: 400 10px/1 var(--mono); color: var(--dim2);
+    font-variant-numeric: tabular-nums;
+    display: flex; align-items: center; overflow: hidden; white-space: nowrap;
+  }
+  .pk-g-step { justify-content: center; }
+  /* ⚠️ SIX ROWS ARE ALWAYS DRAWN AND A PAD'S HEIGHT IS FLAT, so pressing a
+     region cannot move what is under the block and an empty region reserves
+     exactly the room a full one takes. `aspect-ratio` would have made the
+     picture 600 px tall on a wide screen and a different height on a phone. */
+  .pk-pad {
+    height: 22px; border-radius: 2px; background: var(--line);
+    display: flex; align-items: center; justify-content: center;
+    font: 400 10px/1 var(--mono); color: var(--bg); overflow: hidden;
+    white-space: nowrap;
+  }
+  /* 🔴 VELOCITY IS THE FILL'S STRENGTH AND NEVER A SECOND COLOUR, which is
+     `note-grid.mjs`'s rule and the project's: colour says how a mark LANDED and
+     a note sitting in a file has not landed anywhere. `--pk-v` is the velocity
+     out of 127, written per pad.
+     ⚠️ IT STARTS AT 45 PER CENT RATHER THAN AT NOTHING. The pad carries its
+     note's NAME in the page's darkest ink, so a fill that faded to the ground
+     at velocity 1 would take the name with it, and an unreadable name is worse
+     than a flat one. The ramp still spans the whole velocity range. */
+  .pk-pad[data-on] {
+    background: color-mix(in oklab, var(--hi) calc(45% + var(--pk-v, 100) * 0.55%), var(--line));
+  }
+  /* The step the head is on, marked on the pads themselves rather than as a
+     bordered column standing over them, which is what `/tom/` was asked for in
+     those words. */
+  .pk-grid [data-now] { outline: 1px solid var(--fg2); outline-offset: -1px; }
+  .pk-g-step[data-now] { color: var(--fg2); }
+  /* 🔴 ON A PHONE THE NAMES GO AND THE MARKS STAY, AND THE ALTERNATIVES WERE
+     MEASURED BEFORE CHOOSING. MEASURED at 390 px: the block is 356 px wide with
+     no page overflow, and a pad is 16 px, which holds `G2` and cuts `G#2` in
+     half. Dropping the row names would have bought 3 px a column and taken the
+     `slot` labels and the corner's `6 notes` / `no notes` / `not read` with
+     them, which is the one distinction this picture exists to make; a sideways
+     scroller would have put a second one inside a box that already has two.
+     What a phone keeps is where every note is and how hard it was played, and
+     what it loses is the pitch, which is in the pad's own hover.
+     ⚠️ THIS BLOCK IS LAST IN THE STYLE ELEMENT AND THAT IS LOAD BEARING. A
+     media query adds NO specificity, so a plain rule later in the file beats it
+     at every width. `.pos-pick`'s entire phone layout sat above the plain rule
+     that beat it and had never run in its life.
+     ⚠️ AND `demo/verify.mjs` RUNS AT 756 px, so nothing in here is exercised by
+     the harness. The 390 px numbers above were measured by hand in headless
+     Chrome with the viewport overridden; the assert can only say the block is
+     still last. */
+  @media (max-width: 560px) {
+    .pk-pad { font-size: 0; }
+  }
 </style>
 <script type="module">
   import { mount, el, createReport } from '/shell/shell.mjs';
@@ -53,7 +127,16 @@
   import { createDiagram } from '/shell/diagram.mjs';
   import { createDrop } from '/shell/drop.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
-  import { createNoteGrid } from '/shell/note-grid.mjs';
+  /* 🔴 `createNoteGrid` IS GONE FROM THIS PAGE AND `noteName` IS NOT. Asked
+     2026-09-22: *"rm current notes visualization"*. That picture drew all
+     sixteen patterns of a session at once, between the two tables, with no way
+     to ask about one of them. `/kit/` still carries the specimen and
+     `demo/shell/note-grid-test.mjs` still grades its arithmetic, so what went
+     is a picture rather than a component.
+     ⚠️ THE NAMING STAYS SHARED. `noteName` holds the decision that middle C is
+     C3 here, because that is what the Circuit's own pads say, and a second
+     copy of that would be a second answer. */
+  import { noteName } from '/shell/note-grid.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createStack } from '/shell/stack.mjs';
   import { createGlue } from '/shell/glue.mjs';
@@ -63,6 +146,7 @@
   import {
     readSession, summarise as summariseSession, patchPayloads,
     notesPerRegion, notesIn, VELOCITY_AT, VELOCITY_PER_STEP,
+    STEPS, STEP_SLOTS,
   } from '/shell/circuit-session.mjs';
   import {
     readWave, toMono, summarise as summariseWave, summariseAll,
@@ -392,11 +476,12 @@
    * ⚠️ AND ONE FACT FROM THE LINE HAD NOWHERE TO GO, so it got a column of its
    * own on the regions table below: the region SIZE, which is what made
    * `1 of 76, 16 of 1,508, 32 of 720, 1 of 6,004` legible. It was in a hover.
+   * 🔴 AND THE PICTURE MOVED OUT FROM BETWEEN THE TWO TABLES ON 2026-09-22,
+   * ASKED FOR AS *"rm current notes visualization, restore session and region
+   * tables as they where"*. The two lists are a master and a detail and had a
+   * third thing wedged between them; the picture belongs under the row it is
+   * about, which is a REGION, and that row is on the lower table.
    */
-  const notesHost = el('div', 'pk-notes');
-  const grid = createNoteGrid(notesHost, {
-    label: 'pattern down the side, sixteen steps across, pitch up the row',
-  });
   /**
    * 🔴 THE FIFTY REGIONS, WHICH ARE THE DECODER'S WHOLE MODEL OF THE FILE. A
    * header, sixteen synth slots at 1,508 bytes, thirty two drum slots at 720 and
@@ -420,12 +505,130 @@
       { key: 'notes', label: 'notes', width: 64, align: 'right', hi: true },
     ],
     cap: 64, empty: '', note: 'hover',
+    /* 🔴 THE REGIONS LIST OPENS, ASKED FOR 2026-09-22: *"when clicked on region
+       on regions table, make that line active"*. It had `note: 'hover'` and no
+       `onPick` at all, so fifty rows were readable one at a time and pressable
+       never. The sessions table above it has had one since yesterday, so this
+       is the same arrangement one level down. */
+    onPick: (r) => showRegion(r.i),
   });
   partsTable.el.classList.add('pk-tbl');
-  /* ⚠️ GLUED, WHICH IS THE ARRANGEMENT THE SAMPLES TAB ALREADY HAS: the list,
-     the picture of the pressed row, and the detail under it. Three parts of one
-     component rather than three blocks with the page's rhythm between them. */
-  panel('sessions').append(createGlue(sessionTable.el, notesHost, partsTable.el));
+
+  /**
+   * 🔴 THE SIXTEEN STEPS OF THE PRESSED REGION, UNDER THE STANDARD TRANSPORT.
+   * Asked 2026-09-22: *"below it use out transport + timeline glued together
+   * with the note events, x being time. if there is no time info, use pad
+   * grid?"*.
+   *
+   * 🔴 IT IS THE PAD GRID AND NOT `createStripView`, AND THAT IS THE QUESTION
+   * MARK IN THE ASK BEING ANSWERED WITH A MEASUREMENT. A strip draws a
+   * MILLISECOND axis and labels it in seconds, `timeline/strip.mjs` has no
+   * option to label one in anything else, and `circuit-session.mjs` reads no
+   * tempo, no beat and no millisecond out of a session: a note has a STEP and a
+   * GATE and nothing that converts either into a second. So every mapping of
+   * these sixteen steps onto a strip would have printed a time on the axis that
+   * came from this page rather than from the file, which is the one thing this
+   * project has paid for over and over.
+   * ⚠️ AND `x` IS STILL TIME, AS FAR AS THE FILE CARRIES ANY: the sixteen
+   * columns are the sixteen steps, in order, which is the only ordering of
+   * events the file states.
+   * ⚠️ THE GATE IS READ AND IS NOT DRAWN AS A WIDTH. Two reasons, and the
+   * second is the one that decided it: the slots inside a step are independent
+   * of the slots inside the next one, so a bar drawn from step 3 across four
+   * steps would cover three other slots' own cells and claim they were empty.
+   * The length is in the pad's hover, in steps, converted per encoding.
+   *
+   * 🔴 SIX ROWS, BECAUSE A STEP RECORD HOLDS SIX SLOTS. `STEP_SLOTS` is read
+   * from the decoder rather than typed here, and the slot index is the bit
+   * position in the step's own mask. It is a storage order and it is not a
+   * pitch order, which is why the rows are named `slot` and not anything
+   * musical: this page calls a region `region 3` for the same reason.
+   */
+  /**
+   * Which row of the REGIONS table is open, and where the step head sits in it.
+   * `-1` is the state the ask calls *"not selected region"*, and it is the state
+   * a session opens in.
+   * ⚠️ DECLARED HERE RATHER THAN WITH THE REST OF THE PAGE'S STATE, BECAUSE
+   * `moveHead(0)` RUNS A FEW LINES BELOW. A `let` shadows its whole block from
+   * the top, so reading one from a line above its declaration is a temporal
+   * dead zone throw, and this project has already lost seven asserts to exactly
+   * that, silently, with the page reading green on a smaller count.
+   */
+  let pickedRegion = -1, headStep = 0;
+  const stepsHost = el('div', 'pk-steps');
+  const gridEl = el('div', 'pk-grid');
+  stepsHost.append(gridEl);
+  /** The 16 ruler cells and the 16x6 pads, built once and written on a press. */
+  const stepCells = [], padCells = [];
+  gridEl.append(el('div', 'pk-g-lab', ''));
+  for (let s = 0; s < STEPS; s++) {
+    const c = el('div', 'pk-g-step', String(s + 1));
+    stepCells.push(c); gridEl.append(c);
+  }
+  for (let k = 0; k < STEP_SLOTS; k++) {
+    gridEl.append(el('div', 'pk-g-lab', `slot ${k + 1}`));
+    const row = [];
+    for (let s = 0; s < STEPS; s++) {
+      const p = el('div', 'pk-pad', '');
+      row.push(p); gridEl.append(p);
+    }
+    padCells.push(row);
+  }
+
+  /**
+   * 🔴 THE TRANSPORT HAS NO PLAY BUTTON, AND THAT IS THE SAME MEASUREMENT AS
+   * THE PARAGRAPH ABOVE RATHER THAN A SECOND DECISION. Play is a claim that
+   * there is a rate at which this runs, and the file names none. A toggle whose
+   * only honest behaviour is to do nothing is the shape of control this project
+   * calls a lie, and `transport-bar.mjs` has carried `toggle: false` for
+   * exactly this case since 2026-09-16.
+   * ✅ WHAT IT CAN HONESTLY DO IS MOVE ONE STEP AT A TIME, which is `‹` and `›`,
+   * the same pair `/reel/` and `/tapes/` carry. The head is a step index, the
+   * clock says which step it is on, and neither is a time.
+   * ⚠️ `publish: false`, FOR THE SAME REASON THE SAMPLES BAR PASSES IT: this
+   * page has two bars and `__demo.transport` may name only one. Neither claims
+   * it, because nothing on this page can advance a position until a file has
+   * been opened and a row pressed, and `demo/verify.mjs`'s play drill would go
+   * red on a page where nothing is wrong.
+   */
+  const stepHost = el('div', 'pk-bar');
+  const stepDeck = createDeck({ items: [], adapters: {}, range: [0, STEPS] });
+  const stepBar = createTransportBar(stepHost, stepDeck, {
+    publish: false, toggle: false, scrub: false, loop: false,
+    // 🔴 THE CLOCK NEVER PRINTS A TIME. `fmt` gets the whole line, so there is
+    // no `0:00.000` and no total beside it: the deck's unit here is one step
+    // and the readout says so in the same words the picture does.
+    fmt: (pos) => `step ${Math.min(STEPS, Math.floor(pos) + 1)} of ${STEPS}`,
+    extras: [
+      { id: 'prev', label: '‹', aria: 'the step before this one', onClick: () => walk(-1) },
+      { id: 'next', label: '›', aria: 'the step after this one', onClick: () => walk(+1) },
+    ],
+  });
+
+  /* 🔴 TWO BLOCKS, NOT ONE, AND ALL FOUR PARTS WERE IN ONE GLUE UNTIL
+     2026-09-22. Reported with a screenshot of the sessions list running
+     straight into the regions heading, as *"have space betwen tables"*.
+     ⚠️ **THE GAP WAS NOT MISSING, THERE WAS NOTHING FOR IT TO ACT ON.**
+     `.pos-tabs-p > * + *` carries 22 px and the panel had exactly ONE child, so
+     the rule was working perfectly against a list of one. `positron-ui` records
+     the same shape on `/held/`, which shipped glued because `.pos-body` held a
+     single `.pos-glue`. **Before hunting for a rule that lost, count the
+     siblings.**
+     ⚠️ AND IT IS A GLUE'S OWN RULE BEING KEPT RATHER THAN A LAYOUT PREFERENCE.
+     `createGlue` is for parts that are ONE surface, and its whole point is that
+     a reader can tell which control belongs to which picture. The regions
+     table, the transport and the step grid are that: a list, the head that runs
+     across it, and the picture the head runs across. The SESSIONS list is not.
+     It is the thing you press to decide what the other three are about.
+     ⚠️ THE ORDER INSIDE THE GLUE IS UNCHANGED. `/replay/`, `/reel/`, `/stage/`
+     and `/held/` all put the bar ABOVE the thing it drives, and *"transport +
+     timeline"* is that order written out. */
+  panel('sessions').append(
+    sessionTable.el,
+    createGlue(partsTable.el, stepHost, stepsHost));
+  /* The head is on step 1 before anything is opened, so the picture and the
+     bar's own readout cannot disagree about where it is at rest. */
+  moveHead(0);
 
   /**
    * 🔴 THE SAMPLES TAB, ASKED FOR AS *"why there is no samples?"*. The plan
@@ -466,12 +669,21 @@
   });
   sampleTable.el.classList.add('pk-tbl');
   /**
-   * ⚠️ THE TOTALS, AND `refused` IS THE NUMBER THAT MATTERS MOST IN THEM.
-   * `summariseAll` counts a file that would not parse rather than dropping it,
-   * because a total taken over the ones that worked hides the only thing worth
-   * seeing. The line is empty until something is open.
+   * 🔴 THE TOTALS LINE IS GONE FROM THE PAGE AND ITS TWO UNHOUSED FACTS ARE IN
+   * THE LOG. Asked 2026-09-22 by quoting it whole: *"pack#samples 64 of 64
+   * read, all 48 kHz 16 bit mono, 0.12 s to 2.00 s, 53.4 s in total -- rm"*. It
+   * was six facts glued into one sentence above a table that already carries
+   * four of them as columns: the rate is a column, the length is a column, the
+   * shortest and the longest are that column sorted, and the depth and the
+   * channel count are in every row's hover.
+   * ✅ **THE TWO THAT HAD NO COLUMN ARE LOGGED**, which is the rule about
+   * deleting a display without deleting what it said. `refused` is the number
+   * that matters most here, because `summariseAll` counts a file that would not
+   * parse rather than dropping it and a total over the ones that worked hides
+   * the only thing worth seeing. The other is the total length, which is a fact
+   * about the SET and can never be a column. The log is where a state change
+   * belongs and opening a file is one.
    */
-  const samplesLine = el('div', 'pk-line', '');
 
   /**
    * 🔴 THE PLAYER IS UNDER THE TABLE AND GLUED TO IT, ASKED FOR 2026-09-21 AS
@@ -623,7 +835,7 @@
     return n;
   }
 
-  panel('samples').append(samplesLine, createGlue(sampleTable.el, waveHost, player));
+  panel('samples').append(createGlue(sampleTable.el, waveHost, player));
 
   // ── what is open ─────────────────────────────────────────────────────────
   let patches = [], rows = [], sessions = [], samples = [];
@@ -689,7 +901,16 @@
    */
   const dgBox = {
     o1: { id: 'o1', label: 'osc 1', sub: '', tech: 'sound',
-          note: 'One of thirty waveforms, and fourteen of those are wavetables rather than plain '
+          /* 🔴 `fourteen` UNTIL 2026-09-22, AND IT WAS THE OTHER HALF OF THE
+             SPLIT. `FIRST_WAVETABLE` is 14, which is the count of PLAIN
+             waveforms and the INDEX the tables start at, and
+             `OSC_WAVES.slice(14)` is 16 rows long. One constant, two meanings,
+             and the note took the wrong one. MEASURED today: 30 total, 14
+             plain, 16 tables. ⚠️ It reached this page, `BACKLOG.md` and a
+             briefing before an agent building a waveform view measured it and
+             sent it back. **A number in prose is checkable and was not
+             checked.** */
+          note: 'One of thirty waveforms, and sixteen of those are wavetables rather than plain '
               + 'shapes. Its level, its tuning and its pulse width are separate bytes, so an '
               + 'oscillator can be fully configured and silent.' },
     o2: { id: 'o2', label: 'osc 2', sub: '', tech: 'sound',
@@ -1205,10 +1426,6 @@
     pickedSession = i;
     sessionTable.mark((r) => r.i === i);
 
-    /* Every one of these is a column on the list above now. What opening a
-       session changes is the picture and the region table. */
-    grid.set(x.events || []);
-
     /**
      * 🔴 THE REGIONS ARE NUMBERED AND NOT NAMED, CORRECTED 2026-09-21 AFTER
      * **"five synths??"**. They read `synth 1` through `synth 16` and a Circuit
@@ -1222,6 +1439,13 @@
      */
 
     partsTable.set(x.parts.map((r, k) => ({
+      /* 🔴 `i` IS WHAT A PRESS AND A MARK BOTH READ, AND THE ROWS HAD NONE.
+         `table.mjs` hands `onPick` the row OBJECT and the element, never an
+         index, and `mark(is)` asks the object too, so a table whose rows carry
+         no identity can be pressed and can never say which row was pressed.
+         It did not matter while this list was hover-only; the first check
+         written after it gained `onPick` went red on it. */
+      i: k,
       part: `region ${k + 1}`,
       size: n(r.size),
       at: n(r.at),
@@ -1237,9 +1461,119 @@
              : `. ${n(r.notes)} note event(s) in its sixteen step records`),
     })));
 
+    /* 🔴 A NEW SESSION OPENS WITH NO REGION PRESSED, which is the state the ask
+       describes: *"when not selected region, show empty trans/timeline/padgrid"*.
+       The block keeps its room either way, so nothing below it moves. */
+    showRegion(-1);
+
     d.log(`${x.name || '(no name)'}, head ${x.head}, ${n(x.used)} B written across `
         + `${x.parts.length} regions, holding ${x.patchNames.join(' and ') || 'no readable patches'}`);
   }
+
+  /**
+   * A note's length, in steps, which is the only unit the file states.
+   *
+   * 🔴 THE GATE BYTE MEANS TWO DIFFERENT THINGS AND HEADER BYTE 8 SAYS WHICH,
+   * so a picture that drew the raw byte would draw a `0xFF` session's notes SIX
+   * TIMES TOO LONG. MEASURED in `research/circuit-session-notes-2026-09-21.md`
+   * and re-measured over this pack on 2026-09-22: the `0x07` encoding's gate
+   * runs 0 to 15 and the `0xFF` encoding's runs 1 to 96, `ff = 6 x (07 + 1)`
+   * holds on 31 of 31 events of one session served in both encodings, and a
+   * full sixteen step gate is 96 in one reading and 15 in the other.
+   * ⚖️ IT IS A READING RATHER THAN A SPECIFICATION. Nothing here was checked
+   * against an instrument, and that is why the number is shown as `n step(s)`
+   * on a hover rather than drawn as a length anybody would measure off the
+   * picture.
+   */
+  function gateSteps(x, e) {
+    const raw = e.gate;
+    if (!Number.isFinite(raw)) return null;
+    return x.velocityPerStep ? raw + 1 : raw / 6;
+  }
+
+  /**
+   * The step picture, written from the pressed region. Six rows of sixteen,
+   * always, so the block reserves the same room whatever it is showing.
+   *
+   * 🔴 THE THREE ANSWERS A REGION CAN GIVE ARE THREE DIFFERENT SENTENCES, and
+   * the whole reason this function says anything at all is that two of them
+   * would otherwise render identically. A region either holds note events, or
+   * is one of the sixteen this decoder reads and holds none, or is one of the
+   * thirty four it does not read for notes at all. An empty picture means the
+   * second and the third equally well, and *"we did not look"* read as *"there
+   * is nothing there"* is this project's most repeated wrong answer.
+   * ⚠️ SO THE ROW'S OWN CELL ALREADY SEPARATES THEM, a number against a blank,
+   * and the step grid's row names say it a second time in the one place a
+   * reader is looking when the picture is empty.
+   */
+  function showRegion(i) {
+    pickedRegion = i;
+    partsTable.mark((r) => r.i === i);
+    const x = sessions[pickedSession];
+    const part = i >= 0 ? x?.parts[i] : null;
+    /* The wide regions are parts 1 to 16 and `notesIn` numbers them 0 to 15,
+       so the offset is one and it is read off the part rather than assumed. */
+    const events = part && part.notes !== null && x
+      ? x.events.filter((e) => e.region === i - 1)
+      : [];
+
+    const say = !part ? ''
+      : part.notes === null ? 'not read'
+      : part.notes === 0 ? 'no notes'
+      : `${part.notes} note${part.notes === 1 ? '' : 's'}`;
+    /* The corner cell, which is the one label with room for the answer and is
+       the first thing under the pressed row. */
+    gridEl.firstChild.textContent = say;
+    gridEl.firstChild.title = !part
+      ? 'press a region above to see its sixteen steps'
+      : part.notes === null
+        ? 'nothing is known about what this region holds, so it was never read for notes'
+        : `${part.notes} note event(s) in this region's sixteen step records`;
+
+    for (const row of padCells) {
+      for (const p of row) {
+        delete p.dataset.on;
+        p.style.removeProperty('--pk-v');
+        p.textContent = '';
+        p.title = '';
+      }
+    }
+    for (const e of events) {
+      const p = padCells[e.slot]?.[e.step];
+      if (!p) continue;
+      p.dataset.on = '1';
+      p.style.setProperty('--pk-v', String(Math.max(0, Math.min(127, e.velocity)) / 1.27));
+      /* ⚠️ A NOTE NUMBER ABOVE 127 CANNOT BE A NOTE AND IS NOT CLAMPED. 105 of
+         this pack's 5,095 events carry one; `noteName` answers '' for them and
+         the pad shows the raw byte instead, so a hole in our own decoder is
+         visible rather than folded into a chord nobody played. */
+      const name = noteName(e.note);
+      p.textContent = name || String(e.note);
+      const g = gateSteps(x, e);
+      p.title = `step ${e.step + 1}, slot ${e.slot + 1}`
+        + `, ${name ? `note ${name} (${e.note})` : `byte ${e.note}, which is too high to be a note`}`
+        + `, velocity ${e.velocity}`
+        + (g === null ? '' : `, ${g % 1 ? g.toFixed(2) : g} step(s) long`);
+    }
+    if (headStep >= STEPS || headStep < 0) headStep = 0;
+    moveHead(headStep);
+  }
+
+  /** Where the transport's head is, as a step index. */
+  function moveHead(step) {
+    headStep = Math.max(0, Math.min(STEPS - 1, step));
+    stepDeck.seek(headStep);
+    stepCells.forEach((c, s) => {
+      if (s === headStep) c.dataset.now = '1'; else delete c.dataset.now;
+    });
+    padCells.forEach((row) => row.forEach((p, s) => {
+      if (s === headStep) p.dataset.now = '1'; else delete p.dataset.now;
+    }));
+  }
+
+  /* ‹ and ›. They wrap, because sixteen steps are a ring and a head parked at
+     the end with a dead button beside it is a control that looks live. */
+  function walk(by) { moveHead((headStep + by + STEPS) % STEPS); }
 
   /**
    * How far each session is from its nearest neighbour in the same file, in
@@ -1354,15 +1688,14 @@
       };
     }));
 
+    /* The two facts the removed line carried that no column can. See the note
+       over where that line used to be built. */
     const all = summariseAll(wavs.map((w) => w.wave));
-    samplesLine.textContent = all.count
-      ? `${all.parsed} of ${all.count} read`
-        + (all.refused ? `, ${all.refused} refused` : '')
-        + `${all.rates.length === 1 ? `, all ${all.rates[0] / 1000} kHz ${all.depths[0]} bit `
-          + `${all.channels[0] === 1 ? 'mono' : `${all.channels[0]} channel`}` : ''}`
-        + `, ${all.shortest.toFixed(2)} s to ${all.longest.toFixed(2)} s`
-        + `, ${all.seconds.toFixed(1)} s in total`
-      : '';
+    if (all.count) {
+      d.log(`${all.parsed} of ${all.count} samples read`
+          + (all.refused ? `, ${all.refused} refused` : '')
+          + `, ${all.seconds.toFixed(1)} s in total`);
+    }
 
     countTabs({ patches: patches.length, sessions: sessions.length, samples: samples.length });
     sayCounts(stats);
@@ -1388,7 +1721,7 @@
       // ⚠️ EVERY CELL BACK TO EMPTY RATHER THAN TO 0. Nothing unmeasured prints
       // as a zero here: a `0` in a readout reads as a very confident
       // measurement of nothing, and `setCell` hides the unit with it.
-      partsTable.set([]); grid.clear(); pickedSession = -1;
+      partsTable.set([]); pickedSession = -1; showRegion(-1);
     }
   }
 
@@ -1464,7 +1797,17 @@
     if (mono.ok) {
       waveHost.hidden = false;
       wave.buffer(peaksOf(mono.samples));
-      wave.source(w.name);
+      /* 🔴 `wave.source(w.name)` STOOD HERE AND CAME OFF 2026-09-22: *"rm
+         sample name from corner of the canvas"*. The name is drawn INSIDE the
+         canvas by `grain-scope.mjs`, and it was saying a third time what the
+         marked row and the row's own `name` column already say an inch above
+         it.
+         ⚠️ THE COMPONENT IS UNTOUCHED, WHICH IS THE POINT. `/radio/`,
+         `/tapes/` and `/grains/` all draw with the same module and all three
+         pass a name that is worth having: on a live station the corner is the
+         only thing that says what the picture IS. A component option would have
+         been a change reaching three pages to remove one line from a fourth.
+         Not calling the setter is the whole fix. */
       wave.playhead(0);
     } else { wave.clear(); waveHost.hidden = true; }
 
@@ -1647,7 +1990,7 @@
   }
 
   d.assert('the picture cut nothing and refused nothing',
-    dg.cuts.length === 0, dg.cuts.map((c) => `${c.id}: ${c.shown}`).join(' · ') || 'none');
+    dg.cuts.length === 0, dg.cuts.map((c) => `${c.id}: ${c.shown}`).join(', ') || 'none');
   d.assert('every line in the picture has an arrowhead on it',
     dg.ties === 0, `${dg.ties} headless tie(s)`);
 
@@ -1674,6 +2017,34 @@
   d.assert('every tab keeps its bare word until it has something to count',
     tabs.buttons.map((b) => b.textContent).join(' ') === 'PATCHES SESSIONS SAMPLES',
     tabs.buttons.map((b) => b.textContent).join(' '));
+
+  /**
+   * 🔴 THE PHONE LAYOUT IS THE ONE THING ON THIS PAGE THE HARNESS CANNOT SEE,
+   * SO WHAT IS ASSERTED IS THE ONE THING THAT CAN BE. `demo/verify.mjs` runs at
+   * 756 px and never enters a `max-width: 560px` block, and a media query adds
+   * NO SPECIFICITY, so a plain rule written after it wins at every width. That
+   * is not a theory: `.pos-pick`'s whole phone layout sat above the plain rule
+   * that beat it and had never run once.
+   * ⚠️ ORDERING IS NOT BEHAVIOUR, AND THIS ASSERT CLAIMS ONLY THE ORDERING.
+   * What the block DOES was measured by hand at 390 px and is written beside
+   * the rules themselves.
+   */
+  {
+    const css = document.querySelector('style')?.textContent || '';
+    const at = css.lastIndexOf('@media');
+    /* Walk the braces from the query to the one that closes it, then read what
+       is left. Anything but whitespace after it is a plain rule that beats the
+       whole block at every width. */
+    let depth = 0, end = -1;
+    for (let i = at; i >= 0 && i < css.length; i++) {
+      if (css[i] === '{') depth++;
+      else if (css[i] === '}' && --depth === 0) { end = i; break; }
+    }
+    const after = end >= 0 ? css.slice(end + 1) : 'unclosed';
+    d.assert('the phone rules are the last thing in the stylesheet, where a media query can still win',
+      at > 0 && end > at && after.trim() === '',
+      `${after.trim().length} characters of plain CSS follow the last media query`);
+  }
 
   /**
    * 🔴 THIS ASSERT PASSED EVERY RUN WHILE THE HEADINGS WERE ON SCREEN, AND A
@@ -1915,40 +2286,154 @@
           + 'of the other 34 are blank rather than zero');
 
         /**
-         * 🔴 THE NOTES ARE DRAWN, WHICH IS WHAT WAS ASKED FOR TWICE. A count in
-         * a cell says how many; this asserts that each one is somewhere, that
-         * the rows are the patterns that hold anything, and that PITCH moves a
-         * note rather than only the step.
-         * ⚠️ AND IT ASSERTS THE INK, because a picture that laid out perfectly
-         * and painted nothing would pass everything above it.
+         * 🔴 THE NOTES ARE DRAWN, ONE REGION AT A TIME, WHICH IS WHAT WAS ASKED
+         * FOR ON 2026-09-22. A count in a cell says how many; these assert that
+         * each event is on its own step and in its own slot, that the block
+         * reserves its room whether or not anything is pressed, and that the
+         * three answers a region can give are three different answers.
+         * ⚠️ THE SESSIONS TAB HAS TO BE OPEN OR EVERY RECT IN IT READS ZERO.
+         * An inactive tab panel has no layout at all while `getComputedStyle`
+         * goes on answering real colours, which is the half-true measurement
+         * this page's seam check already records paying for.
          */
-        /* ⚠️ THE SESSIONS TAB HAS TO BE OPEN OR THE CANVAS HAS NO WIDTH AND
-           PAINTS NOTHING. Measured at 0 lit pixels on a picture that was
-           perfectly correct, which is the same hidden-element reading that
-           cost the loop toggle its first assert an hour earlier. */
         const wasTab = tabs.at();
         tabs.go('sessions');
-        grid.repaint();
-        const f = grid.facts();
-        const hi = sessions[0].events.reduce((a, b) => (b.note > a.note ? b : a));
-        const lo = sessions[0].events.reduce((a, b) => (b.note < a.note ? b : a));
-        d.assert('the notes are drawn, one row per pattern that holds any, with pitch up the row',
-          f.count === sessions[0].notes && f.regions === 12 && f.steps === 16
-          && grid.ink() > 40
-          && grid.place(hi).y < grid.place(lo).y + (f.rows.indexOf(lo.region)
-             - f.rows.indexOf(hi.region)) * f.rowH + f.rowH,
-          `${f.count} notes across ${f.regions} of 16 patterns, ${f.lo} to ${f.hi}, `
-          + `${grid.ink()} lit pixels`);
+        showSession(0);
+        const lit = () => padCells.flat().filter((p) => p.dataset.on).length;
+        const corner = () => gridEl.firstChild.textContent;
+        const onRow = () => partsTable.scroller().querySelector('.pos-tbl-row.on')
+          ?.children[0].textContent.trim();
+        /* Parts 1 to 16 are the wide ones and `notesIn` numbers them 0 to 15,
+           so a part index is one more than the region number in an event. */
+        const withNotes = sessions[0].parts.findIndex((p) => p.notes > 0);
+        const emptyWide = sessions[0].parts.findIndex((p) => p.notes === 0);
+        const unread = sessions[0].parts.findIndex((p) => p.notes === null);
 
-        /* 🔴 NEGATIVE CONTROL: a picture that drew the same thing whatever it
-           was given would pass the line above. An empty session hides it. */
-        const before = grid.ink();
-        grid.set([]);
-        d.assert('NEGATIVE CONTROL: a session with no notes draws nothing and hides its box',
-          grid.ink() === 0 && grid.el.hidden === true && grid.says() === '',
-          `${before} lit pixels became ${grid.ink()} and the box is `
-          + `${grid.el.hidden ? 'hidden' : 'still shown'}`);
-        grid.set(sessions[0].events);
+        /* 🔴 PRESSED, NOT CALLED. The ask is *"when clicked on region on
+           regions table, make that line active"*, so the check clicks the row
+           a person would click. Calling `showRegion` directly would grade the
+           function and say nothing about whether the list is wired to it, which
+           is exactly how a table with no `i` on its rows passed review. */
+        [...partsTable.scroller().querySelectorAll('.pos-tbl-row')][withNotes].click();
+        const ev = sessions[0].events.filter((e) => e.region === withNotes - 1);
+        const placed = ev.every((e) => padCells[e.slot]?.[e.step]?.dataset.on === '1'
+          && padCells[e.slot][e.step].textContent === (noteName(e.note) || String(e.note)));
+        d.assert('pressing a region marks its row and draws that region, every note on its own step',
+          pickedRegion === withNotes && onRow() === `region ${withNotes + 1}`
+          && ev.length > 0 && lit() === ev.length && placed
+          && stepsHost.getBoundingClientRect().height > 100,
+          `region ${withNotes + 1} holds ${ev.length} events and ${lit()} pads are lit, `
+          + `the marked row reads "${onRow()}", every note is on its own step: ${placed}, `
+          + `in a picture ${stepsHost.getBoundingClientRect().height.toFixed(0)} px tall`);
+
+        /**
+         * 🔴 THE THREE-WAY SPLIT, AND IT IS A NEGATIVE CONTROL AS WELL AS A
+         * CHECK. A region holds notes, or is one of the sixteen this decoder
+         * reads and holds none, or is one of the thirty four it never reads for
+         * notes. The last two draw an identical picture, so if the words did not
+         * differ the page would be saying *there is nothing there* about
+         * regions it never looked at, which is this project's most repeated
+         * wrong answer in its most expensive form.
+         */
+        showRegion(withNotes); const sayA = corner(); const litA = lit();
+        showRegion(emptyWide); const sayB = corner(); const litB = lit();
+        showRegion(unread); const sayC = corner(); const litC = lit();
+        d.assert('a region with notes, one read and empty, and one never read for notes say three different things',
+          litA > 0 && litB === 0 && litC === 0
+          && sayB === 'no notes' && sayC === 'not read'
+          && sayA !== sayB && sayA !== sayC && sayB !== sayC,
+          `region ${withNotes + 1} says "${sayA}" over ${litA} pads, region `
+          + `${emptyWide + 1} says "${sayB}" over ${litB}, region ${unread + 1} `
+          + `says "${sayC}" over ${litC}`);
+
+        /**
+         * 🔴 PRESENT AND EMPTY, WHICH IS THE ASK IN ITS OWN WORDS: *"when not
+         * selected region, show empty trans/timeline/padgrid"*.
+         * ⚠️ IT POINTS THE OPPOSITE WAY TO THIS PAGE'S OWN RULE FROM THE DAY
+         * BEFORE, which is that a container with nothing in it must not paint
+         * its edges. The newer instruction wins, and what makes it cost nothing
+         * is that the picture is SIX FIXED ROWS: an empty one is the same height
+         * as a full one, so the reserved block cannot move what is under it.
+         */
+        showRegion(-1);
+        const sglue = stepsHost.parentElement;
+        /* 🔴 THREE PARTS SINCE 2026-09-22 AND THIS READ FOUR. The sessions list
+           left the glue when *"have space betwen tables"* was reported, so it
+           is a SIBLING of the glue now rather than its first child. The claim
+           the assert carries is unchanged and is about the three parts that
+           really are one surface. ⚠️ The list's own separation is the next
+           clause, because a gap nobody grades is a gap that comes back: the
+           two blocks are 22 px apart by `.pos-tabs-p > * + *`, and the
+           harness runs wide enough to see it. */
+        const gap = sglue.getBoundingClientRect().top
+          - sessionTable.el.getBoundingClientRect().bottom;
+        d.assert('the regions list, the transport and the picture are one box, empty, with the sessions list a block above it',
+          sglue.classList.contains('pos-glue') && sglue.children.length === 3
+          && sglue.children[0] === partsTable.el
+          && sglue.children[1] === stepHost && sglue.children[2] === stepsHost
+          && sessionTable.el.parentElement === sglue.parentElement
+          && sessionTable.el.nextElementSibling === sglue && gap > 8
+          && pickedRegion === -1 && lit() === 0 && corner() === ''
+          && stepsHost.getBoundingClientRect().height > 100
+          && stepHost.getBoundingClientRect().height > 40,
+          `${sglue.children.length} parts, ${gap.toFixed(1)} px under the sessions list, `
+          + `${lit()} lit pads, the picture `
+          + `${stepsHost.getBoundingClientRect().height.toFixed(0)} px tall and the `
+          + `transport ${stepHost.getBoundingClientRect().height.toFixed(0)} px`);
+
+        /**
+         * 🔴 NO PLAY BUTTON AND NO TIME ANYWHERE ON THAT BAR, WHICH IS THE
+         * WHOLE REASON THE PICTURE IS NOT A STRIP. Nothing this decoder reads
+         * carries a tempo, a beat or a millisecond, so a play button would be
+         * claiming a rate the file does not name and the clock would be printing
+         * a second that came from this page.
+         */
+        const clockNow = stepBar.api.el.querySelector('.tbar-now')?.textContent || '';
+        d.assert('the sessions transport has no play button and its clock counts steps rather than seconds',
+          stepBar.api.toggles === false
+          && stepBar.api.el.querySelector('.tbar-toggle') === null
+          && /^step \d+ of 16$/.test(clockNow)
+          && (stepBar.api.el.querySelector('.tbar-all')?.textContent ?? '') === ''
+          && !/\d+[:.]\d\d/.test(stepBar.api.el.textContent),
+          `the clock reads "${clockNow}" and the bar says "${stepBar.api.el.textContent.trim()}"`);
+
+        /* ‹ and ›, pressed as a person would press them rather than by calling
+           what they call. The head wraps, so the last step's neighbour is the
+           first and neither button is ever dead. */
+        moveHead(0);
+        stepBar.extra('next').click();
+        const at1 = headStep;
+        stepBar.extra('prev').click();
+        stepBar.extra('prev').click();
+        const at2 = headStep;
+        d.assert('the step head walks one step at a time, wraps round the sixteen, and is in one place at once',
+          at1 === 1 && at2 === STEPS - 1
+          && stepCells[at2].dataset.now === '1'
+          && stepCells.filter((c) => c.dataset.now).length === 1
+          && padCells.every((row) => row.filter((p) => p.dataset.now).length === 1),
+          `one press of › put the head on step ${at1 + 1} and two of ‹ put it on ${at2 + 1}`);
+        moveHead(0);
+
+        /**
+         * 🔴 A GATE BYTE MEANS TWO DIFFERENT THINGS AND THE RAW ONE WOULD HAVE
+         * DRAWN A NOTE SIX TIMES TOO LONG. MEASURED here over the whole pack:
+         * the raw field reaches 96, which is six sixteen step patterns, and the
+         * length this page reports never leaves the sixteen steps a pattern
+         * has. Both encodings are in this one file, so the conversion is
+         * exercised rather than merely present.
+         */
+        {
+          const raw = sessions.flatMap((x) => x.events.map((e) => e.gate));
+          const steps = sessions.flatMap((x) => x.events.map((e) => gateSteps(x, e)));
+          const perStep = sessions.filter((x) => x.velocityPerStep).length;
+          d.assert('a gate becomes a length in steps through the encoding its own header names',
+            steps.length === 5095 && perStep === 8 && sessions.length - perStep === 24
+            && Math.max(...raw) === 96 && Math.max(...steps) === 16
+            && Math.min(...steps) > 0,
+            `${perStep} sessions count gate in steps and ${sessions.length - perStep} in `
+            + `sixths of one, the raw field reaches ${Math.max(...raw)} and the length `
+            + `reaches ${Math.max(...steps)} steps`);
+        }
         tabs.go(wasTab);
 
         /* ⚠️ AND THE 105 THAT CANNOT BE NOTES ARE SAID RATHER THAN DRAWN AS
@@ -2011,20 +2496,29 @@
        */
       const otherSession = sessions.findIndex((x, k) => k > 0 && x.name !== sessions[0].name
         && x.used !== sessions[0].used);
+      /* ⚠️ THE REGION TABLE IS WHAT PROVES IT NOW. The readout that used to
+         answer this went on 2026-09-21 and the picture that answered it after
+         that went on 2026-09-22, so the differential is the note counts down
+         the lower list: two sessions that put their notes in different patterns
+         cannot fill that column the same way, and a table that ignored the
+         press would keep the first one's numbers. */
+      const notesCol = () => [...partsTable.scroller().querySelectorAll('.pos-tbl-row')]
+        .map((r) => r.children[partsTable.columns.findIndex((c) => c.key === 'notes')].textContent.trim())
+        .join(' ');
       showSession(0);
-      const g0 = grid.facts();
-      /* ⚠️ THE PICTURE IS WHAT PROVES IT NOW. The readout that used to answer
-         this is gone, so the differential is the drawing: two sessions with
-         different note counts cannot draw the same thing, and a picture that
-         ignored the press would keep the first one's numbers. */
+      const c0 = notesCol();
       showSession(otherSession);
-      const g1 = grid.facts();
-      d.assert('NEGATIVE CONTROL: pressing another session draws that one rather than the first',
+      const c1 = notesCol();
+      d.assert('NEGATIVE CONTROL: pressing another session opens that one rather than the first',
         pickedSession === otherSession && otherSession > 0
-        && g1.count === sessions[otherSession].notes
-        && g1.count !== g0.count && g1.count > 0,
-        `session ${otherSession} is "${sessions[otherSession].name}" with ${g1.count} notes `
-        + `against session 0's "${sessions[0].name}" with ${g0.count}`);
+        && c1 !== c0 && c0.trim() !== '' && c1.trim() !== ''
+        && sessions[otherSession].notes !== sessions[0].notes
+        /* And a press of a session puts the picture back to nothing pressed,
+           because the region numbers mean something different in a new file. */
+        && pickedRegion === -1,
+        `session ${otherSession} is "${sessions[otherSession].name}" with `
+        + `${sessions[otherSession].notes} notes against session 0's `
+        + `"${sessions[0].name}" with ${sessions[0].notes}`);
       showSession(0);
 
       const stock = sessions.filter((x) => x.nearest < 16);
@@ -2330,21 +2824,28 @@
        * ⚠️ IT ALSO PROVES THE PRESS REFUSES. A row that cannot decode must not
        * increment the play counter, or the page reports having played something
        * that made no sound.
+       * 🔴 AND IT READS THE LOG NOW, BECAUSE THE LINE IT USED TO READ WAS
+       * REMOVED ON 2026-09-22 AND THE REFUSAL COUNT MOVED THERE. A removed
+       * display takes its checks with it SILENTLY unless somebody follows the
+       * fact to its new home, which is this one being followed. `__demo.logs`
+       * is the sanctioned surface: the harness reads that object and never the
+       * page's own elements.
        */
       const badWave = readWave(new Uint8Array([0x52, 0x58, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]));
       fill([], [], [{ name: 'broken.wav', size: 12, wave: badWave, row: summariseWave(badWave, 'broken.wav') }]);
       const beforeBad = played;
       openSample(0, true);
+      const said = window.__demo.logs.map((l) => l.msg).join('\n');
       d.assert('NEGATIVE CONTROL: a sample that will not read keeps its row, is counted as refused and does not play',
         sampleTable.count() === 1 && played === beforeBad && playBtn.disabled === true
-        && /1 refused/.test(samplesLine.textContent)
+        && /0 of 1 samples read, 1 refused/.test(said)
         && /did not read/.test(sampleTable.scroller().querySelector('.pos-tbl-row')?.title || '')
         && tabs.buttons[2].textContent === '1 SAMPLE'
         && tabs.enabled('samples') === true
         && tabs.enabled('patches') === false && tabs.enabled('sessions') === false,
         `${sampleTable.count()} row saying `
-        + `"${sampleTable.scroller().querySelector('.pos-tbl-row')?.title}"`
-        + ` · the line reads "${samplesLine.textContent}"`);
+        + `"${sampleTable.scroller().querySelector('.pos-tbl-row')?.title}", `
+        + `and the log says "${said.split('\n').filter((l) => /samples read/.test(l)).pop()}"`);
       // ⚠️ `scroller()` AND NOT `el`, AND THE FIRST TRY READ THE HEADING. The
       // heading is `.pos-tbl-row pos-tbl-head` and it is FIRST in the element,
       // so `el.querySelector('.pos-tbl-row')` returns a row with no title and

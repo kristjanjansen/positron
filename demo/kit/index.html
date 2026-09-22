@@ -83,6 +83,44 @@
      and drag the page sideways, which is the defect the tab row shipped. */
   .kit-vps { align-items: flex-start; }
   .kit-vp { flex: 1 1 240px; min-width: 0; }
+  /* A row of drawn figures, wrapping. `min-width: 0` or a canvas refuses to
+     shrink below its content and drags the page sideways, which is the defect
+     the tab row shipped and is recorded three lines up. */
+  .kit-figs { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start;
+              width: 100%; }
+  /* A step grid's two halves, which is the arrangement `step-grid.mjs` expects
+     and which `/tom/` gets from `panel-layout.mjs`. It is written out here
+     rather than borrowed, because what this block is showing is the GRID and a
+     cased panel round it would be a second component in the picture.
+     🔴 `min-width: 0` ON THE SCROLLER OR THE PAGE DRAGS SIDEWAYS. `overflow-x`
+     cannot shrink a flex item below its content, and this repository has
+     measured 141 px of page overflow from exactly that pair being half
+     written. */
+  /* 🔴 ROOM UNDER THE LAST ROW, ASKED FOR 2026-09-22 AS *"make stepgrid
+     distance from glue line same as left padding"*, with a crop of the pads
+     sitting on the seam.
+     ⚠️ **THE WORDS COULD NOT BE TAKEN LITERALLY AND THE MEASUREMENT IS WHY.**
+     MEASURED inside the glue at 900 px: left 1.0 px, right 1.0 px, bottom
+     1.0 px. All three are the glue's own seam and there is no left padding to
+     match, so what reads as a left inset is the LABEL COLUMN's own width, not
+     a gap. The bottom had nothing playing that part, which is why only that
+     edge looked wrong.
+     ⚠️ AND IT IS BOTTOM ONLY, DELIBERATELY. A symmetric inset here would be
+     the double padding `/pack/` was reported for on the same day, where a
+     glued part painted its own box inside the glue's. */
+  .kit-pg { display: flex; align-items: flex-start; gap: 6px; width: 100%;
+            padding-bottom: 10px; }
+  .kit-pg-strip { overflow-x: auto; min-width: 0; flex: 1 1 auto; }
+  .kit-fig { flex: 1 1 200px; min-width: 0; }
+  /* One column's worth of a figure and the word naming it, so a row of four can
+     be read without a legend. The word is under the box rather than in it,
+     because what is IN the box is the component's own honesty mark. */
+  /* 🔴 AIR ABOVE THE NAME, ASKED FOR 2026-09-22 AS *"add more space on top of
+     tese env 1, CC 73 75 70 72"*. The word sat directly on the canvas edge, so
+     a row of four figures read as four boxes with their captions stuck to
+     them rather than as four labelled figures. */
+  .kit-fig-l { display: block; margin-top: 8px; font: 500 9.5px/1.6 var(--mono);
+               letter-spacing: .1em; text-transform: uppercase; color: var(--dim2); }
   /* ⚠️ NOTHING HERE UNDOES A COMPONENT'S MARGIN ANY MORE, because no component
      has one. That was the first fix and it was the wrong one: a sandbox
      cancelling a side effect leaves the side effect everywhere else. The margins
@@ -221,16 +259,29 @@
      them; every knob already carries its CC under it. */
   .kit-hwrow { width: 100%; }
   .kit-hwrow + .kit-hwrow { margin-top: 18px; }
-  .kit-hwitems { min-width: 0; }
+  .kit-hwitems { min-width: 0; overflow-x: auto; }
   /* 🔴 THE FOUR SHAPES SIDE BY SIDE, ASKED FOR AS *"align channel strips
      horiztlly"*. They were four full width rows stacked, which is a picture of
      four separate demonstrations; a channel strip is the four TOGETHER, and
      nothing about that reads off a column of them.
-     ⚠️ IT WRAPS RATHER THAN SCROLLING. Four groups do not fit a phone and a
-     horizontal scroll inside a page that also scrolls is the thing `shell.css`
-     already refuses everywhere else. */
+     🔴 WRAPPING ALONE IS NOT ENOUGH AND THIS DRAGGED THE PAGE 65 px SIDEWAYS.
+     Reported 2026-09-22 from a phone and then MEASURED at 390 px: `flex-wrap`
+     wraps BETWEEN items, and **a single item wider than the container cannot
+     wrap**. One strip's content is 424 px against a 358 px box, so it hung 65
+     px off the right and took the whole document with it.
+     ⚠️ **AND THE LINE THAT STOOD HERE WAS WRONG ABOUT THIS PROJECT.** It said a
+     horizontal scroll is *"the thing shell.css already refuses everywhere
+     else"*. It does not: `.pos-tbl-row` scrolls against its own minimum,
+     `tabs.mjs` is an x-scrollable bar by design, and `step-grid.mjs` scrolls
+     its strip. What `positron-ui` actually refuses is the PAGE dragging, and
+     the repair for that is a scroller with `min-width: 0` beside it, because
+     `overflow-x` cannot shrink a flex item below its content.
+     ✅ SO IT WRAPS FIRST AND SCROLLS ONLY WHEN ONE ITEM CANNOT FIT. Four
+     strips on a wide screen still sit side by side, which is what was asked
+     for; on a phone they stack, and the one that is still too wide scrolls by
+     itself instead of moving the page. */
   .kit-hwstrips { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px 30px; }
-  .kit-hwstrips > .kit-hwrow { width: auto; }
+  .kit-hwstrips > .kit-hwrow { width: auto; max-width: 100%; min-width: 0; }
   .kit-hwstrips > .kit-hwrow + .kit-hwrow { margin-top: 0; }
   /* The vertical twins, beside the horizontal ones they are meant to match. */
   .kit-vrow { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
@@ -362,6 +413,12 @@
   import { createStack } from '/shell/stack.mjs';
   import { createStepper } from '/shell/stepper.mjs';
   import { createSlider, createSliderGroup, GLIDE_MS, HAND_YIELD_MS } from '/shell/slider.mjs';
+  import { createRangeSlider, spanPixels } from '/shell/range-slider.mjs';
+  import { createStepGrid, cellSize as padWidth, PAD_MIN } from '/shell/step-grid.mjs';
+  import { createCheck, createCheckGroup } from '/shell/check.mjs';
+  import { createEnvelopeView, createFilterView, createWaveShape, shapeFor, filterShapeFor }
+    from '/shell/synth-view.mjs';
+  import { OSC_WAVES, FILTER_TYPES, FIRST_WAVETABLE } from '/shell/circuit-patch.mjs';
   import { MOVE_GLYPH, MOVE_OFF, MOVE_SAYS } from '/shell/hand.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createTabs } from '/shell/tabs.mjs';
@@ -385,6 +442,7 @@
   import { decode } from '/shell/midi-decode.mjs';
   import { createPresence, PRESENCE_STATES } from '/shell/presence.mjs';
   import { createDeck } from '/timeline/transport.mjs';
+  import { createGlue } from '/shell/glue.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -392,6 +450,8 @@
   import { createPad, createPadGrid } from '/shell/pad.mjs';
   import { createFader, createFaderBank } from '/shell/fader.mjs';
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
+  import { createInstrument } from '/shell/instrument.mjs';
+  import { createControlGrid } from '/shell/control-grid.mjs';
   import { createDrop } from '/shell/drop.mjs';
   import { createXrProbe, xrCaps, onXrCaps, reasonFor, canEnter, answered, XR_STATES }
     from '/shell/xr-caps.mjs';
@@ -751,7 +811,6 @@
   // message about a different line.
   let panelWith = null;       // { panel, reading }  the absorber is on the block
   let panelWithout = null;    // { panel, reading }  NEGATIVE CONTROL: no absorber
-  let panelPhone = null;      // { panel, holder }   a card at 320 px
   let panelGrowBlk = null;    // the dashed block that absorbs the slack
 
   /**
@@ -819,6 +878,25 @@
   let kitDrop = null, kitDropLine = null, kitDropTall = 0;
   let kitRoFlex = null, kitRoGrid = null;
 
+  // 🔴 THE SIX NEWEST BLOCKS' SPECIMENS, DECLARED UP HERE WITH EVERY OTHER
+  // HOLDER. Same reason the eight comments above give and this page has now
+  // written down four times: these are the topmost blocks, and a `let` left
+  // where a block used to be is read in its dead zone, swallowed by `section()`
+  // into `failed`, and reported much later with a message about a different
+  // line.
+  // ⚠️ `gridSpec`, NOT `padSpec`. The PAD block already holds a `padSpec` and a
+  // second one would shadow nothing and collide with everything, which is the
+  // kind of half-collision that reads as correct until somebody moves a line.
+  let cgSpec = null;         // { six, four, faders }  the control grids
+  let instSpec = null;       // { named, bare }  the two instrument cases
+  let gridSpec = null;        // { edit, read, phone, holder }
+  let rangeSpec = null;       // { wide, shut, off, single, group }
+  let checkSpec = null;       // { one, off, some, dim, across, down }
+  let standSpec = null;       // { lying, standing, empty }
+  let envSpec = null;         // { one, two, three, flat }
+  let filtSpec = null;        // { live, deep, refused }
+  let waveSpec = null;        // { drawn: [...], pulse, blend, table, walk }
+
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A drop target, as of
    * 2026-09-21, asked for as *"do lightweight planning on patch demo (inclu
@@ -849,6 +927,662 @@
    * block with a control in it moves every other block's press. These two
    * buttons are in the box, which nothing presses by position.
    */
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A pad grid, as of
+   * 2026-09-22, asked for as *"use a standard pad grid component from tom, make
+   * it universal and add to kit"*.
+   *
+   * 🔴 IT IS A LIFT OUT OF `/tom/` AND THE SECOND COPY IS WHY. `/pack/` grew a
+   * 16 by 6 grid the day after `/tom/`'s 16 by 64 shipped, which is
+   * `positron-ui`'s own words for a component that has not been noticed yet.
+   *
+   * 🔴 **TWO GRIDS SIDE BY SIDE, AND THE SECOND ONE IS THE STATE THAT IS EASY
+   * TO GET WRONG.** One is editable with a label column, which is `/tom/`; one
+   * is READ ONLY with a corner cell, which is `/pack/`. A grid nobody may edit
+   * must not look pressable, and `disabled` would be the wrong answer: it says
+   * *this is switched off* about a picture that is perfectly current. Its pads
+   * are not buttons at all, so they take no tab stop, do not lift under a
+   * pointer and draw no focus ring, and all three are asserted at the foot of
+   * this file.
+   *
+   * 🔴 **AND THE THIRD ONE IS A PHONE, WHICH IS WHERE THE MEASURED PAD EARNS
+   * ITS KEEP.** The pad size cannot be done in CSS alone, because the label
+   * column and the steps are separate flex children and nothing in the browser
+   * relates a pad's height to a label row's. At 320 px the floor takes over and
+   * the STRIP scrolls rather than the page, which is a pair of properties this
+   * repository has measured 141 px of page overflow from being half written.
+   *
+   * 🔴 **THE PLAY BUTTON NAMES WHOSE TEMPO IT IS RUNNING AT, AND THE COMPONENT
+   * REFUSES TO RUN WITHOUT ONE.** Asked for as *"just add std play / stop of
+   * the grid pad, no prev next"*, which overrides a decision made the day
+   * before on a measurement: `/pack/` has no play button because NOTHING IN A
+   * CIRCUIT SESSION NAMES A TEMPO. So `rate` takes a `whose` and
+   * `createStepGrid` throws without it, and the read only grid here is given no
+   * rate at all, which is exactly `/pack/`'s case.
+   * ⚠️ **THE BUTTON IS IN THE BOX AND NOT IN A `.pos-controls` ROW**, for the
+   * reason every block below gives: both harnesses press that row by position,
+   * so a new top block with a control in it moves every other block's press.
+   * MEASURED once on `/radio/` as a single press moving from t+1 s to t+31 s.
+   */
+  /**
+   * 🔴 ONE GRID AND THE STANDARD TRANSPORT OVER IT, SINCE 2026-09-22. Reported
+   * with a screenshot of three grids and a loose `Play` button, as *"use std
+   * transport glued on top, rm other examples"*.
+   * 🔴 THE `Play` BUTTON WAS HAND ROLLED, ON THE ONE PAGE WHOSE JOB IS TO CATCH
+   * THAT. `createTransportBar` is what thirty pages use and the block below it
+   * demonstrates twice. A page building its own play button beside a component
+   * that already has a clock is the exact defect `positron-ui` exists to stop,
+   * and it was sitting in the kit.
+   * ⚠️ THE BAR IS ABOVE THE GRID, WHICH IS WHERE EVERY OTHER PAGE PUTS IT.
+   * `/replay/`, `/reel/`, `/stage/` and `/held/` all glue the bar over the
+   * thing it drives, and `/pack/` will do the same with this component.
+   * 🔴 AND TWO EXAMPLES WENT WITH IT, SO SAY WHAT STOPPED BEING GRADED HERE.
+   * The read only shape and the 320 px scroller were separate grids in this
+   * block, each with its own assert. What survives without a browser is in
+   * `demo/shell/step-grid-test.mjs`: the read only branch is read off the
+   * SOURCE there, and the pad floor arithmetic at a phone's width is asserted
+   * against 64 steps at 360 px. **What is gone is the computed half**, the
+   * cursor, the opacity and the rendered tab stops, and no check makes those
+   * claims any more.
+   */
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A control grid, as of
+   * 2026-09-22, asked for as *"make component for know etc grid where centers
+   * of 2x2 knobs make square etc"* and then *"it can be any x y count of
+   * elements, right?"*.
+   *
+   * 🔴 **THE PROBLEM IS THAT A CONTROL IS TALLER THAN IT IS WIDE AND MUST BE.**
+   * `--ctl-head` and `--ctl-foot` are the contract: a value line above the
+   * dial and a label and a sub below it. So the distance between two dial
+   * centres ACROSS is a dial plus a gap, and DOWN it is a dial plus three lines
+   * plus a gap. On `/plai/` that was 46 against about 100, and four knobs made
+   * a tall rectangle.
+   * ✅ **THE FIX WIDENS THE COLUMNS AND NEVER SHRINKS THE ROWS**, because
+   * shrinking a row means cutting the value or the label, which are the only
+   * things naming what the control does.
+   * ⚠️ **AND THE THIRD SPECIMEN IS THE DEMONSTRATION.** A grid of FADERS, which
+   * are a different shape again, on the same component with the same rule.
+   * A block showing only knobs would have proved the arithmetic works once.
+   */
+  section('hardware', 'CONTROL GRID',
+    'Any number of controls across by any number down, with the column pitch widened '
+    + 'to the row pitch so the working surfaces land on a square lattice.',
+    `createControlGrid({ cols: 3, gap: 10, items: knobs })
+grid.pitch()        // the measured square, written as --cg-pitch
+grid.centres()      // where each dial really is, for a check`,
+    (box) => {
+      const o = out('nothing pressed');
+      const mk = (label, sub) => createKnob({
+        label, sub, min: 0, max: 127, value: 64,
+        onInput: (v) => { o.textContent = `${label} ${v}`; },
+      });
+      /* Six controls as three across and two down, and the labels are
+         deliberately uneven: `FM` against `HARMONICS` is what makes the widest
+         cell rather than the first cell decide the pitch. */
+      const six = createControlGrid({
+        cols: 3, gap: 10,
+        items: [mk('FM', 'CC 1'), mk('HARMONICS', 'CC 2'), mk('TIMBRE', 'CC 3'),
+          mk('MORPH', 'CC 4'), mk('DECAY', 'CC 5'), mk('COLOUR', 'CC 6')],
+      });
+      /* Four as two by two, which is the shape that was reported. */
+      const four = createControlGrid({
+        cols: 2, gap: 10,
+        items: [mk('FREQ', '24 to 96'), mk('HARMO', '0 to 1'),
+          mk('TIMBRE', '0 to 1'), mk('MORPH', '0 to 1')],
+      });
+      /* A different control entirely, on the same rule. */
+      const faders = createControlGrid({
+        cols: 4, gap: 10,
+        items: [1, 2, 3, 4].map((i) => createFader({
+          label: `CH${i}`, min: 0, max: 127, value: 30 + i * 12,
+        })),
+      });
+      cgSpec = { six, four, faders };
+      box.classList.add('kit-wide');
+      box.append(el('p', 'kit-cap', 'three by two, with uneven labels'), six.el,
+        el('p', 'kit-cap', 'two by two, the shape that was reported'), four.el,
+        el('p', 'kit-cap', 'four faders, a different shape on the same rule'), faders.el, o);
+    });
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. An instrument case, as
+   * of 2026-09-22, asked for as *"wrap it into insrtument wrapper with title
+   * suppoer |positron      plai|"* and *"add global component (takes instument
+   * panels into it) to kit"*.
+   *
+   * 🔴 **IT IS A COMPOSITION AND THE BLOCK SHOWS THAT RATHER THAN HIDING IT.**
+   * `createPanelLayout` already owned the case and the one scrolling strip;
+   * `createNameplate` already owned the plate and its three placements. What
+   * did not exist was the sentence joining them, and FIVE pages had each
+   * written it: `/tom/` prepends its own plate, `/circuit/` and `/evo/` place
+   * theirs their own way, `/twelve/` uses a single line, and this page had two
+   * more in its PANEL specimen. `positron-ui` calls that a component that has
+   * not been noticed yet.
+   * ⚠️ **SO THE INTERESTING ASSERT IS AN ABSENCE**, and it is in
+   * `instrument-test.mjs` rather than here: the module builds no case and no
+   * plate of its own. A second implementation would pass every check on this
+   * page and drift from `panel-layout.mjs` the first time a panel changed.
+   * ⚠️ **AND THE SECOND SPECIMEN IS THE ONE WITH NO MAKER**, because a plate
+   * with one line cannot use `ends`: that is `space-between`, which parks a
+   * lone child on the LEFT. `plateSpec` decides it so a caller cannot get it
+   * wrong, and `/twelve/` is the page that was reported for exactly this.
+   */
+  section('hardware', 'INSTRUMENT',
+    'A cased panel with the maker at one end of its plate and the model at the other, '
+    + 'built out of the two components that already draw those.',
+    `createInstrument({ name: 'PLAI', panel: { side: 'left' } })
+inst.fixed.append(knob.el)        // the column that does not scroll
+inst.add(row)                     // the flow that does
+createInstrument({ name: 'MODEL 12', maker: '' })   // one line, pushed right`,
+    (box) => {
+      const o = out('nothing pressed');
+      const named = createInstrument({
+        name: 'PLAI',
+        panel: { side: 'left', cls: { fixed: 'kit-panelcol' } },
+      });
+      named.fixed.append(
+        createKnob({ label: 'FREQ', min: 0, max: 127, value: 64,
+          onInput: (v) => { o.textContent = `frequency ${v}`; } }).el,
+        createPad({ half: true, label: 'TRIG',
+          onPress: () => { o.textContent = 'triggered'; } }).el,
+      );
+      const row = el('div', 'panel-row kit-panelrow');
+      row.append(createPadGrid({ cols: 16, pad: (x) => ({ top: String(x + 1) }) }).el);
+      named.add(row, el('div', 'kit-blk', 'the flow, which is what scrolls'));
+
+      /* The one line case, which is `/twelve/`'s shape and the reason
+         `plateSpec` chooses the placement rather than the caller. */
+      const bare = createInstrument({
+        name: 'MODEL 12', maker: '',
+        panel: { side: 'left', cls: { fixed: 'kit-panelcol' } },
+      });
+      bare.fixed.append(createFader({ label: 'CH1', min: 0, max: 127, value: 30 }).el);
+      bare.add(el('div', 'kit-blk', 'no maker, so the model is pushed right'));
+
+      instSpec = { named, bare };
+      box.classList.add('kit-wide');
+      box.append(el('p', 'kit-cap', 'a maker and a model, at the ends'), named.el,
+        el('p', 'kit-cap', 'one line, which cannot use the same placement'), bare.el, o);
+    });
+
+  section('hardware', 'STEP GRID',
+    'Rows of square pads over a ruler, with the standard transport glued above them '
+    + 'and a tempo the page has to say out loud whose it is.',
+    `const grid = createStepGrid({
+  fixed, strip, rows: 6, steps: 16,
+  label: (r) => String(r),
+  silent: (r) => r === 4,                 // lit but grey: it can make no sound
+  rate: { bpm: 120, whose: 'this page' }, // no whose, no clock, and it throws
+})
+createTransportBar(host, deck, { publish: false, scrub: false, loop: false,
+  command: { play: () => grid.clock.play(), pause: () => grid.clock.stop() } })
+createGlue(host, grid.el)                 // the bar over the thing it drives`,
+    (box) => {
+      const o = out('nothing pressed');
+      const wrap = el('div', 'kit-pg');
+      const fixed = el('div');
+      const strip = el('div', 'kit-pg-strip');
+      wrap.append(fixed, strip);
+
+      const STEPS = 16;
+      const edit = createStepGrid({
+        fixed, strip, rows: 6, steps: STEPS,
+        label: (r) => String(r),
+        title: (r) => (r === 4
+          ? 'this row has nothing behind it, so its steps are silent'
+          : `row ${r}, press to hear it`),
+        // Rows 0 to 3 and 5 can be heard, row 4 cannot, so a lit pad on it
+        // stays grey. Brightness says WHETHER THIS CAN MAKE A SOUND, which is
+        // the one thing a reader cannot see any other way.
+        canPress: (r) => r !== 4,
+        silent: (r) => r === 4,
+        onLabel: (r) => { edit.lit(r); o.textContent = `row ${r} was pressed`; },
+        onSeek: (s) => { edit.at(s); o.textContent = `seeked to step ${s + 1}`; },
+        onToggle: (r, s, lit, why) => {
+          o.textContent = `row ${r} step ${s + 1} ${lit ? 'on' : 'off'}, by ${why}`;
+        },
+        /**
+         * 🔴 THE TEMPO IS NAMED IN WORDS, AND THE COMPONENT WILL NOT PLAY
+         * WITHOUT IT. Nothing about a grid of pads carries a rate, so a play
+         * button is a page claiming one. This page's claim is that the number
+         * is its own and nobody else's.
+         */
+        rate: { bpm: 120, whose: 'this page, which invented it' },
+      });
+      for (const [r, s] of [[0, 0], [0, 4], [0, 8], [0, 12], [1, 2], [1, 10],
+        [2, 6], [4, 3], [4, 11], [5, 15]]) edit.set(r, s, true, 'quiet');
+
+      /**
+       * 🔴 THE DECK IS A FOLLOWER AND THE GRID OWNS THE CLOCK, which is the
+       * arrangement `/pack/` and `/crate/` both use. The component's clock is
+       * the only thing that knows the step length, so a deck running free
+       * beside it would be a second reading of one tempo, and the two would
+       * disagree the moment either was touched.
+       * ⚠️ `publish: false`, BECAUSE THIS PAGE HAS THREE BARS. `__demo.transport`
+       * may name only one, and the two blocks further down this file are what
+       * the transport checks are written against.
+       * ⚠️ `scrub: false` AND `loop: false`: the grid's own ruler already seeks
+       * on a press, and one position surface per component is the rule.
+       * ⚠️ AND THE CLOCK NEVER PRINTS A TIME. `fmt` takes the whole line, so
+       * there is no `0:00.000` and no total: the deck's unit here is one step
+       * and the readout says so in the same words the picture does.
+       */
+      const barHost = el('div', 'kit-pg-bar');
+      const deck = createDeck({ items: [], adapters: {}, range: [0, STEPS] });
+      const bar = createTransportBar(barHost, deck, {
+        publish: false, scrub: false, loop: false,
+        fmt: (pos) => `step ${Math.min(STEPS, Math.floor(pos) + 1)} of ${STEPS}`,
+        command: {
+          play: () => {
+            edit.clock.play();
+            o.textContent = `running at ${edit.clock.bpm()} beats a minute, `
+              + edit.clock.whose;
+          },
+          pause: () => {
+            edit.clock.stop();
+            o.textContent = 'stopped, and back at the first column';
+          },
+        },
+      });
+      /* The head follows the grid rather than the deck's own clock, so the
+         number in the bar and the lit column cannot come apart. */
+      edit.clock.onStep((i) => deck.seek(i));
+
+      gridSpec = { edit, bar, deck, barHost, wrap };
+      box.classList.add('kit-wide');
+      box.append(createGlue(barHost, wrap), o);
+    });
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A range slider, as of
+   * 2026-09-22, asked for as *"2-head slider (range)"*.
+   *
+   * ✅ **IT HAS A NAMED JOB RATHER THAN BEING A SHAPE SOMEBODY WANTED.** A
+   * macro leg on the Circuit is `Destination, Start, End, Depth`, and 8 macro
+   * knobs by 4 legs is 32 start and end pairs, every one of which is two
+   * sliders today.
+   *
+   * 🔴 **FOUR CONTROLS IN ONE GROUP, AND THAT IS THE DEMONSTRATION.** What is
+   * being shown is not that a range can be dragged; it is that a range and a
+   * single slider share the group's columns, so a panel can mix them and every
+   * lane still starts at the same x. A block with one range in it would have
+   * proved nothing and the check at the foot of this file would have had
+   * nothing to compare against.
+   * ⚠️ **AND THREE OF THEM ARE AWKWARD STATES.** One is collapsed, which is a
+   * real setting for a leg with no travel and is also the case where every
+   * press would grab the same handle if the tie rule were wrong. One is
+   * disabled. One carries a gap, so the two can never meet.
+   * ⚠️ **NOTHING HERE IS IN A `.pos-controls` ROW**, for the reason the blocks
+   * below give: both harnesses press that row by position, so a new top block
+   * with a control in it moves every other block's press. MEASURED once on
+   * `/radio/` as a single press moving from t+1 s to t+31 s.
+   */
+  section('input', 'RANGE SLIDER',
+    'One lane with a start and an end on it, in a group beside an ordinary slider '
+    + 'so the shared columns can be seen holding both.',
+    `createRangeSlider({ label: 'macro 1 A', sub: 'start and end',
+                    min: 0, max: 127, step: 1, from: 12, to: 96, onInput })`,
+    (box) => {
+      const o = out('nothing moved');
+      const say = (what) => ({ from, to }) => { o.textContent = `${what} ${from} to ${to}`; };
+      const wide = createRangeSlider({
+        label: 'macro 1 A', sub: 'start and end', min: 0, max: 127, step: 1,
+        from: 12, to: 96, onInput: say('leg A'),
+      });
+      // A leg with no travel. Both handles on one number, which the tie rule
+      // exists for: press left of the pair and the start comes away, press
+      // right and the end does.
+      const shut = createRangeSlider({
+        label: 'macro 1 B', sub: 'no travel', min: 0, max: 127, step: 1,
+        from: 64, to: 64, onInput: say('leg B'),
+      });
+      const gap = createRangeSlider({
+        label: 'macro 1 C', sub: 'never closer than 20', min: 0, max: 127, step: 1,
+        from: 30, to: 100, gap: 20, onInput: say('leg C'),
+      });
+      const off = createRangeSlider({
+        label: 'macro 1 D', sub: 'not assigned', min: 0, max: 127, step: 1, from: 0, to: 127,
+      });
+      off.disabled(true);
+      const single = createSlider({
+        label: 'depth', sub: 'CC 80', min: 0, max: 127, step: 1, value: 64,
+        onInput: (v) => { o.textContent = `depth ${v}`; },
+      });
+      const g = createSliderGroup([wide, shut, gap, off, single]);
+      rangeSpec = { wide, shut, gap, off, single, group: g };
+      box.append(g.el, o);
+    });
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A checkbox, as of
+   * 2026-09-22, asked for as *"plus checboxes and radios (horiz and vert)"*.
+   *
+   * 🔴 **THERE WAS NO CHECKBOX IN THIS KIT AT ALL.** Searched the whole of
+   * `demo/shell/` and every page on 2026-09-22: zero. `choice.mjs` is a
+   * segmented row where exactly one option is armed, which answers *which one
+   * of these*, and nothing here answered *which of these*.
+   * ⚠️ **IT IS A REAL `<input type="checkbox">` AND NOT A BUTTON WEARING
+   * `aria-pressed`**, which is the opposite choice from the one beside it and
+   * is the right one for a different question. The four reasons are in
+   * `check.mjs`, and the one that decides it is the announcement: a screen
+   * reader says `checkbox, checked` for one and `button, pressed` for the
+   * other, and *pressed* says something happened where what is true is that
+   * something IS.
+   * ⚠️ **THE THIRD STATE IS HERE BECAUSE IT IS THE ONE A BUTTON CANNOT DRAW.**
+   * `indeterminate` is *some of the ones under this heading*, and
+   * `aria-pressed` can spell it `mixed` and nothing paints it.
+   */
+  section('input', 'CHECKBOX',
+    'Many of a set rather than one of them, with the half lit third state that a '
+    + 'button wearing a pressed attribute can spell and cannot draw.',
+    `createCheck({ label: 'loop', checked: true, onChange })
+createCheckGroup({ label: 'sends', options: [['reverb','rev'], …], value: ['rev'] })
+createCheckGroup({ label: 'parts', options: [...], orient: 'column' })`,
+    (box) => {
+      const o = out('nothing changed');
+      const one = createCheck({
+        label: 'loop', checked: true,
+        onChange: (on) => { o.textContent = `loop ${on ? 'on' : 'off'}`; },
+      });
+      const off = createCheck({
+        label: 'mute', checked: false,
+        onChange: (on) => { o.textContent = `mute ${on ? 'on' : 'off'}`; },
+      });
+      // 🔴 SOME OF THEM, WHICH IS A REAL ANSWER AND NOT A LOADING STATE. It is
+      // what a heading over a set looks like when part of the set is on, and a
+      // press clears it because a press has answered the question.
+      const some = createCheck({
+        label: 'all parts', mixed: true,
+        onChange: (on) => { o.textContent = `all parts ${on ? 'on' : 'off'}, and no longer some`; },
+      });
+      const dim = createCheck({ label: 'sync', checked: true, disabled: true });
+      const across = createCheckGroup({
+        label: 'sends',
+        options: [['reverb', 'rev'], ['delay', 'dly'], ['side chain', 'sc'],
+          ['distortion', 'dist'], ['equaliser', 'eq']],
+        value: ['rev', 'dly'],
+        onChange: (vals) => { o.textContent = `sends ${vals.join(' ') || 'none'}`; },
+      });
+      const down = createCheckGroup({
+        label: 'record',
+        options: [['synth 1', 1], ['synth 2', 2], ['drums', 10], ['session', 16]],
+        value: [1, 10],
+        orient: 'column',
+        onChange: (vals) => { o.textContent = `record ${vals.join(' ') || 'nothing'}`; },
+      });
+      checkSpec = { one, off, some, dim, across, down };
+      const row = el('div', 'kit-row');
+      row.append(one.el, off.el, some.el, dim.el);
+      box.append(row, across.el, down.el, o);
+    });
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A choice standing up,
+   * as of 2026-09-22, the other half of *"radios (horiz and vert)"*.
+   *
+   * 🔴 **THE TWO ARE SIDE BY SIDE AND THAT IS THE WHOLE POINT**, the same
+   * argument the SLIDER block makes for putting a fader next to a slider: a
+   * standing choice is the lying one with the join and the corners turned, so
+   * the only way to catch the two drifting apart is to put them where one pair
+   * of eyes sees both.
+   * ⚠️ **TURNING THE DIRECTION IS THE HALF FIX THAT LOOKS FINISHED.**
+   * `.pos-seg` overlaps its children on the LEFT and rounds the first child's
+   * left corners, so a column that only changed `flex-direction` has a doubled
+   * border on every join and two stray curves in the middle of it. Both are
+   * asserted at the foot of this file.
+   * ⚠️ **AND THE THIRD ONE HAS NOTHING CHOSEN**, which is `at: -1` and is a
+   * real state rather than a bug: a question that arrives with an answer
+   * already given is a question nobody was asked.
+   */
+  section('input', 'CHOICE, STANDING UP',
+    'The same segmented row of options turned on its side, beside the lying one '
+    + 'so a drift between them is visible rather than argued about.',
+    `createChoice({ label: 'space', options: [...], at: 1, orient: 'column' })`,
+    (box) => {
+      const o = out('room');
+      const opts = [['dry', 0], ['room', 1], ['hall', 2], ['plate', 3]];
+      const lying = createChoice({
+        label: 'space', options: opts, at: 1,
+        onPick: (_v, name) => { o.textContent = `lying ${name}`; },
+      });
+      const standing = createChoice({
+        label: 'space', options: opts, at: 1, orient: 'column',
+        onPick: (_v, name) => { o.textContent = `standing ${name}`; },
+      });
+      const empty = createChoice({
+        label: 'not answered', options: [['yes', 1], ['no', 0]], at: -1,
+        orient: 'column',
+        onPick: (_v, name) => { o.textContent = `answered ${name}`; },
+      });
+      standSpec = { lying, standing, empty };
+      const row = el('div', 'kit-row');
+      row.append(lying.el, standing.el, empty.el);
+      box.append(row, o);
+    });
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. An envelope figure, as
+   * of 2026-09-22, asked for as *"evelope editor / display (can start with
+   * noninteracive)"*.
+   *
+   * 🔴 **NON-INTERACTIVE IS WHAT THE HARDWARE PERMITS FOR TWO OF THE THREE, NOT
+   * A FIRST VERSION.** MEASURED out of `circuit-cc.mjs` and
+   * `circuit-patch.mjs`: Envelope 1 is on five controller numbers, so the four
+   * sliders here are honest. Envelopes 2 and 3 are in the patch format and on
+   * NO controller number at all, so a control for either would name something
+   * it cannot do, which is the defect that cost `/twelve/` four buttons.
+   *
+   * 🔴 **THE SHAPE IS EXACT AND THE TIME AXIS IS NOT, AND THE PICTURE SAYS SO
+   * ON ITS OWN FACE.** Attack is `0 to 127` with no published mapping to
+   * seconds, so the stage widths follow the settings and the figure paints
+   * `proportions, not seconds` into its own canvas rather than into a caption
+   * beside it, so the warning travels with the picture into any page that puts
+   * it somewhere.
+   * ⚠️ **THE FOURTH FIGURE HAS NO LENGTHS AT ALL**, which is a real setting and
+   * is also the divide by zero this component had to be written around.
+   */
+  section('hardware', 'ENVELOPE',
+    'The four stages drawn from their own settings, with the one envelope a '
+    + 'controller number can reach wired to four sliders and the two it cannot '
+    + 'standing still beside it.',
+    `createEnvelopeView({ label: 'env 1', attack: 2, decay: 90, sustain: 127, release: 40 })
+env.set({ attack: v })      // redraws, and nothing here sends anything`,
+    (box) => {
+      const o = out('env 1 as the patch format opens it');
+      const figs = el('div', 'kit-figs');
+      const fig = (title, view) => {
+        const cell = el('div', 'kit-fig');
+        cell.append(view.el, el('span', 'kit-fig-l', title));
+        figs.append(cell);
+        return view;
+      };
+      // The numbers are the patch format's own defaults, read off the address
+      // table in `circuit-patch.mjs` rather than invented for a picture.
+      const one = fig('env 1, CC 73 75 70 72',
+        createEnvelopeView({ label: 'env 1', attack: 2, decay: 90, sustain: 127, release: 40 }));
+      const two = fig('env 2, patch only',
+        createEnvelopeView({ label: 'env 2', attack: 2, decay: 75, sustain: 35, release: 45 }));
+      const three = fig('env 3, patch only, has a delay',
+        createEnvelopeView({ label: 'env 3', delay: 48, attack: 10, decay: 70,
+          sustain: 64, release: 40 }));
+      const flat = fig('every length at zero',
+        createEnvelopeView({ label: 'env 1', attack: 0, decay: 0, sustain: 96, release: 0 }));
+      envSpec = { one, two, three, flat };
+
+      // ⚠️ THE SECONDARY LABEL IS THE CONTROLLER NUMBER, which is exactly what
+      // `slider.mjs` says that slot is for: the primary names what the control
+      // moves and the secondary names what it is on the wire. Here it is also
+      // the evidence that this envelope is the reachable one.
+      const mk = (label, cc, key, value) => createSlider({
+        label, sub: `CC ${cc}`, min: 0, max: 127, step: 1, value,
+        onInput: (v) => {
+          one.set({ [key]: v });
+          o.textContent = `env 1 ${label} ${v}, and nothing was sent anywhere`;
+        },
+      });
+      const drive = createSliderGroup([
+        mk('attack', 73, 'attack', 2),
+        mk('decay', 75, 'decay', 90),
+        mk('sustain', 70, 'sustain', 127),
+        mk('release', 72, 'release', 40),
+      ], { pair: true });
+      box.append(figs, drive.el, o);
+    });
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A filter figure, as of
+   * 2026-09-22, asked for as *"filter editor / display (can start with
+   * nonimteractive)"*.
+   *
+   * 🔴 **THIS ONE CAN BE DRIVEN AND IT STILL DRAWS A SCHEMATIC, AND THOSE ARE
+   * TWO DIFFERENT FACTS.** The filter IS reachable over control change, type on
+   * CC 68 across six values, frequency on 74 and resonance on 71, so a control
+   * that moves it is honest. What is NOT honest is the curve: Novation publish
+   * no response measurements for this instrument and nothing in this repository
+   * has taken one. So the corner is where the parameter says, the slope is what
+   * the type's NAME says, and the peak follows the resonance, and every one of
+   * those is a statement about a textbook model.
+   * ⚠️ **THE WORD IS PAINTED INTO THE CANVAS RATHER THAN WRITTEN BESIDE IT.** A
+   * caption in this page's prose would not travel with the picture, and a curve
+   * that looks like a measurement and is not is exactly the confident wrong
+   * picture this project keeps paying for. There is no hertz on the x axis and
+   * no decibel figure on the y for the same reason: the only scale anybody here
+   * has for a cutoff is `0 to 127`, which is a parameter rather than a
+   * frequency.
+   * ⚠️ **AND THE THIRD FIGURE IS A NAME THE COMPONENT CANNOT READ**, which it
+   * refuses in words instead of drawing the default low pass under somebody
+   * else's label.
+   */
+  section('hardware', 'FILTER RESPONSE',
+    'A drawn response with the corner where the cutoff says and the slope the type '
+    + 'name claims, marked as a schematic on its own face because nothing here has '
+    + 'measured a real one.',
+    `createFilterView({ type: 'low pass 24dB', freq: 78, resonance: 40 })
+filt.set({ freq: v })     // the type name is read, and a name it cannot read is refused`,
+    (box) => {
+      const o = out('low pass 24dB, cutoff 78 of 127');
+      const figs = el('div', 'kit-figs');
+      const fig = (title, view) => {
+        const cell = el('div', 'kit-fig');
+        cell.append(view.el, el('span', 'kit-fig-l', title));
+        figs.append(cell);
+        return view;
+      };
+      const live = fig('driven below',
+        createFilterView({ label: 'filter', type: 'low pass 24dB', freq: 78, resonance: 40 }));
+      const deep = fig('band pass 12/12 dB, resonant',
+        createFilterView({ label: 'filter', type: 'band pass 12/12 dB', freq: 64, resonance: 118 }));
+      // 🔴 THE REFUSAL, WHICH IS THE HALF NOBODY TESTS. A name the component
+      // cannot read has an unknown slope and an unknown direction, and drawing
+      // the default under it would be an invention wearing an instrument's
+      // label. `filterShapeFor` answers null and the picture says so.
+      const refused = fig('a name it cannot read',
+        createFilterView({ label: 'filter', type: 'comb 9dB', freq: 64, resonance: 0 }));
+      filtSpec = { live, deep, refused };
+
+      // ⚠️ `onPick` HANDS BACK AN INDEX, NOT A NAME, which is what the dropdown
+      // knows about itself. `show` takes the name AND the index, so the drawn
+      // cell and the native list underneath it cannot drift apart.
+      let at = 1;
+      const go = (i) => {
+        at = ((i % FILTER_TYPES.length) + FILTER_TYPES.length) % FILTER_TYPES.length;
+        const name = FILTER_TYPES[at];
+        type.show(name, at);
+        live.set({ type: name });
+        const s = filterShapeFor(name);
+        o.textContent = s
+          ? `${name}, read as ${s.poles} pole ${s.kind}`
+          : `${name}, and the name does not say which filter it is`;
+      };
+      const type = createPicker({
+        label: 'type', what: 'filter type',
+        prev: () => go(at - 1), next: () => go(at + 1),
+        onPick: (i) => go(i),
+      });
+      type.options(FILTER_TYPES, at);
+      go(at);
+
+      const drive = createSliderGroup([
+        createSlider({ label: 'cutoff', sub: 'CC 74', min: 0, max: 127, step: 1, value: 78,
+          onInput: (v) => { live.set({ freq: v }); o.textContent = `cutoff ${v} of 127`; } }),
+        createSlider({ label: 'resonance', sub: 'CC 71', min: 0, max: 127, step: 1, value: 40,
+          onInput: (v) => { live.set({ resonance: v }); o.textContent = `resonance ${v} of 127`; } }),
+      ], { pair: true });
+      box.append(figs, type.el, drive.el, o);
+    });
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A waveform figure, as
+   * of 2026-09-22, and it is HALF of what was asked for under *"waveform
+   * display"*. The other half is drawing a recorded buffer, which is
+   * `wave-view.mjs` and `grain-scope.mjs` and already exists on four pages. A
+   * second one of those is what this block is not.
+   *
+   * 🔴 **IT DRAWS 4 OF THE 30 AND REFUSES 26 IN WORDS, AND THE REFUSAL IS THE
+   * REASON IT IS WORTH HAVING.** A name is mapped to a shape only when the name
+   * IS the shape's name. Sixteen of the Circuit's thirty oscillator waves are
+   * WAVETABLES, which have no single shape by definition, and nine more are
+   * `saw 9:1 PW` blends whose ratios nothing here has measured, and one is a
+   * `pulse width` with no width. An invented squiggle under a real
+   * instrument's parameter name is the failure this component exists not to be.
+   * ⚠️ **AND THAT IS STILL BETTER THAN WHAT THOSE PAGES HAVE**, which is a
+   * slider reading `17`.
+   * ⚠️ **THE PICKER WALKS ALL THIRTY**, which is the demonstration: press
+   * through the table and watch the same component draw four of them and name
+   * its reason for the rest. A block showing only the four it can draw would
+   * have hidden the whole point.
+   * 🔴 **SIXTEEN, AND THE REQUEST THIS WAS BUILT FROM SAID FOURTEEN.** MEASURED
+   * 2026-09-22: `FIRST_WAVETABLE` is 14, which is the count of PLAIN waveforms,
+   * and `OSC_WAVES.slice(14)` is 16 rows long. Two halves of one split written
+   * down the wrong way round. The conclusion does not move.
+   */
+  section('hardware', 'WAVEFORM',
+    'One cycle shape drawn from its own definition, and a name that does not name a '
+    + 'shape refused in words rather than drawn as a plausible squiggle.',
+    `createWaveShape({ name: 'sawtooth' })              // drawn
+createWaveShape({ name: 'digital nasty 1',          // refused, and it says why
+                  reason: 'a wavetable has no one shape' })
+createWaveShape({ shape: 'pulse', duty: 0.2 })      // a width has to be handed over`,
+    (box) => {
+      const drawnNames = OSC_WAVES.filter((n) => shapeFor(n));
+      const o = out(`${drawnNames.length} of ${OSC_WAVES.length} have a shape here`);
+      const figs = el('div', 'kit-figs');
+      const fig = (title, view) => {
+        const cell = el('div', 'kit-fig');
+        cell.append(view.el, el('span', 'kit-fig-l', title));
+        figs.append(cell);
+        return view;
+      };
+      // ⚠️ `drawnViews`, NOT `drawn`. This page already has a module level
+      // `const drawn` holding what each diagram reported, and a second one in
+      // here would shadow it inside this block only, which is the kind of
+      // half-collision that reads as correct until somebody moves a line.
+      const drawnViews = drawnNames.map((n) =>
+        fig(n, createWaveShape({ name: n, height: 76 })));
+      // A pulse is a family rather than a shape, so its width is handed over by
+      // hand. `shapeFor` never returns one, on purpose.
+      const pulse = fig('pulse at a fifth, given by hand',
+        createWaveShape({ shape: 'pulse', duty: 0.2, name: 'pulse 20%', height: 76 }));
+      const blend = fig('a blend, refused',
+        createWaveShape({ name: 'saw 5:5 PW', height: 76,
+          reason: 'a blend, and its ratio is not published' }));
+      /* 🔴 THE WALK AND THE WAVETABLE FIGURE BOTH LEFT ON 2026-09-22, asked
+         for as *"rm this exampoel a wavetable, refused"* and *"rm osc 1 wave
+         example"*. The walk was a picker over all thirty waves with a figure
+         following it, and its argument was that pressing through the table is
+         how a reader sees four drawn and twenty six named.
+         🔴 SO SAY WHAT STOPPED BEING GRADED. Two asserts went with them: that
+         the walk draws exactly the four `shapeFor` answers and refuses the
+         other twenty six while walking the whole table, and that a wavetable
+         and a blend are refused for DIFFERENT stated reasons. **The counts
+         survive** in `synth-view-test.mjs`, which asserts `shapeFor` over all
+         thirty with no browser. **What is gone is the demonstration that one
+         component handles both answers as a reader steps through them**, and
+         the blend figure is the only refusal left on the page. */
+      waveSpec = { drawnViews, pulse, blend, drawnNames };
+      box.append(figs, o);
+    });
+
   section('input', 'DROP TARGET',
     'A visible area that says what it takes, a button for somebody who does not drag, '
     + 'and one line that reports what happened. A file opens in the tab and nothing '
@@ -931,9 +1665,13 @@ createNameplate({ lines: ['POSITRON', 'PANEL-1'], place: 'mid' })`,
         row.append(createPadGrid({
           cols: 16, pad: (x) => ({ top: String(x + 1) }),
         }).el);
-        row.append(createNameplate({
-          lines: ['POSITRON', 'PANEL-1'], place: 'mid',
-        }).el);
+        /* 🔴 A NAMEPLATE STOOD IN THIS ROW UNTIL 2026-09-22, ASKED OFF AS *"no
+           nameplate exaple"*. It demonstrated the `mid` placement, which is
+           what a plate inside a SCROLLING flow needs, and that is the one
+           thing no longer shown anywhere. The plate itself is demonstrated on
+           the INSTRUMENT block at the top of this file, at `ends`, which is
+           the placement a cased instrument uses. `panel-layout.mjs` still
+           documents all three. */
         const blk = el('div', 'kit-blk', absorb
           ? 'this block carries .panel-grow' : 'this block carries nothing');
         p.flow.append(row, blk);
@@ -952,27 +1690,18 @@ createNameplate({ lines: ['POSITRON', 'PANEL-1'], place: 'mid' })`,
       box.append(el('p', 'kit-cap', 'no absorber, which is the negative control'));
       panelWithout = build(false);
 
-      /**
-       * 🔴 THE THIRD SPECIMEN ANSWERS A QUESTION THE SUITE CANNOT ASK ANYWHERE
-       * ELSE. `demo/verify.mjs` runs at 756 px with no viewport override, so
-       * every assert on all three panel pages passes WITHOUT EVER ENTERING A
-       * MEDIA QUERY, and `/circuit/`'s own *the panel box starts and ends where
-       * the rest of the page does* is false at 390 px by 286.0 px with nothing
-       * red. A panel inside a 320 px holder is the cheapest thing that can see
-       * it, and it grades the COMPONENT rather than the three pages.
-       * ⚠️ 320 px IS NARROWER THAN ANY PHONE ANYBODY OWNS (iPhone SE 375, the
-       * commonest 390, Pixel 412), so what fits here fits on all of them.
-       */
-      box.append(el('p', 'kit-cap', 'a card in a 320 px holder'));
-      const holder = el('div', 'kit-phone');
-      const pp = createPanelLayout({ side: 'left', cls: { fixed: 'kit-panelcol' } });
-      pp.fixed.append(createPad({ half: true, label: 'TAP' }).el);
-      const prow = el('div', 'panel-row kit-panelrow');
-      prow.append(createPadGrid({ cols: 8, pad: () => ({}) }).el);
-      pp.flow.append(prow);
-      holder.append(pp.el);
-      box.append(holder);
-      panelPhone = { panel: pp, holder };
+      /* 🔴 A THIRD SPECIMEN, A CARD IN A 320 px HOLDER, STOOD HERE UNTIL
+         2026-09-22 AND WAS ASKED OFF IN THOSE WORDS. **It was the only check
+         in this repository that entered a media query.** `demo/verify.mjs`
+         runs at 756 px with no viewport override, so every assert on all
+         three panel pages passes without ever meeting one, and `/circuit/`'s
+         own *the panel box starts and ends where the rest of the page does*
+         is green while being FALSE at 390 px by 286.0 px.
+         🔴 SO WHAT WENT IS NOT A SPECIMEN, IT IS THE PROJECT'S ONLY PHONE
+         WIDTH ASSERT, and nothing replaces it. The day a panel breaks on a
+         phone again, this suite will be green. `plans/plan-panel-component.md`
+         has three unpriced options for grading a phone properly, and
+         `BACKLOG.md` carries this as open. */
     });
 
   section('hardware', 'SEGMENT DISPLAY',
@@ -3266,6 +3995,699 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
   measure();
 
   /**
+   * 🔴 THE TWO COLUMNS SHARE ONE PITCH, AND NOTHING IN THE BROWSER MAKES THEM.
+   * The labels and the steps are separate flex children, so a pad's height and
+   * a label row's height are two unrelated numbers that happen to be written
+   * from one token. `/tom/` asserts this over 64 rows because `/twelve/`
+   * records three alignments that looked like one with two of them lining up
+   * while the third was 30 px out. Six rows is enough here and the claim is the
+   * same: first row against first label, last against last.
+   */
+  /**
+   * 🔴 A ROW THAT CANNOT FIT SCROLLS INSIDE ITSELF, AND THAT TAKES TWO
+   * PROPERTIES ON ONE ELEMENT. `overflow-x` cannot shrink a flex or grid item
+   * below its content, so a scroller without `min-width: 0` beside it drags the
+   * PAGE instead, and `positron-ui` has 141 px of measured page overflow from
+   * exactly that pair being half written.
+   * 🔴 AND BOTH OF THESE WERE HALF WRITTEN UNTIL 2026-09-22, REPORTED FROM A
+   * PHONE. `.pos-padgrid` had the `min-width` and not the overflow, so eight
+   * fixed columns spilled 27 px out of their own box; `.kit-hwitems` had the
+   * same half, and one channel strip at 424 px in a 358 px box dragged the
+   * document **65 px sideways**. Both comments beside those rules claimed a
+   * behaviour the rules did not have, one saying it wrapped and one saying this
+   * project refuses horizontal scroll.
+   * ⚠️ **THIS READS THE COMPUTED VALUE AND NOT THE STYLESHEET**, which is the
+   * only thing that knows which rule won, and it is the fourth dead rule this
+   * repository has found that way.
+   * ⚠️ **AND IT IS NOT A PHONE CHECK.** `demo/verify.mjs` runs at 756 px with
+   * no viewport override, so nothing here has entered a media query. What this
+   * grades is that the two properties are still declared together. The
+   * overflow itself was measured by hand at 390 px across all ten tabs, page
+   * overflow 0, and nothing in this suite can say that.
+   */
+  {
+    const pairs = [
+      ['.pos-padgrid', document.querySelector('.pos-padgrid')],
+      ['.kit-hwitems', document.querySelector('.kit-hwitems')],
+    ].filter(([, n]) => n);
+    const read = pairs.map(([sel, n]) => {
+      const cs = getComputedStyle(n);
+      return { sel, ox: cs.overflowX, mw: cs.minWidth };
+    });
+    d.assert('a row too wide for its box scrolls inside itself, which is two properties and not one',
+      read.length === 2
+      && read.every((r) => r.ox === 'auto' && r.mw === '0px'),
+      read.map((r) => `${r.sel} is overflow-x ${r.ox} at min-width ${r.mw}`).join(', ')
+        || 'neither element is on the page');
+  }
+
+  /**
+   * 🔴 THE PLATE IS READ AS THE BROWSER RENDERS IT, NOT AS THE PAGE TYPED IT.
+   * `createNameplate.shown()` applies the `text-transform` before answering,
+   * and `panel-layout.mjs` records why: `/circuit/` rendered `NOVATION`
+   * correctly while its source typed `novation`, leaning entirely on the
+   * stylesheet, and a check reading `textContent` graded the source and stayed
+   * green whichever half went missing.
+   * ⚠️ AND THE SECOND HALF IS THE SINGLE LINE CASE, which is the one a caller
+   * can get wrong: `ends` is `space-between` and parks a lone child on the
+   * LEFT, so a plate with no maker has to be `end`. `plateSpec` decides it and
+   * this reads the decision off the rendered plate.
+   */
+  /**
+   * 🔴 THE CLAIM IS THE SQUARE, SO THE CHECK MEASURES DIAL CENTRES AND NOTHING
+   * ELSE. Asserting the pitch token would grade what the component WROTE; the
+   * request was about where the working surfaces land, which is one layer out
+   * and is the only thing a reader can see.
+   * ⚠️ **AND IT IS A LATTICE, NOT ONE PAIR.** Across against down on a three
+   * by two, so a grid that happened to be square at cell zero and drifted
+   * cannot pass. The `/twelve/` lesson is exactly this: two of three
+   * alignments lined up while the third was 30 px out.
+   * ⚠️ THE NEGATIVE CONTROL IS THE FADERS. A different control with a
+   * different natural shape, on the same rule, so a component that only
+   * happened to work for knobs goes red.
+   */
+  if (cgSpec) {
+    for (const g of [cgSpec.six, cgSpec.four, cgSpec.faders]) g.size();
+    /* ⚠️ `dy` IS null ON A SINGLE ROW, AND MY FIRST VERSION READ `c[cols].y`
+       UNCONDITIONALLY AND THREW ON THE FADERS, WHICH ARE FOUR IN FOUR COLUMNS.
+       The page died on `__demo.ready` rather than failing an assert, which is
+       the worst shape: the harness names itself and nothing in the per-page
+       count moves to say what changed. A grid with no second row has no down
+       to measure and says so. */
+    const read = (g, cols) => {
+      const c = g.centres();
+      return {
+        dx: +(c[1].x - c[0].x).toFixed(1),
+        dy: c[cols] ? +(c[cols].y - c[0].y).toFixed(1) : null,
+        dx2: c[2] ? +(c[2].x - c[1].x).toFixed(1) : null,
+        pitch: g.pitch(),
+      };
+    };
+    const six = read(cgSpec.six, 3);
+    const four = read(cgSpec.four, 2);
+    d.assert('dial centres land on a square lattice, across equalling down, on both grids',
+      Math.abs(six.dx - six.dy) <= 1 && Math.abs(four.dx - four.dy) <= 1
+      && six.dx > 40 && four.dx > 40,
+      `three by two is ${six.dx} across against ${six.dy} down at a `
+      + `${six.pitch} px pitch, two by two is ${four.dx} against ${four.dy}`);
+
+    /* 🔴 EVERY COLUMN, NOT THE FIRST PAIR. A fixed track count makes this true
+       by construction, which is the point: it is graded so that the day
+       somebody reaches for `1fr` it goes red rather than being square at one
+       width only. */
+    d.assert('the columns are even across the row, so the lattice does not drift',
+      Math.abs(six.dx - six.dx2) <= 0.6,
+      `first gap ${six.dx}, second ${six.dx2}`);
+
+    /* 🔴 THE NEGATIVE CONTROL: a fader is a different shape and the rule is the
+       same. A component that only worked for knobs would pass everything above
+       and fail here. */
+    /* ⚠️ CENTRE TO CENTRE IS THE PITCH PLUS THE GAP, AND THIS ASSERT READ THE
+       PITCH ALONE AND WENT RED AT `166 apart at a 156 px pitch`. The ten it was
+       out by IS the gap, which is exactly what the knob grids show too: 101
+       across at a 91 px pitch. The component was right and the claim was
+       missing a term. */
+    const fad = read(cgSpec.faders, 4);
+    const gap = parseFloat(getComputedStyle(cgSpec.faders.el).columnGap) || 0;
+    d.assert('NEGATIVE CONTROL: a grid of faders keeps the same centre to centre rule',
+      Math.abs(fad.dx - (fad.pitch + gap)) <= 1 && fad.dx > 20 && gap > 0,
+      `faders sit ${fad.dx} apart, which is a ${fad.pitch} px pitch plus a ${gap} px gap`);
+  }
+
+  if (instSpec) {
+    const named = instSpec.named.shown();
+    const bare = instSpec.bare.shown();
+    /* 🔴 THE COMPUTED `justify-content`, AND MY FIRST TRY READ RECTS AND WENT
+       RED ON A PLATE DOING EXACTLY WHAT IT PROMISES. A `.panel-plate-l` is a
+       full width flex child, so its own left and right edges sit at the
+       plate's whatever the placement is, and both offsets came back `0.0 px`.
+       The rect could not see the difference; the property that implements it
+       can. `ends` is `space-between` and `end` is `flex-end`, which is the
+       whole of what those two placements are. */
+    const nj = getComputedStyle(instSpec.named.plate.el).justifyContent;
+    const bj = getComputedStyle(instSpec.bare.plate.el).justifyContent;
+    d.assert('an instrument prints the maker at one end and the model at the other, as rendered',
+      named.join(' / ') === 'POSITRON / PLAI' && named.length === 2
+      && bare.length === 1 && bare[0] === 'MODEL 12'
+      && instSpec.named.plate.place === 'ends' && instSpec.bare.plate.place === 'end'
+      && nj === 'space-between' && bj === 'flex-end',
+      `named reads ${JSON.stringify(named)} at ${instSpec.named.plate.place} (${nj}), `
+      + `bare reads ${JSON.stringify(bare)} at ${instSpec.bare.plate.place} (${bj})`);
+
+    /* 🔴 THE PLATE BELONGS TO THE CASE, ABOVE BOTH HALVES, or it scrolls away
+       from the instrument it names. `/tom/` found that by prepending. */
+    /**
+     * 🔴 THE PLATE SITS OFF THE TOP BY THE CASE'S OWN INSET, AND NOTHING
+     * GRADED THIS UNTIL 2026-09-22. `.panel-case` is `padding: 0
+     * var(--panel-pad)`, horizontal only, so a plate put in from outside sat
+     * on the top border. `/tom/` repaired that in its OWN stylesheet, `/plai/`
+     * had no such rule, and this wrapper shipped the defect to a new page on
+     * the day it was written to prevent it.
+     * ⚠️ **THE CLAIM IS AN EQUALITY, NOT A NUMBER.** The plate is as far from
+     * the top as the controls are from the sides, so nobody can satisfy this
+     * by typing a value they liked, and a change to `--panel-pad` moves both
+     * together or goes red.
+     */
+    {
+      const caseEl = instSpec.named.el;
+      const cs = getComputedStyle(caseEl);
+      const cr = caseEl.getBoundingClientRect();
+      /* 🔴 THE LINE, NOT THE PLATE'S BOX, AND THIS WENT RED FIRST FOR READING
+         THE WRONG EDGE. The inset is `padding-block` on the plate, so the plate
+         BOX starts at the case's content top and its TEXT sits 20 px down. The
+         box's own rect reported `0.0 px` while the picture was correct. What a
+         reader sees is the line. */
+      const pr = instSpec.named.plate.el
+        .querySelector('.panel-plate-l').getBoundingClientRect();
+      const side = parseFloat(cs.paddingLeft);
+      const top = pr.top - cr.top - parseFloat(cs.borderTopWidth);
+      d.assert('the plate sits off the top by the same inset the controls sit off the sides',
+        side > 0 && Math.abs(top - side) <= 1,
+        `${top.toFixed(1)} px above the plate against ${side.toFixed(1)} px at the side`);
+    }
+
+    /* ⚠️ THE STRIP IS NOT A CHILD OF THE CASE, IT IS INSIDE `panel-wrap`, and
+       my first reading of this assumed otherwise and went red saying so. What
+       the claim is really about is ORDER: the plate is first, and everything
+       the panel builds comes after it, so the plate cannot scroll away from
+       the instrument it names. `compareDocumentPosition` answers that whatever
+       the nesting turns out to be. */
+    const kids = [...instSpec.named.el.children];
+    const after = instSpec.named.plate.el
+      .compareDocumentPosition(instSpec.named.strip) & Node.DOCUMENT_POSITION_FOLLOWING;
+    d.assert('the plate is the case\u2019s first child, and the scrolling strip comes after it',
+      kids[0] === instSpec.named.plate.el && !!after
+      && instSpec.named.el.contains(instSpec.named.strip),
+      `the case holds ${kids.map((k) => (k.className || '').toString().split(' ')[0]).join(', ')}, `
+      + `and the strip is ${after ? 'after' : 'NOT after'} the plate`);
+  }
+
+  if (gridSpec) {
+    gridSpec.edit.size();
+    const g = gridSpec.edit;
+    const p0 = g.pads[0][0].getBoundingClientRect();
+    const l0 = g.labels[0].getBoundingClientRect();
+    const pz = g.pads[g.pads.length - 1][0].getBoundingClientRect();
+    const lz = g.labels[g.labels.length - 1].getBoundingClientRect();
+    d.assert('the label column and the steps share one pitch, at the first row and at the last',
+      Math.abs(p0.top - l0.top) <= 0.6 && Math.abs(pz.top - lz.top) <= 0.6
+      && Math.abs(pz.bottom - lz.bottom) <= 0.6,
+      `first ${(p0.top - l0.top).toFixed(2)} px apart, last `
+      + `${(pz.top - lz.top).toFixed(2)} px at the top and `
+      + `${(pz.bottom - lz.bottom).toFixed(2)} at the bottom, over ${g.labels.length} rows`);
+
+    /* 🔴 THE PADS ARE SQUARE AND THEY FILL THE ROOM, which is the measured size
+       doing its job. Neither half can be read off the stylesheet: the token is
+       written from script. */
+    d.assert('a pad is square and the sixteen of them fill the strip they are in',
+      Math.abs(p0.width - p0.height) <= 0.6 && p0.width > 20
+      && Math.abs(p0.width - padWidth(g.el.parentElement.clientWidth, 16)) <= 1,
+      `${p0.width.toFixed(1)} by ${p0.height.toFixed(1)} px, against `
+      + `${padWidth(g.el.parentElement.clientWidth, 16)} from the arithmetic`);
+
+    /* 🔴 THE READ ONLY GRID LEFT THIS BLOCK ON 2026-09-22 AND ITS ASSERT WENT
+       WITH IT, WHICH IS WORTH SAYING RATHER THAN LEAVING AS A GAP IN A COUNT.
+       It read that a read only pad is a `DIV` with no tab stop, a default
+       cursor and full opacity, because `disabled` would say *switched off*
+       about a picture that is perfectly current. **The structural half is
+       graded without a browser** in `demo/shell/step-grid-test.mjs`, which
+       reads the branch off the source. **The computed half is not graded
+       anywhere now**: the cursor, the opacity and the rendered tab stops are
+       claims nothing makes. `/pack/` is the page that uses that shape and is
+       where the check belongs if it is wanted back. */
+    d.assert('the whole editable grid is one tab stop and not one per pad',
+      gridSpec.edit.rowsEl.querySelectorAll('[tabindex="0"]').length === 1
+      && gridSpec.edit.pads.flat().length === 96,
+      `1 of ${gridSpec.edit.pads.flat().length} pads is reachable by tab`);
+
+    /* A lit pad on a row that can make no sound stays grey, because brightness
+       here says WHETHER THIS CAN SOUND and nothing else can tell a reader. */
+    const mute = gridSpec.edit.pads[4][3];
+    const loud = gridSpec.edit.pads[0][0];
+    d.assert('a lit pad on a row with nothing behind it is grey, and one that can sound is amber',
+      mute.dataset.on === '1' && mute.dataset.mute === '1'
+      && loud.dataset.on === '1' && loud.dataset.mute === undefined
+      && getComputedStyle(mute).backgroundColor !== getComputedStyle(loud).backgroundColor,
+      `silent row ${getComputedStyle(mute).backgroundColor} against `
+      + `${getComputedStyle(loud).backgroundColor}`);
+
+    /**
+     * 🔴 NEITHER HEAD REPLACES THE FIELD ANY MORE, AND THAT IS THE SECOND HALF
+     * OF A REPORT MADE TWICE. `/tom/` said *"hilite should not kill my 1st col
+     * beat bg color"* about the PARKED head and it was moved to a filter. The
+     * running head went on replacing `background` until 2026-09-22, when the
+     * same complaint arrived about it: *"its rms cell orginial color ...
+     * preseve original button hue a bit"*.
+     * ✅ SO THE CLAIM IS NOW THAT THE PAD'S OWN COLOUR SURVIVES BOTH STATES,
+     * which is what makes `[data-on]`, `[data-mute]` and `[data-bar]` readable
+     * under a head at all. A running head is an inset wash layered OVER that
+     * colour, so the two states are told apart by the shadow and not by the
+     * background.
+     * ⚠️ AND THE NEGATIVE HALF IS THE ONE THAT MATTERS: a parked head must NOT
+     * carry the wash, or the difference between waiting and running is gone.
+     */
+    const at = gridSpec.edit.step();
+    const cell = gridSpec.edit.pads[0][at];
+    const base = getComputedStyle(gridSpec.edit.pads[0][(at + 4) % 16]).backgroundColor;
+    const parked = getComputedStyle(cell);
+    const parkedBg = parked.backgroundColor, parkedFilter = parked.filter;
+    const parkedShadow = parked.boxShadow;
+    gridSpec.edit.live(true);
+    const playing = getComputedStyle(cell);
+    const playBg = playing.backgroundColor, playFilter = playing.filter;
+    const playShadow = playing.boxShadow;
+    gridSpec.edit.live(false);
+    d.assert('neither head replaces the pad\u2019s own colour, and only the running one carries the wash',
+      parkedBg === base && playBg === base
+      && parkedFilter !== 'none' && playFilter !== 'none'
+      && /inset/.test(playShadow) && !/inset/.test(parkedShadow),
+      `the pad keeps ${playBg} in both states · parked ${parkedFilter} with `
+      + `shadow ${parkedShadow.slice(0, 40)} · playing ${playFilter} with `
+      + `shadow ${playShadow.slice(0, 40)}`);
+
+    /**
+     * 🔴 THE CLOCK BELONGS TO THE PAGE AND SAYS SO, AND A GRID WITH NO TEMPO TO
+     * CLAIM GETS NO CLOCK AT ALL. That is `/pack/`'s case: nothing in a Circuit
+     * session names a rate, so a play button there would be a number presented
+     * as the file's. The read only grid here was given no rate, and the
+     * component answers `null` rather than a control that lies, and
+     * `step-grid-test.mjs` asserts BOTH that absence and the throw on a rate
+     * with no `whose`, so neither claim depends on a grid standing here.
+     * ⚠️ IT IS PLAYED AND STOPPED ON THESE LINES AND PUT BACK, with no `await`
+     * between them, so no frame is rendered in the middle and nobody reading
+     * the page sees it happen.
+     */
+    const clock = gridSpec.edit.clock;
+    clock.play();
+    const ran = { on: clock.playing(), live: gridSpec.edit.rowsEl.hasAttribute('data-live') };
+    clock.stop();
+    d.assert('the clock plays, stops back at the first column, and names whose tempo it is',
+      !!clock && /this page/.test(clock.whose) && clock.bpm() === 120
+      && clock.stepMs() === 125
+      && ran.on === true && ran.live === true
+      && clock.playing() === false && gridSpec.edit.step() === 0,
+      `${clock.bpm()} beats a minute is ${clock.stepMs()} ms a step, owned by `
+      + `"${clock.whose}"`);
+
+    /**
+     * 🔴 THE 320 px SCROLLER LEFT THIS BLOCK ON 2026-09-22 WITH THE OTHER
+     * EXAMPLES, and what it measured is named here rather than left as a hole.
+     * It asserted that at a phone's width the STRIP scrolls and the page does
+     * not, which takes `overflow-x: auto` AND `min-width: 0` on one element,
+     * and this repository has measured 141 px of page overflow from that pair
+     * being half written. **The arithmetic behind it survives** as the
+     * negative control below and in `step-grid-test.mjs`. **The rendered half
+     * does not**, and no check now watches a real strip scroll.
+     *
+     * 🔴 WHAT REPLACES IT IS THE THING THE BLOCK IS NOW ABOUT: the bar and the
+     * grid are ONE surface with a 1 px seam, and the bar is ABOVE. A glue that
+     * quietly stopped gluing would look like ordinary spacing, which is
+     * exactly the failure `/pack/` met from the other direction when four
+     * parts in one glue left a panel with a single child and no rhythm at all.
+     */
+    {
+      const glue = gridSpec.barHost.parentElement;
+      const b = gridSpec.barHost.getBoundingClientRect();
+      const w = gridSpec.wrap.getBoundingClientRect();
+      const seam = w.top - b.bottom;
+      d.assert('the transport is one surface with the grid, seam of 1 px, and it is the half on top',
+        glue.classList.contains('pos-glue')
+        && glue.children[0] === gridSpec.barHost && glue.children[1] === gridSpec.wrap
+        && Math.abs(seam - 1) < 0.6 && b.bottom <= w.top,
+        `${glue.children.length} parts, the bar ends at ${b.bottom.toFixed(0)} and `
+        + `the grid starts at ${w.top.toFixed(0)}, a seam of ${seam.toFixed(1)} px`);
+    }
+
+    /**
+     * 🔴 THE FLOOR IS WHAT MAKES THAT SCROLL RATHER THAN MAKING THE PADS
+     * VANISH, and it is the NEGATIVE CONTROL for the measurement above: without
+     * it a 320 px box over sixteen steps still fits, so the case that proves
+     * the floor is a step count that does not. `/tom/` opened at 64 steps.
+     */
+    d.assert('NEGATIVE CONTROL: a pad never gets smaller than the floor, whatever the room',
+      padWidth(320, 64) === PAD_MIN && padWidth(0, 16) === PAD_MIN
+      && padWidth(320, 16) > PAD_MIN,
+      `32 steps in a phone's strip is the ${PAD_MIN} px floor, 16 steps is `
+      + `${padWidth(320, 16)} px and fits without scrolling`);
+  }
+
+  /**
+   * 🔴 THE BAND BETWEEN TWO HANDLES IS THE ONE THING `range-slider-test.mjs`
+   * CANNOT SEE. That file grades the arithmetic and says so at the top: the
+   * component positions the band with a `calc()` in percentages, because a
+   * percentage follows the lane with no resize observation, and a percentage
+   * cannot be run in node. `spanPixels` is the same arithmetic written in
+   * pixels, so this compares what the browser resolved against what the
+   * arithmetic says, and the two can disagree.
+   */
+  if (rangeSpec) {
+    const lane = rangeSpec.wide.lane.getBoundingClientRect();
+    const [ka, kb] = rangeSpec.wide.knobs.map((k) => k.getBoundingClientRect());
+    const bandEl = rangeSpec.wide.lane.querySelector('.sld-span');
+    const band = bandEl.getBoundingClientRect();
+    const { from, to } = rangeSpec.wide.get();
+    const want = spanPixels(from / 127, to / 127, lane.width, ka.width);
+    const gotLeft = band.left - lane.left;
+    d.assert('the band runs between the two handles’ centres, and the arithmetic agrees',
+      Math.abs(gotLeft - (ka.left + ka.width / 2 - lane.left)) <= 1
+      && Math.abs(band.right - (kb.left + kb.width / 2)) <= 1
+      && Math.abs(gotLeft - want.left) <= 1 && Math.abs(band.width - want.width) <= 1,
+      `band ${gotLeft.toFixed(1)} to ${(gotLeft + band.width).toFixed(1)} in a `
+      + `${lane.width.toFixed(1)} px lane, against ${want.left.toFixed(1)} and `
+      + `${(want.left + want.width).toFixed(1)} from the arithmetic`);
+
+    /**
+     * 🔴 THE WHOLE ARGUMENT FOR THIS BEING A NEW MODULE RATHER THAN A COPY IS
+     * THAT IT SHARES THE SLIDER'S COLUMNS, and a group holding four ranges and
+     * one plain slider is the only way to measure it. `grains` once appended
+     * four sliders to a class with no CSS anywhere and every lane started at a
+     * different x, because a wider label pushes its own lane right.
+     */
+    const lanes = [...rangeSpec.group.el.querySelectorAll('.sld-lane')]
+      .map((l) => +l.getBoundingClientRect().left.toFixed(2));
+    const spread = Math.max(...lanes) - Math.min(...lanes);
+    d.assert('four ranges and one plain slider in one group start every lane at the same x',
+      lanes.length === 5 && spread <= 0.5,
+      `${lanes.length} lanes, ${spread.toFixed(2)} px apart at the left edge`);
+
+    /**
+     * 🔴 TWO VALUES ARE TWO TAB STOPS, AND THE LANE IS NOT ONE OF THEM. On a
+     * single slider the LANE carries `tabindex` and is the slider; a range that
+     * copied that would have one of its two values unreachable from a keyboard
+     * entirely, which is invisible in a screenshot and free to read off the DOM.
+     */
+    const stops = [...rangeSpec.wide.el.querySelectorAll('[tabindex]')];
+    d.assert('a range is two tab stops, one per handle, and the lane is not one',
+      stops.length === 2 && stops.every((s) => s.classList.contains('sld-knob'))
+      && stops.every((s) => s.getAttribute('role') === 'slider')
+      && !rangeSpec.wide.lane.hasAttribute('tabindex')
+      && rangeSpec.wide.lane.getAttribute('role') === 'group',
+      `${stops.length} stops, both handles, the lane is a ${rangeSpec.wide.lane.getAttribute('role')}`);
+
+    /**
+     * 🔴 AND EACH HANDLE IS TOLD THE SCALE IT CAN ACTUALLY REACH. Reporting the
+     * full 0 to 127 on both says the start can go to 127 while the end is at 96,
+     * and the only way to find that out is to press the key and hear nothing
+     * change. This reads the attributes a screen reader reads.
+     */
+    const [aa, ab] = rangeSpec.wide.knobs;
+    d.assert('each handle’s reported scale stops at the other handle',
+      aa.getAttribute('aria-valuemax') === String(to)
+      && ab.getAttribute('aria-valuemin') === String(from)
+      && aa.getAttribute('aria-valuenow') === String(from),
+      `start reaches ${aa.getAttribute('aria-valuemax')} and end starts at `
+      + `${ab.getAttribute('aria-valuemin')}, with the pair at ${from} and ${to}`);
+
+    /* A leg with no travel, which is a real setting and is also the case where
+       a wrong tie rule makes every press grab the same handle. */
+    const shutBand = rangeSpec.shut.lane.querySelector('.sld-span').getBoundingClientRect();
+    const [sa, sb] = rangeSpec.shut.knobs.map((k) => k.getBoundingClientRect());
+    d.assert('a collapsed pair draws no band and stacks its two handles exactly',
+      shutBand.width <= 0.5 && Math.abs(sa.left - sb.left) <= 0.5,
+      `band ${shutBand.width.toFixed(2)} px, handles ${Math.abs(sa.left - sb.left).toFixed(2)} px apart`);
+
+    /* 🔴 A DISABLED CONTROL LEAVES THE TAB ORDER, or it is a control that can be
+       driven from a keyboard while looking greyed out. */
+    d.assert('a disabled range takes both its handles out of the tab order',
+      rangeSpec.off.knobs.every((k) => !k.hasAttribute('tabindex'))
+      && rangeSpec.off.lane.getAttribute('aria-disabled') === 'true',
+      'neither handle is reachable and the lane says it is off');
+
+    /**
+     * 🔴 THE KEYBOARD, DRIVEN RATHER THAN READ. `verify.mjs` cannot drag a lane
+     * and `slider.mjs` says so in its own header, so the arrow keys are the one
+     * route a harness has into a control like this. The gap slider is used
+     * because it is the one where the invariant has something to do: `End` on
+     * its start handle lands 20 below the end rather than at 127.
+     * ⚠️ AND IT PUTS THE VALUES BACK. A check does not get to leave a reader's
+     * page in a state they did not ask for, and this block holds no `await`, so
+     * no frame is rendered in the middle of it.
+     */
+    const was = rangeSpec.gap.get();
+    const key = (node, k) => node.dispatchEvent(
+      new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    key(rangeSpec.gap.knobs[0], 'ArrowRight');
+    const stepped = rangeSpec.gap.get().from;
+    key(rangeSpec.gap.knobs[0], 'End');
+    const ended = rangeSpec.gap.get();
+    rangeSpec.gap.set(was.from, was.to, true);
+    d.assert('an arrow moves one handle by a step and End takes it to its own limit, not the scale’s',
+      stepped === was.from + 1 && ended.from === ended.to - 20 && ended.to === was.to
+      && rangeSpec.gap.get().from === was.from,
+      `${was.from} stepped to ${stepped}, End landed on ${ended.from} against an end at `
+      + `${ended.to} with a gap of 20, and the pair is back at ${was.from} and ${was.to}`);
+  }
+
+  /**
+   * 🔴 THE CHECKBOX IS A REAL ONE, AND THE HALF THAT MATTERS IS THE HALF THAT
+   * IS INVISIBLE. `check.mjs` clips the input to a pixel and draws the box
+   * beside it, and the whole reason that is better than `display: none` is that
+   * the input stays focusable. That claim cannot be seen and is free to read.
+   */
+  if (checkSpec) {
+    const i = checkSpec.one.input;
+    const box = i.nextElementSibling;
+    const r = i.getBoundingClientRect();
+    const cs = getComputedStyle(i);
+    d.assert('the input is a real checkbox, clipped to a pixel and still focusable',
+      i.tagName === 'INPUT' && i.type === 'checkbox'
+      && cs.display !== 'none' && cs.visibility !== 'hidden'
+      && r.width <= 2 && r.height <= 2
+      && box.classList.contains('pos-check-b')
+      && !i.hasAttribute('aria-pressed'),
+      `${r.width.toFixed(0)} by ${r.height.toFixed(0)} px, display ${cs.display}, `
+      + `and the drawn box is its next sibling`);
+
+    /**
+     * 🔴 THE THIRD STATE IS THE ONE A BUTTON WEARING `aria-pressed` CANNOT
+     * DRAW, so it is the one worth grading. It is a property rather than an
+     * attribute, which means nothing in the HTML says it is there and only a
+     * check like this can see it.
+     * ⚠️ AND A PRESS CLEARS IT, because a press has answered the question. The
+     * click is put back on the next line and nothing is awaited in between.
+     */
+    const s = checkSpec.some;
+    const mixedBefore = s.input.indeterminate;
+    s.input.click();
+    const afterClick = { mixed: s.input.indeterminate, on: s.input.checked };
+    s.input.checked = false; s.mixed(true);
+    d.assert('the half lit third state is real, and a press answers the question and clears it',
+      mixedBefore === true && afterClick.mixed === false && afterClick.on === true
+      && s.input.indeterminate === true,
+      `it opened half lit, a press left it ${afterClick.on ? 'on' : 'off'} and no longer `
+      + `half lit, and the check put it back`);
+
+    /**
+     * A set of boxes is a GROUP with its own name attached. Without that, five
+     * boxes beside a word are five loose controls and a stray label.
+     */
+    const set = checkSpec.across.el.querySelector('[role="group"]');
+    const named = document.getElementById(set.getAttribute('aria-labelledby'));
+    d.assert('a set of boxes is announced by its own name rather than by a word beside it',
+      !!set && !!named && named.textContent === 'sends',
+      `role ${set.getAttribute('role')}, named "${named?.textContent}"`);
+
+    /* Across and down, measured rather than read off a class name. */
+    const rowTops = [...checkSpec.across.el.querySelectorAll('.pos-check')]
+      .map((n) => +n.getBoundingClientRect().top.toFixed(1));
+    const colTops = [...checkSpec.down.el.querySelectorAll('.pos-check')]
+      .map((n) => +n.getBoundingClientRect().top.toFixed(1));
+    d.assert('a row of boxes sits on one line and a column puts each on its own',
+      new Set(rowTops).size === 1 && new Set(colTops).size === colTops.length
+      && colTops.length === 4,
+      `${rowTops.length} across on ${new Set(rowTops).size} line, `
+      + `${colTops.length} down on ${new Set(colTops).size} lines`);
+  }
+
+  /**
+   * 🔴 A STANDING CHOICE IS THE LYING ONE WITH THE JOIN AND THE CORNERS TURNED,
+   * AND TURNING ONLY THE DIRECTION IS THE HALF FIX THAT LOOKS FINISHED.
+   * `.pos-seg` overlaps its children on the LEFT and rounds the first child's
+   * left corners, both of which are the wrong axis once the options are
+   * stacked: a doubled border on every join, and two stray curves in the middle
+   * of the column. Neither shows in a count of buttons.
+   */
+  if (standSpec) {
+    const lay = [...standSpec.lying.el.querySelectorAll('button')];
+    const std = [...standSpec.standing.el.querySelectorAll('button')];
+    const layTops = new Set(lay.map((b) => +b.getBoundingClientRect().top.toFixed(1)));
+    const stdTops = new Set(std.map((b) => +b.getBoundingClientRect().top.toFixed(1)));
+    d.assert('the same four options lie on one line and stand on four',
+      lay.length === 4 && std.length === 4 && layTops.size === 1 && stdTops.size === 4,
+      `lying on ${layTops.size} line, standing on ${stdTops.size}`);
+
+    const first = getComputedStyle(std[0]);
+    const second = getComputedStyle(std[1]);
+    const lastOne = getComputedStyle(std[3]);
+    d.assert('the join and the corners turn with it, not just the direction',
+      first.borderTopLeftRadius === '4px' && first.borderBottomLeftRadius === '0px'
+      && lastOne.borderBottomLeftRadius === '4px' && lastOne.borderTopLeftRadius === '0px'
+      && second.marginTop === '-1px' && second.marginLeft === '0px',
+      `first corner ${first.borderTopLeftRadius} over ${first.borderBottomLeftRadius}, `
+      + `last ${lastOne.borderTopLeftRadius} over ${lastOne.borderBottomLeftRadius}, `
+      + `join ${second.marginTop} up and ${second.marginLeft} across`);
+
+    d.assert('a question nobody has answered has nothing pressed',
+      standSpec.empty.get() === -1
+      && [...standSpec.empty.el.querySelectorAll('button')]
+        .every((b) => b.getAttribute('aria-pressed') === 'false'),
+      `at ${standSpec.empty.get()}, and no option is armed`);
+  }
+
+  /**
+   * 🔴 THE THREE DRAWN FIGURES ARE GRADED ON WHETHER INK REACHED THE CANVAS,
+   * WHICH IS THE ONE THING `synth-view-test.mjs` SAYS IT CANNOT SEE. Every
+   * claim below needs a document: a picture whose arithmetic is perfect and
+   * whose `clientWidth` is zero draws nothing at all and looks like a component
+   * that was never wired up.
+   * ⚠️ `redraw()` FIRST, AND IT IS NOT A WORKAROUND. A resize observation
+   * arrives a frame after a panel is laid out, and this window holds no
+   * `await`, so a figure last painted while its tab was shut is still at zero
+   * width on this line. A reader never meets it, because opening a tab gives
+   * the observer its frame.
+   */
+  if (envSpec) {
+    const all = [envSpec.one, envSpec.two, envSpec.three, envSpec.flat];
+    for (const v of all) v.redraw();
+    const inks = all.map((v) => v.ink());
+    const areas = all.map((v) => v.area());
+    const shares = inks.map((n, i) => n / Math.max(1, areas[i]));
+    /**
+     * 🔴 THE DENOMINATOR IS HERE BECAUSE THIS ASSERT WAS BLIND FOR ONE RUN AND
+     * WAS GREEN THE WHOLE TIME. It read `inks.every(n => n > 200)` and reported
+     * **10032, 10032, 10032**, three different envelope shapes agreeing to the
+     * digit, because `ink()` was comparing each pixel against `--card` parsed
+     * with `/\d+/g` and `#11151d` answers the single number 11151. Every
+     * painted pixel counted, so the statistic was the AREA OF THE BOX. Three
+     * subjects agreeing exactly is a broken collector and never a finding, and
+     * it is the only reason this was caught.
+     * ⚠️ SO THE CLAIM IS NOW A SHARE RATHER THAN A COUNT. A drawn envelope is a
+     * line and a few words, which is a small part of its box; a filled field is
+     * all of it. The two are now different numbers, which they were not.
+     */
+    d.assert('all four envelopes draw a line on their field rather than filling it',
+      inks.every((n) => n > 200) && shares.every((s) => s > 0.005 && s < 0.2)
+      && new Set(inks).size > 1,
+      shares.map((s, i) => `${inks[i]} of ${areas[i]} is ${(s * 100).toFixed(1)}%`).join(', '));
+
+    /* 🔴 THE FIGURE FOLLOWS THE SETTING, MEASURED BY MOVING ONE AND PUTTING IT
+       BACK. A picture that ignored its inputs would look completely ordinary
+       and would pass every check above. Synchronous, so no frame is rendered
+       in the middle of it. */
+    const before = envSpec.one.path().stages.attack;
+    const paintsBefore = envSpec.one.paints;
+    envSpec.one.set({ attack: 120 });
+    const after = envSpec.one.path().stages.attack;
+    envSpec.one.set({ attack: 2 });
+    d.assert('a longer attack widens the attack stage and the figure repaints for it',
+      after > before && envSpec.one.paints > paintsBefore
+      && Math.abs(envSpec.one.path().stages.attack - before) < 1e-9,
+      `${before.toFixed(3)} of the width to ${after.toFixed(3)} and back, `
+      + `${envSpec.one.paints - paintsBefore} repaints`);
+
+    /* Every length at zero is a real setting and is also the divide by zero
+       this component had to be written around. */
+    const flat = envSpec.flat.path();
+    d.assert('an envelope with no lengths at all still fills its box rather than a quarter of it',
+      flat.silent === true && Math.abs(flat.end - 1) < 1e-9 && envSpec.flat.ink() > 200,
+      `ends at ${flat.end}, hold takes ${flat.stages.hold} of the width`);
+
+    /* A canvas says nothing to a screen reader on its own, so the label is the
+       only channel there is and it has to carry the numbers. */
+    const lab = envSpec.one.canvas.getAttribute('aria-label');
+    d.assert('the picture is an image with a label carrying the four numbers',
+      envSpec.one.canvas.getAttribute('role') === 'img'
+      && /attack 2/.test(lab) && /sustain 127/.test(lab),
+      `"${lab}"`);
+  }
+
+  /**
+   * 🔴 THE FILTER IS THE ONE WITH THE HONESTY PROBLEM, so it gets the checks
+   * about refusing. A drawn response curve is acceptable here only because it
+   * says on its own face that it is a schematic and because a type name it
+   * cannot read is refused rather than drawn as the default low pass.
+   */
+  if (filtSpec) {
+    for (const v of [filtSpec.live, filtSpec.deep, filtSpec.refused]) v.redraw();
+    /* ⚠️ THE REFUSAL HAS TO CARRY LESS INK THAN A DRAWN CURVE, which is the
+       half that says the two states are really different pictures rather than
+       one picture and a count that cannot see. Two lines of words are fewer
+       marked pixels than a curve across the whole box with a grid under it. */
+    const refInk = filtSpec.refused.ink(), drawnInk = filtSpec.live.ink();
+    d.assert('a type name the component cannot read draws no curve and still says something',
+      filtSpec.refused.curve() === null && filtSpec.refused.shape() === null
+      && refInk > 40 && refInk < drawnInk
+      && filtSpec.live.curve() !== null && filtSpec.deep.curve() !== null,
+      `"comb 9dB" was refused with ${refInk} pixels of words on it against `
+      + `${drawnInk} for a drawn curve of the same size`);
+
+    /* 🔴 THE NEGATIVE CONTROL A DRAWER THAT IGNORED ITS TYPE WOULD FAIL. Any
+       curve that slopes satisfies "a low pass goes down"; only a curve that
+       really reads the name has a low pass and a high pass disagreeing at BOTH
+       ends. Driven through the live component and put back. */
+    const wasType = filtSpec.live.get().type;
+    filtSpec.live.set({ type: 'low pass 12dB' });
+    const lp = filtSpec.live.curve().y;
+    filtSpec.live.set({ type: 'high pass 12dB' });
+    const hp = filtSpec.live.curve().y;
+    filtSpec.live.set({ type: wasType });
+    const at = (y, u) => y[Math.round(u * (y.length - 1))];
+    d.assert('a low pass and a high pass disagree at both ends, so the type is really read',
+      at(lp, 0.05) > at(hp, 0.05) && at(hp, 0.95) > at(lp, 0.95)
+      && filtSpec.live.get().type === wasType,
+      `at the bottom ${at(lp, 0.05).toFixed(3)} against ${at(hp, 0.05).toFixed(3)}, `
+      + `at the top ${at(lp, 0.95).toFixed(3)} against ${at(hp, 0.95).toFixed(3)}, `
+      + `and it is back on ${wasType}`);
+
+    /* Nothing on this picture is a measurement, and the label says so where a
+       screen reader can hear it as well as where an eye can see it. */
+    const lab = filtSpec.live.canvas.getAttribute('aria-label');
+    d.assert('the label says the picture is a schematic and gives no frequency in hertz',
+      /schematic/.test(lab) && !/Hz/.test(lab) && /of 127/.test(lab),
+      `"${lab}"`);
+  }
+
+  /**
+   * 🔴 THE WAVEFORM'S WHOLE POINT IS WHAT IT REFUSES, so the counts are graded
+   * against the real table through the real component rather than typed here.
+   */
+  if (waveSpec) {
+    for (const v of [...waveSpec.drawnViews, waveSpec.pulse, waveSpec.blend]) v.redraw();
+    const drew = waveSpec.drawnViews.filter((v) => v.drawn());
+    d.assert('4 of the Circuit’s 30 oscillator waves are drawn and 26 are not',
+      waveSpec.drawnNames.length === 4 && drew.length === 4
+      && OSC_WAVES.length === 30
+      && OSC_WAVES.filter((n) => shapeFor(n)).length === 4,
+      `${waveSpec.drawnNames.join(', ')}, and ${OSC_WAVES.length - 4} refused`);
+
+    /* 🔴 A REFUSAL IS A PICTURE WITH WORDS ON IT, NOT AN EMPTY BOX. An empty
+       box reads as a component that failed; the name and the reason read as the
+       instrument not publishing a shape, which is what is true. */
+    /* 🔴 ONE REFUSAL LEFT ON THE PAGE. The wavetable figure was removed on
+       2026-09-22 and this read both. What it can no longer say is that a
+       wavetable and a blend are refused for DIFFERENT stated reasons, which
+       was the pair's whole job. */
+    d.assert('a refused wave draws no curve and still names itself and its reason',
+      !waveSpec.blend.drawn() && waveSpec.blend.ink() > 40
+      && /not drawn/.test(waveSpec.blend.canvas.getAttribute('aria-label')),
+      `"${waveSpec.blend.canvas.getAttribute('aria-label')}"`);
+
+    /* A pulse is a family rather than a shape, so it is the one a name can
+       never produce and a caller has to hand over. */
+    d.assert('a pulse is drawn only when a width is handed over, never from a name',
+      waveSpec.pulse.drawn() === true && shapeFor('pulse width') === null,
+      `the figure drew a pulse at a duty of ${waveSpec.pulse.get().duty}, `
+      + `and the name "pulse width" still maps to nothing`);
+
+    /* 🔴 THE WALK ASSERT WENT WITH THE WALK ON 2026-09-22. It turned the same
+       component's picture OFF at wave 14 and ON again at wave 0, which is the
+       one behaviour a static specimen cannot show, and nothing on this page
+       claims it now. `synth-view-test.mjs` still asserts `shapeFor` across all
+       thirty names without a browser, so the COUNTS are graded and the
+       transition is not. */
+  }
+
+  /**
    * 🔴 A FADER IS THE SLIDER TURNED 90 DEGREES, AND THAT IS A MEASUREMENT.
    * Both read their look from `.sld-lane` and `.sld-knob` with the axes
    * swapped, so the two can only drift if nobody compares them. **Putting them
@@ -3618,8 +5040,12 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
      */
     const bars = [...document.querySelectorAll('.tbar')];
     const published = d.api.transport || window.__demo?.transport;
-    d.assert('of the four bars here exactly one claims the page\u2019s playhead, and it is the whole row',
-      bars.length === 4 && !!published && published === tbarSpec.whole.api
+    /* FIVE since 2026-09-22: the STEP GRID block gained a standard transport
+       when its hand-rolled `Play` button was reported. It passes
+       `publish: false` like the other specimens, so the claim below is
+       unchanged and only the count moved. */
+    d.assert('of the five bars here exactly one claims the page\u2019s playhead, and it is the whole row',
+      bars.length === 5 && !!published && published === tbarSpec.whole.api
       && published.el === tbarSpec.whole.api.el
       && bars.filter((b) => b === published.el).length === 1,
       `${bars.length} bars on the page · the handle holds ${published ? 'one of them' : 'NOTHING'}`
@@ -4718,10 +6144,23 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       const gapR = hb.right - bb.right, gapB = hb.bottom - bb.bottom;
       d.assert('the way out is inside the thing that went full, square, and off its bottom right corner',
         host.contains(exit.el) && Math.abs(bb.width - bb.height) <= 0.6
-        && cs.opacity === '1' && cs.pointerEvents === 'auto'
+        /* 🔴 A THRESHOLD, BECAUSE `=== '1'` IS AN EXACT EQUALITY ON AN
+           ANIMATING PROPERTY AND THAT IS A RACE THE CHECK WILL EVENTUALLY
+           LOSE. MEASURED 2026-09-22, when a busier page put a 140 ms fade at
+           **0.998744** after a 200 ms nap. The claim is that the way out is
+           VISIBLE, and 0.998744 is visible; nothing here ever wanted the
+           difference between that and 1. The faded state it has to be told
+           apart from is 0, which no threshold near 1 can reach. */
+        && parseFloat(cs.opacity) > 0.9 && cs.pointerEvents === 'auto'
         && gapR >= 10 && gapR < hb.width / 2 && gapB >= 10 && gapB < hb.height / 2,
+        /* 🔴 THE DETAIL COULD NOT NAME ITS OWN FAILING CLAUSE AND THE WORDS
+           `inside the cover` WERE PRINTED WHETHER OR NOT IT WAS. Measured
+           2026-09-22: this went red reporting a square button at the right
+           inset, which is every clause it prints, so the fault was in one of
+           the two it did not. Six clauses, six facts. */
         `${bb.width.toFixed(1)} by ${bb.height.toFixed(1)} px, ${gapR.toFixed(1)} px off the right edge `
-        + `and ${gapB.toFixed(1)} off the bottom, inside the cover`);
+        + `and ${gapB.toFixed(1)} off the bottom, contained ${host.contains(exit.el)}, `
+        + `opacity ${cs.opacity}, pointer-events ${cs.pointerEvents}`);
 
       exit.el.click();
       await nap(160);
@@ -5070,7 +6509,7 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
    * one reads a real rect or a computed value, and every one has a way of going
    * red that was tried on purpose.
    */
-  if (panelWith && panelWithout && panelPhone) {
+  if (panelWith && panelWithout) {
     /* 1. The two children are ONE DEPTH, and the column is the taller one's
        content. That is contract 3, and it is the claim `/twelve/` was reported
        for with a screenshot: `align-items: flex-end` would make them END
@@ -5138,25 +6577,13 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       + `the page overflows by `
       + `${document.documentElement.scrollWidth - document.documentElement.clientWidth} px`);
 
-    /* 5. 🔴 THE CARD'S EDGES AT A PHONE'S WIDTH, WHICH IS THE ONE THING NO
-       PANEL PAGE'S OWN ASSERT CAN REACH. `demo/verify.mjs` runs at 756 px, so
-       `/circuit/`'s *the panel box starts and ends where the rest of the page
-       does* is green while being false at 390 px by 286.0 px. In a 320 px
-       holder a card whose scroller is INSIDE it sits at its holder's own
-       insets, and the holder is what overflows. Both edges, because a card can
-       be right on the left and 286 px out on the right. */
-    const hb = panelPhone.holder.getBoundingClientRect();
-    const hs = getComputedStyle(panelPhone.holder);
-    const cb = panelPhone.panel.el.getBoundingClientRect();
-    const lOff = +(cb.left - (hb.left + parseFloat(hs.paddingLeft) + parseFloat(hs.borderLeftWidth))).toFixed(2);
-    const rOff = +((hb.right - parseFloat(hs.paddingRight) - parseFloat(hs.borderRightWidth)) - cb.right).toFixed(2);
-    d.assert('in a 320 px holder the card sits at the holder’s own edges, both of them',
-      hb.width <= 320 && Math.abs(lOff) <= 1 && Math.abs(rOff) <= 1
-      && document.documentElement.scrollWidth <= document.documentElement.clientWidth,
-      `holder ${hb.width.toFixed(0)} px · card ${cb.width.toFixed(1)} px, `
-      + `${lOff} px inside the left edge and ${rOff} px inside the right · `
-      + `the page overflows by `
-      + `${document.documentElement.scrollWidth - document.documentElement.clientWidth} px`);
+    /* 🔴 A FIFTH CHECK STOOD HERE AND IT WAS THE ONLY ONE IN THIS REPOSITORY
+       THAT ENTERED A MEDIA QUERY. It read a card's left AND right edges inside
+       a 320 px holder, both of them, because a card can be right on the left
+       and 286 px out on the right. Its specimen was asked off on 2026-09-22
+       and the assert went with it. **Nothing replaces it.** `verify.mjs` runs
+       at 756 px, so every remaining panel assert passes without ever meeting a
+       phone. See the note where the specimen was built. */
   }
 
   // ── the parts, and whether a reader can still find what is new ──────────
