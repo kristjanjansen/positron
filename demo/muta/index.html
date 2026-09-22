@@ -121,7 +121,6 @@
   // something still ringing.
   import { mount, guard, el } from '/shell/shell.mjs';
   import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
-  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createInstrument } from '/shell/instrument.mjs';
@@ -260,16 +259,27 @@
   // Built before boot, because a page whose controls appear only after a press
   // is a page that looks broken until you press the one button it shows.
   //
-  // ⚠️ THE VOICE COUNT IS NOT A PANEL CONTROL AND SITS APART FROM THE ONES
-  // THAT ARE. Plaits has six knobs and one voice; this row is the host's
-  // arrangement of copies and says so in its second label.
-  const voicesSlider = createSlider({
-    label: 'voices', sub: 'host, not panel',
-    min: 1, max: SLIDER_MAX_VOICES, step: 1, value: SLIDER_MAX_VOICES,
-    onInput: (v) => setVoices(v),
-  });
-  const voicesRow = createSliderGroup([voicesSlider]);
-  voicesRow.el.classList.add('plai-voices');
+  /**
+   * 🔴 THE VOICE COUNT IS A STEPPED KNOB IN THE BOTTOM RIGHT SINCE 2026-09-22,
+   * ASKED FOR AS *"move voices to knobs, bottom right, stepped knob"*. It was a
+   * slider outside the case.
+   * 🔴 **AND THE COMMENT THAT PUT IT OUTSIDE WAS ALREADY OUTVOTED ON THIS PAGE,
+   * WHICH IS WHY THIS IS NOT A REVERSAL OF A LIVE ARGUMENT.** It read that the
+   * voice count is not a panel control, that Plaits has one voice, and that
+   * putting it on the case would have the case claiming a knob the instrument
+   * does not have. Every word of that is true. **`decay` and `lpg_colour` are
+   * not panel knobs either**: `plaits/ui.cc:70-84` binds them as the ALTERNATE
+   * functions of MORPH and TIMBRE, reached by holding a button, and this page
+   * gives both of them a knob of their own in the same case. The principle had
+   * already been traded for usability twice before this ask arrived.
+   * ⚠️ **WHAT KEEPS IT HONEST IS THE SECOND LABEL, NOT THE POSITION.** Row two
+   * is where the controls the hardware does not give you a knob for live, and
+   * every one of them says so underneath itself.
+   * ⚠️ **AND IT TAKES NO INVISIBLE HAND.** `hand-drive.mjs` refuses a control
+   * under about thirty steps, because the wander at each end would be less than
+   * one step and it would draw a staircase. Eight voices is eight, so this is
+   * the one knob here that asks for none rather than wearing a refused button.
+   */
 
   const pick = createPicker({
     label: 'model',
@@ -340,7 +350,14 @@
     // ON EVERY MOVE. There is no wire here and no relay to overrun: the
     // message crosses one thread boundary and is audible in the next render
     // quantum, which is 2.67 ms away.
-    const k = createKnob({ hand: true, ...o, onInput: (v) => send({ t: 'param', id, value: v }) });
+    /**
+     * ⚠️ `o.onInput` WINS WHERE A CALLER GIVES ONE, AND THIS LINE USED TO PUT
+     * THE HELPER'S AFTER THE SPREAD, so a caller's callback was silently
+     * replaced. Every knob but one is a firmware parameter and wants the
+     * default; the voice count is the host's own and has to be able to say so.
+     */
+    const k = createKnob({ hand: true, ...o,
+      onInput: o.onInput || ((v) => send({ t: 'param', id, value: v })) });
     knobs.set(key, k);
     return k;
   };
@@ -386,6 +403,19 @@
       { label: 'decay', sub: 'held button', min: 0, max: 1, value: 0.5, home: 0.5 }),
     knob('colour', P.lpgColour,
       { label: 'colour', sub: 'held button', min: 0, max: 1, value: 0.5, home: 0.5 }),
+    /**
+     * ⚠️ `step: 1` IS THE COMPONENT'S, NOT A ROUNDING THIS PAGE DOES ON THE WAY
+     * OUT. A page that rounds its own value leaves the DIAL somewhere the
+     * number is not, and a voice count that reads 5 while the needle sits
+     * between 5 and 6 is a control arguing with its own readout.
+     * ⚠️ AND IT IS `onChange` AS WELL AS `onInput`: eight is the ceiling the
+     * wasm reports, and the value that has to land is the one the drag ended
+     * on.
+     */
+    knob('voices', null,
+      { label: 'voices', sub: 'host, not panel', min: 1, max: SLIDER_MAX_VOICES,
+        step: 1, value: SLIDER_MAX_VOICES, home: SLIDER_MAX_VOICES, hand: false,
+        onInput: (v) => setVoices(v) }),
   ]);
   // The first knob after the instrument's own pair, on each row, carries the
   // gap. One class, one declaration, and the two rows line up because every
@@ -422,11 +452,36 @@
      rather than `ends`, because `ends` is `space-between` and parks a lone
      child on the left, which `/twelve/` was reported for. The page does not
      choose that placement and cannot get it wrong. */
+  /**
+   * 🔴 A HEADER ON EACH CASE SINCE 2026-09-22, ASKED FOR AS *"create instrumet
+   * header/glue ... left: online status button: enabled disabled (green/gray).
+   * right nameplate. center patch selector (optically center to the
+   * instrument)"* and then *"apply to muta's"*. This page is the component's
+   * first caller with TWO cases on one page, which is the arrangement that
+   * finds whatever one hides.
+   * 🔴 **THE STATUS REPORTS AND DOES NOT PRETEND TO ACT, WHICH IS A CHOICE THE
+   * COMPONENT MAKES POSSIBLE AND THIS PAGE HAS TO MAKE.** `createInstrument`
+   * gives a caller that supplies `press` a real button and a caller that
+   * supplies none a badge with no tab stop and no handler. **Nothing here can
+   * be switched off.** Both firmwares are compiled into the page and start
+   * with the audio; a button offering to disconnect one would be a control
+   * whose only honest behaviour is to do nothing, which `positron-ui` calls the
+   * shape this project calls a lie.
+   * ✅ **WHAT IT REPORTS IS REAL AND ARRIVES LATE**, which is why it is worth
+   * a light at all: each case opens `disabled` and turns `enabled` when ITS OWN
+   * wasm has compiled and its processor has answered. The two do not arrive
+   * together, so on a slow load the page shows one instrument up and one not.
+   * ⚠️ **AND THE PICKER MOVES OUT OF THE BODY INTO THE HEADER**, which is what
+   * the centre cell is for. It was the one candidate for a fixed column and was
+   * refused there for width; the header solves the same problem by giving it a
+   * row of its own on a phone.
+   */
   const inst = createInstrument({
     name: 'PLAI', maker: '',
+    header: { online: { of: 'PLAI', state: 'offline' }, patch: pickRow },
     panel: { side: null, cls: { panel: 'muta-panel plai-panel' } },
   });
-  inst.add(pickRow, knobGrid);
+  inst.add(knobGrid);
 
   // ── the second case, which is an effect and not an oscillator ────────────
   //
@@ -484,11 +539,12 @@
 
   const warpInst = createInstrument({
     name: 'WARP', maker: '',
+    header: { online: { of: 'WARP', state: 'offline' }, patch: wpickRow },
     panel: { side: null, cls: { panel: 'muta-panel warp-panel' } },
   });
-  warpInst.add(wpickRow, warpRow.el);
+  warpInst.add(warpRow.el);
 
-  d.stack.add(voicesRow.el, inst.el, warpInst.el);
+  d.stack.add(inst.el, warpInst.el);
 
   function send(m) { if (node) node.port.postMessage(m); }
   function sendWarp(m) { if (warpNode) warpNode.port.postMessage(m); }
@@ -627,8 +683,14 @@
     warpNode.port.postMessage({ t: 'wasm', bytes: warpBytesBuf, rate: ctx.sampleRate });
     warpReady = await waitWarp;
     warpImports = warpReady.imports;
+    /* ⚠️ EACH LIGHT COMES ON WHEN ITS OWN PROCESSOR HAS ANSWERED, not when the
+       pair has. They are two compiles and two handshakes, so a page that lit
+       both together would be reporting one fact about two instruments and would
+       be wrong for whichever of them was slower. */
+    warpInst.online?.set('online');
     ready = await waitReady;
     wasmImports = ready.imports;
+    inst.online?.set('online');
     trim = ready.trim;
     // ⚠️ A FAILED BOOT STILL REPORTS. Letting this throw would take the whole
     // check block with it, and a page that stops before it grades itself is a
@@ -689,7 +751,7 @@
         + 'agreeing about pitch. Oversampling the effect alone is the real answer and '
         + 'is not built');
 
-    setVoices(voicesSlider.get());
+    setVoices(knobs.get('voices').value());
     setCarrier(0);
 
     bench = makeBench(bytes);
@@ -1244,12 +1306,28 @@
             : 'the chord was never measured');
 
     // ⚠️ A NUMBER TYPED ON THIS PAGE, GRADED AGAINST THE WASM THAT OWNS IT.
-    // The slider has to exist before anything is fetched, so its top end is a
+    // The control has to exist before anything is fetched, so its top end is a
     // constant here and `kMaxVoices` is a constant in the shim. This is the
     // one line that can notice them disagreeing.
-    d.assert('the voice control reaches exactly as far as the wasm does',
-      !!ready && ready.maxVoices === SLIDER_MAX_VOICES,
-      ready ? `slider to ${SLIDER_MAX_VOICES}, wasm reports ${ready.maxVoices}` : 'never started');
+    /* 🔴 AND SINCE 2026-09-22 IT ALSO GRADES THE CONTROL, which the slider
+       version did not: a knob that steps can land between two voices and read a
+       number the DSP was never given. `step` is the component's, so what this
+       reads is the rendered value after a move rather than the option. */
+    const vKnob = knobs.get('voices');
+    const stepped = (() => {
+      if (!vKnob) return null;
+      const was = vKnob.value();
+      vKnob.set(4.4, { from: 'hand' });
+      const got = vKnob.value();
+      vKnob.set(was, { from: 'hand' });
+      return got;
+    })();
+    d.assert('the voice control reaches exactly as far as the wasm does, and lands on whole voices',
+      !!ready && ready.maxVoices === SLIDER_MAX_VOICES && stepped === 4,
+      ready
+        ? `the knob reaches ${SLIDER_MAX_VOICES}, the wasm reports ${ready.maxVoices}, `
+          + `and 4.4 landed on ${stepped}`
+        : 'never started');
 
     // THE STAMP IS THE WHOLE POINT OF THE EXERCISE AND IT IS NOT YET A PROOF.
     // It names both upstream commits and a digest over the exact source set,
@@ -1445,8 +1523,14 @@
     // it starts where the case's border does and the controls inside start one
     // `--panel-pad` further in. Two different edges, and the assert below
     // grades the outer one.
+    /* 🔴 THIS CLAIMED THE MODEL PICKER STARTS ON THE ROTARIES' LINE UNTIL
+       2026-09-22, AND THE PICKER MOVED INTO THE HEADER THAT DAY, where being
+       centred on the case is the whole point of the cell it now sits in. The
+       old claim is not re-baselined, it is REPLACED by the two claims that
+       survive the move: the rotary rows still agree with each other, and the
+       picker is centred on the CASE rather than on the space left over between
+       a status light and a nameplate. */
     const rows = [
-      ['model', document.querySelector('.pos-pick-l')],
       ['row 1', document.querySelectorAll('.plai-knobs .pos-knob-row')[0]],
       ['row 2', document.querySelectorAll('.plai-knobs .pos-knob-row')[1]],
     ].map(([name, node2]) => [name, node2 ? node2.getBoundingClientRect().x : NaN]);
@@ -1454,11 +1538,33 @@
     const spread = found
       ? Math.max(...rows.map(([, x]) => x)) - Math.min(...rows.map(([, x]) => x))
       : NaN;
-    d.assert('the model picker and both rows of rotaries start on the same line',
+    d.assert('both rows of rotaries start on the same line',
       found && spread < 1,
       found ? `${rows.map(([n, x]) => `${n} ${x.toFixed(1)} px`).join(', ')}, at `
             + `${Math.round(innerWidth)} px wide`
-            : 'one of the three is not on the page');
+            : 'one of the two is not on the page');
+
+    /**
+     * 🔴 THE PICKER IS CENTRED ON THE CASE, WHICH IS THE ASK AND IS THE ONE
+     * THING A PLAIN ROW CANNOT DO: *"center patch selector (optically center to
+     * the instrument)"*. A flex row with a status light on the left and a
+     * nameplate on the right puts its middle child wherever the difference
+     * between those two leaves it, which is a different place on every panel.
+     * ⚠️ **BOTH CASES ARE MEASURED, BECAUSE THE TWO HAVE DIFFERENT NEIGHBOURS**:
+     * `PLAI` and `WARP` are different lengths, so a header that balanced rather
+     * than centred would be wrong by a different amount on each and could pass
+     * on one of them by luck.
+     */
+    const centres = [['PLAI', inst], ['WARP', warpInst]].map(([nm, ins]) => {
+      const cell = ins.patchSlot;
+      const kase = ins.el.querySelector('.panel-case') || ins.el;
+      if (!cell) return [nm, NaN];
+      const c = cell.getBoundingClientRect(), k = kase.getBoundingClientRect();
+      return [nm, (c.left + c.width / 2) - (k.left + k.width / 2)];
+    });
+    d.assert('the patch selector is centred on its own case, not balanced between its neighbours',
+      centres.every(([, off]) => Number.isFinite(off) && Math.abs(off) <= 1),
+      centres.map(([nm, off]) => `${nm} ${Number.isFinite(off) ? `${off.toFixed(1)} px off centre` : 'no patch cell'}`).join(', '));
 
     // 🔴 THE CASE STARTS AND ENDS WHERE THE REST OF THE PAGE DOES, WHICH IS
     // `/circuit/`'s OWN CLAIM AND THE ONE IT FAILS. `shell.css` contract 8
@@ -1498,18 +1604,25 @@
     // numbers, and only a rect knows which.
     // ⚠️ A BORDER IS A PIXEL AND IT COUNTS. These are measured from the panel's
     // BORDER box, so 20 px of padding reads as 21.
+    /* 🔴 AND THE PLATE LEFT THE TOP INSET ON 2026-09-22 WHEN THE CASE GAINED A
+       HEADER, so the third term is the HEADER's height now rather than the
+       plate's. The claim is unchanged and is the one worth grading: the
+       rotaries are inset by the same amount left and below, and everything
+       above them is that inset plus the row the case wears. Reading the header
+       rather than typing its height is what keeps this true the day it gains a
+       second line on a phone. */
     const bFlow = document.querySelector('.panel-flow')?.getBoundingClientRect();
-    const bPlate = document.querySelector('.panel-plate')?.getBoundingClientRect();
-    const air = bPanel && bFlow && bPlate
+    const bHead = inst.head?.getBoundingClientRect();
+    const air = bPanel && bFlow && bHead
       ? { top: bFlow.top - bPanel.top, left: bFlow.left - bPanel.left,
-          bottom: bPanel.bottom - bFlow.bottom, plate: bPlate.height }
+          bottom: bPanel.bottom - bFlow.bottom, head: bHead.height }
       : null;
-    d.assert('the case insets the rotaries equally, with the plate in the top one',
+    d.assert('the case insets the rotaries equally, with the header in the top one',
       !!air && air.left > 16 && Math.abs(air.left - air.bottom) < 1
-        && Math.abs(air.top - air.bottom - air.plate) < 1,
+        && Math.abs(air.top - air.bottom - air.head) < 1,
       air ? `${air.left.toFixed(1)} px left, ${air.bottom.toFixed(1)} px below, and `
-          + `${air.top.toFixed(1)} px above, which is that plus an ${air.plate.toFixed(1)} px plate`
-          : 'the case, its flow or its plate is not on the page');
+          + `${air.top.toFixed(1)} px above, which is that plus a ${air.head.toFixed(1)} px header`
+          : 'the case, its flow or its header is not on the page');
 
     // 🔴 THE MARKS ARE ON EXACTLY THE THREE ATTENUVERTERS AND NOWHERE ELSE,
     // WHICH IS BOTH HALVES OF ONE CLAIM. `ends` costs no height, so a knob that
