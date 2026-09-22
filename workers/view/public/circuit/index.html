@@ -166,6 +166,17 @@
   }
   /* the macro row and the pad area centre in the same track */
   .circ-macros, .circ-mid { justify-self: center; }
+  /* 🔴 THE TWO OUTER KNOBS CENTRE IN THEIR TRACK RATHER THAN FILLING IT, AND
+     THAT IS WHAT KEEPS THEM OVER THEIR COLUMNS. The outer tracks are
+     `var(--ctl-w)`, which is the PAD's width and the width the round buttons
+     below centre in. A knob has been `--ctl-w * 1.1` since 2026-09-22, so a
+     knob left to start at the track's edge overflowed 4.6 px to the right and
+     landed 2.3 px off the column, which this page's own assert caught.
+     ⚠️ THE TRACK IS NOT WIDENED TO FIT IT. Widening it would move the pads and
+     both side columns to make room for a thing that is printed OVER them, and
+     on the real panel the knob is simply a bigger object on the same centre
+     line. Overflowing 2.3 px each way into a 22 px gap costs nothing. */
+  .circ-panel > .pos-knob { justify-self: center; }
   /* 🔴 EVERY CELL IS PLACED, BECAUSE TWO NEW CHILDREN JOINED THE AUTO FLOW AND
      SHIFTED ALL SIX. Adding the brand names moved the knob row into row 2 and
      the columns into rows 3 and 4, which took three alignment asserts red at
