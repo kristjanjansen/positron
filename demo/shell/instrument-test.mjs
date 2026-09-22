@@ -95,11 +95,25 @@ const is = (what, cond, detail) => {
      or it scrolls away from the instrument it names. `/tom/` found that with a
      plate, and a header is the same claim one element out.
      🔴 THIS ASSERT USED TO READ `panel.el.prepend(plate.el)` AGAINST THE RAW
-     SOURCE AND THAT LINE HAD NOT EXISTED FOR A DAY. See the note on `code`. */
-  is('the header goes in by prepend, so nothing above the instrument can scroll away',
-    /panel\.el\.prepend\(head\.head\)/.test(code)
+     SOURCE AND THAT LINE HAD NOT EXISTED FOR A DAY. See the note on `code`.
+     🔴 **AND IT WENT RED AGAIN ON 2026-09-22 FOR THE SAME REASON IN A NEW
+     PLACE**: the header is a GLUED part now rather than a child prepended to
+     the case, reported as *"underline does not extend to sides, to much
+     padding"*, both of which are what a border drawn inside the case's padding
+     does. What the claim was protecting is unchanged and is what this now
+     reads: the header is ABOVE the instrument and outside anything that
+     scrolls, and a case with no header still places its own plate. */
+  is('the header is glued above the case, so nothing above the instrument can scroll away',
+    /createGlue\(head\.head, panel\.el\)/.test(code)
     && /plate: head \? null : spec/.test(code),
-    'prepend on the case, and the panel keeps placing the plate when there is no header');
+    'glued above the case, and the panel keeps placing the plate when there is no header');
+
+  /* 🔴 AND THE SEAM IS `glue.mjs`'S, WHICH IS THE WHOLE POINT OF THE CHANGE. A
+     `border-bottom` typed in this file would put the imitation back one element
+     along, and it would read as correct in the stylesheet. */
+  is('NEGATIVE CONTROL: the header draws no edge of its own',
+    !/border-bottom/.test(code),
+    'the seam between a header and its case is the glue’s');
 
   is('an instrument with no name is refused at build time',
     /if \(!name\)/.test(code) && /throw new Error\('an instrument needs a name/.test(code),
@@ -132,7 +146,13 @@ const is = (what, cond, detail) => {
      done. */
   is('the two states and their words are declared here and drawn by the kit’s badge',
     HEADER_STATES.length === 2 && HEADER_STATES.join() === 'online,offline'
-    && /off/.test(HEADER_SAYS.online) && /on/.test(HEADER_SAYS.offline)
+    /* ⚠️ THE PAIR READS THE SAME WAY ROUND AS THE STATE SINCE 2026-09-22:
+       *"reverse on / off names"*. This asserted the opposite for an hour, when
+       the word was what a press would DO, and the claim underneath is the same
+       either way and is the one worth grading: **the two words are different
+       and neither is the other's state**. A pair that said `on` for both, or
+       that drifted so `online` read `off` again, is what this catches. */
+    && HEADER_SAYS.online === 'on' && HEADER_SAYS.offline === 'off'
     && HEADER_SAYS.online !== HEADER_SAYS.offline
     && /from '\.\/presence\.mjs'/.test(code),
     `${HEADER_STATES.join(' and ')} reading ${HEADER_SAYS.online} and ${HEADER_SAYS.offline}`);

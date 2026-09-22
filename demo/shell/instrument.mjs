@@ -28,6 +28,7 @@
 // away from the instrument it names.
 
 import { el } from './shell.mjs';
+import { createGlue } from './glue.mjs';
 import { createPanelLayout, createNameplate } from './panel-layout.mjs';
 import { createPresence, createPresenceButton } from './presence.mjs';
 
@@ -53,6 +54,15 @@ export const MAKER = 'POSITRON';
 /**
  * 🔴 THE WORD SAYS WHAT A PRESS DOES, NOT WHAT THE STATE IS, SINCE 2026-09-22:
  * *"online labels: 'turn on' 'turn off'"*. It read `enabled` and `disabled`.
+ * ⚠️ AND IT IS ONE WORD, CORRECTED WITHIN THE HOUR TO *"*name* off / on"*. The
+ * badge already prints the instrument's name in front of it, so `PLAITS turn
+ * off` said the verb twice as far as a reader is concerned.
+ * 🔴 **AND THEN REVERSED: *"reverse on / off names"*, SO THE WORD IS THE STATE
+ * AFTER ALL.** `PLAITS on` means it IS on, and the dot agrees with it rather
+ * than contradicting it. The first arrangement asked a reader to hold two
+ * things at once, a green dot meaning running and a word meaning what a press
+ * would do, and one of them had to be read backwards. Two channels saying one
+ * fact beats two channels saying two.
  * ⚠️ **THE DOT STILL CARRIES THE STATE**, which is what makes this legible
  * rather than confusing: green with `turn off` is a thing that is on and a
  * press that would stop it. Two channels, one fact each, which is the rule this
@@ -62,7 +72,7 @@ export const MAKER = 'POSITRON';
  * follow, so a caller that supplies no `press` still gets the states named as
  * states through `says`.
  */
-export const HEADER_SAYS = { online: 'turn off', offline: 'turn on' };
+export const HEADER_SAYS = { online: 'on', offline: 'off' };
 /** The only two states a header's status control can reach. See `HEADER_SAYS`. */
 export const HEADER_STATES = ['online', 'offline'];
 
@@ -130,8 +140,20 @@ function buildHeader({ name, maker, header }) {
      the phone. The desktop places all three by `grid-column` in `shell.css`,
      which is visible in the stylesheet, rather than by a flex `order` nobody
      can see in the markup. */
-  const plate = createNameplate({ ...plateSpec(maker, name, 'end'), cls: 'panel-head-plate' });
-  head.append(plate.el);
+  /**
+   * 🔴 A HEADER MAY CARRY NO PLATE AT ALL, `plate: false`, ADDED 2026-09-22:
+   * *"rm nameplates"*. It is not a bare removal: the status control prints the
+   * instrument's name in front of its state, so a plate beside it is the name
+   * twice on one row, which is the doubled-channel objection this project keeps
+   * making about everything else.
+   * ⚠️ **THE DEFAULT KEEPS THE PLATE**, because a caller whose status control
+   * is a plain badge with no name has nothing else to say which instrument it
+   * is looking at.
+   */
+  const plate = header.plate === false
+    ? null
+    : createNameplate({ ...plateSpec(maker, name, 'end'), cls: 'panel-head-plate' });
+  if (plate) head.append(plate.el);
 
   let status = null;
   if (online !== false) {
@@ -205,6 +227,22 @@ export function createInstrument(o = {}) {
      THERE IS NOT. Two plates would be two names on one case, and handing the
      panel a plate it then places in the top inset while the header holds
      another is exactly that. */
+  /**
+   * 🔴 THE HEADER IS A GLUED PART, NOT A ROW INSIDE THE CASE, SINCE
+   * 2026-09-22. Reported against a screenshot: *"this does not look like glued
+   * transport or smt. underline does not extend to sides, to much padding. make
+   * it a snd componetn or reuse one"*.
+   * 🔴 **AND EVERY WORD OF THAT WAS A SYMPTOM OF ONE CAUSE: IT WAS AN
+   * IMITATION.** A border drawn on a child of the case sits INSIDE the case's
+   * own padding, so it can never reach the sides; the padding was the case's
+   * plus the header's; and the whole thing was a second implementation of a
+   * seam `glue.mjs` already owns and `/pack/`, `/tom/` and `/wish/` already
+   * use. `positron-ui` opens with BUILD FROM `/kit/` for exactly this.
+   * ✅ `createGlue` gives the seam its full width, drops the doubled padding by
+   * making the children give up their own border and radius, and makes an
+   * instrument with a header the same object as a transport bar over the strip
+   * it drives.
+   */
   const head = header ? buildHeader({ name, maker, header }) : null;
   /**
    * 🔴 THE PANEL PLACES THE PLATE, THIS FILE DOES NOT. It did
@@ -228,11 +266,18 @@ export function createInstrument(o = {}) {
      off the same `--panel-pad`. Centralising an assembly that does not own its
      own layout moves the duplication rather than removing it, which is written
      at length in `panel-layout.mjs` and was paid for on `/plai/`. */
-  if (head) panel.el.prepend(head.head);
-  host?.append(panel.el);
+  /* 🔴 GLUED, NEVER PREPENDED, SINCE 2026-09-22. This put the header INSIDE the
+     case, where its underline sat within the case's own padding and could never
+     reach the sides, and where its padding was the case's plus its own. See the
+     note on `head` above. `createGlue` returns the single block unwrapped when
+     there is only one, so a case with no header gains no box and no edge. */
+  const root = head ? createGlue(head.head, panel.el) : panel.el;
+  host?.append(root);
 
   return {
-    el: panel.el,
+    el: root,
+    /** The case itself, which is `el` on an instrument with no header. */
+    case: panel.el,
     panel,
     plate,
     /** The header row, or `null` on a case that was not given one. */

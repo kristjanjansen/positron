@@ -48,8 +48,28 @@
      same guard `.pos-knob-row` carries and for the same reason: `overflow-x`
      cannot shrink a flex item below its content, and this container sits
      between the row and the panel's flow. */
+  /* 🔴 THE TWO GRIDS SIT SIDE BY SIDE WITH A DIVIDER BETWEEN THEM, ASKED FOR
+     2026-09-22 AGAINST A SCREENSHOT OF THEM STACKED: *"no. keep 2 x 2 group,
+     then divider then 3 x 2 grouo"*. This was `flex-direction: column` from
+     when it held two knob ROWS, so two GRIDS inherited the stacking and the
+     panel came out four rows tall.
+     🔴 **AND THE DIVIDER IS A RULE HERE, WHICH REVERSES WHAT THIS FILE SAID.**
+     The note below it still records the older decision, that separation is
+     spacing and a widened gap did the job, and that was right for two groups in
+     ONE row. It is wrong for two blocks that are each two rows deep: a gap
+     between them reads as the gap between columns inside them, because at this
+     pitch it IS one. `panel-layout.mjs` already draws exactly this line for a
+     fixed column, `border-right: 1px solid var(--line)` with `--panel-gap`
+     either side, so this is that treatment rather than a new one.
+     ⚠️ `align-items: start`, or the shorter grid stretches and its knobs move
+     off the lattice the taller one sets. */
   .plai-knobs {
-    display: flex; flex-direction: column; gap: var(--ctl-gap); min-width: 0;
+    display: flex; align-items: start; min-width: 0;
+  }
+  .plai-knobs > :first-child {
+    border-right: 1px solid var(--line);
+    padding-right: var(--panel-gap);
+    margin-right: var(--panel-gap);
   }
 
   /* The effect has one row and one carrier picker above it, which is the same
@@ -121,7 +141,8 @@
   // something still ringing.
   import { mount, guard, el } from '/shell/shell.mjs';
   import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
-  import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createControlGrid } from '/shell/control-grid.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createInstrument } from '/shell/instrument.mjs';
 
@@ -182,7 +203,7 @@
   // chain; 1 to 3 render an internal carrier instead and turn the first input
   // into a phase modulation input. `warps/ui.cc:231` is `(shape + 1) & 3`, so
   // four positions is the instrument's own count rather than a choice here.
-  const CARRIERS = ['from PLAI', 'sine', 'triangle', 'saw'];
+  const CARRIERS = ['from PLAITS', 'sine', 'triangle', 'saw'];
 
   // WHERE THE VOCODER LIVES ON THE KNOB, AND IT IS NOT AT THE TOP.
   // `modulator.cc:206` puts the vocoder above 0.725, and `:312` reads
@@ -438,48 +459,63 @@
   // `-` and `+` add the one thing neither of those carries: WHICH HALF OF THE
   // TRAVEL is negative, said by position rather than by text.
   const MARKS = ['-', '+'];
-  const rowTop = createKnobBank([
-    knob('pitch', P.note,
-      { label: 'frequency', min: 24, max: 96, value: 60, home: 60 }),
-    knob('harmonics', P.harmonics,
-      { label: 'harmonics', min: 0, max: 1, value: 0.5, home: 0.5 }),
-    knob('timbreMod', P.timbreModAmount,
-      { label: 'timbre', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
-    knob('fmMod', P.fmAmount,
-      { label: 'fm', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
-    knob('morphMod', P.morphModAmount,
-      { label: 'morph', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
-  ]);
-  const rowBottom = createKnobBank([
-    knob('timbre', P.timbre,
-      { label: 'timbre', min: 0, max: 1, value: 0.5, home: 0.5 }),
-    knob('morph', P.morph,
-      { label: 'morph', min: 0, max: 1, value: 0.5, home: 0.5 }),
-    knob('decay', P.decay,
-      { label: 'decay', min: 0, max: 1, value: 0.5, home: 0.5 }),
-    knob('colour', P.lpgColour,
-      { label: 'colour', min: 0, max: 1, value: 0.5, home: 0.5 }),
-    /**
-     * ⚠️ `step: 1` IS THE COMPONENT'S, NOT A ROUNDING THIS PAGE DOES ON THE WAY
-     * OUT. A page that rounds its own value leaves the DIAL somewhere the
-     * number is not, and a voice count that reads 5 while the needle sits
-     * between 5 and 6 is a control arguing with its own readout.
-     * ⚠️ AND IT IS `onChange` AS WELL AS `onInput`: eight is the ceiling the
-     * wasm reports, and the value that has to land is the one the drag ended
-     * on.
-     */
-    knob('voices', null,
-      { label: 'voices', min: 1, max: SLIDER_MAX_VOICES,
-        step: 1, value: SLIDER_MAX_VOICES, home: SLIDER_MAX_VOICES, hand: false,
-        onInput: (v) => setVoices(v) }),
-  ]);
-  // The first knob after the instrument's own pair, on each row, carries the
-  // gap. One class, one declaration, and the two rows line up because every
-  // knob is `--ctl-w` wide and the browser does the rest.
-  knobs.get('timbreMod').el.classList.add('plai-extra');
-  knobs.get('decay').el.classList.add('plai-extra');
+  /**
+   * 🔴 TWO CONTROL GRIDS, NOT TWO KNOB BANKS, SINCE 2026-09-22. Asked four
+   * times, latterly as *"where is knobs grid?"*, and it closes a circle:
+   * `control-grid.mjs` was EXTRACTED FROM THIS PAGE. Its header quotes the ask
+   * it was built for, *"make component for know etc grid where centers of 2x2
+   * knobs make square etc"*, and records the measurement that prompted it,
+   * **46 px across and about 100 down, so four knobs made a tall rectangle and
+   * were reported as one**. The page it came from was the one page never
+   * converted to it.
+   * 🔴 **WHY TWO GRIDS AND NOT ONE.** A grid has ONE gap, and this panel has
+   * two different ones on purpose: *"add more space around plai rotaties"* put
+   * a wider gap between the module's own four rotaries and the ones this page
+   * adds. A single five wide grid would have to give that up. Two grids keep
+   * both asks, and the left one is literally the 2 by 2 the component was asked
+   * for.
+   * ⚠️ **THE LATTICE IS SQUARE AND THAT IS A REAL CHANGE TO WHAT YOU SEE.**
+   * `pitchFor` is `max(width, height) + gap`, and a knob cell is far taller
+   * than it is wide, so the columns open out to the row pitch. The knobs sit
+   * further apart than they did, which is the whole point: centres on a square
+   * lattice rather than a tall rectangle.
+   */
+  const ownGrid = createControlGrid({
+    cols: 2, gap: 10,
+    items: [
+      knob('pitch', P.note, { label: 'frequency', min: 24, max: 96, value: 60, home: 60 }),
+      knob('harmonics', P.harmonics, { label: 'harmonics', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      knob('timbre', P.timbre, { label: 'timbre', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      knob('morph', P.morph, { label: 'morph', min: 0, max: 1, value: 0.5, home: 0.5 }),
+    ],
+  });
+  /**
+   * 🔴 THE THREE ATTENUVERTERS PRINT THE PANEL'S OWN MARKS, WHICH IS WHAT
+   * `ends` IS FOR, and the order is the PANEL's: `plaits/drivers/pots_adc.h`
+   * enumerates them `TIMBRE_ATTENUVERTER, FM_ATTENUVERTER, MORPH_ATTENUVERTER`.
+   * ⚠️ AND ROW TWO OF THIS GRID HOLDS THE THREE THE HARDWARE GIVES NO KNOB TO:
+   * `decay` and `lpg_colour` are the alternate functions of MORPH and TIMBRE,
+   * reached by holding a button, and the voice count is this page's own.
+   */
+  const extraGrid = createControlGrid({
+    cols: 3, gap: 10,
+    items: [
+      knob('timbreMod', P.timbreModAmount,
+        { label: 'timbre', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
+      knob('fmMod', P.fmAmount,
+        { label: 'fm', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
+      knob('morphMod', P.morphModAmount,
+        { label: 'morph', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
+      knob('decay', P.decay, { label: 'decay', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      knob('colour', P.lpgColour, { label: 'colour', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      knob('voices', null,
+        { label: 'voices', min: 1, max: SLIDER_MAX_VOICES, step: 1,
+          value: SLIDER_MAX_VOICES, home: SLIDER_MAX_VOICES, hand: false,
+          onInput: (v) => setVoices(v) }),
+    ],
+  });
   const knobGrid = el('div', 'plai-knobs');
-  knobGrid.append(rowTop.el, rowBottom.el);
+  knobGrid.append(ownGrid.el, extraGrid.el);
 
   // ── the case ────────────────────────────────────────────────────────────
   //
@@ -533,8 +569,9 @@
    * row of its own on a phone.
    */
   const inst = createInstrument({
-    name: 'PLAI', maker: '',
-    header: { online: { of: 'PLAI', state: 'offline', press: () => togglePlai() },
+    name: 'PLAITS', maker: '',
+    header: { plate: false,
+              online: { of: 'PLAITS', state: 'offline', press: () => togglePlai() },
               patch: pickRow },
     panel: { side: null, cls: { panel: 'muta-panel plai-panel' } },
   });
@@ -543,7 +580,7 @@
   // ── the second case, which is an effect and not an oscillator ────────────
   //
   // 🔴 TWO INSTRUMENTS ON ONE PAGE, AND THE ORDER ON THE PAGE IS THE ORDER OF
-  // THE SIGNAL. PLAI makes the sound and WARP changes it, so PLAI is above.
+  // THE SIGNAL. PLAITS makes the sound and WARPS changes it, so PLAITS is above.
   // Nothing about a WebAudio connection makes that visible, and a reader who
   // has to work out which way round two cases are wired has been handed a
   // puzzle rather than a panel.
@@ -581,26 +618,73 @@
   const wpickRow = el('div', 'warp-pick');
   wpickRow.append(wpick.el);
 
-  const warpRow = createKnobBank([
+  /* 🔴 THE EFFECT'S FIVE ON THE SAME LATTICE, asked for as *"apply grid to warp
+     too"*. One row, so there is no second row of centres to square against, and
+     the component squares it anyway: the pitch is `max(width, height)`, which
+     on a knob is its height, so a single row opens to the same spacing a second
+     row would have wanted. That is consistent rather than accidental, and it is
+     why the two instruments read as one panel. */
+  const warpGrid = createControlGrid({
+    cols: 5, gap: 10,
+    items: [
+    /**
+     * 🔴 THE DIAL PRINTS THE TWO SHAPERS IT IS BETWEEN, NOT A FRACTION. Asked
+     * 2026-09-22: *"should show names instead"*, and *"fraction num is not that
+     * helpful"*.
+     * 🔴 **AND NAMING ONE WOULD HAVE BEEN THE SAME MISTAKE THE CUT READOUT CELL
+     * MADE.** This knob is NOT stepped and must not be: `warp_shim.cc` says so
+     * where the arithmetic lives, *"the control surface is continuous rather
+     * than a list of modes, which is the thing that makes this module different
+     * from Plaits' stepped engines"*. `modulator.cc:285` takes
+     * `min(modulation_algorithm * 8, 5.999)`, whose integral part picks the
+     * PAIR being crossfaded and whose fractional part is how far between them
+     * the knob sits. So the honest reading is two names, and a single nearest
+     * name would hide the blend exactly as `0.31` hid the pair.
+     * ⚠️ AT AN END THERE IS NOTHING TO BLEND WITH, so it reads one name. That
+     * is the value being AT a shaper rather than between two, which is the one
+     * case where a single name is the whole truth.
+     */
     wknob('algorithm', W.algorithm,
-      { label: 'algorithm', min: 0, max: 1, value: 0, home: 0 }),
+      { label: 'algorithm', min: 0, max: 1, value: 0, home: 0,
+        /**
+         * ⚠️ **ONE NAME, NOT TWO, AND THE TWO WAS MINE RATHER THAN ASKED FOR.**
+         * Printing the pair said more about a crossfade, and it cost the width
+         * of the widest PAIR: the value cell reserves the longest string it can
+         * ever print, `digital ring bitwise xor` is 24 characters, and that one
+         * cell then set the square pitch for every knob in the grid. MEASURED
+         * on the page: five knobs spread across about 1000 px with the last one
+         * off the edge, reported as *"do not"*.
+         * ✅ The blend is still visible, in the place it has always been: where
+         * the needle sits between two marks. The name says which one it is
+         * nearest, which is what was asked for.
+         */
+        format: (v) => ALGORITHMS[Math.floor(Math.min(Math.max(v, 0) * 8, 5.999))] ?? '?' }),
+    /* 🔴 THE PANEL CALLS THIS ONE `TIMBRE` AND THIS PAGE CALLED IT `amount`
+       UNTIL 2026-09-22, when it was asked for by name: *"where is timbre"*. It
+       is `modulation_parameter` in the firmware and the shim's own list says
+       *"whose meaning changes with the algorithm. In the vocoder it is the
+       formant shift"*, which is exactly why the module prints one word on the
+       panel instead of naming the thing it currently does. A replica uses the
+       word on the box. */
     wknob('amount', W.amount,
-      { label: 'amount', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      { label: 'timbre', min: 0, max: 1, value: 0.5, home: 0.5 }),
     wknob('drive1', W.drive1,
       { label: 'level 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
     wknob('drive2', W.drive2,
       { label: 'level 2', min: 0, max: 1, value: 0.5, home: 0.5 }),
     wknob('note', W.note,
       { label: 'note', min: 12, max: 72, value: 48, home: 48 }),
-  ]);
+  ],
+  });
 
   const warpInst = createInstrument({
-    name: 'WARP', maker: '',
-    header: { online: { of: 'WARP', state: 'offline', press: () => toggleWarp() },
+    name: 'WARPS', maker: '',
+    header: { plate: false,
+              online: { of: 'WARPS', state: 'offline', press: () => toggleWarp() },
               patch: wpickRow },
     panel: { side: null, cls: { panel: 'muta-panel warp-panel' } },
   });
-  warpInst.add(warpRow.el);
+  warpInst.add(warpGrid.el);
 
   d.stack.add(inst.el, warpInst.el);
 
@@ -619,8 +703,8 @@
     wpick.show(CARRIERS[carrier], carrier);
     sendWarp({ t: 'param', id: W.carrier, value: carrier });
     d.log(carrier === 0
-      ? 'the second input comes from PLAI, so the whole sound is the chain'
-      : `the carrier is WARP's own ${CARRIERS[carrier]} and PLAI's first output `
+      ? 'the second input comes from PLAITS, so the whole sound is the chain'
+      : `the carrier is WARPS' own ${CARRIERS[carrier]} and PLAITS' first output `
         + 'becomes a phase modulation input');
   }
 
@@ -854,7 +938,7 @@
     // with nothing played, and both have to be near zero.
     chainOff = warpMeters > wbefore ? warpLast.peak : null;
     d.log(quiet == null ? 'the audio thread reported nothing in 600 ms'
-                        : `untriggered peak ${quiet.toFixed(6)} out of PLAI and `
+                        : `untriggered peak ${quiet.toFixed(6)} out of PLAITS and `
                           + `${chainOff == null ? 'nothing' : chainOff.toFixed(6)} out of WARP`,
           quiet == null ? 'bad' : '');
 
@@ -1610,15 +1694,28 @@
     // four of them. This compares the gap between the two groups against the
     // gap between two neighbours in the same row, so a rule that never applied
     // takes it red.
+    /* 🔴 AND THE TWO GROUPS ARE SEPARATED BY A LINE THAT IS REALLY DRAWN, NOT A
+       CLASS THAT EXISTS. A dead CSS rule reads as correct and this project has
+       measured four of them. This reads the computed border on the first group
+       and checks the second starts beyond it, so a rule that never matched
+       takes it red.
+       ⚠️ IT WAS A WIDENED GAP UNTIL 2026-09-22 and the change was asked for:
+       *"keep 2 x 2 group, then divider then 3 x 2 grouo"*. A gap between two
+       blocks that are each two rows deep reads as the gap between the columns
+       INSIDE them, because at this pitch it is the same distance. */
     const bTmod = box('timbreMod'), bDecay = box('decay');
-    const wide = bTmod && bHarm ? bTmod.x - bHarm.right : NaN;
-    const narrow = bHarm && bFreq ? bHarm.x - bFreq.right : NaN;
-    d.assert('the added rotaries start in one column on both rows, after a wider gap',
-      near(bTmod?.x, bDecay?.x) && wide > narrow + 8,
-      Number.isFinite(wide)
-        ? `both rows start theirs at ${bTmod.x.toFixed(1)} px, with ${wide.toFixed(0)} px `
-          + `of gap against ${narrow.toFixed(0)} px between neighbours`
-        : 'the two rows could not both be measured');
+    const firstGroup = document.querySelector('.plai-knobs > *');
+    const rule = firstGroup ? getComputedStyle(firstGroup) : null;
+    const lineW = rule ? parseFloat(rule.borderRightWidth) : NaN;
+    d.assert('the panel’s own four are divided from the added ones by a drawn line',
+      near(bTmod?.x, bDecay?.x) && lineW >= 1
+      && rule.borderRightStyle !== 'none'
+      && bTmod && firstGroup && bTmod.x > firstGroup.getBoundingClientRect().right,
+      Number.isFinite(lineW)
+        ? `a ${lineW.toFixed(0)} px ${rule.borderRightStyle} line at `
+          + `${firstGroup.getBoundingClientRect().right.toFixed(0)} px, and the added ones `
+          + `start at ${bTmod ? bTmod.x.toFixed(0) : '?'} px on both rows`
+        : 'the first group is not on the page');
 
     // ⚠️ AND THE STACKED COMPONENTS STILL SHARE A LEFT EDGE. `/radio/` had
     // exactly this go wrong when a `createChoice` row became a `createPicker`
@@ -1636,19 +1733,26 @@
        survive the move: the rotary rows still agree with each other, and the
        picker is centred on the CASE rather than on the space left over between
        a status light and a nameplate. */
-    const rows = [
-      ['row 1', document.querySelectorAll('.plai-knobs .pos-knob-row')[0]],
-      ['row 2', document.querySelectorAll('.plai-knobs .pos-knob-row')[1]],
-    ].map(([name, node2]) => [name, node2 ? node2.getBoundingClientRect().x : NaN]);
-    const found = rows.every(([, x]) => Number.isFinite(x));
-    const spread = found
-      ? Math.max(...rows.map(([, x]) => x)) - Math.min(...rows.map(([, x]) => x))
-      : NaN;
-    d.assert('both rows of rotaries start on the same line',
-      found && spread < 1,
-      found ? `${rows.map(([n, x]) => `${n} ${x.toFixed(1)} px`).join(', ')}, at `
-            + `${Math.round(innerWidth)} px wide`
-            : 'one of the two is not on the page');
+    /**
+     * 🔴 THE DIAL CENTRES LAND ON A SQUARE LATTICE, WHICH IS THE WHOLE REASON
+     * `control-grid.mjs` EXISTS AND WHY THIS PAGE NOW USES IT. That component
+     * was extracted FROM this page after the four rotaries were reported as a
+     * tall rectangle, measured at **46 px across and about 100 down**, and it
+     * was never wired back in until *"where is knobs grid?"* was asked four
+     * times.
+     * ⚠️ **ACROSS AGAINST DOWN, ON THE GROUP THAT WAS REPORTED.** The claim is
+     * not that the knobs are evenly spaced, which they were before; it is that
+     * one step right and one step down are the SAME distance.
+     */
+    const cs = ownGrid.centres();
+    const dx = cs.length > 1 ? cs[1].x - cs[0].x : NaN;
+    const dy = cs.length > 2 ? cs[2].y - cs[0].y : NaN;
+    d.assert('the panel’s four rotaries sit on a square lattice, across equalling down',
+      Number.isFinite(dx) && Number.isFinite(dy) && Math.abs(dx - dy) <= 1 && dx > 40,
+      Number.isFinite(dx)
+        ? `${dx.toFixed(1)} px across against ${dy.toFixed(1)} px down, at a `
+          + `${ownGrid.pitch()} px pitch`
+        : 'the grid reported no centres');
 
     /**
      * 🔴 THE PICKER IS CENTRED ON THE CASE, WHICH IS THE ASK AND IS THE ONE
@@ -1666,16 +1770,35 @@
        The claim never was about the picker, it was about the middle cell being
        centred on the CASE rather than balanced between two unequal neighbours,
        so it follows the cell rather than its tenant. */
-    const centres = [['PLAI', inst], ['WARP', warpInst]].map(([nm, ins]) => {
+    const centres = [['PLAITS', inst], ['WARPS', warpInst]].map(([nm, ins]) => {
       const cell = ins.el.querySelector('.panel-head-plate');
       const kase = ins.el.querySelector('.panel-case') || ins.el;
       if (!cell) return [nm, NaN];
       const c = cell.getBoundingClientRect(), k = kase.getBoundingClientRect();
       return [nm, (c.left + c.width / 2) - (k.left + k.width / 2)];
     });
-    d.assert('the nameplate is centred on its own case, not balanced between its neighbours',
-      centres.every(([, off]) => Number.isFinite(off) && Math.abs(off) <= 1),
-      centres.map(([nm, off]) => `${nm} ${Number.isFinite(off) ? `${off.toFixed(1)} px off centre` : 'no middle cell'}`).join(', '));
+    /**
+     * 🔴 THE NAMEPLATE LEFT THE HEADER ON 2026-09-22: *"rm nameplates"*, and
+     * the centring claim went with it because there is no middle cell to
+     * centre. It is not re-baselined, it is replaced by what the header still
+     * promises: **the status is at one end and the patch selector at the
+     * other**, both at the bar's own inset rather than floating.
+     * ✅ AND THE NAME IS NOT LOST. The status control prints it in front of its
+     * state, which is why the plate could go: `PLAITS off` says both.
+     */
+    const ends = [['PLAITS', inst], ['WARPS', warpInst]].map(([nm, ins]) => {
+      const bar = ins.head?.getBoundingClientRect();
+      const on = ins.el.querySelector('.panel-head-on')?.getBoundingClientRect();
+      const mid = ins.el.querySelector('.panel-head-mid')?.getBoundingClientRect();
+      if (!bar || !on || !mid) return [nm, null];
+      return [nm, { l: +(on.left - bar.left).toFixed(1), r: +(bar.right - mid.right).toFixed(1),
+                    plate: !!ins.el.querySelector('.panel-head-plate') }];
+    });
+    d.assert('the header holds its status at one end and its patch selector at the other',
+      ends.every(([, m]) => m && Math.abs(m.l - m.r) <= 1 && m.l > 4 && !m.plate),
+      ends.map(([nm, m]) => (m
+        ? `${nm} ${m.l} px in on the left and ${m.r} px on the right${m.plate ? ', with a plate' : ''}`
+        : `${nm} is missing a cell`)).join(', '));
 
     // 🔴 THE CASE STARTS AND ENDS WHERE THE REST OF THE PAGE DOES, WHICH IS
     // `/circuit/`'s OWN CLAIM AND THE ONE IT FAILS. `shell.css` contract 8
@@ -1691,7 +1814,11 @@
     // page. The readout is the page's own full width furniture and is in a
     // different subtree from the case, so the two agreeing is a real reading
     // rather than a child measuring its own parent.
-    const bPanel = document.querySelector('.plai-panel')?.getBoundingClientRect();
+    /* ⚠️ THE OUTER OBJECT IS THE GLUE SINCE THE HEADER WAS GLUED ON, and the
+       case inside it is inset by the glue's own 1 px border. This claim is about
+       where the INSTRUMENT starts and ends against the rest of the page, so it
+       reads the edge a visitor can see rather than the case's. */
+    const bPanel = inst.el.getBoundingClientRect();
     const bRead = document.querySelector('.pos-readout')?.getBoundingClientRect();
     d.assert('the case starts and ends where the rest of the page does',
       !!bPanel && !!bRead && near(bPanel.x, bRead.x) && near(bPanel.right, bRead.right)
@@ -1774,7 +1901,7 @@
        `plateSpec` decides it, and this grades the decision rather than the
        page's typing. */
     d.assert('the case is named by its model alone, pushed to the far end',
-      plate.length === 1 && plate[0] === 'PLAI'
+      plate.length === 1 && plate[0] === 'PLAITS'
       && inst.plate.place === 'end'
       && getComputedStyle(inst.plate.el).justifyContent === 'flex-end',
       `the plate reads ${plate.join(' then ')} at ${inst.plate.place}`);
@@ -1856,7 +1983,7 @@
    */
   ifSelfcheck(() => { inst.online?.el?.click(); }, {
     log: d.log,
-    say: 'the audio is started by pressing PLAI’s own turn on, because a harness '
+    say: 'the audio is started by pressing PLAITS’ own turn on, because a harness '
       + 'only presses the row of controls under the page',
   });
   d.ready();
