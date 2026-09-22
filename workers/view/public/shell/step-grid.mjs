@@ -100,9 +100,45 @@ export const PAD_MIN = 10;
  *  gap, which is what lets the label column and the steps share one pitch. */
 export const PAD_GAP = 2;
 
-/** How tall the ruler is. It carries no text, so it is a press target and a
- *  measuring stick rather than a row of labels. */
+/** How tall the ruler is.
+ *  ⚠️ THIS SAID *"it carries no text"* UNTIL 2026-09-22 AND THAT IS NO LONGER
+ *  TRUE. `ticks` numbers the beats on it. The height is unchanged and does not
+ *  depend on whether there is text in it, which is what makes the option free:
+ *  `.pos-pg-tick` already carried the font and the colours for a string it
+ *  never had. */
 export const RULER_H = 8;
+
+/**
+ * How long the head's light takes to arrive and how long it takes to die, in
+ * milliseconds.
+ *
+ * 🔴 **A LAMP LIGHTS FAST AND DIES SLOWLY, AND THE FALL WAS 320 ms UNTIL
+ * 2026-09-22.** Asked first as *"make it appear smooth like analog lamp lights
+ * up and turns out"*, which bought the asymmetry, and then, from a screenshot
+ * of the grid running at step 13 with three washed columns behind the head, as
+ * *"make 2nd and 3nd fade fade faster"*.
+ * 🔴 **THE TRAIL IS THE TRANSITION AND THERE IS NO TRAIL CODE TO FIND.** Only
+ * ONE column is ever marked: `ensureSteps` generates a rule for the current
+ * step alone, so every other lit column in that screenshot is a cell still
+ * transitioning out.
+ * 🔴 **AND THE NUMBER ONLY MEANS ANYTHING AS A FRACTION OF A STEP.** At 120
+ * beats a minute with four steps to a beat a step is **125 ms**, so 320 ms was
+ * **2.6 steps** of tail and the third column behind the head was still visibly
+ * lit. 180 ms is **1.4 steps**: the column one behind is most of the way out
+ * and the one two behind is gone. The same millisecond count is a long tail at
+ * 120 and a strobe at 240, which is why it is written down this way.
+ * ⚠️ **SHORTENING THE 90 ms WOULD HAVE BEEN THE WRONG EDIT** and is the obvious
+ * one. That number is on the HEAD's rule and governs the light ARRIVING, which
+ * is the half the earlier report bought. The fall is on the base rule, because
+ * the element being transitioned FROM is the one whose transition runs when an
+ * attribute is removed.
+ * ⚠️ **AND THE BREATHE ANIMATION IS NOT PART OF THE TRAIL, WHICH WAS CHECKED.**
+ * `pg-breathe` runs from the same `[data-now]` selector, and an animation ends
+ * the instant its rule stops matching rather than easing out, so a cell the
+ * head has left is not still breathing.
+ */
+export const RISE_MS = 90;
+export const FALL_MS = 180;
 
 /**
  * How wide one pad is, given the room and the number of steps.
@@ -246,7 +282,7 @@ function ensureSteps(steps) {
     out.push(`.pos-pg-rows[data-live][data-now="${i}"] ${at}{`
       + 'filter:brightness(1.12);'
       + 'box-shadow:inset 0 0 0 999px color-mix(in oklab, var(--pg-now) 58%, transparent);'
-      + 'transition:box-shadow 90ms ease-out,filter 90ms ease-out;'
+      + `transition:box-shadow ${RISE_MS}ms ease-out,filter ${RISE_MS}ms ease-out;`
       + 'animation:pg-breathe 1.4s ease-in-out infinite}');
   }
   sheet.textContent += (sheet.textContent ? '\n' : '') + out.join('\n');
@@ -288,6 +324,10 @@ export function stepRulesBuilt() { return widest; }
  *   AND THIS THROWS WITHOUT IT. See the header.
  * @param {(step:number)=>void} [o.onStep]  fired by the clock, never by `at()`
  * @param {number} [o.beat] @param {number} [o.bar]
+ * @param {boolean|((s:number,m:object)=>string)} [o.ticks]  number the step
+ *   axis. `true` numbers the BEATS and nothing between them, which is the only
+ *   scale that fits. A function is a caller that knows better. Default nothing,
+ *   which is what every grid had before 2026-09-22. See `tickText`.
  * @param {number} [o.minCell]
  * @param {string} [o.cls]
  */
@@ -297,7 +337,7 @@ export function createStepGrid({
   corner = null, readOnly = false, silent = () => false, padTitle = null,
   onToggle = null, onSeek = null,
   rate = null, onStep = null,
-  beat = 4, bar = 16, minCell = PAD_MIN, cls = '',
+  beat = 4, bar = 16, ticks = false, minCell = PAD_MIN, cls = '',
 } = {}) {
   if (!strip) throw new Error('step grid: no strip to put the steps in');
   if (rate && !rate.whose) {
@@ -322,6 +362,14 @@ export function createStepGrid({
   let lastLit = -1;
 
   const gridEl = el('div', `pos-pg ${cls}`.trim());
+  /* 🔴 THE FALL IS PUBLISHED AS A CUSTOM PROPERTY AND THE RISE IS INTERPOLATED
+     INTO THE GENERATED RULE, SO BOTH NUMBERS ARE DECLARED IN THIS FILE ONCE.
+     The fall belongs on the BASE rule, which is in `shell.css`, and a `180` typed
+     there against a `180` typed here is a measurement that will disagree. This
+     repository has repaired exactly that twice, as `--sld-col` and `--ctl-gap`.
+     ⚠️ A CUSTOM PROPERTY, NEVER THE PROPERTY. Writing the transition itself from
+     here would be a rule nothing can override, including `shell.css`. */
+  gridEl.style.setProperty('--pg-fall', `${FALL_MS}ms`);
   const rulerEl = el('div', 'pos-pg-ruler', '', {
     role: 'slider', tabindex: '0', 'aria-label': 'position',
     'aria-valuemin': '1', 'aria-valuemax': String(S), 'aria-valuenow': '1',
@@ -337,6 +385,38 @@ export function createStepGrid({
   gridEl.append(rulerEl, rowsEl);
   strip.append(gridEl);
   if (fixed) fixed.classList.add('pos-pg-labs');
+
+  /**
+   * What a tick says, which is NOTHING unless a caller asks for numbers.
+   *
+   * 🔴 **THE STEP AXIS CARRIED NO TEXT AT ALL UNTIL 2026-09-22**, asked for as
+   * *"show example with both axies labels and one withouth ones"*. The row axis
+   * was already optional (`fixed` plus `label`) and the step axis had no
+   * numbers to switch off, so *both axes labelled* could not be demonstrated by
+   * passing options that existed.
+   *
+   * 🔴 **AND IT NUMBERS THE BEATS RATHER THAN THE STEPS, WHICH IS A DECISION
+   * AND NOT A DETAIL.** A number under every one of 64 steps is this project's
+   * wrapping table heading in a new costume: the cell is `--pg-cell` wide,
+   * about 26 px, and `64` at 9 px mono is most of it, so a full numbering would
+   * either collide or have to be shrunk at the reader. `positron-ui` is
+   * explicit that a heading which does not fit is the AUTHOR's problem, never
+   * solved by wrapping it or shrinking it. The component already knows `beat`,
+   * so the honest scale is the one the music has: 1, 2, 3, 4 under the
+   * downbeats and nothing between them.
+   * ⚠️ **THE RULER'S TWO EXISTING JOBS ARE UNTOUCHED.** It is still a press
+   * target and still the track the head runs along, its height is still
+   * `--pg-ruler` whether or not there is text in it, and `.pos-pg-tick` already
+   * carried the font and the colours for text it never had. Numbering costs no
+   * height and moves nothing.
+   * ⚠️ A CALLER MAY PASS ITS OWN FUNCTION, which is how `label(r)` works one
+   * axis along, and then the budget is that caller's problem to keep.
+   */
+  function tickText(s, m) {
+    if (!ticks) return '';
+    if (typeof ticks === 'function') return String(ticks(s, m) ?? '');
+    return m.beat && beat > 0 ? String(Math.floor(s / beat) + 1) : '';
+  }
 
   /* ── drawing ─────────────────────────────────────────────────────────── */
 
@@ -361,7 +441,7 @@ export function createStepGrid({
 
     for (let s = 0; s < S; s++) {
       const m = marksAt(s, beat, bar);
-      const t = el('div', 'pos-pg-tick', '');
+      const t = el('div', 'pos-pg-tick', tickText(s, m));
       if (m.beat) t.dataset.beat = '1';
       if (m.bar) t.dataset.bar = '1';
       t.dataset.step = String(s);

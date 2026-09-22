@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  /**
+   * nola. A piano you play from a MIDI keyboard, and the pedal works.
+   *
+   * `plans/plan-nola.md` argued the whole of this and answered *"what drives
+   * it, sc? plain webmidi?"* with: plain Web Audio, one `AudioBufferSourceNode`
+   * per note, `demo/shell/midi.mjs` for the keyboard and a new
+   * `demo/shell/pedal.mjs` for the foot. Not scsynth, not an AudioWorklet, not
+   * a physical model.
+   *
+   * ── WHAT THIS IS AND WHAT IT IS NOT YET ────────────────────────────────────
+   *
+   * 🔴 THIS IS THE PLAN'S PHASE ZERO, AND IT IS FINISHED RATHER THAN PARTIAL.
+   * The plan's §6.1 asks for a page that gets MIDI, the pedal, the voice
+   * manager, the damper, the readout and every assert working against a REAL
+   * sound before anything is encoded, *"and only then build the Salamander
+   * pack"*. Everything on this page is the shipping machinery. What is phase
+   * zero is the RECORDINGS: 30 notes at ONE velocity layer out of FluidR3,
+   * where the pack will be 30 notes at THREE with key-off releases beside them.
+   *
+   * ⚠️ SO VELOCITY IS VOLUME HERE AND THE PAGE SAYS SO. A piano played hard is
+   * not a piano played softly and turned up: the hammer hits harder, the string
+   * goes brighter, and one recording cannot know that. That is the single
+   * biggest thing the pack buys and it is worth naming rather than hiding.
+   *
+   * 🔴 AND THERE IS NO SECOND ENGINE ON THIS PAGE YET, WHICH THE PLAN'S §6.1
+   * ITEM 6 ASKS FOR. `demo/shell/rhodes.mjs` is 60 lines of per-sample
+   * arithmetic already in the kit, and the reason to put it opposite the
+   * samples is the NUMBER: megabytes of recording against kilobytes of
+   * arithmetic, both audible from one keyboard. Three things stopped it landing
+   * today and all three are recorded in `BACKLOG.md` rather than discovered
+   * again:
+   *   - MEASURED here: rendering one `rhodesVoice` to its own end costs
+   *     **38.3 ms at note 21**, 25.8 at note 60 and 11.3 at note 108. This page
+   *     REPORTS press to sound, so a 38 ms render at press time would be the
+   *     biggest number in its own readout, and it would be a fact about the
+   *     renderer rather than about the instrument.
+   *   - A worklet is the right home for it and `rhodes.mjs` was written to be
+   *     one. But `demo/muta/muta-worklet.js` already records that an
+   *     `AudioWorkletGlobalScope` has no module loader at all, so a worklet
+   *     cannot import the kit's copy of the arithmetic. A second copy of it is
+   *     the drift `/kit/` exists to catch.
+   *   - And the number it is FOR is not available yet: the recording side of
+   *     the comparison is today 656 KB of phase zero soundfont rather than the
+   *     3.80 MiB pack the plan sizes. The comparison lands with the pack.
+   *
+   * ── WHAT THE KEYBOARD ON THIS DESK SENDS, MEASURED 2026-09-23 ──────────────
+   *
+   * ✅ **IT DOES SEND CONTROLLER 64.** MEASURED in front of `/evo/`: `B1 40 00`
+   * and `B1 40 7F`, on channel 2. So the default is right on this unit, and
+   * `?pedal=<n>` stays for the next one, because the MK-425C's footswitch is
+   * *"fully MIDI assignable"* and which number it sends is a setting held in
+   * the instrument rather than a fact about the model.
+   *
+   * 🔴 **AND ITS POLARITY IS UPSIDE DOWN THIS SESSION.** Two press and release
+   * gestures both arrived as `00` followed 0.40 s later by `7F`, which reads as
+   * PRESSING SENDING 0 and releasing sending 127, the opposite way round from
+   * the specification. The manual says where that comes from: the polarity is
+   * sensed at power up, so a pedal held down while the keyboard boots is
+   * inverted for the whole session and nothing on any screen would say so.
+   * ⚠️ **`?flip=1` READS IT THE RIGHT WAY UP**, and the better fix is on the
+   * instrument: power the keyboard up with the pedal unpressed. The option
+   * exists because the fault expires at the next power cycle, and nobody should
+   * have to restart an instrument to play a page.
+   * ⚠️ **AND IT IS AN OPTION RATHER THAN A DETECTION, ON PURPOSE.** A page
+   * cannot tell an inverted pedal from a pedal somebody is holding, and one
+   * that guessed would hold the first note of every session for a player whose
+   * foot happened to be down.
+   *
+   * 🔴 AND THE KEYBOARD ON THIS DESK IS A SEMITONE FLAT. MEASURED and recorded
+   * in `demo/evo/index.html`: the MK-425C's 25 keys arrive as notes 47 to 71,
+   * where a C-to-C 25-key controller sits at 48 to 72. `/evo/` deliberately
+   * does not correct it, because it is a page ABOUT that keyboard. This is a
+   * page about a piano, and a piano a semitone flat against every other
+   * instrument is the kind of fault that gets blamed on the sample pack. Hence
+   * TRANSPOSE, defaulting to 0, and a log line the first time a note below 48
+   * arrives.
+   */
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { SELFCHECK, ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { createKeyboard, QWERTY_CHROMATIC } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
+  import { createPedal, PEDAL_SAYS, SUSTAIN_CC, damperSec } from '/shell/pedal.mjs';
+  import { createSwitch } from '/shell/switch.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { parseChords } from '/shell/chords.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
+
+  const q = new URLSearchParams(location.search);
+
+  /**
+   * 🔴 THIRTY NOTES AT MINOR THIRDS, A0 TO C8, WHICH IS ARITHMETIC AND NOT A
+   * CHOICE. 21 to 108 inclusive at step 3 is exactly 30, so every one of an 88
+   * key piano's notes is at most ONE SEMITONE from a recording. The Salamander
+   * pack the plan sizes samples exactly these thirty, so nothing about this
+   * page's voice manager changes when the recordings are replaced.
+   * ⚠️ AND IT IS WHY THE PHASE ZERO SET IS 30 FILES RATHER THAN THE PLAN'S 88.
+   * A chromatic soundfont would leave `playbackRate` at 1 on every note and the
+   * shift assert true by construction, which proves less machinery rather than
+   * more. `demo/resources/fetch-fluidr3-piano.mjs` has the argument.
+   */
+  const SAMPLED = Array.from({ length: 30 }, (_, i) => 21 + i * 3);
+  const LOW = SAMPLED[0], HIGH = SAMPLED[SAMPLED.length - 1];
+
+  /** The recording a note is played from, and how far it has to be bent. */
+  const nearestOf = (note) => Math.min(HIGH, Math.max(LOW, LOW + Math.round((note - LOW) / 3) * 3));
+  const shiftOf = (note) => note - nearestOf(note);
+
+  /**
+   * ⚠️ 64 VOICES, AND THE NUMBER IS A GUESS WITH A REASON RATHER THAN A
+   * MEASUREMENT. A pedalled glissando up the keyboard is over a hundred
+   * simultaneous buffer sources, and `plans/plan-nola.md` §7 item 10 names this
+   * as the one place the plain Web Audio choice could be wrong and says nobody
+   * has measured it on a phone. `sounding` in the readout is where the answer
+   * will first be visible.
+   */
+  const VOICES = 64;
+
+  /**
+   * 🔴 THE RECORDINGS ARE 21 dB DOWN AND THE PAGE HAS TO MAKE THAT UP.
+   * MEASURED 2026-09-22 by decoding all thirty: they peak between **0.068 and
+   * 0.097 of full scale**, median **0.0894**, which is a spread of only 3.1 dB
+   * across the whole keyboard and about 21 dB under where a sample set would
+   * normally sit. Without this the page plays correctly and READS AS BROKEN:
+   * the first run measured a held note at **0.0057** and took two asserts red
+   * on thresholds that were right for the instrument and wrong for the files.
+   * ⚠️ AND THE HEADROOM IS SPENT ON PURPOSE, WHICH IS WHY THE TARGET IS A THIRD
+   * OF FULL SCALE AND NOT ALL OF IT. This is a page about holding a pedalled
+   * chord: six notes at once really do add up, nothing here compresses them,
+   * and one fortissimo note at full scale would mean every chord clipping. A
+   * compressor would fix the arithmetic and change the dynamics, which is the
+   * one thing a piano page may not quietly do.
+   * ⚠️ IT IS A CONSTANT HERE AND A TRIM IN THE BUILD LATER.
+   * `plans/plan-nola.md` §3.5 wants a peak and an envelope per file when the
+   * Salamander pack is encoded, which is the right place for it. This is one
+   * number standing in for that, measured rather than guessed.
+   */
+  const SAMPLE_PEAK = 0.097;         // the loudest of the thirty, measured
+  const LOUDEST = 0.30;              // where one note played as hard as possible lands
+  const LEVEL = LOUDEST / SAMPLE_PEAK;
+
+  /** What one press is worth, before the damper. One layer, so this is the only
+   *  thing velocity can do here, which is the phase zero limitation named above. */
+  const velGain = (vel) => LEVEL * Math.pow(Math.max(1, Math.min(127, vel)) / 127, 1.5);
+
+  /* 🔴 REWRITTEN WHEN THE PAGE GREW ITS CHORDS, IN THE SAME CHANGE. The old
+     line said *play a piano from a MIDI keyboard, with the sustain pedal
+     working*, which was true and had stopped being the whole of it: the first
+     thing on the page is now a line of chord symbols. A description that has
+     drifted is worse than a missing one, because a visitor believes it. */
+  const ONE = 'a piano you play from a MIDI keyboard, with a line of chords drawn out above it';
+
+  const d = mount({
+    name: 'nola',
+    // 🔴 THE INDEX'S OWN LINE, VERBATIM. A page with a diagram gets a one line
+    // `what`, because a paragraph and a picture of the machinery are two
+    // explanations of one thing and the paragraph is the weaker of them.
+    what: ONE,
+    /**
+     * 🔴 `null`, WHICH IS A PAGE SAYING IT HAS NO READOUT RATHER THAN ONE THAT
+     * NEVER FILLED. Asked 2026-09-23: *"rm readout"*. `mount()` keeps those two
+     * apart on purpose and a harness reads the declaration, so `{}` here would
+     * be the page claiming six cells and delivering none.
+     * ⚠️ AND WHAT THE SIX CELLS SAID IS REHOMED RATHER THAN DELETED, which is
+     * the rule for taking a display away: press to sound, its worst, the voice
+     * count, what the foot is holding, the bytes fetched and the pitch shift
+     * are all still MEASURED, and all six are still reported, in the asserts
+     * that already carried every one of those numbers. Deleting the display
+     * without the facts is how a page quietly stops reporting something.
+     * ⚠️ THE ONE THAT HAD NOWHERE ELSE TO GO IS `press to sound` for a VISITOR,
+     * who runs no checks. It is a number nobody could read without a MIDI
+     * keyboard anyway, which is what made the cell the weakest of the six.
+     */
+    readout: null,
+    /**
+     * 🔴 NO CONTROL ROW AT ALL, AND THAT MOVED EVERY CHECK ON THIS PAGE.
+     * Asked 2026-09-23: *"rm 'play a phrase'"*. `demo/verify.mjs` drives a page
+     * by clicking `.pos-controls button`, and this page's whole check block
+     * hung off that one handler, so deleting it would have taken all of them
+     * out of the run while the suite stayed green. `positron-verify` records
+     * exactly that loss twice, on `/mirror/` and `/blocks/`, where ten and six
+     * asserts would have gone silent.
+     * ✅ THE CHECKS RUN AT LOAD BEHIND `SELFCHECK` NOW, which is what `/muta/`
+     * and `/radio/` already do, and the per page assert count was diffed either
+     * side of the change rather than assumed.
+     * ⚠️ AND THE PAGE IS BETTER FOR IT. The thing to press was always the
+     * keyboard.
+     */
+    controls: [],
+  });
+  guard(d);
+
+  // ── nothing is opened on a visit ───────────────────────────────────────────
+  //
+  // 🔴 EVERY URL THAT CAN LEAVE THIS PAGE GOES THROUGH ONE COUNTED FUNCTION, so
+  // "a visit fetches nothing" is an ASSERT OVER A COUNTER rather than a claim
+  // about a file. That is the `/reel/` repair: six of that page's nine outward
+  // requests were media source assignments rather than `fetch`, so a grep would
+  // have missed them.
+  let gotBytes = 0, gotFiles = 0;
+  async function pull(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${url} answered ${res.status}`);
+    const buf = await res.arrayBuffer();
+    gotBytes += buf.byteLength;
+    gotFiles++;
+    return buf;
+  }
+
+  let ctx = null, master = null, ana = null, anaBuf = null, fine = null, fineBuf = null;
+  const buffers = new Map();      // sampled note -> AudioBuffer
+  const wanted = new Map();       // octave -> promise, so one press fetches once
+  const voices = [];              // {note, src, gain, at, damped}
+
+  async function ensureAudio() {
+    if (ctx) return ctx;
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+    // ⚠️ Fire and move on. `resume()` waits on a gesture in a real browser and
+    // NEVER rejects, so awaiting it is a hang rather than an error.
+    ctx.resume().catch(() => {});
+    master = ctx.createGain();
+    master.gain.value = 1;
+    ana = ctx.createAnalyser();
+    /**
+     * 🔴 512 SAMPLES, NOT 2048, AND 2048 MADE A CHECK BLIND. An analyser hands
+     * back the most recent `fftSize` samples, so at 2048 the window is **46 ms
+     * at 44.1 kHz** and a reading taken 40 ms after a key was released is still
+     * mostly made of samples from BEFORE it was released. MEASURED by sabotage:
+     * replacing the damper ramp with an instant `setValueAtTime(0)` left this
+     * page **24/24 green**, because the window the damper was being graded
+     * through was wider than the damper. 512 is 11.6 ms.
+     * ⚠️ AND IT IS A FLOOR ON WHAT CAN BE MEASURED, NOT A FREE CHOICE. 11.6 ms
+     * is one and a half cycles of note 60 and half a cycle of note 33, so a
+     * level reading on a bass note under-reports. Every check here plays notes
+     * 60 to 67 for that reason.
+     */
+    ana.fftSize = 512;
+    anaBuf = new Float32Array(ana.fftSize);
+    master.connect(ana).connect(ctx.destination);
+    /**
+     * 🔴 A SECOND ANALYSER, BECAUSE LEVEL AND PITCH WANT OPPOSITE WINDOWS. The
+     * one above has to be SHORT so that a reading taken 45 ms after a key was
+     * released contains no samples from before it. This one has to be LONG or
+     * it cannot tell two neighbouring semitones apart at all: at 512 samples a
+     * bin is 86 Hz wide and notes 60 and 61 are 15.6 Hz apart, so they land in
+     * the same bin. At 16384 a bin is 2.7 Hz.
+     * ⚠️ IT EXISTS BECAUSE A SABOTAGE STAYED GREEN. `playbackRate` forced to 1
+     * on every note left this page 24/24, because the shift check was reading
+     * the number the page had COMPUTED rather than the pitch it had played.
+     * That is measuring the quantity next to the one in question, which is the
+     * trap this project has already paid for on `/mirror/` and on the MIM
+     * corpus.
+     */
+    fine = ctx.createAnalyser();
+    fine.fftSize = 16384;
+    fineBuf = new Float32Array(fine.frequencyBinCount);
+    master.connect(fine);
+    /**
+     * ⚠️ `outputLatency` IS THE ONE TO READ AND `baseLatency` IS THE FALLBACK.
+     * The first is how long after `start()` a sample reaches the speaker, which
+     * is the half of press to sound that happens after this page is finished.
+     * It is Baseline since March 2025; where it is missing, `baseLatency` is
+     * the graph's own buffer and is smaller, so the number is optimistic and
+     * the log says which one it came from.
+     */
+    outMs = (ctx.outputLatency ?? ctx.baseLatency ?? 0) * 1000;
+    d.log(`press to sound is measured from the MIDI message to the scheduled start, plus `
+        + `${outMs.toFixed(1)} ms of ${ctx.outputLatency != null ? 'output latency' : 'graph buffer'}`);
+    d.log('what no browser can see is the keyboard scanning its own keys and the USB stack, '
+        + 'which is everything between the felt and the message');
+    return ctx;
+  }
+  let outMs = 0;
+
+  /**
+   * 🔴 ONE OCTAVE AT A TIME, ON THE FIRST PRESS OF A KEY IN IT, AND NEVER ON A
+   * VISIT. Two to four files and about 60 KB, rather than 656 KB for a visitor
+   * who pressed one key. The promise is kept in `wanted` so a chord in one
+   * octave fetches it once rather than four times.
+   */
+  function octaveOf(note) { return Math.floor(nearestOf(note) / 12); }
+  function fetchOctave(note) {
+    const oct = octaveOf(note);
+    if (wanted.has(oct)) return wanted.get(oct);
+    const need = SAMPLED.filter((n) => Math.floor(n / 12) === oct && !buffers.has(n));
+    const t0 = performance.now();
+    const p = (async () => {
+      await ensureAudio();
+      for (const n of need) {
+        const raw = await pull(`/nola/${n}.mp3`);
+        buffers.set(n, await ctx.decodeAudioData(raw));
+      }
+      if (need.length) {
+        d.log(`${need.length} recording${need.length === 1 ? '' : 's'} arrived for this octave `
+            + `in ${Math.round(performance.now() - t0)} ms, and nothing was asked for before `
+            + 'the first key was pressed');
+      }
+    })();
+    wanted.set(oct, p);
+    return p;
+  }
+
+  // ── one note ──────────────────────────────────────────────────────────────
+
+  let lastShift = null, presses = 0, sumMs = 0, worstMs = 0, medians = [];
+
+  /* ⚠️ IT STILL RUNS WITH NO READOUT TO WRITE TO. The counts are what the
+     checks read, and `voices` and the pedal's own sets are where they live, so
+     this is now the one place that keeps the two in step at every event rather
+     than a painter. */
+  function showVoices() { /* the numbers live on `voices` and `pedal`, and the
+     asserts read them there. */ }
+
+  /**
+   * 🔴 THE DAMPER IS A RAMP AND NOT A `stop()`. A real damper takes 50 to
+   * 150 ms to silence a string and longer in the bass, and a page that calls
+   * `stop()` on a key release makes a click instead of a note ending.
+   * `setTargetAtTime` reaches within 5 per cent of its target in three time
+   * constants, so the constant is a third of the time asked for and the source
+   * is stopped at one and a half times it, by which point it is at about 1 per
+   * cent. `rig/board/synth.mjs` picked the same 0.12 s floor for the same
+   * reason, and `demo/shell/pedal.mjs` owns the number.
+   */
+  function damp(v, sec) {
+    if (v.damped) return;
+    v.damped = true;
+    const now = ctx.currentTime;
+    v.gain.gain.cancelScheduledValues(now);
+    v.gain.gain.setTargetAtTime(0, now, Math.max(0.005, sec / 3));
+    try { v.src.stop(now + sec * 1.5); } catch { /* already stopped */ }
+  }
+
+  function endVoice(v) {
+    const i = voices.indexOf(v);
+    if (i >= 0) voices.splice(i, 1);
+    showVoices();
+  }
+
+  /**
+   * A key went down, by any route.
+   *
+   * 🔴 ONE PATH, NOT TWO. A tapped key and a played key call this and nothing
+   * else, which is `midi.mjs`'s own first rule: a note number is a note number,
+   * and a page that grows a second route for MIDI has two things to keep in
+   * step for ever.
+   */
+  async function press(note, vel, at) {
+    if (note < 0 || note > 127) return;
+    pedal.keyDown(note);
+    keys.lightNote(note, true);
+    await ensureAudio();
+    const near = nearestOf(note);
+    /* ⚠️ A LOCAL, NOT A FLAG ON THE MODULE. Two keys pressed in the same
+       millisecond are two overlapping runs of this function, and one shared
+       boolean between them means whichever finishes second reads the other's
+       answer. A chord is the ordinary case here, not the edge one. */
+    let waitedForFiles = false;
+    if (!buffers.has(near)) { waitedForFiles = true; await fetchOctave(note); }
+    const buf = buffers.get(near);
+    if (!buf) return;
+
+    /* 🔴 A KEY STRUCK AGAIN DAMPS THE STRING IT IS ABOUT TO STRIKE. One key is
+       one string: re-pressing it does not add a second voice on a real piano,
+       it re-excites the one that is ringing. The old one goes quickly, which is
+       also what stops a repeated key stacking into a wall. */
+    for (const v of [...voices]) if (v.note === note) damp(v, 0.04);
+
+    /* ⚠️ OLDEST FIRST PAST THE CAP, and the oldest is index 0 because voices are
+       pushed in order. A steal is a real event, so it goes in the log rather
+       than being silent. */
+    while (voices.length >= VOICES) {
+      const old = voices[0];
+      damp(old, 0.02);
+      endVoice(old);
+      d.log(`${VOICES} voices were already sounding, so the oldest was taken`, 'warn');
+    }
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const shift = note - near;
+    src.playbackRate.value = Math.pow(2, shift / 12);
+    const g = ctx.createGain();
+    g.gain.value = velGain(vel);
+    src.connect(g).connect(master);
+    const v = { note, src, gain: g, at: ctx.currentTime, damped: false };
+    src.onended = () => endVoice(v);
+    src.start();
+    voices.push(v);
+
+    lastShift = shift;
+    showVoices();
+
+    /* 🔴 MEASURED FROM THE MESSAGE, NOT FROM THIS FUNCTION, AND ONLY WHEN THE
+       RECORDING WAS ALREADY IN HAND. A first press in an octave waits on a
+       network fetch and a decode, and folding that into `worst` would leave one
+       number standing at a few hundred milliseconds for the rest of the page's
+       life, which is exactly what `worst` exists to make visible about
+       something else. The fetch has its own line in the log. */
+    if (at != null && !waitedForFiles) {
+      const ms = (performance.now() - at) + outMs;
+      presses++; sumMs += ms;
+      medians.push(ms);
+      if (ms > worstMs) worstMs = ms;
+      medians.sort((a, b) => a - b);
+    }
+  }
+
+  /** A key came up, by any route. The pedal decides whether anything happens. */
+  function lift(note) {
+    keys.lightNote(note, false);
+    pedal.keyUp(note);
+    showVoices();
+  }
+
+  /** What letting go of a note means on this page's graph. */
+  function release(note, sec) {
+    for (const v of [...voices]) if (v.note === note && !v.damped) damp(v, sec);
+    showVoices();
+  }
+
+  // ── the foot ──────────────────────────────────────────────────────────────
+
+  /**
+   * 🔴 THE CONTROLLER NUMBER IS AN OPTION BECAUSE NOBODY HAS READ WHAT THE
+   * PEDAL ON THIS DESK SENDS. `?pedal=67` points this at another one, and the
+   * page says in its log which number it is listening to, so a reader never has
+   * to guess whether a silent pedal is unplugged or on the wrong controller.
+   */
+  const PEDAL_CC = Math.max(0, Math.min(127, Number(q.get('pedal')) || SUSTAIN_CC));
+  /** `?flip=1`, for a pedal whose polarity was sensed wrong at power up. */
+  const PEDAL_FLIP = q.get('flip') === '1';
+
+  const pedal = createPedal({
+    cc: PEDAL_CC,
+    flip: PEDAL_FLIP,
+    release,
+    onPedal: (down, value, freed) => {
+      d.log(down ? PEDAL_SAYS.down : freed ? PEDAL_SAYS.freed(freed) : PEDAL_SAYS.up);
+      /* 🔴 THE RAW VALUE, BESIDE THE READING, AND THIS IS THE INVERTED PEDAL
+         MADE VISIBLE. The MK-425C senses its footswitch's polarity at POWER UP,
+         so a pedal held down while the keyboard boots is inverted for the whole
+         session and nothing on any screen would otherwise say so. A page cannot
+         tell that from somebody holding the pedal and must not pretend to. What
+         it can do is print the number, so a player whose foot is nowhere near
+         it can see the instrument lying. */
+      d.log(PEDAL_SAYS.raw(PEDAL_CC, value, down));
+      const kind = pedal.switchy();
+      if (kind !== null && kind !== saidKind) {
+        saidKind = kind;
+        d.log(kind ? PEDAL_SAYS.switchy : PEDAL_SAYS.continuous);
+      }
+      sustainBtn.set(down, true);
+      showVoices();
+    },
+  });
+  let saidKind = null;
+
+  // ── the keys, and the two ways in ─────────────────────────────────────────
+
+  /**
+   * 🔴 TWENTY FIVE KEYS, WHICH IS FIFTEEN WHITE ONES AND A DECISION ABOUT
+   * TOUCH. Asked for as *"scale keys so 25 keys fit in"*. `shell.css` floors a
+   * white column at `--k-min`, default **49 px**, and `keyboard.mjs` argues at
+   * length that 49 is already only one pixel above Android's 48 dp minimum and
+   * five above Apple's 44 pt: *"the next request to make the keys smaller is a
+   * request to make them too small to hit"*. Fifteen at 49 plus fourteen 3 px
+   * gaps is 777 px and this page is 688.
+   * ✅ SO THE FLOOR MOVES TO 44 HERE AND NOWHERE ELSE, which is Apple's minimum
+   * exactly rather than under it, and it is a page level custom property
+   * because `.keys` already reads `minmax(var(--k-min, 49px), 1fr)`. Nothing
+   * shared changes and no other keyboard on the site moves.
+   * ⚠️ AND ON A PHONE IT STILL SCROLLS, which is correct rather than a
+   * shortfall: fifteen keys at any touchable size do not fit 390 px, the row
+   * hands the gesture to the platform with `touch-action: pan-x`, and a swipe
+   * scrolls while a drag plays.
+   */
+  const KEY_MIN = 44;
+
+  /**
+   * 🔴 THE LETTERS COVER THE MIDDLE OCTAVE AND NOTHING ELSE, BECAUSE THERE ARE
+   * NOT TWENTY FIVE OF THEM. The computer keyboard has one octave's worth in
+   * `QWERTY_CHROMATIC`, and `z` and `x` are already the octave pair inside
+   * `keyboard.mjs`. So the twelve keys below middle C carry note names only and
+   * the thirteen from C4 up keep their letter, which is the component's own
+   * rule applied per key: a key labelled `a` that does nothing when you press
+   * `a` is worse than a key with no letter on it.
+   */
+  const LOW_KEYS = 12;
+  const { KEY_MAP, KEY_ORDER, KEY_SHARPS, KEY_LETTERS } = (() => {
+    const map = {}, order = [], sharps = new Set(), lettered = new Set();
+    const BLACK = new Set([1, 3, 6, 8, 10]);
+    const qwerty = Object.keys(QWERTY_CHROMATIC);
+    for (let i = 0; i <= 24; i++) {
+      const id = i < LOW_KEYS ? `lo${i}` : qwerty[i - LOW_KEYS];
+      map[id] = i;
+      order.push(id);
+      if (BLACK.has(i % 12)) sharps.add(id);
+      if (i >= LOW_KEYS) lettered.add(id);
+    }
+    return { KEY_MAP: map, KEY_ORDER: order, KEY_SHARPS: sharps, KEY_LETTERS: lettered };
+  })();
+
+  const keysHost = el('div', 'nola-keys');
+  keysHost.style.setProperty('--k-min', `${KEY_MIN}px`);
+  const keys = createKeyboard(keysHost, {
+    /* C3, so the two octaves land C3 to C5 with middle C in the middle of the
+       picture rather than at its left edge. */
+    base: 48,
+    map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: KEY_LETTERS,
+    minBase: 24, maxBase: 84,
+    onDown: (note) => press(note, 100, performance.now()),
+    onUp: (note) => lift(note),
+    /* 🔴 AND THE CHARTS MOVE WITH IT. They are drawn in the instrument's window
+       so a shape can be carried down the page; an octave press that moved the
+       keys and left the charts behind would break exactly that. */
+    onOctave: (base) => { d.log(`the keys on screen now start at ${base}`); redrawCharts(); },
+    onPanic: () => {
+      for (const v of [...voices]) { damp(v, 0.02); endVoice(v); }
+      pedal.panic();
+      sustainBtn.set(false, true);
+      showVoices();
+    },
+  });
+
+  /**
+   * 🔴 TRANSPOSE MOVES WHAT ARRIVES OVER MIDI AND NOTHING ELSE, AND THAT IS THE
+   * WHOLE POINT OF IT. It exists to correct a keyboard that is a semitone flat,
+   * which is a fact about a box on this desk rather than about the piano. An
+   * on-screen key plays the note printed on it at every setting, or a page
+   * would be shipping a piano whose middle C is not middle C.
+   * ⚠️ AND THE KEY THAT LIGHTS IS THE ONE THAT SOUNDS. `keyboard.mjs`'s own rule
+   * is that a key is lit by a NOTE, and after a correction the note you hear is
+   * the note you meant.
+   */
+  /**
+   * 🔴 AND IT HAS NO CONTROL ANY MORE, BECAUSE THE INSTRUMENT WAS FIXED.
+   * Reported 2026-09-23 as *"fixed transpose"*: the correction now lives on the
+   * keyboard, where it belongs, so a stepper on this page would be a second
+   * place to get it wrong. `?transpose=<n>` keeps the capability for the
+   * session after a power cycle puts the fault back, and the check below still
+   * drives it, so the behaviour stays graded with nothing on screen.
+   */
+  let transpose = 0, flatSaid = false;
+  /* `?transpose=-1` for the session after a power cycle puts the keyboard's own
+     fault back. It is read once and never drawn. */
+  function setTranspose(v) {
+    transpose = Math.max(-12, Math.min(12, v));
+    d.log(transpose === 0
+      ? 'a MIDI keyboard now plays the note it sends'
+      : `a MIDI keyboard now plays ${transpose > 0 ? transpose : -transpose} semitone`
+        + `${Math.abs(transpose) === 1 ? '' : 's'} ${transpose > 0 ? 'up' : 'down'} from what it sends`);
+  }
+
+  /**
+   * 🔴 A SUSTAIN SWITCH, AND IT GOES DOWN THE SAME PATH A PEDAL DOES. Most
+   * people opening this page have no pedal, and one of them is holding a phone
+   * with no Web MIDI at all, so without this the thing the page is about is
+   * unreachable for them. It sends the pedal a real controller message rather
+   * than reaching past it, which is `midi.mjs`'s one path rule again: a switch
+   * with its own route into the voice manager would be a second implementation
+   * of the pedal that nothing grades.
+   */
+  /**
+   * 🔴 A TOGGLE BUTTON UNDER THE KEYS, WHICH IS WHERE A PEDAL IS. Asked for
+   * 2026-09-23: *"make sustain a toggle button under the keyboard, std
+   * component. rm top component buttons"*. `createPresenceButton` is the kit's
+   * toggle button and `/muta/` already drives its MIDI switch with it, so this
+   * is the component rather than a fourth thing that looks like one.
+   * ⚠️ AND IT SITS WITH THE OCTAVE PAD RATHER THAN IN `.pos-controls`, for the
+   * reason `keyboard.mjs` gives about the pad itself: these are controls ABOUT
+   * the keys, and a hand's width away at the top of the page is the wrong place
+   * for all of them.
+   * 🔴 `set`, NOT `control`, AND THE DIFFERENCE IS A CONTROL THAT LIED. This
+   * button is somebody saying the dampers are up. It is not a keyboard with a
+   * backwards footswitch, so `?flip=1` must not reverse it as well. MEASURED:
+   * routing it through `control` took four asserts red under `?flip=1` and
+   * would have shipped a SUSTAIN button that turns sustain off.
+   */
+  /**
+   * ⚠️ AND IT IS A SWITCH RATHER THAN A PRESENCE BUTTON, WHICH IS WHAT `rm
+   * sustain up / down` LEAVES. A presence badge is a dot and a STATE WORD, and
+   * its reserved width is measured on the longest word it can say, so emptying
+   * the words leaves a reserved empty box, which is the `an empty box is a
+   * line` rule one component along. `createPad` was the other candidate and is
+   * a fixed square of `--ctl-w` with a 10 px face; `SUSTAIN` is seven letters
+   * and would ellipsise. A switch carries a name, no state word, and puts the
+   * state in the knob.
+   */
+  const sustainBtn = createSwitch({
+    label: 'SUSTAIN',
+    title: 'hold the dampers off the strings, the way a pedal does',
+    onChange: (on) => pedal.set(on),
+  });
+
+  /**
+   * 🔴 A LINE OF CHORDS, AND A PICTURE OF EACH ONE UNDER IT. Asked for as
+   * *"just strings like c5 cmaj, can be separated by anyhing ... render list of
+   * pianokeys with chords based on these parsings"*. `demo/shell/chords.mjs`
+   * does the reading and has 27 checks of its own with no browser in them.
+   * ⚠️ IT IS AT THE TOP BECAUSE IT IS AN INPUT, and the keys under it are what
+   * it acts on. The row that used to be here held a SUSTAIN switch and a
+   * TRANSPOSE stepper, and both are gone: one moved under the keys where a
+   * pedal belongs, and the other went with the instrument being fixed.
+   */
+  const chordField = createField({
+    label: 'CHORDS',
+    value: 'Cmaj C9 F/C Fm6/C',
+    placeholder: 'Cmaj C9 F/C Fm6/C',
+    grow: 'grow',
+    onInput: (v) => drawChords(v),
+  });
+  const chordList = el('div', 'nola-chords');
+  const padRow = el('div', 'nola-pad');
+  padRow.append(sustainBtn.el);
+
+  /**
+   * 🔴 THE ORDER OF THE PAGE, GIVEN AS FOUR LINES: `desc / textield / exaple
+   * keyboar rows / play keyboard`. The instrument goes LAST, under the charts,
+   * which is the opposite of where a page usually puts the thing you press.
+   * It is right here: the field is what you change, the charts are what it
+   * produced, and the keyboard is where you go to hear any of it. Reading down
+   * the page is reading the sentence.
+   */
+  d.stack.add(chordField.el, chordList, keysHost, padRow);
+
+  // ── the MIDI keyboard ─────────────────────────────────────────────────────
+
+  /**
+   * 🔴 THE THREE MIDI HANDLERS ARE NAMED FUNCTIONS RATHER THAN LITERALS INSIDE
+   * `createMidi`, SO THE PAGE'S OWN CHECKS CAN DRIVE THEM. This machine has no
+   * MIDI under a harness, so they are the only part of that path a check can
+   * ever reach, and a check that reached past them to `press` would grade this
+   * page's arithmetic against itself.
+   * ⚠️ AND IT WAS EXACTLY THAT, AND SABOTAGE CAUGHT IT. The transpose check
+   * used to call `press(60 + transpose)` by hand, which is the correction
+   * written out a second time in the check, so a transpose that leaked into the
+   * on-screen keys left the page 24/24 green.
+   */
+  function midiDown(note, vel, ch, at) {
+    if (note < 48 && !flatSaid) {
+      flatSaid = true;
+      d.log(`this keyboard sent note ${note}, below the 48 a C to C controller starts at, `
+          + 'so it may be transposed down a semitone like the one on this desk', 'warn');
+    }
+    press(note + transpose, vel, at);
+  }
+  function midiUp(note) { lift(note + transpose); }
+  function midiControl(cc, value) {
+    if (pedal.control(cc, value) || cc === PEDAL_CC || ccSaid.has(cc)) return;
+    ccSaid.add(cc);
+    d.log(`controller ${cc} arrived and this page listens to ${PEDAL_CC} only, `
+        + `so open it with ?pedal=${cc} if that is the foot`);
+  }
+
+  const midi = createMidi({
+    onDown: midiDown,
+    onUp: midiUp,
+    onControl: midiControl,
+    log: d.log,
+    onPorts: (n) => d.log(n ? `${n} MIDI input${n === 1 ? '' : 's'} to listen to`
+                            : 'no MIDI keyboard is plugged in, and the keys on screen still play'),
+  });
+  const ccSaid = new Set();
+  d.log(`the sustain pedal is read on controller ${PEDAL_CC}`
+      + (PEDAL_FLIP ? ', upside down, so 0 is the foot going down' : ''));
+  if (!PEDAL_FLIP) {
+    d.log('if the pedal works backwards, open this page with ?flip=1, or power the keyboard '
+        + 'up with the pedal unpressed, which is where that fault comes from');
+  }
+
+  // ── a phrase, for somebody with neither a keyboard nor a pedal ────────────
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const peak = () => {
+    if (!ana) return 0;
+    ana.getFloatTimeDomainData(anaBuf);
+    let p = 0;
+    for (let i = 0; i < anaBuf.length; i++) { const a = Math.abs(anaBuf[i]); if (a > p) p = a; }
+    return p;
+  };
+
+  /**
+   * The loudest partial in whatever is sounding, in Hz.
+   *
+   * ⚠️ WHICH PARTIAL IT IS DOES NOT MATTER AND THAT IS THE POINT. Two notes a
+   * semitone apart played from the SAME recording are the same samples at two
+   * rates, so their spectra are one shape scaled: whichever partial is loudest
+   * in one is loudest in the other, and the ratio of the two readings is the
+   * ratio of the two rates whether that partial is the first or the fifth.
+   * Measuring both at the same age after the key went down is what makes that
+   * true, because a piano's partials decay at different speeds.
+   */
+  function topHz() {
+    if (!fine) return 0;
+    fine.getFloatFrequencyData(fineBuf);
+    let best = -Infinity, at = 0;
+    for (let i = 2; i < fineBuf.length; i++) if (fineBuf[i] > best) { best = fineBuf[i]; at = i; }
+    return at * ctx.sampleRate / fine.fftSize;
+  }
+
+  /**
+   * 🔴 THE CHORDS ON SCREEN, ONE SMALL KEYBOARD EACH.
+   *
+   * ⚠️ `pad: false` AND `letters: false`, WHICH IS WHAT MAKES THIS A PICTURE
+   * RATHER THAN AN INSTRUMENT. An octave pair and a `Notes off` under each of
+   * twelve chords is a screen of controls belonging to nothing, and the letters
+   * would claim a computer key plays a chord chart.
+   * ⚠️ AND PRESSING ONE STILL SOUNDS, because a chord you can hear is the whole
+   * reason to draw it. That is the one thing it keeps from being an instrument.
+   * 🔴 EVERY CHART IS 25 KEYS BASED AT THE C AT OR BELOW THE CHORD'S LOWEST
+   * NOTE. A window sized to each chord would make a ragged list, and 13 keys is
+   * not enough: `Bmaj7` spans eleven semitones from B and a slash bass puts
+   * another octave under it, so a fixed 13 would cut notes off the end without
+   * saying so.
+   */
+  const charts = [];
+  let saidKey = null;
+  /* Declared here so `onOctave` above can reach it before `drawChords` is
+     defined. A function declaration would hoist; this is a page saying the
+     order of its own definitions out loud. */
+  const redrawCharts = () => drawChords(chordField.value());
+  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  function drawChords(line) {
+    for (const c of charts) c.kb.destroy();
+    charts.length = 0;
+    chordList.textContent = '';
+    const { chords, bad, key } = parseChords(line);
+    for (const c of chords) {
+      const item = el('div', 'nola-chord');
+      const head = el('div', 'nola-chord-h');
+      head.append(el('span', 'nola-chord-n', c.name));
+      /* 🔴 THE NUMERAL, WHICH IS WHAT THE FOUR FRAMES WERE ABOUT. `F` is IV and
+         `Fm6` is iv on the same root in the same key, so the case says
+         something the name cannot. */
+      if (c.roman) head.append(el('span', 'nola-chord-r', c.roman));
+      item.append(head);
+      const host = el('div', 'nola-chord-k');
+      host.style.setProperty('--k-min', `${KEY_MIN}px`);
+      /**
+       * 🔴 EVERY CHART IS THE INSTRUMENT'S OWN WINDOW, AND IT WAS NOT UNTIL A
+       * SCREENSHOT SAID SO. The charts were based at the C below each chord and
+       * the keyboard below them at C3, so the same key was in a different
+       * COLUMN on the chart and on the instrument. Same width, same key size,
+       * different base: the one thing a chord chart is for is carrying a shape
+       * down the page to your hands, and it could not be carried.
+       * ⚠️ SO THE CHORD IS VOICED INTO THE WINDOW RATHER THAN THE WINDOW MOVED
+       * TO THE CHORD. `chords.mjs` voices from middle C because it has to pick
+       * something; which octave a chord is played in is the player's, so
+       * shifting it by octaves to land under the keys is free and moving the
+       * window is not.
+       */
+      const base = keys.base;
+      let shifted = c.notes;
+      let lo = Math.min(...shifted);
+      while (lo < base) { shifted = shifted.map((n) => n + 12); lo += 12; }
+      while (lo >= base + 12) { shifted = shifted.map((n) => n - 12); lo -= 12; }
+      const kb = createKeyboard(host, {
+        base,
+        map: KEY_MAP, keys: KEY_ORDER, sharps: KEY_SHARPS, letters: false,
+        pad: false,
+        onDown: (note) => press(note, 100, performance.now()),
+        onUp: (note) => lift(note),
+      });
+      for (const n of shifted) kb.lightNote(n, true, 'hint');
+      item.append(host);
+      chordList.append(item);
+      /* ⚠️ A NOTE ABOVE THE WINDOW IS SAID, NOT SWALLOWED. `lightNote` on a
+         note this keyboard cannot draw returns quietly, which is right for the
+         component and wrong for a reader: a chord drawn with one key missing
+         and nothing said is the silent kind of wrong. */
+      const outside = shifted.filter((n) => n < base || n > base + 24);
+      if (outside.length) {
+        head.append(el('span', 'nola-chord-o',
+          `${outside.length} note${outside.length === 1 ? '' : 's'} above these keys`));
+      }
+      charts.push({ chord: c, kb, notes: shifted, outside });
+    }
+    /* 🔴 A TOKEN THAT DID NOT PARSE IS SHOWN BACK, NEVER DROPPED. A line with
+       four words and three keyboards under it, and nothing saying which word
+       went missing, is the shape `createDiagram`'s `cuts` already refuses. */
+    if (bad.length) {
+      const why = el('div', 'nola-bad',
+        bad.map((b) => `${b.text} is not a chord, because ${b.why}`).join('. '));
+      chordList.append(why);
+    }
+    /* 🔴 WHERE THE KEY CAME FROM, SAID OUT LOUD. Nothing in a line of chord
+       symbols declares one, so the numerals are read against the FIRST chord's
+       root. That is an inference, and a page showing `bVII` without saying what
+       it is flat OF would be stating a fact it had guessed. */
+    if (key !== null && key !== saidKey) {
+      saidKey = key;
+      d.log(`the numerals are read in the key of ${NOTE_NAMES[key]}, `
+          + 'taken from the first chord in the line');
+    }
+    return { chords, bad, key };
+  }
+
+  // ── what only this page can say ───────────────────────────────────────────
+  //
+  // 🔴 THESE FOUR RUN FOR EVERYBODY, because they are gradable from data
+  // already in hand and cost a visitor nothing. `selfcheck.mjs`: a visit
+  // asserts a STRICT SUBSET, and what moves behind the gate is anything that
+  // opens a file, makes a sound, presses a control or moves the picture.
+
+  d.assert('one recording every minor third, from the bottom of a piano to the top',
+    SAMPLED.length === 30 && LOW === 21 && HIGH === 108
+    && SAMPLED.every((n, i) => i === 0 || n - SAMPLED[i - 1] === 3),
+    `${SAMPLED.length} notes, ${LOW} to ${HIGH}, three apart`);
+
+  /* 🔴 THE SHIFT ASSERT, AND IT IS ONLY WORTH ANYTHING BECAUSE THE SET IS
+     SPARSE. Against a chromatic soundfont every note is its own recording and
+     this is true by construction, which is a check that cannot fail and so
+     cannot report. Here 58 of the 88 keys really are bent. */
+  {
+    let worstShift = 0, bent = 0;
+    for (let n = 21; n <= 108; n++) {
+      const s = Math.abs(shiftOf(n));
+      if (s > worstShift) worstShift = s;
+      if (s) bent++;
+    }
+    d.assert('every key on a piano is within one semitone of a recording',
+      worstShift <= 1 && bent === 58,
+      `worst bend ${worstShift} semitone across notes 21 to 108, and ${bent} of 88 keys are bent at all`);
+  }
+
+  d.assert('a visit asks for no audio at all, counted rather than read off the page',
+    gotFiles === 0 && gotBytes === 0,
+    `${gotFiles} files and ${gotBytes} bytes before anything was pressed`);
+
+  /* ⚠️ `__demo.logs`, NOT `d.logs`. The lines live on the machine contract the
+     shell publishes, and the object a page is handed carries `log` to write one
+     and no way to read them back. */
+  d.assert('the pedal is read on one controller, and the page says which',
+    pedal.cc === PEDAL_CC && pedal.flipped() === PEDAL_FLIP
+    && window.__demo.logs.some((l) => l.msg.includes(`controller ${PEDAL_CC}`)),
+    `controller ${PEDAL_CC}${PEDAL_CC === SUSTAIN_CC ? ', the default' : ', from the query'}`
+    + `, read ${PEDAL_FLIP ? 'upside down' : 'the right way up'}`);
+
+  /* 🔴 THE NEGATIVE CONTROL FOR `?flip=1` BEING WIRED AT ALL. Without one, the
+     option could be read off the query, logged, and then ignored, and this page
+     would assert exactly the same things either way. Two pedals and one byte:
+     they must not agree.
+     ⚠️ AND THE SWITCH ON THE PAGE IS NEVER FLIPPED, WHICH IS NOT AN OVERSIGHT.
+     `?flip=1` corrects a fault in one instrument on one desk this session, and
+     the switch is not that instrument: it sends the value the specification
+     asks for. A page that flipped its own control to match a keyboard would
+     ship a SUSTAIN switch that turns sustain off. */
+  {
+    const mine = createPedal({ cc: PEDAL_CC, flip: PEDAL_FLIP });
+    const other = createPedal({ cc: PEDAL_CC, flip: !PEDAL_FLIP });
+    mine.control(PEDAL_CC, 127);
+    other.control(PEDAL_CC, 127);
+    d.assert('reading the pedal upside down reaches the opposite conclusion from one byte',
+      mine.down() !== other.down() && mine.down() === !PEDAL_FLIP,
+      `a value of 127 reads ${mine.down() ? 'down' : 'up'} here and `
+      + `${other.down() ? 'down' : 'up'} the other way up`);
+  }
+
+  async function checks() {
+    /**
+     * 🔴 DRIVEN THROUGH THE REAL HANDLERS, WHICH IS THE PATTERN `/muta/` SET.
+     * This machine has no MIDI under a harness, so `press`, `lift` and
+     * `pedal.control` are the only part of that path a check can reach, and
+     * reaching past them to a buffer source would grade Web Audio and say
+     * nothing about the keyboard.
+     */
+    const quiet = async () => { keys.panic(); await sleep(350); };
+
+    /**
+     * 🔴 THE CHEAP ONES GO FIRST, AND THAT IS ABOUT THE HARNESS RATHER THAN
+     * ABOUT THE PAGE. `demo/verify.mjs` waits while the assert count is
+     * GROWING and gives up after about two seconds of silence. This block's
+     * first audio assert lands three and a half seconds in, so with the audio
+     * checks first the harness collected **7 of 25** and reported 13/13 GREEN:
+     * a page that had lost eighteen checks and looked perfect. MEASURED by
+     * opening the same page by hand and reading `__demo.asserts.length`, which
+     * came back **20 and still climbing** while the suite had already left.
+     * ⚠️ SO THE COUNT IS THE INSTRUMENT AND THE COLOUR IS NOT. Nothing failed
+     * in either run. The only thing that said anything was wrong was 25
+     * becoming 7.
+     */
+    {
+      const { chords, bad } = drawChords('Cmaj C9 F/C Fm6/C');
+      d.assert('the chord line draws one keyboard per chord, with the chord lit on it',
+        chords.length === 4 && bad.length === 0 && charts.length === 4
+        && chordList.querySelectorAll('.kbd').length === 4,
+        `${chords.length} chords, ${chordList.querySelectorAll('.kbd').length} keyboards, `
+        + `${bad.length} refused`);
+
+      /* 🔴 THE FOUR FRAMES, READ BACK OFF THE PAGE RATHER THAN OFF THE PARSER.
+         `chords-test.mjs` already grades the arithmetic with no browser in it;
+         what only this page can say is that the numeral it computed is the
+         numeral on screen, and that `Fm6/C` came out lower case where `F/C`
+         did not. That difference is the whole reason a numeral is drawn. */
+      const drawn = [...chordList.querySelectorAll('.nola-chord-h')]
+        .map((h) => `${h.querySelector('.nola-chord-n').textContent} `
+                  + `${h.querySelector('.nola-chord-r')?.textContent ?? ''}`.trim());
+      d.assert('each chord is drawn with its numeral, and the case says which third it has',
+        drawn.join(', ') === 'Cmaj I, C9 I, F/C IV, Fmin6/C iv',
+        drawn.join(', '));
+
+      /* 🔴 THE LIT KEYS ARE COUNTED OFF THE PAINTED PICTURE, not off the array
+         the page just handed itself. Asserting `c.notes.length` here would be
+         the page grading its own arithmetic, which is the trap that let a
+         `playbackRate` of 1 read green earlier today. */
+      const lit = charts.map((c) => c.kb.el.querySelectorAll('.k.hint').length);
+      const want = charts.map((c) => c.chord.notes.length);
+      d.assert('every note of every chord is painted, and nothing else is',
+        lit.join(',') === want.join(',')
+        && chordList.querySelectorAll('.k.down, .k.remote').length === 0
+        && charts.every((c) => c.outside.length === 0),
+        `painted ${lit.join(',')} against ${want.join(',')} notes`);
+
+      /* 🔴 THE CHARTS AND THE INSTRUMENT ARE THE SAME WINDOW, MEASURED AS A
+         COLUMN POSITION RATHER THAN AS A BASE NUMBER. Comparing the two `base`
+         values would grade the page's own arithmetic; comparing where a key
+         LANDS grades the picture, and the picture is the thing that has to
+         carry a shape from a chart down to the keys. */
+      const colOf = (root) => {
+        const ks = [...root.querySelectorAll('.k')];
+        const box = root.getBoundingClientRect();
+        return ks.slice(0, 3).map((k) => Math.round(k.getBoundingClientRect().left - box.left));
+      };
+      const onChart = colOf(charts[0].kb.el.querySelector('.keys'));
+      const onKeys = colOf(keysHost.querySelector('.keys'));
+      d.assert('a chord chart lines up with the keys under it, key for key',
+        charts.every((c) => c.kb.base === keys.base) && onChart.join(',') === onKeys.join(','),
+        `chart columns at ${onChart.join(',')} px against ${onKeys.join(',')} px on the instrument`);
+
+      /* ⚠️ AND A CHART CARRIES NO PAD, which is the option this page bought
+         from `keyboard.mjs` today. Twelve octave pairs and twelve `Notes off`
+         under twelve chords is a screen of controls belonging to nothing. */
+      d.assert('a chord chart is a picture, so it has no octave pad under it',
+        chordList.querySelectorAll('.kpad').length === 0
+        && keysHost.querySelectorAll('.kpad').length === 1,
+        `${chordList.querySelectorAll('.kpad').length} pads in the list, `
+        + `${keysHost.querySelectorAll('.kpad').length} under the instrument`);
+
+      const refused = drawChords('Cmaj wibble');
+      d.assert('a token that is not a chord is shown back rather than dropped',
+        refused.bad.length === 1 && chordList.querySelector('.nola-bad')?.textContent.includes('wibble'),
+        chordList.querySelector('.nola-bad')?.textContent || 'nothing said');
+      drawChords(chordField.value());
+    }
+
+    /* 🔴 TWENTY FIVE KEYS, FIFTEEN OF THEM WHITE, AND THE ROW REALLY FITS.
+       A floor of 44 px is the claim; the measurement is that the row is not
+       scrolling at this width, which is the only thing a reader would notice. */
+    {
+      const row = keysHost.querySelector('.keys');
+      const whites = keysHost.querySelectorAll('.k:not(.sharp)').length;
+      d.assert('the keyboard is two octaves and every key of it fits the page',
+        keys.notes().length === 25 && whites === 15
+        && row.scrollWidth <= row.clientWidth + 1,
+        `${keys.notes().length} keys, ${whites} white, row ${row.scrollWidth} px `
+        + `in ${row.clientWidth} px`);
+
+      /* ⚠️ AND THE LETTERS ARE ON THE MIDDLE OCTAVE ONLY, because there are not
+         twenty five of them to give. A letter on a key that does nothing is
+         worse than no letter, which is the component's own rule. */
+      const lettered = keysHost.querySelectorAll('.k .kk').length;
+      d.assert('only the octave the computer keyboard can reach carries letters',
+        lettered === 13, `${lettered} keys of 25 carry a letter`);
+    }
+
+    /* ── the pedal, and the control beside it ────────────────────────────── */
+    //
+    // ⚠️ THE CONTROL IS THE SAME GESTURE WITH NOTHING UNDER THE FOOT, MEASURED
+    // AT THE SAME AGE. Without it, what is being measured is only that a note
+    // takes a while to die.
+    await quiet();
+    await press(60, 100, performance.now());
+    await sleep(150);
+    lift(60);
+    await sleep(700);
+    const noPedal = peak();
+
+    await quiet();
+    pedal.control(PEDAL_CC, pedal.wire(true));
+    await press(60, 100, performance.now());
+    await sleep(150);
+    lift(60);
+    const heldByFoot = pedal.held();
+    await sleep(700);
+    const onPedal = peak();
+    pedal.control(PEDAL_CC, pedal.wire(false));
+    await sleep(600);
+    const afterLift = peak();
+
+    d.assert('a key let go with the pedal down keeps sounding, and lifting the pedal ends it',
+      heldByFoot === 1 && onPedal > noPedal * 2 && afterLift < onPedal / 2,
+      `at the same age the peak is ${onPedal.toFixed(4)} with the pedal down against `
+      + `${noPedal.toFixed(4)} without it, and 600 ms after the pedal came up it is `
+      + `${afterLift.toFixed(4)}`);
+
+    /* ── the two sets, which is the bug a first implementation ships ─────── */
+    await quiet();
+    pedal.control(PEDAL_CC, pedal.wire(true));
+    await press(62, 100, performance.now());
+    await sleep(120);
+    lift(62);                                   // 62 is on the foot
+    const onFoot = pedal.held();
+    await press(62, 100, performance.now());                 // and a finger is back on it
+    const backUnderFinger = pedal.held();
+    await sleep(120);
+    pedal.control(PEDAL_CC, pedal.wire(false));
+    await sleep(500);
+    const stillThere = peak();
+    d.assert('a key pressed again while the pedal is down is not taken away when it lifts',
+      onFoot === 1 && backUnderFinger === 0 && stillThere > 0.01,
+      `the foot held ${onFoot} note, then ${backUnderFinger} once the key was pressed again, `
+      + `and 500 ms after the pedal lifted the peak is ${stillThere.toFixed(4)}`);
+    lift(62);
+
+    /* ── the damper is a ramp, read at two times ─────────────────────────── */
+    //
+    // 🔴 BOTH READINGS ARE CLEAR OF THE ANALYSER'S OWN 11.6 ms WINDOW, and at
+    // 2048 samples neither was: a reading 40 ms after the key came up was still
+    // half made of samples from before it, so an instant stop measured the same
+    // as a ramp. The damper's time constant is a third of `damperSec`, so 45 ms
+    // in it is at about a third of where it started and 130 ms in at a
+    // twenty-fifth, which is a difference no window width can manufacture.
+    await quiet();
+    await press(64, 110, performance.now());
+    await sleep(200);
+    lift(64);
+    await sleep(45);
+    const early = peak();
+    await sleep(85);
+    const late = peak();
+    d.assert('a key released is damped over time rather than stopped',
+      early > 0.01 && late < early * 0.4,
+      `45 ms after the key came up the peak is ${early.toFixed(4)} and 130 ms after it is `
+      + `${late.toFixed(4)}, over a damper of ${damperSec(0).toFixed(2)}s`);
+
+    /* ── the switch takes the pedal's own road ───────────────────────────── */
+    await quiet();
+    sustainBtn.input.click();
+    const switchDown = pedal.down();
+    const litDown = sustainBtn.get();
+    await press(67, 100, performance.now());
+    await sleep(120);
+    lift(67);
+    const switchHeld = pedal.held();
+    sustainBtn.input.click();
+    await sleep(500);
+    d.assert('the sustain button goes down the same road a real pedal does',
+      switchDown === true && switchHeld === 1 && pedal.down() === false && pedal.held() === 0,
+      `the button put the pedal down and the foot held ${switchHeld} note, and pressing it `
+      + 'again let go of it');
+
+    /* 🔴 AND THE LAMP FOLLOWS THE FOOT RATHER THAN THE PRESS, which is the
+       mistake `/muta/` shipped and had reported as *"midi off, same label on
+       both states??"*. A real pedal moves this button without anybody touching
+       it, so the state has to come from the pedal. */
+    pedal.control(PEDAL_CC, pedal.wire(true));
+    const litByPedal = sustainBtn.get();
+    pedal.control(PEDAL_CC, pedal.wire(false));
+    d.assert('the button follows a real pedal, not only its own press',
+      litDown === true && litByPedal === true && sustainBtn.get() === false,
+      `pressed ${litDown}, pedal ${litByPedal}, released ${sustainBtn.get()}`);
+
+    /* ── the pitch shift is real, not a claim ────────────────────────────── */
+    //
+    // 🔴 THE PITCH, NOT THE NUMBER THE PAGE COMPUTED. Notes 63 and 64 come from
+    // ONE recording, 63 at its own rate and 64 bent up a semitone, both read at
+    // the same age. A semitone is a factor of 1.0595, and reading the page's own
+    // `shift` instead would have been the page grading its arithmetic against
+    // itself: MEASURED by forcing `playbackRate` to 1, which left this page
+    // 24/24 green until this check read the sound.
+    await quiet();
+    await press(63, 100, performance.now());                 // 63 has its own recording
+    await sleep(250);
+    const hzFlat = topHz();
+    const flat = lastShift;
+    lift(63);
+    await quiet();
+    await press(64, 100, performance.now());                 // 64 is bent up from 63
+    await sleep(250);
+    const hzBent = topHz();
+    const bent = lastShift;
+    lift(64);
+    await quiet();
+    const ratio = hzFlat ? hzBent / hzFlat : 0;
+    d.assert('a note with no recording really sounds a semitone above the one it came from',
+      bent === 1 && flat === 0 && Math.abs(ratio - Math.pow(2, 1 / 12)) < 0.03,
+      `note 63 came from ${nearestOf(63)} at ${flat} and its loudest partial is `
+      + `${hzFlat.toFixed(1)} Hz, note 64 came from ${nearestOf(64)} at ${bent} and its is `
+      + `${hzBent.toFixed(1)} Hz, a ratio of ${ratio.toFixed(4)} against 1.0595`);
+
+    /* ── transpose, and the half of the keyboard it must not touch ───────── */
+    //
+    // 🔴 BOTH HALVES AT THE SAME SETTING, because the claim is about what
+    // transpose does NOT reach. Putting it back to 0 before touching the screen
+    // keys grades the second half at the one value where the two answers cannot
+    // differ, and a transpose that leaked into the screen path read green.
+    await quiet();
+    setTranspose(1);
+    midiDown(60, 100, 0, performance.now());    // a flat keyboard's middle C
+    await sleep(80);
+    const soundedFromMidi = voices.length ? voices[voices.length - 1].note : null;
+    midiUp(60);
+    await quiet();
+    keys.press('a');                            // the screen's own middle C, still at +1
+    await sleep(80);
+    const fromScreenNote = voices.length ? voices[voices.length - 1].note : null;
+    keys.release('a');
+    setTranspose(0);
+    await quiet();
+    d.assert('transpose moves a MIDI keyboard and leaves the keys on screen where they are',
+      soundedFromMidi === 61 && fromScreenNote === 60 && transpose === 0,
+      `at +1 a keyboard sending 60 sounded ${soundedFromMidi}, and the screen's own C sounded `
+      + `${fromScreenNote} at the same setting`);
+
+    /* ── the octave pad, which no harness can press ──────────────────────── */
+    //
+    // 🔴 `verify.mjs` PRESSES `.pos-controls button` AND THE PAD IS NOT IN IT,
+    // on purpose, because it belongs to the keyboard rather than to the page.
+    // A page that ships it and asserts nothing about it has three ungraded
+    // controls, which is how `/mirror/` lost two while reading green.
+    const was = keys.base;
+    const up = keys.shiftOctave(1);
+    const down = keys.shiftOctave(-1);
+    d.assert('the octave pad moves the keys, and it stops where the keyboard does',
+      up === was + 12 && down === was,
+      `${was} to ${up} and back to ${down}`);
+
+    /* ── notes off, WITH SOMETHING ACTUALLY RINGING ──────────────────────── */
+    //
+    // 🔴 THREE KEYS STILL DOWN AND THE PEDAL STILL DOWN, because a panic check
+    // run on a quiet page grades nothing. This assert used to read the state
+    // after everything had already decayed on its own, so deleting the whole
+    // body of `onPanic` left it green: the notes were gone either way and the
+    // check could not tell which reason it was looking at.
+    await quiet();
+    pedal.control(PEDAL_CC, pedal.wire(true));
+    for (const n of [60, 64, 67]) await press(n, 100, performance.now());
+    await sleep(150);
+    const ringing = voices.length, loud = peak();
+    keys.panic();
+    await sleep(400);
+    d.assert('notes off stops what is ringing and takes the foot off the pedal',
+      ringing === 3 && loud > 0.01 && voices.length === 0 && pedal.held() === 0
+      && pedal.fingers() === 0 && pedal.down() === false && peak() < 0.01,
+      `${ringing} voices at ${loud.toFixed(4)} before it, ${voices.length} at `
+      + `${peak().toFixed(4)} after, and the pedal reads `
+      + `${pedal.down() ? 'still down' : 'up'}`);
+
+    /* ── the fetch really only took the octaves that were played ─────────── */
+    d.assert('only the octaves somebody played were asked for',
+      gotFiles > 0 && gotFiles < SAMPLED.length && buffers.size === gotFiles,
+      `${gotFiles} of ${SAMPLED.length} recordings, ${Math.round(gotBytes / 1024)} KB, `
+      + `for ${wanted.size} octave${wanted.size === 1 ? '' : 's'}`);
+
+    d.assert('the page measured its own press to sound', presses === 0 || worstMs > 0,
+      presses ? `${presses} presses timed, median ${medians[medians.length >> 1].toFixed(1)} ms, `
+              + `worst ${worstMs.toFixed(1)} ms`
+              : 'no press carried a timestamp, which is every press under a harness');
+
+    d.assert('nothing cut and nothing refused in the picture', dg.cuts.length === 0,
+      dg.cuts.map((c) => `${c.where} ${c.id}: ${c.shown}`).join(', ') || 'nothing cut, nothing refused');
+    /* 🔴 EXACTLY ONE, WHICH CATCHES BOTH DIRECTIONS. A bracket standing in for
+       an arrow is the defect this is usually written against, so most pages
+       assert 0. Here one is CORRECT: the keyboard's keys and its footswitch are
+       a set and the component is told so. Asserting 1 rather than 0 means
+       losing the bracket fails as loudly as growing a second one, and losing it
+       would put an arrow from the keys into the footswitch. */
+    d.assert('the only headless line in the picture is the one joining a set',
+      dg.ties === 1, `${dg.ties} line${dg.ties === 1 ? '' : 's'} with no head`);
+  }
+
+  // ── the picture ───────────────────────────────────────────────────────────
+  //
+  // 🔴 NO BOX FOR SYMPATHETIC RESONANCE AND NO BOX FOR A STRING MODEL. Neither
+  // is here, and a box for one would draw a mechanism the page does not have,
+  // which is the one thing a diagram may never do.
+  //
+  // 🔴 AND THE BUCKET IS NOT DRAWN EITHER. `plans/plan-nola.md` §6.3 asks for a
+  // `Cloudflare` container holding `workers/station` at `R2, 3.8MB`, and that is
+  // where the Salamander pack will live. Today the recordings sit beside this
+  // page and are served by the site itself, so the box says `workers/view` and
+  // the size is the real one. A picture of next week's architecture is the same
+  // defect as a note about how the picture was made.
+  const dg = createDiagram(d.el, {
+    caption: 'Two ways in and one instrument: a key on screen, a key on a chord chart and a '
+      + 'key on a MIDI keyboard all call the same two functions, so nothing downstream can '
+      + 'tell them apart.',
+    nodes: [
+      /* 🔴 THE KEYBOARD IS DRAWN AS A MACHINE WITH TWO PARTS, AND THE FOOTSWITCH
+         IS ONE OF THEM. Half of a keyboard is under the player's foot, and a
+         picture that draws the keys and not the pedal is a picture of the half
+         this page is not about. It is also what keeps the three machines a
+         similar size: `diagram.mjs` gives EVERY top level box the height of the
+         tallest, so one machine with five parts beside one with none draws two
+         boxes that are mostly empty, which is the shape the rules already
+         refuse for a container with nothing in it. MEASURED: five children made
+         this picture 962 px tall, and three made it a third of that. */
+      /* ⚠️ `set: true`, BECAUSE KEYS AND A FOOTSWITCH DO NOT FEED EACH OTHER.
+         Between two neighbours with no declared link the component draws an
+         ARROW by default, and it drew one from the keys into the footswitch,
+         which is a mechanism that does not exist. A machine whose children
+         really are a set says so and gets a bracket instead. */
+      { id: 'kbd', label: 'MIDI keyboard', sub: 'USB MIDI', kind: 'device', tech: 'device',
+        set: true,
+        children: [
+          { id: 'kkeys', label: 'keys', sub: 'notes, velocity', tech: 'device',
+            note: 'A note on at velocity 0 is a note off, and many keyboards never send a real '
+                + 'note off at all. The one on this desk also arrives a semitone flat, which is '
+                + 'what the TRANSPOSE control is for.' },
+          { id: 'foot', label: 'footswitch', sub: 'CC64 by default', tech: 'device',
+            note: 'Which controller a footswitch sends is a setting held inside the keyboard, so '
+                + '64 is a default rather than a measurement. Open the page with **?pedal=67** '
+                + 'for one that sends something else.' },
+        ] },
+      { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
+        children: [
+          { id: 'keys', label: 'screen keys', sub: 'no MIDI needed', tech: 'browser',
+            note: 'The instrument and every chord chart above it are the same component in the '
+                + 'same window, so a shape carries down the page. Safari has no **Web MIDI** on '
+                + 'any platform, so on an iPhone these are the whole instrument.' },
+          { id: 'damp', label: 'damper', sub: 'CC64, 63/64', tech: 'sound',
+            note: 'The pedal is the ABSENCE of the damper rather than a sustain, so nothing is '
+                + 'added to a note. A value of 63 is off and 64 is on.' },
+          { id: 'smp', label: 'sampler', sub: '30 notes', tech: 'sound',
+            note: 'A key plays the nearest recording at a changed **playbackRate**, never more '
+                + 'than one semitone away. Up to 64 **AudioBufferSourceNode**s sound at once, '
+                + 'each into its own gain.' },
+        ] },
+      { id: 'cf', label: 'Cloudflare', sub: 'the site itself', kind: 'cloud', tech: 'cloudflare',
+        children: [
+          /* ⚠️ THE FILES COME FIRST BECAUSE THE BYTES GO THAT WAY. The worker
+             READS the recordings and serves them, so an arrow from the worker
+             into the files would draw the flow backwards, which a reader
+             following the picture would believe. */
+          { id: 'files', label: 'recordings', sub: '30 mp3, 656KB', tech: 'file',
+            note: 'One every minor third from A0 to C8, at one velocity layer. Flat files beside '
+                + 'the page rather than a bucket, which is what makes this phase zero.' },
+          { id: 'wrk', label: 'Worker', sub: 'workers/view', tech: 'cloudflare',
+            note: 'The same worker that serves the page serves the recordings beside it. '
+                + 'Nothing here is a bucket yet, and the Salamander pack the plan sizes will '
+                + 'be.' },
+        ] },
+    ],
+    links: [
+      /* 🔴 BOTH WAYS IN LAND ON THE SAME BOX, AND THEY DID NOT UNTIL THIS WAS
+         DRAWN. The MIDI keys pointed at the sampler while the screen keys
+         pointed at the damper, which is a picture of two different instruments
+         under one caption saying they are one. Every key event on this page,
+         from either road, goes through the pedal's two sets first, because the
+         pedal is what decides whether a release is a release. */
+      { from: 'kkeys', to: 'damp', label: 'notes',
+        note: '**requestMIDIAccess**, three bytes a message, and the browser stamps each one '
+            + 'with the time it arrived. That stamp is where press to sound is measured from.' },
+      { from: 'foot', to: 'damp', label: 'CC64',
+        note: 'The polarity is sensed at power up on the keyboard here, so a pedal held down '
+            + 'while it boots is inverted all session. The page prints the raw value so a '
+            + 'player can see it lying.' },
+      { from: 'keys', to: 'damp',
+        note: 'A tap calls the same two functions a MIDI note calls. There is no second route, '
+            + 'which is why the page cannot drift into lighting one key and playing another.' },
+      { from: 'damp', to: 'smp',
+        note: 'Two sets, not one: what is under a finger and what is only under the foot. '
+            + 'Lifting the pedal cannot take away a key somebody is still holding.' },
+      { from: 'files', to: 'wrk',
+        note: 'No build pipeline exists yet and none is needed to play the thing, which is the '
+            + 'whole argument for starting here rather than with an encoder.' },
+      { from: 'wrk', to: 'smp', label: '30 mp3',
+        note: 'One octave at a time, on the first press of a key in it, decoded into memory '
+            + 'once each. A release is a **setTargetAtTime** over about 0.12 s rather than a '
+            + 'stop, because a stop is a click.' },
+    ],
+  }, { how: true, atEnd: true });
+
+  /* The chords the field opens with, drawn before anybody types. It fetches
+     nothing and sounds nothing: a chart is a picture until a key is pressed. */
+  drawChords(chordField.value());
+  setTranspose(Number(q.get('transpose')) || 0);
+
+  /**
+   * 🔴 THE CHECKS RUN AT LOAD AND ARE NOT AWAITED, AND THAT IS THE WHOLE COST
+   * OF DELETING THE CONTROL ROW. They used to hang off `Play a phrase`, which
+   * is how `demo/verify.mjs` drove this page; with no button to press they had
+   * to move or vanish, and vanishing is silent. `/muta/` and `/radio/` already
+   * do exactly this.
+   */
+  ifSelfcheck(checks, { log: d.log,
+    say: 'the checks this page runs on itself are off for a visitor, because they play notes '
+       + 'and press the controls in front of you' });
+
+  /**
+   * 🔴 `ready()` GOES AFTER THE CHECKS ARE STARTED AND NOT AT THE END OF THEM,
+   * AND PUTTING IT AT THE END DEADLOCKED THE HARNESS ONCE ALREADY.
+   * `demo/verify.mjs` waits up to six seconds for `__demo.ready` before it
+   * touches the page, so a ready at the end of a ten second check block is a
+   * page waiting for a harness that is waiting for the page. It read
+   * `failed: null` and `console: nothing`, which is the shape that says hanging
+   * rather than throwing.
+   * ⚠️ SO THE TALLY LINE IS EARLY, AND THAT IS THE HOUSE PATTERN RATHER THAN A
+   * SLIP. `verify.mjs` reads `__demo.asserts` and waits for the count to stop
+   * growing, so nothing is lost but the number in one log line.
+   */
+  d.ready();
+</script>
+
+<style>
+  /* 🔴 THE SUSTAIN BUTTON SITS WITH THE OCTAVE PAD, NOT IN `.pos-controls`.
+     `keyboard.mjs` already argues this about the pad itself: an octave pair and
+     a `Notes off` are controls ABOUT the keys, and a hand's width away at the
+     top of the page is the wrong place for any of them. A pedal is the same
+     kind of thing.
+     ⚠️ AND `presence.mjs` WARNS THAT A CONTROL OUTSIDE THAT ROW IS ONE NO
+     HARNESS DRIVES. True, and answered: this page's own check presses it
+     twice and then proves the lamp follows a REAL pedal as well as its own
+     press, which is more than a harness click would have graded. */
+  .nola-pad { display: flex; align-items: center; gap: 10px; margin-top: -4px; }
+
+  /* A chord and its picture. The list wraps, so a long line of chords becomes
+     rows rather than a sideways scroll: `tabs.mjs` already records that a
+     scrolling row drags the whole page sideways on a phone. */
+  /* 🔴 ONE PER ROW, AT THE KEYBOARD'S OWN WIDTH. Asked for as *"'hint
+     keyboards': same w as regular one"*. They were a wrapping row of 320 px
+     cards, which put two different key widths on one page: the chart's C and
+     the instrument's C were different sizes, so the eye could not carry a shape
+     from one to the other, which is the only thing a chord chart is for. */
+  .nola-chords { display: flex; flex-direction: column; gap: 12px; }
+  .nola-chord { width: 100%; min-width: 0; }
+  /* ⚠️ `nowrap` AND `tabular-nums`, because a chord name sits over a picture
+     whose width it must not change. A name that wrapped would move the keyboard
+     under it and nothing that redraws may change how much room it takes. */
+  .nola-chord-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .nola-chord-n { font: 600 12px/1.4 var(--mono); letter-spacing: .06em;
+                  color: var(--fg); white-space: nowrap; overflow: hidden;
+                  text-overflow: ellipsis; }
+  /* ⚠️ A SECOND INK, BECAUSE IT IS A SECOND KIND OF FACT. The name is what you
+     type and the numeral is what it MEANS in this key, and the reference the
+     four frames came from separates them the same way. */
+  .nola-chord-r { font: 600 12px/1.4 var(--mono); color: var(--hi);
+                  white-space: nowrap; }
+  /* A chord with a note the window cannot draw says so beside its name, because
+     a chart with one key missing and nothing said is the silent kind of wrong. */
+  .nola-chord-o { font: 500 11px/1.4 var(--mono); color: var(--warn);
+                  white-space: nowrap; }
+  /* 🔴 A CHART'S KEYS ARE SHORTER THAN AN INSTRUMENT'S. Twelve of these on a
+     page at the playing keyboard's 74 px would be a screen of piano and no
+     room for the piano you play. The proportions are the component's own:
+     `.k.sharp` is `height: 46px` against 74, so 44 against 70 keeps the black
+     key the same fraction of the white one. */
+  .nola-chord-k .k { height: 44px; }
+  .nola-chord-k .k.sharp { height: 27px; }
+  .nola-chord-k .kbd { margin: 0; }
+  .nola-chord-k .keys { margin: 0; }
+
+  /* A token the parser refused, shown back. `.pos-log` is for things that
+     HAPPENED; this is a standing statement about what is in the field, so it
+     lives beside the charts it is missing from. */
+  .nola-bad { flex: 1 1 100%; font: 500 12px/1.5 var(--mono); color: var(--warn); }
+
+  /* 🔴 A 2 px GAP, NOT THE COMPONENT'S 3, AND IT IS 14 PIXELS OF ARITHMETIC.
+     MEASURED: fifteen white keys at the 44 px floor plus fourteen 3 px gaps is
+     702 px and this page is 688, so the row scrolled by exactly the gaps. The
+     alternative was a 43 px key, and 44 is Apple's minimum touch target on the
+     nose: the gap is decoration and the key is the thing a finger has to hit,
+     so the gap gives way. 15 x 44 + 14 x 2 = 688.
+     ⚠️ IT IS ON THIS PAGE'S KEYBOARDS ONLY. Every other keyboard on the site
+     draws eight white keys and has room to spare. */
+  .nola-keys .keys, .nola-chord-k .keys { column-gap: 2px; }
+  .nola-keys { display: block; }
+</style>
+</html>

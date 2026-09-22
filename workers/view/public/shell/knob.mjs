@@ -76,6 +76,51 @@ const ARC = 270;
 const SELF = 'self';
 
 /**
+ * A value held inside the ends and, when there is a step, rounded onto one.
+ *
+ * 🔴 PURE, EXPORTED AND SEPARATE, SO IT CAN BE GRADED WITH NO BROWSER. The rest
+ * of this file needs a `document`, and `instrument.mjs` already records why
+ * that matters: a rule only a browser can check is a rule that gets checked
+ * once. `node demo/shell/knob-test.mjs` runs this in a few milliseconds, and
+ * the drag arithmetic that snapping breaks is graded there rather than by
+ * dragging a dial and looking.
+ *
+ * ⚠️ THE SIX PLACES ARE `slider.mjs`'S AND THE REASON IS FLOATING POINT.
+ * `Math.round((3 - 1) / 0.1) * 0.1 + 1` is 3.0000000000000004, which prints
+ * with a decimal the caller never asked for and compares unequal to the step
+ * above it.
+ *
+ * @param {number} n
+ * @param {object} o
+ * @param {number} o.min @param {number} o.max
+ * @param {number} [o.step]  0 or omitted for a continuous travel
+ */
+export function snapTo(n, { min, max, step = 0 } = {}) {
+  const x = Math.min(max, Math.max(min, Number(n)));
+  if (!step) return x;
+  return Math.min(max, Math.max(min,
+    Number((Math.round((x - min) / step) * step + min).toFixed(6))));
+}
+
+/**
+ * How many decimal places a knob prints its value at, from its own resolution.
+ *
+ * 🔴 IT IS DECIDED ONCE AND NEVER PER FRAME, WHICH IS THE WHOLE POINT. See the
+ * note on `dp` inside `createKnob`: a string that gains and loses a decimal
+ * point sixty times a second is what *"make it stop wiggling"* was about.
+ *
+ * @param {object} o
+ * @param {number} o.min @param {number} o.max
+ * @param {number} [o.step]
+ * @param {number} [o.sweep]  the travel in pixels. Only a test passes this.
+ */
+export function knobPlaces({ min, max, step = 0, sweep = SWEEP } = {}) {
+  const cap = (n) => Math.max(0, Math.min(4, n));
+  if (step) return cap(String(step).split('.')[1]?.length ?? 0);
+  return cap(Math.round(-Math.log10((max - min) / sweep)));
+}
+
+/**
  * One knob.
  *
  * @param {object} o
@@ -87,6 +132,29 @@ const SELF = 'self';
  * @param {number} [o.home]    where a double press returns it to, default `value`
  * @param {string} [o.unit]    printed after the number
  * @param {string} [o.title]   hover text
+ * @param {number} [o.step]    a knob that lands only on whole steps.
+ *
+ *   🔴 **THE ROUNDING BELONGS HERE AND NOT IN THE PAGE, WHICH IS THE WHOLE
+ *   REASON THIS IS AN OPTION.** Asked for 2026-09-22 as *"move voices to knobs,
+ *   bottom right, stepped knob"*, for a voice count that can only be a whole
+ *   number. A page that rounds the value on its way out leaves the NEEDLE
+ *   somewhere the number is not, so the dial and the readout disagree about a
+ *   control the reader is looking straight at.
+ *   ⚠️ **THE NAME AND THE ARITHMETIC ARE `slider.mjs`'S**, deliberately, rather
+ *   than a second vocabulary for one idea: the option is `step`, the snap is
+ *   `Math.round((x - min) / step) * step + min` rounded to six places, and the
+ *   invisible hand's step count is `span / step` exactly as it is there.
+ *   🔴 **AND THE TRAP IS THE DRAG, WHICH SNAPPING KILLS IF IT IS WRITTEN THE
+ *   OBVIOUS WAY.** The pointer moves the value by `span / SWEEP` a pixel, which
+ *   on a one-to-eight knob is 0.039, so every single pixel of hand movement
+ *   rounds straight back to where it started. Zeroing the accumulator after
+ *   each move, which is what the continuous knob does, then throws that pixel
+ *   away and **the knob never moves at all, at any speed**. So the accumulator
+ *   is spent by what the value ACTUALLY moved and keeps whatever the snap ate.
+ *   ⚠️ **AND THE WHEEL AND THE ARROW KEYS BOTH HAVE A FLOOR OF ONE STEP** for
+ *   the same reason. `span / SWEEP * 6` is a sixth of a voice, and shift makes
+ *   it a thirtieth, so both controls would have been inert on exactly the knob
+ *   this was built for.
  * @param {number} [o.stroke]  how thick the ring and the needle are, in the
  *   dial's own 100 unit space. Default 4.
  *   🔴 BOTH ARE HERE TO BE COMPARED, NOT TO BE VARIED PER PAGE. Asked
@@ -106,11 +174,48 @@ const SELF = 'self';
 export function createKnob({
   label, sub = '', min = 0, max = 127, value, home, unit = '', title = '',
   onInput = () => {}, onChange = () => {}, disabled = false,
-  stroke, ends, hand: wantHand = false,
+  stroke, ends, step, hand: wantHand = false, format = null,
 } = {}) {
   if (!label) throw new Error('a knob needs a label: it is the only thing naming what it moves');
   const span = max - min;
   if (!(span > 0)) throw new Error(`a knob needs max above min, got ${min}..${max}`);
+  /**
+   * The step, or 0 for the continuous travel every knob had before today.
+   *
+   * ⚠️ `0` RATHER THAN `undefined` INSIDE, so every arithmetic below reads
+   * `Math.max(x, stp)` and `stp || fallback` with no branch of its own, and the
+   * continuous case comes out byte for byte what it was. A step of 0 is the
+   * only value that makes all three of those expressions the identity.
+   * 🔴 AND IT IS REFUSED RATHER THAN CLAMPED. A step wider than the travel is a
+   * knob with two positions, which is a switch wearing a dial, and a step of
+   * zero or less is a control that can never move. Both are the shape this
+   * project calls a lie, and both are the caller's mistake, so they are said in
+   * front of the author at build time.
+   */
+  const stp = step === undefined ? 0 : Number(step);
+  if (step !== undefined && !(stp > 0 && stp <= span)) {
+    throw new Error(`a knob's step is above 0 and no wider than its travel, got ${step} on ${min}..${max}`);
+  }
+  /**
+   * 🔴 HOW MANY DECIMALS THE NUMBER IS PRINTED AT, DECIDED ONCE AND NEVER PER
+   * FRAME. REPORTED 2026-09-22 watching the invisible hand run: *"invisible m4
+   * knob: show value without floating or make it stop wiggling"*.
+   * `Math.round(v * 100) / 100` yields `40`, `40.4` and `40.37` on three
+   * consecutive frames, so the STRING gains and loses a decimal point sixty
+   * times a second. It only became visible now, because until the hand landed
+   * nothing moved a knob on its own.
+   * ⚠️ **THE BASIS IS THE CONTROL'S OWN RESOLUTION**, which is the step when
+   * there is one and `span / SWEEP` when there is not, because that is the
+   * quantity the drag and the arrow keys already move by. A stepped knob prints
+   * its step's own decimals, the way `slider.mjs` infers them. A continuous one
+   * prints to the ORDER OF MAGNITUDE of its smallest move: 0 places on a 0 to
+   * 127 knob whose least move is 0.71, and 2 on a -1 to 1 attenuverter whose
+   * least move is 0.011.
+   * ⚠️ **A BLANKET "NO DECIMALS" WOULD HAVE DESTROYED THE ATTENUVERTERS**, which
+   * is why this is derived rather than chosen: three of them on `/muta/` run
+   * -1 to 1 and would have shown `-1`, `0` and `1` and nothing else.
+   */
+  const dp = knobPlaces({ min, max, step: stp });
 
   const mk = (tag, cls, text) => {
     const n = document.createElementNS(
@@ -186,7 +291,24 @@ export function createKnob({
    */
   const vbW = 2 * (xOut + PAD), vbH = yBot - yTop + 2 * PAD;
   root.style.setProperty('--knob-dial-r', (vbH / vbW).toFixed(4));
-  root.style.setProperty('--knob-ring-f', ((yBot - (yTop - PAD)) / vbH).toFixed(4));
+  /**
+   * 🔴 THE ARC'S REAL LOWEST POINT, NOT THE BOUNDING BOX'S. Corrected
+   * 2026-09-22 on a photograph of the button sitting across the word `TIMBRE`:
+   * *"move invisible hand upwards"*.
+   * ⚠️ **`yBot` IS A VIEWBOX CONVENTION AND WAS THE WRONG NUMBER TO REUSE.**
+   * For a sweep of 180 degrees or more it is `50 + R`, the bottom of the whole
+   * CIRCLE, which leaves room for the stroke's round cap. The ring is not drawn
+   * there: a 270 degree arc ENDS at 135 degrees either side of twelve o'clock,
+   * so its lowest ink is at `50 + R cos(135)`, which is **76.9 against 88**.
+   * The button was being centred 11 units below the last thing anybody can see,
+   * and on a 50.6 px knob that put half of it over the label.
+   * ⚠️ AND IT IS THE SAME ARITHMETIC THE VIEWBOX ALREADY DOES ONE BRANCH ALONG:
+   * `yBot` uses `50 - R cos(half)` for a short sweep, which IS the drawn
+   * extent. Only the long branch swaps in the bounding value, and this reads
+   * the drawn one at every sweep.
+   */
+  const inkBot = 50 - R * Math.cos(half);
+  root.style.setProperty('--knob-ring-f', ((inkBot - (yTop - PAD)) / vbH).toFixed(4));
   const track = mk('path', 'pos-knob-track');
   const arc = mk('path', 'pos-knob-arc');
   const pointer = mk('path', 'pos-knob-ptr');
@@ -234,7 +356,78 @@ export function createKnob({
   }
   if (sub) root.append(mk('div', 'pos-knob-sub', sub));
 
-  function clamp(n) { return Math.min(max, Math.max(min, n)); }
+  /** The ends only, with no snap, so a drag can keep what the snap ate. */
+  function hold(n) { return Math.min(max, Math.max(min, Number(n))); }
+
+  /**
+   * Inside the ends AND on a whole step, which is what every caller of this
+   * gets. `hold` is the half without the snap and exists for the drag alone.
+   */
+  function clamp(n) { return snapTo(n, { min, max, step: stp }); }
+
+  /**
+   * What the number reads, at a fixed number of places.
+   *
+   * ⚠️ `-0.00` IS WRITTEN AS `0.00`. `(-0.0004).toFixed(2)` is `"-0.00"`, so an
+   * attenuverter sitting on nothing flickers a minus sign in and out while a
+   * hand runs it, which is the same complaint the decimal count came from one
+   * character along.
+   */
+  function show(n) {
+    /**
+     * 🔴 A KNOB WHOSE VALUE HAS A NAME PRINTS THE NAME, ADDED 2026-09-22 FOR
+     * `/muta/`'s WARPS ALGORITHM, ASKED FOR AS *"should show names instead"*
+     * and *"fraction num is not that helpful"*. That dial sweeps a continuous
+     * crossfade through six shapers, so `0.31` is a true number that says
+     * nothing about which two a reader is between, and the panel itself prints
+     * a ring of eight icons rather than a scale.
+     * ⚠️ IT IS THE CALLER'S FUNCTION AND NOT A TABLE HERE, because what a value
+     * is CALLED is a fact about an instrument and this component knows nothing
+     * about instruments.
+     * ⚠️ AND `unit` IS NOT APPENDED TO IT. A name is not a quantity.
+     */
+    if (format) return String(format(n));
+    let t = n.toFixed(dp);
+    if (t === `-${(0).toFixed(dp)}`) t = (0).toFixed(dp);
+    return unit ? `${t} ${unit}` : t;
+  }
+
+  /**
+   * 🔴 THE NUMBER'S BOX RESERVES THE WIDEST THING THIS KNOB CAN EVER PRINT, and
+   * without it fixing the decimals is only half the repair. `.pos-knob` is
+   * `align-items: center` and `.pos-knob-v` had a fixed HEIGHT and no width, so
+   * `9` becoming `10` still slid the whole string sideways under the hand
+   * moving it. `slider.mjs` reserves its readout the same way and for the same
+   * reason, and `positron-ui` states the rule: nothing that redraws every frame
+   * may change how much room it takes.
+   * ⚠️ **A CUSTOM PROPERTY, NEVER THE PROPERTY.** Writing `num.style.minWidth`
+   * from here would be a rule nothing can override, including this component's
+   * own stylesheet, which is the defect `video-panel.mjs` shipped with `aspect`.
+   * ⚠️ **AND `ch` IS EXACT HERE** because the face is monospaced and the cell is
+   * `tabular-nums`, so a digit, a minus and a point are all one advance. The
+   * two ends are the widest strings a value between them can make.
+   */
+  /**
+   * 🔴 **AND THE TWO ENDS STOP BEING ENOUGH THE MOMENT A KNOB PRINTS NAMES.**
+   * For a number, the widest string a value between two ends can make is at one
+   * of them, which is why this read `min` and `max` alone. A NAME has no such
+   * order: on Plaits' own list `chord` sits between `harmonic` and `speech` and
+   * is shorter than both, so the longest name on a dial is usually in the
+   * middle. A reservation taken from the ends would be too narrow and the cell
+   * would slide again, which is the entire defect this line exists to stop.
+   * ⚠️ SO A FORMATTED KNOB IS SAMPLED ACROSS ITS TRAVEL: every step where it
+   * has steps, and one sweep of points where it is continuous. Measured rather
+   * than declared, because a caller asked to hand over its longest string will
+   * eventually hand over its second longest.
+   */
+  const widestValue = () => {
+    if (!format) return Math.max(...[min, max].map((n) => show(n).length));
+    const n = stp > 0 ? Math.round(span / stp) : SWEEP;
+    let w = 0;
+    for (let i = 0; i <= n; i++) w = Math.max(w, show(min + (span * i) / n).length);
+    return w;
+  };
+  root.style.setProperty('--knob-num-w', `${widestValue()}ch`);
 
   function paint() {
     const frac = (v - min) / span;
@@ -261,7 +454,9 @@ export function createKnob({
     // ⚠️ `tabular-nums` IS ON THE CLASS, and the unit is hidden when there is no
     // number, because a `%` with nothing in front of it reads as a value that
     // went missing. Same rule as a readout cell.
-    num.textContent = `${Math.round(v * 100) / 100}${unit ? ` ${unit}` : ''}`;
+    // 🔴 AND THE PLACES ARE FIXED, so the string cannot gain and lose a decimal
+    // point sixty times a second under a hand. See `dp` and `show` above.
+    num.textContent = show(v);
     svg.setAttribute('aria-valuenow', String(Math.round(v)));
     if (from) root.setAttribute('data-from', from); else root.removeAttribute('data-from');
   }
@@ -312,10 +507,22 @@ export function createKnob({
     // a knob because it feels wrong without looking wrong.
     const dy = -(e.movementY ?? 0);
     acc += dy * (e.shiftKey ? FINE : 1);
-    const step = span / SWEEP;
+    const per = span / SWEEP;
     if (Math.abs(acc) < 0.001) return;
-    set(v + acc * step, { from: 'hand' });
-    acc = 0;
+    /**
+     * 🔴 THE ACCUMULATOR IS SPENT BY WHAT THE VALUE ACTUALLY MOVED, AND KEEPS
+     * WHAT THE SNAP ATE. This line read `set(...); acc = 0` until a `step`
+     * existed, and on a stepped knob that is a control that can never move: one
+     * pixel of hand is a fraction of a step, `set` rounds it straight back, and
+     * zeroing throws the pixel away, so the value does not change at any speed.
+     * ⚠️ **AND IT IS BYTE FOR BYTE THE OLD BEHAVIOUR WITH NO STEP.** `hold`
+     * applies the ends and `set` applies the ends and the snap, so on a
+     * continuous knob `want` and `got` are the same number and `acc` lands on
+     * exactly 0, including at both ends of the travel.
+     */
+    const want = hold(v + acc * per);
+    const got = set(want, { from: 'hand' });
+    acc = (want - got) / per;
   });
 
   const stop = (e) => {
@@ -340,15 +547,21 @@ export function createKnob({
   svg.addEventListener('wheel', (e) => {
     if (off) return;
     e.preventDefault();
-    const step = (span / SWEEP) * (e.shiftKey ? FINE : 1);
+    // ⚠️ A FLOOR OF ONE STEP. Six notches of `span / SWEEP` is a sixth of a
+    // voice on a one-to-eight knob and a thirtieth of one with shift held, so
+    // without this the wheel would be inert on the control `step` was built
+    // for. `Math.max(x, 0)` is the identity, so a continuous knob is unchanged.
+    const amount = Math.max((span / SWEEP) * (e.shiftKey ? FINE : 1) * 6, stp);
     handApi?.yield();
-    set(v - Math.sign(e.deltaY) * step * 6, { from: 'hand' });
+    set(v - Math.sign(e.deltaY) * amount, { from: 'hand' });
   }, { passive: false });
 
   svg.addEventListener('keydown', (e) => {
     if (off) return;
     const fine = e.shiftKey ? FINE : 1;
-    const one = Math.max(span / 127, span / SWEEP) * fine;
+    // ⚠️ ONE STEP IS THE WHOLE UNIT ON A STEPPED KNOB, and shift does not make
+    // it finer, because there is nothing finer than one voice to go to.
+    const one = stp || Math.max(span / 127, span / SWEEP) * fine;
     const go = { ArrowUp: one, ArrowRight: one, ArrowDown: -one, ArrowLeft: -one,
                  PageUp: one * 10, PageDown: -one * 10,
                  Home: min - v, End: max - v }[e.key];
@@ -375,8 +588,14 @@ export function createKnob({
      * distinguishable positions whatever `min` and `max` are, and a 0..1 knob
      * is exactly as fine as a 0..127 one. Counting `span` instead would have
      * called a 0..1 knob a one-step control and refused it a hand.
+     * 🔴 **UNLESS IT REALLY HAS STEPS, IN WHICH CASE THEY ARE THE ANSWER.** A
+     * knob with `step: 1` over one to eight has EIGHT places to be and no
+     * others, and `hand-drive.mjs` refuses a hand under about thirty steps
+     * because the wander at each end would be less than one step. Reporting
+     * `SWEEP` here would have talked it out of a refusal that is correct. Same
+     * arithmetic as `slider.mjs`'s own step count.
      */
-    const steps = SWEEP;
+    const steps = stp ? Math.max(1, Math.round(span / stp)) : SWEEP;
     const handBtn = mk('button', 'pos-knob-hand');
     handBtn.setAttribute('type', 'button');
     // ⚠️ THE BUTTON IS NOT THE DIAL AND MUST NOT BEHAVE LIKE IT. A press on it

@@ -10,6 +10,51 @@
      `.pos-line.hi` down the file, which carries the reason. */
   --fg2: #b6bcc7;
   --hi: #ffd400;
+
+  /* 🔴 MUTABLE INSTRUMENTS' OWN PANEL COLOURS, MEASURED 2026-09-22 RATHER THAN
+     PICKED. Asked for as *"extract mutable instr brand colors and add to your
+     palette"*, with two photographs. These are the values a decoder of those
+     PNGs counted, with the pixel counts, so they are readings rather than
+     somebody's eye:
+
+       from a 196x416 crop of the Plaits panel
+         #c0426c   163 px   the magenta on the callouts and the pink outline
+         #3c8a8a   116 px   the teal on the jack rings
+       from a 116x60 crop of the maker's own swatch strip
+         #d08048    40 px
+         #4898b0    17 px
+         #802840    13 px
+
+     ⚠️ THEY ARE NAMED FOR THE MAKER, NOT FOR A ROLE, AND THAT IS DELIBERATE.
+     This project holds one meaning for colour across every page: green is
+     inside what a thing promises, amber and red are late, `--hi` is the thing
+     the control is about. Five more colours with roles would be five more
+     meanings to keep straight. These are a REPLICA's palette, for pages that
+     draw somebody else's instrument, and a page using one is saying *this is
+     the colour that is on the box*.
+     ⚠️ AND NOTHING USES THEM YET. They are here so the next panel does not
+     invent its own pink. */
+  --mi-magenta: #c0426c;
+  --mi-teal: #3c8a8a;
+  --mi-orange: #d08048;
+  --mi-blue: #4898b0;
+  --mi-maroon: #802840;
+
+  /* 🔴 AND THE TWO THAT ARE DRAWN ON GET A LIGHTER PAIR, because a colour off a
+     WHITE panel does not read on a dark one. Asked 2026-09-22: *"adjust both to
+     work on dark"*.
+     🔴 **THE MAROON IS THE ONE THAT MADE THIS NECESSARY.** MEASURED against
+     `--card2`, the ground these figures sit on: the panel's own `#802840`
+     contrasts at **1.89**, which is below every readable threshold there is and
+     is a line you cannot see. The teal is `4.27`, legible but dim.
+     ✅ HUE AND SATURATION ARE KEPT AND ONLY LIGHTNESS MOVES, to 0.55, which is
+     what makes these the same colours rather than two new ones: teal
+     **#5fb9b9 at 7.54** and maroon **#c85071 at 3.99**.
+     ⚠️ **THE MEASURED PAIR STAYS ABOVE AND IS NOT OVERWRITTEN.** One is the
+     record of what is on the instrument and the other is what this site can
+     draw with; a page needing the real value for anything else still has it. */
+  --mi-teal-lit: #5fb9b9;
+  --mi-maroon-lit: #c85071;
   /* the gap between a slider's label column and its lane — see `.sld-group` */
   --sld-col: 12px;
   /* 🔴 HOW MUCH AIR A WORD GETS INSIDE A CONTROL, AS A SCALE OF THREE RATHER
@@ -1423,6 +1468,25 @@ video[hidden] { display: none; }
 .k.sharp { background: #0e1219; }
 .k.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
 .k.remote { background: var(--ok); color: #0b0e14; border-color: var(--ok); }
+/* 🔴 MUTED GREY, AND IT IS THE QUIETEST OF THE THREE ON PURPOSE. `.down` and
+   `.remote` both say something HAPPENED: a finger here, a player elsewhere.
+   This one says something COULD, which is a chord's notes with nobody holding
+   them, and painting that in an ink reserved for an event is the colour rule
+   this project already keeps for marks.
+   ⚠️ IT SITS BEFORE `.down` IN WEIGHT AND AFTER IT IN SOURCE, so a key that is
+   hinted AND held reads as held. That is the case that actually happens: you
+   play along with a chord on screen, and what you are doing outranks what you
+   were being shown. A black key keeps its own darker ground, or a hinted sharp
+   would read lighter than the whites around it. */
+/* ⚠️ A LITERAL, NOT A `var()` WITH A FALLBACK NOTHING DEFINES. `--card3` does
+   not exist in this stylesheet, and a variable that always falls through reads
+   as a token somebody can retheme when it is not. These two greys are picked
+   against `--card2` (#151b26), which is the key's own ground. */
+.k.hint { background: #222a37; border-color: #39424f; }
+.k.hint .kn, .k.hint .kk { color: var(--fg); opacity: .8; }
+.k.sharp.hint { background: #242b36; }
+.k.hint.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
+.k.hint.down .kn, .k.hint.down .kk { color: inherit; opacity: 1; }
 
 
 /* ── in a headset ─────────────────────────────────────────────────────────
@@ -2067,7 +2131,16 @@ button.pos-pg-pad:hover { filter: brightness(1.35); }
    being transitioned FROM is the one whose transition runs when a class or an
    attribute is removed. Putting both durations on the head's rule gives one
    speed in both directions, which is a lamp with no filament. */
-.pos-pg-pad { transition: box-shadow 320ms ease-out, filter 320ms ease-out; }
+/* ⚠️ THE FALL IS `step-grid.mjs`'S NUMBER, NOT ONE TYPED HERE. It sets
+   `--pg-fall` from its own `FALL_MS`, and the rise is interpolated into the
+   generated head rule from `RISE_MS` in the same file, so the two halves of the
+   lamp are declared once and in one place. It went 320 ms to 180 on 2026-09-22
+   after *"make 2nd and 3nd fade fade faster"*: at 120 beats a minute a step is
+   125 ms, so the tail went from 2.6 steps to 1.4 and the third column behind
+   the head is gone. The fallback here is the old value and is only ever used by
+   a `.pos-pg-pad` that no component built. */
+.pos-pg-pad { transition: box-shadow var(--pg-fall, 320ms) ease-out,
+                          filter var(--pg-fall, 320ms) ease-out; }
 .pos-pg-pad[data-on] { background: var(--pg-on); }
 .pos-pg-pad[data-on][data-mute] { background: var(--dim2); }
 /* ⚠️ THE BREATHING IS `opacity` EITHER WAY, so nothing it does can change how
@@ -4067,10 +4140,22 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 }
 /* 🔴 A FIXED HEIGHT ON THE NUMBER. It changes sixty times a second under a
    drag, and anything that redraws that often may not change how much room it
-   takes or the whole column jumps under the hand moving it. */
+   takes or the whole column jumps under the hand moving it.
+   🔴 AND A FIXED WIDTH SINCE 2026-09-22, WHICH IS THE HALF THAT WAS MISSING AND
+   ONLY BECAME VISIBLE WHEN THE INVISIBLE HAND STARTED MOVING A KNOB ON ITS OWN.
+   REPORTED: *"invisible m4 knob: show value without floating or make it stop
+   wiggling"*. `.pos-knob` is `align-items: center`, so a box sized by its
+   content re-centres on every frame and `9` becoming `10` slides the whole
+   string sideways. The height alone could never have stopped that.
+   ⚠️ `--knob-num-w` IS WRITTEN BY `knob.mjs` FROM THE TWO ENDS AT THIS KNOB'S
+   OWN PRECISION, which is the widest string it can ever print, and it is a
+   custom property rather than an inline `min-width` so this rule still wins
+   where a page needs it to. The fallback is 0 for anything that renders a
+   `.pos-knob-v` without the component. */
 .pos-knob-v {
   font: 500 11px/14px var(--mono); font-variant-numeric: tabular-nums;
   color: var(--fg); height: var(--knob-num-h); white-space: nowrap; overflow: hidden;
+  min-width: var(--knob-num-w, 0); text-align: center;
 }
 /* ⚠️ `height: auto`, BECAUSE THE VIEWBOX DECIDES THE SHAPE. `knob.mjs` crops the
    viewBox to the arc's real extent, which depends on the sweep, so a height
@@ -5052,8 +5137,134 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    depending on its parent.
    ⚠️ `text-align: right` is for the non-flex parent, which no caller has today
    and which would otherwise be the one arrangement this placement got wrong. */
+/* ⚠️ `column-gap` SINCE 2026-09-22, AND IT CHANGES NOTHING THAT EXISTS TODAY. A
+   gap only ever appears BETWEEN children, and the one caller of this placement
+   before today had a single line. What needed it is the instrument header,
+   whose plate is `end` whether it has one line or two: in the header's right
+   cell there is no width for `space-between` to spend, so `ends` would put the
+   maker and the model hard against each other. */
 .panel-plate[data-place="end"] {
   display: flex; justify-content: flex-end; text-align: right; margin-left: auto;
+  column-gap: var(--panel-gap);
+}
+
+/* 🔴 THE INSTRUMENT HEADER, 2026-09-22, ASKED FOR AS *"create instrumet
+   header/glue: similar to transport glue etc. left: online status button:
+   enabled disabled (green/gray). right nameplate. center patch selector
+   (optically center to the instrument)"*.
+
+   🔴 **`1fr auto 1fr` IS THE WHOLE ASK AND A FLEX ROW WOULD HAVE MISSED IT.**
+   *"Optically center to the instrument"* means centred on the CASE, not
+   balanced between two unequal neighbours. A `space-between` row with a status
+   control on the left and a plate on the right puts its middle child wherever
+   the difference between those two leaves it, which is a different place on
+   every panel and moves the moment a patch name gets one character longer.
+   Equal outer TRACKS put the centre track on the container's own centre
+   whatever is in them, and `.panel-case` is `padding: 0 var(--panel-pad)`, the
+   same both sides, so the header's centre is the case's centre. `/kit/` asserts
+   that against the case's own box and asserts the naive flex answer would have
+   been visibly elsewhere.
+   ⚠️ **THE OUTER TRACKS ARE `minmax(0, 1fr)` RATHER THAN `1fr`.** A `1fr` track
+   has an automatic minimum of its content, so a long patch name or a wide
+   status control would push the tracks apart unequally and the centre would
+   drift off the case the moment anything overflowed, which is the failure this
+   grid exists to prevent arriving through the back door.
+
+   ⚠️ THE INSET IS THE PLATE'S OWN RULE, OFF THE SAME TOKEN. `.panel-case` pads
+   horizontally only, because `.panel-fixed` and `.panel-strip` each supply
+   their own `padding-block`, so anything prepended to a case supplies its own
+   or sits on the top border. That is the defect `/plai/` was reported for.
+
+   🔴 **AND THE PHONE IS THREE LEVELS, WHICH IS SHIPPED ON A READING RATHER THAN
+   ON A MEASUREMENT.** Asked as *"i mobile: header in 2 levels / title /
+   enabled (full w) / patch (full w)"*, corrected in the next breath to
+   *"3 levels, sorry"*. `demo/verify.mjs` runs at 756 px with no viewport
+   override, so NOTHING in this repository can enter the block below, and this
+   project has four dead CSS rules measured rather than reviewed, one of them a
+   phone layout that never ran in its life because a later plain rule beat it at
+   every width. **So the media block is LAST in this file's panel section**,
+   which is the one thing that can be checked, and the layout itself is read and
+   not measured. It is said in the report and it is said here. */
+/* 🔴 A SEAM UNDER THE HEADER SINCE 2026-09-22: *"make top secion a glued
+   section with line under it"*. It is the glue's own 1 px of `--line`, the same
+   edge `createGlue` draws between a transport bar and the strip it drives, so a
+   header here and a glued pair anywhere else are one treatment rather than two.
+   ⚠️ **THE PADDING MOVES WITH IT.** The header used to sit in the case's top
+   inset with nothing under it; a line needs air on both sides or it reads as
+   the header's underline rather than as the edge of a section. */
+/* 🔴 NO BORDER AND NO MARGIN. The header is a GLUED part since 2026-09-22, so
+   the line under it is `.pos-glue`'s own 1 px seam, drawn at the full width of
+   the surface. A `border-bottom` here was inside the case's padding and could
+   never reach the sides, which is exactly how it was reported.
+   🔴 **AND IT DECLARES `--panel-pad` RATHER THAN READING IT, WHICH COST A ROUND
+   TRIP.** That token is declared on `.panel`, and the header was a CHILD of the
+   case until this change, so it inherited it. As a SIBLING it inherits nothing,
+   `var(--panel-pad)` resolved to nothing, and the padding shorthand fell to
+   zero: reported one minute later as *"where is padding. good god.."*, with the
+   status button against the edge.
+   ⚠️ **A CUSTOM PROPERTY INHERITS DOWNWARD, NEVER SIDEWAYS**, which `shell.css`
+   already records about `--fdr-foot` being declared on `.pos-fdr` and invisible
+   to the button column beside it. Same mistake, same file, one component
+   along. */
+/* 🔴 **THE TRANSPORT BAR'S OWN NUMBERS, BECAUSE THAT IS WHAT WAS ASKED FOR:**
+   *"this does not look like glued transport or smt"*, and then, pointing at a
+   screenshot of the bar itself, *"just look at transport"*. `.tbar` is a flat
+   `padding: 8px` with a 1 px border, which its own comment records as MEASURED
+   after a report of *"unify paddings and button sizes"*, and a `gap: 14px`.
+   ⚠️ **`--panel-pad` WAS THE WRONG MEASURE AND IT WAS 20.** It is the inset a
+   CASE keeps around its controls, which is a different quantity from the air a
+   glued BAR keeps around its buttons, and using it made a header two and a half
+   times the thing it is glued to. A number being available is not a reason to
+   read it. */
+/* The bar takes the same air whichever end of the glue it is at. */
+.pos-glue > .panel-head {
+  padding: 8px;
+  column-gap: 14px;
+  background: var(--card);
+}
+.panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--panel-gap);
+}
+/* 🔴 PLACED BY COLUMN RATHER THAN BY SOURCE ORDER, so the DOM can be the phone's
+   order and the stylesheet can say what the desktop does where a reader of the
+   stylesheet will find it. `panel-layout.mjs` makes the same choice for its
+   fixed column and says why: reading order follows the picture rather than a
+   flex `order` nobody can see in the markup. Here the two disagree on purpose,
+   and this is the visible half. */
+/* 🔴 THE NAMEPLATE IS THE MIDDLE CELL AND THE PATCH SELECTOR IS THE RIGHT ONE,
+   SWAPPED 2026-09-22: *"move patch selector the right and nameplate to
+   center"*. The grid is unchanged and only the two assignments moved, which is
+   the whole reason the placement lives in the stylesheet rather than in source
+   order: the cell that is optically centred on the case is column 2, whatever
+   is put in it. */
+.panel-head-on { grid-column: 1; grid-row: 1; justify-self: start; }
+.panel-head-plate { grid-column: 2; grid-row: 1; justify-self: center; text-align: center; }
+.panel-head-mid { grid-column: 3; grid-row: 1; justify-self: end; min-width: 0; }
+/* ⚠️ THE `end` PLACEMENT'S OWN `margin-left: auto` IS LEFT ALONE HERE, AND
+   TURNING IT OFF WAS TRIED AND DELETED. `.panel-plate[data-place="end"]` is
+   (0,2,0) and a `.panel-head-plate` override would be (0,1,0), so it would have
+   lost on specificity and shipped as the fifth dead rule this repository has
+   measured. It also does not need turning off: an auto margin in a grid cell
+   absorbs the free space to its left, which puts the plate exactly where
+   `justify-self: end` already puts it. */
+@media (max-width: 560px) {
+  .panel-head {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+  /* ⚠️ EVERY CHILD BACK INTO ONE COLUMN AND INTO SOURCE ORDER, which is plate,
+     status, patch: the title, then enabled at full width, then the patch at
+     full width. `grid-row: auto` is the half that is easy to forget, because
+     the desktop rules pin all three to row 1 and they would stack on top of
+     each other with only the column reset. */
+  .panel-head-on, .panel-head-mid, .panel-head-plate {
+    grid-column: 1; grid-row: auto; justify-self: stretch;
+  }
+  .panel-head-on, .panel-head-mid { width: 100%; }
+  .panel-head-on .pos-pres, .panel-head-mid > * { width: 100%; }
 }
 
 /* Two display fields sharing one window the panel draws. The page draws the
@@ -5224,3 +5435,95 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   padding: 8px 16px;
 }
 .pos-drop-note[hidden] { display: none; }
+
+/* ── switch (demo/shell/switch.mjs) ───────────────────────────────────────
+   🔴 APPENDED AT THE FOOT OF THIS FILE RATHER THAN BESIDE `.pos-check`, WHERE
+   IT BELONGS BY SUBJECT. Another session was editing this stylesheet in the
+   same checkout while this block was written, and an append cannot land inside
+   somebody else's half finished rule. Nothing here shares a selector with
+   anything above it, so source order carries no meaning and the block can be
+   moved up beside the checkbox whenever this file is quiet.
+
+   🔴 A REAL `<input type="checkbox">` WEARING `role="switch"`, CLIPPED, WITH
+   THE TRACK AND THE KNOB DRAWN BESIDE IT. The reasons are in the module header
+   and they are the checkbox's four plus one attribute. What is left for CSS is
+   the picture, and the picture is the whole of what was asked for: a rounded
+   rectangle, yellow for a primary switch and grey for a secondary one.
+
+   ⚠️ CLIPPED, NEVER `display: none`. A `display: none` input is not focusable,
+   so the keyboard path would be gone and nothing on the page would say so. This
+   is the same clip `.pos-check-i` uses, and `/kit/` asserts the input is still
+   in the tab order and still 1 px rather than 0. */
+.pos-switch {
+  display: inline-flex; align-items: center; gap: 8px; height: 34px;
+  cursor: pointer;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+.pos-switch-i {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+/* 🔴 A ROUNDED RECTANGLE, NOT A PILL, AND THAT IS WHAT WAS ASKED FOR. Every
+   other control in this kit has square shoulders with a 3 or 4 px radius on
+   them, and a pill would be the one component on the page drawn to a different
+   system. The 4 px here is `.pos-check-b`'s 3 px one step up for a box twice as
+   wide, so the two sit next to each other as one family.
+
+   The same inset shadow the checkbox and the slider's lane use rather than a
+   border, for the same reason: a border insets the padding box, and the knob
+   inside it would be a pixel off centre at this size. */
+.pos-switch-b {
+  position: relative; flex: none; width: 34px; height: 18px; border-radius: 4px;
+  background: var(--card2); box-shadow: inset 0 0 0 1px var(--line2);
+}
+/* 🔴 THE KNOB IS AN ELEMENT AND ITS TRAVEL IS ONE NUMBER, DECLARED ONCE. The
+   track is 34 wide, the knob is 14 and sits 2 in from the end, so it moves
+   34 - 14 - 2 - 2 = 16 px. Typing 16 in one place and the widths in another is
+   a measurement in two files waiting to disagree, which `--sld-col` and
+   `--ctl-gap` were both repaired for, so the travel is computed from the
+   figures it comes from and the check reads the rendered edges rather than
+   either. */
+.pos-switch-k {
+  position: absolute; left: 2px; top: 2px; width: 14px; height: 14px;
+  border-radius: 3px; background: var(--dim2);
+  transition: transform .12s ease, background-color .12s ease;
+}
+.pos-switch-i:checked + .pos-switch-b .pos-switch-k {
+  transform: translateX(calc(34px - 14px - 2px - 2px));
+  background: var(--bg);
+}
+/* 🔴 ONE YELLOW, AND THE SECOND WEIGHT DOES NOT GET TO INVENT ANOTHER. `--hi`
+   means *the thing this control is about* on every page here, so a primary
+   switch lights in it and a secondary switch lights in `--dim`, a grey that is
+   already in this file. `/kit/` asserts the primary's lit track against the
+   token read off the stylesheet, so the two are one measurement rather than two
+   that happen to match, and asserts that the secondary is NOT that colour,
+   which is the half that catches a secondary quietly reaching for the yellow.
+
+   ⚠️ BOTH WEIGHTS SHARE ONE OFF PICTURE, which is the rule rather than an
+   economy: weight says how loudly the ON state announces itself, so two
+   switches that are both off have nothing to say about each other. */
+.pos-switch-i:checked + .pos-switch-b {
+  background: var(--hi); box-shadow: inset 0 0 0 1px var(--hi);
+}
+/* (0,3,0) against (0,2,0), so this wins on weight and source order is not
+   load-bearing. It is still written after the rule it overrides, because the
+   day a specificity tie is introduced is the day it silently stops working. */
+.pos-switch[data-weight="secondary"] .pos-switch-i:checked + .pos-switch-b {
+  background: var(--dim); box-shadow: inset 0 0 0 1px var(--dim);
+}
+/* Focus is grey here and nowhere near the lit colour. One colour, one meaning,
+   which is the answer `.pos-check` and `.pos-choice` both reached. */
+.pos-switch-i:focus-visible + .pos-switch-b {
+  outline: 2px solid var(--dim2); outline-offset: 2px;
+}
+.pos-switch-t { font: 500 11px/1 var(--mono); color: var(--fg); white-space: nowrap; }
+.pos-switch-i:disabled ~ .pos-switch-t { color: var(--dim2); }
+.pos-switch:has(.pos-switch-i:disabled) { cursor: default; opacity: .45; }
+/* The knob slides because sliding is what says there are two positions and this
+   is one of them. Somebody who has asked for less movement gets the position
+   and none of the travel. */
+@media (prefers-reduced-motion: reduce) {
+  .pos-switch-k { transition: none; }
+}

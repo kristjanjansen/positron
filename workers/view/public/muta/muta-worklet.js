@@ -91,6 +91,132 @@ const P = {
 // number came from. Timing nothing and printing a zero would have read as
 // free.
 
+const SCOPE_RING = 2048;
+const SCOPE_OUT = 256;
+// How many cycles of the fundamental the picture shows.
+const SCOPE_CYCLES = 4;
+
+function scopeWindow(ring, write, held, prev) {
+  const lin = new Float32Array(SCOPE_RING);
+  for (let i = 0; i < SCOPE_RING; i++) lin[i] = ring[(write + i) % SCOPE_RING];
+
+  let peak = 0;
+  for (let i = 0; i < SCOPE_RING; i++) { const m = Math.abs(lin[i]); if (m > peak) peak = m; }
+  if (peak < 0.0005) return null;
+
+  /**
+   * 🔴 A HYSTERESIS TRIGGER, AND IT HAS TO BE HIGH. A bare zero crossing fires
+   * on any wobble through zero, and these engines put out stepped signals that
+   * wobble: at `timbre 0.86` the virtual analog wave crossed the old quarter
+   * peak level TWICE a cycle, so the period came out halved, the span read
+   * **7.4 ms where four cycles at MIDI 60 is 15.3**, and the time base flipped
+   * between one reading and the other. Reported as *"its very nervous in this
+   * setting"*.
+   * ✅ Half the peak, and it has to STAY above for three samples. A step that
+   * touches the level and falls back is not a cycle starting.
+   */
+  const level = peak * 0.5;
+  const rises = [];
+  let armed = false;
+  for (let i = 0; i < SCOPE_RING - 3; i++) {
+    if (lin[i] < -level) { armed = true; continue; }
+    if (!armed || lin[i] <= level) continue;
+    if (lin[i + 1] > level && lin[i + 2] > level) { rises.push(i); armed = false; }
+  }
+  if (rises.length < 2) return null;
+
+  const gaps = [];
+  for (let i = 1; i < rises.length; i++) gaps.push(rises[i] - rises[i - 1]);
+  gaps.sort((x, y) => x - y);
+  let period = gaps[gaps.length >> 1];
+  if (!(period > 1)) return null;
+
+  /**
+   * 🔴 AND THE TIME BASE IS HELD BETWEEN CAPTURES, WHICH IS WHAT A SCOPE'S
+   * HOLD DOES. A period re-measured 47 times a second wanders by a frame or
+   * two even on a steady note, and every wander restretches the whole window,
+   * so the picture breathes and the phosphor's ghosts never sit under the live
+   * trace. A new reading is taken only when it differs by more than a tenth,
+   * which is a real change of pitch rather than measurement noise.
+   */
+  /* The caller's own figure wins outright when it has one: it is arithmetic on
+     a note somebody set rather than a reading of a signal, so it is exact and
+     cannot wander. Measuring is the fallback for a voice whose pitch nothing
+     here knows. */
+  if (held > 1) period = held;
+
+  /**
+   * 🔴 THE START IS CHOSEN BY MATCHING THE LAST WINDOW, NOT BY THE FIRST
+   * TRIGGER. A threshold says WHERE a cycle begins only on a simple wave. At
+   * `timbre 0.99` a waveshaper crosses the level more than once a cycle, so
+   * *the first rise in the ring* is a different feature of the wave each time,
+   * and the picture jumps by a fraction of a cycle even with the period exact.
+   * MEASURED before this: consecutive windows differed by **0.03 to 0.17 worst
+   * sample on a signal whose peak is 0.125**, which is the same size as the
+   * signal. Reported as *"i still see some nervousness"*.
+   * ✅ **SO IT LOCKS TO ITSELF.** Every candidate start within one period is
+   * scored against the window that was drawn last, and the best match wins.
+   * That is what a scope's phase lock does, and it is the only thing that works
+   * when the wave has no single unambiguous edge.
+   * ⚠️ THE FIRST CAPTURE HAS NOTHING TO MATCH, so the trigger picks it and
+   * every later one follows from it.
+   * ⚠️ AND THE SEARCH IS COARSE THEN FINE, so it costs about 3,000 comparisons
+   * rather than 47,000: 32 steps across the period, then 8 either side of the
+   * winner.
+   */
+  let span = Math.round(period * SCOPE_CYCLES);
+  let start = rises[0];
+  if (prev && prev.length === SCOPE_OUT) {
+    const step0 = span / SCOPE_OUT;
+    const score = (off) => {
+      if (off < 0 || off + span >= SCOPE_RING) return Infinity;
+      let sum = 0;
+      for (let i = 0; i < SCOPE_OUT; i += 2) {
+        const at = off + i * step0;
+        const k = Math.floor(at);
+        const fr = at - k;
+        const v = lin[k] * (1 - fr) + lin[Math.min(k + 1, SCOPE_RING - 1)] * fr;
+        const d = v - prev[i];
+        sum += d * d;
+      }
+      return sum;
+    };
+    let best = start, bestScore = Infinity;
+    const coarse = Math.max(1, Math.round(period / 32));
+    for (let o = rises[0]; o < rises[0] + period; o += coarse) {
+      const sc = score(o);
+      if (sc < bestScore) { bestScore = sc; best = o; }
+    }
+    for (let o = best - coarse; o <= best + coarse; o++) {
+      const sc = score(o);
+      if (sc < bestScore) { bestScore = sc; best = o; }
+    }
+    start = best;
+  }
+  if (start + span > SCOPE_RING) span = SCOPE_RING - start;
+  if (span < 8) return null;
+
+  /**
+   * ⚠️ INTERPOLATED, NOT NEAREST. `span / SCOPE_OUT` is about 2.87 frames, so
+   * taking `lin[floor(i * step)]` picks a different sub-position in each source
+   * cycle every time the start moves by a fraction of a frame. On a stepped
+   * waveform that reads as the trace shivering even when the window is
+   * perfectly placed. MEASURED between consecutive windows: nearest-sample left
+   * 0.02 to 0.06 of difference on a signal peaking at 0.125.
+   */
+  const out = new Array(SCOPE_OUT);
+  const step = span / SCOPE_OUT;
+  for (let i = 0; i < SCOPE_OUT; i++) {
+    const at = start + i * step;
+    const k = Math.floor(at);
+    const f = at - k;
+    out[i] = lin[k] * (1 - f) + lin[Math.min(k + 1, SCOPE_RING - 1)] * f;
+  }
+  out.spanFrames = span;
+  out.period = period;
+  return out;
+}
+
 class PlaiVoice extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -103,6 +229,11 @@ class PlaiVoice extends AudioWorkletProcessor {
     this.blockSize = 12;
     this.maxVoices = 1;
     this.quanta = 0;
+    this.scopeRing = new Float32Array(SCOPE_RING);
+    this.scopeAt = 0;
+    this.scopePeriod = 0;
+    this.scopeHz = 0;
+    this.scopePrev = null;
     this.peak = 0;
     this.blocksLast = 0;
     this.announced = false;      // the first rendered quantum, said once
@@ -119,7 +250,25 @@ class PlaiVoice extends AudioWorkletProcessor {
     if (!m) return;
     if (m.t === 'wasm') { this.boot(m.bytes, m.rate); return; }
     if (!this.ex) return;
-    if (m.t === 'param') { this.ex.plai_set_param(m.id, m.value); return; }
+    if (m.t === 'param') {
+      this.ex.plai_set_param(m.id, m.value);
+      /**
+       * 🔴 THE SCOPE'S TIME BASE COMES FROM THE NOTE, NOT FROM THE SIGNAL.
+       * Reported as *"supernervous"* after two rounds of trying to make a
+       * measured period hold still. **Measuring was the wrong approach and no
+       * amount of smoothing fixes it**: a waveshaper at `timbre 0.99` and eight
+       * voices put out something with no single period to find, so every
+       * capture disagreed with the last and the whole window restretched.
+       * ✅ The page already KNOWS the pitch, because it set it. Parameter 1 is
+       * the note, so the period is exact arithmetic rather than a reading, and
+       * it cannot jitter at all.
+       * ⚠️ IT IS STILL TRIGGERED. A known period says how much to show, and a
+       * trigger says where to start; without the second the window would slide
+       * one quantum at a time even with a perfect time base.
+       */
+      if (m.id === 1) this.scopeHz = 440 * Math.pow(2, (m.value - 69) / 12);
+      return;
+    }
     if (m.t === 'channel') { this.channel = m.value ? 1 : 0; return; }
     if (m.t === 'voices') {
       const got = this.ex.plai_set_polyphony(m.n | 0);
@@ -137,6 +286,16 @@ class PlaiVoice extends AudioWorkletProcessor {
       return;
     }
     if (m.t === 'noteOn') { this.noteOn(m); return; }
+    /* A KEY COMING BACK UP, WHICH THE SHIM COULD NOT BE TOLD ABOUT UNTIL
+       2026-09-22. `plai_note_off` drops that note's gate and leaves the voice
+       rendering, so the lowpass gate closes over `decay` rather than the sound
+       being cut. `released` is 0 for a note nobody is holding, which is an
+       ordinary thing for a keyboard to send and not an error. */
+    if (m.t === 'noteOff') {
+      const released = this.ex.plai_note_off(m.note);
+      this.port.postMessage({ t: 'noteOff', note: m.note, released, held: this.ex.plai_held() });
+      return;
+    }
   }
 
   /**
@@ -162,12 +321,17 @@ class PlaiVoice extends AudioWorkletProcessor {
       ? Math.max(1, Math.round((ms / 1000) * sampleRate / this.blockSize))
       : 0;
 
-    const voice = ex.plai_note_on(m.note, hold);
+    /* 0..1, and only read for a held note. `voice.cc:143` turns it into the
+       engine's accent as well as the lowpass gate's level, so this is velocity
+       arriving at the DSP rather than being counted and thrown away. */
+    const level = Number.isFinite(m.level) ? Math.min(1, Math.max(0, m.level)) : 1;
+    const voice = ex.plai_note_on(m.note, hold, level);
     this.port.postMessage({
       t: 'note',
       note: m.note,
       voice,
       holdBlocks: hold,
+      level,
       stolen: ex.plai_last_stolen(),
       stolenNote: ex.plai_last_stolen_note(),
       stolenLevel: ex.plai_last_stolen_level(),
@@ -266,11 +430,32 @@ class PlaiVoice extends AudioWorkletProcessor {
 
     if (peak > this.peak) this.peak = peak;
 
+    for (let i = 0; i < frames; i++) {
+      this.scopeRing[this.scopeAt] = this.out[i];
+      this.scopeAt = (this.scopeAt + 1) % SCOPE_RING;
+    }
+
     this.quanta++;
 
     // Report four times a second, not per quanta. A readout cell is a fixed
     // box and a message per 2.67 ms is 375 posts a second for a number nobody
     // can read that fast.
+    /**
+     * The picture posts on its own cadence, 8 quanta against the readout's 94.
+     * A readout cell is a number somebody reads and four a second is plenty; a
+     * scope is a moving thing and at four a second it lurches, which was
+     * reported as *"wave updae feels slow"*. 8 quanta is about 47 a second.
+     */
+    if (this.quanta % 8 === 0) {
+      const win = scopeWindow(this.scopeRing, this.scopeAt,
+        this.scopeHz ? sampleRate / this.scopeHz : 0, this.scopePrev);
+      if (win) {
+        this.scopePeriod = win.period;
+        this.scopePrev = win;
+        this.port.postMessage({ t: 'wave', wave: win, waveFrames: win.spanFrames });
+      }
+    }
+
     if (this.quanta % 94 === 0) {
       this.port.postMessage({
         t: 'meter',
@@ -332,6 +517,11 @@ class WarpMod extends AudioWorkletProcessor {
     this.auxPtr = 0;
     this.blockSize = 60;
     this.quanta = 0;
+    this.scopeRing = new Float32Array(SCOPE_RING);
+    this.scopeAt = 0;
+    this.scopePeriod = 0;
+    this.scopeHz = 0;
+    this.scopePrev = null;
     this.peak = 0;
     this.inPeak = 0;
     this.blocksLast = 0;
@@ -450,7 +640,25 @@ class WarpMod extends AudioWorkletProcessor {
 
     if (peak > this.peak) this.peak = peak;
     if (inPeak > this.inPeak) this.inPeak = inPeak;
+
+    for (let i = 0; i < frames; i++) {
+      this.scopeRing[this.scopeAt] = this.out[i];
+      this.scopeAt = (this.scopeAt + 1) % SCOPE_RING;
+    }
+
     this.quanta++;
+
+    /* The picture's own cadence, the same 8 quanta the oscillator uses. The
+       effect takes its period from the oscillator's note when it is being fed
+       one, and finds its own otherwise, which is the internal carrier case. */
+    if (this.quanta % 8 === 0) {
+      const win = scopeWindow(this.scopeRing, this.scopeAt, this.scopePeriod, this.scopePrev);
+      if (win) {
+        this.scopePeriod = win.period;
+        this.scopePrev = win;
+        this.port.postMessage({ t: 'wave', wave: win, waveFrames: win.spanFrames });
+      }
+    }
 
     if (this.quanta % 94 === 0) {
       this.port.postMessage({

@@ -20,8 +20,20 @@
     font: 12px/1.4 var(--mono, ui-monospace, monospace); color: var(--ink);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .bay-why { min-height: 18px; font-size: 12px; color: var(--dim); }
-  .bay-why[data-bad] { color: var(--bad, #e0908a); }
+  /* 🔴 TWO LINES' ROOM SINCE 2026-09-22, BECAUSE A REFUSAL IS TWO SENTENCES.
+     Asked as *"can we have cooncrete problem -> soluton texts?"*: `bay.mjs`
+     answers a refusal with what is wrong and with the thing a person can do
+     about it, and both are shown here. One line of room under a box that can
+     hold two is the reflow this project has already been reported for once, as
+     *"a horrible jump of content each time it updates"*, so the room is taken
+     whatever is in it.
+     ⚠️ MEASURED at 18 px a line in this face and size, which is the number
+     that was already here for one. */
+  .bay-why { min-height: 36px; font-size: 12px; color: var(--dim); }
+  /* ⚠️ THE PROBLEM IS IN THE REFUSAL'S OWN INK AND THE SOLUTION IS NOT. A
+     second red line reads as a second refusal, and what it carries is the way
+     out of the first one. */
+  .bay-why[data-bad] .bay-why-p { color: var(--bad, #e0908a); }
   .bay-patch {
     white-space: pre; overflow-x: auto; min-width: 0;
     padding: 10px; border: 1px solid var(--line); border-radius: 4px;
@@ -324,9 +336,19 @@
    * `ready` cannot be a row whose press is refused, and the sentence on a
    * refused row's hover is the same sentence the press would have printed.
    */
+  /* ⚠️ THE TWO REFUSALS THIS PAGE WORDS ITSELF CARRY A SOLUTION TOO, since
+     2026-09-22, or the one box on the page would show two lines for a
+     validator's refusal and one for these. Neither has a repair: a controller
+     with no sound engine is not going to grow one. */
   function candidate(src, dst) {
-    if (!src.out) return { ok: false, why: `${src.label} has no output, so nothing leaves it` };
-    if (!dst.in) return { ok: false, why: `${dst.label} has no input, so nothing can reach it` };
+    if (!src.out) {
+      return { ok: false, why: `${src.label} has no output, so nothing leaves it.`,
+               fix: `Press ${src.label} second instead, so something reaches it.` };
+    }
+    if (!dst.in) {
+      return { ok: false, why: `${dst.label} has no input, so nothing can reach it.`,
+               fix: `Press ${dst.label} first instead, so it is the one that sends.` };
+    }
     const transforms = suggest(src.out.id, dst.in.id);
     return { from: src.out.id, to: dst.in.id, transforms,
       ...bay.validate(src.out.id, dst.in.id, transforms) };
@@ -503,11 +525,11 @@
     if (node === pick) { paint(); return; }         // still the same hand
     const held = instrument(pick);
     const plan0 = plan(held, g);
-    if (!plan0.from) { say(plan0.why, true); paint(); return; }
+    if (!plan0.from) { say(plan0.why, true, plan0.fix); paint(); return; }
     const r = bay.link(plan0.from, plan0.to, plan0.transforms);
     if (!r.ok) {
-      say(r.why, true);
-      d.log(`${held.label} to ${g.label} was refused: ${r.why}`, 'warn');
+      say(r.why, true, r.fix);
+      d.log(`${held.label} to ${g.label} was refused: ${r.why} ${r.fix}`, 'warn');
       paint();
       return;
     }
@@ -549,9 +571,9 @@
     const p = plan(instrument(pick), g);
     // The only refusal this page words itself: one side has no port at all, so
     // there is nothing for the validator to be asked about.
-    if (!p.from) { say(p.why, true); paint(); return; }
+    if (!p.from) { say(p.why, true, p.fix); paint(); return; }
     const r = bay.link(p.from, p.to, p.transforms);
-    if (!r.ok) { say(r.why, true); paint(); return; }
+    if (!r.ok) { say(r.why, true, r.fix); paint(); return; }
     say(r.warn || `${bay.port(p.from).label} now reaches ${bay.port(p.to).label}`, !!r.warn);
     d.log(`connected ${printLink(bay.links().at(-1))}`);
     pick = null;
@@ -579,8 +601,17 @@
     return t;
   }
 
-  function say(text, bad = false) {
-    why.textContent = text;
+  /**
+   * 🔴 TWO CONTENTS, ONE BOX: what is wrong, and what to do about it. The
+   * second half arrived with `bay.mjs`'s two sentence refusals on 2026-09-22.
+   * ⚠️ AND IT IS NEVER A JOIN. Gluing them with a middot or a dash is the tic
+   * CLAUDE.md names; they are two facts and they get two lines, which is the
+   * same answer `table.mjs` gives about a row of them.
+   */
+  function say(text, bad = false, fix = '') {
+    why.replaceChildren();
+    if (text) why.append(el('div', 'bay-why-p', text));
+    if (fix) why.append(el('div', 'bay-why-s', fix));
     if (bad) why.dataset.bad = '1'; else delete why.dataset.bad;
   }
 
@@ -621,6 +652,11 @@
         lines.push(p.ok
           ? `press it to connect ${printLink({ from: p.from, to: p.to, transforms: p.transforms })}`
           : p.why);
+        /* ⚠️ THE WAY OUT IS ON THE HOVER TOO, on its own line, since the
+           refusals gained one on 2026-09-22. A reader who can see why a row is
+           refused before pressing it should be able to see what would make it
+           ready in the same place. */
+        if (!p.ok && p.fix) lines.push(p.fix);
         if (p.ok && p.warn) lines.push(p.warn);
       }
       return {
@@ -1122,18 +1158,46 @@
     const l2 = bay.links().length;
     choose('test:mk-425c');
     choose('test:circuit');
+    const problem = () => why.querySelector('.bay-why-p')?.textContent || '';
+    const solution = () => why.querySelector('.bay-why-s')?.textContent || '';
     d.assert('a refused pair is not connected, says why, and keeps the first pick',
-      bay.links().length === l2 && /sysex/i.test(why.textContent)
+      bay.links().length === l2 && /sysex/i.test(problem())
       && pick === 'test:mk-425c',
-      `${why.textContent}, holding ${pick || 'nothing'}`);
+      `${problem()}, holding ${pick || 'nothing'}`);
+
+    /**
+     * 🔴 A REFUSAL IS A PROBLEM AND A WAY OUT, AND UNTIL 2026-09-22 IT WAS ONE
+     * SENTENCE MADE OF FIELD NAMES. REPORTED on `/wish/`, which prints these
+     * same sentences: *"only takes "cls" and was given "to" - its not for
+     * humans, i do not know what to do"*, and then *"can we have cooncrete
+     * problem -> soluton texts?"*.
+     * 🔴 THE SOLUTION IS THE TRANSFORM THIS PAGE'S OWN NEGATIVE CONTROL
+     * ALREADY USES. Four lines above, `and the same pair is allowed once SysEx
+     * is dropped` connects the identical pair with `{ op: 'drop', cls: 'sysex' }`,
+     * so a refusal that does not offer it is withholding a repair the page
+     * knows about. ⚠️ AND WHAT HAS NO REPAIR IS THE RULE: the Circuit has no
+     * factory reset, so nothing here offers to send it SysEx anyway.
+     * ⚠️ THE ROOM IS TAKEN EITHER WAY, or the table below it moves whenever a
+     * refusal lands.
+     */
+    const twoLines = why.getBoundingClientRect().height;
+    d.assert('a refusal says what is wrong and what to do, in two lines that keep their room',
+      /does not accept sysex/.test(problem())
+      && solution().includes('{"op":"drop","cls":"sysex"}')
+      && !/"cls"|"to"|"from"|"by"/.test(problem())
+      && twoLines >= 36,
+      `${problem()} / ${solution()}, in ${twoLines.toFixed(1)} px`);
 
     /* 🔴 AND THE REASON IS READABLE BEFORE THE PRESS, WHICH IS WHAT THE GONE
        BUTTON USED TO BUY. */
     const circuitRow = rowOf('Circuit');
     d.assert('a row that cannot take the pick reads as refused, with the reason in its hover',
       !!circuitRow && circuitRow.lastElementChild.textContent === 'refused'
-      && /sysex/i.test(circuitRow.title),
-      circuitRow ? `join reads ${circuitRow.lastElementChild.textContent}, hover says ${circuitRow.title.split('\n').pop()}` : 'no row');
+      && /sysex/i.test(circuitRow.title)
+      /* ⚠️ AND THE WAY OUT IS THERE BEFORE THE PRESS AS WELL, which is the
+         whole point of answering at the row rather than after the press. */
+      && circuitRow.title.includes('{"op":"drop","cls":"sysex"}'),
+      circuitRow ? `join reads ${circuitRow.lastElementChild.textContent}, hover says ${circuitRow.title.split('\n').slice(-2).join(' / ')}` : 'no row');
 
     /**
      * 🔴 THE ROW THAT MOTIVATED THIS BUILD, AND IT IS THE NEGATIVE HALF. The

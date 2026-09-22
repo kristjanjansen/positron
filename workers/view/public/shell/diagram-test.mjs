@@ -1140,5 +1140,44 @@ console.log('\n== a container is never empty ==');
      `${flat.nodes.length} machines, ${flat.cuts.length} cuts`);
 }
 
+/**
+ * 🔴 `align: 'left'`, ADDED 2026-09-22 FOR `/wish/`, WHERE A FIGURE IS NO
+ * LONGER THE WHOLE BLOCK. Graded here rather than on the page because it is
+ * pure arithmetic: `placeRow` picks one number and every x in the row follows
+ * from it.
+ */
+{
+  const wide = layout(TRIP, { width: 900, measure });
+  const left = layout({ ...TRIP, align: 'left' }, { width: 900, measure });
+  const firstX = (L) => Math.min(...L.nodes.map((n) => n.x));
+  ok('a left aligned figure starts at the same inset a centred one keeps off its own edge',
+     firstX(left) < firstX(wide) && firstX(left) > 0,
+     `left aligned starts at ${firstX(left)}, centred at ${firstX(wide)}, in 900 px`);
+
+  /* 🔴 THE NEGATIVE CONTROL, AND IT IS THE ONE THAT MATTERS: in a box exactly
+     as wide as the figure there is nothing to centre, so both must agree. A
+     test that only compared a wide box would pass on an `align` that did
+     something arbitrary rather than nothing. */
+  /* The inset a left aligned figure keeps off its own edge IS the number a
+     centred one falls back to when there is no room, so it is read from the
+     drawing rather than typed. Typing 24 here made the box 20 px too loose and
+     the check went red against a component doing exactly what it promises. */
+  const pad = firstX(left);
+  const tight = Math.round(wide.boxW * 3 + wide.gapX * 2 + pad * 2);
+  const a = layout(TRIP, { width: tight, measure });
+  const b = layout({ ...TRIP, align: 'left' }, { width: tight, measure });
+  ok('NEGATIVE CONTROL: with no room to centre, both alignments agree to the pixel',
+     firstX(a) === firstX(b),
+     `centred starts at ${firstX(a)} and left aligned at ${firstX(b)} in a ${tight} px box`);
+
+  /* An option nobody can spell is reported to the author rather than falling
+     back in silence, which is this component's habit for a label that will not
+     fit and a link it cannot route. */
+  const odd = layout({ ...TRIP, align: 'middle' }, { width: 900, measure });
+  ok('an align nobody knows is reported on cuts and the figure is centred',
+     odd.cuts.some((c) => c.where === 'align') && firstX(odd) === firstX(wide),
+     `${odd.cuts.filter((c) => c.where === 'align').length} reported, starts at ${firstX(odd)}`);
+}
+
 console.log(`\n${pass} ok, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
