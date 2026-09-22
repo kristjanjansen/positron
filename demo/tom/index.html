@@ -60,6 +60,24 @@
     font: 400 12px/1.5 var(--mono); color: var(--dim); min-height: 1.5em;
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   }
+
+  /* 🔴 THE PLATE FLOATS SO THE GRID RISES, asked for as *"move grid upwards"*.
+     MEASURED before: the plate sat in the flow at 31 px tall carrying its own
+     20 px top inset, so everything under it started 32 px down and the first
+     pad at 62. Out of the flow it keeps the same inset from the case's corner
+     and gives its height back to the grid.
+     ⚠️ PAGE SCOPED, because `.panel-plate` belongs to `/twelve/` and
+     `/circuit/` too, where a plate sits above a strip that scrolls and floating
+     it over the contents would be wrong. `/muta/` made the same change for the
+     same reason and says so in its own file.
+     ⚠️ AND NO PADDING, or the inset is counted twice: `shell.css` gives a plate
+     in a case `padding-block: var(--panel-pad) 0` precisely because it earns
+     its own top inset while it is IN the flow. */
+  .tom { position: relative; }
+  .tom > .panel-plate {
+    position: absolute; top: var(--panel-pad, 20px); right: var(--panel-pad, 20px);
+    padding: 0;
+  }
 </style>
 
 <script type="module">
@@ -174,7 +192,17 @@
      * have not happened is not, and `0` there would read as a very confident
      * measurement of nothing.
      */
-    readout: { on: '', step: '', voices: '', late: 'ms' },
+    /* 🔴 NO READOUT AT ALL SINCE 2026-09-22: *"rm readout from tom"*. It held
+       `on`, `step`, `voices` and `late`.
+       ⚠️ **THE FACTS DO NOT GO WITH THE CELLS.** `late` is the only one that was
+       a measurement rather than a restatement of what the grid already shows,
+       and it is in the log, where a number that matters once is read once.
+       ⚠️ AND IT IS `readout: null`, NOT AN OMITTED FIELD. `shell.mjs` reads
+       `null` as `readoutOptOut`, which is how a page SAYS it has none rather
+       than appearing to have forgotten: the harness then asserts *declares that
+       it has no readout, on purpose* instead of going red. `/blocks/` is the
+       other page that does this and carries the same note. */
+    readout: null,
     /**
      * 🔴 NO CONTROL ROW AT ALL, AND THE MISSING CONTROL IS `clear`. `verify.mjs`
      * presses every button in `.pos-controls` in order on every run, so a
@@ -277,7 +305,6 @@
       // step, which would only measure the timer against itself. Read on the
       // page's side of the boundary, which is the side that can be wrong.
       worstLate = Math.max(worstLate, Math.abs(deck.position() - p.at));
-      d.set('late', worstLate.toFixed(1));
     },
     // ⚠️ COUNT ONLY. The rows a reducer is handed are not the items that were
     // scheduled, and assuming they are took a whole page down from inside a
@@ -414,6 +441,12 @@
    * wrapper is somewhere no harness looks.
    */
   window.__demo.drop = drop;
+  /* ⚠️ THE WORST LATENESS, PUBLISHED FOR THE CHECK RATHER THAN READ OUT OF A
+     CELL. It was a readout cell until 2026-09-22, and a check reading a cell is
+     a check that breaks when the page stops printing it, which is exactly what
+     happened. A getter, so it reports the value at the moment it is asked. */
+  Object.defineProperty(window.__demo, 'worstLate', { get: () => worstLate });
+
 
   // ── the transport ───────────────────────────────────────────────────────
   //
@@ -641,7 +674,6 @@
      * not. `stroke` is a pad dragged across under a held pointer.
      */
     onToggle: (r, s, lit, why) => {
-      d.set('on', grid.count());
       /* `draw` since 2026-09-22, when `stroke` was reported as this file's
          private word appearing in a readout a visitor reads. Both names are
          listed for one release rather than swapped, because a page that stops
@@ -745,9 +777,7 @@
    * rather than sixty.
    */
   function showAt(pos) {
-    const was = grid.step();
-    const s = grid.at(stepAt(pos));
-    if (s !== was) d.set('step', s + 1);
+    grid.at(stepAt(pos));
   }
 
   // ── pressing things ─────────────────────────────────────────────────────
@@ -814,7 +844,6 @@
       src.start();
       voices++;
       lastFired = { row: r, name: rows[r].name, seconds: buf.duration, frames: buf.length, rate: buf.sampleRate, why };
-      d.set('voices', voices);
       // ⚠️ ON A PRESS AND NEVER ON A STEP. Eight lines of prose a second is the
       // live caption `grain-scope` was reported for, and a fixed box only stops
       // it moving the page: it does not make it readable.
@@ -1019,7 +1048,6 @@
     grid.setRows(rows.length);
     grid.redraw();
     built = performance.now() - t0;
-    d.set('on', grid.count());
     // ⚠️ AFTER THE GRID, so the picture is on screen before the decoding
     // starts, and only if a context already exists: making one here would be
     // the page opening an audio device nobody asked it to.
@@ -1030,7 +1058,6 @@
       + (bufs.size ? `, ${bufs.size} decoded in ${warmed.toFixed(0)} ms` : ''));
   }
 
-  d.set('on', grid.count());
 
   // ── what a visit is allowed to have done ────────────────────────────────
   d.assert('a visit opens nothing, asks for nothing and makes no sound',
@@ -1533,27 +1560,56 @@
          */
         const at = row0[want];
         const parkedBg = getComputedStyle(at).backgroundColor;
-        const parkedFx = getComputedStyle(at).filter;
+        let parkedFx = getComputedStyle(at).filter;
         // The same cell with the playhead elsewhere, which is the only honest
         // reference for "its own colour survived".
         rowsEl.dataset.now = String((want + 1) % STEPS);
         const ownBg = getComputedStyle(at).backgroundColor;
         rowsEl.dataset.now = String(want);
+        /**
+         * 🔴 A TRANSITIONING PROPERTY READ IN THE SAME TASK IS ITS START, NOT
+         * ITS TARGET. `shell.css` gives every pad `transition: filter
+         * var(--pg-fall) ease-out`, so setting `data-now` and reading
+         * `getComputedStyle().filter` in the same turn reports **brightness(1)**
+         * on a pad that is on its way to 1.45. This check read it that way and
+         * called a working playhead a broken one.
+         * ⚠️ IT IS THE SAME FAULT `switch.mjs` FOUND THE SAME DAY IN A
+         * DIFFERENT PROPERTY, where a knob measured 157.4 px before a press and
+         * 157.4 px in the same task after it. **Anything with a transition on
+         * it has to be read after the transition**, which is what `settle`
+         * waits for.
+         */
+        const settle = async () => {
+          const ms = parseFloat(getComputedStyle(at).transitionDuration) * 1000 || 0;
+          await new Promise((r) => setTimeout(r, Math.max(40, ms + 30)));
+          await raf2();
+        };
+        await settle();
+        const parkedFxSettled = getComputedStyle(at).filter;
         setLive(true);
+        await settle();
         const liveBg = getComputedStyle(at).backgroundColor;
         const liveFx = getComputedStyle(at).filter;
         const liveShadow = getComputedStyle(at).boxShadow;
         setLive(false);
+        await settle();
         const parkedShadow = getComputedStyle(at).boxShadow;
+        parkedFx = parkedFxSettled;
         setLive(!!deck.transport.playing);
         d.assert('neither playhead replaces the pad\u2019s own colour, and only the running one carries the wash',
           rowsEl.dataset.now === String(want)
           && grid.ticks[want].dataset.now === '1'
-          && window.__demo.readout.step === want + 1
+          /* ⚠️ THE GRID'S OWN STEP, NOT A READOUT CELL. This read
+             `readout.step`, which went with the readout on 2026-09-22, so the
+             clause compared `undefined` against a number and took the whole
+             assert red on a page whose playhead was working. A check reading a
+             CELL is a check that breaks when the page stops printing it; the
+             component knows where its head is. */
+          && grid.step() === want
           && parkedBg === ownBg && liveBg === ownBg
           && /brightness/.test(parkedFx) && liveFx !== 'none'
           && /inset/.test(liveShadow) && !/inset/.test(parkedShadow),
-          `the pad keeps ${ownBg} in both states · parked ${parkedFx} with `
+          `step ${want} of ${STEPS}, now=${rowsEl.dataset.now}; the pad keeps ${ownBg} in both states · parked ${parkedFx} with `
           + `shadow ${parkedShadow.slice(0, 40)} · playing ${liveFx} with `
           + `shadow ${liveShadow.slice(0, 40)}`);
       }
@@ -1614,7 +1670,13 @@
         deck.play();
         await new Promise((r) => setTimeout(r, 420));
         deck.pause();
-        const late = Number(window.__demo.readout.late);
+        /* ⚠️ THE PAGE'S OWN NUMBER, NOT A READOUT CELL. The readout went on
+           2026-09-22 and this read `readout.late`, which is `undefined` and
+           becomes `NaN` the moment it is a Number: the assert reported
+           `worst NaN ms late` on a page that was measuring correctly. The value
+           is published for the check instead, which is the same number one step
+           earlier in its life. */
+        const late = Number(window.__demo.worstLate);
         d.assert('playing walks the grid and fires the cells it passes over',
           actuated >= wasA + 3 && voices >= wasV + 3
           && deck.position() > 3 * STEP_MS && Number.isFinite(late),
