@@ -291,7 +291,24 @@ export function createKnob({
    */
   const vbW = 2 * (xOut + PAD), vbH = yBot - yTop + 2 * PAD;
   root.style.setProperty('--knob-dial-r', (vbH / vbW).toFixed(4));
-  root.style.setProperty('--knob-ring-f', ((yBot - (yTop - PAD)) / vbH).toFixed(4));
+  /**
+   * 🔴 THE ARC'S REAL LOWEST POINT, NOT THE BOUNDING BOX'S. Corrected
+   * 2026-09-22 on a photograph of the button sitting across the word `TIMBRE`:
+   * *"move invisible hand upwards"*.
+   * ⚠️ **`yBot` IS A VIEWBOX CONVENTION AND WAS THE WRONG NUMBER TO REUSE.**
+   * For a sweep of 180 degrees or more it is `50 + R`, the bottom of the whole
+   * CIRCLE, which leaves room for the stroke's round cap. The ring is not drawn
+   * there: a 270 degree arc ENDS at 135 degrees either side of twelve o'clock,
+   * so its lowest ink is at `50 + R cos(135)`, which is **76.9 against 88**.
+   * The button was being centred 11 units below the last thing anybody can see,
+   * and on a 50.6 px knob that put half of it over the label.
+   * ⚠️ AND IT IS THE SAME ARITHMETIC THE VIEWBOX ALREADY DOES ONE BRANCH ALONG:
+   * `yBot` uses `50 - R cos(half)` for a short sweep, which IS the drawn
+   * extent. Only the long branch swaps in the bounding value, and this reads
+   * the drawn one at every sweep.
+   */
+  const inkBot = 50 - R * Math.cos(half);
+  root.style.setProperty('--knob-ring-f', ((inkBot - (yTop - PAD)) / vbH).toFixed(4));
   const track = mk('path', 'pos-knob-track');
   const arc = mk('path', 'pos-knob-arc');
   const pointer = mk('path', 'pos-knob-ptr');
