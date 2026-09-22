@@ -50,7 +50,19 @@ export const MAKER = 'POSITRON';
  * `coming`. Narrowing it also narrows the reserve to the longer of these two
  * words rather than to `coming online`.
  */
-export const HEADER_SAYS = { online: 'enabled', offline: 'disabled' };
+/**
+ * 🔴 THE WORD SAYS WHAT A PRESS DOES, NOT WHAT THE STATE IS, SINCE 2026-09-22:
+ * *"online labels: 'turn on' 'turn off'"*. It read `enabled` and `disabled`.
+ * ⚠️ **THE DOT STILL CARRIES THE STATE**, which is what makes this legible
+ * rather than confusing: green with `turn off` is a thing that is on and a
+ * press that would stop it. Two channels, one fact each, which is the rule this
+ * project applies to every other control.
+ * ⚠️ AND IT IS RIGHT ONLY BECAUSE THE CONTROL ACTS. A badge that reported and
+ * could not be pressed would be labelled with an instruction nobody can
+ * follow, so a caller that supplies no `press` still gets the states named as
+ * states through `says`.
+ */
+export const HEADER_SAYS = { online: 'turn off', offline: 'turn on' };
 /** The only two states a header's status control can reach. See `HEADER_SAYS`. */
 export const HEADER_STATES = ['online', 'offline'];
 

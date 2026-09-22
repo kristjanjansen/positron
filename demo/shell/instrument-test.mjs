@@ -123,9 +123,17 @@ const is = (what, cond, detail) => {
 
   /* 🔴 GREEN AND GREY ARE `presence.mjs`'S, DECIDED ONCE. A second green dot in
      this file would be the hand-rolled control defect inside the kit itself. */
+  /* 🔴 AND THE WORDS ARE WHAT A PRESS DOES, NOT WHAT THE STATE IS, SINCE
+     2026-09-22: *"online labels: 'turn on' 'turn off'"*. This asserted the two
+     literal words and had to move with them, but the claim underneath is not a
+     spelling: the word for the ONLINE state is what would turn it OFF, and the
+     word for OFFLINE is what would turn it on. A pair that read the same way
+     round as the state would be a button promising to do what it has already
+     done. */
   is('the two states and their words are declared here and drawn by the kit’s badge',
     HEADER_STATES.length === 2 && HEADER_STATES.join() === 'online,offline'
-    && HEADER_SAYS.online === 'enabled' && HEADER_SAYS.offline === 'disabled'
+    && /off/.test(HEADER_SAYS.online) && /on/.test(HEADER_SAYS.offline)
+    && HEADER_SAYS.online !== HEADER_SAYS.offline
     && /from '\.\/presence\.mjs'/.test(code),
     `${HEADER_STATES.join(' and ')} reading ${HEADER_SAYS.online} and ${HEADER_SAYS.offline}`);
 

@@ -5121,7 +5121,21 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    every width. **So the media block is LAST in this file's panel section**,
    which is the one thing that can be checked, and the layout itself is read and
    not measured. It is said in the report and it is said here. */
-.panel-case > .panel-head { padding-block: var(--panel-pad) 0; }
+/* 🔴 A SEAM UNDER THE HEADER SINCE 2026-09-22: *"make top secion a glued
+   section with line under it"*. It is the glue's own 1 px of `--line`, the same
+   edge `createGlue` draws between a transport bar and the strip it drives, so a
+   header here and a glued pair anywhere else are one treatment rather than two.
+   ⚠️ **THE PADDING MOVES WITH IT.** The header used to sit in the case's top
+   inset with nothing under it; a line needs air on both sides or it reads as
+   the header's underline rather than as the edge of a section. */
+/* ⚠️ NO `margin-bottom`. The case already puts its own inset between the header
+   and what follows, so a margin here is that inset counted twice: MEASURED at
+   40 px under the line against 21 px left and below, on a panel whose whole
+   claim is that the three agree. */
+.panel-case > .panel-head {
+  padding-block: var(--panel-pad);
+  border-bottom: 1px solid var(--line);
+}
 .panel-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -5134,9 +5148,15 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    fixed column and says why: reading order follows the picture rather than a
    flex `order` nobody can see in the markup. Here the two disagree on purpose,
    and this is the visible half. */
+/* 🔴 THE NAMEPLATE IS THE MIDDLE CELL AND THE PATCH SELECTOR IS THE RIGHT ONE,
+   SWAPPED 2026-09-22: *"move patch selector the right and nameplate to
+   center"*. The grid is unchanged and only the two assignments moved, which is
+   the whole reason the placement lives in the stylesheet rather than in source
+   order: the cell that is optically centred on the case is column 2, whatever
+   is put in it. */
 .panel-head-on { grid-column: 1; grid-row: 1; justify-self: start; }
-.panel-head-mid { grid-column: 2; grid-row: 1; justify-self: center; min-width: 0; }
-.panel-head-plate { grid-column: 3; grid-row: 1; justify-self: end; }
+.panel-head-plate { grid-column: 2; grid-row: 1; justify-self: center; text-align: center; }
+.panel-head-mid { grid-column: 3; grid-row: 1; justify-self: end; min-width: 0; }
 /* ⚠️ THE `end` PLACEMENT'S OWN `margin-left: auto` IS LEFT ALONE HERE, AND
    TURNING IT OFF WAS TRIED AND DELETED. `.panel-plate[data-place="end"]` is
    (0,2,0) and a `.panel-head-plate` override would be (0,1,0), so it would have

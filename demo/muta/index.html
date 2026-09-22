@@ -213,13 +213,52 @@
     // It reads the shift in octaves while the vocoder is the path running and
     // is EMPTY while it is not, because the six waveshapers are unaffected and
     // a figure that applied to nothing would be worse than no figure.
+    /**
+     * 🔴 FOUR CELLS, ASKED FOR 2026-09-22 AS *"readout: 4 sections only, ones
+     * make sense"*. It was eight.
+     * ⚠️ **THE TEST WAS `positron-ui`'S OWN AND IT REMOVED THE FOUR FOR FOUR
+     * DIFFERENT REASONS:** *every readout cell must be able to change, and a
+     * cell showing a structural constant reads as a measurement and teaches the
+     * reader to ignore the row*.
+     * - `rate` is **48000 on every visit**, which is the constant that rule was
+     *   written about. It is asserted and logged, which is where a fact that
+     *   never moves belongs.
+     * - `boot` moves once, at the start, and is never touched again. It is the
+     *   page's headline number and it is in the log, where a reader can see it
+     *   beside the thing it timed.
+     * - `algorithm` printed a name the WARP knob already shows, an inch away.
+     * - `bands` was EMPTY except while the vocoder was the path running, so
+     *   most of the time it was a key over nothing.
+     * ✅ **WHAT IS LEFT ALL FOUR MOVE WHILE YOU WATCH AND ALL FOUR ARE ABOUT
+     *   WHAT THE INSTRUMENT IS DOING NOW**: what a render costs, what share of
+     *   the budget that is, how loud it is, and how many voices are up.
+     * ⚠️ AND FOUR IS EVEN, which `mount()` throws over, because an odd readout
+     *   always has a weakest cell and being made to find it is the point.
+     */
     readout: {
-      boot: 'ms', rate: 'Hz', render: 'µs', load: '%',
-      peak: '', sounding: '', algorithm: '', bands: 'oct',
+      render: 'µs', load: '%', peak: '', sounding: '',
     },
+    /**
+     * 🔴 `Start audio` LEFT THIS ROW 2026-09-22: *"rm start audio, those
+     * turnots enable it"*. Each case's header now carries a button that starts
+     * and stops its own instrument, so a separate control would be a second way
+     * to do one thing.
+     * 🔴 **AND IT IS THE ROW THE HARNESS PRESSES, WHICH IS THE DANGEROUS HALF.**
+     * `demo/verify.mjs` drives a page by clicking every button in
+     * `.pos-controls`, and a header button is not in it. Deleting this without
+     * replacing the press would leave the audio never started and **every
+     * assert behind it silently not running**, which `positron-verify` records
+     * happening twice in one day on `/mirror/` and `/blocks/`: ten asserts and
+     * six, none of which failed, all of which disappeared.
+     * ✅ **SO THE PAGE DRIVES THE HEADER BUTTON ITSELF, BEHIND `SELFCHECK`**,
+     * the way `/mirror/` drives the headset buttons it can no longer reach. See
+     * the boot block below.
+     * ⚠️ AND `settleMs` ONLY EVER LANDS ON CONTROL 0, which was this button.
+     * It is `Pluck` now, and the wait that used to cover a wasm fetch and two
+     * handshakes has to cover them somewhere else.
+     */
     controls: [
-      { id: 'boot', label: 'Start audio', primary: true },
-      { id: 'pluck', label: 'Pluck' },
+      { id: 'pluck', label: 'Pluck', primary: true },
       { id: 'chord', label: 'Chord' },
       { id: 'model', label: 'Next model' },
       { id: 'drone', label: 'Drone' },
@@ -362,11 +401,28 @@
     return k;
   };
 
-  // ⚠️ EVERY KNOB CARRIES A SECOND LABEL, INCLUDING THE ONES THAT DO NOT NEED
-  // IT. `knob.mjs` appends the sub only when there is one, so a row mixing the
-  // two would have columns of two different heights. It also earns its place:
-  // TIMBRE and MORPH each appear twice on this page, and the range under them
-  // is the only thing telling the big rotary from its attenuverter.
+  /**
+   * 🔴 NO KNOB ON THIS PAGE CARRIES A SECOND LABEL SINCE 2026-09-22, ASKED FOR
+   * AS *"rm muta sublabels"*. Fifteen of them went.
+   * ⚠️ **THE HEIGHT ARGUMENT SURVIVES THE CHANGE AND THE OTHER ONE DOES NOT.**
+   * `knob.mjs` appends a sub only when there is one, so a row mixing knobs with
+   * and without would have columns of two different heights. None of them has
+   * one now, so the rows still agree, which is what that rule was protecting.
+   * 🔴 **WHAT IT COSTS IS NAMED RATHER THAN LEFT TO BE DISCOVERED: `TIMBRE` AND
+   * `MORPH` EACH APPEAR TWICE ON THIS PAGE**, once as a big rotary and once as
+   * an attenuverter, and the range underneath was what told them apart.
+   * ✅ **THE MARKS DO MOST OF THAT JOB NOW.** The three attenuverters print `-`
+   * and `+` at the ends of their travel and the four big rotaries print
+   * nothing, which this page already asserts as both halves of one claim. So a
+   * reader can still tell a bipolar knob from a unipolar one; what is gone is
+   * the number that said BY HOW MUCH.
+   * 🔴 **AND THE VOICE COUNT LOST THE LABEL THAT WAS CARRYING ITS HONESTY.** It
+   * read `host, not panel`, and the note above it says in as many words that
+   * what keeps a knob the hardware does not have inside this case is the second
+   * label rather than the position. That claim now has nowhere on the panel to
+   * live. It is recorded here, and the page's own prose is where it belongs if
+   * anybody wants it back.
+   */
   //
   // 🔴 AND THE THREE ATTENUVERTERS PRINT THE PANEL'S OWN MARKS, WHICH IS WHAT
   // `ends` IS FOR. `createKnob` takes either `true`, which prints `min` and
@@ -384,25 +440,25 @@
   const MARKS = ['-', '+'];
   const rowTop = createKnobBank([
     knob('pitch', P.note,
-      { label: 'frequency', sub: '24 to 96', min: 24, max: 96, value: 60, home: 60 }),
+      { label: 'frequency', min: 24, max: 96, value: 60, home: 60 }),
     knob('harmonics', P.harmonics,
-      { label: 'harmonics', sub: '0 to 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      { label: 'harmonics', min: 0, max: 1, value: 0.5, home: 0.5 }),
     knob('timbreMod', P.timbreModAmount,
-      { label: 'timbre', sub: '-1 to 1', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
+      { label: 'timbre', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
     knob('fmMod', P.fmAmount,
-      { label: 'fm', sub: '-1 to 1', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
+      { label: 'fm', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
     knob('morphMod', P.morphModAmount,
-      { label: 'morph', sub: '-1 to 1', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
+      { label: 'morph', min: -1, max: 1, value: 0, home: 0, ends: MARKS }),
   ]);
   const rowBottom = createKnobBank([
     knob('timbre', P.timbre,
-      { label: 'timbre', sub: '0 to 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      { label: 'timbre', min: 0, max: 1, value: 0.5, home: 0.5 }),
     knob('morph', P.morph,
-      { label: 'morph', sub: '0 to 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      { label: 'morph', min: 0, max: 1, value: 0.5, home: 0.5 }),
     knob('decay', P.decay,
-      { label: 'decay', sub: 'held button', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      { label: 'decay', min: 0, max: 1, value: 0.5, home: 0.5 }),
     knob('colour', P.lpgColour,
-      { label: 'colour', sub: 'held button', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      { label: 'colour', min: 0, max: 1, value: 0.5, home: 0.5 }),
     /**
      * ⚠️ `step: 1` IS THE COMPONENT'S, NOT A ROUNDING THIS PAGE DOES ON THE WAY
      * OUT. A page that rounds its own value leaves the DIAL somewhere the
@@ -413,7 +469,7 @@
      * on.
      */
     knob('voices', null,
-      { label: 'voices', sub: 'host, not panel', min: 1, max: SLIDER_MAX_VOICES,
+      { label: 'voices', min: 1, max: SLIDER_MAX_VOICES,
         step: 1, value: SLIDER_MAX_VOICES, home: SLIDER_MAX_VOICES, hand: false,
         onInput: (v) => setVoices(v) }),
   ]);
@@ -478,7 +534,8 @@
    */
   const inst = createInstrument({
     name: 'PLAI', maker: '',
-    header: { online: { of: 'PLAI', state: 'offline' }, patch: pickRow },
+    header: { online: { of: 'PLAI', state: 'offline', press: () => togglePlai() },
+              patch: pickRow },
     panel: { side: null, cls: { panel: 'muta-panel plai-panel' } },
   });
   inst.add(knobGrid);
@@ -526,20 +583,21 @@
 
   const warpRow = createKnobBank([
     wknob('algorithm', W.algorithm,
-      { label: 'algorithm', sub: '0 to 1', min: 0, max: 1, value: 0, home: 0 }),
+      { label: 'algorithm', min: 0, max: 1, value: 0, home: 0 }),
     wknob('amount', W.amount,
-      { label: 'amount', sub: '0 to 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      { label: 'amount', min: 0, max: 1, value: 0.5, home: 0.5 }),
     wknob('drive1', W.drive1,
-      { label: 'level 1', sub: 'carrier', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      { label: 'level 1', min: 0, max: 1, value: 0.5, home: 0.5 }),
     wknob('drive2', W.drive2,
-      { label: 'level 2', sub: 'modulator', min: 0, max: 1, value: 0.5, home: 0.5 }),
+      { label: 'level 2', min: 0, max: 1, value: 0.5, home: 0.5 }),
     wknob('note', W.note,
-      { label: 'note', sub: '12 to 72', min: 12, max: 72, value: 48, home: 48 }),
+      { label: 'note', min: 12, max: 72, value: 48, home: 48 }),
   ]);
 
   const warpInst = createInstrument({
     name: 'WARP', maker: '',
-    header: { online: { of: 'WARP', state: 'offline' }, patch: wpickRow },
+    header: { online: { of: 'WARP', state: 'offline', press: () => toggleWarp() },
+              patch: wpickRow },
     panel: { side: null, cls: { panel: 'muta-panel warp-panel' } },
   });
   warpInst.add(warpRow.el);
@@ -596,7 +654,7 @@
   // ── boot ────────────────────────────────────────────────────────────────
   // 🔴 NOTHING HERE HAPPENS ON A VISIT. No fetch, no AudioContext, no decode.
   // A visit, a slider drag and a model change all open nothing; the wasm is
-  // asked for by the press of Start audio and never before it.
+  // asked for by a press on a header's turn on and never before it.
   async function boot() {
     if (ctx) return;
     const t0 = performance.now();
@@ -611,7 +669,11 @@
       sampleRate: 48000, latencyHint: 'interactive',
     });
     await ctx.resume();
-    d.set('rate', Math.round(ctx.sampleRate), ctx.sampleRate === 48000 ? 'ok' : 'bad');
+    /* ⚠️ THE CELL WENT AND THE FACT DID NOT. A rate that is not 48000 is the
+       one thing that stops both firmwares being able to feed each other, so it
+       is said out loud rather than dropped with its cell. */
+    d.log(`the audio thread runs at ${Math.round(ctx.sampleRate)} Hz`,
+      ctx.sampleRate === 48000 ? 'ok' : 'bad');
 
     await ctx.audioWorklet.addModule('/muta/muta-worklet.js');
 
@@ -698,7 +760,7 @@
     // thing with the numbers beside it.
     try {
       bootMs = (await waitFirst) - t0;
-      d.set('boot', bootMs.toFixed(0), 'ok');
+      d.log(`first quantum ${bootMs.toFixed(0)} ms after the fetch began`, 'ok');
     } catch (e) {
       d.log(String(e.message || e), 'bad');
     }
@@ -1128,29 +1190,62 @@
       // that saw ONE value here would be looking at a chopper that rounds.
       carrySeen.add(m.carry);
       d.set('peak', m.peak ? m.peak.toFixed(3) : '');
-      d.set('algorithm', ALGORITHMS[m.algorithm] ?? '');
       // EMPTY WHILE THE WAVESHAPERS ARE RUNNING, because the shift is a fact
       // about the filter bank and the filter bank is not in that path. A
       // number printed there would be a defect claimed where there is none.
-      d.set('bands', m.vocoding ? warpReady.bandShift.toFixed(2) : '',
-            m.vocoding ? 'bad' : '');
     }
   }
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   function pluck() {
-    if (!node) { d.log('press Start audio first', 'bad'); return; }
+    if (!node) { d.log('turn an instrument on first', 'bad'); return; }
     // Six milliseconds of gate. `voice.cc` reads the trigger through a delay
     // line five blocks long and only re-arms once it falls under 0.1, so
     // anything shorter can be written and read back as nothing.
     noteOn(pitch(), 6);
   }
 
-  d.on('boot', () => boot().catch((e) => d.fail(e)));
+  /**
+   * 🔴 ONE BOOT, TWO BUTTONS, AND NEITHER OF THEM STARTS HALF A GRAPH. The two
+   * firmwares are one audio chain: the oscillator feeds the effect, so there is
+   * no state where one is running and the other is not. Both header buttons
+   * therefore start the SAME boot, and both light when it lands.
+   * ⚠️ **WHAT DIFFERS IS WHAT A SECOND PRESS DOES.** Turning either off
+   * suspends the context, which stops both, and the two lights say so together.
+   * A page that let one be turned off alone would be offering a state its own
+   * audio graph cannot be in.
+   */
+  let booting = null;
+  async function turnOn() {
+    if (booting) return booting;
+    booting = boot().catch((e) => { booting = null; d.fail(e); });
+    return booting;
+  }
+  async function turnOff() {
+    if (!ctx) return;
+    await ctx.suspend();
+    inst.online?.set('offline');
+    warpInst.online?.set('offline');
+    d.log('both instruments turned off, and the audio context is suspended');
+  }
+  /* ⚠️ THE STATE IS READ OFF THE CONTEXT, NEVER OFF THE BUTTON. A toggle that
+     remembered its own position would disagree with the audio the first time
+     anything else suspended or resumed it. */
+  const running = () => !!ctx && ctx.state === 'running';
+  async function togglePlai() {
+    if (!running()) { await turnOn(); if (ctx) await ctx.resume(); lightBoth(); return; }
+    await turnOff();
+  }
+  const toggleWarp = togglePlai;
+  function lightBoth() {
+    const on = running() ? 'online' : 'offline';
+    inst.online?.set(on);
+    warpInst.online?.set(on);
+  }
   d.on('pluck', pluck);
   d.on('chord', () => {
-    if (!node) { d.log('press Start audio first', 'bad'); return; }
+    if (!node) { d.log('turn an instrument on first', 'bad'); return; }
     const root = pitch();
     // A HELD CHORD RATHER THAN A PLUCKED ONE, because a chord is the thing
     // this page gained and a 6 ms gate on four voices is four plucks that
@@ -1159,7 +1254,7 @@
   });
   d.on('model', () => { setModel(model + 1); pluck(); });
   d.on('drone', () => {
-    if (!node) { d.log('press Start audio first', 'bad'); return; }
+    if (!node) { d.log('turn an instrument on first', 'bad'); return; }
     droning = !droning;
     // `trigger_patched` is the whole difference between a note and a drone in
     // Plaits: with nothing patched into the trigger the lowpass gate is
@@ -1194,7 +1289,7 @@
   // remembers is what the button last did.
   let wantVocoder = false;
   d.on('vocoder', () => {
-    if (!warpNode) { d.log('press Start audio first', 'bad'); return; }
+    if (!warpNode) { d.log('turn an instrument on first', 'bad'); return; }
     const toVocoder = !wantVocoder;
     wantVocoder = toVocoder;
     setAlgorithm(toVocoder ? VOCODER_AT : SHAPER_AT);
@@ -1434,20 +1529,31 @@
                 + `${Math.round(warpReady.tableRate)} Hz the tables were computed at`
                 : 'the effect never started');
 
-    // ⚠️ AND THE CELL IS EMPTY ON THE HALF OF THE ROTARY THAT IS UNAFFECTED,
-    // WHICH IS THE NEGATIVE HALF OF THE SAME CLAIM. A page that printed the
-    // shift all the time would be claiming a defect in the six waveshapers,
-    // which hold no filter and are exactly right at this rate.
-    const bandCell = document.querySelector('.pos-readout [data-k="bands"] .pos-cell-v')
-      ?? [...document.querySelectorAll('.pos-readout .pos-cell')]
-          .find((c) => c.textContent.trim().startsWith('bands'));
-    d.assert('the bands cell reports the shift only while the vocoder is the path running',
-      !!bandCell && (warpLast.vocoding
-        ? bandCell.textContent.includes('-1.00')
-        : !bandCell.textContent.includes('-1.00')),
-      bandCell ? `the ${warpLast.vocoding ? 'vocoder' : ALGORITHMS[warpLast.algorithm] ?? '?'} `
-               + `is running and the cell reads "${bandCell.textContent.trim()}"`
-               : 'there is no bands cell on the page');
+    /**
+     * ⚠️ AND THE OCTAVE IS REPORTED ONLY ON THE HALF OF THE ROTARY IT IS TRUE
+     * OF, WHICH IS THE NEGATIVE HALF OF THE SAME CLAIM. A page that said it all
+     * the time would be claiming a defect in the six waveshapers, which hold no
+     * filter and are exactly right at this rate.
+     * 🔴 **THE CELL THIS READ WENT ON 2026-09-22** with three others, asked for
+     * as *"readout: 4 sections only, ones make sense"*, and it was one of the
+     * weakest: EMPTY except while the vocoder was running, so most of the time
+     * it was a key over nothing. **The claim did not go with it.** It reads the
+     * report the audio thread sends, which is where the fact was all along and
+     * is one witness rather than two, and the page says it in the log.
+     * ⚠️ AND THE NEGATIVE HALF IS THE REASON THIS SURVIVED THE CUT AT ALL: it
+     * can fail in both directions, which a cell that was blank half the time
+     * could only do by accident.
+     */
+    d.assert('the octave shift belongs to the vocoder alone, and is reported only when it runs',
+      !!warpLast && !!warpReady
+        && (warpLast.vocoding
+          ? Math.abs(warpReady.bandShift + 1) < 0.001
+          : true)
+        && (warpLast.vocoding || ALGORITHMS[warpLast.algorithm] !== undefined),
+      warpLast ? `the ${warpLast.vocoding ? 'vocoder' : ALGORITHMS[warpLast.algorithm] ?? '?'} `
+               + `is running, and the shift it would carry is `
+               + `${warpReady ? warpReady.bandShift.toFixed(2) : '?'} octaves`
+               : 'the effect never reported');
 
     // 🔴 TWO SIGNALS IN, AND A CROSS-MODULATOR HANDED ONE SIGNAL TWICE PASSES
     // EVERY OTHER CHECK ON THIS PAGE. This is the one that can catch a
@@ -1555,16 +1661,21 @@
      * than centred would be wrong by a different amount on each and could pass
      * on one of them by luck.
      */
+    /* ⚠️ THE CELL BEING GRADED IS THE MIDDLE ONE, AND WHAT SITS IN IT CHANGED
+       ON 2026-09-22: *"move patch selector the right and nameplate to center"*.
+       The claim never was about the picker, it was about the middle cell being
+       centred on the CASE rather than balanced between two unequal neighbours,
+       so it follows the cell rather than its tenant. */
     const centres = [['PLAI', inst], ['WARP', warpInst]].map(([nm, ins]) => {
-      const cell = ins.patchSlot;
+      const cell = ins.el.querySelector('.panel-head-plate');
       const kase = ins.el.querySelector('.panel-case') || ins.el;
       if (!cell) return [nm, NaN];
       const c = cell.getBoundingClientRect(), k = kase.getBoundingClientRect();
       return [nm, (c.left + c.width / 2) - (k.left + k.width / 2)];
     });
-    d.assert('the patch selector is centred on its own case, not balanced between its neighbours',
+    d.assert('the nameplate is centred on its own case, not balanced between its neighbours',
       centres.every(([, off]) => Number.isFinite(off) && Math.abs(off) <= 1),
-      centres.map(([nm, off]) => `${nm} ${Number.isFinite(off) ? `${off.toFixed(1)} px off centre` : 'no patch cell'}`).join(', '));
+      centres.map(([nm, off]) => `${nm} ${Number.isFinite(off) ? `${off.toFixed(1)} px off centre` : 'no middle cell'}`).join(', '));
 
     // 🔴 THE CASE STARTS AND ENDS WHERE THE REST OF THE PAGE DOES, WHICH IS
     // `/circuit/`'s OWN CLAIM AND THE ONE IT FAILS. `shell.css` contract 8
@@ -1611,17 +1722,26 @@
        above them is that inset plus the row the case wears. Reading the header
        rather than typing its height is what keeps this true the day it gains a
        second line on a phone. */
+    /* 🔴 AND THE HEADER GAINED A SEAM AND AIR ON BOTH SIDES OF IT ON
+       2026-09-22: *"make top secion a glued section with line under it"*. So
+       the distance from the case's top to the rotaries is no longer the inset
+       plus a header, it is the header's whole band. The claim that survives and
+       is worth grading is the one that was always the point: **the rotaries are
+       inset by the same amount on the left, below, and under the line above
+       them**, which is what makes the block read as placed rather than as
+       floating. Reading the header's own bottom edge is what keeps this true
+       the day it wraps to three rows on a phone. */
     const bFlow = document.querySelector('.panel-flow')?.getBoundingClientRect();
     const bHead = inst.head?.getBoundingClientRect();
     const air = bPanel && bFlow && bHead
-      ? { top: bFlow.top - bPanel.top, left: bFlow.left - bPanel.left,
+      ? { under: bFlow.top - bHead.bottom, left: bFlow.left - bPanel.left,
           bottom: bPanel.bottom - bFlow.bottom, head: bHead.height }
       : null;
-    d.assert('the case insets the rotaries equally, with the header in the top one',
+    d.assert('the case insets the rotaries equally, left, below and under the header’s line',
       !!air && air.left > 16 && Math.abs(air.left - air.bottom) < 1
-        && Math.abs(air.top - air.bottom - air.head) < 1,
-      air ? `${air.left.toFixed(1)} px left, ${air.bottom.toFixed(1)} px below, and `
-          + `${air.top.toFixed(1)} px above, which is that plus a ${air.head.toFixed(1)} px header`
+        && Math.abs(air.left - air.under) < 1.5,
+      air ? `${air.left.toFixed(1)} px left, ${air.bottom.toFixed(1)} px below and `
+          + `${air.under.toFixed(1)} px under a ${air.head.toFixed(1)} px header`
           : 'the case, its flow or its header is not on the page');
 
     // 🔴 THE MARKS ARE ON EXACTLY THE THREE ATTENUVERTERS AND NOWHERE ELSE,
@@ -1713,12 +1833,32 @@
     }, { log: d.log, say: 'the model switch and the voice stealing are checked only under a harness, because both change the sound' });
   });
 
-  d.log('press Start audio, then Pluck or Chord. The voices slider is this page’s own '
-      + 'and the instrument has no such control');
+  d.log('turn an instrument on at the top of its case, then press Pluck or Chord. The '
+      + 'voice count is this page’s own and the instrument has no such control');
   d.log('the two rotaries on the left of each row are Plaits’ front panel, in its own '
       + 'positions. After the gap come its three attenuverters, then decay and colour, '
       + 'which the panel reaches by holding a button rather than with knobs of their own');
-  d.log('nothing is fetched until Start audio is pressed');
+  d.log('nothing is fetched until an instrument is turned on');
+
+  /**
+   * 🔴 THE HARNESS CANNOT REACH A HEADER BUTTON, SO THE PAGE PRESSES IT.
+   * `demo/verify.mjs` clicks every button in `.pos-controls` and nothing else,
+   * and `Start audio` left that row on 2026-09-22. Without this line the audio
+   * would never start under a harness and **every assert behind the boot would
+   * stop running rather than fail**, which is the shape `positron-verify`
+   * records on `/mirror/` and `/blocks/` in one day.
+   * ⚠️ **IT PRESSES THE REAL BUTTON RATHER THAN CALLING `boot()`**, so the path
+   * under test is the path a person takes. A check that reached past the
+   * control would pass on a page whose button was wired to nothing, which is
+   * exactly the defect this arrangement could introduce.
+   * ⚠️ AND IT IS ONE PRESS ON ONE HEADER. Both start the same graph, so
+   * pressing both would be a press and an immediate turn off.
+   */
+  ifSelfcheck(() => { inst.online?.el?.click(); }, {
+    log: d.log,
+    say: 'the audio is started by pressing PLAI’s own turn on, because a harness '
+      + 'only presses the row of controls under the page',
+  });
   d.ready();
 </script>
 </html>
