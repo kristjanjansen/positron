@@ -118,6 +118,26 @@ the instrument's own transpose was fixed, so the software correction for it is
 redundant. `?transpose=<n>` keeps the capability without the control, for the
 session after a power cycle puts it back.
 
+### Found 2026-09-23, not fixed: a slow link truncates what the harness collects
+
+🔴 **`node demo/verify.mjs nola` IS 34/34 LOCALLY AND EITHER 34/34 OR 21/21
+AGAINST THE DEPLOY, ON THE SAME PAGE, WITH NOTHING FAILING IN EITHER.** MEASURED
+over five runs. The assert LIST is identical when it collects them all, so
+nothing is missing from the page: what varies is how long `verify.mjs` stays.
+Its growth loop leaves after about two seconds with no new assert, and every gap
+in a page whose checks play notes and wait for them to decay is over a second
+already.
+✅ **THE PAGE'S OWN HALF IS DONE**: the cheap checks run first so the count
+starts growing at once, and the recordings are fetched in one block before any
+timed check so the network is out of the middle. That removed the worst of it.
+🔴 **WHAT IS LEFT IS THE HARNESS, AND IT IS NOT THIS SESSION'S FILE TO CHANGE.**
+`demo/verify.mjs` is modified in another session's tree right now. The fix there
+is one number: `GROWTH_PATIENCE` is 5 ticks of 400 ms, which was raised once
+already for `/muta/` and is still under the gap an audio check needs.
+⚠️ **AND THE SHAPE IS THE LESSON RATHER THAN THE NUMBER.** A green suite that
+collected 21 of 34 looks exactly like a green suite that collected all of them.
+The count is the instrument; the colour says nothing.
+
 ### Urgent 2026-09-23: the MK-425C's transpose was fixed, and eight files still say it is flat
 
 🔴 **THE INSTRUMENT CHANGED AND THE REPOSITORY DOES NOT KNOW.** Reported in two

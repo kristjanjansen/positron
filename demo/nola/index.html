@@ -972,6 +972,23 @@
         lettered === 13, `${lettered} keys of 25 carry a letter`);
     }
 
+    /**
+     * 🔴 THE RECORDINGS ARE FETCHED BEFORE ANY TIMED CHECK, AND THIS IS THE
+     * SECOND TIME THE HARNESS'S PATIENCE HAS BITTEN. `verify.mjs` leaves after
+     * about two seconds with no new assert, and `press()` awaits a fetch the
+     * first time a key in an octave is played. On localhost that is tens of
+     * milliseconds and invisible; against the DEPLOY it is hundreds, and two
+     * runs of the same green page collected **21 and 34** asserts. Nothing
+     * failed in either, the assert LIST was identical, and the only thing that
+     * differed was how many of them the harness stayed for.
+     * ⚠️ SO THE NETWORK COMES OUT OF THE MIDDLE OF THE BLOCK RATHER THAN THE
+     * GAPS BEING SHAVED. Shaving them would have made the same defect rarer
+     * instead of absent, and a check that is graded only when the link is fast
+     * is a check nobody can trust the count of.
+     */
+    await ensureAudio();
+    await Promise.all([fetchOctave(60), fetchOctave(72)]);
+
     /* ── the pedal, and the control beside it ────────────────────────────── */
     //
     // ⚠️ THE CONTROL IS THE SAME GESTURE WITH NOTHING UNDER THE FOOT, MEASURED
