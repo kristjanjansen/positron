@@ -286,6 +286,16 @@ class PlaiVoice extends AudioWorkletProcessor {
       return;
     }
     if (m.t === 'noteOn') { this.noteOn(m); return; }
+    /* A KEY COMING BACK UP, WHICH THE SHIM COULD NOT BE TOLD ABOUT UNTIL
+       2026-09-22. `plai_note_off` drops that note's gate and leaves the voice
+       rendering, so the lowpass gate closes over `decay` rather than the sound
+       being cut. `released` is 0 for a note nobody is holding, which is an
+       ordinary thing for a keyboard to send and not an error. */
+    if (m.t === 'noteOff') {
+      const released = this.ex.plai_note_off(m.note);
+      this.port.postMessage({ t: 'noteOff', note: m.note, released, held: this.ex.plai_held() });
+      return;
+    }
   }
 
   /**
@@ -311,12 +321,17 @@ class PlaiVoice extends AudioWorkletProcessor {
       ? Math.max(1, Math.round((ms / 1000) * sampleRate / this.blockSize))
       : 0;
 
-    const voice = ex.plai_note_on(m.note, hold);
+    /* 0..1, and only read for a held note. `voice.cc:143` turns it into the
+       engine's accent as well as the lowpass gate's level, so this is velocity
+       arriving at the DSP rather than being counted and thrown away. */
+    const level = Number.isFinite(m.level) ? Math.min(1, Math.max(0, m.level)) : 1;
+    const voice = ex.plai_note_on(m.note, hold, level);
     this.port.postMessage({
       t: 'note',
       note: m.note,
       voice,
       holdBlocks: hold,
+      level,
       stolen: ex.plai_last_stolen(),
       stolenNote: ex.plai_last_stolen_note(),
       stolenLevel: ex.plai_last_stolen_level(),

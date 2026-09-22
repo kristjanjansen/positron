@@ -108,7 +108,7 @@ plai)
     stmlib/dsp/units.cc
     stmlib/utils/random.cc
   )
-  EXPORTS='["_plai_init","_plai_set_param","_plai_get_param","_plai_render","_plai_out_ptr","_plai_aux_ptr","_plai_scratch_frames","_plai_active_engine","_plai_engine_count","_plai_block_size","_plai_sample_rate","_plai_blocks_rendered","_plai_build","_plai_source_sha","_plai_set_polyphony","_plai_polyphony","_plai_max_voices","_plai_trim","_plai_note_on","_plai_all_off","_plai_set_drone","_plai_droning","_plai_held","_plai_voice_note","_plai_voice_level","_plai_voice_state","_plai_steals","_plai_last_voice","_plai_last_stolen","_plai_last_stolen_note","_plai_last_stolen_level","_plai_voice_renders","_plai_voice_bytes","_plai_alloc_bytes"]'
+  EXPORTS='["_plai_init","_plai_set_param","_plai_get_param","_plai_render","_plai_out_ptr","_plai_aux_ptr","_plai_scratch_frames","_plai_active_engine","_plai_engine_count","_plai_block_size","_plai_sample_rate","_plai_blocks_rendered","_plai_build","_plai_source_sha","_plai_set_polyphony","_plai_polyphony","_plai_max_voices","_plai_trim","_plai_note_on","_plai_note_off","_plai_all_off","_plai_set_drone","_plai_droning","_plai_held","_plai_voice_note","_plai_voice_level","_plai_voice_state","_plai_steals","_plai_last_voice","_plai_last_stolen","_plai_last_stolen_note","_plai_last_stolen_level","_plai_voice_renders","_plai_voice_bytes","_plai_alloc_bytes"]'
   ;;
 warp)
   UPSTREAM_DIR="warps"
