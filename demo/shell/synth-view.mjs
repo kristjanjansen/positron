@@ -970,10 +970,28 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
      * ⚠️ AND THE OLDEST IS THE FAINTEST, CUBED, so the fall is quick and the
      * tail is short. It was squared at 0.45 and reported as *"fade faster"*: at
      * 47 windows a second a long tail is six visible lines rather than a glow.
+     * 🔴 **AND IT IS FAINT BECAUSE THERE ARE TWO PHOSPHORS, NOT ONE.** Reported
+     * 2026-09-22: *"screenshot gives nice fading but at 120hz all waves are
+     * extra yellow. photogreaph is somehing in beween. what gives"*, and the
+     * three readings are all correct and are three different measurements. **A
+     * screenshot is ONE frame** and shows what is drawn. **An eye at 120 Hz
+     * integrates several**, so it adds the drawn decay to its own persistence.
+     * A photograph sits between them because a shutter is open for some time
+     * but not for long.
+     * 🔴 **AND THE COMPOUNDING ONLY STARTED WHEN THE TIME BASE WAS LOCKED.**
+     * While the window still wandered the ghosts sat at different phases and
+     * read as a smear; aligned, they stack exactly on the live trace, so what
+     * they add is BRIGHTNESS rather than motion. MEASURED as a composite over
+     * the ground: four ghosts peaking at 0.30 put **0.226** of extra ink under
+     * a stationary line, which is the extra yellow. Three at 0.16 put
+     * **0.089**.
+     * ⚠️ THE TRAIL IS STILL WORTH HAVING, and what it is worth is the moving
+     * case: turn a knob and you see where the wave was. A stationary trace
+     * should look like one line, and now does.
      */
     for (let i = 0; i < past.length; i++) {
       const age = (past.length - i) / (past.length + 1);
-      line({ pts: past[i], colour: a.colour }, Math.pow(1 - age, 3) * 0.3, 1);
+      line({ pts: past[i], colour: a.colour }, Math.pow(1 - age, 3) * 0.16, 1);
     }
 
     line(b);

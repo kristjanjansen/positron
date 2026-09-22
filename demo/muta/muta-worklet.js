@@ -381,12 +381,9 @@ class PlaiVoice extends AudioWorkletProcessor {
     }
 
     if (this.quanta % 94 === 0) {
-      this.scopeWin = scopeWindow(this.scopeRing, this.scopeAt);
       this.port.postMessage({
         t: 'meter',
         peak: this.peak,
-        wave: this.scopeWin,
-        waveFrames: this.scopeWin ? this.scopeWin.spanFrames : 0,
         blocks: this.ex.plai_blocks_rendered(),
         // 🔴 THE HALF THAT MAKES THE BLOCK INVARIANT CHECKABLE. `Voice::Render`
         // calls summed over every voice. With N voices sounding for a whole
@@ -574,12 +571,22 @@ class WarpMod extends AudioWorkletProcessor {
 
     this.quanta++;
 
+    /* The picture's own cadence, the same 8 quanta the oscillator uses. The
+       effect takes its period from the oscillator's note when it is being fed
+       one, and finds its own otherwise, which is the internal carrier case. */
+    if (this.quanta % 8 === 0) {
+      const win = scopeWindow(this.scopeRing, this.scopeAt, this.scopePeriod);
+      if (win) {
+        this.scopePeriod = win.period;
+        this.port.postMessage({ t: 'wave', wave: win, waveFrames: win.spanFrames });
+      }
+    }
+
     if (this.quanta % 94 === 0) {
       this.port.postMessage({
         t: 'meter',
         peak: this.peak,
         inPeak: this.inPeak,
-        wave: scopeWindow(this.scopeRing, this.scopeAt),
         blocks: this.ex.warp_blocks_rendered(),
         frames: this.ex.warp_frames_rendered(),
         blocksPerQuantum: this.blocksLast,

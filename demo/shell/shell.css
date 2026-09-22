@@ -39,6 +39,22 @@
   --mi-orange: #d08048;
   --mi-blue: #4898b0;
   --mi-maroon: #802840;
+
+  /* 🔴 AND THE TWO THAT ARE DRAWN ON GET A LIGHTER PAIR, because a colour off a
+     WHITE panel does not read on a dark one. Asked 2026-09-22: *"adjust both to
+     work on dark"*.
+     🔴 **THE MAROON IS THE ONE THAT MADE THIS NECESSARY.** MEASURED against
+     `--card2`, the ground these figures sit on: the panel's own `#802840`
+     contrasts at **1.89**, which is below every readable threshold there is and
+     is a line you cannot see. The teal is `4.27`, legible but dim.
+     ✅ HUE AND SATURATION ARE KEPT AND ONLY LIGHTNESS MOVES, to 0.55, which is
+     what makes these the same colours rather than two new ones: teal
+     **#5fb9b9 at 7.54** and maroon **#c85071 at 3.99**.
+     ⚠️ **THE MEASURED PAIR STAYS ABOVE AND IS NOT OVERWRITTEN.** One is the
+     record of what is on the instrument and the other is what this site can
+     draw with; a page needing the real value for anything else still has it. */
+  --mi-teal-lit: #5fb9b9;
+  --mi-maroon-lit: #c85071;
   /* the gap between a slider's label column and its lane — see `.sld-group` */
   --sld-col: 12px;
   /* 🔴 HOW MUCH AIR A WORD GETS INSIDE A CONTROL, AS A SCALE OF THREE RATHER

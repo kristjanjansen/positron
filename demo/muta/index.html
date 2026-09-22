@@ -92,6 +92,23 @@
      true. The plate keeps the case's standard inset and sits above the values,
      which is the arrangement every other panel on this site has. */
   .muta-panel { position: relative; --muta-knob-air: 17px; }
+
+  /* 🔴 EACH INSTRUMENT IN ITS MAKER'S OWN COLOUR, asked for as *"use mi
+     cyan/teal for the plaits"* and *"and darkred for warps"*. Both come off
+     photographs of the panels and both are lightened for a dark ground, which
+     `shell.css` records with the contrast each one measured at.
+     🔴 **AND IT IS THE ARC ONLY, NOT THE NEEDLE OR THE VALUE.** A knob's ring
+     is the thing that says where it is set, so it is the one channel that can
+     carry an identity without taking one away: `--hi` still means *the thing
+     this control is about* on the rest of the site, and this page's own states,
+     a knob moved by hardware and a knob switched off, keep the colours they
+     have everywhere else because those rules come after this one in the file.
+     ⚠️ **A COLOUR PER INSTRUMENT IS A CLAIM THIS PAGE CAN MAKE AND MOST
+     CANNOT.** It has two instruments side by side from one maker, and the
+     panels really are printed in these two colours. A page with one instrument
+     would be inventing a distinction. */
+  .plai-panel .pos-knob-arc { stroke: var(--mi-teal-lit); }
+  .warp-panel .pos-knob-arc { stroke: var(--mi-maroon-lit); }
   /* 🔴 THE PLATE KEEPS THE CASE'S OWN INSET ON BOTH EDGES, CORRECTED
      2026-09-22: *"keep nameplate standard distance from edges"*. It had been
      pushed down to meet the values, which put it at a distance from the top
@@ -674,10 +691,13 @@
        ⚠️ IT DOES NOT DISPLACE `--hi`, which still means *the thing this control
        is about* everywhere else on the site. A replica drawing somebody else's
        instrument in their colour is a different claim from a page highlighting
-       its own control, and this trace is the first. */
-    colour: '--mi-teal',
+       its own control, and this trace is the first.
+       ⚠️ AND IT IS THE LIGHTENED ONE. The panel's own `#3c8a8a` came off a
+       WHITE box and contrasts at 4.27 against this ground; `--mi-teal-lit` is
+       the same hue and saturation at 7.54. See `shell.css`. */
+    colour: '--mi-teal-lit',
     height: 140,
-    trail: 4,
+    trail: 3,
   });
 
   const inst = createInstrument({
@@ -806,17 +826,36 @@
   ],
   });
 
+  const warpScope = createWaveShape({
+    reason: null,
+    colour: '--mi-maroon-lit',
+    height: 140,
+    trail: 3,
+  });
+
   const warpInst = createInstrument({
     name: 'WARPS', maker: '',
     header: { at: 'foot',
               plate: false,
               online: { of: 'WARPS', state: 'offline', press: () => toggleWarps() },
               patch: wpickRow },
+    parts: [warpScope.el],
     panel: { side: null, cls: { panel: 'muta-panel warp-panel' } },
   });
 
-  let plaitsWave = null, warpsWave = null, scopeFrames = 0;
+  let plaitsWave = null, warpsWave = null, scopeFrames = 0, warpFrames = 0;
   const anyInk = (w) => !!w && w.some((x) => Math.abs(x) > 0.0005);
+  function paintWarpScope() {
+    if (!anyInk(warpsWave)) { warpScope.set({ points: null, reason: null }); return; }
+    const ms = warpFrames ? (warpFrames / (ctx ? ctx.sampleRate : 48000)) * 1000 : null;
+    warpScope.set({
+      points: warpsWave,
+      reason: '',
+      colour: '--mi-maroon-lit',
+      axes: { y: '\u00b11', x: ms ? `${ms.toFixed(1)} ms` : '' },
+    });
+  }
+
   function paintScope() {
     if (!anyInk(plaitsWave)) {
       scope.set({ points: null, reason: null });
@@ -1446,11 +1485,17 @@
           + `of ${m.frames} frames, wasm ${m.ready ? 'in place' : 'not yet'}`);
       return;
     }
+    if (m.t === 'wave') {
+      warpsWave = m.wave;
+      warpFrames = m.waveFrames || 0;
+      paintWarpScope();
+      return;
+    }
     if (m.t === 'meter') {
       warpLast = m;
       warpMeters++;
       vocoding = m.vocoding;
-      if (m.wave) { warpsWave = m.wave; paintScope(); }
+
       // 🔴 THE CARRY IS THE ONE READING THAT PROVES THE BLOCK ARITHMETIC RAN.
       // 128 frames against blocks of 60 leaves 8, then 16, then 24, so a page
       // that saw ONE value here would be looking at a chopper that rounds.
@@ -2131,6 +2176,27 @@
     const crossings = anyInk(plaitsWave)
       ? plaitsWave.reduce((n, x, i) => n + (i && (plaitsWave[i - 1] <= 0) !== (x <= 0) ? 1 : 0), 0)
       : 0;
+    /**
+     * 🔴 TWO PICTURES, TWO SIGNALS, AND THEY ARE NOT THE SAME SIGNAL. Each
+     * instrument draws its own output in its own maker's colour, so what the
+     * effect DID is the difference a reader can see between them.
+     * ⚠️ **THE HALF THAT CAN FAIL IS THE DIFFERENCE, NOT THE COUNT.** Two
+     * pictures fed from one buffer would satisfy *both scopes are drawn* and
+     * prove nothing, which is two witnesses who are one witness.
+     * ⚠️ AND THE WINDOWS ARE THE SAME LENGTH, because both take their period
+     * from the note the oscillator was given, so comparing them sample for
+     * sample is comparing the same instant of the same chain.
+     */
+    const pair = anyInk(plaitsWave) && anyInk(warpsWave)
+      && plaitsWave.length === warpsWave.length;
+    const apart = pair
+      ? Math.max(...plaitsWave.map((x, i) => Math.abs(x - warpsWave[i]))) : NaN;
+    d.assert('each instrument draws its own signal, and the effect’s is not the oscillator’s',
+      pair && scope.drawn() && warpScope.drawn() && apart > 0.001,
+      pair ? `two pictures, worst sample difference ${apart.toFixed(4)} over ${plaitsWave.length} frames`
+           : `the oscillator ${anyInk(plaitsWave) ? 'has' : 'has no'} ink and the effect `
+             + `${anyInk(warpsWave) ? 'has' : 'has no'} ink`);
+
     d.assert('the picture carries the oscillator’s own signal, and it is a wave rather than a slope',
       anyInk(plaitsWave) && scope.drawn() && crossings >= 2,
       anyInk(plaitsWave)
