@@ -22,31 +22,18 @@
 // came out, not on the pixel that moved.
 
 import { el } from './shell.mjs';
-import { MOVES, MOVE_TURN, MOVE_GLYPH, MOVE_SAYS, MOVE_OFF,
-  plan as planMove, positionAt, minSteps } from './hand.mjs';
+import { MOVES, MOVE_TURN, MOVE_GLYPH, MOVE_OFF } from './hand.mjs';
+import { createHandDrive, HAND_MAX_MS, HAND_YIELD_MS } from './hand-drive.mjs';
 
 /**
- * 🔴 A CEILING, BECAUSE A HAND LEFT ON IS A PAGE SENDING FOR AS LONG AS THE TAB
- * IS OPEN. `/knobs/` puts fifty messages a second on a relay and into a
- * Raspberry Pi in another building, so ten minutes is about thirty thousand
- * messages: long enough to demonstrate anything, short enough that walking away
- * from it costs nothing. `transport-bar.mjs` already says the general form of
- * this, that a live loop with no ceiling is a recording with no end.
+ * 🔴 THE TWO CEILINGS MOVED TO `hand-drive.mjs` ON 2026-09-22 AND ARE
+ * RE-EXPORTED HERE UNCHANGED. `/radio/`, `/kit/` and `/knobs/` import
+ * `HAND_YIELD_MS` from this module, and `/radio/`'s comment says in as many
+ * words that it is imported RATHER THAN TYPED, so a moved export would be three
+ * broken pages in exchange for a tidier import list.
  */
-export const HAND_MAX_MS = 10 * 60 * 1000;
+export { HAND_MAX_MS, HAND_YIELD_MS };
 
-/**
- * How long the hand keeps its own hands off after somebody else moved the
- * handle.
- *
- * ⚠️ YIELD, NOT OFF. A motorised fader you can grab is the physical thing the
- * phrase "invisible hand" names, and nothing pressed the button, so the hand
- * picks the movement up again from wherever it was left. A pointer lifting
- * resumes it at once; a `set()` from the page or from an arrow key has no lift,
- * so it waits this long instead. Shorter and the arrow keys look broken,
- * because the value is dragged away between one press and the next.
- */
-export const HAND_YIELD_MS = 1200;
 
 /**
  * How long a glide takes. ONE number, because a knob and the sound it stands
@@ -460,185 +447,48 @@ export function createSlider({ label, sub = '', aria, min = 0, max = 1, step, va
 
   // ── the invisible hand ────────────────────────────────────────────────────
   //
-  // What a movement IS lives in `hand.mjs` and is graded with no browser at all
-  // by `node demo/shell/hand-test.mjs`. What lives here is the button, the
-  // frame loop and the hand-over, which is the same split `looper.mjs` uses.
+  // 🔴 THREE FILES, AND THE SPLIT IS THE SAME ONE `looper.mjs` USES. What a
+  // movement IS lives in `hand.mjs`, graded with no browser at all by `node
+  // demo/shell/hand-test.mjs`. The button, the frame loop, the ten minute
+  // ceiling, the hand-over and the `.pos-controls` refusal live in
+  // `hand-drive.mjs`, one implementation shared with `knob.mjs` since
+  // 2026-09-22. What is left here is the three things only a SLIDER knows: how
+  // many steps its lane has, how a share of that lane becomes a value, and the
+  // sentence it says when it is barred.
   let handApi = null;
   if (hand) {
     const opt = (hand && typeof hand === 'object') ? hand : {};
-    const nameOf = (i) => MOVES[MOVE_TURN[i]][0];
-    const presetOf = (i) => opt.preset || MOVES[MOVE_TURN[i]][1];
-    // -1 is off, and it opens there on every page and forever: the button is a
-    // press, and nothing this page can do turns it on by itself.
-    let idx = -1;
-    let raf = 0, pl = null, t0 = 0, startedAt = 0, seed = ((Math.random() * 1e9) | 0) || 1;
-    let yielded = false, yieldTimer = 0;
-
     /**
      * 🔴 A SLIDER TOO COARSE TO SHOW A HAND SAYS SO RATHER THAN DRAWING A
-     * STAIRCASE. The ends of a sweep wander by `endJit` of the travel, so on a
-     * lane of N steps that wander is `endJit * N` steps, and under one step it
-     * rounds away and every lap turns at the same number. MEASURED at 8 steps:
-     * the metric cannot find a single reach to measure while the ends still read
-     * as varied, which is a page looking right and moving like a machine.
+     * STAIRCASE, and counting its steps is the slider's own business.
      * ⚠️ AN EXPONENTIAL LANE IS COUNTED BY ITS KEYBOARD STEP, which is one per
      * cent of the lane, because a ratio lane has no fixed step to count.
      */
     const steps = exp ? 100 : Math.max(1, Math.round(span / stp));
-    const need = minSteps(presetOf(0));
-    const coarse = steps < need
-      ? `this lane has ${steps} steps and an invisible hand needs about ${need}: `
-        + 'the wander at each end would be less than one step, so it would draw a staircase'
-      : null;
-
-    const nextSeed = () => { seed = ((seed * 1664525 + 1013904223) >>> 0) || 1; return seed; };
-
-    function face() {
-      const on = idx >= 0;
-      handRow.dataset.hand = on ? 'on' : 'off';
-      if (yielded) handRow.dataset.held = '1'; else delete handRow.dataset.held;
-      const says = on ? MOVE_SAYS[nameOf(idx)] : MOVE_OFF;
-      handBtn.textContent = MOVE_GLYPH[nameOf(on ? idx : 0)];
-      handBtn.title = says;
-      handBtn.setAttribute('aria-label', says);
-      handBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      handBtn.dataset.on = on ? '1' : '0';
-    }
-
-    /**
-     * ⚠️ THE VALUE IS A FUNCTION OF THE CLOCK, NEVER AN ACCUMULATION PER FRAME,
-     * so a dropped frame costs a skipped sample and never a drifted phase.
-     * ⚠️ AND IT NEVER CALLS `set()`. It shares `clamp()` and `paint()` and emits
-     * `onInput` exactly as a pointer move does, which is what makes `set()`
-     * mean "somebody else is moving this" with no exceptions.
-     */
-    const frame = () => {
-      raf = 0;
-      if (idx < 0 || yielded) return;
-      const now = performance.now();
-      if (now - startedAt >= HAND_MAX_MS) { stop('ceiling'); return; }
-      let t = now - t0;
-      // The plan is regenerated when it runs out and the seed advances, so a
-      // hand left on for ten minutes does not repeat itself.
-      if (t >= pl.totalMs) { pl = planMove(presetOf(idx), { seed: nextSeed(), from: toT(v) }); t0 = now; t = 0; }
-      const nv = clamp(fromT(positionAt(pl, t)));
-      if (nv !== v) { v = nv; paint(); onInput?.(v); }
-      raf = requestAnimationFrame(frame);
-    };
-
-    function start(i, why = 'press') {
-      // The refusal below is on `start` rather than only on the button, because
-      // a page can reach `hand.start()` directly and a check certainly will.
-      if (barred) return;
-      idx = i;
-      endGlide(false);
-      pl = planMove(presetOf(idx), { seed: nextSeed(), from: toT(v) });
-      t0 = startedAt = performance.now();
-      yielded = false; clearTimeout(yieldTimer); yieldTimer = 0;
-      if (!raf) raf = requestAnimationFrame(frame);
-      face();
-      onHand?.({ on: true, move: nameOf(idx), why, says: MOVE_SAYS[nameOf(idx)], coarse });
-    }
-
-    function stop(why = 'press') {
-      if (idx < 0) return;
-      const was = nameOf(idx);
-      idx = -1; yielded = false;
-      cancelAnimationFrame(raf); raf = 0;
-      clearTimeout(yieldTimer); yieldTimer = 0;
-      face();
-      // ⚠️ THE LAST VALUE OF A GESTURE IS THE ONE THAT HAS TO LAND. A send gate
-      // holds back a move that is not due yet, so a hand that stopped without an
-      // endpoint could leave a filter at the second to last position for ever.
-      // This is what `onChange` on a pointer lift is for, and a hand stopping is
-      // the same event.
-      onChange?.(v);
-      onHand?.({ on: false, move: was, why, says: MOVE_OFF, coarse });
-    }
-
-    handYield = () => {
-      if (idx < 0) return;
-      yielded = true;
-      cancelAnimationFrame(raf); raf = 0;
-      clearTimeout(yieldTimer);
-      yieldTimer = setTimeout(() => handPickUp(), HAND_YIELD_MS);
-      face();
-    };
-    handPickUp = () => {
-      if (idx < 0 || !yielded) return;
-      clearTimeout(yieldTimer); yieldTimer = 0;
-      yielded = false;
-      endGlide(false);
-      // It picks the movement up from wherever the handle was left, which is
-      // what makes it a fader you can grab rather than one that argues with you.
-      pl = planMove(presetOf(idx), { seed: nextSeed(), from: toT(v) });
-      t0 = performance.now();
-      if (!raf) raf = requestAnimationFrame(frame);
-      face();
-    };
-
-    /**
-     * 🔴 IT REFUSES TO RUN FROM INSIDE A CONTROL ROW, AND THAT IS NOT
-     * THEORETICAL. `verify.mjs` presses `.pos-controls button` on every demo on
-     * every run, dozens of times a day, and TWO pages build their own
-     * `.pos-controls` and put sliders in it: `/draw/` appends a two-slider group
-     * to one, and `/grains/` puts its fade and its brightness in two of them.
-     * Neither has a hand today and both are one `hand: true` away from a suite
-     * run starting fifty messages a second to a shared Raspberry Pi.
-     *
-     * ⚠️ A COMMENT IN THIS FILE AND AN ASSERT ON THE PAGE THAT TURNED IT ON
-     * PROTECT NEITHER OF THOSE PAGES, because the mistake would be made on a
-     * page that has no such assert. So the component answers for itself: the
-     * button is disabled, it says why on its own face, and the page gets a line
-     * for its log. It fails in the log rather than on the board.
-     * ⚠️ AND IT IS READ ONE FRAME LATE, because a slider is built before it is
-     * appended to anything: asking at construction time asks about an element
-     * with no parent, which always answers no.
-     */
-    let barred = null;
-    requestAnimationFrame(() => {
-      if (!handBtn.closest('.pos-controls')) return;
-      barred = 'a slider in a control row may not have an invisible hand: the suite presses '
-        + 'every button in that row on every run, and this one would start sending';
-      stop('in-controls');
-      handBtn.disabled = true;
-      handBtn.title = barred;
-      handBtn.setAttribute('aria-label', barred);
-      onHand?.({ on: false, move: null, why: 'in-controls', says: barred, coarse });
-    });
-
-    const press = () => {
-      const at = idx < 0 ? 0 : idx + 1;
-      if (at >= MOVE_TURN.length) stop('press'); else start(at, 'press');
-    };
-    handBtn.addEventListener('click', press);
-
-    // 🔴 OFF WHEN THE TAB IS HIDDEN. A forgotten tab on a second monitor sending
-    // fifty messages a second to shared hardware is the `/tapes/` and
-    // `/videoradio/` failure in a new costume.
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) stop('hidden');
-    });
-
-    face();
-    handApi = {
-      el: handBtn,
-      press,
-      start: (i = 0, why = 'page') => start(i, why),
-      stop: (why = 'page') => stop(why),
-      yield: () => handYield(),
-      resume: () => handPickUp(),
-      get running() { return idx >= 0; },
-      get held() { return yielded; },
-      get move() { return idx < 0 ? null : nameOf(idx); },
-      get says() { return idx < 0 ? MOVE_OFF : MOVE_SAYS[nameOf(idx)]; },
-      get plan() { return pl; },
-      /** how long it has left before the ceiling stops it, in ms */
-      get leftMs() { return idx < 0 ? 0 : Math.max(0, HAND_MAX_MS - (performance.now() - startedAt)); },
-      coarse,
+    handApi = createHandDrive({
+      btn: handBtn,
+      row: handRow,
+      at: () => toT(v),
+      /**
+       * ⚠️ THE SAME PATH A POINTER DRAG TAKES, WHICH IS WHY IT IS NOT `set()`.
+       * It shares `clamp()` and `paint()` and emits `onInput` exactly as a
+       * pointer move does, so `set()` keeps meaning "somebody else is moving
+       * this" with no exceptions.
+       */
+      move: (share) => {
+        const nv = clamp(fromT(share));
+        if (nv !== v) { v = nv; paint(); onInput?.(v); }
+      },
+      rest: () => onChange?.(v),
+      settle: () => endGlide(false),
       steps,
-    };
-    if (coarse) onHand?.({ on: false, move: null, why: 'coarse', says: coarse, coarse });
+      preset: opt.preset,
+      onHand,
+      barredSays: 'a slider in a control row may not have an invisible hand: the suite presses '
+        + 'every button in that row on every run, and this one would start sending',
+    });
+    handYield = handApi.yield;
+    handPickUp = handApi.resume;
   }
 
   paint();

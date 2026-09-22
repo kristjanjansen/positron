@@ -1366,15 +1366,33 @@ const PAN_SCALE = 2;
      * IT**, reading both far edges and the drop against `--pos-gap`. Nothing it
      * measured exists any more, so it is replaced rather than re-baselined.
      */
+    /**
+     * 🔴 **AND `fRow`'S RIGHT EDGE WAS THE WRONG YARDSTICK, FOUND 2026-09-22 BY
+     * A KNOB GETTING TEN PER CENT WIDER.** This read `b.right` against the
+     * function key row's, on the reasoning above that *"whatever the inset is,
+     * both obey it"*. They do not. The plate reaches the inset by
+     * `margin-left: auto`, which outranks the lane's `align-items: center`; the
+     * row is simply CENTRED, so its right edge is the inset only while the row
+     * happens to be the widest thing in the lane. One control grew by 4.6 px
+     * and the row's right edge moved 2.3, on a page where nothing about the
+     * nameplate had changed.
+     * ✅ **SO IT MEASURES THE INSET ITSELF NOW**, which is what the paragraph
+     * above says the claim is. The row is still read and still printed, because
+     * a plate flush with an inset that the controls are nowhere near would be
+     * true and useless, but it is a DETAIL rather than the test.
+     */
     {
       const b = brands.getBoundingClientRect();
       const f = fRow.getBoundingClientRect();
-      const l = document.querySelector('.rack-lane').getBoundingClientRect();
+      const lane = document.querySelector('.rack-lane');
+      const l = lane.getBoundingClientRect();
+      const inset = l.right - parseFloat(getComputedStyle(lane).paddingRight);
       d.assert('the nameplate is in the top right corner of the master lane',
-        b.top >= l.top && b.bottom <= f.top && Math.abs(b.right - f.right) <= 1,
+        b.top >= l.top && b.bottom <= f.top && Math.abs(b.right - inset) <= 1,
         `${(b.top - l.top).toFixed(1)} px below the lane's top, `
-        + `${(b.right - f.right).toFixed(1)} px off the controls' right edge, `
-        + `${(f.top - b.bottom).toFixed(1)} px above them`);
+        + `${(b.right - inset).toFixed(1)} px off the lane's own inset, `
+        + `${(f.top - b.bottom).toFixed(1)} px above the controls, whose right edge is `
+        + `${(f.right - inset).toFixed(1)} px from that inset`);
     }
 
     /**

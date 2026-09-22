@@ -888,6 +888,7 @@
   // second one would shadow nothing and collide with everything, which is the
   // kind of half-collision that reads as correct until somebody moves a line.
   let cgSpec = null;         // { six, four, faders }  the control grids
+  let handKnobs = null;      // the KNOB block's four, the last of which has a hand
   let instSpec = null;       // { named, bare }  the two instrument cases
   let gridSpec = null;        // { edit, read, phone, holder }
   let rangeSpec = null;       // { wide, shut, off, single, group }
@@ -3569,7 +3570,8 @@ links: [{ from: 'in', to: 'synth', note: 'What it heard...' },  // next to it
   section('hardware', 'KNOB',
     'Dragged up and down rather than turned, with its controller under it.',
     `createKnob({ label: 'M1', sub: 'CC 80', min: 0, max: 127, value: 18 })
-createKnobBank([k1, k2, k3])
+createKnob({ label: 'M4', hand: true })        // an invisible hand, on the ring
+createKnobBank([k1, k2, k3, k4])
 k.set(96, { from: 'hardware', quiet: true })   // moved at the desk, not here`,
     (box) => {
       box.classList.add('kit-wide');
@@ -3589,9 +3591,22 @@ k.set(96, { from: 'hardware', quiet: true })   // moved at the desk, not here`,
                      title: 'macro 2, CC 81 on channel 1' }),
         createKnob({ label: 'M3', sub: 'CC 82', min: 0, max: 127, value: 64,
                      disabled: true, title: 'disabled: nothing is bound to this one' }),
+        /**
+         * 🔴 THE INVISIBLE HAND, 2026-09-22, ON A KNOB RATHER THAN ON A LANE.
+         * The button is the same one a slider carries and the movement is the
+         * same `hand.mjs` plan, which is the whole reason it was extracted into
+         * `hand-drive.mjs` rather than written twice.
+         * ⚠️ IT SITS ON THE RING'S LOWER EDGE AND COSTS NO HEIGHT, so this knob
+         * lines up with the three beside it. That is asserted below, because
+         * `positron-ui` records `/twelve/` being corrected twelve times in one
+         * evening over arithmetic exactly like it.
+         */
+        createKnob({ label: 'M4', sub: 'no hand', min: 0, max: 127, value: 40,
+                     hand: true, title: 'press the button on the ring: it moves itself' }),
       ];
       ks[1].set(96, { from: 'hardware', quiet: true });
       box.append(createKnobBank(ks, {}).el);
+      handKnobs = ks;
     });
 
   section('hardware', 'PAD',
@@ -4066,6 +4081,66 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
    * different natural shape, on the same rule, so a component that only
    * happened to work for knobs goes red.
    */
+  /**
+   * 🔴 THE INVISIBLE HAND ON A KNOB, GRADED WHERE IT IS DEMONSTRATED. Three
+   * claims, and they are three asserts rather than one because two of them
+   * lined up on `/twelve/` while the third was 30 px out.
+   */
+  if (handKnobs) {
+    const withHand = handKnobs[3];
+    const plain = handKnobs[0];
+    const btn = withHand.el.querySelector('.pos-knob-hand');
+    const dial = withHand.el.querySelector('.pos-knob-dial');
+    const kb = withHand.el.getBoundingClientRect();
+    const db = dial.getBoundingClientRect();
+    const bb = btn.getBoundingClientRect();
+    const f = parseFloat(getComputedStyle(withHand.el).getPropertyValue('--knob-ring-f'));
+    /* WHERE THE RING'S LOWER EDGE ACTUALLY IS ON SCREEN, from the drawing's own
+       fraction rather than from a number typed here. */
+    const ringY = db.top + db.height * f;
+
+    d.assert('the hand button is centred across the knob, not merely near the middle',
+      Math.abs((bb.left + bb.width / 2) - (kb.left + kb.width / 2)) <= 0.6,
+      `button centre ${(bb.left + bb.width / 2).toFixed(1)} px against the knob's `
+      + `${(kb.left + kb.width / 2).toFixed(1)} px`);
+
+    d.assert('the hand button sits on the ring\u2019s lower edge, which is read off the drawing',
+      Math.abs((bb.top + bb.height / 2) - ringY) <= 1.0,
+      `button centre y ${(bb.top + bb.height / 2).toFixed(1)} px against the ring edge at `
+      + `${ringY.toFixed(1)} px, which is ${f} of a ${db.height.toFixed(1)} px drawing`);
+
+    /* 🔴 THE ONE THAT MATTERS MOST, AND IT IS THE REASON THE BUTTON IS
+       ABSOLUTE. A control that gained height here would push its own label down
+       and every knob beside it would be a label out of line, which is the
+       `--ctl-head` and `--ctl-foot` contract `positron-ui` states. */
+    d.assert('a knob with a hand is exactly as tall as one without, so a row still lines up',
+      Math.abs(kb.height - plain.el.getBoundingClientRect().height) <= 0.6
+      && Math.abs(kb.top - plain.el.getBoundingClientRect().top) <= 0.6,
+      `${kb.height.toFixed(1)} px against ${plain.el.getBoundingClientRect().height.toFixed(1)} px, `
+      + `tops ${kb.top.toFixed(1)} and ${plain.el.getBoundingClientRect().top.toFixed(1)}`);
+
+    /* 🔴 THE SIZE ASK, MEASURED AS A RATIO AND NOT AS A PIXEL COUNT. `--ctl-w`
+       is the thing 10 per cent was asked against, so the assert reads both and
+       divides rather than believing 50.6. */
+    const ctlW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-w'));
+    const pad = document.querySelector('.pos-pad');
+    d.assert('a knob is ten per cent wider than a control row\u2019s unit, and a pad is not',
+      Math.abs(db.width / ctlW - 1.1) <= 0.02
+      && (!pad || Math.abs(pad.getBoundingClientRect().width - ctlW) <= 1),
+      `dial ${db.width.toFixed(1)} px against --ctl-w ${ctlW} px, a factor of `
+      + `${(db.width / ctlW).toFixed(3)}`
+      + (pad ? `, and a pad still ${pad.getBoundingClientRect().width.toFixed(1)} px` : ', no pad on the page'));
+
+    /* 🔴 THE NEGATIVE CONTROL: a knob that was not given one has no button at
+       all. Without this, a selector that matched nothing would satisfy every
+       assert above by never running them. */
+    d.assert('a knob with no hand has no button, so the option is what puts it there',
+      plain.el.querySelector('.pos-knob-hand') === null && withHand.hand !== null
+      && plain.hand === null,
+      `the plain knob has ${plain.el.querySelectorAll('.pos-knob-hand').length} and `
+      + `publishes ${plain.hand === null ? 'no hand' : 'a hand'}`);
+  }
+
   if (cgSpec) {
     for (const g of [cgSpec.six, cgSpec.four, cgSpec.faders]) g.size();
     /* ⚠️ `dy` IS null ON A SINGLE ROW, AND MY FIRST VERSION READ `c[cols].y`
