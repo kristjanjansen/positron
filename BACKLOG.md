@@ -118,6 +118,47 @@ the instrument's own transpose was fixed, so the software correction for it is
 redundant. `?transpose=<n>` keeps the capability without the control, for the
 session after a power cycle puts it back.
 
+### Correction 2026-09-23: this repository already has most of SuperCollider in the tab
+
+🔴 **`plans/plan-fau.md` §8 TREATS SC-IN-THE-BROWSER AS SOMETHING WE DO NOT
+HAVE.** Read off this checkout: `demo/shell/vendor/scsynth-nrt.wasm` is
+**1,701,983 bytes** of sound server already deployed, and `demo/shell/
+synthdef.mjs` is a SynthDef WRITER that runs in the tab, format version 2, whose
+own header says the grader is real scsynth *"which either plays the bytes or does
+not"*.
+🔴 **THE MISSING HALF IS `sclang`, THE LANGUAGE, NOT THE ENGINE.** The tab can
+already emit any graph; what it cannot do is let a person WRITE one, because
+`graph()` is a node list with explicit rates, special indices and input
+references and sclang is where the sugar and the thousand named unit generators
+live.
+⚠️ **SO THE QUESTION IS WHO WRITES THE GRAPH.** Page writes it: everything
+needed is here. Visitor writes it in a text area: a language is required, and
+that is the whole of what `fau` would be for.
+⚠️ **AND `checkCompiledDefs()` HAS A THIRD ANSWER NOBODY HAS PRICED**: compile
+on the board at BUILD time rather than in the tab. No browser compiler at all,
+and the staleness guard still stops being necessary.
+
+### Asked 2026-09-23, not answered: can a Faust patch be sanitized rather than refused
+
+🔴 **NOT BY READING THE SOURCE, AND `plan-fau.md` §6 MEASURED WHY.**
+`process = _ @ 100000000;` is 24 bytes, compiles in 25 ms into a 512 MiB struct,
+instantiates, and RENDERS, taking a process from 91 MiB to **603**. At 2^28 the
+compiler's size arithmetic overflows to **-2,147,483,640**, reports the compile
+SUCCEEDED, and throws out of bounds during render, which in a page is the audio
+thread. `par(i, 50000, ...)` held a thread **9.5 seconds** and libfaust is
+synchronous inside its wasm, so `terminate()` is the only stop.
+⚠️ **AND NOTHING BOUNDS WHAT THE COMPILED CODE COSTS PER SAMPLE**, which no
+compiler could fix: a DSP that compiles in 15 ms can be 200 voices of reverb and
+the audio thread has 2.667 ms a quantum.
+✅ **CONTAINMENT IS A DIFFERENT QUESTION AND IS UNTRIED**: compile in a dedicated
+Worker, `terminate()` on a 2 s watchdog, refuse a factory whose `meta.size` is
+negative or over a few megabytes, never instantiate on the main thread. **A
+negative size is the testable symptom that makes the overflow catchable.** That
+is a plan and not a measurement.
+⚠️ **AND IT PROTECTS THE PAGE, NOT THE PHONE.** A watchdog stops a hostile
+patch. It does not stop an expensive one, and the machine that pays is the
+visitor's, which is `CLAUDE.md`'s ERR rule one layer out.
+
 ### Found 2026-09-23, not fixed: a slow link truncates what the harness collects
 
 🔴 **`node demo/verify.mjs nola` IS 34/34 LOCALLY AND EITHER 34/34 OR 21/21
