@@ -26,10 +26,31 @@ import { el } from './shell.mjs';
  * @param {Array<[string, any]>} o.options  [visible name, value]
  * @param {number} [o.at]             index chosen at the start
  * @param {(value:any, name:string, i:number)=>void} [o.onPick]
+ * @param {(value:any, name:string, i:number)=>string} [o.title]  the browser's
+ *   own tooltip for one option, or '' for none.
+ *
+ * 🔴 A NAMED OPTION, NEVER A THIRD ELEMENT OF `options`, AND THAT SLOT IS
+ * ALREADY TAKEN. Asked for on `/wish/` 2026-09-22: a picker shows `70B` and
+ * `Scout`, and what a reader wants on hover is the full model id and what a
+ * press costs. The obvious shape is `[name, value, title]` and it would have
+ * been a defect the moment it shipped: `/radio/`'s `STATIONS` are already
+ * `['Klassika', 'klassikaraadio', 128]`, where the third element is a BITRATE,
+ * so every station button on that page would have grown a tooltip reading
+ * `128`. FOUND BY READING ALL ELEVEN CALL SITES BEFORE WRITING THIS, NOT AFTER.
+ * ⚠️ AND IT IS A FUNCTION RATHER THAN A LIST, so the tooltip is keyed on the
+ * option's own VALUE. A list keyed by position is a second table that agrees
+ * with the first until somebody reorders one of them, which is this project's
+ * most repeated defect in its cheapest form.
+ * ⚠️ NO TITLE, NO ATTRIBUTE. Every existing caller passes nothing here and
+ * therefore renders exactly as it did.
+ * @param {'row'|'column'} [o.orient]  which way the options run, default across.
+ *   The label goes above a standing group rather than beside it, because beside
+ *   a column a label is one word floating against the first option and reads as
+ *   that option's heading rather than the group's.
  * @returns {{el:HTMLElement, get:()=>number, value:()=>any, set:(i:number, quiet?:boolean)=>void,
  *            disabled:(v:boolean)=>void, buttons:HTMLButtonElement[]}}
  */
-export function createChoice({ label, options, at = 0, onPick } = {}) {
+export function createChoice({ label, options, at = 0, onPick, title, orient = 'row' } = {}) {
   /**
    * 🔴 `at: -1` MEANS NOTHING IS CHOSEN YET, AND IT IS A REAL STATE. Added
    * 2026-09-17 for `/stage/`, where the control room asks the audience a
@@ -42,6 +63,34 @@ export function createChoice({ label, options, at = 0, onPick } = {}) {
   let chosen = at < 0 ? -1 : Math.max(0, Math.min(options.length - 1, at));
 
   const wrap = el('span', 'pos-choice');
+  /**
+   * 🔴 STANDING UP IS AN ATTRIBUTE AND NOT A SECOND COMPONENT. Asked for
+   * 2026-09-22 as *"plus checboxes and radios (horiz and vert)"*. Everything
+   * about this control except which way the segments run is the same standing
+   * as lying, so a second module would have been the third hand-built copy of a
+   * radio row, which is what this file exists because of.
+   *
+   * ⚠️ IT IS ONE ATTRIBUTE AND EVERY EXISTING CALLER IS BYTE IDENTICAL. `row`
+   * writes nothing at all, so the eleven pages already using this render exactly
+   * as they did. ⚠️ AND IT IS AN ATTRIBUTE RATHER THAN A CLASS ONLY BECAUSE THE
+   * VALUE MATTERS: `[data-orient]` would match both, and `[data-orient="column"]`
+   * matches one, which is the `[data-full]` lesson recorded in CLAUDE.md where
+   * an attribute selector matching on PRESENCE kept a panel in its full screen
+   * look for the rest of a page's life.
+   *
+   * 🔴 AND THE STYLESHEET HAS TO TURN THREE THINGS, NOT ONE. `.pos-seg` overlaps
+   * its children on the LEFT and rounds the first child's left corners and the
+   * last child's right, all of which are the wrong axis stacked: turning only
+   * `flex-direction` leaves a doubled border on every join and two stray curves
+   * in the middle of the column. `/kit/` measures all three.
+   *
+   * ⚠️ WHAT THIS DOES NOT CHANGE IS WHAT THE BUTTONS ARE. They are still
+   * buttons wearing `aria-pressed` rather than `role="radio"`, which is a real
+   * gap and is left alone deliberately: changing the role is a change to eleven
+   * call sites and to what a screen reader announces on every page that has
+   * one, and it is nothing to do with which way the row runs.
+   */
+  if (orient === 'column') wrap.dataset.orient = 'column';
   if (label) wrap.append(el('span', 'pos-choice-l', label));
   // ⚠️ `step` IS THE JOIN, and it is reused rather than reimplemented. The 1 px
   // border overlap, the outer-only corners and the raise-on-hover all live in
@@ -49,8 +98,10 @@ export function createChoice({ label, options, at = 0, onPick } = {}) {
   const seg = el('span', 'step pos-seg pos-choice-seg');
   wrap.append(seg);
 
-  const buttons = options.map(([name], i) => {
+  const buttons = options.map(([name, value], i) => {
     const b = el('button', '', name, { type: 'button', 'aria-pressed': String(i === chosen) });
+    const tip = title ? title(value, name, i) : '';
+    if (tip) b.title = tip;
     b.onclick = () => set(i);
     seg.append(b);
     return b;

@@ -295,9 +295,41 @@ export function checkTransforms(transforms) {
          * that does not exist arriving at an instrument down a link the page
          * called connected.
          */
+        /**
+         * 🔴 TWO DIFFERENT FAULTS WORE ONE SENTENCE UNTIL 2026-09-22, AND ON
+         * THE SECOND OF THEM IT NAMED SOMETHING THAT WAS NOT WRONG.
+         * REPORTED against `{ op: 'cc', to: 80 }` with the words *"do not get
+         * this error"*, which came out as **`cc takes "from" and was given
+         * "to"`**. That reads as *cc takes from, NOT to*, and it is false:
+         * `cc` needs BOTH, it moves the controller numbered `from` onto the
+         * controller numbered `to`, and **`to: 80` was exactly right**, 80
+         * being the Circuit's first macro knob. The only fault was that
+         * `from` was absent.
+         * ✅ **SO THE SENTENCE SPLITS ON WHETHER THE GIVEN KEYS BELONG TO THIS
+         * OP AT ALL.** A key the op does not have is a SWAP, and naming both
+         * sides is the whole help: `transpose takes "by" and was given "to"`
+         * is right and stays exactly as it was. Keys that all belong, with a
+         * required one missing, is an OMISSION, and there the only useful
+         * sentence says what is needed and which part did not arrive.
+         * ⚠️ IT IS THE SAME LESSON THIS PROJECT KEEPS PAYING FOR, ARRIVING IN
+         * PROSE RATHER THAN IN AN ASSERT: a message that measures something
+         * NEXT TO the quantity in question sends a reader to the wrong place.
+         * Here it sent one to delete an argument that was correct.
+         */
         const given = Object.keys(t).filter((x) => x !== 'op');
-        return `${t.op} takes "${k}" and was given `
-          + (given.length ? given.map((x) => `"${x}"`).join(', ') : 'nothing');
+        const strange = given.filter((x) => !op.args.includes(x));
+        const q = (x) => `"${x}"`;
+        /* ⚠️ THREE CASES, NOT TWO, AND THE THIRD WAS FOUND BY `bay-test.mjs`
+           GOING RED IN ONE LINE. An empty object is neither a swap nor a
+           partial omission: nothing arrived, so there is no other key to name
+           and no half of the requirement to point at. `fixed needs "to", and
+           "to" is missing` is a sentence tying itself in a knot to say what
+           `and was given nothing` says plainly. */
+        if (!given.length) return `${t.op} takes ${q(k)} and was given nothing`;
+        if (strange.length) {
+          return `${t.op} takes ${q(k)} and was given ${strange.map(q).join(', ')}`;
+        }
+        return `${t.op} needs ${op.need.map(q).join(' and ')}, and ${q(k)} is missing`;
       }
       if (k === 'cls') {
         if (!CLASSES.includes(t.cls)) return `${t.op} was given cls "${t.cls}", which is not one of ${CLASSES.join(', ')}`;

@@ -513,9 +513,32 @@ export function createReport({
    * `style.aspectRatio` from an option and left one page's picture square on a
    * 16:9 screen with the way out of full screen off the top of it.
    */
-  if (rows > 0) {
-    readoutEl.dataset.rows = String(rows);
-    readoutEl.style.setProperty('--ro-cols', String(Math.ceil(keys.length / rows)));
+  /**
+   * 🔴 AND ABOVE SIX CELLS IT IS NO LONGER OPT IN, SINCE 2026-09-22. Reported
+   * against `/plai/`'s eight cell readout, which the flex row laid out as
+   * **SEVEN AND ONE**: *"make rule of max 6 in a row or go full 2 x 4. no odd
+   * nrs"*. A lone cell on its own line reads as a cell that failed to load,
+   * and at eight cells there is no width where the flex row does the right
+   * thing by accident.
+   * ⚠️ **THE OPT IN WAS THE DEFECT.** `rows` was added on 2026-09-21 for a ten
+   * cell readout that wrapped 7 and 3, and it fixed that page and left every
+   * page written afterwards free to make the same shape again. A rule nobody
+   * has to remember is the only kind that holds.
+   * ✅ **SIX IS THE CAP AND THE ROWS ARE BALANCED**, which is the two halves of
+   * what was asked: `ceil(n / 6)` rows, then the columns fall out of that, so
+   * eight is 4 and 4 rather than 6 and 2. Nothing changes at six or fewer,
+   * which is every page that was measured filling at thirteen widths.
+   * ⚠️ A CALLER'S OWN `rows` STILL WINS, because a page that has named its
+   * shape has a reason the cell count cannot see: `/pack/`'s `written` and
+   * `not erasure` are a PAIR and belong on one line.
+   */
+  const MAX_PER_ROW = 6;
+  const autoRows = keys.length > MAX_PER_ROW
+    ? Math.ceil(keys.length / MAX_PER_ROW) : 0;
+  const shapeRows = rows > 0 ? rows : autoRows;
+  if (shapeRows > 0) {
+    readoutEl.dataset.rows = String(shapeRows);
+    readoutEl.style.setProperty('--ro-cols', String(Math.ceil(keys.length / shapeRows)));
   }
   // ⚠️ `sm` IS A QUIETER VALUE AND NOT A SMALLER PANEL. The key stays 9.5 px
   // because it is the half a reader scans down.

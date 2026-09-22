@@ -1708,6 +1708,43 @@ video[hidden] { display: none; }
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
+/* ── range slider, two handles (demo/shell/range-slider.mjs) ──────────────
+   🔴 ALMOST NOTHING IS DECLARED HERE, AND THAT IS THE POINT. A range is the
+   slider above with a second handle and a band between them, so it wears
+   `.sld`, `.sld-head`, `.sld-l`, `.sld-lane` and `.sld-knob` unchanged: same
+   34 px height, same lane, same corner, same handle. What follows is only what
+   is different, which is three things.
+
+   ⚠️ AND IT CONTRIBUTES EXACTLY TWO GRID ITEMS, a head and a lane, so
+   `.sld-group .sld { display: contents }` puts it in the shared columns beside
+   single sliders with no rule of its own. A third child would take a column
+   and shift every lane in the group sideways. */
+/* Two numbers under one label, left and right, under the two handles they
+   belong to. `.sld-v` already reserves each one's widest value and sets
+   tabular figures, so neither can move the other while somebody drags. */
+.sld-v-pair { display: inline-flex; gap: 10px; }
+/* 🔴 THE BAND IS `--hi` AT A THIRD, NOT A SECOND GREY. It is the same ink as
+   the two handles because it is the same fact as the two handles: this part of
+   the scale is the one that was chosen. A separate colour would be a second
+   channel saying what the handles already say, and this project's one rule
+   about colour is that a colour means one thing.
+   ⚠️ IT SITS UNDER THEM. Both handles are painted after it in source order and
+   all three are absolutely positioned, so the handles keep their full strength
+   where the band passes beneath. */
+.sld-span {
+  position: absolute; top: 0; height: 34px;
+  background: var(--hi); opacity: .3; border-radius: 2px; pointer-events: none;
+}
+/* 🔴 A HANDLE IS FOCUSABLE HERE AND IS NOT ON A SINGLE SLIDER, so it needs a
+   focus ring of its own. On `slider.mjs` the LANE is the slider and carries
+   `tabindex`; a range has two values and therefore two tab stops, one per
+   handle, because a control that hides one of its two values behind a mode key
+   is a control where one of them cannot be reached from a keyboard at all.
+   ⚠️ THE RING IS GREY. `--hi` is already the handle's own fill, so a yellow
+   ring on a yellow block says nothing. Same answer `.pos-choice` reached. */
+.sld-knob[role="slider"]:focus { outline: none; }
+.sld-knob[role="slider"]:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
+
 /* ── stepper (demo/shell/stepper.mjs) ────────────────────────────────────
    🔴 ONE OBJECT, NOT THREE BUTTONS. Laid out with a gap, each button carried
    its own full border and its own four rounded corners, so the group read as
@@ -1800,6 +1837,329 @@ video[hidden] { display: none; }
 .pos-pick button:focus:not(:focus-visible) { outline: none; }
 .pos-choice button:focus-visible,
 .pos-pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
+
+/* ── choice, standing up (demo/shell/choice.mjs, orient: 'column') ─────────
+   🔴 THE SEGMENT JOIN TURNS WITH THE ROW AND THE CORNERS TURN WITH IT. `.pos-seg`
+   overlaps its children by -1 px on the LEFT and rounds the first child's left
+   corners and the last child's right, all of which is the wrong axis once the
+   options are stacked. Overlapping the wrong way leaves a doubled border on
+   every join, and rounding the wrong corners leaves a column with four square
+   ends and two stray curves in the middle of it.
+   ⚠️ (0,3,0) AGAINST (0,1,0), so this wins on weight and source order is not
+   load-bearing. It is still written after the rules it overrides, because the
+   day a specificity tie is introduced is the day it silently stops working, and
+   this project has measured a phone layout that had never run in its life for
+   exactly that reason.
+
+   ⚠️ THE LABEL GOES ABOVE, NOT BESIDE. Beside a column of four options a label
+   is one word floating against the first of them, which reads as that option's
+   heading rather than the group's. Above is where `.sld-head` already puts a
+   slider's name, so the two stacked controls agree. */
+.pos-choice[data-orient="column"] {
+  display: inline-flex; flex-direction: column; align-items: flex-start;
+  height: auto; gap: 6px;
+}
+.pos-choice[data-orient="column"] .pos-seg {
+  flex-direction: column; align-items: stretch; overflow-x: visible;
+}
+.pos-choice[data-orient="column"] .pos-seg > * { border-radius: 0; margin-left: 0; }
+.pos-choice[data-orient="column"] .pos-seg > * + * { margin-top: -1px; }
+.pos-choice[data-orient="column"] .pos-seg > :first-child {
+  border-radius: 4px 4px 0 0;
+}
+.pos-choice[data-orient="column"] .pos-seg > :last-child {
+  border-radius: 0 0 4px 4px;
+}
+/* A stacked option is a row, so its word starts at the left the way every other
+   stacked label on this page does, rather than floating in the middle of a
+   button whose width is decided by the longest name in the column. */
+.pos-choice[data-orient="column"] .pos-seg > button {
+  justify-content: flex-start; height: 34px;
+}
+
+/* ── checkbox (demo/shell/check.mjs) ──────────────────────────────────────
+   🔴 A REAL `<input type="checkbox">`, CLIPPED, WITH THE BOX DRAWN BESIDE IT.
+   The reasons are in the module header and they are all about what the element
+   IS rather than what it looks like: the announcement is `checkbox, checked`
+   rather than `button, pressed`, the space key works with no code, and
+   `indeterminate` is a real third state. What is left for CSS is the picture.
+
+   ⚠️ CLIPPED, NEVER `display: none`. A `display: none` input is not focusable,
+   so the keyboard path would be gone and nothing on the page would say so. This
+   is the standard clip, and `/kit/` asserts the input is still in the tab order
+   and still 1 px rather than 0. */
+.pos-check {
+  display: inline-flex; align-items: center; gap: 8px; height: 34px;
+  cursor: pointer;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+.pos-check-i {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+/* The same inset shadow the slider's lane uses rather than a border, for the
+   same reason: a border insets the padding box and the tick inside it would be
+   a pixel off centre at this size. */
+.pos-check-b {
+  position: relative; flex: none; width: 16px; height: 16px; border-radius: 3px;
+  background: var(--card2); box-shadow: inset 0 0 0 1px var(--line2);
+}
+/* 🔴 THE TICK IS DRAWN, NOT TYPED. A `✓` is a font glyph, and a font glyph is a
+   different shape, weight and baseline on every machine, which is the same trap
+   this project already recorded for the transport's arrows. Two borders on a
+   rotated box is the same two strokes everywhere. */
+.pos-check-b::after {
+  content: ''; position: absolute; left: 5px; top: 1.5px; width: 4px; height: 8px;
+  border: solid var(--bg); border-width: 0 2px 2px 0; transform: rotate(42deg);
+  opacity: 0;
+}
+.pos-check-i:checked + .pos-check-b {
+  background: var(--hi); box-shadow: inset 0 0 0 1px var(--hi);
+}
+.pos-check-i:checked + .pos-check-b::after { opacity: 1; }
+/* SOME OF THEM, which is a bar rather than a tick. It is the one state a
+   button wearing `aria-pressed` can only spell and never draw. */
+.pos-check-i:indeterminate + .pos-check-b {
+  background: var(--hi); box-shadow: inset 0 0 0 1px var(--hi);
+}
+.pos-check-i:indeterminate + .pos-check-b::after {
+  opacity: 1; left: 3px; top: 7px; width: 10px; height: 0;
+  border-width: 0 0 2px 0; transform: none;
+}
+/* Grey, and nowhere near `--hi`, which is already the checked colour. One
+   colour, one meaning, which is the answer `.pos-choice` reached for the same
+   collision. */
+.pos-check-i:focus-visible + .pos-check-b { outline: 2px solid var(--dim2); outline-offset: 2px; }
+.pos-check-t { font: 500 11px/1 var(--mono); color: var(--fg); white-space: nowrap; }
+.pos-check-i:disabled ~ .pos-check-t { color: var(--dim2); }
+.pos-check:has(.pos-check-i:disabled) { cursor: default; opacity: .45; }
+
+/* ── step grid (demo/shell/step-grid.mjs) ────────────────────────────────
+   🔴 LIFTED OUT OF `/tom/`, WHERE FIVE SEPARATE EDGES WERE ASKED OFF IT, EACH
+   ONE REPORTED ON ITS OWN: the playhead cursor, the highlight border, the pad
+   hover, the focus ring and the pads' own outline. Every one of those is a rule
+   that is NOT here, and the module header carries the reports. A careless
+   rewrite of this block re-opens all five.
+
+   🔴 ONE PITCH, DECLARED ONCE, AND THE JAVASCRIPT NEVER TYPES IT AGAIN. A
+   step's width decides where the head sits, how wide a ruler tick is and how
+   far an arrow key moves. `--sld-col` is already this project's record of what
+   happens when a shared measurement is typed in two files.
+   ⚠️ AND THE ROW PITCH IS THE SAME ONE, which is what makes the label column
+   line up with the steps beside it. A layout that puts the two in separate flex
+   children relates nothing in the browser: they agree because every cell on
+   both sides is `--pg-cell` tall with `--pg-gap` between.
+   ⚠️ `--pg-cell` IS WRITTEN FROM SCRIPT, measured off the strip. It cannot be
+   done in CSS alone, and the module says why at length. */
+:root {
+  --pg-gap: 2px;
+  /* A fallback only. `pad-grid.mjs` measures the real one and writes it onto
+     the grid and onto the label column, so neither half can drift. */
+  --pg-cell: 16px;
+  /* ⚠️ THE RULER CARRIES NO TEXT, so it is a press target and a measuring stick
+     rather than a row of labels. 8 px is enough to press and small enough not
+     to read as a band. */
+  --pg-ruler: 8px;
+  /* 🔴 A NUMBER, NOT A NAME, SO THE COLUMN IS 22 px RATHER THAN 108. Asked for
+     as *"rm divider vert line next to pads, just numbers 0..64 on left"*. It
+     was 108 px because `sample_10.wav` is thirteen characters of 10 px mono,
+     and every row in a pack differs only in the digits: 64 rows of the same
+     eight characters in a column sized to hold a word none of them differ in. */
+  --pg-lab: 22px;
+  /* 🔴 TWO TOKENS SO THE GENERATED `nth-child` RULES HAVE SOMETHING TO NAME. A
+     colour written into sixteen generated rules would be sixteen places one
+     decision lives.
+     ⚠️ CIRCUIT COLOURS, ASKED FOR AS *"use circuilt colors"* WITH A PHOTOGRAPH.
+     A lit step on that machine is warm amber and the pad under the head is a
+     cold near-white, which is the same two-colour language the hardware uses
+     and the reason a reader can tell them apart at a glance.
+     ⚠️ LESS ORANGE THAN THE FIRST TRY, REPORTED AS *"still wrong hues on pads
+     (orangey)"*. It was `#f0a030`, a red-leaning orange and the loudest hue on
+     a page whose every other surface is a blue grey. A photograph of a backlit
+     silicone pad in a room is not a screen colour. */
+  --pg-now: #dfe6ef;
+  --pg-on: #e3c168;
+}
+/* The steps. `width: max-content` so the caller's own scroller is what moves,
+   which is one scrolling region and a page that never drags sideways. */
+.pos-pg {
+  position: relative; width: max-content;
+  display: flex; flex-direction: column; gap: var(--pg-gap);
+}
+.pos-pg-ruler { display: flex; gap: var(--pg-gap); height: var(--pg-ruler); cursor: pointer; }
+.pos-pg-tick {
+  width: var(--pg-cell); flex: 0 0 auto; height: var(--pg-ruler);
+  font: 500 9px/var(--pg-ruler) var(--mono); color: var(--dim2);
+  text-align: left;
+}
+.pos-pg-tick[data-bar] { color: var(--dim); }
+.pos-pg-tick[data-now] { color: var(--hi); }
+.pos-pg-rows { display: flex; flex-direction: column; gap: var(--pg-gap); }
+.pos-pg-row { display: flex; gap: var(--pg-gap); height: var(--pg-cell); }
+/* 🔴 THE PAD OVERRIDES SIX THINGS THE GLOBAL `button` RULE SETS, and every one
+   of them is a number that belongs to a pill rather than to a grid.
+   🔴 NO BORDER, ASKED FOR AS *"rm borders on pads"*. The field IS the pad; an
+   outline round it was a second way of saying where it is, and sixteen of them
+   across a row read as a wire grid rather than as an instrument.
+   ⚠️ `border: 0` AND NOT A COLOUR CHANGE, because `box-sizing: border-box` is
+   global here: a 1 px border was taking 2 px out of every pad's inside, and
+   keeping it transparent would keep taking them. */
+.pos-pg-pad {
+  width: var(--pg-cell); height: var(--pg-cell); min-height: 0; flex: 0 0 auto;
+  padding: 0; border-radius: 3px;
+  background: #171d29; border: 0;
+}
+/* Every fourth step is a beat and every sixteenth is a bar, so sixty four pads
+   can be counted without reading the ruler. It is the field that changes and
+   never the ink, which is the same decision `pattern.mjs` made. */
+.pos-pg-pad[data-beat] { background: #1c2331; }
+.pos-pg-pad[data-bar] { background: #222b3c; }
+/* ⚠️ HOVER LIFTS THE FIELD AND DOES NOTHING ELSE, asked for as *"no border
+   hover effect on pad, just make pad brigher on hover"* and *"hover on pad only
+   changes bg lighter a bit"*. `filter: brightness()` rather than a pair of
+   typed colours, so a pad that is off, on, silent or under the head all lift by
+   the same amount from whatever they already are. Four states, one line. */
+button.pos-pg-pad { cursor: pointer; }
+button.pos-pg-pad:hover { filter: brightness(1.35); }
+/* 🔴 THE FOCUS RING SAT OUTSIDE THE PAD AND OVERLAPPED ITS NEIGHBOURS. Reported
+   with a crop as *"outline looks bad"*: a 2 px yellow ring standing off a 16 px
+   pad is wider than the 2 px gutter, so it drew over the two pads either side
+   and read as a rendering fault. `outline-offset: -1px` puts it INSIDE the pad,
+   where it cannot reach a neighbour at any gap, and one pixel is enough on a
+   shape this small. The ring keeps the accent colour, because focus is the one
+   thing on this grid that is about the person rather than about the music. */
+.pos-pg-pad:focus-visible {
+  outline: 2px solid var(--hi); outline-offset: -1px; border-radius: 3px;
+}
+/* 🔴 A READ ONLY GRID MUST NOT LOOK PRESSABLE, AND IT IS NOT `disabled`. Greying
+   it out would say *this is switched off* about a picture that is perfectly
+   current. Its pads are `div`s, so none of the three rules above them reaches
+   one: no pointer, no hover lift, no focus ring, and no tab stop from script.
+   This rule exists to say so rather than to do anything, because that absence is
+   the thing a reader of this file has to be told about. */
+.pos-pg-rows[role="table"] .pos-pg-pad { cursor: default; }
+/* 🔴 BRIGHTNESS SAYS WHETHER THIS PAD CAN MAKE A SOUND, which is the one thing a
+   reader cannot see any other way. A pad on a row with nothing behind it is
+   switched on and silent, and colouring it like one that will sound would be the
+   page asserting something nothing measured.
+   🔴 AND THE ROWS ARE NOT COLOURED BY TRACK, WHICH IS THE OBVIOUS THING TO DO
+   AND WOULD BE A LIE. Which of a Circuit's drum pads plays a given slot is a
+   property of a SESSION, is in no WAV header, and
+   `research/circuit-session-notes-2026-09-21.md` says so in as many words.
+   Painting that mapping would be this project's label-as-content mistake in
+   colour. ✅ SO COLOUR SAYS STATE, WHICH IS MEASURED: lit, silent, or playing. */
+/* 🔴 A LAMP LIGHTS FAST AND DIES SLOWLY, AND THAT ASYMMETRY IS THE WHOLE
+   EFFECT. Asked 2026-09-22: *"make it appear smooth like analog lamp lights up
+   and turns out"*. The head's own rule carries a 90 ms transition, so a pad
+   LIGHTING uses that; a pad going dark falls back to this one and takes 320 ms.
+   Two rules, one property, and the difference between them is the decay.
+   ⚠️ IT IS ON THE BASE RULE RATHER THAN ON THE HEAD'S, because the element
+   being transitioned FROM is the one whose transition runs when a class or an
+   attribute is removed. Putting both durations on the head's rule gives one
+   speed in both directions, which is a lamp with no filament. */
+.pos-pg-pad { transition: box-shadow 320ms ease-out, filter 320ms ease-out; }
+.pos-pg-pad[data-on] { background: var(--pg-on); }
+.pos-pg-pad[data-on][data-mute] { background: var(--dim2); }
+/* ⚠️ THE BREATHING IS `opacity` EITHER WAY, so nothing it does can change how
+   much room anything takes, and reduced motion stops it dead. The two durations
+   live in the generated rules, 2.2 s parked and 1.4 s playing, so there is no
+   third rule here overriding a fourth: a head that is waiting and one that is
+   running must not pulse the same way or the animation stops carrying
+   anything. */
+@keyframes pg-breathe {
+  0%, 100% { opacity: .82; }
+  50%      { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The fade goes with the breathing. A head that glides is still motion to
+     somebody who asked for none, and the head is still perfectly legible
+     without it because the wash and the brightness both remain. */
+  .pos-pg-rows .pos-pg-pad { animation: none !important; transition: none !important; }
+}
+/* The column of labels, and the corner above it.
+   🔴 NO DIVIDER, asked for as *"rm divider vert line next to pads"*. */
+.pos-pg-labs {
+  display: flex; flex-direction: column; gap: var(--pg-gap);
+  width: var(--pg-lab); border-right: 0; padding-right: 0;
+}
+/* ⚠️ THE CORNER IS RESERVED EVEN WHEN IT IS EMPTY, or the first label sits a
+   ruler's height above the first row of pads and the two columns never line up
+   again. A component's invisible reservations have to be made or a caller gets
+   them wrong, which is the `--ctl-head` lesson one control along. */
+.pos-pg-corner { height: var(--pg-ruler); flex: 0 0 auto; }
+.pos-pg-corner-said {
+  font: 500 9px/var(--pg-ruler) var(--mono); color: var(--dim2);
+  text-align: right; padding-right: 6px; overflow: hidden; white-space: nowrap;
+}
+/* ⚠️ CENTRED BY LINE HEIGHT AND NOT BY `align-items`, because `text-overflow`
+   does not reach a flex item's text: the first build centred the name that way
+   and every name past `sample_9.wav` was HARD CLIPPED mid word with no
+   ellipsis, which photographs as a rendering fault rather than as a name that
+   does not fit.
+   ⚠️ RIGHT ALIGNED AND `tabular-nums`, so 0 to 63 make one straight edge
+   against the pads rather than a ragged one. Same reason a readout reserves its
+   widest value. */
+.pos-pg-lab {
+  height: var(--pg-cell); flex: 0 0 auto; padding: 0 6px 0 0;
+  font: 500 10px/var(--pg-cell) var(--mono); color: var(--dim2);
+  text-align: right; font-variant-numeric: tabular-nums;
+  overflow: hidden; white-space: nowrap;
+}
+/* A row that can be heard is a button; a row with nothing behind it is a div.
+   🔴 NOT A DISABLED BUTTON: at rest every row is empty, and sixty four dimmed
+   controls read as a page that failed rather than as a page waiting for a file.
+   A control that cannot do what it names is this project's named lie, and the
+   repair is to not draw the control.
+   ⚠️ THE GLOBAL BUTTON RULE IS A 34 px PILL WITH 18 px OF PADDING, and a cell in
+   a grid is none of those things. The padding stays the one `.pos-pg-lab` sets,
+   so a row with something behind it and a row without start at the same x.
+   ⚠️ AND `text-align: right` IS REPEATED HERE ON PURPOSE. The base rule right
+   aligns, and `button.pos-pg-lab` at (0,1,1) was quietly overriding it: opening
+   a pack would have left aligned exactly the rows that had something in them,
+   and the straight edge asked for would have appeared only while empty. */
+button.pos-pg-lab {
+  height: var(--pg-cell); min-height: 0; border-radius: 3px;
+  background: transparent; border: 0; color: var(--fg2);
+  text-align: right; cursor: pointer; display: block; width: 100%;
+  /* The colour is the only thing that moves, so it is the only thing with a
+     transition on it. */
+  transition: color .18s ease-out;
+}
+button.pos-pg-lab:hover { color: var(--fg); }
+/* 🔴 NO BACKGROUND ON A ROW THAT JUST DID SOMETHING, ASKED FOR AS *"rm bg on
+   sample preview, just animate color to yellow"*. Hearing a row is not selecting
+   it: a filled box behind the number said *this one is chosen* and stayed saying
+   it, while what actually happened was a sound that has already finished. Colour
+   can say a moment; a box says a state. */
+.pos-pg-lab[data-lit] { color: var(--hi); animation: pg-heard .45s ease-out; }
+@keyframes pg-heard {
+  0%   { color: #fff8dc; }
+  100% { color: var(--hi); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pos-pg-lab[data-lit] { animation: none; }
+}
+
+/* The set, and its name. `.pos-check-l` is the same label as a slider's and a
+   choice's, so three controls in a row carry one kind of name. */
+.pos-checks { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.pos-check-l {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap;
+}
+/* ⚠️ THE ROW WRAPS RATHER THAN SCROLLING, WHICH IS THE OPPOSITE OF `.pos-choice`
+   AND IS NOT AN INCONSISTENCY. A segmented row is ONE object and cutting it in
+   half across two lines breaks the object, so it scrolls. Checkboxes are loose
+   controls that happen to share a heading, and a wrapped second line of them is
+   still the same set. Wrapping keeps them all reachable without a sideways drag,
+   which this project has already recorded as a thing nobody does. */
+.pos-checks-set { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-width: 0; }
+.pos-checks-col { align-items: flex-start; flex-direction: column; gap: 6px; }
+.pos-checks-col .pos-checks-set { flex-direction: column; flex-wrap: nowrap; gap: 0; }
+/* Stacked, a box is a row rather than a chip, so it gets the row height every
+   other stacked control here has. */
+.pos-checks-col .pos-check { height: 26px; }
 
 /* ── button group (demo/shell/button-group.mjs) ───────────────────────────
    🔴 IT IS SEGMENTED, AND IT SHIPPED WITH A GAP. The first build put 8 px
@@ -2872,6 +3232,17 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
 .pos-dg-back { stroke: var(--dim2); }
 .pos-dg-head { fill: var(--dim); }
 .pos-dg-head-b { fill: var(--dim2); }
+/* 🔴 A REFUSED LINK IS RED ALL THE WAY ALONG, 2026-09-22, asked for on
+   `/wish/` as *"when refused, paint recused conector/label red"*. Line, label
+   and arrowhead, because a red line arriving at a grey head is a picture
+   disagreeing with itself at the end a reader looks at.
+   ⚠️ IT IS A SECOND CHANNEL AND NEVER THE ONLY ONE: the label still reads
+   `refused` in words. Colour alone fails a reader who cannot separate these
+   two hues, and fails every greyscale screenshot.
+   ⚠️ AND IT SITS AFTER `[data-on]` BELOW, DELIBERATELY. A pointer on a refused
+   arrow must not turn it back to `--fg`, or hovering the one link that failed
+   would hide the fact that it failed. `--bad` wins the hover. */
+.pos-dg-head-bad { fill: var(--bad); }
 
 /* `here` — the browser you are reading this in. The only box with a lighter
    back, and it needs no hue at all: being filled is the whole signal. */
@@ -3270,6 +3641,10 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 .pos-dg-link, .pos-dg-llab { transition: stroke 140ms ease, fill 140ms ease; }
 .pos-dg-l[data-on] .pos-dg-link { stroke: var(--fg); }
 .pos-dg-l[data-on] .pos-dg-llab { fill: var(--fg); }
+/* See `.pos-dg-head-bad`. Last, so a hover cannot paint a refusal back to
+   ordinary ink. */
+.pos-dg-l[data-bad] .pos-dg-link { stroke: var(--bad); }
+.pos-dg-l[data-bad] .pos-dg-llab { fill: var(--bad); }
 
 /* ── presence: online, offline, coming online — shell/presence.mjs ──────────
    🔴 GREEN AND TWO GREYS, AND THE COLOUR SAYS HOW IT LANDED. This project's
@@ -3725,6 +4100,26 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   color: var(--dim); text-align: center; max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* 🔴 THE TWO ENDS OF A KNOB'S TRAVEL, IN THE GAP THE ARC LEAVES AT THE BOTTOM.
+   Asked for on `/plai/` 2026-09-22 as *"support starte end labels -1 1"*, and
+   the control that needs it is the bipolar attenuverter: `-1` to `1` with a
+   centre home looks exactly like `0` to `127` until a finger moves it.
+   🔴 IT COSTS NO HEIGHT, WHICH IS THE WHOLE REASON IT IS PLACED THIS WAY. The
+   row is pulled up into the dial's own dead space by a negative margin, so
+   `--ctl-head` and `--ctl-foot` are untouched and a row mixing knobs with and
+   without ends still lines up. A knob that grew when labelled would break every
+   `.pos-crow` on the site, which is the arithmetic `/twelve/` was corrected by
+   screenshot twelve times over.
+   ⚠️ `pointer-events: none` BECAUSE THE DIAL IS THE CONTROL. A number sitting
+   over the knob's own hit area that swallows a press is a control with a dead
+   corner, and nobody would know why. */
+.pos-knob-ends {
+  display: flex; justify-content: space-between; width: 100%;
+  margin-top: -11px; pointer-events: none;
+  font: 400 8.5px/1 var(--mono); color: var(--dim2);
+  font-variant-numeric: tabular-nums;
+}
+.pos-knob-end { opacity: .85; }
 .pos-knob-sub {
   font: 400 9px/1.3 var(--mono); color: var(--dim2); text-align: center;
   font-variant-numeric: tabular-nums;
@@ -3803,14 +4198,32 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    pad's SIZE was a function of how many of them there were and how wide the
    page was: sixteen looked right and eight were enormous. A pad is a thing a
    finger hits, so its size is a property of the pad.
-   ⚠️ IT WRAPS RATHER THAN SHRINKING. Sixteen at 40 px plus gaps is 700 px, and
-   a pad narrow enough to fit a phone is one nobody can hit. */
+   🔴 AND THE LINE THAT USED TO STAND HERE SAID `IT WRAPS RATHER THAN
+   SHRINKING`, WHICH THE RULE UNDERNEATH IT CANNOT DO. MEASURED 2026-09-22 on a
+   real phone and then at 390 px in a browser: `repeat(var(--pad-cols), …)` is a
+   FIXED track count, so a grid too wide for its box neither wraps nor shrinks,
+   it spills. `/kit/`'s eight column specimen ran **27 px past its own box** and
+   dragged the whole page **65 px sideways**. The comment described an intention
+   and the stylesheet had never implemented it.
+   ⚠️ **THE HALF THAT WAS RIGHT IS KEPT**: a pad narrow enough to fit a phone is
+   one nobody can hit, so it must not shrink.
+   ⚠️ **AND WRAPPING IS THE WRONG REPAIR, WHICH IS WHY IT IS SCROLLING.** A pad
+   grid carries LANES: `/kit/`'s first specimen is two rows that mean two
+   different things, and `/circuit/` and `/evo/` both lay a keypad out in rows.
+   Wrapping folds the tail of a row underneath itself and the lanes stop being
+   lanes. A row that scrolls keeps every pad its own size and keeps the rows in
+   step, which is what `.pos-tbl-row` already does with its own minimum and what
+   `step-grid.mjs` does with its strip.
+   🔴 `overflow-x: auto` NEEDS `min-width: 0` BESIDE IT, and this rule already
+   had the second half. `overflow-x` cannot shrink a flex or grid item below its
+   content, and `positron-ui` records 141 px of page overflow from that pair
+   being half written. */
 /* A grid where no pad carries a label: the reserved slots are only air, so they
    go and the gap is the same across and down. See createPadGrid. */
 .pos-padgrid-bare .pos-pad-top { display: none; }
 
 .pos-padgrid {
-  display: grid; gap: var(--ctl-gap); min-width: 0;
+  display: grid; gap: var(--ctl-gap); min-width: 0; overflow-x: auto;
   grid-template-columns: repeat(var(--pad-cols, 16), var(--ctl-w));
   justify-content: start;
 }
@@ -4519,6 +4932,22 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    both are `ends`: the difference is which parent the caller appends it to, not
    how the row lays out. Two placements and one append, rather than three
    placements. */
+/* 🔴 A PLATE INSIDE A CASE SITS OFF THE TOP BORDER BY THE CASE'S OWN INSET, AND
+   THIS RULE DID NOT EXIST UNTIL 2026-09-22. `.panel-case` is
+   `padding: 0 var(--panel-pad)`, horizontal only, because `.panel-fixed` and
+   `.panel-strip` each supply their own `padding-block`. A plate prepended from
+   outside supplied none and sat on the border.
+   🔴 ONE PAGE NOTICED AND FIXED IT PRIVATELY: `demo/tom/index.html` carried
+   `.tom .panel-plate { padding: 16px 0 0 }`. Every page after it inherited the
+   defect and not the fix, which is what a page-local repair to a shared
+   component always does. Reported on `/plai/` as *"you failed afain on
+   nameplate padding"*, and correctly.
+   ⚠️ IT IS THE SAME TOKEN THE SIDES USE, so the plate is as far from the top as
+   the controls are from the edges, rather than a number somebody liked.
+   ⚠️ AND IT IS SCOPED TO A DIRECT CHILD OF THE CASE. `/circuit/` puts a plate
+   INSIDE a card and `/evo/` puts one in the flow, and neither wants a case's
+   inset applied to it. */
+.panel-case > .panel-plate { padding-block: var(--panel-pad) 0; }
 .panel-plate-l {
   font: 600 11px/1 var(--mono); letter-spacing: .14em; color: var(--dim2);
   text-transform: uppercase;
