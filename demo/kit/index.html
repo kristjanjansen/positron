@@ -476,6 +476,7 @@
   import { createStepGrid, cellSize as padWidth, PAD_MIN, RISE_MS, FALL_MS }
     from '/shell/step-grid.mjs';
   import { createCheck, createCheckGroup } from '/shell/check.mjs';
+  import { createSwitch } from '/shell/switch.mjs';
   import { createEnvelopeView, createFilterView, createWaveShape, shapeFor, filterShapeFor }
     from '/shell/synth-view.mjs';
   import { OSC_WAVES, FILTER_TYPES, FIRST_WAVETABLE } from '/shell/circuit-patch.mjs';
@@ -959,6 +960,12 @@
   let stepSpec = null;       // { stepped, quarters, free }  the stepped knobs
   let gridSpec = null;        // { edit, read, phone, holder }
   let rangeSpec = null;       // { wide, shut, off, single, group }
+  // ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, NOT BESIDE ITS BLOCK. The
+  // SWITCH block is the newest one on this page and so it is the topmost one,
+  // and a `let` left where a block used to be is read in its dead zone: this
+  // page has already been taken out that way once, and `section()` swallowed
+  // the throw so the message named a different line.
+  let switchSpec = null;      // { lit, dark, quietOn, quietOff, dim, presses }
   let checkSpec = null;       // { one, off, some, dim, across, down }
   let standSpec = null;       // { lying, standing, empty }
   let envSpec = null;         // { one, two, three, flat }
@@ -1072,6 +1079,68 @@
    * are a different shape again, on the same component with the same rule.
    * A block showing only knobs would have proved the arithmetic works once.
    */
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A switch, as of
+   * 2026-09-22, asked for as *"add switch component (similar to checbox,
+   * rounded yellow ot lightgray rect (primary second))"*.
+   *
+   * 🔴 **IT IS IN `input` TWO BLOCKS ABOVE THE CHECKBOX, AND THAT IS THE WHOLE
+   * POINT**, the same argument the SLIDER block makes for a fader beside a
+   * slider and the CHOICE one makes for a standing choice beside a lying one.
+   * A switch and a checkbox are two state controls built a day apart, so the
+   * only thing that can catch them collapsing into one control with two looks
+   * is having them on one scroll where one pair of eyes sees both.
+   *
+   * 🔴 **THE QUESTION THEY ANSWER IS DIFFERENT AND THE LOOK FOLLOWS FROM IT.**
+   * A box is a member of a set, so it is small, square and read as part of a
+   * list with a heading over it. A switch is one thing running or not, so it
+   * has two positions and a knob that is in one of them. `switch.mjs` carries
+   * the argument in full, and the half that decides it is the announcement:
+   * `role="switch"` exists so that *on* is not announced as *in the set*.
+   * ⚠️ **WHAT THAT ROLE SOUNDS LIKE IS NOT MEASURED ANYWHERE.** No screen
+   * reader was run on this machine. What is graded below is that the role is on
+   * the element carrying the state, which is the half a browser can answer.
+   *
+   * 🔴 **BOTH WEIGHTS ARE HERE ON AND OFF, AND SO IS A SWITCH NOBODY MAY
+   * PRESS.** A state nobody can see is a state nobody grades, and the disabled
+   * one is the negative control the rest of this block leans on: it is wired to
+   * the same counter as the other four, so a press that gets through shows up
+   * as a number rather than as a look.
+   */
+  section('input', 'SWITCH',
+    'One thing running or not, in the yellow that means this is what the page is '
+    + 'about and in a grey for a switch that is not, with a disabled one beside them.',
+    `createSwitch({ label: 'monitor', checked: true, onChange })
+createSwitch({ label: 'follow', checked: true, weight: 'secondary', onChange })
+createSwitch({ label: 'board', checked: true, disabled: true })`,
+    (box) => {
+      const o = out('nothing flipped');
+      // 🔴 ONE COUNTER BEHIND ALL FIVE, WHICH IS WHAT MAKES THE DISABLED ONE A
+      // MEASUREMENT. A press that got through a control that says it cannot be
+      // pressed would be invisible in a screenshot and is one integer here.
+      const presses = { n: 0, last: '' };
+      const say = (name) => (on) => {
+        presses.n++;
+        presses.last = `${name} ${on ? 'on' : 'off'}`;
+        o.textContent = presses.last;
+      };
+      const lit = createSwitch({ label: 'monitor', checked: true, onChange: say('monitor') });
+      const dark = createSwitch({ label: 'click', checked: false, onChange: say('click') });
+      const quietOn = createSwitch({
+        label: 'follow', checked: true, weight: 'secondary', onChange: say('follow'),
+      });
+      const quietOff = createSwitch({
+        label: 'snap', checked: false, weight: 'secondary', onChange: say('snap'),
+      });
+      const dim = createSwitch({
+        label: 'board', checked: true, disabled: true, onChange: say('board'),
+      });
+      switchSpec = { lit, dark, quietOn, quietOff, dim, presses };
+      const row = el('div', 'kit-row');
+      row.append(lit.el, dark.el, quietOn.el, quietOff.el, dim.el);
+      box.append(row, o);
+    });
+
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. The instrument header,
    * as of 2026-09-22, asked for as *"create instrumet header/glue: similar to
@@ -5236,6 +5305,157 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       && rangeSpec.gap.get().from === was.from,
       `${was.from} stepped to ${stepped}, End landed on ${ended.from} against an end at `
       + `${ended.to} with a gap of 20, and the pair is back at ${was.from} and ${was.to}`);
+  }
+
+  /**
+   * 🔴 THE SWITCH ACTS OR IT IS NOT A CONTROL, SO NOTHING BELOW ASSERTS AN
+   * OPTION THAT WAS PASSED IN. A real click goes down the same path a finger
+   * takes, the counter behind all five specimens says whether the page was
+   * told, and the disabled one is clicked on purpose to prove the counter can
+   * refuse to move.
+   */
+  if (switchSpec) {
+    const i = switchSpec.lit.input;
+    const r = i.getBoundingClientRect();
+    const cs = getComputedStyle(i);
+    d.assert('the switch is a real checkbox wearing the switch role, clipped to a pixel and still focusable',
+      i.tagName === 'INPUT' && i.type === 'checkbox' && i.getAttribute('role') === 'switch'
+      && cs.display !== 'none' && cs.visibility !== 'hidden'
+      && r.width <= 2 && r.height <= 2 && i.tabIndex >= 0
+      && !i.hasAttribute('aria-pressed')
+      && switchSpec.lit.track.getAttribute('aria-hidden') === 'true',
+      `${r.width.toFixed(0)} by ${r.height.toFixed(0)} px at tab index ${i.tabIndex}, `
+      + `display ${cs.display}, role ${i.getAttribute('role')}, and the drawn track is `
+      + `hidden from a reader`);
+
+    /* A press, down the path a finger takes, and the page put back afterwards.
+       Nothing is awaited between the click and the reading. */
+    const was = switchSpec.dark.get();
+    const saidWas = switchSpec.presses.n;
+    const kWas = switchSpec.dark.knob.getBoundingClientRect().left;
+    switchSpec.dark.input.click();
+    const now = switchSpec.dark.get();
+    const kNow = switchSpec.dark.knob.getBoundingClientRect().left;
+    const told = switchSpec.presses.last, said = switchSpec.presses.n;
+    switchSpec.dark.set(was, true);
+    d.assert('a press flips the switch and tells the page, which is the whole of it acting',
+      was === false && now === true && said === saidWas + 1 && told === 'click on'
+      && switchSpec.dark.get() === was,
+      `it said "${told}" on press ${said} and the check put it back, and the knob read `
+      + `${kWas.toFixed(1)} px before the press against ${kNow.toFixed(1)} px in the same task`);
+
+    /**
+     * 🔴 THE TRAVEL IS READ OFF TWO SETTLED SPECIMENS RATHER THAN BEFORE AND
+     * AFTER ONE PRESS, AND THE ASSERT ABOVE CARRIES THE MEASUREMENT THAT SAYS
+     * WHY. The knob slides, so a rect taken in the same task as the click is the
+     * START of a transition rather than the position it is heading for.
+     * MEASURED 2026-09-22: `157.4 px before the press against 157.4 px in the
+     * same task`, so a switch that works perfectly reads as one that never
+     * moved. The off specimen and the on one have both been sitting still since
+     * the page was laid out, so both are asked at rest.
+     * ⚠️ AND THE GAPS AT THE TWO ENDS ARE COMPARED, not just the distance. A
+     * knob that moved by the right amount and overshot the track would pass a
+     * check that only measured travel.
+     * ✅ PROVED BY BREAKING IT: with the moved rule sabotaged to
+     * `translateX(0px)` this reads `0.0 px of travel` and goes red on its own,
+     * 187/188, with nothing else moving.
+     */
+    const offT = switchSpec.dark.track.getBoundingClientRect();
+    const offK = switchSpec.dark.knob.getBoundingClientRect();
+    const onT = switchSpec.lit.track.getBoundingClientRect();
+    const onK = switchSpec.lit.knob.getBoundingClientRect();
+    const head = offK.left - offT.left;
+    const tail = onT.right - onK.right;
+    const travel = (onK.left - onT.left) - head;
+    d.assert('the knob sits at one end of its track when the switch is off and at the other when it is on',
+      offK.width > 6 && travel >= 12 && head > 0.5
+      && Math.abs(head - tail) < 0.6 && Math.abs(onT.width - offT.width) < 0.01,
+      `a ${offT.width.toFixed(0)} px track and a ${offK.width.toFixed(0)} px knob, `
+      + `${head.toFixed(1)} px in from the left when off and ${tail.toFixed(1)} px in from `
+      + `the right when on, ${travel.toFixed(1)} px of travel between them`);
+
+    /**
+     * 🔴 ONE YELLOW, AND THE SECOND WEIGHT DOES NOT GET TO INVENT ANOTHER.
+     * `--hi` means *the thing this control is about* on every page here, so the
+     * primary is compared against the token READ OFF THE STYLESHEET rather than
+     * against a colour typed into this check: two sources that can disagree.
+     * ⚠️ AND THE NEGATIVE HALF IS THE ONE WORTH HAVING. A check that only asked
+     * *is the primary yellow* would pass a page on which BOTH weights are, which
+     * is the drift this block exists to catch. Three grounds are told apart
+     * here, not two.
+     * ✅ PROVED BY BREAKING IT: with the secondary rule given `--hi` this goes
+     * red on its own, 187/188, reporting the secondary as `rgb(255, 212, 0)`.
+     */
+    {
+      const asColour = (v) => {
+        const probe = el('span');
+        probe.style.color = v;
+        document.body.append(probe);
+        const c = getComputedStyle(probe).color;
+        probe.remove();
+        return c;
+      };
+      const root = getComputedStyle(document.documentElement);
+      const hi = asColour(root.getPropertyValue('--hi').trim());
+      const grey = asColour(root.getPropertyValue('--dim').trim());
+      const litBack = getComputedStyle(switchSpec.lit.track).backgroundColor;
+      const quietBack = getComputedStyle(switchSpec.quietOn.track).backgroundColor;
+      const offBack = getComputedStyle(switchSpec.dark.track).backgroundColor;
+      d.assert('the lit primary is this page’s own --hi and NEGATIVE CONTROL: the lit secondary is not',
+        litBack === hi && quietBack === grey && quietBack !== hi
+        && offBack !== hi && offBack !== grey
+        && getComputedStyle(switchSpec.quietOff.track).backgroundColor === offBack,
+        `primary ${litBack} against --hi ${hi}, secondary ${quietBack} against --dim ${grey}, `
+        + `and both weights share one unlit ground at ${offBack}`);
+
+      /**
+       * 🔴 THE WEIGHT CAN BE CHANGED AFTER THE FACT, AND A SETTER NOBODY CALLS
+       * IS A SETTER THAT WILL BE WRONG. Nothing on this page needs to change a
+       * switch's weight, so without this the path is reachable only by a caller
+       * who does not exist yet, which is the shape this project already records
+       * as the place a count lies quietest.
+       * ⚠️ AND IT GOES BOTH WAYS, because the half that fails is the way BACK:
+       * a setter that adds the attribute and never removes it leaves a switch
+       * stuck on the quiet weight, and the attribute is deleted rather than set
+       * empty for exactly that reason.
+       * ✅ PROVED BY BREAKING IT: with `switch.mjs` writing `= ''` instead of
+       * deleting, this goes red on its own, 188/189, and so does the matching
+       * check in `switch-test.mjs`.
+       */
+      const one = switchSpec.quietOn;
+      one.weight('primary');
+      const asLoud = getComputedStyle(one.track).backgroundColor;
+      const markedLoud = one.el.hasAttribute('data-weight');
+      one.weight('secondary');
+      const asQuiet = getComputedStyle(one.track).backgroundColor;
+      d.assert('a switch can be told its weight afterwards, and the way back works too',
+        asLoud === hi && asQuiet === grey && markedLoud === false
+        && one.el.dataset.weight === 'secondary',
+        `it went to ${asLoud} with no mark on it and back to ${asQuiet} marked `
+        + `"${one.el.dataset.weight}"`);
+    }
+
+    /**
+     * 🔴 A CONTROL THAT SAYS IT CANNOT BE PRESSED AND THEN ACTS IS THE LIE THIS
+     * PROJECT HAS A NAME FOR, and the press is real rather than assumed. It is
+     * wired to the same counter as the other four, so a press that got through
+     * is an integer rather than something somebody has to notice in a
+     * screenshot.
+     */
+    {
+      const wasN = switchSpec.presses.n, wasOn = switchSpec.dim.get();
+      switchSpec.dim.input.click();
+      const faded = getComputedStyle(switchSpec.dim.el).opacity;
+      const quietWord = getComputedStyle(switchSpec.dim.el.querySelector('.pos-switch-t')).color;
+      const loudWord = getComputedStyle(switchSpec.lit.el.querySelector('.pos-switch-t')).color;
+      d.assert('NEGATIVE CONTROL: a switch nobody may press does not move and does not speak',
+        switchSpec.dim.input.disabled === true
+        && switchSpec.dim.get() === wasOn && switchSpec.presses.n === wasN
+        && Number(faded) < 1 && quietWord !== loudWord,
+        `a real click left it ${switchSpec.dim.get() ? 'on' : 'off'} with the counter still at `
+        + `${switchSpec.presses.n}, and the whole control is at opacity ${faded} with its word `
+        + `in ${quietWord} against ${loudWord}`);
+    }
   }
 
   /**

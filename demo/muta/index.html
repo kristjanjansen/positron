@@ -109,6 +109,14 @@
      would be inventing a distinction. */
   .plai-panel .pos-knob-arc { stroke: var(--mi-teal-lit); }
   .warp-panel .pos-knob-arc { stroke: var(--mi-maroon-lit); }
+  /* ⚠️ AND THE HAND'S GLYPH TAKES THE SAME COLOUR WHEN IT IS RUNNING, asked for
+     as *"invisible hand color has to be brand color on knobs"*. `shell.css`
+     lights it `--hi` because yellow means *the thing this control is about*,
+     and while a hand is running the thing this control is about IS the hand.
+     That argument is unchanged; on this page the instrument's own colour is
+     what carries it, so the meaning travels and only the hue moves. */
+  .plai-panel .pos-knob-hand[data-on="1"] { color: var(--mi-teal-lit); }
+  .warp-panel .pos-knob-hand[data-on="1"] { color: var(--mi-maroon-lit); }
   /* 🔴 THE PLATE KEEPS THE CASE'S OWN INSET ON BOTH EDGES, CORRECTED
      2026-09-22: *"keep nameplate standard distance from edges"*. It had been
      pushed down to meet the values, which put it at a distance from the top
@@ -504,7 +512,9 @@
    * BUTTON.** Every knob here is continuous, so every one qualifies; the voice
    * count does not and is not a knob in this bank.
    */
+  const knobParam = new Map();
   const knob = (key, id, o) => {
+    if (id != null) knobParam.set(key, id);
     // ON EVERY MOVE. There is no wire here and no relay to overrun: the
     // message crosses one thread boundary and is audible in the next render
     // quantum, which is 2.67 ms away.
@@ -734,7 +744,9 @@
   // which is where a number that moves belongs.
   const wknobs = new Map();
   // A hand on every one of these too. See the note on `knob` above.
+  const wknobParam = new Map();
   const wknob = (key, id, o) => {
+    if (id != null) wknobParam.set(key, id);
     const k = createKnob({ hand: true, ...o, onInput: (v) => sendWarp({ t: 'param', id, value: v }) });
     wknobs.set(key, k);
     return k;
@@ -845,29 +857,48 @@
 
   let plaitsWave = null, warpsWave = null, scopeFrames = 0, warpFrames = 0;
   const anyInk = (w) => !!w && w.some((x) => Math.abs(x) > 0.0005);
+  /**
+   * 🔴 A SWITCHED OFF INSTRUMENT DRAWS NOTHING, asked for as *"if warps off do
+   * not show wave"*. Both worklets keep running whatever the switches say,
+   * because the graph is built once and the switches are about what a person
+   * has turned on, so the windows keep arriving and the picture would keep
+   * drawing them.
+   * ⚠️ **AND `anyInk` IS NOT THE SAME TEST.** An effect switched off can still
+   * have a signal passing through it, and an effect switched on can be silent;
+   * only the switch says what a reader asked for. Checking the ink alone would
+   * leave a picture up on a panel that says it is off.
+   */
   function paintWarpScope() {
-    if (!anyInk(warpsWave)) { warpScope.set({ points: null, reason: null }); return; }
+    if (!warpsOn || !anyInk(warpsWave)) { warpScope.set({ points: null, reason: null }); return; }
     const ms = warpFrames ? (warpFrames / (ctx ? ctx.sampleRate : 48000)) * 1000 : null;
     warpScope.set({
       points: warpsWave,
       reason: '',
-      colour: '--mi-maroon-lit',
       axes: { y: '\u00b11', x: ms ? `${ms.toFixed(1)} ms` : '' },
     });
   }
 
+  /* a handle for a throwaway probe, behind the selfcheck gate's own flag so it
+     is never present for a visitor */
+  if (SELFCHECK || location.search.includes('probe=1')) window.__scopeGet = () => scope.get();
+
   function paintScope() {
-    if (!anyInk(plaitsWave)) {
+    if (!plaitsOn || !anyInk(plaitsWave)) {
       scope.set({ points: null, reason: null });
       return;
     }
     /* The span is the worklet's own count of frames, not a number typed here,
        so the axis follows the window rather than agreeing with it by luck. */
     const ms = scopeFrames ? (scopeFrames / (ctx ? ctx.sampleRate : 48000)) * 1000 : null;
+    /* 🔴 NO `colour` HERE, AND IT WAS `--hi` FOR THREE ROUNDS OF BEING ASKED TO
+       CHANGE IT. The figure is BUILT with the instrument's colour and every
+       repaint passed a second one, so the constructor was right and the paint
+       path silently won. A caller that sets a property on every update owns
+       that property, whatever the constructor says. Asked three times, and each
+       time I changed the line that does not run. */
     scope.set({
       points: plaitsWave,
       reason: '',
-      colour: '--hi',
       axes: { y: '\u00b11', x: ms ? `${ms.toFixed(1)} ms` : '' },
     });
   }
@@ -1090,6 +1121,35 @@
         + 'the oscillator refuses any rate but 48000, so the two firmwares would stop '
         + 'agreeing about pitch. Oversampling the effect alone is the real answer and '
         + 'is not built');
+
+    /**
+     * 🔴 EVERY KNOB IS PUSHED AT BOOT, AND NOTHING DID THIS UNTIL 2026-09-22.
+     * The knobs were built with values and the DSP came up with its own
+     * defaults, and the two only met when somebody turned something. **A
+     * control showing one value while the DSP holds another is the smallest
+     * version of a control that lies**, which this page already refuses about
+     * the pitch knob in as many words.
+     * 🔴 **AND IT IS WHY THE SCOPE WAS A MESH OF LINES.** The time base was
+     * supposed to come from the note, which is parameter 1, but the page never
+     * sent parameter 1: `scopeHz` stayed 0, the worklet fell back to MEASURING
+     * the period, and a measured period on a stepped waveform wanders. Every
+     * window was then a slightly different length, so the phosphor's ghosts
+     * could never sit under the live trace. Reported three times, latterly as
+     * *"i stills ee mesh of lines in 120hz"*.
+     * ⚠️ THE LESSON IS THE FIX I MADE BEFORE THIS ONE. Locking the time base
+     * to the note was correct and did nothing, because the number it locked to
+     * never arrived. **A fix that cannot be observed to work is a fix nobody
+     * checked**, and three rounds of tuning the fade were spent on a cause that
+     * was one line away.
+     */
+    for (const [key, k] of knobs) {
+      const id = knobParam.get(key);
+      if (id != null) send({ t: 'param', id, value: k.value() });
+    }
+    for (const [key, k] of wknobs) {
+      const id = wknobParam.get(key);
+      if (id != null) sendWarp({ t: 'param', id, value: k.value() });
+    }
 
     setVoices(knobs.get('voices').value());
     setCarrier(0);
@@ -1573,16 +1633,39 @@
   async function togglePlaits() {
     if (plaitsOn) {
       plaitsOn = false;
+      /* 🔴 THE DRONE HAS TO BE STOPPED, NOT JUST THE NOTES, AND THIS SENT ONLY
+         `allOff` UNTIL 2026-09-22. A drone is `trigger_patched` cleared, which
+         bypasses the lowpass gate and lets the engine simply RUN: releasing the
+         notes does nothing to it, so an oscillator switched off went on
+         sounding and, with the effect set to take it, went on being heard.
+         Reported as *"if plaits is off and warps on when i am on 'from plaits'
+         i should get no sound"*. */
+      stopDrone();
       send({ t: 'allOff' });
       /* ⚠️ THE EFFECT KEEPS PLAYING IF IT IS ON, on its own carrier, which is
          the state `carrier_shape` exists for. */
       if (warpsOn && carrier === 0) setCarrier(1);
       light();
+      paintScope();
       await idleIfEmpty();
       return;
     }
-    await ensureAudio();
+    /* 🔴 THE FLAG IS SET BEFORE THE BOOT, NOT AFTER IT, and the ordering is not
+       cosmetic: `ensureAudio` awaits `boot()`, and `boot()` runs this page's
+       whole check block at its end. With the flag set afterwards the checks ran
+       while the page still believed nothing was on, so the pictures were blank
+       and two asserts went red on a page that was working.
+       ⚠️ AND IT IS ALSO THE HONEST ORDER FOR A READER: the lamp shows what was
+       asked for the moment it is asked, and the sound follows. A boot that
+       fails puts it back. */
     plaitsOn = true;
+    light();
+    try {
+      await ensureAudio();
+    } catch (e) {
+      plaitsOn = false; light();
+      throw e;
+    }
     setCarrier(0);
     /* 🔴 IT DRONES FROM THE MOMENT IT IS ON. `trigger_patched` is the whole
        difference between a note and a drone in Plaits: with nothing patched
@@ -1598,11 +1681,18 @@
     if (warpsOn) {
       warpsOn = false;
       light();
+      paintWarpScope();
       await idleIfEmpty();
       return;
     }
-    await ensureAudio();
     warpsOn = true;
+    light();
+    try {
+      await ensureAudio();
+    } catch (e) {
+      warpsOn = false; light();
+      throw e;
+    }
     /* The effect needs something coming through it, and with PLAITS off that is
        its own carrier. With PLAITS on it is already droning. */
     if (plaitsOn) startDrone();
@@ -2321,7 +2411,14 @@
    * ⚠️ AND IT IS ONE PRESS ON ONE HEADER. Both start the same graph, so
    * pressing both would be a press and an immediate turn off.
    */
-  ifSelfcheck(() => { inst.online?.el?.click(); }, {
+  ifSelfcheck(() => {
+    inst.online?.el?.click();
+    /* ⚠️ AND THE EFFECT TOO, BECAUSE A SWITCHED OFF INSTRUMENT DRAWS NOTHING
+       SINCE 2026-09-22 and the pair assert needs both pictures. A harness
+       presses the row of controls under a page and this page has none, so
+       every press it takes is one the page makes for it. */
+    warpInst.online?.el?.click();
+  }, {
     log: d.log,
     say: 'the audio is started by pressing PLAITS’ own turn on, because this page has '
       + 'no row of controls for a harness to press',
