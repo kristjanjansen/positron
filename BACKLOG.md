@@ -1,5 +1,185 @@
 ## Open
 
+### ✅ DONE 2026-09-22: the knob stream, session 44
+
+🔴 **ASKED IN ONE MESSAGE:** *"reduce \"invisible hand\" speed 2x. add this mode
+to knobs: button in the h center, vertically centered to the lower edge ot the
+\"ring\" use same icon. make knobs 10% bigger"*.
+
+- ✅ **THE HAND, HALF SPEED.** `demo/shell/hand.mjs` `MOVES[0].lapMs` is
+  **7000**, one end to the other, and `DEFAULTS` on line 100 carries the same
+  number a second time. Both move to **14000**.
+  ⚠️ **THE TEST SHOULD NOT MOVE AND THAT IS CHECKABLE**: `hand-test.mjs`'s
+  numbers are ratios and fractions of a lap, and it asserts rate invariance
+  across 24 to 120 Hz, so a slower lap is the same curve read at a different
+  speed. If anything there goes red, the number was not the only thing changed.
+  ⚠️ **AND `lapMs` WAS 2200 BEFORE 2026-09-16**, raised to 7000 on *"way
+  slower"*. This is the second time the same control has been slowed, so the
+  comment records both.
+- ✅ **THE HAND ON A KNOB.** A button at the knob's horizontal centre, its own
+  centre on the **lower edge of the ring**, carrying the same `⇄` glyph the
+  slider's hand carries (`MOVE_GLYPH.sweep`).
+  🔴 **IT MUST NOT BE A SECOND IMPLEMENTATION.** `slider.mjs`'s own header
+  states the split: *"What a movement IS lives in `hand.mjs` ... What lives here
+  is the button, the frame loop and the hand-over"*. That second half is about
+  150 lines inside `createSlider`, and copying it into `knob.mjs` is the
+  hand-rolled control rule arriving from inside the kit. The driver is extracted
+  and BOTH components use it.
+  ✅ **THE POSITION IS DERIVED AND NOT TYPED.** The dial's viewBox is computed
+  from `ARC`, which is 270, so it spans y 3 to 97 and the ring's lower edge is
+  at y 88. That is **90.4 per cent of the element's height**, and a typed pixel
+  would be correct at one `sweep` and wrong at every other, which is the trap
+  the viewBox comment already records.
+  ⚠️ **THE `ends` LABELS ALREADY LIVE IN THAT GAP**, at the sides. A centre
+  button and two side marks can share it; a knob with both has to be looked at.
+- ✅ **KNOBS 10 PER CENT BIGGER.** `--ctl-w` is **46 px** and is the width of a
+  pad, a fader and a knob alike, so raising it moves every control on the site.
+  A knob-only `--knob-w` at `calc(var(--ctl-w) * 1.1)` is 50.6 px.
+  ⚠️ **AND IT MOVES EVERY PITCH THAT WAS MEASURED AGAINST 46.** `/muta/`'s row
+  asserts read 55.0 and 117.0 px, `control-grid.mjs` computes its square from
+  the cell width, and `plans/plan-panel-component.md` counts 286 px of content
+  in a row of five. Every one of those numbers is re-measured rather than
+  re-derived on paper.
+
+#### What it cost, measured rather than predicted
+
+✅ **`/kit/` 151/151 to 156/156, AND THE BASELINE WAS TAKEN RATHER THAN
+REMEMBERED.** `HANDOFF.md` said 147, which was stale, so the before number was
+produced by stashing the change and running the page: **151**. Five asserts
+added, five asserts appeared, nothing went silent. The handoff figure would have
+left four asserts unaccounted for and a search for a bug that was not there.
+🔴 **TWO PAGES WENT RED AND BOTH WERE THE SAME 2.3 px, WHICH IS HALF OF 4.6.**
+A knob is 4.6 px wider, so anything positioned against a row containing one
+moved by half of that.
+- `/circuit/`: the outer grid tracks are `var(--ctl-w)`, the PAD's width, and a
+  50.6 px knob left to start at the track's edge overflowed right and landed
+  **2.3 px off the column it is printed over**. It centres in the track now and
+  reads **660.4 against 660.4**. ⚠️ **THE TRACK IS NOT WIDENED**: that would
+  move the pads and both side columns to make room for a thing printed OVER
+  them.
+- `/twelve/`: *the nameplate is in the top right corner* compared the plate's
+  right edge against the FUNCTION KEY ROW's, on the stated reasoning that
+  *"whatever the inset is, both obey it"*. 🔴 **THEY DO NOT.** The plate reaches
+  the inset by `margin-left: auto`, which outranks the lane's `align-items:
+  center`; the row is centred, so its right edge is the inset **only while the
+  row is the widest thing in the lane**. It measures the inset itself now.
+⚠️ **AND A THIRD RED IS NOT MINE.** `/circuit/`'s *the printed names sit the
+same distance from the top and both sides* reads **left 21.0, right 21.0, top
+41.0**, and the stashed baseline gives the same three numbers. It was red before
+this work and is still red.
+✅ **EVERYTHING ELSE HELD**: `/shape/`, whose whole subject is the invisible
+hand, is green including *an invisible hand moves a handle with nobody touching
+it*, and `/evo/`, `/tom/` and `/muta/` are unchanged.
+🔴 **THE DRIVER IS ONE IMPLEMENTATION NOW, WHICH IS THE REAL CHANGE.**
+`demo/shell/hand-drive.mjs`: the button, the frame loop, the ten minute ceiling,
+the hand-over and the `.pos-controls` refusal, all of which lived inside
+`createSlider` where a knob could not reach them. `slider.mjs` lost about 150
+lines and kept its exports, because `/radio/`, `/kit/` and `/knobs/` import
+`HAND_YIELD_MS` from it.
+
+#### An instrument header, glued, 2026-09-22
+
+🔴 **ASKED:** *"create instrumet header/glue: similar to transport glue etc.
+left: online status button: enabled disabled (green/gray). right nameplate.
+center patch selector (optically center to the instrument)"*.
+
+- ⏳ **IT BELONGS TO `instrument.mjs`**, which landed today and already owns the
+  case and the nameplate, and which five pages had each built themselves before
+  it existed. A header built on a page would be the sixth copy.
+- ⏳ **LEFT, AN ONLINE BUTTON**: green when it is enabled, grey when it is not.
+  ⚠️ **A BUTTON THAT REPORTS AND A BUTTON THAT ACTS ARE DIFFERENT THINGS**, and
+  this asks for one element doing both. `positron-ui` calls a control whose only
+  honest behaviour is to do nothing *"the shape of control this project calls a
+  lie"*, so it has to be settled whether a press CONNECTS or whether the colour
+  is a badge that happens to be pressable.
+- ⏳ **RIGHT, THE NAMEPLATE**, which today sits in the case's top inset and is
+  asserted there by `/muta/`: *the case is named by its model alone, pushed to
+  the far end*, reading `PLAI at end`. Moving it into a header moves that
+  assert, so the count is diffed rather than assumed.
+- ⏳ **CENTRE, A PATCH SELECTOR, OPTICALLY CENTRED TO THE INSTRUMENT.**
+  🔴 **THAT IS THE HARD HALF AND IT IS SAID PRECISELY.** Centred to the
+  INSTRUMENT, not balanced between two unequal neighbours: a flex row with a
+  status button on the left and a nameplate on the right puts the middle child
+  wherever the difference between them leaves it, which is a different place on
+  every panel. A three column grid with equal outer tracks centres it on the
+  case, and that is the thing to assert.
+- ⏳ **AND ON A PHONE IT IS THREE LEVELS, ASKED FOR IMMEDIATELY AFTER:**
+  *"i mobile: header in 2 levels / title / enabled (full w) / patch (full w)"*,
+  corrected in the next breath to *"3 levels, sorry"*. So: the title on its own
+  line, then the enabled button at full width, then the patch selector at full
+  width.
+  🔴 **THIS IS THE FIRST LAYOUT ASK IN THIS PROJECT THAT IS ONLY ABOUT A PHONE,
+  AND NOTHING HERE CAN GRADE IT.** `verify.mjs` runs at 756 px with no viewport
+  override, **the only assert that ever entered a media query was removed on
+  request**, and `shell.css` has four dead CSS rules measured rather than
+  reviewed, one of which was a phone layout that had never run in its life
+  because a later plain rule beat it at every width. A three level phone header
+  written and not measured is the fifth.
+  ⚠️ **SO THIS ONE FORCES THE QUESTION `plans/plan-panel-component.md` HAS THREE
+  UNPRICED OPTIONS FOR.** Either the harness learns to emulate a width, or this
+  is shipped on a reading and said to be shipped on a reading.
+- ⏳ **AND IT IS APPLIED TO `/muta/`'S TWO INSTRUMENTS**, asked for as *"apply
+  to muta's"*. That page has PLAI and WARP in two cases, so it is the first
+  caller with TWO of them on one page and therefore the one that finds whatever
+  a single header hides. `positron-ui` records the component extracted from the
+  caller that needed least being the component with a hole in it, found only by
+  the second caller.
+  ⚠️ **AND `/muta/` ALREADY HAS A MODEL PICKER**, the sixteen engine choice,
+  which is either the patch selector this asks for or a second control beside
+  it. Settle that before building the slot.
+- ⚠️ **GLUE IS NOT A SYNONYM FOR A ROW.** `createGlue`'s own header says it is
+  for the one pair it was written for, a strip sitting on the transport bar that
+  drives it, and inside a glue the children give up their border and radius.
+  Whether this header is a `createGlue` or a part of the case is a decision to
+  make and write down, not to assume from the word in the ask.
+
+#### /muta/'s voice count becomes a stepped knob, 2026-09-22
+
+🔴 **ASKED:** *"move voices to knobs, bottom right, stepped knob"*. So the
+eight voice control leaves the slider row and becomes a knob in the bottom
+right of the rotary block, stepping through whole voices.
+
+✅ **THE PAGE ALREADY ASSERTS WHAT THIS CONTROL HAS TO KEEP DOING**: *the voice
+control reaches exactly as far as the wasm does*, reading `slider to 8, wasm
+reports 8`. That assert moves to the knob rather than being deleted, because
+what it grades is the shim's ceiling and not the control.
+🔴 **`createKnob` HAS NO `step` TODAY.** Its drag, wheel and arrow keys all move
+by `span / SWEEP`, which is a continuous travel, and a knob that lands between
+two voices is a control that cannot say what it is set to. So this is an option
+on the component, not a rounding the page does on the way out: a page rounding
+its own value leaves the DIAL somewhere the number is not.
+⚠️ **AND A STEPPED KNOB IS EXACTLY THE COARSE CASE THE INVISIBLE HAND REFUSES.**
+`hand-drive.mjs` prints a refusal under about 30 steps because the wander at
+each end would be less than one step, and eight voices is eight. The two
+features landing on the same control in the same hour is a coincidence worth
+checking rather than a conflict: this knob simply does not ask for a hand.
+
+#### A scope at the top of /muta/, 2026-09-22
+
+🔴 **ASKED:** *"can you have wave / osilocope visualizer to top of muta. plai
+and warp with different colors (change warp rotary knobs as well)"*.
+
+- ⏳ **ONE PICTURE AT THE TOP, TWO SIGNALS IN IT.** The oscillator's output and
+  the effect's output in two colours, so a visitor can see what the second
+  firmware did to the first. That is the page's whole claim made visible, and
+  today the only evidence of the chain is an assert nobody reads.
+- ⏳ **AND THE WARP ROTARIES TAKE THE EFFECT'S COLOUR**, so the picture and the
+  panel agree about which instrument is which.
+- 🔴 **IT IS `synth-view.mjs`, NOT A CANVAS THIS PAGE DRAWS.** That component
+  landed today with a WAVEFORM view among its three, and `positron-ui` opens
+  with *"BUILD FROM `/kit/`"*: three pages ended up with three different radio
+  rows exactly this way. If it cannot take two traces, the component gains the
+  option once rather than the page growing a fourth copy.
+- ⚠️ **THE TAP IS ALREADY THERE AND IS NOT FREE.** The worklet posts reports to
+  the page; a scope needs SAMPLES, which is a different and much larger channel.
+  Whatever it costs is measured before it ships, because this page's own assert
+  says the whole chain is 44 microseconds of the 2667 a quantum lasts, and a
+  visualiser that doubles that has spent the page's headline.
+- ⚠️ **AND A PICTURE THAT REDRAWS EVERY FRAME MAY NOT CHANGE ITS OWN HEIGHT.**
+  `positron-ui` records `grain-scope`'s caption reflowing between three and four
+  lines sixty times a second, reported as *"a horrible jump of content each time
+  it updates"*.
+
 ### `/muta/`, the panel layout, 2026-09-22, arrived mid-task
 
 Asked from a photo of the real Plaits panel: *"can we organize 4 rotaries like
