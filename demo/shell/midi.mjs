@@ -19,9 +19,10 @@
 
 /**
  * @param {object} o
- * @param {(note:number, vel:number)=>void} o.onDown
- * @param {(note:number)=>void} o.onUp
- * @param {(cc:number, value:number, ch:number)=>void} [o.onControl]
+ * @param {(note:number, vel:number, ch:number, at:number)=>void} o.onDown
+ *   `at` is the MIDI message's own `DOMHighResTimeStamp`, not this handler's.
+ * @param {(note:number, ch:number, at:number)=>void} o.onUp
+ * @param {(cc:number, value:number, ch:number, at:number)=>void} [o.onControl]
  * @param {(line:string, kind?:string)=>void} [o.log]
  * @param {(n:number)=>void} [o.onPorts]  called with the input count, on every change
  * @returns {{ports:()=>number, state:()=>string, close:()=>void}}
@@ -33,9 +34,18 @@ export function createMidi({ onDown, onUp, onControl, log = () => {}, onPorts = 
     port.onmidimessage = (e) => {
       const [st, a, b] = e.data;
       const kind = st & 0xf0, ch = st & 0x0f;
-      if (kind === 0x90 && b > 0) onDown?.(a, b, ch);
-      else if (kind === 0x80 || (kind === 0x90 && b === 0)) onUp?.(a, ch);
-      else if (kind === 0xb0) onControl?.(a, b, ch);
+      /* 🔴 THE TIMESTAMP IS THE MESSAGE'S, NOT THIS HANDLER'S, AND THEY ARE NOT
+         THE SAME NUMBER. `e.timeStamp` is a `DOMHighResTimeStamp` on the same
+         clock as `performance.now()`, taken when the browser received the
+         message; a busy main thread can run this callback milliseconds later,
+         and a page measuring press to sound from inside its own handler has
+         already thrown that delay away. `/nola/` reports it, so it is passed.
+         ⚠️ WHAT NEITHER OF THEM SEES is the keyboard's own scanning delay and
+         the USB stack, which is everything between the felt of the key and the
+         event. No browser API can measure it. */
+      if (kind === 0x90 && b > 0) onDown?.(a, b, ch, e.timeStamp);
+      else if (kind === 0x80 || (kind === 0x90 && b === 0)) onUp?.(a, ch, e.timeStamp);
+      else if (kind === 0xb0) onControl?.(a, b, ch, e.timeStamp);
     };
   };
 

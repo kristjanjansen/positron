@@ -1,0 +1,297 @@
+// demo/shell/chords-test.mjs. The chord parser, with no browser at all.
+//
+//   node demo/shell/chords-test.mjs
+//
+// `parseChord` is a grammar and a table, and every bug it has had so far lived
+// in one of them: a case insensitive pass that read `CM` as C MINOR, a bare
+// number read as an octave rather than an extension, and a slash bass folded
+// into the chord so that `F/C` and `Fadd4` came out the same. None of those
+// needs a browser and none of them looks wrong from the outside, because every
+// one of them returns a perfectly good chord that is the wrong chord.
+//
+// TWENTY OF THESE ARE NEGATIVE CONTROLS: written so that the bug they name
+// would fail them, rather than so that today's code passes.
+
+import { parseChord, parseChords, roman, QUALITIES, QUALITY_SAYS, noteName, ROOT_OCTAVE }
+  from './chords.mjs';
+
+let pass = 0, fail = 0;
+const ok = (name, cond, detail = '') => {
+  if (cond) { pass++; console.log(`  ok   ${name}${detail ? '   ' + detail : ''}`); }
+  else { fail++; console.log(`  FAIL ${name}${detail ? '   ' + detail : ''}`); }
+};
+const notes = (s) => { const c = parseChord(s); return c.ok ? c.notes.join(',') : `BAD ${c.why}`; };
+const spell = (s) => { const c = parseChord(s); return c.ok ? c.notes.map(noteName).join(' ') : `BAD ${c.why}`; };
+
+console.log('\n== chords ==');
+
+// ── the four examples that decided the grammar ──────────────────────────────
+
+// 1. Given as `Cmaj C9 F/C Fm6/C`, and between them they fix the root, the
+//    quality, the extension, the slash bass and the order of all four.
+ok('Cmaj is a major triad on middle C', notes('Cmaj') === '60,64,67', spell('Cmaj'));
+ok('C9 is a dominant ninth, not C in octave 9',
+  notes('C9') === '60,64,67,70,74', spell('C9'));
+ok('F/C is F major over a C below it', notes('F/C') === '60,65,69,72', spell('F/C'));
+ok('Fm6/C is a minor sixth over a bass', notes('Fm6/C') === '60,65,68,72,74', spell('Fm6/C'));
+
+// 2. NEGATIVE CONTROL, AND IT IS THE READING THIS PARSER ALMOST SHIPPED. `c5`
+//    beside `cmaj` looks like a NOTE with an octave. `C9` proves it is not, so
+//    `c5` is the power chord and lighting one key here would be wrong.
+ok('c5 is the power chord, root and fifth, not a note in octave 5',
+  notes('c5') === '60,67', spell('c5'));
+
+// ── the one place case carries meaning ──────────────────────────────────────
+
+// 3. NEGATIVE CONTROL. MEASURED as a real bug: a case insensitive walk of the
+//    table reaches `m` before `M` and returns C MINOR for `CM`. A wrong chord,
+//    not a refused one, and none of the four examples would have caught it.
+ok('CM is major and Cm is minor', notes('CM') === '60,64,67' && notes('Cm') === '60,63,67',
+  `CM ${spell('CM')}, Cm ${spell('Cm')}`);
+
+// 4. And the capital is normalised rather than special cased, so the numbered
+//    ones come for free.
+ok('CM7 is a major seventh and Cm7 is a minor seventh',
+  notes('CM7') === '60,64,67,71' && notes('Cm7') === '60,63,67,70',
+  `CM7 ${spell('CM7')}`);
+
+// 5. NEGATIVE CONTROL, THE OTHER WAY. Everything that is NOT `M` is case blind,
+//    or a parser that takes `Cmaj` and refuses `CMAJ` is one nobody can use.
+ok('every other spelling is case blind',
+  notes('CMAJ') === notes('Cmaj') && notes('cMaJ') === notes('Cmaj')
+  && notes('csus4') === notes('CSUS4'),
+  `CMAJ ${spell('CMAJ')}`);
+
+// ── the table's order is load bearing ───────────────────────────────────────
+
+// 6. NEGATIVE CONTROL. `m` is a prefix of `maj`, `maj` of `maj7`, `m7` of
+//    `m7b5`. A table in any other order loses the seventh or the flat fifth.
+{
+  const names = QUALITIES.map(([n]) => n);
+  let shadowed = null;
+  for (let i = 0; i < names.length && !shadowed; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      if (names[j] && names[i] && names[j].toLowerCase().startsWith(names[i].toLowerCase())) {
+        shadowed = `${names[i]} at ${i} shadows ${names[j]} at ${j}`;
+        break;
+      }
+    }
+  }
+  ok('no quality in the table shadows a longer one after it', shadowed === null,
+    shadowed || `${names.length} qualities, longest first`);
+}
+
+// 7. And the longest ones really do win, read off the parser rather than the table.
+ok('the longest matching quality wins',
+  notes('Cmaj7') === '60,64,67,71' && notes('Cm7b5') === '60,63,66,70',
+  `Cmaj7 ${spell('Cmaj7')}, Cm7b5 ${spell('Cm7b5')}`);
+
+// ── a slash is a bass, not a chord tone ─────────────────────────────────────
+
+// 8. NEGATIVE CONTROL, AND IT IS WHY THE BASS IS NOT FOLDED INTO THE STACK.
+//    Folding the C of F/C between the F and the A makes it an Fadd4, which is
+//    a different chord with the same notes in a different order.
+ok('a bass sits below the root rather than inside the chord',
+  parseChord('F/C').notes[0] < parseChord('F/C').notes[1]
+  && parseChord('F/C').notes[0] === 60 && parseChord('F/C').notes[1] === 65,
+  spell('F/C'));
+
+// 9. NEGATIVE CONTROL. A bass on the root itself goes an octave DOWN rather
+//    than doubling it in unison, which is inaudible and reads as a bug.
+ok('a bass on the root drops an octave instead of doubling it',
+  notes('C/C') === '48,60,64,67', spell('C/C'));
+
+// 10. A bass above the root in pitch class still lands below it in pitch.
+ok('a bass whose letter is above the root still sounds below it',
+  parseChord('C/G').notes[0] === 55 && parseChord('C/G').notes[1] === 60, spell('C/G'));
+
+// 11. And the bass is reported separately, so a caller can draw it differently.
+{
+  const c = parseChord('Fm6/C');
+  ok('the bass is reported as its own pitch class', c.bass === 0 && c.root === 5,
+    `root ${c.root}, bass ${c.bass}`);
+}
+
+// ── roots, flats and the letter that is both ────────────────────────────────
+
+// 12. NEGATIVE CONTROL. `b` is a note AND a flat, and only position tells them
+//     apart: the first character is the root, so a `b` after it is an accidental.
+ok('Bb is B flat and B is B',
+  parseChord('Bb').root === 10 && parseChord('B').root === 11,
+  `Bb root ${parseChord('Bb').root}, B root ${parseChord('B').root}`);
+
+// 13. NEGATIVE CONTROL. A sharp that runs off the top of the octave wraps
+//     rather than going out of range.
+ok('B# wraps to C rather than leaving the octave',
+  parseChord('B#').root === 0, `root ${parseChord('B#').root}`);
+
+// 14. And Cb wraps the other way.
+ok('Cb wraps down to B', parseChord('Cb').root === 11, `root ${parseChord('Cb').root}`);
+
+// ── the separator is everything else ────────────────────────────────────────
+
+// 15. NEGATIVE CONTROL. Asked for as *"can be separated by anyhing"*, so this
+//     cannot be a list of separators. A parser that split on spaces would take
+//     `Cmaj,C9` as one token and refuse it.
+{
+  const want = 'Cmaj,C9,F/C';
+  const forms = ['Cmaj C9 F/C', 'Cmaj,C9,F/C', 'Cmaj | C9 | F/C', 'Cmaj->C9->F/C',
+    '  Cmaj\n\tC9 ... F/C  ', 'Cmaj; C9; F/C'];
+  const got = forms.map((f) => parseChords(f).chords.map((c) => c.text).join(','));
+  ok('any separator at all gives the same three chords',
+    got.every((g) => g === want), `${forms.length} spellings, all ${got[0]}`);
+}
+
+// 16. NEGATIVE CONTROL. `#` and `/` are chord characters and must survive the
+//     split, or `F#dim7` becomes `F` and `dim7` and `F/C` becomes two chords.
+{
+  const r = parseChords('F#dim7 F/C');
+  ok('a sharp and a slash are not separators',
+    r.chords.length === 2 && r.chords[0].text === 'F#dim7' && r.chords[1].text === 'F/C',
+    r.chords.map((c) => c.name).join(' '));
+}
+
+// ── what did not parse is reported, never dropped ───────────────────────────
+
+// 17. NEGATIVE CONTROL. A token that vanishes silently is the worst outcome
+//     here: the page draws fewer keyboards than the line has words and nothing
+//     says why.
+{
+  const r = parseChords('Cmaj wibble C9');
+  ok('a token that did not parse comes back with a reason',
+    r.chords.length === 2 && r.bad.length === 1 && r.bad[0].text === 'wibble'
+    && typeof r.bad[0].why === 'string' && r.bad[0].why.length > 0,
+    `${r.bad.length} refused: ${r.bad.map((b) => `${b.text} (${b.why})`).join(', ')}`);
+}
+
+// 18. Two slashes is refused rather than silently taking the first.
+ok('more than one slash is refused', parseChord('C/G/E').ok === false,
+  parseChord('C/G/E').why);
+
+// 19. And a bass that is not a note is refused rather than ignored.
+ok('a slash onto something that is not a note is refused',
+  parseChord('C/wat').ok === false, parseChord('C/wat').why);
+
+// 20. An empty line parses to nothing at all and reports nothing bad.
+{
+  const r = parseChords('   ');
+  ok('an empty line is not an error', r.chords.length === 0 && r.bad.length === 0);
+}
+
+// ── the voicing, and where middle C is ──────────────────────────────────────
+
+// 21. The default octave is the one `keyboard.mjs` and `midi-decode.mjs` print,
+//     so a chord's C4 and a key labelled C4 are the same note.
+ok('a chord with no octave is voiced from middle C',
+  ROOT_OCTAVE === 4 && noteName(60) === 'C4' && parseChord('C').notes[0] === 60,
+  `C4 is ${parseChord('C').notes[0]}`);
+
+// 22. NEGATIVE CONTROL. Extensions go ABOVE the octave rather than being folded
+//     into it, or a ninth and a second are the same chord.
+ok('a ninth is above the octave, not a second inside it',
+  notes('C9') !== notes('Csus2') && parseChord('C9').notes.includes(74),
+  `C9 ${spell('C9')} against Csus2 ${spell('Csus2')}`);
+
+// ── the numeral, and the four frames that decided it ────────────────────────
+
+// 25. The reference was four frames of a piano video with no words on them:
+//     `Cmaj` I, `C9` I, `F/C` IV, `Fm6/C` iv. Between them they fix the key,
+//     the case, the dominant and the bass, which is more than a sentence would
+//     have.
+{
+  const r = parseChords('Cmaj C9 F/C Fm6/C');
+  ok('the four frames come back exactly as they were labelled',
+    r.chords.map((c) => c.roman).join(' ') === 'I I IV iv' && r.key === 0,
+    r.chords.map((c) => `${c.text} ${c.roman}`).join(', '));
+}
+
+// 26. NEGATIVE CONTROL, AND IT IS THE WHOLE REASON A NUMERAL SAYS MORE THAN A
+//     NAME. The same root in the same key is IV or iv depending on its third.
+{
+  const r = parseChords('C F Fm');
+  ok('case follows the third, so F is IV and Fm is iv',
+    r.chords[1].roman === 'IV' && r.chords[2].roman === 'iv',
+    r.chords.map((c) => `${c.text} ${c.roman}`).join(', '));
+}
+
+// 27. NEGATIVE CONTROL. A dominant stays UPPER case: its seventh is flat and
+//     its third is not, and a numeral describes the third.
+{
+  const r = parseChords('C C7 C9 C13');
+  ok('a dominant is upper case, because a flat seventh is not a minor third',
+    r.chords.every((c) => c.roman === 'I'), r.chords.map((c) => c.roman).join(' '));
+}
+
+// 28. NEGATIVE CONTROL. The bass is ignored: `F/C` is IV, not a numeral about
+//     C, which is the key itself and would read as I.
+{
+  const r = parseChords('C F/C');
+  ok('a slash bass does not move the numeral', r.chords[1].roman === 'IV',
+    `${r.chords[1].name} is ${r.chords[1].roman}`);
+}
+
+// 29. The whole diatonic set, which is the one row anybody would check by eye.
+{
+  const r = parseChords('C Dm Em F G Am Bdim');
+  ok('a major scale reads I ii iii IV V vi vii°',
+    r.chords.map((c) => c.roman).join(' ') === 'I ii iii IV V vi vii\u00b0',
+    r.chords.map((c) => c.roman).join(' '));
+}
+
+// 30. NEGATIVE CONTROL. A root outside the scale is a FLATTENED degree and
+//     never a sharpened one: `bVII` is what everybody writes and `#VI` is what
+//     nobody does.
+{
+  const r = parseChords('C Ab Bb Db');
+  ok('a root outside the key is spelled flat',
+    r.chords.map((c) => c.roman).join(' ') === 'I bVI bVII bII',
+    r.chords.map((c) => c.roman).join(' '));
+}
+
+// 31. NEGATIVE CONTROL. Diminished and augmented take a MARK as well as a case,
+//     because case alone cannot tell them from an ordinary minor or major.
+{
+  const r = parseChords('C Cdim Caug Cm7b5 Cm');
+  ok('diminished and augmented carry a mark that case cannot give them',
+    r.chords.map((c) => c.roman).join(' ') === 'I i\u00b0 I+ i\u00f8 i',
+    r.chords.map((c) => c.roman).join(' '));
+}
+
+// 32. The key comes from the FIRST chord, so the same chords in a different
+//     order are different numerals, which is what makes it an inference worth
+//     saying out loud on the page.
+{
+  const a = parseChords('C F G'), b = parseChords('G C F');
+  ok('the key is the first chord, so the order changes every numeral',
+    a.chords.map((c) => c.roman).join(' ') === 'I IV V'
+    && b.chords.map((c) => c.roman).join(' ') === 'I IV bVII',
+    `${a.chords.map((c) => c.roman).join(' ')} against ${b.chords.map((c) => c.roman).join(' ')}`);
+}
+
+// 33. And an empty line has no key to infer, rather than defaulting to C.
+ok('an empty line has no key', parseChords('').key === null);
+
+// ── the words ───────────────────────────────────────────────────────────────
+
+// 23. Every quality the table can reach has a name a reader gets shown.
+{
+  const reachable = QUALITIES.map(([n]) => n).filter((n) => n !== '');
+  const unnamed = reachable.filter((n) => {
+    const c = parseChord(`C${n}`);
+    return !c.ok || !c.quality;
+  });
+  ok('every quality in the table parses and comes back named', unnamed.length === 0,
+    unnamed.join(', ') || `${reachable.length} qualities`);
+}
+
+// 24. Nothing a visitor reads carries an em dash or a middot.
+{
+  const strings = [...Object.values(QUALITY_SAYS), ...QUALITIES.map(([n]) => n),
+    parseChord('Cxyz').why, parseChord('C/G/E').why];
+  ok('no em dash and no middot in anything the parser says',
+    strings.every((s) => !String(s).includes('—') && !String(s).includes('·')),
+    `${strings.length} strings`);
+}
+
+console.log(`\n${pass} ok, ${fail} failed`);
+process.exit(fail ? 1 : 0);
