@@ -859,7 +859,7 @@ export function traceOf(t = {}, fallback = '--dim') {
  */
 export function createWaveShape({ host, label = '', height = 96, name = '', ground = '--card2',
                                   shape, duty = 0.5, reason = '', cycles = 2,
-                                  points, colour = '--dim', over = null, axes = null } = {}) {
+                                  points, colour = '--dim', over = null, axes = null, trail = 0 } = {}) {
   /* 🔴 THE SAME GROUND AS THE FILTER, ASKED FOR 2026-09-22 AS *"add same bg to
      waveform as to filter"*. Safe for the same reason it was safe there: `ink()`
      reads the field back OUT OF THE CANVAS after the fill, so the counter
@@ -871,6 +871,9 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
   let a = traceOf(v, colour);
   let b = v.over ? traceOf(v.over, '--hi') : null;
   let pts = a.pts;
+  /* The windows behind the current one, oldest first. Empty unless a caller
+     asked for a `trail`, so a figure that never moves carries no cost. */
+  const past = [];
 
   const PAD = 8;
 
@@ -937,10 +940,12 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
     /* Each trace in its own ink, the first on top of the second so a caller's
        primary signal is never buried under whatever it was put through. */
     const room = (yBot - yTop) / 2;
-    const line = (t) => {
+    const line = (t, alpha = 1, width = 1.5) => {
       if (!t?.pts) return;
+      ctx.save();
+      ctx.globalAlpha = alpha;
       ctx.strokeStyle = f.tok(t.colour, t.colour);
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = width;
       ctx.lineJoin = 'round';
       ctx.beginPath();
       for (let i = 0; i < t.pts.length; i++) {
@@ -949,7 +954,28 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
         if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
       }
       ctx.stroke();
+      ctx.restore();
     };
+
+    /**
+     * 🔴 THE TRACES BEHIND THIS ONE, FADING, WHICH IS A PHOSPHOR AND NOT AN
+     * ANIMATION. Asked 2026-09-22: *"can you do a bit of analog effect so
+     * previous wave is still bit shown fading out when news is coming, vacuum
+     * tube ... make it subtle"*.
+     * ⚠️ **IT IS DRAWN, NOT ANIMATED, WHICH IS WHY THIS FILE STILL HAS NO FRAME
+     * LOOP.** The old windows are kept and painted on the next `set`, so the
+     * decay happens at whatever rate the caller feeds it and this component
+     * still never asks for a frame. A `requestAnimationFrame` here would be the
+     * poll the whole file is written to avoid.
+     * ⚠️ AND THE OLDEST IS THE FAINTEST, CUBED, so the fall is quick and the
+     * tail is short. It was squared at 0.45 and reported as *"fade faster"*: at
+     * 47 windows a second a long tail is six visible lines rather than a glow.
+     */
+    for (let i = 0; i < past.length; i++) {
+      const age = (past.length - i) / (past.length + 1);
+      line({ pts: past[i], colour: a.colour }, Math.pow(1 - age, 3) * 0.3, 1);
+    }
+
     line(b);
     line(a);
 
@@ -976,7 +1002,7 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
      * `x` sits under the trace's right edge because it labels the span. Neither
      * takes room from the picture: both are on lines the figure already has.
      */
-    if (v.axes?.y) f.say(v.axes.y, PAD, yTop + 9, { px: 10, colour: C.faint, room: W / 2 });
+    if (v.axes?.y) f.say(v.axes.y, W - PAD, yTop + 9, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
     if (v.axes?.x) f.say(v.axes.x, W - PAD, yBot - 3, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
 
     const nameA = v.name || a.shape || '';
@@ -1016,6 +1042,15 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
     el: f.wrap,
     canvas: f.canvas,
     set(next = {}) {
+      /* ⚠️ THE OLD WINDOW IS KEPT BEFORE THE NEW ONE REPLACES IT, and only when
+         there is a real one to keep: a caller clearing the picture should not
+         leave a ghost of the last signal hanging over an instrument that has
+         been switched off. */
+      if (trail > 0 && next.points && pts && pts.length) {
+        past.push(pts);
+        while (past.length > trail) past.shift();
+      }
+      if (trail > 0 && next.points === null) past.length = 0;
       v = { ...v, ...next };
       if (next.shape === undefined && next.name !== undefined) v.shape = shapeFor(next.name);
       a = traceOf(v, v.colour);

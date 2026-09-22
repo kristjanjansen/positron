@@ -10,6 +10,35 @@
      `.pos-line.hi` down the file, which carries the reason. */
   --fg2: #b6bcc7;
   --hi: #ffd400;
+
+  /* 🔴 MUTABLE INSTRUMENTS' OWN PANEL COLOURS, MEASURED 2026-09-22 RATHER THAN
+     PICKED. Asked for as *"extract mutable instr brand colors and add to your
+     palette"*, with two photographs. These are the values a decoder of those
+     PNGs counted, with the pixel counts, so they are readings rather than
+     somebody's eye:
+
+       from a 196x416 crop of the Plaits panel
+         #c0426c   163 px   the magenta on the callouts and the pink outline
+         #3c8a8a   116 px   the teal on the jack rings
+       from a 116x60 crop of the maker's own swatch strip
+         #d08048    40 px
+         #4898b0    17 px
+         #802840    13 px
+
+     ⚠️ THEY ARE NAMED FOR THE MAKER, NOT FOR A ROLE, AND THAT IS DELIBERATE.
+     This project holds one meaning for colour across every page: green is
+     inside what a thing promises, amber and red are late, `--hi` is the thing
+     the control is about. Five more colours with roles would be five more
+     meanings to keep straight. These are a REPLICA's palette, for pages that
+     draw somebody else's instrument, and a page using one is saying *this is
+     the colour that is on the box*.
+     ⚠️ AND NOTHING USES THEM YET. They are here so the next panel does not
+     invent its own pink. */
+  --mi-magenta: #c0426c;
+  --mi-teal: #3c8a8a;
+  --mi-orange: #d08048;
+  --mi-blue: #4898b0;
+  --mi-maroon: #802840;
   /* the gap between a slider's label column and its lane — see `.sld-group` */
   --sld-col: 12px;
   /* 🔴 HOW MUCH AIR A WORD GETS INSIDE A CONTROL, AS A SCALE OF THREE RATHER
