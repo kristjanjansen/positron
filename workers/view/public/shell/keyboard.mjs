@@ -204,6 +204,10 @@ export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
  * @param swipePx      argued for at the top of this file. They are arguments
  *                     only so a page's own check can drive both branches
  *                     deliberately; no page passes them.
+ * @param letters  `true` for all keys, `false` for none, or a Set of which keys
+ *                 carry a letter. A 25 key layout has no 25 letters to give.
+ * @param pad      `false` draws no octave pair and no `Notes off`, for a chord
+ *                 chart rather than an instrument. See the block beside it.
  * @returns {{el, keysEl, pad, noteOf, keyOf, press, release, base, shiftOctave,
  *            panic, lightNote, notes, timing, destroy}}
  *          `el` is the WHOLE component — keys plus pad — so a page that places
@@ -213,8 +217,23 @@ export function createKeyboard(host, {
   base = 60, map = QWERTY_CHROMATIC, sharps = SHARP_KEYS,
   onDown = () => {}, onUp = () => {}, keys: keyOpts = null,
   onPanic = null, onOctave = null, minBase = 24, maxBase = 96, letters = true,
+  pad: wantPad = true,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
+  /**
+   * 🔴 `letters` MAY BE A SET NOW, AND THE RULE IT ENFORCES IS UNCHANGED.
+   * The rule below is *a key labelled `a` that does nothing when you press `a`
+   * is worse than a key with no letter on it*, and a boolean could only apply
+   * it to a whole keyboard. A 25 key layout has no 25 letters to give: the
+   * computer keyboard has one octave's worth and `z` and `x` are already the
+   * octave pair here. A Set says WHICH keys have one, so the middle octave of
+   * `/nola/` stays playable from the keys under your hands and the two outer
+   * octaves carry note names only.
+   * ⚠️ THE BINDINGS ARE STILL ALL OR NOTHING, on purpose. They are three
+   * listeners on `window` and they already refuse a key that is not in the map,
+   * so a Set changes what is DRAWN and nothing about what is heard.
+   */
+  const hasLetter = (k) => (letters instanceof Set ? letters.has(k) : !!letters);
   const keys = keyOpts || Object.keys(map);
   const noteOf = (k) => base + map[k];
   // A key carries two names: the note it plays and the letter that plays it.
@@ -229,7 +248,7 @@ export function createKeyboard(host, {
     b.append(nn);
     // ⚠️ THE LETTER IS ONLY DRAWN IF IT DOES SOMETHING. A key labelled `a` that
     // does nothing when you press `a` is worse than a key with no letter on it.
-    if (letters) {
+    if (hasLetter(k)) {
       const kk = document.createElement('span'); kk.className = 'kk'; kk.textContent = k;
       b.append(kk);
     }
@@ -462,6 +481,25 @@ export function createKeyboard(host, {
   // glyphs sit under a row of keys that are already labelled with their octave
   // number. Thirteen keys reading `C4` say what − and + move. Two
   // buttons that have to be read to be told apart are not one control.
+  /**
+   * 🔴 THE PAD IS OPTIONAL SINCE 2026-09-23, AND THE RULE ABOVE SAID IT NEVER
+   * WOULD BE. That rule reads *"There is no option to turn the pad off: one
+   * keyboard that sometimes has an octave control is two components"*, and it
+   * was right about every caller it had, because every one was an INSTRUMENT.
+   * `/nola/` draws a list of CHORD CHARTS: a row of small keyboards with a
+   * chord lit on each, which nobody plays an octave on and nobody sends a panic
+   * from. An octave pair and a `Notes off` under each of twelve chords is a
+   * screen of controls that do not belong to anything.
+   * ⚠️ SO THE RULE'S OWN ARITHMETIC IS WHAT CHANGED, NOT ITS REASONING. It says
+   * a keyboard that sometimes has an octave control is two components; a
+   * picture of a chord and an instrument you play ARE two things, and this is
+   * the flag that says which one a caller wants. The alternative was a second
+   * module drawing a second piano, and two drawings of a piano is exactly what
+   * this file exists to prevent.
+   * ⚠️ AND IT IS NOT A WAY TO MOVE THE PAD SOMEWHERE ELSE. A page that turns it
+   * off and builds its own octave buttons has hand rolled a control that
+   * exists, which is the thing `/keys/` did before this component was written.
+   */
   const pad = make('div', 'kpad');
   // ⚠️ IT WEARS `.step`, WHICH IS THE STEPPER'S CLASS, AND THAT IS THE POINT.
   // The segmented geometry — borders overlapped by a pixel so a join is one
@@ -485,7 +523,7 @@ export function createKeyboard(host, {
   });
   panicBtn.onclick = () => api.panic();
   pad.append(panicBtn);
-  el.append(pad);
+  if (wantPad) el.append(pad);
 
   host.append(el);
 
@@ -610,11 +648,27 @@ export function createKeyboard(host, {
       for (const b of els.values()) b.classList.remove('down');
       onPanic?.();
     },
-    /** paint a key. `who` is 'self' or 'remote'; they are different colours. */
+    /**
+     * paint a key. `who` is 'self', 'remote' or 'hint', and they are three
+     * different colours.
+     *
+     * 🔴 `hint` IS MUTED GREY AND IT IS DELIBERATELY THE QUIETEST OF THE THREE.
+     * Asked for on `/nola/` 2026-09-23: *"a parser that shows hilited keys
+     * (muted gray) on keyboard"*. The other two say something HAPPENED, a
+     * finger here or a player elsewhere, and this one says something COULD:
+     * these are the notes of a chord, nobody is holding them. Painting that in
+     * an ink that means an event would be the colour rule this project already
+     * holds for marks, one component along, where a colour says how a thing
+     * landed and never which lane it is in.
+     * ⚠️ THE THREE ARE SEPARATE CLASSES RATHER THAN ONE ATTRIBUTE, so a key can
+     * be hinted AND held at once, which is exactly what happens when somebody
+     * plays along with a chord on screen.
+     */
     lightNote(note, on, who = 'self') {
       const k = keyOf(note);
       if (!k) return;
-      els.get(k)?.classList.toggle(who === 'remote' ? 'remote' : 'down', !!on);
+      const cls = who === 'remote' ? 'remote' : who === 'hint' ? 'hint' : 'down';
+      els.get(k)?.classList.toggle(cls, !!on);
     },
     /** every note this keyboard can produce, for a caller that needs the range */
     notes: () => keys.map(noteOf),

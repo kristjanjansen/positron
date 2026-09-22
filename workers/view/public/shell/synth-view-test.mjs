@@ -32,7 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  shapeFor, waveSample, wavePoints, WAVE_SHAPES,
+  shapeFor, waveSample, wavePoints, WAVE_SHAPES, traceOf,
   envelopePath, HOLD_SHARE,
   filterShapeFor, filterCurve, DB_TOP, DB_FLOOR, Q_MIN, Q_MAX,
 } from './synth-view.mjs';
@@ -132,6 +132,40 @@ ok('a shape this file cannot derive answers NaN rather than a number',
     p.every((v) => v >= -1 && v <= 1));
   ok('a shape with no definition gives no points at all',
     wavePoints('digital vocal 3', 200) === null);
+}
+
+// ── two traces in one picture ──────────────────────────────────────────────
+{
+  /**
+   * 🔴 SAMPLES OUTRANK A DERIVED SHAPE, AND THAT IS NOT A HOLE IN THE REFUSAL.
+   * The refusal is about GUESSING: a wavetable has no single shape and a blend's
+   * ratio is not published, so a name is refused rather than invented. A caller
+   * handing over samples read the signal, and a reading beats a textbook shape.
+   */
+  const measured = traceOf({ name: 'digital nasty 1', points: [0, 0.5, -0.5, 0] });
+  ok('a trace with real samples is drawn even where its NAME would be refused',
+    measured.pts && measured.pts.length === 4 && shapeFor('digital nasty 1') === null,
+    `${measured.pts.length} samples under a name that has no shape`);
+
+  ok('a trace with no samples still derives its shape from its name',
+    traceOf({ name: 'sawtooth' }).pts.length === 512
+    && traceOf({ name: 'sawtooth' }).shape === 'saw');
+
+  /* 🔴 THE NEGATIVE CONTROL: neither samples nor a derivable name is still a
+     refusal. Without this, the two asserts above would pass on a version that
+     drew a straight line for everything it did not understand. */
+  ok('NEGATIVE CONTROL: no samples and no derivable name is still nothing to draw',
+    traceOf({ name: 'digital nasty 1' }).pts === null
+    && traceOf({ name: 'saw 5:5 PW', points: [] }).pts === null,
+    'an empty sample list is not evidence either');
+
+  /* Two traces are two inks, and the default second is the highlight rather
+     than a second grey, because the whole point is telling them apart. */
+  ok('the two traces carry different inks, and a caller may name either',
+    traceOf({ name: 'sine' }).colour === '--dim'
+    && traceOf({ name: 'sine' }, '--hi').colour === '--hi'
+    && traceOf({ name: 'sine', colour: '#7fb2ff' }, '--hi').colour === '#7fb2ff',
+    'first --dim, second --hi, and a literal wins over both');
 }
 
 // ── the envelope ───────────────────────────────────────────────────────────
@@ -268,6 +302,24 @@ ok('a shape this file cannot derive answers NaN rather than a number',
 // ── what the file says about itself ────────────────────────────────────────
 {
   const src = fs.readFileSync(path.join(HERE, 'synth-view.mjs'), 'utf8');
+  /**
+   * The same file with every comment taken out.
+   *
+   * 🔴 **AN ABSENCE ASSERTED OVER THE WHOLE FILE GRADES THE PROSE, AND THIS
+   * FILE WAS THE THIRD TO BE CAUGHT BY IT IN ONE DAY**, after
+   * `instrument-test.mjs`, where two asserts had been green for a day matching
+   * comment text, and `knob-test.mjs`, where one went red on its first run for
+   * finding the sentence that FORBIDS the thing it was looking for. Here both
+   * `nothing here asks for an animation frame` and `nothing in here sends
+   * anything anywhere` went red the moment a comment explained that the second
+   * trace takes its samples from a caller and runs no frame loop and opens no
+   * `AudioContext`. The claims were true and the instrument was reading the
+   * wrong text.
+   * ⚠️ **A PRESENCE MAY BE ASSERTED OVER EITHER AND AN ABSENCE OVER `code`
+   * ONLY.** The two checks below that read `src` on purpose are about what the
+   * file SAYS, which is the one thing the comments are.
+   */
+  const code = src.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
 
   /* 🔴 THE PROMISE THAT MAKES A DRAWN RESPONSE CURVE ACCEPTABLE AT ALL, and the
      only cheap way to grade a promise is to read it. The pixels are graded on
@@ -277,19 +329,37 @@ ok('a shape this file cannot derive answers NaN rather than a number',
   ok('the envelope paints what its axis is not',
     src.includes('proportions, not seconds'));
   ok('no frequency in hertz and no decibel figure is ever printed on the filter',
-    !/'\d+ ?Hz'/.test(src) && !/`\$\{[^`]*\} ?Hz`/.test(src));
+    !/'\d+ ?Hz'/.test(code) && !/`\$\{[^`]*\} ?Hz`/.test(code));
 
   /* No frame loop anywhere: a still picture asking for animation frames is a
      phone's battery going with nothing on screen saying so. */
   ok('nothing here asks for an animation frame',
-    !src.includes('requestAnimationFrame'));
+    !code.includes('requestAnimationFrame'));
 
   ok('the height is a custom property, so a page can still override it',
-    src.includes("setProperty('--sv-h'") && !/canvas\.style\.height\s*=/.test(src));
+    code.includes("setProperty('--sv-h'") && !/canvas\.style\.height\s*=/.test(code));
 
   ok('nothing in here sends anything anywhere',
-    !src.includes('fetch(') && !src.includes('WebSocket')
-    && !src.includes('AudioContext') && !src.includes('midi'));
+    !code.includes('fetch(') && !code.includes('WebSocket')
+    && !code.includes('AudioContext') && !code.includes('midi'));
+
+  /* 🔴 `not drawn` CAME OFF THE PICTURE 2026-09-22, ASKED AS *"no \"not
+     drawn\""*, AND STAYED IN THE ANNOUNCEMENT. The card was carrying the
+     refusal twice: the reason says why nothing is drawn and `not drawn` said
+     that nothing is drawn, which the empty picture has already said. A reader
+     with no picture has no empty canvas to infer from, so the words are the
+     only channel they have, and `/kit/` reads them off the aria-label. */
+  ok('the refusal is announced and no longer painted',
+    !/f\.say\('not drawn'/.test(code) && /not drawn: \$\{v\.reason/.test(code),
+    'off the canvas, still in the aria-label');
+
+  /* ⚠️ ONE CONSTANT MEANING THE GAP AT THE BOTTOM, NOT TWO. `shell.css` has
+     paid for this twice, as `--sld-col` and as `--ctl-gap`. Both the refusal's
+     lines and the drawn case's name line are laid against `PAD` and `foot`. */
+  ok('the refusal sits on the same baseline the drawn name does, off the card\'s one padding',
+    /f\.say\(v\.reason \|\| NO_SHAPE, PAD, foot,/.test(code)
+    && /f\.say\(v\.name \|\| 'no wave', PAD, foot - 13,/.test(code),
+    'foot and PAD, and no second number for the same gap');
 
   const dash = String.fromCharCode(0x2014), middot = String.fromCharCode(0x00b7);
   ok('no em dash and no middot anywhere in the module, comments included',

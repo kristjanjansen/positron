@@ -472,6 +472,17 @@ function figure({ host, cls, height, label, ground = '--card' }) {
     ctx,
     C,
     mono,
+    /**
+     * A colour, from a token name or from a literal.
+     *
+     * ⚠️ IT EXISTS FOR THE SECOND TRACE AND FOR NOTHING ELSE. A figure drawing
+     * one line needs no palette, and the three greys plus `--hi` above are this
+     * project's settled answer to everything that is not an identity. Two
+     * signals in one picture ARE an identity, which is the one case colour is
+     * allowed to carry here, and a caller naming `--hi` rather than a hex is a
+     * caller whose picture follows the theme.
+     */
+    tok,
     say,
     get W() { return W; },
     get H() { return H; },
@@ -788,6 +799,34 @@ export function createFilterView({ host, label = '', height = 96, max = 127, gro
 export const NO_SHAPE = 'no shape is published for this one';
 
 /**
+ * The samples a trace draws: what the caller MEASURED if it has any, and what
+ * this file can DERIVE otherwise.
+ *
+ * 🔴 **`points` OUTRANKS `shape`, AND THAT IS NOT A HOLE IN THE REFUSAL, IT IS
+ * WHAT THE REFUSAL IS ABOUT.** The whole argument of this component is that an
+ * invented squiggle under a real instrument's parameter name is a lie: sixteen
+ * of the Circuit's thirty waves are wavetables with no single shape and nine
+ * are blends whose ratios nobody here has measured, so a name is refused rather
+ * than guessed at. A caller handing over SAMPLES is not guessing. It read the
+ * signal, and a reading is strictly better evidence than a textbook shape,
+ * which is the same reason `wave-view.mjs` draws a min/max envelope of a real
+ * file rather than a picture of what the file ought to look like.
+ * ⚠️ **NOTHING HERE TAKES A TAP, A CONTEXT OR A FRAME LOOP.** The page owns the
+ * sound and calls `set({ points })` at its own rate, exactly as `wave-view.mjs`
+ * takes a position rather than making one. This file still has no
+ * `AudioContext`, no `requestAnimationFrame` and no poll of any kind.
+ */
+export function traceOf(t = {}, fallback = '--dim') {
+  const shape = t.shape ?? shapeFor(t.name);
+  const cycles = t.cycles ?? 2;
+  const duty = t.duty ?? 0.5;
+  const pts = t.points?.length
+    ? Float64Array.from(t.points)
+    : wavePoints(shape, 512, { cycles, duty });
+  return { ...t, shape, cycles, duty, pts, colour: t.colour || fallback };
+}
+
+/**
  * @param {object} o
  * @param {string} [o.name]    the wave's own name, read by `shapeFor`
  * @param {string} [o.shape]   one of `WAVE_SHAPES`, when the caller knows it
@@ -797,9 +836,30 @@ export const NO_SHAPE = 'no shape is published for this one';
  * @param {string} [o.reason]  what to say when there is no shape. The caller
  *   knows more than this file does: a wavetable and a blend whose ratio nobody
  *   has measured are two different absences.
+ * @param {ArrayLike<number>} [o.points]  samples between -1 and 1, when the
+ *   caller MEASURED the signal instead of naming it. See `traceOf`.
+ * @param {string} [o.colour]  a token name or a literal, default `--dim`
+ * @param {object} [o.over]    A SECOND TRACE IN THE SAME PICTURE, described
+ *   exactly as the first: `{ name, shape, points, duty, cycles, colour }`.
+ *
+ *   🔴 **ASKED FOR 2026-09-22 AS A SCOPE SHOWING AN OSCILLATOR AND AN EFFECT AT
+ *   ONCE**: *"can you have wave / osilocope visualizer to top of muta. plai and
+ *   warp with different colors"*. Two signals in one picture is the only way to
+ *   see what the second thing did to the first, and drawing them in two boxes
+ *   side by side asks a reader to hold one in their head while looking at the
+ *   other.
+ *   ⚠️ **COLOUR IS ALLOWED HERE AND NOWHERE ELSE IN THIS FILE, AND THE RULE IS
+ *   UNCHANGED.** The three greys and one highlight exist because colour here
+ *   says what a mark IS rather than how it landed. Two traces are two different
+ *   things, so which is which IS what a mark is, and it is the same argument
+ *   that gives a lane its gutter swatch.
+ *   ⚠️ **AND IT IS ONE EXTRA TRACE, NOT A LIST.** Three signals in one box with
+ *   no legend is a picture nobody can read, and the moment a caller wants four
+ *   it wants a strip with rows and labels, which this project already has.
  */
 export function createWaveShape({ host, label = '', height = 96, name = '', ground = '--card2',
-                                  shape, duty = 0.5, reason = '', cycles = 2 } = {}) {
+                                  shape, duty = 0.5, reason = '', cycles = 2,
+                                  points, colour = '--dim', over = null, axes = null, trail = 0 } = {}) {
   /* 🔴 THE SAME GROUND AS THE FILTER, ASKED FOR 2026-09-22 AS *"add same bg to
      waveform as to filter"*. Safe for the same reason it was safe there: `ink()`
      reads the field back OUT OF THE CANVAS after the fill, so the counter
@@ -807,8 +867,13 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
      ⚠️ THE ENVELOPE IS STILL `--card` AND THAT IS WHAT WAS ASKED, not an
      oversight. Two of the three figures sit on the lighter ground. */
   const f = figure({ host, cls: 'pos-sv-wave', height, label: label || 'waveform', ground });
-  let v = { name, shape: shape ?? shapeFor(name), duty, reason, cycles };
-  let pts = wavePoints(v.shape, 512, { cycles: v.cycles, duty: v.duty });
+  let v = { name, shape: shape ?? shapeFor(name), duty, reason, cycles, points, colour, over, axes };
+  let a = traceOf(v, colour);
+  let b = v.over ? traceOf(v.over, '--hi') : null;
+  let pts = a.pts;
+  /* The windows behind the current one, oldest first. Empty unless a caller
+     asked for a `trail`, so a figure that never moves carries no cost. */
+  const past = [];
 
   const PAD = 8;
 
@@ -830,48 +895,161 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
     }
 
     if (!pts) {
-      // 🔴 THE REFUSAL, AND IT IS THE REASON THIS COMPONENT IS WORTH HAVING.
-      // Sixteen of the Circuit's thirty oscillator waves are WAVETABLES, which
-      // have no single shape by definition, and nine more are blends whose
-      // ratios nothing here has measured. Drawing a plausible squiggle under
-      // one of those names would be an invention wearing an instrument's label.
-      f.say(v.name || 'no wave', PAD, mid - 4, { colour: C.ink, px: 11, room: W - PAD * 2 });
-      f.say(v.reason || NO_SHAPE, PAD, mid + 10, { room: W - PAD * 2 });
-      if (label) f.say(label, PAD, foot, { room: W / 2 });
-      f.say('not drawn', W - PAD, foot, { align: 'right', room: W / 2 });
+      /* 🔴 THE REFUSAL, AND IT IS THE REASON THIS COMPONENT IS WORTH HAVING.
+         Sixteen of the Circuit's thirty oscillator waves are WAVETABLES, which
+         have no single shape by definition, and nine more are blends whose
+         ratios nothing here has measured. Drawing a plausible squiggle under
+         one of those names would be an invention wearing an instrument's label.
+         🔴 IT SITS AT THE BOTTOM SINCE 2026-09-22, ASKED FOR AS *"alitng title
+         and desc to bottm (leave nice padding)"* after a screenshot of the two
+         lines floating in the middle of an otherwise empty card.
+         🔴 AND `not drawn` WENT WITH IT, ASKED AS *"no \"not drawn\""*. The card
+         was carrying the refusal twice: the reason says why nothing is drawn and
+         `not drawn` said that nothing is drawn, which the empty picture has
+         already said. Two channels for one fact, and the one removed is the one
+         with no information in it. ⚠️ THE `aria-label` STILL SAYS IT, because a
+         reader with no picture has no empty canvas to infer from, and the assert
+         on `/kit/` reads it there.
+         ⚠️ **THE PADDING IS `PAD`, WHICH IS THE CARD'S ONE CONSTANT.** The
+         drawn case's own name line sits on `foot`, and the two here sit on the
+         same baseline and one line above it, so nothing in this file carries a
+         second number meaning the gap at the bottom. */
+      /**
+       * 🔴 `reason: null` DRAWS NOTHING AT ALL, added 2026-09-22. It is
+       * DISTINCT from `''` and from no reason, which both fall back to
+       * `NO_SHAPE`, and the distinction is the point: this file refuses to
+       * invent a shape and says so, which is right for a wavetable nobody has
+       * measured and wrong for a scope whose instrument is simply switched off.
+       * ⚠️ **THE ABSENCE STILL HAS TO BE EXPLAINED SOMEWHERE**, and a caller
+       * passing `null` is claiming it is explained elsewhere. On `/muta/` the
+       * instrument's own lamp reads `PLAITS off` an inch below, so a second
+       * sentence saying nothing is sounding would be the doubled channel this
+       * project keeps removing.
+       * ⚠️ AND THE ROOM IS STILL RESERVED. The figure keeps its height whether
+       * it draws words, a trace or nothing, so a picture arriving cannot move
+       * the page under a reader.
+       */
+      if (v.reason !== null) {
+        f.say(v.reason || NO_SHAPE, PAD, foot, { room: W - PAD * 2 });
+        f.say(v.name || 'no wave', PAD, foot - 13, { colour: C.ink, px: 11, room: W - PAD * 2 });
+        if (label) f.say(label, W - PAD, foot - 13, { align: 'right', room: W / 2 });
+      }
       return;
     }
 
-    ctx.strokeStyle = C.ink;
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
+    /* Each trace in its own ink, the first on top of the second so a caller's
+       primary signal is never buried under whatever it was put through. */
     const room = (yBot - yTop) / 2;
-    for (let i = 0; i < pts.length; i++) {
-      const x = PAD + (i / (pts.length - 1)) * (W - PAD * 2);
-      const y = mid - pts[i] * room;
-      if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    const line = (t, alpha = 1, width = 1.5) => {
+      if (!t?.pts) return;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = f.tok(t.colour, t.colour);
+      ctx.lineWidth = width;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (let i = 0; i < t.pts.length; i++) {
+        const x = PAD + (i / (t.pts.length - 1)) * (W - PAD * 2);
+        const y = mid - Math.max(-1, Math.min(1, t.pts[i])) * room;
+        if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    /**
+     * 🔴 THE TRACES BEHIND THIS ONE, FADING, WHICH IS A PHOSPHOR AND NOT AN
+     * ANIMATION. Asked 2026-09-22: *"can you do a bit of analog effect so
+     * previous wave is still bit shown fading out when news is coming, vacuum
+     * tube ... make it subtle"*.
+     * ⚠️ **IT IS DRAWN, NOT ANIMATED, WHICH IS WHY THIS FILE STILL HAS NO FRAME
+     * LOOP.** The old windows are kept and painted on the next `set`, so the
+     * decay happens at whatever rate the caller feeds it and this component
+     * still never asks for a frame. A `requestAnimationFrame` here would be the
+     * poll the whole file is written to avoid.
+     * ⚠️ AND THE OLDEST IS THE FAINTEST, CUBED, so the fall is quick and the
+     * tail is short. It was squared at 0.45 and reported as *"fade faster"*: at
+     * 47 windows a second a long tail is six visible lines rather than a glow.
+     * 🔴 **AND IT IS FAINT BECAUSE THERE ARE TWO PHOSPHORS, NOT ONE.** Reported
+     * 2026-09-22: *"screenshot gives nice fading but at 120hz all waves are
+     * extra yellow. photogreaph is somehing in beween. what gives"*, and the
+     * three readings are all correct and are three different measurements. **A
+     * screenshot is ONE frame** and shows what is drawn. **An eye at 120 Hz
+     * integrates several**, so it adds the drawn decay to its own persistence.
+     * A photograph sits between them because a shutter is open for some time
+     * but not for long.
+     * 🔴 **AND THE COMPOUNDING ONLY STARTED WHEN THE TIME BASE WAS LOCKED.**
+     * While the window still wandered the ghosts sat at different phases and
+     * read as a smear; aligned, they stack exactly on the live trace, so what
+     * they add is BRIGHTNESS rather than motion. MEASURED as a composite over
+     * the ground: four ghosts peaking at 0.30 put **0.226** of extra ink under
+     * a stationary line, which is the extra yellow. Three at 0.16 put
+     * **0.089**.
+     * ⚠️ THE TRAIL IS STILL WORTH HAVING, and what it is worth is the moving
+     * case: turn a knob and you see where the wave was. A stationary trace
+     * should look like one line, and now does.
+     */
+    for (let i = 0; i < past.length; i++) {
+      const age = (past.length - i) / (past.length + 1);
+      line({ pts: past[i], colour: a.colour }, Math.pow(1 - age, 3) * 0.16, 1);
     }
-    ctx.stroke();
+
+    line(b);
+    line(a);
 
     /* 🔴 THE NAME IS ON THE LEFT SINCE 2026-09-22, ASKED FOR AS *"align
        waveform names to left"*. A column of figures with their names on the
        right had every name at a different x, because the boxes are not all the
        same width, so the one thing a reader scans down was the one thing that
        did not line up. When a caller passes a `label` as well, the label keeps
-       the left and the name follows it. */
-    if (label) {
+       the left and the name follows it.
+       ⚠️ AND WITH TWO TRACES EACH NAME IS WRITTEN IN ITS OWN TRACE'S INK, which
+       is the legend. A separate key beside the picture would be the thing this
+       project keeps taking off pages: a figure and its ink joined across two
+       elements is what makes a legend necessary in the first place. */
+    /**
+     * 🔴 THE TWO SCALES, WHERE A SCOPE PUTS THEM. `axes: { x, y }`, added
+     * 2026-09-22 on *"perhaps x y units?"*. Without them a trace is a shape
+     * with no size: the same picture is a 20 ms window or a 2 second one, and a
+     * reader has no way to tell which.
+     * ⚠️ **THEY ARE THE CALLER'S STRINGS AND THIS FILE INVENTS NEITHER.** What
+     * a window spans is a fact about the thing that captured it, and a
+     * component that guessed at it would be drawing a number nobody measured,
+     * which is the whole argument this file already makes about waveshapes.
+     * ⚠️ AND `y` SITS AT THE TOP because it labels the vertical extent, while
+     * `x` sits under the trace's right edge because it labels the span. Neither
+     * takes room from the picture: both are on lines the figure already has.
+     */
+    if (v.axes?.y) f.say(v.axes.y, W - PAD, yTop + 9, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
+    if (v.axes?.x) f.say(v.axes.x, W - PAD, yBot - 3, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
+
+    const nameA = v.name || a.shape || '';
+    if (b) {
+      const nameB = v.over?.name || b.shape || '';
+      f.say(nameA, PAD, foot, { colour: f.tok(a.colour, a.colour), room: W / 2 - PAD });
+      f.say(nameB, W - PAD, foot, { align: 'right', colour: f.tok(b.colour, b.colour), room: W / 2 - PAD });
+    } else if (label) {
       f.say(label, PAD, foot, { room: W / 2 });
-      f.say(v.name || v.shape, W - PAD, foot, { align: 'right', room: W / 2 });
+      f.say(nameA, W - PAD, foot, { align: 'right', room: W / 2 });
     } else {
-      f.say(v.name || v.shape, PAD, foot, { room: W - PAD * 2 });
+      f.say(nameA, PAD, foot, { room: W - PAD * 2 });
     }
   });
 
   function relabel() {
-    f.canvas.setAttribute('aria-label', pts
-      ? `${v.name || v.shape} drawn as ${v.cycles} cycles of a ${v.shape}`
-      : `${v.name || 'wave'}, not drawn: ${v.reason || NO_SHAPE}`);
+    /* 🔴 `not drawn` STAYS IN THE ANNOUNCEMENT AFTER COMING OFF THE PICTURE.
+       A reader who cannot see the canvas has no empty box to infer an absence
+       from, so these words are the only channel they have, and `/kit/` asserts
+       them here. The drawn string and the announced string are two different
+       channels and only the drawn one was objected to. */
+    const how = a.points?.length ? 'measured' : `${a.cycles} cycles of a ${a.shape}`;
+    const one = pts
+      ? `${v.name || a.shape} drawn as ${how}`
+      : `${v.name || 'wave'}, not drawn: ${v.reason || NO_SHAPE}`;
+    const two = b?.pts
+      ? `, over ${v.over?.name || b.shape} in a second colour`
+      : '';
+    f.canvas.setAttribute('aria-label', one + two);
   }
 
   f.resize();
@@ -882,9 +1060,20 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
     el: f.wrap,
     canvas: f.canvas,
     set(next = {}) {
+      /* ⚠️ THE OLD WINDOW IS KEPT BEFORE THE NEW ONE REPLACES IT, and only when
+         there is a real one to keep: a caller clearing the picture should not
+         leave a ghost of the last signal hanging over an instrument that has
+         been switched off. */
+      if (trail > 0 && next.points && pts && pts.length) {
+        past.push(pts);
+        while (past.length > trail) past.shift();
+      }
+      if (trail > 0 && next.points === null) past.length = 0;
       v = { ...v, ...next };
       if (next.shape === undefined && next.name !== undefined) v.shape = shapeFor(next.name);
-      pts = wavePoints(v.shape, 512, { cycles: v.cycles, duty: v.duty });
+      a = traceOf(v, v.colour);
+      b = v.over ? traceOf(v.over, '--hi') : null;
+      pts = a.pts;
       relabel();
       f.resize();
       f.paint();
@@ -893,6 +1082,10 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
     get: () => ({ ...v }),
     /** `false` when this wave has no shape to draw, which is the honest case. */
     drawn: () => !!pts,
+    /** `false` when there is no second trace, or it has nothing to draw. */
+    overDrawn: () => !!b?.pts,
+    /** The two traces' inks, resolved, so a check can tell them apart. */
+    inks: () => [f.tok(a.colour, a.colour), b ? f.tok(b.colour, b.colour) : null],
     /**
      * Measure the box again and paint, now, on this line.
      *

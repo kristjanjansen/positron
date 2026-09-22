@@ -647,6 +647,25 @@ export const DEMOS = [
     one: 'a TASCAM Model 12 on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI', 'Mackie Control'] },
 
+  /**
+   * 🔴 A PIANO, AND THE PEDAL IS THE POINT RATHER THAN A FEATURE OF IT. Asked
+   * 2026-09-22 as *"what drives it, sc? plain webmidi?"* about a proposed slug
+   * `nola`, and answered at length in `plans/plan-nola.md`: plain Web Audio,
+   * one buffer source per note, `demo/shell/midi.mjs` for the keys and a new
+   * `demo/shell/pedal.mjs` for the foot. Not scsynth, not a worklet, not a
+   * physical model.
+   * ⚠️ THIS IS THE PLAN'S PHASE ZERO AND IT IS FINISHED RATHER THAN PARTIAL.
+   * Every part of the shipping machinery is here; what is phase zero is the
+   * RECORDINGS, 30 notes at one velocity layer out of FluidR3 where the
+   * Salamander pack will be 30 at three with releases beside them. The page
+   * says on its own face that velocity is only volume here.
+   * ⚠️ NO `settleMs`. The phrase button is an async handler, so `verify.mjs`
+   * waits for `data-busy` to clear rather than for a number somebody guessed.
+   */
+  { name: 'nola', group: 'instruments', act: 4, created: '2026-09-22', built: true,
+    one: 'a piano you play from a MIDI keyboard, with a line of chords drawn out above it',
+    tags: ['WebMIDI', 'WebAudio', 'sampler', 'chords'] },
+
   { name: 'able', group: 'instruments', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',
     one: 'play Ableton Live on a studio Mac from here, with no virtual audio cable',
     tags: ['Ableton Live', 'CoreMIDI', 'CoreAudio tap', 'relay', 'PCM'] },
@@ -769,9 +788,22 @@ export const DEMOS = [
    * `plaits::Voice` against one `Patch`, which is what Rack's adapter does with
    * sixteen. No line of `plaits/` was changed to allow it.
    */
-  { name: 'muta', group: 'instruments', act: 4, created: '2026-09-22', built: true, settleMs: 8000,
+  /**
+   * ⚠️ `hardware`, NOT `instruments`, ASKED FOR 2026-09-22 AS *"move muta to
+   * hardware group"*. Both readings are defensible and the ask settles it: the
+   * page IS an instrument you play, and what it is ABOUT is a piece of eurorack
+   * hardware reproduced exactly. The group it now sits in holds `/circuit/`,
+   * `/twelve/`, `/evo/` and `/dump/`, which are all pages about a real device
+   * rather than pages that make a sound of their own, and that is the company
+   * this one keeps.
+   */
+  { name: 'muta', group: 'hardware', act: 4, created: '2026-09-22', built: true, settleMs: 8000,
     one: 'two of Emilie Gillet’s firmwares, an oscillator and an effect, compiled from their own C++ to WebAssembly and chained in one audio graph',
-    tags: ['WebAssembly', 'AudioWorklet', 'WebAudio'] },
+    /* ⚠️ `WebMIDI` IS A SOFT CAPABILITY in `caps.mjs`, so a browser with no MIDI
+       keeps this row linked and the page says why rather than the row vanishing,
+       which would read as the demo not existing. The page plays perfectly from
+       its own knobs without a keyboard. */
+    tags: ['WebAssembly', 'AudioWorklet', 'WebAudio', 'WebMIDI'] },
 
   /**
    * 🔴 THE INSTRUMENT FOR EVERY OTHER PAGE IN THIS GROUP, AND FOR THREE PLAN

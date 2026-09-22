@@ -628,7 +628,7 @@ export function createPresence({
  * handed to `createPresence`. Returns the presence api with `el` being the
  * BUTTON, plus `badge` for the element inside it.
  */
-export function createPresenceButton({ of = '', press = () => {}, ...rest } = {}) {
+export function createPresenceButton({ of = '', press = () => {}, aria = '', ...rest } = {}) {
   const badge = createPresence({ of, mode: 'badge', ...rest });
   const b = document.createElement('button');
   b.type = 'button';
@@ -645,7 +645,15 @@ export function createPresenceButton({ of = '', press = () => {}, ...rest } = {}
   /* ⚠️ THE BADGE'S OWN LIVE REGION STAYS. Wrapping it in a button must not take
      the announcement away, so nothing here touches `aria-live`; what the button
      adds is a name for the ACTION, which the badge cannot carry. */
-  b.setAttribute('aria-label', `check whether ${of || 'it'} is there`);
+  /* 🔴 THE NAME OF THE ACTION, AND A CALLER MAY SAY ITS OWN SINCE 2026-09-22.
+     The default is right for the case this was written for, which is a page
+     asking whether a thing on a cable answered. It is WRONG for an instrument
+     header, where the same badge inside the same button switches something on
+     and off, and `check whether PLAI is there` would be the only channel a
+     screen reader gets describing an action that is not what happens. A label
+     that names the wrong verb is the lying control rule arriving where nobody
+     can see it. */
+  b.setAttribute('aria-label', aria || `check whether ${of || 'it'} is there`);
   let this_;
   /* 🔴 DELEGATED, NOT SPREAD. `{ ...badge }` reads every property ONCE at
      spread time, so `get driver()` would have been frozen at whatever it was

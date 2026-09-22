@@ -56,7 +56,15 @@
      `printLink` off the same object. A seam between them would say they are two
      answers. Under it, with no seam, they are the answer and what this desk
      makes of it. */
-  .wish-dump { display: flex; flex-direction: column; gap: 8px; }
+  /* 🔴 ITS OWN BORDER SINCE IT LEFT THE GLUE, 2026-09-22: *"json dump border
+     should have border"*. Inside a glue every child gives up its border because
+     the glue draws one round the lot; a part that moves out and keeps that up
+     is a surface with no edge, which on this ground reads as text floating on
+     the page rather than as a block. */
+  .wish-dump {
+    display: flex; flex-direction: column; gap: 8px;
+    border: 1px solid var(--line); border-radius: 4px;
+  }
   /* 🔴 THE TRANSCRIPTION IS EDITABLE AND ITS HEIGHT IS FIXED. A textarea that
      grows with its content is the one thing this project has a rule against,
      so it scrolls instead. `resize: none` for the same reason: a corner a
@@ -82,19 +90,27 @@
        right edge, and what was off the edge was the evidence. It changes height
        when an answer lands, which is a human-paced change rather than a clock,
        and is the case the no-twitch rule explicitly allows. */
-    /* 🔴 A CEILING AS WELL AS A FLOOR, ASKED FOR 2026-09-22 AS *"limit height
-       of this box"* against a two link split that ran to thirty lines. The
-       object is EVIDENCE, read once and checked against, and a block that
-       pushes the picture and the verdict off the screen has stopped being
-       evidence and started being the page.
+    /* 🔴 ONE RESERVED HEIGHT, FLOOR AND CEILING THE SAME NUMBER, ASKED FOR
+       2026-09-22 AS *"separate json dump to sepatate block, reserve its
+       hight"*. It was a 62 px floor and an 18 line ceiling while this box held
+       every link at once; it holds ONE now, the selected row's, and a box that
+       is 7 lines for one connection and 16 for the next would move the log and
+       the end of the page on every press of a row. That is the caption that
+       reflowed sixty times a second on `grain-scope`, arriving through a
+       click.
        ⚠️ IT SCROLLS INSIDE ITSELF RATHER THAN CLIPPING, because the one thing
        this box exists to show is the argument a refusal names, and that can be
        on any line of it. A clip would hide exactly the evidence a reader came
        for, which is the defect `pre-wrap` was introduced to fix from the other
        direction.
-       ⚠️ AND THE NUMBER IS A LINE COUNT RATHER THAN A PIXEL GUESS: 18 lines at
-       this leading, so a single link is never scrollable and a split is. */
-    min-height: 62px; max-height: calc(18 * 12px * 1.6); overflow-y: auto;
+       ⚠️ AND THE NUMBER IS A LINE COUNT RATHER THAN A PIXEL GUESS, MEASURED
+       OVER WHAT ONE CONNECTION CAN BE: 7 lines with no transform on it, 12 with
+       one, 16 with two, which is the longest this desk's own examples produce.
+       14 holds the common case whole and lets the longest scroll by two lines,
+       against a reservation of 16 that would stand 60 px of air over every
+       ordinary answer and over an empty page. */
+    min-height: calc(14 * 12px * 1.6); max-height: calc(14 * 12px * 1.6);
+    overflow-y: auto;
     white-space: pre-wrap; overflow-wrap: anywhere;
     /* 🔴 GREYER, ASKED FOR IN ONE WORD AGAINST THE OBJECT ITSELF. It was
        `--ink`, the page's reading colour, which made a raw object the loudest
@@ -157,22 +173,140 @@
      ⚠️ WHAT IT WAS FOR IS NOT LOST. `data-busy` is still set on both boxes, so
      a page rule could paint them again and the checks that read the attribute
      are unmoved; what is gone is the animation. */
-  /* ⚠️ NO MARGIN AND NO BORDER OF ITS OWN. It is a glue part now, so the seam
-     above it and the air around it come from `.pos-glue` and `.wish-part`, in
-     the same colour and the same measure as the picture and the object below
-     it. A divider typed here would be a second one. */
-  .wish-why { min-height: 20px; font-size: 13px; color: var(--dim); }
-  /* 🔴 THE VERDICT PART KEEPS ONE LINE'S ROOM WHETHER OR NOT IT HAS WORDS.
-     Asked 2026-09-21: *"make this the minimal height even when no data"*. It
-     used to go away, which meant the picture and the object below it moved down
-     the instant an answer landed, under the eye of the person who pressed for
-     it. Every other box on this page already reserves its room from the first
-     paint and says so; this one now does too. */
-  .wish-verdict { min-height: 40px; display: flex; align-items: center; }
+  /* 🔴 ONE ROW PER CONNECTION, AND EVERY ROW IS A PART OF THE GLUE. Asked
+     2026-09-22 with a sketch: *"make allowes/disallower + diagram to a separate
+     row: --- interpret ... --- (diagram1) allowed: Mk... --- (diagram2)
+     allowed: .... ---"*. Every verdict used to stack in one part with ONE
+     picture of all of them under the lot, so a reply proposing two connections
+     drew two arrows in one figure and left the reader to work out which
+     sentence belonged to which arrow. A connection is a row now, and it carries
+     its own picture, its own sentence and its own reserved room on the right.
+     ⚠️ A GRID RATHER THAN NESTED FLEX ROWS, because the right hand column has to
+     be RESERVED rather than sized by what is in it: a track declared in
+     `grid-template-columns` takes its width with an empty cell, and a flex
+     child cannot. See `--wish-act`. */
+  .wish-conn {
+    /* Declared here rather than at `:root`, because it is this component's own
+       measure and the one element that reads it is a child of this one. */
+    --wish-act: 72px;
+    display: grid; grid-template-columns: minmax(0, 1fr) var(--wish-act);
+    column-gap: 12px;
+    /* 🔴 A ROW CARRIES ITS OWN AIR SINCE 2026-09-22, ASKED FOR AS *"add more
+       padding to patch block"*. It had only `.wish-part`'s 10 by 12, which was
+       written for a part holding a paragraph, and a row holds a DRAWING: the
+       figure keeps 2 px off its own edge, so with 12 px of part padding the
+       first box stood 14 px from the seam and read as falling out of the row.
+       ⚠️ IT ARRIVED WITH THE LEFT ALIGNMENT AND NOT BEFORE IT, which is the
+       whole reason it was not seen earlier: a centred figure bought this air by
+       accident, from space nobody had asked for. Left aligning it took away a
+       margin that was never declared. */
+    padding: 6px 10px;
+  }
+  /* 🔴 THE RIGHT OF EVERY ROW IS FOR ACTIONS AND IT IS EMPTY TODAY. Asked in
+     the same breath: *"reserve right side of diagram+allowed to action buttons
+     etc. align diagram to left?"*. Nothing is built into it yet, which is the
+     whole reason it is declared here: a column that arrives with its first
+     button moves the picture sideways under the reader's eye.
+     🔴 AND ITS TENANT IS KNOWN, WHICH IS WHY THE THIRD VERDICT MADE THIS
+     COLUMN WORTH MORE THAN *buttons may appear later*. An incomplete row is
+     the one row with something a person can supply: the missing number in
+     `{ op: 'cc', to: 1 }` is a controller number, and the ask that followed was
+     whether it could be given by turning the knob. An allowed row has nothing
+     to ask for and a refused one has nothing to offer.
+     ⚠️ IT IS NOT BUILT AND THE REASON IS MEASURED. Learning a controller number
+     from a knob needs WebMIDI, which this page declares in its tags and opens
+     nowhere: there is not one `requestMIDIAccess` in it. That is a piece of
+     work rather than a button.
+     🔴 AND THE WIDTH IS A MEASUREMENT RATHER THAN A TASTE. `diagram.mjs` draws
+     a row of boxes while its host is at least 560 px wide and stacks them into
+     one tall column below that. This page is 688 px at its widest, the glue
+     spends 2 px on its border and a part 24 px on its own padding, so 662 px is
+     what the row has and everything the actions take comes off the picture. 72
+     plus the 12 px gap leaves 578, which is 18 px of headroom. The check reads
+     the mode the drawer chose and prints the width beside it, so the day this
+     column grows the page says which number broke it. */
+  .wish-conn-act {
+    grid-column: 2; grid-row: 1 / 3; min-width: 0;
+    display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  }
+  /* 🔴 A ROW IS PRESSED TO CHOOSE IT, AND THE TREATMENT IS THE TABLE'S OWN.
+     Asked as *"clickin on row enables it (left yellow border and slihjt bg
+     change as in table)"*, so the two declarations under `.on` are
+     `.pos-tbl-row.on`'s, read out of `shell.css` rather than invented here.
+     ⚠️ THEY ARE COPIED RATHER THAN BORROWED, WHICH IS A DECISION AND NOT AN
+     OVERSIGHT. `.pos-tbl-row` is a grid of the columns a table declares, with
+     its own padding and its own bottom rule, so a page pulling that class onto
+     something that is not a table row would be reaching into a component's
+     insides for two lines of paint. What keeps the copy honest is the check: it
+     marks a row in the table above and compares the computed shadow and ground
+     of the two, so the day `shell.css` moves either one this page goes red. */
+  .wish-conn.pick { cursor: pointer; }
+  .wish-conn.pick:hover { background: var(--card2); }
+  .wish-conn.pick:focus-visible { outline: 2px solid var(--hi); outline-offset: -2px; }
+  /* 🔴 THE LIFTED GROUND ALONE, AND THE YELLOW LEFT BAR IS GONE SINCE
+     2026-09-22: *"rm yellow left line, its excessive"*. It was taken from
+     `table.mjs` so that a chosen row here and a chosen row there would be one
+     treatment, and that reasoning was right about the SOURCE and wrong about
+     the DOSE: a table row is 28 px tall and one line of text, where a 2 px bar
+     is the only thing that could carry a state; a connection row is 180 px of
+     picture and sentence, where the same bar is a stripe down a panel.
+     ⚠️ **THE GROUND STILL COMES FROM `table.mjs`'S OWN**, and the check still
+     compares the two, so one treatment survives where it can be seen. What went
+     is the half that did not scale with the row. */
+  .wish-conn.on { background: var(--card2); }
+  /* 🔴 THE ROW'S OWN SENTENCE, UNDER ITS OWN PICTURE, IN THE LEFT COLUMN, AND
+     IT KEEPS TWO LINES' ROOM WITH ONE LINE IN IT. That reservation was on the
+     verdict PART until 2026-09-22 and the reason has not changed: a refusal
+     names its reason under it and an allowed link names what the far end
+     drops, so most answers are two lines and some are one, and a box sized by
+     its words would move the picture above it between two answers that are
+     both perfectly ordinary. MEASURED at 39 px for two lines against this
+     40 px floor.
+     ⚠️ CENTRED IN THAT ROOM, so a single line does not sit against the picture
+     with all the air under it. The flex children are the two lines, which are
+     blocks either way, so the column direction changes nothing about how they
+     read. */
+  /* 🔴 NO RESERVED BOX, SINCE 2026-09-22: *"rm wish-hy"*, against an inspector
+     shot of `div.wish-why 582 x 40` sitting empty under every row. It reserved
+     40 px for a sentence that MOVED INTO THE FIGURE'S CAPTION hours earlier, so
+     what it held was air, and that air is the *"extra huge padding below
+     diagram"* reported three times.
+     ⚠️ **IT STILL EXISTS FOR THE ONE ROW THAT HAS NO PICTURE**, a link that
+     begins and ends at one instrument, which draws no arrow and so has no
+     caption to write into. It takes the room it needs and none when it is
+     empty, which is the empty box rule: a container with nothing in it must not
+     paint its edges or hold its height. */
+  .wish-why {
+    grid-column: 1; grid-row: 2; min-width: 0;
+    font-size: 13px; color: var(--dim);
+  }
+  .wish-why:empty { display: none; }
+  /* 🔴 THE SENTENCE IS THERE WHEN NOBODY IS READING THE PICTURE. Asked as
+     *"allowed: Mk... (show when no iteraction with diagram)"*. `createDiagram`
+     writes the box's or the arrow's own note into its caption on hover and
+     marks that caption `data-on`, so the attribute is the whole signal and
+     nothing has to be wired to a pointer on this page.
+     ⚠️ `visibility`, NEVER `display`: the line keeps its room, so reading the
+     picture cannot move the row the picture is in.
+     ⚠️ AND A BROWSER THAT DOES NOT KNOW `:has()` DISCARDS THE RULE AND SHOWS
+     THE SENTENCE ALWAYS, which is what this page did yesterday. `shell.css`
+     records what a discarded selector list cost on `:fullscreen`; what is
+     different here is that the fallback is the old behaviour rather than a
+     control that does nothing. */
+  .wish-conn:has(.pos-dg-cap[data-on]) .wish-why { visibility: hidden; }
   .wish-why b { color: var(--bad, #e0908a); font-weight: 600; }
+  /* 🔴 THE THIRD VERDICT, AND ITS COLOUR IS DECIDED ONCE HERE. `--ok` is the
+     desk agreeing and `--bad` is the desk refusing, and a link that is missing
+     an argument is neither: it is the desk waiting for something a person can
+     supply. `--warn` is the project's third mark colour and carries exactly
+     that on every lane that uses it, so nothing new is invented and no reader
+     has to learn a fourth hue.
+     ⚠️ NOT `--hi`, WHICH ALREADY MEANS SOMETHING ON THIS ROW. The chosen row's
+     left edge is `--hi`, and a word in the same yellow inside it would read as
+     part of the selection rather than as a verdict. */
+  .wish-why-q { color: var(--warn, #e0b060); font-weight: 600; }
   .wish-why i { color: var(--ok, #8fd6a8); font-style: normal; }
   .wish-why-l { color: var(--ink); }
-  .wish-rows { display: flex; flex-direction: column; gap: 6px; }
 
   /* 🔴 THE PICTURE'S ROOM, AND IT STANDS NOW BECAUSE THE HOST MOVED. This
      comment recorded a measured failure until 2026-09-21: with nothing proposed
@@ -190,6 +324,12 @@
      ⚠️ IT IS CENTRED IN ITS OWN BOX, because the tallest state is the one with
      the least in it: without this the picture would sit against the top and
      leave nothing but air under it for every run that succeeds. */
+  /* ⚠️ **120 STAYS, AND I CUT IT TO 100 FOR A FEW MINUTES ON A MISREADING.**
+     `.pos-dg` measures 100 and the HOST measures 119 with a picture in it,
+     because the figure carries its own caption line. Reserving 100 would make
+     the row grow by 19 px the moment an answer landed, which is the jump this
+     reservation exists to stop, and the page's own check caught it in one run:
+     `100 px is the default height, against 0, 119, 100 drawn`. */
   .wish-dg {
     /* 🔴 A DEFAULT HEIGHT, AND IT IS MEASURED. Asked 2026-09-21: *"use the
        patcher visualizer with a default height and a shimmer only while
@@ -199,15 +339,28 @@
        ⚠️ IT READ 252 px BEFORE THAT, measured when the WHOLE DESK was drawn in
        one column. Only the instruments a proposal touches are drawn since, so
        that number reserved 133 px of air that nothing could ever fill.
-       🔴 AND IT READS 140 RATHER THAN 120 SINCE THIS BECAME A PART OF THE GLUE,
-       which is the same 120 with the part's own padding added back. `*
-       { box-sizing: border-box }` is project-wide, so a `min-height` on a
-       padded box reserves the padding OUT of it, and 120 here would have left
-       100 px for a 119 px picture. The check subtracts the padding off again
-       and compares the FIGURE against 120, so the number that is graded is
-       still the number that was measured. */
-    min-height: 140px; display: flex; flex-direction: column; justify-content: center;
+       🔴 IT READ 140 WHILE THIS HOST WAS ITSELF A PART OF THE GLUE, which was
+       the same 120 with the part's own padding added back, because `*
+       { box-sizing: border-box }` is project-wide and a `min-height` on a
+       padded box reserves the padding out of it. The host is a CELL of a
+       connection row since 2026-09-22 and the padding belongs to the row, so
+       the number is 120 again and it is the number that was measured. The
+       check still subtracts whatever padding it finds, which is 0 here.
+       ⚠️ AND THE PICTURE IS CENTRED INSIDE THIS CELL RATHER THAN AGAINST THE
+       LEFT EDGE, because `diagram.mjs` centres its own figure in the width it
+       is given. What the row can do is take the width away: the actions column
+       holds the right hand end, so the picture sits in the left of the row.
+       Going further is a change to the component and was not made. */
+    grid-column: 1; grid-row: 1; min-width: 0;
+    min-height: 120px; display: flex; flex-direction: column; justify-content: center;
   }
+  /* 🔴 ONE PADDING ON BOTH AXES, ASKED FOR AS *"just have unified x y
+     padding"*. The row was `6px 10px`, so the air above a picture was not the
+     air beside it, and the figure carried its own band on top of that. 10 is
+     the horizontal number that was already there, and `.tbar` makes the same
+     argument for its own 8: one number, both ways, and the three that follow
+     from it are one sum rather than three typed figures. */
+  .wish-conn { padding: 10px; }
   /* 🔴 NO MARGIN AT ALL, AND IT USED TO BE `margin-top` ONLY. Not
      `.pos-body > .pos-dg`: that 44 px belongs to the standing `How it works`
      picture, which opens a section at the end of a page. This one is a result
@@ -250,7 +403,7 @@
   import { createGlue } from '/shell/glue.mjs';
   import { createTable } from '/shell/table.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { createBay, printLink, checkTransforms, delivers } from '/shell/bay.mjs';
+  import { createBay, printLink, checkTransforms, delivers, OP_HELP } from '/shell/bay.mjs';
   import { describe, reword } from '/shell/instruments.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
 
@@ -702,9 +855,28 @@
    */
   said.spellcheck = false;
   const patch = el('pre', 'wish-patch');
-  const whyBox = el('div', 'wish-rows');
-  /* The picture's room, taken from the first paint. See `.wish-dg`. */
-  const dgHost = el('div', 'wish-dg wish-part');
+
+  /**
+   * 🔴 A CONNECTION IS A ROW, AND THE ROW IS A PART OF THE GLUE. Asked
+   * 2026-09-22: *"make allowes/disallower + diagram to a separate row"*. It
+   * holds the picture of that one link on the left, a reserved column for
+   * actions on the right, and the sentence about it underneath, and the
+   * stylesheet owns every measurement in that sentence.
+   * ⚠️ ONE IS BUILT WITH NOTHING IN IT WHENEVER THERE IS NO ANSWER, so the
+   * component is the same height before and after a one link reply lands. That
+   * is this page's standing rule, the one every other box on it already obeys,
+   * and it is the reason the verdict used to keep a line of room while it was a
+   * part of its own.
+   */
+  function connRow() {
+    const row = el('div', 'wish-part wish-conn');
+    /* The picture's room, taken from the first paint. See `.wish-dg`. */
+    const fig = el('div', 'wish-dg');
+    const act = el('div', 'wish-conn-act');
+    const say = el('div', 'wish-why');
+    row.append(fig, act, say);
+    return { el: row, fig, act, say };
+  }
 
   /**
    * 🔴 ONE COMPONENT, THREE PARTS, GLUED. Asked 2026-09-21: *"make it a single
@@ -786,10 +958,27 @@
    * the glue's and exist for the parts either side of this one whatever it
    * holds, so nothing new is painted; what is reserved is a line's height.
    */
-  const whyPart = el('div', 'wish-part wish-verdict');
-  whyPart.append(whyBox);
   const heard = createGlue(hear.part, said);
-  const answer = createGlue(patchHead.part, whyPart, dgHost, dump);
+  /**
+   * 🔴 THE ROWS SIT BETWEEN THE HEADER AND THE OBJECT, AND THEY ARE THE ONLY
+   * PART OF THIS COMPONENT THAT COMES AND GOES. `.pos-glue` is a flex column
+   * whose seam is its own `gap` over a line coloured ground, so a part inserted
+   * into it is drawn with the same 1 px seam as the parts that were there at
+   * build time and nothing has to be told about it.
+   */
+  /**
+   * 🔴 THE OBJECT BLOCK IS ITS OWN SURFACE SINCE 2026-09-22, NOT THE GLUE'S
+   * LAST PART. Asked against a screenshot of the two touching: *"disconnect
+   * these 2 panels"*, and in the same breath *"clickig on it shoul should show
+   * dump in a separate panel"*.
+   * ⚠️ **IT WAS RIGHT WHILE THE BLOCK HELD ONE ANSWER AND IS WRONG NOW.**
+   * `createGlue`'s own rule is that gluing CLAIMS two things are one object,
+   * which was true of a header, a picture and the object behind it. The rows
+   * are the answer now, and the object is a reading OF the row a person
+   * pressed: one surface per thing, with the page's own rhythm between them,
+   * says that where a shared border says the opposite.
+   */
+  const answer = createGlue(patchHead.part, connRow().el);
 
   /**
    * 🔴 FIVE THINGS TO SAY, IN A TABLE, AND SOME OF THEM GO WRONG. Asked
@@ -847,7 +1036,9 @@
    * five sentences you can press, here is where you say your own, here is what
    * came back.
    */
-  d.el.append(examples.el, heard, answer);
+  /* ⚠️ THE OBJECT BLOCK IS A SIBLING OF THE ANSWER, not a child of it, so the
+     page's own vertical rhythm sits between them. See the note on `answer`. */
+  d.el.append(examples.el, heard, answer, dump);
 
   /**
    * Put one example in the box and ask about it, which is what the button this
@@ -856,11 +1047,40 @@
    * an answer can see which sentence produced it. `mark` takes a predicate over
    * the row data rather than an index, which is the component's own rule.
    */
-  async function useExample(r) {
+  /**
+   * 🔴 A ROW PRESSES THE BUTTON RATHER THAN DOING THE BUTTON'S WORK. Asked
+   * 2026-09-22: *"wish: when i click to prepared ask, interpret button should
+   * disable and shimmer"*. A row used to call `think` itself, so the two models
+   * ran while `Interpret` sat there looking idle and pressable, and the page
+   * had no way to say a proposal was already in flight.
+   * 🔴 AND THE BUSY STATE IS NOT THIS PAGE'S TO INVENT. `shell.mjs` attaches
+   * one listener to every control it builds and, when the handler returns a
+   * promise, paints `data-busy`, disables the button, sets `aria-busy` and
+   * clears all three in a `finally`. Its own comment says it does this *"rather
+   * than every page inventing its own"*. Pressing the button is how a page gets
+   * all of it and cannot drift from it.
+   * ⚠️ THE BOX IS FILLED FIRST, because `askBox` reads it synchronously the
+   * moment the press lands.
+   * 🔴 AND A ROW PRESSED WHILE ONE IS IN FLIGHT IS REFUSED BEFORE IT MARKS
+   * ANYTHING. The shell's disabled button already swallows the press, so the
+   * work could never double up; what it cannot stop is this page lighting a row
+   * and writing a sentence into the box for a question nobody is going to ask,
+   * which is a row that looks chosen while the answer on screen belongs to
+   * another one. The log says what happened, because it is a thing that
+   * happened rather than a state.
+   * ⚠️ THE ROW LIGHTS UP, so a reader scrolling back to the table after reading
+   * an answer can see which sentence produced it. `mark` takes a predicate over
+   * the row data rather than an index, which is the component's own rule.
+   */
+  function useExample(r) {
+    const go = d.button('interpret');
+    if (go.disabled) {
+      d.log('a proposal is already being made, so that example was not asked');
+      return;
+    }
     said.value = r.say;
     examples.mark((x) => x.say === r.say);
-    clearAnswer();
-    try { await think(r.say); } catch (e) { blame(e); }
+    go.click();
   }
 
   /**
@@ -933,14 +1153,64 @@
    * point of the page: a model's output is an opinion and the validator is the
    * thing with an argument.
    */
+  /**
+   * 🔴 A TRANSFORM WHOSE SHAPE IS RIGHT AND WHOSE ARGUMENT DID NOT ARRIVE,
+   * WHICH IS A QUESTION RATHER THAN A REFUSAL. Asked 2026-09-22: *"perhaps a
+   * step model can return: not 'accepted' not accepted but needs more info /
+   * input?"*
+   * 🔴 THE MEASURED CASE IS `{ op: 'cc', to: 1 }`, from *"connect the first
+   * rotary knob of evolution to the first rotary knob of circuit"* on
+   * 2026-09-21. `cc` moves the controller numbered `from` onto the controller
+   * numbered `to`; the model had been told the channels and nothing about
+   * controller numbers, so it gave the destination and left the source out.
+   * Nothing about that proposal is wrong. One number is absent, and it is a
+   * number a person at this desk knows.
+   * 🔴 IT IS A STRUCTURAL TEST AND NEVER A READING OF THE SENTENCE.
+   * `checkTransforms` returns English and the temptation is to match on it,
+   * which would make this page's vocabulary depend on the wording of somebody
+   * else's error message. `OP_HELP` carries the same `args`, `need` and `oneOf`
+   * the validator enforces, so the question *did every key that arrived belong
+   * to this op, and is a required one absent* is asked of the object.
+   * ⚠️ AND A KEY THE OP DOES NOT HAVE IS NOT A GAP. `{ op: 'transpose', to: 1 }`
+   * carries its argument under the wrong name, which is a mistake in what was
+   * said rather than something anybody can supply, and it stays refused. So do
+   * an op that does not exist, an argument of the wrong type and every policy
+   * refusal, none of which a person can answer.
+   * @returns {{op: string, key: string}|null} the first gap, or null
+   */
+  const OP_BY_NAME = new Map(OP_HELP.map((o) => [o.op, o]));
+  function missingArg(transforms) {
+    for (const t of transforms || []) {
+      const op = OP_BY_NAME.get(t?.op);
+      if (!op) continue;
+      const given = Object.keys(t).filter((k) => k !== 'op');
+      if (given.some((k) => !op.args.includes(k))) continue;
+      const gap = op.need.find((k) => t[k] === undefined || t[k] === null);
+      if (gap) return { op: t.op, key: gap };
+      if (op.oneOf.length && op.oneOf.every((k) => t[k] === undefined || t[k] === null)) {
+        return { op: t.op, key: op.oneOf.join(' or ') };
+      }
+    }
+    return null;
+  }
+
   function grade(links) {
     const b = freshBay();
     const rows = [];
     let ok = 0;
+    let waiting = 0;
     for (const l of links) {
       const bad = checkTransforms(l.transforms || []);
-      const v = bad ? { ok: false, why: bad } : b.validate(l.from, l.to, l.transforms || []);
+      /* 🔴 TWO QUESTIONS WERE BEING ANSWERED WITH ONE BOOLEAN UNTIL 2026-09-22.
+         `checkTransforms` reports what a transform is missing and `validate`
+         reports what this desk will not do, and flattening both to `ok: false`
+         printed a question as a verdict. It is the lesson `bay.mjs` already
+         paid for one layer down, where one `accepts` list merged *I do not use
+         that* with *that damages me* and refused every real link on the desk. */
+      const gap = bad ? missingArg(l.transforms) : null;
+      const v = bad ? { ok: false, ...bad } : b.validate(l.from, l.to, l.transforms || []);
       if (v.ok) { b.link(l.from, l.to, l.transforms || []); ok++; }
+      else if (gap) waiting++;
       /**
        * 🔴 `warn` IS KEPT SINCE 2026-09-22 AND WAS THROWN AWAY BEFORE IT.
        * `bay.mjs` returns one on an allowed link, and on this desk it is almost
@@ -950,10 +1220,22 @@
        * on the diagram not slop"*, and the first actual detail was already in
        * hand and being discarded one line from here.
        */
+      /* 🔴 `fix` IS THE SECOND HALF OF A REFUSAL AND IT ARRIVED 2026-09-22.
+         Asked as *"can we have cooncrete problem -> soluton texts?"*. Every
+         value it needs was already inside `bay.mjs`, so the page carries the
+         sentence rather than composing one: two pages print these and one
+         vocabulary is the whole reason the validator is a module. */
       rows.push({ link: l, say: sayLink(l), carries: carriedBy(l),
-                  ok: v.ok, why: v.why, warn: v.warn || '' });
+                  ok: v.ok, needs: !v.ok && !!gap, gap,
+                  why: v.why, fix: v.fix || '', warn: v.warn || '' });
     }
-    return { rows, ok, refused: rows.length - ok };
+    /* 🔴 THREE DISJOINT COUNTS, AND `refused` KEEPS ITS OLD MEANING RATHER
+       THAN QUIETLY GAINING ONE. A link the desk will not make is refused; a
+       link it cannot judge until somebody supplies a number is not. Every
+       check on this page that counts refusals counts the same things it
+       counted yesterday, because the only rows that moved are the ones nothing
+       was refusing. */
+    return { rows, ok, needs: waiting, refused: rows.length - ok - waiting };
   }
 
   // ── the words, the names and the picture ─────────────────────────────────
@@ -1191,6 +1473,12 @@
    * ⚠️ TWO PROPOSALS BETWEEN ONE PAIR ARE ONE ARROW, or two would be drawn down
    * one gap and read as one, and then the picture would say fewer links than the
    * readout does.
+   * ⚠️ AND NOTHING REACHES THAT BRANCH SINCE 2026-09-22, BECAUSE EVERY CALLER
+   * NOW HANDS IT ONE LINK: a connection is a row and a row draws its own. It is
+   * kept rather than cut because it is what makes this function safe to call
+   * with any list, and because the day a row holds more than one link it is the
+   * behaviour that was wanted. The examples table asserts the outcome from the
+   * other side: the split reads as two rows and two arrows.
    * ⚠️ AND A LINK THAT BEGINS AND ENDS AT ONE INSTRUMENT HAS NO ARROW TO DRAW.
    * It is counted and logged rather than dropped in silence.
    */
@@ -1202,9 +1490,11 @@
       if (!a || !b) continue;
       if (a === b) { loops++; continue; }
       const key = `${a}|${b}`;
-      const g = pairs.get(key) || { from: a, to: b, n: 0, ok: 0, why: '', carries: new Set(),
-                                    ts: new Set(), ports: new Set(), drops: '' };
+      const g = pairs.get(key) || { from: a, to: b, n: 0, ok: 0, needs: 0, why: '',
+                                    carries: new Set(), ts: new Set(), ports: new Set(),
+                                    drops: '' };
       g.n++;
+      if (r.needs) g.needs++;
       /* 🔴 WHICH PORTS, WHICH IS THE DETAIL THE PICTURE CANNOT DRAW. A box is
          an INSTRUMENT and the Model 12 has four ports, two of which look like
          the right one and only one of which carries its buttons. A `Set`,
@@ -1257,6 +1547,34 @@
       const ports = [...g.ports].join(' and ');
       const also = g.n > 1 ? ` The model proposed ${g.n} links between these two.` : '';
       const ts = [...g.ts].join(' and ');
+      /**
+       * 🔴 FOUR STATES, NOT TWO, AND THE PICTURE CARRIES THE VERDICT AS WELL
+       * AS THE WORDS. Asked 2026-09-22: *"diagam could show grayed out boxes
+       * with "?" in the right place and/or grayed connector/label. depences if
+       * model gets the hw rihht just connetion details missiong or really hw is
+       * misising"*.
+       *
+       *   allowed      solid boxes, the ordinary grey line, named by what crosses it
+       *   incomplete   solid boxes, the ordinary grey line, labelled `?`
+       *   refused      solid boxes, a red line, labelled `refused`
+       *   not here     grey boxes labelled `??`, NOT BUILT
+       *
+       * 🔴 THE BOXES STAY SOLID ON THE MIDDLE TWO, WHICH IS THE WHOLE POINT
+       * OF THE DISTINCTION THE ASK DRAWS. Both instruments are real and on this
+       * desk; what is missing is a number, or the desk's consent. Greying a box
+       * would say the hardware is not there.
+       * 🔴 AND THE FOURTH IS NOT REACHABLE FROM HERE. `from` and `to` are an
+       * `enum` of the real port ids, which is what stopped a Moog and a Prophet
+       * coming back as inventions, so a model cannot name an instrument this
+       * desk does not have: it returns no links and there is nothing to draw.
+       * Drawing it needs a second free text field on the reply for the names
+       * the model could not map, which is a change to the schema and to the
+       * Worker rather than to this page.
+       * ⚠️ `?` RATHER THAN A SENTENCE, because a link label gets 52 px over two
+       * lines here and `createDiagram` reports anything longer as a cut. What
+       * is missing is in the note, read on hover in the line under the picture.
+       */
+      const state = g.ok ? 'ok' : g.needs === g.n ? 'needs' : 'bad';
       return {
         from: g.from,
         to: g.to,
@@ -1267,14 +1585,14 @@
            still reads `refused` in words, so the picture still says what
            happened in greyscale, in a screenshot, and to a reader who cannot
            separate these two hues. Colour is never the only carrier here. */
-        bad: !g.ok,
-        label: g.ok ? [...g.carries].join(', ') : 'refused',
+        bad: state === 'bad',
+        label: state === 'ok' ? [...g.carries].join(', ') : state === 'needs' ? '?' : 'refused',
         /* 🔴 THE WHOLE CONNECTION, IN THE LINE UNDER THE PICTURE, WHICH IS THE
            ONE CHANNEL HERE WITH ROOM FOR A SENTENCE. Three facts and three
            sentences rather than one string with commas holding it together:
            which ports, what crosses them and after what, and what the far end
            will throw away. */
-        note: g.ok
+        note: state === 'ok'
           ? `${ports}. It carries ${[...g.carries].join(', ') || 'nothing'}`
             + `${ts ? `, after ${ts}` : ''}.`
             + (g.drops ? ` ${g.drops}.` : '')
@@ -1285,12 +1603,22 @@
     return { links, loops };
   }
 
-  let dg = null;
-  function draw(g) {
-    const { links, loops } = arrowsFor(g.rows);
+  /**
+   * 🔴 ONE PICTURE PER CONNECTION SINCE 2026-09-22, AND IT WAS ONE PICTURE
+   * UNDER ALL OF THEM UNTIL THEN. A reply proposing two connections drew two
+   * arrows into one figure under a stack of two sentences, and which arrow
+   * belonged to which sentence was left to the reader. This draws the links of
+   * ONE row into that row's own host, which is why it takes a host.
+   * ⚠️ IT GOES THROUGH `arrowsFor`, WHICH IS UNCHANGED AND STILL TAKES A LIST.
+   * A row is a list of one, and everything that function knows about a loop,
+   * about what an arrow carries and about what the far end drops is knowledge
+   * this page has in one place rather than two.
+   */
+  function drawOne(host, r) {
+    const { links, loops } = arrowsFor([r]);
     if (loops) {
-      d.log(`${loops} proposed link${loops > 1 ? 's' : ''} began and ended at one instrument, `
-        + 'so the picture has no arrow for it');
+      d.log('a proposed link began and ended at one instrument, '
+        + 'so its row has no picture in it');
     }
     /**
      * 🔴 ONLY THE INSTRUMENTS THE PROPOSAL TOUCHES, NOT THE WHOLE DESK.
@@ -1317,9 +1645,7 @@
      * that refuses a link cannot drift apart. A typed note could, and did.
      */
     const nodes = INSTRUMENTS.filter((n) => touched.has(n.id))
-      .map((n) => ({ ...n, sub: portSub(n.id, g.rows) || n.sub, note: portNote(n.id) }));
-    dg?.destroy();
-    dg = null;
+      .map((n) => ({ ...n, sub: portSub(n.id, [r]) || n.sub, note: portNote(n.id) }));
     /**
      * 🔴 NO LINKS, NO PICTURE AT ALL, AND THIS WAS A REAL DEFECT. Reported
      * 2026-09-21: *"Every arrow is a link the model asked for, and a refused
@@ -1340,9 +1666,27 @@
      * is furniture with nothing above it either way.
      * ⚠️ THE ROOM STAYS EITHER WAY. See `.wish-dg`.
      */
-    if (!links.length) { dgHost.replaceChildren(); return { drawn: 0, loops, boxes: 0 }; }
-    dg = createDiagram(dgHost, { nodes, links });
-    return { drawn: links.length, loops, boxes: nodes.length };
+    if (!links.length) { host.replaceChildren(); return { dg: null, drawn: 0, loops, boxes: 0 }; }
+    /* 🔴 THE ROW'S OWN SENTENCE IS THIS FIGURE'S CAPTION, which is the slot
+       `createDiagram` already reserves and already swaps on hover. See
+       `captionFor`. */
+    const caption = captionFor(r);
+    /**
+     * 🔴 `align: 'left'`, ADDED TO `diagram.mjs` 2026-09-22 FOR THIS PAGE.
+     * A figure here is not the block any more: it shares its row with a
+     * verdict under it and a reserved action column to its right. `placeRow`
+     * centres by default, which is right on every page where the picture IS
+     * the block, and here it put each figure about 70 px in from each side of
+     * whatever space was left. **Two rows with different box counts then had
+     * their first box at two different x**, so a column of pictures lined up
+     * with nothing.
+     * ⚠️ THE ROW TAKING THE WIDTH AWAY WAS NOT ENOUGH, which is worth writing
+     * down because it looked like it should have been: reserving the column
+     * moves where the figure's space ENDS and says nothing about where the
+     * drawing sits inside it.
+     */
+    return { dg: createDiagram(host, { nodes, links, caption, align: 'left' }),
+             drawn: links.length, loops, boxes: nodes.length };
   }
 
   /**
@@ -1357,8 +1701,13 @@
    * nothing on this desk, so it is shown in a box that paints its edges like
    * any other answer. There is an assert on it.
    */
-  const EMPTY_PATCH = '# the model proposed nothing, which is the right answer to an instruction\n'
-    + '# that names nothing on this desk';
+  /* 🔴 NOTHING, SINCE 2026-09-22: *"rm # the model proposed nothing, which is
+     the right answer to an instruction / # that names nothing on this desk"*.
+     ⚠️ **IT WAS A REPORT RATHER THAN FURNITURE AND IT IS STILL SAID**, in the
+     log, where a sentence about one run belongs. What it could not go on doing
+     is sitting inside a box whose whole subject is the model's own object: a
+     comment in a JSON box is a thing a reader tries to parse. */
+  const EMPTY_PATCH = '';
 
   /**
    * 🔴 THE PATCH BOX IS JSON, ONE OBJECT PER LINE. Asked 2026-09-21: *"can it
@@ -1370,45 +1719,207 @@
    * that was the whole problem, so the refusal underneath named a key the line
    * above it did not show.
    */
-  function show(links) {
-    const g = grade(links);
-    /* 🔴 INDENTED, AND WRAPPED RATHER THAN CLIPPED. Asked as *"indent json"*,
-       and the clipping was the more serious half: a screenshot showed the line
-       cut at `"op":"trans` , which is one character before the `"to": 1` that
-       the whole JSON exists to reveal. The compact form hid that argument by
-       omitting it; the one-line form hid it by running off the edge. */
-    /* 🔴 ONE JSON ARRAY, AND IT IS AN ARRAY EVEN WHEN THERE IS ONE LINK IN IT.
-       Asked 2026-09-22 as *"display as json array"* and then *"(event when
-       one)"*, against a keyboard split that came back as two objects printed
-       one after the other. Two top level objects with nothing between them is
-       not JSON at all: it cannot be pasted anywhere, and a reader counting
-       connections has to count braces.
-       ⚠️ AND THE SINGLE CASE IS THE ONE THAT WAS ASKED FOR TWICE. A shape that
-       is an object for one and an array for two is a shape every reader and
-       every parser has to branch on, which is the same argument the readout
-       makes about a cell that is sometimes a number and sometimes blank. */
-    patch.textContent = links.length
-      ? JSON.stringify(links, null, 2) : EMPTY_PATCH;
+  /**
+   * The two lines a row says about its own connection.
+   *
+   * 🔴 THE VERDICT WORD IS GONE, ASKED FOR 2026-09-22: *"rm refused text, its
+   * already on connetor"*. Two channels for one fact, which is the third time
+   * in two days: the wave card said *not drawn* beside an empty picture, the
+   * slider's hand had a filled button and a hollowed handle, and the arrow and
+   * the sentence both said refused.
+   * 🔴 **AND ALL THREE WENT, NOT ONLY `refused`.** The arrow carries every one
+   * of them already: an allowed one is labelled with what crosses it, an
+   * incomplete one with `?`, and a refused one reads `refused` in red. Dropping
+   * one word of three would have left the state a reader most needs to spot as
+   * the only one with no word in the picture, which runs the asymmetry the
+   * wrong way round. What the sentence keeps is the half only it can carry,
+   * which is WHY.
+   * ⚠️ AND THE STATE IS STILL READABLE OFF THE ROW, in `data-verdict`, so a
+   * check grades what a reader is shown and the reserved action column has
+   * something to key on the day it grows a button.
+   *
+   * 🔴 TWO LINES, A PROBLEM AND A SOLUTION. Asked in the next breath: *"can we
+   * have cooncrete problem -> soluton texts?"*. `bay.mjs` answers a refusal
+   * with both halves and the values in them are its own, so nothing here
+   * composes a sentence out of a validator's insides.
+   * ⚠️ AN ALLOWED LINK HAS NO PROBLEM, so its first line is the link itself and
+   * its second is what the far end will throw away. That second line is often
+   * the only surprising thing about an allowed connection on this desk: a MIDI
+   * source emits six classes and the Circuit consents to three.
+   */
+  /**
+   * 🔴 EVERY ROW NAMES ITS CONNECTION FIRST, WHATEVER THE VERDICT. This put
+   * `r.why` at the head of a refused row, so a refusal printed its reason and
+   * never said WHICH link it was about: on a page that now draws one row per
+   * connection, two refusals read as the same sentence twice.
+   * ⚠️ IT WAS RIGHT WHILE THERE WAS ONE BLOCK FOR ALL OF THEM, because the
+   * object underneath named them. One row per connection changed what a row has
+   * to carry on its own.
+   * ✅ SO IT IS THREE LINES AND THEY ARE THREE DIFFERENT KINDS OF THING: WHICH
+   * connection, then what is wrong with it, then what would fix it. An allowed
+   * link has nothing wrong with it, so it prints what the far end will throw
+   * away instead, which is the only thing left that a reader cannot see.
+   */
+  function sayRow(r) {
+    const lines = [r.say];
+    if (r.ok) { if (r.warn) lines.push(r.warn); }
+    else {
+      if (r.why) lines.push(r.why);
+      if (r.fix) lines.push(r.fix);
+    }
+    return lines.filter(Boolean);
+  }
+  /**
+   * 🔴 THE SAME TWO LINES AS ONE STRING, FOR THE LINE UNDER THE PICTURE.
+   * `createDiagram` reserves that line, writes the caption into it when nothing
+   * is hovered and a box's or an arrow's own sentence while one is, so the
+   * caption slot is ALREADY the one element with two contents. This page used
+   * to run a second element beneath it and hide it with `visibility` while the
+   * caption was up, which is two elements taking turns in one place. Asked for
+   * 2026-09-22: *"do not put refused etc below diagram text, it is a default
+   * text when no interacton"*.
+   * ⚠️ A NEWLINE RATHER THAN A JOIN, and `.wish-dg .pos-dg-cap` is what makes
+   * it break. A middot or a dash between a problem and its solution is the tic
+   * CLAUDE.md names, and it would let the pair read as one run-on sentence.
+   */
+  const captionFor = (r) => sayRow(r).join('\n');
+
+  /**
+   * 🔴 THE ROWS ON SCREEN, IN ORDER, AND THE ONE THAT IS CHOSEN. `chosen` is an
+   * INDEX into this list rather than a flag on a row, because the object block
+   * below has to be able to ask *which connection am I showing* and there is
+   * exactly one answer to that question.
+   */
+  let conns = [];
+  let chosen = -1;
+
+  /** Put a fresh set of rows into the glue, between the header and the object. */
+  /* ⚠️ THE ROWS GO AT THE END OF THE GLUE NOW, because the object block left it
+     on 2026-09-22 and `insertBefore(row, dump)` was inserting before a node that
+     is no longer a child. It threw on the first answer and took the whole page
+     with it, which is why `__demo.ready` failed rather than one assert. */
+  function layRows(rows) {
+    for (const old of [...answer.children]) {
+      if (old.classList.contains('wish-conn')) old.remove();
+    }
+    for (const row of rows) answer.append(row);
+  }
+
+  /**
+   * 🔴 THE OBJECT BLOCK SHOWS ONE CONNECTION, THE CHOSEN ONE. Asked
+   * 2026-09-22: *"separate json dump to sepatate block, reserve its hight. it
+   * will show just one connection json at time"*.
+   * 🔴 AND IT IS STILL AN ARRAY, WHICH IS THE ASK THIS ONE HAS TO NOT UNDO.
+   * *"display as json array"* and then *"(event when one)"* were asked the same
+   * day about a reply that printed two bare objects one after the other. A box
+   * that is an array for two links and an object for one is a shape every
+   * reader and every parser has to branch on; now that it is always one link,
+   * always an array is the only reading that keeps that true.
+   * ⚠️ INDENTED, AND WRAPPED RATHER THAN CLIPPED. Asked as *"indent json"*, and
+   * the clipping was the more serious half: a screenshot showed a line cut at
+   * `"op":"trans`, one character before the `"to": 1` that the whole box exists
+   * to reveal.
+   */
+  function choose(i) {
+    chosen = conns[i] ? i : -1;
+    conns.forEach((c, n) => {
+      c.el.classList.toggle('on', n === chosen);
+      c.el.setAttribute('aria-pressed', String(n === chosen));
+    });
+    patch.textContent = conns[chosen]
+      ? JSON.stringify([conns[chosen].link], null, 2) : EMPTY_PATCH;
     /* Both of these are things to show, the object and the report that there is
        no object, so both get the box's edges. See `.wish-patch`. */
     patch.dataset.shown = '1';
-    whyBox.replaceChildren(...g.rows.map((r) => {
-      const e = el('div', 'wish-why');
-      e.append(el(r.ok ? 'i' : 'b', '', r.ok ? 'allowed' : 'refused'),
-        el('span', 'wish-why-l', `  ${r.say}`));
-      // A refusal's reason names the key or the port, never the row it is about,
-      // so the link it belongs to is on the line above it.
-      // ⚠️ AND AN ALLOWED LINK GETS THE SAME SECOND LINE WHEN THE VALIDATOR HAS
-      // SOMETHING TO SAY ABOUT IT. `allowed` alone reads as *everything you
-      // said will happen*, and on this desk it usually is not: a MIDI source
-      // emits six classes and the Circuit consents to three. The line is the
-      // same shape as a refusal's, in the same dim ink, because it is the same
-      // kind of fact and only the weight differs.
-      if (!r.ok) e.append(el('div', '', r.why));
-      else if (r.warn) e.append(el('div', '', r.warn));
-      return e;
-    }));
-    g.picture = draw(g);
+  }
+
+  /**
+   * 🔴 THE LIST IS ONE TAB STOP AND THE ARROWS MOVE INSIDE IT, WHICH IS
+   * `table.mjs`'S OWN PATTERN AND IS ON THIS PAGE ALREADY. Every row being a
+   * tab stop is what made tabbing past `/making/`'s 63 rows take sixty-three
+   * presses. Enter and the space bar choose; the arrows move the focus and
+   * choose nothing, because a table on this same page behaves that way and two
+   * keyboard conventions in one component is worse than either of them.
+   */
+  function wire(c, i) {
+    c.el.classList.add('pick');
+    c.el.setAttribute('role', 'button');
+    c.el.tabIndex = i === 0 ? 0 : -1;
+    c.el.addEventListener('click', () => choose(conns.indexOf(c)));
+    c.el.addEventListener('focus', () => {
+      for (const other of conns) other.el.tabIndex = other === c ? 0 : -1;
+    });
+    c.el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(conns.indexOf(c)); return; }
+      const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+      const jump = e.key === 'Home' ? 0 : e.key === 'End' ? conns.length - 1 : null;
+      if (step === undefined && jump === null) return;
+      /* Or the page scrolls under the arrow as well as the focus moving, which
+         puts the row you just reached somewhere you did not expect. */
+      e.preventDefault();
+      const here = conns.indexOf(c);
+      const want = jump !== null ? jump : here + step;
+      conns[Math.max(0, Math.min(conns.length - 1, want))]?.el.focus();
+    });
+  }
+
+  function show(links) {
+    const g = grade(links);
+    for (const c of conns) c.dg?.destroy();
+    const built = g.rows.map((r) => {
+      const c = connRow();
+      /* 🔴 THE STATE IS AN ATTRIBUTE NOW THAT IT IS NO LONGER A WORD. The
+         picture carries it for a reader; this carries it for a check and for
+         the action column the day it grows a button. */
+      c.el.dataset.verdict = r.ok ? 'allowed' : r.needs ? 'incomplete' : 'refused';
+      return { ...c, link: r.link, row: r };
+    });
+    /* 🔴 A ROW WITH NOTHING IN IT WHEN THERE IS NOTHING TO SHOW. A proposal
+       naming nothing on this desk is an answer, and the component may not
+       change height between having one and having none. */
+    layRows(built.length ? built.map((c) => c.el) : [connRow().el]);
+    /* 🔴 DRAWN AFTER THE ROWS ARE IN THE PAGE, NEVER BEFORE, AND THIS IS THE
+       ONE ORDERING THAT MATTERS HERE. `createDiagram` measures the host it is
+       given and falls back to 320 px when that host has no size yet, which is
+       under the 560 px at which it stops laying a picture out in a row: a
+       picture built into a detached element would be drawn stacked, and its
+       `ResizeObserver` would put it right one frame later, so every check that
+       reads the picture in the same tick would be reading a layout no reader
+       ever sees. */
+    conns = built.map((c) => ({ ...c, ...drawOne(c.fig, c.row) }));
+    /* 🔴 THE REPORT IS A LOG LINE SINCE 2026-09-22, not a comment inside the
+       object box: *"rm # the model proposed nothing..."*. It is still made,
+       because an empty reply is an ANSWER and a blank box alone cannot say
+       which of the two empty states it is in. */
+    if (!g.rows.length) {
+      d.log('the model proposed nothing, which is the right answer to an instruction '
+          + 'that names nothing on this desk');
+    }
+    /**
+     * 🔴 THE ONE ROW THAT HAS NO PICTURE TO CAPTION STILL HAS TO SAY
+     * SOMETHING. A link that begins and ends at one instrument draws no arrow,
+     * so `drawOne` renders no figure and there is no caption slot to write
+     * into, and a proposal of `Circuit -> Circuit` would have been a blank row.
+     * The line under the picture's room carries the same two sentences there.
+     * ⚠️ IT IS NOT THE OLD PAIR OF ELEMENTS TAKING TURNS. Exactly one of the
+     * two exists on any row: a row with a figure has a caption and no line, a
+     * row without one has the line and no figure. What was removed on
+     * 2026-09-22 was a line standing down with `visibility` while a caption
+     * above it said something else.
+     */
+    for (const c of conns) {
+      const lines = c.drawn ? [] : sayRow(c.row);
+      c.say.replaceChildren(...lines.map((t) => el('div', '', t)));
+      c.say.hidden = !lines.length;
+    }
+    conns.forEach(wire);
+    choose(0);
+    g.picture = {
+      drawn: conns.reduce((n, c) => n + c.drawn, 0),
+      loops: conns.reduce((n, c) => n + c.loops, 0),
+      boxes: conns.reduce((n, c) => n + c.boxes, 0),
+      rows: conns.length,
+    };
     return g;
   }
 
@@ -1450,10 +1961,13 @@
        presence: a box that had held one answer would keep its edges for the
        rest of the page's life. */
     delete patch.dataset.shown;
-    whyBox.replaceChildren();
-    dg?.destroy();
-    dg = null;
-    dgHost.replaceChildren();
+    for (const c of conns) c.dg?.destroy();
+    conns = [];
+    chosen = -1;
+    /* 🔴 BACK TO ONE EMPTY ROW, NEVER TO NO ROW AT ALL. The room a
+       connection takes is reserved from the first paint, so pressing Interpret
+       and getting one link back moves nothing under the reader's hand. */
+    layRows([connRow().el]);
   }
   function clearAll() { said.value = ''; clearAnswer(); }
 
@@ -1642,7 +2156,8 @@
          reporting. Four facts on one line, dated by the log, so two answers can
          be compared. */
       d.log(`the patch came back in ${out.ms ?? '?'} ms: ${out.links?.length ?? 0} link(s), `
-        + `${g.refused} refused, ${out.usage?.total_tokens ?? '?'} tokens`);
+        + `${g.refused} refused, ${g.needs} incomplete, `
+        + `${out.usage?.total_tokens ?? '?'} tokens`);
       return out;
     } finally {
       /* ⚠️ IN A `finally`, or a model that answers with an error leaves both
@@ -1792,10 +2307,12 @@
      * ⚠️ `range` WAS ADDED THE SAME DAY AND THIS REPLY IS FROM BEFORE IT
      * EXISTED. Whether the model reaches for `range` now has not been measured,
      * and a canned answer saying it does would be a claim nobody checked.
-     * ⚠️ IT IS ALSO THE ONLY ROW WITH TWO LINKS BETWEEN ONE PAIR, which is one
-     * arrow on purpose: two drawn down one gap read as one, and then the
-     * picture would say fewer links than the answer does. The count is in the
-     * arrow's own sentence.
+     * ⚠️ IT IS ALSO THE ONLY ROW WITH TWO LINKS BETWEEN ONE PAIR, AND IT IS TWO
+     * ROWS AND TWO ARROWS SINCE 2026-09-22. It was one arrow while every link
+     * was drawn into one picture, because two lines down one gap read as one
+     * and the picture would then have said fewer links than the answer does. A
+     * connection is a row with a picture of its own now, so there is no shared
+     * gap left and each link is drawn whole.
      */
     { say: 'Split the keyboard in half, the lower part plays synth 1 and the upper part plays synth 2.',
       about: 'a keyboard split',
@@ -2114,6 +2631,38 @@
 
   d.on('check', async () => {
     /**
+     * 🔴 THE ROWS, READ OFF THE PAGE RATHER THAN OFF `conns`. What is being
+     * graded is what a reader is shown, and two numbers derived from one field
+     * agree with each other whatever is wrong, which this project has already
+     * paid for once on the MIM corpus.
+     * ⚠️ EVERY CHECK BELOW THAT USED TO READ ONE `whyBox` READS THE SAME WORDS
+     * THROUGH `whyText`. The claims did not move when the layout did: a refusal
+     * still has to name the key it is about, and a row still has to name the
+     * instrument rather than a port id.
+     */
+    const rowsOf = () => [...answer.querySelectorAll('.wish-conn')];
+    /**
+     * 🔴 A ROW'S SENTENCE LIVES IN TWO PLACES AND THE CHECKS MAY NOT CARE
+     * WHICH. Since 2026-09-22 it is the FIGURE'S CAPTION, the slot
+     * `createDiagram` already reserves and already swaps on hover, and
+     * `.wish-why` is the fallback for the one row that has no picture to
+     * caption: a link that begins and ends at one instrument draws no arrow.
+     * ⚠️ **SO A CHECK READING `.wish-why` DIRECTLY WOULD READ AN EMPTY BOX ON
+     * EVERY ORDINARY ROW AND PASS ONLY ON THE ODD ONE.** Six asserts did
+     * exactly that for one run. This reads whichever element is carrying the
+     * words, which is what every one of them meant.
+     */
+    const sayEls = () => rowsOf().map((r) =>
+      r.querySelector('.pos-dg-cap') || r.querySelector('.wish-why'));
+    /* ⚠️ THE WHOLE ROW, NOT THE CAPTION ELEMENT. A row's sentence may be three
+       lines and the figure's caption renders the first of them, so a check
+       reading the caption alone sees the connection's name and never the reason
+       under it. Reading the row catches the words wherever the component put
+       them. */
+    const whyText = () => rowsOf().map((r) => r.textContent || '').join('\n');
+    const figs = () => rowsOf().map((r) => r.querySelector('.wish-dg'));
+
+    /**
      * 🔴 A CANNED REPLY, AND IT IS THE ONE THE REAL MODEL GAVE. Measured
      * 2026-09-21 through `demo/wish-local.mjs` against
      * `@cf/meta/llama-3.3-70b-instruct-fp8-fast`: the ports were right and the
@@ -2129,15 +2678,34 @@
        leave it, and it counts every call. */
     d.assert('a visit reached nobody', reached === 0, `${reached} calls to the agent`);
 
-    /* 🔴 THE FIELD NAMES ARE QUOTED, AND THAT IS WHAT THIS LINE NOW GRADES.
-       `refused transpose needs by and was given to` was reported as unreadable
-       because `by` and `to` are FIELD NAMES printed as bare English, so the
-       sentence parses as broken grammar rather than as a report about two keys.
-       The check behind it is untouched and must stay untouched. */
-    d.assert('the transform the real model returned is refused, and both keys read as keys',
-      g.refused === 1 && /transpose takes "by"/.test(whyBox.textContent)
-      && /was given "to"/.test(whyBox.textContent),
-      whyBox.textContent.trim().slice(0, 110));
+    /* 🔴 THE SENTENCE NAMES NO FIELD AT ALL SINCE 2026-09-22, WHICH REVERSES
+       WHAT THIS ASSERT USED TO REQUIRE. It read `transpose takes "by"` and
+       `was given "to"`, and the quoting was itself a repair: bare `by` and `to`
+       parsed as broken grammar. Then the whole register was reported as
+       unusable, *"its not for humans, i do not know what to do"*, and the
+       sentences became English about the instrument.
+       ✅ **SO THIS GRADES THE CLAIM RATHER THAN THE WORDING, AND ALSO GRADES
+       THE ABSENCE.** The link is still refused, the reason still says what is
+       missing in words a person can act on, and NO field name appears in it.
+       The last clause is the one that would catch a slide back. */
+    /* ⚠️ AND THE PROSE IS WHAT MAY NOT CARRY A FIELD NAME, not the repair. The
+       solution line offers the corrected OBJECT, which is a thing to compare
+       against the JSON block directly above it rather than an English claim
+       about two keys, and `bay.mjs` argues that at length where it is built.
+       So the absence is graded on the reason and not on the row. */
+    const whyOnly = g.rows.map((r) => r.why || '').join('\n');
+    /* ⚠️ A LIST RATHER THAN A REGEX LITERAL, and the reason is the build rather
+       than taste: `build.mjs` scans modules for imports, and a pattern holding
+       a quoted `from` reads as one. It refused the build with
+       `wish/index.html imports /.test(whyOnly)`, which is the scanner quoting
+       my own check back at me. */
+    const FIELD_WORDS = ['by', 'to', 'cls', 'from'];
+    const namesAField = (t) => FIELD_WORDS.some((w) => t.includes(`"${w}"`));
+    d.assert('the transform the real model returned is refused, in words with no field names in them',
+      g.refused === 1
+      && /semitones/.test(whyText())
+      && !namesAField(whyOnly),
+      `${g.refused} refused, said "${whyOnly.slice(0, 90)}"`);
 
     /* 🔴 THE JSON IS THE MODEL'S OWN OBJECT, and the `to: 1` that caused the
        refusal is IN it. That is the whole reason this box stopped being the
@@ -2179,32 +2747,41 @@
        and it means this machine, which nobody outside this repository can know
        and which is the same word on every row of this desk. */
     d.assert('a row names the instrument and never shows a port id',
-      /MK-425C USB MIDI Keyboard to Circuit/.test(whyBox.textContent)
-      && !whyBox.textContent.includes('here:'),
-      whyBox.textContent.trim().slice(0, 110));
+      /MK-425C USB MIDI Keyboard to Circuit/.test(whyText())
+      && !whyText().includes('here:'),
+      whyText().trim().slice(0, 110));
 
     /**
-     * 🔴 AND WITH AN ANSWER ON SCREEN THE VERDICT IS A PART OF THE GLUE WITH A
-     * SEAM ABOVE IT, which is the only moment that can be measured: the part is
-     * away until something is proposed, so every check taken before one lands
-     * grades a three part component and says nothing about the fourth.
+     * 🔴 AND WITH AN ANSWER ON SCREEN A CONNECTION IS A PART OF THE GLUE WITH
+     * A SEAM ABOVE IT, which is the only moment that can be measured: a row
+     * holding nothing is what stands there until something is proposed, so a
+     * check taken before one lands says nothing about the rows an answer makes.
      * ⚠️ THAT IS WHY THIS SITS HERE RATHER THAN BESIDE THE OTHER LAYOUT CHECKS.
      * A check run at the wrong moment is a check that measures a state nothing
      * has reached, which this page has already paid for once.
+     * ⚠️ AND THE SEAM UNDER IT IS MEASURED AGAINST THE OBJECT BLOCK, which is
+     * the part that follows the last row. With one link there is one row, so
+     * both of its seams belong to the glue and neither is drawn by this page.
      */
     {
       const seam = (a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().bottom;
       const head = patchRow.parentElement;
       const glueBg = getComputedStyle(answer).backgroundColor;
-      d.assert('with an answer up, the verdict is its own part with the glue\'s own seam over it',
-        whyPart.hidden === false && whyPart.parentElement === answer
-        && Math.abs(seam(head, whyPart) - 1) < 0.6
-        && Math.abs(seam(whyPart, dgHost) - 1) < 0.6
-        && getComputedStyle(whyPart).backgroundColor !== glueBg
-        && getComputedStyle(whyPart).borderTopWidth === '0px',
-        `${[...answer.children].filter((n) => !n.hidden).length} parts up, seams `
-        + `${seam(head, whyPart).toFixed(1)} above and ${seam(whyPart, dgHost).toFixed(1)} below, `
-        + `and it draws ${getComputedStyle(whyPart).borderTopWidth} of border of its own`);
+      const row = rowsOf()[0];
+      /* ⚠️ THE SEAM BELOW WENT WITH THE OBJECT BLOCK, 2026-09-22. A row is the
+         LAST part of the glue now, so what is under it is the component's own
+         edge rather than a seam, and asking for 1 px there was asking the glue
+         to have a part it no longer has. The claim that survives is the one
+         this was always about: a row is a PART, with the glue's seam above it,
+         painting its own ground and drawing no border of its own. */
+      d.assert('with an answer up, the connection is its own part with the glue\'s own seam over it',
+        rowsOf().length === g.rows.length && row.parentElement === answer
+        && Math.abs(seam(head, row) - 1) < 0.6
+        && getComputedStyle(row).backgroundColor !== glueBg
+        && getComputedStyle(row).borderTopWidth === '0px',
+        `${[...answer.children].filter((n) => !n.hidden).length} parts up for `
+        + `${g.rows.length} connection(s), a ${seam(head, row).toFixed(1)} px seam above it, `
+        + `and it draws ${getComputedStyle(row).borderTopWidth} of border of its own`);
     }
 
     // ⚠️ THE NEGATIVE CONTROL: the same link, spelled right, is allowed. Without
@@ -2219,7 +2796,7 @@
     const NASTY = [{ from: 'here:circuit:out', to: 'here:circuit:in', transforms: [] }];
     const g3 = show(NASTY);
     d.assert('a proposal that loops an instrument into itself is refused',
-      g3.refused === 1, whyBox.textContent.trim().slice(0, 80));
+      g3.refused === 1, whyText().trim().slice(0, 80));
 
     /* 🔴 A MODEL THAT PROPOSED NOTHING IS A REPORT AND IS SHOWN LIKE ANY OTHER
        ANSWER, which is the second clause here and is the negative control for
@@ -2231,11 +2808,21 @@
        a glue no child has an edge of its own, so the fact moved to the assert on
        the component's seams and edges, where it is now measured for all three
        parts at once instead of for this one. */
+    /* 🔴 THE REPORT MOVED TO THE LOG ON 2026-09-22: *"rm # the model proposed
+       nothing..."*. It was a REPORT rather than furniture and is still made, in
+       the place a sentence about one run belongs. What it could not go on doing
+       is sitting inside a box whose subject is the model's own object, where a
+       comment is a thing a reader tries to parse.
+       ⚠️ SO WHAT IS GRADED IS THE SAYING, NOT WHERE IT IS SAID: an empty reply
+       still produces a line naming it, and the object box is blank rather than
+       holding prose. */
     const EMPTY = show([]);
-    d.assert('a proposal of nothing says so rather than showing an empty box',
-      EMPTY.ok === 0 && patch.textContent.includes('proposed nothing')
-      && patch.dataset.shown === '1',
-      `${patch.textContent.split('\n')[0]}, shown ${patch.dataset.shown === '1'}`);
+    d.assert('a proposal of nothing is reported in words, and the object box stays blank',
+      EMPTY.ok === 0 && patch.textContent.trim() === ''
+      && /proposed nothing/.test(document.querySelector('.pos-log')?.textContent || ''),
+      `the box holds ${JSON.stringify(patch.textContent.trim())} and the log `
+      + `${/proposed nothing/.test(document.querySelector('.pos-log')?.textContent || '')
+        ? 'says it' : 'does not say it'}`);
 
     /**
      * 🔴 AND THE OTHER EMPTY STATE IS THE ONE THAT SAYS NOTHING, WHICH IS WHAT
@@ -2263,9 +2850,14 @@
       patch.textContent === '' && !patch.dataset.shown
       && parseFloat(blank.borderTopWidth) === 0
       && blank.backgroundColor === 'rgba(0, 0, 0, 0)'
-      && blankFloor > 0 && blankH >= blankFloor,
+      /* ⚠️ WITHIN HALF A PIXEL, BECAUSE A USED HEIGHT IS NOT THE NUMBER THAT
+         WAS ASKED FOR. The browser lays out on a 1/64 px grid, so a
+         `min-height` of 268.8 px is used as 268.796875 and an exact `>=`
+         reads as a box that lost its floor by three thousandths of a pixel.
+         MEASURED the moment the reservation stopped being a whole number. */
+      && blankFloor > 0 && blankH >= blankFloor - 0.5,
       `${JSON.stringify(patch.textContent)}, edge ${blank.borderTopWidth}, `
-      + `ground ${blank.backgroundColor}, ${blankH.toFixed(0)} px standing on a `
+      + `ground ${blank.backgroundColor}, ${blankH.toFixed(2)} px standing on a `
       + `${blankFloor} px floor`);
 
     /* ── the picture, in all three of its states ──────────────────────────
@@ -2277,9 +2869,16 @@
        drawer had to cut passed straight through a check written to catch
        exactly that. The picture is rebuilt on every answer, so the cuts are a
        fact about a state rather than about the page. */
-    const boxes = () => dgHost.querySelectorAll('.pos-dg-n').length;
-    const arrows = () => dgHost.querySelectorAll('.pos-dg-l').length;
-    const figH = () => dgHost.querySelector('.pos-dg')?.getBoundingClientRect().height ?? 0;
+    /* 🔴 ACROSS EVERY ROW, WHICH IS WHAT `THE PICTURE` MEANS SINCE 2026-09-22.
+       One host became one per connection, so a query rooted at a single host
+       would have gone on grading the first row and reporting it as the page.
+       The counts are totals and the heights are the tallest of them, so a
+       second row that draws badly cannot hide behind a first one that does
+       not. */
+    const boxes = () => answer.querySelectorAll('.wish-conn .pos-dg-n').length;
+    const arrows = () => answer.querySelectorAll('.wish-conn .pos-dg-l').length;
+    const figH = () => Math.max(0, ...figs()
+      .map((h) => h.querySelector('.pos-dg')?.getBoundingClientRect().height ?? 0));
     /* ⚠️ `:not([aria-hidden])` IS NOT DECORATION. `createDiagram` measures its
        own text with a ruler element that carries the same class, parked off to
        one side and emptied after each layout, so a plain query answers one more
@@ -2290,25 +2889,38 @@
        `note, cc,bend` and an assert about what the picture says was failing on
        the place the drawer chose to break. MEASURED 2026-09-22, the first day
        an allowed arrow had a name on it. */
-    const labels = () => [...dgHost.querySelectorAll('.pos-dg-llab:not([aria-hidden])')]
+    const labels = () => [...answer.querySelectorAll('.wish-conn .pos-dg-llab:not([aria-hidden])')]
       .map((t) => {
         const lines = [...t.querySelectorAll('tspan')].map((x) => x.textContent);
         return lines.length ? lines.join(' ') : t.textContent;
       });
 
     const seen = [];
-    /* ⚠️ `dg` IS NULL IN THE STATE WHERE NOTHING WAS PROPOSED, since a picture
-       with no arrows is not drawn at all. Reading `dg.mode` there is a
+    /* ⚠️ A ROW'S `dg` IS NULL IN THE STATE WHERE NOTHING WAS PROPOSED, since a
+       picture with no arrows is not drawn at all. Reading `dg.mode` there is a
        TypeError inside the check, which does not go red, it takes every assert
        after it with it. */
     const look = (what) => seen.push({
-      what, boxes: boxes(), arrows: arrows(), h: figH(), mode: dg?.mode ?? 'not drawn',
-      /* The PART's own height, which is a different question from the figure's:
-         a picture that fits can still grow the part it sits in, and the part is
+      what,
+      boxes: boxes(),
+      arrows: arrows(),
+      h: figH(),
+      rows: rowsOf().length,
+      mode: conns[0]?.dg?.mode ?? 'not drawn',
+      /* The HOST's own height, which is a different question from the figure's:
+         a picture that fits can still grow the cell it sits in, and the cell is
          what a reader sees move. See the room assert below. */
-      hostH: dgHost.getBoundingClientRect().height,
-      labels: labels(), inHost: dgHost.childElementCount,
-      cuts: (dg?.cuts ?? []).map((c) => `${c.where} ${c.id} at ${c.width}px`),
+      hostH: Math.max(0, ...figs().map((h) => h.getBoundingClientRect().height)),
+      /* 🔴 AND THE WIDTH THE DRAWER WAS GIVEN, because the mode above is
+         decided on it: `diagram.mjs` lays a picture out in a row while its host
+         is at least 560 px and stacks it below that, and everything the
+         reserved action column takes comes off this number. A row layout that
+         quietly became a column would double the height of every connection. */
+      figW: Math.max(0, ...figs().map((h) => h.getBoundingClientRect().width)),
+      labels: labels(),
+      inHost: figs().reduce((n, h) => n + h.childElementCount, 0),
+      cuts: conns.flatMap((c) => (c.dg?.cuts ?? [])
+        .map((x) => `${x.where} ${x.id} at ${x.width}px`)),
     });
 
     show([]); look('nothing proposed');
@@ -2379,10 +2991,10 @@
      */
     const ink = (run) => {
       show(run);
-      const g = dgHost.querySelector('.pos-dg-l');
+      const g = answer.querySelector('.wish-conn .pos-dg-l');
       const path = g?.querySelector('.pos-dg-link');
       /* 🔴 THE LINK'S OWN `marker-end`, NEVER A SEARCH FOR THE RED MARKER.
-         This read `dgHost.querySelector('.pos-dg-head-bad')` on its first run
+         This read `.pos-dg-head-bad` anywhere in the picture on its first run
          and went red correctly on the ALLOWED case: all four arrowheads are
          declared in `<defs>` on every picture, so the red one is always
          present and finding it says nothing about whether any line uses it.
@@ -2413,6 +3025,66 @@
       + `allowed line ${good.line} label ${good.lab} head ${good.end}, `
       + `--bad is ${BAD_INK} which computes to ${want}`);
 
+    /**
+     * 🔴 THE THIRD VERDICT, DRIVEN ON THE OBJECT A REAL MODEL RETURNED.
+     * Asked 2026-09-22: *"perhaps a step model can return: not 'accepted' not
+     * accepted but needs more info / input?"* ✅ MEASURED 2026-09-21: *"connect
+     * the first rotary knob of evolution to the first rotary knob of circuit"*
+     * came back as `{ op: 'cc', to: 1 }` with no `from`, and the page called it
+     * refused. Nothing about it is refused. One number is absent and it is a
+     * number a person at this desk knows.
+     * 🔴 FOUR CLAIMS AT ONCE BECAUSE THEY ONLY WORK TOGETHER: it is counted
+     * apart from both the allowed and the refused, it says so in its own word,
+     * that word is in neither of the other two colours, and the picture asks
+     * rather than refuses. Any one of them alone would pass on a page that had
+     * renamed a refusal.
+     * ⚠️ AND THE BOXES STAY SOLID, which is the distinction the picture was
+     * asked to draw: the hardware is real and known, and only the connection's
+     * detail is missing.
+     */
+    const WARN_INK = getComputedStyle(document.documentElement)
+      .getPropertyValue('--warn').trim();
+    const SHORT = [{ from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+      transforms: [{ op: 'cc', to: 1 }] }];
+    const g6 = show(SHORT);
+    {
+      /* 🔴 THE VERDICT IS AN ATTRIBUTE AND THE COLOUR IS THE ROW'S, since the
+         word came off the sentence on 2026-09-22. This looked for a
+         `.wish-why-q` span holding the word `incomplete` and read its ink, and
+         neither exists any more: the row carries `data-verdict` and the
+         stylesheet colours the row from it.
+         ⚠️ AND THE REASON IS IN WORDS NOW, so the old `"from" is missing` test
+         was looking for a field name the sentence deliberately no longer says.
+         What it was protecting is that the reason names the thing that is
+         missing, which it does, in instrument terms. */
+      const row = rowsOf()[0];
+      const verdict = row.dataset.verdict;
+      const ink = getComputedStyle(row).getPropertyValue('--wish-verdict-ink').trim()
+        || getComputedStyle(row).color;
+      d.assert('a link missing an argument is neither allowed nor refused, and the picture asks for it',
+        g6.ok === 0 && g6.refused === 0 && g6.needs === 1
+        && verdict === 'incomplete'
+        && /controller it comes from/.test(row.textContent)
+        && labels().join() === '?'
+        && !answer.querySelector('.wish-conn .pos-dg-l[data-bad]')
+        && boxes() === 2,
+        `${g6.ok} allowed, ${g6.refused} refused, ${g6.needs} incomplete; the row is `
+        + `"${verdict}" and reads `
+        + `${JSON.stringify(row.textContent.trim().slice(0, 64))}; the picture draws `
+        + `${boxes()} solid boxes and an arrow saying ${JSON.stringify(labels().join())}`);
+    }
+
+    /* ⚠️ THE NEGATIVE CONTROL, AND IT IS THE SAME TRANSFORM WITH THE NUMBER
+       SUPPLIED. Without it the line above would pass on a page that had learned
+       to call everything incomplete, and it is also the exact thing an action
+       in the row's reserved column would do: 84 is the keyboard's first rotary
+       knob, which is what a person turning it would tell the desk. */
+    const g7 = show([{ ...SHORT[0], transforms: [{ op: 'cc', from: 84, to: 1 }] }]);
+    d.assert('and the same link with the number it was waiting for is allowed',
+      g7.ok === 1 && g7.needs === 0 && g7.refused === 0
+      && !sayEls()[0].querySelector('.wish-why-q'),
+      `${g7.ok} allowed, ${g7.refused} refused, ${g7.needs} incomplete`);
+
     /* 🔴 THE ROOM IS TAKEN BEFORE THE PICTURE ARRIVES, which is what *"reserve
        space for it"* asked for. The reservation is a CSS number, so this reads
        the COMPUTED value rather than the source: a rule that lost is a rule that
@@ -2424,26 +3096,39 @@
        beaten by `.pos-stack > div:empty` in `shell.css` at (0,2,1), so the log
        moved on every answer while this line read green. The empty height is a
        clause now, not a remark.
-       🔴 AND THE ROOM IS THE CONTENT BOX, NOT THE `min-height`, SINCE THE HOST
-       BECAME A PART OF THE GLUE. `box-sizing` is `border-box` project-wide, so
-       a padded part's `min-height` includes its own padding and comparing a
-       figure against it would grade the picture against a number that is
-       partly air. The padding comes off before the comparison and the detail
-       line prints both, so nobody has to re-derive which is which. */
-    const dgBox = getComputedStyle(dgHost);
+       🔴 AND THE ROOM IS THE CONTENT BOX, NOT THE `min-height`. `box-sizing` is
+       `border-box` project-wide, so any padding on the host would be inside its
+       `min-height` and comparing a figure against that number would grade the
+       picture against a box that is partly air. The padding comes off before
+       the comparison and the detail line prints both, so nobody has to
+       re-derive which is which. It is 0 now that the host is a cell of a
+       connection row and the padding belongs to the row.
+       🔴 AND THE HOST IS THE FIRST ROW'S, WHICH IS EVERY ROW'S: they are cells
+       of one grid column with one rule on them, and `figH` and `hostH` take the
+       TALLEST of whatever is on screen, so a second row that grew would be the
+       number this reads. */
+    const dgBox = getComputedStyle(figs()[0]);
     const dgPad = parseFloat(dgBox.paddingTop) + parseFloat(dgBox.paddingBottom);
     const reserved = (parseFloat(dgBox.minHeight) || 0) - dgPad;
     clearAnswer();
-    const roomWhenEmpty = dgHost.getBoundingClientRect().height;
-    const showsWhenEmpty = getComputedStyle(dgHost).display;
-    d.assert('the picture fits the room kept for it, and the part never changes height',
+    const roomWhenEmpty = figs()[0].getBoundingClientRect().height;
+    const showsWhenEmpty = getComputedStyle(figs()[0]).display;
+    d.assert('the picture fits the room kept for it, and the row never changes height',
       reserved > 0 && seen.every((s) => s.h <= reserved)
       && roomWhenEmpty >= reserved + dgPad
-      && seen.every((s) => Math.round(s.hostH) === Math.round(roomWhenEmpty)),
+      && seen.every((s) => Math.round(s.hostH) === Math.round(roomWhenEmpty))
+      /* 🔴 AND THE DRAWER IS STILL LAYING THE PICTURE OUT IN A ROW, WHICH IS
+         THE CLAUSE THE ACTION COLUMN PUT HERE. `diagram.mjs` stacks a picture
+         into one tall column when its host drops under 560 px, so widening the
+         reserved column past what is left would double the height of every
+         connection and no other clause in this check would say so. */
+      && seen.filter((x) => x.mode !== 'not drawn').every((x) => x.mode === 'row'),
       `${reserved} px is the default height, against ${seen.map((s) => s.h.toFixed(0)).join(', ')} `
       + `drawn, and ${roomWhenEmpty.toFixed(0)} px standing as ${showsWhenEmpty} with nothing in it, `
-      + `${dgPad} px of it the part's own padding; the part measured `
-      + `${seen.map((s) => s.hostH.toFixed(0)).join(', ')} px through those states`);
+      + `${dgPad} px of it the host's own padding; the host measured `
+      + `${seen.map((s) => s.hostH.toFixed(0)).join(', ')} px through those states, `
+      + `laid out as ${seen.map((s) => s.mode).join(', ')} across `
+      + `${seen.map((s) => s.figW.toFixed(0)).join(', ')} px`);
 
     /* ── the only feedback the control has left ────────────────────────────
        🔴 THE BUTTON CARRIES NOTHING OF ITS OWN, so the paint IS the signal and
@@ -2578,19 +3263,40 @@
      * 11 px above where the part does and reports an 11 px seam on a component
      * that is glued perfectly. MEASURED when exactly that happened.
      */
+    /**
+     * ⚠️ AND THE MIDDLE PART IS A LIST SINCE 2026-09-22, WHICH IS WHY THIS READS
+     * THE ROWS RATHER THAN ONE NAMED BOX. There is one part per connection and
+     * a single empty one when there is nothing to show, so what has to be true
+     * is that every one of them sits inside the glue, under the header and over
+     * the object, in that order and with none of them overlapping.
+     */
     const rect = (n) => n.getBoundingClientRect();
     const patchPart = patchRow.parentElement;
     const picked = rect(patchPart);
-    const drawn = rect(dgHost);
+    const laid = rowsOf().map(rect);
     const dumped = rect(dump);
+    /* 🔴 THE OBJECT BLOCK IS NO LONGER IN THE GLUE, SINCE 2026-09-22:
+       *"disconnect these 2 panels"*. So this grades two claims that used to be
+       one: the picker and the rows are ONE glued component in order, and the
+       object is a SEPARATE surface under it with the page's own air between
+       them rather than a shared border. The second half is the ask, and reading
+       the gap is what tells a disconnected panel from one that merely lost its
+       seam. */
     const oneBox = answer.classList.contains('pos-glue')
-      && [patchPart, dgHost, dump].every((n) => n.parentElement === answer)
-      && answer.parentElement === d.el;
-    d.assert('the patch picker, the picture and the JSON are one glued component, in that order',
-      oneBox && picked.bottom <= drawn.top && drawn.bottom <= dumped.top,
-      `${oneBox ? 'one .pos-glue holds all three' : 'NOT one box'}, picker ends at `
-      + `${picked.bottom.toFixed(0)}, picture runs ${drawn.top.toFixed(0)} to `
-      + `${drawn.bottom.toFixed(0)}, JSON starts at ${dumped.top.toFixed(0)}`);
+      && [patchPart, ...rowsOf()].every((n) => n.parentElement === answer)
+      && answer.parentElement === d.el
+      && dump.parentElement === d.el;
+    const apart = dumped.top - laid[laid.length - 1].bottom;
+    d.assert('the picker and the connections are one glued component, and the JSON is its own',
+      oneBox && laid.length > 0
+      && picked.bottom <= laid[0].top
+      && laid.every((r, i) => (i === 0 || laid[i - 1].bottom <= r.top))
+      && apart > 8,
+      `${oneBox ? `one .pos-glue holds the header and ${laid.length} row(s), with the JSON outside it`
+        : 'NOT the right two boxes'}, picker ends at `
+      + `${picked.bottom.toFixed(0)}, rows run ${laid.map((r) => `${r.top.toFixed(0)} to `
+        + `${r.bottom.toFixed(0)}`).join(' and ')}, and the JSON starts `
+      + `${apart.toFixed(0)} px below them`);
 
     /**
      * 🔴 AND WHAT SAYS WHERE A PART ENDS IS THE SEAM, WHICH IS THE WHOLE
@@ -2638,27 +3344,323 @@
       + `against the glue's ${seamInk}`);
 
     /**
-     * 🔴 THE VERDICT KEEPS ITS ROOM WITH NOTHING IN IT, which is what
-     * *"make this the minimal height even when no data"* asks for and the only
-     * part of it a check can see. The test is not that it is tall: it is that
-     * the component does not CHANGE HEIGHT when an answer lands, because that
-     * is the thing a reader would have seen move.
+     * 🔴 A CONNECTION KEEPS ITS ROOM WITH NOTHING IN IT, which is what
+     * *"make this the minimal height even when no data"* asked for about the
+     * verdict and is now the whole row's job. The test is not that it is tall:
+     * it is that the component does not CHANGE HEIGHT between an answer of one
+     * connection and no answer at all, because that is the thing a reader would
+     * have seen move under the button they pressed.
+     * 🔴 AND THE SENTENCE'S OWN ROOM IS THE SECOND CLAUSE, because it is two
+     * lines on most answers and one on some: a refusal names its reason under
+     * it and an allowed link names what the far end drops. A box sized by its
+     * words would make the picture above it move between two answers that are
+     * both perfectly ordinary.
      * ⚠️ IT EMPTIES AND REFILLS THE BOX IN ONE BLOCK WITH NO `await` IN IT, so
      * no frame can be drawn between and nobody watching the page sees it
      * flicker. Same argument `/kit/` makes about its own measuring window.
+     * ⚠️ AND TWO CONNECTIONS ARE TALLER THAN ONE, WHICH IS NOT A DEFECT AND IS
+     * NOT GRADED HERE. One row per connection is what was asked for, so a reply
+     * with two of them takes two rows' room. What may not move is everything
+     * that is on screen before the reply lands.
      */
     {
+      show(FIXED);
       const full = answer.getBoundingClientRect().height;
-      const fullPart = whyPart.getBoundingClientRect().height;
-      const kept = [...whyBox.childNodes];
-      whyBox.replaceChildren();
+      const fullRow = rowsOf()[0].getBoundingClientRect().height;
+      const say = sayEls()[0];
+      const lines = say.childElementCount;
+      const kept = [...say.childNodes];
+      say.replaceChildren();
+      const mute = rowsOf()[0].getBoundingClientRect().height;
+      say.replaceChildren(...kept);
+      clearAnswer();
       const bare = answer.getBoundingClientRect().height;
-      const barePart = whyPart.getBoundingClientRect().height;
-      whyBox.replaceChildren(...kept);
-      d.assert('the verdict keeps a line of room with nothing in it, so nothing moves when an answer lands',
-        whyPart.hidden === false && barePart > 0 && Math.abs(full - bare) < 1,
-        `the part is ${fullPart.toFixed(1)} px with an answer and ${barePart.toFixed(1)} px `
-        + `without, and the component is ${full.toFixed(1)} against ${bare.toFixed(1)}`);
+      const bareRow = rowsOf()[0].getBoundingClientRect().height;
+      d.assert('a connection keeps its room with nothing in it, so nothing moves when an answer lands',
+        rowsOf().length === 1 && bareRow > 0
+        && Math.abs(full - bare) < 1 && Math.abs(fullRow - mute) < 1,
+        `the row is ${fullRow.toFixed(1)} px with ${lines} line(s) of verdict, `
+        + `${mute.toFixed(1)} px with none and ${bareRow.toFixed(1)} px with no answer at all, `
+        + `and the component is ${full.toFixed(1)} against ${bare.toFixed(1)}`);
+    }
+
+    /* ── one row per connection, and the one a reader chose ────────────────
+       🔴 MEASURED ON THE ONE EXAMPLE THAT COMES BACK AS TWO CONNECTIONS,
+       because a page that draws one row correctly says nothing about the thing
+       this redesign was asked for: *"a reader cannot tell which picture belongs
+       to which sentence when the model returns two"*. The keyboard split is two
+       links between the same pair of ports, which is also the hardest case for
+       the rows to tell apart. */
+    {
+      /**
+       * 🔴 TWO CONNECTIONS BETWEEN DIFFERENT PAIRS, AND THIS ONE IS
+       * CONSTRUCTED RATHER THAN MEASURED, WHICH IS WHY IT SAYS SO. The two link
+       * reply this desk really produced is the keyboard split, and both of its
+       * links run between the same two ports with the same refusal under them,
+       * so its two rows are expected to read alike and it can say nothing about
+       * a reader telling one picture from another. That is the defect this
+       * redesign was asked about, so the check builds the shape it is about:
+       * two instruments reaching one, one row each.
+       * ⚠️ THE SPLIT IS NOT DROPPED. It is driven in the examples table below,
+       * where its two rows and its two arrows are counted.
+       */
+      const PAIR = [
+        { from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+          transforms: [{ op: 'transpose', by: 1 }] },
+        { from: 'here:model-12-midi-in:out', to: 'here:circuit:in',
+          transforms: [{ op: 'channel', to: 1 }] },
+      ];
+      const g5 = show(PAIR);
+      const rs = rowsOf();
+      const words = sayEls().map((n) => n.textContent.trim());
+      d.assert('every connection is a row of its own, with its own picture and its own sentence',
+        g5.rows.length === 2 && rs.length === 2
+        && rs.every((r) => r.querySelectorAll('.pos-dg').length === 1)
+        && rs.every((r) => r.querySelectorAll('.wish-why').length === 1)
+        /* ⚠️ THE VERDICT IS AN ATTRIBUTE, NOT THE SENTENCE'S FIRST WORD. It
+           came off the words on 2026-09-22, *"rm refused text, its already on
+           connetor"*, so a row is read by `data-verdict` and the sentence
+           carries what only it can: which connection this is. */
+        && rs.every((r) => r.dataset.verdict === 'allowed')
+        && words.every((w) => w.includes(' to '))
+        /* ⚠️ AND THE TWO SENTENCES ARE DIFFERENT, AND SO ARE THE TWO PICTURES,
+           which is the pair of clauses that cannot be satisfied by drawing one
+           answer twice. One row names the keyboard and the other the Model 12,
+           in the words and in the boxes. */
+        && words[0] !== words[1]
+        && rs[0].querySelector('.pos-dg-lab').textContent
+           !== rs[1].querySelector('.pos-dg-lab').textContent,
+        `${g5.rows.length} connections in ${rs.length} rows, `
+        + `${rs.reduce((n, r) => n + r.querySelectorAll('.pos-dg').length, 0)} pictures, `
+        + `sentences ${JSON.stringify(words.map((w) => w.slice(8, 34).trim()))}`);
+
+      /* 🔴 THE OBJECT BLOCK FOLLOWS THE ROW A READER PRESSED, AND SHOWS THAT
+         ONE ALONE. *"it will show just one connection json at time"*. The two
+         objects here differ in one field, so an assert that the box CHANGED is
+         also an assert that it changed to the right one. */
+      const read = () => { try { return JSON.parse(patch.textContent); } catch { return null; } };
+      const first = read();
+      rs[1].click();
+      const second = read();
+      d.assert('pressing a row chooses it, and the object block shows that connection alone',
+        Array.isArray(first) && first.length === 1 && first[0].from === PAIR[0].from
+        && Array.isArray(second) && second.length === 1 && second[0].from === PAIR[1].from
+        && rs[1].classList.contains('on') && !rs[0].classList.contains('on'),
+        `the box went from ${JSON.stringify(first?.[0]?.from)} to `
+        + `${JSON.stringify(second?.[0]?.from)}, and `
+        + `${rs.filter((r) => r.classList.contains('on')).length} of ${rs.length} rows is marked`);
+
+      /**
+       * 🔴 THE MARK IS THE TABLE'S OWN, COMPARED AGAINST A REAL TABLE ROW
+       * RATHER THAN AGAINST TWO VALUES TYPED HERE. Asked as *"left yellow
+       * border and slihjt bg change as in table"*. This page declares those two
+       * properties itself, because `.pos-tbl-row` carries a table's grid and
+       * padding with it and a page pulling that class onto something that is
+       * not a table row would be reaching into a component's insides. What
+       * makes the copy safe is this line: the example table is marked, and the
+       * computed shadow and ground of its lit row are compared against the
+       * chosen connection's, so the day `shell.css` moves either one this page
+       * goes red instead of drifting.
+       * ⚠️ AND THE NEGATIVE HALF IS THE ROW BESIDE IT, or a page that marked
+       * everything would pass.
+       */
+      examples.mark((x) => x.say === EXAMPLES[0].say);
+      const litRow = examples.scroller().querySelector('.pos-tbl-row.on');
+      const asTable = litRow && getComputedStyle(litRow);
+      const asRow = getComputedStyle(rs[1]);
+      const asOther = getComputedStyle(rs[0]);
+      d.assert('a chosen connection wears the table\'s own ground, and no bar of its own',
+        !!litRow && asRow.backgroundColor === asTable.backgroundColor
+        && asOther.backgroundColor !== asRow.backgroundColor
+        /* ⚠️ AND THE BAR IS ASSERTED ABSENT RATHER THAN SIMPLY NOT CHECKED.
+           It was removed on a report that it is excessive at this size, so a
+           day when somebody re-adds it by copying a table rule should be a red
+           run rather than a silent return. */
+        && asRow.boxShadow === 'none',
+        `the row draws ${asRow.backgroundColor} with ${asRow.boxShadow} of its own, the `
+        + `table's own lit row draws ${asTable?.backgroundColor}, and the row beside it `
+        + `${asOther.backgroundColor}`);
+
+      /**
+       * 🔴 ONE TAB STOP FOR THE LIST, NOT ONE PER ROW, WHICH IS
+       * `table.mjs`'S RULE AND IS ON THIS PAGE ALREADY. `positron-ui` records
+       * what the other shape cost: tabbing past a 63 row table took sixty-three
+       * presses. It is invisible in a screenshot and free to read off the DOM,
+       * so both halves are asserted, the one at 0 and every other at -1.
+       * ⚠️ AND AN ARROW MOVES WITHOUT CHOOSING, WHICH IS THE OTHER HALF OF THE
+       * SAME CONVENTION. Choosing here is free, so the reason is consistency
+       * rather than cost: a table on this same page moves on an arrow and opens
+       * on Enter, and two keyboard conventions in one component is worse than
+       * either of them.
+       */
+      const roving = () => rowsOf().map((r) => r.tabIndex).join();
+      const marks = () => rowsOf().map((r) => r.classList.contains('on')).join();
+      rs[0].dispatchEvent(new KeyboardEvent('keydown',
+        { key: 'Enter', bubbles: true, cancelable: true }));
+      const byKey = marks();
+      rs[0].focus();
+      const held = roving();
+      const wasMarked = marks();
+      rs[0].dispatchEvent(new KeyboardEvent('keydown',
+        { key: 'ArrowDown', bubbles: true, cancelable: true }));
+      d.assert('the connections are one tab stop, and an arrow moves inside it without choosing',
+        rowsOf().filter((r) => r.tabIndex === 0).length === 1
+        && rowsOf().filter((r) => r.tabIndex === -1).length === rowsOf().length - 1
+        && rowsOf().every((r) => r.getAttribute('role') === 'button')
+        && byKey === 'true,false'
+        && document.activeElement === rs[1] && marks() === wasMarked,
+        `tabindex ${held} while the first row held the focus and ${roving()} after the arrow, `
+        + `Enter marked ${byKey}, the arrow left ${marks()} and put the focus on row `
+        + `${rowsOf().indexOf(document.activeElement) + 1}`);
+
+      /**
+       * 🔴 THE ACTION COLUMN IS RESERVED FROM THE FIRST PAINT, WHICH IS THE
+       * WHOLE ASK: *"reserve right side of diagram+allowed to action buttons
+       * etc"*. Nothing is in it yet, so the only thing that can be measured is
+       * that it takes its width with nothing in it and that the picture stops
+       * at its edge. A column that arrived with its first button would move the
+       * picture sideways under the reader's eye.
+       * ⚠️ AND THE ROW WITH NO ANSWER IN IT IS MEASURED TOO, because *from the
+       * first paint* is a claim about the state nobody has pressed anything in.
+       */
+      const actOf = (r) => r.querySelector('.wish-conn-act').getBoundingClientRect();
+      const want = parseFloat(getComputedStyle(rs[1]).getPropertyValue('--wish-act'));
+      const withAnswer = actOf(rs[1]);
+      const picture = figs()[1].getBoundingClientRect();
+      clearAnswer();
+      const atRest = actOf(rowsOf()[0]);
+      d.assert('the right of every row is reserved for actions, and the picture stops at its edge',
+        want > 0 && Math.abs(withAnswer.width - want) < 0.5
+        && Math.abs(atRest.width - want) < 0.5
+        && picture.right <= withAnswer.left + 0.5
+        && rs[1].querySelector('.wish-conn-act').childElementCount === 0,
+        `${want} px asked for, ${withAnswer.width.toFixed(1)} px standing with an answer and `
+        + `${atRest.width.toFixed(1)} px with none, holding `
+        + `${rs[1].querySelector('.wish-conn-act').childElementCount} controls; the picture ends `
+        + `at ${picture.right.toFixed(0)} and the column starts at ${withAnswer.left.toFixed(0)}`);
+    }
+
+    /**
+     * 🔴 AND THE LEFT EDGE IS THE HALF THE RESERVED COLUMN COULD NOT FIX.
+     * Asked as *"align diagram to left?"*. `placeRow` centres, so reserving the
+     * column moved where the space ENDS and said nothing about where the
+     * drawing sits inside it: every figure stood about 70 px in from each side
+     * of whatever was left, and **two rows with different box counts started at
+     * two different x**. `diagram.mjs` took an `align` option on 2026-09-22 and
+     * this page is its one caller.
+     * ⚠️ THE CLAIM IS AGREEMENT ACROSS ROWS, NOT A NUMBER. A figure at a typed
+     * x would pass while being wrong the first time a box got wider, and this
+     * page draws a different number of boxes per row by design.
+     * ⚠️ AND IT NEEDS TWO ROWS WITH DIFFERENT CONTENT TO MEAN ANYTHING, which
+     * is why it runs on the split: one link and two are the case that was
+     * broken.
+     */
+    {
+      /* Two pairs, so the two rows really do draw different pictures. The same
+         shape the row check above builds, for the same stated reason. */
+      show([
+        { from: 'here:mk-425c-usb-midi-keyboard:out', to: 'here:circuit:in',
+          transforms: [{ op: 'transpose', by: 1 }] },
+        { from: 'here:model-12-midi-in:out', to: 'here:circuit:in',
+          transforms: [{ op: 'channel', to: 1 }] },
+      ]);
+      /* ⚠️ THE LEFTMOST BOX, NOT THE FIRST IN THE DOM. They are different
+         elements: a figure paints its boxes in node order, and the node order
+         is the caller's, so `querySelector` returned row two's DESTINATION and
+         the check read a 248 px spread on a figure that was correct in one of
+         the two rows. Measure the quantity in question. */
+      const boxes = rowsOf()
+        .map((r) => [...r.querySelectorAll('.pos-dg-box')]
+          .map((b) => b.getBoundingClientRect().left))
+        .filter((xs) => xs.length)
+        .map((xs) => Math.min(...xs));
+      const spread = boxes.length > 1 ? Math.max(...boxes) - Math.min(...boxes) : NaN;
+      d.assert('every row starts its picture on one line, whatever it has to draw',
+        boxes.length > 1 && spread <= 0.5,
+        `${boxes.length} rows, first boxes at ${boxes.map((x) => x.toFixed(1)).join(', ')}, `
+        + `a spread of ${Number.isNaN(spread) ? 'nothing to compare' : spread.toFixed(2)} px`);
+      clearAnswer();
+    }
+
+    /**
+     * 🔴 THE OBJECT BLOCK KEEPS ONE HEIGHT WHATEVER IS IN IT. Asked as
+     * *"reserve its hight"*, and the reason is the one `grain-scope` bought: a
+     * box that is 7 lines for one connection and 16 for the next moves the log
+     * and the end of the page every time a row is pressed.
+     * ⚠️ THE TALLEST CASE IS THE NEGATIVE CONTROL AND IT HAS TO SCROLL. A
+     * reservation that everything fitted inside would pass this line while
+     * saying nothing, and a clip would hide the argument a refusal names, which
+     * can be on any line of the object.
+     */
+    {
+      show(FIXED);                       // two transforms, 16 lines
+      const tall = patch.getBoundingClientRect().height;
+      const scrolls = patch.scrollHeight > patch.clientHeight + 1;
+      show(EXAMPLES[1].links);           // one transform, 12 lines
+      const short = patch.getBoundingClientRect().height;
+      const still = patch.scrollHeight > patch.clientHeight + 1;
+      clearAnswer();
+      const empty = patch.getBoundingClientRect().height;
+      d.assert('the object block keeps its height whatever is in it, and anything taller scrolls inside it',
+        tall > 0 && Math.abs(tall - short) < 1 && Math.abs(tall - empty) < 1
+        && scrolls && !still && getComputedStyle(patch).overflowY === 'auto',
+        `${tall.toFixed(0)} px for a 16 line object, ${short.toFixed(0)} for a 12 line one and `
+        + `${empty.toFixed(0)} with nothing asked; the long one `
+        + `${scrolls ? 'scrolls' : 'does NOT scroll'} and the short one `
+        + `${still ? 'scrolls too' : 'does not'}`);
+    }
+
+    /**
+     * 🔴 THE SENTENCE IS THERE WHEN NOBODY IS READING THE PICTURE, which is
+     * the one clause of the ask that was ambiguous: *"allowed: Mk... (show when
+     * no iteraction with diagram)"*. What is built is the reading where the
+     * two share the space: `createDiagram` writes a box's or an arrow's own
+     * note into its caption on hover and marks it `data-on`, and the row's
+     * sentence stands down while that is up. The other reading, that the
+     * sentence goes for good once a reader touches the picture, is not built,
+     * because a verdict that disappears permanently is a fact the page has
+     * stopped reporting.
+     * ⚠️ IT IS DRIVEN WITH A REAL `pointerenter` ON THE BOX, and the caption's
+     * own attribute is read as well, or this would pass on a page where nothing
+     * happened at all.
+     * ⚠️ AND THE ROOM IS THE OTHER HALF. `visibility` rather than `display`, so
+     * the line keeps its height and reading the picture cannot move the row the
+     * picture is in.
+     */
+    {
+      show(FIXED);
+      const say = sayEls()[0];
+      const box = answer.querySelector('.wish-conn .pos-dg-n');
+      const cap = answer.querySelector('.wish-conn .pos-dg-cap');
+      /**
+       * 🔴 ONE ELEMENT WITH TWO CONTENTS, NOT TWO TAKING TURNS. This graded a
+       * second line standing down under `visibility` while the caption was up,
+       * which is what the page did for a few hours. Asked for on 2026-09-22:
+       * *"do not put refused etc below diagram text, it is a default text when
+       * no interacton"*, and the sentence BECAME the caption, so there is no
+       * second element left to hide.
+       * ✅ **WHAT IT WAS PROTECTING IS UNCHANGED AND IS WHAT THIS READS NOW**:
+       * pointing at a box swaps the line to that box's own words, leaving takes
+       * it back to the verdict, and the row does not change height while either
+       * happens. That last clause is the one that matters, because a line that
+       * grew under a pointer would move the picture the pointer is on.
+       */
+      const roomBefore = say.getBoundingClientRect().height;
+      const restText = cap?.textContent || '';
+      box.dispatchEvent(new PointerEvent('pointerenter', { bubbles: false }));
+      const duringText = cap?.textContent || '';
+      const roomDuring = say.getBoundingClientRect().height;
+      const reading = cap?.dataset.on === '1' && duringText !== restText;
+      box.dispatchEvent(new PointerEvent('pointerleave', { bubbles: false }));
+      const afterText = cap?.textContent || '';
+      d.assert('the line swaps to what a box says while it is read, and takes its verdict back',
+        restText.length > 10 && reading && afterText === restText
+        && roomBefore > 0 && Math.abs(roomBefore - roomDuring) < 0.5,
+        `at rest ${JSON.stringify(restText.slice(0, 40))}, while read `
+        + `${JSON.stringify(duringText.slice(0, 40))}, back to `
+        + `${afterText === restText ? 'the same' : JSON.stringify(afterText.slice(0, 40))}, `
+        + `and the line is ${roomBefore.toFixed(1)} px either way`);
+      clearAnswer();
     }
 
     d.assert('the desk it describes is the one the other pages build ids for',
@@ -2709,7 +3711,7 @@
        the recording plus both model calls. */
     show(CANNED);
     said.value = EXAMPLE;
-    const before = [patch.textContent, whyBox.textContent, said.value,
+    const before = [patch.textContent, whyText(), said.value,
       d.el.isConnected ? arrows() : 1].join('|');
 
     const began0 = talk.began, ended0 = talk.ended;
@@ -2727,9 +3729,15 @@
       `busy before ${!darkBefore}, busy during ${litDuring}`);
     d.assert('the press takes the whole last answer away before it listens',
       before.length > 20 && patch.textContent === '' && !patch.dataset.shown
-      && whyBox.textContent === '' && said.value === '' && arrows() === 0,
+      && whyText() === '' && said.value === '' && arrows() === 0
+      /* ⚠️ AND THE ROOM A CONNECTION TAKES IS STILL THERE, which is the half a
+         count of nothing cannot see: the press empties the rows, it does not
+         take them away, or the component would shrink under the hand that
+         pressed it and grow again when the answer landed. */
+      && rowsOf().length === 1,
       `patch ${JSON.stringify(patch.textContent)}, shown ${!!patch.dataset.shown}, `
-      + `${whyBox.childElementCount} rows, ${said.value.length} characters, ${arrows()} arrows`);
+      + `${sayEls().filter((n) => n.textContent).length} rows with words in them, `
+      + `${rowsOf().length} standing, ${said.value.length} characters, ${arrows()} arrows`);
 
     press('pointerup');
     d.assert('a press and a release is one hold, begun and ended',
@@ -2828,8 +3836,21 @@
      * numbers derived from one field agree with each other whatever is wrong,
      * which this project has already paid for on the MIM corpus.
      */
-    const verdicts = () => [...whyBox.querySelectorAll('.wish-why')]
-      .map((e) => (e.querySelector('i') ? 'allowed' : 'refused'));
+    /**
+     * 🔴 THE VERDICT IS AN ATTRIBUTE, NOT A WORD IN THE SENTENCE, SINCE
+     * 2026-09-22. This read `<i>` for allowed and `.wish-why-q` for incomplete
+     * out of the row's own markup, and both of those went when the verdict word
+     * came off the sentence: *"rm refused text, its already on connetor"*. The
+     * sentence is the figure's caption now, which is plain text with no
+     * elements in it at all.
+     * 🔴 **AND THE FAILURE WAS THE WORST SHAPE THERE IS**: every row fell
+     * through to the last branch, so five examples that were allowed came back
+     * **refused**, in a check whose own name is about telling them apart. A
+     * reader of that output would have gone looking for a broken validator.
+     * ✅ `data-verdict` is written by `show()` for exactly this, and the
+     * component that draws the sentence cannot affect it.
+     */
+    const verdicts = () => rowsOf().map((r) => r.dataset.verdict).filter(Boolean);
     const ran = [];
     for (let i = 0; i < EXAMPLES.length; i++) {
       rowEls()[i].click();
@@ -2839,8 +3860,14 @@
         about: EXAMPLES[i].about,
         inBox: said.value === EXAMPLES[i].say,
         lit: examples.scroller().querySelectorAll('.pos-tbl-row.on').length,
+        /* ⚠️ THE THIRD VERDICT IS COUNTED HERE TOO, SINCE 2026-09-22, OR A ROW
+           THAT BECAME INCOMPLETE WOULD BE COUNTED BY NEITHER HALF OF THIS LINE
+           AND THE STRING WOULD GO ON MATCHING. None of the five is incomplete
+           today, which is what the zero says and is a fact worth keeping an eye
+           on rather than an omission. */
         line: `${EXAMPLES[i].about}: ${v.filter((x) => x === 'allowed').length} allowed, `
-          + `${v.filter((x) => x === 'refused').length} refused, ${arrows()} arrow`
+          + `${v.filter((x) => x === 'refused').length} refused, `
+          + `${v.filter((x) => x === 'incomplete').length} incomplete, ${arrows()} arrow`
           + `${arrows() === 1 ? '' : 's'}`
           + (labels().length ? ` saying ${labels().map((t) => JSON.stringify(t)).join(' and ')}` : ''),
       });
@@ -2851,11 +3878,16 @@
       + `${ran.map((r) => r.lit).join()} rows lit, ${reached} calls to the agent`);
     d.assert('the five examples come back five different ways',
       ran.map((r) => r.line).join(' | ') === [
-        'a transpose: 1 allowed, 0 refused, 1 arrow saying "note, cc, bend"',
-        'a port with a twin: 1 allowed, 0 refused, 1 arrow saying "note, cc, bend"',
-        'a keyboard split: 0 allowed, 2 refused, 1 arrow saying "refused"',
-        'not on this desk: 0 allowed, 0 refused, 0 arrows',
-        'a knob: 1 allowed, 0 refused, 1 arrow saying "note, cc, bend"',
+        'a transpose: 1 allowed, 0 refused, 0 incomplete, 1 arrow saying "note, cc, bend"',
+        'a port with a twin: 1 allowed, 0 refused, 0 incomplete, 1 arrow saying "note, cc, bend"',
+        /* 🔴 TWO ARROWS SINCE 2026-09-22, AND IT WAS ONE UNTIL THEN. The split
+           is two links between one pair of ports, which `arrowsFor` drew as a
+           single arrow because two lines down one gap read as one. A connection
+           is a row with its own picture now, so there is no gap for them to
+           share and each one is drawn whole. */
+        'a keyboard split: 0 allowed, 2 refused, 0 incomplete, 2 arrows saying "refused" and "refused"',
+        'not on this desk: 0 allowed, 0 refused, 0 incomplete, 0 arrows',
+        'a knob: 1 allowed, 0 refused, 0 incomplete, 1 arrow saying "note, cc, bend"',
       ].join(' | '),
       ran.map((r) => r.line).join(' | '));
 
@@ -2873,9 +3905,10 @@
      */
     rowEls()[1].click();
     await tick();
-    const subs = [...dgHost.querySelectorAll('.pos-dg-sub:not([aria-hidden])')]
+    const subs = [...answer.querySelectorAll('.wish-conn .pos-dg-sub:not([aria-hidden])')]
       .map((t) => t.textContent);
-    const arrowSays = dgHost.querySelector('.pos-dg-l')?.getAttribute('aria-label') || '';
+    const arrowSays = answer.querySelector('.wish-conn .pos-dg-l')
+      ?.getAttribute('aria-label') || '';
     d.assert('the picture names the port in use, and the arrow carries the whole connection',
       /* ⚠️ WHAT IS UNDER THE BOXES, NOT IN WHAT ORDER. The picture draws them
          in `INSTRUMENTS` order and which end of an arrow comes first is the
@@ -2893,9 +3926,47 @@
        has said so on every allowed link since it was written and the page threw
        it away until 2026-09-22. */
     d.assert('an allowed link says what the far end will throw away',
-      /Circuit will drop touch, program, clock/.test(whyBox.textContent)
+      /Circuit will drop touch, program, clock/.test(whyText())
       && verdicts().join() === 'allowed',
-      whyBox.textContent.trim().slice(0, 120));
+      whyText().trim().slice(0, 120));
+
+    /**
+     * 🔴 A PREPARED ROW PRESSES `Interpret`, SO THE BUTTON SAYS IT IS
+     * WORKING. Asked 2026-09-22: *"wish: when i click to prepared ask,
+     * interpret button should disable and shimmer"*. A row used to call the
+     * model itself and the button sat there looking idle.
+     * ⚠️ NONE OF THAT STATE IS THIS PAGE'S. `shell.mjs` paints `data-busy`,
+     * disables the control and sets `aria-busy` whenever a handler returns a
+     * promise, and clears all three in a `finally`, so what is graded here is
+     * that the press reaches that one implementation rather than that this page
+     * reproduced it.
+     * 🔴 AND THE FAILURE WORTH CATCHING IS THE STATE THAT NEVER CLEARS, so the
+     * line reads both ends: nothing lit before, all three up during, all three
+     * gone once the answer has landed.
+     * ⚠️ THE SECOND PRESS IS THE OTHER HALF. A disabled button swallows it, so
+     * no second run can start; what this page had to add is that a refused
+     * press marks no row and writes no sentence into the box, or a row would
+     * look chosen while the answer on screen belonged to another one.
+     */
+    {
+      const go = d.button('interpret');
+      const idle = !go.disabled && !go.dataset.busy;
+      rowEls()[2].click();
+      const lit = go.disabled && go.dataset.busy === '1' && go.getAttribute('aria-busy') === 'true';
+      const asked = said.value;
+      const marked = examples.scroller().querySelectorAll('.pos-tbl-row.on').length;
+      rowEls()[3].click();
+      const refused = said.value === asked
+        && examples.scroller().querySelectorAll('.pos-tbl-row.on').length === marked
+        && examples.scroller().querySelector('.pos-tbl-row.on')?.title === EXAMPLES[2].was;
+      await tick();
+      const done = !go.disabled && !go.dataset.busy && !go.hasAttribute('aria-busy');
+      d.assert('a prepared row leaves Interpret disabled and swept while it works, and clears it after',
+        idle && lit && refused && done,
+        `${idle ? 'idle' : 'ALREADY LIT'} before, ${lit ? 'disabled and swept' : 'NOT lit'} `
+        + `during, ${done ? 'clear' : 'STILL LIT'} after, and a second row while it worked `
+        + `${refused ? 'changed nothing' : 'CHANGED THE PAGE'}`);
+    }
 
     /* ⚠️ AND THE LAST PRESS IS LEFT PENDING ON PURPOSE. The shimmer drill below
        opens by waiting a whole turn for everything already in flight to land,

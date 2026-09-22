@@ -1,0 +1,221 @@
+{
+  "what": "Acoustic grand piano, one recording every minor third from A0 to C8.",
+  "source": "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3",
+  "project": "midi-js-soundfonts, Benjamin Gleitzman",
+  "soundfont": "FluidR3_GM, Frank Wen",
+  "licence": "MIT (the conversion); FluidR3_GM is released for redistribution. See the two projects above.",
+  "renamed": "Files are named by MIDI note number here. `name` is what the source calls each one.",
+  "taken": "2026-09-22",
+  "notes": [
+    {
+      "note": 21,
+      "name": "A0",
+      "file": "21.mp3",
+      "bytes": 25585,
+      "sha256": "5c47e8142b04505c888b8edd7246a8881b4b30c4340682f0264191599df232fc"
+    },
+    {
+      "note": 24,
+      "name": "C1",
+      "file": "24.mp3",
+      "bytes": 25585,
+      "sha256": "eb3b985e3b692cfe0c48550a26843fc3da44c7630c0b7bcfd820e87c5122cccc"
+    },
+    {
+      "note": 27,
+      "name": "Eb1",
+      "file": "27.mp3",
+      "bytes": 25585,
+      "sha256": "694e89cd30008f47411336ea1b76675503bbc5383c3849df676b2cf6b51eee67"
+    },
+    {
+      "note": 30,
+      "name": "Gb1",
+      "file": "30.mp3",
+      "bytes": 25585,
+      "sha256": "6ff97bc16a3020037f46ebe4196ce2602eed8af243b567768d4cb5d47a8ba0bc"
+    },
+    {
+      "note": 33,
+      "name": "A1",
+      "file": "33.mp3",
+      "bytes": 25585,
+      "sha256": "abab379d4d0557abb93856f816b7bb395872e656533c3fe7f02048fc993834b7"
+    },
+    {
+      "note": 36,
+      "name": "C2",
+      "file": "36.mp3",
+      "bytes": 25585,
+      "sha256": "e02c5a80c03871e1889a3bb371d853f92294c1e8538ac06f70df0fd045540207"
+    },
+    {
+      "note": 39,
+      "name": "Eb2",
+      "file": "39.mp3",
+      "bytes": 25585,
+      "sha256": "708ff787e5ae2bfa45fe386e5fadc90a9339817dd245ed6e6f62532e42fad8d2"
+    },
+    {
+      "note": 42,
+      "name": "Gb2",
+      "file": "42.mp3",
+      "bytes": 25585,
+      "sha256": "95ab26a90d088fdc938673005ba2b2a4b166ee188ffbad0c7f75fb746334b043"
+    },
+    {
+      "note": 45,
+      "name": "A2",
+      "file": "45.mp3",
+      "bytes": 25585,
+      "sha256": "e21d9ab9b30c73c0aea921c2cd0dd59fece4cc021619927c9ff3dee71f0a9679"
+    },
+    {
+      "note": 48,
+      "name": "C3",
+      "file": "48.mp3",
+      "bytes": 25585,
+      "sha256": "7d0409ea3c40af25c6d3d606f12890f88f896d93c381b6eb8c58497f308b30d3"
+    },
+    {
+      "note": 51,
+      "name": "Eb3",
+      "file": "51.mp3",
+      "bytes": 25585,
+      "sha256": "bec9944789ef9e7ec3dd7f9fcdf63ed1e5e82e29447c81be3578df9b1269b4b6"
+    },
+    {
+      "note": 54,
+      "name": "Gb3",
+      "file": "54.mp3",
+      "bytes": 25585,
+      "sha256": "91605f55bf0265c1e526b966a3901f9c2813473ac890f4b7330ee08874c5d30f"
+    },
+    {
+      "note": 57,
+      "name": "A3",
+      "file": "57.mp3",
+      "bytes": 25585,
+      "sha256": "02dee2fa184b9b94a5f72886c2370bd076103ebb76fc179982fa503e549dcc10"
+    },
+    {
+      "note": 60,
+      "name": "C4",
+      "file": "60.mp3",
+      "bytes": 25585,
+      "sha256": "b6d32e0d9d0c2e4b88165a2ec27b8787a970f131a03d96d065f28f158640af96"
+    },
+    {
+      "note": 63,
+      "name": "Eb4",
+      "file": "63.mp3",
+      "bytes": 25585,
+      "sha256": "96586e2865651cfa0469e762f3bd40821f6e45eecf4761a86a37bc59cfebfb2c"
+    },
+    {
+      "note": 66,
+      "name": "Gb4",
+      "file": "66.mp3",
+      "bytes": 25585,
+      "sha256": "f0db7ee32b9175907ca60cf53e6c7a129ea8e7c8f6562dc7ebe6e5c81dcbdf99"
+    },
+    {
+      "note": 69,
+      "name": "A4",
+      "file": "69.mp3",
+      "bytes": 25585,
+      "sha256": "4f1671ac831bc41c845e67b18e6c9ea200fc9b753bdffe124703b7141aa928c3"
+    },
+    {
+      "note": 72,
+      "name": "C5",
+      "file": "72.mp3",
+      "bytes": 25585,
+      "sha256": "7a4be6dae323ac5564ad1a617b554fd595e5e0a63f19c3581e3ee94c33ae2e4b"
+    },
+    {
+      "note": 75,
+      "name": "Eb5",
+      "file": "75.mp3",
+      "bytes": 24753,
+      "sha256": "aad99b852c20c2aee66143dd103513523566716cb2f4c6ef6ac478ef84f282b0"
+    },
+    {
+      "note": 78,
+      "name": "Gb5",
+      "file": "78.mp3",
+      "bytes": 24493,
+      "sha256": "bd1d81203f5338ab62372f88c0b4eb5b4a3133ef58518a8770f3dfdf34f74124"
+    },
+    {
+      "note": 81,
+      "name": "A5",
+      "file": "81.mp3",
+      "bytes": 18929,
+      "sha256": "2cccfe0aa8077bfd20bcbba470012faa0328ae97d5bd2297147c01f2b255e574"
+    },
+    {
+      "note": 84,
+      "name": "C6",
+      "file": "84.mp3",
+      "bytes": 19371,
+      "sha256": "6a0030c071ccd6c9a722455851d65b18cb86cbfe515772a6ded4c747eda339a0"
+    },
+    {
+      "note": 87,
+      "name": "Eb6",
+      "file": "87.mp3",
+      "bytes": 17915,
+      "sha256": "c0f4c45d7930ed90edebfd93321807cdb7346e364ba1933867c4b49ba18d5368"
+    },
+    {
+      "note": 90,
+      "name": "Gb6",
+      "file": "90.mp3",
+      "bytes": 17239,
+      "sha256": "c5f87e3bf666919bd1e230f6945ee4af752761faa54dc1814f854e8e9d8a7920"
+    },
+    {
+      "note": 93,
+      "name": "A6",
+      "file": "93.mp3",
+      "bytes": 15315,
+      "sha256": "87dab2b5bfdd8bafa575fc24b99591e87e5a0c991a8bbdc8aeb8a1e517b576d2"
+    },
+    {
+      "note": 96,
+      "name": "C7",
+      "file": "96.mp3",
+      "bytes": 14977,
+      "sha256": "5e4cadc06eb25e2302dcc5bf1af76fe85ed258759d02c46e9169376ade83845e"
+    },
+    {
+      "note": 99,
+      "name": "Eb7",
+      "file": "99.mp3",
+      "bytes": 14925,
+      "sha256": "c23b9b43ca8ece152e59ef04832b2290e96db54f9539af3162df4054c23271c7"
+    },
+    {
+      "note": 102,
+      "name": "Gb7",
+      "file": "102.mp3",
+      "bytes": 14665,
+      "sha256": "8615b92d93fa16b4051bdc8800a6430642bdcff17e26d020ec5fd83bf89db759"
+    },
+    {
+      "note": 105,
+      "name": "A7",
+      "file": "105.mp3",
+      "bytes": 14535,
+      "sha256": "ace76663dac4610a93259655f069835e6eb397b76aedf85c1f48a5036cf25687"
+    },
+    {
+      "note": 108,
+      "name": "C8",
+      "file": "108.mp3",
+      "bytes": 14327,
+      "sha256": "4ec066cab9362f6706b90fedc3249fa3c221769ee95ff52d7e46aaaf0a01fd16"
+    }
+  ]
+}
