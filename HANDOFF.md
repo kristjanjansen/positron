@@ -1,175 +1,137 @@
-# Handoff, 2026-09-21, session 41
+# Handoff, 2026-09-22, session 43, closed
 
-**Six commits, deployed three times, and one published claim was disproved by
-the file it was written about.**
+**A day of work that was entirely uncommitted this morning is committed in six
+commits and live on the edge, and the instrument it was mostly about now runs
+TWO unedited firmwares in one audio graph.**
 
-🔴 **READ THIS FIRST. THE PUSH COMMAND IN THE LAST HANDOFF WAS WRONG AND WOULD
-HAVE DESTROYED NINE DAYS OF HISTORY.** It said to push `6a8befc:main`. That
-commit is from **2026-09-12** and is **464 commits behind `HEAD`**. The lease sha
-in it was right, so the command would have SUCCEEDED and left `origin/main` at a
-nine day old tree. It is the fourth session running that this needs a person.
+✅ **NOTHING IS UNCOMMITTED AND THE DEPLOY MATCHES THE TREE.** `HEAD` carries
+every file the previous handoff listed as at risk, `demo/muta/` included, and
+`git status` is clean. The wasm mismatch that handoff opened with is gone:
+`deploy.mjs` rebuilds, fingerprints and refuses to upload if a byte moved, and
+it confirmed **BUILD 7e0f76b-114640-dbc2** on the edge itself.
+
+```
+f35d119  six kit components, and the case five pages had each built themselves
+45c4716  /plai/ is /muta/, and a second unedited firmware runs after the first
+4008985  three plans and the research they were written from
+a07e93f  six lessons, and the backlog the day was worked from
+7e0f76b  the build output for BUILD a07e93f-114602
+e6dc49a  the stamp of the build that is on the edge, 7e0f76b-114640
+```
+
+## The push, still needing a person, now for the seventh session
+
+🔴 **AND THERE IS A NEW FACT ABOUT IT: `git fetch origin` FAILS AS THE WORK
+ACCOUNT.** Measured today: `fatal: could not read Password for
+'https://kristjanjansen@github.com': Device not configured`. So the line the
+previous handoff wrote, *verify the tip before running anything out of this
+file*, cannot be carried out before the account switch. **The switch comes
+first, then the fetch, then the lease is worth something.**
 
 ```sh
 gh auth switch --user kristjanjansen
-git push --force-with-lease=main:4add3238cd812195db75fddfe405786fe5359a8b origin HEAD:main
-gh auth switch --user Kristjan-Jansen_enefit
+git fetch origin                                  # THIS is where the tip gets verified
+git log -1 --format='%H' origin/main              # stale local ref says 4add3238...
+git push --force-with-lease=main:<the sha the fetch just proved> origin HEAD:main
+gh auth switch --user Kristjan-Jansen_enefit      # put it back, ASKED FOR 2026-09-17
 ```
 
-`HEAD` is **`999487e`**, 73 ahead of the merge base. The one remote-only commit
-`4add323` is **pure renames, zero insertions and zero deletions**, and all 64
-plans are in `HEAD`'s tree, so discarding it loses no content. ⚠️ **Verify the
-tip you are pushing before you run any command out of this file**: `git log -1`
-and `git rev-list --left-right --count origin/main...HEAD`.
-
-✅ **THE TREE IS CLEAN AND EVERY COMMIT WAS PATH LIMITED**, because an agent was
-writing in this checkout for most of the session.
+⚠️ **IT IS A FORCE PUSH THAT DISCARDS ONE COMMIT ON `origin`.**
+`git rev-list --left-right --count origin/main...HEAD` reads **1 149** against
+the stale ref: one commit on `origin/main` that `HEAD` does not have, 149 the
+other way. That one commit is what the lease is protecting and what the push
+overwrites, so somebody has to look at it before deciding.
 
 ## Deployed, and what to open
 
-- **https://positron.studio/pack/** a Circuit pack opened and read. **The
-  pack in this repository is NOT published**, deliberately, so the way in on the
-  deploy is your own file through the drop target.
-  Locally, with the pack: **http://127.0.0.1:8890/pack/** and press
-  `open the pack here`. ⚠️ `node demo/server.mjs` must be running.
-- **https://positron.studio/wish/** now points at a deployed agent and needs no
-  local process. **https://wish.positron.studio** is that agent.
-- **https://positron.studio/kit/** has a `DROP TARGET` block at the top of INPUT.
+Everything below is live and was confirmed after the deploy, not before it.
+
+- **https://positron.studio/muta/** two of Emilie Gillet's firmwares chained,
+  an oscillator into an effect. ✅ **38/38 green AGAINST THE DEPLOY**, which is
+  the check the previous handoff could not make.
+- **https://positron.studio/kit/**, **/pack/**, **/tom/**, **/wish/** all
+  current as of this build.
+- 🔴 **`/plai/` IS GONE AND 404s.** It existed on the deploy for part of one
+  day. Any link to it out of an older file is answered by `/muta/`.
 
 ## The one thing to carry forward above everything else
 
-🔴 **THE FIRST FOUR BYTES OF A SESSION FILE ARE NOT A BACKUP TEST, AND THREE
-FILES SAID THEY WERE.** `CLAUDE.md`, `plans/plan-pack-page.md` §2.1 and
-`research/circuit-soundbank-2026-09-21.md` all published `INIT` as the blank
-signature against the owner's `DEMO`. MEASURED on both sides while building the
-page: the owner's 32 sessions are **`USER` 22, `DEMO` 7 and `INIT` 3**. Three of
-somebody's real sessions carry the exact head published as the blank marker, and
-all three are ordinary work at **entropy 0.87 and 86.5 per cent non-zero** with
-distinct fingerprints. **A check keyed on the head would have condemned them.**
-✅ **THE OTHER THREE NUMBERS ARE FINE AND ARE NOT DELICATE.** Owner: 32 distinct
-fingerprints of 32, 0.827 to 1.462 bits a byte, 84.57 to 89.58 per cent non-zero.
-The two purchased packs: **ONE fingerprint across all 64 of their session files**,
-0.009 bits, 0.07 per cent. Two orders of magnitude.
-⚠️ **IT IS THE `User Session` MISTAKE ONE LAYER DOWN.** That one was a name in an
-index; this one is a four byte marker inside the file, which looks like content
-and is still a label. All three files are corrected.
+🔴 **THE BEST PARTS OF THE VCV ECOSYSTEM WERE NOT WRITTEN FOR VCV, AND `/muta/`
+NOW PROVES IT TWICE IN ONE GRAPH.** `plans/plan-vcv-modules.md`, 881 lines.
+`AudibleInstruments` is GPL glue around a **git submodule of Emilie Gillet's MIT
+firmware**, and its Plaits adapter is **391 lines of which six touch the DSP**.
+✅ **TWO ARTEFACTS, ONE BUILD SCRIPT, TWO DIFFERENT DIGESTS**, which is the
+assert that says the pipeline is general rather than one lucky module:
+`ece3f3c55e5ab63a` for the oscillator and `1a0619e5a94767ee` for the effect,
+over the same pinned commits, **0 wasm imports each**, **195.0 KB and 76.4 KB**
+against `scsynth.wasm`'s **1740.8 KB**, first quantum **195 ms** after the
+fetch began.
+⚠️ **AND IT IS STILL HALF BUILT, WHICH HAS NOT CHANGED.** Nothing has been
+built on the board, so each digest is a hook rather than a proof.
 
-## What was built
+## What landed today
 
-- **`demo/shell/circuit-patch.mjs`**, the decoder that existed once and was not
-  kept. 340 addresses **generated** out of Novation's Programmer's Reference with
-  `pdftotext -layout` rather than typed, and checked to be 340 contiguous
-  addresses with no duplicates before being written out. The two rows that wrap
-  across two lines in that document, 91 and 99, are written by hand as bitfields.
-  🔴 **IT EXPORTS NOTHING THAT MAKES OR SENDS A MESSAGE, AND THE TEST ASSERTS THE
-  ABSENCE.** That is the safety property: `Replace Current Patch` and `Replace
-  Patch` differ at offset 6, and the second writes flash.
-  ✅ **48/48, AND EVERY FIGURE IN IT WAS PUBLISHED BY AN IMPLEMENTATION THAT NO
-  LONGER EXISTS**: 246 of 324 varying parameter bytes, zero bytes above 0x7F,
-  `Aciiid` at category 2 genre 3, 37 poly / 22 mono / 5 mono AG, 26 silent second
-  oscillators, 22 drive, 9 chorus, 6 distortion, 21 EQ, median attack 2 and
-  release 40, 4 with release above 80, and the LFO reach 43 / 13 / 7 / 1. Two
-  independent implementations agreeing about one real artefact.
-  ⚠️ **ONE FIGURE LOOKED LIKE A DISAGREEMENT AND WAS A DEFINITION.** The research
-  says the factory bank *reaches slot 15*; under a depth other than 64 the highest
-  is **11**. Both are right: slot 15 carries a destination somebody set at zero
-  depth. Both readings are asserted, apart.
-- **`demo/shell/drop.mjs`**, a kit module, `open` and never `upload`, naming no
-  network API at all. Enter minus leave counter, `preventDefault` on both
-  `dragover` and `drop`, a cover that is in the document only during a drag and
-  `pointer-events: none` for its whole life, a refusal that says so in words, and
-  a file input behind a button. `/kit/` is **112/112**.
-- **`/pack/`**, 22/22 locally and 14/14 against the deploy.
-
-## The defects worth carrying forward
-
-🔴 **`/kit/`'s OWN FRAME COUNTER CAUGHT AN `await` I PUT INSIDE ITS MEASURING
-WINDOW, ON THE FIRST RUN, IN ONE LINE.** Reading a file is a promise, so the
-window was open when a `requestAnimationFrame` callback ran and a frame was drawn
-with all five parts laid out at once. That counter exists because **no reading of
-the source can see an await**, and three other places on that page already do the
-`settle()` / `measure()` dance for the same reason. It worked exactly as written.
-
-🔴 **A PICTURE THAT WAS HONEST AND UNREADABLE, AND THE MEASUREMENT DECIDED IT.**
-`/pack/`'s diagram was two machines, a `Browser` and a `Circuit`, with NO arrow
-between them, because nothing on the page can reach the instrument. The absence
-was the message. Two containers with no link between them land in the same column
-and stack, so it filled **27 per cent of its width at 746 px tall**, against
-`/crate/`'s 64 per cent at 271 px and `/items/`'s 100 per cent at 226 px, all
-measured the same minute. **The layout puts two containers side by side only when
-something joins them**, so the honest picture and the legible one were in direct
-conflict. It is the signal path of the selected patch now: 100 per cent at 118 px.
-⚠️ **AND THE FACT IT CARRIED WAS NOT LOST, IT MOVED TO WHERE IT CAN GO RED.** A
-missing arrow was never gradable. The counter on `requestMIDIAccess` is.
-
-🔴 **TWO OF MY OWN ASSERTS MEASURED SOMETHING NEXT TO THE QUANTITY IN QUESTION.**
-One required `window.MIDIOutput` to be undefined, which is a fact about the
-BROWSER: Chrome defines that constructor whether or not anybody asks for access,
-so it went red on a page where nothing was wrong. The other read an empty table's
-`textContent` for a column name, and the heading is `hidden` rather than absent,
-so it went red on a component doing exactly what it promises.
-
-🔴 **AND A THIRD ASSERTED A STATE NOTHING HAD REACHED YET.** The deploy check read
-a sentence that the button press produces, while the check block runs before the
-harness presses anything. Red on the deploy, green locally, page correct in both.
-
-🔴 **A RED THAT IS EXPECTED IS A RED EVERYBODY LEARNS TO SKIP.** `/pack/` first
-discovered that the pack is unpublished by fetching it and reading the 404. That
-reads correctly to a person and took the deploy run red on `no console errors`.
-It decides from the origin now, which is a fact about `build.mjs`'s allowlist
-rather than a guess about the file.
-
-🔴 **SIX TABLE COLUMNS MADE A PHONE DRAG 240 px.** Cut to five and it is 122, with
-page overflow 0 at 390 px and at 1280 and every heading one line at both. `kind`
-went rather than another: Novation publish no label table for that byte, seven of
-fifteen values were recovered by correlation, and **16 of 64 rows would have shown
-a bare number**.
+- **`/muta/`**, which was `/plai/` until the afternoon. Asked for as `rename
+  plai demo to muta and implement warps in there`, settled as `no muta is slug.
+  it contains 2 istriments chained, plai and warp`. **38/38 with 32 page
+  asserts**, against the oscillator alone at 26/26 with 20.
+  🔴 **HALF OF WARPS IS AN OCTAVE DOWN AT 48 kHz AND THE PAGE PRINTS IT RATHER
+  THAN HIDING IT.** Its filter bank coefficients are baked at 96,000, so the
+  twenty vocoder bands land at **43.7 to 3520 Hz**, which the readout reports as
+  **-1.00 octaves**. The six cross modulation algorithms are exactly right,
+  because `Modulator::Init` takes the rate and gets the oscillators and the
+  follower times from it. **Running the context at 96 kHz is not the repair**:
+  `plai_init` refuses any rate but 48000, and the two firmwares would stop being
+  able to feed each other at all.
+  ⚠️ **AND THE CELL ONLY SAYS IT WHILE THE VOCODER IS THE PATH RUNNING**, which
+  is its own assert. A shift reported under the cross modulation algorithms
+  would be a true number about the wrong signal.
+  🔴 **THE BLOCK SIZE IS 12 AND `voice.cc` USES THE CONSTANT, NOT THE `size`
+  ARGUMENT.** Unchanged and still the trap. Warps does NOT have it: every
+  `kMaxBlockSize` there is an array dimension and every loop uses `size`.
+- **Six kit components**: `range-slider.mjs`, `check.mjs`, `synth-view.mjs`,
+  `step-grid.mjs`, `control-grid.mjs` and `instrument.mjs`, **140 asserts
+  across six tests that need no browser**, all green today. `/kit/` 113/113 to
+  147/147, `/tom/` converted and back at exactly 44/44 having lost 268 lines of
+  CSS into the component.
+- **Three plans**, `plan-vcv-modules`, `plan-two-more-modules` and
+  `plan-browser-models`, and the research the first was written from.
+  ⚠️ **`plan-two-more-modules` IS HALF SPENT ALREADY**: its Warps proposal
+  shipped the same day inside `/muta/` and its 48 kHz recommendation is what
+  that page does, so §3 describes a thing that exists and §4 is still a
+  proposal. Its header says so.
+- **Six lessons**, 107 to 112, all in `LESSONS.md`.
 
 ## What is open
 
-1. **`origin/main`**, above, and the command in the last handoff was wrong. This
-   is the only thing here needing a person rather than a decision.
-2. 🔴 **THE PARAMETER PANEL ON `/pack/` IS NOT BUILT.**
-   `plans/plan-pack-page.md` §2 asked for a panel showing a pressed patch's
-   parameters grouped by `circuit-cc.mjs`'s sections, and what shipped instead is
-   the diagram, because the ask that arrived was *"table plus diagram"*.
-   `patchFields()` and `macroLegs()` are built and tested and the page uses the
-   first only for a hover count. **The panel is the obvious next thing.**
-3. **The samples half of a pack is untouched.** 64 WAVs, 48 kHz 16 bit mono, 0.12
-   to 2.00 s, 53.4 s in total. `plans/plan-circuit-samples.md` owns it and wants a
-   drum machine.
-4. 🔴 **`/wish/`'s PRODUCTION EXPOSURE IS REAL AND IS WRITTEN DOWN RATHER THAN
-   SOLVED.** The `Origin` allowlist stops a stray page and a crawler and stops
-   nothing else: `curl` with the right header walks through. The rate limit is
-   **per data centre** and measured approximate in both directions, one burst
-   seeing its first 429 at request 21 and another letting 40 through. One press is
-   about **$0.00034** and the free daily allowance covers roughly **320**; the
-   worst case under the 1 MB cap is about **$3.20 an hour** from one address in
-   one location. ⚠️ If that matters, the next layer is a shared secret or Access.
-5. ⚠️ **ONE SABOTAGE OF EIGHT DID NOT BITE ON `/wish/`** and the branch it was
-   meant to cover is now graded in `demo/shell/instruments-test.mjs` rather than on
-   the page, because `/wish/`'s three instrument desk cannot raise the ambiguity.
-6. **ESTONIAN** is still deliberately not scheduled, and the reason is at the top
-   of `BACKLOG.md`: `STOP` is a closed set of English verbs and it carries all of
-   the matcher's precision.
-7. **`vad_filter` is unmeasured**, unchanged from the last two sessions.
-8. 🔴 **NO PAGE IS GRADED ON A PHONE AND `verify.mjs` STILL RUNS AT 756 px ONLY.**
-   `/pack/` was measured at 390 with a throwaway probe, which is the same
-   arrangement the last session flagged as the largest blind spot. Three unpriced
-   options are in `plans/plan-panel-component.md`.
-9. ✅ **THE 32 SESSIONS ARE BACKED UP AND THIS ITEM WAS WRONG FOR FOUR
-   SESSIONS.** It read *"the 32 user sessions off the Circuit, still the missing
-   part of the backup"*. Corrected by the owner 2026-09-21: *"its in
-   kristjanjansen git"*. `New Pack.circuitpack` holds 32 distinct fingerprints of
-   32, none empty, under their own names. 🔴 **THE WRONG SENTENCE ORIGINATED IN
-   `plans/plan-circuit-editor.md` §5, WAS MEASURED AS WRONG BY
-   `research/circuit-soundbank-2026-09-21.md` §9 THE SAME DAY, AND STILL
-   PROPAGATED INTO TWO MORE FILES AND INTO THIS ONE**, because the research named
-   the contradiction and nobody went back and edited the source. **Flagging a
-   wrong claim is not correcting it.** All three are corrected now.
-   ⚠️ What survives is narrow: the pack is dated 2026-09-20, so take a fresh one
-   before anything risky.
-10. 🔴 **`/bay/` IS STILL UNHEARD** and still shows `here:` port ids in its link
-    line. Both carried over unchanged.
-11. **The remaining `/evo/` and `/shape/` asks in `BACKLOG.md`**, collected and
-    not worked. The C3 one has an instrument half: power-cycle the keyboard first,
-    because the manual's non-volatile list does not include transpose.
+1. **`origin/main`**, above. The only item needing a person, and the new fact
+   about the fetch is worth reading before trying it.
+2. 🔴 **NO PAGE IS GRADED ON A PHONE.** `verify.mjs` runs at 756 px with no
+   viewport override, and **the only assert in this repository that entered a
+   media query was removed on request** with the 320 px card specimen.
+   `/circuit/`'s own *the panel box starts and ends where the rest of the page
+   does* is green while being false at 390 px by 286.0 px, and `/muta/` now
+   carries the same shape of claim at the same width. `/muta/`'s nine knob
+   columns have never been drawn below 560 px.
+   `plans/plan-panel-component.md` has three unpriced options.
+3. **The board half of `/muta/`.** One aarch64 build of the same source, then
+   render N samples at both ends and diff them. That is what turns a digest
+   from a hook into a proof, and there are two digests to do it to now.
+   ⚠️ The Pi is a live service in another building and needs asking.
+4. **`CHANNEL STRIP`'s specimen**, asked for as *"make real channels with
+   dividers (see panels) and line things up"*. Not started.
+5. **Four checks stopped being made in session 43 and every one is named in the
+   file where it was**: a read only grid's computed cursor, opacity and tab
+   stops; a real strip scrolling at 320 px; that a wavetable and a blend are
+   refused for DIFFERENT stated reasons; and that one component turns its
+   picture off at wave 14 and on again at wave 0.
+6. **The segmented choice is still `button`, not `role="radio"`.** Eleven call
+   sites and a change to what every page announces. Recorded in `choice.mjs`.
+7. **Two vertical rhythms exist**: `.pos-stack` is `--pos-gap: 40px` and
+   `.pos-tabs-p > * + *` is **22 px**, the old pre-2026-09-20 value, live on
+   every tabbed page.
+8. **The second proposal in `plan-two-more-modules` is unbuilt**, and it is a
+   proposal rather than a plan with a date on it.
+9. **Everything carried over from session 42** that was not touched: `/bay/`
+   unheard, `vad_filter` unmeasured, Estonian deliberately unscheduled, and the
+   `/evo/` and `/shape/` asks in `BACKLOG.md`.
