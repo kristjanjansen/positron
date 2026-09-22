@@ -1,4 +1,4 @@
-// demo/shell/knob.mjs — a rotary control that is NOT turned in a circle.
+// demo/shell/knob.mjs: a rotary control that is NOT turned in a circle.
 //
 // 🔴 THE INTERACTION IS THE WHOLE COMPONENT, AND IT WAS RESEARCHED RATHER THAN
 // GUESSED, ON INSTRUCTION: *"research the implementation (moving them via mouse
@@ -55,7 +55,25 @@ const FINE = 0.2;
  * knobs do not match the next page's, which is the drift `/kit/` exists to
  * catch.
  */
+// The invisible hand's button, frame loop and hand-over come from
+// `hand-drive.mjs`, shared with `slider.mjs`. What a movement IS lives in
+// `hand.mjs` and is graded with no browser by `node demo/shell/hand-test.mjs`.
+import { createHandDrive } from './hand-drive.mjs';
+
 const ARC = 270;
+
+/**
+ * 🔴 THE WORD "HAND" MEANS TWO DIFFERENT THINGS ON THIS COMPONENT AND BOTH ARE
+ * OLDER THAN THE OTHER FILE'S. `set(v, { from: 'hand' })` has meant A PERSON
+ * since this knob was written, and `handMoves()` counts those. The INVISIBLE
+ * hand, added 2026-09-22, is the opposite claim: nobody touched it. So its
+ * moves arrive as `from: 'self'` with their own counter, and a page asking
+ * *"did a person move this"* keeps the answer it always had.
+ * ⚠️ THE OPTION IS STILL CALLED `hand`, because that is what it is called on
+ * `slider.mjs`, on the button and by the person who asked for it. Renaming it
+ * here would make the kit disagree with itself to fix a word.
+ */
+const SELF = 'self';
 
 /**
  * One knob.
@@ -88,7 +106,7 @@ const ARC = 270;
 export function createKnob({
   label, sub = '', min = 0, max = 127, value, home, unit = '', title = '',
   onInput = () => {}, onChange = () => {}, disabled = false,
-  stroke, ends,
+  stroke, ends, hand: wantHand = false,
 } = {}) {
   if (!label) throw new Error('a knob needs a label: it is the only thing naming what it moves');
   const span = max - min;
@@ -105,7 +123,7 @@ export function createKnob({
 
   let v = clamp(value === undefined ? min + span / 2 : value);
   const rest = home === undefined ? v : clamp(home);
-  let from = '', hw = 0, hand = 0;
+  let from = '', hw = 0, hand = 0, selfMoves = 0;
 
   const root = mk('div', 'pos-knob');
   if (title) root.setAttribute('title', title);
@@ -153,6 +171,22 @@ export function createKnob({
     (2 * (xOut + PAD)).toFixed(2), (yBot - yTop + 2 * PAD).toFixed(2),
   ].join(' ');
   svg.setAttribute('viewBox', vb);
+  /**
+   * 🔴 WHERE THE RING'S LOWER EDGE IS, AS A FRACTION OF THE DRAWING, BECAUSE
+   * THE HAND BUTTON SITS ON IT. Asked for 2026-09-22: *"button in the h center,
+   * vertically centered to the lower edge ot the \"ring\""*.
+   * ⚠️ **DERIVED, NEVER TYPED.** `sweep` is an option and the viewBox is
+   * already computed from it, so a pixel measured off one knob would be wrong
+   * on every other. At the 270 degree default the box spans y 3 to 97 and the
+   * ring's lower edge is y 88, which is 0.904 of the height; a 150 degree arc
+   * puts it somewhere else entirely and this arithmetic follows it.
+   * ⚠️ AND THE SHAPE GOES WITH IT. The element's height follows its width
+   * through the viewBox ratio, so the stylesheet needs both numbers to place
+   * anything against the drawing rather than against the column.
+   */
+  const vbW = 2 * (xOut + PAD), vbH = yBot - yTop + 2 * PAD;
+  root.style.setProperty('--knob-dial-r', (vbH / vbW).toFixed(4));
+  root.style.setProperty('--knob-ring-f', ((yBot - (yTop - PAD)) / vbH).toFixed(4));
   const track = mk('path', 'pos-knob-track');
   const arc = mk('path', 'pos-knob-arc');
   const pointer = mk('path', 'pos-knob-ptr');
@@ -250,10 +284,21 @@ export function createKnob({
   }
 
   // ── the hand ───────────────────────────────────────────────────────────
+  //
+  // ⚠️ `handApi` IS DECLARED HERE AND FILLED IN FURTHER DOWN, rather than
+  // declared where it is built. A `let` shadows its whole block from the top,
+  // and `positron-ui` records seven asserts going silent on exactly that: the
+  // handlers below name it, and they must not be reading a variable in its dead
+  // zone if one of them ever runs during construction.
+  let handApi = null;
   let dragging = false, acc = 0;
 
   svg.addEventListener('pointerdown', (e) => {
     if (off) return;
+    // ⚠️ YIELD, NOT OFF. A motorised fader you can grab is the thing the phrase
+    // names, and nothing pressed the button. `hand-drive.mjs` picks the
+    // movement up again from wherever the dial was left.
+    handApi?.yield();
     dragging = true;
     acc = 0;
     svg.setPointerCapture(e.pointerId);
@@ -277,6 +322,9 @@ export function createKnob({
     if (!dragging) return;
     dragging = false;
     try { svg.releasePointerCapture(e.pointerId); } catch { /* already gone */ }
+    // A lift resumes it at once. Only a `set()` with no lift has to wait out
+    // `HAND_YIELD_MS`, which is the arrow-key case below.
+    handApi?.resume();
   };
   svg.addEventListener('pointerup', stop);
   svg.addEventListener('pointercancel', stop);
@@ -293,6 +341,7 @@ export function createKnob({
     if (off) return;
     e.preventDefault();
     const step = (span / SWEEP) * (e.shiftKey ? FINE : 1);
+    handApi?.yield();
     set(v - Math.sign(e.deltaY) * step * 6, { from: 'hand' });
   }, { passive: false });
 
@@ -305,8 +354,63 @@ export function createKnob({
                  Home: min - v, End: max - v }[e.key];
     if (go === undefined) return;
     e.preventDefault();
+    // ⚠️ NO LIFT ON A KEY PRESS, so this one waits out `HAND_YIELD_MS` rather
+    // than resuming at once. Shorter and the arrow keys look broken, because
+    // the value is dragged away between one press and the next.
+    handApi?.yield();
     set(v + go, { from: 'hand' });
   });
+
+  // ── the invisible hand ────────────────────────────────────────────────────
+  //
+  // 🔴 EVERYTHING BUT THE THREE THINGS ONLY A KNOB KNOWS COMES FROM
+  // `hand-drive.mjs`. Those three are: how many steps this travel has, how a
+  // share of the travel becomes a value, and the sentence it says when it is
+  // barred from a control row.
+  if (wantHand) {
+    const opt = (wantHand && typeof wantHand === 'object') ? wantHand : {};
+    /**
+     * ⚠️ A KNOB'S STEP IS ITS DRAG RESOLUTION, NOT ITS RANGE. Both the pointer
+     * and the arrow keys move by `span / SWEEP`, so the travel has `SWEEP`
+     * distinguishable positions whatever `min` and `max` are, and a 0..1 knob
+     * is exactly as fine as a 0..127 one. Counting `span` instead would have
+     * called a 0..1 knob a one-step control and refused it a hand.
+     */
+    const steps = SWEEP;
+    const handBtn = mk('button', 'pos-knob-hand');
+    handBtn.setAttribute('type', 'button');
+    // ⚠️ THE BUTTON IS NOT THE DIAL AND MUST NOT BEHAVE LIKE IT. A press on it
+    // would otherwise start a drag on the dial underneath and the knob would
+    // jump by whatever the pointer did next.
+    for (const ev of ['pointerdown', 'pointerup', 'wheel', 'dblclick'])
+      handBtn.addEventListener(ev, (e) => e.stopPropagation());
+    root.append(handBtn);
+    handApi = createHandDrive({
+      btn: handBtn,
+      row: root,
+      at: () => (v - min) / span,
+      /**
+       * ⚠️ IT DOES NOT CALL `set()`, WHICH IS WHAT KEEPS `set()` MEANING
+       * "SOMEBODY ELSE MOVED THIS". It shares `clamp()` and `paint()` and emits
+       * `onInput` exactly as a drag does, with `from: 'self'` rather than
+       * `'hand'`, because the whole point of this control is that no hand was
+       * anywhere near it.
+       */
+      move: (share) => {
+        const nv = clamp(min + share * span);
+        if (nv === v) return;
+        v = nv; from = SELF; selfMoves++;
+        paint();
+        onInput(v, SELF);
+      },
+      rest: () => onChange(v, SELF),
+      steps,
+      preset: opt.preset,
+      onHand: opt.onHand,
+      barredSays: 'a knob in a control row may not have an invisible hand: the suite presses '
+        + 'every button in that row on every run, and this one would start sending',
+    });
+  }
 
   /** See the note on `pad.mjs`'s `enable`: a disabled control costs the checks
    *  behind it, and is still the right answer when the control cannot do its job. */
@@ -315,6 +419,11 @@ export function createKnob({
     if (off) { root.setAttribute('data-off', '1'); svg.removeAttribute('tabindex'); }
     else { root.removeAttribute('data-off'); svg.setAttribute('tabindex', '0'); }
     if (why) root.setAttribute('title', why);
+    // A control that cannot be dragged cannot be driven by a hand either, and a
+    // hand still running on a disabled knob is the page arguing with its own
+    // greyed-out control. Same rule `slider.mjs` states for its own disable.
+    handApi?.setEnabled(!off);
+    if (off) handApi?.stop('disabled');
     return !off;
   }
   enable(!off, title);
@@ -328,11 +437,16 @@ export function createKnob({
     el: root,
     set,
     value: () => v,
-    /** '' until something has moved it, then 'hand' or 'hardware'. */
+    /** '' until something has moved it, then 'hand', 'hardware' or 'self'. */
     source: () => from,
     /** 🔴 COUNTERS, so "is this binding live" is answerable after the fact. */
     hardwareMoves: () => hw,
+    /** how many times A PERSON moved it. See the note on `SELF` above. */
     handMoves: () => hand,
+    /** how many times the INVISIBLE hand moved it, which is nobody moving it. */
+    selfMoves: () => selfMoves,
+    /** the invisible hand, or `null` on a knob that was not given one. */
+    hand: handApi,
     repaint: paint,
     enable,
     disabled: () => off,

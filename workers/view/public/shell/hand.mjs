@@ -36,17 +36,27 @@ export const MOVES = [
     a: 3, b: 4,
     shape: 'beta',
     /**
-     * 🔴 WAY SLOWER, ASKED FOR IN THOSE WORDS 2026-09-16. It was 2200 ms, which
-     * is a hand demonstrating a slider rather than a hand playing one: at that
-     * rate a filter sweep is a gesture you watch, and what this is for is a
-     * sound that changes under you while you listen to it. 7000 ms is about a
-     * breath and a half each way.
+     * 🔴 SLOWED TWICE, BY TWO DIFFERENT ASKS, AND BOTH ARE KEPT HERE BECAUSE
+     * THE DIRECTION IS THE FINDING. It was **2200 ms**, which is a hand
+     * demonstrating a slider rather than a hand playing one: at that rate a
+     * filter sweep is a gesture you watch, and what this is for is a sound that
+     * changes under you while you listen to it. *"way slower"*, 2026-09-16,
+     * took it to **7000**, about a breath and a half each way. *"reduce
+     * invisible hand speed 2x"*, 2026-09-22, halves the speed again to
+     * **14000**, which is a slow breath in and a slow breath out.
+     * ⚠️ NOBODY HAS EVER ASKED FOR IT TO GO FASTER. Two asks, both one
+     * direction, an order of magnitude between the first value and this one.
      * ⚠️ THE SHAPE IS UNAFFECTED AND SO IS ITS MEASUREMENT. Every number in
      * `hand-test.mjs` is a ratio or a fraction of a lap, and the test asserts
      * rate invariance across 24 to 120 Hz for the same reason: a slower lap is
-     * the same curve read at a different speed.
+     * the same curve read at a different speed. MEASURED after this change:
+     * 23 ok, 0 failed, not one number in it moved.
+     * ⚠️ AND A PAGE THAT WAITS OUT A LAP READS IT FROM HERE. `/knobs/` does
+     * `MOVES.find(([name]) => name === 'sweep')[1].lapMs` and THROWS if it is
+     * missing, so its self-check re-sizes its own wait rather than carrying a
+     * number that would now be half a lap short.
      */
-    lapMs: 7000,         // one end to the other
+    lapMs: 14000,        // one end to the other
     span: [0, 1],        // as a share of the lane's travel
     settle: 0.15,        // the share of a lap spent correcting the overshoot
     turnMs: 130,         // held still at each end
@@ -96,8 +106,12 @@ export const BARE = { settle: 0, turnMs: 0, endJit: 0, timeJit: 0, over: 0, wobb
 /** How many harmonics the speed wobble uses. See `warp`. */
 export const HARMONICS = 2;
 
+// ⚠️ THE SAME NUMBERS A SECOND TIME, AND `lapMs` HAS TO MOVE IN BOTH. A preset
+// given to `plan()` with fields left out falls back here, so a `DEFAULTS` that
+// disagreed with `MOVES[0]` would give a partial preset a different speed from
+// the button's.
 const DEFAULTS = {
-  a: 3, b: 4, shape: 'beta', lapMs: 7000, span: [0, 1],
+  a: 3, b: 4, shape: 'beta', lapMs: 14000, span: [0, 1],
   settle: 0.15, turnMs: 130, endJit: 0.03, timeJit: 0.12, over: 0.022, wobble: 0.05,
 };
 

@@ -59,6 +59,15 @@
      is the `--sld-col` lesson, which cost a row snapping back to the width of
      one word three reports running. */
   --ctl-w: 46px;
+  /* 🔴 A KNOB IS TEN PER CENT WIDER THAN THAT, 2026-09-22, AND IT IS HERE
+     RATHER THAN ON `.pos-knob` BECAUSE A PAGE HAS TO BE ABLE TO SIZE A TRACK
+     WITH IT. `/circuit/` builds one grid whose outer columns hold a knob above
+     a round button, and a column declared `var(--ctl-w)` put a 50.6 px knob in
+     a 46 px track: the knob overflowed to the right and its centre came out
+     2.3 px off the column it is printed over. A custom property declared on the
+     component is invisible to the caller, which is the `--fdr-foot` lesson one
+     file along. */
+  --knob-w: calc(var(--ctl-w) * 1.1);
   --ctl-gap: 8px;
   /* ── THE CONTROL LAYOUT CONTRACT ──────────────────────────────────────
 
@@ -4034,9 +4043,26 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    discoverability: a control that LOOKS like a dial invites somebody to turn
    it in a circle, and there is no signifier for "drag me up". This arrow is
    the standard one and it is the cheapest honest signal there is. */
+/* 🔴 A KNOB IS TEN PER CENT WIDER THAN EVERY OTHER CONTROL SINCE
+   2026-09-22, ASKED FOR AS *"make knobs 10% bigger"*, AND IT IS ITS OWN TOKEN
+   RATHER THAN A BIGGER `--ctl-w`. That variable is the width of a pad, a fader
+   and a knob alike, so raising it would have grown every control on the site to
+   answer a request about one of them, and `positron-ui` records the pad grid,
+   the strip and `/twelve/`'s three alignments all measured against 46.
+   ⚠️ **NOTHING A CALLER MEASURES BREAKS, BECAUSE NOTHING MEASURES A KNOB BY
+   TYPING 46.** `control-grid.mjs` reads the first cell back off the page, a
+   knob row is flex, and `--ctl-head` and `--ctl-foot` are unchanged, which is
+   the contract that makes a row of mixed controls line up.
+   ⚠️ AND IT IS `calc`, NOT 51px: the relationship is the thing that was asked
+   for, so a later change to `--ctl-w` keeps it. */
 .pos-knob {
+  /* the number's fixed height, read here AND by the hand button, because a
+     shared measurement typed twice is a measurement that will disagree */
+  --knob-num-h: 14px;
   display: flex; flex-direction: column; align-items: center;
-  width: var(--ctl-w); flex: 0 0 auto;
+  width: var(--knob-w); flex: 0 0 auto;
+  /* the hand button is placed against the DRAWING, so the column is its frame */
+  position: relative;
   -webkit-touch-callout: none; user-select: none;
 }
 /* 🔴 A FIXED HEIGHT ON THE NUMBER. It changes sixty times a second under a
@@ -4044,20 +4070,61 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    takes or the whole column jumps under the hand moving it. */
 .pos-knob-v {
   font: 500 11px/14px var(--mono); font-variant-numeric: tabular-nums;
-  color: var(--fg); height: 14px; white-space: nowrap; overflow: hidden;
+  color: var(--fg); height: var(--knob-num-h); white-space: nowrap; overflow: hidden;
 }
 /* ⚠️ `height: auto`, BECAUSE THE VIEWBOX DECIDES THE SHAPE. `knob.mjs` crops the
    viewBox to the arc's real extent, which depends on the sweep, so a height
    typed here would be a second opinion about a shape the drawing already knows.
    It was a square, and a 150 degree arc in a square box read as half a knob. */
 .pos-knob-dial {
-  width: var(--ctl-w); height: auto; display: block; margin: 3px 0 4px;
+  width: var(--knob-w); height: auto; display: block; margin: 3px 0 4px;
   cursor: ns-resize;
   /* or a drag on a phone scrolls the page instead of moving the knob */
   touch-action: none;
   border-radius: 50%; outline-offset: 2px;
 }
 .pos-knob-dial:focus-visible { outline: 2px solid var(--hi); }
+/* 🔴 THE INVISIBLE HAND'S BUTTON, ON THE RING'S LOWER EDGE. Asked for
+   2026-09-22: *"add this mode to knobs: button in the h center, vertically
+   centered to the lower edge ot the \"ring\" use same icon"*.
+   🔴 **IT COSTS NO HEIGHT, WHICH IS THE ONLY REASON IT CAN GO THERE.** It is
+   absolute, so `--ctl-head` and `--ctl-foot` do not move and a row mixing
+   knobs that have a hand with knobs that do not still lines up. The same
+   argument bought `.pos-knob-ends` its place in the dial's own dead space, and
+   `positron-ui` records what happens when a page does this arithmetic itself.
+   🔴 **AND THE POSITION IS READ OFF THE DRAWING, NOT TYPED.** `knob.mjs`
+   publishes `--knob-ring-f`, where the ring's lower edge sits as a fraction of
+   the drawing, and `--knob-dial-r`, the drawing's height over its width. Both
+   fall out of the viewBox, which is already computed from `sweep`. A pixel
+   typed here would be right on a 270 degree knob and wrong on every other, and
+   that is the exact defect the viewBox comment in `knob.mjs` was written about.
+   ⚠️ THE THREE TERMS ARE: the number's fixed height, the dial's 3px top margin,
+   and the ring's edge inside the drawing. */
+.pos-knob-hand {
+  position: absolute; left: 50%;
+  top: calc(var(--knob-num-h) + 3px
+            + var(--knob-ring-f, 0.9) * var(--knob-w) * var(--knob-dial-r, 1));
+  transform: translate(-50%, -50%);
+  width: 22px; min-width: 22px; height: 22px; padding: 0;
+  display: grid; place-items: center;
+  font-size: 12px; line-height: 1;
+  /* it sits ON the drawing, so it needs a ground of its own or the ring shows
+     through the glyph */
+  background: var(--card); border: 1px solid var(--line); border-radius: 50%;
+  color: var(--fg2); cursor: pointer;
+  -webkit-touch-callout: none; touch-action: manipulation;
+}
+.pos-knob-hand:hover { border-color: var(--line2); color: var(--fg); }
+/* ⚠️ THE SYMBOL LIGHTS AND NOTHING ELSE CHANGES, which is `.sld-hand`'s rule
+   verbatim and was instructed there: *"just color it yellow when enabled (the
+   symbol)"*. A knob whose ring or needle changed while a hand held it would be
+   a second channel for one fact, and a dial that changes appearance while it
+   moves reads as one that has broken. */
+.pos-knob-hand[data-on="1"] { color: var(--hi); }
+.pos-knob-hand[data-held] { opacity: .55; }
+.pos-knob-hand:disabled { opacity: .4; cursor: not-allowed; }
+/* a knob switched off cannot be driven, and says so on the button too */
+.pos-knob[data-off] .pos-knob-hand { opacity: .4; cursor: default; }
 /* 🔴 ONE STROKE WIDTH, READ BY THE TRACK AND THE ARC. It was 7 in two places,
    so changing it meant editing two numbers that have to stay equal or the
    yellow sits inside a grey halo. One token, and the needle derives from it.
@@ -4113,9 +4180,14 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    ⚠️ `pointer-events: none` BECAUSE THE DIAL IS THE CONTROL. A number sitting
    over the knob's own hit area that swallows a press is a control with a dead
    corner, and nobody would know why. */
+/* ⚠️ THE PULL UP IS A RATIO OF THE DIAL, NOT A PIXEL, SINCE 2026-09-22. It was
+   `-11px`, tuned by eye against a 46 px dial, and the knob is `--ctl-w * 1.1`
+   now: a typed pixel tuned against one size is a rule that silently stops
+   meaning what it meant the moment the size moves. -11/46 is 0.239 of the
+   dial's width, which is what that number always was. */
 .pos-knob-ends {
   display: flex; justify-content: space-between; width: 100%;
-  margin-top: -11px; pointer-events: none;
+  margin-top: calc(var(--knob-w) * -0.239); pointer-events: none;
   font: 400 8.5px/1 var(--mono); color: var(--dim2);
   font-variant-numeric: tabular-nums;
 }
