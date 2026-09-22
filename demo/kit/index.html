@@ -108,9 +108,32 @@
      ⚠️ AND IT IS BOTTOM ONLY, DELIBERATELY. A symmetric inset here would be
      the double padding `/pack/` was reported for on the same day, where a
      glued part painted its own box inside the glue's. */
-  .kit-pg { display: flex; align-items: flex-start; gap: 6px; width: 100%;
-            padding-bottom: 10px; }
+  /* 🔴 THE RIGHT MATCHES THE BOTTOM SINCE 2026-09-22, ASKED FOR AS *"make sure
+     right padding is same as bottom"* with a crop of the last pad nearly
+     touching the right edge while there was clear room under it.
+     ⚠️ **ONE NUMBER READ TWICE, NOT TWO THAT HAPPEN TO MATCH.** Right and bottom
+     being equal is a claim that they are the same measurement, and `shell.css`
+     has repaired exactly this twice, as `--sld-col` and as `--ctl-gap`.
+     ⚠️ **AND IT IS ON `.kit-pg` RATHER THAN ON THE SCROLLER, WHICH IS THE TRAP
+     WORTH NAMING.** `.kit-pg-strip` is the scroll container, and a scroll
+     container's END padding is not reliably honoured once its content overflows:
+     it can be declared, be correct in the computed style, and render as nothing
+     at the far end. `.kit-pg` is the flex parent and is never the thing that
+     scrolls, so its padding is real at every width. */
+  .kit-pg { --kit-pg-inset: 10px;
+            display: flex; align-items: flex-start; gap: 6px; width: 100%;
+            padding-bottom: var(--kit-pg-inset); padding-right: var(--kit-pg-inset); }
   .kit-pg-strip { overflow-x: auto; min-width: 0; flex: 1 1 auto; }
+  /* 🔴 THE SPECIMEN'S OWN FRAME COMES OFF WHERE A GLUE IS THE SPECIMEN, ASKED
+     FOR 2026-09-22 AS *"rm wrapper and info footer"* with a screenshot of two
+     nested rounded boxes.
+     ⚠️ **THE REDUNDANT ONE IS THIS PAGE'S, NOT THE COMPONENT'S**, which is the
+     half worth checking before deleting. `createGlue` draws one edge round the
+     whole component and its children give up theirs, so a glue is ALREADY a
+     bounded object; `.kit-pg` contributes no border at all. What was left was
+     `.kit-box`'s frame round a thing that draws its own, which is a box around
+     a box and an edge nobody wrote. */
+  .kit-nobox { border: 0; border-radius: 0; background: none; padding: 0; }
   .kit-fig { flex: 1 1 200px; min-width: 0; }
   /* One column's worth of a figure and the word naming it, so a row of four can
      be read without a legend. The word is under the box rather than in it,
@@ -254,12 +277,12 @@
   .kit-panelcol { gap: 10px; }
   .kit-panelrow { gap: 10px; }
 
-  /* A channel strip: four rows of controls, stacked the way a mixer stacks
-     them. The row headings came off 2026-09-20 and `.kit-hwlab` went with
-     them; every knob already carries its CC under it. */
-  .kit-hwrow { width: 100%; }
-  .kit-hwrow + .kit-hwrow { margin-top: 18px; }
-  .kit-hwitems { min-width: 0; overflow-x: auto; }
+  /* 🔴 `.kit-hwrow`, `.kit-hwitems` AND `.kit-hwstrips` WENT ON 2026-09-22 WITH
+     THE CHANNEL STRIP THEY LAID OUT. They were four full width horizontal rows
+     inside a wrapping flex box, which is the arrangement the report
+     *"still not aligned to vertical separated lanes"* was about. `.kit-chans`
+     and `.kit-chan` below replace them, and the scroller pair that
+     `.kit-hwitems` carried moved to `.kit-chans` with it. */
   /* 🔴 THE FOUR SHAPES SIDE BY SIDE, ASKED FOR AS *"align channel strips
      horiztlly"*. They were four full width rows stacked, which is a picture of
      four separate demonstrations; a channel strip is the four TOGETHER, and
@@ -280,9 +303,45 @@
      strips on a wide screen still sit side by side, which is what was asked
      for; on a phone they stack, and the one that is still too wide scrolls by
      itself instead of moving the page. */
-  .kit-hwstrips { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px 30px; }
-  .kit-hwstrips > .kit-hwrow { width: auto; max-width: 100%; min-width: 0; }
-  .kit-hwstrips > .kit-hwrow + .kit-hwrow { margin-top: 0; }
+
+  /* 🔴 REAL CHANNELS, 2026-09-22, AND THE REPORT SAID *"still"*: *"still not
+     aligned to vertical separated lanes"*. What stood here was four independent
+     HORIZONTAL rows, six knobs over eight pad columns over six faders, three
+     pitches stacked, so a reader could not follow any channel down the picture.
+     It was a catalogue of four components arranged vertically and captioned as
+     a channel strip.
+
+     🔴 **THE DIVIDER IS THE PANEL'S, WHICH IS WHAT *"(see panels)"* MEANT.**
+     `.panel-fixed-l` is `border-right: 1px solid var(--line)` with
+     `padding-right: var(--panel-gap)`, so a divider here and a divider on
+     `/twelve/` are one line rather than two opinions. It goes on the lane
+     rather than between lanes, so the last one loses it and nothing has to
+     count children.
+
+     🔴 **THE ALIGNMENT IS `--ctl-head` AND `--ctl-foot` AND NOT ARITHMETIC.**
+     `positron-ui` is explicit that a row of different controls cannot be
+     aligned by a caller, and `/twelve/` was corrected twelve times in one
+     evening by people doing exactly that. There is no margin in this rule that
+     lifts or drops a control.
+
+     🔴 **A KNOB IS `--ctl-w * 1.1` WIDE SINCE TODAY AND A PAD IS `--ctl-w`, AND
+     THAT IS THE THING THAT BITES IN A COLUMN.** `/circuit/` solves it by
+     centring both in a pad sized track rather than by resizing either, which is
+     what `align-items: center` does here. Resizing a control to make a column
+     tidy is the page doing arithmetic about a component's insides. */
+  .kit-chans { display: flex; align-items: stretch; min-width: 0; overflow-x: auto; }
+  .kit-chan {
+    display: flex; flex-direction: column; align-items: center;
+    gap: var(--ctl-gap); flex: 0 0 auto;
+    border-right: 1px solid var(--line);
+    padding: 0 var(--panel-gap, 16px);
+  }
+  .kit-chan:last-child { border-right: 0; }
+  /* The channel's own name, under the lane it names, in the panel's own ink. */
+  .kit-chan-l {
+    font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--dim2); padding-top: 2px;
+  }
   /* The vertical twins, beside the horizontal ones they are meant to match. */
   .kit-vrow { display: flex; gap: var(--ctl-gap); align-items: flex-end; }
 
@@ -414,7 +473,8 @@
   import { createStepper } from '/shell/stepper.mjs';
   import { createSlider, createSliderGroup, GLIDE_MS, HAND_YIELD_MS } from '/shell/slider.mjs';
   import { createRangeSlider, spanPixels } from '/shell/range-slider.mjs';
-  import { createStepGrid, cellSize as padWidth, PAD_MIN } from '/shell/step-grid.mjs';
+  import { createStepGrid, cellSize as padWidth, PAD_MIN, RISE_MS, FALL_MS }
+    from '/shell/step-grid.mjs';
   import { createCheck, createCheckGroup } from '/shell/check.mjs';
   import { createEnvelopeView, createFilterView, createWaveShape, shapeFor, filterShapeFor }
     from '/shell/synth-view.mjs';
@@ -707,8 +767,13 @@
   // once left its `const` behind, the build read it in its dead zone,
   // `section()` swallowed the throw into `failed`, and the page died much
   // later with a message about a different line.
-  const knobSpec = [];
-  let padSpec = null, halfSpec = null, fadeSpec = null, roundSpec = null, vertSpec = null;
+  /* 🔴 `knobSpec`, `halfSpec`, `roundSpec` AND `fadeSpec` WENT WITH THE CHANNEL
+     STRIP REBUILD ON 2026-09-22, AND NOTHING WAS READING THEM. MEASURED before
+     deleting them: all four were assigned in that block and appeared in no
+     assert on this page, so they were four holders of dead state. `padSpec` is
+     still read by the PAD block. `chanSpec` replaces all of them and IS read. */
+  let padSpec = null, vertSpec = null;
+  let chanSpec = null;       // the four channel lanes, each { lane, knob, pad, half, fader }
   const presSpec = new Map();
   // ⚠️ DECLARED WITH THE OTHERS, NOT INSIDE THE BLOCK. A block that moved to the
   // top of this page once left its `const` behind, the build read it in its dead
@@ -898,7 +963,7 @@
   let standSpec = null;       // { lying, standing, empty }
   let envSpec = null;         // { one, two, three, flat }
   let filtSpec = null;        // { live, deep, refused }
-  let waveSpec = null;        // { drawn: [...], pulse, blend, table, walk }
+  let waveSpec = null;        // { drawnViews, pulse, blend, two, measured, drawnNames }
 
   /**
    * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A drop target, as of
@@ -1284,12 +1349,45 @@ inst.add(row)                     // the flow that does`,
       box.append(el('p', 'kit-cap', 'a maker and a model, at the ends'), named.el, o);
     });
 
+  /**
+   * 🔴 TWO SPECIMENS SINCE 2026-09-22, ASKED FOR AS *"STEP GRID / show example
+   * with both axies labels and one withouth ones"*.
+   *
+   * 🔴 **AND THE STEP AXIS HAD NO LABELS AT ALL, WHICH WAS THE REAL WORK.** The
+   * ROW axis was already optional: omit `fixed` and no label column is built.
+   * The ruler was a press target and a track for the head and carried no text,
+   * so *both axes labelled* could not be shown by passing options that existed.
+   * `ticks` is new, and it numbers the BEATS rather than the steps: a number
+   * under every one of 64 steps is this project's wrapping table heading in a
+   * new costume, and `positron-ui` is explicit that a heading which does not fit
+   * is the author's problem rather than something to shrink at the reader.
+   * ⚠️ **THE RULER'S TWO EXISTING JOBS SURVIVE INTACT**, which is what made this
+   * cheap: its height is `--pg-ruler` whether or not there is text in it, and
+   * `.pos-pg-tick` already carried the font and the two colours for a string it
+   * never had.
+   *
+   * 🔴 **THE BARE ONE IS THE NEGATIVE CONTROL AND THAT IS ITS WHOLE VALUE.** It
+   * is asserted as an ABSENCE, the way `instrument-test.mjs` asserts that the
+   * module builds no case of its own: no label column, no numbers on the ruler,
+   * and the labelled one has both.
+   *
+   * 🔴 **THE WRAPPER AND THE FOOTER WENT IN THE SAME BREATH**, asked as *"rm
+   * wrapper and info footer"*. The box was `.kit-box` drawn round a `.pos-glue`
+   * that draws its own edge, and the footer was a `nothing pressed` line under
+   * it. ⚠️ **WHAT THE FOOTER COST IN CHECKS: NOTHING.** Its three writers were
+   * `onLabel`, `onSeek` and `onToggle` and no assert on this page read it; the
+   * one that sounds like it did, `a question nobody has answered has nothing
+   * pressed`, belongs to the standing choice specimen and reads `standSpec`.
+   * The three callbacks are gone with the line rather than left writing to a
+   * detached node.
+   */
   section('hardware', 'STEP GRID',
     'Rows of square pads over a ruler, with the standard transport glued above them '
-    + 'and a tempo the page has to say out loud whose it is.',
+    + 'and a second grid carrying no labels on either axis.',
     `const grid = createStepGrid({
   fixed, strip, rows: 6, steps: 16,
-  label: (r) => String(r),
+  label: (r) => String(r),                // omit fixed and there is no column
+  ticks: true,                            // numbers the BEATS, never the steps
   silent: (r) => r === 4,                 // lit but grey: it can make no sound
   rate: { bpm: 120, whose: 'this page' }, // no whose, no clock, and it throws
 })
@@ -1297,7 +1395,6 @@ createTransportBar(host, deck, { publish: false, scrub: false, loop: false,
   command: { play: () => grid.clock.play(), pause: () => grid.clock.stop() } })
 createGlue(host, grid.el)                 // the bar over the thing it drives`,
     (box) => {
-      const o = out('nothing pressed');
       const wrap = el('div', 'kit-pg');
       const fixed = el('div');
       const strip = el('div', 'kit-pg-strip');
@@ -1307,6 +1404,12 @@ createGlue(host, grid.el)                 // the bar over the thing it drives`,
       const edit = createStepGrid({
         fixed, strip, rows: 6, steps: STEPS,
         label: (r) => String(r),
+        /* 🔴 BOTH AXES. The rows are named by `label` and the steps by `ticks`,
+           which puts a beat number under every fourth one and nothing between
+           them. `corner` is the cell above the label column and now has a word
+           in it, because the ruler beside it carries text at last. */
+        ticks: true,
+        corner: 'beat',
         title: (r) => (r === 4
           ? 'this row has nothing behind it, so its steps are silent'
           : `row ${r}, press to hear it`),
@@ -1315,11 +1418,8 @@ createGlue(host, grid.el)                 // the bar over the thing it drives`,
         // the one thing a reader cannot see any other way.
         canPress: (r) => r !== 4,
         silent: (r) => r === 4,
-        onLabel: (r) => { edit.lit(r); o.textContent = `row ${r} was pressed`; },
-        onSeek: (s) => { edit.at(s); o.textContent = `seeked to step ${s + 1}`; },
-        onToggle: (r, s, lit, why) => {
-          o.textContent = `row ${r} step ${s + 1} ${lit ? 'on' : 'off'}, by ${why}`;
-        },
+        onLabel: (r) => { edit.lit(r); },
+        onSeek: (s) => { edit.at(s); },
         /**
          * 🔴 THE TEMPO IS NAMED IN WORDS, AND THE COMPONENT WILL NOT PLAY
          * WITHOUT IT. Nothing about a grid of pads carries a rate, so a play
@@ -1352,24 +1452,37 @@ createGlue(host, grid.el)                 // the bar over the thing it drives`,
         publish: false, scrub: false, loop: false,
         fmt: (pos) => `step ${Math.min(STEPS, Math.floor(pos) + 1)} of ${STEPS}`,
         command: {
-          play: () => {
-            edit.clock.play();
-            o.textContent = `running at ${edit.clock.bpm()} beats a minute, `
-              + edit.clock.whose;
-          },
-          pause: () => {
-            edit.clock.stop();
-            o.textContent = 'stopped, and back at the first column';
-          },
+          play: () => edit.clock.play(),
+          pause: () => edit.clock.stop(),
         },
       });
       /* The head follows the grid rather than the deck's own clock, so the
          number in the bar and the lit column cannot come apart. */
       edit.clock.onStep((i) => deck.seek(i));
 
-      gridSpec = { edit, bar, deck, barHost, wrap };
-      box.classList.add('kit-wide');
-      box.append(createGlue(barHost, wrap), o);
+      /* 🔴 NO LABELS ON EITHER AXIS, WHICH IS THE NEGATIVE CONTROL. No `fixed`
+         means no label column is built at all, and `ticks` left off means the
+         ruler is what it has always been. It is a smaller grid because what is
+         being shown is an absence rather than a sequence. */
+      const bareWrap = el('div', 'kit-pg');
+      const bareStrip = el('div', 'kit-pg-strip');
+      bareWrap.append(bareStrip);
+      const bare = createStepGrid({
+        strip: bareStrip, rows: 3, steps: STEPS,
+        padTitle: (r, s) => `row ${r}, step ${s + 1}`,
+      });
+      for (const [r, s] of [[0, 0], [0, 6], [1, 3], [2, 9], [2, 14]]) {
+        bare.set(r, s, true, 'quiet');
+      }
+
+      /* ⚠️ `bar` AND `deck` ARE HELD SO THE BLOCK KEEPS THEM ALIVE, and neither
+         is read by an assert: what is graded about the transport here is the
+         GLUE, through `barHost` and `wrap`. Saying so beats a reader wondering
+         which check reads them. */
+      gridSpec = { edit, bare, bar, deck, barHost, wrap, bareWrap };
+      box.classList.add('kit-wide', 'kit-nobox');
+      box.append(createGlue(barHost, wrap),
+        el('p', 'kit-cap', 'no labels on either axis'), bareWrap);
     });
 
   /**
@@ -1681,12 +1794,56 @@ filt.set({ freq: v })     // the type name is read, and a name it cannot read is
       type.options(FILTER_TYPES, at);
       go(at);
 
-      const drive = createSliderGroup([
-        createSlider({ label: 'cutoff', sub: 'CC 74', min: 0, max: 127, step: 1, value: 78,
-          onInput: (v) => { live.set({ freq: v }); o.textContent = `cutoff ${v} of 127`; } }),
-        createSlider({ label: 'resonance', sub: 'CC 71', min: 0, max: 127, step: 1, value: 40,
-          onInput: (v) => { live.set({ resonance: v }); o.textContent = `resonance ${v} of 127`; } }),
-      ], { pair: true });
+      /**
+       * 🔴 THE CONTROLS ARE ONE GRID SINCE 2026-09-22, ASKED FOR AS *"put all
+       * to controls grid"* after a screenshot of a type stepper on its own line
+       * with two labelled sliders under it, all three placed by hand.
+       *
+       * 🔴 **AND THE TWO SLIDERS BECAME KNOBS, WHICH IS A CHANGE TO THE BLOCK
+       * AND NOT ONLY A TIDY UP. MEASURED, BECAUSE THE OBVIOUS READING OF THE
+       * ASK WOULD HAVE SHIPPED A DEFECT.** `createControlGrid` writes
+       * `gridAutoRows` at the same pitch as its columns, which is
+       * `max(cellW, cellH) + gap`: the whole component is the claim that two
+       * working surfaces sit on a SQUARE lattice. A horizontal slider is about
+       * 300 px wide and 40 tall, so a square cell for one is **300 px tall for
+       * a 40 px control**, and three of them would have been a row of empty
+       * case seven times the height of what is in it. That is the exact
+       * condition `panel-layout.mjs`'s own `check()` exists to report.
+       * ✅ **SO THE LATTICE IS RIGHT AND THE CONTROL WAS WRONG.** Cutoff is
+       * CC 74 and resonance is CC 71, which are KNOBS on this instrument and on
+       * every other one, and a knob is taller than it is wide, which is the
+       * shape a square lattice is a claim about.
+       *
+       * 🔴 **AND THE TYPE PICKER IS REFUSED FROM THE GRID, ON THE SAME
+       * MEASUREMENT, WHICH IS HALF OF WHAT WAS ASKED FOR.** All three were put
+       * in first and the page reported it: the picker is about 272 px wide, so
+       * the square lattice came out at a **282 px pitch holding a 96 px
+       * control, 34 per cent filled**, and both knobs sat in the middle of a
+       * box nearly three times their height. A picker is a wide horizontal
+       * object exactly as a slider is, and a square lattice is a claim about
+       * controls that are TALLER than they are wide.
+       * ⚠️ **SO IT SITS ABOVE THE GRID RATHER THAN IN IT.** That is also what a
+       * real panel does: a type or a patch selector is a display with two
+       * buttons, and it is not on the knob lattice on any instrument on this
+       * desk. `positron-ui`'s other half is that if the thing you need is not
+       * in the kit, stop and ask, and the thing that is not in the kit here is
+       * a grid cell that may span a row.
+       * ⚠️ **THE EMPTY CASE IS ASSERTED BOTH WAYS BELOW**, so the day somebody
+       * puts a wide control back in, the page says so rather than looking
+       * slightly odd.
+       */
+      const cutoff = createKnob({
+        label: 'CUTOFF', sub: 'CC 74', min: 0, max: 127, value: 78,
+        onInput: (v) => { live.set({ freq: v }); o.textContent = `cutoff ${v} of 127`; },
+      });
+      const reso = createKnob({
+        label: 'RESONANCE', sub: 'CC 71', min: 0, max: 127, value: 40,
+        onInput: (v) => { live.set({ resonance: v }); o.textContent = `resonance ${v} of 127`; },
+      });
+      const drive = createControlGrid({ cols: 2, gap: 10, items: [cutoff, reso] });
+      filtSpec.drive = drive;
+      filtSpec.knobs = [cutoff, reso];
+      filtSpec.type = type;
       box.append(figs, type.el, drive.el, o);
     });
 
@@ -1742,9 +1899,44 @@ createWaveShape({ shape: 'pulse', duty: 0.2 })      // a width has to be handed 
       // hand. `shapeFor` never returns one, on purpose.
       const pulse = fig('pulse at a fifth, given by hand',
         createWaveShape({ shape: 'pulse', duty: 0.2, name: 'pulse 20%', height: 76 }));
+      /* 🔴 THE REASON IS SHORTER SINCE 2026-09-22 BECAUSE THE OLD ONE WAS BEING
+         CUT. It read `a blend, and its ratio is not published` and rendered as
+         `is not publ…` in this block's narrow cards. `positron-ui` is explicit
+         that anything truncating with an ellipsis is in the WRONG PLACE, and
+         that the ellipsis is the signal rather than a styling problem to widen
+         your way out of. The words that carry the fact are `ratio not
+         published`; the rest was a sentence built round them. */
       const blend = fig('a blend, refused',
         createWaveShape({ name: 'saw 5:5 PW', height: 76,
-          reason: 'a blend, and its ratio is not published' }));
+          reason: 'its ratio is not published' }));
+      /**
+       * 🔴 TWO TRACES IN ONE PICTURE, 2026-09-22, ASKED FOR AS *"can you have
+       * wave / osilocope visualizer to top of muta. plai and warp with
+       * different colors"*. A page that puts an oscillator's output and an
+       * effect's output in two boxes side by side asks a reader to hold one in
+       * their head while looking at the other.
+       * 🔴 **AND THE SECOND SPECIMEN IS THE ONE THAT MATTERS, BECAUSE IT IS
+       * MEASURED RATHER THAN DERIVED.** `points` outranks a name, and it has
+       * to, or this option would be useless to the page that asked for it:
+       * `/muta/`'s two signals are a Plaits engine and a wave folder, and
+       * neither is a sine, a triangle, a sawtooth or a square. A caller with
+       * SAMPLES is not guessing, which is the only thing the refusal is about.
+       */
+      const two = fig('two named shapes, two colours',
+        createWaveShape({ name: 'sawtooth', height: 76, colour: '--dim',
+          over: { name: 'sine', colour: '--hi' } }));
+      /* Samples rather than names, under a name that has no shape at all. The
+         curve is a fold of a saw, which is what a wave folder does to one. */
+      const N = 256;
+      const folded = Array.from({ length: N }, (_, i) => {
+        const p = (i / (N - 1)) * 2;
+        const saw = 2 * (p % 1) - 1;
+        return Math.sin(saw * Math.PI * 1.5);
+      });
+      const raw = Array.from({ length: N }, (_, i) => 2 * (((i / (N - 1)) * 2) % 1) - 1);
+      const measured = fig('measured samples, where a name would be refused',
+        createWaveShape({ name: 'plaits engine', height: 76, points: raw, colour: '--dim',
+          over: { name: 'folded', points: folded, colour: '--hi' } }));
       /* 🔴 THE WALK AND THE WAVETABLE FIGURE BOTH LEFT ON 2026-09-22, asked
          for as *"rm this exampoel a wavetable, refused"* and *"rm osc 1 wave
          example"*. The walk was a picker over all thirty waves with a figure
@@ -1758,7 +1950,7 @@ createWaveShape({ shape: 'pulse', duty: 0.2 })      // a width has to be handed 
          thirty with no browser. **What is gone is the demonstration that one
          component handles both answers as a reader steps through them**, and
          the blend figure is the only refusal left on the page. */
-      waveSpec = { drawnViews, pulse, blend, drawnNames };
+      waveSpec = { drawnViews, pulse, blend, two, measured, drawnNames };
       box.append(figs, o);
     });
 
@@ -3992,119 +4184,97 @@ f.set(104, { from: 'hardware', quiet: true })`,
   /* 🔴 THE FOUR NAMES CAME OFF THE HEADING 2026-09-21, ASKED FOR AS *"rm :
      KNOB, PAD, HALF PAD, FADER"*. Each of the four has its own section on this
      page already, the snippet below names all four constructors, and a heading
-     that lists its own contents is the caption the contents already are. It is
-     the same cut the row headings inside this block took the day before. */
+     that lists its own contents is the caption the contents already are. */
+  /**
+   * 🔴 REAL CHANNELS SINCE 2026-09-22, AND THE REPORT SAID *"still"*: *"still
+   * not aligned to vertical separated lanes"*. It had been asked for once
+   * before and never started.
+   *
+   * 🔴 **WHAT WAS HERE WAS NOT A CHANNEL STRIP, AND ITS OWN DESCRIPTION SAID
+   * SO**: *"the four shapes a hardware layout is built from"*. Four independent
+   * HORIZONTAL rows, six knobs over eight pad columns over six faders, three
+   * different pitches stacked, so nothing shared a column with anything above
+   * it and a reader could not follow any channel down the picture. A catalogue
+   * of four components arranged vertically, captioned as a channel strip.
+   * ⚠️ **AND THE CATALOGUE IS NOT LOST**, which is why this is a rebuild rather
+   * than an argument: KNOB, PAD and FADER each have their own block on this
+   * page, which is where a reader compares shapes. This block is the one place
+   * they are assembled, and assembly is the thing it was failing to show.
+   *
+   * 🔴 **THE DIVIDER IS THE PANEL'S OWN LINE.** `.panel-fixed-l` carries
+   * `border-right: 1px solid var(--line)` with `padding-right:
+   * var(--panel-gap)`, and `.kit-chan` uses the same two tokens, so a divider
+   * here and a divider on `/twelve/` are one measurement.
+   *
+   * 🔴 **AND THE ALIGNMENT IS THE CONTRACT, NEVER ARITHMETIC IN THIS FILE.**
+   * `--ctl-head` and `--ctl-foot` reserve the slot above and below every
+   * working surface whether or not it is filled, so a column of a knob, two
+   * pads and a fader lines up by itself. `positron-ui` records `/twelve/` being
+   * corrected twelve times in one evening, every one of them the page doing
+   * arithmetic about a component's insides. There is not one margin here.
+   * ⚠️ **A KNOB IS `--ctl-w * 1.1` WIDE AND A PAD IS `--ctl-w`**, which is a
+   * real difference rather than a bug, and `/circuit/` solves it by centring
+   * both rather than resizing either. So does this.
+   *
+   * 🔴 **THREE ALIGNMENTS THAT LOOK LIKE ONE ARE THREE ASSERTS**, which is the
+   * other half of the same record: two of `/twelve/`'s three lined up while the
+   * third was 30 px out, and later the boxes matched while the faders inside
+   * them were 17 px apart. The checks below read the DIAL, the BUTTON and the
+   * LANE, never a wrapper.
+   */
   section('hardware', 'CHANNEL STRIP',
-    'The four shapes a hardware layout is built from, with the knobs on a Novation '
-    + 'Circuit’s measured macros, CC 80 to 87. A knob is dragged up and down rather than '
-    + 'turned, and the last control in every row is disabled.',
-    `createKnobBank([createKnob({ label: 'M1', sub: 'CC 80', min: 0, max: 127, value: 18 })])
-createPadGrid({ cols: 8, rows: 2, pad: (x, y) => ({ tint, top, on }) })
-createPadGrid({ cols: 8, pad: (x) => ({ half: true, label: String(x + 1) }) })
-createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
+    'Four channels as four vertical lanes, each control in a lane centred on one line '
+    + 'and each lane divided from the next by the panel’s own border.',
+    `const lane = el('div', 'kit-chan')
+lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
+// .kit-chan is the panel's divider: border-right var(--line), padding var(--panel-gap)
+// nothing here sets a margin: --ctl-head and --ctl-foot do the lining up`,
     (box) => {
       box.classList.add('kit-wide');
-      /**
-       * ⚠️ WHY A KNOB IS A VERTICAL DRAG, kept here because the note above lost
-       * it on 2026-09-20 and it is a measurement rather than a preference:
-       * angular drag dies near the centre, where two pixels swing the angle
-       * through most of its range.
-       * ⚠️ AND THE ROW HEADINGS ARE GONE, asked for the same day as *"headings"*
-       * with three of the four quoted back. Every knob carries its CC in its own
-       * `sub`, `half: true` is in the snippet above, and the fourth heading said
-       * *"which is the whole difference"*, which is the author explaining his own
-       * demonstration.
-       */
-      const strips = el('div', 'kit-hwstrips');
-      box.append(strips);
-      const row = () => {
-        const r = el('div', 'kit-hwrow');
-        const inner = el('div', 'kit-hwitems');
-        r.append(inner);
-        strips.append(r);
-        return inner;
-      };
+      const chans = el('div', 'kit-chans');
+      box.append(chans);
 
-      // ── knobs, carrying the Circuit's measured macro numbers ──────────
-      const kRow = row();
-      for (let i = 0; i < 5; i++) {
-        knobSpec.push(createKnob({
+      /* Four channels, and the last one is disabled throughout, because a
+         disabled control has to line up with a live one or the state reads as
+         a rendering fault. */
+      const lanes = [];
+      for (let i = 0; i < 4; i++) {
+        const off = i === 3;
+        const lane = el('div', 'kit-chan');
+        const knob = createKnob({
           label: 'M' + (i + 1), sub: 'CC ' + (80 + i),
-          min: 0, max: 127, value: 18 + i * 22,
-          title: 'macro ' + (i + 1) + ', CC ' + (80 + i) + ' on channel 1',
-        }));
+          min: 0, max: 127, value: 18 + i * 22, disabled: off,
+          title: off ? 'disabled: nothing is bound to this one'
+            : 'macro ' + (i + 1) + ', CC ' + (80 + i) + ' on channel 1',
+        });
+        /* One pad per lane, not a grid across the page, because a grid across
+           the page is what this block was doing wrong. */
+        const pad = createPad({
+          label: String(i + 1), top: 'step', tint: '#7fb2ff',
+          on: i % 2 === 0, disabled: off,
+          title: off ? 'disabled' : 'step ' + (i + 1),
+        });
+        const half = createPad({
+          half: true, label: String(i + 1), tint: '#8fd6a8',
+          on: i % 3 === 0, disabled: off,
+          title: off ? 'disabled' : 'mute ' + (i + 1),
+        });
+        const fader = createFader({
+          label: 'CH' + (i + 1), value: 30 + i * 20, disabled: off,
+          title: off ? 'disabled: no channel is bound'
+            : 'channel ' + (i + 1) + ' fader, pitch bend on channel ' + (i + 1),
+        });
+        lane.append(knob.el, pad.el, half.el, fader.el,
+          el('div', 'kit-chan-l', 'CH' + (i + 1)));
+        chans.append(lane);
+        lanes.push({ lane, knob, pad, half, fader });
       }
-      // ⚠️ ONE SHOWN AS MOVED BY HARDWARE, because that state is the reason the
-      // component tracks a source at all and it is invisible until something is
-      // in it. A live binding and one nobody ever bound look identical.
-      knobSpec[3].set(96, { from: 'hardware', quiet: true });
-      knobSpec.push(createKnob({
-        label: 'M6', sub: 'CC 85', value: 40, disabled: true,
-        title: 'disabled: nothing is bound to this one',
-      }));
-      kRow.append(createKnobBank(knobSpec, {}).el);
-
-      // ── square pads ───────────────────────────────────────────────────
-      const pRow = row();
-      const TINT = ['#7fb2ff', '#ff9f7f'];
-      padSpec = createPadGrid({
-        cols: 8, rows: 2,
-        pad: (x, y) => ({
-          tint: TINT[y],
-          top: x % 2 === 0 ? String(x / 2 + 1) : '',
-          on: y === 0 ? x % 2 === 0 : x % 4 === 1,
-          disabled: x === 7 && y === 1,
-          title: x === 7 && y === 1 ? 'disabled' : 'step ' + (x + 1) + ' of lane ' + (y + 1),
-        }),
-      });
-      pRow.append(padSpec.el);
-
-      // ── the same pads, half height, which is one prop ─────────────────
-      const hRow = row();
-      halfSpec = createPadGrid({
-        cols: 8,
-        pad: (x) => ({
-          half: true, tint: '#8fd6a8',
-          top: x % 2 === 0 ? String(x / 2 + 1) : '',
-          label: String(x + 1),
-          on: x % 3 === 0,
-          disabled: x === 7,
-          title: x === 7 ? 'disabled' : 'step ' + (x + 1),
-        }),
-      });
-      hRow.append(halfSpec.el);
-
-      // ── round pads, which are the same component with a shape prop ────
-      const rRow = row();
-      roundSpec = createPadGrid({
-        cols: 5,
-        pad: (x) => ({
-          round: true, tint: '#c9a0ff',
-          top: x === 0 ? 'top' : '',
-          label: String(x + 1),
-          bottom: ['play', 'stop', 'rec', '', 'off'][x],
-          on: x === 2,
-          disabled: x === 4,
-          title: x === 4 ? 'disabled' : 'round pad ' + (x + 1),
-        }),
-      });
-      rRow.append(roundSpec.el);
-
-      // ── vertical faders, the Model 12's measured shape ────────────────
-      const fRow = row();
-      const faders = [];
-      for (let i = 0; i < 5; i++) {
-        faders.push(createFader({
-          label: 'CH' + (i + 1),
-          value: 30 + i * 20,
-          title: 'channel ' + (i + 1) + ' fader, pitch bend on channel ' + (i + 1),
-        }));
-      }
-      faders[2].set(104, { from: 'hardware', quiet: true });
-      faders.push(createFader({ label: 'FX', value: 64, disabled: true,
-                                title: 'disabled: no master is bound' }));
-      fadeSpec = createFaderBank(faders, {});
-      fRow.append(fadeSpec.el);
+      /* ⚠️ ONE SHOWN AS MOVED BY HARDWARE, because that state is the reason the
+         component tracks a source at all and it is invisible until something
+         is in it. A live binding and one nobody ever bound look identical. */
+      lanes[1].knob.set(96, { from: 'hardware', quiet: true });
+      lanes[2].fader.set(104, { from: 'hardware', quiet: true });
+      chanSpec = lanes;
     });
 
   // 🔴 EVERY BLOCK IS BUILT, SO THE PARTS CLOSE. The window was open for the
@@ -4204,7 +4374,8 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
    * exactly that pair being half written.
    * 🔴 AND BOTH OF THESE WERE HALF WRITTEN UNTIL 2026-09-22, REPORTED FROM A
    * PHONE. `.pos-padgrid` had the `min-width` and not the overflow, so eight
-   * fixed columns spilled 27 px out of their own box; `.kit-hwitems` had the
+   * fixed columns spilled 27 px out of their own box; the channel strip's own
+   * scroller (`.kit-hwitems` then, `.kit-chans` now) had the
    * same half, and one channel strip at 424 px in a 358 px box dragged the
    * document **65 px sideways**. Both comments beside those rules claimed a
    * behaviour the rules did not have, one saying it wrapped and one saying this
@@ -4219,16 +4390,22 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
    * overflow 0, and nothing in this suite can say that.
    */
   {
+    /* 🔴 `.pos-cg` JOINED THIS LIST 2026-09-22 AND SHIPPED WITH NEITHER HALF.
+       Its columns are fixed at the measured pitch and never `1fr`, precisely so
+       the lattice stays square at every width, so a five wide grid of 50.6 px
+       knobs is 280 px whatever the phone is and had nowhere to go but the
+       document. Third component with the same defect in three days. */
     const pairs = [
       ['.pos-padgrid', document.querySelector('.pos-padgrid')],
-      ['.kit-hwitems', document.querySelector('.kit-hwitems')],
+      ['.kit-chans', document.querySelector('.kit-chans')],
+      ['.pos-cg', document.querySelector('.pos-cg')],
     ].filter(([, n]) => n);
     const read = pairs.map(([sel, n]) => {
       const cs = getComputedStyle(n);
       return { sel, ox: cs.overflowX, mw: cs.minWidth };
     });
     d.assert('a row too wide for its box scrolls inside itself, which is two properties and not one',
-      read.length === 2
+      read.length === 3
       && read.every((r) => r.ox === 'auto' && r.mw === '0px'),
       read.map((r) => `${r.sel} is overflow-x ${r.ox} at min-width ${r.mw}`).join(', ')
         || 'neither element is on the page');
@@ -4430,6 +4607,77 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       && instSpec.named.el.contains(instSpec.named.strip),
       `the case holds ${kids.map((k) => (k.className || '').toString().split(' ')[0]).join(', ')}, `
       + `and the strip is ${after ? 'after' : 'NOT after'} the plate`);
+  }
+
+  if (chanSpec) {
+    /**
+     * 🔴 THREE ALIGNMENTS THAT LOOK LIKE ONE ARE THREE ASSERTS. `positron-ui`
+     * records two of `/twelve/`'s three lining up while the third was 30 px
+     * out, and later the boxes matching perfectly while the faders inside them
+     * were 17 px apart. One summary check would have passed both times.
+     * 🔴 **AND EACH ONE READS THE WORKING SURFACE, NEVER THE WRAPPER.** A pad
+     * returns its wrapper as `el` and exposes `button` separately, and an
+     * assert reading the wrapper once reported a button 17 px low while the
+     * button was exactly right. A knob's surface is `.pos-knob-dial`, a pad's
+     * is its `button`, a fader's is `.pos-fdr-lane`.
+     */
+    const mid = (n) => { const r = n.getBoundingClientRect(); return r.left + r.width / 2; };
+    const lanes = chanSpec.map((c) => ({
+      dial: mid(c.knob.el.querySelector('.pos-knob-dial')),
+      pad: mid(c.pad.button),
+      half: mid(c.half.button),
+      fader: mid(c.fader.el.querySelector('.pos-fdr-lane')),
+      box: c.lane.getBoundingClientRect(),
+    }));
+    const worst = (a, b) => Math.max(...lanes.map((l) => Math.abs(l[a] - l[b])));
+
+    d.assert('in every lane the dial and the pad sit on one centre line',
+      worst('dial', 'pad') <= 1,
+      `worst ${worst('dial', 'pad').toFixed(2)} px apart over ${lanes.length} lanes, `
+      + `and a knob is wider than a pad so this is centring rather than matching`);
+
+    d.assert('in every lane the pad and the half pad sit on that same line',
+      worst('pad', 'half') <= 1,
+      `worst ${worst('pad', 'half').toFixed(2)} px apart`);
+
+    d.assert('in every lane the fader’s lane sits on it too',
+      worst('dial', 'fader') <= 1,
+      `worst ${worst('dial', 'fader').toFixed(2)} px apart, measured on the lane and not the column`);
+
+    /**
+     * 🔴 THE DIVIDER IS BETWEEN LANES AND NOT INSIDE ONE, WHICH IS THE OTHER
+     * HALF OF THE REPORT. It is read as the computed border rather than as a
+     * class name, and the last lane has to have none or the strip ends in a
+     * line with nothing after it.
+     * ⚠️ AND IT IS THE PANEL'S LINE, checked against the same token
+     * `.panel-fixed-l` uses rather than against a colour typed here.
+     */
+    const borders = chanSpec.map((c) => getComputedStyle(c.lane));
+    const lineTok = getComputedStyle(document.documentElement)
+      .getPropertyValue('--line').trim();
+    const probe = el('div');
+    probe.style.color = lineTok;
+    document.body.append(probe);
+    const lineRgb = getComputedStyle(probe).color;
+    probe.remove();
+    d.assert('a divider sits between two lanes and never after the last one, in the panel’s own line',
+      borders.slice(0, -1).every((cs) => parseFloat(cs.borderRightWidth) === 1
+        && cs.borderRightColor === lineRgb)
+      && parseFloat(borders[borders.length - 1].borderRightWidth) === 0,
+      `${borders.length - 1} dividers of ${lineRgb} and none on lane `
+      + `${borders.length}, against --line ${lineTok}`);
+
+    /* 🔴 THE NEGATIVE CONTROL: the lanes are really four separate columns and
+       not one column with four things in it. Without this, every assert above
+       would pass on a single lane holding everything, because one lane's
+       controls are trivially on one centre. */
+    const lefts = lanes.map((l) => +l.box.left.toFixed(1));
+    d.assert('NEGATIVE CONTROL: the four lanes are four columns, each starting further right',
+      new Set(lefts).size === 4
+      && lefts.every((x, i) => i === 0 || x > lefts[i - 1])
+      && new Set(lanes.map((l) => +l.dial.toFixed(1))).size === 4,
+      `lanes start at ${lefts.join(', ')} and their dials sit at `
+      + `${lanes.map((l) => l.dial.toFixed(0)).join(', ')}`);
   }
 
   if (headSpec) {
@@ -4768,6 +5016,99 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
     }
 
     /**
+     * 🔴 BOTH AXES ON ONE GRID AND NEITHER ON THE OTHER, WHICH IS THE ASK AND
+     * ITS OWN NEGATIVE CONTROL IN ONE PAIR. The absence is the half worth
+     * grading: a component that numbered every ruler whatever it was told would
+     * pass any check that only looked at the labelled one.
+     * ⚠️ AND THE STEP AXIS IS COUNTED AS BEATS, NOT AS STEPS. Sixteen steps at
+     * four to a beat is FOUR numbers, which is the decision `tickText` records:
+     * a number under every one of 64 steps is the wrapping heading defect in a
+     * new costume.
+     */
+    {
+      const said = (g) => g.el.querySelectorAll('.pos-pg-tick')
+        .length && [...g.el.querySelectorAll('.pos-pg-tick')]
+        .filter((t) => t.textContent.trim()).length;
+      d.assert('a grid can be labelled on both axes, and the steps are counted in beats',
+        said(gridSpec.edit) === 4 && gridSpec.edit.labels.length === 6
+        && [...gridSpec.edit.el.querySelectorAll('.pos-pg-tick')]
+          .filter((t) => t.textContent.trim()).map((t) => t.textContent).join('') === '1234',
+        `${said(gridSpec.edit)} numbers on 16 steps at 4 to a beat, over `
+        + `${gridSpec.edit.labels.length} row labels`);
+
+      d.assert('NEGATIVE CONTROL: a grid given neither axis builds no label column and no numbers',
+        said(gridSpec.bare) === 0 && gridSpec.bare.labels.length === 0
+        && gridSpec.bareWrap.querySelectorAll('.pos-pg-lab').length === 0
+        && gridSpec.bare.el.querySelectorAll('.pos-pg-tick').length === 16,
+        `${gridSpec.bare.el.querySelectorAll('.pos-pg-tick').length} ticks carrying `
+        + `${said(gridSpec.bare)} words, and ${gridSpec.bare.labels.length} row labels`);
+    }
+
+    /**
+     * 🔴 THE RIGHT INSET AND THE BOTTOM ONE ARE THE SAME MEASUREMENT, AND THAT
+     * IS TWO CLAIMS RATHER THAN ONE. Asked as *"make sure right padding is same
+     * as bottom"* from a crop of the last pad nearly touching the right edge.
+     * The computed pair is the stylesheet's claim; the RENDERED distance from
+     * the last pad to the content edge is what the crop actually showed, and a
+     * scroll container can satisfy the first and fail the second.
+     */
+    {
+      const cs = getComputedStyle(gridSpec.wrap);
+      const pr = parseFloat(cs.paddingRight), pb = parseFloat(cs.paddingBottom);
+      d.assert('the step grid’s right inset is the same measurement as its bottom one',
+        pr > 0 && Math.abs(pr - pb) < 0.5,
+        `${pr} px right against ${pb} px bottom, both from --kit-pg-inset`);
+
+      const box = gridSpec.wrap.getBoundingClientRect();
+      const row = gridSpec.edit.pads[0];
+      const last = row[row.length - 1].getBoundingClientRect();
+      const lastRow = gridSpec.edit.pads[gridSpec.edit.pads.length - 1][0]
+        .getBoundingClientRect();
+      const right = box.right - last.right;
+      const bottom = box.bottom - lastRow.bottom;
+      d.assert('and the last pad is no closer to the right edge than to the bottom one',
+        right >= pr - 0.5 && bottom >= pb - 0.5,
+        `${right.toFixed(1)} px to the right edge against ${bottom.toFixed(1)} px `
+        + `to the bottom, on an inset of ${pr} px`);
+    }
+
+    /**
+     * 🔴 THE TRAIL IS A TRANSITION AND NOTHING ELSE, WHICH IS WHY THERE IS NO
+     * TRAIL CODE TO FIND. Only one column is ever marked, so every other lit
+     * column behind the head is a cell still easing out. Reported from a
+     * screenshot at step 13 as *"make 2nd and 3nd fade fade faster"*.
+     * ⚠️ **THE NUMBER ONLY MEANS ANYTHING AS A FRACTION OF A STEP.** At 120
+     * beats a minute with four steps to a beat a step is 125 ms, so the old
+     * 320 ms fall was 2.6 steps of tail and the third column was still visibly
+     * lit. It is asserted against the component's own `stepMsFor`, so the claim
+     * survives a change of tempo rather than being a millisecond count.
+     * ⚠️ **AND THE LAMP KEEPS ITS FILAMENT.** The rise stays shorter than the
+     * fall, so shortening the tail did not undo the earlier repair that made
+     * the light arrive smoothly.
+     */
+    {
+      const ms = (s) => (s || '').split(',').map((x) => parseFloat(x) * (/ms/.test(x) ? 1 : 1000));
+      const base = ms(getComputedStyle(gridSpec.edit.pads[0][0]).transitionDuration);
+      const step = gridSpec.edit.clock.stepMs();
+      d.assert('a lit pad dies inside a step and a half, and still slower than it lights',
+        base[0] > 0 && base[0] / step < 1.6 && base[0] > RISE_MS && FALL_MS === base[0],
+        `${base[0]} ms of fall against a ${step} ms step, which is `
+        + `${(base[0] / step).toFixed(2)} steps, lighting in ${RISE_MS} ms`);
+
+      /* 🔴 THE NEGATIVE CONTROL: the two directions really are two rules. One
+         duration on the head's rule would give a lamp with no filament, and
+         the earlier report that bought the asymmetry would be back. */
+      const head = [...document.styleSheets]
+        .flatMap((sh) => { try { return [...sh.cssRules]; } catch { return []; } })
+        .find((r) => /data-live\]\[data-now="0"\]/.test(r.selectorText || ''));
+      d.assert('NEGATIVE CONTROL: arriving and leaving are two separate rules, with two durations',
+        !!head && ms(head.style.transitionDuration)[0] === RISE_MS
+        && RISE_MS !== FALL_MS,
+        `the head's own rule transitions in ${head ? ms(head.style.transitionDuration)[0] : '?'} ms `
+        + `against ${FALL_MS} on the base rule`);
+    }
+
+    /**
      * 🔴 THE FLOOR IS WHAT MAKES THAT SCROLL RATHER THAN MAKING THE PADS
      * VANISH, and it is the NEGATIVE CONTROL for the measurement above: without
      * it a 320 px box over sixteen steps still fits, so the case that proves
@@ -5094,6 +5435,49 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
     d.assert('the label says the picture is a schematic and gives no frequency in hertz',
       /schematic/.test(lab) && !/Hz/.test(lab) && /of 127/.test(lab),
       `"${lab}"`);
+
+    /**
+     * 🔴 A SQUARE LATTICE IS A CLAIM ABOUT CONTROLS THAT ARE TALLER THAN THEY
+     * ARE WIDE, AND THIS IS WHERE THAT CLAIM IS PAID FOR. `createControlGrid`
+     * writes `gridAutoRows` at the same pitch as its columns, so a cell is as
+     * tall as the WIDEST thing in the grid. Put a 300 px wide horizontal
+     * slider in and every row becomes 300 px tall for a 40 px control, which is
+     * the empty case condition `panel-layout.mjs` reports. The two sliders in
+     * this block became knobs for exactly that reason, and the number below is
+     * what stops the next person putting them back without noticing.
+     * ⚠️ IT IS A RATIO, NOT A PIXEL COUNT, so the claim survives a change to
+     * any of the sizes it is made of.
+     */
+    /* ⚠️ MEASURE IT AGAIN FIRST. This page lays every closed tab panel out
+       inside a measuring window that holds no `await`, so a grid built at a
+       width of zero is still at zero when a synchronous reader arrives. The
+       control grid asserts above do the same, and for the same reason. */
+    filtSpec.drive.size();
+    const cellH = Math.max(...filtSpec.drive.cells.map((c) => c.getBoundingClientRect().height));
+    const pitch = filtSpec.drive.pitch();
+    d.assert('every control in the grid fills most of the square it was given',
+      pitch > 0 && cellH / pitch > 0.6,
+      `the tallest control is ${cellH.toFixed(0)} px in a ${pitch} px square, `
+      + `which is ${(cellH / pitch * 100).toFixed(0)} per cent of it`);
+
+    /* 🔴 THE NEGATIVE CONTROL, AND IT IS THE MEASUREMENT THAT DECIDED THE
+       SHAPE OF THIS BLOCK. A horizontal slider in the same grid fails the claim
+       above by a wide margin, which is why the two here are knobs. It is built,
+       measured and thrown away rather than shipped. */
+    {
+      const probe = createSlider({ label: 'cutoff', sub: 'CC 74', min: 0, max: 127, value: 78 });
+      const spare = el('div', 'kit-wide');
+      filtSpec.drive.el.parentElement.append(spare);
+      const g = createControlGrid({ cols: 1, gap: 10, items: [probe], host: spare });
+      g.size();
+      const sh = g.cells[0].getBoundingClientRect().height;
+      const sp = g.pitch();
+      d.assert('NEGATIVE CONTROL: a horizontal slider in the same grid is mostly empty case',
+        sp > 0 && sh / sp < 0.4,
+        `a slider is ${sh.toFixed(0)} px tall in the ${sp} px square its own width buys it, `
+        + `which is ${(sh / sp * 100).toFixed(0)} per cent`);
+      spare.remove();
+    }
   }
 
   /**
@@ -5101,7 +5485,8 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
    * against the real table through the real component rather than typed here.
    */
   if (waveSpec) {
-    for (const v of [...waveSpec.drawnViews, waveSpec.pulse, waveSpec.blend]) v.redraw();
+    for (const v of [...waveSpec.drawnViews, waveSpec.pulse, waveSpec.blend,
+      waveSpec.two, waveSpec.measured]) v.redraw();
     const drew = waveSpec.drawnViews.filter((v) => v.drawn());
     d.assert('4 of the Circuit’s 30 oscillator waves are drawn and 26 are not',
       waveSpec.drawnNames.length === 4 && drew.length === 4
@@ -5127,6 +5512,49 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       waveSpec.pulse.drawn() === true && shapeFor('pulse width') === null,
       `the figure drew a pulse at a duty of ${waveSpec.pulse.get().duty}, `
       + `and the name "pulse width" still maps to nothing`);
+
+    /**
+     * 🔴 TWO TRACES REALLY ARE TWO, AND THE PROOF IS INK AND NOT A FLAG. A
+     * second trace that was declared and never stroked would satisfy every
+     * boolean in the component and draw one line, so the measurement is the
+     * count of marked pixels against the same figure with nothing over it.
+     * ⚠️ AND THE INKS HAVE TO DIFFER, or two traces in ONE colour is a picture
+     * that cannot say which signal is which, which is the whole ask.
+     */
+    const solo = createWaveShape({ name: 'sawtooth', height: 76 });
+    waveSpec.two.el.parentElement.append(solo.el);
+    solo.redraw();
+    const [inkA, inkB] = waveSpec.two.inks();
+    d.assert('a second trace adds a second line, in a second colour',
+      waveSpec.two.overDrawn() === true && inkA !== inkB
+      && waveSpec.two.ink() > solo.ink() * 1.3,
+      `two traces mark ${waveSpec.two.ink()} pixels against ${solo.ink()} for one, `
+      + `in ${inkA} and ${inkB}`);
+    solo.destroy();
+    solo.el.remove();
+
+    /**
+     * 🔴 SAMPLES OUTRANK A NAME, AND THIS IS THE HALF THE PAGE THAT ASKED FOR
+     * IT NEEDS. `/muta/`'s two signals are a Plaits engine and a wave folder,
+     * and neither is a sine, a triangle, a sawtooth or a square, so an option
+     * that only took names would have been decoration on the one page it was
+     * built for. A caller handing over SAMPLES is not guessing, which is the
+     * only thing the refusal was ever about.
+     */
+    d.assert('a trace with real samples is drawn under a name that has no shape',
+      waveSpec.measured.drawn() === true && waveSpec.measured.overDrawn() === true
+      && shapeFor('plaits engine') === null && waveSpec.measured.ink() > 40,
+      `"plaits engine" maps to ${shapeFor('plaits engine')} and still marks `
+      + `${waveSpec.measured.ink()} pixels`);
+
+    /* 🔴 THE NEGATIVE CONTROL: a figure with no second trace reports none, so
+       `overDrawn` is measuring the option rather than answering true to
+       everything. */
+    d.assert('NEGATIVE CONTROL: a figure with one trace reports no second one and one ink',
+      waveSpec.pulse.overDrawn() === false && waveSpec.pulse.inks()[1] === null
+      && waveSpec.blend.overDrawn() === false,
+      `the pulse reports ${waveSpec.pulse.overDrawn()} with inks `
+      + `${JSON.stringify(waveSpec.pulse.inks())}`);
 
     /* 🔴 THE WALK ASSERT WENT WITH THE WALK ON 2026-09-22. It turned the same
        component's picture OFF at wave 14 and ON again at wave 0, which is the

@@ -47,7 +47,21 @@ function ensureCss() {
   const s = el('style');
   s.id = 'pos-cg-css';
   s.textContent = `
-.pos-cg { display: grid; justify-content: start; align-items: start; }
+/* 🔴 IT SCROLLS SIDEWAYS RATHER THAN DRAGGING THE PAGE, AND THAT TAKES TWO
+   PROPERTIES ON ONE ELEMENT. \`overflow-x\` cannot shrink a flex or grid item
+   below its content, so a scroller with no \`min-width: 0\` beside it drags the
+   DOCUMENT instead. This repository has measured 141 px of page overflow from
+   that pair being half written, and 65 px from it again a week later.
+   🔴 AND THIS COMPONENT SHIPPED WITH NEITHER, WHICH IS A LIVE DEFECT RATHER
+   THAN A PRECAUTION: the columns are fixed at the measured pitch and never
+   \`1fr\`, precisely so the lattice stays square at every width, so a five wide
+   grid of 50.6 px knobs is 280 px whatever the phone is. \`.pos-knob-row\` next
+   door has carried both since it was written.
+   ⚠️ **IT IS NOT A PHONE CHECK AND CANNOT BE.** \`demo/verify.mjs\` runs at
+   756 px with no viewport override, so what \`/kit/\` grades is that the two
+   properties are still declared together on the computed style. */
+.pos-cg { display: grid; justify-content: start; align-items: start;
+          overflow-x: auto; min-width: 0; }
 /* 🔴 BOTH TRACKS ARE THE SAME MEASURED PITCH, WHICH IS THE WHOLE COMPONENT.
    The columns are fixed at the pitch rather than \`1fr\`, because a fractional
    track stretches with the container and the lattice would only be square at
