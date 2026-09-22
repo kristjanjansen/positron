@@ -303,6 +303,40 @@ const FILES = [
   ['demo/weight/vendor/gabarito-latin-ext.woff2', 'weight/vendor/gabarito-latin-ext.woff2'],
   ['demo/weight/vendor/LICENSE-gabarito', 'weight/vendor/LICENSE-gabarito'],
 
+  // ── Plaits and Warps, compiled to WebAssembly, for `/muta/` ─────────────────
+  //
+  // ⚠️ LISTED BY NAME FOR THE THIRD REASON IN A ROW AND IT IS THE SAME ONE:
+  // `.wasm` is not in `demoFiles()`'s extension set and `vendor/` is a
+  // subdirectory, so these artefacts would be declined silently and the page
+  // would ship pointing at a 404. `checkVendorUrls()` below is what refuses
+  // the build instead, which is why `demo/muta/index.html` writes both URLs as
+  // quoted `/muta/vendor/*.wasm` strings.
+  //
+  // 🔴 UNDER THE PAGE, NOT IN `demo/shell/`, WHICH IS LAYOUT.md RULE 6.
+  // One page reads it. Promoting 188 KB of somebody else's DSP into the shared
+  // kit invites a second page to import it without noticing what it costs, and
+  // the two exceptions already recorded there (the controller meshes, wasm
+  // scsynth) both moved because TWO pages needed them.
+  //
+  // LICENCE: MIT, Emilie Gillet, for BOTH, and it is worth checking per module
+  // rather than per repository. `plaits/` and `stmlib/` are STM32F projects,
+  // which is the half of the eurorack grant that is MIT rather than GPL:
+  // `plaits/makefile` says `FAMILY = f37x` and `warps/makefile` says
+  // `FAMILY = f4xx`. The panel graphics are NOT taken and are the one thing in
+  // that ecosystem that could not be. The licences, the upstream commits and
+  // the source digests baked into each wasm live in `demo/muta/vendor/`; the
+  // build recipe for both is `demo/muta/build/build.sh`.
+  //
+  // ⚠️ `PROVENANCE-*.json` IS DELIBERATELY NOT DEPLOYED. The page reads each
+  // build stamp out of the WASM ITSELF (`plai_build()`, `warp_build()`), which
+  // is the copy that cannot drift from the thing making the sound. A second
+  // copy served beside it would be a number that agrees by construction, which
+  // LESSONS #82 records as two witnesses who are one witness.
+  ['demo/muta/vendor/plai.wasm', 'muta/vendor/plai.wasm'],
+  ['demo/muta/vendor/LICENSE-plaits', 'muta/vendor/LICENSE-plaits'],
+  ['demo/muta/vendor/warp.wasm', 'muta/vendor/warp.wasm'],
+  ['demo/muta/vendor/LICENSE-warps', 'muta/vendor/LICENSE-warps'],
+
   ...extraPages(),
   ...demoFiles(),
 ];
