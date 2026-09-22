@@ -107,6 +107,69 @@ own test reported it.
   argument, because `e.timeStamp` and `performance.now()` inside the handler are
   not the same number on a busy main thread.
 
+## Pushed, and the account put back
+
+`c869cf9..7146853` on `origin/session-28-station-videoradio`, a clean fast
+forward, 170 ahead and 0 behind, so **no force and no lease were needed**. The
+dance was the one in `CLAUDE.md`: switch to `kristjanjansen`, fetch, push, switch
+back to `Kristjan-Jansen_enefit`. Divergence read `0 0` after it and the active
+account is the work one again.
+⚠️ **THE DEPLOY SHIPPED THREE FILES THIS SESSION DID NOT WRITE**, because
+`build.mjs` copies the working tree: `LESSONS.md`, `demo/verify.mjs` and
+`demo/wish/index.html` are another session's in flight work, they are NOT in any
+of these commits, and `/wish/` on the edge carries an unfinished change.
+
+## 🔴 A correction to `plans/plan-fau.md` §8, found by reading this checkout
+
+**The plan treats SuperCollider in the browser as a thing this repository does
+not have, and it has most of it.** MEASURED here rather than recalled:
+
+| what | where | bytes |
+| --- | --- | --- |
+| scsynth, the sound server, in the tab | `demo/shell/vendor/scsynth-nrt.wasm` | **1,701,983** |
+| a SynthDef WRITER that runs in the tab | `demo/shell/synthdef.mjs`, `graph()` | source |
+| a SynthDef compiled somewhere else | `demo/grains/defs/pappus-tiny.scsyndef` | 64,733 |
+
+🔴 **SO THE MISSING HALF IS `sclang`, THE LANGUAGE, AND NOT THE ENGINE.**
+`synthdef.mjs` writes format version 2 byte for byte and its own header says the
+grader is real scsynth compiled to wasm, *"which either plays the bytes or does
+not"*. The tab can already emit ANY graph. What it cannot do is let a PERSON
+write one: `graph()` is a node list with explicit rates, special indices and
+input references, and sclang is where multichannel expansion, signal arithmetic
+and a thousand named unit generators live.
+⚠️ **WHICH MAKES THE COMPILER QUESTION A QUESTION ABOUT WHO WRITES THE GRAPH.**
+If the page writes it, everything needed is already here. If a visitor writes it
+in a text area, a language is required and that is the whole of what `fau` is
+for. `Engine_Pappus.sc` is **1,467 unit generators**; nobody hand writes that as
+a node list, which is why `/grains/` ships an artefact.
+⚠️ **AND THE STALENESS GUARD HAS A THIRD ANSWER NOBODY HAS PRICED**: compile on
+the board at BUILD time rather than in the tab, which needs no compiler in a
+browser at all and would still delete `checkCompiledDefs()`'s reason to exist.
+
+## The Faust plan in five lines, for somebody not reading 1,419 of them
+
+- **The mechanism is real**: `@grame/faustwasm` 0.18.5, libfaust 2.89.2, LGPL,
+  compiles to an `AudioWorkletNode` in **10 to 100 ms**, and needs **no COOP or
+  COEP**. It costs **6,162,473 bytes**, 970,416 over brotli.
+- 🔴 **THE REASON IT WAS ASKED FOR DOES NOT HOLD.** The wasm compiler has three
+  backends and C++ is not one of them, so the tab cannot emit what the board
+  builds, and the tab is 2.89.2 against Debian's 2.54.9. One compiler two
+  outputs is dead; **one source, two compilers, and a generated receipt** is
+  what survives.
+- ✅ **THE PART TO DO REGARDLESS** is `Function.prototype.toString()` into a
+  `Blob` into `addModule`, which is how `faustwasm` gets a processor into a
+  worklet with no module loader. **That unblocks `rhodes.mjs` with no Faust and
+  no dependency.**
+- 🔴 **A PATCH MAY NOT ARRIVE OVER THE RELAY AND SANITIZING THE TEXT CANNOT
+  FIX IT.** `process = _ @ 100000000;` is 24 bytes, compiles in 25 ms, and
+  RENDERS, taking a process from 91 to 603 MiB. At 2^28 the size arithmetic
+  overflows to **-2,147,483,640**, reports success, and throws during render,
+  which in a page is the audio thread. Containment is possible and untried:
+  a dedicated Worker, `terminate()` on a 2 s watchdog, refuse a negative or
+  huge `meta.size`, never instantiate on the main thread.
+- ⚠️ **AND TWO `plan-nola.md` CLAIMS ARE WRONG**: `faust-stk/piano.dsp` does not
+  compile to wasm at all, and `piano1.dsp`, which does, has **no pedal**.
+
 ## What is open
 
 1. 🔴 **THE EIGHT FILES THAT STILL SAY THE KEYBOARD IS A SEMITONE FLAT**, listed
