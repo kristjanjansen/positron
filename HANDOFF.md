@@ -1,137 +1,358 @@
-# Handoff, 2026-09-22, session 43, closed
+# Handoff, 2026-09-23, session 45, closed
 
-**A day of work that was entirely uncommitted this morning is committed in six
-commits and live on the edge, and the instrument it was mostly about now runs
-TWO unedited firmwares in one audio graph.**
-
-✅ **NOTHING IS UNCOMMITTED AND THE DEPLOY MATCHES THE TREE.** `HEAD` carries
-every file the previous handoff listed as at risk, `demo/muta/` included, and
-`git status` is clean. The wasm mismatch that handoff opened with is gone:
-`deploy.mjs` rebuilds, fingerprints and refuses to upload if a byte moved, and
-it confirmed **BUILD 7e0f76b-114640-dbc2** on the edge itself.
-
-```
-f35d119  six kit components, and the case five pages had each built themselves
-45c4716  /plai/ is /muta/, and a second unedited firmware runs after the first
-4008985  three plans and the research they were written from
-a07e93f  six lessons, and the backlog the day was worked from
-7e0f76b  the build output for BUILD a07e93f-114602
-e6dc49a  the stamp of the build that is on the edge, 7e0f76b-114640
-```
-
-## The push, still needing a person, now for the seventh session
-
-🔴 **AND THERE IS A NEW FACT ABOUT IT: `git fetch origin` FAILS AS THE WORK
-ACCOUNT.** Measured today: `fatal: could not read Password for
-'https://kristjanjansen@github.com': Device not configured`. So the line the
-previous handoff wrote, *verify the tip before running anything out of this
-file*, cannot be carried out before the account switch. **The switch comes
-first, then the fetch, then the lease is worth something.**
+**`/nola/` is a piano you play from a MIDI keyboard, with a line of chord
+symbols drawn out above it as keyboards you can press. 34/34.** The sustain
+pedal is a kit module now, the chord parser is another one, and both have a node
+test beside them that needs no browser.
 
 ```sh
-gh auth switch --user kristjanjansen
-git fetch origin                                  # THIS is where the tip gets verified
-git log -1 --format='%H' origin/main              # stale local ref says 4add3238...
-git push --force-with-lease=main:<the sha the fetch just proved> origin HEAD:main
-gh auth switch --user Kristjan-Jansen_enefit      # put it back, ASKED FOR 2026-09-17
+node -e "import('./demo/manifest.mjs').then(m => console.log(m.DEMOS.length))"   # 60 today
+node demo/shell/pedal-test.mjs      # 44 ok, no browser
+node demo/shell/chords-test.mjs     # 36 ok, no browser
+node demo/verify.mjs nola muta      # 34/34 and 51/51
 ```
 
-⚠️ **IT IS A FORCE PUSH THAT DISCARDS ONE COMMIT ON `origin`.**
-`git rev-list --left-right --count origin/main...HEAD` reads **1 149** against
-the stale ref: one commit on `origin/main` that `HEAD` does not have, 149 the
-other way. That one commit is what the lease is protecting and what the push
-overwrites, so somebody has to look at it before deciding.
+## What to open
 
-## Deployed, and what to open
+- **https://positron.studio/nola/** deployed. Type chords in the field, press a
+  chart, play the keys, and press SUSTAIN under them if you have no pedal.
+- **https://positron.studio/nola/?flip=1** if the pedal works backwards, which
+  it does on this desk this session. See the measurement below.
+- **https://positron.studio/muta/** unchanged at 51/51, switched over to the new
+  pedal module.
 
-Everything below is live and was confirmed after the deploy, not before it.
+## What the instrument on this desk actually sends, MEASURED 2026-09-23
 
-- **https://positron.studio/muta/** two of Emilie Gillet's firmwares chained,
-  an oscillator into an effect. ✅ **38/38 green AGAINST THE DEPLOY**, which is
-  the check the previous handoff could not make.
-- **https://positron.studio/kit/**, **/pack/**, **/tom/**, **/wish/** all
-  current as of this build.
-- 🔴 **`/plai/` IS GONE AND 404s.** It existed on the deploy for part of one
-  day. Any link to it out of an older file is answered by `/muta/`.
+Read off `/evo/`'s own MIDI log, in two screenshots, which answered two of the
+three questions `plans/plan-nola.md` §8 put first.
 
-## The one thing to carry forward above everything else
+✅ **THE FOOTSWITCH DOES SEND CONTROLLER 64.** `B1 40 00` and `B1 40 7F` on
+channel 2. The default in `pedal.mjs` is right on this unit, and `?pedal=<n>`
+stays for the next one because the MK-425C's footswitch is *"fully MIDI
+assignable"*.
+🔴 **AND ITS POLARITY IS UPSIDE DOWN.** Two press and release gestures both
+arrived as `00` then `7F` 0.40 s later, so PRESSING SENDS 0. The manual says
+where that comes from: the polarity is sensed at power up, so a pedal held down
+while the keyboard boots is inverted for the session. **The fix on the
+instrument is to power it up with the pedal unpressed**; `?flip=1` is for the
+session you are already in.
+✅ **EVERY RELEASE IS A NOTE ON AT VELOCITY 0**, `91 25 00`, confirming what
+`/evo/` recorded and what `midi.mjs` already handles.
+🔴 **AND THE TRANSPOSE WAS FIXED ON THE KEYBOARD**, reported as *"fixed
+transpose"*. **`BACKLOG.md` has the urgent entry**: eight files still say the
+instrument is a semitone flat, `/evo/` computes `m.note - KEY_LO` against a 25
+entry array so every key would light one position too high, and **`/evo/` cannot
+go red about it** because its own check reads `KEY_LO === 47 && flatSaid` and
+both halves are the page's own. Nothing is edited until the wire is read again.
 
-🔴 **THE BEST PARTS OF THE VCV ECOSYSTEM WERE NOT WRITTEN FOR VCV, AND `/muta/`
-NOW PROVES IT TWICE IN ONE GRAPH.** `plans/plan-vcv-modules.md`, 881 lines.
-`AudibleInstruments` is GPL glue around a **git submodule of Emilie Gillet's MIT
-firmware**, and its Plaits adapter is **391 lines of which six touch the DSP**.
-✅ **TWO ARTEFACTS, ONE BUILD SCRIPT, TWO DIFFERENT DIGESTS**, which is the
-assert that says the pipeline is general rather than one lucky module:
-`ece3f3c55e5ab63a` for the oscillator and `1a0619e5a94767ee` for the effect,
-over the same pinned commits, **0 wasm imports each**, **195.0 KB and 76.4 KB**
-against `scsynth.wasm`'s **1740.8 KB**, first quantum **195 ms** after the
-fetch began.
-⚠️ **AND IT IS STILL HALF BUILT, WHICH HAS NOT CHANGED.** Nothing has been
-built on the board, so each digest is a hook rather than a proof.
+## The five things that were found rather than assumed
 
-## What landed today
+🔴 **REMOVING `Play a phrase` TOOK 18 OF 25 CHECKS OUT OF THE RUN AND THE SUITE
+READ 13/13 GREEN.** `verify.mjs` gives up after about two seconds with no new
+assert, and this page's first audio check landed three and a half seconds in.
+Found by opening the page by hand and reading `__demo.asserts.length`, which
+said **20 and still climbing** while the suite had already left. The cheap
+checks run first now. **Nothing failed in either run. The only thing that said
+anything was wrong was 25 becoming 7.**
 
-- **`/muta/`**, which was `/plai/` until the afternoon. Asked for as `rename
-  plai demo to muta and implement warps in there`, settled as `no muta is slug.
-  it contains 2 istriments chained, plai and warp`. **38/38 with 32 page
-  asserts**, against the oscillator alone at 26/26 with 20.
-  🔴 **HALF OF WARPS IS AN OCTAVE DOWN AT 48 kHz AND THE PAGE PRINTS IT RATHER
-  THAN HIDING IT.** Its filter bank coefficients are baked at 96,000, so the
-  twenty vocoder bands land at **43.7 to 3520 Hz**, which the readout reports as
-  **-1.00 octaves**. The six cross modulation algorithms are exactly right,
-  because `Modulator::Init` takes the rate and gets the oscillators and the
-  follower times from it. **Running the context at 96 kHz is not the repair**:
-  `plai_init` refuses any rate but 48000, and the two firmwares would stop being
-  able to feed each other at all.
-  ⚠️ **AND THE CELL ONLY SAYS IT WHILE THE VOCODER IS THE PATH RUNNING**, which
-  is its own assert. A shift reported under the cross modulation algorithms
-  would be a true number about the wrong signal.
-  🔴 **THE BLOCK SIZE IS 12 AND `voice.cc` USES THE CONSTANT, NOT THE `size`
-  ARGUMENT.** Unchanged and still the trap. Warps does NOT have it: every
-  `kMaxBlockSize` there is an array dimension and every loop uses `size`.
-- **Six kit components**: `range-slider.mjs`, `check.mjs`, `synth-view.mjs`,
-  `step-grid.mjs`, `control-grid.mjs` and `instrument.mjs`, **140 asserts
-  across six tests that need no browser**, all green today. `/kit/` 113/113 to
-  147/147, `/tom/` converted and back at exactly 44/44 having lost 268 lines of
-  CSS into the component.
-- **Three plans**, `plan-vcv-modules`, `plan-two-more-modules` and
-  `plan-browser-models`, and the research the first was written from.
-  ⚠️ **`plan-two-more-modules` IS HALF SPENT ALREADY**: its Warps proposal
-  shipped the same day inside `/muta/` and its 48 kHz recommendation is what
-  that page does, so §3 describes a thing that exists and §4 is still a
-  proposal. Its header says so.
-- **Six lessons**, 107 to 112, all in `LESSONS.md`.
+🔴 **AN ANALYSER AT 2048 SAMPLES IS A 46 ms WINDOW AND IT MADE A CHECK BLIND.**
+Replacing the damper ramp with an instant stop left the page **24/24 green**,
+because the reading taken 40 ms after a key came up was still half made of
+samples from before it. 512 for level now, and a second analyser at 16384 for
+pitch, because level and pitch want opposite windows.
+
+🔴 **THE SHIFT CHECK WAS GRADING ARITHMETIC AND NOT SOUND.** Forcing
+`playbackRate` to 1 on every note also read 24/24. It measures the loudest
+partial now: note 63 reads **310.5 Hz** and note 64, bent from the same
+recording, **331.1 Hz**, a ratio of **1.0660** against 1.0595.
+
+🔴 **THE RECORDINGS ARE 21 dB DOWN.** All thirty peak between **0.068 and
+0.097** of full scale, median 0.0894, a spread of only 3.1 dB across the whole
+keyboard. Until the page made it up, two asserts were red on thresholds that
+were right for the instrument and wrong for the files.
+
+🔴 **THE CHORD CHARTS DID NOT LINE UP WITH THE KEYBOARD UNDER THEM.** Same
+width, same key size, different base, so a shape could not be carried down the
+page, which is the only thing a chord chart is for. Caught by a screenshot and
+by nothing else. They share the instrument's window now and move with the octave
+pad, asserted as a **column position in pixels** rather than as a base number.
+
+## Three defects the kit had, found by sabotage
+
+🔴 **`/muta/` RELEASED A NOTE TWICE.** A second note off for a note the foot was
+holding went straight past the pedal, and lifting the pedal released it again. A
+velocity-0 note on followed by a real `0x80` is the commonest shape of it.
+🔴 **A DEAD GUARD IN THE PEDAL.** `if (!keysDown.has(n))` at the lift was
+unreachable: the two sets are disjoint by construction, so removing it changed
+nothing, which is this project's own signal.
+🔴 **A DEAD ROW IN THE CHORD TABLE.** `['M', [0,4,7]]` could never be reached,
+because a capital `M` is normalised to `maj` before the table is consulted. Its
+own test reported it.
+
+## What is in the kit now, done once
+
+- **`demo/shell/pedal.mjs` + `pedal-test.mjs`.** Two sets, the 63/64 threshold,
+  the change filter, the panic, the half pedal reading, the raw value for the
+  inverted case, the controller number as an option and `flip` for a backwards
+  pedal. **44 checks, nineteen negative controls**, ten sabotages take 1 to 4
+  red each.
+- **`demo/shell/chords.mjs` + `chords-test.mjs`.** Chord symbols into notes and
+  roman numerals. **36 checks, twenty negative controls.**
+- **`demo/shell/keyboard.mjs`** takes a Set of which keys carry a letter, an
+  optional `pad: false` for a chart rather than an instrument, and a third
+  `hint` colour. ⚠️ **`pad: false` AMENDS A STATED RULE** and the reasoning is
+  written beside it: a picture of a chord and an instrument you play really are
+  two things.
+- **`demo/shell/midi.mjs`** passes the message's own timestamp as a fourth
+  argument, because `e.timeStamp` and `performance.now()` inside the handler are
+  not the same number on a busy main thread.
 
 ## What is open
 
-1. **`origin/main`**, above. The only item needing a person, and the new fact
-   about the fetch is worth reading before trying it.
-2. 🔴 **NO PAGE IS GRADED ON A PHONE.** `verify.mjs` runs at 756 px with no
-   viewport override, and **the only assert in this repository that entered a
-   media query was removed on request** with the 320 px card specimen.
-   `/circuit/`'s own *the panel box starts and ends where the rest of the page
-   does* is green while being false at 390 px by 286.0 px, and `/muta/` now
-   carries the same shape of claim at the same width. `/muta/`'s nine knob
-   columns have never been drawn below 560 px.
-   `plans/plan-panel-component.md` has three unpriced options.
-3. **The board half of `/muta/`.** One aarch64 build of the same source, then
-   render N samples at both ends and diff them. That is what turns a digest
-   from a hook into a proof, and there are two digests to do it to now.
-   ⚠️ The Pi is a live service in another building and needs asking.
-4. **`CHANNEL STRIP`'s specimen**, asked for as *"make real channels with
-   dividers (see panels) and line things up"*. Not started.
-5. **Four checks stopped being made in session 43 and every one is named in the
-   file where it was**: a read only grid's computed cursor, opacity and tab
-   stops; a real strip scrolling at 320 px; that a wavetable and a blend are
-   refused for DIFFERENT stated reasons; and that one component turns its
-   picture off at wave 14 and on again at wave 0.
-6. **The segmented choice is still `button`, not `role="radio"`.** Eleven call
-   sites and a change to what every page announces. Recorded in `choice.mjs`.
-7. **Two vertical rhythms exist**: `.pos-stack` is `--pos-gap: 40px` and
-   `.pos-tabs-p > * + *` is **22 px**, the old pre-2026-09-20 value, live on
-   every tabbed page.
-8. **The second proposal in `plan-two-more-modules` is unbuilt**, and it is a
-   proposal rather than a plan with a date on it.
-9. **Everything carried over from session 42** that was not touched: `/bay/`
-   unheard, `vad_filter` unmeasured, Estonian deliberately unscheduled, and the
-   `/evo/` and `/shape/` asks in `BACKLOG.md`.
+1. 🔴 **THE EIGHT FILES THAT STILL SAY THE KEYBOARD IS A SEMITONE FLAT**, listed
+   in `BACKLOG.md` with the line numbers. It needs one reading off `/evo/`: press
+   the leftmost white key and see whether it says a C or a B.
+2. **`plans/plan-fau.md`, 1419 lines, written and not acted on.** Its headline is
+   not about Faust: `faustwasm` gets a processor into a worklet with
+   `Function.prototype.toString()` into a Blob, which deletes the blocker that
+   keeps `demo/shell/rhodes.mjs` off `/nola/`. Also measured there:
+   `faust-stk/piano.dsp` does NOT compile to wasm, and `piano1.dsp`, which does,
+   has no pedal at all, so `plan-nola.md` §4's description of it is wrong.
+3. **The Salamander pack**, `plan-nola.md` §8 steps 4 to 7, a session of its own.
+   Until then velocity on `/nola/` is only volume and the page says so.
+4. **The chord charts draw root position**, which is a spelling rather than a
+   voicing. The four frames that bought the feature show a pedal point on C with
+   the hands a long way apart, and a voicing option was offered and not asked
+   for yet.
+5. **`demo/shell/keyboard.mjs` clips its own note names** where a black key sits
+   on a white key's shoulder. Photographed on two pages, so it is the component.
+   In `BACKLOG.md` with why the obvious fix is wrong.
+6. **Everything from session 44 that was not touched**, below.
+
+# Handoff, 2026-09-22, session 44, closed
+
+**A day spent almost entirely inside `/muta/`'s MIDI, which arrived working in
+the trivial sense and broken in every sense that matters, and a harness that was
+silently dropping the checks written to catch it.**
+
+⚠️ **NOTHING IS COMMITTED.** `git status` shows eleven modified files and
+`plans/plan-nola.md` untracked, all of it described below. The deploy is AHEAD of
+`HEAD`: **BUILD befbd99-200309-9a46** is on the edge and its source is only on
+this disk.
+
+```sh
+node -e "import('./demo/manifest.mjs').then(m => console.log(m.DEMOS.length))"   # 59 today
+```
+
+## What to open
+
+- **https://positron.studio/muta/** deployed and **51/51 green against the
+  edge**. A MIDI keyboard plays it, a sustain pedal holds it, and the drone is
+  played from the keys.
+- **https://positron.studio/wish/** unchanged today beyond one log line.
+
+## The five reports, and what each one really was
+
+Every one of these came in as a player's sentence and every one had a cause
+somewhere other than where it looked.
+
+1. 🔴 ***"i want long midi notes, i got plunky sound"*, AND THE CAUSE WAS THAT
+   PLAITS HAS NO SUSTAIN UNLESS YOU PATCH `LEVEL`.** `voice.cc:212` drives the
+   lowpass gate with `lpg_envelope_.ProcessPing(...)` whenever the trigger is
+   patched and the LEVEL input is not, and **a ping is a decay**. Holding the
+   gate high does nothing; the trigger only re-arms the ping on a rising edge.
+   ✅ With `level_patched` the same gate runs `ProcessLP(compressed_level, ...)`,
+   `voice.cc:210`, which FOLLOWS the level. On a rack that is two cables, TRIG
+   for the attack and LEVEL for the gate, and the second one was missing.
+   ⚠️ **THE FIRST REPAIR WAS `plai_note_off` AND IT CHANGED NOTHING AUDIBLE.**
+   Necessary, not sufficient, and the report that followed it was *"midi support
+   is really messed up"*, which was correct.
+   ✅ MEASURED: **0.4653 held against 0.1817** for the same note at the same age
+   with the key let go after 100 ms. Before the change those two numbers were
+   equal.
+   ✅ **VELOCITY IS REAL NOW AS A SIDE EFFECT.** `voice.cc:143` makes the level
+   the engine's accent too, so the shim stops discarding the velocity byte.
+
+2. 🔴 ***"i still hear drone wien midi on"*.** `toggleWarps` calls `startDrone`
+   as well as `togglePlaits`, so stopping the drone once inside `toggleMidi`
+   left two other ways back in. The drone is owned by an intent flag now
+   (`droneWanted`) and `startDrone` refuses without it. ⚠️ The sabotage that
+   proves it: with the guard removed, cycling the effect brings the drone back
+   at **0.249822** while the first half of the same assert still reads 0.000000.
+
+3. 🔴 ***"i get distorted pluck and then beneath it the right drone sound. that
+   pluck never goes away"*, AND IT WAS A KEYBOARD NOTE BEING TURNED INTO A
+   DRONE.** `plai_set_drone(1)` clears `trigger_patched` on everything SOUNDING,
+   which takes the lowpass gate out of the circuit, so a note still ringing from
+   a key when the drone starts becomes a second drone at that key's pitch
+   **for ever**. Nothing could release it: no gate left to drop, and its own
+   note off found `trigger_patched` false and correctly refused to touch it.
+   ✅ The shim silences level-patched voices when a drone starts. MEASURED: a
+   drone started over a sounding key reads **0.7066 on 1 voice**, identical to
+   one started with nothing sounding.
+
+4. 🔴 ***"plaits on should not turn midi on"*, SAID TWICE, AND NOTHING EVER
+   REACHED THAT WAY.** Grepped and read: `togglePlaits` has never touched the
+   MIDI switch. What existed was the REVERSE, `toggleMidi` turning the
+   oscillator on for you, and that is what manufactured report 3: it set
+   `droneWanted` true one line before clearing it, so the page wanted a drone it
+   had just stopped, and the next press brought that drone up UNDER the held
+   keys. The line is gone and the switches are independent in both directions.
+   ⚠️ A keyboard switched on with PLAITS off is silent and says so in the log.
+   Reaching into the instrument to make the lamp look honest was the worse of
+   the two.
+
+5. 🔴 ***"when voices is 1 i still hear chords"*, AND THE OSCILLATOR IS RIGHT.**
+   MEASURED: three keys held at once leave **1 voice sounding, on note 67**.
+   ⚠️ **`chord` IS ONE OF THE SIXTEEN MODEL NAMES**, model 6, and it plays a
+   four note chord from a single voice by design. Not reproduced, not fixed, and
+   probably not a fault.
+
+## The wasm was rebuilt three times and the digest moved every time
+
+`ece3f3c55e5ab63a` to `d77815fad21aa700` to `5091126ebca10e36` to
+**`d2721dd0059930d4`**, 200,710 bytes. That is the shim's own bytes being part
+of the digest working exactly as designed. Warps is untouched at
+`1a0619e5a94767ee`, 78,204 bytes. ⚠️ **HANDOFF 43 AND `BACKLOG.md` BOTH QUOTE
+`ece3f3c55e5ab63a` AS THE OSCILLATOR'S DIGEST AND BOTH ARE NOW HISTORY**, which
+is correct for a record of what was measured that day.
+
+🔴 **AND THE PAGE'S OWN BENCH CAUGHT ME BREAKING IT, WHICH IS THE BEST THING
+THAT HAPPENED TODAY.** The first version inferred *this is a keyboard note* from
+a hold of zero. `costOf` plays `plai_note_on(note, 0)` for each of eight voices
+and then drones them, so all eight became keyboard notes and the drone wiped
+them: it priced **eight voices at 4 µs against one voice at 4 µs** and
+`every voice costs, and all of them together still fit a render quantum` went
+red. That assert exists because a voice count costing the same whatever it is
+set to means the voices are not being rendered. The level patch is an explicit
+argument now, so a caller wanting a held gate with no envelope passes nothing
+and gets the old behaviour exactly.
+
+## The harness was dropping asserts in silence, in three different ways
+
+🔴 **A CHECK BLOCK THAT GOES QUIET IS CUT OFF WHERE IT WENT QUIET, AND THE RUN
+STAYS GREEN.** `verify.mjs`'s growth loop stopped collecting after ONE 400 ms
+poll with no new assert. A check that holds a note for 700 ms and its release
+for 900 ms looks exactly like a page that has finished. It took **itself and a
+voice stealing check that had been there a day** out of the run, and the suite
+read **40/40 before and after**.
+⚠️ Raising `settleMs` from 8 s to 14 s changed nothing, which is what said the
+settle window was not the cause. `settleMs` sizes the wait before the FIRST
+assert and has no bearing on a gap in the middle.
+🔴 **`isReady` WAS DECLARED AND NEVER CALLED**, three lines above a comment
+saying in capitals that both conditions must hold, `Both conditions`.
+🔴 **AND `ready` ALONE CANNOT REPLACE IT.** `/muta/` calls `ifSelfcheck(...)`
+WITHOUT awaiting it and `d.ready()` on the next line, so ready is true a few
+milliseconds in. `/radio/` does the same from inside the granulator's boot.
+🔴 **THE THIRD WAY IS THE CEILING.** 12 s, and this page's DSP checks now run
+about twelve seconds. Reaching it drops whatever has not asserted yet, which is
+the same silent truncation arriving from the other end of the same loop.
+✅ **NOW `GROWTH_PATIENCE = 5` AND `GROWTH_TRIES = 60`**, 2.0 s of tolerated
+silence and a 24 s ceiling. Costs a fast page nothing, because the loop still
+leaves the moment a page is quiet and ready. MEASURED after: `tom` 44/44 and
+`wish` 70/70 unchanged, so no other page was being truncated.
+✅ **AND THE FAILURE BRANCH SAYS WHICH FAULT IT IS NOW.** It printed
+`failed: null` and `console: nothing` for two different causes, a module that
+never finished and a page that finished without becoming ready. It prints
+`typeof window.__demo`, the type of `ready` and the assert count, and that line
+named the fault in one run after an hour of bisecting by hand.
+⚠️ **AND A WRONG FIRST DIAGNOSIS COST MOST OF THAT HOUR.** `shell.mjs` has
+`ready:` twice and it was read as one object literal re-declaring a key, so the
+boolean was called an illusion and the shell was changed to publish a separate
+`done`. **The two keys are on two different objects**: `api`, which is what
+`window.__demo` is, carries the boolean, and the object `mount()` returns
+carries the method that sets it. Reverted. **A key name appearing twice in a
+file is not two declarations of one thing.**
+⚠️ **AND TWO STRAY HEADLESS CHROMES FROM THIS SESSION'S OWN PROBES MADE ONE
+ISOLATION RUN LIE.** The run that appeared to clear the shell change was the one
+in which they had just been killed. The harness prints that warning for exactly
+this reason and it was read past.
+
+## What the checks now say, and what they cost
+
+`/muta/` is **51/51 with 45 page asserts**, from 40/40 with 32 this morning.
+Every new one has a control beside it, because two of them passed on a build
+with no sustain in it at all:
+
+| assert | number | its control |
+| --- | --- | --- |
+| a held key keeps sounding | 0.4653 | 0.1817 for the same note at the same age, let go at 100 ms |
+| the release ends it | 1 voice, 0.4653 to 0.0620 | a note nobody holds releases 0 |
+| the pedal holds it | 0.6052 | 0.1428 with no pedal, 0.0706 after the pedal lifts |
+| the model changes under a held note | 0.2102 | 0.0732 for the same model over the same 300 ms |
+| a key steers the drone | knob to 48, 0.7066 | still 0.7066 after the key comes up |
+| a key is not turned into a drone | 0.7066 on 1 voice | 0.7066 for a drone with nothing sounding |
+| one voice is one note | 1 voice, note 67 | three keys held at once |
+| three keys do not clip | 0.6271 and 0.3190 | |
+
+⚠️ **TWO THRESHOLDS WERE FITTED TO ONE AFTERNOON'S READINGS AND HAD TO BE
+REWRITTEN.** `decay` sits at 0.5 and its tail is long, so a released note reads
+0.07 to 0.18 at the same age across runs; a released note asserted to be *gone*
+went red on a build where everything works, and a factor of three went red for
+the same reason. What is asserted now is that holding is audibly LOUDER than
+letting go, which is the claim. ⚠️ And the waveform comparison was **measuring
+phase, not timbre**, until it was changed to compare SORTED amplitudes.
+
+## `nola`, researched and not started
+
+`plans/plan-nola.md`, **1,456 lines**, untracked. A playable piano from a MIDI
+keyboard with a real sustain pedal.
+
+- ✅ **PLAIN WEB AUDIO, one `AudioBufferSourceNode` per note.** Not scsynth,
+  which measured **1.88 MB on disk** and buys nothing a browser lacks: there is
+  no piano on the board and no `.scsyndef` to be faithful to.
+- ✅ **Salamander Grand Piano**, and it is the one thing MEASURED rather than
+  read about: the full tree is **641 files, 748,397,030 bytes**, and
+  `STREAMINFO` was read out of fifty of them by ranged GET, 3.2 KB of requests
+  with nothing downloaded. **48 kHz, 24 bit, stereo, 30 notes exactly three
+  semitones apart, 16 velocity layers, 88 release samples, 69 resonance.**
+  Licence genuinely open between CC-BY 3.0 on every mirror and the author's blog
+  saying public domain since 2022.
+- ✅ **3.80 MiB budget.** Every semitone at 16 layers across 88 keys is
+  **3,707 MiB**; minor thirds cap the worst pitch shift at **one semitone**.
+- 🔴 **THE CODEC FOLKLORE IS WRONG AND IT WAS MEASURED.** Neither codec smears
+  the attack: every encode reproduced a 3.35 ms rise within 0.1 ms. What happens
+  is PRE-ECHO, and **Opus is about 18 dB worse than AAC at the same bitrate**.
+  Pre-echo lives BEFORE the attack, so trimming to just before onset discards
+  exactly that region.
+- 🔴 **NOT ONE SAMPLER LIBRARY IMPLEMENTS A SUSTAIN PEDAL**, and `smplr`'s
+  README shows `setCC(64, 127) // sustain pedal on` while its source admits it
+  only affects region matching and no bundled preset declares a `ccRange`. **A
+  control that reads as live and is inert**, arriving from outside this
+  repository.
+- ⚠️ **FIVE PACKS FORBID WHAT A BROWSER DEMO DOES.** Pianobook forbids
+  redistribution in as many words, Keppy's is **ND**, jRhodes3c is **NC**,
+  Maestro is all-rights-reserved behind a `Custom` label, Piano in 162 has no
+  licence at all. Iowa's only grant is one sentence and **Iowa does not call it
+  public domain**.
+- 🔴 **AND THE FIRST STEP IS FOUR SECONDS IN FRONT OF `/evo/` WITH A FOOT ON THE
+  PEDAL.** The MK-425C's socket is fully MIDI assignable and nobody has checked
+  which CC it sends; its polarity is sensed at power up, so a pedal held down
+  while it boots is inverted for the session with nothing on screen saying so;
+  and the keyboard is **a semitone flat** on notes 47 to 71, which on a piano
+  page gets blamed on the sample pack.
+
+## What is open
+
+1. 🔴 **THE COMMIT AND THE PUSH.** Nothing is committed and the edge is ahead of
+   `HEAD`. The push still needs `gh auth switch --user kristjanjansen` and the
+   force-with-lease dance recorded in `CLAUDE.md`, and handoff 43's warning
+   stands: **`git fetch origin` FAILS as the work account**, so the switch comes
+   first and the lease is worth nothing before the fetch.
+2. ✅ **DONE IN SESSION 45. `demo/shell/pedal.mjs` EXISTS**, with
+   `demo/shell/pedal-test.mjs` beside it and `/muta/` switched over in the same
+   change. The four things that page got right are all in it, plus the half
+   pedal reading and the raw value. `/muta/` is unchanged at 51/51.
+3. **`/muta/`'s check block is about twelve seconds long** and is the reason the
+   harness ceiling had to move. It is not obviously too long for what it grades,
+   but it is the longest on the site and worth watching.
+4. **A GENERAL MIDI PAGE, from the `nola` research**: SpessaSynth is
+   Apache-2.0, AudioWorklet, and is the one library that holds note offs until
+   the pedal lifts as documented engine behaviour.
+5. **Everything from session 43 that was not touched**: no page is graded on a
+   phone, the board half of `/muta/`, `CHANNEL STRIP`'s specimen, the four
+   checks that stopped being made, the segmented choice still being `button`,
+   and the two vertical rhythms.
+6. **The greyed `??` diagram boxes for hardware not on the desk**, raised twice
+   and still blocked on `/wish/`'s reply gaining a free text field beside the
+   port `enum`.

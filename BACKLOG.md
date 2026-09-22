@@ -1,5 +1,278 @@
 ## Open
 
+### Asked 2026-09-23, doing now: the roman numeral under each chord
+
+🔴 **ASKED WITH FOUR FRAMES OF A PIANO VIDEO**, no words, showing exactly the
+four chords that were given as the example, each with a numeral under it:
+**`Cmaj` I**, **`C9` I**, **`F/C` IV**, **`Fm6/C` iv**.
+✅ **AND BETWEEN THEM THEY SETTLE EVERY RULE**, which is why four frames were
+worth more than a sentence:
+- the KEY is C, and nothing in the line declares it, so it is taken from the
+  FIRST chord's root. That is an inference and it is stated on the page.
+- the CASE carries the quality: `Fm6` is **iv** in lower case and `F` is **IV**
+  in upper. That is the whole reason a numeral says more than a name.
+- a dominant is still upper case: `C9` is **I**, not `i`, because the third is
+  major even though the seventh is not.
+- the BASS is ignored by the numeral: `F/C` is **IV**, not something about C.
+
+### Asked 2026-09-23, doing now: `/nola/` loses its readout and its state words
+
+🔴 **THREE ASKS:** *"rm sustain up / down"*, *"rm readout"*, and an order for the
+page given as four lines: **`desc` / `textield` / `exaple keyboar rows` /
+`play keyboard`**. So the playable keyboard moves to the BOTTOM, under the chord
+charts, and the description, the field, the charts and the instrument are the
+whole page.
+⚠️ **`rm sustain up / down` MOVES THE COMPONENT, NOT JUST THE WORDS.** A
+presence badge is a dot and a STATE WORD, and its reserved width is measured on
+the longest word it can say, so emptying the words leaves a reserved empty box:
+the `an empty box is a line` rule. `createSwitch` is the kit's toggle with a
+name and no state word, which is exactly what is left once `up` and `down` go.
+⚠️ **AND `createPad` WAS CONSIDERED AND REFUSED**: it is a fixed square of
+`--ctl-w` with a 10 px face that ellipsises, and `SUSTAIN` is seven letters.
+🔴 **`rm readout` MEANS `readout: null`, NOT AN EMPTY ONE.** `mount()` treats
+those as different on purpose: `null` is a page DECLARING it has no readout and
+`{}` is one that never filled. Every `d.set` has to go with it, because
+`setCell` throws on a key the page never declared.
+⚠️ **AND WHAT THE CELLS SAID IS REHOMED RATHER THAN DELETED**, which is
+`positron-ui`'s rule for removing a display: press to sound, the voice count and
+the fetched bytes are all still measured and all still reported, in the asserts
+that already carried them and in the log.
+
+### Asked 2026-09-23, doing now: the chord charts are as wide as the keyboard
+
+🔴 **ASKED AS** *"'hint keyboards': same w as regular one"*. They were laid out
+as a wrapping row of 320 px cards, which makes each chart narrower than the
+keyboard above it and puts two different key widths on one page. Same width
+means one per row, full width, and the same `--k-min` as the instrument.
+
+### Asked 2026-09-23, doing now: the chord examples, and `Play a phrase` goes
+
+🔴 **THE EXAMPLES SETTLE AN AMBIGUITY THE OTHER WAY, AND IT IS WORTH WRITING
+DOWN BECAUSE THE FIRST READING WAS WRONG.** Given as *"Cmaj C9 F/C Fm6/C
+example"*. The first ask said *"strings like c5 cmaj"*, and `c5` was read here
+as **note C, octave 5**, pairing a note with a chord. `C9` kills that reading:
+a bare number after a root is an EXTENSION, not an octave, so `c5` is the POWER
+CHORD and every token in this grammar is a chord. There is no octave in it.
+⚠️ **AND `F/C` ADDS A SLASH BASS**, which is a second pitch under the chord
+rather than a member of it, so the parser returns a bass separately or the
+voicing is wrong.
+⚠️ **`Fm6/C` IS THE ONE THAT PROVES THE ORDER**: root, quality, extension, then
+bass. Reading `m6` as `m` followed by a `6` extension and reading it as the
+named quality `m6` give the same four notes here, and will not on `m7b5`.
+
+🔴 **AND `Play a phrase` IS REMOVED**, asked as *"rm 'play a phrase'"*, which
+also settles what *"rm top component buttons"* covered.
+🔴 **THAT TAKES EVERY CHECK ON THE PAGE OUT OF THE RUN UNLESS THEY MOVE.**
+`demo/verify.mjs` drives a page by clicking `.pos-controls button`, and this
+page's whole check block hangs off that one handler. `positron-verify` records
+this exact loss twice, on `/mirror/` and `/blocks/`, where ten and six asserts
+would have gone silent while the suite stayed green. **The checks move to load
+behind `SELFCHECK`**, which is the pattern `/muta/` and `/radio/` already use:
+`ifSelfcheck(checks)` NOT awaited, then `d.ready()` on the next line.
+⚠️ **AND THE PER PAGE ASSERT COUNT IS DIFFED AFTER**, because that count is the
+only thing that says whether a check stopped running rather than started
+failing.
+
+### Asked 2026-09-23, doing now: a chord parser and a list of chord keyboards on `/nola/`
+
+🔴 **ASKED IN THESE WORDS:** *"i need a parser that shows hilited keys (muted
+gray) on keyboard. just strings like c5 cmaj, can be separated by anyhing. add
+that textfield to the top. render list of pianokeys with chords based on these
+parsings"*.
+⚠️ **FOUR THINGS, AND THEY ARE SEPARABLE:** a PARSER from text to notes, a TEXT
+FIELD at the top, a THIRD KEY COLOUR that is muted grey and is neither the one a
+finger makes nor the one another player makes, and a LIST of small keyboards,
+one per parsed chord.
+⚠️ **THE PARSER BELONGS IN THE KIT WITH A NODE TEST BESIDE IT.** It is pure
+string to numbers with no audio and no browser in it, which is the bargain
+`looper-test.mjs` and `pedal-test.mjs` already make. `c5` is one note and `cmaj`
+is three, and *"separated by anyhing"* means the splitter cannot be a list of
+separators, it has to be a token grammar.
+⚠️ **AND THE THIRD COLOUR IS A SHARED CHANGE.** `keyboard.mjs`'s `lightNote`
+takes `self` or `remote` today and `shell.css` paints `.k.down` in `--hi` and
+`.k.remote` in `--ok`. A muted grey third state is one class and one rule, and
+it reaches every page that draws a keyboard, so it is done once and deliberately
+rather than per page.
+
+### Asked 2026-09-23, doing now: `/nola/`'s keyboard and where its controls sit
+
+🔴 **ASKED IN THESE WORDS:** *"in nola scale keys so 25 keys fit in"*, then
+*"make sustain a toggle button under the keyboard, std component. rm top
+component buttons"*.
+⚠️ **25 KEYS IS 15 WHITE ONES**, and `shell.css` floors a white column at
+`--k-min`, default **49 px**, which `demo/shell/keyboard.mjs` argues is already
+one pixel above Android's 48 dp minimum and five above Apple's 44 pt. 15 at 49
+is 735 px plus gaps and does not fit a 688 px page, so fitting them means going
+under that floor.
+✅ **AND IT NEEDS NO COMPONENT CHANGE**, checked rather than assumed:
+`.keys` already reads `minmax(var(--k-min, 49px), 1fr)`, so a page sets the
+property and nothing shared moves.
+⚠️ **`rm top component buttons` IS READ AS THE ROW ABOVE THE KEYBOARD**, which
+held the SUSTAIN switch and the TRANSPOSE stepper, both kit components. `Play a
+phrase` STAYS, because it is the shell's control row rather than a component and
+because every check on the page hangs off it: deleting it would take them all
+out of the run while the suite stayed green, which is the defect
+`positron-verify` records twice.
+⚠️ **TRANSPOSE GOES WITH THAT ROW**, and the reason it can is the entry below:
+the instrument's own transpose was fixed, so the software correction for it is
+redundant. `?transpose=<n>` keeps the capability without the control, for the
+session after a power cycle puts it back.
+
+### Urgent 2026-09-23: the MK-425C's transpose was fixed, and eight files still say it is flat
+
+🔴 **THE INSTRUMENT CHANGED AND THE REPOSITORY DOES NOT KNOW.** Reported in two
+words, *"fixed transpose"*, after the keyboard was measured on 2026-09-20
+sending notes **47 to 71** where a 25 key controller sits at 48 to 72. That
+measurement is now written into eight places and at least one of them will draw
+the wrong picture in silence.
+
+🔴 **AND `/evo/` WILL NOT GO RED, WHICH IS WHY THIS IS URGENT RATHER THAN
+TIDY.** Its own check reads
+`d.assert('the lowest key is a semitone below where a 25 key controller sits',
+KEY_LO === 47 && flatSaid)`, and both halves are the page's own: `KEY_LO` is a
+constant it typed and `flatSaid` is set by a SYNTHETIC message the check feeds
+itself. So the page grades its own arithmetic and nothing in it can notice that
+the instrument moved. **A green suite meaning zero coverage, on the one page
+whose whole job is to report what the wire says.**
+
+⚠️ **WHAT BREAKS IF THE KEYBOARD NOW SENDS 48 TO 72**, read off the source
+rather than guessed: `demo/evo/index.html` computes `const idx = m.note -
+KEY_LO` against a 25 entry array, so every key would light ONE POSITION TOO
+HIGH and note 72 would index 25 and light nothing at all.
+
+**The eight places, so nobody has to find them again:**
+
+| file | what it says |
+| --- | --- |
+| `demo/evo/index.html:421` | `const KEY_LO = 47, KEYS = 25` and the assert at 1172 |
+| `demo/evo/index.html:387` | prose calling the instrument a semitone flat |
+| `demo/wish/index.html:1354` | `keys: 'Sends on channel 2, one semitone flat.'`, which a VISITOR reads |
+| `demo/bay/index.html:589` | prose, and a comment at 960 |
+| `demo/shell/instruments.mjs:57` | the shared device table |
+| `demo/shell/bay.mjs:78` and `bay-test.mjs:71` | comments the tests are written against |
+| `demo/manifest.mjs:627` | the `/evo/` row's own comment |
+| `demo/nola/index.html:80` | the header, and a diagram note at 908 |
+
+⚠️ **AND THE RESEARCH FILE'S OWN OPEN QUESTION IS ANSWERED BY HOW IT WAS
+FIXED, WHICH IS NOT KNOWN YET.** `research/evo-mk425c-face-2026-09-21.md` asks:
+*"switch the keyboard off and on and play the bottom key. If it comes back at
+48, the minus one was a live transpose somebody left set and the instrument is
+ordinary. If it comes back at 47, transpose survives a power cycle and the
+manual's list is incomplete."* A power cycle that cleared it and a hand
+correction with `TRANSPOSE` plus `OCTAVE +` mean opposite things about the
+manual's non-volatile list, and only one of them is stable.
+
+🔴 **NOTHING IS TO BE EDITED UNTIL THE WIRE IS READ AGAIN.** Rewriting a
+MEASUREMENT without a measurement is the defect this project pays for most
+often, and a hand transpose is a LIVE setting that the next power cycle may
+clear, which would make a hard coded 48 as wrong as the 47 it replaced.
+
+### Found 2026-09-22, not fixed: the on-screen keyboard clips its own note names
+
+🔴 **`demo/shell/keyboard.mjs` DRAWS A BLACK KEY OVER THE NOTE NAME OF THE WHITE
+KEY IT SITS ON.** PHOTOGRAPHED at 900 px on TWO pages, so it is the component
+and not a page: `/nola/` and `/instrument/` both render `F4` with its `4` half
+covered by `F#4`, and `B4` as `34` under `A#4`. `C4`, `D4`, `E4`, `G4`, `A4` and
+`C5` are all clear, so it is exactly the whites whose right shoulder carries a
+black key.
+⚠️ **IT IS OLD AND IT IS SHARED.** Every page that draws a keyboard has it, and
+`demo/shell/keyboard.mjs` is 644 lines with a measured layout behind it: eight
+white keys in a grid, five blacks raised over the joins, and a sharp offset
+table (`SHARP_OFF`) taken from research on real piano proportions. A change here
+moves every one of those pages, so it is not a thing to do in passing.
+⚠️ **AND THE OBVIOUS FIX IS PROBABLY WRONG.** Moving the note name to the left
+of a white key puts it under the black key on its LEFT shoulder instead, which
+is the same defect one key along. What the shape actually asks for is the name
+at the BOTTOM of a white key, below where a black key ends, which is where a
+real keyboard overlay prints it and where the letter (`a`, `s`, `d`) already
+sits.
+
+### Asked 2026-09-22, not started: Faust research, for a demo called `fau`
+
+🔴 **ASKED IN THESE WORDS:** *"in bg do faust research. demo called fau"*, then
+*"also loop up similar alternatives"*, after a reply arguing that `libfaust`
+compiled to WebAssembly (`@grame/faustwasm`) would let one `.dsp` source compile
+in the tab AND on the board, which is the one-description-two-ends pattern
+`/grains/`, `/able/` and `/keys/` already use.
+⚠️ **THE SLUG IS `fau`**, said in the ask. Nothing is built.
+⚠️ **AND THE THREE NUMBERS THAT WOULD SETTLE IT ARE NAMED**: the compiler blob's
+size on disk, the compile time for one small `.dsp`, and whether the resulting
+worklet holds up under polyphony. Every size and latency figure in that reply
+was RECALLED rather than measured and is marked as such there.
+⚠️ **THE TRUST QUESTION IS THE ONE TO DECIDE BEFORE BUILDING**: compiling source
+that arrived over the relay means whoever is on the far end of the socket
+chooses what DSP runs on the audio thread. `bay.mjs`'s split already has the
+shape, and `positron-verify`'s Workers AI conclusion applies directly, that a
+model proposes and a person presses.
+
+### Done 2026-09-22: `/nola/`, a piano with a working sustain pedal
+
+✅ **`demo/shell/pedal.mjs` AND `demo/shell/pedal-test.mjs` EXIST**, which is the
+item below that said they did not, and `/muta/` is switched over in the same
+change. 29 checks, twelve of them negative controls, seven sabotages taking 1 to
+4 red each. `/muta/` is unchanged at 51/51.
+✅ **`/nola/` IS 24/24**, phase zero of `plans/plan-nola.md` against 30 FluidR3
+recordings copied into `demo/nola/`, 656 KB, fetched one octave at a time and
+never on a visit.
+
+### Not done in that change, and each one has a reason
+
+🔴 **NO SECOND ENGINE ON `/nola/` YET**, which `plans/plan-nola.md` §6.1 item 6
+asks for: `demo/shell/rhodes.mjs` opposite the samples, so one keyboard plays
+megabytes of recording and kilobytes of arithmetic. MEASURED 2026-09-22 and it
+is why: rendering one `rhodesVoice` to its own end costs **38.3 ms at note 21**,
+25.8 at note 60 and 11.3 at note 108, and this page reports press to sound, so
+that render would be the largest number in its own readout. A worklet is the
+right home and `rhodes.mjs` was written to be one, but an
+`AudioWorkletGlobalScope` has no module loader, so it cannot import the kit's
+copy and a second copy is the drift `/kit/` exists to catch. ⚠️ **THIS IS THE
+SAME PROBLEM THE FAUST ASK ABOVE WOULD SOLVE**, which is worth deciding before
+either is built.
+
+🔴 **THE SALAMANDER PACK IS NOT BUILT.** `plans/plan-nola.md` §8 steps 4 to 7 are
+a second session: fetch the 90 FLACs, trim, fade, cap, encode at 96 kbps, upload
+to R2 through `workers/station`, and run the three listening tests that decide
+the bitrate, the spacing and whether the resonance layer earns its half
+megabyte. Until then velocity on `/nola/` is only volume and the page says so.
+
+⚠️ **AND THE THREE FOUR-SECOND CHECKS IN FRONT OF `/evo/` HAVE NOT BEEN DONE**,
+which `plans/plan-nola.md` §8 puts FIRST: does the pedal send controller 64, is
+its polarity inverted this session, and is the semitone-flat transpose the
+instrument's base or a setting somebody left. `/nola/` ships `?pedal=<n>` and a
+TRANSPOSE control defaulting to 0 so that none of the three blocks it, and a log
+line the first time a note below 48 arrives.
+
+
+### Done 2026-09-22: `/muta/` plays a MIDI keyboard, and holds the note
+
+✅ **`plai_note_off` DID NOT EXIST AND THAT IS WHY EVERY KEY WAS A PLUCK.**
+Reported as *"i want long midi notes, i got plunky sound"*. `plai_note_on(note,
+hold)` takes a hold in BLOCKS decided when the key goes DOWN, so a note's length
+had to be guessed before it was played, and 6 ms through a lowpass gate is a
+pluck whatever the key does next. Added to `demo/muta/build/plai_shim.cc` and the
+wasm rebuilt in the container: digest `ece3f3c55e5ab63a` becomes
+**`d77815fad21aa700`**, 199,825 bytes, which is the shim's own bytes being part
+of the digest working as designed.
+✅ **AND LISTENING STOPS THE DRONE**, asked for in the same line.
+`plai_set_drone(1)` clears `trigger_patched` on everything sounding, so a key
+pressed into a droning instrument was a second triggered voice layered on a note
+that never ends. Switching MIDI off puts the drone back.
+✅ **MEASURED, IN TWO ASSERTS**: 700 ms after the key went down the peak is
+**0.0782 on 1 voice**, where a 6 ms trigger would have left 0; the release takes
+it to **0.0055**; and a note nobody is holding releases **0**, which is the
+negative control that stops a note-off releasing whatever it is handed.
+✅ **THE LAMP SAYS WHETHER THE PAGE IS LISTENING, NOT HOW MANY PORTS THERE ARE.**
+Reported as *"midi off - same label on both states??"*: it read the port count,
+so a press that switched listening on left it reading `MIDI off`. The port count
+is a log line now.
+✅ **AND THERE IS NO PERMISSION PROMPT TO SEE, WHICH WAS MEASURED RATHER THAN
+QUOTED.** Asked *"did not saw webmidi permission?"*. On a real headed Chrome with
+a fresh profile, `navigator.permissions.query({name:'midi'})` reads **`prompt`**,
+`requestMIDIAccess({sysex: false})` then **resolves granted with no dialog at
+all** and the state flips to **`granted`**. Chrome puts a prompt in front of
+**sysex** and we do not ask for it. It found **2 inputs** on this machine.
+
+
 ### The session 44 sprint, every ask, indexed 2026-09-22
 
 ⚠️ **THIS INDEX EXISTS BECAUSE THE QUESTION WAS ASKED AND COULD NOT BE ANSWERED

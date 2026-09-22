@@ -1468,6 +1468,25 @@ video[hidden] { display: none; }
 .k.sharp { background: #0e1219; }
 .k.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
 .k.remote { background: var(--ok); color: #0b0e14; border-color: var(--ok); }
+/* 🔴 MUTED GREY, AND IT IS THE QUIETEST OF THE THREE ON PURPOSE. `.down` and
+   `.remote` both say something HAPPENED: a finger here, a player elsewhere.
+   This one says something COULD, which is a chord's notes with nobody holding
+   them, and painting that in an ink reserved for an event is the colour rule
+   this project already keeps for marks.
+   ⚠️ IT SITS BEFORE `.down` IN WEIGHT AND AFTER IT IN SOURCE, so a key that is
+   hinted AND held reads as held. That is the case that actually happens: you
+   play along with a chord on screen, and what you are doing outranks what you
+   were being shown. A black key keeps its own darker ground, or a hinted sharp
+   would read lighter than the whites around it. */
+/* ⚠️ A LITERAL, NOT A `var()` WITH A FALLBACK NOTHING DEFINES. `--card3` does
+   not exist in this stylesheet, and a variable that always falls through reads
+   as a token somebody can retheme when it is not. These two greys are picked
+   against `--card2` (#151b26), which is the key's own ground. */
+.k.hint { background: #222a37; border-color: #39424f; }
+.k.hint .kn, .k.hint .kk { color: var(--fg); opacity: .8; }
+.k.sharp.hint { background: #242b36; }
+.k.hint.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
+.k.hint.down .kn, .k.hint.down .kk { color: inherit; opacity: 1; }
 
 
 /* ── in a headset ─────────────────────────────────────────────────────────
