@@ -2067,7 +2067,16 @@ button.pos-pg-pad:hover { filter: brightness(1.35); }
    being transitioned FROM is the one whose transition runs when a class or an
    attribute is removed. Putting both durations on the head's rule gives one
    speed in both directions, which is a lamp with no filament. */
-.pos-pg-pad { transition: box-shadow 320ms ease-out, filter 320ms ease-out; }
+/* ⚠️ THE FALL IS `step-grid.mjs`'S NUMBER, NOT ONE TYPED HERE. It sets
+   `--pg-fall` from its own `FALL_MS`, and the rise is interpolated into the
+   generated head rule from `RISE_MS` in the same file, so the two halves of the
+   lamp are declared once and in one place. It went 320 ms to 180 on 2026-09-22
+   after *"make 2nd and 3nd fade fade faster"*: at 120 beats a minute a step is
+   125 ms, so the tail went from 2.6 steps to 1.4 and the third column behind
+   the head is gone. The fallback here is the old value and is only ever used by
+   a `.pos-pg-pad` that no component built. */
+.pos-pg-pad { transition: box-shadow var(--pg-fall, 320ms) ease-out,
+                          filter var(--pg-fall, 320ms) ease-out; }
 .pos-pg-pad[data-on] { background: var(--pg-on); }
 .pos-pg-pad[data-on][data-mute] { background: var(--dim2); }
 /* ⚠️ THE BREATHING IS `opacity` EITHER WAY, so nothing it does can change how
@@ -4067,10 +4076,22 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 }
 /* 🔴 A FIXED HEIGHT ON THE NUMBER. It changes sixty times a second under a
    drag, and anything that redraws that often may not change how much room it
-   takes or the whole column jumps under the hand moving it. */
+   takes or the whole column jumps under the hand moving it.
+   🔴 AND A FIXED WIDTH SINCE 2026-09-22, WHICH IS THE HALF THAT WAS MISSING AND
+   ONLY BECAME VISIBLE WHEN THE INVISIBLE HAND STARTED MOVING A KNOB ON ITS OWN.
+   REPORTED: *"invisible m4 knob: show value without floating or make it stop
+   wiggling"*. `.pos-knob` is `align-items: center`, so a box sized by its
+   content re-centres on every frame and `9` becoming `10` slides the whole
+   string sideways. The height alone could never have stopped that.
+   ⚠️ `--knob-num-w` IS WRITTEN BY `knob.mjs` FROM THE TWO ENDS AT THIS KNOB'S
+   OWN PRECISION, which is the widest string it can ever print, and it is a
+   custom property rather than an inline `min-width` so this rule still wins
+   where a page needs it to. The fallback is 0 for anything that renders a
+   `.pos-knob-v` without the component. */
 .pos-knob-v {
   font: 500 11px/14px var(--mono); font-variant-numeric: tabular-nums;
   color: var(--fg); height: var(--knob-num-h); white-space: nowrap; overflow: hidden;
+  min-width: var(--knob-num-w, 0); text-align: center;
 }
 /* ⚠️ `height: auto`, BECAUSE THE VIEWBOX DECIDES THE SHAPE. `knob.mjs` crops the
    viewBox to the arc's real extent, which depends on the sweep, so a height
@@ -5052,8 +5073,92 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    depending on its parent.
    ⚠️ `text-align: right` is for the non-flex parent, which no caller has today
    and which would otherwise be the one arrangement this placement got wrong. */
+/* ⚠️ `column-gap` SINCE 2026-09-22, AND IT CHANGES NOTHING THAT EXISTS TODAY. A
+   gap only ever appears BETWEEN children, and the one caller of this placement
+   before today had a single line. What needed it is the instrument header,
+   whose plate is `end` whether it has one line or two: in the header's right
+   cell there is no width for `space-between` to spend, so `ends` would put the
+   maker and the model hard against each other. */
 .panel-plate[data-place="end"] {
   display: flex; justify-content: flex-end; text-align: right; margin-left: auto;
+  column-gap: var(--panel-gap);
+}
+
+/* 🔴 THE INSTRUMENT HEADER, 2026-09-22, ASKED FOR AS *"create instrumet
+   header/glue: similar to transport glue etc. left: online status button:
+   enabled disabled (green/gray). right nameplate. center patch selector
+   (optically center to the instrument)"*.
+
+   🔴 **`1fr auto 1fr` IS THE WHOLE ASK AND A FLEX ROW WOULD HAVE MISSED IT.**
+   *"Optically center to the instrument"* means centred on the CASE, not
+   balanced between two unequal neighbours. A `space-between` row with a status
+   control on the left and a plate on the right puts its middle child wherever
+   the difference between those two leaves it, which is a different place on
+   every panel and moves the moment a patch name gets one character longer.
+   Equal outer TRACKS put the centre track on the container's own centre
+   whatever is in them, and `.panel-case` is `padding: 0 var(--panel-pad)`, the
+   same both sides, so the header's centre is the case's centre. `/kit/` asserts
+   that against the case's own box and asserts the naive flex answer would have
+   been visibly elsewhere.
+   ⚠️ **THE OUTER TRACKS ARE `minmax(0, 1fr)` RATHER THAN `1fr`.** A `1fr` track
+   has an automatic minimum of its content, so a long patch name or a wide
+   status control would push the tracks apart unequally and the centre would
+   drift off the case the moment anything overflowed, which is the failure this
+   grid exists to prevent arriving through the back door.
+
+   ⚠️ THE INSET IS THE PLATE'S OWN RULE, OFF THE SAME TOKEN. `.panel-case` pads
+   horizontally only, because `.panel-fixed` and `.panel-strip` each supply
+   their own `padding-block`, so anything prepended to a case supplies its own
+   or sits on the top border. That is the defect `/plai/` was reported for.
+
+   🔴 **AND THE PHONE IS THREE LEVELS, WHICH IS SHIPPED ON A READING RATHER THAN
+   ON A MEASUREMENT.** Asked as *"i mobile: header in 2 levels / title /
+   enabled (full w) / patch (full w)"*, corrected in the next breath to
+   *"3 levels, sorry"*. `demo/verify.mjs` runs at 756 px with no viewport
+   override, so NOTHING in this repository can enter the block below, and this
+   project has four dead CSS rules measured rather than reviewed, one of them a
+   phone layout that never ran in its life because a later plain rule beat it at
+   every width. **So the media block is LAST in this file's panel section**,
+   which is the one thing that can be checked, and the layout itself is read and
+   not measured. It is said in the report and it is said here. */
+.panel-case > .panel-head { padding-block: var(--panel-pad) 0; }
+.panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--panel-gap);
+}
+/* 🔴 PLACED BY COLUMN RATHER THAN BY SOURCE ORDER, so the DOM can be the phone's
+   order and the stylesheet can say what the desktop does where a reader of the
+   stylesheet will find it. `panel-layout.mjs` makes the same choice for its
+   fixed column and says why: reading order follows the picture rather than a
+   flex `order` nobody can see in the markup. Here the two disagree on purpose,
+   and this is the visible half. */
+.panel-head-on { grid-column: 1; grid-row: 1; justify-self: start; }
+.panel-head-mid { grid-column: 2; grid-row: 1; justify-self: center; min-width: 0; }
+.panel-head-plate { grid-column: 3; grid-row: 1; justify-self: end; }
+/* ⚠️ THE `end` PLACEMENT'S OWN `margin-left: auto` IS LEFT ALONE HERE, AND
+   TURNING IT OFF WAS TRIED AND DELETED. `.panel-plate[data-place="end"]` is
+   (0,2,0) and a `.panel-head-plate` override would be (0,1,0), so it would have
+   lost on specificity and shipped as the fifth dead rule this repository has
+   measured. It also does not need turning off: an auto margin in a grid cell
+   absorbs the free space to its left, which puts the plate exactly where
+   `justify-self: end` already puts it. */
+@media (max-width: 560px) {
+  .panel-head {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+  /* ⚠️ EVERY CHILD BACK INTO ONE COLUMN AND INTO SOURCE ORDER, which is plate,
+     status, patch: the title, then enabled at full width, then the patch at
+     full width. `grid-row: auto` is the half that is easy to forget, because
+     the desktop rules pin all three to row 1 and they would stack on top of
+     each other with only the column reset. */
+  .panel-head-on, .panel-head-mid, .panel-head-plate {
+    grid-column: 1; grid-row: auto; justify-self: stretch;
+  }
+  .panel-head-on, .panel-head-mid { width: 100%; }
+  .panel-head-on .pos-pres, .panel-head-mid > * { width: 100%; }
 }
 
 /* Two display fields sharing one window the panel draws. The page draws the

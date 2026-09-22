@@ -29,9 +29,30 @@
 
 import { el } from './shell.mjs';
 import { createPanelLayout, createNameplate } from './panel-layout.mjs';
+import { createPresence, createPresenceButton } from './presence.mjs';
 
 /** What every instrument on this site is made by, so no page types it. */
 export const MAKER = 'POSITRON';
+
+/**
+ * What the header's status control says in its two states.
+ *
+ * 🔴 THE WORDS ARE THE ONES IN THE ASK, AND THE COLOURS COME FROM THE KIT.
+ * Asked 2026-09-22: *"left: online status button: enabled disabled
+ * (green/gray)"*. `presence.mjs` already owns green for a thing that answered
+ * and grey for one that has not, already reserves the badge's width off the
+ * longest word it can say so it cannot twitch, and is already the settled
+ * answer on eight pages. A second green dot here would be the hand-rolled
+ * control defect arriving inside the kit.
+ * ⚠️ TWO STATES, NOT FIVE, WHICH IS WHAT `can` IS FOR. A header is not asking
+ * whether a board in another building is answering; it is saying whether this
+ * instrument is switched into the chain, which has no `checking` and no
+ * `coming`. Narrowing it also narrows the reserve to the longer of these two
+ * words rather than to `coming online`.
+ */
+export const HEADER_SAYS = { online: 'enabled', offline: 'disabled' };
+/** The only two states a header's status control can reach. See `HEADER_SAYS`. */
+export const HEADER_STATES = ['online', 'offline'];
 
 /**
  * The plate's lines, and the placement they need.
@@ -53,6 +74,78 @@ export function plateSpec(maker, name, place = 'ends') {
 }
 
 /**
+ * The header row: a status control on the left, a patch selector optically
+ * centred on the case, and the nameplate on the right.
+ *
+ * 🔴 **A THREE COLUMN GRID WITH EQUAL OUTER TRACKS, WHICH IS THE WHOLE ASK AND
+ * IS SAID PRECISELY IN IT.** *"center patch selector (optically center to the
+ * instrument)"*. Centred to the INSTRUMENT, not balanced between two unequal
+ * neighbours: a flex row with a status on one side and a plate on the other
+ * puts its middle child wherever the difference between those two leaves it,
+ * which is a different place on every panel and moves the moment a patch name
+ * gets longer. `1fr auto 1fr` puts the centre track on the container's own
+ * centre whatever is in the outer two, and `.panel-case` is
+ * `padding: 0 var(--panel-pad)`, the same both sides, so the header's centre is
+ * the CASE's centre. That is what `/kit/` asserts, against the case's own box.
+ *
+ * 🔴 **THE STATUS CONTROL ACTS OR IT IS NOT A BUTTON, AND THAT IS DECIDED HERE
+ * RATHER THAN LEFT TO A CALLER.** `positron-ui` calls a control whose only
+ * honest behaviour is to do nothing *"the shape of control this project calls a
+ * lie"*, and the ask wants one element that both reports a state and looks
+ * pressable. So: a caller that hands over `press` gets a real button that calls
+ * it, built by `createPresenceButton`, and a caller that hands over nothing
+ * gets a BADGE, which is a span with no tab stop, no pointer cursor and no
+ * handler. There is no third shape, and nothing here ever presses itself.
+ * ⚠️ **A BADGE IS NOT A DEGRADED BUTTON, IT IS THE HONEST ANSWER FOR AN
+ * INSTRUMENT THAT IS SIMPLY ON.** `/muta/`'s two firmwares are in the page and
+ * cannot be unplugged; a header on one of those reports and does not pretend to
+ * connect anything.
+ *
+ * ⚠️ **AND THE PLATE IN A HEADER IS `end`, NEVER `ends`.** `ends` is
+ * `space-between`, which needs a box that SPANS something to put a gap in; in a
+ * header's right cell, which is as wide as its content, it puts the maker and
+ * the model hard against each other. `end` pushes both to the right edge, and
+ * `shell.css` gives that placement a `column-gap` so two lines read as two.
+ */
+function buildHeader({ name, maker, header }) {
+  const { online = {}, patch = null } = header;
+  const head = el('div', 'panel-head');
+
+  /* ⚠️ THE PLATE IS FIRST IN THE DOM AND THIRD IN THE PICTURE, and that is the
+     phone layout rather than an accident. Asked for as *"3 levels"*: the title,
+     then the enabled button at full width, then the patch at full width. A
+     single column grid lays its children out in source order, so this order IS
+     the phone. The desktop places all three by `grid-column` in `shell.css`,
+     which is visible in the stylesheet, rather than by a flex `order` nobody
+     can see in the markup. */
+  const plate = createNameplate({ ...plateSpec(maker, name, 'end'), cls: 'panel-head-plate' });
+  head.append(plate.el);
+
+  let status = null;
+  if (online !== false) {
+    const { press = null, state = 'online', says = {}, of = name, ...rest } = online;
+    const opts = {
+      of,
+      can: HEADER_STATES,
+      says: { ...HEADER_SAYS, ...says },
+      state,
+      ...rest,
+    };
+    status = press
+      ? createPresenceButton({ ...opts, press, aria: `switch ${of} on and off` })
+      : createPresence({ ...opts, mode: 'badge' });
+    status.el.classList.add('panel-head-on');
+    head.append(status.el);
+  }
+
+  const mid = el('div', 'panel-head-mid');
+  if (patch) mid.append(patch.el || patch);
+  head.append(mid);
+
+  return { head, plate, status, mid };
+}
+
+/**
  * A cased instrument panel with its name printed across the top.
  *
  * @param {object}  o
@@ -61,10 +154,25 @@ export function plateSpec(maker, name, place = 'ends') {
  * @param {Element} [o.host]          append the case to this
  * @param {string}  [o.place='ends']  a `createNameplate` placement
  * @param {object}  [o.panel]         passed straight to `createPanelLayout`
- * @returns {{el, panel, plate, fixed, strip, flow, add, shown}}
+ * @param {object}  [o.header]        build a header row across the top of the
+ *   case. See `buildHeader`. `{ online, patch }`, where `online` takes a
+ *   `press` to become a button and is `false` for no status control at all.
+ *
+ *   🔴 **IT IS AN OPTION AND THE DEFAULT IS OFF, WHICH IS A DECISION ABOUT
+ *   OTHER PEOPLE'S PAGES RATHER THAN A HEDGE.** The plate sits in the case's
+ *   top inset today and `/muta/` and `/kit/` both ASSERT it there, one of them
+ *   by reading the case's first child. Moving it into a header for every caller
+ *   would take those asserts red on pages nobody had touched, and this file
+ *   already records a wrapper shipping a defect to a new page on the day it was
+ *   written to prevent one. **With a header the plate moves into it; without
+ *   one nothing about any existing case changes.**
+ * @returns {{el, panel, plate, fixed, strip, flow, head, online, add, shown}}
  */
 export function createInstrument(o = {}) {
-  const { name, maker = MAKER, host, place = 'ends', panel: panelOpts = {} } = o;
+  const {
+    name, maker = MAKER, host, place = 'ends', panel: panelOpts = {},
+    header = false,
+  } = o;
   /**
    * 🔴 REFUSED WITHOUT A NAME, FOR THE REASON `knob.mjs` REFUSES WITHOUT A
    * LABEL: the plate is the only thing on a case that says which instrument
@@ -81,6 +189,11 @@ export function createInstrument(o = {}) {
   /* The lines and the placement are decided by `plateSpec`, which is pure and
      is graded without a browser. */
   const spec = plateSpec(maker, name, place);
+  /* 🔴 THE HEADER OWNS THE PLATE WHEN THERE IS ONE, AND THE PANEL OWNS IT WHEN
+     THERE IS NOT. Two plates would be two names on one case, and handing the
+     panel a plate it then places in the top inset while the header holds
+     another is exactly that. */
+  const head = header ? buildHeader({ name, maker, header }) : null;
   /**
    * 🔴 THE PANEL PLACES THE PLATE, THIS FILE DOES NOT. It did
    * `panel.el.prepend(plate.el)` for one day, which is exactly what the five
@@ -93,14 +206,29 @@ export function createInstrument(o = {}) {
    * DUPLICATION RATHER THAN REMOVING IT.** `createPanelLayout` takes a `plate`
    * now and owns the spacing, so no wrapper and no page can get it wrong.
    */
-  const panel = createPanelLayout({ ...panelOpts, plate: spec });
-  const plate = panel.plate;
+  const panel = createPanelLayout({ ...panelOpts, plate: head ? null : spec });
+  const plate = head ? head.plate : panel.plate;
+  /* 🔴 THE HEADER GOES IN BY `prepend`, FOR THE REASON THE PLATE DOES: it
+     belongs to the CASE, above the fixed column and the strip both, or it
+     scrolls away from the instrument it names. `/tom/` found that with a plate.
+     ⚠️ AND THE SPACING IS `shell.css`'S, NOT THIS FILE'S. `.panel-case >
+     .panel-head` carries the same `padding-block` the plate's own rule does,
+     off the same `--panel-pad`. Centralising an assembly that does not own its
+     own layout moves the duplication rather than removing it, which is written
+     at length in `panel-layout.mjs` and was paid for on `/plai/`. */
+  if (head) panel.el.prepend(head.head);
   host?.append(panel.el);
 
   return {
     el: panel.el,
     panel,
     plate,
+    /** The header row, or `null` on a case that was not given one. */
+    head: head?.head || null,
+    /** The header's status control, or `null`. A presence api either way. */
+    online: head?.status || null,
+    /** The header's centre cell, which is where a patch selector goes. */
+    patchSlot: head?.mid || null,
     // The three places a caller puts things, forwarded rather than wrapped, so
     // everything `panel-layout.mjs` documents about them stays true here.
     fixed: panel.fixed,

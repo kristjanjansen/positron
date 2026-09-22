@@ -30,7 +30,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   cellSize, stepAt, stepMsFor, rovingNext, marksAt,
-  createStepGrid, PAD_MIN, PAD_GAP,
+  createStepGrid, PAD_MIN, PAD_GAP, RISE_MS, FALL_MS,
 } from './step-grid.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -240,6 +240,34 @@ ok('NEGATIVE CONTROL: any other key is not this function\'s business',
 
   ok('the live attribute is deleted rather than set empty, because [data-live] matches on presence',
     /delete rowsEl\.dataset\.live/.test(src));
+
+  /* 🔴 THE STEP AXIS IS NUMBERED IN BEATS AND NOT IN STEPS, AND IT IS A
+     DECISION RATHER THAN A DETAIL. A number under every one of 64 steps in a
+     26 px cell is this project's wrapping table heading in a new costume, and
+     `positron-ui` is explicit that a heading which does not fit is the AUTHOR's
+     problem rather than something to shrink at the reader. */
+  ok('the ruler numbers the beats, and only when a caller asks for numbers at all',
+    /if \(!ticks\) return '';/.test(code)
+    && /m\.beat && beat > 0 \? String\(Math\.floor\(s \/ beat\) \+ 1\)/.test(code),
+    'ticks off is the empty string, ticks on is one number a beat');
+
+  /* 🔴 THE LAMP'S TWO HALVES ARE DECLARED IN THIS FILE ONCE EACH, and the fall
+     reaches `shell.css` as a custom property rather than as a second copy of
+     the number. `shell.css` has repaired that shape twice, as `--sld-col` and
+     as `--ctl-gap`. */
+  ok('the fall is longer than the rise, and both numbers live only here',
+    FALL_MS > RISE_MS && /setProperty\('--pg-fall'/.test(code)
+    && /transition:box-shadow \$\{RISE_MS\}ms/.test(code)
+    && /var\(--pg-fall, 320ms\)/.test(css) && !/box-shadow 320ms/.test(css),
+    `${RISE_MS} ms up and ${FALL_MS} ms down, the fall published as --pg-fall`);
+
+  /* ⚠️ THE NUMBER ONLY MEANS ANYTHING AS A FRACTION OF A STEP. At 120 beats a
+     minute with four to a beat a step is 125 ms, so 320 ms was 2.6 steps of
+     tail and the third column behind the head was still visibly lit. */
+  ok('the fall is under a step and a half at the tempo the kit runs at',
+    FALL_MS / stepMsFor(120, 4) < 1.6 && 320 / stepMsFor(120, 4) > 2.5,
+    `${FALL_MS} ms is ${(FALL_MS / stepMsFor(120, 4)).toFixed(2)} steps of a `
+    + `${stepMsFor(120, 4)} ms step, against ${(320 / stepMsFor(120, 4)).toFixed(2)} before`);
 
   const dash = String.fromCharCode(0x2014), middot = String.fromCharCode(0x00b7);
   ok('no em dash and no middot anywhere in the module, comments included',

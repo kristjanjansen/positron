@@ -921,7 +921,18 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   }
   boxH = Math.round(boxH);
 
-  const shared = { sibs, kidIx, sibSpan, childGap, childInset };
+  /**
+   * ⚠️ AN UNKNOWN `align` IS REPORTED RATHER THAN IGNORED, which is this
+   * component's own habit: a label that does not fit and a link it cannot route
+   * both land on `cuts` so the AUTHOR sees them. An option silently falling
+   * back to the default is an option that reads as broken from the page and as
+   * correct from here.
+   */
+  const align = spec.align === 'left' || spec.align === 'centre' || spec.align === undefined
+    ? spec.align
+    : (cuts.push({ id: '(figure)', where: 'align', full: String(spec.align),
+                   shown: 'centred', width: 0 }), undefined);
+  const shared = { sibs, kidIx, sibSpan, childGap, childInset, align };
   const out = mode === 'row'
     ? placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts,
                                ...shared })
@@ -1003,9 +1014,26 @@ export function checkEnds(out, cuts) {
 }
 
 function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts,
-                                  sibs, kidIx, sibSpan, childGap, childInset }) {
+                                  sibs, kidIx, sibSpan, childGap, childInset, align }) {
   const total = cols * w + (cols - 1) * gapX;
-  const left = Math.max(PAD, Math.round((avail - total) / 2));
+  /**
+   * 🔴 CENTRED IS THE DEFAULT AND `align: 'left'` IS THE ONE EXCEPTION, ADDED
+   * 2026-09-22. A figure on its own under a page's controls is centred because
+   * the picture IS the block, and that is every caller but one.
+   * 🔴 THE CALLER THAT BOUGHT IT IS `/wish/`, WHERE A PICTURE IS NO LONGER THE
+   * BLOCK. That page now draws one diagram per proposed connection, in a row
+   * that also reserves a column on its right for actions. Centring inside the
+   * space left over put the figure about 70 px in from each side, so two rows
+   * with different box counts had their first box at two different x, and
+   * nothing in the column of pictures lined up with anything.
+   * ⚠️ IT IS AN OPTION RATHER THAN A CHANGE OF DEFAULT, BECAUSE THE DEFAULT IS
+   * RIGHT FOR EVERY OTHER PAGE AND THIS PROJECT HAS ONE TREATMENT PER PICTURE.
+   * A page asking for this is saying the figure sits beside something, which is
+   * a fact about the host and not about the drawing.
+   * ⚠️ AND IT IS STILL `PAD` AT THE LEFT, never 0. The inset a figure keeps off
+   * its own edge is the same on both sides and at both alignments.
+   */
+  const left = align === 'left' ? PAD : Math.max(PAD, Math.round((avail - total) / 2));
 
   const inCol = [];
   for (const n of nodes) {

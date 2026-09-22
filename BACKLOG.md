@@ -35,8 +35,8 @@ because two writers in one checkout is this project's most expensive mistake.
 | 16 | `create instrumet header/glue...` | ⏳ | kit agent |
 | 17 | `i mobile: header in 2 levels` then `3 levels, sorry` | ⏳ ungradable here | kit agent |
 | 18 | `move voices to knobs, bottom right, stepped knob` | ⏳ needs `step` first | kit agent, then session |
-| 19 | `redeisgn it` + `reserve right side...`, `/wish/` Interpret | ⏳ | wish agent |
-| 20 | `when i click to prepared ask, interpret button should disable and shimmer` | ⏳ | wish agent |
+| 19 | `redeisgn it` + `reserve right side...`, `/wish/` Interpret | ✅ 69/69, left align blocked | done |
+| 20 | `when i click to prepared ask, interpret button should disable and shimmer` | ✅ done | done |
 | 21 | `apply to muta's`, the instrument header | ⏳ blocked on 16 | session |
 | 22 | `can you have wave / osilocope visualizer to top of muta...` | ⏳ blocked on a kit answer | session |
 | 23 | `match createKnobBank and createControlGrid or unifu?` | ✅ answered, recommendation recorded | session |
@@ -124,6 +124,267 @@ the hand-over and the `.pos-controls` refusal, all of which lived inside
 `createSlider` where a knob could not reach them. `slider.mjs` lost about 150
 lines and kept its exports, because `/radio/`, `/kit/` and `/knobs/` import
 `HAND_YIELD_MS` from it.
+
+#### /wish/ rows, the second round of reports, 2026-09-22
+
+🔴 **ASKED AGAINST A SCREENSHOT OF THE NEW ROWS:** *"json dump is a separate
+block. rm yellow left line, its excessive. do not put refused etc below diagram
+text, it is a default text when no interacton. rm refused text, its already on
+connetor."*
+
+- ⏳ **THE YELLOW LEFT LINE GOES.** It was taken from `table.mjs` deliberately,
+  and graded against a real lit table row so a change in `shell.css` would go
+  red here. **That check has to move with it rather than be deleted**: a chosen
+  row still has to be tellable from an unchosen one, so what survives is the
+  lifted ground and the assert compares THAT.
+  ⚠️ **AND A ROW IS STILL THE THING THAT DRIVES THE DUMP**, so selection must
+  stay visible somehow. *Excessive* is about the 2 px bar, not about the state.
+- ⏳ **THE VERDICT IS THE DIAGRAM'S DEFAULT CAPTION, NOT A LINE UNDER IT.**
+  This is the ambiguous clause from the first round, answered: the sentence
+  belongs IN the caption slot `createDiagram` already reserves and already
+  swaps on hover, rather than in a second line of the page's own beneath it.
+  ⚠️ **SO THE `visibility: hidden` DANCE GOES TOO.** The agent built the
+  sentence standing down while the caption is up, which is two elements taking
+  turns in one place. One element, two contents, is what was actually wanted.
+- ⏳ **`refused` COMES OFF THE SENTENCE, BECAUSE THE CONNECTOR ALREADY SAYS
+  IT.** Two channels for one fact, the third time today: the wave card said *not
+  drawn* beside an empty picture, the slider's hand had a filled button and a
+  hollowed handle, and now the arrow and the sentence both say refused.
+  ⚠️ **THE WORD IS NOT WASTED, IT IS RELOCATED.** The arrow carries it in the
+  picture; the sentence keeps the part only it can carry, which is WHY.
+
+#### 🔴 THE REFUSAL SENTENCES ARE WRITTEN IN FIELD NAMES, NOT IN WORDS
+
+🔴 **REPORTED, AND IT IS THE SHARPEST THING SAID ABOUT THIS PAGE:**
+*"MK-425C USB MIDI Keyboard to Circuit { only } / only takes \"cls\" and was
+given \"to\" - its not for humans, i do not know what to do"*.
+
+🔴 **IT IS THE NO JARGON RULE, BROKEN IN THE ONE PLACE IT COSTS MOST.**
+CLAUDE.md: *"No jargon in anything a visitor sees. Not in `what`, not in `how`,
+not in a readout key"*. `cls` is a FIELD NAME in this repository's own schema.
+`to` is another. A sentence made of two of them tells a reader which keys the
+validator compared and nothing about what to do next.
+⚠️ **AND THIS LINE HAS ALREADY BEEN REPAIRED ONCE FOR A DIFFERENT DEFECT**,
+2026-09-22: it read `cc takes "from" and was given "to"` and accused a correct
+argument of being wrong. That repair made it TRUE. **True and unreadable are
+different problems and only the first one was fixed.**
+✅ **WHAT THE SENTENCE COULD SAY INSTEAD IS ALREADY IN THE CODE.** `bay.mjs`
+holds `OP_HELP` and `CLASSES`, so the page knows that `only` keeps one KIND of
+message and that the kinds are note, cc and bend. *"only keeps one kind of
+message, and no kind was named"* uses no field name and says what is missing.
+🔴 **AND THE REAL ANSWER IS THE ACTION, NOT THE WORDING.** This is exactly the
+INCOMPLETE verdict landing in the reserved column: a row that cannot be
+completed by reading should offer the thing that completes it. *I do not know
+what to do* is the report; a row with nothing to press is the cause.
+⚠️ **IT IS A `bay.mjs` CHANGE AND THEREFORE REACHES `/bay/` TOO**, which prints
+the same sentences. One vocabulary, two pages, and `bay-test.mjs` asserts on the
+current wording in at least three places.
+
+🔴 **AND THE SHAPE WAS ASKED FOR IN THE NEXT BREATH: `can we have cooncrete
+problem -> soluton texts?`** Yes, and it falls out of the split that already
+landed today rather than being a new idea:
+
+| | problem | solution |
+| --- | --- | --- |
+| **incomplete** | what is missing, in words | **the thing a person can do**, naming real values |
+| **refused** | what rule says no, in words | **there is no fix**, said plainly |
+
+✅ **EVERY VALUE THOSE SENTENCES NEED IS ALREADY IN `bay.mjs`.** `OP_HELP` says
+what each operator needs, `CLASSES` lists the kinds a link can carry, `OP_NAMES`
+lists the operators. So `only takes "cls" and was given "to"` becomes something
+like *only keeps one kind of message and no kind was named* over *name one of
+note, cc, bend*, with no field name in either line.
+🔴 **AND A REFUSAL'S SOLUTION IS OFTEN THAT THERE IS NONE, WHICH IS THE HONEST
+TEXT RATHER THAN A MISSING ONE.** *The Circuit has no factory reset, so this
+desk never sends it SysEx* has no repair a person can perform, and saying so is
+what tells a reader to stop trying. **A blank solution line would read as a
+sentence that failed to load.**
+⚠️ **THE TWO LINES MUST NOT RESTATE EACH OTHER**, which is the failure mode of
+every problem-and-solution pair ever written. If the solution is the problem
+with *do not* in front of it, there is one line, not two.
+⚠️ **AND THE SOLUTION IS WHERE THE ACTION GOES.** A row whose solution is *name
+one of note, cc, bend* is a row that could offer three buttons in the column
+already reserved on its right. That is the same conclusion the wiggle reached
+from the other direction: **the text says what to do and the column is where it
+gets done.**
+
+#### ✅ DONE 2026-09-22: /wish/ rebuilt into rows, and four things it left
+
+✅ **59/59 to 69/69, page asserts 53 to 63, RE-RUN INDEPENDENTLY BY THE SESSION.**
+The baseline was MEASURED before the work rather than read out of a file. Ten
+asserts added, none removed, five re-pointed keeping their claim.
+✅ **THE NEW ASSERTS ARE THE KIND ONLY THAT PAGE CAN MAKE**: a chosen row's
+computed `inset 2px 0 0` and lifted ground compared against **a real lit
+`table.mjs` row**, so a change in `shell.css` goes red here; the action column
+holding **72.0 px with an answer and 72.0 px with none**; one tab stop with a
+roving tabindex where an arrow moves without choosing; and the incomplete
+verdict drawn in `rgb(224, 176, 96)` against a refusal's `rgb(224, 144, 138)`.
+
+🔴 **AND ONE REAL COST, REPORTED BY THE AGENT RATHER THAN FOUND:** while taking
+a screenshot it clicked a prepared example on a page loaded WITHOUT
+`?selfcheck=1`, so **one request went to the deployed `wish.positron.studio`
+Worker**. Whether it billed a model call is unknown and was deliberately not
+re-tested, because asking again to find out would cost a second one.
+⚠️ **THIS IS THE STANDING RULE MEETING A NEW DOOR.** Every rule here about
+external cost is written about a page's own behaviour or a harness run; this was
+a person pressing a control to photograph it. **A screenshot is a visit, and a
+visit that presses a button that calls a model is a billed visit.** The gate
+exists and works; the agent simply had not opened the page through it.
+
+⏳ **FOUR THINGS IT LEFT, EACH BLOCKED FOR A NAMED REASON:**
+1. 🔴 **THE DIAGRAM IS NOT TRULY LEFT ALIGNED AND CANNOT BE FROM THE PAGE.**
+   `placeRow` in `demo/shell/diagram.mjs` centres: `left = max(PAD, (avail -
+   total) / 2)`. The row takes the width away so the picture is left OF the
+   reserved column, but inside its cell it is still centred, about 70 px in each
+   side. **It needs an `align: 'left'` option on the component**, which the
+   agent was told not to touch because another agent owns `demo/shell/`.
+2. **The grey `??` not-on-this-desk state**, blocked on the schema gaining a
+   free text field, above.
+3. **The knob wiggle**, blocked on `/wish/` opening WebMIDI at all. The reserved
+   column's comment names it as the intended tenant.
+4. 🔴 **ENTER IN THE TRANSCRIPT BOX STILL DOES NOT MARK `Interpret` BUSY AND CAN
+   START A SECOND RUN.** The same defect through a third door, found while
+   fixing the second. Not asked for, not changed, and worth more than it looks:
+   the prepared row was fixed by pressing the button, and this one is not
+   pressing it either.
+
+#### The picture says which kind of missing, 2026-09-22
+
+🔴 **ASKED, and it is the third verdict drawn rather than only written:**
+*"diagam could show grayed out boxes with \"?\" in the right place and/or grayed
+connector/label. depences if model gets the hw rihht just connetion details
+missiong or really hw is misising. so moog can also be drawne as gayed out ??"*
+
+✅ **TWO DIFFERENT MISSINGS, AND THE PICTURE CAN TELL THEM APART WHERE THE WORDS
+CANNOT.** The instruments are right and a value is absent, versus the instrument
+itself is not on this desk. Today both end as nothing or as one red arrow.
+
+| what is missing | box | connector |
+| --- | --- | --- |
+| nothing, it is allowed | solid | solid, labelled with what crosses |
+| an argument, `cc` with no `from` | **solid**, the hardware is real | **grey, labelled `?`** |
+| a rule says no | solid | the existing refused arrow |
+| the instrument is not on this desk | **grey, `??`** | grey |
+
+🔴 **AND THE LAST ROW CANNOT BE BUILT WITHOUT A SCHEMA CHANGE, WHICH IS THE
+FINDING.** `from` and `to` are an `enum` of the real port ids, and that enum is
+the measured thing that stopped a Moog and a Prophet **coming back as inventions
+in 496 ms**. So the model CANNOT name a Moog today: it returns no links at all,
+and the page cannot draw what it was never told.
+🔴 **`no links at all` AND `the model said nothing useful` ARE THEREFORE THE
+SAME OUTPUT**, which is the defect this idea exposes. A reader asking for a Moog
+gets *the model proposed nothing*, which is true and useless.
+✅ **THE REPAIR KEEPS THE ENUM AND ADDS A SECOND FIELD.** Free text, for names
+the model could not map to a port, which the page draws as grey `??` boxes and
+**never validates as a link**. That is the page's own existing principle about
+aliases, stated one screen away: *"AND AN ALIAS NEVER BECOMES A PORT ID. `from`
+and `to` in the schema stay an `enum` of the real ids ... Aliases go in the prose
+the model READS, never in the list it must choose from."* Same rule, other
+direction.
+⚠️ **AND IT MUST NOT BE MEASURED BY WHETHER IT LOOKS RIGHT.** The claim to grade
+is that asking for a Moog draws a grey box named moog AND produces no link,
+because a free text field that leaked into a link would undo the one guarantee
+the enum buys.
+⚠️ `arrowsFor()` drops a link whose port maps to no box (`if (!a || !b) continue`)
+and `draw()` filters `INSTRUMENTS` to the touched ones, so an unknown box has no
+home in either today. Both need a place for a node that is not an instrument.
+⚠️ **A DIAGRAM CHANGE MEANS LOADING `positron-diagram` FIRST**, and this project
+allows one picture per page with one treatment.
+
+#### A third verdict: not allowed, not refused, INCOMPLETE, 2026-09-22
+
+🔴 **ASKED:** *"perhaps a step model can return: not 'accepted' not accepted but
+needs more info / input?"*
+
+✅ **AND THE SPLIT ALREADY EXISTS IN THE CODE AND IS THROWN AWAY ONE LINE
+LATER.** `grade()` in `demo/wish/index.html` reads:
+
+```js
+const bad = checkTransforms(l.transforms || []);
+const v = bad ? { ok: false, why: bad } : b.validate(l.from, l.to, l.transforms || []);
+```
+
+**Two different questions are asked and one boolean comes out.**
+- `checkTransforms` (`bay.mjs:278`) walks each op's `need` list and reports a
+  MISSING OR WRONG ARGUMENT. That is not a refusal, it is a question: the shape
+  is right and a value is absent. `cc needs "from" and "to", and "from" is
+  missing` is a QUESTION printed as a verdict.
+- `b.validate` answers a POLICY question: does this destination accept this
+  class, and is it on the `never` list. No amount of further input changes a
+  `never`.
+
+🔴 **THIS IS THE SAME LESSON THIS PROJECT ALREADY PAID FOR, ONE LAYER UP.**
+`positron-verify` records it about `bay.mjs` itself: *"UNSUPPORTED AND FORBIDDEN
+ARE TWO LISTS AND MERGING THEM BREAKS EVERYTHING OR PROTECTS NOTHING"*, repaired
+by splitting *I do not use that* from *that damages me*, because **only the
+second is worth an error**. The verdict vocabulary above it never got the same
+treatment, so a question and a prohibition still come out the same colour and
+the same word.
+
+✅ **WHAT A THIRD STATE BUYS, BEYOND BEING TRUE:**
+- **It gives the wiggle a home.** An INCOMPLETE row is exactly the row that can
+  say *turn the knob you mean*. A refused row has nothing to ask for.
+- **It makes the model's failure legible.** The reported run is not a model
+  proposing something forbidden, it is a model leaving a blank, and those
+  deserve different words in front of a reader.
+- **It is honest about who can act.** Refused is the desk saying no. Incomplete
+  is the desk saying *your turn*.
+
+⚠️ **AND IT IS A THIRD COLOUR, WHICH THIS PROJECT DOES NOT HAND OUT LIGHTLY.**
+`allowed` is `--ok` and `refused` is `--bad`. A third must not read as a milder
+failure, because it is not a failure at all. The standing rule is one meaning
+for colour across every demo, so whatever is chosen is chosen once.
+⚠️ **IT LANDS WHILE `/wish/` IS BEING REBUILT INTO ROWS**, so the row design and
+this vocabulary have to arrive together rather than one retrofitting the other.
+
+#### Wiggle a knob to say which knob, 2026-09-22
+
+🔴 **ASKED, AND IT REFRAMES THE WHOLE PROBLEM:** *"i do not know controller cc's
+by heart. i only see where they are located on the hardware ... so what to do?
+can i add more data by wiggliling those realtime?"*
+
+✅ **YES, AND IT IS BETTER THAN MORE FACTS, FOR A REASON THAT HAS NOTHING TO DO
+WITH THE MODEL.** `FACTS` currently TYPES the keyboard's six controller numbers.
+The MK-425C's rotaries are USER ASSIGNABLE, so that line is a claim about one
+configuration on one day, and nothing on the page can tell when it stops being
+true. A wiggle MEASURES it, which is this project's standing preference and the
+same argument that put `durationMs` in `corpus.json`.
+🔴 **BUT WIGGLING TO IMPROVE THE PROMPT WOULD NOT FIX WHAT WAS REPORTED.** The
+model already had CC 84, in the same sentence it read CC 80 out of, and dropped
+it. Feeding it a measured 84 hands it the same number by a better road.
+✅ **SO THE WIGGLE HAS TO FILL THE SLOT, NOT THE PROMPT**, and then the number
+never passes through the model's choice at all. Two shapes, smallest first:
+1. **LEARN AT THE REFUSAL.** The validator already says exactly what is missing,
+   `cc needs "from" and "to", and "from" is missing`. Instead of stopping there,
+   the row offers *turn the knob you mean*, the page reads the next controller
+   that moves, and the patch completes. **A refusal becomes an action**, and the
+   person is used for the one thing they are better at than any model: pointing
+   at a physical object.
+2. **WIGGLE AS POINTING.** *"connect this knob to the first macro"* said while
+   turning it. `this` resolves to a port, a channel and a controller number the
+   page measured, which is strictly MORE than the typed fact: it also proves
+   which port the message came from, which no sentence can.
+
+🔴 **AND `/wish/` DECLARES `WebMIDI` IN ITS TAGS AND CONTAINS NO
+`requestMIDIAccess` AT ALL.** MEASURED today: zero matches in that file. So the
+row already promises a capability the page never opens, `caps.mjs` will un-link
+it on a browser with no MIDI for a reason that does not exist, and this idea
+would make the tag honest rather than adding a new claim.
+✅ **THE MACHINERY IS WIRING, NOT INVENTION**: `demo/shell/midi.mjs`,
+`midi-log.mjs` and `midi-decode.mjs`, and `/dump/` already shows every message a
+plugged in instrument sends.
+
+⚠️ **FOUR TRAPS, ALL ALREADY MEASURED ON THIS DESK:**
+- **A wiggle is many messages, not one.** Picking *the* control needs a stated
+  rule and the page must REPORT what it saw rather than silently choosing.
+- **A relative encoder gives increments, not a position.** The Model 12's PAN
+  knobs are relative CC 16 upward, and `/twelve/` measured its jog sending only
+  `0x01` and `0x41`. A learn has to say WHICH KIND it found.
+- **The Model 12 sends nothing at all unless DAW control mode is on at the
+  mixer.** So *nothing arrived* is ambiguous between the wrong port and the mode
+  being off, and the page must say it cannot tell those apart.
+- **REC sends no note off.** A learned note from REC would look identical to a
+  stuck note, and nothing in a validator can catch it.
 
 #### The knob sentence still fails, and the fix for it was never re-tested
 
