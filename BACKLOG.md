@@ -1,5 +1,53 @@
 ## Open
 
+### The session 44 sprint, every ask, indexed 2026-09-22
+
+⚠️ **THIS INDEX EXISTS BECAUSE THE QUESTION WAS ASKED AND COULD NOT BE ANSWERED
+IN ONE LOOK.** *"do you have all my current sprint requests in backlog?"*, and
+the honest answer at the time was **19 of 22**: three had been relayed to an
+agent and never written down, which is the exact failure the standing rule
+exists to stop. A stream of asks tracked anywhere but this file is a stream with
+a hole in it.
+⚠️ **AND THE THREE THAT WERE MISSING HAD ALL BEEN ACTED ON.** They were not
+forgotten, they were undocumented, which is worse in one specific way: a reader
+of this file would have concluded they were never made.
+
+Every ask is quoted in the section that owns it. `who` says where the work is,
+because two writers in one checkout is this project's most expensive mistake.
+
+| # | the ask, in the words it arrived in | state | who |
+|---|---|---|---|
+| 1 | `reduce "invisible hand" speed 2x` | ✅ done, deployed | session |
+| 2 | `add this mode to knobs: button in the h center...` | ✅ done, deployed | session |
+| 3 | `make knobs 10% bigger` | ✅ done, deployed | session |
+| 4 | `rm four faders, a different shape on the same rule` | ✅ done, 156 to 155 | session |
+| 5 | `add inivisible hands to muta's` | ✅ built, not verified | session |
+| 6 | `invisible m4 knob: show value without floating or make it stop wiggling` | ⏳ | kit agent |
+| 7 | `still not aligned to vertical separated lanes`, CHANNEL STRIP | ⏳ | kit agent |
+| 8 | `one line, which cannot use the same placement / rm example` | ⏳ | kit agent |
+| 9 | `rm wrapper and info footer`, STEP GRID | ⏳ | kit agent |
+| 10 | `make sure right padding is same as bottom` | ⏳ | kit agent |
+| 11 | `show example with both axies labels and one withouth ones` | ⏳ | kit agent |
+| 12 | `make 2nd and 3nd fade fade faster` | ⏳ | kit agent |
+| 13 | `put all to controls grid`, FILTER RESPONSE | ⏳ | kit agent |
+| 14 | `alitng title and desc to bottm (leave nice padding)` | ⏳ | kit agent |
+| 15 | `no "not drawn"` | ⏳ | kit agent |
+| 16 | `create instrumet header/glue...` | ⏳ | kit agent |
+| 17 | `i mobile: header in 2 levels` then `3 levels, sorry` | ⏳ ungradable here | kit agent |
+| 18 | `move voices to knobs, bottom right, stepped knob` | ⏳ needs `step` first | kit agent, then session |
+| 19 | `redeisgn it` + `reserve right side...`, `/wish/` Interpret | ⏳ | wish agent |
+| 20 | `when i click to prepared ask, interpret button should disable and shimmer` | ⏳ | wish agent |
+| 21 | `apply to muta's`, the instrument header | ⏳ blocked on 16 | session |
+| 22 | `can you have wave / osilocope visualizer to top of muta...` | ⏳ blocked on a kit answer | session |
+| 23 | `match createKnobBank and createControlGrid or unifu?` | ✅ answered, recommendation recorded | session |
+| 24 | `do not unserstand why it fails`, `/wish/` | ✅ answered, and it found a stale claim | session |
+
+🔴 **TWO OF THESE ARE NOT TASKS AND ARE THE MOST VALUABLE ROWS IN THE TABLE.**
+24 turned out to be the first re-test of a prompt fix nobody had checked, and it
+failed. 23 turned up a live defect: `.pos-cg` has no overflow rule, so a grid of
+knobs drags the page sideways on a phone.
+
+
 ### ✅ DONE 2026-09-22: the knob stream, session 44
 
 🔴 **ASKED IN ONE MESSAGE:** *"reduce \"invisible hand\" speed 2x. add this mode
@@ -76,6 +124,314 @@ the hand-over and the `.pos-controls` refusal, all of which lived inside
 `createSlider` where a knob could not reach them. `slider.mjs` lost about 150
 lines and kept its exports, because `/radio/`, `/kit/` and `/knobs/` import
 `HAND_YIELD_MS` from it.
+
+#### The knob sentence still fails, and the fix for it was never re-tested
+
+🔴 **REPORTED with a screenshot of `/wish/`: `do not unserstand why it fails`.**
+The ask was *"Connect the first rotary knob of the keyboard to the first macro
+knob of the circuit."*, the model returned `{"op": "cc", "to": 80}`, and the page
+refused it with `cc needs "from" and "to", and "from" is missing`.
+
+✅ **THE REFUSAL IS CORRECT.** `cc` remaps one controller number to another, so
+it needs BOTH: which number to catch and which to send. Only the destination was
+given.
+
+🔴 **AND THE MODEL WAS TOLD THE MISSING NUMBER, IN THE SAME SENTENCE AS THE ONE
+IT USED.** `FACTS` reads *"Its six rotary knobs send, in the order they are
+printed on the panel, CC 84, 72, 74, 71, 93 and 5, so its FIRST rotary knob is CC
+84"* and *"its FIRST macro knob is CC 80"*. **It took the 80 and dropped the
+84.** So this is not a knowledge gap and more facts will not close it.
+
+🔴 **THE PAGE'S OWN EXAMPLE ROW PREDICTED THIS WAS FIXED AND SAID SO WAS
+UNMEASURED.** Its `was` field reads: *"Constructed, not measured. Asked on
+2026-09-21 this came back as a cc with no source and was refused, and the prompt
+gained the knob numbers that day. Nobody has asked it again."* **This screenshot
+is the first time anybody asked it again, and the answer is that the prompt
+change did not work.** The row's expected links still carry
+`{ op: 'cc', from: 84, to: 80 }`, which is now known to be a hope rather than a
+reading, and the row should say so.
+
+🔴 **IT IS THE SAME SHAPE `positron-verify` ALREADY RECORDS FOR THIS MODEL.**
+*"Asked for a patch, `llama-3.3-70b` returned `{"op": "transpose", "to": 1}` on
+every run. `transpose` takes `by`."* Same model, same hole: it reaches for `to`
+and stops. **Twice now, on two different operators, the missing key is the one
+that is not called `to`.**
+⚠️ **AND THE OBVIOUS REPAIR IS MEASURED AND IS WORSE.** A tighter schema with an
+`anyOf` branch per operation took that model from **1.6 s to 10.2 s** and made it
+repeat one transform until the tokens ran out. The loose schema plus an ordinary
+validator wins.
+⏳ **WHAT IS UNTRIED**: feeding the validator's own sentence back for one retry.
+That is a real candidate and nobody has measured it.
+✅ **AND NOTHING ABOUT THE PAGE IS BROKEN HERE.** A model proposes, a validator
+argues and a person reads: all three did their job, and the refusal named the
+missing key precisely, which is itself a repair made on 2026-09-22 after the
+message accused a correct argument of being wrong.
+
+#### CHANNEL STRIP, reported a third time, 2026-09-22
+
+🔴 **REPORTED AGAINST A SCREENSHOT: `still not aligned to vertical separated
+lanes`.** *"Still"* is the word that matters: it was asked for once as *"make
+real channels with dividers (see panels) and line things up"*, never started,
+and is now reported again.
+
+🔴 **THE BLOCK IS A CATALOGUE OF FOUR COMPONENTS CAPTIONED AS A CHANNEL STRIP.**
+Its own description calls it *"the four shapes a hardware layout is built
+from"*, and it draws them as four independent HORIZONTAL rows at three different
+pitches: six knobs over an 8 by 2 pad grid over a row of 8 half pads over 5
+round buttons beside 6 faders. **Nothing shares a column with anything above
+it**, so no channel can be followed down the picture.
+⚠️ **THE DIVIDERS ARE THE PANEL'S**, which is what *"(see panels)"* meant:
+`.panel-fixed-l` and `.panel-fixed-r` already carry a `var(--line)` border and
+`var(--panel-gap)`. A divider here and a divider on `/twelve/` are one line, not
+two opinions.
+🔴 **AND THE ALIGNMENT IS `--ctl-head` AND `--ctl-foot`, NEVER ARITHMETIC IN
+THIS BLOCK.** A row of different controls cannot be aligned by a caller, and
+`/twelve/` was corrected twelve times in one evening by people trying.
+⚠️ **A KNOB IS `--ctl-w * 1.1` AND A PAD IS `--ctl-w` SINCE TODAY**, which is
+the thing that bites when they go in one column. `/circuit/` solves it by
+centring the knob in a pad sized track rather than resizing either.
+
+#### /wish/, the Interpret button goes busy on a prepared ask, 2026-09-22
+
+🔴 **ASKED:** *"wish: when i click to prepared ask, interpret button should
+disable and shimmer"*.
+
+✅ **THE BUSY STATE ALREADY EXISTS AND IS NOT THE PAGE'S TO INVENT.**
+`shell.mjs:183`: the shell listens on every control it builds, and **if the
+handler returns a promise** it sets `data-busy`, disables the button, sets
+`aria-busy`, awaits and clears all three. `shell.css` paints the sweep off that
+attribute, and its comment says there is deliberately no spinner and no label
+change because both resize the button and the row reflows under the pointer.
+🔴 **THE GAP IS THAT A PRESS ON A TABLE ROW IS NOT A PRESS ON THE BUTTON**, so
+that listener never runs. The repair is to make the row press the button, not to
+hand-roll a second disable and a second shimmer on the page.
+
+#### A decision asked for: match `createKnobBank` and `createControlGrid`, 2026-09-22
+
+🔴 **ASKED:** *"match createKnobBank and createControlGrid or unifu?"*. Answered
+in chat; the recommendation is recorded here because it is a kit decision and
+chat is not where those live.
+
+🔴 **THEY CANNOT MERGE, AND THE REASON IS ARITHMETIC RATHER THAN TASTE.**
+`pitchFor` is `max(w, h) + gap`, and `control-grid.mjs`'s own header measured a
+knob cell at **about 46 across and 100 down**. A one row grid therefore takes
+its pitch from the HEIGHT and would space knobs about 100 px apart against the
+~56 they sit at, moving `/muta/`, `/circuit/` and `/twelve/`.
+🔴 **BUT `.pos-cg` HAS NO OVERFLOW RULE AT ALL, AND `.pos-knob-row` HAS
+`overflow-x: auto` WITH `min-width: 0`.** So a five wide grid of 50.6 px knobs
+at 390 px **drags the document sideways**, which this repo has measured at
+141 px and at 65 px from exactly that pair being half written. **That is a live
+defect, not a difference of style.**
+✅ **THE RECOMMENDATION, IN THREE PARTS**: the grid gains the scroll guard and
+an optional group label; a grid of ONE row stops squaring its pitch, which makes
+the two produce identical geometry with neither file learning about the other;
+and `createKnobBank` survives as a thin caller keeping `bound()` and
+`repaint()`, which read `hardwareMoves()` and are genuinely knob shaped.
+⚠️ The gap and the guard are then ONE declaration read by both. Two numbers that
+happen to match is the `--sld-col` defect, paid for twice already.
+
+#### The /kit/ stream, 2026-09-22, session 44, ALL WITH THE AGENT
+
+⚠️ **EVERY ITEM BELOW LANDS ON `demo/kit/index.html` OR ON A MODULE BESIDE IT,
+AND ONE AGENT OWNS THAT FILE**, so all of them were relayed rather than worked
+from here. Two writers in one checkout is how this project got three different
+radio rows.
+
+- ⏳ **`make 2nd and 3nd fade fade faster`**, on the step grid's playhead trail.
+  🔴 **THERE IS NO TRAIL CODE TO FIND, WHICH IS THE POINT.** `ensureSteps()`
+  marks the CURRENT step only, so every other washed column in the screenshot is
+  a cell still TRANSITIONING OUT of `transition: box-shadow 90ms ease-out`. The
+  fix is an ASYMMETRIC transition, and the obvious edit is wrong: shortening
+  that 90 ms speeds the fade IN as well, and the comment above it records that
+  the 90 ms is what repaired *"appears and disappears too abrupt"*.
+  ⚠️ At 120 bpm with four steps to a beat a step is **125 ms**, so a 90 ms fade
+  is most of a step. Whatever is picked is stated as a fraction of a step, since
+  the same number is a long tail at 120 and a strobe at 240.
+- ⏳ **`put all to controls grid`** on FILTER RESPONSE.
+  ⚠️ **IT IS A TEST OF `control-grid.mjs` AND NOT A TIDY-UP.** That component
+  was built for knobs and its whole argument is the square pitch; a stepper and
+  two horizontal sliders are a different shape. If it cannot hold the row
+  without distorting something, the answer is to say so, which is the other half
+  of the BUILD FROM `/kit/` rule.
+- ⏳ **`alitng title and desc to top`**, corrected within the minute to
+  **`to bottm (leave nice padding)`**, on the WAVEFORM block's refused card.
+  The text is drawn by `synth-view.mjs` into a canvas, not laid out by CSS.
+  ⚠️ **THE DESCRIPTION IS BEING CUT**: `a blend, and its ratio is not publ…`.
+  `positron-ui` says anything truncating with an ellipsis is in the wrong place,
+  and that is the signal rather than a width to argue with.
+- ⏳ **`no "not drawn"`**, on the same card.
+  ✅ **RIGHT, AND FOR THE PROJECT'S OWN REASON**: the card said the refusal
+  twice, once as *a blend, and its ratio is not published* and once as *not
+  drawn*, which the empty picture had already said. The channel removed is the
+  one with no information in it.
+  🔴 **THE `aria-label` KEEPS SAYING IT.** A reader with no picture has no empty
+  canvas to infer from, and `demo/kit/index.html:4747` reads `/not drawn/` out
+  of that label.
+
+#### STEP GRID, two specimens and a missing axis, 2026-09-22
+
+🔴 **ASKED:** *"STEP GRID / show example with both axies labels and one withouth
+ones"*, alongside *"rm wrapper and info footer"* and *"make sure right padding is
+same as bottom"* on the same block.
+
+🔴 **AND THE STEP AXIS HAS NO LABELS AT ALL TODAY, WHICH MAKES THIS A COMPONENT
+CHANGE RATHER THAN TWO CALLS.** MEASURED in `step-grid.mjs`: the ROW axis is
+already optional and documented as such, *"omit it and no label column is
+built"*. The STEP axis is a `.pos-pg-ruler` built unconditionally, and its own
+comment says *"it carries no text, so it is a press target and a place for the
+head"*. So *"both axes labels"* cannot be demonstrated with the options that
+exist.
+⚠️ **AND NUMBERING EVERY STEP IS THE WRAPPING TABLE HEADING IN A NEW COSTUME.**
+Sixteen numbers fit and sixty-four do not, and `positron-ui` is explicit that a
+label which does not fit is the AUTHOR's problem rather than something to shrink
+at the reader. The honest rule is probably to number the BEATS, which the
+component already knows through `perBeat`, `beat` and `bar`. That is a decision
+to write down.
+✅ **THE BARE GRID IS THE NEGATIVE CONTROL FOR THE LABELLED ONE**, so its
+assert is an ABSENCE, the shape `instrument-test.mjs` already uses.
+
+#### Three removals from /kit/, 2026-09-22
+
+🔴 **ASKED IN THREE MESSAGES, ALL HANDED TO THE AGENT THAT OWNS THAT FILE:**
+*"rm four faders, a different shape on the same rule"*, *"one line, which cannot
+use the same placement / rm example"*, and, against a screenshot of the STEP GRID
+block, *"rm wrapper and info footer"*.
+
+🔴 **ALL THREE ARE SPECIMENS THAT CARRY A CHECK, WHICH IS THE PATTERN WORTH
+NAMING RATHER THAN THE THREE DELETIONS.** A `/kit/` specimen is not an
+illustration: it is the only instance of its case on the site, so the assert
+about that case has nowhere else to stand.
+- the four faders are the CONTROL GRID's **only negative control**, and its own
+  comment says a component that only worked for knobs would pass everything
+  above it and fail there;
+- the one line nameplate is `/twelve/`'s shape, and `shell.css` carries a whole
+  entry on why `end` exists at all, that a single line plate under `ends` parks
+  LEFT and under `mid` centres and *"both are wrong corners rather than near
+  misses"*;
+- the STEP GRID footer is read by `a question nobody has answered has nothing
+  pressed`.
+⚠️ **SO EACH ONE EITHER KEEPS ITS CHECK ALIVE ANOTHER WAY OR NAMES WHAT STOPPED
+BEING CHECKED, IN THE FILE WHERE IT WAS.** That is what this page already did
+when the read only grid and the 320 px strip left it, and it is the fourth time
+in two days. **A shrinking assert count with no account of it is the failure
+`positron-verify` describes: asserts do not fail when they stop running.**
+
+#### Invisible hands on /muta/, 2026-09-22
+
+🔴 **ASKED:** *"add inivisible hands to muta's"*. The knobs on that page gain
+the hand that landed on the component today.
+
+⚠️ **WHICH KNOBS IS A DECISION, NOT A SWEEP.** `hand-drive.mjs` refuses a
+control with fewer than about 30 steps and says why on the button's own face,
+because the wander at each end would be less than one step and it would draw a
+staircase. Every continuous knob on this page qualifies; a stepped one, which
+VOICES is about to become, does not.
+✅ **AND IT COSTS NOBODY ANYTHING HERE**, which is worth stating because the
+ceiling in that file was written for `/knobs/`, where a hand puts fifty messages
+a second on a relay and into a Raspberry Pi in another building. `/muta/` opens
+no socket and reaches no relay: a hand on it moves a number in an AudioWorklet
+on this machine.
+
+#### The knob value line wiggles under a hand, 2026-09-22
+
+🔴 **REPORTED watching the M4 knob in `/kit/`, the one with the invisible hand:**
+*"invisible m4 knob: show value without floating or make it stop wiggling"*.
+Both halves are real and both are one line.
+
+- 🔴 **`knob.mjs:264` IS `Math.round(v * 100) / 100`, SO THE STRING GAINS AND
+  LOSES A DECIMAL POINT SIXTY TIMES A SECOND**: `40`, `40.4`, `40.37` on three
+  consecutive frames. The decimal count has to be derived ONCE, from the
+  control's own resolution.
+  ⚠️ **AND A BLANKET "NO DECIMALS" WOULD DESTROY `/muta/`'S THREE
+  ATTENUVERTERS**, which run -1 to 1. The basis that works for both is the
+  smallest change the control can make, `span / SWEEP`, which the drag and the
+  arrow keys already use.
+- 🔴 **`.pos-knob-v` HAS `tabular-nums` AND A FIXED HEIGHT AND NO RESERVED
+  WIDTH**, while `.pos-knob` is `align-items: center`, so `9` to `10` still
+  moves the whole string sideways with the decimals fixed.
+- ⚠️ **IT IS `positron-ui`'S OWN RULE ARRIVING ON THE ONE CONTROL THAT HAD
+  ESCAPED IT**: *"nothing that redraws every frame may change how much room it
+  takes"*. It only became visible today, because until today nothing moved a
+  knob sixty times a second on its own. **The invisible hand is a test
+  instrument for every control it is put on.**
+
+#### /kit/ loses the four fader specimen, 2026-09-22
+
+🔴 **ASKED:** *"rm four faders, a different shape on the same rule"*. That is
+the CONTROL GRID block's fourth specimen in `demo/kit/index.html`, captioned in
+those words.
+
+🔴 **AND IT IS THE BLOCK'S ONLY NEGATIVE CONTROL, WHICH IS THE PART THAT COSTS
+SOMETHING.** The assert `NEGATIVE CONTROL: a grid of faders keeps the same
+centre to centre rule` reads `cgSpec.faders`, and its own comment says a
+component that only worked for knobs would pass everything above it and fail
+there. `positron-verify`: a check nobody can fail is a decoration.
+⚠️ **SO EITHER THE NEGATIVE CONTROL SURVIVES ANOTHER WAY, OR WHAT STOPPED BEING
+CHECKED IS NAMED IN THE FILE WHERE IT WAS**, which is what this page already did
+when the read only grid and the 320 px strip left it. Not a quietly smaller
+assert count.
+⚠️ `cgSpec.faders` is also read by the `size()` sweep, so that moves too or the
+page throws on a null.
+
+#### /wish/ Interpret, redesigned into rows, 2026-09-22
+
+🔴 **ASKED WITH A SCREENSHOT OF THE `Interpret` BLOCK:** *"redeisgn it: separate
+json dump to sepatate block, reserve its hight. it will show just one connection
+json at time. make allowes/disallower + diagram to a separate row: --- interpret
+... --- (diagram1) allowed: Mk... (show when no iteraction with diagram) ---
+(diagram2) allowed: .... --- clickin on row enables it (left yellow border and
+slihjt bg change as in table) and shows dump below"*.
+
+The shape asked for, read off the sketch:
+
+```
++-------------------------------------------+
+| Interpret                    MODEL 70B 8B |
++-------------------------------------------+
+| (diagram 1)                               |   <- one row per connection
+| allowed MK-425C to Circuit { ... }         |
++-------------------------------------------+
+| (diagram 2)                               |
+| allowed ...                               |
++-------------------------------------------+
+| the JSON of the SELECTED row only         |   <- own block, reserved height
++-------------------------------------------+
+```
+
+- ⏳ **ONE ROW PER CONNECTION, each holding its OWN diagram and its own verdict
+  line.** Today every verdict is stacked in one paragraph block and ONE diagram
+  is drawn under all of them, so a reader cannot tell which picture belongs to
+  which sentence when the model returns two.
+- ⏳ **A ROW IS SELECTABLE, and selection is the table's own treatment**: a
+  yellow left border and a slight change of ground, *"as in table"*. So it is
+  `table.mjs`'s row selection, not a new one invented here.
+- ⏳ **THE JSON IS ITS OWN BLOCK BELOW, SHOWING ONE CONNECTION AT A TIME, AND
+  ITS HEIGHT IS RESERVED.** Said explicitly: *"reserve its hight"*.
+  🔴 **THAT IS THE `grain-scope` RULE ARRIVING AS A REQUEST.** `positron-ui`
+  records a caption that reflowed between three and four lines sixty times a
+  second, reported as *"a horrible jump of content each time it updates"*. A
+  dump that is 8 lines for one connection and 30 for another moves everything
+  under it on every click, and the ask is to stop that before it happens.
+  ⚠️ **AND A RESERVED HEIGHT NEEDS A NUMBER AND AN OVERFLOW RULE.** Whatever is
+  taller than the reservation scrolls INSIDE the block, which is the
+  `min-width: 0` rule's vertical twin and is where this project has already paid
+  for a scroller without the property that lets it shrink.
+- ⏳ **AND THE RIGHT OF EACH ROW IS RESERVED FOR ACTIONS, WITH THE DIAGRAM
+  PUSHED LEFT.** Asked immediately after: *"reserve right side of
+  diagram+allowed to action buttons etc. align diagram to left?"*.
+  ⚠️ **RESERVED MEANS RESERVED FROM THE FIRST PAINT**, the same rule the verdict
+  line already obeys on this page: a column that appears when the first button
+  does would move the picture sideways under the reader's eye. The question mark
+  is the author's, so the diagram going left is taken as agreed and said so.
+  ⚠️ **AND `createDiagram` CENTRES ITS FIGURE TODAY**, which is why the picture
+  sits in the middle of the screenshot. Left is a change to the host, not to the
+  component, unless the component turns out to centre internally.
+- ⏳ **THE VERDICT LINE SHOWS WHEN THERE IS NO INTERACTION WITH THE DIAGRAM**,
+  which reads as: the diagram's own hover explanations take the space when a
+  pointer is on it, and the sentence is what is there otherwise.
+  ⚠️ **TO BE CONFIRMED RATHER THAN ASSUMED.** It is one clause in a fast note
+  and it could equally mean the row only prints its sentence until the reader
+  starts using the picture. Build the first reading, say which was built.
 
 #### An instrument header, glued, 2026-09-22
 

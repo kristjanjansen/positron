@@ -887,9 +887,11 @@
   // ⚠️ `gridSpec`, NOT `padSpec`. The PAD block already holds a `padSpec` and a
   // second one would shadow nothing and collide with everything, which is the
   // kind of half-collision that reads as correct until somebody moves a line.
-  let cgSpec = null;         // { six, four, faders }  the control grids
+  let cgSpec = null;         // { six, four }  the control grids
   let handKnobs = null;      // the KNOB block's four, the last of which has a hand
-  let instSpec = null;       // { named, bare }  the two instrument cases
+  let instSpec = null;       // { named }  the cased instrument
+  let headSpec = null;       // { acting, reporting, presses }  the two headers
+  let stepSpec = null;       // { stepped, quarters, free }  the stepped knobs
   let gridSpec = null;        // { edit, read, phone, holder }
   let rangeSpec = null;       // { wide, shut, off, single, group }
   let checkSpec = null;       // { one, off, some, dim, across, down }
@@ -1005,6 +1007,170 @@
    * are a different shape again, on the same component with the same rule.
    * A block showing only knobs would have proved the arithmetic works once.
    */
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. The instrument header,
+   * as of 2026-09-22, asked for as *"create instrumet header/glue: similar to
+   * transport glue etc. left: online status button: enabled disabled
+   * (green/gray). right nameplate. center patch selector (optically center to
+   * the instrument)"*.
+   *
+   * 🔴 **THE CENTRE IS THE WHOLE ASK AND IT IS SAID PRECISELY.** Centred to the
+   * INSTRUMENT, not balanced between two unequal neighbours. The two specimens
+   * below have deliberately different outer contents, so a flex row would put
+   * their patch selectors in two different places while a three column grid
+   * with equal outer tracks puts both on the case's own centre. **Both are
+   * asserted against the case's own box, and the naive answer is asserted to be
+   * visibly elsewhere**, which is the negative control.
+   *
+   * 🔴 **THE STATUS CONTROL ACTS OR IT IS NOT A BUTTON, AND BOTH SHAPES ARE
+   * HERE.** `positron-ui` calls a control whose only honest behaviour is to do
+   * nothing *"the shape of control this project calls a lie"*, and the ask
+   * wanted one element that both reports a state and looks pressable. A caller
+   * that says what a press DOES gets a real button; one that says nothing gets
+   * a badge with no tab stop and no handler. The second case is not a degraded
+   * first: `/muta/`'s two firmwares are in the page and cannot be unplugged.
+   * ⚠️ **AND THE PRESS IS DRIVEN HERE RATHER THAN ASSUMED**, because a callback
+   * nobody calls is a binding nothing grades.
+   *
+   * 🔴 **THE ONE LINE CASE LIVES HERE NOW.** It was the INSTRUMENT block's
+   * second specimen and was removed on 2026-09-22 (*"one line, which cannot use
+   * the same placement / rm example"*). It is a MOVE rather than a loss: a
+   * header's plate is `end` whether it has one line or two, so the placement
+   * `shell.css` has a whole entry about is still on the page and still checked.
+   * ⚠️ **WHAT DID NOT MOVE**: the one line plate sitting in a CASE's top inset,
+   * which is `/twelve/`'s shape. That is now demonstrated nowhere on this page,
+   * and `instrument-test.mjs` keeps the decision itself.
+   *
+   * ⚠️ **AND THE PHONE IS SHIPPED ON A READING.** Three levels were asked for
+   * (*"3 levels, sorry"*) and `demo/verify.mjs` runs at 756 px with no viewport
+   * override, so nothing in this repository can enter that media query. What is
+   * asserted here is the desktop geometry and that the block is last in
+   * `shell.css`, which answers the failure this repo has actually measured. The
+   * layout itself is read and not measured.
+   */
+  section('hardware', 'INSTRUMENT HEADER',
+    'A status control at one end and the nameplate at the other, with the patch '
+    + 'selector sitting on the case’s own centre rather than between them.',
+    `createInstrument({
+  name: 'PLAI',
+  header: {
+    online: { state: 'online', press: () => connect() },   // no press, no button
+    patch: createPicker({ what: 'patch', prev, next }),
+  },
+})
+inst.online.set('offline')    // green to grey, the kit's one badge
+inst.head                     // the row, a 1fr auto 1fr grid on the case`,
+    (box) => {
+      const o = out('nothing pressed');
+      let pressed = 0;
+
+      /* The acting case: a press really flips the state, and the state is the
+         page's to hold. Nothing here connects to anything, and that is the
+         page's business rather than the component's. */
+      const acting = createInstrument({
+        name: 'PLAI',
+        panel: { side: 'left', cls: { fixed: 'kit-panelcol' } },
+        header: {
+          online: {
+            state: 'online',
+            press: () => {
+              pressed++;
+              const next = acting.online.state() === 'online' ? 'offline' : 'online';
+              acting.online.set(next);
+              o.textContent = `PLAI ${next === 'online' ? 'enabled' : 'disabled'}`;
+            },
+          },
+          patch: createPicker({
+            label: '', what: 'patch',
+            prev: () => 'BELL 3', next: () => 'BELL 5',
+            onPick: (name) => { o.textContent = `patch ${name}`; },
+          }),
+        },
+      });
+      acting.fixed.append(createKnob({ label: 'FREQ', min: 0, max: 127, value: 64 }).el);
+      acting.add(el('div', 'kit-blk', 'the flow, which is what scrolls'));
+
+      /* 🔴 THE REPORTING CASE, AND ITS OUTER CONTENTS ARE DELIBERATELY A
+         DIFFERENT WIDTH FROM THE FIRST ONE'S. A one line plate is much narrower
+         than `POSITRON WARP`, and a badge is narrower than a button, so if the
+         centre were balanced between neighbours these two patch selectors would
+         sit in two different places. That is the negative control. */
+      const reporting = createInstrument({
+        name: 'MODEL 12', maker: '',
+        panel: { side: 'left', cls: { fixed: 'kit-panelcol' } },
+        header: {
+          online: { state: 'offline' },
+          patch: createPicker({
+            label: '', what: 'patch',
+            prev: () => 'INIT', next: () => 'INIT',
+            onPick: (name) => { o.textContent = `patch ${name}`; },
+          }),
+        },
+      });
+      reporting.fixed.append(createFader({ label: 'CH1', min: 0, max: 127, value: 30 }).el);
+      reporting.add(el('div', 'kit-blk', 'no maker, so the plate is one line'));
+
+      headSpec = { acting, reporting, presses: () => pressed };
+      box.classList.add('kit-wide');
+      box.append(
+        el('p', 'kit-cap', 'a press switches it, so the control is a button'), acting.el,
+        el('p', 'kit-cap', 'nothing to press, so the status is a badge and not one'), reporting.el,
+        o);
+    });
+
+  /**
+   * 🔴 NEWEST AT THE TOP, AND THE HEADING IS UPPERCASE. A stepped knob, as of
+   * 2026-09-22, asked for as *"move voices to knobs, bottom right, stepped
+   * knob"* for a voice count that can only be a whole number.
+   *
+   * 🔴 **THE ROUNDING IS THE COMPONENT'S, NOT THE PAGE'S, AND THAT IS THE WHOLE
+   * POINT.** A page that rounds the value on its way out leaves the NEEDLE
+   * somewhere the number is not, so the dial and the readout disagree about a
+   * control the reader is looking straight at. The assert below reads the
+   * NEEDLE'S ANGLE off the drawing and compares it against the value, which is
+   * the only thing that can tell those two apart.
+   *
+   * 🔴 **AND THE THIRD SPECIMEN IS WHY THIS IS NOT A ROUNDING BOLTED ON.** The
+   * pointer moves a knob by `span / SWEEP` a pixel, which on a one to eight
+   * knob is 0.039, so the obvious implementation rounds every pixel straight
+   * back and **the knob never moves at any speed**. The drag arithmetic is
+   * graded with no browser by `node demo/shell/knob-test.mjs`, 19 asserts, and
+   * one deliberate sabotage of the accumulator takes it red.
+   */
+  section('hardware', 'STEPPED KNOB',
+    'A knob that lands only on whole steps, with the needle on the step rather than '
+    + 'between two of them.',
+    `createKnob({ label: 'VOICES', min: 1, max: 8, step: 1, value: 4 })
+createKnob({ label: 'FM', min: -1, max: 1, ends: ['-', '+'] })   // no step
+k.value()        // always on a step, whatever moved it`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const o = out('nothing pressed');
+      /* Eight voices, which is the control this was built for. */
+      const stepped = createKnob({
+        label: 'VOICES', sub: '1 to 8', min: 1, max: 8, step: 1, value: 4,
+        title: 'a voice count, which can only be a whole number',
+        onInput: (v) => { o.textContent = `voices ${v}`; },
+      });
+      /* A fractional step, because the rule is about landing on a step rather
+         than about being an integer. */
+      const quarters = createKnob({
+        label: 'RATIO', sub: 'by a quarter', min: 0, max: 2, step: 0.25, value: 1,
+        onInput: (v) => { o.textContent = `ratio ${v}`; },
+      });
+      /* 🔴 THE NEGATIVE CONTROL, AND IT IS THE ONE THAT PROTECTS THIRTY PAGES.
+         A knob with no step must still be continuous, or a snap that leaked
+         into the default would quantise every knob on the site while every
+         assert above stayed green. */
+      const free = createKnob({
+        label: 'FM', sub: 'bipolar', min: -1, max: 1, value: 0, home: 0,
+        ends: ['-', '+'],
+        onInput: (v) => { o.textContent = `fm ${v}`; },
+      });
+      stepSpec = { stepped, quarters, free };
+      box.append(createKnobBank([stepped, quarters, free], {}).el, o);
+    });
+
   section('hardware', 'CONTROL GRID',
     'Any number of controls across by any number down, with the column pitch widened '
     + 'to the row pitch so the working surfaces land on a square lattice.',
@@ -1031,18 +1197,30 @@ grid.centres()      // where each dial really is, for a check`,
         items: [mk('FREQ', '24 to 96'), mk('HARMO', '0 to 1'),
           mk('TIMBRE', '0 to 1'), mk('MORPH', '0 to 1')],
       });
-      /* A different control entirely, on the same rule. */
-      const faders = createControlGrid({
-        cols: 4, gap: 10,
-        items: [1, 2, 3, 4].map((i) => createFader({
-          label: `CH${i}`, min: 0, max: 127, value: 30 + i * 12,
-        })),
-      });
-      cgSpec = { six, four, faders };
+      /**
+       * 🔴 THE FOUR FADER SPECIMEN WENT 2026-09-22, ASKED FOR AS *"rm four
+       * faders, a different shape on the same rule"*, AND IT TOOK THIS BLOCK'S
+       * ONLY NEGATIVE CONTROL WITH IT.
+       * ⚠️ **WHAT STOPPED BEING CHECKED, NAMED HERE RATHER THAN LEFT AS A
+       * SMALLER COUNT**: that a control which is NOT a knob lays out on the
+       * same lattice, measured in a real browser. Its assert read
+       * `NEGATIVE CONTROL: a grid of faders keeps the same centre to centre
+       * rule` and compared a rendered `dx` against the pitch plus the gap. A
+       * component that only worked for knobs passed everything else in this
+       * block and failed that one, which is what a negative control is for.
+       * ✅ **THE ARITHMETIC HALF SURVIVES WITH NO BROWSER**, in
+       * `control-grid-test.mjs`: 9 asserts including its own negative control,
+       * `it is not the average, which would clip whichever is bigger`. `pitchFor`
+       * is pure and exported for exactly this.
+       * 🔴 **WHAT IS GONE IS THE RENDERED HALF, AND THOSE ARE DIFFERENT
+       * CLAIMS.** The pure test cannot see a stylesheet rule that happens to
+       * suit a knob's proportions, because it never lays anything out. The day
+       * somebody writes one, nothing on this page will notice.
+       */
+      cgSpec = { six, four };
       box.classList.add('kit-wide');
       box.append(el('p', 'kit-cap', 'three by two, with uneven labels'), six.el,
-        el('p', 'kit-cap', 'two by two, the shape that was reported'), four.el,
-        el('p', 'kit-cap', 'four faders, a different shape on the same rule'), faders.el, o);
+        el('p', 'kit-cap', 'two by two, the shape that was reported'), four.el, o);
     });
 
   /**
@@ -1063,18 +1241,28 @@ grid.centres()      // where each dial really is, for a check`,
    * `instrument-test.mjs` rather than here: the module builds no case and no
    * plate of its own. A second implementation would pass every check on this
    * page and drift from `panel-layout.mjs` the first time a panel changed.
-   * ⚠️ **AND THE SECOND SPECIMEN IS THE ONE WITH NO MAKER**, because a plate
-   * with one line cannot use `ends`: that is `space-between`, which parks a
-   * lone child on the LEFT. `plateSpec` decides it so a caller cannot get it
-   * wrong, and `/twelve/` is the page that was reported for exactly this.
+   * 🔴 **THE ONE LINE SPECIMEN WENT 2026-09-22**, asked for as *"one line,
+   * which cannot use the same placement / rm example"*. It was
+   * `createInstrument({ name: 'MODEL 12', maker: '' })`, which is `/twelve/`'s
+   * shape, and it was the only place the `end` placement was visible.
+   * ✅ **IT IS A MOVE RATHER THAN A LOSS, AND THE MOVE IS UP THE PAGE.** The
+   * INSTRUMENT HEADER block's second specimen is a one line plate, because a
+   * header's plate is `end` whether it has one line or two, so the placement
+   * and its assert are both still here.
+   * 🔴 **WHAT STOPPED BEING SHOWN, NAMED HERE RATHER THAN LEFT AS A SMALLER
+   * COUNT**: a one line plate sitting in a CASE'S TOP INSET, which is what
+   * `/twelve/` really has. The header puts it in a grid cell instead, and
+   * `shell.css`'s own entry on `end` is about a flex COLUMN whose items are
+   * centred, which is neither of those. Nothing on this page renders that
+   * arrangement any more; `instrument-test.mjs` keeps the decision that a lone
+   * line takes `end`, which is the part a browser was never needed for.
    */
   section('hardware', 'INSTRUMENT',
     'A cased panel with the maker at one end of its plate and the model at the other, '
     + 'built out of the two components that already draw those.',
     `createInstrument({ name: 'PLAI', panel: { side: 'left' } })
 inst.fixed.append(knob.el)        // the column that does not scroll
-inst.add(row)                     // the flow that does
-createInstrument({ name: 'MODEL 12', maker: '' })   // one line, pushed right`,
+inst.add(row)                     // the flow that does`,
     (box) => {
       const o = out('nothing pressed');
       const named = createInstrument({
@@ -1091,19 +1279,9 @@ createInstrument({ name: 'MODEL 12', maker: '' })   // one line, pushed right`,
       row.append(createPadGrid({ cols: 16, pad: (x) => ({ top: String(x + 1) }) }).el);
       named.add(row, el('div', 'kit-blk', 'the flow, which is what scrolls'));
 
-      /* The one line case, which is `/twelve/`'s shape and the reason
-         `plateSpec` chooses the placement rather than the caller. */
-      const bare = createInstrument({
-        name: 'MODEL 12', maker: '',
-        panel: { side: 'left', cls: { fixed: 'kit-panelcol' } },
-      });
-      bare.fixed.append(createFader({ label: 'CH1', min: 0, max: 127, value: 30 }).el);
-      bare.add(el('div', 'kit-blk', 'no maker, so the model is pushed right'));
-
-      instSpec = { named, bare };
+      instSpec = { named };
       box.classList.add('kit-wide');
-      box.append(el('p', 'kit-cap', 'a maker and a model, at the ends'), named.el,
-        el('p', 'kit-cap', 'one line, which cannot use the same placement'), bare.el, o);
+      box.append(el('p', 'kit-cap', 'a maker and a model, at the ends'), named.el, o);
     });
 
   section('hardware', 'STEP GRID',
@@ -4142,7 +4320,7 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
   }
 
   if (cgSpec) {
-    for (const g of [cgSpec.six, cgSpec.four, cgSpec.faders]) g.size();
+    for (const g of [cgSpec.six, cgSpec.four]) g.size();
     /* ⚠️ `dy` IS null ON A SINGLE ROW, AND MY FIRST VERSION READ `c[cols].y`
        UNCONDITIONALLY AND THREW ON THE FADERS, WHICH ARE FOUR IN FOUR COLUMNS.
        The page died on `__demo.ready` rather than failing an assert, which is
@@ -4174,24 +4352,20 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       Math.abs(six.dx - six.dx2) <= 0.6,
       `first gap ${six.dx}, second ${six.dx2}`);
 
-    /* 🔴 THE NEGATIVE CONTROL: a fader is a different shape and the rule is the
-       same. A component that only worked for knobs would pass everything above
-       and fail here. */
-    /* ⚠️ CENTRE TO CENTRE IS THE PITCH PLUS THE GAP, AND THIS ASSERT READ THE
-       PITCH ALONE AND WENT RED AT `166 apart at a 156 px pitch`. The ten it was
-       out by IS the gap, which is exactly what the knob grids show too: 101
-       across at a 91 px pitch. The component was right and the claim was
-       missing a term. */
-    const fad = read(cgSpec.faders, 4);
-    const gap = parseFloat(getComputedStyle(cgSpec.faders.el).columnGap) || 0;
-    d.assert('NEGATIVE CONTROL: a grid of faders keeps the same centre to centre rule',
-      Math.abs(fad.dx - (fad.pitch + gap)) <= 1 && fad.dx > 20 && gap > 0,
-      `faders sit ${fad.dx} apart, which is a ${fad.pitch} px pitch plus a ${gap} px gap`);
+    /* 🔴 THE NEGATIVE CONTROL THAT USED TO SIT HERE IS GONE WITH ITS SPECIMEN,
+       2026-09-22, and the block above says at length what stopped being
+       checked. It read `NEGATIVE CONTROL: a grid of faders keeps the same
+       centre to centre rule`.
+       ⚠️ THE ONE THING WORTH KEEPING OUT OF IT IS THE TERM THAT MADE IT RIGHT:
+       CENTRE TO CENTRE IS THE PITCH PLUS THE GAP. It read the pitch alone once
+       and went red at `166 apart at a 156 px pitch`, and the ten it was out by
+       IS the gap. The knob grids show the same, 101 across at a 91 px pitch, so
+       the two asserts above carry that term and are the reason this note is
+       here rather than in a commit message nobody will find. */
   }
 
   if (instSpec) {
     const named = instSpec.named.shown();
-    const bare = instSpec.bare.shown();
     /* 🔴 THE COMPUTED `justify-content`, AND MY FIRST TRY READ RECTS AND WENT
        RED ON A PLATE DOING EXACTLY WHAT IT PROMISES. A `.panel-plate-l` is a
        full width flex child, so its own left and right edges sit at the
@@ -4199,15 +4373,16 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
        The rect could not see the difference; the property that implements it
        can. `ends` is `space-between` and `end` is `flex-end`, which is the
        whole of what those two placements are. */
+    /* ⚠️ THE ONE LINE HALF OF THIS ASSERT MOVED UP THE PAGE WITH ITS SPECIMEN.
+       It read `bare.length === 1 && bare[0] === 'MODEL 12'` and `end` is
+       `flex-end`, and the INSTRUMENT HEADER block grades both against its own
+       one line plate. What is no longer graded ANYWHERE is `end` inside a
+       case's top inset, which is named in the comment above this block. */
     const nj = getComputedStyle(instSpec.named.plate.el).justifyContent;
-    const bj = getComputedStyle(instSpec.bare.plate.el).justifyContent;
     d.assert('an instrument prints the maker at one end and the model at the other, as rendered',
       named.join(' / ') === 'POSITRON / PLAI' && named.length === 2
-      && bare.length === 1 && bare[0] === 'MODEL 12'
-      && instSpec.named.plate.place === 'ends' && instSpec.bare.plate.place === 'end'
-      && nj === 'space-between' && bj === 'flex-end',
-      `named reads ${JSON.stringify(named)} at ${instSpec.named.plate.place} (${nj}), `
-      + `bare reads ${JSON.stringify(bare)} at ${instSpec.bare.plate.place} (${bj})`);
+      && instSpec.named.plate.place === 'ends' && nj === 'space-between',
+      `named reads ${JSON.stringify(named)} at ${instSpec.named.plate.place} (${nj})`);
 
     /* 🔴 THE PLATE BELONGS TO THE CASE, ABOVE BOTH HALVES, or it scrolls away
        from the instrument it names. `/tom/` found that by prepending. */
@@ -4255,6 +4430,205 @@ createFaderBank([createFader({ label: 'CH1', value: 30 })])`,
       && instSpec.named.el.contains(instSpec.named.strip),
       `the case holds ${kids.map((k) => (k.className || '').toString().split(' ')[0]).join(', ')}, `
       + `and the strip is ${after ? 'after' : 'NOT after'} the plate`);
+  }
+
+  if (headSpec) {
+    /**
+     * 🔴 THE CENTRE IS ON THE CASE, NOT BETWEEN ITS NEIGHBOURS, AND THAT IS THE
+     * WHOLE ASK: *"center patch selector (optically center to the instrument)"*.
+     * It is read against the CASE'S OWN BOX rather than against the header's,
+     * because the header is the thing under test and grading a thing against
+     * itself is how a check comes out true by construction.
+     * ⚠️ AND BOTH CASES ARE READ, because the two have deliberately different
+     * outer contents: `POSITRON PLAI` with a button on the left against
+     * `MODEL 12` with a badge. One of them being centred is luck.
+     */
+    const centres = ['acting', 'reporting'].map((k) => {
+      const inst = headSpec[k];
+      const caseR = inst.el.getBoundingClientRect();
+      const midR = inst.patchSlot.getBoundingClientRect();
+      const onR = inst.online.el.getBoundingClientRect();
+      const plateR = inst.plate.el.getBoundingClientRect();
+      return {
+        k,
+        off: (midR.left + midR.width / 2) - (caseR.left + caseR.width / 2),
+        /* Where a flex row would have put it: the middle of the space left
+           between the two outer children, which is what `space-between` on
+           three children does. */
+        flex: (onR.right + (plateR.left - onR.right) / 2) - (caseR.left + caseR.width / 2),
+        on: onR.width, plate: plateR.width,
+      };
+    });
+    d.assert('the patch selector sits on the case’s own centre, on both cases',
+      centres.every((c) => Math.abs(c.off) <= 1),
+      centres.map((c) => `${c.k} is ${c.off.toFixed(1)} px off the case centre`).join(', '));
+
+    /* 🔴 THE NEGATIVE CONTROL, AND IT IS THE REASON THIS IS A GRID. A flex row
+       puts its middle child wherever the difference between two unequal
+       neighbours leaves it, which is a different place on every panel. If that
+       answer happened to agree here, the assert above would be proving
+       nothing. */
+    d.assert('NEGATIVE CONTROL: balanced between its neighbours it would land somewhere else',
+      centres.every((c) => Math.abs(c.flex) > 4)
+      && centres.some((c) => Math.abs(c.on - c.plate) > 10),
+      centres.map((c) => `${c.k} would be ${c.flex.toFixed(1)} px off, with a `
+        + `${c.on.toFixed(0)} px status against a ${c.plate.toFixed(0)} px plate`).join(', '));
+
+    /**
+     * 🔴 A CONTROL THAT ACTS IS A BUTTON AND ONE THAT REPORTS IS NOT, AND THE
+     * PRESS IS DRIVEN HERE RATHER THAN ASSUMED. `positron-ui` calls a control
+     * whose only honest behaviour is to do nothing *"the shape of control this
+     * project calls a lie"*, and a callback nobody calls is a binding nothing
+     * grades.
+     * ⚠️ IT IS NOT IN `.pos-controls`, so no harness presses it and this is the
+     * only place it is ever pressed.
+     */
+    const was = headSpec.acting.online.state();
+    headSpec.acting.online.el.click();
+    const now = headSpec.acting.online.state();
+    d.assert('a press on the acting header really switches it, and the badge follows',
+      headSpec.acting.online.el.tagName === 'BUTTON' && headSpec.presses() === 1
+      && was === 'online' && now === 'offline',
+      `${was} became ${now} after ${headSpec.presses()} press`);
+
+    /* 🔴 THE OTHER HALF, AS AN ABSENCE. A badge that was a button with the
+       handler left off would satisfy the assert above by never being pressed.
+       ⚠️ IT READS THE STATUS CELL AND NOT THE HEADER. My first version asked
+       the whole header for buttons and went red at `2 buttons` on a header
+       doing exactly what it promises: the PATCH SELECTOR has a prev and a next.
+       That is the project's own rule about measuring the quantity in question
+       rather than one beside it, arriving one element out. */
+    const rep = headSpec.reporting.online.el;
+    d.assert('NEGATIVE CONTROL: a header with nothing to press builds no button and takes no tab stop',
+      rep.tagName !== 'BUTTON' && rep.tabIndex <= 0
+      && rep.querySelector('button') === null
+      && headSpec.acting.online.el.tagName === 'BUTTON',
+      `the reporting status is a <${rep.tagName.toLowerCase()}> holding `
+      + `${rep.querySelectorAll('button').length} buttons, against a `
+      + `<${headSpec.acting.online.el.tagName.toLowerCase()}> on the acting one`);
+
+    /* The plate in a header is `end` whether it has one line or two, which is
+       the placement the removed INSTRUMENT specimen used to demonstrate. */
+    const two = headSpec.acting.plate.shown();
+    const one = headSpec.reporting.plate.shown();
+    d.assert('a header’s plate is pushed right, one line or two, and is the row’s last cell',
+      two.join(' / ') === 'POSITRON / PLAI' && one.length === 1 && one[0] === 'MODEL 12'
+      && headSpec.acting.plate.place === 'end' && headSpec.reporting.plate.place === 'end'
+      && getComputedStyle(headSpec.acting.plate.el).justifyContent === 'flex-end'
+      && getComputedStyle(headSpec.acting.plate.el).gridColumnStart === '3',
+      `${JSON.stringify(two)} and ${JSON.stringify(one)}, both at `
+      + `${headSpec.acting.plate.place} in column `
+      + `${getComputedStyle(headSpec.acting.plate.el).gridColumnStart}`);
+
+    /* ⚠️ THE HEADER IS THE CASE'S FIRST CHILD FOR THE REASON THE PLATE IS: it
+       belongs to the case, above both halves, or it scrolls away. And the case
+       carries no plate of its own, because two names on one instrument is the
+       failure this option could have shipped. */
+    const hk = [...headSpec.acting.el.children];
+    d.assert('the header is the case’s first child, and the case carries no second plate',
+      hk[0] === headSpec.acting.head
+      && headSpec.acting.el.querySelectorAll('.panel-plate').length === 1,
+      `the case holds ${hk.map((k) => (k.className || '').toString().split(' ')[0]).join(', ')}`);
+
+    /**
+     * 🔴 THE PHONE LAYOUT IS THREE LEVELS AND NOTHING HERE CAN GRADE IT.
+     * `demo/verify.mjs` runs at 756 px with no viewport override, so this page
+     * has never entered that media query and never will. What IS checkable is
+     * the failure this repository has measured: `.pos-pick`'s entire phone
+     * layout sat ABOVE the plain rule that beat it at every width and had never
+     * run in its life. A media query adds no specificity, so order decides.
+     * ⚠️ **ORDERING IS NOT BEHAVIOUR**, and this assert claims only ordering.
+     */
+    {
+      const sheet = [...document.styleSheets].find((s) => (s.href || '').includes('shell.css'));
+      let lastPlain = -1, media = -1;
+      try {
+        const rules = [...sheet.cssRules];
+        rules.forEach((r, i) => {
+          if (r.selectorText && /\.panel-head/.test(r.selectorText)) lastPlain = i;
+          if (r.media && /560px/.test(r.conditionText || r.media.mediaText)
+            && [...r.cssRules].some((x) => /\.panel-head/.test(x.selectorText || ''))) media = i;
+        });
+      } catch { /* a cross origin sheet cannot be read, and says so below */ }
+      d.assert('the header’s phone block comes after every plain rule it has to beat',
+        media > lastPlain && lastPlain >= 0,
+        `the last plain .panel-head rule is at ${lastPlain} and the 560 px block at ${media}`);
+    }
+  }
+
+  if (stepSpec) {
+    /**
+     * 🔴 THE NEEDLE LANDS ON THE STEP, WHICH IS THE WHOLE REASON THE ROUNDING
+     * IS THE COMPONENT'S AND NOT THE PAGE'S. A page that rounds on the way out
+     * leaves the dial where the number is not, and the only thing that can tell
+     * those apart is reading the DRAWING. The pointer path is
+     * `M cx cy L ex ey` with the tick between r=24 and r=32 off a centre at
+     * 50,50, so the angle comes straight out of it.
+     */
+    const angleOf = (k) => {
+      const d2 = k.el.querySelector('.pos-knob-ptr').getAttribute('d');
+      const [, x, y] = d2.match(/L\s+([\d.-]+)\s+([\d.-]+)/).map(Number);
+      return Math.atan2(x - 50, 50 - y) * 180 / Math.PI;
+    };
+    /* 270 degrees of sweep, so a value's angle is -135 plus its share of 270. */
+    const wanted = (k, min, max) => -135 + ((k.value() - min) / (max - min)) * 270;
+
+    stepSpec.stepped.set(5.4, { from: 'hand' });
+    const landed = stepSpec.stepped.value();
+    d.assert('a stepped knob lands on a whole step and the needle lands with it',
+      landed === 5 && Math.abs(angleOf(stepSpec.stepped) - wanted(stepSpec.stepped, 1, 8)) < 0.5,
+      `5.4 became ${landed}, needle at ${angleOf(stepSpec.stepped).toFixed(1)} degrees `
+      + `against ${wanted(stepSpec.stepped, 1, 8).toFixed(1)} wanted`);
+
+    stepSpec.quarters.set(1.4, { from: 'hand' });
+    d.assert('a fractional step lands on a quarter and prints the places its step has',
+      stepSpec.quarters.value() === 1.5
+      && stepSpec.quarters.el.querySelector('.pos-knob-v').textContent === '1.50',
+      `1.4 became ${stepSpec.quarters.value()}, printed as `
+      + `"${stepSpec.quarters.el.querySelector('.pos-knob-v').textContent}"`);
+
+    /* 🔴 THE NEGATIVE CONTROL, AND IT PROTECTS EVERY OTHER KNOB ON THE SITE. A
+       snap leaking into the default would quantise thirty pages while both
+       asserts above stayed green. */
+    stepSpec.free.set(0.371, { from: 'hand' });
+    d.assert('NEGATIVE CONTROL: a knob with no step keeps the value it was given',
+      Math.abs(stepSpec.free.value() - 0.371) < 1e-9,
+      `0.371 stayed ${stepSpec.free.value()}`);
+
+    /**
+     * 🔴 THE NUMBER'S BOX DOES NOT MOVE, WHICH IS THE `"stop wiggling"` REPORT.
+     * Two readings at values with DIFFERENT DIGIT COUNTS, which is the half
+     * that makes this a measurement: comparing two values that print the same
+     * number of characters is a check that cannot fail. `positron-verify`
+     * records three subjects agreeing to the digit being a broken collector.
+     */
+    {
+      const numOf = (k) => k.el.querySelector('.pos-knob-v');
+      const read = (k, v) => {
+        k.set(v, { from: 'hand' });
+        const n = numOf(k);
+        return { text: n.textContent, w: n.getBoundingClientRect().width };
+      };
+      const a = read(stepSpec.free, -0.94);
+      const b = read(stepSpec.free, 0.1);
+      d.assert('the value box is one width at every value, and the places never change',
+        a.w > 0 && Math.abs(a.w - b.w) < 0.5
+        && a.text.length !== b.text.length
+        && a.text.split('.')[1].length === b.text.split('.')[1].length,
+        `"${a.text}" is ${a.w.toFixed(2)} px and "${b.text}" is ${b.w.toFixed(2)} px, `
+        + `${a.text.length} characters against ${b.text.length}`);
+
+      /* 🔴 THE NEGATIVE CONTROL FOR THE SAME BOX: the reserve is a real number
+         off the component and not an empty box that never had a width. A
+         0 to 127 knob reserves three characters and a -1 to 1 knob five. */
+      const res = (k) => getComputedStyle(k.el).getPropertyValue('--knob-num-w').trim();
+      d.assert('NEGATIVE CONTROL: the reserve is measured per knob, so two ranges differ',
+        res(stepSpec.free) === '5ch' && res(stepSpec.stepped) === '1ch'
+        && numOf(stepSpec.free).getBoundingClientRect().width
+           > numOf(stepSpec.stepped).getBoundingClientRect().width,
+        `-1 to 1 reserves ${res(stepSpec.free)} and 1 to 8 by ones reserves `
+        + `${res(stepSpec.stepped)}`);
+    }
   }
 
   if (gridSpec) {
