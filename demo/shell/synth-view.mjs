@@ -859,7 +859,7 @@ export function traceOf(t = {}, fallback = '--dim') {
  */
 export function createWaveShape({ host, label = '', height = 96, name = '', ground = '--card2',
                                   shape, duty = 0.5, reason = '', cycles = 2,
-                                  points, colour = '--dim', over = null } = {}) {
+                                  points, colour = '--dim', over = null, axes = null } = {}) {
   /* 🔴 THE SAME GROUND AS THE FILTER, ASKED FOR 2026-09-22 AS *"add same bg to
      waveform as to filter"*. Safe for the same reason it was safe there: `ink()`
      reads the field back OUT OF THE CANVAS after the fill, so the counter
@@ -867,7 +867,7 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
      ⚠️ THE ENVELOPE IS STILL `--card` AND THAT IS WHAT WAS ASKED, not an
      oversight. Two of the three figures sit on the lighter ground. */
   const f = figure({ host, cls: 'pos-sv-wave', height, label: label || 'waveform', ground });
-  let v = { name, shape: shape ?? shapeFor(name), duty, reason, cycles, points, colour, over };
+  let v = { name, shape: shape ?? shapeFor(name), duty, reason, cycles, points, colour, over, axes };
   let a = traceOf(v, colour);
   let b = v.over ? traceOf(v.over, '--hi') : null;
   let pts = a.pts;
@@ -911,9 +911,26 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
          drawn case's own name line sits on `foot`, and the two here sit on the
          same baseline and one line above it, so nothing in this file carries a
          second number meaning the gap at the bottom. */
-      f.say(v.reason || NO_SHAPE, PAD, foot, { room: W - PAD * 2 });
-      f.say(v.name || 'no wave', PAD, foot - 13, { colour: C.ink, px: 11, room: W - PAD * 2 });
-      if (label) f.say(label, W - PAD, foot - 13, { align: 'right', room: W / 2 });
+      /**
+       * 🔴 `reason: null` DRAWS NOTHING AT ALL, added 2026-09-22. It is
+       * DISTINCT from `''` and from no reason, which both fall back to
+       * `NO_SHAPE`, and the distinction is the point: this file refuses to
+       * invent a shape and says so, which is right for a wavetable nobody has
+       * measured and wrong for a scope whose instrument is simply switched off.
+       * ⚠️ **THE ABSENCE STILL HAS TO BE EXPLAINED SOMEWHERE**, and a caller
+       * passing `null` is claiming it is explained elsewhere. On `/muta/` the
+       * instrument's own lamp reads `PLAITS off` an inch below, so a second
+       * sentence saying nothing is sounding would be the doubled channel this
+       * project keeps removing.
+       * ⚠️ AND THE ROOM IS STILL RESERVED. The figure keeps its height whether
+       * it draws words, a trace or nothing, so a picture arriving cannot move
+       * the page under a reader.
+       */
+      if (v.reason !== null) {
+        f.say(v.reason || NO_SHAPE, PAD, foot, { room: W - PAD * 2 });
+        f.say(v.name || 'no wave', PAD, foot - 13, { colour: C.ink, px: 11, room: W - PAD * 2 });
+        if (label) f.say(label, W - PAD, foot - 13, { align: 'right', room: W / 2 });
+      }
       return;
     }
 
@@ -946,6 +963,22 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
        is the legend. A separate key beside the picture would be the thing this
        project keeps taking off pages: a figure and its ink joined across two
        elements is what makes a legend necessary in the first place. */
+    /**
+     * 🔴 THE TWO SCALES, WHERE A SCOPE PUTS THEM. `axes: { x, y }`, added
+     * 2026-09-22 on *"perhaps x y units?"*. Without them a trace is a shape
+     * with no size: the same picture is a 20 ms window or a 2 second one, and a
+     * reader has no way to tell which.
+     * ⚠️ **THEY ARE THE CALLER'S STRINGS AND THIS FILE INVENTS NEITHER.** What
+     * a window spans is a fact about the thing that captured it, and a
+     * component that guessed at it would be drawing a number nobody measured,
+     * which is the whole argument this file already makes about waveshapes.
+     * ⚠️ AND `y` SITS AT THE TOP because it labels the vertical extent, while
+     * `x` sits under the trace's right edge because it labels the span. Neither
+     * takes room from the picture: both are on lines the figure already has.
+     */
+    if (v.axes?.y) f.say(v.axes.y, PAD, yTop + 9, { px: 10, colour: C.faint, room: W / 2 });
+    if (v.axes?.x) f.say(v.axes.x, W - PAD, yBot - 3, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
+
     const nameA = v.name || a.shape || '';
     if (b) {
       const nameB = v.over?.name || b.shape || '';

@@ -206,6 +206,7 @@ export function createInstrument(o = {}) {
   const {
     name, maker = MAKER, host, place = 'ends', panel: panelOpts = {},
     header = false,
+    parts = null,
   } = o;
   /**
    * 🔴 REFUSED WITHOUT A NAME, FOR THE REASON `knob.mjs` REFUSES WITHOUT A
@@ -292,10 +293,22 @@ export function createInstrument(o = {}) {
    * rather than a second assembly. The seam, the shared border and the children
    * giving up their own edges are the same either way.
    */
+  /**
+   * 🔴 A CALLER MAY GLUE ITS OWN PARTS IN, `parts: [el]`, ADDED 2026-09-22:
+   * *"move it to glued section on top of onoff/patchselector"*. They sit
+   * BETWEEN the case and the bar, which is the only place a part can go that is
+   * neither the instrument's controls nor its bar.
+   * ⚠️ **AND THEY ARE GLUE PARTS, NOT CASE CONTENTS.** `add()` puts something
+   * inside the case, where it scrolls with the panel and sits within the case's
+   * inset. A part is its own surface with the glue's seam either side of it,
+   * which is what a picture under an instrument wants: the same edge the bar
+   * has, at the same width.
+   */
   const atFoot = !!head && header.at === 'foot';
+  const mid = (parts || []).filter(Boolean).map((b) => b.el || b);
   const root = head
-    ? (atFoot ? createGlue(panel.el, head.head) : createGlue(head.head, panel.el))
-    : panel.el;
+    ? (atFoot ? createGlue(panel.el, ...mid, head.head) : createGlue(head.head, panel.el, ...mid))
+    : createGlue(panel.el, ...mid);
   host?.append(root);
 
   return {
