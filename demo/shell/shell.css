@@ -5152,6 +5152,7 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
    glued BAR keeps around its buttons, and using it made a header two and a half
    times the thing it is glued to. A number being available is not a reason to
    read it. */
+/* The bar takes the same air whichever end of the glue it is at. */
 .pos-glue > .panel-head {
   padding: 8px;
   column-gap: 14px;

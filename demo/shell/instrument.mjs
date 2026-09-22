@@ -256,8 +256,19 @@ export function createInstrument(o = {}) {
    * DUPLICATION RATHER THAN REMOVING IT.** `createPanelLayout` takes a `plate`
    * now and owns the spacing, so no wrapper and no page can get it wrong.
    */
-  const panel = createPanelLayout({ ...panelOpts, plate: head ? null : spec });
-  const plate = head ? head.plate : panel.plate;
+  /**
+   * 🔴 THE CASE KEEPS ITS OWN PLATE WHENEVER THE BAR IS NOT CARRYING ONE.
+   * A header with `plate: false` used to leave the instrument with no plate
+   * anywhere, which was right while the status control printed the name beside
+   * it and wrong the moment the bar moved to the foot: a nameplate at the
+   * BOTTOM of a case names it after a reader has already read it.
+   * ⚠️ SO THE TEST IS WHO HAS THE PLATE, NOT WHETHER THERE IS A BAR. One plate,
+   * in one of two places, decided by the bar rather than by the caller having
+   * to remember to ask twice.
+   */
+  const barHasPlate = !!head && header.plate !== false;
+  const panel = createPanelLayout({ ...panelOpts, plate: barHasPlate ? null : spec });
+  const plate = barHasPlate ? head.plate : panel.plate;
   /* 🔴 THE HEADER GOES IN BY `prepend`, FOR THE REASON THE PLATE DOES: it
      belongs to the CASE, above the fixed column and the strip both, or it
      scrolls away from the instrument it names. `/tom/` found that with a plate.
@@ -271,7 +282,20 @@ export function createInstrument(o = {}) {
      reach the sides, and where its padding was the case's plus its own. See the
      note on `head` above. `createGlue` returns the single block unwrapped when
      there is only one, so a case with no header gains no box and no edge. */
-  const root = head ? createGlue(head.head, panel.el) : panel.el;
+  /**
+   * 🔴 THE BAR SITS ABOVE OR BELOW, `header: { at: 'head' | 'foot' }`, ADDED
+   * 2026-09-22: *"make it revertable: move plaits/warps headers to footers and
+   * add nameplate to top right"*. **`head` is the default and nothing about it
+   * changed**, which is the whole of *revertable*: a caller moves one word back
+   * and gets exactly what it had, rather than a rewrite being undone by hand.
+   * ⚠️ AND `createGlue` TAKES THE PARTS IN ORDER, so this is an argument swap
+   * rather than a second assembly. The seam, the shared border and the children
+   * giving up their own edges are the same either way.
+   */
+  const atFoot = !!head && header.at === 'foot';
+  const root = head
+    ? (atFoot ? createGlue(panel.el, head.head) : createGlue(head.head, panel.el))
+    : panel.el;
   host?.append(root);
 
   return {

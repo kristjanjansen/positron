@@ -275,6 +275,20 @@ class PlaiVoice extends AudioWorkletProcessor {
       this.port.postMessage({
         t: 'meter',
         peak: this.peak,
+        /**
+         * 🔴 A WINDOW OF THE SIGNAL ITSELF, FOR THE PICTURE. Asked 2026-09-22:
+         * *"can you have wave / osilocope visualizer to top of muta. plai and
+         * warp with different colors"*, and *"what about waveform under
+         * warps?"*.
+         * ⚠️ **IT RIDES THE REPORT THAT ALREADY EXISTS RATHER THAN OPENING A
+         * SECOND CHANNEL.** The meter goes four times a second, which is about
+         * the rate a person reads at, so a scope costs one copy per report and
+         * no extra message. A window per quantum would be 375 posts a second.
+         * ⚠️ AND IT IS ONE QUANTUM, NOT A HISTORY. What a scope is for here is
+         * the SHAPE each firmware makes, and 128 frames at 48 kHz holds several
+         * cycles of anything at a musical pitch.
+         */
+        wave: Array.from(this.out.subarray(0, Math.min(frames, 128))),
         blocks: this.ex.plai_blocks_rendered(),
         // 🔴 THE HALF THAT MAKES THE BLOCK INVARIANT CHECKABLE. `Voice::Render`
         // calls summed over every voice. With N voices sounding for a whole
@@ -457,6 +471,10 @@ class WarpMod extends AudioWorkletProcessor {
         t: 'meter',
         peak: this.peak,
         inPeak: this.inPeak,
+        /* The effect's own output, the same window and for the same reason as
+           the oscillator's. Two traces, one picture, so what the effect DID is
+           the difference between them rather than something to take on trust. */
+        wave: Array.from(this.out.subarray(0, Math.min(frames, 128))),
         blocks: this.ex.warp_blocks_rendered(),
         frames: this.ex.warp_frames_rendered(),
         blocksPerQuantum: this.blocksLast,
