@@ -103,10 +103,23 @@ const is = (what, cond, detail) => {
      does. What the claim was protecting is unchanged and is what this now
      reads: the header is ABOVE the instrument and outside anything that
      scrolls, and a case with no header still places its own plate. */
-  is('the header is glued above the case, so nothing above the instrument can scroll away',
-    /createGlue\(head\.head, panel\.el\)/.test(code)
-    && /plate: head \? null : spec/.test(code),
-    'glued above the case, and the panel keeps placing the plate when there is no header');
+  /* 🔴 AND IT MAY SIT AT EITHER END SINCE 2026-09-22: *"move plaits/warps
+     headers to footers"*, with `head` still the default so the change is one
+     word to revert. What this grades is unchanged in substance: the bar is
+     GLUED to the case rather than placed inside it, and the case keeps placing
+     its own plate whenever the bar is not carrying one. */
+  is('the bar is glued to the case at either end, and never placed inside it',
+    /createGlue\(panel\.el, head\.head\)/.test(code)
+    && /createGlue\(head\.head, panel\.el\)/.test(code)
+    && /plate: barHasPlate \? null : spec/.test(code),
+    'glued above or below, and the panel keeps placing the plate when the bar has none');
+
+  /* 🔴 THE DEFAULT IS THE TOP, WHICH IS WHAT MAKES THE MOVE REVERTIBLE RATHER
+     THAN A REWRITE. A caller that says nothing gets what every caller had
+     before the option existed. */
+  is('NEGATIVE CONTROL: a bar with no placement asked for goes to the top',
+    /header\.at === 'foot'/.test(code) && !/at = 'foot'/.test(code),
+    'foot is opt in, so head is what a silent caller gets');
 
   /* 🔴 AND THE SEAM IS `glue.mjs`'S, WHICH IS THE WHOLE POINT OF THE CHANGE. A
      `border-bottom` typed in this file would put the imitation back one element
