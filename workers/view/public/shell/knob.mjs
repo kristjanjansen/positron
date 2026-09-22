@@ -88,7 +88,7 @@ const ARC = 270;
 export function createKnob({
   label, sub = '', min = 0, max = 127, value, home, unit = '', title = '',
   onInput = () => {}, onChange = () => {}, disabled = false,
-  stroke,
+  stroke, ends,
 } = {}) {
   if (!label) throw new Error('a knob needs a label: it is the only thing naming what it moves');
   const span = max - min;
@@ -173,6 +173,31 @@ export function createKnob({
   const num = mk('div', 'pos-knob-v');
   const lab = mk('div', 'pos-knob-lab', label);
   root.append(num, svg, lab);
+  /**
+   * 🔴 THE TWO ENDS OF THE TRAVEL, PRINTED EITHER SIDE OF THE DIAL. Asked for
+   * 2026-09-22 on `/plai/` as *"support starte end labels -1 1"*, and the case
+   * that needs it is the bipolar attenuverter: a knob running -1 to 1 with a
+   * centre home is indistinguishable from one running 0 to 127 until a finger
+   * moves it, and the real module prints `-` and `+` on exactly those three.
+   * ⚠️ **IT IS `ends: true` FOR THE NUMBERS AND A PAIR FOR ANYTHING ELSE.**
+   * `true` prints `min` and `max`, which is the honest default because those
+   * are the numbers the control really carries. A caller passing `['-', '+']`
+   * gets the panel's own marks instead, which is what Mutable print.
+   * ⚠️ **AND IT SITS IN THE DIAL'S OWN GAP RATHER THAN ON A NEW ROW.** A knob's
+   * travel stops short of the bottom, which is the whole reason the arc is an
+   * SVG and not a conic gradient, and that gap is where a panel prints these.
+   * A new row would change `--ctl-foot` for every knob on the site, and
+   * `positron-ui` records `/twelve/` being corrected twelve times in one
+   * evening over exactly that kind of arithmetic.
+   */
+  if (ends) {
+    const [lo, hi] = ends === true
+      ? [String(min), String(max)]
+      : [String(ends[0] ?? min), String(ends[1] ?? max)];
+    const row = mk('div', 'pos-knob-ends');
+    row.append(mk('span', 'pos-knob-end', lo), mk('span', 'pos-knob-end', hi));
+    root.insertBefore(row, lab);
+  }
   if (sub) root.append(mk('div', 'pos-knob-sub', sub));
 
   function clamp(n) { return Math.min(max, Math.max(min, n)); }

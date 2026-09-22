@@ -7,43 +7,13 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* 🔴 ONE PITCH, DECLARED ONCE, AND THE JAVASCRIPT NEVER TYPES IT AGAIN.
-     A step's width decides where the playhead band sits, how wide the ruler
-     tick under it is, and how far an arrow key moves. Three numbers that have
-     to agree, and `--sld-col` is already this project's record of what happens
-     when a shared measurement is typed in two files: `/radio/`'s label column
-     snapped back to the width of one word and was reported three times.
-     ⚠️ THE PAGE READS IT OFF THE LAID OUT ELEMENTS rather than off this
-     declaration, so even this token cannot disagree with the picture: the head
-     takes the ruler tick's own `offsetLeft` and `offsetWidth`.
-     ⚠️ AND THE ROW PITCH IS THE SAME ONE, which is what makes the fixed name
-     column line up with the steps beside it. `panel-layout.mjs`'s contract puts
-     the two in separate flex children, so nothing in the browser makes them
-     agree: they agree because every cell on both sides is `--tom-cell` tall
-     with `--tom-gap` between. There is an assert on the top and bottom edges,
-     because `/twelve/` records three alignments that looked like one and two of
-     them lining up while the third was 30 px out. */
-  .tom {
-    --tom-gap: 2px;
-    --tom-cell: 16px;
-    /* ⚠️ THE RULER CARRIES NO TEXT SINCE 2026-09-21, so it is a press target and
-       a measuring stick rather than a row of labels. 8 px is enough to press
-       and small enough not to read as a band. */
-    --tom-ruler: 8px;
-    /* ⚠️ MEASURED RATHER THAN CHOSEN. `sample_10.wav` is thirteen characters of
-       10 px mono, about 78 px, and the column has to hold that plus its own
-       4 px each side or every row past nine reads `sample_10.wa`. It did, in
-       the first screenshot. */
-    /**
-     * 🔴 A NUMBER, NOT A NAME, SO THE COLUMN IS 28 px RATHER THAN 108. Asked
-     * 2026-09-21: *"rm divider vert line next to pads, just numbers 0..64 on
-     * left"*. It was 108 px because `sample_10.wav` is thirteen characters of
-     * 10 px mono, and every row in a pack differs only in the digits: 64 rows
-     * of the same eight characters, in a column sized to hold a word none of
-     * them differ in.
-     */
-    --tom-name: 22px;
-  }
+  /* 🔴 THE PITCH, THE RULER HEIGHT AND THE LABEL COLUMN'S WIDTH LEFT THIS FILE
+     ON 2026-09-22 AND ARE `--pg-gap`, `--pg-cell`, `--pg-ruler` AND `--pg-lab`
+     IN `shell.css`. They were never about this page: they are what makes a
+     label column line up with the steps beside it, which is true of every grid
+     of pads there will ever be here. `step-grid.mjs` measures `--pg-cell` off
+     the strip and writes it onto both halves, so the two cannot drift. */
+
   /* 🔴 I READ `no top padding on titles` BACKWARDS AND SPENT FOUR ROUNDS
      REMOVING PADDING THAT WAS NOT THERE. It meant the title HAS no padding and
      needs some. Every repeat after it said so again, in plainer words each
@@ -63,239 +33,25 @@
      `/circuit/` puts it inside the card, so neither of them has ever been in
      this position. The title gets its own room here, over it, which is what was
      asked for four times. */
-  .tom .panel-plate { padding: 16px 0 0; }
 
-  /* 🔴 NO DIVIDER. `panel-layout.mjs` gives a left fixed column a `border-right`
-     and a gutter, which is right when the two halves are different KINDS of
-     thing. Here they are one grid with its row labels: a rule down the middle
-     is `positron-ui`'s separation rule broken in the smallest way, a line
-     saying what the gap already says. (0,1,0) against the component's own
-     (0,1,0), and this block is after `shell.css`, so it wins on order. */
-  .tom-fixed { border-right: 0; padding-right: 0; }
-  /* The column of names. `panel-fixed` already stacks; it has no gap of its own
-     because the panel's flow is what normally carries one, and this page does
-     not use the flow. */
-  .tom-fixed { gap: var(--tom-gap); width: var(--tom-name); }
-  /* ⚠️ THE SPACER IS THE RULER'S HEIGHT AND NOT A GUESS. It is the one child of
-     the fixed column with no counterpart to measure against, so it is declared
-     from the same token the ruler is. */
-  .tom-spacer { height: var(--tom-ruler); flex: 0 0 auto; }
-  /* 🔴 `line-height`, NOT `display: flex`, AND THAT IS WHY THE ELLIPSIS WORKS.
-     A flex container's text is an anonymous flex item, and `text-overflow` does
-     not reach it: the first build centred the name with `align-items` and every
-     name past `sample_9.wav` was HARD CLIPPED mid word with no ellipsis, which
-     photographs as a rendering fault rather than as a name that does not fit.
-     Centring by line height leaves the text in an inline box, where the
-     property applies. */
-  .tom-name {
-    height: var(--tom-cell); flex: 0 0 auto; padding: 0 6px 0 0;
-    font: 500 10px/var(--tom-cell) var(--mono); color: var(--dim2);
-    /* ⚠️ RIGHT ALIGNED AND `tabular-nums`, so 0 to 63 make one straight edge
-       against the pads rather than a ragged one. It is the same reason the
-       readout reserves its widest value. */
-    text-align: right; font-variant-numeric: tabular-nums;
-    overflow: hidden; white-space: nowrap;
-  }
-  /* A row whose sample can be heard is a button; a row with nothing behind it
-     is a div. 🔴 NOT A DISABLED BUTTON: at rest every row is empty, and eight
-     dimmed controls read as a page that failed rather than as a page waiting
-     for a file. A control that cannot do what it names is this project's named
-     lie, and the repair is to not draw the control. */
-  button.tom-name {
-    /* the global button rule is a 34 px pill with 18 px of padding; a cell in a
-       grid is none of those things. The padding stays the one `.tom-name`
-       already sets, so a row with a sample and a row without start their names
-       at the same x. */
-    height: var(--tom-cell); min-height: 0; border-radius: 3px;
-    background: transparent; border: 0; color: var(--fg2);
-    /* ⚠️ `right`, NOT `left`. The base `.tom-name` rule right aligns the
-       numbers, and `button.tom-name` at (0,1,1) was quietly overriding it: a
-       row WITH a sample is a button and a row without is a div, so opening a
-       pack would have left aligned exactly the rows that had something in them
-       and the straight edge asked for would have appeared only while the grid
-       was empty. */
-    text-align: right; cursor: pointer; display: block; width: 100%;
-    /* The colour is the only thing that moves, so it is the only thing with a
-       transition on it. */
-    transition: color .18s ease-out;
-  }
-  /* 🔴 NO BACKGROUND ON A PREVIEW, ASKED FOR AS *"rm bg on sample preview, just
-     animate color to yellow"*. Hearing a row is not selecting it: a filled box
-     behind the number said *this one is chosen* and stayed saying it, while
-     what actually happened was a sound that has already finished. Colour can
-     say a moment; a box says a state.
-     ⚠️ AND IT IS THE SAME LANGUAGE AS THE REST OF THE GRID, where the pads
-     light rather than growing edges. This page has now had a box asked off it
-     four times: the playhead cursor, the highlight border, the pad hover and
-     this. */
-  button.tom-name:hover { color: var(--fg); }
-  .tom-name[data-pick] { color: var(--hi); animation: tom-heard .45s ease-out; }
-  @keyframes tom-heard {
-    0%   { color: #fff8dc; }
-    100% { color: var(--hi); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .tom-name[data-pick] { animation: none; }
-  }
+  /* 🔴 THE GRID'S OWN RULES LEFT THIS FILE ON 2026-09-22 AND ARE IN
+     `shell.css` UNDER `step-grid`. `/pack/` grew a second hand-rolled grid the
+     day after this one shipped, which is `positron-ui`'s own definition of a
+     component that has not been noticed yet, so the pads, the ruler, the label
+     column and every one of the five edges asked off them are a component now.
+     ⚠️ NOTHING ABOUT THE LOOK CHANGED AND NOTHING WAS SUMMARISED AWAY. Every
+     report that took an edge off this grid travelled with the rules, because a
+     condensed rule reads as an opinion and the next person to touch it will put
+     the border back.
+     WHAT IS STILL HERE is only what is about THIS page: the plate's own room,
+     and the line under the grid that says what was last heard. */
 
-  /* The steps. `width: max-content` so the panel's own scroller is what moves,
-     which is contract 1 of `panel-layout.mjs`: one scrolling region, and the
-     page never drags sideways. */
-  .tom-grid {
-    position: relative; width: max-content;
-    display: flex; flex-direction: column; gap: var(--tom-gap);
-  }
-  .tom-ruler {
-    display: flex; gap: var(--tom-gap); height: var(--tom-ruler);
-    cursor: pointer;
-  }
-  .tom-tick {
-    width: var(--tom-cell); flex: 0 0 auto; height: var(--tom-ruler);
-    font: 500 9px/var(--tom-ruler) var(--mono); color: var(--dim2);
-    text-align: center;
-    text-align: left; letter-spacing: 0;
-  }
-  .tom-tick[data-bar] { color: var(--dim); }
-  .tom-tick[data-now] { color: var(--hi); }
-  .tom-rows { display: flex; flex-direction: column; gap: var(--tom-gap); }
-  .tom-row { display: flex; gap: var(--tom-gap); height: var(--tom-cell); }
-  /* 🔴 THE CELL OVERRIDES SIX THINGS THE GLOBAL `button` RULE SETS, and every
-     one of them is a number that belongs to a pill rather than to a grid. */
-  /* 🔴 THE PADS FILL THE WIDTH AND ARE SQUARE, ASKED FOR AS *"make tom pads fit
-     the space"* and *"the rest of w are sqare pads"*. `--tom-cell` is measured
-     from the strip in JavaScript rather than typed, because the name column and
-     the steps live in separate flex children of `panel-layout.mjs` and nothing
-     in the browser makes them agree: they agree because both sides are one
-     token tall. Making the pads flex in CSS alone would have let the two halves
-     drift the moment the window moved. */
-  .tom-cell {
-    width: var(--tom-cell); height: var(--tom-cell); min-height: 0; flex: 0 0 auto;
-    padding: 0; border-radius: 3px;
-    /* 🔴 NO BORDER, ASKED FOR AS *"rm borders on pads"*. That is the fifth time
-       an edge has been asked off this grid: the playhead cursor, the highlight
-       border, the pad hover, the preview box and now the pads themselves. The
-       field IS the pad; an outline round it was a second way of saying where it
-       is, and sixteen of them across a row read as a wire grid rather than as
-       an instrument.
-       ⚠️ `border: 0` AND NOT A COLOUR CHANGE, because `box-sizing: border-box`
-       is global here: a 1 px border was taking 2 px out of every pad's inside,
-       and keeping it transparent would keep taking them. */
-    background: #171d29; border: 0;
-  }
-  /* Every fourth step is a beat and every sixteenth is a bar, so sixty four
-     cells can be counted without reading the ruler. It is the field that
-     changes and never the ink, which is the same decision `pattern.mjs` made
-     for the opposite reason. */
-  .tom-cell[data-beat] { background: #1c2331; }
-  .tom-cell[data-bar] { background: #222b3c; }
-  /* ⚠️ HOVER BRIGHTENS THE PAD AND LEAVES ITS EDGE ALONE, asked for as *"no
-     border hover effect on pad, just make pad brigher on hover"*. A border that
-     changes on hover is the bordered cursor arriving a third time, one property
-     at a time: this grid has now had an edge asked off it for the playhead, for
-     the focus ring and for this. The pad is the thing; its outline is not. */
-  /* ⚠️ HOVER LIFTS THE FIELD AND DOES NOTHING ELSE, asked for as *"hover on pad
-     only changes bg lighter a bit"*. `filter: brightness()` rather than a pair
-     of typed colours, so a pad that is off, on, muted or under the playhead all
-     lift by the same amount from whatever they already are, and none of them
-     needs its own hover rule. Four states, one line. */
-  .tom-cell:hover { filter: brightness(1.35); }
-  /* 🔴 THE FOCUS RING SAT OUTSIDE THE PAD AND OVERLAPPED ITS NEIGHBOURS.
-     Reported 2026-09-21 with a crop: *"outline looks bad"*, showing a 2 px
-     yellow ring standing off a 16 px pad, wider than the 2 px gutter, so it
-     drew over the two cells either side and read as a rendering fault.
-     ✅ `outline-offset: -1px` PUTS IT INSIDE THE PAD, where it cannot reach a
-     neighbour at any gap, and one pixel is enough on a shape this small. The
-     ring is still the accent colour, because focus is the one thing on this
-     grid that is about the person rather than about the music. */
-  .tom-cell:focus-visible {
-    outline: 2px solid var(--hi); outline-offset: -1px; border-radius: 3px;
-  }
-  /* 🔴 BRIGHTNESS SAYS WHETHER THIS CELL CAN MAKE A SOUND, WHICH IS THE ONE
-     THING A READER CANNOT SEE ANY OTHER WAY. A cell on a row with no sample is
-     switched on and silent, and colouring it like a cell that will sound would
-     be the page asserting something nothing measured. Three greys and no hue,
-     which is `grain-scope.mjs`'s settled answer reused: material is grey here,
-     and the one thing that moves keeps the bright ink. */
-  /* 🔴 CIRCUIT COLOURS, ASKED FOR AS *"use circuilt colors"* WITH A PHOTOGRAPH
-     OF THE INSTRUMENT. A lit step on that machine is warm amber; the pad under
-     the playhead is a cold near-white. So a lit cell is amber here and the
-     column being played is white, which is the same two-colour language the
-     hardware uses and the reason a reader can tell them apart at a glance.
-     🔴 AND THE ROWS ARE NOT COLOURED BY DRUM TRACK, WHICH IS THE OBVIOUS THING
-     TO DO AND WOULD BE A LIE. The photograph shows four drum tracks in two
-     colours, orange and green, and it is tempting to paint rows 0 to 15 orange
-     and so on. **Which of the Circuit's drum pads plays slot 37 is not known**:
-     it is a property of a SESSION, it is in no WAV header, and
-     `research/circuit-session-notes-2026-09-21.md` says so in as many words.
-     Painting that mapping would be this project's label-as-content mistake for
-     the fifth time in three days, in colour.
-     ✅ SO COLOUR SAYS STATE, WHICH IS MEASURED: lit, silent, or playing. */
-  /* ⚠️ LESS ORANGE, REPORTED AS *"still wrong hues on pads (orangey)"*. It was
-     `#f0a030`, which is a red-leaning orange and the loudest hue on a page
-     whose every other surface is a blue grey. The Circuit's lit pads photograph
-     warm, but a photograph of a backlit silicone pad in a room is not a screen
-     colour, and copying the camera's cast is how a page ends up with one
-     element nothing else on it agrees with.
-     ✅ ONE TOKEN, so moving it is one line rather than a hunt. */
-  .tom-cell[data-on] { background: var(--tom-on); }
-  /* A cell that is on but has no sample behind it stays grey, because
-     brightness here says WHETHER THIS CAN MAKE A SOUND and nothing else can
-     tell a reader that. */
-  .tom-cell[data-on][data-mute] { background: var(--dim2); }
-  /* 🔴 THE BAND MOVES WITH A TRANSFORM AND CHANGES NOTHING ABOUT LAYOUT. It is
-     the only thing on this page that moves on its own, and `positron-ui`'s rule
-     is that nothing redrawing may change how much room it takes. A transform on
-     an absolutely positioned element takes no room at all. */
-  /* 🔴 THE PLAYING COLUMN IS THE PADS THEMSELVES, WHITE, AND THEY BREATHE.
-     Asked for as *"just hilite current col whit whitey (some anim)"*, then
-     reported again as *"still no playing col hilite.."*, and finally, against a
-     bordered column standing over the grid, *"just hilite the pads, no extra
-     bordered cursor"*. The instrument in the photograph lights its pads; a band
-     drawn on top was a second object with its own edge and its own alignment to
-     get wrong.
-     ⚠️ TWO TOKENS SO THE GENERATED `nth-child` RULES HAVE SOMETHING TO NAME.
-     A colour written into sixteen generated rules would be sixteen places one
-     decision lives. */
-  .tom {
-    /* ⚠️ OPAQUE RATHER THAN TRANSLUCENT. At .78 over a dark card the fill came
-       out closer to the field than to white, so the only thing a reader could
-       see was the edge, which is why the edge was asked for twice and then
-       removed. The light is the fill now and there is nothing else. */
-    /* 🔴 TWO BRIGHTNESSES, AND THE DIM ONE IS THE DEFAULT. Asked 2026-09-21:
-       *"nonplaying hilited col should be way less bright"*. A full white column
-       on a stopped page is the loudest thing on screen saying nothing is
-       happening, and it competes with the lit steps a reader is actually
-       editing. Playing, it is white; stopped, it is barely more than the field,
-       which is enough to say where the playhead is parked and no more. */
-    --tom-now: #dfe6ef;
-    --tom-on: #e3c168;
-  }
-  /* ⚠️ THE BRIGHT VALUE AND THE BREATHING BOTH HANG OFF ONE ATTRIBUTE, set from
-     the deck's own state rather than guessed from whether positions are
-     arriving. A stopped grid does not animate at all, which is the rule about
-     not running a frame loop to draw a still picture, one property along. */
-  /* 🔴 THE PARKED COLUMN BREATHES AS WELL, AND DARKER. Asked 2026-09-21:
-     *"hilited col when paused should breate and be bit darker"*. It held
-     perfectly still at `brightness(1.85)`, which read as a selection rather
-     than as a playhead waiting: what says *this is where it will start* is that
-     it is alive, and what says *it is not running* is that it is dimmer. Two
-     channels, one per fact, instead of stillness carrying both.
-     ⚠️ EACH GENERATED RULE NAMES ITS OWN DURATION, 2.2 s parked and 1.4 s
-     playing, so there is no third rule here overriding a fourth. A playhead
-     that is waiting and one that is running must not pulse the same way or the
-     animation stops carrying anything.
-     ⚠️ AND IT IS `opacity` EITHER WAY, so nothing it does can change how much
-     room anything takes, and reduced motion stops it dead.
-  @media (prefers-reduced-motion: reduce) {
-    .tom-rows .tom-cell { animation: none !important; }
-  }
-  /* ⚠️ THE PARKED BREATH IS SHALLOWER AND SLOWER THAN THE PLAYING ONE. A
-     playhead that is running and one that is waiting should not pulse the same
-     way, or the animation stops carrying anything. */
-  @keyframes tom-breathe {
-    0%, 100% { opacity: .82; }
-    50%      { opacity: 1; }
-  }
+  /* ⚠️ THE LABEL COLUMN IS THE PANEL'S FIXED COLUMN, so it carries both the
+     component's class and the panel's. `.pos-pg-labs` already takes the border
+     off and sets the width; this one line is the gap the panel's flow would
+     normally carry and this page does not use the flow. */
+  .tom-fixed { gap: var(--pg-gap); }
+
   /* ⚠️ IT MOVES ON A PRESS AND NEVER ON A CLOCK, which is what makes a line of
      prose allowed here at all. It says which sample was last heard and why, and
      it is a fixed box either way so a longer name cannot move the grid under
@@ -312,6 +68,7 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStepper } from '/shell/stepper.mjs';
   import { createPanelLayout, createNameplate } from '/shell/panel-layout.mjs';
+  import { createStepGrid } from '/shell/step-grid.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { readZip } from '/shell/unzip.mjs';
   import {
@@ -449,16 +206,18 @@
    *  because a reader that silently dropped one leaves a pack looking smaller
    *  than it is. */
   let rows = restRows();
-  /** One `Uint8Array(STEPS)` per row. */
-  let on = rows.map(() => new Uint8Array(STEPS));
-  let cells = [];                 // cells[r][s]
-  let nameEls = [];
-  let tickEls = [];
-  let focusR = 0, focusS = 0;     // the roving tab stop
+  /**
+   * 🔴 WHICH PADS ARE ON LIVES IN THE COMPONENT NOW AND NOWHERE ELSE. This page
+   * kept its own `on`, its own `cells`, its own element lists and its own
+   * roving tab stop until 2026-09-22, and all five moved into `step-grid.mjs`
+   * with the drawing. Keeping a second copy here would be a shared measurement
+   * in two files, which is the defect `--sld-col` exists to record: two numbers
+   * that agree until one of them is edited.
+   */
   let ac = null, master = null;
   const bufs = new Map();         // row index -> AudioBuffer
   let voices = 0, silent = 0, worstLate = 0, lastFired = null;
-  let nowStep = -1, picked = -1, built = 0;
+  let picked = -1, built = 0;
   let audioSaid = false;
 
   function restRows() {
@@ -468,7 +227,11 @@
   }
 
   const hasSound = (r) => !!(rows[r] && rows[r].wave && rows[r].wave.ok);
-  const onCount = () => on.reduce((n, r) => n + r.reduce((m, v) => m + v, 0), 0);
+  // ⚠️ A FUNCTION DECLARATION RATHER THAN AN ARROW, so it is hoisted over the
+  // grid it reads and this page's own checks can call it wherever they sit. A
+  // `const` here would be read in its dead zone by anything above the grid,
+  // which this project has already lost seven asserts to.
+  function onCount() { return grid.count(); }
 
   // ── the deck ────────────────────────────────────────────────────────────
   /**
@@ -552,11 +315,11 @@
 
 
 
-  /** Bright while it runs, barely there while it is parked. */
-  function setLive(on) {
-    if (on) rowsEl.dataset.live = '1';
-    else delete rowsEl.dataset.live;
-  }
+  /** Bright while it runs, barely there while it is parked.
+   *  ⚠️ THE ATTRIBUTE IS THE COMPONENT'S AND IS DELETED RATHER THAN SET EMPTY,
+   *  because every rule about a running head is written `[data-live]` and an
+   *  attribute selector matches on PRESENCE. `step-grid.mjs` owns that. */
+  const setLive = (yes) => grid.live(yes);
 
   /**
    * 🔴 PERMANENT LOOP MODE. Asked for three times in one evening and the third
@@ -804,6 +567,13 @@
   const panel = createPanelLayout({
     side: 'left', flow: false,
     cls: { panel: 'tom', fixed: 'tom-fixed' },
+    /* The case places its own nameplate and owns the inset. See below. */
+    /* 🔴 THE MAKER CAME OFF 2026-09-22, ASKED FOR AS *"rm positron from plai
+       and tom nameplates"*. One line cannot use `ends`, which is
+       `space-between` and parks a lone child on the LEFT. `end` pushes it
+       right, and `panel-layout.mjs` records `/twelve/` being reported for
+       exactly that. */
+    plate: { lines: ['TOM'], place: 'end' },
     /**
      * ⚠️ THE SCROLLER TAKES NO TAB STOP, WHICH IS A DEPARTURE FROM WHAT THE
      * COMPONENT OFFERS AND HAS A REASON. `transport-bar.mjs` binds the project's
@@ -815,46 +585,73 @@
      */
     strip: { role: 'group', label: 'steps' },
   });
-  const fixedEl = panel.fixed;
-  const gridEl = el('div', 'tom-grid');
-  const rulerEl = el('div', 'tom-ruler', '', {
-    role: 'slider', tabindex: '0', 'aria-label': 'position',
-    'aria-valuemin': '1', 'aria-valuemax': String(STEPS), 'aria-valuenow': '1',
-  });
-  const rowsEl = el('div', 'tom-rows');
-
-  gridEl.append(rulerEl, rowsEl);
-  {
-    // The sixteen column rules, generated from the one constant that knows.
-    const sheet = document.createElement('style');
+  /**
+   * 🔴 THE GRID IS A KIT COMPONENT SINCE 2026-09-22, ASKED FOR AS *"use a
+   * standard pad grid component from tom, make it universal and add to kit"*.
+   * ⚠️ IT IS `createStepGrid` AND NOT `createPadGrid`, because `pad.mjs`
+   * already exports one of those and it is a different component: a grid of the
+   * hardware PAD control, which `/circuit/` and `/evo/` both use for a keypad.
+   * Two components answering to one name in one kit is the drift `/kit/` exists
+   * to catch.
+   * `/pack/` grew a second hand-rolled grid the day after this page shipped,
+   * 16 steps by 6 slots against this one's 16 by 64, which is `positron-ui`'s
+   * own definition of a component that has not been noticed yet.
+   *
+   * 🔴 WHAT WENT INTO `step-grid.mjs` IS EVERY DECISION, NOT JUST THE MARKUP.
+   * Five separate edges were asked off this grid, each one reported on its own:
+   * the playhead cursor, the highlight border, the pad hover, the focus ring
+   * and the pads' own outline. All five are absences, and an absence is exactly
+   * what a rewrite puts back, so the reports travelled with the rules rather
+   * than being summarised into a line saying the grid has no borders.
+   *
+   * ⚠️ WHAT STAYS ON THIS PAGE IS THE SOUND AND THE TRANSPORT. The component
+   * has no `AudioContext` in it and no deck: this page decides what a step
+   * costs, which row can be heard, and where the playhead is. That is the same
+   * split `looper.mjs` and `board.mjs` already use, and it is what lets
+   * `/pack/`, which has no tempo to claim, use the same grid with no play
+   * button at all.
+   *
+   * ⚠️ AND THIS PAGE ASKS FOR NO `rate`, SO `grid.clock` IS `null`. The
+   * component can run its own clock for a page that has nothing else, and this
+   * page has a real transport with a score behind it. Two heads would argue.
+   */
+  const grid = createStepGrid({
+    fixed: panel.fixed,
+    strip: panel.strip,
+    rows: rows.length,
+    steps: STEPS,
+    label: (r) => String(r),
+    title: (r) => (hasSound(r)
+      ? `${rows[r].name}, ${rows[r].row.seconds.toFixed(2)} s, `
+        + `peak ${rows[r].row.peak.toFixed(2)}. Press to hear it`
+      : (rows[r].row && !rows[r].row.ok
+        ? `this one did not read: ${rows[r].row.why}`
+        : 'this row has no sample yet, so its steps are silent')),
+    // A row with a sample is a button and a row without is a div, which the
+    // component decides from this. Not a disabled button: at rest every row
+    // here is empty, and sixty four dimmed controls read as a page that failed.
+    canPress: (r) => hasSound(r),
+    onLabel: (r) => audition(r),
+    silent: (r) => !hasSound(r),
+    onSeek: (s) => deck.seek(s * STEP_MS),
     /**
-     * 🔴 TWO RULES A STEP, AND THE PARKED ONE CHANGES NO COLOUR AT ALL.
-     * Reported 2026-09-21 against a crop: *"hilite should not kill my 1st col
-     * beat bg color"*. A parked playhead was REPLACING the background, so
-     * column 1, which is a bar and therefore the lightest field on the grid,
-     * lost the one thing that said so. Every fourth pad is a beat and every
-     * sixteenth a bar, in the field, and a highlight that overwrites the field
-     * deletes that for whichever column it is on.
-     * ✅ `filter: brightness()` LIFTS WHATEVER IS THERE rather than replacing
-     * it, so a bar column parked under the playhead is still visibly a bar, and
-     * a lit step under it is still visibly lit.
-     * ⚠️ PLAYING IS THE OTHER RULE AND IT DOES REPLACE, deliberately: a running
-     * playhead is the loudest thing on the grid and has nothing to share with.
-     * ⚠️ THE FILL AND NOTHING ELSE, asked for as *"lose hilite borders"*. A lit
-     * pad on the instrument is a lit pad: the light IS the fill, and an edge
-     * round it is the bordered cursor coming back one property at a time.
+     * ⚠️ A PRESS MAKES A SOUND AND A PAGE SETTING A CELL DOES NOT, which is
+     * what `why` is for. Hearing what you just switched on is how a pattern
+     * gets built, and hearing sixty four cells because a pack just landed is
+     * not. `stroke` is a pad dragged across under a held pointer.
      */
-    sheet.textContent = Array.from({ length: STEPS }, (_, i) => {
-      const at = `.tom-cell:nth-child(${i + 1})`;
-      return `.tom-rows[data-now="${i}"] ${at}{filter:brightness(1.45);`
-        + 'animation:tom-breathe 2.2s ease-in-out infinite}\n'
-        + `.tom-rows[data-live][data-now="${i}"] ${at}{`
-        + 'filter:none;background:var(--tom-now);'
-        + 'animation:tom-breathe 1.4s ease-in-out infinite}';
-    }).join('\n');
-    document.head.append(sheet);
-  }
-  panel.strip.append(gridEl);
+    onToggle: (r, s, lit, why) => {
+      d.set('on', grid.count());
+      /* `draw` since 2026-09-22, when `stroke` was reported as this file's
+         private word appearing in a readout a visitor reads. Both names are
+         listed for one release rather than swapped, because a page that stops
+         firing on a drag is silent rather than red. */
+      if (lit && (why === 'press' || why === 'draw' || why === 'stroke')) fire(r, 'a cell');
+    },
+  });
+  const fixedEl = panel.fixed;
+  const rulerEl = grid.ruler;
+  const rowsEl = grid.rowsEl;
   /**
    * ⚠️ EMPTY AT REST AND RESERVED, NOT AN INSTRUCTION. A gutter carries what it
    * MEASURED and never what to press; what to press is the control's own label.
@@ -865,146 +662,6 @@
   const line = el('div', 'tom-line', '');
   d.stack.add(panel.el, line);
 
-  /**
-   * Draw the whole grid: one name per row, one cell per step.
-   *
-   * 🔴 THE ROVING TAB STOP IS SET WHILE THE CELLS ARE MADE, NOT AFTERWARDS.
-   * `table.mjs` records why there is one at all: every row at `tabIndex = 0`
-   * made tabbing past a 63 row table take sixty three presses, and a grid is
-   * that failure squared: 4,096 tab stops for one block on the page.
-   */
-  function drawGrid() {
-    const t0 = performance.now();
-    fixedEl.textContent = '';
-    rowsEl.textContent = '';
-    rulerEl.textContent = '';
-    cells = []; nameEls = []; tickEls = [];
-    focusR = Math.min(focusR, rows.length - 1);
-    focusS = Math.min(focusS, STEPS - 1);
-
-    fixedEl.append(el('div', 'tom-spacer'));
-    for (let s = 0; s < STEPS; s++) {
-      // Every fourth step carries its own number, which is sixteen numbers
-      // across four bars. Every cell carries a tick so the ruler and the rows
-      // share one geometry and the head can read it off either.
-      /**
-       * 🔴 NO NUMBERS OVER THE PADS, ASKED FOR AS *"no 1 5 labels above the top
-       * pad row"*. It printed 1, 5, 9 and 13 every fourth step, which is a
-       * second way of saying what the cells already say: every fourth pad is a
-       * beat and every sixteenth a bar, in the FIELD, which is the channel
-       * `pattern.mjs` settled on for the same reason. Two channels carrying one
-       * fact, and the one removed was the one made of words.
-       * ⚠️ THE TICK ELEMENT STAYS AND ONLY ITS TEXT GOES, which is deliberate:
-       * it is the ruler a press seeks on, and `geometry()` reads the first two
-       * ticks' `offsetLeft` so the band and the cells cannot disagree. Deleting
-       * the row would have taken both with it to remove some digits.
-       */
-      const t = el('div', 'tom-tick', '');
-      if (s % 4 === 0) t.dataset.beat = '1';
-      if (s % 16 === 0) t.dataset.bar = '1';
-      t.dataset.step = String(s);
-      tickEls.push(t);
-      rulerEl.append(t);
-    }
-
-    for (let r = 0; r < rows.length; r++) {
-      const sound = hasSound(r);
-      /**
-       * 🔴 A ROW IS ITS SLOT NUMBER, ASKED FOR AS *"relpace sammple names with
-       * 0 1 2 etc numbers in tom"*. Every name in a pack is `sample_N.wav`, so
-       * a column of them was 64 rows of the same eight characters with the only
-       * varying part at the end, and the column had to be 108 px wide to hold
-       * a word none of them differ in.
-       * ✅ AND THE NUMBER IS THE SLOT RATHER THAN A ROW INDEX, which is the same
-       * thing here and would stop being so the day a pack arrives with a gap in
-       * it. `samplesIn()` returns them in the pack's own numeric order and its
-       * test asserts exactly that, with a negative control that hands the
-       * entries in backwards.
-       * ⚠️ THE FULL NAME IS STILL ON THE HOVER, so nothing was lost: it is one
-       * of the three facts that title already carries.
-       */
-      const nm = el(sound ? 'button' : 'div', 'tom-name', String(r));
-      if (sound) {
-        nm.type = 'button';
-        nm.title = `${rows[r].name}, ${rows[r].row.seconds.toFixed(2)} s, `
-          + `peak ${rows[r].row.peak.toFixed(2)}. Press to hear it`;
-        nm.dataset.row = String(r);
-      } else {
-        nm.title = rows[r].row && !rows[r].row.ok
-          ? `this one did not read: ${rows[r].row.why}`
-          : 'this row has no sample yet, so its steps are silent';
-      }
-      nameEls.push(nm);
-      fixedEl.append(nm);
-
-      const rowEl = el('div', 'tom-row');
-      // ⚠️ `rowCells`, NOT `line`. A `const line` here would shadow the page's
-      // own `.tom-line` element from the top of this block, which is the exact
-      // shape `positron-ui` records as seven asserts going silent on a temporal
-      // dead zone while the page read green.
-      const rowCells = [];
-      for (let s = 0; s < STEPS; s++) {
-        const c = el('button', 'tom-cell', '', {
-          type: 'button',
-          'aria-label': `${rows[r].name}, step ${s + 1}`,
-          'aria-pressed': on[r][s] ? 'true' : 'false',
-        });
-        if (s % 4 === 0) c.dataset.beat = '1';
-        if (s % 16 === 0) c.dataset.bar = '1';
-        c.dataset.row = String(r); c.dataset.step = String(s);
-        if (on[r][s]) c.dataset.on = '1';
-        if (on[r][s] && !sound) c.dataset.mute = '1';
-        c.tabIndex = (r === focusR && s === focusS) ? 0 : -1;
-        rowCells.push(c);
-        rowEl.append(c);
-      }
-      cells.push(rowCells);
-      rowsEl.append(rowEl);
-    }
-    built = performance.now() - t0;
-    geom = null;
-    nowStep = -1;
-    // ⚠️ SIZED AFTER THE ROWS EXIST, because the strip's width is what it is
-    // once its content is in it, and a measurement taken before that is a
-    // measurement of an empty box.
-    sizeCells();
-    showAt(deck.position());
-    d.set('on', onCount());
-  }
-
-  /**
-   * 🔴 THE PAD SIZE IS MEASURED FROM THE STRIP AND WRITTEN TO ONE TOKEN, which
-   * is what makes the pads square AND keeps the two halves of the grid in step.
-   * Asked 2026-09-21: *"make tom pads fit the space"* and *"the rest of w are
-   * sqare pads"*.
-   * ⚠️ IT CANNOT BE DONE IN CSS ALONE HERE, AND THAT IS THE WHOLE REASON THIS
-   * FUNCTION EXISTS. `panel-layout.mjs` puts the names and the steps in separate
-   * flex children, so nothing in the browser relates a pad's height to a name
-   * row's height: they agree because both are `--tom-cell`. A pad that flexed
-   * in CSS would size itself and leave the names behind, and the misalignment
-   * would grow with the window. One token, measured once, read by both.
-   * ⚠️ AND IT IS A CUSTOM PROPERTY, NEVER A WRITTEN `width`. A component that
-   * varies a property per instance sets a custom property or no stylesheet can
-   * take it back, which is the `video-panel.mjs` lesson this project already
-   * paid for once.
-   * ⚠️ THE FLOOR IS 10 px. At 390 px the strip has about 360 to give, which is
-   * 20 px a pad over sixteen steps; the floor is there so a narrower box makes
-   * the strip scroll rather than making the pads vanish.
-   */
-  const CELL_MIN = 10;
-  function sizeCells() {
-    const box = panel.strip?.clientWidth || 0;
-    if (!box) return;
-    const gap = 2;                     // `--tom-gap`, and the only place it is read
-    const w = Math.max(CELL_MIN, Math.floor((box - (STEPS - 1) * gap) / STEPS));
-    panel.el.style.setProperty('--tom-cell', `${w}px`);
-    geom = null;
-    nowStep = -1;
-    showAt(deck.position());
-  }
-  // ⚠️ A `ResizeObserver` RATHER THAN A `resize` LISTENER. The strip changes
-  // width when the window does AND when the log grows, and only one of those
-  // fires `resize`.
   /**
    * 🔴 THE CASE IS PRINTED, ASKED FOR AS *"add titles to tom area: left:
    * positron right: tom"*. `place: 'ends'` is exactly that: the maker at one
@@ -1018,8 +675,13 @@
    * ⚠️ TYPED UPPERCASE THOUGH THE RULE UPPERCASES IT ANYWAY, so the source
    * reads like the page. Same rule `/kit/` states about its own headings.
    */
-  const plate = createNameplate({ lines: ['POSITRON', 'TOM'], place: 'ends' });
-  panel.el.prepend(plate.el);
+  /* 🔴 THE PANEL PLACES IT SINCE 2026-09-22 AND THIS PAGE USED TO PREPEND IT,
+     carrying `.tom .panel-plate { padding: 16px 0 0 }` in its own stylesheet to
+     put the plate off the top border. That rule was a page repairing a shared
+     component privately, so every page written after it inherited the defect
+     and not the fix, which is exactly what happened to `/plai/`. The inset is
+     `--panel-pad` in `shell.css` now and this page types nothing. */
+  const plate = panel.plate;
 
   /**
    * 🔴 THE PLAY STATE COMES OFF THE TRANSPORT'S OWN LISTENER, AND MY FIRST TRY
@@ -1072,207 +734,33 @@
    */
   deck.transport.onState((st) => setLive(!!st?.playing));
 
-  const ro = new ResizeObserver(() => sizeCells());
-  ro.observe(panel.strip);
-
-  /** Where the steps actually are, read off the laid out ruler rather than
-   *  computed from the token, so the band and the cells cannot disagree. */
-  let geom = null;
-  function geometry() {
-    if (geom && geom.w) return geom;
-    const a = tickEls[0], b = tickEls[1];
-    if (!a) return null;
-    const w = a.offsetWidth;
-    geom = { x0: a.offsetLeft, pitch: b ? b.offsetLeft - a.offsetLeft : w, w };
-    return geom.w ? geom : null;
-  }
-
   /**
-   * Put the band on the step the position is in.
+   * Put the head on the step the position is in.
    *
-   * ⚠️ IT TOUCHES THE DOM ONLY WHEN THE STEP CHANGES, which at 120 beats a
-   * minute is eight times a second rather than sixty. And what it touches is a
-   * transform and two attributes, none of which can change how much room
-   * anything takes.
-   */
-  /**
-   * 🔴 THE PADS THEMSELVES LIGHT UP, AND THERE IS NO CURSOR. Reported
-   * 2026-09-21 with a crop of a bordered column standing over the grid: *"just
-   * hilite the pads, no extra bordered cursor"*. That is what the instrument in
-   * the photograph does, and it is what a band over the top could never be: the
-   * band was a second object drawn on top of the pads, with its own edge, its
-   * own corners and its own alignment to get wrong.
-   *
-   * ✅ AND IT IS ONE DOM WRITE PER STEP RATHER THAN SIXTY FOUR. Setting
-   * `data-now` on each cell of a column would be 64 removals and 64 additions
-   * eight times a second; one attribute on the CONTAINER, with sixteen
-   * generated `nth-child` rules behind it, is one write. `positron-ui`'s rule
-   * is that a live picture may not change how much room it takes, and a
-   * background colour cannot.
-   * ⚠️ THE RULES ARE GENERATED ONCE FROM `STEPS`, not typed sixteen times. A
-   * hand-written list would be a second place the step count lives.
+   * 🔴 THE PICTURE IS THE COMPONENT'S AND THE ARITHMETIC IS THIS PAGE'S, which
+   * is the whole split. `stepAt` divides a POSITION by a step length, and only
+   * this page knows what a step is worth in milliseconds, because only this
+   * page has a tempo to claim. `at()` moves nothing unless the step really
+   * changed, so at 120 beats a minute it touches the DOM eight times a second
+   * rather than sixty.
    */
   function showAt(pos) {
-    const s = stepAt(pos);
-    if (s === nowStep) return;
-    if (tickEls[nowStep]) delete tickEls[nowStep].dataset.now;
-    nowStep = s;
-    if (tickEls[s]) tickEls[s].dataset.now = '1';
-    rulerEl.setAttribute('aria-valuenow', String(s + 1));
-    rowsEl.dataset.now = String(s);
-    d.set('step', s + 1);
+    const was = grid.step();
+    const s = grid.at(stepAt(pos));
+    if (s !== was) d.set('step', s + 1);
   }
 
   // ── pressing things ─────────────────────────────────────────────────────
-  function setCell(r, s, v) {
-    if (!on[r] || s < 0 || s >= STEPS) return false;
-    on[r][s] = v ? 1 : 0;
-    const c = cells[r] && cells[r][s];
-    if (c) {
-      if (v) c.dataset.on = '1'; else delete c.dataset.on;
-      if (v && !hasSound(r)) c.dataset.mute = '1'; else delete c.dataset.mute;
-      c.setAttribute('aria-pressed', v ? 'true' : 'false');
-    }
-    d.set('on', onCount());
-    return true;
-  }
-
-  /**
-   * 🔴 HOLD AND DRAW, ASKED FOR 2026-09-21: *"when i hold pointer down enabling
-   * pads, i should be able to draw otjher pads before i do poiunterup"*. A
-   * sixteen step pattern is built in runs, and clicking sixteen times to make
-   * one is the kind of thing an instrument is supposed to save you.
-   *
-   * 🔴 THE VALUE IS DECIDED BY THE FIRST PAD AND CARRIED, NOT TOGGLED PER PAD.
-   * Toggling each one under the finger means dragging across a run of lit pads
-   * ERASES them while dragging across dark ones lights them, so one gesture
-   * does two opposite things depending on what it crosses. The first press says
-   * `on` or `off` and the whole stroke means that.
-   *
-   * ⚠️ NO `setPointerCapture`, WHICH IS THE OBVIOUS THING AND IS WRONG HERE.
-   * Capturing retargets every later pointer event to the element that captured,
-   * so `pointerover` would never fire on the pads being dragged across: the
-   * stroke would paint exactly one pad, which is what it does today. The
-   * listeners sit on the CONTAINER instead.
-   *
-   * ⚠️ AND `click` IS GONE, because a press that painted on `pointerdown` and
-   * again on `click` toggles twice and lands back where it started. The
-   * keyboard path is unaffected: Enter has its own branch in the keydown
-   * handler and does not come through here.
-   */
-  let drawing = null;                 // the value this stroke is painting, or null
-
-  function paint(c, first) {
-    const r = +c.dataset.row, s = +c.dataset.step;
-    if (Number.isNaN(r) || Number.isNaN(s)) return;
-    if (on[r][s] === (drawing ? 1 : 0)) return;   // already what the stroke wants
-    setCell(r, s, drawing);
-    if (first) rove(r, s, false);
-    // Hearing what you just switched on is how a pattern gets built. It is a
-    // press, so it is allowed to make a sound.
-    if (drawing) fire(r, 'a cell');
-  }
-
-  rowsEl.addEventListener('pointerdown', (e) => {
-    const c = e.target.closest('.tom-cell');
-    if (!c || e.button !== 0) return;
-    e.preventDefault();
-    drawing = !on[+c.dataset.row][+c.dataset.step];
-    paint(c, true);
-  });
-
-  rowsEl.addEventListener('pointerover', (e) => {
-    if (drawing === null) return;
-    const c = e.target.closest('.tom-cell');
-    if (c) paint(c, false);
-  });
-
-  // ⚠️ ON THE WINDOW, because a stroke that ends off the grid still has to end.
-  // A `pointerup` on the page background never reaches the container, and a
-  // stroke left armed would paint on the next hover with nothing held down.
-  for (const ev of ['pointerup', 'pointercancel']) {
-    addEventListener(ev, () => { drawing = null; });
-  }
-
-  fixedEl.addEventListener('click', (e) => {
-    const b = e.target.closest('button.tom-name');
-    if (!b) return;
-    audition(+b.dataset.row);
-  });
-
-  /**
-   * 🔴 THE RULER SEEKS, WHICH IS WHAT MAKES THIS PAGE'S ONE POSITION SURFACE A
-   * POSITION SURFACE. Without it `scrub: false` would take seeking off the page
-   * rather than moving it.
-   * ⚠️ ON A PRESS AND NOT ON A DRAG, AND THAT IS A TRADE RATHER THAN AN
-   * OVERSIGHT. The ruler sits inside the panel's horizontal scroller, so a
-   * `touch-action: none` that captured a drag would also stop a finger
-   * scrolling the steps, which is the gesture a reader makes far more often. A
-   * tap seeks, a swipe scrolls, and the keyboard table the bar owns still moves
-   * the playhead with the arrows.
-   */
-  rulerEl.addEventListener('click', (e) => {
-    const t = e.target.closest('.tom-tick');
-    if (!t) return;
-    deck.seek(+t.dataset.step * STEP_MS);
-  });
-
-  // ── the keyboard ────────────────────────────────────────────────────────
-  /**
-   * 🔴 AN ARROW MOVES AND DOES NOT OPEN, AND IT MUST NOT REACH THE TRANSPORT.
-   * `transport-bar.mjs` binds ONE keyboard table for the whole project on
-   * `window`: space toggles play, the arrows seek, a digit jumps to a tenth. A
-   * grid that moved focus with the arrows and let the event through would seek
-   * two per cent of the piece on every press, so this stops the event at the
-   * grid. There is an assert on exactly that, and it is a negative control: the
-   * playhead must not move.
-   * ⚠️ SPACE IS STOPPED TOO AND NOT HANDLED. A `<button>` activates on keyup,
-   * so the cell still toggles; what is prevented is the same press also
-   * starting the transport.
-   */
-  function rove(r, s, focus = true) {
-    const old = cells[focusR] && cells[focusR][focusS];
-    if (old) old.tabIndex = -1;
-    focusR = Math.max(0, Math.min(rows.length - 1, r));
-    focusS = Math.max(0, Math.min(STEPS - 1, s));
-    const next = cells[focusR] && cells[focusR][focusS];
-    if (next) { next.tabIndex = 0; if (focus) next.focus(); }
-    return next;
-  }
-
-  rowsEl.addEventListener('keydown', (e) => {
-    const c = e.target.closest('.tom-cell');
-    if (!c) return;
-    const r = +c.dataset.row, s = +c.dataset.step;
-    const k = e.key;
-    /**
-     * 🔴 SPACE PLAYS AND STOPS, ENTER TURNS A PAD ON AND OFF. Asked 2026-09-21:
-     * *"space should play and stop. enter turns pad on and off"*.
-     * ⚠️ SPACE WAS BEING SWALLOWED HERE, on purpose and wrongly. A pad is a
-     * `<button>`, so the browser's own default for space is to PRESS it, which
-     * would have toggled a step; `stopPropagation` stopped the transport bar
-     * seeing it and the default still fired. So space toggled a pad and did not
-     * play, which is the two keys the other way round.
-     * ✅ `preventDefault` KILLS THE BUTTON DEFAULT and the event is left to
-     * bubble to the bar's own keyboard table, which already owns space as the
-     * play key on every page here. One binding for play, not a second copy.
-     * ⚠️ AND ENTER GETS `preventDefault` TOO, or a button fires its click as
-     * well and the pad toggles twice, landing back where it started.
-     */
-    if (k === ' ') { e.preventDefault(); return; }
-    if (k === 'Enter') { e.preventDefault(); e.stopPropagation(); setCell(r, s, !on[r][s]); return; }
-    let to = null;
-    if (k === 'ArrowLeft') to = [r, s - 1];
-    else if (k === 'ArrowRight') to = [r, s + 1];
-    else if (k === 'ArrowUp') to = [r - 1, s];
-    else if (k === 'ArrowDown') to = [r + 1, s];
-    else if (k === 'Home') to = [r, 0];
-    else if (k === 'End') to = [r, STEPS - 1];
-    else return;
-    e.preventDefault();
-    e.stopPropagation();
-    rove(to[0], to[1]);
-  });
+  //
+  // 🔴 THE STROKE, THE ROVING TAB STOP, THE RULER SEEK AND THE KEYBOARD ALL
+  // LEFT THIS FILE ON 2026-09-22 and are in `step-grid.mjs`. Every one of them
+  // is true of any grid of pads: hold and draw with one value for the whole
+  // stroke, one tab stop rather than 1,024, an arrow that moves and must not
+  // reach the transport, space prevented so the bar's own key still plays, and
+  // a tap on the ruler that seeks while a swipe still scrolls.
+  // ⚠️ WHAT STAYS IS WHAT THEY COST HERE, which is sound, and it arrives
+  // through `onToggle` and `onSeek` where the component was built.
+  const setCell = (r, s, v) => grid.set(r, s, v, 'page');
 
   // ── the sound ───────────────────────────────────────────────────────────
   /**
@@ -1342,16 +830,18 @@
    *  sounded, which is not the same as how many cells were on. */
   function fireStep(s) {
     let n = 0;
-    for (let r = 0; r < rows.length; r++) if (on[r][s] && fire(r, `step ${s + 1}`, false)) n++;
+    for (let r = 0; r < rows.length; r++) if (grid.get(r, s) && fire(r, `step ${s + 1}`, false)) n++;
     return n;
   }
 
   /** Hear one row on its own. A grid of sixty four rows named `sample_0.wav` to
    *  `sample_63.wav` cannot be worked without this. */
   function audition(r) {
-    if (nameEls[picked]) delete nameEls[picked].dataset.pick;
     picked = r;
-    if (nameEls[r]) nameEls[r].dataset.pick = '1';
+    // ⚠️ `lit` IS A COLOUR AND NEVER A BOX, which is the component's own note:
+    // hearing a row is not selecting it, and a filled box behind the number
+    // stayed saying *this one is chosen* about a sound that had finished.
+    grid.lit(r);
     fire(r, 'its name');
   }
 
@@ -1518,12 +1008,18 @@
   }
 
   function setRows(got) {
-    const was = on;
     rows = got;
-    on = rows.map((_, i) => (was[i] ? was[i].slice() : new Uint8Array(STEPS)));
     bufs.clear();
     picked = -1;
-    drawGrid();
+    // 🔴 THE PATTERN SURVIVES THE PACK ARRIVING, and it is the component that
+    // keeps it now: `setRows` carries every pad that still has a row. There is
+    // an assert on exactly that, because somebody typing a pattern before
+    // opening a file must not lose it.
+    const t0 = performance.now();
+    grid.setRows(rows.length);
+    grid.redraw();
+    built = performance.now() - t0;
+    d.set('on', grid.count());
     // ⚠️ AFTER THE GRID, so the picture is on screen before the decoding
     // starts, and only if a context already exists: making one here would be
     // the page opening an audio device nobody asked it to.
@@ -1534,7 +1030,7 @@
       + (bufs.size ? `, ${bufs.size} decoded in ${warmed.toFixed(0)} ms` : ''));
   }
 
-  drawGrid();
+  d.set('on', grid.count());
 
   // ── what a visit is allowed to have done ────────────────────────────────
   d.assert('a visit opens nothing, asks for nothing and makes no sound',
@@ -1547,9 +1043,9 @@
     `requestMIDIAccess called ${midiAsked} time(s), and the counter is still in front of it`);
 
   d.assert('the grid is 64 rows of 16 steps before a pack lands, one row for every sample slot',
-    cells.length === REST_ROWS && cells.every((r) => r.length === STEPS)
+    grid.pads.length === REST_ROWS && grid.pads.every((r) => r.length === STEPS)
     && rows.every((r) => r.wave === null),
-    `${cells.length} rows of ${cells[0] ? cells[0].length : 0}, none of them a sample`);
+    `${grid.pads.length} rows of ${grid.pads[0] ? grid.pads[0].length : 0}, none of them a sample`);
 
   d.assert('the way in is visible at rest and says what it takes',
     drop.el.classList.contains('pos-drop-area')
@@ -1585,9 +1081,9 @@
     const scrubEl = bar.el.querySelector('.tbar-scrub');
     d.assert('the grid is the one position surface, so the bar draws no slider',
       bar.el.dataset.scrub === '0' && getComputedStyle(scrubEl).display === 'none'
-      && rulerEl.getAttribute('role') === 'slider' && tickEls.length === STEPS,
+      && rulerEl.getAttribute('role') === 'slider' && grid.ticks.length === STEPS,
       `the bar says data-scrub="${bar.el.dataset.scrub}" and its slider computes `
-      + `display: ${getComputedStyle(scrubEl).display}, against ${tickEls.length} `
+      + `display: ${getComputedStyle(scrubEl).display}, against ${grid.ticks.length} `
       + 'ticks on the ruler that do seek');
   }
 
@@ -1599,16 +1095,16 @@
    * makes them agree: they agree because both sides are built from one token.
    */
   {
-    const n0 = nameEls[0].getBoundingClientRect();
+    const n0 = grid.labels[0].getBoundingClientRect();
     const r0 = rowsEl.children[0].getBoundingClientRect();
-    const nz = nameEls[nameEls.length - 1].getBoundingClientRect();
+    const nz = grid.labels[grid.labels.length - 1].getBoundingClientRect();
     const rz = rowsEl.children[rowsEl.children.length - 1].getBoundingClientRect();
     d.assert('the first name sits on the first row of steps',
       Math.abs(n0.top - r0.top) < 1 && Math.abs(n0.bottom - r0.bottom) < 1,
       `top ${(n0.top - r0.top).toFixed(2)} px apart, bottom ${(n0.bottom - r0.bottom).toFixed(2)} px apart`);
     d.assert('and the last one still does, so the two columns share one pitch',
       Math.abs(nz.top - rz.top) < 1 && Math.abs(nz.bottom - rz.bottom) < 1,
-      `top ${(nz.top - rz.top).toFixed(2)} px apart over ${nameEls.length} rows`);
+      `top ${(nz.top - rz.top).toFixed(2)} px apart over ${grid.labels.length} rows`);
   }
 
   /**
@@ -1694,7 +1190,7 @@
    * with nothing held down, which is a page that changes under a moving mouse.
    */
   if (SELFCHECK) {
-    const row = cells[0];
+    const row = grid.pads[0];
     const down = (c) => c.dispatchEvent(new PointerEvent('pointerdown',
       { bubbles: true, button: 0, pointerId: 1 }));
     const over = (c) => c.dispatchEvent(new PointerEvent('pointerover',
@@ -1702,23 +1198,28 @@
     for (let s = 0; s < 4; s++) setCell(0, s, false);
 
     down(row[0]); over(row[1]); over(row[2]);
-    const drew = [0, 1, 2, 3].map((s) => on[0][s]);
+    const drew = [0, 1, 2, 3].map((s) => grid.get(0, s));
     dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
     over(row[3]);
-    const afterUp = on[0][3];
+    const afterUp = grid.get(0, 3);
 
     // Now the other way: start on a lit pad and rub a run of them out.
     for (let s = 0; s < 4; s++) setCell(0, s, s !== 2);
     down(row[0]); over(row[1]); over(row[2]); over(row[3]);
-    const erased = [0, 1, 2, 3].map((s) => on[0][s]);
+    const erased = [0, 1, 2, 3].map((s) => grid.get(0, s));
     dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
     for (let s = 0; s < 4; s++) setCell(0, s, false);
 
+    // ⚠️ `grid.get` ANSWERS A BOOLEAN, which is what the component reports and
+    // what this page's own `on` array used to report as a 0 or a 1. The digits
+    // are what a reader wants to see in the detail line, so they are made here
+    // rather than the comparison being loosened.
+    const bits = (a) => a.map((v) => (v ? 1 : 0)).join('');
     d.assert('holding and dragging paints every pad it crosses, one value for the whole stroke',
-      drew.join() === '1,1,1,0' && afterUp === 0
-      && erased.join() === '0,0,0,0',
-      `drew ${drew.join('')} then ${afterUp} after the release, `
-      + `and a stroke starting on a lit pad left ${erased.join('')}`);
+      bits(drew) === '1110' && afterUp === false
+      && bits(erased) === '0000',
+      `drew ${bits(drew)} then ${afterUp ? 1 : 0} after the release, `
+      + `and a stroke starting on a lit pad left ${bits(erased)}`);
   }
 
   /**
@@ -1788,7 +1289,7 @@
    * grid where every cell is.
    */
   {
-    const all = cells.flat();
+    const all = grid.pads.flat();
     const zero = all.filter((c) => c.tabIndex === 0).length;
     const minus = all.filter((c) => c.tabIndex === -1).length;
     d.assert('the grid is one tab stop, not one per cell',
@@ -1824,7 +1325,7 @@
       setCell(0, 0, true);
       const rang = fireStep(0);
       d.assert('NEGATIVE CONTROL: a step on a row with no sample lights its cell and starts no sound',
-        cells[0][0].dataset.on === '1' && cells[0][0].dataset.mute === '1'
+        grid.pads[0][0].dataset.on === '1' && grid.pads[0][0].dataset.mute === '1'
         && rang === 0 && voices === was && ac === null,
         `${rang} sound(s) from a lit cell, ${voices - was} new voice(s), `
         + `audio context ${ac === null ? 'never made' : 'made'}`);
@@ -1840,15 +1341,15 @@
      */
     {
       const before = deck.position();
-      cells[0][0].focus();
-      cells[0][0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-      const moved = document.activeElement === cells[0][1];
+      grid.pads[0][0].focus();
+      grid.pads[0][0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      const moved = document.activeElement === grid.pads[0][1];
       d.assert('NEGATIVE CONTROL: an arrow inside the grid moves focus and leaves the playhead alone',
-        moved && cells[0][1].tabIndex === 0 && cells[0][0].tabIndex === -1
+        moved && grid.pads[0][1].tabIndex === 0 && grid.pads[0][0].tabIndex === -1
         && Math.abs(deck.position() - before) < 1,
         `focus ${moved ? 'moved one step' : 'did not move'}, position `
         + `${before.toFixed(1)} -> ${deck.position().toFixed(1)}`);
-      rove(0, 0, false);
+      grid.focus(0, 0);
     }
 
     /**
@@ -1910,10 +1411,10 @@
       await openPack('New Pack.circuitpack', bytes);
 
       d.assert('the pack gives the grid one row for every sample in it, and the steps do not move',
-        rows.length === 64 && cells.length === 64
-        && cells.every((row) => row.length === STEPS)
-        && nameEls.length === 64 && nameEls.every((n) => n.textContent),
-        `${rows.length} rows of ${cells[0].length}, first "${rows[0].name}", last "${rows[63].name}"`);
+        rows.length === 64 && grid.pads.length === 64
+        && grid.pads.every((row) => row.length === STEPS)
+        && grid.labels.length === 64 && grid.labels.every((n) => n.textContent),
+        `${rows.length} rows of ${grid.pads[0].length}, first "${rows[0].name}", last "${rows[63].name}"`);
 
       /**
        * 🔴 THE WORK A READER DID BEFORE THE FILE ARRIVED IS STILL THERE. The
@@ -1923,10 +1424,10 @@
        * across, and it is free because the earlier check already put it there.
        */
       d.assert('the pattern typed before the pack survives the pack arriving',
-        on[0][0] === 1 && cells[0][0].dataset.on === '1'
-        && cells[0][0].dataset.mute === undefined,
-        `step 1 of row 1 is ${on[0][0] ? 'still on' : 'gone'} and is `
-        + `${cells[0][0].dataset.mute ? 'still silent' : 'no longer silent'}`);
+        grid.get(0, 0) === true && grid.pads[0][0].dataset.on === '1'
+        && grid.pads[0][0].dataset.mute === undefined,
+        `step 1 of row 1 is ${grid.get(0, 0) ? 'still on' : 'gone'} and is `
+        + `${grid.pads[0][0].dataset.mute ? 'still silent' : 'no longer silent'}`);
 
       const all = summariseAll(rows.map((x) => x.wave));
       d.assert('all 64 read as 48 kHz 16 bit mono with none refused, and their lengths differ',
@@ -1980,10 +1481,10 @@
        */
       {
         const was = voices, where = deck.position();
-        nameEls[7].click();
+        grid.labels[7].click();
         d.assert('pressing a row\'s name hears that sample and does not move the transport',
           voices === was + 1 && lastFired.name === rows[7].name
-          && nameEls[7].dataset.pick === '1'
+          && grid.labels[7].dataset.lit === '1'
           && Math.abs(deck.position() - where) < 1 && deck.playing() === false,
           `"${lastFired.name}" after pressing row 8, position `
           + `${where.toFixed(1)} -> ${deck.position().toFixed(1)}`);
@@ -2010,7 +1511,7 @@
         deck.seek(7 * STEP_MS);
         await raf2();
         const want = stepAt(deck.position());
-        const row0 = cells[0] || [];
+        const row0 = grid.pads[0] || [];
         /**
          * 🔴 THREE CLAIMS, AND THE FIRST TRY MEASURED A QUANTITY THAT CANNOT
          * MOVE. It compared `backgroundColor` across the two states and read
@@ -2021,7 +1522,14 @@
          * this project's measure-the-adjacent-quantity mistake again, and the
          * page was behaving exactly as asked while the check said otherwise.
          * ✅ SO: parked LIFTS AND REPLACES NOTHING, which is what keeps a bar
-         * column's own field colour; playing REPLACES and stops lifting.
+         * column's own field colour.
+         * 🔴 AND SINCE 2026-09-22 NEITHER DOES THE RUNNING ONE. The same
+         * complaint arrived about the playing head, *"its rms cell orginial
+         * color ... preseve original button hue a bit"*, so it is an inset
+         * wash layered OVER the pad's colour rather than a replacement. The
+         * two states are told apart by the shadow now, and the negative half
+         * is the one that matters: a PARKED head must not carry that wash or
+         * waiting and running look the same.
          */
         const at = row0[want];
         const parkedBg = getComputedStyle(at).backgroundColor;
@@ -2034,15 +1542,20 @@
         setLive(true);
         const liveBg = getComputedStyle(at).backgroundColor;
         const liveFx = getComputedStyle(at).filter;
+        const liveShadow = getComputedStyle(at).boxShadow;
+        setLive(false);
+        const parkedShadow = getComputedStyle(at).boxShadow;
         setLive(!!deck.transport.playing);
-        d.assert('a parked playhead lifts the pad without replacing its field, and a playing one replaces it',
+        d.assert('neither playhead replaces the pad\u2019s own colour, and only the running one carries the wash',
           rowsEl.dataset.now === String(want)
-          && tickEls[want].dataset.now === '1'
+          && grid.ticks[want].dataset.now === '1'
           && window.__demo.readout.step === want + 1
-          && parkedBg === ownBg && /brightness/.test(parkedFx)
-          && liveFx === 'none' && liveBg !== ownBg,
-          `parked keeps ${parkedBg} under ${parkedFx}, playing paints ${liveBg} `
-          + `with filter ${liveFx}`);
+          && parkedBg === ownBg && liveBg === ownBg
+          && /brightness/.test(parkedFx) && liveFx !== 'none'
+          && /inset/.test(liveShadow) && !/inset/.test(parkedShadow),
+          `the pad keeps ${ownBg} in both states · parked ${parkedFx} with `
+          + `shadow ${parkedShadow.slice(0, 40)} · playing ${liveFx} with `
+          + `shadow ${liveShadow.slice(0, 40)}`);
       }
 
       /**
@@ -2066,8 +1579,8 @@
         const rang = fireStep(0);
         d.assert('NEGATIVE CONTROL: a sample that will not read keeps its row, says why, and starts nothing',
           rows.length === 65 && bad.length === 1 && bad[0].row.ok === false
-          && nameEls[r64].tagName === 'DIV'
-          && /did not read/.test(nameEls[r64].title)
+          && grid.labels[r64].tagName === 'DIV'
+          && /did not read/.test(grid.labels[r64].title)
           && rang === 0 && voices === was,
           `${rows.length} rows, the last one "${bad[0].name}" refused because `
           + `"${bad[0].row.why}", ${rang} sound(s) from it`);
