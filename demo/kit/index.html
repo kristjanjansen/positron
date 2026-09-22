@@ -4694,9 +4694,14 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
     const centres = ['acting', 'reporting'].map((k) => {
       const inst = headSpec[k];
       const caseR = inst.el.getBoundingClientRect();
-      const midR = inst.patchSlot.getBoundingClientRect();
+      /* 🔴 THE MIDDLE CELL IS THE NAMEPLATE SINCE 2026-09-22: *"move patch
+         selector the right and nameplate to center"*. The claim never was about
+         the picker, it is that whatever sits in column 2 is centred on the CASE
+         rather than balanced between two unequal neighbours, so it follows the
+         cell rather than its tenant. */
+      const midR = inst.plate.el.getBoundingClientRect();
       const onR = inst.online.el.getBoundingClientRect();
-      const plateR = inst.plate.el.getBoundingClientRect();
+      const plateR = inst.patchSlot.getBoundingClientRect();
       return {
         k,
         off: (midR.left + midR.width / 2) - (caseR.left + caseR.width / 2),
@@ -4707,7 +4712,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         on: onR.width, plate: plateR.width,
       };
     });
-    d.assert('the patch selector sits on the case’s own centre, on both cases',
+    d.assert('the nameplate sits on the case’s own centre, on both cases',
       centres.every((c) => Math.abs(c.off) <= 1),
       centres.map((c) => `${c.k} is ${c.off.toFixed(1)} px off the case centre`).join(', '));
 
@@ -4720,7 +4725,7 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       centres.every((c) => Math.abs(c.flex) > 4)
       && centres.some((c) => Math.abs(c.on - c.plate) > 10),
       centres.map((c) => `${c.k} would be ${c.flex.toFixed(1)} px off, with a `
-        + `${c.on.toFixed(0)} px status against a ${c.plate.toFixed(0)} px plate`).join(', '));
+        + `${c.on.toFixed(0)} px status against a ${c.plate.toFixed(0)} px picker`).join(', '));
 
     /**
      * 🔴 A CONTROL THAT ACTS IS A BUTTON AND ONE THAT REPORTS IS NOT, AND THE
@@ -4756,14 +4761,19 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
       + `<${headSpec.acting.online.el.tagName.toLowerCase()}> on the acting one`);
 
     /* The plate in a header is `end` whether it has one line or two, which is
-       the placement the removed INSTRUMENT specimen used to demonstrate. */
+       the placement the removed INSTRUMENT specimen used to demonstrate.
+       🔴 AND IT IS THE MIDDLE CELL SINCE 2026-09-22, not the last: *"move patch
+       selector the right and nameplate to center"*. The placement stays `end`
+       and that is not a contradiction: `end` is how a plate lays its own lines
+       out, and the column is where the header puts it. This asserted both and
+       had to follow the one that moved. */
     const two = headSpec.acting.plate.shown();
     const one = headSpec.reporting.plate.shown();
-    d.assert('a header’s plate is pushed right, one line or two, and is the row’s last cell',
+    d.assert('a header’s plate lays out at its end, one line or two, in the middle cell',
       two.join(' / ') === 'POSITRON / PLAI' && one.length === 1 && one[0] === 'MODEL 12'
       && headSpec.acting.plate.place === 'end' && headSpec.reporting.plate.place === 'end'
       && getComputedStyle(headSpec.acting.plate.el).justifyContent === 'flex-end'
-      && getComputedStyle(headSpec.acting.plate.el).gridColumnStart === '3',
+      && getComputedStyle(headSpec.acting.plate.el).gridColumnStart === '2',
       `${JSON.stringify(two)} and ${JSON.stringify(one)}, both at `
       + `${headSpec.acting.plate.place} in column `
       + `${getComputedStyle(headSpec.acting.plate.el).gridColumnStart}`);

@@ -667,8 +667,17 @@
    */
   const scope = createWaveShape({
     reason: null,
-    colour: '--hi',
+    /* 🔴 THE MAKER'S OWN TEAL, ASKED FOR AS *"use mi cyan/teal for the
+       plaits"*. `--mi-teal` is `#3c8a8a`, MEASURED off a photograph of the
+       panel at 116 px of it, and it is in `shell.css` beside the four others
+       from the same two images.
+       ⚠️ IT DOES NOT DISPLACE `--hi`, which still means *the thing this control
+       is about* everywhere else on the site. A replica drawing somebody else's
+       instrument in their colour is a different claim from a page highlighting
+       its own control, and this trace is the first. */
+    colour: '--mi-teal',
     height: 140,
+    trail: 4,
   });
 
   const inst = createInstrument({
@@ -1406,11 +1415,16 @@
       }
       return;
     }
+    if (m.t === 'wave') {
+      plaitsWave = m.wave;
+      scopeFrames = m.waveFrames || 0;
+      paintScope();
+      return;
+    }
     if (m.t === 'meter') {
       last = m;
       meters++;
       d.set('sounding', m.held);
-      if (m.wave) { plaitsWave = m.wave; scopeFrames = m.waveFrames || 0; paintScope(); }
     }
   }
 
