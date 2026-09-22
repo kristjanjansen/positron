@@ -321,11 +321,26 @@
   // times in one evening, every time for a page doing arithmetic about a
   // component's insides.
   const knobs = new Map();
+  /**
+   * 🔴 EVERY KNOB ON THIS PAGE HAS AN INVISIBLE HAND, ASKED FOR 2026-09-22 AS
+   * *"add inivisible hands to muta's"*. It is `hand: true` in these two helpers
+   * rather than on fourteen call sites, so a knob added later gets one by
+   * being a knob.
+   * ✅ **AND IT COSTS NOBODY ANYTHING HERE, WHICH IS NOT TRUE EVERYWHERE.**
+   * The ten minute ceiling in `hand-drive.mjs` was written for `/knobs/`, where
+   * a hand puts fifty messages a second on a relay and into a Raspberry Pi in
+   * another building. This page opens no socket and reaches no relay: a hand on
+   * it moves a number across one thread boundary into an AudioWorklet on this
+   * machine, and it is audible in the next render quantum, 2.67 ms away.
+   * ⚠️ **A CONTROL TOO COARSE FOR ONE REFUSES ITSELF AND SAYS SO ON ITS OWN
+   * BUTTON.** Every knob here is continuous, so every one qualifies; the voice
+   * count does not and is not a knob in this bank.
+   */
   const knob = (key, id, o) => {
     // ON EVERY MOVE. There is no wire here and no relay to overrun: the
     // message crosses one thread boundary and is audible in the next render
     // quantum, which is 2.67 ms away.
-    const k = createKnob({ ...o, onInput: (v) => send({ t: 'param', id, value: v }) });
+    const k = createKnob({ hand: true, ...o, onInput: (v) => send({ t: 'param', id, value: v }) });
     knobs.set(key, k);
     return k;
   };
@@ -435,8 +450,9 @@
   // wearing this one's name. What is sounding is in a readout cell instead,
   // which is where a number that moves belongs.
   const wknobs = new Map();
+  // A hand on every one of these too. See the note on `knob` above.
   const wknob = (key, id, o) => {
-    const k = createKnob({ ...o, onInput: (v) => sendWarp({ t: 'param', id, value: v }) });
+    const k = createKnob({ hand: true, ...o, onInput: (v) => sendWarp({ t: 'param', id, value: v }) });
     wknobs.set(key, k);
     return k;
   };
