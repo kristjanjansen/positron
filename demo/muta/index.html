@@ -100,6 +100,20 @@
      obeys and the air above a knob is this block's own. */
   .muta-panel > .panel-plate {
     position: absolute; top: var(--panel-pad); right: var(--panel-pad);
+    /* 🔴 AND NO PADDING, WHICH IS THE WHOLE BUG AND IT TOOK THREE ROUNDS.
+       `shell.css` gives a plate in a case `padding-block: var(--panel-pad) 0`,
+       which is how it earns its own top inset WHILE IT IS IN THE FLOW. Floating
+       it put that inset in twice: the box sits at 20 from the top and the WORDS
+       sit 20 further down inside it.
+       🔴 **AND EVERY MEASUREMENT I TOOK AGREED WITH THE STYLESHEET AND WITH
+       NOBODY'S EYES**, because a `getBoundingClientRect` reads the BOX and the
+       thing a reader sees is the INK. The screenshot that settled it was the
+       user's own inspector: `div.panel-plate 40.82 x 31, Padding 20px 0px
+       0px`. **Measure the quantity in question**, which here was never the box.
+       ⚠️ THE RULE IT OVERRIDES IS RIGHT FOR EVERY OTHER CALLER. `/tom/`,
+       `/twelve/` and `/circuit/` keep their plates in the flow, where that
+       padding IS the inset. */
+    padding: 0;
   }
 
   .plai-knobs {
@@ -651,12 +665,19 @@
    * refused there for width; the header solves the same problem by giving it a
    * row of its own on a phone.
    */
+  const scope = createWaveShape({
+    reason: null,
+    colour: '--hi',
+    height: 140,
+  });
+
   const inst = createInstrument({
     name: 'PLAITS', maker: '',
     header: { at: 'foot',
               plate: false,
               online: { of: 'PLAITS', state: 'offline', press: () => togglePlaits() },
               patch: pickRow },
+    parts: [scope.el],
     panel: { side: null, cls: { panel: 'muta-panel plai-panel' } },
   });
   inst.add(knobGrid);
@@ -784,58 +805,28 @@
               patch: wpickRow },
     panel: { side: null, cls: { panel: 'muta-panel warp-panel' } },
   });
-  /**
-   * 🔴 ONE PICTURE, TWO SIGNALS, UNDER THE EFFECT. Asked 2026-09-22: *"can you
-   * have wave / osilocope visualizer to top of muta. plai and warp with
-   * different colors"*, and placed by *"what about waveform under warps?"*.
-   * 🔴 **IT IS THE PAGE'S WHOLE CLAIM MADE VISIBLE.** Every other piece of
-   * evidence that the chain is a chain is a number in a log: the effect reads
-   * 0.8872 with both inputs and 0.0000 with the modulator silenced. Two traces
-   * on one picture is the same fact where a visitor can see it, because what
-   * the effect DID is the difference between them.
-   * ⚠️ **NOTHING HERE TAPS THE GRAPH.** `synth-view.mjs` has no
-   * `AudioContext`, no frame loop and no poll, by its own rule. The samples
-   * arrive on the meter message the worklets already post four times a second,
-   * and this calls `set` when they land.
-   * ⚠️ AND THE COLOURS ARE THE COMPONENT'S OWN: the base trace takes `--dim`
-   * and the second takes `--hi`, which is this project's one meaning for
-   * yellow. The effect's output is the one in yellow, because it is the thing
-   * this panel is about.
-   */
-  const scope = createWaveShape({
-    label: 'signal',
-    reason: 'nothing is running yet',
-    colour: '--dim',
-    over: { colour: '--hi' },
-  });
 
-  /**
-   * ⚠️ THE TRACES ARE KEPT AND REDRAWN TOGETHER, because the two worklets post
-   * on their own clocks and a picture that drew whichever arrived last would
-   * show one firmware's signal against the other's previous one.
-   * ⚠️ AND A SILENT INSTRUMENT DRAWS NOTHING RATHER THAN A FLAT LINE. A line
-   * through zero is a real reading of silence and reads as a broken picture, so
-   * the refusal the component already owns says which of the two is quiet.
-   */
-  let plaitsWave = null, warpsWave = null;
+  let plaitsWave = null, warpsWave = null, scopeFrames = 0;
   const anyInk = (w) => !!w && w.some((x) => Math.abs(x) > 0.0005);
   function paintScope() {
-    const a = anyInk(plaitsWave), b = anyInk(warpsWave);
-    if (!a && !b) {
-      scope.set({ points: null, reason: 'nothing is sounding yet', over: null });
+    if (!anyInk(plaitsWave)) {
+      scope.set({ points: null, reason: null });
       return;
     }
+    /* The span is the worklet's own count of frames, not a number typed here,
+       so the axis follows the window rather than agreeing with it by luck. */
+    const ms = scopeFrames ? (scopeFrames / (ctx ? ctx.sampleRate : 48000)) * 1000 : null;
     scope.set({
-      points: a ? plaitsWave : null,
-      reason: a ? '' : 'the oscillator is quiet',
-      colour: '--dim',
-      over: b ? { points: warpsWave, colour: '--hi' } : null,
+      points: plaitsWave,
+      reason: '',
+      colour: '--hi',
+      axes: { y: '\u00b11', x: ms ? `${ms.toFixed(1)} ms` : '' },
     });
   }
 
   const warpKnobs = el('div', 'plai-knobs');
   warpKnobs.append(warpAlgoGrid.el, warpGrid.el);
-  warpInst.add(warpKnobs, scope.el);
+  warpInst.add(warpKnobs);
 
   d.stack.add(inst.el, warpInst.el);
 
@@ -1097,14 +1088,34 @@
                           + `${chainOff == null ? 'nothing' : chainOff.toFixed(6)} out of WARPS`,
           quiet == null ? 'bad' : '');
 
-    const mid = meters;
-    const wmid = warpMeters;
-    pluck();
-    await sleep(600);
-    loud = meters > mid ? last.peak : null;
-    chainOn = warpMeters > wmid ? warpLast.peak : null;
-
-    await measureChord();
+    /**
+     * 🔴 THE MEASURING PLAYS ONLY UNDER A HARNESS, AND IT PLAYED FOR EVERYBODY
+     * UNTIL 2026-09-22. Reported twice, the second time as *"i still hear
+     * opening chime. god..."*, and MEASURED rather than argued about: the
+     * oscillator's peak after a press ran **0.113 decaying to 0.023, then 0.315
+     * decaying to 0.027, then steady at 0.125**. Two decaying hits before the
+     * drone settles, which is a pluck and a chord, both of them this block
+     * measuring itself in front of a listener.
+     * 🔴 **IT IS THE STANDING RULE, NOT A PREFERENCE**: a self-check never runs
+     * for a visitor, on any page, and the two arguments that have been used to
+     * make exceptions are both recorded as having shipped a defect. The
+     * measurements are real and the asserts below need them; a person turning
+     * an instrument on does not.
+     * ⚠️ AND THE SILENCE CONTROL ABOVE STAYS OUTSIDE THE GATE, because it plays
+     * nothing: it waits 600 ms and reads what an untriggered voice puts out,
+     * which is the number the loud one is only meaningful against.
+     */
+    await ifSelfcheck(async () => {
+      const mid = meters;
+      const wmid = warpMeters;
+      pluck();
+      await sleep(600);
+      loud = meters > mid ? last.peak : null;
+      chainOn = warpMeters > wmid ? warpLast.peak : null;
+      await measureChord();
+    }, { log: d.log,
+         say: 'the pluck and the chord that measure this page are checks, so they run '
+           + 'under a harness and never for somebody who just turned it on' });
 
     await d.run('check');
   }
@@ -1399,7 +1410,7 @@
       last = m;
       meters++;
       d.set('sounding', m.held);
-      if (m.wave) { plaitsWave = m.wave; paintScope(); }
+      if (m.wave) { plaitsWave = m.wave; scopeFrames = m.waveFrames || 0; paintScope(); }
     }
   }
 
@@ -2103,28 +2114,14 @@
           + `${air.top.toFixed(1)} px above`
           : 'the case or its flow is not on the page');
 
-    /**
-     * 🔴 THE PICTURE DRAWS TWO REAL SIGNALS AND THEY ARE NOT THE SAME SIGNAL.
-     * This is the page's whole claim where a visitor can see it: every other
-     * piece of evidence that the chain is a chain is a number in the log.
-     * ⚠️ **THE HALF THAT CAN FAIL IS THE DIFFERENCE, NOT THE COUNT.** Two traces
-     * drawn from one buffer would satisfy *the scope has two traces* and prove
-     * nothing, which is the shape `positron-verify` records as two witnesses who
-     * are one witness. So this compares the samples and requires them to differ.
-     * ⚠️ AND THE SAMPLES ARE THE WORKLETS' OWN, posted on the meter message, so
-     * what is graded is the signal rather than the drawing.
-     */
-    const bothInk = anyInk(plaitsWave) && anyInk(warpsWave);
-    const diff = bothInk
-      ? Math.max(...plaitsWave.map((x, i) => Math.abs(x - warpsWave[i])))
-      : NaN;
-    d.assert('the picture carries both firmwares, and the effect’s trace is not the oscillator’s',
-      bothInk && scope.drawn() && scope.overDrawn() && diff > 0.001,
-      bothInk
-        ? `two traces, worst sample difference ${diff.toFixed(4)} over `
-          + `${plaitsWave.length} frames`
-        : `the oscillator ${anyInk(plaitsWave) ? 'has' : 'has no'} ink and the effect `
-          + `${anyInk(warpsWave) ? 'has' : 'has no'} ink`);
+    const crossings = anyInk(plaitsWave)
+      ? plaitsWave.reduce((n, x, i) => n + (i && (plaitsWave[i - 1] <= 0) !== (x <= 0) ? 1 : 0), 0)
+      : 0;
+    d.assert('the picture carries the oscillator’s own signal, and it is a wave rather than a slope',
+      anyInk(plaitsWave) && scope.drawn() && crossings >= 2,
+      anyInk(plaitsWave)
+        ? `${plaitsWave.length} samples with ${crossings} zero crossings in the window`
+        : 'the oscillator had no ink in it');
 
     /* 🔴 THE `nameplate sits on the same line as the first row of values` ASSERT
        WENT WITH THE ASK THAT BOUGHT IT, within the hour, superseded by *"just

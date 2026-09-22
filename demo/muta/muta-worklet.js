@@ -91,6 +91,42 @@ const P = {
 // number came from. Timing nothing and printing a zero would have read as
 // free.
 
+const SCOPE_RING = 2048;
+const SCOPE_OUT = 256;
+// How many cycles of the fundamental the picture shows.
+const SCOPE_CYCLES = 4;
+
+function scopeWindow(ring, write) {
+  const lin = new Float32Array(SCOPE_RING);
+  for (let i = 0; i < SCOPE_RING; i++) lin[i] = ring[(write + i) % SCOPE_RING];
+
+  // every rising zero crossing, which is what both the trigger and the period
+  // are read from
+  const rises = [];
+  for (let i = 1; i < SCOPE_RING; i++) {
+    if (lin[i - 1] <= 0 && lin[i] > 0) rises.push(i);
+  }
+  if (rises.length < 2) return null;
+
+  // the median gap, so one glitched crossing cannot set the time base
+  const gaps = [];
+  for (let i = 1; i < rises.length; i++) gaps.push(rises[i] - rises[i - 1]);
+  gaps.sort((x, y) => x - y);
+  const period = gaps[gaps.length >> 1];
+  if (!(period > 1)) return null;
+
+  const start = rises[0];
+  let span = Math.round(period * SCOPE_CYCLES);
+  if (start + span > SCOPE_RING) span = SCOPE_RING - start;
+  if (span < 8) return null;
+
+  const out = new Array(SCOPE_OUT);
+  const step = span / SCOPE_OUT;
+  for (let i = 0; i < SCOPE_OUT; i++) out[i] = lin[start + Math.floor(i * step)];
+  out.spanFrames = span;
+  return out;
+}
+
 class PlaiVoice extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -103,6 +139,8 @@ class PlaiVoice extends AudioWorkletProcessor {
     this.blockSize = 12;
     this.maxVoices = 1;
     this.quanta = 0;
+    this.scopeRing = new Float32Array(SCOPE_RING);
+    this.scopeAt = 0;
     this.peak = 0;
     this.blocksLast = 0;
     this.announced = false;      // the first rendered quantum, said once
@@ -266,29 +304,23 @@ class PlaiVoice extends AudioWorkletProcessor {
 
     if (peak > this.peak) this.peak = peak;
 
+    for (let i = 0; i < frames; i++) {
+      this.scopeRing[this.scopeAt] = this.out[i];
+      this.scopeAt = (this.scopeAt + 1) % SCOPE_RING;
+    }
+
     this.quanta++;
 
     // Report four times a second, not per quanta. A readout cell is a fixed
     // box and a message per 2.67 ms is 375 posts a second for a number nobody
     // can read that fast.
     if (this.quanta % 94 === 0) {
+      this.scopeWin = scopeWindow(this.scopeRing, this.scopeAt);
       this.port.postMessage({
         t: 'meter',
         peak: this.peak,
-        /**
-         * 🔴 A WINDOW OF THE SIGNAL ITSELF, FOR THE PICTURE. Asked 2026-09-22:
-         * *"can you have wave / osilocope visualizer to top of muta. plai and
-         * warp with different colors"*, and *"what about waveform under
-         * warps?"*.
-         * ⚠️ **IT RIDES THE REPORT THAT ALREADY EXISTS RATHER THAN OPENING A
-         * SECOND CHANNEL.** The meter goes four times a second, which is about
-         * the rate a person reads at, so a scope costs one copy per report and
-         * no extra message. A window per quantum would be 375 posts a second.
-         * ⚠️ AND IT IS ONE QUANTUM, NOT A HISTORY. What a scope is for here is
-         * the SHAPE each firmware makes, and 128 frames at 48 kHz holds several
-         * cycles of anything at a musical pitch.
-         */
-        wave: Array.from(this.out.subarray(0, Math.min(frames, 128))),
+        wave: this.scopeWin,
+        waveFrames: this.scopeWin ? this.scopeWin.spanFrames : 0,
         blocks: this.ex.plai_blocks_rendered(),
         // 🔴 THE HALF THAT MAKES THE BLOCK INVARIANT CHECKABLE. `Voice::Render`
         // calls summed over every voice. With N voices sounding for a whole
@@ -346,6 +378,8 @@ class WarpMod extends AudioWorkletProcessor {
     this.auxPtr = 0;
     this.blockSize = 60;
     this.quanta = 0;
+    this.scopeRing = new Float32Array(SCOPE_RING);
+    this.scopeAt = 0;
     this.peak = 0;
     this.inPeak = 0;
     this.blocksLast = 0;
@@ -464,6 +498,12 @@ class WarpMod extends AudioWorkletProcessor {
 
     if (peak > this.peak) this.peak = peak;
     if (inPeak > this.inPeak) this.inPeak = inPeak;
+
+    for (let i = 0; i < frames; i++) {
+      this.scopeRing[this.scopeAt] = this.out[i];
+      this.scopeAt = (this.scopeAt + 1) % SCOPE_RING;
+    }
+
     this.quanta++;
 
     if (this.quanta % 94 === 0) {
@@ -471,10 +511,7 @@ class WarpMod extends AudioWorkletProcessor {
         t: 'meter',
         peak: this.peak,
         inPeak: this.inPeak,
-        /* The effect's own output, the same window and for the same reason as
-           the oscillator's. Two traces, one picture, so what the effect DID is
-           the difference between them rather than something to take on trust. */
-        wave: Array.from(this.out.subarray(0, Math.min(frames, 128))),
+        wave: scopeWindow(this.scopeRing, this.scopeAt),
         blocks: this.ex.warp_blocks_rendered(),
         frames: this.ex.warp_frames_rendered(),
         blocksPerQuantum: this.blocksLast,
