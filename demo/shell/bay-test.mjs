@@ -13,8 +13,19 @@
 // other side.
 
 import { createBay, apply, delivers, printLink, parseLink, printPatch, parsePatch,
-  classOf, checkTransforms, CLASSES, MEDIA, STALE_MS, OP_NAMES, OP_HELP } from './bay.mjs';
+  classOf, checkTransforms, CLASSES, MEDIA, STALE_MS, OP_NAMES, OP_HELP,
+  OP_SAYS } from './bay.mjs';
 import { decode } from './midi-decode.mjs';
+
+/**
+ * 🔴 A REFUSAL IS TWO SENTENCES SINCE 2026-09-22, SO THE TWO HALVES ARE READ
+ * SEPARATELY HERE. `checkTransforms` answers `''` or `{ why, fix }`: `why` is
+ * the problem in words and `fix` is the thing a person can do. Every check
+ * below that used to match one string matches `why`, and the claim behind it
+ * did not move: a refusal still has to name the thing that is wrong.
+ */
+const why = (t) => checkTransforms(t).why || '';
+const fix = (t) => checkTransforms(t).fix || '';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -231,8 +242,15 @@ console.log('\n== the patch bay ==');
 {
   const b = desk();
   const r = b.link('here:mk425c:out', 'here:circuit:in', [{ op: 'transpose', to: 1 }]);
+  /* 🔴 `by` WAS THE WHOLE OF THIS CLAIM UNTIL 2026-09-22 AND IT IS A FIELD
+     NAME. What a reader needs is the thing that is missing, said in words, and
+     the object they could write instead. **The 1 was never wrong**, so the
+     solution carries it over rather than inventing a number. */
   ok('a transform with its argument under the wrong key is refused, by name',
-    !r.ok && r.why.includes('transpose') && r.why.includes('by'), r.why);
+    !r.ok && r.why.includes('transpose')
+    && r.why.includes('the number of semitones')
+    && r.fix.includes('{"op":"transpose","by":1}'),
+    `${r.why} / ${r.fix}`);
 }
 
 {
@@ -244,14 +262,18 @@ console.log('\n== the patch bay ==');
 
 {
   ok('a class nobody has heard of is named in the refusal',
-    checkTransforms([{ op: 'only', cls: 'banana' }]).includes('banana'),
-    checkTransforms([{ op: 'only', cls: 'banana' }]));
+    why([{ op: 'only', cls: 'banana' }]).includes('banana'),
+    why([{ op: 'only', cls: 'banana' }]));
+  /* ⚠️ `to` IS A FIELD NAME AND MAY NOT BE MATCHED ON ANY MORE, which is the
+     whole of the 2026-09-22 report. The claim is unchanged and is stronger
+     read this way: the refusal has to say WHICH HALF of the remap did not
+     arrive, in the words a person uses for it. */
   ok('a half given cc remap says which half is missing',
-    checkTransforms([{ op: 'cc', from: 1 }]).includes('to'),
-    checkTransforms([{ op: 'cc', from: 1 }]));
+    why([{ op: 'cc', from: 1 }]).includes('the controller it goes to'),
+    why([{ op: 'cc', from: 1 }]));
   ok('a number given as a string is refused rather than coerced',
-    checkTransforms([{ op: 'channel', to: '1' }]).includes('number'),
-    checkTransforms([{ op: 'channel', to: '1' }]));
+    why([{ op: 'channel', to: '1' }]).includes('number'),
+    why([{ op: 'channel', to: '1' }]));
   ok('and a well formed list says nothing at all',
     checkTransforms([{ op: 'channel', to: 1 }, { op: 'drop', cls: 'sysex' }]) === '',
     'empty string');
@@ -382,10 +404,15 @@ console.log('\n== the patch bay ==');
     'the release stays 0');
 }
 {
+  /* 🔴 THE NAME IS THE THING'S NAME AND NEVER ITS KEY SINCE 2026-09-22. This
+     read `fixed takes "to"`, which names the key the validator compared. What
+     a reader needs named is the loudness and the channel. */
   ok('a missing argument is refused by name',
-    /fixed takes "to"/.test(checkTransforms([{ op: 'fixed' }]))
-    && /channel takes "to"/.test(checkTransforms([{ op: 'channel' }])),
-    checkTransforms([{ op: 'fixed' }]));
+    /fixed gives every note the same loudness/.test(why([{ op: 'fixed' }]))
+    && /channel puts every message on one MIDI channel/.test(why([{ op: 'channel' }]))
+    && fix([{ op: 'fixed' }]).includes('96')
+    && fix([{ op: 'channel' }]).includes('1 to 16'),
+    `${why([{ op: 'fixed' }])} / ${fix([{ op: 'fixed' }])}`);
 
   /**
    * 🔴 ONE BOUND IS A WHOLE INSTRUCTION, AND THIS ASSERT SAID THE OPPOSITE
@@ -398,7 +425,7 @@ console.log('\n== the patch bay ==');
     checkTransforms([{ op: 'range', lo: 60 }]) === ''
     && checkTransforms([{ op: 'range', hi: 7 }]) === ''
     && checkTransforms([{ op: 'vrange', lo: 64 }]) === '',
-    checkTransforms([{ op: 'range', lo: 60 }]));
+    'nothing said about any of the three');
 
   const noteAt = (n) => ({ cls: 'note', ch: 1, d1: n, d2: 64 });
   ok('an open top keeps everything above the bound and an open bottom everything below',
@@ -411,9 +438,19 @@ console.log('\n== the patch bay ==');
      optional arguments. A range with NO bound passes every note, which is a
      filter that reads as working and does nothing at all. */
   ok('NEGATIVE CONTROL: a range with neither bound is refused rather than passing everything',
-    /range takes "lo" or "hi"/.test(checkTransforms([{ op: 'range' }]))
-    && /vrange takes "lo" or "hi"/.test(checkTransforms([{ op: 'vrange' }])),
-    checkTransforms([{ op: 'range' }]));
+    /neither the lowest note nor the highest note was given/.test(why([{ op: 'range' }]))
+    && /neither the softest hit nor the hardest hit was given/.test(why([{ op: 'vrange' }])),
+    why([{ op: 'range' }]));
+
+  /* 🔴 AND BEING GIVEN THE WRONG THING IS NOT BEING GIVEN NOTHING. One
+     sentence covered both until 2026-09-22 and said `was given nothing` about
+     `{"op":"range","to":7}`, which plainly has a number in it. That object is
+     MEASURED rather than imagined: eleven runs of `llama-3.3-70b` out of
+     eleven. */
+  ok('NEGATIVE CONTROL: a range given something that is not a bound says so, not "nothing"',
+    /nothing it was given is the lowest note or the highest note/.test(why([{ op: 'range', to: 7 }]))
+    && why([{ op: 'range', to: 7 }]) !== why([{ op: 'range' }]),
+    why([{ op: 'range', to: 7 }]));
 
   /* 🔴 AND THE TEXT FORM HAS TO SURVIVE THE ABSENT BOUND, which is the defect
      an open end would otherwise introduce quietly: `{ range, hi: 7 }` printed
@@ -436,8 +473,10 @@ console.log('\n== the patch bay ==');
    * of eight. The refusal carries the correction as JSON the person can read.
    */
   const two = checkTransforms([{ op: 'range', hi: 0 }, { op: 'range', hi: 7 }]);
-  ok('two ranges open at the same end are refused, and the message carries the right patch',
-    /both open at the same end/.test(two) && two.includes('"lo": 0, "hi": 7'), two);
+  ok('two ranges open at the same end are refused, and the solution carries the right patch',
+    /each name only the highest note/.test(two.why)
+    && two.fix.includes('{"op":"range","lo":0,"hi":7}'),
+    `${two.why} / ${two.fix}`);
 
   /**
    * 🔴 THE NEGATIVE CONTROL, AND IT IS THE HALF THAT STOPS THIS REFUSING REAL
@@ -449,7 +488,7 @@ console.log('\n== the patch bay ==');
     checkTransforms([{ op: 'range', lo: 60 }, { op: 'range', hi: 72 }]) === ''
     && checkTransforms([{ op: 'range', lo: 0, hi: 59 }]) === ''
     && checkTransforms([{ op: 'range', lo: 60, hi: 127 }]) === '',
-    checkTransforms([{ op: 'range', lo: 60 }, { op: 'range', hi: 72 }]));
+    'nothing said about a window, or about either closed range');
 
   ok('a window written as two one-sided ranges keeps only what is inside it',
     apply([{ op: 'range', lo: 60 }, { op: 'range', hi: 72 }], noteAt(64)) !== null
@@ -458,14 +497,20 @@ console.log('\n== the patch bay ==');
 
   /* A range that can never pass anything is a silent link, not a tight filter. */
   ok('a low bound above the high one is refused rather than passing nothing',
-    /can never pass anything/.test(checkTransforms([{ op: 'range', lo: 60, hi: 7 }])),
-    checkTransforms([{ op: 'range', lo: 60, hi: 7 }]));
+    /nothing can ever pass/.test(why([{ op: 'range', lo: 60, hi: 7 }]))
+    /* ⚠️ AND THE OFFER IS MADE TO A PERSON RATHER THAN TAKEN BY THE CODE. The
+       file refuses to merge two bounds because one run of eleven produced them
+       descending; showing the swapped object costs nothing and decides
+       nothing. */
+    && fix([{ op: 'range', lo: 60, hi: 7 }]).includes('{"op":"range","lo":7,"hi":60}'),
+    `${why([{ op: 'range', lo: 60, hi: 7 }])} / ${fix([{ op: 'range', lo: 60, hi: 7 }])}`);
 
   /* An optional argument that is present is still typed, which it was not while
      the type check ran over the REQUIRED list only. */
   ok('an optional bound that is present is still checked for being a number',
-    /range needs "hi" to be a number/.test(checkTransforms([{ op: 'range', lo: 36, hi: '47' }])),
-    checkTransforms([{ op: 'range', lo: 36, hi: '47' }]));
+    /the highest note came as "47" rather than as a number/
+      .test(why([{ op: 'range', lo: 36, hi: '47' }])),
+    why([{ op: 'range', lo: 36, hi: '47' }]));
 }
 {
   /**
@@ -501,9 +546,9 @@ console.log('\n== the patch bay ==');
    */
   const refused = OP_HELP
     .map((o) => [o.op, checkTransforms([{ op: o.op, ...o.eg }])])
-    .filter(([, why]) => why !== '');
+    .filter(([, bad]) => bad !== '');
   ok('every transform example passes the validator it demonstrates',
-    refused.length === 0, refused.map(([op, why]) => `${op}: ${why}`).join(' | '));
+    refused.length === 0, refused.map(([op, bad]) => `${op}: ${bad.why}`).join(' | '));
 
   /* And an example has to USE the op it names: `{"op":"range"}` with no
      arguments passes nothing and would still be a line in the table. */
@@ -511,13 +556,119 @@ console.log('\n== the patch bay ==');
   ok('NEGATIVE CONTROL: no example leaves out an argument its op requires',
     thin.length === 0, thin.map((o) => o.op).join(', '));
 
-  /* 🔴 NEGATIVE CONTROL: the thing the owner actually saw. `only` takes a
-     class, so a channel number under `to` is refused BY NAME, and the name in
-     the refusal is the word the prompt now puts next to it. */
-  ok('NEGATIVE CONTROL: `only` given a channel number is refused naming the argument it wanted',
-    /only takes "cls"/.test(checkTransforms([{ op: 'only', to: 1 }]))
+  /**
+   * 🔴 NEGATIVE CONTROL: THE THING THE OWNER ACTUALLY SAW, TWICE, AND THE
+   * SECOND REPORT IS WHAT THIS LINE NOW GRADES. It read
+   * `/only takes "cls"/` until 2026-09-22, which passed happily on the
+   * sentence *only takes "cls" and was given "to"* that was reported as
+   * *"its not for humans, i do not know what to do"*. The claim behind it is
+   * unchanged: the refusal has to name the thing that is missing. What
+   * changed is that a KEY is not a name. The signature still carries `cls=`
+   * because a language model is choosing keys and a visitor is not.
+   */
+  ok('NEGATIVE CONTROL: `only` given a channel number names what is missing without naming a key',
+    /nothing it was given is a kind of message/.test(why([{ op: 'only', to: 1 }]))
+    && fix([{ op: 'only', to: 1 }]) === `Name one of ${CLASSES.join(', ')}.`
     && sig.only.includes('cls='),
-    checkTransforms([{ op: 'only', to: 1 }]));
+    `${why([{ op: 'only', to: 1 }])} / ${fix([{ op: 'only', to: 1 }])}`);
+}
+
+/**
+ * 🔴 THE REFUSALS ARE READ BY A PERSON, AND UNTIL 2026-09-22 THEY WERE WRITTEN
+ * IN FIELD NAMES. REPORTED against a real reply: *"only takes "cls" and was
+ * given "to" - its not for humans, i do not know what to do"*, and in the next
+ * breath *"can we have cooncrete problem -> soluton texts?"*. These four
+ * checks are what stops that coming back, and they are graded over EVERY
+ * refusal this module can produce rather than over the three that were
+ * reported.
+ */
+{
+  /* Every shape of bad patch there is, so the sweeps below are about the
+     module rather than about whichever case somebody remembered. */
+  const BAD = [
+    [{ op: 'only', to: 1 }], [{ op: 'only' }], [{ op: 'only', cls: 'banana' }],
+    [{ op: 'transpose', to: 1 }], [{ op: 'cc', to: 80 }], [{ op: 'cc', from: 1 }],
+    [{ op: 'fixed' }], [{ op: 'channel', to: '1' }], [{ op: 'channel' }],
+    [{ op: 'range' }], [{ op: 'range', to: 7 }], [{ op: 'range', lo: 60, hi: 7 }],
+    [{ op: 'range', lo: 36, hi: '47' }], [{ op: 'vrange' }],
+    [{ op: 'range', hi: 0 }, { op: 'range', hi: 7 }],
+    [{ op: 'banana' }], [null], [{ op: 'velocity' }], [{ op: 'drop', to: 'sysex' }],
+  ];
+  const said = BAD.map((t) => ({ t, ...checkTransforms(t) }));
+
+  ok('every refusal answers in two sentences, a problem and something to do about it',
+    said.every((s) => s.why && s.fix && /\.$/.test(s.why.trim()) && /\.$/.test(s.fix.trim())),
+    `${said.filter((s) => s.why && s.fix).length} of ${said.length} carry both`);
+
+  /**
+   * 🔴 NO FIELD NAME IN ANYTHING A VISITOR READS, WHICH IS THE REPORT ITSELF.
+   * Every argument of every operator, hunted in both sentences. The JSON
+   * objects a solution may offer are cut out first, because a key inside
+   * `{"op":"transpose","by":1}` is DATA sitting beside the data it corrects,
+   * and the defect was a key printed as English prose.
+   * ⚠️ IT IS THE QUOTED FORM THAT IS HUNTED, AND THE FIRST WRITING OF THIS
+   * LINE WENT RED ON TWO SENTENCES THAT ARE PERFECTLY FINE. It also matched a
+   * bare word before ` is`, which catches *the controller it comes from is
+   * missing*: `from` and `to` are ordinary English as well as keys, and the
+   * reported defect was never a word, it was `only takes "cls"`. A check that
+   * refuses the English is a check that would push the words back towards the
+   * jargon.
+   */
+  const KEYS = [...new Set(OP_HELP.flatMap((o) => o.args))];
+  const prose = (s) => `${s.why} ${s.fix}`.replace(/\{[^}]*\}/g, ' ');
+  const leaks = said.filter((s) => KEYS.some((k) => prose(s).includes(`"${k}"`)));
+  ok('NEGATIVE CONTROL: no refusal prints a field name as if it were a word',
+    leaks.length === 0,
+    leaks.length ? leaks.map((s) => prose(s)).join(' | ') : `${said.length} swept, ${KEYS.length} keys`);
+
+  /* ⚠️ AND THE SWEEP IS PROVED BY BREAKING IT, or `no field name` is a claim
+     about a regular expression. The sentence that was reported is put through
+     the same test and has to be caught. */
+  const OLD = { why: 'only takes "cls" and was given "to".', fix: 'Name one of note.' };
+  ok('NEGATIVE CONTROL: and the sweep catches the sentence that was reported',
+    KEYS.some((k) => prose(OLD).includes(`"${k}"`)), prose(OLD));
+
+  /* ⚠️ AND THE TWO LINES MAY NOT RESTATE EACH OTHER, which is the failure mode
+     of every problem-and-solution pair ever written. A solution that is the
+     problem with `do not` in front of it is one line, not two. */
+  const echo = said.filter((s) => s.why.toLowerCase().includes(s.fix.toLowerCase())
+    || s.fix.toLowerCase().includes(s.why.toLowerCase()));
+  ok('NEGATIVE CONTROL: no solution is its own problem said again',
+    echo.length === 0, echo.map((s) => s.why).join(' | ') || `${said.length} pairs, none an echo`);
+
+  /**
+   * 🔴 AND THE THREE CASES STAY TELLABLE APART, WHICH IS WHAT THE OLD WORDING
+   * BOUGHT AND THE NEW WORDING HAD TO KEEP. A key the operator does not have
+   * is a SWAP, a key it has with a required one absent is an OMISSION, and an
+   * empty object is neither: nothing arrived. Naming them alike is how
+   * `cc takes "from" and was given "to"` once accused a correct argument of
+   * being wrong.
+   */
+  const swap = why([{ op: 'cc', by: 1 }]);
+  const gap = why([{ op: 'cc', to: 80 }]);
+  const bare = why([{ op: 'cc' }]);
+  ok('a swapped argument, an omission and an empty object are three different sentences',
+    swap !== gap && gap !== bare && swap !== bare
+    && /nothing it was given is/.test(swap)
+    && /is missing/.test(gap)
+    && /given nothing at all/.test(bare),
+    [swap, gap, bare].join(' | '));
+
+  /**
+   * ⚠️ AND THE VOCABULARY IS GRADED WHOLE, the same guard `help` already has.
+   * A transform added with no words beside it would fall back to *what it
+   * needs*, which is the placeholder, and a placeholder in a refusal is the
+   * defect above arriving again with nobody noticing.
+   */
+  const thin = OP_NAMES.filter((op) => {
+    const s = OP_SAYS[op];
+    if (!s || !s.does) return true;
+    return OP_HELP.find((o) => o.op === op).args
+      .some((a) => !s.part?.[a] || !s.ask?.[a]);
+  });
+  ok('every operator and every argument of it has words a visitor can read',
+    thin.length === 0 && Object.keys(OP_SAYS).length === OP_NAMES.length,
+    `${thin.join(', ') || 'none'} silent, ${Object.keys(OP_SAYS).length} of ${OP_NAMES.length}`);
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
