@@ -769,7 +769,16 @@ export const DEMOS = [
    * `plaits::Voice` against one `Patch`, which is what Rack's adapter does with
    * sixteen. No line of `plaits/` was changed to allow it.
    */
-  { name: 'muta', group: 'instruments', act: 4, created: '2026-09-22', built: true, settleMs: 8000,
+  /**
+   * ⚠️ `hardware`, NOT `instruments`, ASKED FOR 2026-09-22 AS *"move muta to
+   * hardware group"*. Both readings are defensible and the ask settles it: the
+   * page IS an instrument you play, and what it is ABOUT is a piece of eurorack
+   * hardware reproduced exactly. The group it now sits in holds `/circuit/`,
+   * `/twelve/`, `/evo/` and `/dump/`, which are all pages about a real device
+   * rather than pages that make a sound of their own, and that is the company
+   * this one keeps.
+   */
+  { name: 'muta', group: 'hardware', act: 4, created: '2026-09-22', built: true, settleMs: 8000,
     one: 'two of Emilie Gillet’s firmwares, an oscillator and an effect, compiled from their own C++ to WebAssembly and chained in one audio graph',
     tags: ['WebAssembly', 'AudioWorklet', 'WebAudio'] },
 
