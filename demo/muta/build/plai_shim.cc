@@ -104,6 +104,7 @@ struct VoiceState {
   int restart;       // blocks of released gate before the note fires
   int settle;        // blocks since the note-on, so a new voice is not "quiet"
   int age;           // the serial number of the note it is playing
+  float gate;        // 0..1 while a key is down, which drives the LEVEL input
   bool active;       // rendered at all
 };
 VoiceState vs[kMaxVoices];
@@ -166,6 +167,13 @@ void SilenceVoice(int v) {
   VoiceState& s = vs[v];
   s.mod.trigger = 0.0f;
   s.mod.trigger_patched = true;
+  /* ⚠️ AND THE LEVEL INPUT IS UNPATCHED AGAIN. A voice left with
+     `level_patched` true and a level of 0 is not silent, it is a lowpass gate
+     held shut, which is a different state and one the next note-on would have
+     to undo. */
+  s.mod.level_patched = false;
+  s.mod.level = 0.0f;
+  s.gate = 1.0f;
   s.hold = 0;
   s.restart = 0;
   s.level = 0.0f;
@@ -392,11 +400,14 @@ float plai_trim(void) { return trim; }
  * get wrong, and a free voice's delay line is flushed the same way as a stolen
  * one's.
  *
- * @param note  MIDI note number
- * @param hold  blocks to hold the gate, 24 is 6 ms. 0 holds it until something
- *              else releases it, which is what the drone does.
+ * @param note   MIDI note number
+ * @param hold   blocks to hold the gate, 24 is 6 ms. 0 holds it until something
+ *               else releases it, which is what a key and the drone both do.
+ * @param level  0..1, the LEVEL input while the key is down, which is velocity.
+ *               Only read when `hold` is 0; a pluck wants the ping envelope and
+ *               gets its loudness from the engine.
  */
-int plai_note_on(float note, int hold) {
+int plai_note_on(float note, int hold, float level) {
   if (!ready) return -1;
 
   int pick = -1;
@@ -432,12 +443,98 @@ int plai_note_on(float note, int hold) {
   s.hold = hold > 0 ? hold : 0;
   s.mod.trigger_patched = true;
   s.mod.trigger = 0.0f;
+  /**
+   * 🔴 A HELD NOTE PATCHES **LEVEL**, AND WITHOUT IT THERE IS NO SUSTAIN IN
+   * PLAITS AT ALL. `voice.cc:212` drives the lowpass gate with
+   * `lpg_envelope_.ProcessPing(...)` whenever the trigger is patched and the
+   * LEVEL input is not, and a ping is a DECAY. Holding the gate high does
+   * nothing: the trigger only re-arms the ping on a rising edge, so a key held
+   * for a second sounded exactly like a key tapped, which is what was reported
+   * as *"i want long midi notes, i got plunky sound"* and, after a first repair
+   * that added a note off and changed nothing audible, as *"midi support is
+   * really messed up"*.
+   * ✅ **WITH `level_patched` THE SAME GATE RUNS `ProcessLP(compressed_level,
+   * ...)` INSTEAD**, `voice.cc:210`, which FOLLOWS the level rather than
+   * decaying from it. That is how Plaits is played from a keyboard on a rack:
+   * TRIG for the attack, LEVEL for the gate. Two cables, and the second one is
+   * the one that was missing.
+   * ⚠️ AND IT IS PER NOTE RATHER THAN A MODE. `hold > 0` is this page's own
+   * pluck, which wants the ping, so it keeps it. `hold == 0` is a key that is
+   * down and a drone, and only the key raises the level.
+   * ⚠️ `p.accent` BECOMES THE LEVEL TOO, `voice.cc:143`, so velocity is real
+   * from here rather than being a number this file throws away.
+   */
+  /**
+   * 🔴 A LEVEL ABOVE ZERO IS WHAT PATCHES THE LEVEL INPUT, NOT A HOLD OF ZERO.
+   * This read `hold == 0` for one build and that was too broad by one caller:
+   * the page's own BENCH plays `plai_note_on(note, 0)` for each voice and then
+   * drones them, so all eight became keyboard notes and the drone silenced
+   * every one. It priced eight voices at the cost of the one the drone
+   * allocates for itself, **4 µs against 4 µs**, and the assert that says a
+   * voice count which costs the same whatever it is set to means the voices are
+   * not being rendered went red on the next run.
+   * ⚠️ SO THE SIGNAL IS EXPLICIT. A caller that wants a gate held open with no
+   * envelope on it passes nothing, which is 0 across the wasm boundary, and
+   * gets the old behaviour exactly. A key passes its velocity.
+   */
+  s.gate = level > 0.0f ? (level > 1.0f ? 1.0f : level) : 1.0f;
+  s.mod.level_patched = hold == 0 && level > 0.0f;
+  s.mod.level = s.mod.level_patched ? s.gate : 0.0f;
   s.restart = static_cast<int>(plaits::kTriggerDelay) + 1;
   s.active = true;
 
   last_voice = pick;
   last_stolen = stole;
   return pick;
+}
+
+/**
+ * RELEASE ONE NOTE, WHICH IS WHAT A KEY COMING BACK UP MEANS.
+ *
+ * 🔴 UNTIL 2026-09-22 THIS FILE HAD NO NOTE-OFF AT ALL, AND THAT IS WHY A REAL
+ * KEYBOARD PLAYED PLUCKS. `plai_note_on` is the only way in and its `hold`
+ * argument is a number of BLOCKS decided at the moment the key goes DOWN, so
+ * the length of a note had to be guessed before the player had finished
+ * playing it. 6 ms of hold through a lowpass gate is a pluck whatever the key
+ * does next, and holding the key longer changed nothing.
+ *
+ * ⚠️ IT DROPS THE GATE AND NOTHING ELSE. The voice keeps rendering, the lowpass
+ * gate closes over `decay`, and `RenderBlock` frees it when its level falls
+ * under `kSilence`. Freeing it here would cut the release, which is the sound
+ * the instrument is FOR.
+ *
+ * ⚠️ AND A DRONING VOICE IS LEFT ALONE. With `trigger_patched` false there is no
+ * gate to drop, so a note-off on it would be silently ignored rather than
+ * obviously ignored, and the drone is not something a key press owns.
+ *
+ * ⚠️ A KEY RELEASED INSIDE 1.5 ms IS THE ONE CASE THAT NEEDS ARITHMETIC. The
+ * gate has not gone UP yet at that point: `restart` counts the five block
+ * trigger delay `voice.cc:87` reads through. Zeroing it there would produce a
+ * note-on that never sounds, so the gate is scheduled to rise and then fall
+ * four blocks later, which is the pluck this function exists to avoid and is
+ * the honest answer to a key that really was tapped that fast.
+ *
+ * @param note  the MIDI note number the key sent. Every voice holding it is
+ *              released, because two keys cannot send one number.
+ * @return how many voices were released, which is 0 for a note nobody is
+ *         holding and is a fact the page prints rather than an error.
+ */
+int plai_note_off(float note) {
+  int n = 0;
+  for (int v = 0; v < polyphony; v++) {
+    VoiceState& s = vs[v];
+    if (!s.active || s.note != note) continue;
+    if (!s.mod.trigger_patched) continue;
+    /* 🔴 THE LEVEL IS WHAT ENDS IT, NOT THE TRIGGER. With `level_patched` the
+       lowpass gate follows this number, so dropping it to 0 closes the gate
+       over the decay tail. Dropping the trigger alone left `ProcessLP` holding
+       whatever level it was last given, which is a note that never stops. */
+    s.mod.level = 0.0f;
+    if (s.restart > 0) { s.hold = s.restart + 4; }
+    else { s.mod.trigger = 0.0f; s.hold = 0; }
+    n++;
+  }
+  return n;
 }
 
 /** Stop everything, now. Used when the voice count changes and by the page's
@@ -458,20 +555,51 @@ void plai_all_off(void) {
  */
 void plai_set_drone(int on) {
   if (on) {
+    /**
+     * 🔴 A KEYBOARD NOTE IS NOT DRONE MATERIAL, AND TURNING IT INTO ONE IS A
+     * NOTE THAT CAN NEVER BE STOPPED. Reported 2026-09-22: *"i get distorted
+     * pluck and then beneath it the right drone sound. that pluck never goes
+     * away"*. The loop below clears `trigger_patched` on everything SOUNDING,
+     * which takes the lowpass gate out of the circuit, so a note still ringing
+     * from a key when the drone starts stops being a note and becomes a second
+     * drone, at that key's pitch, for ever. Nothing can release it: there is no
+     * gate left to drop, and its own note off finds `trigger_patched` false and
+     * correctly refuses to touch it.
+     * ✅ A LEVEL-PATCHED VOICE IS EXACTLY A KEYBOARD NOTE, which is what makes
+     * this separable at all: the page's own pluck is not level patched, so
+     * *"a chord held first and droned second sustains as a chord"* below is
+     * unchanged and still true of the thing it was written about.
+     */
+    for (int v = 0; v < kMaxVoices; v++) {
+      if (vs[v].mod.level_patched) SilenceVoice(v);
+    }
     bool any = false;
     for (int v = 0; v < polyphony; v++) if (vs[v].active) any = true;
-    if (!any) plai_note_on(base_note, 0);
+    /* 0 FOR THE LEVEL, WHICH MEANS THE GATE IS HELD OPEN WITH NO ENVELOPE ON
+       IT. A drone that patched the level input would be a note held by an
+       envelope rather than an engine running free, and would silence itself on
+       the next drone. */
+    if (!any) plai_note_on(base_note, 0, 0.0f);
     for (int v = 0; v < polyphony; v++) {
       if (!vs[v].active) continue;
       vs[v].hold = 0;
       vs[v].restart = 0;
       vs[v].mod.trigger = 0.0f;
       vs[v].mod.trigger_patched = false;
+      /* 🔴 AND THE LEVEL INPUT COMES OUT TOO, OR THERE IS NO DRONE.
+         `voice.cc:201` bypasses the lowpass gate only when NEITHER input is
+         patched. A voice droning with `level_patched` still true would have the
+         gate following a level nobody is moving, which is a note held open by
+         an envelope rather than an engine running free. */
+      vs[v].mod.level_patched = false;
+      vs[v].mod.level = 0.0f;
     }
   } else {
     for (int v = 0; v < kMaxVoices; v++) {
       vs[v].mod.trigger_patched = true;
       vs[v].mod.trigger = 0.0f;
+      vs[v].mod.level_patched = false;
+      vs[v].mod.level = 0.0f;
       vs[v].hold = 0;
       vs[v].restart = 0;
     }
