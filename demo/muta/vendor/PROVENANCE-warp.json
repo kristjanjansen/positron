@@ -1,0 +1,18 @@
+{
+  "artefact": "warp.wasm",
+  "bytes": 78204,
+  "sha256": "5ccb0c9894f6ae6f0dc979cf35d8e6b0abc53462f178b4956c5f4fef0123b553",
+  "sourceSha": "1a0619e5a94767ee",
+  "build": "warps 9739c02 stmlib c0c42ec src 1a0619e5a94767ee emcc 6.0.10",
+  "builtAt": "2026-09-22T11:05:48Z",
+  "emcc": "6.0.10",
+  "defines": "-DTEST",
+  "image": "emscripten/emsdk:latest",
+  "upstream": {
+    "eurorack": { "repo": "https://github.com/VCVRack/pichenettes-eurorack.git", "commit": "9739c0227708fab7a28b4efef7b27a9a1bc098d1", "module": "warps", "licence": "MIT (STM32F projects)" },
+    "stmlib": { "repo": "https://github.com/pichenettes/stmlib.git", "commit": "c0c42ec91d315a2ec9c0a3845e593b71ffa429db", "licence": "MIT" }
+  },
+  "shim": { "path": "demo/muta/build/warp_shim.cc", "sha256": "cb791383925cbf01ebba4914b3033a14685e110f749ad33af1a4bbc37538a671" },
+  "sources": ["warps/dsp/modulator.cc","warps/dsp/oscillator.cc","warps/dsp/vocoder.cc","warps/dsp/filter_bank.cc","warps/resources.cc","stmlib/dsp/atan.cc","stmlib/dsp/units.cc","stmlib/utils/random.cc"],
+  "recipe": "demo/muta/build/build.sh warp"
+}
