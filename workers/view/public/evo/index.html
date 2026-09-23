@@ -132,10 +132,17 @@
      ⚠️ AND IT IS CLOSER TO THE PANEL, NOT FURTHER FROM IT: the real buttons are
      about 1.45 times wider than they are tall, so squat is the right direction
      and square never was. */
-  .evo-keypad { display: flex; flex-direction: column; padding: 10px; }
-  /* The digit is printed ABOVE each button on the panel rather than on its
-     face, which is what `--ctl-head` already reserves. */
-  .evo-keypad .pos-pad-top { color: var(--dim); }
+  /* 🔴 NO BOX ROUND THE KEYPAD. Asked 2026-09-23: *"rm box around it"*. Every
+     other group on this panel is a box because it is a printed area of the real
+     case with a name on it; the keypad's box was carrying nothing, since its
+     label came off on 2026-09-21 with *"rm funciton buttons / assignable buttons
+     labels"* and the fact moved to the hover. What was left was an edge round
+     twelve buttons that are already twelve edges, in the narrowest column on the
+     page.
+     ⚠️ THE PADDING GOES WITH IT, because padding without a box is a gap nobody
+     can see the reason for, and this column is tight. */
+  .evo-keypad { display: flex; flex-direction: column;
+                background: none; border: 0; border-radius: 0; padding: 0; }
   .evo-snapbox { margin-top: 6px; }
 
   /* ── the wheels ────────────────────────────────────────────────────────── */
@@ -603,15 +610,38 @@
    * choice says nothing about whether that scheme should exist.
    */
   const win = el('div', 'panel-win evo-win');
+  /* 🔴 SKINNIER BARS AND QUIETER UNLIT ONES, ASKED 2026-09-23: *"segmented
+     should be skinnier numbers, less empasised nonactive ones"*. The default
+     2.6 is a METER's weight, drawn to be read across a room; this is a panel
+     mirror at 38 px where the digits sit inside a window and the unlit bars are
+     furniture rather than information. ⚠️ THE GLYPH IS UNCHANGED, which is why
+     only the weight is passed: every display on this site is the same typeface
+     and that is what makes two of them side by side read as one instrument. */
+  const DISP_THICK = 1.7;
+  const DISP_GHOST = 0.16;
   const disp3 = createSegment({
     digits: 3, frame: false, size: 38, scheme: 'backlit',
+    thick: DISP_THICK, ghost: DISP_GHOST,
     title: 'the three digit field. On this instrument it carries the value: a '
          + 'controller number, a program number, or a velocity',
   });
   const disp2 = createSegment({
     digits: 2, frame: false, size: 20, scheme: 'backlit',
-    title: 'the two digit field. It says which control the value is about, and '
-         + 'it is blank when nothing on the wire says which',
+    thick: DISP_THICK, ghost: DISP_GHOST, value: '00',
+    /* 🔴 WHAT THIS FIELD IS FOR, FROM THE MANUAL RATHER THAN FROM INFERENCE.
+       Asked 2026-09-23: *"read from manual whar left smaller segmented numebr
+       does i do not know"*. The Advanced Guide's Default mode paragraph, quoted
+       verbatim in `research/evo-mk425c-face-2026-09-21.md`: *"In Default mode,
+       the LCD will show the controller symbol, and the 2 digit display will show
+       the last selected controller. The 3 digits display the currently assigned
+       MIDI CC number."*
+       ⚠️ SO IT IS THE LAST CONTROLLER SELECTED, NOT THE LAST VALUE SENT, and the
+       hover said something weaker and vaguer than the instrument's own
+       documentation. `00` is what it opens on, before anything has been
+       selected. */
+    title: 'the two digit field. The manual says it shows the last selected '
+         + 'controller, while the three digits show that controller’s MIDI CC '
+         + 'number. It opens on 00, before anything has been selected',
   });
   /* 🔴 THE WINDOW'S OWN GLASS COMES OUT OF THE SAME SCHEME THE FIELDS DO, and
      that is why it is set from the module rather than declared in the
@@ -668,8 +698,14 @@
       const face = KEYPAD[y][x];
       const digit = /\d/.test(face);
       return {
-        /* The digit is printed above the button on the panel, not on it. */
-        top: face, half: true,
+        /* 🔴 ON THE FACE SINCE 2026-09-23, ASKED AS *"put number labels on
+           buttons not on top to save space"*. The panel prints them above the
+           buttons and this page followed it, which cost a whole text slot of
+           height on every row of a four row grid in the narrowest column on the
+           page. The face is where a number belongs anyway: `pad.mjs` says the
+           face is read while you are looking at the pad you are about to hit,
+           and a keypad digit is nothing else. */
+        label: face, half: true,
         aria: digit ? `assignable button ${face}` : `${face} button`,
         tint: '#7fb2ff', latch: false, disabled: true,
         title: digit
@@ -1050,9 +1086,22 @@
             + 'which of the eight sent it, so that is an order of arrival');
       }
       knobs[slot].set(m.d2, { from: 'hardware' });
-      /* The instrument's default reading: the controller number in the three
-         digits. The two digits stay blank because the slot is the unknown. */
-      show(m.cc, '');
+      /* 🔴 BOTH FIELDS, WHICH IS WHAT THE MANUAL DESCRIBES AND THIS PAGE WAS
+         ONLY HALF DOING. Reported 2026-09-23 as *"segmented does not update when
+         cc's are changed"*, and the three digits were updating all along, which
+         an assert on this page already proved. What never moved was the small
+         field, and it is the one the instrument uses for this.
+         📄 The Advanced Guide, quoted in `research/evo-mk425c-face-2026-09-21.md`:
+         *"In Default mode, the LCD will show the controller symbol, and the 2
+         digit display will show the last selected controller. The 3 digits
+         display the currently assigned MIDI CC number."*
+         ⚠️ THE OLD COMMENT SAID THE SLOT WAS THE UNKNOWN, AND THAT IS NO LONGER
+         TRUE HERE. Nothing on the wire says which of the eight rotaries sent a
+         CC, so the page works it out by order of arrival, and by this line it
+         has a slot in hand. It is an inference and the log already says so in
+         those words, which is why the small field carries the rotary and not a
+         claim about the hardware. */
+      show(m.cc, slot + 1);
     }
   }
 
@@ -1137,12 +1186,24 @@
 
     for (const cc of KNOB_CC_SEEN) take([0xb0 | ch, cc, 64]);
 
-    // ⚠️ THE NEGATIVE HALF, and it is the whole point of the field: a rotary's
-    // slot is NOT on the wire, so the small field must go back to saying
-    // nothing rather than keeping the wheel's answer or printing a zero.
-    d.assert('and a rotary fills only the value, because nothing says which slot sent it',
+    /* 🔴 THIS CHECK REVERSED ON 2026-09-23 AND THE OLD ONE IS QUOTED SO IT IS NOT
+       RE-ARGUED. It read `a rotary fills only the value, because nothing says
+       which slot sent it`, and asserted the small field went back to blank.
+       Reported as *"segmented does not update when cc's are changed"*, and the
+       three digits had been updating all along: it was the small field that
+       never moved.
+       📄 THE MANUAL DESCRIBES BOTH FIELDS TOGETHER: *"In Default mode, the LCD
+       will show the controller symbol, and the 2 digit display will show the
+       last selected controller. The 3 digits display the currently assigned MIDI
+       CC number."* Blank was this page being more cautious than the instrument.
+       ⚠️ THE CAUTION IT WAS PROTECTING IS STILL REAL AND HAS MOVED, NOT GONE. A
+       rotary's slot is not on the wire and the page works it out by order of
+       arrival, which is an inference; the log says so in those words already,
+       and the small field carries the page's best reading rather than a claim
+       about what the hardware sent. */
+    d.assert('and a rotary fills both fields, the value and the rotary it was read as',
       disp3.text().trim() === String(KNOB_CC_SEEN[KNOB_CC_SEEN.length - 1])
-        && disp2.text().trim() === '',
+        && /^[1-8]$/.test(disp2.text().trim()),
       `three digits "${disp3.text()}", two digits "${disp2.text()}"`);
 
     take([0xb0 | ch, 32, 0]); take([0xb0 | ch, 0, 0]); take([0xc0 | ch, 3]);   // a button
@@ -1373,7 +1434,13 @@
         .map((b) => { const r = b.getBoundingClientRect();
                       return { x: Math.round(r.left), y: Math.round(r.top),
                                w: r.width, h: r.height,
-                               t: b.parentElement.querySelector('.pos-pad-top').textContent }; });
+                               /* ⚠️ THE FACE, NOT THE TOP LABEL. The digits moved
+                                  onto the buttons on 2026-09-23 to save a text
+                                  slot of height per row, and this check read the
+                                  slot they left. It went red reporting two empty
+                                  strings, which is a check measuring furniture
+                                  rather than the thing it names. */
+                               t: b.querySelector('.pos-pad-face').textContent.trim() }; });
       const cols = new Set(cells.map((c) => c.x)), rows = new Set(cells.map((c) => c.y));
       d.assert('the keypad is three across and four down',
         cells.length === 12 && cols.size === 3 && rows.size === 4,
