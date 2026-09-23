@@ -5114,6 +5114,25 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
   background: var(--card); border-color: var(--line);
 }
 .pos-pad:disabled .pos-pad-face { color: var(--dim2); }
+/* 🔴 A DISABLED PAD CAN STILL BE FLASHED BY THE THING IT IS A PICTURE OF, AND
+   UNTIL 2026-09-23 IT COULD NOT BE SEEN DOING IT. Reported on `/evo/` with a
+   message log showing programs 1, 2 and 3 arriving from the panel: *"show visual
+   feedback on left numeric keypad"*. The page has called `flash()` on the right
+   pad all along.
+   🔴 THE FLASH WAS LOSING ON SOURCE ORDER. `.pos-pad[data-hit]` and
+   `.pos-pad:disabled` are BOTH (0,2,0), and the disabled block is written later
+   in this file, so it won every time and painted `opacity: .38` over it. That is
+   this project's recorded specificity defect arriving in a third place, after
+   `.pos-pick`'s phone layout and `.pos-faux`.
+   ⚠️ AND `disabled` HERE MEANS *you cannot press this*, NOT *nothing happens to
+   it*. A panel mirror is exactly the case: the hardware presses it, you do not.
+   It needs (0,3,0) and it needs to be after the block it beats. */
+.pos-pad:disabled[data-hit] {
+  opacity: 1;
+  background: color-mix(in srgb, var(--pad-tint) 80%, #fff 10%);
+  border-color: color-mix(in srgb, var(--pad-tint) 55%, var(--line));
+}
+.pos-pad:disabled[data-hit] .pos-pad-face { color: var(--fg); }
 /* The labels live OUTSIDE the button, so :disabled cannot reach them. The
    wrapper carries the state for exactly this.
    🔴 AND THE AMOUNT IS `--ctl-off`, PUBLISHED AT `:root`, BECAUSE A CALLER
