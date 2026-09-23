@@ -1075,7 +1075,7 @@
      somebody really put their hands on, and the honest drawing of those is the
      one that matches the hands. A learned row is drawn as played whatever this
      is set to; this decides the typed line and the proposal. */
-  let voicing = 'root';
+  let voicing = 'lead';
   /* 🔴 THE LABELS SAY WHAT EACH ONE DOES, NOT WHAT IT IS CALLED. They read
      `SPELLED`, `CLOSE` and `LEADING` for ten minutes and the report was *"i do
      not know what spelled close leading means"*, which is fair: those are the
@@ -1099,7 +1099,7 @@
        ordinary words look like an abbreviation. */
     label: 'VOICING',
     options: [['Exact', 'root'], ['Tight', 'close'], ['Smooth', 'lead']],
-    at: VOICINGS.indexOf('root'),
+    at: VOICINGS.indexOf('lead'),
     /* 🔴 A VOICING PRESS RE-VOICES EVERYTHING, LEARNED ROWS INCLUDED, AND THAT
        IS THE ANSWER TO *"you can revoice if i choose so?"*. A row lands where
        your hands were, because that is a record of what you did; pressing one of
@@ -1142,7 +1142,21 @@
      put are both about the instrument under them, and two labelled choices on
      two lines would read as two unrelated settings. */
   const picks = el('div', 'nola-picks');
-  picks.append(instPick.el, voicePick.el);
+  /* 🔴 THE VOICING PICKER IS PUT AWAY, ASKED FOR IN THESE WORDS: *"it feels
+     'exact' does not have role in played mode except savign my position. i am
+     lost in this setting"*, then *"can we archive it and pick one for now so i
+     can enjoy playing without travelline too much"*.
+     ⚠️ IT IS BUILT AND NOT DRAWN, RATHER THAN DELETED. Everything it does still
+     works and `chords.mjs` still grades all three modes with no browser in it,
+     so bringing it back is one line. What is gone is a control that had stopped
+     meaning anything where the page now opens: a learned row is drawn where the
+     hands were, so `Exact` only ever meant *leave my playing alone*, and the
+     other two were a way to scramble a record of what somebody did.
+     ✅ AND THE ONE IT IS FIXED AT IS THE ONE THAT MOVES YOUR HAND LEAST, which
+     is measured rather than chosen: `chords-test.mjs` reads 27 semitones of
+     movement over seven chords for `lead` against 57 for close and 46 for root.
+     *"without travelline too much"* is exactly what that number is. */
+  picks.append(instPick.el);
   instrument.append(picks, keysHost, credit);
 
   /* 🔴 THE ONE CONTROL THAT ONLY EXISTS UNDER `?rec=1`, so no visitor meets it
@@ -1694,10 +1708,19 @@
    * MEASURED over 24 four chord loops: the rule names the real third chord at
    * top 1 nine times in 24 and at top 2 fifteen times.
    */
+  /** the proposal's notes, lit small on the keys, so the old one can be cleared */
+  let aiLit = [];
+  const lightGuess = (notes) => {
+    for (const n of aiLit) keys.lightNote(n, false, 'ai');
+    aiLit = notes || [];
+    for (const n of aiLit) keys.lightNote(n, true, 'ai');
+  };
+
   function drawGuesses() {
     roll.trimRows(learned.length);
     guesses = [];
     lastGuess = null;
+    lightGuess([]);
     if (mode !== 'learn' || learned.length < 2) return;
     const r = suggest({ chords: learned }, { style: LEARN_STYLE });
     if (!r.ok) return;
@@ -1730,6 +1753,11 @@
       near = notes;
       guesses.push({ ...p, notes });
       roll.addRow({ kind: 'guess', notes, label: rowLabel(p.name, outside) });
+      /* 🔴 AND IT IS ON THE KEYS AS WELL AS IN THE ROLL, asked for as *"fade
+         them also in keyboard so smaller are on top of larger"*. The roll says
+         WHAT to play and the keyboard says WHERE, and a proposal you have to
+         read off one picture and find on another is a proposal you travel to. */
+      lightGuess(notes);
     }
   }
 
@@ -3170,6 +3198,22 @@
         `the proposal sits ${apart.toFixed(1)} semitones from the middle of `
         + `${learned[learned.length - 1].name}, against the ${SHOWN()} the keyboard draws`);
 
+      /* 🔴 THE PROPOSAL IS ON THE KEYS, SMALLER, AND UNDERNEATH WHAT YOU PLAY.
+         Asked as *"make suggested notes appear subtly and be smaller that real
+         ones"* and *"fade them also in keyboard so smaller are on top of
+         larger"*. A proposal you read in the roll and then hunt for on the
+         keyboard is a proposal you travel to. */
+      const aiKeys = () => keysHost.querySelectorAll('.k.ai').length;
+      const litAi = aiKeys();
+      const dotOf = (sel) => {
+        const el = keysHost.querySelector(sel);
+        return el ? getComputedStyle(el, '::after').width : '';
+      };
+      d.assert('the proposal is lit on the keys as well as in the roll, smaller than a played dot',
+        litAi === guesses[0].notes.length && dotOf('.k.ai .kd') !== '',
+        `${litAi} key(s) carry the proposal against ${guesses[0].notes.length} notes in it, `
+        + `and the mark inside the dot measures ${dotOf('.k.ai .kd')}`);
+
       /* 🔴 WHAT YOU PLAYED COMES FIRST, ASKED FOR IN THOSE WORDS: *"played is
          first choice"*. It was already true, by the order `addLearned` appends
          in rather than by anything saying so, and a rule nothing grades is a
@@ -3488,8 +3532,20 @@
   .nola-rec { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
   .nola-rec-say { color: var(--dim); font: 400 11px/1.4 var(--mono); }
 
+  /* 🔴 A PROPOSAL IS DRAWN SMALLER THAN SOMETHING YOU PLAYED, AND GROWS INTO IT
+     WHEN YOU DO. Asked 2026-09-23: *"make suggested notes appear subtly and be
+     smaller that real ones. they fade and get bigger then actually played"*.
+     Size carries the same meaning the colour does, one channel louder: a small
+     faint mark is an offer, a full one is a fact. `transform` rather than width,
+     because `positron-ui` forbids an animation that changes how much room a
+     thing takes and a dot that resized its cell would move the columns under a
+     reader. */
   .roll-row[data-kind="guess"] .roll-label { color: var(--ai); }
-  .roll-row[data-kind="guess"] .roll-cell.on::after { background: var(--ai); }
+  .roll-row[data-kind="guess"] .roll-cell.on::after {
+    background: var(--ai); transform: scale(.62);
+    transition: transform 120ms ease-out, opacity 120ms linear;
+  }
+  .roll-row[data-kind="guess"][data-held] .roll-cell.on::after { transform: scale(1); }
   /* 🔴 A PROPOSAL SITS BACK UNTIL YOU PLAY IT, asked for as *"fade 'ai row'
      subtly. when i play it, rm fading"*. The fade is the row saying it is not
      one of yours yet, and landing the chord is the moment it stops being a
